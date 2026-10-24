@@ -698,6 +698,57 @@
         }
       }
     },
+    "「%@」を削除しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleted “%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」を削除しました"
+          }
+        }
+      }
+    },
+    "「%@」を削除しますか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete “%@”?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」を削除しますか?"
+          }
+        }
+      }
+    },
+    "「%@」を削除できませんでした: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't delete “%1$@”: %2$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%1$@」を削除できませんでした: %2$@"
+          }
+        }
+      }
+    },
     "「%@」を単体アプリに": {
       "extractionState": "manual",
       "localizations": {
@@ -3163,6 +3214,40 @@
         }
       }
     },
+    "元に戻せません。シェアリンクと「探す」への掲載も取り下げます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This can't be undone. Its share links and Explore listing will also be removed."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "元に戻せません。シェアリンクと「探す」への掲載も取り下げます。"
+          }
+        }
+      }
+    },
+    "元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ初期画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This can't be undone. You're using this app, so you'll be switched to another app (or the start screen). Its share links and Explore listing will also be removed."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ初期画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。"
+          }
+        }
+      }
+    },
     "入れる": {
       "extractionState": "manual",
       "localizations": {
@@ -3329,6 +3414,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "別の端末で更新されていたため、最新の状態に合わせました。もう一度お話しください"
+          }
+        }
+      }
+    },
+    "削除": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除"
           }
         }
       }

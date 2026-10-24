@@ -201,6 +201,35 @@ final class MetamonUITests: XCTestCase {
         attachScreenshot("switcher-share")
     }
 
+    // MARK: - 変身一覧 → 削除(#180)
+
+    func testSwitcherCardDeleteRemovesCard() {
+        launch(example: "kakeibo", ["METAMON_MOCK_SHARING": "1"])
+        waitForFab()
+        fab.press(forDuration: 1.0)
+        XCTAssertTrue(switcher.waitForExistence(timeout: 5), "長押しで変身一覧が開かない")
+        let menus = app.buttons.matching(identifier: "switcher.cardMenu")
+        XCTAssertTrue(menus.firstMatch.waitForExistence(timeout: 5), "カードに「…」メニューが無い")
+        XCTAssertEqual(menus.count, 2, "モックの一覧は 2 件")
+        let target = app.buttons["家計簿のメニュー"]
+        XCTAssertTrue(target.exists, "家計簿カードのメニューが無い")
+        target.tap()
+        let delete = app.buttons.matching(NSPredicate(format: "identifier == 'switcher.delete' OR label == '削除'")).firstMatch
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), "メニューに「削除」が無い")
+        attachScreenshot("app-delete-1-menu")
+        delete.tap()
+        // 確認ダイアログ(破壊的操作なので赤の「削除」)
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), "確認ダイアログが出ない")
+        XCTAssertTrue(alert.label.contains("家計簿"), "ダイアログにアプリ名が無い: \(alert.label)")
+        attachScreenshot("app-delete-2-confirm")
+        alert.buttons.matching(NSPredicate(format: "label == %@", "削除")).firstMatch.tap()
+        XCTAssertTrue(waitFor(target, "exists == false", timeout: 5), "削除したカードが一覧から消えない")
+        XCTAssertEqual(menus.count, 1, "残りは 1 件")
+        XCTAssertTrue(app.buttons["買い物リストのメニュー"].exists, "他のアプリは残る")
+        attachScreenshot("app-delete-3-after")
+    }
+
     // MARK: - フォーム(家計簿の支出追加)
 
     func testKakeiboAddExpenseAppearsInList() {

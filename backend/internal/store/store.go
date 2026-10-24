@@ -151,6 +151,7 @@ type Store interface {
 	ReleaseRequests // "ship this as its own app" requests (release.go)
 	Accounts        // account deletion (account.go)
 	Ownership       // appId creators + catalog installs (owner.go)
+	Purger          // physical app deletion (purge.go)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).

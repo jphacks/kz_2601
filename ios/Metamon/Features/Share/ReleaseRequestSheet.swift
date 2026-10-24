@@ -48,38 +48,56 @@ struct AppCardActions: View {
     @Environment(AppRuntime.self) private var rt
     @State private var sharingUI = SharingUI.shared
     @State private var releaseUI = ReleaseUI.shared
+    /// 削除の確認ダイアログ(#180)
+    @State private var confirmingDelete = false
 
     var body: some View {
         VStack(alignment: .trailing, spacing: Theme.Spacing.xs) {
-            if rt.canShare || rt.services.releaseRequests != nil {
-                Menu {
-                    if rt.canShare {
-                        Button { sharingUI.shareTarget = app } label: {
-                            Label("シェア・公開", systemImage: "square.and.arrow.up")
-                        }
-                        .accessibilityIdentifier("switcher.share")
+            Menu {
+                if rt.canShare {
+                    Button { sharingUI.shareTarget = app } label: {
+                        Label("シェア・公開", systemImage: "square.and.arrow.up")
                     }
-                    if rt.services.releaseRequests != nil {
-                        Button { releaseUI.target = app } label: {
-                            Label("単体アプリとしてリリースを申請", systemImage: "shippingbox")
-                        }
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.footnote.weight(.bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 32, height: 32)
-                        .background(.black.opacity(0.35), in: Circle())
-                        .overlay(Circle().strokeBorder(.white.opacity(0.3)))
+                    .accessibilityIdentifier("switcher.share")
                 }
-                .accessibilityLabel(L10n.tr("\(app.name)のメニュー"))
-                .accessibilityIdentifier("switcher.cardMenu")
+                if rt.services.releaseRequests != nil {
+                    Button { releaseUI.target = app } label: {
+                        Label("単体アプリとしてリリースを申請", systemImage: "shippingbox")
+                    }
+                }
+                Divider()
+                Button(role: .destructive) { confirmingDelete = true } label: {
+                    Label("削除", systemImage: "trash")
+                }
+                .accessibilityIdentifier("switcher.delete")
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(.black.opacity(0.35), in: Circle())
+                    .overlay(Circle().strokeBorder(.white.opacity(0.3)))
             }
+            .accessibilityLabel(L10n.tr("\(app.name)のメニュー"))
+            .accessibilityIdentifier("switcher.cardMenu")
             if let req = releaseUI.byApp[app.id] {
                 ReleaseStatusBadge(status: req.kind)
             }
         }
         .padding(Theme.Spacing.sm)
+        .alert(L10n.tr("「\(app.name)」を削除しますか?"), isPresented: $confirmingDelete) {
+            Button("削除", role: .destructive) {
+                Task { await rt.deleteApp(app) }
+            }
+            .accessibilityIdentifier("switcher.delete.confirm")
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            if rt.document.appId == app.id {
+                Text("元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ初期画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。")
+            } else {
+                Text("元に戻せません。シェアリンクと「探す」への掲載も取り下げます。")
+            }
+        }
     }
 }
 
