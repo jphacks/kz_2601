@@ -18,7 +18,8 @@ struct PickerLeaf: View {
             case "wheel":
                 picker.pickerStyle(.wheel).frame(height: 120)
             default:
-                picker.pickerStyle(.menu)
+                // menu は List/Form の外ではラベルを描かないので、他の入力と同じく上にラベルを出す
+                LabeledInput(label: c.label) { picker.pickerStyle(.menu).labelsHidden() }
             }
         } else {
             NeedsForm(c: c)

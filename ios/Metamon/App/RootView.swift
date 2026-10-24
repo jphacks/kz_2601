@@ -147,7 +147,10 @@ struct RootView: View {
                 .padding(.horizontal, Theme.Spacing.md).padding(.vertical, Theme.Spacing.sm + 2)
                 .background(.regularMaterial, in: Capsule())
                 .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
-                .padding(.bottom, 100)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Theme.Spacing.md)
+                // マイク FAB と DSL の最下段(行 11〜12 のボタン)の上に出す(被せない)。タブ無しでも同じ高さ
+                .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .task(id: message) {
                     try? await Task.sleep(for: .seconds(3))
