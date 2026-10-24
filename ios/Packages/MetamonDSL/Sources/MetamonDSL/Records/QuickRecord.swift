@@ -9,6 +9,8 @@ public enum QuickRecord {
     public struct Parsed: Equatable, Sendable {
         public var title: String?
         public var number: Double?
+        /// 数値の直後の単位(円/kg/回…)。数値項目の選択に使う
+        public var unit: String? = nil
     }
 
     public struct Draft: Equatable, Sendable {
@@ -36,13 +38,16 @@ public enum QuickRecord {
         else { return Parsed(title: cleanTitle(text), number: nil) }
         // 単位っぽい後続(円/kg/回…)は落とすが、「800円のランチ」の「のラ」のような助詞+語は残す
         var unitEnd = whole.upperBound
+        var unitText: String?
+        if text[whole].hasPrefix("¥") || text[whole].hasPrefix("$") { unitText = "円" }
         if let unitRange = Range(match.range(at: 2), in: text) {
             let unit = String(text[unitRange])
             let kept = unit.prefix { !particles.contains($0) }
             unitEnd = text.index(unitRange.lowerBound, offsetBy: kept.count)
+            if !kept.isEmpty { unitText = String(kept) }
         }
         let rest = String(text[..<whole.lowerBound]) + " " + String(text[unitEnd...])
-        return Parsed(title: cleanTitle(rest), number: number)
+        return Parsed(title: cleanTitle(rest), number: number, unit: unitText)
     }
 
     /// 全角の数字・記号だけ半角に(カタカナは変えない)。
@@ -75,9 +80,15 @@ public enum QuickRecord {
         return entity.fields.first { $0.type == .string || $0.type == .text }
     }
 
-    /// 数値に当てる項目: 最初の required な数値 → 最初の数値。
-    public static func numberField(of entity: Entity) -> Field? {
-        entity.fields.first { $0.type.isNumeric && ($0.required ?? false) } ?? entity.fields.first { $0.type.isNumeric }
+    /// 数値に当てる項目: 単位が一致する数値(「20回」→ unit 回、「800円」→ currency)→ 最初の required な数値 → 最初の数値。
+    public static func numberField(of entity: Entity, unit: String? = nil) -> Field? {
+        if let unit, !unit.isEmpty {
+            let isYen = ["円", "¥", "$"].contains(unit)
+            if let hit = entity.fields.first(where: { $0.type.isNumeric && (($0.unit.map { unit.hasPrefix($0) || $0.hasPrefix(unit) } ?? false) || (isYen && $0.type == .currency)) }) {
+                return hit
+            }
+        }
+        return entity.fields.first { $0.type.isNumeric && ($0.required ?? false) } ?? entity.fields.first { $0.type.isNumeric }
     }
 
     /// 「記録を追加」の対象に出す entity。フォーム画面(`screen.entity`)を持つものを先に、項目の無いものは除く。
@@ -97,7 +108,7 @@ public enum QuickRecord {
         for f in entity.fields { values[f.id] = FieldCoding.defaultValue(for: f) }
 
         let titleF = titleField(of: entity)
-        let numberF = numberField(of: entity)
+        let numberF = numberField(of: entity, unit: parsed.unit)
         let rawText = text ?? ""
         // 文中にオプション名がある enum は全部それに合わせる(「交通費 300円」→ category=交通費)
         for f in entity.fields where f.type == .enum {

@@ -4,14 +4,14 @@ import XCTest
 /// Siri / ショートカット「記録を追加」(#80)のパラメータ解決。
 final class QuickRecordTests: XCTestCase {
     func testParse() {
-        XCTAssertEqual(QuickRecord.parse("ランチ 800円"), .init(title: "ランチ", number: 800))
-        XCTAssertEqual(QuickRecord.parse("ランチ８００円"), .init(title: "ランチ", number: 800))
-        XCTAssertEqual(QuickRecord.parse("ランチを1,200円"), .init(title: "ランチ", number: 1200))
-        XCTAssertEqual(QuickRecord.parse("￥980 コンビニ"), .init(title: "コンビニ", number: 980))
-        XCTAssertEqual(QuickRecord.parse("¥980 コンビニ"), .init(title: "コンビニ", number: 980))
-        XCTAssertEqual(QuickRecord.parse("体重 62.5kg"), .init(title: "体重", number: 62.5))
-        XCTAssertEqual(QuickRecord.parse("スクワット20回"), .init(title: "スクワット", number: 20))
-        XCTAssertEqual(QuickRecord.parse("800円のランチ"), .init(title: "ランチ", number: 800))
+        XCTAssertEqual(QuickRecord.parse("ランチ 800円"), .init(title: "ランチ", number: 800, unit: "円"))
+        XCTAssertEqual(QuickRecord.parse("ランチ８００円"), .init(title: "ランチ", number: 800, unit: "円"))
+        XCTAssertEqual(QuickRecord.parse("ランチを1,200円"), .init(title: "ランチ", number: 1200, unit: "円"))
+        XCTAssertEqual(QuickRecord.parse("￥980 コンビニ"), .init(title: "コンビニ", number: 980, unit: "円"))
+        XCTAssertEqual(QuickRecord.parse("¥980 コンビニ"), .init(title: "コンビニ", number: 980, unit: "円"))
+        XCTAssertEqual(QuickRecord.parse("体重 62.5kg"), .init(title: "体重", number: 62.5, unit: "kg"))
+        XCTAssertEqual(QuickRecord.parse("スクワット20回"), .init(title: "スクワット", number: 20, unit: "回"))
+        XCTAssertEqual(QuickRecord.parse("800円のランチ"), .init(title: "ランチ", number: 800, unit: "円"))
         XCTAssertEqual(QuickRecord.parse("散歩した"), .init(title: "散歩した", number: nil))
         XCTAssertEqual(QuickRecord.parse("  "), .init(title: nil, number: nil))
     }
@@ -62,5 +62,15 @@ final class QuickRecordTests: XCTestCase {
         let dsl = try ExamplesFixture.load("kakeibo")
         XCTAssertEqual(QuickRecord.recordableEntities(in: dsl).first?.id, "expense")
         XCTAssertTrue(QuickRecord.recordableEntities(in: try ExamplesFixture.load("initial")).isEmpty)
+    }
+
+    /// 単位で数値項目を選ぶ(生成アプリでよくある 重量 kg / 回数 回 の両方を持つ entity)
+    func testNumberFieldByUnit() throws {
+        let json = #"{"id":"workout","name":"筋トレ","titleField":"exercise","fields":[{"id":"exercise","name":"種目","type":"string","required":true},{"id":"weight","name":"重量","type":"number","unit":"kg"},{"id":"reps","name":"回数","type":"integer","unit":"回"},{"id":"sets","name":"セット数","type":"integer","defaultValue":3}]}"#
+        let entity = try JSONDecoder().decode(Entity.self, from: Data(json.utf8))
+        XCTAssertEqual(QuickRecord.build(entity: entity, text: "スクワット 20回").data["reps"], 20)
+        XCTAssertEqual(QuickRecord.build(entity: entity, text: "ベンチ 60kg").data["weight"], 60)
+        XCTAssertEqual(QuickRecord.build(entity: entity, text: "ベンチ 60").data["weight"], 60) // 単位なしは先頭の数値
+        XCTAssertEqual(QuickRecord.build(entity: entity, text: "スクワット 20回").data["sets"], 3)
     }
 }
