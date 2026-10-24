@@ -14,8 +14,11 @@ public struct MockAIClient: AIClient {
         return "kakeibo"
     }
 
-    public func morph(transcript: String, appId: String, currentVersion: Int) async throws -> AppDocument {
+    public func morph(transcript: String, appId: String, currentVersion: Int) async throws -> MorphResult {
         try await Task.sleep(for: delay)
-        return try DSLExamples.document(Self.sampleName(for: transcript), version: currentVersion + 1)
+        let name = Self.sampleName(for: transcript)
+        var doc = try DSLExamples.document(name, version: currentVersion + 1)
+        doc.appId = appId
+        return MorphResult(document: doc, summary: "「\(doc.dsl.app.name)」を用意しました(モック)", mode: "full")
     }
 }
