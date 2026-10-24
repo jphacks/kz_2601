@@ -29,7 +29,7 @@ func lintApp(t *testing.T, raw string) []string {
 }
 
 func TestLintExamplesClean(t *testing.T) {
-	for _, name := range []string{"kakeibo", "warikan", "bmi", "training", "walk"} {
+	for _, name := range []string{"kakeibo", "warikan", "bmi", "training", "walk", "water"} {
 		raw, err := os.ReadFile(filepath.Join(docsDir, "examples", name+".json"))
 		if err != nil {
 			t.Fatal(err)
