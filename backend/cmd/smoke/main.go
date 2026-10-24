@@ -6,11 +6,15 @@
 //	go run ./cmd/smoke -ai http://localhost:8081 -appconfig http://localhost:8080          # AUTH_MODE=dev
 //	go run ./cmd/smoke -ai $AI_URL -appconfig $APPCONFIG_URL -firebase-api-key $KEY       # staging (firebase)
 //	go run ./cmd/smoke ... -only kakeibo                                                   # one scenario
+//	go run ./cmd/smoke ... -only kakeibo -cleanup                                          # production: archive smoke-* apps at the end
 //
 // Token resolution: -token > -firebase-api-key (anonymous sign-up via the
 // identitytoolkit REST API) > $SMOKE_UID or "dev-smoke" (appconfig AUTH_MODE=dev).
 // When the resolved token is rejected by appconfig (401) the run falls back to
 // health + "ai rejects unauthenticated generate" checks only.
+//
+// -cleanup archives every app the run created (DELETE /v1/apps/{id}, status=archived)
+// so production Firestore does not accumulate smoke-* apps. Needs -appconfig.
 package main
 
 import (
@@ -56,6 +60,7 @@ type runner struct {
 	tokenKind     string // flag|firebase|dev
 	http          *http.Client
 	store         *appconfigclient.HTTP // nil when -appconfig is empty
+	created       []string              // appIds this run created (archived by -cleanup)
 	steps         []step
 }
 
@@ -68,6 +73,7 @@ func main() {
 		only    = flag.String("only", "", "run one scenario: kakeibo|training|walk")
 		appID   = flag.String("app", "", "appId prefix (default smoke-<unix>)")
 		timeout = flag.Duration("timeout", 90*time.Second, "per-request timeout")
+		cleanup = flag.Bool("cleanup", false, "archive the apps this run created (DELETE /v1/apps/{id}) at the end")
 	)
 	flag.Parse()
 	if *appID == "" {
@@ -104,6 +110,9 @@ func main() {
 			r.walk(ctx, *appID+"-walk")
 		}
 	}
+	if *cleanup {
+		r.cleanup(ctx)
+	}
 	failed := r.print(fallback)
 	if failed > 0 {
 		os.Exit(1)
@@ -113,6 +122,7 @@ func main() {
 // ---- scenarios --------------------------------------------------------------
 
 func (r *runner) kakeibo(ctx context.Context, appID string) {
+	r.track(appID)
 	bctx := appconfigclient.WithBearer(ctx, r.token)
 	if r.store != nil {
 		t := time.Now()
@@ -195,6 +205,7 @@ func (r *runner) kakeibo(ctx context.Context, appID string) {
 }
 
 func (r *runner) training(ctx context.Context, appID string) {
+	r.track(appID)
 	r.generate(ctx, "B 筋トレ create(通知)", appID, sayTraining, func(_ *ai.Result, app *dsl.App) error {
 		for _, n := range app.App.Notifications {
 			if n.Repeat == "daily" && strings.HasPrefix(n.Time, "08:") {
@@ -208,6 +219,7 @@ func (r *runner) training(ctx context.Context, appID string) {
 }
 
 func (r *runner) walk(ctx context.Context, appID string) {
+	r.track(appID)
 	r.generate(ctx, "C 散歩 create(写真)", appID, sayWalk, func(_ *ai.Result, app *dsl.App) error {
 		if src := photoSource(app); src == "" {
 			return errors.New("no photoField")
@@ -265,7 +277,8 @@ func (r *runner) authProbe(ctx context.Context, appID string) bool {
 		return false
 	}
 	t := time.Now()
-	status, _, err := r.do(ctx, http.MethodGet, r.appconfig+"/v1/apps/"+appID+"-probe/dsl", r.token, nil)
+	probeID := appID + "-probe"
+	status, _, err := r.do(ctx, http.MethodGet, r.appconfig+"/v1/apps/"+probeID+"/dsl", r.token, nil)
 	switch {
 	case err != nil:
 		r.fail("auth probe ("+r.tokenKind+" token)", t, err.Error())
@@ -278,7 +291,36 @@ func (r *runner) authProbe(ctx context.Context, appID string) bool {
 		return true
 	}
 	r.pass("auth probe ("+r.tokenKind+" token)", t, "200")
+	r.track(probeID) // GET /dsl auto-created it
 	return false
+}
+
+// track remembers an appId so -cleanup can archive it.
+func (r *runner) track(appID string) {
+	r.created = append(r.created, appID)
+}
+
+// cleanup archives every tracked app via DELETE /v1/apps/{id} (204). 404 = already
+// gone (WARN); anything else is a FAIL so leaked smoke-* apps show up in the table.
+func (r *runner) cleanup(ctx context.Context) {
+	if r.appconfig == "" {
+		return
+	}
+	for _, id := range r.created {
+		name := "cleanup DELETE /v1/apps/" + id
+		t := time.Now()
+		status, data, err := r.do(ctx, http.MethodDelete, r.appconfig+"/v1/apps/"+id, r.token, nil)
+		switch {
+		case err != nil:
+			r.fail(name, t, err.Error())
+		case status == http.StatusNoContent:
+			r.pass(name, t, "archived")
+		case status == http.StatusNotFound:
+			r.warn(name, t, "404 (already gone)")
+		default:
+			r.fail(name, t, fmt.Sprintf("status=%d %s", status, trunc(string(data), 120)))
+		}
+	}
 }
 
 func (r *runner) unauthenticatedGenerateIs401(ctx context.Context, appID string) {

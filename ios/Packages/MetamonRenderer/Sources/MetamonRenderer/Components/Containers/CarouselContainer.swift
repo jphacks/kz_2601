@@ -16,10 +16,9 @@ struct CarouselContainer: View {
                 LazyHStack(spacing: c.containerSpacing) {
                     ForEach(c.children) { child in
                         DSLView(component: child, ctx: ctx)
-                            .padding(16)
-                            .frame(width: geo.size.width * widthRatio, alignment: .leading)
                             .frame(maxHeight: .infinity, alignment: .top)
-                            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+                            .renderCard()
+                            .frame(width: geo.size.width * widthRatio, alignment: .leading)
                     }
                 }
                 .scrollTargetLayout()

@@ -35,9 +35,7 @@ struct CalendarLeaf: View {
             Divider()
             dayList(days[selected] ?? [])
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        .renderCard()
     }
 
     private var header: some View {

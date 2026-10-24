@@ -1,0 +1,268 @@
+{
+  "date": "2026-10-24",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "tag": "locale-forced",
+  "cases": [
+    {
+      "id": "kakeibo_short",
+      "kind": "create",
+      "group": "demo-A",
+      "transcript": "家計簿",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 6659,
+      "totalMs": 6662,
+      "usage": {
+        "inputTokens": 93,
+        "outputTokens": 1283,
+        "cacheReadInputTokens": 16471
+      },
+      "summary": "I made a Budget Book app. Use the button at the bottom right to add expenses.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 12,
+        "topLevel": 5,
+        "withArea": 5,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 4,
+        "hasPhoto": false,
+        "hasChart": false,
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "expense_form: A1:F7 A11:F12"
+        ]
+      },
+      "dsl": {
+        "app": {
+          "description": "Record your spending and see this month's total at a glance",
+          "icon": "yensign.circle",
+          "name": "Budget Book",
+          "theme": {
+            "primaryColor": "#2E7D32"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "amount",
+                "name": "Amount",
+                "required": true,
+                "type": "currency",
+                "unit": "$"
+              },
+              {
+                "defaultValue": "Food",
+                "id": "category",
+                "name": "Category",
+                "options": [
+                  "Food",
+                  "Transport",
+                  "Household",
+                  "Fun",
+                  "Other"
+                ],
+                "required": true,
+                "type": "enum"
+              },
+              {
+                "id": "note",
+                "name": "Note",
+                "type": "string"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Date",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "expense",
+            "name": "Expense",
+            "titleField": "note"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "sum",
+                    "entity": "expense",
+                    "field": "amount",
+                    "filter": {
+                      "field": "date",
+                      "op": "thisMonth",
+                      "value": null
+                    },
+                    "format": "currency",
+                    "label": "Spent this month",
+                    "type": "stat"
+                  },
+                  {
+                    "aggregate": "count",
+                    "entity": "expense",
+                    "filter": {
+                      "field": "date",
+                      "op": "thisMonth",
+                      "value": null
+                    },
+                    "label": "Entries this month",
+                    "type": "stat"
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "No expenses yet",
+                    "entity": "expense",
+                    "item": {
+                      "subtitle": "category",
+                      "title": "note",
+                      "trailing": "amount"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "expense_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "Recent expenses",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "expense_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Add expense",
+                "style": "primary",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Budget Book",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "expense_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F7",
+                "children": [
+                  {
+                    "field": "amount",
+                    "label": "Amount",
+                    "type": "numberField",
+                    "unit": "$"
+                  },
+                  {
+                    "field": "category",
+                    "label": "Category",
+                    "style": "menu",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "note",
+                    "label": "Note",
+                    "placeholder": "Groceries",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "date",
+                    "label": "Date",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "Details",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this expense?",
+                  "entity": "expense",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "expense",
+            "id": "expense_form",
+            "title": "Expense",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "expense",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "n": 1,
+    "ok": 1,
+    "firstPass": 1,
+    "regenerated": 0,
+    "areaFallback": 0,
+    "failed": 0,
+    "expectMisses": 0,
+    "createP50Ms": 6659,
+    "createP95Ms": 6659,
+    "editP50Ms": 0,
+    "avgOutputTokens": 1283,
+    "avgCreateOutputTokens": 1283,
+    "avgEditOutputTokens": 0,
+    "avgAreaRatio": 1,
+    "tabbedCreates": 0
+  }
+}

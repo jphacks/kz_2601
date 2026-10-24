@@ -105,7 +105,11 @@ public struct HTTPAppConfigClient: AppConfigClient {
     }
 
     public func create(appId: String, entity: String, data: [String: JSONValue]) async throws -> Record {
-        let body = CreateBody(data: data, clientId: UUID().uuidString.lowercased())
+        try await create(appId: appId, entity: entity, data: data, clientId: UUID().uuidString.lowercased())
+    }
+
+    public func create(appId: String, entity: String, data: [String: JSONValue], clientId: String) async throws -> Record {
+        let body = CreateBody(data: data, clientId: clientId)
         let path = "v1/apps/\(appId)/entities/\(entity)/records"
         do {
             return try await decodeRecord(try await request("POST", path, body: body))

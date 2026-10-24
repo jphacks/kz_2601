@@ -18,12 +18,10 @@ struct DisclosureContainer: View {
             VStack(alignment: .leading, spacing: c.containerSpacing) {
                 ForEach(c.children) { DSLView(component: $0, ctx: ctx) }
             }
-            .padding(.top, 8)
+            .padding(.top, RenderTheme.Spacing.sm)
         } label: {
-            Text(c.title ?? "詳細").font(.headline)
+            Text(c.title ?? "詳細").font(RenderTheme.Fonts.cardTitle)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        .renderCard()
     }
 }

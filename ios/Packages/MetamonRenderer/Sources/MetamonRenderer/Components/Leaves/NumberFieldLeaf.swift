@@ -13,11 +13,12 @@ struct NumberFieldLeaf: View {
                 HStack {
                     TextField(c.placeholder ?? "0", text: form.number(field))
                         .keyboardType(ftype == .number ? .decimalPad : .numberPad)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
                     if let unit = c.unit ?? form.entity.field(field)?.unit {
-                        Text(unit).foregroundStyle(.secondary)
+                        Text(unit).font(.subheadline).foregroundStyle(.secondary)
                     }
                 }
+                .renderInputChrome()
             }
         } else {
             NeedsForm(c: c)

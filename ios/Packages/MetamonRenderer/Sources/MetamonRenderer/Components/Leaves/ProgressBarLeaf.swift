@@ -21,9 +21,7 @@ struct ProgressBarLeaf: View {
                 .tint(ratio >= 1 ? .red : .accentColor)
                 .animation(.easeOut(duration: 0.3), value: ratio)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        .renderCard()
     }
 
     private var resolvedRatio: Double {

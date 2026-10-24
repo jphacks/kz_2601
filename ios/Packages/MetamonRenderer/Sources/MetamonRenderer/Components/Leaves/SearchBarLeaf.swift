@@ -22,9 +22,10 @@ struct SearchBarLeaf: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, RenderTheme.Spacing.inputH)
+            .padding(.vertical, RenderTheme.Spacing.inputV)
+            .background(RenderTheme.Colors.surface, in: RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous).strokeBorder(RenderTheme.Colors.hairline))
         } else {
             UnsupportedComponent(label: "searchBar は field が必要です")
         }

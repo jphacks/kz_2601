@@ -3,7 +3,10 @@
 // per-case metrics + the resulting DSL as JSON. Edit cases are seeded with the
 // DSL produced by their `base` create case in the same run. `expect` keys:
 // photo / chart (bool), notification ("HH:MM" or "any"), substitution (bool:
-// the summary mentions 代替 because a requested part is not in the catalog).
+// the summary mentions 代替 / "replaced" because a requested part is not in
+// the catalog). A case may pin `locale` (ja|en); -locale overrides every case;
+// otherwise the locale is detected from the transcript. English edits whose
+// base was not produced in the run are seeded with examples/expense_en.json.
 //
 //	set -a; source ../.env; set +a
 //	go run ./cmd/ai-eval -effort low -out ../docs/backend/ai-eval/raw
@@ -31,6 +34,7 @@ type Case struct {
 	Kind       string         `json:"kind"` // create|edit
 	Group      string         `json:"group"`
 	Base       string         `json:"base,omitempty"`
+	Locale     string         `json:"locale,omitempty"` // ja|en; empty = detect
 	Transcript string         `json:"transcript"`
 	Note       string         `json:"note,omitempty"`
 	Expect     map[string]any `json:"expect,omitempty"`
@@ -57,6 +61,7 @@ type Record struct {
 	Kind          string          `json:"kind"`
 	Group         string          `json:"group"`
 	Transcript    string          `json:"transcript"`
+	Locale        string          `json:"locale,omitempty"`
 	OK            bool            `json:"ok"`
 	Error         string          `json:"error,omitempty"`
 	Mode          string          `json:"mode,omitempty"`
@@ -109,6 +114,7 @@ func main() {
 	outDir := flag.String("out", "../docs/backend/ai-eval/raw", "raw output directory")
 	only := flag.String("only", "", "comma-separated case ids to run (edits still need their base: pass it too or it falls back to examples/kakeibo.json)")
 	tag := flag.String("tag", "", "suffix for the output filename")
+	locale := flag.String("locale", "", "ja|en for every case (overrides per-case locale; empty = per-case or detected from the transcript)")
 	timeout := flag.Duration("timeout", 60*time.Second, "per Claude call timeout")
 	flag.Parse()
 
@@ -148,24 +154,35 @@ func main() {
 		}
 		appID := fmt.Sprintf("eval-%s-%d", c.ID, time.Now().UnixNano())
 		mode := ai.ModeCreate
+		loc := ai.Locale(c.Locale)
+		if *locale != "" {
+			loc = ai.Locale(*locale)
+		}
+		if loc == "" {
+			loc = ai.DetectLocale(c.Transcript)
+		}
 		if c.Kind == "edit" {
 			mode = ai.ModeEdit
 			base, ok := created[c.Base]
 			if !ok {
-				base, err = os.ReadFile("internal/ai/examples/kakeibo.json")
+				seed := "internal/ai/examples/kakeibo.json"
+				if loc == ai.LocaleEN {
+					seed = "internal/ai/examples/expense_en.json"
+				}
+				base, err = os.ReadFile(seed)
 				if err != nil {
 					log.Fatal(err)
 				}
-				log.Printf("[%s] base %q not produced in this run; seeding examples/kakeibo.json", c.ID, c.Base)
+				log.Printf("[%s] base %q not produced in this run; seeding %s", c.ID, c.Base, seed)
 			}
 			if _, err := store.Put(ctx, appID, 0, base, appconfigclient.Source{Kind: "seed"}); err != nil {
 				log.Fatalf("[%s] seed: %v", c.ID, err)
 			}
 		}
-		log.Printf("[%s] %s effort=%s %q", c.ID, c.Kind, *effort, c.Transcript)
-		rec := Record{ID: c.ID, Kind: c.Kind, Group: c.Group, Transcript: c.Transcript}
+		log.Printf("[%s] %s effort=%s locale=%s %q", c.ID, c.Kind, *effort, loc, c.Transcript)
+		rec := Record{ID: c.ID, Kind: c.Kind, Group: c.Group, Transcript: c.Transcript, Locale: string(loc)}
 		started := time.Now()
-		res, err := svc.Generate(ctx, ai.Request{AppID: appID, Transcript: c.Transcript, Mode: mode})
+		res, err := svc.Generate(ctx, ai.Request{AppID: appID, Transcript: c.Transcript, Mode: mode, Locale: loc})
 		rec.TotalMs = time.Since(started).Milliseconds()
 		if err != nil {
 			rec.Error = err.Error()
@@ -269,7 +286,7 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 	for k, v := range exp {
 		switch k {
 		case "substitution": // a part missing from the catalog was requested: summary must say so
-			if strings.Contains(summary, "代替") != v.(bool) {
+			if mentionsSubstitution(summary) != v.(bool) {
 				miss = append(miss, fmt.Sprintf("substitution=%v", !v.(bool)))
 			}
 		case "photo":
@@ -295,6 +312,11 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 	}
 	sort.Strings(miss)
 	return miss
+}
+
+// mentionsSubstitution: the ja template says 代替, the en one says "replaced".
+func mentionsSubstitution(summary string) bool {
+	return strings.Contains(summary, "代替") || strings.Contains(strings.ToLower(summary), "replaced")
 }
 
 func percentile(v []int64, p float64) int64 {
@@ -370,8 +392,8 @@ func summarize(recs []Record) Summary {
 
 func printTable(run Run) {
 	fmt.Printf("\n## %s %s effort=%s\n\n", run.Date, run.Model, run.Effort)
-	fmt.Println("| id | kind | ok | att | fb | claude ms | in/out tok | tabs | scr | comp | area% | notif | misses | summary |")
-	fmt.Println("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+	fmt.Println("| id | kind | loc | ok | att | fb | claude ms | in/out tok | tabs | scr | comp | area% | notif | misses | summary |")
+	fmt.Println("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 	for _, r := range run.Cases {
 		ok := "OK"
 		if !r.OK {
@@ -402,8 +424,8 @@ func printTable(run Run) {
 		if !r.OK {
 			sum = r.Error
 		}
-		fmt.Printf("| %s | %s | %s | %d | %s | %d | %d/%d | %s | %s | %s | %s | %s | %s | %s |\n",
-			r.ID, r.Kind, ok, r.Attempts, fb, r.ClaudeMs, r.Usage.InputTokens+r.Usage.CacheReadInputTokens+r.Usage.CacheCreationInputTokens,
+		fmt.Printf("| %s | %s | %s | %s | %d | %s | %d | %d/%d | %s | %s | %s | %s | %s | %s | %s |\n",
+			r.ID, r.Kind, r.Locale, ok, r.Attempts, fb, r.ClaudeMs, r.Usage.InputTokens+r.Usage.CacheReadInputTokens+r.Usage.CacheCreationInputTokens,
 			r.Usage.OutputTokens, tabs, scr, comp, area, notif, misses, strings.ReplaceAll(sum, "|", "/"))
 	}
 	s := run.Summary
