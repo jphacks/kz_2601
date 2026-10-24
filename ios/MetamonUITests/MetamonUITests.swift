@@ -42,7 +42,7 @@ final class MetamonUITests: XCTestCase {
         XCTAssertTrue(fab.waitForExistence(timeout: 15), "マイク FAB が出ない", file: file, line: line)
         // 起動直後の FAB_POSITION 適用・入場アニメが終わる(位置が 2 回続けて同じ)まで待つ
         var last = CGRect.null
-        XCTAssertTrue(waitUntil(timeout: 10) { [fab] in
+        XCTAssertTrue(waitUntil(timeout: 15) { [fab] in
             let now = fab.frame
             defer { last = now }
             return now == last && !now.isEmpty
@@ -77,7 +77,7 @@ final class MetamonUITests: XCTestCase {
         launch(example: "kakeibo")
         waitForFab()
         fab.tap()
-        XCTAssertTrue(voiceSheet.waitForExistence(timeout: 5), "タップで音声シートが開かない")
+        XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "タップで音声シートが開かない")
         XCTAssertFalse(switcher.exists, "タップで変身一覧まで開いた")
         attachScreenshot("fab-tap-voice-sheet")
     }
@@ -86,7 +86,7 @@ final class MetamonUITests: XCTestCase {
         launch(example: "kakeibo")
         waitForFab()
         fab.press(forDuration: 1.0)
-        XCTAssertTrue(switcher.waitForExistence(timeout: 5), "長押しで変身一覧が開かない")
+        XCTAssertTrue(switcher.waitForExistence(timeout: 15), "長押しで変身一覧が開かない")
         // 長押しを離した瞬間の Button タップで音声シートが開いてしまわないこと
         Thread.sleep(forTimeInterval: 1.0)
         XCTAssertFalse(voiceSheet.exists, "長押しで音声シートも開いた")
@@ -112,7 +112,7 @@ final class MetamonUITests: XCTestCase {
             // 遅い runner でイベントが詰まり長押し扱いになった時だけ 1 回やり直す(2 回続けば下の assert で落ちる)
             attachScreenshot("fab-drag-became-longpress")
             switcher.tap()
-            XCTAssertTrue(waitFor(switcher, "exists == false", timeout: 10), "変身一覧が閉じない")
+            XCTAssertTrue(waitFor(switcher, "exists == false", timeout: 15), "変身一覧が閉じない")
             dragRight()
         }
 
@@ -136,14 +136,14 @@ final class MetamonUITests: XCTestCase {
         let to = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.99, dy: start.midY / window.height))
         from.press(forDuration: 0.1, thenDragTo: to, withVelocity: XCUIGestureVelocity(4000), thenHoldForDuration: 0)
 
-        XCTAssertTrue(fabHandle.waitForExistence(timeout: 3), "端の外へ弾いても取っ手が出ない")
+        XCTAssertTrue(fabHandle.waitForExistence(timeout: 15), "端の外へ弾いても取っ手が出ない")
         XCTAssertFalse(fab.isHittable, "隠れた後も FAB が押せる")
         XCTAssertGreaterThan(fabHandle.frame.midX, window.midX, "取っ手が右端に無い")
         XCTAssertFalse(voiceSheet.exists, "弾いた後に音声シートが開いた")
         attachScreenshot("fab-hidden-handle")
 
         fabHandle.tap()
-        XCTAssertTrue(waitFor(fabHandle, "exists == false", timeout: 3), "取っ手のタップで FAB が戻らない(取っ手が残っている)")
+        XCTAssertTrue(waitFor(fabHandle, "exists == false", timeout: 15), "取っ手のタップで FAB が戻らない(取っ手が残っている)")
         // accessibilityHidden の解除がアクセシビリティツリーに反映されるまで少し遅れることがある。戻りのバネが終わるまで待つ
         XCTAssertTrue(waitFor(fab, "exists == true", timeout: 15), "取っ手のタップで FAB が戻らない")
         XCTAssertTrue(waitUntil(timeout: 15) { [fab] in fab.frame.minX > window.midX && fab.frame.maxX < window.width },
@@ -153,7 +153,7 @@ final class MetamonUITests: XCTestCase {
         XCTAssertFalse(voiceSheet.exists, "取っ手のタップで音声シートまで開いた")
         // 戻った FAB を実際に押せること(isHittable は SwiftUI の .position 配置で偽陰性が出るので使わない)
         fab.tap()
-        XCTAssertTrue(voiceSheet.waitForExistence(timeout: 5), "戻った FAB を押しても音声シートが開かない")
+        XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "戻った FAB を押しても音声シートが開かない")
     }
 
     // MARK: - 対話のチップ(#105)
@@ -166,8 +166,8 @@ final class MetamonUITests: XCTestCase {
         attachScreenshot("chat-question-chips")
         let label = chip.label
         chip.tap()
-        XCTAssertTrue(element(labelBeginsWith: "あなた: \(label)").waitForExistence(timeout: 5), "チップの答えが吹き出しに出ない")
-        XCTAssertTrue(app.buttons["chat.build"].waitForExistence(timeout: 10), "チップで次(この内容で作る)に進まない")
+        XCTAssertTrue(element(labelBeginsWith: "あなた: \(label)").waitForExistence(timeout: 15), "チップの答えが吹き出しに出ない")
+        XCTAssertTrue(app.buttons["chat.build"].waitForExistence(timeout: 15), "チップで次(この内容で作る)に進まない")
         attachScreenshot("chat-ready")
     }
 
@@ -178,14 +178,15 @@ final class MetamonUITests: XCTestCase {
         launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "見やすくして", "METAMON_AUTO_PAUSE": "600"])
         let choose = app.buttons.matching(identifier: "chat.option.choose")
         XCTAssertTrue(choose.firstMatch.waitForExistence(timeout: 15), "案のカードの「これでいく」が出ない")
-        XCTAssertEqual(choose.count, 2, "案のカードが 2 枚でない")
+        // カードは順に差し込まれるので、遅い CI では 1 枚目だけの瞬間がある。2 枚そろうまで待つ
+        XCTAssertTrue(waitUntil(timeout: 15) { choose.count == 2 }, "案のカードが 2 枚でない(\(choose.count) 枚)")
         XCTAssertTrue(voiceSheet.exists, "案を出しただけで音声シートが閉じた")
         attachScreenshot("chat-proposal-cards")
 
         choose.firstMatch.tap()
-        XCTAssertTrue(waitFor(voiceSheet, "exists == false", timeout: 5), "「これでいく」で音声シートが閉じない(生成が始まらない)")
+        XCTAssertTrue(waitFor(voiceSheet, "exists == false", timeout: 15), "「これでいく」で音声シートが閉じない(生成が始まらない)")
         let applied = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "反映しました")).firstMatch
-        XCTAssertTrue(applied.waitForExistence(timeout: 10), "「これでいく」の案で改変されない")
+        XCTAssertTrue(applied.waitForExistence(timeout: 15), "「これでいく」の案で改変されない")
         attachScreenshot("chat-proposal-applied")
     }
 
@@ -194,14 +195,14 @@ final class MetamonUITests: XCTestCase {
     func testListCheckCircleMarksDone() {
         launch(example: "shopping")
         let row = element(labelBeginsWith: "牛乳")
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "買い物リストの行が出ない")
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "買い物リストの行が出ない")
         XCTAssertEqual(row.value as? String, "未チェック")
         // 丸は行頭(行の左端から 16pt + 半径 14pt)。行の中央を押すとフォームが開くので丸だけを狙う
         row.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 30, dy: 0)).tap()
 
         let checked = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@ AND value == %@", "牛乳", "チェック済み")).firstMatch
-        XCTAssertTrue(checked.waitForExistence(timeout: 5), "丸のタップでチェック済みにならない")
+        XCTAssertTrue(checked.waitForExistence(timeout: 15), "丸のタップでチェック済みにならない")
         XCTAssertFalse(app.buttons["保存"].exists, "丸のタップでフォームが開いた")
         attachScreenshot("list-checked")
     }
@@ -212,16 +213,16 @@ final class MetamonUITests: XCTestCase {
         launch(example: "kakeibo", ["METAMON_MOCK_SHARING": "1"])
         waitForFab()
         fab.press(forDuration: 1.0)
-        XCTAssertTrue(switcher.waitForExistence(timeout: 5), "長押しで変身一覧が開かない")
+        XCTAssertTrue(switcher.waitForExistence(timeout: 15), "長押しで変身一覧が開かない")
         // カード右上の「…」メニュー(#144/#145)→「シェア・公開」
         let menu = app.buttons.matching(identifier: "switcher.cardMenu").firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 5), "カードに「…」メニューが無い")
+        XCTAssertTrue(menu.waitForExistence(timeout: 15), "カードに「…」メニューが無い")
         menu.tap()
         let share = app.buttons.matching(NSPredicate(format: "identifier == 'switcher.share' OR label == 'シェア・公開'")).firstMatch
-        XCTAssertTrue(share.waitForExistence(timeout: 5), "メニューに「シェア・公開」が無い")
+        XCTAssertTrue(share.waitForExistence(timeout: 15), "メニューに「シェア・公開」が無い")
         share.tap()
-        XCTAssertTrue(app.buttons["share.close"].waitForExistence(timeout: 5), "シェアシートが開かない")
-        XCTAssertTrue(app.descendants(matching: .any)["シェア用 QR コード"].waitForExistence(timeout: 5), "シェアリンク(QR)が出ない")
+        XCTAssertTrue(app.buttons["share.close"].waitForExistence(timeout: 15), "シェアシートが開かない")
+        XCTAssertTrue(app.descendants(matching: .any)["シェア用 QR コード"].waitForExistence(timeout: 15), "シェアリンク(QR)が出ない")
         attachScreenshot("switcher-share")
     }
 
@@ -231,25 +232,25 @@ final class MetamonUITests: XCTestCase {
         launch(example: "kakeibo", ["METAMON_MOCK_SHARING": "1"])
         waitForFab()
         fab.press(forDuration: 1.0)
-        XCTAssertTrue(switcher.waitForExistence(timeout: 5), "長押しで変身一覧が開かない")
+        XCTAssertTrue(switcher.waitForExistence(timeout: 15), "長押しで変身一覧が開かない")
         let menus = app.buttons.matching(identifier: "switcher.cardMenu")
-        XCTAssertTrue(menus.firstMatch.waitForExistence(timeout: 5), "カードに「…」メニューが無い")
-        XCTAssertEqual(menus.count, 2, "モックの一覧は 2 件")
+        XCTAssertTrue(menus.firstMatch.waitForExistence(timeout: 15), "カードに「…」メニューが無い")
+        XCTAssertTrue(waitUntil(timeout: 15) { menus.count == 2 }, "モックの一覧は 2 件(\(menus.count) 件)")
         let target = app.buttons["家計簿のメニュー"]
-        XCTAssertTrue(target.exists, "家計簿カードのメニューが無い")
+        XCTAssertTrue(target.waitForExistence(timeout: 15), "家計簿カードのメニューが無い")
         target.tap()
         let delete = app.buttons.matching(NSPredicate(format: "identifier == 'switcher.delete' OR label == '削除'")).firstMatch
-        XCTAssertTrue(delete.waitForExistence(timeout: 5), "メニューに「削除」が無い")
+        XCTAssertTrue(delete.waitForExistence(timeout: 15), "メニューに「削除」が無い")
         attachScreenshot("app-delete-1-menu")
         delete.tap()
         // 確認ダイアログ(破壊的操作なので赤の「削除」)
         let alert = app.alerts.firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 5), "確認ダイアログが出ない")
+        XCTAssertTrue(alert.waitForExistence(timeout: 15), "確認ダイアログが出ない")
         XCTAssertTrue(alert.label.contains("家計簿"), "ダイアログにアプリ名が無い: \(alert.label)")
         attachScreenshot("app-delete-2-confirm")
         alert.buttons.matching(NSPredicate(format: "label == %@", "削除")).firstMatch.tap()
-        XCTAssertTrue(waitFor(target, "exists == false", timeout: 5), "削除したカードが一覧から消えない")
-        XCTAssertEqual(menus.count, 1, "残りは 1 件")
+        XCTAssertTrue(waitFor(target, "exists == false", timeout: 15), "削除したカードが一覧から消えない")
+        XCTAssertTrue(waitUntil(timeout: 15) { menus.count == 1 }, "残りは 1 件(\(menus.count) 件)")
         XCTAssertTrue(app.buttons["買い物リストのメニュー"].exists, "他のアプリは残る")
         attachScreenshot("app-delete-3-after")
     }
@@ -259,22 +260,22 @@ final class MetamonUITests: XCTestCase {
     func testKakeiboAddExpenseAppearsInList() {
         launch(example: "kakeibo")
         let add = app.buttons["支出を追加"]
-        XCTAssertTrue(add.waitForExistence(timeout: 10), "「支出を追加」が無い")
+        XCTAssertTrue(add.waitForExistence(timeout: 15), "「支出を追加」が無い")
         add.tap()
 
         let amount = app.textFields.matching(NSPredicate(format: "placeholderValue == '0'")).firstMatch
-        XCTAssertTrue(amount.waitForExistence(timeout: 5), "金額の入力欄が無い")
+        XCTAssertTrue(amount.waitForExistence(timeout: 15), "金額の入力欄が無い")
         amount.tap()
         amount.typeText("1234")
         let memo = app.textFields.matching(NSPredicate(format: "placeholderValue == 'コンビニ'")).firstMatch
-        XCTAssertTrue(memo.exists, "メモの入力欄が無い")
+        XCTAssertTrue(memo.waitForExistence(timeout: 15), "メモの入力欄が無い")
         memo.tap()
         memo.typeText("UIテスト")
         attachScreenshot("form-filled")
 
         app.buttons["保存"].firstMatch.tap()
         let row = element(labelBeginsWith: "UIテスト")
-        XCTAssertTrue(row.waitForExistence(timeout: 8), "保存した支出が一覧に出ない")
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "保存した支出が一覧に出ない")
         XCTAssertTrue(row.label.contains("1,234"), "一覧の金額が入力と違う: \(row.label)")
         attachScreenshot("form-saved-list")
     }
