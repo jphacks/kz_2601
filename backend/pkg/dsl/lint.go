@@ -15,8 +15,8 @@ import (
 //     against "now" or a fixed string (iOS compares numbers -> always empty)
 //   - entity without an add form (or the form is unreachable) / without a list
 //   - expressions that are always a constant (mul by 0, x*0+0-0)
-//   - stat label says 今月/今日/this month/today but the filter is missing or
-//     another period; 今週/今年 have no filter op
+//   - stat label says 今日/今週/今月/今年 (today/this week/this month/this
+//     year) but the filter is missing or another period
 func (a *App) Lint() []string {
 	l := &linter{app: a, entities: map[string]*Entity{}}
 	for i := range a.Entities {
@@ -232,13 +232,15 @@ type period struct {
 }
 
 // op "latest": no aggregate returns the newest record; "recent": needs an
-// expression date filter (addDays(today,-N)); "": weeks/years have no op.
+// expression date filter (addDays(today,-N)); the rest are period filter ops.
+// Order matters: "今週(直近7日)" is recent, not thisWeek.
 var periods = []period{
 	{"latest", []string{"最新", "latest", "most recent"}},
 	{"recent", []string{"直近", "last 7 days", "past 7 days", "last 30 days", "past week"}},
 	{"thisMonth", []string{"今月", "this month", "monthly total"}},
 	{"today", []string{"今日", "本日", "today"}},
-	{"", []string{"今週", "this week", "今年", "this year", "年間"}},
+	{"thisWeek", []string{"今週", "this week", "weekly total"}},
+	{"thisYear", []string{"今年", "this year", "年間", "yearly total"}},
 }
 
 // sincePhrases mean "up to now" (all-time), not the period itself.
@@ -256,8 +258,9 @@ func labelPeriod(label string) (period, string, bool) {
 	return period{}, "", false
 }
 
-// periodLabel: a 今月/今日 label needs a filter, and not one of the other
-// period; 今週/今年 need an expression date filter (no op exists).
+// periodLabel: a 今日/今週/今月/今年 label needs that period's filter op
+// (thisWeek starts on Monday), not another period. An expression date filter
+// is also accepted for 今週/今年 (older recipe: year == year(today)).
 func (l *linter) periodLabel(where string, c *Component) {
 	label := c.Label
 	if label == "" {
@@ -284,7 +287,7 @@ func (l *linter) periodLabel(where string, c *Component) {
 	}
 	hasExprFilter := false
 	for _, f := range filters {
-		if f.Op != "thisMonth" && f.Op != "today" && f.Value != nil {
+		if !IsPeriodFilterOp(f.Op) && f.Value != nil {
 			if ve, err := exprFromValue(f.Value); err == nil && ve != nil && ve.Kind != ExprLiteral {
 				hasExprFilter = true // e.g. date >= addDays(today,-6), year == year(today)
 			}
@@ -296,26 +299,21 @@ func (l *linter) periodLabel(where string, c *Component) {
 		}
 		return
 	}
-	if p.op == "" {
-		if hasExprFilter {
-			return
-		}
-		l.add(`%s: label %q says %q but there is no filter op for weeks/years; either filter by an expression ({"field":"<date>","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-6]}}) and relabel it 直近7日 / last 7 days, or relabel it to what it really shows (全期間 / 合計 / total) and end app.description with "○○は△△で代替しました。"`, where, label, word)
+	if (p.op == "thisWeek" || p.op == "thisYear") && hasExprFilter {
 		return
 	}
 	if len(filters) == 0 {
 		l.add(`%s: label %q says %q but the value has no filter, so it is the all-time total; add {"field":"<date field>","op":"%s"} (inside the agg when using value) or relabel it (合計 / total)`, where, label, word, p.op)
 		return
 	}
-	other := map[string]string{"thisMonth": "today", "today": "thisMonth"}[p.op]
 	for _, f := range filters {
 		if f.Op == p.op {
 			return
 		}
 	}
 	for _, f := range filters {
-		if f.Op == other {
-			l.add(`%s: label %q says %q but the filter is %s; use op %s or fix the label`, where, label, word, other, p.op)
+		if IsPeriodFilterOp(f.Op) {
+			l.add(`%s: label %q says %q but the filter is %s; use op %s or fix the label`, where, label, word, f.Op, p.op)
 			return
 		}
 	}
