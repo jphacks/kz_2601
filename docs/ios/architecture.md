@@ -315,6 +315,7 @@ FAB 本体は `ios/Metamon/App/VoiceFab.swift`。判定ロジックは純粋関�
 | 隠す | 離した時の中心 x(実位置 or 予測位置)が端から `fabSize × 0.3` 以内 → 本体は画面外、辺に取っ手(幅 14pt・触れる幅 32pt)だけ残る |
 | 戻す | 取っ手のタップ / 内側へ 20pt 以上引く。取っ手の長押しは変身一覧 |
 | 部品回避 | 吸着した側の最下段 2 列(左 A〜B / 右 E〜F)に部品があれば、その上端まで上げる(#83)。Renderer が `GridBottomObstructionKey`(左)/ `GridBottomTrailingObstructionKey`(右)で上端 y を上げる。ユーザーが下げても退避位置より下には置かない(`FabDock.displayedBottom`) |
+| 背の高い部品 | 最下段に寄せた操作部品ではない背の高い list / table / section 等(背景扱い)は FAB が上に浮く。代わりに `VoiceFab` が止まっている矩形(global)を `VoiceFabFrameKey` で上げ、`RootView` が環境値 `fabFrame` で Renderer に渡す。`GridCell` のセル内スクロール(と area 無しで積んだ画面スクロール)は、FAB と重なる分だけ末尾に `contentMargins` を足し、最後の行を FAB の上までスクロールで出せる(#157・`FabClearance.contentMargin`)。隠れている / 非表示 / 横に重ならない時は 0 |
 | 保存 | `@AppStorage`: `fab.side`(leading/trailing)・`fab.bottom`(下端からの距離。-1 = 自動)・`fab.hidden`。アプリごとではなく Tailor It 共通 |
 | 維持 | フォーム表示中は出さない(#83)・生成中は沈めて触れない。Reduce Motion では吸着アニメを 0.12s の easeOut に短縮 |
 | VoiceOver | 本体: 「話しかけて変える」+ アクション「変身一覧」「反対側へ移動」「端に隠す」。取っ手: 「話しかけて変える。ダブルタップで表示」+「変身一覧」 |
