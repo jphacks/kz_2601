@@ -2,20 +2,21 @@ import SwiftUI
 import MetamonDSL
 
 /// `openUrlButton`: 固定 URL を `openURL` で開く(Safari / 対応アプリ)。`style`: primary|secondary|plain(既定 secondary)。
+/// 開けるのは https と `ExternalURLPolicy` の allowlist(line/slack/discord/tel/mailto/maps/comgooglemaps)だけ。
 struct OpenUrlButtonLeaf: View {
     @Environment(\.openURL) private var openURL
     let c: Component
 
     var body: some View {
-        if let s = c.url, let url = URL(string: s) {
+        if let url = ExternalURLPolicy.openable(c.url) {
             styled(Button {
                 openURL(url)
             } label: {
-                Label(c.label ?? s, systemImage: c.icon ?? "safari")
+                Label(c.label ?? url.absoluteString, systemImage: c.icon ?? "safari")
                     .frame(maxWidth: c.style == "plain" ? nil : .infinity)
             })
         } else {
-            UnsupportedComponent(label: "openUrlButton: url が不正です")
+            UnsupportedComponent(label: "openUrlButton: url は https か line/slack/discord/tel/mailto/maps のみ")
         }
     }
 
