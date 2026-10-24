@@ -10,6 +10,7 @@
 //
 //	set -a; source ../.env; set +a
 //	go run ./cmd/ai-eval -effort low -out ../docs/backend/ai-eval/raw
+//	go run ./cmd/ai-eval -chat          # clarify phase (chat.go, chat_cases.json)
 package main
 
 import (
@@ -116,11 +117,33 @@ func main() {
 	tag := flag.String("tag", "", "suffix for the output filename")
 	locale := flag.String("locale", "", "ja|en for every case (overrides per-case locale; empty = per-case or detected from the transcript)")
 	timeout := flag.Duration("timeout", 60*time.Second, "per Claude call timeout")
+	chat := flag.Bool("chat", false, "run the clarify-phase cases (internal/ai/eval/chat_cases.json unless -cases is set) through Service.Chat instead of /generate")
 	flag.Parse()
+	if *chat && *casesPath == "internal/ai/eval/cases.json" {
+		*casesPath = "internal/ai/eval/chat_cases.json"
+	}
 
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" {
 		log.Fatal("ANTHROPIC_API_KEY is not set")
+	}
+	filter := map[string]bool{}
+	for _, id := range strings.Split(*only, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			filter[id] = true
+		}
+	}
+	store := appconfigclient.NewMemory()
+	svc := &ai.Service{
+		Claude:      ai.NewClient(apiKey, *model, *effort),
+		Store:       store,
+		Model:       *model,
+		CallTimeout: *timeout,
+	}
+	ctx := context.Background()
+	if *chat {
+		runChat(ctx, svc, *casesPath, *outDir, *model, *effort, *tag, filter)
+		return
 	}
 	raw, err := os.ReadFile(*casesPath)
 	if err != nil {
@@ -130,21 +153,6 @@ func main() {
 	if err := json.Unmarshal(raw, &cases); err != nil {
 		log.Fatal(err)
 	}
-	filter := map[string]bool{}
-	for _, id := range strings.Split(*only, ",") {
-		if id = strings.TrimSpace(id); id != "" {
-			filter[id] = true
-		}
-	}
-
-	store := appconfigclient.NewMemory()
-	svc := &ai.Service{
-		Claude:      ai.NewClient(apiKey, *model, *effort),
-		Store:       store,
-		Model:       *model,
-		CallTimeout: *timeout,
-	}
-	ctx := context.Background()
 	run := Run{Date: time.Now().Format("2006-01-02"), Model: *model, Effort: *effort, Tag: *tag}
 	created := map[string]json.RawMessage{} // create case id -> resulting DSL
 

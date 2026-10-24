@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
@@ -90,6 +91,9 @@ type Service struct {
 	Model            string
 	MaxRegenerations int           // validation-driven retries after the first attempt (default 2)
 	CallTimeout      time.Duration // per Claude call (default 40s)
+
+	conv     *convStore // clarify conversations (chat.go); lazily created
+	convOnce sync.Once
 }
 
 func (s *Service) maxRegen() int {
