@@ -31,14 +31,36 @@ private struct DSLRuntimeKey: EnvironmentKey {
 }
 
 public extension EnvironmentValues {
-    /// Renderer の全 View が参照するランタイム。未注入で描画すると即クラッシュ(DI 漏れを早期に出す)。
+    /// Renderer の全 View が参照するランタイム。未注入なら `MissingDSLRuntime`(空描画・副作用 no-op)。
+    /// getter で precondition してはいけない: `.environment(\.dslRuntime, rt)` の書き込みは WritableKeyPath 経由で
+    /// **先に getter を呼ぶ**ため、注入そのものが起動時クラッシュになる(SIGTRAP in EnvironmentValues.dslRuntime.getter)。
     var dslRuntime: any DSLRuntime {
-        get {
-            guard let rt = self[DSLRuntimeKey.self] else {
-                preconditionFailure("DSLRuntime が未注入です。.environment(\\.dslRuntime, runtime) を付けてください")
-            }
-            return rt
-        }
+        get { self[DSLRuntimeKey.self] ?? MissingDSLRuntime.shared }
         set { self[DSLRuntimeKey.self] = newValue }
+    }
+}
+
+/// DI 漏れ時のフォールバック。何も描けず何もしない(DEBUG では初回アクセスをログに出す)。
+@MainActor @Observable
+public final class MissingDSLRuntime: DSLRuntime {
+    public static let shared = MissingDSLRuntime()
+
+    public let dsl: AppDSL = .fallback
+    public let paths: [String: [Route]] = [:]
+    public var selectedTab: String = ""
+    public let loading: Set<String> = []
+
+    private init() {}
+
+    public func records(for entity: String) -> [Record] { warn(); return [] }
+    public func load(entities: Set<String>, force: Bool) async { warn() }
+    public func run(_ action: Action, _ ctx: ActionContext) async { warn() }
+    public func close(_ route: Route) { warn() }
+    public func pathBinding(_ stack: String) -> Binding<[Route]> { warn(); return .constant([]) }
+
+    private func warn() {
+        #if DEBUG
+        print("[MetamonRenderer] DSLRuntime が未注入です。.environment(\\.dslRuntime, runtime) を付けてください")
+        #endif
     }
 }
