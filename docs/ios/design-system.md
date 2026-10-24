@@ -1,10 +1,10 @@
 # 生成アプリのデザインシステム(Renderer 共通 UI)
 
-> 対象: `ios/Packages/MetamonRenderer`(DSL から生成されるアプリ側の全部品)。本体(音声画面・生成中画面)の `ios/Metamon/App/Theme.swift` と**同じ値**を `Support/RenderTheme.swift` に持つ(依存が 本体→Renderer なので import できず二重定義。片方を変えたらもう片方も揃える)。
+> 対象: `ios/Packages/MetamonRenderer`(DSL から生成されるアプリ側の全部品)。**色の正典は `Support/SemanticColor.swift` の `SemanticPalette`**(ライト/ダーク対)で、`RenderTheme.Colors` がそれを公開し、本体(音声画面・生成中画面)の `ios/Metamon/App/Theme.swift` の色は `RenderTheme.Colors` を参照する(#102 で色の二重定義を解消)。余白・角丸は従来どおり本体と二重定義なので片方を変えたらもう片方も揃える。ウィジェット(`MetamonWidget`)だけは Renderer を import できないので brandA/brandB を複製している。
 > 目的: 「どんなアプリが欲しい?」画面・「作成中」画面と、生成後のアプリ(家計簿・筋トレ・散歩…)が**同じブランドの作り込み**に見えること。アプリごとに変えない(`app.theme.primaryColor` は使わず、常に Tailor It ブランド)。
 
 ## 1. 原則
-1. **1 ブランド**: 紫→水色のグラデーションが「押せる・選ばれている・いま注目」の 3 つだけを指す。装飾には使わない。
+1. **1 ブランド**: 藍→青緑のグラデーション(アプリアイコンの紺 × ツルの生成りから取った「藍 × 生成り」・#102)が「押せる・選ばれている・いま注目」の 3 つだけを指す。装飾には使わない。
 2. **面で読ませる**: canvas(画面)> surface(カード)> elevated(入力の器)の 3 段。影は薄く、枠は hairline。
 3. **数字は主役**: 金額・回数は rounded + monospacedDigit で大きく。ラベルは小さく secondary。
 4. **触った手応え**: 押下 0.97 のスプリング、出現はスタガー、保存はチェックの一拍。Reduce Motion では止める。
@@ -13,22 +13,25 @@
 ## 2. トークン(`RenderTheme`)
 
 ### 2.1 色
-| トークン | 値 | 使い所 |
-|---|---|---|
-| `Colors.brandA` | `#8E6CFF`(紫) | tint / フォーカスリング / 選択中 / stat のアイコン |
-| `Colors.brandB` | `#4CC9FF`(水色) | グラデーションの終点 / チャートの 2 色目 |
-| `brandGradient` | brandA → brandB(topLeading→bottomTrailing) | primary ボタン / segmented の選択チップ / 塗り星 / ゲージ |
-| `Colors.brandSoft` | brandA 12% | secondary ボタン面 / 選択行の背景 / list のアイコン背景 |
-| `Colors.brandText` | ライト `#5F40D6` / ダーク `#A48BFF` | ブランド色の**文字**(リンク・secondary/plain ボタン・stepper/slider の値・フォーカス中ラベル)。brandA は白地 3.7:1 なので AA(4.5:1)を満たす版。`SemanticPalette.brand` として #68 の `SemanticColorContrastTests` が検算 |
-| `brandFill` | `#6A4CE8` → `#2F8FE0` | **白文字を載せる塗り**(primary ボタン・segmented 選択チップ・calendar 選択日・timer の数字)。装飾用 brandGradient の終点 `#4CC9FF` は白文字 1.9:1 で読めないため分けた。両端とも白文字 3:1 以上(`BrandContrastTests`) |
-| `Colors.canvas` | `systemGroupedBackground` | 画面背景 |
-| `Colors.surface` | `secondarySystemGroupedBackground` | カード |
-| `Colors.surfaceElevated` | `tertiarySystemGroupedBackground` | 入力の器(カードの中で一段沈む) |
-| `Colors.hairline` | primary 8% | 枠線・区切り |
-| `Colors.positive / negative / warning` | green / red / orange | semantic(達成・削除・警告)。ブランドと混ぜない |
-| `Colors.chartPalette` | brandA, brandB, mint, indigo, orange, pink, teal, purple | chart / カテゴリ色ドット(文字列ハッシュで安定割当) |
+アイコン(折り鶴)から抽出した色が出発点: 背景の紺 `#335267`・ツルの生成り `#F4F1E8`・メジャーの金 `#F0D060`・とさかの朱 `#AE4639`。紫は撤去した(#102)。
+値は「ライト / ダーク」。ダークで暗い面に沈まないよう、操作色はダークで一段明るくする。
 
-本体 `Theme.Colors.brandA/brandB/canvas/surface/surfaceElevated/hairline` と同値。
+| トークン | 値(ライト / ダーク) | 使い所 |
+|---|---|---|
+| `Colors.brandA` | `#2E6A93` / `#4E8DB8`(藍) | tint / フォーカスリング / 選択中 / stat のアイコン。面に対し非文字 3:1 以上、かつ白いアイコンを載せて 3:1 以上(`BrandContrastTests`) |
+| `Colors.brandB` | `#3E9A9C` / `#3B9E9F`(青緑) | グラデーションの終点 / チャートの 2 色目。白は 3.2〜3.3:1 なのでアイコン・大きい文字まで(本文の白文字は brandFill に載せる) |
+| `brandGradient` | brandA → brandB(topLeading→bottomTrailing) | 塗り星 / ゲージ / chart の bar・line / 本体のマイク・送信・ブランドマーク(白アイコン 3:1 以上) |
+| `Colors.brandSoft` | brandA 12% | secondary ボタン面 / 選択行の背景 / list のアイコン背景 |
+| `Colors.brandText` | `#1F5A82` / `#8CC3E6` | ブランド色の**文字**(リンク・secondary/plain ボタン・stepper/slider の値・フォーカス中ラベル)。面に対し AA(4.5:1)。`SemanticPalette.brand` として #68 の `SemanticColorContrastTests` が検算 |
+| `brandFill` | `#245E86` → `#286F7E`(両モード共通) | **白文字を載せる塗り**(primary ボタン・segmented 選択チップ・calendar 選択日・timer の数字)。両端とも白文字 4.5:1 以上(`BrandContrastTests`) |
+| `Colors.canvas` | `#F6F3EC`(生成り) / `#0F1A22`(紺) | 画面背景 |
+| `Colors.surface` | `#FFFDF8` / `#16232D` | カード。contrast テストの基準面 |
+| `Colors.surfaceElevated` | `#F9F6EF` / `#1E2E3A` | 入力の器(ライトはカードより一段沈み、ダークは一段浮く) |
+| `Colors.hairline` | 紺 `#335267` 12% / 生成り 10% | 枠線・区切り |
+| `Colors.positive / negative / warning` | green / red / orange(AA トーン) | semantic(達成・削除・警告)。ブランドと混ぜない |
+| `Colors.chartPalette` | 藍, 青緑, 金 `#C99A22`, 朱 `#B5523F`, 藍鼠 `#6C8BA3`, 灰緑 `#6F966E`, 砂色 `#A88B5E`, 紺桔梗 `#54629E`(ダークは各一段明るく) | chart / カテゴリ色ドット(文字列ハッシュで安定割当)。ブランド以外はアイコンにある色と同系の落ち着いた色 |
+
+本体 `Theme.Colors.brandA/brandB/brandText/canvas/surface/surfaceElevated/hairline` は上を参照(同じもの)。録音中の `recordGradient`(赤〜珊瑚)と `warning`(orange)は本体だけの状態色で、ブランドには含めない。
 
 ### 2.2 タイポグラフィ(すべて text style 相対・`design: .rounded` は数字と見出しだけ)
 | 役割 | Font | 用途 |
