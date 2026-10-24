@@ -22,6 +22,8 @@ struct VoiceInputView: View {
 
     /// 初期状態(全画面)か、生成後のシート(改変)か。
     private var isInitial: Bool { rt.dsl.isVoiceOnly }
+    /// 生成前の対話中(初期画面のみ)。
+    private var inChat: Bool { isInitial && rt.isChatting }
 
     /// 見出し・サブ文言(#42)。初回/再訪/新規/戻る/改変 × 時間帯。`prompt`(DSL の voiceInput.prompt)があれば見出しだけ上書き。
     private var greeting: Greeting.Copy {
@@ -34,16 +36,23 @@ struct VoiceInputView: View {
 
             VStack(spacing: 0) {
                 topBar
-                Spacer(minLength: Theme.Spacing.md)
-                heading
-                Spacer(minLength: Theme.Spacing.lg)
-                micSection
-                Spacer(minLength: Theme.Spacing.lg)
-                errorCard
-                transcriptCard
-                Spacer(minLength: Theme.Spacing.md)
-                examples
-                textEntry
+                if inChat {
+                    // 生成前の対話(#75): 吹き出し + 最新の質問 + 「このまま作る」/「この内容で作る」
+                    ClarifyChatView(micMode: micMode, statusText: statusText, onMic: { Task { await toggle() } },
+                                    onSend: { submit($0) })
+                        .transition(.opacity)
+                } else {
+                    Spacer(minLength: Theme.Spacing.md)
+                    heading
+                    Spacer(minLength: Theme.Spacing.lg)
+                    micSection
+                    Spacer(minLength: Theme.Spacing.lg)
+                    errorCard
+                    transcriptCard
+                    Spacer(minLength: Theme.Spacing.md)
+                    examples
+                    textEntry
+                }
             }
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.bottom, Theme.Spacing.md)
@@ -52,6 +61,7 @@ struct VoiceInputView: View {
         .animation(.spring(duration: 0.45, bounce: 0.15), value: phase)
         .animation(.spring(duration: 0.45, bounce: 0.15), value: transcript)
         .animation(.spring(duration: 0.45, bounce: 0.15), value: rt.errorCard)
+        .animation(.spring(duration: 0.45, bounce: 0.15), value: inChat)
         .sheet(isPresented: $showSettings) { SettingsSheet() }
         .onTapGesture { typing = false }
     }
@@ -67,6 +77,19 @@ struct VoiceInputView: View {
                 }
             }
             Spacer()
+            if inChat {
+                Button { rt.resetChat() } label: {
+                    Label(ClarifyCopy.restart, systemImage: "arrow.counterclockwise")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, Theme.Spacing.md)
+                        .padding(.vertical, Theme.Spacing.sm)
+                        .background(Theme.Colors.surface, in: Capsule())
+                        .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
+                }
+                .disabled(rt.isMorphing)
+                .accessibilityIdentifier("chat.restart")
+            }
             Button { showSettings = true } label: {
                 Image(systemName: "gearshape")
                     .font(.body.weight(.medium))
@@ -255,7 +278,7 @@ struct VoiceInputView: View {
         case .idle: return transcriber.isReady ? "タップして話す" : "音声モデルを準備中…"
         case .listening: return "聞いています… もう一度タップで終了"
         case .transcribing: return "文字起こし中…"
-        case .thinking: return "アプリを考えています…"
+        case .thinking: return rt.isChatting ? ClarifyCopy.thinking : "アプリを考えています…"
         }
     }
 
@@ -292,6 +315,11 @@ struct VoiceInputView: View {
                 phase = .idle
                 return
             }
+            if rt.routesToChat(text) {
+                // 対話: 書き起こしはそのまま吹き出しになるので、タイプライター演出は挟まない
+                await morph(text)
+                return
+            }
             transcript = text
             // 1 文字ずつ出すのを見せてから送る(edit はシートを閉じて本体側のインジケータに任せる)
             try? await Task.sleep(for: .milliseconds(min(900, 40 * text.count)))
@@ -310,15 +338,21 @@ struct VoiceInputView: View {
     }
 
     private func submit(_ text: String) {
-        transcript = text
+        if !rt.routesToChat(text) { transcript = text }
         Task { await morph(text) }
     }
 
+    /// 初期画面は `submitUtterance`(対話 ON なら質問を挟む)、生成後のシート(edit)は従来どおり即反映。
     private func morph(_ text: String) async {
         phase = .thinking
-        if !isInitial { rt.showVoiceSheet = false }
-        await rt.morph(transcript: text)
+        if isInitial {
+            await rt.submitUtterance(text)
+        } else {
+            rt.showVoiceSheet = false
+            await rt.morph(transcript: text)
+        }
         phase = .idle
+        if rt.isChatting { transcript = "" }
     }
 }
 

@@ -86,6 +86,29 @@ final class AppRuntime: DSLRuntime {
     /// サーバー(appconfig)に届かず、ローカルキャッシュの DSL を表示している。
     private(set) var isOffline = false
 
+    // MARK: 生成前の対話(#75)。ロジックは `AppRuntime+Clarify.swift`
+
+    /// チャットの吹き出し。user = 発話(書き起こし)/ assistant = AI の質問・返答。
+    struct ChatBubble: Identifiable, Equatable {
+        enum Role: Equatable { case user, assistant }
+        let id = UUID()
+        var role: Role
+        var text: String
+    }
+    /// 会話中の吹き出し(空 = 対話していない)。初期(音声)画面でだけ使う。
+    var chatBubbles: [ChatBubble] = []
+    /// `POST /v1/chat` の応答待ち
+    var chatPending = false
+    /// 直近の応答。question なら suggestions をチップに、ready なら brief を「この内容で作る」カードに出す
+    var chatTurn: ChatTurn?
+    /// 新規作成の前に質問を挟むか(設定で切替・既定 ON)。edit(生成後の改変)は常に従来どおり即反映。
+    var clarifyEnabled: Bool = ClarifySettings.enabled {
+        didSet { ClarifySettings.enabled = clarifyEnabled }
+    }
+    @ObservationIgnored var chatTask: Task<Void, Never>?
+    /// リセットのたびに進める。古い応答(待っている間に「最初から」された等)を捨てるため
+    @ObservationIgnored var chatEpoch = 0
+
     let services: Services
     /// レコードのローカル DB + 未送信キュー(Issue #48)。`records` はここから読み、書きはここに即反映してから裏で送る。
     let recordSync: RecordSyncEngine
@@ -128,9 +151,10 @@ final class AppRuntime: DSLRuntime {
                 handle(primary, of: card)
             }
         }
-        // ヘッドレス E2E 用: `METAMON_AUTO_TRANSCRIPT="家計簿アプリが欲しい"` で起動直後に 1 回だけ生成を投げる
+        // ヘッドレス E2E 用: `METAMON_AUTO_TRANSCRIPT="家計簿アプリが欲しい"` で起動直後に 1 回だけ発話を投げる。
+        // 対話が ON(#75)なら質問に `METAMON_AUTO_REPLIES`(| 区切り)で答え、ready で「この内容で作る」まで自動で進めて生成を待つ
         if let text = ProcessInfo.processInfo.environment["METAMON_AUTO_TRANSCRIPT"], !text.isEmpty {
-            await morph(transcript: text)
+            await autoDrive(firstUtterance: text)
         }
         // ヘッドレス E2E 用: `METAMON_AUTO_RECORD='{"entity":"expense","data":{"amount":980,...}}'` で起動直後に 1 件保存する
         if let raw = ProcessInfo.processInfo.environment["METAMON_AUTO_RECORD"], let data = raw.data(using: .utf8),
@@ -285,6 +309,8 @@ final class AppRuntime: DSLRuntime {
 
     /// 新しい DSL に差し替える。ナビ・キャッシュは初期化(画面構成が変わるため)。通知は DSL に同期。
     func apply(_ doc: AppDocument, animated: Bool = true) {
+        // 別アプリへの切替・新規 appId・生成完了では、進行中の対話を捨てる(サーバー側も DELETE)
+        if !chatBubbles.isEmpty || chatPending { resetChat() }
         let swap = {
             self.document = doc
             self.records = [:]
@@ -331,6 +357,12 @@ final class AppRuntime: DSLRuntime {
         case .morph:
             break
         }
+        await generate(text)
+    }
+
+    /// 意図判定を済ませた依頼文を生成に回す(対話の ready からも直接ここへ: AI がまとめた文を「元に戻して」等と誤判定しないため)。
+    func generate(_ text: String) async {
+        guard morphJob == nil else { return }
         // 圏外(#60): 送らずに保留し、状態カード「接続が戻ったら自動で送ります」。復帰で 1 回だけ自動送信(モックは常にオンライン)
         if services.isLive || recordSync.connectivity is ManualConnectivity,
            deferredMorph.holdIfOffline(text, send: { [weak self] queued in await self?.sendDeferred(queued) }) {
@@ -401,6 +433,11 @@ final class AppRuntime: DSLRuntime {
 
     /// 状態カードの主ボタン。もう一度 / 今すぐ送る = 同じ発話で再送、サインイン = セッション切れ処理。
     func handle(_ primary: ErrorPresentation.Primary, of card: ErrorPresentation) {
+        if card.origin == .chat, primary == .retry {
+            withAnimation(.easeInOut(duration: 0.3)) { errorCard = nil }
+            retryChat()
+            return
+        }
         switch primary {
         case .retry, .sendNow:
             deferredMorph.cancel()
