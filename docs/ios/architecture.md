@@ -751,3 +751,20 @@ Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-
 - **描画**(`Metamon/Features/ScreenMap/`): カードは段ごとに中央揃え、幅に収まらなければ横スクロール。矢印は Canvas。下向きは直線、上向き・往復は進行方向の左へ曲げ、同じ段どうしはカードの下を回す
 - **この画面について話す**: カードを選ぶと出入りの一覧とボタン。押すと `ScreenMapUI.context` をセットして音声シートを開き、上部にチップ「画面「B」について話す」(× で外す)。送信時に **transcript の先頭へ「画面「B」(id: b)で: 」を付ける**(API の契約は変えない。「元に戻して」等の意図判定は付ける前の文で行う)。文脈は 1 回送ると消える
 - 確認: `METAMON_INITIAL_EXAMPLE=navigation METAMON_AUTO_SCREEN_MAP=b`(画面 b を選んだ状態で開く)、`METAMON_AUTO_SCREEN_MAP_TALK=1` で音声シートまで進む
+
+## 21. キーボードの扱い(#143)
+
+方針: 標準の SwiftUI の挙動(セーフエリアのキーボード領域 + ScrollView)に任せ、足りない所だけ補う。`.ignoresSafeArea(.keyboard)` は計測用の背景以外では使わない。
+
+| 場所 | 扱い | 実装 |
+|---|---|---|
+| グリッド画面(`GridScreenLayout`) | 行の高さはキーボード前の高さで固定し、縮んだ可視領域は外側の `ScrollView` でスクロールさせる(以前は `GeometryReader` の高さ ÷ 12 がキーボードで縮み、セルが潰れて隣のセルと重なっていた) | 背景の `GeometryReader` に `.ignoresSafeArea(.keyboard)` を付けて `stableHeight` を測り、`GridLayoutHeight.resolve` で `max(今の高さ, stableHeight)` を使う |
+| フォーカスした入力欄 | キーボードが上がり切ってから可視領域(保存バーとキーボードの上)の中央へスクロール。標準の自動スクロールだけだと保存バーの裏に半分隠れていた | 入力 leaf は `.keyboardAnchor(c, $focused)`(`.id("input:<部品 id>")` + フォーカス時に `focusedInputReporter` へ報告)。グリッドの `ScrollViewReader` が 350ms 後と 700ms 後に `scrollTo(.center)` |
+| 保存バー(`FormSaveBar`) | `safeAreaInset(.bottom)` なのでキーボードの上に乗る。手動の padding は足さない。背景は `.ignoresSafeArea(.container, edges: .bottom)`(ホームインジケータ下だけ塗る) | iOS 26 はキーボードのツールバー(「完了」)がセーフエリアの外に浮くので、キーボード表示中だけ `KeyboardState.toolbarClearance`(36pt)持ち上げる。閉じれば元の位置 |
+| マイク FAB | キーボード表示中は隠す(入力欄・「完了」に被るため) | `KeyboardState.shared.isVisible`(keyboardWillShow / WillHide)→ `FabVisibility.isShown`。ハードウェアキーボードの候補バー(高さ 120pt 以下)は「出ていない」扱い |
+| 閉じる手段 | ① 下スワイプ(`.scrollDismissesKeyboard(.interactively)`)② 部品の無い所をタップ ③ キーボード上の「完了」(数値キーパッドには return が無いため、全入力共通で付ける) | ③ は `ScreenView` の `ToolbarItemGroup(placement: .keyboard)`(leaf ごとに付けるとフィールド数だけ重複するため画面に 1 つ) |
+| 音声画面 / 発話シート(`VoiceInputView`) | 文字入力中はマイク・例文・「探す」を畳み、見出しと入力欄だけにする(縦に収まらず、入力欄がキーボードの裏に、ロゴがステータスバーに重なっていた) | `@FocusState typing` で分岐 |
+| 対話(`ClarifyChatView`) | 入力行は VStack の最下段なのでキーボードの上に付いて動く。キーボードが上がった後に最新の吹き出しへスクロールし直す | `.onChange(of: typing)` → 350ms 後に `scrollToEnd` |
+| シェアシート | `.scrollDismissesKeyboard(.interactively)` | |
+
+DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か field>` で表示 3 秒後にその入力欄へフォーカス、`METAMON_AUTO_BLUR=<秒>` でさらに n 秒後に閉じる。`voice`(音声画面)/ `voice-sheet`(生成後に発話シートを開いて入力)/ `chat`(対話の返答欄)も可。例: `METAMON_MOCK=1 METAMON_INITIAL_EXAMPLE=gallery-input METAMON_AUTO_OPEN=checkin_form METAMON_AUTO_FOCUS=pin`。ヘッドレス起動のシミュレータはハードウェアキーボード未接続なのでソフトキーボードが出る。

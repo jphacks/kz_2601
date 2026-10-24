@@ -32,6 +32,14 @@ struct ClarifyChatView: View {
             inputRow
         }
         .padding(.top, Theme.Spacing.sm)
+        #if DEBUG
+        .task {
+            // ヘッドレス E2E 用: `METAMON_AUTO_FOCUS=chat` で 3 秒後に返答欄へフォーカス(キーボードの確認・#143)
+            guard ProcessInfo.processInfo.environment["METAMON_AUTO_FOCUS"] == "chat" else { return }
+            try? await Task.sleep(for: .seconds(3))
+            typing = true
+        }
+        #endif
     }
 
     // MARK: - 吹き出し
@@ -62,6 +70,14 @@ struct ClarifyChatView: View {
             .scrollDismissesKeyboard(.interactively)
             .onChange(of: rt.chatBubbles.count) { scrollToEnd(proxy) }
             .onChange(of: rt.chatPending) { scrollToEnd(proxy) }
+            // キーボードが上がると吹き出し欄が縮むので、最新の吹き出しを見せ直す(#143)
+            .onChange(of: typing) { _, isTyping in
+                guard isTyping else { return }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(350))
+                    scrollToEnd(proxy)
+                }
+            }
         }
     }
 

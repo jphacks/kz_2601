@@ -14,6 +14,8 @@ struct RootView: View {
     @State private var bottomObstructions: [String: CGFloat] = [:]
     /// 同じく右端(E〜F 列)。FAB を右に吸着させた時に使う(#52)
     @State private var trailingBottomObstructions: [String: CGFloat] = [:]
+    /// ソフトキーボードの表示状態(FAB を隠す・#143)
+    private let keyboard = KeyboardState.shared
 
     var body: some View {
         @Bindable var rt = rt
@@ -41,8 +43,10 @@ struct RootView: View {
                 .onPreferenceChange(GridBottomTrailingObstructionKey.self) { trailingBottomObstructions = $0 }
 
             // フォーム画面(push)では FAB を出さず、ナビバー右上のマイク(`formToolbarAccessory`)が入口になる(#83)
+            // キーボード表示中も隠す(入力欄・キーボードのツールバーに被るため・#143)
             ZStack {
-                if rt.dsl.app.voiceEntry == .floating, !isFormVisible {
+                if FabVisibility.isShown(floating: rt.dsl.app.voiceEntry == .floating, formVisible: isFormVisible,
+                                         keyboardVisible: keyboard.isVisible) {
                     VoiceFab(
                         hasTabs: rt.dsl.app.hasTabs,
                         leadingObstructionTop: bottomObstructions[visibleMainRoute.id],
@@ -55,6 +59,7 @@ struct RootView: View {
                 }
             }
             .animation(.easeOut(duration: 0.22), value: isFormVisible)
+            .animation(.easeOut(duration: 0.22), value: keyboard.isVisible)
             if let job = rt.morphJob {
                 switch job.kind {
                 case .create:
@@ -109,6 +114,12 @@ struct RootView: View {
             guard ProcessInfo.processInfo.environment["METAMON_AUTO_SWITCHER"] == "1" else { return }
             try? await Task.sleep(for: .seconds(2.5))
             rt.openSwitcher()
+        }
+        .task {
+            // ヘッドレス E2E 用: `METAMON_AUTO_FOCUS=voice-sheet` で起動 2 秒後に発話シートを開く(シート内の文字入力へフォーカス・#143)
+            guard ProcessInfo.processInfo.environment["METAMON_AUTO_FOCUS"] == "voice-sheet", !rt.dsl.isVoiceOnly else { return }
+            try? await Task.sleep(for: .seconds(2))
+            rt.showVoiceSheet = true
         }
         .task {
             // ヘッドレス E2E 用: `METAMON_AUTO_OPEN=<screen>[:push|sheet][:record]` で起動 2.5 秒後に画面を開く
