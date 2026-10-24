@@ -256,7 +256,7 @@ final class AppRuntime: DSLRuntime {
     }
 
     /// 他端末 / ai 直叩きで進んだ DSL を当てる。操作中なら閉じるまで保留し、最新の 1 件だけ当てる。
-    private func hotReload(_ doc: AppDocument) {
+    func hotReload(_ doc: AppDocument) {
         guard doc.version > document.version, morphJob == nil else { return }
         guard !isInteracting else {
             if doc.version > (pendingHotReload?.version ?? 0) { pendingHotReload = doc }
@@ -300,6 +300,7 @@ final class AppRuntime: DSLRuntime {
         recordSync.setForeground(active)
         if active {
             startSync()
+            Task { await catchUpAfterBackground() } // #38: 背面中の取りこぼしを即取り直す(AppRuntime+Background)
         } else {
             syncTask?.cancel()
             // 背面の間の変化は通知されないので、復帰で購読が戻った時に表示中の records を読み直す
