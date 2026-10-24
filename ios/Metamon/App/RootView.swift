@@ -101,6 +101,7 @@ struct RootView: View {
     return RootView()
         .environment(rt)
         .environment(\.dslRuntime, rt)
+        .environment(AuthSession(service: services.auth))
         .environment(\.services, services)
         .environment(\.componentRegistry, MetamonApp.componentRegistry)
 }

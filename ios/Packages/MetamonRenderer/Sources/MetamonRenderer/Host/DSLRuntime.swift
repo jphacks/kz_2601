@@ -30,15 +30,29 @@ private struct DSLRuntimeKey: EnvironmentKey {
     static let defaultValue: (any DSLRuntime)? = nil
 }
 
+/// 未注入時のフォールバック(何もしない・`AppDSL.fallback` を描く)。
+/// `.environment(\.dslRuntime, x)` は WritableKeyPath 経由で getter を呼んでから setter を呼ぶため、getter で落とすと注入自体がクラッシュする。
+@MainActor
+@Observable
+final class UnboundDSLRuntime: DSLRuntime {
+    static let shared = UnboundDSLRuntime()
+
+    var dsl: AppDSL = .fallback
+    var paths: [String: [Route]] = [:]
+    var selectedTab = ""
+    var loading: Set<String> = []
+
+    func records(for entity: String) -> [Record] { [] }
+    func load(entities: Set<String>, force: Bool) async {}
+    func run(_ action: Action, _ ctx: ActionContext) async {}
+    func close(_ route: Route) {}
+    func pathBinding(_ stack: String) -> Binding<[Route]> { .constant([]) }
+}
+
 public extension EnvironmentValues {
-    /// Renderer の全 View が参照するランタイム。未注入で描画すると即クラッシュ(DI 漏れを早期に出す)。
+    /// Renderer の全 View が参照するランタイム。アプリ本体が `.environment(\.dslRuntime, runtime)` で注入する。
     var dslRuntime: any DSLRuntime {
-        get {
-            guard let rt = self[DSLRuntimeKey.self] else {
-                preconditionFailure("DSLRuntime が未注入です。.environment(\\.dslRuntime, runtime) を付けてください")
-            }
-            return rt
-        }
+        get { self[DSLRuntimeKey.self] ?? MainActor.assumeIsolated { UnboundDSLRuntime.shared } }
         set { self[DSLRuntimeKey.self] = newValue }
     }
 }

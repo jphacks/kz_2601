@@ -6,6 +6,7 @@ import MetamonServices
 /// 流れ: 録音 → WhisperKit(オンデバイス)文字起こし → ai サービス → 新 DSL をアニメーション付きで適用。
 struct VoiceInputView: View {
     @Environment(AppRuntime.self) private var rt
+    @Environment(AuthSession.self) private var session
     @Environment(\.services) private var services
     var prompt: String?
 
@@ -54,10 +55,25 @@ struct VoiceInputView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(typed.isEmpty || rt.isMorphing)
             }
+            accountFooter
         }
         .padding(24)
         .animation(.spring(duration: 0.4), value: phase)
         .animation(.spring(duration: 0.4), value: transcript)
+    }
+
+    /// デバッグ用: uid 先頭 6 桁とログアウト(目立たせない)。
+    @ViewBuilder
+    private var accountFooter: some View {
+        if let user = session.user {
+            Menu {
+                Button("ログアウト", role: .destructive) { session.signOut() }
+            } label: {
+                Text("uid \(user.uid.prefix(6))\(user.isAnonymous ? "・匿名" : "")\(services.ai is MockAIClient ? "・ai:mock" : "")")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
     }
 
     private var micButton: some View {
@@ -200,5 +216,6 @@ struct VoiceInputView: View {
     let services = BuildConfig.make(environment: .mock)
     VoiceInputView()
         .environment(AppRuntime(document: .fallback, services: services))
+        .environment(AuthSession(service: services.auth))
         .environment(\.services, services)
 }
