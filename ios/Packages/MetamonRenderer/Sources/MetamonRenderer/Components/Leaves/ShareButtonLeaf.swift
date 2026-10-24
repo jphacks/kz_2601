@@ -49,8 +49,7 @@ struct ShareButtonLeaf: View {
                 ShareLink(item: text) { buttonLabel }
             }
         }
-        .buttonStyle(.bordered)
-        .controlSize(.large)
+        .buttonStyle(RenderButtonStyle(kind: .secondary))
     }
 
     private var buttonLabel: some View {

@@ -1,0 +1,74 @@
+import SwiftUI
+import MetamonDSL
+
+/// フォーム画面(`screen.entity` あり)の toolbar にある `saveRecord` を、ナビバーではなく画面下の固定バー(primary ボタン)に出す。
+/// `safeAreaInset` なのでセル内スクロールの外に常に見え、キーボードが出てもその上に逃げる。
+/// 押下中はスピナー、完了後は 0.6 秒チェックを見せてから元に戻る(画面が閉じればそのまま消える)。
+struct FormSaveBar: ViewModifier {
+    @Environment(\.dslRuntime) private var rt
+    let screen: Screen
+    let ctx: RenderContext
+    @State private var phase: Phase = .idle
+
+    private enum Phase { case idle, saving, done }
+
+    /// 画面下に出す toolbar 項目(= ナビバーからは外す)。
+    static func pinned(in screen: Screen) -> [ToolbarButton] {
+        guard screen.entity != nil else { return [] }
+        return screen.toolbar.filter { $0.action.type == .saveRecord }
+    }
+
+    func body(content: Content) -> some View {
+        let pinned = Self.pinned(in: screen)
+        content
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let save = pinned.first {
+                    bar(save)
+                }
+            }
+    }
+
+    private func bar(_ save: ToolbarButton) -> some View {
+        Button {
+            guard phase == .idle else { return }
+            Task { await run(save.action) }
+        } label: {
+            HStack(spacing: RenderTheme.Spacing.sm) {
+                switch phase {
+                case .idle:
+                    Image(systemName: save.icon ?? "checkmark")
+                    Text(save.label)
+                case .saving:
+                    ProgressView().tint(.white)
+                    Text(save.label)
+                case .done:
+                    Image(systemName: "checkmark.circle.fill")
+                        .transition(.scale.combined(with: .opacity))
+                    Text("保存しました")
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(RenderButtonStyle(kind: .primary))
+        .disabled(phase != .idle)
+        .animation(RenderTheme.Motion.select, value: phase)
+        .sensoryFeedback(.success, trigger: phase) { _, new in new == .done }
+        .accessibilityLabel(save.label)
+        .padding(.horizontal, RenderTheme.Spacing.screenInset)
+        .padding(.top, RenderTheme.Spacing.sm)
+        .padding(.bottom, RenderTheme.Spacing.sm)
+        .background {
+            RenderTheme.Colors.canvas
+                .overlay(alignment: .top) { Hairline() }
+                .ignoresSafeArea(edges: .bottom)
+        }
+    }
+
+    private func run(_ action: Action) async {
+        phase = .saving
+        await rt.run(action, ctx.actionContext())
+        phase = .done
+        try? await Task.sleep(for: .seconds(RenderTheme.Motion.checkSeconds))
+        phase = .idle
+    }
+}

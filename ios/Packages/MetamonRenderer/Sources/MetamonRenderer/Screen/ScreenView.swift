@@ -15,7 +15,8 @@ public struct ScreenView: View {
         if let screen = rt.dsl.screen(route.screen) {
             let ctx = RenderContext(route: route, form: form, locals: locals)
             GridScreenLayout(screen: screen, ctx: ctx)
-                .background(Color(.systemGroupedBackground))
+                .background(RenderTheme.Colors.canvas)
+                .modifier(FormSaveBar(screen: screen, ctx: ctx)) // saveRecord は画面下の固定バーへ(#89)
                 .navigationTitle(screen.title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -24,7 +25,7 @@ public struct ScreenView: View {
                         ToolbarItem(placement: .topBarTrailing) { accessory }
                     }
                     ToolbarItemGroup(placement: .topBarTrailing) {
-                        ForEach(screen.toolbar) { tb in
+                        ForEach(screen.toolbar.filter { tb in !FormSaveBar.pinned(in: screen).contains { $0.id == tb.id } }) { tb in
                             Button {
                                 Task { await rt.run(tb.action, ctx.actionContext()) }
                             } label: {
