@@ -1,0 +1,4 @@
+# ローカル開発用プレースホルダ(Bearer dev-smoke)の誤検知。実トークンではない。
+5a42052d431c9ba4a9da724170befbe7941537bc:backend/README.md:curl-auth-header:42
+5a42052d431c9ba4a9da724170befbe7941537bc:backend/README.md:curl-auth-header:47
+19585e6c607daf879faceefaa5f06dfb827de30e:backend/internal/auth/verifier.go:curl-auth-header:43

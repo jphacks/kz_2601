@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "はじめてのアプリ",
+    "description": "話しかけるとアプリに変わる初期状態",
+    "icon": "waveform",
+    "voiceEntry": "fullscreen"
+  },
+  "initialScreen": "home",
+  "entities": [],
+  "screens": [
+    {
+      "id": "home",
+      "title": "",
+      "components": [
+        { "type": "voiceInput", "id": "mic", "area": "A1:F12", "prompt": "どんなアプリが欲しい？", "size": "large" }
+      ]
+    }
+  ]
+}

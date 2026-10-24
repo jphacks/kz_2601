@@ -1,0 +1,82 @@
+# xcodegen 定義。`cd ios && xcodegen generate` で Metamon.xcodeproj を生成する(.xcodeproj はコミットしない)。
+# ホーム画面の表示名(現在「メタモン」)は Metamon/Resources/Info.plist の CFBundleDisplayName だけで変えられる。
+# 内部識別子 `Metamon` / Bundle ID `jp.kz2601.metamon` は Firebase に登録済みなので変更しない。
+name: Metamon
+
+options:
+  bundleIdPrefix: jp.kz2601
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    # Swift 6 コンパイラ + Swift 5 言語モード。strict concurrency は targeted(警告止まり)でハッカソン速度を優先。
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: targeted
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    # 実機ビルド時: `METAMON_TEAM_ID=XXXXXXXXXX xcodegen generate` で Team を注入(空なら未設定)
+    DEVELOPMENT_TEAM: ${METAMON_TEAM_ID}
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    # バックエンド URL(Info.plist の MetamonAIBaseURL / MetamonAppConfigBaseURL に展開)。空=その側はモック/インメモリ。
+    # 既定の ai は staging(Cloud Run)。ローカル ai に向けるなら xcodebuild ... METAMON_AI_BASE_URL=http://127.0.0.1:8081(シミュレータ)。
+    # 全モックで起動したい時は実行時の環境変数 METAMON_MOCK=1。
+    METAMON_AI_BASE_URL: "https://ai-stg-378953239426.asia-northeast1.run.app"
+    METAMON_APPCONFIG_BASE_URL: ""
+
+# ---- ローカル Swift Package(マルチモジュール。依存の向きは各 Package.swift で固定) ----
+#   MetamonDSL      : DSL モデル・グリッド計算・集計(Foundation のみ。macOS で `swift test` 可)
+#   MetamonRenderer : SwiftUI View(コンポーネント1種=1ファイル + ComponentRegistry)。Services を知らない
+#   MetamonServices : Services protocol 群 + 実装(HTTP/Mock/WhisperKit/Firebase Auth/通知)。
+#                     WhisperKit(argmax-oss-swift 1.1.1)と firebase-ios-sdk(FirebaseAuth のみ・13.1.1 固定)はこのパッケージの依存
+packages:
+  MetamonDSL:
+    path: Packages/MetamonDSL
+  MetamonRenderer:
+    path: Packages/MetamonRenderer
+  MetamonServices:
+    path: Packages/MetamonServices
+# Firebase: `ios/scripts/sync-firebase-plist.sh` で GoogleService-Info.plist を Metamon/Resources/ にコピーしてから generate する
+# (.gitignore 済み・コミット禁止)。無くてもビルド/起動はでき、認証はモック(固定 uid)になる。
+
+targets:
+  Metamon:
+    type: application
+    platform: iOS
+    sources:
+      - path: Metamon
+      # DSL v1 の正典サンプル(docs/dsl/examples/*.json)をそのままバンドル。iOS 側にコピーを持たない(ドリフト防止)。
+      - path: ../docs/dsl/examples
+        buildPhase: resources
+        type: group
+    dependencies:
+      - package: MetamonDSL
+      - package: MetamonRenderer
+      - package: MetamonServices
+    # Sign in with Apple。自動署名(-allowProvisioningUpdates)が App ID に capability を付与する(有料 Developer Program 必須)。
+    entitlements:
+      path: Metamon/Metamon.entitlements
+      properties:
+        com.apple.developer.applesignin: [Default]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon
+        PRODUCT_NAME: Metamon
+        INFOPLIST_FILE: Metamon/Resources/Info.plist
+        TARGETED_DEVICE_FAMILY: "1"
+        ENABLE_PREVIEWS: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
+    scheme:
+      # 各モジュールのユニットテストを `xcodebuild -scheme Metamon test` で一括実行する。
+      testTargets:
+        - package: MetamonDSL/MetamonDSLTests
+        - package: MetamonRenderer/MetamonRendererTests
+        - package: MetamonServices/MetamonServicesTests
+      gatherCoverageData: false

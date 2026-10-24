@@ -1,0 +1,485 @@
+openapi: 3.1.0
+info:
+  title: appconfig API
+  version: 0.1.0
+  description: |
+    アプリ DSL JSON の CRUD・バージョン管理・汎用レコード API。
+    - 認証: `Authorization: Bearer <Firebase ID token>`。uid はトークンから取得し URL には含めない。
+    - すべてのパスは呼び出しユーザー自身の `users/{uid}/...` に束縛される。
+    - エラーは全て `Error` 形式。ページングは `pageSize` + `pageToken` / `nextPageToken`。
+    - DSL の本体スキーマは `../dsl/dsl.schema.json` を参照 (OpenAPI 内では `$ref`)。
+servers:
+  - url: http://localhost:8080/v1
+    description: local (AUTH_MODE=dev では `X-Debug-Uid` ヘッダで代替可)
+  - url: https://appconfig-REPLACE.a.run.app/v1
+security:
+  - firebaseAuth: []
+tags:
+  - { name: apps }
+  - { name: dsl }
+  - { name: versions }
+  - { name: entities }
+  - { name: records }
+
+paths:
+  /apps:
+    get:
+      tags: [apps]
+      summary: 自分のアプリ一覧
+      parameters: [{ $ref: '#/components/parameters/PageSize' }, { $ref: '#/components/parameters/PageToken' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/AppSummary' } }
+                  nextPageToken: { type: string }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+    post:
+      tags: [apps]
+      summary: アプリ作成 (初期 DSL = 音声画面のみ)
+      description: body の `dsl` を省略すると `dsl.Initial()` で作成。初回起動時に iOS が 1 回呼ぶ。
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, description: 省略時は dsl.app.name }
+                dsl: { $ref: '../dsl/dsl.schema.json' }
+      responses:
+        '201':
+          description: Created
+          headers: { ETag: { $ref: '#/components/headers/ETag' } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AppWithDSL' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '422': { $ref: '#/components/responses/InvalidDSL' }
+
+  /apps/{appId}:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [apps]
+      summary: アプリ情報 (DSL 含む)
+      responses:
+        '200':
+          description: OK
+          headers: { ETag: { $ref: '#/components/headers/ETag' } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AppWithDSL' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [apps]
+      summary: メタ更新 (名前・status)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                status: { type: string, enum: [active, archived] }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AppSummary' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [apps]
+      summary: アーカイブ (論理削除)
+      responses:
+        '204': { description: Archived }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /apps/{appId}/dsl:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [dsl]
+      summary: 現在の DSL (iOS ホットリロード用)
+      description: |
+        `If-None-Match: "<version>"` が現行と一致すれば 304。ETag は `"<currentVersion>"` (例 `"7"`)。
+        iOS は 2 秒ポーリングか Firestore リスナーで version 変化を検知してから取得する。
+      parameters:
+        - in: header
+          name: If-None-Match
+          schema: { type: string, examples: ['"7"'] }
+      responses:
+        '200':
+          description: OK
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { schema: { type: string }, description: 'no-cache' }
+          content: { application/json: { schema: { $ref: '#/components/schemas/DSLEnvelope' } } }
+        '304': { description: Not Modified }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [dsl]
+      summary: 'JSON Patch (RFC 6902) を適用して新バージョン作成 — 2回目以降の改変はこちら (確定)'
+      description: |
+        **編集モード。** ai サービスが Claude に生成させた Patch をそのまま送る。
+        1. `If-Match: "<baseVersion>"` 必須。Patch は基底バージョン依存なので不一致は 409 (ai は最新を取り直して再生成)。
+        2. サーバーは `dsl.ApplyPatch(現行DSL, patch)` = 適用 → JSON Schema → 意味検証。失敗は 422 に全問題を列挙 (現行 DSL は無変更)。
+        3. 成功時は `versions/{n+1}` に **フルスナップショット `dsl` と `patch` の両方**を保存。
+        Patch の `value` は `docs/dsl/dsl.schema.json#/$defs/PatchValue` (プリミティブ or DSL 部分文書) に限る。ops 上限 50。
+      parameters:
+        - in: header
+          name: If-Match
+          required: true
+          schema: { type: string, examples: ['"6"'] }
+      requestBody:
+        required: true
+        content:
+          application/json-patch+json:
+            schema:
+              type: array
+              items: { $ref: '../dsl/dsl.schema.json#/$defs/PatchOp' }
+            example:
+              - { op: add, path: /entities/0/fields/-, value: { id: shop, name: 店名, type: string } }
+              - { op: add, path: /screens/1/components/0/children/-, value: { type: textField, field: shop, label: 店名 } }
+          application/json:
+            schema:
+              type: object
+              required: [patch]
+              description: 'JSON Patch をメタ情報付きで送る形 (ai サービスはこちらを使う)'
+              properties:
+                patch: { type: array, items: { $ref: '../dsl/dsl.schema.json#/$defs/PatchOp' } }
+                source: { $ref: '#/components/schemas/VersionSource' }
+      responses:
+        '201':
+          description: 新バージョン作成 (適用後のフル DSL を返す)
+          headers: { ETag: { $ref: '#/components/headers/ETag' } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/DSLEnvelope' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/VersionConflict' }
+        '412': { description: 'If-Match ヘッダ欠落', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { $ref: '#/components/responses/InvalidDSL' }
+    put:
+      tags: [dsl]
+      summary: 'DSL 全体を置き換えて新バージョン作成 — 初回生成 / create モード / フォールバック用 (確定)'
+      description: |
+        **フルモード。** 初回生成(初期状態からの生成)・「新しいアプリにして」(create)・Patch 失敗時の降格・テンプレ fallback が使う。
+        楽観ロック: `If-Match: "<baseVersion>"` 必須。現行と不一致なら 409 (ボディに現行 version)。
+        サーバーは `dsl.Parse` (JSON Schema + 意味検証) を通し、失敗は 422 に全問題を列挙する。
+      parameters:
+        - in: header
+          name: If-Match
+          required: true
+          schema: { type: string, examples: ['"6"'] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dsl]
+              properties:
+                dsl: { $ref: '../dsl/dsl.schema.json' }
+                source: { $ref: '#/components/schemas/VersionSource' }
+      responses:
+        '201':
+          description: 新バージョン作成
+          headers: { ETag: { $ref: '#/components/headers/ETag' } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/VersionSummary' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/VersionConflict' }
+        '412': { description: 'If-Match ヘッダ欠落', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { $ref: '#/components/responses/InvalidDSL' }
+
+  /apps/{appId}/versions:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [versions]
+      summary: バージョン履歴 (新しい順・DSL 本体は含まない)
+      parameters: [{ $ref: '#/components/parameters/PageSize' }, { $ref: '#/components/parameters/PageToken' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/VersionSummary' } }
+                  nextPageToken: { type: string }
+
+  /apps/{appId}/versions/{version}:
+    parameters: [{ $ref: '#/components/parameters/AppId' }, { $ref: '#/components/parameters/Version' }]
+    get:
+      tags: [versions]
+      summary: 特定バージョンの DSL
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/DSLEnvelope' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /apps/{appId}/versions/{version}/restore:
+    parameters: [{ $ref: '#/components/parameters/AppId' }, { $ref: '#/components/parameters/Version' }]
+    post:
+      tags: [versions]
+      summary: ロールバック (該当バージョンの内容で新バージョンを作る・履歴は消さない)
+      responses:
+        '201':
+          description: Created
+          headers: { ETag: { $ref: '#/components/headers/ETag' } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/VersionSummary' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /apps/{appId}/entities:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [entities]
+      summary: エンティティ定義一覧 (現行 DSL の entities[] の読み出しビュー)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, version]
+                properties:
+                  version: { type: integer }
+                  items: { type: array, items: { $ref: '../dsl/dsl.schema.json#/$defs/Entity' } }
+
+  /apps/{appId}/entities/{entityId}:
+    parameters: [{ $ref: '#/components/parameters/AppId' }, { $ref: '#/components/parameters/EntityId' }]
+    get:
+      tags: [entities]
+      summary: エンティティ定義
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '../dsl/dsl.schema.json#/$defs/Entity' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [entities]
+      summary: エンティティ定義を作成/更新 (内部的には DSL の新バージョンを作る糖衣)
+      description: '`If-Match` 必須。`/dsl` PUT と同じ検証・同じバージョン経路。UI 側のデバッグ・手動修正用。'
+      parameters:
+        - { in: header, name: If-Match, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '../dsl/dsl.schema.json#/$defs/Entity' } } }
+      responses:
+        '201': { description: 新バージョン作成, headers: { ETag: { $ref: '#/components/headers/ETag' } }, content: { application/json: { schema: { $ref: '#/components/schemas/VersionSummary' } } } }
+        '409': { $ref: '#/components/responses/VersionConflict' }
+        '422': { $ref: '#/components/responses/InvalidDSL' }
+
+  /apps/{appId}/entities/{entityId}/records:
+    parameters: [{ $ref: '#/components/parameters/AppId' }, { $ref: '#/components/parameters/EntityId' }]
+    get:
+      tags: [records]
+      summary: レコード一覧
+      description: |
+        既定は `createdAt desc`。`sort`/`filter` は DSL の List と同じ語彙。
+        複合インデックスが無い組み合わせはサーバー側メモリソート (1 entity 上限 2000 件、超過は 413)。
+      parameters:
+        - { $ref: '#/components/parameters/PageSize' }
+        - { $ref: '#/components/parameters/PageToken' }
+        - { in: query, name: sortField, schema: { type: string } }
+        - { in: query, name: sortDir, schema: { type: string, enum: [asc, desc] } }
+        - { in: query, name: filterField, schema: { type: string } }
+        - { in: query, name: filterOp, schema: { type: string, enum: [eq, neq, gt, gte, lt, lte, thisMonth, today] } }
+        - { in: query, name: filterValue, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Record' } }
+                  nextPageToken: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [records]
+      summary: レコード作成
+      description: '`data` は現行 DSL のフィールド定義で型検証・正規化。未知キーは 400。`required` 欠落は 422。'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data: { $ref: '#/components/schemas/RecordData' }
+                clientId: { type: string, description: 冪等キー (同じ clientId の再送は既存を返す) }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Record' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/InvalidRecord' }
+    delete:
+      tags: [records]
+      summary: エンティティの全レコード削除 (デモリセット用・`?confirm=true` 必須)
+      parameters: [{ in: query, name: confirm, required: true, schema: { type: boolean } }]
+      responses:
+        '204': { description: Deleted }
+
+  /apps/{appId}/entities/{entityId}/records/{recordId}:
+    parameters:
+      - { $ref: '#/components/parameters/AppId' }
+      - { $ref: '#/components/parameters/EntityId' }
+      - { in: path, name: recordId, required: true, schema: { type: string } }
+    get:
+      tags: [records]
+      summary: レコード取得
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Record' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [records]
+      summary: レコード部分更新 (data のキー単位でマージ)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties: { data: { $ref: '#/components/schemas/RecordData' } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Record' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/InvalidRecord' }
+    delete:
+      tags: [records]
+      summary: レコード削除
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /healthz:
+    get:
+      security: []
+      summary: liveness
+      responses: { '200': { description: ok } }
+
+components:
+  securitySchemes:
+    firebaseAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Firebase ID token
+  parameters:
+    AppId: { in: path, name: appId, required: true, schema: { type: string }, example: app_01HXYZ }
+    EntityId: { in: path, name: entityId, required: true, schema: { type: string }, example: expense }
+    Version: { in: path, name: version, required: true, schema: { type: integer, minimum: 1 } }
+    PageSize: { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+    PageToken: { in: query, name: pageToken, schema: { type: string }, description: 前レスポンスの nextPageToken (不透明文字列) }
+  headers:
+    ETag:
+      description: '現行バージョン。`"7"` の形式'
+      schema: { type: string }
+  responses:
+    BadRequest: { description: 入力不正, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthenticated: { description: トークン欠落/無効, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound: { description: 存在しない (他人のリソースも 404), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    VersionConflict:
+      description: If-Match が現行と不一致
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: version_conflict, message: 'current version is 7', details: { currentVersion: 7 } } }
+    InvalidDSL:
+      description: DSL がスキーマ/意味検証に失敗
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error:
+              code: invalid_dsl
+              message: '2 problem(s)'
+              details:
+                problems:
+                  - 'initialScreen "main" does not exist'
+                  - 'screen "home" components[1]: list entity "expenses" does not exist'
+    InvalidRecord:
+      description: data がエンティティ定義に適合しない
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: invalid_record, message: 'field "amount" is required', details: { field: amount } } }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: 機械可読コード
+              enum: [bad_request, unauthenticated, not_found, version_conflict, invalid_dsl, invalid_record, payload_too_large, rate_limited, internal]
+            message: { type: string }
+            details: { type: object, additionalProperties: true }
+            requestId: { type: string }
+    AppSummary:
+      type: object
+      required: [id, name, currentVersion, status, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        currentVersion: { type: integer }
+        status: { type: string, enum: [active, archived] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AppWithDSL:
+      allOf:
+        - { $ref: '#/components/schemas/AppSummary' }
+        - type: object
+          required: [dsl]
+          properties: { dsl: { $ref: '../dsl/dsl.schema.json' } }
+    DSLEnvelope:
+      type: object
+      required: [appId, version, dsl]
+      properties:
+        appId: { type: string }
+        version: { type: integer }
+        dsl: { $ref: '../dsl/dsl.schema.json' }
+        source: { $ref: '#/components/schemas/VersionSource' }
+        createdAt: { type: string, format: date-time }
+    VersionSource:
+      type: object
+      description: このバージョンが生まれた経緯
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [ai, manual, restore, system] }
+        mode: { type: string, enum: [full, patch], description: 'full = PUT (初回/create/fallback), patch = PATCH (編集)' }
+        transcript: { type: string, description: ユーザー発話 (ai) }
+        summary: { type: string, description: 変更の一文要約 (iOS が読み上げ) }
+        model: { type: string }
+        restoredFrom: { type: integer }
+    VersionSummary:
+      type: object
+      required: [appId, version, createdAt]
+      properties:
+        appId: { type: string }
+        version: { type: integer }
+        parentVersion: { type: integer }
+        source: { $ref: '#/components/schemas/VersionSource' }
+        patch:
+          type: array
+          description: このバージョンを作った RFC 6902 ops (PATCH 経由の時のみ)
+          items: { $ref: '../dsl/dsl.schema.json#/$defs/PatchOp' }
+        createdAt: { type: string, format: date-time }
+    RecordData:
+      type: object
+      description: 'キー = Field.id。値の型は Field.type に従う: string/text→string, integer/currency→integer, number→number, boolean→boolean, date→"YYYY-MM-DD", datetime→RFC3339, enum→options のいずれか, photo→https URL (iOS が Firebase Storage へ直接アップロード), location→"lat,lng"'
+      additionalProperties:
+        anyOf: [{ type: string }, { type: number }, { type: integer }, { type: boolean }, { type: 'null' }]
+      example: { amount: 1200, category: 食費, memo: ランチ, date: '2026-10-24' }
+    Record:
+      type: object
+      required: [id, entity, data, createdAt, updatedAt]
+      properties:
+        id: { type: string, example: rec_01HXYZ }
+        entity: { type: string }
+        data: { $ref: '#/components/schemas/RecordData' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }

@@ -43,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         if: github.event_name == 'pull_request'
         with:
@@ -66,14 +66,19 @@ jobs:
     name: ios-ci
     needs: ios-changes
     if: needs.ios-changes.outputs.run == 'true'
-    # macos-15: Xcode 16 系が既定。分単価が高いので無駄に再実行しないこと。
-    runs-on: macos-15
+    # macos-26: Xcode 26 系。firebase-ios-sdk 13.x が swift-tools 6.2(= Xcode 26)を要求するため macos-15(Xcode 16)では解決不可。
+    # 分単価が高いので無駄に再実行しないこと。
+    runs-on: macos-26
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
-      - name: Xcode バージョン
-        run: xcodebuild -version
+      - name: Xcode 26 を選択
+        run: |
+          latest="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)"
+          if [ -z "$latest" ]; then latest="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)"; fi
+          if [ -n "$latest" ]; then sudo xcode-select -s "$latest"; fi
+          xcodebuild -version
 
       # Homebrew より GitHub Release のバイナリ取得の方が速い(数秒)。バージョン固定でキャッシュ。
       - name: xcodegen キャッシュ
@@ -184,7 +189,7 @@ jobs:
 
       - name: テスト結果をアップロード(失敗時)
         if: failure() && steps.has-tests.outputs.run == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-test-results
           path: ios/TestResults.xcresult

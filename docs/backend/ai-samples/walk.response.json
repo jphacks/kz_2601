@@ -1,0 +1,217 @@
+{
+  "appId": "walk",
+  "version": 2,
+  "previousVersion": 1,
+  "mode": "full",
+  "dsl": {
+    "app": {
+      "description": "歩いた場所と写真を記録し、今日の件数と全部の一覧を見る",
+      "icon": "figure.walk",
+      "name": "散歩メモ",
+      "theme": {
+        "primaryColor": "#00897B"
+      },
+      "voiceEntry": "floating"
+    },
+    "entities": [
+      {
+        "fields": [
+          {
+            "id": "place",
+            "name": "場所",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "id": "memo",
+            "name": "メモ",
+            "type": "text"
+          },
+          {
+            "defaultValue": "now",
+            "id": "date",
+            "name": "日付",
+            "required": true,
+            "type": "date"
+          },
+          {
+            "id": "photo",
+            "name": "写真",
+            "type": "photo"
+          }
+        ],
+        "id": "walk",
+        "name": "散歩",
+        "titleField": "place"
+      }
+    ],
+    "initialScreen": "home",
+    "schemaVersion": 1,
+    "screens": [
+      {
+        "components": [
+          {
+            "area": "A1:F2",
+            "children": [
+              {
+                "aggregate": "count",
+                "entity": "walk",
+                "filter": {
+                  "field": "date",
+                  "op": "today",
+                  "value": null
+                },
+                "label": "今日の件数",
+                "type": "stat"
+              },
+              {
+                "aggregate": "count",
+                "entity": "walk",
+                "label": "全部の件数",
+                "type": "stat"
+              }
+            ],
+            "id": "summary",
+            "type": "hstack"
+          },
+          {
+            "area": "A3:F10",
+            "children": [
+              {
+                "emptyText": "まだ散歩の記録がありません",
+                "entity": "walk",
+                "item": {
+                  "image": "photo",
+                  "subtitle": "memo",
+                  "title": "place",
+                  "trailing": "date"
+                },
+                "onItemTap": {
+                  "presentation": "push",
+                  "screen": "walk_form",
+                  "type": "navigate"
+                },
+                "sort": {
+                  "direction": "desc",
+                  "field": "date"
+                },
+                "swipeToDelete": true,
+                "type": "list"
+              }
+            ],
+            "id": "all_walks",
+            "title": "全部の散歩",
+            "type": "section"
+          },
+          {
+            "action": {
+              "presentation": "sheet",
+              "screen": "walk_form",
+              "type": "navigate"
+            },
+            "area": "D11:F12",
+            "icon": "plus",
+            "id": "add",
+            "label": "散歩を記録",
+            "style": "primary",
+            "type": "button"
+          }
+        ],
+        "id": "home",
+        "title": "散歩メモ",
+        "toolbar": [
+          {
+            "action": {
+              "presentation": "sheet",
+              "screen": "walk_form",
+              "type": "navigate"
+            },
+            "icon": "plus",
+            "label": "追加"
+          }
+        ]
+      },
+      {
+        "components": [
+          {
+            "area": "A1:F6",
+            "children": [
+              {
+                "field": "place",
+                "label": "歩いた場所",
+                "placeholder": "近所の公園",
+                "type": "textField"
+              },
+              {
+                "field": "memo",
+                "label": "メモ",
+                "multiline": true,
+                "placeholder": "気づいたこと",
+                "type": "textField"
+              },
+              {
+                "field": "date",
+                "label": "日付",
+                "type": "datePicker"
+              }
+            ],
+            "id": "fields",
+            "title": "内容",
+            "type": "section"
+          },
+          {
+            "area": "A7:F9",
+            "field": "photo",
+            "id": "photo_input",
+            "label": "写真を撮る",
+            "source": "camera",
+            "type": "photoField"
+          },
+          {
+            "action": {
+              "confirmMessage": "この散歩の記録を削除しますか？",
+              "entity": "walk",
+              "type": "deleteRecord"
+            },
+            "area": "A11:F12",
+            "id": "delete",
+            "label": "削除",
+            "style": "destructive",
+            "type": "button"
+          }
+        ],
+        "entity": "walk",
+        "id": "walk_form",
+        "title": "散歩を記録",
+        "toolbar": [
+          {
+            "action": {
+              "entity": "walk",
+              "type": "saveRecord"
+            },
+            "icon": "checkmark",
+            "label": "保存"
+          }
+        ]
+      }
+    ]
+  },
+  "summary": "散歩メモを作りました。散歩メモ/散歩を記録の2画面で、散歩を記録できます。",
+  "transcript": "散歩メモのアプリ。歩いた場所と写真、今日の件数と全部の一覧が見たい",
+  "source": "claude",
+  "latencyMs": {
+    "claude": 6645,
+    "total": 6649
+  },
+  "meta": {
+    "model": "claude-sonnet-5-5",
+    "attempts": 1,
+    "regenerations": 0,
+    "areaFallback": false,
+    "usage": {
+      "inputTokens": 99,
+      "outputTokens": 1271,
+      "cacheReadInputTokens": 8588
+    }
+  }
+}

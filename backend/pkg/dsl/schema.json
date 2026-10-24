@@ -1,0 +1,2441 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jphacks/kz_2601/docs/dsl/dsl.schema.json",
+  "title": "AppDSL",
+  "description": "Server-Driven UI DSL v1 (unified backend/iOS). Non-recursive by design (Claude structured output compatible): Screen > Container > Leaf. No numeric/string length constraints here; limits are enforced by the Go validator (backend/pkg/dsl). appId/version live in the API envelope (DSLEnvelope), never in this document. $defs/PatchDocument is the structured-output schema for edit turns (RFC 6902); iOS never sees patches. Layout: each Screen has an implicit 6-column grid (A-F) x rows of visibleHeight/12; components carry an optional `area` (\"A1:C3\") rectangle, non-overlapping among siblings; components without area stack below the grid.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "app",
+    "initialScreen",
+    "entities",
+    "screens"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Fixed 1 for v1. Bumped only on incompatible changes."
+    },
+    "app": {
+      "$ref": "#/$defs/AppMeta"
+    },
+    "initialScreen": {
+      "type": "string",
+      "description": "Screen id shown at launch."
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Entity"
+      }
+    },
+    "screens": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Screen"
+      }
+    }
+  },
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "description": "snake_case or kebab-case ASCII id, unique within its scope. Validated by Go (^[a-z][a-z0-9_-]{0,39}$)."
+    },
+    "AppMeta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "voiceEntry"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string",
+          "description": "SF Symbols name, e.g. yensign.circle"
+        },
+        "theme": {
+          "$ref": "#/$defs/Theme"
+        },
+        "voiceEntry": {
+          "type": "string",
+          "enum": [
+            "fullscreen",
+            "floating",
+            "none"
+          ],
+          "description": "How the user re-enters voice mode to change the app. fullscreen = the initial voice-only state."
+        },
+        "notifications": {
+          "type": "array",
+          "description": "Local notifications iOS schedules when this DSL version is loaded (re-synced on every version).",
+          "items": {
+            "$ref": "#/$defs/Notification"
+          }
+        },
+        "tabs": {
+          "type": "array",
+          "description": "Optional bottom tab bar (2-5 tabs). Each tab is its own navigation stack rooted at `screen`. initialScreen selects the starting tab when it matches one. Omit for a single-stack app.",
+          "items": {
+            "$ref": "#/$defs/Tab"
+          }
+        }
+      }
+    },
+    "Theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "primaryColor": {
+          "type": "string",
+          "description": "#RRGGBB"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "system",
+            "light",
+            "dark"
+          ]
+        }
+      }
+    },
+    "Entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "fields"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name (ja ok)"
+        },
+        "titleField": {
+          "type": "string",
+          "description": "Field id used as the record title in lists."
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Field"
+          }
+        }
+      }
+    },
+    "Field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "type"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "text",
+            "integer",
+            "number",
+            "boolean",
+            "date",
+            "datetime",
+            "enum",
+            "currency",
+            "photo",
+            "location"
+          ],
+          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. location = \"lat,lng\" string (P1)."
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "options": {
+          "type": "array",
+          "description": "Only for type=enum.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "defaultValue": {
+          "description": "Literal default. For date/datetime the string \"now\" is allowed.",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "description": "e.g. 円, kg"
+        }
+      }
+    },
+    "Screen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "components"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "title": {
+          "type": "string"
+        },
+        "entity": {
+          "type": "string",
+          "description": "If set, the screen is a form over this entity: inputs with `field` bind to a draft record. Opened with a recordId -> edit mode."
+        },
+        "toolbar": {
+          "type": "array",
+          "description": "Trailing navigation-bar buttons.",
+          "items": {
+            "$ref": "#/$defs/ToolbarButton"
+          }
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Component"
+          }
+        }
+      }
+    },
+    "ToolbarButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "action"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/$defs/Action"
+        }
+      }
+    },
+    "Action": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "ボタン・toolbar・list.onItemTap から実行される副作用。入れ子不可。confirmMessage はどの type にも付けられ、先に確認ダイアログを出す。",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "navigate",
+            "back",
+            "saveRecord",
+            "deleteRecord",
+            "openVoice",
+            "openUrl",
+            "resetForm",
+            "scheduleNotification",
+            "cancelNotification"
+          ],
+          "x-enumDescriptions": {
+            "navigate": "画面遷移。list.onItemTap からは recordId が暗黙に渡り、遷移先フォームが編集モードになる。",
+            "back": "前の画面へ戻る(push なら pop、モーダルなら dismiss)。",
+            "saveRecord": "フォームのドラフトを保存(新規 POST / 編集 PATCH)して screen へ、無ければ back。フォーム画面の toolbar に置く。",
+            "deleteRecord": "現在のレコードを削除して back。confirmMessage を付けるのが定石。",
+            "openVoice": "音声シートを開く。",
+            "openUrl": "URL を Safari で開く。",
+            "resetForm": "フォームのドラフトを既定値に戻す。",
+            "scheduleNotification": "ローカル通知をその場で予約(dsl.<id> で置換)。任意で押すリマインドはこれ。毎日の定期通知は app.notifications に宣言する。",
+            "cancelNotification": "予約した通知を取り消す。"
+          }
+        },
+        "screen": {
+          "type": "string",
+          "description": "navigate / saveRecord: target screen id.",
+          "x-for": {
+            "navigate": "required",
+            "saveRecord": "optional"
+          }
+        },
+        "presentation": {
+          "type": "string",
+          "enum": [
+            "push",
+            "sheet",
+            "fullScreen"
+          ],
+          "x-for": {
+            "navigate": "optional"
+          }
+        },
+        "entity": {
+          "type": "string",
+          "description": "saveRecord / deleteRecord: entity id.",
+          "x-for": {
+            "saveRecord": "required",
+            "deleteRecord": "required"
+          }
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "x-for": {
+            "openUrl": "required"
+          }
+        },
+        "confirmMessage": {
+          "type": "string",
+          "description": "If set, iOS shows a confirm dialog first."
+        },
+        "notification": {
+          "$ref": "#/$defs/Notification",
+          "description": "scheduleNotification only.",
+          "x-for": {
+            "scheduleNotification": "required"
+          }
+        },
+        "notificationId": {
+          "type": "string",
+          "description": "cancelNotification only.",
+          "x-for": {
+            "cancelNotification": "required"
+          }
+        }
+      }
+    },
+    "Component": {
+      "description": "Top-level component inside a screen. Containers may hold Leaf children (one level only).",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Container"
+        },
+        {
+          "$ref": "#/$defs/Leaf"
+        }
+      ]
+    },
+    "Container": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "子 Leaf を並べる器。1 段のみ(Container の中に Container は置けない)。Screen 直下で area を持ち、子は積むだけ(子に area は付けない)。",
+      "x-usage": "Container は Leaf と同じく Screen 直下に area で置く: card / section は全幅(例 A1:F3)、stat/button タイルの grid は A1:F4、画像やヒントの carousel は A1:F4、補足の disclosure は画面下部(A9:F12)。子に area は付けない。",
+      "required": [
+        "type",
+        "children"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "vstack",
+            "hstack",
+            "section",
+            "card",
+            "disclosure",
+            "carousel",
+            "grid"
+          ],
+          "x-enumDescriptions": {
+            "vstack": "子を縦に積む。入力欄やボタンをまとめる既定の器。",
+            "hstack": "子を横に並べる。stat を 2〜3 枚並べて指標カードにする時に使う。",
+            "section": "見出し(title)付きのグループ。フォームの入力欄や一覧の見出しに使う。",
+            "card": "角丸背景+影の 1 枚カード。見出し(title)と stat/text を 2〜3 個まとめて目立たせる時に使う。",
+            "disclosure": "折りたたみグループ。title がトグル行、expanded が初期状態(既定 false)。補足説明・注意書き・あまり使わない操作に使う。",
+            "carousel": "横スクロールの帯。子を itemWidth(small|medium|large)の等幅カードとして横に並べる。ヒント・画像・クイック操作に使う。",
+            "grid": "等幅 columnCount(2|3|4)列のタイル。stat / button / image など小さい部品を並べる時に使う。"
+          }
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "section / card / disclosure の見出し(disclosure ではトグル行の文言)。",
+          "x-for": {
+            "section": "optional",
+            "card": "optional",
+            "disclosure": "optional"
+          }
+        },
+        "spacing": {
+          "type": "string",
+          "enum": [
+            "none",
+            "small",
+            "medium",
+            "large"
+          ]
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Leaf"
+          }
+        },
+        "expanded": {
+          "type": "boolean",
+          "description": "disclosure のみ: 初期状態で開いておくか(既定 false)。",
+          "x-for": {
+            "disclosure": "optional"
+          }
+        },
+        "itemWidth": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ],
+          "description": "carousel のみ: 子 1 枚の幅(small=帯の 40% / medium=70%(既定) / large=90%)。",
+          "x-for": {
+            "carousel": "optional"
+          }
+        },
+        "columnCount": {
+          "type": "integer",
+          "enum": [
+            2,
+            3,
+            4
+          ],
+          "description": "grid のみ: 等幅の列数(既定 2)。",
+          "x-for": {
+            "grid": "optional"
+          }
+        }
+      }
+    },
+    "Leaf": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Text"
+        },
+        {
+          "$ref": "#/$defs/Button"
+        },
+        {
+          "$ref": "#/$defs/TextField"
+        },
+        {
+          "$ref": "#/$defs/NumberField"
+        },
+        {
+          "$ref": "#/$defs/DatePicker"
+        },
+        {
+          "$ref": "#/$defs/Picker"
+        },
+        {
+          "$ref": "#/$defs/Toggle"
+        },
+        {
+          "$ref": "#/$defs/PhotoField"
+        },
+        {
+          "$ref": "#/$defs/Image"
+        },
+        {
+          "$ref": "#/$defs/List"
+        },
+        {
+          "$ref": "#/$defs/Stat"
+        },
+        {
+          "$ref": "#/$defs/Chart"
+        },
+        {
+          "$ref": "#/$defs/VoiceInput"
+        },
+        {
+          "$ref": "#/$defs/Spacer"
+        },
+        {
+          "$ref": "#/$defs/Divider"
+        },
+        {
+          "$ref": "#/$defs/Slider"
+        },
+        {
+          "$ref": "#/$defs/Stepper"
+        },
+        {
+          "$ref": "#/$defs/TextEditor"
+        },
+        {
+          "$ref": "#/$defs/SecureField"
+        },
+        {
+          "$ref": "#/$defs/TimePicker"
+        },
+        {
+          "$ref": "#/$defs/ColorPicker"
+        },
+        {
+          "$ref": "#/$defs/Rating"
+        },
+        {
+          "$ref": "#/$defs/Label"
+        },
+        {
+          "$ref": "#/$defs/Icon"
+        },
+        {
+          "$ref": "#/$defs/ProgressBar"
+        },
+        {
+          "$ref": "#/$defs/Gauge"
+        },
+        {
+          "$ref": "#/$defs/Badge"
+        },
+        {
+          "$ref": "#/$defs/Link"
+        },
+        {
+          "$ref": "#/$defs/Markdown"
+        },
+        {
+          "$ref": "#/$defs/Avatar"
+        },
+        {
+          "$ref": "#/$defs/Table"
+        },
+        {
+          "$ref": "#/$defs/Timeline"
+        },
+        {
+          "$ref": "#/$defs/EmptyState"
+        },
+        {
+          "$ref": "#/$defs/SearchBar"
+        },
+        {
+          "$ref": "#/$defs/Calendar"
+        },
+        {
+          "$ref": "#/$defs/ShareButton"
+        },
+        {
+          "$ref": "#/$defs/OpenUrlButton"
+        },
+        {
+          "$ref": "#/$defs/MapView"
+        },
+        {
+          "$ref": "#/$defs/LocationButton"
+        },
+        {
+          "$ref": "#/$defs/QrScanner"
+        },
+        {
+          "$ref": "#/$defs/TimerDisplay"
+        }
+      ]
+    },
+    "Text": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "固定の見出し・説明文・注意書き。レコードの値は表示しない(値は stat / list / image で)。",
+      "x-usage": "style は title(画面内見出し)/ headline / body / caption(補足)。長文はセル内でスクロールする。",
+      "required": [
+        "type",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "text"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "text": {
+          "type": "string"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "title",
+            "headline",
+            "body",
+            "caption"
+          ]
+        },
+        "align": {
+          "type": "string",
+          "enum": [
+            "leading",
+            "center",
+            "trailing"
+          ]
+        }
+      }
+    },
+    "Button": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "タップで action を実行するボタン。画面遷移・保存・削除・通知予約・音声の入口。",
+      "x-usage": "追加ボタンは右下 D11:F12 に primary、削除は destructive でフォーム下部 A11:F12。toolbar にも同じ action を置ける。",
+      "required": [
+        "type",
+        "label",
+        "action"
+      ],
+      "properties": {
+        "type": {
+          "const": "button"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary",
+            "destructive",
+            "plain"
+          ]
+        },
+        "action": {
+          "$ref": "#/$defs/Action"
+        }
+      }
+    },
+    "TextField": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "文字入力(string / text field)。multiline:true で複数行。",
+      "x-usage": "screen.entity のあるフォーム画面にのみ置く。メモ・感想・コメントなど自由文は multiline:true。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "textField"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Field id of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "multiline": {
+          "type": "boolean"
+        }
+      }
+    },
+    "NumberField": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "数値入力(integer / number / currency field)。unit で単位(円・kg・回)を添える。",
+      "x-usage": "金額は currency field + unit 円。回数・量・体重は integer / number。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "numberField"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        }
+      }
+    },
+    "DatePicker": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "日付(date)または日時(datetime・includeTime:true)の入力。",
+      "x-usage": "日付 field は defaultValue \"now\" にして入力の手間を省く。時刻まで要るときだけ includeTime:true。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "datePicker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "includeTime": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Picker": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "選択肢から 1 つ選ぶ入力(enum field の options が選択肢)。カテゴリ・種類・気分など。style=segmented がセグメントコントロール(独立した `segmented` type は無い)。",
+      "x-usage": "選択肢が 2〜4 個なら segmented(全幅 1〜2 行・例 A1:F2)、多ければ menu(1 行)、wheel は 3 行。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "picker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Must be an enum field; options come from the field."
+        },
+        "label": {
+          "type": "string"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "menu",
+            "segmented",
+            "wheel"
+          ]
+        }
+      }
+    },
+    "Toggle": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "ON/OFF スイッチ(boolean field)。完了・済み・お気に入りなどのチェック。",
+      "x-usage": "「買ったらチェック」のような完了フラグはこれ。一覧側は filter(eq false)で未完了だけに絞れる。",
+      "required": [
+        "type",
+        "field",
+        "label"
+      ],
+      "properties": {
+        "type": {
+          "const": "toggle"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "List": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "entity のレコード一覧。行の表示は item に field id を割り当て、タップで onItemTap(通常はフォームへ navigate → 編集モード)。",
+      "x-usage": "可変長なので大きめの矩形 A3:F10 でセル内スクロール。sort は日付 desc が既定、swipeToDelete:true で削除。カレンダー / タイムライン / 履歴 / 日記風の表示は日付でソートした list で代替する。",
+      "required": [
+        "type",
+        "entity",
+        "item"
+      ],
+      "properties": {
+        "type": {
+          "const": "list"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "item": {
+          "$ref": "#/$defs/ListItem"
+        },
+        "sort": {
+          "$ref": "#/$defs/Sort"
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        },
+        "emptyText": {
+          "type": "string"
+        },
+        "onItemTap": {
+          "$ref": "#/$defs/Action",
+          "description": "Usually navigate to a form screen; iOS passes recordId."
+        },
+        "swipeToDelete": {
+          "type": "boolean"
+        },
+        "searchField": {
+          "type": "string",
+          "description": "同じ画面の `searchBar.field` の id。入力文字列で title/subtitle を部分一致(大小無視)で絞り込む(iOS クライアント側)。"
+        }
+      }
+    },
+    "ListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル。",
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Field id."
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Field id."
+        },
+        "trailing": {
+          "type": "string",
+          "description": "Field id (e.g. amount, date)."
+        },
+        "icon": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string",
+          "description": "Field id of a photo field shown as thumbnail."
+        }
+      }
+    },
+    "Sort": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "list の並び順。",
+      "required": [
+        "field",
+        "direction"
+      ],
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "asc",
+            "desc"
+          ]
+        }
+      }
+    },
+    "Filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "list / stat / chart のレコード絞り込み。op が thisMonth / today のときは value を null にする。",
+      "required": [
+        "field",
+        "op",
+        "value"
+      ],
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "eq",
+            "neq",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "thisMonth",
+            "today"
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "Stat": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "集計値 1 つのカード(件数・合計・平均・最小・最大)。今月の合計・今日の件数・平均体重など。",
+      "x-usage": "2〜3 枚を hstack に入れて A1:F2 に横並び、または単体で A1:C2 / D1:F2。filter で thisMonth / today(value は null)。金額は format currency。",
+      "required": [
+        "type",
+        "label",
+        "entity",
+        "aggregate"
+      ],
+      "properties": {
+        "type": {
+          "const": "stat"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "aggregate": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum",
+            "avg",
+            "min",
+            "max"
+          ]
+        },
+        "field": {
+          "type": "string",
+          "description": "Required unless aggregate=count."
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "plain",
+            "currency",
+            "percent"
+          ]
+        }
+      }
+    },
+    "Chart": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "グラフ(棒・折れ線・円)。groupBy の field(enum か日付)ごとに集計して描く。",
+      "x-usage": "「グラフ・推移・内訳・割合」と求められた時だけ使う。推移 = line + 日付 groupBy + bucket、内訳 = pie + enum groupBy。縦 2 枚なら A1:F6 / A7:F12。",
+      "required": [
+        "type",
+        "entity",
+        "kind",
+        "groupBy",
+        "aggregate"
+      ],
+      "properties": {
+        "type": {
+          "const": "chart"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "bar",
+            "line",
+            "pie"
+          ]
+        },
+        "groupBy": {
+          "type": "string",
+          "description": "Field id (enum/date). Dates are bucketed by iOS per `bucket`."
+        },
+        "bucket": {
+          "type": "string",
+          "enum": [
+            "day",
+            "week",
+            "month"
+          ]
+        },
+        "aggregate": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum",
+            "avg"
+          ]
+        },
+        "field": {
+          "type": "string"
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        }
+      }
+    },
+    "VoiceInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "マイク UI。声でアプリを作り変える入口(初期状態は 1 画面にこれ 1 つ)。",
+      "x-usage": "生成したアプリには通常置かない(voiceEntry floating で FAB が出る)。",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "voiceInput"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Caption shown under the mic, e.g. どんなアプリが欲しい？"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "compact",
+            "large"
+          ]
+        }
+      }
+    },
+    "Spacer": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "余白。部品同士の間隔を空ける。",
+      "x-usage": "area で配置する画面ではほぼ不要。Container 内の間隔調整に。",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "spacer"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large",
+            "flexible"
+          ]
+        }
+      }
+    },
+    "Divider": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "区切り線。",
+      "x-usage": "Container 内で入力グループを分けるときに。",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "divider"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        }
+      }
+    },
+    "Notification": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "ローカル通知 1 件。app.notifications(定期)と scheduleNotification(その場で予約)で共通。time は HH:MM。",
+      "required": [
+        "id",
+        "title",
+        "body",
+        "repeat"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "title": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "repeat": {
+          "type": "string",
+          "enum": [
+            "once",
+            "daily",
+            "weekly"
+          ]
+        },
+        "time": {
+          "type": "string",
+          "description": "HH:MM local time (daily/weekly/once)."
+        },
+        "weekday": {
+          "type": "string",
+          "enum": [
+            "mon",
+            "tue",
+            "wed",
+            "thu",
+            "fri",
+            "sat",
+            "sun"
+          ],
+          "description": "weekly only."
+        }
+      }
+    },
+    "PhotoField": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "カメラ / ライブラリから写真を取り込んで photo field に保存する入力。",
+      "x-usage": "「写真を撮る・残す」は source camera、既存の写真を選ぶなら library、迷えば both。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "photoField"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Must be a photo field of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "camera",
+            "library",
+            "both"
+          ]
+        }
+      }
+    },
+    "Image": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "photo field の画像を表示する(フォーム / 詳細画面)。入力ではない。",
+      "x-usage": "撮った写真のプレビューに。一覧のサムネイルは list.item.image を使う。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "image"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "photo field of the screen entity (form/detail screens)."
+        },
+        "height": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ]
+        }
+      }
+    },
+    "PatchValue": {
+      "description": "Values a patch may insert: primitives or DSL sub-documents (no free-form objects, to stay structured-output compatible).",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/AppMeta"
+        },
+        {
+          "$ref": "#/$defs/Tab"
+        },
+        {
+          "$ref": "#/$defs/Theme"
+        },
+        {
+          "$ref": "#/$defs/Notification"
+        },
+        {
+          "$ref": "#/$defs/Entity"
+        },
+        {
+          "$ref": "#/$defs/Field"
+        },
+        {
+          "$ref": "#/$defs/Screen"
+        },
+        {
+          "$ref": "#/$defs/ToolbarButton"
+        },
+        {
+          "$ref": "#/$defs/Action"
+        },
+        {
+          "$ref": "#/$defs/Component"
+        },
+        {
+          "$ref": "#/$defs/ListItem"
+        },
+        {
+          "$ref": "#/$defs/Sort"
+        },
+        {
+          "$ref": "#/$defs/Filter"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Notification"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Entity"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Field"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Screen"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolbarButton"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Component"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Leaf"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Tab"
+          }
+        },
+        {
+          "$ref": "#/$defs/TableColumn"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TableColumn"
+          }
+        }
+      ]
+    },
+    "PatchOp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "path"
+      ],
+      "description": "RFC 6902 operation against the current App document.",
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": [
+            "add",
+            "remove",
+            "replace",
+            "move",
+            "copy",
+            "test"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "description": "JSON Pointer, e.g. /screens/0/components/- or /entities/0/fields/2"
+        },
+        "from": {
+          "type": "string",
+          "description": "move/copy only."
+        },
+        "value": {
+          "$ref": "#/$defs/PatchValue"
+        }
+      }
+    },
+    "PatchDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "patch",
+        "summary"
+      ],
+      "description": "Structured-output root for edit turns.",
+      "properties": {
+        "patch": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PatchOp"
+          }
+        },
+        "summary": {
+          "type": "string",
+          "description": "One Japanese sentence describing the change, read aloud by iOS."
+        }
+      }
+    },
+    "Area": {
+      "type": "string",
+      "pattern": "^[A-F][1-9][0-9]*:[A-F][1-9][0-9]*$",
+      "description": "Grid rectangle on the screen's implicit grid, spreadsheet style 'A1:C3' = top-left cell : bottom-right cell. Columns A-F (screen width / 6), rows 1..N (row height = visible height / 12; rows > 12 make the screen scroll). Siblings with area must not overlap (Go validator). Only meaningful for direct children of a Screen; inside a Container children are stacked. Omit to stack below the grid (fallback)."
+    },
+    "Tab": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "screen",
+        "title"
+      ],
+      "properties": {
+        "screen": {
+          "type": "string",
+          "description": "Screen id shown as this tab's root."
+        },
+        "title": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string",
+          "description": "SF Symbols name."
+        }
+      }
+    },
+    "Slider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field",
+        "min",
+        "max"
+      ],
+      "description": "範囲の決まった数値をつまみで入力(満足度 0〜10・音量 % など)。細かい桁より感覚で決める値に。自由な数値は numberField。",
+      "x-usage": "screen.entity のあるフォーム画面に全幅 2 行(例 A3:F4)。integer field は step 1。",
+      "properties": {
+        "type": {
+          "const": "slider"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Numeric field (integer/number/currency) of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "min": {
+          "type": "number",
+          "description": "Lower bound (inclusive)."
+        },
+        "max": {
+          "type": "number",
+          "description": "Upper bound (inclusive). Must be > min."
+        },
+        "step": {
+          "type": "number",
+          "description": "Increment; omit for continuous. Use 1 for integer fields."
+        }
+      }
+    },
+    "Stepper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "-/+ ボタンで少しずつ増減する数値入力(セット数・杯数・人数)。1〜2 ずつ調整する値に。広い範囲は slider。",
+      "x-usage": "全幅 1 行(例 A5:F5)。短い入力と半分ずつ横に並べてもよい。",
+      "properties": {
+        "type": {
+          "const": "stepper"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Numeric field (integer/number/currency) of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "min": {
+          "type": "number",
+          "description": "Lower bound (inclusive)."
+        },
+        "max": {
+          "type": "number",
+          "description": "Upper bound (inclusive). Must be > min when both are given."
+        },
+        "step": {
+          "type": "number",
+          "description": "Increment per tap (default 1)."
+        }
+      }
+    },
+    "TextEditor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "複数行の自由記述(日記本文・メモ・説明)。数文以上書く欄は textField ではなくこちら。",
+      "x-usage": "全幅 3〜5 行(例 A7:F10)。フォームの最後に置くことが多い。",
+      "properties": {
+        "type": {
+          "const": "textEditor"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Text field (string/text) of the screen entity."
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "minLines": {
+          "type": "integer",
+          "description": "Minimum visible lines (default 4)."
+        }
+      }
+    },
+    "SecureField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "伏せ字の文字入力(PIN・パスワード・見られたくないメモ)。",
+      "x-usage": "全幅 1 行(例 A2:F2)。",
+      "properties": {
+        "type": {
+          "const": "secureField"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Text field (string/text) of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        }
+      }
+    },
+    "TimePicker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "日付なしの時:分だけを選ぶ(起床時刻・服薬時刻・開始時刻)。string/text field には \"HH:mm\"、datetime field には今日の日付付き RFC3339 で保存。日付も要るなら datePicker。",
+      "x-usage": "半幅 2 行(例 A9:C10)で 2 つ横並びにできる。全幅でもよい。",
+      "properties": {
+        "type": {
+          "const": "timePicker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "string/text field -> stored as \"HH:mm\" (same format as Notification.time); datetime field -> stored as RFC3339 with today's date."
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "ColorPicker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "システムのカラーウェル。string/text field に \"#RRGGBB\" で保存。タグ色・ラベル色・テーマ色など色分けしたい値に。",
+      "x-usage": "全幅 1 行(例 A11:F11)。",
+      "properties": {
+        "type": {
+          "const": "colorPicker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Text field (string/text) of the screen entity; stored as \"#RRGGBB\"."
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "Rating": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "星をタップして 1〜max(既定 5)で評価。満足度・難易度・味など 5 段階評価に。細かい段階は slider。",
+      "x-usage": "全幅 1〜2 行(例 A7:F8)。",
+      "properties": {
+        "type": {
+          "const": "rating"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Numeric field (integer/number) of the screen entity; stores 1..max."
+        },
+        "label": {
+          "type": "string"
+        },
+        "max": {
+          "type": "integer",
+          "description": "Number of stars (default 5)."
+        }
+      }
+    },
+    "Label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "text",
+        "icon"
+      ],
+      "properties": {
+        "type": {
+          "const": "label"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "text": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string",
+          "description": "SF Symbols name, e.g. flame.fill"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "title",
+            "headline",
+            "body",
+            "caption"
+          ]
+        }
+      },
+      "description": "Icon + text on one line (SwiftUI Label). Choose over `text` when a small symbol makes the heading scannable (section headers, status lines).",
+      "x-usage": "Heading of a card or section: full width, 1 row (e.g. A1:F1). Inside hstack/vstack as a title line."
+    },
+    "Icon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "name"
+      ],
+      "properties": {
+        "type": {
+          "const": "icon"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "name": {
+          "type": "string",
+          "description": "SF Symbols name, e.g. heart.fill"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ]
+        },
+        "color": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary",
+            "accent",
+            "red",
+            "green",
+            "orange",
+            "blue"
+          ],
+          "description": "Semantic color (iOS maps to system colors; accent = app theme). Never a hex string."
+        }
+      },
+      "description": "A single SF Symbol with semantic color/size and no text. Use as decoration next to badges/stats or as a big hero symbol.",
+      "x-usage": "Small square cell (A1:A1, 1x1) beside text, or 2x2 as a hero mark. Prefer `label` when text accompanies it."
+    },
+    "ProgressBar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "progressBar"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number",
+          "description": "Literal progress 0..1. Omit when using entity aggregation."
+        },
+        "entity": {
+          "type": "string",
+          "description": "Entity-driven mode: progress = aggregate(field) / target."
+        },
+        "aggregate": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum"
+          ],
+          "description": "Entity mode only; default sum."
+        },
+        "field": {
+          "type": "string",
+          "description": "Numeric field aggregated (required unless aggregate=count)."
+        },
+        "target": {
+          "type": "number",
+          "description": "Entity mode denominator (> 0), e.g. monthly budget 30000."
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        }
+      },
+      "description": "Horizontal bar showing progress toward a goal (ProgressView). Either a literal `value` (0..1) or entity aggregation `sum(field)/target`. Choose for budgets, habit streaks, goal completion.",
+      "x-usage": "Full width, 1-2 rows (e.g. A3:F4), directly under the stat/label it explains."
+    },
+    "Gauge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "gauge"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number",
+          "description": "Literal value. Omit when using entity aggregation."
+        },
+        "min": {
+          "type": "number",
+          "description": "Lower bound (default 0)."
+        },
+        "max": {
+          "type": "number",
+          "description": "Upper bound (default 1; must be > min)."
+        },
+        "entity": {
+          "type": "string",
+          "description": "Entity-driven mode: value = aggregate(field)."
+        },
+        "aggregate": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum",
+            "avg",
+            "min",
+            "max"
+          ]
+        },
+        "field": {
+          "type": "string",
+          "description": "Required unless aggregate=count."
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        }
+      },
+      "description": "Circular/linear gauge of a value inside [min,max] (SwiftUI Gauge). Choose when the magnitude relative to a range matters (weight vs goal, steps vs 10000).",
+      "x-usage": "Square cell 2x2 or 3x3 (e.g. A5:C7); pair two gauges side by side (A5:C7 + D5:F7)."
+    },
+    "Badge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "badge"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "text": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary",
+            "accent",
+            "red",
+            "green",
+            "orange",
+            "blue"
+          ],
+          "description": "Semantic color (iOS maps to system colors; accent = app theme). Never a hex string."
+        }
+      },
+      "description": "Small rounded pill with short text and a semantic color (status, category, count). Choose for 1-3 word tags, not sentences.",
+      "x-usage": "Inside an hstack with other badges/icons, or a 1-row cell (e.g. D2:F2). Keep text short."
+    },
+    "Link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "text",
+        "url"
+      ],
+      "properties": {
+        "type": {
+          "const": "link"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "text": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "https URL opened in Safari."
+        }
+      },
+      "description": "Tappable text that opens an https URL (SwiftUI Link). Choose for external references (official site, docs). For in-app navigation use `button` + navigate.",
+      "x-usage": "Full width 1 row (e.g. A10:F10) near the bottom or inside a section of references."
+    },
+    "Markdown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "markdown"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "text": {
+          "type": "string",
+          "description": "Inline Markdown: **bold**, *italic*, `code`, [link](https://...). No headings/lists/tables."
+        }
+      },
+      "description": "Rich text with inline Markdown (bold/italic/code/links). Choose over `text` when emphasis inside a sentence is needed (tips, explanations).",
+      "x-usage": "Full width, 1-3 rows depending on length (e.g. A8:F9)."
+    },
+    "Avatar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "avatar"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "image": {
+          "type": "string",
+          "description": "Literal image: https URL or data:image/...;base64 string."
+        },
+        "field": {
+          "type": "string",
+          "description": "Photo field of screen.entity (form/detail screens). Takes precedence over `image`."
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name; its initials are shown when no image is available."
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ]
+        }
+      },
+      "description": "Circular profile image, or initials fallback from `name`. Choose for people/pets/profile headers; use `image` for photos of things.",
+      "x-usage": "Square cell 1x1..3x3 (e.g. D5:F7) at the top of a profile/detail screen, or inside an hstack before a name."
+    },
+    "TableColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "Field id of the table entity."
+        },
+        "title": {
+          "type": "string",
+          "description": "Header text; defaults to the field name."
+        }
+      }
+    },
+    "Table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "columns"
+      ],
+      "properties": {
+        "type": {
+          "const": "table"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TableColumn"
+          },
+          "description": "2-4 columns work best on a phone."
+        },
+        "sort": {
+          "$ref": "#/$defs/Sort"
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max rows shown (default all)."
+        }
+      },
+      "description": "Compact rows x columns grid of records (SwiftUI Grid) with a header row; columns = [{field, title?}] (2-4 columns fit a phone). Choose over `list` when several numeric columns must be compared at a glance (date / item / amount).",
+      "x-usage": "Full width, 4-6 rows (e.g. A1:F5). Scrolls inside its cell when longer."
+    },
+    "Timeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "dateField",
+        "titleField"
+      ],
+      "properties": {
+        "type": {
+          "const": "timeline"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "dateField": {
+          "type": "string",
+          "description": "date/datetime field; newest first."
+        },
+        "titleField": {
+          "type": "string"
+        },
+        "subtitleField": {
+          "type": "string"
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max entries shown (default all)."
+        }
+      },
+      "description": "Vertical chronological feed of records with a date rail (newest first). Choose over `list` for diaries, logs, history where the date is the primary axis.",
+      "x-usage": "Full width, 4-8 rows (e.g. A6:F9). Scrolls inside its cell."
+    },
+    "EmptyState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "title"
+      ],
+      "properties": {
+        "type": {
+          "const": "emptyState"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "icon": {
+          "type": "string",
+          "description": "SF Symbols name, e.g. tray"
+        },
+        "title": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "description": "Centered icon + title + message placeholder (ContentUnavailableView). Choose for screens/sections that have nothing to show yet, or onboarding hints. Lists already have `emptyText`; use this for whole screens.",
+      "x-usage": "Large cell, 3+ rows (e.g. A10:F12 or A1:F12 for a whole empty screen)."
+    },
+    "SearchBar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "searchBar"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "画面ローカルの検索キー(任意の id・例 \"search\")。entity の field ではない。同じ画面の list が `searchField` で参照する。"
+        },
+        "placeholder": {
+          "type": "string"
+        }
+      },
+      "description": "同じ画面の list を title/subtitle の部分一致で絞り込む検索欄。連絡先・本・メモなど一覧が長くなるアプリで選ぶ。screen.entity は不要。",
+      "x-usage": "一覧の直上に細い全幅の帯で置く: searchBar A1:F1、list A2:F12。list は 1 つだけ対にする(list.searchField = この field)。"
+    },
+    "Calendar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "dateField"
+      ],
+      "properties": {
+        "type": {
+          "const": "calendar"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "dateField": {
+          "type": "string",
+          "description": "レコードを日に載せる `entity` の date/datetime field。"
+        },
+        "onDateTap": {
+          "$ref": "#/$defs/Action"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "description": "月カレンダー(カレンダービュー)。entity のレコードを dateField の日に載せ、レコードのある日に点を打つ。日をタップするとその日のレコード一覧が下に出る。一覧の行タップ = onDateTap を recordId 付きで実行(編集)、「追加」= onDateTap をタップした日を dateField の初期値にして実行(新規)。予定・スケジュール・日記・習慣/トレーニング記録・シフト・締切など「日付のある記録を月表示で見たい」時に必ずこれを選ぶ(list+datePicker で代替しない)。",
+      "x-usage": "画面の主役として A1:F9 に置き、下に stat や追加ボタン(A10:F12)。onDateTap は通常 entity のフォーム画面への navigate(presentation: sheet)。"
+    },
+    "ShareButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "shareButton"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "text": {
+          "type": "string",
+          "description": "共有する文面。screen.entity がある画面では `{{fieldId}}` をフォームの現在値で置換する。"
+        },
+        "field": {
+          "type": "string",
+          "description": "任意: screen.entity の field。photo なら画像も一緒に共有、それ以外は値を文面の末尾に追加。"
+        },
+        "label": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        }
+      },
+      "description": "OS の共有シート(ShareLink)で文面と(任意で)写真を他のアプリや友人に送るボタン。日記の 1 件・記録のスコア・写真メモを共有したいアプリで選ぶ。",
+      "x-usage": "小さく画面下部の半幅(A11:C12)に、別のボタンと並べる。`field` や `{{...}}` を使う時だけ screen.entity が必要。"
+    },
+    "OpenUrlButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "label",
+        "url"
+      ],
+      "properties": {
+        "type": {
+          "const": "openUrlButton"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Safari(または対応アプリ)で開く https URL。"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary",
+            "plain"
+          ]
+        }
+      },
+      "description": "固定 URL を開くリンクボタン(公式サイト・地図検索・レシピページなど)。button + openUrl アクションと同じ意味だが短く書け、リンク風に描画される。静的な外部リンクに選ぶ。",
+      "x-usage": "画面下部の帯(A11:F12)か card/section の子として置く。他の主要ボタンと見た目を揃えたい時は button + openUrl を使う。"
+    },
+    "MapView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "locationField"
+      ],
+      "properties": {
+        "type": {
+          "const": "mapView"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "locationField": {
+          "type": "string",
+          "description": "`entity` の location field(\"lat,lng\")。値を持つレコード 1 件 = ピン 1 本。"
+        },
+        "titleField": {
+          "type": "string",
+          "description": "ピンのラベルにする field(既定 entity.titleField)。"
+        },
+        "zoom": {
+          "type": "string",
+          "enum": [
+            "near",
+            "city",
+            "wide"
+          ],
+          "description": "初期表示の広さ: near 約1km / city 約10km(既定) / wide 約100km。"
+        },
+        "onItemTap": {
+          "$ref": "#/$defs/Action",
+          "description": "ピンのタップで実行。iOS が recordId を渡す。"
+        }
+      },
+      "description": "MapKit の地図。location 値を持つレコードごとにピンを立てる。訪問スポット記録・お店リスト・釣り/散歩の地点ログなど「場所を地図で見たい」アプリで選ぶ。フォーム側の locationButton と対で使う。",
+      "x-usage": "大きめに A1:F8、下に一覧(A9:F12)。または専用タブで全面 A1:F12。entity に location 型 field が必要。"
+    },
+    "LocationButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "locationButton"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "screen.entity の location field。現在地が \"lat,lng\" で入る。"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "description": "現在地(GPS)を 1 回取得してフォームの location field に保存するボタン。散歩メモ・駐車位置・釣果など「どこで起きたか」を記録するアプリのフォーム画面で選ぶ。",
+      "x-usage": "フォーム画面のみ(screen.entity 必須)。他の入力欄の近くに 1 行(A8:F9)。ホーム側の mapView と対で使う。"
+    },
+    "QrScanner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "qrScanner"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "screen.entity の string/text field。読み取った文字列が入る。"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "description": "カメラで QR / バーコードを読み取り、文字列をフォームの文字 field に入れる(実機専用・シミュレータはプレースホルダ+手入力)。在庫管理・チケット受付・本の ISBN・URL 取り込みで選ぶ。",
+      "x-usage": "フォーム画面のみ(screen.entity 必須)。結果を表示する textField の上に 1 行(A3:F4)。"
+    },
+    "TimerDisplay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "mode"
+      ],
+      "properties": {
+        "type": {
+          "const": "timerDisplay"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "stopwatch",
+            "countdown"
+          ]
+        },
+        "seconds": {
+          "type": "integer",
+          "description": "countdown のみ: 開始秒数(例 180)。stopwatch では無視。"
+        },
+        "field": {
+          "type": "string",
+          "description": "任意: screen.entity の integer/number field。一時停止・終了時に経過秒を保存する。"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "description": "大きな mm:ss 表示と 開始/一時停止/リセット。stopwatch はカウントアップ、countdown は seconds から 0 へ。筋トレのセット・プランク・ポモドーロ・料理・瞑想など時間を計るアプリで選ぶ。",
+      "x-usage": "画面の主役として A2:F6、下にフォームの入力欄。フォーム画面で `field` を指定すると計測秒をレコードと一緒に保存できる。"
+    }
+  }
+}
