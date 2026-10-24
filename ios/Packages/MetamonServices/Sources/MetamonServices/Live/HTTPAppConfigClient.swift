@@ -74,9 +74,9 @@ public struct HTTPAppConfigClient: AppConfigClient {
     }
 
     public func restore(appId: String, toVersion version: Int) async throws -> AppDocument {
-        // 201 の本文は VersionSummary(DSL 無し)。続けて最新 DSL を取り直す
-        _ = try await request("POST", "v1/apps/\(appId)/versions/\(version)/restore")
-        return try await fetchDocument(appId: appId)
+        // 201 の本文は VersionSummary + 復元後の dsl(DSLEnvelope 互換・#67)。そのまま現行 DSL として使う
+        let data = try await request("POST", "v1/apps/\(appId)/versions/\(version)/restore")
+        return try store(appId: appId, envelope: data)
     }
 
     /// backend の `etag(v)` と同じ `"7"` 形式。

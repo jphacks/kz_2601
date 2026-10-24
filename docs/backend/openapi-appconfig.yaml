@@ -219,11 +219,15 @@ paths:
     post:
       tags: [versions]
       summary: ロールバック (該当バージョンの内容で新バージョンを作る・履歴は消さない)
+      description: |
+        応答は VersionSummary に復元後の `dsl` を足したもの(= DSLEnvelope と同じ形で読める)。
+        `source.kind=restore` / `source.restoredFrom` に元バージョンが入る。
+        クライアントは続けて `GET /dsl` を叩かずにこの本文をそのまま現行 DSL として使ってよい(#67)。
       responses:
         '201':
           description: Created
           headers: { ETag: { $ref: '#/components/headers/ETag' } }
-          content: { application/json: { schema: { $ref: '#/components/schemas/VersionSummary' } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RestoreResult' } } }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /apps/{appId}/entities:
@@ -468,6 +472,13 @@ components:
           description: このバージョンを作った RFC 6902 ops (PATCH 経由の時のみ)
           items: { $ref: '../dsl/dsl.schema.json#/$defs/PatchOp' }
         createdAt: { type: string, format: date-time }
+    RestoreResult:
+      description: restore の応答。VersionSummary + 復元後の dsl(DSLEnvelope と互換)
+      allOf:
+        - { $ref: '#/components/schemas/VersionSummary' }
+        - type: object
+          required: [dsl]
+          properties: { dsl: { $ref: '../dsl/dsl.schema.json' } }
     RecordData:
       type: object
       description: 'キー = Field.id。値の型は Field.type に従う: string/text→string, integer/currency→integer, number→number, boolean→boolean, date→"YYYY-MM-DD", datetime→RFC3339, enum→options のいずれか, photo→https URL (iOS が Firebase Storage へ直接アップロード), location→"lat,lng"'

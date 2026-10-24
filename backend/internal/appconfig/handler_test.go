@@ -177,8 +177,15 @@ func TestDSLLifecycle(t *testing.T) {
 
 	// restore 1 -> version 4 with the initial dsl
 	r = e.do("u1", http.MethodPost, app+"/versions/1/restore", nil, nil)
-	if r.code != http.StatusCreated || r.version() != 4 {
+	if r.code != http.StatusCreated || r.version() != 4 || r.hdr.Get("ETag") != `"4"` {
 		t.Fatalf("restore: %d %s", r.code, r.raw)
+	}
+	// the response carries the restored DSL (no follow-up GET /dsl needed) and its provenance
+	if d, _ := r.body["dsl"].(map[string]any); d == nil || len(d["entities"].([]any)) != 0 {
+		t.Fatalf("restore must return the restored dsl: %s", r.raw)
+	}
+	if src, _ := r.body["source"].(map[string]any); src["kind"] != "restore" || src["restoredFrom"] != float64(1) || r.body["parentVersion"] != float64(3) {
+		t.Fatalf("restore source: %s", r.raw)
 	}
 	r = e.do("u1", http.MethodGet, app+"/dsl", nil, nil)
 	if d, _ := r.body["dsl"].(map[string]any); r.version() != 4 || len(d["entities"].([]any)) != 0 {
