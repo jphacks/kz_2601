@@ -171,6 +171,40 @@
         }
       }
     },
+    "%lld / %lld 回": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld / %2$lld"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld / %lld 回"
+          }
+        }
+      }
+    },
+    "%lld 回(制限なし)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld (no limit)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 回(制限なし)"
+          }
+        }
+      }
+    },
     "%lld 秒": {
       "extractionState": "manual",
       "localizations": {
@@ -269,6 +303,74 @@
           "stringUnit": {
             "state": "translated",
             "value": "ON にすると、新しいアプリを作る前に AI が 1〜3 個だけ質問します。「このまま作る」でいつでも飛ばせます。作ったアプリの変更は質問なしですぐ反映します。"
+          }
+        }
+      }
+    },
+    "Pro にする": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go Pro"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro にする"
+          }
+        }
+      }
+    },
+    "Pro にする(%@ / 月)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go Pro (%@ / month)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro にする(%@ / 月)"
+          }
+        }
+      }
+    },
+    "Pro になりました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You're now Pro"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro になりました"
+          }
+        }
+      }
+    },
+    "Pro をご利用中です": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You're on Pro"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro をご利用中です"
           }
         }
       }
@@ -558,6 +660,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "あなた: "
+          }
+        }
+      }
+    },
+    "いつでも解約できます(App Store の設定から)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel anytime in App Store settings"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "いつでも解約できます(App Store の設定から)"
           }
         }
       }
@@ -1786,6 +1905,23 @@
         }
       }
     },
+    "プラン": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プラン"
+          }
+        }
+      }
+    },
     "マイク。タップして話す": {
       "extractionState": "manual",
       "localizations": {
@@ -2143,6 +2279,40 @@
         }
       }
     },
+    "今日の新規作成": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New apps today"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日の新規作成"
+          }
+        }
+      }
+    },
+    "今日の無料作成(%lld 回)を使い切りました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You've used today's %lld free new apps"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日の無料作成(%lld 回)を使い切りました"
+          }
+        }
+      }
+    },
     "他の端末で変更されていたため、サーバーの内容に合わせました": {
       "extractionState": "manual",
       "localizations": {
@@ -2173,6 +2343,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "件"
+          }
+        }
+      }
+    },
+    "作ったアプリへの「ここを変えて」はこれまでどおり無料": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editing your apps by voice stays free"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作ったアプリへの「ここを変えて」はこれまでどおり無料"
           }
         }
       }
@@ -2224,6 +2411,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "使用中"
+          }
+        }
+      }
+    },
+    "価格を取得できませんでした。通信状態を確認してください。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the price. Check your connection."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "価格を取得できませんでした。通信状態を確認してください。"
           }
         }
       }
@@ -2568,6 +2772,23 @@
         }
       }
     },
+    "回数制限を無効にする(デモ用)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disable the daily limit (demo)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "回数制限を無効にする(デモ用)"
+          }
+        }
+      }
+    },
     "変更を反映しています…": {
       "extractionState": "manual",
       "localizations": {
@@ -2721,6 +2942,40 @@
         }
       }
     },
+    "復元できませんでした。時間をおいて試してください。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't restore. Please try again later."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "復元できませんでした。時間をおいて試してください。"
+          }
+        }
+      }
+    },
+    "復元できる購入は見つかりませんでした。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No purchases to restore were found."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "復元できる購入は見つかりませんでした。"
+          }
+        }
+      }
+    },
     "必要な画面とデータを決めています…": {
       "extractionState": "manual",
       "localizations": {
@@ -2734,6 +2989,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "必要な画面とデータを決めています…"
+          }
+        }
+      }
+    },
+    "承認待ちです。承認されると自動で Pro になります。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for approval. You'll become Pro automatically once approved."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "承認待ちです。承認されると自動で Pro になります。"
           }
         }
       }
@@ -2908,6 +3180,23 @@
         }
       }
     },
+    "新しいアプリを、いくつでも": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make as many new apps as you like"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しいアプリを、いくつでも"
+          }
+        }
+      }
+    },
     "新しく作るアプリと質問もこの言語になります。作成済みのアプリの文言は変わりません。": {
       "extractionState": "manual",
       "localizations": {
@@ -3010,6 +3299,23 @@
         }
       }
     },
+    "月額の自動更新サブスクリプションです。期間終了の 24 時間前までに解約しない限り自動で更新されます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monthly auto-renewing subscription. It renews automatically unless cancelled at least 24 hours before the end of the period."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "月額の自動更新サブスクリプションです。期間終了の 24 時間前までに解約しない限り自動で更新されます。"
+          }
+        }
+      }
+    },
     "未ダウンロード": {
       "extractionState": "manual",
       "localizations": {
@@ -3061,6 +3367,40 @@
         }
       }
     },
+    "次回更新": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renews on"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次回更新"
+          }
+        }
+      }
+    },
+    "毎日、新しいアプリを無制限に作れます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create unlimited new apps every day"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎日、新しいアプリを無制限に作れます"
+          }
+        }
+      }
+    },
     "混み合っています": {
       "extractionState": "manual",
       "localizations": {
@@ -3108,6 +3448,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "準備完了"
+          }
+        }
+      }
+    },
+    "無料": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Free"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無料"
+          }
+        }
+      }
+    },
+    "無料プランでは新しいアプリを 1 日 %lld 回まで作れます。作ったアプリの改変は回数に数えません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The free plan lets you create %lld new apps a day. Editing your apps doesn't count."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無料プランでは新しいアプリを 1 日 %lld 回まで作れます。作ったアプリの改変は回数に数えません。"
           }
         }
       }
@@ -3584,6 +3958,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "質問をうまく用意できませんでした"
+          }
+        }
+      }
+    },
+    "購入できませんでした。時間をおいて試してください。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Purchase failed. Please try again later."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "購入できませんでした。時間をおいて試してください。"
+          }
+        }
+      }
+    },
+    "購入を復元": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore Purchases"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "購入を復元"
+          }
+        }
+      }
+    },
+    "購入を復元しました。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Purchases restored."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "購入を復元しました。"
           }
         }
       }

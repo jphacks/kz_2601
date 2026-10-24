@@ -14,6 +14,7 @@ struct SettingsSheet: View {
         NavigationStack {
             List {
                 accountSection
+                ProSettingsSection() // 課金(#77)
                 languageSection
                 voiceModelSection
                 clarifySection
