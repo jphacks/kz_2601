@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "BMI記録",
+    "description": "体重と身長を記録して BMI を自動で計算する",
+    "icon": "scalemass",
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "body",
+      "name": "記録",
+      "titleField": "date",
+      "fields": [
+        { "id": "date", "name": "日付", "type": "date", "required": true, "defaultValue": "now" },
+        { "id": "weight", "name": "体重", "type": "number", "required": true, "unit": "kg" },
+        { "id": "height", "name": "身長", "type": "number", "required": true, "unit": "cm" },
+        { "id": "bmi", "name": "BMI", "type": "number",
+          "computed": { "op": "div", "args": [ { "op": "round", "args": [ { "op": "mul", "args": [ { "op": "div", "args": [ { "ref": "weight" }, { "op": "pow", "args": [ { "op": "div", "args": [ { "ref": "height" }, 100 ] }, 2 ] } ] }, 10 ] } ] }, 10 ] } }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "BMI記録",
+      "components": [
+        { "type": "stat", "id": "avg", "area": "A1:F2", "label": "平均 BMI", "entity": "body", "aggregate": "avg", "field": "bmi" },
+        { "type": "section", "id": "history", "area": "A3:F10", "title": "履歴",
+          "children": [
+            { "type": "list", "entity": "body", "item": { "title": "date", "subtitle": "weight", "trailing": "bmi" },
+              "sort": { "field": "date", "direction": "desc" }, "emptyText": "まだ記録がありません", "swipeToDelete": true }
+          ] },
+        { "type": "button", "id": "add", "area": "D11:F12", "label": "記録する", "icon": "plus",
+          "action": { "type": "navigate", "screen": "body_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "body_form",
+      "title": "記録",
+      "entity": "body",
+      "toolbar": [
+        { "label": "保存", "action": { "type": "saveRecord", "entity": "body" } }
+      ],
+      "components": [
+        { "type": "section", "title": "体",
+          "children": [
+            { "type": "datePicker", "field": "date", "label": "日付" },
+            { "type": "numberField", "field": "weight", "label": "体重", "unit": "kg" },
+            { "type": "numberField", "field": "height", "label": "身長", "unit": "cm" }
+          ] }
+      ]
+    }
+  ]
+}
