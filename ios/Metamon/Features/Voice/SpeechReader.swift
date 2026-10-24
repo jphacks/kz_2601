@@ -114,7 +114,7 @@ final class SpeechReader: NSObject, AVSpeechSynthesizerDelegate {
 
 /// 読み上げまわりの文言(`ClarifyCopy` と同じく 1 か所に)。
 enum SpeechCopy {
-    static let sectionTitle = "読み上げ"
-    static let settingTitle = "挨拶と質問を読み上げる"
-    static let settingFooter = "ON にすると、最初の挨拶・AI の質問・アプリができた時の説明を声で読み上げます。マイクを押すとすぐ止まります。"
+    static var sectionTitle: String { L10n.tr("読み上げ") }
+    static var settingTitle: String { L10n.tr("挨拶と質問を読み上げる") }
+    static var settingFooter: String { L10n.tr("ON にすると、最初の挨拶・AI の質問・アプリができた時の説明を声で読み上げます。マイクを押すとすぐ止まります。") }
 }
