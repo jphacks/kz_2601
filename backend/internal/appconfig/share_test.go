@@ -4,9 +4,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -211,5 +214,181 @@ func TestSharePage(t *testing.T) {
 	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/s/missing", nil))
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("missing: %d", rr.Code)
+	}
+}
+
+// ownerStores runs f against Memory and, when FIRESTORE_EMULATOR_HOST is set,
+// against the Firestore emulator (ids get a per-run suffix there).
+func ownerStores(t *testing.T, f func(t *testing.T, e *env, sfx string)) {
+	t.Run("memory", func(t *testing.T) {
+		t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
+		f(t, &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(store.NewMemory()))}, "")
+	})
+	t.Run("firestore", func(t *testing.T) {
+		if os.Getenv("FIRESTORE_EMULATOR_HOST") == "" {
+			t.Skip("FIRESTORE_EMULATOR_HOST not set")
+		}
+		st, err := store.NewFirestore(t.Context(), "demo-kz2601")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = st.Close() })
+		t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
+		f(t, &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(st))}, "-"+strconv.FormatInt(time.Now().UnixNano(), 36))
+	})
+}
+
+// #153: opening someone's appId seeds it into your tree, but only its creator
+// can publish it; a blank app cannot be published or shared.
+func TestPublishCreatorOnly(t *testing.T) {
+	ownerStores(t, func(t *testing.T, e *env, sfx string) {
+		owner, squatter := "owner"+sfx, "squatter"+sfx
+		app := "/v1/apps/SQUAT-ME" + sfx
+		e.ownApp(owner, app, kakeibo(t))
+
+		// GET /dsl by another user still works (seed = join, #47 / #93) ...
+		if r := e.do(squatter, http.MethodGet, app+"/dsl", nil, nil); r.code != http.StatusOK || r.body["version"] != float64(1) {
+			t.Fatalf("seed: %d %s", r.code, r.raw)
+		}
+		// ... but the seed cannot be published
+		if r := e.do(squatter, http.MethodPost, app+"/publish", `{"description":"x"}`, nil); r.code != http.StatusForbidden {
+			t.Fatalf("squat with seed: want 403, got %d %s", r.code, r.raw)
+		}
+		// nor after writing real content to the same appId
+		if r := e.do(squatter, http.MethodPut, app+"/dsl", putBody(walk(t)), map[string]string{"If-Match": `"1"`}); r.code != http.StatusCreated {
+			t.Fatalf("squatter put: %d %s", r.code, r.raw)
+		}
+		if r := e.do(squatter, http.MethodPost, app+"/publish", `{}`, nil); r.code != http.StatusForbidden {
+			t.Fatalf("squat with content: want 403, got %d %s", r.code, r.raw)
+		}
+		if r := e.do(owner, http.MethodPost, app+"/publish", `{}`, nil); r.code != http.StatusOK || r.body["mine"] != true {
+			t.Fatalf("owner publish: %d %s", r.code, r.raw)
+		}
+		if r := e.do(squatter, http.MethodDelete, app+"/publish", nil, nil); r.code != http.StatusForbidden {
+			t.Fatalf("unpublish by non-owner: %d %s", r.code, r.raw)
+		}
+
+		// a blank app (initial DSL only) is 400 for publish and share
+		fresh := "/v1/apps/FRESH" + sfx
+		if r := e.do(owner, http.MethodGet, fresh+"/dsl", nil, nil); r.code != http.StatusOK {
+			t.Fatalf("fresh: %d %s", r.code, r.raw)
+		}
+		if r := e.do(owner, http.MethodPost, fresh+"/publish", `{}`, nil); r.code != http.StatusBadRequest {
+			t.Fatalf("publish blank: want 400, got %d %s", r.code, r.raw)
+		}
+		if r := e.do(owner, http.MethodPost, fresh+"/share", nil, nil); r.code != http.StatusBadRequest {
+			t.Fatalf("share blank: want 400, got %d %s", r.code, r.raw)
+		}
+		// the blank attempt did not claim it: generating then publishing works
+		e.ownApp(owner, fresh, walk(t))
+		if r := e.do(owner, http.MethodPost, fresh+"/publish", `{}`, nil); r.code != http.StatusOK {
+			t.Fatalf("publish after generate: %d %s", r.code, r.raw)
+		}
+	})
+}
+
+// #153 / #118: a member who joined a shared app keeps using and sharing it,
+// but cannot publish it.
+func TestJoinedMemberCannotPublish(t *testing.T) {
+	ownerStores(t, func(t *testing.T, e *env, sfx string) {
+		owner, friend, guest := "owner"+sfx, "friend"+sfx, "guest"+sfx
+		app := "/v1/apps/BOARD" + sfx
+		e.ownApp(owner, app, sharedKakeibo(t))
+		tok, _ := e.do(owner, http.MethodPost, app+"/share", nil, nil).body["token"].(string)
+		if r := e.do(friend, http.MethodPost, "/v1/shares/"+tok+"/import", nil, nil); r.code != http.StatusCreated || r.body["joined"] != true {
+			t.Fatalf("join: %d %s", r.code, r.raw)
+		}
+		if r := e.do(friend, http.MethodPost, app+"/publish", `{}`, nil); r.code != http.StatusForbidden {
+			t.Fatalf("member publish: want 403, got %d %s", r.code, r.raw)
+		}
+		r := e.do(friend, http.MethodPost, app+"/share", nil, nil)
+		if r.code != http.StatusCreated {
+			t.Fatalf("member share: %d %s", r.code, r.raw)
+		}
+		tok2, _ := r.body["token"].(string)
+		if r = e.do(guest, http.MethodPost, "/v1/shares/"+tok2+"/import", nil, nil); r.code != http.StatusCreated || r.body["id"] != "BOARD"+sfx || r.body["joined"] != true {
+			t.Fatalf("guest join via member's share: %d %s", r.code, r.raw)
+		}
+		if r = e.do(owner, http.MethodPost, app+"/publish", `{}`, nil); r.code != http.StatusOK {
+			t.Fatalf("owner publish: %d %s", r.code, r.raw)
+		}
+	})
+}
+
+// #154: installing again returns the first copy and installs counts uids.
+func TestInstallTwiceCountsOnce(t *testing.T) {
+	ownerStores(t, func(t *testing.T, e *env, sfx string) {
+		owner, finder := "owner"+sfx, "finder"+sfx
+		id := "TWICE" + sfx
+		e.ownApp(owner, "/v1/apps/"+id, kakeibo(t))
+		e.do(owner, http.MethodPost, "/v1/apps/"+id+"/publish", `{}`, nil)
+
+		r1 := e.do(finder, http.MethodPost, "/v1/public-apps/"+id+"/install", nil, nil)
+		if r1.code != http.StatusCreated || r1.body["created"] != true {
+			t.Fatalf("install: %d %s", r1.code, r1.raw)
+		}
+		copyID, _ := r1.body["id"].(string)
+		e.do(finder, http.MethodDelete, "/v1/apps/"+copyID, nil, nil) // archived; re-install brings it back
+		r2 := e.do(finder, http.MethodPost, "/v1/public-apps/"+id+"/install", nil, nil)
+		if r2.code != http.StatusCreated || r2.body["created"] != false || r2.body["id"] != copyID || r2.body["status"] != "active" {
+			t.Fatalf("re-install: %d %s", r2.code, r2.raw)
+		}
+		e.do(owner, http.MethodPost, "/v1/public-apps/"+id+"/install", nil, nil)
+		r := e.do(finder, http.MethodGet, "/v1/public-apps?pageSize=200", nil, nil)
+		var installs any
+		for _, it := range r.body["items"].([]any) {
+			if m := it.(map[string]any); m["id"] == id {
+				installs = m["installs"]
+			}
+		}
+		if installs != float64(1) {
+			t.Fatalf("installs: want 1, got %v (%s)", installs, r.raw)
+		}
+	})
+}
+
+// #153: listings made before app_owners existed keep their publisher as creator.
+func TestPublishLegacyListingOwner(t *testing.T) {
+	ctx := t.Context()
+	st := store.NewMemory()
+	raw := kakeibo(t)
+	if _, _, err := st.EnsureApp(ctx, "legacy", "OLD", raw, "家計簿"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.PutCatalogApp(ctx, "legacy", store.CatalogApp{ID: "OLD", Name: "家計簿", DSL: raw, Version: 1}); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
+	e := &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(st))}
+	e.ownApp("squatter", "/v1/apps/OLD", walk(t))
+	if r := e.do("squatter", http.MethodPost, "/v1/apps/OLD/publish", `{}`, nil); r.code != http.StatusForbidden {
+		t.Fatalf("squat legacy: want 403, got %d %s", r.code, r.raw)
+	}
+	if r := e.do("legacy", http.MethodPost, "/v1/apps/OLD/publish", `{}`, nil); r.code != http.StatusOK {
+		t.Fatalf("legacy owner republish: %d %s", r.code, r.raw)
+	}
+	if o, _ := st.AppOwner(ctx, "OLD"); o != "legacy" {
+		t.Fatalf("owner backfilled: %q", o)
+	}
+}
+
+// #154: placeholder strings are not appIds; existing id styles still are.
+func TestInvalidAppID(t *testing.T) {
+	e := newEnv(t)
+	for _, id := range []string{"null", "undefined", "NULL", "a%20b", strings.Repeat("x", 129)} {
+		if r := e.do("u", http.MethodGet, "/v1/apps/"+id+"/dsl", nil, nil); r.code != http.StatusBadRequest {
+			t.Fatalf("GET /apps/%s/dsl: want 400, got %d %s", id, r.code, r.raw)
+		}
+	}
+	if r := e.do("u", http.MethodPost, "/v1/apps", `{"id":"undefined"}`, nil); r.code != http.StatusBadRequest {
+		t.Fatalf("create undefined: %d %s", r.code, r.raw)
+	}
+	for _, id := range []string{"8F2C1A3E-0B6D-4E1F-9A7C-2D5B8E4F6A10", "catalog-kakeibo", "RT-SMOKE-1761300000", "app_01JB0000000000000000000000", "nullable"} {
+		if r := e.do("u", http.MethodGet, "/v1/apps/"+id+"/dsl", nil, nil); r.code != http.StatusOK {
+			t.Fatalf("GET /apps/%s/dsl: want 200, got %d %s", id, r.code, r.raw)
+		}
+	}
+	if r := e.do("u", http.MethodGet, "/v1/apps", nil, nil); len(r.body["items"].([]any)) != 5 {
+		t.Fatalf("only valid ids seeded: %s", r.raw)
 	}
 }

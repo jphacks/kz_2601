@@ -143,7 +143,7 @@ func uidOf(r *http.Request) string { return auth.UID(r.Context()) }
 
 func pathID(r *http.Request, name string) (string, error) {
 	v := r.PathValue(name)
-	if !idRe.MatchString(v) {
+	if !idRe.MatchString(v) || (name == "appId" && !validAppID(v)) {
 		return "", apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "invalid "+name)
 	}
 	return v, nil

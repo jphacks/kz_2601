@@ -89,7 +89,7 @@ func (h *Handler) createApp(w http.ResponseWriter, r *http.Request) {
 	id := body.ID
 	if id == "" {
 		id = store.NewID("app_")
-	} else if !idRe.MatchString(id) {
+	} else if !validAppID(id) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "invalid id"))
 		return
 	}
@@ -101,6 +101,9 @@ func (h *Handler) createApp(w http.ResponseWriter, r *http.Request) {
 	if !isNew {
 		fail(w, apiErr(http.StatusConflict, httpx.CodeVersionConflict, "app already exists").With("currentVersion", created.CurrentVersion))
 		return
+	}
+	if len(body.DSL) > 0 {
+		h.claim(r, id)
 	}
 	h.publish(r, id, app, raw, created.CurrentVersion)
 	w.Header().Set("ETag", etag(created.CurrentVersion))
