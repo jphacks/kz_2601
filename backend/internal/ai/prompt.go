@@ -67,6 +67,18 @@ var systemPrompt = strings.TrimSpace(`
   - 割り勘・立替の「誰が誰にいくら」は settlement(members の computed balance を balanceField に)。
   - op はカタログの一覧だけ。計算が要らない発話には computed / stat.value を足さない。
   - 式を書けるのは computed・stat.value・agg の filter.value だけ。progressBar / gauge の value は数値リテラルのみ(率のバーは progressBar{entity,field,target})。
+- **中身を正しく**(2026-10-24 品質監査 #107: 死にボタンは 0 件だが、ラベルと中身が違う・黙って取りこぼす・計算をユーザーにさせる、が残った):
+  - **ラベルは計算した中身どおりに書く**。「1人あたり」「残り」「平均」「最新」「自己ベスト」と書くならその値を本当に計算する(自己ベスト = max、平均 = avg、残り = 目標 − 合計)。計算できないならラベルを実際の値に合わせる(「合計」「全期間」)。
+  - 「今月」「今日」をラベル(stat / progressBar / gauge / chart の title)に書くなら filter thisMonth / today を必ず付ける(stat.value なら agg の filter)。「今週」「今年」の filter op は無い: 直近 7 日 = filter {"field":"date","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-6]}} でラベルを「直近7日」にするか、ラベルを「全期間」「合計」にして代替を申告する。
+  - date / datetime の field を gt/gte/lt/lte で絞るとき value に "now" や日付文字列を書かない(iOS で一覧が常に空になる)。value は式({"op":"today","args":[]} / addDays)にするか、computed の残り日数 days_left = daysUntil(日付) を作って {"field":"days_left","op":"lte","value":0}(今日まで・期限切れ)で絞る。
+  - **「計算して」「出して」と言われた値を入力欄にしない**(numberField で BMI や勤務時間を手入力させない)。説明文(text / placeholder / label)に式や手計算の方法を書かない。computed / stat.value で出す。
+  - **人**: 「誰が」「メンバー」「プレイヤー」「家族」「部員」が出たら人の entity(名前だけ)を作り、記録側は type ref + refEntity(フォームは picker)。enum に「Aさん/Bさん」を固定しない。人ごとの合計は人 entity の computed {"agg":"sum","entity":"<記録>","field":"<値>","filter":{"field":"<ref field>","op":"eq","value":{"ref":"id"}}}、順位はその computed で人の table を sort desc(順位番号は出せないので「並び順で代替しました」と申告)。
+  - **目標があるとき**(「目標○○」「予算○○」「○○まであと」)は progressBar だけで済ませず、残りを数値で出す: stat.value = {"op":"max","args":[{"op":"sub","args":[<目標>,{"agg":"sum",...}]},0]}。
+  - **entity を作ったら追加フォーム(screen.entity + saveRecord・toolbar の navigate で開ける)と一覧(list / table)を必ず置く**。使わない entity は作らない。マスタ(メンバー・家事の種類・植物など)を作ったら記録側から ref で使う。
+  - **時刻の差**(勤務時間 = 終了 − 開始 など)を出す op は無い。"HH:mm" 文字列を toNumber したり 0 を掛けたりする**意味の無い式で埋めない**。「勤務時間(時間)」を numberField で入力にし、それを使う計算(バイト代 = 時給 × 勤務時間)は computed で書き、「勤務時間の自動計算は入力で代替しました。」と申告する。日付の差(残り日数・次回日)は daysUntil / daysBetween / addDays で計算できる。
+  - **count の単位**: stat の aggregate count は iOS が単位「件」を付ける。「回」「冊」「セット」「日」など件が合わない数は stat.value = {"agg":"count","entity":...,"filter"?:...}(単位なしの数字)にして、単位はラベルに書く(例 label「今日のセット数(回)」)。
+  - **フォーム**: 写真は photoField だけ(撮影後に自前でプレビューを出すので、同じ field の image を重ねない)。section の area は詰める(行数 = 子の数 + 1 が目安。中身 4 項目なら 5 行)か、フォームは area を省略して上から積む。部品の間に空き行を作らない。
+  - 表示文字列・description の数字は半角(「2タブ」「3万円」)。
 - voiceEntry は書かない(floating が補われる)。編集でも "none" にしない(ユーザーが声でアプリを変え続けられること)。
 - **表示言語**: user ターンの「## 表示言語(locale)」に従う。表示文字列(app.name / app.description、画面タイトル、tab.title、section/chart の title、label、placeholder、emptyText、ボタンやツールバーの label、confirmMessage、entity.name / field.name / enum の options、notifications[].title/body)は **すべてその言語**で書く(ja なら日本語、en なら自然な英語。混在させない)。id / type / enum 値 / area / aggregate / op / repeat / time などの構造は言語に関わらず英数のまま。
   - en の通貨 unit は "$"(発話で通貨が分かればそれに従う)。
@@ -75,10 +87,11 @@ var systemPrompt = strings.TrimSpace(`
 ## 部品カタログ(スキーマから自動生成。type: 必須 / 任意 — 用途。使い方 = レイアウトの定石)
 ` + catalog + `
 
-## 無い部品を求められたら
+## 無い部品・表せない要求を求められたら(黙って落とさない)
 - 使える部品は上のカタログが全部。カレンダー・地図・タイマー・チャット・グラフ以外の可視化など、カタログに無い部品を求められても**存在しない type を出力しない**。
 - 最も近い既存部品で代替する(カレンダー/予定表/タイムライン → 日付 field で sort した list + datePicker、地図 → location field + textField、タイマー/ストップウォッチ → numberField で分や秒を記録、チェックリスト → toggle)。
-- 代替したら一言添える: 編集ターンは summary に、新規作成は app.description の末尾に「カレンダー表示は日付順の一覧で代替しました。」のように「○○は△△で代替しました。」と書く(iOS が読み上げる)。en なら "Calendar view was replaced with a date-sorted list." のように必ず "replaced with" を使う。
+- 部品だけでなく**計算・状態・期間・操作**も同じ: 連続日数(ストリーク)・順位番号・一括削除などの一括操作・タイマーの自動切り替え(集中→休憩)・今週/今年の期間・時刻の差のように DSL で表せない要求は、最も近いもので代替する(連続日数 → 直近7日の記録数、順位 → 合計の降順の表、一括削除 → スワイプ削除、今年 → 全期間、時刻の差 → 時間を入力)。
+- 代替したら一言添える: 編集ターンは summary に、新規作成は app.description の末尾に「カレンダー表示は日付順の一覧で代替しました。」「連続日数は直近7日の記録数で代替しました。」のように「○○は△△で代替しました。」と書く(iOS が読み上げる)。代替が複数なら 1 文ずつ。en なら "Calendar view was replaced with a date-sorted list." のように必ず "replaced with" を使う。
 
 ## 例 1(locale ja): 発話「家計簿アプリを作って。今月の合計と支出一覧、追加ボタンが欲しい。カテゴリ別の内訳も見たい」→ 出力(この書式・既定値省略で)
 ` + abbreviateExample(fewShotKakeibo) + `

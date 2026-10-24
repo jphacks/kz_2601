@@ -152,6 +152,27 @@ func TestNormalizeDigits(t *testing.T) {
 	}
 }
 
+// The audit #107 rules must stay in the system prompt (they are what moves
+// the eval numbers in docs/backend/ai-eval/2026-10-24-prompt-fixes.md).
+func TestSystemPromptHasQualityRules(t *testing.T) {
+	for _, s := range []string{
+		"ラベルは計算した中身どおりに書く",
+		"filter thisMonth / today を必ず付ける",
+		"計算して」「出して」と言われた値を入力欄にしない",
+		"人の entity",
+		"残りを数値で出す",
+		"追加フォーム(screen.entity + saveRecord",
+		"意味の無い式で埋めない",
+		"count の単位",
+		"photoField だけ",
+		"計算・状態・期間・操作",
+	} {
+		if !strings.Contains(systemPrompt, s) {
+			t.Errorf("system prompt lost the rule %q", s)
+		}
+	}
+}
+
 func TestLintExampleFewShotsClean(t *testing.T) {
 	for _, raw := range []string{fewShotKakeibo, fewShotExpenseEN, fewShotWarikan} {
 		app, err := dsl.Parse([]byte(raw))
