@@ -14,6 +14,7 @@ public enum DSLExamples {
         "gallery-web",
         "warikan",
         "bmi",
+        "shopping",
         "navigation",
     ]
 

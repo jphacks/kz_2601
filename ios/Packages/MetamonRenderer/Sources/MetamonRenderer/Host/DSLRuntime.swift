@@ -19,6 +19,9 @@ public protocol DSLRuntime: AnyObject, Observable {
     func records(for entity: String) -> [Record]
     func load(entities: Set<String>, force: Bool) async
     func run(_ action: Action, _ ctx: ActionContext) async
+    /// 既存レコードの一部フィールドだけを保存する(`list.item.toggle` のワンタップ チェック #108)。
+    /// ローカル DB に即反映して同期キューが送る(フォームの saveRecord と同じ経路)。保存できなければ false(呼び出し側が表示を戻す)。
+    func updateRecord(entity: String, recordId: String, data: [String: JSONValue]) async -> Bool
     /// back: スタックに積まれていれば pop、モーダルの最下層なら dismiss
     func close(_ route: Route)
     func pathBinding(_ stack: String) -> Binding<[Route]>
@@ -27,6 +30,8 @@ public protocol DSLRuntime: AnyObject, Observable {
 public extension DSLRuntime {
     func load(entities: Set<String>) async { await load(entities: entities, force: false) }
     var failed: Set<String> { [] }
+    /// 既定は保存しない(プレビュー・テスト用のランタイム)。
+    func updateRecord(entity: String, recordId: String, data: [String: JSONValue]) async -> Bool { false }
 
     /// 部品が共通で使う空状態の判定: 読み込み中 / 取得失敗 / 本当に空。
     func emptyState(for entity: String) -> EmptyState {
