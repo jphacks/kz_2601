@@ -12,7 +12,7 @@ struct SearchBarLeaf: View {
         if let locals = ctx.locals, let key = c.field {
             HStack(spacing: RenderTheme.Spacing.sm + 2) {
                 InputIcon(name: "magnifyingglass", focused: focused)
-                TextField(c.placeholder ?? "検索", text: locals.text(key))
+                TextField(c.placeholder ?? L("検索"), text: locals.text(key))
                     .textFieldStyle(.plain)
                     .font(RenderTheme.Fonts.inputValue)
                     .autocorrectionDisabled()
@@ -23,12 +23,12 @@ struct SearchBarLeaf: View {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("クリア")
+                    .accessibilityLabel(L("クリア"))
                 }
             }
             .renderInputChrome(focused: focused)
         } else {
-            UnsupportedComponent(label: "searchBar は field が必要です")
+            UnsupportedComponent(label: L("searchBar は field が必要です"))
         }
     }
 }

@@ -1,23 +1,42 @@
 import Foundation
 
 /// stat / chart / list の filter・sort・集計。v1 は **iOS クライアント集計**(件数が増えたらサーバー側へ)。
-/// `thisMonth` / `today` は端末ローカル時刻基準。
+/// 期間 filter(`today` / `thisWeek` / `thisMonth` / `thisYear`)は端末ローカル時刻基準。
 public enum Aggregator {
+    /// iOS が解釈する `Filter.op`(schema の enum と一致させる。テストで突き合わせる)。
+    public static let filterOps: Set<String> = ["eq", "neq", "gt", "gte", "lt", "lte", "today", "thisWeek", "thisMonth", "thisYear"]
+
+    /// `thisWeek` 用の暦: 週の始まりを**月曜に固定**する。
+    /// 日本の暦・学校・職場の「今週」は月〜日で数えるのが一般的で、ロケール既定(ja_JP は日曜始まり)のままだと
+    /// 日曜の記録が翌週側に入り、週末に振り返る用途(家事当番・週の目標)で直感とずれるため。
+    public static func weekCalendar(_ base: Calendar = .current) -> Calendar {
+        var cal = base
+        cal.firstWeekday = 2
+        return cal
+    }
+
     public static func apply(_ filter: Filter?, entity: Entity?, to records: [Record]) -> [Record] {
         guard let filter else { return records }
         let field = entity?.field(filter.field)
         return records.filter { matches(filter, record: $0, field: field) }
     }
 
-    public static func matches(_ f: Filter, record: Record, field: Field?) -> Bool {
+    public static func matches(_ f: Filter, record: Record, field: Field?, now: Date = Date(), calendar: Calendar = .current) -> Bool {
         let v = record[f.field]
         switch f.op {
         case "thisMonth":
             guard let d = FieldCoding.date(from: v) else { return false }
-            return Calendar.current.isDate(d, equalTo: Date(), toGranularity: .month)
+            return calendar.isDate(d, equalTo: now, toGranularity: .month)
         case "today":
             guard let d = FieldCoding.date(from: v) else { return false }
-            return Calendar.current.isDateInToday(d)
+            return calendar.isDate(d, inSameDayAs: now)
+        case "thisWeek":
+            // 月曜 0:00 ≤ d < 次の月曜 0:00(年をまたぐ週もそのまま 1 週として扱う)
+            guard let d = FieldCoding.date(from: v), let week = weekCalendar(calendar).dateInterval(of: .weekOfYear, for: now) else { return false }
+            return d >= week.start && d < week.end
+        case "thisYear":
+            guard let d = FieldCoding.date(from: v) else { return false }
+            return calendar.isDate(d, equalTo: now, toGranularity: .year)
         case "eq": return v == f.value || v.displayString == (f.value ?? .null).displayString
         case "neq": return !(v == f.value || v.displayString == (f.value ?? .null).displayString)
         case "gt", "gte", "lt", "lte":

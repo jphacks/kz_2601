@@ -820,7 +820,7 @@
       "type": "object",
       "additionalProperties": false,
       "description": "ON/OFF スイッチ(boolean field)。完了・済み・お気に入りなどのチェック。",
-      "x-usage": "「買ったらチェック」のような完了フラグはこれ。一覧側は filter(eq false)で未完了だけに絞れる。",
+      "x-usage": "完了フラグをフォームで編集するときに。一覧から 1 タップでチェックさせたいなら、同じ boolean field を list.item.toggle にも指定する(フォームを開かせない)。一覧側は filter(eq false)で未完了だけに絞れる。",
       "required": [
         "type",
         "field",
@@ -848,7 +848,7 @@
       "type": "object",
       "additionalProperties": false,
       "description": "entity のレコード一覧。行の表示は item に field id を割り当て、タップで onItemTap(通常はフォームへ navigate → 編集モード)。",
-      "x-usage": "可変長なので大きめの矩形 A3:F10 でセル内スクロール。sort は日付 desc が既定、swipeToDelete:true で削除。カレンダー / タイムライン / 履歴 / 日記風の表示は日付でソートした list で代替する。",
+      "x-usage": "可変長なので大きめの矩形 A3:F10 でセル内スクロール。sort は日付 desc が既定、swipeToDelete:true で削除。カレンダー / タイムライン / 履歴 / 日記風の表示は日付でソートした list で代替する。 「買ったらチェック」「飲んだらチェック」「済んだらチェック」のようなチェックリストは item.toggle に boolean field(行頭の丸を 1 タップで保存・フォーム不要)。未完了だけ見せるなら filter {field, op:eq, value:false}。",
       "required": [
         "type",
         "entity",
@@ -895,7 +895,7 @@
     "ListItem": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル。",
+      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル、toggle に boolean field で行頭のチェック丸。",
       "required": [
         "title"
       ],
@@ -918,6 +918,10 @@
         "image": {
           "type": "string",
           "description": "Field id of a photo field shown as thumbnail."
+        },
+        "toggle": {
+          "type": "string",
+          "description": "Field id of a stored boolean field. iOS draws a check circle at the row start; tapping it flips the value and saves that record immediately (no form). Checked rows are struck through and dimmed."
         }
       }
     },
@@ -945,7 +949,7 @@
     "Filter": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list / stat / chart / agg のレコード絞り込み。op が thisMonth / today のときは value を null にする。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。",
+      "description": "list / stat / chart / agg のレコード絞り込み。op が today / thisWeek / thisMonth / thisYear(期間・端末ローカル。今週は月曜始まり)のときは value を null にし、field は date / datetime。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。",
       "required": [
         "field",
         "op",
@@ -965,8 +969,22 @@
             "lt",
             "lte",
             "thisMonth",
-            "today"
-          ]
+            "today",
+            "thisWeek",
+            "thisYear"
+          ],
+          "x-enumDescriptions": {
+            "eq": "field == value",
+            "neq": "field != value",
+            "gt": "field > value",
+            "gte": "field >= value",
+            "lt": "field < value",
+            "lte": "field <= value",
+            "today": "今日(端末ローカル)。value は null",
+            "thisWeek": "今週 = 月曜 0:00 〜 日曜 24:00(端末ローカル)。value は null",
+            "thisMonth": "今月(端末ローカル)。value は null",
+            "thisYear": "今年 = 1/1 〜 12/31(端末ローカル)。value は null"
+          }
         },
         "value": {
           "anyOf": [
@@ -995,7 +1013,7 @@
               "$ref": "#/$defs/ExprIf"
             }
           ],
-          "description": "Literal or Expr. null for thisMonth/today. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id)."
+          "description": "Literal or Expr. null for today/thisWeek/thisMonth/thisYear. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id)."
         }
       }
     },
@@ -1003,7 +1021,7 @@
       "type": "object",
       "additionalProperties": false,
       "description": "集計値 1 つのカード(件数・合計・平均・最小・最大)、または計算式 value の結果。今月の合計・今日の件数・平均体重・残り予算・1人あたりなど。",
-      "x-usage": "2〜3 枚を hstack に入れて A1:F2 に横並び、または単体で A1:C2 / D1:F2。filter で thisMonth / today(value は null)。金額は format currency。aggregate と value はどちらか一方: 単純な合計/件数は aggregate、差・割り算・条件分岐が要る時は value に Expr(例: 残り予算 {\"op\":\"sub\",\"args\":[50000,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]})。",
+      "x-usage": "2〜3 枚を hstack に入れて A1:F2 に横並び、または単体で A1:C2 / D1:F2。filter で期間を絞る: 今日 today / 今週 thisWeek / 今月 thisMonth / 今年 thisYear(value は null)。ラベルに「今週」「今年」と書いたら必ず同じ期間の filter を付ける。金額は format currency。aggregate と value はどちらか一方: 単純な合計/件数は aggregate、差・割り算・条件分岐が要る時は value に Expr(例: 残り予算 {\"op\":\"sub\",\"args\":[50000,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]})。",
       "required": [
         "type",
         "label"
@@ -2606,7 +2624,8 @@
         "BMI(body{date,weight:number kg,height:number cm}): body.computed bmi(number) = {\"op\":\"div\",\"args\":[{\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"op\":\"div\",\"args\":[{\"ref\":\"weight\"},{\"op\":\"pow\",\"args\":[{\"op\":\"div\",\"args\":[{\"ref\":\"height\"},100]},2]}]},10]}]},10]}(小数 1 桁)。list の trailing / table の列に bmi。",
         "残り予算: stat.value = {\"op\":\"sub\",\"args\":[<予算>,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]}。予算額が発話に無い/後で変えたいなら budget{amount:currency} entity を作り <予算> = {\"agg\":\"max\",\"entity\":\"budget\",\"field\":\"amount\"}。",
         "達成率: stat{format:percent,value:{\"op\":\"div\",\"args\":[{\"agg\":\"sum\",\"entity\":\"saving\",\"field\":\"amount\"},<目標>]}}(percent は 0..1 を % 表示)+ progressBar{entity,field,target:<目標>}。",
-        "カウントダウン: exam{title,date:date} の computed days_left(integer) = {\"op\":\"daysUntil\",\"args\":[{\"ref\":\"date\"}]}。list の trailing に days_left、最も近い試験は stat.value = {\"agg\":\"min\",\"entity\":\"exam\",\"field\":\"days_left\",\"filter\":{\"field\":\"days_left\",\"op\":\"gte\",\"value\":0}}。"
+        "カウントダウン: exam{title,date:date} の computed days_left(integer) = {\"op\":\"daysUntil\",\"args\":[{\"ref\":\"date\"}]}。list の trailing に days_left、最も近い試験は stat.value = {\"agg\":\"min\",\"entity\":\"exam\",\"field\":\"days_left\",\"filter\":{\"field\":\"days_left\",\"op\":\"gte\",\"value\":0}}。",
+        "シフト・バイト代(shift{date,start:string \"HH:mm\"(timePicker),end:string \"HH:mm\",wage:currency 時給}): computed hours(number) = {\"op\":\"hoursBetween\",\"args\":[{\"ref\":\"start\"},{\"ref\":\"end\"}]}(22:00→翌 5:00 は 7)/ pay(currency) = {\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"ref\":\"hours\"},{\"ref\":\"wage\"}]}]}。今月の給料 = stat aggregate sum pay filter date thisMonth。時刻を toNumber しない。"
       ]
     },
     "ExprRef": {
@@ -2707,6 +2726,7 @@
             "daysBetween",
             "daysUntil",
             "addDays",
+            "hoursBetween",
             "year",
             "month",
             "day",
@@ -2747,6 +2767,7 @@
             "daysBetween": "daysBetween(a,b) = b - a の日数",
             "daysUntil": "daysUntil(d) = d - 今日 の日数(過ぎたら負)",
             "addDays": "addDays(d, n) = d の n 日後",
+            "hoursBetween": "hoursBetween(start, end) = \"HH:mm\" 同士の差の時間数(小数。30 分 = 0.5)。end < start は日付またぎとして +24h。勤務時間・睡眠時間に",
             "year": "年",
             "month": "月(1-12)",
             "day": "日(1-31)",

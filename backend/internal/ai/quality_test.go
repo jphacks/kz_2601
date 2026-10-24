@@ -169,6 +169,13 @@ func TestSystemPromptHasQualityRules(t *testing.T) {
 		"count の単位",
 		"photoField だけ",
 		"計算・状態・期間・操作",
+		"filter thisWeek(月曜始まりの暦の週)/ thisYear",
+		`{"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]}`,
+		"一覧の list.item.toggle",
+		"入れた記録を見て直せる list",
+		"済み(eq true)の list",
+		"時間順・時刻順の予定",
+		"分類の合計 chart",
 	} {
 		if !strings.Contains(systemPrompt, s) {
 			t.Errorf("system prompt lost the rule %q", s)

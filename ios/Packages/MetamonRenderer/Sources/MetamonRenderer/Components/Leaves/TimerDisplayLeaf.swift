@@ -28,12 +28,12 @@ struct TimerDisplayLeaf: View {
                 .foregroundStyle(finished ? AnyShapeStyle(RenderTheme.Colors.negative) : AnyShapeStyle(RenderTheme.brandFill))
                 .contentTransition(.numericText())
             HStack(spacing: 12) {
-                Button(running ? "一時停止" : (elapsed > 0 && !finished ? "再開" : "開始"), systemImage: running ? "pause.fill" : "play.fill") {
+                Button(running ? L("一時停止") : (elapsed > 0 && !finished ? L("再開") : L("開始")), systemImage: running ? "pause.fill" : "play.fill") {
                     running ? pause() : start()
                 }
                 .buttonStyle(RenderButtonStyle(kind: .primary))
                 .disabled(finished)
-                Button("リセット", systemImage: "arrow.counterclockwise") { reset() }
+                Button(L("リセット"), systemImage: "arrow.counterclockwise") { reset() }
                     .buttonStyle(RenderButtonStyle(kind: .secondary))
                     .disabled(elapsed == 0 && !running)
             }

@@ -56,8 +56,8 @@ struct ComputedFieldRow: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(c.label ?? field.name)
-        .accessibilityValue(value == nil ? "計算できません" : text)
-        .accessibilityHint("自動で計算されます")
+        .accessibilityValue(value == nil ? L("計算できません") : text)
+        .accessibilityHint(L("自動で計算されます"))
     }
 }
 
@@ -73,7 +73,7 @@ struct RefPickerRow: View {
         let options = field.refEntity.map { rt.records(for: $0) } ?? []
         LabeledInput(label: c.label ?? field.name) {
             if options.isEmpty {
-                Label("先に\(target?.name ?? "参照先")を追加してください", systemImage: "info.circle")
+                Label(L("先に\(target?.name ?? L("参照先"))を追加してください"), systemImage: "info.circle")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -81,7 +81,7 @@ struct RefPickerRow: View {
             } else {
                 // #131: 素の menu だと青文字だけが浮いて他の入力と揃わないので、picker(menu)と同じ器にする
                 MenuSelect(icon: "link", label: c.label ?? field.name, selection: form.string(field.id),
-                           options: [("", "選択してください")] + options.map { ($0.id, rt.refTitle($0.id, entity: field.refEntity) ?? $0.id) })
+                           options: [("", L("選択してください"))] + options.map { ($0.id, rt.refTitle($0.id, entity: field.refEntity) ?? $0.id) })
             }
         }
     }

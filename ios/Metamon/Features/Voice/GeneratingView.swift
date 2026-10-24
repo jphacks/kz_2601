@@ -19,22 +19,22 @@ enum GeneratingStage: Equatable {
     }
 
     /// 文言表(docs/ios/architecture.md §6 と同期)
-    static let normalMessages = [
-        "どんなアプリにするか考えています…",
-        "必要な画面とデータを決めています…",
-        "画面を組み立てています…",
-        "細部を整えています…",
-    ]
+    static var normalMessages: [String] { [
+        L10n.tr("どんなアプリにするか考えています…"),
+        L10n.tr("必要な画面とデータを決めています…"),
+        L10n.tr("画面を組み立てています…"),
+        L10n.tr("細部を整えています…"),
+    ] }
 
     func message(elapsed: TimeInterval, edit: Bool) -> String {
         switch self {
         case .normal:
-            if edit { return "変更を反映しています…" }
+            if edit { return L10n.tr("変更を反映しています…") }
             let i = Int(elapsed / 3) % Self.normalMessages.count
             return Self.normalMessages[i]
-        case .slow: return "もう少しかかっています…"
-        case .warning: return "時間がかかっています。もう少しだけお待ちください"
-        case .fallback: return "混み合っています。安全なテンプレートに切り替えています…"
+        case .slow: return L10n.tr("もう少しかかっています…")
+        case .warning: return L10n.tr("時間がかかっています。もう少しだけお待ちください")
+        case .fallback: return L10n.tr("混み合っています。安全なテンプレートに切り替えています…")
         }
     }
 }
@@ -125,7 +125,7 @@ struct GeneratingView: View {
     }
 
     private var elapsedLabel: String {
-        String(format: "%.0f 秒", elapsed.rounded(.down))
+        L10n.tr("\(Int(elapsed.rounded(.down))) 秒")
     }
 }
 

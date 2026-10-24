@@ -19,11 +19,20 @@ public struct MorphResult: Sendable {
 /// 生成前の対話(`chat` / `resetChat`)も同じ ai サービスが持つ。
 public protocol AIClient: Sendable {
     func morph(transcript: String, appId: String, currentVersion: Int) async throws -> MorphResult
+    /// `locale`("ja" | "en" | nil=発話から自動判定)付きの生成(#45)。UI 言語を明示した時に生成アプリの文言言語を揃える。
+    func morph(transcript: String, appId: String, currentVersion: Int, locale: String?) async throws -> MorphResult
     /// `POST /v1/chat`(#74 / #75)。iOS は手元の全履歴を毎回送る(2 件以上はサーバー側の会話状態を置き換える契約なので、
     /// ai の再起動や 30 分の期限切れでも会話が途切れない)。
     func chat(appId: String, messages: [ChatMessage], locale: String?) async throws -> ChatTurn
     /// `DELETE /v1/chat/{appId}`。失敗しても UI は止めない(サーバー側は 30 分で自然に消える)。
     func resetChat(appId: String) async
+}
+
+public extension AIClient {
+    /// locale を扱わない実装(モック等)は従来の morph に委ねる。
+    func morph(transcript: String, appId: String, currentVersion: Int, locale: String?) async throws -> MorphResult {
+        try await morph(transcript: transcript, appId: appId, currentVersion: currentVersion)
+    }
 }
 
 // MARK: - 生成前の対話(clarify)

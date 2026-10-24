@@ -207,9 +207,10 @@ struct EmptyStateView: View {
             }
             .frame(width: 30, height: 30)
             Spacer(minLength: 0)
+            // ウィジェットは端末の言語に従う(アプリ内の言語設定は共有しない・#44)
             Text(appName == nil
-                 ? "Tailor It でアプリを作るとここに数字が出ます"
-                 : "「\(appName ?? "")」に集計(stat)の部品がありません")
+                 ? String(localized: "Tailor It でアプリを作るとここに数字が出ます")
+                 : String(localized: "「\(appName ?? "")」に集計(stat)の部品がありません"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(3)

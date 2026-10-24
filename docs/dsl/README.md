@@ -195,6 +195,22 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 - public entity を 1 つでも含むアプリは、作成者の `PUT/PATCH /dsl`(と `POST /apps`・restore)で **`apps_public/{appId}` に DSL が複製**される。他ユーザーが同じ appId で `GET /v1/apps/{appId}/dsl` を開くと、自分の `users/{uid}/apps/{appId}` が無ければその DSL が**インストール**(自分の下に複製・version 1)される。以後の編集は各自のコピーに対して行われ、公開 DSL を上書きできるのは最初に公開したユーザーだけ。
 - 作り方: AI が「みんなで」「共有」「投稿」「ランキング」「掲示板」を聞いたら `scope:"public"`、個人の記録なら省略。iOS 側(投稿者名の表示・他人のレコードは編集不可・authorName の送信)は別 Issue。iOS のデコーダは未知キーを無視するので、未対応ビルドでも落ちない。
 
+### 3.6 ナビゲーション = 画面グラフの規則(#112 #114 #115)
+
+画面を頂点、`navigate`(button / toolbar / `list.onItemTap` / `calendar.onDateTap` / `mapView.onItemTap`)と `saveRecord.screen` を辺とする有向グラフで考える。根はタブがあれば `app.tabs[].screen`、無ければ `initialScreen`(タブがある時に `initialScreen` がタブの根でなければ iOS は先頭タブを開く)。実装は `backend/pkg/dsl/nav.go`(`NavEdges` / `Reachable` / `Unreachable` / `HasNav`)。
+
+| 規則 | 扱い | 理由 |
+|---|---|---|
+| `navigate.screen` / `saveRecord.screen` / `app.tabs[].screen` / `initialScreen` が存在する画面 id | **エラー**(`Validate`。メッセージに使える画面 id の一覧と直し方を入れ、AI の再生成プロンプトにそのまま渡す) | 押すと何も起きない・描画できない |
+| `app.tabs` は 0 個(省略)か 2〜5 個 | **エラー** | タブ 1 個は TabView として意味が無い・6 個以上はタブバーに入らない |
+| どの根からも辿れない画面 | 警告(`Lint`)。フォームは追加ボタンや `list.onItemTap` から辿れれば可(entity のフォームが 1 つも辿れない時は従来の「form screen is not reachable」1 件だけ) | 表示はできるので保存済み DSL を壊さない。声で直せばよい |
+| タブがあるのに `initialScreen` がタブの根でない | 警告 | 起動画面が意図と違う |
+| `fullScreen` で開く画面に戻る手段(`back` か、遷移先指定の無い `saveRecord`)が無い | 警告 | iOS は fullScreenCover に閉じるボタンを自動で付けないので閉じ込められる。push は OS の戻る、sheet は下スワイプで戻れるので対象外 |
+
+- 警告は `Meta.lint` に載るだけで再生成は起こさない(`AI_LINT_RETRY=1` の時だけ 1 回再生成)。
+- AI 側の基準(`internal/ai/prompt.go`): 役割の違う一覧・集計・設定はタブ(2〜4 個)、入力はフォーム画面を sheet、詳細は `list.onItemTap` で push、1 画面の直下は 8 部品まで、孤立画面を作らない。navigate はどこからどこへ飛んでもよい前提(タブの根へ飛んだらタブ切替は iOS 側 #113)。
+- 遷移を変える編集は JSON Patch のレシピで出す: 「B から C にも」= B の components に navigate C の button を add、「タブを足す」= `/screens/-` + `/app/tabs/-`(タブが無ければ `/app/tabs` を 2 個で add)、「タブを消す」= `/app/tabs/i` を remove(残り 1 個なら `/app/tabs` ごと remove し、辿れなくなる画面も remove)、「順番」= `/app/tabs` の move。eval は `cases.json` の `group: nav`(`expect` の `patch` / `unreachable` / `nav` / `tabs` / `tabOrder` / `tabHas`)。
+
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 
 AI に渡す部品カタログは手書きではなく **`dsl.schema.json` から自動生成**される(`backend/internal/ai/catalog.go` の `BuildCatalog`)。検証(Go)・描画(iOS)・AI(プロンプト)の 3 者はすべてスキーマから導出され、抜けはテストで赤になる。

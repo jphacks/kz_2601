@@ -32,7 +32,7 @@ struct ProgressBarLeaf: View {
         }
         .renderCard()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(c.label ?? "進捗")
+        .accessibilityLabel(c.label ?? L("進捗"))
         .accessibilityValue(String(format: "%.0f%%", ratio * 100))
     }
 

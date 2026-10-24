@@ -212,9 +212,9 @@ struct EmptyPlaceholder: View {
     var state: EmptyState = .empty
     var retry: (() -> Void)? = nil
 
-    static let loadingText = "読み込み中…"
-    static let unavailableText = "読み込めませんでした"
-    static let retryLabel = "再試行"
+    static var loadingText: String { L("読み込み中…") }
+    static var unavailableText: String { L("読み込めませんでした") }
+    static var retryLabel: String { L("再試行") }
     /// stat の値に出す「取れていない」印
     static let unavailableValue = "—"
 

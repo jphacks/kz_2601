@@ -14,7 +14,7 @@ struct TimelineLeaf: View {
         let all = Aggregator.sorted(rt.filteredRecords(c), by: sort, entity: entity)
         let rows = (c.limit ?? 0) > 0 ? Array(all.prefix(c.limit!)) : all
         if rows.isEmpty {
-            EmptyPlaceholder(icon: "clock", emptyText: "まだありません", state: rt.emptyState(for: entityId)) {
+            EmptyPlaceholder(icon: "clock", emptyText: L("まだありません"), state: rt.emptyState(for: entityId)) {
                 Task { await rt.load(entities: [entityId], force: true) }
             }
         } else {

@@ -1,6 +1,7 @@
 import Foundation
 import MetamonDSL
 import MetamonServices
+import MetamonRenderer
 
 /// 起動環境。appconfig / ai の URL は別々に設定でき、どちらも無ければ全モックで動く。
 /// 既定(project.yml)は ai = staging・appconfig = staging(どちらも Cloud Run https)。
@@ -136,7 +137,9 @@ enum BuildConfig {
         #if targetEnvironment(simulator)
         return MockTranscriber()
         #else
-        return WhisperKitRecognizer(model: whisperModel)
+        let recognizer = WhisperKitRecognizer(model: whisperModel)
+        recognizer.language = { LanguagePreference.shared.code } // 認識言語は UI 言語に合わせる(#45)
+        return recognizer
         #endif
     }
 }
