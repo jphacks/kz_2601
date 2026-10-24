@@ -2,8 +2,10 @@ import SwiftUI
 import MetamonDSL
 
 /// `stat`: entity の集計値(count|sum|avg|min|max)を1枚のカードに。数値は大きく・等幅数字、ラベルは secondary。
+/// VoiceOver はカード 1 要素として「今月の支出, 1,400円」と読む。Dynamic Type(アクセシビリティサイズ)ではラベルを 2 行まで許す。
 struct StatLeaf: View {
     @Environment(\.dslRuntime) private var rt
+    @Environment(\.dynamicTypeSize) private var typeSize
     let c: Component
 
     var body: some View {
@@ -19,13 +21,17 @@ struct StatLeaf: View {
         let unavailable = rows.isEmpty && rt.emptyState(for: entityId) == .unavailable
         // 初回ロード中は 0 を見せず placeholder(起動直後に「¥0 → ¥480」と跳ねるのを防ぐ)
         let isLoading = rt.loading.contains(entityId) && rt.records(for: entityId).isEmpty
+        let formatted = isLoading ? "0000" : unavailable ? EmptyPlaceholder.unavailableValue : Aggregator.format(value, as: format, unit: c.aggregate == "count" ? "件" : unit)
+        // アクセシビリティサイズ: 1 行高のセルでも数値が見えるよう、ラベルは縮小 1 行・余白を詰める(足りなければセル内スクロール)
+        let compact = typeSize.isAccessibilitySize
         VStack(alignment: .leading, spacing: RenderTheme.Spacing.xs) {
             Text(c.label ?? "")
                 .font(RenderTheme.Fonts.statLabel)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .minimumScaleFactor(compact ? 0.6 : 0.8)
             // 大きめの基準サイズから、セルの高さに収まるまで縮める(「もっと大きく」で area を広げると数字も大きくなる)
-            Text(isLoading ? "0000" : unavailable ? EmptyPlaceholder.unavailableValue : Aggregator.format(value, as: format, unit: c.aggregate == "count" ? "件" : unit))
+            Text(formatted)
                 .font(RenderTheme.Fonts.statValue)
                 .lineLimit(1)
                 .minimumScaleFactor(0.45)
@@ -34,6 +40,9 @@ struct StatLeaf: View {
         }
         // セル全体をカードにする(area を縦に広げた時にカードの下だけ空くのを防ぐ)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .renderCard()
+        .renderCard(padding: compact ? RenderTheme.Spacing.sm : RenderTheme.Spacing.md)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(c.label ?? "")
+        .accessibilityValue(unavailable ? "取得できませんでした" : formatted)
     }
 }

@@ -31,6 +31,7 @@ struct TimelineLeaf: View {
                                 Rectangle().fill(.quaternary).frame(width: 2).frame(maxHeight: .infinity)
                             }
                         }
+                        .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(FieldCoding.display(row[c.titleField ?? ""], field: entity?.field(c.titleField ?? ""))).font(.subheadline.weight(.medium))
                             if let sub = c.subtitleField {
@@ -42,6 +43,7 @@ struct TimelineLeaf: View {
                         Spacer(minLength: 0)
                     }
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityElement(children: .combine) // 「10/24, 朝ラン, 5km」と 1 行で読む
                 }
             }
         .renderCard()

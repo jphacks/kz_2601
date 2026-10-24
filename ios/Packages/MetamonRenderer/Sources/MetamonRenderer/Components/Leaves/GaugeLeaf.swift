@@ -31,6 +31,10 @@ struct GaugeLeaf: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .renderCard()
+        // VoiceOver: 「体重 (kg), 62.5(範囲 40〜120)」と 1 要素で読む
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(unit.flatMap { u in c.label.map { "\($0) (\(u))" } } ?? c.label ?? "ゲージ")
+        .accessibilityValue("\(Aggregator.format(value, as: nil, unit: nil))(範囲 \(compact(lo))〜\(compact(hi)))")
     }
 
     /// 端の目盛り: 大きい値は 30K のように短く(円形ゲージの幅に収める)。

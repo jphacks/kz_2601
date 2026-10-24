@@ -44,6 +44,16 @@ enum Theme {
         static let fabHorizontalInset: CGFloat = Spacing.lg
         /// タブバーがある時はその上に逃がす。
         static func fabBottomInset(hasTabs: Bool) -> CGFloat { hasTabs ? 70 : Spacing.lg }
+        /// FAB 退避(#83): 最下段(行 11〜12・A〜B 列)に DSL の部品がある時は、その上端より `fabClearanceGap` 上に逃がす。
+        /// `obstructionTop` = 部品の上端(global y・Renderer の `GridBottomObstructionKey`)、`rootBottom` = FAB を置く領域の下端(global y)。
+        static let fabClearanceGap: CGFloat = Spacing.sm
+        static func fabBottomInset(hasTabs: Bool, obstructionTop: CGFloat?, rootBottom: CGFloat) -> CGFloat {
+            let base = fabBottomInset(hasTabs: hasTabs)
+            guard let obstructionTop else { return base }
+            return max(base, rootBottom - obstructionTop + fabClearanceGap)
+        }
+        /// フォーム画面(`screen.entity` あり)では FAB を隠し、ナビバー右上の小さなマイク(この径)を入口にする。
+        static let toolbarMicSize: CGFloat = 30
         /// 長押し(= 変身一覧)と判定するまでの秒数。初期画面の大きなマイクも同じ。
         static let fabLongPressSeconds: Double = 0.45
     }

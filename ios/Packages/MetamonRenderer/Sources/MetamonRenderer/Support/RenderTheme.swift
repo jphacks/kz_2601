@@ -160,6 +160,7 @@ struct EmptyPlaceholder: View {
                 Image(systemName: icon)
                     .font(.title2)
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
             Text(text)
                 .font(.subheadline)
@@ -175,7 +176,7 @@ struct EmptyPlaceholder: View {
                 .padding(.top, RenderTheme.Spacing.xs)
             }
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity) // 器(セル)が高さを渡してくれば全体を使い中央に置く(#84)
         .padding(.vertical, RenderTheme.Spacing.lg)
         .padding(.horizontal, RenderTheme.Spacing.md)
         .background(

@@ -3,12 +3,25 @@ import MetamonDSL
 
 /// `button`: style(primary|secondary|destructive|plain)。押下で `action` をランタイムに渡す。
 /// primary = tint 塗り / secondary = tint の薄塗り / destructive = red の薄塗り、の 3 つが同じ高さ・角丸で並ぶ。
+/// `deleteRecord` のボタンは編集モード(フォームに recordId がある時)だけ描く(#73: 新規フォームで押しても何も起きない)。
 struct ButtonLeaf: View {
     @Environment(\.dslRuntime) private var rt
     let c: Component
     let ctx: RenderContext
 
+    /// 新規フォーム(recordId 無し)では `deleteRecord` を隠す。削除対象が無いので押しても何も起きないため。
+    static func isVisible(action: Action?, isEditing: Bool) -> Bool {
+        action?.type != .deleteRecord || isEditing
+    }
+
     var body: some View {
+        if Self.isVisible(action: c.action, isEditing: ctx.form?.isEditing ?? false) {
+            styled
+        }
+    }
+
+    @ViewBuilder
+    private var styled: some View {
         let button = Button {
             guard let action = c.action else { return }
             Task { await rt.run(action, ctx.actionContext()) }
@@ -25,18 +38,24 @@ struct ButtonLeaf: View {
 }
 
 /// Renderer の 3 ボタン様式(トークンで高さ・角丸・押下フィードバックを統一)。
+/// 高さ 48 は `@ScaledMetric` で Dynamic Type に追従(アクセシビリティサイズでは 2 行まで折り返す)。
 struct RenderButtonStyle: ButtonStyle {
     enum Kind { case primary, secondary, destructive }
     let kind: Kind
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .body) private var minHeight: CGFloat = 48
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(RenderTheme.Fonts.button)
-            .lineLimit(1)
+            .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
             .minimumScaleFactor(0.8)
+            .multilineTextAlignment(.center)
             .padding(.horizontal, RenderTheme.Spacing.md)
-            .frame(maxWidth: .infinity, minHeight: 48)
+            .padding(.vertical, RenderTheme.Spacing.xs)
+            .frame(maxWidth: .infinity, minHeight: minHeight)
             .foregroundStyle(foreground)
             .background(background, in: RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous))
             .overlay {
@@ -46,8 +65,8 @@ struct RenderButtonStyle: ButtonStyle {
                 }
             }
             .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.45)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
             .contentShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous))
     }
 

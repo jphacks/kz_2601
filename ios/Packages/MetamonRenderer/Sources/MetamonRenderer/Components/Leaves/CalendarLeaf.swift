@@ -10,6 +10,7 @@ struct CalendarLeaf: View {
     let ctx: RenderContext
     @State private var month: Date = Calendar.current.startOfMonth(for: .now)
     @State private var selected: Date = Calendar.current.startOfDay(for: .now)
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var cal: Calendar { Calendar.current }
     private var entityId: String { c.entity ?? "" }
@@ -44,11 +45,16 @@ struct CalendarLeaf: View {
                 Text(title).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button { shift(-1) } label: { Image(systemName: "chevron.left") }
+            Button { shift(-1) } label: { Image(systemName: "chevron.left").frame(minWidth: 32, minHeight: 32) }
+                .accessibilityLabel("前の月")
             Text(month.formatted(.dateTime.year().month(.wide)))
                 .font(.headline.monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
                 .frame(minWidth: 110)
-            Button { shift(1) } label: { Image(systemName: "chevron.right") }
+                .accessibilityAddTraits(.isHeader)
+            Button { shift(1) } label: { Image(systemName: "chevron.right").frame(minWidth: 32, minHeight: 32) }
+                .accessibilityLabel("次の月")
         }
         .buttonStyle(.plain)
     }
@@ -63,6 +69,7 @@ struct CalendarLeaf: View {
                     .frame(maxWidth: .infinity)
             }
         }
+        .accessibilityHidden(true) // 曜日は各日のラベルに含めて読むので見出し行は飛ばす
     }
 
     private func monthGrid(_ days: [Date: [Record]]) -> some View {
@@ -70,7 +77,7 @@ struct CalendarLeaf: View {
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 4) {
             ForEach(Array(cells.enumerated()), id: \.offset) { _, date in
                 if let date {
-                    dayCell(date, hasRecords: days[date] != nil)
+                    dayCell(date, recordCount: days[date]?.count ?? 0)
                 } else {
                     Color.clear.frame(height: 36)
                 }
@@ -78,9 +85,11 @@ struct CalendarLeaf: View {
         }
     }
 
-    private func dayCell(_ date: Date, hasRecords: Bool) -> some View {
+    /// VoiceOver: 「10月24日 金曜日, 記録2件(, 今日)(, 選択中)」。日の数字は Dynamic Type で 36pt 枠に収まるよう縮小。
+    private func dayCell(_ date: Date, recordCount: Int) -> some View {
         let isSelected = date == selected
         let isToday = cal.isDateInToday(date)
+        let hasRecords = recordCount > 0
         return Button {
             selected = date
         } label: {
@@ -88,6 +97,8 @@ struct CalendarLeaf: View {
                 Text("\(cal.component(.day, from: date))")
                     .font(.callout.monospacedDigit())
                     .fontWeight(isToday ? .bold : .regular)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .foregroundStyle(isSelected ? Color.white : (isToday ? Color.accentColor : Color.primary))
                 Circle()
                     .fill(hasRecords ? (isSelected ? Color.white : Color.accentColor) : Color.clear)
@@ -98,6 +109,9 @@ struct CalendarLeaf: View {
             .background(isSelected ? Color.accentColor : Color.clear, in: RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(date.formatted(.dateTime.month().day().weekday(.wide)) + (isToday ? "、今日" : ""))
+        .accessibilityValue(hasRecords ? "記録\(recordCount)件" : "記録なし")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func dayList(_ rows: [Record]) -> some View {
@@ -142,7 +156,7 @@ struct CalendarLeaf: View {
 
     private func shift(_ delta: Int) {
         if let m = cal.date(byAdding: .month, value: delta, to: month) {
-            withAnimation(.snappy) { month = cal.startOfMonth(for: m) }
+            withAnimation(reduceMotion ? nil : .snappy) { month = cal.startOfMonth(for: m) }
         }
     }
 
