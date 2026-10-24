@@ -8,11 +8,20 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     // leaf
     case text, button, textField, numberField, datePicker, picker, toggle
     case photoField, image, list, stat, chart, voiceInput, spacer, divider
+    // container(構造系: card/disclosure/carousel/grid)
+    case card, disclosure, carousel, grid
+    // leaf(ナビ・ネイティブ系)
+    case searchBar, calendar, shareButton, openUrlButton, mapView, locationButton, qrScanner, timerDisplay
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
 
-    public var isContainer: Bool { self == .vstack || self == .hstack || self == .section }
+    public var isContainer: Bool {
+        switch self {
+        case .vstack, .hstack, .section, .card, .disclosure, .carousel, .grid: true
+        default: false
+        }
+    }
 }
 
 /// 全コンポーネントの props をフラットに持つ1ノード(Go の `dsl.Component` と 1:1)。
@@ -64,10 +73,28 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var prompt: String?
     public var size: String?           // voiceInput: compact|large / spacer: small|medium|large|flexible
 
+    // 構造系 container
+    public var expanded: Bool?         // disclosure: 初期展開
+    public var itemWidth: String?      // carousel: small|medium|large
+    public var columns: Int?           // grid: 2..4
+
+    // ナビ・ネイティブ系 leaf
+    public var searchField: String?    // list: 同画面の searchBar.field
+    public var dateField: String?      // calendar
+    public var onDateTap: Action?      // calendar
+    public var url: String?            // openUrlButton
+    public var locationField: String?  // mapView
+    public var titleField: String?     // mapView のピン名
+    public var zoom: String?           // mapView: near|city|wide
+    public var mode: String?           // timerDisplay: stopwatch|countdown
+    public var seconds: Int?           // timerDisplay countdown 初期秒
+
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
         case includeTime, source, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
         case kind, groupBy, bucket, prompt, size
+        case expanded, itemWidth, columns
+        case searchField, dateField, onDateTap, url, locationField, titleField, zoom, mode, seconds
     }
 
     public init(from decoder: Decoder) throws {
@@ -106,6 +133,18 @@ public struct Component: Decodable, Identifiable, Sendable {
         bucket = try? c.decodeIfPresent(String.self, forKey: .bucket)
         prompt = try? c.decodeIfPresent(String.self, forKey: .prompt)
         size = try? c.decodeIfPresent(String.self, forKey: .size)
+        expanded = try? c.decodeIfPresent(Bool.self, forKey: .expanded)
+        itemWidth = try? c.decodeIfPresent(String.self, forKey: .itemWidth)
+        columns = try? c.decodeIfPresent(Int.self, forKey: .columns)
+        searchField = try? c.decodeIfPresent(String.self, forKey: .searchField)
+        dateField = try? c.decodeIfPresent(String.self, forKey: .dateField)
+        onDateTap = try? c.decodeIfPresent(Action.self, forKey: .onDateTap)
+        url = try? c.decodeIfPresent(String.self, forKey: .url)
+        locationField = try? c.decodeIfPresent(String.self, forKey: .locationField)
+        titleField = try? c.decodeIfPresent(String.self, forKey: .titleField)
+        zoom = try? c.decodeIfPresent(String.self, forKey: .zoom)
+        mode = try? c.decodeIfPresent(String.self, forKey: .mode)
+        seconds = try? c.decodeIfPresent(Int.self, forKey: .seconds)
     }
 }
 

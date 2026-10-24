@@ -6,12 +6,13 @@ public struct ScreenView: View {
     @Environment(\.dslRuntime) private var rt
     let route: Route
     @State private var form: FormDraft?
+    @State private var locals = ScreenLocals()
 
     public init(route: Route) { self.route = route }
 
     public var body: some View {
         if let screen = rt.dsl.screen(route.screen) {
-            let ctx = RenderContext(route: route, form: form)
+            let ctx = RenderContext(route: route, form: form, locals: locals)
             GridScreenLayout(screen: screen, ctx: ctx)
                 .background(Color(.systemGroupedBackground))
                 .navigationTitle(screen.title)
@@ -52,7 +53,12 @@ public struct ScreenView: View {
         }
         let record = route.recordId.flatMap { id in rt.records(for: entityId).first { $0.id == id } }
         if form == nil || form?.entity.id != entityId || form?.recordId != record?.id {
-            form = FormDraft(entity: entity, record: record)
+            let draft = FormDraft(entity: entity, record: record)
+            if record == nil {
+                // calendar の日付タップなど、直前に積まれた初期値を新規フォームだけが受け取る
+                for (k, v) in FormPrefill.consume(for: entity) { draft.values[k] = v }
+            }
+            form = draft
         }
     }
 }
