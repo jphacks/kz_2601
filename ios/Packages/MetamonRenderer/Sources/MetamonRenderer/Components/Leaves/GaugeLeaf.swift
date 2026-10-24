@@ -24,7 +24,7 @@ struct GaugeLeaf: View {
             .gaugeStyle(.accessoryCircular)
             .scaleEffect(1.4)
             .frame(height: 80)
-            .tint(.accentColor)
+            .tint(Gradient(colors: [RenderTheme.Colors.brandA, RenderTheme.Colors.brandB]))
             if let label = c.label {
                 Text(unit.map { "\(label) (\($0))" } ?? label).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }

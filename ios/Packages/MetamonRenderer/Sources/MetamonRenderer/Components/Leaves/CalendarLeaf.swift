@@ -41,16 +41,17 @@ struct CalendarLeaf: View {
     private var header: some View {
         HStack {
             if let title = c.title, !title.isEmpty {
-                Text(title).font(.caption).foregroundStyle(.secondary)
+                Text(title).font(RenderTheme.Fonts.sectionTitle).foregroundStyle(.secondary)
             }
             Spacer()
-            Button { shift(-1) } label: { Image(systemName: "chevron.left") }
+            Button { shift(-1) } label: { Image(systemName: "chevron.left").font(.body.weight(.semibold)) }
             Text(month.formatted(.dateTime.year().month(.wide)))
                 .font(.headline.monospacedDigit())
                 .frame(minWidth: 110)
-            Button { shift(1) } label: { Image(systemName: "chevron.right") }
+            Button { shift(1) } label: { Image(systemName: "chevron.right").font(.body.weight(.semibold)) }
         }
         .buttonStyle(.plain)
+        .foregroundStyle(.primary)
     }
 
     private var weekdayRow: some View {
@@ -88,14 +89,14 @@ struct CalendarLeaf: View {
                 Text("\(cal.component(.day, from: date))")
                     .font(.callout.monospacedDigit())
                     .fontWeight(isToday ? .bold : .regular)
-                    .foregroundStyle(isSelected ? Color.white : (isToday ? Color.accentColor : Color.primary))
+                    .foregroundStyle(isSelected ? Color.white : (isToday ? RenderTheme.Colors.brandA : Color.primary))
                 Circle()
-                    .fill(hasRecords ? (isSelected ? Color.white : Color.accentColor) : Color.clear)
+                    .fill(hasRecords ? (isSelected ? Color.white : RenderTheme.Colors.brandA) : Color.clear)
                     .frame(width: 5, height: 5)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 36)
-            .background(isSelected ? Color.accentColor : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+            .background(isSelected ? AnyShapeStyle(RenderTheme.brandGradient) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -110,7 +111,7 @@ struct CalendarLeaf: View {
                     Button {
                         addOnSelectedDay()
                     } label: {
-                        Label("追加", systemImage: "plus").font(.subheadline)
+                        Label("追加", systemImage: "plus").font(.subheadline.weight(.semibold)).foregroundStyle(RenderTheme.Colors.brandA)
                     }
                 }
             }

@@ -11,9 +11,9 @@ struct SectionContainer: View {
             if let title = c.title, !title.isEmpty {
                 Text(title)
                     .font(RenderTheme.Fonts.sectionTitle)
-                    .kerning(0.2)
+                    .kerning(0.3)
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, RenderTheme.Spacing.xs)
+                    .padding(.horizontal, RenderTheme.Spacing.xs + 2)
             }
             if c.children.allSatisfy(\.rendersOwnSurface) {
                 // list / table など自前の面を持つ子だけなら見出し + そのまま(カードの中にカードを作らない)

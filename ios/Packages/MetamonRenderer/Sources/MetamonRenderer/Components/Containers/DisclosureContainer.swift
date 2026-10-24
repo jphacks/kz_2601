@@ -22,6 +22,7 @@ struct DisclosureContainer: View {
         } label: {
             Text(c.title ?? "詳細").font(RenderTheme.Fonts.cardTitle)
         }
+        .tint(RenderTheme.Colors.brandA)
         .renderCard()
     }
 }

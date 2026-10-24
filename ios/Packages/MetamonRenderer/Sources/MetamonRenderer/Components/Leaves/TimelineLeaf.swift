@@ -25,13 +25,13 @@ struct TimelineLeaf: View {
                             .foregroundStyle(.secondary)
                             .frame(width: 84, alignment: .trailing)
                         VStack(spacing: 0) {
-                            Circle().fill(Color.accentColor).frame(width: 10, height: 10).padding(.top, 4)
+                            Circle().fill(RenderTheme.brandGradient).frame(width: 10, height: 10).padding(.top, 4)
                             if index < rows.count - 1 {
-                                Rectangle().fill(.quaternary).frame(width: 2).frame(maxHeight: .infinity)
+                                Rectangle().fill(RenderTheme.Colors.hairline).frame(width: 2).frame(maxHeight: .infinity)
                             }
                         }
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(FieldCoding.display(row[c.titleField ?? ""], field: entity?.field(c.titleField ?? ""))).font(.subheadline.weight(.medium))
+                            Text(FieldCoding.display(row[c.titleField ?? ""], field: entity?.field(c.titleField ?? ""))).font(.subheadline.weight(.semibold))
                             if let sub = c.subtitleField {
                                 let s = FieldCoding.display(row[sub], field: entity?.field(sub))
                                 if !s.isEmpty { Text(s).font(.caption).foregroundStyle(.secondary) }

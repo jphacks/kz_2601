@@ -40,11 +40,11 @@ struct AvatarLeaf: View {
 
     private var placeholder: some View {
         ZStack {
-            Circle().fill(Color.accentColor.opacity(0.2))
+            Circle().fill(RenderTheme.Colors.brandSoft)
             if initials.isEmpty {
-                Image(systemName: "person.fill").font(.system(size: diameter * 0.45)).foregroundStyle(.secondary)
+                Image(systemName: "person.fill").font(.system(size: diameter * 0.45)).foregroundStyle(RenderTheme.Colors.brandA.opacity(0.7))
             } else {
-                Text(initials).font(.system(size: diameter * 0.4, weight: .semibold, design: .rounded)).foregroundStyle(Color.accentColor)
+                Text(initials).font(.system(size: diameter * 0.4, weight: .semibold, design: .rounded)).foregroundStyle(RenderTheme.brandGradient)
             }
         }
     }

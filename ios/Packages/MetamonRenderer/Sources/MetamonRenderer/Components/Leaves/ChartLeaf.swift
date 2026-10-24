@@ -21,14 +21,30 @@ struct ChartLeaf: View {
                     switch c.kind {
                     case "line":
                         LineMark(x: .value("x", b.label), y: .value("y", b.value))
+                            .foregroundStyle(RenderTheme.Colors.brandA)
+                            .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                            .interpolationMethod(.catmullRom)
+                        AreaMark(x: .value("x", b.label), y: .value("y", b.value))
+                            .foregroundStyle(RenderTheme.brandWash)
+                            .interpolationMethod(.catmullRom)
                         PointMark(x: .value("x", b.label), y: .value("y", b.value))
+                            .foregroundStyle(RenderTheme.Colors.brandA)
+                            .symbolSize(40)
                     case "pie":
-                        SectorMark(angle: .value("y", b.value), innerRadius: .ratio(0.5), angularInset: 1)
+                        SectorMark(angle: .value("y", b.value), innerRadius: .ratio(0.55), angularInset: 1.5)
+                            .cornerRadius(4)
                             .foregroundStyle(by: .value("x", b.label))
                     default:
                         BarMark(x: .value("x", b.label), y: .value("y", b.value))
+                            .foregroundStyle(RenderTheme.brandGradient)
+                            .cornerRadius(6)
                     }
                 }
+                .chartForegroundStyleScale(range: RenderTheme.Colors.chartPalette)
+                .chartXAxis { AxisMarks { AxisValueLabel().font(RenderTheme.Fonts.legend) } }
+                .chartYAxis { AxisMarks { AxisGridLine().foregroundStyle(RenderTheme.Colors.hairline); AxisValueLabel().font(RenderTheme.Fonts.legend) } }
+                .chartLegend(position: .bottom, alignment: .leading, spacing: RenderTheme.Spacing.sm)
+                .font(RenderTheme.Fonts.legend)
                 // グリッドのセル内ではセルの高さに合わせて伸縮、縦積みでは ideal(200)で描く
                 .frame(minHeight: 120, idealHeight: 200, maxHeight: .infinity)
             }
