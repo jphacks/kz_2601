@@ -43,7 +43,14 @@ struct ChartLeaf: View {
                     }
                 }
                 .chartForegroundStyleScale(range: RenderTheme.Colors.chartPalette)
-                .chartXAxis { AxisMarks { AxisValueLabel().font(RenderTheme.Fonts.legend) } }
+                // #131: 長いカテゴリ名で x 軸ラベルが重なっていたので、短く切って衝突時は間引く
+                .chartXAxis {
+                    AxisMarks { v in
+                        AxisValueLabel(collisionResolution: .greedy) {
+                            Text(Self.axisLabel(v.as(String.self) ?? "")).font(RenderTheme.Fonts.legend).lineLimit(1)
+                        }
+                    }
+                }
                 .chartYAxis { AxisMarks { AxisGridLine().foregroundStyle(RenderTheme.Colors.hairline); AxisValueLabel().font(RenderTheme.Fonts.legend) } }
                 // 凡例は上(左下に置くと左下のマイク FAB に隠れる)
                 .chartLegend(position: .top, alignment: .leading, spacing: RenderTheme.Spacing.sm)
@@ -54,5 +61,10 @@ struct ChartLeaf: View {
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .renderCard()
+    }
+
+    /// x 軸ラベル: 6 文字を超えたら 5 文字 + …(凡例・VoiceOver は元の文字列のまま)
+    static func axisLabel(_ s: String) -> String {
+        s.count > 6 ? String(s.prefix(5)) + "…" : s
     }
 }

@@ -30,12 +30,15 @@ struct StatLeaf: View {
             // 大きめの基準サイズから、セルの高さに収まるまで縮める(「もっと大きく」で area を広げると数字も大きくなる)
             // minimumScaleFactor は幅にしか効かないので、高さは ViewThatFits で基準 56pt から段階的に下げる
             // (#89: アイコン行を足した分、2 行セルで数値の下が切れていた)
-            ViewThatFits(in: .vertical) {
+            // #131: 幅も ViewThatFits で判定する(縦だけ見ていたので「¥1,582,7…」と省略されていた)。
+            // 最後の候補だけ minimumScaleFactor で縮めて、どんな桁数でも省略記号を出さない
+            ViewThatFits(in: [.horizontal, .vertical]) {
                 valueText(formatted, size: 56)
                 valueText(formatted, size: 44)
                 valueText(formatted, size: 34)
                 valueText(formatted, size: 28)
                 valueText(formatted, size: 22)
+                valueText(formatted, size: 22).minimumScaleFactor(0.5)
             }
             .contentTransition(.numericText())
             .redacted(reason: isLoading ? .placeholder : [])
@@ -48,12 +51,11 @@ struct StatLeaf: View {
         .accessibilityValue(unavailable ? "取得できませんでした" : formatted)
     }
 
-    /// 数値 1 段分(ViewThatFits の候補)。幅は minimumScaleFactor で縮める
+    /// 数値 1 段分(ViewThatFits の候補)。
     private func valueText(_ text: String, size: CGFloat) -> some View {
         Text(text)
             .font(.system(size: size, weight: .bold, design: .rounded).monospacedDigit())
             .lineLimit(1)
-            .minimumScaleFactor(0.45)
     }
 
     /// `value`(Expr)で値を出すモード(aggregate 指定が優先)

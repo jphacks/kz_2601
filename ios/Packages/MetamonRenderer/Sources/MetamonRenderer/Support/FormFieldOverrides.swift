@@ -79,15 +79,26 @@ struct RefPickerRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .renderInputChrome()
             } else {
-                Picker(c.label ?? field.name, selection: form.string(field.id)) {
-                    Text("選択してください").tag("")
-                    ForEach(options) { r in
-                        Text(rt.refTitle(r.id, entity: field.refEntity) ?? r.id).tag(r.id)
+                // #131: 素の menu だと青文字だけが浮いて他の入力と揃わないので、picker(menu)と同じ器 + chevron にする
+                HStack(spacing: RenderTheme.Spacing.sm + 2) {
+                    InputIcon(name: "link")
+                    Picker(c.label ?? field.name, selection: form.string(field.id)) {
+                        Text("選択してください").tag("")
+                        ForEach(options) { r in
+                            Text(rt.refTitle(r.id, entity: field.refEntity) ?? r.id).tag(r.id)
+                        }
                     }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .tint(.primary)
+                    .font(RenderTheme.Fonts.inputValue)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(RenderTheme.Colors.brandA)
+                        .accessibilityHidden(true)
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .renderInputChrome()
             }
         }
     }
