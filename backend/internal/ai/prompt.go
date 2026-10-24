@@ -109,7 +109,7 @@ var editRules = strings.TrimSpace(`
 `)
 
 // createUserMessage builds the user turn for a full generation.
-func createUserMessage(transcript string, currentDSL string, problems []string, loc Locale) string {
+func createUserMessage(transcript string, currentDSL string, problems []string, loc Locale, uiOnly bool) string {
 	var b strings.Builder
 	if currentDSL != "" {
 		b.WriteString("## 参考: 現在のアプリ(作り直してよい)\n```json\n")
@@ -119,6 +119,10 @@ func createUserMessage(transcript string, currentDSL string, problems []string, 
 	writeLocale(&b, loc)
 	fmt.Fprintf(&b, "## 今回の指示\n「%s」\n\n", strings.TrimSpace(transcript))
 	writeProblems(&b, problems)
+	if uiOnly {
+		// logic pass (logic.go) adds computed / stat.value / settlement afterwards.
+		b.WriteString("## 工程\nこの出力は UI の工程です。計算式(computed / stat.value / settlement)は次の工程で足すので書かなくてよい。他 entity を指す項目(type ref + refEntity)と、計算結果を置く余白(空き行)は用意しておく。\n\n")
+	}
 	b.WriteString("## 出力\nAppDSL 全体を 1 行の compact JSON で出力してください(app を先頭に・既定値は省略・全画面に area を付けた配置)。")
 	return b.String()
 }

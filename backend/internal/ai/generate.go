@@ -37,6 +37,9 @@ type Request struct {
 	Text        string `json:"text,omitempty"` // alias used by openapi-ai.yaml
 	Mode        Mode   `json:"mode,omitempty"`
 	Locale      Locale `json:"locale,omitempty"` // ja|en; empty = detect from the transcript
+	// LogicPass overrides Service.LogicPass for this request: true = UI pass
+	// then a second call that adds calculations (logic.go). Create turns only.
+	LogicPass *bool `json:"logicPass,omitempty"`
 }
 
 // Latency is per-stage wall time in ms.
@@ -47,14 +50,15 @@ type Latency struct {
 
 // Meta is diagnostic detail about how the result was produced.
 type Meta struct {
-	Model            string   `json:"model"`
-	Attempts         int      `json:"attempts"`      // Claude calls made
-	Regenerations    int      `json:"regenerations"` // attempts - 1 (validation retries)
-	AreaFallback     bool     `json:"areaFallback"`  // areas stripped to pass validation
-	DowngradedToFull bool     `json:"downgradedToFull,omitempty"`
-	Usage            Usage    `json:"usage"`
-	OutputChars      int      `json:"outputChars,omitempty"` // model text length (whitespace share diagnostics)
-	LastProblems     []string `json:"lastProblems,omitempty"`
+	Model            string     `json:"model"`
+	Attempts         int        `json:"attempts"`      // Claude calls made
+	Regenerations    int        `json:"regenerations"` // attempts - 1 (validation retries)
+	AreaFallback     bool       `json:"areaFallback"`  // areas stripped to pass validation
+	DowngradedToFull bool       `json:"downgradedToFull,omitempty"`
+	Usage            Usage      `json:"usage"`
+	OutputChars      int        `json:"outputChars,omitempty"` // model text length (whitespace share diagnostics)
+	LastProblems     []string   `json:"lastProblems,omitempty"`
+	LogicPass        *LogicMeta `json:"logicPass,omitempty"` // set when the logic pass ran
 }
 
 // Event is a progress message emitted by GenerateStream before the Result,
@@ -110,6 +114,9 @@ type Service struct {
 	Model            string
 	MaxRegenerations int           // validation-driven retries after the first attempt (default 2)
 	CallTimeout      time.Duration // per Claude call (default 40s)
+	// LogicPass enables the second "calculations only" call after a create
+	// (env AI_LOGIC_PASS=1; Request.LogicPass overrides per request).
+	LogicPass bool
 
 	conv     *convStore // clarify conversations (chat.go); lazily created
 	convOnce sync.Once
@@ -179,13 +186,17 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 	}
 
 	var ar *attemptResult
+	logic := s.logicEnabled(req)
 	switch mode {
 	case ModeCreate:
 		ref := ""
 		if !isInitial(current) {
 			ref = string(env.DSL)
 		}
-		ar, err = s.generateFull(ctx, transcript, ref, nil, loc, sink)
+		ar, err = s.generateFull(ctx, transcript, ref, nil, loc, sink, logic)
+		if err == nil && logic {
+			s.applyLogicPass(ctx, transcript, ar, loc)
+		}
 	case ModeEdit:
 		ar, err = s.generateEdit(ctx, transcript, env, loc, sink)
 	default:
@@ -231,7 +242,7 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 
 // generateFull asks for a whole AppDSL; on validation problems it re-prompts
 // up to maxRegen times, then strips areas, then fails with the problems.
-func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, meta *Meta, loc Locale, sink Sink) (*attemptResult, error) {
+func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, meta *Meta, loc Locale, sink Sink, uiOnly bool) (*attemptResult, error) {
 	ar := &attemptResult{}
 	if meta != nil {
 		ar.meta = *meta
@@ -240,7 +251,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 	var problems []string
 	var lastCandidate []byte
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(ctx, systemPrompt, createUserMessage(transcript, refDSL, problems, loc), GenerationSchema(), ar,
+		resp, err := s.call(ctx, systemPrompt, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
 			appEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
 			return nil, err
@@ -322,7 +333,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	meta := ar.meta
 	meta.DowngradedToFull = true
 	full := &Service{Claude: s.Claude, Store: s.Store, Model: s.Model, MaxRegenerations: -1, CallTimeout: s.CallTimeout}
-	fr, err := full.generateFull(ctx, transcript, string(env.DSL), &meta, loc, sink)
+	fr, err := full.generateFull(ctx, transcript, string(env.DSL), &meta, loc, sink, false)
 	if err != nil {
 		var ge *Error
 		if errors.As(err, &ge) {
