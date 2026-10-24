@@ -27,20 +27,8 @@ struct PickerLeaf: View {
             default:
                 // menu は List/Form の外ではラベルを描かないので、他の入力と同じく上にラベルを出す
                 LabeledInput(label: c.label) {
-                    HStack(spacing: RenderTheme.Spacing.sm + 2) {
-                        InputIcon(name: FieldIcon.infer(component: c, field: fieldDef))
-                        picker
-                            .pickerStyle(.menu)
-                            .labelsHidden()
-                            .tint(.primary)
-                            .font(RenderTheme.Fonts.inputValue)
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(RenderTheme.Colors.brandA)
-                            .accessibilityHidden(true)
-                    }
-                    .renderInputChrome()
+                    MenuSelect(icon: FieldIcon.infer(component: c, field: fieldDef), label: c.label ?? "",
+                               selection: selection, options: options.map { ($0, $0) })
                 }
             }
         } else {

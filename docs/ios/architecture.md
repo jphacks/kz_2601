@@ -90,6 +90,13 @@ extension Component: Decodable {
 
 描画スコープ `RenderContext { params, item, index }` を再帰で持ち回り、`list` の行だけ `item/index` を上書きする。
 
+### 生成 DSL の見た目監査(#131)
+
+- **フォーム画面(`screen.entity` あり)は area を「並び順と横幅」だけに使い、高さは中身なり**(`GridScreenLayout` → `FormFlowLayout`)。行が重なる部品は 1 段にまとめ、前の段から 3 行以上下の部品(最下段の削除ボタン等)は少し間を空けて続ける。chart / map / list など面を埋める型だけ area の高さを保つ。AI が入力 section を小さく取っても切れない。
+- セルは矩形で clip せず、影のぶん(16pt)外まで描く(カード/ボタンの影が四角く切れて「薄い箱」に見えていた)。
+- 行がある list(と list だけの section)はカードを行の高さで止める。空の時だけセル全体に空状態(#84)。
+- DEBUG フック: `METAMON_INITIAL_DSL_PATH=<DSL JSON のパス>`(起動時の document をファイルから読む・appId はファイル名ごと)/ `METAMON_INITIAL_SCREEN=<screen>`(タブ 2 枚目などを初期表示)/ `METAMON_SEED_DUMMY=<n>`(モック時、entity の field 型から n 件のダミーレコード。長い文字列・大きい金額を混ぜる)。`METAMON_MOCK=1` と併用。実装は `Metamon/App/DebugDSLOverride.swift`。
+
 ## 3. ナビゲーション
 
 | DSL | SwiftUI | 状態 |
@@ -659,3 +666,31 @@ HealthKit を足す時の手順(Apple アカウント操作が要るので未着
 - **翻訳しないもの**: DSL 内の文言(AI が locale に合わせて生成)、Services のログ、FieldIcon のキーワード、音声意図判定の語彙。通貨は DSL の `currency` が円前提なので英語 UI でも `¥`。
 - 確認: `-metamon.appLanguage en`(起動引数で UserDefaults を上書き)/ `-AppleLanguages "(en)"`、設定シートは `METAMON_AUTO_SETTINGS=1`。
 
+
+## 17. バックグラウンド(タイマー・同期・位置 / Issue #38)
+
+方針: **バックグラウンド実行には頼らない**。OS が裏で動かしてくれる保証はないので、「時刻を保存して戻った時に計算し直す」「終わる時刻にローカル通知を予約する」「前面に戻った瞬間に取り直す」で補う。
+
+### 17.1 タイマー(`timerDisplay`)
+- 状態は `TimerRun { base(一時停止までの累計秒), startedAt(走行中の開始時刻) }` だけ持ち、表示秒は毎回 `now` から計算(`MetamonRenderer/Support/TimerClock.swift`)。
+- `TimerRunStore`(UserDefaults・キー `metamon.timer.<アプリ名>/<画面>/<部品 id>`)に保存。アプリを殺しても、次に開いた時に残り時間 / 完了(00:00)を正しく出す。
+- 終了通知は純粋関数 `TimerNotificationPlan.decide` で判定: **countdown が走行中で scenePhase が active 以外になった時だけ** 終了時刻に予約(識別子 `timer.<キー>`)、active に戻ったら取り消し。inactive(コントロールセンター・許可ダイアログ・App スイッチャー)でも予約するのは、スイッチャーからの強制終了でも通知を残すため(active で取り消すので重複しない)。
+- 通知許可は countdown を初めて開始した時に求める。拒否されていても画面上のタイマーは正しく動く。
+- 見た目(`TimerDisplayLeaf` の body)は変更していない。
+
+### 17.2 同期
+- **前面復帰**(`AppRuntime.setForeground(true)` → `catchUpAfterBackground()`・`AppRuntime+Background.swift`): 未送信キュー(`SyncQueue`)を流す → live なら DSL を `fetchDocumentIfChanged` で取り直し `hotReload`(操作中は保留)→ 表示中の entity の records を pull。背面中は SSE を止めているので、その間の取りこぼしをここで埋める。
+- **裏の定期同期**: `BGAppRefreshTask`(識別子 `jp.kz2601.metamon.refresh`・Info.plist の `BGTaskSchedulerPermittedIdentifiers` と `UIBackgroundModes: fetch`)。scenePhase が background になった時と、タスク実行の冒頭で次回分を予約(最短 15 分・実際の間隔は OS 任せ)。中身は前面復帰と同じ `syncAll`。SwiftUI の `.backgroundTask(.appRefresh(...))` で受ける。
+- Background Modes(fetch)は Info.plist だけで有効になり、App ID の capability 操作は要らない。
+- 確認: 実機で背面にして Xcode の一時停止 → `e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"jp.kz2601.metamon.refresh"]` → 続行。**シミュレータでは `submit` が常に `BGTaskSchedulerErrorDomain 1`(unavailable)で失敗し発火もしない**ので、実機でのみ確認できる。
+
+### 17.3 位置の継続記録(未実装・後続)
+デモでは扱わない。入れる場合の手順と注意:
+1. Info.plist に `NSLocationAlwaysAndWhenInUseUsageDescription`(何のために常時取るかを具体的に)と `UIBackgroundModes: location` を追加。
+2. 権限は段階的に: まず When In Use → 記録開始時に Always を要求(iOS は「後で常時を許可するか」を OS が聞き直す仕組み)。
+3. `CLLocationManager` は `allowsBackgroundLocationUpdates = true`・`pausesLocationUpdatesAutomatically = true`・電池のため `startMonitoringSignificantLocationChanges` か `CLLocationUpdate.liveUpdates` の低頻度設定を使い、点はローカル DB に溜めて `SyncQueue` で送る。
+4. App Store 審査では「常時位置が必要な理由」と電池への配慮の説明が求められ、却下されやすい。ハッカソン期間の価値に対して重いので見送った。
+
+### 17.4 シミュレータでの確認手順(ヘッドレス)
+- `METAMON_E2E_TIMER_START=<部品 id>`(DEBUG)で、表示時に timerDisplay を開始する。例: `METAMON_INITIAL_EXAMPLE=gallery-structure METAMON_AUTO_OPEN=memo_form:sheet METAMON_E2E_TIMER_START=timer` → `xcrun simctl launch <UDID> com.apple.Preferences` で背面化 → 60 秒後に通知 → アプリを起動し直すと 00:00。
+- 同期は `METAMON_E2E_OFFLINE_SECONDS` + `METAMON_AUTO_RECORD` でオフライン記録 → 背面 → 前面で `[Metamon] background(foreground): ...` を確認。
