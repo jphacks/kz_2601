@@ -1,0 +1,346 @@
+{
+  "appId": "training",
+  "version": 2,
+  "previousVersion": 1,
+  "mode": "full",
+  "dsl": {
+    "app": {
+      "description": "毎日の筋トレのセットを記録し、今日の内容と履歴・種目ごとの推移を確認する",
+      "icon": "dumbbell",
+      "name": "筋トレ記録",
+      "notifications": [
+        {
+          "body": "今日のトレーニングを記録しましょう",
+          "id": "morning_reminder",
+          "repeat": "daily",
+          "time": "08:00",
+          "title": "筋トレの時間です"
+        }
+      ],
+      "tabs": [
+        {
+          "icon": "flame",
+          "screen": "today",
+          "title": "今日"
+        },
+        {
+          "icon": "clock.arrow.circlepath",
+          "screen": "history",
+          "title": "履歴"
+        }
+      ],
+      "theme": {
+        "primaryColor": "#E65100"
+      },
+      "voiceEntry": "floating"
+    },
+    "entities": [
+      {
+        "fields": [
+          {
+            "defaultValue": "ベンチプレス",
+            "id": "exercise",
+            "name": "種目",
+            "options": [
+              "ベンチプレス",
+              "スクワット",
+              "デッドリフト",
+              "懸垂",
+              "腕立て伏せ",
+              "ショルダープレス",
+              "その他"
+            ],
+            "required": true,
+            "type": "enum"
+          },
+          {
+            "id": "weight",
+            "name": "重量",
+            "type": "number",
+            "unit": "kg"
+          },
+          {
+            "id": "reps",
+            "name": "回数",
+            "required": true,
+            "type": "integer",
+            "unit": "回"
+          },
+          {
+            "defaultValue": 1,
+            "id": "sets",
+            "name": "セット数",
+            "type": "integer",
+            "unit": "セット"
+          },
+          {
+            "defaultValue": "now",
+            "id": "date",
+            "name": "日付",
+            "required": true,
+            "type": "date"
+          },
+          {
+            "id": "memo",
+            "name": "メモ",
+            "type": "text"
+          }
+        ],
+        "id": "workout",
+        "name": "セット",
+        "titleField": "exercise"
+      }
+    ],
+    "initialScreen": "today",
+    "schemaVersion": 1,
+    "screens": [
+      {
+        "components": [
+          {
+            "area": "A1:F2",
+            "children": [
+              {
+                "aggregate": "count",
+                "entity": "workout",
+                "filter": {
+                  "field": "date",
+                  "op": "today",
+                  "value": null
+                },
+                "label": "今日のセット",
+                "type": "stat"
+              },
+              {
+                "aggregate": "sum",
+                "entity": "workout",
+                "field": "reps",
+                "filter": {
+                  "field": "date",
+                  "op": "today",
+                  "value": null
+                },
+                "label": "今日の総回数",
+                "type": "stat"
+              }
+            ],
+            "id": "summary",
+            "type": "hstack"
+          },
+          {
+            "area": "A3:F10",
+            "children": [
+              {
+                "emptyText": "今日はまだ記録がありません",
+                "entity": "workout",
+                "filter": {
+                  "field": "date",
+                  "op": "today",
+                  "value": null
+                },
+                "item": {
+                  "subtitle": "weight",
+                  "title": "exercise",
+                  "trailing": "reps"
+                },
+                "onItemTap": {
+                  "presentation": "push",
+                  "screen": "workout_form",
+                  "type": "navigate"
+                },
+                "sort": {
+                  "direction": "desc",
+                  "field": "date"
+                },
+                "swipeToDelete": true,
+                "type": "list"
+              }
+            ],
+            "id": "today_list",
+            "title": "今日のセット",
+            "type": "section"
+          },
+          {
+            "action": {
+              "presentation": "sheet",
+              "screen": "workout_form",
+              "type": "navigate"
+            },
+            "area": "D11:F12",
+            "icon": "plus",
+            "id": "add",
+            "label": "セットを追加",
+            "style": "primary",
+            "type": "button"
+          }
+        ],
+        "id": "today",
+        "title": "今日のトレーニング",
+        "toolbar": [
+          {
+            "action": {
+              "presentation": "sheet",
+              "screen": "workout_form",
+              "type": "navigate"
+            },
+            "icon": "plus",
+            "label": "追加"
+          }
+        ]
+      },
+      {
+        "components": [
+          {
+            "aggregate": "count",
+            "area": "A1:F4",
+            "entity": "workout",
+            "filter": {
+              "field": "date",
+              "op": "thisMonth",
+              "value": null
+            },
+            "groupBy": "exercise",
+            "id": "by_exercise",
+            "kind": "pie",
+            "title": "種目別のセット数(今月)",
+            "type": "chart"
+          },
+          {
+            "aggregate": "sum",
+            "area": "A5:F8",
+            "bucket": "day",
+            "entity": "workout",
+            "field": "reps",
+            "groupBy": "date",
+            "id": "by_day",
+            "kind": "bar",
+            "title": "日ごとの総回数",
+            "type": "chart"
+          },
+          {
+            "area": "A9:F16",
+            "children": [
+              {
+                "emptyText": "まだ記録がありません",
+                "entity": "workout",
+                "item": {
+                  "subtitle": "date",
+                  "title": "exercise",
+                  "trailing": "reps"
+                },
+                "onItemTap": {
+                  "presentation": "push",
+                  "screen": "workout_form",
+                  "type": "navigate"
+                },
+                "sort": {
+                  "direction": "desc",
+                  "field": "date"
+                },
+                "swipeToDelete": true,
+                "type": "list"
+              }
+            ],
+            "id": "history_list",
+            "title": "これまでの記録",
+            "type": "section"
+          }
+        ],
+        "id": "history",
+        "title": "履歴"
+      },
+      {
+        "components": [
+          {
+            "area": "A1:F8",
+            "children": [
+              {
+                "field": "exercise",
+                "label": "種目",
+                "style": "menu",
+                "type": "picker"
+              },
+              {
+                "field": "weight",
+                "label": "重量",
+                "placeholder": "60",
+                "type": "numberField",
+                "unit": "kg"
+              },
+              {
+                "field": "reps",
+                "label": "回数",
+                "placeholder": "10",
+                "type": "numberField",
+                "unit": "回"
+              },
+              {
+                "field": "sets",
+                "label": "セット数",
+                "type": "numberField",
+                "unit": "セット"
+              },
+              {
+                "field": "date",
+                "label": "日付",
+                "type": "datePicker"
+              },
+              {
+                "field": "memo",
+                "label": "メモ",
+                "multiline": true,
+                "placeholder": "フォームの感想など",
+                "type": "textField"
+              }
+            ],
+            "id": "fields",
+            "title": "内容",
+            "type": "section"
+          },
+          {
+            "action": {
+              "confirmMessage": "この記録を削除しますか？",
+              "entity": "workout",
+              "type": "deleteRecord"
+            },
+            "area": "A11:F12",
+            "id": "delete",
+            "label": "削除",
+            "style": "destructive",
+            "type": "button"
+          }
+        ],
+        "entity": "workout",
+        "id": "workout_form",
+        "title": "セットを記録",
+        "toolbar": [
+          {
+            "action": {
+              "entity": "workout",
+              "type": "saveRecord"
+            },
+            "icon": "checkmark",
+            "label": "保存"
+          }
+        ]
+      }
+    ]
+  },
+  "summary": "筋トレ記録を作りました。今日/履歴の2タブ構成で、セットを記録できます。毎日08:00に「筋トレの時間です」の通知を送ります。",
+  "transcript": "筋トレの記録アプリ。今日のセットと履歴、毎朝8時にリマインド",
+  "source": "claude",
+  "latencyMs": {
+    "claude": 10134,
+    "total": 10137
+  },
+  "meta": {
+    "model": "claude-sonnet-5-5",
+    "attempts": 1,
+    "regenerations": 0,
+    "areaFallback": false,
+    "usage": {
+      "inputTokens": 95,
+      "outputTokens": 1745,
+      "cacheReadInputTokens": 8588
+    }
+  }
+}

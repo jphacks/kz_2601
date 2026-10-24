@@ -92,7 +92,7 @@ paths:
         '413': { description: 音声が大きすぎる, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
         '501': { description: 未設定, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
 
-  /healthz:
+  /health:
     get:
       security: []
       summary: liveness
