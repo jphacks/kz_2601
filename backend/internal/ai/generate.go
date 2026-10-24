@@ -549,10 +549,10 @@ func mapClaudeErr(err error) error {
 	}
 	var ae *APIError
 	if errors.As(err, &ae) {
-		switch {
-		case ae.Status == 429:
+		switch ae.Status {
+		case 429:
 			return &Error{Status: http.StatusTooManyRequests, Code: "rate_limited", Message: "Claude rate limit"}
-		case ae.Status == 400 || ae.Status == 401 || ae.Status == 403:
+		case 400, 401, 403:
 			return &Error{Status: http.StatusInternalServerError, Code: "internal", Message: "Claude request rejected: " + ae.Message}
 		default:
 			return &Error{Status: http.StatusServiceUnavailable, Code: "upstream_unavailable", Message: "Claude unavailable: " + ae.Type}
