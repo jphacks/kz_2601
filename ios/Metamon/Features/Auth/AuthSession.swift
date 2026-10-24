@@ -63,6 +63,13 @@ final class AuthSession {
         }
     }
 
+    /// セッション切れ(#60: トークン再取得後も 401)。サインアウトしてサインイン画面に理由を出す。
+    func expire() {
+        signOut()
+        errorMessage = ErrorCopy.sessionExpiredSignIn
+        print("[Metamon] session expired → sign-in screen")
+    }
+
     private func perform(_ body: () async throws -> AuthUser) async {
         isBusy = true
         defer { isBusy = false }

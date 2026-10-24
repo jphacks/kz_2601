@@ -15,7 +15,9 @@ struct ChartLeaf: View {
         VStack(alignment: .leading, spacing: 8) {
             if let title = c.title { Text(title).font(RenderTheme.Fonts.cardTitle) }
             if buckets.isEmpty {
-                EmptyPlaceholder(icon: "chart.bar", text: "データがありません")
+                EmptyPlaceholder(icon: "chart.bar", emptyText: "データがありません", state: rt.emptyState(for: entityId)) {
+                    Task { await rt.load(entities: [entityId], force: true) }
+                }
             } else {
                 Chart(buckets) { b in
                     switch c.kind {

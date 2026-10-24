@@ -112,11 +112,45 @@ struct Hairline: View {
     }
 }
 
-/// 空・読み込み中のプレースホルダ(`emptyState` 風)。list / table / timeline / chart が共用。
+/// 空・読み込み中・取得失敗のプレースホルダ(`emptyState` 風)。list / table / timeline / chart が共用。
+/// `state == .unavailable`(#85: サーバーから取れずローカルにも無い)は空状態と区別し「読み込めませんでした」+ 再試行ボタン。
 struct EmptyPlaceholder: View {
     var icon: String = "tray"
     var text: String
     var loading = false
+    var state: EmptyState = .empty
+    var retry: (() -> Void)? = nil
+
+    static let loadingText = "読み込み中…"
+    static let unavailableText = "読み込めませんでした"
+    static let retryLabel = "再試行"
+    /// stat の値に出す「取れていない」印
+    static let unavailableValue = "—"
+
+    /// list / table / timeline / chart 共通の組み立て: 状態から文言・アイコンを決める。
+    init(icon: String = "tray", emptyText: String, state: EmptyState, retry: (() -> Void)? = nil) {
+        self.state = state
+        self.loading = state == .loading
+        self.retry = state == .unavailable ? retry : nil
+        switch state {
+        case .loading:
+            self.icon = icon
+            self.text = Self.loadingText
+        case .unavailable:
+            self.icon = "wifi.exclamationmark"
+            self.text = Self.unavailableText
+        case .empty:
+            self.icon = icon
+            self.text = emptyText
+        }
+    }
+
+    init(icon: String = "tray", text: String, loading: Bool = false) {
+        self.icon = icon
+        self.text = text
+        self.loading = loading
+        self.state = loading ? .loading : .empty
+    }
 
     var body: some View {
         VStack(spacing: RenderTheme.Spacing.sm) {
@@ -131,6 +165,15 @@ struct EmptyPlaceholder: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+            if let retry {
+                Button(action: retry) {
+                    Label(Self.retryLabel, systemImage: "arrow.clockwise")
+                        .font(.footnote.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .padding(.top, RenderTheme.Spacing.xs)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, RenderTheme.Spacing.lg)

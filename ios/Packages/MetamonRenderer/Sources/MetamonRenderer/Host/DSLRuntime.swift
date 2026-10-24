@@ -13,6 +13,8 @@ public protocol DSLRuntime: AnyObject, Observable {
     var selectedTab: String { get set }
     /// 読み込み中の entity id
     var loading: Set<String> { get }
+    /// サーバーから取れずローカルにも無い entity id(#85)。空状態(まだありません)と区別して「読み込めませんでした」を描く
+    var failed: Set<String> { get }
 
     func records(for entity: String) -> [Record]
     func load(entities: Set<String>, force: Bool) async
@@ -24,6 +26,19 @@ public protocol DSLRuntime: AnyObject, Observable {
 
 public extension DSLRuntime {
     func load(entities: Set<String>) async { await load(entities: entities, force: false) }
+    var failed: Set<String> { [] }
+
+    /// 部品が共通で使う空状態の判定: 読み込み中 / 取得失敗 / 本当に空。
+    func emptyState(for entity: String) -> EmptyState {
+        if loading.contains(entity) { return .loading }
+        if failed.contains(entity) { return .unavailable }
+        return .empty
+    }
+}
+
+/// レコードが 0 件の時の理由。`EmptyPlaceholder` の文言・再試行ボタンを決める。
+public enum EmptyState: Equatable, Sendable {
+    case loading, unavailable, empty
 }
 
 private struct DSLRuntimeKey: EnvironmentKey {

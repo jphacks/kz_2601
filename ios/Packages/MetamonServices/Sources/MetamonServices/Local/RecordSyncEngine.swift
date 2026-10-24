@@ -36,7 +36,8 @@ public final class RecordSyncEngine {
     @ObservationIgnored public let store: RecordStore
     @ObservationIgnored public let queue: SyncQueue
     @ObservationIgnored private let client: any AppConfigClient
-    @ObservationIgnored private let connectivity: any ConnectivityMonitor
+    /// 到達性。`AppRuntime` が生成の圏外判定・復帰待ち(#60)にも使う(E2E の機内モード擬似もここに入る)
+    @ObservationIgnored public let connectivity: any ConnectivityMonitor
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     @ObservationIgnored private var isForeground = true
     @ObservationIgnored private var started = false

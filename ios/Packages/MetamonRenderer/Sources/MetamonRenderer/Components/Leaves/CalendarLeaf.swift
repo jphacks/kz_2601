@@ -115,8 +115,16 @@ struct CalendarLeaf: View {
                 }
             }
             if rows.isEmpty {
-                Text(rt.loading.contains(entityId) ? "読み込み中…" : "予定はありません")
-                    .font(.caption).foregroundStyle(.secondary)
+                switch rt.emptyState(for: entityId) {
+                case .loading: Text(EmptyPlaceholder.loadingText).font(.caption).foregroundStyle(.secondary)
+                case .unavailable:
+                    HStack(spacing: RenderTheme.Spacing.sm) {
+                        Text(EmptyPlaceholder.unavailableText).font(.caption).foregroundStyle(.secondary)
+                        Button(EmptyPlaceholder.retryLabel) { Task { await rt.load(entities: [entityId], force: true) } }
+                            .font(.caption.weight(.semibold))
+                    }
+                case .empty: Text("予定はありません").font(.caption).foregroundStyle(.secondary)
+                }
             } else {
                 ForEach(rows) { row in
                     ListRow(item: ListItem(title: entity?.titleField ?? dateField), record: row, entity: entity)
