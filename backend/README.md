@@ -1,7 +1,7 @@
 # backend (Go)
 
 単一モジュール・複数サービス構成。`cmd/<service>` が1つの Cloud Run サービスに対応する。
-設計: `docs/backend/architecture.md`、API契約: `docs/backend/openapi-*.yaml`、DSL: `docs/backend/dsl-proposal.md`。
+設計: `docs/backend/architecture.md`、API契約: `docs/backend/openapi-*.yaml`、DSL: `docs/dsl/README.md` + `docs/dsl/dsl.schema.json`。
 
 | cmd | 担当 | 役割 |
 |---|---|---|
@@ -23,5 +23,5 @@ cd backend
 make build vet test      # CI と同じ
 make emulator            # 別ターミナル: Firestore :8089 / Auth :9099
 make dev                 # appconfig :8080 / ai :8081 (AUTH_MODE=dev, X-Debug-Uid で叩ける)
-make schema-sync         # docs/backend/dsl.schema.json → pkg/dsl/schema.json (スキーマ変更時)
+make schema-sync         # docs/dsl/dsl.schema.json → pkg/dsl/schema.json (スキーマ変更時)
 ```

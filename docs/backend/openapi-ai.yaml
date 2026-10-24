@@ -133,8 +133,8 @@ components:
         patch:
           type: array
           description: mode=patch の時、適用した RFC 6902 ops (iOS は使わなくてよい。デバッグ・表示用)
-          items: { $ref: './dsl.schema.json#/$defs/PatchOp' }
-        dsl: { $ref: './dsl.schema.json', description: 適用後のフル DSL (iOS はこれを即適用) }
+          items: { $ref: '../dsl/dsl.schema.json#/$defs/PatchOp' }
+        dsl: { $ref: '../dsl/dsl.schema.json', description: 適用後のフル DSL (iOS はこれを即適用) }
         summary: { type: string, example: 家計簿アプリを作成しました。支出の記録と今月の合計、カテゴリ別の内訳が見られます }
         transcript: { type: string, description: 入力が audio の時の文字起こし }
         source:

@@ -7,7 +7,7 @@ info:
     - 認証: `Authorization: Bearer <Firebase ID token>`。uid はトークンから取得し URL には含めない。
     - すべてのパスは呼び出しユーザー自身の `users/{uid}/...` に束縛される。
     - エラーは全て `Error` 形式。ページングは `pageSize` + `pageToken` / `nextPageToken`。
-    - DSL の本体スキーマは `dsl.schema.json` を参照 (OpenAPI 内では `$ref`)。
+    - DSL の本体スキーマは `../dsl/dsl.schema.json` を参照 (OpenAPI 内では `$ref`)。
 servers:
   - url: http://localhost:8080/v1
     description: local (AUTH_MODE=dev では `X-Debug-Uid` ヘッダで代替可)
@@ -50,7 +50,7 @@ paths:
               type: object
               properties:
                 name: { type: string, description: 省略時は dsl.app.name }
-                dsl: { $ref: './dsl.schema.json' }
+                dsl: { $ref: '../dsl/dsl.schema.json' }
       responses:
         '201':
           description: Created
@@ -120,7 +120,7 @@ paths:
         1. `If-Match: "<baseVersion>"` 必須。Patch は基底バージョン依存なので不一致は 409 (ai は最新を取り直して再生成)。
         2. サーバーは `dsl.ApplyPatch(現行DSL, patch)` = 適用 → JSON Schema → 意味検証。失敗は 422 に全問題を列挙 (現行 DSL は無変更)。
         3. 成功時は `versions/{n+1}` に **フルスナップショット `dsl` と `patch` の両方**を保存。
-        Patch の `value` は `dsl.schema.json#/$defs/PatchValue` (プリミティブ or DSL 部分文書) に限る。ops 上限 50。
+        Patch の `value` は `docs/dsl/dsl.schema.json#/$defs/PatchValue` (プリミティブ or DSL 部分文書) に限る。ops 上限 50。
       parameters:
         - in: header
           name: If-Match
@@ -132,7 +132,7 @@ paths:
           application/json-patch+json:
             schema:
               type: array
-              items: { $ref: './dsl.schema.json#/$defs/PatchOp' }
+              items: { $ref: '../dsl/dsl.schema.json#/$defs/PatchOp' }
             example:
               - { op: add, path: /entities/0/fields/-, value: { id: shop, name: 店名, type: string } }
               - { op: add, path: /screens/1/components/0/children/-, value: { type: textField, field: shop, label: 店名 } }
@@ -142,7 +142,7 @@ paths:
               required: [patch]
               description: 'JSON Patch をメタ情報付きで送る形 (ai サービスはこちらを使う)'
               properties:
-                patch: { type: array, items: { $ref: './dsl.schema.json#/$defs/PatchOp' } }
+                patch: { type: array, items: { $ref: '../dsl/dsl.schema.json#/$defs/PatchOp' } }
                 source: { $ref: '#/components/schemas/VersionSource' }
       responses:
         '201':
@@ -174,7 +174,7 @@ paths:
               type: object
               required: [dsl]
               properties:
-                dsl: { $ref: './dsl.schema.json' }
+                dsl: { $ref: '../dsl/dsl.schema.json' }
                 source: { $ref: '#/components/schemas/VersionSource' }
       responses:
         '201':
@@ -241,7 +241,7 @@ paths:
                 required: [items, version]
                 properties:
                   version: { type: integer }
-                  items: { type: array, items: { $ref: './dsl.schema.json#/$defs/Entity' } }
+                  items: { type: array, items: { $ref: '../dsl/dsl.schema.json#/$defs/Entity' } }
 
   /apps/{appId}/entities/{entityId}:
     parameters: [{ $ref: '#/components/parameters/AppId' }, { $ref: '#/components/parameters/EntityId' }]
@@ -249,7 +249,7 @@ paths:
       tags: [entities]
       summary: エンティティ定義
       responses:
-        '200': { description: OK, content: { application/json: { schema: { $ref: './dsl.schema.json#/$defs/Entity' } } } }
+        '200': { description: OK, content: { application/json: { schema: { $ref: '../dsl/dsl.schema.json#/$defs/Entity' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
     put:
       tags: [entities]
@@ -259,7 +259,7 @@ paths:
         - { in: header, name: If-Match, required: true, schema: { type: string } }
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: './dsl.schema.json#/$defs/Entity' } } }
+        content: { application/json: { schema: { $ref: '../dsl/dsl.schema.json#/$defs/Entity' } } }
       responses:
         '201': { description: 新バージョン作成, headers: { ETag: { $ref: '#/components/headers/ETag' } }, content: { application/json: { schema: { $ref: '#/components/schemas/VersionSummary' } } } }
         '409': { $ref: '#/components/responses/VersionConflict' }
@@ -434,14 +434,14 @@ components:
         - { $ref: '#/components/schemas/AppSummary' }
         - type: object
           required: [dsl]
-          properties: { dsl: { $ref: './dsl.schema.json' } }
+          properties: { dsl: { $ref: '../dsl/dsl.schema.json' } }
     DSLEnvelope:
       type: object
       required: [appId, version, dsl]
       properties:
         appId: { type: string }
         version: { type: integer }
-        dsl: { $ref: './dsl.schema.json' }
+        dsl: { $ref: '../dsl/dsl.schema.json' }
         source: { $ref: '#/components/schemas/VersionSource' }
         createdAt: { type: string, format: date-time }
     VersionSource:
@@ -466,7 +466,7 @@ components:
         patch:
           type: array
           description: このバージョンを作った RFC 6902 ops (PATCH 経由の時のみ)
-          items: { $ref: './dsl.schema.json#/$defs/PatchOp' }
+          items: { $ref: '../dsl/dsl.schema.json#/$defs/PatchOp' }
         createdAt: { type: string, format: date-time }
     RecordData:
       type: object

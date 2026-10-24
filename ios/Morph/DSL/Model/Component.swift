@@ -1,218 +1,159 @@
 import Foundation
 
-/// DSL ツリーの1ノード = 共通メタ(id/visible/padding) + 種別ごとの props。
-struct Node: Decodable, Identifiable, Sendable {
+/// コンポーネント種別(schema `type`)。未知は `.unknown` に丸めてプレースホルダ描画する。
+enum ComponentType: String, Decodable, Sendable {
+    // container(children は Leaf のみ・1段)
+    case vstack, hstack, section
+    // leaf
+    case text, button, textField, numberField, datePicker, picker, toggle
+    case photoField, image, list, stat, chart, voiceInput, spacer, divider
+    case unknown
+
+    init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
+
+    var isContainer: Bool { self == .vstack || self == .hstack || self == .section }
+}
+
+/// 全コンポーネントの props をフラットに持つ1ノード(Go の `dsl.Component` と 1:1)。
+/// どの props が意味を持つかは `type` 次第(docs/dsl/README.md のコンポーネント表)。
+struct Component: Decodable, Identifiable, Sendable {
     let id: String
-    /// `true/false` または式 `"{{state.flag}}"`。nil は常に表示。
-    let visible: JSONValue?
-    let padding: Double?
-    let component: Component
+    var type: ComponentType
+    /// デコード時の生の type 文字列(未知 type のプレースホルダ表示用)。
+    var rawType: String
+    /// 画面グリッド上の矩形 "A1:C3"(Screen 直下のみ有効)。nil = グリッドの下に積む。
+    var area: String?
+    var gridArea: GridArea? { area.flatMap(GridArea.init) }
 
-    private enum Keys: String, CodingKey { case id, visible, padding }
+    // container
+    var title: String?          // section / chart
+    var spacing: String?        // none|small|medium|large
+    var children: [Component]
 
-    init(id: String = UUID().uuidString, visible: JSONValue? = nil, padding: Double? = nil, component: Component) {
-        self.id = id
-        self.visible = visible
-        self.padding = padding
-        self.component = component
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: Keys.self)
-        id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
-        visible = try c.decodeIfPresent(JSONValue.self, forKey: .visible)
-        padding = try c.decodeIfPresent(Double.self, forKey: .padding)
-        component = try Component(from: decoder)
-    }
-}
-
-/// `type` で分岐するポリモーフィック表現。
-/// 未知 type は `.unknown`、既知 type の props 不正は `.invalid` として描画側で安全に無視する。
-indirect enum Component: Sendable {
-    case text(TextProps)
-    case image(ImageProps)
-    case button(ButtonProps)
-    case textField(TextFieldProps)
-    case toggle(ToggleProps)
-    case picker(PickerProps)
-    case stack(StackProps)
-    case list(ListProps)
-    case card(CardProps)
-    case section(SectionProps)
-    case spacer(SpacerProps)
-    case divider
-    case progress(ProgressProps)
-    case map(MapProps)
-    case camera(CameraProps)
-    case aiVoice(AIVoiceProps)
-    case unknown(type: String)
-    case invalid(type: String, reason: String)
-}
-
-extension Component: Decodable {
-    private enum Keys: String, CodingKey { case type }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: Keys.self)
-        let type = try c.decode(String.self, forKey: .type)
-        do {
-            switch type {
-            case "text": self = .text(try TextProps(from: decoder))
-            case "image": self = .image(try ImageProps(from: decoder))
-            case "button": self = .button(try ButtonProps(from: decoder))
-            case "textField": self = .textField(try TextFieldProps(from: decoder))
-            case "toggle": self = .toggle(try ToggleProps(from: decoder))
-            case "picker": self = .picker(try PickerProps(from: decoder))
-            case "vstack", "hstack", "zstack": self = .stack(try StackProps(from: decoder))
-            case "list": self = .list(try ListProps(from: decoder))
-            case "card": self = .card(try CardProps(from: decoder))
-            case "section": self = .section(try SectionProps(from: decoder))
-            case "spacer": self = .spacer(try SpacerProps(from: decoder))
-            case "divider": self = .divider
-            case "progress": self = .progress(try ProgressProps(from: decoder))
-            case "map": self = .map(try MapProps(from: decoder))
-            case "camera": self = .camera(try CameraProps(from: decoder))
-            case "aiVoice": self = .aiVoice(try AIVoiceProps(from: decoder))
-            default: self = .unknown(type: type)
-            }
-        } catch {
-            self = .invalid(type: type, reason: String(describing: error))
-        }
-    }
-}
-
-// MARK: - Props
-
-enum TextStyle: String, Decodable, Sendable {
-    case largeTitle, title, title2, headline, body, caption, footnote
-    init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .body) }
-}
-
-enum TextAlign: String, Decodable, Sendable {
-    case leading, center, trailing
-    init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .leading) }
-}
-
-struct TextProps: Decodable, Sendable {
-    var text: String
-    var style: TextStyle?
-    var color: String?
-    var align: TextAlign?
-    var bold: Bool?
-}
-
-struct ImageProps: Decodable, Sendable {
-    var url: String?
-    var systemName: String?
-    var height: Double?
-    var cornerRadius: Double?
-}
-
-enum ButtonKind: String, Decodable, Sendable {
-    case primary, secondary, destructive, plain
-    init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .primary) }
-}
-
-struct ButtonProps: Decodable, Sendable {
+    // text / button / inputs
+    var text: String?
+    var style: String?          // text: title|headline|body|caption / button: primary|secondary|destructive|plain / picker: menu|segmented|wheel
+    var align: String?          // leading|center|trailing
     var label: String?
     var icon: String?
-    var style: ButtonKind?
     var action: Action?
-    var disabled: JSONValue?
-}
-
-struct TextFieldProps: Decodable, Sendable {
-    var bind: String
+    var field: String?          // 入力の束縛先 field id / stat・chart の値 field
     var placeholder: String?
-    var keyboard: String?
-    var secure: Bool?
     var multiline: Bool?
-}
+    var unit: String?
+    var includeTime: Bool?
+    var source: String?         // photoField: camera|library|both
+    var height: String?         // image: small|medium|large
 
-struct ToggleProps: Decodable, Sendable {
-    var bind: String
-    var label: String
-}
+    // data-bound(list / stat / chart)
+    var entity: String?
+    var item: ListItem?
+    var sort: Sort?
+    var filter: Filter?
+    var emptyText: String?
+    var onItemTap: Action?
+    var swipeToDelete: Bool?
+    var aggregate: String?      // count|sum|avg|min|max
+    var format: String?         // plain|currency|percent
+    var kind: String?           // bar|line|pie
+    var groupBy: String?
+    var bucket: String?         // day|week|month
 
-struct PickerOption: Decodable, Hashable, Sendable {
-    var label: String
-    var value: JSONValue
-}
+    // voiceInput / spacer
+    var prompt: String?
+    var size: String?           // voiceInput: compact|large / spacer: small|medium|large|flexible
 
-struct PickerProps: Decodable, Sendable {
-    var bind: String
-    var label: String?
-    var options: [PickerOption]
-}
+    private enum Keys: String, CodingKey {
+        case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
+        case includeTime, source, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
+        case kind, groupBy, bucket, prompt, size
+    }
 
-enum StackAxis: String, Decodable, Sendable {
-    case vstack, hstack, zstack
-    init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .vstack) }
-}
-
-struct StackProps: Decodable, Sendable {
-    var axis: StackAxis
-    var spacing: Double?
-    var alignment: String?
-    @Lossy var children: [Node]
-
-    private enum CodingKeys: String, CodingKey {
-        case axis = "type", spacing, alignment, children
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        rawType = try c.decodeIfPresent(String.self, forKey: .type) ?? ""
+        type = ComponentType(rawValue: rawType) ?? .unknown
+        id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        area = try? c.decodeIfPresent(String.self, forKey: .area)
+        title = try? c.decodeIfPresent(String.self, forKey: .title)
+        spacing = try? c.decodeIfPresent(String.self, forKey: .spacing)
+        children = (try? c.decode(Lossy<Component>.self, forKey: .children).wrappedValue) ?? []
+        text = try? c.decodeIfPresent(String.self, forKey: .text)
+        style = try? c.decodeIfPresent(String.self, forKey: .style)
+        align = try? c.decodeIfPresent(String.self, forKey: .align)
+        label = try? c.decodeIfPresent(String.self, forKey: .label)
+        icon = try? c.decodeIfPresent(String.self, forKey: .icon)
+        action = try? c.decodeIfPresent(Action.self, forKey: .action)
+        field = try? c.decodeIfPresent(String.self, forKey: .field)
+        placeholder = try? c.decodeIfPresent(String.self, forKey: .placeholder)
+        multiline = try? c.decodeIfPresent(Bool.self, forKey: .multiline)
+        unit = try? c.decodeIfPresent(String.self, forKey: .unit)
+        includeTime = try? c.decodeIfPresent(Bool.self, forKey: .includeTime)
+        source = try? c.decodeIfPresent(String.self, forKey: .source)
+        height = try? c.decodeIfPresent(String.self, forKey: .height)
+        entity = try? c.decodeIfPresent(String.self, forKey: .entity)
+        item = try? c.decodeIfPresent(ListItem.self, forKey: .item)
+        sort = try? c.decodeIfPresent(Sort.self, forKey: .sort)
+        filter = try? c.decodeIfPresent(Filter.self, forKey: .filter)
+        emptyText = try? c.decodeIfPresent(String.self, forKey: .emptyText)
+        onItemTap = try? c.decodeIfPresent(Action.self, forKey: .onItemTap)
+        swipeToDelete = try? c.decodeIfPresent(Bool.self, forKey: .swipeToDelete)
+        aggregate = try? c.decodeIfPresent(String.self, forKey: .aggregate)
+        format = try? c.decodeIfPresent(String.self, forKey: .format)
+        kind = try? c.decodeIfPresent(String.self, forKey: .kind)
+        groupBy = try? c.decodeIfPresent(String.self, forKey: .groupBy)
+        bucket = try? c.decodeIfPresent(String.self, forKey: .bucket)
+        prompt = try? c.decodeIfPresent(String.self, forKey: .prompt)
+        size = try? c.decodeIfPresent(String.self, forKey: .size)
     }
 }
 
-struct ListProps: Decodable, Sendable {
-    /// 配列を返す式。例 `"{{state.todos}}"`
-    var source: String
-    /// 行テンプレート。中では `{{item.*}}` / `{{index}}` が使える。
-    var item: Node
-    var emptyText: String?
-    var onTap: Action?
-    var onDelete: Action?
+/// list の行テンプレート。値は全部 field id。
+struct ListItem: Decodable, Sendable {
+    var title: String
+    var subtitle: String?
+    var trailing: String?
+    var icon: String?
+    /// photo field id → サムネイル
+    var image: String?
 }
 
-struct CardProps: Decodable, Sendable {
-    var title: String?
-    var action: Action?
-    @Lossy var children: [Node]
+struct Sort: Decodable, Sendable {
+    var field: String
+    var direction: String  // asc|desc
 }
 
-struct SectionProps: Decodable, Sendable {
-    var title: String?
-    var footer: String?
-    @Lossy var children: [Node]
-}
-
-struct SpacerProps: Decodable, Sendable {
-    var minLength: Double?
-}
-
-struct ProgressProps: Decodable, Sendable {
-    /// 0...1 の数値または式。nil は不定(スピナー)。
+struct Filter: Decodable, Sendable {
+    var field: String
+    var op: String          // eq|neq|gt|gte|lt|lte|thisMonth|today
     var value: JSONValue?
-    var label: String?
 }
 
-struct MapPin: Decodable, Identifiable, Sendable {
-    var id: String { "\(lat),\(lng)" }
-    var lat: Double
-    var lng: Double
-    var title: String?
-}
+/// `area` の解析結果。列は 0 始まり(A=0)、行は 1 始まり、両端含む。
+/// 画面は横 6 列(A-F)× 縦 N 行(1 行 = 可視高さ ÷ 12、13 行目以降は画面全体がスクロール)。
+struct GridArea: Equatable, Sendable {
+    static let columns = 6
+    static let visibleRows = 12
 
-struct MapProps: Decodable, Sendable {
-    var lat: Double
-    var lng: Double
-    var span: Double?
-    @Lossy var pins: [MapPin]
-}
+    var col1: Int, row1: Int, col2: Int, row2: Int
 
-struct CameraProps: Decodable, Sendable {
-    /// 撮影/選択した画像(base64 JPEG)を書き込む state パス
-    var bind: String
-    var label: String?
-}
+    init?(_ s: String) {
+        let parts = s.split(separator: ":")
+        guard parts.count == 2, let a = Self.cell(parts[0]), let b = Self.cell(parts[1]),
+              a.col <= b.col, a.row <= b.row else { return nil }
+        (col1, row1, col2, row2) = (a.col, a.row, b.col, b.row)
+    }
 
-struct AIVoiceProps: Decodable, Sendable {
-    var prompt: String?
+    private static func cell(_ s: Substring) -> (col: Int, row: Int)? {
+        guard let first = s.first, let ascii = first.asciiValue, (65...70).contains(ascii),
+              let row = Int(s.dropFirst()), row >= 1 else { return nil }
+        return (Int(ascii) - 65, row)
+    }
+
+    var colSpan: Int { col2 - col1 + 1 }
+    var rowSpan: Int { row2 - row1 + 1 }
+
+    func overlaps(_ o: GridArea) -> Bool {
+        col1 <= o.col2 && o.col1 <= col2 && row1 <= o.row2 && o.row1 <= row2
+    }
 }

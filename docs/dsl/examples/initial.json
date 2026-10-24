@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "0.1",
+  "schemaVersion": 1,
   "app": {
     "name": "はじめてのアプリ",
     "description": "話しかけるとアプリに変わる初期状態",
@@ -13,9 +13,7 @@
       "id": "home",
       "title": "",
       "components": [
-        { "type": "spacer", "size": "flexible" },
-        { "type": "voiceInput", "id": "mic", "prompt": "どんなアプリが欲しい？", "size": "large" },
-        { "type": "spacer", "size": "flexible" }
+        { "type": "voiceInput", "id": "mic", "area": "A1:F12", "prompt": "どんなアプリが欲しい？", "size": "large" }
       ]
     }
   ]

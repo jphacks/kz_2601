@@ -1,6 +1,6 @@
 # バックエンド設計 (Go / GCP) v0
 
-> 正典は `docs/00_decisions.md`。本書はそれを実装可能な粒度に落としたもの。契約は `openapi-appconfig.yaml` / `openapi-ai.yaml`、DSLは `dsl-proposal.md` + `dsl.schema.json`。
+> 正典は `docs/00_decisions.md`。本書はそれを実装可能な粒度に落としたもの。契約は `openapi-appconfig.yaml` / `openapi-ai.yaml`、DSLは `docs/dsl/README.md`(v1 正典) + `docs/dsl/dsl.schema.json`(旧案: `dsl-proposal.md`)。
 
 ## 1. サービス構成とリクエストフロー
 
@@ -36,7 +36,7 @@ sequenceDiagram
   iOS->>AI: POST /generate {appId, text, baseVersion}
   AI->>AC: GET /apps/{id}/dsl (現DSL + ETag)
   alt 初回 (現DSLが初期状態) or mode=create
-    AI->>CL: output_config.format = dsl.schema.json (フルDSL)
+    AI->>CL: output_config.format = docs/dsl/dsl.schema.json (フルDSL)
     CL-->>AI: 新DSL JSON
     AI->>AI: dsl.Parse() (schema + 意味検証)
     AI->>AC: PUT /apps/{id}/dsl  If-Match  {dsl, source}
@@ -258,7 +258,7 @@ flowchart TD
   PP -- 201 --> O
 ```
 
-ルールベース fallback(`internal/ai/fallback`): キーワード辞書 → `templates/*.json` = **デモ3本(家計簿・トレーニング記録・散歩メモ)** + ToDo。テンプレは `docs/backend/examples/*.json` をそのまま埋め込み、`dsl_test.go` が CI で検証済み。デモ当日に Claude が落ちても 3 本は必ず動く保険。
+ルールベース fallback(`internal/ai/fallback`): キーワード辞書 → `templates/*.json` = **デモ3本(家計簿・トレーニング記録・散歩メモ)** + ToDo。テンプレは `docs/dsl/examples/*.json` をそのまま埋め込み、`dsl_test.go` が CI で検証済み。デモ当日に Claude が落ちても 3 本は必ず動く保険。
 
 ### 6.4 レイテンシ目標
 

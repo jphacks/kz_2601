@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "0.1",
+  "schemaVersion": 1,
   "app": {
     "name": "散歩メモ",
     "description": "散歩中に見つけたものを写真とひとことで残す",
@@ -27,16 +27,13 @@
       "title": "散歩メモ",
       "toolbar": [{ "label": "撮る", "icon": "camera", "action": { "type": "navigate", "screen": "memo_form", "presentation": "fullScreen" } }],
       "components": [
-        { "type": "stat", "label": "今日のメモ", "entity": "memo", "aggregate": "count", "filter": { "field": "date", "op": "today", "value": null } },
-        {
-          "type": "list",
-          "entity": "memo",
+        { "type": "stat", "id": "today", "area": "A1:C2", "label": "今日のメモ", "entity": "memo", "aggregate": "count", "filter": { "field": "date", "op": "today", "value": null } },
+        { "type": "stat", "id": "total", "area": "D1:F2", "label": "ぜんぶ", "entity": "memo", "aggregate": "count" },
+        { "type": "list", "id": "memos", "area": "A3:F12", "entity": "memo",
           "item": { "title": "note", "subtitle": "date", "image": "photo" },
           "sort": { "field": "date", "direction": "desc" },
-          "emptyText": "散歩に出かけて最初のメモを残そう",
-          "swipeToDelete": true,
-          "onItemTap": { "type": "navigate", "screen": "memo_form", "presentation": "push" }
-        }
+          "emptyText": "散歩に出かけて最初のメモを残そう", "swipeToDelete": true,
+          "onItemTap": { "type": "navigate", "screen": "memo_form", "presentation": "push" } }
       ]
     },
     {
@@ -45,10 +42,10 @@
       "entity": "memo",
       "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "memo" } }],
       "components": [
-        { "type": "image", "field": "photo", "height": "large" },
-        { "type": "photoField", "field": "photo", "label": "写真を撮る", "source": "camera" },
-        { "type": "textField", "field": "note", "label": "ひとこと", "placeholder": "きれいな紅葉" },
-        { "type": "button", "label": "30分後に思い出す", "style": "secondary",
+        { "type": "image", "id": "preview", "area": "A1:F5", "field": "photo", "height": "large" },
+        { "type": "photoField", "id": "shoot", "area": "A6:F7", "field": "photo", "label": "写真を撮る", "source": "camera" },
+        { "type": "textField", "id": "note", "area": "A8:F9", "field": "note", "label": "ひとこと", "placeholder": "きれいな紅葉" },
+        { "type": "button", "id": "remind", "area": "A11:F12", "label": "今夜18時に思い出す", "style": "secondary",
           "action": { "type": "scheduleNotification", "notification": { "id": "remind_memo", "title": "散歩メモ", "body": "さっきのメモ、続きを書きませんか？", "repeat": "once", "time": "18:00" } } }
       ]
     }

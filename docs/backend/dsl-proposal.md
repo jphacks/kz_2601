@@ -1,5 +1,7 @@
 # AppDSL v0.1 提案 (バックエンド側案・iOS 案とすり合わせ用)
 
+> **【旧案・参考】** 2026-10-24 昼に iOS 案とすり合わせ、統一版 **DSL v1** を `docs/dsl/README.md` + `docs/dsl/dsl.schema.json` に確定した。以下は提案時点の記録で、v1 と食い違う箇所(`schemaVersion` が `"0.1"` 文字列、スキーマ/examples のパス、v1 で追加された `area` グリッド配置・`app.tabs[]` 等)は v1 が正。
+
 > スキーマ本体: `dsl.schema.json` (JSON Schema draft 2020-12)。Go 型: `backend/pkg/dsl`。実例(全て CI で検証済み): `examples/initial.json`(初期・音声画面のみ)、デモ3本 `examples/kakeibo.json`(家計簿)・`examples/training.json`(トレーニング記録・毎朝通知)・`examples/walk.json`(散歩メモ・カメラ)。
 
 ## 1. 設計原則(Claude 構造化出力に最適化)

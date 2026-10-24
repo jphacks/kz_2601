@@ -1,6 +1,6 @@
-// Package dsl holds the Server-Driven UI schema (v0.1) shared by all services.
+// Package dsl holds the Server-Driven UI schema (v1, unified with iOS) shared by all services.
 //
-// The canonical schema is docs/backend/dsl.schema.json (copied to schema.json
+// The canonical schema is docs/dsl/dsl.schema.json (copied to schema.json
 // in this package and embedded). Go types mirror it 1:1; Component is a single
 // flattened struct discriminated by Type so that JSON round-trips losslessly
 // and the human backend dev does not need custom (un)marshalers.
@@ -10,12 +10,12 @@
 // schemas, and iOS gets a bounded renderer.
 package dsl
 
-// SchemaVersion is the only accepted value of App.SchemaVersion in v0.
-const SchemaVersion = "0.1"
+// SchemaVersion is the only accepted value of App.SchemaVersion (v1).
+const SchemaVersion = 1
 
 // App is the root document (one per app version) stored in Firestore.
 type App struct {
-	SchemaVersion string   `json:"schemaVersion"`
+	SchemaVersion int      `json:"schemaVersion"`
 	App           AppMeta  `json:"app"`
 	InitialScreen string   `json:"initialScreen"`
 	Entities      []Entity `json:"entities"`
@@ -30,6 +30,14 @@ type AppMeta struct {
 	Theme         *Theme         `json:"theme,omitempty"`
 	VoiceEntry    VoiceEntry     `json:"voiceEntry"`
 	Notifications []Notification `json:"notifications,omitempty"` // iOS re-syncs local notifications on every version
+	Tabs          []Tab          `json:"tabs,omitempty"`          // optional bottom tab bar (2-5); each tab = own nav stack
+}
+
+// Tab is one bottom-bar tab rooted at a screen.
+type Tab struct {
+	Screen string `json:"screen"`
+	Title  string `json:"title"`
+	Icon   string `json:"icon,omitempty"`
 }
 
 // Notification is a local notification (P0 native feature).
@@ -167,10 +175,14 @@ const (
 var ContainerTypes = map[ComponentType]bool{CompVStack: true, CompHStack: true, CompSection: true}
 
 // Component is a flattened union of all component kinds. Which fields are
-// meaningful depends on Type (see docs/backend/dsl-proposal.md).
+// meaningful depends on Type (see docs/dsl/README.md).
 type Component struct {
 	Type ComponentType `json:"type"`
 	ID   string        `json:"id,omitempty"`
+	// Area places the component on the screen grid ("A1:C3", columns A-F,
+	// rows of visibleHeight/12). Only direct children of a Screen; siblings
+	// must not overlap. Empty = stacked below the grid (fallback).
+	Area string `json:"area,omitempty"`
 
 	// container
 	Title    string      `json:"title,omitempty"` // section, chart
@@ -249,9 +261,7 @@ func Initial() App {
 			ID:    "home",
 			Title: "",
 			Components: []Component{
-				{Type: CompSpacer, Size: "flexible"},
-				{Type: CompVoiceInput, ID: "mic", Prompt: "どんなアプリが欲しい？", Size: "large"},
-				{Type: CompSpacer, Size: "flexible"},
+				{Type: CompVoiceInput, ID: "mic", Area: "A1:F12", Prompt: "どんなアプリが欲しい？", Size: "large"},
 			},
 		}},
 	}

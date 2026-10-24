@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/jphacks/kz_2601/docs/backend/dsl.schema.json",
+  "$id": "https://github.com/jphacks/kz_2601/docs/dsl/dsl.schema.json",
   "title": "AppDSL",
-  "description": "Server-Driven UI DSL v0. Non-recursive by design (Claude structured output compatible): Screen > Component(container) > Leaf. No numeric/string length constraints here; limits are enforced by the Go validator (pkg/dsl). $defs/PatchDocument is the structured-output schema for edit turns (RFC 6902).",
+  "description": "Server-Driven UI DSL v1 (unified backend/iOS). Non-recursive by design (Claude structured output compatible): Screen > Container > Leaf. No numeric/string length constraints here; limits are enforced by the Go validator (backend/pkg/dsl). appId/version live in the API envelope (DSLEnvelope), never in this document. $defs/PatchDocument is the structured-output schema for edit turns (RFC 6902); iOS never sees patches. Layout: each Screen has an implicit 6-column grid (A-F) x rows of visibleHeight/12; components carry an optional `area` (\"A1:C3\") rectangle, non-overlapping among siblings; components without area stack below the grid.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -14,8 +14,9 @@
   ],
   "properties": {
     "schemaVersion": {
-      "type": "string",
-      "const": "0.1"
+      "type": "integer",
+      "const": 1,
+      "description": "Fixed 1 for v1. Bumped only on incompatible changes."
     },
     "app": {
       "$ref": "#/$defs/AppMeta"
@@ -77,6 +78,13 @@
           "description": "Local notifications iOS schedules when this DSL version is loaded (re-synced on every version).",
           "items": {
             "$ref": "#/$defs/Notification"
+          }
+        },
+        "tabs": {
+          "type": "array",
+          "description": "Optional bottom tab bar (2-5 tabs). Each tab is its own navigation stack rooted at `screen`. initialScreen selects the starting tab when it matches one. Omit for a single-stack app.",
+          "items": {
+            "$ref": "#/$defs/Tab"
           }
         }
       }
@@ -157,7 +165,7 @@
             "photo",
             "location"
           ],
-          "description": "photo = https URL of an image iOS uploaded to Firebase Storage. location = \"lat,lng\" string."
+          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. location = \"lat,lng\" string (P1)."
         },
         "required": {
           "type": "boolean"
@@ -330,6 +338,9 @@
         "id": {
           "$ref": "#/$defs/Id"
         },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
         "title": {
           "type": "string",
           "description": "section only."
@@ -414,6 +425,9 @@
         "id": {
           "$ref": "#/$defs/Id"
         },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
         "text": {
           "type": "string"
         },
@@ -451,6 +465,9 @@
         "id": {
           "$ref": "#/$defs/Id"
         },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
         "label": {
           "type": "string"
         },
@@ -485,6 +502,9 @@
         "id": {
           "$ref": "#/$defs/Id"
         },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
         "field": {
           "type": "string",
           "description": "Field id of the screen entity."
@@ -514,6 +534,9 @@
         "id": {
           "$ref": "#/$defs/Id"
         },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
         "field": {
           "type": "string"
         },
@@ -542,6 +565,9 @@
         "id": {
           "$ref": "#/$defs/Id"
         },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
         "field": {
           "type": "string"
         },
@@ -566,6 +592,9 @@
         },
         "id": {
           "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
         },
         "field": {
           "type": "string",
@@ -599,6 +628,9 @@
         "id": {
           "$ref": "#/$defs/Id"
         },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
         "field": {
           "type": "string"
         },
@@ -621,6 +653,9 @@
         },
         "id": {
           "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
         },
         "entity": {
           "type": "string"
@@ -753,6 +788,9 @@
         "id": {
           "$ref": "#/$defs/Id"
         },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
         "label": {
           "type": "string"
         },
@@ -802,6 +840,9 @@
         },
         "id": {
           "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
         },
         "title": {
           "type": "string"
@@ -858,6 +899,9 @@
         "id": {
           "$ref": "#/$defs/Id"
         },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
         "prompt": {
           "type": "string",
           "description": "Caption shown under the mic, e.g. どんなアプリが欲しい？"
@@ -869,7 +913,8 @@
             "large"
           ]
         }
-      }
+      },
+      "description": "Mic UI as a Leaf (not a screen kind). The initial state is one screen with exactly one voiceInput."
     },
     "Spacer": {
       "type": "object",
@@ -883,6 +928,9 @@
         },
         "id": {
           "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
         },
         "size": {
           "type": "string",
@@ -907,6 +955,9 @@
         },
         "id": {
           "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
         }
       }
     },
@@ -970,6 +1021,9 @@
         "id": {
           "$ref": "#/$defs/Id"
         },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
         "field": {
           "type": "string",
           "description": "Must be a photo field of the screen entity."
@@ -1000,6 +1054,9 @@
         },
         "id": {
           "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
         },
         "field": {
           "type": "string",
@@ -1032,6 +1089,9 @@
         },
         {
           "$ref": "#/$defs/AppMeta"
+        },
+        {
+          "$ref": "#/$defs/Tab"
         },
         {
           "$ref": "#/$defs/Theme"
@@ -1113,6 +1173,12 @@
           "items": {
             "$ref": "#/$defs/Leaf"
           }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Tab"
+          }
         }
       ]
     },
@@ -1167,6 +1233,32 @@
         "summary": {
           "type": "string",
           "description": "One Japanese sentence describing the change, read aloud by iOS."
+        }
+      }
+    },
+    "Area": {
+      "type": "string",
+      "pattern": "^[A-F][1-9][0-9]*:[A-F][1-9][0-9]*$",
+      "description": "Grid rectangle on the screen's implicit grid, spreadsheet style 'A1:C3' = top-left cell : bottom-right cell. Columns A-F (screen width / 6), rows 1..N (row height = visible height / 12; rows > 12 make the screen scroll). Siblings with area must not overlap (Go validator). Only meaningful for direct children of a Screen; inside a Container children are stacked. Omit to stack below the grid (fallback)."
+    },
+    "Tab": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "screen",
+        "title"
+      ],
+      "properties": {
+        "screen": {
+          "type": "string",
+          "description": "Screen id shown as this tab's root."
+        },
+        "title": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string",
+          "description": "SF Symbols name."
         }
       }
     }

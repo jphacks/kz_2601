@@ -1,241 +1,350 @@
 import SwiftUI
-import MapKit
+import Charts
 import PhotosUI
 
-// MARK: - Text
+// MARK: - Container (vstack / hstack / section)
 
-struct TextComponent: View {
-    @Environment(AppRuntime.self) private var rt
-    let props: TextProps
+struct ContainerView: View {
+    let c: Component
     let ctx: RenderContext
 
+    private var spacing: CGFloat {
+        switch c.spacing { case "none": 0; case "small": 6; case "large": 24; default: 12 }
+    }
+
     var body: some View {
-        Text(rt.string(props.text, ctx))
+        switch c.type {
+        case .hstack:
+            HStack(alignment: .top, spacing: spacing) {
+                ForEach(c.children) { DSLView(component: $0, ctx: ctx).frame(maxWidth: .infinity) }
+            }
+        case .section:
+            VStack(alignment: .leading, spacing: spacing) {
+                if let title = c.title, !title.isEmpty {
+                    Text(title).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 4)
+                }
+                VStack(alignment: .leading, spacing: spacing) {
+                    ForEach(c.children) { DSLView(component: $0, ctx: ctx) }
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            }
+        default:
+            VStack(alignment: .leading, spacing: spacing) {
+                ForEach(c.children) { DSLView(component: $0, ctx: ctx) }
+            }
+        }
+    }
+}
+
+// MARK: - Text / Button
+
+struct TextLeaf: View {
+    let c: Component
+
+    var body: some View {
+        Text(c.text ?? "")
             .font(font)
-            .fontWeight(props.bold == true ? .bold : nil)
-            .foregroundStyle(Color(hex: props.color) ?? .primary)
-            .multilineTextAlignment(textAlignment)
+            .multilineTextAlignment(alignment)
             .frame(maxWidth: .infinity, alignment: frameAlignment)
     }
 
     private var font: Font {
-        switch props.style ?? .body {
-        case .largeTitle: return .largeTitle.bold()
-        case .title: return .title.bold()
-        case .title2: return .title2.bold()
-        case .headline: return .headline
-        case .body: return .body
-        case .caption: return .caption
-        case .footnote: return .footnote
-        }
+        switch c.style { case "title": .title.bold(); case "headline": .headline; case "caption": .caption; default: .body }
     }
-
-    private var textAlignment: TextAlignment {
-        switch props.align ?? .leading {
-        case .leading: return .leading
-        case .center: return .center
-        case .trailing: return .trailing
-        }
+    private var alignment: TextAlignment {
+        switch c.align { case "center": .center; case "trailing": .trailing; default: .leading }
     }
-
     private var frameAlignment: Alignment {
-        switch props.align ?? .leading {
-        case .leading: return .leading
-        case .center: return .center
-        case .trailing: return .trailing
-        }
+        switch c.align { case "center": .center; case "trailing": .trailing; default: .leading }
     }
 }
 
-// MARK: - Image
-
-struct ImageComponent: View {
+struct ButtonLeaf: View {
     @Environment(AppRuntime.self) private var rt
-    let props: ImageProps
+    let c: Component
     let ctx: RenderContext
 
     var body: some View {
-        Group {
-            if let name = props.systemName {
-                Image(systemName: name)
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundStyle(.tint)
-            } else if let url = URL(string: rt.string(props.url, ctx)) {
-                AsyncImage(url: url) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    Rectangle().fill(.quaternary)
-                }
+        styled(Button {
+            guard let action = c.action else { return }
+            Task { await rt.run(action, ctx.actionContext()) }
+        } label: {
+            Group {
+                if let icon = c.icon { Label(c.label ?? "", systemImage: icon) } else { Text(c.label ?? "") }
             }
-        }
-        .frame(height: CGFloat(props.height ?? 160))
-        .frame(maxWidth: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: CGFloat(props.cornerRadius ?? 12)))
-    }
-}
-
-// MARK: - Button
-
-struct ButtonComponent: View {
-    @Environment(AppRuntime.self) private var rt
-    let props: ButtonProps
-    let ctx: RenderContext
-
-    var body: some View {
-        styled(
-            Button {
-                guard let action = props.action else { return }
-                Task { await rt.run(action, ctx) }
-            } label: {
-                label.frame(maxWidth: props.style == .plain ? nil : .infinity)
-            }
-        )
-        .disabled(props.disabled.map { rt.resolve($0, ctx).truthy } ?? false)
-    }
-
-    @ViewBuilder
-    private var label: some View {
-        let text = rt.string(props.label, ctx)
-        if let icon = props.icon, !text.isEmpty {
-            Label(text, systemImage: icon)
-        } else if let icon = props.icon {
-            Image(systemName: icon)
-        } else {
-            Text(text)
-        }
+            .frame(maxWidth: c.style == "plain" ? nil : .infinity)
+        })
     }
 
     @ViewBuilder
     private func styled<V: View>(_ button: V) -> some View {
-        switch props.style ?? .primary {
-        case .primary: button.buttonStyle(.borderedProminent).controlSize(.large)
-        case .secondary: button.buttonStyle(.bordered).controlSize(.large)
-        case .destructive: button.buttonStyle(.bordered).controlSize(.large).tint(.red)
-        case .plain: button.buttonStyle(.plain)
+        switch c.style {
+        case "secondary": button.buttonStyle(.bordered).controlSize(.large)
+        case "destructive": button.buttonStyle(.bordered).controlSize(.large).tint(.red)
+        case "plain": button.buttonStyle(.plain)
+        default: button.buttonStyle(.borderedProminent).controlSize(.large)
         }
     }
 }
 
-// MARK: - Inputs
+// MARK: - Inputs (bind to FormDraft via `field`)
 
-struct TextFieldComponent: View {
-    @Environment(AppRuntime.self) private var rt
-    let props: TextFieldProps
+extension FormDraft {
+    func value(_ field: String) -> Binding<JSONValue> {
+        Binding(get: { self.values[field] ?? .null }, set: { self.values[field] = $0 })
+    }
+
+    func string(_ field: String) -> Binding<String> {
+        Binding(get: { (self.values[field] ?? .null).displayString }, set: { self.values[field] = .string($0) })
+    }
+
+    func number(_ field: String) -> Binding<String> {
+        Binding(
+            get: { (self.values[field] ?? .null).displayString },
+            set: { s in
+                let cleaned = s.replacingOccurrences(of: ",", with: "")
+                self.values[field] = cleaned.isEmpty ? .null : (Double(cleaned).map { .number($0) } ?? .string(cleaned))
+            })
+    }
+
+    func bool(_ field: String) -> Binding<Bool> {
+        Binding(get: { (self.values[field] ?? .null).truthy }, set: { self.values[field] = .bool($0) })
+    }
+
+    func date(_ field: String) -> Binding<Date> {
+        let f = entity.field(field)
+        return Binding(
+            get: { FieldCoding.date(from: self.values[field] ?? .null) ?? Date() },
+            set: { d in
+                guard let f else { return }
+                self.values[field] = .string(FieldCoding.encode(d, for: f))
+            })
+    }
+}
+
+/// フォーム外(screen.entity 無し)に入力が置かれた時のプレースホルダ。
+private struct NeedsForm: View {
+    let c: Component
+    var body: some View { UnsupportedComponent(label: "\(c.rawType) は screen.entity が必要です") }
+}
+
+struct TextFieldLeaf: View {
+    let c: Component
     let ctx: RenderContext
 
     var body: some View {
-        let placeholder = rt.string(props.placeholder, ctx)
-        Group {
-            if props.secure == true {
-                SecureField(placeholder, text: rt.stringBinding(props.bind))
-            } else {
-                TextField(placeholder, text: rt.stringBinding(props.bind), axis: props.multiline == true ? .vertical : .horizontal)
-                    .lineLimit(props.multiline == true ? 3 ... 8 : 1 ... 1)
+        if let form = ctx.form, let field = c.field {
+            LabeledInput(label: c.label) {
+                TextField(c.placeholder ?? "", text: form.string(field), axis: c.multiline == true ? .vertical : .horizontal)
+                    .lineLimit(c.multiline == true ? 3 ... 8 : 1 ... 1)
+                    .textFieldStyle(.roundedBorder)
             }
-        }
-        .textFieldStyle(.roundedBorder)
-        .keyboardType(keyboard)
-    }
-
-    private var keyboard: UIKeyboardType {
-        switch props.keyboard {
-        case "number": return .numberPad
-        case "decimal": return .decimalPad
-        case "email": return .emailAddress
-        case "url": return .URL
-        case "phone": return .phonePad
-        default: return .default
-        }
-    }
-}
-
-struct ToggleComponent: View {
-    @Environment(AppRuntime.self) private var rt
-    let props: ToggleProps
-    let ctx: RenderContext
-
-    var body: some View {
-        Toggle(rt.string(props.label, ctx), isOn: rt.boolBinding(props.bind))
-    }
-}
-
-struct PickerComponent: View {
-    @Environment(AppRuntime.self) private var rt
-    let props: PickerProps
-    let ctx: RenderContext
-
-    var body: some View {
-        let picker = Picker(rt.string(props.label, ctx), selection: rt.binding(props.bind)) {
-            ForEach(props.options, id: \.value) { option in
-                Text(option.label).tag(option.value)
-            }
-        }
-        if props.options.count <= 4 {
-            picker.pickerStyle(.segmented)
         } else {
-            picker.pickerStyle(.menu)
+            NeedsForm(c: c)
         }
     }
 }
 
-// MARK: - Containers
-
-struct StackComponent: View {
-    let props: StackProps
+struct NumberFieldLeaf: View {
+    let c: Component
     let ctx: RenderContext
 
     var body: some View {
-        let spacing = props.spacing.map { CGFloat($0) } ?? 12
-        switch props.axis {
-        case .vstack:
-            VStack(alignment: horizontal, spacing: spacing) { children }
-        case .hstack:
-            HStack(alignment: vertical, spacing: spacing) { children }
-        case .zstack:
-            ZStack { children }
+        if let form = ctx.form, let field = c.field {
+            let ftype = form.entity.field(field)?.type ?? .number
+            LabeledInput(label: c.label) {
+                HStack {
+                    TextField(c.placeholder ?? "0", text: form.number(field))
+                        .keyboardType(ftype == .number ? .decimalPad : .numberPad)
+                        .textFieldStyle(.roundedBorder)
+                    if let unit = c.unit ?? form.entity.field(field)?.unit {
+                        Text(unit).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } else {
+            NeedsForm(c: c)
         }
-    }
-
-    private var children: some View {
-        ForEach(props.children) { DSLView(node: $0, ctx: ctx) }
-    }
-
-    private var horizontal: HorizontalAlignment {
-        switch props.alignment { case "center": .center; case "trailing": .trailing; default: .leading }
-    }
-
-    private var vertical: VerticalAlignment {
-        switch props.alignment { case "top": .top; case "bottom": .bottom; default: .center }
     }
 }
 
-struct ListComponent: View {
+struct DatePickerLeaf: View {
+    let c: Component
+    let ctx: RenderContext
+
+    var body: some View {
+        if let form = ctx.form, let field = c.field {
+            let includeTime = c.includeTime ?? (form.entity.field(field)?.type == .datetime)
+            DatePicker(c.label ?? "", selection: form.date(field), displayedComponents: includeTime ? [.date, .hourAndMinute] : [.date])
+        } else {
+            NeedsForm(c: c)
+        }
+    }
+}
+
+struct PickerLeaf: View {
+    let c: Component
+    let ctx: RenderContext
+
+    var body: some View {
+        if let form = ctx.form, let field = c.field {
+            let options = form.entity.field(field)?.options ?? []
+            let picker = Picker(c.label ?? "", selection: form.string(field)) {
+                ForEach(options, id: \.self) { Text($0).tag($0) }
+            }
+            switch c.style ?? (options.count <= 4 ? "segmented" : "menu") {
+            case "segmented":
+                LabeledInput(label: c.label) { picker.pickerStyle(.segmented) }
+            case "wheel":
+                picker.pickerStyle(.wheel).frame(height: 120)
+            default:
+                picker.pickerStyle(.menu)
+            }
+        } else {
+            NeedsForm(c: c)
+        }
+    }
+}
+
+struct ToggleLeaf: View {
+    let c: Component
+    let ctx: RenderContext
+
+    var body: some View {
+        if let form = ctx.form, let field = c.field {
+            Toggle(c.label ?? "", isOn: form.bool(field))
+        } else {
+            NeedsForm(c: c)
+        }
+    }
+}
+
+struct LabeledInput<Content: View>: View {
+    var label: String?
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let label, !label.isEmpty {
+                Text(label).font(.caption).foregroundStyle(.secondary)
+            }
+            content
+        }
+    }
+}
+
+// MARK: - Photo (P0 カメラ)
+
+/// 撮影/選択 → 800px 以下・JPEG q0.5 に縮小 → "data:image/jpeg;base64,..." を photo フィールドへ。
+/// v1 は PhotosPicker(シミュレータでも動く)。実機の `source: camera` は UIImagePickerController(.camera) に差し替え予定。
+struct PhotoFieldLeaf: View {
+    let c: Component
+    let ctx: RenderContext
+    @State private var selection: PhotosPickerItem?
+
+    var body: some View {
+        if let form = ctx.form, let field = c.field {
+            PhotosPicker(selection: $selection, matching: .images) {
+                Label(c.label ?? "写真を撮る / 選ぶ", systemImage: "camera")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .onChange(of: selection) { _, item in
+                guard let item else { return }
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self), let encoded = PhotoCodec.dataURL(from: data) {
+                        form.values[field] = .string(encoded)
+                    }
+                }
+            }
+        } else {
+            NeedsForm(c: c)
+        }
+    }
+}
+
+enum PhotoCodec {
+    static func dataURL(from data: Data, maxSide: CGFloat = 800, quality: CGFloat = 0.5) -> String? {
+        guard let image = UIImage(data: data) else { return nil }
+        let scale = min(1, maxSide / max(image.size.width, image.size.height))
+        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let resized = UIGraphicsImageRenderer(size: size).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
+        guard let jpeg = resized.jpegData(compressionQuality: quality) else { return nil }
+        return "data:image/jpeg;base64," + jpeg.base64EncodedString()
+    }
+
+    static func image(from value: JSONValue) -> UIImage? {
+        guard let s = value.stringValue, s.hasPrefix("data:"), let comma = s.firstIndex(of: ",") else { return nil }
+        return Data(base64Encoded: String(s[s.index(after: comma)...])).flatMap(UIImage.init(data:))
+    }
+}
+
+struct ImageLeaf: View {
+    let c: Component
+    let ctx: RenderContext
+
+    private var height: CGFloat {
+        switch c.height { case "small": 100; case "large": 260; default: 160 }
+    }
+
+    var body: some View {
+        let value = c.field.flatMap { ctx.form?.values[$0] } ?? .null
+        PhotoView(value: value, height: height)
+    }
+}
+
+struct PhotoView: View {
+    let value: JSONValue
+    var height: CGFloat
+
+    var body: some View {
+        Group {
+            if let img = PhotoCodec.image(from: value) {
+                Image(uiImage: img).resizable().scaledToFill()
+            } else if let s = value.stringValue, s.hasPrefix("http"), let url = URL(string: s) {
+                AsyncImage(url: url) { $0.resizable().scaledToFill() } placeholder: { Rectangle().fill(.quaternary) }
+            } else {
+                Rectangle().fill(.quaternary).overlay(Image(systemName: "photo").foregroundStyle(.secondary))
+            }
+        }
+        .frame(height: height)
+        .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: - List / Stat / Chart (entity bound, client-side aggregation)
+
+struct ListLeaf: View {
     @Environment(AppRuntime.self) private var rt
-    let props: ListProps
+    let c: Component
     let ctx: RenderContext
 
     var body: some View {
-        let rows = rt.resolve(props.source, ctx).arrayValue ?? []
+        let entityId = c.entity ?? ""
+        let entity = rt.dsl.entity(entityId)
+        let rows = Aggregator.sorted(Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId)), by: c.sort, entity: entity)
         if rows.isEmpty {
-            Text(rt.string(props.emptyText, ctx).isEmpty ? "まだありません" : rt.string(props.emptyText, ctx))
+            Text(rt.loading.contains(entityId) ? "読み込み中…" : (c.emptyText ?? "まだありません"))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 24)
         } else {
             LazyVStack(spacing: 8) {
-                ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
-                    let rowCtx = ctx.with(item: row, index: index)
-                    DSLView(node: props.item, ctx: rowCtx)
+                ForEach(rows) { row in
+                    ListRow(item: c.item, record: row, entity: entity)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            guard let action = props.onTap else { return }
-                            Task { await rt.run(action, rowCtx) }
+                            guard let action = c.onItemTap else { return }
+                            Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
                         }
                         .contextMenu {
-                            if let delete = props.onDelete {
+                            if c.swipeToDelete == true {
                                 Button("削除", systemImage: "trash", role: .destructive) {
-                                    Task { await rt.run(delete, rowCtx) }
+                                    Task { await rt.run(Action.delete(entity: entityId), ctx.actionContext(recordId: row.id)) }
                                 }
                             }
                         }
@@ -245,139 +354,127 @@ struct ListComponent: View {
     }
 }
 
-struct CardComponent: View {
-    @Environment(AppRuntime.self) private var rt
-    let props: CardProps
-    let ctx: RenderContext
+extension Action {
+    /// list の長押し削除用(DSL 外で iOS が合成する)。
+    static func delete(entity: String) -> Action {
+        var a = Action.placeholder
+        a.type = .deleteRecord
+        a.rawType = "deleteRecord"
+        a.entity = entity
+        return a
+    }
+
+    static let placeholder: Action = try! JSONDecoder().decode(Action.self, from: Data(#"{"type":"back"}"#.utf8))
+}
+
+struct ListRow: View {
+    let item: ListItem?
+    let record: Record
+    let entity: Entity?
+
+    private func text(_ fieldId: String?) -> String? {
+        guard let fieldId else { return nil }
+        return FieldCoding.display(record[fieldId], field: entity?.field(fieldId))
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let title = props.title {
-                Text(rt.string(title, ctx)).font(.headline)
+        HStack(spacing: 12) {
+            if let img = item?.image {
+                PhotoView(value: record[img], height: 56).frame(width: 56)
+            } else if let icon = item?.icon {
+                Image(systemName: icon).foregroundStyle(.tint).frame(width: 28)
             }
-            ForEach(props.children) { DSLView(node: $0, ctx: ctx) }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(text(item?.title ?? entity?.titleField) ?? "").font(.headline)
+                if let sub = text(item?.subtitle), !sub.isEmpty {
+                    Text(sub).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            if let trailing = text(item?.trailing), !trailing.isEmpty {
+                Text(trailing).font(.body.monospacedDigit())
+            }
+        }
+        .padding(12)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+struct StatLeaf: View {
+    @Environment(AppRuntime.self) private var rt
+    let c: Component
+
+    var body: some View {
+        let entityId = c.entity ?? ""
+        let entity = rt.dsl.entity(entityId)
+        let rows = Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId))
+        let value = Aggregator.aggregate(c.aggregate, field: c.field, over: rows)
+        let unit = c.field.flatMap { entity?.field($0)?.unit }
+        VStack(alignment: .leading, spacing: 4) {
+            Text(c.label ?? "").font(.caption).foregroundStyle(.secondary)
+            Text(Aggregator.format(value, as: c.format ?? (c.aggregate == "count" ? "plain" : nil), unit: c.aggregate == "count" ? "件" : unit))
+                .font(.title2.bold().monospacedDigit())
+                .contentTransition(.numericText())
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
-        .contentShape(RoundedRectangle(cornerRadius: 16))
-        .onTapGesture {
-            guard let action = props.action else { return }
-            Task { await rt.run(action, ctx) }
-        }
     }
 }
 
-struct SectionComponent: View {
+struct ChartLeaf: View {
     @Environment(AppRuntime.self) private var rt
-    let props: SectionProps
-    let ctx: RenderContext
+    let c: Component
 
     var body: some View {
+        let entityId = c.entity ?? ""
+        let entity = rt.dsl.entity(entityId)
+        let rows = Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId))
+        let buckets = Aggregator.buckets(c, entity: entity, records: rows)
         VStack(alignment: .leading, spacing: 8) {
-            if let title = props.title {
-                Text(rt.string(title, ctx).uppercased())
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
-            }
-            ForEach(props.children) { DSLView(node: $0, ctx: ctx) }
-            if let footer = props.footer {
-                Text(rt.string(footer, ctx)).font(.footnote).foregroundStyle(.secondary).padding(.horizontal, 4)
+            if let title = c.title { Text(title).font(.headline) }
+            if buckets.isEmpty {
+                Text("データがありません").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 24)
+            } else {
+                Chart(buckets) { b in
+                    switch c.kind {
+                    case "line":
+                        LineMark(x: .value("x", b.label), y: .value("y", b.value))
+                        PointMark(x: .value("x", b.label), y: .value("y", b.value))
+                    case "pie":
+                        SectorMark(angle: .value("y", b.value), innerRadius: .ratio(0.5), angularInset: 1)
+                            .foregroundStyle(by: .value("x", b.label))
+                    default:
+                        BarMark(x: .value("x", b.label), y: .value("y", b.value))
+                    }
+                }
+                .frame(height: 180)
             }
         }
+        .padding(16)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
 // MARK: - Misc
 
-struct ProgressComponent: View {
-    @Environment(AppRuntime.self) private var rt
-    let props: ProgressProps
-    let ctx: RenderContext
+struct SpacerLeaf: View {
+    let c: Component
 
     var body: some View {
-        let label = rt.string(props.label, ctx)
-        if let v = props.value {
-            ProgressView(value: min(max(rt.resolve(v, ctx).doubleValue ?? 0, 0), 1)) {
-                if !label.isEmpty { Text(label) }
-            }
-        } else {
-            ProgressView {
-                if !label.isEmpty { Text(label) }
-            }
-            .frame(maxWidth: .infinity)
+        switch c.size {
+        case "small": Spacer().frame(height: 8)
+        case "medium": Spacer().frame(height: 16)
+        case "large": Spacer().frame(height: 32)
+        default: Spacer(minLength: 0)
         }
     }
 }
-
-struct MapComponent: View {
-    let props: MapProps
-
-    var body: some View {
-        let center = CLLocationCoordinate2D(latitude: props.lat, longitude: props.lng)
-        let span = props.span ?? 0.02
-        Map(initialPosition: .region(MKCoordinateRegion(center: center, span: .init(latitudeDelta: span, longitudeDelta: span)))) {
-            ForEach(props.pins) { pin in
-                Marker(pin.title ?? "", coordinate: CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng))
-            }
-        }
-        .frame(height: 220)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-}
-
-/// P0 カメラ。v0 は PhotosPicker(シミュレータでも動く)。実機では UIImagePickerController(.camera) に差し替える。
-struct CameraComponent: View {
-    @Environment(AppRuntime.self) private var rt
-    let props: CameraProps
-    @State private var selection: PhotosPickerItem?
-
-    var body: some View {
-        VStack(spacing: 8) {
-            if let b64 = rt.state[path: Interpolator.statePath(props.bind)]?.stringValue,
-               let data = Data(base64Encoded: b64), let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(height: 200)
-                    .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-            }
-            PhotosPicker(selection: $selection, matching: .images) {
-                Label(props.label ?? "写真を撮る / 選ぶ", systemImage: "camera")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-        }
-        .onChange(of: selection) { _, item in
-            guard let item else { return }
-            Task {
-                if let data = try? await item.loadTransferable(type: Data.self),
-                   let jpeg = UIImage(data: data)?.jpegData(compressionQuality: 0.6) {
-                    rt.state.set(path: Interpolator.statePath(props.bind), to: .string(jpeg.base64EncodedString()))
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Helpers
 
 extension Color {
-    /// "#RRGGBB" / "#RRGGBBAA" / 名前(red, blue...)
+    /// "#RRGGBB" / "#RRGGBBAA"
     init?(hex: String?) {
         guard let hex else { return nil }
-        switch hex {
-        case "primary": self = .primary; return
-        case "secondary": self = .secondary; return
-        case "red": self = .red; return
-        case "green": self = .green; return
-        case "blue": self = .blue; return
-        case "orange": self = .orange; return
-        default: break
-        }
         var s = hex.trimmingCharacters(in: .whitespaces)
         if s.hasPrefix("#") { s.removeFirst() }
         guard s.count == 6 || s.count == 8, let v = UInt64(s, radix: 16) else { return nil }

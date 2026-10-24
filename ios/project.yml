@@ -49,6 +49,10 @@ targets:
     platform: iOS
     sources:
       - path: Morph
+      # DSL v1 の正典サンプル(docs/dsl/examples/*.json)をそのままバンドル。iOS 側にコピーを持たない(ドリフト防止)。
+      - path: ../docs/dsl/examples
+        buildPhase: resources
+        type: group
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.morph

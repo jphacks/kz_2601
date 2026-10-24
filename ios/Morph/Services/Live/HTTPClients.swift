@@ -1,60 +1,58 @@
 import Foundation
 
-/// appconfig の REST 実装。パスは docs/ios/dsl-proposal.md の提案値(backend とすり合わせ後に調整)。
+/// appconfig の REST 実装(docs/backend/openapi-appconfig.yaml)。
 struct HTTPAppConfigClient: AppConfigClient {
     let baseURL: URL
     let token: any TokenProvider
 
-    private struct ListResponse: Decodable { var items: [JSONValue] }
+    private struct ListResponse: Decodable { var items: [Record] }
+    private struct RecordBody: Encodable { var data: [String: JSONValue] }
 
     func fetchDocument(appId: String) async throws -> AppDocument {
-        try AppDocument.decode(try await request("GET", "v1/apps/\(appId)"))
+        try AppDocument.decode(try await request("GET", "v1/apps/\(appId)/dsl"))
     }
 
-    func list(appId: String, entity: String, query: JSONValue?) async throws -> [JSONValue] {
-        var path = "v1/apps/\(appId)/entities/\(entity)/records"
-        if let q = query?.objectValue, !q.isEmpty {
-            let items = q.map { "\($0.key)=\($0.value.displayString)" }
-            path += "?" + items.joined(separator: "&")
-        }
-        return try JSONDecoder().decode(ListResponse.self, from: try await request("GET", path)).items
+    func list(appId: String, entity: String) async throws -> [Record] {
+        try JSONDecoder().decode(ListResponse.self, from: try await request("GET", "v1/apps/\(appId)/entities/\(entity)/records?pageSize=200")).items
     }
 
-    func create(appId: String, entity: String, data: JSONValue) async throws -> JSONValue {
-        try JSONDecoder().decode(JSONValue.self,
-                                 from: try await request("POST", "v1/apps/\(appId)/entities/\(entity)/records", body: data))
+    func create(appId: String, entity: String, data: [String: JSONValue]) async throws -> Record {
+        try JSONDecoder().decode(Record.self,
+                                 from: try await request("POST", "v1/apps/\(appId)/entities/\(entity)/records", body: RecordBody(data: data)))
     }
 
-    func update(appId: String, entity: String, id: String, data: JSONValue) async throws -> JSONValue {
-        try JSONDecoder().decode(JSONValue.self,
-                                 from: try await request("PATCH", "v1/apps/\(appId)/entities/\(entity)/records/\(id)", body: data))
+    func update(appId: String, entity: String, id: String, data: [String: JSONValue]) async throws -> Record {
+        try JSONDecoder().decode(Record.self,
+                                 from: try await request("PATCH", "v1/apps/\(appId)/entities/\(entity)/records/\(id)", body: RecordBody(data: data)))
     }
 
     func delete(appId: String, entity: String, id: String) async throws {
         _ = try await request("DELETE", "v1/apps/\(appId)/entities/\(entity)/records/\(id)")
     }
 
-    private func request(_ method: String, _ path: String, body: JSONValue? = nil) async throws -> Data {
+    private func request(_ method: String, _ path: String, body: (any Encodable)? = nil) async throws -> Data {
         try await HTTP.send(method, baseURL: baseURL, path: path, body: body, token: token)
     }
 }
 
-/// ai サービス: POST /v1/morph
+/// ai サービス: POST /v1/generate → 適用後の DSL 封筒({appId, version, dsl, ...})
 struct HTTPAIClient: AIClient {
     let baseURL: URL
     let token: any TokenProvider
 
+    private struct GenerateBody: Encodable {
+        var appId: String
+        var baseVersion: Int
+        var transcript: String
+    }
+
     func morph(transcript: String, appId: String, currentVersion: Int) async throws -> AppDocument {
-        let body: JSONValue = [
-            "appId": .string(appId),
-            "currentVersion": .number(Double(currentVersion)),
-            "transcript": .string(transcript),
-        ]
-        return try AppDocument.decode(try await HTTP.send("POST", baseURL: baseURL, path: "v1/morph", body: body, token: token))
+        let body = GenerateBody(appId: appId, baseVersion: currentVersion, transcript: transcript)
+        return try AppDocument.decode(try await HTTP.send("POST", baseURL: baseURL, path: "v1/generate", body: body, token: token))
     }
 }
 
-/// ポーリング方式のホットリロード(v0)。version が進んだ時だけ流す。
+/// ポーリング方式のホットリロード(v1)。version が進んだ時だけ流す。
 struct PollingDocumentSync: DocumentSync {
     let client: any AppConfigClient
     var interval: Duration = .seconds(2)
@@ -78,7 +76,7 @@ struct PollingDocumentSync: DocumentSync {
 }
 
 enum HTTP {
-    static func send(_ method: String, baseURL: URL, path: String, body: JSONValue?, token: any TokenProvider) async throws -> Data {
+    static func send(_ method: String, baseURL: URL, path: String, body: (any Encodable)?, token: any TokenProvider) async throws -> Data {
         guard let url = URL(string: path, relativeTo: baseURL) else { throw APIError.invalidURL }
         var req = URLRequest(url: url)
         req.httpMethod = method

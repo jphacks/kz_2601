@@ -16,12 +16,12 @@ test: schema-check
 lint: vet
 	@command -v staticcheck >/dev/null && staticcheck ./... || echo "staticcheck not installed (go install honnef.co/go/tools/cmd/staticcheck@latest)"
 
-# docs/backend/dsl.schema.json is canonical; the Go package embeds a copy.
+# docs/dsl/dsl.schema.json is canonical; the Go package embeds a copy.
 schema-sync:
-	cp ../docs/backend/dsl.schema.json pkg/dsl/schema.json
+	cp ../docs/dsl/dsl.schema.json pkg/dsl/schema.json
 
 schema-check:
-	@cmp -s ../docs/backend/dsl.schema.json pkg/dsl/schema.json || (echo "schema out of sync: run make schema-sync" && exit 1)
+	@cmp -s ../docs/dsl/dsl.schema.json pkg/dsl/schema.json || (echo "schema out of sync: run make schema-sync" && exit 1)
 
 # ---- local dev -------------------------------------------------------------
 # Terminal 1: make emulator   Terminal 2: make dev

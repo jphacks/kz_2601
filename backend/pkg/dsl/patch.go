@@ -76,7 +76,7 @@ var patchSchemaJSON = func() []byte {
 	}
 	derived := map[string]any{
 		"$schema":     root["$schema"],
-		"$id":         "https://github.com/jphacks/kz_2601/docs/backend/dsl-patch.schema.json",
+		"$id":         "https://github.com/jphacks/kz_2601/docs/dsl/dsl-patch.schema.json",
 		"title":       "AppDSLPatch",
 		"description": "Structured-output schema for edit turns: {patch: RFC6902 ops, summary}.",
 		"$ref":        "#/$defs/PatchDocument",

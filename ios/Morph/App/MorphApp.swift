@@ -6,7 +6,7 @@ struct MorphApp: App {
 
     init() {
         let services = BuildConfig.makeServices()
-        let document = (try? AppDocument.bundled("app_initial")) ?? .fallback
+        let document = (try? AppDocument.bundled("initial")) ?? .fallback
         _runtime = State(initialValue: AppRuntime(document: document, services: services))
     }
 
