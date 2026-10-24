@@ -17,6 +17,7 @@ public enum DSLExamples {
         "shopping",
         "navigation",
         "diary_ai",
+        "medicine",
     ]
 
     /// 初期状態(音声画面のみ)の DSL 名。

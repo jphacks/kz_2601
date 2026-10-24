@@ -128,7 +128,9 @@ func TestRelaxedSchemaAcceptsExamples(t *testing.T) {
 }
 
 func TestExtractJSON(t *testing.T) {
-	for _, in := range []string{`{"a":1}`, "```json\n{\"a\":1}\n```", "はい、こちらです:\n{\"a\":1}\n以上"} {
+	for _, in := range []string{`{"a":1}`, "```json\n{\"a\":1}\n```", "はい、こちらです:\n{\"a\":1}\n以上",
+		// edit output with trailing prose (invalid character 'W' after top-level value)
+		"{\"a\":1}What I changed: {nothing}", "{\"a\":1}\n\nWait, also {\"b\":2}"} {
 		if got := string(extractJSON(in)); got != `{"a":1}` {
 			t.Fatalf("extractJSON(%q) = %q", in, got)
 		}

@@ -540,15 +540,20 @@ func applyUnchecked(current []byte, ops []dsl.PatchOp) ([]byte, bool) {
 }
 
 // extractJSON tolerates a code fence or a short preamble around the JSON
-// (needed when the request runs without output_config.format).
+// (needed when the request runs without output_config.format). Only the first
+// JSON value is taken, so trailing prose ("...}Wait, I also changed X") does
+// not fail with "invalid character after top-level value".
 func extractJSON(text string) []byte {
 	t := strings.TrimSpace(text)
-	if strings.HasPrefix(t, "{") && strings.HasSuffix(t, "}") {
+	start := strings.Index(t, "{")
+	if start < 0 {
 		return []byte(t)
 	}
-	start := strings.Index(t, "{")
-	end := strings.LastIndex(t, "}")
-	if start >= 0 && end > start {
+	var first json.RawMessage
+	if err := json.NewDecoder(strings.NewReader(t[start:])).Decode(&first); err == nil {
+		return first
+	}
+	if end := strings.LastIndex(t, "}"); end > start {
 		return []byte(t[start : end+1])
 	}
 	return []byte(t)
