@@ -179,7 +179,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 ### 音声画面 → 生成中 → 変身 の状態遷移(2026-10-24 刷新)
 
 デザイントークン(色・角丸・余白・影)は `ios/Metamon/App/Theme.swift` に集約し、音声画面・生成中・サインイン・設定で共用する(Renderer の部品は触らない)。
-生成アプリ側(Renderer の全部品)のトークンは `MetamonRenderer/Support/RenderTheme.swift`(本体 Theme と同値)で、方針は **[`docs/ios/design-system.md`](design-system.md)**(#89: タイポ・ブランド色の使い所・面・角丸・影・モーション・アイコン推定・部品ごとの仕様)。生成アプリは `app.theme.primaryColor` を使わず常に Tailor It ブランド(紫→水色)で描く。
+生成アプリ側(Renderer の全部品)のトークンは `MetamonRenderer/Support/RenderTheme.swift`(色の正典。本体 Theme の色はこれを参照)で、方針は **[`docs/ios/design-system.md`](design-system.md)**(#89: タイポ・ブランド色の使い所・面・角丸・影・モーション・アイコン推定・部品ごとの仕様)。生成アプリは `app.theme.primaryColor` を使わず常に Tailor It ブランド(藍→青緑・アイコンの紺に合わせる #102)で描く。
 初期状態(`voiceEntry = fullscreen`)は `RootView` が `DSLNavigationRoot` ではなく `VoiceInputView` を直接全面に描く(背景を画面いっぱいに敷くため)。生成後の FAB シートも同じ View。
 
 ```
