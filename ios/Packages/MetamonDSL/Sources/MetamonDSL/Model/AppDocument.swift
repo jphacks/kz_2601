@@ -95,6 +95,21 @@ public struct AppDSL: Decodable, Sendable {
     }()
 }
 
+extension AppDSL {
+    private enum Keys: String, CodingKey { case schemaVersion, app, initialScreen, entities, screens }
+
+    /// 毎日リセットのチェック(#132)の toggle field は、デコード時に新規作成の既定値(今日)を外す。
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        schemaVersion = try c.decode(Int.self, forKey: .schemaVersion)
+        app = try c.decode(AppMeta.self, forKey: .app)
+        initialScreen = try c.decode(String.self, forKey: .initialScreen)
+        _entities = try c.decode(Lossy<Entity>.self, forKey: .entities)
+        _screens = try c.decode(Lossy<Screen>.self, forKey: .screens)
+        clearDailyToggleDefaults()
+    }
+}
+
 public enum VoiceEntry: String, Decodable, Sendable {
     case fullscreen, floating, none
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .floating) }

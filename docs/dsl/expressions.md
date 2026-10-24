@@ -23,8 +23,8 @@
 
 ```
 Expr := number | string | boolean
-      | {"ref": "<fieldId>"}
-      | {"agg": "count|sum|avg|min|max", "entity": "<entityId>", "field"?: "<fieldId>", "filter"?: Filter | [Filter]}
+      | {"ref": "<fieldId>"} | {"ref": "<refFieldId>.<fieldId>"}
+      | {"agg": "count|sum|avg|min|max|latest|earliest", "entity": "<entityId>", "field"?: "<fieldId>", "by"?: "<dateFieldId>", "filter"?: Filter | [Filter]}
       | {"op": "<name>", "args": [Expr, ...]}
       | {"if": Expr, "then": Expr, "else": Expr}
 ```
@@ -32,8 +32,8 @@ Expr := number | string | boolean
 | 形 | 意味 |
 |---|---|
 | リテラル | 数値・文字列・真偽値。`null` は式ではない(スキーマで拒否) |
-| `ref` | 行コンテキスト(§4)のレコードのフィールド値。`"id"` はレコード id |
-| `agg` | エンティティ全レコード(filter で絞る)の集計。count 以外は `field` 必須。`field` に computed フィールドも可 |
+| `ref` | 行コンテキスト(§4)のレコードのフィールド値。`"id"` はレコード id。`"payer.name"` のように **ドット 1 つ**で、type ref の field が指す先のレコードのフィールド値(lookup・#134)。`"<ref>.id"` は ref の値そのもの。2 段以上(`a.b.c`)は不可 |
+| `agg` | エンティティ全レコード(filter で絞る)の集計。count 以外は `field` 必須。`field` に computed フィールドも可。`latest` / `earliest`(#133)は `by`(date/datetime field)で並べた最新 / 最古の 1 件の `field` の値(型は field のまま・数値以外も可) |
 | `op` | 関数呼び出し。§3 の閉じた一覧のみ |
 | `if` | `if` が true なら `then`、それ以外は `else` |
 
@@ -43,6 +43,14 @@ Expr := number | string | boolean
 {"agg":"sum","entity":"expenses","field":"amount","filter":{"field":"payer","op":"eq","value":{"ref":"id"}}}
 ```
 = 「このメンバー(外側のレコード)が払った支出の合計」。
+
+**latest / earliest**(#133): `{"agg":"latest","entity":"body","field":"weight","by":"date"}` = 「今の体重」。
+
+- `by` 省略時は entity の最初の date/datetime field、それも無ければ作成順(createdAt)。
+- 同じ日(`by` の値が同じ)は作成順で後の方を新しいとみなす。0 件・値が空は nil(「—」)。
+- stat の `aggregate: "latest"` + `by` も同じ(stat の `field` が返す値)。chart / progressBar / gauge では使えない。
+
+**lookup**(#134): ドット記法を選んだ理由 — `{"op":"lookup","args":[{"ref":"chore"},"points"]}` より短く、生成 AI が普段書く「オブジェクト.プロパティ」と同じ形で書き間違えにくい。行コンテキストの規則(stat.value 不可)と依存・循環の検出も `ref` のものをそのまま使える。文字列リテラル引数を field 名として特別扱いする必要もない。
 
 ## 3. op 一覧
 
@@ -105,6 +113,8 @@ Expr := number | string | boolean
 | op 名が §3 の一覧内 | `... unknown op "median" (allowed: abs add ...)` |
 | 引数個数 | `... op sub takes exactly 2 args (got 1)` / `op add needs at least 2 args` |
 | `ref` の存在 | `ref "nope" is not a field of entity "members" (fields: name, paid, ..., or "id")` |
+| lookup(`a.b`) | `ref "title.name": "title" is string, not a ref field` / `"ghost" is not a field of entity "members"` / `only one level of "<refField>.<fieldId>"` |
+| latest / earliest | `latest by "title" must be a date or datetime field` / `by is only for agg latest/earliest` |
 | `ref` の行コンテキスト | `{"ref":"amount"} is not allowed here (no current record; stat.value is a screen value). Use {"agg":...} over an entity instead` |
 | `agg` の entity/field/filter | `entity "ghost" does not exist` / `field "zzz" not in entity "expenses"` / `sum needs a numeric field but "title" is string` |
 | 循環禁止(DAG は可・agg 経由も検出) | `computed field cycle: members.balance -> members.paid -> members.balance; ...` |
@@ -116,6 +126,7 @@ Expr := number | string | boolean
 | 期間 filter | `filter op thisWeek takes value null` / `filter op thisYear needs a date or datetime field but "name" is string` |
 | `hoursBetween` の引数 | `hoursBetween expects a "HH:mm" time string (or a datetime field) but got a number` |
 | `list.item.toggle` | `list item.toggle "name" must be a boolean field (got string)` / `... is computed (read-only)` |
+| `list.item.resets` | `... with resets daily must be a date field (got boolean)` / `... is a date field; add "resets":"daily"` / `... must not have defaultValue` |
 | Stat 排他 | `stat takes either aggregate or value, not both` / `stat needs aggregate (with entity) or value` |
 
 ## 7. レシピ
@@ -128,7 +139,9 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
    - `balance` = `{"op":"sub","args":[{"ref":"paid"},{"ref":"share"}]}`
    - ホーム: stat(合計・1 人あたり)+ members の table(名前/支払済/残高)+ settlement + 支出 list + 追加ボタン。
 2. **BMI**(`examples/bmi.json`): `bmi` = weight / (height/100)^2 を小数 1 桁に(`round(x*10)/10`)。
-3. **残り予算**: stat.value = `sub(予算, agg sum thisMonth)`。予算を後で変えたいなら budget entity を作り `agg max budget.amount`。
+3. **残り予算**: stat.value = `sub(予算, agg sum thisMonth)`。予算を後で変えたいなら budget{amount, date} entity を作り `agg latest budget.amount by date`(max だと下げた予算が反映されない)。
+3.5. **今の値**: 今の体重 = stat `aggregate: latest, field: weight, by: date`。今の BMI = latest の field に computed bmi。増減 = `sub(latest, earliest)`。
+3.6. **マスタの値**: 家事の点数 = log の computed `{"ref":"chore.points"}`、売上 = `mul({"ref":"item.price"}, {"ref":"qty"})`。
 4. **達成率**: stat{format:percent, value: `div(agg sum, 目標)`} + progressBar{entity, field, target}。
 5. **シフト・バイト代**: shift{date, start/end: string `"HH:mm"`(timePicker), wage: currency}。computed `hours` = `hoursBetween(ref start, ref end)`、`pay` = `round(hours * wage)`。今月の給料 = stat sum pay filter date thisMonth。
 6. **カウントダウン**: computed `days_left` = `daysUntil(ref date)`、最も近い予定 = `agg min days_left filter days_left gte 0`。
@@ -143,13 +156,23 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
 - backend 検証: toggle は同 entity の**保存される** boolean field(computed 不可)。
 - 実例: `examples/shopping.json`。
 
+### 毎日くり返すチェック(`list.item.resets: "daily"`, #132)
+
+- 服薬・習慣のように「登録した項目が毎日未チェックで並ぶ」一覧。`item: {"toggle": "taken_on", "resets": "daily"}`。
+- toggle は **保存される date field**(defaultValue なし。backend の既定値補完でも `"now"` を入れない)。丸を押すと今日の日付(端末ローカル `YYYY-MM-DD`)を保存、もう一度押すと空に戻す。**値が今日なら済み**と表示するので、日付が変わると全行が未チェックに戻る。
+- 新しい entity は作らない(最後にやった日だけを持つ)。今日やった数 = `{"agg":"count","entity":"medicine","filter":{"field":"taken_on","op":"today","value":null}}`。
+- 割り切り: 履歴(何日に飲んだか)と 1 日に同じ項目を 2 回以上は持てない(朝・夜は項目を分ける)。連続日数(ストリーク)も出さない(出すなら toggle 時に「前回が昨日なら +1」で integer field を更新する形が最小)。
+- iOS の「今日」は DEBUG ビルドだけ環境変数 `METAMON_DEBUG_TODAY=YYYY-MM-DD` で差し替えられる(日付境界の確認用)。
+- 実例: `examples/medicine.json`。
+
 ## 8. 割り切り(やらないこと)
 
 「0 と 1 を管理して PC 上に PC を作る」状態にしないため、以下は**やらない**:
 
 - 変数・代入・ループ・ユーザー定義関数・ラムダ・再帰。式はツリー 1 本で、深さ 8 まで。
 - 配列/オブジェクト値、map/filter/reduce、文字列の部分抽出・正規表現・フォーマット指定(表示は `format`/`unit` に任せる)。
-- 状態を持つ計算(累積・前回値との差・移動平均)、レコード間の順序依存(「最新の 1 件」)。必要になったら専用の `agg` 名を足す方針。
+- 状態を持つ計算(累積・前回値との差・移動平均)。「最新 / 最古の 1 件」だけは専用の `agg`(latest / earliest)で足した。
+- lookup の多段(`a.b.c`)。必要なら参照先 entity に computed を作って 1 段で読む。
 - 副作用(式からの保存・通知・遷移)。
 - サーバー側評価・集計 API(評価は iOS。件数が増えたら README 決定表 #10 の集計 API と合わせて検討)。
 - progressBar/gauge の `value`/`target` を Expr にすること(stat.value で代替可能・iOS 契約の拡大を避けた。必要なら後段で)。

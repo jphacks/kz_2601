@@ -27,6 +27,7 @@ func (a *App) Lint() []string {
 	l.screens()
 	l.entityReach()
 	l.navGraph()
+	l.micSeat()
 	return l.out
 }
 
@@ -233,11 +234,11 @@ type period struct {
 	words []string
 }
 
-// op "latest": no aggregate returns the newest record; "recent": needs an
+// op "latest": needs aggregate/agg latest (#133); "recent": needs an
 // expression date filter (addDays(today,-N)); the rest are period filter ops.
 // Order matters: "今週(直近7日)" is recent, not thisWeek.
 var periods = []period{
-	{"latest", []string{"最新", "latest", "most recent"}},
+	{"latest", []string{"最新", "現在の", "今の", "latest", "most recent", "current"}},
 	{"recent", []string{"直近", "last 7 days", "past 7 days", "last 30 days", "past week"}},
 	{"thisMonth", []string{"今月", "this month", "monthly total"}},
 	{"today", []string{"今日", "本日", "today"}},
@@ -284,7 +285,9 @@ func (l *linter) periodLabel(where string, c *Component) {
 		})
 	}
 	if p.op == "latest" {
-		l.add(`%s: label %q says %q but no aggregate returns the newest record (avg/max/min/sum are not "latest"); relabel it to what it computes (今日の○○ with filter today, 平均, 最大) or show the newest value at the top of a list sorted by date desc`, where, label, word)
+		if !usesPickAgg(c) {
+			l.add(`%s: label %q says %q but the value is not the newest record (avg/max/min/sum are not "latest"); use aggregate "latest" with by (the date field) and field (the value), or {"agg":"latest","entity":...,"field":...,"by":...} inside value`, where, label, word)
+		}
 		return
 	}
 	hasExprFilter := false
@@ -463,4 +466,53 @@ func (l *linter) settingEntities() map[string]bool {
 		}
 	}
 	return out
+}
+
+// usesPickAgg: the stat reads one record (aggregate latest/earliest, or an
+// agg latest/earliest somewhere in value).
+func usesPickAgg(c *Component) bool {
+	if IsPickAgg(c.Aggregate) {
+		return true
+	}
+	found := false
+	if c.Type == CompStat && c.Value != nil {
+		walkExpr(c.Value, func(x *Expr) {
+			if x.Kind == ExprAgg && x.Agg != nil && IsPickAgg(x.Agg.Agg) {
+				found = true
+			}
+		})
+	}
+	return found
+}
+
+// micSeat (#140): the voice FAB sits at the bottom-left (A-B) of non-form
+// screens. A part anchored in the screen's last 2 rows there pushes the FAB up
+// onto list rows (visual audit #131: 5/18). Mirrors iOS
+// FabClearance.obstructedRows; a screen taller than 12 rows is checked at its
+// last 2 rows (where the FAB ends up when scrolled to the bottom).
+func (l *linter) micSeat() {
+	const seatCols, seatRows, anchorRows = 2, 2, 3
+	for _, s := range l.app.Screens {
+		if s.Entity != "" {
+			continue
+		}
+		areas := make(map[int]Area, len(s.Components))
+		last := GridVisibleRows
+		for i := range s.Components {
+			if a, err := ParseArea(s.Components[i].Area); err == nil {
+				areas[i] = a
+				last = max(last, a.Row2)
+			}
+		}
+		for i := range s.Components {
+			a, ok := areas[i]
+			// reaches the last 2 rows and starts at most 3 rows above the end
+			// (a taller part is the background the FAB floats over)
+			if !ok || a.Col1 >= seatCols || a.Row2 <= last-seatRows || a.Row1 < last-anchorRows {
+				continue
+			}
+			c := &s.Components[i]
+			l.add("screen %q components[%d]: %s %s sits on the mic button's seat (bottom-left A-B of the last 2 rows); keep it empty and put the button at the bottom-right (e.g. D11:F12) or in the toolbar", s.ID, i, c.Type, c.Area)
+		}
+	}
 }

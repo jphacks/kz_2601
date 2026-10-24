@@ -141,10 +141,15 @@ func withArticle(s string) string {
 	return "a " + s
 }
 
+// uncountableEN are entity names that read wrong with an "s" ("add spendings").
+var uncountableEN = map[string]bool{"spending": true, "money": true, "water": true, "food": true, "income": true, "equipment": true, "homework": true, "info": true, "data": true, "sleep": true}
+
 // pluralEN is the naive English plural: entry -> entries, expense -> expenses.
+// Uncountable last words and -ing nouns stay as they are (spending, reading).
 func pluralEN(s string) string {
+	last := s[strings.LastIndex(s, " ")+1:]
 	switch {
-	case s == "":
+	case s == "" || uncountableEN[last] || strings.HasSuffix(last, "ing"):
 		return s
 	case strings.HasSuffix(s, "s") || strings.HasSuffix(s, "x") || strings.HasSuffix(s, "ch") || strings.HasSuffix(s, "sh"):
 		return s + "es"
