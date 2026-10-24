@@ -1,0 +1,6241 @@
+{
+  "date": "2026-10-24",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "tag": "after1-audit",
+  "cases": [
+    {
+      "id": "a01_warikan",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "友達4人で行く旅行の割り勘アプリを作って。誰がいくら払ったかを登録して、最後に誰が誰にいくら払えば精算できるか出してほしい",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 8939,
+      "totalMs": 8944,
+      "outputChars": 4041,
+      "usage": {
+        "inputTokens": 155,
+        "outputTokens": 1692,
+        "cacheCreationInputTokens": 24444
+      },
+      "summary": "旅行の割り勘アプリを作りました。左下のボタンからメンバーと支出を追加できます。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 3,
+        "components": 18,
+        "topLevel": 10,
+        "withArea": 10,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 2,
+        "fields": 8,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "members:private",
+          "expenses:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F5 A6:F8 A9:F10 A11:C12 D11:F12",
+          "expense_form: A1:F5 A11:F12",
+          "member_form: A1:F2 A11:F12"
+        ],
+        "computed": [
+          "members.paid",
+          "members.share",
+          "members.balance"
+        ],
+        "statValues": 1,
+        "settlement": true,
+        "refFields": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "友達4人での旅行の支出を、誰が払ったかと一緒に記録し、1人あたりの負担額と精算(誰が誰にいくら払うか)を自動で計算する",
+          "icon": "person.3",
+          "name": "旅行の割り勘",
+          "theme": {
+            "primaryColor": "#00897B"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "名前",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "computed": {
+                  "agg": "sum",
+                  "entity": "expenses",
+                  "field": "amount",
+                  "filter": {
+                    "field": "payer",
+                    "op": "eq",
+                    "value": {
+                      "ref": "id"
+                    }
+                  }
+                },
+                "id": "paid",
+                "name": "支払済",
+                "type": "currency",
+                "unit": "円"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "agg": "sum",
+                          "entity": "expenses",
+                          "field": "amount"
+                        },
+                        {
+                          "agg": "count",
+                          "entity": "members"
+                        }
+                      ],
+                      "op": "div"
+                    }
+                  ],
+                  "op": "round"
+                },
+                "id": "share",
+                "name": "負担額",
+                "type": "currency",
+                "unit": "円"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "ref": "paid"
+                    },
+                    {
+                      "ref": "share"
+                    }
+                  ],
+                  "op": "sub"
+                },
+                "id": "balance",
+                "name": "残高",
+                "type": "currency",
+                "unit": "円"
+              }
+            ],
+            "id": "members",
+            "name": "メンバー",
+            "titleField": "name"
+          },
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "内容",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "amount",
+                "name": "金額",
+                "required": true,
+                "type": "currency",
+                "unit": "円"
+              },
+              {
+                "id": "payer",
+                "name": "払った人",
+                "refEntity": "members",
+                "required": true,
+                "type": "ref"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "type": "date"
+              }
+            ],
+            "id": "expenses",
+            "name": "支出",
+            "titleField": "title"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "sum",
+                    "entity": "expenses",
+                    "field": "amount",
+                    "format": "currency",
+                    "label": "合計",
+                    "type": "stat"
+                  },
+                  {
+                    "format": "currency",
+                    "label": "1人あたり",
+                    "type": "stat",
+                    "value": {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "agg": "sum",
+                              "entity": "expenses",
+                              "field": "amount"
+                            },
+                            {
+                              "agg": "count",
+                              "entity": "members"
+                            }
+                          ],
+                          "op": "div"
+                        }
+                      ],
+                      "op": "round"
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F5",
+                "columns": [
+                  {
+                    "field": "name"
+                  },
+                  {
+                    "field": "paid"
+                  },
+                  {
+                    "field": "balance"
+                  }
+                ],
+                "entity": "members",
+                "id": "members_table",
+                "type": "table"
+              },
+              {
+                "area": "A6:F8",
+                "balanceField": "balance",
+                "entity": "members",
+                "id": "settle",
+                "nameField": "name",
+                "title": "精算",
+                "type": "settlement"
+              },
+              {
+                "area": "A9:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ支出がありません",
+                    "entity": "expenses",
+                    "item": {
+                      "subtitle": "payer",
+                      "title": "title",
+                      "trailing": "amount"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "expense_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "支出一覧",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "member_form",
+                  "type": "navigate"
+                },
+                "area": "A11:C12",
+                "icon": "person.badge.plus",
+                "id": "add_member",
+                "label": "メンバー追加",
+                "style": "secondary",
+                "type": "button"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "expense_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add_expense",
+                "label": "支出を追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "旅行の割り勘",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "expense_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "支出を追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "title",
+                    "label": "内容",
+                    "placeholder": "夕食",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "amount",
+                    "label": "金額",
+                    "type": "numberField",
+                    "unit": "円"
+                  },
+                  {
+                    "field": "payer",
+                    "label": "払った人",
+                    "style": "menu",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この支出を削除しますか？",
+                  "entity": "expenses",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "expenses",
+            "id": "expense_form",
+            "title": "支出を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "expenses",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "名前",
+                    "placeholder": "たろう",
+                    "type": "textField"
+                  }
+                ],
+                "id": "fields",
+                "title": "メンバー",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "このメンバーを削除しますか？",
+                  "entity": "members",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "members",
+            "id": "member_form",
+            "title": "メンバーを追加",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "members",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a02_circle_dues",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "サークルの出欠と集金を管理したい。練習ごとに誰が来たかをチェックして、部費を払った人と未払いの人と、集まった合計金額が分かるようにして",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 12080,
+      "totalMs": 12086,
+      "outputChars": 5592,
+      "usage": {
+        "inputTokens": 155,
+        "outputTokens": 2341,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "サークル出欠・集金アプリを作りました。集金と出欠の2タブで、左下のボタンからメンバー・部費・出欠を追加できます。",
+      "metrics": {
+        "tabs": 2,
+        "screens": 5,
+        "components": 26,
+        "topLevel": 13,
+        "withArea": 13,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 3,
+        "fields": 12,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "members:private",
+          "fees:private",
+          "attendance:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F8 A9:F10 A11:C12 D11:F12",
+          "attendance: A1:F2 A3:F10 D11:F12",
+          "fee_form: A1:F5 A11:F12",
+          "attendance_form: A1:F5 A11:F12",
+          "member_form: A1:F2"
+        ],
+        "computed": [
+          "members.paid_total",
+          "members.status",
+          "members.attend_count"
+        ],
+        "statValues": 1,
+        "refFields": 2
+      },
+      "dsl": {
+        "app": {
+          "description": "練習ごとの出欠をチェックし、部費の支払い状況と集まった合計金額を確認する",
+          "icon": "person.3.fill",
+          "name": "サークル出欠・集金",
+          "tabs": [
+            {
+              "icon": "yensign.circle",
+              "screen": "home",
+              "title": "集金"
+            },
+            {
+              "icon": "checklist",
+              "screen": "attendance",
+              "title": "出欠"
+            }
+          ],
+          "theme": {
+            "primaryColor": "#EF6C00"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "名前",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "computed": {
+                  "agg": "sum",
+                  "entity": "fees",
+                  "field": "amount",
+                  "filter": {
+                    "field": "member",
+                    "op": "eq",
+                    "value": {
+                      "ref": "id"
+                    }
+                  }
+                },
+                "id": "paid_total",
+                "name": "支払額",
+                "type": "currency",
+                "unit": "円"
+              },
+              {
+                "computed": {
+                  "else": "未払い",
+                  "if": {
+                    "args": [
+                      {
+                        "ref": "paid_total"
+                      },
+                      0
+                    ],
+                    "op": "gt"
+                  },
+                  "then": "支払済"
+                },
+                "id": "status",
+                "name": "支払状況",
+                "type": "string"
+              },
+              {
+                "computed": {
+                  "agg": "count",
+                  "entity": "attendance",
+                  "filter": [
+                    {
+                      "field": "member",
+                      "op": "eq",
+                      "value": {
+                        "ref": "id"
+                      }
+                    },
+                    {
+                      "field": "present",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                },
+                "id": "attend_count",
+                "name": "出席回数",
+                "type": "integer"
+              }
+            ],
+            "id": "members",
+            "name": "メンバー",
+            "titleField": "name"
+          },
+          {
+            "fields": [
+              {
+                "id": "member",
+                "name": "支払った人",
+                "refEntity": "members",
+                "required": true,
+                "type": "ref"
+              },
+              {
+                "id": "amount",
+                "name": "金額",
+                "required": true,
+                "type": "currency",
+                "unit": "円"
+              },
+              {
+                "id": "memo",
+                "name": "メモ",
+                "type": "string"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "type": "date"
+              }
+            ],
+            "id": "fees",
+            "name": "部費",
+            "titleField": "memo"
+          },
+          {
+            "fields": [
+              {
+                "id": "practice",
+                "name": "練習",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "type": "date"
+              },
+              {
+                "id": "member",
+                "name": "メンバー",
+                "refEntity": "members",
+                "required": true,
+                "type": "ref"
+              },
+              {
+                "defaultValue": true,
+                "id": "present",
+                "name": "出席",
+                "type": "boolean"
+              }
+            ],
+            "id": "attendance",
+            "name": "出欠",
+            "titleField": "practice"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "sum",
+                    "entity": "fees",
+                    "field": "amount",
+                    "format": "currency",
+                    "label": "集まった合計",
+                    "type": "stat"
+                  },
+                  {
+                    "label": "未払いの人数",
+                    "type": "stat",
+                    "value": {
+                      "agg": "count",
+                      "entity": "members",
+                      "filter": {
+                        "field": "paid_total",
+                        "op": "eq",
+                        "value": 0
+                      }
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F8",
+                "columns": [
+                  {
+                    "field": "name"
+                  },
+                  {
+                    "field": "status"
+                  },
+                  {
+                    "field": "paid_total"
+                  }
+                ],
+                "entity": "members",
+                "id": "members_table",
+                "type": "table"
+              },
+              {
+                "area": "A9:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ支払いがありません",
+                    "entity": "fees",
+                    "item": {
+                      "subtitle": "member",
+                      "title": "memo",
+                      "trailing": "amount"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "fee_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "支払い履歴",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "member_form",
+                  "type": "navigate"
+                },
+                "area": "A11:C12",
+                "icon": "person.badge.plus",
+                "id": "add_member",
+                "label": "メンバー追加",
+                "style": "secondary",
+                "type": "button"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "fee_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add_fee",
+                "label": "部費を記録",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "集金",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "fee_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "部費を記録"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "aggregate": "count",
+                "area": "A1:F2",
+                "entity": "attendance",
+                "filter": {
+                  "field": "present",
+                  "op": "eq",
+                  "value": true
+                },
+                "id": "count",
+                "label": "出席の延べ人数",
+                "type": "stat"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ出欠がありません",
+                    "entity": "attendance",
+                    "item": {
+                      "subtitle": "member",
+                      "title": "practice",
+                      "trailing": "present"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "attendance_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "log",
+                "title": "出欠の記録",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "attendance_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add_att",
+                "label": "出欠を記録",
+                "type": "button"
+              }
+            ],
+            "id": "attendance",
+            "title": "出欠",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "attendance_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "出欠を記録"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "member",
+                    "label": "支払った人",
+                    "style": "menu",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "amount",
+                    "label": "金額",
+                    "type": "numberField",
+                    "unit": "円"
+                  },
+                  {
+                    "field": "memo",
+                    "label": "メモ",
+                    "placeholder": "4月分",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "fees",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "fees",
+            "id": "fee_form",
+            "title": "部費を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "fees",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "practice",
+                    "label": "練習",
+                    "placeholder": "4/20 練習",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  },
+                  {
+                    "field": "member",
+                    "label": "メンバー",
+                    "style": "menu",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "present",
+                    "label": "出席",
+                    "type": "toggle"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "attendance",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "attendance",
+            "id": "attendance_form",
+            "title": "出欠を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "attendance",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "名前",
+                    "placeholder": "たろう",
+                    "type": "textField"
+                  }
+                ],
+                "id": "fields",
+                "title": "メンバー",
+                "type": "section"
+              }
+            ],
+            "entity": "members",
+            "id": "member_form",
+            "title": "メンバーを追加",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "members",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a03_shift_wage",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "バイトのシフト表アプリ。日付と開始と終了の時刻を入れたら勤務時間を出して、時給1100円で今月のバイト代を計算して",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5922,
+      "totalMs": 5924,
+      "outputChars": 2540,
+      "usage": {
+        "inputTokens": 149,
+        "outputTokens": 1079,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "バイトシフト表アプリを作りました。右下のボタンからシフトを追加できます。勤務時間の自動計算は入力で代替しました。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 12,
+        "topLevel": 5,
+        "withArea": 5,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 5,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "shift:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "shift_form: A1:F6 A11:F12"
+        ],
+        "computed": [
+          "shift.pay"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "バイトのシフトを日付・開始・終了時刻・勤務時間で記録し、時給1100円で今月のバイト代を計算する。勤務時間の自動計算は入力で代替しました。",
+          "icon": "calendar.badge.clock",
+          "name": "バイトシフト表",
+          "theme": {
+            "primaryColor": "#EF6C00"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "id": "start_time",
+                "name": "開始時刻",
+                "type": "string"
+              },
+              {
+                "id": "end_time",
+                "name": "終了時刻",
+                "type": "string"
+              },
+              {
+                "id": "hours",
+                "name": "勤務時間",
+                "required": true,
+                "type": "number",
+                "unit": "時間"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "ref": "hours"
+                    },
+                    1100
+                  ],
+                  "op": "mul"
+                },
+                "id": "pay",
+                "name": "バイト代",
+                "type": "currency",
+                "unit": "円"
+              }
+            ],
+            "id": "shift",
+            "name": "シフト",
+            "titleField": "date"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "sum",
+                    "entity": "shift",
+                    "field": "hours",
+                    "filter": {
+                      "field": "date",
+                      "op": "thisMonth",
+                      "value": null
+                    },
+                    "label": "今月の勤務時間(時間)",
+                    "type": "stat"
+                  },
+                  {
+                    "format": "currency",
+                    "label": "今月のバイト代",
+                    "type": "stat",
+                    "value": {
+                      "args": [
+                        {
+                          "agg": "sum",
+                          "entity": "shift",
+                          "field": "hours",
+                          "filter": {
+                            "field": "date",
+                            "op": "thisMonth",
+                            "value": null
+                          }
+                        },
+                        1100
+                      ],
+                      "op": "mul"
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "まだシフトがありません",
+                    "entity": "shift",
+                    "item": {
+                      "subtitle": "hours",
+                      "title": "date",
+                      "trailing": "pay"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "shift_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "shifts",
+                "title": "シフト一覧",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "shift_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "シフトを追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "バイトシフト表",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "shift_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F6",
+                "children": [
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  },
+                  {
+                    "field": "start_time",
+                    "label": "開始時刻",
+                    "type": "timePicker"
+                  },
+                  {
+                    "field": "end_time",
+                    "label": "終了時刻",
+                    "type": "timePicker"
+                  },
+                  {
+                    "field": "hours",
+                    "label": "勤務時間",
+                    "type": "numberField",
+                    "unit": "時間"
+                  }
+                ],
+                "id": "fields",
+                "title": "シフト",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "このシフトを削除しますか？",
+                  "entity": "shift",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "shift",
+            "id": "shift_form",
+            "title": "シフトを記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "shift",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a04_exam_countdown",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "テスト勉強の管理アプリ。試験日まであと何日かを大きく出して、科目ごとに勉強した時間を記録して、目標20時間に対する進捗を見たい",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 2,
+      "regenerations": 1,
+      "areaFallback": false,
+      "claudeMs": 16816,
+      "totalMs": 16819,
+      "outputChars": 7492,
+      "usage": {
+        "inputTokens": 396,
+        "outputTokens": 3141,
+        "cacheReadInputTokens": 48888
+      },
+      "summary": "テスト勉強管理アプリを作りました。左下のボタンから試験と勉強記録を追加できます。",
+      "lastProblems": [
+        "content: entity \"exam\" has no list: show its records with a list or table (with onItemTap to the form) so what users add is visible"
+      ],
+      "metrics": {
+        "tabs": 0,
+        "screens": 3,
+        "components": 19,
+        "topLevel": 12,
+        "withArea": 12,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 2,
+        "fields": 6,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "exam:private",
+          "study:private"
+        ],
+        "areas": [
+          "home: A1:C2 D1:F2 A3:F3 A4:F5 A6:F8 A9:F10 A11:C12 D11:F12",
+          "study_form: A1:F4 A11:F12",
+          "exam_form: A1:F3 A11:F12"
+        ],
+        "computed": [
+          "exam.days_left"
+        ],
+        "statValues": 2,
+        "progressTarget": true
+      },
+      "dsl": {
+        "app": {
+          "description": "試験日までの残り日数を大きく表示し、科目ごとの勉強時間を記録して目標20時間に対する進捗を確認する",
+          "icon": "book.closed",
+          "name": "テスト勉強管理",
+          "theme": {
+            "primaryColor": "#5E35B1"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "試験名",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "試験日",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "ref": "date"
+                    }
+                  ],
+                  "op": "daysUntil"
+                },
+                "id": "days_left",
+                "name": "残り日数",
+                "type": "integer"
+              }
+            ],
+            "id": "exam",
+            "name": "試験",
+            "titleField": "title"
+          },
+          {
+            "fields": [
+              {
+                "id": "subject",
+                "name": "科目",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "hours",
+                "name": "勉強時間",
+                "required": true,
+                "type": "number",
+                "unit": "時間"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "study",
+            "name": "勉強記録",
+            "titleField": "subject"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:C2",
+                "id": "countdown",
+                "label": "試験まであと(日)",
+                "type": "stat",
+                "value": {
+                  "agg": "min",
+                  "entity": "exam",
+                  "field": "days_left",
+                  "filter": {
+                    "field": "days_left",
+                    "op": "gte",
+                    "value": 0
+                  }
+                }
+              },
+              {
+                "aggregate": "sum",
+                "area": "D1:F2",
+                "entity": "study",
+                "field": "hours",
+                "id": "total",
+                "label": "合計勉強時間(時間)",
+                "type": "stat"
+              },
+              {
+                "aggregate": "sum",
+                "area": "A3:F3",
+                "entity": "study",
+                "field": "hours",
+                "id": "progress",
+                "label": "目標20時間に対する進捗",
+                "target": 20,
+                "type": "progressBar"
+              },
+              {
+                "area": "A4:F5",
+                "id": "remaining",
+                "label": "目標まで残り(時間)",
+                "type": "stat",
+                "value": {
+                  "args": [
+                    {
+                      "args": [
+                        20,
+                        {
+                          "agg": "sum",
+                          "entity": "study",
+                          "field": "hours"
+                        }
+                      ],
+                      "op": "sub"
+                    },
+                    0
+                  ],
+                  "op": "max"
+                }
+              },
+              {
+                "area": "A6:F8",
+                "children": [
+                  {
+                    "emptyText": "試験がまだありません",
+                    "entity": "exam",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "title",
+                      "trailing": "days_left"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "exam_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "asc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "exams",
+                "title": "試験",
+                "type": "section"
+              },
+              {
+                "area": "A9:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "study",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "subject",
+                      "trailing": "hours"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "study_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "records",
+                "title": "勉強記録",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "exam_form",
+                  "type": "navigate"
+                },
+                "area": "A11:C12",
+                "icon": "calendar.badge.plus",
+                "id": "add_exam",
+                "label": "試験を追加",
+                "style": "secondary",
+                "type": "button"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "study_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add_study",
+                "label": "勉強を記録",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "テスト勉強",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "study_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "記録"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F4",
+                "children": [
+                  {
+                    "field": "subject",
+                    "label": "科目",
+                    "placeholder": "数学",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "hours",
+                    "label": "勉強時間",
+                    "type": "numberField",
+                    "unit": "時間"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "study",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "study",
+            "id": "study_form",
+            "title": "勉強を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "study",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F3",
+                "children": [
+                  {
+                    "field": "title",
+                    "label": "試験名",
+                    "placeholder": "期末テスト",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "date",
+                    "label": "試験日",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "試験",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この試験を削除しますか？",
+                  "entity": "exam",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "exam",
+            "id": "exam_form",
+            "title": "試験を追加",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "exam",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a05_cooking_cost",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "自炊の記録アプリ。作った料理と材料費と何食分できたかを入れて、1食あたりいくらかと今月の食費の合計を出して",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 6084,
+      "totalMs": 6086,
+      "outputChars": 2694,
+      "usage": {
+        "inputTokens": 145,
+        "outputTokens": 1143,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "自炊の記録アプリを作りました。右下のボタンから料理を追加できます。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 12,
+        "topLevel": 5,
+        "withArea": 5,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 5,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "meal:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "meal_form: A1:F5 A11:F12"
+        ],
+        "computed": [
+          "meal.per_serving"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "作った料理・材料費・何食分できたかを記録し、1食あたりの金額と今月の食費の合計を見る",
+          "icon": "fork.knife",
+          "name": "自炊の記録",
+          "theme": {
+            "primaryColor": "#EF6C00"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "料理名",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "cost",
+                "name": "材料費",
+                "required": true,
+                "type": "currency",
+                "unit": "円"
+              },
+              {
+                "defaultValue": 1,
+                "id": "servings",
+                "name": "食分",
+                "required": true,
+                "type": "integer",
+                "unit": "食"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "ref": "cost"
+                        },
+                        {
+                          "ref": "servings"
+                        }
+                      ],
+                      "op": "div"
+                    }
+                  ],
+                  "op": "round"
+                },
+                "id": "per_serving",
+                "name": "1食あたり",
+                "type": "currency"
+              }
+            ],
+            "id": "meal",
+            "name": "料理",
+            "titleField": "title"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "sum",
+                    "entity": "meal",
+                    "field": "cost",
+                    "filter": {
+                      "field": "date",
+                      "op": "thisMonth",
+                      "value": null
+                    },
+                    "format": "currency",
+                    "label": "今月の食費合計",
+                    "type": "stat"
+                  },
+                  {
+                    "format": "currency",
+                    "label": "今月の1食あたり平均",
+                    "type": "stat",
+                    "value": {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "agg": "sum",
+                              "entity": "meal",
+                              "field": "cost",
+                              "filter": {
+                                "field": "date",
+                                "op": "thisMonth",
+                                "value": null
+                              }
+                            },
+                            {
+                              "agg": "sum",
+                              "entity": "meal",
+                              "field": "servings",
+                              "filter": {
+                                "field": "date",
+                                "op": "thisMonth",
+                                "value": null
+                              }
+                            }
+                          ],
+                          "op": "div"
+                        }
+                      ],
+                      "op": "round"
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "meal",
+                    "item": {
+                      "subtitle": "per_serving",
+                      "title": "title",
+                      "trailing": "cost"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "meal_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "作った料理",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "meal_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "料理を追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "自炊の記録",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "meal_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "title",
+                    "label": "料理名",
+                    "placeholder": "カレー",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "cost",
+                    "label": "材料費",
+                    "type": "numberField",
+                    "unit": "円"
+                  },
+                  {
+                    "field": "servings",
+                    "label": "何食分できた?",
+                    "max": 20,
+                    "min": 1,
+                    "step": 1,
+                    "type": "stepper"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "meal",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "meal",
+            "id": "meal_form",
+            "title": "料理を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "meal",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a06_gym_pr",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "ジムの記録アプリ。種目と重さと回数を記録して、種目ごとの自己ベストと、ベストを更新したかが分かるようにして",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 7992,
+      "totalMs": 7997,
+      "outputChars": 3590,
+      "usage": {
+        "inputTokens": 145,
+        "outputTokens": 1541,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "ジム記録アプリを作りました。左下のボタンから種目とトレーニングを追加できます。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 3,
+        "components": 15,
+        "topLevel": 8,
+        "withArea": 8,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 2,
+        "fields": 8,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "exercise:private",
+          "workout:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F6 A7:F10 A11:C12 D11:F12",
+          "workout_form: A1:F5 A11:F12",
+          "exercise_form: A1:F2"
+        ],
+        "computed": [
+          "exercise.best",
+          "workout.best_before",
+          "workout.is_pb"
+        ],
+        "statValues": 1,
+        "refFields": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "種目・重さ・回数を記録し、種目ごとの自己ベスト(最大重量)とベスト更新かどうかを確認する",
+          "icon": "dumbbell",
+          "name": "ジム記録",
+          "theme": {
+            "primaryColor": "#D84315"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "種目名",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "computed": {
+                  "agg": "max",
+                  "entity": "workout",
+                  "field": "weight",
+                  "filter": {
+                    "field": "exercise",
+                    "op": "eq",
+                    "value": {
+                      "ref": "id"
+                    }
+                  }
+                },
+                "id": "best",
+                "name": "自己ベスト(kg)",
+                "type": "number",
+                "unit": "kg"
+              }
+            ],
+            "id": "exercise",
+            "name": "種目",
+            "titleField": "name"
+          },
+          {
+            "fields": [
+              {
+                "id": "exercise",
+                "name": "種目",
+                "refEntity": "exercise",
+                "required": true,
+                "type": "ref"
+              },
+              {
+                "id": "weight",
+                "name": "重さ",
+                "required": true,
+                "type": "number",
+                "unit": "kg"
+              },
+              {
+                "id": "reps",
+                "name": "回数",
+                "required": true,
+                "type": "integer",
+                "unit": "回"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "computed": {
+                  "agg": "max",
+                  "entity": "workout",
+                  "field": "weight",
+                  "filter": [
+                    {
+                      "field": "exercise",
+                      "op": "eq",
+                      "value": {
+                        "ref": "exercise"
+                      }
+                    },
+                    {
+                      "field": "date",
+                      "op": "lt",
+                      "value": {
+                        "ref": "date"
+                      }
+                    }
+                  ]
+                },
+                "id": "best_before",
+                "name": "過去のベスト",
+                "type": "number",
+                "unit": "kg"
+              },
+              {
+                "computed": {
+                  "else": "-",
+                  "if": {
+                    "args": [
+                      {
+                        "ref": "weight"
+                      },
+                      {
+                        "args": [
+                          {
+                            "ref": "best_before"
+                          },
+                          0
+                        ],
+                        "op": "coalesce"
+                      }
+                    ],
+                    "op": "gt"
+                  },
+                  "then": "更新!"
+                },
+                "id": "is_pb",
+                "name": "ベスト更新",
+                "type": "string"
+              }
+            ],
+            "id": "workout",
+            "name": "トレーニング",
+            "titleField": "exercise"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "id": "count",
+                "label": "記録数(回)",
+                "type": "stat",
+                "value": {
+                  "agg": "count",
+                  "entity": "workout"
+                }
+              },
+              {
+                "area": "A3:F6",
+                "children": [
+                  {
+                    "columns": [
+                      {
+                        "field": "name"
+                      },
+                      {
+                        "field": "best"
+                      }
+                    ],
+                    "entity": "exercise",
+                    "type": "table"
+                  }
+                ],
+                "id": "best_sec",
+                "title": "種目ごとの自己ベスト",
+                "type": "section"
+              },
+              {
+                "area": "A7:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "workout",
+                    "item": {
+                      "subtitle": "is_pb",
+                      "title": "exercise",
+                      "trailing": "weight"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "workout_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "最近の記録",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "exercise_form",
+                  "type": "navigate"
+                },
+                "area": "A11:C12",
+                "icon": "plus",
+                "id": "add_ex",
+                "label": "種目を追加",
+                "style": "secondary",
+                "type": "button"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "workout_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "記録する",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "ジム記録",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "workout_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "記録"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "exercise",
+                    "label": "種目",
+                    "style": "menu",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "weight",
+                    "label": "重さ",
+                    "type": "numberField",
+                    "unit": "kg"
+                  },
+                  {
+                    "field": "reps",
+                    "label": "回数",
+                    "type": "numberField",
+                    "unit": "回"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "workout",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "workout",
+            "id": "workout_form",
+            "title": "トレーニングを記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "workout",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "種目名",
+                    "placeholder": "ベンチプレス",
+                    "type": "textField"
+                  }
+                ],
+                "id": "fields",
+                "title": "種目",
+                "type": "section"
+              }
+            ],
+            "entity": "exercise",
+            "id": "exercise_form",
+            "title": "種目を追加",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "exercise",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a07_pomodoro",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "ポモドーロタイマーを作って。25分集中して5分休憩、終わったら回数を記録して今日何ポモドーロやったか見たい",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5487,
+      "totalMs": 5490,
+      "outputChars": 2357,
+      "usage": {
+        "inputTokens": 143,
+        "outputTokens": 1013,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "ポモドーロアプリを作りました。右下のボタンからポモドーロを追加できます。集中から休憩への自動切り替えは、集中と休憩の2つのタイマーで代替しました。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 11,
+        "topLevel": 7,
+        "withArea": 7,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "pomodoro:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:C6 D3:F6 A7:F10 D11:F12",
+          "pomodoro_form: A1:F5 A11:F12"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "25分集中して5分休憩し、終わったら回数を記録して今日のポモドーロ数を確認する。集中から休憩への自動切り替えは、集中と休憩の2つのタイマーで代替しました。",
+          "icon": "timer",
+          "name": "ポモドーロ",
+          "theme": {
+            "primaryColor": "#E53935"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "task",
+                "name": "取り組んだこと",
+                "type": "string"
+              },
+              {
+                "defaultValue": 1,
+                "id": "count",
+                "name": "回数",
+                "type": "integer"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "pomodoro",
+            "name": "ポモドーロ",
+            "titleField": "task"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "id": "today_count",
+                "label": "今日のポモドーロ(回)",
+                "type": "stat",
+                "value": {
+                  "agg": "sum",
+                  "entity": "pomodoro",
+                  "field": "count",
+                  "filter": {
+                    "field": "date",
+                    "op": "today",
+                    "value": null
+                  }
+                }
+              },
+              {
+                "area": "A3:C6",
+                "id": "focus_timer",
+                "label": "集中 25分",
+                "mode": "countdown",
+                "seconds": 1500,
+                "type": "timerDisplay"
+              },
+              {
+                "area": "D3:F6",
+                "id": "break_timer",
+                "label": "休憩 5分",
+                "mode": "countdown",
+                "seconds": 300,
+                "type": "timerDisplay"
+              },
+              {
+                "area": "A7:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "pomodoro",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "task",
+                      "trailing": "count"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "pomodoro_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "記録",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "pomodoro_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "ポモドーロを記録",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "ポモドーロ",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "pomodoro_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "記録"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "task",
+                    "label": "取り組んだこと",
+                    "placeholder": "勉強",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "count",
+                    "label": "回数",
+                    "max": 20,
+                    "min": 1,
+                    "step": 1,
+                    "type": "stepper"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "pomodoro",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "pomodoro",
+            "id": "pomodoro_form",
+            "title": "ポモドーロを記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "pomodoro",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a08_habit_streak",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "習慣トラッカー。毎日筋トレと読書をやったかチェックして、何日連続で続いているかを表示して",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5994,
+      "totalMs": 5996,
+      "outputChars": 2520,
+      "usage": {
+        "inputTokens": 134,
+        "outputTokens": 1078,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "習慣トラッカーアプリを作りました。今日と履歴の2タブで、右下のボタンから習慣記録を追加できます。連続日数は直近7日の記録数で代替しました。",
+      "metrics": {
+        "tabs": 2,
+        "screens": 3,
+        "components": 12,
+        "topLevel": 6,
+        "withArea": 6,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "habit_log:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "log_form: A1:F4 A11:F12",
+          "history: A1:F10"
+        ]
+      },
+      "dsl": {
+        "app": {
+          "description": "筋トレと読書をやったか毎日チェックして記録する。連続日数は直近7日の記録数で代替しました。",
+          "icon": "checkmark.seal",
+          "name": "習慣トラッカー",
+          "tabs": [
+            {
+              "icon": "checkmark.circle",
+              "screen": "home",
+              "title": "今日"
+            },
+            {
+              "icon": "clock.arrow.circlepath",
+              "screen": "history",
+              "title": "履歴"
+            }
+          ],
+          "theme": {
+            "primaryColor": "#EF6C00"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "defaultValue": false,
+                "id": "workout",
+                "name": "筋トレ",
+                "type": "boolean"
+              },
+              {
+                "defaultValue": false,
+                "id": "reading",
+                "name": "読書",
+                "type": "boolean"
+              }
+            ],
+            "id": "habit_log",
+            "name": "習慣記録",
+            "titleField": "date"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "count",
+                    "entity": "habit_log",
+                    "filter": {
+                      "field": "workout",
+                      "op": "eq",
+                      "value": true
+                    },
+                    "label": "筋トレ(直近7日)",
+                    "type": "stat"
+                  },
+                  {
+                    "aggregate": "count",
+                    "entity": "habit_log",
+                    "filter": {
+                      "field": "reading",
+                      "op": "eq",
+                      "value": true
+                    },
+                    "label": "読書(直近7日)",
+                    "type": "stat"
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "habit_log",
+                    "item": {
+                      "subtitle": "workout",
+                      "title": "date",
+                      "trailing": "reading"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "log_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "最近の記録",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "log_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "今日を記録",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "習慣トラッカー",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "log_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "記録"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F4",
+                "children": [
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  },
+                  {
+                    "field": "workout",
+                    "label": "筋トレ",
+                    "type": "toggle"
+                  },
+                  {
+                    "field": "reading",
+                    "label": "読書",
+                    "type": "toggle"
+                  }
+                ],
+                "id": "fields",
+                "title": "今日はやった?",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか?",
+                  "entity": "habit_log",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "habit_log",
+            "id": "log_form",
+            "title": "習慣を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "habit_log",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F10",
+                "columns": [
+                  {
+                    "field": "date"
+                  },
+                  {
+                    "field": "workout"
+                  },
+                  {
+                    "field": "reading"
+                  }
+                ],
+                "entity": "habit_log",
+                "id": "log_table",
+                "sort": {
+                  "direction": "desc",
+                  "field": "date"
+                },
+                "type": "table"
+              }
+            ],
+            "id": "history",
+            "title": "履歴"
+          }
+        ]
+      }
+    },
+    {
+      "id": "a09_reading_month",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "読書記録アプリ。読んだ本のタイトルとページ数と読み終わった日を記録して、今月何冊読んだかと今年の合計ページ数を出して",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5117,
+      "totalMs": 5118,
+      "outputChars": 2195,
+      "usage": {
+        "inputTokens": 150,
+        "outputTokens": 898,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "読書記録アプリを作りました。右下のボタンから本を追加できます。今年の合計ページ数は全期間の合計で代替しました。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 11,
+        "topLevel": 5,
+        "withArea": 5,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "book:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "book_form: A1:F4 A11:F12"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "読んだ本のタイトル・ページ数・読了日を記録し、今月の冊数と全期間の合計ページ数を確認する。今年の合計ページ数は全期間の合計で代替しました。",
+          "icon": "book",
+          "name": "読書記録",
+          "theme": {
+            "primaryColor": "#6D4C41"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "タイトル",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "pages",
+                "name": "ページ数",
+                "required": true,
+                "type": "integer",
+                "unit": "ページ"
+              },
+              {
+                "defaultValue": "now",
+                "id": "finished",
+                "name": "読了日",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "book",
+            "name": "本",
+            "titleField": "title"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "label": "今月の冊数(冊)",
+                    "type": "stat",
+                    "value": {
+                      "agg": "count",
+                      "entity": "book",
+                      "filter": {
+                        "field": "finished",
+                        "op": "thisMonth",
+                        "value": null
+                      }
+                    }
+                  },
+                  {
+                    "aggregate": "sum",
+                    "entity": "book",
+                    "field": "pages",
+                    "label": "全期間の合計ページ数",
+                    "type": "stat"
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "book",
+                    "item": {
+                      "subtitle": "finished",
+                      "title": "title",
+                      "trailing": "pages"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "book_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "finished"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "読んだ本",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "book_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "本を追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "読書記録",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "book_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F4",
+                "children": [
+                  {
+                    "field": "title",
+                    "label": "タイトル",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "pages",
+                    "label": "ページ数",
+                    "type": "numberField",
+                    "unit": "ページ"
+                  },
+                  {
+                    "field": "finished",
+                    "label": "読み終わった日",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "book",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "book",
+            "id": "book_form",
+            "title": "本を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "book",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a10_saving_goal",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "貯金アプリ。目標金額は10万円で、貯金した額を記録したら達成率と、あといくらで目標に届くかを表示して",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5565,
+      "totalMs": 5569,
+      "outputChars": 2429,
+      "usage": {
+        "inputTokens": 141,
+        "outputTokens": 1034,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "貯金アプリを作りました。右下のボタンから貯金を追加できます。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 13,
+        "topLevel": 7,
+        "withArea": 7,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "saving:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F4 A5:F5 A6:F10 D11:F12",
+          "saving_form: A1:F4 A11:F12"
+        ],
+        "statValues": 2,
+        "progressTarget": true
+      },
+      "dsl": {
+        "app": {
+          "description": "貯金した額を記録して、目標10万円に対する達成率とあといくらで届くかを表示する",
+          "icon": "banknote",
+          "name": "貯金アプリ",
+          "theme": {
+            "primaryColor": "#2E7D32"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "amount",
+                "name": "金額",
+                "required": true,
+                "type": "currency",
+                "unit": "円"
+              },
+              {
+                "id": "memo",
+                "name": "メモ",
+                "type": "string"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "saving",
+            "name": "貯金",
+            "titleField": "memo"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "sum",
+                    "entity": "saving",
+                    "field": "amount",
+                    "format": "currency",
+                    "label": "貯金合計",
+                    "type": "stat"
+                  },
+                  {
+                    "format": "percent",
+                    "label": "達成率",
+                    "type": "stat",
+                    "value": {
+                      "args": [
+                        {
+                          "agg": "sum",
+                          "entity": "saving",
+                          "field": "amount"
+                        },
+                        100000
+                      ],
+                      "op": "div"
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F4",
+                "format": "currency",
+                "id": "remaining",
+                "label": "目標まであと",
+                "type": "stat",
+                "value": {
+                  "args": [
+                    {
+                      "args": [
+                        100000,
+                        {
+                          "agg": "sum",
+                          "entity": "saving",
+                          "field": "amount"
+                        }
+                      ],
+                      "op": "sub"
+                    },
+                    0
+                  ],
+                  "op": "max"
+                }
+              },
+              {
+                "aggregate": "sum",
+                "area": "A5:F5",
+                "entity": "saving",
+                "field": "amount",
+                "id": "progress",
+                "label": "目標10万円",
+                "target": 100000,
+                "type": "progressBar"
+              },
+              {
+                "area": "A6:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "saving",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "memo",
+                      "trailing": "amount"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "saving_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "貯金の記録",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "saving_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "貯金を追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "貯金",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "saving_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F4",
+                "children": [
+                  {
+                    "field": "amount",
+                    "label": "金額",
+                    "type": "numberField",
+                    "unit": "円"
+                  },
+                  {
+                    "field": "memo",
+                    "label": "メモ",
+                    "placeholder": "お小遣い",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "saving",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "saving",
+            "id": "saving_form",
+            "title": "貯金を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "saving",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a11_part_time_income",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "バイト代の管理アプリ。もらった給料を記録して、月ごとの合計と今年の合計を出して、扶養の103万円まであといくらか分かるようにして",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5837,
+      "totalMs": 5839,
+      "outputChars": 2597,
+      "usage": {
+        "inputTokens": 151,
+        "outputTokens": 1083,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "バイト代管理アプリを作りました。右下のボタンから給料を追加できます。今年の合計は全期間の合計で代替しました。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 13,
+        "topLevel": 7,
+        "withArea": 7,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "pay:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F4 A5:F5 A6:F10 D11:F12",
+          "pay_form: A1:F4 A11:F12"
+        ],
+        "statValues": 1,
+        "progressTarget": true
+      },
+      "dsl": {
+        "app": {
+          "description": "もらった給料を記録し、今月の合計と全期間の合計、扶養の103万円まであといくらかを確認する。今年の合計は全期間の合計で代替しました。",
+          "icon": "yensign.circle",
+          "name": "バイト代管理",
+          "theme": {
+            "primaryColor": "#2E7D32"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "workplace",
+                "name": "バイト先",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "amount",
+                "name": "金額",
+                "required": true,
+                "type": "currency",
+                "unit": "円"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "受け取った日",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "pay",
+            "name": "給料",
+            "titleField": "workplace"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "sum",
+                    "entity": "pay",
+                    "field": "amount",
+                    "filter": {
+                      "field": "date",
+                      "op": "thisMonth",
+                      "value": null
+                    },
+                    "format": "currency",
+                    "label": "今月の合計",
+                    "type": "stat"
+                  },
+                  {
+                    "aggregate": "sum",
+                    "entity": "pay",
+                    "field": "amount",
+                    "format": "currency",
+                    "label": "全期間の合計",
+                    "type": "stat"
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F4",
+                "format": "currency",
+                "id": "remain",
+                "label": "103万円まであと",
+                "type": "stat",
+                "value": {
+                  "args": [
+                    {
+                      "args": [
+                        1030000,
+                        {
+                          "agg": "sum",
+                          "entity": "pay",
+                          "field": "amount"
+                        }
+                      ],
+                      "op": "sub"
+                    },
+                    0
+                  ],
+                  "op": "max"
+                }
+              },
+              {
+                "aggregate": "sum",
+                "area": "A5:F5",
+                "entity": "pay",
+                "field": "amount",
+                "id": "progress",
+                "label": "103万円までの進み具合",
+                "target": 1030000,
+                "type": "progressBar"
+              },
+              {
+                "area": "A6:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "pay",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "workplace",
+                      "trailing": "amount"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "pay_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "給料の記録",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "pay_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "給料を追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "バイト代",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "pay_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F4",
+                "children": [
+                  {
+                    "field": "workplace",
+                    "label": "バイト先",
+                    "placeholder": "コンビニ",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "amount",
+                    "label": "金額",
+                    "type": "numberField",
+                    "unit": "円"
+                  },
+                  {
+                    "field": "date",
+                    "label": "受け取った日",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "pay",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "pay",
+            "id": "pay_form",
+            "title": "給料を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "pay",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a12_bmi",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "体重管理アプリ。身長は170センチで、毎日の体重を記録したらBMIを計算して、グラフで推移を見たい",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 6943,
+      "totalMs": 6949,
+      "outputChars": 2570,
+      "usage": {
+        "inputTokens": 139,
+        "outputTokens": 1136,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "体重管理アプリを作りました。記録と推移の2タブで、右下のボタンから体重を追加できます。",
+      "metrics": {
+        "tabs": 2,
+        "screens": 3,
+        "components": 12,
+        "topLevel": 7,
+        "withArea": 5,
+        "areaRatio": 0.7142857142857143,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": true,
+        "scopes": [
+          "body:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "body_form: - -",
+          "trend: A1:F6 A7:F12"
+        ],
+        "computed": [
+          "body.bmi"
+        ]
+      },
+      "dsl": {
+        "app": {
+          "description": "毎日の体重を記録してBMIを自動計算し、グラフで推移を見る(身長170cmで計算)",
+          "icon": "scalemass",
+          "name": "体重管理",
+          "tabs": [
+            {
+              "icon": "list.bullet.rectangle",
+              "screen": "home",
+              "title": "記録"
+            },
+            {
+              "icon": "chart.xyaxis.line",
+              "screen": "trend",
+              "title": "推移"
+            }
+          ],
+          "theme": {
+            "primaryColor": "#00897B"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "id": "weight",
+                "name": "体重",
+                "required": true,
+                "type": "number",
+                "unit": "kg"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "args": [
+                                {
+                                  "ref": "weight"
+                                },
+                                {
+                                  "args": [
+                                    1.7,
+                                    2
+                                  ],
+                                  "op": "pow"
+                                }
+                              ],
+                              "op": "div"
+                            },
+                            10
+                          ],
+                          "op": "mul"
+                        }
+                      ],
+                      "op": "round"
+                    },
+                    10
+                  ],
+                  "op": "div"
+                },
+                "id": "bmi",
+                "name": "BMI",
+                "type": "number"
+              }
+            ],
+            "id": "body",
+            "name": "体重",
+            "titleField": "date"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "avg",
+                    "entity": "body",
+                    "field": "weight",
+                    "filter": {
+                      "field": "date",
+                      "op": "today",
+                      "value": null
+                    },
+                    "label": "最新の体重(kg)",
+                    "type": "stat"
+                  },
+                  {
+                    "aggregate": "avg",
+                    "entity": "body",
+                    "field": "bmi",
+                    "label": "平均BMI",
+                    "type": "stat"
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "body",
+                    "item": {
+                      "subtitle": "bmi",
+                      "title": "date",
+                      "trailing": "weight"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "body_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "記録一覧",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "body_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "体重を記録",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "体重管理",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "body_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "children": [
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  },
+                  {
+                    "field": "weight",
+                    "label": "体重",
+                    "type": "numberField",
+                    "unit": "kg"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "body",
+                  "type": "deleteRecord"
+                },
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "body",
+            "id": "body_form",
+            "title": "体重を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "body",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "aggregate": "avg",
+                "area": "A1:F6",
+                "bucket": "day",
+                "entity": "body",
+                "field": "weight",
+                "groupBy": "date",
+                "id": "weight_trend",
+                "kind": "line",
+                "title": "体重の推移",
+                "type": "chart"
+              },
+              {
+                "aggregate": "avg",
+                "area": "A7:F12",
+                "bucket": "day",
+                "entity": "body",
+                "field": "bmi",
+                "groupBy": "date",
+                "id": "bmi_trend",
+                "kind": "line",
+                "title": "BMIの推移",
+                "type": "chart"
+              }
+            ],
+            "id": "trend",
+            "title": "推移"
+          }
+        ]
+      }
+    },
+    {
+      "id": "a13_medicine",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "薬の飲み忘れ防止アプリ。朝8時と夜9時に通知して、飲んだらチェックして、今日飲んだかどうか分かるようにして",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5833,
+      "totalMs": 5844,
+      "outputChars": 2454,
+      "usage": {
+        "inputTokens": 150,
+        "outputTokens": 1038,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "薬の飲み忘れ防止アプリを作りました。右下のボタンから服薬を追加できます。毎朝8時に通知が届きます。毎晩9時に通知が届きます。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 10,
+        "topLevel": 5,
+        "withArea": 5,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "notifications": [
+          "daily@08:00",
+          "daily@21:00"
+        ],
+        "scopes": [
+          "dose:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "dose_form: A1:F5 A11:F12"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "朝8時と夜9時に通知でお知らせし、飲んだらチェックして今日の服薬状況を確認する",
+          "icon": "pills",
+          "name": "薬の飲み忘れ防止",
+          "notifications": [
+            {
+              "body": "朝の薬を飲みましょう。飲んだら記録してください。",
+              "id": "morning_med",
+              "repeat": "daily",
+              "time": "08:00",
+              "title": "朝の薬の時間です"
+            },
+            {
+              "body": "夜の薬を飲みましょう。飲んだら記録してください。",
+              "id": "night_med",
+              "repeat": "daily",
+              "time": "21:00",
+              "title": "夜の薬の時間です"
+            }
+          ],
+          "theme": {
+            "primaryColor": "#00897B"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "defaultValue": "朝",
+                "id": "timing",
+                "name": "タイミング",
+                "options": [
+                  "朝",
+                  "夜"
+                ],
+                "required": true,
+                "type": "enum"
+              },
+              {
+                "defaultValue": true,
+                "id": "taken",
+                "name": "飲んだ",
+                "type": "boolean"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "dose",
+            "name": "服薬",
+            "titleField": "timing"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "label": "今日飲んだ回数(回)",
+                    "type": "stat",
+                    "value": {
+                      "agg": "count",
+                      "entity": "dose",
+                      "filter": [
+                        {
+                          "field": "date",
+                          "op": "today",
+                          "value": null
+                        },
+                        {
+                          "field": "taken",
+                          "op": "eq",
+                          "value": true
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "dose",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "timing",
+                      "trailing": "taken"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "dose_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "服薬の記録",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "dose_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "checkmark.circle",
+                "id": "add",
+                "label": "飲んだ記録をつける",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "服薬チェック",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "dose_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "記録"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "timing",
+                    "label": "タイミング",
+                    "style": "segmented",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "taken",
+                    "label": "飲んだ",
+                    "type": "toggle"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか?",
+                  "entity": "dose",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "dose",
+            "id": "dose_form",
+            "title": "服薬を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "dose",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a14_shopping_clear",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "買い物リスト。買うものを追加して、買ったらチェック、チェック済みのものはまとめて消せるようにして",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5155,
+      "totalMs": 5156,
+      "outputChars": 2093,
+      "usage": {
+        "inputTokens": 134,
+        "outputTokens": 859,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "買い物リストアプリを作りました。右下のボタンから買うものを追加できます。一括削除はスワイプ削除で代替しました。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 10,
+        "topLevel": 6,
+        "withArea": 6,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 2,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "item:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F7 A8:F10 D11:F12",
+          "item_form: A1:F3 A11:F12"
+        ]
+      },
+      "dsl": {
+        "app": {
+          "description": "買うものを追加して、買ったらチェックする。一括削除はスワイプ削除で代替しました。",
+          "icon": "cart",
+          "name": "買い物リスト",
+          "theme": {
+            "primaryColor": "#EF6C00"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "品名",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "defaultValue": false,
+                "id": "done",
+                "name": "買った",
+                "type": "boolean"
+              }
+            ],
+            "id": "item",
+            "name": "買うもの",
+            "titleField": "name"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "aggregate": "count",
+                "area": "A1:F2",
+                "entity": "item",
+                "filter": {
+                  "field": "done",
+                  "op": "eq",
+                  "value": false
+                },
+                "id": "remaining",
+                "label": "未購入",
+                "type": "stat"
+              },
+              {
+                "area": "A3:F7",
+                "children": [
+                  {
+                    "emptyText": "買うものはありません",
+                    "entity": "item",
+                    "filter": {
+                      "field": "done",
+                      "op": "eq",
+                      "value": false
+                    },
+                    "item": {
+                      "title": "name"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "item_form",
+                      "type": "navigate"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "todo",
+                "title": "買うもの",
+                "type": "section"
+              },
+              {
+                "area": "A8:F10",
+                "children": [
+                  {
+                    "emptyText": "購入済みはありません",
+                    "entity": "item",
+                    "filter": {
+                      "field": "done",
+                      "op": "eq",
+                      "value": true
+                    },
+                    "item": {
+                      "title": "name"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "item_form",
+                      "type": "navigate"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "bought",
+                "title": "購入済み(左にスワイプで削除)",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "item_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "買うものを追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "買い物リスト",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "item_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F3",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "品名",
+                    "placeholder": "牛乳",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "done",
+                    "label": "買った",
+                    "type": "toggle"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この項目を削除しますか？",
+                  "entity": "item",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "item",
+            "id": "item_form",
+            "title": "買うもの",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "item",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a15_game_ranking",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "友達とのゲーム大会のスコア表を作って。プレイヤーごとに点数を入れて、合計点の順位を表示して",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 7203,
+      "totalMs": 7205,
+      "outputChars": 3445,
+      "usage": {
+        "inputTokens": 138,
+        "outputTokens": 1413,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "ゲーム大会スコアアプリを作りました。左下のボタンからプレイヤーとスコアを追加できます。順位番号は出せないため、順位は合計点の降順の並びで代替しました。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 3,
+        "components": 17,
+        "topLevel": 8,
+        "withArea": 8,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 2,
+        "fields": 6,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "players:private",
+          "scores:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F6 A7:F10 A11:C12 D11:F12",
+          "score_form: A1:F5 A11:F12",
+          "player_form: A1:F2"
+        ],
+        "computed": [
+          "players.total"
+        ],
+        "statValues": 1,
+        "refFields": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "友達とのゲーム大会でプレイヤーごとの点数を記録し、合計点の高い順に並べて表示する。順位番号は出せないため、順位は合計点の降順の並びで代替しました。",
+          "icon": "gamecontroller",
+          "name": "ゲーム大会スコア",
+          "theme": {
+            "primaryColor": "#6A1B9A"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "名前",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "computed": {
+                  "agg": "sum",
+                  "entity": "scores",
+                  "field": "points",
+                  "filter": {
+                    "field": "player",
+                    "op": "eq",
+                    "value": {
+                      "ref": "id"
+                    }
+                  }
+                },
+                "id": "total",
+                "name": "合計点",
+                "type": "number"
+              }
+            ],
+            "id": "players",
+            "name": "プレイヤー",
+            "titleField": "name"
+          },
+          {
+            "fields": [
+              {
+                "id": "player",
+                "name": "プレイヤー",
+                "refEntity": "players",
+                "required": true,
+                "type": "ref"
+              },
+              {
+                "id": "game",
+                "name": "ゲーム名",
+                "type": "string"
+              },
+              {
+                "id": "points",
+                "name": "点数",
+                "required": true,
+                "type": "number",
+                "unit": "点"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "type": "date"
+              }
+            ],
+            "id": "scores",
+            "name": "スコア",
+            "titleField": "game"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "label": "プレイヤー数(人)",
+                    "type": "stat",
+                    "value": {
+                      "agg": "count",
+                      "entity": "players"
+                    }
+                  },
+                  {
+                    "aggregate": "max",
+                    "entity": "scores",
+                    "field": "points",
+                    "label": "最高の1回の点数",
+                    "type": "stat"
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F6",
+                "children": [
+                  {
+                    "columns": [
+                      {
+                        "field": "name"
+                      },
+                      {
+                        "field": "total",
+                        "title": "合計点"
+                      }
+                    ],
+                    "entity": "players",
+                    "sort": {
+                      "direction": "desc",
+                      "field": "total"
+                    },
+                    "type": "table"
+                  }
+                ],
+                "id": "ranking",
+                "title": "合計点ランキング(高い順)",
+                "type": "section"
+              },
+              {
+                "area": "A7:F10",
+                "children": [
+                  {
+                    "emptyText": "まだスコアがありません",
+                    "entity": "scores",
+                    "item": {
+                      "subtitle": "game",
+                      "title": "player",
+                      "trailing": "points"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "score_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "スコア履歴",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "player_form",
+                  "type": "navigate"
+                },
+                "area": "A11:C12",
+                "icon": "person.badge.plus",
+                "id": "add_player",
+                "label": "プレイヤー追加",
+                "style": "secondary",
+                "type": "button"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "score_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add_score",
+                "label": "スコア追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "ゲーム大会スコア",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "score_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "スコア追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "player",
+                    "label": "プレイヤー",
+                    "style": "menu",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "game",
+                    "label": "ゲーム名",
+                    "placeholder": "マリオカート",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "points",
+                    "label": "点数",
+                    "type": "numberField",
+                    "unit": "点"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "このスコアを削除しますか?",
+                  "entity": "scores",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "scores",
+            "id": "score_form",
+            "title": "スコアを記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "scores",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "名前",
+                    "placeholder": "たろう",
+                    "type": "textField"
+                  }
+                ],
+                "id": "fields",
+                "title": "プレイヤー",
+                "type": "section"
+              }
+            ],
+            "entity": "players",
+            "id": "player_form",
+            "title": "プレイヤーを追加",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "players",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a16_trip_plan",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "旅行のしおりアプリ。日ごとの予定を時間順に並べて、持ち物リストは準備できたらチェックできるようにして",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 2,
+      "regenerations": 1,
+      "areaFallback": false,
+      "claudeMs": 15449,
+      "totalMs": 15453,
+      "outputChars": 6941,
+      "usage": {
+        "inputTokens": 342,
+        "outputTokens": 2907,
+        "cacheReadInputTokens": 48888
+      },
+      "summary": "旅行のしおりアプリを作りました。予定と持ち物の2タブで、右下のボタンから予定と持ち物を追加できます。",
+      "lastProblems": [
+        "/screens/0/components/0: additional properties 'sort' not allowed"
+      ],
+      "metrics": {
+        "tabs": 2,
+        "screens": 4,
+        "components": 17,
+        "topLevel": 8,
+        "withArea": 8,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 2,
+        "fields": 7,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "plan:private",
+          "item:private"
+        ],
+        "areas": [
+          "home: A1:F10 D11:F12",
+          "plan_form: A1:F7 A11:F12",
+          "packing: A1:F10 D11:F12",
+          "item_form: A1:F3 A11:F12"
+        ]
+      },
+      "dsl": {
+        "app": {
+          "description": "日ごとの予定を時間順に並べ、持ち物は準備できたらチェックできる旅行のしおり。",
+          "icon": "airplane",
+          "name": "旅行のしおり",
+          "tabs": [
+            {
+              "icon": "calendar",
+              "screen": "home",
+              "title": "予定"
+            },
+            {
+              "icon": "checklist",
+              "screen": "packing",
+              "title": "持ち物"
+            }
+          ],
+          "theme": {
+            "primaryColor": "#0288D1"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "予定",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "id": "time",
+                "name": "時間",
+                "type": "string"
+              },
+              {
+                "id": "place",
+                "name": "場所",
+                "type": "string"
+              },
+              {
+                "id": "memo",
+                "name": "メモ",
+                "type": "text"
+              }
+            ],
+            "id": "plan",
+            "name": "予定",
+            "titleField": "title"
+          },
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "持ち物",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "defaultValue": false,
+                "id": "ready",
+                "name": "準備できた",
+                "type": "boolean"
+              }
+            ],
+            "id": "item",
+            "name": "持ち物",
+            "titleField": "name"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ予定がありません",
+                    "entity": "plan",
+                    "item": {
+                      "subtitle": "time",
+                      "title": "title",
+                      "trailing": "date"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "plan_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "asc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "plans",
+                "title": "日ごとの予定",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "plan_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "予定を追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "旅のしおり",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "plan_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F7",
+                "children": [
+                  {
+                    "field": "title",
+                    "label": "予定",
+                    "placeholder": "清水寺を観光",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  },
+                  {
+                    "field": "time",
+                    "label": "時間",
+                    "type": "timePicker"
+                  },
+                  {
+                    "field": "place",
+                    "label": "場所",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "memo",
+                    "label": "メモ",
+                    "multiline": true,
+                    "type": "textField"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この予定を削除しますか？",
+                  "entity": "plan",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "plan",
+            "id": "plan_form",
+            "title": "予定を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "plan",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F10",
+                "children": [
+                  {
+                    "emptyText": "持ち物がありません",
+                    "entity": "item",
+                    "item": {
+                      "title": "name",
+                      "trailing": "ready"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "item_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "asc",
+                      "field": "ready"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "items",
+                "title": "持ち物リスト",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "item_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "持ち物を追加",
+                "type": "button"
+              }
+            ],
+            "id": "packing",
+            "title": "持ち物",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "item_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F3",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "持ち物",
+                    "placeholder": "パスポート",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "ready",
+                    "label": "準備できた",
+                    "type": "toggle"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この持ち物を削除しますか？",
+                  "entity": "item",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "item",
+            "id": "item_form",
+            "title": "持ち物",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "item",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a17_oshi_spend",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "推し活の出費管理。グッズ、チケット、遠征費みたいにカテゴリ別に記録して、今月いくら使ったかと月の予算3万円の残りを出して",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5942,
+      "totalMs": 5945,
+      "outputChars": 2722,
+      "usage": {
+        "inputTokens": 154,
+        "outputTokens": 1129,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "推し活出費アプリを作りました。右下のボタンから出費を追加できます。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 13,
+        "topLevel": 6,
+        "withArea": 6,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 4,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "expense:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F3 A4:F10 D11:F12",
+          "expense_form: A1:F5 A11:F12"
+        ],
+        "statValues": 1,
+        "progressTarget": true
+      },
+      "dsl": {
+        "app": {
+          "description": "グッズ・チケット・遠征費をカテゴリ別に記録し、今月の合計と月3万円の予算の残りを確認する",
+          "icon": "heart.circle",
+          "name": "推し活出費",
+          "theme": {
+            "primaryColor": "#E91E63"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "内容",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "amount",
+                "name": "金額",
+                "required": true,
+                "type": "currency",
+                "unit": "円"
+              },
+              {
+                "defaultValue": "グッズ",
+                "id": "category",
+                "name": "カテゴリ",
+                "options": [
+                  "グッズ",
+                  "チケット",
+                  "遠征費",
+                  "その他"
+                ],
+                "required": true,
+                "type": "enum"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "expense",
+            "name": "出費",
+            "titleField": "title"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "sum",
+                    "entity": "expense",
+                    "field": "amount",
+                    "filter": {
+                      "field": "date",
+                      "op": "thisMonth",
+                      "value": null
+                    },
+                    "format": "currency",
+                    "label": "今月の合計",
+                    "type": "stat"
+                  },
+                  {
+                    "format": "currency",
+                    "label": "今月の残り予算",
+                    "type": "stat",
+                    "value": {
+                      "args": [
+                        30000,
+                        {
+                          "agg": "sum",
+                          "entity": "expense",
+                          "field": "amount",
+                          "filter": {
+                            "field": "date",
+                            "op": "thisMonth",
+                            "value": null
+                          }
+                        }
+                      ],
+                      "op": "sub"
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "aggregate": "sum",
+                "area": "A3:F3",
+                "entity": "expense",
+                "field": "amount",
+                "filter": {
+                  "field": "date",
+                  "op": "thisMonth",
+                  "value": null
+                },
+                "id": "budget_bar",
+                "label": "今月の予算(3万円)",
+                "target": 30000,
+                "type": "progressBar"
+              },
+              {
+                "area": "A4:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ出費がありません",
+                    "entity": "expense",
+                    "item": {
+                      "subtitle": "category",
+                      "title": "title",
+                      "trailing": "amount"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "expense_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "出費一覧",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "expense_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "出費を追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "推し活出費",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "expense_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "title",
+                    "label": "内容",
+                    "placeholder": "ライブ遠征の交通費",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "amount",
+                    "label": "金額",
+                    "type": "numberField",
+                    "unit": "円"
+                  },
+                  {
+                    "field": "category",
+                    "label": "カテゴリ",
+                    "style": "menu",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この出費を削除しますか？",
+                  "entity": "expense",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "expense",
+            "id": "expense_form",
+            "title": "出費を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "expense",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a18_plant_water",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "植物の水やり管理アプリ。植物ごとに水やりの間隔を決めて、最後に水をあげた日から次はいつか、今日水やりが必要な植物を教えて",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 6601,
+      "totalMs": 6610,
+      "outputChars": 2955,
+      "usage": {
+        "inputTokens": 155,
+        "outputTokens": 1239,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "植物の水やりアプリを作りました。右下のボタンから植物を追加できます。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 11,
+        "topLevel": 6,
+        "withArea": 6,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 5,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "plants:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F6 A7:F10 D11:F12",
+          "plant_form: A1:F5 A11:F12"
+        ],
+        "computed": [
+          "plants.next_date",
+          "plants.days_left"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "植物ごとに水やりの間隔を決め、最後に水をあげた日から次の水やり日と今日水やりが必要な植物を確認する",
+          "icon": "leaf",
+          "name": "植物の水やり",
+          "theme": {
+            "primaryColor": "#2E7D32"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "名前",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "defaultValue": 7,
+                "id": "interval_days",
+                "name": "水やり間隔(日)",
+                "required": true,
+                "type": "integer",
+                "unit": "日"
+              },
+              {
+                "defaultValue": "now",
+                "id": "last_watered",
+                "name": "最後に水をあげた日",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "ref": "last_watered"
+                    },
+                    {
+                      "ref": "interval_days"
+                    }
+                  ],
+                  "op": "addDays"
+                },
+                "id": "next_date",
+                "name": "次の水やり日",
+                "type": "date"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "ref": "last_watered"
+                        },
+                        {
+                          "ref": "interval_days"
+                        }
+                      ],
+                      "op": "addDays"
+                    }
+                  ],
+                  "op": "daysUntil"
+                },
+                "id": "days_left",
+                "name": "あと何日",
+                "type": "integer",
+                "unit": "日"
+              }
+            ],
+            "id": "plants",
+            "name": "植物",
+            "titleField": "name"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "id": "due_count",
+                "label": "今日までに水やりが必要な植物(期限切れ含む)",
+                "type": "stat",
+                "value": {
+                  "agg": "count",
+                  "entity": "plants",
+                  "filter": {
+                    "field": "days_left",
+                    "op": "lte",
+                    "value": 0
+                  }
+                }
+              },
+              {
+                "area": "A3:F6",
+                "children": [
+                  {
+                    "emptyText": "今日水やりが必要な植物はありません",
+                    "entity": "plants",
+                    "filter": {
+                      "field": "days_left",
+                      "op": "lte",
+                      "value": 0
+                    },
+                    "item": {
+                      "subtitle": "next_date",
+                      "title": "name",
+                      "trailing": "days_left"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "plant_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "asc",
+                      "field": "days_left"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "due",
+                "title": "今日水やりが必要",
+                "type": "section"
+              },
+              {
+                "area": "A7:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ植物がありません",
+                    "entity": "plants",
+                    "item": {
+                      "subtitle": "next_date",
+                      "title": "name",
+                      "trailing": "days_left"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "plant_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "asc",
+                      "field": "days_left"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "all",
+                "title": "すべての植物(次の水やり日)",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "plant_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "植物を追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "植物の水やり",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "plant_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "名前",
+                    "placeholder": "モンステラ",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "interval_days",
+                    "label": "水やり間隔(日)",
+                    "max": 60,
+                    "min": 1,
+                    "step": 1,
+                    "type": "stepper"
+                  },
+                  {
+                    "field": "last_watered",
+                    "label": "最後に水をあげた日",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この植物を削除しますか？",
+                  "entity": "plants",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "plants",
+            "id": "plant_form",
+            "title": "植物を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "plants",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a19_calorie_en",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "A calorie counter. Log what I ate and the calories, show today's total and how much is left from my 2000 kcal daily goal",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5662,
+      "totalMs": 5669,
+      "outputChars": 2264,
+      "usage": {
+        "inputTokens": 141,
+        "outputTokens": 999,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "I made a Calorie Counter app. Use the button at the bottom right to add meals.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 12,
+        "topLevel": 6,
+        "withArea": 6,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "meal:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F3 A4:F10 D11:F12",
+          "meal_form: A1:F4 A11:F12"
+        ],
+        "statValues": 1,
+        "progressTarget": true
+      },
+      "dsl": {
+        "app": {
+          "description": "Log what you eat and track today's calories against your 2000 kcal daily goal",
+          "icon": "flame",
+          "name": "Calorie Counter",
+          "theme": {
+            "primaryColor": "#EF6C00"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "food",
+                "name": "Food",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "calories",
+                "name": "Calories",
+                "required": true,
+                "type": "integer",
+                "unit": "kcal"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Date",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "meal",
+            "name": "Meal",
+            "titleField": "food"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "sum",
+                    "entity": "meal",
+                    "field": "calories",
+                    "filter": {
+                      "field": "date",
+                      "op": "today",
+                      "value": null
+                    },
+                    "label": "Today's calories (kcal)",
+                    "type": "stat"
+                  },
+                  {
+                    "label": "Left today (kcal)",
+                    "type": "stat",
+                    "value": {
+                      "args": [
+                        {
+                          "args": [
+                            2000,
+                            {
+                              "agg": "sum",
+                              "entity": "meal",
+                              "field": "calories",
+                              "filter": {
+                                "field": "date",
+                                "op": "today",
+                                "value": null
+                              }
+                            }
+                          ],
+                          "op": "sub"
+                        },
+                        0
+                      ],
+                      "op": "max"
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "aggregate": "sum",
+                "area": "A3:F3",
+                "entity": "meal",
+                "field": "calories",
+                "filter": {
+                  "field": "date",
+                  "op": "today",
+                  "value": null
+                },
+                "id": "goal",
+                "label": "Today's goal (2000 kcal)",
+                "target": 2000,
+                "type": "progressBar"
+              },
+              {
+                "area": "A4:F10",
+                "children": [
+                  {
+                    "emptyText": "No meals logged yet",
+                    "entity": "meal",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "food",
+                      "trailing": "calories"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "meal_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "Recent meals",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "meal_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Add meal",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Calorie Counter",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "meal_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F4",
+                "children": [
+                  {
+                    "field": "food",
+                    "label": "Food",
+                    "placeholder": "Chicken salad",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "calories",
+                    "label": "Calories",
+                    "type": "numberField",
+                    "unit": "kcal"
+                  },
+                  {
+                    "field": "date",
+                    "label": "Date",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "Details",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this meal?",
+                  "entity": "meal",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "meal",
+            "id": "meal_form",
+            "title": "Log meal",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "meal",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a20_chores_en",
+      "kind": "create",
+      "group": "audit",
+      "transcript": "A family chore tracker. Each chore is worth points, log who did which chore, and show each person's total points this week and who is winning",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 15719,
+      "totalMs": 15721,
+      "outputChars": 4128,
+      "usage": {
+        "inputTokens": 139,
+        "outputTokens": 2491,
+        "cacheReadInputTokens": 24444
+      },
+      "summary": "I made a Chore Tracker app. Use the button at the bottom left to add persons, chores or logs. This week was replaced with the last 7 days, the winner is the top row of the sorted table, and each log's points are entered per log.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 4,
+        "components": 19,
+        "topLevel": 10,
+        "withArea": 10,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 3,
+        "fields": 8,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "members:private",
+          "chores:private",
+          "logs:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F6 A7:F10 A11:C12 D11:F12",
+          "log_form: A1:F5 A11:F12",
+          "chore_form: A1:F3 A4:F10",
+          "member_form: A1:F2"
+        ],
+        "computed": [
+          "members.week_points"
+        ],
+        "statValues": 1,
+        "refFields": 2
+      },
+      "dsl": {
+        "app": {
+          "description": "Log who did which chore and see each person's points for the last 7 days, sorted so the leader is on top. This week was replaced with the last 7 days, the winner is the top row of the sorted table, and each log's points are entered per log.",
+          "icon": "checklist",
+          "name": "Chore Tracker",
+          "theme": {
+            "primaryColor": "#00897B"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "Name",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "computed": {
+                  "agg": "sum",
+                  "entity": "logs",
+                  "field": "points",
+                  "filter": [
+                    {
+                      "field": "member",
+                      "op": "eq",
+                      "value": {
+                        "ref": "id"
+                      }
+                    },
+                    {
+                      "field": "date",
+                      "op": "gte",
+                      "value": {
+                        "args": [
+                          {
+                            "args": [],
+                            "op": "today"
+                          },
+                          -6
+                        ],
+                        "op": "addDays"
+                      }
+                    }
+                  ]
+                },
+                "id": "week_points",
+                "name": "Points (7 days)",
+                "type": "integer"
+              }
+            ],
+            "id": "members",
+            "name": "Person",
+            "titleField": "name"
+          },
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "Chore",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "defaultValue": 5,
+                "id": "points",
+                "name": "Points",
+                "required": true,
+                "type": "integer"
+              }
+            ],
+            "id": "chores",
+            "name": "Chore",
+            "titleField": "name"
+          },
+          {
+            "fields": [
+              {
+                "id": "chore",
+                "name": "Chore",
+                "refEntity": "chores",
+                "required": true,
+                "type": "ref"
+              },
+              {
+                "id": "member",
+                "name": "Done by",
+                "refEntity": "members",
+                "required": true,
+                "type": "ref"
+              },
+              {
+                "defaultValue": 5,
+                "id": "points",
+                "name": "Points",
+                "required": true,
+                "type": "integer"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Date",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "logs",
+            "name": "Log",
+            "titleField": "chore"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "format": "plain",
+                "id": "top",
+                "label": "Top score (last 7 days)",
+                "type": "stat",
+                "value": {
+                  "agg": "max",
+                  "entity": "members",
+                  "field": "week_points"
+                }
+              },
+              {
+                "area": "A3:F6",
+                "columns": [
+                  {
+                    "field": "name",
+                    "title": "Person"
+                  },
+                  {
+                    "field": "week_points",
+                    "title": "Points (7 days)"
+                  }
+                ],
+                "entity": "members",
+                "id": "board",
+                "sort": {
+                  "direction": "desc",
+                  "field": "week_points"
+                },
+                "type": "table"
+              },
+              {
+                "area": "A7:F10",
+                "children": [
+                  {
+                    "emptyText": "No chores logged yet",
+                    "entity": "logs",
+                    "item": {
+                      "subtitle": "member",
+                      "title": "chore",
+                      "trailing": "points"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "log_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "Recent logs",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "member_form",
+                  "type": "navigate"
+                },
+                "area": "A11:C12",
+                "icon": "person.badge.plus",
+                "id": "add_member",
+                "label": "Add person",
+                "style": "secondary",
+                "type": "button"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "log_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add_log",
+                "label": "Log chore",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Chores",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "chore_form",
+                  "type": "navigate"
+                },
+                "icon": "plus.square",
+                "label": "Add chore"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "chore",
+                    "label": "Chore",
+                    "style": "menu",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "member",
+                    "label": "Done by",
+                    "style": "menu",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "points",
+                    "label": "Points",
+                    "max": 50,
+                    "min": 1,
+                    "step": 1,
+                    "type": "stepper"
+                  },
+                  {
+                    "field": "date",
+                    "label": "Date",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "Details",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this log?",
+                  "entity": "logs",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "logs",
+            "id": "log_form",
+            "title": "Log a chore",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "logs",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F3",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "Chore",
+                    "placeholder": "Wash dishes",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "points",
+                    "label": "Points",
+                    "max": 50,
+                    "min": 1,
+                    "step": 1,
+                    "type": "stepper"
+                  }
+                ],
+                "id": "fields",
+                "title": "Chore",
+                "type": "section"
+              },
+              {
+                "area": "A4:F10",
+                "children": [
+                  {
+                    "emptyText": "No chores yet",
+                    "entity": "chores",
+                    "item": {
+                      "title": "name",
+                      "trailing": "points"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "chore_form",
+                      "type": "navigate"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "existing",
+                "title": "All chores",
+                "type": "section"
+              }
+            ],
+            "entity": "chores",
+            "id": "chore_form",
+            "title": "Add chore",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "chores",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "Name",
+                    "placeholder": "Alex",
+                    "type": "textField"
+                  }
+                ],
+                "id": "fields",
+                "title": "Person",
+                "type": "section"
+              }
+            ],
+            "entity": "members",
+            "id": "member_form",
+            "title": "Add person",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "members",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "n": 20,
+    "ok": 20,
+    "firstPass": 18,
+    "regenerated": 2,
+    "areaFallback": 0,
+    "failed": 0,
+    "expectMisses": 0,
+    "createP50Ms": 6084,
+    "createP95Ms": 15719,
+    "editP50Ms": 0,
+    "avgOutputTokens": 1462.7,
+    "avgCreateOutputTokens": 1462.7,
+    "avgEditOutputTokens": 0,
+    "avgCreateOutputChars": 3380.95,
+    "avgAreaRatio": 0.9857142857142858,
+    "tabbedCreates": 4,
+    "calcCreates": 17
+  }
+}
