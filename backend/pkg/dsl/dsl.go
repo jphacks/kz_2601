@@ -169,6 +169,18 @@ const (
 	CompVoiceInput  ComponentType = "voiceInput"
 	CompSpacer      ComponentType = "spacer"
 	CompDivider     ComponentType = "divider"
+	// display leaves
+	CompLabel       ComponentType = "label"
+	CompIcon        ComponentType = "icon"
+	CompProgressBar ComponentType = "progressBar"
+	CompGauge       ComponentType = "gauge"
+	CompBadge       ComponentType = "badge"
+	CompLink        ComponentType = "link"
+	CompMarkdown    ComponentType = "markdown"
+	CompAvatar      ComponentType = "avatar"
+	CompTable       ComponentType = "table"
+	CompTimeline    ComponentType = "timeline"
+	CompEmptyState  ComponentType = "emptyState"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -221,6 +233,28 @@ type Component struct {
 	// voiceInput / spacer
 	Prompt string `json:"prompt,omitempty"`
 	Size   string `json:"size,omitempty"`
+
+	// display (label / icon / progressBar / gauge / badge / link / markdown / avatar / table / timeline / emptyState)
+	Name          string        `json:"name,omitempty"`          // icon: SF Symbols name / avatar: initials source
+	Color         string        `json:"color,omitempty"`         // SemanticColor enum
+	Value         *float64      `json:"value,omitempty"`         // progressBar (0..1) / gauge literal value
+	Target        *float64      `json:"target,omitempty"`        // progressBar entity mode denominator
+	Min           *float64      `json:"min,omitempty"`           // gauge
+	Max           *float64      `json:"max,omitempty"`           // gauge
+	URL           string        `json:"url,omitempty"`           // link
+	Image         string        `json:"image,omitempty"`         // avatar literal (https / data URL)
+	Message       string        `json:"message,omitempty"`       // emptyState
+	Columns       []TableColumn `json:"columns,omitempty"`       // table
+	Limit         int           `json:"limit,omitempty"`         // table / timeline
+	DateField     string        `json:"dateField,omitempty"`     // timeline
+	TitleField    string        `json:"titleField,omitempty"`    // timeline
+	SubtitleField string        `json:"subtitleField,omitempty"` // timeline
+}
+
+// TableColumn is one column of a table component.
+type TableColumn struct {
+	Field string `json:"field"`
+	Title string `json:"title,omitempty"`
 }
 
 // ListItem maps record fields onto a list row.

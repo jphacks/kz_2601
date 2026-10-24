@@ -1,6 +1,6 @@
 # DSL v1(統一版・正典)
 
-> **正典はこのフォルダ**: `dsl.schema.json`(JSON Schema draft 2020-12)+ `examples/{initial,kakeibo,training,walk}.json`(デモ3本+初期状態)。
+> **正典はこのフォルダ**: `dsl.schema.json`(JSON Schema draft 2020-12)+ `examples/{initial,kakeibo,training,walk}.json`(デモ3本+初期状態)+ `examples/gallery-*.json`(部品ギャラリー)。
 > Go 型は `backend/pkg/dsl`(`schema.json` を埋め込み・`make schema-sync` で同期・CI で byte 一致を検証)、Swift 型は `ios/Packages/MetamonDSL/Sources/MetamonDSL/Model`(examples をそのままバンドルしデコードテスト)。
 > backend 案 `docs/backend/dsl-proposal.md` と iOS 案 `docs/ios/dsl-proposal.md` は**すり合わせ前の記録**として残す。矛盾したら本書が勝つ。
 
@@ -51,11 +51,11 @@ AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: full
 Entity  { id, name, titleField?, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit? } }
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (15 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
+Leaf (26 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
-### 3.1 コンポーネント(18 種 = Container 3 + Leaf 15)
+### 3.1 コンポーネント(29 種 = Container 3 + Leaf 26)
 
 全種に共通の任意キー: `id`(画面内一意)・`area`(§3.4 のグリッド矩形。Screen 直下のみ有効)。
 
@@ -78,6 +78,19 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `voiceInput` | | `prompt`, `size`(compact/large) | | P0 |
 | `spacer` | | `size`(small/medium/large/flexible) | | P0 |
 | `divider` | | | | P0 |
+| `label` | `text`, `icon`(SF Symbols) | `style`(title/headline/body/caption) | | P1 |
+| `icon` | `name`(SF Symbols) | `size`(small/medium/large), `color`(SemanticColor) | | P1 |
+| `progressBar` | `value`(0〜1) **または** `entity`+`target`(>0) | `label`, `aggregate`(count/sum・既定 sum), `field`(count 以外必須), `filter` | | P1 |
+| `gauge` | `value` **または** `entity`(+`aggregate`/`field`) | `label`, `min`(既定 0), `max`(既定 1・min より大), `filter` | | P1 |
+| `badge` | `text` | `color`(SemanticColor) | | P1 |
+| `link` | `text`, `url`(http(s)) | | | P1 |
+| `markdown` | `text`(インライン markdown) | | | P1 |
+| `avatar` | | `image`(https/data URL), `field`(photo・要 screen.entity), `name`(イニシャル), `size` | △(`field` 時) | P1 |
+| `table` | `entity`, `columns[{field,title?}]` | `sort`, `filter`, `limit` | | P1 |
+| `timeline` | `entity`, `dateField`(date/datetime), `titleField` | `subtitleField`, `filter`, `limit` | | P1 |
+| `emptyState` | `title` | `icon`, `message` | | P1 |
+
+`SemanticColor` = `primary|secondary|accent|red|green|orange|blue`(閉じた enum。hex 文字列は不可・Claude 構造化出力互換)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
 ### 3.2 アクション(9 種)
 
