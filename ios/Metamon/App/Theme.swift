@@ -1,0 +1,105 @@
+import SwiftUI
+import MetamonRenderer
+
+/// アプリ本体(音声画面・サインイン・生成中・設定)のデザイントークン。Renderer の部品の見た目はここでは扱わない。
+/// 色はライト/ダーク両対応(system color か、両モードで映えるブランド色のみ)。
+enum Theme {
+    enum Spacing {
+        static let xs: CGFloat = 4
+        static let sm: CGFloat = 8
+        static let md: CGFloat = 16
+        static let lg: CGFloat = 24
+        static let xl: CGFloat = 32
+        static let xxl: CGFloat = 48
+    }
+
+    enum Radius {
+        static let sm: CGFloat = 10
+        static let md: CGFloat = 16
+        static let card: CGFloat = 22
+        static let lg: CGFloat = 28
+    }
+
+    enum Colors {
+        /// ブランド(メタモン = 紫〜水色)
+        static let brandA = Color(hex: "#8E6CFF")!
+        static let brandB = Color(hex: "#4CC9FF")!
+        /// 録音中(赤〜珊瑚)
+        static let recordA = Color(hex: "#FF5F6D")!
+        static let recordB = Color(hex: "#FF9966")!
+        /// 警告(生成が長引いた時)
+        static let warning = Color.orange
+
+        static let canvas = Color(.systemGroupedBackground)
+        static let surface = Color(.secondarySystemGroupedBackground)
+        static let surfaceElevated = Color(.tertiarySystemGroupedBackground)
+        static let hairline = Color.primary.opacity(0.08)
+    }
+
+    enum Shadow {
+        static let softColor = Color.black.opacity(0.10)
+        static let softRadius: CGFloat = 18
+        static let softY: CGFloat = 8
+    }
+
+    static let brandGradient = LinearGradient(
+        colors: [Colors.brandA, Colors.brandB],
+        startPoint: .topLeading, endPoint: .bottomTrailing
+    )
+    static let recordGradient = LinearGradient(
+        colors: [Colors.recordA, Colors.recordB],
+        startPoint: .topLeading, endPoint: .bottomTrailing
+    )
+    static let brandAngular = AngularGradient(
+        colors: [Colors.brandA, Colors.brandB, Colors.brandA.opacity(0.6), Colors.brandA],
+        center: .center
+    )
+
+    /// 音声画面の背景(淡いブランド色の滲み + キャンバス)
+    static func backdrop(_ scheme: ColorScheme) -> some View {
+        ZStack {
+            Colors.canvas
+            RadialGradient(
+                colors: [Colors.brandA.opacity(scheme == .dark ? 0.28 : 0.18), .clear],
+                center: .init(x: 0.2, y: 0.1), startRadius: 0, endRadius: 420
+            )
+            RadialGradient(
+                colors: [Colors.brandB.opacity(scheme == .dark ? 0.22 : 0.16), .clear],
+                center: .init(x: 0.9, y: 0.9), startRadius: 0, endRadius: 380
+            )
+        }
+        .ignoresSafeArea()
+    }
+}
+
+extension View {
+    /// 面(カード)。surface 色 + card 角丸 + 柔らかい影。
+    func metamonCard(padding: CGFloat = Theme.Spacing.md) -> some View {
+        self
+            .padding(padding)
+            .background(Theme.Colors.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous).strokeBorder(Theme.Colors.hairline))
+            .shadow(color: Theme.Shadow.softColor, radius: Theme.Shadow.softRadius, y: Theme.Shadow.softY)
+    }
+
+    /// ブランドグラデーションの文字。
+    func brandText() -> some View {
+        self.foregroundStyle(Theme.brandGradient)
+    }
+}
+
+/// ブランドマーク(サインイン・設定で共用)。
+struct BrandMark: View {
+    var size: CGFloat = 72
+
+    var body: some View {
+        ZStack {
+            Circle().fill(Theme.brandGradient)
+            Image(systemName: "waveform")
+                .font(.system(size: size * 0.46, weight: .semibold))
+                .foregroundStyle(.white)
+        }
+        .frame(width: size, height: size)
+        .shadow(color: Theme.Colors.brandA.opacity(0.35), radius: size * 0.25, y: size * 0.1)
+    }
+}
