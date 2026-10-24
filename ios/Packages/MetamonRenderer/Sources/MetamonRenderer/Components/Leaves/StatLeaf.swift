@@ -13,14 +13,75 @@ struct StatLeaf: View {
         let (formatted, isLoading, unavailable) = isValueMode ? exprValue : aggregateValue
         // アクセシビリティサイズ: 1 行高のセルでも数値が見えるよう、ラベルは縮小 1 行・余白を詰める(足りなければセル内スクロール)
         let compact = typeSize.isAccessibilitySize
+        // area が 1 行しか無いと「アイコン行 + 数値」の 2 段が収まらず、カードの下が隣のセルに隠れていた(#157)。
+        // その高さに満たない時は 1 段(アイコン・ラベル・数値を横並び)のカードに切り替える。
+        // どちらもセルの高さいっぱいに広がるので、測った高さ = セルの高さ(切り替えても揺れない)。
+        // 高さの提案が無い所(フォーム・スクロール内)は 2 段の自然な高さになり、従来どおり
+        Group {
+            if singleLineMode {
+                singleLine(formatted, isLoading: isLoading)
+            } else {
+                regular(formatted, isLoading: isLoading, compact: compact)
+            }
+        }
+        .onGeometryChange(for: Bool.self) { Self.usesSingleLine(height: $0.size.height) } action: { singleLineMode = $0 }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(c.label ?? "")
+        .accessibilityValue(unavailable ? L("取得できませんでした") : formatted)
+    }
+
+    /// 2 段版が崩れずに収まる最小の高さ(余白 16×2 + アイコン行 18 + 間 4 + 最小の数値 22pt の行高 ≒ 27)。
+    static let regularMinHeight: CGFloat = RenderTheme.Spacing.md * 2 + 18 + RenderTheme.Spacing.xs + 27
+
+    /// 器の高さが 2 段版に足りない(1 行ぶんの area 等)なら 1 段版。0 はまだ測れていない時。
+    static func usesSingleLine(height: CGFloat) -> Bool { height > 0 && height < regularMinHeight }
+
+    @State private var singleLineMode = false
+
+    private var iconView: some View {
+        Image(systemName: c.icon ?? (isValueMode ? "function" : FieldIcon.stat(aggregate: c.aggregate, field: fieldDef)))
+            .font(.caption.weight(.bold))
+            .foregroundStyle(RenderTheme.Colors.brandA)
+            .frame(width: 18, height: 18)
+            .background(RenderTheme.Colors.brandSoft, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .accessibilityHidden(true)
+    }
+
+    private func valueStyle(_ formatted: String) -> AnyShapeStyle {
+        // マイナス(予算の残りが赤字 等)は負の色にする(#131: 「-¥112,230」が普通の黒で読み流されていた)
+        formatted.hasPrefix("-") ? AnyShapeStyle(RenderTheme.Colors.negative) : AnyShapeStyle(.primary)
+    }
+
+    /// 1 段版(1 行ぶんの area): [アイコン ラベル ……… 数値]。数値は高さ・幅に収まる大きさまで下げる。
+    private func singleLine(_ formatted: String, isLoading: Bool) -> some View {
+        HStack(spacing: 6) {
+            iconView
+            Text(c.label ?? "")
+                .font(RenderTheme.Fonts.statLabel)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Spacer(minLength: RenderTheme.Spacing.sm)
+            ViewThatFits(in: [.horizontal, .vertical]) {
+                valueText(formatted, size: 28)
+                valueText(formatted, size: 22)
+                valueText(formatted, size: 17)
+                valueText(formatted, size: 17).minimumScaleFactor(0.5)
+            }
+            .layoutPriority(1)
+            .foregroundStyle(valueStyle(formatted))
+            .contentTransition(.numericText())
+            .redacted(reason: isLoading ? .placeholder : [])
+        }
+        .padding(.horizontal, RenderTheme.Spacing.xs)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .renderCard(padding: RenderTheme.Spacing.sm, wash: true)
+    }
+
+    private func regular(_ formatted: String, isLoading: Bool, compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: RenderTheme.Spacing.xs) {
             HStack(spacing: 6) {
-                Image(systemName: c.icon ?? (isValueMode ? "function" : FieldIcon.stat(aggregate: c.aggregate, field: fieldDef)))
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(RenderTheme.Colors.brandA)
-                    .frame(width: 18, height: 18)
-                    .background(RenderTheme.Colors.brandSoft, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .accessibilityHidden(true)
+                iconView
                 Text(c.label ?? "")
                     .font(RenderTheme.Fonts.statLabel)
                     .foregroundStyle(.secondary)
@@ -40,17 +101,13 @@ struct StatLeaf: View {
                 valueText(formatted, size: 22)
                 valueText(formatted, size: 22).minimumScaleFactor(0.5)
             }
-            // マイナス(予算の残りが赤字 等)は負の色にする(#131: 「-¥112,230」が普通の黒で読み流されていた)
-            .foregroundStyle(formatted.hasPrefix("-") ? AnyShapeStyle(RenderTheme.Colors.negative) : AnyShapeStyle(.primary))
+            .foregroundStyle(valueStyle(formatted))
             .contentTransition(.numericText())
             .redacted(reason: isLoading ? .placeholder : [])
         }
         // セル全体をカードにする(area を縦に広げた時にカードの下だけ空くのを防ぐ)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .renderCard(padding: compact ? RenderTheme.Spacing.sm : RenderTheme.Spacing.md, wash: true)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(c.label ?? "")
-        .accessibilityValue(unavailable ? L("取得できませんでした") : formatted)
     }
 
     /// 数値 1 段分(ViewThatFits の候補)。
