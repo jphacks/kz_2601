@@ -1,25 +1,88 @@
 package main
 
 import (
-	"log"
+	"context"
+	"errors"
+	"log/slog"
+	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
 
+const shutdownTimeout = 15 * time.Second
+
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	logger := httpx.NewLogger()
+	slog.SetDefault(logger)
+
+	port := envOr("PORT", "8080")
+	mode := envOr("AUTH_MODE", auth.ModeFirebase)
+
+	handler := newHandler(auth.Middleware(auth.NotConfigured{}, mode), logger)
+	server := &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
+
+	listener, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		logger.Error("listen failed", slog.String("port", port), slog.Any("error", err))
+		os.Exit(1)
+	}
+	logger.Info("appconfig listening",
+		slog.String("addr", listener.Addr().String()),
+		slog.String("authMode", mode),
+		slog.String("project", os.Getenv("GOOGLE_CLOUD_PROJECT")),
+	)
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- server.Serve(listener) }()
+
+	select {
+	case err := <-serveErr:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("serve failed", slog.Any("error", err))
+			os.Exit(1)
+		}
+	case <-ctx.Done():
+		logger.Info("shutting down")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			logger.Error("shutdown failed", slog.Any("error", err))
+		}
+	}
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+func newHandler(authMiddleware func(http.Handler) http.Handler, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
-	// Cloud Run の Google Front End は /healthz をコンテナに届けない(HTML 404)ため、正式なヘルスパスは /health。
-	// /healthz はローカル用に残す。
-	health := func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	}
 	mux.HandleFunc("GET /health", health)
 	mux.HandleFunc("GET /healthz", health)
-	log.Printf("appconfig listening on :%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	mux.Handle("GET /v1/apps", authMiddleware(http.HandlerFunc(listApps)))
+	return httpx.Chain(mux, httpx.WithRequestID, httpx.Log(logger), httpx.Recover(logger), httpx.ErrorEnvelope)
+}
+
+func health(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ok"))
+}
+
+func listApps(w http.ResponseWriter, _ *http.Request) {
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": []any{}})
 }
