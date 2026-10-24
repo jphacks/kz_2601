@@ -169,6 +169,14 @@ const (
 	CompVoiceInput  ComponentType = "voiceInput"
 	CompSpacer      ComponentType = "spacer"
 	CompDivider     ComponentType = "divider"
+	// leaves: input batch
+	CompSlider      ComponentType = "slider"      // bounded numeric
+	CompStepper     ComponentType = "stepper"     // -/+ numeric
+	CompTextEditor  ComponentType = "textEditor"  // multi-line text
+	CompSecureField ComponentType = "secureField" // masked text
+	CompTimePicker  ComponentType = "timePicker"  // "HH:mm" (string) or datetime
+	CompColorPicker ComponentType = "colorPicker" // "#RRGGBB" string
+	CompRating      ComponentType = "rating"      // 1..max stars -> numeric
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -221,6 +229,13 @@ type Component struct {
 	// voiceInput / spacer
 	Prompt string `json:"prompt,omitempty"`
 	Size   string `json:"size,omitempty"`
+
+	// input batch (slider / stepper / rating / textEditor). Pointers so that
+	// an explicit 0 round-trips through omitempty.
+	Min      *float64 `json:"min,omitempty"`
+	Max      *float64 `json:"max,omitempty"`      // rating: star count (default 5)
+	Step     *float64 `json:"step,omitempty"`     // slider: omit = continuous; stepper: default 1
+	MinLines int      `json:"minLines,omitempty"` // textEditor: visible lines (default 4)
 }
 
 // ListItem maps record fields onto a list row.

@@ -8,6 +8,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     // leaf
     case text, button, textField, numberField, datePicker, picker, toggle
     case photoField, image, list, stat, chart, voiceInput, spacer, divider
+    // leaf: 入力系バッチ
+    case slider, stepper, textEditor, secureField, timePicker, colorPicker, rating
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -64,10 +66,17 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var prompt: String?
     public var size: String?           // voiceInput: compact|large / spacer: small|medium|large|flexible
 
+    // 入力系バッチ(slider / stepper / rating / textEditor)
+    public var min: Double?
+    public var max: Double?            // rating: 星の数(既定 5)
+    public var step: Double?           // slider: 省略で連続 / stepper: 既定 1
+    public var minLines: Int?          // textEditor: 最低表示行数(既定 4)
+
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
         case includeTime, source, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
         case kind, groupBy, bucket, prompt, size
+        case min, max, step, minLines
     }
 
     public init(from decoder: Decoder) throws {
@@ -106,6 +115,10 @@ public struct Component: Decodable, Identifiable, Sendable {
         bucket = try? c.decodeIfPresent(String.self, forKey: .bucket)
         prompt = try? c.decodeIfPresent(String.self, forKey: .prompt)
         size = try? c.decodeIfPresent(String.self, forKey: .size)
+        min = try? c.decodeIfPresent(Double.self, forKey: .min)
+        max = try? c.decodeIfPresent(Double.self, forKey: .max)
+        step = try? c.decodeIfPresent(Double.self, forKey: .step)
+        minLines = try? c.decodeIfPresent(Int.self, forKey: .minLines)
     }
 }
 
