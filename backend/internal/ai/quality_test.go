@@ -24,6 +24,7 @@ func TestCreate_LintRetryOnceThenClean(t *testing.T) {
 	}
 	f := &fakeCaller{replies: []string{bad, string(kb)}}
 	svc, _ := newSvc(f)
+	svc.LintRetry = true
 	res, err := svc.Generate(context.Background(), Request{AppID: "a1", Transcript: "家計簿"})
 	if err != nil {
 		t.Fatal(err)
@@ -45,6 +46,7 @@ func TestCreate_LintRetryKeepsFirstWhenRetryBreaks(t *testing.T) {
 	bad := withoutMonthFilter(kb)
 	f := &fakeCaller{replies: []string{bad, withBadEntity(t, kb), string(kb)}}
 	svc, _ := newSvc(f)
+	svc.LintRetry = true
 	res, err := svc.Generate(context.Background(), Request{AppID: "a1", Transcript: "家計簿"})
 	if err != nil {
 		t.Fatal(err)
@@ -62,6 +64,7 @@ func TestCreate_LintStillPresentAfterRetryIsAccepted(t *testing.T) {
 	bad := withoutMonthFilter(kakeibo(t))
 	f := &fakeCaller{replies: []string{bad, bad}}
 	svc, _ := newSvc(f)
+	svc.LintRetry = true
 	res, err := svc.Generate(context.Background(), Request{AppID: "a1", Transcript: "家計簿"})
 	if err != nil {
 		t.Fatal(err)
@@ -80,7 +83,7 @@ func TestEdit_LintOnlyForWarningsThePatchAdds(t *testing.T) {
 	}
 	ok := `{"summary":"カテゴリにカフェを追加しました。","patch":[{"op":"add","path":"/entities/0/fields/1/options/-","value":"カフェ"}]}`
 	f := &fakeCaller{replies: []string{ok}}
-	svc := &Service{Claude: f, Store: store, Model: "m"}
+	svc := &Service{Claude: f, Store: store, Model: "m", LintRetry: true}
 	res, err := svc.Generate(ctx, Request{AppID: "a1", Transcript: "カテゴリにカフェを追加して"})
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +101,7 @@ func TestEdit_LintOnlyForWarningsThePatchAdds(t *testing.T) {
 		return `{"summary":"今日の支出を追加しました。","patch":[{"op":"add","path":"/screens/0/components/0/children/-","value":{"type":"stat","label":"今日の支出","entity":"expense","field":"amount"` + filter + `}}]}`
 	}
 	f2 := &fakeCaller{replies: []string{add(""), add(`,"filter":{"field":"date","op":"today"}`)}}
-	svc2 := &Service{Claude: f2, Store: store2, Model: "m"}
+	svc2 := &Service{Claude: f2, Store: store2, Model: "m", LintRetry: true}
 	res, err = svc2.Generate(ctx, Request{AppID: "a1", Transcript: "今日の支出も出して"})
 	if err != nil {
 		t.Fatal(err)
@@ -182,5 +185,19 @@ func TestLintExampleFewShotsClean(t *testing.T) {
 		if w := app.Lint(); len(w) > 0 {
 			t.Errorf("few-shot must be lint-clean (Claude copies it): %v", w)
 		}
+	}
+}
+
+// Default (LintRetry off): warnings are reported in Meta.Lint, no second call.
+func TestCreate_LintReportedWithoutRetryByDefault(t *testing.T) {
+	kb := kakeibo(t)
+	f := &fakeCaller{replies: []string{withoutMonthFilter(kb), string(kb)}}
+	svc, _ := newSvc(f)
+	res, err := svc.Generate(context.Background(), Request{AppID: "a1", Transcript: "家計簿"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Meta.Attempts != 1 || res.Meta.LintRetried || len(res.Meta.Lint) == 0 {
+		t.Fatalf("meta: %+v", res.Meta)
 	}
 }

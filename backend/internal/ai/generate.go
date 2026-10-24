@@ -122,6 +122,10 @@ type Service struct {
 	// LogicPass enables the second "calculations only" call after a create
 	// (env AI_LOGIC_PASS=1; Request.LogicPass overrides per request).
 	LogicPass bool
+	// LintRetry regenerates once when the first valid output has content
+	// warnings (dsl.Lint). Off by default: warnings are only reported in
+	// Meta.Lint, and the user fixes the app by voice instead (env AI_LINT_RETRY=1).
+	LintRetry bool
 
 	conv     *convStore // clarify conversations (chat.go); lazily created
 	convOnce sync.Once
@@ -268,7 +272,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			ar.raw = canon(raw)
 			ar.summary = summarizeFor(app, loc)
 			ar.meta.Lint = app.Lint()
-			if len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
+			if s.LintRetry && len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
 				// one retry for content problems; keep this output in case it fails
 				ar.meta.LintRetried = true
 				kept := *ar
@@ -339,7 +343,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 			ar.ops = doc.Patch
 			ar.summary = normalizeDigits(strings.TrimSpace(doc.Summary))
 			ar.meta.Lint = newLint(baseLint, lintOf(next))
-			if len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
+			if s.LintRetry && len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
 				ar.meta.LintRetried = true
 				kept := *ar
 				linted = &kept
