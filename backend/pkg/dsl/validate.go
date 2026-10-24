@@ -112,7 +112,7 @@ func flatten(ve *jsonschema.ValidationError) []string {
 		}
 		causes := v.Causes
 		if _, ok := v.ErrorKind.(*kind.AnyOf); ok {
-			causes = deepestCauses(causes)
+			causes = deepestCauses(matchingTypeCauses(v.InstanceLocation, causes))
 		}
 		for _, c := range causes {
 			walk(c)
@@ -121,6 +121,44 @@ func flatten(ve *jsonschema.ValidationError) []string {
 	walk(ve)
 	if len(out) > 20 {
 		out = append(out[:20], fmt.Sprintf("...and %d more", len(out)-20))
+	}
+	return out
+}
+
+// matchingTypeCauses drops anyOf branches that failed on the node's own
+// `type` (a component def whose const did not match), so a stat with a bad
+// value reports the value, not 50 "type must be text/button/..." lines.
+// If every branch failed on type (unknown type), all are kept.
+func matchingTypeCauses(loc []string, causes []*jsonschema.ValidationError) []*jsonschema.ValidationError {
+	typeLoc := strings.Join(append(append([]string{}, loc...), "type"), "/")
+	var failsOnType func(v *jsonschema.ValidationError) bool
+	failsOnType = func(v *jsonschema.ValidationError) bool {
+		if len(v.Causes) == 0 {
+			return strings.Join(v.InstanceLocation, "/") == typeLoc
+		}
+		if _, ok := v.ErrorKind.(*kind.AnyOf); ok { // nested union: fails on type only if every branch does
+			for _, c := range v.Causes {
+				if !failsOnType(c) {
+					return false
+				}
+			}
+			return true
+		}
+		for _, c := range v.Causes {
+			if failsOnType(c) {
+				return true
+			}
+		}
+		return false
+	}
+	var out []*jsonschema.ValidationError
+	for _, c := range causes {
+		if !failsOnType(c) {
+			out = append(out, c)
+		}
+	}
+	if len(out) == 0 {
+		return causes
 	}
 	return out
 }

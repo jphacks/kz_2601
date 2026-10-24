@@ -215,6 +215,26 @@ func TestSchemaErrorInExprIsConcise(t *testing.T) {
 	}
 }
 
+// A component whose type matched but a prop is wrong reports that prop only
+// (eval logic_oshi: progressBar.value written as an Expr gave 120+ lines).
+func TestSchemaErrorReportsMatchedComponentOnly(t *testing.T) {
+	raw := []byte(`{"schemaVersion":1,"app":{"name":"x","voiceEntry":"none"},"initialScreen":"home","entities":[],
+	"screens":[{"id":"home","title":"t","components":[{"type":"progressBar","label":"達成率","value":{"op":"div","args":[1,2]}}]}]}`)
+	_, perr := Parse(raw)
+	ve, ok := perr.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected ValidationError, got %v", perr)
+	}
+	if len(ve.Problems) > 2 || !strings.Contains(strings.Join(ve.Problems, ";"), "/screens/0/components/0/value") {
+		t.Fatalf("want the value problem only, got %v", ve.Problems)
+	}
+	for _, p := range ve.Problems {
+		if strings.Contains(p, "/type:") {
+			t.Fatalf("type mismatch lines of other components leaked: %v", ve.Problems)
+		}
+	}
+}
+
 func TestPickerAcceptsRef(t *testing.T) {
 	app := warikanApp(t)
 	if ps := problems(t, app); len(ps) != 0 {

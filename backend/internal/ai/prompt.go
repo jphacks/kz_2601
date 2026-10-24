@@ -66,6 +66,7 @@ var systemPrompt = strings.TrimSpace(`
   - 他の entity のレコードを指す項目(支出の「払った人」→メンバー)は type "ref" + refEntity。フォームでは picker で選ぶ。
   - 割り勘・立替の「誰が誰にいくら」は settlement(members の computed balance を balanceField に)。
   - op はカタログの一覧だけ。計算が要らない発話には computed / stat.value を足さない。
+  - 式を書けるのは computed・stat.value・agg の filter.value だけ。progressBar / gauge の value は数値リテラルのみ(率のバーは progressBar{entity,field,target})。
 - voiceEntry は書かない(floating が補われる)。編集でも "none" にしない(ユーザーが声でアプリを変え続けられること)。
 - **表示言語**: user ターンの「## 表示言語(locale)」に従う。表示文字列(app.name / app.description、画面タイトル、tab.title、section/chart の title、label、placeholder、emptyText、ボタンやツールバーの label、confirmMessage、entity.name / field.name / enum の options、notifications[].title/body)は **すべてその言語**で書く(ja なら日本語、en なら自然な英語。混在させない)。id / type / enum 値 / area / aggregate / op / repeat / time などの構造は言語に関わらず英数のまま。
   - en の通貨 unit は "$"(発話で通貨が分かればそれに従う)。
