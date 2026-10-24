@@ -150,6 +150,7 @@ type Store interface {
 	Sharing         // share links + public catalog (share.go)
 	ReleaseRequests // "ship this as its own app" requests (release.go)
 	Ownership       // appId creators + catalog installs (owner.go)
+	Purger          // physical app deletion (purge.go)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).

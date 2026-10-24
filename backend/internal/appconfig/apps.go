@@ -2,6 +2,7 @@ package appconfig
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -150,16 +151,26 @@ func (h *Handler) patchApp(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, summary(app))
 }
 
+// deleteApp: DELETE /v1/apps/{appId} (#180). Physically deletes the caller's
+// app (document + versions + records) together with what the caller made
+// public for it: their share links, their "探す" listing (+ installs) and
+// their apps_public mirror (+ shared records). Only documents the caller owns
+// are touched, so another user's app is a 404 and another user's listing
+// stays. Copies other people installed from the catalog are separate appIds
+// and stay; a member who joined the appId only deletes their own copy.
 func (h *Handler) deleteApp(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r, "appId")
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	archived := "archived"
-	if _, err := h.store.UpdateAppMeta(r.Context(), uidOf(r), id, nil, &archived); err != nil {
+	res, err := h.store.PurgeApp(r.Context(), uidOf(r), id)
+	if err != nil {
 		fail(w, mapStoreErr(err, "app"))
 		return
 	}
+	slog.Info("appconfig: app deleted", slog.String("appId", id), slog.Int("shares", res.Shares),
+		slog.Bool("listing", res.Listing), slog.Bool("mirror", res.Mirror),
+		slog.Int("versions", res.Versions), slog.Int("records", res.Records))
 	w.WriteHeader(http.StatusNoContent)
 }

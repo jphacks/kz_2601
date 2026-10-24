@@ -216,10 +216,10 @@ func TestCreateApp(t *testing.T) {
 		t.Fatalf("get: %d %s", r.code, r.raw)
 	}
 	if r = e.do("u1", http.MethodDelete, "/v1/apps/"+id, nil, nil); r.code != http.StatusNoContent {
-		t.Fatalf("archive: %d", r.code)
+		t.Fatalf("delete: %d", r.code)
 	}
-	if r = e.do("u1", http.MethodGet, "/v1/apps/"+id, nil, nil); r.body["status"] != "archived" {
-		t.Fatalf("status: %s", r.raw)
+	if r = e.do("u1", http.MethodGet, "/v1/apps/"+id, nil, nil); r.code != http.StatusNotFound {
+		t.Fatalf("get after delete (#180 physical): %d %s", r.code, r.raw)
 	}
 }
 
