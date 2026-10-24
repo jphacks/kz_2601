@@ -162,6 +162,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 位置 | P1 | `native: location.current → into` / `map` コンポーネント | `CLLocationManager` 1回取得(stub) / MapKit(実装済み) | `NSLocationWhenInUseUsageDescription` |
 | モーション/歩数 | P1 | `native: motion.read` | CoreMotion / CMPedometer(stub) | `NSMotionUsageDescription` |
 | 共有 | P1 | `native: share {text}` | `UIActivityViewController`(stub) | 不要 |
+| オンデバイス AI | P1 | `aiButton { task, input?, entity?, output, prompt?, options? }` コンポーネント | **実装済み**(`AiButtonLeaf` + `Support/OnDeviceAI.swift`・Foundation Models・§18) | 不要(Apple Intelligence の ON は OS 設定) |
 
 ### photoField(カメラ)の実装要点(`MetamonRenderer/Components/Leaves/PhotoFieldLeaf.swift`)
 
@@ -683,11 +684,26 @@ HealthKit を足す時の手順(Apple アカウント操作が要るので未着
 - `METAMON_E2E_TIMER_START=<部品 id>`(DEBUG)で、表示時に timerDisplay を開始する。例: `METAMON_INITIAL_EXAMPLE=gallery-structure METAMON_AUTO_OPEN=memo_form:sheet METAMON_E2E_TIMER_START=timer` → `xcrun simctl launch <UDID> com.apple.Preferences` で背面化 → 60 秒後に通知 → アプリを起動し直すと 00:00。
 - 同期は `METAMON_E2E_OFFLINE_SECONDS` + `METAMON_AUTO_RECORD` でオフライン記録 → 背面 → 前面で `[Metamon] background(foreground): ...` を確認。
 
-## 18. アプリ内課金「Tailor It Pro」(StoreKit 2・Issue #77 の最小形)
+## 18. オンデバイス AI 部品 `aiButton`(Foundation Models・Issue #78)
+
+**AI 部品はオンデバイス完結。入力もプロンプトも結果も端末外に出ない**(クラウド API を呼ばない・課金なし)。アプリを生成する Claude(backend)とは別物で、生成されたアプリの「中」で動く AI。
+
+| 項目 | 内容 |
+|---|---|
+| 実行 | `LanguageModelSession(instructions:)` → `respond(to:)`。classify は `DynamicGenerationSchema(anyOf: 候補)` の guided generation で候補外を出させない(候補は DSL 由来の動的な値なので静的な `@Generable enum` ではなく動的スキーマ。制約付き生成の仕組みは同じ) |
+| 入力 | `input` field の値 / 省略時はフォーム全体(output 以外・写真/位置は除く)/ `entity` 指定時はそのレコードの新しい順 `limit` 件(既定 20)。上限 3000 文字(モデルのコンテキスト約 4k トークン) |
+| 出力 | `output` field の**ドラフト**に入れるだけ。保存はユーザーが保存ボタンで行う。classify は候補に正規化(候補外なら入れずにエラー表示) |
+| 可用性 | `SystemLanguageModel.default.availability` を表示時・前面復帰時に再評価。`deviceNotEligible` / `appleIntelligenceNotEnabled` / `modelNotReady` / iOS 26 未満 → ボタン無効 +「この端末では AI を使えません: 理由」 |
+| ビルド | FoundationModels を触るのは `Support/OnDeviceAI.swift` だけ。`#if canImport(FoundationModels)` + `if #available(iOS 26, *)`、フレームワークは weak link(`LC_LOAD_WEAK_DYLIB` を確認済み)なので deployment target は iOS 17 のまま |
+| テスト | `AiButtonTests`(可用性→文言の分岐・SDK の Availability からの写像・リクエスト組み立て・classify 正規化)。モデル実行そのものは実機で確認 |
+
+実機での確認: Apple Intelligence 対応機(iPhone 15 Pro 以降・iOS 26+)で 設定 > Apple Intelligence と Siri を ON → モデルのダウンロード完了を待つ → `METAMON_INITIAL_EXAMPLE=diary_ai` か「AI 日記を作って」で生成 → 「書く」→ 本文を入力 →「AI で要約」「気分を判定」。機内モードでも動くこと(=端末外に出ていない)を確認する。
+
+## 22. アプリ内課金「Tailor It Pro」(StoreKit 2・Issue #77 の最小形)
 
 外部アカウント(RevenueCat・App Store Connect)を使わず、**StoreKit 2 + ローカルの StoreKit Configuration** だけで動く形。本番の商品登録は後続。
 
-### 18.1 売るもの・上限
+### 22.1 売るもの・上限
 | 項目 | 値 | 理由 |
 |---|---|---|
 | 商品 | 「Tailor It Pro」月額の自動更新サブスク 1 つ(`jp.kz2601.metamon.pro.monthly`・¥500/月) | 生成ごとにサーバー(ai)側の LLM 費用がかかり続けるので、買い切りより月額が費用構造に合う。¥500 は Issue の想定額に合わせた |
@@ -697,7 +713,7 @@ HealthKit を足す時の手順(Apple アカウント操作が要るので未着
 
 商品 ID・無料回数の正典は `MetamonServices/Purchase/ProProducts.swift`(本番の ID に差し替える時はここと `.storekit` を直す)。
 
-### 18.2 構成
+### 22.2 構成
 | 層 | ファイル | 役割 |
 |---|---|---|
 | 判定(純粋関数) | `MetamonServices/Purchase/CreationQuota.swift` | `CreationQuota.decide(used:isPro:limitDisabled:)` → unlimited / allowed(残り) / blocked。`CreationLedger` は端末のローカル日付で 1 日ごとにリセット。保存は `CreationUsageStore`(UserDefaults) |
@@ -706,21 +722,21 @@ HealthKit を足す時の手順(Apple アカウント操作が要るので未着
 | UI | `Features/Purchase/PaywallSheet.swift`・`ProSettingsSection.swift` | 上限シート(説明・価格・購入・復元・閉じる)と設定の「Tailor It Pro」セクション |
 | 入口 | `AppRuntime.generate(_:)` | `dsl.isVoiceOnly`(= 新規作成)の時だけ `admitNewApp()` → 送信 → 成功したら `recordNewApp()`。対話(#75)の「この内容で作る」もここを通る |
 
-### 18.3 回数は端末で数える(サーバー強制は後続)
+### 22.3 回数は端末で数える(サーバー強制は後続)
 - いまは UserDefaults に保存するだけなので、**アプリの削除・端末の時計の変更で回避できる**。ハッカソンの段階では「課金導線の体験」を作ることを優先した。
 - 本番化する時は ai サービス(`POST /v1/generate` の新規作成)側で uid ごとの日次カウンタを持ち、超過は 402 を返す → iOS は 402 を上限シートに繋ぐ。権利はサーバーが App Store Server API(または RevenueCat の webhook)で確認する。
 
-### 18.4 デモ端末で上限に当たらないようにする
+### 22.4 デモ端末で上限に当たらないようにする
 - **DEBUG ビルドは既定で制限なし**(設定の「Tailor It Pro」に DEBUG のみ「回数制限を無効にする(デモ用)」トグル・既定 ON)。Release は既定で制限あり・トグルは出ない。
 - 上限シートを確認したい時は起動時の環境変数 `METAMON_IAP_ENFORCE=1`(トグルに関係なく制限を有効)・`METAMON_IAP_FREE_LIMIT=<n>`(無料回数の上書き)。
 
-### 18.5 StoreKit Configuration(ローカルのテスト購入)
+### 22.5 StoreKit Configuration(ローカルのテスト購入)
 - `ios/StoreKit/TailorItPro.storekit` を `project.yml` の Scheme(`targets.Metamon.scheme.storeKitConfiguration`)に設定済み。**Xcode で Run(⌘R)するとシミュレータでもテスト購入できる**(Apple ID・App Store Connect 不要・実決済なし)。購入履歴は Xcode の Debug > StoreKit > Manage Transactions で消せる。
 - `xcrun simctl launch` で起動した場合は Scheme の構成が効かないため商品が取れず、上限シートは「価格を取得できませんでした」になる(購入ボタンは押せない)。
 - テスト: 判定の純粋関数は `MetamonServicesTests/PurchaseTests.swift`。購入 → 権利は `ios/MetamonTests/PurchaseFlowTests.swift`(アプリをホストにした `SKTestSession`)。ただし **xcodebuild(CLI)からの実行では SKTestSession が `SKInternalErrorDomain Code=3` で構成を保存できず商品が空になる**(Xcode 26.5 で実測)ため、購入部分は skip する。Xcode の ⌘U で実行して確認する。
 - 試した上で採らなかった方法: パッケージのテストで SKTestSession(ホストアプリが無く商品が空)、アプリ内で StoreKitTest を dlopen(XCTest 構成が無いと `abort`)。
 
-### 18.6 本番化の手順(後続・外部アカウントの操作が要る)
+### 22.6 本番化の手順(後続・外部アカウントの操作が要る)
 **App Store Connect(StoreKit 2 のまま)**
 1. Agreements, Tax, and Banking で有料 App 契約・口座・税務を有効化(アカウント保有者)。
 2. App(`jp.kz2601.metamon`)の「サブスクリプション」でグループ「Tailor It Pro」を作り、商品 ID `jp.kz2601.metamon.pro.monthly`・期間 1 か月・価格(¥500 相当)・表示名と説明(日英)・審査用スクリーンショットを登録。

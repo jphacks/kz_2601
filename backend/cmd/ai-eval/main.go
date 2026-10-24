@@ -156,6 +156,9 @@ func main() {
 	envFile := flag.String("env-file", "", "KEY=VALUE file to load into the environment first (e.g. ../.env); values are never printed")
 	logicPass := flag.Bool("logic-pass", false, "enable the 2nd calculations-only call after each create (same as AI_LOGIC_PASS=1)")
 	chat := flag.Bool("chat", false, "run the clarify-phase cases (internal/ai/eval/chat_cases.json unless -cases is set) through Service.Chat instead of /generate")
+	chatModel := flag.String("chat-model", "", "-chat: clarify model (empty = ai.DefaultChatModel, same as AI_CHAT_MODEL)")
+	chatEffort := flag.String("chat-effort", "", "-chat: clarify effort (empty = ai.DefaultChatEffort)")
+	chatThinking := flag.String("chat-thinking", "", "-chat: thinking.type adaptive|disabled|between_tools (empty = ai.DefaultChatThinking)")
 	flag.Parse()
 	if *chat && *casesPath == "internal/ai/eval/cases.json" {
 		*casesPath = "internal/ai/eval/chat_cases.json"
@@ -193,7 +196,8 @@ func main() {
 	}
 	ctx := context.Background()
 	if *chat {
-		runChat(ctx, svc, *casesPath, *outDir, *model, *effort, *tag, filter)
+		svc.ChatConfig = ai.ChatConfig{Model: *chatModel, Effort: *chatEffort, Thinking: *chatThinking}
+		runChat(ctx, svc, *casesPath, *outDir, *tag, filter)
 		return
 	}
 	raw, err := os.ReadFile(*casesPath)
