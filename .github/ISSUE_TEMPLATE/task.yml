@@ -1,0 +1,31 @@
+name: タスク
+description: 機能でもバグでもない作業(設定・調査・ドキュメント・リファクタ)
+title: "chore: "
+labels: [task]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: 領域
+      options: [ios, backend/appconfig, backend/ai, dsl, infra, docs, github]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: 内容
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: 完了条件
+      placeholder: |
+        - [ ]
+    validations:
+      required: true
+  - type: input
+    id: due
+    attributes:
+      label: 期限(目安)
+      placeholder: Day1 昼 / Day2 午前 など
