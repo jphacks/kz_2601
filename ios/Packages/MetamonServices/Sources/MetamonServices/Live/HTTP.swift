@@ -7,6 +7,17 @@ enum HTTP {
     /// 既定タイムアウト。ai の生成(Claude 呼び出し)を待つので長め。
     static let defaultTimeout: TimeInterval = 45
 
+    /// URLCache を使わないセッション。appconfig の `GET /dsl` は `Cache-Control: no-cache` + ETag だが、
+    /// URLSession.shared は再検証せずに古い 200(旧 version)を返すことがあり、起動時復元が 1 つ前の version になった。
+    /// 鮮度は自前の `If-None-Match` と `DocumentCache` で管理するので HTTP キャッシュは切る。
+    static let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.waitsForConnectivity = false
+        return URLSession(configuration: config)
+    }()
+
     struct Response {
         var status: Int
         var data: Data
@@ -41,7 +52,7 @@ enum HTTP {
         headers: [String: String] = [:]
     ) async throws -> Response {
         guard let url = URL(string: path, relativeTo: baseURL) else { throw APIError.invalidURL }
-        var req = URLRequest(url: url, timeoutInterval: timeout)
+        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: timeout)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
@@ -51,7 +62,7 @@ enum HTTP {
         if let body {
             req.httpBody = try JSONEncoder().encode(body)
         }
-        let (data, resp) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await session.data(for: req)
         let http = resp as? HTTPURLResponse
         return Response(status: http?.statusCode ?? -1, data: data, headers: http?.allHeaderFields ?? [:])
     }

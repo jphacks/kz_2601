@@ -30,7 +30,13 @@ final class AppRuntime: DSLRuntime {
     }
     var confirm: Confirm?
     /// エラー等の短い通知(下部カプセル)。生成の summary はこちらではなく `summaryBanner`。
-    var toast: String?
+    var toast: String? {
+        didSet {
+            #if DEBUG
+            if let toast { print("[Metamon] toast: \(toast)") } // ヘッドレス E2E でエラー文言を拾うため
+            #endif
+        }
+    }
 
     /// 生成中の状態。nil なら生成していない。`create` は初期状態からの生成(全画面演出)、`edit` は 2 回目以降(薄いインジケータ)。
     struct MorphJob: Equatable {
