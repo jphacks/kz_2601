@@ -401,6 +401,7 @@ final class AppRuntime: DSLRuntime {
             startSync()
             if let summary = result.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
                 summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary))
+                SpeechReader.shared.speak(summary) // #43(設定 OFF なら何もしない)
             }
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
         } catch {
