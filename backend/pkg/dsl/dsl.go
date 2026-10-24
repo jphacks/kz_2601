@@ -177,6 +177,18 @@ const (
 	CompTimePicker  ComponentType = "timePicker"  // "HH:mm" (string) or datetime
 	CompColorPicker ComponentType = "colorPicker" // "#RRGGBB" string
 	CompRating      ComponentType = "rating"      // 1..max stars -> numeric
+	// display leaves
+	CompLabel       ComponentType = "label"
+	CompIcon        ComponentType = "icon"
+	CompProgressBar ComponentType = "progressBar"
+	CompGauge       ComponentType = "gauge"
+	CompBadge       ComponentType = "badge"
+	CompLink        ComponentType = "link"
+	CompMarkdown    ComponentType = "markdown"
+	CompAvatar      ComponentType = "avatar"
+	CompTable       ComponentType = "table"
+	CompTimeline    ComponentType = "timeline"
+	CompEmptyState  ComponentType = "emptyState"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -231,11 +243,31 @@ type Component struct {
 	Size   string `json:"size,omitempty"`
 
 	// input batch (slider / stepper / rating / textEditor). Pointers so that
-	// an explicit 0 round-trips through omitempty.
-	Min      *float64 `json:"min,omitempty"`
-	Max      *float64 `json:"max,omitempty"`      // rating: star count (default 5)
+	// an explicit 0 round-trips through omitempty. Min/Max are shared with gauge.
+	Min      *float64 `json:"min,omitempty"`      // slider / stepper / gauge
+	Max      *float64 `json:"max,omitempty"`      // rating: star count (default 5) / gauge
 	Step     *float64 `json:"step,omitempty"`     // slider: omit = continuous; stepper: default 1
 	MinLines int      `json:"minLines,omitempty"` // textEditor: visible lines (default 4)
+
+	// display (label / icon / progressBar / gauge / badge / link / markdown / avatar / table / timeline / emptyState)
+	Name          string        `json:"name,omitempty"`          // icon: SF Symbols name / avatar: initials source
+	Color         string        `json:"color,omitempty"`         // SemanticColor enum
+	Value         *float64      `json:"value,omitempty"`         // progressBar (0..1) / gauge literal value
+	Target        *float64      `json:"target,omitempty"`        // progressBar entity mode denominator
+	URL           string        `json:"url,omitempty"`           // link
+	Image         string        `json:"image,omitempty"`         // avatar literal (https / data URL)
+	Message       string        `json:"message,omitempty"`       // emptyState
+	Columns       []TableColumn `json:"columns,omitempty"`       // table
+	Limit         int           `json:"limit,omitempty"`         // table / timeline
+	DateField     string        `json:"dateField,omitempty"`     // timeline
+	TitleField    string        `json:"titleField,omitempty"`    // timeline
+	SubtitleField string        `json:"subtitleField,omitempty"` // timeline
+}
+
+// TableColumn is one column of a table component.
+type TableColumn struct {
+	Field string `json:"field"`
+	Title string `json:"title,omitempty"`
 }
 
 // ListItem maps record fields onto a list row.

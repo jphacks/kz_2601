@@ -67,6 +67,18 @@ public struct ComponentRegistry: Sendable {
         r.register(.timePicker) { c, ctx in TimePickerLeaf(c: c, ctx: ctx) }
         r.register(.colorPicker) { c, ctx in ColorPickerLeaf(c: c, ctx: ctx) }
         r.register(.rating) { c, ctx in RatingLeaf(c: c, ctx: ctx) }
+        // leaf(表示系)
+        r.register(.label) { c, _ in LabelLeaf(c: c) }
+        r.register(.icon) { c, _ in IconLeaf(c: c) }
+        r.register(.progressBar) { c, _ in ProgressBarLeaf(c: c) }
+        r.register(.gauge) { c, _ in GaugeLeaf(c: c) }
+        r.register(.badge) { c, _ in BadgeLeaf(c: c) }
+        r.register(.link) { c, _ in LinkLeaf(c: c) }
+        r.register(.markdown) { c, _ in MarkdownLeaf(c: c) }
+        r.register(.avatar) { c, ctx in AvatarLeaf(c: c, ctx: ctx) }
+        r.register(.table) { c, _ in TableLeaf(c: c) }
+        r.register(.timeline) { c, _ in TimelineLeaf(c: c) }
+        r.register(.emptyState) { c, _ in EmptyStateLeaf(c: c) }
         return r
     }()
 }

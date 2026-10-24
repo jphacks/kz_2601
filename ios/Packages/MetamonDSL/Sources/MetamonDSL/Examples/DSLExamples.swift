@@ -3,7 +3,7 @@ import Foundation
 /// 正典サンプル `docs/dsl/examples/*.json`(backend CI でも検証される 4 本)。
 /// アプリは xcodegen でこのディレクトリをそのままリソースにバンドルする(iOS 側にコピーを持たない=ドリフト防止)。
 public enum DSLExamples {
-    public static let names = ["initial", "kakeibo", "training", "walk", "gallery-input"]
+    public static let names = ["initial", "kakeibo", "training", "walk", "gallery-input", "gallery-display"]
 
     /// 初期状態(音声画面のみ)の DSL 名。
     public static let initial = "initial"

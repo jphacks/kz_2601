@@ -359,6 +359,54 @@ func (a *App) Validate() error {
 					add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
 				}
 			case CompVoiceInput, CompSpacer, CompDivider:
+			case CompLabel:
+				if c.Text == "" || c.Icon == "" {
+					add("%s: label needs text and icon", where)
+				}
+			case CompIcon:
+				if c.Name == "" {
+					add("%s: icon needs name", where)
+				}
+			case CompProgressBar:
+				checkProgressBar(where, c, entities, add)
+			case CompGauge:
+				checkGauge(where, c, entities, add)
+			case CompBadge:
+				if c.Text == "" {
+					add("%s: badge needs text", where)
+				}
+			case CompLink:
+				if c.Text == "" {
+					add("%s: link needs text", where)
+				}
+				if !isHTTPURL(c.URL) {
+					add("%s: link url %q must be an http(s) URL", where, c.URL)
+				}
+			case CompMarkdown:
+				if c.Text == "" {
+					add("%s: markdown text is empty", where)
+				}
+			case CompAvatar:
+				if c.Image != "" && !isHTTPURL(c.Image) && !strings.HasPrefix(c.Image, "data:image/") {
+					add("%s: avatar image must be an https URL or data:image/... string", where)
+				}
+				if c.Field != "" {
+					if formEntity == nil {
+						add("%s: avatar field requires screen.entity", where)
+					} else if f := formEntity.FieldByID(c.Field); f == nil {
+						add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
+					} else if f.Type != FieldPhoto {
+						add("%s: avatar field %q must be type photo", where, c.Field)
+					}
+				}
+			case CompTable:
+				checkTable(where, c, entities, add)
+			case CompTimeline:
+				checkTimeline(where, c, entities, add)
+			case CompEmptyState:
+				if c.Title == "" {
+					add("%s: emptyState needs title", where)
+				}
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}
@@ -390,6 +438,125 @@ func checkNotification(where string, n *Notification, add func(string, ...any)) 
 }
 
 var timeRe = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
+
+func isHTTPURL(s string) bool {
+	return strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://")
+}
+
+// checkAggregateRef validates the entity/aggregate/field/filter trio shared by
+// the display components that reuse the stat aggregation path. ok=false when
+// the entity is missing (callers skip further checks).
+func checkAggregateRef(where string, c *Component, entities map[string]*Entity, add func(string, ...any)) (*Entity, bool) {
+	e := entities[c.Entity]
+	if e == nil {
+		add("%s: %s entity %q does not exist", where, c.Type, c.Entity)
+		return nil, false
+	}
+	// aggregate omitted = sum, so a field is required unless aggregate=count.
+	if c.Aggregate != "count" && e.FieldByID(c.Field) == nil {
+		add("%s: %s field %q not in entity %q (required unless aggregate=count)", where, c.Type, c.Field, e.ID)
+	}
+	if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
+		add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
+	}
+	return e, true
+}
+
+func checkProgressBar(where string, c *Component, entities map[string]*Entity, add func(string, ...any)) {
+	if c.Value != nil {
+		if *c.Value < 0 || *c.Value > 1 {
+			add("%s: progressBar value %v must be within 0..1", where, *c.Value)
+		}
+		if c.Entity != "" {
+			add("%s: progressBar takes either value or entity, not both", where)
+		}
+		return
+	}
+	if c.Entity == "" {
+		add("%s: progressBar needs value or entity+target", where)
+		return
+	}
+	if _, ok := checkAggregateRef(where, c, entities, add); !ok {
+		return
+	}
+	if c.Target == nil || *c.Target <= 0 {
+		add("%s: progressBar entity mode needs target > 0", where)
+	}
+}
+
+func checkGauge(where string, c *Component, entities map[string]*Entity, add func(string, ...any)) {
+	lo, hi := 0.0, 1.0
+	if c.Min != nil {
+		lo = *c.Min
+	}
+	if c.Max != nil {
+		hi = *c.Max
+	}
+	if hi <= lo {
+		add("%s: gauge max %v must be greater than min %v", where, hi, lo)
+	}
+	if c.Value != nil {
+		if c.Entity != "" {
+			add("%s: gauge takes either value or entity, not both", where)
+		}
+		return
+	}
+	if c.Entity == "" {
+		add("%s: gauge needs value or entity", where)
+		return
+	}
+	checkAggregateRef(where, c, entities, add)
+}
+
+func checkTable(where string, c *Component, entities map[string]*Entity, add func(string, ...any)) {
+	e := entities[c.Entity]
+	if e == nil {
+		add("%s: table entity %q does not exist", where, c.Entity)
+		return
+	}
+	if len(c.Columns) == 0 {
+		add("%s: table needs at least one column", where)
+	}
+	for i, col := range c.Columns {
+		if e.FieldByID(col.Field) == nil {
+			add("%s: columns[%d] field %q not in entity %q", where, i, col.Field, e.ID)
+		}
+	}
+	if c.Sort != nil && e.FieldByID(c.Sort.Field) == nil {
+		add("%s: sort field %q not in entity %q", where, c.Sort.Field, e.ID)
+	}
+	if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
+		add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
+	}
+	if c.Limit < 0 {
+		add("%s: limit must be >= 0", where)
+	}
+}
+
+func checkTimeline(where string, c *Component, entities map[string]*Entity, add func(string, ...any)) {
+	e := entities[c.Entity]
+	if e == nil {
+		add("%s: timeline entity %q does not exist", where, c.Entity)
+		return
+	}
+	if f := e.FieldByID(c.DateField); f == nil {
+		add("%s: dateField %q not in entity %q", where, c.DateField, e.ID)
+	} else if f.Type != FieldDate && f.Type != FieldDatetime {
+		add("%s: dateField %q must be date or datetime", where, c.DateField)
+	}
+	if e.FieldByID(c.TitleField) == nil {
+		add("%s: titleField %q not in entity %q", where, c.TitleField, e.ID)
+	}
+	if c.SubtitleField != "" && e.FieldByID(c.SubtitleField) == nil {
+		add("%s: subtitleField %q not in entity %q", where, c.SubtitleField, e.ID)
+	}
+	if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
+		add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
+	}
+	if c.Limit < 0 {
+		add("%s: limit must be >= 0", where)
+	}
+}
 
 // inputFieldTypes lists the Field types each input-batch component may bind to.
 var inputFieldTypes = map[ComponentType][]FieldType{

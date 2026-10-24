@@ -1,6 +1,6 @@
 # DSL v1(統一版・正典)
 
-> **正典はこのフォルダ**: `dsl.schema.json`(JSON Schema draft 2020-12)+ `examples/{initial,kakeibo,training,walk}.json`(デモ3本+初期状態)。
+> **正典はこのフォルダ**: `dsl.schema.json`(JSON Schema draft 2020-12)+ `examples/{initial,kakeibo,training,walk}.json`(デモ3本+初期状態)+ `examples/gallery-*.json`(部品ギャラリー)。
 > Go 型は `backend/pkg/dsl`(`schema.json` を埋め込み・`make schema-sync` で同期・CI で byte 一致を検証)、Swift 型は `ios/Packages/MetamonDSL/Sources/MetamonDSL/Model`(examples をそのままバンドルしデコードテスト)。
 > backend 案 `docs/backend/dsl-proposal.md` と iOS 案 `docs/ios/dsl-proposal.md` は**すり合わせ前の記録**として残す。矛盾したら本書が勝つ。
 
@@ -51,11 +51,11 @@ AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: full
 Entity  { id, name, titleField?, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit? } }
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (15 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
+Leaf (33 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
-### 3.1 コンポーネント(18 種 = Container 3 + Leaf 15)
+### 3.1 コンポーネント(36 種 = Container 3 + Leaf 33)
 
 全種に共通の任意キー: `id`(画面内一意)・`area`(§3.4 のグリッド矩形。Screen 直下のみ有効)。用途・レイアウトの定石は `dsl.schema.json` 各定義の `description` / `x-usage` が正典(AI へのカタログはそこから生成。§4)。
 
@@ -91,6 +91,19 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 - **`timePicker` の保存形式**: `Field.type` に `time` は無い。string/text field なら `"HH:mm"`(`Notification.time` と同じ書式・日付を持たない)、datetime field なら今日の日付付き RFC3339。「毎朝の起床時刻」のように日付が要らないなら string を使う。
 - 数値系(`slider`/`stepper`/`rating`)は integer/currency field では丸めて保存。`min >= max`・`step <= 0`・`rating.max` が 1〜10 の整数でない場合は backend `Validate()` がエラー。
 - 実例: `examples/gallery-input.json`(entity 1 つに上記全部品を area 配置)。
+| `label` | `text`, `icon`(SF Symbols) | `style`(title/headline/body/caption) | | P1 |
+| `icon` | `name`(SF Symbols) | `size`(small/medium/large), `color`(primary/secondary/accent/red/green/orange/blue) | | P1 |
+| `progressBar` | `value`(0〜1) **または** `entity`+`target`(>0) | `label`, `aggregate`(count/sum・既定 sum), `field`(count 以外必須), `filter` | | P1 |
+| `gauge` | `value` **または** `entity`(+`aggregate`/`field`) | `label`, `min`(既定 0), `max`(既定 1・min より大), `filter` | | P1 |
+| `badge` | `text` | `color`(primary/secondary/accent/red/green/orange/blue) | | P1 |
+| `link` | `text`, `url`(http(s)) | | | P1 |
+| `markdown` | `text`(インライン markdown) | | | P1 |
+| `avatar` | | `image`(https/data URL), `field`(photo・要 screen.entity), `name`(イニシャル), `size` | △(`field` 時) | P1 |
+| `table` | `entity`, `columns[{field,title?}]` | `sort`, `filter`, `limit` | | P1 |
+| `timeline` | `entity`, `dateField`(date/datetime), `titleField` | `subtitleField`, `filter`, `limit` | | P1 |
+| `emptyState` | `title` | `icon`, `message` | | P1 |
+
+`color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
 ### 3.2 アクション(9 種)
 
