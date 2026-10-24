@@ -589,6 +589,8 @@ func (a *App) Validate() error {
 				if c.Title == "" {
 					add("%s: emptyState needs title", where)
 				}
+			case CompAiButton:
+				checkAIButton(where, c, formEntity, entities, add)
 			case CompNearbyShare:
 				if c.Label == "" {
 					add("%s: nearbyShare needs label", where)

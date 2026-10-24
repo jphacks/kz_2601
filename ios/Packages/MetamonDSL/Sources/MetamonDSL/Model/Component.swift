@@ -29,6 +29,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case emptyState
     // leaf(計算・#101)
     case settlement
+    // leaf(オンデバイス AI・#78)
+    case aiButton
     // leaf(近距離共有・#36)
     case nearbyShare
     case unknown
@@ -102,6 +104,11 @@ public struct Component: Decodable, Identifiable, Sendable {
     // settlement(#101)
     public var nameField: String?
     public var balanceField: String?
+    // aiButton(#78)。label / prompt / entity / limit は共用
+    public var task: String?           // summarize|classify|rewrite|extract|suggest
+    public var input: String?          // AI に渡す field(nil = フォーム全体)
+    public var output: String?         // 結果を入れる field
+    public var options: [String]?      // classify の候補(nil = enum field の options)
     public var target: Double?         // progressBar entity モードの分母
     public var url: String?            // link
     public var image: String?          // avatar リテラル(https / data URL)
@@ -140,6 +147,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case name, color, value, target, url, image, message, columns, limit, dateField, titleField, subtitleField
         case min, max, step, minLines
         case nameField, balanceField
+        case task, input, output, options
     }
 
     public init(from decoder: Decoder) throws {
@@ -199,6 +207,10 @@ public struct Component: Decodable, Identifiable, Sendable {
         valueExpr = try? c.decodeIfPresent(Expr.self, forKey: .value)
         nameField = try? c.decodeIfPresent(String.self, forKey: .nameField)
         balanceField = try? c.decodeIfPresent(String.self, forKey: .balanceField)
+        task = try? c.decodeIfPresent(String.self, forKey: .task)
+        input = try? c.decodeIfPresent(String.self, forKey: .input)
+        output = try? c.decodeIfPresent(String.self, forKey: .output)
+        options = try? c.decodeIfPresent([String].self, forKey: .options)
         target = try? c.decodeIfPresent(Double.self, forKey: .target)
         url = try? c.decodeIfPresent(String.self, forKey: .url)
         image = try? c.decodeIfPresent(String.self, forKey: .image)

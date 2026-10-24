@@ -239,6 +239,8 @@ const (
 	CompEmptyState  ComponentType = "emptyState"
 	// logic
 	CompSettlement ComponentType = "settlement" // greedy "A pays B" list from a balance field
+	// on-device AI (#78)
+	CompAiButton ComponentType = "aiButton" // Foundation Models -> form field (never leaves the device)
 	// peer-to-peer
 	CompNearbyShare ComponentType = "nearbyShare" // MultipeerConnectivity: send records to a nearby device
 )
@@ -340,7 +342,16 @@ type Component struct {
 	// settlement
 	NameField    string `json:"nameField,omitempty"`
 	BalanceField string `json:"balanceField,omitempty"`
+
+	// aiButton (#78). Label / Prompt / Entity / Limit are shared with the fields above.
+	Task    string   `json:"task,omitempty"`    // summarize|classify|rewrite|extract|suggest
+	Input   string   `json:"input,omitempty"`   // form field fed to the model ("" = whole draft)
+	Output  string   `json:"output,omitempty"`  // form field the result is written to
+	Options []string `json:"options,omitempty"` // classify candidates (else the enum output field's options)
 }
+
+// AITasks is the closed set of aiButton.task values.
+var AITasks = map[string]bool{"summarize": true, "classify": true, "rewrite": true, "extract": true, "suggest": true}
 
 // TableColumn is one column of a table component.
 type TableColumn struct {

@@ -90,6 +90,13 @@ extension Component: Decodable {
 
 描画スコープ `RenderContext { params, item, index }` を再帰で持ち回り、`list` の行だけ `item/index` を上書きする。
 
+### 生成 DSL の見た目監査(#131)
+
+- **フォーム画面(`screen.entity` あり)は area を「並び順と横幅」だけに使い、高さは中身なり**(`GridScreenLayout` → `FormFlowLayout`)。行が重なる部品は 1 段にまとめ、前の段から 3 行以上下の部品(最下段の削除ボタン等)は少し間を空けて続ける。chart / map / list など面を埋める型だけ area の高さを保つ。AI が入力 section を小さく取っても切れない。
+- セルは矩形で clip せず、影のぶん(16pt)外まで描く(カード/ボタンの影が四角く切れて「薄い箱」に見えていた)。
+- 行がある list(と list だけの section)はカードを行の高さで止める。空の時だけセル全体に空状態(#84)。
+- DEBUG フック: `METAMON_INITIAL_DSL_PATH=<DSL JSON のパス>`(起動時の document をファイルから読む・appId はファイル名ごと)/ `METAMON_INITIAL_SCREEN=<screen>`(タブ 2 枚目などを初期表示)/ `METAMON_SEED_DUMMY=<n>`(モック時、entity の field 型から n 件のダミーレコード。長い文字列・大きい金額を混ぜる)。`METAMON_MOCK=1` と併用。実装は `Metamon/App/DebugDSLOverride.swift`。
+
 ## 3. ナビゲーション
 
 | DSL | SwiftUI | 状態 |
@@ -155,6 +162,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 位置 | P1 | `native: location.current → into` / `map` コンポーネント | `CLLocationManager` 1回取得(stub) / MapKit(実装済み) | `NSLocationWhenInUseUsageDescription` |
 | モーション/歩数 | P1 | `native: motion.read` | CoreMotion / CMPedometer(stub) | `NSMotionUsageDescription` |
 | 共有 | P1 | `native: share {text}` | `UIActivityViewController`(stub) | 不要 |
+| オンデバイス AI | P1 | `aiButton { task, input?, entity?, output, prompt?, options? }` コンポーネント | **実装済み**(`AiButtonLeaf` + `Support/OnDeviceAI.swift`・Foundation Models・§18) | 不要(Apple Intelligence の ON は OS 設定) |
 
 ### photoField(カメラ)の実装要点(`MetamonRenderer/Components/Leaves/PhotoFieldLeaf.swift`)
 
@@ -676,6 +684,21 @@ HealthKit を足す時の手順(Apple アカウント操作が要るので未着
 - `METAMON_E2E_TIMER_START=<部品 id>`(DEBUG)で、表示時に timerDisplay を開始する。例: `METAMON_INITIAL_EXAMPLE=gallery-structure METAMON_AUTO_OPEN=memo_form:sheet METAMON_E2E_TIMER_START=timer` → `xcrun simctl launch <UDID> com.apple.Preferences` で背面化 → 60 秒後に通知 → アプリを起動し直すと 00:00。
 - 同期は `METAMON_E2E_OFFLINE_SECONDS` + `METAMON_AUTO_RECORD` でオフライン記録 → 背面 → 前面で `[Metamon] background(foreground): ...` を確認。
 
+## 18. オンデバイス AI 部品 `aiButton`(Foundation Models・Issue #78)
+
+**AI 部品はオンデバイス完結。入力もプロンプトも結果も端末外に出ない**(クラウド API を呼ばない・課金なし)。アプリを生成する Claude(backend)とは別物で、生成されたアプリの「中」で動く AI。
+
+| 項目 | 内容 |
+|---|---|
+| 実行 | `LanguageModelSession(instructions:)` → `respond(to:)`。classify は `DynamicGenerationSchema(anyOf: 候補)` の guided generation で候補外を出させない(候補は DSL 由来の動的な値なので静的な `@Generable enum` ではなく動的スキーマ。制約付き生成の仕組みは同じ) |
+| 入力 | `input` field の値 / 省略時はフォーム全体(output 以外・写真/位置は除く)/ `entity` 指定時はそのレコードの新しい順 `limit` 件(既定 20)。上限 3000 文字(モデルのコンテキスト約 4k トークン) |
+| 出力 | `output` field の**ドラフト**に入れるだけ。保存はユーザーが保存ボタンで行う。classify は候補に正規化(候補外なら入れずにエラー表示) |
+| 可用性 | `SystemLanguageModel.default.availability` を表示時・前面復帰時に再評価。`deviceNotEligible` / `appleIntelligenceNotEnabled` / `modelNotReady` / iOS 26 未満 → ボタン無効 +「この端末では AI を使えません: 理由」 |
+| ビルド | FoundationModels を触るのは `Support/OnDeviceAI.swift` だけ。`#if canImport(FoundationModels)` + `if #available(iOS 26, *)`、フレームワークは weak link(`LC_LOAD_WEAK_DYLIB` を確認済み)なので deployment target は iOS 17 のまま |
+| テスト | `AiButtonTests`(可用性→文言の分岐・SDK の Availability からの写像・リクエスト組み立て・classify 正規化)。モデル実行そのものは実機で確認 |
+
+実機での確認: Apple Intelligence 対応機(iPhone 15 Pro 以降・iOS 26+)で 設定 > Apple Intelligence と Siri を ON → モデルのダウンロード完了を待つ → `METAMON_INITIAL_EXAMPLE=diary_ai` か「AI 日記を作って」で生成 → 「書く」→ 本文を入力 →「AI で要約」「気分を判定」。機内モードでも動くこと(=端末外に出ていない)を確認する。
+
 ## 19. 近距離共有(nearbyShare・MultipeerConnectivity / Issue #36)
 
 対面で記録を渡す最小版。インターネット・サインイン不要で、OS が Wi-Fi(P2P)/ Bluetooth を自動で選ぶ MultipeerConnectivity を使う。
@@ -703,3 +726,4 @@ Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-
 - 単体: `NearbyShareTests`(MetamonDSL・`swift test` で macOS 上で回る)。エンコード/デコード・未知キー・取り込み判定・sanitize・件数上限。
 - シミュレータ 2 台(同じ Mac)で送受信できた。DEBUG 用の環境変数: 送信側 `METAMON_AUTO_NEARBY_SEND=<entity>`(起動 3 秒後にシートを開き最初の相手へ送る)/ 受信側 `METAMON_AUTO_NEARBY_ACCEPT=1`(確認を 2 秒見せて受け取る)。例は `METAMON_INITIAL_EXAMPLE=attendance_nearby METAMON_MOCK=1`。
 - 実機 2 台: 両方に同じビルドを入れ、両方で同じアプリ(例: 出席カード)を開く → 初回はローカルネットワークの許可を「許可」→ 送る側で「近くの先生に送る」→ 相手の名前をタップ → 受け取る側で「受け取る」→ 一覧に増え、送る側に「◯◯さんに N 件届きました」。Wi-Fi と Bluetooth はオンにしておく(同じ Wi-Fi でなくてよい)。
+
