@@ -323,11 +323,9 @@ func lint(a *app) []string {
 		}
 		chk(reMonth, "thisMonth", "今月")
 		chk(reToday, "today", "今日")
-		if reWeek.MatchString(strings.ToLower(label)) {
-			add("period_unsupported: %s %s %q は今週を言うが週の filter は無い", c.screen, t, label)
-		}
-		if reYear.MatchString(strings.ToLower(label)) && !exprUses(c.c, "year") {
-			add("period_unsupported: %s %s %q は今年を言うが年の filter は無い(全期間になる)", c.screen, t, label)
+		chk(reWeek, "thisWeek", "今週")
+		if reYear.MatchString(strings.ToLower(label)) && !contains(ops, "thisYear") && !exprUses(c.c, "year") {
+			add("label_filter_mismatch: %s %s %q は今年と言うが filter thisYear が無い(全期間になる)", c.screen, t, label)
 		}
 		if t == "stat" && c.c["value"] == nil && reDerive.MatchString(strings.ToLower(label)) {
 			add("label_promises_calc: %s stat %q は単純集計(%s)しかしていない", c.screen, label, str(c.c, "aggregate"))
@@ -369,12 +367,24 @@ func need(a *app, n string) (string, string) {
 	case "filter_today":
 		return yes(hasOp("today"), "filter today")
 	case "filter_week", "filter_year":
-		if exprUses(a.raw, "year", "daysBetween", "weekday") {
+		op := map[string]string{"filter_week": "thisWeek", "filter_year": "thisYear"}[n]
+		if hasOp(op) || (n == "filter_year" && exprUses(a.raw, "year")) {
+			return "○", "filter " + op
+		}
+		if exprUses(a.raw, "year", "daysBetween", "weekday", "addDays") {
 			return "△", "日付関数で近似"
 		}
-		return "×", "週/年の filter が DSL に無い"
+		return "×", "週/年の filter が無い"
 	case "toggle":
-		return yes(hasType("toggle"), "toggle")
+		if a.has(func(c obj) bool { return str(sub(c, "item"), "toggle") != "" }) {
+			return "○", "list.item.toggle(一覧からワンタップ)"
+		}
+		if hasType("toggle") {
+			return "△", "フォームの toggle のみ(一覧からチェックできない)"
+		}
+		return "×", "チェックが無い"
+	case "tabs3":
+		return yes(len(arr(sub(a.raw, "app"), "tabs")) >= 3, "タブ 3 つ以上")
 	case "filter_bool":
 		ok := a.has(func(c obj) bool {
 			f := sub(c, "filter")
@@ -444,7 +454,7 @@ func need(a *app, n string) (string, string) {
 	case "days_until", "date_add":
 		return yes(exprUses(a.raw, "daysUntil", "addDays", "daysBetween"), "日付の計算")
 	case "time_diff":
-		return yes(exprUses(a.raw, "sub", "daysBetween"), "時刻の差の計算")
+		return yes(exprUses(a.raw, "hoursBetween"), "hoursBetween")
 	case "filter_due":
 		return yes(exprUses(a.raw, "daysUntil", "addDays", "today", "lte"), "期限での絞り込み")
 	case "pb_detect":

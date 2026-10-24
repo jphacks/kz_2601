@@ -38,5 +38,17 @@
   {"id": "a19_calorie_en", "kind": "create", "group": "audit", "locale": "en", "transcript": "A calorie counter. Log what I ate and the calories, show today's total and how much is left from my 2000 kcal daily goal",
    "needs": ["agg", "filter_today", "remaining"]},
   {"id": "a20_chores_en", "kind": "create", "group": "audit", "locale": "en", "transcript": "A family chore tracker. Each chore is worth points, log who did which chore, and show each person's total points this week and who is winning",
-   "needs": ["agg", "group_by_member", "rank", "filter_week", "ref"]}
+   "needs": ["agg", "group_by_member", "rank", "filter_week", "ref"]},
+  {"id": "a21_shopping_check", "kind": "create", "group": "audit2", "transcript": "買い物リストを作って。買うものを追加して、買ったら一覧でそのままチェックできるようにして、まだ買っていないものだけ見たい",
+   "needs": ["toggle", "filter_bool"]},
+  {"id": "a22_medicine_check", "kind": "create", "group": "audit2", "transcript": "服薬チェックアプリ。毎日飲む薬を登録して、飲んだら一覧でチェック、今日何回飲んだか分かるようにして",
+   "needs": ["toggle", "agg", "filter_today"]},
+  {"id": "a23_shift_pay", "kind": "create", "group": "audit2", "transcript": "シフト管理アプリ。出勤した日と開始時刻と終了時刻を入れたら勤務時間を自動で出して、時給1200円で今月の給料がいくらか見たい",
+   "needs": ["calc", "time_diff", "agg", "filter_month"]},
+  {"id": "a24_workout_week", "kind": "create", "group": "audit2", "transcript": "運動の記録アプリ。ランニングや筋トレをした日と時間を記録して、今週何回運動したかと今月の合計時間を出して",
+   "needs": ["agg", "filter_week", "filter_month"]},
+  {"id": "a25_reading_year", "kind": "create", "group": "audit2", "transcript": "読書の記録。読み終わった本を登録して、今年何冊読んだかと、年間50冊の目標まであと何冊かを出して",
+   "needs": ["agg", "filter_year", "remaining"]},
+  {"id": "a26_tabs_split", "kind": "create", "group": "audit2", "transcript": "家計簿アプリを作って。タブで「記録」「グラフ」「設定」に分けたい。設定で月の予算を決めて、記録の画面で今月の予算の残りが見えるようにして",
+   "needs": ["tabs3", "chart", "remaining", "filter_month"]}
 ]
