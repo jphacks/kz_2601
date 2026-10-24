@@ -1,0 +1,140 @@
+# Cloud Run デプロイ(雛形)。
+#   develop への push → staging / main への push → prod。workflow_dispatch で手動も可。
+#
+# 前提(infra 担当が手順書 docs/0x_gcp_setup.md で用意する):
+#   - Workload Identity Federation(鍵ファイル不要。public リポに JSON キーを置かないため)
+#   - Cloud Run / Cloud Build / Artifact Registry / Secret Manager API 有効化
+#   - Dockerfile 無しで Go buildpacks を使う(`gcloud run deploy --source`)。
+#     単一モジュール複数 cmd なので GOOGLE_BUILDABLE で main パッケージを指定する。
+#
+# GitHub 側で設定するもの(Settings → Environments に `staging` / `production` を作り、環境ごとに設定):
+#   vars.GCP_PROJECT_ID                 例: morph-staging-123456
+#   vars.GCP_REGION                     例: asia-northeast1
+#   vars.GCP_WORKLOAD_IDENTITY_PROVIDER 例: projects/123456789/locations/global/workloadIdentityPools/github/providers/github
+#   vars.GCP_SERVICE_ACCOUNT            例: github-deployer@morph-staging-123456.iam.gserviceaccount.com
+#   vars.SERVICE_PREFIX                 例: morph(省略時 morph)。Cloud Run サービス名は <prefix>-<cmd>
+#   secrets.* は不要(WIF のため)。ANTHROPIC_API_KEY 等は GCP Secret Manager に置き --set-secrets で注入する。
+name: deploy-cloudrun
+
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-cloudrun.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: デプロイ先
+        type: choice
+        required: true
+        default: staging
+        options: [staging, production]
+      service:
+        description: デプロイするサービス(all で両方)
+        type: choice
+        required: true
+        default: all
+        options: [all, appconfig, ai]
+
+# 同じ環境へのデプロイは直列化(古い実行はキャンセルしない: 中途半端な状態を避ける)
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || (github.ref_name == 'main' && 'production' || 'staging') }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # WIF に必須
+
+jobs:
+  resolve:
+    name: resolve-target
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      services: ${{ steps.env.outputs.services }}
+    steps:
+      - id: env
+        env:
+          INPUT_ENV: ${{ github.event.inputs.environment }}
+          INPUT_SERVICE: ${{ github.event.inputs.service }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ -n "$INPUT_ENV" ]; then
+            environment="$INPUT_ENV"
+          elif [ "$REF_NAME" = "main" ]; then
+            environment="production"
+          else
+            environment="staging"
+          fi
+          case "${INPUT_SERVICE:-all}" in
+            all) services='["appconfig","ai"]' ;;
+            *)   services="[\"${INPUT_SERVICE}\"]" ;;
+          esac
+          echo "environment=$environment" >> "$GITHUB_OUTPUT"
+          echo "services=$services" >> "$GITHUB_OUTPUT"
+          echo "deploy $services to $environment"
+
+  deploy:
+    name: deploy-${{ matrix.service }}
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: ${{ needs.resolve.outputs.environment }}
+      url: ${{ steps.deploy.outputs.url }}
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.resolve.outputs.services) }}
+    env:
+      SERVICE_NAME: ${{ vars.SERVICE_PREFIX || 'morph' }}-${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: GCP 認証(Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Cloud Run デプロイ(buildpacks / Dockerfile 不要)
+        id: deploy
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ vars.GCP_REGION }}
+          CMD: ${{ matrix.service }}
+          ENVIRONMENT: ${{ needs.resolve.outputs.environment }}
+        run: |
+          set -euo pipefail
+          extra=()
+          if [ "$CMD" = "ai" ]; then
+            # Secret Manager のシークレット名は infra 手順書と合わせる
+            extra+=(--set-secrets "ANTHROPIC_API_KEY=anthropic-api-key:latest")
+          fi
+          gcloud run deploy "$SERVICE_NAME" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --source backend \
+            --set-build-env-vars "GOOGLE_BUILDABLE=./cmd/${CMD}" \
+            --set-env-vars "APP_ENV=${ENVIRONMENT},GIT_SHA=${GITHUB_SHA}" \
+            --allow-unauthenticated \
+            --min-instances 0 \
+            --max-instances 3 \
+            --quiet \
+            "${extra[@]}"
+          url="$(gcloud run services describe "$SERVICE_NAME" \
+            --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format 'value(status.url)')"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "deployed: $url"
+
+      - name: ヘルスチェック
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: curl -fsS --retry 5 --retry-delay 3 "${URL}/healthz"
