@@ -18,7 +18,7 @@ struct SearchBarLeaf: View {
                     .autocorrectionDisabled()
                     .submitLabel(.search)
                     .focused($focused)
-                    .debugAutoFocus(c, $focused)
+                    .keyboardAnchor(c, $focused)
                 if !(locals.values[key] ?? "").isEmpty {
                     Button { locals.values[key] = "" } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)

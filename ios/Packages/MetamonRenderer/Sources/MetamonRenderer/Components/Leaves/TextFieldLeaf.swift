@@ -20,7 +20,7 @@ struct TextFieldLeaf: View {
                         .textFieldStyle(.plain)
                         .font(RenderTheme.Fonts.inputValue)
                         .focused($focused)
-                        .debugAutoFocus(c, $focused)
+                        .keyboardAnchor(c, $focused)
                 }
                 .renderInputChrome(focused: focused)
             }

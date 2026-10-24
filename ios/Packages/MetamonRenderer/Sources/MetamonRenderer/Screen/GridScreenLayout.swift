@@ -14,6 +14,10 @@ public struct GridScreenLayout: View {
 
     private let gap = RenderTheme.Spacing.gridGap
     private let inset = RenderTheme.Spacing.screenInset
+    /// キーボードの領域を含めた高さ(#143)。キーボードで可視領域が縮んでも行の高さはこれで決める
+    @State private var stableHeight: CGFloat = 0
+    /// フォーカスを得た入力欄(`keyboardAnchor` の id)。tick は同じ欄への再フォーカスでもスクロールさせるため
+    @State private var focusRequest: (key: String, tick: Int)?
 
     public init(screen: Screen, ctx: RenderContext) {
         self.screen = screen
@@ -23,7 +27,8 @@ public struct GridScreenLayout: View {
     public var body: some View {
         GeometryReader { geo in
             let cellW = (geo.size.width - inset * 2) / CGFloat(GridArea.columns)
-            let cellH = (geo.size.height - inset * 2) / CGFloat(GridArea.visibleRows)
+            let layoutH = GridLayoutHeight.resolve(current: geo.size.height, stable: stableHeight)
+            let cellH = (layoutH - inset * 2) / CGFloat(GridArea.visibleRows)
             let placement = screen.gridPlacement
             let lastRow = placement.placed.map(\.area.row2).max() ?? 0
             let gridHeight = CGFloat(lastRow) * cellH
@@ -52,20 +57,45 @@ public struct GridScreenLayout: View {
             }
             .padding(inset)
             .frame(width: geo.size.width, alignment: .topLeading)
+            // 入力欄の外(部品の無い所)をタップしたらキーボードを閉じる
+            .background(Color.clear.contentShape(Rectangle()).onTapGesture { KeyboardState.dismiss() })
 
             Group {
                 if screen.isVoiceScreen {
                     content
                 } else {
-                    ScrollView {
-                        content
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            content
+                        }
+                        .scrollDismissesKeyboard(.interactively)
+                        .scrollBounceBehavior(.basedOnSize)
+                        // キーボードが上がり切ってから、フォーカスした入力欄を可視領域(保存バーとキーボードの上)の中央へ
+                        .task(id: focusRequest?.tick) {
+                            guard let key = focusRequest?.key else { return }
+                            // 2 回目: キーボードのツールバー・保存バーの持ち上げが後から入って可視領域が変わるので、落ち着いた位置で合わせ直す
+                            for delay in [350, 350] {
+                                try? await Task.sleep(for: .milliseconds(delay))
+                                guard !Task.isCancelled, KeyboardState.shared.isVisible else { return }
+                                withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(key, anchor: .center) }
+                            }
+                        }
                     }
-                    .scrollDismissesKeyboard(.interactively)
-                    .scrollBounceBehavior(.basedOnSize)
+                    .environment(\.focusedInputReporter) { key in
+                        focusRequest = (key, (focusRequest?.tick ?? 0) + 1)
+                    }
                 }
             }
             .preference(key: GridBottomObstructionKey.self, value: bottomObstruction(geo: geo, cellH: cellH, placed: placement.placed.map(\.area)))
             .preference(key: GridBottomTrailingObstructionKey.self, value: bottomObstruction(geo: geo, cellH: cellH, placed: placement.placed.map(\.area), side: .trailing))
+        }
+        .background {
+            GeometryReader { full in
+                Color.clear
+                    .onAppear { stableHeight = full.size.height }
+                    .onChange(of: full.size.height) { _, h in stableHeight = h }
+            }
+            .ignoresSafeArea(.keyboard)
         }
     }
 

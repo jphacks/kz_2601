@@ -30,7 +30,7 @@ struct NumberFieldLeaf: View {
                         .textFieldStyle(.plain)
                         .font(RenderTheme.Fonts.number)
                         .focused($focused)
-                        .debugAutoFocus(c, $focused)
+                        .keyboardAnchor(c, $focused)
                     if let unit = c.unit ?? fieldDef?.unit {
                         Text(unit).font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
                     }
