@@ -1,6 +1,6 @@
 # 1イメージに appconfig / ai の両バイナリを同梱する。
 # Cloud Run 側は `--command=/app/ai` でサービスごとに起動バイナリを切り替える(ビルドは1回で済む)。
-FROM golang:1.24-bookworm AS build
+FROM golang:1.26-bookworm AS build
 WORKDIR /src
 COPY go.mod go.sum* ./
 RUN go mod download
