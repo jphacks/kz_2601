@@ -214,7 +214,7 @@ func UID(ctx context.Context) string { s, _ := ctx.Value(ctxKey{}).(string); ret
 
 ### 6.1 Claude 呼び出し
 
-> 実装: `backend/internal/ai/{client.go,schema.go,prompt.go,generate.go,chat.go,handler.go}` + `backend/internal/appconfigclient`。実 API の応答サンプルは `docs/backend/ai-samples/*.response.json`、発話 16 本の品質/速度 eval は `docs/backend/ai-eval/`(ランナー `backend/cmd/ai-eval`・ケース `backend/internal/ai/eval/cases.json`、対話フェーズは `-chat` + `chat_cases.json`)。
+> 実装: `backend/internal/ai/{client.go,schema.go,prompt.go,defaults.go,stream.go,generate.go,chat.go,handler.go}` + `backend/internal/appconfigclient`。実 API の応答サンプルは `docs/backend/ai-samples/*.response.json`、発話 16 本の品質/速度 eval は `docs/backend/ai-eval/`(ランナー `backend/cmd/ai-eval`・ケース `backend/internal/ai/eval/cases.json`、対話フェーズは `-chat` + `chat_cases.json`)。
 
 | 項目 | 値(実装済み) |
 |---|---|
@@ -222,7 +222,9 @@ func UID(ctx context.Context) string { s, _ := ctx.Value(ctxKey{}).(string); ret
 | モデル | 既定 `claude-sonnet-5-5`。`CLAUDE_MODEL=claude-opus-5-5` で品質側へ切替。モデルIDに日付サフィックスは付けない |
 | 思考 | adaptive(省略時既定)。`output_config.effort = CLAUDE_EFFORT`(既定 `low`)。**2026-10-24 の 16 本 eval で low/high とも検証一発通過 16/16・create p50 は low 6.6s / high 8.2s、p95 8.7s / 17.0s → high は遅いだけなので `low` 固定**(`docs/backend/ai-eval/2026-10-24.md`) |
 | 出力 | **既定は「スキーマをプロンプトに載せて JSON のみを出させ、Go で厳密検証」**。`output_config.format`(構造化出力)は `CLAUDE_STRUCTURED_OUTPUT=1` のときだけ送る(下記「構造化出力の制約」参照)。応答テキストは `extractJSON`(コードフェンス/前置き除去)→ 初回 `dsl.Parse`、編集 `dsl.ApplyPatch` |
-| max_tokens | 16000(非ストリーミング)。DSL 64KB 上限内 |
+| max_tokens | 16000。DSL 64KB 上限内 |
+| 出力の短縮(#61) | プロンプトで **1 行の compact JSON**(改行・インデント無し)と **既定値の省略** を指示し、Go 側 `internal/ai/defaults.go` `fillDefaults` / `fillPatchDefaults` が `dsl.Parse` の前に補完する(schemaVersion 1・voiceEntry floating・navigate.presentation = フォームへ sheet / 行タップ push・filter.value null・sort.direction desc・list.swipeToDelete true・stat/chart.aggregate sum・date の defaultValue now)。few-shot も同じ省略形で埋め込む(`abbreviateExample`、round-trip テスト付き)。`pkg/dsl` の検証は不変・iOS には明示値が届く。**実測(2026-10-24・create 5 本 × 2): 出力 1,300 → 964 tokens(−26%)、p50 6.5 → 6.0s、品質 10/10 維持**(`docs/backend/ai-eval/2026-10-24-latency.md`) |
+| ストリーミング(#61) | `POST /v1/generate?stream=1` は SSE。`client.go` が `stream: true` を読み(`Completion.OnText`)、`stream.go` `keyWatcher` が出力先頭の `app` ブロック(edit は `summary`)の完了を検出 → `event: app` / `event: summary`(名前・タブ名・仮の読み上げ文「家計簿アプリを作っています。ホームと集計の2タブです。」)→ 検証・保存後に `event: result`(JSON モードと同じ応答)か `event: error`。create のキー順 app → initialScreen → entities → screens、edit は `{"summary":…,"patch":[…]}` をプロンプトで固定。**first event p50 2.4s(完了 6.0s)、edit は 0.9〜1.0s(完了 1.3s)**。JSON モード(`stream` 無し)は従来どおり |
 | 拒否 | `stop_reason == "refusal"` → 400 `refused`。`fallbacks: "default"`(beta `server-side-fallback-2026-07-01`)を常時送付 |
 | キャッシュ | system(設計原則・部品カタログ・few-shot `examples/kakeibo.json`・生成用スキーマ ≈8.6K tokens)は固定文字列で `cache_control: ephemeral`。可変部(現 DSL・発話・前回の Problems)は user に置く。実測: 2 回目以降 `cache_read_input_tokens=8588` |
 | 再生成ループ | 検証 NG(`dsl.ValidationError.Problems`: 重なり・範囲外・参照不整合・スキーマ違反)は **Problems を user に添付して最大 2 回再生成**(計 3 回)。それでも NG → **`area` を全部落として再検証**(省略=上から積むフォールバック)→ それも NG なら **400 `generation_failed`**(`details.problems`/`details.attempts`)。編集は Patch 3 回 NG → `area` 落とし → **フル生成 1 回に降格**(`meta.downgradedToFull`)→ 400 |
@@ -312,7 +314,7 @@ flowchart TD
 | WhisperKit(端末) | iOS 側 |
 | `/generate` 全体(text 入力・初回フル) | **4s / 10s** |
 | `/generate` 全体(編集 Patch) | **2.5s / 6s** |
-| Claude 1回(Sonnet 5.5, effort low, フル出力 ~0.9-1.7K tokens / Patch ~0.1-0.4K tokens) | 目標 3s / 7s ・ 1.5s / 4s。**実測(2026-10-24・16 本)**: create p50 6.6s / p95 8.7s ・ edit p50 1.7s / p95 5.0s |
+| Claude 1回(Sonnet 5.5, effort low, フル出力 ~0.8-1.2K tokens / Patch ~0.1-0.4K tokens) | 目標 3s / 7s ・ 1.5s / 4s。**実測(2026-10-24・16 本)**: create p50 6.6s / p95 8.7s ・ edit p50 1.7s / p95 5.0s → **compact 出力+既定値省略後(create 5 本 × 2)**: create p50 6.0s・平均出力 964 tokens(−26%)。`?stream=1` なら **先頭 `app` ブロックが p50 2.4s** で届く(iOS が名前と仮要約を先出し) |
 | 検証 + appconfig PUT | 150ms / 400ms |
 | `/transcribe`(Whisper API, 10s 音声) | 1.5s / 4s |
 
