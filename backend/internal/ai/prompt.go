@@ -26,7 +26,7 @@ var systemPrompt = strings.TrimSpace(`
   - 可変長(list / section / vstack / hstack / 長い text)はセル内でスクロールするので、矩形は大きめ(例 A3:F10)に取る。入力・ボタン・stat・chart は矩形に収まる。
   - Container の子に area は付けない(付けるとエラー)。
   - 迷ったら area を省略してよい(省略した部品は最後に使われた行の次から全幅で上から積まれる)。
-- タブ: app.tabs は 0 個(省略)または 2〜5 個。各 tab.screen は screens に存在する id で、重複不可。initialScreen は screens に存在する id。
+- タブ: app.tabs は 0 個(省略)または 2〜5 個(「ホーム / 集計」「今日 / 履歴」のように 2〜3 個が扱いやすい)。各 tab.screen は screens に存在する id で、重複不可。initialScreen は screens に存在する id。
 - entity/field 束縛: 入力部品(textField/numberField/datePicker/picker/toggle/photoField/image)は screen.entity が設定された画面にのみ置き、field はその entity の field id。picker は enum field、photoField/image は photo field。
   list/stat/chart の entity は entities の id、item.title/subtitle/trailing/image・sort.field・filter.field・stat.field・chart.groupBy はその entity の field id。stat は aggregate=count 以外 field 必須。
 - アクション: navigate.screen は存在する画面 id。saveRecord/deleteRecord は entity 必須。フォーム画面には toolbar に saveRecord ボタンを置く。list.onItemTap で navigate するとフォームが編集モードになる。
@@ -41,32 +41,8 @@ var systemPrompt = strings.TrimSpace(`
 - voiceEntry は "floating" を既定にする("none" にしない。ユーザーが声でアプリを変え続けられること)。
 - UI 文言はすべて日本語。app.icon / tab.icon / button.icon は SF Symbols 名。theme.primaryColor は #RRGGBB。
 
-## P0 部品カタログ(type: 必須 / 任意)
-- vstack|hstack: children / spacing(none|small|medium|large)
-- section: children / title, spacing
-- text: text / style(title|headline|body|caption), align(leading|center|trailing)
-- button: label, action / icon, style(primary|secondary|destructive|plain)
-- textField: field / label, placeholder, multiline
-- numberField: field / label, placeholder, unit
-- datePicker: field / label, includeTime
-- picker: field(enum) / label, style(menu|segmented|wheel)
-- toggle: field, label
-- photoField: field(photo) / label, source(camera|library|both)
-- image: field(photo) / height(small|medium|large)
-- list: entity, item{title} / item.subtitle|trailing|icon|image, sort{field,direction}, filter{field,op,value}, emptyText, onItemTap, swipeToDelete
-- stat: label, entity, aggregate(count|sum|avg|min|max) / field, filter, format(plain|currency|percent)
-- chart: entity, kind(bar|line|pie), groupBy, aggregate(count|sum|avg) / title, field, bucket(day|week|month), filter
-- voiceInput: / prompt, size(compact|large)
-- spacer: / size(small|medium|large|flexible)
-- divider
-- filter.op: eq|neq|gt|gte|lt|lte|thisMonth|today(thisMonth/today は value に null)
-- アクション type: navigate{screen,presentation:push|sheet|fullScreen} | back | saveRecord{entity,screen?} | deleteRecord{entity,confirmMessage?} | openVoice | openUrl{url} | resetForm | scheduleNotification{notification} | cancelNotification{notificationId}
-
-## 典型的な画面構成
-- ホーム: 上部に stat(今月の合計など) A1:F2、中央に section+list A3:F10、右下に追加ボタン D11:F12。toolbar にも追加ボタン。
-- フォーム画面: screen.entity を設定し、section 内に入力部品を並べ(A1:F7 程度)、toolbar に保存(saveRecord)、下部に削除ボタン(deleteRecord, destructive)。
-- 集計画面: chart を縦に 2 枚(A1:F6 / A7:F12)。
-- タブは「ホーム / 集計」「今日 / 履歴」のように 2〜3 個が扱いやすい。
+## 部品カタログ(スキーマから自動生成。type: 必須 / 任意 — 用途。使い方 = レイアウトの定石)
+` + catalog + `
 
 ## 例: 発話「家計簿アプリを作って。今月の合計と支出一覧、追加ボタンが欲しい。カテゴリ別の内訳も見たい」→ 出力
 ` + "```json\n" + strings.TrimSpace(fewShotKakeibo) + "\n```" + `
