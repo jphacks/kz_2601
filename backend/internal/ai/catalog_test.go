@@ -67,6 +67,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompSettlement,
 		// on-device AI
 		dsl.CompAiButton,
+		// peer-to-peer
+		dsl.CompNearbyShare,
 	} {
 		goTypes[string(ct)] = true
 	}

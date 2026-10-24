@@ -99,6 +99,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.webView) { c, _ in WebViewLeaf(c: c) }
         // leaf(オンデバイス AI・#78)
         r.register(.aiButton) { c, ctx in AiButtonLeaf(c: c, ctx: ctx) }
+        // leaf(近距離共有・#36)
+        r.register(.nearbyShare) { c, ctx in NearbyShareLeaf(c: c, ctx: ctx) }
         return r
     }()
 }

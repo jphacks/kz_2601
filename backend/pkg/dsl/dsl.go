@@ -241,6 +241,8 @@ const (
 	CompSettlement ComponentType = "settlement" // greedy "A pays B" list from a balance field
 	// on-device AI (#78)
 	CompAiButton ComponentType = "aiButton" // Foundation Models -> form field (never leaves the device)
+	// peer-to-peer
+	CompNearbyShare ComponentType = "nearbyShare" // MultipeerConnectivity: send records to a nearby device
 )
 
 // ContainerTypes lists component types that may have Children.

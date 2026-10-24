@@ -591,6 +591,13 @@ func (a *App) Validate() error {
 				}
 			case CompAiButton:
 				checkAIButton(where, c, formEntity, entities, add)
+			case CompNearbyShare:
+				if c.Label == "" {
+					add("%s: nearbyShare needs label", where)
+				}
+				if entities[c.Entity] == nil {
+					add("%s: nearbyShare entity %q does not exist", where, c.Entity)
+				}
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}
