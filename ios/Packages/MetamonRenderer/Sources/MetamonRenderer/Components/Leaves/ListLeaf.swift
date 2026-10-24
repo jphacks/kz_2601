@@ -64,10 +64,10 @@ struct ListLeaf: View {
         return RenderTheme.Spacing.md
     }
 
-    /// 前回描画に無かった id をハイライト(初回描画・読み込み直後は対象外)。
+    /// 前回描画に無かった id をハイライト(初回描画・空 → 初回ロードは対象外)。
     private func markNewRows(_ now: [String]) {
         defer { seenIds = Set(now) }
-        guard let seen = seenIds, !reduceMotion, let fresh = now.first(where: { !seen.contains($0) }) else { return }
+        guard let seen = seenIds, !seen.isEmpty, !reduceMotion, let fresh = now.first(where: { !seen.contains($0) }) else { return }
         withAnimation(RenderTheme.Motion.select) { highlightedId = fresh }
         Task {
             try? await Task.sleep(for: .seconds(RenderTheme.Motion.highlightSeconds))
