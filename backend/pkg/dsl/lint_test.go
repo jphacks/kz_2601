@@ -117,6 +117,37 @@ func TestLintEntityReach(t *testing.T) {
 	wantLint(t, lintApp(t, hidden), `entity "log" has no list on a reachable screen`)
 }
 
+// logic_budget / logic_oshi: a budget entity read only through an agg needs
+// a form but no list; once a ref or a list-like component uses it, it does.
+func TestLintSettingEntityNeedsNoList(t *testing.T) {
+	raw := strings.Replace(strings.Replace(lintBase, "%s", "", 1), "%s",
+		`{"type":"stat","label":"今月の残り","value":{"op":"sub","args":[{"agg":"max","entity":"budget","field":"amount"},{"agg":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}}]}},
+		 {"type":"button","label":"予算","action":{"type":"navigate","screen":"budget_form","presentation":"sheet"}},`, 1)
+	var doc map[string]any
+	_ = json.Unmarshal([]byte(raw), &doc)
+	doc["entities"] = append(doc["entities"].([]any), map[string]any{"id": "budget", "name": "予算", "fields": []any{map[string]any{"id": "amount", "name": "予算額", "type": "currency"}}})
+	doc["screens"] = append(doc["screens"].([]any), map[string]any{"id": "budget_form", "title": "予算", "entity": "budget",
+		"toolbar":    []any{map[string]any{"label": "保存", "action": map[string]any{"type": "saveRecord", "entity": "budget"}}},
+		"components": []any{map[string]any{"type": "numberField", "field": "amount"}}})
+	b, _ := json.Marshal(doc)
+	if w := lintApp(t, string(b)); len(w) > 0 {
+		t.Fatalf("setting entity should be clean: %v", w)
+	}
+
+	// still needs an add form
+	noForm := strings.Replace(string(b), `"entity":"budget","id":"budget_form"`, `"id":"budget_form"`, 1)
+	noForm = strings.Replace(noForm, `{"field":"amount","type":"numberField"}`, `{"text":"x","type":"text"}`, 1)
+	wantLint(t, lintApp(t, noForm), `entity "budget" has no add form`)
+
+	// a ref to it makes it a master list again
+	withRef := strings.Replace(string(b), `{"defaultValue":"now","id":"date","name":"日付","type":"date"}`,
+		`{"defaultValue":"now","id":"date","name":"日付","type":"date"},{"id":"b","name":"予算","type":"ref","refEntity":"budget"}`, 1)
+	if withRef == string(b) {
+		t.Fatal("fixture did not change")
+	}
+	wantLint(t, lintApp(t, withRef), `entity "budget" has no list`)
+}
+
 func TestLintConstantExpr(t *testing.T) {
 	// audit a03: round((toNumber(coalesce(end,"0")) * 0 + 0 - 0) / 1, 1)
 	a03 := `,{"id":"hours","name":"勤務時間","type":"number","computed":{"op":"round","args":[{"op":"div","args":[{"op":"sub","args":[{"op":"add","args":[{"op":"mul","args":[{"op":"toNumber","args":[{"op":"coalesce","args":[{"ref":"start"},"0"]}]},0]},0]},0]},1]},1]}}`

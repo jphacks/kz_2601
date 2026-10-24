@@ -392,6 +392,7 @@ func (l *linter) entityReach() {
 			}
 		}
 	}
+	settings := l.settingEntities()
 	for _, e := range l.app.Entities {
 		switch fs := forms[e.ID]; {
 		case len(fs) == 0:
@@ -399,7 +400,7 @@ func (l *linter) entityReach() {
 		case !anyOf(fs, targets):
 			l.add(`entity %q: form screen %q is not reachable; add a toolbar/button navigate to it`, e.ID, fs[0])
 		}
-		if !listed[e.ID] {
+		if !listed[e.ID] && !settings[e.ID] {
 			l.add(`entity %q has no list on a reachable screen: show its records with a list or table (with onItemTap to the form) on a tab or the home screen so what users add is visible`, e.ID)
 		}
 	}
@@ -412,4 +413,60 @@ func anyOf(ids []string, set map[string]bool) bool {
 		}
 	}
 	return false
+}
+
+// scalarTypes show one number computed from an entity, not its records.
+var scalarTypes = map[ComponentType]bool{CompStat: true, CompProgressBar: true, CompGauge: true}
+
+// settingEntities returns entities that hold a setting such as a budget or a
+// goal: read only as a single number (agg in stat.value / computed, or a
+// stat / progressBar / gauge aggregate) and never pointed at by a ref field.
+// They need an add form but not a list (a list of one budget is noise, and
+// asking for it doubled the latency of those generations).
+func (l *linter) settingEntities() map[string]bool {
+	scalar := map[string]bool{}
+	other := map[string]bool{}
+	aggs := func(e *Expr) {
+		walkExpr(e, func(x *Expr) {
+			if x.Kind == ExprAgg && x.Agg != nil {
+				scalar[x.Agg.Entity] = true
+			}
+		})
+	}
+	for i := range l.app.Entities {
+		for _, f := range l.app.Entities[i].Fields {
+			if f.Type == FieldRef {
+				other[f.RefEntity] = true
+			}
+			aggs(f.Computed)
+		}
+	}
+	visit := func(c *Component) {
+		if c.Type == CompStat && c.Value != nil {
+			aggs(c.Value)
+		}
+		if c.Entity == "" {
+			return
+		}
+		if scalarTypes[c.Type] {
+			scalar[c.Entity] = true
+		} else {
+			other[c.Entity] = true
+		}
+	}
+	for _, s := range l.app.Screens {
+		for i := range s.Components {
+			visit(&s.Components[i])
+			for j := range s.Components[i].Children {
+				visit(&s.Components[i].Children[j])
+			}
+		}
+	}
+	out := map[string]bool{}
+	for id := range scalar {
+		if !other[id] {
+			out[id] = true
+		}
+	}
+	return out
 }
