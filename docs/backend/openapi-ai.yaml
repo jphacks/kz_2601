@@ -75,6 +75,52 @@ paths:
         '429': { description: Claude/Whisper のレート制限 (Retry-After 付き), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
         '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
 
+  /chat:
+    post:
+      summary: 生成前の対話 (clarify)。1 問だけ聞き返すか、要件が揃えば ready で生成用の transcript を返す
+      description: |
+        Issue #74 / G17。初回生成の前に数ラリーで要件を固める。`/generate` は無変更で、iOS は `ready.transcript` をそのまま `POST /generate`(mode auto/create)に渡す。
+        - `messages` は会話の全履歴でも最新のユーザー発話 1 件でもよい。2 件以上ならサーバーの会話状態を置き換え、1 件なら追記する
+        - 応答は `kind=question`(質問 1 文 + 選択肢 ≤3)か `kind=ready`(brief + transcript)。Claude が質問できるのは 3 ラリーまで、4 ラリー目は必ず ready
+        - 最新発話が「もう作って / それでいい / お任せ / just build it / go ahead」等の短い go-ahead なら Claude を呼ばず直前の理解で即 ready(`source=shortcut`)
+        - 会話状態は ai プロセス内(appId ごと・直近 10 メッセージ・30 分で消える)。永続化は後段
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChatRequest' }
+      responses:
+        '200':
+          description: 質問または ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatResponse' }
+              examples:
+                question:
+                  value: { kind: question, text: レシートの写真も残したいですか?, suggestions: [写真も残す, 文字だけでOK, お任せ], turn: 1, locale: ja, source: claude }
+                ready:
+                  value:
+                    kind: ready
+                    text: では作りますね。
+                    turn: 2
+                    locale: ja
+                    source: claude
+                    brief: { name: 筋トレ記録, purpose: 腕立てとスクワットの回数を毎日つける, entities: [トレーニング], features: [記録の一覧, 今日の合計回数, 毎朝8時の通知], native: [notification] }
+                    transcript: 筋トレ記録アプリを作って。腕立てとスクワットの回数と日付を記録して、記録の一覧と今日の合計回数を見たい。毎朝8時に通知してほしい。
+        '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
+        '429': { description: Claude のレート制限, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '502': { description: Claude の出力がスキーマに合わず 2 回とも失敗 (generation_failed), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+
+  /chat/{appId}:
+    delete:
+      summary: 対話の会話状態を消す (iOS が「最初から」「キャンセル」した時)
+      parameters:
+        - { name: appId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: 消した (存在しなくても 204) }
+
   /transcribe:
     post:
       summary: 音声→文字 (optional。WhisperKit が使えない端末向け)
@@ -173,3 +219,59 @@ components:
         latencyMs:
           type: object
           properties: { transcribe: { type: integer }, claude: { type: integer }, total: { type: integer } }
+    ChatMessage:
+      type: object
+      required: [role, text]
+      properties:
+        role: { type: string, enum: [user, assistant] }
+        text: { type: string }
+    ChatRequest:
+      type: object
+      required: [appId, messages]
+      properties:
+        appId: { type: string }
+        messages:
+          type: array
+          minItems: 1
+          description: 最後は user。全履歴(iOS が持つ分)か最新 1 件
+          items: { $ref: '#/components/schemas/ChatMessage' }
+        locale: { type: string, enum: [ja, en], description: 省略時はユーザー発話から判定 (かな・漢字があれば ja) }
+      example: { appId: app_01HXYZ, messages: [{ role: user, text: 家計簿 }] }
+    ChatBrief:
+      type: object
+      description: 現時点の要件理解 (iOS は表示に使ってもよい。生成には transcript を使う)
+      required: [name, purpose, entities, features, native]
+      properties:
+        name: { type: string, description: アプリ名 }
+        purpose: { type: string, description: 一文 }
+        entities: { type: array, items: { type: string }, description: 記録する項目 }
+        features: { type: array, items: { type: string }, description: 見たい一覧・集計・ボタンなど }
+        native:
+          type: array
+          items: { type: string }
+          description: 必要なネイティブ機能の英小文字キーワード (camera / notification / calendar / map / location / share …)。無ければ空配列
+    ChatResponse:
+      type: object
+      required: [kind, text, turn, locale, source]
+      properties:
+        kind: { type: string, enum: [question, ready] }
+        text: { type: string, description: 'question: 質問文 (読み上げる)。ready: 「では作りますね。」/ "Got it, I''ll build it now."' }
+        suggestions:
+          type: array
+          maxItems: 3
+          items: { type: string }
+          description: question の時だけ。チップとして出す短い選択肢 (そのまま次の user text に使える)
+        turn: { type: integer, description: これまでのユーザー発話数 (1 始まり)。4 以上は必ず ready }
+        brief: { $ref: '#/components/schemas/ChatBrief', description: ready の時だけ }
+        transcript: { type: string, description: ready の時だけ。要件を 1 段落にまとめた一人称の依頼文。これを POST /generate の text に渡す }
+        locale: { type: string, enum: [ja, en] }
+        source:
+          type: string
+          enum: [claude, shortcut, forced]
+          description: shortcut = go-ahead 語で Claude を呼ばず即 ready。forced = 4 ラリー目 (または 1 発目の go-ahead) で ready に寄せた
+        latencyMs:
+          type: object
+          properties: { claude: { type: integer }, total: { type: integer } }
+        meta:
+          type: object
+          description: 診断用 (model / attempts / usage)

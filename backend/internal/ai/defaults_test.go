@@ -57,9 +57,9 @@ func TestFillDefaults_RulesAndIdempotence(t *testing.T) {
 	for _, want := range []string{
 		`"schemaVersion":1`, `"voiceEntry":"floating"`,
 		`"id":"d","name":"D","type":"date"`, `"defaultValue":"now"`, `"defaultValue":"2026-01-01"`,
-		`"presentation":"sheet","screen":"form","type":"navigate"`,  // toolbar -> form
-		`"presentation":"push","screen":"stats","type":"navigate"`,  // button -> non-form
-		`"presentation":"fullScreen"`,                                // explicit value kept
+		`"presentation":"sheet","screen":"form","type":"navigate"`, // toolbar -> form
+		`"presentation":"push","screen":"stats","type":"navigate"`, // button -> non-form
+		`"presentation":"fullScreen"`,                              // explicit value kept
 		`"filter":{"field":"d","op":"today","value":null}`,
 		`"aggregate":"sum"`, `"aggregate":"count"`,
 		`"sort":{"direction":"desc","field":"d"}`,

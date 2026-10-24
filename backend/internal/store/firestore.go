@@ -20,12 +20,16 @@ import (
 //	users/{uid}/apps/{appId}                       {name,currentVersion,status,createdAt,updatedAt,dsl(map),dslJson}
 //	users/{uid}/apps/{appId}/versions/{n:08d}      {version,parentVersion,dslJson,patchJson,source,createdAt}
 //	users/{uid}/apps/{appId}/entities/{e}/records/{id} {entity,data,clientId,createdAt,updatedAt}
+//	apps_public/{appId}                            {ownerUid,name,version,dsl(map),dslJson,createdAt,updatedAt}
+//	apps_public/{appId}/entities/{e}/records/{id}  {entity,data,clientId,author,authorName,createdAt,updatedAt}
 //
 // `dsl` is stored twice: as a native map (so an iOS realtime listener can
 // read it) and as the canonical JSON string (what the API serves back).
 type Firestore struct {
 	c *firestore.Client
 }
+
+const publicCollection = "apps_public"
 
 // NewFirestore connects to projectID (honours FIRESTORE_EMULATOR_HOST).
 func NewFirestore(ctx context.Context, projectID string) (*Firestore, error) {
@@ -45,8 +49,23 @@ func (f *Firestore) appRef(uid, appID string) *firestore.DocumentRef {
 	return f.c.Collection("users").Doc(uid).Collection("apps").Doc(appID)
 }
 
-func (f *Firestore) recRef(uid, appID, entity, id string) *firestore.DocumentRef {
-	return f.appRef(uid, appID).Collection("entities").Doc(entity).Collection("records").Doc(id)
+func (f *Firestore) publicRef(appID string) *firestore.DocumentRef {
+	return f.c.Collection(publicCollection).Doc(appID)
+}
+
+// recordsCol is the collection a RecordSet maps to.
+func (f *Firestore) recordsCol(rs RecordSet) *firestore.CollectionRef {
+	var app *firestore.DocumentRef
+	if rs.Public {
+		app = f.publicRef(rs.AppID)
+	} else {
+		app = f.appRef(rs.UID, rs.AppID)
+	}
+	return app.Collection("entities").Doc(rs.Entity).Collection("records")
+}
+
+func (f *Firestore) recRef(rs RecordSet, id string) *firestore.DocumentRef {
+	return f.recordsCol(rs).Doc(id)
 }
 
 func isNotFound(err error) bool { return status.Code(err) == codes.NotFound }
@@ -98,18 +117,34 @@ func (d *versionDoc) toVersion(appID string) (*Version, error) {
 }
 
 type recordDoc struct {
-	Entity    string         `firestore:"entity"`
-	Data      map[string]any `firestore:"data"`
-	ClientID  string         `firestore:"clientId,omitempty"`
-	CreatedAt time.Time      `firestore:"createdAt"`
-	UpdatedAt time.Time      `firestore:"updatedAt"`
+	Entity     string         `firestore:"entity"`
+	Data       map[string]any `firestore:"data"`
+	ClientID   string         `firestore:"clientId,omitempty"`
+	Author     string         `firestore:"author,omitempty"`
+	AuthorName string         `firestore:"authorName,omitempty"`
+	CreatedAt  time.Time      `firestore:"createdAt"`
+	UpdatedAt  time.Time      `firestore:"updatedAt"`
 }
 
 func (d *recordDoc) toRecord(id string) *Record {
 	if d.Data == nil {
 		d.Data = map[string]any{}
 	}
-	return &Record{ID: id, Entity: d.Entity, Data: d.Data, ClientID: d.ClientID, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+	return &Record{ID: id, Entity: d.Entity, Data: d.Data, ClientID: d.ClientID, Author: d.Author, AuthorName: d.AuthorName, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+}
+
+type publicAppDoc struct {
+	OwnerUID  string         `firestore:"ownerUid"`
+	Name      string         `firestore:"name"`
+	Version   int64          `firestore:"version"`
+	DSL       map[string]any `firestore:"dsl"`
+	DSLJSON   string         `firestore:"dslJson"`
+	CreatedAt time.Time      `firestore:"createdAt"`
+	UpdatedAt time.Time      `firestore:"updatedAt"`
+}
+
+func (d *publicAppDoc) toPublicApp(id string) *PublicApp {
+	return &PublicApp{ID: id, OwnerUID: d.OwnerUID, Name: d.Name, Version: int(d.Version), DSL: json.RawMessage(d.DSLJSON), CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
 }
 
 func rawToMap(raw json.RawMessage) (map[string]any, error) {
@@ -357,11 +392,67 @@ func (f *Firestore) GetVersion(ctx context.Context, uid, appID string, n int) (*
 	return d.toVersion(appID)
 }
 
+// ---- public apps ------------------------------------------------------------
+
+// PublishApp implements Store.
+func (f *Firestore) PublishApp(ctx context.Context, uid, appID string, raw json.RawMessage, name string, version int) (bool, error) {
+	ref := f.publicRef(appID)
+	m, err := rawToMap(raw)
+	if err != nil {
+		return false, err
+	}
+	published := false
+	err = f.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		published = false
+		now := time.Now().UTC()
+		snap, err := tx.Get(ref)
+		if err == nil {
+			var d publicAppDoc
+			if err := snap.DataTo(&d); err != nil {
+				return err
+			}
+			if d.OwnerUID != uid {
+				return nil
+			}
+			published = true
+			return tx.Update(ref, []firestore.Update{
+				{Path: "name", Value: name}, {Path: "version", Value: version},
+				{Path: "dsl", Value: m}, {Path: "dslJson", Value: string(raw)}, {Path: "updatedAt", Value: now},
+			})
+		}
+		if !isNotFound(err) {
+			return err
+		}
+		published = true
+		return tx.Create(ref, publicAppDoc{OwnerUID: uid, Name: name, Version: int64(version), DSL: m, DSLJSON: string(raw), CreatedAt: now, UpdatedAt: now})
+	})
+	if err != nil {
+		return false, err
+	}
+	return published, nil
+}
+
+// GetPublicApp implements Store.
+func (f *Firestore) GetPublicApp(ctx context.Context, appID string) (*PublicApp, error) {
+	snap, err := f.publicRef(appID).Get(ctx)
+	if isNotFound(err) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	var d publicAppDoc
+	if err := snap.DataTo(&d); err != nil {
+		return nil, err
+	}
+	return d.toPublicApp(appID), nil
+}
+
 // ---- records ----------------------------------------------------------------
 
 // ListRecords implements Store.
-func (f *Firestore) ListRecords(ctx context.Context, uid, appID, entity string, limit int) ([]Record, error) {
-	q := f.appRef(uid, appID).Collection("entities").Doc(entity).Collection("records").OrderBy("createdAt", firestore.Desc)
+func (f *Firestore) ListRecords(ctx context.Context, rs RecordSet, limit int) ([]Record, error) {
+	q := f.recordsCol(rs).OrderBy("createdAt", firestore.Desc)
 	if limit > 0 {
 		q = q.Limit(limit)
 	}
@@ -385,8 +476,8 @@ func (f *Firestore) ListRecords(ctx context.Context, uid, appID, entity string, 
 }
 
 // GetRecord implements Store.
-func (f *Firestore) GetRecord(ctx context.Context, uid, appID, entity, id string) (*Record, error) {
-	snap, err := f.recRef(uid, appID, entity, id).Get(ctx)
+func (f *Firestore) GetRecord(ctx context.Context, rs RecordSet, id string) (*Record, error) {
+	snap, err := f.recRef(rs, id).Get(ctx)
 	if isNotFound(err) {
 		return nil, ErrNotFound
 	}
@@ -401,8 +492,8 @@ func (f *Firestore) GetRecord(ctx context.Context, uid, appID, entity, id string
 }
 
 // CreateRecord implements Store.
-func (f *Firestore) CreateRecord(ctx context.Context, uid, appID, entity string, rec Record) (*Record, bool, error) {
-	ref := f.recRef(uid, appID, entity, rec.ID)
+func (f *Firestore) CreateRecord(ctx context.Context, rs RecordSet, rec Record) (*Record, bool, error) {
+	ref := f.recRef(rs, rec.ID)
 	var out *Record
 	created := false
 	err := f.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
@@ -420,7 +511,7 @@ func (f *Firestore) CreateRecord(ctx context.Context, uid, appID, entity string,
 			return err
 		}
 		now := time.Now().UTC()
-		d := recordDoc{Entity: entity, Data: rec.Data, ClientID: rec.ClientID, CreatedAt: now, UpdatedAt: now}
+		d := recordDoc{Entity: rs.Entity, Data: rec.Data, ClientID: rec.ClientID, Author: rec.Author, AuthorName: rec.AuthorName, CreatedAt: now, UpdatedAt: now}
 		if err := tx.Create(ref, d); err != nil {
 			return err
 		}
@@ -435,8 +526,8 @@ func (f *Firestore) CreateRecord(ctx context.Context, uid, appID, entity string,
 }
 
 // UpdateRecord implements Store.
-func (f *Firestore) UpdateRecord(ctx context.Context, uid, appID, entity, id string, data map[string]any) (*Record, error) {
-	ref := f.recRef(uid, appID, entity, id)
+func (f *Firestore) UpdateRecord(ctx context.Context, rs RecordSet, id string, data map[string]any) (*Record, error) {
+	ref := f.recRef(rs, id)
 	_, err := ref.Update(ctx, []firestore.Update{
 		{Path: "data", Value: data},
 		{Path: "updatedAt", Value: time.Now().UTC()},
@@ -447,12 +538,12 @@ func (f *Firestore) UpdateRecord(ctx context.Context, uid, appID, entity, id str
 	if err != nil {
 		return nil, err
 	}
-	return f.GetRecord(ctx, uid, appID, entity, id)
+	return f.GetRecord(ctx, rs, id)
 }
 
 // DeleteRecord implements Store.
-func (f *Firestore) DeleteRecord(ctx context.Context, uid, appID, entity, id string) error {
-	ref := f.recRef(uid, appID, entity, id)
+func (f *Firestore) DeleteRecord(ctx context.Context, rs RecordSet, id string) error {
+	ref := f.recRef(rs, id)
 	_, err := ref.Delete(ctx, firestore.Exists)
 	if isNotFound(err) {
 		return ErrNotFound
@@ -461,8 +552,8 @@ func (f *Firestore) DeleteRecord(ctx context.Context, uid, appID, entity, id str
 }
 
 // DeleteAllRecords implements Store.
-func (f *Firestore) DeleteAllRecords(ctx context.Context, uid, appID, entity string) error {
-	col := f.appRef(uid, appID).Collection("entities").Doc(entity).Collection("records")
+func (f *Firestore) DeleteAllRecords(ctx context.Context, rs RecordSet) error {
+	col := f.recordsCol(rs)
 	for {
 		it := col.Limit(200).Documents(ctx)
 		docs, err := it.GetAll()

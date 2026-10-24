@@ -41,6 +41,9 @@ type Completion struct {
 	// text delta as it arrives (same goroutine, in order). The returned
 	// Response is still the complete message.
 	OnText func(delta string)
+	// Structured sends Schema as output_config.format for this call even when
+	// Client.StructuredOutput is off (small schemas such as ChatSchema compile).
+	Structured bool
 }
 
 // Usage is the token accounting of one call.
@@ -206,7 +209,7 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 	if c.Effort != "" {
 		oc["effort"] = c.Effort
 	}
-	if c.StructuredOutput && len(req.Schema) > 0 {
+	if (c.StructuredOutput || req.Structured) && len(req.Schema) > 0 {
 		oc["format"] = map[string]any{"type": "json_schema", "schema": req.Schema}
 	}
 	if len(oc) > 0 {

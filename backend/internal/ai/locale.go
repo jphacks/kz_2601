@@ -61,11 +61,12 @@ var localeNames = map[Locale]string{
 type summaryText struct {
 	nothingToUndo string
 	restored      string // fmt with version
+	readyText     string // clarify phase: spoken when the brief is complete
 }
 
 var summaryTexts = map[Locale]summaryText{
-	LocaleJA: {nothingToUndo: "戻せる変更がありません。", restored: "ひとつ前の状態(version %d)に戻しました。"},
-	LocaleEN: {nothingToUndo: "There is nothing to undo.", restored: "I went back to the previous state (version %d)."},
+	LocaleJA: {nothingToUndo: "戻せる変更がありません。", restored: "ひとつ前の状態(version %d)に戻しました。", readyText: "では作りますね。"},
+	LocaleEN: {nothingToUndo: "There is nothing to undo.", restored: "I went back to the previous state (version %d).", readyText: "Got it, I'll build it now."},
 }
 
 func (l Locale) text() summaryText {

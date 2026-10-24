@@ -4,7 +4,8 @@
 // DSL produced by their `base` create case in the same run. `expect` keys:
 // photo / chart (bool), notification ("HH:MM" or "any"), substitution (bool:
 // the summary mentions 代替 / "replaced" because a requested part is not in
-// the catalog). A case may pin `locale` (ja|en); -locale overrides every case;
+// the catalog), scope ("public"|"shared"|"private": at least one entity has
+// that scope). A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
 //
@@ -12,6 +13,7 @@
 //	go run ./cmd/ai-eval -effort low -out ../docs/backend/ai-eval/raw
 //	go run ./cmd/ai-eval -stream -repeat 2 -only kakeibo_a,walk_a   # SSE path, time to first event
 //	go run ./cmd/ai-eval -compare-before 'raw/*-before-*.json' -compare-after 'raw/*-after-*.json'  # no API calls
+//	go run ./cmd/ai-eval -chat          # clarify phase (chat.go, chat_cases.json)
 package main
 
 import (
@@ -55,6 +57,7 @@ type Metrics struct {
 	HasPhoto      bool     `json:"hasPhoto"`
 	HasChart      bool     `json:"hasChart"`
 	Notifications []string `json:"notifications,omitempty"` // repeat@time
+	Scopes        []string `json:"scopes,omitempty"`        // entityId:scope (effective)
 	Areas         []string `json:"areas"`                   // screenId: area list
 }
 
@@ -129,7 +132,11 @@ func main() {
 	repeat := flag.Int("repeat", 1, "run every selected case this many times (p50/p95 over all runs)")
 	cmpBefore := flag.String("compare-before", "", "glob of raw run files = before; with -compare-after prints a before/after table and exits (no API calls)")
 	cmpAfter := flag.String("compare-after", "", "glob of raw run files = after")
+	chat := flag.Bool("chat", false, "run the clarify-phase cases (internal/ai/eval/chat_cases.json unless -cases is set) through Service.Chat instead of /generate")
 	flag.Parse()
+	if *chat && *casesPath == "internal/ai/eval/cases.json" {
+		*casesPath = "internal/ai/eval/chat_cases.json"
+	}
 
 	if *cmpBefore != "" || *cmpAfter != "" {
 		if err := compare(*cmpBefore, *cmpAfter); err != nil {
@@ -142,21 +149,12 @@ func main() {
 	if apiKey == "" {
 		log.Fatal("ANTHROPIC_API_KEY is not set")
 	}
-	raw, err := os.ReadFile(*casesPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var cases []Case
-	if err := json.Unmarshal(raw, &cases); err != nil {
-		log.Fatal(err)
-	}
 	filter := map[string]bool{}
 	for _, id := range strings.Split(*only, ",") {
 		if id = strings.TrimSpace(id); id != "" {
 			filter[id] = true
 		}
 	}
-
 	store := appconfigclient.NewMemory()
 	svc := &ai.Service{
 		Claude:      ai.NewClient(apiKey, *model, *effort),
@@ -165,6 +163,18 @@ func main() {
 		CallTimeout: *timeout,
 	}
 	ctx := context.Background()
+	if *chat {
+		runChat(ctx, svc, *casesPath, *outDir, *model, *effort, *tag, filter)
+		return
+	}
+	raw, err := os.ReadFile(*casesPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var cases []Case
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		log.Fatal(err)
+	}
 	run := Run{Date: time.Now().Format("2006-01-02"), Model: *model, Effort: *effort, Tag: *tag, Stream: *stream}
 	created := map[string]json.RawMessage{} // create case id -> resulting DSL
 
@@ -282,8 +292,10 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 
 func measure(a *dsl.App) *Metrics {
 	m := &Metrics{Tabs: len(a.App.Tabs), Screens: len(a.Screens), Entities: len(a.Entities)}
-	for _, e := range a.Entities {
+	for i := range a.Entities {
+		e := &a.Entities[i]
 		m.Fields += len(e.Fields)
+		m.Scopes = append(m.Scopes, e.ID+":"+string(e.EffectiveScope()))
 	}
 	for _, n := range a.App.Notifications {
 		m.Notifications = append(m.Notifications, n.Repeat+"@"+n.Time)
@@ -350,6 +362,17 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 			}
 			if !found {
 				miss = append(miss, fmt.Sprintf("notification=%v (want %s)", m.Notifications, want))
+			}
+		case "scope":
+			want := fmt.Sprint(v)
+			found := false
+			for _, s := range m.Scopes {
+				if strings.HasSuffix(s, ":"+want) {
+					found = true
+				}
+			}
+			if !found {
+				miss = append(miss, fmt.Sprintf("scope=%v (want %s)", m.Scopes, want))
 			}
 		}
 	}

@@ -1,0 +1,16 @@
+[
+  {"id": "kakeibo_short", "group": "ja", "note": "1 語 → 質問が出る",
+   "steps": [{"say": "家計簿", "expect": "question"}]},
+  {"id": "kakeibo_full", "group": "ja", "note": "具体的な発話 → 1 ターンで ready。カメラが native に乗る",
+   "steps": [{"say": "毎日の出費をメモできる家計簿。合計と一覧、レシート写真も残したい", "expect": "ready", "native": ["camera"]}]},
+  {"id": "training", "group": "ja", "note": "質問 → 回答で ready。通知が native に乗る",
+   "steps": [{"say": "筋トレ", "expect": "question"},
+             {"say": "腕立てとスクワット、朝8時に通知", "expect": "ready", "native": ["notification"]}]},
+  {"id": "diary_en", "group": "en", "locale": "en", "note": "英語 1 語 → 英語の質問",
+   "steps": [{"say": "a diary", "expect": "question"}]},
+  {"id": "just_build", "group": "ja", "note": "質問の後に「もう作って」→ Claude を呼ばず即 ready",
+   "steps": [{"say": "家計簿", "expect": "question"},
+             {"say": "もう作って", "expect": "ready", "source": "shortcut"}]},
+  {"id": "training_en_full", "group": "en", "note": "英語の具体的な発話 → 1 ターンで ready",
+   "steps": [{"say": "A workout log for pushups and squats, remind me at 8 in the morning", "expect": "ready", "native": ["notification"]}]}
+]

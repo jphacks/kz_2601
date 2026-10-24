@@ -127,6 +127,21 @@
           "type": "string",
           "description": "Field id used as the record title in lists."
         },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "private",
+            "shared",
+            "public"
+          ],
+          "description": "レコードを誰と共有するか(省略時 private)。みんなで投稿・ランキング・掲示板など、他のユーザーと同じデータを見たい時は public。private は本人だけ。shared は v1 では public と同じ扱い(参加者限定は後段)。",
+          "x-usage": "public/shared のレコードには backend が author(uid)と authorName を自動付与するので、field id に author / authorName は使えない。「みんなで」「共有」「投稿」「ランキング」「掲示板」と言われたら public、家計簿や日記のような個人記録は省略(private)。",
+          "x-enumDescriptions": {
+            "private": "本人だけが読み書きできる個人データ(既定)。家計簿・日記・体重など。",
+            "shared": "同じアプリを開いた人と共有(v1 は public と同じ)。",
+            "public": "誰でも読めて、ログインしていれば誰でも投稿できる。編集・削除は投稿者本人のみ。掲示板・みんなのランキング・共有リスト。"
+          }
+        },
         "fields": {
           "type": "array",
           "items": {

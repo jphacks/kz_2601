@@ -17,7 +17,7 @@ struct SignInView: View {
                 BrandMark(size: 96)
                     .symbolEffect(.pulse, options: .repeating, isActive: session.isBusy)
                 VStack(spacing: Theme.Spacing.sm) {
-                    Text("メタモン")
+                    Text("Tailor It")
                         .font(.system(size: 40, weight: .bold, design: .rounded))
                         .brandText()
                     Text("話しかけるだけで、アプリが生まれ変わる")

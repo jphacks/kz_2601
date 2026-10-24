@@ -29,6 +29,8 @@ struct ChartLeaf: View {
                         BarMark(x: .value("x", b.label), y: .value("y", b.value))
                     }
                 }
+                // 凡例は上(左下に置くと左下のマイク FAB に隠れる)
+                .chartLegend(position: .top, alignment: .leading)
                 // グリッドのセル内ではセルの高さに合わせて伸縮、縦積みでは ideal(200)で描く
                 .frame(minHeight: 120, idealHeight: 200, maxHeight: .infinity)
             }

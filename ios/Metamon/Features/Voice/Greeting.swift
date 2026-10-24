@@ -10,7 +10,7 @@ enum Greeting {
         case returning
         /// 変身一覧の「+ 新しいアプリ」/ 発話「別のアプリ」
         case newApp
-        /// 変身一覧の「メタモンに戻る」/ アプリのリセット
+        /// 変身一覧の「Tailor It に戻る」/ アプリのリセット
         case home
         /// 既にアプリがある(FAB からの音声シート)
         case editing
@@ -50,7 +50,7 @@ enum Greeting {
     static let switcherEmpty = "まだ他のアプリはありません。\n「+ 新しいアプリ」から 2 つ目を作れます"
     static let currentBadge = "使用中"
     static let newAppAction = "新しいアプリ"
-    static let homeAction = "メタモンに戻る(初期画面)"
+    static let homeAction = "Tailor It に戻る(初期画面)"
 
     /// 例文チップ。
     static let createExamples = ["家計簿アプリが欲しい", "筋トレの記録", "散歩の写真メモ"]

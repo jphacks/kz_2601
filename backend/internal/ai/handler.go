@@ -10,7 +10,8 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 )
 
-// NewHandler exposes POST /v1/generate and GET /health.
+// NewHandler exposes POST /v1/generate, POST /v1/chat, DELETE /v1/chat/{appId}
+// and GET /health.
 // Cloud Run's front end swallows /healthz, so /health is the one to probe.
 //
 // POST /v1/generate?stream=1 answers with Server-Sent Events instead of one
@@ -58,6 +59,28 @@ func NewHandler(svc *Service) http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, res)
+	})
+	mux.HandleFunc("POST /v1/chat", func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		if err != nil {
+			writeErr(w, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "cannot read body"})
+			return
+		}
+		var req ChatRequest
+		if err := json.Unmarshal(body, &req); err != nil {
+			writeErr(w, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "invalid JSON: " + err.Error()})
+			return
+		}
+		res, err := svc.Chat(r.Context(), req)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, res)
+	})
+	mux.HandleFunc("DELETE /v1/chat/{appId}", func(w http.ResponseWriter, r *http.Request) {
+		svc.ClearChat(r.PathValue("appId"))
+		w.WriteHeader(http.StatusNoContent)
 	})
 	return mux
 }
