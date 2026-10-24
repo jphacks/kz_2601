@@ -45,7 +45,7 @@ var systemPrompt = strings.TrimSpace(`
 - 画面レイアウトはグリッド座標: 各 Screen は横 A〜F の 6 列 × 縦 1〜12 行(13 行目以降はスクロール、上限 48 行)。Screen 直下の各コンポーネントに area:"A1:C3"(左上セル:右下セル)を付ける。
   - 兄弟同士の area はセルを 1 つも共有してはならない(重なり禁止)。列は A〜F のみ、行は 1 以上。右下セルは左上セル以降。
   - 可変長(list / section / vstack / hstack / 長い text)はセル内でスクロールするので、矩形は大きめ(例 A3:F10)に取る。入力・ボタン・stat・chart は矩形に収まる。
-  - Container の子に area は付けない(付けるとエラー)。
+  - Container の子は通常 area 無しで積む(例外は下の「Container 内のグリッド」)。
   - 迷ったら area を省略してよい(省略した部品は最後に使われた行の次から全幅で上から積まれる)。
 - タブ: app.tabs は 0 個(省略)または 2〜5 個(「ホーム / 集計」「今日 / 履歴」のように 2〜3 個が扱いやすい)。各 tab.screen は screens に存在する id で、重複不可。initialScreen は screens に存在する id。
 - entity/field 束縛: 入力部品(textField/numberField/datePicker/picker/toggle/photoField/image)は screen.entity が設定された画面にのみ置き、field はその entity の field id。picker は enum field、photoField/image は photo field。
@@ -112,6 +112,12 @@ var systemPrompt = strings.TrimSpace(`
 - **件数の単位**: stat の aggregate count は iOS が単位 "items" を付ける。物でない数(books / workouts / days / pills / times)は stat.value = {"agg":"count",...} にして、単位はラベルに書く(例 "Books read this year")。
 - list.item の title / subtitle / trailing に boolean field を置かない(iOS が Yes/No を日本語で出す)。チェックは item.toggle で見せる。
 - 文言は自然で短い英語: 画面タイトルと tab.title は Title Case の 1〜2 語("Today" / "History")、ボタンは動詞始まり("Add book" / "Log workout")、emptyText は "No books yet"、confirmMessage は "Delete this book?"。entity.name は単数形の可算名詞("Book" / "Workout" / "Expense"。"Spending" のような不可算名詞にしない)。日本語・全角文字を 1 字も混ぜない。
+
+## Container 内のグリッド(#81・使うのはまれ)
+- **カードの中で 2 列に並べたい時だけ使う**(card の stat 2 枚を左右に・section のボタン 2 つを左右に)。それ以外は子に area を付けず積む。入れ子は 1 段まで。
+- 使えるのは card / section / vstack の子だけ。子の area は Container の左上を A1 とするローカル座標(列 A〜F・行は Container 自身の area の行数まで)。
+- 付けるなら**その Container の子の全部**に付ける(一部だけはエラー)。子同士も重ねない。
+- 例: {"type":"card","title":"今月","area":"A1:F3","children":[{"type":"stat",...,"area":"A1:C2"},{"type":"stat",...,"area":"D1:F2"}]}
 
 ## 例 1(locale ja): 発話「家計簿アプリを作って。今月の合計と支出一覧、追加ボタンが欲しい。カテゴリ別の内訳も見たい」→ 出力(この書式・既定値省略で)
 ` + abbreviateExample(fewShotKakeibo) + `

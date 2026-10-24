@@ -29,7 +29,27 @@ final class GridAreaTests: XCTestCase {
                 let overlaps = s.overlappingAreas
                 XCTAssertTrue(overlaps.isEmpty, "\(name)/\(s.id): \(overlaps.map { "\($0.0.id)×\($0.1.id)" })")
                 XCTAssertFalse(s.gridPlacement.placed.isEmpty, "\(name)/\(s.id): examples should use the grid")
+                for c in s.components {
+                    guard let local = c.localGridPlacement else { continue }
+                    for i in local.indices {
+                        for j in local.indices where j > i {
+                            XCTAssertFalse(local[i].area.overlaps(local[j].area), "\(name)/\(s.id)/\(c.id): children overlap")
+                        }
+                    }
+                }
             }
         }
+    }
+
+    /// Container 内グリッド(#81): card / section / vstack の子が全員 area を持つ時だけ配置を返す。
+    func testLocalGridPlacement() throws {
+        let dsl = try ExamplesFixture.load("water")
+        let home = try XCTUnwrap(dsl.screens.first { $0.id == "home" })
+        let card = try XCTUnwrap(home.components.first { $0.type == .card })
+        XCTAssertEqual(card.localGridPlacement?.map(\.area.col1), [0, 3])
+        let section = try XCTUnwrap(home.components.first { $0.id == "quick" })
+        XCTAssertEqual(section.localGridPlacement?.count, 2)
+        // area の無い子だけの section は従来どおり積む
+        XCTAssertNil(home.components.first { $0.id == "recent" }?.localGridPlacement)
     }
 }

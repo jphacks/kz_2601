@@ -8,7 +8,7 @@ struct VStackContainer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: c.containerSpacing) {
-            ForEach(c.children) { DSLView(component: $0, ctx: ctx) }
+            if let placed = c.localGridPlacement { LocalGrid(placed: placed, ctx: ctx) } else { ForEach(c.children) { DSLView(component: $0, ctx: ctx) } }
         }
     }
 }
