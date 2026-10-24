@@ -18,6 +18,12 @@ var fewShotKakeibo string
 //go:embed examples/expense_en.json
 var fewShotExpenseEN string
 
+// Logic few-shot (#100): a byte copy of docs/dsl/examples/warikan.json —
+// ref field + computed paid/share/balance + stat.value + settlement.
+//
+//go:embed examples/warikan.json
+var fewShotWarikan string
+
 // systemPrompt is static so the whole block is prompt-cacheable. It embeds
 // the (flattened) generation schema because the API cannot enforce it.
 var systemPrompt = strings.TrimSpace(`
@@ -55,6 +61,12 @@ var systemPrompt = strings.TrimSpace(`
   - chart と集計タブは「グラフ・推移・内訳・割合」のように可視化を求められた時だけ。求められていなければ stat + list のホーム画面とフォーム画面(必要ならタブ無し)で済ませる。
   - app.notifications は「通知・リマインド・知らせて・忘れないように」と言われた時だけ。「毎朝記録する」「夜に見返したい」は使う時間の説明であって毎日の通知の依頼ではない。後者は任意で押せる scheduleNotification ボタン(repeat once)程度に留める。
   - 下の例は形式の参考。タブ名・stat・画面構成は例をコピーせず、その発話の用途に合わせる(例: 毎日つけるものは「今日 / 履歴」)。
+- **計算ロジック**(2026-10-24: 割り勘で支出画面だけ作り「割る」計算が無かった): 発話に「割り勘・精算・1人あたり・残り・差・率・%・達成・BMI・あと何日・カウントダウン」のような計算が含まれるなら、UI だけで終わらせず、カタログ末尾の「計算式 Expr」とレシピで計算を必ず書く。
+  - レコードごとの算出列(支払済・残高・BMI・残り日数)は Field.computed(ref で同じレコードのフィールド・"id" でレコード id)。画面に 1 つの値(1人あたり・残り予算・達成率)は stat.value(ref 不可・agg を使う)。単純な合計/件数は従来どおり stat.aggregate。
+  - 他の entity のレコードを指す項目(支出の「払った人」→メンバー)は type "ref" + refEntity。フォームでは picker で選ぶ。
+  - 割り勘・立替の「誰が誰にいくら」は settlement(members の computed balance を balanceField に)。
+  - op はカタログの一覧だけ。計算が要らない発話には computed / stat.value を足さない。
+  - 式を書けるのは computed・stat.value・agg の filter.value だけ。progressBar / gauge の value は数値リテラルのみ(率のバーは progressBar{entity,field,target})。
 - voiceEntry は書かない(floating が補われる)。編集でも "none" にしない(ユーザーが声でアプリを変え続けられること)。
 - **表示言語**: user ターンの「## 表示言語(locale)」に従う。表示文字列(app.name / app.description、画面タイトル、tab.title、section/chart の title、label、placeholder、emptyText、ボタンやツールバーの label、confirmMessage、entity.name / field.name / enum の options、notifications[].title/body)は **すべてその言語**で書く(ja なら日本語、en なら自然な英語。混在させない)。id / type / enum 値 / area / aggregate / op / repeat / time などの構造は言語に関わらず英数のまま。
   - en の通貨 unit は "$"(発話で通貨が分かればそれに従う)。
@@ -73,6 +85,9 @@ var systemPrompt = strings.TrimSpace(`
 
 ## 例 2(locale en): 発話 "Make an expense tracker. I want this month's total, a list of expenses and an add button. Remind me every evening at 8" → 出力
 ` + abbreviateExample(fewShotExpenseEN) + `
+
+## 例 3(locale ja・計算あり): 発話「旅行の割り勘アプリ。メンバーごとに誰がいくら払ったかと精算額が見たい」→ 出力
+` + abbreviateExample(fewShotWarikan) + `
 
 ## AppDSL の JSON Schema(Component は type ごとに該当するプロパティだけを使う)
 ` + "```json\n" + string(GenerationSchema()) + "\n```")
@@ -95,7 +110,7 @@ var editRules = strings.TrimSpace(`
 `)
 
 // createUserMessage builds the user turn for a full generation.
-func createUserMessage(transcript string, currentDSL string, problems []string, loc Locale) string {
+func createUserMessage(transcript string, currentDSL string, problems []string, loc Locale, uiOnly bool) string {
 	var b strings.Builder
 	if currentDSL != "" {
 		b.WriteString("## 参考: 現在のアプリ(作り直してよい)\n```json\n")
@@ -105,6 +120,10 @@ func createUserMessage(transcript string, currentDSL string, problems []string, 
 	writeLocale(&b, loc)
 	fmt.Fprintf(&b, "## 今回の指示\n「%s」\n\n", strings.TrimSpace(transcript))
 	writeProblems(&b, problems)
+	if uiOnly {
+		// logic pass (logic.go) adds computed / stat.value / settlement afterwards.
+		b.WriteString("## 工程\nこの出力は UI の工程です。計算式(computed / stat.value / settlement)は次の工程で足すので書かなくてよい。他 entity を指す項目(type ref + refEntity)と、計算結果を置く余白(空き行)は用意しておく。\n\n")
+	}
 	b.WriteString("## 出力\nAppDSL 全体を 1 行の compact JSON で出力してください(app を先頭に・既定値は省略・全画面に area を付けた配置)。")
 	return b.String()
 }

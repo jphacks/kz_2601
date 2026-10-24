@@ -41,8 +41,7 @@ struct ProgressBarLeaf: View {
     private var resolvedRatio: Double {
         if let v = c.value { return v }
         guard let entityId = c.entity, let target = c.target, target > 0 else { return 0 }
-        let entity = rt.dsl.entity(entityId)
-        let rows = Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId))
+        let rows = rt.filteredRecords(c)
         return Aggregator.aggregate(c.aggregate ?? "sum", field: c.field, over: rows) / target
     }
 }

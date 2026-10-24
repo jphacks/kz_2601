@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/santhosh-tekuri/jsonschema/v6/kind"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
@@ -109,13 +110,80 @@ func flatten(ve *jsonschema.ValidationError) []string {
 			out = append(out, loc+": "+v.ErrorKind.LocalizedString(errPrinter))
 			return
 		}
-		for _, c := range v.Causes {
+		causes := v.Causes
+		if _, ok := v.ErrorKind.(*kind.AnyOf); ok {
+			causes = deepestCauses(matchingTypeCauses(v.InstanceLocation, causes))
+		}
+		for _, c := range causes {
 			walk(c)
 		}
 	}
 	walk(ve)
 	if len(out) > 20 {
 		out = append(out[:20], fmt.Sprintf("...and %d more", len(out)-20))
+	}
+	return out
+}
+
+// matchingTypeCauses drops anyOf branches that failed on the node's own
+// `type` (a component def whose const did not match), so a stat with a bad
+// value reports the value, not 50 "type must be text/button/..." lines.
+// If every branch failed on type (unknown type), all are kept.
+func matchingTypeCauses(loc []string, causes []*jsonschema.ValidationError) []*jsonschema.ValidationError {
+	typeLoc := strings.Join(append(append([]string{}, loc...), "type"), "/")
+	var failsOnType func(v *jsonschema.ValidationError) bool
+	failsOnType = func(v *jsonschema.ValidationError) bool {
+		if len(v.Causes) == 0 {
+			return strings.Join(v.InstanceLocation, "/") == typeLoc
+		}
+		if _, ok := v.ErrorKind.(*kind.AnyOf); ok { // nested union: fails on type only if every branch does
+			for _, c := range v.Causes {
+				if !failsOnType(c) {
+					return false
+				}
+			}
+			return true
+		}
+		for _, c := range v.Causes {
+			if failsOnType(c) {
+				return true
+			}
+		}
+		return false
+	}
+	var out []*jsonschema.ValidationError
+	for _, c := range causes {
+		if !failsOnType(c) {
+			out = append(out, c)
+		}
+	}
+	if len(out) == 0 {
+		return causes
+	}
+	return out
+}
+
+// deepestCauses keeps the anyOf branches whose errors reach deepest into the
+// instance: for {"op":"median"} that is ".../op: value must be one of ..."
+// instead of one line per Expr shape that did not match ("best match").
+func deepestCauses(causes []*jsonschema.ValidationError) []*jsonschema.ValidationError {
+	var depth func(v *jsonschema.ValidationError) int
+	depth = func(v *jsonschema.ValidationError) int {
+		d := len(v.InstanceLocation)
+		for _, c := range v.Causes {
+			d = max(d, depth(c))
+		}
+		return d
+	}
+	best := -1
+	var out []*jsonschema.ValidationError
+	for _, c := range causes {
+		switch d := depth(c); {
+		case d > best:
+			best, out = d, []*jsonschema.ValidationError{c}
+		case d == best:
+			out = append(out, c)
+		}
 	}
 	return out
 }
@@ -186,6 +254,7 @@ func (a *App) Validate() error {
 			add("entity %q titleField %q does not exist", e.ID, e.TitleField)
 		}
 	}
+	checkComputedFields(a.Entities, entities, add)
 
 	notifIDs := map[string]bool{}
 	for i := range a.App.Notifications {
@@ -310,6 +379,9 @@ func (a *App) Validate() error {
 			if len(c.Children) > 0 {
 				add("%s: %s cannot have children", where, c.Type)
 			}
+			if c.Filter != nil {
+				checkComponentFilterValue(where, c.Filter, entities, add)
+			}
 			switch c.Type {
 			case CompText:
 				if c.Text == "" {
@@ -325,8 +397,12 @@ func (a *App) Validate() error {
 					add("%s: %s requires screen.entity", where, c.Type)
 				} else if f := formEntity.FieldByID(c.Field); f == nil {
 					add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
-				} else if c.Type == CompPicker && f.Type != FieldEnum {
-					add("%s: picker field %q must be enum", where, c.Field)
+				} else if f.Computed != nil && c.Type != CompImage {
+					add("%s: field %q is computed (read-only); inputs cannot bind to it. Bind a stored field or show it with list/table/stat", where, c.Field)
+				} else if c.Type == CompPicker && f.Type != FieldEnum && f.Type != FieldRef {
+					add("%s: picker field %q must be enum or ref", where, c.Field)
+				} else if c.Type != CompPicker && f.Type == FieldRef {
+					add("%s: field %q is type ref; use a picker to choose the %s record", where, c.Field, f.RefEntity)
 				} else if (c.Type == CompPhotoField || c.Type == CompImage) && f.Type != FieldPhoto {
 					add("%s: %s field %q must be type photo", where, c.Type, c.Field)
 				}
@@ -357,7 +433,11 @@ func (a *App) Validate() error {
 				if c.SearchField != "" && !searchKeys[c.SearchField] {
 					add("%s: searchField %q has no matching searchBar (field) on screen %q", where, c.SearchField, s.ID)
 				}
-			case CompStat, CompChart:
+			case CompStat:
+				checkStat(where, c, entities, add)
+			case CompSettlement:
+				checkSettlement(where, c, entities, add)
+			case CompChart:
 				e := entities[c.Entity]
 				if e == nil {
 					add("%s: %s entity %q does not exist", where, c.Type, c.Entity)
@@ -366,7 +446,7 @@ func (a *App) Validate() error {
 				if c.Aggregate != "count" && e.FieldByID(c.Field) == nil {
 					add("%s: %s field %q not in entity %q (required unless aggregate=count)", where, c.Type, c.Field, e.ID)
 				}
-				if c.Type == CompChart && e.FieldByID(c.GroupBy) == nil {
+				if e.FieldByID(c.GroupBy) == nil {
 					add("%s: chart groupBy %q not in entity %q", where, c.GroupBy, e.ID)
 				}
 				if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
@@ -433,6 +513,8 @@ func (a *App) Validate() error {
 					add("%s: %s requires screen.entity", where, c.Type)
 				} else if f := formEntity.FieldByID(c.Field); f == nil {
 					add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
+				} else if f.Computed != nil {
+					add("%s: field %q is computed (read-only); inputs cannot bind to it", where, c.Field)
 				} else if c.Type == CompLocationButton && f.Type != FieldLocation {
 					add("%s: locationButton field %q must be type location", where, c.Field)
 				} else if c.Type == CompQrScanner && f.Type != FieldString && f.Type != FieldText {
@@ -453,8 +535,8 @@ func (a *App) Validate() error {
 						add("%s: timerDisplay.field requires screen.entity", where)
 					} else if f := formEntity.FieldByID(c.Field); f == nil {
 						add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
-					} else if f.Type != FieldInteger && f.Type != FieldNumber {
-						add("%s: timerDisplay field %q must be integer or number", where, c.Field)
+					} else if (f.Type != FieldInteger && f.Type != FieldNumber) || f.Computed != nil {
+						add("%s: timerDisplay field %q must be integer or number (stored, not computed)", where, c.Field)
 					}
 				}
 			case CompLabel:
@@ -630,8 +712,10 @@ func checkAggregateRef(where string, c *Component, entities map[string]*Entity, 
 
 func checkProgressBar(where string, c *Component, entities map[string]*Entity, add func(string, ...any)) {
 	if c.Value != nil {
-		if *c.Value < 0 || *c.Value > 1 {
-			add("%s: progressBar value %v must be within 0..1", where, *c.Value)
+		if v, ok := c.Value.Number(); !ok {
+			add("%s: progressBar value must be a number literal 0..1 (expressions are only for stat.value)", where)
+		} else if v < 0 || v > 1 {
+			add("%s: progressBar value %v must be within 0..1", where, v)
 		}
 		if c.Entity != "" {
 			add("%s: progressBar takes either value or entity, not both", where)
@@ -662,6 +746,9 @@ func checkGauge(where string, c *Component, entities map[string]*Entity, add fun
 		add("%s: gauge max %v must be greater than min %v", where, hi, lo)
 	}
 	if c.Value != nil {
+		if _, ok := c.Value.Number(); !ok {
+			add("%s: gauge value must be a number literal (expressions are only for stat.value)", where)
+		}
 		if c.Entity != "" {
 			add("%s: gauge takes either value or entity, not both", where)
 		}
@@ -746,6 +833,9 @@ func checkInputBinding(where string, c *Component, formEntity *Entity, add func(
 	if f == nil {
 		add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
 		return
+	}
+	if f.Computed != nil {
+		add("%s: field %q is computed (read-only); inputs cannot bind to it", where, c.Field)
 	}
 	allowed := inputFieldTypes[c.Type]
 	ok := false

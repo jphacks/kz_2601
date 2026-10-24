@@ -40,9 +40,16 @@ enum Theme {
 
     /// ランタイム側オーバーレイ(DSL 外)の配置。
     enum Layout {
-        /// マイク FAB の位置。DSL の「追加」ボタンは右下(`D11:F12` が定番)に来るので**左下**に置いて被らないようにする。
-        static let fabAlignment: Alignment = .bottomLeading
+        /// マイク FAB の初期位置。DSL の「追加」ボタンは右下(`D11:F12` が定番)に来るので**左下**に置いて被らないようにする。
+        /// ユーザーはドラッグで左右どちらの辺にも移せる(#52・`VoiceFab` / `FabDock`)。
+        static let fabDefaultSide: FabSide = .leading
         static let fabSize: CGFloat = 60
+        /// FAB を上へ動かせる限界(領域の上端からこの距離)。ナビバー(大見出し無し 44pt + 余白)にかからない位置で止める。
+        static let fabTopReserve: CGFloat = 64
+        /// 端に隠した時に残る取っ手(見た目の幅・高さ)と、指で触れる幅。
+        static let fabHandleWidth: CGFloat = 14
+        static let fabHandleHeight: CGFloat = 56
+        static let fabHandleHitWidth: CGFloat = 32
         static let fabHorizontalInset: CGFloat = Spacing.lg
         /// タブバーがある時はその上に逃がす。
         static func fabBottomInset(hasTabs: Bool) -> CGFloat { hasTabs ? 70 : Spacing.lg }

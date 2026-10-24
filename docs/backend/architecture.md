@@ -151,6 +151,29 @@ apps_public/{appId}                                   # 公開 DSL: {ownerUid, n
 
 実装: `store.RecordSet{UID, AppID, Entity, Public}` でコレクションを選ぶ(`store.PrivateRecords` / `store.PublicRecords`)。`store.PublishApp` / `GetPublicApp` が公開 DSL。handler は `appconfig/records.go` の `recordSet()` と `ownRecord()`(403 判定)。レコード検証は従来どおり呼び出し側ユーザーの現行 DSL で行うので、インストール後に各自が entity を変えても他人のレコードは消えない(スキーマレス)。
 
+### 3.2 シェアリンクと公開カタログ「探す」(#49 #50)
+
+```
+shares/{token}        # {appId, ownerUid, name, dslVersion, dslJson, revoked, createdAt}  token = 192bit base64url
+public_apps/{appId}   # {ownerUid, name, description, tags[], authorName, components[], dslVersion, dslJson, installs, createdAt, updatedAt}
+```
+
+`public_apps`(探すの掲載)は §3.1 の `apps_public`(共有レコードの置き場)とは**別物**。名前が近いので注意。
+
+| 項目 | 決定 |
+|---|---|
+| シェア | `POST /apps/{appId}/share` が現行 DSL を**スナップショット**して token を返す(後から作者が変えてもリンク先は変わらない)。`DELETE /shares/{token}` で取り消し(発行者のみ)。取り消し後の import / プレビュー / Web ページは 404 |
+| 複製(import / install 共通 `installCopy`) | 受け取った人の木に version 1(初期)→ version 2(複製 DSL・`source.kind=import`)で作る(iOS の変身一覧は version 1 を「未生成」として隠すため)。**レコードは複製しない** |
+| 共有データ(scope: shared/public)の扱い | 共有 entity を含むアプリは**新しい appId を振らず元の appId に参加**する。理由: #93 の共有レコードは `apps_public/{appId}` で appId 単位、かつ「他人が同じ appId を開く = インストール」という設計なので、新 appId だと受け取った人は空の掲示板を見るだけになり共有の意味が無い。既に持っていれば何もしない(`created:false`)。private だけのアプリは新しい UUID の appId に独立コピー |
+| 公開 | `POST /apps/{appId}/publish`(name/description/tags/authorName)で作成・更新、`DELETE` で取り下げ。同じ appId の掲載を他人が持っていれば 403(共有アプリに参加した人が乗っ取れない) |
+| 検索 | `GET /public-apps?q=&sort=popular`(または `new`): installs 降順で最大 500 件を読み、名前・説明・タグ・作者名の部分一致をメモリ内で絞る(全文検索なし・複合インデックス不要) |
+| installs | `POST /public-apps/{id}/install` で**新規に複製した時だけ** `firestore.Increment(1)`。掲載者本人・参加済みの再インストールは数えない |
+| 認可 | share / publish / unpublish / revoke = 所有者のみ(自分の木にあるアプリ・掲載の ownerUid)。import / install / 検索 = 認証済みなら誰でも |
+| Web フォールバック | 認証不要の `GET /s/{token}`(appconfig 直下・`/v1` の外)。アプリ名と `tailorit://import/<token>` を開くボタンだけを出し、DSL は返さない。ベース URL は `SHARE_WEB_BASE_URL`、無ければリクエストのホスト |
+| モデレーション | 通報・運営による強制非公開は未実装。掲載者が `DELETE /publish` で取り下げられるだけ(後続) |
+
+デモ用シード: `scripts/seed-public-apps.sh <appconfig URL>` が `docs/dsl/examples` の kakeibo / training / walk を `catalog-<name>` として公開する(再実行は上書き)。
+
 ## 4. 認証・認可
 
 | 項目 | 決定 |
@@ -368,6 +391,18 @@ flowchart LR
 | 既存アプリがある時 | `/chat` は呼ばれない想定(iOS が初期状態の時だけ対話 UI を出す)。`/generate` の `mode: auto` 判定は従来どおり |
 | 実測(Sonnet 5.5 / low・6 ケース 8 ステップ全通過) | Claude 1 回 **p50 2.4s**(初回キャッシュ作成 7.5s を除くと 2.05〜2.6s)、即 ready は 0ms。Haiku 5.5 は速くならず(2.2 / 2.8s)英語の具体発話で質問に戻ったので採用せず |
 
+### 6.7 計算ロジック(Expr・Issue #100)
+
+割り勘で「割る」計算が DSL に書けなかった問題への対応。仕様は [../dsl/expressions.md](../dsl/expressions.md)、eval は [ai-eval/2026-10-24-logic.md](ai-eval/2026-10-24-logic.md)。
+
+| 項目 | 決定 |
+|---|---|
+| 表現 | 小さな式ツリー `Expr`(リテラル / ref / agg / op / if・op は閉じた 38 種・深さ 8)を `Field.computed`(行ごとの算出列)と `stat.value`(画面スカラー)に置く。他 entity 参照は `Field.type:"ref"`、精算は Leaf `settlement`。評価は iOS、backend は `pkg/dsl/expr.go` で検証(op/引数/ref 文脈/agg/循環/深さ/粗い型) |
+| AI への教え方 | カタログ末尾に `$defs/Expr` から自動生成した「計算式 Expr」節(形・op 一覧・レシピ 5 本)+ few-shot 例 3(割り勘)+ プロンプト規則「計算が要る発話では UI だけで終わらせない」 |
+| 既定 = **1 パス** | UI と計算を 1 回の生成で出す。新 5 ケースで計算 5/5・一発通過 5/5・p50 6.5s / p95 8.1s。入力は約 +5.8K tok(キャッシュ対象) |
+| 2 パス(opt-in) | `AI_LOGIC_PASS=1` か `Request.logicPass:true`。create の後に計算カタログだけの小さな system prompt(約 2.9K tok)で「計算を足す JSON Patch」を 1 回(+1 回再試行)。検証に通らなければ 1 パス目を返す。計算 5/5 は同じで p50 10.7s(1 パス 6.5s)と遅いので既定にしない。edit ターンでは動かない(後続対応) |
+| ストリーミング | 1 パス目の `event: app` はそのまま先に届く。2 パス目の結果は最終 DSL(`event: result`)に反映 |
+
 ## 7. ローカル開発・デプロイ・環境変数
 
 ### ローカル
@@ -440,6 +475,7 @@ jobs:
 | `CLAUDE_STRUCTURED_OUTPUT` | - | o | 未設定(=off)。`1` で `output_config.format` を送る(現状は文法サイズ超過で 400) |
 | `OPENAI_API_KEY` | - | o | Secret Manager・任意(無ければ /transcribe 501) |
 | `GENERATE_TIMEOUT_SEC` | - | o | `45` |
+| `AI_LOGIC_PASS` | - | o | 未設定(=off)。`1` で create 後に計算ロジックの 2 パス目を実行(§6.7) |
 | `MAX_AUDIO_BYTES` | - | o | `26214400` |
 
 ## 8. ディレクトリ構成

@@ -178,9 +178,10 @@
             "enum",
             "currency",
             "photo",
-            "location"
+            "location",
+            "ref"
           ],
-          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. location = \"lat,lng\" string (P1)."
+          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField."
         },
         "required": {
           "type": "boolean"
@@ -212,6 +213,14 @@
         "unit": {
           "type": "string",
           "description": "e.g. 円, kg"
+        },
+        "refEntity": {
+          "type": "string",
+          "description": "type=ref only: the entity id whose record this field points to."
+        },
+        "computed": {
+          "$ref": "#/$defs/Expr",
+          "description": "Read-only calculated field (never stored, never bound to inputs). Evaluated per record: `ref` reads this record's fields (\"id\" = record id). type must be number|integer|currency|string|boolean|date. Usable in list/table/stat/chart like a stored field."
         }
       }
     },
@@ -587,6 +596,9 @@
         },
         {
           "$ref": "#/$defs/WebView"
+        },
+        {
+          "$ref": "#/$defs/Settlement"
         }
       ]
     },
@@ -933,7 +945,7 @@
     "Filter": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list / stat / chart のレコード絞り込み。op が thisMonth / today のときは value を null にする。",
+      "description": "list / stat / chart / agg のレコード絞り込み。op が thisMonth / today のときは value を null にする。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。",
       "required": [
         "field",
         "op",
@@ -969,21 +981,32 @@
             },
             {
               "type": "null"
+            },
+            {
+              "$ref": "#/$defs/ExprRef"
+            },
+            {
+              "$ref": "#/$defs/ExprAgg"
+            },
+            {
+              "$ref": "#/$defs/ExprOp"
+            },
+            {
+              "$ref": "#/$defs/ExprIf"
             }
-          ]
+          ],
+          "description": "Literal or Expr. null for thisMonth/today. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id)."
         }
       }
     },
     "Stat": {
       "type": "object",
       "additionalProperties": false,
-      "description": "集計値 1 つのカード(件数・合計・平均・最小・最大)。今月の合計・今日の件数・平均体重など。",
-      "x-usage": "2〜3 枚を hstack に入れて A1:F2 に横並び、または単体で A1:C2 / D1:F2。filter で thisMonth / today(value は null)。金額は format currency。",
+      "description": "集計値 1 つのカード(件数・合計・平均・最小・最大)、または計算式 value の結果。今月の合計・今日の件数・平均体重・残り予算・1人あたりなど。",
+      "x-usage": "2〜3 枚を hstack に入れて A1:F2 に横並び、または単体で A1:C2 / D1:F2。filter で thisMonth / today(value は null)。金額は format currency。aggregate と value はどちらか一方: 単純な合計/件数は aggregate、差・割り算・条件分岐が要る時は value に Expr(例: 残り予算 {\"op\":\"sub\",\"args\":[50000,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]})。",
       "required": [
         "type",
-        "label",
-        "entity",
-        "aggregate"
+        "label"
       ],
       "properties": {
         "type": {
@@ -999,7 +1022,8 @@
           "type": "string"
         },
         "entity": {
-          "type": "string"
+          "type": "string",
+          "description": "Required with aggregate (omit with value)."
         },
         "aggregate": {
           "type": "string",
@@ -1009,7 +1033,8 @@
             "avg",
             "min",
             "max"
-          ]
+          ],
+          "description": "Exactly one of aggregate or value. aggregate=count|sum|avg|min|max over entity(.field)."
         },
         "field": {
           "type": "string",
@@ -1025,6 +1050,10 @@
             "currency",
             "percent"
           ]
+        },
+        "value": {
+          "$ref": "#/$defs/Expr",
+          "description": "Calculated value (alternative to aggregate/entity/field/filter). Screen scalar: `ref` is not allowed, use `agg`. e.g. remaining budget = sub(50000, agg sum thisMonth)."
         }
       }
     },
@@ -1404,6 +1433,18 @@
           "items": {
             "$ref": "#/$defs/TableColumn"
           }
+        },
+        {
+          "$ref": "#/$defs/ExprRef"
+        },
+        {
+          "$ref": "#/$defs/ExprAgg"
+        },
+        {
+          "$ref": "#/$defs/ExprOp"
+        },
+        {
+          "$ref": "#/$defs/ExprIf"
         }
       ]
     },
@@ -2494,6 +2535,256 @@
       },
       "description": "外部サイトをアプリ内で表示する(WKWebView・戻る/進む/再読込の小ツールバー付き)。ニュース・地図サイト・公式ページ・時刻表など「○○を見たい」「○○のサイトを埋め込みたい」に選ぶ。Safari に飛ばすだけでよければ openUrlButton。",
       "x-usage": "A1:F12 など大きめの area に 1 画面 1 つ。セル内で WebView 自身がスクロールするので list と同じ段に並べない。タブの 1 つを webView だけにするのが定石。"
+    },
+    "Settlement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "nameField",
+        "balanceField"
+      ],
+      "properties": {
+        "type": {
+          "const": "settlement"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "Card title (optional, e.g. 精算)."
+        },
+        "entity": {
+          "type": "string",
+          "description": "Entity whose records are the people (e.g. members)."
+        },
+        "nameField": {
+          "type": "string",
+          "description": "Field shown as the person's name."
+        },
+        "balanceField": {
+          "type": "string",
+          "description": "Numeric (usually computed) field: positive = should receive, negative = should pay."
+        }
+      },
+      "description": "割り勘の精算リスト。balance(正=受け取る・負=払う)から少ない送金回数になるよう貪欲法で列挙し「A → B ¥1,200」と表示する。割り勘・立替精算専用。",
+      "x-usage": "members entity に computed の paid / share / balance を作り、balanceField に balance を指定。全幅 3〜4 行(例 A7:F10)、members の table の下に置く。"
+    },
+    "Expr": {
+      "description": "計算式(式ツリー)。リテラル(number/string/boolean)・{ref}(行のフィールド値)・{agg}(エンティティの集計)・{op,args}(関数)・{if,then,else}。評価エラー(ゼロ除算・型不一致・参照先なし)は iOS で「—」表示。深さ 8 まで。",
+      "x-usage": "置き場所は Field.computed(行ごとの算出列・ref 可)と stat.value(画面のスカラー・ref 不可)。発話に計算(割る・差・率・残り・日数・BMI など)がある時だけ足す。",
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "$ref": "#/$defs/ExprRef"
+        },
+        {
+          "$ref": "#/$defs/ExprAgg"
+        },
+        {
+          "$ref": "#/$defs/ExprOp"
+        },
+        {
+          "$ref": "#/$defs/ExprIf"
+        }
+      ],
+      "x-recipes": [
+        "割り勘(members{name} + expenses{title,amount:currency,payer:ref→members,date}): members.computed paid = {\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"amount\",\"filter\":{\"field\":\"payer\",\"op\":\"eq\",\"value\":{\"ref\":\"id\"}}} / share = {\"op\":\"round\",\"args\":[{\"op\":\"div\",\"args\":[{\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"amount\"},{\"agg\":\"count\",\"entity\":\"members\"}]}]} / balance = {\"op\":\"sub\",\"args\":[{\"ref\":\"paid\"},{\"ref\":\"share\"}]}。ホームに stat(合計 aggregate sum・1人あたり value)+ members の table(name/paid/balance)+ settlement{entity:members,nameField:name,balanceField:balance}。支出フォームの payer は picker。",
+        "BMI(body{date,weight:number kg,height:number cm}): body.computed bmi(number) = {\"op\":\"div\",\"args\":[{\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"op\":\"div\",\"args\":[{\"ref\":\"weight\"},{\"op\":\"pow\",\"args\":[{\"op\":\"div\",\"args\":[{\"ref\":\"height\"},100]},2]}]},10]}]},10]}(小数 1 桁)。list の trailing / table の列に bmi。",
+        "残り予算: stat.value = {\"op\":\"sub\",\"args\":[<予算>,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]}。予算額が発話に無い/後で変えたいなら budget{amount:currency} entity を作り <予算> = {\"agg\":\"max\",\"entity\":\"budget\",\"field\":\"amount\"}。",
+        "達成率: stat{format:percent,value:{\"op\":\"div\",\"args\":[{\"agg\":\"sum\",\"entity\":\"saving\",\"field\":\"amount\"},<目標>]}}(percent は 0..1 を % 表示)+ progressBar{entity,field,target:<目標>}。",
+        "カウントダウン: exam{title,date:date} の computed days_left(integer) = {\"op\":\"daysUntil\",\"args\":[{\"ref\":\"date\"}]}。list の trailing に days_left、最も近い試験は stat.value = {\"agg\":\"min\",\"entity\":\"exam\",\"field\":\"days_left\",\"filter\":{\"field\":\"days_left\",\"op\":\"gte\",\"value\":0}}。"
+      ]
+    },
+    "ExprRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref"
+      ],
+      "description": "行コンテキスト(computed の対象レコード)のフィールド値。\"id\" はレコード id。stat.value では使えない。",
+      "properties": {
+        "ref": {
+          "type": "string",
+          "description": "Field id of the current record, or \"id\"."
+        }
+      }
+    },
+    "ExprAgg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agg",
+        "entity"
+      ],
+      "description": "エンティティ全体(filter で絞り込み)の集計。count 以外は field 必須。filter は 1 つ、または配列(AND)。",
+      "properties": {
+        "agg": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum",
+            "avg",
+            "min",
+            "max"
+          ]
+        },
+        "entity": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string",
+          "description": "Required unless agg=count. May be a computed field of that entity."
+        },
+        "filter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Filter"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Filter"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ExprOp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "args"
+      ],
+      "description": "関数呼び出し。op は閉じた一覧(これ以外の関数は無い)。",
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": [
+            "add",
+            "sub",
+            "mul",
+            "div",
+            "mod",
+            "neg",
+            "abs",
+            "sqrt",
+            "pow",
+            "round",
+            "floor",
+            "ceil",
+            "min",
+            "max",
+            "clamp",
+            "eq",
+            "neq",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "and",
+            "or",
+            "not",
+            "concat",
+            "len",
+            "now",
+            "today",
+            "daysBetween",
+            "daysUntil",
+            "addDays",
+            "year",
+            "month",
+            "day",
+            "weekday",
+            "toNumber",
+            "toString",
+            "coalesce"
+          ],
+          "x-enumDescriptions": {
+            "add": "a+b+...(2 個以上)",
+            "sub": "a-b",
+            "mul": "a*b*...(2 個以上)",
+            "div": "a/b(b=0 は評価エラー)",
+            "mod": "a mod b",
+            "neg": "-a",
+            "abs": "|a|",
+            "sqrt": "√a(a<0 はエラー)",
+            "pow": "a の b 乗",
+            "round": "round(x) 四捨五入して整数 / round(x, n) 小数 n 桁",
+            "floor": "floor(x[, n]) 切り捨て(n = 小数桁)",
+            "ceil": "ceil(x[, n]) 切り上げ(n = 小数桁)",
+            "min": "最小(2 個以上)",
+            "max": "最大(2 個以上)",
+            "clamp": "clamp(x, lo, hi)",
+            "eq": "a == b(型が違えば数値か文字列に寄せて比べる: id と ref の比較用)",
+            "neq": "a != b(eq と同じ寄せ方)",
+            "gt": "a > b",
+            "gte": "a >= b",
+            "lt": "a < b",
+            "lte": "a <= b",
+            "and": "a かつ b(2 個)",
+            "or": "a または b(2 個)",
+            "not": "否定",
+            "concat": "文字列連結(2 個)",
+            "len": "文字数",
+            "now": "現在日時(引数なし)",
+            "today": "今日の日付(引数なし)",
+            "daysBetween": "daysBetween(a,b) = b - a の日数",
+            "daysUntil": "daysUntil(d) = d - 今日 の日数(過ぎたら負)",
+            "addDays": "addDays(d, n) = d の n 日後",
+            "year": "年",
+            "month": "月(1-12)",
+            "day": "日(1-31)",
+            "weekday": "曜日(1=日 ... 7=土)",
+            "toNumber": "数値に変換(不可ならエラー)",
+            "toString": "文字列に変換",
+            "coalesce": "coalesce(a,b) = a が空(null・空文字)/エラーなら b"
+          }
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Expr"
+          },
+          "description": "now/today は []。"
+        }
+      }
+    },
+    "ExprIf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "if",
+        "then",
+        "else"
+      ],
+      "description": "条件分岐。if が true なら then、それ以外は else。",
+      "properties": {
+        "if": {
+          "$ref": "#/$defs/Expr"
+        },
+        "then": {
+          "$ref": "#/$defs/Expr"
+        },
+        "else": {
+          "$ref": "#/$defs/Expr"
+        }
+      }
     }
   }
 }

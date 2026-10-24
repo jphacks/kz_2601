@@ -279,7 +279,24 @@ DEBUG フック(シミュレータ E2E): `METAMON_E2E_OFFLINE_SECONDS=<n>`(#70�
 bootstrap の順序(#86): `recordSync.start()` → 到達性監視 → `GET /dsl` 復元 → ポーリング開始 → **通知の同期(許可ダイアログ)は最後に `Task {}` で投げて await しない** → DEBUG フック。ダイアログに答えるまで復元・同期が止まらない。
 
 生成後も **マイク FAB**(ランタイム側、DSL 外)から同じシートを開いて再改変できる。初期 DSL は `voiceInput` 1画面のみ。
-FAB の位置は `Theme.Layout.fabAlignment`(**左下**)の 1 箇所で決める。DSL の「追加」ボタンは右下 `D11:F12` に置かれるのが定番で、右下 FAB だと被るため左下に移した(タブバーがある時は `fabBottomInset(hasTabs:)` でその上に逃がす)。
+#### マイク FAB の位置(ピクチャーインピクチャー風・#52)
+
+FAB 本体は `ios/Metamon/App/VoiceFab.swift`。判定ロジックは純粋関数 `FabDock`(`MetamonRenderer/Screen/FabDock.swift`・`FabDockTests`)。
+
+| 項目 | 挙動 |
+|---|---|
+| 初期位置 | **左下**(`Theme.Layout.fabDefaultSide`)。DSL の「追加」ボタンは右下 `D11:F12` が定番なので被らない側。タブバーがある時は `fabBottomInset(hasTabs:)` でその上 |
+| ドラッグ | 10pt 以上動かすとドラッグ(`DragGesture(minimumDistance: 10, coordinateSpace: .global)`)。離すと最寄りの左右の辺へ spring で吸着。辺は慣性込みの予測位置(`predictedEndTranslation`)で選ぶ。縦位置は自由(上限 = 領域上端から `fabTopReserve` 64pt・ナビバーにかからない) |
+| 隠す | 離した時の中心 x(実位置 or 予測位置)が端から `fabSize × 0.3` 以内 → 本体は画面外、辺に取っ手(幅 14pt・触れる幅 32pt)だけ残る |
+| 戻す | 取っ手のタップ / 内側へ 20pt 以上引く。取っ手の長押しは変身一覧 |
+| 部品回避 | 吸着した側の最下段 2 列(左 A〜B / 右 E〜F)に部品があれば、その上端まで上げる(#83)。Renderer が `GridBottomObstructionKey`(左)/ `GridBottomTrailingObstructionKey`(右)で上端 y を上げる。ユーザーが下げても退避位置より下には置かない(`FabDock.displayedBottom`) |
+| 保存 | `@AppStorage`: `fab.side`(leading/trailing)・`fab.bottom`(下端からの距離。-1 = 自動)・`fab.hidden`。アプリごとではなく Tailor It 共通 |
+| 維持 | フォーム表示中は出さない(#83)・生成中は沈めて触れない。Reduce Motion では吸着アニメを 0.12s の easeOut に短縮 |
+| VoiceOver | 本体: 「話しかけて変える」+ アクション「変身一覧」「反対側へ移動」「端に隠す」。取っ手: 「話しかけて変える。ダブルタップで表示」+「変身一覧」 |
+
+ジェスチャ競合: `Button` は残し(VoiceOver・押下ハイライト)、長押しとドラッグを `simultaneousGesture` で重ねる。FAB が指に付いて動くので離した瞬間に Button のタップも発火する → ドラッグ認識時に `suppressTap`、長押し発火時に `longPressFired` を立ててタップを捨てる(次に指が触れた瞬間 = `LongPressGesture.onChanged` でリセット、ドラッグ後は 0.3s 後にも解除)。長押しの許容移動は 10pt でドラッグしきい値と揃える(先に 10pt 動けば長押し失敗 = ドラッグ、0.45s 静止で変身一覧)。長押し発火後のドラッグは無視。
+
+DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例 `right-hidden:360`)/ `auto`(初期状態に戻す)。simctl でドラッグを再現しにくいので保存値を直接書く。
 
 ### 復元・元に戻す・新規作成 の状態遷移(appconfig 接続・2026-10-24 夕)
 
@@ -369,6 +386,19 @@ FAB の位置は `Theme.Layout.fabAlignment`(**左下**)の 1 箇所で決める
 初期画面の見出しは DSL の `voiceInput.prompt` ではなく Greeting を使う(生成アプリ内の `voiceInput` 部品は従来どおり `prompt` を表示)。
 
 DEBUG フック: `METAMON_AUTO_SWITCHER=1`(起動 2.5 秒後に変身一覧を開く)。`METAMON_AUTO_TRANSCRIPT="家計簿に切り替えて"` で音声切替も通せる。
+
+### シェアと「探す」(#49 #50)(2026-10-24 夜)
+
+| 入口 | 動き | 実装 |
+|---|---|---|
+| 変身一覧の各カード右上の共有ボタン | `ShareAppSheet`: `POST /apps/{id}/share` → QR(`tailorit://import/<token>`)・`ShareLink`(Web フォールバック URL + アプリ URL)・コピー・取り消し。下段で「探す」へ公開/非公開(説明・タグ) | `Features/Share/ShareAppSheet.swift`。発行済みトークンは `SharingUI.issued` に保持(開くたびに増やさない) |
+| `tailorit://import/<token>`(QR / リンク) | `POST /shares/{token}/import` → 返った appId に `switchApp`(変身アニメ)→ 要約カード「シェアされた「◯◯」を追加しました」 | `Info.plist` の `CFBundleURLTypes`、`SharingHooks`(RootView に 1 行)の `onOpenURL` → `AppRuntime.openShareURL` |
+| 初期画面下部「みんなが作ったアプリを探す」 | `DiscoverSheet`: 検索(250ms 間引き)・人気/新着・カード(名前・作者・利用数・説明・部品アイコン・タグ)→「入れる」で `POST /public-apps/{id}/install` → 変身 | `Features/Share/DiscoverSheet.swift`。導線は `VoiceInputView` に 1 行(`DiscoverEntry`) |
+
+- サービスは `MetamonServices` の `SharingClient`(`HTTPSharingClient`)。`Services.sharing` は appconfig が live の時だけ非 nil で、モック起動では導線ごと出さない。
+- 共有データ(scope: shared/public)を持つアプリは受け取ると**元の appId に参加**する(backend architecture §3.2)。要約カードに「みんなの投稿も見られます」を添える。
+- DEBUG フック: `METAMON_AUTO_SHARE=1`(変身一覧 → 今のアプリのシェアシート)/ `METAMON_AUTO_IMPORT=<token>`(リンクを開いたのと同じ経路。`simctl openurl` は OS の確認ダイアログで止まるため)/ `METAMON_AUTO_DISCOVER=1`(+ `METAMON_AUTO_INSTALL=<公開 id>`)。
+- 注意: 端末ローカルの `DocumentCache` / レコードキャッシュは uid を区別しないので、同じ端末で `METAMON_DEV_UID` を切り替えると前ユーザーのキャッシュが一瞬見える(サーバーは正しく分離)。2 ユーザー検証はアプリを入れ直してから行う。
 
 ## 7. 認証(実装済み)
 
@@ -531,3 +561,25 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 | blue | #0054BE / 6.97 / 5.47 | #5AA0FF / 6.41 / 5.02 | #007AFF / 4.02 |
 
 既知の残課題: primary button の白文字 × AccentColor(#587AF0)は 3.85:1(本体の asset catalog 側。太字 17pt なので AA Large の 3:1 は満たす)。確認は `xcrun simctl ui <udid> content_size accessibility-large` / `appearance dark` で kakeibo・training・walk を表示して行う。
+
+## 14. 計算ロジック(Expr・computed・ref・settlement / Issue #101)
+
+割り勘のように「画面はできたが裏の計算が無い」を埋めるため、DSL に計算式 `Expr` を足した(backend #100 と共通契約)。
+**契約の正典は `docs/dsl/expressions.md`(とスキーマ `$defs/Expr`)**。本節は iOS 実装の対応表で、食い違ったら expressions.md が勝つ。
+
+| 置き場所 | 意味 | iOS 実装 |
+|---|---|---|
+| `Field.computed: Expr` | 読み取り専用の算出フィールド(行 = そのレコード)。**Record に保存しない** | `DSLRuntime.viewRecords(for:)` が computed を data に合成した表示用レコードを返す → list / table / timeline / stat(aggregate の field)/ chart(groupBy・field)/ sort がそのまま扱える |
+| フォーム内の computed(防御) | 契約上 computed に入力部品は束縛できない(backend がエラー)。それでも来た場合は読み取り専用行にし、入力中のドラフトで**ライブ更新** | `FormFieldOverride`(`DSLView` で 1 箇所振り分け)→ `ComputedFieldRow`。`FormDraft` は `storedFields` だけを持ち・送る |
+| `Stat.value: Expr` | aggregate の代替(行なし・`ref` 不可)。`value` のときは `entity/field/filter` を書かない(agg の中に書く) | `StatLeaf.exprValue`(アイコン既定は `function`) |
+| `Field.type = ref` + `refEntity` | 別 entity のレコード参照。保存値はレコード id。入力は `picker`(それ以外の入力部品は backend がエラー) | 表示は `rt.display(_:field:)` が見出し(titleField → 最初の string)に解決。フォームは `RefPickerRow`(0 件なら「先に◯◯を追加してください」) |
+| `settlement` leaf | balance(正=受け取る/負=払う)から「A → B ¥1,200」 | `Settlement.transfers`(貪欲法・1 円未満は 0)+ `SettlementLeaf` |
+
+- 評価器 `MetamonDSL/Logic/ExprEvaluator.swift`。値は `ExprValue`(number/string/bool/date)、評価不能(ゼロ除算・型不一致・参照なし)は `nil` → 表示「—」(`FieldCoding.unavailable`)。深さ ≤ 8・循環なしは backend が保証する。iOS は防御として循環と入れ子 48 段超も `nil` にする。
+- リテラルは number / string / boolean(`null` は契約外)。iOS のデコードは寛容に `null` も受ける。
+- `agg.filter.value` の Expr(例 `{"ref":"id"}`)は**外側の行**で評価してから照合する。`agg.filter` は単体 or 配列(AND)。部品レベルの `filter`(list / stat / chart …)はスキーマ上 1 つだけ(iOS は配列も読める)。
+- progressBar / gauge の `value` は従来どおり数値リテラルのみ(Expr にしない)。
+- 性能: `rt.evaluator()` は全 entity のレコード + computed 定義のハッシュを署名にして評価器を使い回す(computed / agg の結果をメモ)。10 行 × 支出 100 件程度なら 1 画面 1 回の評価で済む。
+- レコード取得対象は `AppDSL.entitiesNeeded(by:)`(部品の entity + computed の agg 先 + ref 先を推移的に)。
+- op 一覧・JSON 形は `docs/dsl/expressions.md` §2-3 / `docs/dsl/dsl.schema.json` の `$defs`(`Expr` / `ExprRef` / `ExprAgg` / `ExprOp` / `ExprIf`)。`weekday` は Calendar 準拠(日=1 … 土=7)。
+- 確認: `METAMON_MOCK=1 METAMON_INITIAL_EXAMPLE=warikan`(モック seed にメンバー 3 人・支出 3 件 → 合計 ¥15,000・1 人 ¥5,000・精算 じろう→たろう ¥5,000 / はなこ→たろう ¥500)、フォームは `METAMON_AUTO_OPEN=expense_form:sheet:record`。BMI は `METAMON_INITIAL_EXAMPLE=bmi`(seed 2 件 → 22.5 / 22.9・平均 22.7)。
