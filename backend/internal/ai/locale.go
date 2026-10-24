@@ -98,8 +98,16 @@ func summarizeEN(a *dsl.App) string {
 		for _, e := range a.Entities {
 			names = append(names, pluralEN(strings.ToLower(e.Name)))
 		}
-		if where := addButtonHintEN(a); where != "" {
-			fmt.Fprintf(&b, " Use %s to add %s.", where, joinEN(names, "or"))
+		if hints := addHints(a, addButtonEN, addToolbarEN); len(hints) > 0 {
+			parts := make([]string, 0, len(hints))
+			for _, h := range hints {
+				plural := make([]string, 0, len(h.entities))
+				for _, n := range h.entities {
+					plural = append(plural, pluralEN(strings.ToLower(n)))
+				}
+				parts = append(parts, fmt.Sprintf("%s to add %s", h.where, joinEN(plural, "or")))
+			}
+			fmt.Fprintf(&b, " Use %s.", joinEN(parts, "and"))
 		} else {
 			fmt.Fprintf(&b, " It keeps track of %s.", joinEN(names, "and"))
 		}
@@ -172,37 +180,17 @@ func joinEN(items []string, conj string) string {
 	}
 }
 
-// addButtonHintEN names the add button on the initial screen ("the button at
-// the bottom right", `the "Add" button at the top right`), or "".
-func addButtonHintEN(a *dsl.App) string {
-	forms := map[string]bool{}
-	for _, s := range a.Screens {
-		if s.Entity != "" {
-			forms[s.ID] = true
-		}
+// addButtonEN / addToolbarEN phrase where an add control is ("the button at
+// the bottom right", `the "Add member" button at the top right`).
+func addButtonEN(c *dsl.Component) string {
+	if pos := areaPositionEN(c.Area); pos != "" {
+		return "the button at the " + pos
 	}
-	toForm := func(act *dsl.Action) bool {
-		return act != nil && act.Type == dsl.ActionNavigate && forms[act.Screen]
-	}
-	for _, s := range a.Screens {
-		if s.ID != a.InitialScreen {
-			continue
-		}
-		for _, c := range s.Components {
-			if c.Type == dsl.CompButton && toForm(c.Action) {
-				if pos := areaPositionEN(c.Area); pos != "" {
-					return "the button at the " + pos
-				}
-				return "the " + strings.Trim(c.Label, " ") + " button"
-			}
-		}
-		for _, tb := range s.Toolbar {
-			if toForm(&tb.Action) {
-				return `the "` + tb.Label + `" button at the top right`
-			}
-		}
-	}
-	return ""
+	return "the " + strings.Trim(c.Label, " ") + " button"
+}
+
+func addToolbarEN(tb *dsl.ToolbarButton) string {
+	return `the "` + tb.Label + `" button at the top right`
 }
 
 // areaPositionEN turns a grid rectangle into "bottom right" / "top left" / "bottom" / "".
