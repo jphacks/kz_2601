@@ -30,6 +30,14 @@ final class FabContentInsetTests: XCTestCase {
         XCTAssertEqual(FabClearance.contentMargin(viewport: list, fab: fab(x: 24, y: 20)), 0)
     }
 
+    func testFabCoveringShortCellNoMargin() {
+        // 2 行ぶんの低い list(y 600〜706)を FAB が上から覆う → 持ち上げても見えないので 0(空白までスクロールさせない)
+        let short = CGRect(x: 14, y: 600, width: 362, height: 106)
+        XCTAssertEqual(FabClearance.contentMargin(viewport: short, fab: fab(x: 24, y: 590)), 0)
+        // FAB の上に 1 行の見出しぶん(32pt)以上残るなら余白を足す
+        XCTAssertEqual(FabClearance.contentMargin(viewport: short, fab: fab(x: 24, y: 660)), 46 + gap)
+    }
+
     func testFabDraggedToMiddleLiftsUpToItsTop() {
         // FAB を list の途中(上端 400)へ動かした → 下端 700 から FAB の上端まで
         XCTAssertEqual(FabClearance.contentMargin(viewport: list, fab: fab(x: 24, y: 400)), 300 + gap)

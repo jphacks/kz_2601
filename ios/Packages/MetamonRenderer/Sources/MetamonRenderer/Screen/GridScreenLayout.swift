@@ -68,11 +68,11 @@ public struct GridScreenLayout: View {
                 } else {
                     ScrollViewReader { proxy in
                         ScrollView {
+                            // area 無しで積んだ部品(全幅の list 等)は画面のスクロールの末尾に FAB ぶんの余白(#157)。
+                            // area だけの画面は高さぴったりなので足さない(足すと常に少しスクロールしてしまう)
                             content
+                                .padding(.bottom, placement.stacked.isEmpty ? 0 : FabClearance.contentMargin(viewport: geo.frame(in: .global), fab: fabFrame))
                         }
-                        // area 無しで積んだ部品(全幅の list 等)は画面のスクロールの末尾に FAB ぶんの余白(#157)。
-                        // area だけの画面は高さぴったりなので足さない(足すと常に少しスクロールしてしまう)
-                        .contentMargins(.bottom, placement.stacked.isEmpty ? 0 : FabClearance.contentMargin(viewport: geo.frame(in: .global), fab: fabFrame), for: .scrollContent)
                         .scrollDismissesKeyboard(.interactively)
                         .scrollBounceBehavior(.basedOnSize)
                         // キーボードが上がり切ってから、フォーカスした入力欄を可視領域(保存バーとキーボードの上)の中央へ
@@ -302,7 +302,7 @@ private struct FadingScrollView<Content: View>: View {
     var body: some View {
         ScrollView(.vertical) {
             content
-                .frame(minHeight: fillsViewport ? max(0, viewportHeight - bottomPad) : nil, alignment: .top)
+                .frame(minHeight: fillsViewport ? max(0, viewportHeight - bottomPad - trailingMargin) : nil, alignment: .top)
                 // 影が器の外にはみ出さないよう、カードの影ぶんだけ内側に余白
                 .padding(.bottom, bottomPad)
                 .background(
@@ -310,8 +310,13 @@ private struct FadingScrollView<Content: View>: View {
                         Color.clear.preference(key: ContentFrameKey.self, value: g.frame(in: .named("fadingScroll")))
                     }
                 )
+                // FAB ぶんの余白は中身の末尾に持つ(フェード判定には含めない)。contentMargins では末尾までスクロールしても最後の行が FAB の下に残った
+                .padding(.bottom, trailingMargin)
         }
-        .contentMargins(.bottom, trailingMargin, for: .scrollContent)
+        #if DEBUG
+        // 撮影用(#157): `METAMON_SCROLL_CELLS_TO_END=1` でセル内スクロールを末尾から表示(FAB の上に最後の行が出るかを確認)
+        .defaultScrollAnchor(ProcessInfo.processInfo.environment["METAMON_SCROLL_CELLS_TO_END"] == "1" ? .bottom : nil)
+        #endif
         .coordinateSpace(name: "fadingScroll")
         .scrollBounceBehavior(.basedOnSize)
         .onPreferenceChange(ContentFrameKey.self) { contentFrame = $0 }
