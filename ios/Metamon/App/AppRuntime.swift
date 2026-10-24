@@ -676,6 +676,14 @@ final class AppRuntime: DSLRuntime {
         return true
     }
 
+    /// `locationTracker`(#168)の位置 1 点。フォームを通さず 1 件足す(saveRecord と同じくローカル DB に即反映・送信は同期キュー)。
+    func createRecord(entity: String, data: [String: JSONValue]) async -> Bool {
+        guard dsl.entity(entity) != nil else { return false }
+        records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: nil, data: data)
+        WidgetSnapshotWriter.write(dsl: dsl, records: records)
+        return true
+    }
+
     func load(entities: Set<String>, force: Bool = false) async {
         for e in entities where force || records[e] == nil {
             await refresh(e)

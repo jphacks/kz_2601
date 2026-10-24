@@ -103,6 +103,40 @@
         }
       }
     },
+    "%lld分たったので記録を止めました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped recording after %lld min"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld分たったので記録を止めました"
+          }
+        }
+      }
+    },
+    "%lld点を記録・あと%lld分で自動停止": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld points · auto-stops in %lld min"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld点を記録・あと%lld分で自動停止"
+          }
+        }
+      }
+    },
     "QRを読み取る": {
       "extractionState": "manual",
       "localizations": {
@@ -218,6 +252,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "いいえ"
+          }
+        }
+      }
+    },
+    "いま / ゴール": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Now / Finish"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "いま / ゴール"
+          }
+        }
+      }
+    },
+    "その記録を停止": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop that recording"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "その記録を停止"
           }
         }
       }
@@ -375,6 +443,23 @@
         }
       }
     },
+    "スタート": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "スタート"
+          }
+        }
+      }
+    },
     "タイマー": {
       "extractionState": "manual",
       "localizations": {
@@ -511,6 +596,40 @@
         }
       }
     },
+    "位置を待っています…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for location…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置を待っています…"
+          }
+        }
+      }
+    },
+    "位置情報がオフのため記録できません。設定で「このAppの使用中のみ許可」を選んでください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Location is off. In Settings, choose “While Using the App” to record."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置情報がオフのため記録できません。設定で「このAppの使用中のみ許可」を選んでください"
+          }
+        }
+      }
+    },
     "位置情報の利用が許可されていません": {
       "extractionState": "manual",
       "localizations": {
@@ -524,6 +643,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "位置情報の利用が許可されていません"
+          }
+        }
+      }
+    },
+    "位置情報の許可を待っています": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for location permission"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置情報の許可を待っています"
           }
         }
       }
@@ -698,6 +834,23 @@
         }
       }
     },
+    "別の記録が進行中です": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another recording is in progress"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "別の記録が進行中です"
+          }
+        }
+      }
+    },
     "削除": {
       "extractionState": "manual",
       "localizations": {
@@ -766,6 +919,23 @@
         }
       }
     },
+    "完了": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完了"
+          }
+        }
+      }
+    },
     "実機のみ": {
       "extractionState": "manual",
       "localizations": {
@@ -779,6 +949,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "実機のみ"
+          }
+        }
+      }
+    },
+    "押した時だけ位置を記録します(最長%lld分で自動停止)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Records your location only after you tap start (auto-stops after %lld min)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "押した時だけ位置を記録します(最長%lld分で自動停止)"
           }
         }
       }
@@ -1021,6 +1208,74 @@
         }
       }
     },
+    "記録を保存できませんでした": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save the recording"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録を保存できませんでした"
+          }
+        }
+      }
+    },
+    "記録を停止": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop recording"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録を停止"
+          }
+        }
+      }
+    },
+    "記録を開始": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start recording"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録を開始"
+          }
+        }
+      }
+    },
+    "記録中": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録中"
+          }
+        }
+      }
+    },
     "設定を開く": {
       "extractionState": "manual",
       "localizations": {
@@ -1153,23 +1408,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "選択してください"
-          }
-        }
-      }
-    },
-    "完了": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Done"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "完了"
           }
         }
       }

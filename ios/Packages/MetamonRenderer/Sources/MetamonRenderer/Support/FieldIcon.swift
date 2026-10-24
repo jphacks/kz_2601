@@ -44,6 +44,8 @@ enum FieldIcon {
         case "avg": return "chart.bar"
         case "max": return "arrow.up.right"
         case "min": return "arrow.down.right"
+        case "distance": return "point.bottomleft.forward.to.point.topright.scurvepath"
+        case "duration": return "clock"
         default: return infer(field: field, hint: field?.name ?? "")
         }
     }

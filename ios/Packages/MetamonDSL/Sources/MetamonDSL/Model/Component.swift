@@ -33,6 +33,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case aiButton
     // leaf(近距離共有・#36)
     case nearbyShare
+    // leaf(位置の記録・#168)
+    case locationTracker
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -129,8 +131,8 @@ public struct Component: Decodable, Identifiable, Sendable {
     // ナビ・ネイティブ系 leaf(url / dateField / titleField は link / timeline と共用)
     public var searchField: String?    // list: 同画面の searchBar.field
     public var onDateTap: Action?      // calendar
-    public var locationField: String?  // mapView
-    public var zoom: String?           // mapView: near|city|wide
+    public var locationField: String?  // mapView / locationTracker
+    public var zoom: String?           // mapView: near|city|wide(mapView の kind: pins|route・#168)
     public var mode: String?           // timerDisplay: stopwatch|countdown
     public var seconds: Int?           // timerDisplay countdown 初期秒
     public var shareTo: String?        // shareButton: any|line|slack|discord(`target` は progressBar の数値)
