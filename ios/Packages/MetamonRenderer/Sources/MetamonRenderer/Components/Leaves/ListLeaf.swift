@@ -2,25 +2,33 @@ import SwiftUI
 import MetamonDSL
 
 /// `list`: entity のレコード一覧(filter/sort はクライアント側)。行タップで `onItemTap`、長押しで削除(swipeToDelete)。
+/// 保存で増えた行(前回描画に無かった id)はブランドの薄い色で 1.2 秒ハイライト(Reduce Motion では省略)。
 struct ListLeaf: View {
     @Environment(\.dslRuntime) private var rt
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let c: Component
     let ctx: RenderContext
+    @State private var seenIds: Set<String>?
+    @State private var highlightedId: String?
 
     var body: some View {
         let entityId = c.entity ?? ""
         let entity = rt.dsl.entity(entityId)
         let filtered = Aggregator.sorted(Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId)), by: c.sort, entity: entity)
         let rows = searched(filtered, entity: entity)
+        let ids = rows.map(\.id)
         if rows.isEmpty {
             let loading = rt.loading.contains(entityId)
-            EmptyPlaceholder(icon: "tray", text: loading ? "読み込み中…" : (c.emptyText ?? "まだありません"), loading: loading)
+            EmptyPlaceholder(icon: "tray", text: loading ? "読み込み中…" : (c.emptyText ?? "まだありません"),
+                             cta: loading ? nil : "最初の 1 件を追加しましょう", loading: loading)
+                .onChange(of: ids, initial: true) { _, now in seenIds = Set(now) }
         } else {
             // 1 枚のカードに行を積み、行間は 1pt の hairline(iOS の inset grouped list と同じ読み味)
             LazyVStack(spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                     if index > 0 { Hairline(inset: separatorInset) }
                     ListRow(item: c.item, record: row, entity: entity, showsChevron: c.onItemTap != nil)
+                        .background(highlightedId == row.id ? RenderTheme.Colors.brandSoft : Color.clear)
                         .contentShape(Rectangle())
                         .onTapGesture {
                             guard let action = c.onItemTap else { return }
@@ -36,14 +44,26 @@ struct ListLeaf: View {
                 }
             }
             .renderCard(padding: 0)
+            .onChange(of: ids, initial: true) { _, now in markNewRows(now) }
         }
     }
 
-    /// 先頭のアイコン/画像の幅ぶんセパレータを内側に寄せる。
+    /// 先頭のアイコン/画像/ドットの幅ぶんセパレータを内側に寄せる。
     private var separatorInset: CGFloat {
         if c.item?.image != nil { return RenderTheme.Spacing.md + 52 + RenderTheme.Spacing.row }
-        if c.item?.icon != nil { return RenderTheme.Spacing.md + 32 + RenderTheme.Spacing.row }
+        if c.item?.icon != nil { return RenderTheme.Spacing.md + 36 + RenderTheme.Spacing.row }
         return RenderTheme.Spacing.md
+    }
+
+    /// 前回描画に無かった id をハイライト(初回描画・読み込み直後は対象外)。
+    private func markNewRows(_ now: [String]) {
+        defer { seenIds = Set(now) }
+        guard let seen = seenIds, !reduceMotion, let fresh = now.first(where: { !seen.contains($0) }) else { return }
+        withAnimation(RenderTheme.Motion.select) { highlightedId = fresh }
+        Task {
+            try? await Task.sleep(for: .seconds(RenderTheme.Motion.highlightSeconds))
+            withAnimation(.easeOut(duration: 0.4)) { if highlightedId == fresh { highlightedId = nil } }
+        }
     }
 
     /// `searchField`(同画面の searchBar.field)の文字列で title/subtitle を部分一致(大小無視)フィルタ。

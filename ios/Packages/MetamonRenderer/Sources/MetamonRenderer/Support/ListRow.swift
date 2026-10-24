@@ -3,6 +3,7 @@ import MetamonDSL
 
 /// `list` の1行(`ListItem` テンプレート: title / subtitle / trailing / icon / image)。
 /// 行自身は背景を持たない(ListLeaf が 1 枚のカードにまとめ、行間を hairline で区切る)。
+/// 先頭: 画像サムネ(角丸 10)> アイコン(ブランドの薄い角丸)> カテゴリ色ドット(enum field の値から安定割当)。
 struct ListRow: View {
     let item: ListItem?
     let record: Record
@@ -19,18 +20,34 @@ struct ListRow: View {
         item?.trailing.flatMap { entity?.field($0)?.type.isNumeric } ?? false
     }
 
+    /// subtitle / title のどちらかが enum(カテゴリ)なら、その値から色を決める。
+    private var categoryColor: Color? {
+        for fieldId in [item?.subtitle, item?.title].compactMap({ $0 }) {
+            if entity?.field(fieldId)?.type == .enum, let v = text(fieldId), !v.isEmpty {
+                return RenderTheme.Colors.category(v)
+            }
+        }
+        return nil
+    }
+
     var body: some View {
         HStack(spacing: RenderTheme.Spacing.row) {
             if let img = item?.image {
                 PhotoView(value: record[img], height: 52).frame(width: 52)
             } else if let icon = item?.icon {
                 Image(systemName: icon)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.tint)
-                    .frame(width: 32, height: 32)
-                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: RenderTheme.Radius.control, style: .continuous))
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(RenderTheme.Colors.brandA)
+                    .frame(width: 36, height: 36)
+                    .background(RenderTheme.Colors.brandSoft, in: RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
+            } else if let dot = categoryColor {
+                Circle()
+                    .fill(dot)
+                    .frame(width: 10, height: 10)
+                    .overlay(Circle().strokeBorder(.white.opacity(0.6), lineWidth: 1))
+                    .accessibilityHidden(true)
             }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(text(item?.title ?? entity?.titleField) ?? "")
                     .font(RenderTheme.Fonts.rowTitle)
                     .lineLimit(1)
