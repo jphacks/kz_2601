@@ -35,6 +35,7 @@ type Request struct {
 	Transcript  string `json:"transcript"`
 	Text        string `json:"text,omitempty"` // alias used by openapi-ai.yaml
 	Mode        Mode   `json:"mode,omitempty"`
+	Locale      Locale `json:"locale,omitempty"` // ja|en; empty = detect from the transcript
 }
 
 // Latency is per-stage wall time in ms.
@@ -64,6 +65,7 @@ type Result struct {
 	DSL             json.RawMessage `json:"dsl"`
 	Patch           []dsl.PatchOp   `json:"patch,omitempty"`
 	Summary         string          `json:"summary"`
+	Locale          Locale          `json:"locale"` // language of the UI strings and summary
 	Transcript      string          `json:"transcript"`
 	Source          string          `json:"source"` // claude|restore
 	LatencyMs       Latency         `json:"latencyMs"`
@@ -119,6 +121,10 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 	if req.AppID == "" || transcript == "" {
 		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "appId and transcript are required"}
 	}
+	loc, err := resolveLocale(req.Locale, transcript)
+	if err != nil {
+		return nil, err
+	}
 	env, err := s.Store.Get(ctx, req.AppID)
 	if err != nil {
 		return nil, mapStoreErr(err)
@@ -139,7 +145,7 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 		}
 	}
 	if mode == ModeUndo {
-		return s.undo(ctx, req.AppID, transcript, env, started)
+		return s.undo(ctx, req.AppID, transcript, env, started, loc)
 	}
 
 	var ar *attemptResult
@@ -149,9 +155,9 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 		if !isInitial(current) {
 			ref = string(env.DSL)
 		}
-		ar, err = s.generateFull(ctx, transcript, ref, nil)
+		ar, err = s.generateFull(ctx, transcript, ref, nil, loc)
 	case ModeEdit:
-		ar, err = s.generateEdit(ctx, transcript, env)
+		ar, err = s.generateEdit(ctx, transcript, env, loc)
 	default:
 		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "mode must be auto|create|edit|undo"}
 	}
@@ -181,6 +187,7 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 		Mode:            src.Mode,
 		DSL:             saved.DSL,
 		Summary:         ar.summary,
+		Locale:          loc,
 		Transcript:      transcript,
 		Source:          "claude",
 		Meta:            ar.meta,
@@ -194,7 +201,7 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 
 // generateFull asks for a whole AppDSL; on validation problems it re-prompts
 // up to maxRegen times, then strips areas, then fails with the problems.
-func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, meta *Meta) (*attemptResult, error) {
+func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, meta *Meta, loc Locale) (*attemptResult, error) {
 	ar := &attemptResult{}
 	if meta != nil {
 		ar.meta = *meta
@@ -203,7 +210,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 	var problems []string
 	var lastCandidate []byte
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(ctx, systemPrompt, createUserMessage(transcript, refDSL, problems), GenerationSchema(), ar)
+		resp, err := s.call(ctx, systemPrompt, createUserMessage(transcript, refDSL, problems, loc), GenerationSchema(), ar)
 		if err != nil {
 			return nil, err
 		}
@@ -211,7 +218,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 		app, perr := dsl.Parse(raw)
 		if perr == nil {
 			ar.raw = canon(raw)
-			ar.summary = summarize(app)
+			ar.summary = summarizeFor(app, loc)
 			return ar, nil
 		}
 		lastCandidate = raw
@@ -221,7 +228,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 	if stripped, ok := stripAreas(lastCandidate); ok {
 		if app, perr := dsl.Parse(stripped); perr == nil {
 			ar.raw = stripped
-			ar.summary = summarize(app)
+			ar.summary = summarizeFor(app, loc)
 			ar.meta.AreaFallback = true
 			return ar, nil
 		}
@@ -232,7 +239,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 
 // generateEdit asks for a PatchDocument, validates with dsl.ApplyPatch, retries
 // with problems, then tries area-stripping, then downgrades to a full rewrite.
-func (s *Service) generateEdit(ctx context.Context, transcript string, env *appconfigclient.Envelope) (*attemptResult, error) {
+func (s *Service) generateEdit(ctx context.Context, transcript string, env *appconfigclient.Envelope, loc Locale) (*attemptResult, error) {
 	ar := &attemptResult{}
 	ar.meta.Model = s.Model
 	var problems []string
@@ -240,7 +247,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	var lastSummary string
 	for i := 0; i <= s.maxRegen(); i++ {
 		resp, err := s.call(ctx, systemPrompt+"\n"+editRules,
-			editUserMessage(transcript, env.Version, string(env.DSL), problems), PatchGenerationSchema(), ar)
+			editUserMessage(transcript, env.Version, string(env.DSL), problems, loc), PatchGenerationSchema(), ar)
 		if err != nil {
 			return nil, err
 		}
@@ -282,7 +289,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	meta := ar.meta
 	meta.DowngradedToFull = true
 	full := &Service{Claude: s.Claude, Store: s.Store, Model: s.Model, MaxRegenerations: -1, CallTimeout: s.CallTimeout}
-	fr, err := full.generateFull(ctx, transcript, string(env.DSL), &meta)
+	fr, err := full.generateFull(ctx, transcript, string(env.DSL), &meta, loc)
 	if err != nil {
 		var ge *Error
 		if errors.As(err, &ge) {
@@ -389,11 +396,17 @@ func isInitial(a *dsl.App) bool {
 	return true
 }
 
-var newAppPhrases = []string{"新しいアプリ", "作り直して", "作りなおして", "別のアプリ", "ゼロから", "一から"}
+// newAppPhrases anywhere in the utterance switch an existing app to a full
+// rebuild (ja and en; matched case-insensitively).
+var newAppPhrases = []string{
+	"新しいアプリ", "作り直して", "作りなおして", "別のアプリ", "ゼロから", "一から",
+	"new app", "different app", "another app", "start over", "start again", "from scratch", "rebuild",
+}
 
 func wantsNewApp(t string) bool {
+	s := strings.ToLower(t)
 	for _, p := range newAppPhrases {
-		if strings.Contains(t, p) {
+		if strings.Contains(s, p) {
 			return true
 		}
 	}
@@ -401,7 +414,8 @@ func wantsNewApp(t string) bool {
 }
 
 // undoPrefixes are matched at the start of a short utterance only, so edits
-// such as 「一覧を元の位置に戻して」 or long sentences are never mistaken for undo.
+// such as 「一覧を元の位置に戻して」 / "put the list back at the top" or long
+// sentences are never mistaken for undo.
 var undoPrefixes = []string{
 	"元に戻し", "もとに戻し", "元へ戻し", "戻して",
 	"取り消し", "取消", "アンドゥ", "undo",
@@ -409,16 +423,28 @@ var undoPrefixes = []string{
 	"さっきのを戻", "さっきのを元に戻", "さっきのを取り消", "さっきの取り消",
 	"やっぱりやめ", "やっぱやめ",
 	"一つ前に戻", "ひとつ前に戻", "1つ前に戻", "一つ前の状態に戻", "ひとつ前の状態に戻", "前の状態に戻",
+	// en ("undo" above also covers "undo that" / "undo the last change")
+	"revert", "roll back", "rollback", "go back", "take that back", "take it back",
+	"scrap that", "cancel that", "never mind", "nevermind", "forget that", "forget it",
 }
 
-const undoMaxRunes = 16
+// undoMaxRunes / undoMaxRunesEN bound the utterance length: 16 runes fits
+// 「さっきの変更を元に戻して」, 32 fits "go back to the previous version".
+const (
+	undoMaxRunes   = 16
+	undoMaxRunesEN = 32
+)
 
-// wantsUndo is the keyword classifier for 「元に戻して」. No Claude call: the
-// utterance must be short and start with one of undoPrefixes.
+// wantsUndo is the keyword classifier for 「元に戻して」 / "undo". No Claude
+// call: the utterance must be short and start with one of undoPrefixes.
 func wantsUndo(t string) bool {
 	s := strings.ToLower(strings.TrimSpace(t))
 	s = strings.TrimRight(s, "。．.!！?？、,…　 ")
-	if s == "" || len([]rune(s)) > undoMaxRunes {
+	limit := undoMaxRunes
+	if !hasJapanese(s) {
+		limit = undoMaxRunesEN
+	}
+	if s == "" || len([]rune(s)) > limit {
 		return false
 	}
 	for _, p := range undoPrefixes {
@@ -433,7 +459,7 @@ func wantsUndo(t string) bool {
 // version is itself a restore, it steps back from the version it restored
 // (so repeated 「戻して」 keeps going back instead of redoing). Version 1 is
 // the voice-only seed, so there is nothing to undo below version 2.
-func (s *Service) undo(ctx context.Context, appID, transcript string, env *appconfigclient.Envelope, started time.Time) (*Result, error) {
+func (s *Service) undo(ctx context.Context, appID, transcript string, env *appconfigclient.Envelope, started time.Time, loc Locale) (*Result, error) {
 	versions, err := s.Store.Versions(ctx, appID)
 	if err != nil {
 		return nil, mapStoreErr(err)
@@ -450,12 +476,13 @@ func (s *Service) undo(ctx context.Context, appID, transcript string, env *appco
 		PreviousVersion: env.Version,
 		Mode:            "restore",
 		DSL:             env.DSL,
+		Locale:          loc,
 		Transcript:      transcript,
 		Source:          "restore",
 		Meta:            Meta{Model: s.Model},
 	}
 	if target < 1 {
-		res.Summary = "戻せる変更がありません。"
+		res.Summary = loc.text().nothingToUndo
 		res.LatencyMs = Latency{Total: time.Since(started).Milliseconds()}
 		return res, nil
 	}
@@ -466,9 +493,17 @@ func (s *Service) undo(ctx context.Context, appID, transcript string, env *appco
 	res.Version = saved.Version
 	res.RestoredFrom = target
 	res.DSL = saved.DSL
-	res.Summary = fmt.Sprintf("ひとつ前の状態(version %d)に戻しました。", target)
+	res.Summary = fmt.Sprintf(loc.text().restored, target)
 	res.LatencyMs = Latency{Total: time.Since(started).Milliseconds()}
 	return res, nil
+}
+
+// summarizeFor picks the summary renderer for the locale (ja is the default).
+func summarizeFor(a *dsl.App, loc Locale) string {
+	if loc == LocaleEN {
+		return summarizeEN(a)
+	}
+	return summarize(a)
 }
 
 // summarize renders the Japanese summary for a full generation

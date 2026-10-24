@@ -108,6 +108,10 @@ components:
       properties:
         appId: { type: string }
         text: { type: string, description: 文字起こし済みの発話 (WhisperKit 経由) }
+        locale:
+          type: string
+          enum: [ja, en]
+          description: UI 文言と summary の言語。省略時は発話にかな・漢字があれば ja、無ければ en(英語で話せば英語 UI)。それ以外の値は 400
         baseVersion:
           type: integer
           description: iOS が今表示している version。省略時はサーバー側で現行を取得 (競合検知を iOS が気にしない場合)
@@ -117,11 +121,11 @@ components:
           default: auto
           description: |
             create = 既存を捨てて新規アプリ (フル DSL / PUT)。edit = 既存を Patch で編集 (PATCH)。undo = 1 つ前に restore。
-            auto = 現行が初期状態なら create、それ以外は edit (「元に戻して」「新しく作り直して」はキーワードで判定)
+            auto = 現行が初期状態なら create、それ以外は edit (「元に戻して」/ "undo"・「新しく作り直して」/ "start over" はキーワードで判定)
       example: { appId: app_01HXYZ, text: 家計簿アプリが欲しい。金額とカテゴリとメモを記録したい, baseVersion: 1 }
     GenerateResponse:
       type: object
-      required: [appId, version, mode, dsl, summary, source]
+      required: [appId, version, mode, dsl, summary, locale, source]
       properties:
         appId: { type: string }
         version: { type: integer, description: 新しく作られた version }
@@ -132,13 +136,14 @@ components:
           description: 実際に使われた適用モード (patch が full に降格した場合は full)。restore = undo で 1 つ前の version を復元(Claude を呼ばない)
         restoredFrom:
           type: integer
-          description: mode=restore の時、復元元の version。戻せる変更が無い時(version 1 のみ)は省略され version は変わらず summary が「戻せる変更がありません。」になる
+          description: mode=restore の時、復元元の version。戻せる変更が無い時(version 1 のみ)は省略され version は変わらず summary が「戻せる変更がありません。」(en は "There is nothing to undo.")になる
         patch:
           type: array
           description: mode=patch の時、適用した RFC 6902 ops (iOS は使わなくてよい。デバッグ・表示用)
           items: { $ref: '../dsl/dsl.schema.json#/$defs/PatchOp' }
         dsl: { $ref: '../dsl/dsl.schema.json', description: 適用後のフル DSL (iOS はこれを即適用) }
-        summary: { type: string, example: 家計簿アプリを作成しました。支出の記録と今月の合計、カテゴリ別の内訳が見られます }
+        summary: { type: string, description: iOS がそのまま読み上げる 1 文(locale の言語), example: 家計簿アプリを作成しました。支出の記録と今月の合計、カテゴリ別の内訳が見られます }
+        locale: { type: string, enum: [ja, en], description: UI 文言と summary の言語(リクエストの locale、省略時は発話から判定した値) }
         transcript: { type: string, description: 入力が audio の時の文字起こし }
         source:
           type: string
