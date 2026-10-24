@@ -13,6 +13,8 @@ public struct Services {
     public var notifications: any NotificationScheduler
     /// true なら起動時にサーバー(appconfig)から DSL を取得し、ホットリロードを開始する。
     public var isLive: Bool
+    /// シェア / 「探す」(#49 #50)。appconfig が live の時だけ(モックでは nil = 導線を出さない)。
+    public var sharing: (any SharingClient)?
 
     public init(
         auth: any AuthService,

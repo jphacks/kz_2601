@@ -151,6 +151,29 @@ apps_public/{appId}                                   # 公開 DSL: {ownerUid, n
 
 実装: `store.RecordSet{UID, AppID, Entity, Public}` でコレクションを選ぶ(`store.PrivateRecords` / `store.PublicRecords`)。`store.PublishApp` / `GetPublicApp` が公開 DSL。handler は `appconfig/records.go` の `recordSet()` と `ownRecord()`(403 判定)。レコード検証は従来どおり呼び出し側ユーザーの現行 DSL で行うので、インストール後に各自が entity を変えても他人のレコードは消えない(スキーマレス)。
 
+### 3.2 シェアリンクと公開カタログ「探す」(#49 #50)
+
+```
+shares/{token}        # {appId, ownerUid, name, dslVersion, dslJson, revoked, createdAt}  token = 192bit base64url
+public_apps/{appId}   # {ownerUid, name, description, tags[], authorName, components[], dslVersion, dslJson, installs, createdAt, updatedAt}
+```
+
+`public_apps`(探すの掲載)は §3.1 の `apps_public`(共有レコードの置き場)とは**別物**。名前が近いので注意。
+
+| 項目 | 決定 |
+|---|---|
+| シェア | `POST /apps/{appId}/share` が現行 DSL を**スナップショット**して token を返す(後から作者が変えてもリンク先は変わらない)。`DELETE /shares/{token}` で取り消し(発行者のみ)。取り消し後の import / プレビュー / Web ページは 404 |
+| 複製(import / install 共通 `installCopy`) | 受け取った人の木に version 1(初期)→ version 2(複製 DSL・`source.kind=import`)で作る(iOS の変身一覧は version 1 を「未生成」として隠すため)。**レコードは複製しない** |
+| 共有データ(scope: shared/public)の扱い | 共有 entity を含むアプリは**新しい appId を振らず元の appId に参加**する。理由: #93 の共有レコードは `apps_public/{appId}` で appId 単位、かつ「他人が同じ appId を開く = インストール」という設計なので、新 appId だと受け取った人は空の掲示板を見るだけになり共有の意味が無い。既に持っていれば何もしない(`created:false`)。private だけのアプリは新しい UUID の appId に独立コピー |
+| 公開 | `POST /apps/{appId}/publish`(name/description/tags/authorName)で作成・更新、`DELETE` で取り下げ。同じ appId の掲載を他人が持っていれば 403(共有アプリに参加した人が乗っ取れない) |
+| 検索 | `GET /public-apps?q=&sort=popular`(または `new`): installs 降順で最大 500 件を読み、名前・説明・タグ・作者名の部分一致をメモリ内で絞る(全文検索なし・複合インデックス不要) |
+| installs | `POST /public-apps/{id}/install` で**新規に複製した時だけ** `firestore.Increment(1)`。掲載者本人・参加済みの再インストールは数えない |
+| 認可 | share / publish / unpublish / revoke = 所有者のみ(自分の木にあるアプリ・掲載の ownerUid)。import / install / 検索 = 認証済みなら誰でも |
+| Web フォールバック | 認証不要の `GET /s/{token}`(appconfig 直下・`/v1` の外)。アプリ名と `tailorit://import/<token>` を開くボタンだけを出し、DSL は返さない。ベース URL は `SHARE_WEB_BASE_URL`、無ければリクエストのホスト |
+| モデレーション | 通報・運営による強制非公開は未実装。掲載者が `DELETE /publish` で取り下げられるだけ(後続) |
+
+デモ用シード: `scripts/seed-public-apps.sh <appconfig URL>` が `docs/dsl/examples` の kakeibo / training / walk を `catalog-<name>` として公開する(再実行は上書き)。
+
 ## 4. 認証・認可
 
 | 項目 | 決定 |

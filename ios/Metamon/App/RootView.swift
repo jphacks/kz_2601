@@ -86,6 +86,7 @@ struct RootView: View {
                 .modifier(HostSheets(onModal: true))
         }
         .modifier(HostSheets(onModal: false))
+        .modifier(SharingHooks()) // シェアリンク受信・「探す」シート(#49 #50)
         .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
         .onChange(of: rt.document.version) {
