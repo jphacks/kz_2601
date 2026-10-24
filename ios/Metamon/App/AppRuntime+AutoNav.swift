@@ -20,7 +20,10 @@ extension AppRuntime {
                 guard let action = try? JSONDecoder().decode(Action.self, from: JSONEncoder().encode(json)) else { return }
                 await run(action, ActionContext(route: visibleRoute))
                 let stack = visibleRoute.stack
-                print("[Metamon] auto nav \(i + 1)/\(steps.count): → \(step.joined(separator: ":")) tab=\(selectedTab) stack=\(stack) depth=\(paths[stack]?.count ?? 0) sheet=\(sheet?.screen ?? "-")")
+                let line = "auto nav \(i + 1)/\(steps.count): → \(step.joined(separator: ":")) tab=\(selectedTab) stack=\(stack) depth=\(paths[stack]?.count ?? 0) sheet=\(sheet?.screen ?? "-")"
+                print("[Metamon] \(line)")
+                // stdout はまとめて流れることがあるので、スクショ側が同期できるよう tmp/autonav-step にも書く
+                try? line.write(toFile: NSTemporaryDirectory() + "autonav-step", atomically: true, encoding: .utf8)
                 try? await Task.sleep(for: .seconds(interval))
             }
         }
