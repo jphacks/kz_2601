@@ -15,6 +15,7 @@ struct SettingsSheet: View {
                 accountSection
                 voiceModelSection
                 appSection
+                syncSection
                 connectionSection
             }
             .navigationTitle("設定")
@@ -97,6 +98,36 @@ struct SettingsSheet: View {
             Text("アプリ")
         } footer: {
             Text("現在: \(rt.dsl.app.name)(v\(rt.document.version))" + (rt.isOffline ? "・オフライン(キャッシュ表示)" : "") + "\n「元に戻して」と話しても同じ。「別のアプリ。…」と話すと新しいアプリとして作ります。")
+        }
+    }
+
+    /// レコードの同期状態(Issue #48): 最新 / 未送信 N 件 / オフライン。「今すぐ同期」でキューを流し直す。
+    private var syncSection: some View {
+        Section {
+            LabeledContent("同期") {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Circle().fill(syncColor).frame(width: 8, height: 8)
+                    Text(rt.recordSync.status.label)
+                }
+            }
+            Button {
+                rt.recordSync.syncNow()
+            } label: {
+                Label("今すぐ同期", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .disabled(!rt.recordSync.isOnline || rt.recordSync.pendingCount == 0)
+        } header: {
+            Text("データ")
+        } footer: {
+            Text("記録はまずこの端末に保存され、接続があるときにサーバーへ送られます。")
+        }
+    }
+
+    private var syncColor: Color {
+        switch rt.recordSync.status {
+        case .synced: .green
+        case .syncing, .pending: .orange
+        case .offline: .gray
         }
     }
 
