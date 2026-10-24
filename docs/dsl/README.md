@@ -55,7 +55,7 @@ Leaf (33 種・全て id? と area? を持つ) / Action (9 種) / Notification {
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
-### 3.1 コンポーネント(36 種 = Container 3 + Leaf 33)
+### 3.1 コンポーネント(48 種 = Container 7 + Leaf 41)
 
 全種に共通の任意キー: `id`(画面内一意)・`area`(§3.4 のグリッド矩形。Screen 直下のみ有効)。用途・レイアウトの定石は `dsl.schema.json` 各定義の `description` / `x-usage` が正典(AI へのカタログはそこから生成。§4)。
 
