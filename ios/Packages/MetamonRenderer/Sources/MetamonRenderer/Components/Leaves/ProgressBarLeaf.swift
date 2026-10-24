@@ -11,7 +11,9 @@ struct ProgressBarLeaf: View {
         let raw = resolvedRatio
         let ratio = max(0, min(1, raw))
         let style = Self.style(raw: raw, tone: c.tone)
-        let percent = String(format: "%.0f%%", (c.tone == nil ? ratio : max(0, raw)) * 100)
+        // tone 指定時は実比率(112%)。桁が暴れないよう 999% で頭打ち
+        let shown = c.tone == nil ? ratio : min(max(0, raw), 9.99)
+        let percent = String(format: "%.0f%%", shown * 100) + (c.tone != nil && raw > 9.99 ? "+" : "")
         VStack(alignment: .leading, spacing: 6) {
             if let label = c.label {
                 HStack {
