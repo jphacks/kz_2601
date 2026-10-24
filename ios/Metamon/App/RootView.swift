@@ -64,22 +64,26 @@ struct RootView: View {
             .animation(.easeOut(duration: 0.22), value: isFormVisible)
             .animation(.easeOut(duration: 0.22), value: keyboard.isVisible)
             .onPreferenceChange(VoiceFabFrameKey.self) { fabFrame = $0 }
-            if let job = rt.morphJob {
-                switch job.kind {
-                case .create:
-                    GeneratingView(job: job)
-                        .transition(.opacity)
-                        .zIndex(2)
-                case .edit:
-                    VStack {
-                        EditingIndicator(job: job)
-                            .padding(.top, Theme.Spacing.sm)
-                        Spacer()
+            // 生成中の層は常に置き(zIndex 固定)、中身だけを出し入れする。全画面の「変身中」は挿入を即時にする。
+            // ZStack 直下での条件挿入 + フェードインだと、初期画面の再レイアウト(キーボードを閉じる・入力欄を畳む)と重なった時に
+            // 完成まで透明のまま(アクセシビリティにも出ない)で初期画面が見えていた(遅い CI で再現・#200)。撤去はフェードのまま(新しいアプリとのクロスフェード)
+            ZStack {
+                if let job = rt.morphJob {
+                    switch job.kind {
+                    case .create:
+                        GeneratingView(job: job)
+                            .transition(.asymmetric(insertion: .identity, removal: .opacity))
+                    case .edit:
+                        VStack {
+                            EditingIndicator(job: job)
+                                .padding(.top, Theme.Spacing.sm)
+                            Spacer()
+                        }
+                        .transition(.move(edge: .top).combined(with: .opacity))
                     }
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(2)
                 }
             }
+            .zIndex(2)
             if let banner = rt.summaryBanner, let anchor = banner.highlight {
                 PositionHighlight(anchor: anchor)
                     .transition(.opacity)
