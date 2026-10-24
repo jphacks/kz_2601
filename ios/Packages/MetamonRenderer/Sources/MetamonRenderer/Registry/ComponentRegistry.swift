@@ -59,6 +59,14 @@ public struct ComponentRegistry: Sendable {
         r.register(.voiceInput) { c, _ in VoiceInputLeaf(c: c) }
         r.register(.spacer) { c, _ in SpacerLeaf(c: c) }
         r.register(.divider) { _, _ in DividerLeaf() }
+        // leaf: 入力系バッチ
+        r.register(.slider) { c, ctx in SliderLeaf(c: c, ctx: ctx) }
+        r.register(.stepper) { c, ctx in StepperLeaf(c: c, ctx: ctx) }
+        r.register(.textEditor) { c, ctx in TextEditorLeaf(c: c, ctx: ctx) }
+        r.register(.secureField) { c, ctx in SecureFieldLeaf(c: c, ctx: ctx) }
+        r.register(.timePicker) { c, ctx in TimePickerLeaf(c: c, ctx: ctx) }
+        r.register(.colorPicker) { c, ctx in ColorPickerLeaf(c: c, ctx: ctx) }
+        r.register(.rating) { c, ctx in RatingLeaf(c: c, ctx: ctx) }
         // leaf(表示系)
         r.register(.label) { c, _ in LabelLeaf(c: c) }
         r.register(.icon) { c, _ in IconLeaf(c: c) }

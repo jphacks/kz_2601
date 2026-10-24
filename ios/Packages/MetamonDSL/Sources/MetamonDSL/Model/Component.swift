@@ -8,6 +8,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     // leaf
     case text, button, textField, numberField, datePicker, picker, toggle
     case photoField, image, list, stat, chart, voiceInput, spacer, divider
+    // leaf: 入力系バッチ
+    case slider, stepper, textEditor, secureField, timePicker, colorPicker, rating
     // leaf(表示系)
     case label
     case icon
@@ -81,8 +83,6 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var color: String?          // SemanticColor: primary|secondary|accent|red|green|orange|blue
     public var value: Double?          // progressBar(0..1)/ gauge のリテラル値
     public var target: Double?         // progressBar entity モードの分母
-    public var min: Double?            // gauge
-    public var max: Double?            // gauge
     public var url: String?            // link
     public var image: String?          // avatar リテラル(https / data URL)
     public var message: String?        // emptyState
@@ -92,11 +92,18 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var titleField: String?     // timeline
     public var subtitleField: String?  // timeline
 
+    // 入力系バッチ(slider / stepper / rating / textEditor)
+    public var min: Double?            // slider / stepper / gauge
+    public var max: Double?            // rating: 星の数(既定 5) / gauge
+    public var step: Double?           // slider: 省略で連続 / stepper: 既定 1
+    public var minLines: Int?          // textEditor: 最低表示行数(既定 4)
+
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
         case includeTime, source, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
         case kind, groupBy, bucket, prompt, size
-        case name, color, value, target, min, max, url, image, message, columns, limit, dateField, titleField, subtitleField
+        case name, color, value, target, url, image, message, columns, limit, dateField, titleField, subtitleField
+        case min, max, step, minLines
     }
 
     public init(from decoder: Decoder) throws {
@@ -135,12 +142,14 @@ public struct Component: Decodable, Identifiable, Sendable {
         bucket = try? c.decodeIfPresent(String.self, forKey: .bucket)
         prompt = try? c.decodeIfPresent(String.self, forKey: .prompt)
         size = try? c.decodeIfPresent(String.self, forKey: .size)
+        min = try? c.decodeIfPresent(Double.self, forKey: .min)
+        max = try? c.decodeIfPresent(Double.self, forKey: .max)
+        step = try? c.decodeIfPresent(Double.self, forKey: .step)
+        minLines = try? c.decodeIfPresent(Int.self, forKey: .minLines)
         name = try? c.decodeIfPresent(String.self, forKey: .name)
         color = try? c.decodeIfPresent(String.self, forKey: .color)
         value = try? c.decodeIfPresent(Double.self, forKey: .value)
         target = try? c.decodeIfPresent(Double.self, forKey: .target)
-        min = try? c.decodeIfPresent(Double.self, forKey: .min)
-        max = try? c.decodeIfPresent(Double.self, forKey: .max)
         url = try? c.decodeIfPresent(String.self, forKey: .url)
         image = try? c.decodeIfPresent(String.self, forKey: .image)
         message = try? c.decodeIfPresent(String.self, forKey: .message)
