@@ -40,7 +40,7 @@ flowchart TD
 | アプリ本体 | `ios/Metamon` | `MetamonApp`(組み立て)、`AppRuntime`(状態・アクション実行。`DSLRuntime` に準拠)、`RootView`(モーダル/FAB/オーバーレイ)、`VoiceInputView`、`BuildConfig`(環境 → Services) | 全部 | なし(ロジックは各パッケージへ) |
 
 ### 1.1 DI(依存性注入)
-- **入口は `ios/Metamon/App/BuildConfig.swift` の `BuildConfig.make(environment:)` だけ**。`AppEnvironment`(`.mock` / `.live(appConfigURL:aiURL:)`)を環境変数 `METAMON_API_BASE_URL` / Info.plist から判定し、`Services`(protocol のコンテナ struct)を**1回だけ**組み立てる。Mock と本番の切替はこのファイルで完結する。
+- **入口は `ios/Metamon/App/BuildConfig.swift` の `BuildConfig.make(environment:)` だけ**。`AppEnvironment`(`.mock` / `.live(appConfigURL:aiURL:)`・どちらか片方だけ live も可)を環境変数 `METAMON_AI_BASE_URL` / `METAMON_APPCONFIG_BASE_URL` / Info.plist から判定し、`Services`(protocol のコンテナ struct。`auth` を含む)を**1回だけ**組み立てる。Mock と本番の切替はこのファイルで完結する。
 - `MetamonApp` が `Services` を `AppRuntime(document:services:)` と SwiftUI Environment `\.services`(`App/ServicesEnvironment.swift`)に渡す。View は `@Environment(\.services)` で protocol 越しに使う(例: `VoiceInputView` → `services.transcriber`)。
 - Renderer は Services を知らない。必要な能力(DSL、レコード、`run(action)`、ナビ)は `DSLRuntime` protocol(`MetamonRenderer/Host/DSLRuntime.swift`)で宣言し、`AppRuntime` が準拠して `\.dslRuntime` で注入する。`@Observable` なのでプロパティ変更は SwiftUI が追跡する。
 - 外部 DI ライブラリは使わない。
@@ -178,18 +178,47 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 
 推奨: **Day1 は A**、Day2 に余裕があれば **C**(Firestore が正典なので一番筋が良い)。B は中間なので採らない。
 
-## 7. 認証
+## 7. 認証(実装済み)
 
-| 項目 | 方針 |
+```
+SignInView ──Sign in with Apple──▶ ASAuthorizationAppleIDCredential(identityToken, nonce=SHA256(raw))
+   │                                   │ AuthSession.completeAppleSignIn
+   │                                   ▼
+   │                      AuthService.signInWithApple(idToken, rawNonce, fullName)
+   │                      = OAuthProvider.appleCredential → Auth.signIn(with:)
+   └──「ログインせずに使う」──▶ AuthService.signInAnonymously()
+                                       │
+                                       ▼ currentUser(uid)
+            AuthTokenProvider.idToken() = user.getIDToken()  ──▶ HTTP.send: Authorization: Bearer <ID token>
+                                       │
+                                       ▼
+                    HTTPAIClient POST {ai}/v1/generate {appId, baseVersion?, transcript, mode:"auto"}
+                                       ▼
+                    {appId, version, mode, dsl, summary} → AppRuntime.apply(dsl) + toast(summary)
+```
+
+| 項目 | 実装 |
 |---|---|
-| 第一候補 | Firebase Auth + Sign in with Apple(`ASAuthorizationAppleIDProvider` → `OAuthProvider.credential(providerID: .apple, idToken:, rawNonce:)`) |
-| 代替 | `Auth.auth().signInAnonymously()`。UID が端末固有 ID として機能する(再インストールで変わる点だけ注意) |
-| 切替条件 | Apple Developer Program(有料)未加入 / Capability 設定で30分詰まったら即匿名へ |
-| トークン付与 | `FirebaseTokenProvider: TokenProvider { Auth.auth().currentUser?.getIDToken() }` → `HTTP.send` が `Authorization: Bearer` を付ける(実装済み・現状は `NoAuthTokenProvider`) |
-| 起動シーケンス | `bootstrap()` 冒頭で `currentUser == nil` なら サインイン → 以降の全リクエストにトークン |
-| Go 側 | `firebase.google.com/go/v4/auth` の `VerifyIDToken`。`uid` を entity レコードの owner に使う |
+| protocol | `MetamonServices/Protocols/AuthService.swift`: `currentUser: AuthUser?(uid, isAnonymous, displayName)`・`stateChanges()`・`signInWithApple(idToken:nonce:fullName:)`・`signInAnonymously()`・`signOut()`・`idToken(forceRefresh:)` |
+| Live | `Live/FirebaseAuthService.swift`(firebase-ios-sdk **13.1.1 固定・product は FirebaseAuth のみ**)。`FirebaseBootstrap.configureIfAvailable()` は plist がバンドルに無ければクラッシュせず false(→ Mock に落ちる) |
+| Mock | `Mock/MockAuthService.swift`: 固定 uid `mock00-fixed-uid`。`AppEnvironment.mock` と Preview/テスト用。トークンは nil(ヘッダ無し) |
+| Bearer | `Live/AuthTokenProvider.swift` が `AuthService.idToken(forceRefresh:false)` を `TokenProvider` として供給。`HTTP.send` が毎リクエスト付与(更新は Firebase SDK 任せ) |
+| 画面 | `Metamon/Features/Auth/SignInView.swift`(`SignInWithAppleButton` + 匿名ボタン)。`AuthSession`(@Observable)の `user == nil` の間だけ `MetamonApp` が表示。nonce は `AppleNonce.random()`(生値→Firebase)/`sha256`(→Apple) |
+| ログアウト | `VoiceInputView` 最下部の `uid 先頭6桁` ラベル(Menu)→ ログアウト。デバッグ用に目立たせない |
+| entitlements | `project.yml` → `Metamon/Metamon.entitlements` に `com.apple.developer.applesignin: [Default]`。自動署名(`-allowProvisioningUpdates`)が App ID に capability を付ける |
+| 初期化順 | `MetamonApp.init`: `FirebaseBootstrap.configureIfAvailable()` → `BuildConfig.make()` → `AuthSession(service: services.auth)` |
+| Go 側 | `firebase.google.com/go/v4/auth` の `VerifyIDToken`。`uid` を entity レコードの owner に使う(ai は受け取った Bearer を appconfig へ転送するだけ) |
 
-UI は専用ログイン画面を作らない(匿名なら無言、Apple なら初回に `SignInWithAppleButton` をシートで出す)。
+### 環境変数(ai と appconfig は別々に live にできる)
+| 用途 | 実行時 env | Info.plist キー(build setting から展開) | 未設定時 |
+|---|---|---|---|
+| ai | `METAMON_AI_BASE_URL` | `MetamonAIBaseURL` = `$(METAMON_AI_BASE_URL)` | `MockAIClient` |
+| appconfig | `METAMON_APPCONFIG_BASE_URL`(旧 `METAMON_API_BASE_URL` も可) | `MetamonAppConfigBaseURL` = `$(METAMON_APPCONFIG_BASE_URL)` | `InMemoryAppConfigClient` + `NoopDocumentSync`(`isLive=false`) |
+
+- 両方未設定 = `AppEnvironment.mock`(認証もモック)。どちらか設定 = `.live(appConfigURL:aiURL:)`(認証は Firebase、plist 無しなら Mock に警告付きで降格)。
+- appId は `DeviceAppID.current`(UserDefaults の UUID・端末固定)。ai のインメモリ store は未知の appId を初期状態(version 1)として扱うので、ai 再起動後も次の発話で作り直せる。version ズレ(409 `version_conflict`)は `HTTPAIClient` が `baseVersion` 無しで 1 回だけ再試行。
+- ai 契約: 成功 `{appId, version, previousVersion, mode(full|patch), dsl, patch?, summary, transcript, source, latencyMs, meta}`、失敗 `{error:{code,message,details?}}`(`APIError.server` → toast に message)。タイムアウト 45s(`HTTP.defaultTimeout`)。
+- ATS: `NSAllowsLocalNetworking` のみ(LAN の `http://<IP>:8081` 用)。`NSAllowsArbitraryLoads` は入れない。
 
 ## 8. DSL スキーマ
 → 統一版 v1: `docs/dsl/README.md`(決定表)+ `docs/dsl/dsl.schema.json`。旧 iOS 案は `docs/ios/dsl-proposal.md`。
@@ -218,13 +247,14 @@ UI は専用ログイン画面を作らない(匿名なら無言、Apple なら�
 ## 11. ビルド/実行
 ```sh
 cd ios
+./scripts/sync-firebase-plist.sh               # GoogleService-Info.plist をリポ外からコピー(git-ignored。無ければ認証モック)
 METAMON_TEAM_ID=CHP337D75C xcodegen generate   # .xcodeproj 生成(コミットしない)。Team を注入
 xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' build CODE_SIGNING_ALLOWED=NO
 xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' test CODE_SIGNING_ALLOWED=NO   # 3 パッケージのテストを一括
 (cd Packages/MetamonDSL && swift test)         # DSL だけなら macOS で数秒
-# 実機
-xcodebuild -scheme Metamon -destination 'id=<DEVICE_ID>' -allowProvisioningUpdates DEVELOPMENT_TEAM=CHP337D75C build
+# 実機(ai をローカル LAN で live にする例。appconfig 未指定ならインメモリのまま)
+xcodebuild -scheme Metamon -destination 'id=<DEVICE_ID>' -allowProvisioningUpdates DEVELOPMENT_TEAM=CHP337D75C build METAMON_AI_BASE_URL=http://$(ipconfig getifaddr en0):8081
 xcrun devicectl device install app --device <DEVICE_ID> <path/to/Metamon.app>
 xcrun devicectl device process launch --device <DEVICE_ID> jp.kz2601.metamon
-# 実サーバー接続: Scheme の環境変数に METAMON_API_BASE_URL / METAMON_AI_BASE_URL を設定(未設定なら全モック)
+# 実サーバー接続: build setting(上記)か Scheme の環境変数 METAMON_AI_BASE_URL / METAMON_APPCONFIG_BASE_URL(未設定なら全モック)。§7 参照
 ```
