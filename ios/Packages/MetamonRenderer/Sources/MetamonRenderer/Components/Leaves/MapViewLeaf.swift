@@ -50,7 +50,7 @@ struct MapViewLeaf: View {
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
         .frame(maxWidth: .infinity, minHeight: 160, maxHeight: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous))
         .onAppear { position = Self.camera(for: pins.map(\.coordinate), span: spanMeters) }
         .onChange(of: pins.map(\.id)) { _, _ in position = Self.camera(for: pins.map(\.coordinate), span: spanMeters) }
     }

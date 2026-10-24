@@ -7,16 +7,18 @@ struct SectionContainer: View {
     let ctx: RenderContext
 
     var body: some View {
-        VStack(alignment: .leading, spacing: c.containerSpacing) {
+        VStack(alignment: .leading, spacing: RenderTheme.Spacing.sm) {
             if let title = c.title, !title.isEmpty {
-                Text(title).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 4)
+                Text(title)
+                    .font(RenderTheme.Fonts.sectionTitle)
+                    .kerning(0.2)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, RenderTheme.Spacing.xs)
             }
             VStack(alignment: .leading, spacing: c.containerSpacing) {
                 ForEach(c.children) { DSLView(component: $0, ctx: ctx) }
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            .renderCard()
         }
     }
 }

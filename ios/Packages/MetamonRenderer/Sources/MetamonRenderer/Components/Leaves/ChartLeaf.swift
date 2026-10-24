@@ -13,9 +13,9 @@ struct ChartLeaf: View {
         let rows = Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId))
         let buckets = Aggregator.buckets(c, entity: entity, records: rows)
         VStack(alignment: .leading, spacing: 8) {
-            if let title = c.title { Text(title).font(.headline) }
+            if let title = c.title { Text(title).font(RenderTheme.Fonts.cardTitle) }
             if buckets.isEmpty {
-                Text("データがありません").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 24)
+                EmptyPlaceholder(icon: "chart.bar", text: "データがありません")
             } else {
                 Chart(buckets) { b in
                     switch c.kind {
@@ -32,7 +32,6 @@ struct ChartLeaf: View {
                 .frame(height: 180)
             }
         }
-        .padding(16)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        .renderCard()
     }
 }
