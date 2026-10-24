@@ -2,12 +2,16 @@
   "schemaVersion": 1,
   "app": {
     "name": "トレーニング記録",
-    "description": "筋トレの種目・回数・重量を記録し、週ごとの回数を見る",
+    "description": "筋トレの種目・回数・重量を記録し、週ごとの回数を見る。毎朝8時にリマインド",
     "icon": "dumbbell",
     "theme": { "primaryColor": "#1565C0" },
     "voiceEntry": "floating",
     "notifications": [
       { "id": "morning", "title": "トレーニング", "body": "今日のトレーニングを記録しましょう", "repeat": "daily", "time": "08:00" }
+    ],
+    "tabs": [
+      { "screen": "home", "title": "今日", "icon": "figure.strengthtraining.traditional" },
+      { "screen": "history", "title": "履歴", "icon": "clock" }
     ]
   },
   "initialScreen": "home",
@@ -17,11 +21,11 @@
       "name": "トレーニング",
       "titleField": "exercise",
       "fields": [
-        { "id": "exercise", "name": "種目", "type": "enum", "required": true, "options": ["スクワット", "ベンチプレス", "デッドリフト", "懸垂", "ランニング"] },
+        { "id": "exercise", "name": "種目", "type": "enum", "required": true, "options": ["腕立て", "スクワット", "懸垂", "ベンチプレス", "ランニング"] },
         { "id": "reps", "name": "回数", "type": "integer", "required": true },
         { "id": "weight", "name": "重量", "type": "number", "unit": "kg" },
         { "id": "done", "name": "完了", "type": "boolean", "defaultValue": true },
-        { "id": "date", "name": "日付", "type": "datetime", "required": true, "defaultValue": "now" }
+        { "id": "date", "name": "日時", "type": "datetime", "required": true, "defaultValue": "now" }
       ]
     }
   ],
@@ -34,21 +38,19 @@
       ],
       "components": [
         {
-          "type": "hstack",
+          "type": "hstack", "id": "summary", "area": "A1:F2",
           "children": [
-            { "type": "stat", "label": "今月の回数", "entity": "workout", "aggregate": "count", "filter": { "field": "date", "op": "thisMonth", "value": null } },
+            { "type": "stat", "label": "今日の回数", "entity": "workout", "aggregate": "sum", "field": "reps", "filter": { "field": "date", "op": "today", "value": null } },
+            { "type": "stat", "label": "今月のセット", "entity": "workout", "aggregate": "count", "filter": { "field": "date", "op": "thisMonth", "value": null } },
             { "type": "stat", "label": "最大重量", "entity": "workout", "aggregate": "max", "field": "weight", "format": "plain" }
           ]
         },
-        { "type": "chart", "title": "週ごとの回数", "entity": "workout", "kind": "bar", "groupBy": "date", "bucket": "week", "aggregate": "sum", "field": "reps" },
-        {
-          "type": "list",
-          "entity": "workout",
-          "item": { "title": "exercise", "subtitle": "date", "trailing": "reps" },
-          "sort": { "field": "date", "direction": "desc" },
-          "swipeToDelete": true,
-          "onItemTap": { "type": "navigate", "screen": "workout_form", "presentation": "push" }
-        }
+        { "type": "chart", "id": "weekly", "area": "A3:F7", "title": "週ごとの回数", "entity": "workout", "kind": "bar",
+          "groupBy": "date", "bucket": "week", "aggregate": "sum", "field": "reps" },
+        { "type": "chart", "id": "by_exercise", "area": "A8:F10", "title": "種目別", "entity": "workout", "kind": "pie",
+          "groupBy": "exercise", "aggregate": "sum", "field": "reps" },
+        { "type": "button", "id": "record", "area": "A11:F12", "label": "今日の記録を保存", "icon": "plus",
+          "action": { "type": "navigate", "screen": "workout_form", "presentation": "sheet" } }
       ]
     },
     {
@@ -58,7 +60,7 @@
       "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "workout" } }],
       "components": [
         {
-          "type": "section",
+          "type": "section", "id": "fields", "area": "A1:F8",
           "children": [
             { "type": "picker", "field": "exercise", "label": "種目", "style": "menu" },
             { "type": "numberField", "field": "reps", "label": "回数" },
@@ -66,7 +68,19 @@
             { "type": "toggle", "field": "done", "label": "完了" },
             { "type": "datePicker", "field": "date", "label": "日時", "includeTime": true }
           ]
-        }
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "workout", "confirmMessage": "この記録を削除しますか？" } }
+      ]
+    },
+    {
+      "id": "history",
+      "title": "履歴",
+      "components": [
+        { "type": "list", "id": "all", "area": "A1:F12", "entity": "workout",
+          "item": { "title": "exercise", "subtitle": "date", "trailing": "reps" },
+          "sort": { "field": "date", "direction": "desc" }, "emptyText": "まだ記録がありません", "swipeToDelete": true,
+          "onItemTap": { "type": "navigate", "screen": "workout_form", "presentation": "push" } }
       ]
     }
   ]

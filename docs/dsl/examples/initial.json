@@ -13,9 +13,7 @@
       "id": "home",
       "title": "",
       "components": [
-        { "type": "spacer", "size": "flexible" },
-        { "type": "voiceInput", "id": "mic", "prompt": "どんなアプリが欲しい？", "size": "large" },
-        { "type": "spacer", "size": "flexible" }
+        { "type": "voiceInput", "id": "mic", "area": "A1:F12", "prompt": "どんなアプリが欲しい？", "size": "large" }
       ]
     }
   ]

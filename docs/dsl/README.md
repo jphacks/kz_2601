@@ -23,7 +23,7 @@
 | 3 | `appId` / `version` の置き場 | DSL 外(API 封筒 `DSLEnvelope{appId,version,dsl}`) | DSL ルート内 | **封筒側**。DSL 本文には持たない | Claude に出力させない値を本文に混ぜない。OpenAPI の `DSLEnvelope` が既にそう定義済み |
 | 4 | `screens` | 配列 `[{id,...}]` | object `{id: Screen}` | **配列** | 動的キー object は `additionalProperties:false` 必須の構造化出力と両立しない。Swift 側は `first{ $0.id == }` 1 行で済む |
 | 5 | props の包み方 | フラット | フラット推奨 | **フラット** | 両案一致。短い・Claude が書きやすい |
-| 6 | ナビゲーション | `initialScreen` + `navigate{screen,presentation:push/sheet/fullScreen}` | `navigation{type:stack/tab, tabs[]}` + `navigate/present/dismiss` | **backend 案**。タブ無し。`back` が pop と dismiss を兼ねる | デモ3本はタブ不要。アクション数を減らす。タブは P1 で `app.tabs[]` を**追加**すれば互換 |
+| 6 | ナビゲーション | `initialScreen` + `navigate{screen,presentation:push/sheet/fullScreen}` | `navigation{type:stack/tab, tabs[]}` + `navigate/present/dismiss` | **アクションは backend 案 + タブは iOS 案を `app.tabs[]: [{screen,title,icon?}]` として採用**(ユーザー決定・2〜5 個・各タブが独立スタック)。`back` が pop と dismiss を兼ねる | 実機で好感触だった「タブで切り替わるアプリらしさ」を残す。閉じた配列なので構造化出力でも問題なし |
 | 7 | データ束縛 | `screen.entity` のドラフト + 入力 Leaf の `field` | `state` + `{{式}}` + `bind` + `setState` | **backend 案**。`{{...}}` 式・`state`・`sequence` は v1 に無し | 式言語は AI の出力が揺れる最大要因。entity/field の id 参照なら Go が整合性検証できる |
 | 8 | 保存/削除 | `saveRecord{entity,screen?}` / `deleteRecord{entity,confirmMessage?}` | `entity.create/update/delete` + `sequence` | **backend 案**。`list.onItemTap` の navigate で iOS が **recordId を暗黙に渡し**編集モード | 1 アクションで完結。フォーム→保存→戻るを AI が 1 行で書ける |
 | 9 | 一覧 | `list{entity,item{title,subtitle,trailing,image},sort,filter,swipeToDelete}` | `list{source:式,item:テンプレ Node}` | **backend 案**(item は field id) | 行テンプレの再帰を避ける。見た目は iOS のデザインシステムで固定 |
@@ -39,21 +39,25 @@
 | 19 | 未知 type / キー | スキーマで拒否 | 無視・プレースホルダ | **両方**(backend 拒否・iOS は落ちない) | 二重防御。Day2 に部品を足しても古いビルドが死なない |
 | 20 | 「元に戻して」 | `versions/{n}/restore` | `ai.prompt` で再生成 | **versions restore**(appconfig)。undo はスキーマに無し | 既存 API で済む。DSL に履歴概念を持ち込まない |
 | 21 | ID 形式 | `^[a-z][a-z0-9_-]{0,39}$`(Go で検証) | 任意 | **backend 案** | Firestore パス安全性。iOS は気にしない |
+| 23 | **画面レイアウト** | 上から積むスタック | 上から積むスタック(+`padding`) | **グリッド座標配置**(ユーザー決定)。Screen 直下の各コンポーネントに省略可能な `area:"A1:C3"`。詳細は §3.4 | 「全部品を長方形とみなし、A1〜C3 の正方形に入力欄を置く」ように AI/ユーザーが位置を調整できる DSL が理想 |
+| 24 | Container 内のグリッド | — | — | **v1 は Screen 直下 1 階層のみ**。Container の子は積むだけ(`area` を付けたら backend がエラー) | 実装が単純(GeometryReader 1 個)・非再帰 2 段と整合。ローカルグリッドは P1 で `area` の意味を広げるだけで互換 |
 | 22 | 編集ターンの形 | `$defs/PatchDocument{patch,summary}`(構造化出力) | — | **backend 案**。`$defs/PatchValue` で value を閉じる | iOS には無関係(常にフル DSL) |
 
 ## 3. 構造
 
 ```
 AppDSL { schemaVersion:1, app:AppMeta, initialScreen, entities[], screens[] }
-AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: fullscreen|floating|none, notifications[]? }
+AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: fullscreen|floating|none, notifications[]?, tabs[]?: {screen,title,icon?} }
 Entity  { id, name, titleField?, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit? } }
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
-Container { type: vstack|hstack|section, id?, title?, spacing?, children[]: Leaf }
-Leaf (15 種) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
+Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
+Leaf (15 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
 ### 3.1 コンポーネント(18 種 = Container 3 + Leaf 15)
+
+全種に共通の任意キー: `id`(画面内一意)・`area`(§3.4 のグリッド矩形。Screen 直下のみ有効)。
 
 | type | 必須 | 任意 | 要 `screen.entity` | P |
 |---|---|---|---|---|
@@ -106,6 +110,22 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `location` | `"lat,lng"`(P1) |
 
 `defaultValue` は date/datetime で `"now"` を許可。
+
+
+### 3.4 画面レイアウト = グリッド座標配置
+
+| 項目 | 仕様 |
+|---|---|
+| グリッド | 各 Screen は暗黙のグリッドを持つ。**横 = A〜F の 6 列**(可視幅 ÷ 6)、**縦 = 1〜N 行**(1 行 = 可視高さ ÷ 12)。13 行目以降を使うと画面全体が縦スクロール。上限 48 行 |
+| `area` | Screen 直下の Container/Leaf に省略可能。スプレッドシート記法 `"左上セル:右下セル"`(例 `A1:C3` = 3 列 × 3 行の正方形、`A1:F12` = 全画面)。スキーマ pattern `^[A-F][1-9][0-9]*:[A-F][1-9][0-9]*$` |
+| 重なり禁止 | `area` を持つ兄弟同士でセルを共有したら **backend `Validate()` がエラー**。文言例: `screen "home" components[2] (id "recent") area A3:F10 overlaps screen "home" components[0] (id "summary") area A1:F4; areas of sibling components must not share cells`。範囲外(G 列・0 行・右下が左上より前・48 行超)も同様にエラーで列挙 → Claude 再生成に渡す |
+| セル内スクロール | セル = 長方形の器。可変長(`list`・`section`・`vstack`/`hstack`・長い `text`)は**器の内側でスクロール**(`scrollBounceBehavior(.basedOnSize)` なので短ければ動かない)。その他(入力・ボタン・stat・chart・image)は器に収めて `clipped` |
+| フォールバック(`area` 無し) | 従来どおり**上から積む**。同一画面で混在した場合は「`area` で使われた**最終行の次の行**から、全幅で上から順に積む」(決定的・LLM が配置を出し損ねても崩れない)。`area` が 1 つも無ければ 1 行目から積む |
+| Container 内 | **v1 はグリッドを Screen 直下 1 階層のみ**。Container の子は積むだけ。子に `area` を付けると backend がエラー(iOS は無視) |
+| タブとの関係 | グリッドは**タブ内の各 Screen の中身**の配置。直交する概念で、タブの有無に関係なく同じ |
+| iOS 実装 | `GridScreenLayout`: `GeometryReader` で `cellW = (幅-24)/6`、`cellH = (高さ-24)/12` を算出し、`area` 子を `.frame(width: colSpan*cellW-8, height: rowSpan*cellH-8).offset(...)` で絶対配置。`voiceInput` 画面(初期状態)は非スクロール |
+
+例(家計簿 home): 合計カード `A1:F2`・最近の支出(list・セル内スクロール) `A3:F10`・追加ボタン `D11:F12`。散歩メモ home: 今日 `A1:C2` / ぜんぶ `D1:F2` の 2 枚並び + 一覧 `A3:F12`。
 
 ## 4. 変更手順(Day2 に部品を足す時)
 

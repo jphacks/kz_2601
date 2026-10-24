@@ -69,4 +69,5 @@ kz_2601/
 | 10/24 午前 | STT | WhisperKit(オンデバイス)で確定。不足時のみ OpenAI Whisper API |
 | 10/24 午前 | CI時間 | backend 5分以内必須。iOS は制限なし |
 | 10/24 午前 | 秘密管理 | publicリポ。APIキー・plist は .gitignore + gitleaks。ローカルは `~/Desktop/JPHACKS2026/.env`(リポ外) |
-| 10/24 昼 | DSL v1 統一(backend 案 × iOS 案) | **構造は backend 案(非再帰2段・閉じた enum・`additionalProperties:false`)、命名は iOS 案(camelCase・props フラット)**。`screens` は配列、`appId/version` は API 封筒、`voiceInput` は Leaf、`datePicker` 追加、式 `{{}}`/state/tab は v1 に無し、写真は data URL(≤800px)、集計は iOS クライアント。正典 `docs/dsl/`(決定表 22 論点は `docs/dsl/README.md`) |
+| 10/24 昼 | DSL v1 統一(backend 案 × iOS 案) | **構造は backend 案(非再帰2段・閉じた enum・`additionalProperties:false`)、命名は iOS 案(camelCase・props フラット)**。`screens` は配列、`appId/version` は API 封筒、`voiceInput` は Leaf、`datePicker` 追加、式 `{{}}`/state は v1 に無し、写真は data URL(≤800px)、集計は iOS クライアント。正典 `docs/dsl/`(決定表 22 論点は `docs/dsl/README.md`) |
+| 10/24 昼 | 画面レイアウト・タブ | **グリッド座標配置**: 各 Screen = 横 A〜F の 6 列 × 縦 1 行=可視高さ÷12(13 行目以降はスクロール)。Screen 直下の部品に省略可能な `area:"A1:C3"`、兄弟の重なりは backend 検証でエラー(id と area を人間可読で列挙)、可変長はセル内スクロール、`area` 無しは最終使用行の次から積む。Container 内は積むだけ(v1)。**タブ(`app.tabs[]`)は v1 に残す**(「タブ無し」却下)。仕様は `docs/dsl/README.md` §3.4 |
