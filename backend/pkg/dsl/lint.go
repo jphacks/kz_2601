@@ -231,7 +231,11 @@ type period struct {
 	words []string
 }
 
+// op "latest": no aggregate returns the newest record; "recent": needs an
+// expression date filter (addDays(today,-N)); "": weeks/years have no op.
 var periods = []period{
+	{"latest", []string{"最新", "latest", "most recent"}},
+	{"recent", []string{"直近", "last 7 days", "past 7 days", "last 30 days", "past week"}},
 	{"thisMonth", []string{"今月", "this month", "monthly total"}},
 	{"today", []string{"今日", "本日", "today"}},
 	{"", []string{"今週", "this week", "今年", "this year", "年間"}},
@@ -274,13 +278,27 @@ func (l *linter) periodLabel(where string, c *Component) {
 			}
 		})
 	}
-	if p.op == "" {
-		for _, f := range filters {
-			if f.Op != "thisMonth" && f.Op != "today" && f.Value != nil {
-				if ve, err := exprFromValue(f.Value); err == nil && ve != nil && ve.Kind != ExprLiteral {
-					return // e.g. date >= addDays(today,-6)
-				}
+	if p.op == "latest" {
+		l.add(`%s: label %q says %q but no aggregate returns the newest record (avg/max/min/sum are not "latest"); relabel it to what it computes (今日の○○ with filter today, 平均, 最大) or show the newest value at the top of a list sorted by date desc`, where, label, word)
+		return
+	}
+	hasExprFilter := false
+	for _, f := range filters {
+		if f.Op != "thisMonth" && f.Op != "today" && f.Value != nil {
+			if ve, err := exprFromValue(f.Value); err == nil && ve != nil && ve.Kind != ExprLiteral {
+				hasExprFilter = true // e.g. date >= addDays(today,-6), year == year(today)
 			}
+		}
+	}
+	if p.op == "recent" {
+		if !hasExprFilter {
+			l.add(`%s: label %q says %q but the value has no date filter, so it counts all records; add {"field":"<date>","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-6]}} (inside the agg when using value) or relabel it (合計 / total)`, where, label, word)
+		}
+		return
+	}
+	if p.op == "" {
+		if hasExprFilter {
+			return
 		}
 		l.add(`%s: label %q says %q but there is no filter op for weeks/years; either filter by an expression ({"field":"<date>","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-6]}}) and relabel it 直近7日 / last 7 days, or relabel it to what it really shows (全期間 / 合計 / total) and end app.description with "○○は△△で代替しました。"`, where, label, word)
 		return

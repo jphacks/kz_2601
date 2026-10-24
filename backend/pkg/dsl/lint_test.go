@@ -8,6 +8,16 @@ import (
 	"testing"
 )
 
+// The prompt's 今年 recipe (computed year + filter eq year(today)) must
+// validate and be lint-clean.
+func TestLintThisYearRecipe(t *testing.T) {
+	got := lintWith(t, `,{"id":"year","name":"年","type":"integer","computed":{"op":"year","args":[{"ref":"date"}]}}`,
+		`{"type":"stat","label":"今年の合計","aggregate":"sum","entity":"log","field":"amount","filter":{"field":"year","op":"eq","value":{"op":"year","args":[{"op":"today","args":[]}]}}},`)
+	if len(got) > 0 {
+		t.Fatalf("unexpected: %v", got)
+	}
+}
+
 // lintApp parses a document (must pass Validate) and returns its lint warnings.
 func lintApp(t *testing.T, raw string) []string {
 	t.Helper()
@@ -132,7 +142,12 @@ func TestLintPeriodLabel(t *testing.T) {
 	// no op for weeks / years
 	wantLint(t, lintWith(t, "", `{"type":"stat","label":"Points this week","aggregate":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}},`), `no filter op for weeks/years`)
 
-	ok := lintWith(t, "", `{"type":"stat","label":"今月の支出","aggregate":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}},
+	// audit a08 (after): 直近7日 without a date filter / a12: 最新 is an avg
+	wantLint(t, lintWith(t, "", `{"type":"stat","label":"筋トレ(直近7日)","aggregate":"count","entity":"log"},`), `has no date filter`)
+	wantLint(t, lintWith(t, "", `{"type":"stat","label":"最新の体重","aggregate":"avg","entity":"log","field":"amount"},`), `no aggregate returns the newest record`)
+
+	ok := lintWith(t, "", `{"type":"stat","label":"直近7日","aggregate":"count","entity":"log","filter":{"field":"date","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-6]}}},
+	 {"type":"stat","label":"今月の支出","aggregate":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}},
 	 {"type":"stat","label":"今月の残り","value":{"op":"sub","args":[30000,{"agg":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}}]}},
 	 {"type":"stat","label":"今週(直近7日)","aggregate":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-6]}}},
 	 {"type":"stat","label":"今日水やりが必要","aggregate":"count","entity":"log","filter":{"field":"amount","op":"lte","value":0}},
