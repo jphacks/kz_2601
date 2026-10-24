@@ -2,25 +2,23 @@ package store
 
 import "context"
 
-// DeleteUserData implements Accounts.
-func (m *Memory) DeleteUserData(_ context.Context, uid string) error {
+// DeactivateUser implements Accounts.
+func (m *Memory) DeactivateUser(_ context.Context, uid string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for _, p := range m.public {
-		if p.app != nil && p.app.OwnerUID == uid {
-			p.app = nil
-		}
-		for _, recs := range p.records {
-			for id, r := range recs {
-				if r.Author == uid {
-					delete(recs, id)
-				}
-			}
+	now := m.now().UTC()
+	if m.deleted == nil {
+		m.deleted = map[string]bool{}
+	}
+	m.deleted[uid] = true
+	for _, a := range m.users[uid] {
+		if a.app.Status != "archived" {
+			a.app.Status, a.app.UpdatedAt = "archived", now
 		}
 	}
-	for token, s := range m.shares {
+	for _, s := range m.shares {
 		if s.OwnerUID == uid {
-			delete(m.shares, token)
+			s.Revoked = true
 		}
 	}
 	for id, c := range m.catalog {
@@ -28,6 +26,12 @@ func (m *Memory) DeleteUserData(_ context.Context, uid string) error {
 			delete(m.catalog, id)
 		}
 	}
-	delete(m.users, uid)
 	return nil
+}
+
+// UserDeleted implements Accounts.
+func (m *Memory) UserDeleted(_ context.Context, uid string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.deleted[uid], nil
 }

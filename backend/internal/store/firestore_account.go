@@ -4,114 +4,100 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
 )
 
-// DeleteUserData implements Accounts.
-//
-// Order matters for idempotency: shared records are found through the uid's
-// own apps (posting requires the private copy, see appconfig.entityOf), so
-// they are deleted before users/{uid}. A retry after any partial failure
-// therefore still finds what is left.
-func (f *Firestore) DeleteUserData(ctx context.Context, uid string) error {
+// users/{uid} {status: "deleted", deletedAt}. The document is otherwise never
+// written (apps live in its subcollection), so absence means active.
+func (f *Firestore) userRef(uid string) *firestore.DocumentRef {
+	return f.c.Collection("users").Doc(uid)
+}
+
+// DeactivateUser implements Accounts.
+func (f *Firestore) DeactivateUser(ctx context.Context, uid string) error {
+	if err := f.markDeleted(ctx, uid); err != nil {
+		return fmt.Errorf("mark users/%s: %w", uid, err)
+	}
+	now := time.Now().UTC()
 	bw := f.c.BulkWriter(ctx)
 	defer bw.End()
-
-	appIDs, err := docIDs(f.c.Collection("users").Doc(uid).Collection("apps").DocumentRefs(ctx))
+	err := each(ctx, f.userRef(uid).Collection("apps").Query, func(s *firestore.DocumentSnapshot) error {
+		if st, _ := s.DataAt("status"); st == "archived" {
+			return nil
+		}
+		_, err := bw.Update(s.Ref, []firestore.Update{{Path: "status", Value: "archived"}, {Path: "updatedAt", Value: now}})
+		return err
+	})
 	if err != nil {
-		return fmt.Errorf("list apps: %w", err)
+		return fmt.Errorf("archive apps: %w", err)
 	}
-	for _, appID := range appIDs {
-		if err := f.deleteAuthoredPublicRecords(ctx, bw, uid, appID); err != nil {
-			return fmt.Errorf("public records of %s: %w", appID, err)
+	err = each(ctx, f.c.Collection(sharesCollection).Where("ownerUid", "==", uid), func(s *firestore.DocumentSnapshot) error {
+		if r, _ := s.DataAt("revoked"); r == true {
+			return nil
 		}
+		_, err := bw.Update(s.Ref, []firestore.Update{{Path: "revoked", Value: true}})
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("revoke shares: %w", err)
 	}
-	// apps_public: only the document; other users' records stay in its subcollections.
-	for _, col := range []string{publicCollection, sharesCollection, catalogCollection} {
-		if err := f.deleteMatches(ctx, bw, f.c.Collection(col).Where("ownerUid", "==", uid)); err != nil {
-			return fmt.Errorf("%s: %w", col, err)
-		}
-	}
-	bw.Flush()
-	if err := f.deleteTree(ctx, bw, f.c.Collection("users").Doc(uid)); err != nil {
-		return fmt.Errorf("users/%s: %w", uid, err)
+	err = each(ctx, f.c.Collection(catalogCollection).Where("ownerUid", "==", uid), func(s *firestore.DocumentSnapshot) error {
+		_, err := bw.Delete(s.Ref)
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("unlist: %w", err)
 	}
 	bw.Flush()
 	return nil
 }
 
-// deleteAuthoredPublicRecords deletes apps_public/{appID}/entities/*/records
-// whose author is uid. Entity documents are never written ("missing"), which
-// DocumentRefs still lists.
-func (f *Firestore) deleteAuthoredPublicRecords(ctx context.Context, bw *firestore.BulkWriter, uid, appID string) error {
-	entities, err := docIDs(f.publicRef(appID).Collection("entities").DocumentRefs(ctx))
-	if err != nil {
-		return err
-	}
-	for _, e := range entities {
-		q := f.recordsCol(PublicRecords(appID, e)).Where("author", "==", uid)
-		if err := f.deleteMatches(ctx, bw, q); err != nil {
+// markDeleted writes the mark once (a retry keeps the first deletedAt).
+func (f *Firestore) markDeleted(ctx context.Context, uid string) error {
+	ref := f.userRef(uid)
+	return f.c.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
+		snap, err := tx.Get(ref)
+		if err == nil {
+			if st, _ := snap.DataAt("status"); st == AccountDeleted {
+				return nil
+			}
+		} else if !isNotFound(err) {
 			return err
 		}
-	}
-	return nil
+		return tx.Set(ref, map[string]any{"status": AccountDeleted, "deletedAt": time.Now().UTC()}, firestore.MergeAll)
+	})
 }
 
-// deleteMatches enqueues a delete for every document q matches (not their subcollections).
-func (f *Firestore) deleteMatches(ctx context.Context, bw *firestore.BulkWriter, q firestore.Query) error {
-	it := q.Select().Documents(ctx)
+// UserDeleted implements Accounts.
+func (f *Firestore) UserDeleted(ctx context.Context, uid string) (bool, error) {
+	snap, err := f.userRef(uid).Get(ctx)
+	if isNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	st, _ := snap.DataAt("status")
+	return st == AccountDeleted, nil
+}
+
+// each calls fn for every document q returns.
+func each(ctx context.Context, q firestore.Query, fn func(*firestore.DocumentSnapshot) error) error {
+	it := q.Documents(ctx)
 	defer it.Stop()
 	for {
-		snap, err := it.Next()
+		s, err := it.Next()
 		if errors.Is(err, iterator.Done) {
 			return nil
 		}
 		if err != nil {
 			return err
 		}
-		if _, err := bw.Delete(snap.Ref); err != nil {
+		if err := fn(s); err != nil {
 			return err
 		}
 	}
-}
-
-// deleteTree deletes doc and every document below it (the Go client has no
-// RecursiveDelete). Missing parent documents are listed too, so records under
-// a never-written entities/{e} are reached.
-func (f *Firestore) deleteTree(ctx context.Context, bw *firestore.BulkWriter, doc *firestore.DocumentRef) error {
-	cols := doc.Collections(ctx)
-	for {
-		col, err := cols.Next()
-		if errors.Is(err, iterator.Done) {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		children, err := col.DocumentRefs(ctx).GetAll()
-		if err != nil {
-			return err
-		}
-		for _, child := range children {
-			if err := f.deleteTree(ctx, bw, child); err != nil {
-				return err
-			}
-		}
-	}
-	_, err := bw.Delete(doc)
-	return err
-}
-
-func docIDs(it *firestore.DocumentRefIterator) ([]string, error) {
-	refs, err := it.GetAll()
-	if err != nil {
-		return nil, err
-	}
-	out := make([]string, len(refs))
-	for i, r := range refs {
-		out[i] = r.ID
-	}
-	return out, nil
 }

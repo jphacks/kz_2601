@@ -4,48 +4,76 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
+	"sync"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
-// Option configures New.
-type Option func(*Handler)
+// CodeAccountDeleted is the 410 error code for uids that deleted their account.
+const CodeAccountDeleted = "account_deleted"
 
-// WithUserDeleter makes DELETE /v1/me also delete the Firebase Auth user.
-// Without it (AUTH_MODE=dev, tests) only the stored data is deleted.
-func WithUserDeleter(d auth.UserDeleter) Option {
-	return func(h *Handler) { h.users = d }
-}
-
-// deleteMe is DELETE /v1/me (#119, App Store 5.1.1(v)): physically deletes
-// everything the caller owns, then the sign-in account. Idempotent: a retry
-// after any failure deletes what is left and still answers 204.
+// deleteMe is DELETE /v1/me (#119, App Store 5.1.1(v)). Logical deletion:
+// store.Accounts.DeactivateUser marks the uid deleted, archives its apps,
+// revokes its share links and takes down its catalog listings. The Firebase
+// Auth user is not deleted. Idempotent: always 204.
 func (h *Handler) deleteMe(w http.ResponseWriter, r *http.Request) {
-	ctx, uid := r.Context(), uidOf(r)
-	if err := h.store.DeleteUserData(ctx, uid); err != nil {
-		fail(w, fmt.Errorf("delete user data: %w", err))
+	if err := h.store.DeactivateUser(r.Context(), uidOf(r)); err != nil {
+		fail(w, fmt.Errorf("deactivate user: %w", err))
 		return
 	}
-	h.forget(uid)
-	// Last, so that a failure above leaves a token the client can retry with.
-	if h.users != nil {
-		if err := h.users.DeleteUser(ctx, uid); err != nil {
-			fail(w, fmt.Errorf("delete auth user: %w", err))
-			return
-		}
-	}
-	slog.Info("appconfig: account deleted", slog.Bool("authUserDeleted", h.users != nil))
+	slog.Info("appconfig: account deleted (logical)")
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// forget drops uid's parsed DSLs from the cache.
-func (h *Handler) forget(uid string) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	for k := range h.cache {
-		if strings.HasPrefix(k, uid+"/") {
-			delete(h.cache, k)
+// recheckAfter bounds how long an instance trusts "not deleted" for a uid
+// (other Cloud Run instances learn about a deletion within this window).
+const recheckAfter = 30 * time.Second
+
+// RejectDeleted answers 410 account_deleted to every authenticated request of
+// a deleted uid, except DELETE /v1/me itself (so it stays idempotent). Mount it
+// inside auth.Middleware.
+func RejectDeleted(s store.Accounts, next http.Handler) http.Handler {
+	var (
+		mu      sync.Mutex
+		deleted = map[string]bool{}      // permanent
+		active  = map[string]time.Time{} // uid -> checked at
+	)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uid := auth.UID(r.Context())
+		if r.Method == http.MethodDelete && r.URL.Path == "/v1/me" {
+			next.ServeHTTP(w, r)
+			mu.Lock()
+			delete(active, uid) // re-read on the next request
+			mu.Unlock()
+			return
 		}
-	}
+		mu.Lock()
+		gone, checked := deleted[uid], active[uid]
+		mu.Unlock()
+		if !gone && time.Since(checked) > recheckAfter {
+			var err error
+			if gone, err = s.UserDeleted(r.Context(), uid); err != nil {
+				fail(w, fmt.Errorf("account status: %w", err))
+				return
+			}
+			mu.Lock()
+			if gone {
+				deleted[uid] = true
+			} else {
+				if len(active) > 10000 {
+					active = map[string]time.Time{}
+				}
+				active[uid] = time.Now()
+			}
+			mu.Unlock()
+		}
+		if gone {
+			httpx.Error(w, http.StatusGone, CodeAccountDeleted, "this account has been deleted")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

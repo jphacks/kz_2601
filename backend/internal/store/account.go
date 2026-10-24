@@ -2,18 +2,22 @@ package store
 
 import "context"
 
+// Account status written to users/{uid} by DeactivateUser.
+const AccountDeleted = "deleted"
+
 // Accounts is the account-deletion part of Store (DELETE /v1/me, #119).
+// Deletion is logical: nothing is physically removed.
 type Accounts interface {
-	// DeleteUserData physically deletes everything uid owns:
+	// DeactivateUser marks users/{uid} {status: "deleted", deletedAt} (the
+	// first deletedAt is kept) and hides what others could reach:
 	//
-	//   - users/{uid} and all its subcollections (apps, versions, records)
-	//   - shared records uid posted (apps_public/*/entities/*/records with author == uid);
-	//     other users' posts in the same app are kept
-	//   - apps_public/{appId} documents owned by uid (the published DSL only:
-	//     other users' records in its subcollections are kept)
-	//   - shares/* and public_apps/* owned by uid
+	//   - every users/{uid}/apps/{appId} gets status "archived"
+	//   - shares/* owned by uid are revoked
+	//   - public_apps/* (the "探す" listings) owned by uid are taken down
 	//
-	// It is idempotent: calling it again (also after a partial failure) deletes
-	// whatever is left and returns nil when nothing is.
-	DeleteUserData(ctx context.Context, uid string) error
+	// Shared records uid posted (apps_public/...) are kept. Idempotent: the
+	// mark is written first, so a retry after a partial failure finishes the rest.
+	DeactivateUser(ctx context.Context, uid string) error
+	// UserDeleted reports whether DeactivateUser has been called for uid.
+	UserDeleted(ctx context.Context, uid string) (bool, error)
 }

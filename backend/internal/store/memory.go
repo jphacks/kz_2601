@@ -31,6 +31,7 @@ type Memory struct {
 	catalog  map[string]*CatalogApp     // public_apps/{appId}
 	releases map[string]*ReleaseRequest // release_requests/{id} (memory_release.go)
 	hub      hub                        // change notifications for Watcher (watch.go)
+	deleted  map[string]bool            // uids that called DELETE /v1/me (memory_account.go)
 }
 
 // NewMemory returns an empty store.
