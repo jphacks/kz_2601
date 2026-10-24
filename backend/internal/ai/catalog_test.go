@@ -59,6 +59,7 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompCard, dsl.CompDisclosure, dsl.CompCarousel, dsl.CompGrid,
 		dsl.CompSearchBar, dsl.CompCalendar, dsl.CompShareButton, dsl.CompOpenURLButton,
 		dsl.CompMapView, dsl.CompLocationButton, dsl.CompQrScanner, dsl.CompTimerDisplay,
+		dsl.CompSlider, dsl.CompStepper, dsl.CompTextEditor, dsl.CompSecureField, dsl.CompTimePicker, dsl.CompColorPicker, dsl.CompRating,
 	} {
 		goTypes[string(ct)] = true
 	}

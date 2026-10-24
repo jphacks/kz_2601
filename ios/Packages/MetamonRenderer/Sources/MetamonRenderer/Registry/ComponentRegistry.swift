@@ -73,6 +73,14 @@ public struct ComponentRegistry: Sendable {
         r.register(.locationButton) { c, ctx in LocationButtonLeaf(c: c, ctx: ctx) }
         r.register(.qrScanner) { c, ctx in QrScannerLeaf(c: c, ctx: ctx) }
         r.register(.timerDisplay) { c, ctx in TimerDisplayLeaf(c: c, ctx: ctx) }
+        // leaf: 入力系バッチ
+        r.register(.slider) { c, ctx in SliderLeaf(c: c, ctx: ctx) }
+        r.register(.stepper) { c, ctx in StepperLeaf(c: c, ctx: ctx) }
+        r.register(.textEditor) { c, ctx in TextEditorLeaf(c: c, ctx: ctx) }
+        r.register(.secureField) { c, ctx in SecureFieldLeaf(c: c, ctx: ctx) }
+        r.register(.timePicker) { c, ctx in TimePickerLeaf(c: c, ctx: ctx) }
+        r.register(.colorPicker) { c, ctx in ColorPickerLeaf(c: c, ctx: ctx) }
+        r.register(.rating) { c, ctx in RatingLeaf(c: c, ctx: ctx) }
         return r
     }()
 }

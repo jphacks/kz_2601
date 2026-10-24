@@ -354,7 +354,7 @@
     "Container": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Groups Leaf children (one level only, children stack; no `area` inside). vstack/hstack = plain stacks; section = titled rounded group; card = rounded surface with shadow for one highlighted block; disclosure = collapsible group (title is the toggle row); carousel = horizontal paging strip of same-size items; grid = equal-width columns (2-4) of small tiles such as stat/button/image.",
+      "description": "子 Leaf を並べる器。1 段のみ(Container の中に Container は置けない)。Screen 直下で area を持ち、子は積むだけ(子に area は付けない)。",
       "x-usage": "Container は Leaf と同じく Screen 直下に area で置く: card / section は全幅(例 A1:F3)、stat/button タイルの grid は A1:F4、画像やヒントの carousel は A1:F4、補足の disclosure は画面下部(A9:F12)。子に area は付けない。",
       "required": [
         "type",
@@ -491,6 +491,27 @@
         },
         {
           "$ref": "#/$defs/Divider"
+        },
+        {
+          "$ref": "#/$defs/Slider"
+        },
+        {
+          "$ref": "#/$defs/Stepper"
+        },
+        {
+          "$ref": "#/$defs/TextEditor"
+        },
+        {
+          "$ref": "#/$defs/SecureField"
+        },
+        {
+          "$ref": "#/$defs/TimePicker"
+        },
+        {
+          "$ref": "#/$defs/ColorPicker"
+        },
+        {
+          "$ref": "#/$defs/Rating"
         },
         {
           "$ref": "#/$defs/SearchBar"
@@ -699,8 +720,8 @@
     "Picker": {
       "type": "object",
       "additionalProperties": false,
-      "description": "選択肢から 1 つ選ぶ入力(enum field の options が選択肢)。カテゴリ・種類・気分など。",
-      "x-usage": "選択肢が 2〜4 個なら segmented、多ければ menu。",
+      "description": "選択肢から 1 つ選ぶ入力(enum field の options が選択肢)。カテゴリ・種類・気分など。style=segmented がセグメントコントロール(独立した `segmented` type は無い)。",
+      "x-usage": "選択肢が 2〜4 個なら segmented(全幅 1〜2 行・例 A1:F2)、多ければ menu(1 行)、wheel は 3 行。",
       "required": [
         "type",
         "field"
@@ -1403,6 +1424,239 @@
         "icon": {
           "type": "string",
           "description": "SF Symbols name."
+        }
+      }
+    },
+    "Slider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field",
+        "min",
+        "max"
+      ],
+      "description": "範囲の決まった数値をつまみで入力(満足度 0〜10・音量 % など)。細かい桁より感覚で決める値に。自由な数値は numberField。",
+      "x-usage": "screen.entity のあるフォーム画面に全幅 2 行(例 A3:F4)。integer field は step 1。",
+      "properties": {
+        "type": {
+          "const": "slider"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Numeric field (integer/number/currency) of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "min": {
+          "type": "number",
+          "description": "Lower bound (inclusive)."
+        },
+        "max": {
+          "type": "number",
+          "description": "Upper bound (inclusive). Must be > min."
+        },
+        "step": {
+          "type": "number",
+          "description": "Increment; omit for continuous. Use 1 for integer fields."
+        }
+      }
+    },
+    "Stepper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "-/+ ボタンで少しずつ増減する数値入力(セット数・杯数・人数)。1〜2 ずつ調整する値に。広い範囲は slider。",
+      "x-usage": "全幅 1 行(例 A5:F5)。短い入力と半分ずつ横に並べてもよい。",
+      "properties": {
+        "type": {
+          "const": "stepper"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Numeric field (integer/number/currency) of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "min": {
+          "type": "number",
+          "description": "Lower bound (inclusive)."
+        },
+        "max": {
+          "type": "number",
+          "description": "Upper bound (inclusive). Must be > min when both are given."
+        },
+        "step": {
+          "type": "number",
+          "description": "Increment per tap (default 1)."
+        }
+      }
+    },
+    "TextEditor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "複数行の自由記述(日記本文・メモ・説明)。数文以上書く欄は textField ではなくこちら。",
+      "x-usage": "全幅 3〜5 行(例 A7:F10)。フォームの最後に置くことが多い。",
+      "properties": {
+        "type": {
+          "const": "textEditor"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Text field (string/text) of the screen entity."
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "minLines": {
+          "type": "integer",
+          "description": "Minimum visible lines (default 4)."
+        }
+      }
+    },
+    "SecureField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "伏せ字の文字入力(PIN・パスワード・見られたくないメモ)。",
+      "x-usage": "全幅 1 行(例 A2:F2)。",
+      "properties": {
+        "type": {
+          "const": "secureField"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Text field (string/text) of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        }
+      }
+    },
+    "TimePicker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "日付なしの時:分だけを選ぶ(起床時刻・服薬時刻・開始時刻)。string/text field には \"HH:mm\"、datetime field には今日の日付付き RFC3339 で保存。日付も要るなら datePicker。",
+      "x-usage": "半幅 2 行(例 A9:C10)で 2 つ横並びにできる。全幅でもよい。",
+      "properties": {
+        "type": {
+          "const": "timePicker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "string/text field -> stored as \"HH:mm\" (same format as Notification.time); datetime field -> stored as RFC3339 with today's date."
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "ColorPicker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "システムのカラーウェル。string/text field に \"#RRGGBB\" で保存。タグ色・ラベル色・テーマ色など色分けしたい値に。",
+      "x-usage": "全幅 1 行(例 A11:F11)。",
+      "properties": {
+        "type": {
+          "const": "colorPicker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Text field (string/text) of the screen entity; stored as \"#RRGGBB\"."
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "Rating": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "星をタップして 1〜max(既定 5)で評価。満足度・難易度・味など 5 段階評価に。細かい段階は slider。",
+      "x-usage": "全幅 1〜2 行(例 A7:F8)。",
+      "properties": {
+        "type": {
+          "const": "rating"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Numeric field (integer/number) of the screen entity; stores 1..max."
+        },
+        "label": {
+          "type": "string"
+        },
+        "max": {
+          "type": "integer",
+          "description": "Number of stars (default 5)."
         }
       }
     },

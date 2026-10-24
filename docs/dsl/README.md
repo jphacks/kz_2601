@@ -92,6 +92,19 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `timerDisplay` | `mode`(stopwatch/countdown) | `seconds`(countdown 必須 >0), `field`(integer/number), `label` | `field` 使用時のみ | P1 |
 
 `list` は任意キー `searchField` を持ち、同じ画面の `searchBar.field` を指すと title/subtitle の部分一致で絞り込む(backend は対応する `searchBar` の存在を検証)。
+| `slider` | `field`(integer/number/currency), `min`, `max` | `label`, `step`(省略で連続・integer は 1) | ○ | P1 |
+| `stepper` | `field`(integer/number/currency) | `label`, `min`, `max`, `step`(既定 1) | ○ | P1 |
+| `textEditor` | `field`(string/text) | `placeholder`, `minLines`(既定 4) | ○ | P1 |
+| `secureField` | `field`(string/text) | `label`, `placeholder` | ○ | P1 |
+| `timePicker` | `field`(string/text → `"HH:mm"` / datetime → RFC3339) | `label` | ○ | P1 |
+| `colorPicker` | `field`(string/text → `"#RRGGBB"`) | `label` | ○ | P1 |
+| `rating` | `field`(integer/number・1〜max) | `label`, `max`(既定 5・1〜10) | ○ | P1 |
+
+入力系バッチの補足:
+- **`segmented` は独立 type にしない**。`picker{style:"segmented"}` がセグメントコントロール(enum field・4 択以下なら既定で segmented)。同じ enum 束縛を 2 type に分けると AI の選択が揺れ、レジストリ/検証も二重になるため。
+- **`timePicker` の保存形式**: `Field.type` に `time` は無い。string/text field なら `"HH:mm"`(`Notification.time` と同じ書式・日付を持たない)、datetime field なら今日の日付付き RFC3339。「毎朝の起床時刻」のように日付が要らないなら string を使う。
+- 数値系(`slider`/`stepper`/`rating`)は integer/currency field では丸めて保存。`min >= max`・`step <= 0`・`rating.max` が 1〜10 の整数でない場合は backend `Validate()` がエラー。
+- 実例: `examples/gallery-input.json`(entity 1 つに上記全部品を area 配置)。
 
 ### 3.2 アクション(9 種)
 

@@ -68,21 +68,25 @@ func TestGenerationSchemaHasNoUnsupportedKeywords(t *testing.T) {
 	if props["patch"] == nil || props["summary"] == nil {
 		t.Fatal("patch schema root must expose patch and summary")
 	}
-	// Leaf is flattened: one object whose `type` enum covers all 15 leaves,
-	// and the Stat `format` property survives (only the keyword is stripped).
+	// Leaf is flattened: one object whose `type` enum covers every leaf in the
+	// canonical schema (counted, not hard-coded, so adding a component does not
+	// break this test), and the Stat `format` property survives (only the
+	// keyword is stripped).
+	allComponents, _, defs := schemaTypes(t)
+	wantLeaves := len(allComponents) - len(enumValues(defs["Container"].(map[string]any), "type")) // minus containers
 	leaf := p["$defs"].(map[string]any)["Leaf"].(map[string]any)
 	lp := leaf["properties"].(map[string]any)
 	if lp["format"] == nil || lp["text"] == nil || lp["entity"] == nil {
 		t.Fatalf("flattened leaf misses properties: %v", lp)
 	}
-	if en := lp["type"].(map[string]any)["enum"].([]any); len(en) < 15 { // 15 = v1 baseline; batches append
+	if en := lp["type"].(map[string]any)["enum"].([]any); len(en) != wantLeaves {
 		t.Fatalf("leaf type enum: %v", en)
 	}
 	if _, ok := lp["children"]; ok {
 		t.Fatal("leaf must not have children")
 	}
 	comp := p["$defs"].(map[string]any)["Component"].(map[string]any)["properties"].(map[string]any)
-	if comp["children"] == nil || len(comp["type"].(map[string]any)["enum"].([]any)) < 18 {
+	if comp["children"] == nil || len(comp["type"].(map[string]any)["enum"].([]any)) != len(allComponents) {
 		t.Fatalf("component: %v", comp["type"])
 	}
 	for _, gone := range []string{"Container", "Text", "Stat"} {

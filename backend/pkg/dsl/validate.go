@@ -321,6 +321,8 @@ func (a *App) Validate() error {
 				} else if (c.Type == CompPhotoField || c.Type == CompImage) && f.Type != FieldPhoto {
 					add("%s: %s field %q must be type photo", where, c.Type, c.Field)
 				}
+			case CompSlider, CompStepper, CompRating, CompTextEditor, CompSecureField, CompTimePicker, CompColorPicker:
+				checkInputBinding(where, c, formEntity, add)
 			case CompList:
 				e := entities[c.Entity]
 				if e == nil {
@@ -510,4 +512,66 @@ func collectSearchKeys(screenID string, comps []Component, add func(string, ...a
 		}
 	}
 	return keys
+}
+
+// inputFieldTypes lists the Field types each input-batch component may bind to.
+var inputFieldTypes = map[ComponentType][]FieldType{
+	CompSlider:      {FieldInteger, FieldNumber, FieldCurrency},
+	CompStepper:     {FieldInteger, FieldNumber, FieldCurrency},
+	CompRating:      {FieldInteger, FieldNumber},
+	CompTextEditor:  {FieldString, FieldText},
+	CompSecureField: {FieldString, FieldText},
+	CompTimePicker:  {FieldString, FieldText, FieldDatetime},
+	CompColorPicker: {FieldString, FieldText},
+}
+
+// checkInputBinding validates field reference + type and the numeric range
+// props (min/max/step) of the input-batch components.
+func checkInputBinding(where string, c *Component, formEntity *Entity, add func(string, ...any)) {
+	if formEntity == nil {
+		add("%s: %s requires screen.entity", where, c.Type)
+		return
+	}
+	f := formEntity.FieldByID(c.Field)
+	if f == nil {
+		add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
+		return
+	}
+	allowed := inputFieldTypes[c.Type]
+	ok := false
+	for _, t := range allowed {
+		if f.Type == t {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		add("%s: %s field %q must be one of %v (got %s)", where, c.Type, c.Field, allowed, f.Type)
+	}
+	switch c.Type {
+	case CompSlider:
+		if c.Min == nil || c.Max == nil {
+			add("%s: slider needs min and max", where)
+		} else if *c.Min >= *c.Max {
+			add("%s: slider min (%v) must be < max (%v)", where, *c.Min, *c.Max)
+		}
+		if c.Step != nil && *c.Step <= 0 {
+			add("%s: slider step must be > 0", where)
+		}
+	case CompStepper:
+		if c.Min != nil && c.Max != nil && *c.Min >= *c.Max {
+			add("%s: stepper min (%v) must be < max (%v)", where, *c.Min, *c.Max)
+		}
+		if c.Step != nil && *c.Step <= 0 {
+			add("%s: stepper step must be > 0", where)
+		}
+	case CompRating:
+		if c.Max != nil && (*c.Max < 1 || *c.Max > 10 || *c.Max != float64(int(*c.Max))) {
+			add("%s: rating max must be an integer 1..10", where)
+		}
+	case CompTextEditor:
+		if c.MinLines < 0 {
+			add("%s: textEditor minLines must be >= 0", where)
+		}
+	}
 }

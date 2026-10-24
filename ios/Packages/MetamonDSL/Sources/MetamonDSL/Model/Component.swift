@@ -12,6 +12,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case card, disclosure, carousel, grid
     // leaf(ナビ・ネイティブ系)
     case searchBar, calendar, shareButton, openUrlButton, mapView, locationButton, qrScanner, timerDisplay
+    // leaf: 入力系バッチ
+    case slider, stepper, textEditor, secureField, timePicker, colorPicker, rating
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -88,6 +90,11 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var zoom: String?           // mapView: near|city|wide
     public var mode: String?           // timerDisplay: stopwatch|countdown
     public var seconds: Int?           // timerDisplay countdown 初期秒
+    // 入力系バッチ(slider / stepper / rating / textEditor)
+    public var min: Double?
+    public var max: Double?            // rating: 星の数(既定 5)
+    public var step: Double?           // slider: 省略で連続 / stepper: 既定 1
+    public var minLines: Int?          // textEditor: 最低表示行数(既定 4)
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
@@ -95,6 +102,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case kind, groupBy, bucket, prompt, size
         case expanded, itemWidth, columns
         case searchField, dateField, onDateTap, url, locationField, titleField, zoom, mode, seconds
+        case min, max, step, minLines
     }
 
     public init(from decoder: Decoder) throws {
@@ -145,6 +153,10 @@ public struct Component: Decodable, Identifiable, Sendable {
         zoom = try? c.decodeIfPresent(String.self, forKey: .zoom)
         mode = try? c.decodeIfPresent(String.self, forKey: .mode)
         seconds = try? c.decodeIfPresent(Int.self, forKey: .seconds)
+        min = try? c.decodeIfPresent(Double.self, forKey: .min)
+        max = try? c.decodeIfPresent(Double.self, forKey: .max)
+        step = try? c.decodeIfPresent(Double.self, forKey: .step)
+        minLines = try? c.decodeIfPresent(Int.self, forKey: .minLines)
     }
 }
 
