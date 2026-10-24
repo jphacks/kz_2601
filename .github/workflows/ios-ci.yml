@@ -1,0 +1,191 @@
+# iOS(SwiftUI / xcodegen) の CI。PR が Open(非Draft) / develop・main への push で発火。
+#
+# !!! コスト注意 !!!
+#   macOS runner は Linux の 10倍の分単価(無料枠の消費も10倍換算)。
+#   - ios/ に変更が無い PR では macOS ジョブ自体を起動しない(ubuntu の軽いジョブで判定)
+#   - timeout-minutes: 25 をガードにし、暴走ビルドで枠を食い潰さない
+#     (iOS は「5分以内」の対象外。build + unit test が通ればよい。backend-ci は 5分厳守)
+#   - SwiftPM(SourcePackages) と DerivedData をキャッシュして時間と分単価を節約
+#
+# 設計メモ:
+# - workflow レベルの `paths:` は使わない(backend-ci.yml と同じ理由: required check が永遠に待ちになる)。
+# - ios/project.yml が無い間(別エージェントが作成中)はジョブごとスキップ。
+# - required check 名 = ジョブ名 `ios-ci`。
+name: ios-ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [develop, main]
+
+concurrency:
+  group: ios-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  XCODEGEN_VERSION: "2.43.0"
+  # 空なら ios/project.yml の `name:` から自動取得(アプリ名は仮に Morph)
+  IOS_SCHEME: ""
+
+jobs:
+  ios-changes:
+    name: ios-changes
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      run: ${{ (github.event_name == 'push' || steps.filter.outputs.ios == 'true') && steps.spec.outputs.exists == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            ios:
+              - 'ios/**'
+              - '.github/workflows/ios-ci.yml'
+
+      - name: ios/project.yml の存在チェック
+        id: spec
+        run: |
+          if [ -f ios/project.yml ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::ios/project.yml が無いため ios-ci をスキップします"
+          fi
+
+  ios-ci:
+    name: ios-ci
+    needs: ios-changes
+    if: needs.ios-changes.outputs.run == 'true'
+    # macos-15: Xcode 16 系が既定。分単価が高いので無駄に再実行しないこと。
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode バージョン
+        run: xcodebuild -version
+
+      # Homebrew より GitHub Release のバイナリ取得の方が速い(数秒)。バージョン固定でキャッシュ。
+      - name: xcodegen キャッシュ
+        id: xcodegen-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/xcodegen
+          key: xcodegen-${{ env.XCODEGEN_VERSION }}
+
+      - name: xcodegen インストール
+        if: steps.xcodegen-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+
+      - name: スキーム名を決定
+        id: scheme
+        run: |
+          set -euo pipefail
+          scheme="${IOS_SCHEME}"
+          if [ -z "$scheme" ]; then
+            scheme="$(awk '/^name:/{print $2; exit}' ios/project.yml | tr -d '"'"'")"
+          fi
+          echo "scheme=$scheme" >> "$GITHUB_OUTPUT"
+          echo "scheme=$scheme"
+
+      - name: xcodegen generate
+        working-directory: ios
+        run: |
+          "$RUNNER_TEMP/xcodegen/bin/xcodegen" generate --quiet
+
+      - name: SwiftPM キャッシュ
+        uses: actions/cache@v4
+        with:
+          path: ios/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('ios/project.yml', 'ios/**/Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      # DerivedData は数百MB〜になる。リポジトリのキャッシュ上限(10GB)を圧迫したら外す。
+      - name: DerivedData キャッシュ
+        uses: actions/cache@v4
+        with:
+          path: ios/DerivedData
+          key: dd-${{ runner.os }}-${{ hashFiles('ios/project.yml') }}-${{ github.sha }}
+          restore-keys: |
+            dd-${{ runner.os }}-${{ hashFiles('ios/project.yml') }}-
+            dd-${{ runner.os }}-
+
+      - name: xcodebuild build (iOS Simulator)
+        working-directory: ios
+        env:
+          SCHEME: ${{ steps.scheme.outputs.scheme }}
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project "${SCHEME}.xcodeproj" \
+            -scheme "${SCHEME}" \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath DerivedData \
+            -clonedSourcePackagesDirPath SourcePackages \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            -parallelizeTargets \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: ユニットテストの有無を判定
+        id: has-tests
+        working-directory: ios
+        run: |
+          if grep -qE 'bundle\.unit-test' project.yml; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::unit-test ターゲットが無いため test をスキップします"
+          fi
+
+      - name: xcodebuild test
+        if: steps.has-tests.outputs.run == 'true'
+        working-directory: ios
+        env:
+          SCHEME: ${{ steps.scheme.outputs.scheme }}
+        run: |
+          set -euo pipefail
+          # 利用可能な最初の iPhone シミュレータを使う(イメージ更新でデバイス名が変わっても壊れない)
+          device="$(xcrun simctl list devices available -j \
+            | jq -r '[.devices[][] | select(.name | startswith("iPhone"))][0].name')"
+          echo "destination device: $device"
+          xcodebuild test \
+            -project "${SCHEME}.xcodeproj" \
+            -scheme "${SCHEME}" \
+            -destination "platform=iOS Simulator,name=${device}" \
+            -derivedDataPath DerivedData \
+            -clonedSourcePackagesDirPath SourcePackages \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            -parallelizeTargets \
+            -resultBundlePath TestResults.xcresult \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: テスト結果をアップロード(失敗時)
+        if: failure() && steps.has-tests.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: ios/TestResults.xcresult
+          retention-days: 3
