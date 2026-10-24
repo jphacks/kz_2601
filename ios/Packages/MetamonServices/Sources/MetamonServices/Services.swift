@@ -15,6 +15,8 @@ public struct Services {
     public var isLive: Bool
     /// シェア / 「探す」(#49 #50)。appconfig が live の時だけ(モックでは nil = 導線を出さない)。
     public var sharing: (any SharingClient)?
+    /// アカウント削除(#119)。live では `HTTPAccountClient`、それ以外はモック(成功のみ)。
+    public var account: any AccountClient = MockAccountClient()
 
     public init(
         auth: any AuthService,

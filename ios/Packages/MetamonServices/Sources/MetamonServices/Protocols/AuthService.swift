@@ -37,4 +37,11 @@ public protocol AuthService: AnyObject, Sendable {
     func signOut() throws
     /// Bearer に載せる Firebase ID トークン。未サインインなら nil。
     func idToken(forceRefresh: Bool) async throws -> String?
+    /// Sign in with Apple のトークンを Apple 側で取り消す(アカウント削除時・#119)。`authorizationCode` は直前の Apple 認証で得た値。
+    func revokeAppleToken(authorizationCode: String) async throws
+}
+
+public extension AuthService {
+    /// 既定は何もしない(モック)。
+    func revokeAppleToken(authorizationCode: String) async throws {}
 }
