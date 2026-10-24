@@ -1,0 +1,33 @@
+name: 機能追加
+description: 新しい機能・画面・API の提案
+title: "feat: "
+labels: [feature]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: 領域
+      options: [ios, backend/appconfig, backend/ai, dsl, infra, docs]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: やりたいこと
+      description: ユーザー視点で1〜3行。デモのどのシーンで使うか。
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: 実現方法(案)
+      description: 画面 / エンドポイント / DSL の変更点など。未定なら空でOK。
+  - type: textarea
+    id: done
+    attributes:
+      label: 完了条件
+      placeholder: |
+        - [ ] 実機で○○ができる
+        - [ ] curl で○○が返る
+    validations:
+      required: true

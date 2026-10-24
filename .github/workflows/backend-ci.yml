@@ -1,0 +1,81 @@
+# backend(Go) の CI。PR が Open(非Draft) / develop・main への push で発火。
+# **5分以内が必須**(timeout-minutes: 5 で強制。超えたら lint 対象やテストを削るのではなく原因を直す)。
+#
+# 設計メモ:
+# - workflow レベルの `paths:` フィルタは使わない。required status check にした時、
+#   backend を触らない PR では check が "Expected" のまま永遠に待ちになりマージ不能になるため。
+#   代わりに `backend-changes` ジョブ(dorny/paths-filter)で変更有無を判定し、本体ジョブを
+#   `if:` でスキップする。スキップされたジョブは required check 上 "成功" 扱いになる。
+# - required check 名 = ジョブ名 `backend-ci`(scripts/github/setup-branch-protection.sh と一致させること)。
+name: backend-ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [develop, main]
+
+concurrency:
+  group: backend-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  backend-changes:
+    name: backend-changes
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      run: ${{ github.event_name == 'push' || steps.filter.outputs.backend == 'true' }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/backend-ci.yml'
+
+  backend-ci:
+    name: backend-ci
+    needs: backend-changes
+    if: needs.backend-changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          # go.sum が無い間(依存ゼロ)でもキャッシュキーを解決できるよう go.mod も含める
+          cache-dependency-path: |
+            backend/go.sum
+            backend/go.mod
+
+      - name: go mod download
+        run: go mod download
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          working-directory: backend
+          args: --timeout=3m
+
+      - name: go build
+        run: go build ./...
+
+      - name: go test (-race)
+        run: go test ./... -race -count=1
