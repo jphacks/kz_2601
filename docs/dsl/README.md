@@ -50,14 +50,14 @@
 ```
 AppDSL { schemaVersion:1, app:AppMeta, initialScreen, entities[], screens[] }
 AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: fullscreen|floating|none, notifications[]?, tabs[]?: {screen,title,icon?} }
-Entity  { id, name, titleField?, scope?: private|shared|public, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit?, refEntity?, computed?: Expr } }
+Entity  { id, name, titleField?, scope?: private|shared|public, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit?, refEntity?, computed?: Expr, health?: "weight" } }
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
 Leaf (42 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
-### 3.1 コンポーネント(49 種 = Container 7 + Leaf 42)
+### 3.1 コンポーネント(50 種 = Container 7 + Leaf 43)
 
 全種に共通の任意キー: `id`(画面内一意)・`area`(§3.4 のグリッド矩形。Screen 直下と、card / section / vstack の子で有効)。用途・レイアウトの定石は `dsl.schema.json` 各定義の `description` / `x-usage` が正典(AI へのカタログはそこから生成。§4)。
 
@@ -122,6 +122,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `settlement` | `entity`, `nameField`, `balanceField`(数値・通常は computed) | | | P1 |
 | `aiButton` | `task`(summarize\|classify\|rewrite\|extract\|suggest), `output`(string/text・classify は enum も可) | `label`, `input`(field)または `entity`+`limit`, `prompt`(`{{field}}` `{{input}}` 置換), `options`(classify 候補) | ✓ | P1 |
 | `nearbyShare` | `label`, `entity` | | | P2 |
+| `healthStat` | `metric`(steps\|weight), `label` | `period`(today\|week・既定 today), `target`(steps の 1 日の目標) | | P2 |
 
 `color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
@@ -151,6 +152,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 - `calendar.onDateTap` は既存の `navigate` を使う。行タップは recordId を渡して編集、「追加」はタップした日を `dateField` の初期値として Renderer 内の `FormPrefill` に積み、次に開いた新規フォームが 1 回だけ消費する(`Action` に params を増やさない)。
 - `searchBar.field` は entity の field ではなく**画面ローカルのキー**(`ScreenLocals`)。`list.searchField` で参照し、レコードには保存しない。
 - `mapView` は `latField`/`lngField` の 2 列ではなく既存の **`location` 型 field 1 つ**(`"lat,lng"`)を使う(`locationButton` の保存先と同じ表現・entity の field 数を増やさない)。既存 `map` Leaf は無かったので新設。
+- **`healthStat` / `Field.health`(#167)**: 端末のヘルスデータ。`healthStat` は **entity を持たない表示カード**で、歩数は iPhone の歩数計(CoreMotion・直近 7 日・capability 不要)、歩数計の無い端末(シミュレータ)はヘルスケアの歩数、体重はヘルスケアの最新値を読む。today は数値(steps は `target` で達成率バー)、week は 7 日のグラフ(steps は棒 + 目標線・weight は折れ線)。許可が無い・使えない端末は「ヘルスケアへのアクセスが許可されていません」等を表示。書き込みは部品ではなく **`Field.health: "weight"`**(number・unit kg): フォームで**新規**保存した時にヘルスケアの体重にも 1 件書く(編集保存では書かない・失敗してもレコードは保存済みでトーストだけ)。入力部品や `saveRecord` を増やさず「どの値をヘルスケアに出すか」をデータ側に 1 キーで持つため。実例: `examples/health.json`。設計は `docs/ios/architecture.md` §15.1。
 - `aiButton`(#78)は **オンデバイス完結の AI 部品**(Apple Intelligence / Foundation Models・iOS 26+)。データは端末外に出ず、クラウド API も課金も無い。結果は output field のドラフトに入るだけで保存はユーザー。非対応端末・Apple Intelligence OFF・モデル準備中は「この端末では AI を使えません」と理由付きで無効化。`Action` の `runAI` 案ではなく Leaf にしたのは、(1) 生成 AI が 1 部品で書き切れる(button + action の 2 段より短く、入力・出力 field を同じ場所で検証できる)、(2) 実行中スピナー・不可時の無効表示が部品の見た目に属する、(3) `ActionType` を増やすとホストの網羅 switch 改修が要る、の 3 点。実例: `examples/diary_ai.json`(本文 → 要約・気分の分類)。
 
 ### 3.3 フィールド型と値(appconfig `RecordData` と一致)
