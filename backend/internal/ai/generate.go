@@ -269,6 +269,11 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 		raw := dropFormPhotoPreviews(fillDefaults(extractJSON(resp.Text)))
 		app, perr := dsl.Parse(raw)
 		if perr == nil {
+			if fixed := addMissingLists(raw, app); len(fixed) != len(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
 			ar.raw = canon(raw)
 			ar.summary = summarizeFor(app, loc)
 			ar.meta.Lint = app.Lint()

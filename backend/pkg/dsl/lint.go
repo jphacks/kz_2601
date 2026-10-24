@@ -344,16 +344,43 @@ var listTypes = map[ComponentType]bool{
 }
 
 func (l *linter) entityReach() {
-	forms := map[string][]string{} // entity -> form screen ids
-	for _, s := range l.app.Screens {
+	forms := formScreens(l.app)
+	targets := l.app.Reachable()
+	unlisted := map[string]bool{}
+	for _, id := range l.app.UnlistedEntities() {
+		unlisted[id] = true
+	}
+	for _, e := range l.app.Entities {
+		switch fs := forms[e.ID]; {
+		case len(fs) == 0:
+			l.add(`entity %q has no add form: add a form screen (screen.entity %q with inputs and a saveRecord toolbar button) and a navigate button to it, or remove the entity (a master list such as members must be addable, then referenced with type ref)`, e.ID, e.ID)
+		case !anyOf(fs, targets):
+			l.add(`entity %q: form screen %q is not reachable; add a toolbar/button navigate to it`, e.ID, fs[0])
+		}
+		if unlisted[e.ID] {
+			l.add(`entity %q has no list on a reachable screen: show its records with a list or table (with onItemTap to the form) on a tab or the home screen so what users add is visible`, e.ID)
+		}
+	}
+}
+
+// formScreens maps entity id -> form screen ids (screen.entity).
+func formScreens(a *App) map[string][]string {
+	forms := map[string][]string{}
+	for _, s := range a.Screens {
 		if s.Entity != "" {
 			forms[s.Entity] = append(forms[s.Entity], s.ID)
 		}
 	}
-	// reachable screens: initial + tabs, then navigate targets (nav.go)
-	targets := l.app.Reachable()
+	return forms
+}
+
+// UnlistedEntities returns, in entity order, the entities whose records no
+// reachable screen lists (list / table / timeline / calendar / mapView /
+// settlement), excluding single-value setting entities (budget, goal).
+func (a *App) UnlistedEntities() []string {
+	targets := a.Reachable()
 	listed := map[string]bool{}
-	for _, s := range l.app.Screens {
+	for _, s := range a.Screens {
 		if !targets[s.ID] {
 			continue
 		}
@@ -363,18 +390,14 @@ func (l *linter) entityReach() {
 			}
 		})
 	}
-	settings := l.settingEntities()
-	for _, e := range l.app.Entities {
-		switch fs := forms[e.ID]; {
-		case len(fs) == 0:
-			l.add(`entity %q has no add form: add a form screen (screen.entity %q with inputs and a saveRecord toolbar button) and a navigate button to it, or remove the entity (a master list such as members must be addable, then referenced with type ref)`, e.ID, e.ID)
-		case !anyOf(fs, targets):
-			l.add(`entity %q: form screen %q is not reachable; add a toolbar/button navigate to it`, e.ID, fs[0])
-		}
+	settings := (&linter{app: a}).settingEntities()
+	var out []string
+	for _, e := range a.Entities {
 		if !listed[e.ID] && !settings[e.ID] {
-			l.add(`entity %q has no list on a reachable screen: show its records with a list or table (with onItemTap to the form) on a tab or the home screen so what users add is visible`, e.ID)
+			out = append(out, e.ID)
 		}
 	}
+	return out
 }
 
 func anyOf(ids []string, set map[string]bool) bool {
