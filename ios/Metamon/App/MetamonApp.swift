@@ -9,6 +9,7 @@ struct MetamonApp: App {
     private let services: Services
     @State private var runtime: AppRuntime
     @State private var session: AuthSession
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Renderer 同梱のコンポーネント + アプリ本体が提供する `voiceInput`(WhisperKit 依存なので Renderer には置かない)。
     static let componentRegistry = ComponentRegistry.standard
@@ -27,6 +28,9 @@ struct MetamonApp: App {
             document = (try? DSLExamples.document(DSLExamples.initial, version: 0)) ?? .fallback
         }
         document.appId = appId
+        #if DEBUG
+        if let override = DebugDSLOverride.document { document = override } // 見た目監査(#131)
+        #endif
         self.services = services
         let runtime = AppRuntime(document: document, services: services)
         let session = AuthSession(service: services.auth)
@@ -60,6 +64,13 @@ struct MetamonApp: App {
             // 表示言語(#44): 設定の「言語」で即時切替。`Text("…")` の解決と日付・数値の書式がこの Locale に従う
             .environment(\.locale, LanguagePreference.shared.locale)
             .task { await session.observe() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .background { BackgroundRefresh.schedule() } // #38: 裏の定期同期を予約
+            }
+        }
+        .backgroundTask(.appRefresh(BackgroundRefresh.identifier)) { [runtime] in
+            await MainActor.run { BackgroundRefresh.schedule() } // 次回分を先に積む(連鎖させて定期化)
+            await runtime.backgroundRefresh()
         }
     }
 }

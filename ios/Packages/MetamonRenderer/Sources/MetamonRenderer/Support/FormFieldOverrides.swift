@@ -79,16 +79,48 @@ struct RefPickerRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .renderInputChrome()
             } else {
-                Picker(c.label ?? field.name, selection: form.string(field.id)) {
-                    Text(L("選択してください")).tag("")
-                    ForEach(options) { r in
-                        Text(rt.refTitle(r.id, entity: field.refEntity) ?? r.id).tag(r.id)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(maxWidth: .infinity, alignment: .leading)
+                // #131: 素の menu だと青文字だけが浮いて他の入力と揃わないので、picker(menu)と同じ器にする
+                MenuSelect(icon: "link", label: c.label ?? field.name, selection: form.string(field.id),
+                           options: [("", L("選択してください"))] + options.map { ($0.id, rt.refTitle($0.id, entity: field.refEntity) ?? $0.id) })
             }
         }
+    }
+}
+
+/// menu 型の選択入力(#131)。入力と同じ器の全幅ボタン「アイコン + 選択中の値 … chevron」をタップでメニュー。
+/// 素の `Picker(.menu)` は値の横にシステムの ⌃⌄ を出すので、器の chevron と二重になっていた。
+struct MenuSelect: View {
+    let icon: String
+    let label: String
+    @Binding var selection: String
+    /// (保存値, 表示名)
+    let options: [(value: String, title: String)]
+
+    private var current: String? { options.first { $0.value == selection }?.title }
+
+    var body: some View {
+        Menu {
+            Picker(label, selection: $selection) {
+                ForEach(options, id: \.value) { Text($0.title).tag($0.value) }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: RenderTheme.Spacing.sm + 2) {
+                InputIcon(name: icon)
+                Text(current ?? "選択してください")
+                    .font(RenderTheme.Fonts.inputValue)
+                    .foregroundStyle(current == nil || selection.isEmpty ? .secondary : .primary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(RenderTheme.Colors.brandA)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+            .renderInputChrome()
+        }
+        .accessibilityLabel(label)
+        .accessibilityValue(current ?? "")
     }
 }
