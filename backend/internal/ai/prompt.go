@@ -12,10 +12,16 @@ import (
 //go:embed examples/kakeibo.json
 var fewShotKakeibo string
 
+// English few-shot (short: home + form, one notification) so locale=en gets
+// natural English labels instead of translated Japanese idioms.
+//
+//go:embed examples/expense_en.json
+var fewShotExpenseEN string
+
 // systemPrompt is static so the whole block is prompt-cacheable. It embeds
 // the (flattened) generation schema because the API cannot enforce it.
 var systemPrompt = strings.TrimSpace(`
-あなたは iOS アプリの Server-Driven UI 設計者です。ユーザーの日本語の発話(音声文字起こし)から、AppDSL v1 の JSON を生成または編集します。
+あなたは iOS アプリの Server-Driven UI 設計者です。ユーザーの発話(音声文字起こし・日本語または英語)から、AppDSL v1 の JSON を生成または編集します。
 出力は **JSON オブジェクト 1 つだけ**です。前置き・説明・コードフェンスは付けません。以下の JSON Schema と設計原則に厳密に従ってください。
 
 ## DSL の設計原則(必ず守る)
@@ -39,7 +45,9 @@ var systemPrompt = strings.TrimSpace(`
   - app.notifications は「通知・リマインド・知らせて・忘れないように」と言われた時だけ。「毎朝記録する」「夜に見返したい」は使う時間の説明であって毎日の通知の依頼ではない。後者は任意で押せる scheduleNotification ボタン(repeat once)程度に留める。
   - 下の例は形式の参考。タブ名・stat・画面構成は例をコピーせず、その発話の用途に合わせる(例: 毎日つけるものは「今日 / 履歴」)。
 - voiceEntry は "floating" を既定にする("none" にしない。ユーザーが声でアプリを変え続けられること)。
-- UI 文言はすべて日本語。app.icon / tab.icon / button.icon は SF Symbols 名。theme.primaryColor は #RRGGBB。
+- **表示言語**: user ターンの「## 表示言語(locale)」に従う。表示文字列(app.name / app.description、画面タイトル、tab.title、section/chart の title、label、placeholder、emptyText、ボタンやツールバーの label、confirmMessage、entity.name / field.name / enum の options、notifications[].title/body)は **すべてその言語**で書く(ja なら日本語、en なら自然な英語。混在させない)。id / type / enum 値 / area / aggregate / op / repeat / time などの構造は言語に関わらず英数のまま。
+  - en の通貨 unit は "$"(発話で通貨が分かればそれに従う)。
+- app.icon / tab.icon / button.icon は SF Symbols 名。theme.primaryColor は #RRGGBB。
 
 ## 部品カタログ(スキーマから自動生成。type: 必須 / 任意 — 用途。使い方 = レイアウトの定石)
 ` + catalog + `
@@ -47,10 +55,13 @@ var systemPrompt = strings.TrimSpace(`
 ## 無い部品を求められたら
 - 使える部品は上のカタログが全部。カレンダー・地図・タイマー・チャット・グラフ以外の可視化など、カタログに無い部品を求められても**存在しない type を出力しない**。
 - 最も近い既存部品で代替する(カレンダー/予定表/タイムライン → 日付 field で sort した list + datePicker、地図 → location field + textField、タイマー/ストップウォッチ → numberField で分や秒を記録、チェックリスト → toggle)。
-- 代替したら一言添える: 編集ターンは summary に、新規作成は app.description の末尾に「カレンダー表示は日付順の一覧で代替しました。」のように「○○は△△で代替しました。」と書く(iOS が読み上げる)。
+- 代替したら一言添える: 編集ターンは summary に、新規作成は app.description の末尾に「カレンダー表示は日付順の一覧で代替しました。」のように「○○は△△で代替しました。」と書く(iOS が読み上げる)。en なら "Calendar view was replaced with a date-sorted list." のように必ず "replaced with" を使う。
 
-## 例: 発話「家計簿アプリを作って。今月の合計と支出一覧、追加ボタンが欲しい。カテゴリ別の内訳も見たい」→ 出力
+## 例 1(locale ja): 発話「家計簿アプリを作って。今月の合計と支出一覧、追加ボタンが欲しい。カテゴリ別の内訳も見たい」→ 出力
 ` + "```json\n" + strings.TrimSpace(fewShotKakeibo) + "\n```" + `
+
+## 例 2(locale en): 発話 "Make an expense tracker. I want this month's total, a list of expenses and an add button. Remind me every evening at 8" → 出力
+` + "```json\n" + strings.TrimSpace(fewShotExpenseEN) + "\n```" + `
 
 ## AppDSL の JSON Schema(Component は type ごとに該当するプロパティだけを使う)
 ` + "```json\n" + string(GenerationSchema()) + "\n```")
@@ -60,8 +71,8 @@ var editRules = strings.TrimSpace(`
 
 ## 編集ターンのルール(JSON Patch RFC 6902)
 - 出力は {"patch": [{"op": "add|remove|replace|move|copy|test", "path": "/JSON/Pointer", "from"?: "...", "value"?: ...}], "summary": "..."} の JSON オブジェクト 1 つだけ。patch は「現在の DSL」に対する操作の配列(最大 50)。
-- summary は iOS がそのまま読み上げる自然な日本語 1 文(40 字程度まで・「。」で終える)。「カテゴリにカフェを追加しました。」「追加ボタンを左上に移しました。」のように何がどう変わったかだけを言う。経緯や補足説明は書かない。
-- すでに満たされている場合は、その値を確認する test 操作 1 つだけの patch にし(空の patch は不可)、summary は「すでに〜になっています。」と短く答える。
+- summary は iOS がそのまま読み上げる自然な 1 文。locale ja なら日本語(40 字程度まで・「。」で終える)「カテゴリにカフェを追加しました。」「追加ボタンを左上に移しました。」、locale en なら英語(80 字程度まで・ピリオドで終える)"Added Cafe to the categories." "Moved the add button to the top left." のように何がどう変わったかだけを言う。経緯や補足説明は書かない。
+- すでに満たされている場合は、その値を確認する test 操作 1 つだけの patch にし(空の patch は不可)、summary は「すでに〜になっています。」/ "It's already ..." と短く答える。
 - 部品を消した結果その画面が空になるなら、その画面と対応する tab も remove する(空のタブを残さない)。
 - value はプリミティブか、上の Schema の部分文書(Entity / Field / Screen / Component / Action / Tab / Notification など)かその配列。
 - 配列 index は「現在の DSL」のものをそのまま使う。末尾追加は "/-"。既存要素の置換は replace、削除は remove。
@@ -72,13 +83,14 @@ var editRules = strings.TrimSpace(`
 `)
 
 // createUserMessage builds the user turn for a full generation.
-func createUserMessage(transcript string, currentDSL string, problems []string) string {
+func createUserMessage(transcript string, currentDSL string, problems []string, loc Locale) string {
 	var b strings.Builder
 	if currentDSL != "" {
 		b.WriteString("## 参考: 現在のアプリ(作り直してよい)\n```json\n")
 		b.WriteString(currentDSL)
 		b.WriteString("\n```\n\n")
 	}
+	writeLocale(&b, loc)
 	fmt.Fprintf(&b, "## 今回の指示\n「%s」\n\n", strings.TrimSpace(transcript))
 	writeProblems(&b, problems)
 	b.WriteString("## 出力\nAppDSL 全体を JSON で出力してください(schemaVersion 1、全画面に area を付けた配置)。")
@@ -86,13 +98,23 @@ func createUserMessage(transcript string, currentDSL string, problems []string) 
 }
 
 // editUserMessage builds the user turn for a patch generation.
-func editUserMessage(transcript string, version int, currentDSL string, problems []string) string {
+func editUserMessage(transcript string, version int, currentDSL string, problems []string, loc Locale) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## 現在の DSL (version %d)\n```json\n%s\n```\n\n", version, currentDSL)
+	writeLocale(&b, loc)
 	fmt.Fprintf(&b, "## 今回の指示\n「%s」\n\n", strings.TrimSpace(transcript))
 	writeProblems(&b, problems)
 	b.WriteString("## 出力\n{patch: 現在の DSL に対する RFC 6902 操作の配列, summary: 変更の一文}")
 	return b.String()
+}
+
+// writeLocale is the per-request line the system prompt's 表示言語 rule points at.
+func writeLocale(b *strings.Builder, loc Locale) {
+	name, ok := localeNames[loc]
+	if !ok {
+		name = localeNames[LocaleJA]
+	}
+	fmt.Fprintf(b, "## 表示言語(locale)\n%s\n\n", name)
 }
 
 func writeProblems(b *strings.Builder, problems []string) {
