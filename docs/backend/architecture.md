@@ -134,7 +134,7 @@ match /users/{uid}/{document=**} {
 | プロバイダ | **Sign in with Apple** が第一候補、詰まったら **Firebase 匿名認証**で代替。どちらも同じ Firebase ID トークンなので **Go 側は無変更**(`firebase.sign_in_provider` claim が `apple.com` / `anonymous` になるだけ)。匿名→Apple への **アカウントリンク**で uid は維持されるため、後から Apple を足してもデータ移行不要 |
 | uid の扱い | **URL に uid を含めない**。全パスは `/v1/apps/...` で、uid はトークンから取り出して `users/{uid}/...` に束縛。他人のデータに辿り着く URL が存在しない |
 | 失敗 | 401 `unauthenticated`(欠落/期限切れ/署名不正)。403 は現状使わない(自分の木しか触れないため) |
-| ローカル | `AUTH_MODE=dev` かつ `FIREBASE_AUTH_EMULATOR_HOST` 設定時のみ `X-Debug-Uid: <uid>` を受理。本番では `AUTH_MODE=firebase` 固定で、dev ヘッダは無視 |
+| ローカル | `AUTH_MODE=dev` かつ `FIREBASE_AUTH_EMULATOR_HOST` 設定時のみ `X-Debug-Uid: <uid>` を受理。加えて dev では verifier が `auth.DevVerifier`(Bearer 値をそのまま uid として受理)になるので、Authorization を転送するだけの ai 経由でも通る。本番では `AUTH_MODE=firebase` 固定(`auth.FirebaseVerifier`)で、dev ヘッダは無視 |
 | ai→appconfig | 受け取った Bearer をそのまま転送(`internal/appconfigclient`)。トークン残寿命が 60s 未満なら iOS 側で refresh してから呼ぶ(Firebase SDK が自動) |
 
 ```go
@@ -383,12 +383,14 @@ backend/
 
 規約: ハンドラは `store` の interface に依存(テストで fake 差替)。エラーは `httpx.Error(w, status, code, message)` の1経路。すべての書き込みは `dsl.Parse` / `dsl.ApplyPatch` を通過した `*dsl.App` だけを受け取る。
 
-## 9. appconfig 担当(@2410as)の着手順
+## 9. appconfig 実装状況(2026-10-24)
 
-| # | タスク | 完了条件 | 目安 |
+| # | タスク | 状態 | 備考 |
 |---|---|---|---|
-| 1 | **`internal/httpx` + `internal/auth` + `cmd/appconfig` の配線**: JSON エラー封筒、RequestID、recover、Firebase `VerifyIDToken` middleware(`AUTH_MODE=dev` で `X-Debug-Uid`)。`GET /v1/apps` がダミー配列を返す | `make dev` → `curl -H 'X-Debug-Uid: u1' localhost:8080/v1/apps` が 200。トークン無しで 401 | Day1 午後 1h |
-| 2 | **`internal/store` + apps/dsl/versions エンドポイント**: `POST /apps`(`dsl.Initial()`)、`GET /apps/{id}/dsl`(ETag/304)、`PUT /apps/{id}/dsl`(If-Match・tx・409)、`PATCH /apps/{id}/dsl`(`dsl.ApplyPatch`)、`GET /versions`、`POST /versions/{v}/restore` | エミュレータで PUT→PATCH→GET 304→restore の往復が curl で通る。409 と 422 が再現できる | Day1 午後 2-3h |
-| 3 | **records API**: `entities/{entityId}/records` の list(cursor)/create/patch/delete、`data` の型検証・正規化(DSL の Field 定義から)、`clientId` 冪等 | 家計簿 example を PUT した状態で `amount` 文字列 → 422、正常 → 201、一覧が `date desc` で返る | Day2 午前 |
+| 1 | `internal/httpx` + `internal/auth` + `cmd/appconfig` の配線 | **実装済み**(PR #26 / #27 / #28、@2410as) | `httpx.WriteJSON/Error/ErrorWithDetails/DecodeBody(DisallowUnknownFields・1MiB)/Chain/WithRequestID/Log/Recover/ErrorEnvelope`、`auth.Middleware(verifier, mode)` / `auth.UID(ctx)`。verifier は `auth.FirebaseVerifier`(firebase・ADC)/ `auth.DevVerifier`(dev・Bearer 値=uid) |
+| 2 | `internal/store` + apps/dsl/versions API | **実装済み**(`feature/appconfig-store-api`) | `store.Store`(Firestore / Memory)。`GET /dsl` は未知 appId を `dsl.Initial()` version 1 で自動作成(iOS は端末固定 UUID を appId に使う)。`PUT`/`PATCH` は `If-Match` 必須(欠落 412 `bad_request`・不一致 409 `version_conflict` + `details.currentVersion`)、422 `invalid_dsl` + `details.problems`。`PATCH` は `application/json-patch+json`(配列)と `application/json`(`{patch, source}`・ai が使う)の両方。`GET /versions`、`GET /versions/{n}`、`POST /versions/{n}/restore`、`GET /entities[/{id}]` |
+| 3 | records API | **実装済み**(同上) | list(`pageSize`/`pageToken`・`sortField`/`sortDir`・`filterField`/`filterOp`/`filterValue`・メモリソート上限 2000 → 413)、POST(`clientId` 冪等=同じ id を返す・`defaultValue` 補完・`required` 422・未知キー 400)、PATCH(キー単位マージ・`null` で削除)、DELETE、DELETE 全件(`?confirm=true`)。`photo` は `data:image/...` か `https://`、1 レコード 300KB 上限 |
+| 4 | ai との実プロセス結合 | **確認済み** | `AUTH_MODE=dev` の appconfig(Firestore エミュレータ)+ ai で `POST /v1/generate`(create → `PUT`、edit → `PATCH`)→ `GET /dsl` の version が 1→2→3 と増え、`GET /versions` に `source.kind=ai`・`patch` が残ることを curl で実測 |
+| - | 残課題 | | `PUT /entities/{id}`(糖衣・未実装)、`PATCH /apps/{id}` の `name` 変更後も version 書き込み時に `dsl.app.name` で上書きされる、`GET /dsl` 封筒に `source`/`createdAt` を含めない(読み 1 回で返すため)、Firestore 複合インデックス未作成(メモリソートで代替)、staging での Firebase 実トークン疎通 |
 
-ai 側(Claude Code 担当)は #1 の `httpx`/`auth` を共有して使うので、**#1 を最優先で `develop` にマージ**してほしい(それまで ai はスタブで進める)。
+**書き込み形式(Firestore)**: `apps/{appId}` は `dsl`(map・iOS リスナー用)と `dslJson`(正規化 JSON 文字列・API が返す本体)の両方を持つ。`versions/{n:08d}` は `dslJson` + `patchJson` + `source`。`records/{id}` の `data` はネイティブ map(将来のクエリ用)。
