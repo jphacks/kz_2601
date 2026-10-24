@@ -40,7 +40,7 @@
           ]
         },
         {
-          "type": "section", "id": "todo", "area": "A3:F8", "title": "買うもの",
+          "type": "section", "id": "todo", "area": "A3:F7", "title": "買うもの",
           "children": [
             { "type": "list", "entity": "groceries", "item": { "title": "name", "subtitle": "category", "trailing": "qty", "toggle": "done" },
               "filter": { "field": "done", "op": "eq", "value": false }, "sort": { "field": "added", "direction": "desc" },
@@ -49,7 +49,7 @@
           ]
         },
         {
-          "type": "section", "id": "bought", "area": "A9:F10", "title": "買ったもの",
+          "type": "section", "id": "bought", "area": "A8:F10", "title": "買ったもの",
           "children": [
             { "type": "list", "entity": "groceries", "item": { "title": "name", "toggle": "done" },
               "filter": { "field": "done", "op": "eq", "value": true }, "emptyText": "まだありません", "swipeToDelete": true }
