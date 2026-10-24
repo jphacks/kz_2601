@@ -23,3 +23,6 @@ backend/**/*.test
 # misc
 node_modules/
 .idea/
+
+# claude worktrees
+.claude/worktrees/
