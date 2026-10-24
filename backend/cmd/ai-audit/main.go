@@ -204,9 +204,10 @@ func exprUses(v any, ops ...string) bool {
 // ---------- lint: mechanical defects ----------
 
 var (
-	reMonth    = regexp.MustCompile(`今月|this month|monthly`)
+	reMonth    = regexp.MustCompile(`今月|this month`) // not "monthly": "Monthly budget" is a setting (#142)
 	reToday    = regexp.MustCompile(`今日|本日|today`)
-	reWeek     = regexp.MustCompile(`今週|this week|weekly`)
+	reWeek     = regexp.MustCompile(`今週|this week`)
+	reLast7    = regexp.MustCompile(`直近7日|直近 7 日|last 7 days|past 7 days|past week`)
 	reYear     = regexp.MustCompile(`今年|年間|this year|year`)
 	reValueish = regexp.MustCompile(`[0-9０-９]|—|\?`)
 	reDerive   = regexp.MustCompile(`残り|あと|達成率|あたり|1人|一人|順位|ランキング|連続|BMI|精算|left|remaining|per |rank|streak|winning|%`)
@@ -324,6 +325,7 @@ func lint(a *app) []string {
 		chk(reMonth, "thisMonth", "今月")
 		chk(reToday, "today", "今日")
 		chk(reWeek, "thisWeek", "今週")
+		chk(reLast7, "gte", "直近7日")
 		if reYear.MatchString(strings.ToLower(label)) && !contains(ops, "thisYear") && !exprUses(c.c, "year") {
 			add("label_filter_mismatch: %s %s %q は今年と言うが filter thisYear が無い(全期間になる)", c.screen, t, label)
 		}

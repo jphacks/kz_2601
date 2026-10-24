@@ -589,6 +589,15 @@ func (a *App) Validate() error {
 				if c.Title == "" {
 					add("%s: emptyState needs title", where)
 				}
+			case CompAiButton:
+				checkAIButton(where, c, formEntity, entities, add)
+			case CompNearbyShare:
+				if c.Label == "" {
+					add("%s: nearbyShare needs label", where)
+				}
+				if entities[c.Entity] == nil {
+					add("%s: nearbyShare entity %q does not exist", where, c.Entity)
+				}
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}
@@ -713,6 +722,9 @@ func checkAggregateRef(where string, c *Component, entities map[string]*Entity, 
 }
 
 func checkProgressBar(where string, c *Component, entities map[string]*Entity, add func(string, ...any)) {
+	if c.Tone != "" && c.Tone != "positive" && c.Tone != "negative" {
+		add("%s: progressBar tone %q must be positive (goal) or negative (budget)", where, c.Tone)
+	}
 	if c.Value != nil {
 		if v, ok := c.Value.Number(); !ok {
 			add("%s: progressBar value must be a number literal 0..1 (expressions are only for stat.value)", where)

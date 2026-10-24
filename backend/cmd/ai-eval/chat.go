@@ -46,6 +46,7 @@ type ChatStepRecord struct {
 	Brief       *ai.Brief `json:"brief,omitempty"`
 	Transcript  string    `json:"transcript,omitempty"`
 	ClaudeMs    int64     `json:"claudeMs"`
+	FirstTokMs  int64     `json:"firstTokenMs"`
 	TotalMs     int64     `json:"totalMs"`
 	Attempts    int       `json:"attempts"`
 	Usage       ai.Usage  `json:"usage"`
@@ -68,6 +69,9 @@ type ChatSummary struct {
 	ClaudeCalls int   `json:"claudeCalls"`
 	ClaudeP50Ms int64 `json:"claudeP50Ms"` // over steps that called Claude
 	ClaudeP95Ms int64 `json:"claudeP95Ms"`
+	FirstTokP50 int64 `json:"firstTokenP50Ms"`
+	InTokP50    int64 `json:"inputTokensP50"`
+	OutTokP50   int64 `json:"outputTokensP50"`
 	TotalP50Ms  int64 `json:"totalP50Ms"` // over every step incl. shortcuts
 }
 
@@ -80,7 +84,21 @@ type ChatRun struct {
 	Summary ChatSummary  `json:"summary"`
 }
 
-func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, model, effort, tag string, filter map[string]bool) {
+func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string, filter map[string]bool) {
+	cfg := svc.ChatConfig
+	if cfg.Model == "" {
+		cfg.Model = ai.DefaultChatModel
+	}
+	if cfg.Effort == "" {
+		cfg.Effort = ai.DefaultChatEffort
+	}
+	if cfg.Thinking == "" {
+		cfg.Thinking = ai.DefaultChatThinking
+	}
+	model, effort := cfg.Model, cfg.Effort
+	if cfg.Thinking != "" {
+		effort += "-" + cfg.Thinking
+	}
 	raw, err := os.ReadFile(casesPath)
 	if err != nil {
 		log.Fatal(err)
@@ -113,6 +131,7 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, model, eff
 			sr.Kind, sr.Source, sr.Turn, sr.Text = res.Kind, res.Source, res.Turn, res.Text
 			sr.Suggestions, sr.Brief, sr.Transcript = res.Suggestions, res.Brief, res.Transcript
 			sr.ClaudeMs, sr.Attempts, sr.Usage = res.LatencyMs.Claude, res.Meta.Attempts, res.Meta.Usage
+			sr.FirstTokMs = res.FirstTokenMs
 			if rec.Locale == "" {
 				rec.Locale = string(res.Locale)
 			}
@@ -182,7 +201,7 @@ func checkChatStep(st ChatStep, res *ai.ChatResult) []string {
 
 func summarizeChat(recs []ChatRecord) ChatSummary {
 	var s ChatSummary
-	var claudeMs, totalMs []int64
+	var claudeMs, totalMs, ttft, inTok, outTok []int64
 	for _, r := range recs {
 		s.Cases++
 		if r.OK {
@@ -200,19 +219,26 @@ func summarizeChat(recs []ChatRecord) ChatSummary {
 			if st.Attempts > 0 {
 				s.ClaudeCalls += st.Attempts
 				claudeMs = append(claudeMs, st.ClaudeMs)
+				ttft = append(ttft, st.FirstTokMs)
+				u := st.Usage
+				inTok = append(inTok, int64(u.InputTokens+u.CacheReadInputTokens+u.CacheCreationInputTokens))
+				outTok = append(outTok, int64(u.OutputTokens))
 			}
 		}
 	}
 	s.ClaudeP50Ms = percentile(claudeMs, 0.5)
 	s.ClaudeP95Ms = percentile(claudeMs, 0.95)
 	s.TotalP50Ms = percentile(totalMs, 0.5)
+	s.FirstTokP50 = percentile(ttft, 0.5)
+	s.InTokP50 = percentile(inTok, 0.5)
+	s.OutTokP50 = percentile(outTok, 0.5)
 	return s
 }
 
 func printChatTable(run ChatRun) {
 	fmt.Printf("\n## chat %s %s effort=%s\n\n", run.Date, run.Model, run.Effort)
-	fmt.Println("| id | loc | step | say | kind | src | turn | claude ms | in/out tok | text | suggestions | native | misses |")
-	fmt.Println("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+	fmt.Println("| id | loc | step | say | kind | src | turn | claude ms | 1st tok ms | in/out tok | text | suggestions | native | misses |")
+	fmt.Println("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 	for _, r := range run.Cases {
 		for i, st := range r.Steps {
 			kind := st.Kind
@@ -231,15 +257,15 @@ func printChatTable(run ChatRun) {
 			if len(st.Suggestions) > 0 {
 				sugg = strings.Join(st.Suggestions, " / ")
 			}
-			fmt.Printf("| %s | %s | %d | %s | %s | %s | %d | %d | %d/%d | %s | %s | %s | %s |\n",
-				r.ID, r.Locale, i+1, cell(st.Say), kind, st.Source, st.Turn, st.ClaudeMs,
+			fmt.Printf("| %s | %s | %d | %s | %s | %s | %d | %d | %d | %d/%d | %s | %s | %s | %s |\n",
+				r.ID, r.Locale, i+1, cell(st.Say), kind, st.Source, st.Turn, st.ClaudeMs, st.FirstTokMs,
 				st.Usage.InputTokens+st.Usage.CacheReadInputTokens+st.Usage.CacheCreationInputTokens, st.Usage.OutputTokens,
 				cell(st.Text), cell(sugg), native, misses)
 		}
 	}
 	s := run.Summary
-	fmt.Printf("\ncases=%d ok=%d | steps=%d ok=%d | claude calls=%d p50=%dms p95=%dms | step total p50=%dms\n",
-		s.Cases, s.CasesOK, s.Steps, s.StepsOK, s.ClaudeCalls, s.ClaudeP50Ms, s.ClaudeP95Ms, s.TotalP50Ms)
+	fmt.Printf("\ncases=%d ok=%d | steps=%d ok=%d | claude calls=%d p50=%dms p95=%dms 1st-tok p50=%dms in/out tok p50=%d/%d | step total p50=%dms\n",
+		s.Cases, s.CasesOK, s.Steps, s.StepsOK, s.ClaudeCalls, s.ClaudeP50Ms, s.ClaudeP95Ms, s.FirstTokP50, s.InTokP50, s.OutTokP50, s.TotalP50Ms)
 	ids := make([]string, 0)
 	for _, r := range run.Cases {
 		if !r.OK {

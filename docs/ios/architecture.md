@@ -162,6 +162,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 位置 | P1 | `native: location.current → into` / `map` コンポーネント | `CLLocationManager` 1回取得(stub) / MapKit(実装済み) | `NSLocationWhenInUseUsageDescription` |
 | モーション/歩数 | P1 | `native: motion.read` | CoreMotion / CMPedometer(stub) | `NSMotionUsageDescription` |
 | 共有 | P1 | `native: share {text}` | `UIActivityViewController`(stub) | 不要 |
+| オンデバイス AI | P1 | `aiButton { task, input?, entity?, output, prompt?, options? }` コンポーネント | **実装済み**(`AiButtonLeaf` + `Support/OnDeviceAI.swift`・Foundation Models・§18) | 不要(Apple Intelligence の ON は OS 設定) |
 
 ### photoField(カメラ)の実装要点(`MetamonRenderer/Components/Leaves/PhotoFieldLeaf.swift`)
 
@@ -694,3 +695,59 @@ HealthKit を足す時の手順(Apple アカウント操作が要るので未着
 ### 17.4 シミュレータでの確認手順(ヘッドレス)
 - `METAMON_E2E_TIMER_START=<部品 id>`(DEBUG)で、表示時に timerDisplay を開始する。例: `METAMON_INITIAL_EXAMPLE=gallery-structure METAMON_AUTO_OPEN=memo_form:sheet METAMON_E2E_TIMER_START=timer` → `xcrun simctl launch <UDID> com.apple.Preferences` で背面化 → 60 秒後に通知 → アプリを起動し直すと 00:00。
 - 同期は `METAMON_E2E_OFFLINE_SECONDS` + `METAMON_AUTO_RECORD` でオフライン記録 → 背面 → 前面で `[Metamon] background(foreground): ...` を確認。
+
+## 18. オンデバイス AI 部品 `aiButton`(Foundation Models・Issue #78)
+
+**AI 部品はオンデバイス完結。入力もプロンプトも結果も端末外に出ない**(クラウド API を呼ばない・課金なし)。アプリを生成する Claude(backend)とは別物で、生成されたアプリの「中」で動く AI。
+
+| 項目 | 内容 |
+|---|---|
+| 実行 | `LanguageModelSession(instructions:)` → `respond(to:)`。classify は `DynamicGenerationSchema(anyOf: 候補)` の guided generation で候補外を出させない(候補は DSL 由来の動的な値なので静的な `@Generable enum` ではなく動的スキーマ。制約付き生成の仕組みは同じ) |
+| 入力 | `input` field の値 / 省略時はフォーム全体(output 以外・写真/位置は除く)/ `entity` 指定時はそのレコードの新しい順 `limit` 件(既定 20)。上限 3000 文字(モデルのコンテキスト約 4k トークン) |
+| 出力 | `output` field の**ドラフト**に入れるだけ。保存はユーザーが保存ボタンで行う。classify は候補に正規化(候補外なら入れずにエラー表示) |
+| 可用性 | `SystemLanguageModel.default.availability` を表示時・前面復帰時に再評価。`deviceNotEligible` / `appleIntelligenceNotEnabled` / `modelNotReady` / iOS 26 未満 → ボタン無効 +「この端末では AI を使えません: 理由」 |
+| ビルド | FoundationModels を触るのは `Support/OnDeviceAI.swift` だけ。`#if canImport(FoundationModels)` + `if #available(iOS 26, *)`、フレームワークは weak link(`LC_LOAD_WEAK_DYLIB` を確認済み)なので deployment target は iOS 17 のまま |
+| テスト | `AiButtonTests`(可用性→文言の分岐・SDK の Availability からの写像・リクエスト組み立て・classify 正規化)。モデル実行そのものは実機で確認 |
+
+実機での確認: Apple Intelligence 対応機(iPhone 15 Pro 以降・iOS 26+)で 設定 > Apple Intelligence と Siri を ON → モデルのダウンロード完了を待つ → `METAMON_INITIAL_EXAMPLE=diary_ai` か「AI 日記を作って」で生成 → 「書く」→ 本文を入力 →「AI で要約」「気分を判定」。機内モードでも動くこと(=端末外に出ていない)を確認する。
+
+## 19. 近距離共有(nearbyShare・MultipeerConnectivity / Issue #36)
+
+対面で記録を渡す最小版。インターネット・サインイン不要で、OS が Wi-Fi(P2P)/ Bluetooth を自動で選ぶ MultipeerConnectivity を使う。
+
+| 役割 | 実装 | 中身 |
+|---|---|---|
+| leaf | `NearbyShareLeaf`(Renderer) | 送る範囲を決めて `DSLRuntime.shareNearby(entity:records:)` を呼ぶだけ。フォーム画面(`screen.entity == entity`)は入力中の 1 件(未保存でも今の値)、それ以外はその entity の新しい順 最大 50 件。0 件なら押せない |
+| データ・判定 | `NearbyShare`(MetamonDSL・純粋ロジック) | `Header`(送信者・appId・entity id/名・保存フィールドの id+型・件数)を招待の context に、`Payload`(Header + レコード)を接続後に 1 回、受信側は `Ack` を返す。JSON。未知キーは無視、レコード内の未知フィールド・型違い・null は `sanitize` で捨てる |
+| 通信 | `NearbyService`(アプリ本体 `Features/Nearby/`) | `MCSession(encryptionPreference: .required)`。送信シートを開いている間だけ browse、相手を選ぶと招待(30 秒)→ 接続で送信 → Ack で完了表示して切断 |
+| 受信 UI | `NearbySheets`(RootView の根とモーダル内に付ける) | 招待が来ると「◯◯さんから「出席」が 3 件届きました」の確認。**承認した時だけ招待を受ける**(勝手に受け取らない)。取り込めない時は理由だけ出して断る |
+
+取り込み判定(`NearbyShare.decide`):
+- 同じ appId → 同じ id の entity があれば受け取る(DSL の版違いで増減したフィールドは `sanitize` が捨てる)。
+- 別 appId → **同じ entity id かつ保存フィールドの id+型の集合が一致**する時だけ。`ref` フィールドは相手端末のレコード id なので捨てる。
+- 招待時に判定し、データ到着時にも今開いているアプリで判定し直す(承認後にアプリを切り替えた場合)。受け取りは最大 200 件。
+- 追加は `RecordSyncEngine.save`(ローカル DB に即反映・サーバー送信はキュー)→ `reloadLocal`。
+
+待ち受け(advertise)は **前面にいて、今のアプリのどこかに `nearbyShare` がある間だけ**。Issue の案「起動中は常に」から変えた理由: advertise した瞬間に iOS のローカルネットワーク許可ダイアログが出るため、使わないアプリ(と初回起動の音声画面)で出さない。受け取る側も同じアプリを開いている前提なので実害は無い。
+
+Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-mc._tcp` / `_udp`。`NearbyService.serviceType = "tailorit-mc"` と一致)。
+
+**Core Bluetooth(BLE 直叩き)は後続**: MultipeerConnectivity が Bluetooth を内部で使うので iOS 同士はこれで足りる。BLE を直接使う意味があるのは Android / マイコン等の非 Apple 端末やバックグラウンドでのビーコン的な検出だが、GATT のサービス設計・分割転送(MTU ~180B)・ペアリング UX・`NSBluetoothAlwaysUsageDescription` とバックグラウンドモードが要り、デモの範囲を超える。必要になったら `NearbyShare.Payload` をそのまま運ぶ別トランスポートとして足す。
+
+確認:
+- 単体: `NearbyShareTests`(MetamonDSL・`swift test` で macOS 上で回る)。エンコード/デコード・未知キー・取り込み判定・sanitize・件数上限。
+- シミュレータ 2 台(同じ Mac)で送受信できた。DEBUG 用の環境変数: 送信側 `METAMON_AUTO_NEARBY_SEND=<entity>`(起動 3 秒後にシートを開き最初の相手へ送る)/ 受信側 `METAMON_AUTO_NEARBY_ACCEPT=1`(確認を 2 秒見せて受け取る)。例は `METAMON_INITIAL_EXAMPLE=attendance_nearby METAMON_MOCK=1`。
+- 実機 2 台: 両方に同じビルドを入れ、両方で同じアプリ(例: 出席カード)を開く → 初回はローカルネットワークの許可を「許可」→ 送る側で「近くの先生に送る」→ 相手の名前をタップ → 受け取る側で「受け取る」→ 一覧に増え、送る側に「◯◯さんに N 件届きました」。Wi-Fi と Bluetooth はオンにしておく(同じ Wi-Fi でなくてよい)。
+
+## 20. 画面マップ(Issue #116)
+
+作ったアプリの画面のつながりを図で見せ、選んだ画面を文脈にして声で直す。
+
+- **入口**: 変身一覧の「使用中」カード右下の「画面マップ」/ 設定シート「アプリ」節(音声シートから開いた設定のみ。初期状態では出さない)
+- **グラフ**: `MetamonRenderer/Host/ScreenGraph.swift`(純粋関数・`ScreenGraphTests`)。backend `pkg/dsl/nav.go` の NavEdges / NavRoots / Reachable と同じ考え方
+  - 辺: button / toolbar / list の行タップ / calendar の日付タップの `navigate` と、`saveRecord` の保存後遷移先。同じ from→to は矢印 1 本にまとめる(すべて sheet / fullScreen なら破線)
+  - 根: タブの根(タブ順)、タブが無ければ initialScreen。タブの有無は iOS の描画と同じ `hasTabs`(2 個以上。nav.go は 1 個でもタブ扱い)
+  - 段: 根を 0 段目に BFS の深さで下へ。段の中は見つかった順。到達できない画面は最後の段に文書順で薄く・破線枠
+- **描画**(`Metamon/Features/ScreenMap/`): カードは段ごとに中央揃え、幅に収まらなければ横スクロール。矢印は Canvas。下向きは直線、上向き・往復は進行方向の左へ曲げ、同じ段どうしはカードの下を回す
+- **この画面について話す**: カードを選ぶと出入りの一覧とボタン。押すと `ScreenMapUI.context` をセットして音声シートを開き、上部にチップ「画面「B」について話す」(× で外す)。送信時に **transcript の先頭へ「画面「B」(id: b)で: 」を付ける**(API の契約は変えない。「元に戻して」等の意図判定は付ける前の文で行う)。文脈は 1 回送ると消える
+- 確認: `METAMON_INITIAL_EXAMPLE=navigation METAMON_AUTO_SCREEN_MAP=b`(画面 b を選んだ状態で開く)、`METAMON_AUTO_SCREEN_MAP_TALK=1` で音声シートまで進む

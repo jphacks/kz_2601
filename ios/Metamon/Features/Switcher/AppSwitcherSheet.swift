@@ -35,6 +35,7 @@ struct AppSwitcherSheet: View {
         .task { await rt.appsList() }
         .task { await releaseUI.refresh(rt.services.releaseRequests) }
         .sheet(item: $sharingUI.shareTarget) { ShareAppSheet(app: $0) }
+        .screenMapSheet { ScreenMapUI.shared.closeSwitcherThenTalk(rt) } // #116
         .sheet(item: $releaseUI.target) { ReleaseRequestSheet(app: $0) }
     }
 
@@ -96,6 +97,7 @@ struct AppSwitcherSheet: View {
                             select(app)
                         }
                         .overlay(alignment: .topTrailing) { AppCardActions(app: app) }
+                        .overlay(alignment: .bottomTrailing) { if app.id == rt.document.appId { ScreenMapCardButton() } } // #116
                     }
                 }
                 .padding(.horizontal, Theme.Spacing.lg)

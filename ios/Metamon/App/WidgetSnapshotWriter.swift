@@ -60,6 +60,7 @@ enum WidgetSnapshotWriter {
     /// `StatLeaf` と同じ式で表示文字列にする。
     static func formatted(_ c: Component, entity: Entity?, records: [Record]) -> String {
         let rows = Aggregator.apply(c.filter, entity: entity, to: records) // filter.value の Expr は未対応(ウィジェットは行コンテキスト無し)
+        if Aggregator.isPick(c.aggregate) { return Aggregator.pickText(c, entity: entity, records: rows) ?? "—" } // latest / earliest(#133)
         let value = Aggregator.aggregate(c.aggregate, field: c.field, over: rows)
         let unit = c.field.flatMap { entity?.field($0)?.unit }
         return Aggregator.format(

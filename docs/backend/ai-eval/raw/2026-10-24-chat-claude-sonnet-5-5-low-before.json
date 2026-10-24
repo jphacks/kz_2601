@@ -1,0 +1,581 @@
+{
+  "date": "2026-10-24",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "tag": "before",
+  "cases": [
+    {
+      "id": "kakeibo_short",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "家計簿",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "レシートの写真も残したいですか?",
+          "suggestions": [
+            "残したい",
+            "いらない",
+            "お任せ"
+          ],
+          "claudeMs": 2237,
+          "firstTokenMs": 1360,
+          "totalMs": 2237,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 82,
+            "outputTokens": 186,
+            "cacheReadInputTokens": 1368
+          }
+        }
+      ]
+    },
+    {
+      "id": "kakeibo_full",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "毎日の出費をメモできる家計簿。合計と一覧、レシート写真も残したい",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 1,
+          "text": "では作りますね。",
+          "brief": {
+            "name": "毎日の家計簿",
+            "purpose": "毎日の出費をメモして、合計と一覧を確認できる家計簿アプリ。",
+            "entities": [
+              "金額",
+              "カテゴリ",
+              "日付",
+              "メモ",
+              "レシート写真"
+            ],
+            "features": [
+              "出費の一覧",
+              "合計の表示",
+              "出費の追加・編集・削除",
+              "レシート写真の添付"
+            ],
+            "native": [
+              "camera"
+            ]
+          },
+          "transcript": "毎日の出費をメモできる家計簿アプリを作って。金額とカテゴリと日付とメモを記録して、合計と出費の一覧を見たい。レシートの写真も撮って残したい。",
+          "claudeMs": 2279,
+          "firstTokenMs": 1080,
+          "totalMs": 2279,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 110,
+            "outputTokens": 236,
+            "cacheReadInputTokens": 1368
+          }
+        }
+      ]
+    },
+    {
+      "id": "training",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "筋トレ",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "何を記録したいですか?",
+          "suggestions": [
+            "重量と回数",
+            "体重の推移",
+            "種目と時間"
+          ],
+          "claudeMs": 2087,
+          "firstTokenMs": 1133,
+          "totalMs": 2087,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 83,
+            "outputTokens": 170,
+            "cacheReadInputTokens": 1368
+          }
+        },
+        {
+          "say": "腕立てとスクワット、朝8時に通知",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 2,
+          "text": "では作りますね。",
+          "brief": {
+            "name": "筋トレ記録",
+            "purpose": "腕立てとスクワットの回数を記録し、毎朝8時に通知で知らせる",
+            "entities": [
+              "種目(腕立て・スクワット)",
+              "回数",
+              "日付"
+            ],
+            "features": [
+              "種目と回数の記録",
+              "日付ごとの記録一覧",
+              "今日の合計回数",
+              "毎朝8時の通知"
+            ],
+            "native": [
+              "notification"
+            ]
+          },
+          "transcript": "筋トレ記録アプリを作って。腕立てとスクワットの種目と回数と日付を記録して、記録の一覧と今日の合計回数を見たい。毎朝8時に通知してほしい。",
+          "claudeMs": 2262,
+          "firstTokenMs": 1047,
+          "totalMs": 2262,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 123,
+            "outputTokens": 238,
+            "cacheReadInputTokens": 1368
+          }
+        }
+      ]
+    },
+    {
+      "id": "diary_en",
+      "group": "en",
+      "locale": "en",
+      "ok": true,
+      "steps": [
+        {
+          "say": "a diary",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "Should entries include photos?",
+          "suggestions": [
+            "Text only",
+            "With photos",
+            "With mood"
+          ],
+          "claudeMs": 1930,
+          "firstTokenMs": 996,
+          "totalMs": 1930,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 88,
+            "outputTokens": 153,
+            "cacheReadInputTokens": 1368
+          }
+        }
+      ]
+    },
+    {
+      "id": "just_build",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "家計簿",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "レシートの写真も残したいですか?",
+          "suggestions": [
+            "残したい",
+            "いらない",
+            "お任せ"
+          ],
+          "claudeMs": 2189,
+          "firstTokenMs": 1046,
+          "totalMs": 2189,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 82,
+            "outputTokens": 190,
+            "cacheReadInputTokens": 1368
+          }
+        },
+        {
+          "say": "もう作って",
+          "ok": true,
+          "kind": "ready",
+          "source": "shortcut",
+          "turn": 2,
+          "text": "では作りますね。",
+          "brief": {
+            "name": "家計簿",
+            "purpose": "日々の支出を記録して、今月の合計や一覧を確認する。",
+            "entities": [
+              "金額",
+              "カテゴリ",
+              "日付",
+              "メモ"
+            ],
+            "features": [
+              "今月の合計",
+              "支出一覧"
+            ],
+            "native": []
+          },
+          "transcript": "家計簿アプリを作って。金額とカテゴリと日付とメモを記録して、今月の合計と支出一覧を見たい。",
+          "claudeMs": 0,
+          "firstTokenMs": 0,
+          "totalMs": 0,
+          "attempts": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "training_en_full",
+      "group": "en",
+      "locale": "en",
+      "ok": true,
+      "steps": [
+        {
+          "say": "A workout log for pushups and squats, remind me at 8 in the morning",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 1,
+          "text": "Got it, I'll build it now.",
+          "brief": {
+            "name": "Pushup \u0026 Squat Log",
+            "purpose": "Log daily pushup and squat workouts and get a reminder every morning at 8.",
+            "entities": [
+              "Exercise (pushups or squats)",
+              "Reps",
+              "Date"
+            ],
+            "features": [
+              "Quick add for pushups and squats",
+              "History list by date",
+              "Daily totals per exercise",
+              "Daily reminder at 8:00 AM"
+            ],
+            "native": [
+              "notification"
+            ]
+          },
+          "transcript": "I want a workout log app for pushups and squats. I want to record the exercise, number of reps, and date, and see a history list and daily totals for each exercise. Please remind me every morning at 8 with a notification.",
+          "claudeMs": 2671,
+          "firstTokenMs": 1150,
+          "totalMs": 2671,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 108,
+            "outputTokens": 238,
+            "cacheReadInputTokens": 1368
+          }
+        }
+      ]
+    },
+    {
+      "id": "diary_ja",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "日記",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "写真も一緒に残したいですか?",
+          "suggestions": [
+            "文章だけ",
+            "写真も付ける",
+            "お任せ"
+          ],
+          "claudeMs": 2038,
+          "firstTokenMs": 916,
+          "totalMs": 2038,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 80,
+            "outputTokens": 172,
+            "cacheReadInputTokens": 1368
+          }
+        }
+      ]
+    },
+    {
+      "id": "water_long",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "毎日の水分補給を記録するアプリ。飲んだ量(ml)と時刻を記録して、今日の合計と1日2リットルの目標までの残り、過去7日の一覧を見たい。2時間おきに通知も欲しい。",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 1,
+          "text": "では作りますね。",
+          "brief": {
+            "name": "水分補給記録",
+            "purpose": "毎日の水分摂取量を記録し、1日2リットルの目標達成を管理する。",
+            "entities": [
+              "飲んだ量(ml)",
+              "時刻"
+            ],
+            "features": [
+              "今日の合計",
+              "2リットルの目標までの残り量",
+              "過去7日の一覧",
+              "2時間おきのリマインド通知"
+            ],
+            "native": [
+              "notification"
+            ]
+          },
+          "transcript": "毎日の水分補給を記録するアプリを作って。飲んだ量(ml)と時刻を記録して、今日の合計と1日2リットルの目標までの残り、過去7日の一覧を見たい。2時間おきに通知も欲しい。",
+          "claudeMs": 2536,
+          "firstTokenMs": 1282,
+          "totalMs": 2536,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 161,
+            "outputTokens": 249,
+            "cacheReadInputTokens": 1368
+          }
+        }
+      ]
+    },
+    {
+      "id": "habit_en",
+      "group": "en",
+      "locale": "en",
+      "ok": true,
+      "steps": [
+        {
+          "say": "A habit tracker",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "How do you want to check off habits?",
+          "suggestions": [
+            "Daily checkbox",
+            "Count per day",
+            "Streak calendar"
+          ],
+          "claudeMs": 2627,
+          "firstTokenMs": 1218,
+          "totalMs": 2627,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 91,
+            "outputTokens": 195,
+            "cacheReadInputTokens": 1368
+          }
+        },
+        {
+          "say": "Daily checkboxes for reading and running, and a weekly streak count",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 2,
+          "text": "Got it, I'll build it now.",
+          "brief": {
+            "name": "Habit Tracker",
+            "purpose": "Check off daily habits like reading and running and see weekly streak counts.",
+            "entities": [
+              "Habit name",
+              "Date",
+              "Daily checkbox (done/not done)"
+            ],
+            "features": [
+              "Daily checklist for reading and running",
+              "Weekly streak count per habit",
+              "History list of past check-offs"
+            ],
+            "native": []
+          },
+          "transcript": "I want to build a habit tracker app. I want daily checkboxes for reading and running that I can tick off each day, and I want to see a weekly streak count for each habit.",
+          "claudeMs": 1938,
+          "firstTokenMs": 772,
+          "totalMs": 1938,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 135,
+            "outputTokens": 207,
+            "cacheReadInputTokens": 1368
+          }
+        }
+      ]
+    },
+    {
+      "id": "kono_mama",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "買い物リスト",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "家族と共有しますか?",
+          "suggestions": [
+            "自分だけ",
+            "家族と共有",
+            "お任せ"
+          ],
+          "claudeMs": 2369,
+          "firstTokenMs": 1063,
+          "totalMs": 2369,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 84,
+            "outputTokens": 192,
+            "cacheReadInputTokens": 1368
+          }
+        },
+        {
+          "say": "このまま作って",
+          "ok": true,
+          "kind": "ready",
+          "source": "shortcut",
+          "turn": 2,
+          "text": "では作りますね。",
+          "brief": {
+            "name": "買い物リスト",
+            "purpose": "買うものを記録して、買い忘れを防ぐ",
+            "entities": [
+              "品名",
+              "数量",
+              "購入済み"
+            ],
+            "features": [
+              "未購入の一覧",
+              "購入済みにするチェック"
+            ],
+            "native": []
+          },
+          "transcript": "買い物リストアプリを作って。品名と数量を記録して、未購入の一覧を見たい。買ったらチェックして購入済みにしたい。",
+          "claudeMs": 0,
+          "firstTokenMs": 0,
+          "totalMs": 0,
+          "attempts": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "two_rounds",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "記録したい",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "何を記録したいですか?",
+          "suggestions": [
+            "家計簿",
+            "筋トレ",
+            "日記"
+          ],
+          "claudeMs": 1804,
+          "firstTokenMs": 1042,
+          "totalMs": 1804,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 82,
+            "outputTokens": 133,
+            "cacheReadInputTokens": 1368
+          }
+        },
+        {
+          "say": "読書",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 2,
+          "text": "何を見返したいですか?",
+          "suggestions": [
+            "読了冊数",
+            "感想の一覧",
+            "読書の進み具合"
+          ],
+          "claudeMs": 1877,
+          "firstTokenMs": 922,
+          "totalMs": 1877,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 107,
+            "outputTokens": 169,
+            "cacheReadInputTokens": 1368
+          }
+        },
+        {
+          "say": "タイトルと読んだページ数、月の合計が見たい",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 3,
+          "text": "では作りますね。",
+          "brief": {
+            "name": "読書記録",
+            "purpose": "読んだ本のタイトルとページ数を記録し、月ごとの合計ページ数を見返す。",
+            "entities": [
+              "タイトル",
+              "読んだページ数",
+              "日付"
+            ],
+            "features": [
+              "記録の一覧",
+              "今月の合計ページ数",
+              "月ごとの合計"
+            ],
+            "native": []
+          },
+          "transcript": "読書記録アプリを作って。本のタイトルと読んだページ数と日付を記録して、記録の一覧と月ごとの合計ページ数を見たい。",
+          "claudeMs": 2591,
+          "firstTokenMs": 1629,
+          "totalMs": 2591,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 149,
+            "outputTokens": 202,
+            "cacheReadInputTokens": 1368
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "cases": 11,
+    "casesOk": 11,
+    "steps": 17,
+    "stepsOk": 17,
+    "claudeCalls": 15,
+    "claudeP50Ms": 2237,
+    "claudeP95Ms": 2627,
+    "firstTokenP50Ms": 1063,
+    "inputTokensP50": 1459,
+    "outputTokensP50": 192,
+    "totalP50Ms": 2189
+  }
+}

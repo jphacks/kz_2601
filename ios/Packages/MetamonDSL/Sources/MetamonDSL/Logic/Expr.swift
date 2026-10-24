@@ -4,7 +4,8 @@ import Foundation
 /// ```
 /// Expr := number | string | boolean
 ///       | {"ref": "<fieldId>"}                       行コンテキストのフィールド値("id" でレコード id)
-///       | {"agg": "count|sum|avg|min|max", "entity": "...", "field"?: "...", "filter"?: Filter | [Filter]}
+///       | {"ref": "<refField>.<fieldId>"}            ref field が指す先のレコードの値(1 段・#134)
+///       | {"agg": "count|sum|avg|min|max|latest|earliest", "entity": "...", "field"?: "...", "by"?: "...", "filter"?: Filter | [Filter]}
 ///       | {"op": "<name>", "args": [Expr, ...]}
 ///       | {"if": Expr, "then": Expr, "else": Expr}
 /// ```
@@ -23,22 +24,25 @@ public indirect enum Expr: Hashable, Sendable {
 }
 
 public struct AggExpr: Hashable, Sendable {
-    public var op: String          // count|sum|avg|min|max
+    public var op: String          // count|sum|avg|min|max|latest|earliest
     public var entity: String
     public var field: String?
+    /// latest / earliest の並べ替えに使う日付 field(#133)
+    public var by: String?
     /// AND で全部満たすレコードだけ集計する。
     public var filters: [Filter]
 
-    public init(op: String, entity: String, field: String? = nil, filters: [Filter] = []) {
+    public init(op: String, entity: String, field: String? = nil, by: String? = nil, filters: [Filter] = []) {
         self.op = op
         self.entity = entity
         self.field = field
+        self.by = by
         self.filters = filters
     }
 }
 
 extension Expr: Codable {
-    private enum Keys: String, CodingKey { case ref, agg, entity, field, filter, op, args, `if`, then, `else` }
+    private enum Keys: String, CodingKey { case ref, agg, entity, field, by, filter, op, args, `if`, then, `else` }
 
     public init(from decoder: Decoder) throws {
         if let single = try? decoder.singleValueContainer() {
@@ -53,6 +57,7 @@ extension Expr: Codable {
         } else if let a = try c.decodeIfPresent(String.self, forKey: .agg) {
             self = .agg(AggExpr(op: a, entity: try c.decode(String.self, forKey: .entity),
                                 field: try c.decodeIfPresent(String.self, forKey: .field),
+                                by: try c.decodeIfPresent(String.self, forKey: .by),
                                 filters: Filter.decodeOneOrMany(c, forKey: .filter)))
         } else if let o = try c.decodeIfPresent(String.self, forKey: .op) {
             self = .op(o, try c.decodeIfPresent([Expr].self, forKey: .args) ?? [])
@@ -77,6 +82,7 @@ extension Expr: Codable {
             try c.encode(a.op, forKey: .agg)
             try c.encode(a.entity, forKey: .entity)
             try c.encodeIfPresent(a.field, forKey: .field)
+            try c.encodeIfPresent(a.by, forKey: .by)
             if a.filters.count == 1 { try c.encode(a.filters[0], forKey: .filter) }
             else if !a.filters.isEmpty { try c.encode(a.filters, forKey: .filter) }
         case .op(let o, let args):

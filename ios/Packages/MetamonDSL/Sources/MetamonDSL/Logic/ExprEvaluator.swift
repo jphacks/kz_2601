@@ -83,7 +83,7 @@ public final class ExprEvaluator {
     private var inProgress: Set<String> = []
     private var depth = 0
 
-    public init(entities: [Entity], records: @escaping (String) -> [Record], now: Date = Date(), calendar: Calendar = .current) {
+    public init(entities: [Entity], records: @escaping (String) -> [Record], now: Date = DSLClock.now(), calendar: Calendar = .current) {
         var map: [String: Entity] = [:]
         for e in entities where map[e.id] == nil { map[e.id] = e }
         self.entities = map
@@ -92,7 +92,7 @@ public final class ExprEvaluator {
         self.calendar = calendar
     }
 
-    public convenience init(dsl: AppDSL, records: @escaping (String) -> [Record], now: Date = Date()) {
+    public convenience init(dsl: AppDSL, records: @escaping (String) -> [Record], now: Date = DSLClock.now()) {
         self.init(entities: dsl.entities, records: records, now: now)
     }
 
@@ -115,8 +115,10 @@ public final class ExprEvaluator {
     }
 
     /// 行のフィールド値。"id" はレコード id、computed は評価(メモ)、それ以外は保存値。
+    /// "<refField>.<fieldId>" は ref field が指す先のレコードの値(#134・1 段だけ)。参照先が無ければ nil。
     public func fieldValue(_ fieldId: String, row: Row) -> ExprValue? {
         if fieldId == "id" { return .string(row.record.id) }
+        if let dot = fieldId.firstIndex(of: ".") { return lookup(String(fieldId[..<dot]), String(fieldId[fieldId.index(after: dot)...]), row: row) }
         let field = row.entity?.field(fieldId)
         guard let expr = field?.computed else { return Self.value(from: row.record[fieldId], field: field) }
         let key = "\(row.entity?.id ?? "")/\(row.record.id)/\(fieldId)"
@@ -127,6 +129,13 @@ public final class ExprEvaluator {
         inProgress.remove(key)
         if row.memoizable { computedMemo[key] = v }
         return v
+    }
+
+    private func lookup(_ refField: String, _ target: String, row: Row) -> ExprValue? {
+        guard !target.contains("."), let f = row.entity?.field(refField), f.type == .ref,
+              let refEntity = f.refEntity, let id = row.record[refField].stringValue, !id.isEmpty,
+              let record = source(refEntity).first(where: { $0.id == id }) else { return nil }
+        return fieldValue(target, row: Row(entity: entities[refEntity], record: record))
     }
 
     /// computed を data に合成した表示用レコード(Record には保存しない)。評価できない computed はキーを落とす。
@@ -164,11 +173,11 @@ public final class ExprEvaluator {
     // MARK: - agg
 
     private func aggregate(_ a: AggExpr, row: Row?) -> ExprValue? {
-        let resolved = AggExpr(op: a.op, entity: a.entity, field: a.field, filters: resolve(a.filters, row: row))
+        let resolved = AggExpr(op: a.op, entity: a.entity, field: a.field, by: a.by, filters: resolve(a.filters, row: row))
         if let hit = aggMemo[resolved] { return hit }
         let entity = entities[a.entity]
         // computed field を集計・絞り込みに使う時だけ合成済みレコードを使う(無駄な評価と自己参照を避ける)
-        let usesComputed = ([a.field].compactMap { $0 } + a.filters.map(\.field)).contains { entity?.field($0)?.isComputed == true }
+        let usesComputed = ([a.field, a.by].compactMap { $0 } + a.filters.map(\.field)).contains { entity?.field($0)?.isComputed == true }
         let base = usesComputed ? viewRecords(for: a.entity) : source(a.entity)
         let rows = resolved.filters.isEmpty ? base : base.filter { r in
             resolved.filters.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field), now: now, calendar: calendar) }
@@ -181,6 +190,9 @@ public final class ExprEvaluator {
         case "avg": v = nums.isEmpty ? nil : .number(nums.reduce(0, +) / Double(nums.count))
         case "min": v = nums.min().map { .number($0) }
         case "max": v = nums.max().map { .number($0) }
+        case "latest", "earliest":
+            // 1 件の値(型は field のまま・#133)。computed も合成済みレコードから読む
+            v = a.field.flatMap { f in Aggregator.pick(a.op, by: a.by, entity: entity, over: rows).flatMap { Self.value(from: $0[f], field: entity?.field(f)) } }
         default: v = nil
         }
         aggMemo[resolved] = v

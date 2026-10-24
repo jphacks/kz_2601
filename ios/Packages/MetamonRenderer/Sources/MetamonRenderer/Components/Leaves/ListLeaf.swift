@@ -22,6 +22,7 @@ struct ListLeaf: View {
         let rows = searched(filtered, entity: entity)
         let ids = rows.map(\.id)
         let toggleField = ListToggle.field(c.item, in: entity)
+        let today = DSLClock.now()
         if rows.isEmpty {
             EmptyPlaceholder(icon: "tray", emptyText: c.emptyText ?? L("まだありません"), state: rt.emptyState(for: entityId),
                              cta: L("最初の 1 件を追加しましょう")) {
@@ -34,7 +35,7 @@ struct ListLeaf: View {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                     if index > 0 { Hairline(inset: separatorInset) }
                     ListRow(item: c.item, record: row, entity: entity, showsChevron: c.onItemTap != nil,
-                            toggleOn: toggleField.map { ListToggle.isOn(row, field: $0.id, overrides: toggleOverrides) },
+                            toggleOn: toggleField.map { ListToggle.isOn(row, field: $0.id, daily: ListToggle.isDaily(c.item), overrides: toggleOverrides, today: today) },
                             onToggle: toggleField.map { f in { toggle(row, field: f.id, entity: entityId) } })
                         .background(highlightedId == row.id ? RenderTheme.Colors.brandSoft : Color.clear)
                         .contentShape(Rectangle())
@@ -73,11 +74,12 @@ struct ListLeaf: View {
 
     /// 楽観的に反転 → ローカル DB へ保存(同期キューが送る)→ 結果で保存待ち表示を外す(失敗ならストアの値 = 元に戻る)。
     private func toggle(_ row: Record, field: String, entity: String) {
-        let next = !ListToggle.isOn(row, field: field, overrides: toggleOverrides)
+        let daily = ListToggle.isDaily(c.item), today = DSLClock.now()
+        let next = !ListToggle.isOn(row, field: field, daily: daily, overrides: toggleOverrides, today: today)
         withAnimation(RenderTheme.Motion.select) { toggleOverrides[row.id] = next }
         toggleTaps += 1
         Task {
-            let saved = await rt.updateRecord(entity: entity, recordId: row.id, data: [field: .bool(next)])
+            let saved = await rt.updateRecord(entity: entity, recordId: row.id, data: [field: ListToggle.stored(next, daily: daily, today: today)])
             if !saved { print("[Metamon] list toggle not saved: \(entity)/\(row.id)") }
             withAnimation(RenderTheme.Motion.select) { ListToggle.settle(&toggleOverrides, recordId: row.id, requested: next) }
         }
