@@ -20,9 +20,9 @@ struct MapViewLeaf: View {
         let entityId = c.entity ?? ""
         let entity = rt.dsl.entity(entityId)
         let titleField = c.titleField ?? entity?.titleField
-        return rt.records(for: entityId).compactMap { r in
+        return rt.viewRecords(for: entityId).compactMap { r in
             guard let coord = Self.coordinate(r[c.locationField ?? ""]) else { return nil }
-            let title = titleField.map { FieldCoding.display(r[$0], field: entity?.field($0)) } ?? ""
+            let title = titleField.map { rt.display(r[$0], field: entity?.field($0)) } ?? ""
             return Pin(id: r.id, title: title, coordinate: coord)
         }
     }

@@ -5,7 +5,9 @@
 // photo / chart (bool), notification ("HH:MM" or "any"), substitution (bool:
 // the summary mentions 代替 / "replaced" because a requested part is not in
 // the catalog), scope ("public"|"shared"|"private": at least one entity has
-// that scope). A case may pin `locale` (ja|en); -locale overrides every case;
+// that scope), calc / computed / statValue / settlement / ref (bool, #100:
+// any calculation / Field.computed / stat.value / settlement leaf / ref field;
+// -logic-pass runs the 2nd calculations-only call). A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
 //
@@ -59,6 +61,17 @@ type Metrics struct {
 	Notifications []string `json:"notifications,omitempty"` // repeat@time
 	Scopes        []string `json:"scopes,omitempty"`        // entityId:scope (effective)
 	Areas         []string `json:"areas"`                   // screenId: area list
+	// logic (#100)
+	Computed   []string `json:"computed,omitempty"` // entity.field of computed fields
+	StatValues int      `json:"statValues,omitempty"`
+	Settlement bool     `json:"settlement,omitempty"`
+	RefFields  int      `json:"refFields,omitempty"`
+	ProgressTo bool     `json:"progressTarget,omitempty"` // progressBar entity+target (aggregate-based rate)
+}
+
+// HasCalc reports whether the app computes anything beyond plain aggregate stats.
+func (m *Metrics) HasCalc() bool {
+	return len(m.Computed) > 0 || m.StatValues > 0 || m.Settlement || m.ProgressTo
 }
 
 type Record struct {
@@ -85,6 +98,7 @@ type Record struct {
 	LastProblems  []string        `json:"lastProblems,omitempty"`
 	Metrics       *Metrics        `json:"metrics,omitempty"`
 	ExpectMisses  []string        `json:"expectMisses,omitempty"`
+	LogicPass     *ai.LogicMeta   `json:"logicPass,omitempty"`
 	Patch         []dsl.PatchOp   `json:"patch,omitempty"`
 	DSL           json.RawMessage `json:"dsl,omitempty"`
 }
@@ -117,6 +131,7 @@ type Summary struct {
 	AvgCreateOutChars float64 `json:"avgCreateOutputChars,omitempty"`
 	AvgAreaRatio      float64 `json:"avgAreaRatio"`
 	TabbedCreates     int     `json:"tabbedCreates"`
+	CalcCreates       int     `json:"calcCreates"` // creates whose app computes something (Metrics.HasCalc)
 }
 
 func main() {
@@ -132,6 +147,8 @@ func main() {
 	repeat := flag.Int("repeat", 1, "run every selected case this many times (p50/p95 over all runs)")
 	cmpBefore := flag.String("compare-before", "", "glob of raw run files = before; with -compare-after prints a before/after table and exits (no API calls)")
 	cmpAfter := flag.String("compare-after", "", "glob of raw run files = after")
+	envFile := flag.String("env-file", "", "KEY=VALUE file to load into the environment first (e.g. ../.env); values are never printed")
+	logicPass := flag.Bool("logic-pass", false, "enable the 2nd calculations-only call after each create (same as AI_LOGIC_PASS=1)")
 	chat := flag.Bool("chat", false, "run the clarify-phase cases (internal/ai/eval/chat_cases.json unless -cases is set) through Service.Chat instead of /generate")
 	flag.Parse()
 	if *chat && *casesPath == "internal/ai/eval/cases.json" {
@@ -145,6 +162,11 @@ func main() {
 		return
 	}
 
+	if *envFile != "" {
+		if err := loadEnvFile(*envFile); err != nil {
+			log.Fatalf("env-file: %v", err)
+		}
+	}
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" {
 		log.Fatal("ANTHROPIC_API_KEY is not set")
@@ -161,6 +183,7 @@ func main() {
 		Store:       store,
 		Model:       *model,
 		CallTimeout: *timeout,
+		LogicPass:   *logicPass,
 	}
 	ctx := context.Background()
 	if *chat {
@@ -275,6 +298,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 	rec.Usage = res.Meta.Usage
 	rec.Summary = res.Summary
 	rec.LastProblems = res.Meta.LastProblems
+	rec.LogicPass = res.Meta.LogicPass
 	rec.Patch = res.Patch
 	rec.DSL = res.DSL
 	if app, perr := dsl.Parse(res.DSL); perr == nil {
@@ -296,6 +320,14 @@ func measure(a *dsl.App) *Metrics {
 		e := &a.Entities[i]
 		m.Fields += len(e.Fields)
 		m.Scopes = append(m.Scopes, e.ID+":"+string(e.EffectiveScope()))
+		for _, f := range e.Fields {
+			if f.Computed != nil {
+				m.Computed = append(m.Computed, e.ID+"."+f.ID)
+			}
+			if f.Type == dsl.FieldRef {
+				m.RefFields++
+			}
+		}
 	}
 	for _, n := range a.App.Notifications {
 		m.Notifications = append(m.Notifications, n.Repeat+"@"+n.Time)
@@ -322,6 +354,16 @@ func measure(a *dsl.App) *Metrics {
 					m.HasPhoto = true
 				case dsl.CompChart:
 					m.HasChart = true
+				case dsl.CompSettlement:
+					m.Settlement = true
+				case dsl.CompStat:
+					if x.Value != nil {
+						m.StatValues++
+					}
+				case dsl.CompProgressBar:
+					if x.Entity != "" && x.Target != nil {
+						m.ProgressTo = true
+					}
 				}
 				if x.Action != nil && x.Action.Type == dsl.ActionScheduleNotif && x.Action.Notification != nil {
 					m.Notifications = append(m.Notifications, "action:"+x.Action.Notification.Repeat+"@"+x.Action.Notification.Time)
@@ -362,6 +404,26 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 			}
 			if !found {
 				miss = append(miss, fmt.Sprintf("notification=%v (want %s)", m.Notifications, want))
+			}
+		case "calc": // computed / stat.value / settlement / progressBar target: any calculation at all
+			if m.HasCalc() != v.(bool) {
+				miss = append(miss, fmt.Sprintf("calc=%v", m.HasCalc()))
+			}
+		case "computed":
+			if (len(m.Computed) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("computed=%v", m.Computed))
+			}
+		case "statValue":
+			if (m.StatValues > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("statValue=%d", m.StatValues))
+			}
+		case "settlement":
+			if m.Settlement != v.(bool) {
+				miss = append(miss, fmt.Sprintf("settlement=%v", m.Settlement))
+			}
+		case "ref":
+			if (m.RefFields > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("ref=%d", m.RefFields))
 			}
 		case "scope":
 			want := fmt.Sprint(v)
@@ -431,6 +493,9 @@ func summarize(recs []Record) Summary {
 			nCreate++
 			if r.Metrics != nil && r.Metrics.Tabs >= 2 {
 				s.TabbedCreates++
+			}
+			if r.Metrics != nil && r.Metrics.HasCalc() {
+				s.CalcCreates++
 			}
 		} else {
 			editMs = append(editMs, r.ClaudeMs)
@@ -506,8 +571,19 @@ func printTable(run Run) {
 	}
 	s := run.Summary
 	fmt.Printf("\nn=%d ok=%d firstPass=%d regenerated=%d areaFallback=%d failed=%d expectMisses=%d\n", s.N, s.OK, s.FirstPass, s.Regenerated, s.AreaFallback, s.Failed, s.ExpectMisses)
-	fmt.Printf("create p50=%dms p95=%dms first-event p50=%dms | edit p50=%dms | avg out tokens all=%.0f create=%.0f edit=%.0f | avg create chars=%.0f | avg area ratio=%.2f | tabbed creates=%d\n",
-		s.CreateP50Ms, s.CreateP95Ms, s.CreateFirstP50Ms, s.EditP50Ms, s.AvgOutTokens, s.AvgCreateOut, s.AvgEditOut, s.AvgCreateOutChars, s.AvgAreaRatio, s.TabbedCreates)
+	fmt.Printf("create p50=%dms p95=%dms first-event p50=%dms | edit p50=%dms | avg out tokens all=%.0f create=%.0f edit=%.0f | avg create chars=%.0f | avg area ratio=%.2f | tabbed creates=%d | calc creates=%d\n",
+		s.CreateP50Ms, s.CreateP95Ms, s.CreateFirstP50Ms, s.EditP50Ms, s.AvgOutTokens, s.AvgCreateOut, s.AvgEditOut, s.AvgCreateOutChars, s.AvgAreaRatio, s.TabbedCreates, s.CalcCreates)
+	for _, r := range run.Cases {
+		if r.Metrics == nil {
+			continue
+		}
+		lp := "-"
+		if r.LogicPass != nil {
+			lp = fmt.Sprintf("applied=%v ops=%d att=%d %dms out=%d problems=%d", r.LogicPass.Applied, r.LogicPass.Ops, r.LogicPass.Attempts, r.LogicPass.ClaudeMs, r.LogicPass.Usage.OutputTokens, len(r.LogicPass.Problems))
+		}
+		fmt.Printf("logic %s: computed=%v statValue=%d settlement=%v ref=%d progressTarget=%v | pass2 %s\n",
+			r.ID, r.Metrics.Computed, r.Metrics.StatValues, r.Metrics.Settlement, r.Metrics.RefFields, r.Metrics.ProgressTo, lp)
+	}
 }
 
 // ---- compare ----------------------------------------------------------------
@@ -631,5 +707,29 @@ func compare(beforeGlob, afterGlob string) error {
 	fmt.Printf("| 平均出力 chars (create) | %.0f | %.0f | |\n", bs.AvgCreateOutChars, as.AvgCreateOutChars)
 	fmt.Printf("| area 付与率 | %.2f | %.2f | |\n", bs.AvgAreaRatio, as.AvgAreaRatio)
 	fmt.Printf("| expect miss | %d | %d | |\n", bs.ExpectMisses, as.ExpectMisses)
+	return nil
+}
+
+// loadEnvFile sets KEY=VALUE lines (export prefix, quotes and # comments
+// allowed) that are not already set. Values are never logged.
+func loadEnvFile(path string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "export "))
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		k, v = strings.TrimSpace(k), strings.Trim(strings.TrimSpace(v), `"'`)
+		if _, set := os.LookupEnv(k); !set {
+			_ = os.Setenv(k, v)
+		}
+	}
 	return nil
 }

@@ -40,11 +40,11 @@ public struct ScreenView: View {
                     }
                 }
                 .task(id: route) {
-                    await rt.load(entities: screen.referencedEntities)
+                    await rt.load(entities: rt.dsl.entitiesNeeded(by: screen))
                     setUpForm(screen)
                 }
                 .refreshable {
-                    await rt.load(entities: screen.referencedEntities, force: true)
+                    await rt.load(entities: rt.dsl.entitiesNeeded(by: screen), force: true)
                 }
         } else {
             ContentUnavailableView("画面がありません: \(route.screen)", systemImage: "questionmark.square.dashed")

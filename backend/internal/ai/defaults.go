@@ -19,7 +19,8 @@ import (
 //	filter.value             -> null
 //	sort.direction           -> "desc"
 //	list.swipeToDelete       -> true
-//	stat/chart.aggregate     -> "sum"
+//	stat/chart.aggregate     -> "sum" (not when stat.value is set)
+//	agg.filter[] value       -> null (each filter of a list too)
 //
 // abbreviateExample is the inverse used on the few-shot examples, and
 // defaults_test.go asserts fillDefaults(abbreviateExample(x)) == x.
@@ -104,17 +105,13 @@ func fillNode(v any, forms map[string]bool) {
 		case actionTypes[typ]:
 			fillAction(t, forms, false)
 		case dateTypes[typ] && t["id"] != nil && t["name"] != nil: // entity field
-			if _, ok := t["defaultValue"]; !ok {
+			if _, ok := t["defaultValue"]; !ok && t["computed"] == nil {
 				t["defaultValue"] = "now"
 			}
 		case typ != "":
 			fillComponent(t, typ)
 		}
-		if f, ok := t["filter"].(map[string]any); ok {
-			if _, ok := f["value"]; !ok {
-				f["value"] = nil
-			}
-		}
+		fillFilters(t["filter"])
 		if s, ok := t["sort"].(map[string]any); ok {
 			if _, ok := s["direction"]; !ok {
 				s["direction"] = "desc"
@@ -142,8 +139,27 @@ func fillComponent(c map[string]any, typ string) {
 			c["swipeToDelete"] = true
 		}
 	case dsl.CompStat, dsl.CompChart:
+		if _, ok := c["value"]; ok && typ == string(dsl.CompStat) {
+			return // stat.value (Expr) replaces aggregate
+		}
 		if _, ok := c["aggregate"]; !ok {
 			c["aggregate"] = "sum"
+		}
+	}
+}
+
+// fillFilters sets value null on a filter object or on each filter of an
+// agg's filter list, then completes Expr nodes inside the values.
+func fillFilters(v any) {
+	switch t := v.(type) {
+	case map[string]any:
+		if _, ok := t["value"]; !ok {
+			t["value"] = nil
+		}
+		fillNode(t["value"], nil)
+	case []any:
+		for _, f := range t {
+			fillFilters(f)
 		}
 	}
 }

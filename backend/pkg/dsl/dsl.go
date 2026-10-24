@@ -119,6 +119,7 @@ const (
 	FieldCurrency FieldType = "currency"
 	FieldPhoto    FieldType = "photo"    // https URL uploaded by iOS to Firebase Storage
 	FieldLocation FieldType = "location" // "lat,lng"
+	FieldRef      FieldType = "ref"      // id of a record of Field.RefEntity
 )
 
 // Field is one column of an Entity.
@@ -130,6 +131,8 @@ type Field struct {
 	Options      []string  `json:"options,omitempty"`
 	DefaultValue any       `json:"defaultValue,omitempty"` // string|number|bool|nil; "now" for date types
 	Unit         string    `json:"unit,omitempty"`
+	RefEntity    string    `json:"refEntity,omitempty"` // type=ref: target entity id
+	Computed     *Expr     `json:"computed,omitempty"`  // read-only calculated field (row context = this record)
 }
 
 // Screen is one navigable page.
@@ -234,6 +237,8 @@ const (
 	CompTable       ComponentType = "table"
 	CompTimeline    ComponentType = "timeline"
 	CompEmptyState  ComponentType = "emptyState"
+	// logic
+	CompSettlement ComponentType = "settlement" // greedy "A pays B" list from a balance field
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -319,7 +324,7 @@ type Component struct {
 	// display (label / icon / progressBar / gauge / badge / link / markdown / avatar / table / timeline / emptyState)
 	Name          string        `json:"name,omitempty"`          // icon: SF Symbols name / avatar: initials source
 	Color         string        `json:"color,omitempty"`         // SemanticColor enum
-	Value         *float64      `json:"value,omitempty"`         // progressBar (0..1) / gauge literal value
+	Value         *Expr         `json:"value,omitempty"`         // stat: Expr / progressBar (0..1) & gauge: number literal
 	Target        *float64      `json:"target,omitempty"`        // progressBar entity mode denominator
 	URL           string        `json:"url,omitempty"`           // link
 	Image         string        `json:"image,omitempty"`         // avatar literal (https / data URL)
@@ -329,6 +334,10 @@ type Component struct {
 	DateField     string        `json:"dateField,omitempty"`     // timeline
 	TitleField    string        `json:"titleField,omitempty"`    // timeline
 	SubtitleField string        `json:"subtitleField,omitempty"` // timeline
+
+	// settlement
+	NameField    string `json:"nameField,omitempty"`
+	BalanceField string `json:"balanceField,omitempty"`
 }
 
 // TableColumn is one column of a table component.

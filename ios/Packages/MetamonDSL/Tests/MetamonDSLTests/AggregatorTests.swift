@@ -26,6 +26,8 @@ final class AggregatorTests: XCTestCase {
         XCTAssertEqual(Aggregator.sorted(records, by: Sort(field: "amount", direction: "asc"), entity: entity).map(\.id), ["2", "1"])
         XCTAssertEqual(Aggregator.sorted(records, by: Sort(field: "amount", direction: "asc"), entity: nil).map(\.id), ["1", "2"])
         XCTAssertEqual(Aggregator.format(1234, as: "currency"), "¥1,234")
+        XCTAssertEqual(FieldCoding.currency(-500), "-¥500")
+        XCTAssertEqual(FieldCoding.currency(-0.2), "¥0")
         XCTAssertEqual(Aggregator.format(12.5, as: nil, unit: "kg"), "12.5 kg")
         XCTAssertEqual(Aggregator.format(40, as: "percent"), "40%")
     }

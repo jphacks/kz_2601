@@ -180,6 +180,12 @@ components:
           description: |
             create = 既存を捨てて新規アプリ (フル DSL / PUT)。edit = 既存を Patch で編集 (PATCH)。undo = 1 つ前に restore。
             auto = 現行が初期状態なら create、それ以外は edit (「元に戻して」/ "undo"・「新しく作り直して」/ "start over" はキーワードで判定)
+        logicPass:
+          type: boolean
+          description: |
+            計算ロジックの 2 パス目(#100・docs/dsl/expressions.md)。true = create の UI 生成後に「発話に必要な計算(Field.computed / stat.value / settlement / ref 型)だけを JSON Patch で足す」小さな呼び出しを追加する。
+            省略時はサーバー既定(env AI_LOGIC_PASS=1 で有効・既定は無効 = 1 パスで UI と計算を同時に生成)。edit / undo では無視。2 パス目が検証に通らなければ 1 パス目の結果を返す(失敗にしない)。
+            ?stream=1 の `event: app` は 1 パス目の app ブロックで従来どおり先に届き、2 パス目の結果は `event: result` の dsl に入る。
       example: { appId: app_01HXYZ, text: 家計簿アプリが欲しい。金額とカテゴリとメモを記録したい, baseVersion: 1 }
     GenerateResponse:
       type: object
@@ -219,6 +225,18 @@ components:
         latencyMs:
           type: object
           properties: { transcribe: { type: integer }, claude: { type: integer }, total: { type: integer } }
+        meta:
+          type: object
+          description: 診断情報(model / attempts / usage など)。logicPass は 2 パス目を実行した時だけ入る
+          properties:
+            logicPass:
+              type: object
+              properties:
+                applied: { type: boolean, description: 計算の patch が検証を通って DSL に反映された }
+                ops: { type: integer }
+                attempts: { type: integer }
+                claudeMs: { type: integer }
+                problems: { type: array, items: { type: string }, description: 反映されなかった時の最後の検証エラー }
     ChatMessage:
       type: object
       required: [role, text]
