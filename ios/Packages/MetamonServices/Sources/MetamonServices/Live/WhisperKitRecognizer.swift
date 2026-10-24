@@ -8,27 +8,27 @@ import WhisperKit
 /// 途中結果(ストリーミング)は v0 では出さない。実機専用(シミュレータは MockTranscriber)。
 @MainActor
 @Observable
-final class WhisperKitRecognizer: SpeechTranscriber {
-    private(set) var status: TranscriberStatus = .notDownloaded
-    private(set) var downloadProgress: Double = 0
-    var isReady: Bool { status == .ready }
+public final class WhisperKitRecognizer: SpeechTranscriber {
+    public private(set) var status: TranscriberStatus = .notDownloaded
+    public private(set) var downloadProgress: Double = 0
+    public var isReady: Bool { status == .ready }
 
     private let variant: String
     private let repo = "argmaxinc/whisperkit-coreml"
-    /// Application Support 配下に固定(Documents に 500MB を置かない)。
+    /// Application Support 配下に固定(Documents に 500MB を置かない)。アプリのサンドボックス内なので Bundle ID が変わると再 DL になる。
     private let downloadBase: URL
     @ObservationIgnored private var pipe: WhisperKit?
     @ObservationIgnored private var prepareTask: Task<Void, Error>?
     private var isRecording = false
 
-    init(model: String) {
+    public init(model: String) {
         variant = Self.resolveVariant(model)
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         downloadBase = support.appending(path: "WhisperKit", directoryHint: .isDirectory)
     }
 
     /// `small` → `openai_whisper-small`。既に `openai_whisper-` / `distil-` 等の接頭辞付きならそのまま。
-    static func resolveVariant(_ model: String) -> String {
+    nonisolated public static func resolveVariant(_ model: String) -> String {
         model.contains("_") || model.hasPrefix("distil") ? model : "openai_whisper-\(model)"
     }
 
@@ -44,7 +44,7 @@ final class WhisperKitRecognizer: SpeechTranscriber {
     // MARK: - SpeechTranscriber
 
     /// 多重呼び出しは同じ Task を待つ。失敗したら次回呼び出しで再試行。
-    func prepare() async throws {
+    public func prepare() async throws {
         if pipe != nil { return }
         if let running = prepareTask { return try await running.value }
         let task = Task { try await self.prepareImpl() }
@@ -90,7 +90,7 @@ final class WhisperKitRecognizer: SpeechTranscriber {
         }
     }
 
-    func startRecording() async throws {
+    public func startRecording() async throws {
         guard let pipe else { throw RecognizerError.notReady }
         guard !isRecording else { return }
         guard await AudioProcessor.requestRecordPermission() else {
@@ -101,7 +101,7 @@ final class WhisperKitRecognizer: SpeechTranscriber {
         isRecording = true
     }
 
-    func stopAndTranscribe() async throws -> String {
+    public func stopAndTranscribe() async throws -> String {
         guard let pipe else { throw RecognizerError.notReady }
         guard isRecording else { return "" }
         pipe.audioProcessor.stopRecording()
@@ -126,11 +126,11 @@ final class WhisperKitRecognizer: SpeechTranscriber {
         return results.map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    enum RecognizerError: LocalizedError {
+    public enum RecognizerError: LocalizedError {
         case notReady
         case microphoneDenied
 
-        var errorDescription: String? {
+        public var errorDescription: String? {
             switch self {
             case .notReady: return "音声モデルの準備が終わっていません"
             case .microphoneDenied: return "マイクの使用が許可されていません。設定アプリで許可してください"

@@ -1,7 +1,20 @@
 import Foundation
-import MetamonDSL
+import MetamonServices
 
-/// 起動構成。`METAMON_API_BASE_URL`(環境変数 or Info.plist `MetamonAPIBaseURL`)が無ければ全モックで動く。
+/// 起動環境。`METAMON_API_BASE_URL`(環境変数 or Info.plist `MetamonAPIBaseURL`)が無ければ全モックで動く。
+enum AppEnvironment {
+    case mock
+    case live(appConfigURL: URL, aiURL: URL)
+
+    /// 環境変数 / Info.plist から判定した現在の環境。
+    static var current: AppEnvironment {
+        guard let api = BuildConfig.apiBaseURL, let ai = BuildConfig.aiBaseURL else { return .mock }
+        return .live(appConfigURL: api, aiURL: ai)
+    }
+}
+
+/// **DI の入口**。`Services` はここで1回だけ組み立て、`MetamonApp` が `AppRuntime` と SwiftUI Environment(`\.services`)に渡す。
+/// Mock / 本番の差し替えはこのファイルだけで完結する(View / Runtime は protocol にしか依存しない)。
 enum BuildConfig {
     static var apiBaseURL: URL? {
         let env = ProcessInfo.processInfo.environment["METAMON_API_BASE_URL"]
@@ -26,9 +39,32 @@ enum BuildConfig {
     }
 
     @MainActor
-    static func makeServices() -> Services {
-        guard let api = apiBaseURL, let ai = aiBaseURL else { return .mock(transcriber: makeTranscriber()) }
-        return .live(appConfigURL: api, aiURL: ai, transcriber: makeTranscriber())
+    static func make(environment: AppEnvironment = .current) -> Services {
+        switch environment {
+        case .mock:
+            return Services(
+                appConfig: InMemoryAppConfigClient(seed: MockSeed.demoRecords()),
+                ai: MockAIClient(),
+                sync: NoopDocumentSync(),
+                token: NoAuthTokenProvider(),
+                transcriber: makeTranscriber(),
+                notifications: UserNotificationScheduler(),
+                isLive: false
+            )
+        case .live(let appConfigURL, let aiURL):
+            // TODO: Firebase 導入後は FirebaseTokenProvider に差し替える
+            let token = NoAuthTokenProvider()
+            let appConfig = HTTPAppConfigClient(baseURL: appConfigURL, token: token)
+            return Services(
+                appConfig: appConfig,
+                ai: HTTPAIClient(baseURL: aiURL, token: token),
+                sync: PollingDocumentSync(client: appConfig),
+                token: token,
+                transcriber: makeTranscriber(),
+                notifications: UserNotificationScheduler(),
+                isLive: true
+            )
+        }
     }
 
     /// 実機 = WhisperKit(モック API でも音声認識は本物)。シミュレータは CoreML/ANE が使えず実用不可なのでモック(文字入力フォールバック)。
@@ -39,49 +75,5 @@ enum BuildConfig {
         #else
         return WhisperKitRecognizer(model: whisperModel)
         #endif
-    }
-}
-
-extension Services {
-    /// デモ3本(docs/dsl/examples)の entity id に合わせた seed データ。
-    @MainActor
-    static func mock(transcriber: (any SpeechTranscriber)? = nil) -> Services {
-        let today = FieldCoding.dateFormatter.string(from: .now)
-        let now = ISO8601DateFormatter().string(from: .now)
-        let seed: [String: [Record]] = [
-            "expense": [
-                Record(id: "1", data: ["amount": 980, "category": "食費", "memo": "ランチ", "date": .string(today)], createdAt: now),
-                Record(id: "2", data: ["amount": 420, "category": "交通", "memo": "電車", "date": .string(today)], createdAt: now),
-            ],
-            "workout": [
-                Record(id: "1", data: ["exercise": "スクワット", "reps": 20, "weight": 40, "done": true, "date": .string(now)], createdAt: now),
-            ],
-            "memo": [
-                Record(id: "1", data: ["note": "きれいな紅葉", "date": .string(now)], createdAt: now),
-            ],
-        ]
-        return Services(
-            appConfig: InMemoryAppConfigClient(seed: seed),
-            ai: MockAIClient(),
-            sync: NoopDocumentSync(),
-            token: NoAuthTokenProvider(),
-            transcriber: transcriber ?? MockTranscriber(),
-            isLive: false
-        )
-    }
-
-    @MainActor
-    static func live(appConfigURL: URL, aiURL: URL, transcriber: any SpeechTranscriber) -> Services {
-        // TODO: Firebase 導入後は FirebaseTokenProvider に差し替える
-        let token = NoAuthTokenProvider()
-        let appConfig = HTTPAppConfigClient(baseURL: appConfigURL, token: token)
-        return Services(
-            appConfig: appConfig,
-            ai: HTTPAIClient(baseURL: aiURL, token: token),
-            sync: PollingDocumentSync(client: appConfig),
-            token: token,
-            transcriber: transcriber,
-            isLive: true
-        )
     }
 }

@@ -1,10 +1,12 @@
 import SwiftUI
 import MetamonDSL
+import MetamonServices
 
 /// 音声入力画面。初期状態のアプリ全体でもあり、生成後は FAB からシートとしても開く。
 /// 流れ: 録音 → WhisperKit(オンデバイス)文字起こし → ai サービス → 新 DSL をアニメーション付きで適用。
 struct VoiceInputView: View {
     @Environment(AppRuntime.self) private var rt
+    @Environment(\.services) private var services
     var prompt: String?
 
     @State private var phase: Phase = .idle
@@ -85,7 +87,7 @@ struct VoiceInputView: View {
 
     @State private var pulse = false
 
-    private var transcriber: any SpeechTranscriber { rt.services.transcriber }
+    private var transcriber: any SpeechTranscriber { services.transcriber }
 
     /// WhisperKit モデルの DL / ロード状況。ready になったら消える。
     @ViewBuilder
@@ -195,6 +197,8 @@ struct VoiceInputView: View {
 }
 
 #Preview {
+    let services = BuildConfig.make(environment: .mock)
     VoiceInputView()
-        .environment(AppRuntime(document: .fallback, services: .mock()))
+        .environment(AppRuntime(document: .fallback, services: services))
+        .environment(\.services, services)
 }

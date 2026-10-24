@@ -1,6 +1,7 @@
 import SwiftUI
 import Observation
 import MetamonDSL
+import MetamonServices
 
 /// NavigationStack の path 要素。画面 id + 編集対象 recordId + どのスタック(main / sheet / full)に属するか。
 struct Route: Hashable, Identifiable {
@@ -62,7 +63,7 @@ final class AppRuntime {
     /// 起動時: live ならサーバーの最新 DSL を取得しホットリロード開始。文字起こしモデルも温めておく。
     func bootstrap() async {
         Task { try? await services.transcriber.prepare() }
-        await NotificationSync.sync(dsl.app.notifications)
+        await services.notifications.sync(dsl.app.notifications)
         guard services.isLive else { return }
         if let remote = try? await services.appConfig.fetchDocument(appId: document.appId) {
             apply(remote, animated: false)
@@ -98,7 +99,7 @@ final class AppRuntime {
         } else {
             swap()
         }
-        Task { await NotificationSync.sync(doc.dsl.app.notifications) }
+        Task { await services.notifications.sync(doc.dsl.app.notifications) }
     }
 
     /// 発話 → ai サービス → 最新 DSL 適用。
@@ -230,13 +231,13 @@ final class AppRuntime {
         case .scheduleNotification:
             guard let spec = action.notification else { return }
             await attempt {
-                try await NotificationSync.schedule(spec)
+                try await services.notifications.schedule(spec)
                 toast = "通知を予約しました(\(spec.time ?? ""))"
             }
 
         case .cancelNotification:
             guard let id = action.notificationId else { return }
-            NotificationSync.cancel(id: id)
+            services.notifications.cancel(id: id)
 
         case .unknown:
             toast = "未対応のアクション: \(action.rawType)"

@@ -1,5 +1,6 @@
 import SwiftUI
 import MetamonDSL
+import MetamonServices
 
 /// Component → SwiftUI View。2段固定(Container > Leaf)なので再帰は1段だけ。
 struct DSLView: View {
@@ -48,6 +49,7 @@ struct UnsupportedComponent: View {
 }
 
 #Preview("家計簿サンプル") {
-    let rt = AppRuntime(document: (try? AppDocument.bundled("kakeibo")) ?? .fallback, services: .mock())
-    return RootView().environment(rt)
+    let services = BuildConfig.make(environment: .mock)
+    let rt = AppRuntime(document: (try? DSLExamples.document("kakeibo")) ?? .fallback, services: services)
+    return RootView().environment(rt).environment(\.services, services)
 }

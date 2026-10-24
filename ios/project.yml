@@ -28,15 +28,12 @@ settings:
 
 # ---- ローカル Swift Package(マルチモジュール。依存の向きは各 Package.swift で固定) ----
 #   MetamonDSL      : DSL モデル・グリッド計算・集計(Foundation のみ。macOS で `swift test` 可)
-# ---- 外部パッケージ ----
-# WhisperKit は v1.0.0 で argmax-oss-swift に統合(旧 URL argmaxinc/WhisperKit は同リポジトリへリダイレクト)。
-# product `WhisperKit` のみリンク(ArgmaxOSS 全部入りは TTS/Speaker を巻き込むので不要)。バージョンは完全固定。
+#   MetamonServices : Services protocol 群 + 実装(HTTP/Mock/WhisperKit/通知)。WhisperKit(argmax-oss-swift 1.1.1)はこのパッケージの依存
 packages:
   MetamonDSL:
     path: Packages/MetamonDSL
-  ArgmaxOSS:
-    url: https://github.com/argmaxinc/argmax-oss-swift
-    exactVersion: "1.1.1"
+  MetamonServices:
+    path: Packages/MetamonServices
 # Firebase(未導入。導入時にコメントを外す):
 #   Firebase:
 #     url: https://github.com/firebase/firebase-ios-sdk
@@ -57,8 +54,7 @@ targets:
         type: group
     dependencies:
       - package: MetamonDSL
-      - package: ArgmaxOSS
-        product: WhisperKit
+      - package: MetamonServices
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon
@@ -71,4 +67,5 @@ targets:
       # 各モジュールのユニットテストを `xcodebuild -scheme Metamon test` で一括実行する。
       testTargets:
         - package: MetamonDSL/MetamonDSLTests
+        - package: MetamonServices/MetamonServicesTests
       gatherCoverageData: false
