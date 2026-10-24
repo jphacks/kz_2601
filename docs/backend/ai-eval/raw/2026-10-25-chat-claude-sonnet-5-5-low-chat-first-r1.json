@@ -1,0 +1,1099 @@
+{
+  "date": "2026-10-25",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "tag": "chat-first-r1",
+  "cases": [
+    {
+      "id": "kakeibo_short",
+      "group": "ja",
+      "locale": "ja",
+      "ok": false,
+      "steps": [
+        {
+          "say": "家計簿",
+          "ok": false,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 1,
+          "text": "では作りますね。",
+          "mode": "create",
+          "brief": {
+            "name": "家計簿",
+            "purpose": "日々の支出を記録して、今月の合計と一覧を確認する家計簿アプリ。",
+            "entities": [
+              "金額",
+              "カテゴリ",
+              "日付",
+              "メモ"
+            ],
+            "features": [
+              "今月の合計",
+              "支出一覧",
+              "カテゴリ別の集計"
+            ],
+            "native": []
+          },
+          "transcript": "家計簿アプリを作って。金額とカテゴリと日付とメモを記録して、今月の合計と支出一覧を見たい。カテゴリ別の集計も見たい。",
+          "claudeMs": 4122,
+          "firstTokenMs": 3086,
+          "totalMs": 4122,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 72,
+            "outputTokens": 210,
+            "cacheCreationInputTokens": 3222
+          },
+          "misses": [
+            "kind=ready (want question)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kakeibo_full",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "毎日の出費をメモできる家計簿。合計と一覧、レシート写真も残したい",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 1,
+          "text": "では作りますね。",
+          "mode": "create",
+          "brief": {
+            "name": "出費メモ",
+            "purpose": "毎日の出費を記録して、合計と一覧を確認できる家計簿アプリ",
+            "entities": [
+              "金額",
+              "カテゴリ",
+              "日付",
+              "メモ",
+              "レシート写真"
+            ],
+            "features": [
+              "今月の合計",
+              "支出一覧",
+              "レシート写真の保存"
+            ],
+            "native": [
+              "camera"
+            ]
+          },
+          "transcript": "毎日の出費をメモできる家計簿アプリを作って。金額とカテゴリと日付とメモを記録して、今月の合計と支出一覧を見たい。レシートの写真も残したい。",
+          "claudeMs": 2207,
+          "firstTokenMs": 1112,
+          "totalMs": 2208,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 100,
+            "outputTokens": 223,
+            "cacheReadInputTokens": 3222
+          }
+        }
+      ]
+    },
+    {
+      "id": "training",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "筋トレ",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "何を記録したいですか?",
+          "suggestions": [
+            "種目・重量・回数",
+            "日々の記録だけ",
+            "お任せで作って"
+          ],
+          "mode": "create",
+          "claudeMs": 1744,
+          "firstTokenMs": 1393,
+          "totalMs": 1744,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        },
+        {
+          "say": "腕立てとスクワット、朝8時に通知",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 2,
+          "text": "では作りますね。",
+          "mode": "create",
+          "brief": {
+            "name": "筋トレ記録",
+            "purpose": "腕立てとスクワットの回数を記録し、毎朝8時に通知で知らせる。",
+            "entities": [
+              "種目(腕立て/スクワット)",
+              "回数",
+              "日付"
+            ],
+            "features": [
+              "記録の一覧",
+              "今日と今週の回数の合計",
+              "毎朝8時の通知"
+            ],
+            "native": [
+              "notification"
+            ]
+          },
+          "transcript": "筋トレ記録アプリを作って。種目は腕立てとスクワットから選べて、回数と日付を記録したい。記録の一覧と、今日と今週の合計回数を見たい。毎朝8時に通知してほしい。",
+          "claudeMs": 2647,
+          "firstTokenMs": 1355,
+          "totalMs": 3261,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 113,
+            "outputTokens": 243,
+            "cacheReadInputTokens": 3222
+          }
+        }
+      ]
+    },
+    {
+      "id": "diary_en",
+      "group": "en",
+      "locale": "en",
+      "ok": true,
+      "steps": [
+        {
+          "say": "a diary",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "Should entries include photos?",
+          "suggestions": [
+            "Text only",
+            "Add photos",
+            "Add mood too"
+          ],
+          "mode": "create",
+          "claudeMs": 2069,
+          "firstTokenMs": 1722,
+          "totalMs": 2069,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "just_build",
+      "group": "ja",
+      "locale": "ja",
+      "ok": false,
+      "steps": [
+        {
+          "say": "家計簿",
+          "ok": false,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 1,
+          "text": "では作りますね。",
+          "mode": "create",
+          "brief": {
+            "name": "家計簿",
+            "purpose": "日々の支出を記録して、今月の合計と一覧を確認する家計簿アプリ。",
+            "entities": [
+              "金額",
+              "カテゴリ",
+              "日付",
+              "メモ"
+            ],
+            "features": [
+              "今月の合計",
+              "支出一覧",
+              "カテゴリ別の集計"
+            ],
+            "native": []
+          },
+          "transcript": "家計簿アプリを作って。金額とカテゴリと日付とメモを記録して、今月の合計と支出一覧を見たい。カテゴリ別の集計も見たい。",
+          "claudeMs": 1899,
+          "firstTokenMs": 955,
+          "totalMs": 1899,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 72,
+            "outputTokens": 210,
+            "cacheReadInputTokens": 3222
+          },
+          "misses": [
+            "kind=ready (want question)"
+          ]
+        },
+        {
+          "say": "もう作って",
+          "ok": true,
+          "kind": "ready",
+          "source": "shortcut",
+          "turn": 2,
+          "text": "では作りますね。",
+          "mode": "create",
+          "brief": {
+            "name": "家計簿",
+            "purpose": "日々の支出を記録して、今月の合計と一覧を確認する家計簿アプリ。",
+            "entities": [
+              "金額",
+              "カテゴリ",
+              "日付",
+              "メモ"
+            ],
+            "features": [
+              "今月の合計",
+              "支出一覧",
+              "カテゴリ別の集計"
+            ],
+            "native": []
+          },
+          "transcript": "家計簿アプリを作って。金額とカテゴリと日付とメモを記録して、今月の合計と支出一覧を見たい。カテゴリ別の集計も見たい。",
+          "claudeMs": 0,
+          "firstTokenMs": 0,
+          "totalMs": 0,
+          "attempts": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "training_en_full",
+      "group": "en",
+      "locale": "en",
+      "ok": true,
+      "steps": [
+        {
+          "say": "A workout log for pushups and squats, remind me at 8 in the morning",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 1,
+          "text": "Got it, I'll build it now.",
+          "mode": "create",
+          "brief": {
+            "name": "Workout Log",
+            "purpose": "Log pushup and squat workouts and get a daily reminder at 8 AM.",
+            "entities": [
+              "Exercise (pushups or squats)",
+              "Reps",
+              "Date"
+            ],
+            "features": [
+              "Add a workout entry",
+              "List of past workouts",
+              "This week's total reps per exercise",
+              "Daily notification at 8:00 AM"
+            ],
+            "native": [
+              "notification"
+            ]
+          },
+          "transcript": "I want a workout log app for pushups and squats. I'll record the exercise type, number of reps, and date, and I want to see a list of my workouts plus this week's total reps for each exercise. Please send me a daily reminder at 8 in the morning.",
+          "claudeMs": 2337,
+          "firstTokenMs": 964,
+          "totalMs": 2337,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 98,
+            "outputTokens": 249,
+            "cacheReadInputTokens": 3222
+          }
+        }
+      ]
+    },
+    {
+      "id": "diary_ja",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "日記",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "写真も一緒に残したいですか?",
+          "suggestions": [
+            "文章だけ",
+            "写真つき",
+            "気分も記録"
+          ],
+          "mode": "create",
+          "claudeMs": 1671,
+          "firstTokenMs": 1322,
+          "totalMs": 1671,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "water_long",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "毎日の水分補給を記録するアプリ。飲んだ量(ml)と時刻を記録して、今日の合計と1日2リットルの目標までの残り、過去7日の一覧を見たい。2時間おきに通知も欲しい。",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 1,
+          "text": "では作りますね。",
+          "mode": "create",
+          "brief": {
+            "name": "水分補給記録",
+            "purpose": "毎日の水分摂取量を記録し、1日2リットルの目標に対する進捗を確認する。",
+            "entities": [
+              "飲んだ量(ml)",
+              "時刻"
+            ],
+            "features": [
+              "今日の合計",
+              "目標2000mlまでの残り",
+              "過去7日の記録一覧",
+              "2時間おきの通知"
+            ],
+            "native": [
+              "notification"
+            ]
+          },
+          "transcript": "水分補給を記録するアプリを作って。飲んだ量(ml)と時刻を記録して、今日の合計と1日2リットルの目標までの残り、過去7日の一覧を見たい。2時間おきに通知も欲しい。",
+          "claudeMs": 2227,
+          "firstTokenMs": 1006,
+          "totalMs": 2228,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 151,
+            "outputTokens": 251,
+            "cacheReadInputTokens": 3222
+          }
+        }
+      ]
+    },
+    {
+      "id": "habit_en",
+      "group": "en",
+      "locale": "en",
+      "ok": true,
+      "steps": [
+        {
+          "say": "A habit tracker",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "How do you want to check off habits?",
+          "suggestions": [
+            "Daily checkbox",
+            "Count per day",
+            "Streak-style log"
+          ],
+          "mode": "create",
+          "claudeMs": 1632,
+          "firstTokenMs": 1300,
+          "totalMs": 1632,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        },
+        {
+          "say": "Daily checkboxes for reading and running, and a weekly streak count",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 2,
+          "text": "Got it, I'll build it now. Note: streaks aren't supported, so I'll show a count of check-offs over the last 7 days instead.",
+          "mode": "create",
+          "brief": {
+            "name": "Habit Tracker",
+            "purpose": "Check off daily reading and running habits and see how many times I did each over the last 7 days.",
+            "entities": [
+              "Habit (reading or running)",
+              "Date",
+              "Done checkbox"
+            ],
+            "features": [
+              "Daily checkboxes for reading and running",
+              "Count of check-offs over the last 7 days for each habit",
+              "List of past records"
+            ],
+            "native": []
+          },
+          "transcript": "I want a habit tracker app. Every day I want to check off two habits, reading and running, with simple checkboxes. I also want to see a weekly count of how many days I completed each habit over the last 7 days, plus a list of my past records.",
+          "claudeMs": 2546,
+          "firstTokenMs": 987,
+          "totalMs": 3670,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 125,
+            "outputTokens": 276,
+            "cacheReadInputTokens": 3222
+          }
+        }
+      ]
+    },
+    {
+      "id": "kono_mama",
+      "group": "ja",
+      "locale": "ja",
+      "ok": false,
+      "steps": [
+        {
+          "say": "買い物リスト",
+          "ok": false,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 1,
+          "text": "では作りますね。",
+          "mode": "create",
+          "brief": {
+            "name": "買い物リスト",
+            "purpose": "買うものを記録して、買ったらチェックできるリスト",
+            "entities": [
+              "品名",
+              "数量",
+              "買ったかどうか"
+            ],
+            "features": [
+              "未購入の品物の一覧",
+              "ワンタップでチェック",
+              "スワイプで削除",
+              "件数の表示"
+            ],
+            "native": []
+          },
+          "transcript": "買い物リストアプリを作って。品名と数量を記録して、買ったらワンタップでチェックできるようにしたい。未購入の一覧を見て、いらなくなったらスワイプで削除したい。",
+          "claudeMs": 2383,
+          "firstTokenMs": 1121,
+          "totalMs": 2383,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 74,
+            "outputTokens": 218,
+            "cacheReadInputTokens": 3222
+          },
+          "misses": [
+            "kind=ready (want question)"
+          ]
+        },
+        {
+          "say": "このまま作って",
+          "ok": true,
+          "kind": "ready",
+          "source": "shortcut",
+          "turn": 2,
+          "text": "では作りますね。",
+          "mode": "create",
+          "brief": {
+            "name": "買い物リスト",
+            "purpose": "買うものを記録して、買ったらチェックできるリスト",
+            "entities": [
+              "品名",
+              "数量",
+              "買ったかどうか"
+            ],
+            "features": [
+              "未購入の品物の一覧",
+              "ワンタップでチェック",
+              "スワイプで削除",
+              "件数の表示"
+            ],
+            "native": []
+          },
+          "transcript": "買い物リストアプリを作って。品名と数量を記録して、買ったらワンタップでチェックできるようにしたい。未購入の一覧を見て、いらなくなったらスワイプで削除したい。",
+          "claudeMs": 0,
+          "firstTokenMs": 0,
+          "totalMs": 0,
+          "attempts": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "two_rounds",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "記録したい",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "何を記録したいですか?",
+          "suggestions": [
+            "お金の支出",
+            "筋トレ",
+            "日記"
+          ],
+          "mode": "create",
+          "claudeMs": 1357,
+          "firstTokenMs": 1002,
+          "totalMs": 1357,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        },
+        {
+          "say": "読書",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 2,
+          "text": "読書の何を残したいですか?",
+          "suggestions": [
+            "読んだ本の一覧",
+            "読書時間",
+            "感想メモ"
+          ],
+          "mode": "create",
+          "claudeMs": 1544,
+          "firstTokenMs": 1203,
+          "totalMs": 1749,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        },
+        {
+          "say": "タイトルと読んだページ数、月の合計が見たい",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 3,
+          "text": "では作りますね。",
+          "mode": "create",
+          "brief": {
+            "name": "読書記録",
+            "purpose": "読んだ本のタイトルとページ数を記録し、月の合計ページ数を確認する。",
+            "entities": [
+              "タイトル",
+              "読んだページ数",
+              "日付"
+            ],
+            "features": [
+              "今月の合計ページ数",
+              "読書記録の一覧"
+            ],
+            "native": []
+          },
+          "transcript": "読書記録アプリを作って。本のタイトルと読んだページ数と日付を記録して、今月の合計ページ数と記録の一覧を見たい。",
+          "claudeMs": 1912,
+          "firstTokenMs": 951,
+          "totalMs": 2626,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 141,
+            "outputTokens": 196,
+            "cacheReadInputTokens": 3222
+          }
+        }
+      ]
+    },
+    {
+      "id": "edit_webview",
+      "group": "edit",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "これ現状は WebView でやってるんですか?",
+          "ok": true,
+          "kind": "answer",
+          "source": "claude",
+          "turn": 1,
+          "text": "いいえ、WebView ではありません。iOS の SwiftUI でネイティブに描画しています。WebView になるのは、サイトを埋め込む部品を置いた画面のその枠だけです。今のアプリにはありません。",
+          "mode": "edit",
+          "claudeMs": 3462,
+          "firstTokenMs": 2970,
+          "totalMs": 3463,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "edit_chart_q",
+      "group": "edit",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "グラフも出せる?",
+          "ok": true,
+          "kind": "answer",
+          "source": "claude",
+          "turn": 1,
+          "text": "はい、すでに「集計」タブに今月のカテゴリ別の円グラフと、月ごとの支出の棒グラフがあります。折れ線グラフなど別の形も追加できます。",
+          "suggestions": [
+            "集計タブに日ごとの折れ線グラフを追加して",
+            "ホームに今月のカテゴリ別円グラフを追加して"
+          ],
+          "mode": "edit",
+          "claudeMs": 2299,
+          "firstTokenMs": 1550,
+          "totalMs": 2300,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "edit_bigger_q",
+      "group": "edit",
+      "locale": "ja",
+      "ok": false,
+      "steps": [
+        {
+          "say": "もうちょっと大きくすることも可能?",
+          "ok": false,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "どの部分を大きくしますか?",
+          "suggestions": [
+            "今月の支出の数字を大きく",
+            "最近の支出の一覧を広げて",
+            "グラフを大きく"
+          ],
+          "mode": "edit",
+          "claudeMs": 1514,
+          "firstTokenMs": 1092,
+          "totalMs": 1515,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          },
+          "misses": [
+            "text lacks any of できます/可能",
+            "kind=question (want answer)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "edit_notify_q",
+      "group": "edit",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "今このアプリって通知出る?",
+          "ok": true,
+          "kind": "answer",
+          "source": "claude",
+          "turn": 1,
+          "text": "今は通知を設定していないので、通知は出ません。毎日決まった時刻のリマインド通知なら追加できます。",
+          "suggestions": [
+            "毎晩21時に支出入力の通知を出して",
+            "毎週日曜に今週の支出を確認する通知を追加して"
+          ],
+          "mode": "edit",
+          "claudeMs": 1914,
+          "firstTokenMs": 1048,
+          "totalMs": 1915,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "edit_route_q",
+      "group": "edit",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "地図で経路案内もできる?",
+          "ok": true,
+          "kind": "answer",
+          "source": "claude",
+          "turn": 1,
+          "text": "経路案内やナビはできません。代わりに、記録した場所を地図にピンで表示したり、地図アプリを開くボタンを置いたりできます。",
+          "suggestions": [
+            "支出に現在地を保存して地図に表示して",
+            "ホームに地図アプリで開くボタンを追加して"
+          ],
+          "mode": "edit",
+          "claudeMs": 1989,
+          "firstTokenMs": 1398,
+          "totalMs": 1989,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "edit_mieyasuku",
+      "group": "edit",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "もっと見やすくして",
+          "ok": true,
+          "kind": "proposal",
+          "source": "claude",
+          "turn": 1,
+          "text": "こんな案はどうでしょう。",
+          "options": [
+            {
+              "id": "opt1",
+              "title": "金額を目立たせる",
+              "detail": "ホーム上の『今月の支出』『今月の件数』の枠を広げて、数字を見やすくします。",
+              "instruction": "ホーム画面の上の『今月の支出』と『今月の件数』を、枠を A1:F3 に広げて目立たせて。最近の支出の一覧は A4:F10 にずらして。"
+            },
+            {
+              "id": "opt2",
+              "title": "予算の進捗を表示",
+              "detail": "ホームに今月の使いすぎが一目で分かる進捗バーを足します。",
+              "instruction": "ホーム画面の『今月の支出』の下に、今月の支出の合計を 50000 円の予算に対して表示する進捗バー(tone negative、ラベル『予算の消化』)を追加して。"
+            },
+            {
+              "id": "opt3",
+              "title": "一覧を表で見せる",
+              "detail": "『最近の支出』を日付・メモ・カテゴリ・金額が並ぶ表にして比べやすくします。",
+              "instruction": "ホーム画面の『最近の支出』の一覧を、日付・メモ・カテゴリ・金額の 4 列の表に変えて、日付の新しい順に並べて。"
+            }
+          ],
+          "mode": "edit",
+          "generate": {
+            "instruction": "ホーム画面の上の『今月の支出』と『今月の件数』を、枠を A1:F3 に広げて目立たせて。最近の支出の一覧は A4:F10 にずらして。",
+            "ok": true,
+            "mode": "patch",
+            "summary": "今月の支出と件数の枠を広げ、一覧を下にずらしました。",
+            "ops": 2,
+            "totalMs": 1871
+          },
+          "claudeMs": 4181,
+          "firstTokenMs": 1533,
+          "totalMs": 4181,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "edit_family",
+      "group": "edit",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "家族でも使いたい",
+          "ok": true,
+          "kind": "proposal",
+          "source": "claude",
+          "turn": 1,
+          "text": "家族だけに限る設定はまだ無いので、こんな案はどうでしょう。",
+          "options": [
+            {
+              "id": "opt1",
+              "title": "支出をみんなで共有",
+              "detail": "支出の記録を公開にして、アプリを使う人が同じ記録を見て投稿できます(誰でも読める点に注意)。",
+              "instruction": "支出(expense)の記録をみんなで共有する public にして、ホームの最近の支出の一覧で投稿者名が分かるようにして。"
+            },
+            {
+              "id": "opt2",
+              "title": "誰が払ったか選ぶ",
+              "detail": "支出フォームに『支払った人』の選択を足し、家族ごとの使った額を集計タブで見られます。",
+              "instruction": "支出フォームに『支払った人』のカテゴリ選択(自分・家族1・家族2)を追加し、集計タブにその人ごとの今月の支出を円グラフで追加して。"
+            },
+            {
+              "id": "opt3",
+              "title": "割り勘の精算",
+              "detail": "家族の立替を記録して、誰が誰にいくら払うかを精算画面で表示します。",
+              "instruction": "家族のメンバー一覧を作り、支出に支払った人を選ぶ欄を足して、ホームに1人あたりの金額と割り勘の精算を表示して。"
+            }
+          ],
+          "mode": "edit",
+          "generate": {
+            "instruction": "支出(expense)の記録をみんなで共有する public にして、ホームの最近の支出の一覧で投稿者名が分かるようにして。",
+            "ok": true,
+            "mode": "patch",
+            "summary": "支出をみんなで共有する設定にしました。",
+            "ops": 1,
+            "totalMs": 3851
+          },
+          "claudeMs": 3886,
+          "firstTokenMs": 1173,
+          "totalMs": 3886,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "edit_amount_big",
+      "group": "edit",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "金額を大きくして",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 1,
+          "text": "金額を大きくしますね。",
+          "mode": "edit",
+          "generate": {
+            "instruction": "ホーム画面の上の『今月の支出』の金額が目立つように、枠をA1:F3に広げて大きくして。",
+            "ok": true,
+            "mode": "patch",
+            "summary": "今月の支出の枠をA1:F3に広げ、一覧を下にずらしました。",
+            "ops": 2,
+            "totalMs": 2984
+          },
+          "transcript": "ホーム画面の上の『今月の支出』の金額が目立つように、枠をA1:F3に広げて大きくして。",
+          "claudeMs": 1333,
+          "firstTokenMs": 879,
+          "totalMs": 1334,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 1471,
+            "outputTokens": 87,
+            "cacheReadInputTokens": 14972
+          }
+        }
+      ]
+    },
+    {
+      "id": "edit_delete_memo",
+      "group": "edit",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "メモ欄を消して",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 1,
+          "text": "メモ欄を消しますね。",
+          "mode": "edit",
+          "transcript": "支出フォーム画面の『メモ』の入力欄を消して、ホーム画面の最近の支出の一覧でもメモの代わりにカテゴリを見出しとして表示して。",
+          "claudeMs": 1674,
+          "firstTokenMs": 1082,
+          "totalMs": 1675,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 1471,
+            "outputTokens": 109,
+            "cacheReadInputTokens": 14972
+          }
+        }
+      ]
+    },
+    {
+      "id": "edit_en_chart",
+      "group": "edit-en",
+      "locale": "en",
+      "ok": true,
+      "steps": [
+        {
+          "say": "Can this app show a pie chart of my spending?",
+          "ok": true,
+          "kind": "answer",
+          "source": "claude",
+          "turn": 1,
+          "text": "Yes, it already does. The Stats tab has a pie chart called \"カテゴリ別(今月)\" showing this month's spending by category, plus a bar chart of monthly totals below it.",
+          "suggestions": [
+            "Make the pie chart bigger",
+            "Add a line chart of daily spending"
+          ],
+          "mode": "edit",
+          "claudeMs": 3071,
+          "firstTokenMs": 2414,
+          "totalMs": 3072,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "edit_q_then_do",
+      "group": "edit",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "ホームの上にある数字って何?",
+          "ok": true,
+          "kind": "answer",
+          "source": "claude",
+          "turn": 1,
+          "text": "ホームの上にある数字は、今月の支出の合計金額と、今月に記録した支出の件数です。『今月の支出』と『今月の件数』という2枚のカードが横に並んでいます。",
+          "mode": "edit",
+          "claudeMs": 1728,
+          "firstTokenMs": 1244,
+          "totalMs": 1728,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        },
+        {
+          "say": "じゃあそれを大きくして",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 2,
+          "text": "ホームの数字を大きくしますね。",
+          "mode": "edit",
+          "transcript": "ホーム画面の上の『今月の支出』と『今月の件数』のカードの枠を縦に広げて、数字を大きく目立たせて。",
+          "claudeMs": 3820,
+          "firstTokenMs": 3328,
+          "totalMs": 3821,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 1565,
+            "outputTokens": 99,
+            "cacheReadInputTokens": 14972
+          }
+        }
+      ]
+    },
+    {
+      "id": "create_what",
+      "group": "create-first",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "何が作れるの?",
+          "ok": true,
+          "kind": "answer",
+          "source": "claude",
+          "turn": 1,
+          "text": "家計簿・筋トレ記録・日記・買い物リストなどの記録アプリが作れます。入力、一覧、合計やグラフ、通知、カメラ、地図なども使えます。",
+          "suggestions": [
+            "家計簿を作りたい",
+            "筋トレ記録を作りたい",
+            "通知は出せる?"
+          ],
+          "mode": "create",
+          "claudeMs": 2283,
+          "firstTokenMs": 1394,
+          "totalMs": 2283,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "create_style",
+      "group": "create-first",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "家計簿を作りたいけど、どんな感じがいいかな?",
+          "ok": true,
+          "kind": "proposal",
+          "source": "claude",
+          "turn": 1,
+          "text": "こんな案はどうでしょう。",
+          "options": [
+            {
+              "id": "opt1",
+              "title": "シンプル家計簿",
+              "detail": "金額・カテゴリ・日付を記録して、今月の合計と支出一覧を見るだけの基本の家計簿です。",
+              "instruction": "家計簿アプリを作って。金額とカテゴリと日付を記録して、今月の合計と支出一覧を見たい。"
+            },
+            {
+              "id": "opt2",
+              "title": "グラフで見る家計簿",
+              "detail": "支出を記録して、カテゴリ別の円グラフと月ごとの棒グラフで使い道が一目で分かる家計簿です。",
+              "instruction": "家計簿アプリを作って。金額とカテゴリと日付とメモを記録して、今月の合計、カテゴリ別の円グラフ、月ごとの棒グラフ、支出一覧を見たい。"
+            },
+            {
+              "id": "opt3",
+              "title": "レシート付き家計簿",
+              "detail": "支出と一緒にレシートの写真を残せて、あとから一覧で見返せる家計簿です。",
+              "instruction": "家計簿アプリを作って。金額とカテゴリと日付を記録して、レシートの写真も残したい。今月の合計と支出一覧を見たい。"
+            }
+          ],
+          "mode": "create",
+          "claudeMs": 3513,
+          "firstTokenMs": 1161,
+          "totalMs": 3513,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "cases": 24,
+    "casesOk": 20,
+    "steps": 31,
+    "stepsOk": 27,
+    "claudeCalls": 29,
+    "claudeP50Ms": 2207,
+    "claudeP95Ms": 4122,
+    "firstTokenP50Ms": 1203,
+    "inputTokensP50": 0,
+    "outputTokensP50": 0,
+    "totalP50Ms": 2208
+  }
+}

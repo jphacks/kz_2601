@@ -162,6 +162,7 @@ func main() {
 	chatModel := flag.String("chat-model", "", "-chat: clarify model (empty = ai.DefaultChatModel, same as AI_CHAT_MODEL)")
 	chatEffort := flag.String("chat-effort", "", "-chat: clarify effort (empty = ai.DefaultChatEffort)")
 	chatThinking := flag.String("chat-thinking", "", "-chat: thinking.type adaptive|disabled|between_tools (empty = ai.DefaultChatThinking)")
+	chatCaps := flag.String("capabilities", "", "-chat: comma-separated capabilities (answer,proposal) sent by cases without their own mode/capabilities (#185)")
 	flag.Parse()
 	if *chat && *casesPath == "internal/ai/eval/cases.json" {
 		*casesPath = "internal/ai/eval/chat_cases.json"
@@ -200,7 +201,13 @@ func main() {
 	ctx := context.Background()
 	if *chat {
 		svc.ChatConfig = ai.ChatConfig{Model: *chatModel, Effort: *chatEffort, Thinking: *chatThinking}
-		runChat(ctx, svc, *casesPath, *outDir, *tag, filter)
+		var caps []string
+		for _, c := range strings.Split(*chatCaps, ",") {
+			if c = strings.TrimSpace(c); c != "" {
+				caps = append(caps, c)
+			}
+		}
+		runChat(ctx, svc, *casesPath, *outDir, *tag, filter, caps)
 		return
 	}
 	raw, err := os.ReadFile(*casesPath)

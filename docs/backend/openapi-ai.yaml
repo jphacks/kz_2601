@@ -84,6 +84,15 @@ paths:
         - 応答は `kind=question`(質問 1 文 + 選択肢 ≤3)か `kind=ready`(brief + transcript)。Claude が質問できるのは 3 ラリーまで、4 ラリー目は必ず ready
         - 最新発話が「もう作って / それでいい / お任せ / just build it / go ahead」等の短い go-ahead なら Claude を呼ばず直前の理解で即 ready(`source=shortcut`)
         - 会話状態は ai プロセス内(appId ごと・直近 10 メッセージ・30 分で消える)。永続化は後段
+
+        **チャット基本化 (#184 / #185)**: リクエストに `mode` か `capabilities: ["answer","proposal"]` があれば、question / ready に加えて
+        `answer`(質問への答え。アプリは変えない)と `proposal`(案 1〜3 個。`options[].instruction` を「これでいく」で `POST /generate` に渡す)も返す。
+        どちらも無いリクエスト(旧 iOS)は上の clarify の振る舞いのまま(新しい kind も `mode` / `options` も返さない)。
+        - `mode`: create | edit。省略時は appId に生成済みの DSL があれば edit、無ければ create(初期の音声画面だけの DSL は create 扱い)。edit を指定しても生成前なら create になる。応答の `mode` が実際に使ったもの
+        - edit: サーバーが今の DSL を appconfig から読んで要約し、部品カタログと「できる / できない」と一緒に Claude に渡す。明確な指示は聞き返さず `ready`(`transcript` = generate の edit にそのまま渡す変更指示)、質問は `answer`、曖昧な要望は `proposal`
+        - create: 既存の question / ready(曖昧なら 1 問・具体的ならすぐ ready・go-ahead は shortcut)に加え、「何が作れるの?」→ `answer`、「どんな感じがいい?」→ `proposal`(instruction = 作るアプリの依頼文)。質問は 3 回まで(answer / proposal は数えない)、それ以降の question は ready に寄せる(`source=forced`)
+        - create と edit で会話は別(mode が変わると会話状態を作り直す)。answer / question / proposal は本文がそろった時点で先に返す
+        - edit で DSL を読むので `Authorization` をそのまま appconfig に渡す
       requestBody:
         required: true
         content:
@@ -107,6 +116,24 @@ paths:
                     source: claude
                     brief: { name: 筋トレ記録, purpose: 腕立てとスクワットの回数を毎日つける, entities: [トレーニング], features: [記録の一覧, 今日の合計回数, 毎朝8時の通知], native: [notification] }
                     transcript: 筋トレ記録アプリを作って。腕立てとスクワットの回数と日付を記録して、記録の一覧と今日の合計回数を見たい。毎朝8時に通知してほしい。
+                answer:
+                  summary: edit の質問への答え (#185)
+                  value: { kind: answer, mode: edit, text: いいえ、WebView ではなく iOS のネイティブ画面で表示しています。, turn: 1, locale: ja, source: claude }
+                proposal:
+                  summary: edit の曖昧な要望への案 (#185)
+                  value:
+                    kind: proposal
+                    mode: edit
+                    text: こんな案はどうでしょう。
+                    turn: 1
+                    locale: ja
+                    source: claude
+                    options:
+                      - { id: opt1, title: 金額を大きく, detail: ホームの上の今月の支出を大きく表示します, instruction: ホーム画面の上の「今月の支出」の枠を広げて数字を大きく目立たせて。 }
+                      - { id: opt2, title: グラフで見せる, detail: ホームにカテゴリ別の円グラフを置きます, instruction: ホーム画面に今月のカテゴリ別の円グラフを追加して。 }
+                editReady:
+                  summary: edit の明確な指示 (#185)
+                  value: { kind: ready, mode: edit, text: メモ欄を消しますね。, turn: 1, locale: ja, source: claude, transcript: 支出を記録画面のメモ欄を消して。 }
         '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
         '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
         '429': { description: Claude のレート制限, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
@@ -254,7 +281,23 @@ components:
           description: 最後は user。全履歴(iOS が持つ分)か最新 1 件
           items: { $ref: '#/components/schemas/ChatMessage' }
         locale: { type: string, enum: [ja, en], description: 省略時はユーザー発話から判定 (かな・漢字があれば ja) }
+        mode:
+          type: string
+          enum: [create, edit]
+          description: '#185。省略時は生成済みの DSL があれば edit、無ければ create。これか capabilities を送ると answer / proposal が返りうる'
+        capabilities:
+          type: array
+          items: { type: string, enum: [answer, proposal] }
+          description: '#185。クライアントが表示できる追加の kind。mode を省いて自動判定に任せる新しい iOS はこれを送る'
       example: { appId: app_01HXYZ, messages: [{ role: user, text: 家計簿 }] }
+    ChatOption:
+      type: object
+      required: [id, title, detail, instruction]
+      properties:
+        id: { type: string, description: opt1 / opt2 / opt3 }
+        title: { type: string, description: カードの見出し (短い) }
+        detail: { type: string, description: 何がどう変わるか 1 文 }
+        instruction: { type: string, description: 「これでいく」で POST /generate の text にそのまま渡す指示文 (edit = 変更内容、create = 作るアプリの依頼文) }
     ChatBrief:
       type: object
       description: 現時点の要件理解 (iOS は表示に使ってもよい。生成には transcript を使う)
@@ -272,21 +315,28 @@ components:
       type: object
       required: [kind, text, turn, locale, source]
       properties:
-        kind: { type: string, enum: [question, ready] }
+        kind: { type: string, enum: [question, ready, answer, proposal], description: 'answer / proposal は mode か capabilities を送った時だけ (#185)' }
+        mode: { type: string, enum: [create, edit], description: '#185 のリクエストの時だけ。実際に使った mode' }
+        options:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items: { $ref: '#/components/schemas/ChatOption' }
+          description: proposal の時だけ
         text: { type: string, description: 'question: 質問文 (読み上げる)。ready: 「では作りますね。」/ "Got it, I''ll build it now."' }
         suggestions:
           type: array
           maxItems: 3
           items: { type: string }
-          description: question の時だけ。チップとして出す短い選択肢 (そのまま次の user text に使える)
+          description: question の時(と answer の時に任意で)。チップとして出す短い選択肢 (そのまま次の user text に使える)。answer では「グラフを追加して」のような、そのまま言える次の指示
         turn: { type: integer, description: これまでのユーザー発話数 (1 始まり)。4 以上は必ず ready }
-        brief: { $ref: '#/components/schemas/ChatBrief', description: ready の時だけ }
-        transcript: { type: string, description: ready の時だけ。要件を 1 段落にまとめた一人称の依頼文。これを POST /generate の text に渡す }
+        brief: { $ref: '#/components/schemas/ChatBrief', description: create の ready の時だけ }
+        transcript: { type: string, description: ready の時だけ。create = 要件を 1 段落にまとめた一人称の依頼文、edit = 変更指示。これを POST /generate の text に渡す }
         locale: { type: string, enum: [ja, en] }
         source:
           type: string
           enum: [claude, shortcut, forced]
-          description: shortcut = go-ahead 語で Claude を呼ばず即 ready。forced = 4 ラリー目 (または 1 発目の go-ahead) で ready に寄せた
+          description: shortcut = go-ahead 語で Claude を呼ばず即 ready。forced = 4 ラリー目 (または 1 発目の go-ahead、#185 の create では 4 回目の質問) で ready に寄せた
         latencyMs:
           type: object
           properties: { claude: { type: integer }, total: { type: integer } }
