@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "買い物リスト",
+    "description": "買うものを書いておき、買ったら一覧の丸を 1 タップでチェックする",
+    "icon": "cart",
+    "theme": { "primaryColor": "#00897B" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "groceries",
+      "name": "買うもの",
+      "titleField": "name",
+      "fields": [
+        { "id": "name", "name": "品名", "type": "string", "required": true },
+        { "id": "category", "name": "売り場", "type": "enum", "options": ["食品", "日用品", "その他"], "defaultValue": "食品" },
+        { "id": "qty", "name": "個数", "type": "integer", "defaultValue": 1 },
+        { "id": "done", "name": "買った", "type": "boolean", "defaultValue": false },
+        { "id": "added", "name": "追加日", "type": "date", "defaultValue": "now" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "買い物リスト",
+      "toolbar": [
+        { "label": "追加", "icon": "plus", "action": { "type": "navigate", "screen": "item_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        {
+          "type": "hstack", "id": "summary", "area": "A1:F2",
+          "children": [
+            { "type": "stat", "label": "残り", "entity": "groceries", "aggregate": "count",
+              "filter": { "field": "done", "op": "eq", "value": false } },
+            { "type": "stat", "label": "今週追加", "entity": "groceries", "aggregate": "count",
+              "filter": { "field": "added", "op": "thisWeek", "value": null } }
+          ]
+        },
+        {
+          "type": "section", "id": "todo", "area": "A3:F8", "title": "買うもの",
+          "children": [
+            { "type": "list", "entity": "groceries", "item": { "title": "name", "subtitle": "category", "trailing": "qty", "toggle": "done" },
+              "filter": { "field": "done", "op": "eq", "value": false }, "sort": { "field": "added", "direction": "desc" },
+              "emptyText": "全部買いました", "swipeToDelete": true,
+              "onItemTap": { "type": "navigate", "screen": "item_form", "presentation": "push" } }
+          ]
+        },
+        {
+          "type": "section", "id": "bought", "area": "A9:F10", "title": "買ったもの",
+          "children": [
+            { "type": "list", "entity": "groceries", "item": { "title": "name", "toggle": "done" },
+              "filter": { "field": "done", "op": "eq", "value": true }, "emptyText": "まだありません", "swipeToDelete": true }
+          ]
+        },
+        { "type": "button", "id": "add", "area": "D11:F12", "label": "追加", "icon": "plus",
+          "action": { "type": "navigate", "screen": "item_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "item_form",
+      "title": "買うもの",
+      "entity": "groceries",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "groceries" } }],
+      "components": [
+        {
+          "type": "section", "id": "fields", "area": "A1:F7", "title": "内容",
+          "children": [
+            { "type": "textField", "field": "name", "label": "品名", "placeholder": "牛乳" },
+            { "type": "picker", "field": "category", "label": "売り場", "style": "segmented" },
+            { "type": "stepper", "field": "qty", "label": "個数", "min": 1, "max": 99, "step": 1 },
+            { "type": "toggle", "field": "done", "label": "買った" }
+          ]
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "groceries", "confirmMessage": "この品目を削除しますか？" } }
+      ]
+    }
+  ]
+}
