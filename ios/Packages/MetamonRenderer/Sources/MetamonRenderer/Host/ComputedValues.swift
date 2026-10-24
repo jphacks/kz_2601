@@ -43,7 +43,7 @@ public extension DSLRuntime {
 
     /// 表示用の文字列。type=ref は参照先レコードの見出しに解決する(未取得・削除済みは「—」)。
     func display(_ value: JSONValue, field: Field?) -> String {
-        guard let field, field.type == .ref else { return FieldCoding.display(value, field: field, locale: LanguagePreference.shared.locale) }
+        guard let field, field.type == .ref else { return displayText(value, field: field) }
         guard let id = value.stringValue, !id.isEmpty else { return "" }
         return refTitle(id, entity: field.refEntity) ?? FieldCoding.unavailable
     }
@@ -53,7 +53,7 @@ public extension DSLRuntime {
         guard let refEntity, let target = dsl.entity(refEntity),
               let record = records(for: refEntity).first(where: { $0.id == id }) else { return nil }
         guard let tf = target.displayTitleField else { return record.id }
-        return FieldCoding.display(record[tf], field: target.field(tf), locale: LanguagePreference.shared.locale)
+        return displayText(record[tf], field: target.field(tf))
     }
 }
 

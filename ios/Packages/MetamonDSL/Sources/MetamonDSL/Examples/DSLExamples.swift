@@ -18,6 +18,7 @@ public enum DSLExamples {
         "navigation",
         "diary_ai",
         "medicine",
+        "attendance_nearby",
         "water",
     ]
 

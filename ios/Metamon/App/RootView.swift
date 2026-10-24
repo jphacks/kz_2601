@@ -82,13 +82,16 @@ struct RootView: View {
         .sheet(item: $rt.sheet) { route in
             ScreenStack(root: route)
                 .modifier(HostSheets(onModal: true))
+                .modifier(NearbySheets(onModal: true))
         }
         .fullScreenCover(item: $rt.fullScreen) { route in
             ScreenStack(root: route)
                 .modifier(HostSheets(onModal: true))
+                .modifier(NearbySheets(onModal: true))
         }
         .modifier(HostSheets(onModal: false))
         .modifier(SharingHooks()) // シェアリンク受信・「探す」シート(#49 #50)
+        .modifier(NearbySheets(onModal: false)) // 近くの端末と送り合う(#36)
         .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
         .onChange(of: rt.document.version) {
@@ -100,6 +103,7 @@ struct RootView: View {
             }
         }
         #if DEBUG
+        .task { await ScreenMapUI.shared.autoOpenIfRequested(rt) } // `METAMON_AUTO_SCREEN_MAP`(#116)
         .task {
             // ヘッドレス E2E 用: `METAMON_AUTO_SWITCHER=1` で起動 2.5 秒後に変身一覧を開く
             guard ProcessInfo.processInfo.environment["METAMON_AUTO_SWITCHER"] == "1" else { return }

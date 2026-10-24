@@ -121,6 +121,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `emptyState` | `title` | `icon`, `message` | | P1 |
 | `settlement` | `entity`, `nameField`, `balanceField`(数値・通常は computed) | | | P1 |
 | `aiButton` | `task`(summarize\|classify\|rewrite\|extract\|suggest), `output`(string/text・classify は enum も可) | `label`, `input`(field)または `entity`+`limit`, `prompt`(`{{field}}` `{{input}}` 置換), `options`(classify 候補) | ✓ | P1 |
+| `nearbyShare` | `label`, `entity` | | | P2 |
 
 `color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
@@ -144,6 +145,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 - `shareButton` / `openUrlButton` / `locationButton` / `qrScanner` / `timerDisplay` は **Leaf 内で完結**し(ShareLink / `openURL` / CoreLocation / AVFoundation / Timer)、新しい `Action` 種別(`share` / `requestLocation` 等)は足さない。`ActionType` に case を足すとホスト(`AppRuntime.run` の網羅 switch)の改修が必須になるため。URL は既存の `openUrl` アクションで足りる。
 - **他アプリ連携(#37 最小版)**: `shareButton.shareTo` で送り先を選ぶ。`line` → `https://line.me/R/share?text=<urlencoded>` を `openURL`(LINE 未インストールなら Web 版に遷移・写真は送れないので文面のみ)。`slack` / `discord` → 公式に汎用の共有 URL スキームが無いので **OS 共有シート(ShareLink)を開き、文面をチャンネル投稿向けに整形**(`**` `#` 等の Markdown 記号を落としたプレーンテキスト + 先頭に 💬)。`any`(既定)は従来どおり。キー名が `target` でないのは `progressBar.target`(number)と JSON キーが衝突するため(`columnCount` と同じ理由)。**Slack/Discord への Incoming Webhook 直接投稿は後段(#37 中版: appconfig 側にユーザー設定として保存し `postWebhook` アクションから投稿)**で、この版には含めない。
+- **`nearbyShare`(#36)**: 近くの Tailor It 端末へ MultipeerConnectivity(Wi-Fi / Bluetooth 自動・インターネット不要)でレコードを送る。**送る範囲**: `screen.entity == entity` のフォーム画面なら入力中の 1 件(未保存でも今の値)、それ以外の画面ではその entity の新しい順 最大 50 件。**受け取り**: 受信側は前面にいて今のアプリが nearbyShare を使っている間だけ待ち受け(ローカルネットワーク許可ダイアログを無関係なアプリで出さないため)、招待を受けると「◯◯さんから「出席」3 件」の確認を出し、承認した時だけ接続する(暗号化必須)。取り込みは **同じ appId**、または **同じ entity id で保存フィールドの id+型が一致**する時だけ。未知のフィールドは捨てる。設計・実機手順は `docs/ios/architecture.md` §近距離共有。Leaf 内で完結し新しい Action は足さない(上と同じ理由)。
 - `openUrlButton.url` は https のほか allowlist のカスタムスキーム(`line` `slack` `discord` `tel` `mailto` `maps` `comgooglemaps`)を許可する(backend `dsl.OpenURLSchemes` と iOS `ExternalURLPolicy` が同じ表・`line`/`slack`/`discord` は Info.plist `LSApplicationQueriesSchemes` にも登録)。`http://` や未知スキームは backend がエラー・iOS はプレースホルダ。
 - `webView` は `WKWebView` の `UIViewRepresentable`(戻る/進む/再読込の小ツールバー + 読み込みバー)。https 以外は不可。WKWebView 自身がスクロールするので `GridScreenLayout.scrollsInside` には**入れない**(セル内で二重スクロールしない)。ページ内リンクが allowlist のスキーム(tel: 等)なら OS に渡し、それ以外の非 http(s) は無視。実例: `examples/gallery-web.json`(webView + LINE/Slack/Discord/共有シートの 4 ボタン + maps/tel/mailto/line リンク)。
 - `calendar.onDateTap` は既存の `navigate` を使う。行タップは recordId を渡して編集、「追加」はタップした日を `dateField` の初期値として Renderer 内の `FormPrefill` に積み、次に開いた新規フォームが 1 回だけ消費する(`Action` に params を増やさない)。
