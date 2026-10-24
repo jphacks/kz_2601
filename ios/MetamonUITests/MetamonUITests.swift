@@ -48,6 +48,11 @@ final class MetamonUITests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
     }
 
+    private func waitFor(_ element: XCUIElement, _ predicate: String, timeout: TimeInterval) -> Bool {
+        let exp = XCTNSPredicateExpectation(predicate: NSPredicate(format: predicate), object: element)
+        return XCTWaiter().wait(for: [exp], timeout: timeout) == .completed
+    }
+
     private func attachScreenshot(_ name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = name
@@ -115,10 +120,16 @@ final class MetamonUITests: XCTestCase {
         attachScreenshot("fab-hidden-handle")
 
         fabHandle.tap()
-        Thread.sleep(forTimeInterval: 1.0)
-        XCTAssertTrue(fab.waitForExistence(timeout: 3) && fab.isHittable, "取っ手のタップで FAB が戻らない")
-        XCTAssertFalse(fabHandle.exists, "戻った後も取っ手が残っている")
+        XCTAssertTrue(waitFor(fabHandle, "exists == false", timeout: 3), "取っ手のタップで FAB が戻らない(取っ手が残っている)")
+        Thread.sleep(forTimeInterval: 1.0) // 戻りのバネのアニメを待つ
+        // accessibilityHidden の解除がアクセシビリティツリーに反映されるまで少し遅れることがある
+        XCTAssertTrue(waitFor(fab, "exists == true", timeout: 5), "取っ手のタップで FAB が戻らない")
+        XCTAssertGreaterThan(fab.frame.minX, window.midX, "FAB が右端の画面内に戻っていない")
+        XCTAssertLessThan(fab.frame.maxX, window.width, "FAB が画面外に残っている")
         XCTAssertFalse(voiceSheet.exists, "取っ手のタップで音声シートまで開いた")
+        // 戻った FAB を実際に押せること(isHittable は SwiftUI の .position 配置で偽陰性が出るので使わない)
+        fab.tap()
+        XCTAssertTrue(voiceSheet.waitForExistence(timeout: 5), "戻った FAB を押しても音声シートが開かない")
     }
 
     // MARK: - 対話のチップ(#105)
