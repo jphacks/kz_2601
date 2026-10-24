@@ -167,9 +167,3 @@ private extension Calendar {
         self.date(from: dateComponents([.year, .month], from: date)) ?? date
     }
 }
-
-private extension ListItem {
-    init(title: String) {
-        self.init(title: title, subtitle: nil, trailing: nil, icon: nil, image: nil)
-    }
-}

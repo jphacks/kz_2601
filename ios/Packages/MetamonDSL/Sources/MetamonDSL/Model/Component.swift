@@ -156,6 +156,14 @@ public struct ListItem: Decodable, Sendable {
     public var icon: String?
     /// photo field id → サムネイル
     public var image: String?
+
+    public init(title: String, subtitle: String? = nil, trailing: String? = nil, icon: String? = nil, image: String? = nil) {
+        self.title = title
+        self.subtitle = subtitle
+        self.trailing = trailing
+        self.icon = icon
+        self.image = image
+    }
 }
 
 public struct Sort: Decodable, Sendable {
