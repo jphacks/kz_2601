@@ -28,6 +28,8 @@ enum ErrorCopy {
     static let rejectedTitle = "うまく伝わりませんでした"
     static let failedTitle = "生成に失敗しました"
     static let cancelledToast = "生成をキャンセルしました"
+    // 生成前の対話(#75)
+    static let chatFailedTitle = "質問をうまく用意できませんでした"
     // サーバー到達不能(起動時)
     static func offlineRestored(version: Int) -> String { "オフライン: 最後に取得したアプリ(v\(version))を表示しています" }
     static func unreachable(_ detail: String) -> String { "サーバーに接続できません: \(detail)" }

@@ -53,6 +53,27 @@ public struct HTTPAIClient: AIClient {
         return result
     }
 
+    // MARK: - 対話(clarify)
+
+    struct ChatBody: Encodable {
+        var appId: String
+        var messages: [ChatMessage]
+        var locale: String?
+    }
+
+    /// `POST {base}/v1/chat`(契約: backend/internal/ai/chat.go の `ChatRequest` / `ChatResult`)。
+    public func chat(appId: String, messages: [ChatMessage], locale: String?) async throws -> ChatTurn {
+        let body = ChatBody(appId: appId, messages: messages, locale: locale)
+        let data = try await HTTP.send("POST", baseURL: baseURL, path: "v1/chat", body: body, token: token, timeout: timeout)
+        return try JSONDecoder().decode(ChatTurn.self, from: data)
+    }
+
+    /// `DELETE {base}/v1/chat/{appId}` → 204。失敗は握りつぶす(状態はサーバー側で 30 分で消える)。
+    public func resetChat(appId: String) async {
+        let id = appId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? appId
+        _ = try? await HTTP.send("DELETE", baseURL: baseURL, path: "v1/chat/\(id)", body: nil, token: token, timeout: 10)
+    }
+
     static func parse(_ data: Data, appId: String) throws -> MorphResult {
         let res = try JSONDecoder().decode(GenerateResponse.self, from: data)
         let doc = AppDocument(appId: res.appId ?? appId, version: res.version, dsl: res.dsl)

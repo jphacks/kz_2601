@@ -215,9 +215,40 @@ VoiceInputView.phase                         AppRuntime.morphJob               R
 | 失敗 | — | **状態カード**(下表・#60)。トーストは使わない | 〃(画面上部にコンパクト版) | 画面は元のまま。主ボタン「もう一度」は同じ発話で再送 |
 | キャンセル | — | 下部トースト「生成をキャンセルしました」(軽微) | 〃 | 画面は元のまま |
 
-**設定シート**(音声画面右上の歯車・旧 `uid …` フッターの置き換え): アカウント(匿名 / Apple・uid・ログアウト)、音声モデル(モデル名・状態・再試行)、アプリをリセット(初期状態に戻す = DSL を `initial`、`DeviceAppID.rotate()` で appId を作り直す。サーバーの旧データは残る)、接続先(ai / appconfig / バージョン)。
+**設定シート**(音声画面右上の歯車・旧 `uid …` フッターの置き換え): アカウント(匿名 / Apple・uid・ログアウト)、音声モデル(モデル名・状態・再試行)、対話(「作る前に質問する」トグル・#75)、アプリをリセット(初期状態に戻す = DSL を `initial`、`DeviceAppID.rotate()` で appId を作り直す。サーバーの旧データは残る)、接続先(ai / appconfig / バージョン)。
 
-DEBUG フック: `METAMON_AUTO_ANON=1`(起動時に匿名サインイン)、`METAMON_AUTO_TRANSCRIPT="…"`(起動直後に 1 回生成)。シミュレータでもマイクは表示され、`MockTranscriber` が定型文を返す。
+DEBUG フック: `METAMON_AUTO_ANON=1`(起動時に匿名サインイン)、`METAMON_AUTO_TRANSCRIPT="…"`(起動直後に 1 回発話。対話 ON なら下記の対話を自動で進めて生成まで待つ)。シミュレータでもマイクは表示され、`MockTranscriber` が定型文を返す。
+
+### 生成前の対話(clarify・#75 / backend #74)
+
+初期(音声)画面で **新規作成するとき だけ**、最初の発話を即生成せず ai に 1〜3 個聞き返させてから作る。生成後の改変(edit・音声シート)は従来どおり即反映(backend の chat は新規作成用プロンプトで edit 非対応)。
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle: 初期画面
+    Idle --> Asking: 発話 / 文字 (VoiceIntent=morph かつ 対話ON)
+    Idle --> Generating: 対話OFF・「元に戻して」等
+    Asking --> Question: POST /v1/chat → kind=question
+    Question --> Asking: 答える(マイク / 文字 / 選択肢チップ)
+    Question --> Asking: 「このまま作る」(= "このまま作って" を送る → shortcut ready)
+    Asking --> Ready: kind=ready
+    Ready --> Generating: 「この内容で作る」→ generate(ready.transcript)
+    Question --> Idle: 「最初から」(DELETE /v1/chat/{appId})
+    Ready --> Idle: 「最初から」
+    Generating --> [*]: 変身(GeneratingView → apply)
+```
+
+| 項目 | 実装 |
+|---|---|
+| 契約 | `POST /v1/chat` `{appId, messages[{role,text}], locale?}` → `{kind: question\|ready, text, suggestions?, turn, brief?, transcript?, source}`。`DELETE /v1/chat/{appId}` → 204。generate は無変更で `ready.transcript` を `text`(iOS 実装は `transcript` キー。backend は両方受ける)に渡す |
+| 履歴 | iOS は手元の全履歴を毎回送る(2 件以上はサーバー状態を置き換える契約 → ai 再起動・30 分失効でも続く)。新規会話の 1 発目の前に `DELETE` して前の会話への追記を防ぐ |
+| 状態 | `AppRuntime.chatBubbles` / `chatPending` / `chatTurn` / `clarifyEnabled`。ロジックは `App/AppRuntime+Clarify.swift`(`submitUtterance` / `say` / `buildNow` / `buildFromChat` / `resetChat`) |
+| UI | `Features/Voice/ClarifyChatView.swift`。右 = ユーザー(書き起こし)、左 = AI。最新の質問だけ title3 で大きく。質問中は選択肢チップ +「このまま作る」(常時)、ready は要約カード(brief: 名前・目的・記録する・見られる)+「この内容で作る」。入力は小さいマイク(録音は `VoiceInputView` のまま)+ 文字 |
+| 生成への受け渡し | `AppRuntime.generate(_:)`(意図判定を通さない。AI のまとめ文を「元に戻して」等に誤判定させない)。圏外保留・状態カードは既存どおり |
+| リセット | 「最初から」・生成開始・`apply()`(別アプリへの切替 / 新規 appId / 生成完了)で会話を捨てて `DELETE`。初期画面はシートではないので「閉じる」は無い |
+| エラー | 既存の状態カード(`ErrorPresentation.origin = .chat`)。主ボタン「もう一度」は同じ履歴を再送(生成ではない)。失敗タイトルは「質問をうまく用意できませんでした」。「このまま作る」で chat が落ちていたら、これまでの発話をつないで生成に進む |
+| 設定 | 設定 >「作る前に質問する」(既定 ON・UserDefaults)。`METAMON_CLARIFY=0/1` が優先 |
+| DEBUG | `METAMON_AUTO_TRANSCRIPT="日記" METAMON_AUTO_REPLIES="写真も残したい\|もう作って" METAMON_AUTO_PAUSE=5` で 質問 → 答え → … → ready →「この内容で作る」まで無人で通す(返答が尽きたら「このまま作る」)。`METAMON_CLARIFY=0` で従来の即生成 |
 
 ### エラー状態表(#60・2026-10-24 深夜)
 

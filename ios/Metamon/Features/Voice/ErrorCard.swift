@@ -21,21 +21,27 @@ struct ErrorPresentation: Equatable, Identifiable {
     enum Primary: Equatable { case retry, sendNow, signIn }
     enum Secondary: Equatable { case discard, dismiss }
 
+    /// 何の失敗か。generate = 生成(「もう一度」で同じ発話を再生成)、chat = 生成前の対話(#75・「もう一度」で同じ履歴を再送)
+    enum Origin: Equatable { case generate, chat }
+
     let id = UUID()
     var kind: Kind
     /// 再送に使う発話
     var transcript: String
+    var origin: Origin = .generate
 
-    static func == (a: ErrorPresentation, b: ErrorPresentation) -> Bool { a.kind == b.kind && a.transcript == b.transcript }
+    static func == (a: ErrorPresentation, b: ErrorPresentation) -> Bool {
+        a.kind == b.kind && a.transcript == b.transcript && a.origin == b.origin
+    }
 
     /// `FailureKind`(Services の分類)→ 表示。`conflict` はカードにせず呼び出し側がバナー + 最新取り直しで処理する。
-    static func from(_ failure: FailureKind, transcript: String) -> ErrorPresentation? {
+    static func from(_ failure: FailureKind, transcript: String, origin: Origin = .generate) -> ErrorPresentation? {
         switch failure {
-        case .offline: return ErrorPresentation(kind: .offlineInterrupted, transcript: transcript)
-        case .timeout: return ErrorPresentation(kind: .timeout, transcript: transcript)
-        case .busy(let after): return ErrorPresentation(kind: .busy(retryAfter: after), transcript: transcript)
-        case .sessionExpired: return ErrorPresentation(kind: .sessionExpired, transcript: transcript)
-        case .rejected(let m), .other(let m): return ErrorPresentation(kind: .failed(message: m), transcript: transcript)
+        case .offline: return ErrorPresentation(kind: .offlineInterrupted, transcript: transcript, origin: origin)
+        case .timeout: return ErrorPresentation(kind: .timeout, transcript: transcript, origin: origin)
+        case .busy(let after): return ErrorPresentation(kind: .busy(retryAfter: after), transcript: transcript, origin: origin)
+        case .sessionExpired: return ErrorPresentation(kind: .sessionExpired, transcript: transcript, origin: origin)
+        case .rejected(let m), .other(let m): return ErrorPresentation(kind: .failed(message: m), transcript: transcript, origin: origin)
         case .conflict, .cancelled: return nil
         }
     }
@@ -58,7 +64,7 @@ struct ErrorPresentation: Equatable, Identifiable {
         case .busy: ErrorCopy.busyTitle
         case .timeout: ErrorCopy.timeoutTitle
         case .sessionExpired: ErrorCopy.sessionExpiredTitle
-        case .failed: ErrorCopy.failedTitle
+        case .failed: origin == .chat ? ErrorCopy.chatFailedTitle : ErrorCopy.failedTitle
         }
     }
 
