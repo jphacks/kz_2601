@@ -27,43 +27,43 @@ enum Greeting {
         let hello = timeOfDay(date, calendar: calendar)
         switch context {
         case .firstVisit:
-            return Copy(title: "どんなアプリが欲しいですか?",
-                        subtitle: "\(hello)。話しかけるだけで、アプリが生まれ変わります")
+            return Copy(title: L10n.tr("どんなアプリが欲しいですか?"),
+                        subtitle: L10n.tr("\(hello)。話しかけるだけで、アプリが生まれ変わります"))
         case .returning:
-            return Copy(title: "おかえりなさい。\n今日は何を作りますか?",
-                        subtitle: "\(hello)。「アプリ一覧」と話すか、マイクを長押しすると前に作ったアプリを呼び出せます")
+            return Copy(title: L10n.tr("おかえりなさい。\n今日は何を作りますか?"),
+                        subtitle: L10n.tr("\(hello)。「アプリ一覧」と話すか、マイクを長押しすると前に作ったアプリを呼び出せます"))
         case .newApp:
-            return Copy(title: "新しいアプリですね。\nどんなアプリにしますか?",
-                        subtitle: "前のアプリは、マイクの長押しからいつでも戻せます")
+            return Copy(title: L10n.tr("新しいアプリですね。\nどんなアプリにしますか?"),
+                        subtitle: L10n.tr("前のアプリは、マイクの長押しからいつでも戻せます"))
         case .home:
-            return Copy(title: "おかえりなさい。\n次は何を作りますか?",
-                        subtitle: "\(hello)。前のアプリは、マイクの長押しからいつでも戻せます")
+            return Copy(title: L10n.tr("おかえりなさい。\n次は何を作りますか?"),
+                        subtitle: L10n.tr("\(hello)。前のアプリは、マイクの長押しからいつでも戻せます"))
         case .editing:
-            return Copy(title: "このアプリをどう変えますか?",
-                        subtitle: "話しかけると、このアプリが育ちます")
+            return Copy(title: L10n.tr("このアプリをどう変えますか?"),
+                        subtitle: L10n.tr("話しかけると、このアプリが育ちます"))
         }
     }
 
     /// 変身一覧シートの見出し。
-    static let switcherTitle = "変身一覧"
-    static let switcherSubtitle = "タップで切り替え。マイクを長押しすると、いつでもここに戻れます"
-    static let switcherEmpty = "まだ他のアプリはありません。\n「+ 新しいアプリ」から 2 つ目を作れます"
-    static let currentBadge = "使用中"
-    static let newAppAction = "新しいアプリ"
-    static let homeAction = "Tailor It に戻る(初期画面)"
+    static var switcherTitle: String { L10n.tr("変身一覧") }
+    static var switcherSubtitle: String { L10n.tr("タップで切り替え。マイクを長押しすると、いつでもここに戻れます") }
+    static var switcherEmpty: String { L10n.tr("まだ他のアプリはありません。\n「+ 新しいアプリ」から 2 つ目を作れます") }
+    static var currentBadge: String { L10n.tr("使用中") }
+    static var newAppAction: String { L10n.tr("新しいアプリ") }
+    static var homeAction: String { L10n.tr("Tailor It に戻る(初期画面)") }
 
     /// 例文チップ。
-    static let createExamples = ["家計簿アプリが欲しい", "筋トレの記録", "散歩の写真メモ"]
-    static let editExamples = ["ダークモードにして", "グラフを追加して", "メモ欄を増やして"]
-    static let examplesLabel = "たとえば"
-    static let editExamplesLabel = "たとえば、こんな変更"
+    static var createExamples: [String] { [L10n.tr("家計簿アプリが欲しい"), L10n.tr("筋トレの記録"), L10n.tr("散歩の写真メモ")] }
+    static var editExamples: [String] { [L10n.tr("ダークモードにして"), L10n.tr("グラフを追加して"), L10n.tr("メモ欄を増やして")] }
+    static var examplesLabel: String { L10n.tr("たとえば") }
+    static var editExamplesLabel: String { L10n.tr("たとえば、こんな変更") }
 
     /// 5〜10 時 おはよう / 11〜17 時 こんにちは / それ以外 こんばんは
     static func timeOfDay(_ date: Date = .now, calendar: Calendar = .current) -> String {
         switch calendar.component(.hour, from: date) {
-        case 5..<11: return "おはようございます"
-        case 11..<18: return "こんにちは"
-        default: return "こんばんは"
+        case 5..<11: return L10n.tr("おはようございます")
+        case 11..<18: return L10n.tr("こんにちは")
+        default: return L10n.tr("こんばんは")
         }
     }
 

@@ -18,8 +18,8 @@ struct ListLeaf: View {
         let rows = searched(filtered, entity: entity)
         let ids = rows.map(\.id)
         if rows.isEmpty {
-            EmptyPlaceholder(icon: "tray", emptyText: c.emptyText ?? "まだありません", state: rt.emptyState(for: entityId),
-                             cta: "最初の 1 件を追加しましょう") {
+            EmptyPlaceholder(icon: "tray", emptyText: c.emptyText ?? L("まだありません"), state: rt.emptyState(for: entityId),
+                             cta: L("最初の 1 件を追加しましょう")) {
                 Task { await rt.load(entities: [entityId], force: true) }
             }
             .onChange(of: ids, initial: true) { _, now in seenIds = Set(now) }
@@ -34,11 +34,11 @@ struct ListLeaf: View {
                         .onTapGesture { open(row) }
                         // VoiceOver: onTapGesture は読まれないので、行をボタンとして宣言しダブルタップで同じ遷移を実行
                         .accessibilityAddTraits(c.onItemTap != nil ? .isButton : [])
-                        .accessibilityHint(c.onItemTap != nil ? "ダブルタップで開きます" : "")
+                        .accessibilityHint(c.onItemTap != nil ? L("ダブルタップで開きます") : "")
                         .accessibilityAction { open(row) }
                         .contextMenu {
                             if c.swipeToDelete == true {
-                                Button("削除", systemImage: "trash", role: .destructive) {
+                                Button(L("削除"), systemImage: "trash", role: .destructive) {
                                     Task { await rt.run(Action(type: .deleteRecord, entity: entityId), ctx.actionContext(recordId: row.id)) }
                                 }
                             }

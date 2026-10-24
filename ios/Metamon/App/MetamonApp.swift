@@ -53,6 +53,8 @@ struct MetamonApp: App {
             .animation(.easeInOut(duration: 0.3), value: session.user == nil)
             .environment(session)
             .environment(\.services, services)              // protocol 越しのサービス
+            // 表示言語(#44): 設定の「言語」で即時切替。`Text("…")` の解決と日付・数値の書式がこの Locale に従う
+            .environment(\.locale, LanguagePreference.shared.locale)
             .task { await session.observe() }
         }
     }

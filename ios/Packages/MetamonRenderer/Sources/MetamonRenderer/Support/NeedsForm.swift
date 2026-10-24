@@ -4,7 +4,7 @@ import MetamonDSL
 /// フォーム外(screen.entity 無し)に入力が置かれた時のプレースホルダ。
 struct NeedsForm: View {
     let c: Component
-    var body: some View { UnsupportedComponent(label: "\(c.rawType) は screen.entity が必要です") }
+    var body: some View { UnsupportedComponent(label: L("\(c.rawType) は screen.entity が必要です")) }
 }
 
 /// 入力の上にキャプションを付ける共通ラッパ(小・secondary。フォーカス中はブランド色)。

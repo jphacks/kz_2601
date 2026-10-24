@@ -388,8 +388,8 @@ final class AppRuntime: DSLRuntime {
         }
         interruptedByOffline = false
         let previous = document
-        let task = Task { [services, appId = document.appId, version = document.version] in
-            try await services.ai.morph(transcript: text, appId: appId, currentVersion: version)
+        let task = Task { [services, appId = document.appId, version = document.version, locale = Self.generationLocale] in
+            try await services.ai.morph(transcript: text, appId: appId, currentVersion: version, locale: locale)
         }
         morphTask = task
         defer { morphTask = nil }
