@@ -428,7 +428,22 @@ func summarize(a *dsl.App) string {
 			fmt.Fprintf(&b, "%sに通知が届きます。", when)
 		}
 	}
+	b.WriteString(substitutionNote(a.App.Description))
 	return b.String()
+}
+
+// substitutionNote extracts the "○○は△△で代替しました。" sentences the prompt
+// asks Claude to leave in app.description when a requested part is not in the
+// catalog (create turns have no model-written summary; edit turns put it in
+// PatchDocument.summary directly).
+func substitutionNote(description string) string {
+	var out strings.Builder
+	for _, sentence := range strings.SplitAfter(description, "。") {
+		if strings.Contains(sentence, "代替") {
+			out.WriteString(strings.TrimSpace(sentence))
+		}
+	}
+	return out.String()
 }
 
 // joinJa joins 2 items with と, more with ・.

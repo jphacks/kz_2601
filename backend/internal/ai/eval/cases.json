@@ -14,11 +14,15 @@
   {"id": "water", "kind": "create", "group": "other", "transcript": "水を飲んだ量を記録して1日の合計を見たい。目標は2リットル"},
   {"id": "shopping", "kind": "create", "group": "other", "transcript": "買い物リスト。買うものを追加して、買ったらチェックできるようにして"},
   {"id": "weight", "kind": "create", "group": "other", "transcript": "体重を毎朝記録してグラフで推移を見たいアプリ", "expect": {"chart": true}},
+  {"id": "calendar", "kind": "create", "group": "missing-part", "transcript": "予定を登録してカレンダーで見たいアプリ", "note": "カレンダー部品は無い → 日付順 list で代替し summary で言及する",
+   "expect": {"substitution": true}},
 
   {"id": "edit_cafe", "kind": "edit", "group": "edit", "base": "kakeibo_a", "transcript": "カテゴリにカフェを追加して"},
   {"id": "edit_bigger_total", "kind": "edit", "group": "edit", "base": "kakeibo_a", "transcript": "今月の合計をもっと大きく表示して"},
   {"id": "edit_remove_chart", "kind": "edit", "group": "edit", "base": "kakeibo_a", "transcript": "グラフを消して", "expect": {"chart": false}},
   {"id": "edit_notify_21", "kind": "edit", "group": "edit", "base": "kakeibo_a", "transcript": "毎晩9時に記録を忘れないよう通知して", "expect": {"notification": "21:00"}},
   {"id": "edit_list_photo", "kind": "edit", "group": "edit", "base": "kakeibo_a", "transcript": "支出の一覧を写真付きにして"},
-  {"id": "edit_button_topleft", "kind": "edit", "group": "edit", "base": "kakeibo_a", "transcript": "追加ボタンを左上に移して"}
+  {"id": "edit_button_topleft", "kind": "edit", "group": "edit", "base": "kakeibo_a", "transcript": "追加ボタンを左上に移して"},
+  {"id": "edit_calendar", "kind": "edit", "group": "missing-part", "base": "kakeibo_a", "transcript": "支出をカレンダー表示にして", "note": "無い部品の edit 要求 → 代替+summary 言及",
+   "expect": {"substitution": true}}
 ]

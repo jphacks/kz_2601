@@ -1,7 +1,9 @@
 // ai-eval runs internal/ai/eval/cases.json against the real Claude API through
 // the same Service the ai server uses (in-memory store, no HTTP), and writes
 // per-case metrics + the resulting DSL as JSON. Edit cases are seeded with the
-// DSL produced by their `base` create case in the same run.
+// DSL produced by their `base` create case in the same run. `expect` keys:
+// photo / chart (bool), notification ("HH:MM" or "any"), substitution (bool:
+// the summary mentions 代替 because a requested part is not in the catalog).
 //
 //	set -a; source ../.env; set +a
 //	go run ./cmd/ai-eval -effort low -out ../docs/backend/ai-eval/raw
@@ -189,7 +191,7 @@ func main() {
 			rec.DSL = res.DSL
 			if app, perr := dsl.Parse(res.DSL); perr == nil {
 				rec.Metrics = measure(app)
-				rec.ExpectMisses = checkExpect(c.Expect, rec.Metrics)
+				rec.ExpectMisses = checkExpect(c.Expect, rec.Metrics, rec.Summary)
 			}
 			if c.Kind == "create" {
 				created[c.ID] = res.DSL
@@ -262,10 +264,14 @@ func measure(a *dsl.App) *Metrics {
 	return m
 }
 
-func checkExpect(exp map[string]any, m *Metrics) []string {
+func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 	var miss []string
 	for k, v := range exp {
 		switch k {
+		case "substitution": // a part missing from the catalog was requested: summary must say so
+			if strings.Contains(summary, "代替") != v.(bool) {
+				miss = append(miss, fmt.Sprintf("substitution=%v", !v.(bool)))
+			}
 		case "photo":
 			if m.HasPhoto != v.(bool) {
 				miss = append(miss, fmt.Sprintf("photo=%v", m.HasPhoto))
