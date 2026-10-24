@@ -106,7 +106,7 @@ struct RootView: View {
         switch rt.dsl.app.theme?.mode { case "light": .light; case "dark": .dark; default: nil }
     }
 
-    /// マイク FAB(= メタモン本体)。位置は `Theme.Layout.fabAlignment`(左下。DSL の「追加」ボタンが右下に来るため)。
+    /// マイク FAB(= Tailor It 本体)。位置は `Theme.Layout.fabAlignment`(左下。DSL の「追加」ボタンが右下に来るため)。
     /// タップ = 「このアプリを変える」発話シート、長押し = メタ操作(変身一覧)。
     private var voiceFab: some View {
         Button { rt.showVoiceSheet = true } label: {
