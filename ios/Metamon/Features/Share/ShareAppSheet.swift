@@ -85,7 +85,7 @@ struct ShareAppSheet: View {
                         UIPasteboard.general.string = share.url
                         copied = true
                     } label: {
-                        Label(copied ? "コピーしました" : "リンクをコピー", systemImage: copied ? "checkmark" : "doc.on.doc")
+                        Label(copied ? L10n.tr("コピーしました") : L10n.tr("リンクをコピー"), systemImage: copied ? "checkmark" : "doc.on.doc")
                     }
                     Spacer()
                     Button(role: .destructive) { Task { await revoke(share) } } label: {
@@ -161,7 +161,7 @@ struct ShareAppSheet: View {
 
     private func issue() async {
         guard let sharing = services.sharing else {
-            shareError = "シェアはサーバー接続時のみ使えます"
+            shareError = L10n.tr("シェアはサーバー接続時のみ使えます")
             return
         }
         shareError = nil
@@ -171,7 +171,7 @@ struct ShareAppSheet: View {
             share = s
             print("[Metamon] share issued: \(s.url)")
         } catch {
-            shareError = "リンクを作れませんでした: \(error.localizedDescription)"
+            shareError = L10n.tr("リンクを作れませんでした: \(error.localizedDescription)")
         }
     }
 
@@ -182,10 +182,10 @@ struct ShareAppSheet: View {
             try await services.sharing?.revokeShare(token: s.token)
             ui.issued[app.id] = nil
             share = nil
-            rt.toast = "リンクを取り消しました。もう開けません"
+            rt.toast = L10n.tr("リンクを取り消しました。もう開けません")
             await issue() // 新しいリンクを用意しておく
         } catch {
-            rt.toast = "取り消せませんでした: \(error.localizedDescription)"
+            rt.toast = L10n.tr("取り消せませんでした: \(error.localizedDescription)")
         }
     }
 
@@ -195,9 +195,9 @@ struct ShareAppSheet: View {
         let tagList = tags.split(whereSeparator: { $0 == " " || $0 == "　" || $0 == "," || $0 == "、" }).map(String.init)
         do {
             listing = try await services.sharing?.publish(appId: app.id, description: desc, tags: tagList, authorName: nil)
-            rt.toast = "「探す」に公開しました"
+            rt.toast = L10n.tr("「探す」に公開しました")
         } catch {
-            rt.toast = "公開できませんでした: \(error.localizedDescription)"
+            rt.toast = L10n.tr("公開できませんでした: \(error.localizedDescription)")
         }
     }
 
@@ -207,9 +207,9 @@ struct ShareAppSheet: View {
         do {
             try await services.sharing?.unpublish(appId: app.id)
             listing = nil
-            rt.toast = "公開をやめました"
+            rt.toast = L10n.tr("公開をやめました")
         } catch {
-            rt.toast = "非公開にできませんでした: \(error.localizedDescription)"
+            rt.toast = L10n.tr("非公開にできませんでした: \(error.localizedDescription)")
         }
     }
 }

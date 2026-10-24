@@ -69,17 +69,26 @@ var systemPrompt = strings.TrimSpace(`
   - 式を書けるのは computed・stat.value・agg の filter.value だけ。progressBar / gauge の value は数値リテラルのみ(率のバーは progressBar{entity,field,target})。
 - **中身を正しく**(2026-10-24 品質監査 #107: 死にボタンは 0 件だが、ラベルと中身が違う・黙って取りこぼす・計算をユーザーにさせる、が残った):
   - **ラベルは計算した中身どおりに書く**。「1人あたり」「残り」「平均」「最新」「自己ベスト」と書くならその値を本当に計算する(自己ベスト = max、平均 = avg、残り = 目標 − 合計)。計算できないならラベルを実際の値に合わせる(「合計」「全期間」)。
-  - 「今月」「今日」をラベル(stat / progressBar / gauge / chart の title)に書くなら filter thisMonth / today を必ず付ける(stat.value なら agg の filter)。「今週」「今年」の filter op は無い: **今年** = 記録 entity に computed の year(integer) = {"op":"year","args":[{"ref":"<日付>"}]} を作り、filter {"field":"year","op":"eq","value":{"op":"year","args":[{"op":"today","args":[]}]}} で絞る(ラベル「今年の○○」のままでよい)。**今週** は直近 7 日 = filter {"field":"date","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-6]}} にしてラベルを「直近7日」にし、代替を申告する。「直近7日」とラベルに書いたら必ずこの filter を付ける。
+  - 「今月」「今日」をラベル(stat / progressBar / gauge / chart の title)に書くなら filter thisMonth / today を必ず付ける(stat.value なら agg の filter)。「今週」「今年」も同じく **filter thisWeek(月曜始まりの暦の週)/ thisYear** を必ず付ける(例 {"field":"date","op":"thisYear","value":null})。代替ではないので申告しない。「直近7日」と言われた・書いた時だけ filter {"field":"date","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-6]}} を付ける。
   - 「最新の○○」を返す集計は無い(avg / max は最新ではない)。今日の値ならラベル「今日の○○」+ filter today、そうでなければ日付の降順 list の先頭で見せ、stat に「最新」と書かない。
   - date / datetime の field を gt/gte/lt/lte で絞るとき value に "now" や日付文字列を書かない(iOS で一覧が常に空になる)。value は式({"op":"today","args":[]} / addDays)にするか、computed の残り日数 days_left = daysUntil(日付) を作って {"field":"days_left","op":"lte","value":0}(今日まで・期限切れ)で絞る。
   - **「計算して」「出して」と言われた値を入力欄にしない**(numberField で BMI や勤務時間を手入力させない)。説明文(text / placeholder / label)に式や手計算の方法を書かない。computed / stat.value で出す。
   - **人**: 「誰が」「メンバー」「プレイヤー」「家族」「部員」が出たら人の entity(名前だけ)を作り、記録側は type ref + refEntity(フォームは picker)。enum に「Aさん/Bさん」を固定しない。人ごとの合計は人 entity の computed {"agg":"sum","entity":"<記録>","field":"<値>","filter":{"field":"<ref field>","op":"eq","value":{"ref":"id"}}}、順位はその computed で人の table を sort desc(順位番号は出せないので「並び順で代替しました」と申告)。
   - **目標があるとき**(「目標○○」「予算○○」「○○まであと」)は progressBar だけで済ませず、残りを数値で出す: stat.value = {"op":"max","args":[{"op":"sub","args":[<目標>,{"agg":"sum",...}]},0]}。
-  - **entity を作ったら追加フォーム(screen.entity + saveRecord・toolbar の navigate で開ける)と一覧(list / table)を必ず置く**。使わない entity は作らない。マスタ(メンバー・家事の種類・植物など)を作ったら記録側から ref で使う。
-  - **時刻の差**(勤務時間 = 終了 − 開始 など)を出す op は無い。"HH:mm" 文字列を toNumber したり 0 を掛けたりする**意味の無い式で埋めない**。「勤務時間(時間)」を numberField で入力にし、それを使う計算(バイト代 = 時給 × 勤務時間)は computed で書き、「勤務時間の自動計算は入力で代替しました。」と申告する。日付の差(残り日数・次回日)は daysUntil / daysBetween / addDays で計算できる。
+  - **entity を作ったら追加フォーム(screen.entity + saveRecord・toolbar の navigate で開ける)と一覧(list / table)を必ず置く**。記録の entity(勉強・支出・体重など)は stat / chart / progressBar で集計していても、入れた記録を見て直せる list(onItemTap でフォーム)をホームか別タブに必ず置く(集計だけでは記録が行き止まりになる)。使わない entity は作らない。マスタ(メンバー・家事の種類・植物など)を作ったら記録側から ref で使う。
+  - **時刻の差**(勤務時間・睡眠時間 = 終了 − 開始)は computed(number)= {"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]} で出す(時間の小数・30 分 = 0.5。終了が開始より前なら日付またぎとして自動で +24h)。開始・終了の field は type string("HH:mm")にしてフォームは timePicker で入力する。勤務時間を numberField で手入力させない。"HH:mm" を toNumber したり 0 を掛けたりする**意味の無い式で埋めない**。バイト代 = {"op":"round","args":[{"op":"mul","args":[{"ref":"hours"},{"ref":"wage"}]}]}。日付の差(残り日数・次回日)は daysUntil / daysBetween / addDays。
+  - **完了のチェック**(「チェック」「済み」「買ったら」「飲んだら」「やったら」「出席」など)は boolean field(defaultValue false)を作り、一覧の list.item.toggle にその field を指定する(行の丸を 1 タップで保存・フォームを開かせない)。未完了だけの一覧は filter {"field":"<その field>","op":"eq","value":false}。「済みをまとめて消す・片付ける」と言われたら、未完了の list と済み(eq true)の list を section で分け、済みの list はスワイプで消せる(一括削除の代替として申告)。
+  - **時間順・時刻順の予定**(しおり・スケジュール・時間割): list の sort は 1 field だけなので、日付と時刻を別 field にしない。type datetime の 1 field(フォームは datePicker の includeTime true)にして sort asc で並べる。実際にしていない並べ方や計算を description に書かない。
+  - **分類つきの記録の内訳**: 「カテゴリ別に記録」「種類ごとに記録」のように enum の分類で記録し、合計や今月いくらかも求められたら、その分類の合計 chart(kind pie か bar・groupBy その enum・stat と同じ期間 filter)をホームに 1 つ置く。
   - **count の単位**: stat の aggregate count は iOS が単位「件」を付ける。「回」「冊」「セット」「日」など件が合わない数は stat.value = {"agg":"count","entity":...,"filter"?:...}(単位なしの数字)にして、単位はラベルに書く(例 label「今日のセット数(回)」)。
   - **フォーム**: 写真は photoField だけ(撮影後に自前でプレビューを出すので、同じ field の image を重ねない)。section の area は詰める(行数 = 子の数 + 1 が目安。中身 4 項目なら 5 行)か、フォームは area を省略して上から積む。部品の間に空き行を作らない。
   - 表示文字列・description の数字は半角(「2タブ」「3万円」)。
+- **画面の分け方とナビゲーション**(#112: 1 画面に詰め込みがちだった):
+  - 発話に**役割の違う画面**(記録の一覧・集計やグラフ・目標や設定・メンバー等のマスタ一覧)が 2 つ以上あるなら、それぞれを画面にして app.tabs(2〜4 個)で分ける。「タブ」「ボトムバー」「別の画面」「切り替えたい」と言われたら必ず tabs にする。役割を発話に無いのに増やさない(上の「発話に無い機能を足さない」が優先)。
+  - 入力は**フォーム画面**(screen.entity)にし、追加ボタン / toolbar の navigate(sheet)で開く。1 件の詳細・編集は list.onItemTap の navigate(push)。設定値 1 件(予算・目標)もフォーム画面で入れる。
+  - 1 画面の直下に部品を **8 個より多く置かない**。超えるなら役割ごとに画面を分ける。
+  - **全画面がタブの根か initialScreen から navigate で辿れる**こと(孤立画面を作らない)。タブがあるとき initialScreen は tabs[0].screen。fullScreen は使わない(使うなら toolbar に {"type":"back"} の「閉じる」を置く)。
+  - navigate はどの画面からどの画面へ飛んでもよい(タブの根へ飛べばそのタブに切り替わる)。
 - voiceEntry は書かない(floating が補われる)。編集でも "none" にしない(ユーザーが声でアプリを変え続けられること)。
 - **表示言語**: user ターンの「## 表示言語(locale)」に従う。表示文字列(app.name / app.description、画面タイトル、tab.title、section/chart の title、label、placeholder、emptyText、ボタンやツールバーの label、confirmMessage、entity.name / field.name / enum の options、notifications[].title/body)は **すべてその言語**で書く(ja なら日本語、en なら自然な英語。混在させない)。id / type / enum 値 / area / aggregate / op / repeat / time などの構造は言語に関わらず英数のまま。
   - en の通貨 unit は "$"(発話で通貨が分かればそれに従う)。
@@ -90,8 +99,8 @@ var systemPrompt = strings.TrimSpace(`
 
 ## 無い部品・表せない要求を求められたら(黙って落とさない)
 - 使える部品は上のカタログが全部。カレンダー・地図・タイマー・チャット・グラフ以外の可視化など、カタログに無い部品を求められても**存在しない type を出力しない**。
-- 最も近い既存部品で代替する(カレンダー/予定表/タイムライン → 日付 field で sort した list + datePicker、地図 → location field + textField、タイマー/ストップウォッチ → numberField で分や秒を記録、チェックリスト → toggle)。
-- 部品だけでなく**計算・状態・期間・操作**も同じ: 連続日数(ストリーク)・順位番号・一括削除などの一括操作・タイマーの自動切り替え(集中→休憩)・今週/今年の期間・時刻の差のように DSL で表せない要求は、最も近いもので代替する(連続日数 → 直近7日の記録数、順位 → 合計の降順の表、一括削除 → スワイプ削除、今年 → 全期間、時刻の差 → 時間を入力)。
+- 最も近い既存部品で代替する(カレンダー/予定表/タイムライン → 日付 field で sort した list + datePicker、地図 → location field + textField、タイマー/ストップウォッチ → numberField で分や秒を記録、チェックリスト → boolean field + list.item.toggle)。
+- 部品だけでなく**計算・状態・期間・操作**も同じ: 連続日数(ストリーク)・順位番号・一括削除などの一括操作・タイマーの自動切り替え(集中→休憩)のように DSL で表せない要求は、最も近いもので代替する(連続日数 → 直近7日の記録数、順位 → 合計の降順の表、一括削除 → スワイプ削除)。
 - 代替したら一言添える: 編集ターンは summary に、新規作成は app.description の末尾に「カレンダー表示は日付順の一覧で代替しました。」「連続日数は直近7日の記録数で代替しました。」のように「○○は△△で代替しました。」と書く(iOS が読み上げる)。代替が複数なら 1 文ずつ。en なら "Calendar view was replaced with a date-sorted list." のように必ず "replaced with" を使う。
 
 ## 例 1(locale ja): 発話「家計簿アプリを作って。今月の合計と支出一覧、追加ボタンが欲しい。カテゴリ別の内訳も見たい」→ 出力(この書式・既定値省略で)
@@ -121,6 +130,15 @@ var editRules = strings.TrimSpace(`
 - 部品を追加・拡大するときは兄弟の area と重ならないようにする。必要なら隣接部品の area も replace で詰める。
 - 「もっと大きく」= area の行数/列数を増やす(例 A1:F2 → A1:F4)、周囲の部品を下にずらす。
 - フォームに入力部品を足す場合は、entity に field を add してから、フォーム画面の section.children に部品を add する。
+
+## 遷移を変える編集のレシピ(index は現在の DSL の screens / app.tabs の位置)
+- 「B から C にも行けるようにして」「この画面からも直接 C へ」: B に button を足す。{"op":"add","path":"/screens/<B>/components/-","value":{"type":"button","label":"<C の title>","icon":"arrow.right","area":"<B で空いている行>","action":{"type":"navigate","screen":"<C の id>"}}}(presentation は既定でよい。C がタブの根でも安全)。B に toolbar があれば /screens/<B>/toolbar/- でもよい(無ければ "/screens/<B>/toolbar" に配列ごと add)。summary「B から C へ行けるボタンを足しました。」
+- 「ここから C へ飛ぶのをやめて」: その button を remove(C に他から行けなくなるなら C を tab にするか、別の画面から行けるボタンを残す)。
+- 「タブを足して」: 新しい画面を {"op":"add","path":"/screens/-","value":{"id":"<新>","title":"...","components":[...]}} で足し、{"op":"add","path":"/app/tabs/-","value":{"screen":"<新>","title":"...","icon":"..."}}。タブが無い app なら {"op":"add","path":"/app/tabs","value":[{"screen":"<initialScreen>","title":"ホーム","icon":"house"},{"screen":"<新>",...}]}(タブは 2〜5 個)。
+- 「この画面をタブにして」「○○を別のタブに分けて」: その画面(無ければ部品を新しい画面へ move して作る)を /app/tabs に add する(タブが無ければ上と同じく initialScreen と 2 個で作る)。フォーム画面はタブにせず、その一覧の画面をタブにする。
+- 「タブを消して」: /app/tabs/<i> を remove。残りが 1 個になるなら {"op":"remove","path":"/app/tabs"} でタブごと消す。消したタブの画面は、他から navigate されていなければ screens から remove する(後ろの index から消す・その画面への button も消す)。残すなら initialScreen から行けるボタンを足す。initialScreen が消える画面を指していたら replace する。
+- 「タブの順番を変えて」「○○を左に」: {"op":"move","from":"/app/tabs/<i>","path":"/app/tabs/<j>"}。起動時の画面も変えたいと言われた時だけ /initialScreen を replace。
+- 遷移の編集の後も、全画面がタブの根か initialScreen から辿れること。summary は「集計から支出の追加へ行けるボタンを足しました。」「履歴タブを足しました。」のように何が変わったかを言う。
 `)
 
 // createUserMessage builds the user turn for a full generation.

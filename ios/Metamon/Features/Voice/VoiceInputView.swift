@@ -65,6 +65,27 @@ struct VoiceInputView: View {
         .animation(.spring(duration: 0.45, bounce: 0.15), value: inChat)
         .sheet(isPresented: $showSettings) { SettingsSheet() }
         .onTapGesture { typing = false }
+        // #43 初期画面の挨拶を読み上げ(対話中・生成中・生成後のシートでは読まない)
+        .task(id: "\(isInitial)|\(inChat)|\(greeting.title)") {
+            // 対話 →「この内容で作る」直後は inChat=false でも生成開始が数フレーム遅れるので、少し待ってから判定する
+            try? await Task.sleep(for: .milliseconds(400))
+            if !Task.isCancelled, isInitial, !inChat, !rt.isMorphing { SpeechReader.shared.speak((prompt ?? greeting.title) + "\n" + greeting.subtitle) }
+            #if DEBUG
+            // ヘッドレス E2E 用: `METAMON_AUTO_MIC=<秒>` で読み上げ中にマイクをタップ(読み上げ停止 → 録音の確認)
+            if let s = ProcessInfo.processInfo.environment["METAMON_AUTO_MIC"].flatMap(Double.init), isInitial, phase == .idle {
+                try? await Task.sleep(for: .seconds(s))
+                if !Task.isCancelled { await toggle() }
+            }
+            #endif
+        }
+        #if DEBUG
+        .task {
+            // ヘッドレス E2E 用: `METAMON_AUTO_SETTINGS=1` で起動 2 秒後に設定シートを開く(言語切替の確認・#44)
+            guard ProcessInfo.processInfo.environment["METAMON_AUTO_SETTINGS"] == "1" else { return }
+            try? await Task.sleep(for: .seconds(2))
+            showSettings = true
+        }
+        #endif
     }
 
     // MARK: - Sections
@@ -276,10 +297,10 @@ struct VoiceInputView: View {
 
     private var statusText: String {
         switch phase {
-        case .idle: return transcriber.isReady ? "タップして話す" : "音声モデルを準備中…"
-        case .listening: return "聞いています… もう一度タップで終了"
-        case .transcribing: return "文字起こし中…"
-        case .thinking: return rt.isChatting ? ClarifyCopy.thinking : "アプリを考えています…"
+        case .idle: return transcriber.isReady ? L10n.tr("タップして話す") : L10n.tr("音声モデルを準備中…")
+        case .listening: return L10n.tr("聞いています… もう一度タップで終了")
+        case .transcribing: return L10n.tr("文字起こし中…")
+        case .thinking: return rt.isChatting ? ClarifyCopy.thinking : L10n.tr("アプリを考えています…")
         }
     }
 
@@ -289,30 +310,33 @@ struct VoiceInputView: View {
         switch phase {
         case .idle:
             typing = false
+            await SpeechReader.shared.stopForRecording() // #43 読み上げ中なら即停止してから録音
             do {
                 try await transcriber.startRecording()
                 phase = .listening
             } catch {
-                rt.toast = error.localizedDescription
+                SpeechReader.shared.recordingFinished()
+                rt.toast = ErrorCopy.message(for: error)
             }
         case .listening:
             phase = .transcribing
+            SpeechReader.shared.recordingFinished()
             let text: String
             do {
                 text = try await transcriber.stopAndTranscribe()
             } catch let failure as TranscriberFailure {
                 // 短すぎ / 無音 / マイク未入力 / セッション失敗。理由はそのまま日本語で出る
-                rt.toast = failure.localizedDescription
+                rt.toast = ErrorCopy.transcriberFailure(failure)
                 phase = .idle
                 return
             } catch {
-                rt.toast = "文字起こしに失敗しました: \(error.localizedDescription)"
+                rt.toast = L10n.tr("文字起こしに失敗しました: \(error.localizedDescription)")
                 phase = .idle
                 return
             }
             guard !text.isEmpty else {
-                let detail = transcriber.lastDiagnostics.map { "(\($0.summary))" } ?? ""
-                rt.toast = "音声を聞き取れませんでした\(detail)。もう一度はっきり話してください"
+                let detail = transcriber.lastDiagnostics.map { "(\(ErrorCopy.diagnosticsSummary($0)))" } ?? ""
+                rt.toast = L10n.tr("音声を聞き取れませんでした\(detail)。もう一度はっきり話してください")
                 phase = .idle
                 return
             }
@@ -346,6 +370,7 @@ struct VoiceInputView: View {
     /// 初期画面は `submitUtterance`(対話 ON なら質問を挟む)、生成後のシート(edit)は従来どおり即反映。
     private func morph(_ text: String) async {
         phase = .thinking
+        SpeechReader.shared.stop()
         if isInitial {
             await rt.submitUtterance(text)
         } else {

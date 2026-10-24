@@ -221,6 +221,7 @@ xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' 
 
 - 実機では初回起動時に WhisperKit `small` モデルを DL します(進捗バー表示・一度 DL すればオフラインでロード)。
 - `METAMON_AI_BASE_URL` / `METAMON_APPCONFIG_BASE_URL` を空にするとその側はモック(同梱サンプル DSL / インメモリ)。`METAMON_MOCK=1` で全モック起動。
+- **対応言語: 日本語 / English**(#44 #45)。端末の言語で自動切替し、設定 >「言語」で 自動 / 日本語 / English をアプリ内で即時に切り替えられます。English を選ぶと新しく作るアプリ・対話の質問・音声認識も英語になります(作成済みアプリの文言はそのまま)。
 
 ### secrets の置き方(public リポ)
 

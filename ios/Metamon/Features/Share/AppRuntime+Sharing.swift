@@ -29,16 +29,16 @@ extension AppRuntime {
 
     func importShared(token: String) async {
         guard let sharing = services.sharing else {
-            toast = "シェアリンクはサーバー接続時のみ開けます"
+            toast = L10n.tr("シェアリンクはサーバー接続時のみ開けます")
             return
         }
         do {
             let app = try await sharing.importShare(token: token)
-            await adopt(app, banner: "シェアされた「\(app.name)」を追加しました")
+            await adopt(app, banner: L10n.tr("シェアされた「\(app.name)」を追加しました"))
         } catch {
             toast = (error as? APIError)?.status == 404
-                ? "このシェアリンクは取り消されたか、存在しません"
-                : "シェアされたアプリを開けませんでした: \(error.localizedDescription)"
+                ? L10n.tr("このシェアリンクは取り消されたか、存在しません")
+                : L10n.tr("シェアされたアプリを開けませんでした: \(error.localizedDescription)")
         }
     }
 
@@ -46,9 +46,9 @@ extension AppRuntime {
         guard let sharing = services.sharing else { return }
         do {
             let app = try await sharing.install(publicAppId: listing.id)
-            await adopt(app, banner: "「\(app.name)」をインストールしました")
+            await adopt(app, banner: L10n.tr("「\(app.name)」をインストールしました"))
         } catch {
-            toast = "インストールできませんでした: \(error.localizedDescription)"
+            toast = L10n.tr("インストールできませんでした: \(error.localizedDescription)")
         }
     }
 
@@ -59,7 +59,7 @@ extension AppRuntime {
             await switchApp(to: app.appId, afterSheetDismiss: true)
         }
         guard document.appId == app.appId else { return } // 切替に失敗(トーストは switchApp が出す)
-        summaryBanner = SummaryBanner(text: banner + (app.joined ? "。みんなの投稿も見られます" : ""), highlight: nil)
+        summaryBanner = SummaryBanner(text: banner + (app.joined ? L10n.tr("。みんなの投稿も見られます") : ""), highlight: nil)
         await appsList()
     }
 }

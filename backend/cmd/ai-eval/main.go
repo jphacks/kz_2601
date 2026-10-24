@@ -7,7 +7,13 @@
 // the catalog), scope ("public"|"shared"|"private": at least one entity has
 // that scope), calc / computed / statValue / settlement / ref (bool, #100:
 // any calculation / Field.computed / stat.value / settlement leaf / ref field;
-// -logic-pass runs the 2nd calculations-only call). A case may pin `locale` (ja|en); -locale overrides every case;
+// -logic-pass runs the 2nd calculations-only call). Navigation (#114):
+// patch (bool: stored as a JSON Patch, not a full rewrite), unreachable
+// (number of screens no tab / initial screen reaches, dsl.Unreachable),
+// nav (["from>to", ...]: a button / toolbar / item tap on `from` opens `to`),
+// tabs / tabsMin (number), tabOrder ("a,b": the first tab screens in order),
+// tabHas (component type on a tab root other than the first tab).
+// `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
 //
@@ -244,6 +250,13 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 	if c.Kind == "edit" {
 		mode = ai.ModeEdit
 		base, ok := created[c.Base]
+		if name, isExample := strings.CutPrefix(c.Base, "example:"); isExample {
+			var err error
+			if base, err = os.ReadFile(filepath.Join("internal/ai/examples", name+".json")); err != nil {
+				log.Fatal(err)
+			}
+			ok = true
+		}
 		if !ok {
 			seed := "internal/ai/examples/kakeibo.json"
 			if loc == ai.LocaleEN {
@@ -303,7 +316,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 	rec.DSL = res.DSL
 	if app, perr := dsl.Parse(res.DSL); perr == nil {
 		rec.Metrics = measure(app)
-		rec.ExpectMisses = checkExpect(c.Expect, rec.Metrics, rec.Summary)
+		rec.ExpectMisses = append(checkExpect(c.Expect, rec.Metrics, rec.Summary), checkNav(c.Expect, app, rec.Mode)...)
 	}
 	if c.Kind == "create" {
 		created[c.ID] = res.DSL
@@ -435,6 +448,67 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 			}
 			if !found {
 				miss = append(miss, fmt.Sprintf("scope=%v (want %s)", m.Scopes, want))
+			}
+		}
+	}
+	sort.Strings(miss)
+	return miss
+}
+
+// checkNav checks the navigation expect keys (#114) against the result.
+func checkNav(exp map[string]any, a *dsl.App, mode string) []string {
+	var miss []string
+	num := func(v any) int { f, _ := v.(float64); return int(f) }
+	for k, v := range exp {
+		switch k {
+		case "patch":
+			if (mode == "patch") != v.(bool) {
+				miss = append(miss, "patch="+mode)
+			}
+		case "unreachable":
+			if u := a.Unreachable(); len(u) != num(v) {
+				miss = append(miss, fmt.Sprintf("unreachable=%v", u))
+			}
+		case "nav":
+			for _, e := range v.([]any) {
+				from, to, _ := strings.Cut(fmt.Sprint(e), ">")
+				if !a.HasNav(from, to) {
+					miss = append(miss, "nav!"+from+">"+to)
+				}
+			}
+		case "tabs", "tabsMin":
+			n := len(a.App.Tabs)
+			if (k == "tabs" && n != num(v)) || (k == "tabsMin" && n < num(v)) {
+				miss = append(miss, fmt.Sprintf("tabs=%d", n))
+			}
+		case "tabOrder":
+			want := strings.Split(fmt.Sprint(v), ",")
+			var got []string
+			for _, t := range a.App.Tabs {
+				got = append(got, t.Screen)
+			}
+			if len(got) < len(want) || strings.Join(got[:len(want)], ",") != strings.Join(want, ",") {
+				miss = append(miss, "tabOrder="+strings.Join(got, ","))
+			}
+		case "tabHas":
+			found := false
+			for i, t := range a.App.Tabs {
+				if i == 0 {
+					continue
+				}
+				for _, s := range a.Screens {
+					if s.ID != t.Screen {
+						continue
+					}
+					for _, c := range s.Components {
+						for _, x := range append([]dsl.Component{c}, c.Children...) {
+							found = found || string(x.Type) == fmt.Sprint(v)
+						}
+					}
+				}
+			}
+			if !found {
+				miss = append(miss, fmt.Sprintf("tabHas!%v", v))
 			}
 		}
 	}

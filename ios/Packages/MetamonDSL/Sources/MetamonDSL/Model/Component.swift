@@ -240,13 +240,16 @@ public struct ListItem: Decodable, Sendable {
     public var icon: String?
     /// photo field id → サムネイル
     public var image: String?
+    /// boolean field id → 行頭のチェック丸。タップでそのレコードの値を反転して保存(#108・フォームを開かない)
+    public var toggle: String?
 
-    public init(title: String, subtitle: String? = nil, trailing: String? = nil, icon: String? = nil, image: String? = nil) {
+    public init(title: String, subtitle: String? = nil, trailing: String? = nil, icon: String? = nil, image: String? = nil, toggle: String? = nil) {
         self.title = title
         self.subtitle = subtitle
         self.trailing = trailing
         self.icon = icon
         self.image = image
+        self.toggle = toggle
     }
 }
 
@@ -264,7 +267,7 @@ public struct Sort: Decodable, Sendable {
 /// Expr の場合は `value` が nil で `valueExpr` に入り、`ExprEvaluator.resolve` が外側の行コンテキストで評価してから照合する。
 public struct Filter: Codable, Hashable, Sendable {
     public var field: String
-    public var op: String          // eq|neq|gt|gte|lt|lte|thisMonth|today
+    public var op: String          // eq|neq|gt|gte|lt|lte|today|thisWeek|thisMonth|thisYear
     public var value: JSONValue?
     public var valueExpr: Expr?
 

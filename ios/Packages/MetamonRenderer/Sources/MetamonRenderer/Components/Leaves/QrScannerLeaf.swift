@@ -14,21 +14,21 @@ struct QrScannerLeaf: View {
             VStack(alignment: .leading, spacing: 4) {
                 #if targetEnvironment(simulator)
                 HStack {
-                    Label(c.label ?? "QRを読み取る", systemImage: "qrcode.viewfinder").foregroundStyle(.secondary)
+                    Label(c.label ?? L("QRを読み取る"), systemImage: "qrcode.viewfinder").foregroundStyle(.secondary)
                     Spacer()
-                    Text("実機のみ").font(.caption2).foregroundStyle(.secondary)
+                    Text(L("実機のみ")).font(.caption2).foregroundStyle(.secondary)
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RenderTheme.Colors.surface, in: RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
-                TextField("シミュレータ用: 読み取り結果を手入力", text: form.string(field))
+                TextField(L("シミュレータ用: 読み取り結果を手入力"), text: form.string(field))
                     .textFieldStyle(.roundedBorder)
                     .font(.caption)
                 #else
                 Button {
                     showScanner = true
                 } label: {
-                    Label(c.label ?? "QRを読み取る", systemImage: "qrcode.viewfinder").frame(maxWidth: .infinity)
+                    Label(c.label ?? L("QRを読み取る"), systemImage: "qrcode.viewfinder").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(RenderButtonStyle(kind: .secondary))
                 .sheet(isPresented: $showScanner) {
@@ -38,9 +38,9 @@ struct QrScannerLeaf: View {
                             showScanner = false
                         }
                         .ignoresSafeArea()
-                        .navigationTitle(c.label ?? "QRを読み取る")
+                        .navigationTitle(c.label ?? L("QRを読み取る"))
                         .navigationBarTitleDisplayMode(.inline)
-                        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("閉じる") { showScanner = false } } }
+                        .toolbar { ToolbarItem(placement: .cancellationAction) { Button(L("閉じる")) { showScanner = false } } }
                     }
                 }
                 #endif

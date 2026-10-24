@@ -24,6 +24,8 @@ public struct HTTPAIClient: AIClient {
         var baseVersion: Int?
         var transcript: String
         var mode = "auto"
+        /// ja | en。nil は送らない(サーバーが発話から判定)
+        var locale: String?
     }
 
     struct GenerateResponse: Decodable {
@@ -35,16 +37,20 @@ public struct HTTPAIClient: AIClient {
     }
 
     public func morph(transcript: String, appId: String, currentVersion: Int) async throws -> MorphResult {
+        try await morph(transcript: transcript, appId: appId, currentVersion: currentVersion, locale: nil)
+    }
+
+    public func morph(transcript: String, appId: String, currentVersion: Int, locale: String?) async throws -> MorphResult {
         do {
-            return try await generate(transcript: transcript, appId: appId, baseVersion: currentVersion > 0 ? currentVersion : nil)
+            return try await generate(transcript: transcript, appId: appId, baseVersion: currentVersion > 0 ? currentVersion : nil, locale: locale)
         } catch APIError.server(409, _, _, _) {
             // サーバー側 version とズレた(ai のインメモリ store 再起動など)。現行基準で 1 回だけやり直す。
-            return try await generate(transcript: transcript, appId: appId, baseVersion: nil)
+            return try await generate(transcript: transcript, appId: appId, baseVersion: nil, locale: locale)
         }
     }
 
-    private func generate(transcript: String, appId: String, baseVersion: Int?) async throws -> MorphResult {
-        let body = GenerateBody(appId: appId, baseVersion: baseVersion, transcript: transcript)
+    private func generate(transcript: String, appId: String, baseVersion: Int?, locale: String?) async throws -> MorphResult {
+        let body = GenerateBody(appId: appId, baseVersion: baseVersion, transcript: transcript, locale: locale)
         let data = try await HTTP.send("POST", baseURL: baseURL, path: "v1/generate", body: body, token: token, timeout: timeout)
         let result = try Self.parse(data, appId: appId)
         if let cache, let envelope = Self.envelope(from: data, appId: result.document.appId, version: result.document.version) {
