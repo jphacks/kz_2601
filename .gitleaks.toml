@@ -4,6 +4,7 @@
 useDefault = true
 
 [allowlist]
+regexTarget = "line"
 description = "ローカル開発用プレースホルダ(AUTH_MODE=dev の Bearer 値)"
 regexes = [
   '''Bearer dev-smoke''',
