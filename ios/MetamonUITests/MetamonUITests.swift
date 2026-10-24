@@ -171,8 +171,12 @@ final class MetamonUITests: XCTestCase {
         waitForFab()
         fab.press(forDuration: 1.0)
         XCTAssertTrue(switcher.waitForExistence(timeout: 5), "長押しで変身一覧が開かない")
-        let share = app.buttons.matching(identifier: "switcher.share").firstMatch
-        XCTAssertTrue(share.waitForExistence(timeout: 5), "カードにシェアボタンが無い")
+        // カード右上の「…」メニュー(#144/#145)→「シェア・公開」
+        let menu = app.buttons.matching(identifier: "switcher.cardMenu").firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 5), "カードに「…」メニューが無い")
+        menu.tap()
+        let share = app.buttons.matching(NSPredicate(format: "identifier == 'switcher.share' OR label == 'シェア・公開'")).firstMatch
+        XCTAssertTrue(share.waitForExistence(timeout: 5), "メニューに「シェア・公開」が無い")
         share.tap()
         XCTAssertTrue(app.buttons["share.close"].waitForExistence(timeout: 5), "シェアシートが開かない")
         XCTAssertTrue(app.descendants(matching: .any)["シェア用 QR コード"].waitForExistence(timeout: 5), "シェアリンク(QR)が出ない")

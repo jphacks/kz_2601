@@ -759,7 +759,7 @@ simctl ではタップ・ドラッグ・長押しができないので、指の�
 | 項目 | 内容 |
 |---|---|
 | 起動 | すべてモック `METAMON_MOCK=1`。`METAMON_FAB_POSITION=auto` で前のテストが保存した FAB の位置を毎回初期化。初期アプリは `METAMON_INITIAL_EXAMPLE` |
-| 要素の特定 | accessibilityIdentifier(見た目・挙動は変えない): `voice.fab` / `voice.fabHandle`(FAB と取っ手)、`voice.settings`(音声シートの設定 = シートが開いた目印)、`switcher.close` / `switcher.share`(変身一覧)、`share.close`(シェアシート)、`chat.chip`(対話の選択肢)。既存の `chat.build` / `chat.buildNow` も使う |
+| 要素の特定 | accessibilityIdentifier(見た目・挙動は変えない): `voice.fab` / `voice.fabHandle`(FAB と取っ手)、`voice.settings`(音声シートの設定 = シートが開いた目印)、`switcher.close` / `switcher.cardMenu` / `switcher.share`(変身一覧・カードの「…」メニューと中の「シェア・公開」)、`share.close`(シェアシート)、`chat.chip`(対話の選択肢)。既存の `chat.build` / `chat.buildNow` も使う |
 | シェア | モックはサーバーが無く変身一覧が空・シェアボタンも出ないので、DEBUG フック `METAMON_MOCK_SHARING=1` で一覧に 2 件入れ、端末内で完結する `DebugSharingClient` を使う(`Metamon/App/DebugMockSharing.swift`) |
 | 言語 | 文言で探す要素があるので起動引数 `-AppleLanguages (ja) -AppleLocale ja_JP -metamon.appLanguage ja` で日本語に固定(シミュレータの既定は英語で、英語だと吹き出し・QR のラベルが変わる) |
 | 一覧のチェック丸 | 丸は VoiceOver では行の操作(accessibilityAction)にまとめて隠しているので、行の左端 +30pt を座標でタップする。行の value(`未チェック` / `チェック済み`)で判定 |
@@ -772,7 +772,7 @@ simctl ではタップ・ドラッグ・長押しができないので、指の�
 | `testFabFlickOffEdgeHidesAndHandleRestores` | 右端の外へ弾く → 取っ手だけ残る → 取っ手のタップで FAB が戻る |
 | `testClarifyChipAdvancesChat` | `METAMON_AUTO_TRANSCRIPT=日記`(+ `METAMON_AUTO_PAUSE=600` で自動返答を止める)→ 質問のチップをタップ → 吹き出しに答えが出て「この内容で作る」に進む |
 | `testListCheckCircleMarksDone` | 買い物リストの「牛乳」の丸をタップ → チェック済み(フォームは開かない) |
-| `testSwitcherCardShareOpensShareSheet` | 長押しで変身一覧 → カードのシェア → シェアシート(QR)が開く |
+| `testSwitcherCardShareOpensShareSheet` | 長押しで変身一覧 → カードの「…」メニュー →「シェア・公開」→ シェアシート(QR)が開く |
 | `testKakeiboAddExpenseAppearsInList` | 家計簿「支出を追加」→ 金額・メモを入力 → 保存 → 一覧に増える |
 
 手元での実行(PC 負荷対策: xcodebuild は同時 1 本・シミュレータ 1 台・並列なし):
