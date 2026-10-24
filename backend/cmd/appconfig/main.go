@@ -24,15 +24,21 @@ func main() {
 	port := envOr("PORT", "8080")
 	mode := envOr("AUTH_MODE", auth.ModeFirebase)
 
-	handler := newHandler(auth.Middleware(auth.NotConfigured{}, mode), logger)
+	verifier, err := newVerifier(context.Background(), mode, logger)
+	if err != nil {
+		logger.Error("auth verifier setup failed", slog.String("authMode", mode), slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	handler := newHandler(auth.Middleware(verifier, mode), logger)
 	server := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	listener, err := net.Listen("tcp", ":"+port)
-	if err != nil {
-		logger.Error("listen failed", slog.String("port", port), slog.Any("error", err))
+	listener, listenErr := net.Listen("tcp", ":"+port)
+	if listenErr != nil {
+		logger.Error("listen failed", slog.String("port", port), slog.Any("error", listenErr))
 		os.Exit(1)
 	}
 	logger.Info("appconfig listening",
@@ -61,6 +67,21 @@ func main() {
 			logger.Error("shutdown failed", slog.Any("error", err))
 		}
 	}
+}
+
+func newVerifier(ctx context.Context, mode string, logger *slog.Logger) (auth.TokenVerifier, error) {
+	verifier, err := auth.NewFirebaseVerifier(ctx)
+	if err == nil {
+		return verifier, nil
+	}
+	if mode == auth.ModeFirebase {
+		return nil, err
+	}
+	logger.Warn("firebase verifier unavailable, only the debug uid header will authenticate",
+		slog.String("authMode", mode),
+		slog.Any("error", err),
+	)
+	return auth.NotConfigured{}, nil
 }
 
 func envOr(key, fallback string) string {

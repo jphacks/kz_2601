@@ -2,10 +2,13 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -176,6 +179,67 @@ func TestEnvOr(t *testing.T) {
 			t.Setenv("PORT", tt.value)
 			if got := envOr("PORT", "8080"); got != tt.want {
 				t.Fatalf("envOr = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNewVerifier(t *testing.T) {
+	tests := []struct {
+		name         string
+		mode         string
+		projectID    string
+		emulatorHost string
+		wantType     auth.TokenVerifier
+		wantErr      error
+	}{
+		{
+			name:         "firebase mode builds a firebase verifier",
+			mode:         auth.ModeFirebase,
+			projectID:    "demo-project",
+			emulatorHost: "localhost:9099",
+			wantType:     &auth.FirebaseVerifier{},
+		},
+		{
+			name:    "firebase mode without a project id fails startup",
+			mode:    auth.ModeFirebase,
+			wantErr: auth.ErrProjectIDMissing,
+		},
+		{
+			name:         "dev mode builds a firebase verifier when it can",
+			mode:         auth.ModeDev,
+			projectID:    "demo-project",
+			emulatorHost: "localhost:9099",
+			wantType:     &auth.FirebaseVerifier{},
+		},
+		{
+			name:     "dev mode falls back to the unconfigured verifier",
+			mode:     auth.ModeDev,
+			wantType: auth.NotConfigured{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GOOGLE_CLOUD_PROJECT", tt.projectID)
+			t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", tt.emulatorHost)
+
+			logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
+			got, err := newVerifier(context.Background(), tt.mode, logger)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("err = %v, want %v", err, tt.wantErr)
+				}
+				if got != nil {
+					t.Fatalf("verifier = %T, want nil", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("newVerifier: %v", err)
+			}
+			if reflect.TypeOf(got) != reflect.TypeOf(tt.wantType) {
+				t.Fatalf("verifier = %T, want %T", got, tt.wantType)
 			}
 		})
 	}
