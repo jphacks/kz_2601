@@ -144,6 +144,12 @@ public actor RecordStore {
         try? FileManager.default.removeItem(at: directory.appendingPathComponent(Self.safe(appId), isDirectory: true))
     }
 
+    /// アカウント削除用(#119): 全 appId の行とファイルを消す。
+    public func removeEverything() {
+        tables = [:]
+        try? FileManager.default.removeItem(at: directory)
+    }
+
     // MARK: - Files
 
     private func table(_ appId: String, _ entity: String) -> [LocalRecord] {

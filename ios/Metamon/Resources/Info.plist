@@ -104,14 +104,9 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>生成したアプリで写真を選択・保存するために、写真ライブラリを使用します。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>撮影した写真を保存するために、写真ライブラリへの追加を使用します。</string>
+	<string>生成したアプリの共有ボタンから画像を写真に保存するために、写真ライブラリへの追加を使用します。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>生成したアプリで現在地を記録・表示するために、位置情報を使用します。</string>
-	<key>NSMotionUsageDescription</key>
-	<string>生成したアプリで歩数や動きを記録するために、モーションデータを使用します。</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>オンデバイス音声認識が使えない場合の代替として、音声認識を使用します。</string>
-
 	<!-- nearbyShare(#36): MultipeerConnectivity で近くの Tailor It 端末と記録を送り合う。サービス名は NearbyService.serviceType と一致させる -->
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>近くにいる Tailor It の端末を見つけて、記録をその場で送ったり受け取ったりするために、ローカルネットワークを使用します。</string>

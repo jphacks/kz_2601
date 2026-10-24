@@ -341,6 +341,23 @@
         }
       }
     },
+    "OK": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
     "ON にすると、新しく作る時も作ったアプリを変える時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。": {
       "extractionState": "manual",
       "localizations": {
@@ -1561,6 +1578,74 @@
           "stringUnit": {
             "state": "translated",
             "value": "アカウント"
+          }
+        }
+      }
+    },
+    "アカウントとすべてのアプリが使えなくなります。元に戻せません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your account and all your apps will no longer be usable. This can’t be undone."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウントとすべてのアプリが使えなくなります。元に戻せません。"
+          }
+        }
+      }
+    },
+    "アカウントを削除": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Account"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウントを削除"
+          }
+        }
+      }
+    },
+    "アカウントを削除しますか？": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete your account?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウントを削除しますか？"
+          }
+        }
+      }
+    },
+    "アカウントを削除できませんでした": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t delete your account"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウントを削除できませんでした"
           }
         }
       }
@@ -2925,6 +3010,23 @@
         }
       }
     },
+    "作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your apps will no longer be usable, and your share links and Explore listings will be taken down. Data on this device is also erased. Posts in apps shared with others remain."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。"
+          }
+        }
+      }
+    },
     "作ったアプリへの「ここを変えて」はこれまでどおり無料": {
       "extractionState": "manual",
       "localizations": {
@@ -3227,6 +3329,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "別の端末で更新されていたため、最新の状態に合わせました。もう一度お話しください"
+          }
+        }
+      }
+    },
+    "削除しています…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleting…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除しています…"
+          }
+        }
+      }
+    },
+    "削除する": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除する"
           }
         }
       }

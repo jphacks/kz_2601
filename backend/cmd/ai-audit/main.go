@@ -201,6 +201,44 @@ func exprUses(v any, ops ...string) bool {
 	return false
 }
 
+// usesDoneInDays reports whether c computes doneInDays directly or reads a
+// computed field that does (agg sum of last7).
+func (a *app) usesDoneInDays(c obj) bool {
+	if exprUses(c, "doneInDays") {
+		return true
+	}
+	ids := map[string]bool{}
+	for _, fs := range a.fields {
+		for id, f := range fs {
+			if exprUses(f["computed"], "doneInDays") {
+				ids[id] = true
+			}
+		}
+	}
+	var mentions func(v any) bool
+	mentions = func(v any) bool {
+		switch x := v.(type) {
+		case obj:
+			if ids[str(x, "field")] {
+				return true
+			}
+			for _, y := range x {
+				if mentions(y) {
+					return true
+				}
+			}
+		case []any:
+			for _, y := range x {
+				if mentions(y) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return len(ids) > 0 && mentions(c)
+}
+
 // ---------- lint: mechanical defects ----------
 
 var (
@@ -325,7 +363,9 @@ func lint(a *app) []string {
 		chk(reMonth, "thisMonth", "今月")
 		chk(reToday, "today", "今日")
 		chk(reWeek, "thisWeek", "今週")
-		chk(reLast7, "gte", "直近7日")
+		if !a.usesDoneInDays(c.c) { // doneInDays counts the last n days itself (#172)
+			chk(reLast7, "gte", "直近7日")
+		}
 		if reYear.MatchString(strings.ToLower(label)) && !contains(ops, "thisYear") && !exprUses(c.c, "year") {
 			add("label_filter_mismatch: %s %s %q は今年と言うが filter thisYear が無い(全期間になる)", c.screen, t, label)
 		}
@@ -470,7 +510,13 @@ func need(a *app, n string) (string, string) {
 	case "rank":
 		return "×", "順位(並べ替え/順位番号)を出す手段が無い"
 	case "streak":
-		return "×", "連続日数を出す手段が無い"
+		if exprUses(a.raw, "streak") {
+			return "○", "streak(毎日チェックの履歴)"
+		}
+		if exprUses(a.raw, "doneInDays") {
+			return "△", "直近 N 日の回数のみ(連続日数は出ない)"
+		}
+		return "×", "連続日数を出していない"
 	case "bulk_delete":
 		return "×", "条件で一括削除するアクションが無い"
 	}
