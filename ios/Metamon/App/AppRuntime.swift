@@ -47,11 +47,18 @@ final class AppRuntime: DSLRuntime {
     func bootstrap() async {
         Task { try? await services.transcriber.prepare() }
         await services.notifications.sync(dsl.app.notifications)
-        guard services.isLive else { return }
-        if let remote = try? await services.appConfig.fetchDocument(appId: document.appId) {
-            apply(remote, animated: false)
+        if services.isLive {
+            if let remote = try? await services.appConfig.fetchDocument(appId: document.appId) {
+                apply(remote, animated: false)
+            }
+            startSync()
         }
-        startSync()
+        #if DEBUG
+        // ヘッドレス E2E 用: `METAMON_AUTO_TRANSCRIPT="家計簿アプリが欲しい"` で起動直後に 1 回だけ生成を投げる
+        if let text = ProcessInfo.processInfo.environment["METAMON_AUTO_TRANSCRIPT"], !text.isEmpty {
+            await morph(transcript: text)
+        }
+        #endif
     }
 
     func startSync() {
@@ -91,10 +98,15 @@ final class AppRuntime: DSLRuntime {
         isMorphing = true
         defer { isMorphing = false }
         do {
-            let doc = try await services.ai.morph(transcript: transcript, appId: document.appId, currentVersion: document.version)
-            apply(doc)
+            let result = try await services.ai.morph(transcript: transcript, appId: document.appId, currentVersion: document.version)
+            apply(result.document)
             startSync()
+            if let summary = result.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
+                toast = summary
+            }
+            print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
         } catch {
+            print("[Metamon] morph failed: \(error)")
             toast = "生成に失敗しました: \(error.localizedDescription)"
         }
     }

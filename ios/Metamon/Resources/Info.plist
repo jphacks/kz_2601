@@ -34,9 +34,19 @@
 		<string>arm64</string>
 	</array>
 
-	<!-- バックエンド URL。空ならモックで起動。ビルド時に xcconfig / 環境変数 METAMON_API_BASE_URL でも上書き可 -->
-	<key>MetamonAPIBaseURL</key>
-	<string></string>
+	<!-- バックエンド URL(別々に設定可)。build setting METAMON_AI_BASE_URL / METAMON_APPCONFIG_BASE_URL から展開(project.yml・xcodebuild 引数)。
+	     空ならその側はモック/インメモリ。実行時の環境変数 METAMON_AI_BASE_URL / METAMON_APPCONFIG_BASE_URL が優先 -->
+	<key>MetamonAIBaseURL</key>
+	<string>$(METAMON_AI_BASE_URL)</string>
+	<key>MetamonAppConfigBaseURL</key>
+	<string>$(METAMON_APPCONFIG_BASE_URL)</string>
+
+	<!-- 開発時にローカル LAN の ai(http://<Mac の IP>:8081)へ接続するため。ローカルネットワーク限定で ATS 全体は無効化しない -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 
 	<!-- WhisperKit モデル名。空なら `small`(約500MB・日本語精度優先)。環境変数 METAMON_WHISPER_MODEL でも上書き可 -->
 	<key>MetamonWhisperModel</key>
