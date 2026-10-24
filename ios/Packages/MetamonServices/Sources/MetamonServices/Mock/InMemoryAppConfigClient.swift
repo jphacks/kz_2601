@@ -74,6 +74,17 @@ public enum MockSeed {
             "memo": [
                 Record(id: "1", data: ["note": "きれいな紅葉", "date": .string(iso)], createdAt: iso),
             ],
+            // warikan(#101): 3 人・3 件。合計 ¥15,000 → 1 人 ¥5,000、精算は じろう→たろう ¥5,000 / はなこ→たろう ¥500
+            "members": [
+                Record(id: "m1", data: ["name": "たろう"], createdAt: iso),
+                Record(id: "m2", data: ["name": "はなこ"], createdAt: iso),
+                Record(id: "m3", data: ["name": "じろう"], createdAt: iso),
+            ],
+            "expenses": [
+                Record(id: "e1", data: ["title": "宿", "amount": 9000, "payer": "m1", "date": .string(today)], createdAt: iso),
+                Record(id: "e2", data: ["title": "夕食", "amount": 4500, "payer": "m2", "date": .string(today)], createdAt: iso),
+                Record(id: "e3", data: ["title": "ガソリン", "amount": 1500, "payer": "m1", "date": .string(today)], createdAt: iso),
+            ],
         ]
     }
 }
