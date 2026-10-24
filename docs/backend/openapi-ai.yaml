@@ -290,6 +290,9 @@ components:
         latencyMs:
           type: object
           properties: { claude: { type: integer }, total: { type: integer } }
+        firstTokenMs:
+          type: integer
+          description: 診断用。Claude の最初の出力トークンまでの ms(shortcut では省略)。#147
         meta:
           type: object
-          description: 診断用 (model / attempts / usage)
+          description: 診断用 (model / attempts / usage)。question を先に返した時(#147)は usage が 0(残りは裏で生成)

@@ -13,7 +13,8 @@ import (
 //
 //	schemaVersion            -> 1
 //	app.voiceEntry           -> "floating"
-//	date/datetime field      -> defaultValue "now"
+//	date/datetime field      -> defaultValue "now" (not for a list.item.toggle
+//	                            with resets daily: a new item would start checked)
 //	navigate.presentation    -> "push" from list/calendar/map item taps,
 //	                            "sheet" to a form screen (screen.entity), else "push"
 //	filter.value             -> null
@@ -40,6 +41,7 @@ func fillDefaults(raw []byte) []byte {
 		}
 	}
 	fillNode(doc, formScreens(doc))
+	stripDailyToggleNow(doc, dailyToggleFields(doc, nil))
 	out, err := json.Marshal(doc)
 	if err != nil {
 		return raw
@@ -53,6 +55,13 @@ func fillPatchDefaults(ops []dsl.PatchOp, current []byte) []dsl.PatchOp {
 	var doc map[string]any
 	_ = json.Unmarshal(current, &doc)
 	forms := formScreens(doc)
+	daily := dailyToggleFields(doc, nil)
+	for _, op := range ops {
+		var v any
+		if json.Unmarshal(op.Value, &v) == nil {
+			dailyToggleFields(v, daily)
+		}
+	}
 	out := make([]dsl.PatchOp, len(ops))
 	for i, op := range ops {
 		out[i] = op
@@ -64,6 +73,7 @@ func fillPatchDefaults(ops []dsl.PatchOp, current []byte) []dsl.PatchOp {
 			continue
 		}
 		fillNode(v, forms)
+		stripDailyToggleNow(v, daily)
 		if b, err := json.Marshal(v); err == nil {
 			out[i].Value = b
 		}
@@ -84,6 +94,51 @@ func formScreens(doc map[string]any) map[string]bool {
 		}
 	}
 	return forms
+}
+
+// dailyToggleFields collects the field ids used as list.item.toggle with
+// resets "daily" anywhere in v (a document or a patch value) into into;
+// nested items are reached by the recursion.
+func dailyToggleFields(v any, into map[string]bool) map[string]bool {
+	if into == nil {
+		into = map[string]bool{}
+	}
+	switch t := v.(type) {
+	case []any:
+		for _, e := range t {
+			dailyToggleFields(e, into)
+		}
+	case map[string]any:
+		// a ListItem (inside a list, or a patch value replacing /item)
+		if id, _ := t["toggle"].(string); id != "" && t["resets"] == "daily" {
+			into[id] = true
+		}
+		for _, sub := range t {
+			dailyToggleFields(sub, into)
+		}
+	}
+	return into
+}
+
+// stripDailyToggleNow removes the defaultValue "now" fillNode gave to a date
+// field that a daily toggle stores the check day in.
+func stripDailyToggleNow(v any, ids map[string]bool) {
+	if len(ids) == 0 {
+		return
+	}
+	switch t := v.(type) {
+	case []any:
+		for _, e := range t {
+			stripDailyToggleNow(e, ids)
+		}
+	case map[string]any:
+		if id, _ := t["id"].(string); ids[id] && t["type"] == string(dsl.FieldDate) && t["defaultValue"] == "now" && t["name"] != nil {
+			delete(t, "defaultValue")
+		}
+		for _, sub := range t {
+			stripDailyToggleNow(sub, ids)
+		}
+	}
 }
 
 var (

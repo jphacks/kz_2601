@@ -239,6 +239,10 @@ const (
 	CompEmptyState  ComponentType = "emptyState"
 	// logic
 	CompSettlement ComponentType = "settlement" // greedy "A pays B" list from a balance field
+	// on-device AI (#78)
+	CompAiButton ComponentType = "aiButton" // Foundation Models -> form field (never leaves the device)
+	// peer-to-peer
+	CompNearbyShare ComponentType = "nearbyShare" // MultipeerConnectivity: send records to a nearby device
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -291,7 +295,8 @@ type Component struct {
 	EmptyText     string    `json:"emptyText,omitempty"`
 	OnItemTap     *Action   `json:"onItemTap,omitempty"`
 	SwipeToDelete bool      `json:"swipeToDelete,omitempty"`
-	Aggregate     string    `json:"aggregate,omitempty"` // count|sum|avg|min|max
+	Aggregate     string    `json:"aggregate,omitempty"` // count|sum|avg|min|max (stat also latest|earliest)
+	By            string    `json:"by,omitempty"`        // stat latest/earliest: date field to order by
 	Format        string    `json:"format,omitempty"`    // plain|currency|percent
 	Kind          string    `json:"kind,omitempty"`      // bar|line|pie
 	GroupBy       string    `json:"groupBy,omitempty"`
@@ -326,6 +331,7 @@ type Component struct {
 	Color         string        `json:"color,omitempty"`         // SemanticColor enum
 	Value         *Expr         `json:"value,omitempty"`         // stat: Expr / progressBar (0..1) & gauge: number literal
 	Target        *float64      `json:"target,omitempty"`        // progressBar entity mode denominator
+	Tone          string        `json:"tone,omitempty"`          // progressBar: positive (goal) | negative (budget)
 	URL           string        `json:"url,omitempty"`           // link
 	Image         string        `json:"image,omitempty"`         // avatar literal (https / data URL)
 	Message       string        `json:"message,omitempty"`       // emptyState
@@ -338,7 +344,16 @@ type Component struct {
 	// settlement
 	NameField    string `json:"nameField,omitempty"`
 	BalanceField string `json:"balanceField,omitempty"`
+
+	// aiButton (#78). Label / Prompt / Entity / Limit are shared with the fields above.
+	Task    string   `json:"task,omitempty"`    // summarize|classify|rewrite|extract|suggest
+	Input   string   `json:"input,omitempty"`   // form field fed to the model ("" = whole draft)
+	Output  string   `json:"output,omitempty"`  // form field the result is written to
+	Options []string `json:"options,omitempty"` // classify candidates (else the enum output field's options)
 }
+
+// AITasks is the closed set of aiButton.task values.
+var AITasks = map[string]bool{"summarize": true, "classify": true, "rewrite": true, "extract": true, "suggest": true}
 
 // TableColumn is one column of a table component.
 type TableColumn struct {
@@ -354,6 +369,7 @@ type ListItem struct {
 	Icon     string `json:"icon,omitempty"`
 	Image    string `json:"image,omitempty"`  // photo field id -> thumbnail
 	Toggle   string `json:"toggle,omitempty"` // boolean field id -> one-tap check circle (#108)
+	Resets   string `json:"resets,omitempty"` // "daily": toggle is a date field, checked = today (#132)
 }
 
 // Sort orders a list.

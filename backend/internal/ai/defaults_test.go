@@ -2,6 +2,8 @@ package ai
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -118,5 +120,33 @@ func TestDraftSummary(t *testing.T) {
 	en := &dsl.AppMeta{Name: "Expense Tracker"}
 	if got := draftSummary(en, LocaleEN); got != "Making an Expense Tracker app." {
 		t.Errorf("en: %q", got)
+	}
+}
+
+// #132: the date field a daily toggle stores the check day in must not get
+// defaultValue "now" (a new medicine would start checked), in a full
+// document and in a patch that adds the field.
+func TestFillDefaults_DailyToggleDate(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "dsl", "examples", "medicine.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(fillDefaults(raw))
+	if strings.Contains(out, `"defaultValue":"now"`) {
+		t.Fatalf("daily toggle date got a default: %s", out)
+	}
+	if _, err := dsl.Parse([]byte(out)); err != nil {
+		t.Fatalf("filled medicine invalid: %v", err)
+	}
+	ops := fillPatchDefaults([]dsl.PatchOp{
+		{Op: "add", Path: "/entities/0/fields/-", Value: json.RawMessage(`{"id":"done_on","name":"やった日","type":"date"}`)},
+		{Op: "add", Path: "/entities/0/fields/-", Value: json.RawMessage(`{"id":"start","name":"開始","type":"date"}`)},
+		{Op: "replace", Path: "/screens/0/components/1/children/0/item", Value: json.RawMessage(`{"title":"name","toggle":"done_on","resets":"daily"}`)},
+	}, raw)
+	if strings.Contains(string(ops[0].Value), "defaultValue") {
+		t.Errorf("patch field got a default: %s", ops[0].Value)
+	}
+	if !strings.Contains(string(ops[1].Value), `"defaultValue":"now"`) {
+		t.Errorf("other date fields keep the default: %s", ops[1].Value)
 	}
 }

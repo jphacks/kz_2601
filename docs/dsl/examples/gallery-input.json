@@ -41,7 +41,7 @@
           "item": { "title": "note", "subtitle": "mood", "trailing": "stars" },
           "sort": { "field": "date", "direction": "desc" }, "emptyText": "まだ記録がありません", "swipeToDelete": true,
           "onItemTap": { "type": "navigate", "screen": "checkin_form", "presentation": "push" } },
-        { "type": "button", "id": "add", "area": "A11:F12", "label": "今日の記録をつける", "icon": "square.and.pencil",
+        { "type": "button", "id": "add", "area": "D11:F12", "label": "今日の記録をつける", "icon": "square.and.pencil",
           "action": { "type": "navigate", "screen": "checkin_form", "presentation": "sheet" } }
       ]
     },

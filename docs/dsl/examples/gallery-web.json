@@ -45,7 +45,7 @@
         { "type": "divider", "id": "sep", "area": "A8:F8" },
         { "type": "openUrlButton", "id": "maps", "area": "A9:C10", "label": "会場を地図で開く", "url": "maps:?q=Kanazawa%20Station", "icon": "map", "style": "secondary" },
         { "type": "openUrlButton", "id": "call", "area": "D9:F10", "label": "電話する", "url": "tel:0761234567", "icon": "phone", "style": "secondary" },
-        { "type": "openUrlButton", "id": "mail", "area": "A11:C12", "label": "メールで問い合わせ", "url": "mailto:info@example.com?subject=JPHACKS", "icon": "envelope", "style": "plain" },
+        { "type": "openUrlButton", "id": "mail", "area": "D13:F14", "label": "メールで問い合わせ", "url": "mailto:info@example.com?subject=JPHACKS", "icon": "envelope", "style": "plain" },
         { "type": "openUrlButton", "id": "open_line", "area": "D11:F12", "label": "LINE を開く", "url": "line://nv/chat", "icon": "bubble.left.and.bubble.right", "style": "plain" }
       ]
     },

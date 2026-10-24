@@ -307,6 +307,23 @@
         }
       }
     },
+    "ON にすると、最初の挨拶・AI の質問・アプリができた時の説明を声で読み上げます。マイクを押すとすぐ止まります。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When on, the first greeting, the AI's questions and the note when your app is ready are read aloud. Tap the mic to stop right away."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ON にすると、最初の挨拶・AI の質問・アプリができた時の説明を声で読み上げます。マイクを押すとすぐ止まります。"
+          }
+        }
+      }
+    },
     "Tailor It で「%@」を使ってみて\n%@": {
       "extractionState": "manual",
       "localizations": {
@@ -3044,6 +3061,23 @@
         }
       }
     },
+    "挨拶と質問を読み上げる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read greetings and questions aloud"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挨拶と質問を読み上げる"
+          }
+        }
+      }
+    },
     "接続が戻ったら自動で送ります": {
       "extractionState": "manual",
       "localizations": {
@@ -3992,6 +4026,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "認識中"
+          }
+        }
+      }
+    },
+    "読み上げ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read aloud"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "読み上げ"
           }
         }
       }
