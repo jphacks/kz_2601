@@ -24,6 +24,9 @@ struct RootView: View {
         ZStack {
             Group {
                 if let job = rt.morphJob, job.kind == .create {
+                    #if DEBUG
+                    let _ = MorphProbe.rootCreateEvals += 1
+                    #endif
                     // 全画面の「変身中」は下の画面に重ねず、置き換える(#200)。
                     // 重ねる方式(zIndex 固定の層)では遅い CI で、morphJob が立っているのに完成まで一度も描かれず、
                     // 下の初期画面(「アプリを考えています…」)が見えたままだった。置き換えなら隠れる先が無い。
@@ -256,7 +259,7 @@ private struct UITestMorphProbe: View {
                 .allowsHitTesting(false)
                 .accessibilityElement()
                 .accessibilityIdentifier("debug.morphProbe")
-                .accessibilityLabel("job=\(job) createStarted=\(MorphProbe.createStarted) generatingAppeared=\(MorphProbe.generatingAppeared)")
+                .accessibilityLabel("job=\(job) createStarted=\(MorphProbe.createStarted) generatingAppeared=\(MorphProbe.generatingAppeared) rootCreateEvals=\(MorphProbe.rootCreateEvals) fallbackAppeared=\(MorphProbe.fallbackAppeared)")
         }
     }
 }

@@ -140,6 +140,10 @@ struct GeneratingView: View {
 enum MorphProbe {
     static var createStarted = 0
     static var generatingAppeared = 0
+    /// RootView の body が create の生成中で評価された回数(0 なら RootView が morphJob の変化で作り直されていない)
+    static var rootCreateEvals = 0
+    /// VoiceInputView 側の保険(`GeneratingFallback`)が出た回数
+    static var fallbackAppeared = 0
 }
 #endif
 

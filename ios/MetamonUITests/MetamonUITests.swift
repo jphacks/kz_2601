@@ -301,11 +301,14 @@ final class MetamonUITests: XCTestCase {
         let probe = app.descendants(matching: .any)["debug.morphProbe"]
         let state = probe.exists ? probe.label : "probe なし"
         if !appeared { attachScreenshot("generating-missing-\(name)") }
+        // 通った時も残す(RootView の置き換えと VoiceInputView の保険のどちらで出たかを CI で見る)
+        XCTContext.runActivity(named: "morphProbe(\(name)): \(state)") { _ in }
         XCTAssertTrue(appeared, "生成中の表示が出ない(\(name)・\(state))", file: file, line: line)
         let shown = Date()
         attachScreenshot("generating-\(name)")
         XCTAssertTrue(waitFor(generating, "exists == false", timeout: 30), "完成しても生成中の表示が消えない(\(name))", file: file, line: line)
         let visible = Date().timeIntervalSince(shown)
+        XCTContext.runActivity(named: "morphProbe(\(name)) 完成後: \(probe.exists ? probe.label : "probe なし")") { _ in }
         XCTAssertFalse(textField(placeholder: "または文字で入力").exists, "生成中の表示が消えて初期画面に戻った(\(name))", file: file, line: line)
         // モックの待ちは 6 秒。気づくまでの遅れを引いても 1.5 秒は出続けるはず(すぐ消えたら途中で落ちている)
         XCTAssertGreaterThan(visible, 1.5, "生成中の表示が完成前に消えた(\(name)・\(visible) 秒)", file: file, line: line)
@@ -342,7 +345,8 @@ final class MetamonUITests: XCTestCase {
 
     /// 生成後のアプリから音声シートで「〇〇アプリを作って」(作り直し)も全画面の生成中にする
     func testGeneratingShownForWholeAppRequestFromGeneratedApp() {
-        launch(example: "kakeibo", slowAI)
+        // 対話を挟むと edit の「これでいく」待ちで止まるので、対話は OFF に固定する(既定値・端末の設定に依存させない)
+        launch(example: "kakeibo", slowAI.merging(["METAMON_CLARIFY": "0"]) { $1 })
         waitForFab()
         fab.tap()
         XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開かない")
