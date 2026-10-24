@@ -69,6 +69,40 @@ final class MockServicesTests: XCTestCase {
         XCTAssertEqual(WhisperKitRecognizer.resolveVariant("distil-whisper_distil-large-v3"), "distil-whisper_distil-large-v3")
     }
 
+    /// 0 サンプル / 短すぎ / 無音は "" ではなく理由付きの TranscriberFailure になる(toast にそのまま出す)。
+    func testWhisperPrecheckExplainsEmptyRecordings() {
+        XCTAssertEqual(WhisperKitRecognizer.precheck(sampleCount: 0, seconds: 2.0, peak: 0), .noAudioCaptured(seconds: 2.0))
+        XCTAssertEqual(WhisperKitRecognizer.precheck(sampleCount: 3200, seconds: 0.2, peak: 0.3), .tooShort(seconds: 0.2))
+        guard case .silent(let seconds, let db)? = WhisperKitRecognizer.precheck(sampleCount: 32000, seconds: 2.0, peak: 0.0001) else {
+            return XCTFail("expected .silent")
+        }
+        XCTAssertEqual(seconds, 2.0)
+        XCTAssertEqual(db, -80, accuracy: 0.01)
+        XCTAssertNil(WhisperKitRecognizer.precheck(sampleCount: 32000, seconds: 2.0, peak: 0.2))
+
+        let message = WhisperKitRecognizer.precheck(sampleCount: 0, seconds: 1.5, peak: 0)?.errorDescription ?? ""
+        XCTAssertTrue(message.contains("0サンプル"), message)
+        XCTAssertTrue(message.contains("1.5秒"), message)
+    }
+
+    func testWhisperLevels() {
+        let empty = WhisperKitRecognizer.levels(of: [])
+        XCTAssertEqual(empty.0, 0)
+        XCTAssertEqual(empty.1, 0)
+        let (peak, rms) = WhisperKitRecognizer.levels(of: [0.5, -0.25, 0])
+        XCTAssertEqual(peak, 0.5, accuracy: 1e-6)
+        XCTAssertEqual(rms, 0.3227, accuracy: 1e-3)
+    }
+
+    @MainActor func testMockTranscriberHasNoDiagnostics() {
+        XCTAssertNil(MockTranscriber().lastDiagnostics)
+        var diag = TranscriberDiagnostics()
+        diag.recordedSeconds = 2.3
+        diag.peakAmplitude = 0.04
+        diag.inputRoute = "iPhone Microphone"
+        XCTAssertEqual(diag.summary, "録音2.3秒・音量-28dB・入力:iPhone Microphone")
+    }
+
     // MARK: - Auth
 
     func testMockAuthLifecycle() async throws {

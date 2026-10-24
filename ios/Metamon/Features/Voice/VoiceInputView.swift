@@ -181,13 +181,19 @@ struct VoiceInputView: View {
             let text: String
             do {
                 text = try await transcriber.stopAndTranscribe()
+            } catch let failure as TranscriberFailure {
+                // 短すぎ / 無音 / マイク未入力 / セッション失敗。理由はそのまま日本語で出る
+                rt.toast = failure.localizedDescription
+                phase = .idle
+                return
             } catch {
                 rt.toast = "文字起こしに失敗しました: \(error.localizedDescription)"
                 phase = .idle
                 return
             }
             guard !text.isEmpty else {
-                rt.toast = "音声を聞き取れませんでした。もう一度話してください"
+                let detail = transcriber.lastDiagnostics.map { "(\($0.summary))" } ?? ""
+                rt.toast = "音声を聞き取れませんでした\(detail)。もう一度はっきり話してください"
                 phase = .idle
                 return
             }
