@@ -1,10 +1,11 @@
 import SwiftUI
 import MetamonServices
 
-/// 生成前の対話(#75)。初期(音声)画面で最初の発話のあとに出る。
-/// - 吹き出し: 右 = ユーザー(音声の書き起こし / 文字)、左 = AI の質問。最新の質問だけ大きく
-/// - 質問には選択肢チップ(`suggestions`)、ready には要約カード +「この内容で作る」
-/// - 「このまま作る」は質問中も常に出す(go-ahead を送って即生成)
+/// 生成・改変の前の対話(#75 / チャット基本化 #186)。初期画面(create)と、作ったアプリの音声シート(edit)で最初の発話のあとに出る。
+/// - 吹き出し: 右 = ユーザー(音声の書き起こし / 文字)、左 = AI。最新の質問だけ大きく
+/// - kind ごと(`ClarifyFlow.offer`): answer = 吹き出しだけ / question = 選択肢チップ /
+///   proposal = 案のカード(各「これでいく」)/ ready = 要約カード +「これでいく」
+/// - 副ボタン(`ClarifyFlow.shortcut`): create は「このまま作る」、edit の聞き返し中は「このまま反映」
 /// - 入力はマイク(WhisperKit・録音は親の `VoiceInputView` が持つ)+ 文字入力
 struct ClarifyChatView: View {
     @Environment(AppRuntime.self) private var rt
@@ -16,7 +17,9 @@ struct ClarifyChatView: View {
     @State private var typed = ""
     @FocusState private var typing: Bool
 
-    private var ready: ChatTurn? { rt.chatTurn?.kind == .ready ? rt.chatTurn : nil }
+    private var offer: ClarifyFlow.Offer { rt.chatTurn.map(ClarifyFlow.offer(for:)) ?? .none }
+    private var ready: ChatTurn? { if case .confirm = offer { return rt.chatTurn } else { return nil } }
+    private var proposals: [ChatOption] { if case .proposals(let options) = offer { return options } else { return [] } }
     private var busy: Bool { rt.chatPending || rt.isMorphing }
     private var lastAssistantId: UUID? { rt.chatBubbles.last(where: { $0.role == .assistant })?.id }
 
@@ -49,7 +52,7 @@ struct ClarifyChatView: View {
             ScrollView {
                 VStack(spacing: Theme.Spacing.md) {
                     ForEach(rt.chatBubbles) { bubble in
-                        BubbleRow(bubble: bubble, emphasized: bubble.id == lastAssistantId && ready == nil)
+                        BubbleRow(bubble: bubble, emphasized: bubble.id == lastAssistantId && rt.chatTurn?.kind == .question)
                             .id(bubble.id)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
@@ -59,10 +62,28 @@ struct ClarifyChatView: View {
                             .id("pending")
                             .transition(.opacity)
                     }
-                    if let ready, let brief = ready.brief {
-                        ReadyCard(brief: brief)
-                            .id("ready")
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    if !proposals.isEmpty, !rt.chatPending {
+                        VStack(spacing: Theme.Spacing.sm) {
+                            ForEach(Array(proposals.enumerated()), id: \.element.id) { index, option in
+                                ProposalCard(index: index + 1, option: option, disabled: busy) {
+                                    Task { await rt.choose(option) }
+                                }
+                            }
+                        }
+                        .padding(.leading, 32)
+                        .id("proposals")
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                    if let ready, !rt.chatPending {
+                        Group {
+                            if let brief = ready.brief, rt.chatMode == .create {
+                                ReadyCard(brief: brief)
+                            } else if let text = ready.transcript, !text.isEmpty {
+                                EditReadyCard(instruction: text)
+                            }
+                        }
+                        .id("ready")
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
                 .padding(.vertical, Theme.Spacing.sm)
@@ -82,7 +103,10 @@ struct ClarifyChatView: View {
     }
 
     private func scrollToEnd(_ proxy: ScrollViewProxy) {
-        let target: AnyHashable? = ready != nil ? "ready" : (rt.chatPending ? "pending" : rt.chatBubbles.last.map { AnyHashable($0.id) })
+        let target: AnyHashable? = rt.chatPending ? "pending"
+            : ready != nil ? "ready"
+            : !proposals.isEmpty ? "proposals"
+            : rt.chatBubbles.last.map { AnyHashable($0.id) }
         guard let target else { return }
         withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo(target, anchor: .bottom) }
     }
@@ -91,7 +115,7 @@ struct ClarifyChatView: View {
 
     @ViewBuilder
     private var suggestionChips: some View {
-        if let turn = rt.chatTurn, turn.kind == .question, let chips = turn.suggestions, !chips.isEmpty, !busy {
+        if case .chips(let chips) = offer, !chips.isEmpty, !busy {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Theme.Spacing.sm) {
                     ForEach(chips, id: \.self) { chip in
@@ -113,7 +137,8 @@ struct ClarifyChatView: View {
         }
     }
 
-    /// ready なら「この内容で作る」(主)、質問中は「このまま作る」(副・常に出す)。
+    /// ready なら「これでいく」(主)。それ以外は副ボタン: create =「このまま作る」(常に)、edit の聞き返し中 =「このまま反映」。
+    /// 案のカードはカードごとに「これでいく」を持つのでここには出さない。
     @ViewBuilder
     private var actionButton: some View {
         if ready != nil {
@@ -128,7 +153,21 @@ struct ClarifyChatView: View {
             .buttonStyle(.plain)
             .disabled(busy)
             .accessibilityIdentifier("chat.build")
-        } else {
+        } else if case .applyNow = ClarifyFlow.shortcut(for: rt.chatTurn, mode: rt.chatMode) {
+            Button { Task { await rt.applyNow() } } label: {
+                Label(ClarifyCopy.applyNowButton, systemImage: "forward.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.Colors.brandA)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+                    .background(Theme.Colors.surface, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Theme.Colors.brandA.opacity(0.4)))
+            }
+            .buttonStyle(.plain)
+            .disabled(busy)
+            .opacity(busy ? 0.5 : 1)
+            .accessibilityIdentifier("chat.applyNow")
+        } else if case .buildNow = ClarifyFlow.shortcut(for: rt.chatTurn, mode: rt.chatMode) {
             Button { Task { await rt.buildNow() } } label: {
                 Label(ClarifyCopy.buildNowButton, systemImage: "forward.fill")
                     .font(.subheadline.weight(.semibold))
@@ -152,7 +191,7 @@ struct ClarifyChatView: View {
             MicButton(mode: micMode, size: 34, action: onMic)
                 .frame(width: 56, height: 56)
                 .accessibilityHint(statusText)
-            TextField(ClarifyCopy.replyPlaceholder, text: $typed)
+            TextField(rt.chatMode == .edit ? ClarifyCopy.editReplyPlaceholder : ClarifyCopy.replyPlaceholder, text: $typed)
                 .focused($typing)
                 .submitLabel(.send)
                 .onSubmit(sendTyped)
@@ -254,6 +293,70 @@ private struct ReadyCard: View {
                 Text(items.joined(separator: L10n.tr("・"))).font(.subheadline)
             }
         }
+    }
+}
+
+/// proposal の案 1 つ(#186)。タイトル・説明 +「これでいく」。押すまでアプリは変わらない。
+private struct ProposalCard: View {
+    let index: Int
+    let option: ChatOption
+    let disabled: Bool
+    let onChoose: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
+                Text(L10n.tr("案\(index)"))
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Theme.Spacing.sm)
+                    .padding(.vertical, 2)
+                    .background(Theme.brandGradient, in: Capsule())
+                Text(option.title)
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !option.detail.isEmpty {
+                Text(option.detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Button(action: onChoose) {
+                Label(ClarifyCopy.buildButton, systemImage: "wand.and.stars")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+                    .background(Theme.brandGradient, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(disabled)
+            .opacity(disabled ? 0.5 : 1)
+            .accessibilityIdentifier("chat.option.choose")
+            .accessibilityLabel(L10n.tr("これでいく: \(option.title)"))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .metamonCard()
+    }
+}
+
+/// edit の ready(#186): 「この内容で変えます」+ 変更の指示文。
+private struct EditReadyCard: View {
+    let instruction: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Label(ClarifyCopy.editReadyTitle, systemImage: "checkmark.seal.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.brandGradient)
+            Text(instruction)
+                .font(.body.weight(.medium))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .metamonCard()
+        .accessibilityElement(children: .combine)
     }
 }
 
