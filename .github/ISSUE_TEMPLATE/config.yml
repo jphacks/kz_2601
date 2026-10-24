@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 正典(決定事項)
+    url: https://github.com/jphacks/kz_2601/blob/main/docs/00_decisions.md
+    about: 仕様・技術選定の疑問はまずここを確認。変更したい場合は task Issue で提案。
