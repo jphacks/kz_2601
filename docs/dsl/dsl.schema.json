@@ -188,7 +188,7 @@
         },
         "options": {
           "type": "array",
-          "description": "Only for type=enum.",
+          "description": "type=enum: the choices. type=ref: initial records of refEntity (their titleField values), created once by the app when refEntity has no records (#194).",
           "items": {
             "type": "string"
           }
