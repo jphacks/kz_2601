@@ -699,12 +699,28 @@ HealthKit を足す時の手順(Apple アカウント操作が要るので未着
 - Background Modes(fetch)は Info.plist だけで有効になり、App ID の capability 操作は要らない。
 - 確認: 実機で背面にして Xcode の一時停止 → `e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"jp.kz2601.metamon.refresh"]` → 続行。**シミュレータでは `submit` が常に `BGTaskSchedulerErrorDomain 1`(unavailable)で失敗し発火もしない**ので、実機でのみ確認できる。
 
-### 17.3 位置の継続記録(未実装・後続)
-デモでは扱わない。入れる場合の手順と注意:
-1. Info.plist に `NSLocationAlwaysAndWhenInUseUsageDescription`(何のために常時取るかを具体的に)と `UIBackgroundModes: location` を追加。
-2. 権限は段階的に: まず When In Use → 記録開始時に Always を要求(iOS は「後で常時を許可するか」を OS が聞き直す仕組み)。
-3. `CLLocationManager` は `allowsBackgroundLocationUpdates = true`・`pausesLocationUpdatesAutomatically = true`・電池のため `startMonitoringSignificantLocationChanges` か `CLLocationUpdate.liveUpdates` の低頻度設定を使い、点はローカル DB に溜めて `SyncQueue` で送る。
-4. App Store 審査では「常時位置が必要な理由」と電池への配慮の説明が求められ、却下されやすい。ハッカソン期間の価値に対して重いので見送った。
+### 17.3 位置の継続記録(locationTracker・Issue #168)
+以前は「Always 権限・審査・電池の説明が重い」として見送った。**Always を要求しない形**に組み直して実装した。
+
+| 見送り理由 | どう避けたか |
+|---|---|
+| Always 権限が要る | **When In Use だけ**。背面での継続は `CLBackgroundActivitySession`(iOS 17+)+ Info.plist `UIBackgroundModes: location`。使用中に開始した記録は、使用中許可のまま背面でも続く(Apple の想定する「使用中に始めた作業の継続」) |
+| 審査で常時位置の理由を問われる | 常時は取らない。**使う人が「記録を開始」を押した時だけ**・既定オフ。セッション中は OS がステータスバーに青い位置インジケータを出す(隠せない)ので、記録中であることが常に見える |
+| 電池 | `CLLocationUpdate.liveUpdates(.fitness)`。保存は `Track.shouldKeep` で間引く(精度 50 m 超は捨て、25 m 動くか 5 分経った時だけ 1 点)。**自動停止**(既定 1 時間・最大 4 時間)と、記録中は赤い「記録を停止」ボタン |
+
+構成:
+- `LocationTracking`(Renderer `Support/`・アプリ全体で 1 つ): 権限(When In Use のみ要求)→ `CLBackgroundActivitySession` を作る → liveUpdates → 間引き → `DSLRuntime.createRecord` で 1 点 1 レコード(ローカル DB → 同期キュー。saveRecord と同じ経路)。画面を移っても続く。アプリを切り替えて記録先の entity が無くなったら保存しない。
+- `LocationTrackerLeaf`: 開始 / 停止・経過時間・距離・点の数・自動停止までの残り。拒否時は「設定を開く」。別の部品で記録中なら「その記録を停止」だけ。
+- 表示は既存部品の拡張: `mapView.kind: "route"`(時刻順の線・始点 / 終点の印・最新の記録にカメラ)、`stat.aggregate: "distance" | "duration"`。点列の計算は `Track`(MetamonDSL・純粋ロジック・`TrackTests`)。
+- モック(`METAMON_MOCK=1`): 権限を聞かず `Track.mockRoute`(東京駅の北西 約 1.2 km・13 点)を 2 秒ごとに流す。シミュレータの実位置は `xcrun simctl location <UDID> set 35.68,139.76` / `start` で与える。
+- E2E(DEBUG): `METAMON_MOCK=1 METAMON_INITIAL_EXAMPLE=walk_route METAMON_E2E_TRACKER_START=tracker` で表示時に記録開始。
+
+**審査向けの説明文(下書き・App Review Notes)**:
+> Tailor It lets users build small personal apps by voice. One optional component, "route recording", records the user's walk/run route. Location is used only after the user explicitly taps "Start recording" on that screen; it is off by default. We request "When In Use" permission only (never "Always"). While a recording is in progress the app continues in the background using CLBackgroundActivitySession, and iOS shows the blue location indicator the whole time. Recording stops when the user taps "Stop recording" or automatically after 1 hour (max 4 hours). Recorded points are stored as the user's own records in the app and are not shared with third parties or used for advertising.
+>
+> (日本語) 位置情報は、利用者が「記録を開始」を押した時だけ使い、既定はオフです。「使用中のみ許可」だけを求め、「常に許可」は求めません。記録中は背面でも続け、その間 iOS の青い位置インジケータが常に表示されます。「記録を停止」か 1 時間(最長 4 時間)で自動停止します。記録した地点は利用者自身の記録としてのみ保存し、第三者提供・広告には使いません。
+
+注意(残課題): 記録中に別の画面へ移ると停止ボタンはその部品の画面にしか無い(背面では青いインジケータ・自動停止で担保)。アプリ全体の「記録中」バーは未実装。
 
 ### 17.4 シミュレータでの確認手順(ヘッドレス)
 - `METAMON_E2E_TIMER_START=<部品 id>`(DEBUG)で、表示時に timerDisplay を開始する。例: `METAMON_INITIAL_EXAMPLE=gallery-structure METAMON_AUTO_OPEN=memo_form:sheet METAMON_E2E_TIMER_START=timer` → `xcrun simctl launch <UDID> com.apple.Preferences` で背面化 → 60 秒後に通知 → アプリを起動し直すと 00:00。
