@@ -16,6 +16,7 @@ struct SettingsSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                if Self.e2eDeleteAccount { deleteAccountSection } // E2E: 削除ボタンを画面内に出す(シミュレータはスクロール操作できない)
                 accountSection
                 languageSection
                 voiceModelSection
@@ -24,9 +25,8 @@ struct SettingsSheet: View {
                 appSection
                 syncSection
                 connectionSection
-                deleteAccountSection
+                if !Self.e2eDeleteAccount { deleteAccountSection }
             }
-            .defaultScrollAnchor(Self.e2eDeleteAccount ? .bottom : nil) // E2E で削除ボタンを見せる
             .navigationTitle("設定")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

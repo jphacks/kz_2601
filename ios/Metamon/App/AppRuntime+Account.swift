@@ -12,13 +12,17 @@ extension AppRuntime {
         AppThumbnailStore.shared.removeAll()            // 変身一覧のサムネ(metamon-thumbs)
         WidgetSnapshot.defaults?.removePersistentDomain(forName: WidgetSnapshot.appGroupID) // App Group(ウィジェット)
         WidgetCenter.shared.reloadAllTimelines()
-        if let id = Bundle.main.bundleIdentifier {      // 設定・appId・タイマー等の UserDefaults
-            UserDefaults.standard.removePersistentDomain(forName: id)
+        // 設定・appId・タイマー等の UserDefaults。removePersistentDomain は直後の書き込み(新 appId)が
+        // 永続化されないことがあったので、キーを 1 つずつ消す
+        let defaults = UserDefaults.standard
+        if let id = Bundle.main.bundleIdentifier, let keys = defaults.persistentDomain(forName: id)?.keys {
+            keys.forEach(defaults.removeObject(forKey:))
         }
         let center = UNUserNotificationCenter.current()
         center.removeAllPendingNotificationRequests()
         center.removeAllDeliveredNotifications()
         resetToInitial()                                // 新しい appId を発行して初期 DSL に(UserDefaults を消した後に)
+        DeviceAppID.set(document.appId)                 // 念のため保存し直す(次回起動で別 appId にならないように)
         toast = nil
     }
 }
