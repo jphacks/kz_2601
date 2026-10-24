@@ -222,21 +222,89 @@ final class AppRuntime: DSLRuntime {
         let version = document.version
         syncTask = Task { [weak self] in
             guard let self else { return }
-            for await doc in services.sync.updates(appId: appId, after: version) {
-                guard doc.version > document.version, morphJob == nil else { continue }
-                print("[Metamon] hot reload: version \(document.version) → \(doc.version)")
-                apply(doc)
-                summaryBanner = SummaryBanner(text: "アプリが更新されました(version \(doc.version))", highlight: nil)
+            for await update in services.sync.events(appId: appId, after: version) {
+                guard document.appId == appId else { break }
+                switch update {
+                case .document(let doc):
+                    hotReload(doc)
+                case .records(let entity):
+                    scheduleRecordsRefresh(entity)
+                case .realtime(let on):
+                    let resumed = on && realtimeWasLost
+                    realtimeWasLost = !on
+                    isRealtime = on
+                    print("[Metamon] realtime: \(on ? "listening" : "lost → polling")")
+                    // 切れている間の他ユーザー投稿を取りこぼさないよう、表示中の entity を読み直す
+                    if resumed { for entity in records.keys { scheduleRecordsRefresh(entity) } }
+                }
             }
         }
     }
 
-    /// 前面の時だけポーリングする(G13 Day1 版)。背面では止め、戻ったら今の version から張り直す。
+    /// リアルタイム購読(SSE)が稼働中か。false の間はポーリング(5 秒)で拾う。
+    private(set) var isRealtime = false
+    @ObservationIgnored private var realtimeWasLost = false
+    /// 入力中で差し替えを保留している DSL(閉じたら当てる)。
+    @ObservationIgnored private var pendingHotReload: AppDocument?
+    @ObservationIgnored private var pendingHotReloadTask: Task<Void, Never>?
+    @ObservationIgnored private var recordsRefreshTasks: [String: Task<Void, Never>] = [:]
+
+    /// シート / 全画面 / push 先 / 音声シートが開いている = 入力や操作の途中。DSL を差し替えるとフォームの下書きが消えるので待つ。
+    private var isInteracting: Bool {
+        sheet != nil || fullScreen != nil || showVoiceSheet || paths.values.contains { !$0.isEmpty }
+    }
+
+    /// 他端末 / ai 直叩きで進んだ DSL を当てる。操作中なら閉じるまで保留し、最新の 1 件だけ当てる。
+    private func hotReload(_ doc: AppDocument) {
+        guard doc.version > document.version, morphJob == nil else { return }
+        guard !isInteracting else {
+            if doc.version > (pendingHotReload?.version ?? 0) { pendingHotReload = doc }
+            print("[Metamon] hot reload deferred (interacting): version \(doc.version)")
+            if pendingHotReloadTask == nil {
+                pendingHotReloadTask = Task { [weak self] in
+                    while let self, !Task.isCancelled, let pending = pendingHotReload {
+                        try? await Task.sleep(for: .seconds(1))
+                        guard !isInteracting else { continue }
+                        pendingHotReload = nil
+                        pendingHotReloadTask = nil
+                        hotReload(pending)
+                        return
+                    }
+                }
+            }
+            return
+        }
+        print("[Metamon] hot reload: version \(document.version) → \(doc.version)")
+        apply(doc)
+        summaryBanner = SummaryBanner(text: "アプリが更新されました(version \(doc.version))", highlight: nil)
+    }
+
+    /// records の変化通知はまとめて 1 回だけ取り直す(連投で pull を重ねない)。未表示の entity は画面が開いた時に読むので無視。
+    private func scheduleRecordsRefresh(_ entity: String) {
+        guard records[entity] != nil else { return }
+        recordsRefreshTasks[entity]?.cancel()
+        recordsRefreshTasks[entity] = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard let self, !Task.isCancelled else { return }
+            recordsRefreshTasks[entity] = nil
+            print("[Metamon] realtime: records changed entity=\(entity)")
+            await refresh(entity)
+        }
+    }
+
+    /// 前面の時だけ購読する。背面では止め、戻ったら今の version から張り直す。
     func setForeground(_ active: Bool) {
         guard isForeground != active else { return }
         isForeground = active
         recordSync.setForeground(active)
-        if active { startSync() } else { syncTask?.cancel() }
+        if active {
+            startSync()
+        } else {
+            syncTask?.cancel()
+            // 背面の間の変化は通知されないので、復帰で購読が戻った時に表示中の records を読み直す
+            isRealtime = false
+            realtimeWasLost = true
+        }
     }
 
     /// 新しい DSL に差し替える。ナビ・キャッシュは初期化(画面構成が変わるため)。通知は DSL に同期。

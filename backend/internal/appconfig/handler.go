@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
@@ -36,11 +37,13 @@ type Handler struct {
 
 	mu    sync.Mutex
 	cache map[string]*dsl.App // uid/appId/version -> parsed DSL (records validation)
+
+	eventsMax time.Duration // lifetime of one GET /events stream
 }
 
 // New builds the v1 router (a ServeMux so the caller can probe matches).
 func New(s store.Store) *http.ServeMux {
-	h := &Handler{store: s, cache: map[string]*dsl.App{}}
+	h := &Handler{store: s, cache: map[string]*dsl.App{}, eventsMax: eventsMaxStream()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/apps", h.listApps)
 	mux.HandleFunc("POST /v1/apps", h.createApp)
@@ -49,6 +52,7 @@ func New(s store.Store) *http.ServeMux {
 	mux.HandleFunc("DELETE /v1/apps/{appId}", h.deleteApp)
 
 	mux.HandleFunc("GET /v1/apps/{appId}/dsl", h.getDSL)
+	mux.HandleFunc("GET /v1/apps/{appId}/events", h.events)
 	mux.HandleFunc("PUT /v1/apps/{appId}/dsl", h.putDSL)
 	mux.HandleFunc("PATCH /v1/apps/{appId}/dsl", h.patchDSL)
 	mux.HandleFunc("GET /v1/apps/{appId}/versions", h.listVersions)

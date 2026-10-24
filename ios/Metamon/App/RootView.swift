@@ -12,6 +12,8 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     /// Renderer が上げる「最下段(行 11〜12・A〜B 列)に掛かる部品の上端 y」(Route.id → global y)。FAB 退避に使う(#83)
     @State private var bottomObstructions: [String: CGFloat] = [:]
+    /// 同じく右端(E〜F 列)。FAB を右に吸着させた時に使う(#52)
+    @State private var trailingBottomObstructions: [String: CGFloat] = [:]
 
     var body: some View {
         @Bindable var rt = rt
@@ -36,12 +38,20 @@ struct RootView: View {
                 .blur(radius: rt.morphJob?.kind == .edit ? 1.5 : 0)
                 .allowsHitTesting(rt.morphJob == nil)
                 .onPreferenceChange(GridBottomObstructionKey.self) { bottomObstructions = $0 }
+                .onPreferenceChange(GridBottomTrailingObstructionKey.self) { trailingBottomObstructions = $0 }
 
             // フォーム画面(push)では FAB を出さず、ナビバー右上のマイク(`formToolbarAccessory`)が入口になる(#83)
             ZStack {
                 if rt.dsl.app.voiceEntry == .floating, !isFormVisible {
-                    voiceFab
-                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+                    VoiceFab(
+                        hasTabs: rt.dsl.app.hasTabs,
+                        leadingObstructionTop: bottomObstructions[visibleMainRoute.id],
+                        trailingObstructionTop: trailingBottomObstructions[visibleMainRoute.id],
+                        isBusy: rt.morphJob != nil,
+                        onTap: { rt.showVoiceSheet = true },
+                        onLongPress: { rt.openSwitcher() }
+                    )
+                    .transition(.scale(scale: 0.6).combined(with: .opacity))
                 }
             }
             .animation(.easeOut(duration: 0.22), value: isFormVisible)
@@ -139,43 +149,6 @@ struct RootView: View {
     /// 見えている画面がフォーム(`screen.entity` あり)か。全幅の「削除」等に FAB が被るので隠す(#83)
     private var isFormVisible: Bool {
         rt.dsl.screen(visibleMainRoute.screen)?.entity != nil
-    }
-
-    /// マイク FAB(= Tailor It 本体)。位置は `Theme.Layout.fabAlignment`(左下。DSL の「追加」ボタンが右下に来るため)。
-    /// タップ = 「このアプリを変える」発話シート、長押し = メタ操作(変身一覧)。
-    /// 最下段の左端に DSL の部品がある画面では、その上端まで退避する(#83・`GridBottomObstructionKey`)。
-    private var voiceFab: some View {
-        GeometryReader { geo in
-            let inset = Theme.Layout.fabBottomInset(
-                hasTabs: rt.dsl.app.hasTabs,
-                obstructionTop: bottomObstructions[visibleMainRoute.id],
-                rootBottom: geo.frame(in: .global).maxY
-            )
-            Button { rt.showVoiceSheet = true } label: {
-                Image(systemName: "mic.fill")
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: Theme.Layout.fabSize, height: Theme.Layout.fabSize)
-                    .background(Theme.brandGradient, in: Circle())
-                    .overlay(Circle().strokeBorder(.white.opacity(0.25)))
-                    .shadow(color: Theme.Colors.brandA.opacity(0.45), radius: 14, y: 6)
-            }
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
-                    .onEnded { _ in rt.openSwitcher() }
-            )
-            .accessibilityLabel("話しかけて変える")
-            .accessibilityHint("長押しで変身一覧")
-            .accessibilityAction(named: "変身一覧") { rt.openSwitcher() }
-            // 生成中は画面と一緒に沈めて触れなくする(本体だけ薄くなり FAB だけ浮いて見えるのを防ぐ)
-            .opacity(rt.morphJob == nil ? 1 : 0.35)
-            .allowsHitTesting(rt.morphJob == nil)
-            .animation(.easeInOut(duration: 0.3), value: rt.morphJob == nil)
-            .padding(.horizontal, Theme.Layout.fabHorizontalInset)
-            .padding(.bottom, inset)
-            .animation(.easeOut(duration: 0.25), value: inset)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: Theme.Layout.fabAlignment)
-        }
     }
 
     /// 変身直後の要約(読み上げ文)。上部カードで 3 秒表示して自動で消える。

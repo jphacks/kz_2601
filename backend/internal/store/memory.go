@@ -26,6 +26,7 @@ type Memory struct {
 	users  map[string]map[string]*memApp
 	public map[string]*memPublic
 	now    func() time.Time
+	hub    hub // change notifications for Watcher (watch.go)
 }
 
 // NewMemory returns an empty store.
@@ -152,6 +153,7 @@ func (m *Memory) EnsureApp(_ context.Context, uid, appID string, initial json.Ra
 		m.users[uid] = map[string]*memApp{}
 	}
 	m.users[uid][appID] = a
+	m.hub.publish(appKey(uid, appID), 1)
 	return a.snapshot(), true, nil
 }
 
@@ -194,6 +196,7 @@ func (m *Memory) CommitVersion(_ context.Context, uid, appID string, c Commit) (
 	if c.Name != "" {
 		a.app.Name = c.Name
 	}
+	m.hub.publish(appKey(uid, appID), n)
 	return cloneVersion(v), nil
 }
 
@@ -315,6 +318,7 @@ func (m *Memory) CreateRecord(_ context.Context, rs RecordSet, rec Record) (*Rec
 	rec.CreatedAt, rec.UpdatedAt = now, now
 	rec.Data = cloneData(rec.Data)
 	recs[rs.Entity][rec.ID] = &rec
+	m.hub.publish(recordsKey(rs), 0)
 	return cloneRecord(&rec), true, nil
 }
 
@@ -332,6 +336,7 @@ func (m *Memory) UpdateRecord(_ context.Context, rs RecordSet, id string, data m
 	}
 	r.Data = cloneData(data)
 	r.UpdatedAt = m.now().UTC()
+	m.hub.publish(recordsKey(rs), 0)
 	return cloneRecord(r), nil
 }
 
@@ -347,6 +352,7 @@ func (m *Memory) DeleteRecord(_ context.Context, rs RecordSet, id string) error 
 		return ErrNotFound
 	}
 	delete(recs[rs.Entity], id)
+	m.hub.publish(recordsKey(rs), 0)
 	return nil
 }
 
@@ -359,5 +365,6 @@ func (m *Memory) DeleteAllRecords(_ context.Context, rs RecordSet) error {
 		return err
 	}
 	delete(recs, rs.Entity)
+	m.hub.publish(recordsKey(rs), 0)
 	return nil
 }

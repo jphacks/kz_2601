@@ -19,7 +19,7 @@ flowchart LR
   C -- "messages.create(structured output)" --> K[(Claude API)]
   C -. "optional POST /transcribe" .-> O[(OpenAI Whisper API)]
   B --> F[(Firestore Native)]
-  A -. "realtime listener (任意)<br/>users/{uid}/apps/{appId}" .-> F
+  A -. "SSE GET /events (変化通知のみ・#82)" .-> B
 ```
 
 ```mermaid
@@ -118,7 +118,7 @@ users/{uid}                                   # Firebase Auth uid。プロフィ
 
 v0 のルール: **`sort`/`filter` が複合インデックスを要求する組み合わせは、appconfig がサーバー側でメモリソート**(1 entity 上限 2,000 件・それ以上は 413)。デモ規模では十分で、インデックス作成待ち(数分)で詰まるのを避ける。
 
-Firestore セキュリティルール(iOS がリスナーを使う場合のみ必要・書き込みは全面禁止):
+Firestore セキュリティルール: **#82 で iOS 直読み(案 A)は採らず SSE(案 B)にしたため、現行の全面拒否(`allow read, write: if false`)のまま変更不要**。下は将来 iOS が直接リスナーを張る場合の案(未適用):
 ```
 match /users/{uid}/{document=**} {
   allow read: if request.auth != null && request.auth.uid == uid;
@@ -206,9 +206,24 @@ func UID(ctx context.Context) string { s, _ := ctx.Value(ctxKey{}).(string); ret
 | 保存形式 | 各 version に **フルスナップショット `dsl` + 適用した `patch`**(PUT 時は `patch` 無し) | ロールバックは「コピー」。差分表示・デバッグは `patch` を見る |
 | 楽観ロック | `PUT`/`PATCH` とも `If-Match: "<version>"` 必須。トランザクション内で `currentVersion` と照合し不一致は **409 `version_conflict`**(ボディに現行 version) | Patch は**基底バージョン依存**なので 409 時は再生成が必須(ai は最新を取り直して 1 回だけ再試行) |
 | ロールバック | `POST /v1/apps/{id}/versions/{v}/restore` → version v の `dsl` で **新 version N+1**(`source.kind=restore`)。履歴は消さない | 「元に戻して」と言われた時 ai は Claude を呼ばず **restore を直接叩く**(発話の意図分類は Claude に `{intent: edit|create|undo}` を出させてもよいが v0 はキーワード) |
-| ETag | `ETag: "<currentVersion>"`(例 `"7"`)。`GET /dsl` は `If-None-Match` 一致で **304** | 単調増加 int なので比較が自明。iOS は 2s ポーリングか Firestore リスナー |
+| ETag | `ETag: "<currentVersion>"`(例 `"7"`)。`GET /dsl` は `If-None-Match` 一致で **304** | 単調増加 int なので比較が自明。iOS は SSE(§5.1)で変化を知り、フォールバックでポーリング |
 | 変更の説明 | version.source に `summary`・`transcript`・`mode(full|patch)`・`model` | iOS が「円グラフを追加しました」と読み上げる材料 |
 | 実装 | `pkg/dsl.ApplyPatch(current, ops)`(evanphx/json-patch v5 + `Parse`)、`dsl.PatchSchemaJSON()`、`dsl.ValidatePatchDocument()` は**実装済み・テスト済み** | appconfig/ai が同じ関数を呼ぶので結果が一致する |
+
+### 5.1 ホットリロードの変化通知(`GET /v1/apps/{appId}/events`・SSE・#82)
+
+| 論点 | 決定 | 理由 |
+|---|---|---|
+| 方式 | **backend が Firestore snapshot listener を持ち SSE で通知**(案 B)。iOS が Firestore SDK で直接購読する案 A は不採用 | ルールは全面拒否のまま(クライアント直読みを開けない=認可は API の 1 箇所)。iOS に FirebaseFirestore(gRPC/abseil/leveldb)を足さない=ビルド時間・バイナリ増を避ける。エミュレータ + curl でローカル完結して検証できる |
+| 流すもの | `hello{version,entities}` / `dsl{version}` / `records{entity}` / `bye` のみ。本体は既存 API で再取得 | データの正は API のまま。SSE の認可漏れが即データ漏れにならない |
+| 購読対象 | `users/{uid}/apps/{appId}`(自分の DSL)+ 現行 DSL の各 entity の records(private は自分の下、public/shared は `apps_public/{appId}/entities/{e}/records`) | 共有掲示板(public)で他ユーザーの投稿が数百 ms で出る |
+| records の窓 | `orderBy(updatedAt desc).limit(100)` | 接続ごとに一致件数ぶん読み取り課金されるため。作成/更新は必ず窓の先頭に入る。窓外の古いレコードの削除は通知されない(次の pull で消える) |
+| 寿命 | 1 本 **50 秒**(`EVENTS_MAX_STREAM`)で `bye` → クライアント即再接続。心拍 15 秒 | appconfig の Cloud Run `--timeout=60` 内に収める(デプロイ設定は変更不要)。DSL が変わったら entity 構成が変わり得るので `dsl` の直後にも `bye` |
+| 多インスタンス | 各インスタンスが自分で Firestore を listen するので、別インスタンスへの書き込みも届く | in-process pub/sub だと max-instances=3 で取りこぼす |
+| store | `store.Watcher`(`WatchApp` / `WatchRecords`)。Firestore = snapshot listener、Memory = in-process hub(ローカル・テスト) | ハンドラは interface 依存のまま |
+| 実測 | Firestore エミュレータ: 投稿 → SSE `records` まで **38〜39 ms**。シミュレータ表示まで(250 ms デバウンス + pull 込み)**442 ms** | `scripts/realtime-smoke.sh` |
+
+コスト目安: 1 クライアント 1 entity あたり再接続ごとに最大 100 読み取り(50 秒周期で ≒7,200/時)。無料枠 5 万/日に対し、デモ数台・数時間なら収まるが、常時多数接続は不可。必要なら `EVENTS_MAX_STREAM` と Cloud Run `--timeout` を伸ばす(例 3600s / 55m)と読み取りが約 1/60 になる(Cloud Run は接続中ずっと課金対象になる点とのトレードオフ)。
 
 ## 6. ai サービス詳細
 
@@ -417,6 +432,7 @@ jobs:
 | `FIRESTORE_EMULATOR_HOST` | o | - | ローカルのみ |
 | `FIREBASE_AUTH_EMULATOR_HOST` | o | o | ローカルのみ(dev ヘッダの有効条件) |
 | `LOG_LEVEL` | o | o | `info` |
+| `EVENTS_MAX_STREAM` | o | - | `50s`。`GET /events` 1 本の寿命(Cloud Run `--timeout` 未満にする) |
 | `APPCONFIG_BASE_URL` | - | o | ai→appconfig。**未設定ならインメモリのスタブ store**(未知 appId は `dsl.Initial()` version 1 で seed。Cloud Run 上でも可・永続なし) |
 | `ANTHROPIC_API_KEY` | - | o | **Secret Manager**。コード/ログ/サンプルに出さない |
 | `CLAUDE_MODEL` | - | o | `claude-sonnet-5-5` |

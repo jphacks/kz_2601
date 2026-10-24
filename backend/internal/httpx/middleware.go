@@ -128,6 +128,9 @@ func (rec *responseRecorder) Write(b []byte) (int, error) {
 	return rec.ResponseWriter.Write(b)
 }
 
+// Unwrap lets http.ResponseController reach Flush (SSE) through the wrapper.
+func (rec *responseRecorder) Unwrap() http.ResponseWriter { return rec.ResponseWriter }
+
 func NewLogger() *slog.Logger {
 	return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: LogLevel(os.Getenv("LOG_LEVEL"))}))
 }
@@ -187,6 +190,9 @@ func (ew *envelopeWriter) Write(b []byte) (int, error) {
 	}
 	return ew.ResponseWriter.Write(b)
 }
+
+// Unwrap lets http.ResponseController reach Flush (SSE) through the wrapper.
+func (ew *envelopeWriter) Unwrap() http.ResponseWriter { return ew.ResponseWriter }
 
 func envelopeCode(status int, contentType string) (string, bool) {
 	if strings.HasPrefix(contentType, "application/json") {

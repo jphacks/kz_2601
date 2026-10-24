@@ -7,7 +7,7 @@
 | 項目 | 決定 | iOS 側の帰結 |
 |---|---|---|
 | ユーザーデータ保存先 | **バックエンド(Firestore / appconfig の汎用エンティティ API)** | iOS に永続層を持たない。`entity.*` アクションは全て HTTP。オフライン時のみ最後のレスポンスをメモリ/ディスクにキャッシュ(P2) |
-| 2回目以降の改変 | **JSON Patch(RFC 6902)はサーバー側で適用** | iOS はパッチを扱わない。`POST /v1/morph` の応答 or ポーリングで**最新 DSL 全体**を受け取り差し替えるだけ |
+| 2回目以降の改変 | **JSON Patch(RFC 6902)はサーバー側で適用** | iOS はパッチを扱わない。`POST /v1/morph` の応答 or ホットリロード(SSE 通知 → `GET /dsl`)で**最新 DSL 全体**を受け取り差し替えるだけ |
 | P0 ネイティブ | **カメラ + ローカル通知** | `camera` コンポーネント / `native: notification.*` を実装済み。位置/センサー/共有は P1(ブリッジに stub) |
 | デモ3本 | 家計簿 / トレーニング記録 / 散歩メモ | サンプル DSL は `docs/dsl/examples/*.json`(4 本)をそのままバンドル |
 | 認証 | Sign in with Apple → 詰まったら匿名認証 | `TokenProvider` 抽象の裏で切替。UI/ランタイムは影響なし |
@@ -279,7 +279,24 @@ DEBUG フック(シミュレータ E2E): `METAMON_E2E_OFFLINE_SECONDS=<n>`(#70�
 bootstrap の順序(#86): `recordSync.start()` → 到達性監視 → `GET /dsl` 復元 → ポーリング開始 → **通知の同期(許可ダイアログ)は最後に `Task {}` で投げて await しない** → DEBUG フック。ダイアログに答えるまで復元・同期が止まらない。
 
 生成後も **マイク FAB**(ランタイム側、DSL 外)から同じシートを開いて再改変できる。初期 DSL は `voiceInput` 1画面のみ。
-FAB の位置は `Theme.Layout.fabAlignment`(**左下**)の 1 箇所で決める。DSL の「追加」ボタンは右下 `D11:F12` に置かれるのが定番で、右下 FAB だと被るため左下に移した(タブバーがある時は `fabBottomInset(hasTabs:)` でその上に逃がす)。
+#### マイク FAB の位置(ピクチャーインピクチャー風・#52)
+
+FAB 本体は `ios/Metamon/App/VoiceFab.swift`。判定ロジックは純粋関数 `FabDock`(`MetamonRenderer/Screen/FabDock.swift`・`FabDockTests`)。
+
+| 項目 | 挙動 |
+|---|---|
+| 初期位置 | **左下**(`Theme.Layout.fabDefaultSide`)。DSL の「追加」ボタンは右下 `D11:F12` が定番なので被らない側。タブバーがある時は `fabBottomInset(hasTabs:)` でその上 |
+| ドラッグ | 10pt 以上動かすとドラッグ(`DragGesture(minimumDistance: 10, coordinateSpace: .global)`)。離すと最寄りの左右の辺へ spring で吸着。辺は慣性込みの予測位置(`predictedEndTranslation`)で選ぶ。縦位置は自由(上限 = 領域上端から `fabTopReserve` 64pt・ナビバーにかからない) |
+| 隠す | 離した時の中心 x(実位置 or 予測位置)が端から `fabSize × 0.3` 以内 → 本体は画面外、辺に取っ手(幅 14pt・触れる幅 32pt)だけ残る |
+| 戻す | 取っ手のタップ / 内側へ 20pt 以上引く。取っ手の長押しは変身一覧 |
+| 部品回避 | 吸着した側の最下段 2 列(左 A〜B / 右 E〜F)に部品があれば、その上端まで上げる(#83)。Renderer が `GridBottomObstructionKey`(左)/ `GridBottomTrailingObstructionKey`(右)で上端 y を上げる。ユーザーが下げても退避位置より下には置かない(`FabDock.displayedBottom`) |
+| 保存 | `@AppStorage`: `fab.side`(leading/trailing)・`fab.bottom`(下端からの距離。-1 = 自動)・`fab.hidden`。アプリごとではなく Tailor It 共通 |
+| 維持 | フォーム表示中は出さない(#83)・生成中は沈めて触れない。Reduce Motion では吸着アニメを 0.12s の easeOut に短縮 |
+| VoiceOver | 本体: 「話しかけて変える」+ アクション「変身一覧」「反対側へ移動」「端に隠す」。取っ手: 「話しかけて変える。ダブルタップで表示」+「変身一覧」 |
+
+ジェスチャ競合: `Button` は残し(VoiceOver・押下ハイライト)、長押しとドラッグを `simultaneousGesture` で重ねる。FAB が指に付いて動くので離した瞬間に Button のタップも発火する → ドラッグ認識時に `suppressTap`、長押し発火時に `longPressFired` を立ててタップを捨てる(次に指が触れた瞬間 = `LongPressGesture.onChanged` でリセット、ドラッグ後は 0.3s 後にも解除)。長押しの許容移動は 10pt でドラッグしきい値と揃える(先に 10pt 動けば長押し失敗 = ドラッグ、0.45s 静止で変身一覧)。長押し発火後のドラッグは無視。
+
+DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例 `right-hidden:360`)/ `auto`(初期状態に戻す)。simctl でドラッグを再現しにくいので保存値を直接書く。
 
 ### 復元・元に戻す・新規作成 の状態遷移(appconfig 接続・2026-10-24 夕)
 
@@ -288,7 +305,9 @@ FAB の位置は `Theme.Layout.fabAlignment`(**左下**)の 1 箇所で決める
   └─ bootstrap(live) ── GET /dsl ──┬─ 200: server.version > 表示中 → apply(remote)      … 別端末/ai 直叩きの変更も取り込む
                                    │        server.version < 表示中 → 表示を保つ(server が巻き戻った時の保険)
                                    └─ 失敗: cache があれば表示 + toast「オフライン: 最後に取得したアプリ(vN)」/ 無ければ toast「サーバーに接続できません」
-  └─ startSync(): 前面時のみ 5 秒ポーリング(If-None-Match → 304 は無視)。version が進んだら apply(アニメ) + バナー「アプリが更新されました(version N)」
+  └─ startSync(): 前面時のみ RealtimeDocumentSync を購読(SSE `GET /events` + フォールバックのポーリング・#82)。
+       version が進んだら apply(アニメ) + バナー「アプリが更新されました(version N)」。操作中(シート/全画面/push/音声シート)は閉じるまで保留
+       records の変化通知 → 表示中の entity だけ 250ms デバウンスして refresh(フォームの下書きは ScreenView の @State なので消えない)
 
 発話 ── VoiceIntent.detect(text)
   ├─ .undo   (「元に戻して」「戻して」「取り消して」「アンドゥ」「ひとつ前」…)
@@ -312,11 +331,23 @@ FAB の位置は `Theme.Layout.fabAlignment`(**左下**)の 1 箇所で決める
 **ホットリロード方式**
 | 案 | 仕組み | 評価 |
 |---|---|---|
-| A. ポーリング(**Day1・実装済み**) | 前面時のみ 5 秒毎 `GET /v1/apps/{id}/dsl` + `If-None-Match: "<version>"`。304 なら何もせず、200 で version が進んだら apply | 実装が軽く確実。304 は本文無しなので Cloud Run の無料枠でも問題ない量 |
-| B. SSE | `GET /v1/apps/{id}/events` を `URLSession.bytes(for:)` で読む | Go 側は `http.Flusher` で簡単。Cloud Run はタイムアウト(既定5分)で切れるので再接続必須 |
-| C. Firestore onSnapshot | iOS に FirebaseFirestore SDK を追加し `apps/{id}` を listen | **最も「生きてる」感が出る**。backend 不要。SDK が重い(+10MB) |
+| A. ポーリング(Day1) | 前面時のみ 5 秒毎 `GET /v1/apps/{id}/dsl` + `If-None-Match: "<version>"`。304 なら何もせず、200 で version が進んだら apply | **フォールバックとして残す**(`PollingDocumentSync`。DEBUG `METAMON_REALTIME=0` でこれだけに戻せる) |
+| B. SSE(**Day2・採用・#82**) | `GET /v1/apps/{id}/events` を `URLSession.bytes(for:)` で読む。backend が Firestore snapshot listener を持ち「何が変わったか」だけ流す | ルール変更不要・iOS に Firestore SDK を足さない・ローカル(エミュレータ)で完結検証できる。50 秒ごとの `bye` で張り直し |
+| C. Firestore onSnapshot | iOS に FirebaseFirestore SDK を追加し `apps/{id}` を listen | 不採用: Firestore ルールの全面拒否を開ける必要があり(認可が API と二重化)、gRPC/abseil で CI ビルドが重くなる |
 
-Day2 に余裕があれば **C**(Firestore が正典なので一番筋が良い)。B は中間なので採らない。
+**`RealtimeDocumentSync`(`MetamonServices/Live`)の動作**
+
+| 受信 / 状況 | 動作 |
+|---|---|
+| `hello{version}` | `.realtime(true)`。version が表示より新しければ `GET /dsl`(切断中の変化を拾う) |
+| `dsl{version}` | `GET /dsl`(If-None-Match)→ `.document` → `AppRuntime.hotReload`(操作中は保留) |
+| `records{entity}` | `.records(entity:)` → `AppRuntime` が表示中の entity なら 250ms デバウンスで `refresh`(=`pull` 全件置換・未送信行は残る) |
+| `bye` | 予定終了。即再接続(ポーリングに落とさない) |
+| `bye` 無しの切断 / 非 200 / 40 秒無音 | `.realtime(false)` → 指数バックオフ(1→30 秒)で再接続。401 は次回 `idToken(forceRefresh: true)` |
+| ポーリング | リスナー稼働中 60 秒・停止中 5 秒で `GET /dsl`(If-None-Match) |
+| 購読が戻った(false→true)/ 前面復帰 | 表示中の entity を全部 refresh(取りこぼし防止) |
+
+実測(2026-10-24・Firestore エミュレータ + appconfig `AUTH_MODE=dev` + iPhone 17 シミュレータ): curl(別ユーザー)で public entity に投稿 → シミュレータの一覧に出るまで **442 ms**(SSE 到達は 38 ms、残りはデバウンス 250 ms + pull)。`scripts/realtime-smoke.sh`(curl のみ)で再現できる。
 
 ### 複数アプリの切替「変身一覧」(#51)と起動時の挨拶(#42)(2026-10-24 夜)
 
