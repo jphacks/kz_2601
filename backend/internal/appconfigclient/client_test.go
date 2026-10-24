@@ -106,7 +106,7 @@ func TestMemoryVersionsAndRestore(t *testing.T) {
 	}
 }
 
-func TestHTTPRestoreRereadsDSL(t *testing.T) {
+func TestHTTPRestoreUsesResponseDSL(t *testing.T) {
 	var calls []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls = append(calls, r.Method+" "+r.URL.RequestURI())
@@ -114,10 +114,12 @@ func TestHTTPRestoreRereadsDSL(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/apps/a/versions":
 			_, _ = w.Write([]byte(`{"items":[{"appId":"a","version":3,"parentVersion":2,"source":{"kind":"restore","restoredFrom":1}},{"appId":"a","version":2}]}`))
 		case r.Method == http.MethodPost:
+			w.Header().Set("ETag", `"4"`)
 			w.WriteHeader(201)
-			_, _ = w.Write([]byte(`{"appId":"a","version":4,"source":{"kind":"restore","mode":"full","restoredFrom":2}}`))
+			_, _ = w.Write([]byte(`{"appId":"a","version":4,"parentVersion":3,"source":{"kind":"restore","mode":"full","restoredFrom":2},"dsl":{"k":1}}`))
 		default:
-			_, _ = w.Write([]byte(`{"appId":"a","version":4,"dsl":{"k":1}}`))
+			t.Errorf("unexpected call %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(500)
 		}
 	}))
 	defer srv.Close()
@@ -131,8 +133,31 @@ func TestHTTPRestoreRereadsDSL(t *testing.T) {
 	if err != nil || env.Version != 4 || string(env.DSL) != `{"k":1}` {
 		t.Fatalf("restore: %v %+v", err, env)
 	}
-	want := []string{"GET /v1/apps/a/versions?pageSize=50", "POST /v1/apps/a/versions/2/restore", "GET /v1/apps/a/dsl"}
-	if len(calls) != 3 || calls[0] != want[0] || calls[1] != want[1] || calls[2] != want[2] {
+	want := []string{"GET /v1/apps/a/versions?pageSize=50", "POST /v1/apps/a/versions/2/restore"}
+	if len(calls) != 2 || calls[0] != want[0] || calls[1] != want[1] {
+		t.Fatalf("calls: %v", calls)
+	}
+}
+
+// Older appconfig (bare VersionSummary, no dsl): fall back to GET /dsl.
+func TestHTTPRestoreFallsBackToGetDSL(t *testing.T) {
+	var calls []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.RequestURI())
+		if r.Method == http.MethodPost {
+			w.WriteHeader(201)
+			_, _ = w.Write([]byte(`{"appId":"a","version":4,"source":{"kind":"restore","mode":"full","restoredFrom":2}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"appId":"a","version":4,"dsl":{"k":1}}`))
+	}))
+	defer srv.Close()
+	c := NewHTTP(srv.URL)
+	env, err := c.Restore(WithBearer(context.Background(), "Bearer tok"), "a", 2)
+	if err != nil || env.Version != 4 || string(env.DSL) != `{"k":1}` {
+		t.Fatalf("restore: %v %+v", err, env)
+	}
+	if len(calls) != 2 || calls[1] != "GET /v1/apps/a/dsl" {
 		t.Fatalf("calls: %v", calls)
 	}
 }
