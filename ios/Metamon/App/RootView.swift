@@ -9,6 +9,7 @@ import MetamonRenderer
 /// 生成中オーバーレイの fade out と新ツリーの scale(0.96→1)+fade in がクロスフェードになる。
 struct RootView: View {
     @Environment(AppRuntime.self) private var rt
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         @Bindable var rt = rt
@@ -75,6 +76,9 @@ struct RootView: View {
         }
         .overlay(alignment: .top) { summaryCard }
         .overlay(alignment: .bottom) { toast }
+        .onChange(of: scenePhase) { _, phase in
+            rt.setForeground(phase == .active) // ホットリロードのポーリングは前面時のみ
+        }
     }
 
     /// 初期 DSL の `voiceInput.prompt`(無ければ VoiceInputView の既定文言)。
@@ -86,25 +90,21 @@ struct RootView: View {
         switch rt.dsl.app.theme?.mode { case "light": .light; case "dark": .dark; default: nil }
     }
 
+    /// マイク FAB。位置は `Theme.Layout.fabAlignment`(左下。DSL の「追加」ボタンが右下に来るため)。
     private var voiceFab: some View {
-        VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                Button { rt.showVoiceSheet = true } label: {
-                    Image(systemName: "mic.fill")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 60, height: 60)
-                        .background(Theme.brandGradient, in: Circle())
-                        .overlay(Circle().strokeBorder(.white.opacity(0.25)))
-                        .shadow(color: Theme.Colors.brandA.opacity(0.45), radius: 14, y: 6)
-                }
-                .accessibilityLabel("話しかけて変える")
-                .padding(.trailing, Theme.Spacing.lg)
-                .padding(.bottom, rt.dsl.app.hasTabs ? 70 : Theme.Spacing.lg)
-            }
+        Button { rt.showVoiceSheet = true } label: {
+            Image(systemName: "mic.fill")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: Theme.Layout.fabSize, height: Theme.Layout.fabSize)
+                .background(Theme.brandGradient, in: Circle())
+                .overlay(Circle().strokeBorder(.white.opacity(0.25)))
+                .shadow(color: Theme.Colors.brandA.opacity(0.45), radius: 14, y: 6)
         }
+        .accessibilityLabel("話しかけて変える")
+        .padding(.horizontal, Theme.Layout.fabHorizontalInset)
+        .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: rt.dsl.app.hasTabs))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: Theme.Layout.fabAlignment)
     }
 
     /// 変身直後の要約(読み上げ文)。上部カードで 3 秒表示して自動で消える。
