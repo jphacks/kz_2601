@@ -269,9 +269,15 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			return nil, err
 		}
 		raw := dropFormPhotoPreviews(fillDefaults(extractJSON(resp.Text)))
+		raw = fixButtonOverlap(raw) // before validation: saves a regeneration (#169)
 		app, perr := dsl.Parse(raw)
 		if perr == nil {
 			if fixed := addMissingLists(raw, app); len(fixed) != len(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
+			if fixed := fixLayoutRules(raw, app); string(fixed) != string(raw) {
 				if fixedApp, err := dsl.Parse(fixed); err == nil {
 					raw, app = fixed, fixedApp
 				}
