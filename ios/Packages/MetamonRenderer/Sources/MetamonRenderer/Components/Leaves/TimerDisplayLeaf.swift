@@ -93,7 +93,7 @@ struct TimerDisplayLeaf: View {
 
     private func notify(isForeground: Bool) {
         let plan = TimerNotificationPlan.decide(isForeground: isForeground, isCountdown: isCountdown, run: run, total: total, now: .now)
-        TimerNotifier.apply(plan, key: storeKey, title: rt.dsl.app.name, name: c.label.flatMap { $0.isEmpty ? nil : $0 } ?? "タイマー")
+        TimerNotifier.apply(plan, key: storeKey, title: rt.dsl.app.name, name: c.label.flatMap { $0.isEmpty ? nil : $0 } ?? L("タイマー"))
     }
 
     private func start() {

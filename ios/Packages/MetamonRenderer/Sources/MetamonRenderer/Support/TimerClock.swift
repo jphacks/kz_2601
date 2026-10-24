@@ -80,7 +80,7 @@ enum TimerNotifier {
         case .schedule(let end):
             let content = UNMutableNotificationContent()
             content.title = title
-            content.body = "\(name)のタイマーが終わりました"
+            content.body = L("\(name)のタイマーが終わりました")
             content.sound = .default
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, end.timeIntervalSinceNow), repeats: false)
             center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
