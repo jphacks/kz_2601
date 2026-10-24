@@ -1,0 +1,12 @@
+# CODEOWNERS: PR 作成時にレビュアーを自動アサインする(approve は必須ではない: 0 approve でマージ可)。
+# 後の行ほど優先。
+
+# 既定
+* @ko-tarou
+
+# iOS
+ios/ @ko-tarou
+
+# backend: appconfig はバックエンド担当
+backend/cmd/appconfig/ @2410as
+backend/internal/appconfig/ @2410as

@@ -1,0 +1,9 @@
+# gcloud run deploy --source でアップロードしないもの
+.gcloudignore
+.git
+.gitignore
+bin/
+*.test
+*.md
+.env
+.env.*
