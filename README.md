@@ -42,10 +42,10 @@ flowchart LR
 | 1. 話す | マイクボタンを押して話す。WhisperKit(`small`)が端末内で文字起こし。文字入力に切替可 | オンデバイス・事前 DL |
 | 2. 生成 | `POST /v1/generate` が Claude(`claude-sonnet-5-5`)に部品カタログ + few-shot を渡し、DSL v1 JSON を生成 | create p50 **6.6 秒** / p95 8.7 秒 |
 | 3. 検証 | Go がスキーマ・id 参照・enum・**グリッド座標の重なり/範囲外**を全件列挙して検証。NG ならエラー一覧を添えて再生成(最大 2 回) | 16 発話 × 2 条件で一発通過 **100%** |
-| 4. 描画 | iOS が DSL を受け取り、タブ・画面・部品を SwiftUI で即描画。入力→保存→一覧・集計が動く | 部品 36 種 + アクション 9 種 |
+| 4. 描画 | iOS が DSL を受け取り、タブ・画面・部品を SwiftUI で即描画。入力→保存→一覧・集計が動く | 部品 48 種 + アクション 9 種 |
 | 5. 育てる | 2 回目以降の発話は **JSON Patch(RFC 6902)** の差分生成。「ここをもっと大きく」「カテゴリにカフェを追加」も通る | edit p50 **1.7 秒** |
 
-アプリ本体にはコードが増えません。増えるのは Firestore(予定・現在はサーバーのインメモリ)に保存される DSL JSON の version だけです。
+アプリ本体にはコードが増えません。増えるのは DSL JSON の version だけです(保存先 Firestore への永続化は実装中・現在はサーバーのインメモリ)。
 
 ### 特長
 #### 1. 特長1 AI が画面を"レイアウト"する
@@ -64,17 +64,19 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 
 #### 2. 特長2 ネイティブ機能も"生成"される
 
-生成されるのは Web ページではなく、**ネイティブ部品の組み合わせ**です。部品は **36 種(Container 3 + Leaf 33)+ アクション 9 種**。写真(`photoField`)、ローカル通知(`app.notifications` / `scheduleNotification`)、Swift Charts のグラフ、日付・時刻ピッカー、ゲージ、タイムライン、テーブルなどを AI が選んで配置します。
+生成されるのは Web ページではなく、**ネイティブ部品の組み合わせ**です。部品は **48 種(Container 7 + Leaf 41)+ アクション 9 種**。カメラ撮影(`photoField`)、ローカル通知(`app.notifications` / `scheduleNotification`)、**カレンダー**(`calendar`)、**地図**(`mapView`)、**現在地**(`locationButton`)、**QR スキャナ**(`qrScanner`)、共有シート、タイマー、Swift Charts のグラフ、日付・時刻ピッカー、ゲージ、タイムライン、テーブルなどを AI が選んで配置します。
 
 | 種別 | 例 |
 |---|---|
-| 入力 | `textField` `numberField` `datePicker` `timePicker` `picker` `toggle` `slider` `stepper` `rating` `colorPicker` `photoField` |
+| 構造 | `vstack` `hstack` `section` `card` `disclosure` `carousel` `grid` |
+| 入力 | `textField` `numberField` `datePicker` `timePicker` `picker` `toggle` `slider` `stepper` `rating` `colorPicker` `photoField` `searchBar` |
 | 表示 | `text` `label` `icon` `image` `badge` `progressBar` `gauge` `markdown` `avatar` `emptyState` |
-| データ | `list` `table` `timeline` `stat`(端末集計) `chart`(bar/line/pie) |
-| ネイティブ | 写真(`photoField` → `image`)、ローカル通知(daily/weekly/once)、Safari(`openUrl`)、音声再入力(`voiceInput`) |
-| 予定 | 実カメラ撮影(`source:camera` は現在 PhotosPicker)、地図 `map` / 位置情報 `location` フィールド、他アプリ連携 |
+| データ | `list`(検索バー連動) `table` `timeline` `calendar` `stat`(端末集計) `chart`(bar/line/pie) |
+| ネイティブ | カメラ撮影 / 写真選択(`photoField` → `image`・UIImagePickerController・権限拒否時は設定への導線)、ローカル通知(daily/weekly/once)、地図(`mapView`・MapKit)、現在地(`locationButton`・CoreLocation → `"lat,lng"`)、QR スキャナ(`qrScanner`・AVFoundation)、共有シート(`shareButton`)、Safari(`openUrlButton` / `openUrl`)、タイマー(`timerDisplay`)、音声再入力(`voiceInput`) |
 
-部品を 1 つ足す手順は **3 ステップ**。JSON Schema に定義(`description` / `x-usage` 付き)→ iOS に View を 1 ファイル + レジストリ 1 行 → テスト。**AI へ渡す部品カタログはスキーマから自動生成**され、Go の検証・iOS の描画・AI のカタログの 3 者がズレるとテストが赤になります。カタログに無い部品(カレンダー等)を頼まれても、最も近い部品で代替して「カレンダー表示は日付順の一覧で代替しました」と読み上げます。
+48 種すべてが Go 検証・iOS 描画・AI カタログに揃っています(シミュレータで全種を目視)。実機でしか確認できない QR の読取・GPS の実取得・共有先・タイマーのバックグラウンド継続は**実機検証が一部未了**です。
+
+部品を 1 つ足す手順は **3 ステップ**。JSON Schema に定義(`description` / `x-usage` 付き)→ iOS に View を 1 ファイル + レジストリ 1 行 → テスト。**AI へ渡す部品カタログはスキーマから自動生成**され、Go の検証・iOS の描画・AI のカタログの 3 者がズレるとテストが赤になります。カタログに無い部品を頼まれても、最も近い部品で代替して「○○は△△で代替しました」と読み上げます(カレンダーが無かった時点の実測: 「カレンダー表示は日付順の一覧で代替しました」。現在は `calendar` が本物の部品として選ばれます)。
 
 #### 3. 特長3 その場で変わる・壊れない
 
@@ -91,24 +93,25 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 
 - **非エンジニアが"自分専用の小さなアプリ"を即席で持てる**。家計簿・トレーニング記録・散歩メモ・読書記録・水分記録・買い物リスト・体重記録(いずれも eval 済み)。
 - **「ここをこうして」が通る**。設定画面を探す代わりに、話せばレイアウト・フィールド・通知時刻が変わる。
-- **データは残る設計**。記録(records)は uid に紐付けて保存する設計(Firestore 永続化は実装予定・現在はサーバーのインメモリ)。アプリ自体が変わってもフィールド id を維持するので既存レコードは消えない。
+- **データは残る設計**。記録(records)は uid に紐付けて保存する設計(appconfig の Firestore 永続化は実装中・現在はサーバーのインメモリ)。アプリ自体が変わってもフィールド id を維持するので既存レコードは消えない。
 
 ### 今後の展望
 
 | ID | 展望 | 状態 |
 |---|---|---|
 | G17 | **生成前の対話**。「このアプリ、カメラ使える?」のような確認質問に答えてから生成する `mode: clarify` | 予定(実機で一発生成を試した所感から追加) |
-| G14 | 位置情報 + 地図(`map` Leaf・`location` フィールド)。DSL の enum に 1 要素足すだけで互換 | 予定(スキーマ側に枠を予約済み) |
+| G14 | 位置情報 + 地図(`mapView` / `locationButton`・`location` フィールド) | 実装済み(実 GPS の実機検証は一部未) |
 | G16 | 複数アプリの保持と音声切替 | 予定(現状は 1 ユーザー 1 アプリ) |
 | G11 | 「元に戻して」で `versions/{n}/restore` | 予定(appconfig の version 履歴設計済み) |
 | — | 生成したアプリの共有(DSL JSON はただの文書なので URL 1 本で配れる)、ホーム画面 Widget(最新レコード 1 件の固定 Widget) | 構想 |
-| — | Container 内グリッド、実カメラ撮影、Firestore リスナーによるホットリロード(現在は 2 秒ポーリング) | 予定 |
+| — | appconfig の Firestore 永続化(DSL version 履歴・records) | 実装中 |
+| — | Container 内グリッド、Firestore リスナーによるホットリロード(現在は 2 秒ポーリング) | 予定 |
 
 ### 注力したこと（こだわり等）
 * **DSL を唯一の正典にした設計**。`docs/dsl/dsl.schema.json` から Go 型(埋め込み・CI で byte 一致)、Swift 型(examples をバンドルしてデコードテスト)、AI 向け部品カタログの 3 つを導出し、二重定義を禁止。iOS と backend の契約ズレを構造的に防いだ。
 * **スキーマ → カタログ自動生成**。手書きのプロンプトを捨て、`description` / `x-usage` / `x-enumDescriptions` から起動時に生成。system prompt は約 9.8K tokens で `cache_control` により 2 回目以降はキャッシュ読み。
 * **数値で決める**。effort low/high・Sonnet/Opus を 16 発話で比較し、通過率が同じで遅いだけの high を捨てて low に固定(`docs/backend/ai-eval/2026-10-24.md`)。未要求のグラフ・通知を足す癖もここで発見してプロンプトで抑制。
-* **2 日間の demo-first 運用**。マージ済み PR 24 本・コミット 100 超。backend CI は 5 分以内、`develop` への push で Cloud Run staging に自動デプロイ(Workload Identity Federation・鍵ファイル無し)。public リポのため秘密は `.gitignore` + gitleaks の二重防御。
+* **2 日間の demo-first 運用**。マージ済み PR 25 本・コミット 100 超。backend CI は 5 分以内、`develop` への push で Cloud Run staging に自動デプロイ(Workload Identity Federation・鍵ファイル無し)。public リポのため秘密は `.gitignore` + gitleaks の二重防御。
 * **失敗しても止まらない UX**。WhisperKit 未 DL/失敗時は文字入力へ、Claude 失敗時は再生成→`area` 落とし、未知の部品はプレースホルダ。デモ用に `METAMON_MOCK=1` の全モック起動(同梱サンプル DSL)も用意。
 
 ## 開発技術
@@ -116,12 +119,12 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 #### API・データ
 * Claude API(`claude-sonnet-5-5`・`anthropic-version: 2026-10-21`・生 HTTP・prompt caching・`fallbacks: "default"`)
 * Firebase Auth(Sign in with Apple / 匿名認証。Go 側は ID トークン検証のみ)
-* Firestore(Native mode・DSL version 履歴と records の保存先。永続化は実装予定)
+* Firestore(Native mode・DSL version 履歴と records の保存先。appconfig 側の永続化は実装中)
 * Cloud Run(`appconfig-{stg,prod}` / `ai-{stg,prod}`・asia-northeast1)、Secret Manager(`ANTHROPIC_API_KEY`)、Artifact Registry、Workload Identity Federation
 * JSON Schema draft 2020-12(DSL v1)、JSON Patch RFC 6902
 
 #### フレームワーク・ライブラリ・モジュール
-* SwiftUI(iOS 17+)、Swift Charts、UserNotifications、PhotosUI
+* SwiftUI(iOS 17+)、Swift Charts、UserNotifications、PhotosUI、UIKit(UIImagePickerController)、MapKit、CoreLocation、AVFoundation
 * WhisperKit(argmax-oss-swift 1.1.1・`small` モデル・CoreML/ANE)
 * Go 1.24(Claude 呼び出しは `net/http` 直叩き。依存は `santhosh-tekuri/jsonschema/v6` と `evanphx/json-patch/v5` のみ)
 * xcodegen(`.xcodeproj` をコミットしない)、ローカル Swift Package × 3(マルチモジュール)
@@ -130,9 +133,10 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 #### デバイス
 * iPhone(実機 iPhone 13 で検証。iOS 17+)
 * マイク(AVFoundation → WhisperKit オンデバイス認識)
-* カメラ / フォトライブラリ(PhotosPicker・写真は ≤800px の data URL に縮小)
+* カメラ(UIImagePickerController・背面カメラで撮影 → ≤800px の data URL に縮小)/ フォトライブラリ(PhotosPicker)
 * ローカル通知(UNUserNotificationCenter・daily / weekly / once)
-* 位置情報・MapKit(予定)
+* 位置情報(CoreLocation・1 回取得 → `"lat,lng"`)・地図(MapKit)
+* QR コード読取(AVFoundation・実機のみ)
 
 ### 独自技術
 #### ハッカソンで開発した独自機能・技術
@@ -143,7 +147,8 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 | **生成パイプライン** | 発話 → Claude → フル DSL / JSON Patch → 厳密検証 → 再生成ループ → `area` フォールバック。生成用スキーマの機械導出(`Relax`)、読み上げ用 summary | [`backend/internal/ai/`](backend/internal/ai)(`generate.go` `schema.go` `prompt.go`) | [#17](https://github.com/jphacks/kz_2601/pull/17) `POST /v1/generate`、[#19](https://github.com/jphacks/kz_2601/pull/19) 16 発話 eval + プロンプト改善 |
 | **スキーマ駆動の部品カタログ** | `dsl.schema.json` の `description` / `x-usage` から AI 向けカタログを自動生成。無い部品は代替して summary で言及。抜けは `catalog_test.go` と iOS `ComponentRegistryTests` で検出 | [`backend/internal/ai/catalog.go`](backend/internal/ai/catalog.go) | [#20](https://github.com/jphacks/kz_2601/pull/20) |
 | **レンダラー + レジストリ** | `ComponentRegistry`(type 文字列 → View の辞書・`switch` 無し)、`GridScreenLayout`(GeometryReader 1 個で絶対配置・セル内スクロール)、`DSLNavigationRoot`(タブ/スタック/sheet)。1 部品 = 1 ファイル | [`ios/Packages/MetamonRenderer/`](ios/Packages/MetamonRenderer) | [#18](https://github.com/jphacks/kz_2601/pull/18) マルチモジュール化 + DI |
-| **部品 36 種** | 入力系 7 種(slider/stepper/textEditor/secureField/timePicker/colorPicker/rating)と表示系 11 種(label/icon/progressBar/gauge/badge/link/markdown/avatar/table/timeline/emptyState)を スキーマ・Go 検証・iOS View の 3 点セットで追加 | `docs/dsl/examples/gallery-*.json` | [#23](https://github.com/jphacks/kz_2601/pull/23) 入力系、[#24](https://github.com/jphacks/kz_2601/pull/24) 表示系 |
+| **部品 48 種** | 入力系 7 種(slider/stepper/textEditor/secureField/timePicker/colorPicker/rating)、表示系 11 種(label/icon/progressBar/gauge/badge/link/markdown/avatar/table/timeline/emptyState)、構造・ナビ・ネイティブ系 12 種(card/disclosure/carousel/grid/searchBar/calendar/shareButton/openUrlButton/mapView/locationButton/qrScanner/timerDisplay)をスキーマ・Go 検証・iOS View の 3 点セットで追加 | `docs/dsl/examples/gallery-*.json` | [#23](https://github.com/jphacks/kz_2601/pull/23) 入力系、[#24](https://github.com/jphacks/kz_2601/pull/24) 表示系、[#25](https://github.com/jphacks/kz_2601/pull/25) 構造・ナビ・ネイティブ系 |
+| **実機カメラ撮影** | `photoField` の `source: camera/library/both` に応じてカメラ起動 / 写真選択 / 選択ダイアログ。カメラ無し端末は自動フォールバック、権限拒否時は設定アプリへの導線、サムネイル + 撮り直し。縮小は ≤800px 固定(画面倍率バグ修正で保存量 約 1/9) | [`ios/Packages/MetamonRenderer/Sources/MetamonRenderer/Support/`](ios/Packages/MetamonRenderer/Sources/MetamonRenderer/Support)(`CameraPicker.swift` `PhotoSourcePolicy.swift` `PhotoCodec.swift`) | [#29](https://github.com/jphacks/kz_2601/pull/29) |
 | **オンデバイス音声認識 + 実機接続** | WhisperKit `small` の事前 DL・進捗表示・文字入力フォールバック。Firebase Auth と staging ai への実機接続 | [`ios/Packages/MetamonServices/`](ios/Packages/MetamonServices) | [#10](https://github.com/jphacks/kz_2601/pull/10) WhisperKit、[#21](https://github.com/jphacks/kz_2601/pull/21) Firebase Auth + 実 ai 接続 |
 | **インフラ / CI** | Cloud Run × 2・WIF・Secret Manager の手順書、`develop` → staging / `main` → prod の自動デプロイ、5 分以内の backend CI | [`docs/infra/gcp-setup.md`](docs/infra/gcp-setup.md)、[`.github/workflows/`](.github/workflows) | [#2](https://github.com/jphacks/kz_2601/pull/2) CI、[#3](https://github.com/jphacks/kz_2601/pull/3) GCP、[#16](https://github.com/jphacks/kz_2601/pull/16) deploy |
 
@@ -165,7 +170,7 @@ flowchart LR
   subgraph GCP["GCP (Cloud Run / asia-northeast1)"]
     AI["ai (Go)<br/>generate / validate / patch"]
     AC["appconfig (Go)<br/>DSL version / records"]
-    FS[("Firestore<br/>(永続化は予定)")]
+    FS[("Firestore<br/>(永続化は実装中)")]
     SM["Secret Manager"]
   end
   Svc -- "Bearer: Firebase ID token<br/>POST /v1/generate" --> AI
