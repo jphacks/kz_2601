@@ -84,6 +84,6 @@ private struct FailingAI: AIClient {
         try await Task.sleep(for: .milliseconds(200))
         throw URLError(.timedOut)
     }
-    func chat(appId: String, messages: [ChatMessage], locale: String?) async throws -> ChatTurn { throw URLError(.timedOut) }
+    func chat(appId: String, messages: [ChatMessage], locale: String?, mode: ChatMode?) async throws -> ChatTurn { throw URLError(.timedOut) }
     func resetChat(appId: String) async {}
 }
