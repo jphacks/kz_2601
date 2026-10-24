@@ -25,11 +25,14 @@ flowchart TD
     Services["MetamonServices<br/>Protocols/ (AppConfigClient, AIClient, DocumentSync, TokenProvider, SpeechTranscriber, NotificationScheduler)<br/>Live/ Mock/ Native/"]
     DSL["MetamonDSL<br/>Model (Codable) / GridArea / Record / FieldCoding / Aggregator / DSLExamples<br/>Foundation のみ"]
     WhisperKit[("argmax-oss-swift 1.1.1<br/>WhisperKit")]
+    Widget["ios/MetamonWidget (WidgetKit 拡張)<br/>MetamonStatWidget / WidgetSnapshot(共有)"]
     App --> Renderer
     App --> Services
+    App --> DSL
     Renderer --> DSL
     Services --> DSL
     Services --> WhisperKit
+    App -. "App Group UserDefaults(JSON)" .-> Widget
 ```
 
 | モジュール | 場所 | 責務 | 依存 | テスト |
@@ -37,7 +40,8 @@ flowchart TD
 | `MetamonDSL` | `ios/Packages/MetamonDSL` | DSL v1 の Codable モデル、`GridArea`(area 計算)、`Record`/`FieldCoding`/`Aggregator`(クライアント集計)、`DSLExamples` | なし(Foundation) | `swift test`(macOS で可)/ `xcodebuild test` |
 | `MetamonRenderer` | `ios/Packages/MetamonRenderer` | SwiftUI View。`ComponentRegistry`(`type` 文字列 → View)、`DSLView`、`ScreenView`、`GridScreenLayout`、`DSLNavigationRoot`(TabView)。Services を知らない | DSL | `xcodebuild test`(schema 全 type の登録チェック) |
 | `MetamonServices` | `ios/Packages/MetamonServices` | 外部 I/O の protocol と実装。`Protocols/` と `Live/`(HTTP, WhisperKit)`Mock/` `Native/`(UNUserNotificationCenter)をフォルダで分離。WhisperKit はこのパッケージの依存 | DSL, WhisperKit | `xcodebuild test` |
-| アプリ本体 | `ios/Metamon` | `MetamonApp`(組み立て)、`AppRuntime`(状態・アクション実行。`DSLRuntime` に準拠)、`RootView`(モーダル/FAB/オーバーレイ)、`VoiceInputView`、`BuildConfig`(環境 → Services) | 全部 | なし(ロジックは各パッケージへ) |
+| アプリ本体 | `ios/Metamon` | `MetamonApp`(組み立て)、`AppRuntime`(状態・アクション実行。`DSLRuntime` に準拠)、`RootView`(モーダル/FAB/オーバーレイ)、`VoiceInputView`、`BuildConfig`(環境 → Services)、`WidgetSnapshotWriter`(stat 集計 → App Group) | 全部 | なし(ロジックは各パッケージへ) |
+| ウィジェット | `ios/MetamonWidget` | WidgetKit 拡張(`jp.kz2601.metamon.widget`)。`WidgetSnapshot`(`Shared/`・本体と共用コンパイル)を描画するだけ。§12 | なし(Renderer/DSL を import しない) | なし |
 
 ### 1.1 DI(依存性注入)
 - **入口は `ios/Metamon/App/BuildConfig.swift` の `BuildConfig.make(environment:)` だけ**。`AppEnvironment`(`.mock` / `.live(appConfigURL:aiURL:)`・どちらか片方だけ live も可)を環境変数 `METAMON_AI_BASE_URL` / `METAMON_APPCONFIG_BASE_URL` / Info.plist から判定し、`Services`(protocol のコンテナ struct。`auth` を含む)を**1回だけ**組み立てる。Mock と本番の切替はこのファイルで完結する。
@@ -286,7 +290,7 @@ SignInView ──Sign in with Apple──▶ ASAuthorizationAppleIDCredential(id
 | `RootView.id(version)` で全ツリー再生成 | 入力中の内容が消える | 仕様として許容(改変=アプリ再生成)。version が同じなら再生成しない |
 | Firestore 1MB/doc | 画像 base64 | 圧縮+縮小。超えるなら Cloud Storage |
 | Sign in with Apple の Capability/Team 設定 | 実機動作が止まる | 匿名認証へ即切替(§7)。`DEVELOPMENT_TEAM` は `METAMON_TEAM_ID` 環境変数で注入 |
-| Widget(ホーム画面ウィジェット)の可変性 | 期待値ズレ | **スコープ外**。WidgetKit は静的タイムラインで DSL 動的描画と相性が悪い。やるなら「最新レコード1件を表示」の固定 Widget のみ |
+| Widget(ホーム画面ウィジェット)の可変性 | 期待値ズレ | **実装済み(§12)**: DSL を動的描画せず、本体が `stat` 先頭 3 個を集計した**文字列**だけを App Group で渡す固定レイアウト。更新は本体起動中のみ(WidgetKit の予算内) |
 | 実機 iPhone 13 のみ・カメラはシミュレータ不可 | 検証の遅れ | カメラ v0 を PhotosPicker にしたので UI 動線はシミュレータで確認可能 |
 
 ## 11. ビルド/実行
@@ -303,3 +307,27 @@ xcrun devicectl device install app --device <DEVICE_ID> <path/to/Metamon.app>
 xcrun devicectl device process launch --device <DEVICE_ID> jp.kz2601.metamon
 # 実サーバー接続: build setting(上記)か Scheme の環境変数 METAMON_AI_BASE_URL / METAMON_APPCONFIG_BASE_URL(未設定なら全モック)。§7 参照
 ```
+
+## 12. ホーム画面ウィジェット(WidgetKit・実装済み・Issue #39)
+生成アプリの `stat`(今月の支出など)をホーム画面に出す。**DSL を Widget 側で描画しない**(WidgetKit は静的タイムライン + メモリ上限 30MB で Renderer と相性が悪い)。本体で集計し、文字列だけを渡す。
+
+```
+AppRuntime.apply() / refresh()  ──▶ WidgetSnapshotWriter.write(dsl:records:)
+   stat 先頭 3 個を Aggregator で集計(StatLeaf と同じ式)
+   ──▶ WidgetSnapshot {appName, stats[{label, value}], updatedAt} を JSON で
+       UserDefaults(suiteName: "group.jp.kz2601.metamon") に保存
+   ──▶ WidgetCenter.shared.reloadAllTimelines()
+MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 個 / systemMedium=最大 3 個横並び)
+```
+
+| 項目 | 内容 |
+|---|---|
+| ターゲット | `MetamonWidget`(xcodegen `type: app-extension`、`com.apple.widgetkit-extension`、Bundle ID `jp.kz2601.metamon.widget`、本体に埋め込み) |
+| 共有 | App Group `group.jp.kz2601.metamon`(本体・拡張両方の entitlements)。モデル `ios/MetamonWidget/Shared/WidgetSnapshot.swift` は**両ターゲットにコンパイル**(パッケージ化しない) |
+| 本体側の変更 | `AppRuntime.apply()` 末尾と `refresh()` のレコード代入直後の 1 行ずつ + `BuildConfig.appGroupID`。実装は `ios/Metamon/App/WidgetSnapshotWriter.swift` に集約 |
+| stat の選び方 | 画面順(initialScreen → タブ順 → 残り)で `type: stat` を先頭 3 個。初期状態(`isVoiceOnly`)ならスナップショットを消す |
+| 値が未取得の時 | `records[entity]` が nil(apply 直後)なら前回スナップショットの同じ stat(entity|aggregate|field|label キー)の値を引き継ぐ。無ければ「—」 |
+| 表示 | ブランドグラデーションの薄い背景、数値は `.rounded` 太字 `.monospacedDigit()`、下部にアプリ名(+medium は更新時刻)。データ無しは「メタモンでアプリを作るとここに数字が出ます」。タップで本体起動(`widgetURL(metamon://widget)`) |
+| 更新頻度(制約) | 本体がフォアグラウンドで DSL 適用/レコード更新した時に即時 + 30 分毎のタイムライン再読込(値は前回のまま)。**本体を開かずにレコードが増えても(別端末・ホットリロード未受信)ウィジェットは古い**。値が変わらない時は reload しない(WidgetKit の 1 日の更新予算を節約) |
+| 実機署名 | App Group capability を **本体と拡張の 2 つの App ID** に付ける必要がある。`xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で付与される(有料 Program 必須)。通らない時は Apple Developer > Identifiers > App Groups で `group.jp.kz2601.metamon` を作成 → 両 App ID の Capabilities で App Groups にチェック |
+| シミュレータ | 署名なし(`CODE_SIGNING_ALLOWED=NO`)でも App Group の UserDefaults は動く。ウィジェットの配置はホーム画面長押し → + → 「メタモン」 |
