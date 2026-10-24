@@ -51,6 +51,18 @@ public enum VoiceIntent: Equatable, Sendable {
         return .morph
     }
 
+    /// 「筋トレの記録アプリを作って」「家計簿アプリが欲しい」「make a budget app」のような、アプリ丸ごとの作成依頼か(#182)。
+    /// 生成後の画面から言われても ai は作り直し(mode=full)になるので、生成中の表示を薄いインジケータでなく全画面にする判定に使う。
+    /// 「アプリの色を青にして」のような改変は「アプリ」の直後が作成語でないので拾わない。
+    public static func isWholeAppRequest(_ transcript: String) -> Bool {
+        let text = normalize(transcript)
+        guard !text.isEmpty else { return false }
+        if text.range(of: #"アプリ(を|が|も)?(作|つく|ほし|欲し|ちょうだい|お願い|おねがい)"#, options: .regularExpression) != nil { return true }
+        if text.range(of: #"アプリ(に|へ)(して|変えて|かえて|作り替え|作りかえ|つくりかえ)"#, options: .regularExpression) != nil { return true }
+        // 英語: normalize で空白が落ちるので連結のまま見る(make a budget app → makeabudgetapp)
+        return text.range(of: #"^(please)?(make|build|create|iwant|ineed|giveme)\p{L}*apps?(forme|please)?$"#, options: .regularExpression) != nil
+    }
+
     /// 切替語(`switchWords`)のうち最も手前に現れたものより前の部分。切替語が無ければ nil。
     static func switchTarget(in text: String) -> String? {
         var best: Range<String.Index>?
