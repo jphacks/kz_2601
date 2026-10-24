@@ -18,12 +18,12 @@ struct ShareButtonLeaf: View {
         var s = c.text ?? ""
         if let form = ctx.form {
             for f in form.entity.storedFields {
-                let v = FieldCoding.display(form.values[f.id] ?? .null, field: f)
+                let v = displayText(form.values[f.id] ?? .null, field: f)
                 s = s.replacingOccurrences(of: "{{\(f.id)}}", with: v)
             }
         }
         if let field = c.field, let form = ctx.form, let f = form.entity.field(field), f.type != .photo {
-            let v = FieldCoding.display(form.values[field] ?? .null, field: f)
+            let v = displayText(form.values[field] ?? .null, field: f)
             if !v.isEmpty { s += (s.isEmpty ? "" : "\n") + v }
         }
         return s

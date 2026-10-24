@@ -38,7 +38,7 @@ struct ComputedFieldRow: View {
     var body: some View {
         let row = ExprEvaluator.Row(entity: form.entity, record: Record(id: form.recordId ?? "draft", data: form.payload), memoizable: false)
         let value = field.computed.flatMap { rt.evaluator().evaluate($0, row: row) }
-        let text = FieldCoding.display(value?.json(for: field) ?? .null, field: field)
+        let text = displayText(value?.json(for: field) ?? .null, field: field)
         LabeledInput(label: c.label ?? field.name) {
             HStack {
                 Text(text)
