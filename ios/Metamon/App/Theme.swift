@@ -2,7 +2,7 @@ import SwiftUI
 import MetamonRenderer
 
 /// アプリ本体(音声画面・サインイン・生成中・設定)のデザイントークン。Renderer の部品の見た目はここでは扱わない。
-/// 色はライト/ダーク両対応(system color か、両モードで映えるブランド色のみ)。
+/// 色はライト/ダーク両対応。値の正典は Renderer の `RenderTheme.Colors`(本体と生成アプリを同じトーンに揃える・#102)。
 enum Theme {
     enum Spacing {
         static let xs: CGFloat = 4
@@ -21,19 +21,21 @@ enum Theme {
     }
 
     enum Colors {
-        /// ブランド(Tailor It = 紫〜水色)
-        static let brandA = Color(hex: "#8E6CFF")!
-        static let brandB = Color(hex: "#4CC9FF")!
+        /// ブランド(Tailor It = アイコンの紺に合わせた藍〜青緑)
+        static let brandA = RenderTheme.Colors.brandA
+        static let brandB = RenderTheme.Colors.brandB
+        /// 文字に使うブランド色(AA)
+        static let brandText = RenderTheme.Colors.brandText
         /// 録音中(赤〜珊瑚)
         static let recordA = Color(hex: "#FF5F6D")!
         static let recordB = Color(hex: "#FF9966")!
         /// 警告(生成が長引いた時)
         static let warning = Color.orange
 
-        static let canvas = Color(.systemGroupedBackground)
-        static let surface = Color(.secondarySystemGroupedBackground)
-        static let surfaceElevated = Color(.tertiarySystemGroupedBackground)
-        static let hairline = Color.primary.opacity(0.08)
+        static let canvas = RenderTheme.Colors.canvas
+        static let surface = RenderTheme.Colors.surface
+        static let surfaceElevated = RenderTheme.Colors.surfaceElevated
+        static let hairline = RenderTheme.Colors.hairline
     }
 
     /// ランタイム側オーバーレイ(DSL 外)の配置。
@@ -59,7 +61,8 @@ enum Theme {
     }
 
     enum Shadow {
-        static let softColor = Color.black.opacity(0.10)
+        /// 紺を薄く落とした影(真っ黒より生成りの面に馴染む)
+        static let softColor = Color(red: 15 / 255, green: 26 / 255, blue: 34 / 255).opacity(0.10)
         static let softRadius: CGFloat = 18
         static let softY: CGFloat = 8
     }
