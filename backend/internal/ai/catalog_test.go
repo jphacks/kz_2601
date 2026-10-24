@@ -65,6 +65,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompAvatar, dsl.CompTable, dsl.CompTimeline, dsl.CompEmptyState,
 		// logic
 		dsl.CompSettlement,
+		// on-device AI
+		dsl.CompAiButton,
 	} {
 		goTypes[string(ct)] = true
 	}
