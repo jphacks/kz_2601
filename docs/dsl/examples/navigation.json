@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "画面遷移の確認",
+    "description": "3 画面 A→B→C→A を循環し、C から別タブへも飛べる検証用の例(#113)。navigate は行き先に応じて pop・タブ切替・push を自動で選ぶ",
+    "icon": "arrow.triangle.2.circlepath",
+    "voiceEntry": "floating",
+    "tabs": [
+      { "screen": "a", "title": "A", "icon": "a.circle" },
+      { "screen": "other", "title": "別タブ", "icon": "square.grid.2x2" }
+    ]
+  },
+  "initialScreen": "a",
+  "entities": [],
+  "screens": [
+    {
+      "id": "a",
+      "title": "画面 A",
+      "components": [
+        { "type": "text", "id": "about", "area": "A1:F2", "text": "A はタブの根。B → C → A と進んでも戻るは深くならない", "style": "body" },
+        { "type": "button", "id": "to_b", "area": "A3:F4", "label": "B へ", "icon": "arrow.right",
+          "action": { "type": "navigate", "screen": "b" } },
+        { "type": "button", "id": "c_sheet", "area": "A5:F6", "label": "C をシートで開く", "icon": "rectangle.bottomhalf.inset.filled", "style": "secondary",
+          "action": { "type": "navigate", "screen": "c", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "b",
+      "title": "画面 B",
+      "components": [
+        { "type": "text", "id": "about", "area": "A1:F2", "text": "B から C へ進む", "style": "body" },
+        { "type": "button", "id": "to_c", "area": "A3:F4", "label": "C へ", "icon": "arrow.right",
+          "action": { "type": "navigate", "screen": "c" } }
+      ]
+    },
+    {
+      "id": "c",
+      "title": "画面 C",
+      "components": [
+        { "type": "text", "id": "about", "area": "A1:F2", "text": "C から A(タブの根)へ戻るか、別タブへ飛ぶ", "style": "body" },
+        { "type": "button", "id": "to_a", "area": "A3:F4", "label": "A へ", "icon": "arrow.uturn.left",
+          "action": { "type": "navigate", "screen": "a" } },
+        { "type": "button", "id": "to_other", "area": "A5:F6", "label": "別タブへ", "icon": "square.grid.2x2", "style": "secondary",
+          "action": { "type": "navigate", "screen": "other" } }
+      ]
+    },
+    {
+      "id": "other",
+      "title": "別タブ",
+      "components": [
+        { "type": "text", "id": "about", "area": "A1:F2", "text": "別タブの根。ここからも B へ行ける", "style": "body" },
+        { "type": "button", "id": "to_b", "area": "A3:F4", "label": "B へ", "icon": "arrow.right",
+          "action": { "type": "navigate", "screen": "b" } }
+      ]
+    }
+  ]
+}
