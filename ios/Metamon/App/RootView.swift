@@ -12,6 +12,8 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     /// Renderer が上げる「最下段(行 11〜12・A〜B 列)に掛かる部品の上端 y」(Route.id → global y)。FAB 退避に使う(#83)
     @State private var bottomObstructions: [String: CGFloat] = [:]
+    /// 同じく右端(E〜F 列)。FAB を右に吸着させた時に使う(#52)
+    @State private var trailingBottomObstructions: [String: CGFloat] = [:]
 
     var body: some View {
         @Bindable var rt = rt
@@ -34,13 +36,15 @@ struct RootView: View {
                 .blur(radius: rt.morphJob?.kind == .edit ? 1.5 : 0)
                 .allowsHitTesting(rt.morphJob == nil)
                 .onPreferenceChange(GridBottomObstructionKey.self) { bottomObstructions = $0 }
+                .onPreferenceChange(GridBottomTrailingObstructionKey.self) { trailingBottomObstructions = $0 }
 
             // フォーム画面(push)では FAB を出さず、ナビバー右上のマイク(`formToolbarAccessory`)が入口になる(#83)
             ZStack {
                 if rt.dsl.app.voiceEntry == .floating, !isFormVisible {
                     VoiceFab(
                         hasTabs: rt.dsl.app.hasTabs,
-                        obstructionTop: bottomObstructions[visibleMainRoute.id],
+                        leadingObstructionTop: bottomObstructions[visibleMainRoute.id],
+                        trailingObstructionTop: trailingBottomObstructions[visibleMainRoute.id],
                         isBusy: rt.morphJob != nil,
                         onTap: { rt.showVoiceSheet = true },
                         onLongPress: { rt.openSwitcher() }
