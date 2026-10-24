@@ -129,7 +129,10 @@ components:
         mode:
           type: string
           enum: [full, patch, restore]
-          description: 実際に使われた適用モード (patch が full に降格した場合は full)
+          description: 実際に使われた適用モード (patch が full に降格した場合は full)。restore = undo で 1 つ前の version を復元(Claude を呼ばない)
+        restoredFrom:
+          type: integer
+          description: mode=restore の時、復元元の version。戻せる変更が無い時(version 1 のみ)は省略され version は変わらず summary が「戻せる変更がありません。」になる
         patch:
           type: array
           description: mode=patch の時、適用した RFC 6902 ops (iOS は使わなくてよい。デバッグ・表示用)
@@ -139,8 +142,8 @@ components:
         transcript: { type: string, description: 入力が audio の時の文字起こし }
         source:
           type: string
-          enum: [claude, fallback_template]
-          description: fallback_template の時 iOS は控えめな文言で案内
+          enum: [claude, restore, fallback_template]
+          description: fallback_template の時 iOS は控えめな文言で案内。restore は undo(Claude 不使用)
         changes:
           type: array
           description: 機械生成した差分 (summary の材料)

@@ -70,3 +70,69 @@ func TestHTTPErrorMapping(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestMemoryVersionsAndRestore(t *testing.T) {
+	m := NewMemory()
+	ctx := context.Background()
+	app := dsl.Initial()
+	app.App.Name = "x"
+	raw, _ := json.Marshal(app)
+	if _, err := m.Put(ctx, "a", 1, raw, Source{Kind: "ai", Mode: "full"}); err != nil {
+		t.Fatal(err)
+	}
+	ops := []dsl.PatchOp{{Op: "replace", Path: "/app/name", Value: json.RawMessage(`"y"`)}}
+	if _, err := m.Patch(ctx, "a", 2, ops, Source{Kind: "ai", Mode: "patch"}); err != nil {
+		t.Fatal(err)
+	}
+	vs, err := m.Versions(ctx, "a")
+	if err != nil || len(vs) != 3 || vs[0].Version != 3 || vs[2].Version != 1 || vs[0].Source.Mode != "patch" {
+		t.Fatalf("versions newest first: %v %+v", err, vs)
+	}
+	env, err := m.Restore(ctx, "a", 2)
+	if err != nil || env.Version != 4 {
+		t.Fatalf("restore: %v %+v", err, env)
+	}
+	got, _ := dsl.Parse(env.DSL)
+	if got.App.Name != "x" {
+		t.Fatalf("restored DSL must be version 2's: %q", got.App.Name)
+	}
+	vs, _ = m.Versions(ctx, "a")
+	if vs[0].Source.Kind != "restore" || vs[0].Source.RestoredFrom != 2 || vs[0].ParentVersion != 3 {
+		t.Fatalf("restore source: %+v", vs[0].Source)
+	}
+	var ae *Error
+	if _, err := m.Restore(ctx, "a", 99); !errors.As(err, &ae) || ae.Status != 404 {
+		t.Fatalf("unknown version must be 404: %v", err)
+	}
+}
+
+func TestHTTPRestoreRereadsDSL(t *testing.T) {
+	var calls []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.RequestURI())
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/apps/a/versions":
+			_, _ = w.Write([]byte(`{"items":[{"appId":"a","version":3,"parentVersion":2,"source":{"kind":"restore","restoredFrom":1}},{"appId":"a","version":2}]}`))
+		case r.Method == http.MethodPost:
+			w.WriteHeader(201)
+			_, _ = w.Write([]byte(`{"appId":"a","version":4,"source":{"kind":"restore","mode":"full","restoredFrom":2}}`))
+		default:
+			_, _ = w.Write([]byte(`{"appId":"a","version":4,"dsl":{"k":1}}`))
+		}
+	}))
+	defer srv.Close()
+	c := NewHTTP(srv.URL)
+	ctx := WithBearer(context.Background(), "Bearer tok")
+	vs, err := c.Versions(ctx, "a")
+	if err != nil || len(vs) != 2 || vs[0].Source.RestoredFrom != 1 {
+		t.Fatalf("versions: %v %+v", err, vs)
+	}
+	env, err := c.Restore(ctx, "a", 2)
+	if err != nil || env.Version != 4 || string(env.DSL) != `{"k":1}` {
+		t.Fatalf("restore: %v %+v", err, env)
+	}
+	want := []string{"GET /v1/apps/a/versions?pageSize=50", "POST /v1/apps/a/versions/2/restore", "GET /v1/apps/a/dsl"}
+	if len(calls) != 3 || calls[0] != want[0] || calls[1] != want[1] || calls[2] != want[2] {
+		t.Fatalf("calls: %v", calls)
+	}
+}

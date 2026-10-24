@@ -194,3 +194,79 @@ func TestModeResolution(t *testing.T) {
 		t.Fatal("missing appId must fail")
 	}
 }
+
+func TestWantsUndo(t *testing.T) {
+	yes := []string{"元に戻して", "戻して", "取り消して", "さっきのやめて", "アンドゥ", "Undo", "元に戻して。", "やっぱりやめて",
+		"ひとつ前に戻して", "一つ前の状態に戻して", "さっきの変更を元に戻して", " もとに戻してください "}
+	no := []string{"一覧を元の位置に戻して", "戻すボタンを追加して", "今月の合計をもっと大きく表示して", "家計簿",
+		"カテゴリにカフェを追加して", "追加ボタンを左上に移して", "元に戻してから合計カードをもっと大きくして", ""}
+	for _, s := range yes {
+		if !wantsUndo(s) {
+			t.Errorf("%q must be undo", s)
+		}
+	}
+	for _, s := range no {
+		if wantsUndo(s) {
+			t.Errorf("%q must not be undo", s)
+		}
+	}
+}
+
+func TestUndo_RestoresPreviousVersionWithoutClaude(t *testing.T) {
+	kb := kakeibo(t)
+	f := &fakeCaller{replies: []string{string(kb), `{"patch":[{"op":"replace","path":"/app/name","value":"編集後"}],"summary":"名前を変えました"}`}}
+	svc, store := newSvc(f)
+	ctx := context.Background()
+	if _, err := svc.Generate(ctx, Request{AppID: "a", Transcript: "家計簿"}); err != nil { // v2
+		t.Fatal(err)
+	}
+	if _, err := svc.Generate(ctx, Request{AppID: "a", Transcript: "名前を変えて"}); err != nil { // v3
+		t.Fatal(err)
+	}
+	calls := len(f.calls)
+	res, err := svc.Generate(ctx, Request{AppID: "a", Transcript: "元に戻して"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.calls) != calls {
+		t.Fatal("undo must not call Claude")
+	}
+	if res.Mode != "restore" || res.Version != 4 || res.PreviousVersion != 3 || res.RestoredFrom != 2 || res.Source != "restore" {
+		t.Fatalf("result: %+v", res)
+	}
+	if !strings.Contains(res.Summary, "version 2") {
+		t.Fatalf("summary: %q", res.Summary)
+	}
+	app, err := dsl.Parse(res.DSL)
+	if err != nil || app.App.Name == "編集後" {
+		t.Fatalf("restored DSL must be version 2: %v %q", err, app.App.Name)
+	}
+	env, _ := store.Get(ctx, "a")
+	if env.Version != 4 {
+		t.Fatalf("store version: %d", env.Version)
+	}
+	// Explicit mode=undo steps back again from the restored version (v2 -> v1).
+	res, err = svc.Generate(ctx, Request{AppID: "a", Transcript: "whatever", Mode: ModeUndo})
+	if err != nil || res.Version != 5 || res.RestoredFrom != 1 {
+		t.Fatalf("second undo: %v %+v", err, res)
+	}
+	if a, _ := dsl.Parse(res.DSL); !isInitial(a) {
+		t.Fatal("second undo must reach the initial app")
+	}
+	// Nothing left to undo: current state is returned unchanged.
+	res, err = svc.Generate(ctx, Request{AppID: "a", Transcript: "戻して"})
+	if err != nil || res.Version != 5 || res.RestoredFrom != 0 || res.Summary != "戻せる変更がありません。" {
+		t.Fatalf("third undo: %v %+v", err, res)
+	}
+	if len(f.calls) != calls {
+		t.Fatal("undo must never call Claude")
+	}
+}
+
+func TestUndo_NothingOnFreshApp(t *testing.T) {
+	svc, _ := newSvc(&fakeCaller{})
+	res, err := svc.Generate(context.Background(), Request{AppID: "fresh", Transcript: "元に戻して"})
+	if err != nil || res.Version != 1 || res.Mode != "restore" || res.Summary != "戻せる変更がありません。" {
+		t.Fatalf("%v %+v", err, res)
+	}
+}
