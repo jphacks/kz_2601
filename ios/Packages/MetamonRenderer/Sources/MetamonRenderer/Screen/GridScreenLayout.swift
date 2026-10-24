@@ -192,7 +192,8 @@ public struct GridBottomTrailingObstructionKey: PreferenceKey {
 
 /// セル = 長方形の器。中身がはみ出す型(list / section / stack / text)は器の内側でスクロールし、
 /// 上下にまだ続きがある時だけ端をフェードさせる(「切れている」ではなく「続きがある」と読める)。
-private struct GridCell: View {
+/// Container 内グリッド(#81)の子のセルにも再利用する(`LocalGrid`)。
+struct GridCell: View {
     let component: Component
     let ctx: RenderContext
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -203,13 +204,17 @@ private struct GridCell: View {
     /// 通常サイズでは「中身が伸びる型」だけ内側スクロール。Dynamic Type のアクセシビリティサイズでは
     /// stat / button / 入力なども固定高のセルからはみ出すので、面を自前で埋める型以外は全部スクロールに逃がす。
     private var scrollsInside: Bool {
-        switch component.type {
+        // Container 内グリッド(#81)は子のセルがそれぞれ器になるので、Container 自体は器いっぱいに固定する
+        if hasLocalGrid { return false }
+        return switch component.type {
         // hstack は通常サイズでは器に収める(stat を横に並べる定番。スクロールにすると高さが無制限になり、stat の数値がセル高さで縮まず下が切れる・#89)
         case .list, .section, .vstack, .text, .table, .timeline, .markdown, .card, .disclosure, .grid, .calendar, .settlement: true
         case .image, .mapView, .webView, .chart, .gauge, .spacer, .divider, .qrScanner, .voiceInput: false
         default: typeSize.isAccessibilitySize
         }
     }
+
+    private var hasLocalGrid: Bool { component.localGridPlacement != nil }
 
     @Environment(\.dslRuntime) private var rt
 
@@ -231,6 +236,7 @@ private struct GridCell: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 // 器の矩形で切るとカード/ボタンの影まで四角く切れて「薄い箱」が見える(#131)。影の分だけ外側まで描かせる
                 .mask(Rectangle().padding(-GridCell.shadowBleed))
+                .environment(\.localGridFills, hasLocalGrid)
         }
     }
 }

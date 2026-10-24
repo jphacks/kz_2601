@@ -11,7 +11,7 @@ struct CardContainer: View {
             if let title = c.title, !title.isEmpty {
                 Text(title).font(RenderTheme.Fonts.cardTitle)
             }
-            ForEach(c.children) { DSLView(component: $0, ctx: ctx) }
+            if let placed = c.localGridPlacement { LocalGrid(placed: placed, ctx: ctx) } else { ForEach(c.children) { DSLView(component: $0, ctx: ctx) } }
         }
         .renderCard()
     }
