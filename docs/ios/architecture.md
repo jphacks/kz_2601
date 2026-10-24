@@ -535,18 +535,21 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 ## 14. 計算ロジック(Expr・computed・ref・settlement / Issue #101)
 
 割り勘のように「画面はできたが裏の計算が無い」を埋めるため、DSL に計算式 `Expr` を足した(backend #100 と共通契約)。
+**契約の正典は `docs/dsl/expressions.md`(とスキーマ `$defs/Expr`)**。本節は iOS 実装の対応表で、食い違ったら expressions.md が勝つ。
 
 | 置き場所 | 意味 | iOS 実装 |
 |---|---|---|
 | `Field.computed: Expr` | 読み取り専用の算出フィールド(行 = そのレコード)。**Record に保存しない** | `DSLRuntime.viewRecords(for:)` が computed を data に合成した表示用レコードを返す → list / table / timeline / stat(aggregate の field)/ chart(groupBy・field)/ sort がそのまま扱える |
-| フォーム内の computed | 読み取り専用行。入力中のドラフトで**ライブ更新** | `FormFieldOverride`(`DSLView` で 1 箇所振り分け)→ `ComputedFieldRow`。`FormDraft` は `storedFields` だけを持ち・送る |
-| `Stat.value: Expr` | aggregate の代替(行なし) | `StatLeaf.exprValue` |
-| `Field.type = ref` + `refEntity` | 別 entity のレコード参照。保存値はレコード id | 表示は `rt.display(_:field:)` が見出し(titleField → 最初の string)に解決。フォームは `RefPickerRow`(0 件なら「先に◯◯を追加してください」) |
+| フォーム内の computed(防御) | 契約上 computed に入力部品は束縛できない(backend がエラー)。それでも来た場合は読み取り専用行にし、入力中のドラフトで**ライブ更新** | `FormFieldOverride`(`DSLView` で 1 箇所振り分け)→ `ComputedFieldRow`。`FormDraft` は `storedFields` だけを持ち・送る |
+| `Stat.value: Expr` | aggregate の代替(行なし・`ref` 不可)。`value` のときは `entity/field/filter` を書かない(agg の中に書く) | `StatLeaf.exprValue`(アイコン既定は `function`) |
+| `Field.type = ref` + `refEntity` | 別 entity のレコード参照。保存値はレコード id。入力は `picker`(それ以外の入力部品は backend がエラー) | 表示は `rt.display(_:field:)` が見出し(titleField → 最初の string)に解決。フォームは `RefPickerRow`(0 件なら「先に◯◯を追加してください」) |
 | `settlement` leaf | balance(正=受け取る/負=払う)から「A → B ¥1,200」 | `Settlement.transfers`(貪欲法・1 円未満は 0)+ `SettlementLeaf` |
 
-- 評価器 `MetamonDSL/Logic/ExprEvaluator.swift`。値は `ExprValue`(number/string/bool/date)、評価不能(ゼロ除算・型不一致・参照なし・循環・入れ子 48 段超)は `nil` → 表示「—」(`FieldCoding.unavailable`)。
-- `agg.filter.value` の Expr(例 `{"ref":"id"}`)は**外側の行**で評価してから照合する。`filter` は単体 or 配列(AND)。
+- 評価器 `MetamonDSL/Logic/ExprEvaluator.swift`。値は `ExprValue`(number/string/bool/date)、評価不能(ゼロ除算・型不一致・参照なし)は `nil` → 表示「—」(`FieldCoding.unavailable`)。深さ ≤ 8・循環なしは backend が保証する。iOS は防御として循環と入れ子 48 段超も `nil` にする。
+- リテラルは number / string / boolean(`null` は契約外)。iOS のデコードは寛容に `null` も受ける。
+- `agg.filter.value` の Expr(例 `{"ref":"id"}`)は**外側の行**で評価してから照合する。`agg.filter` は単体 or 配列(AND)。部品レベルの `filter`(list / stat / chart …)はスキーマ上 1 つだけ(iOS は配列も読める)。
+- progressBar / gauge の `value` は従来どおり数値リテラルのみ(Expr にしない)。
 - 性能: `rt.evaluator()` は全 entity のレコード + computed 定義のハッシュを署名にして評価器を使い回す(computed / agg の結果をメモ)。10 行 × 支出 100 件程度なら 1 画面 1 回の評価で済む。
 - レコード取得対象は `AppDSL.entitiesNeeded(by:)`(部品の entity + computed の agg 先 + ref 先を推移的に)。
-- op 一覧・JSON 形は `docs/dsl/dsl.schema.json` の `$defs.Expr`。`weekday` は Calendar 準拠(日=1 … 土=7)。
-- 確認: `METAMON_MOCK=1 METAMON_INITIAL_EXAMPLE=warikan`(モック seed にメンバー 3 人・支出 3 件)、フォームは `METAMON_AUTO_OPEN=expense_form:sheet:record`。
+- op 一覧・JSON 形は `docs/dsl/expressions.md` §2-3 / `docs/dsl/dsl.schema.json` の `$defs`(`Expr` / `ExprRef` / `ExprAgg` / `ExprOp` / `ExprIf`)。`weekday` は Calendar 準拠(日=1 … 土=7)。
+- 確認: `METAMON_MOCK=1 METAMON_INITIAL_EXAMPLE=warikan`(モック seed にメンバー 3 人・支出 3 件 → 合計 ¥15,000・1 人 ¥5,000・精算 じろう→たろう ¥5,000 / はなこ→たろう ¥500)、フォームは `METAMON_AUTO_OPEN=expense_form:sheet:record`。BMI は `METAMON_INITIAL_EXAMPLE=bmi`(seed 2 件 → 22.5 / 22.9・平均 22.7)。
