@@ -1,0 +1,3579 @@
+{
+  "date": "2026-10-24",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "tag": "audit-en-after",
+  "cases": [
+    {
+      "id": "e01_warikan",
+      "kind": "create",
+      "group": "audit-en",
+      "transcript": "Make a bill splitting app for a trip with four friends. I want to log who paid how much, and at the end show who owes whom how much to settle up",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 8817,
+      "totalMs": 8818,
+      "outputChars": 3780,
+      "usage": {
+        "inputTokens": 145,
+        "outputTokens": 1624,
+        "cacheCreationInputTokens": 27244
+      },
+      "summary": "I made a Trip Bill Splitter app. Use the button at the bottom left to add members or expenses.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 3,
+        "components": 18,
+        "topLevel": 10,
+        "withArea": 10,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 2,
+        "fields": 8,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "members:private",
+          "expenses:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F5 A6:F8 A9:F10 A11:C12 D11:F12",
+          "expense_form: A1:F5 A11:F12",
+          "member_form: A1:F2 A11:F12"
+        ],
+        "computed": [
+          "members.paid",
+          "members.share",
+          "members.balance"
+        ],
+        "statValues": 1,
+        "settlement": true,
+        "refFields": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "Log who paid what on your trip and see who owes whom to settle up",
+          "icon": "person.3",
+          "name": "Trip Bill Splitter",
+          "theme": {
+            "primaryColor": "#1565C0"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "Name",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "computed": {
+                  "agg": "sum",
+                  "entity": "expenses",
+                  "field": "amount",
+                  "filter": {
+                    "field": "payer",
+                    "op": "eq",
+                    "value": {
+                      "ref": "id"
+                    }
+                  }
+                },
+                "id": "paid",
+                "name": "Paid",
+                "type": "currency"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "agg": "sum",
+                          "entity": "expenses",
+                          "field": "amount"
+                        },
+                        {
+                          "agg": "count",
+                          "entity": "members"
+                        }
+                      ],
+                      "op": "div"
+                    }
+                  ],
+                  "op": "round"
+                },
+                "id": "share",
+                "name": "Share",
+                "type": "currency"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "ref": "paid"
+                    },
+                    {
+                      "ref": "share"
+                    }
+                  ],
+                  "op": "sub"
+                },
+                "id": "balance",
+                "name": "Balance",
+                "type": "currency"
+              }
+            ],
+            "id": "members",
+            "name": "Member",
+            "titleField": "name"
+          },
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "What for",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "amount",
+                "name": "Amount",
+                "required": true,
+                "type": "currency"
+              },
+              {
+                "id": "payer",
+                "name": "Paid by",
+                "refEntity": "members",
+                "required": true,
+                "type": "ref"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Date",
+                "type": "date"
+              }
+            ],
+            "id": "expenses",
+            "name": "Expense",
+            "titleField": "title"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "sum",
+                    "entity": "expenses",
+                    "field": "amount",
+                    "format": "currency",
+                    "label": "Total spent",
+                    "type": "stat"
+                  },
+                  {
+                    "format": "currency",
+                    "label": "Per person",
+                    "type": "stat",
+                    "value": {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "agg": "sum",
+                              "entity": "expenses",
+                              "field": "amount"
+                            },
+                            {
+                              "agg": "count",
+                              "entity": "members"
+                            }
+                          ],
+                          "op": "div"
+                        }
+                      ],
+                      "op": "round"
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F5",
+                "columns": [
+                  {
+                    "field": "name"
+                  },
+                  {
+                    "field": "paid"
+                  },
+                  {
+                    "field": "balance"
+                  }
+                ],
+                "entity": "members",
+                "id": "members_table",
+                "type": "table"
+              },
+              {
+                "area": "A6:F8",
+                "balanceField": "balance",
+                "entity": "members",
+                "id": "settle",
+                "nameField": "name",
+                "title": "Settle up",
+                "type": "settlement"
+              },
+              {
+                "area": "A9:F10",
+                "children": [
+                  {
+                    "emptyText": "No expenses yet",
+                    "entity": "expenses",
+                    "item": {
+                      "subtitle": "payer",
+                      "title": "title",
+                      "trailing": "amount"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "expense_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "Expenses",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "member_form",
+                  "type": "navigate"
+                },
+                "area": "A11:C12",
+                "icon": "person.badge.plus",
+                "id": "add_member",
+                "label": "Add friend",
+                "style": "secondary",
+                "type": "button"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "expense_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add_expense",
+                "label": "Add expense",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Trip Bills",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "expense_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add expense"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "title",
+                    "label": "What for",
+                    "placeholder": "Dinner",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "amount",
+                    "label": "Amount",
+                    "type": "numberField"
+                  },
+                  {
+                    "field": "payer",
+                    "label": "Paid by",
+                    "style": "menu",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "date",
+                    "label": "Date",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "Details",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this expense?",
+                  "entity": "expenses",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "expenses",
+            "id": "expense_form",
+            "title": "Log Expense",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "expenses",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "Name",
+                    "placeholder": "Alex",
+                    "type": "textField"
+                  }
+                ],
+                "id": "fields",
+                "title": "Friend",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this friend?",
+                  "entity": "members",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "members",
+            "id": "member_form",
+            "title": "Add Friend",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "members",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "e02_shopping_check",
+      "kind": "create",
+      "group": "audit-en",
+      "transcript": "Make a shopping list. Let me add things to buy, check them off right in the list when I buy them, and only show what I haven't bought yet",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 4294,
+      "totalMs": 4295,
+      "outputChars": 1632,
+      "usage": {
+        "inputTokens": 143,
+        "outputTokens": 702,
+        "cacheReadInputTokens": 27244
+      },
+      "summary": "I made a Shopping List app. Use the button at the bottom right to add items.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 7,
+        "topLevel": 4,
+        "withArea": 4,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "item:private"
+        ],
+        "areas": [
+          "home: A1:F10 D11:F12",
+          "item_form: A1:F4 A11:F12"
+        ]
+      },
+      "dsl": {
+        "app": {
+          "description": "Add things to buy and check them off right in the list. Only items you haven't bought yet are shown.",
+          "icon": "cart",
+          "name": "Shopping List",
+          "theme": {
+            "primaryColor": "#2E7D32"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "Item",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "note",
+                "name": "Note",
+                "type": "string"
+              },
+              {
+                "defaultValue": false,
+                "id": "bought",
+                "name": "Bought",
+                "type": "boolean"
+              }
+            ],
+            "id": "item",
+            "name": "Item",
+            "titleField": "name"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F10",
+                "emptyText": "Nothing left to buy",
+                "entity": "item",
+                "filter": {
+                  "field": "bought",
+                  "op": "eq",
+                  "value": false
+                },
+                "id": "to_buy",
+                "item": {
+                  "subtitle": "note",
+                  "title": "name",
+                  "toggle": "bought"
+                },
+                "onItemTap": {
+                  "presentation": "push",
+                  "screen": "item_form",
+                  "type": "navigate"
+                },
+                "swipeToDelete": true,
+                "type": "list"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "item_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Add item",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Shopping List",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "item_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F4",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "Item",
+                    "placeholder": "Milk",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "note",
+                    "label": "Note",
+                    "placeholder": "2 bottles",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "bought",
+                    "label": "Bought",
+                    "type": "toggle"
+                  }
+                ],
+                "id": "fields",
+                "title": "Details",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this item?",
+                  "entity": "item",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "item",
+            "id": "item_form",
+            "title": "New Item",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "item",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "e03_shift_pay",
+      "kind": "create",
+      "group": "audit-en",
+      "transcript": "A shift tracker for my part-time job. When I enter the date and my start and end times, work out the hours automatically, and show how much I'm making this month at 15 dollars an hour",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5724,
+      "totalMs": 5726,
+      "outputChars": 2225,
+      "usage": {
+        "inputTokens": 156,
+        "outputTokens": 978,
+        "cacheReadInputTokens": 27244
+      },
+      "summary": "I made a Shift Tracker app. Use the button at the bottom right to add shifts.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 11,
+        "topLevel": 5,
+        "withArea": 5,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 5,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "shift:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "shift_form: A1:F4 A11:F12"
+        ],
+        "computed": [
+          "shift.hours",
+          "shift.pay"
+        ]
+      },
+      "dsl": {
+        "app": {
+          "description": "Log your part-time shifts, get the hours worked automatically, and see this month's earnings at 15 per hour",
+          "icon": "clock",
+          "name": "Shift Tracker",
+          "theme": {
+            "primaryColor": "#00897B"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Date",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "id": "start",
+                "name": "Start",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "end",
+                "name": "End",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "ref": "start"
+                    },
+                    {
+                      "ref": "end"
+                    }
+                  ],
+                  "op": "hoursBetween"
+                },
+                "id": "hours",
+                "name": "Hours",
+                "type": "number"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "ref": "hours"
+                        },
+                        15
+                      ],
+                      "op": "mul"
+                    }
+                  ],
+                  "op": "round"
+                },
+                "id": "pay",
+                "name": "Pay",
+                "type": "currency"
+              }
+            ],
+            "id": "shift",
+            "name": "Shift",
+            "titleField": "date"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "sum",
+                    "entity": "shift",
+                    "field": "pay",
+                    "filter": {
+                      "field": "date",
+                      "op": "thisMonth",
+                      "value": null
+                    },
+                    "format": "currency",
+                    "label": "Earned this month",
+                    "type": "stat"
+                  },
+                  {
+                    "aggregate": "sum",
+                    "entity": "shift",
+                    "field": "hours",
+                    "filter": {
+                      "field": "date",
+                      "op": "thisMonth",
+                      "value": null
+                    },
+                    "label": "Hours this month",
+                    "type": "stat"
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "No shifts yet",
+                    "entity": "shift",
+                    "item": {
+                      "subtitle": "hours",
+                      "title": "date",
+                      "trailing": "pay"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "shift_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "Recent shifts",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "shift_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Add shift",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Shifts",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "shift_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F4",
+                "children": [
+                  {
+                    "field": "date",
+                    "label": "Date",
+                    "type": "datePicker"
+                  },
+                  {
+                    "field": "start",
+                    "label": "Start time",
+                    "type": "timePicker"
+                  },
+                  {
+                    "field": "end",
+                    "label": "End time",
+                    "type": "timePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "Details",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this shift?",
+                  "entity": "shift",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "shift",
+            "id": "shift_form",
+            "title": "Shift",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "shift",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "e04_workout_week",
+      "kind": "create",
+      "group": "audit-en",
+      "transcript": "A workout log. I want to record the day and how long I ran or lifted, and see how many times I worked out this week and my total minutes this month",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5313,
+      "totalMs": 5315,
+      "outputChars": 2133,
+      "usage": {
+        "inputTokens": 142,
+        "outputTokens": 911,
+        "cacheReadInputTokens": 27244
+      },
+      "summary": "I made a Workout Log app. Use the button at the bottom right to add workouts.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 11,
+        "topLevel": 5,
+        "withArea": 5,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "workout:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "workout_form: A1:F4 A11:F12"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "Log each workout with its day, type and duration, and see this week's sessions and this month's total minutes",
+          "icon": "figure.run",
+          "name": "Workout Log",
+          "theme": {
+            "primaryColor": "#E65100"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Date",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "defaultValue": "Running",
+                "id": "kind",
+                "name": "Type",
+                "options": [
+                  "Running",
+                  "Lifting"
+                ],
+                "required": true,
+                "type": "enum"
+              },
+              {
+                "id": "minutes",
+                "name": "Minutes",
+                "required": true,
+                "type": "integer",
+                "unit": "min"
+              }
+            ],
+            "id": "workout",
+            "name": "Workout",
+            "titleField": "kind"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "label": "Workouts this week (times)",
+                    "type": "stat",
+                    "value": {
+                      "agg": "count",
+                      "entity": "workout",
+                      "filter": {
+                        "field": "date",
+                        "op": "thisWeek",
+                        "value": null
+                      }
+                    }
+                  },
+                  {
+                    "aggregate": "sum",
+                    "entity": "workout",
+                    "field": "minutes",
+                    "filter": {
+                      "field": "date",
+                      "op": "thisMonth",
+                      "value": null
+                    },
+                    "label": "Minutes this month",
+                    "type": "stat"
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "No workouts yet",
+                    "entity": "workout",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "kind",
+                      "trailing": "minutes"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "workout_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "Recent workouts",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "workout_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Log workout",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Workouts",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "workout_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F4",
+                "children": [
+                  {
+                    "field": "date",
+                    "label": "Date",
+                    "type": "datePicker"
+                  },
+                  {
+                    "field": "kind",
+                    "label": "Type",
+                    "style": "segmented",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "minutes",
+                    "label": "Minutes",
+                    "type": "numberField",
+                    "unit": "min"
+                  }
+                ],
+                "id": "fields",
+                "title": "Details",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this workout?",
+                  "entity": "workout",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "workout",
+            "id": "workout_form",
+            "title": "Log Workout",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "workout",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "e05_reading_year",
+      "kind": "create",
+      "group": "audit-en",
+      "transcript": "A reading log. Let me add books when I finish them, and show how many I've read this year and how many more I need to hit my goal of 50 books a year",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5396,
+      "totalMs": 5398,
+      "outputChars": 2230,
+      "usage": {
+        "inputTokens": 145,
+        "outputTokens": 943,
+        "cacheReadInputTokens": 27244
+      },
+      "summary": "I made a Reading Log app. Use the button at the bottom right to add books.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 12,
+        "topLevel": 6,
+        "withArea": 6,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "book:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F3 A4:F10 D11:F12",
+          "book_form: A1:F4 A11:F12"
+        ],
+        "statValues": 2,
+        "progressTarget": true
+      },
+      "dsl": {
+        "app": {
+          "description": "Log each book you finish and track your progress toward 50 books this year",
+          "icon": "book",
+          "name": "Reading Log",
+          "theme": {
+            "primaryColor": "#6D4C41"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "Title",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "author_name",
+                "name": "Author",
+                "type": "string"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Finished on",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "book",
+            "name": "Book",
+            "titleField": "title"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "label": "Books read this year",
+                    "type": "stat",
+                    "value": {
+                      "agg": "count",
+                      "entity": "book",
+                      "filter": {
+                        "field": "date",
+                        "op": "thisYear",
+                        "value": null
+                      }
+                    }
+                  },
+                  {
+                    "label": "Books left to reach 50",
+                    "type": "stat",
+                    "value": {
+                      "args": [
+                        {
+                          "args": [
+                            50,
+                            {
+                              "agg": "count",
+                              "entity": "book",
+                              "filter": {
+                                "field": "date",
+                                "op": "thisYear",
+                                "value": null
+                              }
+                            }
+                          ],
+                          "op": "sub"
+                        },
+                        0
+                      ],
+                      "op": "max"
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "aggregate": "count",
+                "area": "A3:F3",
+                "entity": "book",
+                "filter": {
+                  "field": "date",
+                  "op": "thisYear",
+                  "value": null
+                },
+                "id": "goal",
+                "label": "Goal: 50 books",
+                "target": 50,
+                "type": "progressBar"
+              },
+              {
+                "area": "A4:F10",
+                "children": [
+                  {
+                    "emptyText": "No books yet",
+                    "entity": "book",
+                    "item": {
+                      "subtitle": "author_name",
+                      "title": "title",
+                      "trailing": "date"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "book_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "Books finished",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "book_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Add book",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Reading Log",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "book_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F4",
+                "children": [
+                  {
+                    "field": "title",
+                    "label": "Title",
+                    "placeholder": "Book title",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "author_name",
+                    "label": "Author",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "date",
+                    "label": "Finished on",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "Details",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this book?",
+                  "entity": "book",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "book",
+            "id": "book_form",
+            "title": "New Book",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "book",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "e06_medicine_check",
+      "kind": "create",
+      "group": "audit-en",
+      "transcript": "A medicine checklist. Let me add the pills I take every day, check them off in the list when I take them, and show how many I've taken today",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 6265,
+      "totalMs": 6267,
+      "outputChars": 1956,
+      "usage": {
+        "inputTokens": 141,
+        "outputTokens": 857,
+        "cacheReadInputTokens": 27244
+      },
+      "summary": "I made a Medicine Checklist app. Use the button at the bottom right to add pills.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 10,
+        "topLevel": 5,
+        "withArea": 5,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 4,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "pill:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "pill_form: A1:F5 A11:F12"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "Add the pills you take every day, check them off when taken, and see how many you've taken today",
+          "icon": "pills",
+          "name": "Medicine Checklist",
+          "theme": {
+            "primaryColor": "#00897B"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "Name",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "dose",
+                "name": "Dose",
+                "type": "string"
+              },
+              {
+                "defaultValue": false,
+                "id": "taken",
+                "name": "Taken",
+                "type": "boolean"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Date",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "pill",
+            "name": "Pill",
+            "titleField": "name"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "id": "taken_today",
+                "label": "Pills taken today",
+                "type": "stat",
+                "value": {
+                  "agg": "count",
+                  "entity": "pill",
+                  "filter": [
+                    {
+                      "field": "date",
+                      "op": "today",
+                      "value": null
+                    },
+                    {
+                      "field": "taken",
+                      "op": "eq",
+                      "value": true
+                    }
+                  ]
+                }
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "No pills yet",
+                    "entity": "pill",
+                    "item": {
+                      "subtitle": "dose",
+                      "title": "name",
+                      "toggle": "taken"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "pill_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "pills",
+                "title": "Pills",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "pill_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Add pill",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Today",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "pill_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "Name",
+                    "placeholder": "Vitamin D",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "dose",
+                    "label": "Dose",
+                    "placeholder": "1 tablet",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "date",
+                    "label": "Date",
+                    "type": "datePicker"
+                  },
+                  {
+                    "field": "taken",
+                    "label": "Taken",
+                    "type": "toggle"
+                  }
+                ],
+                "id": "fields",
+                "title": "Details",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this pill?",
+                  "entity": "pill",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "pill",
+            "id": "pill_form",
+            "title": "Pill",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "pill",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "e07_fan_budget",
+      "kind": "create",
+      "group": "audit-en",
+      "transcript": "Track my spending on my favorite band. Log it by category like merch, tickets and travel, and show how much I spent this month and what's left of my 300 dollar monthly budget",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5979,
+      "totalMs": 5980,
+      "outputChars": 2579,
+      "usage": {
+        "inputTokens": 155,
+        "outputTokens": 1093,
+        "cacheReadInputTokens": 27244
+      },
+      "summary": "I made a Fan Spending app. Use the button at the bottom right to add purchases.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 13,
+        "topLevel": 6,
+        "withArea": 6,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 4,
+        "hasPhoto": false,
+        "hasChart": true,
+        "scopes": [
+          "purchase:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F6 A7:F10 D11:F12",
+          "purchase_form: A1:F5 A11:F12"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "Log what you spend on your favorite band by category, and see this month's total and what's left of your 300 monthly budget",
+          "icon": "music.mic",
+          "name": "Fan Spending",
+          "theme": {
+            "primaryColor": "#8E24AA"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "amount",
+                "name": "Amount",
+                "required": true,
+                "type": "currency"
+              },
+              {
+                "defaultValue": "Merch",
+                "id": "category",
+                "name": "Category",
+                "options": [
+                  "Merch",
+                  "Tickets",
+                  "Travel",
+                  "Other"
+                ],
+                "required": true,
+                "type": "enum"
+              },
+              {
+                "id": "note",
+                "name": "Note",
+                "type": "string"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Date",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "purchase",
+            "name": "Purchase",
+            "titleField": "note"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "sum",
+                    "entity": "purchase",
+                    "field": "amount",
+                    "filter": {
+                      "field": "date",
+                      "op": "thisMonth",
+                      "value": null
+                    },
+                    "format": "currency",
+                    "label": "Spent this month",
+                    "type": "stat"
+                  },
+                  {
+                    "format": "currency",
+                    "label": "Left this month",
+                    "type": "stat",
+                    "value": {
+                      "args": [
+                        300,
+                        {
+                          "agg": "sum",
+                          "entity": "purchase",
+                          "field": "amount",
+                          "filter": {
+                            "field": "date",
+                            "op": "thisMonth",
+                            "value": null
+                          }
+                        }
+                      ],
+                      "op": "sub"
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "aggregate": "sum",
+                "area": "A3:F6",
+                "entity": "purchase",
+                "field": "amount",
+                "filter": {
+                  "field": "date",
+                  "op": "thisMonth",
+                  "value": null
+                },
+                "groupBy": "category",
+                "id": "by_category",
+                "kind": "pie",
+                "title": "This month by category",
+                "type": "chart"
+              },
+              {
+                "area": "A7:F10",
+                "children": [
+                  {
+                    "emptyText": "No purchases yet",
+                    "entity": "purchase",
+                    "item": {
+                      "subtitle": "category",
+                      "title": "note",
+                      "trailing": "amount"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "purchase_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "Recent purchases",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "purchase_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Add purchase",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Fan Spending",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "purchase_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "amount",
+                    "label": "Amount",
+                    "type": "numberField"
+                  },
+                  {
+                    "field": "category",
+                    "label": "Category",
+                    "style": "segmented",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "note",
+                    "label": "Note",
+                    "placeholder": "Tour T-shirt",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "date",
+                    "label": "Date",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "Details",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this purchase?",
+                  "entity": "purchase",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "purchase",
+            "id": "purchase_form",
+            "title": "New Purchase",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "purchase",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "e08_bmi",
+      "kind": "create",
+      "group": "audit-en",
+      "transcript": "A weight tracker. I'm 170 centimeters tall. When I log my weight every day, calculate my BMI, and show a chart of how it changes",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 7340,
+      "totalMs": 7365,
+      "outputChars": 2712,
+      "usage": {
+        "inputTokens": 148,
+        "outputTokens": 1211,
+        "cacheReadInputTokens": 27244
+      },
+      "summary": "I made a Weight Tracker app. It has 2 tabs: Today and Trend. Use the button at the bottom right to add weight entries.",
+      "metrics": {
+        "tabs": 2,
+        "screens": 3,
+        "components": 13,
+        "topLevel": 7,
+        "withArea": 7,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 4,
+        "hasPhoto": false,
+        "hasChart": true,
+        "scopes": [
+          "body:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "body_form: A1:F4 A11:F12",
+          "trend: A1:F6 A7:F12"
+        ],
+        "computed": [
+          "body.bmi"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "Log your weight every day, see your BMI calculated automatically, and watch how it changes over time",
+          "icon": "scalemass",
+          "name": "Weight Tracker",
+          "tabs": [
+            {
+              "icon": "list.bullet.rectangle",
+              "screen": "home",
+              "title": "Today"
+            },
+            {
+              "icon": "chart.xyaxis.line",
+              "screen": "trend",
+              "title": "Trend"
+            }
+          ],
+          "theme": {
+            "primaryColor": "#00897B"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Date",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "id": "weight",
+                "name": "Weight (kg)",
+                "required": true,
+                "type": "number",
+                "unit": "kg"
+              },
+              {
+                "defaultValue": 170,
+                "id": "height",
+                "name": "Height (cm)",
+                "required": true,
+                "type": "number",
+                "unit": "cm"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "args": [
+                                {
+                                  "ref": "weight"
+                                },
+                                {
+                                  "args": [
+                                    {
+                                      "args": [
+                                        {
+                                          "ref": "height"
+                                        },
+                                        100
+                                      ],
+                                      "op": "div"
+                                    },
+                                    2
+                                  ],
+                                  "op": "pow"
+                                }
+                              ],
+                              "op": "div"
+                            },
+                            10
+                          ],
+                          "op": "mul"
+                        }
+                      ],
+                      "op": "round"
+                    },
+                    10
+                  ],
+                  "op": "div"
+                },
+                "id": "bmi",
+                "name": "BMI",
+                "type": "number"
+              }
+            ],
+            "id": "body",
+            "name": "Weight Entry",
+            "titleField": "date"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "avg",
+                    "entity": "body",
+                    "field": "weight",
+                    "label": "Average weight (kg)",
+                    "type": "stat"
+                  },
+                  {
+                    "label": "Entries",
+                    "type": "stat",
+                    "value": {
+                      "agg": "count",
+                      "entity": "body"
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "No entries yet",
+                    "entity": "body",
+                    "item": {
+                      "subtitle": "weight",
+                      "title": "date",
+                      "trailing": "bmi"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "body_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "history",
+                "title": "History",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "body_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Log weight",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Weight Tracker",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "body_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F4",
+                "children": [
+                  {
+                    "field": "date",
+                    "label": "Date",
+                    "type": "datePicker"
+                  },
+                  {
+                    "field": "weight",
+                    "label": "Weight",
+                    "type": "numberField",
+                    "unit": "kg"
+                  },
+                  {
+                    "field": "height",
+                    "label": "Height",
+                    "type": "numberField",
+                    "unit": "cm"
+                  }
+                ],
+                "id": "fields",
+                "title": "Details",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this entry?",
+                  "entity": "body",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "body",
+            "id": "body_form",
+            "title": "Log Weight",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "body",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "aggregate": "avg",
+                "area": "A1:F6",
+                "bucket": "day",
+                "entity": "body",
+                "field": "bmi",
+                "groupBy": "date",
+                "id": "bmi_trend",
+                "kind": "line",
+                "title": "BMI over time",
+                "type": "chart"
+              },
+              {
+                "aggregate": "avg",
+                "area": "A7:F12",
+                "bucket": "day",
+                "entity": "body",
+                "field": "weight",
+                "groupBy": "date",
+                "id": "weight_trend",
+                "kind": "line",
+                "title": "Weight over time",
+                "type": "chart"
+              }
+            ],
+            "id": "trend",
+            "title": "Trend"
+          }
+        ]
+      }
+    },
+    {
+      "id": "e09_habit_streak",
+      "kind": "create",
+      "group": "audit-en",
+      "transcript": "A habit tracker. Every day I check off whether I worked out and read, and it shows how many days in a row I've kept it up",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5547,
+      "totalMs": 5548,
+      "outputChars": 2379,
+      "usage": {
+        "inputTokens": 139,
+        "outputTokens": 1040,
+        "cacheReadInputTokens": 27244
+      },
+      "summary": "I made a Habit Tracker app. Use the button at the bottom right to add habit logs. Streak in a row was replaced with a count of the last 7 days.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 12,
+        "topLevel": 5,
+        "withArea": 5,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 4,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "habit_log:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "log_form: A1:F5 A11:F12"
+        ],
+        "statValues": 2
+      },
+      "dsl": {
+        "app": {
+          "description": "Check off your workout and reading each day and see how many days you've kept it up. Streak in a row was replaced with a count of the last 7 days.",
+          "icon": "checkmark.seal",
+          "name": "Habit Tracker",
+          "theme": {
+            "primaryColor": "#2E7D32"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "Title",
+                "type": "string"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Date",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "defaultValue": false,
+                "id": "workout",
+                "name": "Worked out",
+                "type": "boolean"
+              },
+              {
+                "defaultValue": false,
+                "id": "reading",
+                "name": "Read",
+                "type": "boolean"
+              }
+            ],
+            "id": "habit_log",
+            "name": "Habit Log",
+            "titleField": "title"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "label": "Workouts (last 7 days)",
+                    "type": "stat",
+                    "value": {
+                      "agg": "count",
+                      "entity": "habit_log",
+                      "filter": [
+                        {
+                          "field": "workout",
+                          "op": "eq",
+                          "value": true
+                        },
+                        {
+                          "field": "date",
+                          "op": "gte",
+                          "value": {
+                            "args": [
+                              {
+                                "args": [],
+                                "op": "today"
+                              },
+                              -6
+                            ],
+                            "op": "addDays"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "label": "Reading days (last 7 days)",
+                    "type": "stat",
+                    "value": {
+                      "agg": "count",
+                      "entity": "habit_log",
+                      "filter": [
+                        {
+                          "field": "reading",
+                          "op": "eq",
+                          "value": true
+                        },
+                        {
+                          "field": "date",
+                          "op": "gte",
+                          "value": {
+                            "args": [
+                              {
+                                "args": [],
+                                "op": "today"
+                              },
+                              -6
+                            ],
+                            "op": "addDays"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "No entries yet",
+                    "entity": "habit_log",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "title",
+                      "toggle": "workout"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "log_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "logs",
+                "title": "Daily log",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "log_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Add today",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Habits",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "log_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "title",
+                    "label": "Title",
+                    "placeholder": "Today",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "date",
+                    "label": "Date",
+                    "type": "datePicker"
+                  },
+                  {
+                    "field": "workout",
+                    "label": "Worked out",
+                    "type": "toggle"
+                  },
+                  {
+                    "field": "reading",
+                    "label": "Read",
+                    "type": "toggle"
+                  }
+                ],
+                "id": "fields",
+                "title": "Today",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this entry?",
+                  "entity": "habit_log",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "habit_log",
+            "id": "log_form",
+            "title": "Daily Check",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "habit_log",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "e10_exam_countdown",
+      "kind": "create",
+      "group": "audit-en",
+      "transcript": "An exam study planner. Show the number of days left until the exam in big text, let me log study time for each subject, and track my progress toward a goal of 20 hours",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 10009,
+      "totalMs": 10014,
+      "outputChars": 4041,
+      "usage": {
+        "inputTokens": 149,
+        "outputTokens": 1758,
+        "cacheReadInputTokens": 27244
+      },
+      "summary": "I made an Exam Study Planner app. It has 2 tabs: Home and Exam. Use the button at the bottom right to add exams or study sessions.",
+      "metrics": {
+        "tabs": 2,
+        "screens": 4,
+        "components": 20,
+        "topLevel": 13,
+        "withArea": 13,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 2,
+        "fields": 6,
+        "hasPhoto": false,
+        "hasChart": true,
+        "scopes": [
+          "exam:private",
+          "study:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:C4 D3:F4 A5:F5 A6:F8 A9:F11 D12:F12",
+          "exam_screen: A1:F9 D11:F12",
+          "study_form: A1:F4 A11:F12",
+          "exam_form: A1:F3 A11:F12"
+        ],
+        "computed": [
+          "exam.days_left"
+        ],
+        "statValues": 2,
+        "progressTarget": true
+      },
+      "dsl": {
+        "app": {
+          "description": "Count down the days to your exam, log study time by subject, and track progress toward a 20-hour goal",
+          "icon": "book.closed",
+          "name": "Exam Study Planner",
+          "tabs": [
+            {
+              "icon": "house",
+              "screen": "home",
+              "title": "Home"
+            },
+            {
+              "icon": "calendar",
+              "screen": "exam_screen",
+              "title": "Exam"
+            }
+          ],
+          "theme": {
+            "primaryColor": "#5E35B1"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "Exam",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Exam date",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "ref": "date"
+                    }
+                  ],
+                  "op": "daysUntil"
+                },
+                "id": "days_left",
+                "name": "Days left",
+                "type": "integer"
+              }
+            ],
+            "id": "exam",
+            "name": "Exam",
+            "titleField": "title"
+          },
+          {
+            "fields": [
+              {
+                "id": "subject",
+                "name": "Subject",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "hours",
+                "name": "Hours",
+                "required": true,
+                "type": "number"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Date",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "study",
+            "name": "Study session",
+            "titleField": "subject"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "id": "days_left",
+                "label": "Days until exam",
+                "type": "stat",
+                "value": {
+                  "agg": "min",
+                  "entity": "exam",
+                  "field": "days_left",
+                  "filter": {
+                    "field": "days_left",
+                    "op": "gte",
+                    "value": 0
+                  }
+                }
+              },
+              {
+                "area": "A3:C4",
+                "id": "left",
+                "label": "Hours left to goal",
+                "type": "stat",
+                "value": {
+                  "args": [
+                    {
+                      "args": [
+                        20,
+                        {
+                          "agg": "sum",
+                          "entity": "study",
+                          "field": "hours"
+                        }
+                      ],
+                      "op": "sub"
+                    },
+                    0
+                  ],
+                  "op": "max"
+                }
+              },
+              {
+                "aggregate": "sum",
+                "area": "D3:F4",
+                "entity": "study",
+                "field": "hours",
+                "id": "total",
+                "label": "Total hours studied",
+                "type": "stat"
+              },
+              {
+                "aggregate": "sum",
+                "area": "A5:F5",
+                "entity": "study",
+                "field": "hours",
+                "id": "goal",
+                "label": "Progress toward 20 hours",
+                "target": 20,
+                "type": "progressBar"
+              },
+              {
+                "aggregate": "sum",
+                "area": "A6:F8",
+                "entity": "study",
+                "field": "hours",
+                "groupBy": "subject",
+                "id": "by_subject",
+                "kind": "bar",
+                "title": "Hours by subject",
+                "type": "chart"
+              },
+              {
+                "area": "A9:F11",
+                "children": [
+                  {
+                    "emptyText": "No study sessions yet",
+                    "entity": "study",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "subject",
+                      "trailing": "hours"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "study_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "Study log",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "study_form",
+                  "type": "navigate"
+                },
+                "area": "D12:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Log study",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Study Planner",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "study_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Log study"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F9",
+                "children": [
+                  {
+                    "emptyText": "No exam set yet",
+                    "entity": "exam",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "title",
+                      "trailing": "days_left"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "exam_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "asc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "exams",
+                "title": "Exams",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "exam_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add_exam",
+                "label": "Add exam",
+                "type": "button"
+              }
+            ],
+            "id": "exam_screen",
+            "title": "Exam",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "exam_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F4",
+                "children": [
+                  {
+                    "field": "subject",
+                    "label": "Subject",
+                    "placeholder": "Math",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "hours",
+                    "label": "Hours",
+                    "type": "numberField",
+                    "unit": "h"
+                  },
+                  {
+                    "field": "date",
+                    "label": "Date",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "Session",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this session?",
+                  "entity": "study",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "study",
+            "id": "study_form",
+            "title": "Log Study",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "study",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F3",
+                "children": [
+                  {
+                    "field": "title",
+                    "label": "Exam",
+                    "placeholder": "Final exam",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "date",
+                    "label": "Exam date",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "Details",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this exam?",
+                  "entity": "exam",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "exam",
+            "id": "exam_form",
+            "title": "Exam",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "exam",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "e11_tabs_split",
+      "kind": "create",
+      "group": "audit-en",
+      "transcript": "Make a budget app with three tabs: Log, Chart and Settings. In Settings I set my monthly budget, and on the Log screen I can see how much of this month's budget is left",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 9053,
+      "totalMs": 9056,
+      "outputChars": 4142,
+      "usage": {
+        "inputTokens": 157,
+        "outputTokens": 1763,
+        "cacheReadInputTokens": 27244
+      },
+      "summary": "I made a Budget Planner app. It has 3 tabs: Log, Chart and Settings. Use the button at the bottom right to add expenses or budgets.",
+      "metrics": {
+        "tabs": 3,
+        "screens": 5,
+        "components": 20,
+        "topLevel": 11,
+        "withArea": 11,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 2,
+        "fields": 6,
+        "hasPhoto": false,
+        "hasChart": true,
+        "scopes": [
+          "expense:private",
+          "budget:private"
+        ],
+        "areas": [
+          "log: A1:F2 A3:F10 D11:F12",
+          "expense_form: A1:F5 A11:F12",
+          "chart: A1:F6 A7:F12",
+          "settings: A1:F2 A3:F8 A10:F11",
+          "budget_form: A1:F3"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "Log your spending, set a monthly budget in Settings, and see how much is left this month and where it goes",
+          "icon": "creditcard",
+          "name": "Budget Planner",
+          "tabs": [
+            {
+              "icon": "list.bullet.rectangle",
+              "screen": "log",
+              "title": "Log"
+            },
+            {
+              "icon": "chart.pie",
+              "screen": "chart",
+              "title": "Chart"
+            },
+            {
+              "icon": "gearshape",
+              "screen": "settings",
+              "title": "Settings"
+            }
+          ],
+          "theme": {
+            "primaryColor": "#00796B"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "amount",
+                "name": "Amount",
+                "required": true,
+                "type": "currency"
+              },
+              {
+                "defaultValue": "Food",
+                "id": "category",
+                "name": "Category",
+                "options": [
+                  "Food",
+                  "Transport",
+                  "Shopping",
+                  "Fun",
+                  "Other"
+                ],
+                "required": true,
+                "type": "enum"
+              },
+              {
+                "id": "note",
+                "name": "Note",
+                "type": "string"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Date",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "expense",
+            "name": "Expense",
+            "titleField": "note"
+          },
+          {
+            "fields": [
+              {
+                "defaultValue": "Monthly budget",
+                "id": "label",
+                "name": "Label",
+                "type": "string"
+              },
+              {
+                "id": "amount",
+                "name": "Monthly budget",
+                "required": true,
+                "type": "currency"
+              }
+            ],
+            "id": "budget",
+            "name": "Budget",
+            "titleField": "label"
+          }
+        ],
+        "initialScreen": "log",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "format": "currency",
+                    "label": "Left this month",
+                    "type": "stat",
+                    "value": {
+                      "args": [
+                        {
+                          "agg": "max",
+                          "entity": "budget",
+                          "field": "amount"
+                        },
+                        {
+                          "agg": "sum",
+                          "entity": "expense",
+                          "field": "amount",
+                          "filter": {
+                            "field": "date",
+                            "op": "thisMonth",
+                            "value": null
+                          }
+                        }
+                      ],
+                      "op": "sub"
+                    }
+                  },
+                  {
+                    "aggregate": "sum",
+                    "entity": "expense",
+                    "field": "amount",
+                    "filter": {
+                      "field": "date",
+                      "op": "thisMonth",
+                      "value": null
+                    },
+                    "format": "currency",
+                    "label": "Spent this month",
+                    "type": "stat"
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "No expenses yet",
+                    "entity": "expense",
+                    "item": {
+                      "subtitle": "category",
+                      "title": "note",
+                      "trailing": "amount"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "expense_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "Recent expenses",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "expense_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Add expense",
+                "type": "button"
+              }
+            ],
+            "id": "log",
+            "title": "Log",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "expense_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "amount",
+                    "label": "Amount",
+                    "type": "numberField"
+                  },
+                  {
+                    "field": "category",
+                    "label": "Category",
+                    "style": "menu",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "note",
+                    "label": "Note",
+                    "placeholder": "Coffee",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "date",
+                    "label": "Date",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "Details",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this expense?",
+                  "entity": "expense",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "expense",
+            "id": "expense_form",
+            "title": "Expense",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "expense",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "aggregate": "sum",
+                "area": "A1:F6",
+                "entity": "expense",
+                "field": "amount",
+                "filter": {
+                  "field": "date",
+                  "op": "thisMonth",
+                  "value": null
+                },
+                "groupBy": "category",
+                "id": "by_category",
+                "kind": "pie",
+                "title": "By category (this month)",
+                "type": "chart"
+              },
+              {
+                "aggregate": "sum",
+                "area": "A7:F12",
+                "bucket": "month",
+                "entity": "expense",
+                "field": "amount",
+                "groupBy": "date",
+                "id": "by_month",
+                "kind": "bar",
+                "title": "Spending by month",
+                "type": "chart"
+              }
+            ],
+            "id": "chart",
+            "title": "Chart"
+          },
+          {
+            "components": [
+              {
+                "aggregate": "max",
+                "area": "A1:F2",
+                "entity": "budget",
+                "field": "amount",
+                "format": "currency",
+                "id": "current",
+                "label": "Current monthly budget",
+                "type": "stat"
+              },
+              {
+                "area": "A3:F8",
+                "children": [
+                  {
+                    "emptyText": "No budget set yet",
+                    "entity": "budget",
+                    "item": {
+                      "title": "label",
+                      "trailing": "amount"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "budget_form",
+                      "type": "navigate"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "budget_list",
+                "title": "Budget",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "budget_form",
+                  "type": "navigate"
+                },
+                "area": "A10:F11",
+                "icon": "pencil",
+                "id": "set_budget",
+                "label": "Set monthly budget",
+                "type": "button"
+              }
+            ],
+            "id": "settings",
+            "title": "Settings"
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F3",
+                "children": [
+                  {
+                    "field": "amount",
+                    "label": "Monthly budget",
+                    "type": "numberField"
+                  }
+                ],
+                "id": "fields",
+                "title": "Budget",
+                "type": "section"
+              }
+            ],
+            "entity": "budget",
+            "id": "budget_form",
+            "title": "Monthly Budget",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "budget",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "e12_plant_water",
+      "kind": "create",
+      "group": "audit-en",
+      "transcript": "A plant watering app. Set how often each plant needs water, figure out the next watering date from the last time I watered it, and tell me which plants need water today",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 6286,
+      "totalMs": 6289,
+      "outputChars": 2718,
+      "usage": {
+        "inputTokens": 146,
+        "outputTokens": 1157,
+        "cacheReadInputTokens": 27244
+      },
+      "summary": "I made a Plant Watering app. Use the button at the bottom right to add plants.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 11,
+        "topLevel": 6,
+        "withArea": 6,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 5,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "plant:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F6 A7:F10 D11:F12",
+          "plant_form: A1:F4 A11:F12"
+        ],
+        "computed": [
+          "plant.next_date",
+          "plant.days_left"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "Set how often each plant needs water, see the next watering date from the last time you watered it, and check which plants need water today",
+          "icon": "leaf",
+          "name": "Plant Watering",
+          "theme": {
+            "primaryColor": "#2E7D32"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "Name",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "defaultValue": 7,
+                "id": "interval_days",
+                "name": "Water every (days)",
+                "required": true,
+                "type": "integer"
+              },
+              {
+                "defaultValue": "now",
+                "id": "last_watered",
+                "name": "Last watered",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "ref": "last_watered"
+                    },
+                    {
+                      "ref": "interval_days"
+                    }
+                  ],
+                  "op": "addDays"
+                },
+                "id": "next_date",
+                "name": "Next watering",
+                "type": "date"
+              },
+              {
+                "computed": {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "ref": "last_watered"
+                        },
+                        {
+                          "ref": "interval_days"
+                        }
+                      ],
+                      "op": "addDays"
+                    }
+                  ],
+                  "op": "daysUntil"
+                },
+                "id": "days_left",
+                "name": "Days left",
+                "type": "integer"
+              }
+            ],
+            "id": "plant",
+            "name": "Plant",
+            "titleField": "name"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "format": "plain",
+                "id": "due_count",
+                "label": "Plants to water today (or overdue)",
+                "type": "stat",
+                "value": {
+                  "agg": "count",
+                  "entity": "plant",
+                  "filter": {
+                    "field": "days_left",
+                    "op": "lte",
+                    "value": 0
+                  }
+                }
+              },
+              {
+                "area": "A3:F6",
+                "children": [
+                  {
+                    "emptyText": "No plants need water today",
+                    "entity": "plant",
+                    "filter": {
+                      "field": "days_left",
+                      "op": "lte",
+                      "value": 0
+                    },
+                    "item": {
+                      "subtitle": "next_date",
+                      "title": "name",
+                      "trailing": "days_left"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "plant_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "asc",
+                      "field": "days_left"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "due",
+                "title": "Needs water today",
+                "type": "section"
+              },
+              {
+                "area": "A7:F10",
+                "children": [
+                  {
+                    "emptyText": "No plants yet",
+                    "entity": "plant",
+                    "item": {
+                      "subtitle": "next_date",
+                      "title": "name",
+                      "trailing": "days_left"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "plant_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "asc",
+                      "field": "days_left"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "all",
+                "title": "All plants",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "plant_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Add plant",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Plants",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "plant_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F4",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "Name",
+                    "placeholder": "Monstera",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "interval_days",
+                    "label": "Water every (days)",
+                    "max": 60,
+                    "min": 1,
+                    "step": 1,
+                    "type": "stepper"
+                  },
+                  {
+                    "field": "last_watered",
+                    "label": "Last watered",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "Details",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this plant?",
+                  "entity": "plant",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "plant",
+            "id": "plant_form",
+            "title": "Plant",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "plant",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "n": 12,
+    "ok": 12,
+    "firstPass": 12,
+    "regenerated": 0,
+    "areaFallback": 0,
+    "failed": 0,
+    "expectMisses": 0,
+    "createP50Ms": 6265,
+    "createP95Ms": 9053,
+    "editP50Ms": 0,
+    "avgOutputTokens": 1169.75,
+    "avgCreateOutputTokens": 1169.75,
+    "avgEditOutputTokens": 0,
+    "avgCreateOutputChars": 2710.5833333333335,
+    "avgAreaRatio": 1,
+    "tabbedCreates": 3,
+    "calcCreates": 11
+  }
+}
