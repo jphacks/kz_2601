@@ -11,6 +11,20 @@
 - 2人。iOS(Swift)は @ko-tarou がフル担当。@2410as がJSON周り(appconfig)のバックエンド担当。
 - Claude Code(メイン＋サブエージェント)が設計・実装を並走。
 
+## リポジトリ構成(モノレポ)
+iOS アプリとバックエンドは **同じリポジトリ** に置く。ルート直下で領域ごとにフォルダを分け、CI は変更された領域のジョブだけ走る。
+
+```
+kz_2601/
+├── ios/        # iOS アプリ本体(Swift / SwiftUI、xcodegen で project.yml から生成、.xcodeproj はコミットしない)
+├── backend/    # Go 単一モジュール。cmd/appconfig・cmd/ai が各 Cloud Run サービス、pkg/dsl が共有型
+├── docs/       # 00_decisions(正典)・01_goals・02_github_workflow・ios/・backend/・infra/
+├── scripts/    # 運用スクリプト(github/ ブランチ保護など)
+└── .github/    # workflows(backend-ci / ios-ci / secrets-scan / deploy-cloudrun)・PR/Issue テンプレ・CODEOWNERS
+```
+- 担当: `ios/` = @ko-tarou、`backend/cmd/appconfig/` = @2410as、それ以外は共同。
+- iOS と backend の契約は `docs/backend/dsl.schema.json`(DSL)と `docs/backend/openapi-*.yaml`(API)。両側はここから導出し、二重定義しない。
+
 ## 技術スタック
 | 領域 | 決定 | 備考 |
 |---|---|---|
