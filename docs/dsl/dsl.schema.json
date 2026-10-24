@@ -178,7 +178,8 @@
             "enum",
             "currency",
             "photo",
-            "location"
+            "location",
+            "ref"
           ],
           "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. location = \"lat,lng\" string (P1)."
         },
@@ -212,6 +213,14 @@
         "unit": {
           "type": "string",
           "description": "e.g. 円, kg"
+        },
+        "refEntity": {
+          "type": "string",
+          "description": "type=ref の参照先 entity id。保存値は参照先レコードの id 文字列。"
+        },
+        "computed": {
+          "$ref": "#/$defs/Expr",
+          "description": "読み取り専用の算出フィールド(行コンテキスト = そのレコード)。レコードには保存しない。"
         }
       }
     },
@@ -587,6 +596,9 @@
         },
         {
           "$ref": "#/$defs/WebView"
+        },
+        {
+          "$ref": "#/$defs/Settlement"
         }
       ]
     },
@@ -957,20 +969,8 @@
           ]
         },
         "value": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "number"
-            },
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "$ref": "#/$defs/Expr",
+          "description": "リテラル、または Expr(例 {\"ref\":\"id\"} = 外側の行の id)。"
         }
       }
     },
@@ -981,9 +981,7 @@
       "x-usage": "2〜3 枚を hstack に入れて A1:F2 に横並び、または単体で A1:C2 / D1:F2。filter で thisMonth / today(value は null)。金額は format currency。",
       "required": [
         "type",
-        "label",
-        "entity",
-        "aggregate"
+        "label"
       ],
       "properties": {
         "type": {
@@ -1025,6 +1023,10 @@
             "currency",
             "percent"
           ]
+        },
+        "value": {
+          "$ref": "#/$defs/Expr",
+          "description": "aggregate の代替。行コンテキスト無しで評価した値を表示する。"
         }
       }
     },
@@ -2494,6 +2496,187 @@
       },
       "description": "外部サイトをアプリ内で表示する(WKWebView・戻る/進む/再読込の小ツールバー付き)。ニュース・地図サイト・公式ページ・時刻表など「○○を見たい」「○○のサイトを埋め込みたい」に選ぶ。Safari に飛ばすだけでよければ openUrlButton。",
       "x-usage": "A1:F12 など大きめの area に 1 画面 1 つ。セル内で WebView 自身がスクロールするので list と同じ段に並べない。タブの 1 つを webView だけにするのが定石。"
+    },
+    "Expr": {
+      "description": "計算式(#101)。リテラル / {ref} 行のフィールド値(\"id\" でレコード id) / {agg} 集計 / {op,args} 演算 / {if,then,else}。評価できない(ゼロ除算・型不一致・参照なし)は表示「—」。",
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ref"
+          ],
+          "properties": {
+            "ref": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "agg",
+            "entity"
+          ],
+          "properties": {
+            "agg": {
+              "type": "string",
+              "enum": [
+                "count",
+                "sum",
+                "avg",
+                "min",
+                "max"
+              ]
+            },
+            "entity": {
+              "type": "string"
+            },
+            "field": {
+              "type": "string"
+            },
+            "filter": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Filter"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Filter"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "args"
+          ],
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "add",
+                "sub",
+                "mul",
+                "div",
+                "mod",
+                "neg",
+                "abs",
+                "sqrt",
+                "pow",
+                "round",
+                "floor",
+                "ceil",
+                "min",
+                "max",
+                "clamp",
+                "eq",
+                "neq",
+                "gt",
+                "gte",
+                "lt",
+                "lte",
+                "and",
+                "or",
+                "not",
+                "concat",
+                "len",
+                "now",
+                "today",
+                "daysBetween",
+                "daysUntil",
+                "addDays",
+                "year",
+                "month",
+                "day",
+                "weekday",
+                "toNumber",
+                "toString",
+                "coalesce"
+              ]
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Expr"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "if",
+            "then",
+            "else"
+          ],
+          "properties": {
+            "if": {
+              "$ref": "#/$defs/Expr"
+            },
+            "then": {
+              "$ref": "#/$defs/Expr"
+            },
+            "else": {
+              "$ref": "#/$defs/Expr"
+            }
+          }
+        }
+      ]
+    },
+    "Settlement": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "精算: balanceField(正=受け取る/負=払う)から「A → B ¥1,200」を貪欲法で列挙。全員 0 なら「精算は不要です」。",
+      "required": [
+        "type",
+        "entity",
+        "nameField",
+        "balanceField"
+      ],
+      "properties": {
+        "type": {
+          "const": "settlement"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "nameField": {
+          "type": "string"
+        },
+        "balanceField": {
+          "type": "string"
+        }
+      }
     }
   }
 }

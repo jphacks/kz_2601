@@ -12,6 +12,7 @@ public enum DSLExamples {
         "gallery-display",
         "gallery-structure",
         "gallery-web",
+        "warikan",
     ]
 
     /// 初期状態(音声画面のみ)の DSL 名。

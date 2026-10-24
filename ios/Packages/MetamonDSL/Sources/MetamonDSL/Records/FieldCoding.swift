@@ -21,6 +21,7 @@ public enum FieldCoding {
         switch f.type {
         case .boolean: return .bool(false)
         case .enum: return f.options?.first.map { .string($0) } ?? .null
+        case .ref: return .null
         case .date, .datetime: return .string(encode(Date(), for: f))
         default: return .null
         }
@@ -57,6 +58,8 @@ public enum FieldCoding {
     /// 一覧・集計の表示用整形。
     public static func display(_ v: JSONValue, field: Field?) -> String {
         guard let field else { return v.displayString }
+        // computed が評価できなかった(ゼロ除算・参照なし)= 「—」。0 や空欄と区別する(#101)
+        if field.isComputed, v.isNull { return unavailable }
         switch field.type {
         case .currency: return currency(v.doubleValue ?? 0)
         case .number, .integer:
@@ -73,6 +76,9 @@ public enum FieldCoding {
         default: return v.displayString
         }
     }
+
+    /// 値が出せない時の表示(Renderer の `EmptyPlaceholder.unavailableValue` と同じ)。
+    public static let unavailable = "—"
 
     public static func currency(_ n: Double) -> String {
         let f = NumberFormatter()
