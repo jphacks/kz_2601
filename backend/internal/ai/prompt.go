@@ -224,3 +224,13 @@ var visualRules = strings.TrimSpace(`
 `)
 
 func init() { systemPrompt += "\n\n" + visualRules }
+
+// audit3Rules (#169 quality audit 3): holes left after #141 / #146. Appended
+// like visualRules so the existing lines stay untouched.
+var audit3Rules = strings.TrimSpace(`
+## 品質監査 第 3 弾の追加ルール(#169)
+- **分類の内訳**: 「カテゴリ別に記録」「グッズ・チケット・遠征費みたいに分けて」のように分類つきで記録させ、合計・今月の額・予算の残りも求められたら、**その enum の内訳 chart(kind pie・groupBy その enum・stat と同じ期間 filter)をホームに必ず 1 つ置く**。「カテゴリ別」は内訳の依頼なので「発話に無い機能」ではない。
+- **毎日くり返すチェックと連続日数**: resets daily の toggle は最後にやった日しか持たない(履歴が残らない)。連続日数を求められたら「今日やった数」(stat.value の count・filter today)で代替し「連続日数は今日の達成数で代替しました。」(en: "Streak was replaced with today's check count.")と申告する。**実施記録・log の entity を別に足さない**(丸を押しても記録は増えず二重入力になる)。直近 7 日の回数・実施履歴を stat / ラベル / 説明に書かない(出せない値を書くと嘘になる)。連続日数を求められていない時は連続日数に触れない。
+`)
+
+func init() { systemPrompt += "\n\n" + audit3Rules }
