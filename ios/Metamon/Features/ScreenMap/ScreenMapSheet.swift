@@ -25,6 +25,7 @@ struct ScreenMapSheet: View {
             GeometryReader { geo in
                 ScrollView([.horizontal, .vertical], showsIndicators: false) {
                     ScreenMapCanvas(graph: graph, hasTabs: rt.dsl.app.hasTabs, selected: $selected, availableWidth: geo.size.width)
+                        .frame(minWidth: geo.size.width, minHeight: geo.size.height, alignment: .top) // 小さい図は上に寄せる
                 }
             }
             if let id = selected, let node = graph.node(id) {
@@ -141,7 +142,7 @@ struct ScreenMapSheet: View {
                     Text(link.edges.map(Self.describe).joined(separator: L10n.tr("、")))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
             }
         }
@@ -239,7 +240,8 @@ private struct ScreenMapCanvas: View {
                 let from = graph.node(link.from), to = graph.node(link.to)
                 // 上り・同じ段・往復の矢印は曲げて、逆向きの線やカードと重ならないようにする
                 let curved = pairs.contains("\(link.to)->\(link.from)") || (to?.row ?? 0) <= (from?.row ?? 0)
-                let path = ArrowGeometry.path(from: a, to: b, curved: curved)
+                let sameRow = to?.row == from?.row
+                let path = ArrowGeometry.path(from: a, to: b, curved: curved, below: sameRow && !pairs.contains("\(link.to)->\(link.from)"))
                 let active = selected == nil || selected == link.from || selected == link.to
                 let color: Color = active ? Theme.Colors.brandA : .secondary
                 let opacity = (from?.reachable ?? false) ? (active ? 0.9 : 0.25) : 0.25
@@ -259,12 +261,14 @@ enum ArrowGeometry {
     static let bend: CGFloat = 34
     static let headLength: CGFloat = 9
 
-    static func path(from a: CGRect, to b: CGRect, curved: Bool) -> (line: Path, head: Path) {
+    /// `below`: 同じ段どうしはカードの下を回る(段の間の線と重ねない)
+    static func path(from a: CGRect, to b: CGRect, curved: Bool, below: Bool = false) -> (line: Path, head: Path) {
         let ca = CGPoint(x: a.midX, y: a.midY), cb = CGPoint(x: b.midX, y: b.midY)
         let dx = cb.x - ca.x, dy = cb.y - ca.y
         let len = max(1, hypot(dx, dy))
         let mid = CGPoint(x: (ca.x + cb.x) / 2, y: (ca.y + cb.y) / 2)
-        let control = curved ? CGPoint(x: mid.x + dy / len * bend, y: mid.y - dx / len * bend) : mid
+        let control = below ? CGPoint(x: mid.x, y: max(a.maxY, b.maxY) + bend)
+            : curved ? CGPoint(x: mid.x + dy / len * bend, y: mid.y - dx / len * bend) : mid
         let start = edgePoint(of: a, toward: control)
         let end = edgePoint(of: b, toward: control)
         var line = Path()

@@ -647,3 +647,16 @@ HealthKit を足す時の手順(Apple アカウント操作が要るので未着
 - **翻訳しないもの**: DSL 内の文言(AI が locale に合わせて生成)、Services のログ、FieldIcon のキーワード、音声意図判定の語彙。通貨は DSL の `currency` が円前提なので英語 UI でも `¥`。
 - 確認: `-metamon.appLanguage en`(起動引数で UserDefaults を上書き)/ `-AppleLanguages "(en)"`、設定シートは `METAMON_AUTO_SETTINGS=1`。
 
+
+## 20. 画面マップ(Issue #116)
+
+作ったアプリの画面のつながりを図で見せ、選んだ画面を文脈にして声で直す。
+
+- **入口**: 変身一覧の「使用中」カード右下の「画面マップ」/ 設定シート「アプリ」節(音声シートから開いた設定のみ。初期状態では出さない)
+- **グラフ**: `MetamonRenderer/Host/ScreenGraph.swift`(純粋関数・`ScreenGraphTests`)。backend `pkg/dsl/nav.go` の NavEdges / NavRoots / Reachable と同じ考え方
+  - 辺: button / toolbar / list の行タップ / calendar の日付タップの `navigate` と、`saveRecord` の保存後遷移先。同じ from→to は矢印 1 本にまとめる(すべて sheet / fullScreen なら破線)
+  - 根: タブの根(タブ順)、タブが無ければ initialScreen。タブの有無は iOS の描画と同じ `hasTabs`(2 個以上。nav.go は 1 個でもタブ扱い)
+  - 段: 根を 0 段目に BFS の深さで下へ。段の中は見つかった順。到達できない画面は最後の段に文書順で薄く・破線枠
+- **描画**(`Metamon/Features/ScreenMap/`): カードは段ごとに中央揃え、幅に収まらなければ横スクロール。矢印は Canvas。下向きは直線、上向き・往復は進行方向の左へ曲げ、同じ段どうしはカードの下を回す
+- **この画面について話す**: カードを選ぶと出入りの一覧とボタン。押すと `ScreenMapUI.context` をセットして音声シートを開き、上部にチップ「画面「B」について話す」(× で外す)。送信時に **transcript の先頭へ「画面「B」(id: b)で: 」を付ける**(API の契約は変えない。「元に戻して」等の意図判定は付ける前の文で行う)。文脈は 1 回送ると消える
+- 確認: `METAMON_INITIAL_EXAMPLE=navigation METAMON_AUTO_SCREEN_MAP=b`(画面 b を選んだ状態で開く)、`METAMON_AUTO_SCREEN_MAP_TALK=1` で音声シートまで進む

@@ -14,6 +14,16 @@ final class ScreenMapUI {
     /// 音声シートで次に送る edit の対象画面。送ったら消える
     var context: ScreenContext?
 
+    /// 変身一覧から: マップ → 変身一覧の順に閉じてから音声シートを開く(同時に閉じると 2 枚目の dismiss が無視される)。
+    func closeSwitcherThenTalk(_ rt: AppRuntime) {
+        Task {
+            try? await Task.sleep(for: .milliseconds(450))
+            rt.showAppSwitcher = false
+            try? await Task.sleep(for: .milliseconds(650))
+            rt.showVoiceSheet = true
+        }
+    }
+
     /// 文脈を取り出して消す(送信 1 回分)。
     func takeContext() -> ScreenContext? {
         defer { context = nil }
@@ -105,6 +115,7 @@ struct ScreenMapSettingsRow: View {
 
 /// 音声シートの上に出す「画面「B」について話す」チップ。× で文脈を外す。
 struct ScreenContextChip: View {
+    @Environment(AppRuntime.self) private var rt
     @State private var ui = ScreenMapUI.shared
 
     var body: some View {
@@ -125,8 +136,10 @@ struct ScreenContextChip: View {
             .padding(.vertical, Theme.Spacing.sm)
             .background(Theme.Colors.surface, in: Capsule())
             .overlay(Capsule().strokeBorder(Theme.brandGradient, lineWidth: 1.5))
+            .padding(.bottom, Theme.Spacing.md)
             .transition(.scale.combined(with: .opacity))
-            .onDisappear { ui.context = nil } // 送らずにシートを閉じたら外す
+            // 送らずにシートを閉じたら外す(onDisappear はシート表示中の再生成でも呼ばれて消えてしまうので使わない)
+            .onChange(of: rt.showVoiceSheet) { _, shown in if !shown { ui.context = nil } }
             .accessibilityIdentifier("voice.screenContext")
         }
     }
@@ -148,9 +161,7 @@ extension ScreenMapUI {
         try? await Task.sleep(for: .seconds(2.5))
         context = ScreenContext(id: s.id, title: s.title.isEmpty ? s.id : s.title)
         isPresented = false
-        rt.showAppSwitcher = false
-        try? await Task.sleep(for: .milliseconds(700))
-        rt.showVoiceSheet = true
+        closeSwitcherThenTalk(rt)
     }
 }
 #endif

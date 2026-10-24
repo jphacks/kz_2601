@@ -33,7 +33,7 @@ struct AppSwitcherSheet: View {
         .sensoryFeedback(.selection, trigger: selected)
         .task { await rt.appsList() }
         .sheet(item: $sharingUI.shareTarget) { ShareAppSheet(app: $0) }
-        .screenMapSheet { rt.showAppSwitcher = false; Task { try? await Task.sleep(for: .milliseconds(600)); rt.showVoiceSheet = true } }
+        .screenMapSheet { ScreenMapUI.shared.closeSwitcherThenTalk(rt) } // #116
     }
 
     /// カード右上のシェアボタン(#49)。サーバー接続時のみ。
