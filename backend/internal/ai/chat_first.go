@@ -226,7 +226,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 			onEarly = func(e earlyFirst) {
 				// a question past the limit becomes a forced ready, which
 				// needs the transcript: wait for the whole reply
-				if !(noMoreQuestions && e.reply.Kind == "question") {
+				if !noMoreQuestions || e.reply.Kind != "question" {
 					early <- e
 				}
 			}
@@ -549,11 +549,12 @@ var chatEditSystemPrompt = strings.TrimSpace(`
   - **要約に無いものを「ある」と言わない。できないことを「できる」と言わない。**分からないことは推測で言い切らない。
   - できない時は「できません」とはっきり言い、近い代わりを 1 つ添える。
   - 「できる?」でできる時は「できます」+ どう変わるかを言い、suggestions にそのまま言える変更指示を 1〜3 個(各 25 字以内。例「集計タブに棒グラフを追加して」)。純粋な説明(「これ WebView?」)なら suggestions は空でよい。
+  - 「〜できる?」「〜も可能?」は何を指すかがあいまいでも question にせず answer で答える(例「もうちょっと大きくできる?」→「できます。数字のカードや一覧の枠を広げたり、文字を大きくしたりできます。」+ suggestions に対象ごとの指示「今月の支出を大きくして」など)。
 - proposal: 目的はあるがやり方が決まっていない**曖昧な要望・相談**(「見やすくして」「家族でも使いたい」「どうしたらいい?」「もっと便利にしたい」「おすすめは?」)、またはできない指示の代わり。
   - options に案を 2〜3 個。title(15 字以内の名前)、detail(今のアプリのどこがどう変わるか 1 文)、instruction(ユーザーが「これでいく」を押すとそのまま生成 AI に渡る変更指示。画面名・部品名・値まで具体的に 1〜2 文。DSL でできることだけ。今のアプリに既にあることを案にしない)。
   - 案は互いに違う方向にする(例: 見やすく → 数字を大きく / 不要な部品を整理 / グラフで見せる)。
   - text: 一言(「こんな案はどうでしょう。」)。
-- question: 何を指しているか分からず ready / answer / proposal のどれも出せない時だけ。短い 1 問、suggestions に 2〜3 個の選択肢。
+- question: 何を指しているか分からず ready / answer / proposal のどれも出せない時だけ(「できる?」型の質問は question にしない)。短い 1 問、suggestions に 2〜3 個の選択肢。
 
 ## 書き方
 - text は読み上げるので短く、です・ます調。JSON や id・type 名(stat / hstack など)を text に出さず、画面のラベルで言う。
@@ -569,7 +570,7 @@ var chatCreateSystemPrompt = chatSystemPrompt + "\n\n" + strings.TrimSpace(`
 ## 追加: 質問への答えと案(kind answer / proposal も使える)
 - answer: 作れるもの・できることを**聞かれた**時(「何が作れるの?」「計算もできる?」「通知は出せる?」「WebView なの?」)。下の「このアプリの仕組み」を根拠に 1〜3 文(120 字以内)で正直に答える。できない時は「できません」と言い近い代わりを添える。suggestions にそのまま言える作りたいアプリの例か次の一言を 1〜3 個(各 20 字以内)。
 - proposal: 「どんな感じがいい?」「おすすめは?」「迷ってる」のように**方向を任された**時。options に 2〜3 案。title(15 字以内)、detail(どんなアプリか 1 文)、instruction(その案を作る依頼文。transcript と同じ書き方の一人称の 1 段落。ユーザーが言っていない機能は足しすぎない)。text は一言(「こんな案はどうでしょう。」)。
-- 具体的な依頼は今までどおり ready、曖昧なら question 1 問。answer / proposal を理由に ready を遅らせない。
+- 具体的な依頼は今までどおり ready、曖昧なら question 1 問。**アプリの種類だけの 1〜2 語(「家計簿」「買い物リスト」「日記」「筋トレ」)は今までどおり question で最も重要な 1 点を聞く**(answer / proposal があっても ready に飛ばさない)。answer / proposal を理由に ready を遅らせない。
 - suggestions は question / answer 以外では空配列。options は proposal 以外では空配列。
 - brief / transcript は毎回、現時点の理解で埋める(まだ何も分からなければ空文字・空配列)。
 
