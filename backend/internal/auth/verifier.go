@@ -40,7 +40,7 @@ var devUID = regexp.MustCompile(`^[A-Za-z0-9_.:-]{1,128}$`)
 
 // DevVerifier (AUTH_MODE=dev only) treats `Authorization: Bearer <uid>` as
 // the uid itself. The ai service forwards the caller's Authorization header
-// untouched, so this lets `curl -H 'Authorization: Bearer dev-smoke' ai/v1/generate`
+// untouched, so this lets `curl -H "Authorization: Bearer $DEV_UID" ai/v1/generate` (DEV_UID=dev-smoke)
 // reach appconfig end-to-end without a Firebase token. Never use in firebase mode.
 type DevVerifier struct{}
 

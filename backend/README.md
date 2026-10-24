@@ -39,12 +39,13 @@ make schema-sync         # docs/dsl/dsl.schema.json → pkg/dsl/schema.json (ス
 
 # エミュレータ無しで最速起動(インメモリ store・Bearer 値をそのまま uid として扱う)
 STORE=memory AUTH_MODE=dev PORT=8080 go run ./cmd/appconfig
-curl -H 'Authorization: Bearer dev-smoke' localhost:8080/v1/apps/my-device/dsl   # 未知 appId は version 1 を自動作成
+export DEV_UID=dev-smoke
+curl -H "Authorization: Bearer $DEV_UID" localhost:8080/v1/apps/my-device/dsl   # 未知 appId は version 1 を自動作成
 ```
 
 ai → appconfig の結合をローカルで確認する時は、appconfig を上記で起動し、ai を
 `AUTH_MODE=dev APPCONFIG_BASE_URL=http://localhost:8080 ANTHROPIC_API_KEY=... PORT=8082 go run ./cmd/ai` で起動して
-`curl -H 'Authorization: Bearer dev-smoke' -d '{"appId":"my-device","transcript":"家計簿が欲しい"}' localhost:8082/v1/generate`
+`curl -H "Authorization: Bearer $DEV_UID" -d '{"appId":"my-device","transcript":"家計簿が欲しい"}' localhost:8082/v1/generate`
 を叩く(ai は Authorization をそのまま転送する)。
 
 ## 環境変数
