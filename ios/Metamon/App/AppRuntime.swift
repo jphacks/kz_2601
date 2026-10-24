@@ -142,6 +142,7 @@ final class AppRuntime: DSLRuntime {
         }
         Task { await services.notifications.sync(dsl.app.notifications) }
         #if DEBUG
+        autoNavigateIfRequested() // `METAMON_AUTO_NAV`(#113)
         // ヘッドレス E2E 用: `METAMON_E2E_PRESS_PRIMARY_AFTER=<秒>` で、その時点で状態カードが出ていれば主ボタン(もう一度 等)を押す(#60)
         if let raw = ProcessInfo.processInfo.environment["METAMON_E2E_PRESS_PRIMARY_AFTER"], let seconds = Double(raw), seconds > 0 {
             Task { [weak self] in
