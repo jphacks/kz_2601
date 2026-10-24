@@ -40,6 +40,8 @@ struct StatLeaf: View {
                 valueText(formatted, size: 22)
                 valueText(formatted, size: 22).minimumScaleFactor(0.5)
             }
+            // マイナス(予算の残りが赤字 等)は負の色にする(#131: 「-¥112,230」が普通の黒で読み流されていた)
+            .foregroundStyle(formatted.hasPrefix("-") ? AnyShapeStyle(RenderTheme.Colors.negative) : AnyShapeStyle(.primary))
             .contentTransition(.numericText())
             .redacted(reason: isLoading ? .placeholder : [])
         }
