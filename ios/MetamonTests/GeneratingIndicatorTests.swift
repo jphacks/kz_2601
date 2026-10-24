@@ -24,7 +24,8 @@ final class GeneratingIndicatorTests: XCTestCase {
             if seen.last != kind { seen.append(kind) }
         }
         await task.value
-        if seen.last != rt.morphJob?.kind { seen.append(rt.morphJob?.kind) }
+        let final = rt.morphJob?.kind
+        if seen.last.flatMap({ $0 }) != final { seen.append(final) }
         return seen
     }
 
