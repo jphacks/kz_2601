@@ -124,7 +124,32 @@ match /users/{uid}/{document=**} {
   allow read: if request.auth != null && request.auth.uid == uid;
   allow write: if false;   // 書き込みは appconfig (Admin SDK) のみ
 }
+match /apps_public/{appId}/{document=**} {
+  allow read: if request.auth != null;   // 共有データはログイン済みなら誰でも読める
+  allow write: if false;
+}
 ```
+
+### 3.1 共有データ(entity.scope・#47)
+
+DSL の `Entity.scope`(`private` 既定 / `shared` / `public`)でレコードの置き場と権限が変わる。`shared` は v1 では `public` と同じ(参加者限定は後段)。
+
+```
+apps_public/{appId}                                   # 公開 DSL: {ownerUid, name, version, dsl(map), dslJson, createdAt, updatedAt}
+└─ entities/{entityId}/records/{recordId}             # 共有レコード: {entity, data, clientId, author, authorName, createdAt, updatedAt}
+```
+
+| 項目 | private(従来) | public / shared |
+|---|---|---|
+| レコードの置き場 | `users/{uid}/apps/{appId}/entities/{e}/records` | `apps_public/{appId}/entities/{e}/records`(uid 非依存。appId は iOS の UUID なので単独で一意) |
+| 読み取り | 本人のみ | 認証ユーザー全員 |
+| create | 本人 | 認証ユーザー全員。`author`=uid・`authorName`=リクエストの `authorName`(無ければ "匿名")を自動付与。`clientId` の冪等 id は `uid/clientId` から導出(他人と衝突しない) |
+| update / delete | 本人 | `author == uid` のみ(他人のレコードは **403 forbidden**) |
+| delete all(`?confirm=true`) | 全件 | **自分の投稿だけ**削除 |
+| `GET /records` | 従来どおり | 各レコードに `author`/`authorName` を含む。`filterField=author&filterOp=eq&filterValue=<uid>` で「自分の投稿」 |
+| DSL | `users/{uid}/apps/{appId}` | 作成者の `PUT/PATCH /dsl`・`POST /apps`・restore 時に public entity を 1 つでも含めば `apps_public/{appId}` に複製(所有者=最初に公開した uid・他人は上書き不可)。他ユーザーの `GET /dsl` は自分の下に無ければ公開 DSL を複製して version 1 を作る(=インストール) |
+
+実装: `store.RecordSet{UID, AppID, Entity, Public}` でコレクションを選ぶ(`store.PrivateRecords` / `store.PublicRecords`)。`store.PublishApp` / `GetPublicApp` が公開 DSL。handler は `appconfig/records.go` の `recordSet()` と `ownRecord()`(403 判定)。レコード検証は従来どおり呼び出し側ユーザーの現行 DSL で行うので、インストール後に各自が entity を変えても他人のレコードは消えない(スキーマレス)。
 
 ## 4. 認証・認可
 

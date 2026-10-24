@@ -192,16 +192,48 @@ func (p paging) next(got int) string {
 	return base64.RawURLEncoding.EncodeToString([]byte(strconv.Itoa(p.offset + p.size)))
 }
 
-// ensureApp loads the app, seeding version 1 (dsl.Initial) for unknown ids:
-// iOS uses a device-fixed UUID as appId and never calls POST /apps first.
+// ensureApp loads the app, seeding version 1 for unknown ids: iOS uses a
+// device-fixed UUID as appId and never calls POST /apps first. If another
+// user has published that appId (apps_public/{appId}, see publish), the seed
+// is their DSL instead of dsl.Initial — this is how a shared app is
+// "installed" under the caller's own uid.
 func (h *Handler) ensureApp(r *http.Request, appID string) (*store.App, error) {
+	ctx, uid := r.Context(), uidOf(r)
+	if app, err := h.store.GetApp(ctx, uid, appID); err == nil {
+		return app, nil
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return nil, err
+	}
 	init := dsl.Initial()
 	raw, err := json.Marshal(init)
 	if err != nil {
 		return nil, err
 	}
-	app, _, err := h.store.EnsureApp(r.Context(), uidOf(r), appID, raw, init.App.Name)
+	name := init.App.Name
+	if pub, err := h.store.GetPublicApp(ctx, appID); err == nil {
+		raw, name = pub.DSL, pub.Name
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return nil, err
+	}
+	app, _, err := h.store.EnsureApp(ctx, uid, appID, raw, name)
 	return app, err
+}
+
+// publish mirrors a committed DSL to apps_public/{appId} when it has shared
+// entities, so other users opening the same appId get it from ensureApp.
+// Failures are logged, not returned: the owner's private commit already
+// succeeded, and an appId first published by someone else is left alone.
+func (h *Handler) publish(r *http.Request, appID string, app *dsl.App, raw json.RawMessage, version int) {
+	if !app.HasSharedEntity() {
+		return
+	}
+	ok, err := h.store.PublishApp(r.Context(), uidOf(r), appID, raw, app.App.Name, version)
+	switch {
+	case err != nil:
+		slog.Error("appconfig: publish failed", slog.String("appId", appID), slog.Any("error", err))
+	case !ok:
+		slog.Warn("appconfig: appId already published by another user; not overwritten", slog.String("appId", appID))
+	}
 }
 
 // parsedDSL returns the typed DSL for an app version (cached).
