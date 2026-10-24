@@ -49,3 +49,16 @@ public extension Screen {
         return out
     }
 }
+
+public extension Component {
+    /// 子に `area` を付けてローカルグリッドに並べられる Container(#81)。
+    static let localGridTypes: Set<ComponentType> = [.card, .section, .vstack]
+
+    /// Container 内グリッド(#81)。card / section / vstack の子が**全員**有効な `area` を持つ時だけ配置を返す
+    /// (座標は Container の左上 = A1 のローカル座標)。一部だけ・不正・対象外の型なら nil(従来どおり積む)。
+    var localGridPlacement: [(component: Component, area: GridArea)]? {
+        guard Self.localGridTypes.contains(type), !children.isEmpty else { return nil }
+        let placed = children.compactMap { c in c.gridArea.map { (component: c, area: $0) } }
+        return placed.count == children.count ? placed : nil
+    }
+}

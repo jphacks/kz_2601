@@ -41,7 +41,7 @@
 | 20 | 「元に戻して」 | `versions/{n}/restore` | `ai.prompt` で再生成 | **versions restore**(appconfig)。undo はスキーマに無し | 既存 API で済む。DSL に履歴概念を持ち込まない |
 | 21 | ID 形式 | `^[a-z][a-z0-9_-]{0,39}$`(Go で検証) | 任意 | **backend 案** | Firestore パス安全性。iOS は気にしない |
 | 23 | **画面レイアウト** | 上から積むスタック | 上から積むスタック(+`padding`) | **グリッド座標配置**(ユーザー決定)。Screen 直下の各コンポーネントに省略可能な `area:"A1:C3"`。詳細は §3.4 | 「全部品を長方形とみなし、A1〜C3 の正方形に入力欄を置く」ように AI/ユーザーが位置を調整できる DSL が理想 |
-| 24 | Container 内のグリッド | — | — | **v1 は Screen 直下 1 階層のみ**。Container の子は積むだけ(`area` を付けたら backend がエラー) | 実装が単純(GeometryReader 1 個)・非再帰 2 段と整合。ローカルグリッドは P1 で `area` の意味を広げるだけで互換 |
+| 24 | Container 内のグリッド | — | — | **card / section / vstack の子にも `area` を許す**(#81・§3.4)。Container の矩形を 6 列のローカルグリッドとみなす。入れ子は 1 段まで | 「カードの中で 2 列に並べたい」に応える。`area` の意味を広げるだけなので既存 DSL と互換(v1 は Screen 直下のみだった) |
 | 25 | **計算ロジック**(#100) | — | — | **小さな式ツリー `Expr`**(四則・ルート・比較・if・日付・agg)を `Field.computed` と `stat.value` に置ける。他 entity 参照は `Field.type:"ref"`+`refEntity`、精算は専用 Leaf `settlement`。変数・ループ等は持たない(割り切りは `expressions.md` §8) | 割り勘の「割る」が書けなかった。汎用言語にせず、よく使う演算だけ閉じた一覧で持つ |
 | 22 | 編集ターンの形 | `$defs/PatchDocument{patch,summary}`(構造化出力) | — | **backend 案**。`$defs/PatchValue` で value を閉じる | iOS には無関係(常にフル DSL) |
 
@@ -59,7 +59,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 ### 3.1 コンポーネント(49 種 = Container 7 + Leaf 42)
 
-全種に共通の任意キー: `id`(画面内一意)・`area`(§3.4 のグリッド矩形。Screen 直下のみ有効)。用途・レイアウトの定石は `dsl.schema.json` 各定義の `description` / `x-usage` が正典(AI へのカタログはそこから生成。§4)。
+全種に共通の任意キー: `id`(画面内一意)・`area`(§3.4 のグリッド矩形。Screen 直下と、card / section / vstack の子で有効)。用途・レイアウトの定石は `dsl.schema.json` 各定義の `description` / `x-usage` が正典(AI へのカタログはそこから生成。§4)。
 
 | type | 必須 | 任意 | 要 `screen.entity` | P |
 |---|---|---|---|---|
@@ -179,7 +179,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | 重なり禁止 | `area` を持つ兄弟同士でセルを共有したら **backend `Validate()` がエラー**。文言例: `screen "home" components[2] (id "recent") area A3:F10 overlaps screen "home" components[0] (id "summary") area A1:F4; areas of sibling components must not share cells`。範囲外(G 列・0 行・右下が左上より前・48 行超)も同様にエラーで列挙 → Claude 再生成に渡す |
 | セル内スクロール | セル = 長方形の器。可変長(`list`・`section`・`vstack`/`hstack`・長い `text`)は**器の内側でスクロール**(`scrollBounceBehavior(.basedOnSize)` なので短ければ動かない)。その他(入力・ボタン・stat・chart・image)は器に収めて `clipped` |
 | フォールバック(`area` 無し) | 従来どおり**上から積む**。同一画面で混在した場合は「`area` で使われた**最終行の次の行**から、全幅で上から順に積む」(決定的・LLM が配置を出し損ねても崩れない)。`area` が 1 つも無ければ 1 行目から積む |
-| Container 内 | **v1 はグリッドを Screen 直下 1 階層のみ**。Container の子は積むだけ。子に `area` を付けると backend がエラー(iOS は無視) |
+| Container 内(#81) | 子は既定で積む。**card / section / vstack だけ**は子にも `area` を付けられ、Container の中身の矩形を**ローカルグリッド**(A1 = Container の左上・横 6 列 = 中身の幅 ÷ 6・行は Container 自身の `area` の行数まで)として配置する。ルール: 子の**全部に付けるか全部付けないか**(一部だけはエラー)/ 子同士の重なり禁止 / 行は Container の行数以内(Container が `area` 無しで積まれている時は 48 行まで)/ **入れ子は 1 段まで**(hstack / grid / carousel / disclosure の子と孫には付けない)。用途は「カードの中で 2 列に並べる」(stat 2 枚・ボタン 2 つ)だけ。iOS: 通常画面では中身の高さ ÷ 子が使う最終行 を 1 行とし `GridCell` を再利用して絶対配置。フォーム画面(`FormFlowLayout`)と `area` 無しで積まれた Container の中では横位置と幅だけ効かせ、高さは中身なり(#139 の方針) |
 | タブとの関係 | グリッドは**タブ内の各 Screen の中身**の配置。直交する概念で、タブの有無に関係なく同じ |
 | iOS 実装 | `GridScreenLayout`: `GeometryReader` で `cellW = (幅-24)/6`、`cellH = (高さ-24)/12` を算出し、`area` 子を `.frame(width: colSpan*cellW-8, height: rowSpan*cellH-8).offset(...)` で絶対配置。`voiceInput` 画面(初期状態)は非スクロール |
 
