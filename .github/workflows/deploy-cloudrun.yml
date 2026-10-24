@@ -1,27 +1,31 @@
-# Cloud Run デプロイ(雛形)。
-#   develop への push → staging / main への push → prod。workflow_dispatch で手動も可。
+# Cloud Run デプロイ。構築済みの GCP 環境(docs/infra/gcp-setup.md)と 1:1 で対応する。
+#   develop への push → appconfig-stg / ai-stg
+#   main    への push → appconfig-prod / ai-prod
+#   workflow_dispatch → 環境を選んで手動実行(backend 未変更でも強制デプロイ)
 #
-# 前提(infra 担当が手順書 docs/0x_gcp_setup.md で用意する):
-#   - Workload Identity Federation(鍵ファイル不要。public リポに JSON キーを置かないため)
-#   - Cloud Run / Cloud Build / Artifact Registry / Secret Manager API 有効化
-#   - Dockerfile 無しで Go buildpacks を使う(`gcloud run deploy --source`)。
-#     単一モジュール複数 cmd なので GOOGLE_BUILDABLE で main パッケージを指定する。
+# 流れ: docker build(backend/Dockerfile・appconfig/ai 両バイナリ同梱)を 1 回
+#   → Artifact Registry `<region>-docker.pkg.dev/<project>/backend/backend:<sha>` に push
+#   → 同じイメージで appconfig-<env> と ai-<env>(--command=/app/ai)を `gcloud run deploy --image`
+#   → 両サービスの GET /health が 200 を返すことを確認し、URL を job summary に出す。
 #
-# GitHub 側で設定するもの(Settings → Environments に `staging` / `production` を作り、環境ごとに設定):
-#   vars.GCP_PROJECT_ID                 例: morph-staging-123456
-#   vars.GCP_REGION                     例: asia-northeast1
-#   vars.GCP_WORKLOAD_IDENTITY_PROVIDER 例: projects/123456789/locations/global/workloadIdentityPools/github/providers/github
-#   vars.GCP_SERVICE_ACCOUNT            例: github-deployer@morph-staging-123456.iam.gserviceaccount.com
-#   vars.SERVICE_PREFIX                 例: morph(省略時 morph)。Cloud Run サービス名は <prefix>-<cmd>
-#   secrets.* は不要(WIF のため)。ANTHROPIC_API_KEY 等は GCP Secret Manager に置き --set-secrets で注入する。
+# 認証: Workload Identity Federation(鍵ファイル無し)。GitHub 側に Secrets は不要。
+#   repo Variables: GCP_PROJECT_ID / GCP_REGION / GCP_WORKLOAD_IDENTITY_PROVIDER / GCP_SERVICE_ACCOUNT
+#   deployer SA に必要な IAM: roles/run.admin, roles/artifactregistry.writer,
+#     roles/iam.serviceAccountUser(run-backend に対して), roles/iam.workloadIdentityUser(WIF principalSet から)
+#   ANTHROPIC_API_KEY は GCP Secret Manager(同名)から --set-secrets で ai に注入する。
+#
+# 設計メモ:
+# - workflow レベルの `paths:` は使わない(backend-ci.yml と同じ理由: required check 化した時に
+#   "Expected" のまま詰まる)。代わりに `deploy-changes` ジョブ(dorny/paths-filter)で
+#   backend/** とこのファイルの変更有無を判定し、本体ジョブを `if:` で skip する。
+# - ヘルスパスは /health。Cloud Run の Google Front End は /healthz をコンテナに届けない(実測・HTML 404)。
+# - --set-env-vars / --set-secrets は全置換。手動で足した env/secret は次のデプロイで消えるので
+#   必要なものはここに書く。
 name: deploy-cloudrun
 
 on:
   push:
     branches: [develop, main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy-cloudrun.yml'
   workflow_dispatch:
     inputs:
       environment:
@@ -30,16 +34,10 @@ on:
         required: true
         default: staging
         options: [staging, production]
-      service:
-        description: デプロイするサービス(all で両方)
-        type: choice
-        required: true
-        default: all
-        options: [all, appconfig, ai]
 
 # 同じ環境へのデプロイは直列化(古い実行はキャンセルしない: 中途半端な状態を避ける)
 concurrency:
-  group: deploy-${{ github.event.inputs.environment || (github.ref_name == 'main' && 'production' || 'staging') }}
+  group: deploy-${{ inputs.environment || (github.ref_name == 'main' && 'production' || 'staging') }}
   cancel-in-progress: false
 
 permissions:
@@ -47,18 +45,34 @@ permissions:
   id-token: write # WIF に必須
 
 jobs:
-  resolve:
-    name: resolve-target
+  deploy-changes:
+    name: deploy-changes
     runs-on: ubuntu-latest
-    timeout-minutes: 1
+    timeout-minutes: 2
     outputs:
-      environment: ${{ steps.env.outputs.environment }}
-      services: ${{ steps.env.outputs.services }}
+      run: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.backend == 'true' }}
+      environment: ${{ steps.target.outputs.environment }}
+      suffix: ${{ steps.target.outputs.suffix }}
     steps:
-      - id: env
+      - uses: actions/checkout@v4
+        if: github.event_name == 'push'
+        with:
+          fetch-depth: 20
+
+      # push では直前のコミット(push 前の HEAD)との差分で判定する
+      - uses: dorny/paths-filter@v4
+        id: filter
+        if: github.event_name == 'push'
+        with:
+          base: ${{ github.ref_name }}
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/deploy-cloudrun.yml'
+
+      - id: target
         env:
-          INPUT_ENV: ${{ github.event.inputs.environment }}
-          INPUT_SERVICE: ${{ github.event.inputs.service }}
+          INPUT_ENV: ${{ inputs.environment }}
           REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
@@ -69,72 +83,123 @@ jobs:
           else
             environment="staging"
           fi
-          case "${INPUT_SERVICE:-all}" in
-            all) services='["appconfig","ai"]' ;;
-            *)   services="[\"${INPUT_SERVICE}\"]" ;;
+          case "$environment" in
+            production) suffix="prod" ;;
+            *)          suffix="stg" ;;
           esac
-          echo "environment=$environment" >> "$GITHUB_OUTPUT"
-          echo "services=$services" >> "$GITHUB_OUTPUT"
-          echo "deploy $services to $environment"
+          {
+            echo "environment=$environment"
+            echo "suffix=$suffix"
+          } >> "$GITHUB_OUTPUT"
+          echo "target: $environment (appconfig-$suffix / ai-$suffix)"
 
   deploy:
-    name: deploy-${{ matrix.service }}
-    needs: resolve
+    name: deploy
+    needs: deploy-changes
+    if: needs.deploy-changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
-      name: ${{ needs.resolve.outputs.environment }}
-      url: ${{ steps.deploy.outputs.url }}
-    strategy:
-      fail-fast: false
-      matrix:
-        service: ${{ fromJSON(needs.resolve.outputs.services) }}
+      name: ${{ needs.deploy-changes.outputs.environment }}
+      url: ${{ steps.appconfig.outputs.url }}
     env:
-      SERVICE_NAME: ${{ vars.SERVICE_PREFIX || 'morph' }}-${{ matrix.service }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      RUN_SA: run-backend@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+      ENV_SUFFIX: ${{ needs.deploy-changes.outputs.suffix }}
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/backend/backend:${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
 
       - name: GCP 認証(Workload Identity Federation)
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v3
         with:
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
-      - name: Cloud Run デプロイ(buildpacks / Dockerfile 不要)
-        id: deploy
-        env:
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          GCP_REGION: ${{ vars.GCP_REGION }}
-          CMD: ${{ matrix.service }}
-          ENVIRONMENT: ${{ needs.resolve.outputs.environment }}
+      - name: Docker build & push(Artifact Registry)
         run: |
           set -euo pipefail
-          extra=()
-          if [ "$CMD" = "ai" ]; then
-            # Secret Manager のシークレット名は infra 手順書と合わせる
-            extra+=(--set-secrets "ANTHROPIC_API_KEY=anthropic-api-key:latest")
-          fi
-          gcloud run deploy "$SERVICE_NAME" \
-            --project "$GCP_PROJECT_ID" \
-            --region "$GCP_REGION" \
-            --source backend \
-            --set-build-env-vars "GOOGLE_BUILDABLE=./cmd/${CMD}" \
-            --set-env-vars "APP_ENV=${ENVIRONMENT},GIT_SHA=${GITHUB_SHA}" \
-            --allow-unauthenticated \
-            --min-instances 0 \
-            --max-instances 3 \
-            --quiet \
-            "${extra[@]}"
-          url="$(gcloud run services describe "$SERVICE_NAME" \
-            --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format 'value(status.url)')"
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "deployed: $url"
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          docker build --platform linux/amd64 -f backend/Dockerfile -t "$IMAGE" backend
+          docker push "$IMAGE"
+          echo "pushed: $IMAGE"
 
-      - name: ヘルスチェック
+      - name: Deploy appconfig-${{ env.ENV_SUFFIX }}
+        id: appconfig
+        run: |
+          set -euo pipefail
+          gcloud run deploy "appconfig-${ENV_SUFFIX}" \
+            --image="$IMAGE" \
+            --project="$PROJECT_ID" \
+            --region="$REGION" \
+            --service-account="$RUN_SA" \
+            --allow-unauthenticated \
+            --port=8080 \
+            --cpu=1 --memory=512Mi \
+            --min-instances=0 --max-instances=3 \
+            --concurrency=80 --timeout=60 \
+            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=${ENV_SUFFIX},GIT_SHA=${GITHUB_SHA}" \
+            --quiet
+          url="$(gcloud run services describe "appconfig-${ENV_SUFFIX}" \
+            --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)')"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "appconfig-${ENV_SUFFIX}: $url"
+
+      - name: Deploy ai-${{ env.ENV_SUFFIX }}
+        id: ai
         env:
-          URL: ${{ steps.deploy.outputs.url }}
-        run: curl -fsS --retry 5 --retry-delay 3 "${URL}/healthz"
+          APPCONFIG_URL: ${{ steps.appconfig.outputs.url }}
+        run: |
+          set -euo pipefail
+          # 同じイメージを /app/ai で起動。Claude 呼び出しは数十秒かかるので timeout=300
+          gcloud run deploy "ai-${ENV_SUFFIX}" \
+            --image="$IMAGE" \
+            --command=/app/ai \
+            --project="$PROJECT_ID" \
+            --region="$REGION" \
+            --service-account="$RUN_SA" \
+            --allow-unauthenticated \
+            --port=8080 \
+            --cpu=1 --memory=512Mi \
+            --min-instances=0 --max-instances=3 \
+            --concurrency=20 --timeout=300 \
+            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=${ENV_SUFFIX},APPCONFIG_URL=${APPCONFIG_URL},GIT_SHA=${GITHUB_SHA}" \
+            --set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest" \
+            --quiet
+          url="$(gcloud run services describe "ai-${ENV_SUFFIX}" \
+            --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)')"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "ai-${ENV_SUFFIX}: $url"
+
+      - name: ヘルスチェック(GET /health が 200)
+        env:
+          APPCONFIG_URL: ${{ steps.appconfig.outputs.url }}
+          AI_URL: ${{ steps.ai.outputs.url }}
+        run: |
+          set -euo pipefail
+          for url in "$APPCONFIG_URL" "$AI_URL"; do
+            curl -fsS --retry 5 --retry-delay 3 --retry-all-errors "${url}/health"
+            echo " <- ${url}/health OK"
+          done
+
+      - name: Job summary
+        env:
+          ENVIRONMENT: ${{ needs.deploy-changes.outputs.environment }}
+          APPCONFIG_URL: ${{ steps.appconfig.outputs.url }}
+          AI_URL: ${{ steps.ai.outputs.url }}
+        run: |
+          {
+            echo "## Cloud Run deploy: ${ENVIRONMENT}"
+            echo
+            echo "| service | URL | health |"
+            echo "|---|---|---|"
+            echo "| appconfig-${ENV_SUFFIX} | ${APPCONFIG_URL} | [/health](${APPCONFIG_URL}/health) 200 |"
+            echo "| ai-${ENV_SUFFIX} | ${AI_URL} | [/health](${AI_URL}/health) 200 |"
+            echo
+            echo "image: \`${IMAGE}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

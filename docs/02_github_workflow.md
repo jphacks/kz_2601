@@ -78,6 +78,32 @@ scope は `ios` / `appconfig` / `ai` / `dsl` / `infra` あたり。1コミット
 3. 直して push すれば同じ PR の古い実行は自動キャンセルされ再実行される。
 4. どうしても原因不明なら `gh run view <run-id> --log-failed` でログを全部落として読む。
 
+## deploy-cloudrun(backend の自動デプロイ)
+
+`.github/workflows/deploy-cloudrun.yml`。GCP 側の構築手順と実値は `docs/infra/gcp-setup.md`。
+
+| トリガー | デプロイ先(Cloud Run / `asia-northeast1`) | GitHub Environment |
+|---|---|---|
+| `develop` に push | `appconfig-stg` / `ai-stg` | `staging` |
+| `main` に push | `appconfig-prod` / `ai-prod` | `production` |
+| `workflow_dispatch` | 選んだ環境(backend 未変更でも強制デプロイ) | 選んだ環境 |
+
+- push では `backend/**` かこの workflow 自身に変更がある時だけ本体ジョブが走る(`dorny/paths-filter`。workflow の `paths:` は required check 対策で使わない)。
+- 流れ: `backend/Dockerfile` を 1 回 `docker build`(appconfig / ai 両バイナリ同梱)→ Artifact Registry `asia-northeast1-docker.pkg.dev/jphacks-kz2601/backend/backend:<sha>` → 同じイメージで `appconfig-<env>` と `ai-<env>`(`--command=/app/ai`、`ANTHROPIC_API_KEY` は Secret Manager から注入)を `gcloud run deploy --image`。
+- 最後に両サービスの **`GET /health`** が 200 であることを確認し、URL を job summary に出す。**ヘルスパスは `/health`**(Cloud Run の Google Front End は `/healthz` をコンテナに届けず HTML 404 を返すため。`/healthz` はローカル用に残っている)。
+- `--set-env-vars` / `--set-secrets` は全置換。手で足した env/secret は次のデプロイで消えるので、恒久的に要るものは workflow に書く。
+
+認証は Workload Identity Federation(鍵ファイル無し)。GitHub **Secrets は不要**で、repo Variables に以下を入れる(登録済み)。
+
+| Variable | 値 |
+|---|---|
+| `GCP_PROJECT_ID` | `jphacks-kz2601` |
+| `GCP_REGION` | `asia-northeast1` |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/378953239426/locations/global/workloadIdentityPools/github/providers/github` |
+| `GCP_SERVICE_ACCOUNT` | `github-deployer@jphacks-kz2601.iam.gserviceaccount.com` |
+
+`github-deployer` に必要な IAM(付与済み): `roles/run.admin`、`roles/artifactregistry.writer`(プロジェクト)、`roles/iam.serviceAccountUser`(`run-backend` SA に対して。`--service-account` の actAs 用)、`roles/iam.workloadIdentityUser`(WIF の principalSet から。`auth` アクションの SA なりすましに `getAccessToken` を含む)。`roles/iam.serviceAccountTokenCreator` は不要(署名/ID トークン発行をしないため)。
+
 ## 初回セットアップ(オーナーが1回だけ)
 
 ```sh
