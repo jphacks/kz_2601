@@ -1,5 +1,7 @@
 # DSL JSON スキーマ v0 提案(iOS 側)
 
+> **【旧案・参考】** 2026-10-24 昼に backend 案とすり合わせ、統一版 **DSL v1** を `docs/dsl/README.md` + `docs/dsl/dsl.schema.json` に確定した。構造は backend 案(非再帰2段・entity/field 束縛)、命名は本案(camelCase・フラット)を採用。本案の `{{式}}` / `state` / `navigation.tabs` / `sequence` / `native` / `screens` object は **v1 に無い**。実装(`ios/Morph/DSL/Model`)は v1 に更新済み。
+
 > backend(@2410as)案とすり合わせる前提。最後の節に「譲れない / 柔軟」を明記。
 > 実装: `ios/Morph/DSL/Model/*.swift`、サンプル: `ios/Morph/Resources/Samples/*.json`。
 

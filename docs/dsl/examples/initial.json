@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "0.1",
+  "schemaVersion": 1,
   "app": {
     "name": "はじめてのアプリ",
     "description": "話しかけるとアプリに変わる初期状態",

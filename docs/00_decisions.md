@@ -23,7 +23,7 @@ kz_2601/
 └── .github/    # workflows(backend-ci / ios-ci / secrets-scan / deploy-cloudrun)・PR/Issue テンプレ・CODEOWNERS
 ```
 - 担当: `ios/` = @ko-tarou、`backend/cmd/appconfig/` = @2410as、それ以外は共同。
-- iOS と backend の契約は `docs/backend/dsl.schema.json`(DSL)と `docs/backend/openapi-*.yaml`(API)。両側はここから導出し、二重定義しない。
+- iOS と backend の契約は `docs/dsl/dsl.schema.json`(DSL v1・決定表は `docs/dsl/README.md`)と `docs/backend/openapi-*.yaml`(API)。両側はここから導出し、二重定義しない。
 
 ## 技術スタック
 | 領域 | 決定 | 備考 |
@@ -69,3 +69,4 @@ kz_2601/
 | 10/24 午前 | STT | WhisperKit(オンデバイス)で確定。不足時のみ OpenAI Whisper API |
 | 10/24 午前 | CI時間 | backend 5分以内必須。iOS は制限なし |
 | 10/24 午前 | 秘密管理 | publicリポ。APIキー・plist は .gitignore + gitleaks。ローカルは `~/Desktop/JPHACKS2026/.env`(リポ外) |
+| 10/24 昼 | DSL v1 統一(backend 案 × iOS 案) | **構造は backend 案(非再帰2段・閉じた enum・`additionalProperties:false`)、命名は iOS 案(camelCase・props フラット)**。`screens` は配列、`appId/version` は API 封筒、`voiceInput` は Leaf、`datePicker` 追加、式 `{{}}`/state/tab は v1 に無し、写真は data URL(≤800px)、集計は iOS クライアント。正典 `docs/dsl/`(決定表 22 論点は `docs/dsl/README.md`) |

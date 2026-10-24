@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "0.1",
+  "schemaVersion": 1,
   "app": {
     "name": "家計簿",
     "description": "毎日の支出を記録して、月ごとの合計とカテゴリ内訳を見る",

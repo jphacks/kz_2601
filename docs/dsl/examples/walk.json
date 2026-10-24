@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "0.1",
+  "schemaVersion": 1,
   "app": {
     "name": "散歩メモ",
     "description": "散歩中に見つけたものを写真とひとことで残す",

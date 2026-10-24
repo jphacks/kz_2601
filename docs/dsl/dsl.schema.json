@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/jphacks/kz_2601/docs/backend/dsl.schema.json",
+  "$id": "https://github.com/jphacks/kz_2601/docs/dsl/dsl.schema.json",
   "title": "AppDSL",
-  "description": "Server-Driven UI DSL v0. Non-recursive by design (Claude structured output compatible): Screen > Component(container) > Leaf. No numeric/string length constraints here; limits are enforced by the Go validator (pkg/dsl). $defs/PatchDocument is the structured-output schema for edit turns (RFC 6902).",
+  "description": "Server-Driven UI DSL v1 (unified backend/iOS). Non-recursive by design (Claude structured output compatible): Screen > Container > Leaf. No numeric/string length constraints here; limits are enforced by the Go validator (backend/pkg/dsl). appId/version live in the API envelope (DSLEnvelope), never in this document. $defs/PatchDocument is the structured-output schema for edit turns (RFC 6902); iOS never sees patches.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -14,8 +14,9 @@
   ],
   "properties": {
     "schemaVersion": {
-      "type": "string",
-      "const": "0.1"
+      "type": "integer",
+      "const": 1,
+      "description": "Fixed 1 for v1. Bumped only on incompatible changes."
     },
     "app": {
       "$ref": "#/$defs/AppMeta"
@@ -157,7 +158,7 @@
             "photo",
             "location"
           ],
-          "description": "photo = https URL of an image iOS uploaded to Firebase Storage. location = \"lat,lng\" string."
+          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. location = \"lat,lng\" string (P1)."
         },
         "required": {
           "type": "boolean"
@@ -869,7 +870,8 @@
             "large"
           ]
         }
-      }
+      },
+      "description": "Mic UI as a Leaf (not a screen kind). The initial state is one screen with exactly one voiceInput."
     },
     "Spacer": {
       "type": "object",

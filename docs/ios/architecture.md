@@ -1,6 +1,6 @@
 # iOS アーキテクチャ(Morph / Server-Driven UI)
 
-> 正典は `docs/00_decisions.md`。本書は iOS 側の実装設計。DSL スキーマの詳細は `docs/ios/dsl-proposal.md`。
+> 正典は `docs/00_decisions.md`。本書は iOS 側の実装設計。DSL スキーマは統一版 v1 `docs/dsl/README.md`(旧 iOS 案: `docs/ios/dsl-proposal.md`)。**注**: 本書 §2〜§5 の `{{式}}`/`state`/`Interpolator`/`navigation.tabs` の記述は v1 で廃止され、`screen.entity` のドラフト + `field` 束縛(`FormDraft`)・`initialScreen` + push/sheet/fullScreen に置き換わった。
 > スケルトン実装: `ios/Morph/`(`xcodegen generate` → `xcodebuild -scheme Morph build` 済み)。
 
 ## 0. 追加決定の反映(2026-10-24 昼)
@@ -9,7 +9,7 @@
 | ユーザーデータ保存先 | **バックエンド(Firestore / appconfig の汎用エンティティ API)** | iOS に永続層を持たない。`entity.*` アクションは全て HTTP。オフライン時のみ最後のレスポンスをメモリ/ディスクにキャッシュ(P2) |
 | 2回目以降の改変 | **JSON Patch(RFC 6902)はサーバー側で適用** | iOS はパッチを扱わない。`POST /v1/morph` の応答 or ポーリングで**最新 DSL 全体**を受け取り差し替えるだけ |
 | P0 ネイティブ | **カメラ + ローカル通知** | `camera` コンポーネント / `native: notification.*` を実装済み。位置/センサー/共有は P1(ブリッジに stub) |
-| デモ3本 | 家計簿 / トレーニング記録 / 散歩メモ | サンプル DSL は家計簿(`app_kakeibo.json`)。残り2本は同スキーマで表現可能(§9) |
+| デモ3本 | 家計簿 / トレーニング記録 / 散歩メモ | サンプル DSL は `docs/dsl/examples/*.json`(4 本)をそのままバンドル |
 | 認証 | Sign in with Apple → 詰まったら匿名認証 | `TokenProvider` 抽象の裏で切替。UI/ランタイムは影響なし |
 | STT | WhisperKit 確定 | `SpeechTranscriber` 抽象。`MockTranscriber` → `WhisperKitTranscriber` に差し替え |
 | iOS CI | 5分制限なし | WhisperKit/Firebase 解決込みのビルドでも可 |
@@ -174,8 +174,8 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 
 UI は専用ログイン画面を作らない(匿名なら無言、Apple なら初回に `SignInWithAppleButton` をシートで出す)。
 
-## 8. DSL スキーマ v0
-→ `docs/ios/dsl-proposal.md`(譲れない点/柔軟な点を明記)。
+## 8. DSL スキーマ
+→ 統一版 v1: `docs/dsl/README.md`(決定表)+ `docs/dsl/dsl.schema.json`。旧 iOS 案は `docs/ios/dsl-proposal.md`。
 
 ## 9. デモ3本の DSL 表現可能性
 | デモ | 画面 | 使う部品 | 不足 |
