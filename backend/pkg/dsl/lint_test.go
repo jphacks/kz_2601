@@ -29,7 +29,7 @@ func lintApp(t *testing.T, raw string) []string {
 }
 
 func TestLintExamplesClean(t *testing.T) {
-	for _, name := range []string{"kakeibo", "warikan", "bmi", "training", "walk", "diary_ai"} {
+	for _, name := range []string{"kakeibo", "warikan", "bmi", "training", "walk", "diary_ai", "attendance_nearby"} {
 		raw, err := os.ReadFile(filepath.Join(docsDir, "examples", name+".json"))
 		if err != nil {
 			t.Fatal(err)
@@ -182,7 +182,9 @@ func TestLintPeriodLabel(t *testing.T) {
 
 	// audit a08 (after): 直近7日 without a date filter / a12: 最新 is an avg
 	wantLint(t, lintWith(t, "", `{"type":"stat","label":"筋トレ(直近7日)","aggregate":"count","entity":"log"},`), `has no date filter`)
-	wantLint(t, lintWith(t, "", `{"type":"stat","label":"最新の体重","aggregate":"avg","entity":"log","field":"amount"},`), `no aggregate returns the newest record`)
+	wantLint(t, lintWith(t, "", `{"type":"stat","label":"最新の体重","aggregate":"avg","entity":"log","field":"amount"},`), `the value is not the newest record`)
+	// audit a26: 現在の予算 read with max (a lowered budget keeps the old one)
+	wantLint(t, lintWith(t, "", `{"type":"stat","label":"現在の月の予算","value":{"agg":"max","entity":"log","field":"amount"}},`), `use aggregate "latest"`)
 
 	ok := lintWith(t, "", `{"type":"stat","label":"直近7日","aggregate":"count","entity":"log","filter":{"field":"date","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-6]}}},
 	 {"type":"stat","label":"今月の支出","aggregate":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}},
@@ -192,6 +194,8 @@ func TestLintPeriodLabel(t *testing.T) {
 	 {"type":"stat","label":"合計","aggregate":"sum","entity":"log","field":"amount"},
 	 {"type":"stat","label":"今日までの記録日数","aggregate":"count","entity":"log"},
 	 {"type":"stat","label":"今月の予算","aggregate":"max","entity":"log","field":"amount"},
+	 {"type":"stat","label":"最新の体重","aggregate":"latest","entity":"log","field":"amount","by":"date"},
+	 {"type":"stat","label":"現在の予算の残り","value":{"op":"sub","args":[{"agg":"latest","entity":"log","field":"amount"},100]}},
 	 {"type":"stat","label":"今週のポイント","aggregate":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisWeek","value":null}},
 	 {"type":"stat","label":"今年の合計","value":{"agg":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisYear","value":null}}},`)
 	// ...but the remaining budget is a sum over this month

@@ -8,22 +8,27 @@ struct ProgressBarLeaf: View {
     let c: Component
 
     var body: some View {
-        let ratio = max(0, min(1, resolvedRatio))
+        let raw = resolvedRatio
+        let ratio = max(0, min(1, raw))
+        let style = Self.style(raw: raw, tone: c.tone)
+        // tone 指定時は実比率(112%)。桁が暴れないよう 999% で頭打ち
+        let shown = c.tone == nil ? ratio : min(max(0, raw), 9.99)
+        let percent = String(format: "%.0f%%", shown * 100) + (c.tone != nil && raw > 9.99 ? "+" : "")
         VStack(alignment: .leading, spacing: 6) {
             if let label = c.label {
                 HStack {
                     Text(label).font(RenderTheme.Fonts.statLabel).foregroundStyle(.secondary)
                     Spacer()
-                    Text(String(format: "%.0f%%", ratio * 100))
+                    Text(percent)
                         .font(.system(.subheadline, design: .rounded).weight(.semibold).monospacedDigit())
-                        .foregroundStyle(ratio >= 1 ? RenderTheme.Colors.negative : RenderTheme.Colors.brandText)
+                        .foregroundStyle(style.text)
                 }
             }
             GeometryReader { g in
                 ZStack(alignment: .leading) {
                     Capsule().fill(RenderTheme.Colors.surfaceElevated)
                     Capsule()
-                        .fill(ratio >= 1 ? AnyShapeStyle(RenderTheme.Colors.negative) : AnyShapeStyle(RenderTheme.brandGradient))
+                        .fill(style.fill)
                         .frame(width: g.size.width * ratio)
                 }
             }
@@ -33,10 +38,32 @@ struct ProgressBarLeaf: View {
         .renderCard()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(c.label ?? L("進捗"))
-        .accessibilityValue(String(format: "%.0f%%", ratio * 100))
+        .accessibilityValue(percent)
     }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// 色の段階(#140)。`raw` は丸める前の比率(1.2 = 120%)。
+    /// - tone 省略: 従来どおり 100% 以上を negative
+    /// - positive(目標の達成): 100% 以上を成功色
+    /// - negative(予算の消化): 100% を超えたら警告色(ちょうど 100% は通常色)
+    enum Level: Equatable { case normal, success, over }
+
+    static func level(raw: Double, tone: String?) -> Level {
+        switch tone {
+        case "positive": raw >= 1 ? .success : .normal
+        case "negative": raw > 1 ? .over : .normal
+        default: raw >= 1 ? .over : .normal
+        }
+    }
+
+    static func style(raw: Double, tone: String?) -> (text: Color, fill: AnyShapeStyle) {
+        switch level(raw: raw, tone: tone) {
+        case .normal: (RenderTheme.Colors.brandText, AnyShapeStyle(RenderTheme.brandGradient))
+        case .success: (RenderTheme.Colors.positive, AnyShapeStyle(RenderTheme.Colors.positive))
+        case .over: (RenderTheme.Colors.negative, AnyShapeStyle(RenderTheme.Colors.negative))
+        }
+    }
 
     private var resolvedRatio: Double {
         if let v = c.value { return v }

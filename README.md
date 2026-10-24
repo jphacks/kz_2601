@@ -47,7 +47,7 @@ flowchart LR
 | 4. 描画 | iOS が DSL を受け取り、タブ・画面・部品を SwiftUI で即描画。入力→保存→一覧・集計が動く | 部品 48 種 + アクション 9 種 |
 | 5. 育てる | 2 回目以降の発話は **JSON Patch(RFC 6902)** の差分生成。「ここをもっと大きく」「カテゴリにカフェを追加」も通る | edit p50 **1.7 秒** |
 
-アプリ本体にはコードが増えません。増えるのは DSL JSON の version だけです(保存先 Firestore への永続化は実装中・現在はサーバーのインメモリ)。
+アプリ本体にはコードが増えません。増えるのは DSL JSON の version だけです(保存先は Firestore・#32)。
 
 ### 特長
 #### 1. 特長1 AI が画面を"レイアウト"する
@@ -92,24 +92,38 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 | 差分で育つ | 2 回目以降は JSON Patch。言及していない画面・entity は構造的に保持され、出力トークンが小さいので速い(edit p50 1.7 秒) |
 | 実測 | 16 発話 × effort low/high の 32 回 + 回帰 8 回で検証一発通過 **100%**、再生成 0、`area` フォールバック 0、新規 p50 6.6 秒 |
 
+### 10/24 に追加した機能(一覧)
+
+| 機能 | 内容 | PR |
+|---|---|---|
+| 計算ロジック(式 DSL) | 割り勘の精算・BMI・残り予算・時刻の差 × 時給・今週 / 今年の集計・一覧からワンタップでチェック | #117 #127(最新の 1 件・ref 先の値・毎日リセットのチェックは #141 レビュー中) |
+| 生成前の対話 | 足りない点だけ 1〜3 問聞いてから作る(設定でオフ可) | #92 #105 |
+| 画面の分け方と遷移 | 「B からも C へ」を声で直せる。タブの根へはタブ切替、何周しても戻るボタンが深くならない | #126 #128(画面マップは #144 レビュー中) |
+| シェア / 探す | QR・リンクで渡す、公開アプリを探して入れる。共有データはほぼリアルタイムに他端末へ | #104 #118 |
+| Siri / ショートカット | 「Tailor It で家計簿に記録」で記録を追加・アプリを開く | #120 |
+| 読み上げ・英語 | 挨拶・質問・完成の要約を読み上げ(既定 OFF)。UI・生成・音声認識の日英切替 | #125 #129(英語の生成品質は #149 レビュー中) |
+| オフライン・背面 | 圏外でも記録を先に保存して後で同期。タイマーは背面でも正確で終了時に通知 | #70 #136 |
+| 生成品質 | 品質監査で機能の充足 49% → 88%・嘘ラベル 7/20 → 0/20(`docs/backend/ai-eval/2026-10-24-audit2.md`) | #111 #124 #135 |
+| レビュー中 | 端末内の AI で要約・分類する部品(iPhone 15 Pro 以降)、近くの端末へ記録を送る、単体アプリとしてのリリース申請 | #137 #138 #145 |
+
 ### 解決出来ること
 
 - **非エンジニアが"自分専用の小さなアプリ"を即席で持てる**。家計簿・トレーニング記録・散歩メモ・読書記録・水分記録・買い物リスト・体重記録(いずれも eval 済み)。
 - **「ここをこうして」が通る**。設定画面を探す代わりに、話せばレイアウト・フィールド・通知時刻が変わる。
-- **データは残る設計**。記録(records)は uid に紐付けて保存する設計(appconfig の Firestore 永続化は実装中・現在はサーバーのインメモリ)。アプリ自体が変わってもフィールド id を維持するので既存レコードは消えない。
+- **データは残る設計**。記録(records)は uid に紐付けて保存する設計(appconfig が Firestore に保存・#32)。端末内にも先に保存し、圏外でも後で同期する(#70)。アプリ自体が変わってもフィールド id を維持するので既存レコードは消えない。
 
 ### 今後の展望
 
 | ID | 展望 | 状態 |
 |---|---|---|
-| G17 | **生成前の対話**。「このアプリ、カメラ使える?」のような確認質問に答えてから生成する `POST /v1/chat`(1 問+選択肢・最大 3 ラリー・「もう作って」で即 ready) | backend 実装済み(#74・eval 6 本通過)/ iOS は #75 |
+| G17 | **生成前の対話**。「このアプリ、カメラ使える?」のような確認質問に答えてから生成する `POST /v1/chat`(1 問+選択肢・最大 3 ラリー・「もう作って」で即 ready) | **実装済み**(backend #74 / iOS #105。設定でオフにもできる) |
 | G14 | 位置情報 + 地図(`mapView` / `locationButton`・`location` フィールド) | 実装済み(実 GPS の実機検証は一部未) |
-| G16 | 複数アプリの保持と音声切替 | 予定(現状は 1 ユーザー 1 アプリ) |
-| G11 | 「元に戻して」で `versions/{n}/restore` | 予定(appconfig の version 履歴設計済み) |
+| G16 | 複数アプリの保持と音声切替 | **実装済み**(変身一覧・#72) |
+| G11 | 「元に戻して」で `versions/{n}/restore` | **実装済み**(Claude を呼ばず 1 つ前の version に戻す・#53) |
 | G18 | ホーム画面ウィジェット(生成アプリの `stat` 先頭 3 個を App Group 経由で WidgetKit に表示・small=1 個/medium=3 個) | **実装済み**(Issue #39・実機確認済み。更新は本体起動中のみ) |
-| — | 生成したアプリの共有(DSL JSON はただの文書なので URL 1 本で配れる) | 構想 |
-| — | appconfig の Firestore 永続化(DSL version 履歴・records) | 実装中 |
-| — | Container 内グリッド、Firestore リスナーによるホットリロード(現在は 2 秒ポーリング) | 予定 |
+| — | 生成したアプリの共有(DSL JSON はただの文書なので URL 1 本で配れる) | **実装済み**(QR / リンク・公開アプリを探す・#118) |
+| — | appconfig の Firestore 永続化(DSL version 履歴・records) | **実装済み**(#32・staging 接続 #57) |
+| — | Container 内グリッド | 予定(Firestore リスナー + SSE のホットリロードは実装済み・#104) |
 
 ### 注力したこと（こだわり等）
 * **DSL を唯一の正典にした設計**。`docs/dsl/dsl.schema.json` から Go 型(埋め込み・CI で byte 一致)、Swift 型(examples をバンドルしてデコードテスト)、AI 向け部品カタログの 3 つを導出し、二重定義を禁止。iOS と backend の契約ズレを構造的に防いだ。
@@ -123,7 +137,7 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 #### API・データ
 * Claude API(`claude-sonnet-5-5`・`anthropic-version: 2026-10-21`・生 HTTP・prompt caching・`fallbacks: "default"`)
 * Firebase Auth(Sign in with Apple / 匿名認証。Go 側は ID トークン検証のみ)
-* Firestore(Native mode・DSL version 履歴と records の保存先。appconfig 側の永続化は実装中)
+* Firestore(Native mode・DSL version 履歴と records の保存先)
 * Cloud Run(`appconfig-{stg,prod}` / `ai-{stg,prod}`・asia-northeast1)、Secret Manager(`ANTHROPIC_API_KEY`)、Artifact Registry、Workload Identity Federation
 * JSON Schema draft 2020-12(DSL v1)、JSON Patch RFC 6902
 
@@ -177,7 +191,7 @@ flowchart LR
   subgraph GCP["GCP (Cloud Run / asia-northeast1)"]
     AI["ai (Go)<br/>generate / validate / patch"]
     AC["appconfig (Go)<br/>DSL version / records"]
-    FS[("Firestore<br/>(永続化は実装中)")]
+    FS[("Firestore")]
     SM["Secret Manager"]
   end
   Svc -- "Bearer: Firebase ID token<br/>POST /v1/generate" --> AI

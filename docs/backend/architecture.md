@@ -406,6 +406,7 @@ flowchart LR
 | 上限 | Claude が質問できるのは 3 ラリー。4 ラリー目は `## 強制 ready` を付けて呼び、質問が返っても ready に寄せる(`source=forced`) |
 | 会話状態 | ai プロセス内 `map[appId]`(直近 10 メッセージ・TTL 30 分・アクセス時に lazy sweep)。`messages` は全履歴でも最新 1 件でもよい(2 件以上=置換、1 件=追記)。`DELETE /v1/chat/{appId}` でクリア。**永続化(appconfig `conversations/{appId}`・再起動で続きから)は後段**(Cloud Run `min-instances=1` の単一インスタンスなら 30 分内は同じプロセスに当たる前提) |
 | 既存アプリがある時 | `/chat` は呼ばれない想定(iOS が初期状態の時だけ対話 UI を出す)。`/generate` の `mode: auto` 判定は従来どおり |
+| 速度(#147) | chat は生成と別設定(`AI_CHAT_MODEL` / `AI_CHAT_EFFORT` / `AI_CHAT_THINKING`、既定 Sonnet 5.5 / low / adaptive)。1 回目の呼び出しはストリーミングし、`kind=question` で `text` と `suggestions` が出そろった時点で**質問を先に返す**(スキーマ順が kind→text→suggestions→brief→transcript)。brief / transcript は裏で最後まで生成して会話に保存し、同じ appId の次のターンはそれを待つ。ready は全体が必要なので従来どおり。実測は [ai-eval/2026-10-24-chat-latency.md](ai-eval/2026-10-24-chat-latency.md) |
 | 実測(Sonnet 5.5 / low・6 ケース 8 ステップ全通過) | Claude 1 回 **p50 2.4s**(初回キャッシュ作成 7.5s を除くと 2.05〜2.6s)、即 ready は 0ms。Haiku 5.5 は速くならず(2.2 / 2.8s)英語の具体発話で質問に戻ったので採用せず |
 
 ### 6.7 計算ロジック(Expr・Issue #100)
@@ -493,6 +494,9 @@ jobs:
 | `OPENAI_API_KEY` | - | o | Secret Manager・任意(無ければ /transcribe 501) |
 | `GENERATE_TIMEOUT_SEC` | - | o | `45` |
 | `AI_LOGIC_PASS` | - | o | 未設定(=off)。`1` で create 後に計算ロジックの 2 パス目を実行(§6.7) |
+| `AI_CHAT_MODEL` | - | o | 未設定 = `claude-sonnet-5-5`。生成前の対話(§6.6)だけのモデル。速さ優先なら `claude-haiku-5-5`(+`AI_CHAT_THINKING=disabled`) |
+| `AI_CHAT_EFFORT` | - | o | 未設定 = `low` |
+| `AI_CHAT_THINKING` | - | o | 未設定 = 送らない(adaptive)。`disabled`(Haiku)/ `between_tools`(Sonnet 5.5)で思考オフ。#147 の eval では速くならなかった |
 | `MAX_AUDIO_BYTES` | - | o | `26214400` |
 
 ## 8. ディレクトリ構成

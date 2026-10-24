@@ -28,6 +28,7 @@ struct SettingsSheet: View {
                 if !Self.e2eDeleteAccount { deleteAccountSection }
             }
             .navigationTitle("設定")
+            .screenMapSheet { dismiss() } // 設定は音声シートから開くので、閉じればその画面の文脈で話せる
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) { Button("閉じる") { dismiss() } }
@@ -211,6 +212,7 @@ struct SettingsSheet: View {
                 Label("ひとつ前の状態に戻す", systemImage: "arrow.uturn.backward")
             }
             .disabled(rt.isMorphing)
+            ScreenMapSettingsRow() // #116
             Button(role: .destructive) { confirmReset = true } label: {
                 Label("アプリをリセット(初期状態に戻す)", systemImage: "arrow.counterclockwise")
             }

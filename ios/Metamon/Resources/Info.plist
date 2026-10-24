@@ -107,5 +107,13 @@
 	<string>生成したアプリの共有ボタンから画像を写真に保存するために、写真ライブラリへの追加を使用します。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>生成したアプリで現在地を記録・表示するために、位置情報を使用します。</string>
+	<!-- nearbyShare(#36): MultipeerConnectivity で近くの Tailor It 端末と記録を送り合う。サービス名は NearbyService.serviceType と一致させる -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>近くにいる Tailor It の端末を見つけて、記録をその場で送ったり受け取ったりするために、ローカルネットワークを使用します。</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_tailorit-mc._tcp</string>
+		<string>_tailorit-mc._udp</string>
+	</array>
 </dict>
 </plist>

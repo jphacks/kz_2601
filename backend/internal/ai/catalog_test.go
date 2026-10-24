@@ -67,6 +67,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompSettlement,
 		// on-device AI
 		dsl.CompAiButton,
+		// peer-to-peer
+		dsl.CompNearbyShare,
 	} {
 		goTypes[string(ct)] = true
 	}
@@ -115,7 +117,7 @@ func TestCatalogRendering(t *testing.T) {
 		"- section: children / spacing(none|small|medium|large), title",
 		"- vstack: children / spacing(none|small|medium|large) —", // title is section-only (x-for)
 		"- list: entity, item{title} / emptyText, filter{field,op,value}, onItemTap, searchField, sort{field,direction}, swipeToDelete",
-		"- stat: label / aggregate(count|sum|avg|min|max), entity, field, filter{field,op,value}, format(plain|currency|percent), value",
+		"- stat: label / aggregate(count|sum|avg|min|max|latest|earliest), by, entity, field, filter{field,op,value}, format(plain|currency|percent), value",
 		"- settlement: entity, nameField, balanceField / title —",
 		"### 計算式 Expr",
 		"- {\"op\":\"daysUntil\"",
