@@ -64,9 +64,18 @@ struct VoiceInputView: View {
         .animation(.spring(duration: 0.45, bounce: 0.15), value: inChat)
         .sheet(isPresented: $showSettings) { SettingsSheet() }
         .onTapGesture { typing = false }
-        // #43 初期画面の挨拶を読み上げ(対話中・生成後のシートでは読まない)
+        // #43 初期画面の挨拶を読み上げ(対話中・生成中・生成後のシートでは読まない)
         .task(id: "\(isInitial)|\(inChat)|\(greeting.title)") {
-            if isInitial, !inChat { SpeechReader.shared.speak((prompt ?? greeting.title) + "\n" + greeting.subtitle) }
+            // 対話 →「この内容で作る」直後は inChat=false でも生成開始が数フレーム遅れるので、少し待ってから判定する
+            try? await Task.sleep(for: .milliseconds(400))
+            if !Task.isCancelled, isInitial, !inChat, !rt.isMorphing { SpeechReader.shared.speak((prompt ?? greeting.title) + "\n" + greeting.subtitle) }
+            #if DEBUG
+            // ヘッドレス E2E 用: `METAMON_AUTO_MIC=<秒>` で読み上げ中にマイクをタップ(読み上げ停止 → 録音の確認)
+            if let s = ProcessInfo.processInfo.environment["METAMON_AUTO_MIC"].flatMap(Double.init), isInitial, phase == .idle {
+                try? await Task.sleep(for: .seconds(s))
+                if !Task.isCancelled { await toggle() }
+            }
+            #endif
         }
     }
 

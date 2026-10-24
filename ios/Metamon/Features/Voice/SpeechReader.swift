@@ -31,15 +31,22 @@ final class SpeechReader: NSObject, AVSpeechSynthesizerDelegate {
         synthesizer.delegate = self
     }
 
-    /// UI 言語に合わせた読み上げ言語(英語化 #44 で en のローカライズが入れば自動で en-US になる)。
-    nonisolated static var uiLanguage: String {
-        (Bundle.main.preferredLocalizations.first ?? "ja").hasPrefix("en") ? "en-US" : "ja-JP"
+    /// 読み上げ言語の既定: 本文にかな・漢字があれば ja-JP、無ければ en-US。
+    /// UI 言語(#44)ではなく本文で決める。backend の summary / 質問が日本語のまま英語 UI に来ても英語ボイスで読まないため。
+    nonisolated static func language(for text: String) -> String {
+        let japanese = text.unicodeScalars.contains { (0x3040...0x30FF).contains($0.value) || (0x4E00...0x9FFF).contains($0.value) }
+        return japanese ? "ja-JP" : "en-US"
     }
 
-    /// 読み上げる。前の読み上げは打ち切る。OFF・録音中・空文字なら何もしない。
-    func speak(_ text: String, language: String = SpeechReader.uiLanguage) {
+    /// 読み上げる。前の読み上げは打ち切る。OFF・録音中・空文字なら何もしない。`language` 省略時は本文から推定。
+    func speak(_ text: String, language: String? = nil) {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard enabled, !micBusy, !text.isEmpty else { return }
+        let language = language ?? Self.language(for: text)
+        guard enabled, !text.isEmpty else { return }
+        guard !micBusy else {
+            print("[Metamon] speech: skipped (recording)")
+            return
+        }
         if synthesizer.isSpeaking { synthesizer.stopSpeaking(at: .immediate) }
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = voice(for: language)
