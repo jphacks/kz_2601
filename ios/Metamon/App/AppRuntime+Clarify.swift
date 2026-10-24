@@ -79,6 +79,7 @@ extension AppRuntime {
     @discardableResult
     func say(_ text: String, source: ClarifyFlow.InputSource = .text) async -> ChatTurn? {
         cancelAutoBuild()
+        clearPaidConfirm() // 話し直したら確認カードは閉じる(新しい応答で判定し直す)
         chatLastInput = source
         withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
             chatBubbles.append(ChatBubble(role: .user, text: text))
@@ -99,6 +100,7 @@ extension AppRuntime {
         let transcript = chatTurn?.transcript?.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = (transcript?.isEmpty == false ? transcript : nil) ?? fallbackTranscript
         guard !text.isEmpty else { return }
+        if holdForPaidConfirm(PaidFeatureCheck.confirmation(for: chatTurn, text: text, isPro: proGate.isPro, enforced: proGate.isEnforced)) { return }
         print("[Metamon] chat: build mode=\(chatMode.rawValue) transcript=\(text)")
         await runFromChat(text)
     }
@@ -108,6 +110,7 @@ extension AppRuntime {
         guard morphJob == nil, !chatPending else { return }
         let text = option.instruction.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        if holdForPaidConfirm(PaidFeatureCheck.confirmation(for: option, isPro: proGate.isPro, enforced: proGate.isEnforced)) { return }
         print("[Metamon] chat: choose option=\(option.id) mode=\(chatMode.rawValue) instruction=\(text)")
         await runFromChat(text)
     }
@@ -122,7 +125,7 @@ extension AppRuntime {
     }
 
     /// 会話を閉じて生成へ。edit は音声シートを閉じてから(本体側の生成中表示に任せる)、画面マップの文脈があれば先頭に付ける。
-    private func runFromChat(_ text: String) async {
+    func runFromChat(_ text: String) async {
         let mode = chatMode
         resetChat()
         if mode == .edit {
@@ -154,6 +157,7 @@ extension AppRuntime {
         chatTask = nil
         chatLastInput = nil
         chatEpoch += 1
+        clearPaidConfirm()
         let hadConversation = isChatting
         let appId = document.appId
         withAnimation(.easeInOut(duration: 0.3)) {
