@@ -4,7 +4,8 @@
 // DSL produced by their `base` create case in the same run. `expect` keys:
 // photo / chart (bool), notification ("HH:MM" or "any"), substitution (bool:
 // the summary mentions 代替 / "replaced" because a requested part is not in
-// the catalog). A case may pin `locale` (ja|en); -locale overrides every case;
+// the catalog), scope ("public"|"shared"|"private": at least one entity has
+// that scope). A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
 //
@@ -54,6 +55,7 @@ type Metrics struct {
 	HasPhoto      bool     `json:"hasPhoto"`
 	HasChart      bool     `json:"hasChart"`
 	Notifications []string `json:"notifications,omitempty"` // repeat@time
+	Scopes        []string `json:"scopes,omitempty"`        // entityId:scope (effective)
 	Areas         []string `json:"areas"`                   // screenId: area list
 }
 
@@ -247,8 +249,10 @@ func main() {
 
 func measure(a *dsl.App) *Metrics {
 	m := &Metrics{Tabs: len(a.App.Tabs), Screens: len(a.Screens), Entities: len(a.Entities)}
-	for _, e := range a.Entities {
+	for i := range a.Entities {
+		e := &a.Entities[i]
 		m.Fields += len(e.Fields)
+		m.Scopes = append(m.Scopes, e.ID+":"+string(e.EffectiveScope()))
 	}
 	for _, n := range a.App.Notifications {
 		m.Notifications = append(m.Notifications, n.Repeat+"@"+n.Time)
@@ -315,6 +319,17 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 			}
 			if !found {
 				miss = append(miss, fmt.Sprintf("notification=%v (want %s)", m.Notifications, want))
+			}
+		case "scope":
+			want := fmt.Sprint(v)
+			found := false
+			for _, s := range m.Scopes {
+				if strings.HasSuffix(s, ":"+want) {
+					found = true
+				}
+			}
+			if !found {
+				miss = append(miss, fmt.Sprintf("scope=%v (want %s)", m.Scopes, want))
 			}
 		}
 	}

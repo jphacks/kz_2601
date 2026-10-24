@@ -121,6 +121,9 @@ func TestCatalogRendering(t *testing.T) {
 		"- divider: (追加キー無し) —",
 		"- notification{id, title, body, repeat(once|daily|weekly) / time, weekday(mon|tue|wed|thu|fri|sat|sun)}",
 		"どの action にも付けられる任意キー: confirmMessage",
+		"### Entity の scope",
+		"- scope: private —",
+		"- scope: public —",
 	} {
 		if !strings.Contains(catalog, want) {
 			t.Errorf("catalog lacks %q\n%s", want, catalog)

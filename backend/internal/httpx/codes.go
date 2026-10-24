@@ -3,6 +3,7 @@ package httpx
 const (
 	CodeBadRequest      = "bad_request"
 	CodeUnauthenticated = "unauthenticated"
+	CodeForbidden       = "forbidden"
 	CodeNotFound        = "not_found"
 	CodeVersionConflict = "version_conflict"
 	CodeInvalidDSL      = "invalid_dsl"
