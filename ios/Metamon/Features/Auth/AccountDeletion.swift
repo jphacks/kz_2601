@@ -4,39 +4,63 @@ import MetamonServices
 
 extension AuthSession {
     /// アカウント削除(#119・App Store 5.1.1(v))。匿名ユーザーも可。
-    /// 1. Apple でサインインしたユーザーは Apple に再認証してもらい、そのコードでトークンを取り消す(失敗しても続行)
-    /// 2. `DELETE /v1/me`(サーバーで論理削除。以後この uid は 410)。失敗したらここで止める(端末側は消さない=やり直せる)
-    /// 3. 端末のデータを消してサインアウト → サインイン画面へ
+    /// 0. Apple でサインインしたユーザーは Apple に再認証してもらい、Firebase を再認証(requiresRecentLogin の回避)して
+    ///    そのコードで Apple のトークンを取り消す(どちらも失敗しても続行)
+    /// 1〜4. `AccountDeletionFlow`: サーバーで論理削除 → Firebase のユーザー削除 → 端末のデータ削除 → サインアウト
     /// - Returns: 完了したら true。Apple の再認証をキャンセルしたら false(何も消していない)。
     func deleteAccount(account: any AccountClient, runtime: AppRuntime) async throws -> Bool {
-        if let user, !user.isAnonymous, service is FirebaseAuthService {
-            guard let code = try await AppleReauth.authorizationCode() else { return false }
+        let isApple = user.map { !$0.isAnonymous } == true && service is FirebaseAuthService
+        if isApple {
+            guard let apple = try await AppleReauth.credential() else { return false }
             do {
-                try await service.revokeAppleToken(authorizationCode: code)
+                try await service.reauthenticateWithApple(idToken: apple.idToken, nonce: apple.nonce)
+            } catch {
+                print("[Metamon] Firebase reauthenticate failed (continuing): \(error)")
+            }
+            do {
+                try await service.revokeAppleToken(authorizationCode: apple.code)
             } catch {
                 // Firebase の Apple プロバイダ設定(OAuth コードフロー)が無いと失敗する。削除自体は続ける
                 print("[Metamon] Apple token revoke failed (continuing): \(error)")
             }
         }
-        try await account.deleteAccount()
-        await runtime.wipeLocalData()
-        signOut() // サーバー側でユーザーは消えているが、端末のセッションはここで破棄する
+        try await AccountDeletionFlow.run(
+            account: account,
+            auth: service,
+            reauthenticate: { [service] in
+                guard isApple, let apple = try await AppleReauth.credential() else { return false }
+                try await service.reauthenticateWithApple(idToken: apple.idToken, nonce: apple.nonce)
+                return true
+            },
+            wipeLocal: { await runtime.wipeLocalData() }
+        )
+        signOut() // セッションの表示を即反映(サインアウト済みでも安全)
         return true
     }
 }
 
-/// アカウント削除の直前に Apple の再認証シートを出し、`authorizationCode`(5 分有効・1 回限り)を受け取る。
+/// アカウント削除の直前に Apple の再認証シートを出す。`code`(5 分有効・1 回限り)は Apple のトークン取り消しに、
+/// `idToken` + 生の `nonce` は Firebase の再認証に使う。
 @MainActor
 private final class AppleReauth: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
-    private var continuation: CheckedContinuation<String?, Error>?
+    struct Credential {
+        var code: String
+        var idToken: String
+        var nonce: String
+    }
+
+    private var continuation: CheckedContinuation<Credential?, Error>?
+    private var nonce = ""
 
     /// キャンセルなら nil。
-    static func authorizationCode() async throws -> String? {
+    static func credential() async throws -> Credential? {
         let reauth = AppleReauth()
         return try await withCheckedThrowingContinuation { cont in
             reauth.continuation = cont
+            reauth.nonce = AppleNonce.random()
             let request = ASAuthorizationAppleIDProvider().createRequest()
             request.requestedScopes = [] // 再認証なので名前・メールは要らない
+            request.nonce = AppleNonce.sha256(reauth.nonce)
             let controller = ASAuthorizationController(authorizationRequests: [request])
             controller.delegate = reauth
             controller.presentationContextProvider = reauth
@@ -49,11 +73,12 @@ private final class AppleReauth: NSObject, ASAuthorizationControllerDelegate, AS
 
     func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
         let credential = authorization.credential as? ASAuthorizationAppleIDCredential
-        guard let data = credential?.authorizationCode, let code = String(data: data, encoding: .utf8) else {
+        guard let codeData = credential?.authorizationCode, let code = String(data: codeData, encoding: .utf8),
+              let tokenData = credential?.identityToken, let idToken = String(data: tokenData, encoding: .utf8) else {
             finish(.failure(AuthError.invalidAppleCredential))
             return
         }
-        finish(.success(code))
+        finish(.success(Credential(code: code, idToken: idToken, nonce: nonce)))
     }
 
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
@@ -69,7 +94,7 @@ private final class AppleReauth: NSObject, ASAuthorizationControllerDelegate, AS
         return scenes.flatMap(\.windows).first(where: \.isKeyWindow) ?? ASPresentationAnchor()
     }
 
-    private func finish(_ result: Result<String?, Error>) {
+    private func finish(_ result: Result<Credential?, Error>) {
         continuation?.resume(with: result)
         continuation = nil
     }

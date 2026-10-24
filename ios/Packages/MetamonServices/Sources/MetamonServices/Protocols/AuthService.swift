@@ -17,11 +17,14 @@ public enum AuthError: LocalizedError, Sendable {
     /// Firebase 未初期化(GoogleService-Info.plist がバンドルに無い)
     case notConfigured
     case invalidAppleCredential
+    /// Firebase のユーザー削除に直近のサインインが必要(`AuthErrorCode.requiresRecentLogin`)
+    case requiresRecentLogin
 
     public var errorDescription: String? {
         switch self {
         case .notConfigured: return "Firebase が設定されていません(GoogleService-Info.plist を同期してください)"
         case .invalidAppleCredential: return "Apple から ID トークンを取得できませんでした"
+        case .requiresRecentLogin: return "もう一度サインインしてから削除してください"
         }
     }
 }
@@ -39,9 +42,17 @@ public protocol AuthService: AnyObject, Sendable {
     func idToken(forceRefresh: Bool) async throws -> String?
     /// Sign in with Apple のトークンを Apple 側で取り消す(アカウント削除時・#119)。`authorizationCode` は直前の Apple 認証で得た値。
     func revokeAppleToken(authorizationCode: String) async throws
+    /// 現在のユーザーを Firebase Auth から削除する(アカウント削除・#119)。同じ Apple ID で次にサインインすると新しい uid になる。
+    /// 直近のサインインが必要な時は `AuthError.requiresRecentLogin`。
+    func deleteCurrentUser() async throws
+    /// Apple の idToken で現在のユーザーを再認証する(`deleteCurrentUser` の前・requiresRecentLogin の回避)。
+    func reauthenticateWithApple(idToken: String, nonce: String) async throws
 }
 
 public extension AuthService {
     /// 既定は何もしない(モック)。
     func revokeAppleToken(authorizationCode: String) async throws {}
+    /// 既定はサインアウト(モック)。
+    func deleteCurrentUser() async throws { try signOut() }
+    func reauthenticateWithApple(idToken: String, nonce: String) async throws {}
 }

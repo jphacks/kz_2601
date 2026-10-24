@@ -66,6 +66,21 @@ public final class FirebaseAuthService: AuthService, @unchecked Sendable {
     public func revokeAppleToken(authorizationCode: String) async throws {
         try await auth.revokeToken(withAuthorizationCode: authorizationCode)
     }
+
+    public func deleteCurrentUser() async throws {
+        guard let user = auth.currentUser else { return }
+        do {
+            try await user.delete() // 成功すると Firebase がサインアウト状態にする
+        } catch let error as NSError where error.code == AuthErrorCode.requiresRecentLogin.rawValue {
+            throw AuthError.requiresRecentLogin
+        }
+    }
+
+    public func reauthenticateWithApple(idToken: String, nonce: String) async throws {
+        guard let user = auth.currentUser else { return }
+        let credential = OAuthProvider.appleCredential(withIDToken: idToken, rawNonce: nonce, fullName: nil)
+        _ = try await user.reauthenticate(with: credential)
+    }
 }
 
 private extension AuthUser {
