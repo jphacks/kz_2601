@@ -52,8 +52,16 @@ struct MetamonStatWidget: Widget {
 // MARK: - Theme(本体 Theme.swift のブランド色を複製。Renderer を import できないため)
 
 enum WidgetTheme {
-    static let brandA = Color(red: 142 / 255, green: 108 / 255, blue: 255 / 255) // #8E6CFF
-    static let brandB = Color(red: 76 / 255, green: 201 / 255, blue: 255 / 255)  // #4CC9FF
+    /// 藍(ライト #2E6A93 / ダーク #4E8DB8)・青緑(ライト #3E9A9C / ダーク #3B9E9F)。Renderer の SemanticPalette.brandA/brandB と同値(#102)
+    static let brandA = dynamic(light: (46, 106, 147), dark: (78, 141, 184))
+    static let brandB = dynamic(light: (62, 154, 156), dark: (59, 158, 159))
+
+    private static func dynamic(light: (Int, Int, Int), dark: (Int, Int, Int)) -> Color {
+        Color(UIColor { trait in
+            let c = trait.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: CGFloat(c.0) / 255, green: CGFloat(c.1) / 255, blue: CGFloat(c.2) / 255, alpha: 1)
+        })
+    }
 
     static let brandGradient = LinearGradient(
         colors: [brandA, brandB], startPoint: .topLeading, endPoint: .bottomTrailing

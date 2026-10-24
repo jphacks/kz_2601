@@ -31,6 +31,7 @@ struct MetamonApp: App {
         let runtime = AppRuntime(document: document, services: services)
         let session = AuthSession(service: services.auth)
         runtime.onSessionExpired = { session.expire() } // 401 が続いたらサインイン画面へ(#60)
+        IntentHost.shared.register(runtime) // Siri / ショートカット(#80)は本体プロセス内でこの runtime を使う
         _runtime = State(initialValue: runtime)
         _session = State(initialValue: session)
     }
@@ -47,7 +48,10 @@ struct MetamonApp: App {
                         .environment(\.dslRuntime, runtime)         // Renderer 向け(DSLRuntime protocol)
                         .environment(\.componentRegistry, Self.componentRegistry)
                         .transition(.opacity)
-                        .task { await runtime.bootstrap() }
+                        .task {
+                            await runtime.bootstrap()
+                            IntentHost.shared.markReady() // 保留中の「開く/話しかける」を実行(#80)
+                        }
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: session.user == nil)
