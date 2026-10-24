@@ -85,6 +85,11 @@ public enum MockSeed {
                 Record(id: "e2", data: ["title": "夕食", "amount": 4500, "payer": "m2", "date": .string(today)], createdAt: iso),
                 Record(id: "e3", data: ["title": "ガソリン", "amount": 1500, "payer": "m1", "date": .string(today)], createdAt: iso),
             ],
+            // bmi(#101): 65kg/170cm → 22.5、70kg/175cm → 22.9
+            "body": [
+                Record(id: "b1", data: ["date": .string(today), "weight": 65, "height": 170], createdAt: iso),
+                Record(id: "b2", data: ["date": .string(today), "weight": 70, "height": 175], createdAt: iso),
+            ],
         ]
     }
 }
