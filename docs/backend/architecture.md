@@ -189,17 +189,28 @@ func UID(ctx context.Context) string { s, _ := ctx.Value(ctxKey{}).(string); ret
 
 ### 6.1 Claude 呼び出し
 
-| 項目 | 値 |
+> 実装: `backend/internal/ai/{client.go,schema.go,prompt.go,generate.go,handler.go}` + `backend/internal/appconfigclient`。実 API の応答サンプルは `docs/backend/ai-samples/*.response.json`。
+
+| 項目 | 値(実装済み) |
 |---|---|
-| SDK | `github.com/anthropics/anthropic-sdk-go`(`client.Messages.New`) |
-| モデル | 既定 `claude-sonnet-5-5`(正典)。`CLAUDE_MODEL=claude-opus-5-5` で品質側へ切替。モデルIDに日付サフィックスは付けない |
-| 思考 | adaptive(省略時既定)。`output_config.effort = "low"`(レイテンシ優先。品質不足なら `medium`) |
-| 出力 | **構造化出力** `output_config.format = {type:"json_schema", schema: ...}`。初回 = `dsl.SchemaJSON()`(root AppDSL)、編集 = `dsl.PatchSchemaJSON()`(root PatchDocument)。`tool_choice` 強制は Sonnet 5.5 で 400 のため使わない |
+| 呼び出し | **生 HTTP**(`net/http` → `POST /v1/messages`、`anthropic-version: 2026-10-21`)。SDK 依存なし(go.mod を増やさない・テストは `Caller` インターフェースでモック)。429/5xx/接続エラーは指数バックオフで最大 2 回リトライ、1 呼び出し `GENERATE_TIMEOUT_SEC`(既定 45s) |
+| モデル | 既定 `claude-sonnet-5-5`。`CLAUDE_MODEL=claude-opus-5-5` で品質側へ切替。モデルIDに日付サフィックスは付けない |
+| 思考 | adaptive(省略時既定)。`output_config.effort = CLAUDE_EFFORT`(既定 `low`) |
+| 出力 | **既定は「スキーマをプロンプトに載せて JSON のみを出させ、Go で厳密検証」**。`output_config.format`(構造化出力)は `CLAUDE_STRUCTURED_OUTPUT=1` のときだけ送る(下記「構造化出力の制約」参照)。応答テキストは `extractJSON`(コードフェンス/前置き除去)→ 初回 `dsl.Parse`、編集 `dsl.ApplyPatch` |
 | max_tokens | 16000(非ストリーミング)。DSL 64KB 上限内 |
-| 拒否 | `stop_reason == "refusal"` を必ずチェック。`fallbacks: "default"`(beta `server-side-fallback-2026-07-01`)を有効化 |
-| キャッシュ | system(カタログ・ルール・few-shot)は固定文字列にして `cache_control: ephemeral`。可変部(現DSL・発話)は user に置く |
-| リトライ | SDK の max_retries=2(429/5xx)。**検証NGの再生成は最大2回**、2回目はエラー一覧を user メッセージに追記 |
-| 構造化出力の制約 | 再帰スキーマ不可・`min/max/pattern` 不可 → DSL スキーマはこれを前提に設計済み(非再帰・制約は Go 側) |
+| 拒否 | `stop_reason == "refusal"` → 400 `refused`。`fallbacks: "default"`(beta `server-side-fallback-2026-07-01`)を常時送付 |
+| キャッシュ | system(設計原則・部品カタログ・few-shot `examples/kakeibo.json`・生成用スキーマ ≈8.6K tokens)は固定文字列で `cache_control: ephemeral`。可変部(現 DSL・発話・前回の Problems)は user に置く。実測: 2 回目以降 `cache_read_input_tokens=8588` |
+| 再生成ループ | 検証 NG(`dsl.ValidationError.Problems`: 重なり・範囲外・参照不整合・スキーマ違反)は **Problems を user に添付して最大 2 回再生成**(計 3 回)。それでも NG → **`area` を全部落として再検証**(省略=上から積むフォールバック)→ それも NG なら **400 `generation_failed`**(`details.problems`/`details.attempts`)。編集は Patch 3 回 NG → `area` 落とし → **フル生成 1 回に降格**(`meta.downgradedToFull`)→ 400 |
+| summary | 編集 = PatchDocument の `summary`(モデル生成)。初回 = `app.name`/タブ/画面/entity/通知から日本語テンプレで機械生成 |
+
+**構造化出力の制約(2026-10-24 実測)**: `output_config.format` の文法コンパイラは DSL 規模のスキーマを受け付けない。正典スキーマそのまま・Leaf 15 種を 1 オブジェクトに平坦化した版、いずれも `The compiled grammar is too large`。単体プローブでは **任意プロパティ 12 個の平坦オブジェクトは OK、16 個で `Schema is too complex`、入れ子合計 25 個で `too many optional parameters`**。Component は最低でも 30 個の任意プロパティを持つため、現状の上限では構造化出力に載らない。そのため生成用スキーマは **プロンプト埋め込み(モデルへの参照)** として使い、強制は Go 側に一本化した。上限が緩和されたら `CLAUDE_STRUCTURED_OUTPUT=1` で即切替できる。
+
+**生成用スキーマの派生ルール**(`internal/ai/schema.go` `Relax` → `compact`、正典 `docs/dsl/dsl.schema.json` から機械導出・手書き禁止):
+1. `$schema`/`$id` を削除、ルートの `$ref`(PatchDocument)はインライン化(ルートは object)。
+2. 構造化出力非対応キーワードを除去: `pattern`・`format`・`min/maxLength`・`minimum/maximum`・`min/maxItems` 等(`properties` 配下の同名プロパティ、例 `Stat.format` は残す)。
+3. `Leaf`(15 種の `anyOf`)と `Component`(Container|Leaf)を **1 つの平坦オブジェクト**に併合: `type` は全 const の enum、プロパティは和集合(同名 enum は和集合)、`required` は `["type"]`、`children` は Leaf 配列。
+4. `PatchValue` は `string|number|boolean|null | PatchNode | string[] | PatchNode[]`(PatchNode = AppMeta/Tab/Theme/Notification/Entity/Field/Screen/ToolbarButton/Action/Component/ListItem/Sort/Filter の平坦和集合)。
+5. 到達不能な `$defs` を枝刈り。テスト `TestRelaxedSchemaAcceptsExamples` が「緩和スキーマは正典 examples 4 本を受理する(=正典の上位集合)」ことを保証。
 
 ### 6.2 プロンプト骨格
 
@@ -330,10 +341,11 @@ jobs:
 | `FIRESTORE_EMULATOR_HOST` | o | - | ローカルのみ |
 | `FIREBASE_AUTH_EMULATOR_HOST` | o | o | ローカルのみ(dev ヘッダの有効条件) |
 | `LOG_LEVEL` | o | o | `info` |
-| `APPCONFIG_BASE_URL` | - | o | ai→appconfig |
-| `ANTHROPIC_API_KEY` | - | o | **Secret Manager** |
+| `APPCONFIG_BASE_URL` | - | o | ai→appconfig。**未設定ならインメモリのスタブ store**(未知 appId は `dsl.Initial()` version 1 で seed。Cloud Run 上でも可・永続なし) |
+| `ANTHROPIC_API_KEY` | - | o | **Secret Manager**。コード/ログ/サンプルに出さない |
 | `CLAUDE_MODEL` | - | o | `claude-sonnet-5-5` |
 | `CLAUDE_EFFORT` | - | o | `low` |
+| `CLAUDE_STRUCTURED_OUTPUT` | - | o | 未設定(=off)。`1` で `output_config.format` を送る(現状は文法サイズ超過で 400) |
 | `OPENAI_API_KEY` | - | o | Secret Manager・任意(無ければ /transcribe 501) |
 | `GENERATE_TIMEOUT_SEC` | - | o | `45` |
 | `MAX_AUDIO_BYTES` | - | o | `26214400` |
