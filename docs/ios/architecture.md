@@ -90,6 +90,13 @@ extension Component: Decodable {
 
 描画スコープ `RenderContext { params, item, index }` を再帰で持ち回り、`list` の行だけ `item/index` を上書きする。
 
+### 生成 DSL の見た目監査(#131)
+
+- **フォーム画面(`screen.entity` あり)は area を「並び順と横幅」だけに使い、高さは中身なり**(`GridScreenLayout` → `FormFlowLayout`)。行が重なる部品は 1 段にまとめ、前の段から 3 行以上下の部品(最下段の削除ボタン等)は少し間を空けて続ける。chart / map / list など面を埋める型だけ area の高さを保つ。AI が入力 section を小さく取っても切れない。
+- セルは矩形で clip せず、影のぶん(16pt)外まで描く(カード/ボタンの影が四角く切れて「薄い箱」に見えていた)。
+- 行がある list(と list だけの section)はカードを行の高さで止める。空の時だけセル全体に空状態(#84)。
+- DEBUG フック: `METAMON_INITIAL_DSL_PATH=<DSL JSON のパス>`(起動時の document をファイルから読む・appId はファイル名ごと)/ `METAMON_INITIAL_SCREEN=<screen>`(タブ 2 枚目などを初期表示)/ `METAMON_SEED_DUMMY=<n>`(モック時、entity の field 型から n 件のダミーレコード。長い文字列・大きい金額を混ぜる)。`METAMON_MOCK=1` と併用。実装は `Metamon/App/DebugDSLOverride.swift`。
+
 ## 3. ナビゲーション
 
 | DSL | SwiftUI | 状態 |
