@@ -35,6 +35,8 @@ struct ListLeaf: View {
                         }
                 }
             }
+            // 行が少なくてもカードはセルの高さまで伸ばす(#84: 空白の下半分を作らない)。行は上詰め
+            .frame(maxHeight: .infinity, alignment: .top)
             .renderCard(padding: 0)
         }
     }

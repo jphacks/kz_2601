@@ -132,7 +132,7 @@ struct EmptyPlaceholder: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity) // 器(セル)が高さを渡してくれば全体を使い中央に置く(#84)
         .padding(.vertical, RenderTheme.Spacing.lg)
         .padding(.horizontal, RenderTheme.Spacing.md)
         .background(

@@ -87,6 +87,7 @@ private struct GridCell: View {
 }
 
 /// 縦 ScrollView + 端フェード。iOS 17 で動くよう PreferenceKey で内容のフレームを拾い、はみ出している側だけマスクを掛ける。
+/// 中身が器より低い時は器の高さを提案する(#84: 空の list / 行の少ない list がセル全体を使える)。
 private struct FadingScrollView<Content: View>: View {
     @ViewBuilder var content: Content
     @State private var contentFrame: CGRect = .zero
@@ -94,6 +95,7 @@ private struct FadingScrollView<Content: View>: View {
 
     private let fade: CGFloat = 18
     private let slack: CGFloat = 2
+    private let bottomPad = RenderTheme.Shadow.cardY + 2
 
     private var fadesTop: Bool { contentFrame.minY < -slack }
     private var fadesBottom: Bool { viewportHeight > 0 && contentFrame.maxY > viewportHeight + slack }
@@ -101,8 +103,9 @@ private struct FadingScrollView<Content: View>: View {
     var body: some View {
         ScrollView(.vertical) {
             content
+                .frame(minHeight: max(0, viewportHeight - bottomPad), alignment: .top)
                 // 影が器の外にはみ出さないよう、カードの影ぶんだけ内側に余白
-                .padding(.bottom, RenderTheme.Shadow.cardY + 2)
+                .padding(.bottom, bottomPad)
                 .background(
                     GeometryReader { g in
                         Color.clear.preference(key: ContentFrameKey.self, value: g.frame(in: .named("fadingScroll")))
