@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "AI日記",
+    "description": "書いた日記を端末内の AI が要約し、気分を判定する",
+    "icon": "book.closed",
+    "theme": { "primaryColor": "#5E35B1" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "diary",
+      "name": "日記",
+      "titleField": "summary",
+      "fields": [
+        { "id": "date", "name": "日付", "type": "date", "required": true, "defaultValue": "now" },
+        { "id": "body", "name": "本文", "type": "text", "required": true },
+        { "id": "summary", "name": "要約", "type": "string" },
+        { "id": "mood", "name": "気分", "type": "enum", "options": ["うれしい", "ふつう", "かなしい", "イライラ", "つかれた"] }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "AI日記",
+      "toolbar": [{ "label": "書く", "icon": "square.and.pencil", "action": { "type": "navigate", "screen": "diary_form", "presentation": "sheet" } }],
+      "components": [
+        { "type": "chart", "id": "by_mood", "area": "A1:F4", "title": "気分の割合", "entity": "diary", "kind": "pie", "groupBy": "mood", "aggregate": "count" },
+        { "type": "list", "id": "entries", "area": "A5:F12", "entity": "diary",
+          "item": { "title": "summary", "subtitle": "date", "trailing": "mood" },
+          "sort": { "field": "date", "direction": "desc" },
+          "emptyText": "右上の「書く」から今日の日記を書こう", "swipeToDelete": true,
+          "onItemTap": { "type": "navigate", "screen": "diary_form", "presentation": "push" } }
+      ]
+    },
+    {
+      "id": "diary_form",
+      "title": "日記",
+      "entity": "diary",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "diary" } }],
+      "components": [
+        { "type": "textEditor", "id": "body", "area": "A1:F5", "field": "body", "placeholder": "今日あったことを自由に", "minLines": 4 },
+        { "type": "aiButton", "id": "ai_summary", "area": "A6:C7", "label": "AI で要約", "task": "summarize", "input": "body", "output": "summary",
+          "prompt": "日記の本文を 30 字以内の 1 文に要約して。" },
+        { "type": "aiButton", "id": "ai_mood", "area": "D6:F7", "label": "気分を判定", "task": "classify", "input": "body", "output": "mood" },
+        { "type": "textField", "id": "summary", "area": "A8:F9", "field": "summary", "label": "要約", "placeholder": "AI で要約を押すと入ります" },
+        { "type": "picker", "id": "mood", "area": "A10:F11", "field": "mood", "label": "気分" },
+        { "type": "datePicker", "id": "date", "area": "A12:F12", "field": "date", "label": "日付" }
+      ]
+    }
+  ]
+}

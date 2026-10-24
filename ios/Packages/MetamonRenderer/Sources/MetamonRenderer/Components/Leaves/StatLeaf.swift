@@ -30,13 +30,18 @@ struct StatLeaf: View {
             // 大きめの基準サイズから、セルの高さに収まるまで縮める(「もっと大きく」で area を広げると数字も大きくなる)
             // minimumScaleFactor は幅にしか効かないので、高さは ViewThatFits で基準 56pt から段階的に下げる
             // (#89: アイコン行を足した分、2 行セルで数値の下が切れていた)
-            ViewThatFits(in: .vertical) {
+            // #131: 幅も ViewThatFits で判定する(縦だけ見ていたので「¥1,582,7…」と省略されていた)。
+            // 最後の候補だけ minimumScaleFactor で縮めて、どんな桁数でも省略記号を出さない
+            ViewThatFits(in: [.horizontal, .vertical]) {
                 valueText(formatted, size: 56)
                 valueText(formatted, size: 44)
                 valueText(formatted, size: 34)
                 valueText(formatted, size: 28)
                 valueText(formatted, size: 22)
+                valueText(formatted, size: 22).minimumScaleFactor(0.5)
             }
+            // マイナス(予算の残りが赤字 等)は負の色にする(#131: 「-¥112,230」が普通の黒で読み流されていた)
+            .foregroundStyle(formatted.hasPrefix("-") ? AnyShapeStyle(RenderTheme.Colors.negative) : AnyShapeStyle(.primary))
             .contentTransition(.numericText())
             .redacted(reason: isLoading ? .placeholder : [])
         }
@@ -48,12 +53,11 @@ struct StatLeaf: View {
         .accessibilityValue(unavailable ? L("取得できませんでした") : formatted)
     }
 
-    /// 数値 1 段分(ViewThatFits の候補)。幅は minimumScaleFactor で縮める
+    /// 数値 1 段分(ViewThatFits の候補)。
     private func valueText(_ text: String, size: CGFloat) -> some View {
         Text(text)
             .font(.system(size: size, weight: .bold, design: .rounded).monospacedDigit())
             .lineLimit(1)
-            .minimumScaleFactor(0.45)
     }
 
     /// `value`(Expr)で値を出すモード(aggregate 指定が優先)
@@ -95,7 +99,9 @@ struct StatLeaf: View {
         let failed = entities.contains { rt.records(for: $0).isEmpty && rt.emptyState(for: $0) == .unavailable }
         guard !failed, let v = rt.evaluator().evaluate(expr) else { return (EmptyPlaceholder.unavailableValue, false, true) }
         switch v {
-        case .number(let n): return (Aggregator.format(n, as: c.format, unit: c.unit), false, false)
+        // percent の value は比率(0〜1)で来る(生成 DSL は全件 `sum / 目標` の形・progressBar の value と同じ尺度)。
+        // そのまま "%.0f%%" に通すと 1.42 → 「1%」になっていた(#131)
+        case .number(let n): return (Aggregator.format(c.format == "percent" ? n * 100 : n, as: c.format, unit: c.unit), false, false)
         default: return (v.text, false, false)
         }
     }
