@@ -44,6 +44,8 @@ enum Theme {
         static let fabHorizontalInset: CGFloat = Spacing.lg
         /// タブバーがある時はその上に逃がす。
         static func fabBottomInset(hasTabs: Bool) -> CGFloat { hasTabs ? 70 : Spacing.lg }
+        /// 長押し(= 変身一覧)と判定するまでの秒数。初期画面の大きなマイクも同じ。
+        static let fabLongPressSeconds: Double = 0.45
     }
 
     enum Shadow {

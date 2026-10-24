@@ -134,4 +134,9 @@ enum DeviceAppID {
         UserDefaults.standard.set(fresh, forKey: key)
         return fresh
     }
+
+    /// 変身一覧からの切替用: 既存のアプリ(`GET /apps` の id)を現在のアプリにする。
+    static func set(_ appId: String) {
+        UserDefaults.standard.set(appId, forKey: key)
+    }
 }

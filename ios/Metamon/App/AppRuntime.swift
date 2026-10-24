@@ -22,6 +22,14 @@ final class AppRuntime: DSLRuntime {
     var sheet: Route?
     var fullScreen: Route?
     var showVoiceSheet = false
+    /// 変身一覧シート(#51: FAB 長押し / 「アプリ一覧」)。
+    var showAppSwitcher = false
+    /// 自分のアプリ一覧(`appsList()` が更新)。
+    private(set) var apps: [AppSummary] = []
+    private(set) var appsLoading = false
+    /// 初期(音声)画面に来た経緯。挨拶文言(`Greeting`)の出し分けに使う。
+    enum HomeEntry { case launch, newApp, home }
+    var homeEntry: HomeEntry = .launch
 
     struct Confirm: Identifiable {
         let id = UUID()
@@ -188,6 +196,12 @@ final class AppRuntime: DSLRuntime {
             return
         case .newApp:
             startNewApp()
+        case .listApps:
+            openSwitcher(afterSheetDismiss: !dsl.isVoiceOnly)
+            return
+        case .switchApp(let name):
+            await switchApp(named: name)
+            return
         case .morph:
             break
         }
@@ -265,13 +279,122 @@ final class AppRuntime: DSLRuntime {
     }
 
     /// 「別のアプリ。」: appId を新規採番して初期状態にする(サーバー上の前のアプリは残る)。続けて ai に送る前提。
-    private func startNewApp() {
+    /// 変身一覧の「+ 新しいアプリ」「メタモンに戻る」からも呼ぶ(`entry` で挨拶を出し分け・アニメ付き)。
+    func startNewApp(entry: HomeEntry = .newApp, animated: Bool = false) {
         syncTask?.cancel()
         localHistory.removeAll()
         var fresh = (try? DSLExamples.document(DSLExamples.initial, version: 0)) ?? .fallback
         fresh.appId = DeviceAppID.rotate()
-        apply(fresh, animated: false)
-        print("[Metamon] new app: appId=\(fresh.appId)")
+        homeEntry = entry
+        apply(fresh, animated: animated)
+        print("[Metamon] new app: appId=\(fresh.appId) entry=\(entry)")
+    }
+
+    // MARK: - Switcher (#51 複数アプリの切替)
+
+    /// 変身一覧シートを開く(FAB 長押し / 「アプリ一覧」)。開く直前に今の画面をサムネに撮る。
+    /// 音声シートが出ている(いた)時は閉じ終わるのを待ってから撮って開く(シート越しのサムネ・二重 present を避ける)。
+    func openSwitcher(afterSheetDismiss: Bool = false) {
+        guard !showAppSwitcher else { return }
+        let waitForSheet = showVoiceSheet || afterSheetDismiss
+        showVoiceSheet = false
+        Task {
+            if waitForSheet { try? await Task.sleep(for: .milliseconds(500)) }
+            AppThumbnailStore.shared.capture(appId: document.appId, isVoiceOnly: dsl.isVoiceOnly)
+            showAppSwitcher = true
+        }
+    }
+
+    /// `GET /v1/apps`。失敗したら `AppListCache`(オフライン)に落ちる。結果は `apps` にも残す。
+    @discardableResult
+    func appsList() async -> [AppSummary] {
+        appsLoading = apps.isEmpty
+        defer { appsLoading = false }
+        do {
+            apps = try await services.appConfig.listApps()
+        } catch {
+            print("[Metamon] listApps failed: \(error)")
+            let cached = AppListCache.shared.load()
+            if !cached.isEmpty {
+                apps = cached
+                toast = "オフライン: 保存済みのアプリ一覧を表示しています"
+            } else if apps.isEmpty {
+                toast = "アプリ一覧を取得できませんでした: \(error.localizedDescription)"
+            }
+        }
+        return apps
+    }
+
+    /// 一覧に出すアプリ(archived・未生成を除き、現在のアプリを先頭に)。
+    var visibleApps: [AppSummary] { AppSummary.visible(apps, current: document.appId) }
+
+    /// 別のアプリに切り替える: 今の画面をサムネに撮り → `DeviceAppID` を差し替え → `GET /dsl` → `apply()`(変身アニメ)。
+    /// 記録(records)は `apply()` で破棄され、画面が要求する entity を `load(entities:)` の既存経路で読み直す。
+    func switchApp(to appId: String, afterSheetDismiss: Bool = false) async {
+        let fromSwitcher = showAppSwitcher // 一覧から来たなら開く直前に撮ってある(今撮るとシートが写る)
+        showAppSwitcher = false
+        guard morphJob == nil, appId != document.appId else { return }
+        if !fromSwitcher {
+            if afterSheetDismiss { try? await Task.sleep(for: .milliseconds(500)) }
+            AppThumbnailStore.shared.capture(appId: document.appId, isVoiceOnly: dsl.isVoiceOnly)
+        }
+        let previousId = document.appId
+        withAnimation(.easeInOut(duration: 0.35)) {
+            morphJob = MorphJob(kind: .edit, transcript: "アプリを切り替えています…", startedAt: .now)
+        }
+        syncTask?.cancel()
+        var next: AppDocument?
+        do {
+            next = try await services.appConfig.fetchDocument(appId: appId)
+            isOffline = false
+        } catch {
+            print("[Metamon] switch fetch failed: \(error)")
+            next = DocumentCache.shared.load(appId: appId)
+            if next != nil { isOffline = true }
+        }
+        guard var doc = next else {
+            withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
+            toast = "アプリを読み込めませんでした。接続を確認してください"
+            startSync()
+            return
+        }
+        doc.appId = appId
+        DeviceAppID.set(appId)
+        localHistory.removeAll()
+        apply(doc)
+        startSync()
+        summaryBanner = SummaryBanner(text: "「\(doc.dsl.app.name)」に変身しました" + (isOffline ? "(オフライン・キャッシュ)" : ""), highlight: nil)
+        print("[Metamon] switched app: \(previousId) → \(appId) version=\(doc.version)")
+    }
+
+    /// 音声「○○に切り替えて」: `GET /apps` の name と照合。1 件に決まれば切替、曖昧/無ければ一覧を開く。
+    func switchApp(named name: String) async {
+        let fromVoiceSheet = !dsl.isVoiceOnly // 生成後の音声シートからの発話(シートは閉じ始めている)
+        await appsList()
+        let candidates = visibleApps
+        switch AppNameMatch.match(name, in: candidates.map(\.name)) {
+        case .one(let i):
+            let target = candidates[i]
+            if target.id == document.appId {
+                summaryBanner = SummaryBanner(text: "いま使っているのが「\(target.name)」です", highlight: nil)
+                return
+            }
+            await switchApp(to: target.id, afterSheetDismiss: fromVoiceSheet)
+        case .ambiguous:
+            toast = "「\(name)」に近いアプリが複数あります。一覧から選んでください"
+            openSwitcher(afterSheetDismiss: fromVoiceSheet)
+        case .none:
+            toast = "「\(name)」というアプリは見つかりませんでした"
+            openSwitcher(afterSheetDismiss: fromVoiceSheet)
+        }
+    }
+
+    /// 変身一覧の「+ 新しいアプリ」(`.newApp`)と「メタモンに戻る(初期画面)」(`.home`)。
+    /// どちらも appId を作り直して初期(音声)画面へ。前のアプリはサーバーと一覧に残り、いつでも戻せる(サムネは一覧を開く時に撮ってある)。
+    func startFresh(_ entry: HomeEntry) {
+        showAppSwitcher = false
+        startNewApp(entry: entry, animated: true)
+        summaryBanner = nil
     }
 
     /// アプリを初期状態(音声画面のみ)に戻す。appId を作り直すので ai/appconfig 側からも「新規端末」に見える(旧データは削除しない)。
@@ -281,6 +404,7 @@ final class AppRuntime: DSLRuntime {
         DocumentCache.shared.remove(appId: document.appId)
         var fresh = (try? DSLExamples.document(DSLExamples.initial, version: 0)) ?? .fallback
         fresh.appId = DeviceAppID.rotate()
+        homeEntry = .home
         apply(fresh)
         summaryBanner = nil
         toast = "初期状態に戻しました"
