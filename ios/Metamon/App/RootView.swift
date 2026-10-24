@@ -27,7 +27,9 @@ struct RootView: View {
                     DSLNavigationRoot()
                 }
             }
-                .id(rt.document.version) // version が変わったら丸ごと作り直して transition を出す
+                // appId か version が変わったら丸ごと作り直して transition を出す。
+                // appId も含める: 別アプリが同じ version・同じ screen id(home)だと作り直されず、記録が読み直されない(#80 で発見)
+                .id("\(rt.document.appId)#\(rt.document.version)")
                 .transition(.asymmetric(
                     insertion: .scale(scale: 0.96).combined(with: .opacity),
                     removal: .opacity
