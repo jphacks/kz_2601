@@ -29,11 +29,30 @@ final class AppRuntime: DSLRuntime {
         var perform: @MainActor () async -> Void
     }
     var confirm: Confirm?
+    /// エラー等の短い通知(下部カプセル)。生成の summary はこちらではなく `summaryBanner`。
     var toast: String?
-    private(set) var isMorphing = false
+
+    /// 生成中の状態。nil なら生成していない。`create` は初期状態からの生成(全画面演出)、`edit` は 2 回目以降(薄いインジケータ)。
+    struct MorphJob: Equatable {
+        enum Kind { case create, edit }
+        var kind: Kind
+        var transcript: String
+        var startedAt: Date
+    }
+    private(set) var morphJob: MorphJob?
+    var isMorphing: Bool { morphJob != nil }
+
+    /// 変身直後に画面上部へ数秒出す要約(読み上げ文)。位置ヒントがあれば該当領域をハイライトする。
+    struct SummaryBanner: Identifiable, Equatable {
+        let id = UUID()
+        var text: String
+        var highlight: UnitPoint?
+    }
+    var summaryBanner: SummaryBanner?
 
     let services: Services
     @ObservationIgnored private var syncTask: Task<Void, Never>?
+    @ObservationIgnored private var morphTask: Task<MorphResult, Error>?
 
     init(document: AppDocument, services: Services) {
         self.document = document
@@ -83,9 +102,10 @@ final class AppRuntime: DSLRuntime {
             self.fullScreen = nil
             self.showVoiceSheet = false
             self.selectedTab = doc.dsl.initialTab
+            self.morphJob = nil
         }
         if animated {
-            withAnimation(.spring(duration: 0.7, bounce: 0.15), swap)
+            withAnimation(.spring(duration: 0.65, bounce: 0.12), swap)
         } else {
             swap()
         }
@@ -93,22 +113,50 @@ final class AppRuntime: DSLRuntime {
     }
 
     /// 発話 → ai サービス → 最新 DSL 適用。
+    /// 生成中は `morphJob` が立ち、RootView が create(全画面「変身中」)/ edit(薄いインジケータ)を出す。
+    /// 完了時は新ツリーの挿入と生成中オーバーレイの消去を**同じアニメーション**で行い、クロスフェードにする。
     func morph(transcript: String) async {
-        guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        isMorphing = true
-        defer { isMorphing = false }
+        let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, morphJob == nil else { return }
+        withAnimation(.easeInOut(duration: 0.35)) {
+            morphJob = MorphJob(kind: dsl.isVoiceOnly ? .create : .edit, transcript: text, startedAt: .now)
+        }
+        let task = Task { [services, appId = document.appId, version = document.version] in
+            try await services.ai.morph(transcript: text, appId: appId, currentVersion: version)
+        }
+        morphTask = task
+        defer { morphTask = nil }
         do {
-            let result = try await services.ai.morph(transcript: transcript, appId: document.appId, currentVersion: document.version)
-            apply(result.document)
+            let result = try await task.value
+            apply(result.document) // withAnimation の中で morphJob = nil も行う
             startSync()
             if let summary = result.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
-                toast = summary
+                summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary))
             }
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
+        } catch is CancellationError {
+            withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
+            toast = "生成をキャンセルしました"
         } catch {
             print("[Metamon] morph failed: \(error)")
+            withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
             toast = "生成に失敗しました: \(error.localizedDescription)"
         }
+    }
+
+    /// 生成の中断(30 秒超の長引きで UI から呼ぶ)。URLSession は Task キャンセルで切れる。
+    func cancelMorph() {
+        morphTask?.cancel()
+    }
+
+    /// アプリを初期状態(音声画面のみ)に戻す。appId を作り直すので ai/appconfig 側からも「新規端末」に見える(旧データは削除しない)。
+    func resetToInitial() {
+        syncTask?.cancel()
+        var fresh = (try? DSLExamples.document(DSLExamples.initial, version: 0)) ?? .fallback
+        fresh.appId = DeviceAppID.rotate()
+        apply(fresh)
+        summaryBanner = nil
+        toast = "初期状態に戻しました"
     }
 
     // MARK: - Records
