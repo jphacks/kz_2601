@@ -85,6 +85,17 @@
 	<key>MetamonWhisperModel</key>
 	<string></string>
 
+	<!-- バックグラウンド(#38): 裏の定期同期(BGAppRefreshTask)。識別子は AppRuntime+Background.swift の BackgroundRefresh.identifier と一致させる。
+	     fetch は Info.plist だけで有効になり、App ID 側の capability 操作は不要 -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>jp.kz2601.metamon.refresh</string>
+	</array>
+
 	<!-- ネイティブ機能の権限説明(P0: マイク/カメラ/通知、P1: 位置/モーション) -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>話しかけた内容からアプリを生成するために、マイクを使用します。</string>
