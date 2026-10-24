@@ -19,6 +19,11 @@ var strippedKeywords = map[string]bool{
 	"minProperties": true, "maxProperties": true,
 }
 
+// promptNoise is dropped from the generation schema as well: the catalog in
+// the system prompt carries every description, so repeating them inside the
+// schema only costs tokens (compact re-adds the few that explain flattening).
+var promptNoise = map[string]bool{"description": true}
+
 var (
 	generationSchema      = mustRelax(dsl.SchemaJSON())
 	patchGenerationSchema = mustRelax(dsl.PatchSchemaJSON())
@@ -55,7 +60,7 @@ func Relax(raw []byte) (json.RawMessage, error) {
 			for k, v := range target {
 				inlined[k] = v
 			}
-			for _, k := range []string{"title", "description", "$defs"} {
+			for _, k := range []string{"title", "$defs"} {
 				if v, ok := root[k]; ok {
 					inlined[k] = v
 				}
@@ -249,10 +254,11 @@ func pruneDefs(root map[string]any) {
 }
 
 // relaxSchema walks one schema object. Keys under `properties`/`$defs` are
-// names, not keywords, so they are recursed into but never stripped.
+// names, not keywords, so they are recursed into but never stripped. x-*
+// metadata (catalog only) is dropped to keep the prompt small.
 func relaxSchema(s map[string]any) {
 	for k := range s {
-		if strippedKeywords[k] {
+		if strippedKeywords[k] || promptNoise[k] || strings.HasPrefix(k, "x-") {
 			delete(s, k)
 		}
 	}

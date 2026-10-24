@@ -256,6 +256,7 @@
     "Action": {
       "type": "object",
       "additionalProperties": false,
+      "description": "ボタン・toolbar・list.onItemTap から実行される副作用。入れ子不可。confirmMessage はどの type にも付けられ、先に確認ダイアログを出す。",
       "required": [
         "type"
       ],
@@ -272,11 +273,26 @@
             "resetForm",
             "scheduleNotification",
             "cancelNotification"
-          ]
+          ],
+          "x-enumDescriptions": {
+            "navigate": "画面遷移。list.onItemTap からは recordId が暗黙に渡り、遷移先フォームが編集モードになる。",
+            "back": "前の画面へ戻る(push なら pop、モーダルなら dismiss)。",
+            "saveRecord": "フォームのドラフトを保存(新規 POST / 編集 PATCH)して screen へ、無ければ back。フォーム画面の toolbar に置く。",
+            "deleteRecord": "現在のレコードを削除して back。confirmMessage を付けるのが定石。",
+            "openVoice": "音声シートを開く。",
+            "openUrl": "URL を Safari で開く。",
+            "resetForm": "フォームのドラフトを既定値に戻す。",
+            "scheduleNotification": "ローカル通知をその場で予約(dsl.<id> で置換)。任意で押すリマインドはこれ。毎日の定期通知は app.notifications に宣言する。",
+            "cancelNotification": "予約した通知を取り消す。"
+          }
         },
         "screen": {
           "type": "string",
-          "description": "navigate / saveRecord: target screen id."
+          "description": "navigate / saveRecord: target screen id.",
+          "x-for": {
+            "navigate": "required",
+            "saveRecord": "optional"
+          }
         },
         "presentation": {
           "type": "string",
@@ -284,15 +300,25 @@
             "push",
             "sheet",
             "fullScreen"
-          ]
+          ],
+          "x-for": {
+            "navigate": "optional"
+          }
         },
         "entity": {
           "type": "string",
-          "description": "saveRecord / deleteRecord: entity id."
+          "description": "saveRecord / deleteRecord: entity id.",
+          "x-for": {
+            "saveRecord": "required",
+            "deleteRecord": "required"
+          }
         },
         "url": {
           "type": "string",
-          "format": "uri"
+          "format": "uri",
+          "x-for": {
+            "openUrl": "required"
+          }
         },
         "confirmMessage": {
           "type": "string",
@@ -300,11 +326,17 @@
         },
         "notification": {
           "$ref": "#/$defs/Notification",
-          "description": "scheduleNotification only."
+          "description": "scheduleNotification only.",
+          "x-for": {
+            "scheduleNotification": "required"
+          }
         },
         "notificationId": {
           "type": "string",
-          "description": "cancelNotification only."
+          "description": "cancelNotification only.",
+          "x-for": {
+            "cancelNotification": "required"
+          }
         }
       }
     },
@@ -322,6 +354,8 @@
     "Container": {
       "type": "object",
       "additionalProperties": false,
+      "description": "子 Leaf を並べる器。1 段のみ(Container の中に Container は置けない)。Screen 直下で area を持ち、子は積むだけ(子に area は付けない)。",
+      "x-usage": "可変長なのでセル内スクロールする。指標カード = hstack に stat を 2〜3 枚入れて A1:F2。フォーム = section に入力部品を並べて A1:F7 程度。一覧 = section に list を 1 つ入れて A3:F10。",
       "required": [
         "type",
         "children"
@@ -333,7 +367,12 @@
             "vstack",
             "hstack",
             "section"
-          ]
+          ],
+          "x-enumDescriptions": {
+            "vstack": "子を縦に積む。入力欄やボタンをまとめる既定の器。",
+            "hstack": "子を横に並べる。stat を 2〜3 枚並べて指標カードにする時に使う。",
+            "section": "見出し(title)付きのグループ。フォームの入力欄や一覧の見出しに使う。"
+          }
         },
         "id": {
           "$ref": "#/$defs/Id"
@@ -343,7 +382,10 @@
         },
         "title": {
           "type": "string",
-          "description": "section only."
+          "description": "section only.",
+          "x-for": {
+            "section": "optional"
+          }
         },
         "spacing": {
           "type": "string",
@@ -447,6 +489,8 @@
     "Text": {
       "type": "object",
       "additionalProperties": false,
+      "description": "固定の見出し・説明文・注意書き。レコードの値は表示しない(値は stat / list / image で)。",
+      "x-usage": "style は title(画面内見出し)/ headline / body / caption(補足)。長文はセル内でスクロールする。",
       "required": [
         "type",
         "text"
@@ -486,6 +530,8 @@
     "Button": {
       "type": "object",
       "additionalProperties": false,
+      "description": "タップで action を実行するボタン。画面遷移・保存・削除・通知予約・音声の入口。",
+      "x-usage": "追加ボタンは右下 D11:F12 に primary、削除は destructive でフォーム下部 A11:F12。toolbar にも同じ action を置ける。",
       "required": [
         "type",
         "label",
@@ -524,6 +570,8 @@
     "TextField": {
       "type": "object",
       "additionalProperties": false,
+      "description": "文字入力(string / text field)。multiline:true で複数行。",
+      "x-usage": "screen.entity のあるフォーム画面にのみ置く。メモ・感想・コメントなど自由文は multiline:true。",
       "required": [
         "type",
         "field"
@@ -556,6 +604,8 @@
     "NumberField": {
       "type": "object",
       "additionalProperties": false,
+      "description": "数値入力(integer / number / currency field)。unit で単位(円・kg・回)を添える。",
+      "x-usage": "金額は currency field + unit 円。回数・量・体重は integer / number。",
       "required": [
         "type",
         "field"
@@ -587,6 +637,8 @@
     "DatePicker": {
       "type": "object",
       "additionalProperties": false,
+      "description": "日付(date)または日時(datetime・includeTime:true)の入力。",
+      "x-usage": "日付 field は defaultValue \"now\" にして入力の手間を省く。時刻まで要るときだけ includeTime:true。",
       "required": [
         "type",
         "field"
@@ -615,6 +667,8 @@
     "Picker": {
       "type": "object",
       "additionalProperties": false,
+      "description": "選択肢から 1 つ選ぶ入力(enum field の options が選択肢)。カテゴリ・種類・気分など。",
+      "x-usage": "選択肢が 2〜4 個なら segmented、多ければ menu。",
       "required": [
         "type",
         "field"
@@ -649,6 +703,8 @@
     "Toggle": {
       "type": "object",
       "additionalProperties": false,
+      "description": "ON/OFF スイッチ(boolean field)。完了・済み・お気に入りなどのチェック。",
+      "x-usage": "「買ったらチェック」のような完了フラグはこれ。一覧側は filter(eq false)で未完了だけに絞れる。",
       "required": [
         "type",
         "field",
@@ -675,6 +731,8 @@
     "List": {
       "type": "object",
       "additionalProperties": false,
+      "description": "entity のレコード一覧。行の表示は item に field id を割り当て、タップで onItemTap(通常はフォームへ navigate → 編集モード)。",
+      "x-usage": "可変長なので大きめの矩形 A3:F10 でセル内スクロール。sort は日付 desc が既定、swipeToDelete:true で削除。カレンダー / タイムライン / 履歴 / 日記風の表示は日付でソートした list で代替する。",
       "required": [
         "type",
         "entity",
@@ -717,6 +775,7 @@
     "ListItem": {
       "type": "object",
       "additionalProperties": false,
+      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル。",
       "required": [
         "title"
       ],
@@ -745,6 +804,7 @@
     "Sort": {
       "type": "object",
       "additionalProperties": false,
+      "description": "list の並び順。",
       "required": [
         "field",
         "direction"
@@ -765,6 +825,7 @@
     "Filter": {
       "type": "object",
       "additionalProperties": false,
+      "description": "list / stat / chart のレコード絞り込み。op が thisMonth / today のときは value を null にする。",
       "required": [
         "field",
         "op",
@@ -808,6 +869,8 @@
     "Stat": {
       "type": "object",
       "additionalProperties": false,
+      "description": "集計値 1 つのカード(件数・合計・平均・最小・最大)。今月の合計・今日の件数・平均体重など。",
+      "x-usage": "2〜3 枚を hstack に入れて A1:F2 に横並び、または単体で A1:C2 / D1:F2。filter で thisMonth / today(value は null)。金額は format currency。",
       "required": [
         "type",
         "label",
@@ -860,6 +923,8 @@
     "Chart": {
       "type": "object",
       "additionalProperties": false,
+      "description": "グラフ(棒・折れ線・円)。groupBy の field(enum か日付)ごとに集計して描く。",
+      "x-usage": "「グラフ・推移・内訳・割合」と求められた時だけ使う。推移 = line + 日付 groupBy + bucket、内訳 = pie + enum groupBy。縦 2 枚なら A1:F6 / A7:F12。",
       "required": [
         "type",
         "entity",
@@ -922,6 +987,8 @@
     "VoiceInput": {
       "type": "object",
       "additionalProperties": false,
+      "description": "マイク UI。声でアプリを作り変える入口(初期状態は 1 画面にこれ 1 つ)。",
+      "x-usage": "生成したアプリには通常置かない(voiceEntry floating で FAB が出る)。",
       "required": [
         "type"
       ],
@@ -946,12 +1013,13 @@
             "large"
           ]
         }
-      },
-      "description": "Mic UI as a Leaf (not a screen kind). The initial state is one screen with exactly one voiceInput."
+      }
     },
     "Spacer": {
       "type": "object",
       "additionalProperties": false,
+      "description": "余白。部品同士の間隔を空ける。",
+      "x-usage": "area で配置する画面ではほぼ不要。Container 内の間隔調整に。",
       "required": [
         "type"
       ],
@@ -979,6 +1047,8 @@
     "Divider": {
       "type": "object",
       "additionalProperties": false,
+      "description": "区切り線。",
+      "x-usage": "Container 内で入力グループを分けるときに。",
       "required": [
         "type"
       ],
@@ -997,6 +1067,7 @@
     "Notification": {
       "type": "object",
       "additionalProperties": false,
+      "description": "ローカル通知 1 件。app.notifications(定期)と scheduleNotification(その場で予約)で共通。time は HH:MM。",
       "required": [
         "id",
         "title",
@@ -1043,6 +1114,8 @@
     "PhotoField": {
       "type": "object",
       "additionalProperties": false,
+      "description": "カメラ / ライブラリから写真を取り込んで photo field に保存する入力。",
+      "x-usage": "「写真を撮る・残す」は source camera、既存の写真を選ぶなら library、迷えば both。",
       "required": [
         "type",
         "field"
@@ -1077,6 +1150,8 @@
     "Image": {
       "type": "object",
       "additionalProperties": false,
+      "description": "photo field の画像を表示する(フォーム / 詳細画面)。入力ではない。",
+      "x-usage": "撮った写真のプレビューに。一覧のサムネイルは list.item.image を使う。",
       "required": [
         "type",
         "field"
