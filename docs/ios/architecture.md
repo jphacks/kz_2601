@@ -179,6 +179,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 ### 音声画面 → 生成中 → 変身 の状態遷移(2026-10-24 刷新)
 
 デザイントークン(色・角丸・余白・影)は `ios/Metamon/App/Theme.swift` に集約し、音声画面・生成中・サインイン・設定で共用する(Renderer の部品は触らない)。
+生成アプリ側(Renderer の全部品)のトークンは `MetamonRenderer/Support/RenderTheme.swift`(本体 Theme と同値)で、方針は **[`docs/ios/design-system.md`](design-system.md)**(#89: タイポ・ブランド色の使い所・面・角丸・影・モーション・アイコン推定・部品ごとの仕様)。生成アプリは `app.theme.primaryColor` を使わず常に Tailor It ブランド(紫→水色)で描く。
 初期状態(`voiceEntry = fullscreen`)は `RootView` が `DSLNavigationRoot` ではなく `VoiceInputView` を直接全面に描く(背景を画面いっぱいに敷くため)。生成後の FAB シートも同じ View。
 
 ```
@@ -214,9 +215,40 @@ VoiceInputView.phase                         AppRuntime.morphJob               R
 | 失敗 | — | **状態カード**(下表・#60)。トーストは使わない | 〃(画面上部にコンパクト版) | 画面は元のまま。主ボタン「もう一度」は同じ発話で再送 |
 | キャンセル | — | 下部トースト「生成をキャンセルしました」(軽微) | 〃 | 画面は元のまま |
 
-**設定シート**(音声画面右上の歯車・旧 `uid …` フッターの置き換え): アカウント(匿名 / Apple・uid・ログアウト)、音声モデル(モデル名・状態・再試行)、アプリをリセット(初期状態に戻す = DSL を `initial`、`DeviceAppID.rotate()` で appId を作り直す。サーバーの旧データは残る)、接続先(ai / appconfig / バージョン)。
+**設定シート**(音声画面右上の歯車・旧 `uid …` フッターの置き換え): アカウント(匿名 / Apple・uid・ログアウト)、音声モデル(モデル名・状態・再試行)、対話(「作る前に質問する」トグル・#75)、アプリをリセット(初期状態に戻す = DSL を `initial`、`DeviceAppID.rotate()` で appId を作り直す。サーバーの旧データは残る)、接続先(ai / appconfig / バージョン)。
 
-DEBUG フック: `METAMON_AUTO_ANON=1`(起動時に匿名サインイン)、`METAMON_AUTO_TRANSCRIPT="…"`(起動直後に 1 回生成)。シミュレータでもマイクは表示され、`MockTranscriber` が定型文を返す。
+DEBUG フック: `METAMON_AUTO_ANON=1`(起動時に匿名サインイン)、`METAMON_AUTO_TRANSCRIPT="…"`(起動直後に 1 回発話。対話 ON なら下記の対話を自動で進めて生成まで待つ)。シミュレータでもマイクは表示され、`MockTranscriber` が定型文を返す。
+
+### 生成前の対話(clarify・#75 / backend #74)
+
+初期(音声)画面で **新規作成するとき だけ**、最初の発話を即生成せず ai に 1〜3 個聞き返させてから作る。生成後の改変(edit・音声シート)は従来どおり即反映(backend の chat は新規作成用プロンプトで edit 非対応)。
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle: 初期画面
+    Idle --> Asking: 発話 / 文字 (VoiceIntent=morph かつ 対話ON)
+    Idle --> Generating: 対話OFF・「元に戻して」等
+    Asking --> Question: POST /v1/chat → kind=question
+    Question --> Asking: 答える(マイク / 文字 / 選択肢チップ)
+    Question --> Asking: 「このまま作る」(= "このまま作って" を送る → shortcut ready)
+    Asking --> Ready: kind=ready
+    Ready --> Generating: 「この内容で作る」→ generate(ready.transcript)
+    Question --> Idle: 「最初から」(DELETE /v1/chat/{appId})
+    Ready --> Idle: 「最初から」
+    Generating --> [*]: 変身(GeneratingView → apply)
+```
+
+| 項目 | 実装 |
+|---|---|
+| 契約 | `POST /v1/chat` `{appId, messages[{role,text}], locale?}` → `{kind: question\|ready, text, suggestions?, turn, brief?, transcript?, source}`。`DELETE /v1/chat/{appId}` → 204。generate は無変更で `ready.transcript` を `text`(iOS 実装は `transcript` キー。backend は両方受ける)に渡す |
+| 履歴 | iOS は手元の全履歴を毎回送る(2 件以上はサーバー状態を置き換える契約 → ai 再起動・30 分失効でも続く)。新規会話の 1 発目の前に `DELETE` して前の会話への追記を防ぐ |
+| 状態 | `AppRuntime.chatBubbles` / `chatPending` / `chatTurn` / `clarifyEnabled`。ロジックは `App/AppRuntime+Clarify.swift`(`submitUtterance` / `say` / `buildNow` / `buildFromChat` / `resetChat`) |
+| UI | `Features/Voice/ClarifyChatView.swift`。右 = ユーザー(書き起こし)、左 = AI。最新の質問だけ title3 で大きく。質問中は選択肢チップ +「このまま作る」(常時)、ready は要約カード(brief: 名前・目的・記録する・見られる)+「この内容で作る」。入力は小さいマイク(録音は `VoiceInputView` のまま)+ 文字 |
+| 生成への受け渡し | `AppRuntime.generate(_:)`(意図判定を通さない。AI のまとめ文を「元に戻して」等に誤判定させない)。圏外保留・状態カードは既存どおり |
+| リセット | 「最初から」・生成開始・`apply()`(別アプリへの切替 / 新規 appId / 生成完了)で会話を捨てて `DELETE`。初期画面はシートではないので「閉じる」は無い |
+| エラー | 既存の状態カード(`ErrorPresentation.origin = .chat`)。主ボタン「もう一度」は同じ履歴を再送(生成ではない)。失敗タイトルは「質問をうまく用意できませんでした」。「このまま作る」で chat が落ちていたら、これまでの発話をつないで生成に進む |
+| 設定 | 設定 >「作る前に質問する」(既定 ON・UserDefaults)。`METAMON_CLARIFY=0/1` が優先 |
+| DEBUG | `METAMON_AUTO_TRANSCRIPT="日記" METAMON_AUTO_REPLIES="写真も残したい\|もう作って" METAMON_AUTO_PAUSE=5` で 質問 → 答え → … → ready →「この内容で作る」まで無人で通す(返答が尽きたら「このまま作る」)。`METAMON_CLARIFY=0` で従来の即生成 |
 
 ### エラー状態表(#60・2026-10-24 深夜)
 
@@ -247,7 +279,24 @@ DEBUG フック(シミュレータ E2E): `METAMON_E2E_OFFLINE_SECONDS=<n>`(#70�
 bootstrap の順序(#86): `recordSync.start()` → 到達性監視 → `GET /dsl` 復元 → ポーリング開始 → **通知の同期(許可ダイアログ)は最後に `Task {}` で投げて await しない** → DEBUG フック。ダイアログに答えるまで復元・同期が止まらない。
 
 生成後も **マイク FAB**(ランタイム側、DSL 外)から同じシートを開いて再改変できる。初期 DSL は `voiceInput` 1画面のみ。
-FAB の位置は `Theme.Layout.fabAlignment`(**左下**)の 1 箇所で決める。DSL の「追加」ボタンは右下 `D11:F12` に置かれるのが定番で、右下 FAB だと被るため左下に移した(タブバーがある時は `fabBottomInset(hasTabs:)` でその上に逃がす)。
+#### マイク FAB の位置(ピクチャーインピクチャー風・#52)
+
+FAB 本体は `ios/Metamon/App/VoiceFab.swift`。判定ロジックは純粋関数 `FabDock`(`MetamonRenderer/Screen/FabDock.swift`・`FabDockTests`)。
+
+| 項目 | 挙動 |
+|---|---|
+| 初期位置 | **左下**(`Theme.Layout.fabDefaultSide`)。DSL の「追加」ボタンは右下 `D11:F12` が定番なので被らない側。タブバーがある時は `fabBottomInset(hasTabs:)` でその上 |
+| ドラッグ | 10pt 以上動かすとドラッグ(`DragGesture(minimumDistance: 10, coordinateSpace: .global)`)。離すと最寄りの左右の辺へ spring で吸着。辺は慣性込みの予測位置(`predictedEndTranslation`)で選ぶ。縦位置は自由(上限 = 領域上端から `fabTopReserve` 64pt・ナビバーにかからない) |
+| 隠す | 離した時の中心 x(実位置 or 予測位置)が端から `fabSize × 0.3` 以内 → 本体は画面外、辺に取っ手(幅 14pt・触れる幅 32pt)だけ残る |
+| 戻す | 取っ手のタップ / 内側へ 20pt 以上引く。取っ手の長押しは変身一覧 |
+| 部品回避 | 吸着した側の最下段 2 列(左 A〜B / 右 E〜F)に部品があれば、その上端まで上げる(#83)。Renderer が `GridBottomObstructionKey`(左)/ `GridBottomTrailingObstructionKey`(右)で上端 y を上げる。ユーザーが下げても退避位置より下には置かない(`FabDock.displayedBottom`) |
+| 保存 | `@AppStorage`: `fab.side`(leading/trailing)・`fab.bottom`(下端からの距離。-1 = 自動)・`fab.hidden`。アプリごとではなく Tailor It 共通 |
+| 維持 | フォーム表示中は出さない(#83)・生成中は沈めて触れない。Reduce Motion では吸着アニメを 0.12s の easeOut に短縮 |
+| VoiceOver | 本体: 「話しかけて変える」+ アクション「変身一覧」「反対側へ移動」「端に隠す」。取っ手: 「話しかけて変える。ダブルタップで表示」+「変身一覧」 |
+
+ジェスチャ競合: `Button` は残し(VoiceOver・押下ハイライト)、長押しとドラッグを `simultaneousGesture` で重ねる。FAB が指に付いて動くので離した瞬間に Button のタップも発火する → ドラッグ認識時に `suppressTap`、長押し発火時に `longPressFired` を立ててタップを捨てる(次に指が触れた瞬間 = `LongPressGesture.onChanged` でリセット、ドラッグ後は 0.3s 後にも解除)。長押しの許容移動は 10pt でドラッグしきい値と揃える(先に 10pt 動けば長押し失敗 = ドラッグ、0.45s 静止で変身一覧)。長押し発火後のドラッグは無視。
+
+DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例 `right-hidden:360`)/ `auto`(初期状態に戻す)。simctl でドラッグを再現しにくいので保存値を直接書く。
 
 ### 復元・元に戻す・新規作成 の状態遷移(appconfig 接続・2026-10-24 夕)
 

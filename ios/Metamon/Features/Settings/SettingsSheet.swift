@@ -14,6 +14,7 @@ struct SettingsSheet: View {
             List {
                 accountSection
                 voiceModelSection
+                clarifySection
                 appSection
                 syncSection
                 connectionSection
@@ -78,6 +79,20 @@ struct SettingsSheet: View {
             if case .failed = services.transcriber.status {
                 Button("再試行") { Task { try? await services.transcriber.prepare() } }
             }
+        }
+    }
+
+    /// 生成前の対話(#75)。新規作成のみ。edit は常に即反映。
+    private var clarifySection: some View {
+        @Bindable var rt = rt
+        return Section {
+            Toggle(ClarifyCopy.settingTitle, isOn: $rt.clarifyEnabled)
+                .tint(Theme.Colors.brandA)
+                .accessibilityIdentifier("settings.clarify")
+        } header: {
+            Text("対話")
+        } footer: {
+            Text(ClarifyCopy.settingFooter)
         }
     }
 

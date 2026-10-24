@@ -10,12 +10,13 @@ struct LinkLeaf: View {
             if let url = c.url.flatMap(URL.init(string:)) {
                 Link(destination: url) {
                     Label(c.text ?? url.absoluteString, systemImage: "arrow.up.right.square")
+                        .foregroundStyle(RenderTheme.Colors.brandText)
                 }
             } else {
                 Text(c.text ?? "").foregroundStyle(.secondary)
             }
         }
-        .font(.body)
+        .font(.body.weight(.medium))
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
