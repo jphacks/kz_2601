@@ -91,6 +91,31 @@ paths:
         '204': { description: Archived }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /apps/{appId}/events:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [dsl]
+      summary: 変化通知(Server-Sent Events・ホットリロード用・#82)
+      description: |
+        「何が変わったか」だけを流す。本体は `GET /dsl` / `GET /records` で取り直す(読み取り権限は既存 API と同じ)。
+        backend は Firestore の snapshot listener(`users/{uid}/apps/{appId}` と、現行 DSL の各 entity の records
+        コレクション。public/shared entity は `apps_public/{appId}/...`)を持つ。records は `updatedAt` 降順 100 件の窓。
+        未知 appId は `GET /dsl` と同じく seed する。
+
+        ```
+        retry: 2000
+        event: hello    data: {"version":7,"entities":["post"]}
+        event: records  data: {"entity":"post"}
+        event: dsl      data: {"version":8}      # 直後に bye(entity 構成が変わり得るので張り直させる)
+        event: bye      data: {}                 # 予定終了(既定 50 秒・EVENTS_MAX_STREAM)。即再接続してよい
+        : ping                                   # 15 秒ごとの心拍
+        ```
+        `bye` 無しで切れたらリスナー障害。クライアントはポーリングに落としつつ指数バックオフで再接続する。
+      responses:
+        '200':
+          description: SSE ストリーム
+          content: { text/event-stream: { schema: { type: string } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
   /apps/{appId}/dsl:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
     get:
@@ -98,7 +123,7 @@ paths:
       summary: 現在の DSL (iOS ホットリロード用)
       description: |
         `If-None-Match: "<version>"` が現行と一致すれば 304。ETag は `"<currentVersion>"` (例 `"7"`)。
-        iOS は 2 秒ポーリングか Firestore リスナーで version 変化を検知してから取得する。
+        iOS は `GET /apps/{appId}/events`(SSE)で version 変化を知ってから取得する(フォールバックはポーリング)。
 
         **共有アプリのインストール (#47)**: 自分の `users/{uid}/apps/{appId}` が無い appId で呼ぶと、他ユーザーが
         `apps_public/{appId}` に公開した DSL (public/shared entity を含むアプリを PUT/PATCH した時に自動複製) があればそれを、
