@@ -18,11 +18,16 @@ struct ProgressBarLeaf: View {
                 }
             }
             ProgressView(value: ratio)
-                .tint(ratio >= 1 ? .red : .accentColor)
-                .animation(.easeOut(duration: 0.3), value: ratio)
+                .tint(ratio >= 1 ? Color.semantic("red") : .accentColor)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: ratio)
         }
         .renderCard()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(c.label ?? "進捗")
+        .accessibilityValue(String(format: "%.0f%%", ratio * 100))
     }
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var resolvedRatio: Double {
         if let v = c.value { return v }

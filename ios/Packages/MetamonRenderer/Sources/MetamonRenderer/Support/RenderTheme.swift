@@ -126,6 +126,7 @@ struct EmptyPlaceholder: View {
                 Image(systemName: icon)
                     .font(.title2)
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
             Text(text)
                 .font(.subheadline)

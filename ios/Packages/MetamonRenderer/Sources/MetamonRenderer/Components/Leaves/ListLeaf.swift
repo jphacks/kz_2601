@@ -22,10 +22,11 @@ struct ListLeaf: View {
                     if index > 0 { Hairline(inset: separatorInset) }
                     ListRow(item: c.item, record: row, entity: entity, showsChevron: c.onItemTap != nil)
                         .contentShape(Rectangle())
-                        .onTapGesture {
-                            guard let action = c.onItemTap else { return }
-                            Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
-                        }
+                        .onTapGesture { open(row) }
+                        // VoiceOver: onTapGesture は読まれないので、行をボタンとして宣言しダブルタップで同じ遷移を実行
+                        .accessibilityAddTraits(c.onItemTap != nil ? .isButton : [])
+                        .accessibilityHint(c.onItemTap != nil ? "ダブルタップで開きます" : "")
+                        .accessibilityAction { open(row) }
                         .contextMenu {
                             if c.swipeToDelete == true {
                                 Button("削除", systemImage: "trash", role: .destructive) {
@@ -37,6 +38,11 @@ struct ListLeaf: View {
             }
             .renderCard(padding: 0)
         }
+    }
+
+    private func open(_ row: Record) {
+        guard let action = c.onItemTap else { return }
+        Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
     }
 
     /// 先頭のアイコン/画像の幅ぶんセパレータを内側に寄せる。

@@ -65,11 +65,15 @@ public struct GridScreenLayout: View {
 private struct GridCell: View {
     let component: Component
     let ctx: RenderContext
+    @Environment(\.dynamicTypeSize) private var typeSize
 
+    /// 通常サイズでは「中身が伸びる型」だけ内側スクロール。Dynamic Type のアクセシビリティサイズでは
+    /// stat / button / 入力なども固定高のセルからはみ出すので、面を自前で埋める型以外は全部スクロールに逃がす。
     private var scrollsInside: Bool {
         switch component.type {
         case .list, .section, .vstack, .hstack, .text, .table, .timeline, .markdown, .card, .disclosure, .grid, .calendar: true
-        default: false
+        case .image, .mapView, .webView, .chart, .gauge, .spacer, .divider, .qrScanner, .voiceInput: false
+        default: typeSize.isAccessibilitySize
         }
     }
 
@@ -87,10 +91,12 @@ private struct GridCell: View {
 }
 
 /// 縦 ScrollView + 端フェード。iOS 17 で動くよう PreferenceKey で内容のフレームを拾い、はみ出している側だけマスクを掛ける。
+/// Reduce Motion ではフェードの切り替えをアニメーションせず即時に差し替える(マスク自体は「続きがある」合図なので残す)。
 private struct FadingScrollView<Content: View>: View {
     @ViewBuilder var content: Content
     @State private var contentFrame: CGRect = .zero
     @State private var viewportHeight: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let fade: CGFloat = 18
     private let slack: CGFloat = 2
@@ -126,8 +132,8 @@ private struct FadingScrollView<Content: View>: View {
                 LinearGradient(colors: [.black, fadesBottom ? .clear : .black], startPoint: .top, endPoint: .bottom)
                     .frame(height: fade)
             }
-            .animation(.easeOut(duration: 0.18), value: fadesTop)
-            .animation(.easeOut(duration: 0.18), value: fadesBottom)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: fadesTop)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: fadesBottom)
         )
         .clipShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
     }
