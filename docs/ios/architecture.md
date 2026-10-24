@@ -96,13 +96,31 @@ extension Component: Decodable {
 |---|---|---|
 | `navigation.type = "tab"` + `tabs[]` | `TabView(selection:)` 内に **タブ毎の** `NavigationStack(path:)` | `selectedTab`, `paths[tabId]: [Route]` |
 | `navigation.type = "stack"` + `root` | `NavigationStack(path:)` 1本 | `paths["main"]` |
-| `navigate` アクション | `paths[currentTab].append(Route)` | `.navigationDestination(for: Route.self) { ScreenView(route:) }` |
+| `navigate` アクション | `NavigationResolver` が行き先で pop / タブ切替 / push を選ぶ(§3.1) | `.navigationDestination(for: Route.self) { ScreenView(route:) }` |
 | `back` | `removeLast()` | |
 | `present(style: sheet/fullScreen)` | `.sheet(item: $rt.sheet)` / `.fullScreenCover` | `Route: Identifiable` |
 | `dismiss` | `sheet = nil; fullScreen = nil` | |
 
 `Route { screen: String, params: [String: JSONValue] }` は `Hashable`。params は push 時に `{{item.id}}` 等を**解決済みの値**で保持するので、遷移先は `{{params.id}}` で参照できる。
 DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 id が消えている可能性があるため)。存在しない screen id は `ContentUnavailableView` で表示。
+
+### 3.1 行き先に応じて賢く動く navigate(#113)
+
+`navigate` は常に push していたため、タブの根へ飛んでもタブが切り替わらず、A→B→C→A の循環で戻るが無限に深くなっていた。
+解決規則を純粋関数 `NavigationResolver`(`MetamonRenderer/Host/NavigationResolver.swift`)に切り出し、`AppRuntime.navigate` / `close` はその結果(`NavigationState` = paths / selectedTab / sheet / fullScreen)を書き戻すだけにした。**DSL は変えない**(既存の DSL・AI の出力にそのまま効く)。
+
+| 状況 | 動き |
+|---|---|
+| 行き先が今のスタック(根を含む)にある | そこまで pop(積み直さない) |
+| 行き先がタブの根(`app.tabs[].screen`) | そのタブへ切り替え、そのタブのスタックを根まで戻す |
+| それ以外 | 今のスタックへ push(従来どおり) |
+| モーダル(sheet / full)の中から | まずモーダル内のスタックで pop を試す → 無ければ下の画面(選択中タブ / main)で上 2 行を試し、当たればモーダルを閉じてから適用 → どれでもなければモーダル内に push |
+| `presentation: sheet / fullScreen` | 従来どおりモーダルで開く(規則は使わない)。新しいモーダルは根から始める(前のモーダルの積み残しを捨てる) |
+
+- 同じ画面かどうか: 根は recordId を持たないので画面 id だけで一致。push 済みの画面は **screen と recordId が両方一致** した時だけ同じとみなす(別レコードの編集画面は別物として push)。
+- `saveRecord` の `screen`(保存後の遷移先)も同じ規則で解決する。シートのフォームで保存 → タブの根へ、ならシートが閉じてタブが切り替わる。
+- 明示指定(`navigate.mode = push / replace / root`)は **入れていない**。既定規則で「B からも C へ」「C から A へ」が積み増し無しで動くため。強制 push が要る場面(同じ画面を重ねたい)が出たら Action に任意の `mode` を足す。
+- 検証用の例: `docs/dsl/examples/navigation.json`(タブ A / 別タブ、画面 A→B→C→A の循環、C から別タブ、A から C をシートで)。`METAMON_INITIAL_EXAMPLE=navigation` で起動できる。ユニットテストは `MetamonRendererTests/NavigationResolverTests.swift`。
 
 ## 4. アクションとデータバインディング
 
