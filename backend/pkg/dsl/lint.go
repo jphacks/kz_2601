@@ -15,8 +15,9 @@ import (
 //     against "now" or a fixed string (iOS compares numbers -> always empty)
 //   - entity without an add form (or the form is unreachable) / without a list
 //   - expressions that are always a constant (mul by 0, x*0+0-0)
-//   - stat label says 今月/今日/this month/today but the filter is missing or
-//     another period; 今週/今年 have no filter op
+//   - stat label says 今日/今週/今月/今年 (today/this week/this month/this
+//     year) but the filter is missing or another period
+//   - screen graph (nav.go): unreachable screens, fullScreen without a way back
 func (a *App) Lint() []string {
 	l := &linter{app: a, entities: map[string]*Entity{}}
 	for i := range a.Entities {
@@ -25,6 +26,7 @@ func (a *App) Lint() []string {
 	l.computed()
 	l.screens()
 	l.entityReach()
+	l.navGraph()
 	return l.out
 }
 
@@ -232,13 +234,15 @@ type period struct {
 }
 
 // op "latest": no aggregate returns the newest record; "recent": needs an
-// expression date filter (addDays(today,-N)); "": weeks/years have no op.
+// expression date filter (addDays(today,-N)); the rest are period filter ops.
+// Order matters: "今週(直近7日)" is recent, not thisWeek.
 var periods = []period{
 	{"latest", []string{"最新", "latest", "most recent"}},
 	{"recent", []string{"直近", "last 7 days", "past 7 days", "last 30 days", "past week"}},
 	{"thisMonth", []string{"今月", "this month", "monthly total"}},
 	{"today", []string{"今日", "本日", "today"}},
-	{"", []string{"今週", "this week", "今年", "this year", "年間"}},
+	{"thisWeek", []string{"今週", "this week", "weekly total"}},
+	{"thisYear", []string{"今年", "this year", "年間", "yearly total"}},
 }
 
 // sincePhrases mean "up to now" (all-time), not the period itself.
@@ -256,8 +260,9 @@ func labelPeriod(label string) (period, string, bool) {
 	return period{}, "", false
 }
 
-// periodLabel: a 今月/今日 label needs a filter, and not one of the other
-// period; 今週/今年 need an expression date filter (no op exists).
+// periodLabel: a 今日/今週/今月/今年 label needs that period's filter op
+// (thisWeek starts on Monday), not another period. An expression date filter
+// is also accepted for 今週/今年 (older recipe: year == year(today)).
 func (l *linter) periodLabel(where string, c *Component) {
 	label := c.Label
 	if label == "" {
@@ -284,7 +289,7 @@ func (l *linter) periodLabel(where string, c *Component) {
 	}
 	hasExprFilter := false
 	for _, f := range filters {
-		if f.Op != "thisMonth" && f.Op != "today" && f.Value != nil {
+		if !IsPeriodFilterOp(f.Op) && f.Value != nil {
 			if ve, err := exprFromValue(f.Value); err == nil && ve != nil && ve.Kind != ExprLiteral {
 				hasExprFilter = true // e.g. date >= addDays(today,-6), year == year(today)
 			}
@@ -296,26 +301,21 @@ func (l *linter) periodLabel(where string, c *Component) {
 		}
 		return
 	}
-	if p.op == "" {
-		if hasExprFilter {
-			return
-		}
-		l.add(`%s: label %q says %q but there is no filter op for weeks/years; either filter by an expression ({"field":"<date>","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-6]}}) and relabel it 直近7日 / last 7 days, or relabel it to what it really shows (全期間 / 合計 / total) and end app.description with "○○は△△で代替しました。"`, where, label, word)
+	if (p.op == "thisWeek" || p.op == "thisYear") && hasExprFilter {
 		return
 	}
 	if len(filters) == 0 {
 		l.add(`%s: label %q says %q but the value has no filter, so it is the all-time total; add {"field":"<date field>","op":"%s"} (inside the agg when using value) or relabel it (合計 / total)`, where, label, word, p.op)
 		return
 	}
-	other := map[string]string{"thisMonth": "today", "today": "thisMonth"}[p.op]
 	for _, f := range filters {
 		if f.Op == p.op {
 			return
 		}
 	}
 	for _, f := range filters {
-		if f.Op == other {
-			l.add(`%s: label %q says %q but the filter is %s; use op %s or fix the label`, where, label, word, other, p.op)
+		if IsPeriodFilterOp(f.Op) {
+			l.add(`%s: label %q says %q but the filter is %s; use op %s or fix the label`, where, label, word, f.Op, p.op)
 			return
 		}
 	}
@@ -344,55 +344,12 @@ var listTypes = map[ComponentType]bool{
 }
 
 func (l *linter) entityReach() {
-	forms := map[string][]string{} // entity -> form screen ids
-	for _, s := range l.app.Screens {
-		if s.Entity != "" {
-			forms[s.Entity] = append(forms[s.Entity], s.ID)
-		}
+	forms := formScreens(l.app)
+	targets := l.app.Reachable()
+	unlisted := map[string]bool{}
+	for _, id := range l.app.UnlistedEntities() {
+		unlisted[id] = true
 	}
-	// reachable screens: initial + tabs, then navigate targets of reachable screens
-	byID := map[string]*Screen{}
-	for i := range l.app.Screens {
-		byID[l.app.Screens[i].ID] = &l.app.Screens[i]
-	}
-	targets := map[string]bool{}
-	queue := []string{l.app.InitialScreen}
-	for _, t := range l.app.App.Tabs {
-		queue = append(queue, t.Screen)
-	}
-	listed := map[string]bool{}
-	for len(queue) > 0 {
-		id := queue[0]
-		queue = queue[1:]
-		s := byID[id]
-		if s == nil || targets[id] {
-			continue
-		}
-		targets[id] = true
-		nav := func(a *Action) {
-			if a != nil && a.Type == ActionNavigate && !targets[a.Screen] {
-				queue = append(queue, a.Screen)
-			}
-		}
-		visit := func(c *Component) {
-			nav(c.Action)
-			nav(c.OnItemTap)
-			nav(c.OnDateTap)
-			if listTypes[c.Type] {
-				listed[c.Entity] = true
-			}
-		}
-		for i := range s.Toolbar {
-			nav(&s.Toolbar[i].Action)
-		}
-		for i := range s.Components {
-			visit(&s.Components[i])
-			for j := range s.Components[i].Children {
-				visit(&s.Components[i].Children[j])
-			}
-		}
-	}
-	settings := l.settingEntities()
 	for _, e := range l.app.Entities {
 		switch fs := forms[e.ID]; {
 		case len(fs) == 0:
@@ -400,10 +357,47 @@ func (l *linter) entityReach() {
 		case !anyOf(fs, targets):
 			l.add(`entity %q: form screen %q is not reachable; add a toolbar/button navigate to it`, e.ID, fs[0])
 		}
-		if !listed[e.ID] && !settings[e.ID] {
+		if unlisted[e.ID] {
 			l.add(`entity %q has no list on a reachable screen: show its records with a list or table (with onItemTap to the form) on a tab or the home screen so what users add is visible`, e.ID)
 		}
 	}
+}
+
+// formScreens maps entity id -> form screen ids (screen.entity).
+func formScreens(a *App) map[string][]string {
+	forms := map[string][]string{}
+	for _, s := range a.Screens {
+		if s.Entity != "" {
+			forms[s.Entity] = append(forms[s.Entity], s.ID)
+		}
+	}
+	return forms
+}
+
+// UnlistedEntities returns, in entity order, the entities whose records no
+// reachable screen lists (list / table / timeline / calendar / mapView /
+// settlement), excluding single-value setting entities (budget, goal).
+func (a *App) UnlistedEntities() []string {
+	targets := a.Reachable()
+	listed := map[string]bool{}
+	for _, s := range a.Screens {
+		if !targets[s.ID] {
+			continue
+		}
+		eachScreenComponent(s.Components, func(_ string, c *Component) {
+			if listTypes[c.Type] {
+				listed[c.Entity] = true
+			}
+		})
+	}
+	settings := (&linter{app: a}).settingEntities()
+	var out []string
+	for _, e := range a.Entities {
+		if !listed[e.ID] && !settings[e.ID] {
+			out = append(out, e.ID)
+		}
+	}
+	return out
 }
 
 func anyOf(ids []string, set map[string]bool) bool {

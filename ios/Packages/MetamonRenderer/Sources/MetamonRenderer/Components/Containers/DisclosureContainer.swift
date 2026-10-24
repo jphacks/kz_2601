@@ -20,7 +20,7 @@ struct DisclosureContainer: View {
             }
             .padding(.top, RenderTheme.Spacing.sm)
         } label: {
-            Text(c.title ?? "詳細").font(RenderTheme.Fonts.cardTitle)
+            Text(c.title ?? L("詳細")).font(RenderTheme.Fonts.cardTitle)
         }
         .tint(RenderTheme.Colors.brandA)
         .renderCard()

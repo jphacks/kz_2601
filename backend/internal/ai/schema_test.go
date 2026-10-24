@@ -115,7 +115,7 @@ func TestRelaxedSchemaAcceptsExamples(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"initial", "kakeibo", "training", "walk", "warikan", "bmi"} {
+	for _, name := range []string{"initial", "kakeibo", "training", "walk", "warikan", "bmi", "shopping"} {
 		raw, err := os.ReadFile("../../../docs/dsl/examples/" + name + ".json")
 		if err != nil {
 			t.Skip(err)

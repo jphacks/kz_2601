@@ -96,13 +96,31 @@ extension Component: Decodable {
 |---|---|---|
 | `navigation.type = "tab"` + `tabs[]` | `TabView(selection:)` 内に **タブ毎の** `NavigationStack(path:)` | `selectedTab`, `paths[tabId]: [Route]` |
 | `navigation.type = "stack"` + `root` | `NavigationStack(path:)` 1本 | `paths["main"]` |
-| `navigate` アクション | `paths[currentTab].append(Route)` | `.navigationDestination(for: Route.self) { ScreenView(route:) }` |
+| `navigate` アクション | `NavigationResolver` が行き先で pop / タブ切替 / push を選ぶ(§3.1) | `.navigationDestination(for: Route.self) { ScreenView(route:) }` |
 | `back` | `removeLast()` | |
 | `present(style: sheet/fullScreen)` | `.sheet(item: $rt.sheet)` / `.fullScreenCover` | `Route: Identifiable` |
 | `dismiss` | `sheet = nil; fullScreen = nil` | |
 
 `Route { screen: String, params: [String: JSONValue] }` は `Hashable`。params は push 時に `{{item.id}}` 等を**解決済みの値**で保持するので、遷移先は `{{params.id}}` で参照できる。
 DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 id が消えている可能性があるため)。存在しない screen id は `ContentUnavailableView` で表示。
+
+### 3.1 行き先に応じて賢く動く navigate(#113)
+
+`navigate` は常に push していたため、タブの根へ飛んでもタブが切り替わらず、A→B→C→A の循環で戻るが無限に深くなっていた。
+解決規則を純粋関数 `NavigationResolver`(`MetamonRenderer/Host/NavigationResolver.swift`)に切り出し、`AppRuntime.navigate` / `close` はその結果(`NavigationState` = paths / selectedTab / sheet / fullScreen)を書き戻すだけにした。**DSL は変えない**(既存の DSL・AI の出力にそのまま効く)。
+
+| 状況 | 動き |
+|---|---|
+| 行き先が今のスタック(根を含む)にある | そこまで pop(積み直さない) |
+| 行き先がタブの根(`app.tabs[].screen`) | そのタブへ切り替え、そのタブのスタックを根まで戻す |
+| それ以外 | 今のスタックへ push(従来どおり) |
+| モーダル(sheet / full)の中から | まずモーダル内のスタックで pop を試す → 無ければ下の画面(選択中タブ / main)で上 2 行を試し、当たればモーダルを閉じてから適用 → どれでもなければモーダル内に push |
+| `presentation: sheet / fullScreen` | 従来どおりモーダルで開く(規則は使わない)。新しいモーダルは根から始める(前のモーダルの積み残しを捨てる) |
+
+- 同じ画面かどうか: 根は recordId を持たないので画面 id だけで一致。push 済みの画面は **screen と recordId が両方一致** した時だけ同じとみなす(別レコードの編集画面は別物として push)。
+- `saveRecord` の `screen`(保存後の遷移先)も同じ規則で解決する。シートのフォームで保存 → タブの根へ、ならシートが閉じてタブが切り替わる。
+- 明示指定(`navigate.mode = push / replace / root`)は **入れていない**。既定規則で「B からも C へ」「C から A へ」が積み増し無しで動くため。強制 push が要る場面(同じ画面を重ねたい)が出たら Action に任意の `mode` を足す。
+- 検証用の例: `docs/dsl/examples/navigation.json`(タブ A / 別タブ、画面 A→B→C→A の循環、C から別タブ、A から C をシートで)。`METAMON_INITIAL_EXAMPLE=navigation` で起動できる。ユニットテストは `MetamonRendererTests/NavigationResolverTests.swift`。
 
 ## 4. アクションとデータバインディング
 
@@ -618,8 +636,20 @@ HealthKit を足す時の手順(Apple アカウント操作が要るので未着
 2. `xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で App ID に HealthKit が付く(有料 Program 必須)。付かなければ Apple Developer > Identifiers > `jp.kz2601.metamon` > Capabilities で HealthKit にチェック → プロファイル再生成。
 3. 部品は DSL に `healthField`(歩数/体重の読み取り)を足す案(schema・ai・カタログの変更が要るので別 Issue)。歩数だけなら既存の `NSMotionUsageDescription`(CoreMotion の歩数計)で capability 無しに出せる。
 
+## 16. 多言語対応(ja / en・Issue #44 / #45 の iOS 側)
 
-## 16. 近距離共有(nearbyShare・MultipeerConnectivity / Issue #36)
+- **String Catalog**: 本体 `Metamon/Resources/Localizable.xcstrings`、ウィジェット `MetamonWidget/Localizable.xcstrings`、Renderer `Packages/MetamonRenderer/Sources/MetamonRenderer/Resources/Localizable.xcstrings`(`defaultLocalization: "ja"` + `Bundle.module`)。キーは**日本語のソース文字列**(開発言語 ja)。ja も明示して `ja.lproj` を出す(英語端末で「日本語」を選んだ時の解決用)。
+- **単一ソース**: `LanguagePreference.shared`(Renderer・`@Observable`)。`setting`(system / ja / en)は UserDefaults `metamon.appLanguage`。`code` は "ja" | "en"、`locale` は書式用。
+- **切替は即時**: ルートで `.environment(\.locale, LanguagePreference.shared.locale)` を注入 → `Text("…")` リテラルはその Locale で引き直される。`String` を返す文言は本体 `L10n.tr("…")` / Renderer `L("…")`(lproj を直接引く)。body 内で呼ぶので Observation で再描画される。`static let` の文言は `static var` にする(起動時の言語で固定されないように)。
+- **書くときのルール**: SwiftUI に直接渡すリテラル(`Text` / `Button` / `Label` / `Section` / `accessibilityLabel` 等)はそのまま。三項演算子・変数・`String` 返しは `L10n.tr`。Renderer 内は全部 `L()`(リテラルは Bundle.main を引いてしまうため)。新しい文言は xcstrings に en を追加(キーの補間は `%@` / `%lld`、補間ありのキーでは `%` を `%%`)。
+- **端末の AppleLanguages は書き換えない**。権限ダイアログ・システム UI・ウィジェット(別プロセス)は端末の言語のまま。
+- **生成の locale(#45)**: 設定で言語を明示 → generate / chat に `locale` を送る。「自動」は送らない(backend が発話の文字種で判定)。WhisperKit の `language` は `LanguagePreference.code`(録音ごとに読む)。
+- **翻訳しないもの**: DSL 内の文言(AI が locale に合わせて生成)、Services のログ、FieldIcon のキーワード、音声意図判定の語彙。通貨は DSL の `currency` が円前提なので英語 UI でも `¥`。
+- 確認: `-metamon.appLanguage en`(起動引数で UserDefaults を上書き)/ `-AppleLanguages "(en)"`、設定シートは `METAMON_AUTO_SETTINGS=1`。
+
+
+
+## 19. 近距離共有(nearbyShare・MultipeerConnectivity / Issue #36)
 
 対面で記録を渡す最小版。インターネット・サインイン不要で、OS が Wi-Fi(P2P)/ Bluetooth を自動で選ぶ MultipeerConnectivity を使う。
 

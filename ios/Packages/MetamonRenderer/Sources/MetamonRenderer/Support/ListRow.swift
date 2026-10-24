@@ -6,11 +6,14 @@ import MetamonDSL
 /// - 先頭(#89): 画像サムネ(角丸 10)> アイコン(ブランドの薄い角丸)> カテゴリ色ドット(enum field の値から安定割当)。
 /// - VoiceOver: 行は 1 要素。「title, subtitle, trailing」の順に読む(icon / chevron / 画像は装飾なので隠す)。
 /// - Dynamic Type(アクセシビリティサイズ): 横並びだと title が潰れるので trailing を下段に落とし、title は 2 行まで。
+/// - `toggleOn` が非 nil(#108 `list.item.toggle`)なら行頭にチェック丸。チェック済みは title に打ち消し線 + 文字を薄く。
 struct ListRow: View {
     let item: ListItem?
     let record: Record
     let entity: Entity?
     var showsChevron = false
+    var toggleOn: Bool? = nil
+    var onToggle: (() -> Void)? = nil
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.dslRuntime) private var rt
 
@@ -42,10 +45,33 @@ struct ListRow: View {
         [titleText, subtitleText, trailingText].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
     }
 
+    private var checked: Bool { toggleOn == true }
+
+    /// 行頭のチェック丸。行タップ(フォームを開く)とは別のボタン。44pt の当たり判定。
+    private func checkCircle(_ on: Bool) -> some View {
+        Button {
+            onToggle?()
+        } label: {
+            Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                .font(.title2)
+                .foregroundStyle(on ? RenderTheme.Colors.brandA : Color.secondary)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 28, height: 28)
+                .padding(8)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(-8)
+        .accessibilityHidden(true) // 行 1 要素の accessibilityAction で操作する
+    }
+
     var body: some View {
         let stacked = typeSize.isAccessibilitySize
         let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: RenderTheme.Spacing.xs)) : AnyLayout(HStackLayout(spacing: RenderTheme.Spacing.row))
         HStack(alignment: stacked ? .top : .center, spacing: RenderTheme.Spacing.row) {
+            if let on = toggleOn {
+                checkCircle(on)
+            }
             if let img = item?.image {
                 PhotoView(value: record[img], height: 52).frame(width: 52)
             } else if let icon = item?.icon {
@@ -67,6 +93,8 @@ struct ListRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(titleText)
                         .font(RenderTheme.Fonts.rowTitle)
+                        .strikethrough(checked)
+                        .foregroundStyle(checked ? .secondary : .primary)
                         .lineLimit(stacked ? 2 : 1)
                     if let sub = subtitleText {
                         Text(sub).font(RenderTheme.Fonts.rowSubtitle).foregroundStyle(.secondary).lineLimit(stacked ? 2 : 1)
@@ -82,6 +110,7 @@ struct ListRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .opacity(checked ? 0.6 : 1)
             if showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
@@ -94,5 +123,11 @@ struct ListRow: View {
         .padding(.vertical, RenderTheme.Spacing.row)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
+        .accessibilityValue(toggleOn.map { $0 ? "チェック済み" : "未チェック" } ?? "")
+        .accessibilityActions {
+            if let onToggle {
+                Button(checked ? "チェックを外す" : "チェックする", action: onToggle)
+            }
+        }
     }
 }

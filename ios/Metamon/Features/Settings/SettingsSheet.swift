@@ -1,5 +1,6 @@
 import SwiftUI
 import MetamonServices
+import MetamonRenderer
 
 /// 歯車から開く設定シート。アカウント・音声モデル・接続先・アプリのリセット。
 struct SettingsSheet: View {
@@ -13,8 +14,10 @@ struct SettingsSheet: View {
         NavigationStack {
             List {
                 accountSection
+                languageSection
                 voiceModelSection
                 clarifySection
+                speechSection
                 appSection
                 syncSection
                 connectionSection
@@ -47,7 +50,7 @@ struct SettingsSheet: View {
                         .foregroundStyle(Theme.brandGradient)
                         .frame(width: 36)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(user.isAnonymous ? "匿名ユーザー" : "Apple でサインイン済み")
+                        Text(user.isAnonymous ? L10n.tr("匿名ユーザー") : L10n.tr("Apple でサインイン済み"))
                             .font(.body.weight(.medium))
                         Text("uid \(user.uid)")
                             .font(.caption2.monospaced())
@@ -64,6 +67,22 @@ struct SettingsSheet: View {
             } else {
                 Text("サインインしていません").foregroundStyle(.secondary)
             }
+        }
+    }
+
+    /// 表示言語(#44)。自動 = 端末の言語。切り替えは即時(ルートの `\.locale` と `LanguagePreference` の再描画)。
+    /// 新しく作るアプリ・対話・音声認識の言語もこれに合わせる(作成済みアプリの文言はそのまま)。
+    private var languageSection: some View {
+        @Bindable var language = LanguagePreference.shared
+        return Section {
+            Picker("言語", selection: $language.setting) {
+                Text("自動").tag(AppLanguage.system)
+                Text(verbatim: "日本語").tag(AppLanguage.ja)
+                Text(verbatim: "English").tag(AppLanguage.en)
+            }
+            .accessibilityIdentifier("settings.language")
+        } footer: {
+            Text("新しく作るアプリと質問もこの言語になります。作成済みのアプリの文言は変わりません。")
         }
     }
 
@@ -96,6 +115,20 @@ struct SettingsSheet: View {
         }
     }
 
+    /// 読み上げ(#43)。既定 OFF(理由は `SpeechReader.enabled`)。
+    private var speechSection: some View {
+        @Bindable var reader = SpeechReader.shared
+        return Section {
+            Toggle(SpeechCopy.settingTitle, isOn: $reader.enabled)
+                .tint(Theme.Colors.brandA)
+                .accessibilityIdentifier("settings.speech")
+        } header: {
+            Text(SpeechCopy.sectionTitle)
+        } footer: {
+            Text(SpeechCopy.settingFooter)
+        }
+    }
+
     private var appSection: some View {
         Section {
             Button {
@@ -112,7 +145,7 @@ struct SettingsSheet: View {
         } header: {
             Text("アプリ")
         } footer: {
-            Text("現在: \(rt.dsl.app.name)(v\(rt.document.version))" + (rt.isOffline ? "・オフライン(キャッシュ表示)" : "") + "\n「元に戻して」と話しても同じ。「別のアプリ。…」と話すと新しいアプリとして作ります。")
+            Text(L10n.tr("現在: \(rt.dsl.app.name)(v\(rt.document.version))") + (rt.isOffline ? L10n.tr("・オフライン(キャッシュ表示)") : "") + "\n" + L10n.tr("「元に戻して」と話しても同じ。「別のアプリ。…」と話すと新しいアプリとして作ります。"))
         }
     }
 
@@ -122,7 +155,7 @@ struct SettingsSheet: View {
             LabeledContent("同期") {
                 HStack(spacing: Theme.Spacing.sm) {
                     Circle().fill(syncColor).frame(width: 8, height: 8)
-                    Text(rt.recordSync.status.label)
+                    Text(syncLabel)
                 }
             }
             Button {
@@ -138,6 +171,16 @@ struct SettingsSheet: View {
         }
     }
 
+    /// `RecordSyncStatus.label`(Services・日本語固定)の表示言語対応版(#44)
+    private var syncLabel: String {
+        switch rt.recordSync.status {
+        case .synced: L10n.tr("最新")
+        case .pending(let n): L10n.tr("未送信 \(n) 件")
+        case .syncing(let n): L10n.tr("送信中(\(n) 件)")
+        case .offline(let n): n == 0 ? L10n.tr("オフライン") : L10n.tr("オフライン・未送信 \(n) 件")
+        }
+    }
+
     private var syncColor: Color {
         switch rt.recordSync.status {
         case .synced: .green
@@ -148,8 +191,8 @@ struct SettingsSheet: View {
 
     private var connectionSection: some View {
         Section("接続先") {
-            LabeledContent("ai", value: services.ai is MockAIClient ? "モック" : (BuildConfig.aiBaseURL?.host() ?? "live"))
-            LabeledContent("appconfig", value: services.isLive ? (BuildConfig.appConfigBaseURL?.host() ?? "live") : "インメモリ")
+            LabeledContent("ai", value: services.ai is MockAIClient ? L10n.tr("モック") : (BuildConfig.aiBaseURL?.host() ?? "live"))
+            LabeledContent("appconfig", value: services.isLive ? (BuildConfig.appConfigBaseURL?.host() ?? "live") : L10n.tr("インメモリ"))
             LabeledContent("バージョン", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "-")
         }
         .font(.footnote)
@@ -157,12 +200,12 @@ struct SettingsSheet: View {
 
     private var statusText: String {
         switch services.transcriber.status {
-        case .notDownloaded: "未ダウンロード"
-        case .downloading: "ダウンロード中 \(Int(services.transcriber.downloadProgress * 100))%"
-        case .loading: "読み込み中"
-        case .ready: "準備完了"
-        case .recognizing: "認識中"
-        case .failed(let m): "失敗: \(m)"
+        case .notDownloaded: L10n.tr("未ダウンロード")
+        case .downloading: L10n.tr("ダウンロード中 \(Int(services.transcriber.downloadProgress * 100))%")
+        case .loading: L10n.tr("読み込み中")
+        case .ready: L10n.tr("準備完了")
+        case .recognizing: L10n.tr("認識中")
+        case .failed(let m): L10n.tr("失敗: \(m)")
         }
     }
 

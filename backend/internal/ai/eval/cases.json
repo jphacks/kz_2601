@@ -43,5 +43,21 @@
   {"id": "logic_oshi", "kind": "create", "group": "logic", "transcript": "推し活の目標金額に対して達成率",
    "expect": {"calc": true}, "note": "progressBar(entity+target) でも stat.value の div でも可"},
   {"id": "logic_countdown", "kind": "create", "group": "logic", "transcript": "試験日までのカウントダウン",
-   "expect": {"calc": true}, "note": "computed daysUntil か stat.value。timerDisplay の固定秒数は不可(calc=false)"}
+   "expect": {"calc": true}, "note": "computed daysUntil か stat.value。timerDisplay の固定秒数は不可(calc=false)"},
+  {"id": "nav_study", "kind": "create", "group": "nav", "transcript": "勉強時間の記録アプリ。今日の記録、科目ごとの合計、目標の設定をそれぞれ別の画面に分けて、下のタブで切り替えたい",
+   "expect": {"tabsMin": 3, "unreachable": 0}},
+  {"id": "nav_recipe", "kind": "create", "group": "nav", "transcript": "レシピ帳アプリ。レシピの一覧から開いて中身を見たい。材料の買い物リストは別のタブで管理したい",
+   "expect": {"tabsMin": 2, "unreachable": 0}},
+  {"id": "nav_gym", "kind": "create", "group": "nav", "transcript": "ジムの記録アプリ。トレーニングの記録、体重の推移、自分のプロフィールの3つの画面をボトムバーで行き来したい",
+   "expect": {"tabsMin": 3, "unreachable": 0}},
+  {"id": "nav_edit_link", "kind": "edit", "group": "nav", "base": "example:kakeibo", "transcript": "集計の画面からも支出を追加できるようにして",
+   "expect": {"patch": true, "unreachable": 0, "nav": ["stats>expense_form"]}, "note": "B から C にも行けるように = stats に navigate expense_form の button"},
+  {"id": "nav_edit_add_tab", "kind": "edit", "group": "nav", "base": "example:kakeibo", "transcript": "履歴のタブを足して。支出を日付の新しい順に全部見られるようにして",
+   "expect": {"patch": true, "unreachable": 0, "tabs": 3}},
+  {"id": "nav_edit_remove_tab", "kind": "edit", "group": "nav", "base": "example:kakeibo", "transcript": "集計のタブは要らないので消して",
+   "expect": {"patch": true, "unreachable": 0, "tabs": 0}, "note": "タブ 1 個は不可なので app.tabs ごと消す。stats 画面も消すかボタンで辿れるようにする"},
+  {"id": "nav_edit_reorder", "kind": "edit", "group": "nav", "base": "example:kakeibo", "transcript": "タブの順番を入れ替えて、集計を左にして",
+   "expect": {"patch": true, "unreachable": 0, "tabOrder": "stats,home"}},
+  {"id": "nav_edit_to_tab", "kind": "edit", "group": "nav", "base": "example:warikan", "transcript": "精算の結果を別のタブに分けて",
+   "expect": {"patch": true, "unreachable": 0, "tabsMin": 2, "tabHas": "settlement"}, "note": "この画面をタブに: タブ無しの app に app.tabs を作る"}
 ]

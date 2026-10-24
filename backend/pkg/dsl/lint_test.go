@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-// The prompt's 今年 recipe (computed year + filter eq year(today)) must
-// validate and be lint-clean.
+// The older 今年 recipe (computed year + filter eq year(today)) must still
+// validate and be lint-clean (the prompt now uses filter thisYear).
 func TestLintThisYearRecipe(t *testing.T) {
 	got := lintWith(t, `,{"id":"year","name":"年","type":"integer","computed":{"op":"year","args":[{"ref":"date"}]}}`,
 		`{"type":"stat","label":"今年の合計","aggregate":"sum","entity":"log","field":"amount","filter":{"field":"year","op":"eq","value":{"op":"year","args":[{"op":"today","args":[]}]}}},`)
@@ -175,8 +175,10 @@ func TestLintPeriodLabel(t *testing.T) {
 	wantLint(t, lintWith(t, "", `{"type":"stat","label":"Today's total","aggregate":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}},`), `the filter is thisMonth; use op today`)
 	// value mode: the filter lives in the agg
 	wantLint(t, lintWith(t, "", `{"type":"stat","label":"今月の残り","value":{"op":"sub","args":[30000,{"agg":"sum","entity":"log","field":"amount"}]}},`), `has no filter`)
-	// no op for weeks / years
-	wantLint(t, lintWith(t, "", `{"type":"stat","label":"Points this week","aggregate":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}},`), `no filter op for weeks/years`)
+	// weeks / years (#109): thisWeek / thisYear are the answer
+	wantLint(t, lintWith(t, "", `{"type":"stat","label":"Points this week","aggregate":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}},`), `the filter is thisMonth; use op thisWeek`)
+	wantLint(t, lintWith(t, "", `{"type":"stat","label":"今年の合計","aggregate":"sum","entity":"log","field":"amount"},`), `"op":"thisYear"`)
+	wantLint(t, lintWith(t, "", `{"type":"stat","label":"今月の合計","aggregate":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisYear","value":null}},`), `the filter is thisYear; use op thisMonth`)
 
 	// audit a08 (after): 直近7日 without a date filter / a12: 最新 is an avg
 	wantLint(t, lintWith(t, "", `{"type":"stat","label":"筋トレ(直近7日)","aggregate":"count","entity":"log"},`), `has no date filter`)
@@ -189,7 +191,9 @@ func TestLintPeriodLabel(t *testing.T) {
 	 {"type":"stat","label":"今日水やりが必要","aggregate":"count","entity":"log","filter":{"field":"amount","op":"lte","value":0}},
 	 {"type":"stat","label":"合計","aggregate":"sum","entity":"log","field":"amount"},
 	 {"type":"stat","label":"今日までの記録日数","aggregate":"count","entity":"log"},
-	 {"type":"stat","label":"今月の予算","aggregate":"max","entity":"log","field":"amount"},`)
+	 {"type":"stat","label":"今月の予算","aggregate":"max","entity":"log","field":"amount"},
+	 {"type":"stat","label":"今週のポイント","aggregate":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisWeek","value":null}},
+	 {"type":"stat","label":"今年の合計","value":{"agg":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisYear","value":null}}},`)
 	// ...but the remaining budget is a sum over this month
 	wantLint(t, lintWith(t, "", `{"type":"stat","label":"今月の予算の残り","value":{"op":"sub","args":[30000,{"agg":"sum","entity":"log","field":"amount"}]}},`), `has no filter`)
 	if len(ok) > 0 {

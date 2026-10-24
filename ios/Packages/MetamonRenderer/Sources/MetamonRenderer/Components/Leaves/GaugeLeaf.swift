@@ -33,8 +33,8 @@ struct GaugeLeaf: View {
         .renderCard()
         // VoiceOver: 「体重 (kg), 62.5(範囲 40〜120)」と 1 要素で読む
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(unit.flatMap { u in c.label.map { "\($0) (\(u))" } } ?? c.label ?? "ゲージ")
-        .accessibilityValue("\(Aggregator.format(value, as: nil, unit: nil))(範囲 \(compact(lo))〜\(compact(hi)))")
+        .accessibilityLabel(unit.flatMap { u in c.label.map { "\($0) (\(u))" } } ?? c.label ?? L("ゲージ"))
+        .accessibilityValue(L("\(Aggregator.format(value, as: nil, unit: nil))(範囲 \(compact(lo))〜\(compact(hi)))"))
     }
 
     /// 端の目盛り: 大きい値は 30K のように短く(円形ゲージの幅に収める)。
@@ -49,7 +49,7 @@ struct GaugeLeaf: View {
         let entity = rt.dsl.entity(entityId)
         let rows = rt.filteredRecords(c)
         let op = c.aggregate ?? "sum"
-        let unit = op == "count" ? "件" : c.field.flatMap { entity?.field($0)?.unit }
+        let unit = op == "count" ? L("件") : c.field.flatMap { entity?.field($0)?.unit }
         return (Aggregator.aggregate(op, field: c.field, over: rows), unit)
     }
 }

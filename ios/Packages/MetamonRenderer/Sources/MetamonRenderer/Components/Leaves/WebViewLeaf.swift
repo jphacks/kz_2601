@@ -26,7 +26,7 @@ struct WebViewLeaf: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(.separator), lineWidth: 0.5))
         } else {
-            UnsupportedComponent(label: "webView: https の URL だけ表示できます")
+            UnsupportedComponent(label: L("webView: https の URL だけ表示できます"))
         }
     }
 

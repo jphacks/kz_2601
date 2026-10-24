@@ -10,6 +10,7 @@ public struct MockAIClient: AIClient {
     public static func sampleName(for transcript: String) -> String {
         if transcript.contains("トレ") || transcript.contains("筋") || transcript.contains("運動") { return "training" }
         if transcript.contains("散歩") || transcript.contains("写真") || transcript.contains("場所") { return "walk" }
+        if transcript.contains("買い物") || transcript.contains("チェックリスト") { return "shopping" }
         if transcript.contains("最初") || transcript.contains("戻") { return "initial" }
         return "kakeibo"
     }
@@ -37,7 +38,7 @@ public struct MockAIClient: AIClient {
         }
         let transcript = requests.isEmpty ? "家計簿アプリを作って。" : requests.joined(separator: "。")
         let name = Self.sampleName(for: transcript)
-        let title = ["training": "筋トレ記録", "walk": "散歩記録", "kakeibo": "家計簿"][name] ?? "記録アプリ"
+        let title = ["training": "筋トレ記録", "walk": "散歩記録", "kakeibo": "家計簿", "shopping": "買い物リスト"][name] ?? "記録アプリ"
         return ChatTurn(kind: .ready, text: "では作りますね。", turn: turn,
                         brief: ChatBrief(name: title, purpose: requests.first ?? title, entities: [], features: requests.dropFirst().map { $0 }),
                         transcript: transcript, locale: "ja", source: goAhead ? "shortcut" : "mock")

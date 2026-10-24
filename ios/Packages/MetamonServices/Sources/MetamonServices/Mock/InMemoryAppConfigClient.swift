@@ -74,6 +74,13 @@ public enum MockSeed {
             "memo": [
                 Record(id: "1", data: ["note": "きれいな紅葉", "date": .string(iso)], createdAt: iso),
             ],
+            // shopping(#108): 未購入 3 件 + 購入済み 1 件(一覧の丸でチェック)
+            "groceries": [
+                Record(id: "g1", data: ["name": "牛乳", "category": "食品", "qty": 1, "done": false, "added": .string(today)], createdAt: iso),
+                Record(id: "g2", data: ["name": "卵", "category": "食品", "qty": 1, "done": false, "added": .string(today)], createdAt: iso),
+                Record(id: "g3", data: ["name": "トイレットペーパー", "category": "日用品", "qty": 2, "done": false, "added": .string(today)], createdAt: iso),
+                Record(id: "g4", data: ["name": "パン", "category": "食品", "qty": 1, "done": true, "added": .string(today)], createdAt: iso),
+            ],
             // warikan(#101): 3 人・3 件。合計 ¥15,000 → 1 人 ¥5,000、精算は じろう→たろう ¥5,000 / はなこ→たろう ¥500
             "members": [
                 Record(id: "m1", data: ["name": "たろう"], createdAt: iso),

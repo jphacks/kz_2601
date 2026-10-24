@@ -52,7 +52,7 @@ struct PhotoView: View {
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel ?? (hasPhoto ? "写真" : "写真なし"))
+        .accessibilityLabel(accessibilityLabel ?? (hasPhoto ? L("写真") : L("写真なし")))
         .accessibilityAddTraits(hasPhoto ? .isImage : [])
     }
 }

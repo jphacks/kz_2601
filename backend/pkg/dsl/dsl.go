@@ -354,7 +354,8 @@ type ListItem struct {
 	Subtitle string `json:"subtitle,omitempty"`
 	Trailing string `json:"trailing,omitempty"`
 	Icon     string `json:"icon,omitempty"`
-	Image    string `json:"image,omitempty"` // photo field id -> thumbnail
+	Image    string `json:"image,omitempty"`  // photo field id -> thumbnail
+	Toggle   string `json:"toggle,omitempty"` // boolean field id -> one-tap check circle (#108)
 }
 
 // Sort orders a list.
@@ -366,7 +367,7 @@ type Sort struct {
 // Filter narrows records for list/stat/chart.
 type Filter struct {
 	Field string `json:"field"`
-	Op    string `json:"op"` // eq|neq|gt|gte|lt|lte|thisMonth|today
+	Op    string `json:"op"` // eq|neq|gt|gte|lt|lte|today|thisWeek|thisMonth|thisYear
 	Value any    `json:"value"`
 }
 
