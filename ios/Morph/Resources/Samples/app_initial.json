@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "appId": "demo",
+  "version": 1,
+  "name": "Morph",
+  "navigation": { "type": "stack", "root": "voice" },
+  "screens": {
+    "voice": {
+      "title": "",
+      "scroll": false,
+      "body": { "type": "aiVoice", "prompt": "どんなアプリが欲しいですか？" }
+    }
+  }
+}
