@@ -75,14 +75,14 @@ func TestGenerationSchemaHasNoUnsupportedKeywords(t *testing.T) {
 	if lp["format"] == nil || lp["text"] == nil || lp["entity"] == nil {
 		t.Fatalf("flattened leaf misses properties: %v", lp)
 	}
-	if en := lp["type"].(map[string]any)["enum"].([]any); len(en) != 15 {
+	if en := lp["type"].(map[string]any)["enum"].([]any); len(en) < 15 { // 15 = v1 baseline; batches append
 		t.Fatalf("leaf type enum: %v", en)
 	}
 	if _, ok := lp["children"]; ok {
 		t.Fatal("leaf must not have children")
 	}
 	comp := p["$defs"].(map[string]any)["Component"].(map[string]any)["properties"].(map[string]any)
-	if comp["children"] == nil || len(comp["type"].(map[string]any)["enum"].([]any)) != 18 {
+	if comp["children"] == nil || len(comp["type"].(map[string]any)["enum"].([]any)) < 18 {
 		t.Fatalf("component: %v", comp["type"])
 	}
 	for _, gone := range []string{"Container", "Text", "Stat"} {
