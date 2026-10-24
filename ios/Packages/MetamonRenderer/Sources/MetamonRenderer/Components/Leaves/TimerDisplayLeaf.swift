@@ -39,9 +39,8 @@ struct TimerDisplayLeaf: View {
             }
             .controlSize(.regular)
         }
-        .padding(16)
         .frame(maxWidth: .infinity)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        .renderCard()
         .onReceive(tick) { now in
             guard running, let startedAt else { return }
             elapsed = base + Int(now.timeIntervalSince(startedAt))

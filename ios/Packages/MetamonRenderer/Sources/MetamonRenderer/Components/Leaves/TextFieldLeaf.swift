@@ -11,7 +11,8 @@ struct TextFieldLeaf: View {
             LabeledInput(label: c.label) {
                 TextField(c.placeholder ?? "", text: form.string(field), axis: c.multiline == true ? .vertical : .horizontal)
                     .lineLimit(c.multiline == true ? 3 ... 8 : 1 ... 1)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
+                    .renderInputChrome()
             }
         } else {
             NeedsForm(c: c)
