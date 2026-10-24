@@ -20,19 +20,19 @@ struct SettlementLeaf: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: RenderTheme.Spacing.sm) {
                 Image(systemName: "arrow.left.arrow.right.circle.fill").foregroundStyle(.tint).accessibilityHidden(true)
-                Text(c.title ?? "精算").font(RenderTheme.Fonts.cardTitle)
+                Text(c.title ?? L("精算")).font(RenderTheme.Fonts.cardTitle)
             }
             .padding(.horizontal, RenderTheme.Spacing.md)
             .padding(.vertical, RenderTheme.Spacing.row)
             .accessibilityAddTraits(.isHeader)
             Hairline()
             if records.isEmpty {
-                EmptyPlaceholder(icon: "person.3", emptyText: "メンバーがいません", state: rt.emptyState(for: entityId)) {
+                EmptyPlaceholder(icon: "person.3", emptyText: L("メンバーがいません"), state: rt.emptyState(for: entityId)) {
                     Task { await rt.load(entities: [entityId], force: true) }
                 }
                 .padding(RenderTheme.Spacing.md)
             } else if transfers.isEmpty {
-                Label("精算は不要です", systemImage: "checkmark.circle")
+                Label(L("精算は不要です"), systemImage: "checkmark.circle")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(RenderTheme.Spacing.md)
@@ -66,6 +66,6 @@ private struct TransferRow: View {
         .padding(.horizontal, RenderTheme.Spacing.md)
         .padding(.vertical, RenderTheme.Spacing.row)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(transfer.from) から \(transfer.to) へ \(FieldCoding.currency(transfer.amount))")
+        .accessibilityLabel(L("\(transfer.from) から \(transfer.to) へ \(FieldCoding.currency(transfer.amount))"))
     }
 }

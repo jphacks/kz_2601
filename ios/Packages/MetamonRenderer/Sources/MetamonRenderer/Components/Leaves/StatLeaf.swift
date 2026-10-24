@@ -45,7 +45,7 @@ struct StatLeaf: View {
         .renderCard(padding: compact ? RenderTheme.Spacing.sm : RenderTheme.Spacing.md, wash: true)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(c.label ?? "")
-        .accessibilityValue(unavailable ? "取得できませんでした" : formatted)
+        .accessibilityValue(unavailable ? L("取得できませんでした") : formatted)
     }
 
     /// 数値 1 段分(ViewThatFits の候補)。幅は minimumScaleFactor で縮める
@@ -78,7 +78,7 @@ struct StatLeaf: View {
         let unavailable = rows.isEmpty && rt.emptyState(for: entityId) == .unavailable
         // 初回ロード中は 0 を見せず placeholder(起動直後に「¥0 → ¥480」と跳ねるのを防ぐ)
         let isLoading = rt.loading.contains(entityId) && rt.records(for: entityId).isEmpty
-        let formatted = isLoading ? "0000" : unavailable ? EmptyPlaceholder.unavailableValue : Aggregator.format(value, as: format, unit: c.aggregate == "count" ? "件" : unit)
+        let formatted = isLoading ? "0000" : unavailable ? EmptyPlaceholder.unavailableValue : Aggregator.format(value, as: format, unit: c.aggregate == "count" ? L("件") : unit)
         return (formatted, isLoading, unavailable)
     }
 

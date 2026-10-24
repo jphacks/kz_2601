@@ -78,6 +78,14 @@ struct VoiceInputView: View {
             }
             #endif
         }
+        #if DEBUG
+        .task {
+            // ヘッドレス E2E 用: `METAMON_AUTO_SETTINGS=1` で起動 2 秒後に設定シートを開く(言語切替の確認・#44)
+            guard ProcessInfo.processInfo.environment["METAMON_AUTO_SETTINGS"] == "1" else { return }
+            try? await Task.sleep(for: .seconds(2))
+            showSettings = true
+        }
+        #endif
     }
 
     // MARK: - Sections
@@ -289,10 +297,10 @@ struct VoiceInputView: View {
 
     private var statusText: String {
         switch phase {
-        case .idle: return transcriber.isReady ? "タップして話す" : "音声モデルを準備中…"
-        case .listening: return "聞いています… もう一度タップで終了"
-        case .transcribing: return "文字起こし中…"
-        case .thinking: return rt.isChatting ? ClarifyCopy.thinking : "アプリを考えています…"
+        case .idle: return transcriber.isReady ? L10n.tr("タップして話す") : L10n.tr("音声モデルを準備中…")
+        case .listening: return L10n.tr("聞いています… もう一度タップで終了")
+        case .transcribing: return L10n.tr("文字起こし中…")
+        case .thinking: return rt.isChatting ? ClarifyCopy.thinking : L10n.tr("アプリを考えています…")
         }
     }
 
@@ -308,7 +316,7 @@ struct VoiceInputView: View {
                 phase = .listening
             } catch {
                 SpeechReader.shared.recordingFinished()
-                rt.toast = error.localizedDescription
+                rt.toast = ErrorCopy.message(for: error)
             }
         case .listening:
             phase = .transcribing
@@ -318,17 +326,17 @@ struct VoiceInputView: View {
                 text = try await transcriber.stopAndTranscribe()
             } catch let failure as TranscriberFailure {
                 // 短すぎ / 無音 / マイク未入力 / セッション失敗。理由はそのまま日本語で出る
-                rt.toast = failure.localizedDescription
+                rt.toast = ErrorCopy.transcriberFailure(failure)
                 phase = .idle
                 return
             } catch {
-                rt.toast = "文字起こしに失敗しました: \(error.localizedDescription)"
+                rt.toast = L10n.tr("文字起こしに失敗しました: \(error.localizedDescription)")
                 phase = .idle
                 return
             }
             guard !text.isEmpty else {
-                let detail = transcriber.lastDiagnostics.map { "(\($0.summary))" } ?? ""
-                rt.toast = "音声を聞き取れませんでした\(detail)。もう一度はっきり話してください"
+                let detail = transcriber.lastDiagnostics.map { "(\(ErrorCopy.diagnosticsSummary($0)))" } ?? ""
+                rt.toast = L10n.tr("音声を聞き取れませんでした\(detail)。もう一度はっきり話してください")
                 phase = .idle
                 return
             }

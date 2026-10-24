@@ -1,0 +1,74 @@
+{
+  "sourceLanguage": "ja",
+  "strings": {
+    "Tailor It でアプリを作るとここに数字が出ます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make an app in Tailor It and its numbers show up here"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailor It でアプリを作るとここに数字が出ます"
+          }
+        }
+      }
+    },
+    "Tailor It の数字": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailor It Numbers"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailor It の数字"
+          }
+        }
+      }
+    },
+    "「%@」に集計(stat)の部品がありません": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” has no stat component"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」に集計(stat)の部品がありません"
+          }
+        }
+      }
+    },
+    "作ったアプリの集計(今月の支出など)をホーム画面に表示します。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows totals from your app (like this month's spending) on the Home Screen."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作ったアプリの集計(今月の支出など)をホーム画面に表示します。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

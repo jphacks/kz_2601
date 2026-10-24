@@ -19,7 +19,7 @@ public struct DSLView: View {
         } else if let build = registry.builder(for: component.rawType) {
             build(component, ctx)
         } else {
-            UnsupportedComponent(label: "未対応: \(component.rawType)")
+            UnsupportedComponent(label: L("未対応: \(component.rawType)"))
         }
     }
 }

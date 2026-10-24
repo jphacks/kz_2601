@@ -16,7 +16,7 @@ struct OpenUrlButtonLeaf: View {
                     .frame(maxWidth: c.style == "plain" ? nil : .infinity)
             })
         } else {
-            UnsupportedComponent(label: "openUrlButton: url は https か line/slack/discord/tel/mailto/maps のみ")
+            UnsupportedComponent(label: L("openUrlButton: url は https か line/slack/discord/tel/mailto/maps のみ"))
         }
     }
 

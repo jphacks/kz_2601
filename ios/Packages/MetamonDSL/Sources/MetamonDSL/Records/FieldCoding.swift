@@ -86,6 +86,7 @@ public enum FieldCoding {
         let f = NumberFormatter()
         f.numberStyle = .decimal
         f.maximumFractionDigits = 0
+        // DSL の currency は円前提(金額は円の整数)なので、英語 UI でも ¥ 表記のまま(桁区切りだけ Locale に従う・#44)
         // 負は「-¥500」(「¥-500」にしない・割り勘の残高など)
         let body = "¥" + (f.string(from: NSNumber(value: Swift.abs(n))) ?? "0")
         return n < 0 && n.rounded() != 0 ? "-" + body : body

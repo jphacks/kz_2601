@@ -636,3 +636,14 @@ HealthKit を足す時の手順(Apple アカウント操作が要るので未着
 2. `xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で App ID に HealthKit が付く(有料 Program 必須)。付かなければ Apple Developer > Identifiers > `jp.kz2601.metamon` > Capabilities で HealthKit にチェック → プロファイル再生成。
 3. 部品は DSL に `healthField`(歩数/体重の読み取り)を足す案(schema・ai・カタログの変更が要るので別 Issue)。歩数だけなら既存の `NSMotionUsageDescription`(CoreMotion の歩数計)で capability 無しに出せる。
 
+## 16. 多言語対応(ja / en・Issue #44 / #45 の iOS 側)
+
+- **String Catalog**: 本体 `Metamon/Resources/Localizable.xcstrings`、ウィジェット `MetamonWidget/Localizable.xcstrings`、Renderer `Packages/MetamonRenderer/Sources/MetamonRenderer/Resources/Localizable.xcstrings`(`defaultLocalization: "ja"` + `Bundle.module`)。キーは**日本語のソース文字列**(開発言語 ja)。ja も明示して `ja.lproj` を出す(英語端末で「日本語」を選んだ時の解決用)。
+- **単一ソース**: `LanguagePreference.shared`(Renderer・`@Observable`)。`setting`(system / ja / en)は UserDefaults `metamon.appLanguage`。`code` は "ja" | "en"、`locale` は書式用。
+- **切替は即時**: ルートで `.environment(\.locale, LanguagePreference.shared.locale)` を注入 → `Text("…")` リテラルはその Locale で引き直される。`String` を返す文言は本体 `L10n.tr("…")` / Renderer `L("…")`(lproj を直接引く)。body 内で呼ぶので Observation で再描画される。`static let` の文言は `static var` にする(起動時の言語で固定されないように)。
+- **書くときのルール**: SwiftUI に直接渡すリテラル(`Text` / `Button` / `Label` / `Section` / `accessibilityLabel` 等)はそのまま。三項演算子・変数・`String` 返しは `L10n.tr`。Renderer 内は全部 `L()`(リテラルは Bundle.main を引いてしまうため)。新しい文言は xcstrings に en を追加(キーの補間は `%@` / `%lld`、補間ありのキーでは `%` を `%%`)。
+- **端末の AppleLanguages は書き換えない**。権限ダイアログ・システム UI・ウィジェット(別プロセス)は端末の言語のまま。
+- **生成の locale(#45)**: 設定で言語を明示 → generate / chat に `locale` を送る。「自動」は送らない(backend が発話の文字種で判定)。WhisperKit の `language` は `LanguagePreference.code`(録音ごとに読む)。
+- **翻訳しないもの**: DSL 内の文言(AI が locale に合わせて生成)、Services のログ、FieldIcon のキーワード、音声意図判定の語彙。通貨は DSL の `currency` が円前提なので英語 UI でも `¥`。
+- 確認: `-metamon.appLanguage en`(起動引数で UserDefaults を上書き)/ `-AppleLanguages "(en)"`、設定シートは `METAMON_AUTO_SETTINGS=1`。
+

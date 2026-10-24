@@ -1,5 +1,6 @@
 import SwiftUI
 import MetamonServices
+import MetamonRenderer
 
 /// 新規作成の前に質問を挟むかの設定(#75)。既定 ON。`METAMON_CLARIFY=0/1` があれば UserDefaults より優先(E2E・デモ端末用)。
 enum ClarifySettings {
@@ -24,6 +25,13 @@ enum ClarifySettings {
 /// - 「このまま作る」は go-ahead 語を送って backend の shortcut ready に任せる(失敗してもこれまでの発話で生成する)
 /// - edit(生成後の改変)は対話を挟まない
 extension AppRuntime {
+    /// generate / chat に送る `locale`(#45)。設定で言語を明示したらそれ(UI と生成アプリの言語を揃える)、
+    /// 「自動」は nil = サーバーが発話の文字種から判定(日本語 UI でも英語で話せば英語のアプリになる)。
+    static var generationLocale: String? {
+        let pref = LanguagePreference.shared
+        return pref.setting == .system ? nil : pref.code
+    }
+
     /// 対話中か(吹き出しが 1 つ以上)。
     var isChatting: Bool { !chatBubbles.isEmpty }
 
@@ -122,7 +130,7 @@ extension AppRuntime {
             if errorCard?.origin == .chat { errorCard = nil }
         }
         do {
-            let turn = try await services.ai.chat(appId: appId, messages: history, locale: nil)
+            let turn = try await services.ai.chat(appId: appId, messages: history, locale: AppRuntime.generationLocale)
             guard epoch == chatEpoch else { return nil } // 待っている間に「最初から」/ 切替された
             print("[Metamon] chat: turn=\(turn.turn) kind=\(turn.kind.rawValue) source=\(turn.source ?? "-") text=\(turn.text)")
             withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
@@ -182,13 +190,13 @@ extension AppRuntime {
 /// 対話まわりの文言(`Greeting` / `ErrorCopy` と同じく 1 か所に)。
 enum ClarifyCopy {
     /// 「このまま作る」で送る go-ahead 語(backend `buildNowPhrases` の「このまま作って」に一致)
-    static let buildNowUtterance = "このまま作って"
-    static let buildNowButton = "このまま作る"
-    static let buildButton = "この内容で作る"
-    static let restart = "最初から"
-    static let thinking = "考えています…"
-    static let readyTitle = "この内容で作ります"
-    static let replyPlaceholder = "答えを文字で入力"
-    static let settingTitle = "作る前に質問する"
-    static let settingFooter = "ON にすると、新しいアプリを作る前に AI が 1〜3 個だけ質問します。「このまま作る」でいつでも飛ばせます。作ったアプリの変更は質問なしですぐ反映します。"
+    static var buildNowUtterance: String { L10n.tr("このまま作って") }
+    static var buildNowButton: String { L10n.tr("このまま作る") }
+    static var buildButton: String { L10n.tr("この内容で作る") }
+    static var restart: String { L10n.tr("最初から") }
+    static var thinking: String { L10n.tr("考えています…") }
+    static var readyTitle: String { L10n.tr("この内容で作ります") }
+    static var replyPlaceholder: String { L10n.tr("答えを文字で入力") }
+    static var settingTitle: String { L10n.tr("作る前に質問する") }
+    static var settingFooter: String { L10n.tr("ON にすると、新しいアプリを作る前に AI が 1〜3 個だけ質問します。「このまま作る」でいつでも飛ばせます。作ったアプリの変更は質問なしですぐ反映します。") }
 }

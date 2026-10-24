@@ -44,7 +44,7 @@ struct FormSaveBar: ViewModifier {
                 case .done:
                     Image(systemName: "checkmark.circle.fill")
                         .transition(.scale.combined(with: .opacity))
-                    Text("保存しました")
+                    Text(L("保存しました"))
                 }
             }
             .frame(maxWidth: .infinity)
