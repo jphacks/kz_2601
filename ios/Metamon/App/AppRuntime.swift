@@ -678,6 +678,19 @@ final class AppRuntime: DSLRuntime {
         }
     }
 
+    /// type=ref の options(初期の選択肢・#194)を、参照先 entity がサーバーでも空の時に端末ごと一度だけレコードにする。
+    private func seedRefOptions(_ entity: String, appId: String) async {
+        guard let tf = dsl.entity(entity)?.displayTitleField else { return }
+        let names = dsl.entities.flatMap(\.fields).filter { $0.type == .ref && $0.refEntity == entity }.flatMap { $0.options ?? [] }
+        let key = "refSeed.\(appId).\(entity)"
+        guard !names.isEmpty, !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        var seen = Set<String>()
+        for name in names where seen.insert(name).inserted {
+            records[entity] = await recordSync.save(appId: appId, entity: entity, recordId: nil, data: [tf: .string(name)])
+        }
+    }
+
     /// ローカル先出し → サーバー全件で置換 → UI 更新。サーバーに届かなければローカル表示のまま(通信断は toast しない)。
     func refresh(_ entity: String) async {
         let appId = document.appId
@@ -695,6 +708,7 @@ final class AppRuntime: DSLRuntime {
             guard document.appId == appId else { return }
             records[entity] = fresh
             failed.remove(entity)
+            if fresh.isEmpty { await seedRefOptions(entity, appId: appId) }
             print("[Metamon] records loaded: entity=\(entity) count=\(fresh.count)")
             WidgetSnapshotWriter.write(dsl: dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         } catch {
