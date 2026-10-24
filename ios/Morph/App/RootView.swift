@@ -1,61 +1,57 @@
 import SwiftUI
 
-/// DSL の navigation 定義から Tab / Stack を組み、モーダル・音声シート・モーフ中オーバーレイを重ねる。
+/// `initialScreen` を根にした NavigationStack と、モーダル・音声シート・確認ダイアログ・モーフ中オーバーレイ。
 struct RootView: View {
     @Environment(AppRuntime.self) private var rt
 
     var body: some View {
         @Bindable var rt = rt
         ZStack {
-            navigationRoot
-                .id(rt.document.version) // version が変わったら丸ごと作り直して transition を出す
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.94).combined(with: .opacity),
-                    removal: .opacity
-                ))
+            NavigationStack(path: rt.pathBinding("main")) {
+                ScreenView(route: Route(screen: rt.dsl.initialScreen))
+                    .navigationDestination(for: Route.self) { ScreenView(route: $0) }
+            }
+            .id(rt.document.version) // version が変わったら丸ごと作り直して transition を出す
+            .transition(.asymmetric(
+                insertion: .scale(scale: 0.94).combined(with: .opacity),
+                removal: .opacity
+            ))
 
-            if !rt.document.isVoiceOnly {
+            if rt.dsl.app.voiceEntry == .floating {
                 voiceFab
             }
             if rt.isMorphing {
                 morphingOverlay
             }
         }
-        .tint(Color(hex: rt.document.theme?.accent) ?? .accentColor)
+        .tint(Color(hex: rt.dsl.app.theme?.primaryColor) ?? .accentColor)
+        .preferredColorScheme(colorScheme)
         .sheet(item: $rt.sheet) { route in
-            NavigationStack { ScreenView(route: route) }
+            NavigationStack(path: rt.pathBinding("sheet")) {
+                ScreenView(route: route)
+                    .navigationDestination(for: Route.self) { ScreenView(route: $0) }
+            }
         }
         .fullScreenCover(item: $rt.fullScreen) { route in
-            NavigationStack { ScreenView(route: route) }
+            NavigationStack(path: rt.pathBinding("full")) {
+                ScreenView(route: route)
+                    .navigationDestination(for: Route.self) { ScreenView(route: $0) }
+            }
         }
         .sheet(isPresented: $rt.showVoiceSheet) {
             VoiceInputView(prompt: "どう変えたいですか？")
                 .presentationDetents([.medium, .large])
         }
+        .alert(item: $rt.confirm) { confirm in
+            Alert(title: Text(confirm.message),
+                  primaryButton: .destructive(Text("実行")) { Task { await confirm.perform() } },
+                  secondaryButton: .cancel(Text("キャンセル")))
+        }
         .overlay(alignment: .bottom) { toast }
     }
 
-    @ViewBuilder
-    private var navigationRoot: some View {
-        switch rt.document.navigation.type {
-        case .tab:
-            @Bindable var rt = rt
-            TabView(selection: $rt.selectedTab) {
-                ForEach(rt.document.navigation.tabs) { tab in
-                    NavigationStack(path: rt.pathBinding(tab.id)) {
-                        ScreenView(route: Route(screen: tab.screen))
-                            .navigationDestination(for: Route.self) { ScreenView(route: $0) }
-                    }
-                    .tabItem { Label(tab.title, systemImage: tab.icon ?? "square") }
-                    .tag(tab.id)
-                }
-            }
-        case .stack:
-            NavigationStack(path: rt.pathBinding("main")) {
-                ScreenView(route: Route(screen: rt.document.rootScreenId))
-                    .navigationDestination(for: Route.self) { ScreenView(route: $0) }
-            }
-        }
+    private var colorScheme: ColorScheme? {
+        switch rt.dsl.app.theme?.mode { case "light": .light; case "dark": .dark; default: nil }
     }
 
     private var voiceFab: some View {
@@ -72,7 +68,7 @@ struct RootView: View {
                         .shadow(radius: 8, y: 4)
                 }
                 .padding(.trailing, 20)
-                .padding(.bottom, rt.document.navigation.type == .tab ? 70 : 24)
+                .padding(.bottom, 24)
             }
         }
     }

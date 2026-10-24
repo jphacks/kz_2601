@@ -1,59 +1,89 @@
 import XCTest
 @testable import Morph
 
+/// docs/dsl/examples/*.json(= backend の CI でも検証される正典 4 本)が iOS でもデコードできることを保証する。
 final class DSLDecodingTests: XCTestCase {
-    func testBundledSamplesDecode() throws {
-        let initial = try AppDocument.bundled("app_initial")
-        XCTAssertTrue(initial.isVoiceOnly)
-
-        let kakeibo = try AppDocument.bundled("app_kakeibo")
-        XCTAssertEqual(kakeibo.navigation.type, .tab)
-        XCTAssertEqual(kakeibo.navigation.tabs.count, 2)
-        XCTAssertNotNil(kakeibo.screens["home"])
-        XCTAssertFalse(kakeibo.isVoiceOnly)
+    private func load(_ name: String) throws -> AppDSL {
+        try AppDSL.bundled(name, bundle: Bundle.main)
     }
 
-    func testUnknownComponentIsIgnoredNotFatal() throws {
-        let json = #"{"type":"vstack","children":[{"type":"text","text":"a"},{"type":"hologram"},"garbage",{"type":"text"}]}"#
-        let node = try JSONDecoder().decode(Node.self, from: Data(json.utf8))
-        guard case .stack(let props) = node.component else { return XCTFail("expected stack") }
-        // text / unknown / (garbage は skip) / invalid text(props不足)
-        XCTAssertEqual(props.children.count, 3)
-        guard case .unknown(let type) = props.children[1].component else { return XCTFail("expected unknown") }
-        XCTAssertEqual(type, "hologram")
-        guard case .invalid(let badType, _) = props.children[2].component else { return XCTFail("expected invalid") }
-        XCTAssertEqual(badType, "text")
+    func testAllExamplesDecode() throws {
+        for name in ["initial", "kakeibo", "training", "walk"] {
+            let dsl = try load(name)
+            XCTAssertEqual(dsl.schemaVersion, 1, name)
+            XCTAssertNotNil(dsl.screen(dsl.initialScreen), "\(name): initialScreen must exist")
+            for s in dsl.screens {
+                for c in s.allComponents {
+                    XCTAssertNotEqual(c.type, .unknown, "\(name)/\(s.id): unknown component \(c.rawType)")
+                }
+                for tb in s.toolbar {
+                    XCTAssertNotEqual(tb.action.type, .unknown, "\(name)/\(s.id): unknown toolbar action")
+                }
+            }
+        }
     }
 
-    func testUnknownActionAndLenientEnum() throws {
-        let json = #"{"type":"button","label":"x","style":"neon","action":{"type":"teleport"}}"#
-        let node = try JSONDecoder().decode(Node.self, from: Data(json.utf8))
-        guard case .button(let props) = node.component else { return XCTFail("expected button") }
-        XCTAssertEqual(props.style, .primary) // 未知 style は fallback
-        guard case .unknown(let type)? = props.action else { return XCTFail("expected unknown action") }
-        XCTAssertEqual(type, "teleport")
+    func testInitialIsVoiceOnly() throws {
+        let dsl = try load("initial")
+        XCTAssertTrue(dsl.isVoiceOnly)
+        XCTAssertEqual(dsl.screens.count, 1)
+        XCTAssertEqual(dsl.screens[0].allComponents.filter { $0.type == .voiceInput }.count, 1)
+        XCTAssertTrue(dsl.screens[0].isVoiceScreen)
     }
 
-    func testInterpolation() {
-        let state: JSONValue = ["todos": [["title": "a"], ["title": "b"]], "name": "Kota"]
-        let scope = Interpolator.Scope(state: state, user: .null, ctx: RenderContext(params: ["id": "42"]))
-
-        XCTAssertEqual(Interpolator.resolve("{{state.todos.count}}", in: scope), .number(2))
-        XCTAssertEqual(Interpolator.resolve("{{todos.1.title}}", in: scope), .string("b"))
-        XCTAssertEqual(Interpolator.resolve("こんにちは {{state.name}} さん ({{params.id}})", in: scope), .string("こんにちは Kota さん (42)"))
-        XCTAssertEqual(Interpolator.resolve("plain", in: scope), .string("plain"))
-        XCTAssertEqual(Interpolator.resolve("{{missing}}", in: scope), .null)
-
-        let itemScope = Interpolator.Scope(state: state, user: .null, ctx: RenderContext().with(item: ["id": "x"], index: 3))
-        XCTAssertEqual(Interpolator.resolve("{{item.id}}-{{index}}", in: itemScope), .string("x-3"))
+    func testKakeiboStructure() throws {
+        let dsl = try load("kakeibo")
+        XCTAssertEqual(dsl.app.voiceEntry, .floating)
+        XCTAssertEqual(dsl.entities.first?.id, "expense")
+        XCTAssertEqual(dsl.entities.first?.field("amount")?.type, .currency)
+        let form = try XCTUnwrap(dsl.screen("expense_form"))
+        XCTAssertEqual(form.entity, "expense")
+        XCTAssertEqual(form.toolbar.first?.action.type, .saveRecord)
+        XCTAssertTrue(form.allComponents.contains { $0.type == .datePicker })
+        XCTAssertEqual(form.referencedEntities, ["expense"])
+        let home = try XCTUnwrap(dsl.screen("home"))
+        XCTAssertEqual(home.toolbar.first?.action.presentation, .sheet)
+        XCTAssertTrue(home.allComponents.contains { $0.type == .list && $0.onItemTap?.type == .navigate })
     }
 
-    func testJSONValueSetPath() {
-        var v: JSONValue = .object([:])
-        v.set(path: "draft.title", to: "hello")
-        v.set(path: "list.1", to: 5)
-        XCTAssertEqual(v[path: "draft.title"], "hello")
-        XCTAssertEqual(v[path: "list.1"], 5)
-        XCTAssertEqual(v[path: "list.0"], .null)
+    func testTrainingAndWalkNativeFeatures() throws {
+        let training = try load("training")
+        XCTAssertEqual(training.app.notifications.first?.repeat, .daily)
+        XCTAssertEqual(training.app.notifications.first?.time, "08:00")
+        let walk = try load("walk")
+        let form = try XCTUnwrap(walk.screen("memo_form"))
+        XCTAssertTrue(form.allComponents.contains { $0.type == .photoField && $0.source == "camera" })
+        XCTAssertTrue(form.allComponents.contains { $0.action?.type == .scheduleNotification && $0.action?.notification?.repeat == .once })
+    }
+
+    func testUnknownComponentAndEnumAreLenient() throws {
+        let json = #"{"id":"s","title":"t","components":[{"type":"vstack","children":[{"type":"text","text":"a","style":"neon"},{"type":"hologram"},"garbage"]},{"type":"button","label":"x","action":{"type":"teleport"}}]}"#
+        let screen = try JSONDecoder().decode(Screen.self, from: Data(json.utf8))
+        XCTAssertEqual(screen.components.count, 2)
+        XCTAssertEqual(screen.components[0].children.count, 2) // "garbage" は skip
+        XCTAssertEqual(screen.components[0].children[1].type, .unknown)
+        XCTAssertEqual(screen.components[0].children[1].rawType, "hologram")
+        XCTAssertEqual(screen.components[1].action?.type, .unknown)
+        XCTAssertEqual(screen.components[1].action?.rawType, "teleport")
+    }
+
+    func testEnvelopeDecodes() throws {
+        let json = #"{"appId":"a1","version":7,"dsl":{"schemaVersion":1,"app":{"name":"x","voiceEntry":"none"},"initialScreen":"home","entities":[],"screens":[{"id":"home","title":"h","components":[]}]}}"#
+        let doc = try AppDocument.decode(Data(json.utf8))
+        XCTAssertEqual(doc.version, 7)
+        XCTAssertEqual(doc.appId, "a1")
+        XCTAssertEqual(doc.dsl.app.voiceEntry, .none)
+    }
+
+    func testAggregator() {
+        let records = [
+            Record(id: "1", data: ["amount": 100, "category": "食費", "date": .string(FieldCoding.dateFormatter.string(from: .now))]),
+            Record(id: "2", data: ["amount": 50, "category": "交通", "date": "2000-01-01"]),
+        ]
+        XCTAssertEqual(Aggregator.aggregate("sum", field: "amount", over: records), 150)
+        XCTAssertEqual(Aggregator.aggregate("count", field: nil, over: records), 2)
+        let filter = Filter(field: "date", op: "thisMonth", value: nil)
+        XCTAssertEqual(Aggregator.apply(filter, entity: nil, to: records).count, 1)
+        XCTAssertEqual(Aggregator.format(1234, as: "currency"), "¥1,234")
     }
 }

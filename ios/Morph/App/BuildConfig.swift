@@ -24,12 +24,21 @@ enum BuildConfig {
 }
 
 extension Services {
+    /// デモ3本(docs/dsl/examples)の entity id に合わせた seed データ。
     @MainActor
     static func mock() -> Services {
-        let seed: [String: [JSONValue]] = [
+        let today = FieldCoding.dateFormatter.string(from: .now)
+        let now = ISO8601DateFormatter().string(from: .now)
+        let seed: [String: [Record]] = [
             "expense": [
-                ["id": "1", "title": "ランチ", "amount": 980, "category": "food", "date": "2026-10-24"],
-                ["id": "2", "title": "電車", "amount": 420, "category": "transport", "date": "2026-10-24"],
+                Record(id: "1", data: ["amount": 980, "category": "食費", "memo": "ランチ", "date": .string(today)], createdAt: now),
+                Record(id: "2", data: ["amount": 420, "category": "交通", "memo": "電車", "date": .string(today)], createdAt: now),
+            ],
+            "workout": [
+                Record(id: "1", data: ["exercise": "スクワット", "reps": 20, "weight": 40, "done": true, "date": .string(now)], createdAt: now),
+            ],
+            "memo": [
+                Record(id: "1", data: ["note": "きれいな紅葉", "date": .string(now)], createdAt: now),
             ],
         ]
         return Services(
@@ -37,7 +46,6 @@ extension Services {
             ai: MockAIClient(),
             sync: NoopDocumentSync(),
             token: NoAuthTokenProvider(),
-            native: UIKitNativeBridge(),
             transcriber: MockTranscriber(),
             isLive: false
         )
@@ -53,7 +61,6 @@ extension Services {
             ai: HTTPAIClient(baseURL: aiURL, token: token),
             sync: PollingDocumentSync(client: appConfig),
             token: token,
-            native: UIKitNativeBridge(),
             transcriber: MockTranscriber(),
             isLive: true
         )

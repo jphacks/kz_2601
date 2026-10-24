@@ -2,54 +2,55 @@ import Foundation
 
 /// インメモリの appconfig。サーバー無しで DSL レンダラーを動かすためのもの。
 actor InMemoryAppConfigClient: AppConfigClient {
-    private var tables: [String: [JSONValue]]
+    private var tables: [String: [Record]]
 
-    init(seed: [String: [JSONValue]] = [:]) { tables = seed }
+    init(seed: [String: [Record]] = [:]) { tables = seed }
 
     func fetchDocument(appId: String) async throws -> AppDocument {
-        try AppDocument.bundled("app_initial")
+        try AppDocument.bundled("initial")
     }
 
-    func list(appId: String, entity: String, query: JSONValue?) async throws -> [JSONValue] {
+    func list(appId: String, entity: String) async throws -> [Record] {
         tables[entity] ?? []
     }
 
-    func create(appId: String, entity: String, data: JSONValue) async throws -> JSONValue {
-        var row = data.objectValue ?? [:]
-        row["id"] = .string(UUID().uuidString)
-        row["createdAt"] = .string(ISO8601DateFormatter().string(from: .now))
-        let value = JSONValue.object(row)
-        tables[entity, default: []].append(value)
-        return value
+    func create(appId: String, entity: String, data: [String: JSONValue]) async throws -> Record {
+        let now = ISO8601DateFormatter().string(from: .now)
+        let record = Record(id: UUID().uuidString, data: data, createdAt: now, updatedAt: now)
+        tables[entity, default: []].append(record)
+        return record
     }
 
-    func update(appId: String, entity: String, id: String, data: JSONValue) async throws -> JSONValue {
-        var rows = tables[entity] ?? []
-        guard let i = rows.firstIndex(where: { $0[path: "id"]?.stringValue == id }) else {
+    func update(appId: String, entity: String, id: String, data: [String: JSONValue]) async throws -> Record {
+        guard let i = tables[entity]?.firstIndex(where: { $0.id == id }) else {
             throw APIError.http(status: 404, body: "\(entity)/\(id) not found")
         }
-        var row = rows[i].objectValue ?? [:]
-        for (k, v) in data.objectValue ?? [:] { row[k] = v }
-        rows[i] = .object(row)
-        tables[entity] = rows
-        return rows[i]
+        var r = tables[entity]![i]
+        for (k, v) in data { r.data[k] = v }
+        r.updatedAt = ISO8601DateFormatter().string(from: .now)
+        tables[entity]![i] = r
+        return r
     }
 
     func delete(appId: String, entity: String, id: String) async throws {
-        tables[entity]?.removeAll { $0[path: "id"]?.stringValue == id }
+        tables[entity]?.removeAll { $0.id == id }
     }
 }
 
-/// 発話内容に関わらず、バンドルされたサンプル DSL を返す ai モック。
+/// 発話のキーワードで同梱サンプル DSL(docs/dsl/examples)を返す ai モック。
 struct MockAIClient: AIClient {
-    var sampleName = "app_kakeibo"
     var delay: Duration = .seconds(1.2)
+
+    static func sampleName(for transcript: String) -> String {
+        if transcript.contains("トレ") || transcript.contains("筋") || transcript.contains("運動") { return "training" }
+        if transcript.contains("散歩") || transcript.contains("写真") || transcript.contains("場所") { return "walk" }
+        if transcript.contains("最初") || transcript.contains("戻") { return "initial" }
+        return "kakeibo"
+    }
 
     func morph(transcript: String, appId: String, currentVersion: Int) async throws -> AppDocument {
         try await Task.sleep(for: delay)
-        var doc = try AppDocument.bundled(sampleName)
-        doc.version = currentVersion + 1
-        return doc
+        return try AppDocument.bundled(Self.sampleName(for: transcript), version: currentVersion + 1)
     }
 }
 
