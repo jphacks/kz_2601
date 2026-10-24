@@ -682,3 +682,55 @@ HealthKit を足す時の手順(Apple アカウント操作が要るので未着
 ### 17.4 シミュレータでの確認手順(ヘッドレス)
 - `METAMON_E2E_TIMER_START=<部品 id>`(DEBUG)で、表示時に timerDisplay を開始する。例: `METAMON_INITIAL_EXAMPLE=gallery-structure METAMON_AUTO_OPEN=memo_form:sheet METAMON_E2E_TIMER_START=timer` → `xcrun simctl launch <UDID> com.apple.Preferences` で背面化 → 60 秒後に通知 → アプリを起動し直すと 00:00。
 - 同期は `METAMON_E2E_OFFLINE_SECONDS` + `METAMON_AUTO_RECORD` でオフライン記録 → 背面 → 前面で `[Metamon] background(foreground): ...` を確認。
+
+## 18. アプリ内課金「Tailor It Pro」(StoreKit 2・Issue #77 の最小形)
+
+外部アカウント(RevenueCat・App Store Connect)を使わず、**StoreKit 2 + ローカルの StoreKit Configuration** だけで動く形。本番の商品登録は後続。
+
+### 18.1 売るもの・上限
+| 項目 | 値 | 理由 |
+|---|---|---|
+| 商品 | 「Tailor It Pro」月額の自動更新サブスク 1 つ(`jp.kz2601.metamon.pro.monthly`・¥500/月) | 生成ごとにサーバー(ai)側の LLM 費用がかかり続けるので、買い切りより月額が費用構造に合う。¥500 は Issue の想定額に合わせた |
+| 無料 | **新規作成(初期画面からの生成)を 1 日 3 回まで** | 「試せる」回数は残しつつ、費用の大半を占める新規生成だけを数える |
+| 数えないもの | 生成後の改変(「ここを変えて」)・失敗 / キャンセルした生成・元に戻す | 体験の中心(話しかけて直す)を止めない。失敗で枠が減ると不公平 |
+| Pro | 新規作成が無制限 | |
+
+商品 ID・無料回数の正典は `MetamonServices/Purchase/ProProducts.swift`(本番の ID に差し替える時はここと `.storekit` を直す)。
+
+### 18.2 構成
+| 層 | ファイル | 役割 |
+|---|---|---|
+| 判定(純粋関数) | `MetamonServices/Purchase/CreationQuota.swift` | `CreationQuota.decide(used:isPro:limitDisabled:)` → unlimited / allowed(残り) / blocked。`CreationLedger` は端末のローカル日付で 1 日ごとにリセット。保存は `CreationUsageStore`(UserDefaults) |
+| StoreKit 2 | `MetamonServices/Purchase/ProEntitlementStore.swift` | `Product.products(for:)`・`purchase()`・`Transaction.currentEntitlements` で権利を決め直す・`Transaction.updates` を起動時から監視・`AppStore.sync()` で復元。取り消し / 期限切れは無効(`ProEntitlement.isActive`) |
+| 司令塔 | `Metamon/Features/Purchase/ProGate.swift` | 無料枠 + 権利 + 上限シートの表示状態。`admitNewApp()`(枠切れなら上限シートを出して false)/ `recordNewApp()`(成功時だけ数える) |
+| UI | `Features/Purchase/PaywallSheet.swift`・`ProSettingsSection.swift` | 上限シート(説明・価格・購入・復元・閉じる)と設定の「Tailor It Pro」セクション |
+| 入口 | `AppRuntime.generate(_:)` | `dsl.isVoiceOnly`(= 新規作成)の時だけ `admitNewApp()` → 送信 → 成功したら `recordNewApp()`。対話(#75)の「この内容で作る」もここを通る |
+
+### 18.3 回数は端末で数える(サーバー強制は後続)
+- いまは UserDefaults に保存するだけなので、**アプリの削除・端末の時計の変更で回避できる**。ハッカソンの段階では「課金導線の体験」を作ることを優先した。
+- 本番化する時は ai サービス(`POST /v1/generate` の新規作成)側で uid ごとの日次カウンタを持ち、超過は 402 を返す → iOS は 402 を上限シートに繋ぐ。権利はサーバーが App Store Server API(または RevenueCat の webhook)で確認する。
+
+### 18.4 デモ端末で上限に当たらないようにする
+- **DEBUG ビルドは既定で制限なし**(設定の「Tailor It Pro」に DEBUG のみ「回数制限を無効にする(デモ用)」トグル・既定 ON)。Release は既定で制限あり・トグルは出ない。
+- 上限シートを確認したい時は起動時の環境変数 `METAMON_IAP_ENFORCE=1`(トグルに関係なく制限を有効)・`METAMON_IAP_FREE_LIMIT=<n>`(無料回数の上書き)。
+
+### 18.5 StoreKit Configuration(ローカルのテスト購入)
+- `ios/StoreKit/TailorItPro.storekit` を `project.yml` の Scheme(`targets.Metamon.scheme.storeKitConfiguration`)に設定済み。**Xcode で Run(⌘R)するとシミュレータでもテスト購入できる**(Apple ID・App Store Connect 不要・実決済なし)。購入履歴は Xcode の Debug > StoreKit > Manage Transactions で消せる。
+- `xcrun simctl launch` で起動した場合は Scheme の構成が効かないため商品が取れず、上限シートは「価格を取得できませんでした」になる(購入ボタンは押せない)。
+- テスト: 判定の純粋関数は `MetamonServicesTests/PurchaseTests.swift`。購入 → 権利は `ios/MetamonTests/PurchaseFlowTests.swift`(アプリをホストにした `SKTestSession`)。ただし **xcodebuild(CLI)からの実行では SKTestSession が `SKInternalErrorDomain Code=3` で構成を保存できず商品が空になる**(Xcode 26.5 で実測)ため、購入部分は skip する。Xcode の ⌘U で実行して確認する。
+- 試した上で採らなかった方法: パッケージのテストで SKTestSession(ホストアプリが無く商品が空)、アプリ内で StoreKitTest を dlopen(XCTest 構成が無いと `abort`)。
+
+### 18.6 本番化の手順(後続・外部アカウントの操作が要る)
+**App Store Connect(StoreKit 2 のまま)**
+1. Agreements, Tax, and Banking で有料 App 契約・口座・税務を有効化(アカウント保有者)。
+2. App(`jp.kz2601.metamon`)の「サブスクリプション」でグループ「Tailor It Pro」を作り、商品 ID `jp.kz2601.metamon.pro.monthly`・期間 1 か月・価格(¥500 相当)・表示名と説明(日英)・審査用スクリーンショットを登録。
+3. Sandbox テスターを作り、実機の 設定 > App Store > サンドボックスアカウント でサインインしてテスト購入。
+4. 審査提出時はサブスクを App のバージョンに添付。アプリ内に利用規約・プライバシーポリシーへのリンク、上限シートに価格・期間・自動更新の説明(実装済み)が要る。
+5. サーバー強制(18.3)を入れる場合は App Store Server API のキー(.p8)を発行し、ai / appconfig で権利を検証。App Store Server Notifications V2 の URL を設定。
+
+**RevenueCat に移す場合**
+1. RevenueCat でプロジェクトを作り、App Store Connect の App 内課金キー(In-App Purchase Key)と共有シークレットを登録。
+2. Entitlement `pro` を作り、上の商品を Offering に紐付け。
+3. iOS は `ProEntitlementStore` を RevenueCat SDK(`Purchases.configure` + `appUserID` = Firebase uid・`customerInfo.entitlements["pro"]`)の実装に差し替える。`ProGate` / UI はそのまま使える(権利の読み口が `isPro` だけなので)。
+4. サーバー側は RevenueCat の webhook か REST API で uid の権利を確認する。
+5. Issue #77 の「有料 API を使う機能だけ ¥500 の確認カード」(DSL の `requiresPaid`)は、非消耗型の商品を追加し Offering を分けて実装する(未着手)。
