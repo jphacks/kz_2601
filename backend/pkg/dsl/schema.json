@@ -599,6 +599,9 @@
         },
         {
           "$ref": "#/$defs/Settlement"
+        },
+        {
+          "$ref": "#/$defs/AiButton"
         }
       ]
     },
@@ -2815,6 +2818,74 @@
           "$ref": "#/$defs/Expr"
         }
       }
+    },
+    "AiButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "task",
+        "output"
+      ],
+      "properties": {
+        "type": {
+          "const": "aiButton"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string",
+          "description": "ボタン文言(省略時は task から自動: AI で要約 など)。"
+        },
+        "task": {
+          "type": "string",
+          "enum": [
+            "summarize",
+            "classify",
+            "rewrite",
+            "extract",
+            "suggest"
+          ],
+          "description": "summarize=要約 / classify=候補から 1 つ選ぶ / rewrite=言い換え・清書 / extract=要点や値の抜き出し / suggest=一言・アイデアの提案。"
+        },
+        "input": {
+          "type": "string",
+          "description": "AI に渡す screen.entity の field id。省略 = フォームの入力全部(output 以外)。entity と同時に指定しない。"
+        },
+        "entity": {
+          "type": "string",
+          "description": "集計入力: この entity の最近のレコード(limit 件)をまとめて AI に渡す(例: 過去の日記から傾向を一言)。input と同時に指定しない。"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "description": "entity 入力の件数(新しい順・既定 20)。"
+        },
+        "output": {
+          "type": "string",
+          "description": "結果を入れる screen.entity の field id(string/text、classify は enum も可)。フォームのドラフトに入るだけで保存はユーザーが行う。"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "追加の指示テンプレ。{{fieldId}} はフォームの値、{{input}} は入力全体に置換。例: 「{{body}} を 30 字で」。"
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": {
+            "type": "string"
+          },
+          "description": "classify の候補。output が enum field なら省略可(field の options を使う)。"
+        }
+      },
+      "description": "押すとオンデバイス AI(Apple Intelligence / Foundation Models)が走り、フォームの入力を要約・分類・言い換え・抜き出し・提案して output field に入れるボタン。無料・データは端末外に出ない。非対応端末では「この端末では AI を使えません」と無効表示。",
+      "x-usage": "フォーム画面のみ(screen.entity 必須)。発話に「要約して」「分類して」「気分を判定」「タグ付け」「一言で」「言い換えて」「丁寧に」「抜き出して」「提案して」「AI で」がある時に使う。entity に結果用の field(string/text、分類は enum)を足し、その入力欄の直上に 1 行(例 A7:F8)。1 画面 3 個まで。"
     }
   }
 }

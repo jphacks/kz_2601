@@ -126,6 +126,8 @@ type Service struct {
 	// warnings (dsl.Lint). Off by default: warnings are only reported in
 	// Meta.Lint, and the user fixes the app by voice instead (env AI_LINT_RETRY=1).
 	LintRetry bool
+	// Chat is the model setup of the clarify turn (chat.go); zero = defaults.
+	ChatConfig ChatConfig
 
 	conv     *convStore // clarify conversations (chat.go); lazily created
 	convOnce sync.Once
@@ -270,6 +272,11 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 		app, perr := dsl.Parse(raw)
 		if perr == nil {
 			if fixed := addMissingLists(raw, app); len(fixed) != len(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
+			if fixed := fixEnglishUnits(raw, loc); len(fixed) != len(raw) {
 				if fixedApp, err := dsl.Parse(fixed); err == nil {
 					raw, app = fixed, fixedApp
 				}

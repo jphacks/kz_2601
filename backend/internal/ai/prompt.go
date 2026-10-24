@@ -91,7 +91,7 @@ var systemPrompt = strings.TrimSpace(`
   - navigate はどの画面からどの画面へ飛んでもよい(タブの根へ飛べばそのタブに切り替わる)。
 - voiceEntry は書かない(floating が補われる)。編集でも "none" にしない(ユーザーが声でアプリを変え続けられること)。
 - **表示言語**: user ターンの「## 表示言語(locale)」に従う。表示文字列(app.name / app.description、画面タイトル、tab.title、section/chart の title、label、placeholder、emptyText、ボタンやツールバーの label、confirmMessage、entity.name / field.name / enum の options、notifications[].title/body)は **すべてその言語**で書く(ja なら日本語、en なら自然な英語。混在させない)。id / type / enum 値 / area / aggregate / op / repeat / time などの構造は言語に関わらず英数のまま。
-  - en の通貨 unit は "$"(発話で通貨が分かればそれに従う)。
+  - en の詳しい規則は下の「locale en のとき」。
 - app.icon / tab.icon / button.icon は SF Symbols 名。theme.primaryColor は #RRGGBB。
 
 ## 部品カタログ(スキーマから自動生成。type: 必須 / 任意 — 用途。使い方 = レイアウトの定石)
@@ -102,6 +102,14 @@ var systemPrompt = strings.TrimSpace(`
 - 最も近い既存部品で代替する(カレンダー/予定表/タイムライン → 日付 field で sort した list + datePicker、地図 → location field + textField、タイマー/ストップウォッチ → numberField で分や秒を記録、チェックリスト → boolean field + list.item.toggle)。
 - 部品だけでなく**計算・状態・期間・操作**も同じ: 連続日数(ストリーク)・順位番号・一括削除などの一括操作・タイマーの自動切り替え(集中→休憩)のように DSL で表せない要求は、最も近いもので代替する(連続日数 → 直近7日の記録数、順位 → 合計の降順の表、一括削除 → スワイプ削除)。
 - 代替したら一言添える: 編集ターンは summary に、新規作成は app.description の末尾に「カレンダー表示は日付順の一覧で代替しました。」「連続日数は直近7日の記録数で代替しました。」のように「○○は△△で代替しました。」と書く(iOS が読み上げる)。代替が複数なら 1 文ずつ。en なら "Calendar view was replaced with a date-sorted list." のように必ず "replaced with" を使う。
+
+## locale en のとき(#142: 英語の発話でも上の規則はすべて同じ)
+- 上の規則の日本語のキーワードは英語の同じ意味の語でも適用する: "this month" → thisMonth、"today" → today、"this week" → thisWeek、"this year" → thisYear、"last 7 days" / "past week" → 直近7日の filter(gte addDays −6)、"left" / "remaining" / "to go" → 目標 − 合計の stat.value(max …,0)、"per person" → div、"average" → avg、"best" / "record" → max、"in a row" / "streak" → 代替して申告、"split" / "settle up" / "who owes whom" → settlement、"remind me" / "notify" → notifications。**ラベルにこれらの語を書くなら、その filter / 計算を必ず付ける**(ラベルに "(last 7 days)" と書いて filter を付けないのは嘘ラベル)。"Monthly budget" のような設定値の名前は今月の filter と関係ない。
+- 済みの件数("taken today" / "bought" / "done" / "completed")を数える stat は、その boolean の {"field":"<boolean>","op":"eq","value":true} を必ず含める(stat.value の agg の filter に日付の条件と合わせて配列で書く)。
+- **金額**: type currency の field と numberField に unit を書かない(iOS は locale に関わらず "¥1,200" と表示する。"$" を書くと "¥ 15 $" になる)。ラベル・説明文・placeholder にも "$" や "dollars" を書かない("Hourly wage" / "Budget left this month")。発話でドルの金額を言われても数値はそのまま使う(換算しない)。
+- **件数の単位**: stat の aggregate count は iOS が単位 "items" を付ける。物でない数(books / workouts / days / pills / times)は stat.value = {"agg":"count",...} にして、単位はラベルに書く(例 "Books read this year")。
+- list.item の title / subtitle / trailing に boolean field を置かない(iOS が Yes/No を日本語で出す)。チェックは item.toggle で見せる。
+- 文言は自然で短い英語: 画面タイトルと tab.title は Title Case の 1〜2 語("Today" / "History")、ボタンは動詞始まり("Add book" / "Log workout")、emptyText は "No books yet"、confirmMessage は "Delete this book?"。entity.name は単数形の可算名詞("Book" / "Workout" / "Expense"。"Spending" のような不可算名詞にしない)。日本語・全角文字を 1 字も混ぜない。
 
 ## 例 1(locale ja): 発話「家計簿アプリを作って。今月の合計と支出一覧、追加ボタンが欲しい。カテゴリ別の内訳も見たい」→ 出力(この書式・既定値省略で)
 ` + abbreviateExample(fewShotKakeibo) + `
