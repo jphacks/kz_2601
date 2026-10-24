@@ -78,6 +78,19 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `voiceInput` | | `prompt`, `size`(compact/large) | | P0 |
 | `spacer` | | `size`(small/medium/large/flexible) | | P0 |
 | `divider` | | | | P0 |
+| `slider` | `field`(integer/number/currency), `min`, `max` | `label`, `step`(省略で連続・integer は 1) | ○ | P1 |
+| `stepper` | `field`(integer/number/currency) | `label`, `min`, `max`, `step`(既定 1) | ○ | P1 |
+| `textEditor` | `field`(string/text) | `placeholder`, `minLines`(既定 4) | ○ | P1 |
+| `secureField` | `field`(string/text) | `label`, `placeholder` | ○ | P1 |
+| `timePicker` | `field`(string/text → `"HH:mm"` / datetime → RFC3339) | `label` | ○ | P1 |
+| `colorPicker` | `field`(string/text → `"#RRGGBB"`) | `label` | ○ | P1 |
+| `rating` | `field`(integer/number・1〜max) | `label`, `max`(既定 5・1〜10) | ○ | P1 |
+
+入力系バッチの補足:
+- **`segmented` は独立 type にしない**。`picker{style:"segmented"}` がセグメントコントロール(enum field・4 択以下なら既定で segmented)。同じ enum 束縛を 2 type に分けると AI の選択が揺れ、レジストリ/検証も二重になるため。
+- **`timePicker` の保存形式**: `Field.type` に `time` は無い。string/text field なら `"HH:mm"`(`Notification.time` と同じ書式・日付を持たない)、datetime field なら今日の日付付き RFC3339。「毎朝の起床時刻」のように日付が要らないなら string を使う。
+- 数値系(`slider`/`stepper`/`rating`)は integer/currency field では丸めて保存。`min >= max`・`step <= 0`・`rating.max` が 1〜10 の整数でない場合は backend `Validate()` がエラー。
+- 実例: `examples/gallery-input.json`(entity 1 つに上記全部品を area 配置)。
 
 ### 3.2 アクション(9 種)
 
@@ -129,7 +142,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 ## 4. 変更手順(Day2 に部品を足す時)
 
-1. `docs/dsl/dsl.schema.json` を編集(Leaf を足す = `$defs` に object を足し `Leaf.anyOf` と `PatchValue` に追加)。
+1. `docs/dsl/dsl.schema.json` を編集(Leaf を足す = `$defs` に object を足し `Leaf.anyOf` に追加。`PatchValue` は `Component`/`Leaf` 経由なので変更不要)。各 `$defs` に **`description`(用途・いつ選ぶか 1〜2 文)と `x-usage`(area の定石)** を必ず付ける(ai のカタログはここから生成)。並行作業中は `$defs` と `anyOf` の**末尾に 1 行 1 要素**で追記するとマージしやすい。
 2. `cd backend && make schema-sync && go test ./...`(`dsl.go` の `ComponentType` と `validate.go` の per-type 検証も更新)。
 3. iOS: `ios/Packages/MetamonDSL/.../Model/Component.swift` の `ComponentType` に case 追加 + `ios/Packages/MetamonRenderer/.../Components/Leaves/` に View 1 ファイル + `ComponentRegistry.standard` に登録 1 行(`MetamonRendererTests` が schema との一致を検証)。
 4. `examples/*.json` に使用例を足す(backend の `TestExamplesRoundTrip` と iOS の `MetamonDSLTests` が両方で検証)。
