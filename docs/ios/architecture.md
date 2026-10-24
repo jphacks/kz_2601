@@ -418,6 +418,18 @@ DEBUG フック: `METAMON_AUTO_SWITCHER=1`(起動 2.5 秒後に変身一覧を�
 - DEBUG フック: `METAMON_AUTO_SHARE=1`(変身一覧 → 今のアプリのシェアシート)/ `METAMON_AUTO_IMPORT=<token>`(リンクを開いたのと同じ経路。`simctl openurl` は OS の確認ダイアログで止まるため)/ `METAMON_AUTO_DISCOVER=1`(+ `METAMON_AUTO_INSTALL=<公開 id>`)。
 - 注意: 端末ローカルの `DocumentCache` / レコードキャッシュは uid を区別しないので、同じ端末で `METAMON_DEV_UID` を切り替えると前ユーザーのキャッシュが一瞬見える(サーバーは正しく分離)。2 ユーザー検証はアプリを入れ直してから行う。
 
+### リリース申請(#76)(2026-10-24 夜)
+
+| 入口 | 動き | 実装 |
+|---|---|---|
+| 変身一覧の各カード右上「…」メニュー →「単体アプリとしてリリースを申請」 | `ReleaseRequestSheet`: 用途の一言(必須・200 字)と連絡先(任意・100 字)→ `POST /apps/{id}/release-requests` →「受け付けました」+ 今の status。申請中なら開いた時点で「申請済みです」+ status(冪等) | `Features/Share/ReleaseRequestSheet.swift`(シート・`AppCardActions`・`ReleaseStatusBadge`・`ReleaseUI`) |
+| 変身一覧のカード | 申請済みのアプリは「…」の下に小さなバッジ(受付 / 検討中 / リリース予定 / 見送り)。一覧を開くたびに `GET /release-requests` 1 回で全カード分を取る | `AppSwitcherSheet` は overlay を `AppCardActions` に差し替え + `.sheet` / `.task` の 2 行だけ |
+
+- カード右上はシェア直行ボタンから「…」メニュー(「シェア・公開」/「単体アプリとしてリリースを申請」)に変えた。シェアの中身(`ShareAppSheet`)は変更なし。
+- サービスは `ReleaseRequestClient`(`HTTPReleaseRequestClient`)。`Services.releaseRequests` は sharing と同じく live の時だけ非 nil。
+- status は管理者が Firestore コンソールで書き換える(backend architecture §3.3)。未知の値は「受付」扱い。
+- DEBUG フック: `METAMON_AUTO_RELEASE=1`(変身一覧 → 申請シート)+ `METAMON_AUTO_RELEASE_APP=<appId>` / `METAMON_AUTO_RELEASE_PURPOSE=<文>`(入力 → 送信 → 3 秒後に閉じてバッジ)/ `METAMON_AUTO_RELEASE_CONTACT`。
+
 ## 7. 認証(実装済み)
 
 ```
