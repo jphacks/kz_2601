@@ -1,15 +1,16 @@
 import SwiftUI
 import MetamonDSL
+import MetamonRenderer
 
-/// `app.tabs` があれば TabView(タブ毎に NavigationStack)、無ければ `initialScreen` を根にした単一 NavigationStack。
-/// その上にモーダル・音声シート・確認ダイアログ・モーフ中オーバーレイを重ねる。
+/// 画面ツリーの根。`DSLNavigationRoot`(Renderer: タブ or 単一スタック)の上に
+/// モーダル・音声シート・確認ダイアログ・モーフ中オーバーレイ・トーストを重ねる。
 struct RootView: View {
     @Environment(AppRuntime.self) private var rt
 
     var body: some View {
         @Bindable var rt = rt
         ZStack {
-            navigationRoot
+            DSLNavigationRoot()
                 .id(rt.document.version) // version が変わったら丸ごと作り直して transition を出す
                 .transition(.asymmetric(
                     insertion: .scale(scale: 0.94).combined(with: .opacity),
@@ -26,16 +27,10 @@ struct RootView: View {
         .tint(Color(hex: rt.dsl.app.theme?.primaryColor) ?? .accentColor)
         .preferredColorScheme(colorScheme)
         .sheet(item: $rt.sheet) { route in
-            NavigationStack(path: rt.pathBinding("sheet")) {
-                ScreenView(route: route)
-                    .navigationDestination(for: Route.self) { ScreenView(route: $0) }
-            }
+            ScreenStack(root: route)
         }
         .fullScreenCover(item: $rt.fullScreen) { route in
-            NavigationStack(path: rt.pathBinding("full")) {
-                ScreenView(route: route)
-                    .navigationDestination(for: Route.self) { ScreenView(route: $0) }
-            }
+            ScreenStack(root: route)
         }
         .sheet(isPresented: $rt.showVoiceSheet) {
             VoiceInputView(prompt: "どう変えたいですか？")
@@ -47,29 +42,6 @@ struct RootView: View {
                   secondaryButton: .cancel(Text("キャンセル")))
         }
         .overlay(alignment: .bottom) { toast }
-    }
-
-    @ViewBuilder
-    private var navigationRoot: some View {
-        if rt.dsl.app.hasTabs {
-            @Bindable var rt = rt
-            TabView(selection: $rt.selectedTab) {
-                ForEach(rt.dsl.app.tabs) { tab in
-                    let stack = AppRuntime.tabStack(tab.screen)
-                    NavigationStack(path: rt.pathBinding(stack)) {
-                        ScreenView(route: Route(screen: tab.screen, stack: stack))
-                            .navigationDestination(for: Route.self) { ScreenView(route: $0) }
-                    }
-                    .tabItem { Label(tab.title, systemImage: tab.icon ?? "square") }
-                    .tag(tab.screen)
-                }
-            }
-        } else {
-            NavigationStack(path: rt.pathBinding("main")) {
-                ScreenView(route: Route(screen: rt.dsl.initialScreen))
-                    .navigationDestination(for: Route.self) { ScreenView(route: $0) }
-            }
-        }
     }
 
     private var colorScheme: ColorScheme? {
@@ -121,4 +93,14 @@ struct RootView: View {
                 }
         }
     }
+}
+
+#Preview("家計簿サンプル") {
+    let services = BuildConfig.make(environment: .mock)
+    let rt = AppRuntime(document: (try? DSLExamples.document("kakeibo")) ?? .fallback, services: services)
+    return RootView()
+        .environment(rt)
+        .environment(\.dslRuntime, rt)
+        .environment(\.services, services)
+        .environment(\.componentRegistry, MetamonApp.componentRegistry)
 }

@@ -28,10 +28,13 @@ settings:
 
 # ---- ローカル Swift Package(マルチモジュール。依存の向きは各 Package.swift で固定) ----
 #   MetamonDSL      : DSL モデル・グリッド計算・集計(Foundation のみ。macOS で `swift test` 可)
+#   MetamonRenderer : SwiftUI View(コンポーネント1種=1ファイル + ComponentRegistry)。Services を知らない
 #   MetamonServices : Services protocol 群 + 実装(HTTP/Mock/WhisperKit/通知)。WhisperKit(argmax-oss-swift 1.1.1)はこのパッケージの依存
 packages:
   MetamonDSL:
     path: Packages/MetamonDSL
+  MetamonRenderer:
+    path: Packages/MetamonRenderer
   MetamonServices:
     path: Packages/MetamonServices
 # Firebase(未導入。導入時にコメントを外す):
@@ -54,6 +57,7 @@ targets:
         type: group
     dependencies:
       - package: MetamonDSL
+      - package: MetamonRenderer
       - package: MetamonServices
     settings:
       base:
@@ -67,5 +71,6 @@ targets:
       # 各モジュールのユニットテストを `xcodebuild -scheme Metamon test` で一括実行する。
       testTargets:
         - package: MetamonDSL/MetamonDSLTests
+        - package: MetamonRenderer/MetamonRendererTests
         - package: MetamonServices/MetamonServicesTests
       gatherCoverageData: false

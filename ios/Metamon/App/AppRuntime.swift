@@ -1,28 +1,14 @@
 import SwiftUI
 import Observation
 import MetamonDSL
+import MetamonRenderer
 import MetamonServices
 
-/// NavigationStack の path 要素。画面 id + 編集対象 recordId + どのスタック(main / sheet / full)に属するか。
-struct Route: Hashable, Identifiable {
-    var screen: String
-    var recordId: String?
-    var stack: String = "main"
-    var id: String { "\(stack)/\(screen)/\(recordId ?? "")" }
-}
-
-/// アクション実行時の文脈(どの画面・どのフォーム・どのレコードから起動されたか)。
-struct ActionContext {
-    var route: Route
-    var form: FormDraft?
-    /// list の行タップ時に iOS が暗黙に渡す recordId
-    var recordId: String?
-}
-
 /// アプリ全体の単一ランタイム。DSL ドキュメント・レコードキャッシュ・ナビゲーション・アクション実行を担う。
+/// Renderer には `DSLRuntime` protocol 越しに見せる(`.environment(\.dslRuntime, runtime)`)。
 @MainActor
 @Observable
-final class AppRuntime {
+final class AppRuntime: DSLRuntime {
     private(set) var document: AppDocument
     var dsl: AppDSL { document.dsl }
 
@@ -54,9 +40,6 @@ final class AppRuntime {
         self.services = services
         self.selectedTab = document.dsl.initialTab
     }
-
-    /// タブ用スタック名。
-    static func tabStack(_ screen: String) -> String { "tab:" + screen }
 
     // MARK: - Lifecycle
 
