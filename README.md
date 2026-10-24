@@ -1,6 +1,8 @@
-# メタモン(仮)
+# Tailor It
 
-<!-- プロダクト名は上の H1 の 1 箇所だけに書く(本文は「本アプリ」で統一)。正式名が決まったらここを差し替える。 -->
+<!-- プロダクト名は上の H1 と次の由来の行だけに書く(本文は「本アプリ」で統一)。 -->
+
+> 名前の由来: **あなたに合わせて仕立てる(tailor)**。話しかけた人の生活に合わせて、アプリ自身が仕立て直される。内部識別子(ターゲット名 `Metamon`・Bundle ID `jp.kz2601.metamon`・App Group・`Metamon*` パッケージ・`METAMON_*` 環境変数)は Firebase 登録に紐づくため `Metamon` のまま。
 
 [![IMAGE ALT TEXT HERE](https://jphacks.com/wp-content/uploads/2026/07/IMG_5316.png)](https://www.youtube.com/watch?v=piaNsc6ilBI)
 
@@ -103,7 +105,8 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 | G14 | 位置情報 + 地図(`mapView` / `locationButton`・`location` フィールド) | 実装済み(実 GPS の実機検証は一部未) |
 | G16 | 複数アプリの保持と音声切替 | 予定(現状は 1 ユーザー 1 アプリ) |
 | G11 | 「元に戻して」で `versions/{n}/restore` | 予定(appconfig の version 履歴設計済み) |
-| — | 生成したアプリの共有(DSL JSON はただの文書なので URL 1 本で配れる)、ホーム画面 Widget(最新レコード 1 件の固定 Widget) | 構想 |
+| G18 | ホーム画面ウィジェット(生成アプリの `stat` 先頭 3 個を App Group 経由で WidgetKit に表示・small=1 個/medium=3 個) | **実装済み**(Issue #39・実機確認済み。更新は本体起動中のみ) |
+| — | 生成したアプリの共有(DSL JSON はただの文書なので URL 1 本で配れる) | 構想 |
 | — | appconfig の Firestore 永続化(DSL version 履歴・records) | 実装中 |
 | — | Container 内グリッド、Firestore リスナーによるホットリロード(現在は 2 秒ポーリング) | 予定 |
 

@@ -31,6 +31,13 @@ type versionSummary struct {
 	CreatedAt     time.Time     `json:"createdAt"`
 }
 
+// restoreResponse is VersionSummary plus the restored DSL (DSLEnvelope shape),
+// so clients get the new document without a follow-up GET /dsl.
+type restoreResponse struct {
+	versionSummary
+	DSL json.RawMessage `json:"dsl"`
+}
+
 func toSummary(v *store.Version) versionSummary {
 	return versionSummary{AppID: v.AppID, Version: v.Version, ParentVersion: v.ParentVersion, Source: v.Source, Patch: v.Patch, CreatedAt: v.CreatedAt}
 }
@@ -263,7 +270,7 @@ func (h *Handler) restoreVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("ETag", etag(v.Version))
-	httpx.WriteJSON(w, http.StatusCreated, toSummary(v))
+	httpx.WriteJSON(w, http.StatusCreated, restoreResponse{versionSummary: toSummary(v), DSL: v.DSL})
 }
 
 func (h *Handler) listEntities(w http.ResponseWriter, r *http.Request) {

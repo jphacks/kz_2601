@@ -21,7 +21,7 @@ enum Theme {
     }
 
     enum Colors {
-        /// ブランド(メタモン = 紫〜水色)
+        /// ブランド(Tailor It = 紫〜水色)
         static let brandA = Color(hex: "#8E6CFF")!
         static let brandB = Color(hex: "#4CC9FF")!
         /// 録音中(赤〜珊瑚)

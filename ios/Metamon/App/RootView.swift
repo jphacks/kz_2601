@@ -138,7 +138,7 @@ struct RootView: View {
         rt.dsl.screen(visibleMainRoute.screen)?.entity != nil
     }
 
-    /// マイク FAB(= メタモン本体)。位置は `Theme.Layout.fabAlignment`(左下。DSL の「追加」ボタンが右下に来るため)。
+    /// マイク FAB(= Tailor It 本体)。位置は `Theme.Layout.fabAlignment`(左下。DSL の「追加」ボタンが右下に来るため)。
     /// タップ = 「このアプリを変える」発話シート、長押し = メタ操作(変身一覧)。
     /// 最下段の左端に DSL の部品がある画面では、その上端まで退避する(#83・`GridBottomObstructionKey`)。
     private var voiceFab: some View {

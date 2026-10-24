@@ -115,7 +115,7 @@ final class DSLDecodingTests: XCTestCase {
         let gauge = try XCTUnwrap(overview.components.first { $0.id == "spent" })
         XCTAssertEqual(gauge.min, 0)
         XCTAssertEqual(gauge.max, 30000)
-        XCTAssertEqual(overview.components.first { $0.id == "me" }?.name, "メタモン")
+        XCTAssertEqual(overview.components.first { $0.id == "me" }?.name, "Tailor It")
         XCTAssertEqual(overview.components.first { $0.id == "official" }?.url, "https://jphacks.com")
         XCTAssertTrue(overview.components.first { $0.id == "tags" }?.children.contains { $0.type == .badge && $0.color == "red" } == true)
 

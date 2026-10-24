@@ -3,7 +3,7 @@ import MetamonServices
 
 /// 変身一覧(#51)。マイク FAB の長押し / 「アプリ一覧」で開く。
 /// 自分のアプリを横スクロールのカード(サムネ・名前・最終更新・「使用中」)で並べ、タップで切替。
-/// 下に「+ 新しいアプリ」「メタモンに戻る(初期画面)」。
+/// 下に「+ 新しいアプリ」「Tailor It に戻る(初期画面)」。
 struct AppSwitcherSheet: View {
     @Environment(AppRuntime.self) private var rt
     @Environment(\.dismiss) private var dismiss

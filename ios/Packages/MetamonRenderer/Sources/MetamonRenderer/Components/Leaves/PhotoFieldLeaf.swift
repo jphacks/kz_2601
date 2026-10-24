@@ -80,7 +80,7 @@ struct PhotoFieldLeaf: View {
             Button("写真から選ぶ") { showLibrary = true }
             Button("キャンセル", role: .cancel) {}
         } message: {
-            Text("設定アプリでメタモンのカメラへのアクセスを許可してください。")
+            Text("設定アプリで Tailor It のカメラへのアクセスを許可してください。")
         }
     }
 

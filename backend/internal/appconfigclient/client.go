@@ -183,24 +183,26 @@ func (h *HTTP) Versions(ctx context.Context, appID string) ([]VersionSummary, er
 	return out.Items, nil
 }
 
-// Restore is POST /versions/{n}/restore followed by GET /dsl: appconfig
-// answers with a VersionSummary (no DSL), so the new document is re-read.
+// Restore is POST /versions/{n}/restore. appconfig answers with the new
+// DSLEnvelope (#67), so no follow-up GET /dsl is needed; an older appconfig
+// that still returns a bare VersionSummary is handled by re-reading /dsl.
 func (h *HTTP) Restore(ctx context.Context, appID string, n int) (*Envelope, error) {
-	var out struct {
-		Version int `json:"version"`
-	}
-	if err := h.do(ctx, http.MethodPost, fmt.Sprintf("/v1/apps/%s/versions/%d/restore", appID, n), nil, nil, &out); err != nil {
+	var env Envelope
+	if err := h.do(ctx, http.MethodPost, fmt.Sprintf("/v1/apps/%s/versions/%d/restore", appID, n), nil, nil, &env); err != nil {
 		return nil, err
 	}
-	env, err := h.Get(ctx, appID)
+	if len(env.DSL) > 0 {
+		return &env, nil
+	}
+	cur, err := h.Get(ctx, appID)
 	if err != nil {
 		return nil, err
 	}
-	if env.Version != out.Version {
+	if cur.Version != env.Version {
 		return nil, &Error{Status: http.StatusConflict, Code: "version_conflict",
-			Message: fmt.Sprintf("restored as version %d but current is %d", out.Version, env.Version), CurrentVersion: env.Version}
+			Message: fmt.Sprintf("restored as version %d but current is %d", env.Version, cur.Version), CurrentVersion: cur.Version}
 	}
-	return env, nil
+	return cur, nil
 }
 
 func ifMatch(v int) map[string]string {

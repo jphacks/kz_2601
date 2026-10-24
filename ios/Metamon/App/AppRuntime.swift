@@ -283,7 +283,7 @@ final class AppRuntime: DSLRuntime {
     }
 
     /// 「別のアプリ。」: appId を新規採番して初期状態にする(サーバー上の前のアプリは残る)。続けて ai に送る前提。
-    /// 変身一覧の「+ 新しいアプリ」「メタモンに戻る」からも呼ぶ(`entry` で挨拶を出し分け・アニメ付き)。
+    /// 変身一覧の「+ 新しいアプリ」「Tailor It に戻る」からも呼ぶ(`entry` で挨拶を出し分け・アニメ付き)。
     func startNewApp(entry: HomeEntry = .newApp, animated: Bool = false) {
         syncTask?.cancel()
         localHistory.removeAll()
@@ -395,7 +395,7 @@ final class AppRuntime: DSLRuntime {
         }
     }
 
-    /// 変身一覧の「+ 新しいアプリ」(`.newApp`)と「メタモンに戻る(初期画面)」(`.home`)。
+    /// 変身一覧の「+ 新しいアプリ」(`.newApp`)と「Tailor It に戻る(初期画面)」(`.home`)。
     /// どちらも appId を作り直して初期(音声)画面へ。前のアプリはサーバーと一覧に残り、いつでも戻せる(サムネは一覧を開く時に撮ってある)。
     func startFresh(_ entry: HomeEntry) {
         showAppSwitcher = false
