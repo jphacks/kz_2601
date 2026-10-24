@@ -65,6 +65,14 @@ struct VoiceInputView: View {
         .animation(.spring(duration: 0.45, bounce: 0.15), value: inChat)
         .sheet(isPresented: $showSettings) { SettingsSheet() }
         .onTapGesture { typing = false }
+        #if DEBUG
+        .task {
+            // ヘッドレス E2E 用: `METAMON_AUTO_SETTINGS=1` で起動 2 秒後に設定シートを開く(言語切替の確認・#44)
+            guard ProcessInfo.processInfo.environment["METAMON_AUTO_SETTINGS"] == "1" else { return }
+            try? await Task.sleep(for: .seconds(2))
+            showSettings = true
+        }
+        #endif
     }
 
     // MARK: - Sections
