@@ -1,0 +1,40 @@
+name: バグ報告
+description: 期待と違う動作
+title: "fix: "
+labels: [bug]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: 領域
+      options: [ios, backend/appconfig, backend/ai, dsl, infra, docs]
+    validations:
+      required: true
+  - type: dropdown
+    id: env
+    attributes:
+      label: 環境
+      options: [実機 iPhone 13, シミュレータ, ローカル(go run), staging(Cloud Run), prod(Cloud Run)]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      placeholder: |
+        1.
+        2.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する動作
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の動作 / ログ
+      description: ログ・スクショ・DSL JSON を貼る(APIキー等は伏せる)。
+      render: text
