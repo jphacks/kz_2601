@@ -12,45 +12,77 @@ import (
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/ai"
+	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 )
 
 // Chat eval (-chat): runs internal/ai/eval/chat_cases.json through
 // Service.Chat. Each case is a scripted conversation; each step sends one
-// user utterance and checks `expect` (question|ready), optional `source`
-// (claude|shortcut|forced) and optional `native` keywords in the brief.
+// user utterance and checks `expect` (question|ready|answer|proposal),
+// optional `source` (claude|shortcut|forced) and optional `native` keywords
+// in the brief.
+//
+// Chat-first (#185): a case with `base` (a DSL file, e.g.
+// internal/ai/examples/kakeibo.json) is seeded into the store first, so auto
+// mode picks edit; `mode` / `capabilities` are sent as given (-capabilities
+// sets them for cases that have neither). `textAny` (the reply text contains
+// at least one) and `textNot` (none of them) check that answers match the
+// DSL; `generate` passes the first option's instruction (proposal) or the
+// transcript (ready) to Service.Generate on a copy of the base and records
+// whether it went through.
 
 type ChatStep struct {
-	Say    string   `json:"say"`
-	Expect string   `json:"expect"`
-	Source string   `json:"source,omitempty"`
-	Native []string `json:"native,omitempty"`
+	Say      string   `json:"say"`
+	Expect   string   `json:"expect"`
+	Source   string   `json:"source,omitempty"`
+	Native   []string `json:"native,omitempty"`
+	TextAny  []string `json:"textAny,omitempty"`
+	TextNot  []string `json:"textNot,omitempty"`
+	Generate bool     `json:"generate,omitempty"`
 }
 
 type ChatCase struct {
-	ID     string     `json:"id"`
-	Group  string     `json:"group"`
-	Locale string     `json:"locale,omitempty"`
-	Note   string     `json:"note,omitempty"`
-	Steps  []ChatStep `json:"steps"`
+	ID           string     `json:"id"`
+	Group        string     `json:"group"`
+	Locale       string     `json:"locale,omitempty"`
+	Note         string     `json:"note,omitempty"`
+	Base         string     `json:"base,omitempty"`
+	Mode         string     `json:"mode,omitempty"`
+	Capabilities []string   `json:"capabilities,omitempty"`
+	Steps        []ChatStep `json:"steps"`
+}
+
+// ChatGenRecord is the outcome of passing a chat result to /generate.
+type ChatGenRecord struct {
+	Instruction string   `json:"instruction"`
+	OK          bool     `json:"ok"`
+	Error       string   `json:"error,omitempty"`
+	Mode        string   `json:"mode,omitempty"`
+	Summary     string   `json:"summary,omitempty"`
+	Ops         int      `json:"ops"`
+	TotalMs     int64    `json:"totalMs"`
+	Lint        []string `json:"lint,omitempty"`
 }
 
 type ChatStepRecord struct {
-	Say         string    `json:"say"`
-	OK          bool      `json:"ok"`
-	Error       string    `json:"error,omitempty"`
-	Kind        string    `json:"kind,omitempty"`
-	Source      string    `json:"source,omitempty"`
-	Turn        int       `json:"turn"`
-	Text        string    `json:"text,omitempty"`
-	Suggestions []string  `json:"suggestions,omitempty"`
-	Brief       *ai.Brief `json:"brief,omitempty"`
-	Transcript  string    `json:"transcript,omitempty"`
-	ClaudeMs    int64     `json:"claudeMs"`
-	FirstTokMs  int64     `json:"firstTokenMs"`
-	TotalMs     int64     `json:"totalMs"`
-	Attempts    int       `json:"attempts"`
-	Usage       ai.Usage  `json:"usage"`
-	Misses      []string  `json:"misses,omitempty"`
+	Say         string          `json:"say"`
+	OK          bool            `json:"ok"`
+	Error       string          `json:"error,omitempty"`
+	Kind        string          `json:"kind,omitempty"`
+	Source      string          `json:"source,omitempty"`
+	Turn        int             `json:"turn"`
+	Text        string          `json:"text,omitempty"`
+	Suggestions []string        `json:"suggestions,omitempty"`
+	Options     []ai.ChatOption `json:"options,omitempty"`
+	Mode        string          `json:"mode,omitempty"`
+	Gen         *ChatGenRecord  `json:"generate,omitempty"`
+	Brief       *ai.Brief       `json:"brief,omitempty"`
+	Transcript  string          `json:"transcript,omitempty"`
+	ClaudeMs    int64           `json:"claudeMs"`
+	FirstTokMs  int64           `json:"firstTokenMs"`
+	TotalMs     int64           `json:"totalMs"`
+	Attempts    int             `json:"attempts"`
+	Usage       ai.Usage        `json:"usage"`
+	Misses      []string        `json:"misses,omitempty"`
 }
 
 type ChatRecord struct {
@@ -84,7 +116,7 @@ type ChatRun struct {
 	Summary ChatSummary  `json:"summary"`
 }
 
-func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string, filter map[string]bool) {
+func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string, filter map[string]bool, caps []string) {
 	cfg := svc.ChatConfig
 	if cfg.Model == "" {
 		cfg.Model = ai.DefaultChatModel
@@ -114,11 +146,25 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string
 		}
 		appID := fmt.Sprintf("chat-%s-%d", c.ID, time.Now().UnixNano())
 		rec := ChatRecord{ID: c.ID, Group: c.Group, Locale: c.Locale, OK: true}
+		var base []byte
+		if c.Base != "" {
+			base, err = os.ReadFile(c.Base)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if _, err := svc.Store.Put(ctx, appID, 0, base, appconfigclient.Source{Kind: "seed"}); err != nil {
+				log.Fatalf("[%s] seed: %v", c.ID, err)
+			}
+		}
+		capsFor := c.Capabilities
+		if len(capsFor) == 0 && c.Mode == "" {
+			capsFor = caps
+		}
 		for i, st := range c.Steps {
 			log.Printf("[%s] step %d %q", c.ID, i+1, st.Say)
 			sr := ChatStepRecord{Say: st.Say}
 			started := time.Now()
-			res, err := svc.Chat(ctx, ai.ChatRequest{AppID: appID, Locale: ai.Locale(c.Locale),
+			res, err := svc.Chat(ctx, ai.ChatRequest{AppID: appID, Locale: ai.Locale(c.Locale), Mode: c.Mode, Capabilities: capsFor,
 				Messages: []ai.ChatMessage{{Role: "user", Text: st.Say}}})
 			sr.TotalMs = time.Since(started).Milliseconds()
 			if err != nil {
@@ -130,18 +176,25 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string
 			}
 			sr.Kind, sr.Source, sr.Turn, sr.Text = res.Kind, res.Source, res.Turn, res.Text
 			sr.Suggestions, sr.Brief, sr.Transcript = res.Suggestions, res.Brief, res.Transcript
+			sr.Options, sr.Mode = res.Options, res.Mode
 			sr.ClaudeMs, sr.Attempts, sr.Usage = res.LatencyMs.Claude, res.Meta.Attempts, res.Meta.Usage
 			sr.FirstTokMs = res.FirstTokenMs
 			if rec.Locale == "" {
 				rec.Locale = string(res.Locale)
 			}
 			sr.Misses = checkChatStep(st, res)
+			if st.Generate && base != nil {
+				sr.Gen = generateFromChat(ctx, svc, c.ID, base, res)
+				if !sr.Gen.OK {
+					sr.Misses = append(sr.Misses, "generate failed: "+sr.Gen.Error)
+				}
+			}
 			sr.OK = len(sr.Misses) == 0
 			if !sr.OK {
 				rec.OK = false
 			}
-			log.Printf("[%s] %s/%s turn=%d claude=%dms misses=%v text=%q sugg=%v transcript=%q",
-				c.ID, res.Kind, res.Source, res.Turn, sr.ClaudeMs, sr.Misses, res.Text, res.Suggestions, res.Transcript)
+			log.Printf("[%s] %s/%s mode=%s turn=%d claude=%dms total=%dms misses=%v text=%q sugg=%v options=%v transcript=%q",
+				c.ID, res.Kind, res.Source, res.Mode, res.Turn, sr.ClaudeMs, sr.TotalMs, sr.Misses, res.Text, res.Suggestions, res.Options, res.Transcript)
 			rec.Steps = append(rec.Steps, sr)
 		}
 		run.Cases = append(run.Cases, rec)
@@ -164,8 +217,65 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string
 	fmt.Printf("\nwrote %s\n", path)
 }
 
+// generateFromChat runs /generate (edit) with what 「これでいく」 / ready
+// would send, on a fresh copy of the base DSL.
+func generateFromChat(ctx context.Context, svc *ai.Service, caseID string, base []byte, res *ai.ChatResult) *ChatGenRecord {
+	g := &ChatGenRecord{}
+	switch {
+	case res.Kind == "proposal" && len(res.Options) > 0:
+		g.Instruction = res.Options[0].Instruction
+	case res.Kind == "ready":
+		g.Instruction = res.Transcript
+	default:
+		g.Error = "nothing to generate (kind " + res.Kind + ")"
+		return g
+	}
+	appID := fmt.Sprintf("gen-%s-%d", caseID, time.Now().UnixNano())
+	if _, err := svc.Store.Put(ctx, appID, 0, base, appconfigclient.Source{Kind: "seed"}); err != nil {
+		g.Error = err.Error()
+		return g
+	}
+	started := time.Now()
+	out, err := svc.Generate(ctx, ai.Request{AppID: appID, Transcript: g.Instruction, Mode: ai.ModeEdit, Locale: res.Locale})
+	g.TotalMs = time.Since(started).Milliseconds()
+	if err != nil {
+		g.Error = err.Error()
+		return g
+	}
+	g.OK, g.Mode, g.Summary, g.Ops, g.Lint = true, out.Mode, out.Summary, len(out.Patch), out.Meta.Lint
+	log.Printf("[%s] generate %s ops=%d %dms summary=%q", caseID, out.Mode, g.Ops, g.TotalMs, out.Summary)
+	return g
+}
+
 func checkChatStep(st ChatStep, res *ai.ChatResult) []string {
 	var miss []string
+	lower := strings.ToLower(res.Text)
+	if len(st.TextAny) > 0 {
+		hit := false
+		for _, w := range st.TextAny {
+			if strings.Contains(lower, strings.ToLower(w)) {
+				hit = true
+			}
+		}
+		if !hit {
+			miss = append(miss, "text lacks any of "+strings.Join(st.TextAny, "/"))
+		}
+	}
+	for _, w := range st.TextNot {
+		if strings.Contains(lower, strings.ToLower(w)) {
+			miss = append(miss, "text has "+w)
+		}
+	}
+	if res.Kind == "proposal" {
+		if n := len(res.Options); n < 1 || n > 3 {
+			miss = append(miss, fmt.Sprintf("options=%d", n))
+		}
+		for _, o := range res.Options {
+			if o.Instruction == "" || o.Title == "" {
+				miss = append(miss, "empty option")
+			}
+		}
+	}
 	if st.Expect != "" && res.Kind != st.Expect {
 		miss = append(miss, "kind="+res.Kind+" (want "+st.Expect+")")
 	}
@@ -256,6 +366,15 @@ func printChatTable(run ChatRun) {
 			sugg := "-"
 			if len(st.Suggestions) > 0 {
 				sugg = strings.Join(st.Suggestions, " / ")
+			}
+			for _, o := range st.Options {
+				sugg += " [" + o.Title + ": " + o.Instruction + "]"
+			}
+			if st.Transcript != "" && st.Brief == nil {
+				sugg += " transcript=" + st.Transcript
+			}
+			if st.Gen != nil {
+				sugg += fmt.Sprintf(" → generate ok=%v %s %dms %s", st.Gen.OK, st.Gen.Mode, st.Gen.TotalMs, st.Gen.Summary+st.Gen.Error)
 			}
 			fmt.Printf("| %s | %s | %d | %s | %s | %s | %d | %d | %d | %d/%d | %s | %s | %s | %s |\n",
 				r.ID, r.Locale, i+1, cell(st.Say), kind, st.Source, st.Turn, st.ClaudeMs, st.FirstTokMs,
