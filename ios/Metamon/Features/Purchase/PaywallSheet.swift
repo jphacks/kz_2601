@@ -47,7 +47,9 @@ struct PaywallSheet: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .task { if store.products.isEmpty { await store.loadProducts() } }
+        .task {
+            if store.products.isEmpty { await store.loadProducts() }
+        }
         .onChange(of: store.isPro) { _, isPro in
             guard isPro else { return }
             justPurchased = true

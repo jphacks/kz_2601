@@ -27,19 +27,18 @@ final class ProGate {
 
     init(store: ProEntitlementStore? = nil,
          usage: CreationUsageStore = CreationUsageStore(),
-         quota: CreationQuota = CreationQuota(dailyFreeLimit: ProGate.configuredLimit)) {
+         quota: CreationQuota = CreationQuota(dailyFreeLimit: ProGate.configuredLimit),
+         limitDisabled: Bool? = nil) {
         self.store = store ?? ProEntitlementStore()
         self.usage = usage
         self.quota = quota
         self.usedToday = usage.used()
-        self.limitDisabled = (UserDefaults.standard.object(forKey: Self.disabledKey) as? Bool) ?? Self.defaultLimitDisabled
+        self.limitDisabled = limitDisabled
+            ?? (UserDefaults.standard.object(forKey: Self.disabledKey) as? Bool) ?? Self.defaultLimitDisabled
     }
 
     /// 起動時に 1 回(`PaywallHost` の task)。
     func start() {
-        #if DEBUG
-        StoreKitTestHarness.startIfRequested()
-        #endif
         store.start()
     }
 

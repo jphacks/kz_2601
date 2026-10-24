@@ -22,7 +22,7 @@ struct ProSettingsSection: View {
                 }
             } else {
                 LabeledContent("今日の新規作成") {
-                    Text(gate.isEnforced ? L10n.tr("\(gate.usedToday) / \(gate.quota.dailyFreeLimit) 回") : L10n.tr("\(gate.usedToday) 回(制限なし)"))
+                    Text(gate.isEnforced ? L10n.tr("\(min(gate.usedToday, gate.quota.dailyFreeLimit)) / \(gate.quota.dailyFreeLimit) 回") : L10n.tr("\(gate.usedToday) 回(制限なし)"))
                 }
                 Button {
                     showPaywall = true

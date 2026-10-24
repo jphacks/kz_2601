@@ -1,5 +1,4 @@
 import XCTest
-import StoreKitTest
 @testable import MetamonServices
 
 /// 課金(#77): 無料枠の判定・日付の切り替わり・権利の判定。
@@ -70,42 +69,5 @@ final class CreationQuotaTests: XCTestCase {
     }
 }
 
-/// StoreKitTest: ローカルの `.storekit` で購入 → 権利が付く(#77)。
-/// 構成ファイルはアプリと同じ `ios/StoreKit/TailorItPro.storekit` をソースの位置から読む(コピーを持たない)。
-@MainActor
-final class ProStoreKitTests: XCTestCase {
-    private static var configURL: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent() // MetamonServicesTests
-            .deletingLastPathComponent() // Tests
-            .deletingLastPathComponent() // MetamonServices
-            .deletingLastPathComponent() // Packages
-            .deletingLastPathComponent() // ios
-            .appendingPathComponent("StoreKit/TailorItPro.storekit")
-    }
-
-    func testPurchaseGrantsPro() async throws {
-        try XCTSkipUnless(FileManager.default.fileExists(atPath: Self.configURL.path), "storekit config not found")
-        let session = try SKTestSession(contentsOf: Self.configURL)
-        session.resetToDefaultState()
-        session.clearTransactions()
-        session.disableDialogs = true
-
-        let store = ProEntitlementStore()
-        await store.loadProducts()
-        XCTAssertEqual(store.monthly?.id, ProProducts.monthly)
-        await store.refreshEntitlements()
-        XCTAssertFalse(store.isPro)
-
-        let outcome = try await store.purchase(productID: ProProducts.monthly)
-        XCTAssertEqual(outcome, .purchased)
-        XCTAssertTrue(store.isPro)
-        XCTAssertEqual(store.activeProductID, ProProducts.monthly)
-        XCTAssertNotNil(store.expiresAt)
-
-        // 取引を消すと権利が外れる
-        session.clearTransactions()
-        await store.refreshEntitlements()
-        XCTAssertFalse(store.isPro)
-    }
-}
+// StoreKitTest(SKTestSession)の購入テストはここに置かない: パッケージのテストはホストアプリ(Bundle ID)が無く、
+// SKTestSession を開いても Product.products が空で返る(実測)。購入 → 権利の確認はアプリをホストにした `ios/MetamonTests/PurchaseFlowTests.swift` で行う。

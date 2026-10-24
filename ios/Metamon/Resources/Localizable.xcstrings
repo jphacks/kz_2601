@@ -2302,7 +2302,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "You've used today's %lld free new apps"
+            "value": "You've used today's free new apps (%lld)"
           }
         },
         "ja": {
