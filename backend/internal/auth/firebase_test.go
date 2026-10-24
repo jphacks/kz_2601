@@ -17,6 +17,42 @@ func (s stubIDTokenVerifier) VerifyIDToken(context.Context, string) (*firebaseau
 	return s.token, s.err
 }
 
+func TestCheckEmulatorHost(t *testing.T) {
+	tests := []struct {
+		name         string
+		mode         string
+		emulatorHost string
+		wantErr      error
+	}{
+		{
+			name:         "firebase mode rejects the emulator host",
+			mode:         ModeFirebase,
+			emulatorHost: "localhost:9099",
+			wantErr:      ErrEmulatorHostSet,
+		},
+		{
+			name: "firebase mode without the emulator host is allowed",
+			mode: ModeFirebase,
+		},
+		{
+			name:         "dev mode allows the emulator host",
+			mode:         ModeDev,
+			emulatorHost: "localhost:9099",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(emulatorHostEnv, tt.emulatorHost)
+
+			err := CheckEmulatorHost(tt.mode)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("err = %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestNewFirebaseVerifier(t *testing.T) {
 	tests := []struct {
 		name         string

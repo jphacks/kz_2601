@@ -12,7 +12,17 @@ import (
 
 const projectIDEnv = "GOOGLE_CLOUD_PROJECT"
 
-var ErrProjectIDMissing = errors.New(projectIDEnv + " is required for firebase auth")
+var (
+	ErrProjectIDMissing = errors.New(projectIDEnv + " is required for firebase auth")
+	ErrEmulatorHostSet  = errors.New(emulatorHostEnv + " disables ID token signature verification and must not be set in " + ModeFirebase + " auth mode")
+)
+
+func CheckEmulatorHost(mode string) error {
+	if mode == ModeFirebase && os.Getenv(emulatorHostEnv) != "" {
+		return ErrEmulatorHostSet
+	}
+	return nil
+}
 
 type idTokenVerifier interface {
 	VerifyIDToken(ctx context.Context, idToken string) (*firebaseauth.Token, error)

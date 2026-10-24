@@ -70,6 +70,9 @@ func main() {
 }
 
 func newVerifier(ctx context.Context, mode string, logger *slog.Logger) (auth.TokenVerifier, error) {
+	if err := auth.CheckEmulatorHost(mode); err != nil {
+		return nil, err
+	}
 	verifier, err := auth.NewFirebaseVerifier(ctx)
 	if err == nil {
 		return verifier, nil

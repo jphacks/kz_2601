@@ -194,11 +194,11 @@ func TestNewVerifier(t *testing.T) {
 		wantErr      error
 	}{
 		{
-			name:         "firebase mode builds a firebase verifier",
+			name:         "firebase mode refuses to start with the auth emulator",
 			mode:         auth.ModeFirebase,
 			projectID:    "demo-project",
 			emulatorHost: "localhost:9099",
-			wantType:     &auth.FirebaseVerifier{},
+			wantErr:      auth.ErrEmulatorHostSet,
 		},
 		{
 			name:    "firebase mode without a project id fails startup",
