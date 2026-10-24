@@ -1,0 +1,765 @@
+{
+  "date": "2026-10-25",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "tag": "stat-unit-after-demo",
+  "cases": [
+    {
+      "id": "d_training",
+      "kind": "create",
+      "group": "main-B",
+      "transcript": "別のアプリ。筋トレの記録アプリ。腕立てとスクワットの回数を毎日つけて、朝8時にリマインドして",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5829,
+      "totalMs": 5832,
+      "outputChars": 2389,
+      "usage": {
+        "inputTokens": 142,
+        "outputTokens": 994,
+        "cacheCreationInputTokens": 31013
+      },
+      "summary": "筋トレ記録アプリを作りました。右下のボタンから筋トレを追加できます。毎朝8時に通知が届きます。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 11,
+        "topLevel": 5,
+        "withArea": 5,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "notifications": [
+          "daily@08:00"
+        ],
+        "scopes": [
+          "workout:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "workout_form: A1:F6 A11:F12"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "腕立てとスクワットの回数を毎日記録し、朝8時にリマインドする",
+          "icon": "figure.strengthtraining.traditional",
+          "name": "筋トレ記録",
+          "notifications": [
+            {
+              "body": "今日の腕立てとスクワットを記録しましょう。",
+              "id": "morning_reminder",
+              "repeat": "daily",
+              "time": "08:00",
+              "title": "筋トレの時間です"
+            }
+          ],
+          "theme": {
+            "primaryColor": "#E65100"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "defaultValue": "腕立て",
+                "id": "exercise",
+                "name": "種目",
+                "options": [
+                  "腕立て",
+                  "スクワット"
+                ],
+                "required": true,
+                "type": "enum"
+              },
+              {
+                "id": "reps",
+                "name": "回数",
+                "required": true,
+                "type": "integer",
+                "unit": "回"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "workout",
+            "name": "筋トレ",
+            "titleField": "exercise"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "sum",
+                    "entity": "workout",
+                    "field": "reps",
+                    "filter": {
+                      "field": "date",
+                      "op": "today",
+                      "value": null
+                    },
+                    "label": "今日の合計回数",
+                    "type": "stat"
+                  },
+                  {
+                    "label": "今日のセット数(回)",
+                    "type": "stat",
+                    "value": {
+                      "agg": "count",
+                      "entity": "workout",
+                      "filter": {
+                        "field": "date",
+                        "op": "today",
+                        "value": null
+                      }
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "workout",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "exercise",
+                      "trailing": "reps"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "workout_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "記録",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "workout_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "記録を追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "筋トレ記録",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "workout_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F6",
+                "children": [
+                  {
+                    "field": "exercise",
+                    "label": "種目",
+                    "style": "segmented",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "reps",
+                    "label": "回数",
+                    "type": "numberField",
+                    "unit": "回"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "workout",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "workout",
+            "id": "workout_form",
+            "title": "筋トレを記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "workout",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "s_reading",
+      "kind": "create",
+      "group": "safe",
+      "transcript": "読書の記録。読み終わった本を登録して、今年何冊読んだかと、年間50冊の目標まであと何冊かを出して",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 6940,
+      "totalMs": 6944,
+      "outputChars": 2438,
+      "usage": {
+        "inputTokens": 139,
+        "outputTokens": 1014,
+        "cacheReadInputTokens": 31013
+      },
+      "summary": "読書記録アプリを作りました。右下のボタンから本を追加できます。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 13,
+        "topLevel": 6,
+        "withArea": 6,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 4,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "book:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F3 A4:F10 D11:F12",
+          "book_form: A1:F9 A11:F12"
+        ],
+        "statValues": 2,
+        "progressTarget": true
+      },
+      "dsl": {
+        "app": {
+          "description": "読み終わった本を登録し、今年読んだ冊数と年間50冊の目標までの残りを確認する",
+          "icon": "book",
+          "name": "読書記録",
+          "theme": {
+            "primaryColor": "#6D4C41"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "タイトル",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "author",
+                "name": "著者",
+                "type": "string"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "読了日",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "id": "memo",
+                "name": "感想",
+                "type": "text"
+              }
+            ],
+            "id": "book",
+            "name": "本",
+            "titleField": "title"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "label": "今年読んだ冊数(冊)",
+                    "type": "stat",
+                    "value": {
+                      "agg": "count",
+                      "entity": "book",
+                      "filter": {
+                        "field": "date",
+                        "op": "thisYear",
+                        "value": null
+                      }
+                    }
+                  },
+                  {
+                    "label": "目標まであと(冊)",
+                    "type": "stat",
+                    "value": {
+                      "args": [
+                        {
+                          "args": [
+                            50,
+                            {
+                              "agg": "count",
+                              "entity": "book",
+                              "filter": {
+                                "field": "date",
+                                "op": "thisYear",
+                                "value": null
+                              }
+                            }
+                          ],
+                          "op": "sub"
+                        },
+                        0
+                      ],
+                      "op": "max"
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "aggregate": "count",
+                "area": "A3:F3",
+                "entity": "book",
+                "filter": {
+                  "field": "date",
+                  "op": "thisYear",
+                  "value": null
+                },
+                "id": "goal",
+                "label": "年間50冊の目標",
+                "target": 50,
+                "tone": "positive",
+                "type": "progressBar"
+              },
+              {
+                "area": "A4:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ登録された本がありません",
+                    "entity": "book",
+                    "item": {
+                      "subtitle": "author",
+                      "title": "title",
+                      "trailing": "date"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "book_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "books",
+                "title": "読了した本",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "book_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "本を追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "読書記録",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "book_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F9",
+                "children": [
+                  {
+                    "field": "title",
+                    "label": "タイトル",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "author",
+                    "label": "著者",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "date",
+                    "label": "読了日",
+                    "type": "datePicker"
+                  },
+                  {
+                    "field": "memo",
+                    "label": "感想",
+                    "multiline": true,
+                    "type": "textField"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この本を削除しますか？",
+                  "entity": "book",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "book",
+            "id": "book_form",
+            "title": "本を登録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "book",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "s_medicine",
+      "kind": "create",
+      "group": "safe",
+      "transcript": "服薬チェックアプリ。毎日飲む薬を登録して、飲んだら一覧でチェック、今日何回飲んだか分かるようにして",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5398,
+      "totalMs": 5401,
+      "outputChars": 2206,
+      "usage": {
+        "inputTokens": 145,
+        "outputTokens": 945,
+        "cacheReadInputTokens": 31013
+      },
+      "summary": "服薬チェックアプリを作りました。右下のボタンから薬を追加できます。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 10,
+        "topLevel": 5,
+        "withArea": 5,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "medicine:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "medicine_form: A1:F5 A11:F12"
+        ],
+        "statValues": 2
+      },
+      "dsl": {
+        "app": {
+          "description": "毎日飲む薬を登録して、飲んだら一覧の丸をタップしてチェック。今日飲んだ数がひと目で分かる",
+          "icon": "pills",
+          "name": "服薬チェック",
+          "theme": {
+            "primaryColor": "#00897B"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "薬の名前",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "dose",
+                "name": "用量・メモ",
+                "type": "string"
+              },
+              {
+                "id": "taken_on",
+                "name": "最後に飲んだ日",
+                "type": "date"
+              }
+            ],
+            "id": "medicine",
+            "name": "薬",
+            "titleField": "name"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "label": "今日飲んだ数",
+                    "type": "stat",
+                    "value": {
+                      "agg": "count",
+                      "entity": "medicine",
+                      "filter": {
+                        "field": "taken_on",
+                        "op": "today",
+                        "value": null
+                      }
+                    }
+                  },
+                  {
+                    "label": "まだ飲んでいない数",
+                    "type": "stat",
+                    "value": {
+                      "args": [
+                        {
+                          "agg": "count",
+                          "entity": "medicine"
+                        },
+                        {
+                          "agg": "count",
+                          "entity": "medicine",
+                          "filter": {
+                            "field": "taken_on",
+                            "op": "today",
+                            "value": null
+                          }
+                        }
+                      ],
+                      "op": "sub"
+                    }
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ薬が登録されていません",
+                    "entity": "medicine",
+                    "item": {
+                      "resets": "daily",
+                      "subtitle": "dose",
+                      "title": "name",
+                      "toggle": "taken_on"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "medicine_form",
+                      "type": "navigate"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "medicine_list",
+                "title": "今日の薬",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "medicine_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "薬を登録",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "服薬チェック",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "medicine_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "薬を登録"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F5",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "薬の名前",
+                    "placeholder": "ビタミンD",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "dose",
+                    "label": "用量・メモ",
+                    "placeholder": "1錠・朝食後",
+                    "type": "textField"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この薬を削除しますか？",
+                  "entity": "medicine",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "medicine",
+            "id": "medicine_form",
+            "title": "薬を登録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "medicine",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "n": 3,
+    "ok": 3,
+    "firstPass": 3,
+    "regenerated": 0,
+    "areaFallback": 0,
+    "failed": 0,
+    "expectMisses": 0,
+    "createP50Ms": 5829,
+    "createP95Ms": 6940,
+    "editP50Ms": 0,
+    "avgOutputTokens": 984.3333333333334,
+    "avgCreateOutputTokens": 984.3333333333334,
+    "avgEditOutputTokens": 0,
+    "avgCreateOutputChars": 2344.3333333333335,
+    "avgAreaRatio": 1,
+    "tabbedCreates": 0,
+    "calcCreates": 3
+  }
+}
