@@ -83,10 +83,10 @@ Reduce Motion ではスタガーとハイライトを省略(即時表示)。
 | stat | 左上に 20pt の brandSoft 角丸アイコン + ラベル、値は Display。カードの左上に brandA 10% → 透明のグラデーション |
 | section / card / disclosure | section 見出しは footnote semibold secondary + kerning。card/disclosure の見出しは headline。カード内 padding 16、区切り hairline |
 | chart | bar/line は brandGradient、pie は chartPalette。凡例・軸は caption |
-| gauge / progressBar | brandGradient の塗り。達成(≥100%)は positive、超過の警告は warning |
+| gauge / progressBar | brandGradient の塗り。100% 以上(予算超過など)は warning に切り替える |
 | calendar / timeline / table / badge | 選択日・ドット・レールは brandA。table 見出しは caption semibold secondary。badge の `accent` は brandA |
 | タブバー | tint = brandA(`RootView` の `.tint`) |
-| フォーム画面 | 入力はカード内に縦積み(gap 12)。toolbar の `saveRecord` は画面下の固定バー(primary ボタン・`safeAreaInset`)に出し、キーボードが出ても隠れない(`.scrollDismissesKeyboard(.interactively)`)。保存中はボタンがチェックに変わる |
+| フォーム画面 | 入力はカード内に縦積み(gap 12)。toolbar の `saveRecord` は画面下の固定バー(primary ボタン・`safeAreaInset`・`FormSaveBar`)に出し、ナビバーからは外す。キーボードが出てもバーはその上に逃げ、入力は `.scrollDismissesKeyboard(.interactively)` で隠れない。保存中はスピナー→完了でチェックを 0.6 秒 |
 
 ## 4. 守ること
 - 挙動(`field` 束縛・action・area 計算・schema)は見た目の変更で触らない。

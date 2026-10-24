@@ -35,6 +35,7 @@ struct InputRow<Control: View>: View {
     @ViewBuilder var control: Control
 
     var body: some View {
+        // 狭いセルではコントロールを優先し、ラベルは縮小(0.7 まで)で収める
         HStack(spacing: RenderTheme.Spacing.sm + 2) {
             InputIcon(name: icon)
             Text(label)
