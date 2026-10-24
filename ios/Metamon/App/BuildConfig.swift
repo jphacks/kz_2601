@@ -1,4 +1,5 @@
 import Foundation
+import MetamonDSL
 
 /// 起動構成。`METAMON_API_BASE_URL`(環境変数 or Info.plist `MetamonAPIBaseURL`)が無ければ全モックで動く。
 enum BuildConfig {

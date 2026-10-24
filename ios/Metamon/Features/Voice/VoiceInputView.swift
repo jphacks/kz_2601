@@ -1,4 +1,5 @@
 import SwiftUI
+import MetamonDSL
 
 /// 音声入力画面。初期状態のアプリ全体でもあり、生成後は FAB からシートとしても開く。
 /// 流れ: 録音 → WhisperKit(オンデバイス)文字起こし → ai サービス → 新 DSL をアニメーション付きで適用。

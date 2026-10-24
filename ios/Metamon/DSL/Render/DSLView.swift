@@ -1,4 +1,5 @@
 import SwiftUI
+import MetamonDSL
 
 /// Component → SwiftUI View。2段固定(Container > Leaf)なので再帰は1段だけ。
 struct DSLView: View {

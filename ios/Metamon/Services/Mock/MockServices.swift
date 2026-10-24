@@ -1,4 +1,5 @@
 import Foundation
+import MetamonDSL
 
 /// インメモリの appconfig。サーバー無しで DSL レンダラーを動かすためのもの。
 actor InMemoryAppConfigClient: AppConfigClient {

@@ -1,4 +1,5 @@
 import SwiftUI
+import MetamonDSL
 
 @main
 struct MetamonApp: App {

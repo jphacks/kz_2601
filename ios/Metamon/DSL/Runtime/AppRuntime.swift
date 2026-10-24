@@ -1,5 +1,6 @@
 import SwiftUI
 import Observation
+import MetamonDSL
 
 /// NavigationStack の path 要素。画面 id + 編集対象 recordId + どのスタック(main / sheet / full)に属するか。
 struct Route: Hashable, Identifiable {
@@ -50,12 +51,7 @@ final class AppRuntime {
     init(document: AppDocument, services: Services) {
         self.document = document
         self.services = services
-        self.selectedTab = Self.initialTab(document.dsl)
-    }
-
-    /// initialScreen がタブの根ならそれ、違えば先頭タブ。
-    static func initialTab(_ dsl: AppDSL) -> String {
-        dsl.app.tabs.first { $0.screen == dsl.initialScreen }?.screen ?? dsl.app.tabs.first?.screen ?? ""
+        self.selectedTab = document.dsl.initialTab
     }
 
     /// タブ用スタック名。
@@ -95,7 +91,7 @@ final class AppRuntime {
             self.sheet = nil
             self.fullScreen = nil
             self.showVoiceSheet = false
-            self.selectedTab = Self.initialTab(doc.dsl)
+            self.selectedTab = doc.dsl.initialTab
         }
         if animated {
             withAnimation(.spring(duration: 0.7, bounce: 0.15), swap)

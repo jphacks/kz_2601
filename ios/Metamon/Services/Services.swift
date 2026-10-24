@@ -1,33 +1,5 @@
 import Foundation
-
-// MARK: - Record (appconfig `Record`: {id, entity, data, createdAt, updatedAt})
-
-/// 生成アプリのユーザーデータ1件。`data` のキーは Field.id。
-struct Record: Decodable, Identifiable, Hashable, Sendable {
-    var id: String
-    var data: [String: JSONValue]
-    var createdAt: String?
-    var updatedAt: String?
-
-    init(id: String, data: [String: JSONValue], createdAt: String? = nil, updatedAt: String? = nil) {
-        self.id = id
-        self.data = data
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
-    }
-
-    private enum Keys: String, CodingKey { case id, data, createdAt, updatedAt }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: Keys.self)
-        id = try c.decode(String.self, forKey: .id)
-        data = try c.decodeIfPresent([String: JSONValue].self, forKey: .data) ?? [:]
-        createdAt = try? c.decodeIfPresent(String.self, forKey: .createdAt)
-        updatedAt = try? c.decodeIfPresent(String.self, forKey: .updatedAt)
-    }
-
-    subscript(field: String) -> JSONValue { data[field] ?? .null }
-}
+import MetamonDSL
 
 // MARK: - Protocols (本物/モックを差し替える境界)
 

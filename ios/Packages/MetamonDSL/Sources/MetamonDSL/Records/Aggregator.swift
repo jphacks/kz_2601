@@ -2,14 +2,14 @@ import Foundation
 
 /// stat / chart / list の filter・sort・集計。v1 は **iOS クライアント集計**(件数が増えたらサーバー側へ)。
 /// `thisMonth` / `today` は端末ローカル時刻基準。
-enum Aggregator {
-    static func apply(_ filter: Filter?, entity: Entity?, to records: [Record]) -> [Record] {
+public enum Aggregator {
+    public static func apply(_ filter: Filter?, entity: Entity?, to records: [Record]) -> [Record] {
         guard let filter else { return records }
         let field = entity?.field(filter.field)
         return records.filter { matches(filter, record: $0, field: field) }
     }
 
-    static func matches(_ f: Filter, record: Record, field: Field?) -> Bool {
+    public static func matches(_ f: Filter, record: Record, field: Field?) -> Bool {
         let v = record[f.field]
         switch f.op {
         case "thisMonth":
@@ -32,7 +32,7 @@ enum Aggregator {
         }
     }
 
-    static func sorted(_ records: [Record], by sort: Sort?, entity: Entity?) -> [Record] {
+    public static func sorted(_ records: [Record], by sort: Sort?, entity: Entity?) -> [Record] {
         guard let sort else {
             return records.sorted { ($0.createdAt ?? "") > ($1.createdAt ?? "") }
         }
@@ -51,7 +51,7 @@ enum Aggregator {
     }
 
     /// count|sum|avg|min|max
-    static func aggregate(_ op: String?, field: String?, over records: [Record]) -> Double {
+    public static func aggregate(_ op: String?, field: String?, over records: [Record]) -> Double {
         let nums = field.map { f in records.compactMap { $0[f].doubleValue } } ?? []
         switch op ?? "count" {
         case "sum": return nums.reduce(0, +)
@@ -62,7 +62,7 @@ enum Aggregator {
         }
     }
 
-    static func format(_ value: Double, as format: String?, unit: String? = nil) -> String {
+    public static func format(_ value: Double, as format: String?, unit: String? = nil) -> String {
         switch format {
         case "currency": return FieldCoding.currency(value)
         case "percent": return String(format: "%.0f%%", value)
@@ -72,15 +72,15 @@ enum Aggregator {
         }
     }
 
-    struct Bucket: Identifiable {
-        var id: String { key }
-        var key: String
-        var label: String
-        var value: Double
+    public struct Bucket: Identifiable, Sendable {
+        public var id: String { key }
+        public var key: String
+        public var label: String
+        public var value: Double
     }
 
     /// chart: groupBy(enum or 日付 field)でグループ化して集計。日付は `bucket`(day|week|month)で丸める。
-    static func buckets(_ c: Component, entity: Entity?, records: [Record]) -> [Bucket] {
+    public static func buckets(_ c: Component, entity: Entity?, records: [Record]) -> [Bucket] {
         guard let groupBy = c.groupBy else { return [] }
         let field = entity?.field(groupBy)
         var groups: [String: (label: String, rows: [Record])] = [:]

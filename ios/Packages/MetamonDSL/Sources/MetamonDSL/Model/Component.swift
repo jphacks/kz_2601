@@ -1,7 +1,8 @@
 import Foundation
 
 /// コンポーネント種別(schema `type`)。未知は `.unknown` に丸めてプレースホルダ描画する。
-enum ComponentType: String, Decodable, Sendable {
+/// 新しい種別を足す時はここに case を追加し、Renderer 側で `ComponentRegistry` に View を1つ登録する。
+public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     // container(children は Leaf のみ・1段)
     case vstack, hstack, section
     // leaf
@@ -9,59 +10,59 @@ enum ComponentType: String, Decodable, Sendable {
     case photoField, image, list, stat, chart, voiceInput, spacer, divider
     case unknown
 
-    init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
+    public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
 
-    var isContainer: Bool { self == .vstack || self == .hstack || self == .section }
+    public var isContainer: Bool { self == .vstack || self == .hstack || self == .section }
 }
 
 /// 全コンポーネントの props をフラットに持つ1ノード(Go の `dsl.Component` と 1:1)。
 /// どの props が意味を持つかは `type` 次第(docs/dsl/README.md のコンポーネント表)。
-struct Component: Decodable, Identifiable, Sendable {
-    let id: String
-    var type: ComponentType
-    /// デコード時の生の type 文字列(未知 type のプレースホルダ表示用)。
-    var rawType: String
+public struct Component: Decodable, Identifiable, Sendable {
+    public let id: String
+    public var type: ComponentType
+    /// デコード時の生の type 文字列(未知 type のプレースホルダ表示用・レジストリのキー)。
+    public var rawType: String
     /// 画面グリッド上の矩形 "A1:C3"(Screen 直下のみ有効)。nil = グリッドの下に積む。
-    var area: String?
-    var gridArea: GridArea? { area.flatMap(GridArea.init) }
+    public var area: String?
+    public var gridArea: GridArea? { area.flatMap(GridArea.init) }
 
     // container
-    var title: String?          // section / chart
-    var spacing: String?        // none|small|medium|large
-    var children: [Component]
+    public var title: String?          // section / chart
+    public var spacing: String?        // none|small|medium|large
+    public var children: [Component]
 
     // text / button / inputs
-    var text: String?
-    var style: String?          // text: title|headline|body|caption / button: primary|secondary|destructive|plain / picker: menu|segmented|wheel
-    var align: String?          // leading|center|trailing
-    var label: String?
-    var icon: String?
-    var action: Action?
-    var field: String?          // 入力の束縛先 field id / stat・chart の値 field
-    var placeholder: String?
-    var multiline: Bool?
-    var unit: String?
-    var includeTime: Bool?
-    var source: String?         // photoField: camera|library|both
-    var height: String?         // image: small|medium|large
+    public var text: String?
+    public var style: String?          // text: title|headline|body|caption / button: primary|secondary|destructive|plain / picker: menu|segmented|wheel
+    public var align: String?          // leading|center|trailing
+    public var label: String?
+    public var icon: String?
+    public var action: Action?
+    public var field: String?          // 入力の束縛先 field id / stat・chart の値 field
+    public var placeholder: String?
+    public var multiline: Bool?
+    public var unit: String?
+    public var includeTime: Bool?
+    public var source: String?         // photoField: camera|library|both
+    public var height: String?         // image: small|medium|large
 
     // data-bound(list / stat / chart)
-    var entity: String?
-    var item: ListItem?
-    var sort: Sort?
-    var filter: Filter?
-    var emptyText: String?
-    var onItemTap: Action?
-    var swipeToDelete: Bool?
-    var aggregate: String?      // count|sum|avg|min|max
-    var format: String?         // plain|currency|percent
-    var kind: String?           // bar|line|pie
-    var groupBy: String?
-    var bucket: String?         // day|week|month
+    public var entity: String?
+    public var item: ListItem?
+    public var sort: Sort?
+    public var filter: Filter?
+    public var emptyText: String?
+    public var onItemTap: Action?
+    public var swipeToDelete: Bool?
+    public var aggregate: String?      // count|sum|avg|min|max
+    public var format: String?         // plain|currency|percent
+    public var kind: String?           // bar|line|pie
+    public var groupBy: String?
+    public var bucket: String?         // day|week|month
 
     // voiceInput / spacer
-    var prompt: String?
-    var size: String?           // voiceInput: compact|large / spacer: small|medium|large|flexible
+    public var prompt: String?
+    public var size: String?           // voiceInput: compact|large / spacer: small|medium|large|flexible
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
@@ -69,7 +70,7 @@ struct Component: Decodable, Identifiable, Sendable {
         case kind, groupBy, bucket, prompt, size
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
         rawType = try c.decodeIfPresent(String.self, forKey: .type) ?? ""
         type = ComponentType(rawValue: rawType) ?? .unknown
@@ -109,51 +110,33 @@ struct Component: Decodable, Identifiable, Sendable {
 }
 
 /// list の行テンプレート。値は全部 field id。
-struct ListItem: Decodable, Sendable {
-    var title: String
-    var subtitle: String?
-    var trailing: String?
-    var icon: String?
+public struct ListItem: Decodable, Sendable {
+    public var title: String
+    public var subtitle: String?
+    public var trailing: String?
+    public var icon: String?
     /// photo field id → サムネイル
-    var image: String?
+    public var image: String?
 }
 
-struct Sort: Decodable, Sendable {
-    var field: String
-    var direction: String  // asc|desc
-}
+public struct Sort: Decodable, Sendable {
+    public var field: String
+    public var direction: String  // asc|desc
 
-struct Filter: Decodable, Sendable {
-    var field: String
-    var op: String          // eq|neq|gt|gte|lt|lte|thisMonth|today
-    var value: JSONValue?
-}
-
-/// `area` の解析結果。列は 0 始まり(A=0)、行は 1 始まり、両端含む。
-/// 画面は横 6 列(A-F)× 縦 N 行(1 行 = 可視高さ ÷ 12、13 行目以降は画面全体がスクロール)。
-struct GridArea: Equatable, Sendable {
-    static let columns = 6
-    static let visibleRows = 12
-
-    var col1: Int, row1: Int, col2: Int, row2: Int
-
-    init?(_ s: String) {
-        let parts = s.split(separator: ":")
-        guard parts.count == 2, let a = Self.cell(parts[0]), let b = Self.cell(parts[1]),
-              a.col <= b.col, a.row <= b.row else { return nil }
-        (col1, row1, col2, row2) = (a.col, a.row, b.col, b.row)
+    public init(field: String, direction: String) {
+        self.field = field
+        self.direction = direction
     }
+}
 
-    private static func cell(_ s: Substring) -> (col: Int, row: Int)? {
-        guard let first = s.first, let ascii = first.asciiValue, (65...70).contains(ascii),
-              let row = Int(s.dropFirst()), row >= 1 else { return nil }
-        return (Int(ascii) - 65, row)
-    }
+public struct Filter: Decodable, Sendable {
+    public var field: String
+    public var op: String          // eq|neq|gt|gte|lt|lte|thisMonth|today
+    public var value: JSONValue?
 
-    var colSpan: Int { col2 - col1 + 1 }
-    var rowSpan: Int { row2 - row1 + 1 }
-
-    func overlaps(_ o: GridArea) -> Bool {
-        col1 <= o.col2 && o.col1 <= col2 && row1 <= o.row2 && o.row1 <= row2
+    public init(field: String, op: String, value: JSONValue? = nil) {
+        self.field = field
+        self.op = op
+        self.value = value
     }
 }

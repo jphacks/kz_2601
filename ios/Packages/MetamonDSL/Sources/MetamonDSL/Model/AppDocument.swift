@@ -5,13 +5,13 @@ import Foundation
 // backend は厳格に検証するが、iOS が受ける JSON に「未知」が混ざっても落ちない。
 
 /// appconfig の `DSLEnvelope`(`GET /apps/{appId}/dsl`)。version は本文でなく封筒に載る。
-struct AppDocument: Decodable, Sendable {
-    var appId: String
+public struct AppDocument: Decodable, Sendable {
+    public var appId: String
     /// 単調増加。iOS はこれが進んだ時だけ再描画する(ホットリロードの基準)。
-    var version: Int
-    var dsl: AppDSL
+    public var version: Int
+    public var dsl: AppDSL
 
-    init(appId: String, version: Int, dsl: AppDSL) {
+    public init(appId: String, version: Int, dsl: AppDSL) {
         self.appId = appId
         self.version = version
         self.dsl = dsl
@@ -19,7 +19,7 @@ struct AppDocument: Decodable, Sendable {
 
     private enum Keys: String, CodingKey { case appId, version, dsl }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
         appId = try c.decodeIfPresent(String.self, forKey: .appId) ?? "local"
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 0
@@ -27,40 +27,49 @@ struct AppDocument: Decodable, Sendable {
     }
 
     /// バンドルされた DSL 例(docs/dsl/examples/*.json をそのまま同梱)を封筒に包んで読む。
-    static func bundled(_ name: String, version: Int = 1, bundle: Bundle = .main) throws -> AppDocument {
+    public static func bundled(_ name: String, version: Int = 1, bundle: Bundle = .main) throws -> AppDocument {
         AppDocument(appId: "local", version: version, dsl: try AppDSL.bundled(name, bundle: bundle))
     }
 
-    static func decode(_ data: Data) throws -> AppDocument {
+    public static func decode(_ data: Data) throws -> AppDocument {
         try JSONDecoder().decode(AppDocument.self, from: data)
     }
 
     /// バンドル読み込みすら失敗した時の最終手段。
-    static let fallback = AppDocument(appId: "fallback", version: 0, dsl: .fallback)
+    public static let fallback = AppDocument(appId: "fallback", version: 0, dsl: .fallback)
 }
 
 /// DSL 本文(schema root)。
-struct AppDSL: Decodable, Sendable {
-    var schemaVersion: Int
-    var app: AppMeta
-    var initialScreen: String
-    @Lossy var entities: [Entity]
-    @Lossy var screens: [Screen]
+public struct AppDSL: Decodable, Sendable {
+    public var schemaVersion: Int
+    public var app: AppMeta
+    public var initialScreen: String
+    @Lossy public var entities: [Entity]
+    @Lossy public var screens: [Screen]
 
-    func screen(_ id: String) -> Screen? { screens.first { $0.id == id } }
-    func entity(_ id: String) -> Entity? { entities.first { $0.id == id } }
+    public func screen(_ id: String) -> Screen? { screens.first { $0.id == id } }
+    public func entity(_ id: String) -> Entity? { entities.first { $0.id == id } }
 
     /// 初期状態(音声画面のみ)か。
-    var isVoiceOnly: Bool { app.voiceEntry == .fullscreen }
+    public var isVoiceOnly: Bool { app.voiceEntry == .fullscreen }
 
-    static func bundled(_ name: String, bundle: Bundle = .main) throws -> AppDSL {
+    /// タブ表示時の初期タブ(= tab.screen)。initialScreen がタブの根ならそれ、違えば先頭タブ。タブ無しなら空文字。
+    public var initialTab: String {
+        app.tabs.first { $0.screen == initialScreen }?.screen ?? app.tabs.first?.screen ?? ""
+    }
+
+    public static func bundled(_ name: String, bundle: Bundle = .main) throws -> AppDSL {
         guard let url = bundle.url(forResource: name, withExtension: "json") else {
             throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: "\(name).json"])
         }
-        return try JSONDecoder().decode(AppDSL.self, from: Data(contentsOf: url))
+        return try load(contentsOf: url)
     }
 
-    static let fallback: AppDSL = {
+    public static func load(contentsOf url: URL) throws -> AppDSL {
+        try JSONDecoder().decode(AppDSL.self, from: Data(contentsOf: url))
+    }
+
+    public static let fallback: AppDSL = {
         let json = """
         {"schemaVersion":1,"app":{"name":"メタモン","voiceEntry":"none"},"initialScreen":"home","entities":[],
          "screens":[{"id":"home","title":"メタモン","components":[{"type":"text","text":"DSL を読み込めませんでした"}]}]}
@@ -69,26 +78,26 @@ struct AppDSL: Decodable, Sendable {
     }()
 }
 
-enum VoiceEntry: String, Decodable, Sendable {
+public enum VoiceEntry: String, Decodable, Sendable {
     case fullscreen, floating, none
-    init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .floating) }
+    public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .floating) }
 }
 
-struct AppMeta: Decodable, Sendable {
-    var name: String
-    var description: String?
-    var icon: String?
-    var theme: Theme?
-    var voiceEntry: VoiceEntry
-    @Lossy var notifications: [NotificationSpec]
+public struct AppMeta: Decodable, Sendable {
+    public var name: String
+    public var description: String?
+    public var icon: String?
+    public var theme: Theme?
+    public var voiceEntry: VoiceEntry
+    @Lossy public var notifications: [NotificationSpec]
     /// 2〜5 個ならタブバー表示。空なら単一スタック。
-    @Lossy var tabs: [Tab]
+    @Lossy public var tabs: [Tab]
 
-    var hasTabs: Bool { tabs.count >= 2 }
+    public var hasTabs: Bool { tabs.count >= 2 }
 
     private enum Keys: String, CodingKey { case name, description, icon, theme, voiceEntry, notifications, tabs }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
         name = try c.decodeIfPresent(String.self, forKey: .name) ?? "メタモン"
         description = try c.decodeIfPresent(String.self, forKey: .description)
@@ -101,76 +110,76 @@ struct AppMeta: Decodable, Sendable {
 }
 
 /// 下タブ 1 つ。各タブは `screen` を根にした独立の NavigationStack。
-struct Tab: Decodable, Identifiable, Sendable {
-    var id: String { screen }
-    var screen: String
-    var title: String
-    var icon: String?
+public struct Tab: Decodable, Identifiable, Sendable {
+    public var id: String { screen }
+    public var screen: String
+    public var title: String
+    public var icon: String?
 }
 
-struct Theme: Decodable, Sendable {
+public struct Theme: Decodable, Sendable {
     /// "#RRGGBB"
-    var primaryColor: String?
+    public var primaryColor: String?
     /// system | light | dark
-    var mode: String?
+    public var mode: String?
 }
 
 /// ローカル通知(P0)。`app.notifications[]` は DSL ロード時に同期、`scheduleNotification` アクションは押下時に予約。
-struct NotificationSpec: Decodable, Identifiable, Sendable {
-    enum Repeat: String, Decodable, Sendable {
+public struct NotificationSpec: Decodable, Identifiable, Sendable {
+    public enum Repeat: String, Decodable, Sendable {
         case once, daily, weekly
-        init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .once) }
+        public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .once) }
     }
 
-    var id: String
-    var title: String
-    var body: String
-    var `repeat`: Repeat
+    public var id: String
+    public var title: String
+    public var body: String
+    public var `repeat`: Repeat
     /// "HH:MM" ローカル時刻
-    var time: String?
+    public var time: String?
     /// mon..sun(weekly のみ)
-    var weekday: String?
+    public var weekday: String?
 }
 
-struct Entity: Decodable, Identifiable, Sendable {
-    var id: String
-    var name: String
-    var titleField: String?
-    @Lossy var fields: [Field]
+public struct Entity: Decodable, Identifiable, Sendable {
+    public var id: String
+    public var name: String
+    public var titleField: String?
+    @Lossy public var fields: [Field]
 
-    func field(_ id: String) -> Field? { fields.first { $0.id == id } }
+    public func field(_ id: String) -> Field? { fields.first { $0.id == id } }
 }
 
-enum FieldType: String, Decodable, Sendable {
+public enum FieldType: String, Decodable, Sendable {
     case string, text, integer, number, boolean, date, datetime, `enum`, currency, photo, location
-    init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .string) }
+    public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .string) }
 
-    var isNumeric: Bool { self == .integer || self == .number || self == .currency }
-    var isDate: Bool { self == .date || self == .datetime }
+    public var isNumeric: Bool { self == .integer || self == .number || self == .currency }
+    public var isDate: Bool { self == .date || self == .datetime }
 }
 
-struct Field: Decodable, Identifiable, Sendable {
-    var id: String
-    var name: String
-    var type: FieldType
-    var required: Bool?
-    var options: [String]?
+public struct Field: Decodable, Identifiable, Sendable {
+    public var id: String
+    public var name: String
+    public var type: FieldType
+    public var required: Bool?
+    public var options: [String]?
     /// リテラル既定値。date/datetime は "now" 可。
-    var defaultValue: JSONValue?
-    var unit: String?
+    public var defaultValue: JSONValue?
+    public var unit: String?
 }
 
-struct Screen: Decodable, Identifiable, Sendable {
-    var id: String
-    var title: String
+public struct Screen: Decodable, Identifiable, Sendable {
+    public var id: String
+    public var title: String
     /// 指定時はこの entity のフォーム画面(入力系 Leaf の `field` はドラフトのキー)。recordId 付きで開かれたら編集モード。
-    var entity: String?
-    @Lossy var toolbar: [ToolbarButton]
-    @Lossy var components: [Component]
+    public var entity: String?
+    @Lossy public var toolbar: [ToolbarButton]
+    @Lossy public var components: [Component]
 
     private enum Keys: String, CodingKey { case id, title, entity, toolbar, components }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
         id = try c.decode(String.self, forKey: .id)
         title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
@@ -180,22 +189,22 @@ struct Screen: Decodable, Identifiable, Sendable {
     }
 
     /// 画面内の全コンポーネント(コンテナの子も含む・2段固定なので再帰不要)。
-    var allComponents: [Component] { components.flatMap { [$0] + $0.children } }
+    public var allComponents: [Component] { components.flatMap { [$0] + $0.children } }
 
     /// この画面が参照する entity id(レコード取得対象)。
-    var referencedEntities: Set<String> {
+    public var referencedEntities: Set<String> {
         var s = Set(allComponents.compactMap(\.entity))
         if let entity { s.insert(entity) }
         return s
     }
 
     /// voiceInput を含む画面はスクロールさせず全面に出す。
-    var isVoiceScreen: Bool { allComponents.contains { $0.type == .voiceInput } }
+    public var isVoiceScreen: Bool { allComponents.contains { $0.type == .voiceInput } }
 }
 
-struct ToolbarButton: Decodable, Identifiable, Sendable {
-    var id: String { label + (icon ?? "") }
-    var label: String
-    var icon: String?
-    var action: Action
+public struct ToolbarButton: Decodable, Identifiable, Sendable {
+    public var id: String { label + (icon ?? "") }
+    public var label: String
+    public var icon: String?
+    public var action: Action
 }

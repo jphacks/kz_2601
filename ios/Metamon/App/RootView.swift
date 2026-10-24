@@ -1,4 +1,5 @@
 import SwiftUI
+import MetamonDSL
 
 /// `app.tabs` があれば TabView(タブ毎に NavigationStack)、無ければ `initialScreen` を根にした単一 NavigationStack。
 /// その上にモーダル・音声シート・確認ダイアログ・モーフ中オーバーレイを重ねる。

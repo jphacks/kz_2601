@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import MetamonDSL
 
 /// ローカル通知(P0)。
 /// - `app.notifications[]`: DSL ロード毎に id 一致で置換・消えた id は取消(識別子 prefix `dsl.`)。

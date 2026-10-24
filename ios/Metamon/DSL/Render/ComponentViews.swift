@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 import PhotosUI
+import MetamonDSL
 
 // MARK: - Container (vstack / hstack / section)
 
@@ -356,15 +357,7 @@ struct ListLeaf: View {
 
 extension Action {
     /// list の長押し削除用(DSL 外で iOS が合成する)。
-    static func delete(entity: String) -> Action {
-        var a = Action.placeholder
-        a.type = .deleteRecord
-        a.rawType = "deleteRecord"
-        a.entity = entity
-        return a
-    }
-
-    static let placeholder: Action = try! JSONDecoder().decode(Action.self, from: Data(#"{"type":"back"}"#.utf8))
+    static func delete(entity: String) -> Action { Action(type: .deleteRecord, entity: entity) }
 }
 
 struct ListRow: View {

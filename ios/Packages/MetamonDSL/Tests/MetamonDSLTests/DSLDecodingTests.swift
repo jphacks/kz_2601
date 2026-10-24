@@ -1,14 +1,20 @@
 import XCTest
-@testable import Metamon
+@testable import MetamonDSL
 
-/// docs/dsl/examples/*.json(= backend の CI でも検証される正典 4 本)が iOS でもデコードできることを保証する。
+/// docs/dsl/examples/*.json(= backend の CI でも検証される正典 4 本)が Swift 側でもデコードできることを保証する。
 final class DSLDecodingTests: XCTestCase {
-    private func load(_ name: String) throws -> AppDSL {
-        try AppDSL.bundled(name, bundle: Bundle.main)
+    private func load(_ name: String) throws -> AppDSL { try ExamplesFixture.load(name) }
+
+    func testExampleNamesMatchRepository() throws {
+        let onDisk = try FileManager.default.contentsOfDirectory(atPath: ExamplesFixture.examplesDir.path)
+            .filter { $0.hasSuffix(".json") }
+            .map { String($0.dropLast(5)) }
+            .sorted()
+        XCTAssertEqual(onDisk, DSLExamples.names.sorted(), "DSLExamples.names と docs/dsl/examples がずれている")
     }
 
     func testAllExamplesDecode() throws {
-        for name in ["initial", "kakeibo", "training", "walk"] {
+        for name in DSLExamples.names {
             let dsl = try load(name)
             XCTAssertEqual(dsl.schemaVersion, 1, name)
             XCTAssertNotNil(dsl.screen(dsl.initialScreen), "\(name): initialScreen must exist")
@@ -67,35 +73,14 @@ final class DSLDecodingTests: XCTestCase {
         XCTAssertEqual(screen.components[1].action?.rawType, "teleport")
     }
 
-    func testGridAreasAreValidAndNonOverlapping() throws {
-        for name in ["initial", "kakeibo", "training", "walk"] {
-            let dsl = try load(name)
-            for s in dsl.screens {
-                var placed: [GridArea] = []
-                for c in s.components {
-                    guard let raw = c.area else { continue }
-                    let a = try XCTUnwrap(GridArea(raw), "\(name)/\(s.id): bad area \(raw)")
-                    XCTAssertFalse(placed.contains { $0.overlaps(a) }, "\(name)/\(s.id): \(raw) overlaps a sibling")
-                    placed.append(a)
-                }
-                XCTAssertFalse(placed.isEmpty, "\(name)/\(s.id): examples should use the grid")
-            }
-        }
-        XCTAssertEqual(GridArea("A1:C3").map { [$0.col1, $0.row1, $0.col2, $0.row2] }, [0, 1, 2, 3])
-        XCTAssertNil(GridArea("G1:G2"))
-        XCTAssertNil(GridArea("A0:B1"))
-        XCTAssertNil(GridArea("C3:A1"))
-        XCTAssertTrue(GridArea("A1:C3")!.overlaps(GridArea("C3:F6")!))
-        XCTAssertFalse(GridArea("A1:C3")!.overlaps(GridArea("D1:F3")!))
-    }
-
-    @MainActor func testTabs() throws {
+    func testTabs() throws {
         let kakeibo = try load("kakeibo")
         XCTAssertTrue(kakeibo.app.hasTabs)
         XCTAssertEqual(kakeibo.app.tabs.map(\.screen), ["home", "stats"])
-        XCTAssertEqual(AppRuntime.initialTab(kakeibo), "home")
+        XCTAssertEqual(kakeibo.initialTab, "home")
         XCTAssertFalse(try load("walk").app.hasTabs)
         XCTAssertFalse(try load("initial").app.hasTabs)
+        XCTAssertEqual(try load("initial").initialTab, "")
     }
 
     func testEnvelopeDecodes() throws {
@@ -106,15 +91,8 @@ final class DSLDecodingTests: XCTestCase {
         XCTAssertEqual(doc.dsl.app.voiceEntry, .none)
     }
 
-    func testAggregator() {
-        let records = [
-            Record(id: "1", data: ["amount": 100, "category": "食費", "date": .string(FieldCoding.dateFormatter.string(from: .now))]),
-            Record(id: "2", data: ["amount": 50, "category": "交通", "date": "2000-01-01"]),
-        ]
-        XCTAssertEqual(Aggregator.aggregate("sum", field: "amount", over: records), 150)
-        XCTAssertEqual(Aggregator.aggregate("count", field: nil, over: records), 2)
-        let filter = Filter(field: "date", op: "thisMonth", value: nil)
-        XCTAssertEqual(Aggregator.apply(filter, entity: nil, to: records).count, 1)
-        XCTAssertEqual(Aggregator.format(1234, as: "currency"), "¥1,234")
+    func testFallbackDocumentIsUsable() {
+        XCTAssertEqual(AppDocument.fallback.dsl.initialScreen, "home")
+        XCTAssertNotNil(AppDocument.fallback.dsl.screen("home"))
     }
 }

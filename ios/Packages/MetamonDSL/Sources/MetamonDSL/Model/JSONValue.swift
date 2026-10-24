@@ -1,7 +1,7 @@
 import Foundation
 
 /// 任意の JSON を表す値型。DSL の state / params / entity レコードの共通表現。
-enum JSONValue: Hashable, Codable, Sendable {
+public enum JSONValue: Hashable, Codable, Sendable {
     case string(String)
     case number(Double)
     case bool(Bool)
@@ -9,7 +9,7 @@ enum JSONValue: Hashable, Codable, Sendable {
     case array([JSONValue])
     case object([String: JSONValue])
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.singleValueContainer()
         if c.decodeNil() { self = .null; return }
         if let b = try? c.decode(Bool.self) { self = .bool(b); return }
@@ -20,7 +20,7 @@ enum JSONValue: Hashable, Codable, Sendable {
         throw DecodingError.dataCorruptedError(in: c, debugDescription: "Unsupported JSON value")
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
         switch self {
         case .string(let s): try c.encode(s)
@@ -34,15 +34,15 @@ enum JSONValue: Hashable, Codable, Sendable {
 
     // MARK: - Accessors
 
-    var stringValue: String? { if case .string(let s) = self { return s }; return nil }
-    var doubleValue: Double? { if case .number(let n) = self { return n }; return nil }
-    var boolValue: Bool? { if case .bool(let b) = self { return b }; return nil }
-    var arrayValue: [JSONValue]? { if case .array(let a) = self { return a }; return nil }
-    var objectValue: [String: JSONValue]? { if case .object(let o) = self { return o }; return nil }
-    var isNull: Bool { if case .null = self { return true }; return false }
+    public var stringValue: String? { if case .string(let s) = self { return s }; return nil }
+    public var doubleValue: Double? { if case .number(let n) = self { return n }; return nil }
+    public var boolValue: Bool? { if case .bool(let b) = self { return b }; return nil }
+    public var arrayValue: [JSONValue]? { if case .array(let a) = self { return a }; return nil }
+    public var objectValue: [String: JSONValue]? { if case .object(let o) = self { return o }; return nil }
+    public var isNull: Bool { if case .null = self { return true }; return false }
 
     /// テンプレート埋め込み・Text 表示用。
-    var displayString: String {
+    public var displayString: String {
         switch self {
         case .string(let s): return s
         case .number(let n):
@@ -56,7 +56,7 @@ enum JSONValue: Hashable, Codable, Sendable {
     }
 
     /// `visible` / `disabled` 判定用の真偽値化。
-    var truthy: Bool {
+    public var truthy: Bool {
         switch self {
         case .null: return false
         case .bool(let b): return b
@@ -69,11 +69,11 @@ enum JSONValue: Hashable, Codable, Sendable {
 
     // MARK: - Path access ("todos.0.title", "todos.count")
 
-    subscript(path path: String) -> JSONValue? {
+    public subscript(path path: String) -> JSONValue? {
         value(at: path.split(separator: ".").map(String.init))
     }
 
-    func value(at segments: [String]) -> JSONValue? {
+    public func value(at segments: [String]) -> JSONValue? {
         guard let first = segments.first else { return self }
         let rest = Array(segments.dropFirst())
         switch self {
@@ -90,7 +90,7 @@ enum JSONValue: Hashable, Codable, Sendable {
         }
     }
 
-    mutating func set(_ segments: [String], to value: JSONValue) {
+    public mutating func set(_ segments: [String], to value: JSONValue) {
         guard let first = segments.first else { self = value; return }
         let rest = Array(segments.dropFirst())
         if let i = Int(first), var a = arrayValue ?? (isNull ? [] : nil) {
@@ -106,7 +106,7 @@ enum JSONValue: Hashable, Codable, Sendable {
         self = .object(o)
     }
 
-    mutating func set(path: String, to value: JSONValue) {
+    public mutating func set(path: String, to value: JSONValue) {
         set(path.split(separator: ".").map(String.init), to: value)
     }
 }
@@ -115,11 +115,11 @@ enum JSONValue: Hashable, Codable, Sendable {
 
 extension JSONValue: ExpressibleByStringLiteral, ExpressibleByIntegerLiteral, ExpressibleByFloatLiteral,
     ExpressibleByBooleanLiteral, ExpressibleByArrayLiteral, ExpressibleByDictionaryLiteral, ExpressibleByNilLiteral {
-    init(stringLiteral value: String) { self = .string(value) }
-    init(integerLiteral value: Int) { self = .number(Double(value)) }
-    init(floatLiteral value: Double) { self = .number(value) }
-    init(booleanLiteral value: Bool) { self = .bool(value) }
-    init(arrayLiteral elements: JSONValue...) { self = .array(elements) }
-    init(dictionaryLiteral elements: (String, JSONValue)...) { self = .object(Dictionary(uniqueKeysWithValues: elements)) }
-    init(nilLiteral: ()) { self = .null }
+    public init(stringLiteral value: String) { self = .string(value) }
+    public init(integerLiteral value: Int) { self = .number(Double(value)) }
+    public init(floatLiteral value: Double) { self = .number(value) }
+    public init(booleanLiteral value: Bool) { self = .bool(value) }
+    public init(arrayLiteral elements: JSONValue...) { self = .array(elements) }
+    public init(dictionaryLiteral elements: (String, JSONValue)...) { self = .object(Dictionary(uniqueKeysWithValues: elements)) }
+    public init(nilLiteral: ()) { self = .null }
 }

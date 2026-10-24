@@ -1,4 +1,5 @@
 import Foundation
+import MetamonDSL
 
 /// appconfig の REST 実装(docs/backend/openapi-appconfig.yaml)。
 struct HTTPAppConfigClient: AppConfigClient {
