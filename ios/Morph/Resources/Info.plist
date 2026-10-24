@@ -37,6 +37,10 @@
 	<key>MorphAPIBaseURL</key>
 	<string></string>
 
+	<!-- WhisperKit モデル名。空なら `small`(約500MB・日本語精度優先)。環境変数 MORPH_WHISPER_MODEL でも上書き可 -->
+	<key>MorphWhisperModel</key>
+	<string></string>
+
 	<!-- ネイティブ機能の権限説明(P0: マイク/カメラ/通知、P1: 位置/モーション) -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>話しかけた内容からアプリを生成するために、マイクを使用します。</string>
