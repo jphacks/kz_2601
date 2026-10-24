@@ -114,4 +114,12 @@ enum DeviceAppID {
         UserDefaults.standard.set(fresh, forKey: key)
         return fresh
     }
+
+    /// 「アプリをリセット」用: 新しい appId を発行して保存する(サーバーからは新規端末に見える)。
+    @discardableResult
+    static func rotate() -> String {
+        let fresh = UUID().uuidString.lowercased()
+        UserDefaults.standard.set(fresh, forKey: key)
+        return fresh
+    }
 }
