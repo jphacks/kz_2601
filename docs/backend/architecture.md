@@ -269,6 +269,14 @@ flowchart TD
   PP -- 201 --> O
 ```
 
+**undo(「元に戻して」・実装済み)**: `mode=undo` の明示、または `mode=auto` で発話が**短く(16 文字以内)かつ undo 語で始まる**とき(`元に戻し / 戻して / 取り消し / さっきのやめ / やっぱりやめ / アンドゥ / undo / ひとつ前に戻` 等 = `ai.wantsUndo`。「一覧を元の位置に戻して」「戻すボタンを追加して」は文頭一致しないので edit)に、**Claude を呼ばず** appconfig を直接叩く。
+
+1. `GET /versions` で現行 version の `source` を見て戻し先 n を決める: 現行が `restore` なら `restoredFrom - 1`、それ以外は `現行 - 1`(連続「戻して」が redo にならず、さらに前へ戻る)
+2. `n < 1`(version 1 = 初期状態しか無い)なら何もせず現状の DSL を `summary: "戻せる変更がありません。"` で返す
+3. `POST /versions/{n}/restore`(appconfig が新 version N+1 を `source.kind=restore` で積む)→ `GET /dsl` で新 version の DSL を取り直して返す
+
+応答は `mode: "restore"`, `restoredFrom: n`, `source: "restore"`, `summary: "ひとつ前の状態(version n)に戻しました。"`(openapi-ai.yaml)。`appconfigclient.Memory`(インメモリ stub)も履歴を持つので `APPCONFIG_BASE_URL` 無しでも同じ挙動。実測(ローカル 2 プロセス・2026-10-24): create v2 → edit v3 → 「元に戻して」→ v4(= v2 の DSL)で **9 ms**、`GET /versions` の最新が `restore←v2`。
+
 ルールベース fallback(`internal/ai/fallback`): キーワード辞書 → `templates/*.json` = **デモ3本(家計簿・トレーニング記録・散歩メモ)** + ToDo。テンプレは `docs/dsl/examples/*.json` をそのまま埋め込み、`dsl_test.go` が CI で検証済み。デモ当日に Claude が落ちても 3 本は必ず動く保険。
 
 ### 6.4 レイテンシ目標
@@ -330,6 +338,17 @@ jobs:
 ```
 
 実測: 現状 `go test ./...` 0.4s、依存ダウンロード込みでも ~1 分(モジュールキャッシュが効けば 20s)。Firestore エミュレータを使う統合テストは `//go:build integration` タグで CI から外し、ローカル `make test-integration` のみ。staticcheck を足す時も 5 分枠を超えないか確認。
+
+### スモークテスト(`backend/cmd/smoke`・Day2 の保険)
+
+デモ 3 本 + undo を実 API で順に流し、各ステップの ms / Claude ms / トークンを Markdown 表で出す(どれか失敗で非 0 終了)。`GET /dsl`(自動作成) → 家計簿 create(`dsl.Parse` OK・画面数・area 重なり 0) → 「今月の合計をもっと大きく表示して」edit(patch) → 「元に戻して」undo(version が進み DSL が create 時と一致) → appconfig `GET /versions` の最新が restore → 筋トレ create(daily 08:00 通知) → 散歩 create(`photoField` camera/both)。
+
+| 入口 | 内容 |
+|---|---|
+| `make smoke-local` | appconfig(memory store・`AUTH_MODE=dev`・:18080)と ai(`../.env` の key・:18081)を起動 → smoke → 終了。Claude 3 回(約 30 秒) |
+| `FIREBASE_WEB_API_KEY=<Firebase Web API key> make smoke-stg` | staging。appconfig-stg は `AUTH_MODE=firebase` なので identitytoolkit REST の匿名 `signUp` で ID トークンを取る(Web API key はクライアント配布される公開情報・GitHub Variables に置く)。取れなければ health と「未認証 generate が 401」の確認だけにフォールバック |
+| `deploy-cloudrun.yml` | staging デプロイ後に同じものを **非ブロッキング**(`continue-on-error`)で実行し job summary に表を貼る |
+| `-only kakeibo\|training\|walk` / `SMOKE_ONLY=` | 1 本だけ |
 
 ### 環境変数
 
