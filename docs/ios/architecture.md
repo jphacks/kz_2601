@@ -833,7 +833,20 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 2. Entitlement `pro` を作り、上の商品を Offering に紐付け。
 3. iOS は `ProEntitlementStore` を RevenueCat SDK(`Purchases.configure` + `appUserID` = Firebase uid・`customerInfo.entitlements["pro"]`)の実装に差し替える。`ProGate` / UI はそのまま使える(権利の読み口が `isPro` だけなので)。
 4. サーバー側は RevenueCat の webhook か REST API で uid の権利を確認する。
-5. Issue #77 の「有料 API を使う機能だけ ¥500 の確認カード」(DSL の `requiresPaid`)は、非消耗型の商品を追加し Offering を分けて実装する(未着手)。
+5. 有料機能の確認カード(22.7)は同じ「Tailor It Pro」の権利を見るだけなので、RevenueCat に移しても変更不要。
+
+### 22.7 有料機能の確認カード(チャットの「これでいく」・Issue #77 の残り)
+有料のクラウド機能を使うアプリを作る時、生成の**前**に「〇〇には Tailor It Pro(¥500 / 月)が必要です」→「購入して作る」/「この機能なしで作る」を選んでもらう。
+
+| 項目 | 決定 |
+|---|---|
+| 何が有料か | backend の `paid_features.json`(1 か所・docs/backend/architecture.md §6.8)。初期は「みんなで共有するデータ」(共有データ型アプリ)だけ。iOS は判定を持たず、`POST /v1/chat` の ready の `requiresPro` / `paidFeatures` / `freeTranscript`、案の `options[].requiresPro` / `freeInstruction` を見るだけ |
+| 出す時 | ready の「これでいく」(`buildFromChat`・声の自動生成も含む)と案の「これでいく」(`choose`)。判定は `MetamonServices/Purchase/PaidFeatureCheck.swift`(純粋関数) |
+| 出さない時 | **Pro 会員** / **回数制限が無効の時(DEBUG ビルドの既定 = デモ端末)**。`METAMON_IAP_ENFORCE=1` で DEBUG でも出る(`ProGate.isEnforced` と同じ扱い・22.4)/ 旧 backend(`requiresPro` 無し)/ ready の transcript 以外の予備文で作る時 |
+| カード | `ClarifyChatView` の「これでいく」の位置(`PaidFeatureCard`・create は初期画面、edit は音声シートの中)。購入して作る = `ProEntitlementStore.purchase` → 成功したら有料機能込みの文で生成(キャンセル・承認待ちはカードに残る)/ この機能なしで作る = `freeTranscript`(`freeInstruction`)で生成 / × = チャットに戻る。話し直すとカードは閉じて次の応答で判定し直す |
+| 実装 | `Features/Purchase/AppRuntime+PaidFeature.swift`(`holdForPaidConfirm` / `purchaseAndBuild` / `buildWithoutPaidFeatures` / `dismissPaidConfirm`)。モック ai は「みんなで / 共有 / 掲示板 / 投稿」を含む ready に `requiresPro` を付ける |
+| テスト | `MetamonServicesTests/PaidFeatureCheckTests.swift`(出し分け・JSON の新旧)・`MetamonTests/PaidFeatureConfirmTests.swift`(カード → なしで作る・無効化中は出ない・やめる / 話し直し・案)・UI `testPaidFeatureCardBuildWithoutFeature` |
+| 限界(後続) | サーバー強制なし(22.3 と同じ)。チャット OFF の即生成・「このまま作る」の予備文はカードを通らない |
 
 ## 23. UI テスト(XCUITest・Issue #165)
 

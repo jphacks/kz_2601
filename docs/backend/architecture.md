@@ -451,6 +451,23 @@ flowchart LR
 | 2 パス(opt-in) | `AI_LOGIC_PASS=1` か `Request.logicPass:true`。create の後に計算カタログだけの小さな system prompt(約 2.9K tok)で「計算を足す JSON Patch」を 1 回(+1 回再試行)。検証に通らなければ 1 パス目を返す。計算 5/5 は同じで p50 10.7s(1 パス 6.5s)と遅いので既定にしない。edit ターンでは動かない(後続対応) |
 | ストリーミング | 1 パス目の `event: app` はそのまま先に届く。2 パス目の結果は最終 DSL(`event: result`)に反映 |
 
+### 6.8 有料機能の判定(`requiresPro`・Issue #77・2026-10-25)
+
+チャットの ready / proposal に「作る予定の内容が Tailor It Pro(¥500 / 月)を要するか」を付ける。**課金の強制はしない**(iOS が確認カードを出すための情報だけ)。
+
+| 項目 | 決定 |
+|---|---|
+| 有料リスト(1 か所) | **`backend/internal/ai/paid_features.json`**(`//go:embed`)。初期は **`sharedData`(みんなで共有するデータ = entity.scope shared/public・apps_public の同期)だけ**。他の機能を有料にする時はここに 1 要素足す(`id`・`title`/`reason`/`withoutInstruction` の ja/en・`keywords`・`excludeKeywords`・`dslEntityScopes`)。一時的に外す時は `enabled: false`。id の重複は起動時に panic(テスト `TestPaidCatalog_ParseEditable`) |
+| 判定の材料 | **generate に渡る文そのもの**(ready の `transcript` / 案の `instruction`)に `keywords` が含まれるか(`excludeKeywords` を先に取り除く。「共有ボタン」「共有しない」は有料にしない)。sharedData の語は生成プロンプトの `entity.scope` 規則(「みんなで」「共有」「投稿」「ランキング」「掲示板」「友達と」→ scope:public)と揃えてあるので、生成前に生成結果を予測できる |
+| edit | 今のアプリが既に持つ有料機能(`dslEntityScopes` で現 DSL を判定)は除く(既に共有のアプリを直すたびに聞かない) |
+| 応答(追加フィールド・すべて省略可) | ready: `requiresPro` / `paidFeatures[{id,title,reason}]` / `freeTranscript`。proposal: `options[].requiresPro` / `paidFeatures` / `freeInstruction`。無料なら一切出さない(旧 iOS は今と同じ JSON を受け取る) |
+| 「この機能なしで作る」 | `freeTranscript` / `freeInstruction` = 元の文 + `withoutInstruction`(「無料版で作る: 他のユーザーとデータを共有する機能は入れない…scope は private」)。iOS はこれを generate に渡す |
+| 実装 | `internal/ai/paid.go`(`PaidCatalog.Detect` / `InApp` / `Without` / `annotate`)。`Service.Chat`(旧 clarify)と `chatFirst` の戻り値に defer で付ける。テスト `paid_test.go` |
+
+**iOS の生成後 DSL で判定しなかった理由**: ai の generate は生成した DSL を **その場で appconfig に保存する**(version が増え、共有アプリなら apps_public にも公開される)。生成後に判定すると、確認カードを出す前に有料機能入りのアプリがサーバーに出来てしまい(「元に戻して」やアプリ一覧から無料で開ける)、「この機能なしで作る」はもう 1 回の生成(LLM 費用・待ち時間)になる。チャットの ready / 案の時点なら生成前に止められ、判定に LLM 呼び出しも増えない。
+
+**後続(今回やらない)**: サーバー側のエンタイトルメント。App Store Server API(または RevenueCat webhook)でレシートを検証して uid の Pro を appconfig に保存し、ai の generate / appconfig の共有 entity の書き込みで `requiresPro` な内容を 402 で止める。それまでは iOS のカードだけのソフトなゲート(チャット OFF の即生成・「このまま作る」の予備文・改造クライアントは素通り)。
+
 ## 7. ローカル開発・デプロイ・環境変数
 
 ### ローカル
