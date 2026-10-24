@@ -18,7 +18,7 @@ import (
 
 func testHandler() http.Handler {
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
-	return newHandler(auth.Middleware(nil, auth.ModeDev), logger, appconfig.New(store.NewMemory()))
+	return newHandler(auth.Middleware(nil, auth.ModeDev), logger, appconfig.New(store.NewMemory()), nil)
 }
 
 func TestRoutes(t *testing.T) {

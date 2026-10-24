@@ -9,6 +9,7 @@ struct AppSwitcherSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var thumbs = AppThumbnailStore.shared
     @State private var selected: String?
+    @State private var sharingUI = SharingUI.shared
 
     private var apps: [AppSummary] { rt.visibleApps }
     private var showSkeleton: Bool { rt.appsLoading && apps.isEmpty }
@@ -30,6 +31,25 @@ struct AppSwitcherSheet: View {
         .presentationDragIndicator(.visible)
         .sensoryFeedback(.selection, trigger: selected)
         .task { await rt.appsList() }
+        .sheet(item: $sharingUI.shareTarget) { ShareAppSheet(app: $0) }
+    }
+
+    /// カード右上のシェアボタン(#49)。サーバー接続時のみ。
+    @ViewBuilder
+    private func shareButton(for app: AppSummary) -> some View {
+        if rt.canShare {
+            Button { sharingUI.shareTarget = app } label: {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(.black.opacity(0.35), in: Circle())
+                    .overlay(Circle().strokeBorder(.white.opacity(0.3)))
+            }
+            .buttonStyle(.plain)
+            .padding(Theme.Spacing.sm)
+            .accessibilityLabel("\(app.name)をシェア")
+        }
     }
 
     // MARK: - Sections
@@ -89,6 +109,7 @@ struct AppSwitcherSheet: View {
                                 thumbnail: thumbnail(for: app.id)) {
                             select(app)
                         }
+                        .overlay(alignment: .topTrailing) { shareButton(for: app) }
                     }
                 }
                 .padding(.horizontal, Theme.Spacing.lg)

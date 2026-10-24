@@ -68,6 +68,19 @@
 		<string>discord</string>
 	</array>
 
+	<!-- シェアリンク(#49): tailorit://import/<token> で開くと import してそのアプリに変身する(RootView の SharingHooks) -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>jp.kz2601.metamon.share</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>tailorit</string>
+			</array>
+		</dict>
+	</array>
+
 	<!-- WhisperKit モデル名。空なら `small`(約500MB・日本語精度優先)。環境変数 METAMON_WHISPER_MODEL でも上書き可 -->
 	<key>MetamonWhisperModel</key>
 	<string></string>

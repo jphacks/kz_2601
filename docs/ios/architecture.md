@@ -387,6 +387,19 @@ DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例
 
 DEBUG フック: `METAMON_AUTO_SWITCHER=1`(起動 2.5 秒後に変身一覧を開く)。`METAMON_AUTO_TRANSCRIPT="家計簿に切り替えて"` で音声切替も通せる。
 
+### シェアと「探す」(#49 #50)(2026-10-24 夜)
+
+| 入口 | 動き | 実装 |
+|---|---|---|
+| 変身一覧の各カード右上の共有ボタン | `ShareAppSheet`: `POST /apps/{id}/share` → QR(`tailorit://import/<token>`)・`ShareLink`(Web フォールバック URL + アプリ URL)・コピー・取り消し。下段で「探す」へ公開/非公開(説明・タグ) | `Features/Share/ShareAppSheet.swift`。発行済みトークンは `SharingUI.issued` に保持(開くたびに増やさない) |
+| `tailorit://import/<token>`(QR / リンク) | `POST /shares/{token}/import` → 返った appId に `switchApp`(変身アニメ)→ 要約カード「シェアされた「◯◯」を追加しました」 | `Info.plist` の `CFBundleURLTypes`、`SharingHooks`(RootView に 1 行)の `onOpenURL` → `AppRuntime.openShareURL` |
+| 初期画面下部「みんなが作ったアプリを探す」 | `DiscoverSheet`: 検索(250ms 間引き)・人気/新着・カード(名前・作者・利用数・説明・部品アイコン・タグ)→「入れる」で `POST /public-apps/{id}/install` → 変身 | `Features/Share/DiscoverSheet.swift`。導線は `VoiceInputView` に 1 行(`DiscoverEntry`) |
+
+- サービスは `MetamonServices` の `SharingClient`(`HTTPSharingClient`)。`Services.sharing` は appconfig が live の時だけ非 nil で、モック起動では導線ごと出さない。
+- 共有データ(scope: shared/public)を持つアプリは受け取ると**元の appId に参加**する(backend architecture §3.2)。要約カードに「みんなの投稿も見られます」を添える。
+- DEBUG フック: `METAMON_AUTO_SHARE=1`(変身一覧 → 今のアプリのシェアシート)/ `METAMON_AUTO_IMPORT=<token>`(リンクを開いたのと同じ経路。`simctl openurl` は OS の確認ダイアログで止まるため)/ `METAMON_AUTO_DISCOVER=1`(+ `METAMON_AUTO_INSTALL=<公開 id>`)。
+- 注意: 端末ローカルの `DocumentCache` / レコードキャッシュは uid を区別しないので、同じ端末で `METAMON_DEV_UID` を切り替えると前ユーザーのキャッシュが一瞬見える(サーバーは正しく分離)。2 ユーザー検証はアプリを入れ直してから行う。
+
 ## 7. 認証(実装済み)
 
 ```
