@@ -10,12 +10,12 @@ struct StatLeaf: View {
     let c: Component
 
     var body: some View {
-        let (formatted, isLoading, unavailable) = c.aggregate == nil && c.valueExpr != nil ? exprValue : aggregateValue
+        let (formatted, isLoading, unavailable) = isValueMode ? exprValue : aggregateValue
         // アクセシビリティサイズ: 1 行高のセルでも数値が見えるよう、ラベルは縮小 1 行・余白を詰める(足りなければセル内スクロール)
         let compact = typeSize.isAccessibilitySize
         VStack(alignment: .leading, spacing: RenderTheme.Spacing.xs) {
             HStack(spacing: 6) {
-                Image(systemName: c.icon ?? FieldIcon.stat(aggregate: c.aggregate, field: fieldDef))
+                Image(systemName: c.icon ?? (isValueMode ? "function" : FieldIcon.stat(aggregate: c.aggregate, field: fieldDef)))
                     .font(.caption.weight(.bold))
                     .foregroundStyle(RenderTheme.Colors.brandA)
                     .frame(width: 18, height: 18)
@@ -55,6 +55,9 @@ struct StatLeaf: View {
             .lineLimit(1)
             .minimumScaleFactor(0.45)
     }
+
+    /// `value`(Expr)で値を出すモード(aggregate 指定が優先)
+    private var isValueMode: Bool { c.aggregate == nil && c.valueExpr != nil }
 
     /// アイコン選択用の field 定義(value モードでは無し)
     private var fieldDef: Field? {
