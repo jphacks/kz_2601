@@ -778,11 +778,13 @@ simctl ではタップ・ドラッグ・長押しができないので、指の�
 手元での実行(PC 負荷対策: xcodebuild は同時 1 本・シミュレータ 1 台・並列なし):
 ```sh
 cd ios && xcodegen generate
-xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' \
+xcrun simctl list devices booted | grep -c Booted   # 0 を確認(シミュレータは全体で 1 台。新しく作らない = 初回起動のキャッシュ作り直しで PC が発熱する)
+xcodebuild -scheme Metamon -destination 'id=<共有の iPhone 17 の UDID>' \
   -only-testing:MetamonUITests -parallel-testing-enabled NO \
   -resultBundlePath /tmp/uitest.xcresult test CODE_SIGNING_ALLOWED=NO
 # 失敗時のスクショ: xcrun xcresulttool export attachments --path /tmp/uitest.xcresult --output-path <dir>
 ```
 
-実測(2026-10-24・iPhone 17 シミュレータ・M 系 Mac): 8 本すべて成功。テスト本体 約 100 秒、シミュレータ起動込みで約 3.5 分(build-for-testing は差分で 1〜3 分)。
+実測(2026-10-25・iPhone 17 シミュレータ): 8 本すべて成功。テスト本体 約 80〜100 秒、起動済みキャッシュのあるシミュレータで約 2 分強(新規作成したシミュレータだと初回起動込みで約 4 分)。build-for-testing は差分で 10 秒〜1 分。
+注意: 取っ手で FAB を戻した直後は、accessibilityHidden の解除がアクセシビリティツリーに反映されるまで少し遅れることがある。テストは `exists` を待ってから実際にタップして確かめる(`isHittable` は SwiftUI の `.position` 配置で偽になることがあるので使わない)。
 CI: `ios-ci.yml` の test ステップは project.yml に `bundle.unit-test` がある時だけ動く(現状はスキップ)。#166 で `MetamonTests` が入ると Metamon スキームの test が CI で動き、UI テストも一緒に回る(+3〜4 分。10 分以内なので CI に載せる方針)。CI で重すぎる・不安定なら `-skip-testing:MetamonUITests` を足して手元実行だけに戻す。
