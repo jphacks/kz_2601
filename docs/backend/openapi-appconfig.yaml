@@ -406,8 +406,11 @@ paths:
       description: |
         自分のアプリ(`users/{uid}/apps/{appId}`)の**現行 DSL のスナップショット**を `shares/{token}` に保存し、推測不能なトークン(192 bit)を返す。
         レコードは含まない。他人のアプリは自分の木に無いので 404。
+        publish と違い作成者に限らない(トークンは発行ごとに別でグローバルに占有するものが無く、共有アプリの参加者が友だちを招くため・#118)。
+        中身が初期 DSL のまま(生成前・GET /dsl で seed されただけ)のアプリは 400。
       responses:
         '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Share' } } } }
+        '400': { description: 中身が初期 DSL のまま, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
   /shares/{token}:
     parameters: [{ $ref: '#/components/parameters/ShareToken' }]
@@ -456,7 +459,10 @@ paths:
       summary: 「探す」に公開(作成 or 更新)
       description: |
         自分のアプリの現行 DSL を `public_apps/{appId}` に掲載する。再実行で DSL・説明を更新(installs は保持)。
-        同じ appId の掲載を別ユーザーが持っている場合は 403(共有アプリに参加した人が乗っ取れない)。
+        **その appId の作成者だけ**が掲載できる(#153)。作成者 = その appId に最初に実コミット(生成 / PUT・PATCH /dsl / restore / 新規 appId への複製)した uid で、`app_owners/{appId}` に記録する。
+        GET /dsl で他人の appId を開いた(seed・共有アプリへの参加)だけ、または参加後に自分の木で編集しただけの人は 403。
+        記録の無い既存アプリは「探す」の掲載者 → `apps_public` の持ち主の順で作成者とみなし、どちらも無ければ最初に publish した人を作成者として記録する。
+        中身が初期 DSL のまま(components / entities が空)のアプリは 400。
         name / description は省略時 DSL の `app.name` / `app.description`、authorName は省略時 "匿名"。
       requestBody:
         content:
@@ -470,8 +476,8 @@ paths:
                 authorName: { type: string, maxLength: 64 }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PublicApp' } } } }
-        '400': { description: 入力不備, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '400': { description: 入力不備 / 中身が初期 DSL のまま, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { description: その appId の作成者ではない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
       tags: [sharing]
@@ -507,7 +513,10 @@ paths:
     post:
       tags: [sharing]
       summary: 公開アプリをインストール
-      description: import と同じ複製(レコード無し・共有データ付きは元 appId に参加)。新規に複製した時だけ installs +1(掲載者本人は数えない)。
+      description: |
+        import と同じ複製(レコード無し・共有データ付きは元 appId に参加)。
+        同じユーザーの 2 回目以降は新しく複製せず、最初に追加したアプリを返す(`created: false`・アーカイブ済みなら active に戻す)。
+        installs は uid ごとに 1 回だけ +1(掲載者本人は数えない・`public_apps/{id}/installs/{uid}` に記録・#154)。
       responses:
         '201': { description: Installed, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -554,10 +563,11 @@ paths:
           description: OK
           content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/ReleaseRequest' } } } } } }
 
-  /healthz:
+  /health:
     get:
       security: []
       summary: liveness
+      description: Cloud Run(`*.run.app`)では `/healthz` が Google Front End に吸われてコンテナに届かないため `/health` を使う(`/healthz` はローカル用に残っている)。
       responses: { '200': { description: ok } }
 
 components:
@@ -567,7 +577,7 @@ components:
       scheme: bearer
       bearerFormat: Firebase ID token
   parameters:
-    AppId: { in: path, name: appId, required: true, schema: { type: string }, example: app_01HXYZ }
+    AppId: { in: path, name: appId, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$' }, example: app_01HXYZ, description: '`null` / `undefined` / `nil` / `none` / `nan` / `true` / `false`(大文字小文字無視)は 400(クライアントの未設定値で不要なアプリが seed されるのを防ぐ・#154)' }
     EntityId: { in: path, name: entityId, required: true, schema: { type: string }, example: expense }
     Version: { in: path, name: version, required: true, schema: { type: integer, minimum: 1 } }
     PageSize: { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }

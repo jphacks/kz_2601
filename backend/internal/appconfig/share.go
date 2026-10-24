@@ -119,7 +119,9 @@ func toShareOut(r *http.Request, s *store.Share) shareOut {
 }
 
 // createShare: POST /v1/apps/{appId}/share. Only apps in the caller's own tree
-// can be shared, so ownership is implied by the uid-scoped lookup.
+// can be shared. Unlike publish this is not creator-only: a share is keyed by
+// a fresh token (nothing global to squat) and members of a shared app may
+// invite others to it (#118). A blank copy (e.g. a bare GET /dsl seed) is 400.
 func (h *Handler) createShare(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r, "appId")
 	if err != nil {
@@ -129,6 +131,15 @@ func (h *Handler) createShare(w http.ResponseWriter, r *http.Request) {
 	app, err := h.store.GetApp(r.Context(), uidOf(r), id)
 	if err != nil {
 		fail(w, mapStoreErr(err, "app"))
+		return
+	}
+	parsed, err := h.parsedDSL(uidOf(r), app)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if isBlank(parsed) {
+		fail(w, blankErr("sharing"))
 		return
 	}
 	tok, err := newShareToken()
@@ -244,11 +255,8 @@ func (h *Handler) installCopy(r *http.Request, srcAppID string, srcDSL json.RawM
 	if joined {
 		id = srcAppID
 		if cur, err := h.store.GetApp(ctx, uid, id); err == nil {
-			if cur.Status == "archived" {
-				active := "active"
-				if cur, err = h.store.UpdateAppMeta(ctx, uid, id, nil, &active); err != nil {
-					return nil, err
-				}
+			if cur, err = h.reactivate(r, cur); err != nil {
+				return nil, err
 			}
 			return &installResult{appWithDSL: appWithDSL{appSummary: summary(cur), DSL: cur.DSL}, Joined: true}, nil
 		} else if !errors.Is(err, store.ErrNotFound) {
@@ -271,12 +279,24 @@ func (h *Handler) installCopy(r *http.Request, srcAppID string, srcDSL json.RawM
 	if err != nil {
 		return nil, mapStoreErr(err, "app")
 	}
+	if !joined {
+		h.claim(r, id) // a fresh appId: the installer is its creator
+	}
 	cur, err := h.store.GetApp(ctx, uid, id)
 	if err != nil {
 		return nil, err
 	}
 	slog.Info("appconfig: installed copy", slog.String("from", srcAppID), slog.String("appId", id), slog.Bool("joined", joined), slog.Int("version", v.Version))
 	return &installResult{appWithDSL: appWithDSL{appSummary: summary(cur), DSL: cur.DSL}, Joined: joined, Created: true}, nil
+}
+
+// reactivate un-archives an app the caller is getting again.
+func (h *Handler) reactivate(r *http.Request, cur *store.App) (*store.App, error) {
+	if cur.Status != "archived" {
+		return cur, nil
+	}
+	active := "active"
+	return h.store.UpdateAppMeta(r.Context(), uidOf(r), cur.ID, nil, &active)
 }
 
 // ---- public catalog ---------------------------------------------------------
@@ -311,6 +331,7 @@ func toListingOut(r *http.Request, c *store.CatalogApp) listingOut {
 func tooLong(s string, n int) bool { return utf8.RuneCountInString(s) > n }
 
 // publishApp: POST /v1/apps/{appId}/publish (create or update the listing).
+// Creator only (owner.go, #153); a blank app is 400.
 func (h *Handler) publishApp(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r, "appId")
 	if err != nil {
@@ -333,6 +354,10 @@ func (h *Handler) publishApp(w http.ResponseWriter, r *http.Request) {
 	}
 	parsed, err := h.parsedDSL(uidOf(r), app)
 	if err != nil {
+		fail(w, err)
+		return
+	}
+	if err := h.requireCreator(r, id, parsed); err != nil {
 		fail(w, err)
 		return
 	}
@@ -458,17 +483,35 @@ func (h *Handler) listPublicApps(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
-// installPublicApp: POST /v1/public-apps/{id}/install. installs counts new
-// copies only (re-installing a joined app you already have does not count).
+// installPublicApp: POST /v1/public-apps/{id}/install. Installing again
+// returns the copy made the first time (created:false) instead of another
+// one, and installs counts each uid once (never the publisher) (#154).
 func (h *Handler) installPublicApp(w http.ResponseWriter, r *http.Request) {
+	ctx, uid := r.Context(), uidOf(r)
 	id, err := pathID(r, "id")
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	c, err := h.store.GetCatalogApp(r.Context(), id)
+	c, err := h.store.GetCatalogApp(ctx, id)
 	if err != nil {
 		fail(w, mapStoreErr(err, "public app"))
+		return
+	}
+	if prev, err := h.store.GetInstall(ctx, id, uid); err == nil {
+		if cur, err := h.store.GetApp(ctx, uid, prev); err == nil {
+			if cur, err = h.reactivate(r, cur); err != nil {
+				fail(w, err)
+				return
+			}
+			httpx.WriteJSON(w, http.StatusCreated, installResult{appWithDSL: appWithDSL{appSummary: summary(cur), DSL: cur.DSL}, Joined: prev == c.ID})
+			return
+		} else if !errors.Is(err, store.ErrNotFound) {
+			fail(w, err)
+			return
+		}
+	} else if !errors.Is(err, store.ErrNotFound) {
+		fail(w, err)
 		return
 	}
 	res, err := h.installCopy(r, c.ID, c.DSL, "「探す」から追加")
@@ -476,10 +519,8 @@ func (h *Handler) installPublicApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	if res.Created && c.OwnerUID != uidOf(r) {
-		if err := h.store.IncrementInstalls(r.Context(), id); err != nil {
-			slog.Warn("appconfig: install count not incremented", slog.String("id", id), slog.Any("error", err))
-		}
+	if _, err := h.store.RecordInstall(ctx, id, uid, res.ID, res.Created && c.OwnerUID != uid); err != nil {
+		slog.Warn("appconfig: install not recorded", slog.String("id", id), slog.Any("error", err))
 	}
 	httpx.WriteJSON(w, http.StatusCreated, res)
 }
