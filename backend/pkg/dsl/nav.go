@@ -58,10 +58,14 @@ func (a *App) HasNav(from, to string) bool {
 	return false
 }
 
-// NavRoots are the screens the app can show without navigating: the initial
-// screen and the tab roots.
+// NavRoots are the screens the app can show without navigating: the tab
+// roots, or initialScreen when there are no tabs. With tabs iOS opens
+// initialScreen only if it is a tab root (else the first tab).
 func (a *App) NavRoots() []string {
-	roots := []string{a.InitialScreen}
+	if len(a.App.Tabs) == 0 {
+		return []string{a.InitialScreen}
+	}
+	var roots []string
 	for _, t := range a.App.Tabs {
 		if !slices.Contains(roots, t.Screen) {
 			roots = append(roots, t.Screen)
@@ -145,6 +149,7 @@ func eachScreenComponent(comps []Component, fn func(where string, c *Component))
 
 // navGraph adds the screen-graph warnings to the linter.
 //
+//   - initialScreen that is not a tab root when there are tabs
 //   - a screen no root can reach (forms whose entity has no reachable form
 //     are already reported by entityReach)
 //   - a fullScreen target without back / saveRecord (iOS shows no close
@@ -157,8 +162,11 @@ func (l *linter) navGraph() {
 			formReached[s.Entity] = true
 		}
 	}
+	if len(l.app.App.Tabs) > 0 && !slices.Contains(l.app.NavRoots(), l.app.InitialScreen) {
+		l.add(`initialScreen %q is not one of app.tabs, so iOS opens the first tab instead: set initialScreen to a tab screen (usually app.tabs[0].screen)`, l.app.InitialScreen)
+	}
 	for _, s := range l.app.Screens {
-		if reach[s.ID] || (s.Entity != "" && !formReached[s.Entity]) {
+		if reach[s.ID] || (s.Entity != "" && !formReached[s.Entity]) || s.ID == l.app.InitialScreen {
 			continue
 		}
 		l.add(`screen %q is not reachable from the initial screen or any tab: add a button/toolbar {"type":"navigate","screen":%q} on a reachable screen (forms: an add button or list.onItemTap), make it a tab in app.tabs, or remove the screen`, s.ID, s.ID)

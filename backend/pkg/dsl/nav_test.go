@@ -30,7 +30,7 @@ func TestNavExamplesClean(t *testing.T) {
 			t.Errorf("%s: unreachable screens %v", f, u)
 		}
 		for _, w := range app.Lint() {
-			if strings.Contains(w, "not reachable from the initial screen") || strings.Contains(w, "no way back") {
+			if isNavWarning(w) {
 				t.Errorf("%s: %s", f, w)
 			}
 		}
@@ -54,11 +54,15 @@ func navRaw(tabs, homeExtra, screens string) string {
 	return parts[0] + tabs + parts[1] + homeExtra + parts[2] + screens + parts[3]
 }
 
+func isNavWarning(w string) bool {
+	return strings.Contains(w, "not reachable from the initial screen") || strings.Contains(w, "no way back") || strings.Contains(w, "not one of app.tabs")
+}
+
 func navWarnings(t *testing.T, raw string) []string {
 	t.Helper()
 	var out []string
 	for _, w := range lintApp(t, raw) {
-		if strings.Contains(w, "not reachable from the initial screen") || strings.Contains(w, "no way back") {
+		if isNavWarning(w) {
 			out = append(out, w)
 		}
 	}
@@ -157,5 +161,13 @@ func TestNavErrorsHint(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: want %q in %v", c.name, c.want, err)
 		}
+	}
+}
+
+func TestNavInitialNotATab(t *testing.T) {
+	raw := navRaw(`,"tabs":[{"screen":"stats","title":"集計"},{"screen":"form","title":"追加"}]`, "", "")
+	w := navWarnings(t, raw)
+	if len(w) != 1 || !strings.Contains(w[0], `initialScreen "home" is not one of app.tabs`) {
+		t.Fatalf("got %v", w)
 	}
 }
