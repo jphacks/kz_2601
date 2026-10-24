@@ -45,14 +45,17 @@ struct VoiceInputView: View {
                     Spacer(minLength: Theme.Spacing.md)
                     heading
                     Spacer(minLength: Theme.Spacing.lg)
-                    micSection
-                    Spacer(minLength: Theme.Spacing.lg)
+                    // 文字入力中はマイク・例文・「探す」を畳み、入力欄をキーボードの直上に置く(縦に収まらず入力欄が隠れていた・#143)
+                    if !typing {
+                        micSection
+                        Spacer(minLength: Theme.Spacing.lg)
+                    }
                     errorCard
                     transcriptCard
                     Spacer(minLength: Theme.Spacing.md)
-                    examples
+                    if !typing { examples }
                     textEntry
-                    if isInitial { DiscoverEntry() } // 「探す」(#50)
+                    if isInitial, !typing { DiscoverEntry() } // 「探す」(#50)
                 }
             }
             .padding(.horizontal, Theme.Spacing.lg)
@@ -63,6 +66,7 @@ struct VoiceInputView: View {
         .animation(.spring(duration: 0.45, bounce: 0.15), value: transcript)
         .animation(.spring(duration: 0.45, bounce: 0.15), value: rt.errorCard)
         .animation(.spring(duration: 0.45, bounce: 0.15), value: inChat)
+        .animation(.easeOut(duration: 0.25), value: typing)
         .sheet(isPresented: $showSettings) { SettingsSheet() }
         .onTapGesture { typing = false }
         // #43 初期画面の挨拶を読み上げ(対話中・生成中・生成後のシートでは読まない)

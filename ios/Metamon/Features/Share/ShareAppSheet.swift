@@ -29,6 +29,7 @@ struct ShareAppSheet: View {
             }
             .padding(Theme.Spacing.lg)
         }
+        .scrollDismissesKeyboard(.interactively) // 説明・タグの入力後に下スワイプで閉じる(#143)
         .background(Theme.Colors.canvas.ignoresSafeArea())
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)

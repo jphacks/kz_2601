@@ -70,6 +70,14 @@ struct ClarifyChatView: View {
             .scrollDismissesKeyboard(.interactively)
             .onChange(of: rt.chatBubbles.count) { scrollToEnd(proxy) }
             .onChange(of: rt.chatPending) { scrollToEnd(proxy) }
+            // キーボードが上がると吹き出し欄が縮むので、最新の吹き出しを見せ直す(#143)
+            .onChange(of: typing) { _, isTyping in
+                guard isTyping else { return }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(350))
+                    scrollToEnd(proxy)
+                }
+            }
         }
     }
 
