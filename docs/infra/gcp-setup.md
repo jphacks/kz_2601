@@ -10,7 +10,25 @@
 >
 > 前提: Mac に gcloud SDK 542 / firebase CLI 15.x / Go 1.24 / Docker(任意) が入っている。GCP への操作は **すべてあなたのアカウントで** 行う(Claude Code は実行しない)。
 
-> **進捗(2026-10-24)**: Step 0(0-1〜0-5)は Claude Code が実行済み。プロジェクト `jphacks-kz2601`(番号 `378953239426`)作成・課金リンク・API 有効化・SA 2つ・Artifact Registry `backend` 作成済み。**次にやるのは Step 1(Firebase)から。**
+> **進捗(2026-10-24)**: Step 0(0-1〜0-5)は Claude Code が実行済み。プロジェクト `jphacks-kz2601`(番号 `378953239426`)作成・課金リンク・API 有効化・SA 2つ・Artifact Registry `backend` 作成済み。
+>
+> **進捗(2026-10-24 午後・Claude Code 実行済み)**: Step 1-1 / 1-2 / 1-4、Step 2、Step 3、Step 4-1〜4-3、8-2(予算)まで完了。**残りは Step 1-3(Sign in with Apple = あなたの手作業)、4-5(CI 動作確認)、Step 5(ローカル)**。
+>
+> | 項目 | 実値 |
+> |---|---|
+> | Firebase コンソール | https://console.firebase.google.com/project/jphacks-kz2601/overview |
+> | Firebase Auth(プロバイダ) | https://console.firebase.google.com/project/jphacks-kz2601/authentication/providers … **匿名認証は有効化済み**(REST `projects.updateConfig`)。Apple は未設定(1-3 を実施) |
+> | Firebase iOS アプリ | 表示名 `Metamon` / App ID `1:378953239426:ios:6106ede996c98d1f70dd9b` / Bundle ID `jp.kz2601.metamon`。`GoogleService-Info.plist` は repo 外 `~/Desktop/JPHACKS2026/secrets/` に書き出し済み(iOS ターゲット直下へコピーして使う。コミット禁止) |
+> | Cloud Run `appconfig-stg` | https://appconfig-stg-378953239426.asia-northeast1.run.app (旧形式 https://appconfig-stg-zgciuf3iha-an.a.run.app) |
+> | Cloud Run `ai-stg` | https://ai-stg-378953239426.asia-northeast1.run.app (旧形式 https://ai-stg-zgciuf3iha-an.a.run.app)。`--command=/app/ai`、`ANTHROPIC_API_KEY` を Secret 注入済み |
+> | ヘルスチェック実測 | **両サービスとも `/healthz` は Google Front End が HTML 404 を返し、コンテナに届かない**(リクエストログに残らない。`/`・`/foo`・`/healthz/` は Go の `404 page not found` が返るのでコンテナ自体は稼働中・ローカル起動では `/healthz` 200)。`*.run.app` で `/healthz` が予約パス扱いになっている模様。**backend のヘルスパスを `/health`(または `/api/healthz`)に変え、`deploy-cloudrun.yml` の curl も合わせる**こと(要対応・backend 担当) |
+> | Cloud Run コンソール | https://console.cloud.google.com/run?project=jphacks-kz2601 |
+> | WIF プロバイダ | `projects/378953239426/locations/global/workloadIdentityPools/github/providers/github`(条件 `assertion.repository == 'jphacks/kz_2601'`) |
+> | GitHub Variables(repo 単位) | `GCP_PROJECT_ID` / `GCP_REGION` / `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_SERVICE_ACCOUNT`(`.github/workflows/deploy-cloudrun.yml` の変数名に合わせた。本書 4-3 の `GCP_WIF_PROVIDER` / `GCP_DEPLOY_SA` / `GCP_RUNTIME_SA` は旧案) |
+> | GitHub Environments | `staging` / `production` 作成済み |
+> | 予算 | `kz2601 monthly` 4,500 JPY/月(課金アカウントが JPY のため。50/90/100%+予測100%) |
+>
+> **既知の不一致(GitHub 整備担当と要すり合わせ)**: 現行 `deploy-cloudrun.yml` は (a) サービス名が `<SERVICE_PREFIX>-<cmd>`(既定 `morph-appconfig` / `morph-ai`)で stg/prod の区別が無く、本書の `appconfig-stg` 等と別名になる、(b) Secret 名が `anthropic-api-key` だが実体は `ANTHROPIC_API_KEY`、(c) buildpacks 前提(`GOOGLE_BUILDABLE`)だが `backend/Dockerfile` があると Dockerfile が優先され、`--command=/app/ai` が無い ai はappconfig バイナリで起動してしまう。本書 4-4 の YAML に寄せるのを推奨。
 >
 > **zsh で `#` 行を貼ると `command not found: #` が出る**のは無害だが、気になるなら先に `setopt interactivecomments` を実行しておく。
 >
@@ -741,6 +759,7 @@ gcloud run services update ai-prod --region="$REGION" --min-instances=0   # デ�
 | `projects create` が `The project ID you specified is already in use` | ID が他人に取られている | 別 ID。`PROJECT_ID` を更新して以降を続ける |
 | `gcloud run deploy --source` が Cloud Build の権限エラー(`…compute@developer.gserviceaccount.com does not have permission` 等) | 新規プロジェクトの Cloud Build は Compute 既定 SA で動く。既定 SA が無い/権限不足 | `compute.googleapis.com` を有効化(0-4)。それでも駄目なら `gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" --role="roles/cloudbuild.builds.builder"` |
 | `--source` で `cloud-run-source-deploy` の作成確認が出る | 初回のみ | `Y` |
+| `curl <run.app URL>/healthz` が Google の HTML 404(`Error 404 (Not Found)!!1`)。`/` や `/healthz/` は Go の `404 page not found` | `/healthz` が Google Front End に吸われてコンテナに届かない(2026-10-24 実測。リクエストログにも残らない) | ヘルスパスを `/health` 等に変更して再デプロイ。CI の Smoke test / ヘルスチェック step も同じパスに |
 | Cloud Run が `Container failed to start… listen on PORT=8080` | バイナリが 8080 を聞いていない / `--command` のパス違い | `/app/appconfig` or `/app/ai`。ログ `gcloud run services logs read <svc> --region=$REGION` |
 | ai が起動時に `Permission denied on secret` | 2-3 の `secretAccessor` 未付与、または `--service-account` を付け忘れて既定 SA で動いている | チェックリスト 10・14 を確認して再デプロイ |
 | Firestore `databases create` が `already exists` / Datastore モードで作ってしまった | 1 プロジェクト 1 `(default)`。ロケーション・モードは後から変更不可 | 間違えたら `gcloud firestore databases delete --database='(default)'` して作り直す(データが空のうちに)。`--delete-protection` を付けていたら先に `databases update --no-delete-protection` |
