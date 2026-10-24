@@ -219,3 +219,20 @@ func TestSummarizeApp_Kakeibo(t *testing.T) {
 		t.Fatalf("children not nested:\n%s", s)
 	}
 }
+
+// iOS's Record drops authorName (MetamonDSL Record.swift decodes only id /
+// data / dates), so the chat must not offer showing the poster; and English
+// answers quote the app's labels verbatim instead of translating them.
+func TestChatFirst_PromptFacts(t *testing.T) {
+	if strings.Contains(chatCapabilities, "投稿者名つき") || !strings.Contains(chatCapabilities, "投稿者名の表示") {
+		t.Error("capabilities must say the poster name cannot be shown")
+	}
+	for name, p := range map[string]string{"edit": chatEditSystemPrompt, "create": chatCreateSystemPrompt} {
+		if !strings.Contains(p, "投稿者名の表示") {
+			t.Errorf("%s prompt lacks the poster-name limit", name)
+		}
+	}
+	if !strings.Contains(chatEditSystemPrompt, "locale が en でもラベルは訳さない") {
+		t.Error("edit prompt must keep labels untranslated in en")
+	}
+}
