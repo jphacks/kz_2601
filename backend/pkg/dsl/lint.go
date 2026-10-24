@@ -264,7 +264,7 @@ func (l *linter) periodLabel(where string, c *Component) {
 		label = c.Title
 	}
 	p, word, ok := labelPeriod(label)
-	if !ok {
+	if !ok || (p.op == "thisMonth" && isTargetLabel(label)) {
 		return
 	}
 	var filters []Filter
@@ -321,6 +321,21 @@ func (l *linter) periodLabel(where string, c *Component) {
 	}
 }
 
+// isTargetLabel: "今月の予算" / "monthly goal" is the target itself, not a
+// sum over this month's records (but "今月の予算の残り" is).
+func isTargetLabel(label string) bool {
+	low := strings.ToLower(label)
+	has := func(words ...string) bool {
+		for _, w := range words {
+			if strings.Contains(low, w) {
+				return true
+			}
+		}
+		return false
+	}
+	return has("予算", "目標", "budget", "goal", "target") && !has("残", "あと", "使", "達成", "left", "remaining", "spent", "progress")
+}
+
 // ---- entity reachability --------------------------------------------------
 
 // listTypes show an entity's records one by one.
@@ -335,25 +350,38 @@ func (l *linter) entityReach() {
 			forms[s.Entity] = append(forms[s.Entity], s.ID)
 		}
 	}
-	targets := map[string]bool{l.app.InitialScreen: true}
+	// reachable screens: initial + tabs, then navigate targets of reachable screens
+	byID := map[string]*Screen{}
+	for i := range l.app.Screens {
+		byID[l.app.Screens[i].ID] = &l.app.Screens[i]
+	}
+	targets := map[string]bool{}
+	queue := []string{l.app.InitialScreen}
 	for _, t := range l.app.App.Tabs {
-		targets[t.Screen] = true
+		queue = append(queue, t.Screen)
 	}
 	listed := map[string]bool{}
-	nav := func(a *Action) {
-		if a != nil && a.Type == ActionNavigate {
-			targets[a.Screen] = true
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		s := byID[id]
+		if s == nil || targets[id] {
+			continue
 		}
-	}
-	visit := func(c *Component) {
-		nav(c.Action)
-		nav(c.OnItemTap)
-		nav(c.OnDateTap)
-		if listTypes[c.Type] {
-			listed[c.Entity] = true
+		targets[id] = true
+		nav := func(a *Action) {
+			if a != nil && a.Type == ActionNavigate && !targets[a.Screen] {
+				queue = append(queue, a.Screen)
+			}
 		}
-	}
-	for _, s := range l.app.Screens {
+		visit := func(c *Component) {
+			nav(c.Action)
+			nav(c.OnItemTap)
+			nav(c.OnDateTap)
+			if listTypes[c.Type] {
+				listed[c.Entity] = true
+			}
+		}
 		for i := range s.Toolbar {
 			nav(&s.Toolbar[i].Action)
 		}
@@ -372,7 +400,7 @@ func (l *linter) entityReach() {
 			l.add(`entity %q: form screen %q is not reachable; add a toolbar/button navigate to it`, e.ID, fs[0])
 		}
 		if !listed[e.ID] {
-			l.add(`entity %q has no list: show its records with a list or table (with onItemTap to the form) so what users add is visible`, e.ID)
+			l.add(`entity %q has no list on a reachable screen: show its records with a list or table (with onItemTap to the form) on a tab or the home screen so what users add is visible`, e.ID)
 		}
 	}
 }

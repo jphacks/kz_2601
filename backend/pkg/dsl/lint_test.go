@@ -110,6 +110,11 @@ func TestLintEntityReach(t *testing.T) {
 	// form exists but nothing navigates to it
 	unreachable := strings.Replace(raw, `"toolbar":[{"label":"追加","action":{"type":"navigate","screen":"form","presentation":"sheet"}}],`, "", 1)
 	wantLint(t, lintApp(t, unreachable), `form screen "form" is not reachable`)
+
+	// audit a07: the only list sits on a screen nothing opens
+	hidden := strings.Replace(raw, `{"type":"list","entity":"log","item":{"title":"title"}}]},`,
+		`{"type":"text","text":"x"}]},{"id":"history","title":"履歴","components":[{"type":"list","entity":"log","item":{"title":"title"}}]},`, 1)
+	wantLint(t, lintApp(t, hidden), `entity "log" has no list on a reachable screen`)
 }
 
 func TestLintConstantExpr(t *testing.T) {
@@ -152,7 +157,10 @@ func TestLintPeriodLabel(t *testing.T) {
 	 {"type":"stat","label":"今週(直近7日)","aggregate":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-6]}}},
 	 {"type":"stat","label":"今日水やりが必要","aggregate":"count","entity":"log","filter":{"field":"amount","op":"lte","value":0}},
 	 {"type":"stat","label":"合計","aggregate":"sum","entity":"log","field":"amount"},
-	 {"type":"stat","label":"今日までの記録日数","aggregate":"count","entity":"log"},`)
+	 {"type":"stat","label":"今日までの記録日数","aggregate":"count","entity":"log"},
+	 {"type":"stat","label":"今月の予算","aggregate":"max","entity":"log","field":"amount"},`)
+	// ...but the remaining budget is a sum over this month
+	wantLint(t, lintWith(t, "", `{"type":"stat","label":"今月の予算の残り","value":{"op":"sub","args":[30000,{"agg":"sum","entity":"log","field":"amount"}]}},`), `has no filter`)
 	if len(ok) > 0 {
 		t.Errorf("unexpected: %v", ok)
 	}
