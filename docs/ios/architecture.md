@@ -241,13 +241,23 @@ VoiceInputView.phase                         AppRuntime.morphJob               R
 | 失敗 | — | **状態カード**(下表・#60)。トーストは使わない | 〃(画面上部にコンパクト版) | 画面は元のまま。主ボタン「もう一度」は同じ発話で再送 |
 | キャンセル | — | 下部トースト「生成をキャンセルしました」(軽微) | 〃 | 画面は元のまま |
 
-**設定シート**(音声画面右上の歯車・旧 `uid …` フッターの置き換え): アカウント(匿名 / Apple・uid・ログアウト)、音声モデル(モデル名・状態・再試行)、対話(「作る前に質問する」トグル・#75)、アプリをリセット(初期状態に戻す = DSL を `initial`、`DeviceAppID.rotate()` で appId を作り直す。サーバーの旧データは残る)、接続先(ai / appconfig / バージョン)。
+**設定シート**(音声画面右上の歯車・旧 `uid …` フッターの置き換え): アカウント(匿名 / Apple・uid・ログアウト)、音声モデル(モデル名・状態・再試行)、対話(「チャットで相談してから作る」トグル・#75 / #186)、アプリをリセット(初期状態に戻す = DSL を `initial`、`DeviceAppID.rotate()` で appId を作り直す。サーバーの旧データは残る)、接続先(ai / appconfig / バージョン)。
 
 DEBUG フック: `METAMON_AUTO_ANON=1`(起動時に匿名サインイン)、`METAMON_AUTO_TRANSCRIPT="…"`(起動直後に 1 回発話。対話 ON なら下記の対話を自動で進めて生成まで待つ)。シミュレータでもマイクは表示され、`MockTranscriber` が定型文を返す。
 
-### 生成前の対話(clarify・#75 / backend #74)
+### 生成・改変の前の対話(clarify・#75 / backend #74 → チャット基本化 #184 / #186)
 
-初期(音声)画面で **新規作成するとき だけ**、最初の発話を即生成せず ai に 1〜3 個聞き返させてから作る。生成後の改変(edit・音声シート)は従来どおり即反映(backend の chat は新規作成用プロンプトで edit 非対応)。
+初期(音声)画面の **新規作成(create)も、作ったアプリの音声シートでの改変(edit)も**、最初の発話を即反映せずチャットでやり取りする。
+AI は kind で返す: `answer`(質問に答えるだけ・任意の `suggestions` はチップ)/ `question`(聞き返し・チップ)/ `proposal`(案のカード 1〜3 枚・各「これでいく」)/ `ready`(要約カード +「これでいく」)。
+**アプリが変わるのは「これでいく」で generate を呼んだ時だけ**。edit の「これでいく」は音声シートを閉じて本体側の生成中表示に任せる(画面マップの文脈があれば先頭に付ける)。
+声だけで進めた時の ready の自動実行(#160)は **create だけ**。edit は聞き間違いで今のアプリを変えないよう、必ず「これでいく」を押す。
+
+| kind | 表示(`ClarifyFlow.offer`) | 副ボタン(`ClarifyFlow.shortcut`) |
+|---|---|---|
+| answer | 吹き出し(+ suggestions のチップ) | create「このまま作る」/ edit なし |
+| question | 吹き出し(大)+ チップ | create「このまま作る」/ edit「このまま反映」 |
+| proposal | 吹き出し + 案のカード(`chat.option.choose`)→ `AppRuntime.choose(_:)` が `instruction` で generate | create「このまま作る」/ edit なし |
+| ready | 要約カード(create = brief / edit = 指示文)+「これでいく」(`chat.build`) | なし |
 
 ```mermaid
 stateDiagram-v2
@@ -267,16 +277,16 @@ stateDiagram-v2
 
 | 項目 | 実装 |
 |---|---|
-| 契約 | `POST /v1/chat` `{appId, messages[{role,text}], locale?}` → `{kind: question\|ready, text, suggestions?, turn, brief?, transcript?, source}`。`DELETE /v1/chat/{appId}` → 204。generate は無変更で `ready.transcript` を `text`(iOS 実装は `transcript` キー。backend は両方受ける)に渡す |
+| 契約 | `POST /v1/chat` `{appId, messages[{role,text}], locale?, mode: create\|edit, capabilities: ["answer","proposal"]}` → `{kind: answer\|question\|proposal\|ready, text, suggestions?, options?[{id,title,detail,instruction}], mode?, turn, brief?, transcript?, source}`(#184 会話の取り決め。iOS は mode と capabilities を常に送る。知らない kind は answer 扱い)。`DELETE /v1/chat/{appId}` → 204。generate は無変更で `ready.transcript` を `text`(iOS 実装は `transcript` キー。backend は両方受ける)に渡す |
 | 履歴 | iOS は手元の全履歴を毎回送る(2 件以上はサーバー状態を置き換える契約 → ai 再起動・30 分失効でも続く)。新規会話の 1 発目は `DELETE` を待たずに 1 件だけ POST し、応答の `turn != 1`(前の会話に追記された)の時だけ `DELETE` を await して送り直す(`MetamonServices/Clarify/ClarifyFlow.startConversation`・#160)。DELETE を投げっぱなしにしないのは、POST の後に届くと新しい会話の brief を消して「このまま作る」の即答が遅くなるため |
 | 状態 | `AppRuntime.chatBubbles` / `chatPending` / `chatTurn` / `clarifyEnabled`。ロジックは `App/AppRuntime+Clarify.swift`(`submitUtterance` / `say` / `buildNow` / `buildFromChat` / `resetChat`) |
 | UI | `Features/Voice/ClarifyChatView.swift`。右 = ユーザー(書き起こし)、左 = AI。最新の質問だけ title3 で大きく。質問中は選択肢チップ +「このまま作る」(常時)、ready は要約カード(brief: 名前・目的・記録する・見られる)+「この内容で作る」。入力は小さいマイク(録音は `VoiceInputView` のまま)+ 文字 |
 | 生成への受け渡し | `AppRuntime.generate(_:)`(意図判定を通さない。AI のまとめ文を「元に戻して」等に誤判定させない)。圏外保留・状態カードは既存どおり |
 | リセット | 「最初から」・生成開始・`apply()`(別アプリへの切替 / 新規 appId / 生成完了)で会話を捨てて `DELETE`。初期画面はシートではないので「閉じる」は無い |
 | エラー | 既存の状態カード(`ErrorPresentation.origin = .chat`)。主ボタン「もう一度」は同じ履歴を再送(生成ではない)。失敗タイトルは「質問をうまく用意できませんでした」。「このまま作る」で chat が落ちていたら、これまでの発話をつないで生成に進む |
-| 設定 | 設定 >「作る前に質問する」(既定 ON・UserDefaults)。`METAMON_CLARIFY=0/1` が優先。その下に「答えがそろったら自動で作る」(既定 ON・`METAMON_CLARIFY_AUTOBUILD=0/1` が優先)。最後の入力がマイクの時だけ ready で自動生成(待ち中はボタンが「まもなく作ります…」、タップで即生成、「最初から」で取消)。文字・チップで答えた時は従来どおりボタン |
+| 設定 | 設定 >「チャットで相談してから作る」(既定 ON・UserDefaults。OFF は create も edit も一発で反映)。`METAMON_CLARIFY=0/1` が優先。その下に「答えがそろったら自動で作る」(既定 ON・`METAMON_CLARIFY_AUTOBUILD=0/1` が優先)。最後の入力がマイクの時だけ ready で自動生成(待ち中はボタンが「まもなく作ります…」、タップで即生成、「最初から」で取消)。文字・チップで答えた時は従来どおりボタン |
 | 計測 | DEBUG で 1 ラリーごとに `[Metamon] chat timing: turn=N kind=K stt= pre= net= render= total=`(録音停止 → 文字起こし完了 → POST 開始 → 応答受信 → 吹き出し表示。文字入力は stt/pre が `-`)。`ChatTiming`(MetamonServices) |
-| DEBUG | `METAMON_AUTO_TRANSCRIPT="日記" METAMON_AUTO_REPLIES="写真も残したい\|もう作って" METAMON_AUTO_PAUSE=5` で 質問 → 答え → … → ready →「この内容で作る」まで無人で通す(返答が尽きたら「このまま作る」)。`METAMON_CLARIFY=0` で従来の即生成。`METAMON_AUTO_SOURCE=voice` で音声入力として扱い、ready の自動生成を通す |
+| DEBUG | `METAMON_AUTO_TRANSCRIPT="日記" METAMON_AUTO_REPLIES="写真も残したい\|もう作って" METAMON_AUTO_PAUSE=5` で 質問 → 答え → … → ready →「この内容で作る」まで無人で通す(返答が尽きたら「このまま作る」)。`METAMON_CLARIFY=0` で従来の即生成。`METAMON_AUTO_SOURCE=voice` で音声入力として扱い、ready の自動生成を通す。`METAMON_INITIAL_EXAMPLE=kakeibo` と組み合わせると音声シートを開いて edit の対話になる(answer / proposal はそこで止まる。`METAMON_AUTO_CHOOSE=1` で案の 1 枚目を選ぶ)。モックは「?」「可能」等 → answer、「見やすく」→ proposal 2 案、edit のその他の指示 → ready |
 
 ### エラー状態表(#60・2026-10-24 深夜)
 
@@ -831,7 +841,7 @@ simctl ではタップ・ドラッグ・長押しができないので、指の�
 | 項目 | 内容 |
 |---|---|
 | 起動 | すべてモック `METAMON_MOCK=1`。`METAMON_FAB_POSITION=auto` で前のテストが保存した FAB の位置を毎回初期化。初期アプリは `METAMON_INITIAL_EXAMPLE` |
-| 要素の特定 | accessibilityIdentifier(見た目・挙動は変えない): `voice.fab` / `voice.fabHandle`(FAB と取っ手)、`voice.settings`(音声シートの設定 = シートが開いた目印)、`switcher.close` / `switcher.cardMenu` / `switcher.share`(変身一覧・カードの「…」メニューと中の「シェア・公開」)、`share.close`(シェアシート)、`chat.chip`(対話の選択肢)。既存の `chat.build` / `chat.buildNow` も使う |
+| 要素の特定 | accessibilityIdentifier(見た目・挙動は変えない): `voice.fab` / `voice.fabHandle`(FAB と取っ手)、`voice.settings`(音声シートの設定 = シートが開いた目印)、`switcher.close` / `switcher.cardMenu` / `switcher.share`(変身一覧・カードの「…」メニューと中の「シェア・公開」)、`share.close`(シェアシート)、`chat.chip`(対話の選択肢)、`chat.option.choose`(案のカードの「これでいく」・#186)。既存の `chat.build` / `chat.buildNow` も使う |
 | シェア | モックはサーバーが無く変身一覧が空・シェアボタンも出ないので、DEBUG フック `METAMON_MOCK_SHARING=1` で一覧に 2 件入れ、端末内で完結する `DebugSharingClient` を使う(`Metamon/App/DebugMockSharing.swift`) |
 | 言語 | 文言で探す要素があるので起動引数 `-AppleLanguages (ja) -AppleLocale ja_JP -metamon.appLanguage ja` で日本語に固定(シミュレータの既定は英語で、英語だと吹き出し・QR のラベルが変わる) |
 | 一覧のチェック丸 | 丸は VoiceOver では行の操作(accessibilityAction)にまとめて隠しているので、行の左端 +30pt を座標でタップする。行の value(`未チェック` / `チェック済み`)で判定 |
