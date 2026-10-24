@@ -23,7 +23,14 @@ struct RootView: View {
         @Bindable var rt = rt
         ZStack {
             Group {
-                if rt.dsl.isVoiceOnly {
+                if let job = rt.morphJob, job.kind == .create {
+                    // 全画面の「変身中」は下の画面に重ねず、置き換える(#200)。
+                    // 重ねる方式(zIndex 固定の層)では遅い CI で、morphJob が立っているのに完成まで一度も描かれず、
+                    // 下の初期画面(「アプリを考えています…」)が見えたままだった。置き換えなら隠れる先が無い。
+                    // 完成時は apply が document 差し替えと morphJob = nil を同じアニメーションで行い、.id が変わってクロスフェードになる
+                    GeneratingView(job: job)
+                        .transition(.asymmetric(insertion: .identity, removal: .opacity))
+                } else if rt.dsl.isVoiceOnly {
                     // 初期状態(voiceEntry = fullscreen)はグリッドのセル内ではなく全面に描く(背景を画面いっぱいに敷くため)。
                     // 見出しは DSL の prompt ではなく Greeting(#42: 初回/再訪/時間帯で出し分け)
                     VoiceInputView()
@@ -40,7 +47,8 @@ struct RootView: View {
                 ))
                 .opacity(rt.morphJob?.kind == .edit ? 0.45 : 1)
                 .blur(radius: rt.morphJob?.kind == .edit ? 1.5 : 0)
-                .allowsHitTesting(rt.morphJob == nil)
+                // create 中は中身が GeneratingView(30 秒超えのキャンセルを押せるように)。edit 中は下の画面を触らせない
+                .allowsHitTesting(rt.morphJob == nil || rt.morphJob?.kind == .create)
                 .onPreferenceChange(GridBottomObstructionKey.self) { bottomObstructions = $0 }
                 .onPreferenceChange(GridBottomTrailingObstructionKey.self) { trailingBottomObstructions = $0 }
                 .environment(\.fabFrame, fabFrame)
@@ -48,7 +56,9 @@ struct RootView: View {
             // フォーム画面(push)では FAB を出さず、ナビバー右上のマイク(`formToolbarAccessory`)が入口になる(#83)
             // キーボード表示中も隠す(入力欄・キーボードのツールバーに被るため・#143)
             ZStack {
-                if FabVisibility.isShown(floating: rt.dsl.app.voiceEntry == .floating, formVisible: isFormVisible,
+                // create の全画面「変身中」の上には出さない(重ねる方式の時は GeneratingView が覆っていた)
+                if rt.morphJob?.kind != .create,
+                   FabVisibility.isShown(floating: rt.dsl.app.voiceEntry == .floating, formVisible: isFormVisible,
                                          keyboardVisible: keyboard.isVisible) {
                     VoiceFab(
                         hasTabs: rt.dsl.app.hasTabs,
@@ -64,26 +74,21 @@ struct RootView: View {
             .animation(.easeOut(duration: 0.22), value: isFormVisible)
             .animation(.easeOut(duration: 0.22), value: keyboard.isVisible)
             .onPreferenceChange(VoiceFabFrameKey.self) { fabFrame = $0 }
-            // 生成中の層は常に置き(zIndex 固定)、中身だけを出し入れする。全画面の「変身中」は挿入を即時にする。
-            // ZStack 直下での条件挿入 + フェードインだと、初期画面の再レイアウト(キーボードを閉じる・入力欄を畳む)と重なった時に
-            // 完成まで透明のまま(アクセシビリティにも出ない)で初期画面が見えていた(遅い CI で再現・#200)。撤去はフェードのまま(新しいアプリとのクロスフェード)
+            // edit(改変)の小さなインジケータだけを上に重ねる(create の全画面は上の Group で置き換え)
             ZStack {
-                if let job = rt.morphJob {
-                    switch job.kind {
-                    case .create:
-                        GeneratingView(job: job)
-                            .transition(.asymmetric(insertion: .identity, removal: .opacity))
-                    case .edit:
-                        VStack {
-                            EditingIndicator(job: job)
-                                .padding(.top, Theme.Spacing.sm)
-                            Spacer()
-                        }
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                if let job = rt.morphJob, job.kind == .edit {
+                    VStack {
+                        EditingIndicator(job: job)
+                            .padding(.top, Theme.Spacing.sm)
+                        Spacer()
                     }
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
             .zIndex(2)
+            #if DEBUG
+            UITestMorphProbe()
+            #endif
             if let banner = rt.summaryBanner, let anchor = banner.highlight {
                 PositionHighlight(anchor: anchor)
                     .transition(.opacity)
@@ -236,6 +241,26 @@ struct RootView: View {
         }
     }
 }
+
+#if DEBUG
+/// UI テスト用の観測点(`METAMON_UI_PROBE=1` の時だけ置く・#200)。生成中の表示が出ない時に、
+/// 「morphJob が立っていたか」「GeneratingView の onAppear が呼ばれたか」をテスト側から読めるようにする。
+private struct UITestMorphProbe: View {
+    @Environment(AppRuntime.self) private var rt
+
+    var body: some View {
+        if ProcessInfo.processInfo.environment["METAMON_UI_PROBE"] == "1" {
+            let job = rt.morphJob.map { $0.kind == .create ? "create" : "edit" } ?? "none"
+            Color.clear
+                .frame(width: 1, height: 1)
+                .allowsHitTesting(false)
+                .accessibilityElement()
+                .accessibilityIdentifier("debug.morphProbe")
+                .accessibilityLabel("job=\(job) createStarted=\(MorphProbe.createStarted) generatingAppeared=\(MorphProbe.generatingAppeared)")
+        }
+    }
+}
+#endif
 
 /// フォーム画面のナビバー右上に置く小さなマイク(FAB の代わり・#83)。タップ = 発話シート、長押し = 変身一覧(FAB と同じ 2 入口)。
 private struct VoiceToolbarButton: View {

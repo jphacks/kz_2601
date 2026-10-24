@@ -21,7 +21,8 @@ final class MetamonUITests: XCTestCase {
     @discardableResult
     private func launch(example: String?, _ extra: [String: String] = [:]) -> XCUIApplication {
         let app = XCUIApplication()
-        var env = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto"]
+        // METAMON_UI_PROBE: 生成中の表示が出ない時の切り分け用に、morphJob の状態を読める観測点を置く(#200)
+        var env = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto", "METAMON_UI_PROBE": "1"]
         if let example { env["METAMON_INITIAL_EXAMPLE"] = example }
         env.merge(extra) { _, new in new }
         app.launchEnvironment = env
@@ -295,7 +296,12 @@ final class MetamonUITests: XCTestCase {
     /// 生成中の表示が `appearWithin` 秒以内に出て、完成まで出続け、消えたら生成したアプリ(マイク FAB)に切り替わる。
     /// 途中で初期画面に戻らないことは「消えた直後に初期画面の文字入力が無い」+「ある程度の時間出続けた」で見る。
     private func assertGeneratingThenDone(_ name: String, appearWithin: TimeInterval = 15, file: StaticString = #filePath, line: UInt = #line) {
-        XCTAssertTrue(generating.waitForExistence(timeout: appearWithin), "生成中の表示が出ない(\(name))", file: file, line: line)
+        let appeared = generating.waitForExistence(timeout: appearWithin)
+        // 出なかった時は、アプリ側の状態(morphJob が立ったか・GeneratingView の onAppear が呼ばれたか)を一緒に残す
+        let probe = app.descendants(matching: .any)["debug.morphProbe"]
+        let state = probe.exists ? probe.label : "probe なし"
+        if !appeared { attachScreenshot("generating-missing-\(name)") }
+        XCTAssertTrue(appeared, "生成中の表示が出ない(\(name)・\(state))", file: file, line: line)
         let shown = Date()
         attachScreenshot("generating-\(name)")
         XCTAssertTrue(waitFor(generating, "exists == false", timeout: 30), "完成しても生成中の表示が消えない(\(name))", file: file, line: line)

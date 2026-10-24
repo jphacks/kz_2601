@@ -68,6 +68,9 @@ struct GeneratingView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("generating.create") // UI テスト(#182)
+        #if DEBUG
+        .onAppear { MorphProbe.generatingAppeared += 1 }
+        #endif
         .task(id: job.startedAt) {
             // 0.25s 刻みで経過秒を更新(文言切替と段階判定用。グリッドの描画は TimelineView が担う)
             while !Task.isCancelled {
@@ -130,6 +133,15 @@ struct GeneratingView: View {
         L10n.tr("\(Int(elapsed.rounded(.down))) 秒")
     }
 }
+
+#if DEBUG
+/// UI テストの観測用カウンタ(RootView の `UITestMorphProbe` が読む・#200)
+@MainActor
+enum MorphProbe {
+    static var createStarted = 0
+    static var generatingAppeared = 0
+}
+#endif
 
 /// 6×12 のスケルトングリッド。セルが波のように順に光り、3 秒ごとに「レイアウト案」(ブロック)が入れ替わる。
 /// TimelineView(20fps) + 単純な sin で軽量に。

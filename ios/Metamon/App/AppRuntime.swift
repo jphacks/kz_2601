@@ -414,6 +414,9 @@ final class AppRuntime: DSLRuntime {
             errorCard = nil
             morphJob = MorphJob(kind: MorphJob.kind(isVoiceOnly: dsl.isVoiceOnly, transcript: text), transcript: text, startedAt: .now)
         }
+        #if DEBUG
+        if morphJob?.kind == .create { MorphProbe.createStarted += 1 }
+        #endif
         interruptedByOffline = false
         let previous = document
         let task = Task { [services, appId = document.appId, version = document.version, locale = Self.generationLocale] in
