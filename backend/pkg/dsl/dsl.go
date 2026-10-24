@@ -169,10 +169,33 @@ const (
 	CompVoiceInput  ComponentType = "voiceInput"
 	CompSpacer      ComponentType = "spacer"
 	CompDivider     ComponentType = "divider"
+	// structure containers (batch: structure/nav/native)
+	CompCard       ComponentType = "card"       // rounded surface + shadow
+	CompDisclosure ComponentType = "disclosure" // collapsible group
+	CompCarousel   ComponentType = "carousel"   // horizontal strip
+	CompGrid       ComponentType = "grid"       // 2-4 equal columns
+	// nav / native leaves
+	CompSearchBar      ComponentType = "searchBar"      // screen-local search text -> list.searchField
+	CompCalendar       ComponentType = "calendar"       // month view over entity.dateField
+	CompShareButton    ComponentType = "shareButton"    // ShareLink
+	CompOpenURLButton  ComponentType = "openUrlButton"  // fixed URL link
+	CompMapView        ComponentType = "mapView"        // MapKit pins from a location field
+	CompLocationButton ComponentType = "locationButton" // CoreLocation -> location field
+	CompQrScanner      ComponentType = "qrScanner"      // AVFoundation -> string field
+	CompTimerDisplay   ComponentType = "timerDisplay"   // stopwatch / countdown
 )
 
 // ContainerTypes lists component types that may have Children.
-var ContainerTypes = map[ComponentType]bool{CompVStack: true, CompHStack: true, CompSection: true}
+var ContainerTypes = map[ComponentType]bool{
+	CompVStack: true, CompHStack: true, CompSection: true,
+	CompCard: true, CompDisclosure: true, CompCarousel: true, CompGrid: true,
+}
+
+// Grid container column range.
+const (
+	MinGridContainerColumns = 2
+	MaxGridContainerColumns = 4
+)
 
 // Component is a flattened union of all component kinds. Which fields are
 // meaningful depends on Type (see docs/dsl/README.md).
@@ -221,6 +244,22 @@ type Component struct {
 	// voiceInput / spacer
 	Prompt string `json:"prompt,omitempty"`
 	Size   string `json:"size,omitempty"`
+
+	// structure containers
+	Expanded  *bool  `json:"expanded,omitempty"`  // disclosure
+	ItemWidth string `json:"itemWidth,omitempty"` // carousel: small|medium|large
+	Columns   int    `json:"columns,omitempty"`   // grid: 2..4
+
+	// nav / native leaves
+	SearchField   string  `json:"searchField,omitempty"`   // list: searchBar.field on the same screen
+	DateField     string  `json:"dateField,omitempty"`     // calendar
+	OnDateTap     *Action `json:"onDateTap,omitempty"`     // calendar
+	URL           string  `json:"url,omitempty"`           // openUrlButton
+	LocationField string  `json:"locationField,omitempty"` // mapView
+	TitleField    string  `json:"titleField,omitempty"`    // mapView pin label
+	Zoom          string  `json:"zoom,omitempty"`          // mapView: near|city|wide
+	Mode          string  `json:"mode,omitempty"`          // timerDisplay: stopwatch|countdown
+	Seconds       int     `json:"seconds,omitempty"`       // timerDisplay countdown start
 }
 
 // ListItem maps record fields onto a list row.

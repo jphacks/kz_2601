@@ -271,6 +271,7 @@ func (a *App) Validate() error {
 			add("screen %q has too many components", s.ID)
 		}
 		checkGrid(s.ID, s.Components, add)
+		searchKeys := collectSearchKeys(s.ID, s.Components, add)
 		compIDs := map[string]bool{}
 		var walk func(where string, c *Component, depth int)
 		walk = func(where string, c *Component, depth int) {
@@ -291,6 +292,7 @@ func (a *App) Validate() error {
 				if len(c.Children) > MaxComponentsPerLevel {
 					add("%s: too many children", where)
 				}
+				checkContainerProps(where, c, add)
 				for j := range c.Children {
 					walk(fmt.Sprintf("%s.children[%d]", where, j), &c.Children[j], depth+1)
 				}
@@ -341,6 +343,9 @@ func (a *App) Validate() error {
 					add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
 				}
 				checkAction(where+".onItemTap", c.OnItemTap)
+				if c.SearchField != "" && !searchKeys[c.SearchField] {
+					add("%s: searchField %q has no matching searchBar (field) on screen %q", where, c.SearchField, s.ID)
+				}
 			case CompStat, CompChart:
 				e := entities[c.Entity]
 				if e == nil {
@@ -357,6 +362,81 @@ func (a *App) Validate() error {
 					add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
 				}
 			case CompVoiceInput, CompSpacer, CompDivider:
+			case CompSearchBar:
+				if !idRe.MatchString(c.Field) {
+					add("%s: searchBar field %q must be an id (screen-local search key)", where, c.Field)
+				}
+			case CompCalendar:
+				e := entities[c.Entity]
+				if e == nil {
+					add("%s: calendar entity %q does not exist", where, c.Entity)
+					break
+				}
+				if f := e.FieldByID(c.DateField); f == nil {
+					add("%s: calendar dateField %q not in entity %q", where, c.DateField, e.ID)
+				} else if f.Type != FieldDate && f.Type != FieldDatetime {
+					add("%s: calendar dateField %q must be date or datetime", where, c.DateField)
+				}
+				checkAction(where+".onDateTap", c.OnDateTap)
+			case CompShareButton:
+				if c.Text == "" {
+					add("%s: shareButton needs text", where)
+				}
+				if c.Field != "" {
+					if formEntity == nil {
+						add("%s: shareButton.field requires screen.entity", where)
+					} else if formEntity.FieldByID(c.Field) == nil {
+						add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
+					}
+				}
+			case CompOpenURLButton:
+				if c.Label == "" || c.URL == "" {
+					add("%s: openUrlButton needs label and url", where)
+				}
+			case CompMapView:
+				e := entities[c.Entity]
+				if e == nil {
+					add("%s: mapView entity %q does not exist", where, c.Entity)
+					break
+				}
+				if f := e.FieldByID(c.LocationField); f == nil {
+					add("%s: mapView locationField %q not in entity %q", where, c.LocationField, e.ID)
+				} else if f.Type != FieldLocation {
+					add("%s: mapView locationField %q must be type location", where, c.LocationField)
+				}
+				if c.TitleField != "" && e.FieldByID(c.TitleField) == nil {
+					add("%s: mapView titleField %q not in entity %q", where, c.TitleField, e.ID)
+				}
+				checkAction(where+".onItemTap", c.OnItemTap)
+			case CompLocationButton, CompQrScanner:
+				if formEntity == nil {
+					add("%s: %s requires screen.entity", where, c.Type)
+				} else if f := formEntity.FieldByID(c.Field); f == nil {
+					add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
+				} else if c.Type == CompLocationButton && f.Type != FieldLocation {
+					add("%s: locationButton field %q must be type location", where, c.Field)
+				} else if c.Type == CompQrScanner && f.Type != FieldString && f.Type != FieldText {
+					add("%s: qrScanner field %q must be string or text", where, c.Field)
+				}
+			case CompTimerDisplay:
+				switch c.Mode {
+				case "stopwatch":
+				case "countdown":
+					if c.Seconds <= 0 {
+						add("%s: countdown timer needs seconds > 0", where)
+					}
+				default:
+					add("%s: timerDisplay mode must be stopwatch or countdown", where)
+				}
+				if c.Field != "" {
+					if formEntity == nil {
+						add("%s: timerDisplay.field requires screen.entity", where)
+					} else if f := formEntity.FieldByID(c.Field); f == nil {
+						add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
+					} else if f.Type != FieldInteger && f.Type != FieldNumber {
+						add("%s: timerDisplay field %q must be integer or number", where, c.Field)
+					}
+				}
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}
@@ -388,3 +468,46 @@ func checkNotification(where string, n *Notification, add func(string, ...any)) 
 }
 
 var timeRe = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
+
+// checkContainerProps validates props that only make sense for one container
+// kind (grid columns range, carousel itemWidth, disclosure expanded).
+func checkContainerProps(where string, c *Component, add func(string, ...any)) {
+	if c.Columns != 0 {
+		if c.Type != CompGrid {
+			add("%s: columns is only allowed on grid", where)
+		} else if c.Columns < MinGridContainerColumns || c.Columns > MaxGridContainerColumns {
+			add("%s: grid columns must be %d-%d (got %d)", where, MinGridContainerColumns, MaxGridContainerColumns, c.Columns)
+		}
+	}
+	if c.ItemWidth != "" && c.Type != CompCarousel {
+		add("%s: itemWidth is only allowed on carousel", where)
+	}
+	if c.Expanded != nil && c.Type != CompDisclosure {
+		add("%s: expanded is only allowed on disclosure", where)
+	}
+	if (c.Type == CompCarousel || c.Type == CompGrid) && len(c.Children) == 0 {
+		add("%s: %s needs at least one child", where, c.Type)
+	}
+}
+
+// collectSearchKeys returns the `field` keys of every searchBar on a screen
+// (top level or inside a container) and reports duplicates.
+func collectSearchKeys(screenID string, comps []Component, add func(string, ...any)) map[string]bool {
+	keys := map[string]bool{}
+	visit := func(c *Component) {
+		if c.Type != CompSearchBar || c.Field == "" {
+			return
+		}
+		if keys[c.Field] {
+			add("screen %q: duplicate searchBar field %q", screenID, c.Field)
+		}
+		keys[c.Field] = true
+	}
+	for i := range comps {
+		visit(&comps[i])
+		for j := range comps[i].Children {
+			visit(&comps[i].Children[j])
+		}
+	}
+	return keys
+}

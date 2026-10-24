@@ -332,7 +332,11 @@
           "enum": [
             "vstack",
             "hstack",
-            "section"
+            "section",
+            "card",
+            "disclosure",
+            "carousel",
+            "grid"
           ]
         },
         "id": {
@@ -343,7 +347,7 @@
         },
         "title": {
           "type": "string",
-          "description": "section only."
+          "description": "section / card / disclosure: heading text (disclosure uses it as the toggle row)."
         },
         "spacing": {
           "type": "string",
@@ -359,8 +363,32 @@
           "items": {
             "$ref": "#/$defs/Leaf"
           }
+        },
+        "expanded": {
+          "type": "boolean",
+          "description": "disclosure only: initially open (default false)."
+        },
+        "itemWidth": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ],
+          "description": "carousel only: width of each child (small=40%, medium=70%, large=90% of the strip; default medium)."
+        },
+        "columns": {
+          "type": "integer",
+          "enum": [
+            2,
+            3,
+            4
+          ],
+          "description": "grid only: number of equal columns (default 2)."
         }
-      }
+      },
+      "description": "Groups Leaf children (one level only, children stack; no `area` inside). vstack/hstack = plain stacks; section = titled rounded group; card = rounded surface with shadow for one highlighted block; disclosure = collapsible group (title is the toggle row); carousel = horizontal paging strip of same-size items; grid = equal-width columns (2-4) of small tiles such as stat/button/image.",
+      "x-usage": "Place on the screen grid like a Leaf: a card or section typically spans the full width (A1:F3); a grid of 2-4 stat/button tiles usually takes A1:F4; a carousel of image/text cards takes A1:F4; a disclosure with optional details goes near the bottom (A9:F12). Children never carry `area`."
     },
     "Leaf": {
       "anyOf": [
@@ -408,6 +436,30 @@
         },
         {
           "$ref": "#/$defs/Divider"
+        },
+        {
+          "$ref": "#/$defs/SearchBar"
+        },
+        {
+          "$ref": "#/$defs/Calendar"
+        },
+        {
+          "$ref": "#/$defs/ShareButton"
+        },
+        {
+          "$ref": "#/$defs/OpenUrlButton"
+        },
+        {
+          "$ref": "#/$defs/MapView"
+        },
+        {
+          "$ref": "#/$defs/LocationButton"
+        },
+        {
+          "$ref": "#/$defs/QrScanner"
+        },
+        {
+          "$ref": "#/$defs/TimerDisplay"
         }
       ]
     },
@@ -678,6 +730,10 @@
         },
         "swipeToDelete": {
           "type": "boolean"
+        },
+        "searchField": {
+          "type": "string",
+          "description": "Id of a `searchBar.field` on the same screen. iOS filters rows whose title/subtitle contain the typed text (client-side, case-insensitive)."
         }
       }
     },
@@ -1261,6 +1317,286 @@
           "description": "SF Symbols name."
         }
       }
+    },
+    "SearchBar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "searchBar"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Screen-local search key (any Id, e.g. \"search\"). Not an entity field. A `list` on the same screen references it via `searchField`."
+        },
+        "placeholder": {
+          "type": "string"
+        }
+      },
+      "description": "Search text box that filters a list on the same screen by title/subtitle. Choose when a list may grow long (contacts, books, memos). Does not need screen.entity.",
+      "x-usage": "Put it in a thin full-width strip right above the list: searchBar A1:F1, list A2:F12. Pair with exactly one list (`searchField` = this `field`)."
+    },
+    "Calendar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "dateField"
+      ],
+      "properties": {
+        "type": {
+          "const": "calendar"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "dateField": {
+          "type": "string",
+          "description": "date/datetime field of `entity` that places a record on a day."
+        },
+        "onDateTap": {
+          "$ref": "#/$defs/Action"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "description": "Month calendar with a dot on days that have records; tapping a day lists that day's records under the grid. Tapping a listed record runs `onDateTap` with that recordId (edit mode); the + button runs `onDateTap` with the tapped date pre-filled into `dateField` (new record). Choose for diaries, schedules, habit trackers, anything the user thinks of by date.",
+      "x-usage": "Usually the main block of a screen: A1:F9 (calendar) with a stat or button below (A10:F12). `onDateTap` is normally navigate to the entity's form screen (presentation sheet)."
+    },
+    "ShareButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "shareButton"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "text": {
+          "type": "string",
+          "description": "Text to share. `{{fieldId}}` tokens are replaced with the current form values when the screen has an entity."
+        },
+        "field": {
+          "type": "string",
+          "description": "Optional field of screen.entity whose value is shared too (photo -> image, other -> appended text)."
+        },
+        "label": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        }
+      },
+      "description": "System share sheet (ShareLink) for text and optionally a photo of the current record. Choose when the user wants to send a result to friends or other apps (diary entry, score, photo memo).",
+      "x-usage": "Small: half width at the bottom (A11:C12), next to another button. Needs screen.entity only when `field` or `{{...}}` is used."
+    },
+    "OpenUrlButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "label",
+        "url"
+      ],
+      "properties": {
+        "type": {
+          "const": "openUrlButton"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "https URL opened in Safari / the matching app."
+        },
+        "icon": {
+          "type": "string"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary",
+            "plain"
+          ]
+        }
+      },
+      "description": "Button that opens a fixed URL (official site, map search, recipe page). Equivalent to button + openUrl action but shorter and renders as a link style. Choose for static external links.",
+      "x-usage": "Small strip at the bottom or inside a section/card: A11:F12 or as a child of card. Prefer `button` with an `openUrl` action when the label/style must match other primary buttons."
+    },
+    "MapView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "locationField"
+      ],
+      "properties": {
+        "type": {
+          "const": "mapView"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "locationField": {
+          "type": "string",
+          "description": "location field (\"lat,lng\") of `entity`; one pin per record."
+        },
+        "titleField": {
+          "type": "string",
+          "description": "Field shown as the pin label (default entity.titleField)."
+        },
+        "zoom": {
+          "type": "string",
+          "enum": [
+            "near",
+            "city",
+            "wide"
+          ],
+          "description": "Initial span around the pins: near ~1km, city ~10km, wide ~100km (default city)."
+        },
+        "onItemTap": {
+          "$ref": "#/$defs/Action",
+          "description": "Run when a pin is tapped; iOS passes recordId."
+        }
+      },
+      "description": "MapKit map with one pin per record that has a location value. Choose for spot/visit logs, running routes (points), shop lists. Pair with `locationButton` on the form screen to capture positions.",
+      "x-usage": "Large block: A1:F8 with the list below (A9:F12), or full screen A1:F12 on its own tab. Needs a `location` field on the entity."
+    },
+    "LocationButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "locationButton"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "location field of screen.entity; receives \"lat,lng\" of the current position."
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "description": "Button that requests the current GPS position once and stores it into a location field of the form. Choose on form screens of apps that record where something happened (walk memo, parking spot, fishing log).",
+      "x-usage": "Form screen only (screen.entity required). One row: A8:F9 near the other inputs. Pair with `mapView` on the home screen."
+    },
+    "QrScanner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "qrScanner"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "string/text field of screen.entity; receives the decoded QR / barcode payload."
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "description": "Camera QR/barcode reader that writes the decoded string into a text field of the form (device only; the simulator shows a placeholder). Choose for inventory, ticket check-in, book ISBN, Wi-Fi/URL capture.",
+      "x-usage": "Form screen only (screen.entity required). One row: A3:F4 above the text field that shows the result."
+    },
+    "TimerDisplay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "mode"
+      ],
+      "properties": {
+        "type": {
+          "const": "timerDisplay"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "stopwatch",
+            "countdown"
+          ]
+        },
+        "seconds": {
+          "type": "integer",
+          "description": "countdown only: starting seconds (e.g. 180). Ignored for stopwatch."
+        },
+        "field": {
+          "type": "string",
+          "description": "Optional integer/number field of screen.entity that receives the elapsed seconds when the timer is paused or finishes."
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "description": "Big mm:ss display with start / pause / reset (stopwatch counts up, countdown counts down from `seconds`). Choose for workout sets, plank, pomodoro, cooking, meditation apps.",
+      "x-usage": "Centerpiece of a screen: A2:F6, with the record form inputs below. Set `field` on a form screen to save the measured seconds with the record."
     }
   }
 }
