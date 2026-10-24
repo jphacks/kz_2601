@@ -69,6 +69,23 @@
         }
       }
     },
+    "%@のタイマーが終わりました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ timer is done"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@のタイマーが終わりました"
+          }
+        }
+      }
+    },
     "%@を削除": {
       "extractionState": "manual",
       "localizations": {
@@ -320,6 +337,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "シミュレータ用: 読み取り結果を手入力"
+          }
+        }
+      }
+    },
+    "タイマー": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timer"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイマー"
           }
         }
       }
