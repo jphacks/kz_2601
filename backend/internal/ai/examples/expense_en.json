@@ -17,7 +17,7 @@
       "name": "Expense",
       "titleField": "note",
       "fields": [
-        { "id": "amount", "name": "Amount", "type": "currency", "required": true, "unit": "$" },
+        { "id": "amount", "name": "Amount", "type": "currency", "required": true },
         { "id": "category", "name": "Category", "type": "enum", "required": true, "options": ["Food", "Transport", "Shopping", "Fun", "Other"], "defaultValue": "Food" },
         { "id": "note", "name": "Note", "type": "string" },
         { "id": "date", "name": "Date", "type": "date", "required": true, "defaultValue": "now" }
@@ -55,7 +55,7 @@
         {
           "type": "section", "id": "fields", "area": "A1:F7", "title": "Details",
           "children": [
-            { "type": "numberField", "field": "amount", "label": "Amount", "unit": "$" },
+            { "type": "numberField", "field": "amount", "label": "Amount" },
             { "type": "picker", "field": "category", "label": "Category", "style": "segmented" },
             { "type": "textField", "field": "note", "label": "Note", "placeholder": "Coffee" },
             { "type": "datePicker", "field": "date", "label": "Date" }
