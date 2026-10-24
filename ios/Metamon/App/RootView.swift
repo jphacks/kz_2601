@@ -14,6 +14,8 @@ struct RootView: View {
     @State private var bottomObstructions: [String: CGFloat] = [:]
     /// 同じく右端(E〜F 列)。FAB を右に吸着させた時に使う(#52)
     @State private var trailingBottomObstructions: [String: CGFloat] = [:]
+    /// マイク FAB の矩形(global・隠れている / 非表示なら nil)。Renderer が背の高い list の末尾に余白を足す(#157)
+    @State private var fabFrame: CGRect?
     /// ソフトキーボードの表示状態(FAB を隠す・#143)
     private let keyboard = KeyboardState.shared
 
@@ -41,6 +43,7 @@ struct RootView: View {
                 .allowsHitTesting(rt.morphJob == nil)
                 .onPreferenceChange(GridBottomObstructionKey.self) { bottomObstructions = $0 }
                 .onPreferenceChange(GridBottomTrailingObstructionKey.self) { trailingBottomObstructions = $0 }
+                .environment(\.fabFrame, fabFrame)
 
             // フォーム画面(push)では FAB を出さず、ナビバー右上のマイク(`formToolbarAccessory`)が入口になる(#83)
             // キーボード表示中も隠す(入力欄・キーボードのツールバーに被るため・#143)
@@ -60,6 +63,7 @@ struct RootView: View {
             }
             .animation(.easeOut(duration: 0.22), value: isFormVisible)
             .animation(.easeOut(duration: 0.22), value: keyboard.isVisible)
+            .onPreferenceChange(VoiceFabFrameKey.self) { fabFrame = $0 }
             if let job = rt.morphJob {
                 switch job.kind {
                 case .create:

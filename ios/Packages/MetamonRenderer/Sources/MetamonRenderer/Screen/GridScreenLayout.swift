@@ -8,6 +8,7 @@ import MetamonDSL
 /// - 見た目: セル間ギャップ / 画面端余白は `RenderTheme.Spacing`、出現は index × stagger の遅延付きフェード(変身の受け側)。
 /// - 最下段(行 11〜12)の左端(A〜B 列)/ 右端(E〜F 列)に部品があれば、その上端(global 座標)を
 ///   `GridBottomObstructionKey` / `GridBottomTrailingObstructionKey` で上げる(ホストがマイク FAB を上に逃がすため・#83 / #52)。
+/// - 逆に背景扱いの背の高い部品(list 等)は FAB が上に浮くので、ホストが渡す `fabFrame` と重なる分だけ中身の末尾に余白を足す(#157)。
 public struct GridScreenLayout: View {
     let screen: Screen
     let ctx: RenderContext
@@ -18,6 +19,7 @@ public struct GridScreenLayout: View {
     @State private var stableHeight: CGFloat = 0
     /// フォーカスを得た入力欄(`keyboardAnchor` の id)。tick は同じ欄への再フォーカスでもスクロールさせるため
     @State private var focusRequest: (key: String, tick: Int)?
+    @Environment(\.fabFrame) private var fabFrame
 
     public init(screen: Screen, ctx: RenderContext) {
         self.screen = screen
@@ -66,7 +68,10 @@ public struct GridScreenLayout: View {
                 } else {
                     ScrollViewReader { proxy in
                         ScrollView {
+                            // area 無しで積んだ部品(全幅の list 等)は画面のスクロールの末尾に FAB ぶんの余白(#157)。
+                            // area だけの画面は高さぴったりなので足さない(足すと常に少しスクロールしてしまう)
                             content
+                                .padding(.bottom, placement.stacked.isEmpty ? 0 : FabClearance.contentMargin(viewport: geo.frame(in: .global), fab: fabFrame))
                         }
                         .scrollDismissesKeyboard(.interactively)
                         .scrollBounceBehavior(.basedOnSize)
@@ -247,6 +252,9 @@ struct GridCell: View {
     private var hasLocalGrid: Bool { component.localGridPlacement != nil }
 
     @Environment(\.dslRuntime) private var rt
+    @Environment(\.fabFrame) private var fabFrame
+    /// 器の矩形(global)。マイク FAB と重なる分だけ中身の末尾に余白を足す(#157)
+    @State private var frame: CGRect = .zero
 
     /// list(または list だけの section)に行がある時は、カードを行の高さで止める(#131: 4 行なのにセルいっぱいの白い面が残っていた)。
     /// 空の時は従来どおり器の高さを渡し、空状態をセル全体に出す(#84)。
@@ -258,9 +266,10 @@ struct GridCell: View {
 
     var body: some View {
         if scrollsInside {
-            FadingScrollView(fillsViewport: !hugsContent) {
+            FadingScrollView(fillsViewport: !hugsContent, trailingMargin: FabClearance.contentMargin(viewport: frame, fab: fabFrame)) {
                 DSLView(component: component, ctx: ctx)
             }
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
         } else {
             DSLView(component: component, ctx: ctx)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -276,6 +285,8 @@ struct GridCell: View {
 /// 中身が器より低い時は器の高さを提案する(#84: 空の list / 行の少ない list がセル全体を使える)。
 private struct FadingScrollView<Content: View>: View {
     var fillsViewport = true
+    /// 中身の末尾に足す余白(マイク FAB の下に隠れる最後の行を、スクロールで FAB の上へ出す・#157)
+    var trailingMargin: CGFloat = 0
     @ViewBuilder var content: Content
     @State private var contentFrame: CGRect = .zero
     @State private var viewportHeight: CGFloat = 0
@@ -291,7 +302,7 @@ private struct FadingScrollView<Content: View>: View {
     var body: some View {
         ScrollView(.vertical) {
             content
-                .frame(minHeight: fillsViewport ? max(0, viewportHeight - bottomPad) : nil, alignment: .top)
+                .frame(minHeight: fillsViewport ? max(0, viewportHeight - bottomPad - trailingMargin) : nil, alignment: .top)
                 // 影が器の外にはみ出さないよう、カードの影ぶんだけ内側に余白
                 .padding(.bottom, bottomPad)
                 .background(
@@ -299,7 +310,13 @@ private struct FadingScrollView<Content: View>: View {
                         Color.clear.preference(key: ContentFrameKey.self, value: g.frame(in: .named("fadingScroll")))
                     }
                 )
+                // FAB ぶんの余白は中身の末尾に持つ(フェード判定には含めない)。contentMargins では末尾までスクロールしても最後の行が FAB の下に残った
+                .padding(.bottom, trailingMargin)
         }
+        #if DEBUG
+        // 撮影用(#157): `METAMON_SCROLL_CELLS_TO_END=1` でセル内スクロールを末尾から表示(FAB の上に最後の行が出るかを確認)
+        .defaultScrollAnchor(ProcessInfo.processInfo.environment["METAMON_SCROLL_CELLS_TO_END"] == "1" ? .bottom : nil)
+        #endif
         .coordinateSpace(name: "fadingScroll")
         .scrollBounceBehavior(.basedOnSize)
         .onPreferenceChange(ContentFrameKey.self) { contentFrame = $0 }
