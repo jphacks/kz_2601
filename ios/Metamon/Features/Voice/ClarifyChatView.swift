@@ -32,6 +32,14 @@ struct ClarifyChatView: View {
             inputRow
         }
         .padding(.top, Theme.Spacing.sm)
+        #if DEBUG
+        .task {
+            // ヘッドレス E2E 用: `METAMON_AUTO_FOCUS=chat` で 3 秒後に返答欄へフォーカス(キーボードの確認・#143)
+            guard ProcessInfo.processInfo.environment["METAMON_AUTO_FOCUS"] == "chat" else { return }
+            try? await Task.sleep(for: .seconds(3))
+            typing = true
+        }
+        #endif
     }
 
     // MARK: - 吹き出し

@@ -85,6 +85,13 @@ struct VoiceInputView: View {
             try? await Task.sleep(for: .seconds(2))
             showSettings = true
         }
+        .task {
+            // ヘッドレス E2E 用: `METAMON_AUTO_FOCUS=voice` で 3 秒後に文字入力へフォーカス(キーボードの確認・#143)
+            let key = ProcessInfo.processInfo.environment["METAMON_AUTO_FOCUS"]
+            guard key == "voice" || key == "voice-sheet", !inChat else { return }
+            try? await Task.sleep(for: .seconds(3))
+            typing = true
+        }
         #endif
     }
 

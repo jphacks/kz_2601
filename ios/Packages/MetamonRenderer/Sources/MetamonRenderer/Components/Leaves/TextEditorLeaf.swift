@@ -24,6 +24,7 @@ struct TextEditorLeaf: View {
                             .font(RenderTheme.Fonts.inputValue)
                             .padding(.vertical, 4)
                             .focused($focused)
+                            .debugAutoFocus(c, $focused)
                         if text.wrappedValue.isEmpty, let placeholder = c.placeholder, !placeholder.isEmpty {
                             Text(placeholder)
                                 .font(RenderTheme.Fonts.inputValue)

@@ -107,6 +107,12 @@ struct RootView: View {
             rt.openSwitcher()
         }
         .task {
+            // ヘッドレス E2E 用: `METAMON_AUTO_FOCUS=voice-sheet` で起動 2 秒後に発話シートを開く(シート内の文字入力へフォーカス・#143)
+            guard ProcessInfo.processInfo.environment["METAMON_AUTO_FOCUS"] == "voice-sheet", !rt.dsl.isVoiceOnly else { return }
+            try? await Task.sleep(for: .seconds(2))
+            rt.showVoiceSheet = true
+        }
+        .task {
             // ヘッドレス E2E 用: `METAMON_AUTO_OPEN=<screen>[:push|sheet][:record]` で起動 2.5 秒後に画面を開く
             // (`record` を付けると screen.entity の先頭レコードを編集モードで開く)
             guard let spec = ProcessInfo.processInfo.environment["METAMON_AUTO_OPEN"], !spec.isEmpty else { return }
