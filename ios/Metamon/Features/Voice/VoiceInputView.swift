@@ -64,6 +64,10 @@ struct VoiceInputView: View {
         .animation(.spring(duration: 0.45, bounce: 0.15), value: inChat)
         .sheet(isPresented: $showSettings) { SettingsSheet() }
         .onTapGesture { typing = false }
+        // #43 初期画面の挨拶を読み上げ(対話中・生成後のシートでは読まない)
+        .task(id: "\(isInitial)|\(inChat)|\(greeting.title)") {
+            if isInitial, !inChat { SpeechReader.shared.speak((prompt ?? greeting.title) + "\n" + greeting.subtitle) }
+        }
     }
 
     // MARK: - Sections
@@ -288,14 +292,17 @@ struct VoiceInputView: View {
         switch phase {
         case .idle:
             typing = false
+            await SpeechReader.shared.stopForRecording() // #43 読み上げ中なら即停止してから録音
             do {
                 try await transcriber.startRecording()
                 phase = .listening
             } catch {
+                SpeechReader.shared.recordingFinished()
                 rt.toast = error.localizedDescription
             }
         case .listening:
             phase = .transcribing
+            SpeechReader.shared.recordingFinished()
             let text: String
             do {
                 text = try await transcriber.stopAndTranscribe()
@@ -345,6 +352,7 @@ struct VoiceInputView: View {
     /// 初期画面は `submitUtterance`(対話 ON なら質問を挟む)、生成後のシート(edit)は従来どおり即反映。
     private func morph(_ text: String) async {
         phase = .thinking
+        SpeechReader.shared.stop()
         if isInitial {
             await rt.submitUtterance(text)
         } else {
