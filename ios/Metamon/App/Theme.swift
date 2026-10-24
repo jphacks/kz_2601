@@ -85,11 +85,11 @@ enum Theme {
         ZStack {
             Colors.canvas
             RadialGradient(
-                colors: [Colors.brandA.opacity(scheme == .dark ? 0.28 : 0.18), .clear],
+                colors: [Colors.brandA.opacity(scheme == .dark ? 0.28 : 0.10), .clear],
                 center: .init(x: 0.2, y: 0.1), startRadius: 0, endRadius: 420
             )
             RadialGradient(
-                colors: [Colors.brandB.opacity(scheme == .dark ? 0.22 : 0.16), .clear],
+                colors: [Colors.brandB.opacity(scheme == .dark ? 0.22 : 0.08), .clear],
                 center: .init(x: 0.9, y: 0.9), startRadius: 0, endRadius: 380
             )
         }

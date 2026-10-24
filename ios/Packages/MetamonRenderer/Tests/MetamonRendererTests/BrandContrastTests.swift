@@ -25,6 +25,13 @@ final class BrandContrastTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(SemanticPalette.brandA.dark.contrast(with: SemanticPalette.canvas.dark), 3.0)
     }
 
+    func testWhiteGlyphOnBrandGradient() {
+        // 本体のマイク・送信・「新しいアプリ」は brandGradient の上に白いアイコン / 大きい白文字を載せる → 両端・両モードで 3:1 以上
+        for c in [SemanticPalette.brandA.light, SemanticPalette.brandA.dark, SemanticPalette.brandB.light, SemanticPalette.brandB.dark] {
+            XCTAssertGreaterThanOrEqual(white.contrast(with: c), 3.0)
+        }
+    }
+
     func testDecorativeBrandBIsNotForBodyText() {
         // 装飾用 brandB(青緑)は白文字の本文には使えない(だから brandFill を分けた)ことの記録
         XCTAssertLessThan(white.contrast(with: SemanticPalette.brandB.light), 4.5)

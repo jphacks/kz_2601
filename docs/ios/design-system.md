@@ -18,9 +18,9 @@
 
 | トークン | 値(ライト / ダーク) | 使い所 |
 |---|---|---|
-| `Colors.brandA` | `#2E6A93` / `#6FA8CF`(藍) | tint / フォーカスリング / 選択中 / stat のアイコン。面に対し非文字 3:1 以上(`BrandContrastTests`) |
-| `Colors.brandB` | `#3E9A9C` / `#5FC0BE`(青緑) | グラデーションの終点 / チャートの 2 色目。装飾専用(白文字を載せない) |
-| `brandGradient` | brandA → brandB(topLeading→bottomTrailing) | 塗り星 / ゲージ / chart の bar・line / 本体のマイク・ブランドマーク |
+| `Colors.brandA` | `#2E6A93` / `#4E8DB8`(藍) | tint / フォーカスリング / 選択中 / stat のアイコン。面に対し非文字 3:1 以上、かつ白いアイコンを載せて 3:1 以上(`BrandContrastTests`) |
+| `Colors.brandB` | `#3E9A9C` / `#3B9E9F`(青緑) | グラデーションの終点 / チャートの 2 色目。白は 3.2〜3.3:1 なのでアイコン・大きい文字まで(本文の白文字は brandFill に載せる) |
+| `brandGradient` | brandA → brandB(topLeading→bottomTrailing) | 塗り星 / ゲージ / chart の bar・line / 本体のマイク・送信・ブランドマーク(白アイコン 3:1 以上) |
 | `Colors.brandSoft` | brandA 12% | secondary ボタン面 / 選択行の背景 / list のアイコン背景 |
 | `Colors.brandText` | `#1F5A82` / `#8CC3E6` | ブランド色の**文字**(リンク・secondary/plain ボタン・stepper/slider の値・フォーカス中ラベル)。面に対し AA(4.5:1)。`SemanticPalette.brand` として #68 の `SemanticColorContrastTests` が検算 |
 | `brandFill` | `#245E86` → `#286F7E`(両モード共通) | **白文字を載せる塗り**(primary ボタン・segmented 選択チップ・calendar 選択日・timer の数字)。両端とも白文字 4.5:1 以上(`BrandContrastTests`) |
