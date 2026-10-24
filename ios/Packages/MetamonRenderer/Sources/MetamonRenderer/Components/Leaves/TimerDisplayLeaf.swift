@@ -60,6 +60,15 @@ struct TimerDisplayLeaf: View {
     private var storeKey: String { "\(rt.dsl.app.name)/\(ctx.route.screen)/\(c.id)" }
 
     private func restore() {
+        #if DEBUG
+        // ヘッドレス E2E 用: `METAMON_E2E_TIMER_START=<部品 id>` で表示時に開始(#38 の背面・通知の確認)
+        if ProcessInfo.processInfo.environment["METAMON_E2E_TIMER_START"] == c.id, TimerRunStore.shared.load(storeKey)?.isRunning != true {
+            print("[Metamon] E2E: timer start id=\(c.id)")
+            elapsed = 0
+            start()
+            return
+        }
+        #endif
         guard let saved = TimerRunStore.shared.load(storeKey) else { return }
         run = saved
         catchUp(.now)
@@ -84,7 +93,7 @@ struct TimerDisplayLeaf: View {
 
     private func notify(isForeground: Bool) {
         let plan = TimerNotificationPlan.decide(isForeground: isForeground, isCountdown: isCountdown, run: run, total: total, now: .now)
-        TimerNotifier.apply(plan, key: storeKey, title: c.label.flatMap { $0.isEmpty ? nil : $0 } ?? rt.dsl.app.name)
+        TimerNotifier.apply(plan, key: storeKey, title: rt.dsl.app.name, name: c.label.flatMap { $0.isEmpty ? nil : $0 } ?? "タイマー")
     }
 
     private func start() {

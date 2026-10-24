@@ -70,7 +70,8 @@ public struct TimerRunStore: Sendable {
 enum TimerNotifier {
     static let prefix = "timer."
 
-    static func apply(_ plan: TimerNotificationPlan, key: String, title: String) {
+    /// - title: 通知の見出し(アプリ名) / name: タイマーの名前(部品の label)
+    static func apply(_ plan: TimerNotificationPlan, key: String, title: String, name: String) {
         let center = UNUserNotificationCenter.current()
         let id = prefix + key
         switch plan {
@@ -79,7 +80,7 @@ enum TimerNotifier {
         case .schedule(let end):
             let content = UNMutableNotificationContent()
             content.title = title
-            content.body = "\(title)のタイマーが終わりました"
+            content.body = "\(name)のタイマーが終わりました"
             content.sound = .default
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, end.timeIntervalSinceNow), repeats: false)
             center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
