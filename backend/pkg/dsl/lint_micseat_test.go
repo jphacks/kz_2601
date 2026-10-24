@@ -1,9 +1,48 @@
 package dsl
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// Every example (gallery included) keeps the mic seat empty: Claude copies them,
+// and a scrolled-far-down part (A20:C21 on a 12-row-tall check) must not count.
+func TestLintMicSeatExamplesClean(t *testing.T) {
+	files, err := filepath.Glob(filepath.Join(docsDir, "examples", "*.json"))
+	if err != nil || len(files) == 0 {
+		t.Fatalf("no examples: %v", err)
+	}
+	for _, f := range files {
+		raw, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		app, err := Parse(raw)
+		if err != nil {
+			t.Fatalf("%s: %v", filepath.Base(f), err)
+		}
+		for _, w := range app.Lint() {
+			if strings.Contains(w, "mic button") {
+				t.Errorf("%s: %s", filepath.Base(f), w)
+			}
+		}
+	}
+}
+
+// On a screen taller than 12 rows only its last 2 rows are the seat.
+func TestLintMicSeatScrollingScreen(t *testing.T) {
+	btn := func(area string) string {
+		return `,{"type":"button","area":"` + area + `","label":"b","action":{"type":"navigate","screen":"form"}}`
+	}
+	if w := micSeatWarnings(t, btn("A11:C12")+btn("D20:F21")); len(w) != 0 {
+		t.Errorf("A11:C12 is mid-screen when the screen ends at row 21: %v", w)
+	}
+	if w := micSeatWarnings(t, btn("A20:C21")); len(w) != 1 {
+		t.Errorf("A20:C21 at the end of the screen: want 1, got %v", w)
+	}
+}
 
 func micSeatDoc(homeComps string) string {
 	return `{"schemaVersion":1,"app":{"name":"t","voiceEntry":"floating"},"initialScreen":"home",
