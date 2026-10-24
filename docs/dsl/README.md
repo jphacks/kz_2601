@@ -57,7 +57,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 ### 3.1 コンポーネント(18 種 = Container 3 + Leaf 15)
 
-全種に共通の任意キー: `id`(画面内一意)・`area`(§3.4 のグリッド矩形。Screen 直下のみ有効)。
+全種に共通の任意キー: `id`(画面内一意)・`area`(§3.4 のグリッド矩形。Screen 直下のみ有効)。用途・レイアウトの定石は `dsl.schema.json` 各定義の `description` / `x-usage` が正典(AI へのカタログはそこから生成。§4)。
 
 | type | 必須 | 任意 | 要 `screen.entity` | P |
 |---|---|---|---|---|
@@ -140,10 +140,22 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 例(家計簿 home): 合計カード `A1:F2`・最近の支出(list・セル内スクロール) `A3:F10`・追加ボタン `D11:F12`。散歩メモ home: 今日 `A1:C2` / ぜんぶ `D1:F2` の 2 枚並び + 一覧 `A3:F12`。
 
-## 4. 変更手順(Day2 に部品を足す時)
+## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 
-1. `docs/dsl/dsl.schema.json` を編集(Leaf を足す = `$defs` に object を足し `Leaf.anyOf` に追加。`PatchValue` は `Component`/`Leaf` 経由なので変更不要)。各 `$defs` に **`description`(用途・いつ選ぶか 1〜2 文)と `x-usage`(area の定石)** を必ず付ける(ai のカタログはここから生成)。並行作業中は `$defs` と `anyOf` の**末尾に 1 行 1 要素**で追記するとマージしやすい。
-2. `cd backend && make schema-sync && go test ./...`(`dsl.go` の `ComponentType` と `validate.go` の per-type 検証も更新)。
-3. iOS: `ios/Packages/MetamonDSL/.../Model/Component.swift` の `ComponentType` に case 追加 + `ios/Packages/MetamonRenderer/.../Components/Leaves/` に View 1 ファイル + `ComponentRegistry.standard` に登録 1 行(`MetamonRendererTests` が schema との一致を検証)。
-4. `examples/*.json` に使用例を足す(backend の `TestExamplesRoundTrip` と iOS の `MetamonDSLTests` が両方で検証)。
-5. ai のプロンプトカタログ(コンポーネント表)を更新。
+AI に渡す部品カタログは手書きではなく **`dsl.schema.json` から自動生成**される(`backend/internal/ai/catalog.go` の `BuildCatalog`)。検証(Go)・描画(iOS)・AI(プロンプト)の 3 者はすべてスキーマから導出され、抜けはテストで赤になる。
+
+| # | やること | 揃うもの |
+|---|---|---|
+| 1 | `docs/dsl/dsl.schema.json` に定義を足す: `$defs` に object(`type` は `const`)、`Leaf.anyOf` と `PatchValue` に `$ref` 追加。**`description`(何に使うか・いつ選ぶか 1〜2 文)と `x-usage`(レイアウトの定石: area の例・組み合わせ)を必ず書く**。Container の種別は `properties.type.x-enumDescriptions`、特定 type だけのキーは `x-for: {"section":"optional"}`。Action を足す時は `Action.properties.type.enum` + `x-enumDescriptions`、専用キーに `x-for: {"navigate":"required"}` | AI: `make schema-sync` 後にカタログへ自動掲載。`backend/pkg/dsl`: `dsl.go` の `ComponentType` 定数と `validate.go` の per-type 検証を追加、`examples/*.json` に使用例 |
+| 2 | iOS: `MetamonDSL` の `ComponentType` に case 1 つ + `MetamonRenderer` に Leaf の View ファイル 1 つ + `ComponentRegistry.standard` に 1 行 | 描画 |
+| 3 | `cd backend && make test`(= schema-check + `go test ./...`)と `cd ios && xcodebuild test` が**両方緑** | 検証・AI・描画の一致 |
+
+ステップ 3 で赤になる条件(= 追記漏れの検出):
+
+- backend `internal/ai/catalog_test.go`: スキーマの全 Container/Leaf type と全 Action type がカタログ文に出現しない / `description`・`x-usage`・`x-enumDescriptions` が空 / Go の `ComponentType` 定数とスキーマの type 集合が不一致。
+- backend `pkg/dsl`: 埋め込み `schema.json` が docs と byte 不一致(`make schema-sync` 忘れ)/ `examples` が round-trip しない。
+- iOS `ComponentRegistryTests`: スキーマの type が `ComponentRegistry.standard` / `ComponentType` に無い(またはその逆)。
+
+`description` / `x-*` キーは JSON Schema の検証では無視され、iOS のデコーダ(`MetamonDSL` は examples JSON をデコードするだけでスキーマ本文は読まない)にも影響しない。生成用スキーマ(`ai.GenerationSchema()`)では `description` と `x-*` を落としてトークンを節約し、意味はカタログ側だけに載せる。
+
+要求された部品がカタログに無い時(カレンダー・地図など)は、プロンプトの規則で**最も近い既存部品で代替し、存在しない type は出力しない**。代替したことは編集ターンなら `summary`、新規作成なら `app.description` 末尾の「○○は△△で代替しました。」として残り、backend の `summarize()` が読み上げ文に含める。
