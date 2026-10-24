@@ -26,11 +26,19 @@ type Envelope struct {
 
 // Source mirrors VersionSource.
 type Source struct {
-	Kind       string `json:"kind"`
-	Mode       string `json:"mode,omitempty"`
-	Transcript string `json:"transcript,omitempty"`
-	Summary    string `json:"summary,omitempty"`
-	Model      string `json:"model,omitempty"`
+	Kind         string `json:"kind"`
+	Mode         string `json:"mode,omitempty"`
+	Transcript   string `json:"transcript,omitempty"`
+	Summary      string `json:"summary,omitempty"`
+	Model        string `json:"model,omitempty"`
+	RestoredFrom int    `json:"restoredFrom,omitempty"`
+}
+
+// VersionSummary mirrors VersionSummary (GET /versions item, no DSL body).
+type VersionSummary struct {
+	Version       int     `json:"version"`
+	ParentVersion int     `json:"parentVersion,omitempty"`
+	Source        *Source `json:"source,omitempty"`
 }
 
 // Store is what the ai service needs from appconfig.
@@ -38,6 +46,10 @@ type Store interface {
 	Get(ctx context.Context, appID string) (*Envelope, error)
 	Put(ctx context.Context, appID string, baseVersion int, doc json.RawMessage, src Source) (*Envelope, error)
 	Patch(ctx context.Context, appID string, baseVersion int, ops []dsl.PatchOp, src Source) (*Envelope, error)
+	// Versions lists history newest first (the first page is enough for undo).
+	Versions(ctx context.Context, appID string) ([]VersionSummary, error)
+	// Restore appends a new version whose DSL is that of version n.
+	Restore(ctx context.Context, appID string, n int) (*Envelope, error)
 }
 
 // Error is an appconfig-side failure with its HTTP status.
@@ -160,6 +172,37 @@ func (h *HTTP) Patch(ctx context.Context, appID string, baseVersion int, ops []d
 	return &env, nil
 }
 
+// Versions is GET /versions (newest first, first page).
+func (h *HTTP) Versions(ctx context.Context, appID string) ([]VersionSummary, error) {
+	var out struct {
+		Items []VersionSummary `json:"items"`
+	}
+	if err := h.do(ctx, http.MethodGet, "/v1/apps/"+appID+"/versions?pageSize=50", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return out.Items, nil
+}
+
+// Restore is POST /versions/{n}/restore followed by GET /dsl: appconfig
+// answers with a VersionSummary (no DSL), so the new document is re-read.
+func (h *HTTP) Restore(ctx context.Context, appID string, n int) (*Envelope, error) {
+	var out struct {
+		Version int `json:"version"`
+	}
+	if err := h.do(ctx, http.MethodPost, fmt.Sprintf("/v1/apps/%s/versions/%d/restore", appID, n), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	env, err := h.Get(ctx, appID)
+	if err != nil {
+		return nil, err
+	}
+	if env.Version != out.Version {
+		return nil, &Error{Status: http.StatusConflict, Code: "version_conflict",
+			Message: fmt.Sprintf("restored as version %d but current is %d", out.Version, env.Version), CurrentVersion: env.Version}
+	}
+	return env, nil
+}
+
 func ifMatch(v int) map[string]string {
 	return map[string]string{"If-Match": fmt.Sprintf("%q", fmt.Sprint(v))}
 }
@@ -168,13 +211,22 @@ func ifMatch(v int) map[string]string {
 
 // Memory is an in-process Store. Unknown appIds are seeded with dsl.Initial()
 // at version 1 so a fresh ai process can be exercised without appconfig.
+// Every write is kept as a snapshot so Versions/Restore behave like appconfig.
 type Memory struct {
 	mu   sync.Mutex
 	apps map[string]*Envelope
+	hist map[string][]memVersion // appID -> versions ascending
+}
+
+type memVersion struct {
+	summary VersionSummary
+	dsl     json.RawMessage
 }
 
 // NewMemory returns an empty stub store.
-func NewMemory() *Memory { return &Memory{apps: map[string]*Envelope{}} }
+func NewMemory() *Memory {
+	return &Memory{apps: map[string]*Envelope{}, hist: map[string][]memVersion{}}
+}
 
 func (m *Memory) getOrSeed(appID string) *Envelope {
 	if e, ok := m.apps[appID]; ok {
@@ -183,7 +235,19 @@ func (m *Memory) getOrSeed(appID string) *Envelope {
 	raw, _ := json.Marshal(dsl.Initial())
 	e := &Envelope{AppID: appID, Version: 1, DSL: raw}
 	m.apps[appID] = e
+	m.hist[appID] = []memVersion{{summary: VersionSummary{Version: 1, Source: &Source{Kind: "system", Mode: "full"}}, dsl: raw}}
 	return e
+}
+
+// commit bumps the version, stores doc and records the snapshot. Caller holds mu.
+func (m *Memory) commit(e *Envelope, doc json.RawMessage, src Source) {
+	parent := e.Version
+	e.Version++
+	e.DSL = append(json.RawMessage(nil), doc...)
+	m.hist[e.AppID] = append(m.hist[e.AppID], memVersion{
+		summary: VersionSummary{Version: e.Version, ParentVersion: parent, Source: &src},
+		dsl:     e.DSL,
+	})
 }
 
 func (m *Memory) Get(_ context.Context, appID string) (*Envelope, error) {
@@ -194,7 +258,7 @@ func (m *Memory) Get(_ context.Context, appID string) (*Envelope, error) {
 	return &cp, nil
 }
 
-func (m *Memory) Put(_ context.Context, appID string, baseVersion int, doc json.RawMessage, _ Source) (*Envelope, error) {
+func (m *Memory) Put(_ context.Context, appID string, baseVersion int, doc json.RawMessage, src Source) (*Envelope, error) {
 	if _, err := dsl.Parse(doc); err != nil {
 		return nil, &Error{Status: http.StatusUnprocessableEntity, Code: "invalid_dsl", Message: err.Error()}
 	}
@@ -204,13 +268,12 @@ func (m *Memory) Put(_ context.Context, appID string, baseVersion int, doc json.
 	if baseVersion != 0 && baseVersion != e.Version {
 		return nil, &Error{Status: http.StatusConflict, Code: "version_conflict", Message: "base version is stale", CurrentVersion: e.Version}
 	}
-	e.Version++
-	e.DSL = append(json.RawMessage(nil), doc...)
+	m.commit(e, doc, src)
 	cp := *e
 	return &cp, nil
 }
 
-func (m *Memory) Patch(_ context.Context, appID string, baseVersion int, ops []dsl.PatchOp, _ Source) (*Envelope, error) {
+func (m *Memory) Patch(_ context.Context, appID string, baseVersion int, ops []dsl.PatchOp, src Source) (*Envelope, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	e := m.getOrSeed(appID)
@@ -221,8 +284,35 @@ func (m *Memory) Patch(_ context.Context, appID string, baseVersion int, ops []d
 	if err != nil {
 		return nil, &Error{Status: http.StatusUnprocessableEntity, Code: "invalid_dsl", Message: err.Error()}
 	}
-	e.Version++
-	e.DSL = next
+	m.commit(e, next, src)
 	cp := *e
 	return &cp, nil
+}
+
+// Versions returns the history newest first.
+func (m *Memory) Versions(_ context.Context, appID string) ([]VersionSummary, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.getOrSeed(appID)
+	h := m.hist[appID]
+	out := make([]VersionSummary, 0, len(h))
+	for i := len(h) - 1; i >= 0; i-- {
+		out = append(out, h[i].summary)
+	}
+	return out, nil
+}
+
+// Restore appends version n's DSL as a new version (source.kind=restore).
+func (m *Memory) Restore(_ context.Context, appID string, n int) (*Envelope, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	e := m.getOrSeed(appID)
+	for _, v := range m.hist[appID] {
+		if v.summary.Version == n {
+			m.commit(e, v.dsl, Source{Kind: "restore", Mode: "full", RestoredFrom: n})
+			cp := *e
+			return &cp, nil
+		}
+	}
+	return nil, &Error{Status: http.StatusNotFound, Code: "not_found", Message: fmt.Sprintf("version %d not found", n)}
 }
