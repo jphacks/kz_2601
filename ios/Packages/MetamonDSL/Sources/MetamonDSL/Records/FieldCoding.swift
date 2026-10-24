@@ -57,8 +57,8 @@ public enum FieldCoding {
         }
     }
 
-    /// 一覧・集計の表示用整形。
-    public static func display(_ v: JSONValue, field: Field?) -> String {
+    /// 一覧・集計の表示用整形。`locale` / `now` は日付の書式(言語・今年なら年を省く)にだけ使う。
+    public static func display(_ v: JSONValue, field: Field?, locale: Locale = .current, now: Date = Date()) -> String {
         guard let field else { return v.displayString }
         // computed が評価できなかった(ゼロ除算・参照なし)= 「—」。0 や空欄と区別する(#101)
         if field.isComputed, v.isNull { return unavailable }
@@ -68,11 +68,9 @@ public enum FieldCoding {
             guard let n = v.doubleValue else { return "" }
             let s = n == n.rounded() ? String(Int(n)) : String(format: "%.1f", n)
             return field.unit.map { s + " " + $0 } ?? s
-        case .date:
-            return v.stringValue ?? ""
-        case .datetime:
+        case .date, .datetime:
             guard let d = date(from: v) else { return v.displayString }
-            return d.formatted(date: .numeric, time: .shortened)
+            return displayDate(d, withTime: field.type == .datetime, locale: locale, now: now)
         case .boolean: return v.truthy ? "はい" : "いいえ"
         case .photo: return v.isNull ? "" : "写真"
         default: return v.displayString
@@ -90,5 +88,19 @@ public enum FieldCoding {
         // 負は「-¥500」(「¥-500」にしない・割り勘の残高など)
         let body = "¥" + (f.string(from: NSNumber(value: Swift.abs(n))) ?? "0")
         return n < 0 && n.rounded() != 0 ? "-" + body : body
+    }
+
+    /// 日付の表示(#140)。ja「10/24(金)」「10/24(金) 14:30」、en「Fri, Oct 24」「Fri, Oct 24, 2:30 PM」。今年でなければ年を付ける。
+    public static func displayDate(_ d: Date, withTime: Bool, locale: Locale, now: Date = Date()) -> String {
+        let cal = Calendar(identifier: .gregorian)
+        let sameYear = cal.component(.year, from: d) == cal.component(.year, from: now)
+        let f = DateFormatter()
+        f.locale = locale
+        if locale.language.languageCode?.identifier == "ja" {
+            f.dateFormat = (sameYear ? "M/d(EEE)" : "yyyy/M/d(EEE)") + (withTime ? " H:mm" : "")
+        } else {
+            f.setLocalizedDateFormatFromTemplate((sameYear ? "EEEMMMd" : "EEEMMMdy") + (withTime ? "jmm" : ""))
+        }
+        return f.string(from: d)
     }
 }

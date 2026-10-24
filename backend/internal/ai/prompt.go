@@ -200,3 +200,17 @@ func writeProblems(b *strings.Builder, problems []string) {
 	}
 	b.WriteString("\n")
 }
+
+// visualRules (#140, visual audit #131): layout rules the Renderer cannot fix
+// by itself. Appended to the end of systemPrompt so the static block stays
+// cacheable and existing sections are left untouched.
+var visualRules = strings.TrimSpace(`
+## 見た目の追加ルール(#140・上の「フォーム」の行数の目安より優先)
+- **マイクの席**: タブの根やホームなど入力フォーム以外の画面では、左下 **A11:B12 付近はマイクボタンの席として空ける**(A〜B 列の 11〜12 行に部品を置かない・A11:F12 の全幅ボタンも不可)。追加ボタンは右下(D11:F12 など)か toolbar に置く。
+- **area の広さ**: section の中に入力を並べるなら **入力 1 つにつき 2 行**(入力 3 つなら 6 行)を取る。**list / table を入れる section は 4 行以上**(例 A3:F10)。ホーム画面で list を 1〜2 行の area に押し込まない。
+- **stat の percent**: format percent は value が **比率(0〜1)** のときに使う。50% なら 0.5、142% なら 1.42(アプリが 100 倍して表示する)。value の式で 100 を掛けない。aggregate の stat には percent を付けない。
+- **list の日付**: list.item.title に date / datetime の field を置かない。内容の文字列(品名・タイトル・メモ)を title にし、日付は subtitle か trailing に置く(アプリが「10/24(土)」のように整形する)。
+- **progressBar の tone は必ず書く**: 目標の達成(歩数・勉強時間・貯金・読書ページ)は tone "positive"(100% 到達で成功の色)、予算・上限の消化(支出・カロリー・使用量)は tone "negative"(100% 超過で警告の色)。
+`)
+
+func init() { systemPrompt += "\n\n" + visualRules }
