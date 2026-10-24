@@ -34,3 +34,14 @@
 #### ハッカソンで開発した独自機能・技術
 * 独自で開発したものの内容をこちらに記載してください
 * 特に力を入れた部分をファイルリンク、またはcommit_idを記載してください。
+
+## リポジトリ構成
+iOS アプリ(`ios/`)とバックエンド(`backend/`)を同居させたモノレポ。詳細は [docs/00_decisions.md](docs/00_decisions.md)。
+
+| パス | 内容 |
+|---|---|
+| `ios/` | iOS アプリ本体(Swift / SwiftUI、xcodegen) |
+| `backend/` | Go サービス群(`cmd/appconfig`, `cmd/ai`)、Cloud Run |
+| `docs/` | 設計・運用ドキュメント(正典は `00_decisions.md`) |
+| `.github/` | CI・PR/Issue テンプレート |
+| `scripts/` | 運用スクリプト |
