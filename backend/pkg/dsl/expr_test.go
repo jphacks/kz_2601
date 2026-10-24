@@ -197,6 +197,24 @@ func TestExprFilterValueOuterRow(t *testing.T) {
 	}
 }
 
+// A schema error inside an Expr reports the best-matching branch only, not
+// one line per Expr shape (the list goes back to Claude verbatim).
+func TestSchemaErrorInExprIsConcise(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(docsDir, "examples", "warikan.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bad := strings.Replace(string(raw), `"op": "sub"`, `"op": "minus"`, 1)
+	_, perr := Parse([]byte(bad))
+	ve, ok := perr.(*ValidationError)
+	if !ok {
+		t.Fatalf("expected ValidationError, got %v", perr)
+	}
+	if len(ve.Problems) != 1 || !strings.Contains(ve.Problems[0], "/computed/op: value must be one of") {
+		t.Fatalf("want one op problem, got %v", ve.Problems)
+	}
+}
+
 func TestPickerAcceptsRef(t *testing.T) {
 	app := warikanApp(t)
 	if ps := problems(t, app); len(ps) != 0 {

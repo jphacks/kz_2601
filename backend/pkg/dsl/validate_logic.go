@@ -18,6 +18,10 @@ func checkStat(where string, c *Component, entities map[string]*Entity, add func
 		ch.check(where+".value", c.Value, nil, 1)
 		return
 	}
+	if c.Entity == "" {
+		add("%s: stat needs entity (with aggregate) or value (an expression, e.g. {\"op\":\"div\",\"args\":[{\"agg\":\"sum\",...},100000]})", where)
+		return
+	}
 	e := entities[c.Entity]
 	if e == nil {
 		add("%s: stat entity %q does not exist", where, c.Entity)

@@ -121,7 +121,7 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
 2. **BMI**(`examples/bmi.json`): `bmi` = weight / (height/100)^2 を小数 1 桁に(`round(x*10)/10`)。
 3. **残り予算**: stat.value = `sub(予算, agg sum thisMonth)`。予算を後で変えたいなら budget entity を作り `agg max budget.amount`。
 4. **達成率**: stat{format:percent, value: `div(agg sum, 目標)`} + progressBar{entity, field, target}。
-5. **カウントダウン**: computed `daysLeft` = `daysUntil(ref date)`、最も近い予定 = `agg min daysLeft filter daysLeft gte 0`。
+5. **カウントダウン**: computed `days_left` = `daysUntil(ref date)`、最も近い予定 = `agg min days_left filter days_left gte 0`。
 
 ## 8. 割り切り(やらないこと)
 

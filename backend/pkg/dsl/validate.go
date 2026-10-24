@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/santhosh-tekuri/jsonschema/v6/kind"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
@@ -109,13 +110,42 @@ func flatten(ve *jsonschema.ValidationError) []string {
 			out = append(out, loc+": "+v.ErrorKind.LocalizedString(errPrinter))
 			return
 		}
-		for _, c := range v.Causes {
+		causes := v.Causes
+		if _, ok := v.ErrorKind.(*kind.AnyOf); ok {
+			causes = deepestCauses(causes)
+		}
+		for _, c := range causes {
 			walk(c)
 		}
 	}
 	walk(ve)
 	if len(out) > 20 {
 		out = append(out[:20], fmt.Sprintf("...and %d more", len(out)-20))
+	}
+	return out
+}
+
+// deepestCauses keeps the anyOf branches whose errors reach deepest into the
+// instance: for {"op":"median"} that is ".../op: value must be one of ..."
+// instead of one line per Expr shape that did not match ("best match").
+func deepestCauses(causes []*jsonschema.ValidationError) []*jsonschema.ValidationError {
+	var depth func(v *jsonschema.ValidationError) int
+	depth = func(v *jsonschema.ValidationError) int {
+		d := len(v.InstanceLocation)
+		for _, c := range v.Causes {
+			d = max(d, depth(c))
+		}
+		return d
+	}
+	best := -1
+	var out []*jsonschema.ValidationError
+	for _, c := range causes {
+		switch d := depth(c); {
+		case d > best:
+			best, out = d, []*jsonschema.ValidationError{c}
+		case d == best:
+			out = append(out, c)
+		}
 	}
 	return out
 }
