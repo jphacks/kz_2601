@@ -44,6 +44,13 @@ type Completion struct {
 	// Structured sends Schema as output_config.format for this call even when
 	// Client.StructuredOutput is off (small schemas such as ChatSchema compile).
 	Structured bool
+	// Per-call overrides of the client defaults (the clarify turn runs on its
+	// own model/effort, see ChatConfig). Empty = Client.Model / Client.Effort.
+	Model  string
+	Effort string
+	// Thinking, when set, is sent as thinking.type (adaptive|disabled|
+	// between_tools). Empty = omitted (the model default, adaptive).
+	Thinking string
 }
 
 // Usage is the token accounting of one call.
@@ -137,6 +144,7 @@ type wireRequest struct {
 	System       []wireBlock    `json:"system,omitempty"`
 	Messages     []Message      `json:"messages"`
 	OutputConfig map[string]any `json:"output_config,omitempty"`
+	Thinking     map[string]any `json:"thinking,omitempty"`
 	Fallbacks    string         `json:"fallbacks,omitempty"`
 	Stream       bool           `json:"stream,omitempty"`
 }
@@ -195,19 +203,32 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 	if maxTokens == 0 {
 		maxTokens = defaultMaxTokens
 	}
+	model, effort := c.Model, c.Effort
+	if req.Model != "" {
+		model = req.Model
+	}
+	if req.Effort != "" {
+		effort = req.Effort
+	}
 	wr := wireRequest{
-		Model:     c.Model,
+		Model:     model,
 		MaxTokens: maxTokens,
 		Messages:  req.Messages,
-		Fallbacks: "default",
 		Stream:    req.OnText != nil,
+	}
+	// Haiku has no server-side refusal fallback: the parameter is not sent.
+	if !strings.HasPrefix(model, "claude-haiku") {
+		wr.Fallbacks = "default"
+	}
+	if req.Thinking != "" {
+		wr.Thinking = map[string]any{"type": req.Thinking}
 	}
 	if req.System != "" {
 		wr.System = []wireBlock{{Type: "text", Text: req.System, CacheControl: map[string]any{"type": "ephemeral"}}}
 	}
 	oc := map[string]any{}
-	if c.Effort != "" {
-		oc["effort"] = c.Effort
+	if effort != "" {
+		oc["effort"] = effort
 	}
 	if (c.StructuredOutput || req.Structured) && len(req.Schema) > 0 {
 		oc["format"] = map[string]any{"type": "json_schema", "schema": req.Schema}

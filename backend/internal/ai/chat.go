@@ -28,6 +28,35 @@ const (
 	chatMaxUserChars = 2000
 )
 
+// ChatConfig is the model setup of the clarify turn, separate from
+// generation (env AI_CHAT_MODEL / AI_CHAT_EFFORT / AI_CHAT_THINKING). Empty
+// fields fall back to the chat defaults below, not to the generate model.
+type ChatConfig struct {
+	Model    string
+	Effort   string
+	Thinking string // adaptive|disabled|between_tools
+}
+
+// Chat defaults (Issue #147 eval, docs/backend/ai-eval/2026-10-24-chat-latency.md).
+const (
+	DefaultChatModel    = "claude-sonnet-5-5"
+	DefaultChatEffort   = "low"
+	DefaultChatThinking = ""
+)
+
+func (c ChatConfig) resolved() ChatConfig {
+	if c.Model == "" {
+		c.Model = DefaultChatModel
+	}
+	if c.Effort == "" {
+		c.Effort = DefaultChatEffort
+	}
+	if c.Thinking == "" {
+		c.Thinking = DefaultChatThinking
+	}
+	return c
+}
+
 // ChatMessage is one turn of the clarify conversation.
 type ChatMessage struct {
 	Role string `json:"role"` // user|assistant
@@ -62,7 +91,10 @@ type ChatResult struct {
 	Locale      Locale   `json:"locale"`
 	Source      string   `json:"source"` // claude|shortcut|forced
 	LatencyMs   Latency  `json:"latencyMs"`
-	Meta        Meta     `json:"meta"`
+	// FirstTokenMs: time from the last Claude request to its first output
+	// token (diagnostics; 0 for shortcut turns).
+	FirstTokenMs int64 `json:"firstTokenMs,omitempty"`
+	Meta         Meta  `json:"meta"`
 }
 
 // chatReply is the structured output Claude returns.
@@ -206,7 +238,8 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (*ChatResult, error
 	}
 	last := userTexts[turn-1]
 
-	res := &ChatResult{Turn: turn, Locale: loc, Meta: Meta{Model: s.Model}}
+	cfg := s.ChatConfig.resolved()
+	res := &ChatResult{Turn: turn, Locale: loc, Meta: Meta{Model: cfg.Model}}
 
 	// Shortcut: 「もう作って」/ "just build it" after at least one Claude turn
 	// -> ready without Claude, reusing the brief drafted on that turn. A
@@ -229,10 +262,11 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (*ChatResult, error
 	var reply *chatReply
 	var problems []string
 	for i := 0; i < 2; i++ {
-		resp, cerr := s.callChat(ctx, chatUserMessage(cv.messages, loc, turn, force, problems), ar)
+		resp, ttft, cerr := s.callChat(ctx, cfg, chatUserMessage(cv.messages, loc, turn, force, problems), ar)
 		if cerr != nil {
 			return nil, cerr
 		}
+		res.FirstTokenMs = ttft.Milliseconds()
 		var r chatReply
 		if uerr := json.Unmarshal(extractJSON(resp.Text), &r); uerr != nil {
 			problems = []string{"output is not valid JSON for the schema: " + uerr.Error()}
@@ -280,8 +314,9 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (*ChatResult, error
 	return res, nil
 }
 
-// callChat is call() with the small schema sent as output_config.format.
-func (s *Service) callChat(ctx context.Context, user string, ar *attemptResult) (*Response, error) {
+// callChat is call() with the small schema sent as output_config.format. It
+// streams so the time to the first output token can be reported.
+func (s *Service) callChat(ctx context.Context, cfg ChatConfig, user string, ar *attemptResult) (*Response, time.Duration, error) {
 	timeout := s.CallTimeout
 	if timeout == 0 {
 		timeout = 40 * time.Second
@@ -289,25 +324,34 @@ func (s *Service) callChat(ctx context.Context, user string, ar *attemptResult) 
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	t := time.Now()
+	var ttft time.Duration
 	resp, err := s.Claude.Complete(cctx, Completion{
 		System:     chatSystemPrompt,
 		Messages:   []Message{{Role: "user", Content: user}},
 		Schema:     ChatSchema(),
 		Structured: true,
 		MaxTokens:  chatMaxTokens,
+		Model:      cfg.Model,
+		Effort:     cfg.Effort,
+		Thinking:   cfg.Thinking,
+		OnText: func(string) {
+			if ttft == 0 {
+				ttft = time.Since(t)
+			}
+		},
 	})
 	ar.latency += time.Since(t)
-	ar.meta.Model = s.Model
+	ar.meta.Model = cfg.Model
 	ar.meta.Attempts++
 	ar.meta.Regenerations = ar.meta.Attempts - 1
 	if err != nil {
-		return nil, mapClaudeErr(err)
+		return nil, 0, mapClaudeErr(err)
 	}
 	ar.meta.Usage.Add(resp.Usage)
 	if resp.StopReason == "refusal" {
-		return nil, &Error{Status: http.StatusBadRequest, Code: "refused", Message: "the model declined this request", Attempts: ar.meta.Attempts}
+		return nil, 0, &Error{Status: http.StatusBadRequest, Code: "refused", Message: "the model declined this request", Attempts: ar.meta.Attempts}
 	}
-	return resp, nil
+	return resp, ttft, nil
 }
 
 // normalizeMessages validates roles, trims text and drops empty turns.
