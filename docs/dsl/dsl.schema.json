@@ -895,7 +895,7 @@
     "ListItem": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル、toggle に boolean field で行頭のチェック丸。",
+      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル、toggle に boolean field で行頭のチェック丸(resets daily なら date field で毎日リセット)。",
       "required": [
         "title"
       ],
@@ -921,7 +921,14 @@
         },
         "toggle": {
           "type": "string",
-          "description": "Field id of a stored boolean field. iOS draws a check circle at the row start; tapping it flips the value and saves that record immediately (no form). Checked rows are struck through and dimmed."
+          "description": "Field id of a stored boolean field. iOS draws a check circle at the row start; tapping it flips the value and saves that record immediately (no form). Checked rows are struck through and dimmed. With resets daily: a stored date field instead (checked = its value is today)."
+        },
+        "resets": {
+          "type": "string",
+          "enum": [
+            "daily"
+          ],
+          "description": "daily = a check that comes back unchecked every day (服薬・毎日の習慣). toggle must be a stored date field without defaultValue: tapping saves today's date, the row shows checked only while that date is today (device local), tapping again clears it. Today's done count = stat count filter {toggle field, op today}."
         }
       }
     },
@@ -1020,8 +1027,8 @@
     "Stat": {
       "type": "object",
       "additionalProperties": false,
-      "description": "集計値 1 つのカード(件数・合計・平均・最小・最大)、または計算式 value の結果。今月の合計・今日の件数・平均体重・残り予算・1人あたりなど。",
-      "x-usage": "2〜3 枚を hstack に入れて A1:F2 に横並び、または単体で A1:C2 / D1:F2。filter で期間を絞る: 今日 today / 今週 thisWeek / 今月 thisMonth / 今年 thisYear(value は null)。ラベルに「今週」「今年」と書いたら必ず同じ期間の filter を付ける。金額は format currency。aggregate と value はどちらか一方: 単純な合計/件数は aggregate、差・割り算・条件分岐が要る時は value に Expr(例: 残り予算 {\"op\":\"sub\",\"args\":[50000,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]})。",
+      "description": "集計値 1 つのカード(件数・合計・平均・最小・最大・最新)、または計算式 value の結果。今月の合計・今日の件数・平均体重・今の体重・残り予算・1人あたりなど。",
+      "x-usage": "2〜3 枚を hstack に入れて A1:F2 に横並び、または単体で A1:C2 / D1:F2。filter で期間を絞る: 今日 today / 今週 thisWeek / 今月 thisMonth / 今年 thisYear(value は null)。ラベルに「今週」「今年」と書いたら必ず同じ期間の filter を付ける。金額は format currency。aggregate と value はどちらか一方: 単純な合計/件数は aggregate、差・割り算・条件分岐が要る時は value に Expr(例: 残り予算 {\"op\":\"sub\",\"args\":[50000,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]})。 「今の」「現在の」「最新の」「最後に」の値(今の体重・現在の予算・最後に水をやった日)は aggregate latest + by(並べる日付 field)+ field(返す値)。avg / max で代用しない。",
       "required": [
         "type",
         "label"
@@ -1050,13 +1057,19 @@
             "sum",
             "avg",
             "min",
-            "max"
+            "max",
+            "latest",
+            "earliest"
           ],
-          "description": "Exactly one of aggregate or value. aggregate=count|sum|avg|min|max over entity(.field)."
+          "description": "Exactly one of aggregate or value. aggregate=count|sum|avg|min|max over entity(.field). latest/earliest = the field value of the newest/oldest record ordered by `by`."
         },
         "field": {
           "type": "string",
           "description": "Required unless aggregate=count."
+        },
+        "by": {
+          "type": "string",
+          "description": "aggregate latest/earliest only: date/datetime field id that orders the records (omit = the entity's first date field, else creation order). Same day = later created wins."
         },
         "filter": {
           "$ref": "#/$defs/Filter"
@@ -2622,10 +2635,12 @@
       "x-recipes": [
         "割り勘(members{name} + expenses{title,amount:currency,payer:ref→members,date}): members.computed paid = {\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"amount\",\"filter\":{\"field\":\"payer\",\"op\":\"eq\",\"value\":{\"ref\":\"id\"}}} / share = {\"op\":\"round\",\"args\":[{\"op\":\"div\",\"args\":[{\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"amount\"},{\"agg\":\"count\",\"entity\":\"members\"}]}]} / balance = {\"op\":\"sub\",\"args\":[{\"ref\":\"paid\"},{\"ref\":\"share\"}]}。ホームに stat(合計 aggregate sum・1人あたり value)+ members の table(name/paid/balance)+ settlement{entity:members,nameField:name,balanceField:balance}。支出フォームの payer は picker。",
         "BMI(body{date,weight:number kg,height:number cm}): body.computed bmi(number) = {\"op\":\"div\",\"args\":[{\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"op\":\"div\",\"args\":[{\"ref\":\"weight\"},{\"op\":\"pow\",\"args\":[{\"op\":\"div\",\"args\":[{\"ref\":\"height\"},100]},2]}]},10]}]},10]}(小数 1 桁)。list の trailing / table の列に bmi。",
-        "残り予算: stat.value = {\"op\":\"sub\",\"args\":[<予算>,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]}。予算額が発話に無い/後で変えたいなら budget{amount:currency} entity を作り <予算> = {\"agg\":\"max\",\"entity\":\"budget\",\"field\":\"amount\"}。",
+        "今の値・最新の記録(今の体重・最後に水をやった日): stat{aggregate:latest,entity:body,field:weight,by:date}、式の中なら {\"agg\":\"latest\",\"entity\":\"body\",\"field\":\"weight\",\"by\":\"date\"}(by = 並べる日付 field、field = 返す値・computed 可)。今の BMI = latest の field に computed bmi。最初の記録は earliest(体重の増減 = sub(latest, earliest))。",
+        "残り予算: stat.value = {\"op\":\"sub\",\"args\":[<予算>,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]}。予算額が発話に無い/後で変えたいなら budget{amount:currency,date:date} entity を作り <予算> = {\"agg\":\"latest\",\"entity\":\"budget\",\"field\":\"amount\",\"by\":\"date\"}(最後に設定した額。max だと下げた予算が反映されない)。",
         "達成率: stat{format:percent,value:{\"op\":\"div\",\"args\":[{\"agg\":\"sum\",\"entity\":\"saving\",\"field\":\"amount\"},<目標>]}}(percent は 0..1 を % 表示)+ progressBar{entity,field,target:<目標>}。",
         "カウントダウン: exam{title,date:date} の computed days_left(integer) = {\"op\":\"daysUntil\",\"args\":[{\"ref\":\"date\"}]}。list の trailing に days_left、最も近い試験は stat.value = {\"agg\":\"min\",\"entity\":\"exam\",\"field\":\"days_left\",\"filter\":{\"field\":\"days_left\",\"op\":\"gte\",\"value\":0}}。",
-        "シフト・バイト代(shift{date,start:string \"HH:mm\"(timePicker),end:string \"HH:mm\",wage:currency 時給}): computed hours(number) = {\"op\":\"hoursBetween\",\"args\":[{\"ref\":\"start\"},{\"ref\":\"end\"}]}(22:00→翌 5:00 は 7)/ pay(currency) = {\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"ref\":\"hours\"},{\"ref\":\"wage\"}]}]}。今月の給料 = stat aggregate sum pay filter date thisMonth。時刻を toNumber しない。"
+        "シフト・バイト代(shift{date,start:string \"HH:mm\"(timePicker),end:string \"HH:mm\",wage:currency 時給}): computed hours(number) = {\"op\":\"hoursBetween\",\"args\":[{\"ref\":\"start\"},{\"ref\":\"end\"}]}(22:00→翌 5:00 は 7)/ pay(currency) = {\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"ref\":\"hours\"},{\"ref\":\"wage\"}]}]}。今月の給料 = stat aggregate sum pay filter date thisMonth。時刻を toNumber しない。",
+        "マスタの値を記録で使う(家事の点数・商品の単価・科目の単位数): 記録 log{chore:ref→chores,...} の computed points(number) = {\"ref\":\"chore.points\"}(ref field 名 + . + 参照先の field・1 段だけ)。単価 × 個数 = {\"op\":\"mul\",\"args\":[{\"ref\":\"item.price\"},{\"ref\":\"qty\"}]}。記録側に同じ値の入力欄(stepper 等)を作らない。人ごとの合計は人 entity の computed agg sum に log.points を使う。"
       ]
     },
     "ExprRef": {
@@ -2634,11 +2649,11 @@
       "required": [
         "ref"
       ],
-      "description": "行コンテキスト(computed の対象レコード)のフィールド値。\"id\" はレコード id。stat.value では使えない。",
+      "description": "行コンテキスト(computed の対象レコード)のフィールド値。\"id\" はレコード id。\"<ref field>.<field>\"(ドット 1 つ)で ref field が指す先のレコードのフィールド値(例 {\"ref\":\"chore.points\"} = 選んだ家事の点数・参照先が無ければ空)。stat.value では使えない。",
       "properties": {
         "ref": {
           "type": "string",
-          "description": "Field id of the current record, or \"id\"."
+          "description": "Field id of the current record, \"id\", or \"<refField>.<fieldId>\" (one level) to read the referenced record's field."
         }
       }
     },
@@ -2649,7 +2664,7 @@
         "agg",
         "entity"
       ],
-      "description": "エンティティ全体(filter で絞り込み)の集計。count 以外は field 必須。filter は 1 つ、または配列(AND)。",
+      "description": "エンティティ全体(filter で絞り込み)の集計。count 以外は field 必須。filter は 1 つ、または配列(AND)。latest / earliest は by(日付 field)で並べて最新 / 最古の 1 件の field の値を返す(同じ日は後に作った方が新しい・0 件は空)。",
       "properties": {
         "agg": {
           "type": "string",
@@ -2658,7 +2673,9 @@
             "sum",
             "avg",
             "min",
-            "max"
+            "max",
+            "latest",
+            "earliest"
           ]
         },
         "entity": {
@@ -2667,6 +2684,10 @@
         "field": {
           "type": "string",
           "description": "Required unless agg=count. May be a computed field of that entity."
+        },
+        "by": {
+          "type": "string",
+          "description": "latest/earliest only: date/datetime field id that orders the records (omit = the entity's first date field, else creation order)."
         },
         "filter": {
           "anyOf": [

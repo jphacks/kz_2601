@@ -82,7 +82,8 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var emptyText: String?
     public var onItemTap: Action?
     public var swipeToDelete: Bool?
-    public var aggregate: String?      // count|sum|avg|min|max
+    public var aggregate: String?      // count|sum|avg|min|max(stat は latest|earliest も)
+    public var by: String?             // stat latest/earliest: 並べる日付 field(#133)
     public var format: String?         // plain|currency|percent
     public var kind: String?           // bar|line|pie
     public var groupBy: String?
@@ -137,6 +138,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case searchField, onDateTap, locationField, zoom, mode, seconds, shareTo
         case name, color, value, target, url, image, message, columns, limit, dateField, titleField, subtitleField
         case min, max, step, minLines
+        case by
         case nameField, balanceField
     }
 
@@ -171,6 +173,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         onItemTap = try? c.decodeIfPresent(Action.self, forKey: .onItemTap)
         swipeToDelete = try? c.decodeIfPresent(Bool.self, forKey: .swipeToDelete)
         aggregate = try? c.decodeIfPresent(String.self, forKey: .aggregate)
+        by = try? c.decodeIfPresent(String.self, forKey: .by)
         format = try? c.decodeIfPresent(String.self, forKey: .format)
         kind = try? c.decodeIfPresent(String.self, forKey: .kind)
         groupBy = try? c.decodeIfPresent(String.self, forKey: .groupBy)
@@ -230,14 +233,17 @@ public struct ListItem: Decodable, Sendable {
     public var image: String?
     /// boolean field id → 行頭のチェック丸。タップでそのレコードの値を反転して保存(#108・フォームを開かない)
     public var toggle: String?
+    /// "daily" = toggle は date field。押すと今日の日付を保存し、値が今日の間だけ済み(#132)
+    public var resets: String?
 
-    public init(title: String, subtitle: String? = nil, trailing: String? = nil, icon: String? = nil, image: String? = nil, toggle: String? = nil) {
+    public init(title: String, subtitle: String? = nil, trailing: String? = nil, icon: String? = nil, image: String? = nil, toggle: String? = nil, resets: String? = nil) {
         self.title = title
         self.subtitle = subtitle
         self.trailing = trailing
         self.icon = icon
         self.image = image
         self.toggle = toggle
+        self.resets = resets
     }
 }
 

@@ -291,7 +291,8 @@ type Component struct {
 	EmptyText     string    `json:"emptyText,omitempty"`
 	OnItemTap     *Action   `json:"onItemTap,omitempty"`
 	SwipeToDelete bool      `json:"swipeToDelete,omitempty"`
-	Aggregate     string    `json:"aggregate,omitempty"` // count|sum|avg|min|max
+	Aggregate     string    `json:"aggregate,omitempty"` // count|sum|avg|min|max (stat also latest|earliest)
+	By            string    `json:"by,omitempty"`        // stat latest/earliest: date field to order by
 	Format        string    `json:"format,omitempty"`    // plain|currency|percent
 	Kind          string    `json:"kind,omitempty"`      // bar|line|pie
 	GroupBy       string    `json:"groupBy,omitempty"`
@@ -354,6 +355,7 @@ type ListItem struct {
 	Icon     string `json:"icon,omitempty"`
 	Image    string `json:"image,omitempty"`  // photo field id -> thumbnail
 	Toggle   string `json:"toggle,omitempty"` // boolean field id -> one-tap check circle (#108)
+	Resets   string `json:"resets,omitempty"` // "daily": toggle is a date field, checked = today (#132)
 }
 
 // Sort orders a list.
