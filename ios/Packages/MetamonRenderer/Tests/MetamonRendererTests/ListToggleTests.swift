@@ -72,6 +72,42 @@ final class ListToggleTests: XCTestCase {
         XCTAssertFalse(saved, "保存できないランタイムは false を返し、表示は元に戻る")
     }
 
+    // MARK: - 毎日リセット(#132)
+
+    private func medicine() throws -> AppDSL {
+        try AppDSL.load(contentsOf: Self.repoRoot.appending(path: "docs/dsl/examples/medicine.json"))
+    }
+
+    private func day(_ s: String, hour: Int = 12) -> Date {
+        Calendar.current.date(byAdding: .hour, value: hour, to: FieldCoding.dateFormatter.date(from: s)!)!
+    }
+
+    func testDailyToggleShowsOnlyToday() throws {
+        let dsl = try medicine()
+        let list = try XCTUnwrap(homeLists(dsl).first)
+        let f = try XCTUnwrap(ListToggle.field(list.item, in: dsl.entity("medicine")), "date field + resets daily に丸が出る")
+        XCTAssertEqual(f.id, "taken_on")
+        XCTAssertTrue(ListToggle.isDaily(list.item))
+        let took = Record(id: "1", data: ["taken_on": "2026-10-24"])
+        XCTAssertTrue(ListToggle.isOn(took, field: f.id, daily: true, overrides: [:], today: day("2026-10-24", hour: 23)))
+        XCTAssertFalse(ListToggle.isOn(took, field: f.id, daily: true, overrides: [:], today: day("2026-10-25", hour: 0)), "翌日は未チェックに戻る")
+        XCTAssertFalse(ListToggle.isOn(Record(id: "2", data: [:]), field: f.id, daily: true, overrides: [:], today: day("2026-10-24")))
+        XCTAssertTrue(ListToggle.isOn(took, field: f.id, daily: true, overrides: ["1": true], today: day("2026-10-25")), "保存待ちを優先")
+        // 押した時の保存値: 今日の日付 / 外したら null
+        XCTAssertEqual(ListToggle.stored(true, daily: true, today: day("2026-10-25")), "2026-10-25")
+        XCTAssertEqual(ListToggle.stored(false, daily: true, today: day("2026-10-25")), .null)
+        XCTAssertEqual(ListToggle.stored(true, daily: false, today: day("2026-10-25")), .bool(true))
+    }
+
+    func testDailyToggleNeedsDateField() throws {
+        let entity = try JSONDecoder().decode(Entity.self, from: Data(#"""
+        {"id":"t","name":"T","fields":[{"id":"name","name":"n","type":"string"},{"id":"done","name":"d","type":"boolean"},{"id":"on","name":"o","type":"date"}]}
+        """#.utf8))
+        XCTAssertEqual(ListToggle.field(ListItem(title: "name", toggle: "on", resets: "daily"), in: entity)?.id, "on")
+        XCTAssertNil(ListToggle.field(ListItem(title: "name", toggle: "done", resets: "daily"), in: entity), "daily に boolean は出さない")
+        XCTAssertNil(ListToggle.field(ListItem(title: "name", toggle: "on"), in: entity), "resets 無しの date は出さない")
+    }
+
     /// schema の ListItem のキーと Swift の ListItem のプロパティが一致(toggle を足し忘れると赤)。
     func testListItemKeysMatchSchema() throws {
         let data = try Data(contentsOf: Self.repoRoot.appending(path: "docs/dsl/dsl.schema.json"))
