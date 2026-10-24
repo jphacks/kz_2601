@@ -934,7 +934,7 @@
           "enum": [
             "daily"
           ],
-          "description": "daily = a check that comes back unchecked every day (服薬・毎日の習慣). toggle must be a stored date field without defaultValue: tapping saves today's date, the row shows checked only while that date is today (device local), tapping again clears it. Today's done count = stat count filter {toggle field, op today}."
+          "description": "daily = a check that comes back unchecked every day (服薬・毎日の習慣). toggle must be a stored date field without defaultValue: tapping saves today's date, the row shows checked only while that date is today (device local), tapping again clears it. Today's done count = stat count filter {toggle field, op today}. iOS also keeps the checked days (history), so a computed integer on the same entity can show the streak {\"op\":\"streak\",\"args\":[{\"ref\":<toggle>}]} and the days done in the last n days {\"op\":\"doneInDays\",\"args\":[{\"ref\":<toggle>},7]}; totals = agg sum/max of those computed fields. Do not add a separate log entity for checks."
         }
       }
     },
@@ -2655,7 +2655,8 @@
         "達成率: stat{format:percent,value:{\"op\":\"div\",\"args\":[{\"agg\":\"sum\",\"entity\":\"saving\",\"field\":\"amount\"},<目標>]}}(percent は 0..1 を % 表示)+ progressBar{entity,field,target:<目標>}。",
         "カウントダウン: exam{title,date:date} の computed days_left(integer) = {\"op\":\"daysUntil\",\"args\":[{\"ref\":\"date\"}]}。list の trailing に days_left、最も近い試験は stat.value = {\"agg\":\"min\",\"entity\":\"exam\",\"field\":\"days_left\",\"filter\":{\"field\":\"days_left\",\"op\":\"gte\",\"value\":0}}。",
         "シフト・バイト代(shift{date,start:string \"HH:mm\"(timePicker),end:string \"HH:mm\",wage:currency 時給}): computed hours(number) = {\"op\":\"hoursBetween\",\"args\":[{\"ref\":\"start\"},{\"ref\":\"end\"}]}(22:00→翌 5:00 は 7)/ pay(currency) = {\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"ref\":\"hours\"},{\"ref\":\"wage\"}]}]}。今月の給料 = stat aggregate sum pay filter date thisMonth。時刻を toNumber しない。",
-        "マスタの値を記録で使う(家事の点数・商品の単価・科目の単位数): 記録 log{chore:ref→chores,...} の computed points(number) = {\"ref\":\"chore.points\"}(ref field 名 + . + 参照先の field・1 段だけ)。単価 × 個数 = {\"op\":\"mul\",\"args\":[{\"ref\":\"item.price\"},{\"ref\":\"qty\"}]}。記録側に同じ値の入力欄(stepper 等)を作らない。人ごとの合計は人 entity の computed agg sum に log.points を使う。"
+        "マスタの値を記録で使う(家事の点数・商品の単価・科目の単位数): 記録 log{chore:ref→chores,...} の computed points(number) = {\"ref\":\"chore.points\"}(ref field 名 + . + 参照先の field・1 段だけ)。単価 × 個数 = {\"op\":\"mul\",\"args\":[{\"ref\":\"item.price\"},{\"ref\":\"qty\"}]}。記録側に同じ値の入力欄(stepper 等)を作らない。人ごとの合計は人 entity の computed agg sum に log.points を使う。",
+        "毎日チェックの連続日数・直近 7 日(服薬・習慣 medicine{name,taken_on:date} + list item {toggle:taken_on,resets:daily}): medicine.computed streak(integer) = {\"op\":\"streak\",\"args\":[{\"ref\":\"taken_on\"}]} / last7(integer) = {\"op\":\"doneInDays\",\"args\":[{\"ref\":\"taken_on\"},7]}(丸を押した日は iOS が履歴に残す・実施記録 entity は作らない)。list の trailing に streak、全体は stat.value {\"agg\":\"max\",\"entity\":\"medicine\",\"field\":\"streak\"}(最長の連続)/ {\"agg\":\"sum\",\"entity\":\"medicine\",\"field\":\"last7\"}(直近 7 日の合計回数)。"
       ]
     },
     "ExprRef": {
@@ -2769,7 +2770,9 @@
             "weekday",
             "toNumber",
             "toString",
-            "coalesce"
+            "coalesce",
+            "streak",
+            "doneInDays"
           ],
           "x-enumDescriptions": {
             "add": "a+b+...(2 個以上)",
@@ -2810,7 +2813,9 @@
             "weekday": "曜日(1=日 ... 7=土)",
             "toNumber": "数値に変換(不可ならエラー)",
             "toString": "文字列に変換",
-            "coalesce": "coalesce(a,b) = a が空(null・空文字)/エラーなら b"
+            "coalesce": "coalesce(a,b) = a が空(null・空文字)/エラーなら b",
+            "streak": "streak({\"ref\":<毎日チェックの toggle field>}) = 連続日数(今日やっていれば今日から、まだなら昨日から遡る)。list.item.resets daily の toggle field だけ・computed(integer)で使う",
+            "doneInDays": "doneInDays({\"ref\":<毎日チェックの toggle field>}, n) = 直近 n 日(今日を含む)にチェックした日数(直近 7 日 = n 7)。list.item.resets daily の toggle field だけ・computed(integer)で使う"
           }
         },
         "args": {

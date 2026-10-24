@@ -241,7 +241,7 @@ VoiceInputView.phase                         AppRuntime.morphJob               R
 | 失敗 | — | **状態カード**(下表・#60)。トーストは使わない | 〃(画面上部にコンパクト版) | 画面は元のまま。主ボタン「もう一度」は同じ発話で再送 |
 | キャンセル | — | 下部トースト「生成をキャンセルしました」(軽微) | 〃 | 画面は元のまま |
 
-**設定シート**(音声画面右上の歯車・旧 `uid …` フッターの置き換え): アカウント(匿名 / Apple・uid・ログアウト)、音声モデル(モデル名・状態・再試行)、対話(「作る前に質問する」トグル・#75)、アプリをリセット(初期状態に戻す = DSL を `initial`、`DeviceAppID.rotate()` で appId を作り直す。サーバーの旧データは残る)、接続先(ai / appconfig / バージョン)。
+**設定シート**(音声画面右上の歯車・旧 `uid …` フッターの置き換え): アカウント(匿名 / Apple・uid・ログアウト)、音声モデル(モデル名・状態・再試行)、対話(「作る前に質問する」トグル・#75)、アプリをリセット(初期状態に戻す = DSL を `initial`、`DeviceAppID.rotate()` で appId を作り直す。サーバーの旧データは残る)、接続先(ai / appconfig / バージョン)、アカウントを削除(サーバーは論理削除・端末のデータは消す・#119・§7)。
 
 DEBUG フック: `METAMON_AUTO_ANON=1`(起動時に匿名サインイン)、`METAMON_AUTO_TRANSCRIPT="…"`(起動直後に 1 回発話。対話 ON なら下記の対話を自動で進めて生成まで待つ)。シミュレータでもマイクは表示され、`MockTranscriber` が定型文を返す。
 
@@ -468,6 +468,7 @@ SignInView ──Sign in with Apple──▶ ASAuthorizationAppleIDCredential(id
 | Bearer | `Live/AuthTokenProvider.swift` が `AuthService.idToken(forceRefresh:false)` を `TokenProvider` として供給。`HTTP.send` が毎リクエスト付与(更新は Firebase SDK 任せ) |
 | 画面 | `Metamon/Features/Auth/SignInView.swift`(`SignInWithAppleButton` + 匿名ボタン)。`AuthSession`(@Observable)の `user == nil` の間だけ `MetamonApp` が表示。nonce は `AppleNonce.random()`(生値→Firebase)/`sha256`(→Apple) |
 | ログアウト | `VoiceInputView` 最下部の `uid 先頭6桁` ラベル(Menu)→ ログアウト。デバッグ用に目立たせない |
+| アカウント削除(#119) | 設定シートの「アカウントを削除」(赤)→ 確認「アカウントとすべてのアプリが使えなくなります。元に戻せません」→ `AuthSession.deleteAccount`(`Features/Auth/AccountDeletion.swift`): ⓪ Apple ユーザーのみ Apple 再認証(nonce 付き)→ Firebase を再認証(requiresRecentLogin の回避)→ `authorizationCode` で `revokeAppleToken`(Firebase `revokeToken`。どちらも失敗しても続行・再認証キャンセルなら中止)。以降は `AccountDeletionFlow`(Services・順番をユニットテスト済み): ① `DELETE /v1/me`(サーバーは論理削除・以後 410。失敗ならここで止めて何も消さない) ② `AuthService.deleteCurrentUser()` = Firebase `User.delete()`(同じ Apple ID で次にサインインすると新しい uid = 新規ユーザー)。`requiresRecentLogin` なら Apple 再認証→もう一度。それでも失敗ならログを残して続行 ③ `AppRuntime.wipeLocalData()`: `RecordSyncEngine.wipe()`(オフライン DB と未送信キュー)・`DocumentCache.removeAll()`(DSL とアプリ一覧)・サムネ・App Group(ウィジェット)・`UserDefaults`・ローカル通知を消し、`resetToInitial()` で新しい appId の初期状態に ④ サインアウト → `SignInView`。匿名ユーザーも同じ(⓪を飛ばす)。WhisperKit のモデル(端末内・個人データではない)は再ダウンロードを避けるため残す。E2E: `METAMON_AUTO_SETTINGS=1 METAMON_E2E_DELETE_ACCOUNT=<秒>` |
 | entitlements | `project.yml` → `Metamon/Metamon.entitlements` に `com.apple.developer.applesignin: [Default]`。自動署名(`-allowProvisioningUpdates`)が App ID に capability を付ける |
 | 初期化順 | `MetamonApp.init`: `FirebaseBootstrap.configureIfAvailable()` → `BuildConfig.make()` → `AuthSession(service: services.auth)` |
 | Go 側 | `firebase.google.com/go/v4/auth` の `VerifyIDToken`。`uid` を entity レコードの owner に使う(ai は受け取った Bearer を appconfig へ転送するだけ) |

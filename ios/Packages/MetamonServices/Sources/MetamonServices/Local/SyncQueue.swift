@@ -233,6 +233,13 @@ public actor SyncQueue {
         }
     }
 
+    /// アカウント削除用(#119): 未送信操作を捨てる(削除したユーザーのデータを後から送らない)。
+    public func discardAll() {
+        ops = []
+        aliases = [:]
+        if let fileURL { try? FileManager.default.removeItem(at: fileURL) }
+    }
+
     private func persist() {
         guard let fileURL else { return }
         do {

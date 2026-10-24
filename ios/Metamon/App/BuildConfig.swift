@@ -112,6 +112,7 @@ enum BuildConfig {
                 isLive: appConfigURL != nil
             )
             services.sharing = appConfigURL.map { HTTPSharingClient(baseURL: $0, token: token) }
+            if let appConfigURL { services.account = HTTPAccountClient(baseURL: appConfigURL, token: token) } // #119
             services.releaseRequests = appConfigURL.map { HTTPReleaseRequestClient(baseURL: $0, token: token) }
             return services
         }
