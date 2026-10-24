@@ -55,7 +55,10 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 	goTypes := map[string]bool{}
 	for _, ct := range []dsl.ComponentType{dsl.CompVStack, dsl.CompHStack, dsl.CompSection, dsl.CompText, dsl.CompButton,
 		dsl.CompTextField, dsl.CompNumberField, dsl.CompDatePicker, dsl.CompPicker, dsl.CompToggle, dsl.CompPhotoField,
-		dsl.CompImage, dsl.CompList, dsl.CompStat, dsl.CompChart, dsl.CompVoiceInput, dsl.CompSpacer, dsl.CompDivider} {
+		dsl.CompImage, dsl.CompList, dsl.CompStat, dsl.CompChart, dsl.CompVoiceInput, dsl.CompSpacer, dsl.CompDivider,
+		// display
+		dsl.CompLabel, dsl.CompIcon, dsl.CompProgressBar, dsl.CompGauge, dsl.CompBadge, dsl.CompLink, dsl.CompMarkdown,
+		dsl.CompAvatar, dsl.CompTable, dsl.CompTimeline, dsl.CompEmptyState} {
 		goTypes[string(ct)] = true
 	}
 	for _, c := range components {

@@ -1379,19 +1379,6 @@
         }
       }
     },
-    "SemanticColor": {
-      "type": "string",
-      "enum": [
-        "primary",
-        "secondary",
-        "accent",
-        "red",
-        "green",
-        "orange",
-        "blue"
-      ],
-      "description": "Closed semantic color set (iOS maps to system colors; accent = app theme primaryColor). Never a hex string."
-    },
     "Label": {
       "type": "object",
       "additionalProperties": false,
@@ -1460,7 +1447,17 @@
           ]
         },
         "color": {
-          "$ref": "#/$defs/SemanticColor"
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary",
+            "accent",
+            "red",
+            "green",
+            "orange",
+            "blue"
+          ],
+          "description": "Semantic color (iOS maps to system colors; accent = app theme). Never a hex string."
         }
       },
       "description": "A single SF Symbol with semantic color/size and no text. Use as decoration next to badges/stats or as a big hero symbol.",
@@ -1593,7 +1590,17 @@
           "type": "string"
         },
         "color": {
-          "$ref": "#/$defs/SemanticColor"
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary",
+            "accent",
+            "red",
+            "green",
+            "orange",
+            "blue"
+          ],
+          "description": "Semantic color (iOS maps to system colors; accent = app theme). Never a hex string."
         }
       },
       "description": "Small rounded pill with short text and a semantic color (status, category, count). Choose for 1-3 word tags, not sentences.",
@@ -1750,7 +1757,7 @@
           "description": "Max rows shown (default all)."
         }
       },
-      "description": "Compact rows x columns grid of records (SwiftUI Grid) with a header row. Choose over `list` when several numeric columns must be compared at a glance (date / item / amount).",
+      "description": "Compact rows x columns grid of records (SwiftUI Grid) with a header row; columns = [{field, title?}] (2-4 columns fit a phone). Choose over `list` when several numeric columns must be compared at a glance (date / item / amount).",
       "x-usage": "Full width, 4-6 rows (e.g. A1:F5). Scrolls inside its cell when longer."
     },
     "Timeline": {

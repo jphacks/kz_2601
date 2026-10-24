@@ -68,21 +68,21 @@ func TestGenerationSchemaHasNoUnsupportedKeywords(t *testing.T) {
 	if props["patch"] == nil || props["summary"] == nil {
 		t.Fatal("patch schema root must expose patch and summary")
 	}
-	// Leaf is flattened: one object whose `type` enum covers all 15 leaves,
+	// Leaf is flattened: one object whose `type` enum covers all 26 leaves,
 	// and the Stat `format` property survives (only the keyword is stripped).
 	leaf := p["$defs"].(map[string]any)["Leaf"].(map[string]any)
 	lp := leaf["properties"].(map[string]any)
 	if lp["format"] == nil || lp["text"] == nil || lp["entity"] == nil {
 		t.Fatalf("flattened leaf misses properties: %v", lp)
 	}
-	if en := lp["type"].(map[string]any)["enum"].([]any); len(en) != 15 {
+	if en := lp["type"].(map[string]any)["enum"].([]any); len(en) != 26 {
 		t.Fatalf("leaf type enum: %v", en)
 	}
 	if _, ok := lp["children"]; ok {
 		t.Fatal("leaf must not have children")
 	}
 	comp := p["$defs"].(map[string]any)["Component"].(map[string]any)["properties"].(map[string]any)
-	if comp["children"] == nil || len(comp["type"].(map[string]any)["enum"].([]any)) != 18 {
+	if comp["children"] == nil || len(comp["type"].(map[string]any)["enum"].([]any)) != 29 {
 		t.Fatalf("component: %v", comp["type"])
 	}
 	for _, gone := range []string{"Container", "Text", "Stat"} {

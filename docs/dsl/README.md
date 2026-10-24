@@ -79,10 +79,10 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `spacer` | | `size`(small/medium/large/flexible) | | P0 |
 | `divider` | | | | P0 |
 | `label` | `text`, `icon`(SF Symbols) | `style`(title/headline/body/caption) | | P1 |
-| `icon` | `name`(SF Symbols) | `size`(small/medium/large), `color`(SemanticColor) | | P1 |
+| `icon` | `name`(SF Symbols) | `size`(small/medium/large), `color`(primary/secondary/accent/red/green/orange/blue) | | P1 |
 | `progressBar` | `value`(0〜1) **または** `entity`+`target`(>0) | `label`, `aggregate`(count/sum・既定 sum), `field`(count 以外必須), `filter` | | P1 |
 | `gauge` | `value` **または** `entity`(+`aggregate`/`field`) | `label`, `min`(既定 0), `max`(既定 1・min より大), `filter` | | P1 |
-| `badge` | `text` | `color`(SemanticColor) | | P1 |
+| `badge` | `text` | `color`(primary/secondary/accent/red/green/orange/blue) | | P1 |
 | `link` | `text`, `url`(http(s)) | | | P1 |
 | `markdown` | `text`(インライン markdown) | | | P1 |
 | `avatar` | | `image`(https/data URL), `field`(photo・要 screen.entity), `name`(イニシャル), `size` | △(`field` 時) | P1 |
@@ -90,7 +90,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `timeline` | `entity`, `dateField`(date/datetime), `titleField` | `subtitleField`, `filter`, `limit` | | P1 |
 | `emptyState` | `title` | `icon`, `message` | | P1 |
 
-`SemanticColor` = `primary|secondary|accent|red|green|orange|blue`(閉じた enum。hex 文字列は不可・Claude 構造化出力互換)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
+`color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
 ### 3.2 アクション(9 種)
 
