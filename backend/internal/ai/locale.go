@@ -62,11 +62,13 @@ type summaryText struct {
 	nothingToUndo string
 	restored      string // fmt with version
 	readyText     string // clarify phase: spoken when the brief is complete
+	editReadyText string // chat edit mode: spoken before the change is generated
+	proposalText  string // chat proposal fallback line
 }
 
 var summaryTexts = map[Locale]summaryText{
-	LocaleJA: {nothingToUndo: "戻せる変更がありません。", restored: "ひとつ前の状態(version %d)に戻しました。", readyText: "では作りますね。"},
-	LocaleEN: {nothingToUndo: "There is nothing to undo.", restored: "I went back to the previous state (version %d).", readyText: "Got it, I'll build it now."},
+	LocaleJA: {nothingToUndo: "戻せる変更がありません。", restored: "ひとつ前の状態(version %d)に戻しました。", readyText: "では作りますね。", editReadyText: "では変えますね。", proposalText: "こんな案はどうでしょう。"},
+	LocaleEN: {nothingToUndo: "There is nothing to undo.", restored: "I went back to the previous state (version %d).", readyText: "Got it, I'll build it now.", editReadyText: "Got it, I'll change it now.", proposalText: "Here are a few ideas."},
 }
 
 func (l Locale) text() summaryText {
