@@ -15,6 +15,8 @@ public struct Services {
     public var isLive: Bool
     /// シェア / 「探す」(#49 #50)。appconfig が live の時だけ(モックでは nil = 導線を出さない)。
     public var sharing: (any SharingClient)?
+    /// リリース申請(#76)。sharing と同じく live の時だけ。
+    public var releaseRequests: (any ReleaseRequestClient)?
 
     public init(
         auth: any AuthService,

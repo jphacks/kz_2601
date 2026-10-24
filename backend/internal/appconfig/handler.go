@@ -78,6 +78,11 @@ func New(s store.Store) *http.ServeMux {
 	mux.HandleFunc("DELETE /v1/apps/{appId}/publish", h.unpublishApp)
 	mux.HandleFunc("GET /v1/public-apps", h.listPublicApps)
 	mux.HandleFunc("POST /v1/public-apps/{id}/install", h.installPublicApp)
+
+	// release requests (#76): release.go
+	mux.HandleFunc("POST /v1/apps/{appId}/release-requests", h.createReleaseRequest)
+	mux.HandleFunc("GET /v1/apps/{appId}/release-requests", h.listAppReleaseRequests)
+	mux.HandleFunc("GET /v1/release-requests", h.listMyReleaseRequests)
 	return mux
 }
 
