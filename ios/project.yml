@@ -53,6 +53,8 @@ targets:
     platform: iOS
     sources:
       - path: Metamon
+      # ウィジェットと共有する受け渡しモデル(WidgetSnapshot)。両ターゲットにコンパイルする
+      - path: MetamonWidget/Shared
       # DSL v1 の正典サンプル(docs/dsl/examples/*.json)をそのままバンドル。iOS 側にコピーを持たない(ドリフト防止)。
       - path: ../docs/dsl/examples
         buildPhase: resources
@@ -61,11 +63,14 @@ targets:
       - package: MetamonDSL
       - package: MetamonRenderer
       - package: MetamonServices
-    # Sign in with Apple。自動署名(-allowProvisioningUpdates)が App ID に capability を付与する(有料 Developer Program 必須)。
+      # ホーム画面ウィジェット(埋め込み)
+      - target: MetamonWidget
+    # Sign in with Apple + App Group(ウィジェットとの共有)。自動署名(-allowProvisioningUpdates)が App ID に capability を付与する(有料 Developer Program 必須)。
     entitlements:
       path: Metamon/Metamon.entitlements
       properties:
         com.apple.developer.applesignin: [Default]
+        com.apple.security.application-groups: [group.jp.kz2601.metamon]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon
@@ -81,3 +86,23 @@ targets:
         - package: MetamonRenderer/MetamonRendererTests
         - package: MetamonServices/MetamonServicesTests
       gatherCoverageData: false
+
+  # ホーム画面ウィジェット(WidgetKit)。本体が App Group に書いた集計済みスナップショットを描画するだけ(Renderer/DSL 非依存)。
+  # Bundle ID は本体の子(jp.kz2601.metamon.widget)。実機は App ID 2 つ + App Group を自動署名が作る(§docs/ios/architecture.md ウィジェット)。
+  MetamonWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: MetamonWidget
+    entitlements:
+      path: MetamonWidget/MetamonWidget.entitlements
+      properties:
+        com.apple.security.application-groups: [group.jp.kz2601.metamon]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.widget
+        PRODUCT_NAME: MetamonWidget
+        INFOPLIST_FILE: MetamonWidget/Info.plist
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
+        ENABLE_PREVIEWS: YES

@@ -170,6 +170,7 @@ final class AppRuntime: DSLRuntime {
             swap()
         }
         Task { await services.notifications.sync(doc.dsl.app.notifications) }
+        WidgetSnapshotWriter.write(dsl: doc.dsl, records: records) // ホーム画面ウィジェットへ stat を反映
     }
 
     // MARK: - Morph / Undo / New app
@@ -302,6 +303,7 @@ final class AppRuntime: DSLRuntime {
         do {
             records[entity] = try await services.appConfig.list(appId: document.appId, entity: entity)
             print("[Metamon] records loaded: entity=\(entity) count=\(records[entity]?.count ?? 0)")
+            WidgetSnapshotWriter.write(dsl: dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         } catch {
             toast = message(for: error, entity: entity)
         }
