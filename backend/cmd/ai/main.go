@@ -49,6 +49,7 @@ func main() {
 		Store:       store,
 		Model:       model,
 		CallTimeout: time.Duration(timeoutSec) * time.Second,
+		LogicPass:   os.Getenv("AI_LOGIC_PASS") == "1", // UI pass + calculations pass (#100)
 	}
 	srv := &http.Server{
 		Addr:              ":" + port,
@@ -56,6 +57,6 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      time.Duration(timeoutSec)*time.Second*3 + 10*time.Second,
 	}
-	log.Printf("ai listening on :%s (model=%s effort=%s)", port, model, effort)
+	log.Printf("ai listening on :%s (model=%s effort=%s logicPass=%v)", port, model, effort, svc.LogicPass)
 	log.Fatal(srv.ListenAndServe())
 }

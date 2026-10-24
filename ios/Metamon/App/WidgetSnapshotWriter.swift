@@ -19,12 +19,19 @@ enum WidgetSnapshotWriter {
             }
             return
         }
+        // computed field / Stat.value(#101)も StatLeaf と同じ評価器で数える
+        let evaluator = ExprEvaluator(dsl: dsl, records: { records[$0] ?? [] })
         let stats = statComponents(in: dsl).prefix(maxStats).map { c -> WidgetSnapshot.Stat in
             let entityId = c.entity ?? ""
             let key = [entityId, c.aggregate ?? "count", c.field ?? "", c.label ?? ""].joined(separator: "|")
             let value: String?
-            if let rows = records[entityId] {
-                value = formatted(c, entity: dsl.entity(entityId), records: rows)
+            if c.aggregate == nil, let expr = c.valueExpr {
+                value = evaluator.evaluate(expr).map { v in
+                    if case .number(let n) = v { return Aggregator.format(n, as: c.format, unit: c.unit) }
+                    return v.text
+                } ?? "—"
+            } else if records[entityId] != nil {
+                value = formatted(c, entity: dsl.entity(entityId), records: evaluator.viewRecords(for: entityId))
             } else {
                 // レコード未取得(apply 直後など)は前回値を引き継ぎ、ウィジェットが一瞬 0 にならないようにする
                 value = previous?.stats.first { $0.key == key }?.value
@@ -52,7 +59,7 @@ enum WidgetSnapshotWriter {
 
     /// `StatLeaf` と同じ式で表示文字列にする。
     static func formatted(_ c: Component, entity: Entity?, records: [Record]) -> String {
-        let rows = Aggregator.apply(c.filter, entity: entity, to: records)
+        let rows = Aggregator.apply(c.filter, entity: entity, to: records) // filter.value の Expr は未対応(ウィジェットは行コンテキスト無し)
         let value = Aggregator.aggregate(c.aggregate, field: c.field, over: rows)
         let unit = c.field.flatMap { entity?.field($0)?.unit }
         return Aggregator.format(
