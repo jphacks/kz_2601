@@ -30,8 +30,7 @@ struct QrScannerLeaf: View {
                 } label: {
                     Label(c.label ?? "QRを読み取る", systemImage: "qrcode.viewfinder").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+                .buttonStyle(RenderButtonStyle(kind: .secondary))
                 .sheet(isPresented: $showScanner) {
                     NavigationStack {
                         QrCameraView { code in

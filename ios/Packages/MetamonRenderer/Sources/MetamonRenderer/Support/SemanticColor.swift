@@ -39,6 +39,12 @@ enum SemanticPalette {
     static let green = (light: RGB(16, 112, 48), dark: RGB(72, 214, 110))
     static let orange = (light: RGB(150, 76, 0), dark: RGB(255, 170, 60))
     static let blue = (light: RGB(0, 84, 190), dark: RGB(90, 160, 255))
+    /// ブランド(#89)の文字色。brandA #8E6CFF は白地 3.7:1 なのでライトは一段深く、ダークは一段明るく
+    static let brand = (light: RGB(95, 64, 214), dark: RGB(164, 139, 255))
+    /// 白文字を載せる塗り(primary ボタン・選択チップ・選択日)のグラデーション端点。
+    /// 装飾用の brandA→brandB(#4CC9FF は白文字 1.9:1)では読めないので、白文字が large text の AA(3:1)以上になる深いトーン
+    static let brandFillStart = RGB(106, 76, 232)
+    static let brandFillEnd = RGB(47, 143, 224)
 
     /// 検算用: 面の色(secondarySystemGroupedBackground のライト/ダーク)
     static let surfaceLight = RGB(255, 255, 255)
@@ -49,7 +55,10 @@ enum SemanticPalette {
     static let all: [(name: String, light: RGB, dark: RGB)] = [
         ("red", red.light, red.dark), ("green", green.light, green.dark),
         ("orange", orange.light, orange.dark), ("blue", blue.light, blue.dark),
+        ("brand", brand.light, brand.dark),
     ]
+
+    static func swiftUI(_ c: RGB) -> Color { Color(red: c.r, green: c.g, blue: c.b) }
 
     static func color(_ pair: (light: RGB, dark: RGB)) -> Color {
         Color(UIColor { trait in
@@ -64,7 +73,7 @@ extension Color {
     static func semantic(_ name: String?) -> Color {
         switch name {
         case "secondary": .secondary
-        case "accent": .accentColor
+        case "accent": RenderTheme.Colors.brandText
         case "red": SemanticPalette.color(SemanticPalette.red)
         case "green": SemanticPalette.color(SemanticPalette.green)
         case "orange": SemanticPalette.color(SemanticPalette.orange)

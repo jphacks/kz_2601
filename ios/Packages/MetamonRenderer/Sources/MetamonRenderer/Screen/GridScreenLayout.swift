@@ -111,7 +111,8 @@ private struct GridCell: View {
     /// stat / button / 入力なども固定高のセルからはみ出すので、面を自前で埋める型以外は全部スクロールに逃がす。
     private var scrollsInside: Bool {
         switch component.type {
-        case .list, .section, .vstack, .hstack, .text, .table, .timeline, .markdown, .card, .disclosure, .grid, .calendar: true
+        // hstack は通常サイズでは器に収める(stat を横に並べる定番。スクロールにすると高さが無制限になり、stat の数値がセル高さで縮まず下が切れる・#89)
+        case .list, .section, .vstack, .text, .table, .timeline, .markdown, .card, .disclosure, .grid, .calendar: true
         case .image, .mapView, .webView, .chart, .gauge, .spacer, .divider, .qrScanner, .voiceInput: false
         default: typeSize.isAccessibilitySize
         }

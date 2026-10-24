@@ -33,25 +33,24 @@ struct PhotoFieldLeaf: View {
         VStack(alignment: .leading, spacing: 8) {
             if hasPhoto {
                 PhotoView(value: value, height: 160, accessibilityLabel: "\(c.label ?? "写真")(添付済み)")
-                HStack(spacing: 8) {
+                HStack(spacing: RenderTheme.Spacing.sm) {
                     Button { start() } label: {
                         Label("撮り直す", systemImage: "camera").frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(RenderButtonStyle(kind: .secondary))
                     .accessibilityHint(sourceHint)
                     Button(role: .destructive) { form.values[field] = .null } label: {
                         Label("削除", systemImage: "trash").frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(RenderButtonStyle(kind: .destructive))
                     .accessibilityLabel("\(c.label ?? "写真")を削除")
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
             } else {
                 Button { start() } label: {
                     Label(c.label ?? "写真を撮る / 選ぶ", systemImage: mode == .library ? "photo.on.rectangle" : "camera")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+                .buttonStyle(RenderButtonStyle(kind: .secondary))
                 // VoiceOver: 「レシートを撮る, ボタン, カメラを開きます」
                 .accessibilityLabel(c.label ?? "写真を撮る / 選ぶ")
                 .accessibilityHint(sourceHint)

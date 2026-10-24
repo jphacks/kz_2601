@@ -86,6 +86,29 @@ final class AppRuntime: DSLRuntime {
     /// サーバー(appconfig)に届かず、ローカルキャッシュの DSL を表示している。
     private(set) var isOffline = false
 
+    // MARK: 生成前の対話(#75)。ロジックは `AppRuntime+Clarify.swift`
+
+    /// チャットの吹き出し。user = 発話(書き起こし)/ assistant = AI の質問・返答。
+    struct ChatBubble: Identifiable, Equatable {
+        enum Role: Equatable { case user, assistant }
+        let id = UUID()
+        var role: Role
+        var text: String
+    }
+    /// 会話中の吹き出し(空 = 対話していない)。初期(音声)画面でだけ使う。
+    var chatBubbles: [ChatBubble] = []
+    /// `POST /v1/chat` の応答待ち
+    var chatPending = false
+    /// 直近の応答。question なら suggestions をチップに、ready なら brief を「この内容で作る」カードに出す
+    var chatTurn: ChatTurn?
+    /// 新規作成の前に質問を挟むか(設定で切替・既定 ON)。edit(生成後の改変)は常に従来どおり即反映。
+    var clarifyEnabled: Bool = ClarifySettings.enabled {
+        didSet { ClarifySettings.enabled = clarifyEnabled }
+    }
+    @ObservationIgnored var chatTask: Task<Void, Never>?
+    /// リセットのたびに進める。古い応答(待っている間に「最初から」された等)を捨てるため
+    @ObservationIgnored var chatEpoch = 0
+
     let services: Services
     /// レコードのローカル DB + 未送信キュー(Issue #48)。`records` はここから読み、書きはここに即反映してから裏で送る。
     let recordSync: RecordSyncEngine
@@ -128,9 +151,10 @@ final class AppRuntime: DSLRuntime {
                 handle(primary, of: card)
             }
         }
-        // ヘッドレス E2E 用: `METAMON_AUTO_TRANSCRIPT="家計簿アプリが欲しい"` で起動直後に 1 回だけ生成を投げる
+        // ヘッドレス E2E 用: `METAMON_AUTO_TRANSCRIPT="家計簿アプリが欲しい"` で起動直後に 1 回だけ発話を投げる。
+        // 対話が ON(#75)なら質問に `METAMON_AUTO_REPLIES`(| 区切り)で答え、ready で「この内容で作る」まで自動で進めて生成を待つ
         if let text = ProcessInfo.processInfo.environment["METAMON_AUTO_TRANSCRIPT"], !text.isEmpty {
-            await morph(transcript: text)
+            await autoDrive(firstUtterance: text)
         }
         // ヘッドレス E2E 用: `METAMON_AUTO_RECORD='{"entity":"expense","data":{"amount":980,...}}'` で起動直後に 1 件保存する
         if let raw = ProcessInfo.processInfo.environment["METAMON_AUTO_RECORD"], let data = raw.data(using: .utf8),
@@ -198,25 +222,95 @@ final class AppRuntime: DSLRuntime {
         let version = document.version
         syncTask = Task { [weak self] in
             guard let self else { return }
-            for await doc in services.sync.updates(appId: appId, after: version) {
-                guard doc.version > document.version, morphJob == nil else { continue }
-                print("[Metamon] hot reload: version \(document.version) → \(doc.version)")
-                apply(doc)
-                summaryBanner = SummaryBanner(text: "アプリが更新されました(version \(doc.version))", highlight: nil)
+            for await update in services.sync.events(appId: appId, after: version) {
+                guard document.appId == appId else { break }
+                switch update {
+                case .document(let doc):
+                    hotReload(doc)
+                case .records(let entity):
+                    scheduleRecordsRefresh(entity)
+                case .realtime(let on):
+                    let resumed = on && realtimeWasLost
+                    realtimeWasLost = !on
+                    isRealtime = on
+                    print("[Metamon] realtime: \(on ? "listening" : "lost → polling")")
+                    // 切れている間の他ユーザー投稿を取りこぼさないよう、表示中の entity を読み直す
+                    if resumed { for entity in records.keys { scheduleRecordsRefresh(entity) } }
+                }
             }
         }
     }
 
-    /// 前面の時だけポーリングする(G13 Day1 版)。背面では止め、戻ったら今の version から張り直す。
+    /// リアルタイム購読(SSE)が稼働中か。false の間はポーリング(5 秒)で拾う。
+    private(set) var isRealtime = false
+    @ObservationIgnored private var realtimeWasLost = false
+    /// 入力中で差し替えを保留している DSL(閉じたら当てる)。
+    @ObservationIgnored private var pendingHotReload: AppDocument?
+    @ObservationIgnored private var pendingHotReloadTask: Task<Void, Never>?
+    @ObservationIgnored private var recordsRefreshTasks: [String: Task<Void, Never>] = [:]
+
+    /// シート / 全画面 / push 先 / 音声シートが開いている = 入力や操作の途中。DSL を差し替えるとフォームの下書きが消えるので待つ。
+    private var isInteracting: Bool {
+        sheet != nil || fullScreen != nil || showVoiceSheet || paths.values.contains { !$0.isEmpty }
+    }
+
+    /// 他端末 / ai 直叩きで進んだ DSL を当てる。操作中なら閉じるまで保留し、最新の 1 件だけ当てる。
+    private func hotReload(_ doc: AppDocument) {
+        guard doc.version > document.version, morphJob == nil else { return }
+        guard !isInteracting else {
+            if doc.version > (pendingHotReload?.version ?? 0) { pendingHotReload = doc }
+            print("[Metamon] hot reload deferred (interacting): version \(doc.version)")
+            if pendingHotReloadTask == nil {
+                pendingHotReloadTask = Task { [weak self] in
+                    while let self, !Task.isCancelled, let pending = pendingHotReload {
+                        try? await Task.sleep(for: .seconds(1))
+                        guard !isInteracting else { continue }
+                        pendingHotReload = nil
+                        pendingHotReloadTask = nil
+                        hotReload(pending)
+                        return
+                    }
+                }
+            }
+            return
+        }
+        print("[Metamon] hot reload: version \(document.version) → \(doc.version)")
+        apply(doc)
+        summaryBanner = SummaryBanner(text: "アプリが更新されました(version \(doc.version))", highlight: nil)
+    }
+
+    /// records の変化通知はまとめて 1 回だけ取り直す(連投で pull を重ねない)。未表示の entity は画面が開いた時に読むので無視。
+    private func scheduleRecordsRefresh(_ entity: String) {
+        guard records[entity] != nil else { return }
+        recordsRefreshTasks[entity]?.cancel()
+        recordsRefreshTasks[entity] = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard let self, !Task.isCancelled else { return }
+            recordsRefreshTasks[entity] = nil
+            print("[Metamon] realtime: records changed entity=\(entity)")
+            await refresh(entity)
+        }
+    }
+
+    /// 前面の時だけ購読する。背面では止め、戻ったら今の version から張り直す。
     func setForeground(_ active: Bool) {
         guard isForeground != active else { return }
         isForeground = active
         recordSync.setForeground(active)
-        if active { startSync() } else { syncTask?.cancel() }
+        if active {
+            startSync()
+        } else {
+            syncTask?.cancel()
+            // 背面の間の変化は通知されないので、復帰で購読が戻った時に表示中の records を読み直す
+            isRealtime = false
+            realtimeWasLost = true
+        }
     }
 
     /// 新しい DSL に差し替える。ナビ・キャッシュは初期化(画面構成が変わるため)。通知は DSL に同期。
     func apply(_ doc: AppDocument, animated: Bool = true) {
+        // 別アプリへの切替・新規 appId・生成完了では、進行中の対話を捨てる(サーバー側も DELETE)
+        if !chatBubbles.isEmpty || chatPending { resetChat() }
         let swap = {
             self.document = doc
             self.records = [:]
@@ -263,6 +357,12 @@ final class AppRuntime: DSLRuntime {
         case .morph:
             break
         }
+        await generate(text)
+    }
+
+    /// 意図判定を済ませた依頼文を生成に回す(対話の ready からも直接ここへ: AI がまとめた文を「元に戻して」等と誤判定しないため)。
+    func generate(_ text: String) async {
+        guard morphJob == nil else { return }
         // 圏外(#60): 送らずに保留し、状態カード「接続が戻ったら自動で送ります」。復帰で 1 回だけ自動送信(モックは常にオンライン)
         if services.isLive || recordSync.connectivity is ManualConnectivity,
            deferredMorph.holdIfOffline(text, send: { [weak self] queued in await self?.sendDeferred(queued) }) {
@@ -333,6 +433,11 @@ final class AppRuntime: DSLRuntime {
 
     /// 状態カードの主ボタン。もう一度 / 今すぐ送る = 同じ発話で再送、サインイン = セッション切れ処理。
     func handle(_ primary: ErrorPresentation.Primary, of card: ErrorPresentation) {
+        if card.origin == .chat, primary == .retry {
+            withAnimation(.easeInOut(duration: 0.3)) { errorCard = nil }
+            retryChat()
+            return
+        }
         switch primary {
         case .retry, .sendNow:
             deferredMorph.cancel()

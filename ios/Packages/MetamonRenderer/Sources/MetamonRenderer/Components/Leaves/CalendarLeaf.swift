@@ -42,10 +42,10 @@ struct CalendarLeaf: View {
     private var header: some View {
         HStack {
             if let title = c.title, !title.isEmpty {
-                Text(title).font(.caption).foregroundStyle(.secondary)
+                Text(title).font(RenderTheme.Fonts.sectionTitle).foregroundStyle(.secondary)
             }
             Spacer()
-            Button { shift(-1) } label: { Image(systemName: "chevron.left").frame(minWidth: 32, minHeight: 32) }
+            Button { shift(-1) } label: { Image(systemName: "chevron.left").font(.body.weight(.semibold)).frame(minWidth: 32, minHeight: 32) }
                 .accessibilityLabel("前の月")
             Text(month.formatted(.dateTime.year().month(.wide)))
                 .font(.headline.monospacedDigit())
@@ -53,10 +53,11 @@ struct CalendarLeaf: View {
                 .minimumScaleFactor(0.7)
                 .frame(minWidth: 110)
                 .accessibilityAddTraits(.isHeader)
-            Button { shift(1) } label: { Image(systemName: "chevron.right").frame(minWidth: 32, minHeight: 32) }
+            Button { shift(1) } label: { Image(systemName: "chevron.right").font(.body.weight(.semibold)).frame(minWidth: 32, minHeight: 32) }
                 .accessibilityLabel("次の月")
         }
         .buttonStyle(.plain)
+        .foregroundStyle(.primary)
     }
 
     private var weekdayRow: some View {
@@ -99,14 +100,14 @@ struct CalendarLeaf: View {
                     .fontWeight(isToday ? .bold : .regular)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
-                    .foregroundStyle(isSelected ? Color.white : (isToday ? Color.accentColor : Color.primary))
+                    .foregroundStyle(isSelected ? Color.white : (isToday ? RenderTheme.Colors.brandText : Color.primary))
                 Circle()
-                    .fill(hasRecords ? (isSelected ? Color.white : Color.accentColor) : Color.clear)
+                    .fill(hasRecords ? (isSelected ? Color.white : RenderTheme.Colors.brandA) : Color.clear)
                     .frame(width: 5, height: 5)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 36)
-            .background(isSelected ? Color.accentColor : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+            .background(isSelected ? AnyShapeStyle(RenderTheme.brandFill) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(date.formatted(.dateTime.month().day().weekday(.wide)) + (isToday ? "、今日" : ""))
@@ -124,7 +125,7 @@ struct CalendarLeaf: View {
                     Button {
                         addOnSelectedDay()
                     } label: {
-                        Label("追加", systemImage: "plus").font(.subheadline)
+                        Label("追加", systemImage: "plus").font(.subheadline.weight(.semibold)).foregroundStyle(RenderTheme.Colors.brandText)
                     }
                 }
             }

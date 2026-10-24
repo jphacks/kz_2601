@@ -245,6 +245,8 @@ gcloud firestore databases describe --format='value(name,type,locationId)'
 
 > 無料枠(1 GiB / 50k 読み取り/日 等)は `(default)` データベースにのみ適用される。名前付き DB は作らない。
 > セキュリティルール: Go サーバー(Admin SDK)経由でしか触らないので、クライアント直アクセスは閉じる。Firebase コンソール → Firestore → ルールで `allow read, write: if false;` のまま(既定の本番モードで OK)。
+> **ホットリロード(#82)もルール変更不要**: iOS は Firestore を直接購読せず、appconfig の SSE `GET /v1/apps/{appId}/events`(backend が snapshot listener を持つ)で変化を知る。Cloud Run の設定(`--timeout=60`)も変更不要(ストリームは 50 秒で自ら閉じる)。
+> 注意: stg と prod は同じ `(default)` DB・同じコレクション名を共用している(サービス名サフィックスだけで分離)。staging で作ったアプリ/投稿は prod からも同じ appId で見える。
 
 ### 1-3. Firebase Authentication を開始し Apple プロバイダを有効化
 

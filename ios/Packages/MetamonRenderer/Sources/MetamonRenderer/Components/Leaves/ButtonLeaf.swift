@@ -2,7 +2,7 @@ import SwiftUI
 import MetamonDSL
 
 /// `button`: style(primary|secondary|destructive|plain)。押下で `action` をランタイムに渡す。
-/// primary = tint 塗り / secondary = tint の薄塗り / destructive = red の薄塗り、の 3 つが同じ高さ・角丸で並ぶ。
+/// primary = ブランドグラデーション + 影 / secondary = ブランドの薄塗り / destructive = red の薄塗り、の 3 つが同じ高さ(52)・角丸(14)で並ぶ(#89)。
 /// `deleteRecord` のボタンは編集モード(フォームに recordId がある時)だけ描く(#73: 新規フォームで押しても何も起きない)。
 struct ButtonLeaf: View {
     @Environment(\.dslRuntime) private var rt
@@ -31,21 +31,23 @@ struct ButtonLeaf: View {
         switch c.style {
         case "secondary": button.buttonStyle(RenderButtonStyle(kind: .secondary))
         case "destructive": button.buttonStyle(RenderButtonStyle(kind: .destructive))
-        case "plain": button.buttonStyle(.plain).foregroundStyle(.tint)
+        case "plain": button.buttonStyle(RenderButtonStyle(kind: .plain))
         default: button.buttonStyle(RenderButtonStyle(kind: .primary))
         }
     }
 }
 
-/// Renderer の 3 ボタン様式(トークンで高さ・角丸・押下フィードバックを統一)。
-/// 高さ 48 は `@ScaledMetric` で Dynamic Type に追従(アクセシビリティサイズでは 2 行まで折り返す)。
+/// Renderer のボタン様式(トークンで高さ・角丸・押下フィードバックを統一)。
+/// 高さ 52(plain は 44)は `@ScaledMetric` で Dynamic Type に追従(アクセシビリティサイズでは 2 行まで折り返す)。
 struct RenderButtonStyle: ButtonStyle {
-    enum Kind { case primary, secondary, destructive }
+    enum Kind { case primary, secondary, destructive, plain }
     let kind: Kind
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ScaledMetric(relativeTo: .body) private var minHeight: CGFloat = 48
+    @ScaledMetric(relativeTo: .body) private var minHeight: CGFloat = 52
+
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: RenderTheme.Radius.button, style: .continuous) }
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -55,42 +57,47 @@ struct RenderButtonStyle: ButtonStyle {
             .multilineTextAlignment(.center)
             .padding(.horizontal, RenderTheme.Spacing.md)
             .padding(.vertical, RenderTheme.Spacing.xs)
-            .frame(maxWidth: .infinity, minHeight: minHeight)
+            .frame(maxWidth: .infinity, minHeight: kind == .plain ? minHeight * 44 / 52 : minHeight)
             .foregroundStyle(foreground)
-            .background(background, in: RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous))
+            .background { background }
             .overlay {
-                if kind != .primary {
-                    RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous)
-                        .strokeBorder(stroke)
+                if kind == .secondary || kind == .destructive {
+                    shape.strokeBorder(stroke)
                 }
             }
-            .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.45)
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
-            .contentShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous))
+            .shadow(color: kind == .primary && isEnabled ? RenderTheme.Shadow.brandColor : .clear,
+                    radius: RenderTheme.Shadow.brandRadius, y: RenderTheme.Shadow.brandY)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.9 : 1) : 0.45)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? RenderTheme.Motion.pressScale : 1)
+            .animation(reduceMotion ? nil : RenderTheme.Motion.press, value: configuration.isPressed)
+            .contentShape(shape)
     }
 
     private var foreground: Color {
         switch kind {
         case .primary: .white
-        case .secondary: .accentColor
+        case .secondary, .plain: RenderTheme.Colors.brandText
         case .destructive: RenderTheme.Colors.negative
         }
     }
 
-    private var background: Color {
+    @ViewBuilder
+    private var background: some View {
         switch kind {
-        case .primary: .accentColor
-        case .secondary: Color.accentColor.opacity(0.12)
-        case .destructive: RenderTheme.Colors.negative.opacity(0.12)
+        case .primary:
+            shape.fill(RenderTheme.brandFill)
+                .overlay(shape.strokeBorder(.white.opacity(0.18)))
+        case .secondary: shape.fill(RenderTheme.Colors.brandSoft)
+        case .destructive: shape.fill(RenderTheme.Colors.negative.opacity(0.10))
+        case .plain: Color.clear
         }
     }
 
     private var stroke: Color {
         switch kind {
-        case .primary: .clear
-        case .secondary: Color.accentColor.opacity(0.18)
+        case .secondary: RenderTheme.Colors.brandSoftStroke
         case .destructive: RenderTheme.Colors.negative.opacity(0.18)
+        default: .clear
         }
     }
 }

@@ -12,14 +12,23 @@ struct ProgressBarLeaf: View {
         VStack(alignment: .leading, spacing: 6) {
             if let label = c.label {
                 HStack {
-                    Text(label).font(.caption).foregroundStyle(.secondary)
+                    Text(label).font(RenderTheme.Fonts.statLabel).foregroundStyle(.secondary)
                     Spacer()
-                    Text(String(format: "%.0f%%", ratio * 100)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    Text(String(format: "%.0f%%", ratio * 100))
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold).monospacedDigit())
+                        .foregroundStyle(ratio >= 1 ? RenderTheme.Colors.negative : RenderTheme.Colors.brandText)
                 }
             }
-            ProgressView(value: ratio)
-                .tint(ratio >= 1 ? Color.semantic("red") : .accentColor)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: ratio)
+            GeometryReader { g in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(RenderTheme.Colors.surfaceElevated)
+                    Capsule()
+                        .fill(ratio >= 1 ? AnyShapeStyle(RenderTheme.Colors.negative) : AnyShapeStyle(RenderTheme.brandGradient))
+                        .frame(width: g.size.width * ratio)
+                }
+            }
+            .frame(height: 10)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: ratio)
         }
         .renderCard()
         .accessibilityElement(children: .ignore)

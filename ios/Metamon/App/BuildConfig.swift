@@ -74,7 +74,7 @@ enum BuildConfig {
             let token: any TokenProvider = devToken ?? AuthTokenProvider(auth: auth)
             let appConfig: any AppConfigClient = appConfigURL.map { HTTPAppConfigClient(baseURL: $0, token: token) }
                 ?? InMemoryAppConfigClient(seed: MockSeed.demoRecords())
-            let sync: any DocumentSync = (appConfig as? HTTPAppConfigClient).map { PollingDocumentSync(client: $0) } ?? NoopDocumentSync()
+            let sync: any DocumentSync = (appConfig as? HTTPAppConfigClient).map(makeSync) ?? NoopDocumentSync()
             return Services(
                 auth: auth,
                 appConfig: appConfig,
@@ -86,6 +86,18 @@ enum BuildConfig {
                 isLive: appConfigURL != nil
             )
         }
+    }
+
+    /// ホットリロード: SSE(`GET /events`)+ ポーリングのフォールバック(#82)。
+    /// DEBUG のみ `METAMON_REALTIME=0` で Day1 のポーリングだけに戻せる(比較・切り分け用)。
+    static func makeSync(_ client: HTTPAppConfigClient) -> any DocumentSync {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["METAMON_REALTIME"] == "0" {
+            print("[Metamon] METAMON_REALTIME=0: ポーリングのみ(5 秒)")
+            return PollingDocumentSync(client: client)
+        }
+        #endif
+        return RealtimeDocumentSync(client: client)
     }
 
     /// DEBUG のみ: `METAMON_DEV_UID=<uid>` で Bearer にその文字列を送る。`AUTH_MODE=dev` のローカル backend は Bearer をそのまま uid として扱うので、
