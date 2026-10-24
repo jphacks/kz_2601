@@ -60,6 +60,8 @@ final class AppRuntime: DSLRuntime {
     private(set) var isOffline = false
 
     let services: Services
+    /// レコードのローカル DB + 未送信キュー(Issue #48)。`records` はここから読み、書きはここに即反映してから裏で送る。
+    let recordSync: RecordSyncEngine
     @ObservationIgnored private var syncTask: Task<Void, Never>?
     @ObservationIgnored private var morphTask: Task<MorphResult, Error>?
     @ObservationIgnored private var isForeground = true
@@ -69,7 +71,9 @@ final class AppRuntime: DSLRuntime {
     init(document: AppDocument, services: Services) {
         self.document = document
         self.services = services
+        self.recordSync = RecordSyncFactory.make(client: services.appConfig)
         self.selectedTab = document.dsl.initialTab
+        recordSync.onEvent = { [weak self] event in self?.handle(event) }
     }
 
     // MARK: - Lifecycle
@@ -79,6 +83,7 @@ final class AppRuntime: DSLRuntime {
     func bootstrap() async {
         Task { try? await services.transcriber.prepare() }
         await services.notifications.sync(dsl.app.notifications)
+        recordSync.start()
         if services.isLive {
             await restoreFromServer()
             startSync()
@@ -91,11 +96,8 @@ final class AppRuntime: DSLRuntime {
         // ヘッドレス E2E 用: `METAMON_AUTO_RECORD='{"entity":"expense","data":{"amount":980,...}}'` で起動直後に 1 件保存する
         if let raw = ProcessInfo.processInfo.environment["METAMON_AUTO_RECORD"], let data = raw.data(using: .utf8),
            let spec = try? JSONDecoder().decode(AutoRecord.self, from: data) {
-            await attempt(entity: spec.entity) {
-                let rec = try await services.appConfig.create(appId: document.appId, entity: spec.entity, data: spec.data)
-                print("[Metamon] auto record ok: entity=\(spec.entity) id=\(rec.id)")
-                await refresh(spec.entity)
-            }
+            records[spec.entity] = await recordSync.save(appId: document.appId, entity: spec.entity, recordId: nil, data: spec.data)
+            print("[Metamon] auto record saved locally: entity=\(spec.entity) count=\(records[spec.entity]?.count ?? 0) sync=\(recordSync.status.label)")
         }
         #endif
     }
@@ -149,6 +151,7 @@ final class AppRuntime: DSLRuntime {
     func setForeground(_ active: Bool) {
         guard isForeground != active else { return }
         isForeground = active
+        recordSync.setForeground(active)
         if active { startSync() } else { syncTask?.cancel() }
     }
 
@@ -297,15 +300,53 @@ final class AppRuntime: DSLRuntime {
         }
     }
 
+    /// ローカル先出し → サーバー全件で置換 → UI 更新。サーバーに届かなければローカル表示のまま(通信断は toast しない)。
     func refresh(_ entity: String) async {
+        let appId = document.appId
+        if records[entity] == nil {
+            let cached = await recordSync.cached(appId: appId, entity: entity)
+            if !cached.isEmpty, document.appId == appId {
+                records[entity] = cached
+                WidgetSnapshotWriter.write(dsl: dsl, records: records) // ローカル先出し分もウィジェットへ
+            }
+        }
         loading.insert(entity)
         defer { loading.remove(entity) }
         do {
-            records[entity] = try await services.appConfig.list(appId: document.appId, entity: entity)
-            print("[Metamon] records loaded: entity=\(entity) count=\(records[entity]?.count ?? 0)")
+            let fresh = try await recordSync.pull(appId: appId, entity: entity)
+            guard document.appId == appId else { return }
+            records[entity] = fresh
+            print("[Metamon] records loaded: entity=\(entity) count=\(fresh.count)")
             WidgetSnapshotWriter.write(dsl: dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         } catch {
-            toast = message(for: error, entity: entity)
+            if records[entity] == nil { records[entity] = [] }
+            print("[Metamon] records pull failed (showing local): entity=\(entity) \(error)")
+            if error is APIError { toast = message(for: error, entity: entity) }
+        }
+    }
+
+    /// 同期キューからの通知。送信完了はローカル DB を読み直し、競合はサーバーから引き直す(サーバー優先)。
+    private func handle(_ event: SyncEvent) {
+        Task { @MainActor in
+            switch event {
+            case .sent(let appId, let entity):
+                guard appId == document.appId else { return }
+                records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            case .conflict(let appId, let entity, _):
+                guard appId == document.appId else { return }
+                toast = "他の端末で変更されていたため、サーバーの内容に合わせました"
+                await refresh(entity)
+            case .rejected(let appId, let entity, let message):
+                guard appId == document.appId else { return }
+                toast = "保存できませんでした: \(message)"
+                records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            case .paused(let pending):
+                toast = "送信に失敗しました(未送信 \(pending) 件)。接続を確認してください"
+            case .drained:
+                break
+            }
         }
     }
 
@@ -368,28 +409,21 @@ final class AppRuntime: DSLRuntime {
                 toast = "\(missing.joined(separator: "・")) を入力してください"
                 return
             }
-            await attempt(entity: entity) {
-                if let id = form.recordId {
-                    _ = try await services.appConfig.update(appId: document.appId, entity: entity, id: id, data: form.payload)
-                } else {
-                    _ = try await services.appConfig.create(appId: document.appId, entity: entity, data: form.payload)
-                }
-                await refresh(entity)
-                if let screen = action.screen {
-                    navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
-                } else {
-                    close(ctx.route)
-                }
+            // 楽観的 UI: ローカル DB に即反映して画面を進める。appconfig への送信は recordSync のキューが行う
+            records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: form.recordId, data: form.payload)
+            WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            if let screen = action.screen {
+                navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
+            } else {
+                close(ctx.route)
             }
 
         case .deleteRecord:
             guard let entity = action.entity ?? ctx.form?.entity.id,
                   let id = ctx.recordId ?? ctx.form?.recordId else { return }
-            await attempt(entity: entity) {
-                try await services.appConfig.delete(appId: document.appId, entity: entity, id: id)
-                await refresh(entity)
-                if ctx.recordId == nil { close(ctx.route) } // フォーム上からの削除は画面を閉じる
-            }
+            records[entity] = await recordSync.delete(appId: document.appId, entity: entity, recordId: id)
+            WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            if ctx.recordId == nil { close(ctx.route) } // フォーム上からの削除は画面を閉じる
 
         case .openVoice:
             showVoiceSheet = true
