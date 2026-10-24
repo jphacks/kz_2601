@@ -63,7 +63,7 @@ struct VoiceInputView: View {
             if isInitial {
                 HStack(spacing: Theme.Spacing.sm) {
                     BrandMark(size: 28)
-                    Text("メタモン").font(.headline.weight(.bold))
+                    Text("Tailor It").font(.headline.weight(.bold))
                 }
             }
             Spacer()

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -157,6 +158,11 @@ func (a *App) Validate() error {
 		if len(e.Fields) > MaxFieldsPerEntity {
 			add("entity %q has too many fields", e.ID)
 		}
+		switch e.Scope {
+		case "", ScopePrivate, ScopeShared, ScopePublic:
+		default:
+			add("entity %q scope %q must be private, shared or public", e.ID, e.Scope)
+		}
 		seen := map[string]bool{}
 		for j, f := range e.Fields {
 			if !idRe.MatchString(f.ID) {
@@ -166,6 +172,9 @@ func (a *App) Validate() error {
 				add("entity %q duplicate field id %q", e.ID, f.ID)
 			}
 			seen[f.ID] = true
+			if e.IsShared() && slices.Contains(ReservedRecordFields, f.ID) {
+				add("entity %q field %q is reserved on %s entities (appconfig sets it from the signed-in user)", e.ID, f.ID, e.EffectiveScope())
+			}
 			if f.Type == FieldEnum && len(f.Options) == 0 {
 				add("entity %q field %q: enum needs options", e.ID, f.ID)
 			}

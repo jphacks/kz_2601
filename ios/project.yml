@@ -1,5 +1,5 @@
 # xcodegen 定義。`cd ios && xcodegen generate` で Metamon.xcodeproj を生成する(.xcodeproj はコミットしない)。
-# ホーム画面の表示名(現在「メタモン」)は Metamon/Resources/Info.plist の CFBundleDisplayName だけで変えられる。
+# ホーム画面の表示名(正式名「Tailor It」・#62)は Metamon/Resources/Info.plist の CFBundleDisplayName だけで変えられる。
 # 内部識別子 `Metamon` / Bundle ID `jp.kz2601.metamon` は Firebase に登録済みなので変更しない。
 name: Metamon
 

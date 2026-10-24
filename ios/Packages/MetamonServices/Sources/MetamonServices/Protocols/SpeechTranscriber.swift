@@ -86,7 +86,7 @@ public enum TranscriberFailure: LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .notReady(let status): return "音声モデルを準備中です(\(status))。少し待ってからお試しください"
-        case .microphoneDenied: return "マイクの権限がありません。設定アプリ > メタモン でマイクを許可してください"
+        case .microphoneDenied: return "マイクの権限がありません。設定アプリ > Tailor It でマイクを許可してください"
         case .audioSession(let reason): return "録音を開始できませんでした(オーディオセッション: \(reason))"
         case .noInputAvailable: return "使えるマイクが見つかりません(他のアプリが使用中か、入力ルートがありません)"
         case .noAudioCaptured(let s): return String(format: "マイクから音声が届きませんでした(録音%.1f秒・0サンプル)。他のアプリの通話/録音を終了して再試行してください", s)

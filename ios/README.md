@@ -1,4 +1,4 @@
-# ios (Swift / SwiftUI) — メタモン
+# ios (Swift / SwiftUI) — Tailor It
 
 xcodegen で `project.yml` から Xcode プロジェクトを生成する(`.xcodeproj` はコミットしない)。
 
@@ -45,8 +45,9 @@ ios/
 # ai をローカル起動(別 worktree で feature/ai-generate を checkout した backend/ で)
 set -a; source ~/Desktop/JPHACKS2026/.env; set +a; PORT=8081 go run ./cmd/ai
 
-# シミュレータ: localhost でよい
-xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' build CODE_SIGNING_ALLOWED=NO METAMON_AI_BASE_URL=http://127.0.0.1:8081
+# シミュレータ: localhost でよい(起動して使うビルドに CODE_SIGNING_ALLOWED=NO を付けない。
+# 付けると application-identifier entitlement が無くなり Firebase Auth のキーチェーンが -34018 で失敗 → サインイン画面に英語のエラーが出る。test だけなら付けてよい)
+xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' build METAMON_AI_BASE_URL=http://127.0.0.1:8081
 
 # 実機: Mac の LAN IP を渡す(ATS は NSAllowsLocalNetworking のみ許可。IP 直指定の http はこれで通る)
 IP=$(ipconfig getifaddr en0)
@@ -72,5 +73,5 @@ xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' 
 `MetamonRendererTests` が schema と登録の一致を検証するので、抜けると赤になる。
 
 ## 名称
-- 表示名「メタモン」は `Metamon/Resources/Info.plist` の `CFBundleDisplayName` の 1 箇所(提出前に正式名を決める。商標要確認)。
+- 表示名「Tailor It」(正式名・#62)は `Metamon/Resources/Info.plist` と `MetamonWidget/Info.plist` の `CFBundleDisplayName`。UI 文言も「Tailor It」で統一(「変身」は比喩として残す)。
 - 内部識別子 `Metamon` / Bundle ID `jp.kz2601.metamon` は Firebase 登録値なので変更しない。

@@ -4,9 +4,9 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>ja</string>
-	<!-- ホーム画面に出る表示名はここ1箇所だけ。提出前に正式名を決める(商標要確認)。内部識別子 Metamon / Bundle ID jp.kz2601.metamon は Firebase 登録値なので変えない -->
+	<!-- ホーム画面に出る表示名(正式名 Tailor It・#62)はここ1箇所だけ。内部識別子 Metamon / Bundle ID jp.kz2601.metamon は Firebase 登録値なので変えない -->
 	<key>CFBundleDisplayName</key>
-	<string>メタモン</string>
+	<string>Tailor It</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

@@ -13,6 +13,8 @@
   {"id": "reading", "kind": "create", "group": "other", "transcript": "読んだ本のタイトルと感想、読み終わった日を記録する読書記録アプリ"},
   {"id": "water", "kind": "create", "group": "other", "transcript": "水を飲んだ量を記録して1日の合計を見たい。目標は2リットル"},
   {"id": "shopping", "kind": "create", "group": "other", "transcript": "買い物リスト。買うものを追加して、買ったらチェックできるようにして"},
+  {"id": "shopping_shared", "kind": "create", "group": "shared", "transcript": "友達と共有する買い物リスト。みんなで買うものを追加して、買ったらチェックできるようにして", "note": "共有 → entity.scope public",
+   "expect": {"scope": "public"}},
   {"id": "weight", "kind": "create", "group": "other", "transcript": "体重を毎朝記録してグラフで推移を見たいアプリ", "expect": {"chart": true}},
   {"id": "calendar", "kind": "create", "group": "missing-part", "transcript": "予定を登録してカレンダーで見たいアプリ", "note": "カレンダー部品は無い → 日付順 list で代替し summary で言及する",
    "expect": {"substitution": true}},

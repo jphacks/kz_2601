@@ -55,8 +55,8 @@ public enum RenderTheme {
     }
 
     public enum Fonts {
-        /// stat の数値(大きく・等幅数字・rounded)
-        public static let statValue = Font.system(.title, design: .rounded).weight(.bold).monospacedDigit()
+        /// stat の数値(大きく・等幅数字・rounded)。基準 56pt から `minimumScaleFactor` でセルの高さに収まるまで縮める
+        public static let statValue = Font.system(size: 56, design: .rounded).weight(.bold).monospacedDigit()
         public static let statLabel = Font.footnote.weight(.medium)
         public static let cardTitle = Font.headline
         /// section 見出し(小さめ・secondary・少し詰める)
