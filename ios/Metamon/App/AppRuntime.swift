@@ -105,7 +105,18 @@ final class AppRuntime: DSLRuntime {
     var clarifyEnabled: Bool = ClarifySettings.enabled {
         didSet { ClarifySettings.enabled = clarifyEnabled }
     }
+    /// 音声だけで進めている時、ready で自動生成するか(#160・既定 ON)。
+    var clarifyAutoBuild: Bool = ClarifySettings.autoBuild {
+        didSet { ClarifySettings.autoBuild = clarifyAutoBuild }
+    }
+    /// ready 後の自動生成待ち(要約カードを見せている 1.5 秒)。ボタンの文言を変える
+    var chatAutoBuildPending = false
+    /// 最後に吹き出しを足した入力手段(自動生成の判定)
+    @ObservationIgnored var chatLastInput: ClarifyFlow.InputSource?
+    /// 次のラリーの区間計測(録音停止・文字起こし完了の時刻。音声のときだけ)
+    @ObservationIgnored var chatTiming = ChatTiming()
     @ObservationIgnored var chatTask: Task<Void, Never>?
+    @ObservationIgnored var chatAutoBuildTask: Task<Void, Never>?
     /// リセットのたびに進める。古い応答(待っている間に「最初から」された等)を捨てるため
     @ObservationIgnored var chatEpoch = 0
 

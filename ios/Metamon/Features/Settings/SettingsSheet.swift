@@ -108,10 +108,14 @@ struct SettingsSheet: View {
             Toggle(ClarifyCopy.settingTitle, isOn: $rt.clarifyEnabled)
                 .tint(Theme.Colors.brandA)
                 .accessibilityIdentifier("settings.clarify")
+            Toggle(ClarifyCopy.autoBuildSettingTitle, isOn: $rt.clarifyAutoBuild)
+                .tint(Theme.Colors.brandA)
+                .disabled(!rt.clarifyEnabled)
+                .accessibilityIdentifier("settings.clarifyAutoBuild")
         } header: {
             Text("対話")
         } footer: {
-            Text(ClarifyCopy.settingFooter)
+            Text(ClarifyCopy.settingFooter + "\n" + ClarifyCopy.autoBuildSettingFooter)
         }
     }
 
