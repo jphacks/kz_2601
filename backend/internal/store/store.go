@@ -146,6 +146,8 @@ type Store interface {
 	UpdateRecord(ctx context.Context, rs RecordSet, id string, data map[string]any) (*Record, error)
 	DeleteRecord(ctx context.Context, rs RecordSet, id string) error
 	DeleteAllRecords(ctx context.Context, rs RecordSet) error
+
+	Sharing // share links + public catalog (share.go)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).
