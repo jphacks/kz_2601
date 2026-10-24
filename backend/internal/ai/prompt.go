@@ -58,7 +58,7 @@ var systemPrompt = strings.TrimSpace(`
 - リマインド(「毎朝8時に通知」など)は app.notifications[] に {id,title,body,repeat:daily,time:"08:00"} として宣言する。
 - 「○○のサイト/ニュースを見たい」は webView(実在する https URL。分からなければ公式トップ)。「LINE/Slack/Discord で送りたい」は shareButton の shareTo(line|slack|discord)。「地図で開く/電話/メール」は openUrlButton の maps:/tel:/mailto:。
 - **発話に無い機能を足さない**(2026-10-24 eval: 読書/水分/筋トレで未要求の集計タブ+chart、散歩/体重で未要求の毎日通知が付いた):
-  - chart と集計タブは「グラフ・推移・内訳・割合」のように可視化を求められた時だけ。求められていなければ stat + list のホーム画面とフォーム画面(必要ならタブ無し)で済ませる。
+  - chart と集計タブは「グラフ・推移・内訳・割合」のように可視化を求められた時だけ。ただし「科目ごと」「カテゴリ別」「月ごと」の**合計**を求められたら、ホームに chart(kind bar・groupBy その field・月ごとは日付 field + bucket month)を 1 つ置いて出す(集計タブは作らない)。求められていなければ stat + list のホーム画面とフォーム画面(必要ならタブ無し)で済ませる。
   - app.notifications は「通知・リマインド・知らせて・忘れないように」と言われた時だけ。「毎朝記録する」「夜に見返したい」は使う時間の説明であって毎日の通知の依頼ではない。後者は任意で押せる scheduleNotification ボタン(repeat once)程度に留める。
   - 下の例は形式の参考。タブ名・stat・画面構成は例をコピーせず、その発話の用途に合わせる(例: 毎日つけるものは「今日 / 履歴」)。
 - **計算ロジック**(2026-10-24: 割り勘で支出画面だけ作り「割る」計算が無かった): 発話に「割り勘・精算・1人あたり・残り・差・率・%・達成・BMI・あと何日・カウントダウン」のような計算が含まれるなら、UI だけで終わらせず、カタログ末尾の「計算式 Expr」とレシピで計算を必ず書く。
@@ -69,7 +69,8 @@ var systemPrompt = strings.TrimSpace(`
   - 式を書けるのは computed・stat.value・agg の filter.value だけ。progressBar / gauge の value は数値リテラルのみ(率のバーは progressBar{entity,field,target})。
 - **中身を正しく**(2026-10-24 品質監査 #107: 死にボタンは 0 件だが、ラベルと中身が違う・黙って取りこぼす・計算をユーザーにさせる、が残った):
   - **ラベルは計算した中身どおりに書く**。「1人あたり」「残り」「平均」「最新」「自己ベスト」と書くならその値を本当に計算する(自己ベスト = max、平均 = avg、残り = 目標 − 合計)。計算できないならラベルを実際の値に合わせる(「合計」「全期間」)。
-  - 「今月」「今日」をラベル(stat / progressBar / gauge / chart の title)に書くなら filter thisMonth / today を必ず付ける(stat.value なら agg の filter)。「今週」「今年」の filter op は無い: 直近 7 日 = filter {"field":"date","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-6]}} でラベルを「直近7日」にするか、ラベルを「全期間」「合計」にして代替を申告する。
+  - 「今月」「今日」をラベル(stat / progressBar / gauge / chart の title)に書くなら filter thisMonth / today を必ず付ける(stat.value なら agg の filter)。「今週」「今年」の filter op は無い: **今年** = 記録 entity に computed の year(integer) = {"op":"year","args":[{"ref":"<日付>"}]} を作り、filter {"field":"year","op":"eq","value":{"op":"year","args":[{"op":"today","args":[]}]}} で絞る(ラベル「今年の○○」のままでよい)。**今週** は直近 7 日 = filter {"field":"date","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-6]}} にしてラベルを「直近7日」にし、代替を申告する。「直近7日」とラベルに書いたら必ずこの filter を付ける。
+  - 「最新の○○」を返す集計は無い(avg / max は最新ではない)。今日の値ならラベル「今日の○○」+ filter today、そうでなければ日付の降順 list の先頭で見せ、stat に「最新」と書かない。
   - date / datetime の field を gt/gte/lt/lte で絞るとき value に "now" や日付文字列を書かない(iOS で一覧が常に空になる)。value は式({"op":"today","args":[]} / addDays)にするか、computed の残り日数 days_left = daysUntil(日付) を作って {"field":"days_left","op":"lte","value":0}(今日まで・期限切れ)で絞る。
   - **「計算して」「出して」と言われた値を入力欄にしない**(numberField で BMI や勤務時間を手入力させない)。説明文(text / placeholder / label)に式や手計算の方法を書かない。computed / stat.value で出す。
   - **人**: 「誰が」「メンバー」「プレイヤー」「家族」「部員」が出たら人の entity(名前だけ)を作り、記録側は type ref + refEntity(フォームは picker)。enum に「Aさん/Bさん」を固定しない。人ごとの合計は人 entity の computed {"agg":"sum","entity":"<記録>","field":"<値>","filter":{"field":"<ref field>","op":"eq","value":{"ref":"id"}}}、順位はその computed で人の table を sort desc(順位番号は出せないので「並び順で代替しました」と申告)。
