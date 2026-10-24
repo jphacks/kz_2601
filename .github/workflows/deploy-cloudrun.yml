@@ -99,7 +99,7 @@ jobs:
     needs: deploy-changes
     if: needs.deploy-changes.outputs.run == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20 # デプロイ ~10 分 + staging スモーク(Claude 3 回・~1 分)
+    timeout-minutes: 20 # デプロイ ~10 分 + スモーク(staging: Claude 3 回 / production: 2 回・~1 分)
     environment:
       name: ${{ needs.deploy-changes.outputs.environment }}
       url: ${{ steps.appconfig.outputs.url }}
@@ -207,31 +207,44 @@ jobs:
             echo "image: \`${IMAGE}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # ---- staging スモーク(Day2 の保険・非ブロッキング) ----------------------------
-      # デモ 3 本(家計簿 create → edit → undo / 筋トレ / 散歩)を実 API で流し、表を job summary に貼る。
-      # 失敗してもデプロイは成功扱い(continue-on-error)。Claude を 3 回呼ぶ(~30 秒)。
-      # appconfig-stg は AUTH_MODE=firebase なので dev トークンは通らない → Firebase 匿名ユーザーの
+      # ---- スモーク(staging / production・Day2 の保険・非ブロッキング) -----------------
+      # デモ発話を実 API で流し、表を job summary に貼る。失敗してもデプロイは成功扱い(continue-on-error)。
+      #   staging:    デモ 3 本(家計簿 create → edit → undo / 筋トレ / 散歩)。Claude 3 回(~30 秒)。
+      #   production: Claude 費用を抑えるため家計簿 1 本だけ(-only kakeibo・Claude 2 回)。さらに
+      #               -cleanup で作った smoke-* アプリを DELETE /v1/apps/{id}(archive)して Firestore に残さない。
+      # appconfig は AUTH_MODE=firebase なので dev トークンは通らない → Firebase 匿名ユーザーの
       # ID トークンを identitytoolkit REST で取る。FIREBASE_WEB_API_KEY は repo Variables
       # (Firebase Web API key = クライアント配布される公開情報)。未設定 / 取得失敗なら
       # cmd/smoke が health と「未認証 generate が 401」の確認だけにフォールバックする。
       - uses: actions/setup-go@v7
-        if: needs.deploy-changes.outputs.environment == 'staging'
+        if: contains(fromJSON('["staging","production"]'), needs.deploy-changes.outputs.environment)
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: |
             backend/go.sum
             backend/go.mod
 
-      - name: Smoke(staging・非ブロッキング)
-        if: needs.deploy-changes.outputs.environment == 'staging'
+      - name: Smoke(${{ needs.deploy-changes.outputs.environment }}・非ブロッキング)
+        if: contains(fromJSON('["staging","production"]'), needs.deploy-changes.outputs.environment)
         continue-on-error: true
         working-directory: backend
         env:
+          ENVIRONMENT: ${{ needs.deploy-changes.outputs.environment }}
           AI_URL: ${{ steps.ai.outputs.url }}
           APPCONFIG_BASE_URL: ${{ steps.appconfig.outputs.url }}
           FIREBASE_WEB_API_KEY: ${{ vars.FIREBASE_WEB_API_KEY }}
         run: |
           set -o pipefail
-          printf '\n## Smoke(staging)\n\n' >> "$GITHUB_STEP_SUMMARY"
+          extra=()
+          if [ "$ENVIRONMENT" = "production" ]; then
+            extra=(-only kakeibo -cleanup)
+          fi
+          {
+            printf '\n## Smoke(%s)\n\n' "$ENVIRONMENT"
+            if [ "$ENVIRONMENT" = "production" ]; then
+              echo "家計簿 1 本(create → edit → undo)のみ。作った smoke-* アプリは終了時に archive(-cleanup)。"
+              echo
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
           go run ./cmd/smoke -ai "$AI_URL" -appconfig "$APPCONFIG_BASE_URL" \
-            -firebase-api-key "$FIREBASE_WEB_API_KEY" -timeout 120s | tee -a "$GITHUB_STEP_SUMMARY"
+            -firebase-api-key "$FIREBASE_WEB_API_KEY" -timeout 120s "${extra[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
