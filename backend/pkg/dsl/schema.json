@@ -1080,7 +1080,8 @@
             "plain",
             "currency",
             "percent"
-          ]
+          ],
+          "description": "percent = `value` computes a ratio (0..1) and the app shows it ×100: 50% is 0.5, 142% is 1.42 (e.g. div(agg sum, 10000)). Never write 50 or mul(…,100) for 50%. Use percent only with value, not with aggregate."
         },
         "value": {
           "$ref": "#/$defs/Expr",
@@ -1921,10 +1922,18 @@
         },
         "filter": {
           "$ref": "#/$defs/Filter"
+        },
+        "tone": {
+          "type": "string",
+          "enum": [
+            "positive",
+            "negative"
+          ],
+          "description": "What reaching 100% means. positive = a goal (steps, study hours, savings): 100%+ is shown in the success color. negative = a budget / limit being used up (spending, calories): going over 100% is shown in the warning color. Omit only when neither applies."
         }
       },
       "description": "Horizontal bar showing progress toward a goal (ProgressView). Either a literal `value` (0..1) or entity aggregation `sum(field)/target`. Choose for budgets, habit streaks, goal completion.",
-      "x-usage": "Full width, 1-2 rows (e.g. A3:F4), directly under the stat/label it explains."
+      "x-usage": "Full width, 1-2 rows (e.g. A3:F4), directly under the stat/label it explains. Always set tone: 目標の達成(歩数・勉強時間・貯金)= positive、予算・上限の消化(支出・カロリー)= negative."
     },
     "Gauge": {
       "type": "object",

@@ -27,6 +27,7 @@ func (a *App) Lint() []string {
 	l.screens()
 	l.entityReach()
 	l.navGraph()
+	l.micSeat()
 	return l.out
 }
 
@@ -482,4 +483,26 @@ func usesPickAgg(c *Component) bool {
 		})
 	}
 	return found
+}
+
+// micSeat (#140): the voice FAB sits at the bottom-left (rows 11-12, A-B) of
+// non-form screens. A part anchored there pushes the FAB up onto list rows
+// (visual audit #131: 5/18). Mirrors iOS FabClearance.obstructedRows.
+func (l *linter) micSeat() {
+	const seatCols, anchoredRowMin = 2, GridVisibleRows - 3
+	for _, s := range l.app.Screens {
+		if s.Entity != "" {
+			continue
+		}
+		for i := range s.Components {
+			c := &s.Components[i]
+			a, err := ParseArea(c.Area)
+			if err != nil {
+				continue
+			}
+			if a.Col1 < seatCols && a.Row2 > GridVisibleRows-2 && a.Row1 >= anchoredRowMin {
+				l.add("screen %q components[%d]: %s %s sits on the mic button's seat (bottom-left A11:B12); keep it empty and put the button at the bottom-right (e.g. D11:F12) or in the toolbar", s.ID, i, c.Type, c.Area)
+			}
+		}
+	}
 }

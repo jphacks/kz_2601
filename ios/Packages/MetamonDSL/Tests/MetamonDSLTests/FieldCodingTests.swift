@@ -25,4 +25,27 @@ final class FieldCodingTests: XCTestCase {
         XCTAssertEqual(FieldCoding.normalize(.string("35.0,139.0"), for: try field("location")), .string("35.0,139.0"))
         XCTAssertEqual(FieldCoding.normalize(.null, for: try field("boolean")), .bool(false))
     }
+
+    /// #140: 一覧の日付は生の "2026-10-24" ではなく曜日付きで。今年なら年を省く。
+    func testDisplayDateJaAndEn() throws {
+        let now = try XCTUnwrap(FieldCoding.dateFormatter.date(from: "2026-06-01"))
+        let ja = Locale(identifier: "ja_JP"), en = Locale(identifier: "en_US")
+        let d = try field("date")
+        XCTAssertEqual(FieldCoding.display(.string("2026-10-24"), field: d, locale: ja, now: now), "10/24(土)")
+        XCTAssertEqual(FieldCoding.display(.string("2025-10-24"), field: d, locale: ja, now: now), "2025/10/24(金)")
+        XCTAssertEqual(FieldCoding.display(.string("2026-10-24"), field: d, locale: en, now: now), "Sat, Oct 24")
+        XCTAssertEqual(FieldCoding.display(.string("2025-10-24"), field: d, locale: en, now: now), "Fri, Oct 24, 2025")
+        // 解釈できない値はそのまま
+        XCTAssertEqual(FieldCoding.display(.string("来週"), field: d, locale: ja, now: now), "来週")
+        XCTAssertEqual(FieldCoding.display(.null, field: d, locale: ja, now: now), "")
+    }
+
+    func testDisplayDatetimeHasWeekdayAndTime() throws {
+        let now = try XCTUnwrap(FieldCoding.dateFormatter.date(from: "2026-06-01"))
+        let dt = try field("datetime")
+        let s = FieldCoding.display(.string("2026-10-24T12:30:00Z"), field: dt, locale: Locale(identifier: "ja_JP"), now: now)
+        XCTAssertTrue(s.hasPrefix("10/2"), s)
+        XCTAssertTrue(s.contains(":30"), s)
+        XCTAssertFalse(s.contains("2026"), s)
+    }
 }
