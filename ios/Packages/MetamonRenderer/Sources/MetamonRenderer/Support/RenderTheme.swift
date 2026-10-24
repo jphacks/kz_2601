@@ -1,12 +1,12 @@
 import SwiftUI
 
 /// 生成アプリ側(Renderer の全部品)のデザイントークン。方針は `docs/ios/design-system.md`。
-/// アプリ本体 `ios/Metamon/App/Theme.swift` と**同じ値**を二重定義している(依存の向きが 本体→Renderer なので本体 Theme は import できない)。
-/// 本体を変えたらここも揃える。対応表:
-///   Theme.Colors.brandA/brandB     = RenderTheme.Colors.brandA/brandB(#8E6CFF / #4CC9FF)。生成アプリは `app.theme.primaryColor` を使わず常にこのブランド
+/// 色の正典はここ(値は `SemanticPalette`)。アプリ本体 `ios/Metamon/App/Theme.swift` の色はここを参照する(本体→Renderer の向きで import できる)。
+/// 余白・角丸は本体と二重定義なので、変えたら揃える。対応表:
+///   Theme.Colors.brandA/brandB     = RenderTheme.Colors.brandA/brandB(藍 #2E6A93 / 青緑 #3E9A9C・ダークは一段明るく)。生成アプリは `app.theme.primaryColor` を使わず常にこのブランド
 ///   Theme.Spacing.{xs,sm,md,lg,xl} = RenderTheme.Spacing.{xs,sm,md,lg,xl}(4/8/16/24/32)
 ///   Theme.Radius.md(16)            = RenderTheme.Radius.card(16)。control=12 / button=14 / sheet=24(本体 card 22 と lg 28 の間)
-///   Theme.Colors.canvas/surface/surfaceElevated/hairline = RenderTheme.Colors の同名(system grouped 色。ダーク/ライト自動)
+///   Theme.Colors.canvas/surface/surfaceElevated/hairline = RenderTheme.Colors の同名(ライト = 生成り寄り / ダーク = 紺寄り)
 ///   Theme.Shadow.soft(0.10/18/8)   = RenderTheme.Shadow.card は 0.06/10/3(セルが密集するので控えめ。ダークではほぼ見えない前提)
 public enum RenderTheme {
     public enum Spacing {
@@ -44,28 +44,29 @@ public enum RenderTheme {
     }
 
     public enum Colors {
-        /// ブランド(Tailor It = 紫〜水色)。本体 Theme.Colors.brandA/brandB と同値
-        public static let brandA = Color(hex: "#8E6CFF")!
-        public static let brandB = Color(hex: "#4CC9FF")!
+        /// ブランド(Tailor It = アイコンの紺に合わせた藍〜青緑・#102)。ライト/ダークで明度を切り替える
+        public static let brandA = SemanticPalette.color(SemanticPalette.brandA)
+        public static let brandB = SemanticPalette.color(SemanticPalette.brandB)
         /// ブランドの薄い面(secondary ボタン・選択行・アイコン背景)
         public static let brandSoft = brandA.opacity(0.12)
         public static let brandSoftStroke = brandA.opacity(0.22)
 
-        public static let canvas = Color(.systemGroupedBackground)
-        public static let surface = Color(.secondarySystemGroupedBackground)
-        public static let surfaceElevated = Color(.tertiarySystemGroupedBackground)
-        /// 1pt の薄い枠線・セパレータ
-        public static let hairline = Color.primary.opacity(0.08)
+        /// 画面 > カード > 入力の器。ライトは生成り寄り、ダークは紺寄り(#102)
+        public static let canvas = SemanticPalette.color(SemanticPalette.canvas)
+        public static let surface = SemanticPalette.color(SemanticPalette.surface)
+        public static let surfaceElevated = SemanticPalette.color(SemanticPalette.surfaceElevated)
+        /// 1pt の薄い枠線・セパレータ(紺を 12% / ダークは生成りを 10%)
+        public static let hairline = SemanticPalette.color((light: SemanticPalette.RGB(51, 82, 103), dark: SemanticPalette.RGB(244, 241, 232)), lightAlpha: 0.12, darkAlpha: 0.10)
         public static let separator = Color(.separator)
-        /// ブランド色の**文字**(リンク・secondary ボタン・値)。brandA は白地で 3.7:1 しか無いので AA(4.5:1)を満たすトーン(#68 SemanticPalette で検算)
+        /// ブランド色の**文字**(リンク・secondary ボタン・値)。面に対し AA(4.5:1)を満たすトーン(#68 SemanticPalette で検算)
         public static let brandText = SemanticPalette.color(SemanticPalette.brand)
         /// semantic(AA を満たす #68 のトーン。文字にも塗りにも使う)
         public static let positive = SemanticPalette.color(SemanticPalette.green)
         public static let negative = SemanticPalette.color(SemanticPalette.red)
         public static let warning = SemanticPalette.color(SemanticPalette.orange)
 
-        /// chart / カテゴリ色ドット。先頭 2 色がブランド、以降は systemColor(ダークで映える)
-        public static let chartPalette: [Color] = [brandA, brandB, .mint, .indigo, .orange, .pink, .teal, .purple]
+        /// chart / カテゴリ色ドット。先頭 2 色がブランド、以降はアイコンにある色(メジャーの金・とさかの朱・くちばしの砂色)と同系の落ち着いた色
+        public static let chartPalette: [Color] = SemanticPalette.chart.map(SemanticPalette.color)
 
         /// 文字列(カテゴリ名など)→ パレットの安定した 1 色。
         public static func category(_ key: String) -> Color {

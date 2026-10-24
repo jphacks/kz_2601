@@ -50,6 +50,7 @@ func main() {
 		Model:       model,
 		CallTimeout: time.Duration(timeoutSec) * time.Second,
 		LogicPass:   os.Getenv("AI_LOGIC_PASS") == "1", // UI pass + calculations pass (#100)
+		LintRetry:   os.Getenv("AI_LINT_RETRY") == "1", // off: lint warnings are reported only
 	}
 	srv := &http.Server{
 		Addr:              ":" + port,

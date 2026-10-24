@@ -331,6 +331,7 @@ final class AppRuntime: DSLRuntime {
         }
         Task { await services.notifications.sync(doc.dsl.app.notifications) }
         WidgetSnapshotWriter.write(dsl: doc.dsl, records: records) // ホーム画面ウィジェットへ stat を反映
+        IntentHost.shared.appsMayHaveChanged() // Siri のフレーズ候補(アプリ名)を引き直す(#80)
     }
 
     // MARK: - Morph / Undo / New app
@@ -675,6 +676,13 @@ final class AppRuntime: DSLRuntime {
             // 通信断は画面内の placeholder に任せ、トーストは 4xx(権限・入力不備)だけ
             if case .rejected = FailureKind.classify(error) { toast = message(for: error, entity: entity) }
         }
+    }
+
+    /// ローカル DB の内容で表示を差し替える(画面外からの追加: Siri / ショートカット #80)。今のアプリ以外は何もしない。
+    func reloadLocal(_ entity: String, appId: String) async {
+        guard appId == document.appId else { return }
+        records[entity] = await recordSync.cached(appId: appId, entity: entity)
+        WidgetSnapshotWriter.write(dsl: dsl, records: records)
     }
 
     /// 同期キューからの通知。送信完了はローカル DB を読み直し、競合はサーバーから引き直す(サーバー優先)。
