@@ -246,8 +246,9 @@ func (a *App) Validate() error {
 			if f.Type == FieldEnum && len(f.Options) == 0 {
 				add("entity %q field %q: enum needs options", e.ID, f.ID)
 			}
-			if f.Type != FieldEnum && len(f.Options) > 0 {
-				add("entity %q field %q: options only allowed for enum", e.ID, f.ID)
+			// ref: options = initial records of refEntity (their title values, #194)
+			if f.Type != FieldEnum && f.Type != FieldRef && len(f.Options) > 0 {
+				add("entity %q field %q: options only allowed for enum and ref", e.ID, f.ID)
 			}
 		}
 		if e.TitleField != "" && !seen[e.TitleField] {

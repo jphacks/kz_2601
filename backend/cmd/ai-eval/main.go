@@ -32,6 +32,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -331,6 +332,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 	if app, perr := dsl.Parse(res.DSL); perr == nil {
 		rec.Metrics = measure(app)
 		rec.ExpectMisses = append(checkExpect(c.Expect, rec.Metrics, rec.Summary), checkNav(c.Expect, app, rec.Mode)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkEnum(c.Expect, app)...)
 	}
 	if c.Kind == "create" {
 		created[c.ID] = res.DSL
@@ -489,6 +491,53 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 }
 
 // checkNav checks the navigation expect keys (#114) against the result.
+// checkEnum (#194): `enumField` "entity.field" is the choice field; optHas /
+// optNot check its options (enum choices or ref initial records), fields =
+// the entity's field count (no memo / extra field added), refPick = it became
+// a ref to a master entity with a form screen and initial options.
+func checkEnum(exp map[string]any, a *dsl.App) []string {
+	target, _ := exp["enumField"].(string)
+	if target == "" {
+		return nil
+	}
+	eid, fid, _ := strings.Cut(target, ".")
+	e := a.EntityByID(eid)
+	if e == nil || e.FieldByID(fid) == nil {
+		return []string{"enumField missing " + target}
+	}
+	f := e.FieldByID(fid)
+	var miss []string
+	strs := func(v any) (out []string) {
+		for _, s := range v.([]any) {
+			out = append(out, fmt.Sprint(s))
+		}
+		return out
+	}
+	for k, v := range exp {
+		switch k {
+		case "optHas", "optNot":
+			for _, w := range strs(v) {
+				if slices.Contains(f.Options, w) != (k == "optHas") {
+					miss = append(miss, fmt.Sprintf("%s %s (options=%v)", k, w, f.Options))
+				}
+			}
+		case "fields":
+			if n := int(v.(float64)); len(e.Fields) != n {
+				miss = append(miss, fmt.Sprintf("fields=%d (want %d)", len(e.Fields), n))
+			}
+		case "refPick":
+			form := false
+			for _, s := range a.Screens {
+				form = form || (f.RefEntity != "" && s.Entity == f.RefEntity)
+			}
+			if ok := f.Type == dsl.FieldRef && a.EntityByID(f.RefEntity) != nil && form && len(f.Options) > 0; ok != v.(bool) {
+				miss = append(miss, fmt.Sprintf("refPick=%v (type=%s ref=%s form=%v options=%d)", ok, f.Type, f.RefEntity, form, len(f.Options)))
+			}
+		}
+	}
+	return miss
+}
+
 func checkNav(exp map[string]any, a *dsl.App, mode string) []string {
 	var miss []string
 	num := func(v any) int { f, _ := v.(float64); return int(f) }

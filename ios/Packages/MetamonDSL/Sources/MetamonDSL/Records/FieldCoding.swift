@@ -14,7 +14,8 @@ public enum FieldCoding {
     public static let datetimeFormatter = ISO8601DateFormatter()
 
     public static func defaultValue(for f: Field) -> JSONValue {
-        if let d = f.defaultValue {
+        // 選択肢から消えた既定値は使わない(#194)
+        if let d = f.defaultValue, !(f.type == .enum && !(f.options ?? []).contains(d.stringValue ?? "")) {
             if f.type.isDate, d.stringValue == "now" { return .string(encode(Date(), for: f)) }
             return d
         }
