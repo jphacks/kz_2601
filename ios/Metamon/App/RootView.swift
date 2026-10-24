@@ -103,6 +103,7 @@ struct RootView: View {
             }
         }
         #if DEBUG
+        .task { await ScreenMapUI.shared.autoOpenIfRequested(rt) } // `METAMON_AUTO_SCREEN_MAP`(#116)
         .task {
             // ヘッドレス E2E 用: `METAMON_AUTO_SWITCHER=1` で起動 2.5 秒後に変身一覧を開く
             guard ProcessInfo.processInfo.environment["METAMON_AUTO_SWITCHER"] == "1" else { return }

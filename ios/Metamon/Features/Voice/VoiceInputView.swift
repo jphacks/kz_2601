@@ -43,6 +43,7 @@ struct VoiceInputView: View {
                         .transition(.opacity)
                 } else {
                     Spacer(minLength: Theme.Spacing.md)
+                    ScreenContextChip() // 画面マップで選んだ画面(#116)
                     heading
                     Spacer(minLength: Theme.Spacing.lg)
                     micSection
@@ -375,7 +376,7 @@ struct VoiceInputView: View {
             await rt.submitUtterance(text)
         } else {
             rt.showVoiceSheet = false
-            await rt.morph(transcript: text)
+            await rt.morph(transcript: text, about: ScreenMapUI.shared.takeContext())
         }
         phase = .idle
         if rt.isChatting { transcript = "" }
