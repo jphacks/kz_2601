@@ -57,13 +57,30 @@ public enum FieldCoding {
         }
     }
 
-    /// 一覧・集計の表示用整形。`locale` / `now` は日付の書式(言語・今年なら年を省く)にだけ使う。
-    public static func display(_ v: JSONValue, field: Field?, locale: Locale = .current, now: Date = Date()) -> String {
+    /// display が出す固定の語(#150)。DSL パッケージは文言カタログを持たないので、Renderer が `L()` で引いた語を渡す。既定は日本語。
+    public struct Words: Sendable, Equatable {
+        public var yes: String
+        public var no: String
+        public var photo: String
+        public init(yes: String, no: String, photo: String) {
+            self.yes = yes
+            self.no = no
+            self.photo = photo
+        }
+        public static let ja = Words(yes: "はい", no: "いいえ", photo: "写真")
+    }
+
+    /// 一覧・集計の表示用整形。`locale` / `now` は日付の書式(言語・今年なら年を省く)にだけ使う。`words` は boolean / photo の語。
+    public static func display(_ v: JSONValue, field: Field?, locale: Locale = .current, now: Date = Date(), words: Words = .ja) -> String {
         guard let field else { return v.displayString }
         // computed が評価できなかった(ゼロ除算・参照なし)= 「—」。0 や空欄と区別する(#101)
         if field.isComputed, v.isNull { return unavailable }
         switch field.type {
-        case .currency: return currency(v.doubleValue ?? 0)
+        case .currency:
+            // unit が「円」等の通貨そのものなら付けない(¥ と二重になる)。「円/時」なら「¥1,200/時」(#150)
+            let body = currency(v.doubleValue ?? 0)
+            guard let suffix = currencySuffix(unit: field.unit) else { return body }
+            return body + (suffix.hasPrefix("/") ? "" : " ") + suffix
         case .number, .integer:
             guard let n = v.doubleValue else { return "" }
             let s = n == n.rounded() ? String(Int(n)) : String(format: "%.1f", n)
@@ -71,8 +88,8 @@ public enum FieldCoding {
         case .date, .datetime:
             guard let d = date(from: v) else { return v.displayString }
             return displayDate(d, withTime: field.type == .datetime, locale: locale, now: now)
-        case .boolean: return v.truthy ? "はい" : "いいえ"
-        case .photo: return v.isNull ? "" : "写真"
+        case .boolean: return v.truthy ? words.yes : words.no
+        case .photo: return v.isNull ? "" : words.photo
         default: return v.displayString
         }
     }
@@ -88,6 +105,24 @@ public enum FieldCoding {
         // 負は「-¥500」(「¥-500」にしない・割り勘の残高など)
         let body = "¥" + (f.string(from: NSNumber(value: Swift.abs(n))) ?? "0")
         return n < 0 && n.rounded() != 0 ? "-" + body : body
+    }
+
+    /// 通貨そのものを表す unit(大小文字は無視)。currency は ¥ を前に出すので、これらは unit として重ねない(#150)。
+    /// "$" / USD も含める: 通貨は常に ¥ 表示(案 B)なので、生成が "$" を書いても「¥15 $」にしない。
+    static let currencyUnitTokens = ["円", "¥", "￥", "jpy", "yen", "$", "usd", "dollar", "dollars"]
+
+    /// currency field の unit のうち、¥ の後ろに付ける残り(#150)。
+    /// 「円」「JPY」→ nil(¥ だけ)/「円/時」→「/時」/「/h」「per hour」→ そのまま / 空 → nil。
+    public static func currencySuffix(unit: String?) -> String? {
+        guard let raw = unit?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return nil }
+        let lower = raw.lowercased()
+        if currencyUnitTokens.contains(lower) { return nil }
+        // 長い語から当てる("dollars" を "dollar" + "s" と切らない)
+        for token in currencyUnitTokens.sorted(by: { $0.count > $1.count }) where lower.hasPrefix(token) {
+            let rest = raw.dropFirst(token.count).trimmingCharacters(in: .whitespaces)
+            return rest.isEmpty ? nil : rest
+        }
+        return raw
     }
 
     /// 日付の表示(#140)。ja「10/24(金)」「10/24(金) 14:30」、en「Fri, Oct 24」「Fri, Oct 24, 2:30 PM」。今年でなければ年を付ける。

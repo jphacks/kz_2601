@@ -48,7 +48,7 @@
         { "type": "avatar", "id": "me", "area": "D5:F7", "name": "Tailor It", "size": "large" },
         { "type": "markdown", "id": "tip", "area": "A8:F9", "text": "**太字** と *斜体* と `コード` が使えます。詳しくは [JPHACKS](https://jphacks.com) へ。" },
         { "type": "link", "id": "official", "area": "A10:F10", "text": "JPHACKS 公式サイトを開く", "url": "https://jphacks.com" },
-        { "type": "progressBar", "id": "fixed", "area": "A11:F12", "label": "固定値 60%", "value": 0.6 }
+        { "type": "progressBar", "id": "fixed", "area": "C11:F12", "label": "固定値 60%", "value": 0.6 }
       ]
     },
     {
@@ -59,7 +59,7 @@
           "columns": [ { "field": "date", "title": "日付" }, { "field": "memo", "title": "内容" }, { "field": "amount", "title": "金額" } ],
           "sort": { "field": "date", "direction": "desc" } },
         { "type": "timeline", "id": "feed", "area": "A6:F9", "entity": "expense", "dateField": "date", "titleField": "memo", "subtitleField": "category", "limit": 5 },
-        { "type": "emptyState", "id": "empty", "area": "A10:F12", "icon": "tray", "title": "まだ写真がありません", "message": "レシートを撮ると、ここに並びます" }
+        { "type": "emptyState", "id": "empty", "area": "C10:F12", "icon": "tray", "title": "まだ写真がありません", "message": "レシートを撮ると、ここに並びます" }
       ]
     }
   ]
