@@ -222,6 +222,23 @@
         }
       }
     },
+    "(シート)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " (sheet)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(シート)"
+          }
+        }
+      }
+    },
     "(使用中)": {
       "extractionState": "manual",
       "localizations": {
@@ -235,6 +252,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "(使用中)"
+          }
+        }
+      }
+    },
+    "(全画面)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " (full screen)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(全画面)"
           }
         }
       }
@@ -303,6 +337,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tailor It に戻る(初期画面)"
+          }
+        }
+      }
+    },
+    "、": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ", "
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "、"
           }
         }
       }
@@ -422,6 +473,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "「%@」の入力を確認してください(%@)"
+          }
+        }
+      }
+    },
+    "「%@」の画面のつながり": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How the screens of \"%@\" connect"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」の画面のつながり"
           }
         }
       }
@@ -647,6 +715,40 @@
         }
       }
     },
+    "ここから行ける": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Goes to"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ここから行ける"
+          }
+        }
+      }
+    },
+    "ここへ来られる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comes from"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ここへ来られる"
+          }
+        }
+      }
+    },
     "このまま作って": {
       "extractionState": "manual",
       "localizations": {
@@ -749,6 +851,23 @@
         }
       }
     },
+    "この画面について話す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk about this screen"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この画面について話す"
+          }
+        }
+      }
+    },
     "これ以上前の状態はありません": {
       "extractionState": "manual",
       "localizations": {
@@ -834,6 +953,40 @@
         }
       }
     },
+    "どこからも行けない画面": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screens you can't reach"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "どこからも行けない画面"
+          }
+        }
+      }
+    },
+    "どこからも行けません": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not reachable"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "どこからも行けません"
+          }
+        }
+      }
+    },
     "どんなアプリが欲しいですか?": {
       "extractionState": "manual",
       "localizations": {
@@ -864,6 +1017,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "どんなアプリにするか考えています…"
+          }
+        }
+      }
+    },
+    "なし": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "なし"
           }
         }
       }
@@ -1650,6 +1820,23 @@
         }
       }
     },
+    "シートで開く": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open as sheet"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "シートで開く"
+          }
+        }
+      }
+    },
     "タグ(スペース区切り・任意) 例: 健康 習慣": {
       "extractionState": "manual",
       "localizations": {
@@ -1718,6 +1905,40 @@
         }
       }
     },
+    "タップで選択": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap to select"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タップで選択"
+          }
+        }
+      }
+    },
+    "タブ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tab"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タブ"
+          }
+        }
+      }
+    },
     "ダウンロード中 %lld%%": {
       "extractionState": "manual",
       "localizations": {
@@ -1782,6 +2003,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "バージョン"
+          }
+        }
+      }
+    },
+    "フォーム": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Form"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フォーム"
+          }
+        }
+      }
+    },
+    "ボタン「%@」": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "button \"%@\""
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボタン「%@」"
           }
         }
       }
@@ -2058,6 +2313,40 @@
         }
       }
     },
+    "一覧の行": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "list row"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一覧の行"
+          }
+        }
+      }
+    },
+    "上部の「%@」": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "top bar \"%@\""
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上部の「%@」"
+          }
+        }
+      }
+    },
     "並び順": {
       "extractionState": "manual",
       "localizations": {
@@ -2224,6 +2513,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "使用中"
+          }
+        }
+      }
+    },
+    "保存したあと": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "after saving"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存したあと"
           }
         }
       }
@@ -2942,6 +3248,23 @@
         }
       }
     },
+    "日付のタップ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "date tap"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日付のタップ"
+          }
+        }
+      }
+    },
     "時間がかかっています。もう少しだけお待ちください": {
       "extractionState": "manual",
       "localizations": {
@@ -2989,6 +3312,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "最初から"
+          }
+        }
+      }
+    },
+    "最初の画面": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最初の画面"
           }
         }
       }
@@ -3214,6 +3554,91 @@
         }
       }
     },
+    "画面": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screen"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面"
+          }
+        }
+      }
+    },
+    "画面「%@」(id: %@)で: ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On screen \"%1$@\" (id: %2$@): "
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面「%@」(id: %@)で: "
+          }
+        }
+      }
+    },
+    "画面「%@」について話す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talking about \"%@\""
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面「%@」について話す"
+          }
+        }
+      }
+    },
+    "画面の指定を外す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear the screen"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面の指定を外す"
+          }
+        }
+      }
+    },
+    "画面をタップすると、その画面について話せます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap a screen to talk about it"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面をタップすると、その画面について話せます"
+          }
+        }
+      }
+    },
     "画面を組み立てています…": {
       "extractionState": "manual",
       "localizations": {
@@ -3227,6 +3652,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "画面を組み立てています…"
+          }
+        }
+      }
+    },
+    "画面を進む": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Push"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面を進む"
+          }
+        }
+      }
+    },
+    "画面マップ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screen map"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面マップ"
           }
         }
       }
@@ -3669,6 +4128,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "通知を予約しました(%@)"
+          }
+        }
+      }
+    },
+    "部品のタップ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "component tap"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部品のタップ"
           }
         }
       }
