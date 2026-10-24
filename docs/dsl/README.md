@@ -1,7 +1,7 @@
 # DSL v1(統一版・正典)
 
 > **正典はこのフォルダ**: `dsl.schema.json`(JSON Schema draft 2020-12)+ `examples/{initial,kakeibo,training,walk}.json`(デモ3本+初期状態)。
-> Go 型は `backend/pkg/dsl`(`schema.json` を埋め込み・`make schema-sync` で同期・CI で byte 一致を検証)、Swift 型は `ios/Morph/DSL/Model`(examples をそのままバンドルしデコードテスト)。
+> Go 型は `backend/pkg/dsl`(`schema.json` を埋め込み・`make schema-sync` で同期・CI で byte 一致を検証)、Swift 型は `ios/Packages/MetamonDSL/Sources/MetamonDSL/Model`(examples をそのままバンドルしデコードテスト)。
 > backend 案 `docs/backend/dsl-proposal.md` と iOS 案 `docs/ios/dsl-proposal.md` は**すり合わせ前の記録**として残す。矛盾したら本書が勝つ。
 
 ## 1. 統一の原則(確定・議論不要)

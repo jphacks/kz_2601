@@ -1,7 +1,7 @@
-# iOS アーキテクチャ(Morph / Server-Driven UI)
+# iOS アーキテクチャ(Metamon / Server-Driven UI)
 
 > 正典は `docs/00_decisions.md`。本書は iOS 側の実装設計。DSL スキーマは統一版 v1 `docs/dsl/README.md`(旧 iOS 案: `docs/ios/dsl-proposal.md`)。**注**: 本書 §2〜§5 の `{{式}}`/`state`/`Interpolator` の記述は v1 で廃止され、`screen.entity` のドラフト + `field` 束縛(`FormDraft`)・`initialScreen` + push/sheet/fullScreen・`app.tabs[]`(TabView)に置き換わった。画面内配置は `area`(6 列 × 可視高さ÷12 行のグリッド)で `GridScreenLayout` が絶対配置する。
-> スケルトン実装: `ios/Morph/`(`xcodegen generate` → `xcodebuild -scheme Morph build` 済み)。
+> 実装: `ios/Metamon/`(アプリ本体)+ `ios/Packages/{MetamonDSL,MetamonRenderer,MetamonServices}`(ローカル Swift Package)。§1 参照。
 
 ## 0. 追加決定の反映(2026-10-24 昼)
 | 項目 | 決定 | iOS 側の帰結 |
@@ -11,44 +11,49 @@
 | P0 ネイティブ | **カメラ + ローカル通知** | `camera` コンポーネント / `native: notification.*` を実装済み。位置/センサー/共有は P1(ブリッジに stub) |
 | デモ3本 | 家計簿 / トレーニング記録 / 散歩メモ | サンプル DSL は `docs/dsl/examples/*.json`(4 本)をそのままバンドル |
 | 認証 | Sign in with Apple → 詰まったら匿名認証 | `TokenProvider` 抽象の裏で切替。UI/ランタイムは影響なし |
-| STT | WhisperKit 確定 | `SpeechTranscriber` 抽象。`MockTranscriber` → `WhisperKitTranscriber` に差し替え |
+| STT | WhisperKit 確定・**導入済み** | `SpeechTranscriber` 抽象。実機 `WhisperKitRecognizer`(model `small`)/ シミュレータ `MockTranscriber`(§6) |
 | iOS CI | 5分制限なし | WhisperKit/Firebase 解決込みのビルドでも可 |
 
-## 1. 全体構成
+## 1. 全体構成(マルチモジュール)
 
-```
-┌──────────── SwiftUI (View 層) ────────────┐
-│ RootView ── ScreenView ── DSLView(再帰) ── ComponentViews │
-│ VoiceInputView(音声)                                    │
-└──────────────┬───────────────────────────────────────────┘
-               │ @Environment(AppRuntime.self)
-┌──────────────▼──── Runtime 層 (@Observable, @MainActor) ─┐
-│ AppRuntime: document / state(JSONValue) / paths / sheet   │
-│            run(Action) / resolve("{{..}}") / binding(path) │
-│ Interpolator (式展開)                                      │
-└──────────────┬───────────────────────────────────────────┘
-               │ protocol
-┌──────────────▼──── Services 層 ─────────────────────────┐
-│ AppConfigClient(HTTP / InMemory)  AIClient(HTTP / Mock)  │
-│ DocumentSync(Polling / Noop)      TokenProvider(Firebase)│
-│ NativeBridge(UIKit)               SpeechTranscriber(WhisperKit / Mock) │
-└──────────────────────────────────────────────────────────┘
-┌──────────── Model 層 (純 Swift, Decodable, Sendable) ─────┐
-│ AppDocument / Screen / Node / Component / Action / JSONValue │
-└──────────────────────────────────────────────────────────┘
+Android のマルチモジュールに相当する **ローカル Swift Package 3 つ + 薄いアプリ本体**。依存の向きは各 `Package.swift` の `dependencies` で固定され、逆向きの import はコンパイルエラーになる。
+
+```mermaid
+flowchart TD
+    App["ios/Metamon (アプリ本体)<br/>MetamonApp / AppRuntime / RootView / VoiceInputView / BuildConfig"]
+    Renderer["MetamonRenderer<br/>ComponentRegistry / DSLView / ScreenView / GridScreenLayout / DSLNavigationRoot<br/>Components/ 1種=1ファイル"]
+    Services["MetamonServices<br/>Protocols/ (AppConfigClient, AIClient, DocumentSync, TokenProvider, SpeechTranscriber, NotificationScheduler)<br/>Live/ Mock/ Native/"]
+    DSL["MetamonDSL<br/>Model (Codable) / GridArea / Record / FieldCoding / Aggregator / DSLExamples<br/>Foundation のみ"]
+    WhisperKit[("argmax-oss-swift 1.1.1<br/>WhisperKit")]
+    App --> Renderer
+    App --> Services
+    Renderer --> DSL
+    Services --> DSL
+    Services --> WhisperKit
 ```
 
-| 層 | ディレクトリ | 責務 | 依存 |
-|---|---|---|---|
-| Model | `DSL/Model` | DSL の Codable 表現。UI/通信に非依存。ユニットテスト対象 | Foundation |
-| Runtime | `DSL/Runtime` | 単一の `AppRuntime`(Observation)。state・ナビ・アクション実行・式展開 | Model, Services(protocol) |
-| Render | `DSL/Render` | Node → View。状態を持たない薄い View | Runtime |
-| Features | `Features/Voice` | DSL 外のネイティブ画面(音声入力) | Runtime |
-| Services | `Services/{Live,Mock,Native}` | 外部 I/O。protocol で差し替え | Model |
-| App | `App` | エントリ・DI(`BuildConfig.makeServices()`) | 全部 |
+| モジュール | 場所 | 責務 | 依存 | テスト |
+|---|---|---|---|---|
+| `MetamonDSL` | `ios/Packages/MetamonDSL` | DSL v1 の Codable モデル、`GridArea`(area 計算)、`Record`/`FieldCoding`/`Aggregator`(クライアント集計)、`DSLExamples` | なし(Foundation) | `swift test`(macOS で可)/ `xcodebuild test` |
+| `MetamonRenderer` | `ios/Packages/MetamonRenderer` | SwiftUI View。`ComponentRegistry`(`type` 文字列 → View)、`DSLView`、`ScreenView`、`GridScreenLayout`、`DSLNavigationRoot`(TabView)。Services を知らない | DSL | `xcodebuild test`(schema 全 type の登録チェック) |
+| `MetamonServices` | `ios/Packages/MetamonServices` | 外部 I/O の protocol と実装。`Protocols/` と `Live/`(HTTP, WhisperKit)`Mock/` `Native/`(UNUserNotificationCenter)をフォルダで分離。WhisperKit はこのパッケージの依存 | DSL, WhisperKit | `xcodebuild test` |
+| アプリ本体 | `ios/Metamon` | `MetamonApp`(組み立て)、`AppRuntime`(状態・アクション実行。`DSLRuntime` に準拠)、`RootView`(モーダル/FAB/オーバーレイ)、`VoiceInputView`、`BuildConfig`(環境 → Services) | 全部 | なし(ロジックは各パッケージへ) |
 
-**状態管理**: `@Observable final class AppRuntime` 1個を `.environment()` で配る。DSL の動的 state は `JSONValue`(object)1本で持ち、`binding(path)` で SwiftUI `Binding` に変換する。View 側に `@State` を置くのは一時 UI(録音フェーズ、PhotosPicker 選択)のみ。
-**モジュール分割**: ハッカソン中は単一ターゲット。`DSL/Model` は依存ゼロなので、必要なら SwiftPM ローカルパッケージ `MorphDSL` に切り出せる(テストも同梱)。
+### 1.1 DI(依存性注入)
+- **入口は `ios/Metamon/App/BuildConfig.swift` の `BuildConfig.make(environment:)` だけ**。`AppEnvironment`(`.mock` / `.live(appConfigURL:aiURL:)`)を環境変数 `METAMON_API_BASE_URL` / Info.plist から判定し、`Services`(protocol のコンテナ struct)を**1回だけ**組み立てる。Mock と本番の切替はこのファイルで完結する。
+- `MetamonApp` が `Services` を `AppRuntime(document:services:)` と SwiftUI Environment `\.services`(`App/ServicesEnvironment.swift`)に渡す。View は `@Environment(\.services)` で protocol 越しに使う(例: `VoiceInputView` → `services.transcriber`)。
+- Renderer は Services を知らない。必要な能力(DSL、レコード、`run(action)`、ナビ)は `DSLRuntime` protocol(`MetamonRenderer/Host/DSLRuntime.swift`)で宣言し、`AppRuntime` が準拠して `\.dslRuntime` で注入する。`@Observable` なのでプロパティ変更は SwiftUI が追跡する。
+- 外部 DI ライブラリは使わない。
+
+### 1.2 ComponentRegistry(コンポーネントが増えても崩れない仕組み)
+- `MetamonRenderer/Registry/ComponentRegistry.swift`: schema の `type` 文字列 → View ビルダーの辞書。`DSLView` は辞書を引くだけで `switch` を持たない。
+- **追加手順(3 行)**: ① `Components/Leaves/FooLeaf.swift` に View を 1 ファイル作る ② `MetamonDSL` の `ComponentType` に `case foo`(schema にも追加) ③ `ComponentRegistry.standard` に `r.register(.foo) { c, ctx in FooLeaf(c: c, ctx: ctx) }` を 1 行。
+- **テストで強制**: `MetamonRendererTests/ComponentRegistryTests` が `docs/dsl/dsl.schema.json` の Container `enum` + Leaf `const` を読み、`ComponentRegistry.standard.registeredTypes` と `ComponentType.allCases` の**双方向一致**を検証する(抜けても余っても赤)。
+- `voiceInput` だけは音声機能(Services)に依存するため Renderer ではプレースホルダ。アプリ本体が `ComponentRegistry.standard.registering(.voiceInput) { c, _ in VoiceInputView(prompt: c.prompt) }` で差し替え、`\.componentRegistry` で注入する(`MetamonApp`)。
+- ホスト独自のコンポーネント(schema 外)も `register("myType") { ... }` で足せる。
+
+### 1.3 状態管理
+`@Observable final class AppRuntime` 1個を `.environment(runtime)`(アプリ内)と `.environment(\.dslRuntime, runtime)`(Renderer 向け)で配る。フォーム入力は画面ごとの `FormDraft`(Renderer)に閉じる。View 側の `@State` は一時 UI(録音フェーズ、PhotosPicker 選択)のみ。
 
 ## 2. DSL レンダリング
 
@@ -130,17 +135,29 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 共有 | P1 | `native: share {text}` | `UIActivityViewController`(stub) | 不要 |
 
 画像は v0 では **base64 JPEG 文字列として state に置き、entity.create の data に含めて送る**(Firestore ドキュメント 1MB 制限に注意 → 圧縮 0.6、長辺 1024px に縮小を追加予定)。Cloud Storage 経由は P2。
-全 usage description は `ios/Morph/Resources/Info.plist` に記入済み。
+全 usage description は `ios/Metamon/Resources/Info.plist` に記入済み。
 
 ## 6. 音声入力画面とホットリロード
 
 ```
-[録音] AVAudioRecorder(16kHz mono wav)
-  → [文字起こし] WhisperKit.transcribe(audioPath:)  ※オンデバイス
+[録音] WhisperKit.AudioProcessor.startRecordingLive  (AVAudioEngine → 16kHz mono Float32 をメモリに蓄積)
+  → [文字起こし] WhisperKit.transcribe(audioArray:, DecodingOptions(language: "ja", chunkingStrategy: .vad))  ※オンデバイス・停止後に一括
   → [送信] POST ai /v1/morph { appId, currentVersion, transcript }
        (ai: Claude が JSON Patch 生成 → スキーマ検証 → appconfig に適用 → 最新 DSL を返す)
   → [適用] AppRuntime.apply(doc)  withAnimation(.spring) + RootView.id(version) + transition
 ```
+
+### WhisperKit 実装要点(`Services/Live/WhisperKitRecognizer.swift`)
+
+| 項目 | 内容 |
+|---|---|
+| パッケージ | `https://github.com/argmaxinc/argmax-oss-swift` **1.1.1 固定**(`exactVersion`)。WhisperKit は v1.0.0 で Argmax OSS SDK に統合され、旧 URL `argmaxinc/WhisperKit` は同リポジトリへリダイレクト。product は `WhisperKit` のみリンク(`ArgmaxCore` は `@_exported`) |
+| モデル | `BuildConfig.whisperModel`(環境変数 `METAMON_WHISPER_MODEL` / Info.plist `MetamonWhisperModel`、既定 **`small`**)。短縮名は `openai_whisper-small` に解決し、Hugging Face `argmaxinc/whisperkit-coreml` から取得 |
+| 配置 | `Application Support/WhisperKit/models/argmaxinc/whisperkit-coreml/openai_whisper-small/`(約 500MB)。`MelSpectrogram/AudioEncoder/TextDecoder.mlmodelc` + `config.json` が揃っていればオフラインでも Hub に問い合わせずロード |
+| DL と状態 | `prepare()` を `AppRuntime.bootstrap()` が起動直後に呼ぶ。`status`: `notDownloaded → downloading(downloadProgress 0〜1) → loading(CoreML ロード + ANE 特化 prewarm) → ready → recognizing`。失敗は `.failed(message)` で UI に「再試行」ボタン |
+| 権限 | `AudioProcessor.requestRecordPermission()`(`NSMicrophoneUsageDescription`、記入済み)。`NSSpeechRecognitionUsageDescription` は Apple Speech フォールバック用に残置(WhisperKit 自体は不要) |
+| 録音 | `startRecordingLive(callback: nil)` → 停止で `audioSamples` を取り出し `purgeAudioSamples`。0.5 秒未満は無音扱いで送らない(幻聴対策) |
+| 制約 | シミュレータでは `#if targetEnvironment(simulator)` で `MockTranscriber` + 文字入力のみ(マイク非表示)。ストリーミング(途中結果)は未対応=停止後に一括。`small` のメモリは推論時 ~1GB 弱、初回 prewarm は 30〜90 秒 |
 
 | フェーズ | UI |
 |---|---|
@@ -187,22 +204,27 @@ UI は専用ログイン画面を作らない(匿名なら無言、Apple なら�
 ## 10. リスクと対処
 | リスク | 影響 | 対処 |
 |---|---|---|
-| WhisperKit モデル DL(base: ~150MB, small: ~500MB)初回に数分 | デモで待たされる | 起動直後に `prepare()` を非同期実行。**会場 Wi-Fi 前提にせず前日に実機へ DL 済みにする**。`tiny`/`base` 日本語品質が不足なら `small` を事前 DL。文字入力フォールバック(実装済み)を常に残す |
-| WhisperKit はシミュレータで実用不可(CoreML/ANE) | 開発中の検証 | `MockTranscriber` でモーフ動線を確認、音声は実機のみ |
+| WhisperKit モデル DL(`small` ~500MB)初回に数分 | デモで待たされる | 起動直後に `prepare()` を非同期実行、DL 中は進捗バー表示(実装済み)。**会場 Wi-Fi 前提にせず前日に実機へ DL 済みにする**(一度 DL すればオフラインでロード)。文字入力フォールバック(実装済み)を常に残す |
+| WhisperKit はシミュレータで実用不可(CoreML/ANE) | 開発中の検証 | シミュレータは `MockTranscriber` + 文字入力のみ(実装済み)。音声は実機のみ |
 | Firebase + WhisperKit の SwiftPM 解決が遅い | CI/初回ビルド | CI 5分制限なしの決定済み。DerivedData キャッシュ(`actions/cache`) |
 | Swift 6 コンパイラ + strict concurrency | 警告/エラー増 | **Swift 5 言語モード + `targeted`** に固定(project.yml)。Model は全て `Sendable`、UI 寄りは `@MainActor`。Swift 6 モード移行はハッカソン後 |
 | AI が生成する DSL の揺れ(未知 type/typo) | クラッシュ | 未知は無視・不正は skip の設計(§2)。サーバー側スキーマ検証と二重防御 |
 | `RootView.id(version)` で全ツリー再生成 | 入力中の内容が消える | 仕様として許容(改変=アプリ再生成)。version が同じなら再生成しない |
 | Firestore 1MB/doc | 画像 base64 | 圧縮+縮小。超えるなら Cloud Storage |
-| Sign in with Apple の Capability/Team 設定 | 実機動作が止まる | 匿名認証へ即切替(§7)。`DEVELOPMENT_TEAM` は `MORPH_TEAM_ID` 環境変数で注入 |
+| Sign in with Apple の Capability/Team 設定 | 実機動作が止まる | 匿名認証へ即切替(§7)。`DEVELOPMENT_TEAM` は `METAMON_TEAM_ID` 環境変数で注入 |
 | Widget(ホーム画面ウィジェット)の可変性 | 期待値ズレ | **スコープ外**。WidgetKit は静的タイムラインで DSL 動的描画と相性が悪い。やるなら「最新レコード1件を表示」の固定 Widget のみ |
 | 実機 iPhone 13 のみ・カメラはシミュレータ不可 | 検証の遅れ | カメラ v0 を PhotosPicker にしたので UI 動線はシミュレータで確認可能 |
 
 ## 11. ビルド/実行
 ```sh
 cd ios
-xcodegen generate                              # .xcodeproj 生成(コミットしない)
-xcodebuild -scheme Morph -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO
-xcodebuild -scheme Morph -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test CODE_SIGNING_ALLOWED=NO
-# 実サーバー接続: Scheme の環境変数に MORPH_API_BASE_URL / MORPH_AI_BASE_URL を設定(未設定なら全モック)
+METAMON_TEAM_ID=CHP337D75C xcodegen generate   # .xcodeproj 生成(コミットしない)。Team を注入
+xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' build CODE_SIGNING_ALLOWED=NO
+xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' test CODE_SIGNING_ALLOWED=NO   # 3 パッケージのテストを一括
+(cd Packages/MetamonDSL && swift test)         # DSL だけなら macOS で数秒
+# 実機
+xcodebuild -scheme Metamon -destination 'id=<DEVICE_ID>' -allowProvisioningUpdates DEVELOPMENT_TEAM=CHP337D75C build
+xcrun devicectl device install app --device <DEVICE_ID> <path/to/Metamon.app>
+xcrun devicectl device process launch --device <DEVICE_ID> jp.kz2601.metamon
+# 実サーバー接続: Scheme の環境変数に METAMON_API_BASE_URL / METAMON_AI_BASE_URL を設定(未設定なら全モック)
 ```
