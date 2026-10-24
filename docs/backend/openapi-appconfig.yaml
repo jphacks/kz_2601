@@ -21,6 +21,7 @@ tags:
   - { name: entities }
   - { name: records }
   - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。architecture.md §3.2' }
+  - { name: account, description: 'アカウント削除(#119)。architecture.md §4.1' }
 
 paths:
   /apps:
@@ -510,6 +511,23 @@ paths:
       responses:
         '201': { description: Installed, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /me:
+    delete:
+      tags: [account]
+      summary: アカウント削除(全データの物理削除・#119)
+      description: |
+        App Store 審査ガイドライン 5.1.1(v) 対応。呼び出したユーザー(uid)の次を**物理削除**し、最後に Firebase Auth のユーザーを削除する。
+        - `users/{uid}` 配下すべて(apps・versions(発話の文字起こしを含む)・records)
+        - 共有データ(scope: shared/public)のうち自分の投稿(`apps_public/*/entities/*/records` で `author == uid`)。**他人の投稿は残す**
+        - 自分が所有する `apps_public/{appId}`(共有アプリの DSL)・`shares/*`(シェアリンク)・`public_apps/*`(「探す」の掲載)
+        冪等: 途中で失敗しても同じトークンで再実行すれば残りを消して 204(認証ユーザーの削除を最後にしているため、トークンが先に失効しない)。
+        2 回目以降も 204。AUTH_MODE=dev では認証ユーザーは削除しない(データのみ)。
+        Sign in with Apple のトークン取り消しは iOS が Firebase(`Auth.revokeToken(withAuthorizationCode:)`)経由で行う。
+      responses:
+        '204': { description: 削除済み(何も無くても 204) }
+        '401': { description: 未認証, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '500': { description: 途中で失敗。再実行で続きから削除される, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /healthz:
     get:
