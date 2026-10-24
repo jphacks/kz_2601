@@ -152,7 +152,8 @@ func writeExprCatalog(b *strings.Builder, defs map[string]any) error {
 	}
 	b.WriteString("- リテラル: 12 / \"文字\" / true\n")
 	fmt.Fprintf(b, "- {\"ref\":\"<fieldId>\"} — %s\n", descOf("ExprRef"))
-	fmt.Fprintf(b, "- {\"agg\":\"count|sum|avg|min|max\",\"entity\":\"<entityId>\",\"field\"?:\"<fieldId>\",\"filter\"?:filter|[filter]} — %s\n", descOf("ExprAgg"))
+	fmt.Fprintf(b, "- {\"ref\":\"<refField>.<fieldId>\"} — ref field が指す先のレコードの値(1 段だけ)\n")
+	fmt.Fprintf(b, "- {\"agg\":\"count|sum|avg|min|max|latest|earliest\",\"entity\":\"<entityId>\",\"field\"?:\"<fieldId>\",\"by\"?:\"<dateFieldId>\",\"filter\"?:filter|[filter]} — %s\n", descOf("ExprAgg"))
 	fmt.Fprintf(b, "- {\"if\":Expr,\"then\":Expr,\"else\":Expr} — %s\n", descOf("ExprIf"))
 	op, _ := defs["ExprOp"].(map[string]any)
 	ops := enumValues(op, "op")
