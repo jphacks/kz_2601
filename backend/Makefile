@@ -2,7 +2,7 @@ SHELL := /bin/bash
 PROJECT ?= $(shell gcloud config get-value project 2>/dev/null)
 REGION  ?= asia-northeast1
 
-.PHONY: build vet test lint schema-sync dev emulator run-appconfig run-ai
+.PHONY: build vet test lint schema-sync dev emulator run-appconfig run-ai smoke-local smoke-stg
 
 build:
 	go build ./...
@@ -42,3 +42,26 @@ run-appconfig:
 run-ai:
 	FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 GOOGLE_CLOUD_PROJECT=demo-kz2601 AUTH_MODE=dev \
 	APPCONFIG_BASE_URL=http://localhost:8080 PORT=8081 go run ./cmd/ai
+
+# ---- smoke (docs/03_demo_script.md の 3 本 + undo。Claude を 3 回呼ぶ) -------------
+AI_STG_URL        ?= https://ai-stg-378953239426.asia-northeast1.run.app
+APPCONFIG_STG_URL ?= https://appconfig-stg-378953239426.asia-northeast1.run.app
+SMOKE_ONLY        ?=
+SMOKE_FLAGS        = $(if $(SMOKE_ONLY),-only $(SMOKE_ONLY),)
+
+# ローカル 2 プロセス(appconfig: memory store + AUTH_MODE=dev / ai: ../.env の ANTHROPIC_API_KEY)を
+# :18080/:18081 で起動 → smoke → 終了。SMOKE_ONLY=kakeibo で 1 本だけ。
+smoke-local:
+	@set -e; set -a; . ../.env; set +a; \
+	  STORE=memory AUTH_MODE=dev PORT=18080 go run ./cmd/appconfig >/tmp/smoke-appconfig.log 2>&1 & A=$$!; \
+	  AUTH_MODE=dev APPCONFIG_BASE_URL=http://localhost:18080 PORT=18081 go run ./cmd/ai >/tmp/smoke-ai.log 2>&1 & B=$$!; \
+	  trap 'pkill -P $$A $$B 2>/dev/null; kill $$A $$B 2>/dev/null; true' EXIT; \
+	  for i in $$(seq 1 45); do \
+	    curl -fsS localhost:18080/health >/dev/null 2>&1 && curl -fsS localhost:18081/health >/dev/null 2>&1 && break; sleep 2; \
+	  done; \
+	  go run ./cmd/smoke -ai http://localhost:18081 -appconfig http://localhost:18080 $(SMOKE_FLAGS)
+
+# staging(appconfig は AUTH_MODE=firebase)。FIREBASE_WEB_API_KEY(Firebase Web API key・公開情報)で
+# 匿名ユーザーの ID トークンを取る。無ければ health と 401 確認だけにフォールバック。
+smoke-stg:
+	go run ./cmd/smoke -ai $(AI_STG_URL) -appconfig $(APPCONFIG_STG_URL) -firebase-api-key "$(FIREBASE_WEB_API_KEY)" $(SMOKE_FLAGS)
