@@ -2,6 +2,7 @@
 
 > **正典はこのフォルダ**: `dsl.schema.json`(JSON Schema draft 2020-12)+ `examples/{initial,kakeibo,training,walk}.json`(デモ3本+初期状態)+ `examples/gallery-*.json`(部品ギャラリー)。
 > Go 型は `backend/pkg/dsl`(`schema.json` を埋め込み・`make schema-sync` で同期・CI で byte 一致を検証)、Swift 型は `ios/Packages/MetamonDSL/Sources/MetamonDSL/Model`(examples をそのままバンドルしデコードテスト)。
+> **計算式(Expr・computed フィールド・stat.value・ref 型・settlement)は [`expressions.md`](expressions.md)**(#100)。実例 `examples/warikan.json` / `examples/bmi.json`。
 > backend 案 `docs/backend/dsl-proposal.md` と iOS 案 `docs/ios/dsl-proposal.md` は**すり合わせ前の記録**として残す。矛盾したら本書が勝つ。
 
 ## 1. 統一の原則(確定・議論不要)
@@ -41,6 +42,7 @@
 | 21 | ID 形式 | `^[a-z][a-z0-9_-]{0,39}$`(Go で検証) | 任意 | **backend 案** | Firestore パス安全性。iOS は気にしない |
 | 23 | **画面レイアウト** | 上から積むスタック | 上から積むスタック(+`padding`) | **グリッド座標配置**(ユーザー決定)。Screen 直下の各コンポーネントに省略可能な `area:"A1:C3"`。詳細は §3.4 | 「全部品を長方形とみなし、A1〜C3 の正方形に入力欄を置く」ように AI/ユーザーが位置を調整できる DSL が理想 |
 | 24 | Container 内のグリッド | — | — | **v1 は Screen 直下 1 階層のみ**。Container の子は積むだけ(`area` を付けたら backend がエラー) | 実装が単純(GeometryReader 1 個)・非再帰 2 段と整合。ローカルグリッドは P1 で `area` の意味を広げるだけで互換 |
+| 25 | **計算ロジック**(#100) | — | — | **小さな式ツリー `Expr`**(四則・ルート・比較・if・日付・agg)を `Field.computed` と `stat.value` に置ける。他 entity 参照は `Field.type:"ref"`+`refEntity`、精算は専用 Leaf `settlement`。変数・ループ等は持たない(割り切りは `expressions.md` §8) | 割り勘の「割る」が書けなかった。汎用言語にせず、よく使う演算だけ閉じた一覧で持つ |
 | 22 | 編集ターンの形 | `$defs/PatchDocument{patch,summary}`(構造化出力) | — | **backend 案**。`$defs/PatchValue` で value を閉じる | iOS には無関係(常にフル DSL) |
 
 ## 3. 構造
@@ -48,7 +50,7 @@
 ```
 AppDSL { schemaVersion:1, app:AppMeta, initialScreen, entities[], screens[] }
 AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: fullscreen|floating|none, notifications[]?, tabs[]?: {screen,title,icon?} }
-Entity  { id, name, titleField?, scope?: private|shared|public, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit? } }
+Entity  { id, name, titleField?, scope?: private|shared|public, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit?, refEntity?, computed?: Expr } }
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
 Leaf (42 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
@@ -68,12 +70,12 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `textField` | `field` | `label`, `placeholder`, `multiline` | ○ | P0 |
 | `numberField` | `field` | `label`, `placeholder`, `unit` | ○ | P0 |
 | `datePicker` | `field` | `label`, `includeTime` | ○ | P0 |
-| `picker` | `field`(enum) | `label`, `style`(menu/segmented/wheel) | ○ | P0 |
+| `picker` | `field`(enum または ref) | `label`, `style`(menu/segmented/wheel) | ○ | P0 |
 | `toggle` | `field`, `label` | | ○ | P0 |
 | `photoField` | `field`(photo) | `label`, `source`(camera/library/both) | ○ | P0 |
 | `image` | `field`(photo) | `height`(small/medium/large) | ○ | P0 |
 | `list` | `entity`, `item{title}` | `item.subtitle/trailing/icon/image`, `sort`, `filter`, `emptyText`, `onItemTap`, `swipeToDelete` | | P0 |
-| `stat` | `label`, `entity`, `aggregate` | `field`(count 以外必須), `filter`, `format`(plain/currency/percent) | | P0 |
+| `stat` | `label` + (`entity`+`aggregate` **または** `value`(Expr)) | `field`(count 以外必須), `filter`, `format`(plain/currency/percent) | | P0 |
 | `chart` | `entity`, `kind`(bar/line/pie), `groupBy`, `aggregate` | `title`, `field`, `bucket`(day/week/month), `filter` | | P1 |
 | `voiceInput` | | `prompt`, `size`(compact/large) | | P0 |
 | `spacer` | | `size`(small/medium/large/flexible) | | P0 |
@@ -117,6 +119,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `table` | `entity`, `columns[{field,title?}]` | `sort`, `filter`, `limit` | | P1 |
 | `timeline` | `entity`, `dateField`(date/datetime), `titleField` | `subtitleField`, `filter`, `limit` | | P1 |
 | `emptyState` | `title` | `icon`, `message` | | P1 |
+| `settlement` | `entity`, `nameField`, `balanceField`(数値・通常は computed) | | | P1 |
 
 `color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
@@ -159,6 +162,8 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `enum` | `options` の 1 つ |
 | `photo` | `"data:image/jpeg;base64,..."`(v1)または https URL |
 | `location` | `"lat,lng"`(P1) |
+| `ref` | 参照先(`refEntity`)のレコード id 文字列。入力は picker |
+| (computed) | 保存しない。`Field.computed` の Expr を iOS が評価(`expressions.md`) |
 
 `defaultValue` は date/datetime で `"now"` を許可。
 
