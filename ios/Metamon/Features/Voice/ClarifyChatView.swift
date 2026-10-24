@@ -360,11 +360,28 @@ private struct EditReadyCard: View {
     }
 }
 
-/// 応答待ちの「…」。
+/// 応答待ちの「…」+「考えています…」(案は 3〜4 秒かかるので、止まって見えないよう文言も出す・#185)。
 private struct TypingIndicator: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 20)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
+            HStack(spacing: Theme.Spacing.sm) {
+                dots(t)
+                Text(ClarifyCopy.thinking)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.sm + 4)
+            .background(Theme.Colors.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .padding(.leading, 32)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ClarifyCopy.thinking)
+        .accessibilityIdentifier("chat.pending")
+    }
+
+    private func dots(_ t: TimeInterval) -> some View {
             HStack(spacing: 5) {
                 ForEach(0..<3) { i in
                     Circle()
@@ -373,11 +390,5 @@ private struct TypingIndicator: View {
                         .opacity(0.35 + 0.65 * max(0, sin(t * 5 - Double(i) * 0.7)))
                 }
             }
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.vertical, Theme.Spacing.sm + 4)
-            .background(Theme.Colors.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-            .padding(.leading, 32)
-        }
-        .accessibilityLabel(ClarifyCopy.thinking)
     }
 }

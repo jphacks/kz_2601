@@ -126,7 +126,7 @@ public struct ChatTurn: Codable, Equatable, Sendable {
     public var kind: Kind
     /// answer: 答え / question: 質問文 / proposal: 案の前置き / ready: 「では作りますね。」
     public var text: String
-    /// question の時だけ。チップに出す短い選択肢(≤3)
+    /// question: チップに出す短い選択肢(≤3) / answer(任意・#185): そのまま言える次の指示
     public var suggestions: [String]?
     /// これまでのユーザー発話数(1 始まり)
     public var turn: Int
@@ -139,9 +139,12 @@ public struct ChatTurn: Codable, Equatable, Sendable {
     public var locale: String?
     /// claude | shortcut | forced
     public var source: String?
+    /// 実際に使った mode(#185・chat-first のリクエストの時だけ)。edit を送っても未生成なら create。知らない値は nil 扱い
+    public var mode: String?
+    public var resolvedMode: ChatMode? { mode.flatMap(ChatMode.init(rawValue:)) }
 
     public init(kind: Kind, text: String, suggestions: [String]? = nil, turn: Int, brief: ChatBrief? = nil,
-                transcript: String? = nil, options: [ChatOption]? = nil, locale: String? = nil, source: String? = nil) {
+                transcript: String? = nil, options: [ChatOption]? = nil, locale: String? = nil, source: String? = nil, mode: String? = nil) {
         self.kind = kind
         self.text = text
         self.suggestions = suggestions
@@ -151,5 +154,6 @@ public struct ChatTurn: Codable, Equatable, Sendable {
         self.options = options
         self.locale = locale
         self.source = source
+        self.mode = mode
     }
 }

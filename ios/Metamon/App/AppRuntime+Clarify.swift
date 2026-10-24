@@ -203,7 +203,7 @@ extension AppRuntime {
             }
             timing.responded = .now
             guard epoch == chatEpoch else { return nil } // 待っている間に「最初から」/ 切替された
-            print("[Metamon] chat: mode=\(mode.rawValue) turn=\(turn.turn) kind=\(turn.kind.rawValue) options=\(turn.options?.count ?? 0) source=\(turn.source ?? "-") text=\(turn.text)")
+            print("[Metamon] chat: mode=\(mode.rawValue) turn=\(turn.turn) kind=\(turn.kind.rawValue) options=\(turn.options?.count ?? 0) served=\(turn.mode ?? "-") source=\(turn.source ?? "-") text=\(turn.text)")
             withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
                 chatPending = false
                 chatTurn = turn
@@ -292,6 +292,10 @@ extension AppRuntime {
         }
         guard let last = turn else {
             print("[Metamon] E2E: chat stopped (error card shown)")
+            return
+        }
+        if last.kind == .answer {
+            print("[Metamon] E2E: chat answered → staying in chat")
             return
         }
         switch ClarifyFlow.offer(for: last) {

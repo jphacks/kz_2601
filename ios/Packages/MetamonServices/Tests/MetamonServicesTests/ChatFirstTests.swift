@@ -112,9 +112,13 @@ final class ChatFirstTests: XCTestCase {
         XCTAssertEqual(t.kind, .question)
     }
 
-    func testMockEditSummaryEchoesInstruction() async throws {
-        let r = try await MockAIClient(delay: .zero).morph(transcript: "金額を大きくして", appId: "x", currentVersion: 3)
-        XCTAssertEqual(r.summary, "「金額を大きくして」を反映しました(モック)")
-        XCTAssertEqual(r.document.version, 4)
+    func testAnswerSuggestionsAreChipsAndModeIsDecoded() throws {
+        // #185 backend: answer の任意 suggestions(そのまま言える次の指示)と、実際に使った mode
+        let json = #"{"kind":"answer","text":"できます","suggestions":["金額を大きくして"],"mode":"edit","turn":1,"locale":"ja","source":"claude"}"#
+        let t = try JSONDecoder().decode(ChatTurn.self, from: Data(json.utf8))
+        XCTAssertEqual(ClarifyFlow.offer(for: t), .chips(["金額を大きくして"]))
+        XCTAssertEqual(t.resolvedMode, .edit)
+        let unknown = try JSONDecoder().decode(ChatTurn.self, from: Data(#"{"kind":"answer","text":"x","mode":"future","turn":1}"#.utf8))
+        XCTAssertNil(unknown.resolvedMode, "知らない mode でも落ちない")
     }
 }

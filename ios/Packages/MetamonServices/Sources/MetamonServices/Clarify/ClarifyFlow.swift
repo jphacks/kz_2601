@@ -32,9 +32,9 @@ public enum ClarifyFlow {
 
     /// 応答 1 つに対して画面に出すもの(#186)。アプリが変わるのは `.confirm` / `.proposals` のボタンを押した時だけ。
     public enum Offer: Equatable, Sendable {
-        /// answer: 吹き出しだけ(続けて質問できる)
+        /// answer(suggestions 無し): 吹き出しだけ(続けて質問できる)
         case none
-        /// question: 選択肢チップ
+        /// question: 選択肢チップ / answer の suggestions(そのまま言える次の指示・#185)
         case chips([String])
         /// proposal: 案のカード(各カードに「これでいく」)
         case proposals([ChatOption])
@@ -44,10 +44,9 @@ public enum ClarifyFlow {
 
     public static func offer(for turn: ChatTurn) -> Offer {
         switch turn.kind {
-        case .answer:
-            return .none
-        case .question:
-            return .chips(Array((turn.suggestions ?? []).filter { !$0.isEmpty }.prefix(3)))
+        case .answer, .question:
+            let chips = Array((turn.suggestions ?? []).filter { !$0.isEmpty }.prefix(3))
+            return turn.kind == .answer && chips.isEmpty ? .none : .chips(chips)
         case .proposal:
             let options = Array((turn.options ?? []).filter { !$0.instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.prefix(3))
             return options.isEmpty ? .none : .proposals(options) // 案が空なら答えとして扱う

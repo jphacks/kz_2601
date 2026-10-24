@@ -21,8 +21,10 @@ public struct MockAIClient: AIClient {
         let name = Self.sampleName(for: transcript)
         var doc = try DSLExamples.document(name, version: currentVersion + 1)
         doc.appId = appId
-        // edit(作った後の改変)は指示をそのまま要約に返す(「これでいく」で何が反映されたか見えるように・#186)
-        let summary = currentVersion > 0 && name != "initial" ? "「\(transcript)」を反映しました(モック)" : "「\(doc.dsl.app.name)」を用意しました(モック)"
+        // 改変らしい指示(作った後 / 「アプリ」も句点も無い短い指示)は指示をそのまま要約に返す(「これでいく」で何が反映されたか見えるように・#186)。
+        // モックは mode を知らないので推定(同梱例を version 0 で起動した直後の改変も拾う)
+        let looksLikeEdit = currentVersion > 0 || (!transcript.contains("アプリ") && !transcript.contains("。"))
+        let summary = looksLikeEdit && name != "initial" ? "「\(transcript)」を反映しました(モック)" : "「\(doc.dsl.app.name)」を用意しました(モック)"
         return MorphResult(document: doc, summary: summary, mode: "full")
     }
 
@@ -40,11 +42,12 @@ public struct MockAIClient: AIClient {
         let requests = users.filter { !Self.isGoAhead($0) && !Self.isQuestion($0) }
         let mode = mode ?? .create
         if Self.isQuestion(last) {
-            return ChatTurn(kind: .answer, text: Self.answer(for: last), turn: turn, locale: "ja", source: "mock")
+            return ChatTurn(kind: .answer, text: Self.answer(for: last), suggestions: mode == .edit ? ["金額を大きくして", "見やすくして"] : nil,
+                            turn: turn, locale: "ja", source: "mock", mode: mode.rawValue)
         }
         if Self.wantsProposal(last) {
             return ChatTurn(kind: .proposal, text: "こんな案はどうでしょう。よければ「これでいく」を押してください。", turn: turn,
-                            options: Self.proposals(mode: mode), locale: "ja", source: "mock")
+                            options: Self.proposals(mode: mode), locale: "ja", source: "mock", mode: mode.rawValue)
         }
         if mode == .edit {
             let instruction = goAhead ? requests.joined(separator: "。") : last
@@ -89,16 +92,16 @@ public struct MockAIClient: AIClient {
         switch mode {
         case .edit:
             return [
-                ChatOption(id: "big-numbers", title: "数字を大きく", detail: "金額や合計を大きな太字にして、ひと目で分かるようにします。",
+                ChatOption(id: "opt1", title: "数字を大きく", detail: "金額や合計を大きな太字にして、ひと目で分かるようにします。",
                            instruction: "金額と合計の数字を大きな太字にして、ひと目で分かるようにして"),
-                ChatOption(id: "cards", title: "カードで区切る", detail: "記録を 1 件ずつカードにして、余白を広げます。",
+                ChatOption(id: "opt2", title: "カードで区切る", detail: "記録を 1 件ずつカードにして、余白を広げます。",
                            instruction: "一覧の記録を 1 件ずつカードにして、行の間の余白を広げて"),
             ]
         case .create:
             return [
-                ChatOption(id: "kakeibo", title: "家計簿", detail: "金額とカテゴリを記録して、今月の合計を見る。",
+                ChatOption(id: "opt1", title: "家計簿", detail: "金額とカテゴリを記録して、今月の合計を見る。",
                            instruction: "家計簿アプリを作って。金額とカテゴリを記録して、今月の合計を見たい。"),
-                ChatOption(id: "training", title: "筋トレ記録", detail: "種目と回数を記録して、今日の合計を見る。",
+                ChatOption(id: "opt2", title: "筋トレ記録", detail: "種目と回数を記録して、今日の合計を見る。",
                            instruction: "筋トレ記録アプリを作って。種目と回数を記録して、今日の合計を見たい。"),
             ]
         }
