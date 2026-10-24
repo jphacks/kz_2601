@@ -97,6 +97,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.settlement) { c, _ in SettlementLeaf(c: c) }
         // leaf(Web)
         r.register(.webView) { c, _ in WebViewLeaf(c: c) }
+        // leaf(オンデバイス AI・#78)
+        r.register(.aiButton) { c, ctx in AiButtonLeaf(c: c, ctx: ctx) }
         return r
     }()
 }

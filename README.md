@@ -74,7 +74,7 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 | 入力 | `textField` `numberField` `datePicker` `timePicker` `picker` `toggle` `slider` `stepper` `rating` `colorPicker` `photoField` `searchBar` |
 | 表示 | `text` `label` `icon` `image` `badge` `progressBar` `gauge` `markdown` `avatar` `emptyState` |
 | データ | `list`(検索バー連動) `table` `timeline` `calendar` `stat`(端末集計) `chart`(bar/line/pie) |
-| ネイティブ | カメラ撮影 / 写真選択(`photoField` → `image`・UIImagePickerController・権限拒否時は設定への導線)、ローカル通知(daily/weekly/once)、地図(`mapView`・MapKit)、現在地(`locationButton`・CoreLocation → `"lat,lng"`)、QR スキャナ(`qrScanner`・AVFoundation)、共有シート(`shareButton`)、Safari(`openUrlButton` / `openUrl`)、タイマー(`timerDisplay`)、音声再入力(`voiceInput`) |
+| ネイティブ | カメラ撮影 / 写真選択(`photoField` → `image`・UIImagePickerController・権限拒否時は設定への導線)、ローカル通知(daily/weekly/once)、地図(`mapView`・MapKit)、現在地(`locationButton`・CoreLocation → `"lat,lng"`)、QR スキャナ(`qrScanner`・AVFoundation)、共有シート(`shareButton`)、Safari(`openUrlButton` / `openUrl`)、タイマー(`timerDisplay`)、音声再入力(`voiceInput`)、オンデバイス AI(`aiButton`・Apple Intelligence / Foundation Models で要約・分類・言い換え。**端末内で完結し、データは端末外に出ない**) |
 
 48 種すべてが Go 検証・iOS 描画・AI カタログに揃っています(シミュレータで全種を目視)。実機でしか確認できない QR の読取・GPS の実取得・共有先・タイマーのバックグラウンド継続は**実機検証が一部未了**です。
 
@@ -86,6 +86,7 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 |---|---|
 | Server-Driven UI | 画面・遷移・部品はすべてアプリに事前ビルド済み。AI は DSL JSON を書くだけなので、App Store 審査もビルドも不要で**その場で**変わる |
 | オンデバイス音声認識 | WhisperKit(`small`・argmax-oss-swift)を端末内で実行。音声は外に出さず、会場 Wi-Fi に依存しない |
+| オンデバイス AI 部品 | `aiButton` を押すと Apple Intelligence の Foundation Models(iOS 26+)が端末内で入力を要約・分類し、フォームの欄に入れる(保存はユーザー)。**クラウド API を呼ばないので無料・データは端末外に出ない**。非対応端末・Apple Intelligence OFF では「この端末では AI を使えません」と理由付きで無効化 |
 | 「生成用スキーマ + Go 厳密検証」 | Claude の構造化出力は DSL 規模のスキーマを受け付けない(実測: 任意プロパティ 16 個で `Schema is too complex`)。そこで正典スキーマから**生成用の緩和スキーマを機械導出してプロンプトに載せ、強制は Go 側に一本化**。再生成ループ(最大 2 回)→ `area` を全部落として再検証、の順に必ず着地する |
 | backend 厳格・iOS 寛容 | 未知の type や不正な `area` を iOS が受け取っても落ちない(プレースホルダ/無視)。古いビルドでも新しい DSL で死なない二重防御 |
 | 差分で育つ | 2 回目以降は JSON Patch。言及していない画面・entity は構造的に保持され、出力トークンが小さいので速い(edit p50 1.7 秒) |
@@ -128,6 +129,7 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 
 #### フレームワーク・ライブラリ・モジュール
 * SwiftUI(iOS 17+)、Swift Charts、UserNotifications、PhotosUI、UIKit(UIImagePickerController)、MapKit、CoreLocation、AVFoundation
+* FoundationModels(iOS 26+・Apple Intelligence のオンデバイス LLM。`aiButton` だけが使い、canImport + `#available` + weak link で iOS 17〜25 でも起動可)
 * WhisperKit(argmax-oss-swift 1.1.1・`small` モデル・CoreML/ANE)
 * Go 1.24(Claude 呼び出しは `net/http` 直叩き。依存は `santhosh-tekuri/jsonschema/v6` と `evanphx/json-patch/v5` のみ)
 * xcodegen(`.xcodeproj` をコミットしない)、ローカル Swift Package × 3(マルチモジュール)
@@ -140,6 +142,7 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 * ローカル通知(UNUserNotificationCenter・daily / weekly / once)
 * 位置情報(CoreLocation・1 回取得 → `"lat,lng"`)・地図(MapKit)
 * QR コード読取(AVFoundation・実機のみ)
+* Apple Intelligence(Foundation Models・オンデバイス LLM。iPhone 15 Pro 以降 / iOS 26+。`aiButton` の要約・分類を端末内で実行し、データは端末外に出ない)
 
 ### 独自技術
 #### ハッカソンで開発した独自機能・技術
@@ -165,6 +168,7 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 flowchart LR
   subgraph iOS["iOS (SwiftUI・マルチモジュール)"]
     W["WhisperKit<br/>オンデバイス STT"] --> App["Metamon (アプリ本体)<br/>AppRuntime / VoiceInputView"]
+    FM["Foundation Models<br/>オンデバイス AI (aiButton)"] --> Ren
     App --> Ren["MetamonRenderer<br/>ComponentRegistry / GridScreenLayout"]
     App --> Svc["MetamonServices<br/>HTTP / Firebase Auth / 通知"]
     Ren --> DSL["MetamonDSL<br/>Codable / GridArea / Aggregator"]
