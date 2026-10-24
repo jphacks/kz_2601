@@ -31,6 +31,7 @@ const (
 	MaxFieldsPerEntity    = 20
 	MaxComponentsPerLevel = 30
 	MaxDSLBytes           = 64 << 10
+	MaxTabs               = 5
 )
 
 var idRe = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,39}$`)
@@ -200,6 +201,24 @@ func (a *App) Validate() error {
 	if !screens[a.InitialScreen] {
 		add("initialScreen %q does not exist", a.InitialScreen)
 	}
+	if n := len(a.App.Tabs); n > 0 {
+		if n < 2 || n > MaxTabs {
+			add("app.tabs must have 2-%d tabs (got %d); omit tabs for a single-stack app", MaxTabs, n)
+		}
+		seen := map[string]bool{}
+		for i, t := range a.App.Tabs {
+			if !screens[t.Screen] {
+				add("app.tabs[%d]: screen %q does not exist", i, t.Screen)
+			}
+			if seen[t.Screen] {
+				add("app.tabs[%d]: screen %q is used by another tab", i, t.Screen)
+			}
+			seen[t.Screen] = true
+			if strings.TrimSpace(t.Title) == "" {
+				add("app.tabs[%d]: title is empty", i)
+			}
+		}
+	}
 
 	checkAction := func(where string, act *Action) {
 		if act == nil {
@@ -251,6 +270,7 @@ func (a *App) Validate() error {
 		if len(s.Components) > MaxComponentsPerLevel {
 			add("screen %q has too many components", s.ID)
 		}
+		checkGrid(s.ID, s.Components, add)
 		compIDs := map[string]bool{}
 		var walk func(where string, c *Component, depth int)
 		walk = func(where string, c *Component, depth int) {

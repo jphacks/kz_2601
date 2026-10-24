@@ -30,6 +30,14 @@ type AppMeta struct {
 	Theme         *Theme         `json:"theme,omitempty"`
 	VoiceEntry    VoiceEntry     `json:"voiceEntry"`
 	Notifications []Notification `json:"notifications,omitempty"` // iOS re-syncs local notifications on every version
+	Tabs          []Tab          `json:"tabs,omitempty"`          // optional bottom tab bar (2-5); each tab = own nav stack
+}
+
+// Tab is one bottom-bar tab rooted at a screen.
+type Tab struct {
+	Screen string `json:"screen"`
+	Title  string `json:"title"`
+	Icon   string `json:"icon,omitempty"`
 }
 
 // Notification is a local notification (P0 native feature).
@@ -171,6 +179,10 @@ var ContainerTypes = map[ComponentType]bool{CompVStack: true, CompHStack: true, 
 type Component struct {
 	Type ComponentType `json:"type"`
 	ID   string        `json:"id,omitempty"`
+	// Area places the component on the screen grid ("A1:C3", columns A-F,
+	// rows of visibleHeight/12). Only direct children of a Screen; siblings
+	// must not overlap. Empty = stacked below the grid (fallback).
+	Area string `json:"area,omitempty"`
 
 	// container
 	Title    string      `json:"title,omitempty"` // section, chart
@@ -249,9 +261,7 @@ func Initial() App {
 			ID:    "home",
 			Title: "",
 			Components: []Component{
-				{Type: CompSpacer, Size: "flexible"},
-				{Type: CompVoiceInput, ID: "mic", Prompt: "どんなアプリが欲しい？", Size: "large"},
-				{Type: CompSpacer, Size: "flexible"},
+				{Type: CompVoiceInput, ID: "mic", Area: "A1:F12", Prompt: "どんなアプリが欲しい？", Size: "large"},
 			},
 		}},
 	}
