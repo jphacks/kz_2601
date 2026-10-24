@@ -32,10 +32,13 @@ func checkStat(where string, c *Component, entities map[string]*Entity, add func
 	if c.Aggregate != "count" && e.FieldByID(c.Field) == nil {
 		add("%s: stat field %q not in entity %q (required unless aggregate=count)", where, c.Field, e.ID)
 	}
-	if IsPickAgg(c.Aggregate) {
+	switch {
+	case IsPickAgg(c.Aggregate):
 		checkPickBy(where, c.Aggregate, c.By, e, add)
-	} else if c.By != "" {
-		add("%s: by is only for aggregate latest/earliest (remove it)", where)
+	case IsTrackAgg(c.Aggregate):
+		checkTrackStat(where, c, e, add)
+	case c.By != "":
+		add("%s: by is only for aggregate latest/earliest/distance/duration (remove it)", where)
 	}
 	if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
 		add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)

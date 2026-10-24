@@ -12,7 +12,8 @@
 // (number of screens no tab / initial screen reaches, dsl.Unreachable),
 // nav (["from>to", ...]: a button / toolbar / item tap on `from` opens `to`),
 // tabs / tabsMin (number), tabOrder ("a,b": the first tab screens in order),
-// tabHas (component type on a tab root other than the first tab).
+// tabHas (component type on a tab root other than the first tab), has ([type, ...]:
+// each component type appears on some screen).
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
@@ -591,6 +592,20 @@ func checkNav(exp map[string]any, a *dsl.App, mode string) []string {
 			}
 			if !found {
 				miss = append(miss, fmt.Sprintf("tabHas!%v", v))
+			}
+		case "has": // component types that must appear on some screen (#168)
+			for _, w := range v.([]any) {
+				found := false
+				for _, s := range a.Screens {
+					for _, c := range s.Components {
+						for _, x := range append([]dsl.Component{c}, c.Children...) {
+							found = found || string(x.Type) == fmt.Sprint(w)
+						}
+					}
+				}
+				if !found {
+					miss = append(miss, fmt.Sprintf("has!%v", w))
+				}
 			}
 		}
 	}

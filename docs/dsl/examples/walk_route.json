@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "散歩ルート",
+    "description": "開始を押した間だけ歩いた道を記録して地図に線で残す",
+    "icon": "figure.walk",
+    "theme": { "primaryColor": "#2E7D32" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "point",
+      "name": "記録した地点",
+      "fields": [
+        { "id": "loc", "name": "場所", "type": "location", "required": true },
+        { "id": "at", "name": "時刻", "type": "datetime", "required": true, "defaultValue": "now" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "散歩ルート",
+      "components": [
+        { "type": "stat", "id": "distance", "area": "A1:C2", "label": "今日の距離", "entity": "point", "aggregate": "distance", "field": "loc", "by": "at",
+          "filter": { "field": "at", "op": "today", "value": null } },
+        { "type": "stat", "id": "duration", "area": "D1:F2", "label": "今日の時間", "entity": "point", "aggregate": "duration", "field": "loc", "by": "at",
+          "filter": { "field": "at", "op": "today", "value": null } },
+        { "type": "mapView", "id": "route", "area": "A3:F8", "entity": "point", "locationField": "loc", "kind": "route", "dateField": "at" },
+        { "type": "locationTracker", "id": "tracker", "area": "A9:F10", "entity": "point", "locationField": "loc", "dateField": "at", "label": "散歩を記録する", "seconds": 3600 }
+      ]
+    }
+  ]
+}

@@ -10,6 +10,8 @@
    "expect": {"photo": true}},
   {"id": "walk_b", "kind": "create", "group": "demo-C", "transcript": "お散歩日記。立ち寄った場所の写真を撮って一言コメントをつけたい",
    "expect": {"photo": true}},
+  {"id": "walk_route", "kind": "create", "group": "demo-C", "transcript": "散歩のルートを記録したい。今日どれくらい歩いたかも見たい",
+   "expect": {"has": ["locationTracker", "mapView"]}, "note": "#168 locationTracker + mapView kind route + stat distance"},
   {"id": "reading", "kind": "create", "group": "other", "transcript": "読んだ本のタイトルと感想、読み終わった日を記録する読書記録アプリ"},
   {"id": "water", "kind": "create", "group": "other", "transcript": "水を飲んだ量を記録して1日の合計を見たい。目標は2リットル"},
   {"id": "shopping", "kind": "create", "group": "other", "transcript": "買い物リスト。買うものを追加して、買ったらチェックできるようにして"},

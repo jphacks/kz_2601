@@ -243,6 +243,8 @@ const (
 	CompAiButton ComponentType = "aiButton" // Foundation Models -> form field (never leaves the device)
 	// peer-to-peer
 	CompNearbyShare ComponentType = "nearbyShare" // MultipeerConnectivity: send records to a nearby device
+	// location tracking (#168): start/stop recording points while the user opts in
+	CompLocationTracker ComponentType = "locationTracker"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -317,7 +319,7 @@ type Component struct {
 	LocationField string  `json:"locationField,omitempty"` // mapView
 	Zoom          string  `json:"zoom,omitempty"`          // mapView: near|city|wide
 	Mode          string  `json:"mode,omitempty"`          // timerDisplay: stopwatch|countdown
-	Seconds       int     `json:"seconds,omitempty"`       // timerDisplay countdown start
+	Seconds       int     `json:"seconds,omitempty"`       // timerDisplay countdown start / locationTracker auto stop
 	ShareTo       string  `json:"shareTo,omitempty"`       // shareButton: any|line|slack|discord (`target` is progressBar's number)
 	// input batch (slider / stepper / rating / textEditor). Pointers so that
 	// an explicit 0 round-trips through omitempty. Min/Max are shared with gauge.

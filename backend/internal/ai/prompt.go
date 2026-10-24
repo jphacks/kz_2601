@@ -57,6 +57,7 @@ var systemPrompt = strings.TrimSpace(`
 - 金額は type "currency"(unit "円")。日付は type "date"。写真は type "photo" + photoField(source camera)。
 - リマインド(「毎朝8時に通知」など)は app.notifications[] に {id,title,body,repeat:daily,time:"08:00"} として宣言する。
 - 「○○のサイト/ニュースを見たい」は webView(実在する https URL。分からなければ公式トップ)。「LINE/Slack/Discord で送りたい」は shareButton の shareTo(line|slack|discord)。「地図で開く/電話/メール」は openUrlButton の maps:/tel:/mailto:。
+- 「散歩/ランニング/サイクリングのルート・道のり・軌跡を記録」「移動ログ」「どれだけ歩いたか」は locationTracker(開始を押した間だけ位置を保存)。entity は点だけ point{loc: location, at: datetime(required, defaultValue now)}(フォーム画面は作らない)、ホームに stat{aggregate:distance,field:loc,by:at} と stat{aggregate:duration,...}(今日なら filter today)+ mapView{kind:route,locationField:loc,dateField:at} + locationTracker{entity,locationField,dateField}。「場所を 1 回メモ」は locationButton(こちらではない)。
 - **発話に無い機能を足さない**(2026-10-24 eval: 読書/水分/筋トレで未要求の集計タブ+chart、散歩/体重で未要求の毎日通知が付いた):
   - chart と集計タブは「グラフ・推移・内訳・割合」のように可視化を求められた時だけ。ただし「科目ごと」「カテゴリ別」「月ごと」の**合計**を求められたら、ホームに chart(kind bar・groupBy その field・月ごとは日付 field + bucket month)を 1 つ置いて出す(集計タブは作らない)。求められていなければ stat + list のホーム画面とフォーム画面(必要ならタブ無し)で済ませる。
   - app.notifications は「通知・リマインド・知らせて・忘れないように」と言われた時だけ。「毎朝記録する」「夜に見返したい」は使う時間の説明であって毎日の通知の依頼ではない。後者は任意で押せる scheduleNotification ボタン(repeat once)程度に留める。
