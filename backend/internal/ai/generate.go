@@ -126,6 +126,8 @@ type Service struct {
 	// warnings (dsl.Lint). Off by default: warnings are only reported in
 	// Meta.Lint, and the user fixes the app by voice instead (env AI_LINT_RETRY=1).
 	LintRetry bool
+	// Chat is the model setup of the clarify turn (chat.go); zero = defaults.
+	ChatConfig ChatConfig
 
 	conv     *convStore // clarify conversations (chat.go); lazily created
 	convOnce sync.Once

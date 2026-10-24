@@ -12,5 +12,19 @@
    "steps": [{"say": "家計簿", "expect": "question"},
              {"say": "もう作って", "expect": "ready", "source": "shortcut"}]},
   {"id": "training_en_full", "group": "en", "note": "英語の具体的な発話 → 1 ターンで ready",
-   "steps": [{"say": "A workout log for pushups and squats, remind me at 8 in the morning", "expect": "ready", "native": ["notification"]}]}
+   "steps": [{"say": "A workout log for pushups and squats, remind me at 8 in the morning", "expect": "ready", "native": ["notification"]}]},
+  {"id": "diary_ja", "group": "ja", "note": "#147 曖昧な一言 → 質問が出る",
+   "steps": [{"say": "日記", "expect": "question"}]},
+  {"id": "water_long", "group": "ja", "note": "#147 十分具体的な長文 → すぐ ready。通知が native に乗る",
+   "steps": [{"say": "毎日の水分補給を記録するアプリ。飲んだ量(ml)と時刻を記録して、今日の合計と1日2リットルの目標までの残り、過去7日の一覧を見たい。2時間おきに通知も欲しい。", "expect": "ready", "native": ["notification"]}]},
+  {"id": "habit_en", "group": "en", "locale": "en", "note": "#147 英語: 質問 → 回答で ready",
+   "steps": [{"say": "A habit tracker", "expect": "question"},
+             {"say": "Daily checkboxes for reading and running, and a weekly streak count", "expect": "ready"}]},
+  {"id": "kono_mama", "group": "ja", "note": "#147 iOS の「このまま作る」(このまま作って)→ shortcut",
+   "steps": [{"say": "買い物リスト", "expect": "question"},
+             {"say": "このまま作って", "expect": "ready", "source": "shortcut"}]},
+  {"id": "two_rounds", "group": "ja", "note": "#147 2 ラリー目まで曖昧 → 3 ラリー目で ready(2 ラリー目は question/ready どちらも可)",
+   "steps": [{"say": "記録したい", "expect": "question"},
+             {"say": "読書"},
+             {"say": "タイトルと読んだページ数、月の合計が見たい", "expect": "ready"}]}
 ]
