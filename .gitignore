@@ -1,0 +1,25 @@
+# secrets
+.env
+.env.*
+*.pem
+*.p8
+GoogleService-Info.plist
+serviceAccountKey*.json
+
+# macOS / Xcode
+.DS_Store
+ios/*.xcodeproj
+ios/*.xcworkspace
+xcuserdata/
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+
+# Go
+backend/bin/
+backend/**/*.test
+
+# misc
+node_modules/
+.idea/
