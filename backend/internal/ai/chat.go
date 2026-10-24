@@ -69,6 +69,14 @@ type ChatRequest struct {
 	AppID    string        `json:"appId"`
 	Messages []ChatMessage `json:"messages"`
 	Locale   Locale        `json:"locale,omitempty"`
+	// Mode (#185): create|edit; empty = edit when appId already has a
+	// generated DSL. Sending Mode (or Capabilities) opts in to the chat-first
+	// kinds answer / proposal.
+	Mode string `json:"mode,omitempty"`
+	// Capabilities lists the reply kinds the client can show beyond
+	// question / ready ("answer", "proposal"). Old clients send neither Mode
+	// nor Capabilities and get the clarify behaviour unchanged.
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 // Brief is the structured understanding of the requested app.
@@ -82,15 +90,19 @@ type Brief struct {
 
 // ChatResult is the 200 body of POST /v1/chat.
 type ChatResult struct {
-	Kind        string   `json:"kind"` // question|ready
+	Kind        string   `json:"kind"` // question|ready|answer|proposal
 	Text        string   `json:"text"`
 	Suggestions []string `json:"suggestions,omitempty"`
-	Turn        int      `json:"turn"` // 1-based count of user messages so far
-	Brief       *Brief   `json:"brief,omitempty"`
-	Transcript  string   `json:"transcript,omitempty"` // ready: the utterance for POST /v1/generate
-	Locale      Locale   `json:"locale"`
-	Source      string   `json:"source"` // claude|shortcut|forced
-	LatencyMs   Latency  `json:"latencyMs"`
+	// Options: proposal only, 1..3 ideas; Instruction goes to POST /v1/generate.
+	Options []ChatOption `json:"options,omitempty"`
+	// Mode: create|edit, set only for chat-first requests (#185).
+	Mode       string  `json:"mode,omitempty"`
+	Turn       int     `json:"turn"` // 1-based count of user messages so far
+	Brief      *Brief  `json:"brief,omitempty"`
+	Transcript string  `json:"transcript,omitempty"` // ready: the utterance for POST /v1/generate
+	Locale     Locale  `json:"locale"`
+	Source     string  `json:"source"` // claude|shortcut|forced
+	LatencyMs  Latency `json:"latencyMs"`
 	// FirstTokenMs: time from the last Claude request to its first output
 	// token (diagnostics; 0 for shortcut turns).
 	FirstTokenMs int64 `json:"firstTokenMs,omitempty"`
@@ -141,6 +153,8 @@ type conversation struct {
 	brief      *Brief
 	transcript string
 	updated    time.Time
+	mode       string // chat-first: create|edit ("" = legacy clarify)
+	questions  int    // chat-first create: questions asked so far
 }
 
 // convStore is the in-process conversation map with lazy TTL sweeping.
@@ -267,6 +281,9 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (*ChatResult, error
 	incoming, err := normalizeMessages(req.Messages)
 	if err != nil {
 		return nil, err
+	}
+	if wantsChatFirst(req) {
+		return s.chatFirst(ctx, req, incoming, started)
 	}
 	store := s.conversations()
 	store.wait(ctx, req.AppID, s.chatTimeout())
@@ -505,16 +522,21 @@ func completeFields(prefix string) map[string]json.RawMessage {
 // always streams: onText (optional) sees each delta, and the time to the
 // first output token is returned.
 func (s *Service) callChat(ctx context.Context, cfg ChatConfig, user string, ar *attemptResult, onText func(string)) (*Response, time.Duration, error) {
+	return s.callChatWith(ctx, cfg, chatSystemPrompt, ChatSchema(), chatMaxTokens, user, ar, onText)
+}
+
+// callChatWith is callChat with an explicit system prompt, schema and token cap.
+func (s *Service) callChatWith(ctx context.Context, cfg ChatConfig, system string, schema json.RawMessage, maxTokens int, user string, ar *attemptResult, onText func(string)) (*Response, time.Duration, error) {
 	cctx, cancel := context.WithTimeout(ctx, s.chatTimeout())
 	defer cancel()
 	t := time.Now()
 	var ttft time.Duration
 	resp, err := s.Claude.Complete(cctx, Completion{
-		System:     chatSystemPrompt,
+		System:     system,
 		Messages:   []Message{{Role: "user", Content: user}},
-		Schema:     ChatSchema(),
+		Schema:     schema,
 		Structured: true,
-		MaxTokens:  chatMaxTokens,
+		MaxTokens:  maxTokens,
 		Model:      cfg.Model,
 		Effort:     cfg.Effort,
 		Thinking:   cfg.Thinking,
