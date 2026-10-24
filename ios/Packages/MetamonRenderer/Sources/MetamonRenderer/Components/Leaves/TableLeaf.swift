@@ -10,7 +10,7 @@ struct TableLeaf: View {
         let entityId = c.entity ?? ""
         let entity = rt.dsl.entity(entityId)
         let columns = c.columns ?? []
-        let all = Aggregator.sorted(Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId)), by: c.sort, entity: entity)
+        let all = Aggregator.sorted(rt.filteredRecords(c), by: c.sort, entity: entity)
         let rows = (c.limit ?? 0) > 0 ? Array(all.prefix(c.limit!)) : all
         VStack(alignment: .leading, spacing: 0) {
             Grid(alignment: .leading, horizontalSpacing: RenderTheme.Spacing.row, verticalSpacing: 10) {
@@ -26,7 +26,7 @@ struct TableLeaf: View {
                 ForEach(rows) { row in
                     GridRow {
                         ForEach(Array(columns.enumerated()), id: \.offset) { _, col in
-                            Text(FieldCoding.display(row[col.field], field: entity?.field(col.field)))
+                            Text(rt.display(row[col.field], field: entity?.field(col.field)))
                                 .font(RenderTheme.Fonts.tableCell)
                                 .lineLimit(1)
                                 .frame(maxWidth: .infinity, alignment: frameAlignment(for: col, entity: entity))

@@ -33,5 +33,15 @@
   {"id": "books_en", "kind": "create", "group": "en", "transcript": "A reading log where I write down the book title, my thoughts and the date I finished it"},
   {"id": "walk_en", "kind": "create", "group": "en", "transcript": "A walk journal. Save a photo of each nice spot I find with a one-line comment",
    "expect": {"photo": true}},
-  {"id": "edit_books_rating_en", "kind": "edit", "group": "en", "base": "books_en", "transcript": "Add a five-star rating to each book", "note": "English edit; summary must be English"}
+  {"id": "edit_books_rating_en", "kind": "edit", "group": "en", "base": "books_en", "transcript": "Add a five-star rating to each book", "note": "English edit; summary must be English"},
+  {"id": "logic_warikan", "kind": "create", "group": "logic", "transcript": "旅行の割り勘アプリ。メンバーごとに誰がいくら払ったかと精算額が見たい",
+   "expect": {"calc": true, "computed": true, "settlement": true, "ref": true}},
+  {"id": "logic_bmi", "kind": "create", "group": "logic", "transcript": "体重と身長を記録して BMI を出す",
+   "expect": {"calc": true, "computed": true}},
+  {"id": "logic_budget", "kind": "create", "group": "logic", "transcript": "月の予算を決めて残りいくら使えるか見たい",
+   "expect": {"calc": true, "statValue": true}},
+  {"id": "logic_oshi", "kind": "create", "group": "logic", "transcript": "推し活の目標金額に対して達成率",
+   "expect": {"calc": true}, "note": "progressBar(entity+target) でも stat.value の div でも可"},
+  {"id": "logic_countdown", "kind": "create", "group": "logic", "transcript": "試験日までのカウントダウン",
+   "expect": {"calc": true}, "note": "computed daysUntil か stat.value。timerDisplay の固定秒数は不可(calc=false)"}
 ]

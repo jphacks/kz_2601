@@ -179,7 +179,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 ### 音声画面 → 生成中 → 変身 の状態遷移(2026-10-24 刷新)
 
 デザイントークン(色・角丸・余白・影)は `ios/Metamon/App/Theme.swift` に集約し、音声画面・生成中・サインイン・設定で共用する(Renderer の部品は触らない)。
-生成アプリ側(Renderer の全部品)のトークンは `MetamonRenderer/Support/RenderTheme.swift`(本体 Theme と同値)で、方針は **[`docs/ios/design-system.md`](design-system.md)**(#89: タイポ・ブランド色の使い所・面・角丸・影・モーション・アイコン推定・部品ごとの仕様)。生成アプリは `app.theme.primaryColor` を使わず常に Tailor It ブランド(紫→水色)で描く。
+生成アプリ側(Renderer の全部品)のトークンは `MetamonRenderer/Support/RenderTheme.swift`(色の正典。本体 Theme の色はこれを参照)で、方針は **[`docs/ios/design-system.md`](design-system.md)**(#89: タイポ・ブランド色の使い所・面・角丸・影・モーション・アイコン推定・部品ごとの仕様)。生成アプリは `app.theme.primaryColor` を使わず常に Tailor It ブランド(藍→青緑・アイコンの紺に合わせる #102)で描く。
 初期状態(`voiceEntry = fullscreen`)は `RootView` が `DSLNavigationRoot` ではなく `VoiceInputView` を直接全面に描く(背景を画面いっぱいに敷くため)。生成後の FAB シートも同じ View。
 
 ```
@@ -387,6 +387,19 @@ DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例
 
 DEBUG フック: `METAMON_AUTO_SWITCHER=1`(起動 2.5 秒後に変身一覧を開く)。`METAMON_AUTO_TRANSCRIPT="家計簿に切り替えて"` で音声切替も通せる。
 
+### シェアと「探す」(#49 #50)(2026-10-24 夜)
+
+| 入口 | 動き | 実装 |
+|---|---|---|
+| 変身一覧の各カード右上の共有ボタン | `ShareAppSheet`: `POST /apps/{id}/share` → QR(`tailorit://import/<token>`)・`ShareLink`(Web フォールバック URL + アプリ URL)・コピー・取り消し。下段で「探す」へ公開/非公開(説明・タグ) | `Features/Share/ShareAppSheet.swift`。発行済みトークンは `SharingUI.issued` に保持(開くたびに増やさない) |
+| `tailorit://import/<token>`(QR / リンク) | `POST /shares/{token}/import` → 返った appId に `switchApp`(変身アニメ)→ 要約カード「シェアされた「◯◯」を追加しました」 | `Info.plist` の `CFBundleURLTypes`、`SharingHooks`(RootView に 1 行)の `onOpenURL` → `AppRuntime.openShareURL` |
+| 初期画面下部「みんなが作ったアプリを探す」 | `DiscoverSheet`: 検索(250ms 間引き)・人気/新着・カード(名前・作者・利用数・説明・部品アイコン・タグ)→「入れる」で `POST /public-apps/{id}/install` → 変身 | `Features/Share/DiscoverSheet.swift`。導線は `VoiceInputView` に 1 行(`DiscoverEntry`) |
+
+- サービスは `MetamonServices` の `SharingClient`(`HTTPSharingClient`)。`Services.sharing` は appconfig が live の時だけ非 nil で、モック起動では導線ごと出さない。
+- 共有データ(scope: shared/public)を持つアプリは受け取ると**元の appId に参加**する(backend architecture §3.2)。要約カードに「みんなの投稿も見られます」を添える。
+- DEBUG フック: `METAMON_AUTO_SHARE=1`(変身一覧 → 今のアプリのシェアシート)/ `METAMON_AUTO_IMPORT=<token>`(リンクを開いたのと同じ経路。`simctl openurl` は OS の確認ダイアログで止まるため)/ `METAMON_AUTO_DISCOVER=1`(+ `METAMON_AUTO_INSTALL=<公開 id>`)。
+- 注意: 端末ローカルの `DocumentCache` / レコードキャッシュは uid を区別しないので、同じ端末で `METAMON_DEV_UID` を切り替えると前ユーザーのキャッシュが一瞬見える(サーバーは正しく分離)。2 ユーザー検証はアプリを入れ直してから行う。
+
 ## 7. 認証(実装済み)
 
 ```
@@ -548,3 +561,60 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 | blue | #0054BE / 6.97 / 5.47 | #5AA0FF / 6.41 / 5.02 | #007AFF / 4.02 |
 
 既知の残課題: primary button の白文字 × AccentColor(#587AF0)は 3.85:1(本体の asset catalog 側。太字 17pt なので AA Large の 3:1 は満たす)。確認は `xcrun simctl ui <udid> content_size accessibility-large` / `appearance dark` で kakeibo・training・walk を表示して行う。
+
+## 14. 計算ロジック(Expr・computed・ref・settlement / Issue #101)
+
+割り勘のように「画面はできたが裏の計算が無い」を埋めるため、DSL に計算式 `Expr` を足した(backend #100 と共通契約)。
+**契約の正典は `docs/dsl/expressions.md`(とスキーマ `$defs/Expr`)**。本節は iOS 実装の対応表で、食い違ったら expressions.md が勝つ。
+
+| 置き場所 | 意味 | iOS 実装 |
+|---|---|---|
+| `Field.computed: Expr` | 読み取り専用の算出フィールド(行 = そのレコード)。**Record に保存しない** | `DSLRuntime.viewRecords(for:)` が computed を data に合成した表示用レコードを返す → list / table / timeline / stat(aggregate の field)/ chart(groupBy・field)/ sort がそのまま扱える |
+| フォーム内の computed(防御) | 契約上 computed に入力部品は束縛できない(backend がエラー)。それでも来た場合は読み取り専用行にし、入力中のドラフトで**ライブ更新** | `FormFieldOverride`(`DSLView` で 1 箇所振り分け)→ `ComputedFieldRow`。`FormDraft` は `storedFields` だけを持ち・送る |
+| `Stat.value: Expr` | aggregate の代替(行なし・`ref` 不可)。`value` のときは `entity/field/filter` を書かない(agg の中に書く) | `StatLeaf.exprValue`(アイコン既定は `function`) |
+| `Field.type = ref` + `refEntity` | 別 entity のレコード参照。保存値はレコード id。入力は `picker`(それ以外の入力部品は backend がエラー) | 表示は `rt.display(_:field:)` が見出し(titleField → 最初の string)に解決。フォームは `RefPickerRow`(0 件なら「先に◯◯を追加してください」) |
+| `settlement` leaf | balance(正=受け取る/負=払う)から「A → B ¥1,200」 | `Settlement.transfers`(貪欲法・1 円未満は 0)+ `SettlementLeaf` |
+
+- 評価器 `MetamonDSL/Logic/ExprEvaluator.swift`。値は `ExprValue`(number/string/bool/date)、評価不能(ゼロ除算・型不一致・参照なし)は `nil` → 表示「—」(`FieldCoding.unavailable`)。深さ ≤ 8・循環なしは backend が保証する。iOS は防御として循環と入れ子 48 段超も `nil` にする。
+- リテラルは number / string / boolean(`null` は契約外)。iOS のデコードは寛容に `null` も受ける。
+- `agg.filter.value` の Expr(例 `{"ref":"id"}`)は**外側の行**で評価してから照合する。`agg.filter` は単体 or 配列(AND)。部品レベルの `filter`(list / stat / chart …)はスキーマ上 1 つだけ(iOS は配列も読める)。
+- progressBar / gauge の `value` は従来どおり数値リテラルのみ(Expr にしない)。
+- 性能: `rt.evaluator()` は全 entity のレコード + computed 定義のハッシュを署名にして評価器を使い回す(computed / agg の結果をメモ)。10 行 × 支出 100 件程度なら 1 画面 1 回の評価で済む。
+- レコード取得対象は `AppDSL.entitiesNeeded(by:)`(部品の entity + computed の agg 先 + ref 先を推移的に)。
+- op 一覧・JSON 形は `docs/dsl/expressions.md` §2-3 / `docs/dsl/dsl.schema.json` の `$defs`(`Expr` / `ExprRef` / `ExprAgg` / `ExprOp` / `ExprIf`)。`weekday` は Calendar 準拠(日=1 … 土=7)。
+- 確認: `METAMON_MOCK=1 METAMON_INITIAL_EXAMPLE=warikan`(モック seed にメンバー 3 人・支出 3 件 → 合計 ¥15,000・1 人 ¥5,000・精算 じろう→たろう ¥5,000 / はなこ→たろう ¥500)、フォームは `METAMON_AUTO_OPEN=expense_form:sheet:record`。BMI は `METAMON_INITIAL_EXAMPLE=bmi`(seed 2 件 → 22.5 / 22.9・平均 22.7)。
+
+## 15. Siri / ショートカット(App Intents・実装済み・Issue #80)
+作ったアプリを Siri とショートカットアプリから呼べるようにする。**DSL は変えない**(アプリを作れば `GET /v1/apps` に出て、そのまま Intent の候補になる)。
+
+| Intent | フレーズ(例) | 動き |
+|---|---|---|
+| `AddRecordIntent`「記録を追加」 | 「Tailor It で家計簿に記録」→「ランチ 800円」 | **アプリを開かずに** 1 件追加(`openAppWhenRun = false`)。数値項目が足りなければ「金額はいくつですか?」と聞き返す |
+| `OpenTailorAppIntent`「アプリを開く」(`OpenIntent`) | 「Tailor It で筋トレ記録を開く」 | そのアプリに変身した状態で起動(変身一覧と同じ `switchApp`) |
+| `TalkToTailorItIntent`「話しかける」 | 「Tailor It で話しかける」 | 音声シートを開いた状態で起動(初期画面なら音声画面そのまま) |
+
+```
+Siri / ショートカット ──(本体プロセス内で実行。拡張ターゲットは作らない)──▶ IntentHost.shared
+   MetamonApp.init で register(runtime)   … 唯一の AppRuntime / RecordSyncEngine を共有(ローカル DB を二重に開かない)
+   bootstrap 完了で markReady()           … 保留中の「開く/話しかける」を実行・フレーズ候補を更新
+記録を追加: RecordTargetEntity(アプリ × entity)→ DocumentCache の DSL → QuickRecord.build → recordSync.save(画面の保存と同じ)
+   → SyncQueue が appconfig へ送る(最大 4 秒待って「追加しました」。送れなければ「接続が戻ったら送ります」)
+```
+
+| 項目 | 内容 |
+|---|---|
+| 記録追加の方式 | **本体プロセス内の Intent + 既存のローカル DB / SyncQueue**(App Group 共有でも `openAppWhenRun` 受け渡しでもない)。App Intents は本体ターゲットに置くと本体が背面起動されて `perform` が走る。RecordStore は actor + メモリキャッシュなので、別プロセス(拡張)から同じファイルに書くとキャッシュ不整合で上書きし合う。本体内なら同じインスタンスを使えて新しい共有層が要らない |
+| 一言の解釈(`MetamonDSL/Records/QuickRecord.swift`) | 「ランチ 800円」→ タイトル系(titleField → 最初の string/text。enum ならオプション一致)と数値 1 つ(**単位一致**: 回→unit 回 / kg→unit kg / 円→currency → 最初の required 数値 → 最初の数値)。他の項目はフォームと同じ既定値(date の now・enum の先頭)。文中に enum のオプション名があればそれに合わせる(「交通費 300円」)。単体テスト `QuickRecordTests` |
+| 記録先の候補 | `RecordTargetEntity` = `<appId>/<entityId>`。フォーム画面を持つ entity を先に。entity が 1 つなら「家計簿」、複数なら「家計簿 › 支出」。DSL は `DocumentCache` 優先で、無いアプリだけ `GET /dsl`(最大 12 アプリ) |
+| 名前照合 | 「家計簿アプリ」等も音声切替と同じ `AppNameMatch`。曖昧なら候補を全部返して Siri に選ばせる |
+| フレーズの学習 | パラメータ入りフレーズは `TailorItShortcuts.updateAppShortcutParameters()` 時点の候補で学習される。`AppRuntime.apply()` 末尾(DSL 差し替えのたび・2 秒まとめ)と bootstrap 完了で呼ぶ |
+| Siri の聞き取り | `Info.plist` の `INAlternativeAppNames` に「テイラーイット」「テーラーイット」。フレーズは `CFBundleDevelopmentRegion = ja` なので日本語で直書き |
+| 背面起動の注意 | 記録追加は bootstrap 前でも動く(`recordSync.start()` を Intent 側で呼ぶ)。返した後にプロセスが止められても行とキューはファイルに残り、次回起動で送る。開く/話しかけるは bootstrap(`GET /dsl` の復元)と競合しないよう、準備前なら保留して `markReady()` で実行 |
+| E2E(DEBUG) | シミュレータはショートカットアプリのタップ自動化が無いので、`METAMON_E2E_INTENT=add:家計簿:ランチ 800円` / `open:筋トレ` / `talk` で起動直後に本物の Intent 型・Query 経由で実行する(`Features/Intents/IntentE2E.swift`) |
+| HealthKit | 未実装(後続)。App ID に HealthKit capability が要る(下記) |
+
+HealthKit を足す時の手順(Apple アカウント操作が要るので未着手):
+1. `project.yml` の Metamon entitlements に `com.apple.developer.healthkit: true`、Info.plist に `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription`。
+2. `xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で App ID に HealthKit が付く(有料 Program 必須)。付かなければ Apple Developer > Identifiers > `jp.kz2601.metamon` > Capabilities で HealthKit にチェック → プロファイル再生成。
+3. 部品は DSL に `healthField`(歩数/体重の読み取り)を足す案(schema・ai・カタログの変更が要るので別 Issue)。歩数だけなら既存の `NSMotionUsageDescription`(CoreMotion の歩数計)で capability 無しに出せる。
+

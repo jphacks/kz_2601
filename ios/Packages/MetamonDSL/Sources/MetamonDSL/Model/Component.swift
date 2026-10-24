@@ -27,6 +27,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case table
     case timeline
     case emptyState
+    // leaf(計算・#101)
+    case settlement
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -75,6 +77,8 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var item: ListItem?
     public var sort: Sort?
     public var filter: Filter?
+    /// `filter` が配列(AND)で来た時も含む全条件。単体なら [filter]。
+    public var filters: [Filter]
     public var emptyText: String?
     public var onItemTap: Action?
     public var swipeToDelete: Bool?
@@ -92,6 +96,10 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var name: String?           // icon: SF Symbols 名 / avatar: イニシャル元
     public var color: String?          // SemanticColor: primary|secondary|accent|red|green|orange|blue
     public var value: Double?          // progressBar(0..1)/ gauge のリテラル値
+    public var valueExpr: Expr?        // stat: `value` に Expr(aggregate の代替・#101)。数値リテラルも入る
+    // settlement(#101)
+    public var nameField: String?
+    public var balanceField: String?
     public var target: Double?         // progressBar entity モードの分母
     public var url: String?            // link
     public var image: String?          // avatar リテラル(https / data URL)
@@ -129,6 +137,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case searchField, onDateTap, locationField, zoom, mode, seconds, shareTo
         case name, color, value, target, url, image, message, columns, limit, dateField, titleField, subtitleField
         case min, max, step, minLines
+        case nameField, balanceField
     }
 
     public init(from decoder: Decoder) throws {
@@ -156,7 +165,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         entity = try? c.decodeIfPresent(String.self, forKey: .entity)
         item = try? c.decodeIfPresent(ListItem.self, forKey: .item)
         sort = try? c.decodeIfPresent(Sort.self, forKey: .sort)
-        filter = try? c.decodeIfPresent(Filter.self, forKey: .filter)
+        filters = Filter.decodeOneOrMany(c, forKey: .filter)
+        filter = filters.first
         emptyText = try? c.decodeIfPresent(String.self, forKey: .emptyText)
         onItemTap = try? c.decodeIfPresent(Action.self, forKey: .onItemTap)
         swipeToDelete = try? c.decodeIfPresent(Bool.self, forKey: .swipeToDelete)
@@ -184,6 +194,9 @@ public struct Component: Decodable, Identifiable, Sendable {
         name = try? c.decodeIfPresent(String.self, forKey: .name)
         color = try? c.decodeIfPresent(String.self, forKey: .color)
         value = try? c.decodeIfPresent(Double.self, forKey: .value)
+        valueExpr = try? c.decodeIfPresent(Expr.self, forKey: .value)
+        nameField = try? c.decodeIfPresent(String.self, forKey: .nameField)
+        balanceField = try? c.decodeIfPresent(String.self, forKey: .balanceField)
         target = try? c.decodeIfPresent(Double.self, forKey: .target)
         url = try? c.decodeIfPresent(String.self, forKey: .url)
         image = try? c.decodeIfPresent(String.self, forKey: .image)
@@ -235,14 +248,47 @@ public struct Sort: Decodable, Sendable {
     }
 }
 
-public struct Filter: Decodable, Sendable {
+/// list / stat / chart / agg の絞り込み。`value` はリテラル(後方互換)か Expr(#101: 例 `{"ref":"id"}`)。
+/// Expr の場合は `value` が nil で `valueExpr` に入り、`ExprEvaluator.resolve` が外側の行コンテキストで評価してから照合する。
+public struct Filter: Codable, Hashable, Sendable {
     public var field: String
     public var op: String          // eq|neq|gt|gte|lt|lte|thisMonth|today
     public var value: JSONValue?
+    public var valueExpr: Expr?
 
     public init(field: String, op: String, value: JSONValue? = nil) {
         self.field = field
         self.op = op
         self.value = value
+    }
+
+    public init(field: String, op: String, valueExpr: Expr) {
+        self.field = field
+        self.op = op
+        if let lit = valueExpr.literalValue { value = lit } else { self.valueExpr = valueExpr }
+    }
+
+    private enum Keys: String, CodingKey { case field, op, value }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        field = try c.decode(String.self, forKey: .field)
+        op = try c.decode(String.self, forKey: .op)
+        if let e = try c.decodeIfPresent(Expr.self, forKey: .value) {
+            if let lit = e.literalValue { value = lit } else { valueExpr = e }
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: Keys.self)
+        try c.encode(field, forKey: .field)
+        try c.encode(op, forKey: .op)
+        if let valueExpr { try c.encode(valueExpr, forKey: .value) } else { try c.encode(value ?? .null, forKey: .value) }
+    }
+
+    /// `filter` キーが単体 or 配列(AND)のどちらでも読む。壊れていれば空(=絞り込み無し)。
+    static func decodeOneOrMany<K: CodingKey>(_ c: KeyedDecodingContainer<K>, forKey key: K) -> [Filter] {
+        if let one = try? c.decodeIfPresent(Filter.self, forKey: key) { return [one] }
+        return (try? c.decodeIfPresent(Lossy<Filter>.self, forKey: key))?.wrappedValue ?? []
     }
 }

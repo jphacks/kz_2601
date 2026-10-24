@@ -37,6 +37,9 @@ type Request struct {
 	Text        string `json:"text,omitempty"` // alias used by openapi-ai.yaml
 	Mode        Mode   `json:"mode,omitempty"`
 	Locale      Locale `json:"locale,omitempty"` // ja|en; empty = detect from the transcript
+	// LogicPass overrides Service.LogicPass for this request: true = UI pass
+	// then a second call that adds calculations (logic.go). Create turns only.
+	LogicPass *bool `json:"logicPass,omitempty"`
 }
 
 // Latency is per-stage wall time in ms.
@@ -47,14 +50,20 @@ type Latency struct {
 
 // Meta is diagnostic detail about how the result was produced.
 type Meta struct {
-	Model            string   `json:"model"`
-	Attempts         int      `json:"attempts"`      // Claude calls made
-	Regenerations    int      `json:"regenerations"` // attempts - 1 (validation retries)
-	AreaFallback     bool     `json:"areaFallback"`  // areas stripped to pass validation
-	DowngradedToFull bool     `json:"downgradedToFull,omitempty"`
-	Usage            Usage    `json:"usage"`
-	OutputChars      int      `json:"outputChars,omitempty"` // model text length (whitespace share diagnostics)
-	LastProblems     []string `json:"lastProblems,omitempty"`
+	Model            string     `json:"model"`
+	Attempts         int        `json:"attempts"`      // Claude calls made
+	Regenerations    int        `json:"regenerations"` // attempts - 1 (validation retries)
+	AreaFallback     bool       `json:"areaFallback"`  // areas stripped to pass validation
+	DowngradedToFull bool       `json:"downgradedToFull,omitempty"`
+	Usage            Usage      `json:"usage"`
+	OutputChars      int        `json:"outputChars,omitempty"` // model text length (whitespace share diagnostics)
+	LastProblems     []string   `json:"lastProblems,omitempty"`
+	LogicPass        *LogicMeta `json:"logicPass,omitempty"` // set when the logic pass ran
+	// LintRetried: the first valid output had content warnings (dsl.Lint) and
+	// was regenerated once with them; Lint lists the warnings left in the
+	// returned document (create) or added by the patch (edit).
+	LintRetried bool     `json:"lintRetried,omitempty"`
+	Lint        []string `json:"lint,omitempty"`
 }
 
 // Event is a progress message emitted by GenerateStream before the Result,
@@ -110,6 +119,13 @@ type Service struct {
 	Model            string
 	MaxRegenerations int           // validation-driven retries after the first attempt (default 2)
 	CallTimeout      time.Duration // per Claude call (default 40s)
+	// LogicPass enables the second "calculations only" call after a create
+	// (env AI_LOGIC_PASS=1; Request.LogicPass overrides per request).
+	LogicPass bool
+	// LintRetry regenerates once when the first valid output has content
+	// warnings (dsl.Lint). Off by default: warnings are only reported in
+	// Meta.Lint, and the user fixes the app by voice instead (env AI_LINT_RETRY=1).
+	LintRetry bool
 
 	conv     *convStore // clarify conversations (chat.go); lazily created
 	convOnce sync.Once
@@ -179,13 +195,17 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 	}
 
 	var ar *attemptResult
+	logic := s.logicEnabled(req)
 	switch mode {
 	case ModeCreate:
 		ref := ""
 		if !isInitial(current) {
 			ref = string(env.DSL)
 		}
-		ar, err = s.generateFull(ctx, transcript, ref, nil, loc, sink)
+		ar, err = s.generateFull(ctx, transcript, ref, nil, loc, sink, logic)
+		if err == nil && logic {
+			s.applyLogicPass(ctx, transcript, ar, loc)
+		}
 	case ModeEdit:
 		ar, err = s.generateEdit(ctx, transcript, env, loc, sink)
 	default:
@@ -231,7 +251,7 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 
 // generateFull asks for a whole AppDSL; on validation problems it re-prompts
 // up to maxRegen times, then strips areas, then fails with the problems.
-func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, meta *Meta, loc Locale, sink Sink) (*attemptResult, error) {
+func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, meta *Meta, loc Locale, sink Sink, uiOnly bool) (*attemptResult, error) {
 	ar := &attemptResult{}
 	if meta != nil {
 		ar.meta = *meta
@@ -239,22 +259,40 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 	ar.meta.Model = s.Model
 	var problems []string
 	var lastCandidate []byte
+	var linted *attemptResult // valid output kept while regenerating for its lint warnings
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(ctx, systemPrompt, createUserMessage(transcript, refDSL, problems, loc), GenerationSchema(), ar,
+		resp, err := s.call(ctx, systemPrompt, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
 			appEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
 			return nil, err
 		}
-		raw := fillDefaults(extractJSON(resp.Text))
+		raw := dropFormPhotoPreviews(fillDefaults(extractJSON(resp.Text)))
 		app, perr := dsl.Parse(raw)
 		if perr == nil {
 			ar.raw = canon(raw)
 			ar.summary = summarizeFor(app, loc)
+			ar.meta.Lint = app.Lint()
+			if s.LintRetry && len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
+				// one retry for content problems; keep this output in case it fails
+				ar.meta.LintRetried = true
+				kept := *ar
+				linted = &kept
+				problems = lintProblems(ar.meta.Lint)
+				ar.meta.LastProblems = problems
+				continue
+			}
 			return ar, nil
+		}
+		if linted != nil {
+			break // the lint retry broke the document: keep the earlier valid one
 		}
 		lastCandidate = raw
 		problems = problemsOf(perr, resp)
 		ar.meta.LastProblems = problems
+	}
+	if linted != nil {
+		ar.raw, ar.summary, ar.meta.Lint = linted.raw, linted.summary, linted.meta.Lint
+		return ar, nil
 	}
 	if stripped, ok := stripAreas(lastCandidate); ok {
 		if app, perr := dsl.Parse(stripped); perr == nil {
@@ -276,6 +314,8 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	var problems []string
 	var lastOps []dsl.PatchOp
 	var lastSummary string
+	var linted *attemptResult
+	baseLint := lintOf(env.DSL)
 	for i := 0; i <= s.maxRegen(); i++ {
 		resp, err := s.call(ctx, systemPrompt+"\n"+editRules,
 			editUserMessage(transcript, env.Version, string(env.DSL), problems, loc), PatchGenerationSchema(), ar,
@@ -284,7 +324,11 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 			return nil, err
 		}
 		var doc dsl.PatchDocument
-		if uerr := json.Unmarshal(extractJSON(resp.Text), &doc); uerr != nil {
+		uerr := json.Unmarshal(extractJSON(resp.Text), &doc)
+		if uerr != nil && linted != nil {
+			break
+		}
+		if uerr != nil {
 			problems = []string{"output is not a valid PatchDocument: " + uerr.Error()}
 			if resp.StopReason == "max_tokens" {
 				problems = append(problems, "output was truncated (max_tokens); make the patch smaller")
@@ -297,12 +341,28 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 		if perr == nil {
 			ar.raw = next
 			ar.ops = doc.Patch
-			ar.summary = strings.TrimSpace(doc.Summary)
+			ar.summary = normalizeDigits(strings.TrimSpace(doc.Summary))
+			ar.meta.Lint = newLint(baseLint, lintOf(next))
+			if s.LintRetry && len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
+				ar.meta.LintRetried = true
+				kept := *ar
+				linted = &kept
+				problems = lintProblems(ar.meta.Lint)
+				ar.meta.LastProblems = problems
+				continue
+			}
 			return ar, nil
+		}
+		if linted != nil {
+			break
 		}
 		lastOps, lastSummary = doc.Patch, doc.Summary
 		problems = problemsOf(perr, resp)
 		ar.meta.LastProblems = problems
+	}
+	if linted != nil {
+		ar.raw, ar.ops, ar.summary, ar.meta.Lint = linted.raw, linted.ops, linted.summary, linted.meta.Lint
+		return ar, nil
 	}
 	// Fallback 1: apply the last patch unchecked, drop areas, re-validate.
 	if len(lastOps) > 0 {
@@ -322,7 +382,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	meta := ar.meta
 	meta.DowngradedToFull = true
 	full := &Service{Claude: s.Claude, Store: s.Store, Model: s.Model, MaxRegenerations: -1, CallTimeout: s.CallTimeout}
-	fr, err := full.generateFull(ctx, transcript, string(env.DSL), &meta, loc, sink)
+	fr, err := full.generateFull(ctx, transcript, string(env.DSL), &meta, loc, sink, false)
 	if err != nil {
 		var ge *Error
 		if errors.As(err, &ge) {
@@ -614,7 +674,7 @@ func summarizeFor(a *dsl.App, loc Locale) string {
 	if loc == LocaleEN {
 		return summarizeEN(a)
 	}
-	return summarize(a)
+	return normalizeDigits(summarize(a))
 }
 
 // summarize renders the Japanese summary for a full generation

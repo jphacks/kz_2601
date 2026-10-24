@@ -126,7 +126,51 @@ func BuildCatalog(schema []byte) (string, error) {
 			}
 		}
 	}
+	if err := writeExprCatalog(&b, defs); err != nil {
+		return "", err
+	}
 	return strings.TrimRight(b.String(), "\n"), nil
+}
+
+// writeExprCatalog renders the calculation-expression section: the five node
+// shapes, one line per op (from $defs/ExprOp x-enumDescriptions) and the
+// recipes ($defs/Expr x-recipes).
+func writeExprCatalog(b *strings.Builder, defs map[string]any) error {
+	expr, _ := defs["Expr"].(map[string]any)
+	if expr == nil {
+		return fmt.Errorf("schema has no $defs/Expr")
+	}
+	desc, _ := expr["description"].(string)
+	fmt.Fprintf(b, "### 計算式 Expr(Field.computed と stat.value・agg の filter.value に書ける)— %s\n", desc)
+	if usage, _ := expr[keyUsage].(string); usage != "" {
+		fmt.Fprintf(b, "  使い方: %s\n", usage)
+	}
+	descOf := func(name string) string {
+		d, _ := defs[name].(map[string]any)
+		s, _ := d["description"].(string)
+		return s
+	}
+	b.WriteString("- リテラル: 12 / \"文字\" / true\n")
+	fmt.Fprintf(b, "- {\"ref\":\"<fieldId>\"} — %s\n", descOf("ExprRef"))
+	fmt.Fprintf(b, "- {\"agg\":\"count|sum|avg|min|max\",\"entity\":\"<entityId>\",\"field\"?:\"<fieldId>\",\"filter\"?:filter|[filter]} — %s\n", descOf("ExprAgg"))
+	fmt.Fprintf(b, "- {\"if\":Expr,\"then\":Expr,\"else\":Expr} — %s\n", descOf("ExprIf"))
+	op, _ := defs["ExprOp"].(map[string]any)
+	ops := enumValues(op, "op")
+	if len(ops) == 0 {
+		return fmt.Errorf("schema has no $defs/ExprOp.properties.op enum")
+	}
+	fmt.Fprintf(b, "- {\"op\":\"<name>\",\"args\":[Expr,...]} — %s 一覧:\n", descOf("ExprOp"))
+	for _, o := range ops {
+		fmt.Fprintf(b, "- {\"op\":\"%s\"} %s\n", o, enumDescOf(op, "op", o))
+	}
+	recipes, _ := expr["x-recipes"].([]any)
+	if len(recipes) > 0 {
+		b.WriteString("#### 計算レシピ(よくある計算の正解形。そのまま使ってよい)\n")
+		for _, r := range recipes {
+			fmt.Fprintf(b, "- %v\n", r)
+		}
+	}
+	return nil
 }
 
 // writeTypeLine renders "- type: req / opt — desc" + "  使い方: usage".

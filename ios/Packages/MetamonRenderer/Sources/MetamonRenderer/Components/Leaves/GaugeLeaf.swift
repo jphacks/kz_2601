@@ -47,7 +47,7 @@ struct GaugeLeaf: View {
         if let v = c.value { return (v, nil) }
         guard let entityId = c.entity else { return (0, nil) }
         let entity = rt.dsl.entity(entityId)
-        let rows = Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId))
+        let rows = rt.filteredRecords(c)
         let op = c.aggregate ?? "sum"
         let unit = op == "count" ? "件" : c.field.flatMap { entity?.field($0)?.unit }
         return (Aggregator.aggregate(op, field: c.field, over: rows), unit)

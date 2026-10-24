@@ -12,7 +12,7 @@ import (
 // turns back into the canonical example, otherwise the prompt teaches a form
 // the server cannot complete.
 func TestAbbreviateRoundTrip(t *testing.T) {
-	for name, src := range map[string]string{"kakeibo": fewShotKakeibo, "expense_en": fewShotExpenseEN} {
+	for name, src := range map[string]string{"kakeibo": fewShotKakeibo, "expense_en": fewShotExpenseEN, "warikan": fewShotWarikan} {
 		short := abbreviateExample(src)
 		for _, gone := range []string{`"schemaVersion"`, `"voiceEntry"`, `"presentation"`, `"value":null`, `"direction"`, `"swipeToDelete"`, `"defaultValue":"now"`, "\n", "  "} {
 			if strings.Contains(short, gone) {

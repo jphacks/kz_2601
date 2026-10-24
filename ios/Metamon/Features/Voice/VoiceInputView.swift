@@ -52,6 +52,7 @@ struct VoiceInputView: View {
                     Spacer(minLength: Theme.Spacing.md)
                     examples
                     textEntry
+                    if isInitial { DiscoverEntry() } // 「探す」(#50)
                 }
             }
             .padding(.horizontal, Theme.Spacing.lg)

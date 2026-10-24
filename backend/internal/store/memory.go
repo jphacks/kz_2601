@@ -26,7 +26,10 @@ type Memory struct {
 	users  map[string]map[string]*memApp
 	public map[string]*memPublic
 	now    func() time.Time
-	hub    hub // change notifications for Watcher (watch.go)
+
+	shares  map[string]*Share      // shares/{token} (memory_share.go)
+	catalog map[string]*CatalogApp // public_apps/{appId}
+	hub     hub                    // change notifications for Watcher (watch.go)
 }
 
 // NewMemory returns an empty store.

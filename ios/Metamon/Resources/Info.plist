@@ -7,6 +7,18 @@
 	<!-- ホーム画面に出る表示名(正式名 Tailor It・#62)はここ1箇所だけ。内部識別子 Metamon / Bundle ID jp.kz2601.metamon は Firebase 登録値なので変えない -->
 	<key>CFBundleDisplayName</key>
 	<string>Tailor It</string>
+	<!-- Siri が「Tailor It」を聞き取れない時の別名(App Shortcuts のフレーズ「Tailor It で記録を追加」にも効く・#80) -->
+	<key>INAlternativeAppNames</key>
+	<array>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>テイラーイット</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>テーラーイット</string>
+		</dict>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -54,6 +66,19 @@
 		<string>line</string>
 		<string>slack</string>
 		<string>discord</string>
+	</array>
+
+	<!-- シェアリンク(#49): tailorit://import/<token> で開くと import してそのアプリに変身する(RootView の SharingHooks) -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>jp.kz2601.metamon.share</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>tailorit</string>
+			</array>
+		</dict>
 	</array>
 
 	<!-- WhisperKit モデル名。空なら `small`(約500MB・日本語精度優先)。環境変数 METAMON_WHISPER_MODEL でも上書き可 -->
