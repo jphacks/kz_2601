@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct MorphApp: App {
+struct MetamonApp: App {
     @State private var runtime: AppRuntime
 
     init() {

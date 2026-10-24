@@ -1,5 +1,5 @@
 import XCTest
-@testable import Morph
+@testable import Metamon
 
 /// docs/dsl/examples/*.json(= backend の CI でも検証される正典 4 本)が iOS でもデコードできることを保証する。
 final class DSLDecodingTests: XCTestCase {

@@ -62,8 +62,8 @@ struct AppDSL: Decodable, Sendable {
 
     static let fallback: AppDSL = {
         let json = """
-        {"schemaVersion":1,"app":{"name":"Morph","voiceEntry":"none"},"initialScreen":"home","entities":[],
-         "screens":[{"id":"home","title":"Morph","components":[{"type":"text","text":"DSL を読み込めませんでした"}]}]}
+        {"schemaVersion":1,"app":{"name":"メタモン","voiceEntry":"none"},"initialScreen":"home","entities":[],
+         "screens":[{"id":"home","title":"メタモン","components":[{"type":"text","text":"DSL を読み込めませんでした"}]}]}
         """
         return try! JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
     }()
@@ -90,7 +90,7 @@ struct AppMeta: Decodable, Sendable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
-        name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Morph"
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? "メタモン"
         description = try c.decodeIfPresent(String.self, forKey: .description)
         icon = try c.decodeIfPresent(String.self, forKey: .icon)
         theme = try? c.decodeIfPresent(Theme.self, forKey: .theme)

@@ -1,7 +1,7 @@
-# iOS アーキテクチャ(Morph / Server-Driven UI)
+# iOS アーキテクチャ(Metamon / Server-Driven UI)
 
 > 正典は `docs/00_decisions.md`。本書は iOS 側の実装設計。DSL スキーマは統一版 v1 `docs/dsl/README.md`(旧 iOS 案: `docs/ios/dsl-proposal.md`)。**注**: 本書 §2〜§5 の `{{式}}`/`state`/`Interpolator` の記述は v1 で廃止され、`screen.entity` のドラフト + `field` 束縛(`FormDraft`)・`initialScreen` + push/sheet/fullScreen・`app.tabs[]`(TabView)に置き換わった。画面内配置は `area`(6 列 × 可視高さ÷12 行のグリッド)で `GridScreenLayout` が絶対配置する。
-> スケルトン実装: `ios/Morph/`(`xcodegen generate` → `xcodebuild -scheme Morph build` 済み)。
+> スケルトン実装: `ios/Metamon/`(`xcodegen generate` → `xcodebuild -scheme Metamon build` 済み)。
 
 ## 0. 追加決定の反映(2026-10-24 昼)
 | 項目 | 決定 | iOS 側の帰結 |
@@ -48,7 +48,7 @@
 | App | `App` | エントリ・DI(`BuildConfig.makeServices()`) | 全部 |
 
 **状態管理**: `@Observable final class AppRuntime` 1個を `.environment()` で配る。DSL の動的 state は `JSONValue`(object)1本で持ち、`binding(path)` で SwiftUI `Binding` に変換する。View 側に `@State` を置くのは一時 UI(録音フェーズ、PhotosPicker 選択)のみ。
-**モジュール分割**: ハッカソン中は単一ターゲット。`DSL/Model` は依存ゼロなので、必要なら SwiftPM ローカルパッケージ `MorphDSL` に切り出せる(テストも同梱)。
+**モジュール分割**: ハッカソン中は単一ターゲット。`DSL/Model` は依存ゼロなので、必要なら SwiftPM ローカルパッケージ `MetamonDSL` に切り出せる(テストも同梱)。
 
 ## 2. DSL レンダリング
 
@@ -130,7 +130,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 共有 | P1 | `native: share {text}` | `UIActivityViewController`(stub) | 不要 |
 
 画像は v0 では **base64 JPEG 文字列として state に置き、entity.create の data に含めて送る**(Firestore ドキュメント 1MB 制限に注意 → 圧縮 0.6、長辺 1024px に縮小を追加予定)。Cloud Storage 経由は P2。
-全 usage description は `ios/Morph/Resources/Info.plist` に記入済み。
+全 usage description は `ios/Metamon/Resources/Info.plist` に記入済み。
 
 ## 6. 音声入力画面とホットリロード
 
@@ -147,7 +147,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 項目 | 内容 |
 |---|---|
 | パッケージ | `https://github.com/argmaxinc/argmax-oss-swift` **1.1.1 固定**(`exactVersion`)。WhisperKit は v1.0.0 で Argmax OSS SDK に統合され、旧 URL `argmaxinc/WhisperKit` は同リポジトリへリダイレクト。product は `WhisperKit` のみリンク(`ArgmaxCore` は `@_exported`) |
-| モデル | `BuildConfig.whisperModel`(環境変数 `MORPH_WHISPER_MODEL` / Info.plist `MorphWhisperModel`、既定 **`small`**)。短縮名は `openai_whisper-small` に解決し、Hugging Face `argmaxinc/whisperkit-coreml` から取得 |
+| モデル | `BuildConfig.whisperModel`(環境変数 `METAMON_WHISPER_MODEL` / Info.plist `MetamonWhisperModel`、既定 **`small`**)。短縮名は `openai_whisper-small` に解決し、Hugging Face `argmaxinc/whisperkit-coreml` から取得 |
 | 配置 | `Application Support/WhisperKit/models/argmaxinc/whisperkit-coreml/openai_whisper-small/`(約 500MB)。`MelSpectrogram/AudioEncoder/TextDecoder.mlmodelc` + `config.json` が揃っていればオフラインでも Hub に問い合わせずロード |
 | DL と状態 | `prepare()` を `AppRuntime.bootstrap()` が起動直後に呼ぶ。`status`: `notDownloaded → downloading(downloadProgress 0〜1) → loading(CoreML ロード + ANE 特化 prewarm) → ready → recognizing`。失敗は `.failed(message)` で UI に「再試行」ボタン |
 | 権限 | `AudioProcessor.requestRecordPermission()`(`NSMicrophoneUsageDescription`、記入済み)。`NSSpeechRecognitionUsageDescription` は Apple Speech フォールバック用に残置(WhisperKit 自体は不要) |
@@ -206,7 +206,7 @@ UI は専用ログイン画面を作らない(匿名なら無言、Apple なら�
 | AI が生成する DSL の揺れ(未知 type/typo) | クラッシュ | 未知は無視・不正は skip の設計(§2)。サーバー側スキーマ検証と二重防御 |
 | `RootView.id(version)` で全ツリー再生成 | 入力中の内容が消える | 仕様として許容(改変=アプリ再生成)。version が同じなら再生成しない |
 | Firestore 1MB/doc | 画像 base64 | 圧縮+縮小。超えるなら Cloud Storage |
-| Sign in with Apple の Capability/Team 設定 | 実機動作が止まる | 匿名認証へ即切替(§7)。`DEVELOPMENT_TEAM` は `MORPH_TEAM_ID` 環境変数で注入 |
+| Sign in with Apple の Capability/Team 設定 | 実機動作が止まる | 匿名認証へ即切替(§7)。`DEVELOPMENT_TEAM` は `METAMON_TEAM_ID` 環境変数で注入 |
 | Widget(ホーム画面ウィジェット)の可変性 | 期待値ズレ | **スコープ外**。WidgetKit は静的タイムラインで DSL 動的描画と相性が悪い。やるなら「最新レコード1件を表示」の固定 Widget のみ |
 | 実機 iPhone 13 のみ・カメラはシミュレータ不可 | 検証の遅れ | カメラ v0 を PhotosPicker にしたので UI 動線はシミュレータで確認可能 |
 
@@ -214,7 +214,7 @@ UI は専用ログイン画面を作らない(匿名なら無言、Apple なら�
 ```sh
 cd ios
 xcodegen generate                              # .xcodeproj 生成(コミットしない)
-xcodebuild -scheme Morph -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO
-xcodebuild -scheme Morph -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test CODE_SIGNING_ALLOWED=NO
-# 実サーバー接続: Scheme の環境変数に MORPH_API_BASE_URL / MORPH_AI_BASE_URL を設定(未設定なら全モック)
+xcodebuild -scheme Metamon -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO
+xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test CODE_SIGNING_ALLOWED=NO
+# 実サーバー接続: Scheme の環境変数に METAMON_API_BASE_URL / METAMON_AI_BASE_URL を設定(未設定なら全モック)
 ```

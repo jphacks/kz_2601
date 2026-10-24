@@ -1,26 +1,26 @@
 import Foundation
 
-/// 起動構成。`MORPH_API_BASE_URL`(環境変数 or Info.plist `MorphAPIBaseURL`)が無ければ全モックで動く。
+/// 起動構成。`METAMON_API_BASE_URL`(環境変数 or Info.plist `MetamonAPIBaseURL`)が無ければ全モックで動く。
 enum BuildConfig {
     static var apiBaseURL: URL? {
-        let env = ProcessInfo.processInfo.environment["MORPH_API_BASE_URL"]
-        let plist = Bundle.main.object(forInfoDictionaryKey: "MorphAPIBaseURL") as? String
+        let env = ProcessInfo.processInfo.environment["METAMON_API_BASE_URL"]
+        let plist = Bundle.main.object(forInfoDictionaryKey: "MetamonAPIBaseURL") as? String
         guard let raw = [env, plist].compactMap({ $0 }).first(where: { !$0.isEmpty }) else { return nil }
         return URL(string: raw.hasSuffix("/") ? raw : raw + "/")
     }
 
     static var aiBaseURL: URL? {
-        if let raw = ProcessInfo.processInfo.environment["MORPH_AI_BASE_URL"], !raw.isEmpty {
+        if let raw = ProcessInfo.processInfo.environment["METAMON_AI_BASE_URL"], !raw.isEmpty {
             return URL(string: raw.hasSuffix("/") ? raw : raw + "/")
         }
         return apiBaseURL
     }
 
-    /// WhisperKit のモデル名。`MORPH_WHISPER_MODEL`(環境変数 or Info.plist `MorphWhisperModel`)、既定 `small`(日本語精度優先・約500MB)。
+    /// WhisperKit のモデル名。`METAMON_WHISPER_MODEL`(環境変数 or Info.plist `MetamonWhisperModel`)、既定 `small`(日本語精度優先・約500MB)。
     /// `tiny`/`base`/`small`/`large-v3` の短縮名は `openai_whisper-` が補われる。フル名(`openai_whisper-large-v3-v20240930_626MB` 等)はそのまま。
     static var whisperModel: String {
-        let env = ProcessInfo.processInfo.environment["MORPH_WHISPER_MODEL"]
-        let plist = Bundle.main.object(forInfoDictionaryKey: "MorphWhisperModel") as? String
+        let env = ProcessInfo.processInfo.environment["METAMON_WHISPER_MODEL"]
+        let plist = Bundle.main.object(forInfoDictionaryKey: "MetamonWhisperModel") as? String
         return [env, plist].compactMap { $0 }.first { !$0.isEmpty } ?? "small"
     }
 

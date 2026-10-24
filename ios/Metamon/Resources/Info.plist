@@ -4,8 +4,9 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>ja</string>
+	<!-- ホーム画面に出る表示名はここ1箇所だけ。提出前に正式名を決める(商標要確認)。内部識別子 Metamon / Bundle ID jp.kz2601.metamon は Firebase 登録値なので変えない -->
 	<key>CFBundleDisplayName</key>
-	<string>Morph</string>
+	<string>メタモン</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -33,12 +34,12 @@
 		<string>arm64</string>
 	</array>
 
-	<!-- バックエンド URL。空ならモックで起動。ビルド時に xcconfig / 環境変数 MORPH_API_BASE_URL でも上書き可 -->
-	<key>MorphAPIBaseURL</key>
+	<!-- バックエンド URL。空ならモックで起動。ビルド時に xcconfig / 環境変数 METAMON_API_BASE_URL でも上書き可 -->
+	<key>MetamonAPIBaseURL</key>
 	<string></string>
 
-	<!-- WhisperKit モデル名。空なら `small`(約500MB・日本語精度優先)。環境変数 MORPH_WHISPER_MODEL でも上書き可 -->
-	<key>MorphWhisperModel</key>
+	<!-- WhisperKit モデル名。空なら `small`(約500MB・日本語精度優先)。環境変数 METAMON_WHISPER_MODEL でも上書き可 -->
+	<key>MetamonWhisperModel</key>
 	<string></string>
 
 	<!-- ネイティブ機能の権限説明(P0: マイク/カメラ/通知、P1: 位置/モーション) -->
