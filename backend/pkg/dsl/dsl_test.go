@@ -92,7 +92,7 @@ func TestSemanticErrors(t *testing.T) {
 
 func TestSchemaRejectsUnknownComponent(t *testing.T) {
 	raw := []byte(`{"schemaVersion":1,"app":{"name":"x","voiceEntry":"none"},"initialScreen":"home","entities":[],
-	"screens":[{"id":"home","title":"t","components":[{"type":"webview","url":"https://example.com"}]}]}`)
+	"screens":[{"id":"home","title":"t","components":[{"type":"hologram","url":"https://example.com"}]}]}`)
 	if _, err := Parse(raw); err == nil {
 		t.Fatal("expected schema error for unknown component type")
 	}

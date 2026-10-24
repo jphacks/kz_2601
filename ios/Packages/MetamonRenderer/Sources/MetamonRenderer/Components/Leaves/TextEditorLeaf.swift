@@ -23,8 +23,7 @@ struct TextEditorLeaf: View {
                 }
             }
             .frame(minHeight: minHeight)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color(.secondarySystemBackground)))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(.separator), lineWidth: 0.5))
+            .renderInputChrome(padding: false)
         } else {
             NeedsForm(c: c)
         }

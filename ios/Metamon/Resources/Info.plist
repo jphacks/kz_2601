@@ -48,6 +48,14 @@
 		<true/>
 	</dict>
 
+	<!-- openUrlButton / shareButton(shareTo)が他アプリの起動可否を確認するためのスキーム(ExternalURLPolicy の allowlist と対応)。tel/mailto/maps は OS 標準で不要 -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>line</string>
+		<string>slack</string>
+		<string>discord</string>
+	</array>
+
 	<!-- WhisperKit モデル名。空なら `small`(約500MB・日本語精度優先)。環境変数 METAMON_WHISPER_MODEL でも上書き可 -->
 	<key>MetamonWhisperModel</key>
 	<string></string>

@@ -1,0 +1,931 @@
+{
+  "date": "2026-10-24",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "tag": "locale",
+  "cases": [
+    {
+      "id": "habit_en",
+      "kind": "create",
+      "group": "en",
+      "transcript": "A habit tracker. I want to check off meditation and reading every day and see how many days in a row I kept it up. Remind me at 7 in the morning",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 7332,
+      "totalMs": 7335,
+      "usage": {
+        "inputTokens": 135,
+        "outputTokens": 1214,
+        "cacheCreationInputTokens": 16471
+      },
+      "summary": "I made a Habit Tracker app. It has 2 tabs: Today and History. Use the button at the bottom right to add daily checks. You'll get a reminder every morning at 7.",
+      "metrics": {
+        "tabs": 2,
+        "screens": 3,
+        "components": 13,
+        "topLevel": 6,
+        "withArea": 6,
+        "areaRatio": 1,
+        "fullScreenCnt": 1,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "notifications": [
+          "daily@07:00"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F9 D11:F12",
+          "history: A1:F12",
+          "habit_form: A1:F6 A11:F12"
+        ]
+      },
+      "dsl": {
+        "app": {
+          "description": "Check off meditation and reading every day and see how many days in a row you've kept it up",
+          "icon": "checkmark.seal",
+          "name": "Habit Tracker",
+          "notifications": [
+            {
+              "body": "Meditate and read today, then check them off.",
+              "id": "morning_reminder",
+              "repeat": "daily",
+              "time": "07:00",
+              "title": "Time for your habits"
+            }
+          ],
+          "tabs": [
+            {
+              "icon": "checkmark.circle",
+              "screen": "home",
+              "title": "Today"
+            },
+            {
+              "icon": "clock",
+              "screen": "history",
+              "title": "History"
+            }
+          ],
+          "theme": {
+            "primaryColor": "#6A1B9A"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Date",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "defaultValue": false,
+                "id": "meditation",
+                "name": "Meditation",
+                "type": "boolean"
+              },
+              {
+                "defaultValue": false,
+                "id": "reading",
+                "name": "Reading",
+                "type": "boolean"
+              }
+            ],
+            "id": "habit_log",
+            "name": "Daily Check",
+            "titleField": "date"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "count",
+                    "entity": "habit_log",
+                    "label": "Days logged",
+                    "type": "stat"
+                  },
+                  {
+                    "aggregate": "count",
+                    "entity": "habit_log",
+                    "filter": {
+                      "field": "meditation",
+                      "op": "eq",
+                      "value": true
+                    },
+                    "label": "Meditated",
+                    "type": "stat"
+                  },
+                  {
+                    "aggregate": "count",
+                    "entity": "habit_log",
+                    "filter": {
+                      "field": "reading",
+                      "op": "eq",
+                      "value": true
+                    },
+                    "label": "Read",
+                    "type": "stat"
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F9",
+                "dateField": "date",
+                "entity": "habit_log",
+                "id": "cal",
+                "onDateTap": {
+                  "presentation": "sheet",
+                  "screen": "habit_form",
+                  "type": "navigate"
+                },
+                "title": "Streak calendar",
+                "type": "calendar"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "habit_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Check in today",
+                "style": "primary",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Today",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "habit_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Check in"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F12",
+                "children": [
+                  {
+                    "emptyText": "No check-ins yet",
+                    "entity": "habit_log",
+                    "item": {
+                      "subtitle": "meditation",
+                      "title": "date",
+                      "trailing": "reading"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "habit_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "logs",
+                "title": "Past check-ins",
+                "type": "section"
+              }
+            ],
+            "id": "history",
+            "title": "History"
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F6",
+                "children": [
+                  {
+                    "field": "date",
+                    "label": "Date",
+                    "type": "datePicker"
+                  },
+                  {
+                    "field": "meditation",
+                    "label": "Meditated",
+                    "type": "toggle"
+                  },
+                  {
+                    "field": "reading",
+                    "label": "Read",
+                    "type": "toggle"
+                  }
+                ],
+                "id": "fields",
+                "title": "Today's habits",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this check-in?",
+                  "entity": "habit_log",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "habit_log",
+            "id": "habit_form",
+            "title": "Daily check-in",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "habit_log",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "books_en",
+      "kind": "create",
+      "group": "en",
+      "transcript": "A reading log where I write down the book title, my thoughts and the date I finished it",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 6063,
+      "totalMs": 6064,
+      "usage": {
+        "inputTokens": 113,
+        "outputTokens": 1084,
+        "cacheReadInputTokens": 16471
+      },
+      "summary": "I made a Reading Log app. Use the button at the bottom right to add books.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 8,
+        "topLevel": 7,
+        "withArea": 7,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "book_form: A1:F2 A3:F4 A5:F10 A11:F12"
+        ]
+      },
+      "dsl": {
+        "app": {
+          "description": "Write down the books you've read, your thoughts, and the date you finished each one",
+          "icon": "book.closed",
+          "name": "Reading Log",
+          "theme": {
+            "primaryColor": "#6D4C41"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "Title",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "thoughts",
+                "name": "Thoughts",
+                "type": "text"
+              },
+              {
+                "defaultValue": "now",
+                "id": "finished_on",
+                "name": "Date finished",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "book",
+            "name": "Book",
+            "titleField": "title"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "aggregate": "count",
+                "area": "A1:F2",
+                "entity": "book",
+                "id": "total",
+                "label": "Books read",
+                "type": "stat"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "No books logged yet",
+                    "entity": "book",
+                    "item": {
+                      "subtitle": "thoughts",
+                      "title": "title",
+                      "trailing": "finished_on"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "book_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "finished_on"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "books",
+                "title": "Finished books",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "book_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Add book",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Reading Log",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "book_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "field": "title",
+                "id": "title_in",
+                "label": "Book title",
+                "placeholder": "Title",
+                "type": "textField"
+              },
+              {
+                "area": "A3:F4",
+                "field": "finished_on",
+                "id": "date_in",
+                "label": "Date finished",
+                "type": "datePicker"
+              },
+              {
+                "area": "A5:F10",
+                "field": "thoughts",
+                "id": "thoughts_in",
+                "minLines": 4,
+                "placeholder": "Your thoughts on the book",
+                "type": "textEditor"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this book?",
+                  "entity": "book",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "book",
+            "id": "book_form",
+            "title": "Book",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "book",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "walk_en",
+      "kind": "create",
+      "group": "en",
+      "transcript": "A walk journal. Save a photo of each nice spot I find with a one-line comment",
+      "locale": "en",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5221,
+      "totalMs": 5222,
+      "usage": {
+        "inputTokens": 115,
+        "outputTokens": 865,
+        "cacheReadInputTokens": 16471
+      },
+      "summary": "I made a Walk Journal app. Use the button at the bottom right to add spots.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 8,
+        "topLevel": 7,
+        "withArea": 7,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": true,
+        "hasChart": false,
+        "areas": [
+          "home: A1:F10 D11:F12",
+          "spot_form: A1:F2 A3:F7 A8:F8 A9:F9 A11:F12"
+        ]
+      },
+      "dsl": {
+        "app": {
+          "description": "Save a photo of each nice spot you find on your walks, with a one-line comment",
+          "icon": "figure.walk",
+          "name": "Walk Journal",
+          "theme": {
+            "primaryColor": "#388E3C"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "photo",
+                "name": "Photo",
+                "required": true,
+                "type": "photo"
+              },
+              {
+                "id": "comment",
+                "name": "Comment",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "Date",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "spot",
+            "name": "Spot",
+            "titleField": "comment"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F10",
+                "children": [
+                  {
+                    "emptyText": "No spots yet. Add your first one!",
+                    "entity": "spot",
+                    "item": {
+                      "image": "photo",
+                      "subtitle": "date",
+                      "title": "comment"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "spot_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "spots",
+                "title": "My spots",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "spot_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "camera",
+                "id": "add",
+                "label": "Add spot",
+                "style": "primary",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Walk Journal",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "spot_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "field": "photo",
+                "id": "photo_in",
+                "label": "Take a photo",
+                "source": "camera",
+                "type": "photoField"
+              },
+              {
+                "area": "A3:F7",
+                "field": "photo",
+                "height": "large",
+                "id": "photo_view",
+                "type": "image"
+              },
+              {
+                "area": "A8:F8",
+                "field": "comment",
+                "id": "comment_in",
+                "label": "Comment",
+                "placeholder": "What makes this spot nice?",
+                "type": "textField"
+              },
+              {
+                "area": "A9:F9",
+                "field": "date",
+                "id": "date_in",
+                "label": "Date",
+                "type": "datePicker"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this spot?",
+                  "entity": "spot",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "spot",
+            "id": "spot_form",
+            "title": "New spot",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "spot",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "edit_books_rating_en",
+      "kind": "edit",
+      "group": "en",
+      "transcript": "Add a five-star rating to each book",
+      "locale": "en",
+      "ok": true,
+      "mode": "patch",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 2162,
+      "totalMs": 2165,
+      "usage": {
+        "inputTokens": 988,
+        "outputTokens": 240,
+        "cacheCreationInputTokens": 17185
+      },
+      "summary": "Added a five-star rating to each book.",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 9,
+        "topLevel": 8,
+        "withArea": 8,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 4,
+        "hasPhoto": false,
+        "hasChart": false,
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "book_form: A1:F2 A3:F4 A5:F6 A11:F12 A7:F8"
+        ]
+      },
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entities/0/fields/-",
+          "value": {
+            "id": "rating",
+            "name": "Rating",
+            "type": "integer",
+            "defaultValue": 0
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/screens/1/components/2/area",
+          "value": "A5:F6"
+        },
+        {
+          "op": "add",
+          "path": "/screens/1/components/-",
+          "value": {
+            "type": "rating",
+            "id": "rating_in",
+            "area": "A7:F8",
+            "field": "rating",
+            "label": "Rating",
+            "max": 5
+          }
+        },
+        {
+          "op": "replace",
+          "path": "/screens/0/components/1/children/0/item/subtitle",
+          "value": "rating"
+        }
+      ],
+      "dsl": {
+        "app": {
+          "description": "Write down the books you've read, your thoughts, and the date you finished each one",
+          "icon": "book.closed",
+          "name": "Reading Log",
+          "theme": {
+            "primaryColor": "#6D4C41"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "Title",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "thoughts",
+                "name": "Thoughts",
+                "type": "text"
+              },
+              {
+                "defaultValue": "now",
+                "id": "finished_on",
+                "name": "Date finished",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "id": "rating",
+                "name": "Rating",
+                "type": "integer",
+                "defaultValue": 0
+              }
+            ],
+            "id": "book",
+            "name": "Book",
+            "titleField": "title"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "aggregate": "count",
+                "area": "A1:F2",
+                "entity": "book",
+                "id": "total",
+                "label": "Books read",
+                "type": "stat"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "No books logged yet",
+                    "entity": "book",
+                    "item": {
+                      "subtitle": "rating",
+                      "title": "title",
+                      "trailing": "finished_on"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "book_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "finished_on"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "books",
+                "title": "Finished books",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "book_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "Add book",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "Reading Log",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "book_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "Add"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "field": "title",
+                "id": "title_in",
+                "label": "Book title",
+                "placeholder": "Title",
+                "type": "textField"
+              },
+              {
+                "area": "A3:F4",
+                "field": "finished_on",
+                "id": "date_in",
+                "label": "Date finished",
+                "type": "datePicker"
+              },
+              {
+                "area": "A5:F6",
+                "field": "thoughts",
+                "id": "thoughts_in",
+                "minLines": 4,
+                "placeholder": "Your thoughts on the book",
+                "type": "textEditor"
+              },
+              {
+                "action": {
+                  "confirmMessage": "Delete this book?",
+                  "entity": "book",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "Delete",
+                "style": "destructive",
+                "type": "button"
+              },
+              {
+                "type": "rating",
+                "id": "rating_in",
+                "area": "A7:F8",
+                "field": "rating",
+                "label": "Rating",
+                "max": 5
+              }
+            ],
+            "entity": "book",
+            "id": "book_form",
+            "title": "Book",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "book",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "n": 4,
+    "ok": 4,
+    "firstPass": 4,
+    "regenerated": 0,
+    "areaFallback": 0,
+    "failed": 0,
+    "expectMisses": 0,
+    "createP50Ms": 6063,
+    "createP95Ms": 7332,
+    "editP50Ms": 2162,
+    "avgOutputTokens": 850.75,
+    "avgCreateOutputTokens": 1054.3333333333333,
+    "avgEditOutputTokens": 240,
+    "avgAreaRatio": 1,
+    "tabbedCreates": 1
+  }
+}

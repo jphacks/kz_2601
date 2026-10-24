@@ -173,6 +173,7 @@ final class AppRuntime: DSLRuntime {
             swap()
         }
         Task { await services.notifications.sync(doc.dsl.app.notifications) }
+        WidgetSnapshotWriter.write(dsl: doc.dsl, records: records) // ホーム画面ウィジェットへ stat を反映
     }
 
     // MARK: - Morph / Undo / New app
@@ -304,7 +305,10 @@ final class AppRuntime: DSLRuntime {
         let appId = document.appId
         if records[entity] == nil {
             let cached = await recordSync.cached(appId: appId, entity: entity)
-            if !cached.isEmpty, document.appId == appId { records[entity] = cached }
+            if !cached.isEmpty, document.appId == appId {
+                records[entity] = cached
+                WidgetSnapshotWriter.write(dsl: dsl, records: records) // ローカル先出し分もウィジェットへ
+            }
         }
         loading.insert(entity)
         defer { loading.remove(entity) }
@@ -313,6 +317,7 @@ final class AppRuntime: DSLRuntime {
             guard document.appId == appId else { return }
             records[entity] = fresh
             print("[Metamon] records loaded: entity=\(entity) count=\(fresh.count)")
+            WidgetSnapshotWriter.write(dsl: dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         } catch {
             if records[entity] == nil { records[entity] = [] }
             print("[Metamon] records pull failed (showing local): entity=\(entity) \(error)")
@@ -327,6 +332,7 @@ final class AppRuntime: DSLRuntime {
             case .sent(let appId, let entity):
                 guard appId == document.appId else { return }
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records)
             case .conflict(let appId, let entity, _):
                 guard appId == document.appId else { return }
                 toast = "他の端末で変更されていたため、サーバーの内容に合わせました"
@@ -335,6 +341,7 @@ final class AppRuntime: DSLRuntime {
                 guard appId == document.appId else { return }
                 toast = "保存できませんでした: \(message)"
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records)
             case .paused(let pending):
                 toast = "送信に失敗しました(未送信 \(pending) 件)。接続を確認してください"
             case .drained:
@@ -404,6 +411,7 @@ final class AppRuntime: DSLRuntime {
             }
             // 楽観的 UI: ローカル DB に即反映して画面を進める。appconfig への送信は recordSync のキューが行う
             records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: form.recordId, data: form.payload)
+            WidgetSnapshotWriter.write(dsl: dsl, records: records)
             if let screen = action.screen {
                 navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
             } else {
@@ -414,6 +422,7 @@ final class AppRuntime: DSLRuntime {
             guard let entity = action.entity ?? ctx.form?.entity.id,
                   let id = ctx.recordId ?? ctx.form?.recordId else { return }
             records[entity] = await recordSync.delete(appId: document.appId, entity: entity, recordId: id)
+            WidgetSnapshotWriter.write(dsl: dsl, records: records)
             if ctx.recordId == nil { close(ctx.route) } // フォーム上からの削除は画面を閉じる
 
         case .openVoice:

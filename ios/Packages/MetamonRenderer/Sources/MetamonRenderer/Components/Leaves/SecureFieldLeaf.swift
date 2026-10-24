@@ -11,7 +11,8 @@ struct SecureFieldLeaf: View {
             LabeledInput(label: c.label) {
                 SecureField(c.placeholder ?? "", text: form.string(field))
                     .textContentType(.password)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
+                    .renderInputChrome()
             }
         } else {
             NeedsForm(c: c)

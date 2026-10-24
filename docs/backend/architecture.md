@@ -201,7 +201,8 @@ func UID(ctx context.Context) string { s, _ := ctx.Value(ctxKey{}).(string); ret
 | 拒否 | `stop_reason == "refusal"` → 400 `refused`。`fallbacks: "default"`(beta `server-side-fallback-2026-07-01`)を常時送付 |
 | キャッシュ | system(設計原則・部品カタログ・few-shot `examples/kakeibo.json`・生成用スキーマ ≈8.6K tokens)は固定文字列で `cache_control: ephemeral`。可変部(現 DSL・発話・前回の Problems)は user に置く。実測: 2 回目以降 `cache_read_input_tokens=8588` |
 | 再生成ループ | 検証 NG(`dsl.ValidationError.Problems`: 重なり・範囲外・参照不整合・スキーマ違反)は **Problems を user に添付して最大 2 回再生成**(計 3 回)。それでも NG → **`area` を全部落として再検証**(省略=上から積むフォールバック)→ それも NG なら **400 `generation_failed`**(`details.problems`/`details.attempts`)。編集は Patch 3 回 NG → `area` 落とし → **フル生成 1 回に降格**(`meta.downgradedToFull`)→ 400 |
-| summary | 編集 = PatchDocument の `summary`(モデル生成・読み上げ用 1 文 40 字程度「。」止め、満たされていれば `test` 1 つの patch +「すでに〜になっています。」)。初回 = `app.name`/tabs/追加ボタンの `area`/notifications から **読み上げ用の自然文**をテンプレ生成(例「家計簿アプリを作りました。ホームと集計の2タブで、右下のボタンから支出を追加できます。毎朝8時に通知が届きます。」) |
+| summary | 編集 = PatchDocument の `summary`(モデル生成・読み上げ用 1 文 40 字程度「。」止め、満たされていれば `test` 1 つの patch +「すでに〜になっています。」)。初回 = `app.name`/tabs/追加ボタンの `area`/notifications から **読み上げ用の自然文**をテンプレ生成(例「家計簿アプリを作りました。ホームと集計の2タブで、右下のボタンから支出を追加できます。毎朝8時に通知が届きます。」)。**locale=en** は英語テンプレ `summarizeEN`(「I made an Expense Tracker app. Use the button at the bottom right to add expenses. You'll get a reminder every evening at 8.」) |
+| 表示言語(locale) | `Request.locale`(ja/en)。省略時は発話にかな・漢字があれば ja、無ければ en(`ai.DetectLocale`)。system prompt は固定のまま(キャッシュ維持)で、user ターン先頭の「## 表示言語(locale)」1 行だけで切り替える。en few-shot `examples/expense_en.json`(home+form+通知 1 本)を例 2 として同梱。応答 `locale` に実際の言語を返す。undo / 新規作成のキーワードも英語対応(`undo / go back / revert / never mind`、`new app / start over / from scratch`) |
 
 **構造化出力の制約(2026-10-24 実測)**: `output_config.format` の文法コンパイラは DSL 規模のスキーマを受け付けない。正典スキーマそのまま・Leaf 15 種を 1 オブジェクトに平坦化した版、いずれも `The compiled grammar is too large`。単体プローブでは **任意プロパティ 12 個の平坦オブジェクトは OK、16 個で `Schema is too complex`、入れ子合計 25 個で `too many optional parameters`**。Component は最低でも 30 個の任意プロパティを持つため、現状の上限では構造化出力に載らない。そのため生成用スキーマは **プロンプト埋め込み(モデルへの参照)** として使い、強制は Go 側に一本化した。上限が緩和されたら `CLAUDE_STRUCTURED_OUTPUT=1` で即切替できる。
 
@@ -223,7 +224,7 @@ func UID(ctx context.Context) string { s, _ := ctx.Value(ctxKey{}).(string); ret
 - entity を変更する時は既存フィールド id を維持する(リネームしない)。
 - voiceEntry は "none" にしない(ユーザーが声で変更し続けられること)。
 - 画面は最大 12、entity は最大 6、コンテナは 1 段のみ。
-- 日本語 UI。金額は type "currency"。写真は type "photo" + photoField(camera)。リマインドは app.notifications か scheduleNotification。
+- UI 文言は user ターンの「表示言語(locale)」(ja/en)に従う。金額は type "currency"。写真は type "photo" + photoField(camera)。リマインドは app.notifications か scheduleNotification。
 ## コンポーネントカタログ(型ごとに 1 行: 用途・必須プロパティ)
 ...
 ## 例(フル2本: 初期→家計簿 / 初期→散歩メモ。Patch 2本: 家計簿に店名追加 / トレーニングに毎朝8時通知追加)
@@ -242,7 +243,7 @@ func UID(ctx context.Context) string { s, _ := ctx.Value(ctxKey{}).(string); ret
 配列 index は上の DSL のものを使う。末尾追加は "/-"。言及されていない要素は触らない。
 ```
 
-初回ターンは user に「現在の DSL」を載せず、`## 今回の指示` + `## 出力: AppDSL 全体` のみ。`summary` は初回ターンでは構造化出力に含まれないので、ai が **`app.name`/画面数/entity 名から日本語テンプレで機械生成**する(「家計簿アプリを作成しました。支出を記録して…」)。
+初回ターンは user に「現在の DSL」を載せず、`## 今回の指示` + `## 出力: AppDSL 全体` のみ。`summary` は初回ターンでは構造化出力に含まれないので、ai が **`app.name`/画面数/entity 名から locale のテンプレ(ja `summarize` / en `summarizeEN`)で機械生成**する(「家計簿アプリを作成しました。支出を記録して…」)。
 
 ### 6.3 処理パイプラインと失敗時フォールバック
 
@@ -269,13 +270,13 @@ flowchart TD
   PP -- 201 --> O
 ```
 
-**undo(「元に戻して」・実装済み)**: `mode=undo` の明示、または `mode=auto` で発話が**短く(16 文字以内)かつ undo 語で始まる**とき(`元に戻し / 戻して / 取り消し / さっきのやめ / やっぱりやめ / アンドゥ / undo / ひとつ前に戻` 等 = `ai.wantsUndo`。「一覧を元の位置に戻して」「戻すボタンを追加して」は文頭一致しないので edit)に、**Claude を呼ばず** appconfig を直接叩く。
+**undo(「元に戻して」・実装済み)**: `mode=undo` の明示、または `mode=auto` で発話が**短く(16 文字以内)かつ undo 語で始まる**とき(`元に戻し / 戻して / 取り消し / さっきのやめ / やっぱりやめ / アンドゥ / undo / ひとつ前に戻` 等。英語は `undo / go back / revert / roll back / never mind / scrap that` 等で 32 文字以内 = `ai.wantsUndo`。「一覧を元の位置に戻して」「戻すボタンを追加して」は文頭一致しないので edit)に、**Claude を呼ばず** appconfig を直接叩く。
 
 1. `GET /versions` で現行 version の `source` を見て戻し先 n を決める: 現行が `restore` なら `restoredFrom - 1`、それ以外は `現行 - 1`(連続「戻して」が redo にならず、さらに前へ戻る)
-2. `n < 1`(version 1 = 初期状態しか無い)なら何もせず現状の DSL を `summary: "戻せる変更がありません。"` で返す
+2. `n < 1`(version 1 = 初期状態しか無い)なら何もせず現状の DSL を `summary: "戻せる変更がありません。"`(en: "There is nothing to undo.")で返す
 3. `POST /versions/{n}/restore`(appconfig が新 version N+1 を `source.kind=restore` で積む)→ `GET /dsl` で新 version の DSL を取り直して返す
 
-応答は `mode: "restore"`, `restoredFrom: n`, `source: "restore"`, `summary: "ひとつ前の状態(version n)に戻しました。"`(openapi-ai.yaml)。`appconfigclient.Memory`(インメモリ stub)も履歴を持つので `APPCONFIG_BASE_URL` 無しでも同じ挙動。実測(ローカル 2 プロセス・2026-10-24): create v2 → edit v3 → 「元に戻して」→ v4(= v2 の DSL)で **9 ms**、`GET /versions` の最新が `restore←v2`。
+応答は `mode: "restore"`, `restoredFrom: n`, `source: "restore"`, `summary: "ひとつ前の状態(version n)に戻しました。"`(en: "I went back to the previous state (version n)."・openapi-ai.yaml)。`appconfigclient.Memory`(インメモリ stub)も履歴を持つので `APPCONFIG_BASE_URL` 無しでも同じ挙動。実測(ローカル 2 プロセス・2026-10-24): create v2 → edit v3 → 「元に戻して」→ v4(= v2 の DSL)で **9 ms**、`GET /versions` の最新が `restore←v2`。
 
 ルールベース fallback(`internal/ai/fallback`): キーワード辞書 → `templates/*.json` = **デモ3本(家計簿・トレーニング記録・散歩メモ)** + ToDo。テンプレは `docs/dsl/examples/*.json` をそのまま埋め込み、`dsl_test.go` が CI で検証済み。デモ当日に Claude が落ちても 3 本は必ず動く保険。
 

@@ -1,7 +1,7 @@
 import SwiftUI
 import MetamonDSL
 
-/// `stat`: entity の集計値(count|sum|avg|min|max)を1枚のカードに。
+/// `stat`: entity の集計値(count|sum|avg|min|max)を1枚のカードに。数値は大きく・等幅数字、ラベルは secondary。
 struct StatLeaf: View {
     @Environment(\.dslRuntime) private var rt
     let c: Component
@@ -11,15 +11,21 @@ struct StatLeaf: View {
         let entity = rt.dsl.entity(entityId)
         let rows = Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId))
         let value = Aggregator.aggregate(c.aggregate, field: c.field, over: rows)
-        let unit = c.field.flatMap { entity?.field($0)?.unit }
-        VStack(alignment: .leading, spacing: 4) {
-            Text(c.label ?? "").font(.caption).foregroundStyle(.secondary)
-            Text(Aggregator.format(value, as: c.format ?? (c.aggregate == "count" ? "plain" : nil), unit: c.aggregate == "count" ? "件" : unit))
-                .font(.title2.bold().monospacedDigit())
+        let fieldDef = c.field.flatMap { entity?.field($0) }
+        let unit = fieldDef?.unit
+        // format 省略時: count → 件数、currency 型の field → ¥ と桁区切り
+        let format = c.format ?? (c.aggregate == "count" ? "plain" : (fieldDef?.type == .currency ? "currency" : nil))
+        VStack(alignment: .leading, spacing: RenderTheme.Spacing.xs) {
+            Text(c.label ?? "")
+                .font(RenderTheme.Fonts.statLabel)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Text(Aggregator.format(value, as: format, unit: c.aggregate == "count" ? "件" : unit))
+                .font(RenderTheme.Fonts.statValue)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 .contentTransition(.numericText())
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        .renderCard()
     }
 }

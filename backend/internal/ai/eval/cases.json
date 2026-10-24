@@ -24,5 +24,12 @@
   {"id": "edit_list_photo", "kind": "edit", "group": "edit", "base": "kakeibo_a", "transcript": "支出の一覧を写真付きにして"},
   {"id": "edit_button_topleft", "kind": "edit", "group": "edit", "base": "kakeibo_a", "transcript": "追加ボタンを左上に移して"},
   {"id": "edit_calendar", "kind": "edit", "group": "missing-part", "base": "kakeibo_a", "transcript": "支出をカレンダー表示にして", "note": "無い部品の edit 要求 → 代替+summary 言及",
-   "expect": {"substitution": true}}
+   "expect": {"substitution": true}},
+
+  {"id": "habit_en", "kind": "create", "group": "en", "transcript": "A habit tracker. I want to check off meditation and reading every day and see how many days in a row I kept it up. Remind me at 7 in the morning", "note": "English create; UI strings must be English",
+   "expect": {"notification": "07:00"}},
+  {"id": "books_en", "kind": "create", "group": "en", "transcript": "A reading log where I write down the book title, my thoughts and the date I finished it"},
+  {"id": "walk_en", "kind": "create", "group": "en", "transcript": "A walk journal. Save a photo of each nice spot I find with a one-line comment",
+   "expect": {"photo": true}},
+  {"id": "edit_books_rating_en", "kind": "edit", "group": "en", "base": "books_en", "transcript": "Add a five-star rating to each book", "note": "English edit; summary must be English"}
 ]

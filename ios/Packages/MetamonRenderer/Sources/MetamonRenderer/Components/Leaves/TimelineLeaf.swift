@@ -14,10 +14,8 @@ struct TimelineLeaf: View {
         let all = Aggregator.sorted(Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId)), by: sort, entity: entity)
         let rows = (c.limit ?? 0) > 0 ? Array(all.prefix(c.limit!)) : all
         if rows.isEmpty {
-            Text(rt.loading.contains(entityId) ? "読み込み中…" : "まだありません")
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
+            let loading = rt.loading.contains(entityId)
+            EmptyPlaceholder(icon: "clock", text: loading ? "読み込み中…" : "まだありません", loading: loading)
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
@@ -45,9 +43,7 @@ struct TimelineLeaf: View {
                     .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        .renderCard()
         }
     }
 }

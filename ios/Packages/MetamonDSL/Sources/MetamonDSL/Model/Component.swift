@@ -12,6 +12,7 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case card, disclosure, carousel, grid
     // leaf(ナビ・ネイティブ系)
     case searchBar, calendar, shareButton, openUrlButton, mapView, locationButton, qrScanner, timerDisplay
+    case webView
     // leaf: 入力系バッチ
     case slider, stepper, textEditor, secureField, timePicker, colorPicker, rating
     // leaf(表示系)
@@ -113,6 +114,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var zoom: String?           // mapView: near|city|wide
     public var mode: String?           // timerDisplay: stopwatch|countdown
     public var seconds: Int?           // timerDisplay countdown 初期秒
+    public var shareTo: String?        // shareButton: any|line|slack|discord(`target` は progressBar の数値)
     // 入力系バッチ(slider / stepper / rating / textEditor)
     public var min: Double?            // slider / stepper / gauge
     public var max: Double?            // rating: 星の数(既定 5) / gauge
@@ -124,7 +126,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case includeTime, source, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
         case kind, groupBy, bucket, prompt, size
         case expanded, itemWidth, columnCount
-        case searchField, onDateTap, locationField, zoom, mode, seconds
+        case searchField, onDateTap, locationField, zoom, mode, seconds, shareTo
         case name, color, value, target, url, image, message, columns, limit, dateField, titleField, subtitleField
         case min, max, step, minLines
     }
@@ -174,6 +176,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         zoom = try? c.decodeIfPresent(String.self, forKey: .zoom)
         mode = try? c.decodeIfPresent(String.self, forKey: .mode)
         seconds = try? c.decodeIfPresent(Int.self, forKey: .seconds)
+        shareTo = try? c.decodeIfPresent(String.self, forKey: .shareTo)
         min = try? c.decodeIfPresent(Double.self, forKey: .min)
         max = try? c.decodeIfPresent(Double.self, forKey: .max)
         step = try? c.decodeIfPresent(Double.self, forKey: .step)
