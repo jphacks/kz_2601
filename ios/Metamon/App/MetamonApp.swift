@@ -27,6 +27,9 @@ struct MetamonApp: App {
             document = (try? DSLExamples.document(DSLExamples.initial, version: 0)) ?? .fallback
         }
         document.appId = appId
+        #if DEBUG
+        if let override = DebugDSLOverride.document { document = override } // 見た目監査(#131)
+        #endif
         self.services = services
         let runtime = AppRuntime(document: document, services: services)
         let session = AuthSession(service: services.auth)
