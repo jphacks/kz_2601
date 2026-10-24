@@ -211,9 +211,19 @@ private struct GridCell: View {
         }
     }
 
+    @Environment(\.dslRuntime) private var rt
+
+    /// list(または list だけの section)に行がある時は、カードを行の高さで止める(#131: 4 行なのにセルいっぱいの白い面が残っていた)。
+    /// 空の時は従来どおり器の高さを渡し、空状態をセル全体に出す(#84)。
+    private var hugsContent: Bool {
+        let lists = component.type == .list ? [component]
+            : component.type == .section && !component.children.isEmpty && component.children.allSatisfy({ $0.type == .list }) ? component.children : []
+        return !lists.isEmpty && lists.allSatisfy { !rt.filteredRecords($0).isEmpty }
+    }
+
     var body: some View {
         if scrollsInside {
-            FadingScrollView {
+            FadingScrollView(fillsViewport: !hugsContent) {
                 DSLView(component: component, ctx: ctx)
             }
         } else {
@@ -229,6 +239,7 @@ private struct GridCell: View {
 /// Reduce Motion ではフェードの切り替えをアニメーションせず即時に差し替える(マスク自体は「続きがある」合図なので残す)。
 /// 中身が器より低い時は器の高さを提案する(#84: 空の list / 行の少ない list がセル全体を使える)。
 private struct FadingScrollView<Content: View>: View {
+    var fillsViewport = true
     @ViewBuilder var content: Content
     @State private var contentFrame: CGRect = .zero
     @State private var viewportHeight: CGFloat = 0
@@ -244,7 +255,7 @@ private struct FadingScrollView<Content: View>: View {
     var body: some View {
         ScrollView(.vertical) {
             content
-                .frame(minHeight: max(0, viewportHeight - bottomPad), alignment: .top)
+                .frame(minHeight: fillsViewport ? max(0, viewportHeight - bottomPad) : nil, alignment: .top)
                 // 影が器の外にはみ出さないよう、カードの影ぶんだけ内側に余白
                 .padding(.bottom, bottomPad)
                 .background(
