@@ -14,18 +14,64 @@ public enum ClarifyFlow {
     /// - 通常(前の会話は「最初から」/ 生成開始 / 切替で消し済み): POST 1 回だけ
     /// - DELETE を投げっぱなしにしない理由: POST の後に DELETE が届くと新しい会話(1 発目で作った brief)を消し、
     ///   「このまま作る」の即答(shortcut)が Claude 呼び出しに落ちて遅くなる
-    public static func startConversation(ai: any AIClient, appId: String, first: ChatMessage, locale: String?) async throws -> (turn: ChatTurn, retried: Bool) {
-        let turn = try await ai.chat(appId: appId, messages: [first], locale: locale)
+    public static func startConversation(ai: any AIClient, appId: String, first: ChatMessage, locale: String?,
+                                         mode: ChatMode? = nil) async throws -> (turn: ChatTurn, retried: Bool) {
+        let turn = try await ai.chat(appId: appId, messages: [first], locale: locale, mode: mode)
         guard turn.turn != 1 else { return (turn, false) }
         await ai.resetChat(appId: appId)
         try Task.checkCancellation()
-        return (try await ai.chat(appId: appId, messages: [first], locale: locale), true)
+        return (try await ai.chat(appId: appId, messages: [first], locale: locale, mode: mode), true)
     }
 
     /// ready を受けたら確認ボタンを待たずに生成へ進むか(#160)。
     /// 音声だけで進めている(最後の入力がマイク)時だけ。文字・チップで進めた時は従来どおりボタンで。
-    public static func shouldAutoBuild(turn: ChatTurn, lastInput: InputSource?, enabled: Bool) -> Bool {
-        enabled && turn.kind == .ready && lastInput == .voice
+    /// edit(作ったアプリの改変・#186)は自動で実行しない: 聞き間違い・意図しない改変で今のアプリを壊さないよう、必ず「これでいく」を押してもらう。
+    public static func shouldAutoBuild(turn: ChatTurn, lastInput: InputSource?, enabled: Bool, mode: ChatMode = .create) -> Bool {
+        enabled && mode == .create && turn.kind == .ready && lastInput == .voice
+    }
+
+    /// 応答 1 つに対して画面に出すもの(#186)。アプリが変わるのは `.confirm` / `.proposals` のボタンを押した時だけ。
+    public enum Offer: Equatable, Sendable {
+        /// answer(suggestions 無し): 吹き出しだけ(続けて質問できる)
+        case none
+        /// question: 選択肢チップ / answer の suggestions(そのまま言える次の指示・#185)
+        case chips([String])
+        /// proposal: 案のカード(各カードに「これでいく」)
+        case proposals([ChatOption])
+        /// ready: 要約カード +「これでいく」。`transcript` を generate へ
+        case confirm(transcript: String?)
+    }
+
+    public static func offer(for turn: ChatTurn) -> Offer {
+        switch turn.kind {
+        case .answer, .question:
+            let chips = Array((turn.suggestions ?? []).filter { !$0.isEmpty }.prefix(3))
+            return turn.kind == .answer && chips.isEmpty ? .none : .chips(chips)
+        case .proposal:
+            let options = Array((turn.options ?? []).filter { !$0.instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.prefix(3))
+            return options.isEmpty ? .none : .proposals(options) // 案が空なら答えとして扱う
+        case .ready:
+            let t = turn.transcript?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return .confirm(transcript: t?.isEmpty == false ? t : nil)
+        }
+    }
+
+    /// 応答の下に出す副ボタン(主ボタン = ready / proposal の「これでいく」とは別)。
+    public enum Shortcut: Equatable, Sendable {
+        case none
+        /// create: 「このまま作る」(go-ahead を送って backend の shortcut ready に任せる・従来どおり)
+        case buildNow
+        /// edit の聞き返し中: 「このまま反映」(これまでの指示で改変する)
+        case applyNow
+    }
+
+    public static func shortcut(for turn: ChatTurn?, mode: ChatMode) -> Shortcut {
+        if case .confirm = turn.map(offer(for:)) { return .none }
+        switch mode {
+        case .create: return .buildNow
+        // edit は聞き返し中だけ。答え・案の時に出すと「質問しただけなのに改変された」になる
+        case .edit: return turn?.kind == .question ? .applyNow : .none
+        }
     }
 
     /// 自動生成の前に要約カードを見せる時間。

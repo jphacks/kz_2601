@@ -94,20 +94,22 @@ final class AppRuntime: DSLRuntime {
 
     // MARK: 生成前の対話(#75)。ロジックは `AppRuntime+Clarify.swift`
 
-    /// チャットの吹き出し。user = 発話(書き起こし)/ assistant = AI の質問・返答。
+    /// チャットの吹き出し。user = 発話(書き起こし)/ assistant = AI の質問・答え・案の前置き。
     struct ChatBubble: Identifiable, Equatable {
         enum Role: Equatable { case user, assistant }
         let id = UUID()
         var role: Role
         var text: String
+        /// assistant の時だけ。応答の kind(答えをもらった質問を依頼文から除くのに使う)
+        var kind: ChatTurn.Kind? = nil
     }
-    /// 会話中の吹き出し(空 = 対話していない)。初期(音声)画面でだけ使う。
+    /// 会話中の吹き出し(空 = 対話していない)。初期画面(create)と生成後の音声シート(edit・#186)で使う。
     var chatBubbles: [ChatBubble] = []
     /// `POST /v1/chat` の応答待ち
     var chatPending = false
-    /// 直近の応答。question なら suggestions をチップに、ready なら brief を「この内容で作る」カードに出す
+    /// 直近の応答。question = チップ / proposal = 案のカード / ready = 要約 +「これでいく」(`ClarifyFlow.offer`)
     var chatTurn: ChatTurn?
-    /// 新規作成の前に質問を挟むか(設定で切替・既定 ON)。edit(生成後の改変)は常に従来どおり即反映。
+    /// 生成・改変の前にチャットで相談するか(設定で切替・既定 ON・#186)。OFF は create も edit も従来どおり即反映。
     var clarifyEnabled: Bool = ClarifySettings.enabled {
         didSet { ClarifySettings.enabled = clarifyEnabled }
     }

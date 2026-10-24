@@ -176,7 +176,7 @@ struct SettingsSheet: View {
         }
     }
 
-    /// 生成前の対話(#75)。新規作成のみ。edit は常に即反映。
+    /// 生成・改変の前の対話(#75 / #186)。create も edit も。OFF は一発で反映。
     private var clarifySection: some View {
         @Bindable var rt = rt
         return Section {

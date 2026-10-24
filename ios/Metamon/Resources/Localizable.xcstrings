@@ -358,19 +358,19 @@
         }
       }
     },
-    "ON にすると、新しいアプリを作る前に AI が 1〜3 個だけ質問します。「このまま作る」でいつでも飛ばせます。作ったアプリの変更は質問なしですぐ反映します。": {
+    "ON にすると、新しく作る時も作ったアプリを変える時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "When on, the AI asks 1–3 quick questions before building a new app. Tap “Just build it” to skip anytime. Changes to an existing app are applied right away without questions."
+            "value": "When on, you can first chat with the AI both when making a new app and when changing one. It answers questions and suggests ideas; tap \"Go with this\" to apply. When off, what you say is applied right away."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "ON にすると、新しいアプリを作る前に AI が 1〜3 個だけ質問します。「このまま作る」でいつでも飛ばせます。作ったアプリの変更は質問なしですぐ反映します。"
+            "value": "ON にすると、新しく作る時も作ったアプリを変える時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。"
           }
         }
       }
@@ -1004,6 +1004,23 @@
         }
       }
     },
+    "このまま反映": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply as is"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このまま反映"
+          }
+        }
+      }
+    },
     "このアプリをどう変えますか?": {
       "extractionState": "manual",
       "localizations": {
@@ -1072,6 +1089,23 @@
         }
       }
     },
+    "この内容で変えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I'll make this change"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この内容で変えます"
+          }
+        }
+      }
+    },
     "この画面について話す": {
       "extractionState": "manual",
       "localizations": {
@@ -1085,6 +1119,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "この画面について話す"
+          }
+        }
+      }
+    },
+    "これでいく": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go with this"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "これでいく"
+          }
+        }
+      }
+    },
+    "これでいく: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go with this: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "これでいく: %@"
           }
         }
       }
@@ -2313,6 +2381,23 @@
         }
       }
     },
+    "チャットで相談してから作る": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat before building"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "チャットで相談してから作る"
+          }
+        }
+      }
+    },
     "データ": {
       "extractionState": "manual",
       "localizations": {
@@ -2959,23 +3044,6 @@
         }
       }
     },
-    "作る前に質問する": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ask before building"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "作る前に質問する"
-          }
-        }
-      }
-    },
     "使えるマイクが見つかりません(他のアプリが使用中か、入力ルートがありません)": {
       "extractionState": "manual",
       "localizations": {
@@ -3486,23 +3554,6 @@
         }
       }
     },
-    "声だけで答えている時は、内容がそろうと少し待ってから自動で作り始めます。文字やチップで答えた時はボタンで作ります。": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "When you answer by voice, building starts automatically shortly after the details are complete. If you answer by typing or tapping a choice, use the button."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "声だけで答えている時は、内容がそろうと少し待ってから自動で作り始めます。文字やチップで答えた時はボタンで作ります。"
-          }
-        }
-      }
-    },
     "変更を反映しています…": {
       "extractionState": "manual",
       "localizations": {
@@ -3928,6 +3979,23 @@
         }
       }
     },
+    "新しいアプリを声だけで相談している時は、内容がそろうと少し待ってから自動で作り始めます。作ったアプリの変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you plan a new app by voice only, building starts automatically shortly after everything is clear. Changes to an app you already made are applied only after you tap \"Go with this\", so nothing changes by accident."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しいアプリを声だけで相談している時は、内容がそろうと少し待ってから自動で作り始めます。作ったアプリの変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。"
+          }
+        }
+      }
+    },
     "新しく作るアプリと質問もこの言語になります。作成済みのアプリの文言は変わりません。": {
       "extractionState": "manual",
       "localizations": {
@@ -4128,6 +4196,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "未送信 %lld 件"
+          }
+        }
+      }
+    },
+    "案%lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idea %lld"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "案%lld"
           }
         }
       }
@@ -4978,6 +5063,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "読み込めませんでした: %@"
+          }
+        }
+      }
+    },
+    "質問や変えたいことを入力": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask a question or describe a change"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "質問や変えたいことを入力"
           }
         }
       }

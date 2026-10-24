@@ -112,7 +112,7 @@ private actor SpyChatAI: AIClient {
 
     func morph(transcript: String, appId: String, currentVersion: Int) async throws -> MorphResult { throw URLError(.unsupportedURL) }
 
-    func chat(appId: String, messages: [ChatMessage], locale: String?) async throws -> ChatTurn {
+    func chat(appId: String, messages: [ChatMessage], locale: String?, mode: ChatMode?) async throws -> ChatTurn {
         log.append("POST:\(messages.count)")
         let users = messages.filter { $0.role == .user }.count
         storedUserTurns = messages.count > 1 ? users : storedUserTurns + users

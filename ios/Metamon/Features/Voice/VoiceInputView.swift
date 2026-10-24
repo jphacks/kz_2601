@@ -22,8 +22,8 @@ struct VoiceInputView: View {
 
     /// 初期状態(全画面)か、生成後のシート(改変)か。
     private var isInitial: Bool { rt.dsl.isVoiceOnly }
-    /// 生成前の対話中(初期画面のみ)。
-    private var inChat: Bool { isInitial && rt.isChatting }
+    /// 対話中(初期画面の新規作成も、生成後のシートの改変も・#186)。
+    private var inChat: Bool { rt.isChatting }
 
     /// 見出し・サブ文言(#42)。初回/再訪/新規/戻る/改変 × 時間帯。`prompt`(DSL の voiceInput.prompt)があれば見出しだけ上書き。
     private var greeting: Greeting.Copy {
@@ -37,7 +37,7 @@ struct VoiceInputView: View {
             VStack(spacing: 0) {
                 topBar
                 if inChat {
-                    // 生成前の対話(#75): 吹き出し + 最新の質問 + 「このまま作る」/「この内容で作る」
+                    // 対話(#75 / #186): 吹き出し + 答え / 質問チップ / 案のカード / 要約 +「これでいく」
                     ClarifyChatView(micMode: micMode, statusText: statusText, onMic: { Task { await toggle() } },
                                     onSend: { submit($0) })
                         .transition(.opacity)
@@ -381,11 +381,12 @@ struct VoiceInputView: View {
         Task { await morph(text) }
     }
 
-    /// 初期画面は `submitUtterance`(対話 ON なら質問を挟む)、生成後のシート(edit)は従来どおり即反映。
+    /// 対話 ON なら create も edit も `submitUtterance`(チャットへ・#186)。
+    /// 対話 OFF・「元に戻して」等の操作は従来どおり: 初期画面は即生成、生成後のシートは閉じて即反映。
     private func morph(_ text: String, voice: ChatTiming? = nil) async {
         phase = .thinking
         SpeechReader.shared.stop()
-        if isInitial {
+        if isInitial || rt.routesToChat(text) {
             await rt.submitUtterance(text, source: voice == nil ? .text : .voice, timing: voice ?? ChatTiming())
         } else {
             rt.showVoiceSheet = false

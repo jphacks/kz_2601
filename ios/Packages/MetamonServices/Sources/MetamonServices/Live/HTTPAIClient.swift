@@ -65,11 +65,15 @@ public struct HTTPAIClient: AIClient {
         var appId: String
         var messages: [ChatMessage]
         var locale: String?
+        /// create | edit(#184)。nil は送らない
+        var mode: ChatMode?
+        /// iOS が表示できる追加の kind(#184)。backend はここに無い kind を返さない
+        var capabilities: [String] = ChatCapability.all
     }
 
-    /// `POST {base}/v1/chat`(契約: backend/internal/ai/chat.go の `ChatRequest` / `ChatResult`)。
-    public func chat(appId: String, messages: [ChatMessage], locale: String?) async throws -> ChatTurn {
-        let body = ChatBody(appId: appId, messages: messages, locale: locale)
+    /// `POST {base}/v1/chat`(契約: backend/internal/ai/chat.go の `ChatRequest` / `ChatResult`・#184 会話の取り決め)。
+    public func chat(appId: String, messages: [ChatMessage], locale: String?, mode: ChatMode?) async throws -> ChatTurn {
+        let body = ChatBody(appId: appId, messages: messages, locale: locale, mode: mode)
         let data = try await HTTP.send("POST", baseURL: baseURL, path: "v1/chat", body: body, token: token, timeout: timeout)
         return try JSONDecoder().decode(ChatTurn.self, from: data)
     }

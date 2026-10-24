@@ -147,6 +147,24 @@ final class MetamonUITests: XCTestCase {
         attachScreenshot("chat-ready")
     }
 
+    // MARK: - チャット基本化(#186)
+
+    func testProposalChooseStartsGeneration() {
+        // 作ったアプリ(家計簿)の音声シートで「見やすくして」→ モック AI が案を 2 つ出す。案の「これでいく」を指で押す
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "見やすくして", "METAMON_AUTO_PAUSE": "600"])
+        let choose = app.buttons.matching(identifier: "chat.option.choose")
+        XCTAssertTrue(choose.firstMatch.waitForExistence(timeout: 15), "案のカードの「これでいく」が出ない")
+        XCTAssertEqual(choose.count, 2, "案のカードが 2 枚でない")
+        XCTAssertTrue(voiceSheet.exists, "案を出しただけで音声シートが閉じた")
+        attachScreenshot("chat-proposal-cards")
+
+        choose.firstMatch.tap()
+        XCTAssertTrue(waitFor(voiceSheet, "exists == false", timeout: 5), "「これでいく」で音声シートが閉じない(生成が始まらない)")
+        let applied = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "反映しました")).firstMatch
+        XCTAssertTrue(applied.waitForExistence(timeout: 10), "「これでいく」の案で改変されない")
+        attachScreenshot("chat-proposal-applied")
+    }
+
     // MARK: - 一覧のチェック丸(#127)
 
     func testListCheckCircleMarksDone() {
