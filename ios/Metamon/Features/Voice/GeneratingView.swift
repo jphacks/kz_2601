@@ -82,12 +82,20 @@ struct GeneratingView: View {
                 .textCase(.uppercase)
                 .tracking(1.2)
                 .foregroundStyle(Theme.brandGradient)
-            Text("「\(job.transcript)」")
+            Text("「\(displayTranscript)」")
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .minimumScaleFactor(0.8)
         }
+    }
+
+    /// 見出しには「別のアプリ。」などの切替キーワードを出さない(VoiceIntent.newAppPrefixes と同じ語)。
+    private var displayTranscript: String {
+        let prefixes = ["別のアプリ", "別アプリ", "新しいアプリ", "新規アプリ", "違うアプリ", "次のアプリ", "べつのアプリ", "あたらしいアプリ"]
+        guard let p = prefixes.first(where: { job.transcript.hasPrefix($0) }) else { return job.transcript }
+        let rest = job.transcript.dropFirst(p.count).trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+        return rest.isEmpty ? job.transcript : rest
     }
 
     private var footer: some View {

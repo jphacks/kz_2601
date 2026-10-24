@@ -15,17 +15,23 @@ struct StatLeaf: View {
         let unit = fieldDef?.unit
         // format 省略時: count → 件数、currency 型の field → ¥ と桁区切り
         let format = c.format ?? (c.aggregate == "count" ? "plain" : (fieldDef?.type == .currency ? "currency" : nil))
+        // 初回ロード中は 0 を見せず placeholder(起動直後に「¥0 → ¥480」と跳ねるのを防ぐ)
+        let isLoading = rt.loading.contains(entityId) && rt.records(for: entityId).isEmpty
         VStack(alignment: .leading, spacing: RenderTheme.Spacing.xs) {
             Text(c.label ?? "")
                 .font(RenderTheme.Fonts.statLabel)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-            Text(Aggregator.format(value, as: format, unit: c.aggregate == "count" ? "件" : unit))
+            // 大きめの基準サイズから、セルの高さに収まるまで縮める(「もっと大きく」で area を広げると数字も大きくなる)
+            Text(isLoading ? "0000" : Aggregator.format(value, as: format, unit: c.aggregate == "count" ? "件" : unit))
                 .font(RenderTheme.Fonts.statValue)
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.45)
                 .contentTransition(.numericText())
+                .redacted(reason: isLoading ? .placeholder : [])
         }
+        // セル全体をカードにする(area を縦に広げた時にカードの下だけ空くのを防ぐ)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .renderCard()
     }
 }

@@ -125,6 +125,10 @@ struct RootView: View {
         .accessibilityLabel("話しかけて変える")
         .accessibilityHint("長押しで変身一覧")
         .accessibilityAction(named: "変身一覧") { rt.openSwitcher() }
+        // 生成中は画面と一緒に沈めて触れなくする(本体だけ薄くなり FAB だけ浮いて見えるのを防ぐ)
+        .opacity(rt.morphJob == nil ? 1 : 0.35)
+        .allowsHitTesting(rt.morphJob == nil)
+        .animation(.easeInOut(duration: 0.3), value: rt.morphJob == nil)
         .padding(.horizontal, Theme.Layout.fabHorizontalInset)
         .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: rt.dsl.app.hasTabs))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: Theme.Layout.fabAlignment)
@@ -166,7 +170,10 @@ struct RootView: View {
                 .padding(.horizontal, Theme.Spacing.md).padding(.vertical, Theme.Spacing.sm + 2)
                 .background(.regularMaterial, in: Capsule())
                 .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
-                .padding(.bottom, 100)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Theme.Spacing.md)
+                // マイク FAB と DSL の最下段(行 11〜12 のボタン)の上に出す(被せない)。タブ無しでも同じ高さ
+                .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .task(id: message) {
                     try? await Task.sleep(for: .seconds(3))
