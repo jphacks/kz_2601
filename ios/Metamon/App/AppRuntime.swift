@@ -639,6 +639,15 @@ final class AppRuntime: DSLRuntime {
 
     func records(for entity: String) -> [Record] { records[entity] ?? [] }
 
+    /// 一覧のワンタップ チェック(#108 list.item.toggle)。saveRecord と同じくローカル DB に即反映し、送信は同期キュー。
+    /// 表示中に無いレコード(削除済み等)は保存しない(save は recordId が見つからないと新規作成になるため)。
+    func updateRecord(entity: String, recordId: String, data: [String: JSONValue]) async -> Bool {
+        guard records[entity]?.contains(where: { $0.id == recordId }) == true else { return false }
+        records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: recordId, data: data)
+        WidgetSnapshotWriter.write(dsl: dsl, records: records)
+        return true
+    }
+
     func load(entities: Set<String>, force: Bool = false) async {
         for e in entities where force || records[e] == nil {
             await refresh(e)

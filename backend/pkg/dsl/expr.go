@@ -298,7 +298,7 @@ var ComputedFieldTypes = []FieldType{FieldNumber, FieldInteger, FieldCurrency, F
 var AggregateFuncs = []string{"count", "sum", "avg", "min", "max"}
 
 // FilterOps is the closed set of Filter.op values.
-var FilterOps = []string{"eq", "neq", "gt", "gte", "lt", "lte", "thisMonth", "today"}
+var FilterOps = []string{"eq", "neq", "gt", "gte", "lt", "lte", "thisMonth", "today", "thisWeek", "thisYear"}
 
 // opSpec is arity + argument/result types of one op. maxArgs -1 = variadic.
 type opSpec struct {
@@ -319,7 +319,7 @@ var Ops = map[string]opSpec{
 	"and": {2, 2, tBool, tBool}, "or": {2, 2, tBool, tBool}, "not": {1, 1, tBool, tBool},
 	"concat": {2, 2, tAny, tStr}, "len": {1, 1, tStr, tNum},
 	"now": {0, 0, tAny, tDate}, "today": {0, 0, tAny, tDate},
-	"daysBetween": {2, 2, tDate, tNum}, "daysUntil": {1, 1, tDate, tNum}, "addDays": {2, 2, tAny, tDate},
+	"daysBetween": {2, 2, tDate, tNum}, "daysUntil": {1, 1, tDate, tNum}, "addDays": {2, 2, tAny, tDate}, "hoursBetween": {2, 2, tAny, tNum},
 	"year": {1, 1, tDate, tNum}, "month": {1, 1, tDate, tNum}, "day": {1, 1, tDate, tNum}, "weekday": {1, 1, tDate, tNum},
 	"toNumber": {1, 1, tAny, tNum}, "toString": {1, 1, tAny, tStr}, "coalesce": {2, 2, tAny, tAny},
 }
@@ -426,6 +426,9 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 			if !accepts(want, types[i]) {
 				c.add("%s: %s expects a %s but got a %s%s", aw, e.Op, want, types[i], convertHint(want))
 			}
+			if e.Op == "hoursBetween" {
+				c.checkHoursBetweenArg(aw, types[i])
+			}
 		}
 		switch e.Op {
 		case "gt", "gte", "lt", "lte":
@@ -517,10 +520,8 @@ func (c *exprChecker) checkFilter(where string, f *Filter, e *Entity, row *Entit
 	if !known {
 		c.add("%s: filter op %q must be one of %s", where, f.Op, strings.Join(FilterOps, "|"))
 	}
-	if f.Op == "thisMonth" || f.Op == "today" {
-		if f.Value != nil {
-			c.add("%s: filter op %s takes value null", where, f.Op)
-		}
+	if IsPeriodFilterOp(f.Op) {
+		checkPeriodFilter(where, f, e, c.add)
 		return
 	}
 	ve, err := exprFromValue(f.Value)

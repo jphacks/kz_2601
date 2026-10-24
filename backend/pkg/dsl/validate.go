@@ -381,6 +381,7 @@ func (a *App) Validate() error {
 			}
 			if c.Filter != nil {
 				checkComponentFilterValue(where, c.Filter, entities, add)
+				checkComponentPeriodFilter(where, c, entities, add)
 			}
 			switch c.Type {
 			case CompText:
@@ -423,6 +424,7 @@ func (a *App) Validate() error {
 						add("%s: list item field %q not in entity %q", where, fid, e.ID)
 					}
 				}
+				checkListToggle(where, c.Item, e, add)
 				if c.Sort != nil && e.FieldByID(c.Sort.Field) == nil {
 					add("%s: sort field %q not in entity %q", where, c.Sort.Field, e.ID)
 				}

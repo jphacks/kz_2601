@@ -64,6 +64,14 @@ public final class ExprEvaluator {
     /// 入れ子・computed の連鎖の上限(循環参照の防波堤)。
     public static let maxDepth = 48
 
+    /// 評価できる op(schema の `ExprOp.op` enum と一致させる。テストで突き合わせる)。
+    public static let supportedOps: Set<String> = [
+        "add", "sub", "mul", "div", "mod", "neg", "abs", "sqrt", "pow", "round", "floor", "ceil", "min", "max", "clamp",
+        "eq", "neq", "gt", "gte", "lt", "lte", "and", "or", "not", "concat", "len",
+        "now", "today", "daysBetween", "daysUntil", "addDays", "hoursBetween", "year", "month", "day", "weekday",
+        "toNumber", "toString", "coalesce",
+    ]
+
     private let entities: [String: Entity]
     private let source: (String) -> [Record]
     private let now: Date
@@ -150,7 +158,7 @@ public final class ExprEvaluator {
     public func apply(_ filters: [Filter], entity: Entity?, to records: [Record], row: Row? = nil) -> [Record] {
         let resolved = resolve(filters, row: row)
         guard !resolved.isEmpty else { return records }
-        return records.filter { r in resolved.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field)) } }
+        return records.filter { r in resolved.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field), now: now, calendar: calendar) } }
     }
 
     // MARK: - agg
@@ -163,7 +171,7 @@ public final class ExprEvaluator {
         let usesComputed = ([a.field].compactMap { $0 } + a.filters.map(\.field)).contains { entity?.field($0)?.isComputed == true }
         let base = usesComputed ? viewRecords(for: a.entity) : source(a.entity)
         let rows = resolved.filters.isEmpty ? base : base.filter { r in
-            resolved.filters.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field)) }
+            resolved.filters.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field), now: now, calendar: calendar) }
         }
         let nums = a.field.map { f in rows.compactMap { $0[f].doubleValue ?? $0[f].stringValue.flatMap { Double($0) } } } ?? []
         let v: ExprValue?
@@ -200,6 +208,22 @@ public final class ExprEvaluator {
             case .string(let s): return FieldCoding.date(from: .string(s))
             default: return nil
             }
+        }
+        /// 時刻引数 → 0:00 からの秒。"HH:mm"(/"H:mm"/"HH:mm:ss")文字列、または日時の時刻部分。
+        func secondsOfDay(_ i: Int) -> Double? {
+            guard i < vals.count, let v = vals[i] else { return nil }
+            switch v {
+            case .string(let s):
+                if let t = Self.timeOfDay(s) { return t }
+                guard let d = FieldCoding.date(from: .string(s)), s.contains("T") else { return nil }
+                return clockSeconds(d)
+            case .date(let d): return clockSeconds(d)
+            default: return nil
+            }
+        }
+        func clockSeconds(_ d: Date) -> Double {
+            let c = calendar.dateComponents([.hour, .minute, .second], from: d)
+            return Double((c.hour ?? 0) * 3600 + (c.minute ?? 0) * 60 + (c.second ?? 0))
         }
         func allNums() -> [Double]? {
             guard !vals.isEmpty else { return nil }
@@ -262,6 +286,11 @@ public final class ExprEvaluator {
         case "addDays":
             guard let d = date(0), let n = num(1), let r = calendar.date(byAdding: .day, value: Int(n.rounded()), to: d) else { return nil }
             return .date(r)
+        case "hoursBetween":
+            // end − start(時間・小数)。end < start は日付またぎとして +24h(22:00→05:00 = 7)
+            guard let a = secondsOfDay(0), let b = secondsOfDay(1) else { return nil }
+            let diff = b - a
+            return .number((diff < 0 ? diff + 86_400 : diff) / 3600)
         case "year", "month", "day", "weekday":
             guard let d = date(0) else { return nil }
             let comp: Calendar.Component = name == "year" ? .year : name == "month" ? .month : name == "day" ? .day : .weekday
@@ -283,6 +312,16 @@ public final class ExprEvaluator {
     }
 
     // MARK: - 値の変換・比較
+
+    /// "HH:mm" / "H:mm" / "HH:mm:ss" → 0:00 からの秒(24:00 まで可)。形式外は nil。
+    static func timeOfDay(_ s: String) -> Double? {
+        let parts = s.trimmingCharacters(in: .whitespaces).split(separator: ":", omittingEmptySubsequences: false)
+        guard (2...3).contains(parts.count), parts.allSatisfy({ !$0.isEmpty && $0.count <= 2 && $0.allSatisfy { $0.isASCII && $0.isNumber } }),
+              let h = Int(parts[0]), let m = Int(parts[1]), (0...24).contains(h), (0..<60).contains(m) else { return nil }
+        let sec = parts.count == 3 ? Int(parts[2]) : 0
+        guard let sec, (0..<60).contains(sec), h < 24 || (m == 0 && sec == 0) else { return nil }
+        return Double(h * 3600 + m * 60 + sec)
+    }
 
     /// 保存値 → 評価値。date/datetime field の文字列は Date にする。null は nil。
     public static func value(from v: JSONValue, field: Field?) -> ExprValue? {

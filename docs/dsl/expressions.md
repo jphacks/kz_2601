@@ -63,11 +63,14 @@ Expr := number | string | boolean
 | | `daysBetween` | (a, b) | 数値 = b − a の日数 |
 | | `daysUntil` | (d) | 数値 = d − 今日 の日数(過ぎたら負) |
 | | `addDays` | (d, n) | 日付 = d の n 日後 |
+| 時刻 | `hoursBetween` | (start, end) | 数値 = end − start の時間数(小数。30 分 = 0.5)。**end < start は日付またぎとして +24h**(22:00→05:00 = 7)。同じ時刻は 0 |
 | | `year` `month` `day` `weekday` | (d) | 数値(month 1-12、weekday 1=日 … 7=土) |
 | 変換 | `toNumber` `toString` | 任意 1 個 | 数値(変換不可はエラー)/ 文字列 |
 | その他 | `coalesce` | (a, b) | a が空(nil・空文字)/評価エラーなら b |
 
 日付引数は date / datetime フィールド、`today`/`now`/`addDays` の結果、`"YYYY-MM-DD"` 文字列を受け付ける。
+
+時刻引数(`hoursBetween`)は `"HH:mm"`(`"H:mm"`・`"HH:mm:ss"` も可)の文字列 = `timePicker` が string field に保存する形。datetime を渡したときは**その時刻部分だけ**を使う(日付は無視)。数値・真偽は backend が拒否する(`toNumber("09:30")` は 9.5 にならないので、時刻を数値化して引き算しない)。日付をまたいで 24 時間以上働く・2 日以上空く計算は対象外(§8)。
 
 ## 4. 置き場所
 
@@ -90,7 +93,8 @@ Expr := number | string | boolean
 - 型は 数値(Double)/ 文字列 / 真偽 / 日付 / 空。currency・integer フィールドは数値。ref フィールドの値は参照先レコード id(文字列)。
 - 空のフィールド・評価エラー(0 割り・型不一致・参照先なし・`sqrt` の負数)は **nil → 表示は「—」**。nil を受けた op は nil を返す(`coalesce` だけは b を返す)。`agg` は 0 件なら count/sum は 0、avg/min/max は nil。
 - computed 同士の依存は backend が DAG を保証する(循環は来ない)。評価順は依存順でも都度再帰でもよい。
-- `today`/`now`/`thisMonth` は端末ローカル時刻(従来の stat filter と同じ)。
+- `today`/`now` と期間 filter(`today`/`thisWeek`/`thisMonth`/`thisYear`)は端末ローカル時刻(従来の stat filter と同じ)。
+- **`thisWeek` は月曜 0:00 〜 次の月曜 0:00**。端末ロケールの週の始まり(日本の `Calendar` 既定は日曜)に従わず月曜に固定する: 日本の暦・学校・職場の「今週」は月〜日で数えるのが一般的で、日曜始まりだと日曜の記録が「来週」側に入り、週末に振り返る用途(家事当番・週の目標)で直感とずれるため。`thisYear` は 1/1 〜 12/31。
 
 ## 6. 検証ルール(backend)
 
@@ -109,6 +113,9 @@ Expr := number | string | boolean
 | computed の型・読み取り専用 | `computed field type must be one of ...` / `remove required` / `inputs cannot bind to it` |
 | `ref` 型 | `type ref needs refEntity` / `refEntity "people" does not exist` / `use a picker to choose the members record` |
 | settlement | `settlement balanceField "name" must be number/integer/currency` |
+| 期間 filter | `filter op thisWeek takes value null` / `filter op thisYear needs a date or datetime field but "name" is string` |
+| `hoursBetween` の引数 | `hoursBetween expects a "HH:mm" time string (or a datetime field) but got a number` |
+| `list.item.toggle` | `list item.toggle "name" must be a boolean field (got string)` / `... is computed (read-only)` |
 | Stat 排他 | `stat takes either aggregate or value, not both` / `stat needs aggregate (with entity) or value` |
 
 ## 7. レシピ
@@ -123,7 +130,18 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
 2. **BMI**(`examples/bmi.json`): `bmi` = weight / (height/100)^2 を小数 1 桁に(`round(x*10)/10`)。
 3. **残り予算**: stat.value = `sub(予算, agg sum thisMonth)`。予算を後で変えたいなら budget entity を作り `agg max budget.amount`。
 4. **達成率**: stat{format:percent, value: `div(agg sum, 目標)`} + progressBar{entity, field, target}。
-5. **カウントダウン**: computed `days_left` = `daysUntil(ref date)`、最も近い予定 = `agg min days_left filter days_left gte 0`。
+5. **シフト・バイト代**: shift{date, start/end: string `"HH:mm"`(timePicker), wage: currency}。computed `hours` = `hoursBetween(ref start, ref end)`、`pay` = `round(hours * wage)`。今月の給料 = stat sum pay filter date thisMonth。
+6. **カウントダウン**: computed `days_left` = `daysUntil(ref date)`、最も近い予定 = `agg min days_left filter days_left gte 0`。
+
+## 7.5 一覧のワンタップ チェック(`list.item.toggle`, #108)
+
+式ではないが、同じ「状態を変える最小の仕組み」としてここに置く。
+
+- `list.item.toggle: "<boolean fieldId>"`。iOS は行の先頭にチェック丸を出し、タップでそのレコードの boolean を反転して**その場で保存**する(フォームを開かない・`PATCH records/{id}` 相当の 1 フィールド更新。オフライン DB に即反映 → 同期キューが送る)。
+- 楽観的 UI: 丸は先に切り替わり、保存に失敗したら元に戻す。チェック済みの行は打ち消し線 + 薄く。
+- `filter {field: done, op: eq, value: false}` で未完了だけ出している一覧なら、チェックした行はその場で消える(「買ったもの」一覧を `eq true` で並べれば戻せる)。
+- backend 検証: toggle は同 entity の**保存される** boolean field(computed 不可)。
+- 実例: `examples/shopping.json`。
 
 ## 8. 割り切り(やらないこと)
 
