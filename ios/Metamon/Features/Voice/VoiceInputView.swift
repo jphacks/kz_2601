@@ -23,8 +23,10 @@ struct VoiceInputView: View {
     /// 初期状態(全画面)か、生成後のシート(改変)か。
     private var isInitial: Bool { rt.dsl.isVoiceOnly }
 
-    private static let createExamples = ["家計簿アプリが欲しい", "筋トレの記録", "散歩の写真メモ"]
-    private static let editExamples = ["ダークモードにして", "グラフを追加して", "メモ欄を増やして"]
+    /// 見出し・サブ文言(#42)。初回/再訪/新規/戻る/改変 × 時間帯。`prompt`(DSL の voiceInput.prompt)があれば見出しだけ上書き。
+    private var greeting: Greeting.Copy {
+        Greeting.copy(for: Greeting.context(homeEntry: rt.homeEntry, isInitial: isInitial))
+    }
 
     var body: some View {
         ZStack {
@@ -59,7 +61,7 @@ struct VoiceInputView: View {
             if isInitial {
                 HStack(spacing: Theme.Spacing.sm) {
                     BrandMark(size: 28)
-                    Text("メタモン").font(.headline.weight(.bold))
+                    Text("Tailor It").font(.headline.weight(.bold))
                 }
             }
             Spacer()
@@ -78,20 +80,29 @@ struct VoiceInputView: View {
 
     private var heading: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            Text(prompt ?? (isInitial ? "どんなアプリが欲しい？" : "どう変えたい？"))
+            Text(prompt ?? greeting.title)
                 .font(.system(size: 30, weight: .bold, design: .rounded))
                 .multilineTextAlignment(.center)
                 .minimumScaleFactor(0.8)
-            Text(isInitial ? "話しかけるだけで、アプリが生まれ変わる" : "話しかけると、このアプリが育ちます")
+                .contentTransition(.opacity)
+            Text(greeting.subtitle)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .animation(.easeInOut(duration: 0.3), value: greeting)
     }
 
     private var micSection: some View {
         VStack(spacing: Theme.Spacing.md) {
+            // タップ = 発話、長押し = メタ操作(変身一覧)。FAB と同じ二段構え
             MicButton(mode: micMode, size: isInitial ? 132 : 104) { Task { await toggle() } }
+                .simultaneousGesture(
+                    LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
+                        .onEnded { _ in if phase == .idle { rt.openSwitcher() } }
+                )
+                .accessibilityHint("長押しで変身一覧")
             Text(statusText)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(phase == .listening ? Theme.Colors.recordA : .secondary)
@@ -127,12 +138,12 @@ struct VoiceInputView: View {
     private var examples: some View {
         if phase == .idle {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text(isInitial ? "たとえば" : "たとえば、こんな変更")
+                Text(isInitial ? Greeting.examplesLabel : Greeting.editExamplesLabel)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: Theme.Spacing.sm) {
-                        ForEach(isInitial ? Self.createExamples : Self.editExamples, id: \.self) { ex in
+                        ForEach(isInitial ? Greeting.createExamples : Greeting.editExamples, id: \.self) { ex in
                             Button { submit(ex) } label: {
                                 Text(ex)
                                     .font(.subheadline)

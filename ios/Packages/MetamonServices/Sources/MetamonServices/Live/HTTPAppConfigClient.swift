@@ -26,10 +26,32 @@ public struct HTTPAppConfigClient: AppConfigClient {
         var nextPageToken: String?
     }
     private struct VersionsResponse: Decodable { var items: [VersionSummary] }
+    private struct AppsResponse: Decodable {
+        var items: [AppSummary]
+        var nextPageToken: String?
+    }
     private struct RecordBody: Encodable { var data: [String: JSONValue] }
     private struct CreateBody: Encodable {
         var data: [String: JSONValue]
         var clientId: String
+    }
+
+    // MARK: - Apps
+
+    /// `GET /v1/apps`(最大 5 ページ)。成功したら `AppListCache` に保存し、オフライン時の変身一覧に使う。
+    public func listApps() async throws -> [AppSummary] {
+        var items: [AppSummary] = []
+        var token: String?
+        for _ in 0..<Self.maxPages {
+            var path = "v1/apps?pageSize=\(Self.pageSize)"
+            if let token { path += "&pageToken=\(token)" }
+            let page = try JSONDecoder().decode(AppsResponse.self, from: try await request("GET", path))
+            items += page.items
+            guard let next = page.nextPageToken, !next.isEmpty else { break }
+            token = next
+        }
+        AppListCache.shared.store(items)
+        return items
     }
 
     // MARK: - DSL
@@ -52,9 +74,9 @@ public struct HTTPAppConfigClient: AppConfigClient {
     }
 
     public func restore(appId: String, toVersion version: Int) async throws -> AppDocument {
-        // 201 の本文は VersionSummary(DSL 無し)。続けて最新 DSL を取り直す
-        _ = try await request("POST", "v1/apps/\(appId)/versions/\(version)/restore")
-        return try await fetchDocument(appId: appId)
+        // 201 の本文は VersionSummary + 復元後の dsl(DSLEnvelope 互換・#67)。そのまま現行 DSL として使う
+        let data = try await request("POST", "v1/apps/\(appId)/versions/\(version)/restore")
+        return try store(appId: appId, envelope: data)
     }
 
     /// backend の `etag(v)` と同じ `"7"` 形式。
@@ -83,7 +105,11 @@ public struct HTTPAppConfigClient: AppConfigClient {
     }
 
     public func create(appId: String, entity: String, data: [String: JSONValue]) async throws -> Record {
-        let body = CreateBody(data: data, clientId: UUID().uuidString.lowercased())
+        try await create(appId: appId, entity: entity, data: data, clientId: UUID().uuidString.lowercased())
+    }
+
+    public func create(appId: String, entity: String, data: [String: JSONValue], clientId: String) async throws -> Record {
+        let body = CreateBody(data: data, clientId: clientId)
         let path = "v1/apps/\(appId)/entities/\(entity)/records"
         do {
             return try await decodeRecord(try await request("POST", path, body: body))

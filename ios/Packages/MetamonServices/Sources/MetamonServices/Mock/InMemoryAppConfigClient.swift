@@ -5,6 +5,8 @@ import MetamonDSL
 public actor InMemoryAppConfigClient: AppConfigClient {
     private var tables: [String: [Record]]
     private let document: @Sendable () throws -> AppDocument
+    /// `listApps` が返す一覧(モックの変身一覧用。既定は空。`setApps` で差し替え)。
+    private var apps: [AppSummary] = []
 
     /// - Parameters:
     ///   - seed: entity id → 初期レコード
@@ -17,6 +19,10 @@ public actor InMemoryAppConfigClient: AppConfigClient {
     public func fetchDocument(appId: String) async throws -> AppDocument {
         try document()
     }
+
+    public func listApps() async throws -> [AppSummary] { apps }
+
+    public func setApps(_ apps: [AppSummary]) { self.apps = apps }
 
     /// 履歴は持たない(モックの undo は `AppRuntime` のローカル履歴にフォールバックする)。
     public func listVersions(appId: String) async throws -> [VersionSummary] { [] }

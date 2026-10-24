@@ -21,7 +21,7 @@ enum Theme {
     }
 
     enum Colors {
-        /// ブランド(メタモン = 紫〜水色)
+        /// ブランド(Tailor It = 紫〜水色)
         static let brandA = Color(hex: "#8E6CFF")!
         static let brandB = Color(hex: "#4CC9FF")!
         /// 録音中(赤〜珊瑚)
@@ -44,6 +44,8 @@ enum Theme {
         static let fabHorizontalInset: CGFloat = Spacing.lg
         /// タブバーがある時はその上に逃がす。
         static func fabBottomInset(hasTabs: Bool) -> CGFloat { hasTabs ? 70 : Spacing.lg }
+        /// 長押し(= 変身一覧)と判定するまでの秒数。初期画面の大きなマイクも同じ。
+        static let fabLongPressSeconds: Double = 0.45
     }
 
     enum Shadow {

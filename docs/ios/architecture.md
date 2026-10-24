@@ -257,6 +257,44 @@ FAB の位置は `Theme.Layout.fabAlignment`(**左下**)の 1 箇所で決める
 
 Day2 に余裕があれば **C**(Firestore が正典なので一番筋が良い)。B は中間なので採らない。
 
+### 複数アプリの切替「変身一覧」(#51)と起動時の挨拶(#42)(2026-10-24 夜)
+
+私たちが持つ常設 UI は **マイク(FAB / 初期画面の大きなマイク)だけ**。メタ操作は全部ここに集約する(FAB = Tailor It 本体、画面の残りは変身した姿)。
+
+| 操作 | 意味 | 実装 |
+|---|---|---|
+| **タップ** | 「このアプリを変える」発話(従来どおり) | `Button` → `showVoiceSheet` |
+| **長押し**(0.45s・`Theme.Layout.fabLongPressSeconds`) | メタ操作 = **変身一覧シート** | `.simultaneousGesture(LongPressGesture)` → `AppRuntime.openSwitcher()`。触覚 `.sensoryFeedback(.impact)`。VoiceOver は accessibilityAction「変身一覧」 |
+| 音声「○○に切り替えて / ○○を開いて / ○○に変身して」 | 名前で切替 | `VoiceIntent.switchApp(name)` → `switchApp(named:)`: `GET /apps` の name と照合(完全一致→前方一致→部分一致・`AppNameMatch`)。1 件なら切替、曖昧/無ければ toast + 一覧を開く |
+| 音声「アプリ一覧 / 変身一覧 / 別のアプリに切り替えて(名前なし)」 | 一覧を開く | `VoiceIntent.listApps` → `openSwitcher()` |
+
+```
+変身一覧シート(Features/Switcher/AppSwitcherSheet.swift)
+  ├─ カード(横スクロール): サムネ(無ければ名前のイニシャル + ブランドグラデ)・名前・最終更新・現在のアプリに「使用中」。読み込み中はスケルトン
+  │     タップ → AppRuntime.switchApp(to:): 今の画面をサムネに撮る → DeviceAppID.set(appId) → GET /dsl(失敗時 DocumentCache)→ apply()(変身アニメ)→ startSync()
+  │                 records は apply() で破棄し、画面が要求する entity を load(entities:) の既存経路で読み直す
+  ├─ 「+ 新しいアプリ」 → startFresh(.newApp): DeviceAppID.rotate() + 初期状態(音声画面)。挨拶は「新しいアプリですね」
+  └─ 「Tailor It に戻る(初期画面)」 → startFresh(.home): 同上。挨拶は「おかえりなさい。次は何を作りますか?」
+一覧の取得: GET /v1/apps(uid スコープ・HTTPAppConfigClient.listApps)→ AppSummary.visible(): status=archived と未生成(currentVersion<=1)を除外、現在のアプリを先頭、以降は更新日時順
+            失敗時は AppListCache(Application Support/metamon-dsl/apps.json)の保存済み一覧(toast「オフライン」)
+サムネ: AppThumbnailStore(Application Support/metamon-thumbs/<appId>.jpg・1/3 スケール JPEG)。撮るのは「切替・一覧を開く直前」と「apply の 1.2 秒後(RootView.onChange(version))」
+        取得はキーウィンドウの drawHierarchy(ImageRenderer は NavigationStack/TabView を描けないため)
+```
+
+**起動時の挨拶(#42)** — 文言は `Features/Voice/Greeting.swift` の 1 箇所(多言語化 #44 ではこのファイルを差し替える)。時間帯(5〜10 時おはよう / 11〜17 時こんにちは / 他こんばんは)を前置き。
+
+| 状況(`Greeting.Context`) | 判定 | 見出し |
+|---|---|---|
+| firstVisit | 起動回数 0(`UserDefaults metamon.visitCount`・`Greeting.launchIsReturning`)| どんなアプリが欲しいですか? |
+| returning | 2 回目以降の起動で初期画面 | おかえりなさい。今日は何を作りますか? |
+| newApp | 変身一覧「+ 新しいアプリ」/ 発話「別のアプリ」(`AppRuntime.homeEntry = .newApp`) | 新しいアプリですね。どんなアプリにしますか? |
+| home | 「Tailor It に戻る」/ アプリのリセット(`.home`) | おかえりなさい。次は何を作りますか? |
+| editing | 既にアプリがある(FAB からの音声シート) | このアプリをどう変えますか? |
+
+初期画面の見出しは DSL の `voiceInput.prompt` ではなく Greeting を使う(生成アプリ内の `voiceInput` 部品は従来どおり `prompt` を表示)。
+
+DEBUG フック: `METAMON_AUTO_SWITCHER=1`(起動 2.5 秒後に変身一覧を開く)。`METAMON_AUTO_TRANSCRIPT="家計簿に切り替えて"` で音声切替も通せる。
+
 ## 7. 認証(実装済み)
 
 ```
@@ -302,6 +340,38 @@ SignInView ──Sign in with Apple──▶ ASAuthorizationAppleIDCredential(id
 - appconfig 契約(PR #32・`HTTPAppConfigClient`): `GET /v1/apps/{appId}/dsl`(`ETag: "<version>"`・`If-None-Match` で 304)/ `GET /versions`(新しい順・`VersionSummary`)/ `POST /versions/{n}/restore`(201 `VersionSummary` → 続けて `GET /dsl`)/ records `GET`(`pageSize=200`・`nextPageToken` を最大 5 ページ追う)・`POST`(`{data, clientId}`・通信断時は同じ clientId で 1 回再送)・`PATCH`(`{data}`・null で項目削除)・`DELETE`(204)。エラー封筒 `{error:{code,message,details?,requestId?}}` は `APIError.server(status:code:message:details:)`。`details.field` は `APIError.field`。
 - HTTP キャッシュは使わない(`HTTP.session` = ephemeral・`urlCache = nil`・`reloadIgnoringLocalAndRemoteCacheData`)。`GET /dsl` は `Cache-Control: no-cache` + ETag だが `URLSession.shared` が再検証せず古い 200 を返し、起動時復元が 1 つ前の version になる事象が staging E2E で出た。鮮度は自前の `If-None-Match` と `DocumentCache` で管理する。
 - ATS: `NSAllowsLocalNetworking` のみ(LAN の `http://<IP>:8081` 用)。`NSAllowsArbitraryLoads` は入れない。
+
+### ローカル DB と同期(Issue #48・実装済み)
+
+```
+Renderer ──load(entities)──▶ AppRuntime.refresh(entity)
+                               │ 1. recordSync.cached(appId, entity)      ← RecordStore(JSON)を即表示(スケルトン→ローカル)
+                               │ 2. recordSync.pull(appId, entity)        ← GET /records 全件 → store.replace(未送信行は残す)→ UI 置換
+                               ▼
+            saveRecord / deleteRecord ──▶ recordSync.save / delete
+                               │ RecordStore に即反映(pendingOp=create|update|delete)→ records[entity] を返して画面を進める(楽観的 UI)
+                               ▼
+                          SyncQueue(actor・FIFO・queue.json に永続化)
+                               │ POST(clientId=op.id で冪等)/ PATCH / DELETE を 1 件ずつ
+                               │ 失敗: 通信断・5xx・401 → 指数バックオフ(0.5s×2^n・最大 5 回)→ 停止(paused)
+                               │       404/409/412 → 競合: 未送信印を落とし conflict → AppRuntime が refresh(サーバー優先)+ toast
+                               │       400/422 → 拒否: 操作破棄(create はローカル行も削除)+ toast
+                               ▼ 成功: 仮 id(local-<clientId>)→ サーバー id に差し替え・pendingOp=none → sent → records[entity] 読み直し
+   再開トリガー: NWPathMonitor のオンライン復帰 / 前面復帰(setForeground) / 設定「今すぐ同期」 / 新しい書き込み
+```
+
+| 項目 | 実装 |
+|---|---|
+| DB | `MetamonServices/Local/RecordStore.swift`(actor)。**FileManager + JSON**: `Application Support/metamon-records/<appId>/<entity>.json` に `LocalRecord{appId, entity, recordId, data, createdAt, updatedAt, pendingOp, clientId}` の配列。SwiftData/SQLite にしなかった理由: 1 entity ≤ 1000 件・読みは entity 単位全件なのでファイル=索引(appId, entity)で足りる / `DocumentCache` と同じ流儀でスキーマ移行・ModelContainer を抱えない / macOS `swift test` でそのまま動く。万単位になったら同 I/F で SQLite 化 |
+| 差分取得 | appconfig の `GET /records` は `filterField` に entity の Field しか受けない(`buildFilter`)ため `updatedAfter` 相当が無い → **全件取得で置換**(`store.replace`)。未送信行(`pendingOp != none`)だけ残す。`lastUpdatedAt` は将来の差分 API 用に用意済み |
+| 書き込み | `RecordSyncEngine.save/delete`(`Local/RecordSyncEngine.swift`・`@MainActor @Observable`)。create は仮 id `local-<clientId>`、update はキー単位マージ(PATCH と同義・DSL から消えた項目もローカルで保持)、delete は行を `pendingOp=delete` にして一覧から隠す |
+| キュー | `Local/SyncQueue.swift`(actor)。積む時に畳む: create+update → create に併合 / create+delete → 両方消す(サーバーに行かない)/ update+update → 1 つ。送信後は仮 id → サーバー id の別名表を持ち、後続の update/delete を引き直す。`BackoffPolicy(base 0.5s, ×2, maxAttempts 5)`。`sleep` を差し替えられるのでテストは待たない |
+| 冪等 | `AppConfigClient.create(appId:entity:data:clientId:)` を追加(既定実装は clientId 無視)。`HTTPAppConfigClient` は `{data, clientId}` を送り、再送でも同じ clientId |
+| 到達性 | `Local/Connectivity.swift`: `NetworkPathConnectivity`(`NWPathMonitor`)/ `ManualConnectivity`(テスト・E2E)。オンライン復帰で `queue.resume()` |
+| DSL 変更 | 行は entity/field の増減に関わらず保持(`data` は丸ごと)。消えた field は Renderer が参照しないだけ。「別のアプリ」「リセット」で appId が変わっても旧 appId のファイルは消さない(サーバーにも残る) |
+| 設定シート | 「データ」節: `同期: 最新 / 未送信 N 件 / 送信中 / オフライン(・未送信 N 件)` + 「今すぐ同期」(`RecordSyncEngine.status/pendingCount/isOnline`) |
+| E2E | DEBUG `METAMON_E2E_OFFLINE_SECONDS=<n>`(`Metamon/App/RecordSyncFactory.swift`): n 秒間レコード API を `URLError(.notConnectedToInternet)` にし到達性も offline → n 秒後に online。`METAMON_AUTO_RECORD` と併用して「圏外保存 → 即表示 → 復帰で送信」を通す |
+| テスト | `MetamonServicesTests/RecordSyncTests.swift`: Store CRUD/永続化/置換、キューの順序・畳み込み・同一 clientId 再送・バックオフ・5 回で停止→再開・競合、エンジンのオフライン→オンライン送信 |
 
 ## 8. DSL スキーマ
 → 統一版 v1: `docs/dsl/README.md`(決定表)+ `docs/dsl/dsl.schema.json`。旧 iOS 案は `docs/ios/dsl-proposal.md`。
@@ -361,7 +431,7 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 | 本体側の変更 | `AppRuntime.apply()` 末尾と `refresh()` のレコード代入直後の 1 行ずつ + `BuildConfig.appGroupID`。実装は `ios/Metamon/App/WidgetSnapshotWriter.swift` に集約 |
 | stat の選び方 | 画面順(initialScreen → タブ順 → 残り)で `type: stat` を先頭 3 個。初期状態(`isVoiceOnly`)ならスナップショットを消す |
 | 値が未取得の時 | `records[entity]` が nil(apply 直後)なら前回スナップショットの同じ stat(entity|aggregate|field|label キー)の値を引き継ぐ。無ければ「—」 |
-| 表示 | ブランドグラデーションの薄い背景、数値は `.rounded` 太字 `.monospacedDigit()`、下部にアプリ名(+medium は更新時刻)。データ無しは「メタモンでアプリを作るとここに数字が出ます」。タップで本体起動(`widgetURL(metamon://widget)`) |
+| 表示 | ブランドグラデーションの薄い背景、数値は `.rounded` 太字 `.monospacedDigit()`、下部にアプリ名(+medium は更新時刻)。データ無しは「Tailor It でアプリを作るとここに数字が出ます」。タップで本体起動(`widgetURL(metamon://widget)`) |
 | 更新頻度(制約) | 本体がフォアグラウンドで DSL 適用/レコード更新した時に即時 + 30 分毎のタイムライン再読込(値は前回のまま)。**本体を開かずにレコードが増えても(別端末・ホットリロード未受信)ウィジェットは古い**。値が変わらない時は reload しない(WidgetKit の 1 日の更新予算を節約) |
 | 実機署名 | App Group capability を **本体と拡張の 2 つの App ID** に付ける必要がある。`xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で付与される(有料 Program 必須)。通らない時は Apple Developer > Identifiers > App Groups で `group.jp.kz2601.metamon` を作成 → 両 App ID の Capabilities で App Groups にチェック |
-| シミュレータ | 署名なし(`CODE_SIGNING_ALLOWED=NO`)でも App Group の UserDefaults は動く。ウィジェットの配置はホーム画面長押し → + → 「メタモン」 |
+| シミュレータ | 署名なし(`CODE_SIGNING_ALLOWED=NO`)でも App Group の UserDefaults は動く。ウィジェットの配置はホーム画面長押し → + → 「Tailor It」 |

@@ -28,7 +28,7 @@
 > そこで
 
 - 読み上げ目安: 約60秒(3分版では20〜30秒に圧縮、5分版はこのまま)。
-- 「そこで」の受け(案): 「そこで、話しかけるだけでモバイルアプリが生まれ変わる『メタモン(仮)』を作りました。」
+- 「そこで」の受け(案): 「そこで、話しかけるだけでモバイルアプリが生まれ変わる『Tailor It』を作りました。名前の通り、あなたに合わせてアプリを仕立てます。」
 - 以下のタイムテーブルの「導入」はこの原案を正とし、詳細は後日詰める。
 
 ## 1. 3 分版タイムテーブル
@@ -83,6 +83,7 @@
 | 層 | 状況 | 操作 | 所要 |
 |---|---|---|---|
 | 0. 本番前に | staging が本当に動くか不安(デプロイ直後・Wi-Fi 切替後) | Mac で `cd backend && FIREBASE_WEB_API_KEY=<Firebase Web API key> make smoke-stg` → デモ 3 本 + 「元に戻して」が表で全部 PASS(約 40 秒・Claude 3 回)。FAIL が出た行の発話は層 1/2 の代替に切り替える。develop への push 後は deploy-cloudrun の job summary にも同じ表が出る | 60s |
+| 0. 本番前に | デモ端末が **production**(ai-prod)を向いている | `cd backend && FIREBASE_WEB_API_KEY=<Firebase Web API key> make smoke-prod` → 家計簿 create → edit → undo が PASS(約 15 秒・Claude 2 回)。作った `smoke-*` アプリは終了時に自動で archive(`-cleanup`)。main への push 後は job summary にも同じ表が出る | 30s |
 | 1. その場で | 音声が取れない | 音声シート下部の**文字入力**に切替 → 上表の文言を貼る | 10s |
 | 1. その場で | 生成が 20 秒を超える / エラー toast | 短い発話(「家計簿」)で再送。**同じ長文を繰り返さない** | 10s |
 | 1. その場で | `version_conflict`(409) | iOS が自動で 1 回リトライ。toast が出たらもう一度だけ送信 | 5s |
@@ -96,11 +97,12 @@
 |---|---|---|---|
 | 1 | WhisperKit `small` モデルが主端末・予備端末とも DL 済み | アプリ起動 → 音声画面に「準備完了」(DL 進捗バーが出ない)。機内モードで一度起動して確認 | ☐ |
 | 2 | ログイン済み(Sign in with Apple or 匿名) | 音声画面最下部に uid 先頭 6 桁が出ている | ☐ |
-| 3 | 通知の許可状態 | **主端末は未許可のまま**にしておく(デモ B でダイアログを見せるため)。設定 > メタモン > 通知で「許可」が付いていたら一度アプリを削除して入れ直す。予備端末は許可済みでよい | ☐ |
+| 3 | 通知の許可状態 | **主端末は未許可のまま**にしておく(デモ B でダイアログを見せるため)。設定 > Tailor It > 通知で「許可」が付いていたら一度アプリを削除して入れ直す。予備端末は許可済みでよい | ☐ |
 | 3b | カメラの許可状態 | **主端末はカメラを許可済み**にしておく(撮影の流れを止めないため。アプリ削除→再インストール後は未許可に戻るので、リハで 1 回カメラを開いて許可する)。拒否されていると alert →「設定を開く / 写真から選ぶ」になる | ☐ |
 | 4 | 写真ライブラリの先頭にデモ用写真(紅葉・レシート)が 2 枚(カメラが開けない時の逃げ道) | 写真アプリで確認 | ☐ |
 | 5 | ai-stg 稼働 | `curl -s -o /dev/null -w '%{http_code}\n' https://ai-stg-378953239426.asia-northeast1.run.app/health` → `200`。Cloud Run コンソールで min-instances=1(デモ当日のみ) | ☐ |
 | 5b | staging スモーク | `cd backend && FIREBASE_WEB_API_KEY=<Firebase Web API key> make smoke-stg` → `0 failed`(家計簿 create/edit/undo・筋トレ・散歩が PASS) | ☐ |
+| 5c | production スモーク(デモ端末が prod 向きの時だけ) | `cd backend && FIREBASE_WEB_API_KEY=<Firebase Web API key> make smoke-prod` → `0 failed`(家計簿 create/edit/undo + cleanup archived) | ☐ |
 | 6 | 生成の実測(前日 1 回) | 主端末で `kakeibo_a` を 1 回流し、10 秒以内に家計簿になる。「レシートを撮る」で背面カメラが開き撮影→保存→一覧にサムネが出る。5 分版なら「カレンダーで見たい」も 1 回流して `calendar` が出るか確認(#25 後は未実測)。リハ後は**アプリを削除→再インストール**で初期状態に戻す(appId は UserDefaults の UUID なので削除で新しくなり、ai は未知の appId を初期状態として扱う) | ☐ |
 | 7 | Wi-Fi(会場 + テザリング) | iPhone のテザリングを予備回線として ON にできる状態 | ☐ |
 | 8 | 予備端末 = `METAMON_MOCK=1` ビルド | 機内モードで「家計簿」「筋トレ」「散歩」の 3 つが切り替わる | ☐ |
