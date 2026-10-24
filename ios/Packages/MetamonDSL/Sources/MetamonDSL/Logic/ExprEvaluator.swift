@@ -69,7 +69,7 @@ public final class ExprEvaluator {
         "add", "sub", "mul", "div", "mod", "neg", "abs", "sqrt", "pow", "round", "floor", "ceil", "min", "max", "clamp",
         "eq", "neq", "gt", "gte", "lt", "lte", "and", "or", "not", "concat", "len",
         "now", "today", "daysBetween", "daysUntil", "addDays", "hoursBetween", "year", "month", "day", "weekday",
-        "toNumber", "toString", "coalesce",
+        "toNumber", "toString", "coalesce", "streak", "doneInDays",
     ]
 
     private let entities: [String: Entity]
@@ -209,6 +209,13 @@ public final class ExprEvaluator {
         case "coalesce":
             for a in args { if let v = evaluate(a, row: row), v != .string("") { return v } }
             return nil
+        case "streak", "doneInDays":
+            // 毎日チェック(#172): 第 1 引数は resets daily の toggle field の ref。値ではなく行の履歴を読む
+            guard case .ref(let f)? = args.first, !f.contains("."), let row else { return nil }
+            let days = DailyCheck.dates(row.record, field: f)
+            if name == "streak" { return .number(Double(DailyCheck.streak(days, today: now, calendar: calendar))) }
+            guard args.count >= 2, let n = evaluate(args[1], row: row)?.number, n.isFinite else { return nil }
+            return .number(Double(DailyCheck.count(days, lastDays: Int(n.rounded()), today: now, calendar: calendar)))
         default: break
         }
         let vals = args.map { evaluate($0, row: row) }

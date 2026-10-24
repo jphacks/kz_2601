@@ -154,8 +154,8 @@ func TestFixButtonOverlapAvoidsRegeneration(t *testing.T) {
 func TestSystemPromptHasAudit3Rules(t *testing.T) {
 	for _, s := range []string{
 		"その enum の内訳 chart",
-		"連続日数は今日の達成数で代替しました。",
 		"実施記録・log の entity を別に足さない",
+		`{"op":"streak","args":[{"ref":"<toggle field>"}]}`, // #172 replaced "streak → today's count"
 	} {
 		if !strings.Contains(systemPrompt, s) {
 			t.Errorf("system prompt lost the #169 rule %q", s)

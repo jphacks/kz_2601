@@ -79,6 +79,7 @@ func New(s store.Store) *http.ServeMux {
 	mux.HandleFunc("GET /v1/public-apps", h.listPublicApps)
 	mux.HandleFunc("POST /v1/public-apps/{id}/install", h.installPublicApp)
 
+	mux.HandleFunc("DELETE /v1/me", h.deleteMe) // account deletion (#119): account.go
 	// release requests (#76): release.go
 	mux.HandleFunc("POST /v1/apps/{appId}/release-requests", h.createReleaseRequest)
 	mux.HandleFunc("GET /v1/apps/{appId}/release-requests", h.listAppReleaseRequests)

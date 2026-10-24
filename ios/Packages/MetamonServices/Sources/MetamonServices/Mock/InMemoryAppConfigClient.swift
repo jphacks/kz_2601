@@ -85,9 +85,10 @@ public enum MockSeed {
                 Record(id: "g3", data: ["name": "トイレットペーパー", "category": "日用品", "qty": 2, "done": false, "added": .string(today)], createdAt: iso),
                 Record(id: "g4", data: ["name": "パン", "category": "食品", "qty": 1, "done": true, "added": .string(today)], createdAt: iso),
             ],
-            // medicine(#132): 今日飲んだ 1 件・昨日飲んだ 1 件(今日は未チェック)・未服用 1 件
+            // medicine(#132/#172): 今日まで 3 日連続の 1 件・昨日飲んだ 1 件(今日は未チェック・履歴なしの旧形式)・未服用 1 件
             "medicine": [
-                Record(id: "d1", data: ["name": "血圧の薬", "timing": "朝", "taken_on": .string(today)], createdAt: iso),
+                Record(id: "d1", data: ["name": "血圧の薬", "timing": "朝", "taken_on": .string(today),
+                                        DailyCheck.historyKey("taken_on"): .array((0..<3).reversed().map { .string(FieldCoding.dateFormatter.string(from: now.addingTimeInterval(-86_400 * Double($0)))) })], createdAt: iso),
                 Record(id: "d2", data: ["name": "ビタミン剤", "timing": "昼", "taken_on": .string(FieldCoding.dateFormatter.string(from: now.addingTimeInterval(-86_400)))], createdAt: iso),
                 Record(id: "d3", data: ["name": "胃薬", "timing": "夜"], createdAt: iso),
             ],

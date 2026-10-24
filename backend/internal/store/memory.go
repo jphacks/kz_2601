@@ -33,6 +33,7 @@ type Memory struct {
 	owners   map[string]string          // app_owners/{appId} -> uid (memory_owner.go)
 	installs map[string]string          // public_apps/{id}/installs/{uid} -> appId
 	hub      hub                        // change notifications for Watcher (watch.go)
+	deleted  map[string]bool            // uids that called DELETE /v1/me (memory_account.go)
 }
 
 // NewMemory returns an empty store.

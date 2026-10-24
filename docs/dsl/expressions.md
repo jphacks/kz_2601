@@ -75,8 +75,12 @@ Expr := number | string | boolean
 | | `year` `month` `day` `weekday` | (d) | 数値(month 1-12、weekday 1=日 … 7=土) |
 | 変換 | `toNumber` `toString` | 任意 1 個 | 数値(変換不可はエラー)/ 文字列 |
 | その他 | `coalesce` | (a, b) | a が空(nil・空文字)/評価エラーなら b |
+| 毎日チェック(#172) | `streak` | (`{"ref": <toggle field>}`) | 数値 = 連続日数。今日チェック済みなら今日から、まだなら**昨日から**遡って続いた日数(今日未チェックでも昨日までの連続は切らない)。昨日も無ければ 0 |
+| | `doneInDays` | (`{"ref": <toggle field>}`, n) | 数値 = 直近 n 日(今日を含む)にチェックした日数(直近 7 日 = n 7)。n は整数リテラル 1..366 |
 
 日付引数は date / datetime フィールド、`today`/`now`/`addDays` の結果、`"YYYY-MM-DD"` 文字列を受け付ける。
+
+`streak` / `doneInDays` の第 1 引数は**値ではなく field の指定**: `list.item.resets: "daily"` の toggle に使われている同 entity の date field を `{"ref": ...}` で渡す(iOS はその行の「押した日の履歴」を読む・§7.5)。computed(integer)で使い、全体の値は stat.value の `agg sum / max` でその computed を集計する。stat.value 直下では行が無いので使えない。
 
 時刻引数(`hoursBetween`)は `"HH:mm"`(`"H:mm"`・`"HH:mm:ss"` も可)の文字列 = `timePicker` が string field に保存する形。datetime を渡したときは**その時刻部分だけ**を使う(日付は無視)。数値・真偽は backend が拒否する(`toNumber("09:30")` は 9.5 にならないので、時刻を数値化して引き算しない)。日付をまたいで 24 時間以上働く・2 日以上空く計算は対象外(§8)。
 
@@ -127,6 +131,7 @@ Expr := number | string | boolean
 | `hoursBetween` の引数 | `hoursBetween expects a "HH:mm" time string (or a datetime field) but got a number` |
 | `list.item.toggle` | `list item.toggle "name" must be a boolean field (got string)` / `... is computed (read-only)` |
 | `list.item.resets` | `... with resets daily must be a date field (got boolean)` / `... is a date field; add "resets":"daily"` / `... must not have defaultValue` |
+| `streak` / `doneInDays` | `streak needs {"ref": <daily check field>} of this entity` / `"started" is not a daily check; streak only works on a field used as list item.toggle with "resets":"daily"` / `number of days must be an integer literal 1..366` |
 | Stat 排他 | `stat takes either aggregate or value, not both` / `stat needs aggregate (with entity) or value` |
 
 ## 7. レシピ
@@ -145,6 +150,10 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
 4. **達成率**: stat{format:percent, value: `div(agg sum, 目標)`} + progressBar{entity, field, target}。
 5. **シフト・バイト代**: shift{date, start/end: string `"HH:mm"`(timePicker), wage: currency}。computed `hours` = `hoursBetween(ref start, ref end)`、`pay` = `round(hours * wage)`。今月の給料 = stat sum pay filter date thisMonth。
 6. **カウントダウン**: computed `days_left` = `daysUntil(ref date)`、最も近い予定 = `agg min days_left filter days_left gte 0`。
+7. **毎日チェックの連続日数・直近 7 日**(`examples/medicine.json`): medicine{name, taken_on: date} + list `item: {"toggle":"taken_on","resets":"daily","trailing":"streak"}`。
+   - `streak`(integer・unit 日) = `{"op":"streak","args":[{"ref":"taken_on"}]}`
+   - `last7`(integer・unit 回) = `{"op":"doneInDays","args":[{"ref":"taken_on"},7]}`
+   - 全体: 最長の連続 = stat.value `{"agg":"max","entity":"medicine","field":"streak"}`、直近 7 日の合計回数 = `{"agg":"sum","entity":"medicine","field":"last7"}`。実施記録 entity は作らない(丸を押しても増えず二重入力になる)。
 
 ## 7.5 一覧のワンタップ チェック(`list.item.toggle`, #108)
 
@@ -160,8 +169,16 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
 
 - 服薬・習慣のように「登録した項目が毎日未チェックで並ぶ」一覧。`item: {"toggle": "taken_on", "resets": "daily"}`。
 - toggle は **保存される date field**(defaultValue なし。backend の既定値補完でも `"now"` を入れない)。丸を押すと今日の日付(端末ローカル `YYYY-MM-DD`)を保存、もう一度押すと空に戻す。**値が今日なら済み**と表示するので、日付が変わると全行が未チェックに戻る。
-- 新しい entity は作らない(最後にやった日だけを持つ)。今日やった数 = `{"agg":"count","entity":"medicine","filter":{"field":"taken_on","op":"today","value":null}}`。
-- 割り切り: 履歴(何日に飲んだか)と 1 日に同じ項目を 2 回以上は持てない(朝・夜は項目を分ける)。連続日数(ストリーク)も出さない(出すなら toggle 時に「前回が昨日なら +1」で integer field を更新する形が最小)。
+- 新しい entity は作らない。今日やった数 = `{"agg":"count","entity":"medicine","filter":{"field":"taken_on","op":"today","value":null}}`。
+- **押した日の履歴(#172)**: iOS は丸を押すたびにレコードの `"<toggle field>__dates"`(例 `taken_on__dates`)に押した日を残す。DSL には宣言しない(appconfig が date field の隣のキーとして受け付ける)。
+  ```json
+  {"name": "血圧の薬", "taken_on": "2026-10-24", "taken_on__dates": ["2026-10-22", "2026-10-23", "2026-10-24"]}
+  ```
+  - 付けたら今日を足す・**外したら今日だけ消す**。toggle field は後方互換で「最後にやった日」のまま(付けたら今日、外したら残った最新日・無ければ空)なので、「値が今日なら済み」の判定と `filter op today` は従来どおり。
+  - 昇順・重複なし・最大 400 日(古い方から捨てる)。appconfig は `YYYY-MM-DD` 以外を 422 で拒否し、並べ替え・重複除去して保存する。
+  - 履歴の無い旧レコード(#132 の lastDoneDate だけ)は toggle の値を履歴の 1 件として読む(次に押した時に配列が作られる)。
+  - 連続日数 = computed `{"op":"streak","args":[{"ref":"taken_on"}]}`、直近 7 日の回数 = `{"op":"doneInDays","args":[{"ref":"taken_on"},7]}`(§3・§7 の 7)。
+- 割り切り: 1 日に同じ項目を 2 回以上は持てない(朝・夜は項目を分ける)。履歴は押した日だけで時刻は持たない。別端末で同じ日に同時に押した場合は後勝ち(配列ごと上書き)。
 - iOS の「今日」は DEBUG ビルドだけ環境変数 `METAMON_DEBUG_TODAY=YYYY-MM-DD` で差し替えられる(日付境界の確認用)。
 - 実例: `examples/medicine.json`。
 

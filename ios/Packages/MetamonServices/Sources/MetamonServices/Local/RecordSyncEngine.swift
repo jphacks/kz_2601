@@ -89,6 +89,14 @@ public final class RecordSyncEngine {
         started = false
     }
 
+    /// アカウント削除用(#119): 購読を止め、未送信キューとローカル DB を空にする。次の `start()` で再開できる。
+    public func wipe() async {
+        stop()
+        await queue.discardAll()
+        await store.removeEverything()
+        await refreshStatus()
+    }
+
     /// 前面復帰でも未送信を流す(背面でネットワークが戻っていた場合の取りこぼし防止)。
     public func setForeground(_ active: Bool) {
         isForeground = active

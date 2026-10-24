@@ -87,3 +87,61 @@ func (c *exprChecker) checkHoursBetweenArg(where string, got exprType) {
 		c.add("%s: hoursBetween expects a \"HH:mm\" time string (or a datetime field) but got a %s; pass the time fields directly, e.g. {\"op\":\"hoursBetween\",\"args\":[{\"ref\":\"start\"},{\"ref\":\"end\"}]}", where, got)
 	}
 }
+
+// MaxDoneInDays bounds doneInDays' n (iOS keeps about a year of history).
+const MaxDoneInDays = 366
+
+// DailyToggleFields collects entity id -> field ids used as list.item.toggle
+// with resets "daily" on any screen (#132). iOS records the checked days of
+// these fields, so streak / doneInDays may read them (#172).
+func DailyToggleFields(a *App) map[string]map[string]bool {
+	out := map[string]map[string]bool{}
+	var visit func(c *Component)
+	visit = func(c *Component) {
+		if c.Type == CompList && c.Item != nil && c.Item.Resets == "daily" && c.Item.Toggle != "" {
+			if out[c.Entity] == nil {
+				out[c.Entity] = map[string]bool{}
+			}
+			out[c.Entity][c.Item.Toggle] = true
+		}
+		for i := range c.Children {
+			visit(&c.Children[i])
+		}
+	}
+	for i := range a.Screens {
+		for j := range a.Screens[i].Components {
+			visit(&a.Screens[i].Components[j])
+		}
+	}
+	return out
+}
+
+// checkDailyHistory: streak / doneInDays read the checked-day history iOS
+// keeps for a resets daily toggle, so arg 0 must be a plain ref to that
+// field (not a value) and doneInDays' n a number literal 1..366 (#172).
+func (c *exprChecker) checkDailyHistory(where string, e *Expr, row *Entity) {
+	hint := `e.g. {"op":"streak","args":[{"ref":"taken_on"}]} where taken_on is the list item.toggle with "resets":"daily"`
+	if len(e.Args) == 0 || row == nil {
+		return // arity / "no current record" already reported
+	}
+	a := &e.Args[0]
+	if a.Kind != ExprRef || a.Ref == "id" || strings.Contains(a.Ref, ".") {
+		c.add("%s.%s.args[0]: %s needs {\"ref\": <daily check field>} of this entity (the history of checked days is read from it); %s", where, e.Op, e.Op, hint)
+		return
+	}
+	f := row.FieldByID(a.Ref)
+	if f == nil {
+		return // reported by the ref check
+	}
+	switch {
+	case f.Type != FieldDate || f.Computed != nil:
+		c.add("%s.%s.args[0]: %s needs the stored date field of a daily check (got %q: %s); %s", where, e.Op, e.Op, f.ID, f.Type, hint)
+	case c.daily != nil && !c.daily[row.ID][f.ID]:
+		c.add("%s.%s.args[0]: %q is not a daily check; %s only works on a field used as list item.toggle with \"resets\":\"daily\" (iOS records the checked days only there). Add that list or drop %s", where, e.Op, f.ID, e.Op, e.Op)
+	}
+	if e.Op == "doneInDays" && len(e.Args) == 2 {
+		if n, ok := e.Args[1].Number(); !ok || n < 1 || n > MaxDoneInDays || n != float64(int(n)) {
+			c.add("%s.doneInDays.args[1]: number of days must be an integer literal 1..%d (last 7 days = 7)", where, MaxDoneInDays)
+		}
+	}
+}
