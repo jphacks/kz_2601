@@ -17,6 +17,7 @@ struct SettingsSheet: View {
                 languageSection
                 voiceModelSection
                 clarifySection
+                speechSection
                 appSection
                 syncSection
                 connectionSection
@@ -111,6 +112,20 @@ struct SettingsSheet: View {
             Text("対話")
         } footer: {
             Text(ClarifyCopy.settingFooter)
+        }
+    }
+
+    /// 読み上げ(#43)。既定 OFF(理由は `SpeechReader.enabled`)。
+    private var speechSection: some View {
+        @Bindable var reader = SpeechReader.shared
+        return Section {
+            Toggle(SpeechCopy.settingTitle, isOn: $reader.enabled)
+                .tint(Theme.Colors.brandA)
+                .accessibilityIdentifier("settings.speech")
+        } header: {
+            Text(SpeechCopy.sectionTitle)
+        } footer: {
+            Text(SpeechCopy.settingFooter)
         }
     }
 

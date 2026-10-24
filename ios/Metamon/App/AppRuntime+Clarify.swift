@@ -138,6 +138,7 @@ extension AppRuntime {
                 chatTurn = turn
                 chatBubbles.append(ChatBubble(role: .assistant, text: turn.text))
             }
+            SpeechReader.shared.speak(turn.text) // #43 AI の質問(録音中・OFF なら喋らない)
             return turn
         } catch {
             guard epoch == chatEpoch else { return nil }

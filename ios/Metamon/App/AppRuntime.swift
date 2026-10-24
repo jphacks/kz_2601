@@ -142,6 +142,7 @@ final class AppRuntime: DSLRuntime {
         }
         Task { await services.notifications.sync(dsl.app.notifications) }
         #if DEBUG
+        autoNavigateIfRequested() // `METAMON_AUTO_NAV`(#113)
         // ヘッドレス E2E 用: `METAMON_E2E_PRESS_PRIMARY_AFTER=<秒>` で、その時点で状態カードが出ていれば主ボタン(もう一度 等)を押す(#60)
         if let raw = ProcessInfo.processInfo.environment["METAMON_E2E_PRESS_PRIMARY_AFTER"], let seconds = Double(raw), seconds > 0 {
             Task { [weak self] in
@@ -401,6 +402,7 @@ final class AppRuntime: DSLRuntime {
             startSync()
             if let summary = result.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
                 summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary))
+                SpeechReader.shared.speak(summary) // #43(設定 OFF なら何もしない)
             }
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
         } catch {
@@ -715,28 +717,28 @@ final class AppRuntime: DSLRuntime {
         Binding(get: { self.paths[stack] ?? [] }, set: { self.paths[stack] = $0 })
     }
 
+    /// 行き先は `NavigationResolver` が今いる場所で解決する(#113): 今のスタックにあれば pop・タブの根ならタブ切替・
+    /// モーダル内から下の画面へ飛ぶならモーダルを閉じる・それ以外は push。sheet / fullScreen 指定は従来どおり。
     private func navigate(to screen: String, presentation: Presentation?, recordId: String?, from route: Route) {
-        switch presentation ?? .push {
-        case .push:
-            paths[route.stack, default: []].append(Route(screen: screen, recordId: recordId, stack: route.stack))
-        case .sheet:
-            sheet = Route(screen: screen, recordId: recordId, stack: "sheet")
-        case .fullScreen:
-            fullScreen = Route(screen: screen, recordId: recordId, stack: "full")
-        }
+        setNavigation(NavigationResolver.navigate(navigationState, to: screen, presentation: presentation,
+                                                  recordId: recordId, from: route, dsl: dsl))
     }
 
     /// back: スタックに積まれていれば pop、モーダルの最下層なら dismiss。
     func close(_ route: Route) {
-        if !(paths[route.stack] ?? []).isEmpty {
-            paths[route.stack]?.removeLast()
-            return
-        }
-        switch route.stack {
-        case "sheet": sheet = nil
-        case "full": fullScreen = nil
-        default: break // main / tab の根は閉じない
-        }
+        setNavigation(NavigationResolver.close(navigationState, route))
+    }
+
+    private var navigationState: NavigationState {
+        NavigationState(paths: paths, selectedTab: selectedTab, sheet: sheet, fullScreen: fullScreen)
+    }
+
+    /// 変わったものだけ書き戻す(@Observable の無駄な再描画・NavigationStack の再設定を避ける)。
+    private func setNavigation(_ next: NavigationState) {
+        if next.sheet != sheet { sheet = next.sheet }
+        if next.fullScreen != fullScreen { fullScreen = next.fullScreen }
+        if next.selectedTab != selectedTab { selectedTab = next.selectedTab }
+        if next.paths != paths { paths = next.paths }
     }
 
     // MARK: - Actions
