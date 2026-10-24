@@ -393,43 +393,141 @@ func wantsNewApp(t string) bool {
 }
 
 // summarize renders the Japanese summary for a full generation
-// (edit turns get summary straight from the PatchDocument).
+// (edit turns get summary straight from the PatchDocument). It is read aloud
+// by iOS, so it is phrased as speech: "家計簿アプリを作りました。ホームと集計の
+// 2タブで、右下のボタンから支出を追加できます。毎朝8時に通知が届きます。"
 func summarize(a *dsl.App) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%sを作りました。", a.App.Name)
+	name := a.App.Name
+	if !strings.HasSuffix(name, "アプリ") {
+		name += "アプリ"
+	}
+	fmt.Fprintf(&b, "%sを作りました。", name)
 	if n := len(a.App.Tabs); n >= 2 {
 		titles := make([]string, 0, n)
 		for _, t := range a.App.Tabs {
 			titles = append(titles, t.Title)
 		}
-		fmt.Fprintf(&b, "%sの%dタブ構成で、", strings.Join(titles, "/"), n)
-	} else {
-		titles := make([]string, 0, len(a.Screens))
-		for _, s := range a.Screens {
-			if s.Title != "" {
-				titles = append(titles, s.Title)
-			}
-		}
-		if len(titles) > 0 {
-			fmt.Fprintf(&b, "%sの%d画面で、", strings.Join(titles, "/"), len(a.Screens))
-		}
+		fmt.Fprintf(&b, "%sの%dタブで、", joinJa(titles), n)
 	}
 	if len(a.Entities) > 0 {
 		names := make([]string, 0, len(a.Entities))
 		for _, e := range a.Entities {
 			names = append(names, e.Name)
 		}
-		fmt.Fprintf(&b, "%sを記録できます。", strings.Join(names, "・"))
+		if where := addButtonHint(a); where != "" {
+			fmt.Fprintf(&b, "%sから%sを追加できます。", where, joinJa(names))
+		} else {
+			fmt.Fprintf(&b, "%sを記録できます。", joinJa(names))
+		}
 	} else {
 		b.WriteString("すぐに使えます。")
 	}
 	for _, n := range a.App.Notifications {
-		if n.Time != "" {
-			when := map[string]string{"daily": "毎日", "weekly": "毎週", "once": ""}[n.Repeat]
-			fmt.Fprintf(&b, "%s%sに「%s」の通知を送ります。", when, n.Time, n.Title)
+		if when := notificationWhen(n); when != "" {
+			fmt.Fprintf(&b, "%sに通知が届きます。", when)
 		}
 	}
 	return b.String()
+}
+
+// joinJa joins 2 items with と, more with ・.
+func joinJa(items []string) string {
+	if len(items) == 2 {
+		return items[0] + "と" + items[1]
+	}
+	return strings.Join(items, "・")
+}
+
+// addButtonHint names where the "add" button is on the initial screen
+// ("右下のボタン", "右上の「追加」"), or "" when there is none.
+func addButtonHint(a *dsl.App) string {
+	forms := map[string]bool{}
+	for _, s := range a.Screens {
+		if s.Entity != "" {
+			forms[s.ID] = true
+		}
+	}
+	toForm := func(act *dsl.Action) bool {
+		return act != nil && act.Type == dsl.ActionNavigate && forms[act.Screen]
+	}
+	for _, s := range a.Screens {
+		if s.ID != a.InitialScreen {
+			continue
+		}
+		for _, c := range s.Components {
+			if c.Type == dsl.CompButton && toForm(c.Action) {
+				return areaPosition(c.Area) + "ボタン"
+			}
+		}
+		for _, tb := range s.Toolbar {
+			if toForm(&tb.Action) {
+				return "右上の「" + tb.Label + "」"
+			}
+		}
+	}
+	return ""
+}
+
+// areaPosition turns a grid rectangle into "右下の" / "左上の" / "下の" / "".
+func areaPosition(area string) string {
+	ar, err := dsl.ParseArea(area)
+	if err != nil {
+		return ""
+	}
+	v, h := "", ""
+	switch {
+	case ar.Row2 <= 4:
+		v = "上"
+	case ar.Row1 >= 9:
+		v = "下"
+	}
+	switch {
+	case ar.Col2 <= 2:
+		h = "左"
+	case ar.Col1 >= 3:
+		h = "右"
+	}
+	if v == "" && h == "" {
+		return ""
+	}
+	return h + v + "の"
+}
+
+// notificationWhen renders "毎朝8時" / "毎晩9時" / "毎日12時" / "毎週" / "".
+func notificationWhen(n dsl.Notification) string {
+	var hh, mm int
+	if _, err := fmt.Sscanf(n.Time, "%d:%d", &hh, &mm); err != nil {
+		if n.Repeat == "weekly" {
+			return "毎週"
+		}
+		return ""
+	}
+	clock := fmt.Sprintf("%d時", hh)
+	switch {
+	case hh >= 18:
+		clock = fmt.Sprintf("%d時", hh-12)
+	case hh == 0:
+		clock = "0時"
+	}
+	if mm != 0 {
+		clock += fmt.Sprintf("%d分", mm)
+	}
+	switch n.Repeat {
+	case "daily":
+		switch {
+		case hh >= 18:
+			return "毎晩" + clock
+		case hh < 11:
+			return "毎朝" + clock
+		default:
+			return "毎日" + clock
+		}
+	case "weekly":
+		return "毎週" + clock
+	default:
+		return clock
+	}
 }
 
 func mapStoreErr(err error) error {

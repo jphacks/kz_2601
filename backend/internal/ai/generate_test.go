@@ -79,7 +79,7 @@ func TestCreate_RegeneratesOnProblemsThenSucceeds(t *testing.T) {
 	if !strings.Contains(f.calls[1].Messages[0].Content, "overlaps") {
 		t.Fatalf("second prompt should carry the problems: %s", f.calls[1].Messages[0].Content)
 	}
-	if !strings.Contains(res.Summary, "家計簿を作りました") || !strings.Contains(res.Summary, "ホーム/集計の2タブ") {
+	if res.Summary != "家計簿アプリを作りました。ホームと集計の2タブで、右下のボタンから支出を追加できます。" {
 		t.Fatalf("summary: %s", res.Summary)
 	}
 	if res.Meta.Usage.InputTokens != 20 || res.Meta.Usage.OutputTokens != 10 {

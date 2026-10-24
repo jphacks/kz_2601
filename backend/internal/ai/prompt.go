@@ -34,6 +34,10 @@ var systemPrompt = strings.TrimSpace(`
 - 上限: 画面 12・entity 6・entity あたり field 20・1 階層あたり component 30。
 - 金額は type "currency"(unit "円")。日付は type "date"(defaultValue "now")。写真は type "photo" + photoField(source camera)。
 - リマインド(「毎朝8時に通知」など)は app.notifications[] に {id,title,body,repeat:daily,time:"08:00"} として宣言する。
+- **発話に無い機能を足さない**(2026-10-24 eval: 読書/水分/筋トレで未要求の集計タブ+chart、散歩/体重で未要求の毎日通知が付いた):
+  - chart と集計タブは「グラフ・推移・内訳・割合」のように可視化を求められた時だけ。求められていなければ stat + list のホーム画面とフォーム画面(必要ならタブ無し)で済ませる。
+  - app.notifications は「通知・リマインド・知らせて・忘れないように」と言われた時だけ。「毎朝記録する」「夜に見返したい」は使う時間の説明であって毎日の通知の依頼ではない。後者は任意で押せる scheduleNotification ボタン(repeat once)程度に留める。
+  - 下の例は形式の参考。タブ名・stat・画面構成は例をコピーせず、その発話の用途に合わせる(例: 毎日つけるものは「今日 / 履歴」)。
 - voiceEntry は "floating" を既定にする("none" にしない。ユーザーが声でアプリを変え続けられること)。
 - UI 文言はすべて日本語。app.icon / tab.icon / button.icon は SF Symbols 名。theme.primaryColor は #RRGGBB。
 
@@ -74,7 +78,10 @@ var systemPrompt = strings.TrimSpace(`
 var editRules = strings.TrimSpace(`
 
 ## 編集ターンのルール(JSON Patch RFC 6902)
-- 出力は {"patch": [{"op": "add|remove|replace|move|copy|test", "path": "/JSON/Pointer", "from"?: "...", "value"?: ...}], "summary": "..."} の JSON オブジェクト 1 つだけ。patch は「現在の DSL」に対する操作の配列(最大 50)。summary は変更内容を表す日本語の一文(iOS が読み上げる)。
+- 出力は {"patch": [{"op": "add|remove|replace|move|copy|test", "path": "/JSON/Pointer", "from"?: "...", "value"?: ...}], "summary": "..."} の JSON オブジェクト 1 つだけ。patch は「現在の DSL」に対する操作の配列(最大 50)。
+- summary は iOS がそのまま読み上げる自然な日本語 1 文(40 字程度まで・「。」で終える)。「カテゴリにカフェを追加しました。」「追加ボタンを左上に移しました。」のように何がどう変わったかだけを言う。経緯や補足説明は書かない。
+- すでに満たされている場合は、その値を確認する test 操作 1 つだけの patch にし(空の patch は不可)、summary は「すでに〜になっています。」と短く答える。
+- 部品を消した結果その画面が空になるなら、その画面と対応する tab も remove する(空のタブを残さない)。
 - value はプリミティブか、上の Schema の部分文書(Entity / Field / Screen / Component / Action / Tab / Notification など)かその配列。
 - 配列 index は「現在の DSL」のものをそのまま使う。末尾追加は "/-"。既存要素の置換は replace、削除は remove。
 - ユーザーが言及していない画面・entity・field・部品は触らない。entity の既存 field id はリネームしない。
