@@ -17,6 +17,8 @@ public struct Services {
     public var sharing: (any SharingClient)?
     /// アカウント削除(#119)。live では `HTTPAccountClient`、それ以外はモック(成功のみ)。
     public var account: any AccountClient = MockAccountClient()
+    /// リリース申請(#76)。sharing と同じく live の時だけ。
+    public var releaseRequests: (any ReleaseRequestClient)?
 
     public init(
         auth: any AuthService,

@@ -22,6 +22,7 @@ tags:
   - { name: records }
   - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。architecture.md §3.2' }
   - { name: account, description: 'アカウント削除(#119)。architecture.md §4.1' }
+  - { name: release, description: 'リリース申請(#76)。architecture.md §3.3' }
 
 paths:
   /apps:
@@ -528,6 +529,47 @@ paths:
         '204': { description: 削除済み(何も無くても 204) }
         '401': { description: 未認証, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '500': { description: 途中で失敗。再実行で続きから削除される, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /apps/{appId}/release-requests:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    post:
+      tags: [release]
+      summary: 単体アプリとしてのリリースを申請(所有者のみ・冪等)
+      description: |
+        自分のアプリの**現行 DSL のスナップショット**(version)と用途・連絡先を `release_requests/{id}` に `status=received` で保存する。
+        同じアプリの申請中(`declined` 以外)が既にあれば**何も書かずに既存を 200 で返す**(409 にしない)。`declined` の後は新しい申請を作れる。
+        他人のアプリは自分の木に無いので 404。status は API では変えず、管理者が Firestore コンソールで書き換える。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [purpose]
+              properties:
+                purpose: { type: string, minLength: 1, maxLength: 200, description: 用途の一言(前後の空白は除去) }
+                contact: { type: string, maxLength: 100, description: 連絡先(任意) }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ReleaseRequest' } } } }
+        '200': { description: 申請中が既にあった(既存を返す), content: { application/json: { schema: { $ref: '#/components/schemas/ReleaseRequest' } } } }
+        '400': { description: purpose が空・長すぎる / 未知のキー, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    get:
+      tags: [release]
+      summary: このアプリへの自分の申請(新しい順)
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/ReleaseRequest' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /release-requests:
+    get:
+      tags: [release]
+      summary: 自分の申請(全アプリ・新しい順・最大 200)
+      description: 変身一覧のカードに status バッジを 1 回の呼び出しで付けるため。
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/ReleaseRequest' } } } } } }
 
   /healthz:
     get:
@@ -703,6 +745,19 @@ components:
         mine: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    ReleaseRequest:
+      type: object
+      required: [id, appId, name, dslVersion, purpose, status]
+      properties:
+        id: { type: string, example: rr_06GPVRYJ58VK8KN57T8W54M124 }
+        appId: { type: string }
+        name: { type: string, description: 申請時のアプリ名 }
+        dslVersion: { type: integer, description: スナップショットした version(DSL 本体はレスポンスに含めない) }
+        purpose: { type: string }
+        contact: { type: string }
+        status: { type: string, enum: [received, reviewing, planned, declined], description: 'received=受付 / reviewing=検討中 / planned=リリース予定 / declined=見送り。管理者がコンソールで変更' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, description: 'API が書いた時刻(コンソールで status を変えても自動では更新されない)' }
     InstallResult:
       description: AppWithDSL + 複製の結果
       allOf:
