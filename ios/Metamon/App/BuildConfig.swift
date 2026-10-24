@@ -23,6 +23,9 @@ enum AppEnvironment {
 /// **DI の入口**。`Services` はここで1回だけ組み立て、`MetamonApp` が `AppRuntime` と SwiftUI Environment(`\.services`)に渡す。
 /// Mock / 本番の差し替えはこのファイルだけで完結する(View / Runtime は protocol にしか依存しない)。
 enum BuildConfig {
+    /// ウィジェットと共有する App Group(entitlements と一致。実体は両ターゲット共通の `WidgetSnapshot`)。
+    static let appGroupID = WidgetSnapshot.appGroupID
+
     /// `METAMON_MOCK=1`(Scheme の環境変数)で URL 設定を無視して全モック起動(オフラインでの UI 確認用)。
     static var forceMock: Bool {
         ProcessInfo.processInfo.environment["METAMON_MOCK"] == "1"

@@ -110,6 +110,7 @@ final class AppRuntime: DSLRuntime {
             swap()
         }
         Task { await services.notifications.sync(doc.dsl.app.notifications) }
+        WidgetSnapshotWriter.write(dsl: doc.dsl, records: records) // ホーム画面ウィジェットへ stat を反映
     }
 
     /// 発話 → ai サービス → 最新 DSL 適用。
@@ -174,6 +175,7 @@ final class AppRuntime: DSLRuntime {
         defer { loading.remove(entity) }
         do {
             records[entity] = try await services.appConfig.list(appId: document.appId, entity: entity)
+            WidgetSnapshotWriter.write(dsl: dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         } catch {
             toast = error.localizedDescription
         }
