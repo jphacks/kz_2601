@@ -100,9 +100,9 @@ final class ExprEvaluatorTests: XCTestCase {
         let dsl = try ExamplesFixture.load("warikan")
         let records: [String: [Record]] = [
             "members": [
-                Record(id: "m1", data: ["name": "A"]),
-                Record(id: "m2", data: ["name": "B"]),
-                Record(id: "m3", data: ["name": "C"]),
+                Record(id: "m1", data: ["name": "たろう"]),
+                Record(id: "m2", data: ["name": "はなこ"]),
+                Record(id: "m3", data: ["name": "じろう"]),
             ],
             "expenses": [
                 Record(id: "e1", data: ["title": "宿", "amount": 9000, "payer": "m1"]),
@@ -119,13 +119,13 @@ final class ExprEvaluatorTests: XCTestCase {
         let members = ev.viewRecords(for: "members")
         let byName = Dictionary(uniqueKeysWithValues: members.map { ($0["name"].stringValue!, $0) })
         // 合計 15000 / 3 人 = 5000
-        XCTAssertEqual(byName["A"]?["paid"].doubleValue, 10500)
-        XCTAssertEqual(byName["B"]?["paid"].doubleValue, 4500)
-        XCTAssertEqual(byName["C"]?["paid"].doubleValue, 0)
-        XCTAssertEqual(byName["A"]?["share"].doubleValue, 5000)
-        XCTAssertEqual(byName["A"]?["balance"].doubleValue, 5500)
-        XCTAssertEqual(byName["B"]?["balance"].doubleValue, -500)
-        XCTAssertEqual(byName["C"]?["balance"].doubleValue, -5000)
+        XCTAssertEqual(byName["たろう"]?["paid"].doubleValue, 10500)
+        XCTAssertEqual(byName["はなこ"]?["paid"].doubleValue, 4500)
+        XCTAssertEqual(byName["じろう"]?["paid"].doubleValue, 0)
+        XCTAssertEqual(byName["たろう"]?["share"].doubleValue, 5000)
+        XCTAssertEqual(byName["たろう"]?["balance"].doubleValue, 5500)
+        XCTAssertEqual(byName["はなこ"]?["balance"].doubleValue, -500)
+        XCTAssertEqual(byName["じろう"]?["balance"].doubleValue, -5000)
         XCTAssertNil(records["members"]?[0].data["balance"], "computed は保存レコードに入れない")
 
         // agg の field に computed を指定: balance の合計は 0
@@ -133,7 +133,44 @@ final class ExprEvaluatorTests: XCTestCase {
         XCTAssertEqual(sum?.number, 0)
 
         let t = Settlement.transfers(members.map { ($0["name"].stringValue!, $0["balance"].doubleValue!) })
-        XCTAssertEqual(t, [.init(from: "C", to: "A", amount: 5000), .init(from: "B", to: "A", amount: 500)])
+        XCTAssertEqual(t, [.init(from: "じろう", to: "たろう", amount: 5000), .init(from: "はなこ", to: "たろう", amount: 500)])
+    }
+
+    /// 正典 warikan.json のホーム: stat 合計(aggregate)¥15,000 / stat 1人あたり(value)¥5,000 / 支出の per_person。
+    func testWarikanHomeStatsAndPerPerson() throws {
+        let (dsl, records) = try warikan()
+        let ev = ExprEvaluator(dsl: dsl, records: { records[$0] ?? [] })
+        let stats = try XCTUnwrap(dsl.screen("home")?.components.first?.children)
+        XCTAssertEqual(stats.map(\.label), ["合計", "1人あたり"])
+        let total = Aggregator.aggregate(stats[0].aggregate, field: stats[0].field, over: ev.viewRecords(for: "expenses"))
+        XCTAssertEqual(total, 15000)
+        XCTAssertEqual(Aggregator.format(total, as: stats[0].format), "¥15,000")
+        XCTAssertNil(stats[1].aggregate)
+        let perPerson = try XCTUnwrap(ev.evaluate(try XCTUnwrap(stats[1].valueExpr))?.number)
+        XCTAssertEqual(perPerson, 5000)
+        XCTAssertEqual(Aggregator.format(perPerson, as: stats[1].format), "¥5,000")
+        let expenses = Dictionary(uniqueKeysWithValues: ev.viewRecords(for: "expenses").map { ($0.id, $0) })
+        XCTAssertEqual(expenses["e1"]?["per_person"].doubleValue, 3000)
+        XCTAssertEqual(expenses["e2"]?["per_person"].doubleValue, 1500)
+        // 支出フォームの payer は picker(ref)、computed に束縛した入力部品は無い
+        let form = try XCTUnwrap(dsl.screen("expense_form")?.components.first?.children)
+        XCTAssertEqual(form.first { $0.field == "payer" }?.type, .picker)
+        XCTAssertFalse(form.contains { $0.field == "per_person" })
+    }
+
+    /// 正典 bmi.json: 体重 65kg / 身長 170cm → 22.5(小数 1 桁)。
+    func testBMIExample() throws {
+        let dsl = try ExamplesFixture.load("bmi")
+        let records = ["body": [
+            Record(id: "b1", data: ["date": "2026-10-24", "weight": 65, "height": 170]),
+            Record(id: "b2", data: ["date": "2026-10-23", "weight": 70, "height": 175]),
+        ]]
+        let ev = ExprEvaluator(dsl: dsl, records: { records[$0] ?? [] })
+        let rows = Dictionary(uniqueKeysWithValues: ev.viewRecords(for: "body").map { ($0.id, $0) })
+        XCTAssertEqual(rows["b1"]?["bmi"].doubleValue, 22.5)
+        XCTAssertEqual(rows["b2"]?["bmi"].doubleValue, 22.9)
+        let avgStat = try XCTUnwrap(dsl.screen("home")?.components.first)
+        XCTAssertEqual(Aggregator.aggregate(avgStat.aggregate, field: avgStat.field, over: ev.viewRecords(for: "body")), 22.7, accuracy: 1e-9)
     }
 
     func testAggFilterArrayAndEmpty() throws {

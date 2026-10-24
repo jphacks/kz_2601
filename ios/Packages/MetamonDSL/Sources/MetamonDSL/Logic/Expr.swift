@@ -2,12 +2,14 @@ import Foundation
 
 /// 計算式(Issue #101・backend #100 と共通契約)。JSON 表現:
 /// ```
-/// Expr := number | string | boolean | null
+/// Expr := number | string | boolean
 ///       | {"ref": "<fieldId>"}                       行コンテキストのフィールド値("id" でレコード id)
 ///       | {"agg": "count|sum|avg|min|max", "entity": "...", "field"?: "...", "filter"?: Filter | [Filter]}
 ///       | {"op": "<name>", "args": [Expr, ...]}
 ///       | {"if": Expr, "then": Expr, "else": Expr}
 /// ```
+/// 正典は `docs/dsl/expressions.md` / `dsl.schema.json` の `Expr`(ExprRef / ExprAgg / ExprOp / ExprIf)。
+/// 契約上リテラルに null は無いが、デコードは寛容に受けて `.literal(.null)` にする(then/else 省略時の既定値にも使う)。
 /// 評価は `ExprEvaluator`。形の壊れた式はデコードで throw する(呼び出し側が try? で握る)。
 public indirect enum Expr: Hashable, Sendable {
     case literal(JSONValue)
