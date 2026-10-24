@@ -122,6 +122,7 @@ struct VoiceInputView: View {
                     .overlay(Circle().strokeBorder(Theme.Colors.hairline))
             }
             .accessibilityLabel("設定")
+            .accessibilityIdentifier("voice.settings")
         }
         .padding(.top, Theme.Spacing.sm)
     }

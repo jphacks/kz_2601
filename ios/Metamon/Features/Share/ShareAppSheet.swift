@@ -55,6 +55,7 @@ struct ShareAppSheet: View {
                     .background(Theme.Colors.surface, in: Circle())
             }
             .accessibilityLabel("閉じる")
+            .accessibilityIdentifier("share.close")
         }
     }
 

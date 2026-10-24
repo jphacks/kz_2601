@@ -88,6 +88,7 @@ struct ClarifyChatView: View {
                                 .overlay(Capsule().strokeBorder(Theme.Colors.brandA.opacity(0.35)))
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("chat.chip")
                     }
                 }
                 .padding(.horizontal, 1)

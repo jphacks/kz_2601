@@ -57,6 +57,7 @@ struct AppCardActions: View {
                         Button { sharingUI.shareTarget = app } label: {
                             Label("シェア・公開", systemImage: "square.and.arrow.up")
                         }
+                        .accessibilityIdentifier("switcher.share")
                     }
                     if rt.services.releaseRequests != nil {
                         Button { releaseUI.target = app } label: {
@@ -72,6 +73,7 @@ struct AppCardActions: View {
                         .overlay(Circle().strokeBorder(.white.opacity(0.3)))
                 }
                 .accessibilityLabel(L10n.tr("\(app.name)のメニュー"))
+                .accessibilityIdentifier("switcher.cardMenu")
             }
             if let req = releaseUI.byApp[app.id] {
                 ReleaseStatusBadge(status: req.kind)

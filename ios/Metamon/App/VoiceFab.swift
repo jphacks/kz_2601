@@ -147,6 +147,7 @@ struct VoiceFab: View {
         )
         .accessibilityLabel("話しかけて変える")
         .accessibilityHint("長押しで変身一覧")
+        .accessibilityIdentifier("voice.fab")
         .accessibilityAction(named: "変身一覧") { onLongPress() }
         .accessibilityAction(named: "反対側へ移動") {
             withAnimation(snapAnimation) { sideRaw = (side == .leading ? FabSide.trailing : .leading).rawValue }
@@ -195,6 +196,7 @@ struct VoiceFab: View {
             )
             .accessibilityElement()
             .accessibilityLabel("話しかけて変える。ダブルタップで表示")
+            .accessibilityIdentifier("voice.fabHandle")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { reveal() }
             .accessibilityAction(named: "変身一覧") { onLongPress() }
