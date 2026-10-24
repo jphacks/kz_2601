@@ -150,10 +150,55 @@ type convStore struct {
 	now  func() time.Time
 	ttl  time.Duration
 	keep int
+	// pending: an early-returned question whose brief/transcript are still
+	// being generated (closed by finish).
+	pending map[string]chan struct{}
 }
 
 func newConvStore() *convStore {
-	return &convStore{m: map[string]*conversation{}, now: time.Now, ttl: chatTTL, keep: chatMaxMessages}
+	return &convStore{m: map[string]*conversation{}, now: time.Now, ttl: chatTTL, keep: chatMaxMessages,
+		pending: map[string]chan struct{}{}}
+}
+
+// begin marks appID as having a background update in flight.
+func (c *convStore) begin(appID string) chan struct{} {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ch := make(chan struct{})
+	c.pending[appID] = ch
+	return ch
+}
+
+// finish applies fn to the stored conversation if it is still cv (not
+// cleared or replaced), then releases waiters.
+func (c *convStore) finish(appID string, ch chan struct{}, cv *conversation, fn func(*conversation)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.m[appID] == cv {
+		fn(cv)
+	}
+	if c.pending[appID] == ch {
+		delete(c.pending, appID)
+	}
+	close(ch)
+}
+
+// wait blocks until the background update for appID (if any) has finished,
+// the context ends or max elapses.
+func (c *convStore) wait(ctx context.Context, appID string, max time.Duration) {
+	c.mu.Lock()
+	ch := c.pending[appID]
+	c.mu.Unlock()
+	if ch == nil {
+		return
+	}
+	t := time.NewTimer(max)
+	defer t.Stop()
+	select {
+	case <-ch:
+	case <-ctx.Done():
+	case <-t.C:
+	}
 }
 
 func (c *convStore) get(appID string) *conversation {
@@ -207,6 +252,13 @@ func (s *Service) conversations() *convStore {
 func (s *Service) ClearChat(appID string) { s.conversations().delete(appID) }
 
 // Chat runs one clarify turn.
+//
+// Latency (#147): a question needs only kind/text/suggestions, which come
+// first in ChatSchema. The first Claude call streams, and as soon as those
+// three fields are complete the question is returned; brief/transcript (the
+// material for a later shortcut ready) finish in the background and are
+// stored then. The next turn on the same appId waits for that (the user is
+// still answering, so in practice it is already done).
 func (s *Service) Chat(ctx context.Context, req ChatRequest) (*ChatResult, error) {
 	started := time.Now()
 	if req.AppID == "" {
@@ -217,6 +269,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (*ChatResult, error
 		return nil, err
 	}
 	store := s.conversations()
+	store.wait(ctx, req.AppID, s.chatTimeout())
 	cv := store.get(req.AppID)
 	if cv == nil {
 		cv = &conversation{}
@@ -259,37 +312,68 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (*ChatResult, error
 
 	force := turn > chatMaxTurns || goAhead
 	ar := &attemptResult{}
-	var reply *chatReply
-	var problems []string
-	for i := 0; i < 2; i++ {
-		resp, ttft, cerr := s.callChat(ctx, cfg, chatUserMessage(cv.messages, loc, turn, force, problems), ar)
-		if cerr != nil {
-			return nil, cerr
+	var att chatAttempt
+	if !force {
+		// First attempt in the background; an early question wins the race.
+		bgAR := &attemptResult{}
+		questions := make(chan earlyQuestion, 1)
+		done := make(chan chatAttempt, 1)
+		bctx := context.WithoutCancel(ctx)
+		prompt := chatUserMessage(cv.messages, loc, turn, false, nil)
+		callStart := time.Now()
+		go func() {
+			done <- s.chatAttempt(bctx, cfg, prompt, bgAR, func(q earlyQuestion) { questions <- q })
+		}()
+		select {
+		case q := <-questions:
+			res.Kind, res.Source = "question", "claude"
+			res.Text = strings.TrimSpace(q.reply.Text)
+			res.Suggestions = cleanSuggestions(q.reply.Suggestions)
+			res.FirstTokenMs = q.ttft.Milliseconds()
+			res.Meta = Meta{Model: cfg.Model, Attempts: 1}
+			cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: res.Text})
+			pending := store.begin(req.AppID)
+			store.put(req.AppID, cv)
+			go func() {
+				a := <-done
+				store.finish(req.AppID, pending, cv, func(c *conversation) {
+					if a.reply != nil {
+						b := cleanBrief(a.reply.Brief)
+						c.brief, c.transcript = &b, transcriptOr(a.reply.Transcript, userTexts)
+					}
+				})
+			}()
+			res.LatencyMs = Latency{Claude: time.Since(callStart).Milliseconds(), Total: time.Since(started).Milliseconds()}
+			return res, nil
+		case att = <-done:
+			*ar = *bgAR
+		case <-ctx.Done():
+			return nil, &Error{Status: http.StatusGatewayTimeout, Code: "timeout", Message: "clarify turn cancelled"}
 		}
-		res.FirstTokenMs = ttft.Milliseconds()
-		var r chatReply
-		if uerr := json.Unmarshal(extractJSON(resp.Text), &r); uerr != nil {
-			problems = []string{"output is not valid JSON for the schema: " + uerr.Error()}
-			continue
-		}
-		if r.Kind != "question" && r.Kind != "ready" {
-			problems = []string{`kind must be "question" or "ready"`}
-			continue
-		}
-		reply = &r
-		break
+	} else {
+		att = s.chatAttempt(ctx, cfg, chatUserMessage(cv.messages, loc, turn, true, nil), ar, nil)
 	}
-	if reply == nil {
-		return nil, &Error{Status: http.StatusBadGateway, Code: "generation_failed",
-			Message: "could not produce a clarify turn", Problems: problems, Attempts: ar.meta.Attempts}
+	if att.err != nil {
+		return nil, att.err
 	}
+	if att.reply == nil {
+		// one retry with the problems of the first output
+		att2 := s.chatAttempt(ctx, cfg, chatUserMessage(cv.messages, loc, turn, force, att.problems), ar, nil)
+		if att2.err != nil {
+			return nil, att2.err
+		}
+		if att2.reply == nil {
+			return nil, &Error{Status: http.StatusBadGateway, Code: "generation_failed",
+				Message: "could not produce a clarify turn", Problems: att2.problems, Attempts: ar.meta.Attempts}
+		}
+		att = att2
+	}
+	reply := att.reply
+	res.FirstTokenMs = att.ttft.Milliseconds()
 	res.Meta = ar.meta
 	res.Source = "claude"
 	brief := cleanBrief(reply.Brief)
-	transcript := strings.TrimSpace(reply.Transcript)
-	if transcript == "" {
-		transcript = strings.Join(userTexts, "。")
-	}
+	transcript := transcriptOr(reply.Transcript, userTexts)
 	cv.brief, cv.transcript = &brief, transcript
 
 	if reply.Kind == "ready" || force {
@@ -314,14 +398,114 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (*ChatResult, error
 	return res, nil
 }
 
-// callChat is call() with the small schema sent as output_config.format. It
-// streams so the time to the first output token can be reported.
-func (s *Service) callChat(ctx context.Context, cfg ChatConfig, user string, ar *attemptResult) (*Response, time.Duration, error) {
-	timeout := s.CallTimeout
-	if timeout == 0 {
-		timeout = 40 * time.Second
+func transcriptOr(t string, userTexts []string) string {
+	if t = strings.TrimSpace(t); t != "" {
+		return t
 	}
-	cctx, cancel := context.WithTimeout(ctx, timeout)
+	return strings.Join(userTexts, "。")
+}
+
+func (s *Service) chatTimeout() time.Duration {
+	if s.CallTimeout == 0 {
+		return 40 * time.Second
+	}
+	return s.CallTimeout
+}
+
+// chatAttempt is one Claude call plus parsing. onQuestion, when set, is called
+// once (from the streaming goroutine) as soon as a complete question has
+// streamed.
+type earlyQuestion struct {
+	reply chatReply
+	ttft  time.Duration
+}
+
+type chatAttempt struct {
+	reply    *chatReply
+	problems []string
+	ttft     time.Duration
+	err      error
+}
+
+func (s *Service) chatAttempt(ctx context.Context, cfg ChatConfig, user string, ar *attemptResult, onQuestion func(earlyQuestion)) chatAttempt {
+	var buf strings.Builder
+	sent := false
+	start := time.Now()
+	var first time.Duration
+	resp, ttft, err := s.callChat(ctx, cfg, user, ar, func(delta string) {
+		if first == 0 {
+			first = time.Since(start)
+		}
+		if onQuestion == nil || sent {
+			return
+		}
+		buf.WriteString(delta)
+		if q, ok := partialQuestion(buf.String()); ok {
+			sent = true
+			onQuestion(earlyQuestion{reply: q, ttft: first})
+		}
+	})
+	if err != nil {
+		return chatAttempt{err: err}
+	}
+	var r chatReply
+	if uerr := json.Unmarshal(extractJSON(resp.Text), &r); uerr != nil {
+		return chatAttempt{problems: []string{"output is not valid JSON for the schema: " + uerr.Error()}, ttft: ttft}
+	}
+	if r.Kind != "question" && r.Kind != "ready" {
+		return chatAttempt{problems: []string{`kind must be "question" or "ready"`}, ttft: ttft}
+	}
+	return chatAttempt{reply: &r, ttft: ttft}
+}
+
+// partialQuestion reports a question whose kind, text and suggestions are
+// complete in the streamed JSON prefix.
+func partialQuestion(prefix string) (chatReply, bool) {
+	f := completeFields(prefix)
+	var q chatReply
+	if f["kind"] == nil || f["text"] == nil || f["suggestions"] == nil {
+		return q, false
+	}
+	if json.Unmarshal(f["kind"], &q.Kind) != nil || q.Kind != "question" {
+		return q, false
+	}
+	if json.Unmarshal(f["text"], &q.Text) != nil || strings.TrimSpace(q.Text) == "" {
+		return q, false
+	}
+	if json.Unmarshal(f["suggestions"], &q.Suggestions) != nil {
+		return q, false
+	}
+	return q, true
+}
+
+// completeFields returns the top-level members of a JSON object prefix whose
+// values are already complete (a cut-off string or array is left out).
+func completeFields(prefix string) map[string]json.RawMessage {
+	out := map[string]json.RawMessage{}
+	dec := json.NewDecoder(strings.NewReader(prefix))
+	if t, err := dec.Token(); err != nil || t != json.Delim('{') {
+		return out
+	}
+	for dec.More() {
+		kt, err := dec.Token()
+		if err != nil {
+			return out
+		}
+		key, _ := kt.(string)
+		var v json.RawMessage
+		if err := dec.Decode(&v); err != nil {
+			return out
+		}
+		out[key] = v
+	}
+	return out
+}
+
+// callChat is call() with the small schema sent as output_config.format. It
+// always streams: onText (optional) sees each delta, and the time to the
+// first output token is returned.
+func (s *Service) callChat(ctx context.Context, cfg ChatConfig, user string, ar *attemptResult, onText func(string)) (*Response, time.Duration, error) {
+	cctx, cancel := context.WithTimeout(ctx, s.chatTimeout())
 	defer cancel()
 	t := time.Now()
 	var ttft time.Duration
@@ -334,9 +518,12 @@ func (s *Service) callChat(ctx context.Context, cfg ChatConfig, user string, ar 
 		Model:      cfg.Model,
 		Effort:     cfg.Effort,
 		Thinking:   cfg.Thinking,
-		OnText: func(string) {
+		OnText: func(d string) {
 			if ttft == 0 {
 				ttft = time.Since(t)
+			}
+			if onText != nil {
+				onText(d)
 			}
 		},
 	})
