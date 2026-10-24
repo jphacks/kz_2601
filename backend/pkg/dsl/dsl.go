@@ -1,10 +1,278 @@
-// Package dsl holds the Server-Driven UI schema shared by all services.
-// NOTE: placeholder. The real schema is defined after the Day1 design sync.
+// Package dsl holds the Server-Driven UI schema (v0.1) shared by all services.
+//
+// The canonical schema is docs/backend/dsl.schema.json (copied to schema.json
+// in this package and embedded). Go types mirror it 1:1; Component is a single
+// flattened struct discriminated by Type so that JSON round-trips losslessly
+// and the human backend dev does not need custom (un)marshalers.
+//
+// Design rule: the tree is intentionally non-recursive
+// (Screen > Container > Leaf). Claude structured outputs reject recursive
+// schemas, and iOS gets a bounded renderer.
 package dsl
 
-// App is the root document that describes a whole generated application.
+// SchemaVersion is the only accepted value of App.SchemaVersion in v0.
+const SchemaVersion = "0.1"
+
+// App is the root document (one per app version) stored in Firestore.
 type App struct {
+	SchemaVersion string   `json:"schemaVersion"`
+	App           AppMeta  `json:"app"`
+	InitialScreen string   `json:"initialScreen"`
+	Entities      []Entity `json:"entities"`
+	Screens       []Screen `json:"screens"`
+}
+
+// AppMeta describes the whole app.
+type AppMeta struct {
+	Name          string         `json:"name"`
+	Description   string         `json:"description,omitempty"`
+	Icon          string         `json:"icon,omitempty"`
+	Theme         *Theme         `json:"theme,omitempty"`
+	VoiceEntry    VoiceEntry     `json:"voiceEntry"`
+	Notifications []Notification `json:"notifications,omitempty"` // iOS re-syncs local notifications on every version
+}
+
+// Notification is a local notification (P0 native feature).
+type Notification struct {
 	ID      string `json:"id"`
-	Version int    `json:"version"`
-	Name    string `json:"name"`
+	Title   string `json:"title"`
+	Body    string `json:"body"`
+	Repeat  string `json:"repeat"`            // once|daily|weekly
+	Time    string `json:"time,omitempty"`    // HH:MM local
+	Weekday string `json:"weekday,omitempty"` // mon..sun (weekly)
+}
+
+// VoiceEntry is how the user re-enters voice mode.
+type VoiceEntry string
+
+const (
+	VoiceEntryFullscreen VoiceEntry = "fullscreen"
+	VoiceEntryFloating   VoiceEntry = "floating"
+	VoiceEntryNone       VoiceEntry = "none"
+)
+
+// Theme is a minimal theme hint; iOS owns the rest.
+type Theme struct {
+	PrimaryColor string `json:"primaryColor,omitempty"`
+	Mode         string `json:"mode,omitempty"` // system|light|dark
+}
+
+// Entity is a generic data model (e.g. 家計簿の支出). Records are stored by
+// appconfig under apps/{appId}/entities/{entityId}/records.
+type Entity struct {
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	TitleField string  `json:"titleField,omitempty"`
+	Fields     []Field `json:"fields"`
+}
+
+// FieldType is the closed set of record field types.
+type FieldType string
+
+const (
+	FieldString   FieldType = "string"
+	FieldText     FieldType = "text"
+	FieldInteger  FieldType = "integer"
+	FieldNumber   FieldType = "number"
+	FieldBoolean  FieldType = "boolean"
+	FieldDate     FieldType = "date"
+	FieldDatetime FieldType = "datetime"
+	FieldEnum     FieldType = "enum"
+	FieldCurrency FieldType = "currency"
+	FieldPhoto    FieldType = "photo"    // https URL uploaded by iOS to Firebase Storage
+	FieldLocation FieldType = "location" // "lat,lng"
+)
+
+// Field is one column of an Entity.
+type Field struct {
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Type         FieldType `json:"type"`
+	Required     bool      `json:"required,omitempty"`
+	Options      []string  `json:"options,omitempty"`
+	DefaultValue any       `json:"defaultValue,omitempty"` // string|number|bool|nil; "now" for date types
+	Unit         string    `json:"unit,omitempty"`
+}
+
+// Screen is one navigable page.
+type Screen struct {
+	ID         string          `json:"id"`
+	Title      string          `json:"title"`
+	Entity     string          `json:"entity,omitempty"` // form screen over this entity
+	Toolbar    []ToolbarButton `json:"toolbar,omitempty"`
+	Components []Component     `json:"components"`
+}
+
+// ToolbarButton is a navigation-bar button.
+type ToolbarButton struct {
+	Label  string `json:"label"`
+	Icon   string `json:"icon,omitempty"`
+	Action Action `json:"action"`
+}
+
+// ActionType is the closed set of actions.
+type ActionType string
+
+const (
+	ActionNavigate      ActionType = "navigate"
+	ActionBack          ActionType = "back"
+	ActionSaveRecord    ActionType = "saveRecord"
+	ActionDeleteRecord  ActionType = "deleteRecord"
+	ActionOpenVoice     ActionType = "openVoice"
+	ActionOpenURL       ActionType = "openUrl"
+	ActionResetForm     ActionType = "resetForm"
+	ActionScheduleNotif ActionType = "scheduleNotification"
+	ActionCancelNotif   ActionType = "cancelNotification"
+)
+
+// Action is a non-nesting side effect triggered by buttons/list taps.
+type Action struct {
+	Type           ActionType    `json:"type"`
+	Screen         string        `json:"screen,omitempty"`
+	Presentation   string        `json:"presentation,omitempty"` // push|sheet|fullScreen
+	Entity         string        `json:"entity,omitempty"`
+	URL            string        `json:"url,omitempty"`
+	ConfirmMessage string        `json:"confirmMessage,omitempty"`
+	Notification   *Notification `json:"notification,omitempty"`   // scheduleNotification
+	NotificationID string        `json:"notificationId,omitempty"` // cancelNotification
+}
+
+// ComponentType discriminates Component.
+type ComponentType string
+
+const (
+	// containers (children = leaves only)
+	CompVStack  ComponentType = "vstack"
+	CompHStack  ComponentType = "hstack"
+	CompSection ComponentType = "section"
+	// leaves
+	CompText        ComponentType = "text"
+	CompButton      ComponentType = "button"
+	CompTextField   ComponentType = "textField"
+	CompNumberField ComponentType = "numberField"
+	CompDatePicker  ComponentType = "datePicker"
+	CompPicker      ComponentType = "picker"
+	CompToggle      ComponentType = "toggle"
+	CompPhotoField  ComponentType = "photoField" // camera / library -> photo field
+	CompImage       ComponentType = "image"      // displays a photo field
+	CompList        ComponentType = "list"
+	CompStat        ComponentType = "stat"
+	CompChart       ComponentType = "chart"
+	CompVoiceInput  ComponentType = "voiceInput"
+	CompSpacer      ComponentType = "spacer"
+	CompDivider     ComponentType = "divider"
+)
+
+// ContainerTypes lists component types that may have Children.
+var ContainerTypes = map[ComponentType]bool{CompVStack: true, CompHStack: true, CompSection: true}
+
+// Component is a flattened union of all component kinds. Which fields are
+// meaningful depends on Type (see docs/backend/dsl-proposal.md).
+type Component struct {
+	Type ComponentType `json:"type"`
+	ID   string        `json:"id,omitempty"`
+
+	// container
+	Title    string      `json:"title,omitempty"` // section, chart
+	Spacing  string      `json:"spacing,omitempty"`
+	Children []Component `json:"children,omitempty"`
+
+	// text / button / inputs
+	Text        string  `json:"text,omitempty"`
+	Style       string  `json:"style,omitempty"` // text style | button style | picker style
+	Align       string  `json:"align,omitempty"`
+	Label       string  `json:"label,omitempty"`
+	Icon        string  `json:"icon,omitempty"`
+	Action      *Action `json:"action,omitempty"`
+	Field       string  `json:"field,omitempty"` // input binding / stat & chart value field
+	Placeholder string  `json:"placeholder,omitempty"`
+	Multiline   bool    `json:"multiline,omitempty"`
+	Unit        string  `json:"unit,omitempty"`
+	IncludeTime bool    `json:"includeTime,omitempty"`
+	Source      string  `json:"source,omitempty"` // photoField: camera|library|both
+	Height      string  `json:"height,omitempty"` // image: small|medium|large
+
+	// data-bound (list / stat / chart)
+	Entity        string    `json:"entity,omitempty"`
+	Item          *ListItem `json:"item,omitempty"`
+	Sort          *Sort     `json:"sort,omitempty"`
+	Filter        *Filter   `json:"filter,omitempty"`
+	EmptyText     string    `json:"emptyText,omitempty"`
+	OnItemTap     *Action   `json:"onItemTap,omitempty"`
+	SwipeToDelete bool      `json:"swipeToDelete,omitempty"`
+	Aggregate     string    `json:"aggregate,omitempty"` // count|sum|avg|min|max
+	Format        string    `json:"format,omitempty"`    // plain|currency|percent
+	Kind          string    `json:"kind,omitempty"`      // bar|line|pie
+	GroupBy       string    `json:"groupBy,omitempty"`
+	Bucket        string    `json:"bucket,omitempty"` // day|week|month
+
+	// voiceInput / spacer
+	Prompt string `json:"prompt,omitempty"`
+	Size   string `json:"size,omitempty"`
+}
+
+// ListItem maps record fields onto a list row.
+type ListItem struct {
+	Title    string `json:"title"`
+	Subtitle string `json:"subtitle,omitempty"`
+	Trailing string `json:"trailing,omitempty"`
+	Icon     string `json:"icon,omitempty"`
+	Image    string `json:"image,omitempty"` // photo field id -> thumbnail
+}
+
+// Sort orders a list.
+type Sort struct {
+	Field     string `json:"field"`
+	Direction string `json:"direction"` // asc|desc
+}
+
+// Filter narrows records for list/stat/chart.
+type Filter struct {
+	Field string `json:"field"`
+	Op    string `json:"op"` // eq|neq|gt|gte|lt|lte|thisMonth|today
+	Value any    `json:"value"`
+}
+
+// Initial returns the seed DSL every new user starts from (voice screen only).
+func Initial() App {
+	return App{
+		SchemaVersion: SchemaVersion,
+		App: AppMeta{
+			Name:        "はじめてのアプリ",
+			Description: "話しかけるとアプリに変わる初期状態",
+			Icon:        "waveform",
+			VoiceEntry:  VoiceEntryFullscreen,
+		},
+		InitialScreen: "home",
+		Entities:      []Entity{},
+		Screens: []Screen{{
+			ID:    "home",
+			Title: "",
+			Components: []Component{
+				{Type: CompSpacer, Size: "flexible"},
+				{Type: CompVoiceInput, ID: "mic", Prompt: "どんなアプリが欲しい？", Size: "large"},
+				{Type: CompSpacer, Size: "flexible"},
+			},
+		}},
+	}
+}
+
+// EntityByID returns the entity or nil.
+func (a *App) EntityByID(id string) *Entity {
+	for i := range a.Entities {
+		if a.Entities[i].ID == id {
+			return &a.Entities[i]
+		}
+	}
+	return nil
+}
+
+// FieldByID returns the field or nil.
+func (e *Entity) FieldByID(id string) *Field {
+	for i := range e.Fields {
+		if e.Fields[i].ID == id {
+			return &e.Fields[i]
+		}
+	}
+	return nil
 }

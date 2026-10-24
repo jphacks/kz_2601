@@ -1,0 +1,155 @@
+openapi: 3.1.0
+info:
+  title: ai API
+  version: 0.1.0
+  description: |
+    音声/文字 → Claude → DSL JSON 生成 → appconfig へ反映。
+    - 認証・エラー形式・ページングは appconfig と同一 (`openapi-appconfig.yaml` の `Error` を再利用)。
+    - ai は受け取った Bearer をそのまま appconfig へ転送する。
+servers:
+  - url: http://localhost:8081/v1
+  - url: https://ai-REPLACE.a.run.app/v1
+security:
+  - firebaseAuth: []
+
+paths:
+  /generate:
+    post:
+      summary: 発話から新しい DSL を生成して適用
+      description: |
+        **2 モード (確定)**: 初回生成 = フル DSL、2 回目以降の改変 = JSON Patch (RFC 6902)。
+        1. text(または audio→Whisper で text) を得る
+        2. appconfig から現行 DSL を取得 (`baseVersion` 省略時は現行)
+        3. モード判定: 現行が初期状態(entities 空・音声画面のみ) or `mode=create` → **full**。それ以外 → **patch** (`mode=auto` の既定)。「元に戻して」は restore
+        4. full: Claude 構造化出力 (root AppDSL) → `dsl.Parse` → `PUT /apps/{appId}/dsl`
+           patch: Claude 構造化出力 (root PatchDocument `{patch, summary}`) → `dsl.ApplyPatch` で事前検証 → `PATCH /apps/{appId}/dsl`
+           検証 NG は最大 2 回再生成。patch が 3 回失敗したら full に降格 → それも失敗ならテンプレ fallback → 422
+        5. appconfig が 409 なら最新を取り直して 1 回だけ再生成
+        6. 新 DSL と要約を返す。iOS は返却 `dsl` を即時適用してよい (再 GET 不要)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GenerateRequest' }
+          multipart/form-data:
+            schema:
+              type: object
+              required: [appId, audio]
+              properties:
+                appId: { type: string }
+                baseVersion: { type: integer }
+                audio: { type: string, format: binary, description: m4a/wav/mp3 ≤25MB ≤60s }
+                language: { type: string, default: ja }
+      responses:
+        '200':
+          description: 生成・適用成功
+          content: { application/json: { schema: { $ref: '#/components/schemas/GenerateResponse' } } }
+        '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
+        '404': { description: appId が存在しない, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '409':
+          description: baseVersion 指定時に再試行後も競合
+          content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } }
+        '422':
+          description: 生成失敗 (再生成・fallback とも不成立)。iOS は「うまく聞き取れませんでした」を再生
+          content:
+            application/json:
+              schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' }
+              example:
+                error:
+                  code: generation_failed
+                  message: could not produce a valid app from the request
+                  details: { transcript: えーっと, attempts: 2, problems: ['screen "home" components[0]: list entity "x" does not exist'] }
+        '429': { description: Claude/Whisper のレート制限 (Retry-After 付き), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+
+  /transcribe:
+    post:
+      summary: 音声→文字 (optional。WhisperKit が使えない端末向け)
+      description: '`OPENAI_API_KEY` 未設定時は 501 `not_configured`。'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [audio]
+              properties:
+                audio: { type: string, format: binary }
+                language: { type: string, default: ja }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [text]
+                properties:
+                  text: { type: string }
+                  language: { type: string }
+                  durationMs: { type: integer }
+        '413': { description: 音声が大きすぎる, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '501': { description: 未設定, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+
+  /healthz:
+    get:
+      security: []
+      summary: liveness
+      responses: { '200': { description: ok } }
+
+components:
+  securitySchemes:
+    firebaseAuth: { type: http, scheme: bearer, bearerFormat: Firebase ID token }
+  schemas:
+    GenerateRequest:
+      type: object
+      required: [appId, text]
+      properties:
+        appId: { type: string }
+        text: { type: string, description: 文字起こし済みの発話 (WhisperKit 経由) }
+        baseVersion:
+          type: integer
+          description: iOS が今表示している version。省略時はサーバー側で現行を取得 (競合検知を iOS が気にしない場合)
+        mode:
+          type: string
+          enum: [auto, create, edit, undo]
+          default: auto
+          description: |
+            create = 既存を捨てて新規アプリ (フル DSL / PUT)。edit = 既存を Patch で編集 (PATCH)。undo = 1 つ前に restore。
+            auto = 現行が初期状態なら create、それ以外は edit (「元に戻して」「新しく作り直して」はキーワードで判定)
+      example: { appId: app_01HXYZ, text: 家計簿アプリが欲しい。金額とカテゴリとメモを記録したい, baseVersion: 1 }
+    GenerateResponse:
+      type: object
+      required: [appId, version, mode, dsl, summary, source]
+      properties:
+        appId: { type: string }
+        version: { type: integer, description: 新しく作られた version }
+        previousVersion: { type: integer }
+        mode:
+          type: string
+          enum: [full, patch, restore]
+          description: 実際に使われた適用モード (patch が full に降格した場合は full)
+        patch:
+          type: array
+          description: mode=patch の時、適用した RFC 6902 ops (iOS は使わなくてよい。デバッグ・表示用)
+          items: { $ref: './dsl.schema.json#/$defs/PatchOp' }
+        dsl: { $ref: './dsl.schema.json', description: 適用後のフル DSL (iOS はこれを即適用) }
+        summary: { type: string, example: 家計簿アプリを作成しました。支出の記録と今月の合計、カテゴリ別の内訳が見られます }
+        transcript: { type: string, description: 入力が audio の時の文字起こし }
+        source:
+          type: string
+          enum: [claude, fallback_template]
+          description: fallback_template の時 iOS は控えめな文言で案内
+        changes:
+          type: array
+          description: 機械生成した差分 (summary の材料)
+          items:
+            type: object
+            required: [kind, target]
+            properties:
+              kind: { type: string, enum: [screen_added, screen_removed, screen_changed, entity_added, entity_removed, field_added, field_removed, app_renamed, theme_changed] }
+              target: { type: string }
+        latencyMs:
+          type: object
+          properties: { transcribe: { type: integer }, claude: { type: integer }, total: { type: integer } }

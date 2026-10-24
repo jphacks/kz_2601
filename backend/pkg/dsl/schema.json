@@ -1,0 +1,1174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jphacks/kz_2601/docs/backend/dsl.schema.json",
+  "title": "AppDSL",
+  "description": "Server-Driven UI DSL v0. Non-recursive by design (Claude structured output compatible): Screen > Component(container) > Leaf. No numeric/string length constraints here; limits are enforced by the Go validator (pkg/dsl). $defs/PatchDocument is the structured-output schema for edit turns (RFC 6902).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "app",
+    "initialScreen",
+    "entities",
+    "screens"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "app": {
+      "$ref": "#/$defs/AppMeta"
+    },
+    "initialScreen": {
+      "type": "string",
+      "description": "Screen id shown at launch."
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Entity"
+      }
+    },
+    "screens": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Screen"
+      }
+    }
+  },
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "description": "snake_case or kebab-case ASCII id, unique within its scope. Validated by Go (^[a-z][a-z0-9_-]{0,39}$)."
+    },
+    "AppMeta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "voiceEntry"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string",
+          "description": "SF Symbols name, e.g. yensign.circle"
+        },
+        "theme": {
+          "$ref": "#/$defs/Theme"
+        },
+        "voiceEntry": {
+          "type": "string",
+          "enum": [
+            "fullscreen",
+            "floating",
+            "none"
+          ],
+          "description": "How the user re-enters voice mode to change the app. fullscreen = the initial voice-only state."
+        },
+        "notifications": {
+          "type": "array",
+          "description": "Local notifications iOS schedules when this DSL version is loaded (re-synced on every version).",
+          "items": {
+            "$ref": "#/$defs/Notification"
+          }
+        }
+      }
+    },
+    "Theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "primaryColor": {
+          "type": "string",
+          "description": "#RRGGBB"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "system",
+            "light",
+            "dark"
+          ]
+        }
+      }
+    },
+    "Entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "fields"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name (ja ok)"
+        },
+        "titleField": {
+          "type": "string",
+          "description": "Field id used as the record title in lists."
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Field"
+          }
+        }
+      }
+    },
+    "Field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "type"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "text",
+            "integer",
+            "number",
+            "boolean",
+            "date",
+            "datetime",
+            "enum",
+            "currency",
+            "photo",
+            "location"
+          ],
+          "description": "photo = https URL of an image iOS uploaded to Firebase Storage. location = \"lat,lng\" string."
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "options": {
+          "type": "array",
+          "description": "Only for type=enum.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "defaultValue": {
+          "description": "Literal default. For date/datetime the string \"now\" is allowed.",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "description": "e.g. 円, kg"
+        }
+      }
+    },
+    "Screen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "components"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "title": {
+          "type": "string"
+        },
+        "entity": {
+          "type": "string",
+          "description": "If set, the screen is a form over this entity: inputs with `field` bind to a draft record. Opened with a recordId -> edit mode."
+        },
+        "toolbar": {
+          "type": "array",
+          "description": "Trailing navigation-bar buttons.",
+          "items": {
+            "$ref": "#/$defs/ToolbarButton"
+          }
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Component"
+          }
+        }
+      }
+    },
+    "ToolbarButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "action"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/$defs/Action"
+        }
+      }
+    },
+    "Action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "navigate",
+            "back",
+            "saveRecord",
+            "deleteRecord",
+            "openVoice",
+            "openUrl",
+            "resetForm",
+            "scheduleNotification",
+            "cancelNotification"
+          ]
+        },
+        "screen": {
+          "type": "string",
+          "description": "navigate / saveRecord: target screen id."
+        },
+        "presentation": {
+          "type": "string",
+          "enum": [
+            "push",
+            "sheet",
+            "fullScreen"
+          ]
+        },
+        "entity": {
+          "type": "string",
+          "description": "saveRecord / deleteRecord: entity id."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "confirmMessage": {
+          "type": "string",
+          "description": "If set, iOS shows a confirm dialog first."
+        },
+        "notification": {
+          "$ref": "#/$defs/Notification",
+          "description": "scheduleNotification only."
+        },
+        "notificationId": {
+          "type": "string",
+          "description": "cancelNotification only."
+        }
+      }
+    },
+    "Component": {
+      "description": "Top-level component inside a screen. Containers may hold Leaf children (one level only).",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Container"
+        },
+        {
+          "$ref": "#/$defs/Leaf"
+        }
+      ]
+    },
+    "Container": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "children"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "vstack",
+            "hstack",
+            "section"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "title": {
+          "type": "string",
+          "description": "section only."
+        },
+        "spacing": {
+          "type": "string",
+          "enum": [
+            "none",
+            "small",
+            "medium",
+            "large"
+          ]
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Leaf"
+          }
+        }
+      }
+    },
+    "Leaf": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Text"
+        },
+        {
+          "$ref": "#/$defs/Button"
+        },
+        {
+          "$ref": "#/$defs/TextField"
+        },
+        {
+          "$ref": "#/$defs/NumberField"
+        },
+        {
+          "$ref": "#/$defs/DatePicker"
+        },
+        {
+          "$ref": "#/$defs/Picker"
+        },
+        {
+          "$ref": "#/$defs/Toggle"
+        },
+        {
+          "$ref": "#/$defs/PhotoField"
+        },
+        {
+          "$ref": "#/$defs/Image"
+        },
+        {
+          "$ref": "#/$defs/List"
+        },
+        {
+          "$ref": "#/$defs/Stat"
+        },
+        {
+          "$ref": "#/$defs/Chart"
+        },
+        {
+          "$ref": "#/$defs/VoiceInput"
+        },
+        {
+          "$ref": "#/$defs/Spacer"
+        },
+        {
+          "$ref": "#/$defs/Divider"
+        }
+      ]
+    },
+    "Text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "text"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "text": {
+          "type": "string"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "title",
+            "headline",
+            "body",
+            "caption"
+          ]
+        },
+        "align": {
+          "type": "string",
+          "enum": [
+            "leading",
+            "center",
+            "trailing"
+          ]
+        }
+      }
+    },
+    "Button": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "label",
+        "action"
+      ],
+      "properties": {
+        "type": {
+          "const": "button"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "label": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary",
+            "destructive",
+            "plain"
+          ]
+        },
+        "action": {
+          "$ref": "#/$defs/Action"
+        }
+      }
+    },
+    "TextField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "textField"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "field": {
+          "type": "string",
+          "description": "Field id of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "multiline": {
+          "type": "boolean"
+        }
+      }
+    },
+    "NumberField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "numberField"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "field": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        }
+      }
+    },
+    "DatePicker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "datePicker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "field": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "includeTime": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Picker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "picker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "field": {
+          "type": "string",
+          "description": "Must be an enum field; options come from the field."
+        },
+        "label": {
+          "type": "string"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "menu",
+            "segmented",
+            "wheel"
+          ]
+        }
+      }
+    },
+    "Toggle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field",
+        "label"
+      ],
+      "properties": {
+        "type": {
+          "const": "toggle"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "field": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "List": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "item"
+      ],
+      "properties": {
+        "type": {
+          "const": "list"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "item": {
+          "$ref": "#/$defs/ListItem"
+        },
+        "sort": {
+          "$ref": "#/$defs/Sort"
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        },
+        "emptyText": {
+          "type": "string"
+        },
+        "onItemTap": {
+          "$ref": "#/$defs/Action",
+          "description": "Usually navigate to a form screen; iOS passes recordId."
+        },
+        "swipeToDelete": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Field id."
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Field id."
+        },
+        "trailing": {
+          "type": "string",
+          "description": "Field id (e.g. amount, date)."
+        },
+        "icon": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string",
+          "description": "Field id of a photo field shown as thumbnail."
+        }
+      }
+    },
+    "Sort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "direction"
+      ],
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "asc",
+            "desc"
+          ]
+        }
+      }
+    },
+    "Filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "op",
+        "value"
+      ],
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "eq",
+            "neq",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "thisMonth",
+            "today"
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "Stat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "label",
+        "entity",
+        "aggregate"
+      ],
+      "properties": {
+        "type": {
+          "const": "stat"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "label": {
+          "type": "string"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "aggregate": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum",
+            "avg",
+            "min",
+            "max"
+          ]
+        },
+        "field": {
+          "type": "string",
+          "description": "Required unless aggregate=count."
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "plain",
+            "currency",
+            "percent"
+          ]
+        }
+      }
+    },
+    "Chart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "kind",
+        "groupBy",
+        "aggregate"
+      ],
+      "properties": {
+        "type": {
+          "const": "chart"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "title": {
+          "type": "string"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "bar",
+            "line",
+            "pie"
+          ]
+        },
+        "groupBy": {
+          "type": "string",
+          "description": "Field id (enum/date). Dates are bucketed by iOS per `bucket`."
+        },
+        "bucket": {
+          "type": "string",
+          "enum": [
+            "day",
+            "week",
+            "month"
+          ]
+        },
+        "aggregate": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum",
+            "avg"
+          ]
+        },
+        "field": {
+          "type": "string"
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        }
+      }
+    },
+    "VoiceInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "voiceInput"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Caption shown under the mic, e.g. どんなアプリが欲しい？"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "compact",
+            "large"
+          ]
+        }
+      }
+    },
+    "Spacer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "spacer"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large",
+            "flexible"
+          ]
+        }
+      }
+    },
+    "Divider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "divider"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        }
+      }
+    },
+    "Notification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "body",
+        "repeat"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "title": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "repeat": {
+          "type": "string",
+          "enum": [
+            "once",
+            "daily",
+            "weekly"
+          ]
+        },
+        "time": {
+          "type": "string",
+          "description": "HH:MM local time (daily/weekly/once)."
+        },
+        "weekday": {
+          "type": "string",
+          "enum": [
+            "mon",
+            "tue",
+            "wed",
+            "thu",
+            "fri",
+            "sat",
+            "sun"
+          ],
+          "description": "weekly only."
+        }
+      }
+    },
+    "PhotoField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "photoField"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "field": {
+          "type": "string",
+          "description": "Must be a photo field of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "camera",
+            "library",
+            "both"
+          ]
+        }
+      }
+    },
+    "Image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "image"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "field": {
+          "type": "string",
+          "description": "photo field of the screen entity (form/detail screens)."
+        },
+        "height": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ]
+        }
+      }
+    },
+    "PatchValue": {
+      "description": "Values a patch may insert: primitives or DSL sub-documents (no free-form objects, to stay structured-output compatible).",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/AppMeta"
+        },
+        {
+          "$ref": "#/$defs/Theme"
+        },
+        {
+          "$ref": "#/$defs/Notification"
+        },
+        {
+          "$ref": "#/$defs/Entity"
+        },
+        {
+          "$ref": "#/$defs/Field"
+        },
+        {
+          "$ref": "#/$defs/Screen"
+        },
+        {
+          "$ref": "#/$defs/ToolbarButton"
+        },
+        {
+          "$ref": "#/$defs/Action"
+        },
+        {
+          "$ref": "#/$defs/Component"
+        },
+        {
+          "$ref": "#/$defs/ListItem"
+        },
+        {
+          "$ref": "#/$defs/Sort"
+        },
+        {
+          "$ref": "#/$defs/Filter"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Notification"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Entity"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Field"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Screen"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolbarButton"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Component"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Leaf"
+          }
+        }
+      ]
+    },
+    "PatchOp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "path"
+      ],
+      "description": "RFC 6902 operation against the current App document.",
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": [
+            "add",
+            "remove",
+            "replace",
+            "move",
+            "copy",
+            "test"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "description": "JSON Pointer, e.g. /screens/0/components/- or /entities/0/fields/2"
+        },
+        "from": {
+          "type": "string",
+          "description": "move/copy only."
+        },
+        "value": {
+          "$ref": "#/$defs/PatchValue"
+        }
+      }
+    },
+    "PatchDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "patch",
+        "summary"
+      ],
+      "description": "Structured-output root for edit turns.",
+      "properties": {
+        "patch": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PatchOp"
+          }
+        },
+        "summary": {
+          "type": "string",
+          "description": "One Japanese sentence describing the change, read aloud by iOS."
+        }
+      }
+    }
+  }
+}
