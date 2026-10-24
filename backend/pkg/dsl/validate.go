@@ -715,6 +715,9 @@ func checkAggregateRef(where string, c *Component, entities map[string]*Entity, 
 }
 
 func checkProgressBar(where string, c *Component, entities map[string]*Entity, add func(string, ...any)) {
+	if c.Tone != "" && c.Tone != "positive" && c.Tone != "negative" {
+		add("%s: progressBar tone %q must be positive (goal) or negative (budget)", where, c.Tone)
+	}
 	if c.Value != nil {
 		if v, ok := c.Value.Number(); !ok {
 			add("%s: progressBar value must be a number literal 0..1 (expressions are only for stat.value)", where)

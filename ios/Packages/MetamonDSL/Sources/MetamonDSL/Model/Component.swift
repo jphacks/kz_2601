@@ -109,6 +109,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var output: String?         // 結果を入れる field
     public var options: [String]?      // classify の候補(nil = enum field の options)
     public var target: Double?         // progressBar entity モードの分母
+    public var tone: String?           // progressBar: positive(目標)| negative(予算)・#140
     public var url: String?            // link
     public var image: String?          // avatar リテラル(https / data URL)
     public var message: String?        // emptyState
@@ -148,6 +149,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case by
         case nameField, balanceField
         case task, input, output, options
+        case tone
     }
 
     public init(from decoder: Decoder) throws {
@@ -213,6 +215,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         output = try? c.decodeIfPresent(String.self, forKey: .output)
         options = try? c.decodeIfPresent([String].self, forKey: .options)
         target = try? c.decodeIfPresent(Double.self, forKey: .target)
+        tone = try? c.decodeIfPresent(String.self, forKey: .tone)
         url = try? c.decodeIfPresent(String.self, forKey: .url)
         image = try? c.decodeIfPresent(String.self, forKey: .image)
         message = try? c.decodeIfPresent(String.self, forKey: .message)

@@ -45,7 +45,7 @@
       "id": "home",
       "title": "旅行の割り勘",
       "toolbar": [
-        { "label": "支出を追加", "icon": "plus", "action": { "type": "navigate", "screen": "expense_form", "presentation": "sheet" } }
+        { "label": "メンバー追加", "icon": "person.badge.plus", "action": { "type": "navigate", "screen": "member_form", "presentation": "sheet" } }
       ],
       "components": [
         {
@@ -60,17 +60,15 @@
         },
         { "type": "table", "id": "members_table", "area": "A3:F5", "entity": "members",
           "columns": [ { "field": "name" }, { "field": "paid" }, { "field": "balance" } ] },
-        { "type": "settlement", "id": "settle", "area": "A6:F8", "entity": "members", "nameField": "name", "balanceField": "balance" },
+        { "type": "settlement", "id": "settle", "area": "A6:F7", "entity": "members", "nameField": "name", "balanceField": "balance" },
         {
-          "type": "section", "id": "recent", "area": "A9:F10", "title": "支出",
+          "type": "section", "id": "recent", "area": "A8:F10", "title": "支出",
           "children": [
             { "type": "list", "entity": "expenses", "item": { "title": "title", "subtitle": "payer", "trailing": "amount" },
               "sort": { "field": "date", "direction": "desc" }, "emptyText": "まだ支出がありません", "swipeToDelete": true,
               "onItemTap": { "type": "navigate", "screen": "expense_form", "presentation": "push" } }
           ]
         },
-        { "type": "button", "id": "add_member", "area": "A11:C12", "label": "メンバー追加", "icon": "person.badge.plus", "style": "secondary",
-          "action": { "type": "navigate", "screen": "member_form", "presentation": "sheet" } },
         { "type": "button", "id": "add_expense", "area": "D11:F12", "label": "支出を追加", "icon": "plus",
           "action": { "type": "navigate", "screen": "expense_form", "presentation": "sheet" } }
       ]

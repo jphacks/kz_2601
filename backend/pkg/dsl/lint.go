@@ -27,6 +27,7 @@ func (a *App) Lint() []string {
 	l.screens()
 	l.entityReach()
 	l.navGraph()
+	l.micSeat()
 	return l.out
 }
 
@@ -482,4 +483,36 @@ func usesPickAgg(c *Component) bool {
 		})
 	}
 	return found
+}
+
+// micSeat (#140): the voice FAB sits at the bottom-left (A-B) of non-form
+// screens. A part anchored in the screen's last 2 rows there pushes the FAB up
+// onto list rows (visual audit #131: 5/18). Mirrors iOS
+// FabClearance.obstructedRows; a screen taller than 12 rows is checked at its
+// last 2 rows (where the FAB ends up when scrolled to the bottom).
+func (l *linter) micSeat() {
+	const seatCols, seatRows, anchorRows = 2, 2, 3
+	for _, s := range l.app.Screens {
+		if s.Entity != "" {
+			continue
+		}
+		areas := make(map[int]Area, len(s.Components))
+		last := GridVisibleRows
+		for i := range s.Components {
+			if a, err := ParseArea(s.Components[i].Area); err == nil {
+				areas[i] = a
+				last = max(last, a.Row2)
+			}
+		}
+		for i := range s.Components {
+			a, ok := areas[i]
+			// reaches the last 2 rows and starts at most 3 rows above the end
+			// (a taller part is the background the FAB floats over)
+			if !ok || a.Col1 >= seatCols || a.Row2 <= last-seatRows || a.Row1 < last-anchorRows {
+				continue
+			}
+			c := &s.Components[i]
+			l.add("screen %q components[%d]: %s %s sits on the mic button's seat (bottom-left A-B of the last 2 rows); keep it empty and put the button at the bottom-right (e.g. D11:F12) or in the toolbar", s.ID, i, c.Type, c.Area)
+		}
+	}
 }

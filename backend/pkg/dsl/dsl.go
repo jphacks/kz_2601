@@ -329,6 +329,7 @@ type Component struct {
 	Color         string        `json:"color,omitempty"`         // SemanticColor enum
 	Value         *Expr         `json:"value,omitempty"`         // stat: Expr / progressBar (0..1) & gauge: number literal
 	Target        *float64      `json:"target,omitempty"`        // progressBar entity mode denominator
+	Tone          string        `json:"tone,omitempty"`          // progressBar: positive (goal) | negative (budget)
 	URL           string        `json:"url,omitempty"`           // link
 	Image         string        `json:"image,omitempty"`         // avatar literal (https / data URL)
 	Message       string        `json:"message,omitempty"`       // emptyState
