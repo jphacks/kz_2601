@@ -10,7 +10,7 @@ struct ChartLeaf: View {
     var body: some View {
         let entityId = c.entity ?? ""
         let entity = rt.dsl.entity(entityId)
-        let rows = Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId))
+        let rows = rt.filteredRecords(c)
         let buckets = Aggregator.buckets(c, entity: entity, records: rows)
         VStack(alignment: .leading, spacing: 8) {
             if let title = c.title { Text(title).font(RenderTheme.Fonts.cardTitle) }

@@ -44,7 +44,7 @@
         { "label": "保存", "action": { "type": "saveRecord", "entity": "body" } }
       ],
       "components": [
-        { "type": "section", "title": "体",
+        { "type": "section", "id": "fields", "area": "A1:F6", "title": "体",
           "children": [
             { "type": "datePicker", "field": "date", "label": "日付" },
             { "type": "numberField", "field": "weight", "label": "体重", "unit": "kg" },

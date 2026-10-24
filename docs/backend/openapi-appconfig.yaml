@@ -20,6 +20,7 @@ tags:
   - { name: versions }
   - { name: entities }
   - { name: records }
+  - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。architecture.md §3.2' }
 
 paths:
   /apps:
@@ -396,6 +397,120 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /apps/{appId}/share:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    post:
+      tags: [sharing]
+      summary: シェアリンクを発行
+      description: |
+        自分のアプリ(`users/{uid}/apps/{appId}`)の**現行 DSL のスナップショット**を `shares/{token}` に保存し、推測不能なトークン(192 bit)を返す。
+        レコードは含まない。他人のアプリは自分の木に無いので 404。
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Share' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /shares/{token}:
+    parameters: [{ $ref: '#/components/parameters/ShareToken' }]
+    get:
+      tags: [sharing]
+      summary: シェアのプレビュー(import 前の確認用)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  name: { type: string }
+                  description: { type: string }
+                  dslVersion: { type: integer }
+                  components: { type: array, items: { type: string } }
+                  sharedData: { type: boolean, description: 'shared/public entity を含む(import すると元アプリの共有データに参加する)' }
+                  mine: { type: boolean }
+        '404': { description: 取り消し済み or 存在しない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    delete:
+      tags: [sharing]
+      summary: シェアリンクを取り消す(発行者のみ・冪等)
+      responses:
+        '204': { description: Revoked }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /shares/{token}/import:
+    parameters: [{ $ref: '#/components/parameters/ShareToken' }]
+    post:
+      tags: [sharing]
+      summary: シェアされたアプリを自分のアプリとして追加
+      description: |
+        認証済みなら誰でも可。スナップショットの DSL を自分の木に複製する(version 1 = 初期 → version 2 = 複製 DSL、`source.kind=import`)。**レコードは複製しない**。
+        - private entity だけのアプリ: **新しい appId**(UUID)に複製
+        - shared/public entity を含むアプリ: **元の appId のまま**参加(`joined: true`)。共有レコードは appId 単位(`apps_public/{appId}`・#93)なので、受け取った人も同じ投稿を見る。既に持っていれば何もせず返す(`created: false`)
+      responses:
+        '201': { description: Imported, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
+        '404': { description: 取り消し済み or 存在しない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /apps/{appId}/publish:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    post:
+      tags: [sharing]
+      summary: 「探す」に公開(作成 or 更新)
+      description: |
+        自分のアプリの現行 DSL を `public_apps/{appId}` に掲載する。再実行で DSL・説明を更新(installs は保持)。
+        同じ appId の掲載を別ユーザーが持っている場合は 403(共有アプリに参加した人が乗っ取れない)。
+        name / description は省略時 DSL の `app.name` / `app.description`、authorName は省略時 "匿名"。
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 60 }
+                description: { type: string, maxLength: 300 }
+                tags: { type: array, maxItems: 8, items: { type: string, maxLength: 20 }, description: '先頭の # は除去' }
+                authorName: { type: string, maxLength: 64 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PublicApp' } } } }
+        '400': { description: 入力不備, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [sharing]
+      summary: 非公開にする(掲載者のみ)
+      description: 通報/モデレーションは未実装。不適切な掲載はこの API で掲載者が取り下げる(運営側の強制削除は後続)。
+      responses:
+        '204': { description: Unpublished }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /public-apps:
+    get:
+      tags: [sharing]
+      summary: 公開アプリを検索
+      description: 名前・説明・タグ・作者名の部分一致(大文字小文字無視)。件数が少ない前提で最大 500 件をメモリ内で絞り込む(全文検索はしない)。
+      parameters:
+        - { in: query, name: q, schema: { type: string } }
+        - { in: query, name: sort, schema: { type: string, enum: [popular, new], default: popular }, description: 'popular = installs 降順 → 更新日時降順 / new = 更新日時降順' }
+        - { $ref: '#/components/parameters/PageSize' }
+        - { $ref: '#/components/parameters/PageToken' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/PublicApp' } }
+                  nextPageToken: { type: string }
+        '400': { description: sort が不正, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /public-apps/{id}/install:
+    parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+    post:
+      tags: [sharing]
+      summary: 公開アプリをインストール
+      description: import と同じ複製(レコード無し・共有データ付きは元 appId に参加)。新規に複製した時だけ installs +1(掲載者本人は数えない)。
+      responses:
+        '201': { description: Installed, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /healthz:
     get:
       security: []
@@ -413,6 +528,7 @@ components:
     EntityId: { in: path, name: entityId, required: true, schema: { type: string }, example: expense }
     Version: { in: path, name: version, required: true, schema: { type: integer, minimum: 1 } }
     PageSize: { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+    ShareToken: { in: path, name: token, required: true, schema: { type: string }, example: H6-GGDdrAGTqrpqpbKhx4GG1ZT1VJ0Rb }
     PageToken: { in: query, name: pageToken, schema: { type: string }, description: 前レスポンスの nextPageToken (不透明文字列) }
   headers:
     ETag:
@@ -499,7 +615,7 @@ components:
       description: このバージョンが生まれた経緯
       required: [kind]
       properties:
-        kind: { type: string, enum: [ai, manual, restore, system] }
+        kind: { type: string, enum: [ai, manual, restore, system, import] }
         mode: { type: string, enum: [full, patch], description: 'full = PUT (初回/create/fallback), patch = PATCH (編集)' }
         transcript: { type: string, description: ユーザー発話 (ai) }
         summary: { type: string, description: 変更の一文要約 (iOS が読み上げ) }
@@ -542,3 +658,38 @@ components:
         authorName: { type: string, description: '投稿者の表示名。POST の authorName、無ければ "匿名"。public/shared のみ' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    Share:
+      type: object
+      required: [token, appId, name, dslVersion, url, webUrl]
+      properties:
+        token: { type: string }
+        appId: { type: string }
+        name: { type: string }
+        dslVersion: { type: integer, description: スナップショットした version }
+        url: { type: string, example: 'tailorit://import/H6-GGDdrAGTqrpqpbKhx4GG1ZT1VJ0Rb', description: iOS アプリで開く URL(QR もこれ) }
+        webUrl: { type: string, description: 'ブラウザ用フォールバック(認証不要の `GET /s/{token}`。アプリ名と「Tailor It で開く」ボタンだけで DSL は出さない)。`SHARE_WEB_BASE_URL` で上書き可' }
+        revoked: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    PublicApp:
+      type: object
+      required: [id, name, installs]
+      properties:
+        id: { type: string, description: 掲載者の appId }
+        name: { type: string }
+        description: { type: string }
+        tags: { type: array, items: { type: string } }
+        authorName: { type: string }
+        components: { type: array, items: { type: string }, description: '使っている部品の type(コンテナ・voiceInput を除く・最大 8)。カードのアイコン用' }
+        dslVersion: { type: integer }
+        installs: { type: integer }
+        mine: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    InstallResult:
+      description: AppWithDSL + 複製の結果
+      allOf:
+        - { $ref: '#/components/schemas/AppWithDSL' }
+        - type: object
+          properties:
+            joined: { type: boolean, description: 'true = 共有データ付きなので元の appId に参加した' }
+            created: { type: boolean, description: 'false = 既に持っていた(参加済み)' }

@@ -75,7 +75,7 @@ enum BuildConfig {
             let appConfig: any AppConfigClient = appConfigURL.map { HTTPAppConfigClient(baseURL: $0, token: token) }
                 ?? InMemoryAppConfigClient(seed: MockSeed.demoRecords())
             let sync: any DocumentSync = (appConfig as? HTTPAppConfigClient).map(makeSync) ?? NoopDocumentSync()
-            return Services(
+            var services = Services(
                 auth: auth,
                 appConfig: appConfig,
                 ai: aiURL.map { HTTPAIClient(baseURL: $0, token: token) } ?? MockAIClient(),
@@ -85,6 +85,8 @@ enum BuildConfig {
                 notifications: UserNotificationScheduler(),
                 isLive: appConfigURL != nil
             )
+            services.sharing = appConfigURL.map { HTTPSharingClient(baseURL: $0, token: token) }
+            return services
         }
     }
 
