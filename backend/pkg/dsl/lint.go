@@ -17,6 +17,7 @@ import (
 //   - expressions that are always a constant (mul by 0, x*0+0-0)
 //   - stat label says 今日/今週/今月/今年 (today/this week/this month/this
 //     year) but the filter is missing or another period
+//   - screen graph (nav.go): unreachable screens, fullScreen without a way back
 func (a *App) Lint() []string {
 	l := &linter{app: a, entities: map[string]*Entity{}}
 	for i := range a.Entities {
@@ -25,6 +26,7 @@ func (a *App) Lint() []string {
 	l.computed()
 	l.screens()
 	l.entityReach()
+	l.navGraph()
 	return l.out
 }
 
@@ -348,47 +350,18 @@ func (l *linter) entityReach() {
 			forms[s.Entity] = append(forms[s.Entity], s.ID)
 		}
 	}
-	// reachable screens: initial + tabs, then navigate targets of reachable screens
-	byID := map[string]*Screen{}
-	for i := range l.app.Screens {
-		byID[l.app.Screens[i].ID] = &l.app.Screens[i]
-	}
-	targets := map[string]bool{}
-	queue := []string{l.app.InitialScreen}
-	for _, t := range l.app.App.Tabs {
-		queue = append(queue, t.Screen)
-	}
+	// reachable screens: initial + tabs, then navigate targets (nav.go)
+	targets := l.app.Reachable()
 	listed := map[string]bool{}
-	for len(queue) > 0 {
-		id := queue[0]
-		queue = queue[1:]
-		s := byID[id]
-		if s == nil || targets[id] {
+	for _, s := range l.app.Screens {
+		if !targets[s.ID] {
 			continue
 		}
-		targets[id] = true
-		nav := func(a *Action) {
-			if a != nil && a.Type == ActionNavigate && !targets[a.Screen] {
-				queue = append(queue, a.Screen)
-			}
-		}
-		visit := func(c *Component) {
-			nav(c.Action)
-			nav(c.OnItemTap)
-			nav(c.OnDateTap)
+		eachScreenComponent(s.Components, func(_ string, c *Component) {
 			if listTypes[c.Type] {
 				listed[c.Entity] = true
 			}
-		}
-		for i := range s.Toolbar {
-			nav(&s.Toolbar[i].Action)
-		}
-		for i := range s.Components {
-			visit(&s.Components[i])
-			for j := range s.Components[i].Children {
-				visit(&s.Components[i].Children[j])
-			}
-		}
+		})
 	}
 	settings := l.settingEntities()
 	for _, e := range l.app.Entities {

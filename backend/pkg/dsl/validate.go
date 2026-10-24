@@ -277,16 +277,16 @@ func (a *App) Validate() error {
 		screens[s.ID] = true
 	}
 	if !screens[a.InitialScreen] {
-		add("initialScreen %q does not exist", a.InitialScreen)
+		add("initialScreen %q does not exist; set it to one of the screen ids (%s)", a.InitialScreen, screenIDs(a))
 	}
 	if n := len(a.App.Tabs); n > 0 {
 		if n < 2 || n > MaxTabs {
-			add("app.tabs must have 2-%d tabs (got %d); omit tabs for a single-stack app", MaxTabs, n)
+			add("app.tabs must have 2-%d tabs (got %d): add another tab whose screen is a different top-level screen, merge screens to keep at most %d, or remove app.tabs entirely for a single-stack app", MaxTabs, n, MaxTabs)
 		}
 		seen := map[string]bool{}
 		for i, t := range a.App.Tabs {
 			if !screens[t.Screen] {
-				add("app.tabs[%d]: screen %q does not exist", i, t.Screen)
+				add("app.tabs[%d]: screen %q does not exist; point the tab at one of the screen ids (%s) or add that screen to screens", i, t.Screen, screenIDs(a))
 			}
 			if seen[t.Screen] {
 				add("app.tabs[%d]: screen %q is used by another tab", i, t.Screen)
@@ -305,14 +305,14 @@ func (a *App) Validate() error {
 		switch act.Type {
 		case ActionNavigate:
 			if !screens[act.Screen] {
-				add("%s: navigate target screen %q does not exist", where, act.Screen)
+				add("%s: navigate target screen %q does not exist; use one of the screen ids (%s) or add that screen to screens", where, act.Screen, screenIDs(a))
 			}
 		case ActionSaveRecord, ActionDeleteRecord:
 			if entities[act.Entity] == nil {
 				add("%s: %s entity %q does not exist", where, act.Type, act.Entity)
 			}
 			if act.Screen != "" && !screens[act.Screen] {
-				add("%s: then-screen %q does not exist", where, act.Screen)
+				add("%s: saveRecord then-screen %q does not exist; use one of the screen ids (%s) or omit screen to close the form after saving", where, act.Screen, screenIDs(a))
 			}
 		case ActionOpenURL:
 			if act.URL == "" {

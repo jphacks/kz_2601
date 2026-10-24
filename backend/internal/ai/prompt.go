@@ -81,6 +81,12 @@ var systemPrompt = strings.TrimSpace(`
   - **count の単位**: stat の aggregate count は iOS が単位「件」を付ける。「回」「冊」「セット」「日」など件が合わない数は stat.value = {"agg":"count","entity":...,"filter"?:...}(単位なしの数字)にして、単位はラベルに書く(例 label「今日のセット数(回)」)。
   - **フォーム**: 写真は photoField だけ(撮影後に自前でプレビューを出すので、同じ field の image を重ねない)。section の area は詰める(行数 = 子の数 + 1 が目安。中身 4 項目なら 5 行)か、フォームは area を省略して上から積む。部品の間に空き行を作らない。
   - 表示文字列・description の数字は半角(「2タブ」「3万円」)。
+- **画面の分け方とナビゲーション**(#112: 1 画面に詰め込みがちだった):
+  - 発話に**役割の違う画面**(記録の一覧・集計やグラフ・目標や設定・メンバー等のマスタ一覧)が 2 つ以上あるなら、それぞれを画面にして app.tabs(2〜4 個)で分ける。「タブ」「ボトムバー」「別の画面」「切り替えたい」と言われたら必ず tabs にする。役割を発話に無いのに増やさない(上の「発話に無い機能を足さない」が優先)。
+  - 入力は**フォーム画面**(screen.entity)にし、追加ボタン / toolbar の navigate(sheet)で開く。1 件の詳細・編集は list.onItemTap の navigate(push)。設定値 1 件(予算・目標)もフォーム画面で入れる。
+  - 1 画面の直下に部品を **8 個より多く置かない**。超えるなら役割ごとに画面を分ける。
+  - **全画面がタブの根か initialScreen から navigate で辿れる**こと(孤立画面を作らない)。タブがあるとき initialScreen は tabs[0].screen。fullScreen は使わない(使うなら toolbar に {"type":"back"} の「閉じる」を置く)。
+  - navigate はどの画面からどの画面へ飛んでもよい(タブの根へ飛べばそのタブに切り替わる)。
 - voiceEntry は書かない(floating が補われる)。編集でも "none" にしない(ユーザーが声でアプリを変え続けられること)。
 - **表示言語**: user ターンの「## 表示言語(locale)」に従う。表示文字列(app.name / app.description、画面タイトル、tab.title、section/chart の title、label、placeholder、emptyText、ボタンやツールバーの label、confirmMessage、entity.name / field.name / enum の options、notifications[].title/body)は **すべてその言語**で書く(ja なら日本語、en なら自然な英語。混在させない)。id / type / enum 値 / area / aggregate / op / repeat / time などの構造は言語に関わらず英数のまま。
   - en の通貨 unit は "$"(発話で通貨が分かればそれに従う)。
@@ -122,6 +128,15 @@ var editRules = strings.TrimSpace(`
 - 部品を追加・拡大するときは兄弟の area と重ならないようにする。必要なら隣接部品の area も replace で詰める。
 - 「もっと大きく」= area の行数/列数を増やす(例 A1:F2 → A1:F4)、周囲の部品を下にずらす。
 - フォームに入力部品を足す場合は、entity に field を add してから、フォーム画面の section.children に部品を add する。
+
+## 遷移を変える編集のレシピ(index は現在の DSL の screens / app.tabs の位置)
+- 「B から C にも行けるようにして」「この画面からも直接 C へ」: B に button を足す。{"op":"add","path":"/screens/<B>/components/-","value":{"type":"button","label":"<C の title>","icon":"arrow.right","area":"<B で空いている行>","action":{"type":"navigate","screen":"<C の id>"}}}(presentation は既定でよい。C がタブの根でも安全)。B に toolbar があれば /screens/<B>/toolbar/- でもよい(無ければ "/screens/<B>/toolbar" に配列ごと add)。summary「B から C へ行けるボタンを足しました。」
+- 「ここから C へ飛ぶのをやめて」: その button を remove(C に他から行けなくなるなら C を tab にするか、別の画面から行けるボタンを残す)。
+- 「タブを足して」: 新しい画面を {"op":"add","path":"/screens/-","value":{"id":"<新>","title":"...","components":[...]}} で足し、{"op":"add","path":"/app/tabs/-","value":{"screen":"<新>","title":"...","icon":"..."}}。タブが無い app なら {"op":"add","path":"/app/tabs","value":[{"screen":"<initialScreen>","title":"ホーム","icon":"house"},{"screen":"<新>",...}]}(タブは 2〜5 個)。
+- 「この画面をタブにして」「○○を別のタブに分けて」: その画面(無ければ部品を新しい画面へ move して作る)を /app/tabs に add する(タブが無ければ上と同じく initialScreen と 2 個で作る)。フォーム画面はタブにせず、その一覧の画面をタブにする。
+- 「タブを消して」: /app/tabs/<i> を remove。残りが 1 個になるなら {"op":"remove","path":"/app/tabs"} でタブごと消す。消したタブの画面は、他から navigate されていなければ screens から remove する(後ろの index から消す・その画面への button も消す)。残すなら initialScreen から行けるボタンを足す。initialScreen が消える画面を指していたら replace する。
+- 「タブの順番を変えて」「○○を左に」: {"op":"move","from":"/app/tabs/<i>","path":"/app/tabs/<j>"}。起動時の画面も変えたいと言われた時だけ /initialScreen を replace。
+- 遷移の編集の後も、全画面がタブの根か initialScreen から辿れること。summary は「集計から支出の追加へ行けるボタンを足しました。」「履歴タブを足しました。」のように何が変わったかを言う。
 `)
 
 // createUserMessage builds the user turn for a full generation.
