@@ -39,6 +39,7 @@ struct VoiceInputView: View {
                 Spacer(minLength: Theme.Spacing.lg)
                 micSection
                 Spacer(minLength: Theme.Spacing.lg)
+                errorCard
                 transcriptCard
                 Spacer(minLength: Theme.Spacing.md)
                 examples
@@ -50,6 +51,7 @@ struct VoiceInputView: View {
         }
         .animation(.spring(duration: 0.45, bounce: 0.15), value: phase)
         .animation(.spring(duration: 0.45, bounce: 0.15), value: transcript)
+        .animation(.spring(duration: 0.45, bounce: 0.15), value: rt.errorCard)
         .sheet(isPresented: $showSettings) { SettingsSheet() }
         .onTapGesture { typing = false }
     }
@@ -117,9 +119,19 @@ struct VoiceInputView: View {
         }
     }
 
+    /// エラーの状態カード(#60)。圏外 / 混雑 / タイムアウト / セッション切れを 1 文 + 主ボタンで。トーストは使わない。
+    @ViewBuilder
+    private var errorCard: some View {
+        if let card = rt.errorCard {
+            ErrorCard(presentation: card)
+                .padding(.bottom, Theme.Spacing.md)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
     @ViewBuilder
     private var transcriptCard: some View {
-        if !transcript.isEmpty {
+        if !transcript.isEmpty, rt.errorCard?.kind != .offlineQueued {
             HStack(alignment: .top, spacing: Theme.Spacing.sm) {
                 Image(systemName: "quote.opening")
                     .font(.caption.weight(.bold))
@@ -136,7 +148,8 @@ struct VoiceInputView: View {
 
     @ViewBuilder
     private var examples: some View {
-        if phase == .idle {
+        // 状態カードが出ている間は例文を引っ込める(縦に詰まって見出しが潰れるのを防ぎ、「次の一手」をカードに絞る)
+        if phase == .idle, rt.errorCard == nil {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 Text(isInitial ? Greeting.examplesLabel : Greeting.editExamplesLabel)
                     .font(.caption.weight(.semibold))

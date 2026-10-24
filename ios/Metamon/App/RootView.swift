@@ -96,6 +96,7 @@ struct RootView: View {
                   secondaryButton: .cancel(Text("キャンセル")))
         }
         .overlay(alignment: .top) { summaryCard }
+        .overlay(alignment: .top) { errorCardOverlay }
         .overlay(alignment: .bottom) { toast }
         .onChange(of: scenePhase) { _, phase in
             rt.setForeground(phase == .active) // ホットリロードのポーリングは前面時のみ
@@ -155,6 +156,19 @@ struct RootView: View {
                 try? await Task.sleep(for: .seconds(seconds))
                 withAnimation(.easeInOut(duration: 0.35)) { rt.summaryBanner = nil }
             }
+        }
+    }
+
+    /// 生成後(edit)の失敗は音声シートが閉じているので、画面上部に状態カードを出す(#60)。初期画面と音声シートの中は `VoiceInputView` が描く。
+    @ViewBuilder
+    private var errorCardOverlay: some View {
+        if let card = rt.errorCard, !rt.dsl.isVoiceOnly, !rt.showVoiceSheet {
+            ErrorCard(presentation: card, compact: true)
+                .padding(.horizontal, Theme.Spacing.md)
+                .padding(.top, Theme.Spacing.sm)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(.spring(duration: 0.45, bounce: 0.15), value: rt.errorCard)
+                .zIndex(4)
         }
     }
 

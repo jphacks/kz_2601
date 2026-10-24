@@ -15,6 +15,8 @@ final class AppRuntime: DSLRuntime {
     /// entity id → レコード(サーバーが正。ここはキャッシュ)
     private(set) var records: [String: [Record]] = [:]
     private(set) var loading: Set<String> = []
+    /// サーバーから取れず、ローカルにも無い entity(#85)。Renderer は空状態ではなく「読み込めませんでした(再試行)」を描く。
+    private(set) var failed: Set<String> = []
 
     var paths: [String: [Route]] = [:]
     /// タブ表示時に選択中のタブ(= tab.screen)。
@@ -37,7 +39,7 @@ final class AppRuntime: DSLRuntime {
         var perform: @MainActor () async -> Void
     }
     var confirm: Confirm?
-    /// エラー等の短い通知(下部カプセル)。生成の summary はこちらではなく `summaryBanner`。
+    /// 軽微な通知(下部カプセル・保存失敗など)。生成の失敗はこちらではなく `errorCard`、生成の summary は `summaryBanner`。
     var toast: String? {
         didSet {
             #if DEBUG
@@ -45,6 +47,23 @@ final class AppRuntime: DSLRuntime {
             #endif
         }
     }
+
+    /// 生成(morph)まわりのエラー **状態カード**(#60)。音声画面 / 生成後の画面上部に出し、主ボタンで復帰する。nil なら正常。
+    var errorCard: ErrorPresentation? {
+        didSet {
+            #if DEBUG
+            if let errorCard { print("[Metamon] errorCard: \(errorCard.kind) transcript=\(errorCard.transcript)") }
+            else if oldValue != nil { print("[Metamon] errorCard: cleared") }
+            #endif
+        }
+    }
+    /// 401 が再取得後も続いた時(セッション切れ)。`MetamonApp` が `AuthSession.expire()` を結ぶ。
+    @ObservationIgnored var onSessionExpired: (@MainActor () -> Void)?
+    /// 圏外で送れなかった発話を 1 件保留し、復帰で 1 回だけ送る。
+    @ObservationIgnored private let deferredMorph: DeferredSend<String>
+    @ObservationIgnored private var connectivityTask: Task<Void, Never>?
+    /// 生成中に圏外になって自分でキャンセルした(ユーザーのキャンセルと区別する)
+    @ObservationIgnored private var interruptedByOffline = false
 
     /// 生成中の状態。nil なら生成していない。`create` は初期状態からの生成(全画面演出)、`edit` は 2 回目以降(薄いインジケータ)。
     struct MorphJob: Equatable {
@@ -80,6 +99,7 @@ final class AppRuntime: DSLRuntime {
         self.document = document
         self.services = services
         self.recordSync = RecordSyncFactory.make(client: services.appConfig)
+        self.deferredMorph = DeferredSend(connectivity: recordSync.connectivity)
         self.selectedTab = document.dsl.initialTab
         recordSync.onEvent = { [weak self] event in self?.handle(event) }
     }
@@ -88,15 +108,26 @@ final class AppRuntime: DSLRuntime {
 
     /// 起動時: live ならサーバーの最新 DSL を取得しホットリロード開始。文字起こしモデルも温めておく。
     /// サーバーに届かなければ最後に取得した DSL(`DocumentCache`)を出し、トーストで「オフライン」を知らせる。
+    /// 通知の同期(許可ダイアログを出し得る)は復元・同期の **後ろで await せずに** 回す(#86: ダイアログ待ちで復元が止まらない)。
     func bootstrap() async {
         Task { try? await services.transcriber.prepare() }
-        await services.notifications.sync(dsl.app.notifications)
         recordSync.start()
+        observeConnectivity()
         if services.isLive {
             await restoreFromServer()
             startSync()
         }
+        Task { await services.notifications.sync(dsl.app.notifications) }
         #if DEBUG
+        // ヘッドレス E2E 用: `METAMON_E2E_PRESS_PRIMARY_AFTER=<秒>` で、その時点で状態カードが出ていれば主ボタン(もう一度 等)を押す(#60)
+        if let raw = ProcessInfo.processInfo.environment["METAMON_E2E_PRESS_PRIMARY_AFTER"], let seconds = Double(raw), seconds > 0 {
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(seconds))
+                guard let self, let card = errorCard, let primary = card.primary else { print("[Metamon] E2E: no error card to act on"); return }
+                print("[Metamon] E2E: pressing primary \(primary) on \(card.kind)")
+                handle(primary, of: card)
+            }
+        }
         // ヘッドレス E2E 用: `METAMON_AUTO_TRANSCRIPT="家計簿アプリが欲しい"` で起動直後に 1 回だけ生成を投げる
         if let text = ProcessInfo.processInfo.environment["METAMON_AUTO_TRANSCRIPT"], !text.isEmpty {
             await morph(transcript: text)
@@ -131,10 +162,31 @@ final class AppRuntime: DSLRuntime {
             if let cached = DocumentCache.shared.load(appId: document.appId), cached.version >= document.version {
                 apply(cached, animated: false)
                 isOffline = true
-                toast = "オフライン: 最後に取得したアプリ(v\(cached.version))を表示しています"
+                toast = ErrorCopy.offlineRestored(version: cached.version)
             } else {
                 isOffline = true
-                toast = "サーバーに接続できません: \(error.localizedDescription)"
+                toast = ErrorCopy.unreachable(error.localizedDescription)
+            }
+        }
+    }
+
+    /// 到達性を見張る(#60): 生成中に圏外になったら即キャンセルして「通信が切れました」、復帰したら未取得の entity を読み直す。
+    private func observeConnectivity() {
+        connectivityTask?.cancel()
+        connectivityTask = Task { [weak self] in
+            guard let self else { return }
+            var previous: Bool?
+            for await online in recordSync.connectivity.updates() {
+                defer { previous = online }
+                if !online, morphJob != nil, morphTask != nil {
+                    interruptedByOffline = true
+                    morphTask?.cancel()
+                }
+                if online, previous == false {
+                    let retry = failed
+                    for entity in retry { await refresh(entity) }
+                    if isOffline, services.isLive { await restoreFromServer() }
+                }
             }
         }
     }
@@ -168,6 +220,8 @@ final class AppRuntime: DSLRuntime {
         let swap = {
             self.document = doc
             self.records = [:]
+            self.failed = []
+            self.errorCard = nil
             self.paths = [:]
             self.sheet = nil
             self.fullScreen = nil
@@ -209,9 +263,30 @@ final class AppRuntime: DSLRuntime {
         case .morph:
             break
         }
+        // 圏外(#60): 送らずに保留し、状態カード「接続が戻ったら自動で送ります」。復帰で 1 回だけ自動送信(モックは常にオンライン)
+        if services.isLive || recordSync.connectivity is ManualConnectivity,
+           deferredMorph.holdIfOffline(text, send: { [weak self] queued in await self?.sendDeferred(queued) }) {
+            withAnimation(.easeInOut(duration: 0.3)) { errorCard = ErrorPresentation(kind: .offlineQueued, transcript: text) }
+            return
+        }
+        await send(text)
+    }
+
+    /// 復帰時の自動送信(`DeferredSend` から)。保留が生きていれば生成に進む。
+    private func sendDeferred(_ text: String) async {
+        guard errorCard?.kind == .offlineQueued, errorCard?.transcript == text else { return }
+        print("[Metamon] back online → sending deferred transcript")
+        await send(text)
+    }
+
+    /// ai に送って適用する本体。失敗は `FailureKind` で分類して状態カードに(トーストは使わない)。
+    private func send(_ text: String) async {
+        guard morphJob == nil else { return }
         withAnimation(.easeInOut(duration: 0.35)) {
+            errorCard = nil
             morphJob = MorphJob(kind: dsl.isVoiceOnly ? .create : .edit, transcript: text, startedAt: .now)
         }
+        interruptedByOffline = false
         let previous = document
         let task = Task { [services, appId = document.appId, version = document.version] in
             try await services.ai.morph(transcript: text, appId: appId, currentVersion: version)
@@ -227,14 +302,52 @@ final class AppRuntime: DSLRuntime {
                 summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary))
             }
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
-        } catch is CancellationError {
-            withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
-            toast = "生成をキャンセルしました"
         } catch {
-            print("[Metamon] morph failed: \(error)")
+            let failure: FailureKind = interruptedByOffline ? .offline : FailureKind.classify(error)
+            interruptedByOffline = false
+            print("[Metamon] morph failed: \(failure) (\(error))")
             withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
-            toast = "生成に失敗しました: \(error.localizedDescription)"
+            await present(failure, transcript: text)
         }
+    }
+
+    /// 失敗の分類ごとに「次の一手」を出す。conflict は最新を取り直して短いバナー、cancelled は軽微なのでトースト、それ以外は状態カード。
+    private func present(_ failure: FailureKind, transcript: String) async {
+        switch failure {
+        case .cancelled:
+            toast = ErrorCopy.cancelledToast
+        case .conflict:
+            // appconfig の version 競合(ai 側の baseVersion 無しリトライでも解けなかった)。最新 DSL を取り直して再適用
+            if services.isLive, let latest = try? await services.appConfig.fetchDocument(appId: document.appId) {
+                if latest.version != document.version { apply(latest) }
+                startSync()
+            }
+            summaryBanner = SummaryBanner(text: ErrorCopy.conflictBanner, highlight: nil)
+        case .sessionExpired:
+            withAnimation(.easeInOut(duration: 0.3)) { errorCard = ErrorPresentation.from(failure, transcript: transcript) }
+            onSessionExpired?()
+        default:
+            withAnimation(.easeInOut(duration: 0.3)) { errorCard = ErrorPresentation.from(failure, transcript: transcript) }
+        }
+    }
+
+    /// 状態カードの主ボタン。もう一度 / 今すぐ送る = 同じ発話で再送、サインイン = セッション切れ処理。
+    func handle(_ primary: ErrorPresentation.Primary, of card: ErrorPresentation) {
+        switch primary {
+        case .retry, .sendNow:
+            deferredMorph.cancel()
+            withAnimation(.easeInOut(duration: 0.3)) { errorCard = nil }
+            Task { await send(card.transcript) }
+        case .signIn:
+            withAnimation(.easeInOut(duration: 0.3)) { errorCard = nil }
+            onSessionExpired?()
+        }
+    }
+
+    /// 状態カードの副ボタン。やめる = 保留を取り消す、閉じる = カードを消す(発話は残らない)。
+    func handle(_ secondary: ErrorPresentation.Secondary, of card: ErrorPresentation) {
+        if case .discard = secondary { deferredMorph.cancel() }
+        withAnimation(.easeInOut(duration: 0.3)) { errorCard = nil }
     }
 
     /// 生成の中断(30 秒超の長引きで UI から呼ぶ)。URLSession は Task キャンセルで切れる。
@@ -442,12 +555,19 @@ final class AppRuntime: DSLRuntime {
             let fresh = try await recordSync.pull(appId: appId, entity: entity)
             guard document.appId == appId else { return }
             records[entity] = fresh
+            failed.remove(entity)
             print("[Metamon] records loaded: entity=\(entity) count=\(fresh.count)")
             WidgetSnapshotWriter.write(dsl: dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         } catch {
-            if records[entity] == nil { records[entity] = [] }
+            guard document.appId == appId else { return }
+            // ローカルにも無ければ「読み込めませんでした」(#85: 空状態と区別する)。ローカルがあればそのまま見せる
+            if records[entity]?.isEmpty ?? true {
+                records[entity] = []
+                failed.insert(entity)
+            }
             print("[Metamon] records pull failed (showing local): entity=\(entity) \(error)")
-            if error is APIError { toast = message(for: error, entity: entity) }
+            // 通信断は画面内の placeholder に任せ、トーストは 4xx(権限・入力不備)だけ
+            if case .rejected = FailureKind.classify(error) { toast = message(for: error, entity: entity) }
         }
     }
 
@@ -588,7 +708,7 @@ final class AppRuntime: DSLRuntime {
             let name = entity.flatMap { dsl.entity($0)?.field(fieldId)?.name } ?? fieldId
             return "「\(name)」の入力を確認してください(\(api.errorDescription ?? ""))"
         }
-        if api.status == 401 { return "サインインの有効期限が切れました。設定からログインし直してください" }
+        if api.status == 401 { return ErrorCopy.sessionExpiredSignIn }
         return api.errorDescription ?? "\(api)"
     }
 }
