@@ -13,7 +13,8 @@ import (
 //
 //	number | string | boolean
 //	{"ref": "<fieldId>"}                         row field ("id" = record id)
-//	{"agg": "...", "entity": "...", "field"?, "filter"?: Filter | [Filter]}
+//	{"ref": "<refField>.<fieldId>"}              field of the record a ref field points to (1 level)
+//	{"agg": "...", "entity": "...", "field"?, "by"?, "filter"?: Filter | [Filter]}
 //	{"op": "<name>", "args": [Expr, ...]}
 //	{"if": Expr, "then": Expr, "else": Expr}
 //
@@ -44,9 +45,10 @@ const (
 
 // AggExpr aggregates an entity's records. Filter is ANDed.
 type AggExpr struct {
-	Agg    string   `json:"agg"` // count|sum|avg|min|max
+	Agg    string   `json:"agg"` // count|sum|avg|min|max|latest|earliest
 	Entity string   `json:"entity"`
 	Field  string   `json:"field,omitempty"`
+	By     string   `json:"by,omitempty"` // latest/earliest: date field to order by
 	Filter []Filter `json:"-"`
 	// filterList remembers whether filter was written as an array so the
 	// document round-trips byte-for-byte in shape.
@@ -115,7 +117,7 @@ func (e *Expr) UnmarshalJSON(b []byte) error {
 		*e = Expr{Kind: ExprRef}
 		return json.Unmarshal(m["ref"], &e.Ref)
 	case m["agg"] != nil:
-		if err := allow("agg", "entity", "field", "filter"); err != nil {
+		if err := allow("agg", "entity", "field", "by", "filter"); err != nil {
 			return err
 		}
 		a := &AggExpr{}
@@ -129,6 +131,11 @@ func (e *Expr) UnmarshalJSON(b []byte) error {
 		}
 		if raw, ok := m["field"]; ok {
 			if err := json.Unmarshal(raw, &a.Field); err != nil {
+				return err
+			}
+		}
+		if raw, ok := m["by"]; ok {
+			if err := json.Unmarshal(raw, &a.By); err != nil {
 				return err
 			}
 		}
@@ -295,7 +302,11 @@ func fieldExprType(ft FieldType) exprType {
 var ComputedFieldTypes = []FieldType{FieldNumber, FieldInteger, FieldCurrency, FieldString, FieldBoolean, FieldDate}
 
 // AggregateFuncs is the closed set of agg / aggregate names.
-var AggregateFuncs = []string{"count", "sum", "avg", "min", "max"}
+var AggregateFuncs = []string{"count", "sum", "avg", "min", "max", "latest", "earliest"}
+
+// IsPickAgg reports whether agg returns one record's value (latest/earliest)
+// instead of folding numbers.
+func IsPickAgg(agg string) bool { return agg == "latest" || agg == "earliest" }
 
 // FilterOps is the closed set of Filter.op values.
 var FilterOps = []string{"eq", "neq", "gt", "gte", "lt", "lte", "thisMonth", "today", "thisWeek", "thisYear"}
@@ -385,6 +396,9 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 		}
 		if e.Ref == "id" {
 			return tStr
+		}
+		if strings.Contains(e.Ref, ".") {
+			return c.checkLookup(where, e.Ref, row)
 		}
 		f := row.FieldByID(e.Ref)
 		if f == nil {
@@ -479,10 +493,21 @@ func (c *exprChecker) checkAgg(where string, a *AggExpr, row *Entity, depth int)
 		return tNum
 	}
 	result := tNum
+	if IsPickAgg(a.Agg) {
+		checkPickBy(where, a.Agg, a.By, e, c.add)
+		if fld := e.FieldByID(a.By); fld != nil {
+			c.dep(e, fld.ID)
+		}
+	} else if a.By != "" {
+		c.add("%s: by is only for agg latest/earliest (remove it)", where)
+	}
 	if a.Agg != "count" {
 		f := e.FieldByID(a.Field)
 		if f == nil {
 			c.add("%s: field %q not in entity %q (required unless agg=count; fields: %s)", where, a.Field, e.ID, fieldIDs(e))
+		} else if IsPickAgg(a.Agg) {
+			c.dep(e, f.ID)
+			result = fieldExprType(f.Type)
 		} else {
 			c.dep(e, f.ID)
 			ft := fieldExprType(f.Type)

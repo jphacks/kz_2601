@@ -21,7 +21,7 @@ public enum Aggregator {
         return records.filter { matches(filter, record: $0, field: field) }
     }
 
-    public static func matches(_ f: Filter, record: Record, field: Field?, now: Date = Date(), calendar: Calendar = .current) -> Bool {
+    public static func matches(_ f: Filter, record: Record, field: Field?, now: Date = DSLClock.now(), calendar: Calendar = .current) -> Bool {
         let v = record[f.field]
         switch f.op {
         case "thisMonth":

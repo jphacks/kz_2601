@@ -82,7 +82,11 @@ struct StatLeaf: View {
         let unavailable = rows.isEmpty && rt.emptyState(for: entityId) == .unavailable
         // 初回ロード中は 0 を見せず placeholder(起動直後に「¥0 → ¥480」と跳ねるのを防ぐ)
         let isLoading = rt.loading.contains(entityId) && rt.records(for: entityId).isEmpty
-        let formatted = isLoading ? "0000" : unavailable ? EmptyPlaceholder.unavailableValue : Aggregator.format(value, as: format, unit: c.aggregate == "count" ? L("件") : unit)
+        var formatted = isLoading ? "0000" : unavailable ? EmptyPlaceholder.unavailableValue : Aggregator.format(value, as: format, unit: c.aggregate == "count" ? L("件") : unit)
+        // latest / earliest(#133): 1 件の値。0 件・空は「—」
+        if !isLoading, !unavailable, Aggregator.isPick(c.aggregate) {
+            formatted = Aggregator.pickText(c, entity: entity, records: rows) ?? EmptyPlaceholder.unavailableValue
+        }
         return (formatted, isLoading, unavailable)
     }
 
