@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-const docsDir = "../../../docs/backend"
+const docsDir = "../../../docs/dsl"
 
 // The embedded schema must be byte-identical to the canonical doc copy.
 func TestSchemaInSyncWithDocs(t *testing.T) {
@@ -18,7 +18,7 @@ func TestSchemaInSyncWithDocs(t *testing.T) {
 		t.Skip("docs schema not found:", err)
 	}
 	if !bytes.Equal(want, schemaJSON) {
-		t.Fatal("backend/pkg/dsl/schema.json differs from docs/backend/dsl.schema.json; run `make schema-sync`")
+		t.Fatal("backend/pkg/dsl/schema.json differs from docs/dsl/dsl.schema.json; run `make schema-sync`")
 	}
 }
 
@@ -91,7 +91,7 @@ func TestSemanticErrors(t *testing.T) {
 }
 
 func TestSchemaRejectsUnknownComponent(t *testing.T) {
-	raw := []byte(`{"schemaVersion":"0.1","app":{"name":"x","voiceEntry":"none"},"initialScreen":"home","entities":[],
+	raw := []byte(`{"schemaVersion":1,"app":{"name":"x","voiceEntry":"none"},"initialScreen":"home","entities":[],
 	"screens":[{"id":"home","title":"t","components":[{"type":"webview","url":"https://example.com"}]}]}`)
 	if _, err := Parse(raw); err == nil {
 		t.Fatal("expected schema error for unknown component type")

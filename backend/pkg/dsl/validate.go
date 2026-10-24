@@ -20,7 +20,7 @@ var errPrinter = message.NewPrinter(language.English)
 var schemaJSON []byte
 
 // SchemaJSON returns the embedded JSON Schema (same bytes as
-// docs/backend/dsl.schema.json; `make schema-sync` keeps them equal).
+// docs/dsl/dsl.schema.json; `make schema-sync` keeps them equal).
 func SchemaJSON() []byte { return schemaJSON }
 
 // Limits enforced by the semantic validator (not expressible for Claude
@@ -125,7 +125,7 @@ func (a *App) Validate() error {
 	add := func(format string, args ...any) { p = append(p, fmt.Sprintf(format, args...)) }
 
 	if a.SchemaVersion != SchemaVersion {
-		add("schemaVersion must be %q", SchemaVersion)
+		add("schemaVersion must be %d", SchemaVersion)
 	}
 	if strings.TrimSpace(a.App.Name) == "" {
 		add("app.name is empty")

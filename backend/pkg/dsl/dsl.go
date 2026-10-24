@@ -1,6 +1,6 @@
-// Package dsl holds the Server-Driven UI schema (v0.1) shared by all services.
+// Package dsl holds the Server-Driven UI schema (v1, unified with iOS) shared by all services.
 //
-// The canonical schema is docs/backend/dsl.schema.json (copied to schema.json
+// The canonical schema is docs/dsl/dsl.schema.json (copied to schema.json
 // in this package and embedded). Go types mirror it 1:1; Component is a single
 // flattened struct discriminated by Type so that JSON round-trips losslessly
 // and the human backend dev does not need custom (un)marshalers.
@@ -10,12 +10,12 @@
 // schemas, and iOS gets a bounded renderer.
 package dsl
 
-// SchemaVersion is the only accepted value of App.SchemaVersion in v0.
-const SchemaVersion = "0.1"
+// SchemaVersion is the only accepted value of App.SchemaVersion (v1).
+const SchemaVersion = 1
 
 // App is the root document (one per app version) stored in Firestore.
 type App struct {
-	SchemaVersion string   `json:"schemaVersion"`
+	SchemaVersion int      `json:"schemaVersion"`
 	App           AppMeta  `json:"app"`
 	InitialScreen string   `json:"initialScreen"`
 	Entities      []Entity `json:"entities"`
@@ -167,7 +167,7 @@ const (
 var ContainerTypes = map[ComponentType]bool{CompVStack: true, CompHStack: true, CompSection: true}
 
 // Component is a flattened union of all component kinds. Which fields are
-// meaningful depends on Type (see docs/backend/dsl-proposal.md).
+// meaningful depends on Type (see docs/dsl/README.md).
 type Component struct {
 	Type ComponentType `json:"type"`
 	ID   string        `json:"id,omitempty"`
