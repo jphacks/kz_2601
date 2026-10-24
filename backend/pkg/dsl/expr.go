@@ -312,7 +312,7 @@ type opSpec struct {
 var Ops = map[string]opSpec{
 	"add": {2, -1, tNum, tNum}, "sub": {2, 2, tNum, tNum}, "mul": {2, -1, tNum, tNum}, "div": {2, 2, tNum, tNum},
 	"mod": {2, 2, tNum, tNum}, "neg": {1, 1, tNum, tNum}, "abs": {1, 1, tNum, tNum}, "sqrt": {1, 1, tNum, tNum},
-	"pow": {2, 2, tNum, tNum}, "round": {1, 1, tNum, tNum}, "floor": {1, 1, tNum, tNum}, "ceil": {1, 1, tNum, tNum},
+	"pow": {2, 2, tNum, tNum}, "round": {1, 2, tNum, tNum}, "floor": {1, 2, tNum, tNum}, "ceil": {1, 2, tNum, tNum}, // 2nd arg = decimal places
 	"min": {2, -1, tNum, tNum}, "max": {2, -1, tNum, tNum}, "clamp": {3, 3, tNum, tNum},
 	"eq": {2, 2, tAny, tBool}, "neq": {2, 2, tAny, tBool},
 	"gt": {2, 2, tAny, tBool}, "gte": {2, 2, tAny, tBool}, "lt": {2, 2, tAny, tBool}, "lte": {2, 2, tAny, tBool},

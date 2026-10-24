@@ -50,9 +50,10 @@ Expr := number | string | boolean
 |---|---|---|---|
 | 算術 | `add` `mul` `min` `max` | 数値 2 個以上 | 数値 |
 | | `sub` `div` `mod` `pow` | 数値 2 個 | 数値(`div`/`mod` の 0 割りは評価エラー) |
-| | `neg` `abs` `sqrt` `round` `floor` `ceil` | 数値 1 個 | 数値(`round` は整数へ四捨五入・`sqrt` の負数はエラー) |
+| | `neg` `abs` `sqrt` | 数値 1 個 | 数値(`sqrt` の負数はエラー) |
+| | `round` `floor` `ceil` | (x) または (x, n) | 数値(n = 小数桁・省略で整数。`round(x,1)` = 小数 1 桁) |
 | | `clamp` | (x, lo, hi) | 数値 |
-| 比較 | `eq` `neq` | 任意 2 個 | 真偽 |
+| 比較 | `eq` `neq` | 任意 2 個 | 真偽(型が違っても nil にせず、数値か文字列に寄せて比べる: レコード id と ref 値の比較用) |
 | | `gt` `gte` `lt` `lte` | 同じ型(数値同士・日付同士)2 個 | 真偽 |
 | 論理 | `and` `or` | 真偽 2 個 | 真偽 |
 | | `not` | 真偽 1 個 | 真偽 |
@@ -64,7 +65,7 @@ Expr := number | string | boolean
 | | `addDays` | (d, n) | 日付 = d の n 日後 |
 | | `year` `month` `day` `weekday` | (d) | 数値(month 1-12、weekday 1=日 … 7=土) |
 | 変換 | `toNumber` `toString` | 任意 1 個 | 数値(変換不可はエラー)/ 文字列 |
-| その他 | `coalesce` | (a, b) | a が空/評価エラーなら b |
+| その他 | `coalesce` | (a, b) | a が空(nil・空文字)/評価エラーなら b |
 
 日付引数は date / datetime フィールド、`today`/`now`/`addDays` の結果、`"YYYY-MM-DD"` 文字列を受け付ける。
 
@@ -78,9 +79,10 @@ Expr := number | string | boolean
 | `Filter.value`(list/stat/chart 等の画面部品) | なし | 不可 | `{"op":"addDays","args":[{"op":"today","args":[]},-7]}` = 直近 7 日 |
 
 - **computed フィールド**: `type` は `number|integer|currency|string|boolean|date`。保存されない読み取り専用列。list の item / table の columns / stat・chart の field / sort / filter から通常フィールドと同じに参照できる。入力部品(textField 等)は束縛できない。`required` / `defaultValue` は不可。
+- 部品レベルの `filter`(list / stat / chart …)はスキーマ上 1 つだけ(iOS は配列も読めるが、backend は出さない・AND が要るなら stat.value の agg で)。
 - **`Stat.value`**: `aggregate` の代わり。`aggregate` と `value` は**排他でどちらか必須**。`value` のときは `entity/field/filter` を書かない(agg の中に書く)。`format` はそのまま効く(percent は 0..1 → %)。
 - **`Field.type = "ref"` + `refEntity`**: 他エンティティのレコード参照。保存値はレコード id の文字列。入力は **`picker`**(選択肢 = refEntity のレコード、表示は titleField)。list/table では参照先の titleField を表示する。
-- **`settlement`(Leaf)**: `{"type":"settlement","entity":"members","nameField":"name","balanceField":"balance"}` + `id?` `area?`。balance(正=受け取る・負=払う)から貪欲法(最大の債務者 → 最大の債権者に min(|負|, 正) を送る、を繰り返す)で「A → B ¥1,200」を列挙。割り勘専用の割り切り部品。合計 0 にならない端数(1 円未満の丸め差)は無視してよい。
+- **`settlement`(Leaf)**: `{"type":"settlement","entity":"members","nameField":"name","balanceField":"balance"}` + `id?` `area?` `title?`。balance(正=受け取る・負=払う)から貪欲法(最大の債務者 → 最大の債権者に min(|負|, 正) を送る、を繰り返す)で「A → B ¥1,200」を列挙。割り勘専用の割り切り部品。合計 0 にならない端数(1 円未満の丸め差)は無視してよい。全員 0 なら「精算は不要です」。
 - progressBar / gauge の `value` は従来どおり**数値リテラルのみ**(Expr は不可。後述 §8)。
 
 ## 5. 評価ルール(iOS)
@@ -133,6 +135,6 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
 - 副作用(式からの保存・通知・遷移)。
 - サーバー側評価・集計 API(評価は iOS。件数が増えたら README 決定表 #10 の集計 API と合わせて検討)。
 - progressBar/gauge の `value`/`target` を Expr にすること(stat.value で代替可能・iOS 契約の拡大を避けた。必要なら後段で)。
-- タイムゾーン指定・通貨換算・丸め桁指定(`round(x*10)/10` で代替)。
+- タイムゾーン指定・通貨換算。
 
 op を増やすときは `dsl.schema.json`(`ExprOp.op` の enum と x-enumDescriptions)、`backend/pkg/dsl/expr.go`(`Ops`)、本書 §3、iOS の評価器を同時に更新する。

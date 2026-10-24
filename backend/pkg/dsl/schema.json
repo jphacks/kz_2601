@@ -2555,6 +2555,10 @@
         "area": {
           "$ref": "#/$defs/Area"
         },
+        "title": {
+          "type": "string",
+          "description": "Card title (optional, e.g. 精算)."
+        },
         "entity": {
           "type": "string",
           "description": "Entity whose records are the people (e.g. members)."
@@ -2721,14 +2725,14 @@
             "abs": "|a|",
             "sqrt": "√a(a<0 はエラー)",
             "pow": "a の b 乗",
-            "round": "四捨五入して整数",
-            "floor": "切り捨て",
-            "ceil": "切り上げ",
+            "round": "round(x) 四捨五入して整数 / round(x, n) 小数 n 桁",
+            "floor": "floor(x[, n]) 切り捨て(n = 小数桁)",
+            "ceil": "ceil(x[, n]) 切り上げ(n = 小数桁)",
             "min": "最小(2 個以上)",
             "max": "最大(2 個以上)",
             "clamp": "clamp(x, lo, hi)",
-            "eq": "a == b",
-            "neq": "a != b",
+            "eq": "a == b(型が違えば数値か文字列に寄せて比べる: id と ref の比較用)",
+            "neq": "a != b(eq と同じ寄せ方)",
             "gt": "a > b",
             "gte": "a >= b",
             "lt": "a < b",
@@ -2749,7 +2753,7 @@
             "weekday": "曜日(1=日 ... 7=土)",
             "toNumber": "数値に変換(不可ならエラー)",
             "toString": "文字列に変換",
-            "coalesce": "coalesce(a,b) = a が空/エラーなら b"
+            "coalesce": "coalesce(a,b) = a が空(null・空文字)/エラーなら b"
           }
         },
         "args": {

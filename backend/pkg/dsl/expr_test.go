@@ -210,7 +210,7 @@ func TestSchemaErrorInExprIsConcise(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected ValidationError, got %v", perr)
 	}
-	if len(ve.Problems) != 1 || !strings.Contains(ve.Problems[0], "/computed/op: value must be one of") {
+	if len(ve.Problems) != 1 || !strings.Contains(ve.Problems[0], "/op: value must be one of") {
 		t.Fatalf("want one op problem, got %v", ve.Problems)
 	}
 }
