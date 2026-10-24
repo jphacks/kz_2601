@@ -618,3 +618,31 @@ HealthKit を足す時の手順(Apple アカウント操作が要るので未着
 2. `xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で App ID に HealthKit が付く(有料 Program 必須)。付かなければ Apple Developer > Identifiers > `jp.kz2601.metamon` > Capabilities で HealthKit にチェック → プロファイル再生成。
 3. 部品は DSL に `healthField`(歩数/体重の読み取り)を足す案(schema・ai・カタログの変更が要るので別 Issue)。歩数だけなら既存の `NSMotionUsageDescription`(CoreMotion の歩数計)で capability 無しに出せる。
 
+
+## 16. 近距離共有(nearbyShare・MultipeerConnectivity / Issue #36)
+
+対面で記録を渡す最小版。インターネット・サインイン不要で、OS が Wi-Fi(P2P)/ Bluetooth を自動で選ぶ MultipeerConnectivity を使う。
+
+| 役割 | 実装 | 中身 |
+|---|---|---|
+| leaf | `NearbyShareLeaf`(Renderer) | 送る範囲を決めて `DSLRuntime.shareNearby(entity:records:)` を呼ぶだけ。フォーム画面(`screen.entity == entity`)は入力中の 1 件(未保存でも今の値)、それ以外はその entity の新しい順 最大 50 件。0 件なら押せない |
+| データ・判定 | `NearbyShare`(MetamonDSL・純粋ロジック) | `Header`(送信者・appId・entity id/名・保存フィールドの id+型・件数)を招待の context に、`Payload`(Header + レコード)を接続後に 1 回、受信側は `Ack` を返す。JSON。未知キーは無視、レコード内の未知フィールド・型違い・null は `sanitize` で捨てる |
+| 通信 | `NearbyService`(アプリ本体 `Features/Nearby/`) | `MCSession(encryptionPreference: .required)`。送信シートを開いている間だけ browse、相手を選ぶと招待(30 秒)→ 接続で送信 → Ack で完了表示して切断 |
+| 受信 UI | `NearbySheets`(RootView の根とモーダル内に付ける) | 招待が来ると「◯◯さんから「出席」が 3 件届きました」の確認。**承認した時だけ招待を受ける**(勝手に受け取らない)。取り込めない時は理由だけ出して断る |
+
+取り込み判定(`NearbyShare.decide`):
+- 同じ appId → 同じ id の entity があれば受け取る(DSL の版違いで増減したフィールドは `sanitize` が捨てる)。
+- 別 appId → **同じ entity id かつ保存フィールドの id+型の集合が一致**する時だけ。`ref` フィールドは相手端末のレコード id なので捨てる。
+- 招待時に判定し、データ到着時にも今開いているアプリで判定し直す(承認後にアプリを切り替えた場合)。受け取りは最大 200 件。
+- 追加は `RecordSyncEngine.save`(ローカル DB に即反映・サーバー送信はキュー)→ `reloadLocal`。
+
+待ち受け(advertise)は **前面にいて、今のアプリのどこかに `nearbyShare` がある間だけ**。Issue の案「起動中は常に」から変えた理由: advertise した瞬間に iOS のローカルネットワーク許可ダイアログが出るため、使わないアプリ(と初回起動の音声画面)で出さない。受け取る側も同じアプリを開いている前提なので実害は無い。
+
+Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-mc._tcp` / `_udp`。`NearbyService.serviceType = "tailorit-mc"` と一致)。
+
+**Core Bluetooth(BLE 直叩き)は後続**: MultipeerConnectivity が Bluetooth を内部で使うので iOS 同士はこれで足りる。BLE を直接使う意味があるのは Android / マイコン等の非 Apple 端末やバックグラウンドでのビーコン的な検出だが、GATT のサービス設計・分割転送(MTU ~180B)・ペアリング UX・`NSBluetoothAlwaysUsageDescription` とバックグラウンドモードが要り、デモの範囲を超える。必要になったら `NearbyShare.Payload` をそのまま運ぶ別トランスポートとして足す。
+
+確認:
+- 単体: `NearbyShareTests`(MetamonDSL・`swift test` で macOS 上で回る)。エンコード/デコード・未知キー・取り込み判定・sanitize・件数上限。
+- シミュレータ 2 台(同じ Mac)で送受信できた。DEBUG 用の環境変数: 送信側 `METAMON_AUTO_NEARBY_SEND=<entity>`(起動 3 秒後にシートを開き最初の相手へ送る)/ 受信側 `METAMON_AUTO_NEARBY_ACCEPT=1`(確認を 2 秒見せて受け取る)。例は `METAMON_INITIAL_EXAMPLE=attendance_nearby METAMON_MOCK=1`。
+- 実機 2 台: 両方に同じビルドを入れ、両方で同じアプリ(例: 出席カード)を開く → 初回はローカルネットワークの許可を「許可」→ 送る側で「近くの先生に送る」→ 相手の名前をタップ → 受け取る側で「受け取る」→ 一覧に増え、送る側に「◯◯さんに N 件届きました」。Wi-Fi と Bluetooth はオンにしておく(同じ Wi-Fi でなくてよい)。
