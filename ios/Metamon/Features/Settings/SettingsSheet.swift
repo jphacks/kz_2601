@@ -18,6 +18,7 @@ struct SettingsSheet: View {
             List {
                 if Self.e2eDeleteAccount { deleteAccountSection } // E2E: 削除ボタンを画面内に出す(シミュレータはスクロール操作できない)
                 accountSection
+                ProSettingsSection() // 課金(#77)
                 languageSection
                 voiceModelSection
                 clarifySection
@@ -182,10 +183,14 @@ struct SettingsSheet: View {
             Toggle(ClarifyCopy.settingTitle, isOn: $rt.clarifyEnabled)
                 .tint(Theme.Colors.brandA)
                 .accessibilityIdentifier("settings.clarify")
+            Toggle(ClarifyCopy.autoBuildSettingTitle, isOn: $rt.clarifyAutoBuild)
+                .tint(Theme.Colors.brandA)
+                .disabled(!rt.clarifyEnabled)
+                .accessibilityIdentifier("settings.clarifyAutoBuild")
         } header: {
             Text("対話")
         } footer: {
-            Text(ClarifyCopy.settingFooter)
+            Text(ClarifyCopy.settingFooter + "\n" + ClarifyCopy.autoBuildSettingFooter)
         }
     }
 

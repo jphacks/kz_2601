@@ -2,7 +2,7 @@
 // the same Service the ai server uses (in-memory store, no HTTP), and writes
 // per-case metrics + the resulting DSL as JSON. Edit cases are seeded with the
 // DSL produced by their `base` create case in the same run. `expect` keys:
-// photo / chart (bool), notification ("HH:MM" or "any"), substitution (bool:
+// photo / chart / calendar (bool), notification ("HH:MM" or "any"), substitution (bool:
 // the summary mentions 代替 / "replaced" because a requested part is not in
 // the catalog), scope ("public"|"shared"|"private": at least one entity has
 // that scope), calc / computed / statValue / settlement / ref (bool, #100:
@@ -73,6 +73,9 @@ type Metrics struct {
 	Settlement bool     `json:"settlement,omitempty"`
 	RefFields  int      `json:"refFields,omitempty"`
 	ProgressTo bool     `json:"progressTarget,omitempty"` // progressBar entity+target (aggregate-based rate)
+	// #177
+	HasCalendar bool     `json:"hasCalendar,omitempty"`
+	StatUnitDup []string `json:"statUnitDup,omitempty"` // non-count stat labels ending in "(field.unit)"
 }
 
 // HasCalc reports whether the app computes anything beyond plain aggregate stats.
@@ -159,6 +162,7 @@ func main() {
 	chatModel := flag.String("chat-model", "", "-chat: clarify model (empty = ai.DefaultChatModel, same as AI_CHAT_MODEL)")
 	chatEffort := flag.String("chat-effort", "", "-chat: clarify effort (empty = ai.DefaultChatEffort)")
 	chatThinking := flag.String("chat-thinking", "", "-chat: thinking.type adaptive|disabled|between_tools (empty = ai.DefaultChatThinking)")
+	chatCaps := flag.String("capabilities", "", "-chat: comma-separated capabilities (answer,proposal) sent by cases without their own mode/capabilities (#185)")
 	flag.Parse()
 	if *chat && *casesPath == "internal/ai/eval/cases.json" {
 		*casesPath = "internal/ai/eval/chat_cases.json"
@@ -197,7 +201,13 @@ func main() {
 	ctx := context.Background()
 	if *chat {
 		svc.ChatConfig = ai.ChatConfig{Model: *chatModel, Effort: *chatEffort, Thinking: *chatThinking}
-		runChat(ctx, svc, *casesPath, *outDir, *tag, filter)
+		var caps []string
+		for _, c := range strings.Split(*chatCaps, ",") {
+			if c = strings.TrimSpace(c); c != "" {
+				caps = append(caps, c)
+			}
+		}
+		runChat(ctx, svc, *casesPath, *outDir, *tag, filter, caps)
 		return
 	}
 	raw, err := os.ReadFile(*casesPath)
@@ -373,9 +383,15 @@ func measure(a *dsl.App) *Metrics {
 					m.HasChart = true
 				case dsl.CompSettlement:
 					m.Settlement = true
+				case dsl.CompCalendar:
+					m.HasCalendar = true
 				case dsl.CompStat:
 					if x.Value != nil {
 						m.StatValues++
+					}
+					if u := fieldUnit(a, x.Entity, x.Field); u != "" && x.Aggregate != "" && x.Aggregate != "count" &&
+						(strings.HasSuffix(x.Label, "("+u+")") || strings.HasSuffix(x.Label, "（"+u+"）")) {
+						m.StatUnitDup = append(m.StatUnitDup, x.Aggregate+":"+x.Label)
 					}
 				case dsl.CompProgressBar:
 					if x.Entity != "" && x.Target != nil {
@@ -395,6 +411,15 @@ func measure(a *dsl.App) *Metrics {
 	return m
 }
 
+func fieldUnit(a *dsl.App, entity, field string) string {
+	if e := a.EntityByID(entity); e != nil {
+		if f := e.FieldByID(field); f != nil {
+			return f.Unit
+		}
+	}
+	return ""
+}
+
 func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 	var miss []string
 	for k, v := range exp {
@@ -402,6 +427,10 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 		case "substitution": // a part missing from the catalog was requested: summary must say so
 			if mentionsSubstitution(summary) != v.(bool) {
 				miss = append(miss, fmt.Sprintf("substitution=%v", !v.(bool)))
+			}
+		case "calendar":
+			if m.HasCalendar != v.(bool) {
+				miss = append(miss, fmt.Sprintf("calendar=%v", m.HasCalendar))
 			}
 		case "photo":
 			if m.HasPhoto != v.(bool) {

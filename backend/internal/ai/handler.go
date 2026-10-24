@@ -71,7 +71,11 @@ func NewHandler(svc *Service) http.Handler {
 			writeErr(w, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "invalid JSON: " + err.Error()})
 			return
 		}
-		res, err := svc.Chat(r.Context(), req)
+		ctx := r.Context()
+		if auth := r.Header.Get("Authorization"); auth != "" {
+			ctx = appconfigclient.WithBearer(ctx, auth) // edit mode reads the current DSL
+		}
+		res, err := svc.Chat(ctx, req)
 		if err != nil {
 			writeErr(w, err)
 			return

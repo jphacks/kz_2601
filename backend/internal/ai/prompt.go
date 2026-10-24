@@ -45,7 +45,7 @@ var systemPrompt = strings.TrimSpace(`
 - 画面レイアウトはグリッド座標: 各 Screen は横 A〜F の 6 列 × 縦 1〜12 行(13 行目以降はスクロール、上限 48 行)。Screen 直下の各コンポーネントに area:"A1:C3"(左上セル:右下セル)を付ける。
   - 兄弟同士の area はセルを 1 つも共有してはならない(重なり禁止)。列は A〜F のみ、行は 1 以上。右下セルは左上セル以降。
   - 可変長(list / section / vstack / hstack / 長い text)はセル内でスクロールするので、矩形は大きめ(例 A3:F10)に取る。入力・ボタン・stat・chart は矩形に収まる。
-  - Container の子に area は付けない(付けるとエラー)。
+  - Container の子は通常 area 無しで積む(例外は下の「Container 内のグリッド」)。
   - 迷ったら area を省略してよい(省略した部品は最後に使われた行の次から全幅で上から積まれる)。
 - タブ: app.tabs は 0 個(省略)または 2〜5 個(「ホーム / 集計」「今日 / 履歴」のように 2〜3 個が扱いやすい)。各 tab.screen は screens に存在する id で、重複不可。initialScreen は screens に存在する id。
 - entity/field 束縛: 入力部品(textField/numberField/datePicker/picker/toggle/photoField/image)は screen.entity が設定された画面にのみ置き、field はその entity の field id。picker は enum field、photoField/image は photo field。
@@ -64,7 +64,7 @@ var systemPrompt = strings.TrimSpace(`
 - **計算ロジック**(2026-10-24: 割り勘で支出画面だけ作り「割る」計算が無かった): 発話に「割り勘・精算・1人あたり・残り・差・率・%・達成・BMI・あと何日・カウントダウン」のような計算が含まれるなら、UI だけで終わらせず、カタログ末尾の「計算式 Expr」とレシピで計算を必ず書く。
   - レコードごとの算出列(支払済・残高・BMI・残り日数)は Field.computed(ref で同じレコードのフィールド・"id" でレコード id)。画面に 1 つの値(1人あたり・残り予算・達成率)は stat.value(ref 不可・agg を使う)。単純な合計/件数は従来どおり stat.aggregate。
   - 他の entity のレコードを指す項目(支出の「払った人」→メンバー)は type "ref" + refEntity。フォームでは picker で選ぶ。
-  - 割り勘・立替の「誰が誰にいくら」は settlement(members の computed balance を balanceField に)。
+  - 割り勘・立替の「誰が誰にいくら」は settlement(members の computed balance を balanceField に)。精算は最大で「人数−1」行出るので area は 3 行以上(2 行だと 1 行目しか見えない)。
   - op はカタログの一覧だけ。計算が要らない発話には computed / stat.value を足さない。
   - 式を書けるのは computed・stat.value・agg の filter.value だけ。progressBar / gauge の value は数値リテラルのみ(率のバーは progressBar{entity,field,target})。
 - **中身を正しく**(2026-10-24 品質監査 #107: 死にボタンは 0 件だが、ラベルと中身が違う・黙って取りこぼす・計算をユーザーにさせる、が残った):
@@ -82,7 +82,8 @@ var systemPrompt = strings.TrimSpace(`
   - **毎日くり返すチェック**(「毎日飲む薬」「毎日の習慣」「毎朝やること」)は 1 日 1 件の記録 entity を作らない(毎日登録し直しになる)。薬・習慣の entity に type date の field(例 taken_on・defaultValue は書かない)を作り、一覧の item に "toggle":"<その field>","resets":"daily" を指定する(丸を押すとその日の日付を保存、日付が変わると全行が未チェックに戻る)。今日やった数 = stat.value {"agg":"count","entity":...,"filter":{"field":"<その field>","op":"today","value":null}}、まだの数 = 全件数 − それ。フォームにその date field の入力を置かない。連続日数(ストリーク)は出せないので代替を申告する。「済みをまとめて消す・片付ける」と言われたら、未完了の list と済み(eq true)の list を section で分け、済みの list はスワイプで消せる(一括削除の代替として申告)。
   - **時間順・時刻順の予定**(しおり・スケジュール・時間割): list の sort は 1 field だけなので、日付と時刻を別 field にしない。type datetime の 1 field(フォームは datePicker の includeTime true)にして sort asc で並べる。実際にしていない並べ方や計算を description に書かない。
   - **分類つきの記録の内訳**: 「カテゴリ別に記録」「種類ごとに記録」のように enum の分類で記録し、合計や今月いくらかも求められたら、その分類の合計 chart(kind pie か bar・groupBy その enum・stat と同じ期間 filter)をホームに 1 つ置く。
-  - **count の単位**: stat の aggregate count は iOS が単位「件」を付ける。「回」「冊」「セット」「日」など件が合わない数は stat.value = {"agg":"count","entity":...,"filter"?:...}(単位なしの数字)にして、単位はラベルに書く(例 label「今日のセット数(回)」)。
+  - **count の単位**: stat の aggregate count は iOS が単位「件」を付ける。「回」「冊」「セット」「日」など件が合わない数は stat.value = {"agg":"count","entity":...,"filter"?:...}(単位なしの数字)にして、単位はラベルに書いてよい(例 label「今日のセット数(回)」)。
+  - **sum / avg / max / min / latest の単位**(#177: 「今日の合計回数(回)」が「3 回」と二重になった): 値には iOS が field.unit を付ける。ラベルに単位を書かない(label「今日の合計回数」・field reps の unit「回」→「3 回」)。ラベルに単位を書くのは count の stat.value だけ。
   - **フォーム**: 写真は photoField だけ(撮影後に自前でプレビューを出すので、同じ field の image を重ねない)。section の area は詰める(行数 = 子の数 + 1 が目安。中身 4 項目なら 5 行)か、フォームは area を省略して上から積む。部品の間に空き行を作らない。
   - 表示文字列・description の数字は半角(「2タブ」「3万円」)。
 - **画面の分け方とナビゲーション**(#112: 1 画面に詰め込みがちだった):
@@ -109,9 +110,15 @@ var systemPrompt = strings.TrimSpace(`
 - 上の規則の日本語のキーワードは英語の同じ意味の語でも適用する: "this month" → thisMonth、"today" → today、"this week" → thisWeek、"this year" → thisYear、"last 7 days" / "past week" → 直近7日の filter(gte addDays −6)、"left" / "remaining" / "to go" → 目標 − 合計の stat.value(max …,0)、"per person" → div、"average" → avg、"best" / "record" → max、"in a row" / "streak" → 代替して申告、"split" / "settle up" / "who owes whom" → settlement、"remind me" / "notify" → notifications。**ラベルにこれらの語を書くなら、その filter / 計算を必ず付ける**(ラベルに "(last 7 days)" と書いて filter を付けないのは嘘ラベル)。"Monthly budget" のような設定値の名前は今月の filter と関係ない。
 - 済みの件数("taken today" / "bought" / "done" / "completed")を数える stat は、その boolean の {"field":"<boolean>","op":"eq","value":true} を必ず含める(stat.value の agg の filter に日付の条件と合わせて配列で書く)。
 - **金額**: type currency の field と numberField に unit を書かない(iOS は locale に関わらず "¥1,200" と表示する。"$" を書くと "¥ 15 $" になる)。ラベル・説明文・placeholder にも "$" や "dollars" を書かない("Hourly wage" / "Budget left this month")。発話でドルの金額を言われても数値はそのまま使う(換算しない)。
-- **件数の単位**: stat の aggregate count は iOS が単位 "items" を付ける。物でない数(books / workouts / days / pills / times)は stat.value = {"agg":"count",...} にして、単位はラベルに書く(例 "Books read this year")。
+- **件数の単位**: stat の aggregate count は iOS が単位 "items" を付ける。物でない数(books / workouts / days / pills / times)は stat.value = {"agg":"count",...} にして、単位はラベルに書く(例 "Books read this year")。sum / avg / max / min / latest は field.unit が値に付くので、ラベルに単位を書かない("Total reps today"。"Total reps today (reps)" は "12 reps" と二重になる)。
 - list.item の title / subtitle / trailing に boolean field を置かない(iOS が Yes/No を日本語で出す)。チェックは item.toggle で見せる。
 - 文言は自然で短い英語: 画面タイトルと tab.title は Title Case の 1〜2 語("Today" / "History")、ボタンは動詞始まり("Add book" / "Log workout")、emptyText は "No books yet"、confirmMessage は "Delete this book?"。entity.name は単数形の可算名詞("Book" / "Workout" / "Expense"。"Spending" のような不可算名詞にしない)。日本語・全角文字を 1 字も混ぜない。
+
+## Container 内のグリッド(#81・使うのはまれ)
+- **カードの中で 2 列に並べたい時だけ使う**(card の stat 2 枚を左右に・section のボタン 2 つを左右に)。それ以外は子に area を付けず積む。入れ子は 1 段まで。
+- 使えるのは card / section / vstack の子だけ。子の area は Container の左上を A1 とするローカル座標(列 A〜F・行は Container 自身の area の行数まで)。
+- 付けるなら**その Container の子の全部**に付ける(一部だけはエラー)。子同士も重ねない。
+- 例: {"type":"card","title":"今月","area":"A1:F3","children":[{"type":"stat",...,"area":"A1:C2"},{"type":"stat",...,"area":"D1:F2"}]}
 
 ## 例 1(locale ja): 発話「家計簿アプリを作って。今月の合計と支出一覧、追加ボタンが欲しい。カテゴリ別の内訳も見たい」→ 出力(この書式・既定値省略で)
 ` + abbreviateExample(fewShotKakeibo) + `
@@ -218,3 +225,13 @@ var visualRules = strings.TrimSpace(`
 `)
 
 func init() { systemPrompt += "\n\n" + visualRules }
+
+// audit3Rules (#169 quality audit 3): holes left after #141 / #146. Appended
+// like visualRules so the existing lines stay untouched.
+var audit3Rules = strings.TrimSpace(`
+## 品質監査 第 3 弾の追加ルール(#169)
+- **分類の内訳**: 「カテゴリ別に記録」「グッズ・チケット・遠征費みたいに分けて」のように分類つきで記録させ、合計・今月の額・予算の残りも求められたら、**その enum の内訳 chart(kind pie・groupBy その enum・stat と同じ期間 filter)をホームに必ず 1 つ置く**。「カテゴリ別」は内訳の依頼なので「発話に無い機能」ではない。
+- **毎日くり返すチェックと連続日数**: resets daily の toggle は最後にやった日しか持たない(履歴が残らない)。連続日数を求められたら「今日やった数」(stat.value の count・filter today)で代替し「連続日数は今日の達成数で代替しました。」(en: "Streak was replaced with today's check count.")と申告する。**実施記録・log の entity を別に足さない**(丸を押しても記録は増えず二重入力になる)。直近 7 日の回数・実施履歴を stat / ラベル / 説明に書かない(出せない値を書くと嘘になる)。連続日数を求められていない時は連続日数に触れない。
+`)
+
+func init() { systemPrompt += "\n\n" + audit3Rules }

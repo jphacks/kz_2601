@@ -62,6 +62,7 @@ struct AppSwitcherSheet: View {
                     .overlay(Circle().strokeBorder(Theme.Colors.hairline))
             }
             .accessibilityLabel("閉じる")
+            .accessibilityIdentifier("switcher.close")
         }
     }
 
