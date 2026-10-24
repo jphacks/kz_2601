@@ -1,6 +1,6 @@
 // swift-tools-version: 5.10
 // MetamonServices: 外部 I/O の protocol 群(Protocols/)とその実装(Live/ Mock/ Native/)。
-// 依存は MetamonDSL と WhisperKit のみ。SwiftUI は import しない(View は MetamonRenderer / アプリ本体)。
+// 依存は MetamonDSL・WhisperKit・FirebaseAuth のみ。SwiftUI は import しない(View は MetamonRenderer / アプリ本体)。
 import PackageDescription
 
 let package = Package(
@@ -14,6 +14,8 @@ let package = Package(
         // WhisperKit は v1.0.0 で argmax-oss-swift に統合(旧 URL argmaxinc/WhisperKit は同リポジトリへリダイレクト)。
         // product `WhisperKit` のみリンク(ArgmaxOSS 全部入りは TTS/Speaker を巻き込むので不要)。バージョンは完全固定。
         .package(url: "https://github.com/argmaxinc/argmax-oss-swift", exact: "1.1.1"),
+        // Firebase は Auth だけ(Analytics 等は入れない=ビルド時間と権限説明を増やさない)。バージョンは完全固定。
+        .package(url: "https://github.com/firebase/firebase-ios-sdk", exact: "13.1.1"),
     ],
     targets: [
         .target(
@@ -21,6 +23,7 @@ let package = Package(
             dependencies: [
                 .product(name: "MetamonDSL", package: "MetamonDSL"),
                 .product(name: "WhisperKit", package: "argmax-oss-swift"),
+                .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
             ],
             swiftSettings: [.enableExperimentalFeature("StrictConcurrency=targeted")]
         ),
