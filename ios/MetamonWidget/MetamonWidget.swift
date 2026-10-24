@@ -43,7 +43,7 @@ struct MetamonStatWidget: Widget {
                 .containerBackground(for: .widget) { WidgetTheme.background }
                 .widgetURL(URL(string: "metamon://widget"))
         }
-        .configurationDisplayName("メタモンの数字")
+        .configurationDisplayName("Tailor It の数字")
         .description("作ったアプリの集計(今月の支出など)をホーム画面に表示します。")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
@@ -200,7 +200,7 @@ struct EmptyStateView: View {
             .frame(width: 30, height: 30)
             Spacer(minLength: 0)
             Text(appName == nil
-                 ? "メタモンでアプリを作るとここに数字が出ます"
+                 ? "Tailor It でアプリを作るとここに数字が出ます"
                  : "「\(appName ?? "")」に集計(stat)の部品がありません")
                 .font(.caption)
                 .foregroundStyle(.secondary)

@@ -59,7 +59,7 @@ func TestDisplayComponentsValid(t *testing.T) {
 		Component{Type: CompBadge, Text: "今月", Color: "green"},
 		Component{Type: CompLink, Text: "公式", URL: "https://jphacks.com"},
 		Component{Type: CompMarkdown, Text: "**太字**"},
-		Component{Type: CompAvatar, Name: "メタモン", Size: "large"},
+		Component{Type: CompAvatar, Name: "Tailor It", Size: "large"},
 		Component{Type: CompTable, Entity: "expense", Columns: []TableColumn{{Field: "date", Title: "日付"}, {Field: "amount"}}, Limit: 5,
 			Sort: &Sort{Field: "date", Direction: "desc"}},
 		Component{Type: CompTimeline, Entity: "expense", DateField: "date", TitleField: "memo", SubtitleField: "amount", Limit: 5},

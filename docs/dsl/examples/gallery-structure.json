@@ -73,7 +73,7 @@
         { "type": "mapView", "id": "map", "area": "A12:F16", "entity": "memo", "locationField": "place", "titleField": "note", "zoom": "city",
           "onItemTap": { "type": "navigate", "screen": "memo_form", "presentation": "sheet" } },
         { "type": "timerDisplay", "id": "watch", "area": "A17:F19", "mode": "stopwatch", "label": "ストップウォッチ" },
-        { "type": "shareButton", "id": "share", "area": "A20:C21", "text": "メタモンで作ったアプリを見て！", "label": "共有", "icon": "square.and.arrow.up" },
+        { "type": "shareButton", "id": "share", "area": "A20:C21", "text": "Tailor It で作ったアプリを見て！", "label": "共有", "icon": "square.and.arrow.up" },
         { "type": "openUrlButton", "id": "site", "area": "D20:F21", "label": "公式サイト", "url": "https://jphacks.com", "icon": "safari", "style": "secondary" }
       ]
     },
