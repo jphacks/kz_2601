@@ -696,9 +696,9 @@ components:
           properties: { dsl: { $ref: '../dsl/dsl.schema.json' } }
     RecordData:
       type: object
-      description: 'キー = Field.id。値の型は Field.type に従う: string/text→string, integer/currency→integer, number→number, boolean→boolean, date→"YYYY-MM-DD", datetime→RFC3339, enum→options のいずれか, photo→https URL (iOS が Firebase Storage へ直接アップロード), location→"lat,lng"'
+      description: 'キー = Field.id。値の型は Field.type に従う: string/text→string, integer/currency→integer, number→number, boolean→boolean, date→"YYYY-MM-DD", datetime→RFC3339, enum→options のいずれか, photo→https URL (iOS が Firebase Storage へ直接アップロード), location→"lat,lng"。例外として date field の隣の "<field>__dates" は毎日チェックの押した日の履歴("YYYY-MM-DD" の配列・DSL に宣言しない・昇順/重複除去/最大 400 件に正規化・#172)'
       additionalProperties:
-        anyOf: [{ type: string }, { type: number }, { type: integer }, { type: boolean }, { type: 'null' }]
+        anyOf: [{ type: string }, { type: number }, { type: integer }, { type: boolean }, { type: 'null' }, { type: array, items: { type: string, format: date }, maxItems: 400 }]
       example: { amount: 1200, category: 食費, memo: ランチ, date: '2026-10-24' }
     Record:
       type: object
