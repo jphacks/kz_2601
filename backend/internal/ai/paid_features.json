@@ -1,0 +1,32 @@
+{
+  "_comment": "有料機能(Tailor It Pro が必要)のリスト(#77)。ここ 1 か所で足し引きする。enabled=false で一時的に外せる。docs/backend/architecture.md「有料機能の判定」参照。",
+  "features": [
+    {
+      "id": "sharedData",
+      "enabled": true,
+      "title": {
+        "ja": "みんなで共有するデータ",
+        "en": "Shared data"
+      },
+      "reason": {
+        "ja": "みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。",
+        "en": "Data that everyone writes is stored in the cloud and synced to every device, which costs server resources."
+      },
+      "keywords": [
+        "みんなで", "みんなの", "皆で", "全員で", "共有", "投稿", "ランキング", "掲示板", "友達と", "友だちと",
+        "家族で", "チームで", "メンバーで", "クラスで",
+        "everyone", "shared", "share data", "share with", "leaderboard", "bulletin board",
+        "with friends", "with my family", "with my team", "public feed"
+      ],
+      "excludeKeywords": [
+        "共有ボタン", "共有シート", "シェアボタン", "共有しない", "共有はしない", "共有せず", "共有は不要", "共有不要",
+        "share button", "share sheet", "not shared", "without sharing"
+      ],
+      "dslEntityScopes": ["shared", "public"],
+      "withoutInstruction": {
+        "ja": "(無料版で作る: 他のユーザーとデータを共有する機能は入れない。みんなで書き込む・投稿・ランキングの共有はせず、すべて自分だけの記録として作る。entity の scope は省略して private にする)",
+        "en": "(Free version: do not include any feature that shares data with other users. No posting, shared rankings or group writing; keep everything as the user's own private records and omit entity scope so it stays private.)"
+      }
+    }
+  ]
+}

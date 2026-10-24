@@ -5,7 +5,7 @@
 // photo / chart / calendar (bool), notification ("HH:MM" or "any"), substitution (bool:
 // the summary mentions 代替 / "replaced" because a requested part is not in
 // the catalog), scope ("public"|"shared"|"private": at least one entity has
-// that scope), calc / computed / statValue / settlement / ref (bool, #100:
+// that scope), noShared (bool, #77: no shared/public entity), calc / computed / statValue / settlement / ref (bool, #100:
 // any calculation / Field.computed / stat.value / settlement leaf / ref field;
 // -logic-pass runs the 2nd calculations-only call). Navigation (#114):
 // patch (bool: stored as a JSON Patch, not a full rewrite), unreachable
@@ -472,6 +472,13 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 		case "ref":
 			if (m.RefFields > 0) != v.(bool) {
 				miss = append(miss, fmt.Sprintf("ref=%d", m.RefFields))
+			}
+		case "noShared": // #77: 「この機能なしで作る」は shared / public の entity を作らない
+			for _, s := range m.Scopes {
+				if v.(bool) && (strings.HasSuffix(s, ":public") || strings.HasSuffix(s, ":shared")) {
+					miss = append(miss, fmt.Sprintf("noShared: scope=%v", m.Scopes))
+					break
+				}
 			}
 		case "scope":
 			want := fmt.Sprint(v)
