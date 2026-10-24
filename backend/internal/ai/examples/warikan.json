@@ -60,9 +60,9 @@
         },
         { "type": "table", "id": "members_table", "area": "A3:F5", "entity": "members",
           "columns": [ { "field": "name" }, { "field": "paid" }, { "field": "balance" } ] },
-        { "type": "settlement", "id": "settle", "area": "A6:F7", "entity": "members", "nameField": "name", "balanceField": "balance" },
+        { "type": "settlement", "id": "settle", "area": "A6:F8", "entity": "members", "nameField": "name", "balanceField": "balance" },
         {
-          "type": "section", "id": "recent", "area": "A8:F10", "title": "支出",
+          "type": "section", "id": "recent", "area": "A9:F10", "title": "支出",
           "children": [
             { "type": "list", "entity": "expenses", "item": { "title": "title", "subtitle": "payer", "trailing": "amount" },
               "sort": { "field": "date", "direction": "desc" }, "emptyText": "まだ支出がありません", "swipeToDelete": true,

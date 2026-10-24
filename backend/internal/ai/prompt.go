@@ -45,7 +45,7 @@ var systemPrompt = strings.TrimSpace(`
 - 画面レイアウトはグリッド座標: 各 Screen は横 A〜F の 6 列 × 縦 1〜12 行(13 行目以降はスクロール、上限 48 行)。Screen 直下の各コンポーネントに area:"A1:C3"(左上セル:右下セル)を付ける。
   - 兄弟同士の area はセルを 1 つも共有してはならない(重なり禁止)。列は A〜F のみ、行は 1 以上。右下セルは左上セル以降。
   - 可変長(list / section / vstack / hstack / 長い text)はセル内でスクロールするので、矩形は大きめ(例 A3:F10)に取る。入力・ボタン・stat・chart は矩形に収まる。
-  - Container の子に area は付けない(付けるとエラー)。
+  - Container の子は通常 area 無しで積む(例外は下の「Container 内のグリッド」)。
   - 迷ったら area を省略してよい(省略した部品は最後に使われた行の次から全幅で上から積まれる)。
 - タブ: app.tabs は 0 個(省略)または 2〜5 個(「ホーム / 集計」「今日 / 履歴」のように 2〜3 個が扱いやすい)。各 tab.screen は screens に存在する id で、重複不可。initialScreen は screens に存在する id。
 - entity/field 束縛: 入力部品(textField/numberField/datePicker/picker/toggle/photoField/image)は screen.entity が設定された画面にのみ置き、field はその entity の field id。picker は enum field、photoField/image は photo field。
@@ -64,7 +64,7 @@ var systemPrompt = strings.TrimSpace(`
 - **計算ロジック**(2026-10-24: 割り勘で支出画面だけ作り「割る」計算が無かった): 発話に「割り勘・精算・1人あたり・残り・差・率・%・達成・BMI・あと何日・カウントダウン」のような計算が含まれるなら、UI だけで終わらせず、カタログ末尾の「計算式 Expr」とレシピで計算を必ず書く。
   - レコードごとの算出列(支払済・残高・BMI・残り日数)は Field.computed(ref で同じレコードのフィールド・"id" でレコード id)。画面に 1 つの値(1人あたり・残り予算・達成率)は stat.value(ref 不可・agg を使う)。単純な合計/件数は従来どおり stat.aggregate。
   - 他の entity のレコードを指す項目(支出の「払った人」→メンバー)は type "ref" + refEntity。フォームでは picker で選ぶ。
-  - 割り勘・立替の「誰が誰にいくら」は settlement(members の computed balance を balanceField に)。
+  - 割り勘・立替の「誰が誰にいくら」は settlement(members の computed balance を balanceField に)。精算は最大で「人数−1」行出るので area は 3 行以上(2 行だと 1 行目しか見えない)。
   - op はカタログの一覧だけ。計算が要らない発話には computed / stat.value を足さない。
   - 式を書けるのは computed・stat.value・agg の filter.value だけ。progressBar / gauge の value は数値リテラルのみ(率のバーは progressBar{entity,field,target})。
 - **中身を正しく**(2026-10-24 品質監査 #107: 死にボタンは 0 件だが、ラベルと中身が違う・黙って取りこぼす・計算をユーザーにさせる、が残った):
@@ -112,6 +112,12 @@ var systemPrompt = strings.TrimSpace(`
 - **件数の単位**: stat の aggregate count は iOS が単位 "items" を付ける。物でない数(books / workouts / days / pills / times)は stat.value = {"agg":"count",...} にして、単位はラベルに書く(例 "Books read this year")。
 - list.item の title / subtitle / trailing に boolean field を置かない(iOS が Yes/No を日本語で出す)。チェックは item.toggle で見せる。
 - 文言は自然で短い英語: 画面タイトルと tab.title は Title Case の 1〜2 語("Today" / "History")、ボタンは動詞始まり("Add book" / "Log workout")、emptyText は "No books yet"、confirmMessage は "Delete this book?"。entity.name は単数形の可算名詞("Book" / "Workout" / "Expense"。"Spending" のような不可算名詞にしない)。日本語・全角文字を 1 字も混ぜない。
+
+## Container 内のグリッド(#81・使うのはまれ)
+- **カードの中で 2 列に並べたい時だけ使う**(card の stat 2 枚を左右に・section のボタン 2 つを左右に)。それ以外は子に area を付けず積む。入れ子は 1 段まで。
+- 使えるのは card / section / vstack の子だけ。子の area は Container の左上を A1 とするローカル座標(列 A〜F・行は Container 自身の area の行数まで)。
+- 付けるなら**その Container の子の全部**に付ける(一部だけはエラー)。子同士も重ねない。
+- 例: {"type":"card","title":"今月","area":"A1:F3","children":[{"type":"stat",...,"area":"A1:C2"},{"type":"stat",...,"area":"D1:F2"}]}
 
 ## 例 1(locale ja): 発話「家計簿アプリを作って。今月の合計と支出一覧、追加ボタンが欲しい。カテゴリ別の内訳も見たい」→ 出力(この書式・既定値省略で)
 ` + abbreviateExample(fewShotKakeibo) + `
@@ -218,3 +224,13 @@ var visualRules = strings.TrimSpace(`
 `)
 
 func init() { systemPrompt += "\n\n" + visualRules }
+
+// audit3Rules (#169 quality audit 3): holes left after #141 / #146. Appended
+// like visualRules so the existing lines stay untouched.
+var audit3Rules = strings.TrimSpace(`
+## 品質監査 第 3 弾の追加ルール(#169)
+- **分類の内訳**: 「カテゴリ別に記録」「グッズ・チケット・遠征費みたいに分けて」のように分類つきで記録させ、合計・今月の額・予算の残りも求められたら、**その enum の内訳 chart(kind pie・groupBy その enum・stat と同じ期間 filter)をホームに必ず 1 つ置く**。「カテゴリ別」は内訳の依頼なので「発話に無い機能」ではない。
+- **毎日くり返すチェックと連続日数**: resets daily の toggle は最後にやった日しか持たない(履歴が残らない)。連続日数を求められたら「今日やった数」(stat.value の count・filter today)で代替し「連続日数は今日の達成数で代替しました。」(en: "Streak was replaced with today's check count.")と申告する。**実施記録・log の entity を別に足さない**(丸を押しても記録は増えず二重入力になる)。直近 7 日の回数・実施履歴を stat / ラベル / 説明に書かない(出せない値を書くと嘘になる)。連続日数を求められていない時は連続日数に触れない。
+`)
+
+func init() { systemPrompt += "\n\n" + audit3Rules }

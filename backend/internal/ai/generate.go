@@ -269,14 +269,34 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			return nil, err
 		}
 		raw := dropFormPhotoPreviews(fillDefaults(extractJSON(resp.Text)))
+		raw = fixButtonOverlap(raw) // before validation: saves a regeneration (#169)
 		app, perr := dsl.Parse(raw)
 		if perr == nil {
+			// Post-processing order (integration of #173 and #174; each step re-parses):
+			//   1. addMissingLists / fixEnglishUnits: existing content fixes.
+			//   2. fixLayoutRules (#174): moves mic-seat buttons right or into the
+			//      toolbar and fixes date titles on the model's own layout.
+			//   3. addMissingAddButtons (#173): runs after 2 so it sees the final
+			//      openers (a button moved to the toolbar still counts) and never
+			//      adds a toolbar button that 2 would then dedupe or move.
+			//   4. summarizeFor below (summary hints, #173) last, so the spoken
+			//      button positions describe the final layout.
 			if fixed := addMissingLists(raw, app); len(fixed) != len(raw) {
 				if fixedApp, err := dsl.Parse(fixed); err == nil {
 					raw, app = fixed, fixedApp
 				}
 			}
 			if fixed := fixEnglishUnits(raw, loc); len(fixed) != len(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
+			if fixed := fixLayoutRules(raw, app); string(fixed) != string(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
+			if fixed := addMissingAddButtons(raw, app, loc); len(fixed) != len(raw) {
 				if fixedApp, err := dsl.Parse(fixed); err == nil {
 					raw, app = fixed, fixedApp
 				}
@@ -717,8 +737,12 @@ func summarize(a *dsl.App) string {
 		for _, e := range a.Entities {
 			names = append(names, e.Name)
 		}
-		if where := addButtonHint(a); where != "" {
-			fmt.Fprintf(&b, "%sから%sを追加できます。", where, joinJa(names))
+		if hints := addHints(a, addButtonJa, addToolbarJa); len(hints) > 0 {
+			parts := make([]string, 0, len(hints))
+			for _, h := range hints {
+				parts = append(parts, fmt.Sprintf("%sから%sを", h.where, joinJa(h.entities)))
+			}
+			fmt.Fprintf(&b, "%s追加できます。", strings.Join(parts, "、"))
 		} else {
 			fmt.Fprintf(&b, "%sを記録できます。", joinJa(names))
 		}
@@ -756,35 +780,11 @@ func joinJa(items []string) string {
 	return strings.Join(items, "・")
 }
 
-// addButtonHint names where the "add" button is on the initial screen
-// ("右下のボタン", "右上の「追加」"), or "" when there is none.
-func addButtonHint(a *dsl.App) string {
-	forms := map[string]bool{}
-	for _, s := range a.Screens {
-		if s.Entity != "" {
-			forms[s.ID] = true
-		}
-	}
-	toForm := func(act *dsl.Action) bool {
-		return act != nil && act.Type == dsl.ActionNavigate && forms[act.Screen]
-	}
-	for _, s := range a.Screens {
-		if s.ID != a.InitialScreen {
-			continue
-		}
-		for _, c := range s.Components {
-			if c.Type == dsl.CompButton && toForm(c.Action) {
-				return areaPosition(c.Area) + "ボタン"
-			}
-		}
-		for _, tb := range s.Toolbar {
-			if toForm(&tb.Action) {
-				return "右上の「" + tb.Label + "」"
-			}
-		}
-	}
-	return ""
-}
+// addButtonJa / addToolbarJa phrase where an add control is ("右下のボタン",
+// "右上の「メンバー追加」").
+func addButtonJa(c *dsl.Component) string { return areaPosition(c.Area) + "ボタン" }
+
+func addToolbarJa(tb *dsl.ToolbarButton) string { return "右上の「" + tb.Label + "」" }
 
 // areaPosition turns a grid rectangle into "右下の" / "左上の" / "下の" / "".
 func areaPosition(area string) string {

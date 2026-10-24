@@ -1157,6 +1157,23 @@
         }
       }
     },
+    "完了": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完了"
+          }
+        }
+      }
+    },
     "閉じる": {
       "extractionState": "manual",
       "localizations": {

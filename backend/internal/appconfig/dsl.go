@@ -118,6 +118,7 @@ func (h *Handler) putDSL(w http.ResponseWriter, r *http.Request) {
 		fail(w, mapStoreErr(err, "app"))
 		return
 	}
+	h.claim(r, id)
 	h.publish(r, id, app, raw, v.Version)
 	w.Header().Set("ETag", etag(v.Version))
 	httpx.WriteJSON(w, http.StatusCreated, toSummary(v))
@@ -172,6 +173,7 @@ func (h *Handler) patchDSL(w http.ResponseWriter, r *http.Request) {
 		fail(w, mapStoreErr(err, "app"))
 		return
 	}
+	h.claim(r, id)
 	h.publish(r, id, app, next, v.Version)
 	w.Header().Set("ETag", etag(v.Version))
 	httpx.WriteJSON(w, http.StatusCreated, dslEnvelope{AppID: id, Version: v.Version, DSL: v.DSL, Source: v.Source, CreatedAt: &v.CreatedAt})
@@ -272,6 +274,7 @@ func (h *Handler) restoreVersion(w http.ResponseWriter, r *http.Request) {
 		fail(w, mapStoreErr(err, "app"))
 		return
 	}
+	h.claim(r, id)
 	h.publish(r, id, app, target.DSL, v.Version)
 	w.Header().Set("ETag", etag(v.Version))
 	httpx.WriteJSON(w, http.StatusCreated, restoreResponse{versionSummary: toSummary(v), DSL: v.DSL})

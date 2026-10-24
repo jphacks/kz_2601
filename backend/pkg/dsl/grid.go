@@ -51,41 +51,105 @@ func (a Area) Overlaps(b Area) bool {
 	return a.Col1 <= b.Col2 && b.Col1 <= a.Col2 && a.Row1 <= b.Row2 && b.Row1 <= a.Row2
 }
 
-// checkGrid validates the `area` layout of one screen's direct children:
-// format/range, no overlap between siblings, and no `area` inside containers
-// (v1: the grid exists only one level deep; container children stack).
+// LocalGridContainers are the containers whose children may carry `area`
+// (#81). Their rectangle becomes a local 6-column grid: child areas count
+// from A1 at the container's top-left, and rows are bounded by the
+// container's own row count. Nesting stops there (one level only).
+var LocalGridContainers = map[ComponentType]bool{CompCard: true, CompSection: true, CompVStack: true}
+
+type placedArea struct {
+	where string
+	area  Area
+}
+
+// checkGrid validates the `area` layout of one screen's direct children
+// (format/range, no overlap between siblings) and, per container, the local
+// grid of its children (checkLocalGrid).
 func checkGrid(screenID string, comps []Component, add func(string, ...any)) {
-	type placed struct {
-		where string
-		area  Area
-	}
-	var done []placed
+	var done []placedArea
 	for i := range comps {
 		c := &comps[i]
 		where := fmt.Sprintf("screen %q components[%d]", screenID, i)
 		if c.ID != "" {
 			where += fmt.Sprintf(" (id %q)", c.ID)
 		}
-		for j := range c.Children {
-			if c.Children[j].Area != "" {
-				add("%s.children[%d]: area %q is ignored inside a container; only direct children of a screen are placed on the grid (v1)",
-					where, j, c.Children[j].Area)
+		var own *Area
+		if c.Area != "" {
+			a, err := ParseArea(c.Area)
+			if err != nil {
+				add("%s: %v", where, err)
+			} else {
+				own = &a
+				done = addPlaced(done, placedArea{where, a}, "sibling components", add)
 			}
 		}
-		if c.Area == "" {
-			continue
+		checkLocalGrid(where, c, own, add)
+	}
+}
+
+// addPlaced reports overlaps of p with the already placed rectangles and
+// appends it.
+func addPlaced(done []placedArea, p placedArea, scope string, add func(string, ...any)) []placedArea {
+	for _, q := range done {
+		if p.area.Overlaps(q.area) {
+			add("%s area %s overlaps %s area %s; areas of %s must not share cells",
+				p.where, p.area, q.where, q.area, scope)
 		}
-		a, err := ParseArea(c.Area)
+	}
+	return append(done, p)
+}
+
+// checkLocalGrid validates `area` on a container's children (#81): only
+// card / section / vstack, all children or none, rows within the
+// container's own row count (own == nil: the container is stacked, so only
+// the screen-wide row limit applies), no overlap, and no area one level
+// deeper.
+func checkLocalGrid(where string, c *Component, own *Area, add func(string, ...any)) {
+	with := 0
+	for j := range c.Children {
+		if c.Children[j].Area != "" {
+			with++
+		}
+		for k := range c.Children[j].Children {
+			if c.Children[j].Children[k].Area != "" {
+				add("%s.children[%d].children[%d]: area is allowed only one level inside a container; remove it",
+					where, j, k)
+			}
+		}
+	}
+	if with == 0 {
+		return
+	}
+	if !LocalGridContainers[c.Type] {
+		add("%s: children of %s cannot have area (only card / section / vstack children can be laid out on a local grid); remove area from the children",
+			where, c.Type)
+		return
+	}
+	if with < len(c.Children) {
+		add("%s: only %d of %d children have area; inside a container give every child an area (A1 = the container's top-left) or remove all of them to stack",
+			where, with, len(c.Children))
+		return
+	}
+	rows := 0
+	if own != nil {
+		rows = own.Row2 - own.Row1 + 1
+	}
+	var done []placedArea
+	for j := range c.Children {
+		ch := &c.Children[j]
+		cw := fmt.Sprintf("%s.children[%d]", where, j)
+		if ch.ID != "" {
+			cw += fmt.Sprintf(" (id %q)", ch.ID)
+		}
+		a, err := ParseArea(ch.Area)
 		if err != nil {
-			add("%s: %v", where, err)
+			add("%s: %v", cw, err)
 			continue
 		}
-		for _, p := range done {
-			if a.Overlaps(p.area) {
-				add("%s area %s overlaps %s area %s; areas of sibling components must not share cells",
-					where, a, p.where, p.area)
-			}
+		if rows > 0 && a.Row2 > rows {
+			add("%s: area %s goes past row %d; inside a container rows count from 1 to the container's own row count (its area %s has %d rows), so shrink the child or enlarge the container",
+				cw, a, rows, own, rows)
 		}
-		done = append(done, placed{where, a})
+		done = addPlaced(done, placedArea{cw, a}, "children of one container", add)
 	}
 }
