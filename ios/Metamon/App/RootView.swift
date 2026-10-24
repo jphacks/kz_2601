@@ -57,7 +57,7 @@ struct RootView: View {
                     .zIndex(3)
             }
         }
-        .tint(Color(hex: rt.dsl.app.theme?.primaryColor) ?? .accentColor)
+        .tint(RenderTheme.Colors.brandA) // 生成アプリは常に Tailor It ブランド(docs/ios/design-system.md)
         .preferredColorScheme(colorScheme)
         .sheet(item: $rt.sheet) { route in
             ScreenStack(root: route)
