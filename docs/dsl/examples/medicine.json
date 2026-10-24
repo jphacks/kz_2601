@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "app": {
     "name": "服薬チェック",
-    "description": "毎日飲む薬を登録しておき、飲んだら一覧の丸を 1 タップ。日付が変わると全部未チェックに戻る",
+    "description": "毎日飲む薬を登録しておき、飲んだら一覧の丸を 1 タップ。日付が変わると全部未チェックに戻る。押した日は残るので連続日数と直近 7 日の回数も見られる",
     "icon": "pills",
     "theme": { "primaryColor": "#5E35B1" },
     "voiceEntry": "floating"
@@ -16,7 +16,11 @@
       "fields": [
         { "id": "name", "name": "薬の名前", "type": "string", "required": true },
         { "id": "timing", "name": "飲むとき", "type": "enum", "options": ["朝", "昼", "夜", "寝る前"], "defaultValue": "朝" },
-        { "id": "taken_on", "name": "飲んだ日", "type": "date" }
+        { "id": "taken_on", "name": "飲んだ日", "type": "date" },
+        { "id": "streak", "name": "連続", "type": "integer", "unit": "日",
+          "computed": { "op": "streak", "args": [{ "ref": "taken_on" }] } },
+        { "id": "last7", "name": "直近7日", "type": "integer", "unit": "回",
+          "computed": { "op": "doneInDays", "args": [{ "ref": "taken_on" }, 7] } }
       ]
     }
   ],
@@ -37,14 +41,16 @@
               "value": { "op": "sub", "args": [
                 { "agg": "count", "entity": "medicine" },
                 { "agg": "count", "entity": "medicine", "filter": { "field": "taken_on", "op": "today", "value": null } }
-              ] } }
+              ] } },
+            { "type": "stat", "label": "最長の連続(日)",
+              "value": { "agg": "max", "entity": "medicine", "field": "streak" } }
           ]
         },
         {
           "type": "section", "id": "today", "area": "A3:F10", "title": "今日の薬",
           "children": [
             { "type": "list", "entity": "medicine",
-              "item": { "title": "name", "subtitle": "timing", "toggle": "taken_on", "resets": "daily" },
+              "item": { "title": "name", "subtitle": "timing", "trailing": "streak", "toggle": "taken_on", "resets": "daily" },
               "emptyText": "毎日飲む薬を追加してください", "swipeToDelete": true,
               "onItemTap": { "type": "navigate", "screen": "medicine_form", "presentation": "push" } }
           ]

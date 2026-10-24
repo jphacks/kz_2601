@@ -40,6 +40,11 @@ public final class DocumentCache: @unchecked Sendable {
         lock.withLock { try? FileManager.default.removeItem(at: url(appId)) }
     }
 
+    /// アカウント削除用(#119): 全 appId の DSL と一覧キャッシュ(同じフォルダの apps.json)を消す。
+    public func removeAll() {
+        lock.withLock { try? FileManager.default.removeItem(at: directory) }
+    }
+
     private func url(_ appId: String) -> URL {
         let safe = appId.map { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" ? $0 : "_" }
         return directory.appendingPathComponent("\(String(safe)).json")

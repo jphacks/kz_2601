@@ -60,6 +60,27 @@ public final class FirebaseAuthService: AuthService, @unchecked Sendable {
         guard let user = auth.currentUser else { return nil }
         return try await user.getIDToken(forcingRefresh: forceRefresh)
     }
+
+    /// Firebase 経由で Apple の `auth/revoke` を呼ぶ。Firebase コンソールの Apple プロバイダに
+    /// Services ID・Team ID・Key ID・秘密鍵(OAuth コードフロー構成)が設定されていないと失敗する。
+    public func revokeAppleToken(authorizationCode: String) async throws {
+        try await auth.revokeToken(withAuthorizationCode: authorizationCode)
+    }
+
+    public func deleteCurrentUser() async throws {
+        guard let user = auth.currentUser else { return }
+        do {
+            try await user.delete() // 成功すると Firebase がサインアウト状態にする
+        } catch let error as NSError where error.code == AuthErrorCode.requiresRecentLogin.rawValue {
+            throw AuthError.requiresRecentLogin
+        }
+    }
+
+    public func reauthenticateWithApple(idToken: String, nonce: String) async throws {
+        guard let user = auth.currentUser else { return }
+        let credential = OAuthProvider.appleCredential(withIDToken: idToken, rawNonce: nonce, fullName: nil)
+        _ = try await user.reauthenticate(with: credential)
+    }
 }
 
 private extension AuthUser {

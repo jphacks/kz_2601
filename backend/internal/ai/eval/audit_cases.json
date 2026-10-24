@@ -15,6 +15,8 @@
    "needs": ["timer", "timer_cycle", "agg", "filter_today"]},
   {"id": "a08_habit_streak", "kind": "create", "group": "audit", "transcript": "習慣トラッカー。毎日筋トレと読書をやったかチェックして、何日連続で続いているかを表示して",
    "needs": ["toggle", "streak"]},
+  {"id": "a08b_medicine_streak", "kind": "create", "group": "audit", "transcript": "服薬チェック。毎日飲んだらチェックして連続日数も見たい",
+   "needs": ["toggle", "streak"], "note": "#172 毎日チェックの履歴(streak)。実施記録 entity を足さず computed streak を使う"},
   {"id": "a09_reading_month", "kind": "create", "group": "audit", "transcript": "読書記録アプリ。読んだ本のタイトルとページ数と読み終わった日を記録して、今月何冊読んだかと今年の合計ページ数を出して",
    "needs": ["agg", "filter_month", "filter_year"]},
   {"id": "a10_saving_goal", "kind": "create", "group": "audit", "transcript": "貯金アプリ。目標金額は10万円で、貯金した額を記録したら達成率と、あといくらで目標に届くかを表示して",
