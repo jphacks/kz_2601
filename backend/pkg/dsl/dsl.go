@@ -239,6 +239,8 @@ const (
 	CompEmptyState  ComponentType = "emptyState"
 	// logic
 	CompSettlement ComponentType = "settlement" // greedy "A pays B" list from a balance field
+	// peer-to-peer
+	CompNearbyShare ComponentType = "nearbyShare" // MultipeerConnectivity: send records to a nearby device
 )
 
 // ContainerTypes lists component types that may have Children.

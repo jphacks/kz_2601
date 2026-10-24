@@ -587,6 +587,13 @@ func (a *App) Validate() error {
 				if c.Title == "" {
 					add("%s: emptyState needs title", where)
 				}
+			case CompNearbyShare:
+				if c.Label == "" {
+					add("%s: nearbyShare needs label", where)
+				}
+				if entities[c.Entity] == nil {
+					add("%s: nearbyShare entity %q does not exist", where, c.Entity)
+				}
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}

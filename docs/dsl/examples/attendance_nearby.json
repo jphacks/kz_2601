@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "出席カード",
+    "description": "近くの端末に出席を送り、その場で出席を取る",
+    "icon": "person.2.wave.2",
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "members",
+      "name": "名簿",
+      "titleField": "name",
+      "fields": [
+        { "id": "name", "name": "名前", "type": "string", "required": true },
+        { "id": "team", "name": "チーム", "type": "string" }
+      ]
+    },
+    {
+      "id": "attendance",
+      "name": "出席",
+      "titleField": "name",
+      "fields": [
+        { "id": "name", "name": "名前", "type": "string", "required": true },
+        { "id": "status", "name": "状態", "type": "enum", "options": ["出席", "遅刻", "早退"], "defaultValue": "出席" },
+        { "id": "date", "name": "日時", "type": "datetime", "defaultValue": "now" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "出席カード",
+      "components": [
+        { "type": "stat", "id": "today", "area": "A1:F2", "label": "今日の出席", "entity": "attendance", "aggregate": "count",
+          "filter": { "field": "date", "op": "today", "value": null } },
+        { "type": "section", "id": "log", "area": "A3:F10", "title": "届いた出席",
+          "children": [
+            { "type": "list", "entity": "attendance", "item": { "title": "name", "subtitle": "date", "trailing": "status" },
+              "sort": { "field": "date", "direction": "desc" }, "emptyText": "まだ届いていません", "swipeToDelete": true }
+          ] },
+        { "type": "button", "id": "roster", "area": "A11:C12", "label": "名簿", "icon": "person.3",
+          "action": { "type": "navigate", "screen": "members" } },
+        { "type": "button", "id": "attend", "area": "D11:F12", "label": "出席する", "icon": "hand.raised",
+          "action": { "type": "navigate", "screen": "attend_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "attend_form",
+      "title": "出席する",
+      "entity": "attendance",
+      "toolbar": [
+        { "label": "保存", "action": { "type": "saveRecord", "entity": "attendance" } }
+      ],
+      "components": [
+        { "type": "section", "id": "fields", "area": "A1:F6", "title": "自分の出席",
+          "children": [
+            { "type": "textField", "field": "name", "label": "名前", "placeholder": "山田 花子" },
+            { "type": "picker", "field": "status", "label": "状態", "style": "segmented" },
+            { "type": "datePicker", "field": "date", "label": "日時", "includeTime": true }
+          ] },
+        { "type": "nearbyShare", "id": "send", "area": "A8:F9", "label": "近くの先生に送る", "entity": "attendance" }
+      ]
+    },
+    {
+      "id": "members",
+      "title": "名簿",
+      "toolbar": [
+        { "label": "追加", "icon": "plus", "action": { "type": "navigate", "screen": "member_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        { "type": "list", "id": "list", "area": "A1:F10", "entity": "members", "item": { "title": "name", "subtitle": "team" },
+          "sort": { "field": "name", "direction": "asc" }, "emptyText": "名簿は空です", "swipeToDelete": true },
+        { "type": "nearbyShare", "id": "share_roster", "area": "A11:F12", "label": "名簿を近くの人に送る", "entity": "members" }
+      ]
+    },
+    {
+      "id": "member_form",
+      "title": "メンバー",
+      "entity": "members",
+      "toolbar": [
+        { "label": "保存", "action": { "type": "saveRecord", "entity": "members" } }
+      ],
+      "components": [
+        { "type": "section", "id": "fields", "area": "A1:F4", "title": "メンバー",
+          "children": [
+            { "type": "textField", "field": "name", "label": "名前" },
+            { "type": "textField", "field": "team", "label": "チーム" }
+          ] }
+      ]
+    }
+  ]
+}

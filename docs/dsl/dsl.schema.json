@@ -599,6 +599,9 @@
         },
         {
           "$ref": "#/$defs/Settlement"
+        },
+        {
+          "$ref": "#/$defs/NearbyShare"
         }
       ]
     },
@@ -2764,6 +2767,35 @@
           "description": "now/today は []。"
         }
       }
+    },
+    "NearbyShare": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "label",
+        "entity"
+      ],
+      "properties": {
+        "type": {
+          "const": "nearbyShare"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string"
+        },
+        "entity": {
+          "type": "string",
+          "description": "送る entity。screen.entity と同じならフォームの今のレコード(1 件)、それ以外の画面ではその entity の新しい順 最大 50 件を送る。"
+        }
+      },
+      "description": "近くにいる Tailor It 端末(Wi-Fi / Bluetooth・インターネット不要)を探し、選んだ相手にこの画面のレコードをその場で送るボタン。相手が承認した時だけ届き、同じ entity(id とフィールド構成)を持つアプリならレコードとして追加される。「近くの人と共有」「その場で送る」「出席を取る」「名刺交換」「対戦結果を渡す」など、対面で記録を渡したいアプリで選ぶ。",
+      "x-usage": "フォーム画面なら保存ボタンの近く(A10:F11)に 1 つ。一覧画面なら下部の半幅(D11:F12)に。受け取る側も同じアプリ(同じ entity)を開いている必要がある。"
     },
     "ExprIf": {
       "type": "object",
