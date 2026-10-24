@@ -14,6 +14,7 @@ public enum DSLExamples {
         "gallery-web",
         "warikan",
         "bmi",
+        "attendance_nearby",
     ]
 
     /// 初期状態(音声画面のみ)の DSL 名。

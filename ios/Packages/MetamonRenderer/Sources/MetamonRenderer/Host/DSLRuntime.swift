@@ -22,11 +22,15 @@ public protocol DSLRuntime: AnyObject, Observable {
     /// back: スタックに積まれていれば pop、モーダルの最下層なら dismiss
     func close(_ route: Route)
     func pathBinding(_ stack: String) -> Binding<[Route]>
+    /// `nearbyShare`(#36): 近くの端末を探すシートを開き、選んだ相手に `records`(entity の保存フィールドのみ)を送る。
+    func shareNearby(entity: String, records: [[String: JSONValue]])
 }
 
 public extension DSLRuntime {
     func load(entities: Set<String>) async { await load(entities: entities, force: false) }
     var failed: Set<String> { [] }
+    /// 既定は何もしない(プレビュー・テスト用ランタイム)。
+    func shareNearby(entity: String, records: [[String: JSONValue]]) {}
 
     /// 部品が共通で使う空状態の判定: 読み込み中 / 取得失敗 / 本当に空。
     func emptyState(for entity: String) -> EmptyState {

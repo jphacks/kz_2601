@@ -29,6 +29,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case emptyState
     // leaf(計算・#101)
     case settlement
+    // leaf(近距離共有・#36)
+    case nearbyShare
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
