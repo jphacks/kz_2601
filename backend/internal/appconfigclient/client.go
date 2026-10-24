@@ -103,7 +103,7 @@ func (h *HTTP) do(ctx context.Context, method, path string, headers map[string]s
 	if err != nil {
 		return &Error{Status: http.StatusBadGateway, Code: "appconfig_unreachable", Message: err.Error()}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode >= 300 {
 		var e struct {

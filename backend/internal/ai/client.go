@@ -234,7 +234,7 @@ func (c *Client) once(ctx context.Context, body []byte) (*Response, error) {
 	if err != nil {
 		return nil, &APIError{Status: 599, Type: "connection_error", Message: err.Error()}
 	}
-	defer hresp.Body.Close()
+	defer func() { _ = hresp.Body.Close() }()
 	data, err := io.ReadAll(io.LimitReader(hresp.Body, 8<<20))
 	if err != nil {
 		return nil, &APIError{Status: 599, Type: "read_error", Message: err.Error()}
