@@ -26,6 +26,18 @@ paths:
            検証 NG は最大 2 回再生成。patch が 3 回失敗したら full に降格 → それも失敗ならテンプレ fallback → 422
         5. appconfig が 409 なら最新を取り直して 1 回だけ再生成
         6. 新 DSL と要約を返す。iOS は返却 `dsl` を即時適用してよい (再 GET 不要)
+
+        **ストリーミング (`?stream=1`)**: 応答が `text/event-stream` になり、Claude の出力を逐次読んで
+        - `event: app` — create ターン。出力先頭の `app` ブロックが揃った時点 (実測 p50 ≈2.4s) で `{type, attempt, locale, name, description, tabs[], summary}`。`summary` は読み上げ用の仮の一文「家計簿アプリを作っています。ホームと集計の2タブです。」
+        - `event: summary` — edit ターン。PatchDocument は summary を先に書くので `{type, attempt, locale, summary}` が ops より先に届く
+        - `event: result` — JSON モードと同じ GenerateResponse (検証・保存後)
+        - `event: error` — JSON モードと同じ `{error:{code,message,details?,status}}` (HTTP は 200 のまま)
+        再生成が走ると app/summary イベントは attempt を変えてもう一度届くことがある (最新を採用)。
+      parameters:
+        - in: query
+          name: stream
+          schema: { type: string, enum: ['1', 'true'] }
+          description: 指定すると Server-Sent Events で app/summary → result|error の順に返す
       requestBody:
         required: true
         content:
