@@ -9,10 +9,14 @@ struct SettingsSheet: View {
     @Environment(\.services) private var services
     @Environment(\.dismiss) private var dismiss
     @State private var confirmReset = false
+    @State private var confirmDelete = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
 
     var body: some View {
         NavigationStack {
             List {
+                if Self.e2eDeleteAccount { deleteAccountSection } // E2E: 削除ボタンを画面内に出す(シミュレータはスクロール操作できない)
                 accountSection
                 ProSettingsSection() // 課金(#77)
                 languageSection
@@ -22,6 +26,7 @@ struct SettingsSheet: View {
                 appSection
                 syncSection
                 connectionSection
+                if !Self.e2eDeleteAccount { deleteAccountSection }
             }
             .navigationTitle("設定")
             .screenMapSheet { dismiss() } // 設定は音声シートから開くので、閉じればその画面の文脈で話せる
@@ -41,6 +46,74 @@ struct SettingsSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .alert("アカウントを削除しますか？", isPresented: $confirmDelete) {
+            Button("削除する", role: .destructive) { deleteAccount() }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("アカウントとすべてのアプリが使えなくなります。元に戻せません。")
+        }
+        .alert("アカウントを削除できませんでした", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(deleteError ?? "")
+        }
+        .overlay {
+            if isDeleting {
+                ProgressView("削除しています…")
+                    .padding(Theme.Spacing.lg)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            }
+        }
+        .interactiveDismissDisabled(isDeleting)
+        #if DEBUG
+        // ヘッドレス E2E 用(#119): `METAMON_E2E_DELETE_ACCOUNT=<秒>` で、その秒数後に確認ダイアログ → さらに 4 秒後に「削除する」
+        .task {
+            guard let s = ProcessInfo.processInfo.environment["METAMON_E2E_DELETE_ACCOUNT"].flatMap(Double.init) else { return }
+            try? await Task.sleep(for: .seconds(s))
+            confirmDelete = true
+            try? await Task.sleep(for: .seconds(4))
+            confirmDelete = false
+            print("[Metamon] E2E: deleting account")
+            deleteAccount()
+        }
+        #endif
+    }
+
+    /// アカウント削除(#119・App Store 5.1.1(v))。サーバーで論理削除 → 端末のデータ → サインアウト。
+    @ViewBuilder
+    private var deleteAccountSection: some View {
+        if session.user != nil {
+            Section {
+                Button(role: .destructive) { confirmDelete = true } label: {
+                    Label("アカウントを削除", systemImage: "person.crop.circle.badge.xmark")
+                        .foregroundStyle(.red)
+                }
+                .disabled(isDeleting)
+                .accessibilityIdentifier("settings.deleteAccount")
+            } footer: {
+                Text("作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。")
+            }
+        }
+    }
+
+    private static var e2eDeleteAccount: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.environment["METAMON_E2E_DELETE_ACCOUNT"] != nil
+        #else
+        false
+        #endif
+    }
+
+    private func deleteAccount() {
+        isDeleting = true
+        Task {
+            defer { isDeleting = false }
+            do {
+                if try await session.deleteAccount(account: services.account, runtime: rt) { dismiss() }
+            } catch {
+                deleteError = error.localizedDescription
+            }
+        }
     }
 
     private var accountSection: some View {

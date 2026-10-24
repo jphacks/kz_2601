@@ -21,6 +21,7 @@ tags:
   - { name: entities }
   - { name: records }
   - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。architecture.md §3.2' }
+  - { name: account, description: 'アカウント削除(#119)。architecture.md §4.1' }
   - { name: release, description: 'リリース申請(#76)。architecture.md §3.3' }
 
 paths:
@@ -520,6 +521,26 @@ paths:
       responses:
         '201': { description: Installed, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /me:
+    delete:
+      tags: [account]
+      summary: アカウント削除(論理削除・#119)
+      description: |
+        App Store 審査ガイドライン 5.1.1(v) 対応。**論理削除**(データは物理的には消さない):
+        - `users/{uid}` に `status: "deleted"`・`deletedAt` を付ける(再実行でも最初の `deletedAt` を保つ)
+        - 自分のアプリ(`users/{uid}/apps/*`)をすべて `status: "archived"` に(`DELETE /apps/{appId}` と同じ扱い)
+        - 自分のシェアリンク(`shares/*`)を取り消し(`revoked: true` → 受け取り側は 404)
+        - 自分の「探す」の掲載(`public_apps/*`)を取り下げ
+        - 共有データ(`apps_public/*` 配下)の自分の投稿は**残す**。Firebase Auth のユーザーも**削除しない**
+          (iOS が 204 の後にクライアント SDK で Firebase のユーザーを削除するので、同じ Apple ID で再サインインすると新しい uid になる)
+        以後この uid の認証済みリクエストは **410 `account_deleted`**(この `DELETE /me` だけは何度でも 204)。
+        冪等: 削除済みの印を最初に書くので、途中で失敗しても再実行で残りが終わる。
+        Sign in with Apple のトークン取り消しは iOS が Firebase(`Auth.revokeToken(withAuthorizationCode:)`)経由で行う。
+      responses:
+        '204': { description: 削除済み(2 回目以降も 204) }
+        '401': { description: 未認証, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '500': { description: 途中で失敗。再実行で続きが終わる, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /apps/{appId}/release-requests:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
