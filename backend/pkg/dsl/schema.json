@@ -408,6 +408,27 @@
         },
         {
           "$ref": "#/$defs/Divider"
+        },
+        {
+          "$ref": "#/$defs/Slider"
+        },
+        {
+          "$ref": "#/$defs/Stepper"
+        },
+        {
+          "$ref": "#/$defs/TextEditor"
+        },
+        {
+          "$ref": "#/$defs/SecureField"
+        },
+        {
+          "$ref": "#/$defs/TimePicker"
+        },
+        {
+          "$ref": "#/$defs/ColorPicker"
+        },
+        {
+          "$ref": "#/$defs/Rating"
         }
       ]
     },
@@ -611,7 +632,9 @@
             "wheel"
           ]
         }
-      }
+      },
+      "description": "Single choice among the enum field's options. style=segmented (default when <=4 options) is the segmented control; menu for longer lists; wheel for a drum picker. There is no separate `segmented` type.",
+      "x-usage": "segmented: full width, 1-2 rows (e.g. A1:F2). menu: 1 row. wheel: 3 rows."
     },
     "Toggle": {
       "type": "object",
@@ -1259,6 +1282,239 @@
         "icon": {
           "type": "string",
           "description": "SF Symbols name."
+        }
+      }
+    },
+    "Slider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field",
+        "min",
+        "max"
+      ],
+      "description": "Horizontal slider for a bounded numeric value (e.g. satisfaction 0-10, volume %). Choose it when the range is small and the exact digit matters less than the feel; use numberField for free numbers.",
+      "x-usage": "Full width, 2 rows tall (e.g. A3:F4). Place inside a form screen (screen.entity).",
+      "properties": {
+        "type": {
+          "const": "slider"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Numeric field (integer/number/currency) of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "min": {
+          "type": "number",
+          "description": "Lower bound (inclusive)."
+        },
+        "max": {
+          "type": "number",
+          "description": "Upper bound (inclusive). Must be > min."
+        },
+        "step": {
+          "type": "number",
+          "description": "Increment; omit for continuous. Use 1 for integer fields."
+        }
+      }
+    },
+    "Stepper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "-/+ stepper for small counts (sets, cups, people). Choose it when the user adjusts by one or two at a time; use slider for wide ranges.",
+      "x-usage": "Full width, 1 row (e.g. A5:F5), or half width next to another short input.",
+      "properties": {
+        "type": {
+          "const": "stepper"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Numeric field (integer/number/currency) of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "min": {
+          "type": "number",
+          "description": "Lower bound (inclusive)."
+        },
+        "max": {
+          "type": "number",
+          "description": "Upper bound (inclusive). Must be > min when both are given."
+        },
+        "step": {
+          "type": "number",
+          "description": "Increment per tap (default 1)."
+        }
+      }
+    },
+    "TextEditor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "Multi-line free text area for notes, diary bodies, descriptions. Choose it over textField when the user will write several sentences.",
+      "x-usage": "Full width, 3-5 rows tall (e.g. A7:F10). Usually the last input of a form.",
+      "properties": {
+        "type": {
+          "const": "textEditor"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Text field (string/text) of the screen entity."
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "minLines": {
+          "type": "integer",
+          "description": "Minimum visible lines (default 4)."
+        }
+      }
+    },
+    "SecureField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "Masked text input for PIN codes, passwords, secret memos. Choose it whenever the value should not be readable over the shoulder.",
+      "x-usage": "Full width, 1 row (e.g. A2:F2).",
+      "properties": {
+        "type": {
+          "const": "secureField"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Text field (string/text) of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        }
+      }
+    },
+    "TimePicker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "Hour-and-minute wheel for a time of day without a date (wake-up time, dose time, start time). Choose datePicker when the calendar date matters.",
+      "x-usage": "Half width, 2 rows (e.g. A9:C10) so two times can sit side by side; full width also fine.",
+      "properties": {
+        "type": {
+          "const": "timePicker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "string/text field -> stored as \"HH:mm\" (same format as Notification.time); datetime field -> stored as RFC3339 with today's date."
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "ColorPicker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "System color well that stores a hex color string. Choose it for tags, labels, themes or anything the user wants to color-code.",
+      "x-usage": "Full width, 1 row (e.g. A11:F11).",
+      "properties": {
+        "type": {
+          "const": "colorPicker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Text field (string/text) of the screen entity; stored as \"#RRGGBB\"."
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "Rating": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "description": "Tap-to-rate star row (1..max). Choose it for satisfaction, difficulty, taste or any 5-point score; use slider for finer scales.",
+      "x-usage": "Full width, 1-2 rows (e.g. A7:F8).",
+      "properties": {
+        "type": {
+          "const": "rating"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Numeric field (integer/number) of the screen entity; stores 1..max."
+        },
+        "label": {
+          "type": "string"
+        },
+        "max": {
+          "type": "integer",
+          "description": "Number of stars (default 5)."
         }
       }
     }
