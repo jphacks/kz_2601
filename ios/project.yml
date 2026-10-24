@@ -86,6 +86,9 @@ targets:
         - package: MetamonRenderer/MetamonRendererTests
         - package: MetamonServices/MetamonServicesTests
       gatherCoverageData: false
+      # 課金(#77): Run 時の StoreKit をローカル構成ファイルにする(シミュレータでテスト購入できる・外部アカウント不要)。
+      # 本番(TestFlight / App Store)では使われない。商品 ID の正典は MetamonServices/Purchase/ProProducts.swift
+      storeKitConfiguration: StoreKit/TailorItPro.storekit
 
   # ホーム画面ウィジェット(WidgetKit)。本体が App Group に書いた集計済みスナップショットを描画するだけ(Renderer/DSL 非依存)。
   # Bundle ID は本体の子(jp.kz2601.metamon.widget)。実機は App ID 2 つ + App Group を自動署名が作る(§docs/ios/architecture.md ウィジェット)。
