@@ -85,6 +85,9 @@ targets:
         - package: MetamonDSL/MetamonDSLTests
         - package: MetamonRenderer/MetamonRendererTests
         - package: MetamonServices/MetamonServicesTests
+        # 指の操作(タップ・ドラッグ・長押し)の UI テスト(#165)。手元で回す: docs/ios/architecture.md「UI テスト」
+        - name: MetamonUITests
+          parallelizable: false
       gatherCoverageData: false
 
   # ホーム画面ウィジェット(WidgetKit)。本体が App Group に書いた集計済みスナップショットを描画するだけ(Renderer/DSL 非依存)。
@@ -106,3 +109,18 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: YES
         ENABLE_PREVIEWS: YES
+
+  # UI テスト(XCUITest・#165)。モック(METAMON_MOCK=1)+ DEBUG フックで起動し、FAB のドラッグ / 長押し・チップ・チェック丸・フォームを実際に指で操作する。
+  MetamonUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: MetamonUITests
+    dependencies:
+      - target: Metamon
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Metamon
+        TARGETED_DEVICE_FAMILY: "1"
