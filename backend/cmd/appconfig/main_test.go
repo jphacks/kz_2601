@@ -10,13 +10,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jphacks/kz_2601/backend/internal/appconfig"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
 func testHandler() http.Handler {
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
-	return newHandler(auth.Middleware(nil, auth.ModeDev), logger)
+	return newHandler(auth.Middleware(nil, auth.ModeDev), logger, appconfig.New(store.NewMemory()))
 }
 
 func TestRoutes(t *testing.T) {
@@ -84,7 +86,7 @@ func TestUnmatchedRoutesReturnErrorEnvelope(t *testing.T) {
 		},
 		{
 			name:       "wrong method is a bad_request envelope",
-			method:     http.MethodPost,
+			method:     http.MethodPut,
 			path:       "/v1/apps",
 			wantStatus: http.StatusMethodNotAllowed,
 			wantCode:   httpx.CodeBadRequest,
