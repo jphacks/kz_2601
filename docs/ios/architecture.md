@@ -1,7 +1,7 @@
 # iOS アーキテクチャ(Metamon / Server-Driven UI)
 
 > 正典は `docs/00_decisions.md`。本書は iOS 側の実装設計。DSL スキーマは統一版 v1 `docs/dsl/README.md`(旧 iOS 案: `docs/ios/dsl-proposal.md`)。**注**: 本書 §2〜§5 の `{{式}}`/`state`/`Interpolator` の記述は v1 で廃止され、`screen.entity` のドラフト + `field` 束縛(`FormDraft`)・`initialScreen` + push/sheet/fullScreen・`app.tabs[]`(TabView)に置き換わった。画面内配置は `area`(6 列 × 可視高さ÷12 行のグリッド)で `GridScreenLayout` が絶対配置する。
-> スケルトン実装: `ios/Metamon/`(`xcodegen generate` → `xcodebuild -scheme Metamon build` 済み)。
+> 実装: `ios/Metamon/`(アプリ本体)+ `ios/Packages/{MetamonDSL,MetamonRenderer,MetamonServices}`(ローカル Swift Package)。§1 参照。
 
 ## 0. 追加決定の反映(2026-10-24 昼)
 | 項目 | 決定 | iOS 側の帰結 |
@@ -14,41 +14,46 @@
 | STT | WhisperKit 確定・**導入済み** | `SpeechTranscriber` 抽象。実機 `WhisperKitRecognizer`(model `small`)/ シミュレータ `MockTranscriber`(§6) |
 | iOS CI | 5分制限なし | WhisperKit/Firebase 解決込みのビルドでも可 |
 
-## 1. 全体構成
+## 1. 全体構成(マルチモジュール)
 
-```
-┌──────────── SwiftUI (View 層) ────────────┐
-│ RootView ── ScreenView ── DSLView(再帰) ── ComponentViews │
-│ VoiceInputView(音声)                                    │
-└──────────────┬───────────────────────────────────────────┘
-               │ @Environment(AppRuntime.self)
-┌──────────────▼──── Runtime 層 (@Observable, @MainActor) ─┐
-│ AppRuntime: document / state(JSONValue) / paths / sheet   │
-│            run(Action) / resolve("{{..}}") / binding(path) │
-│ Interpolator (式展開)                                      │
-└──────────────┬───────────────────────────────────────────┘
-               │ protocol
-┌──────────────▼──── Services 層 ─────────────────────────┐
-│ AppConfigClient(HTTP / InMemory)  AIClient(HTTP / Mock)  │
-│ DocumentSync(Polling / Noop)      TokenProvider(Firebase)│
-│ NativeBridge(UIKit)               SpeechTranscriber(WhisperKit / Mock) │
-└──────────────────────────────────────────────────────────┘
-┌──────────── Model 層 (純 Swift, Decodable, Sendable) ─────┐
-│ AppDocument / Screen / Node / Component / Action / JSONValue │
-└──────────────────────────────────────────────────────────┘
+Android のマルチモジュールに相当する **ローカル Swift Package 3 つ + 薄いアプリ本体**。依存の向きは各 `Package.swift` の `dependencies` で固定され、逆向きの import はコンパイルエラーになる。
+
+```mermaid
+flowchart TD
+    App["ios/Metamon (アプリ本体)<br/>MetamonApp / AppRuntime / RootView / VoiceInputView / BuildConfig"]
+    Renderer["MetamonRenderer<br/>ComponentRegistry / DSLView / ScreenView / GridScreenLayout / DSLNavigationRoot<br/>Components/ 1種=1ファイル"]
+    Services["MetamonServices<br/>Protocols/ (AppConfigClient, AIClient, DocumentSync, TokenProvider, SpeechTranscriber, NotificationScheduler)<br/>Live/ Mock/ Native/"]
+    DSL["MetamonDSL<br/>Model (Codable) / GridArea / Record / FieldCoding / Aggregator / DSLExamples<br/>Foundation のみ"]
+    WhisperKit[("argmax-oss-swift 1.1.1<br/>WhisperKit")]
+    App --> Renderer
+    App --> Services
+    Renderer --> DSL
+    Services --> DSL
+    Services --> WhisperKit
 ```
 
-| 層 | ディレクトリ | 責務 | 依存 |
-|---|---|---|---|
-| Model | `DSL/Model` | DSL の Codable 表現。UI/通信に非依存。ユニットテスト対象 | Foundation |
-| Runtime | `DSL/Runtime` | 単一の `AppRuntime`(Observation)。state・ナビ・アクション実行・式展開 | Model, Services(protocol) |
-| Render | `DSL/Render` | Node → View。状態を持たない薄い View | Runtime |
-| Features | `Features/Voice` | DSL 外のネイティブ画面(音声入力) | Runtime |
-| Services | `Services/{Live,Mock,Native}` | 外部 I/O。protocol で差し替え | Model |
-| App | `App` | エントリ・DI(`BuildConfig.makeServices()`) | 全部 |
+| モジュール | 場所 | 責務 | 依存 | テスト |
+|---|---|---|---|---|
+| `MetamonDSL` | `ios/Packages/MetamonDSL` | DSL v1 の Codable モデル、`GridArea`(area 計算)、`Record`/`FieldCoding`/`Aggregator`(クライアント集計)、`DSLExamples` | なし(Foundation) | `swift test`(macOS で可)/ `xcodebuild test` |
+| `MetamonRenderer` | `ios/Packages/MetamonRenderer` | SwiftUI View。`ComponentRegistry`(`type` 文字列 → View)、`DSLView`、`ScreenView`、`GridScreenLayout`、`DSLNavigationRoot`(TabView)。Services を知らない | DSL | `xcodebuild test`(schema 全 type の登録チェック) |
+| `MetamonServices` | `ios/Packages/MetamonServices` | 外部 I/O の protocol と実装。`Protocols/` と `Live/`(HTTP, WhisperKit)`Mock/` `Native/`(UNUserNotificationCenter)をフォルダで分離。WhisperKit はこのパッケージの依存 | DSL, WhisperKit | `xcodebuild test` |
+| アプリ本体 | `ios/Metamon` | `MetamonApp`(組み立て)、`AppRuntime`(状態・アクション実行。`DSLRuntime` に準拠)、`RootView`(モーダル/FAB/オーバーレイ)、`VoiceInputView`、`BuildConfig`(環境 → Services) | 全部 | なし(ロジックは各パッケージへ) |
 
-**状態管理**: `@Observable final class AppRuntime` 1個を `.environment()` で配る。DSL の動的 state は `JSONValue`(object)1本で持ち、`binding(path)` で SwiftUI `Binding` に変換する。View 側に `@State` を置くのは一時 UI(録音フェーズ、PhotosPicker 選択)のみ。
-**モジュール分割**: ハッカソン中は単一ターゲット。`DSL/Model` は依存ゼロなので、必要なら SwiftPM ローカルパッケージ `MetamonDSL` に切り出せる(テストも同梱)。
+### 1.1 DI(依存性注入)
+- **入口は `ios/Metamon/App/BuildConfig.swift` の `BuildConfig.make(environment:)` だけ**。`AppEnvironment`(`.mock` / `.live(appConfigURL:aiURL:)`)を環境変数 `METAMON_API_BASE_URL` / Info.plist から判定し、`Services`(protocol のコンテナ struct)を**1回だけ**組み立てる。Mock と本番の切替はこのファイルで完結する。
+- `MetamonApp` が `Services` を `AppRuntime(document:services:)` と SwiftUI Environment `\.services`(`App/ServicesEnvironment.swift`)に渡す。View は `@Environment(\.services)` で protocol 越しに使う(例: `VoiceInputView` → `services.transcriber`)。
+- Renderer は Services を知らない。必要な能力(DSL、レコード、`run(action)`、ナビ)は `DSLRuntime` protocol(`MetamonRenderer/Host/DSLRuntime.swift`)で宣言し、`AppRuntime` が準拠して `\.dslRuntime` で注入する。`@Observable` なのでプロパティ変更は SwiftUI が追跡する。
+- 外部 DI ライブラリは使わない。
+
+### 1.2 ComponentRegistry(コンポーネントが増えても崩れない仕組み)
+- `MetamonRenderer/Registry/ComponentRegistry.swift`: schema の `type` 文字列 → View ビルダーの辞書。`DSLView` は辞書を引くだけで `switch` を持たない。
+- **追加手順(3 行)**: ① `Components/Leaves/FooLeaf.swift` に View を 1 ファイル作る ② `MetamonDSL` の `ComponentType` に `case foo`(schema にも追加) ③ `ComponentRegistry.standard` に `r.register(.foo) { c, ctx in FooLeaf(c: c, ctx: ctx) }` を 1 行。
+- **テストで強制**: `MetamonRendererTests/ComponentRegistryTests` が `docs/dsl/dsl.schema.json` の Container `enum` + Leaf `const` を読み、`ComponentRegistry.standard.registeredTypes` と `ComponentType.allCases` の**双方向一致**を検証する(抜けても余っても赤)。
+- `voiceInput` だけは音声機能(Services)に依存するため Renderer ではプレースホルダ。アプリ本体が `ComponentRegistry.standard.registering(.voiceInput) { c, _ in VoiceInputView(prompt: c.prompt) }` で差し替え、`\.componentRegistry` で注入する(`MetamonApp`)。
+- ホスト独自のコンポーネント(schema 外)も `register("myType") { ... }` で足せる。
+
+### 1.3 状態管理
+`@Observable final class AppRuntime` 1個を `.environment(runtime)`(アプリ内)と `.environment(\.dslRuntime, runtime)`(Renderer 向け)で配る。フォーム入力は画面ごとの `FormDraft`(Renderer)に閉じる。View 側の `@State` は一時 UI(録音フェーズ、PhotosPicker 選択)のみ。
 
 ## 2. DSL レンダリング
 
@@ -213,8 +218,13 @@ UI は専用ログイン画面を作らない(匿名なら無言、Apple なら�
 ## 11. ビルド/実行
 ```sh
 cd ios
-xcodegen generate                              # .xcodeproj 生成(コミットしない)
-xcodebuild -scheme Metamon -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO
-xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test CODE_SIGNING_ALLOWED=NO
+METAMON_TEAM_ID=CHP337D75C xcodegen generate   # .xcodeproj 生成(コミットしない)。Team を注入
+xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' build CODE_SIGNING_ALLOWED=NO
+xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' test CODE_SIGNING_ALLOWED=NO   # 3 パッケージのテストを一括
+(cd Packages/MetamonDSL && swift test)         # DSL だけなら macOS で数秒
+# 実機
+xcodebuild -scheme Metamon -destination 'id=<DEVICE_ID>' -allowProvisioningUpdates DEVELOPMENT_TEAM=CHP337D75C build
+xcrun devicectl device install app --device <DEVICE_ID> <path/to/Metamon.app>
+xcrun devicectl device process launch --device <DEVICE_ID> jp.kz2601.metamon
 # 実サーバー接続: Scheme の環境変数に METAMON_API_BASE_URL / METAMON_AI_BASE_URL を設定(未設定なら全モック)
 ```

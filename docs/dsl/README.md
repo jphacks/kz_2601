@@ -1,7 +1,7 @@
 # DSL v1(統一版・正典)
 
 > **正典はこのフォルダ**: `dsl.schema.json`(JSON Schema draft 2020-12)+ `examples/{initial,kakeibo,training,walk}.json`(デモ3本+初期状態)。
-> Go 型は `backend/pkg/dsl`(`schema.json` を埋め込み・`make schema-sync` で同期・CI で byte 一致を検証)、Swift 型は `ios/Metamon/DSL/Model`(examples をそのままバンドルしデコードテスト)。
+> Go 型は `backend/pkg/dsl`(`schema.json` を埋め込み・`make schema-sync` で同期・CI で byte 一致を検証)、Swift 型は `ios/Packages/MetamonDSL/Sources/MetamonDSL/Model`(examples をそのままバンドルしデコードテスト)。
 > backend 案 `docs/backend/dsl-proposal.md` と iOS 案 `docs/ios/dsl-proposal.md` は**すり合わせ前の記録**として残す。矛盾したら本書が勝つ。
 
 ## 1. 統一の原則(確定・議論不要)
@@ -131,6 +131,6 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 1. `docs/dsl/dsl.schema.json` を編集(Leaf を足す = `$defs` に object を足し `Leaf.anyOf` と `PatchValue` に追加)。
 2. `cd backend && make schema-sync && go test ./...`(`dsl.go` の `ComponentType` と `validate.go` の per-type 検証も更新)。
-3. `ios/Metamon/DSL/Model/Component.swift` の `ComponentType` に case 追加 + `DSLView` に View 1 個。
-4. `examples/*.json` に使用例を足す(backend の `TestExamplesRoundTrip` と iOS の `DSLDecodingTests` が両方で検証)。
+3. iOS: `ios/Packages/MetamonDSL/.../Model/Component.swift` の `ComponentType` に case 追加 + `ios/Packages/MetamonRenderer/.../Components/Leaves/` に View 1 ファイル + `ComponentRegistry.standard` に登録 1 行(`MetamonRendererTests` が schema との一致を検証)。
+4. `examples/*.json` に使用例を足す(backend の `TestExamplesRoundTrip` と iOS の `MetamonDSLTests` が両方で検証)。
 5. ai のプロンプトカタログ(コンポーネント表)を更新。
