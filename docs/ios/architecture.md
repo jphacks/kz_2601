@@ -159,15 +159,48 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 録音 | `startRecordingLive(callback: nil)` → 停止で `audioSamples` を取り出し `purgeAudioSamples`。0.5 秒未満は無音扱いで送らない(幻聴対策) |
 | 制約 | シミュレータでは `#if targetEnvironment(simulator)` で `MockTranscriber` + 文字入力のみ(マイク非表示)。ストリーミング(途中結果)は未対応=停止後に一括。`small` のメモリは推論時 ~1GB 弱、初回 prewarm は 30〜90 秒 |
 
-| フェーズ | UI |
-|---|---|
-| idle | 大きなマイク、"タップして話す"(モデル未ロードなら "準備中…") |
-| listening | 赤ボタン + パルスリング |
-| transcribing | waveform アイコン |
-| thinking | sparkles + 全画面 `.ultraThinMaterial` オーバーレイ "アプリを生成中…" |
-| 適用 | 旧ツリー fade out → 新ツリー scale(0.94→1)+fade in |
+### 音声画面 → 生成中 → 変身 の状態遷移(2026-10-24 刷新)
 
-生成後も右下の **マイク FAB**(ランタイム側、DSL 外)から同じシートを開いて再改変できる。初期 DSL は `aiVoice` 1画面のみ。
+デザイントークン(色・角丸・余白・影)は `ios/Metamon/App/Theme.swift` に集約し、音声画面・生成中・サインイン・設定で共用する(Renderer の部品は触らない)。
+初期状態(`voiceEntry = fullscreen`)は `RootView` が `DSLNavigationRoot` ではなく `VoiceInputView` を直接全面に描く(背景を画面いっぱいに敷くため)。生成後の FAB シートも同じ View。
+
+```
+VoiceInputView.phase                         AppRuntime.morphJob               RootView
+ idle ──tap──▶ listening ──tap──▶ transcribing ──text──▶ (送信) ─▶ create / edit ──apply──▶ nil
+   │ 例文チップ / 文字入力 ─────────────────────────────▶ (送信) ─┘                      │
+   └ 準備中(モデル DL/ロード)はマイク灰色・タップ不可                               summaryBanner 3〜5s
+```
+
+| 画面状態 | 判定 | UI |
+|---|---|---|
+| idle(準備完了) | `transcriber.isReady` | ブランドグラデーションのマイク + ゆっくり呼吸するリング(3.2s 周期・`TimelineView`)、"タップして話す"、例文チップ(タップで即送信)、文字入力 |
+| idle(準備中) | `status` が notDownloaded/downloading/loading | マイク灰色・無効、下に DL 進捗 / 読み込み中 |
+| listening | 録音中 | 赤〜珊瑚のマイク + 外へ広がる波紋 ×3(擬似音量で振幅が揺れる ※ `SpeechTranscriber` に音量 API が無いため実音量連動は未対応)、"聞いています…" |
+| transcribing | `stopAndTranscribe` 待ち | 波形バー、"文字起こし中…"。結果はカードに 1 文字ずつ(`TypewriterText`)表示してから送信 |
+| 生成中 create | `morphJob.kind == .create`(現在 DSL が voice-only) | 全画面 `GeneratingView`: 見出し=「認識テキスト」、6×12 スケルトングリッド(セルが斜めに光り、3s ごとにレイアウト案が入れ替わる)、段階文言、経過秒 |
+| 生成中 edit | `morphJob.kind == .edit` | シートを閉じ、現在画面を 45% + blur 1.5 で薄くし、上部に `EditingIndicator` カプセル(「変更を反映しています…」+ 発話) |
+| 変身 | `apply(doc)` | **同じ `withAnimation(.spring 0.65)` の中で** `document` 差し替えと `morphJob = nil` → 生成中オーバーレイ fade out と新ツリー scale(0.96→1)+fade in がクロスフェード |
+| 要約 | `summaryBanner` | 画面上部のカード(sparkles + summary)を 3〜5 秒(文字数÷12 でクランプ)表示して自動で消える。タップで即閉じ |
+| 位置ハイライト | `PositionHint.anchor(in: summary)` | summary に「右下/左上/上部/一番下/中央/右/左…」が含まれれば、その領域を淡い円で 2 回ほど脈打たせる(部品単位ではなく領域。DSL と summary に対応が無いため) |
+
+**生成中の文言表**(`GeneratingStage`。ai-eval 2026-10-24 §5 の実測 create p50 6.6s / p95 8.7s、edit p50 1.7s と 01 §4 の警告 20s / フォールバック 30s に対応)
+
+| 経過 | stage | create の文言 | edit の文言 | 備考 |
+|---|---|---|---|---|
+| 0〜3s | normal | どんなアプリにするか考えています… | 変更を反映しています… | |
+| 3〜6s | normal | 必要な画面とデータを決めています… | 〃 | |
+| 6〜9s | normal | 画面を組み立てています… | 〃 | create p50 はここで完了 |
+| 9〜10s | normal | 細部を整えています… | 〃 | (以後 3s 周期で巡回) |
+| 10〜20s | slow | もう少しかかっています… | 〃 | `area` 再生成 1 回 ≒ +7s |
+| 20〜30s | warning | 時間がかかっています。もう少しだけお待ちください(橙) | 〃(橙) | backend 警告ライン |
+| 30s〜 | fallback | 混み合っています。安全なテンプレートに切り替えています… + **キャンセル** | 〃 + **中止** | backend はテンプレ DSL へフォールバック。キャンセルは `AppRuntime.cancelMorph()`(Task cancel → URLSession 中断)。HTTP timeout 45s |
+| 失敗 / キャンセル | — | 下部トースト「生成に失敗しました: …」/「生成をキャンセルしました」 | 〃 | 画面は元のまま |
+
+**設定シート**(音声画面右上の歯車・旧 `uid …` フッターの置き換え): アカウント(匿名 / Apple・uid・ログアウト)、音声モデル(モデル名・状態・再試行)、アプリをリセット(初期状態に戻す = DSL を `initial`、`DeviceAppID.rotate()` で appId を作り直す。サーバーの旧データは残る)、接続先(ai / appconfig / バージョン)。
+
+DEBUG フック: `METAMON_AUTO_ANON=1`(起動時に匿名サインイン)、`METAMON_AUTO_TRANSCRIPT="…"`(起動直後に 1 回生成)。シミュレータでもマイクは表示され、`MockTranscriber` が定型文を返す。
+
+生成後も右下の **マイク FAB**(ランタイム側、DSL 外)から同じシートを開いて再改変できる。初期 DSL は `voiceInput` 1画面のみ。
 
 **ホットリロード方式(提案)**
 | 案 | 仕組み | 評価 |
