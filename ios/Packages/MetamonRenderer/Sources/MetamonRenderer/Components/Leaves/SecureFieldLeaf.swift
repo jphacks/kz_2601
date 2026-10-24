@@ -17,6 +17,7 @@ struct SecureFieldLeaf: View {
                         .textContentType(.password)
                         .textFieldStyle(.plain)
                         .font(RenderTheme.Fonts.inputValue)
+                        .singleLineSubmit()
                         .focused($focused)
                         .keyboardAnchor(c, $focused)
                 }

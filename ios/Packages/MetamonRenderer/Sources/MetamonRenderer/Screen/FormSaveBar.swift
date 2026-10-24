@@ -61,7 +61,7 @@ struct FormSaveBar: ViewModifier {
         .background {
             RenderTheme.Colors.canvas
                 .overlay(alignment: .top) { Hairline() }
-                .ignoresSafeArea(.container, edges: .bottom) // ホームインジケータ下だけ塗る(キーボードの裏まで伸ばさない)
+                .ignoresSafeArea(edges: .bottom) // ホームインジケータ下と、iOS 26 の透けるキーボードツールバーの裏まで塗る(下の欄が透けて見えていた・#196)
         }
     }
 
