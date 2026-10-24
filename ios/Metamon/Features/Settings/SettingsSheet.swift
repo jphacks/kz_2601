@@ -82,6 +82,13 @@ struct SettingsSheet: View {
 
     private var appSection: some View {
         Section {
+            Button {
+                dismiss()
+                Task { await rt.undo() }
+            } label: {
+                Label("ひとつ前の状態に戻す", systemImage: "arrow.uturn.backward")
+            }
+            .disabled(rt.isMorphing)
             Button(role: .destructive) { confirmReset = true } label: {
                 Label("アプリをリセット(初期状態に戻す)", systemImage: "arrow.counterclockwise")
             }
@@ -89,7 +96,7 @@ struct SettingsSheet: View {
         } header: {
             Text("アプリ")
         } footer: {
-            Text("現在: \(rt.dsl.app.name)(v\(rt.document.version))")
+            Text("現在: \(rt.dsl.app.name)(v\(rt.document.version))" + (rt.isOffline ? "・オフライン(キャッシュ表示)" : "") + "\n「元に戻して」と話しても同じ。「別のアプリ。…」と話すと新しいアプリとして作ります。")
         }
     }
 

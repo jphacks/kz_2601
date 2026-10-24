@@ -18,8 +18,15 @@ struct MetamonApp: App {
         // Firebase は Services 組み立てより前に初期化(plist が無ければ警告してモック認証に落ちる)
         FirebaseBootstrap.configureIfAvailable()
         let services = BuildConfig.make()
-        var document = (try? DSLExamples.document(DSLExamples.initial)) ?? .fallback
-        document.appId = DeviceAppID.current
+        let appId = DeviceAppID.current
+        var document: AppDocument
+        if services.isLive, let cached = DocumentCache.shared.load(appId: appId) {
+            // 最後に取得した DSL を即描画(G4: 再起動しても作ったアプリが残る)。サーバーの最新は bootstrap で取り直す
+            document = cached
+        } else {
+            document = (try? DSLExamples.document(DSLExamples.initial, version: 0)) ?? .fallback
+        }
+        document.appId = appId
         self.services = services
         _runtime = State(initialValue: AppRuntime(document: document, services: services))
         _session = State(initialValue: AuthSession(service: services.auth))
