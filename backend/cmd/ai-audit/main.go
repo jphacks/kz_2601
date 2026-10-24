@@ -368,7 +368,7 @@ func need(a *app, n string) (string, string) {
 		return yes(hasOp("today"), "filter today")
 	case "filter_week", "filter_year":
 		op := map[string]string{"filter_week": "thisWeek", "filter_year": "thisYear"}[n]
-		if hasOp(op) || (n == "filter_year" && exprUses(a.raw, "year")) {
+		if hasOp(op) || anyFilterOp(a.raw, op) || (n == "filter_year" && exprUses(a.raw, "year")) {
 			return "○", "filter " + op
 		}
 		if exprUses(a.raw, "year", "daysBetween", "weekday", "addDays") {
@@ -473,6 +473,28 @@ func need(a *app, n string) (string, string) {
 		return "×", "条件で一括削除するアクションが無い"
 	}
 	return "?", "未定義の need"
+}
+
+// anyFilterOp finds a filter {field, op} anywhere (e.g. in a computed agg).
+func anyFilterOp(v any, op string) bool {
+	switch x := v.(type) {
+	case obj:
+		if _, ok := x["field"]; ok && str(x, "op") == op {
+			return true
+		}
+		for _, y := range x {
+			if anyFilterOp(y, op) {
+				return true
+			}
+		}
+	case []any:
+		for _, y := range x {
+			if anyFilterOp(y, op) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func hasComputedAgg(a *app) bool {
