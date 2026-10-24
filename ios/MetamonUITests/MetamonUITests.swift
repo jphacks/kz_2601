@@ -225,4 +225,51 @@ final class MetamonUITests: XCTestCase {
         XCTAssertTrue(row.label.contains("1,234"), "一覧の金額が入力と違う: \(row.label)")
         attachScreenshot("form-saved-list")
     }
+
+    // MARK: - テキスト入力(#196)
+
+    /// ソフトキーボードの上端(出ていなければ nil)。
+    private var keyboardTop: CGFloat? {
+        let kb = app.keyboards.firstMatch
+        return kb.exists ? kb.frame.minY : nil
+    }
+
+    func testChatComposerReturnInsertsNewlineAndGrows() {
+        launch(example: nil, ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "日記", "METAMON_AUTO_PAUSE": "600"])
+        XCTAssertTrue(app.buttons.matching(identifier: "chat.chip").firstMatch.waitForExistence(timeout: 15), "対話が始まらない")
+        let field = app.descendants(matching: .any)["composer.field"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "対話の入力欄が無い")
+        field.tap()
+        field.typeText("one")
+        let oneLine = field.frame.height
+        field.typeText("\ntwo\nthree")
+        Thread.sleep(forTimeInterval: 0.5)
+        let value = field.value as? String ?? ""
+        XCTAssertTrue(value.contains("one\ntwo\nthree"), "return で改行が入らない(送信・確定になった?): \(value)")
+        XCTAssertGreaterThan(field.frame.height, oneLine + 20, "複数行で入力欄が伸びない")
+        XCTAssertFalse(element(labelBeginsWith: "あなた: one").exists, "return で送信された")
+        if let top = keyboardTop {
+            XCTAssertLessThanOrEqual(field.frame.maxY, top + 1, "キーボード表示中に入力欄が隠れている")
+        }
+        attachScreenshot("chat-composer-multiline")
+
+        app.buttons["composer.send"].tap()
+        XCTAssertTrue(element(labelBeginsWith: "あなた: one").waitForExistence(timeout: 5), "送信ボタンで送れない")
+        XCTAssertFalse((field.value as? String ?? "").contains("three"), "送信後に入力欄が空にならない")
+    }
+
+    func testDiaryBodyReturnInsertsNewlineAboveKeyboard() {
+        launch(example: "diary_ai", ["METAMON_AUTO_OPEN": "diary_form:push"])
+        let body = app.descendants(matching: .any)["field.body"].firstMatch
+        XCTAssertTrue(body.waitForExistence(timeout: 10), "日記の本文欄が無い")
+        body.tap()
+        body.typeText("a\nb\nc\nd\ne\nf")
+        Thread.sleep(forTimeInterval: 0.6)
+        let value = body.value as? String ?? ""
+        XCTAssertTrue(value.contains("a\nb\nc"), "本文に改行が入らない: \(value)")
+        if let top = keyboardTop {
+            XCTAssertLessThanOrEqual(body.frame.minY + 30, top, "編集中の本文欄がキーボードに隠れている")
+        }
+        attachScreenshot("diary-body-multiline")
+    }
 }
