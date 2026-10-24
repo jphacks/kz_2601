@@ -33,6 +33,7 @@ struct AppSwitcherSheet: View {
         .sensoryFeedback(.selection, trigger: selected)
         .task { await rt.appsList() }
         .sheet(item: $sharingUI.shareTarget) { ShareAppSheet(app: $0) }
+        .screenMapSheet { rt.showAppSwitcher = false; Task { try? await Task.sleep(for: .milliseconds(600)); rt.showVoiceSheet = true } }
     }
 
     /// カード右上のシェアボタン(#49)。サーバー接続時のみ。
@@ -111,6 +112,7 @@ struct AppSwitcherSheet: View {
                             select(app)
                         }
                         .overlay(alignment: .topTrailing) { shareButton(for: app) }
+                        .overlay(alignment: .bottomTrailing) { if app.id == rt.document.appId { ScreenMapCardButton() } } // #116
                     }
                 }
                 .padding(.horizontal, Theme.Spacing.lg)
