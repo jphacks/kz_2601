@@ -51,7 +51,9 @@ public enum FieldCoding {
             return .bool(v.truthy)
         default:
             if let s = v.stringValue { return s.isEmpty ? nil : .string(s) }
-            return v.isNull ? nil : v
+            // JSONValue は ExpressibleByNilLiteral のため三項の `nil` は `.null` になる(#121)。Optional.none を明示する。
+            if v.isNull { return Optional<JSONValue>.none }
+            return v
         }
     }
 
