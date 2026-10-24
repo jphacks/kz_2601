@@ -379,7 +379,7 @@
             "card": "角丸背景+影の 1 枚カード。見出し(title)と stat/text を 2〜3 個まとめて目立たせる時に使う。",
             "disclosure": "折りたたみグループ。title がトグル行、expanded が初期状態(既定 false)。補足説明・注意書き・あまり使わない操作に使う。",
             "carousel": "横スクロールの帯。子を itemWidth(small|medium|large)の等幅カードとして横に並べる。ヒント・画像・クイック操作に使う。",
-            "grid": "等幅 columns(2|3|4)列のタイル。stat / button / image など小さい部品を並べる時に使う。"
+            "grid": "等幅 columnCount(2|3|4)列のタイル。stat / button / image など小さい部品を並べる時に使う。"
           }
         },
         "id": {
@@ -431,7 +431,7 @@
             "carousel": "optional"
           }
         },
-        "columns": {
+        "columnCount": {
           "type": "integer",
           "enum": [
             2,
@@ -512,6 +512,39 @@
         },
         {
           "$ref": "#/$defs/Rating"
+        },
+        {
+          "$ref": "#/$defs/Label"
+        },
+        {
+          "$ref": "#/$defs/Icon"
+        },
+        {
+          "$ref": "#/$defs/ProgressBar"
+        },
+        {
+          "$ref": "#/$defs/Gauge"
+        },
+        {
+          "$ref": "#/$defs/Badge"
+        },
+        {
+          "$ref": "#/$defs/Link"
+        },
+        {
+          "$ref": "#/$defs/Markdown"
+        },
+        {
+          "$ref": "#/$defs/Avatar"
+        },
+        {
+          "$ref": "#/$defs/Table"
+        },
+        {
+          "$ref": "#/$defs/Timeline"
+        },
+        {
+          "$ref": "#/$defs/EmptyState"
         },
         {
           "$ref": "#/$defs/SearchBar"
@@ -1344,6 +1377,15 @@
           "items": {
             "$ref": "#/$defs/Tab"
           }
+        },
+        {
+          "$ref": "#/$defs/TableColumn"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TableColumn"
+          }
         }
       ]
     },
@@ -1659,6 +1701,461 @@
           "description": "Number of stars (default 5)."
         }
       }
+    },
+    "Label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "text",
+        "icon"
+      ],
+      "properties": {
+        "type": {
+          "const": "label"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "text": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string",
+          "description": "SF Symbols name, e.g. flame.fill"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "title",
+            "headline",
+            "body",
+            "caption"
+          ]
+        }
+      },
+      "description": "Icon + text on one line (SwiftUI Label). Choose over `text` when a small symbol makes the heading scannable (section headers, status lines).",
+      "x-usage": "Heading of a card or section: full width, 1 row (e.g. A1:F1). Inside hstack/vstack as a title line."
+    },
+    "Icon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "name"
+      ],
+      "properties": {
+        "type": {
+          "const": "icon"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "name": {
+          "type": "string",
+          "description": "SF Symbols name, e.g. heart.fill"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ]
+        },
+        "color": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary",
+            "accent",
+            "red",
+            "green",
+            "orange",
+            "blue"
+          ],
+          "description": "Semantic color (iOS maps to system colors; accent = app theme). Never a hex string."
+        }
+      },
+      "description": "A single SF Symbol with semantic color/size and no text. Use as decoration next to badges/stats or as a big hero symbol.",
+      "x-usage": "Small square cell (A1:A1, 1x1) beside text, or 2x2 as a hero mark. Prefer `label` when text accompanies it."
+    },
+    "ProgressBar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "progressBar"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number",
+          "description": "Literal progress 0..1. Omit when using entity aggregation."
+        },
+        "entity": {
+          "type": "string",
+          "description": "Entity-driven mode: progress = aggregate(field) / target."
+        },
+        "aggregate": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum"
+          ],
+          "description": "Entity mode only; default sum."
+        },
+        "field": {
+          "type": "string",
+          "description": "Numeric field aggregated (required unless aggregate=count)."
+        },
+        "target": {
+          "type": "number",
+          "description": "Entity mode denominator (> 0), e.g. monthly budget 30000."
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        }
+      },
+      "description": "Horizontal bar showing progress toward a goal (ProgressView). Either a literal `value` (0..1) or entity aggregation `sum(field)/target`. Choose for budgets, habit streaks, goal completion.",
+      "x-usage": "Full width, 1-2 rows (e.g. A3:F4), directly under the stat/label it explains."
+    },
+    "Gauge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "gauge"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number",
+          "description": "Literal value. Omit when using entity aggregation."
+        },
+        "min": {
+          "type": "number",
+          "description": "Lower bound (default 0)."
+        },
+        "max": {
+          "type": "number",
+          "description": "Upper bound (default 1; must be > min)."
+        },
+        "entity": {
+          "type": "string",
+          "description": "Entity-driven mode: value = aggregate(field)."
+        },
+        "aggregate": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum",
+            "avg",
+            "min",
+            "max"
+          ]
+        },
+        "field": {
+          "type": "string",
+          "description": "Required unless aggregate=count."
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        }
+      },
+      "description": "Circular/linear gauge of a value inside [min,max] (SwiftUI Gauge). Choose when the magnitude relative to a range matters (weight vs goal, steps vs 10000).",
+      "x-usage": "Square cell 2x2 or 3x3 (e.g. A5:C7); pair two gauges side by side (A5:C7 + D5:F7)."
+    },
+    "Badge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "badge"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "text": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary",
+            "accent",
+            "red",
+            "green",
+            "orange",
+            "blue"
+          ],
+          "description": "Semantic color (iOS maps to system colors; accent = app theme). Never a hex string."
+        }
+      },
+      "description": "Small rounded pill with short text and a semantic color (status, category, count). Choose for 1-3 word tags, not sentences.",
+      "x-usage": "Inside an hstack with other badges/icons, or a 1-row cell (e.g. D2:F2). Keep text short."
+    },
+    "Link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "text",
+        "url"
+      ],
+      "properties": {
+        "type": {
+          "const": "link"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "text": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "https URL opened in Safari."
+        }
+      },
+      "description": "Tappable text that opens an https URL (SwiftUI Link). Choose for external references (official site, docs). For in-app navigation use `button` + navigate.",
+      "x-usage": "Full width 1 row (e.g. A10:F10) near the bottom or inside a section of references."
+    },
+    "Markdown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "markdown"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "text": {
+          "type": "string",
+          "description": "Inline Markdown: **bold**, *italic*, `code`, [link](https://...). No headings/lists/tables."
+        }
+      },
+      "description": "Rich text with inline Markdown (bold/italic/code/links). Choose over `text` when emphasis inside a sentence is needed (tips, explanations).",
+      "x-usage": "Full width, 1-3 rows depending on length (e.g. A8:F9)."
+    },
+    "Avatar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "avatar"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "image": {
+          "type": "string",
+          "description": "Literal image: https URL or data:image/...;base64 string."
+        },
+        "field": {
+          "type": "string",
+          "description": "Photo field of screen.entity (form/detail screens). Takes precedence over `image`."
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name; its initials are shown when no image is available."
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ]
+        }
+      },
+      "description": "Circular profile image, or initials fallback from `name`. Choose for people/pets/profile headers; use `image` for photos of things.",
+      "x-usage": "Square cell 1x1..3x3 (e.g. D5:F7) at the top of a profile/detail screen, or inside an hstack before a name."
+    },
+    "TableColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "Field id of the table entity."
+        },
+        "title": {
+          "type": "string",
+          "description": "Header text; defaults to the field name."
+        }
+      }
+    },
+    "Table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "columns"
+      ],
+      "properties": {
+        "type": {
+          "const": "table"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TableColumn"
+          },
+          "description": "2-4 columns work best on a phone."
+        },
+        "sort": {
+          "$ref": "#/$defs/Sort"
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max rows shown (default all)."
+        }
+      },
+      "description": "Compact rows x columns grid of records (SwiftUI Grid) with a header row; columns = [{field, title?}] (2-4 columns fit a phone). Choose over `list` when several numeric columns must be compared at a glance (date / item / amount).",
+      "x-usage": "Full width, 4-6 rows (e.g. A1:F5). Scrolls inside its cell when longer."
+    },
+    "Timeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "dateField",
+        "titleField"
+      ],
+      "properties": {
+        "type": {
+          "const": "timeline"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "dateField": {
+          "type": "string",
+          "description": "date/datetime field; newest first."
+        },
+        "titleField": {
+          "type": "string"
+        },
+        "subtitleField": {
+          "type": "string"
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max entries shown (default all)."
+        }
+      },
+      "description": "Vertical chronological feed of records with a date rail (newest first). Choose over `list` for diaries, logs, history where the date is the primary axis.",
+      "x-usage": "Full width, 4-8 rows (e.g. A6:F9). Scrolls inside its cell."
+    },
+    "EmptyState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "title"
+      ],
+      "properties": {
+        "type": {
+          "const": "emptyState"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "icon": {
+          "type": "string",
+          "description": "SF Symbols name, e.g. tray"
+        },
+        "title": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "description": "Centered icon + title + message placeholder (ContentUnavailableView). Choose for screens/sections that have nothing to show yet, or onboarding hints. Lists already have `emptyText`; use this for whole screens.",
+      "x-usage": "Large cell, 3+ rows (e.g. A10:F12 or A1:F12 for a whole empty screen)."
     },
     "SearchBar": {
       "type": "object",

@@ -61,7 +61,7 @@ private struct GridCell: View {
 
     private var scrollsInside: Bool {
         switch component.type {
-        case .list, .section, .vstack, .hstack, .text, .card, .disclosure, .grid, .calendar: true
+        case .list, .section, .vstack, .hstack, .text, .table, .timeline, .markdown, .card, .disclosure, .grid, .calendar: true
         default: false
         }
     }

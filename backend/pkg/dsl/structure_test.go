@@ -54,11 +54,11 @@ func TestStructureSemanticErrors(t *testing.T) {
 	yes := true
 	app := memoApp()
 	app.Screens[0].Components = []Component{
-		{Type: CompGrid, Columns: 5, Children: []Component{{Type: CompDivider}}},         // range
-		{Type: CompCard, Columns: 2, Children: []Component{{Type: CompDivider}}},         // columns only on grid
+		{Type: CompGrid, ColumnCount: 5, Children: []Component{{Type: CompDivider}}},     // range
+		{Type: CompCard, ColumnCount: 2, Children: []Component{{Type: CompDivider}}},     // columns only on grid
 		{Type: CompCarousel, Expanded: &yes, Children: []Component{{Type: CompDivider}}}, // expanded only on disclosure
 		{Type: CompSection, ItemWidth: "small", Children: []Component{{Type: CompDivider}}},
-		{Type: CompGrid, Columns: 2}, // empty grid
+		{Type: CompGrid, ColumnCount: 2},                                                   // empty grid
 		{Type: CompList, Entity: "memo", Item: &ListItem{Title: "note"}, SearchField: "q"}, // no searchBar
 		{Type: CompCalendar, Entity: "memo", DateField: "note"},                            // not a date
 		{Type: CompCalendar, Entity: "nope", DateField: "date"},
@@ -83,8 +83,8 @@ func TestStructureSemanticErrors(t *testing.T) {
 	}
 	joined := strings.Join(ve.Problems, "\n")
 	for _, want := range []string{
-		"grid columns must be 2-4 (got 5)",
-		"columns is only allowed on grid",
+		"grid columnCount must be 2-4 (got 5)",
+		"columnCount is only allowed on grid",
 		"expanded is only allowed on disclosure",
 		"itemWidth is only allowed on carousel",
 		"grid needs at least one child",
@@ -114,7 +114,7 @@ func TestStructureValidPasses(t *testing.T) {
 	app.Screens[0].Components = []Component{
 		{Type: CompSearchBar, Field: "q", Area: "A1:F1"},
 		{Type: CompList, Entity: "memo", Item: &ListItem{Title: "note"}, SearchField: "q", Area: "A2:F4"},
-		{Type: CompGrid, Columns: 3, Area: "A5:F6", Children: []Component{{Type: CompText, Text: "a"}, {Type: CompText, Text: "b"}}},
+		{Type: CompGrid, ColumnCount: 3, Area: "A5:F6", Children: []Component{{Type: CompText, Text: "a"}, {Type: CompText, Text: "b"}}},
 		{Type: CompDisclosure, Title: "more", Expanded: &open, Children: []Component{{Type: CompText, Text: "c"}}},
 		{Type: CompCarousel, ItemWidth: "large", Children: []Component{{Type: CompText, Text: "d"}}},
 		{Type: CompCalendar, Entity: "memo", DateField: "date", OnDateTap: &Action{Type: ActionNavigate, Screen: "form"}},

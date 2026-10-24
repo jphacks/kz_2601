@@ -7,7 +7,7 @@ struct GridContainer: View {
     let ctx: RenderContext
 
     private var columns: [GridItem] {
-        let n = min(max(c.columns ?? 2, 2), 4)
+        let n = min(max(c.columnCount ?? 2, 2), 4)
         return Array(repeating: GridItem(.flexible(), spacing: c.containerSpacing, alignment: .top), count: n)
     }
 

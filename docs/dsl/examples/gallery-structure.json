@@ -37,7 +37,7 @@
             { "type": "text", "text": "角丸 + 影の1枚カード。見出しと集計をまとめる", "style": "body" },
             { "type": "stat", "label": "メモ件数", "entity": "memo", "aggregate": "count" }
           ] },
-        { "type": "grid", "id": "tiles", "area": "A5:F6", "columns": 3,
+        { "type": "grid", "id": "tiles", "area": "A5:F6", "columnCount": 3,
           "children": [
             { "type": "stat", "label": "今日", "entity": "memo", "aggregate": "count", "filter": { "field": "date", "op": "today", "value": null } },
             { "type": "stat", "label": "今月", "entity": "memo", "aggregate": "count", "filter": { "field": "date", "op": "thisMonth", "value": null } },

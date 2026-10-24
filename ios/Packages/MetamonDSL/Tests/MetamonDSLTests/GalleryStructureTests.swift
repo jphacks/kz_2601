@@ -23,7 +23,7 @@ final class GalleryStructureTests: XCTestCase {
         let dsl = try gallery()
         let containers = try XCTUnwrap(dsl.screen("containers"))
         let grid = try XCTUnwrap(containers.components.first { $0.type == .grid })
-        XCTAssertEqual(grid.columns, 3)
+        XCTAssertEqual(grid.columnCount, 3)
         XCTAssertEqual(grid.children.count, 3)
         let carousel = try XCTUnwrap(containers.components.first { $0.type == .carousel })
         XCTAssertEqual(carousel.itemWidth, "medium")

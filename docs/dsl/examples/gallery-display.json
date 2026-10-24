@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "表示部品ギャラリー",
+    "description": "表示系コンポーネント 11 種(label/icon/progressBar/gauge/badge/link/markdown/avatar/table/timeline/emptyState)を 2 画面に area 配置した実例。entity は家計簿と同じ expense(iOS のモック seed がそのまま入る)",
+    "icon": "square.grid.2x2",
+    "theme": { "primaryColor": "#5E35B1" },
+    "voiceEntry": "floating",
+    "tabs": [
+      { "screen": "overview", "title": "概要", "icon": "gauge.with.dots.needle.33percent" },
+      { "screen": "history", "title": "履歴", "icon": "clock" }
+    ]
+  },
+  "initialScreen": "overview",
+  "entities": [
+    {
+      "id": "expense",
+      "name": "支出",
+      "titleField": "memo",
+      "fields": [
+        { "id": "amount", "name": "金額", "type": "currency", "required": true, "unit": "円" },
+        { "id": "category", "name": "カテゴリ", "type": "enum", "required": true, "options": ["食費", "交通", "日用品", "娯楽", "その他"], "defaultValue": "食費" },
+        { "id": "memo", "name": "メモ", "type": "string" },
+        { "id": "date", "name": "日付", "type": "date", "required": true, "defaultValue": "now" },
+        { "id": "receipt", "name": "レシート", "type": "photo" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "overview",
+      "title": "概要",
+      "components": [
+        { "type": "label", "id": "heading", "area": "A1:F1", "text": "今月のダッシュボード", "icon": "chart.bar.fill", "style": "headline" },
+        {
+          "type": "hstack", "id": "tags", "area": "A2:F2", "spacing": "small",
+          "children": [
+            { "type": "icon", "name": "flame.fill", "size": "medium", "color": "orange" },
+            { "type": "badge", "text": "今月", "color": "green" },
+            { "type": "badge", "text": "予算内", "color": "blue" },
+            { "type": "badge", "text": "要注意", "color": "red" }
+          ]
+        },
+        { "type": "progressBar", "id": "budget", "area": "A3:F4", "label": "予算 ¥30,000 の消化", "entity": "expense", "aggregate": "sum", "field": "amount", "target": 30000,
+          "filter": { "field": "date", "op": "thisMonth", "value": null } },
+        { "type": "gauge", "id": "spent", "area": "A5:C7", "label": "今月の支出", "entity": "expense", "aggregate": "sum", "field": "amount", "min": 0, "max": 30000,
+          "filter": { "field": "date", "op": "thisMonth", "value": null } },
+        { "type": "avatar", "id": "me", "area": "D5:F7", "name": "メタモン", "size": "large" },
+        { "type": "markdown", "id": "tip", "area": "A8:F9", "text": "**太字** と *斜体* と `コード` が使えます。詳しくは [JPHACKS](https://jphacks.com) へ。" },
+        { "type": "link", "id": "official", "area": "A10:F10", "text": "JPHACKS 公式サイトを開く", "url": "https://jphacks.com" },
+        { "type": "progressBar", "id": "fixed", "area": "A11:F12", "label": "固定値 60%", "value": 0.6 }
+      ]
+    },
+    {
+      "id": "history",
+      "title": "履歴",
+      "components": [
+        { "type": "table", "id": "recent_table", "area": "A1:F5", "entity": "expense", "limit": 10,
+          "columns": [ { "field": "date", "title": "日付" }, { "field": "memo", "title": "内容" }, { "field": "amount", "title": "金額" } ],
+          "sort": { "field": "date", "direction": "desc" } },
+        { "type": "timeline", "id": "feed", "area": "A6:F9", "entity": "expense", "dateField": "date", "titleField": "memo", "subtitleField": "category", "limit": 5 },
+        { "type": "emptyState", "id": "empty", "area": "A10:F12", "icon": "tray", "title": "まだ写真がありません", "message": "レシートを撮ると、ここに並びます" }
+      ]
+    }
+  ]
+}

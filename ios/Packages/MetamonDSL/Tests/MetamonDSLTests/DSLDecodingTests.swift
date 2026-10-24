@@ -95,4 +95,40 @@ final class DSLDecodingTests: XCTestCase {
         XCTAssertEqual(AppDocument.fallback.dsl.initialScreen, "home")
         XCTAssertNotNil(AppDocument.fallback.dsl.screen("home"))
     }
+
+    /// 表示系ギャラリー(gallery-display.json): 11 種が全部デコードされ、props が落ちていないこと。
+    func testGalleryDisplayDecodes() throws {
+        let dsl = try load("gallery-display")
+        XCTAssertEqual(dsl.app.tabs.map(\.screen), ["overview", "history"])
+        let all = dsl.screens.flatMap(\.allComponents)
+        let expected: Set<ComponentType> = [.label, .icon, .progressBar, .gauge, .badge, .link, .markdown, .avatar, .table, .timeline, .emptyState]
+        XCTAssertEqual(expected.subtracting(Set(all.map(\.type))), [], "ギャラリーに無い表示系 type")
+
+        let overview = try XCTUnwrap(dsl.screen("overview"))
+        let budget = try XCTUnwrap(overview.components.first { $0.id == "budget" })
+        XCTAssertEqual(budget.type, .progressBar)
+        XCTAssertEqual(budget.target, 30000)
+        XCTAssertEqual(budget.entity, "expense")
+        XCTAssertEqual(budget.filter?.op, "thisMonth")
+        let fixed = try XCTUnwrap(overview.components.first { $0.id == "fixed" })
+        XCTAssertEqual(fixed.value, 0.6)
+        let gauge = try XCTUnwrap(overview.components.first { $0.id == "spent" })
+        XCTAssertEqual(gauge.min, 0)
+        XCTAssertEqual(gauge.max, 30000)
+        XCTAssertEqual(overview.components.first { $0.id == "me" }?.name, "メタモン")
+        XCTAssertEqual(overview.components.first { $0.id == "official" }?.url, "https://jphacks.com")
+        XCTAssertTrue(overview.components.first { $0.id == "tags" }?.children.contains { $0.type == .badge && $0.color == "red" } == true)
+
+        let history = try XCTUnwrap(dsl.screen("history"))
+        let table = try XCTUnwrap(history.components.first { $0.id == "recent_table" })
+        XCTAssertEqual(table.columns?.map(\.field), ["date", "memo", "amount"])
+        XCTAssertEqual(table.columns?.first?.title, "日付")
+        XCTAssertEqual(table.limit, 10)
+        let feed = try XCTUnwrap(history.components.first { $0.id == "feed" })
+        XCTAssertEqual(feed.dateField, "date")
+        XCTAssertEqual(feed.titleField, "memo")
+        XCTAssertEqual(feed.subtitleField, "category")
+        XCTAssertEqual(history.components.first { $0.id == "empty" }?.message, "レシートを撮ると、ここに並びます")
+        XCTAssertEqual(overview.referencedEntities, ["expense"])
+    }
 }

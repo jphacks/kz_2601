@@ -14,6 +14,18 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case searchBar, calendar, shareButton, openUrlButton, mapView, locationButton, qrScanner, timerDisplay
     // leaf: 入力系バッチ
     case slider, stepper, textEditor, secureField, timePicker, colorPicker, rating
+    // leaf(表示系)
+    case label
+    case icon
+    case progressBar
+    case gauge
+    case badge
+    case link
+    case markdown
+    case avatar
+    case table
+    case timeline
+    case emptyState
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -73,26 +85,37 @@ public struct Component: Decodable, Identifiable, Sendable {
 
     // voiceInput / spacer
     public var prompt: String?
-    public var size: String?           // voiceInput: compact|large / spacer: small|medium|large|flexible
+    public var size: String?           // voiceInput: compact|large / spacer: small|medium|large|flexible / icon・avatar: small|medium|large
+
+    // 表示系(label / icon / progressBar / gauge / badge / link / markdown / avatar / table / timeline / emptyState)
+    public var name: String?           // icon: SF Symbols 名 / avatar: イニシャル元
+    public var color: String?          // SemanticColor: primary|secondary|accent|red|green|orange|blue
+    public var value: Double?          // progressBar(0..1)/ gauge のリテラル値
+    public var target: Double?         // progressBar entity モードの分母
+    public var url: String?            // link
+    public var image: String?          // avatar リテラル(https / data URL)
+    public var message: String?        // emptyState
+    public var columns: [TableColumnSpec]? // table
+    public var limit: Int?             // table / timeline
+    public var dateField: String?      // timeline
+    public var titleField: String?     // timeline
+    public var subtitleField: String?  // timeline
 
     // 構造系 container
     public var expanded: Bool?         // disclosure: 初期展開
     public var itemWidth: String?      // carousel: small|medium|large
-    public var columns: Int?           // grid: 2..4
+    public var columnCount: Int?       // grid: 2..4(`columns` は table の列定義)
 
-    // ナビ・ネイティブ系 leaf
+    // ナビ・ネイティブ系 leaf(url / dateField / titleField は link / timeline と共用)
     public var searchField: String?    // list: 同画面の searchBar.field
-    public var dateField: String?      // calendar
     public var onDateTap: Action?      // calendar
-    public var url: String?            // openUrlButton
     public var locationField: String?  // mapView
-    public var titleField: String?     // mapView のピン名
     public var zoom: String?           // mapView: near|city|wide
     public var mode: String?           // timerDisplay: stopwatch|countdown
     public var seconds: Int?           // timerDisplay countdown 初期秒
     // 入力系バッチ(slider / stepper / rating / textEditor)
-    public var min: Double?
-    public var max: Double?            // rating: 星の数(既定 5)
+    public var min: Double?            // slider / stepper / gauge
+    public var max: Double?            // rating: 星の数(既定 5) / gauge
     public var step: Double?           // slider: 省略で連続 / stepper: 既定 1
     public var minLines: Int?          // textEditor: 最低表示行数(既定 4)
 
@@ -100,8 +123,9 @@ public struct Component: Decodable, Identifiable, Sendable {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
         case includeTime, source, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
         case kind, groupBy, bucket, prompt, size
-        case expanded, itemWidth, columns
-        case searchField, dateField, onDateTap, url, locationField, titleField, zoom, mode, seconds
+        case expanded, itemWidth, columnCount
+        case searchField, onDateTap, locationField, zoom, mode, seconds
+        case name, color, value, target, url, image, message, columns, limit, dateField, titleField, subtitleField
         case min, max, step, minLines
     }
 
@@ -143,13 +167,10 @@ public struct Component: Decodable, Identifiable, Sendable {
         size = try? c.decodeIfPresent(String.self, forKey: .size)
         expanded = try? c.decodeIfPresent(Bool.self, forKey: .expanded)
         itemWidth = try? c.decodeIfPresent(String.self, forKey: .itemWidth)
-        columns = try? c.decodeIfPresent(Int.self, forKey: .columns)
+        columnCount = try? c.decodeIfPresent(Int.self, forKey: .columnCount)
         searchField = try? c.decodeIfPresent(String.self, forKey: .searchField)
-        dateField = try? c.decodeIfPresent(String.self, forKey: .dateField)
         onDateTap = try? c.decodeIfPresent(Action.self, forKey: .onDateTap)
-        url = try? c.decodeIfPresent(String.self, forKey: .url)
         locationField = try? c.decodeIfPresent(String.self, forKey: .locationField)
-        titleField = try? c.decodeIfPresent(String.self, forKey: .titleField)
         zoom = try? c.decodeIfPresent(String.self, forKey: .zoom)
         mode = try? c.decodeIfPresent(String.self, forKey: .mode)
         seconds = try? c.decodeIfPresent(Int.self, forKey: .seconds)
@@ -157,6 +178,29 @@ public struct Component: Decodable, Identifiable, Sendable {
         max = try? c.decodeIfPresent(Double.self, forKey: .max)
         step = try? c.decodeIfPresent(Double.self, forKey: .step)
         minLines = try? c.decodeIfPresent(Int.self, forKey: .minLines)
+        name = try? c.decodeIfPresent(String.self, forKey: .name)
+        color = try? c.decodeIfPresent(String.self, forKey: .color)
+        value = try? c.decodeIfPresent(Double.self, forKey: .value)
+        target = try? c.decodeIfPresent(Double.self, forKey: .target)
+        url = try? c.decodeIfPresent(String.self, forKey: .url)
+        image = try? c.decodeIfPresent(String.self, forKey: .image)
+        message = try? c.decodeIfPresent(String.self, forKey: .message)
+        columns = try? c.decode(Lossy<TableColumnSpec>.self, forKey: .columns).wrappedValue
+        limit = try? c.decodeIfPresent(Int.self, forKey: .limit)
+        dateField = try? c.decodeIfPresent(String.self, forKey: .dateField)
+        titleField = try? c.decodeIfPresent(String.self, forKey: .titleField)
+        subtitleField = try? c.decodeIfPresent(String.self, forKey: .subtitleField)
+    }
+}
+
+/// `table` の1列。`title` 省略時は Field.name を見出しにする。
+public struct TableColumnSpec: Decodable, Sendable {
+    public var field: String
+    public var title: String?
+
+    public init(field: String, title: String? = nil) {
+        self.field = field
+        self.title = title
     }
 }
 

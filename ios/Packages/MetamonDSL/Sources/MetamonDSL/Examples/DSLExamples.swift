@@ -9,6 +9,7 @@ public enum DSLExamples {
         "training",
         "walk",
         "gallery-input",
+        "gallery-display",
         "gallery-structure",
     ]
 
