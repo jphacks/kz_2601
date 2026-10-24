@@ -15,10 +15,17 @@ struct SectionContainer: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, RenderTheme.Spacing.xs)
             }
-            VStack(alignment: .leading, spacing: c.containerSpacing) {
-                ForEach(c.children) { DSLView(component: $0, ctx: ctx) }
+            if c.children.allSatisfy(\.rendersOwnSurface) {
+                // list / table など自前の面を持つ子だけなら見出し + そのまま(カードの中にカードを作らない)
+                VStack(alignment: .leading, spacing: c.containerSpacing) {
+                    ForEach(c.children) { DSLView(component: $0, ctx: ctx) }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: c.containerSpacing) {
+                    ForEach(c.children) { DSLView(component: $0, ctx: ctx) }
+                }
+                .renderCard()
             }
-            .renderCard()
         }
     }
 }
