@@ -28,7 +28,10 @@ import (
 // at least one) and `textNot` (none of them) check that answers match the
 // DSL; `generate` passes the first option's instruction (proposal) or the
 // transcript (ready) to Service.Generate on a copy of the base and records
-// whether it went through.
+// whether it went through. `optionsNot` (no option's title / detail /
+// instruction contains any of them) and `genNot` (the generate summary
+// contains none of them, e.g. 「省き」 = a part was dropped) catch ideas that
+// mix in something the DSL cannot do.
 
 type ChatStep struct {
 	Say      string   `json:"say"`
@@ -38,6 +41,9 @@ type ChatStep struct {
 	TextAny  []string `json:"textAny,omitempty"`
 	TextNot  []string `json:"textNot,omitempty"`
 	Generate bool     `json:"generate,omitempty"`
+	// OptionsNot / GenNot: see the comment above.
+	OptionsNot []string `json:"optionsNot,omitempty"`
+	GenNot     []string `json:"genNot,omitempty"`
 }
 
 type ChatCase struct {
@@ -188,6 +194,11 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string
 				if !sr.Gen.OK {
 					sr.Misses = append(sr.Misses, "generate failed: "+sr.Gen.Error)
 				}
+				for _, w := range st.GenNot {
+					if strings.Contains(sr.Gen.Summary, w) {
+						sr.Misses = append(sr.Misses, "generate summary has "+w)
+					}
+				}
 			}
 			sr.OK = len(sr.Misses) == 0
 			if !sr.OK {
@@ -264,6 +275,14 @@ func checkChatStep(st ChatStep, res *ai.ChatResult) []string {
 	for _, w := range st.TextNot {
 		if strings.Contains(lower, strings.ToLower(w)) {
 			miss = append(miss, "text has "+w)
+		}
+	}
+	for _, o := range res.Options {
+		all := strings.ToLower(o.Title + " " + o.Detail + " " + o.Instruction)
+		for _, w := range st.OptionsNot {
+			if strings.Contains(all, strings.ToLower(w)) {
+				miss = append(miss, "option "+o.ID+" has "+w)
+			}
 		}
 	}
 	if res.Kind == "proposal" {
