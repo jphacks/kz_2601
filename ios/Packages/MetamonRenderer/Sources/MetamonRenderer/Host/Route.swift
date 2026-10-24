@@ -32,14 +32,17 @@ public struct ActionContext {
     }
 }
 
-/// 描画中の文脈。画面 route と(フォーム画面なら)ドラフト。
+/// 描画中の文脈。画面 route と(フォーム画面なら)ドラフト、画面ローカル状態(searchBar など)。
 public struct RenderContext {
     public var route: Route
     public var form: FormDraft?
+    /// 画面に閉じた UI 状態(`searchBar.field` → 検索文字列)。レコードには保存しない。
+    public var locals: ScreenLocals?
 
-    public init(route: Route, form: FormDraft? = nil) {
+    public init(route: Route, form: FormDraft? = nil, locals: ScreenLocals? = nil) {
         self.route = route
         self.form = form
+        self.locals = locals
     }
 
     public func actionContext(recordId: String? = nil) -> ActionContext {

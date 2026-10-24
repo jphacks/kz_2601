@@ -8,6 +8,10 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     // leaf
     case text, button, textField, numberField, datePicker, picker, toggle
     case photoField, image, list, stat, chart, voiceInput, spacer, divider
+    // container(構造系: card/disclosure/carousel/grid)
+    case card, disclosure, carousel, grid
+    // leaf(ナビ・ネイティブ系)
+    case searchBar, calendar, shareButton, openUrlButton, mapView, locationButton, qrScanner, timerDisplay
     // leaf: 入力系バッチ
     case slider, stepper, textEditor, secureField, timePicker, colorPicker, rating
     // leaf(表示系)
@@ -26,7 +30,12 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
 
-    public var isContainer: Bool { self == .vstack || self == .hstack || self == .section }
+    public var isContainer: Bool {
+        switch self {
+        case .vstack, .hstack, .section, .card, .disclosure, .carousel, .grid: true
+        default: false
+        }
+    }
 }
 
 /// 全コンポーネントの props をフラットに持つ1ノード(Go の `dsl.Component` と 1:1)。
@@ -92,6 +101,18 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var titleField: String?     // timeline
     public var subtitleField: String?  // timeline
 
+    // 構造系 container
+    public var expanded: Bool?         // disclosure: 初期展開
+    public var itemWidth: String?      // carousel: small|medium|large
+    public var columnCount: Int?       // grid: 2..4(`columns` は table の列定義)
+
+    // ナビ・ネイティブ系 leaf(url / dateField / titleField は link / timeline と共用)
+    public var searchField: String?    // list: 同画面の searchBar.field
+    public var onDateTap: Action?      // calendar
+    public var locationField: String?  // mapView
+    public var zoom: String?           // mapView: near|city|wide
+    public var mode: String?           // timerDisplay: stopwatch|countdown
+    public var seconds: Int?           // timerDisplay countdown 初期秒
     // 入力系バッチ(slider / stepper / rating / textEditor)
     public var min: Double?            // slider / stepper / gauge
     public var max: Double?            // rating: 星の数(既定 5) / gauge
@@ -102,6 +123,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
         case includeTime, source, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
         case kind, groupBy, bucket, prompt, size
+        case expanded, itemWidth, columnCount
+        case searchField, onDateTap, locationField, zoom, mode, seconds
         case name, color, value, target, url, image, message, columns, limit, dateField, titleField, subtitleField
         case min, max, step, minLines
     }
@@ -142,6 +165,15 @@ public struct Component: Decodable, Identifiable, Sendable {
         bucket = try? c.decodeIfPresent(String.self, forKey: .bucket)
         prompt = try? c.decodeIfPresent(String.self, forKey: .prompt)
         size = try? c.decodeIfPresent(String.self, forKey: .size)
+        expanded = try? c.decodeIfPresent(Bool.self, forKey: .expanded)
+        itemWidth = try? c.decodeIfPresent(String.self, forKey: .itemWidth)
+        columnCount = try? c.decodeIfPresent(Int.self, forKey: .columnCount)
+        searchField = try? c.decodeIfPresent(String.self, forKey: .searchField)
+        onDateTap = try? c.decodeIfPresent(Action.self, forKey: .onDateTap)
+        locationField = try? c.decodeIfPresent(String.self, forKey: .locationField)
+        zoom = try? c.decodeIfPresent(String.self, forKey: .zoom)
+        mode = try? c.decodeIfPresent(String.self, forKey: .mode)
+        seconds = try? c.decodeIfPresent(Int.self, forKey: .seconds)
         min = try? c.decodeIfPresent(Double.self, forKey: .min)
         max = try? c.decodeIfPresent(Double.self, forKey: .max)
         step = try? c.decodeIfPresent(Double.self, forKey: .step)
@@ -180,6 +212,14 @@ public struct ListItem: Decodable, Sendable {
     public var icon: String?
     /// photo field id → サムネイル
     public var image: String?
+
+    public init(title: String, subtitle: String? = nil, trailing: String? = nil, icon: String? = nil, image: String? = nil) {
+        self.title = title
+        self.subtitle = subtitle
+        self.trailing = trailing
+        self.icon = icon
+        self.image = image
+    }
 }
 
 public struct Sort: Decodable, Sendable {

@@ -59,6 +59,20 @@ public struct ComponentRegistry: Sendable {
         r.register(.voiceInput) { c, _ in VoiceInputLeaf(c: c) }
         r.register(.spacer) { c, _ in SpacerLeaf(c: c) }
         r.register(.divider) { _, _ in DividerLeaf() }
+        // container(構造系)
+        r.register(.card) { c, ctx in CardContainer(c: c, ctx: ctx) }
+        r.register(.disclosure) { c, ctx in DisclosureContainer(c: c, ctx: ctx) }
+        r.register(.carousel) { c, ctx in CarouselContainer(c: c, ctx: ctx) }
+        r.register(.grid) { c, ctx in GridContainer(c: c, ctx: ctx) }
+        // leaf(ナビ・ネイティブ系)
+        r.register(.searchBar) { c, ctx in SearchBarLeaf(c: c, ctx: ctx) }
+        r.register(.calendar) { c, ctx in CalendarLeaf(c: c, ctx: ctx) }
+        r.register(.shareButton) { c, ctx in ShareButtonLeaf(c: c, ctx: ctx) }
+        r.register(.openUrlButton) { c, _ in OpenUrlButtonLeaf(c: c) }
+        r.register(.mapView) { c, ctx in MapViewLeaf(c: c, ctx: ctx) }
+        r.register(.locationButton) { c, ctx in LocationButtonLeaf(c: c, ctx: ctx) }
+        r.register(.qrScanner) { c, ctx in QrScannerLeaf(c: c, ctx: ctx) }
+        r.register(.timerDisplay) { c, ctx in TimerDisplayLeaf(c: c, ctx: ctx) }
         // leaf: 入力系バッチ
         r.register(.slider) { c, ctx in SliderLeaf(c: c, ctx: ctx) }
         r.register(.stepper) { c, ctx in StepperLeaf(c: c, ctx: ctx) }

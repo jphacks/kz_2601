@@ -72,8 +72,8 @@ func TestGenerationSchemaHasNoUnsupportedKeywords(t *testing.T) {
 	// canonical schema (counted, not hard-coded, so adding a component does not
 	// break this test), and the Stat `format` property survives (only the
 	// keyword is stripped).
-	allComponents, _, _ := schemaTypes(t)
-	wantLeaves := len(allComponents) - 3 // minus vstack/hstack/section
+	allComponents, _, defs := schemaTypes(t)
+	wantLeaves := len(allComponents) - len(enumValues(defs["Container"].(map[string]any), "type")) // minus containers
 	leaf := p["$defs"].(map[string]any)["Leaf"].(map[string]any)
 	lp := leaf["properties"].(map[string]any)
 	if lp["format"] == nil || lp["text"] == nil || lp["entity"] == nil {

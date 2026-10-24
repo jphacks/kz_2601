@@ -355,7 +355,7 @@
       "type": "object",
       "additionalProperties": false,
       "description": "子 Leaf を並べる器。1 段のみ(Container の中に Container は置けない)。Screen 直下で area を持ち、子は積むだけ(子に area は付けない)。",
-      "x-usage": "可変長なのでセル内スクロールする。指標カード = hstack に stat を 2〜3 枚入れて A1:F2。フォーム = section に入力部品を並べて A1:F7 程度。一覧 = section に list を 1 つ入れて A3:F10。",
+      "x-usage": "Container は Leaf と同じく Screen 直下に area で置く: card / section は全幅(例 A1:F3)、stat/button タイルの grid は A1:F4、画像やヒントの carousel は A1:F4、補足の disclosure は画面下部(A9:F12)。子に area は付けない。",
       "required": [
         "type",
         "children"
@@ -366,12 +366,20 @@
           "enum": [
             "vstack",
             "hstack",
-            "section"
+            "section",
+            "card",
+            "disclosure",
+            "carousel",
+            "grid"
           ],
           "x-enumDescriptions": {
             "vstack": "子を縦に積む。入力欄やボタンをまとめる既定の器。",
             "hstack": "子を横に並べる。stat を 2〜3 枚並べて指標カードにする時に使う。",
-            "section": "見出し(title)付きのグループ。フォームの入力欄や一覧の見出しに使う。"
+            "section": "見出し(title)付きのグループ。フォームの入力欄や一覧の見出しに使う。",
+            "card": "角丸背景+影の 1 枚カード。見出し(title)と stat/text を 2〜3 個まとめて目立たせる時に使う。",
+            "disclosure": "折りたたみグループ。title がトグル行、expanded が初期状態(既定 false)。補足説明・注意書き・あまり使わない操作に使う。",
+            "carousel": "横スクロールの帯。子を itemWidth(small|medium|large)の等幅カードとして横に並べる。ヒント・画像・クイック操作に使う。",
+            "grid": "等幅 columnCount(2|3|4)列のタイル。stat / button / image など小さい部品を並べる時に使う。"
           }
         },
         "id": {
@@ -382,9 +390,11 @@
         },
         "title": {
           "type": "string",
-          "description": "section only.",
+          "description": "section / card / disclosure の見出し(disclosure ではトグル行の文言)。",
           "x-for": {
-            "section": "optional"
+            "section": "optional",
+            "card": "optional",
+            "disclosure": "optional"
           }
         },
         "spacing": {
@@ -400,6 +410,37 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/Leaf"
+          }
+        },
+        "expanded": {
+          "type": "boolean",
+          "description": "disclosure のみ: 初期状態で開いておくか(既定 false)。",
+          "x-for": {
+            "disclosure": "optional"
+          }
+        },
+        "itemWidth": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ],
+          "description": "carousel のみ: 子 1 枚の幅(small=帯の 40% / medium=70%(既定) / large=90%)。",
+          "x-for": {
+            "carousel": "optional"
+          }
+        },
+        "columnCount": {
+          "type": "integer",
+          "enum": [
+            2,
+            3,
+            4
+          ],
+          "description": "grid のみ: 等幅の列数(既定 2)。",
+          "x-for": {
+            "grid": "optional"
           }
         }
       }
@@ -504,6 +545,30 @@
         },
         {
           "$ref": "#/$defs/EmptyState"
+        },
+        {
+          "$ref": "#/$defs/SearchBar"
+        },
+        {
+          "$ref": "#/$defs/Calendar"
+        },
+        {
+          "$ref": "#/$defs/ShareButton"
+        },
+        {
+          "$ref": "#/$defs/OpenUrlButton"
+        },
+        {
+          "$ref": "#/$defs/MapView"
+        },
+        {
+          "$ref": "#/$defs/LocationButton"
+        },
+        {
+          "$ref": "#/$defs/QrScanner"
+        },
+        {
+          "$ref": "#/$defs/TimerDisplay"
         }
       ]
     },
@@ -790,6 +855,10 @@
         },
         "swipeToDelete": {
           "type": "boolean"
+        },
+        "searchField": {
+          "type": "string",
+          "description": "同じ画面の `searchBar.field` の id。入力文字列で title/subtitle を部分一致(大小無視)で絞り込む(iOS クライアント側)。"
         }
       }
     },
@@ -2087,6 +2156,286 @@
       },
       "description": "Centered icon + title + message placeholder (ContentUnavailableView). Choose for screens/sections that have nothing to show yet, or onboarding hints. Lists already have `emptyText`; use this for whole screens.",
       "x-usage": "Large cell, 3+ rows (e.g. A10:F12 or A1:F12 for a whole empty screen)."
+    },
+    "SearchBar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "searchBar"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "画面ローカルの検索キー(任意の id・例 \"search\")。entity の field ではない。同じ画面の list が `searchField` で参照する。"
+        },
+        "placeholder": {
+          "type": "string"
+        }
+      },
+      "description": "同じ画面の list を title/subtitle の部分一致で絞り込む検索欄。連絡先・本・メモなど一覧が長くなるアプリで選ぶ。screen.entity は不要。",
+      "x-usage": "一覧の直上に細い全幅の帯で置く: searchBar A1:F1、list A2:F12。list は 1 つだけ対にする(list.searchField = この field)。"
+    },
+    "Calendar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "dateField"
+      ],
+      "properties": {
+        "type": {
+          "const": "calendar"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "dateField": {
+          "type": "string",
+          "description": "レコードを日に載せる `entity` の date/datetime field。"
+        },
+        "onDateTap": {
+          "$ref": "#/$defs/Action"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "description": "月カレンダー(カレンダービュー)。entity のレコードを dateField の日に載せ、レコードのある日に点を打つ。日をタップするとその日のレコード一覧が下に出る。一覧の行タップ = onDateTap を recordId 付きで実行(編集)、「追加」= onDateTap をタップした日を dateField の初期値にして実行(新規)。予定・スケジュール・日記・習慣/トレーニング記録・シフト・締切など「日付のある記録を月表示で見たい」時に必ずこれを選ぶ(list+datePicker で代替しない)。",
+      "x-usage": "画面の主役として A1:F9 に置き、下に stat や追加ボタン(A10:F12)。onDateTap は通常 entity のフォーム画面への navigate(presentation: sheet)。"
+    },
+    "ShareButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "const": "shareButton"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "text": {
+          "type": "string",
+          "description": "共有する文面。screen.entity がある画面では `{{fieldId}}` をフォームの現在値で置換する。"
+        },
+        "field": {
+          "type": "string",
+          "description": "任意: screen.entity の field。photo なら画像も一緒に共有、それ以外は値を文面の末尾に追加。"
+        },
+        "label": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        }
+      },
+      "description": "OS の共有シート(ShareLink)で文面と(任意で)写真を他のアプリや友人に送るボタン。日記の 1 件・記録のスコア・写真メモを共有したいアプリで選ぶ。",
+      "x-usage": "小さく画面下部の半幅(A11:C12)に、別のボタンと並べる。`field` や `{{...}}` を使う時だけ screen.entity が必要。"
+    },
+    "OpenUrlButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "label",
+        "url"
+      ],
+      "properties": {
+        "type": {
+          "const": "openUrlButton"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Safari(または対応アプリ)で開く https URL。"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary",
+            "plain"
+          ]
+        }
+      },
+      "description": "固定 URL を開くリンクボタン(公式サイト・地図検索・レシピページなど)。button + openUrl アクションと同じ意味だが短く書け、リンク風に描画される。静的な外部リンクに選ぶ。",
+      "x-usage": "画面下部の帯(A11:F12)か card/section の子として置く。他の主要ボタンと見た目を揃えたい時は button + openUrl を使う。"
+    },
+    "MapView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "locationField"
+      ],
+      "properties": {
+        "type": {
+          "const": "mapView"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "locationField": {
+          "type": "string",
+          "description": "`entity` の location field(\"lat,lng\")。値を持つレコード 1 件 = ピン 1 本。"
+        },
+        "titleField": {
+          "type": "string",
+          "description": "ピンのラベルにする field(既定 entity.titleField)。"
+        },
+        "zoom": {
+          "type": "string",
+          "enum": [
+            "near",
+            "city",
+            "wide"
+          ],
+          "description": "初期表示の広さ: near 約1km / city 約10km(既定) / wide 約100km。"
+        },
+        "onItemTap": {
+          "$ref": "#/$defs/Action",
+          "description": "ピンのタップで実行。iOS が recordId を渡す。"
+        }
+      },
+      "description": "MapKit の地図。location 値を持つレコードごとにピンを立てる。訪問スポット記録・お店リスト・釣り/散歩の地点ログなど「場所を地図で見たい」アプリで選ぶ。フォーム側の locationButton と対で使う。",
+      "x-usage": "大きめに A1:F8、下に一覧(A9:F12)。または専用タブで全面 A1:F12。entity に location 型 field が必要。"
+    },
+    "LocationButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "locationButton"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "screen.entity の location field。現在地が \"lat,lng\" で入る。"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "description": "現在地(GPS)を 1 回取得してフォームの location field に保存するボタン。散歩メモ・駐車位置・釣果など「どこで起きたか」を記録するアプリのフォーム画面で選ぶ。",
+      "x-usage": "フォーム画面のみ(screen.entity 必須)。他の入力欄の近くに 1 行(A8:F9)。ホーム側の mapView と対で使う。"
+    },
+    "QrScanner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "qrScanner"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "screen.entity の string/text field。読み取った文字列が入る。"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "description": "カメラで QR / バーコードを読み取り、文字列をフォームの文字 field に入れる(実機専用・シミュレータはプレースホルダ+手入力)。在庫管理・チケット受付・本の ISBN・URL 取り込みで選ぶ。",
+      "x-usage": "フォーム画面のみ(screen.entity 必須)。結果を表示する textField の上に 1 行(A3:F4)。"
+    },
+    "TimerDisplay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "mode"
+      ],
+      "properties": {
+        "type": {
+          "const": "timerDisplay"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "stopwatch",
+            "countdown"
+          ]
+        },
+        "seconds": {
+          "type": "integer",
+          "description": "countdown のみ: 開始秒数(例 180)。stopwatch では無視。"
+        },
+        "field": {
+          "type": "string",
+          "description": "任意: screen.entity の integer/number field。一時停止・終了時に経過秒を保存する。"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "description": "大きな mm:ss 表示と 開始/一時停止/リセット。stopwatch はカウントアップ、countdown は seconds から 0 へ。筋トレのセット・プランク・ポモドーロ・料理・瞑想など時間を計るアプリで選ぶ。",
+      "x-usage": "画面の主役として A2:F6、下にフォームの入力欄。フォーム画面で `field` を指定すると計測秒をレコードと一緒に保存できる。"
     }
   }
 }

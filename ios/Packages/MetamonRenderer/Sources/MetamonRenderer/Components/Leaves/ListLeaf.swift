@@ -10,7 +10,8 @@ struct ListLeaf: View {
     var body: some View {
         let entityId = c.entity ?? ""
         let entity = rt.dsl.entity(entityId)
-        let rows = Aggregator.sorted(Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId)), by: c.sort, entity: entity)
+        let filtered = Aggregator.sorted(Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId)), by: c.sort, entity: entity)
+        let rows = searched(filtered, entity: entity)
         if rows.isEmpty {
             Text(rt.loading.contains(entityId) ? "読み込み中…" : (c.emptyText ?? "まだありません"))
                 .foregroundStyle(.secondary)
@@ -34,6 +35,15 @@ struct ListLeaf: View {
                         }
                 }
             }
+        }
+    }
+
+    /// `searchField`(同画面の searchBar.field)の文字列で title/subtitle を部分一致(大小無視)フィルタ。
+    private func searched(_ rows: [Record], entity: Entity?) -> [Record] {
+        guard let key = c.searchField, let q = ctx.locals?.values[key]?.trimmingCharacters(in: .whitespaces), !q.isEmpty else { return rows }
+        let fields = [c.item?.title ?? entity?.titleField, c.item?.subtitle].compactMap { $0 }
+        return rows.filter { r in
+            fields.contains { FieldCoding.display(r[$0], field: entity?.field($0)).localizedCaseInsensitiveContains(q) }
         }
     }
 }
