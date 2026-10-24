@@ -1,5 +1,6 @@
 import SwiftUI
 import MetamonServices
+import MetamonRenderer
 
 /// 変身一覧(#51)。マイク FAB の長押し / 「アプリ一覧」で開く。
 /// 自分のアプリを横スクロールのカード(サムネ・名前・最終更新・「使用中」)で並べ、タップで切替。
@@ -211,8 +212,8 @@ struct AppCard: View {
             .frame(width: Self.width)
         }
         .buttonStyle(CardPressStyle())
-        .accessibilityLabel("\(app.name)\(isCurrent ? "(使用中)" : "")")
-        .accessibilityHint(isCurrent ? "" : "タップで切り替え")
+        .accessibilityLabel(app.name + (isCurrent ? L10n.tr("(使用中)") : ""))
+        .accessibilityHint(isCurrent ? "" : L10n.tr("タップで切り替え"))
     }
 
     @ViewBuilder
@@ -256,8 +257,8 @@ struct AppCard: View {
         guard let date = app.updatedDate else { return "v\(app.currentVersion)" }
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .short
-        f.locale = Locale(identifier: "ja_JP")
-        return f.localizedString(for: date, relativeTo: .now) + "に更新"
+        f.locale = LanguagePreference.shared.locale
+        return L10n.tr("\(f.localizedString(for: date, relativeTo: .now))に更新")
     }
 }
 

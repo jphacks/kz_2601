@@ -140,7 +140,7 @@ struct SettingsSheet: View {
             LabeledContent("同期") {
                 HStack(spacing: Theme.Spacing.sm) {
                     Circle().fill(syncColor).frame(width: 8, height: 8)
-                    Text(rt.recordSync.status.label)
+                    Text(syncLabel)
                 }
             }
             Button {
@@ -153,6 +153,16 @@ struct SettingsSheet: View {
             Text("データ")
         } footer: {
             Text("記録はまずこの端末に保存され、接続があるときにサーバーへ送られます。")
+        }
+    }
+
+    /// `RecordSyncStatus.label`(Services・日本語固定)の表示言語対応版(#44)
+    private var syncLabel: String {
+        switch rt.recordSync.status {
+        case .synced: L10n.tr("最新")
+        case .pending(let n): L10n.tr("未送信 \(n) 件")
+        case .syncing(let n): L10n.tr("送信中(\(n) 件)")
+        case .offline(let n): n == 0 ? L10n.tr("オフライン") : L10n.tr("オフライン・未送信 \(n) 件")
         }
     }
 

@@ -118,10 +118,10 @@ struct MicButton: View {
 
     private var accessibilityLabel: String {
         switch mode {
-        case .idle(ready: true): "マイク。タップして話す"
-        case .idle(ready: false): "音声モデルを準備中"
-        case .listening: "録音中。タップで終了"
-        case .transcribing: "文字起こし中"
+        case .idle(ready: true): L10n.tr("マイク。タップして話す")
+        case .idle(ready: false): L10n.tr("音声モデルを準備中")
+        case .listening: L10n.tr("録音中。タップで終了")
+        case .transcribing: L10n.tr("文字起こし中")
         }
     }
 }

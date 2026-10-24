@@ -35,6 +35,30 @@ enum ErrorCopy {
     static func unreachable(_ detail: String) -> String { L10n.tr("サーバーに接続できません: \(detail)") }
     // レコード取得失敗(#85)。Renderer の placeholder 文言は Renderer 側(`EmptyPlaceholder`)に持つ
 
+    // 録音/認識の失敗(#44)。`TranscriberFailure.errorDescription`(Services・日本語固定)の表示言語対応版
+    static func transcriberFailure(_ f: TranscriberFailure) -> String {
+        switch f {
+        case .notReady(let status): L10n.tr("音声モデルを準備中です(\(status))。少し待ってからお試しください")
+        case .microphoneDenied: L10n.tr("マイクの権限がありません。設定アプリ > Tailor It でマイクを許可してください")
+        case .audioSession(let reason): L10n.tr("録音を開始できませんでした(オーディオセッション: \(reason))")
+        case .noInputAvailable: L10n.tr("使えるマイクが見つかりません(他のアプリが使用中か、入力ルートがありません)")
+        case .noAudioCaptured(let s): L10n.tr("マイクから音声が届きませんでした(録音\(seconds(s))秒・0サンプル)。他のアプリの通話/録音を終了して再試行してください")
+        case .tooShort(let s): L10n.tr("録音が短すぎました(\(seconds(s))秒)。タップしてから話し、話し終えてからもう一度タップしてください")
+        case .silent(let s, let db): L10n.tr("音声が小さすぎました(録音\(seconds(s))秒・音量\(Int(db.rounded()))dB)。マイクに向かって話してください")
+        }
+    }
+    static func message(for error: Error) -> String {
+        (error as? TranscriberFailure).map(transcriberFailure) ?? error.localizedDescription
+    }
+    /// toast に添える診断の 1 行要約(`TranscriberDiagnostics.summary` の表示言語対応版)
+    static func diagnosticsSummary(_ d: TranscriberDiagnostics) -> String {
+        var parts = [L10n.tr("録音\(seconds(d.recordedSeconds))秒")]
+        parts.append(d.peakAmplitude > 0 ? L10n.tr("音量\(Int(d.peakDecibels.rounded()))dB") : L10n.tr("無音"))
+        if !d.inputRoute.isEmpty { parts.append(L10n.tr("入力:\(d.inputRoute)")) }
+        return parts.joined(separator: L10n.tr("・"))
+    }
+    private static func seconds(_ s: Double) -> String { String(format: "%.1f", s) }
+
     // ボタン
     static var retry: String { L10n.tr("もう一度") }
     static var sendNow: String { L10n.tr("今すぐ送る") }

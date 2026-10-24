@@ -59,7 +59,7 @@ struct DiscoverSheet: View {
         } else if items.isEmpty {
             VStack(spacing: Theme.Spacing.sm) {
                 Image(systemName: "magnifyingglass").font(.title).foregroundStyle(Theme.brandGradient)
-                Text(query.isEmpty ? "まだ公開されたアプリがありません" : "「\(query)」に合うアプリは見つかりませんでした")
+                Text(query.isEmpty ? L10n.tr("まだ公開されたアプリがありません") : L10n.tr("「\(query)」に合うアプリは見つかりませんでした"))
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             .padding(.top, Theme.Spacing.xl)
@@ -73,7 +73,7 @@ struct DiscoverSheet: View {
     private func search() async {
         guard let sharing = services.sharing else {
             loading = false
-            error = "「探す」はサーバー接続時のみ使えます"
+            error = L10n.tr("「探す」はサーバー接続時のみ使えます")
             return
         }
         if !query.isEmpty { try? await Task.sleep(for: .milliseconds(250)) } // 入力中の連打を間引く
@@ -86,7 +86,7 @@ struct DiscoverSheet: View {
         } catch is CancellationError {
         } catch {
             if (error as? URLError)?.code == .cancelled { return }
-            self.error = "読み込めませんでした: \(error.localizedDescription)"
+            self.error = L10n.tr("読み込めませんでした: \(error.localizedDescription)")
         }
     }
 
@@ -115,7 +115,7 @@ struct PublicAppCard: View {
                 }
                 Spacer(minLength: 0)
                 Button(action: install) {
-                    Text(item.mine ? "コピー" : "入れる")
+                    Text(item.mine ? L10n.tr("コピー") : L10n.tr("入れる"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, Theme.Spacing.md)
@@ -151,8 +151,8 @@ struct PublicAppCard: View {
     }
 
     private var byline: String {
-        let author = item.authorName.isEmpty ? "匿名" : item.authorName
-        return "\(author) ・ \(item.installs) 人が利用" + (item.mine ? " ・ あなたの公開" : "")
+        let author = item.authorName.isEmpty ? L10n.tr("匿名") : item.authorName
+        return L10n.tr("\(author) ・ \(item.installs) 人が利用") + (item.mine ? L10n.tr(" ・ あなたの公開") : "")
     }
 }
 
