@@ -46,10 +46,6 @@ struct ComputedFieldRow: View {
                     .contentTransition(.numericText())
                     .animation(.snappy, value: text)
                 Spacer(minLength: 0)
-                Image(systemName: "function")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
             }
             .renderInputChrome()
             .opacity(0.9)
