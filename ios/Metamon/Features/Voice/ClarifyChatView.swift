@@ -24,17 +24,21 @@ struct ClarifyChatView: View {
     private var lastAssistantId: UUID? { rt.chatBubbles.last(where: { $0.role == .assistant })?.id }
 
     var body: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            transcriptScroll
-            if let card = rt.errorCard {
-                ErrorCard(presentation: card)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+        transcriptScroll
+            .padding(.top, Theme.Spacing.sm)
+            // 下のバー(選択肢・ボタン・入力欄)は safeAreaInset で固定し、キーボードと同じアニメーションで一緒に上げる(#196)
+            .safeAreaInset(edge: .bottom, spacing: Theme.Spacing.sm) {
+                VStack(spacing: Theme.Spacing.sm) {
+                    if let card = rt.errorCard {
+                        ErrorCard(presentation: card)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                    suggestionChips
+                    actionButton
+                    inputRow
+                }
+                .padding(.bottom, Theme.Spacing.sm)
             }
-            suggestionChips
-            actionButton
-            inputRow
-        }
-        .padding(.top, Theme.Spacing.sm)
         #if DEBUG
         .task {
             // ヘッドレス E2E 用: `METAMON_AUTO_FOCUS=chat` で 3 秒後に返答欄へフォーカス(キーボードの確認・#143)
@@ -186,28 +190,13 @@ struct ClarifyChatView: View {
 
     // MARK: - 入力(マイク + 文字)
 
+    /// マイク + 伸びる文字入力 + 送信(#196)。return は改行、送信はボタン。送信後もキーボードは出したまま(続けて打てる)。
     private var inputRow: some View {
-        HStack(spacing: Theme.Spacing.sm) {
+        ChatComposer(placeholder: rt.chatMode == .edit ? ClarifyCopy.editReplyPlaceholder : ClarifyCopy.replyPlaceholder,
+                     text: $typed, focused: $typing, disabled: busy, onSend: onSend) {
             MicButton(mode: micMode, size: 34, action: onMic)
-                .frame(width: 56, height: 56)
+                .frame(width: 48, height: ChatComposer<EmptyView>.fieldMinHeight)
                 .accessibilityHint(statusText)
-            TextField(rt.chatMode == .edit ? ClarifyCopy.editReplyPlaceholder : ClarifyCopy.replyPlaceholder, text: $typed)
-                .focused($typing)
-                .submitLabel(.send)
-                .onSubmit(sendTyped)
-                .padding(.horizontal, Theme.Spacing.md)
-                .frame(height: 44)
-                .background(Theme.Colors.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
-            Button(action: sendTyped) {
-                Image(systemName: "arrow.up")
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(typed.isEmpty || busy ? AnyShapeStyle(Color.gray.opacity(0.4)) : AnyShapeStyle(Theme.brandGradient), in: Circle())
-            }
-            .disabled(typed.isEmpty || busy)
-            .accessibilityLabel("送信")
         }
         .overlay(alignment: .topLeading) {
             if micMode == .listening {
@@ -217,14 +206,6 @@ struct ClarifyChatView: View {
                     .offset(y: -18)
             }
         }
-    }
-
-    private func sendTyped() {
-        let text = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !busy else { return }
-        typed = ""
-        typing = false
-        onSend(text)
     }
 }
 

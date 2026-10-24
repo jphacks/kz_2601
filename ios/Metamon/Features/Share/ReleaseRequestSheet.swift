@@ -134,6 +134,7 @@ struct ReleaseRequestSheet: View {
             }
             .padding(Theme.Spacing.lg)
         }
+        .scrollDismissesKeyboard(.interactively) // 下スワイプでキーボードを閉じる(#196)
         .background(Theme.Colors.canvas.ignoresSafeArea())
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -181,11 +182,12 @@ struct ReleaseRequestSheet: View {
             Text("どんな用途で使っていますか?")
                 .font(.headline)
             TextField("用途の一言(必須) 例: 毎朝の体調記録に使っています", text: $purpose, axis: .vertical)
-                .lineLimit(2...4)
-                .textFieldStyle(.roundedBorder)
+                .lineLimit(2...5)
+                .metamonInputField() // 複数行(return で改行)・#196
                 .onChange(of: purpose) { _, v in if v.count > Self.maxPurpose { purpose = String(v.prefix(Self.maxPurpose)) } }
             TextField("連絡先(任意) メールや SNS など", text: $contact)
-                .textFieldStyle(.roundedBorder)
+                .submitLabel(.done)
+                .metamonInputField()
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .onChange(of: contact) { _, v in if v.count > Self.maxContact { contact = String(v.prefix(Self.maxContact)) } }
