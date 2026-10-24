@@ -71,6 +71,9 @@ targets:
       properties:
         com.apple.developer.applesignin: [Default]
         com.apple.security.application-groups: [group.jp.kz2601.metamon]
+        # healthStat / Field.health(#167): 体重の読み書き・歩数の読み取り。自動署名で App ID に HealthKit が付く
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon

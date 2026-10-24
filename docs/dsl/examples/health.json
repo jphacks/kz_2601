@@ -55,9 +55,11 @@
         { "label": "保存", "action": { "type": "saveRecord", "entity": "body" } }
       ],
       "components": [
-        { "type": "datePicker", "field": "date", "label": "日付" },
-        { "type": "numberField", "field": "weight", "label": "体重", "unit": "kg" },
-        { "type": "text", "text": "保存するとヘルスケアの体重にも記録されます", "style": "caption" }
+        { "type": "section", "id": "fields", "area": "A1:F3", "title": "内容", "children": [
+          { "type": "datePicker", "field": "date", "label": "日付" },
+          { "type": "numberField", "field": "weight", "label": "体重", "unit": "kg" }
+        ] },
+        { "type": "text", "id": "note", "area": "A4:F4", "text": "保存するとヘルスケアの体重にも記録されます", "style": "caption" }
       ]
     }
   ]
