@@ -35,8 +35,9 @@ struct TableLeaf: View {
                 }
             }
             if rows.isEmpty {
-                let loading = rt.loading.contains(entityId)
-                EmptyPlaceholder(icon: "tablecells", text: loading ? "読み込み中…" : "まだありません", loading: loading)
+                EmptyPlaceholder(icon: "tablecells", emptyText: "まだありません", state: rt.emptyState(for: entityId)) {
+                    Task { await rt.load(entities: [entityId], force: true) }
+                }
                     .padding(.top, RenderTheme.Spacing.sm)
             }
         }

@@ -14,16 +14,23 @@ type memApp struct {
 	records  map[string]map[string]*Record // entity -> id -> record
 }
 
+// memPublic is apps_public/{appId}: the published DSL plus shared records.
+type memPublic struct {
+	app     *PublicApp
+	records map[string]map[string]*Record
+}
+
 // Memory is an in-process Store for tests and local development.
 type Memory struct {
-	mu    sync.Mutex
-	users map[string]map[string]*memApp
-	now   func() time.Time
+	mu     sync.Mutex
+	users  map[string]map[string]*memApp
+	public map[string]*memPublic
+	now    func() time.Time
 }
 
 // NewMemory returns an empty store.
 func NewMemory() *Memory {
-	return &Memory{users: map[string]map[string]*memApp{}, now: time.Now}
+	return &Memory{users: map[string]map[string]*memApp{}, public: map[string]*memPublic{}, now: time.Now}
 }
 
 var _ Store = (*Memory)(nil)
@@ -33,6 +40,24 @@ func (m *Memory) get(uid, appID string) *memApp {
 		return apps[appID]
 	}
 	return nil
+}
+
+// recordsOf resolves rs to its entity->id map, creating the public bucket on
+// demand (public sets have no owning app document).
+func (m *Memory) recordsOf(rs RecordSet) (map[string]map[string]*Record, error) {
+	if rs.Public {
+		p := m.public[rs.AppID]
+		if p == nil {
+			p = &memPublic{records: map[string]map[string]*Record{}}
+			m.public[rs.AppID] = p
+		}
+		return p.records, nil
+	}
+	a := m.get(rs.UID, rs.AppID)
+	if a == nil {
+		return nil, ErrNotFound
+	}
+	return a.records, nil
 }
 
 func cloneRaw(b json.RawMessage) json.RawMessage {
@@ -65,6 +90,12 @@ func cloneVersion(v *Version) *Version {
 func cloneRecord(r *Record) *Record {
 	cp := *r
 	cp.Data = cloneData(r.Data)
+	return &cp
+}
+
+func clonePublic(p *PublicApp) *PublicApp {
+	cp := *p
+	cp.DSL = cloneRaw(p.DSL)
 	return &cp
 }
 
@@ -197,16 +228,48 @@ func (m *Memory) GetVersion(_ context.Context, uid, appID string, n int) (*Versi
 	return cloneVersion(v), nil
 }
 
-// ListRecords implements Store.
-func (m *Memory) ListRecords(_ context.Context, uid, appID, entity string, limit int) ([]Record, error) {
+// PublishApp implements Store.
+func (m *Memory) PublishApp(_ context.Context, uid, appID string, raw json.RawMessage, name string, version int) (bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	a := m.get(uid, appID)
-	if a == nil {
+	now := m.now().UTC()
+	p := m.public[appID]
+	if p == nil {
+		p = &memPublic{records: map[string]map[string]*Record{}}
+		m.public[appID] = p
+	}
+	if p.app == nil {
+		p.app = &PublicApp{ID: appID, OwnerUID: uid, Name: name, Version: version, DSL: cloneRaw(raw), CreatedAt: now, UpdatedAt: now}
+		return true, nil
+	}
+	if p.app.OwnerUID != uid {
+		return false, nil
+	}
+	p.app.Name, p.app.Version, p.app.DSL, p.app.UpdatedAt = name, version, cloneRaw(raw), now
+	return true, nil
+}
+
+// GetPublicApp implements Store.
+func (m *Memory) GetPublicApp(_ context.Context, appID string) (*PublicApp, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p := m.public[appID]
+	if p == nil || p.app == nil {
 		return nil, ErrNotFound
 	}
-	out := make([]Record, 0, len(a.records[entity]))
-	for _, r := range a.records[entity] {
+	return clonePublic(p.app), nil
+}
+
+// ListRecords implements Store.
+func (m *Memory) ListRecords(_ context.Context, rs RecordSet, limit int) ([]Record, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	recs, err := m.recordsOf(rs)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Record, 0, len(recs[rs.Entity]))
+	for _, r := range recs[rs.Entity] {
 		out = append(out, *cloneRecord(r))
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -219,14 +282,14 @@ func (m *Memory) ListRecords(_ context.Context, uid, appID, entity string, limit
 }
 
 // GetRecord implements Store.
-func (m *Memory) GetRecord(_ context.Context, uid, appID, entity, id string) (*Record, error) {
+func (m *Memory) GetRecord(_ context.Context, rs RecordSet, id string) (*Record, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	a := m.get(uid, appID)
-	if a == nil {
-		return nil, ErrNotFound
+	recs, err := m.recordsOf(rs)
+	if err != nil {
+		return nil, err
 	}
-	r, ok := a.records[entity][id]
+	r, ok := recs[rs.Entity][id]
 	if !ok {
 		return nil, ErrNotFound
 	}
@@ -234,36 +297,36 @@ func (m *Memory) GetRecord(_ context.Context, uid, appID, entity, id string) (*R
 }
 
 // CreateRecord implements Store.
-func (m *Memory) CreateRecord(_ context.Context, uid, appID, entity string, rec Record) (*Record, bool, error) {
+func (m *Memory) CreateRecord(_ context.Context, rs RecordSet, rec Record) (*Record, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	a := m.get(uid, appID)
-	if a == nil {
-		return nil, false, ErrNotFound
+	recs, err := m.recordsOf(rs)
+	if err != nil {
+		return nil, false, err
 	}
-	if a.records[entity] == nil {
-		a.records[entity] = map[string]*Record{}
+	if recs[rs.Entity] == nil {
+		recs[rs.Entity] = map[string]*Record{}
 	}
-	if existing, ok := a.records[entity][rec.ID]; ok {
+	if existing, ok := recs[rs.Entity][rec.ID]; ok {
 		return cloneRecord(existing), false, nil
 	}
 	now := m.now().UTC()
-	rec.Entity = entity
+	rec.Entity = rs.Entity
 	rec.CreatedAt, rec.UpdatedAt = now, now
 	rec.Data = cloneData(rec.Data)
-	a.records[entity][rec.ID] = &rec
+	recs[rs.Entity][rec.ID] = &rec
 	return cloneRecord(&rec), true, nil
 }
 
 // UpdateRecord implements Store.
-func (m *Memory) UpdateRecord(_ context.Context, uid, appID, entity, id string, data map[string]any) (*Record, error) {
+func (m *Memory) UpdateRecord(_ context.Context, rs RecordSet, id string, data map[string]any) (*Record, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	a := m.get(uid, appID)
-	if a == nil {
-		return nil, ErrNotFound
+	recs, err := m.recordsOf(rs)
+	if err != nil {
+		return nil, err
 	}
-	r, ok := a.records[entity][id]
+	r, ok := recs[rs.Entity][id]
 	if !ok {
 		return nil, ErrNotFound
 	}
@@ -273,28 +336,28 @@ func (m *Memory) UpdateRecord(_ context.Context, uid, appID, entity, id string, 
 }
 
 // DeleteRecord implements Store.
-func (m *Memory) DeleteRecord(_ context.Context, uid, appID, entity, id string) error {
+func (m *Memory) DeleteRecord(_ context.Context, rs RecordSet, id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	a := m.get(uid, appID)
-	if a == nil {
+	recs, err := m.recordsOf(rs)
+	if err != nil {
+		return err
+	}
+	if _, ok := recs[rs.Entity][id]; !ok {
 		return ErrNotFound
 	}
-	if _, ok := a.records[entity][id]; !ok {
-		return ErrNotFound
-	}
-	delete(a.records[entity], id)
+	delete(recs[rs.Entity], id)
 	return nil
 }
 
 // DeleteAllRecords implements Store.
-func (m *Memory) DeleteAllRecords(_ context.Context, uid, appID, entity string) error {
+func (m *Memory) DeleteAllRecords(_ context.Context, rs RecordSet) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	a := m.get(uid, appID)
-	if a == nil {
-		return ErrNotFound
+	recs, err := m.recordsOf(rs)
+	if err != nil {
+		return err
 	}
-	delete(a.records, entity)
+	delete(recs, rs.Entity)
 	return nil
 }

@@ -3,12 +3,25 @@ import MetamonDSL
 
 /// `button`: style(primary|secondary|destructive|plain)。押下で `action` をランタイムに渡す。
 /// primary = tint 塗り / secondary = tint の薄塗り / destructive = red の薄塗り、の 3 つが同じ高さ・角丸で並ぶ。
+/// `deleteRecord` のボタンは編集モード(フォームに recordId がある時)だけ描く(#73: 新規フォームで押しても何も起きない)。
 struct ButtonLeaf: View {
     @Environment(\.dslRuntime) private var rt
     let c: Component
     let ctx: RenderContext
 
+    /// 新規フォーム(recordId 無し)では `deleteRecord` を隠す。削除対象が無いので押しても何も起きないため。
+    static func isVisible(action: Action?, isEditing: Bool) -> Bool {
+        action?.type != .deleteRecord || isEditing
+    }
+
     var body: some View {
+        if Self.isVisible(action: c.action, isEditing: ctx.form?.isEditing ?? false) {
+            styled
+        }
+    }
+
+    @ViewBuilder
+    private var styled: some View {
         let button = Button {
             guard let action = c.action else { return }
             Task { await rt.run(action, ctx.actionContext()) }
