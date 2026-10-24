@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "からだ記録",
+    "description": "iPhone の歩数を毎日見て、体重を記録してヘルスケアにも保存する(#167)",
+    "icon": "figure.walk",
+    "voiceEntry": "floating",
+    "tabs": [
+      { "title": "今日", "icon": "figure.walk", "screen": "home" },
+      { "title": "体重", "icon": "scalemass", "screen": "weights" }
+    ]
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "body",
+      "name": "体重",
+      "titleField": "date",
+      "fields": [
+        { "id": "date", "name": "日付", "type": "date", "required": true, "defaultValue": "now" },
+        { "id": "weight", "name": "体重", "type": "number", "required": true, "unit": "kg", "health": "weight" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "今日",
+      "components": [
+        { "type": "healthStat", "id": "steps_today", "area": "A1:C4", "metric": "steps", "label": "今日の歩数", "target": 8000 },
+        { "type": "healthStat", "id": "weight_now", "area": "D1:F4", "metric": "weight", "label": "体重(ヘルスケア)" },
+        { "type": "healthStat", "id": "steps_week", "area": "A5:F10", "metric": "steps", "period": "week", "label": "1 週間の歩数", "target": 8000 }
+      ]
+    },
+    {
+      "id": "weights",
+      "title": "体重",
+      "toolbar": [
+        { "label": "記録", "icon": "plus", "action": { "type": "navigate", "screen": "body_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        { "type": "stat", "id": "latest", "area": "A1:F2", "label": "最新の体重", "entity": "body", "field": "weight", "aggregate": "latest", "by": "date" },
+        { "type": "list", "id": "history", "area": "A3:F12", "entity": "body",
+          "item": { "title": "weight", "trailing": "date" },
+          "sort": { "field": "date", "direction": "desc" },
+          "emptyText": "右上の + から体重を記録", "swipeToDelete": true,
+          "onItemTap": { "type": "navigate", "screen": "body_form", "presentation": "push" } }
+      ]
+    },
+    {
+      "id": "body_form",
+      "title": "体重を記録",
+      "entity": "body",
+      "toolbar": [
+        { "label": "保存", "action": { "type": "saveRecord", "entity": "body" } }
+      ],
+      "components": [
+        { "type": "datePicker", "field": "date", "label": "日付" },
+        { "type": "numberField", "field": "weight", "label": "体重", "unit": "kg" },
+        { "type": "text", "text": "保存するとヘルスケアの体重にも記録されます", "style": "caption" }
+      ]
+    }
+  ]
+}

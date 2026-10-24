@@ -13,6 +13,8 @@
 // nav (["from>to", ...]: a button / toolbar / item tap on `from` opens `to`),
 // tabs / tabsMin (number), tabOrder ("a,b": the first tab screens in order),
 // tabHas (component type on a tab root other than the first tab).
+// Health (#167): health ("steps"|"weight": a healthStat with that metric),
+// healthField (bool: some field has health "weight").
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
@@ -77,6 +79,9 @@ type Metrics struct {
 	// #177
 	HasCalendar bool     `json:"hasCalendar,omitempty"`
 	StatUnitDup []string `json:"statUnitDup,omitempty"` // non-count stat labels ending in "(field.unit)"
+	// #167
+	Health      []string `json:"health,omitempty"`      // healthStat metric:period
+	HealthField bool     `json:"healthField,omitempty"` // a field with health "weight"
 }
 
 // HasCalc reports whether the app computes anything beyond plain aggregate stats.
@@ -356,6 +361,9 @@ func measure(a *dsl.App) *Metrics {
 			if f.Type == dsl.FieldRef {
 				m.RefFields++
 			}
+			if f.Health != "" {
+				m.HealthField = true
+			}
 		}
 	}
 	for _, n := range a.App.Notifications {
@@ -387,6 +395,8 @@ func measure(a *dsl.App) *Metrics {
 					m.Settlement = true
 				case dsl.CompCalendar:
 					m.HasCalendar = true
+				case dsl.CompHealthStat:
+					m.Health = append(m.Health, x.Metric+":"+x.Period)
 				case dsl.CompStat:
 					if x.Value != nil {
 						m.StatValues++
@@ -429,6 +439,15 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 		case "substitution": // a part missing from the catalog was requested: summary must say so
 			if mentionsSubstitution(summary) != v.(bool) {
 				miss = append(miss, fmt.Sprintf("substitution=%v", !v.(bool)))
+			}
+		case "health":
+			want, _ := v.(string)
+			if !slices.ContainsFunc(m.Health, func(h string) bool { return strings.HasPrefix(h, want+":") }) {
+				miss = append(miss, fmt.Sprintf("health=%v", m.Health))
+			}
+		case "healthField":
+			if m.HealthField != v.(bool) {
+				miss = append(miss, fmt.Sprintf("healthField=%v", m.HealthField))
 			}
 		case "calendar":
 			if m.HasCalendar != v.(bool) {

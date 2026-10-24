@@ -56,6 +56,7 @@ var systemPrompt = strings.TrimSpace(`
 - 上限: 画面 12・entity 6・entity あたり field 20・1 階層あたり component 30。
 - 金額は type "currency"(unit "円")。日付は type "date"。写真は type "photo" + photoField(source camera)。
 - リマインド(「毎朝8時に通知」など)は app.notifications[] に {id,title,body,repeat:daily,time:"08:00"} として宣言する。
+- 「歩数を見たい」「今日何歩」は healthStat(metric steps・entity も入力フォームも作らない。週の推移は period week)。体重を手で記録するアプリで「ヘルスケアにも保存/連携」と言われたら、体重 field(number・unit kg)に health:"weight" を付ける(ヘルスケアの体重を見るだけなら healthStat metric weight)。
 - 「○○のサイト/ニュースを見たい」は webView(実在する https URL。分からなければ公式トップ)。「LINE/Slack/Discord で送りたい」は shareButton の shareTo(line|slack|discord)。「地図で開く/電話/メール」は openUrlButton の maps:/tel:/mailto:。
 - **発話に無い機能を足さない**(2026-10-24 eval: 読書/水分/筋トレで未要求の集計タブ+chart、散歩/体重で未要求の毎日通知が付いた):
   - chart と集計タブは「グラフ・推移・内訳・割合」のように可視化を求められた時だけ。ただし「科目ごと」「カテゴリ別」「月ごと」の**合計**を求められたら、ホームに chart(kind bar・groupBy その field・月ごとは日付 field + bucket month)を 1 つ置いて出す(集計タブは作らない)。求められていなければ stat + list のホーム画面とフォーム画面(必要ならタブ無し)で済ませる。
