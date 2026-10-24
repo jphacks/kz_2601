@@ -22,8 +22,7 @@ struct LocationButtonLeaf: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+                .buttonStyle(RenderButtonStyle(kind: .secondary))
                 .disabled(busy)
                 if let s = (form.values[field] ?? .null).stringValue, !s.isEmpty {
                     Text("📍 \(s)").font(.caption).foregroundStyle(.secondary).monospacedDigit()

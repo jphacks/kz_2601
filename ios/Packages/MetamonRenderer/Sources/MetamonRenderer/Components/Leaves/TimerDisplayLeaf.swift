@@ -25,19 +25,18 @@ struct TimerDisplayLeaf: View {
             }
             Text(Self.format(shown))
                 .font(.system(size: 44, weight: .semibold, design: .rounded).monospacedDigit())
-                .foregroundStyle(finished ? Color.red : Color.primary)
+                .foregroundStyle(finished ? AnyShapeStyle(RenderTheme.Colors.negative) : AnyShapeStyle(RenderTheme.brandGradient))
                 .contentTransition(.numericText())
             HStack(spacing: 12) {
                 Button(running ? "一時停止" : (elapsed > 0 && !finished ? "再開" : "開始"), systemImage: running ? "pause.fill" : "play.fill") {
                     running ? pause() : start()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(RenderButtonStyle(kind: .primary))
                 .disabled(finished)
                 Button("リセット", systemImage: "arrow.counterclockwise") { reset() }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(RenderButtonStyle(kind: .secondary))
                     .disabled(elapsed == 0 && !running)
             }
-            .controlSize(.regular)
         }
         .frame(maxWidth: .infinity)
         .renderCard()

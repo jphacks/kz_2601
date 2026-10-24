@@ -2,7 +2,7 @@ import SwiftUI
 import MetamonDSL
 
 /// `button`: style(primary|secondary|destructive|plain)。押下で `action` をランタイムに渡す。
-/// primary = tint 塗り / secondary = tint の薄塗り / destructive = red の薄塗り、の 3 つが同じ高さ・角丸で並ぶ。
+/// primary = ブランドグラデーション + 影 / secondary = ブランドの薄塗り / destructive = red の薄塗り、の 3 つが同じ高さ(52)・角丸(14)で並ぶ。
 struct ButtonLeaf: View {
     @Environment(\.dslRuntime) private var rt
     let c: Component
@@ -18,17 +18,19 @@ struct ButtonLeaf: View {
         switch c.style {
         case "secondary": button.buttonStyle(RenderButtonStyle(kind: .secondary))
         case "destructive": button.buttonStyle(RenderButtonStyle(kind: .destructive))
-        case "plain": button.buttonStyle(.plain).foregroundStyle(.tint)
+        case "plain": button.buttonStyle(RenderButtonStyle(kind: .plain))
         default: button.buttonStyle(RenderButtonStyle(kind: .primary))
         }
     }
 }
 
-/// Renderer の 3 ボタン様式(トークンで高さ・角丸・押下フィードバックを統一)。
+/// Renderer のボタン様式(トークンで高さ・角丸・押下フィードバックを統一)。
 struct RenderButtonStyle: ButtonStyle {
-    enum Kind { case primary, secondary, destructive }
+    enum Kind { case primary, secondary, destructive, plain }
     let kind: Kind
     @Environment(\.isEnabled) private var isEnabled
+
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: RenderTheme.Radius.button, style: .continuous) }
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -36,42 +38,46 @@ struct RenderButtonStyle: ButtonStyle {
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .padding(.horizontal, RenderTheme.Spacing.md)
-            .frame(maxWidth: .infinity, minHeight: 48)
+            .frame(maxWidth: .infinity, minHeight: kind == .plain ? 44 : 52)
             .foregroundStyle(foreground)
-            .background(background, in: RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous))
+            .background { background }
             .overlay {
-                if kind != .primary {
-                    RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous)
-                        .strokeBorder(stroke)
+                if kind == .secondary || kind == .destructive {
+                    shape.strokeBorder(stroke)
                 }
             }
-            .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.45)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-            .contentShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous))
+            .shadow(color: kind == .primary && isEnabled ? RenderTheme.Shadow.brandColor : .clear,
+                    radius: RenderTheme.Shadow.brandRadius, y: RenderTheme.Shadow.brandY)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.9 : 1) : 0.45)
+            .pressable(configuration.isPressed)
+            .contentShape(shape)
     }
 
     private var foreground: Color {
         switch kind {
         case .primary: .white
-        case .secondary: .accentColor
+        case .secondary, .plain: RenderTheme.Colors.brandA
         case .destructive: RenderTheme.Colors.negative
         }
     }
 
-    private var background: Color {
+    @ViewBuilder
+    private var background: some View {
         switch kind {
-        case .primary: .accentColor
-        case .secondary: Color.accentColor.opacity(0.12)
-        case .destructive: RenderTheme.Colors.negative.opacity(0.12)
+        case .primary:
+            shape.fill(RenderTheme.brandGradient)
+                .overlay(shape.strokeBorder(.white.opacity(0.18)))
+        case .secondary: shape.fill(RenderTheme.Colors.brandSoft)
+        case .destructive: shape.fill(RenderTheme.Colors.negative.opacity(0.10))
+        case .plain: Color.clear
         }
     }
 
     private var stroke: Color {
         switch kind {
-        case .primary: .clear
-        case .secondary: Color.accentColor.opacity(0.18)
+        case .secondary: RenderTheme.Colors.brandSoftStroke
         case .destructive: RenderTheme.Colors.negative.opacity(0.18)
+        default: .clear
         }
     }
 }

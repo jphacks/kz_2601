@@ -23,9 +23,9 @@ struct OpenUrlButtonLeaf: View {
     @ViewBuilder
     private func styled<V: View>(_ button: V) -> some View {
         switch c.style {
-        case "primary": button.buttonStyle(.borderedProminent).controlSize(.large)
-        case "plain": button.buttonStyle(.plain).foregroundStyle(.tint)
-        default: button.buttonStyle(.bordered).controlSize(.large)
+        case "primary": button.buttonStyle(RenderButtonStyle(kind: .primary))
+        case "plain": button.buttonStyle(RenderButtonStyle(kind: .plain))
+        default: button.buttonStyle(RenderButtonStyle(kind: .secondary))
         }
     }
 }
