@@ -105,6 +105,27 @@ func BuildCatalog(schema []byte) (string, error) {
 		}
 		b.WriteString("\n")
 	}
+
+	b.WriteString("### Entity の scope(レコードを誰と共有するか・省略時 private)\n")
+	entity, _ := defs["Entity"].(map[string]any)
+	scopes := enumValues(entity, "scope")
+	if len(scopes) == 0 {
+		return "", fmt.Errorf("schema has no $defs/Entity.properties.scope enum")
+	}
+	for _, v := range scopes {
+		fmt.Fprintf(&b, "- scope: %s", v)
+		if d := enumDescOf(entity, "scope", v); d != "" {
+			b.WriteString(" — " + d)
+		}
+		b.WriteString("\n")
+	}
+	if props, _ := entity["properties"].(map[string]any); props != nil {
+		if sp, _ := props["scope"].(map[string]any); sp != nil {
+			if usage, _ := sp[keyUsage].(string); usage != "" {
+				fmt.Fprintf(&b, "  使い方: %s\n", usage)
+			}
+		}
+	}
 	return strings.TrimRight(b.String(), "\n"), nil
 }
 
@@ -262,9 +283,12 @@ func enumValues(def map[string]any, prop string) []string {
 	return out
 }
 
-func enumDesc(def map[string]any, value string) string {
+func enumDesc(def map[string]any, value string) string { return enumDescOf(def, "type", value) }
+
+// enumDescOf reads properties.<prop>.x-enumDescriptions[value].
+func enumDescOf(def map[string]any, prop, value string) string {
 	props, _ := def["properties"].(map[string]any)
-	ps, _ := props["type"].(map[string]any)
+	ps, _ := props[prop].(map[string]any)
 	m, _ := ps[keyEnumDescs].(map[string]any)
 	s, _ := m[value].(string)
 	return s
