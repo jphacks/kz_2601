@@ -175,6 +175,7 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 * 設計判断の記録: [`docs/00_decisions.md`](docs/00_decisions.md)(正典)、[`docs/01_goals_and_requirements.md`](docs/01_goals_and_requirements.md)(ゴール・デモ 3 本・要件 F01〜F41)
 * 生成品質・速度の実測: [`docs/backend/ai-eval/2026-10-24.md`](docs/backend/ai-eval/2026-10-24.md)、[`2026-10-24-catalog.md`](docs/backend/ai-eval/2026-10-24-catalog.md)(生 JSON は `raw/`)
 * 審査デモ台本: [`docs/03_demo_script.md`](docs/03_demo_script.md)
+* 10/25 のリリースノートと朝のリリース手順: [`docs/release/2026-10-25-release-notes.md`](docs/release/2026-10-25-release-notes.md)、[`docs/release/2026-10-25-runbook.md`](docs/release/2026-10-25-runbook.md)
 
 ## アーキテクチャ
 
