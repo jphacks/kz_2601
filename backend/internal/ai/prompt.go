@@ -82,7 +82,8 @@ var systemPrompt = strings.TrimSpace(`
   - **毎日くり返すチェック**(「毎日飲む薬」「毎日の習慣」「毎朝やること」)は 1 日 1 件の記録 entity を作らない(毎日登録し直しになる)。薬・習慣の entity に type date の field(例 taken_on・defaultValue は書かない)を作り、一覧の item に "toggle":"<その field>","resets":"daily" を指定する(丸を押すとその日の日付を保存、日付が変わると全行が未チェックに戻る)。今日やった数 = stat.value {"agg":"count","entity":...,"filter":{"field":"<その field>","op":"today","value":null}}、まだの数 = 全件数 − それ。フォームにその date field の入力を置かない。連続日数(ストリーク)は出せないので代替を申告する。「済みをまとめて消す・片付ける」と言われたら、未完了の list と済み(eq true)の list を section で分け、済みの list はスワイプで消せる(一括削除の代替として申告)。
   - **時間順・時刻順の予定**(しおり・スケジュール・時間割): list の sort は 1 field だけなので、日付と時刻を別 field にしない。type datetime の 1 field(フォームは datePicker の includeTime true)にして sort asc で並べる。実際にしていない並べ方や計算を description に書かない。
   - **分類つきの記録の内訳**: 「カテゴリ別に記録」「種類ごとに記録」のように enum の分類で記録し、合計や今月いくらかも求められたら、その分類の合計 chart(kind pie か bar・groupBy その enum・stat と同じ期間 filter)をホームに 1 つ置く。
-  - **count の単位**: stat の aggregate count は iOS が単位「件」を付ける。「回」「冊」「セット」「日」など件が合わない数は stat.value = {"agg":"count","entity":...,"filter"?:...}(単位なしの数字)にして、単位はラベルに書く(例 label「今日のセット数(回)」)。
+  - **count の単位**: stat の aggregate count は iOS が単位「件」を付ける。「回」「冊」「セット」「日」など件が合わない数は stat.value = {"agg":"count","entity":...,"filter"?:...}(単位なしの数字)にして、単位はラベルに書いてよい(例 label「今日のセット数(回)」)。
+  - **sum / avg / max / min / latest の単位**(#177: 「今日の合計回数(回)」が「3 回」と二重になった): 値には iOS が field.unit を付ける。ラベルに単位を書かない(label「今日の合計回数」・field reps の unit「回」→「3 回」)。ラベルに単位を書くのは count の stat.value だけ。
   - **フォーム**: 写真は photoField だけ(撮影後に自前でプレビューを出すので、同じ field の image を重ねない)。section の area は詰める(行数 = 子の数 + 1 が目安。中身 4 項目なら 5 行)か、フォームは area を省略して上から積む。部品の間に空き行を作らない。
   - 表示文字列・description の数字は半角(「2タブ」「3万円」)。
 - **画面の分け方とナビゲーション**(#112: 1 画面に詰め込みがちだった):
@@ -109,7 +110,7 @@ var systemPrompt = strings.TrimSpace(`
 - 上の規則の日本語のキーワードは英語の同じ意味の語でも適用する: "this month" → thisMonth、"today" → today、"this week" → thisWeek、"this year" → thisYear、"last 7 days" / "past week" → 直近7日の filter(gte addDays −6)、"left" / "remaining" / "to go" → 目標 − 合計の stat.value(max …,0)、"per person" → div、"average" → avg、"best" / "record" → max、"in a row" / "streak" → 代替して申告、"split" / "settle up" / "who owes whom" → settlement、"remind me" / "notify" → notifications。**ラベルにこれらの語を書くなら、その filter / 計算を必ず付ける**(ラベルに "(last 7 days)" と書いて filter を付けないのは嘘ラベル)。"Monthly budget" のような設定値の名前は今月の filter と関係ない。
 - 済みの件数("taken today" / "bought" / "done" / "completed")を数える stat は、その boolean の {"field":"<boolean>","op":"eq","value":true} を必ず含める(stat.value の agg の filter に日付の条件と合わせて配列で書く)。
 - **金額**: type currency の field と numberField に unit を書かない(iOS は locale に関わらず "¥1,200" と表示する。"$" を書くと "¥ 15 $" になる)。ラベル・説明文・placeholder にも "$" や "dollars" を書かない("Hourly wage" / "Budget left this month")。発話でドルの金額を言われても数値はそのまま使う(換算しない)。
-- **件数の単位**: stat の aggregate count は iOS が単位 "items" を付ける。物でない数(books / workouts / days / pills / times)は stat.value = {"agg":"count",...} にして、単位はラベルに書く(例 "Books read this year")。
+- **件数の単位**: stat の aggregate count は iOS が単位 "items" を付ける。物でない数(books / workouts / days / pills / times)は stat.value = {"agg":"count",...} にして、単位はラベルに書く(例 "Books read this year")。sum / avg / max / min / latest は field.unit が値に付くので、ラベルに単位を書かない("Total reps today"。"Total reps today (reps)" は "12 reps" と二重になる)。
 - list.item の title / subtitle / trailing に boolean field を置かない(iOS が Yes/No を日本語で出す)。チェックは item.toggle で見せる。
 - 文言は自然で短い英語: 画面タイトルと tab.title は Title Case の 1〜2 語("Today" / "History")、ボタンは動詞始まり("Add book" / "Log workout")、emptyText は "No books yet"、confirmMessage は "Delete this book?"。entity.name は単数形の可算名詞("Book" / "Workout" / "Expense"。"Spending" のような不可算名詞にしない)。日本語・全角文字を 1 字も混ぜない。
 
