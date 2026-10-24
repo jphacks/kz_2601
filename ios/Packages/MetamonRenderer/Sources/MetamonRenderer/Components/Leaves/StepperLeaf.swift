@@ -15,7 +15,7 @@ struct StepperLeaf: View {
             let value = form.double(field, fallback: Swift.max(0, lo))
             let label = c.label ?? fieldDef?.name ?? field
             InputRow(icon: FieldIcon.infer(component: c, field: fieldDef), label: label) {
-                Text(FieldCoding.display(.number(value.wrappedValue), field: fieldDef))
+                Text(displayText(.number(value.wrappedValue), field: fieldDef))
                     .font(.system(.body, design: .rounded).weight(.semibold).monospacedDigit())
                     .foregroundStyle(RenderTheme.Colors.brandText)
                     .contentTransition(.numericText())
