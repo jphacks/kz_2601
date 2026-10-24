@@ -59,5 +59,15 @@
   {"id": "create_style", "group": "create-first", "mode": "create", "note": "#185 create で方向を任される → proposal",
    "steps": [{"say": "家計簿を作りたいけど、どんな感じがいいかな?", "expect": "proposal"}]},
   {"id": "create_osusume", "group": "create-first", "mode": "create", "note": "#184 create で方向を任される → proposal(proposal の p50 を測る件数を増やす)",
-   "steps": [{"say": "筋トレの記録アプリを作りたい。おすすめはある?", "expect": "proposal"}]}
+   "steps": [{"say": "筋トレの記録アプリを作りたい。おすすめはある?", "expect": "proposal"}]},
+  {"id": "edit_enum_add", "group": "enum", "base": "internal/ai/examples/okozukai.json", "mode": "edit", "note": "#194 選択肢の追加 → ready",
+   "steps": [{"say": "副業も足して", "expect": "ready", "generate": true, "genNot": ["メモ", "その他"]}]},
+  {"id": "edit_enum_remove", "group": "enum", "base": "internal/ai/examples/okozukai.json", "mode": "edit",
+   "steps": [{"say": "ボーナスは要らない", "expect": "ready", "generate": true, "genNot": ["メモ", "その他"]}]},
+  {"id": "edit_enum_rename", "group": "enum", "base": "internal/ai/examples/okozukai.json", "mode": "edit",
+   "steps": [{"say": "お小遣いを臨時収入に変えて", "expect": "ready", "generate": true, "genNot": ["メモ", "その他"]}]},
+  {"id": "edit_enum_user", "group": "enum", "base": "internal/ai/examples/okozukai.json", "mode": "edit", "note": "#194 自分で増やせる → 自由入力にしない",
+   "steps": [{"say": "種類を自分で増やせるようにして", "expect": "ready", "generate": true, "genNot": ["文字", "自由に入力", "メモ"]}]},
+  {"id": "edit_enum_vague", "group": "enum", "base": "internal/ai/examples/okozukai.json", "mode": "edit", "note": "#194 どちらか分からない → 案",
+   "steps": [{"say": "種類をもっと増やしたい", "expect": "proposal", "generate": true, "genNot": ["メモ", "文字"]}]}
 ]

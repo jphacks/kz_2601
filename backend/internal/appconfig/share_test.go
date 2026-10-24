@@ -328,9 +328,14 @@ func TestInstallTwiceCountsOnce(t *testing.T) {
 			t.Fatalf("install: %d %s", r1.code, r1.raw)
 		}
 		copyID, _ := r1.body["id"].(string)
-		e.do(finder, http.MethodDelete, "/v1/apps/"+copyID, nil, nil) // archived; re-install brings it back
+		// installing again while the copy exists returns that copy
+		if r := e.do(finder, http.MethodPost, "/v1/public-apps/"+id+"/install", nil, nil); r.body["id"] != copyID {
+			t.Fatalf("install again: %d %s", r.code, r.raw)
+		}
+		// deleted (#180 physical): re-install makes a fresh copy, still counted once
+		e.do(finder, http.MethodDelete, "/v1/apps/"+copyID, nil, nil)
 		r2 := e.do(finder, http.MethodPost, "/v1/public-apps/"+id+"/install", nil, nil)
-		if r2.code != http.StatusCreated || r2.body["created"] != false || r2.body["id"] != copyID || r2.body["status"] != "active" {
+		if r2.code != http.StatusCreated || r2.body["created"] != true || r2.body["id"] == copyID || r2.body["status"] != "active" {
 			t.Fatalf("re-install: %d %s", r2.code, r2.raw)
 		}
 		e.do(owner, http.MethodPost, "/v1/public-apps/"+id+"/install", nil, nil)

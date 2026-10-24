@@ -59,5 +59,15 @@
   {"id": "nav_edit_reorder", "kind": "edit", "group": "nav", "base": "example:kakeibo", "transcript": "タブの順番を入れ替えて、集計を左にして",
    "expect": {"patch": true, "unreachable": 0, "tabOrder": "stats,home"}},
   {"id": "nav_edit_to_tab", "kind": "edit", "group": "nav", "base": "example:warikan", "transcript": "精算の結果を別のタブに分けて",
-   "expect": {"patch": true, "unreachable": 0, "tabsMin": 2, "tabHas": "settlement"}, "note": "この画面をタブに: タブ無しの app に app.tabs を作る"}
+   "expect": {"patch": true, "unreachable": 0, "tabsMin": 2, "tabHas": "settlement"}, "note": "この画面をタブに: タブ無しの app に app.tabs を作る"},
+  {"id": "enum_add", "kind": "edit", "group": "enum", "base": "example:okozukai", "transcript": "副業も足して",
+   "expect": {"patch": true, "enumField": "income.kind", "optHas": ["副業", "ボーナス"], "fields": 4}, "note": "#194 選択肢の追加は options だけ"},
+  {"id": "enum_remove", "kind": "edit", "group": "enum", "base": "example:okozukai", "transcript": "ボーナスは要らない",
+   "expect": {"patch": true, "enumField": "income.kind", "optHas": ["給与"], "optNot": ["ボーナス", "その他"], "fields": 4}},
+  {"id": "enum_rename", "kind": "edit", "group": "enum", "base": "example:okozukai", "transcript": "お小遣いを臨時収入に変えて",
+   "expect": {"patch": true, "enumField": "income.kind", "optHas": ["臨時収入"], "optNot": ["お小遣い"], "fields": 4}},
+  {"id": "enum_user", "kind": "edit", "group": "enum", "base": "example:okozukai", "transcript": "種類を自分で増やせるようにして",
+   "expect": {"patch": true, "unreachable": 0, "enumField": "income.kind", "refPick": true, "optHas": ["お小遣い", "給与", "ボーナス"], "fields": 4}, "note": "#194 マスタ entity + ref + 初期の選択肢"},
+  {"id": "enum_user2", "kind": "edit", "group": "enum", "base": "example:kakeibo", "transcript": "カテゴリを自由に追加したり消したりできるようにしたい",
+   "expect": {"patch": true, "unreachable": 0, "enumField": "expense.category", "refPick": true, "optHas": ["食費"], "fields": 5}}
 ]

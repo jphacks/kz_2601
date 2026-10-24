@@ -235,3 +235,13 @@ var audit3Rules = strings.TrimSpace(`
 `)
 
 func init() { systemPrompt += "\n\n" + audit3Rules }
+
+// enumRules (#194): option edits became a new memo field / an 「その他」
+// option, and "let me add kinds myself" became a free-text field.
+var enumRules = strings.TrimSpace(`
+## 選択肢(enum)の編集(#194)
+- **選択肢を足す・消す・名前を変える**(「副業も足して」「ボーナスは要らない」「お小遣いを臨時収入に変えて」): その enum field の options だけを書き換える(追加 = add .../options/-、削除 = remove .../options/<k>、名前変更 = replace .../options/<k>)。defaultValue が消す・変える選択肢なら一緒に replace。**新しい field・メモ欄・「その他」を足さない**。入力部品・一覧・chart は options をそのまま使うので触らない。既存の記録は元の値のまま表示される。
+- **使う人が自分で選択肢を増やせる・消せるようにする**(「種類を自分で増やせるように」「カテゴリを自由に追加・削除したい」): **string の自由入力に変えない**(表記ゆれで集計が割れる)。名前 1 つのマスタ entity(例 {"id":"income_kind","name":"種類","titleField":"name","fields":[{"id":"name","name":"名前","type":"string","required":true}]})を add し、元の field を**同じ id のまま** {"id":"<元の id>","name":"<元の名前>","type":"ref","refEntity":"<マスタ>","options":[<今の選択肢>]} に replace する(ref の options = 初期の選択肢。マスタが空ならアプリが最初に一度だけその名前で作る。defaultValue は書かない)。フォームの picker はそのまま使える(ref なら参照先の一覧から選ぶ・style は menu)。マスタの一覧(list・onItemTap でマスタのフォーム)と追加フォーム(screen.entity = マスタ + saveRecord)を足し、ホームの toolbar かボタン(またはタブ)から開けるようにする。summary「種類を自分で追加・削除できるようにしました。」
+`)
+
+func init() { systemPrompt += "\n\n" + enumRules }

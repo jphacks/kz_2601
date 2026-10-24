@@ -54,6 +54,12 @@ public struct HTTPAppConfigClient: AppConfigClient {
         return items
     }
 
+    /// `DELETE /v1/apps/{appId}`(物理削除・#180)。成功したらオフライン用の一覧キャッシュからも外す。
+    public func deleteApp(appId: String) async throws {
+        _ = try await request("DELETE", "v1/apps/\(appId)")
+        AppListCache.shared.store(AppListCache.shared.load().filter { $0.id != appId })
+    }
+
     // MARK: - DSL
 
     public func fetchDocument(appId: String) async throws -> AppDocument {

@@ -13,7 +13,7 @@
 // When the resolved token is rejected by appconfig (401) the run falls back to
 // health + "ai rejects unauthenticated generate" checks only.
 //
-// -cleanup archives every app the run created (DELETE /v1/apps/{id}, status=archived)
+// -cleanup deletes every app the run created (DELETE /v1/apps/{id}, physical delete)
 // so production Firestore does not accumulate smoke-* apps. Needs -appconfig.
 package main
 
@@ -60,7 +60,7 @@ type runner struct {
 	tokenKind     string // flag|firebase|dev
 	http          *http.Client
 	store         *appconfigclient.HTTP // nil when -appconfig is empty
-	created       []string              // appIds this run created (archived by -cleanup)
+	created       []string              // appIds this run created (deleted by -cleanup)
 	steps         []step
 }
 
@@ -73,7 +73,7 @@ func main() {
 		only    = flag.String("only", "", "run one scenario: kakeibo|training|walk")
 		appID   = flag.String("app", "", "appId prefix (default smoke-<unix>)")
 		timeout = flag.Duration("timeout", 90*time.Second, "per-request timeout")
-		cleanup = flag.Bool("cleanup", false, "archive the apps this run created (DELETE /v1/apps/{id}) at the end")
+		cleanup = flag.Bool("cleanup", false, "delete the apps this run created (DELETE /v1/apps/{id}) at the end")
 	)
 	flag.Parse()
 	if *appID == "" {
@@ -300,7 +300,7 @@ func (r *runner) track(appID string) {
 	r.created = append(r.created, appID)
 }
 
-// cleanup archives every tracked app via DELETE /v1/apps/{id} (204). 404 = already
+// cleanup deletes every tracked app via DELETE /v1/apps/{id} (204, physical since #180). 404 = already
 // gone (WARN); anything else is a FAIL so leaked smoke-* apps show up in the table.
 func (r *runner) cleanup(ctx context.Context) {
 	if r.appconfig == "" {
@@ -314,7 +314,7 @@ func (r *runner) cleanup(ctx context.Context) {
 		case err != nil:
 			r.fail(name, t, err.Error())
 		case status == http.StatusNoContent:
-			r.pass(name, t, "archived")
+			r.pass(name, t, "deleted")
 		case status == http.StatusNotFound:
 			r.warn(name, t, "404 (already gone)")
 		default:

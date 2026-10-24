@@ -38,13 +38,21 @@ struct StatLeaf: View {
 
     @State private var singleLineMode = false
 
+    /// 計算式モードで icon 未指定なら出さない(#193: 「fx」チップは意味が伝わらない)
+    private var iconName: String? {
+        c.icon ?? (isValueMode ? nil : FieldIcon.stat(aggregate: c.aggregate, field: fieldDef))
+    }
+
+    @ViewBuilder
     private var iconView: some View {
-        Image(systemName: c.icon ?? (isValueMode ? "function" : FieldIcon.stat(aggregate: c.aggregate, field: fieldDef)))
-            .font(.caption.weight(.bold))
-            .foregroundStyle(RenderTheme.Colors.brandA)
-            .frame(width: 18, height: 18)
-            .background(RenderTheme.Colors.brandSoft, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .accessibilityHidden(true)
+        if let iconName {
+            Image(systemName: iconName)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(RenderTheme.Colors.brandA)
+                .frame(width: 18, height: 18)
+                .background(RenderTheme.Colors.brandSoft, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .accessibilityHidden(true)
+        }
     }
 
     private func valueStyle(_ formatted: String) -> AnyShapeStyle {
@@ -88,6 +96,7 @@ struct StatLeaf: View {
                     .lineLimit(1)
                     .minimumScaleFactor(compact ? 0.6 : 0.8)
             }
+            .frame(minHeight: 18)  // アイコン無しでも行高を保つ(regularMinHeight の前提)
             // 大きめの基準サイズから、セルの高さに収まるまで縮める(「もっと大きく」で area を広げると数字も大きくなる)
             // minimumScaleFactor は幅にしか効かないので、高さは ViewThatFits で基準 56pt から段階的に下げる
             // (#89: アイコン行を足した分、2 行セルで数値の下が切れていた)

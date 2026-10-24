@@ -10,8 +10,11 @@ struct PickerLeaf: View {
     var body: some View {
         if let form = ctx.form, let field = c.field {
             let fieldDef = form.entity.field(field)
-            let options = fieldDef?.options ?? []
             let selection = form.string(field)
+            // 選択肢から消した値を持つ既存の記録は、その値も並べて表示を保つ(#194)
+            let base = fieldDef?.options ?? []
+            let current = selection.wrappedValue
+            let options = current.isEmpty || base.contains(current) ? base : base + [current]
             let picker = Picker(c.label ?? "", selection: selection) {
                 ForEach(options, id: \.self) { Text($0).tag($0) }
             }

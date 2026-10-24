@@ -89,9 +89,20 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
       tags: [apps]
-      summary: アーカイブ (論理削除)
+      summary: アプリ削除 (物理削除・#180)
+      description: |
+        Firestore から**物理削除**する(元に戻せない)。消すのは**呼び出したユーザーが持ち主のもの**だけ:
+        - `users/{uid}/apps/{appId}` とその配下(`versions/*`・`entities/*/records/*`)
+        - 自分が発行したこのアプリのシェアリンク `shares/*`(`ownerUid == uid && appId`)
+        - 自分の「探す」掲載 `public_apps/{appId}` と配下の `installs/*`
+        - 自分の共有ミラー `apps_public/{appId}` と配下の共有レコード `entities/*/records/*`
+        Firestore は親を消してもサブコレクションが残るので、配下を辿って BulkWriter で消す。自分の木は最後に消す(途中で失敗しても再実行できる)。
+        **残すもの**: 他人が「探す」/シェアからインストール済みのコピー(別 appId・その人の木)、同じ appId に参加しているメンバー自身のコピー、
+        他人が持ち主の掲載/ミラー/シェア、`app_owners/{appId}`(作成者の記録。appId の乗っ取り防止のため残す)、リリース申請。
+        参加メンバーが消した場合は自分のコピーだけが消え、持ち主の掲載・シェア・共有レコードは残る。
+        他人のアプリは自分の木に無いので 404。消した後にもう一度呼ぶと 404。
       responses:
-        '204': { description: Archived }
+        '204': { description: Deleted }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /apps/{appId}/events:

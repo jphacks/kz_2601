@@ -45,7 +45,8 @@ public extension DSLRuntime {
     func display(_ value: JSONValue, field: Field?) -> String {
         guard let field, field.type == .ref else { return displayText(value, field: field) }
         guard let id = value.stringValue, !id.isEmpty else { return "" }
-        return refTitle(id, entity: field.refEntity) ?? FieldCoding.unavailable
+        // enum から ref に変えた後の古い記録は選択肢の名前そのものを持つので、そのまま出す(#194)
+        return refTitle(id, entity: field.refEntity) ?? (field.options?.contains(id) == true ? id : FieldCoding.unavailable)
     }
 
     /// 参照先 entity のレコード id → 見出し(titleField / 最初の string field)。

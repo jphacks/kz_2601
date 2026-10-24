@@ -27,7 +27,9 @@ final class AppRuntime: DSLRuntime {
     /// 変身一覧シート(#51: FAB 長押し / 「アプリ一覧」)。
     var showAppSwitcher = false
     /// 自分のアプリ一覧(`appsList()` が更新)。
-    private(set) var apps: [AppSummary] = []
+    var apps: [AppSummary] = []
+    /// 削除中のアプリを一覧から先に隠す(#180 楽観的 UI)。`AppRuntime+Delete.swift`
+    let appDeletion = OptimisticAppDeletion()
     private(set) var appsLoading = false
     /// 初期(音声)画面に来た経緯。挨拶文言(`Greeting`)の出し分けに使う。
     enum HomeEntry { case launch, newApp, home }
@@ -574,8 +576,8 @@ final class AppRuntime: DSLRuntime {
         return apps
     }
 
-    /// 一覧に出すアプリ(archived・未生成を除き、現在のアプリを先頭に)。
-    var visibleApps: [AppSummary] { AppSummary.visible(apps, current: document.appId) }
+    /// 一覧に出すアプリ(archived・未生成・削除中を除き、現在のアプリを先頭に)。
+    var visibleApps: [AppSummary] { AppSummary.visible(appDeletion.filter(apps), current: document.appId) }
 
     /// 別のアプリに切り替える: 今の画面をサムネに撮り → `DeviceAppID` を差し替え → `GET /dsl` → `apply()`(変身アニメ)。
     /// 記録(records)は `apply()` で破棄され、画面が要求する entity を `load(entities:)` の既存経路で読み直す。
@@ -680,6 +682,19 @@ final class AppRuntime: DSLRuntime {
         }
     }
 
+    /// type=ref の options(初期の選択肢・#194)を、参照先 entity がサーバーでも空の時に端末ごと一度だけレコードにする。
+    private func seedRefOptions(_ entity: String, appId: String) async {
+        guard let tf = dsl.entity(entity)?.displayTitleField else { return }
+        let names = dsl.entities.flatMap(\.fields).filter { $0.type == .ref && $0.refEntity == entity }.flatMap { $0.options ?? [] }
+        let key = "refSeed.\(appId).\(entity)"
+        guard !names.isEmpty, !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        var seen = Set<String>()
+        for name in names where seen.insert(name).inserted {
+            records[entity] = await recordSync.save(appId: appId, entity: entity, recordId: nil, data: [tf: .string(name)])
+        }
+    }
+
     /// ローカル先出し → サーバー全件で置換 → UI 更新。サーバーに届かなければローカル表示のまま(通信断は toast しない)。
     func refresh(_ entity: String) async {
         let appId = document.appId
@@ -697,6 +712,7 @@ final class AppRuntime: DSLRuntime {
             guard document.appId == appId else { return }
             records[entity] = fresh
             failed.remove(entity)
+            if fresh.isEmpty { await seedRefOptions(entity, appId: appId) }
             print("[Metamon] records loaded: entity=\(entity) count=\(fresh.count)")
             WidgetSnapshotWriter.write(dsl: dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         } catch {
