@@ -70,6 +70,13 @@ final class AppThumbnailStore {
         revision += 1
     }
 
+    /// アカウント削除用(#119)
+    func removeAll() {
+        memory = [:]
+        try? FileManager.default.removeItem(at: directory)
+        revision += 1
+    }
+
     private func url(_ appId: String) -> URL {
         let safe = appId.map { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" ? $0 : "_" }
         return directory.appendingPathComponent("\(String(safe)).jpg")

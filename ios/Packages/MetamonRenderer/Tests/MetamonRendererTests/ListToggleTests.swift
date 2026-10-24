@@ -97,6 +97,12 @@ final class ListToggleTests: XCTestCase {
         XCTAssertEqual(ListToggle.stored(true, daily: true, today: day("2026-10-25")), "2026-10-25")
         XCTAssertEqual(ListToggle.stored(false, daily: true, today: day("2026-10-25")), .null)
         XCTAssertEqual(ListToggle.stored(true, daily: false, today: day("2026-10-25")), .bool(true))
+        // #172: 保存する差分は最後にやった日 + 押した日の履歴(旧レコードは taken_on を履歴の 1 件として引き継ぐ)
+        XCTAssertEqual(ListToggle.patch(took, field: f.id, on: true, daily: true, today: day("2026-10-25")),
+                       [f.id: "2026-10-25", "\(f.id)__dates": .array(["2026-10-24", "2026-10-25"])])
+        XCTAssertEqual(ListToggle.patch(took, field: f.id, on: false, daily: true, today: day("2026-10-24")),
+                       [f.id: .null, "\(f.id)__dates": .null], "今日を外すと今日だけ消える")
+        XCTAssertEqual(ListToggle.patch(took, field: "done", on: true, daily: false, today: day("2026-10-25")), ["done": .bool(true)])
     }
 
     func testDailyToggleNeedsDateField() throws {

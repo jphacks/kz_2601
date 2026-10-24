@@ -225,4 +225,68 @@ final class MetamonUITests: XCTestCase {
         XCTAssertTrue(row.label.contains("1,234"), "一覧の金額が入力と違う: \(row.label)")
         attachScreenshot("form-saved-list")
     }
+
+    // MARK: - 生成中の表示(#182)
+
+    /// 全画面の「変身中」(GeneratingView)
+    private var generating: XCUIElement { app.descendants(matching: .any)["generating.create"] }
+    /// モック ai に待ちを入れる(生成中の表示を確実に捉えるため)
+    private let slowAI = ["METAMON_MOCK_AI_DELAY": "3"]
+
+    private func textField(placeholder: String) -> XCUIElement {
+        app.textFields.matching(NSPredicate(format: "placeholderValue == %@", placeholder)).firstMatch
+    }
+
+    /// 生成中の表示が `appearWithin` 秒以内に出て、完成で消え、生成したアプリ(マイク FAB)に切り替わる。
+    private func assertGeneratingThenDone(_ name: String, appearWithin: TimeInterval = 2, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(generating.waitForExistence(timeout: appearWithin), "生成中の表示が出ない(\(name))", file: file, line: line)
+        attachScreenshot("generating-\(name)")
+        // モックの待ち 3 秒の途中でも出続けている(途中で初期画面に戻らない)
+        Thread.sleep(forTimeInterval: 1.0)
+        XCTAssertTrue(generating.exists, "生成中の表示が完成前に消えた(\(name))", file: file, line: line)
+        XCTAssertTrue(waitFor(generating, "exists == false", timeout: 10), "完成しても生成中の表示が消えない(\(name))", file: file, line: line)
+        XCTAssertTrue(fab.waitForExistence(timeout: 5), "完成後に生成したアプリに切り替わらない(\(name))", file: file, line: line)
+    }
+
+    /// 対話なし(設定 OFF): 初期画面で文字入力して送ると、すぐ生成中になり完成で消える
+    func testGeneratingShownWithoutChat() {
+        launch(example: nil, slowAI.merging(["METAMON_CLARIFY": "0"]) { $1 })
+        let field = textField(placeholder: "または文字で入力")
+        XCTAssertTrue(field.waitForExistence(timeout: 10), "初期画面の文字入力が無い")
+        field.tap()
+        field.typeText("家計簿アプリを作って")
+        app.buttons["送信"].firstMatch.tap()
+        assertGeneratingThenDone("no-chat")
+    }
+
+    /// 対話あり:「この内容で作る」を押した瞬間から生成中(初期画面に戻らない)
+    func testGeneratingShownAfterChatBuild() {
+        launch(example: nil, slowAI.merging(["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "毎日の支出を記録する家計簿アプリを作って",
+                                             "METAMON_AUTO_PAUSE": "600"]) { $1 })
+        let build = app.buttons["chat.build"]
+        XCTAssertTrue(build.waitForExistence(timeout: 15), "「この内容で作る」が出ない")
+        build.tap()
+        assertGeneratingThenDone("chat-build", appearWithin: 1)
+    }
+
+    /// 声で答えて ready → 自動で作る(#163)も同じ表示
+    func testGeneratingShownForVoiceAutoBuild() {
+        launch(example: nil, slowAI.merging(["METAMON_CLARIFY": "1", "METAMON_CLARIFY_AUTOBUILD": "1", "METAMON_AUTO_SOURCE": "voice",
+                                             "METAMON_AUTO_TRANSCRIPT": "毎日の支出を記録する家計簿アプリを作って"]) { $1 })
+        assertGeneratingThenDone("voice-auto-build", appearWithin: 15)
+    }
+
+    /// 生成後のアプリから音声シートで「〇〇アプリを作って」(作り直し)も全画面の生成中にする
+    func testGeneratingShownForWholeAppRequestFromGeneratedApp() {
+        launch(example: "kakeibo", slowAI)
+        waitForFab()
+        fab.tap()
+        XCTAssertTrue(voiceSheet.waitForExistence(timeout: 5), "音声シートが開かない")
+        let field = textField(placeholder: "または文字で入力")
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "シートの文字入力が無い")
+        field.tap()
+        field.typeText("筋トレの記録アプリを作って")
+        app.buttons["送信"].firstMatch.tap()
+        assertGeneratingThenDone("from-app", appearWithin: 3)
+    }
 }

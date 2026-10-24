@@ -34,7 +34,11 @@ func main() {
 	st, closeStore := newStore(ctx, project, logger)
 	defer closeStore()
 
-	handler := newHandler(auth.Middleware(verifier, mode), logger, appconfig.New(st), appconfig.SharePage(st))
+	// deleted accounts (DELETE /v1/me) get 410 on everything else: appconfig.RejectDeleted
+	authed := func(h http.Handler) http.Handler {
+		return auth.Middleware(verifier, mode)(appconfig.RejectDeleted(st, h))
+	}
+	handler := newHandler(authed, logger, appconfig.New(st), appconfig.SharePage(st))
 	server := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,

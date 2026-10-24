@@ -65,6 +65,14 @@ enum BuildConfig {
         return MockSeed.demoRecords()
     }
 
+    /// モック ai の応答待ち。DEBUG では `METAMON_MOCK_AI_DELAY=<秒>` で延ばせる(生成中の表示の UI テスト・#182)。
+    private static var mockAIDelay: Duration {
+        #if DEBUG
+        if let s = ProcessInfo.processInfo.environment["METAMON_MOCK_AI_DELAY"].flatMap(Double.init), s >= 0 { return .milliseconds(Int(s * 1000)) }
+        #endif
+        return .seconds(1.2)
+    }
+
     @MainActor
     static func make(environment: AppEnvironment = .current) -> Services {
         switch environment {
@@ -73,7 +81,7 @@ enum BuildConfig {
             var services = Services(
                 auth: MockAuthService(signedIn: true),
                 appConfig: appConfig,
-                ai: MockAIClient(),
+                ai: MockAIClient(delay: mockAIDelay),
                 sync: NoopDocumentSync(),
                 token: NoAuthTokenProvider(),
                 transcriber: makeTranscriber(),
@@ -104,6 +112,7 @@ enum BuildConfig {
                 isLive: appConfigURL != nil
             )
             services.sharing = appConfigURL.map { HTTPSharingClient(baseURL: $0, token: token) }
+            if let appConfigURL { services.account = HTTPAccountClient(baseURL: appConfigURL, token: token) } // #119
             services.releaseRequests = appConfigURL.map { HTTPReleaseRequestClient(baseURL: $0, token: token) }
             return services
         }

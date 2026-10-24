@@ -254,7 +254,7 @@ func (a *App) Validate() error {
 			add("entity %q titleField %q does not exist", e.ID, e.TitleField)
 		}
 	}
-	checkComputedFields(a.Entities, entities, add)
+	checkComputedFields(a.Entities, entities, DailyToggleFields(a), add)
 
 	notifIDs := map[string]bool{}
 	for i := range a.App.Notifications {

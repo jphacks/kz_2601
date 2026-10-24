@@ -71,6 +71,12 @@ final class AppRuntime: DSLRuntime {
         var kind: Kind
         var transcript: String
         var startedAt: Date
+
+        /// 生成中の見せ方。初期画面からの作成に加え、生成後の画面からの「〇〇アプリを作って」も作り直し(mode=full)になるので
+        /// 全画面の「変身中」にする。それ以外の改変は今の画面を薄くして上に小さなインジケータ(#182)。
+        static func kind(isVoiceOnly: Bool, transcript: String) -> Kind {
+            isVoiceOnly || VoiceIntent.isWholeAppRequest(transcript) ? .create : .edit
+        }
     }
     private(set) var morphJob: MorphJob?
     var isMorphing: Bool { morphJob != nil }
@@ -404,7 +410,7 @@ final class AppRuntime: DSLRuntime {
         guard morphJob == nil else { return }
         withAnimation(.easeInOut(duration: 0.35)) {
             errorCard = nil
-            morphJob = MorphJob(kind: dsl.isVoiceOnly ? .create : .edit, transcript: text, startedAt: .now)
+            morphJob = MorphJob(kind: MorphJob.kind(isVoiceOnly: dsl.isVoiceOnly, transcript: text), transcript: text, startedAt: .now)
         }
         interruptedByOffline = false
         let previous = document

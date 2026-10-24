@@ -66,6 +66,8 @@ struct GeneratingView: View {
             .padding(.vertical, Theme.Spacing.xl)
             .padding(.horizontal, Theme.Spacing.lg)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("generating.create") // UI テスト(#182)
         .task(id: job.startedAt) {
             // 0.25s 刻みで経過秒を更新(文言切替と段階判定用。グリッドの描画は TimelineView が担う)
             while !Task.isCancelled {
@@ -218,6 +220,8 @@ struct EditingIndicator: View {
             .background(.regularMaterial, in: Capsule())
             .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
             .shadow(color: Theme.Shadow.softColor, radius: 12, y: 6)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("generating.edit") // UI テスト(#182)
         }
         .animation(.easeInOut(duration: 0.3), value: stage)
         .task(id: job.startedAt) {
