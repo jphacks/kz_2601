@@ -26,10 +26,32 @@ public struct HTTPAppConfigClient: AppConfigClient {
         var nextPageToken: String?
     }
     private struct VersionsResponse: Decodable { var items: [VersionSummary] }
+    private struct AppsResponse: Decodable {
+        var items: [AppSummary]
+        var nextPageToken: String?
+    }
     private struct RecordBody: Encodable { var data: [String: JSONValue] }
     private struct CreateBody: Encodable {
         var data: [String: JSONValue]
         var clientId: String
+    }
+
+    // MARK: - Apps
+
+    /// `GET /v1/apps`(最大 5 ページ)。成功したら `AppListCache` に保存し、オフライン時の変身一覧に使う。
+    public func listApps() async throws -> [AppSummary] {
+        var items: [AppSummary] = []
+        var token: String?
+        for _ in 0..<Self.maxPages {
+            var path = "v1/apps?pageSize=\(Self.pageSize)"
+            if let token { path += "&pageToken=\(token)" }
+            let page = try JSONDecoder().decode(AppsResponse.self, from: try await request("GET", path))
+            items += page.items
+            guard let next = page.nextPageToken, !next.isEmpty else { break }
+            token = next
+        }
+        AppListCache.shared.store(items)
+        return items
     }
 
     // MARK: - DSL

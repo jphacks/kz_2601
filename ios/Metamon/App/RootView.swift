@@ -16,8 +16,9 @@ struct RootView: View {
         ZStack {
             Group {
                 if rt.dsl.isVoiceOnly {
-                    // 初期状態(voiceEntry = fullscreen)はグリッドのセル内ではなく全面に描く(背景を画面いっぱいに敷くため)
-                    VoiceInputView(prompt: initialPrompt)
+                    // 初期状態(voiceEntry = fullscreen)はグリッドのセル内ではなく全面に描く(背景を画面いっぱいに敷くため)。
+                    // 見出しは DSL の prompt ではなく Greeting(#42: 初回/再訪/時間帯で出し分け)
+                    VoiceInputView()
                 } else {
                     DSLNavigationRoot()
                 }
@@ -65,10 +66,30 @@ struct RootView: View {
             ScreenStack(root: route)
         }
         .sheet(isPresented: $rt.showVoiceSheet) {
-            VoiceInputView(prompt: "どう変えたい？")
+            VoiceInputView()
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $rt.showAppSwitcher) {
+            AppSwitcherSheet()
+        }
+        .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
+        .onChange(of: rt.document.version) {
+            // 変身(apply)が落ち着いてから今の画面をサムネに撮る(変身一覧カード用)
+            Task {
+                try? await Task.sleep(for: .milliseconds(1200))
+                guard rt.morphJob == nil, !rt.showAppSwitcher else { return }
+                AppThumbnailStore.shared.capture(appId: rt.document.appId, isVoiceOnly: rt.dsl.isVoiceOnly)
+            }
+        }
+        #if DEBUG
+        .task {
+            // ヘッドレス E2E 用: `METAMON_AUTO_SWITCHER=1` で起動 2.5 秒後に変身一覧を開く
+            guard ProcessInfo.processInfo.environment["METAMON_AUTO_SWITCHER"] == "1" else { return }
+            try? await Task.sleep(for: .seconds(2.5))
+            rt.openSwitcher()
+        }
+        #endif
         .alert(item: $rt.confirm) { confirm in
             Alert(title: Text(confirm.message),
                   primaryButton: .destructive(Text("実行")) { Task { await confirm.perform() } },
@@ -81,16 +102,12 @@ struct RootView: View {
         }
     }
 
-    /// 初期 DSL の `voiceInput.prompt`(無ければ VoiceInputView の既定文言)。
-    private var initialPrompt: String? {
-        rt.dsl.screens.lazy.flatMap(\.components).first { $0.type == .voiceInput }?.prompt
-    }
-
     private var colorScheme: ColorScheme? {
         switch rt.dsl.app.theme?.mode { case "light": .light; case "dark": .dark; default: nil }
     }
 
-    /// マイク FAB。位置は `Theme.Layout.fabAlignment`(左下。DSL の「追加」ボタンが右下に来るため)。
+    /// マイク FAB(= メタモン本体)。位置は `Theme.Layout.fabAlignment`(左下。DSL の「追加」ボタンが右下に来るため)。
+    /// タップ = 「このアプリを変える」発話シート、長押し = メタ操作(変身一覧)。
     private var voiceFab: some View {
         Button { rt.showVoiceSheet = true } label: {
             Image(systemName: "mic.fill")
@@ -101,7 +118,13 @@ struct RootView: View {
                 .overlay(Circle().strokeBorder(.white.opacity(0.25)))
                 .shadow(color: Theme.Colors.brandA.opacity(0.45), radius: 14, y: 6)
         }
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
+                .onEnded { _ in rt.openSwitcher() }
+        )
         .accessibilityLabel("話しかけて変える")
+        .accessibilityHint("長押しで変身一覧")
+        .accessibilityAction(named: "変身一覧") { rt.openSwitcher() }
         .padding(.horizontal, Theme.Layout.fabHorizontalInset)
         .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: rt.dsl.app.hasTabs))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: Theme.Layout.fabAlignment)
