@@ -39,11 +39,18 @@ public protocol AppConfigClient: Sendable {
 
     func list(appId: String, entity: String) async throws -> [Record]
     func create(appId: String, entity: String, data: [String: JSONValue]) async throws -> Record
+    /// 冪等キー付き作成。`SyncQueue` が再送のたびに同じ `clientId` を渡す(サーバーは同一レコードを返す)。
+    func create(appId: String, entity: String, data: [String: JSONValue], clientId: String) async throws -> Record
     func update(appId: String, entity: String, id: String, data: [String: JSONValue]) async throws -> Record
     func delete(appId: String, entity: String, id: String) async throws
 }
 
 public extension AppConfigClient {
+    /// 冪等キーを使わない実装(インメモリ等)向けの既定。
+    func create(appId: String, entity: String, data: [String: JSONValue], clientId: String) async throws -> Record {
+        try await create(appId: appId, entity: entity, data: data)
+    }
+
     func fetchDocumentIfChanged(appId: String, currentVersion: Int) async throws -> AppDocument? {
         let doc = try await fetchDocument(appId: appId)
         return doc.version != currentVersion ? doc : nil
