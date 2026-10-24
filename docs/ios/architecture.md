@@ -153,9 +153,10 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 ```
 [録音] WhisperKit.AudioProcessor.startRecordingLive  (AVAudioEngine → 16kHz mono Float32 をメモリに蓄積)
   → [文字起こし] WhisperKit.transcribe(audioArray:, DecodingOptions(language: "ja", chunkingStrategy: .vad))  ※オンデバイス・停止後に一括
-  → [送信] POST ai /v1/morph { appId, currentVersion, transcript }
-       (ai: Claude が JSON Patch 生成 → スキーマ検証 → appconfig に適用 → 最新 DSL を返す)
-  → [適用] AppRuntime.apply(doc)  withAnimation(.spring) + RootView.id(version) + transition
+  → [意図判定] VoiceIntent.detect: 「元に戻して」→ appconfig restore(ai を呼ばない)/「別のアプリ」→ appId 採番し直し → ai
+  → [送信] POST ai /v1/generate { appId, baseVersion, transcript, mode:"auto" }
+       (ai: Claude が DSL / JSON Patch 生成 → スキーマ検証 → appconfig に PUT/PATCH(If-Match)→ 最新 DSL を返す)
+  → [適用] AppRuntime.apply(doc)  withAnimation(.spring) + RootView.id(version) + transition。DocumentCache にも保存
 ```
 
 ### WhisperKit 実装要点(`Services/Live/WhisperKitRecognizer.swift`)
@@ -212,16 +213,45 @@ VoiceInputView.phase                         AppRuntime.morphJob               R
 
 DEBUG フック: `METAMON_AUTO_ANON=1`(起動時に匿名サインイン)、`METAMON_AUTO_TRANSCRIPT="…"`(起動直後に 1 回生成)。シミュレータでもマイクは表示され、`MockTranscriber` が定型文を返す。
 
-生成後も右下の **マイク FAB**(ランタイム側、DSL 外)から同じシートを開いて再改変できる。初期 DSL は `voiceInput` 1画面のみ。
+生成後も **マイク FAB**(ランタイム側、DSL 外)から同じシートを開いて再改変できる。初期 DSL は `voiceInput` 1画面のみ。
+FAB の位置は `Theme.Layout.fabAlignment`(**左下**)の 1 箇所で決める。DSL の「追加」ボタンは右下 `D11:F12` に置かれるのが定番で、右下 FAB だと被るため左下に移した(タブバーがある時は `fabBottomInset(hasTabs:)` でその上に逃がす)。
 
-**ホットリロード方式(提案)**
+### 復元・元に戻す・新規作成 の状態遷移(appconfig 接続・2026-10-24 夕)
+
+```
+起動 ── DocumentCache に最後の DSL があれば即描画(animated: false)
+  └─ bootstrap(live) ── GET /dsl ──┬─ 200: server.version > 表示中 → apply(remote)      … 別端末/ai 直叩きの変更も取り込む
+                                   │        server.version < 表示中 → 表示を保つ(server が巻き戻った時の保険)
+                                   └─ 失敗: cache があれば表示 + toast「オフライン: 最後に取得したアプリ(vN)」/ 無ければ toast「サーバーに接続できません」
+  └─ startSync(): 前面時のみ 5 秒ポーリング(If-None-Match → 304 は無視)。version が進んだら apply(アニメ) + バナー「アプリが更新されました(version N)」
+
+発話 ── VoiceIntent.detect(text)
+  ├─ .undo   (「元に戻して」「戻して」「取り消して」「アンドゥ」「ひとつ前」…)
+  │      → GET /versions(新しい順)→ current の直下の version を target
+  │      → POST /versions/{target}/restore(新 version N+1 として積む)→ GET /dsl → apply(アニメ)
+  │      → バナー「ひとつ前の状態(version target)に戻しました」。target が無ければ toast「これ以上前の状態はありません」
+  │      → サーバーが履歴を返せない時(mock / 障害)はローカル履歴(直近 10 件)にフォールバック
+  ├─ .newApp (発話頭が「別のアプリ」「新しいアプリ」…)
+  │      → DeviceAppID.rotate() で appId を採番し直し初期状態(v0)に戻してから ai へ(= create 扱い・全画面「変身中」)。前のアプリはサーバーに残る
+  └─ .morph  → 従来どおり POST ai /v1/generate {appId, baseVersion, transcript}
+```
+
+| 状態 | 保持場所 | 備考 |
+|---|---|---|
+| DSL(正典) | appconfig(Firestore)。`GET /dsl` の `ETag: "<version>"` | iOS からの `PUT/PATCH /dsl` は使わない(書き込みは ai 経由。If-Match 競合は ai 側で解決) |
+| DSL キャッシュ | `DocumentCache`(Application Support/metamon-dsl/<appId>.json・封筒の生 JSON) | `HTTPAppConfigClient` と `HTTPAIClient` が成功時に書く。オフライン起動と即描画のみに使う |
+| レコード | appconfig `records`(G4)。iOS は `AppRuntime.records` にキャッシュ | `apply()` で破棄し画面が要求する entity を `load(entities:)` で遅延取得。`POST` は `clientId`(UUID)で冪等(通信断の再送で二重登録しない)。422 `invalid_record` は `details.field` を DSL の Field 名に引き直して toast |
+| version 履歴 | appconfig `versions`(restore は `source.kind = restore`) | `undo()` は常に「サーバーの current の直下」へ戻す(ローカルの version とズレていてもサーバー基準) |
+| appId | `DeviceAppID`(UserDefaults) | 「アプリをリセット」と「別のアプリ」で rotate。旧 appId のデータは削除しない |
+
+**ホットリロード方式**
 | 案 | 仕組み | 評価 |
 |---|---|---|
-| A. ポーリング(v0・実装済み) | 2秒毎 `GET /v1/apps/{id}`、`version` が進んだら apply。`If-None-Match`/`ETag` 対応は backend 次第 | 実装5分・確実。Cloud Run の無料枠でも問題ない量 |
+| A. ポーリング(**Day1・実装済み**) | 前面時のみ 5 秒毎 `GET /v1/apps/{id}/dsl` + `If-None-Match: "<version>"`。304 なら何もせず、200 で version が進んだら apply | 実装が軽く確実。304 は本文無しなので Cloud Run の無料枠でも問題ない量 |
 | B. SSE | `GET /v1/apps/{id}/events` を `URLSession.bytes(for:)` で読む | Go 側は `http.Flusher` で簡単。Cloud Run はタイムアウト(既定5分)で切れるので再接続必須 |
 | C. Firestore onSnapshot | iOS に FirebaseFirestore SDK を追加し `apps/{id}` を listen | **最も「生きてる」感が出る**。backend 不要。SDK が重い(+10MB) |
 
-推奨: **Day1 は A**、Day2 に余裕があれば **C**(Firestore が正典なので一番筋が良い)。B は中間なので採らない。
+Day2 に余裕があれば **C**(Firestore が正典なので一番筋が良い)。B は中間なので採らない。
 
 ## 7. 認証(実装済み)
 
@@ -255,14 +285,18 @@ SignInView ──Sign in with Apple──▶ ASAuthorizationAppleIDCredential(id
 | Go 側 | `firebase.google.com/go/v4/auth` の `VerifyIDToken`。`uid` を entity レコードの owner に使う(ai は受け取った Bearer を appconfig へ転送するだけ) |
 
 ### 環境変数(ai と appconfig は別々に live にできる)
-| 用途 | 実行時 env | Info.plist キー(build setting から展開) | 未設定時 |
-|---|---|---|---|
-| ai | `METAMON_AI_BASE_URL` | `MetamonAIBaseURL` = `$(METAMON_AI_BASE_URL)` | `MockAIClient` |
-| appconfig | `METAMON_APPCONFIG_BASE_URL`(旧 `METAMON_API_BASE_URL` も可) | `MetamonAppConfigBaseURL` = `$(METAMON_APPCONFIG_BASE_URL)` | `InMemoryAppConfigClient` + `NoopDocumentSync`(`isLive=false`) |
+| 用途 | 実行時 env | Info.plist キー(build setting から展開) | 既定(project.yml) | 未設定時 |
+|---|---|---|---|---|
+| ai | `METAMON_AI_BASE_URL` | `MetamonAIBaseURL` = `$(METAMON_AI_BASE_URL)` | `https://ai-stg-378953239426.asia-northeast1.run.app` | `MockAIClient` |
+| appconfig | `METAMON_APPCONFIG_BASE_URL`(旧 `METAMON_API_BASE_URL` も可) | `MetamonAppConfigBaseURL` = `$(METAMON_APPCONFIG_BASE_URL)` | `https://appconfig-stg-378953239426.asia-northeast1.run.app` | `InMemoryAppConfigClient` + `NoopDocumentSync`(`isLive=false`) |
+| 全モック | `METAMON_MOCK=1` | — | — | URL 設定を無視して `AppEnvironment.mock` |
+| 開発用 uid | `METAMON_DEV_UID=<uid>`(DEBUG のみ) | — | — | `AUTH_MODE=dev` のローカル backend 向けに Bearer へ固定 uid を送る(`StaticTokenProvider`)。staging/本番(Firebase 検証)には通らない |
 
 - 両方未設定 = `AppEnvironment.mock`(認証もモック)。どちらか設定 = `.live(appConfigURL:aiURL:)`(認証は Firebase、plist 無しなら Mock に警告付きで降格)。
-- appId は `DeviceAppID.current`(UserDefaults の UUID・端末固定)。ai のインメモリ store は未知の appId を初期状態(version 1)として扱うので、ai 再起動後も次の発話で作り直せる。version ズレ(409 `version_conflict`)は `HTTPAIClient` が `baseVersion` 無しで 1 回だけ再試行。
+- appId は `DeviceAppID.current`(UserDefaults の UUID・端末固定)。appconfig は未知の appId を `GET /dsl` 時に version 1(初期状態)で自動作成するので iOS は `POST /apps` を呼ばない。version ズレ(409 `version_conflict`)は `HTTPAIClient` が `baseVersion` 無しで 1 回だけ再試行。
 - ai 契約: 成功 `{appId, version, previousVersion, mode(full|patch), dsl, patch?, summary, transcript, source, latencyMs, meta}`、失敗 `{error:{code,message,details?}}`(`APIError.server` → toast に message)。タイムアウト 45s(`HTTP.defaultTimeout`)。
+- appconfig 契約(PR #32・`HTTPAppConfigClient`): `GET /v1/apps/{appId}/dsl`(`ETag: "<version>"`・`If-None-Match` で 304)/ `GET /versions`(新しい順・`VersionSummary`)/ `POST /versions/{n}/restore`(201 `VersionSummary` → 続けて `GET /dsl`)/ records `GET`(`pageSize=200`・`nextPageToken` を最大 5 ページ追う)・`POST`(`{data, clientId}`・通信断時は同じ clientId で 1 回再送)・`PATCH`(`{data}`・null で項目削除)・`DELETE`(204)。エラー封筒 `{error:{code,message,details?,requestId?}}` は `APIError.server(status:code:message:details:)`。`details.field` は `APIError.field`。
+- HTTP キャッシュは使わない(`HTTP.session` = ephemeral・`urlCache = nil`・`reloadIgnoringLocalAndRemoteCacheData`)。`GET /dsl` は `Cache-Control: no-cache` + ETag だが `URLSession.shared` が再検証せず古い 200 を返し、起動時復元が 1 つ前の version になる事象が staging E2E で出た。鮮度は自前の `If-None-Match` と `DocumentCache` で管理する。
 - ATS: `NSAllowsLocalNetworking` のみ(LAN の `http://<IP>:8081` 用)。`NSAllowsArbitraryLoads` は入れない。
 
 ## 8. DSL スキーマ

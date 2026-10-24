@@ -166,4 +166,74 @@ final class MockServicesTests: XCTestCase {
         XCTAssertEqual(env.error.code, "generation_failed")
         XCTAssertEqual(APIError.server(status: 422, code: env.error.code, message: env.error.message).errorDescription, "could not produce")
     }
+
+    // MARK: - appconfig 契約(PR #32)
+
+    func testInvalidRecordDetailsExposeField() throws {
+        let data = Data(#"{"error":{"code":"invalid_record","message":"field \"amount\" must be an integer","details":{"field":"amount"},"requestId":"r1"}}"#.utf8)
+        let err = HTTP.error(from: HTTP.Response(status: 422, data: data, headers: [:]))
+        XCTAssertEqual(err.status, 422)
+        XCTAssertEqual(err.code, "invalid_record")
+        XCTAssertEqual(err.field, "amount")
+        XCTAssertEqual(err.errorDescription, "field \"amount\" must be an integer")
+    }
+
+    func testETagFormatMatchesBackend() {
+        XCTAssertEqual(HTTPAppConfigClient.etag(7), "\"7\"")
+    }
+
+    func testVersionSummaryDecodes() throws {
+        let json = """
+        {"items":[{"appId":"a","version":3,"parentVersion":2,"source":{"kind":"restore","mode":"full","restoredFrom":1},"createdAt":"2026-10-24T10:00:00Z"},
+                  {"appId":"a","version":2,"parentVersion":1,"source":{"kind":"ai","mode":"full","summary":"家計簿"},"createdAt":"2026-10-24T09:00:00Z"}]}
+        """
+        struct R: Decodable { var items: [VersionSummary] }
+        let r = try JSONDecoder().decode(R.self, from: Data(json.utf8))
+        XCTAssertEqual(r.items.map(\.version), [3, 2])
+        XCTAssertEqual(r.items[0].source?.restoredFrom, 1)
+        XCTAssertEqual(r.items[1].source?.summary, "家計簿")
+    }
+
+    func testAIEnvelopeForCache() throws {
+        let data = Data(#"{"appId":"dev-1","version":2,"dsl":{"schemaVersion":1,"app":{"name":"x"},"initialScreen":"home","entities":[],"screens":[]},"summary":"s"}"#.utf8)
+        let env = try XCTUnwrap(HTTPAIClient.envelope(from: data, appId: "dev-1", version: 2))
+        let doc = try AppDocument.decode(env)
+        XCTAssertEqual(doc.appId, "dev-1")
+        XCTAssertEqual(doc.version, 2)
+        XCTAssertEqual(doc.dsl.app.name, "x")
+    }
+
+    func testDocumentCacheRoundTrip() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("metamon-cache-\(UUID().uuidString)")
+        let cache = DocumentCache(directory: dir)
+        XCTAssertNil(cache.load(appId: "a"))
+        let env = Data(#"{"appId":"a","version":4,"dsl":{"schemaVersion":1,"app":{"name":"家計簿"},"initialScreen":"home","entities":[],"screens":[]}}"#.utf8)
+        cache.store(appId: "a", envelope: env)
+        XCTAssertEqual(cache.load(appId: "a")?.version, 4)
+        XCTAssertEqual(cache.load(appId: "a")?.dsl.app.name, "家計簿")
+        cache.remove(appId: "a")
+        XCTAssertNil(cache.load(appId: "a"))
+    }
+
+    // MARK: - 発話の意図(G11 / 新規)
+
+    func testVoiceIntentUndo() {
+        for t in ["元に戻して", "元に戻して。", "もとに戻して!", "取り消して", "アンドゥ", "戻して", "前に戻して", "ひとつ前の状態にして", "さっきの状態に戻して"] {
+            XCTAssertEqual(VoiceIntent.detect(t), .undo, t)
+        }
+    }
+
+    func testVoiceIntentNewApp() {
+        for t in ["別のアプリ。家計簿が欲しい", "新しいアプリを作って、散歩メモ", "別アプリで筋トレ記録"] {
+            XCTAssertEqual(VoiceIntent.detect(t), .newApp, t)
+        }
+    }
+
+    func testVoiceIntentMorphIsDefault() {
+        for t in ["家計簿が欲しい", "追加ボタンを左端まで広げて", "ボタンを右に戻して配置して", "", "   "] {
+            XCTAssertEqual(VoiceIntent.detect(t), .morph, t)
+        }
+        // 「別のアプリ」が文中にあるだけでは新規扱いにしない(発話頭だけ)
+        XCTAssertEqual(VoiceIntent.detect("家計簿に別のアプリへのリンクを足して"), .morph)
+    }
 }

@@ -36,6 +36,16 @@ enum Theme {
         static let hairline = Color.primary.opacity(0.08)
     }
 
+    /// ランタイム側オーバーレイ(DSL 外)の配置。
+    enum Layout {
+        /// マイク FAB の位置。DSL の「追加」ボタンは右下(`D11:F12` が定番)に来るので**左下**に置いて被らないようにする。
+        static let fabAlignment: Alignment = .bottomLeading
+        static let fabSize: CGFloat = 60
+        static let fabHorizontalInset: CGFloat = Spacing.lg
+        /// タブバーがある時はその上に逃がす。
+        static func fabBottomInset(hasTabs: Bool) -> CGFloat { hasTabs ? 70 : Spacing.lg }
+    }
+
     enum Shadow {
         static let softColor = Color.black.opacity(0.10)
         static let softRadius: CGFloat = 18
