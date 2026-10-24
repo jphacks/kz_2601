@@ -517,3 +517,38 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 | blue | #0054BE / 6.97 / 5.47 | #5AA0FF / 6.41 / 5.02 | #007AFF / 4.02 |
 
 既知の残課題: primary button の白文字 × AccentColor(#587AF0)は 3.85:1(本体の asset catalog 側。太字 17pt なので AA Large の 3:1 は満たす)。確認は `xcrun simctl ui <udid> content_size accessibility-large` / `appearance dark` で kakeibo・training・walk を表示して行う。
+
+## 14. Siri / ショートカット(App Intents・実装済み・Issue #80)
+作ったアプリを Siri とショートカットアプリから呼べるようにする。**DSL は変えない**(アプリを作れば `GET /v1/apps` に出て、そのまま Intent の候補になる)。
+
+| Intent | フレーズ(例) | 動き |
+|---|---|---|
+| `AddRecordIntent`「記録を追加」 | 「Tailor It で家計簿に記録」→「ランチ 800円」 | **アプリを開かずに** 1 件追加(`openAppWhenRun = false`)。数値項目が足りなければ「金額はいくつですか?」と聞き返す |
+| `OpenTailorAppIntent`「アプリを開く」(`OpenIntent`) | 「Tailor It で筋トレ記録を開く」 | そのアプリに変身した状態で起動(変身一覧と同じ `switchApp`) |
+| `TalkToTailorItIntent`「話しかける」 | 「Tailor It で話しかける」 | 音声シートを開いた状態で起動(初期画面なら音声画面そのまま) |
+
+```
+Siri / ショートカット ──(本体プロセス内で実行。拡張ターゲットは作らない)──▶ IntentHost.shared
+   MetamonApp.init で register(runtime)   … 唯一の AppRuntime / RecordSyncEngine を共有(ローカル DB を二重に開かない)
+   bootstrap 完了で markReady()           … 保留中の「開く/話しかける」を実行・フレーズ候補を更新
+記録を追加: RecordTargetEntity(アプリ × entity)→ DocumentCache の DSL → QuickRecord.build → recordSync.save(画面の保存と同じ)
+   → SyncQueue が appconfig へ送る(最大 4 秒待って「追加しました」。送れなければ「接続が戻ったら送ります」)
+```
+
+| 項目 | 内容 |
+|---|---|
+| 記録追加の方式 | **本体プロセス内の Intent + 既存のローカル DB / SyncQueue**(App Group 共有でも `openAppWhenRun` 受け渡しでもない)。App Intents は本体ターゲットに置くと本体が背面起動されて `perform` が走る。RecordStore は actor + メモリキャッシュなので、別プロセス(拡張)から同じファイルに書くとキャッシュ不整合で上書きし合う。本体内なら同じインスタンスを使えて新しい共有層が要らない |
+| 一言の解釈(`MetamonDSL/Records/QuickRecord.swift`) | 「ランチ 800円」→ タイトル系(titleField → 最初の string/text。enum ならオプション一致)と数値 1 つ(**単位一致**: 回→unit 回 / kg→unit kg / 円→currency → 最初の required 数値 → 最初の数値)。他の項目はフォームと同じ既定値(date の now・enum の先頭)。文中に enum のオプション名があればそれに合わせる(「交通費 300円」)。単体テスト `QuickRecordTests` |
+| 記録先の候補 | `RecordTargetEntity` = `<appId>/<entityId>`。フォーム画面を持つ entity を先に。entity が 1 つなら「家計簿」、複数なら「家計簿 › 支出」。DSL は `DocumentCache` 優先で、無いアプリだけ `GET /dsl`(最大 12 アプリ) |
+| 名前照合 | 「家計簿アプリ」等も音声切替と同じ `AppNameMatch`。曖昧なら候補を全部返して Siri に選ばせる |
+| フレーズの学習 | パラメータ入りフレーズは `TailorItShortcuts.updateAppShortcutParameters()` 時点の候補で学習される。`AppRuntime.apply()` 末尾(DSL 差し替えのたび・2 秒まとめ)と bootstrap 完了で呼ぶ |
+| Siri の聞き取り | `Info.plist` の `INAlternativeAppNames` に「テイラーイット」「テーラーイット」。フレーズは `CFBundleDevelopmentRegion = ja` なので日本語で直書き |
+| 背面起動の注意 | 記録追加は bootstrap 前でも動く(`recordSync.start()` を Intent 側で呼ぶ)。返した後にプロセスが止められても行とキューはファイルに残り、次回起動で送る。開く/話しかけるは bootstrap(`GET /dsl` の復元)と競合しないよう、準備前なら保留して `markReady()` で実行 |
+| E2E(DEBUG) | シミュレータはショートカットアプリのタップ自動化が無いので、`METAMON_E2E_INTENT=add:家計簿:ランチ 800円` / `open:筋トレ` / `talk` で起動直後に本物の Intent 型・Query 経由で実行する(`Features/Intents/IntentE2E.swift`) |
+| HealthKit | 未実装(後続)。App ID に HealthKit capability が要る(下記) |
+
+HealthKit を足す時の手順(Apple アカウント操作が要るので未着手):
+1. `project.yml` の Metamon entitlements に `com.apple.developer.healthkit: true`、Info.plist に `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription`。
+2. `xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で App ID に HealthKit が付く(有料 Program 必須)。付かなければ Apple Developer > Identifiers > `jp.kz2601.metamon` > Capabilities で HealthKit にチェック → プロファイル再生成。
+3. 部品は DSL に `healthField`(歩数/体重の読み取り)を足す案(schema・ai・カタログの変更が要るので別 Issue)。歩数だけなら既存の `NSMotionUsageDescription`(CoreMotion の歩数計)で capability 無しに出せる。
+
