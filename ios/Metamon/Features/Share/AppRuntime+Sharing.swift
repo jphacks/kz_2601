@@ -75,6 +75,7 @@ struct SharingHooks: ViewModifier {
             .sheet(isPresented: $ui.showDiscover) { DiscoverSheet() }
             #if DEBUG
             .task { await debugHooks() }
+            .modifier(ReleaseRequestHooks())
             #endif
     }
 
