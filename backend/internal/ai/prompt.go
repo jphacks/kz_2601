@@ -64,7 +64,7 @@ var systemPrompt = strings.TrimSpace(`
 - **計算ロジック**(2026-10-24: 割り勘で支出画面だけ作り「割る」計算が無かった): 発話に「割り勘・精算・1人あたり・残り・差・率・%・達成・BMI・あと何日・カウントダウン」のような計算が含まれるなら、UI だけで終わらせず、カタログ末尾の「計算式 Expr」とレシピで計算を必ず書く。
   - レコードごとの算出列(支払済・残高・BMI・残り日数)は Field.computed(ref で同じレコードのフィールド・"id" でレコード id)。画面に 1 つの値(1人あたり・残り予算・達成率)は stat.value(ref 不可・agg を使う)。単純な合計/件数は従来どおり stat.aggregate。
   - 他の entity のレコードを指す項目(支出の「払った人」→メンバー)は type "ref" + refEntity。フォームでは picker で選ぶ。
-  - 割り勘・立替の「誰が誰にいくら」は settlement(members の computed balance を balanceField に)。
+  - 割り勘・立替の「誰が誰にいくら」は settlement(members の computed balance を balanceField に)。精算は最大で「人数−1」行出るので area は 3 行以上(2 行だと 1 行目しか見えない)。
   - op はカタログの一覧だけ。計算が要らない発話には computed / stat.value を足さない。
   - 式を書けるのは computed・stat.value・agg の filter.value だけ。progressBar / gauge の value は数値リテラルのみ(率のバーは progressBar{entity,field,target})。
 - **中身を正しく**(2026-10-24 品質監査 #107: 死にボタンは 0 件だが、ラベルと中身が違う・黙って取りこぼす・計算をユーザーにさせる、が残った):
