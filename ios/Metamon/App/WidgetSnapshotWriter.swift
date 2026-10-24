@@ -65,7 +65,7 @@ enum WidgetSnapshotWriter {
         return Aggregator.format(
             value,
             as: c.format ?? (c.aggregate == "count" ? "plain" : nil),
-            unit: c.aggregate == "count" ? "件" : unit
+            unit: c.aggregate == "count" ? L10n.tr("件") : unit
         )
     }
 }

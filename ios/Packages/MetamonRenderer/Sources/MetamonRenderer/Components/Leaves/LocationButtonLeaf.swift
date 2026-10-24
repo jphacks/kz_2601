@@ -18,7 +18,7 @@ struct LocationButtonLeaf: View {
                 } label: {
                     HStack {
                         if busy { ProgressView().controlSize(.small) }
-                        Label(c.label ?? "現在地を記録", systemImage: "location.fill")
+                        Label(c.label ?? L("現在地を記録"), systemImage: "location.fill")
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -43,7 +43,7 @@ struct LocationButtonLeaf: View {
             form.values[field] = .string(String(format: "%.6f,%.6f", loc.coordinate.latitude, loc.coordinate.longitude))
             error = nil
         } catch {
-            self.error = "位置情報を取得できませんでした(\(error.localizedDescription))"
+            self.error = L("位置情報を取得できませんでした(\(error.localizedDescription))")
         }
     }
 }
@@ -56,7 +56,7 @@ final class OneShotLocation: NSObject, CLLocationManagerDelegate {
 
     enum LocationError: LocalizedError {
         case denied
-        var errorDescription: String? { "位置情報の利用が許可されていません" }
+        var errorDescription: String? { L("位置情報の利用が許可されていません") }
     }
 
     func request() async throws -> CLLocation {

@@ -12,7 +12,12 @@ struct CalendarLeaf: View {
     @State private var selected: Date = Calendar.current.startOfDay(for: .now)
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var cal: Calendar { Calendar.current }
+    /// 曜日記号もアプリの表示言語に合わせる(#44)
+    private var cal: Calendar {
+        var c = Calendar.current
+        c.locale = LanguagePreference.shared.locale
+        return c
+    }
     private var entityId: String { c.entity ?? "" }
     private var entity: Entity? { rt.dsl.entity(entityId) }
     private var dateField: String { c.dateField ?? "" }
@@ -46,15 +51,15 @@ struct CalendarLeaf: View {
             }
             Spacer()
             Button { shift(-1) } label: { Image(systemName: "chevron.left").font(.body.weight(.semibold)).frame(minWidth: 32, minHeight: 32) }
-                .accessibilityLabel("前の月")
-            Text(month.formatted(.dateTime.year().month(.wide)))
+                .accessibilityLabel(L("前の月"))
+            Text(month.formatted(.dateTime.year().month(.wide).locale(LanguagePreference.shared.locale)))
                 .font(.headline.monospacedDigit())
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .frame(minWidth: 110)
                 .accessibilityAddTraits(.isHeader)
             Button { shift(1) } label: { Image(systemName: "chevron.right").font(.body.weight(.semibold)).frame(minWidth: 32, minHeight: 32) }
-                .accessibilityLabel("次の月")
+                .accessibilityLabel(L("次の月"))
         }
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
@@ -110,22 +115,22 @@ struct CalendarLeaf: View {
             .background(isSelected ? AnyShapeStyle(RenderTheme.brandFill) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(date.formatted(.dateTime.month().day().weekday(.wide)) + (isToday ? "、今日" : ""))
-        .accessibilityValue(hasRecords ? "記録\(recordCount)件" : "記録なし")
+        .accessibilityLabel(date.formatted(.dateTime.month().day().weekday(.wide).locale(LanguagePreference.shared.locale)) + (isToday ? L("、今日") : ""))
+        .accessibilityValue(hasRecords ? L("記録\(recordCount)件") : L("記録なし"))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func dayList(_ rows: [Record]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(selected.formatted(.dateTime.month().day().weekday()))
+                Text(selected.formatted(.dateTime.month().day().weekday().locale(LanguagePreference.shared.locale)))
                     .font(.subheadline.weight(.semibold))
                 Spacer()
                 if c.onDateTap != nil {
                     Button {
                         addOnSelectedDay()
                     } label: {
-                        Label("追加", systemImage: "plus").font(.subheadline.weight(.semibold)).foregroundStyle(RenderTheme.Colors.brandText)
+                        Label(L("追加"), systemImage: "plus").font(.subheadline.weight(.semibold)).foregroundStyle(RenderTheme.Colors.brandText)
                     }
                 }
             }
@@ -138,7 +143,7 @@ struct CalendarLeaf: View {
                         Button(EmptyPlaceholder.retryLabel) { Task { await rt.load(entities: [entityId], force: true) } }
                             .font(.caption.weight(.semibold))
                     }
-                case .empty: Text("予定はありません").font(.caption).foregroundStyle(.secondary)
+                case .empty: Text(L("予定はありません")).font(.caption).foregroundStyle(.secondary)
                 }
             } else {
                 ForEach(rows) { row in

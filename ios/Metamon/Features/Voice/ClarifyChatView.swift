@@ -200,7 +200,7 @@ private struct BubbleRow: View {
             if bubble.role == .assistant { Spacer(minLength: 32) }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel((bubble.role == .user ? "あなた: " : "AI: ") + bubble.text)
+        .accessibilityLabel((bubble.role == .user ? L10n.tr("あなた: ") : "AI: ") + bubble.text)
     }
 
     private var background: AnyShapeStyle {
@@ -221,8 +221,8 @@ private struct ReadyCard: View {
             if !brief.purpose.isEmpty {
                 Text(brief.purpose).font(.subheadline).foregroundStyle(.secondary)
             }
-            row("記録する", brief.entities)
-            row("見られる", brief.features)
+            row(L10n.tr("記録する"), brief.entities)
+            row(L10n.tr("見られる"), brief.features)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .metamonCard()
@@ -234,7 +234,7 @@ private struct ReadyCard: View {
         if !items.isEmpty {
             HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
                 Text(label).font(.caption.weight(.semibold)).foregroundStyle(.tertiary).frame(width: 52, alignment: .leading)
-                Text(items.joined(separator: "・")).font(.subheadline)
+                Text(items.joined(separator: L10n.tr("・"))).font(.subheadline)
             }
         }
     }

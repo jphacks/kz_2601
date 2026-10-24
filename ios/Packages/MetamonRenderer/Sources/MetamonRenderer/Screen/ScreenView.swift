@@ -35,7 +35,7 @@ public struct ScreenView: View {
                     }
                     if route.stack == "sheet" || route.stack == "full", (rt.paths[route.stack] ?? []).isEmpty {
                         ToolbarItem(placement: .topBarLeading) {
-                            Button("閉じる") { rt.close(route) }
+                            Button(L("閉じる")) { rt.close(route) }
                         }
                     }
                 }
@@ -47,7 +47,7 @@ public struct ScreenView: View {
                     await rt.load(entities: rt.dsl.entitiesNeeded(by: screen), force: true)
                 }
         } else {
-            ContentUnavailableView("画面がありません: \(route.screen)", systemImage: "questionmark.square.dashed")
+            ContentUnavailableView(L("画面がありません: \(route.screen)"), systemImage: "questionmark.square.dashed")
         }
     }
 

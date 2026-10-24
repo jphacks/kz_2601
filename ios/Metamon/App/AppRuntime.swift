@@ -142,6 +142,7 @@ final class AppRuntime: DSLRuntime {
         }
         Task { await services.notifications.sync(dsl.app.notifications) }
         #if DEBUG
+        autoNavigateIfRequested() // `METAMON_AUTO_NAV`(#113)
         // ヘッドレス E2E 用: `METAMON_E2E_PRESS_PRIMARY_AFTER=<秒>` で、その時点で状態カードが出ていれば主ボタン(もう一度 等)を押す(#60)
         if let raw = ProcessInfo.processInfo.environment["METAMON_E2E_PRESS_PRIMARY_AFTER"], let seconds = Double(raw), seconds > 0 {
             Task { [weak self] in
@@ -276,7 +277,7 @@ final class AppRuntime: DSLRuntime {
         }
         print("[Metamon] hot reload: version \(document.version) → \(doc.version)")
         apply(doc)
-        summaryBanner = SummaryBanner(text: "アプリが更新されました(version \(doc.version))", highlight: nil)
+        summaryBanner = SummaryBanner(text: L10n.tr("アプリが更新されました(version \(doc.version))"), highlight: nil)
     }
 
     /// records の変化通知はまとめて 1 回だけ取り直す(連投で pull を重ねない)。未表示の entity は画面が開いた時に読むので無視。
@@ -389,8 +390,8 @@ final class AppRuntime: DSLRuntime {
         }
         interruptedByOffline = false
         let previous = document
-        let task = Task { [services, appId = document.appId, version = document.version] in
-            try await services.ai.morph(transcript: text, appId: appId, currentVersion: version)
+        let task = Task { [services, appId = document.appId, version = document.version, locale = Self.generationLocale] in
+            try await services.ai.morph(transcript: text, appId: appId, currentVersion: version, locale: locale)
         }
         morphTask = task
         defer { morphTask = nil }
@@ -401,6 +402,7 @@ final class AppRuntime: DSLRuntime {
             startSync()
             if let summary = result.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
                 summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary))
+                SpeechReader.shared.speak(summary) // #43(設定 OFF なら何もしない)
             }
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
         } catch {
@@ -466,7 +468,7 @@ final class AppRuntime: DSLRuntime {
     func undo() async {
         guard morphJob == nil else { return }
         withAnimation(.easeInOut(duration: 0.35)) {
-            morphJob = MorphJob(kind: .edit, transcript: "元に戻して", startedAt: .now)
+            morphJob = MorphJob(kind: .edit, transcript: L10n.tr("元に戻して"), startedAt: .now)
         }
         if services.isLive {
             do {
@@ -474,13 +476,13 @@ final class AppRuntime: DSLRuntime {
                 guard let current = versions.first else { throw APIError.server(status: 404, code: "not_found", message: "no versions") }
                 guard let target = versions.first(where: { $0.version < current.version }) else {
                     withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
-                    toast = "これ以上前の状態はありません"
+                    toast = L10n.tr("これ以上前の状態はありません")
                     return
                 }
                 let doc = try await services.appConfig.restore(appId: document.appId, toVersion: target.version)
                 apply(doc)
                 startSync()
-                summaryBanner = SummaryBanner(text: "ひとつ前の状態(version \(target.version))に戻しました", highlight: nil)
+                summaryBanner = SummaryBanner(text: L10n.tr("ひとつ前の状態(version \(target.version))に戻しました"), highlight: nil)
                 print("[Metamon] undo ok: restored from version \(target.version) → new version \(doc.version)")
                 return
             } catch {
@@ -489,11 +491,11 @@ final class AppRuntime: DSLRuntime {
         }
         guard let previous = localHistory.popLast() else {
             withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
-            toast = "これ以上前の状態はありません"
+            toast = L10n.tr("これ以上前の状態はありません")
             return
         }
         apply(previous)
-        summaryBanner = SummaryBanner(text: "ひとつ前の状態(version \(previous.version))に戻しました", highlight: nil)
+        summaryBanner = SummaryBanner(text: L10n.tr("ひとつ前の状態(version \(previous.version))に戻しました"), highlight: nil)
     }
 
     private func remember(_ doc: AppDocument) {
@@ -540,9 +542,9 @@ final class AppRuntime: DSLRuntime {
             let cached = AppListCache.shared.load()
             if !cached.isEmpty {
                 apps = cached
-                toast = "オフライン: 保存済みのアプリ一覧を表示しています"
+                toast = L10n.tr("オフライン: 保存済みのアプリ一覧を表示しています")
             } else if apps.isEmpty {
-                toast = "アプリ一覧を取得できませんでした: \(error.localizedDescription)"
+                toast = L10n.tr("アプリ一覧を取得できませんでした: \(error.localizedDescription)")
             }
         }
         return apps
@@ -563,7 +565,7 @@ final class AppRuntime: DSLRuntime {
         }
         let previousId = document.appId
         withAnimation(.easeInOut(duration: 0.35)) {
-            morphJob = MorphJob(kind: .edit, transcript: "アプリを切り替えています…", startedAt: .now)
+            morphJob = MorphJob(kind: .edit, transcript: L10n.tr("アプリを切り替えています…"), startedAt: .now)
         }
         syncTask?.cancel()
         var next: AppDocument?
@@ -577,7 +579,7 @@ final class AppRuntime: DSLRuntime {
         }
         guard var doc = next else {
             withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
-            toast = "アプリを読み込めませんでした。接続を確認してください"
+            toast = L10n.tr("アプリを読み込めませんでした。接続を確認してください")
             startSync()
             return
         }
@@ -588,7 +590,7 @@ final class AppRuntime: DSLRuntime {
         startSync()
         // recordSync(オフライン DB)は呼び出しごとに appId を受けるので再起動不要。旧 appId の未送信はキューが引き続き送り、
         // 新 appId のレコードは refresh() がローカル先出し → サーバー pull で読み直す(イベントは document.appId で絞られる)
-        summaryBanner = SummaryBanner(text: "「\(doc.dsl.app.name)」に変身しました" + (isOffline ? "(オフライン・キャッシュ)" : ""), highlight: nil)
+        summaryBanner = SummaryBanner(text: L10n.tr("「\(doc.dsl.app.name)」に変身しました") + (isOffline ? L10n.tr("(オフライン・キャッシュ)") : ""), highlight: nil)
         print("[Metamon] switched app: \(previousId) → \(appId) version=\(doc.version)")
     }
 
@@ -601,15 +603,15 @@ final class AppRuntime: DSLRuntime {
         case .one(let i):
             let target = candidates[i]
             if target.id == document.appId {
-                summaryBanner = SummaryBanner(text: "いま使っているのが「\(target.name)」です", highlight: nil)
+                summaryBanner = SummaryBanner(text: L10n.tr("いま使っているのが「\(target.name)」です"), highlight: nil)
                 return
             }
             await switchApp(to: target.id, afterSheetDismiss: fromVoiceSheet)
         case .ambiguous:
-            toast = "「\(name)」に近いアプリが複数あります。一覧から選んでください"
+            toast = L10n.tr("「\(name)」に近いアプリが複数あります。一覧から選んでください")
             openSwitcher(afterSheetDismiss: fromVoiceSheet)
         case .none:
-            toast = "「\(name)」というアプリは見つかりませんでした"
+            toast = L10n.tr("「\(name)」というアプリは見つかりませんでした")
             openSwitcher(afterSheetDismiss: fromVoiceSheet)
         }
     }
@@ -632,7 +634,7 @@ final class AppRuntime: DSLRuntime {
         homeEntry = .home
         apply(fresh)
         summaryBanner = nil
-        toast = "初期状態に戻しました"
+        toast = L10n.tr("初期状態に戻しました")
     }
 
     // MARK: - Records
@@ -703,15 +705,15 @@ final class AppRuntime: DSLRuntime {
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
             case .conflict(let appId, let entity, _):
                 guard appId == document.appId else { return }
-                toast = "他の端末で変更されていたため、サーバーの内容に合わせました"
+                toast = L10n.tr("他の端末で変更されていたため、サーバーの内容に合わせました")
                 await refresh(entity)
             case .rejected(let appId, let entity, let message):
                 guard appId == document.appId else { return }
-                toast = "保存できませんでした: \(message)"
+                toast = L10n.tr("保存できませんでした: \(message)")
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
             case .paused(let pending):
-                toast = "送信に失敗しました(未送信 \(pending) 件)。接続を確認してください"
+                toast = L10n.tr("送信に失敗しました(未送信 \(pending) 件)。接続を確認してください")
             case .drained:
                 break
             }
@@ -724,28 +726,28 @@ final class AppRuntime: DSLRuntime {
         Binding(get: { self.paths[stack] ?? [] }, set: { self.paths[stack] = $0 })
     }
 
+    /// 行き先は `NavigationResolver` が今いる場所で解決する(#113): 今のスタックにあれば pop・タブの根ならタブ切替・
+    /// モーダル内から下の画面へ飛ぶならモーダルを閉じる・それ以外は push。sheet / fullScreen 指定は従来どおり。
     private func navigate(to screen: String, presentation: Presentation?, recordId: String?, from route: Route) {
-        switch presentation ?? .push {
-        case .push:
-            paths[route.stack, default: []].append(Route(screen: screen, recordId: recordId, stack: route.stack))
-        case .sheet:
-            sheet = Route(screen: screen, recordId: recordId, stack: "sheet")
-        case .fullScreen:
-            fullScreen = Route(screen: screen, recordId: recordId, stack: "full")
-        }
+        setNavigation(NavigationResolver.navigate(navigationState, to: screen, presentation: presentation,
+                                                  recordId: recordId, from: route, dsl: dsl))
     }
 
     /// back: スタックに積まれていれば pop、モーダルの最下層なら dismiss。
     func close(_ route: Route) {
-        if !(paths[route.stack] ?? []).isEmpty {
-            paths[route.stack]?.removeLast()
-            return
-        }
-        switch route.stack {
-        case "sheet": sheet = nil
-        case "full": fullScreen = nil
-        default: break // main / tab の根は閉じない
-        }
+        setNavigation(NavigationResolver.close(navigationState, route))
+    }
+
+    private var navigationState: NavigationState {
+        NavigationState(paths: paths, selectedTab: selectedTab, sheet: sheet, fullScreen: fullScreen)
+    }
+
+    /// 変わったものだけ書き戻す(@Observable の無駄な再描画・NavigationStack の再設定を避ける)。
+    private func setNavigation(_ next: NavigationState) {
+        if next.sheet != sheet { sheet = next.sheet }
+        if next.fullScreen != fullScreen { fullScreen = next.fullScreen }
+        if next.selectedTab != selectedTab { selectedTab = next.selectedTab }
+        if next.paths != paths { paths = next.paths }
     }
 
     // MARK: - Actions
@@ -769,12 +771,12 @@ final class AppRuntime: DSLRuntime {
 
         case .saveRecord:
             guard let form = ctx.form, let entity = action.entity ?? ctx.form?.entity.id else {
-                toast = "保存するフォームがありません"
+                toast = L10n.tr("保存するフォームがありません")
                 return
             }
             let missing = form.missingRequired
             guard missing.isEmpty else {
-                toast = "\(missing.joined(separator: "・")) を入力してください"
+                toast = L10n.tr("\(missing.joined(separator: L10n.tr("・"))) を入力してください")
                 return
             }
             // 楽観的 UI: ローカル DB に即反映して画面を進める。appconfig への送信は recordSync のキューが行う
@@ -807,7 +809,7 @@ final class AppRuntime: DSLRuntime {
             guard let spec = action.notification else { return }
             await attempt {
                 try await services.notifications.schedule(spec)
-                toast = "通知を予約しました(\(spec.time ?? ""))"
+                toast = L10n.tr("通知を予約しました(\(spec.time ?? ""))")
             }
 
         case .cancelNotification:
@@ -815,7 +817,7 @@ final class AppRuntime: DSLRuntime {
             services.notifications.cancel(id: id)
 
         case .unknown:
-            toast = "未対応のアクション: \(action.rawType)"
+            toast = L10n.tr("未対応のアクション: \(action.rawType)")
         }
     }
 
@@ -828,7 +830,7 @@ final class AppRuntime: DSLRuntime {
         guard let api = error as? APIError else { return error.localizedDescription }
         if api.code == "invalid_record" || (api.status == 400 && api.field != nil), let fieldId = api.field {
             let name = entity.flatMap { dsl.entity($0)?.field(fieldId)?.name } ?? fieldId
-            return "「\(name)」の入力を確認してください(\(api.errorDescription ?? ""))"
+            return L10n.tr("「\(name)」の入力を確認してください(\(api.errorDescription ?? ""))")
         }
         if api.status == 401 { return ErrorCopy.sessionExpiredSignIn }
         return api.errorDescription ?? "\(api)"

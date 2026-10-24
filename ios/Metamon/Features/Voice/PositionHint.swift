@@ -15,10 +15,18 @@ enum PositionHint {
         ("中央", UnitPoint(x: 0.5, y: 0.5)),
         ("右", UnitPoint(x: 0.85, y: 0.5)),
         ("左", UnitPoint(x: 0.15, y: 0.5)),
+        // en の summary(locale=en・#45)。小文字化して照合する
+        ("bottom right", UnitPoint(x: 0.85, y: 0.85)),
+        ("bottom left", UnitPoint(x: 0.15, y: 0.85)),
+        ("top right", UnitPoint(x: 0.85, y: 0.15)),
+        ("top left", UnitPoint(x: 0.15, y: 0.15)),
+        ("at the bottom", UnitPoint(x: 0.5, y: 0.85)),
+        ("at the top", UnitPoint(x: 0.5, y: 0.15)),
+        ("in the center", UnitPoint(x: 0.5, y: 0.5)),
     ]
 
     /// 最初に出現する位置語を採用(「右下」は「右」より先に判定)。
     static func anchor(in summary: String) -> UnitPoint? {
-        table.first { summary.contains($0.0) }?.1
+        table.first { summary.lowercased().contains($0.0) }?.1
     }
 }
