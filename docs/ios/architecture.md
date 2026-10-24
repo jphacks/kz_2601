@@ -11,7 +11,7 @@
 | P0 ネイティブ | **カメラ + ローカル通知** | `camera` コンポーネント / `native: notification.*` を実装済み。位置/センサー/共有は P1(ブリッジに stub) |
 | デモ3本 | 家計簿 / トレーニング記録 / 散歩メモ | サンプル DSL は `docs/dsl/examples/*.json`(4 本)をそのままバンドル |
 | 認証 | Sign in with Apple → 詰まったら匿名認証 | `TokenProvider` 抽象の裏で切替。UI/ランタイムは影響なし |
-| STT | WhisperKit 確定 | `SpeechTranscriber` 抽象。`MockTranscriber` → `WhisperKitTranscriber` に差し替え |
+| STT | WhisperKit 確定・**導入済み** | `SpeechTranscriber` 抽象。実機 `WhisperKitRecognizer`(model `small`)/ シミュレータ `MockTranscriber`(§6) |
 | iOS CI | 5分制限なし | WhisperKit/Firebase 解決込みのビルドでも可 |
 
 ## 1. 全体構成
@@ -135,12 +135,24 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 ## 6. 音声入力画面とホットリロード
 
 ```
-[録音] AVAudioRecorder(16kHz mono wav)
-  → [文字起こし] WhisperKit.transcribe(audioPath:)  ※オンデバイス
+[録音] WhisperKit.AudioProcessor.startRecordingLive  (AVAudioEngine → 16kHz mono Float32 をメモリに蓄積)
+  → [文字起こし] WhisperKit.transcribe(audioArray:, DecodingOptions(language: "ja", chunkingStrategy: .vad))  ※オンデバイス・停止後に一括
   → [送信] POST ai /v1/morph { appId, currentVersion, transcript }
        (ai: Claude が JSON Patch 生成 → スキーマ検証 → appconfig に適用 → 最新 DSL を返す)
   → [適用] AppRuntime.apply(doc)  withAnimation(.spring) + RootView.id(version) + transition
 ```
+
+### WhisperKit 実装要点(`Services/Live/WhisperKitRecognizer.swift`)
+
+| 項目 | 内容 |
+|---|---|
+| パッケージ | `https://github.com/argmaxinc/argmax-oss-swift` **1.1.1 固定**(`exactVersion`)。WhisperKit は v1.0.0 で Argmax OSS SDK に統合され、旧 URL `argmaxinc/WhisperKit` は同リポジトリへリダイレクト。product は `WhisperKit` のみリンク(`ArgmaxCore` は `@_exported`) |
+| モデル | `BuildConfig.whisperModel`(環境変数 `MORPH_WHISPER_MODEL` / Info.plist `MorphWhisperModel`、既定 **`small`**)。短縮名は `openai_whisper-small` に解決し、Hugging Face `argmaxinc/whisperkit-coreml` から取得 |
+| 配置 | `Application Support/WhisperKit/models/argmaxinc/whisperkit-coreml/openai_whisper-small/`(約 500MB)。`MelSpectrogram/AudioEncoder/TextDecoder.mlmodelc` + `config.json` が揃っていればオフラインでも Hub に問い合わせずロード |
+| DL と状態 | `prepare()` を `AppRuntime.bootstrap()` が起動直後に呼ぶ。`status`: `notDownloaded → downloading(downloadProgress 0〜1) → loading(CoreML ロード + ANE 特化 prewarm) → ready → recognizing`。失敗は `.failed(message)` で UI に「再試行」ボタン |
+| 権限 | `AudioProcessor.requestRecordPermission()`(`NSMicrophoneUsageDescription`、記入済み)。`NSSpeechRecognitionUsageDescription` は Apple Speech フォールバック用に残置(WhisperKit 自体は不要) |
+| 録音 | `startRecordingLive(callback: nil)` → 停止で `audioSamples` を取り出し `purgeAudioSamples`。0.5 秒未満は無音扱いで送らない(幻聴対策) |
+| 制約 | シミュレータでは `#if targetEnvironment(simulator)` で `MockTranscriber` + 文字入力のみ(マイク非表示)。ストリーミング(途中結果)は未対応=停止後に一括。`small` のメモリは推論時 ~1GB 弱、初回 prewarm は 30〜90 秒 |
 
 | フェーズ | UI |
 |---|---|
@@ -187,8 +199,8 @@ UI は専用ログイン画面を作らない(匿名なら無言、Apple なら�
 ## 10. リスクと対処
 | リスク | 影響 | 対処 |
 |---|---|---|
-| WhisperKit モデル DL(base: ~150MB, small: ~500MB)初回に数分 | デモで待たされる | 起動直後に `prepare()` を非同期実行。**会場 Wi-Fi 前提にせず前日に実機へ DL 済みにする**。`tiny`/`base` 日本語品質が不足なら `small` を事前 DL。文字入力フォールバック(実装済み)を常に残す |
-| WhisperKit はシミュレータで実用不可(CoreML/ANE) | 開発中の検証 | `MockTranscriber` でモーフ動線を確認、音声は実機のみ |
+| WhisperKit モデル DL(`small` ~500MB)初回に数分 | デモで待たされる | 起動直後に `prepare()` を非同期実行、DL 中は進捗バー表示(実装済み)。**会場 Wi-Fi 前提にせず前日に実機へ DL 済みにする**(一度 DL すればオフラインでロード)。文字入力フォールバック(実装済み)を常に残す |
+| WhisperKit はシミュレータで実用不可(CoreML/ANE) | 開発中の検証 | シミュレータは `MockTranscriber` + 文字入力のみ(実装済み)。音声は実機のみ |
 | Firebase + WhisperKit の SwiftPM 解決が遅い | CI/初回ビルド | CI 5分制限なしの決定済み。DerivedData キャッシュ(`actions/cache`) |
 | Swift 6 コンパイラ + strict concurrency | 警告/エラー増 | **Swift 5 言語モード + `targeted`** に固定(project.yml)。Model は全て `Sendable`、UI 寄りは `@MainActor`。Swift 6 モード移行はハッカソン後 |
 | AI が生成する DSL の揺れ(未知 type/typo) | クラッシュ | 未知は無視・不正は skip の設計(§2)。サーバー側スキーマ検証と二重防御 |

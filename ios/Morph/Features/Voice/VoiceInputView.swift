@@ -20,9 +20,18 @@ struct VoiceInputView: View {
                 .multilineTextAlignment(.center)
             Text(statusText)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
                 .contentTransition(.opacity)
 
+            #if targetEnvironment(simulator)
+            // シミュレータでは WhisperKit(CoreML/ANE)が動かないため、マイクは出さず文字入力のみ。
+            Label("シミュレータでは音声入力は使えません(文字で入力)", systemImage: "mic.slash")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            #else
             micButton
+            modelStatusView
+            #endif
 
             if !transcript.isEmpty {
                 Text(transcript)
@@ -69,11 +78,52 @@ struct VoiceInputView: View {
             }
         }
         .buttonStyle(.plain)
-        .disabled(phase == .transcribing || phase == .thinking)
+        .disabled(phase == .transcribing || phase == .thinking || (phase == .idle && !transcriber.isReady))
         .onAppear { pulse = true }
     }
 
     @State private var pulse = false
+
+    private var transcriber: any SpeechTranscriber { rt.services.transcriber }
+
+    /// WhisperKit モデルの DL / ロード状況。ready になったら消える。
+    @ViewBuilder
+    private var modelStatusView: some View {
+        switch transcriber.status {
+        case .notDownloaded, .downloading:
+            VStack(spacing: 8) {
+                ProgressView(value: transcriber.downloadProgress)
+                    .progressViewStyle(.linear)
+                Text("音声モデルをダウンロード中 \(Int(transcriber.downloadProgress * 100))%\n初回のみ約500MBをダウンロードします(Wi-Fi 推奨)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal)
+        case .loading:
+            HStack(spacing: 8) {
+                ProgressView()
+                Text("音声モデルを読み込み中…(初回は1分ほどかかります)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        case .failed(let message):
+            VStack(spacing: 8) {
+                Text("音声モデルの準備に失敗しました\n\(message)")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                Button("再試行") {
+                    Task { try? await transcriber.prepare() }
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(.horizontal)
+        case .ready, .recognizing:
+            EmptyView()
+        }
+    }
 
     private var iconName: String {
         switch phase {
@@ -86,7 +136,12 @@ struct VoiceInputView: View {
 
     private var statusText: String {
         switch phase {
-        case .idle: return rt.services.transcriber.isReady ? "タップして話す" : "音声モデルを準備中…"
+        case .idle:
+            #if targetEnvironment(simulator)
+            return "下の欄に文字で入力してください"
+            #else
+            return transcriber.isReady ? "タップして話す" : "音声モデルを準備中…"
+            #endif
         case .listening: return "聞いています… もう一度タップで終了"
         case .transcribing: return "文字起こし中…"
         case .thinking: return "アプリを考えています…"
@@ -97,14 +152,26 @@ struct VoiceInputView: View {
         switch phase {
         case .idle:
             do {
-                try await rt.services.transcriber.startRecording()
+                try await transcriber.startRecording()
                 phase = .listening
             } catch {
                 rt.toast = error.localizedDescription
             }
         case .listening:
             phase = .transcribing
-            let text = (try? await rt.services.transcriber.stopAndTranscribe()) ?? ""
+            let text: String
+            do {
+                text = try await transcriber.stopAndTranscribe()
+            } catch {
+                rt.toast = "文字起こしに失敗しました: \(error.localizedDescription)"
+                phase = .idle
+                return
+            }
+            guard !text.isEmpty else {
+                rt.toast = "音声を聞き取れませんでした。もう一度話してください"
+                phase = .idle
+                return
+            }
             transcript = text
             phase = .thinking
             await rt.morph(transcript: text)

@@ -16,17 +16,35 @@ enum BuildConfig {
         return apiBaseURL
     }
 
+    /// WhisperKit のモデル名。`MORPH_WHISPER_MODEL`(環境変数 or Info.plist `MorphWhisperModel`)、既定 `small`(日本語精度優先・約500MB)。
+    /// `tiny`/`base`/`small`/`large-v3` の短縮名は `openai_whisper-` が補われる。フル名(`openai_whisper-large-v3-v20240930_626MB` 等)はそのまま。
+    static var whisperModel: String {
+        let env = ProcessInfo.processInfo.environment["MORPH_WHISPER_MODEL"]
+        let plist = Bundle.main.object(forInfoDictionaryKey: "MorphWhisperModel") as? String
+        return [env, plist].compactMap { $0 }.first { !$0.isEmpty } ?? "small"
+    }
+
     @MainActor
     static func makeServices() -> Services {
-        guard let api = apiBaseURL, let ai = aiBaseURL else { return .mock() }
-        return .live(appConfigURL: api, aiURL: ai)
+        guard let api = apiBaseURL, let ai = aiBaseURL else { return .mock(transcriber: makeTranscriber()) }
+        return .live(appConfigURL: api, aiURL: ai, transcriber: makeTranscriber())
+    }
+
+    /// 実機 = WhisperKit(モック API でも音声認識は本物)。シミュレータは CoreML/ANE が使えず実用不可なのでモック(文字入力フォールバック)。
+    @MainActor
+    static func makeTranscriber() -> any SpeechTranscriber {
+        #if targetEnvironment(simulator)
+        return MockTranscriber()
+        #else
+        return WhisperKitRecognizer(model: whisperModel)
+        #endif
     }
 }
 
 extension Services {
     /// デモ3本(docs/dsl/examples)の entity id に合わせた seed データ。
     @MainActor
-    static func mock() -> Services {
+    static func mock(transcriber: (any SpeechTranscriber)? = nil) -> Services {
         let today = FieldCoding.dateFormatter.string(from: .now)
         let now = ISO8601DateFormatter().string(from: .now)
         let seed: [String: [Record]] = [
@@ -46,14 +64,14 @@ extension Services {
             ai: MockAIClient(),
             sync: NoopDocumentSync(),
             token: NoAuthTokenProvider(),
-            transcriber: MockTranscriber(),
+            transcriber: transcriber ?? MockTranscriber(),
             isLive: false
         )
     }
 
     @MainActor
-    static func live(appConfigURL: URL, aiURL: URL) -> Services {
-        // TODO: Firebase 導入後は FirebaseTokenProvider / WhisperKitTranscriber に差し替える
+    static func live(appConfigURL: URL, aiURL: URL, transcriber: any SpeechTranscriber) -> Services {
+        // TODO: Firebase 導入後は FirebaseTokenProvider に差し替える
         let token = NoAuthTokenProvider()
         let appConfig = HTTPAppConfigClient(baseURL: appConfigURL, token: token)
         return Services(
@@ -61,7 +79,7 @@ extension Services {
             ai: HTTPAIClient(baseURL: aiURL, token: token),
             sync: PollingDocumentSync(client: appConfig),
             token: token,
-            transcriber: MockTranscriber(),
+            transcriber: transcriber,
             isLive: true
         )
     }
