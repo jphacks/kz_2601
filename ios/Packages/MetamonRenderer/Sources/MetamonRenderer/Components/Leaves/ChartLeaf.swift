@@ -15,7 +15,9 @@ struct ChartLeaf: View {
         VStack(alignment: .leading, spacing: 8) {
             if let title = c.title { Text(title).font(RenderTheme.Fonts.cardTitle) }
             if buckets.isEmpty {
-                EmptyPlaceholder(icon: "chart.bar", text: "データがありません")
+                EmptyPlaceholder(icon: "chart.bar", emptyText: "データがありません", state: rt.emptyState(for: entityId)) {
+                    Task { await rt.load(entities: [entityId], force: true) }
+                }
             } else {
                 Chart(buckets) { b in
                     switch c.kind {
@@ -29,6 +31,8 @@ struct ChartLeaf: View {
                         BarMark(x: .value("x", b.label), y: .value("y", b.value))
                     }
                 }
+                // 凡例は上(左下に置くと左下のマイク FAB に隠れる)
+                .chartLegend(position: .top, alignment: .leading)
                 // グリッドのセル内ではセルの高さに合わせて伸縮、縦積みでは ideal(200)で描く
                 .frame(minHeight: 120, idealHeight: 200, maxHeight: .infinity)
             }

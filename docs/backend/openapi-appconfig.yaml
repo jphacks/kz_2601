@@ -99,6 +99,10 @@ paths:
       description: |
         `If-None-Match: "<version>"` が現行と一致すれば 304。ETag は `"<currentVersion>"` (例 `"7"`)。
         iOS は 2 秒ポーリングか Firestore リスナーで version 変化を検知してから取得する。
+
+        **共有アプリのインストール (#47)**: 自分の `users/{uid}/apps/{appId}` が無い appId で呼ぶと、他ユーザーが
+        `apps_public/{appId}` に公開した DSL (public/shared entity を含むアプリを PUT/PATCH した時に自動複製) があればそれを、
+        無ければ初期 DSL を version 1 として自分の下に作って返す。以後の編集は自分のコピーに対して行われる。
       parameters:
         - in: header
           name: If-None-Match
@@ -277,6 +281,8 @@ paths:
       description: |
         既定は `createdAt desc`。`sort`/`filter` は DSL の List と同じ語彙。
         複合インデックスが無い組み合わせはサーバー側メモリソート (1 entity 上限 2000 件、超過は 413)。
+        public/shared entity は全ユーザーの投稿が返り、各レコードに `author`/`authorName` が付く。
+        `filterField=author&filterOp=eq&filterValue=<uid>` で特定ユーザー (自分) の投稿だけに絞れる。
       parameters:
         - { $ref: '#/components/parameters/PageSize' }
         - { $ref: '#/components/parameters/PageToken' }
@@ -300,7 +306,10 @@ paths:
     post:
       tags: [records]
       summary: レコード作成
-      description: '`data` は現行 DSL のフィールド定義で型検証・正規化。未知キーは 400。`required` 欠落は 422。'
+      description: |
+        `data` は現行 DSL のフィールド定義で型検証・正規化。未知キーは 400。`required` 欠落は 422。
+        entity.scope が public/shared なら誰でも作成でき、レスポンスの `author`(uid) と `authorName` はサーバーが付ける
+        (`data` に author/authorName は入れられない。冪等 id は uid+clientId から導出するので他人の clientId と衝突しない)。
       requestBody:
         required: true
         content:
@@ -311,6 +320,7 @@ paths:
               properties:
                 data: { $ref: '#/components/schemas/RecordData' }
                 clientId: { type: string, description: 冪等キー (同じ clientId の再送は既存を返す) }
+                authorName: { type: string, maxLength: 64, description: '投稿者の表示名 (public/shared entity のみ使われる。省略時 "匿名")' }
       responses:
         '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Record' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -319,6 +329,7 @@ paths:
     delete:
       tags: [records]
       summary: エンティティの全レコード削除 (デモリセット用・`?confirm=true` 必須)
+      description: public/shared entity では**自分が投稿したレコードだけ**削除する (他人の投稿は残る)。
       parameters: [{ in: query, name: confirm, required: true, schema: { type: boolean } }]
       responses:
         '204': { description: Deleted }
@@ -337,6 +348,7 @@ paths:
     patch:
       tags: [records]
       summary: レコード部分更新 (data のキー単位でマージ)
+      description: public/shared entity では `author == 自分` のレコードだけ更新できる (他人のは 403)。
       requestBody:
         required: true
         content:
@@ -347,13 +359,16 @@ paths:
               properties: { data: { $ref: '#/components/schemas/RecordData' } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Record' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/InvalidRecord' }
     delete:
       tags: [records]
       summary: レコード削除
+      description: public/shared entity では `author == 自分` のレコードだけ削除できる (他人のは 403)。
       responses:
         '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /healthz:
@@ -382,6 +397,12 @@ components:
     BadRequest: { description: 入力不正, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Unauthenticated: { description: トークン欠落/無効, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     NotFound: { description: 存在しない (他人のリソースも 404), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden:
+      description: 共有 (public/shared) レコードの author が自分ではない
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: forbidden, message: 'only the author can modify this record', details: { author: 'uid_of_poster' } } }
     VersionConflict:
       description: If-Match が現行と不一致
       content:
@@ -492,5 +513,7 @@ components:
         id: { type: string, example: rec_01HXYZ }
         entity: { type: string }
         data: { $ref: '#/components/schemas/RecordData' }
+        author: { type: string, description: '投稿者 uid。entity.scope が public/shared のレコードにだけ付く (private では省略)' }
+        authorName: { type: string, description: '投稿者の表示名。POST の authorName、無ければ "匿名"。public/shared のみ' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }

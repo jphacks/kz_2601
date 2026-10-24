@@ -13,8 +13,9 @@ struct ListLeaf: View {
         let filtered = Aggregator.sorted(Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId)), by: c.sort, entity: entity)
         let rows = searched(filtered, entity: entity)
         if rows.isEmpty {
-            let loading = rt.loading.contains(entityId)
-            EmptyPlaceholder(icon: "tray", text: loading ? "読み込み中…" : (c.emptyText ?? "まだありません"), loading: loading)
+            EmptyPlaceholder(icon: "tray", emptyText: c.emptyText ?? "まだありません", state: rt.emptyState(for: entityId)) {
+                Task { await rt.load(entities: [entityId], force: true) }
+            }
         } else {
             // 1 枚のカードに行を積み、行間は 1pt の hairline(iOS の inset grouped list と同じ読み味)
             LazyVStack(spacing: 0) {
