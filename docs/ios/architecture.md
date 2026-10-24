@@ -751,3 +751,38 @@ Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-
 - **描画**(`Metamon/Features/ScreenMap/`): カードは段ごとに中央揃え、幅に収まらなければ横スクロール。矢印は Canvas。下向きは直線、上向き・往復は進行方向の左へ曲げ、同じ段どうしはカードの下を回す
 - **この画面について話す**: カードを選ぶと出入りの一覧とボタン。押すと `ScreenMapUI.context` をセットして音声シートを開き、上部にチップ「画面「B」について話す」(× で外す)。送信時に **transcript の先頭へ「画面「B」(id: b)で: 」を付ける**(API の契約は変えない。「元に戻して」等の意図判定は付ける前の文で行う)。文脈は 1 回送ると消える
 - 確認: `METAMON_INITIAL_EXAMPLE=navigation METAMON_AUTO_SCREEN_MAP=b`(画面 b を選んだ状態で開く)、`METAMON_AUTO_SCREEN_MAP_TALK=1` で音声シートまで進む
+
+## 21. UI テスト(XCUITest・Issue #165)
+
+simctl ではタップ・ドラッグ・長押しができないので、指の操作はターゲット `MetamonUITests`(`ios/MetamonUITests/`・bundle.ui-testing)で確認する。Metamon スキームの test に入っている(並列実行なし)。
+
+| 項目 | 内容 |
+|---|---|
+| 起動 | すべてモック `METAMON_MOCK=1`。`METAMON_FAB_POSITION=auto` で前のテストが保存した FAB の位置を毎回初期化。初期アプリは `METAMON_INITIAL_EXAMPLE` |
+| 要素の特定 | accessibilityIdentifier(見た目・挙動は変えない): `voice.fab` / `voice.fabHandle`(FAB と取っ手)、`voice.settings`(音声シートの設定 = シートが開いた目印)、`switcher.close` / `switcher.share`(変身一覧)、`share.close`(シェアシート)、`chat.chip`(対話の選択肢)。既存の `chat.build` / `chat.buildNow` も使う |
+| シェア | モックはサーバーが無く変身一覧が空・シェアボタンも出ないので、DEBUG フック `METAMON_MOCK_SHARING=1` で一覧に 2 件入れ、端末内で完結する `DebugSharingClient` を使う(`Metamon/App/DebugMockSharing.swift`) |
+| 言語 | 文言で探す要素があるので起動引数 `-AppleLanguages (ja) -AppleLocale ja_JP -metamon.appLanguage ja` で日本語に固定(シミュレータの既定は英語で、英語だと吹き出し・QR のラベルが変わる) |
+| 一覧のチェック丸 | 丸は VoiceOver では行の操作(accessibilityAction)にまとめて隠しているので、行の左端 +30pt を座標でタップする。行の value(`未チェック` / `チェック済み`)で判定 |
+
+| テスト | 確認すること |
+|---|---|
+| `testFabTapOpensVoiceSheet` | FAB タップ → 音声シートが開く(変身一覧は開かない) |
+| `testFabLongPressOpensOnlySwitcher` | FAB 長押し → 変身一覧だけ開く(離した瞬間のタップで音声シートが開かない) |
+| `testFabDragRightSnapsToTrailingWithoutOpeningSheet` | 画面の 6 割まで運んで離す → 右端に吸着し、音声シート・変身一覧が開かない |
+| `testFabFlickOffEdgeHidesAndHandleRestores` | 右端の外へ弾く → 取っ手だけ残る → 取っ手のタップで FAB が戻る |
+| `testClarifyChipAdvancesChat` | `METAMON_AUTO_TRANSCRIPT=日記`(+ `METAMON_AUTO_PAUSE=600` で自動返答を止める)→ 質問のチップをタップ → 吹き出しに答えが出て「この内容で作る」に進む |
+| `testListCheckCircleMarksDone` | 買い物リストの「牛乳」の丸をタップ → チェック済み(フォームは開かない) |
+| `testSwitcherCardShareOpensShareSheet` | 長押しで変身一覧 → カードのシェア → シェアシート(QR)が開く |
+| `testKakeiboAddExpenseAppearsInList` | 家計簿「支出を追加」→ 金額・メモを入力 → 保存 → 一覧に増える |
+
+手元での実行(PC 負荷対策: xcodebuild は同時 1 本・シミュレータ 1 台・並列なし):
+```sh
+cd ios && xcodegen generate
+xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -only-testing:MetamonUITests -parallel-testing-enabled NO \
+  -resultBundlePath /tmp/uitest.xcresult test CODE_SIGNING_ALLOWED=NO
+# 失敗時のスクショ: xcrun xcresulttool export attachments --path /tmp/uitest.xcresult --output-path <dir>
+```
+
+実測(2026-10-24・iPhone 17 シミュレータ・M 系 Mac): 8 本すべて成功。テスト本体 約 100 秒、シミュレータ起動込みで約 3.5 分(build-for-testing は差分で 1〜3 分)。
+CI: `ios-ci.yml` の test ステップは project.yml に `bundle.unit-test` がある時だけ動く(現状はスキップ)。#166 で `MetamonTests` が入ると Metamon スキームの test が CI で動き、UI テストも一緒に回る(+3〜4 分。10 分以内なので CI に載せる方針)。CI で重すぎる・不安定なら `-skip-testing:MetamonUITests` を足して手元実行だけに戻す。
