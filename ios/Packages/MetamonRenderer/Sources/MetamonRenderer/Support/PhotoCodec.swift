@@ -31,6 +31,12 @@ public enum PhotoCodec {
 struct PhotoView: View {
     let value: JSONValue
     var height: CGFloat
+    /// VoiceOver の読み上げ(省略時は「写真」。プレースホルダは「写真なし」)
+    var accessibilityLabel: String? = nil
+
+    private var hasPhoto: Bool {
+        PhotoCodec.image(from: value) != nil || (value.stringValue?.hasPrefix("http") ?? false)
+    }
 
     var body: some View {
         Group {
@@ -45,5 +51,8 @@ struct PhotoView: View {
         .frame(height: height)
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel ?? (hasPhoto ? "写真" : "写真なし"))
+        .accessibilityAddTraits(hasPhoto ? .isImage : [])
     }
 }

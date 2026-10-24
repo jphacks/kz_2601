@@ -14,8 +14,9 @@ struct TimelineLeaf: View {
         let all = Aggregator.sorted(Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId)), by: sort, entity: entity)
         let rows = (c.limit ?? 0) > 0 ? Array(all.prefix(c.limit!)) : all
         if rows.isEmpty {
-            let loading = rt.loading.contains(entityId)
-            EmptyPlaceholder(icon: "clock", text: loading ? "読み込み中…" : "まだありません", loading: loading)
+            EmptyPlaceholder(icon: "clock", emptyText: "まだありません", state: rt.emptyState(for: entityId)) {
+                Task { await rt.load(entities: [entityId], force: true) }
+            }
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
@@ -30,6 +31,7 @@ struct TimelineLeaf: View {
                                 Rectangle().fill(RenderTheme.Colors.hairline).frame(width: 2).frame(maxHeight: .infinity)
                             }
                         }
+                        .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(FieldCoding.display(row[c.titleField ?? ""], field: entity?.field(c.titleField ?? ""))).font(.subheadline.weight(.semibold))
                             if let sub = c.subtitleField {
@@ -41,6 +43,7 @@ struct TimelineLeaf: View {
                         Spacer(minLength: 0)
                     }
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityElement(children: .combine) // 「10/24, 朝ラン, 5km」と 1 行で読む
                 }
             }
         .renderCard()

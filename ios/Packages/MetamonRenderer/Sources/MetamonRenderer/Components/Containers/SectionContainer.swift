@@ -16,10 +16,12 @@ struct SectionContainer: View {
                     .padding(.horizontal, RenderTheme.Spacing.xs + 2)
             }
             if c.children.allSatisfy(\.rendersOwnSurface) {
-                // list / table など自前の面を持つ子だけなら見出し + そのまま(カードの中にカードを作らない)
+                // list / table など自前の面を持つ子だけなら見出し + そのまま(カードの中にカードを作らない)。
+                // セルの残り高さを子に渡す(#84: 空の list がセル全体を使えるように)
                 VStack(alignment: .leading, spacing: c.containerSpacing) {
                     ForEach(c.children) { DSLView(component: $0, ctx: ctx) }
                 }
+                .frame(maxHeight: .infinity, alignment: .top)
             } else {
                 VStack(alignment: .leading, spacing: c.containerSpacing) {
                     ForEach(c.children) { DSLView(component: $0, ctx: ctx) }

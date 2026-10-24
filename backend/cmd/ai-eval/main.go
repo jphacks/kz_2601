@@ -4,12 +4,16 @@
 // DSL produced by their `base` create case in the same run. `expect` keys:
 // photo / chart (bool), notification ("HH:MM" or "any"), substitution (bool:
 // the summary mentions 代替 / "replaced" because a requested part is not in
-// the catalog). A case may pin `locale` (ja|en); -locale overrides every case;
+// the catalog), scope ("public"|"shared"|"private": at least one entity has
+// that scope). A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
 //
 //	set -a; source ../.env; set +a
 //	go run ./cmd/ai-eval -effort low -out ../docs/backend/ai-eval/raw
+//	go run ./cmd/ai-eval -stream -repeat 2 -only kakeibo_a,walk_a   # SSE path, time to first event
+//	go run ./cmd/ai-eval -compare-before 'raw/*-before-*.json' -compare-after 'raw/*-after-*.json'  # no API calls
+//	go run ./cmd/ai-eval -chat          # clarify phase (chat.go, chat_cases.json)
 package main
 
 import (
@@ -53,6 +57,7 @@ type Metrics struct {
 	HasPhoto      bool     `json:"hasPhoto"`
 	HasChart      bool     `json:"hasChart"`
 	Notifications []string `json:"notifications,omitempty"` // repeat@time
+	Scopes        []string `json:"scopes,omitempty"`        // entityId:scope (effective)
 	Areas         []string `json:"areas"`                   // screenId: area list
 }
 
@@ -62,6 +67,7 @@ type Record struct {
 	Group         string          `json:"group"`
 	Transcript    string          `json:"transcript"`
 	Locale        string          `json:"locale,omitempty"`
+	Repeat        int             `json:"repeat,omitempty"`
 	OK            bool            `json:"ok"`
 	Error         string          `json:"error,omitempty"`
 	Mode          string          `json:"mode,omitempty"`
@@ -71,6 +77,9 @@ type Record struct {
 	Downgraded    bool            `json:"downgradedToFull,omitempty"`
 	ClaudeMs      int64           `json:"claudeMs"`
 	TotalMs       int64           `json:"totalMs"`
+	FirstEventMs  int64           `json:"firstEventMs,omitempty"` // -stream: time to the app/summary event
+	FirstEvent    string          `json:"firstEvent,omitempty"`   // -stream: its provisional summary
+	OutputChars   int             `json:"outputChars,omitempty"`
 	Usage         ai.Usage        `json:"usage"`
 	Summary       string          `json:"summary,omitempty"`
 	LastProblems  []string        `json:"lastProblems,omitempty"`
@@ -85,26 +94,29 @@ type Run struct {
 	Model   string   `json:"model"`
 	Effort  string   `json:"effort"`
 	Tag     string   `json:"tag,omitempty"`
+	Stream  bool     `json:"stream,omitempty"`
 	Cases   []Record `json:"cases"`
 	Summary Summary  `json:"summary"`
 }
 
 type Summary struct {
-	N             int     `json:"n"`
-	OK            int     `json:"ok"`
-	FirstPass     int     `json:"firstPass"` // ok && regenerations == 0 && !areaFallback
-	Regenerated   int     `json:"regenerated"`
-	AreaFallback  int     `json:"areaFallback"`
-	Failed        int     `json:"failed"`
-	ExpectMisses  int     `json:"expectMisses"`
-	CreateP50Ms   int64   `json:"createP50Ms"`
-	CreateP95Ms   int64   `json:"createP95Ms"`
-	EditP50Ms     int64   `json:"editP50Ms"`
-	AvgOutTokens  float64 `json:"avgOutputTokens"`
-	AvgCreateOut  float64 `json:"avgCreateOutputTokens"`
-	AvgEditOut    float64 `json:"avgEditOutputTokens"`
-	AvgAreaRatio  float64 `json:"avgAreaRatio"`
-	TabbedCreates int     `json:"tabbedCreates"`
+	N                 int     `json:"n"`
+	OK                int     `json:"ok"`
+	FirstPass         int     `json:"firstPass"` // ok && regenerations == 0 && !areaFallback
+	Regenerated       int     `json:"regenerated"`
+	AreaFallback      int     `json:"areaFallback"`
+	Failed            int     `json:"failed"`
+	ExpectMisses      int     `json:"expectMisses"`
+	CreateP50Ms       int64   `json:"createP50Ms"`
+	CreateP95Ms       int64   `json:"createP95Ms"`
+	EditP50Ms         int64   `json:"editP50Ms"`
+	CreateFirstP50Ms  int64   `json:"createFirstEventP50Ms,omitempty"`
+	AvgOutTokens      float64 `json:"avgOutputTokens"`
+	AvgCreateOut      float64 `json:"avgCreateOutputTokens"`
+	AvgEditOut        float64 `json:"avgEditOutputTokens"`
+	AvgCreateOutChars float64 `json:"avgCreateOutputChars,omitempty"`
+	AvgAreaRatio      float64 `json:"avgAreaRatio"`
+	TabbedCreates     int     `json:"tabbedCreates"`
 }
 
 func main() {
@@ -116,11 +128,44 @@ func main() {
 	tag := flag.String("tag", "", "suffix for the output filename")
 	locale := flag.String("locale", "", "ja|en for every case (overrides per-case locale; empty = per-case or detected from the transcript)")
 	timeout := flag.Duration("timeout", 60*time.Second, "per Claude call timeout")
+	stream := flag.Bool("stream", false, "use GenerateStream (SSE path) and record the time to the first app/summary event")
+	repeat := flag.Int("repeat", 1, "run every selected case this many times (p50/p95 over all runs)")
+	cmpBefore := flag.String("compare-before", "", "glob of raw run files = before; with -compare-after prints a before/after table and exits (no API calls)")
+	cmpAfter := flag.String("compare-after", "", "glob of raw run files = after")
+	chat := flag.Bool("chat", false, "run the clarify-phase cases (internal/ai/eval/chat_cases.json unless -cases is set) through Service.Chat instead of /generate")
 	flag.Parse()
+	if *chat && *casesPath == "internal/ai/eval/cases.json" {
+		*casesPath = "internal/ai/eval/chat_cases.json"
+	}
+
+	if *cmpBefore != "" || *cmpAfter != "" {
+		if err := compare(*cmpBefore, *cmpAfter); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" {
 		log.Fatal("ANTHROPIC_API_KEY is not set")
+	}
+	filter := map[string]bool{}
+	for _, id := range strings.Split(*only, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			filter[id] = true
+		}
+	}
+	store := appconfigclient.NewMemory()
+	svc := &ai.Service{
+		Claude:      ai.NewClient(apiKey, *model, *effort),
+		Store:       store,
+		Model:       *model,
+		CallTimeout: *timeout,
+	}
+	ctx := context.Background()
+	if *chat {
+		runChat(ctx, svc, *casesPath, *outDir, *model, *effort, *tag, filter)
+		return
 	}
 	raw, err := os.ReadFile(*casesPath)
 	if err != nil {
@@ -130,94 +175,20 @@ func main() {
 	if err := json.Unmarshal(raw, &cases); err != nil {
 		log.Fatal(err)
 	}
-	filter := map[string]bool{}
-	for _, id := range strings.Split(*only, ",") {
-		if id = strings.TrimSpace(id); id != "" {
-			filter[id] = true
-		}
-	}
-
-	store := appconfigclient.NewMemory()
-	svc := &ai.Service{
-		Claude:      ai.NewClient(apiKey, *model, *effort),
-		Store:       store,
-		Model:       *model,
-		CallTimeout: *timeout,
-	}
-	ctx := context.Background()
-	run := Run{Date: time.Now().Format("2006-01-02"), Model: *model, Effort: *effort, Tag: *tag}
+	run := Run{Date: time.Now().Format("2006-01-02"), Model: *model, Effort: *effort, Tag: *tag, Stream: *stream}
 	created := map[string]json.RawMessage{} // create case id -> resulting DSL
 
-	for _, c := range cases {
-		if len(filter) > 0 && !filter[c.ID] {
-			continue
-		}
-		appID := fmt.Sprintf("eval-%s-%d", c.ID, time.Now().UnixNano())
-		mode := ai.ModeCreate
-		loc := ai.Locale(c.Locale)
-		if *locale != "" {
-			loc = ai.Locale(*locale)
-		}
-		if loc == "" {
-			loc = ai.DetectLocale(c.Transcript)
-		}
-		if c.Kind == "edit" {
-			mode = ai.ModeEdit
-			base, ok := created[c.Base]
-			if !ok {
-				seed := "internal/ai/examples/kakeibo.json"
-				if loc == ai.LocaleEN {
-					seed = "internal/ai/examples/expense_en.json"
-				}
-				base, err = os.ReadFile(seed)
-				if err != nil {
-					log.Fatal(err)
-				}
-				log.Printf("[%s] base %q not produced in this run; seeding %s", c.ID, c.Base, seed)
+	for rep := 1; rep <= max(*repeat, 1); rep++ {
+		for _, c := range cases {
+			if len(filter) > 0 && !filter[c.ID] {
+				continue
 			}
-			if _, err := store.Put(ctx, appID, 0, base, appconfigclient.Source{Kind: "seed"}); err != nil {
-				log.Fatalf("[%s] seed: %v", c.ID, err)
+			rec := runCase(ctx, svc, store, c, *locale, *effort, *stream, created)
+			if *repeat > 1 {
+				rec.Repeat = rep
 			}
+			run.Cases = append(run.Cases, rec)
 		}
-		log.Printf("[%s] %s effort=%s locale=%s %q", c.ID, c.Kind, *effort, loc, c.Transcript)
-		rec := Record{ID: c.ID, Kind: c.Kind, Group: c.Group, Transcript: c.Transcript, Locale: string(loc)}
-		started := time.Now()
-		res, err := svc.Generate(ctx, ai.Request{AppID: appID, Transcript: c.Transcript, Mode: mode, Locale: loc})
-		rec.TotalMs = time.Since(started).Milliseconds()
-		if err != nil {
-			rec.Error = err.Error()
-			var ge *ai.Error
-			if e, ok := err.(*ai.Error); ok {
-				ge = e
-				rec.Attempts = ge.Attempts
-				rec.LastProblems = ge.Problems
-			}
-			log.Printf("[%s] FAIL %v", c.ID, err)
-		} else {
-			rec.OK = true
-			rec.Mode = res.Mode
-			rec.Attempts = res.Meta.Attempts
-			rec.Regenerations = res.Meta.Regenerations
-			rec.AreaFallback = res.Meta.AreaFallback
-			rec.Downgraded = res.Meta.DowngradedToFull
-			rec.ClaudeMs = res.LatencyMs.Claude
-			rec.Usage = res.Meta.Usage
-			rec.Summary = res.Summary
-			rec.LastProblems = res.Meta.LastProblems
-			rec.Patch = res.Patch
-			rec.DSL = res.DSL
-			if app, perr := dsl.Parse(res.DSL); perr == nil {
-				rec.Metrics = measure(app)
-				rec.ExpectMisses = checkExpect(c.Expect, rec.Metrics, rec.Summary)
-			}
-			if c.Kind == "create" {
-				created[c.ID] = res.DSL
-			}
-			log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms out=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",
-				c.ID, rec.Attempts, rec.AreaFallback, rec.ClaudeMs, rec.Usage.OutputTokens,
-				rec.Metrics.Tabs, rec.Metrics.Screens, rec.Metrics.AreaRatio, rec.ExpectMisses, rec.Summary)
-		}
-		run.Cases = append(run.Cases, rec)
 	}
 	run.Summary = summarize(run.Cases)
 
@@ -237,10 +208,94 @@ func main() {
 	fmt.Printf("\nwrote %s\n", path)
 }
 
+func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory, c Case, forceLocale, effort string, stream bool, created map[string]json.RawMessage) Record {
+	appID := fmt.Sprintf("eval-%s-%d", c.ID, time.Now().UnixNano())
+	mode := ai.ModeCreate
+	loc := ai.Locale(c.Locale)
+	if forceLocale != "" {
+		loc = ai.Locale(forceLocale)
+	}
+	if loc == "" {
+		loc = ai.DetectLocale(c.Transcript)
+	}
+	if c.Kind == "edit" {
+		mode = ai.ModeEdit
+		base, ok := created[c.Base]
+		if !ok {
+			seed := "internal/ai/examples/kakeibo.json"
+			if loc == ai.LocaleEN {
+				seed = "internal/ai/examples/expense_en.json"
+			}
+			var err error
+			base, err = os.ReadFile(seed)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("[%s] base %q not produced in this run; seeding %s", c.ID, c.Base, seed)
+		}
+		if _, err := store.Put(ctx, appID, 0, base, appconfigclient.Source{Kind: "seed"}); err != nil {
+			log.Fatalf("[%s] seed: %v", c.ID, err)
+		}
+	}
+	log.Printf("[%s] %s effort=%s locale=%s stream=%v %q", c.ID, c.Kind, effort, loc, stream, c.Transcript)
+	rec := Record{ID: c.ID, Kind: c.Kind, Group: c.Group, Transcript: c.Transcript, Locale: string(loc)}
+	started := time.Now()
+	req := ai.Request{AppID: appID, Transcript: c.Transcript, Mode: mode, Locale: loc}
+	var res *ai.Result
+	var err error
+	if stream {
+		res, err = svc.GenerateStream(ctx, req, func(ev ai.Event) {
+			if rec.FirstEventMs == 0 {
+				rec.FirstEventMs = time.Since(started).Milliseconds()
+				rec.FirstEvent = ev.Summary
+				log.Printf("[%s] first event %s at %dms: %q", c.ID, ev.Type, rec.FirstEventMs, ev.Summary)
+			}
+		})
+	} else {
+		res, err = svc.Generate(ctx, req)
+	}
+	rec.TotalMs = time.Since(started).Milliseconds()
+	if err != nil {
+		rec.Error = err.Error()
+		if ge, ok := err.(*ai.Error); ok {
+			rec.Attempts = ge.Attempts
+			rec.LastProblems = ge.Problems
+		}
+		log.Printf("[%s] FAIL %v", c.ID, err)
+		return rec
+	}
+	rec.OK = true
+	rec.Mode = res.Mode
+	rec.Attempts = res.Meta.Attempts
+	rec.Regenerations = res.Meta.Regenerations
+	rec.AreaFallback = res.Meta.AreaFallback
+	rec.Downgraded = res.Meta.DowngradedToFull
+	rec.ClaudeMs = res.LatencyMs.Claude
+	rec.OutputChars = res.Meta.OutputChars
+	rec.Usage = res.Meta.Usage
+	rec.Summary = res.Summary
+	rec.LastProblems = res.Meta.LastProblems
+	rec.Patch = res.Patch
+	rec.DSL = res.DSL
+	if app, perr := dsl.Parse(res.DSL); perr == nil {
+		rec.Metrics = measure(app)
+		rec.ExpectMisses = checkExpect(c.Expect, rec.Metrics, rec.Summary)
+	}
+	if c.Kind == "create" {
+		created[c.ID] = res.DSL
+	}
+	log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms first=%dms out=%d chars=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",
+		c.ID, rec.Attempts, rec.AreaFallback, rec.ClaudeMs, rec.FirstEventMs, rec.Usage.OutputTokens, rec.OutputChars,
+		rec.Metrics.Tabs, rec.Metrics.Screens, rec.Metrics.AreaRatio, rec.ExpectMisses, rec.Summary)
+	return rec
+}
+
 func measure(a *dsl.App) *Metrics {
 	m := &Metrics{Tabs: len(a.App.Tabs), Screens: len(a.Screens), Entities: len(a.Entities)}
-	for _, e := range a.Entities {
+	for i := range a.Entities {
+		e := &a.Entities[i]
 		m.Fields += len(e.Fields)
+		m.Scopes = append(m.Scopes, e.ID+":"+string(e.EffectiveScope()))
 	}
 	for _, n := range a.App.Notifications {
 		m.Notifications = append(m.Notifications, n.Repeat+"@"+n.Time)
@@ -308,6 +363,17 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 			if !found {
 				miss = append(miss, fmt.Sprintf("notification=%v (want %s)", m.Notifications, want))
 			}
+		case "scope":
+			want := fmt.Sprint(v)
+			found := false
+			for _, s := range m.Scopes {
+				if strings.HasSuffix(s, ":"+want) {
+					found = true
+				}
+			}
+			if !found {
+				miss = append(miss, fmt.Sprintf("scope=%v (want %s)", m.Scopes, want))
+			}
 		}
 	}
 	sort.Strings(miss)
@@ -331,8 +397,8 @@ func percentile(v []int64, p float64) int64 {
 
 func summarize(recs []Record) Summary {
 	var s Summary
-	var createMs, editMs []int64
-	var outAll, outCreate, outEdit, nCreate, nEdit int
+	var createMs, editMs, firstMs []int64
+	var outAll, outCreate, outEdit, nCreate, nEdit, charsCreate int
 	var areaSum float64
 	var areaN int
 	for _, r := range recs {
@@ -357,7 +423,11 @@ func summarize(recs []Record) Summary {
 		outAll += r.Usage.OutputTokens
 		if r.Kind == "create" {
 			createMs = append(createMs, r.ClaudeMs)
+			if r.FirstEventMs > 0 {
+				firstMs = append(firstMs, r.FirstEventMs)
+			}
 			outCreate += r.Usage.OutputTokens
+			charsCreate += r.OutputChars
 			nCreate++
 			if r.Metrics != nil && r.Metrics.Tabs >= 2 {
 				s.TabbedCreates++
@@ -375,11 +445,13 @@ func summarize(recs []Record) Summary {
 	s.CreateP50Ms = percentile(createMs, 0.5)
 	s.CreateP95Ms = percentile(createMs, 0.95)
 	s.EditP50Ms = percentile(editMs, 0.5)
+	s.CreateFirstP50Ms = percentile(firstMs, 0.5)
 	if s.OK > 0 {
 		s.AvgOutTokens = float64(outAll) / float64(s.OK)
 	}
 	if nCreate > 0 {
 		s.AvgCreateOut = float64(outCreate) / float64(nCreate)
+		s.AvgCreateOutChars = float64(charsCreate) / float64(nCreate)
 	}
 	if nEdit > 0 {
 		s.AvgEditOut = float64(outEdit) / float64(nEdit)
@@ -391,9 +463,9 @@ func summarize(recs []Record) Summary {
 }
 
 func printTable(run Run) {
-	fmt.Printf("\n## %s %s effort=%s\n\n", run.Date, run.Model, run.Effort)
-	fmt.Println("| id | kind | loc | ok | att | fb | claude ms | in/out tok | tabs | scr | comp | area% | notif | misses | summary |")
-	fmt.Println("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+	fmt.Printf("\n## %s %s effort=%s stream=%v\n\n", run.Date, run.Model, run.Effort, run.Stream)
+	fmt.Println("| id | kind | loc | ok | att | fb | claude ms | first ms | in/out tok | tabs | scr | comp | area% | notif | misses | summary |")
+	fmt.Println("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 	for _, r := range run.Cases {
 		ok := "OK"
 		if !r.OK {
@@ -424,12 +496,140 @@ func printTable(run Run) {
 		if !r.OK {
 			sum = r.Error
 		}
-		fmt.Printf("| %s | %s | %s | %s | %d | %s | %d | %d/%d | %s | %s | %s | %s | %s | %s | %s |\n",
-			r.ID, r.Kind, r.Locale, ok, r.Attempts, fb, r.ClaudeMs, r.Usage.InputTokens+r.Usage.CacheReadInputTokens+r.Usage.CacheCreationInputTokens,
+		first := "-"
+		if r.FirstEventMs > 0 {
+			first = fmt.Sprint(r.FirstEventMs)
+		}
+		fmt.Printf("| %s | %s | %s | %s | %d | %s | %d | %s | %d/%d | %s | %s | %s | %s | %s | %s | %s |\n",
+			r.ID, r.Kind, r.Locale, ok, r.Attempts, fb, r.ClaudeMs, first, r.Usage.InputTokens+r.Usage.CacheReadInputTokens+r.Usage.CacheCreationInputTokens,
 			r.Usage.OutputTokens, tabs, scr, comp, area, notif, misses, strings.ReplaceAll(sum, "|", "/"))
 	}
 	s := run.Summary
 	fmt.Printf("\nn=%d ok=%d firstPass=%d regenerated=%d areaFallback=%d failed=%d expectMisses=%d\n", s.N, s.OK, s.FirstPass, s.Regenerated, s.AreaFallback, s.Failed, s.ExpectMisses)
-	fmt.Printf("create p50=%dms p95=%dms | edit p50=%dms | avg out tokens all=%.0f create=%.0f edit=%.0f | avg area ratio=%.2f | tabbed creates=%d\n",
-		s.CreateP50Ms, s.CreateP95Ms, s.EditP50Ms, s.AvgOutTokens, s.AvgCreateOut, s.AvgEditOut, s.AvgAreaRatio, s.TabbedCreates)
+	fmt.Printf("create p50=%dms p95=%dms first-event p50=%dms | edit p50=%dms | avg out tokens all=%.0f create=%.0f edit=%.0f | avg create chars=%.0f | avg area ratio=%.2f | tabbed creates=%d\n",
+		s.CreateP50Ms, s.CreateP95Ms, s.CreateFirstP50Ms, s.EditP50Ms, s.AvgOutTokens, s.AvgCreateOut, s.AvgEditOut, s.AvgCreateOutChars, s.AvgAreaRatio, s.TabbedCreates)
+}
+
+// ---- compare ----------------------------------------------------------------
+
+type side struct {
+	name  string
+	recs  map[string][]Record // case id -> runs
+	order []string
+	all   []Record
+}
+
+func loadSide(name, glob string) (*side, error) {
+	files, err := filepath.Glob(glob)
+	if err != nil {
+		return nil, err
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("%s: no files match %q", name, glob)
+	}
+	s := &side{name: name, recs: map[string][]Record{}}
+	for _, f := range files {
+		raw, err := os.ReadFile(f)
+		if err != nil {
+			return nil, err
+		}
+		var run Run
+		if err := json.Unmarshal(raw, &run); err != nil {
+			return nil, fmt.Errorf("%s: %w", f, err)
+		}
+		for _, r := range run.Cases {
+			if _, seen := s.recs[r.ID]; !seen {
+				s.order = append(s.order, r.ID)
+			}
+			s.recs[r.ID] = append(s.recs[r.ID], r)
+			s.all = append(s.all, r)
+		}
+	}
+	return s, nil
+}
+
+func medianOf(recs []Record, f func(Record) int64) int64 {
+	var v []int64
+	for _, r := range recs {
+		if r.OK {
+			v = append(v, f(r))
+		}
+	}
+	return percentile(v, 0.5)
+}
+
+func okCount(recs []Record) (ok, first int) {
+	for _, r := range recs {
+		if r.OK {
+			ok++
+			if r.Regenerations == 0 && !r.AreaFallback {
+				first++
+			}
+		}
+	}
+	return ok, first
+}
+
+func pct(a, b int64) string {
+	if a == 0 {
+		return "-"
+	}
+	return fmt.Sprintf("%+.0f%%", float64(b-a)/float64(a)*100)
+}
+
+// compare prints per-case medians and the aggregate before/after table.
+func compare(beforeGlob, afterGlob string) error {
+	before, err := loadSide("before", beforeGlob)
+	if err != nil {
+		return err
+	}
+	after, err := loadSide("after", afterGlob)
+	if err != nil {
+		return err
+	}
+	ms := func(r Record) int64 { return r.ClaudeMs }
+	out := func(r Record) int64 { return int64(r.Usage.OutputTokens) }
+	first := func(r Record) int64 { return r.FirstEventMs }
+	fmt.Println("| id | kind | runs (before/after) | 一発通過 | Claude ms 中央値 before → after | 出力 tokens 中央値 before → after | first event ms (after) |")
+	fmt.Println("|---|---|---|---|---|---|---|")
+	ids := append([]string(nil), before.order...)
+	for _, id := range after.order {
+		if _, ok := before.recs[id]; !ok {
+			ids = append(ids, id)
+		}
+	}
+	for _, id := range ids {
+		b, a := before.recs[id], after.recs[id]
+		kind := ""
+		if len(b) > 0 {
+			kind = b[0].Kind
+		} else if len(a) > 0 {
+			kind = a[0].Kind
+		}
+		bOK, bFirst := okCount(b)
+		aOK, aFirst := okCount(a)
+		fe := "-"
+		if v := medianOf(a, first); v > 0 {
+			fe = fmt.Sprint(v)
+		}
+		fmt.Printf("| %s | %s | %d/%d | %d/%d → %d/%d | %d → %d (%s) | %d → %d (%s) | %s |\n",
+			id, kind, len(b), len(a), bFirst, bOK, aFirst, aOK,
+			medianOf(b, ms), medianOf(a, ms), pct(medianOf(b, ms), medianOf(a, ms)),
+			medianOf(b, out), medianOf(a, out), pct(medianOf(b, out), medianOf(a, out)), fe)
+	}
+	bs, as := summarize(before.all), summarize(after.all)
+	fmt.Println()
+	fmt.Println("| 指標 | before | after | 差 |")
+	fmt.Println("|---|---|---|---|")
+	fmt.Printf("| 一発通過 | %d/%d | %d/%d | |\n", bs.FirstPass, bs.N, as.FirstPass, as.N)
+	fmt.Printf("| create p50 (Claude ms) | %d | %d | %s |\n", bs.CreateP50Ms, as.CreateP50Ms, pct(bs.CreateP50Ms, as.CreateP50Ms))
+	fmt.Printf("| create p95 (Claude ms) | %d | %d | %s |\n", bs.CreateP95Ms, as.CreateP95Ms, pct(bs.CreateP95Ms, as.CreateP95Ms))
+	fmt.Printf("| create first-event p50 (ms) | %d | %d | |\n", bs.CreateFirstP50Ms, as.CreateFirstP50Ms)
+	fmt.Printf("| edit p50 (Claude ms) | %d | %d | %s |\n", bs.EditP50Ms, as.EditP50Ms, pct(bs.EditP50Ms, as.EditP50Ms))
+	fmt.Printf("| 平均出力 tokens (create) | %.0f | %.0f | %s |\n", bs.AvgCreateOut, as.AvgCreateOut, pct(int64(bs.AvgCreateOut), int64(as.AvgCreateOut)))
+	fmt.Printf("| 平均出力 tokens (edit) | %.0f | %.0f | %s |\n", bs.AvgEditOut, as.AvgEditOut, pct(int64(bs.AvgEditOut), int64(as.AvgEditOut)))
+	fmt.Printf("| 平均出力 chars (create) | %.0f | %.0f | |\n", bs.AvgCreateOutChars, as.AvgCreateOutChars)
+	fmt.Printf("| area 付与率 | %.2f | %.2f | |\n", bs.AvgAreaRatio, as.AvgAreaRatio)
+	fmt.Printf("| expect miss | %d | %d | |\n", bs.ExpectMisses, as.ExpectMisses)
+	return nil
 }

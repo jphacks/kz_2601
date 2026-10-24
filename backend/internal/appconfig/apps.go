@@ -102,6 +102,7 @@ func (h *Handler) createApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusConflict, httpx.CodeVersionConflict, "app already exists").With("currentVersion", created.CurrentVersion))
 		return
 	}
+	h.publish(r, id, app, raw, created.CurrentVersion)
 	w.Header().Set("ETag", etag(created.CurrentVersion))
 	httpx.WriteJSON(w, http.StatusCreated, appWithDSL{appSummary: summary(created), DSL: created.DSL})
 }

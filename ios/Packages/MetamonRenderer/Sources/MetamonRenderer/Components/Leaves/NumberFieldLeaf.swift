@@ -22,7 +22,7 @@ struct NumberFieldLeaf: View {
                     if isCurrency {
                         Text("¥")
                             .font(RenderTheme.Fonts.numberPrefix)
-                            .foregroundStyle(focused ? AnyShapeStyle(RenderTheme.Colors.brandA) : AnyShapeStyle(.secondary))
+                            .foregroundStyle(focused ? AnyShapeStyle(RenderTheme.Colors.brandText) : AnyShapeStyle(.secondary))
                             .accessibilityHidden(true)
                     }
                     TextField(c.placeholder ?? "0", text: form.number(field))

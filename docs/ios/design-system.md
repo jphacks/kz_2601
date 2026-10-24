@@ -19,6 +19,8 @@
 | `Colors.brandB` | `#4CC9FF`(水色) | グラデーションの終点 / チャートの 2 色目 |
 | `brandGradient` | brandA → brandB(topLeading→bottomTrailing) | primary ボタン / segmented の選択チップ / 塗り星 / ゲージ |
 | `Colors.brandSoft` | brandA 12% | secondary ボタン面 / 選択行の背景 / list のアイコン背景 |
+| `Colors.brandText` | ライト `#5F40D6` / ダーク `#A48BFF` | ブランド色の**文字**(リンク・secondary/plain ボタン・stepper/slider の値・フォーカス中ラベル)。brandA は白地 3.7:1 なので AA(4.5:1)を満たす版。`SemanticPalette.brand` として #68 の `SemanticColorContrastTests` が検算 |
+| `brandFill` | `#6A4CE8` → `#2F8FE0` | **白文字を載せる塗り**(primary ボタン・segmented 選択チップ・calendar 選択日・timer の数字)。装飾用 brandGradient の終点 `#4CC9FF` は白文字 1.9:1 で読めないため分けた。両端とも白文字 3:1 以上(`BrandContrastTests`) |
 | `Colors.canvas` | `systemGroupedBackground` | 画面背景 |
 | `Colors.surface` | `secondarySystemGroupedBackground` | カード |
 | `Colors.surfaceElevated` | `tertiarySystemGroupedBackground` | 入力の器(カードの中で一段沈む) |
@@ -45,7 +47,7 @@
 | 要素 | 角丸 | 面 | 影 |
 |---|---|---|---|
 | 入力(control) | 12 | surfaceElevated + hairline | なし(フォーカス時 brandA 1.5pt リング) |
-| ボタン | 14 | primary: brandGradient / secondary: brandSoft / destructive: red 12% | primary のみ brandA 28% ・radius 12・y 6 |
+| ボタン | 14 | primary: brandFill / secondary: brandSoft / destructive: red 12% | primary のみ brandA 28% ・radius 12・y 6 |
 | カード | 16 | surface + hairline | black 6% ・radius 10・y 3 |
 | セル・地図・シート | 24(`Radius.sheet`)| — | — |
 | サムネ | 10 | — | — |
@@ -76,9 +78,9 @@ Reduce Motion ではスタガーとハイライトを省略(即時表示)。
 | textField / secureField / textEditor | 上ラベル(caption secondary)+ 器の左にアイコン(secondary、フォーカス中は brandA)+ フォーカス時 brandA リング。placeholder は tertiary |
 | numberField | 同上。値は Number フォント、currency なら `¥` プレフィックス(secondary)、unit は末尾 |
 | datePicker / timePicker / colorPicker / toggle / stepper | 同じ器の中に「アイコン + ラベル … コントロール」の 1 行。toggle / stepper / picker のつまみは brandA |
-| picker segmented | チップ型。選択中は brandGradient + 白文字、未選択は surfaceElevated。menu は入力と同じ器 + chevron |
+| picker segmented | チップ型。選択中は brandFill + 白文字、未選択は surfaceElevated。menu は入力と同じ器 + chevron |
 | slider / rating | トラックとつまみ brandA、値は monospaced。星は brandGradient で塗る(未選択は tertiary の輪郭) |
-| button | 高さ 52・角丸 14・押下 0.97。primary = brandGradient + 白 + 影、secondary = brandSoft + brandA 文字、destructive = red 12% + red 文字、plain = brandA 文字 |
+| button | 高さ 52・角丸 14・押下 0.97。primary = brandFill + 白 + 影、secondary = brandSoft + brandText 文字、destructive = red 10% + red(AA) 文字、plain = brandText 文字。高さは @ScaledMetric、新規フォームでは deleteRecord を出さない(#73) |
 | list | 1 枚のカード。先頭に画像サムネ(角丸 10)/ アイコン(brandSoft の角丸)/ カテゴリ色ドット(subtitle の文字列から chartPalette を安定割当)。title semibold、subtitle secondary、trailing の金額は monospaced semibold。区切りは先頭要素ぶん inset した hairline。空状態は symbol + 1 行 + brandA の薄い CTA |
 | stat | 左上に 20pt の brandSoft 角丸アイコン + ラベル、値は Display。カードの左上に brandA 10% → 透明のグラデーション |
 | section / card / disclosure | section 見出しは footnote semibold secondary + kerning。card/disclosure の見出しは headline。カード内 padding 16、区切り hairline |

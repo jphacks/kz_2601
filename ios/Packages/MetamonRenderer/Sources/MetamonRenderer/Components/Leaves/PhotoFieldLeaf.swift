@@ -32,16 +32,18 @@ struct PhotoFieldLeaf: View {
 
         VStack(alignment: .leading, spacing: 8) {
             if hasPhoto {
-                PhotoView(value: value, height: 160)
+                PhotoView(value: value, height: 160, accessibilityLabel: "\(c.label ?? "写真")(添付済み)")
                 HStack(spacing: RenderTheme.Spacing.sm) {
                     Button { start() } label: {
                         Label("撮り直す", systemImage: "camera").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(RenderButtonStyle(kind: .secondary))
+                    .accessibilityHint(sourceHint)
                     Button(role: .destructive) { form.values[field] = .null } label: {
                         Label("削除", systemImage: "trash").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(RenderButtonStyle(kind: .destructive))
+                    .accessibilityLabel("\(c.label ?? "写真")を削除")
                 }
             } else {
                 Button { start() } label: {
@@ -49,6 +51,9 @@ struct PhotoFieldLeaf: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(RenderButtonStyle(kind: .secondary))
+                // VoiceOver: 「レシートを撮る, ボタン, カメラを開きます」
+                .accessibilityLabel(c.label ?? "写真を撮る / 選ぶ")
+                .accessibilityHint(sourceHint)
             }
         }
         .confirmationDialog(c.label ?? "写真", isPresented: $showChooser, titleVisibility: .hidden) {
@@ -84,6 +89,14 @@ struct PhotoFieldLeaf: View {
     }
 
     private var mode: PhotoSourceMode { PhotoSourceMode(raw: c.source) }
+
+    private var sourceHint: String {
+        switch PhotoSourcePolicy.plan(for: mode, cameraAvailable: CameraPicker.isAvailable) {
+        case .camera: "カメラを開きます"
+        case .library: "写真ライブラリを開きます"
+        case .choose: "カメラか写真ライブラリを選びます"
+        }
+    }
 
     private func start() {
         switch PhotoSourcePolicy.plan(for: mode, cameraAvailable: CameraPicker.isAvailable) {

@@ -25,7 +25,7 @@ struct TimerDisplayLeaf: View {
             }
             Text(Self.format(shown))
                 .font(.system(size: 44, weight: .semibold, design: .rounded).monospacedDigit())
-                .foregroundStyle(finished ? AnyShapeStyle(RenderTheme.Colors.negative) : AnyShapeStyle(RenderTheme.brandGradient))
+                .foregroundStyle(finished ? AnyShapeStyle(RenderTheme.Colors.negative) : AnyShapeStyle(RenderTheme.brandFill))
                 .contentTransition(.numericText())
             HStack(spacing: 12) {
                 Button(running ? "一時停止" : (elapsed > 0 && !finished ? "再開" : "開始"), systemImage: running ? "pause.fill" : "play.fill") {

@@ -18,10 +18,11 @@ struct ListLeaf: View {
         let rows = searched(filtered, entity: entity)
         let ids = rows.map(\.id)
         if rows.isEmpty {
-            let loading = rt.loading.contains(entityId)
-            EmptyPlaceholder(icon: "tray", text: loading ? "読み込み中…" : (c.emptyText ?? "まだありません"),
-                             cta: loading ? nil : "最初の 1 件を追加しましょう", loading: loading)
-                .onChange(of: ids, initial: true) { _, now in seenIds = Set(now) }
+            EmptyPlaceholder(icon: "tray", emptyText: c.emptyText ?? "まだありません", state: rt.emptyState(for: entityId),
+                             cta: "最初の 1 件を追加しましょう") {
+                Task { await rt.load(entities: [entityId], force: true) }
+            }
+            .onChange(of: ids, initial: true) { _, now in seenIds = Set(now) }
         } else {
             // 1 枚のカードに行を積み、行間は 1pt の hairline(iOS の inset grouped list と同じ読み味)
             LazyVStack(spacing: 0) {
@@ -30,10 +31,11 @@ struct ListLeaf: View {
                     ListRow(item: c.item, record: row, entity: entity, showsChevron: c.onItemTap != nil)
                         .background(highlightedId == row.id ? RenderTheme.Colors.brandSoft : Color.clear)
                         .contentShape(Rectangle())
-                        .onTapGesture {
-                            guard let action = c.onItemTap else { return }
-                            Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
-                        }
+                        .onTapGesture { open(row) }
+                        // VoiceOver: onTapGesture は読まれないので、行をボタンとして宣言しダブルタップで同じ遷移を実行
+                        .accessibilityAddTraits(c.onItemTap != nil ? .isButton : [])
+                        .accessibilityHint(c.onItemTap != nil ? "ダブルタップで開きます" : "")
+                        .accessibilityAction { open(row) }
                         .contextMenu {
                             if c.swipeToDelete == true {
                                 Button("削除", systemImage: "trash", role: .destructive) {
@@ -43,12 +45,19 @@ struct ListLeaf: View {
                         }
                 }
             }
+            // 行が少なくてもカードはセルの高さまで伸ばす(#84: 空白の下半分を作らない)。行は上詰め
+            .frame(maxHeight: .infinity, alignment: .top)
             .renderCard(padding: 0)
             .onChange(of: ids, initial: true) { _, now in markNewRows(now) }
         }
     }
 
-    /// 先頭のアイコン/画像/ドットの幅ぶんセパレータを内側に寄せる。
+    private func open(_ row: Record) {
+        guard let action = c.onItemTap else { return }
+        Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
+    }
+
+    /// 先頭のアイコン/画像の幅ぶんセパレータを内側に寄せる。
     private var separatorInset: CGFloat {
         if c.item?.image != nil { return RenderTheme.Spacing.md + 52 + RenderTheme.Spacing.row }
         if c.item?.icon != nil { return RenderTheme.Spacing.md + 36 + RenderTheme.Spacing.row }

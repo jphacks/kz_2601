@@ -54,7 +54,7 @@ func TestCreate_EnglishPromptAndSummary(t *testing.T) {
 	if !strings.Contains(user, "## 表示言語(locale)\nen (English)") {
 		t.Fatalf("user turn must carry the locale line: %s", user)
 	}
-	if !strings.Contains(f.calls[0].System, `"name": "Expense Tracker"`) || !strings.Contains(f.calls[0].System, "例 2(locale en)") {
+	if !strings.Contains(f.calls[0].System, `"name":"Expense Tracker"`) || !strings.Contains(f.calls[0].System, "例 2(locale en)") {
 		t.Fatal("system prompt must embed the English few-shot")
 	}
 	// Japanese request: ja line, Japanese template.

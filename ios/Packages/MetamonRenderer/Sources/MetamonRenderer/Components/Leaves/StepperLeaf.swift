@@ -17,7 +17,7 @@ struct StepperLeaf: View {
             InputRow(icon: FieldIcon.infer(component: c, field: fieldDef), label: label) {
                 Text(FieldCoding.display(.number(value.wrappedValue), field: fieldDef))
                     .font(.system(.body, design: .rounded).weight(.semibold).monospacedDigit())
-                    .foregroundStyle(RenderTheme.Colors.brandA)
+                    .foregroundStyle(RenderTheme.Colors.brandText)
                     .contentTransition(.numericText())
                     .animation(RenderTheme.Motion.select, value: value.wrappedValue)
                 Stepper("", value: value, in: lo...hi, step: c.step ?? 1)

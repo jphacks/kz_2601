@@ -16,25 +16,27 @@ struct ProgressBarLeaf: View {
                     Spacer()
                     Text(String(format: "%.0f%%", ratio * 100))
                         .font(.system(.subheadline, design: .rounded).weight(.semibold).monospacedDigit())
-                        .foregroundStyle(ratio >= 1 ? RenderTheme.Colors.warning : RenderTheme.Colors.brandA)
+                        .foregroundStyle(ratio >= 1 ? RenderTheme.Colors.negative : RenderTheme.Colors.brandText)
                 }
             }
             GeometryReader { g in
                 ZStack(alignment: .leading) {
                     Capsule().fill(RenderTheme.Colors.surfaceElevated)
                     Capsule()
-                        .fill(ratio >= 1 ? AnyShapeStyle(RenderTheme.Colors.warning) : AnyShapeStyle(RenderTheme.brandGradient))
+                        .fill(ratio >= 1 ? AnyShapeStyle(RenderTheme.Colors.negative) : AnyShapeStyle(RenderTheme.brandGradient))
                         .frame(width: g.size.width * ratio)
                 }
             }
             .frame(height: 10)
-            .animation(.easeOut(duration: 0.3), value: ratio)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(c.label ?? "")
-            .accessibilityValue(String(format: "%.0f%%", ratio * 100))
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: ratio)
         }
         .renderCard()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(c.label ?? "進捗")
+        .accessibilityValue(String(format: "%.0f%%", ratio * 100))
     }
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var resolvedRatio: Double {
         if let v = c.value { return v }

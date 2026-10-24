@@ -25,6 +25,7 @@ struct PickerLeaf: View {
             case "wheel":
                 picker.pickerStyle(.wheel).frame(height: 120)
             default:
+                // menu は List/Form の外ではラベルを描かないので、他の入力と同じく上にラベルを出す
                 LabeledInput(label: c.label) {
                     HStack(spacing: RenderTheme.Spacing.sm + 2) {
                         InputIcon(name: FieldIcon.infer(component: c, field: fieldDef))
@@ -80,7 +81,7 @@ struct ChipSegments: View {
                         .foregroundStyle(selected ? Color.white : Color.primary)
                         .background {
                             if selected {
-                                Capsule().fill(RenderTheme.brandGradient)
+                                Capsule().fill(RenderTheme.brandFill)
                                     .shadow(color: RenderTheme.Shadow.brandColor, radius: 6, y: 3)
                                     .matchedGeometryEffect(id: "chip", in: ns)
                             }

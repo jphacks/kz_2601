@@ -10,6 +10,8 @@ import MetamonRenderer
 struct RootView: View {
     @Environment(AppRuntime.self) private var rt
     @Environment(\.scenePhase) private var scenePhase
+    /// Renderer が上げる「最下段(行 11〜12・A〜B 列)に掛かる部品の上端 y」(Route.id → global y)。FAB 退避に使う(#83)
+    @State private var bottomObstructions: [String: CGFloat] = [:]
 
     var body: some View {
         @Bindable var rt = rt
@@ -31,10 +33,16 @@ struct RootView: View {
                 .opacity(rt.morphJob?.kind == .edit ? 0.45 : 1)
                 .blur(radius: rt.morphJob?.kind == .edit ? 1.5 : 0)
                 .allowsHitTesting(rt.morphJob == nil)
+                .onPreferenceChange(GridBottomObstructionKey.self) { bottomObstructions = $0 }
 
-            if rt.dsl.app.voiceEntry == .floating {
-                voiceFab
+            // フォーム画面(push)では FAB を出さず、ナビバー右上のマイク(`formToolbarAccessory`)が入口になる(#83)
+            ZStack {
+                if rt.dsl.app.voiceEntry == .floating, !isFormVisible {
+                    voiceFab
+                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+                }
             }
+            .animation(.easeOut(duration: 0.22), value: isFormVisible)
             if let job = rt.morphJob {
                 switch job.kind {
                 case .create:
@@ -61,18 +69,14 @@ struct RootView: View {
         .preferredColorScheme(colorScheme)
         .sheet(item: $rt.sheet) { route in
             ScreenStack(root: route)
+                .modifier(HostSheets(onModal: true))
         }
         .fullScreenCover(item: $rt.fullScreen) { route in
             ScreenStack(root: route)
+                .modifier(HostSheets(onModal: true))
         }
-        .sheet(isPresented: $rt.showVoiceSheet) {
-            VoiceInputView()
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $rt.showAppSwitcher) {
-            AppSwitcherSheet()
-        }
+        .modifier(HostSheets(onModal: false))
+        .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
         .onChange(of: rt.document.version) {
             // 変身(apply)が落ち着いてから今の画面をサムネに撮る(変身一覧カード用)
@@ -89,6 +93,22 @@ struct RootView: View {
             try? await Task.sleep(for: .seconds(2.5))
             rt.openSwitcher()
         }
+        .task {
+            // ヘッドレス E2E 用: `METAMON_AUTO_OPEN=<screen>[:push|sheet][:record]` で起動 2.5 秒後に画面を開く
+            // (`record` を付けると screen.entity の先頭レコードを編集モードで開く)
+            guard let spec = ProcessInfo.processInfo.environment["METAMON_AUTO_OPEN"], !spec.isEmpty else { return }
+            try? await Task.sleep(for: .seconds(2.5))
+            let parts = spec.split(separator: ":").map(String.init)
+            let screen = parts[0]
+            let recordId = parts.contains("record")
+                ? rt.dsl.screen(screen)?.entity.flatMap { rt.records(for: $0).first?.id } : nil
+            if parts.contains("sheet") {
+                rt.sheet = Route(screen: screen, recordId: recordId, stack: "sheet")
+            } else {
+                let stack = visibleMainRoute.stack
+                rt.paths[stack, default: []].append(Route(screen: screen, recordId: recordId, stack: stack))
+            }
+        }
         #endif
         .alert(item: $rt.confirm) { confirm in
             Alert(title: Text(confirm.message),
@@ -96,6 +116,7 @@ struct RootView: View {
                   secondaryButton: .cancel(Text("キャンセル")))
         }
         .overlay(alignment: .top) { summaryCard }
+        .overlay(alignment: .top) { errorCardOverlay }
         .overlay(alignment: .bottom) { toast }
         .onChange(of: scenePhase) { _, phase in
             rt.setForeground(phase == .active) // ホットリロードのポーリングは前面時のみ
@@ -106,28 +127,53 @@ struct RootView: View {
         switch rt.dsl.app.theme?.mode { case "light": .light; case "dark": .dark; default: nil }
     }
 
+    /// メインスタック(タブなら選択中タブ)で今いちばん上に見えている画面。モーダルは含めない(FAB はその下に隠れる)。
+    private var visibleMainRoute: Route {
+        let hasTabs = rt.dsl.app.hasTabs
+        let stack = hasTabs ? Route.tabStack(rt.selectedTab) : "main"
+        return rt.paths[stack]?.last ?? Route(screen: hasTabs ? rt.selectedTab : rt.dsl.initialScreen, stack: stack)
+    }
+
+    /// 見えている画面がフォーム(`screen.entity` あり)か。全幅の「削除」等に FAB が被るので隠す(#83)
+    private var isFormVisible: Bool {
+        rt.dsl.screen(visibleMainRoute.screen)?.entity != nil
+    }
+
     /// マイク FAB(= Tailor It 本体)。位置は `Theme.Layout.fabAlignment`(左下。DSL の「追加」ボタンが右下に来るため)。
     /// タップ = 「このアプリを変える」発話シート、長押し = メタ操作(変身一覧)。
+    /// 最下段の左端に DSL の部品がある画面では、その上端まで退避する(#83・`GridBottomObstructionKey`)。
     private var voiceFab: some View {
-        Button { rt.showVoiceSheet = true } label: {
-            Image(systemName: "mic.fill")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(width: Theme.Layout.fabSize, height: Theme.Layout.fabSize)
-                .background(Theme.brandGradient, in: Circle())
-                .overlay(Circle().strokeBorder(.white.opacity(0.25)))
-                .shadow(color: Theme.Colors.brandA.opacity(0.45), radius: 14, y: 6)
+        GeometryReader { geo in
+            let inset = Theme.Layout.fabBottomInset(
+                hasTabs: rt.dsl.app.hasTabs,
+                obstructionTop: bottomObstructions[visibleMainRoute.id],
+                rootBottom: geo.frame(in: .global).maxY
+            )
+            Button { rt.showVoiceSheet = true } label: {
+                Image(systemName: "mic.fill")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: Theme.Layout.fabSize, height: Theme.Layout.fabSize)
+                    .background(Theme.brandGradient, in: Circle())
+                    .overlay(Circle().strokeBorder(.white.opacity(0.25)))
+                    .shadow(color: Theme.Colors.brandA.opacity(0.45), radius: 14, y: 6)
+            }
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
+                    .onEnded { _ in rt.openSwitcher() }
+            )
+            .accessibilityLabel("話しかけて変える")
+            .accessibilityHint("長押しで変身一覧")
+            .accessibilityAction(named: "変身一覧") { rt.openSwitcher() }
+            // 生成中は画面と一緒に沈めて触れなくする(本体だけ薄くなり FAB だけ浮いて見えるのを防ぐ)
+            .opacity(rt.morphJob == nil ? 1 : 0.35)
+            .allowsHitTesting(rt.morphJob == nil)
+            .animation(.easeInOut(duration: 0.3), value: rt.morphJob == nil)
+            .padding(.horizontal, Theme.Layout.fabHorizontalInset)
+            .padding(.bottom, inset)
+            .animation(.easeOut(duration: 0.25), value: inset)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: Theme.Layout.fabAlignment)
         }
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
-                .onEnded { _ in rt.openSwitcher() }
-        )
-        .accessibilityLabel("話しかけて変える")
-        .accessibilityHint("長押しで変身一覧")
-        .accessibilityAction(named: "変身一覧") { rt.openSwitcher() }
-        .padding(.horizontal, Theme.Layout.fabHorizontalInset)
-        .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: rt.dsl.app.hasTabs))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: Theme.Layout.fabAlignment)
     }
 
     /// 変身直後の要約(読み上げ文)。上部カードで 3 秒表示して自動で消える。
@@ -158,6 +204,19 @@ struct RootView: View {
         }
     }
 
+    /// 生成後(edit)の失敗は音声シートが閉じているので、画面上部に状態カードを出す(#60)。初期画面と音声シートの中は `VoiceInputView` が描く。
+    @ViewBuilder
+    private var errorCardOverlay: some View {
+        if let card = rt.errorCard, !rt.dsl.isVoiceOnly, !rt.showVoiceSheet {
+            ErrorCard(presentation: card, compact: true)
+                .padding(.horizontal, Theme.Spacing.md)
+                .padding(.top, Theme.Spacing.sm)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(.spring(duration: 0.45, bounce: 0.15), value: rt.errorCard)
+                .zIndex(4)
+        }
+    }
+
     @ViewBuilder
     private var toast: some View {
         if let message = rt.toast {
@@ -166,13 +225,60 @@ struct RootView: View {
                 .padding(.horizontal, Theme.Spacing.md).padding(.vertical, Theme.Spacing.sm + 2)
                 .background(.regularMaterial, in: Capsule())
                 .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
-                .padding(.bottom, 100)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Theme.Spacing.md)
+                // マイク FAB と DSL の最下段(行 11〜12 のボタン)の上に出す(被せない)。タブ無しでも同じ高さ
+                .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .task(id: message) {
                     try? await Task.sleep(for: .seconds(3))
                     withAnimation { rt.toast = nil }
                 }
         }
+    }
+}
+
+/// フォーム画面のナビバー右上に置く小さなマイク(FAB の代わり・#83)。タップ = 発話シート、長押し = 変身一覧(FAB と同じ 2 入口)。
+private struct VoiceToolbarButton: View {
+    @Environment(AppRuntime.self) private var rt
+
+    var body: some View {
+        Button { rt.showVoiceSheet = true } label: {
+            Image(systemName: "mic.fill")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: Theme.Layout.toolbarMicSize, height: Theme.Layout.toolbarMicSize)
+                .background(Theme.brandGradient, in: Circle())
+                .overlay(Circle().strokeBorder(.white.opacity(0.25)))
+        }
+        .buttonStyle(.plain)
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
+                .onEnded { _ in rt.openSwitcher() }
+        )
+        .accessibilityLabel("話しかけて変える")
+        .accessibilityHint("長押しで変身一覧")
+        .accessibilityAction(named: "変身一覧") { rt.openSwitcher() }
+    }
+}
+
+/// 発話シート・変身一覧の present 元。フォームが sheet/fullScreen で出ている間は根からは present できない(二重 present になる)ので、
+/// モーダルの中身にも同じ 2 枚を付け、「モーダルが出ているか」で片方だけが実際に開く。
+private struct HostSheets: ViewModifier {
+    let onModal: Bool
+    @Environment(AppRuntime.self) private var rt
+
+    func body(content: Content) -> some View {
+        let active = onModal == (rt.sheet != nil || rt.fullScreen != nil)
+        content
+            .sheet(isPresented: Binding(get: { active && rt.showVoiceSheet }, set: { rt.showVoiceSheet = $0 })) {
+                VoiceInputView()
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: Binding(get: { active && rt.showAppSwitcher }, set: { rt.showAppSwitcher = $0 })) {
+                AppSwitcherSheet()
+            }
     }
 }
 

@@ -66,12 +66,42 @@ type Theme struct {
 }
 
 // Entity is a generic data model (e.g. 家計簿の支出). Records are stored by
-// appconfig under apps/{appId}/entities/{entityId}/records.
+// appconfig under users/{uid}/apps/{appId}/entities/{entityId}/records
+// (private) or apps_public/{appId}/entities/{entityId}/records (shared/public).
 type Entity struct {
-	ID         string  `json:"id"`
-	Name       string  `json:"name"`
-	TitleField string  `json:"titleField,omitempty"`
-	Fields     []Field `json:"fields"`
+	ID         string      `json:"id"`
+	Name       string      `json:"name"`
+	TitleField string      `json:"titleField,omitempty"`
+	Scope      EntityScope `json:"scope,omitempty"` // "" = private
+	Fields     []Field     `json:"fields"`
+}
+
+// EntityScope says who shares an entity's records.
+type EntityScope string
+
+const (
+	ScopePrivate EntityScope = "private" // owner only (default)
+	ScopeShared  EntityScope = "shared"  // v1: same as public; participant-only later
+	ScopePublic  EntityScope = "public"  // anyone can read; signed-in users can post
+)
+
+// ReservedRecordFields are set by appconfig on shared/public records and
+// therefore cannot be user-defined field ids on such entities.
+var ReservedRecordFields = []string{"author", "authorName"}
+
+// EffectiveScope resolves the default.
+func (e *Entity) EffectiveScope() EntityScope {
+	if e.Scope == "" {
+		return ScopePrivate
+	}
+	return e.Scope
+}
+
+// IsShared reports whether records live in the app-wide (uid-independent)
+// collection. shared and public are the same in v1.
+func (e *Entity) IsShared() bool {
+	s := e.EffectiveScope()
+	return s == ScopeShared || s == ScopePublic
 }
 
 // FieldType is the closed set of record field types.
@@ -349,6 +379,17 @@ func Initial() App {
 			},
 		}},
 	}
+}
+
+// HasSharedEntity reports whether any entity is shared/public (appconfig then
+// also publishes the DSL under apps_public/{appId} so other users can open it).
+func (a *App) HasSharedEntity() bool {
+	for i := range a.Entities {
+		if a.Entities[i].IsShared() {
+			return true
+		}
+	}
+	return false
 }
 
 // EntityByID returns the entity or nil.

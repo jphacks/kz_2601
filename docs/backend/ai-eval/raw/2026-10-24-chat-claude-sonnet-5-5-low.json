@@ -1,0 +1,287 @@
+{
+  "date": "2026-10-24",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "cases": [
+    {
+      "id": "kakeibo_short",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "家計簿",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "レシートの写真も残したいですか?",
+          "suggestions": [
+            "写真も残す",
+            "文字だけでOK",
+            "お任せ"
+          ],
+          "claudeMs": 7499,
+          "totalMs": 7499,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 82,
+            "outputTokens": 187,
+            "cacheCreationInputTokens": 1368
+          }
+        }
+      ]
+    },
+    {
+      "id": "kakeibo_full",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "毎日の出費をメモできる家計簿。合計と一覧、レシート写真も残したい",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 1,
+          "text": "では作りますね。",
+          "brief": {
+            "name": "毎日の家計簿",
+            "purpose": "毎日の出費をメモして、合計と一覧で確認できる家計簿アプリ",
+            "entities": [
+              "金額",
+              "カテゴリ",
+              "日付",
+              "メモ",
+              "レシート写真"
+            ],
+            "features": [
+              "出費の追加",
+              "支出一覧",
+              "合計金額の表示",
+              "レシート写真の添付"
+            ],
+            "native": [
+              "camera"
+            ]
+          },
+          "transcript": "毎日の出費をメモできる家計簿アプリを作って。金額とカテゴリと日付とメモを記録して、合計と支出一覧を見たい。レシートの写真も残したい。",
+          "claudeMs": 2572,
+          "totalMs": 2572,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 110,
+            "outputTokens": 226,
+            "cacheReadInputTokens": 1368
+          }
+        }
+      ]
+    },
+    {
+      "id": "training",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "筋トレ",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "何を一番記録したいですか?",
+          "suggestions": [
+            "重量と回数",
+            "体重の推移",
+            "トレ日の記録"
+          ],
+          "claudeMs": 2149,
+          "totalMs": 2149,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 83,
+            "outputTokens": 173,
+            "cacheReadInputTokens": 1368
+          }
+        },
+        {
+          "say": "腕立てとスクワット、朝8時に通知",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 2,
+          "text": "では作りますね。",
+          "brief": {
+            "name": "筋トレ記録",
+            "purpose": "腕立てとスクワットの回数を記録し、毎朝8時に通知で知らせる。",
+            "entities": [
+              "種目(腕立て・スクワット)",
+              "回数",
+              "日付"
+            ],
+            "features": [
+              "種目ごとの回数を記録するボタン",
+              "記録の一覧",
+              "今日の合計回数",
+              "毎朝8時の通知"
+            ],
+            "native": [
+              "notification"
+            ]
+          },
+          "transcript": "筋トレ記録アプリを作って。腕立てとスクワットの回数と日付を記録して、記録の一覧と今日の合計回数を見たい。毎朝8時に通知してほしい。",
+          "claudeMs": 2387,
+          "totalMs": 2387,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 125,
+            "outputTokens": 238,
+            "cacheReadInputTokens": 1368
+          }
+        }
+      ]
+    },
+    {
+      "id": "diary_en",
+      "group": "en",
+      "locale": "en",
+      "ok": true,
+      "steps": [
+        {
+          "say": "a diary",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "Should entries include photos?",
+          "suggestions": [
+            "Text only",
+            "With photos",
+            "With mood"
+          ],
+          "claudeMs": 2051,
+          "totalMs": 2051,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 88,
+            "outputTokens": 170,
+            "cacheReadInputTokens": 1368
+          }
+        }
+      ]
+    },
+    {
+      "id": "just_build",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "家計簿",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "レシートの写真も残したいですか?",
+          "suggestions": [
+            "写真も残す",
+            "文字だけでいい",
+            "お任せ"
+          ],
+          "claudeMs": 2618,
+          "totalMs": 2618,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 82,
+            "outputTokens": 198,
+            "cacheReadInputTokens": 1368
+          }
+        },
+        {
+          "say": "もう作って",
+          "ok": true,
+          "kind": "ready",
+          "source": "shortcut",
+          "turn": 2,
+          "text": "では作りますね。",
+          "brief": {
+            "name": "シンプル家計簿",
+            "purpose": "日々の支出を記録して、今月の合計を確認する",
+            "entities": [
+              "金額",
+              "カテゴリ",
+              "日付",
+              "メモ"
+            ],
+            "features": [
+              "今月の合計表示",
+              "支出の一覧"
+            ],
+            "native": []
+          },
+          "transcript": "家計簿アプリを作って。金額とカテゴリと日付とメモを記録して、今月の合計と支出一覧を見たい。",
+          "claudeMs": 0,
+          "totalMs": 0,
+          "attempts": 0,
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "training_en_full",
+      "group": "en",
+      "locale": "en",
+      "ok": true,
+      "steps": [
+        {
+          "say": "A workout log for pushups and squats, remind me at 8 in the morning",
+          "ok": true,
+          "kind": "ready",
+          "source": "claude",
+          "turn": 1,
+          "text": "Got it, I'll build it now.",
+          "brief": {
+            "name": "Pushup \u0026 Squat Log",
+            "purpose": "Log pushup and squat workouts and get a reminder every morning at 8.",
+            "entities": [
+              "Exercise (pushups or squats)",
+              "Reps",
+              "Date"
+            ],
+            "features": [
+              "Add a workout entry",
+              "List of past workouts",
+              "Daily totals per exercise",
+              "Daily reminder at 8:00 AM"
+            ],
+            "native": [
+              "notification"
+            ]
+          },
+          "transcript": "I want a workout log app for pushups and squats. I want to record the exercise, number of reps, and date, and see a list of my workouts along with daily totals for each exercise. Please remind me with a notification every morning at 8.",
+          "claudeMs": 2301,
+          "totalMs": 2301,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 108,
+            "outputTokens": 238,
+            "cacheReadInputTokens": 1368
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "cases": 6,
+    "casesOk": 6,
+    "steps": 8,
+    "stepsOk": 8,
+    "claudeCalls": 7,
+    "claudeP50Ms": 2387,
+    "claudeP95Ms": 7499,
+    "totalP50Ms": 2387
+  }
+}

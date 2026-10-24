@@ -57,9 +57,12 @@ public enum RenderTheme {
         /// 1pt の薄い枠線・セパレータ
         public static let hairline = Color.primary.opacity(0.08)
         public static let separator = Color(.separator)
-        public static let positive = Color.green
-        public static let negative = Color.red
-        public static let warning = Color.orange
+        /// ブランド色の**文字**(リンク・secondary ボタン・値)。brandA は白地で 3.7:1 しか無いので AA(4.5:1)を満たすトーン(#68 SemanticPalette で検算)
+        public static let brandText = SemanticPalette.color(SemanticPalette.brand)
+        /// semantic(AA を満たす #68 のトーン。文字にも塗りにも使う)
+        public static let positive = SemanticPalette.color(SemanticPalette.green)
+        public static let negative = SemanticPalette.color(SemanticPalette.red)
+        public static let warning = SemanticPalette.color(SemanticPalette.orange)
 
         /// chart / カテゴリ色ドット。先頭 2 色がブランド、以降は systemColor(ダークで映える)
         public static let chartPalette: [Color] = [brandA, brandB, .mint, .indigo, .orange, .pink, .teal, .purple]
@@ -83,8 +86,8 @@ public enum RenderTheme {
     }
 
     public enum Fonts {
-        /// stat の数値(大きく・等幅数字・rounded)
-        public static let statValue = Font.system(.title, design: .rounded).weight(.bold).monospacedDigit()
+        /// stat の数値(大きく・等幅数字・rounded)。基準 56pt から `minimumScaleFactor` でセルの高さに収まるまで縮める
+        public static let statValue = Font.system(size: 56, design: .rounded).weight(.bold).monospacedDigit()
         public static let statLabel = Font.footnote.weight(.medium)
         /// numberField の入力値(金額が主役)
         public static let number = Font.system(.title2, design: .rounded).weight(.semibold).monospacedDigit()
@@ -122,6 +125,11 @@ public enum RenderTheme {
     /// ブランドグラデーション(primary ボタン・選択チップ・塗り星・ゲージ)
     public static let brandGradient = LinearGradient(
         colors: [Colors.brandA, Colors.brandB],
+        startPoint: .topLeading, endPoint: .bottomTrailing
+    )
+    /// 白文字を載せる塗り(primary ボタン・segmented の選択チップ・calendar の選択日)。白文字 3:1 以上(BrandContrastTests)
+    public static let brandFill = LinearGradient(
+        colors: [SemanticPalette.swiftUI(SemanticPalette.brandFillStart), SemanticPalette.swiftUI(SemanticPalette.brandFillEnd)],
         startPoint: .topLeading, endPoint: .bottomTrailing
     )
     /// カードの左上に敷く極薄のブランド(stat)
@@ -192,13 +200,48 @@ struct Hairline: View {
     }
 }
 
-/// 空・読み込み中のプレースホルダ(`emptyState` 風)。list / table / timeline / chart が共用。
-/// `cta` があればブランド色の薄い 1 行を添える(「最初の 1 件を追加」など)。
+/// 空・読み込み中・取得失敗のプレースホルダ(`emptyState` 風)。list / table / timeline / chart が共用。
+/// `state == .unavailable`(#85: サーバーから取れずローカルにも無い)は空状態と区別し「読み込めませんでした」+ 再試行ボタン。
+/// `cta` があれば空状態にだけブランド色の薄い 1 行を添える(「最初の 1 件を追加」など・#89)。
 struct EmptyPlaceholder: View {
     var icon: String = "tray"
     var text: String
     var cta: String? = nil
     var loading = false
+    var state: EmptyState = .empty
+    var retry: (() -> Void)? = nil
+
+    static let loadingText = "読み込み中…"
+    static let unavailableText = "読み込めませんでした"
+    static let retryLabel = "再試行"
+    /// stat の値に出す「取れていない」印
+    static let unavailableValue = "—"
+
+    /// list / table / timeline / chart 共通の組み立て: 状態から文言・アイコンを決める。
+    init(icon: String = "tray", emptyText: String, state: EmptyState, cta: String? = nil, retry: (() -> Void)? = nil) {
+        self.state = state
+        self.cta = cta
+        self.loading = state == .loading
+        self.retry = state == .unavailable ? retry : nil
+        switch state {
+        case .loading:
+            self.icon = icon
+            self.text = Self.loadingText
+        case .unavailable:
+            self.icon = "wifi.exclamationmark"
+            self.text = Self.unavailableText
+        case .empty:
+            self.icon = icon
+            self.text = emptyText
+        }
+    }
+
+    init(icon: String = "tray", text: String, loading: Bool = false) {
+        self.icon = icon
+        self.text = text
+        self.loading = loading
+        self.state = loading ? .loading : .empty
+    }
 
     var body: some View {
         VStack(spacing: RenderTheme.Spacing.sm) {
@@ -210,18 +253,29 @@ struct EmptyPlaceholder: View {
                     .foregroundStyle(RenderTheme.Colors.brandA.opacity(0.55))
                     .frame(width: 44, height: 44)
                     .background(RenderTheme.Colors.brandSoft, in: Circle())
+                    .accessibilityHidden(true)
             }
             Text(text)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            if let cta, !loading {
+            if let cta, state == .empty {
                 Text(cta)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(RenderTheme.Colors.brandA.opacity(0.8))
+                    .foregroundStyle(RenderTheme.Colors.brandText)
+            }
+            if let retry {
+                Button(action: retry) {
+                    Label(Self.retryLabel, systemImage: "arrow.clockwise")
+                        .font(.footnote.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(RenderTheme.Colors.brandText)
+                .padding(.top, RenderTheme.Spacing.xs)
             }
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity) // 器(セル)が高さを渡してくれば全体を使い中央に置く(#84)
         .padding(.vertical, RenderTheme.Spacing.lg)
         .padding(.horizontal, RenderTheme.Spacing.md)
         .background(

@@ -27,7 +27,7 @@ struct SliderLeaf: View {
                     .tint(RenderTheme.Colors.brandA)
                     Text(FieldCoding.display(.number(value.wrappedValue), field: fieldDef))
                         .font(.system(.body, design: .rounded).weight(.semibold).monospacedDigit())
-                        .foregroundStyle(RenderTheme.Colors.brandA)
+                        .foregroundStyle(RenderTheme.Colors.brandText)
                         .frame(minWidth: 40, alignment: .trailing)
                         .contentTransition(.numericText())
                 }

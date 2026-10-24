@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
@@ -52,8 +53,27 @@ type Meta struct {
 	AreaFallback     bool     `json:"areaFallback"`  // areas stripped to pass validation
 	DowngradedToFull bool     `json:"downgradedToFull,omitempty"`
 	Usage            Usage    `json:"usage"`
+	OutputChars      int      `json:"outputChars,omitempty"` // model text length (whitespace share diagnostics)
 	LastProblems     []string `json:"lastProblems,omitempty"`
 }
+
+// Event is a progress message emitted by GenerateStream before the Result,
+// as soon as the first top-level block of the model output is complete:
+// create turns send `app` (name / description / tabs + a provisional spoken
+// line), edit turns send `summary`. iOS can show and read them out while the
+// rest of the DSL is still being generated.
+type Event struct {
+	Type        string   `json:"type"` // app|summary
+	Attempt     int      `json:"attempt"`
+	Locale      Locale   `json:"locale"`
+	Name        string   `json:"name,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Tabs        []string `json:"tabs,omitempty"`
+	Summary     string   `json:"summary,omitempty"`
+}
+
+// Sink receives Events in order, on the calling goroutine.
+type Sink func(Event)
 
 // Result is the 200 body of POST /v1/generate.
 type Result struct {
@@ -90,6 +110,9 @@ type Service struct {
 	Model            string
 	MaxRegenerations int           // validation-driven retries after the first attempt (default 2)
 	CallTimeout      time.Duration // per Claude call (default 40s)
+
+	conv     *convStore // clarify conversations (chat.go); lazily created
+	convOnce sync.Once
 }
 
 func (s *Service) maxRegen() int {
@@ -113,6 +136,13 @@ type attemptResult struct {
 // Generate runs the pipeline: fetch current -> decide mode -> Claude ->
 // validate (retry) -> fallback -> save -> result.
 func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
+	return s.GenerateStream(ctx, req, nil)
+}
+
+// GenerateStream is Generate with Claude streaming: sink (if non-nil) gets
+// an Event as soon as the app block / summary has been generated; the Result
+// is still validated and saved before it is returned.
+func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*Result, error) {
 	started := time.Now()
 	transcript := strings.TrimSpace(req.Transcript)
 	if transcript == "" {
@@ -155,9 +185,9 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 		if !isInitial(current) {
 			ref = string(env.DSL)
 		}
-		ar, err = s.generateFull(ctx, transcript, ref, nil, loc)
+		ar, err = s.generateFull(ctx, transcript, ref, nil, loc, sink)
 	case ModeEdit:
-		ar, err = s.generateEdit(ctx, transcript, env, loc)
+		ar, err = s.generateEdit(ctx, transcript, env, loc, sink)
 	default:
 		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "mode must be auto|create|edit|undo"}
 	}
@@ -201,7 +231,7 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 
 // generateFull asks for a whole AppDSL; on validation problems it re-prompts
 // up to maxRegen times, then strips areas, then fails with the problems.
-func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, meta *Meta, loc Locale) (*attemptResult, error) {
+func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, meta *Meta, loc Locale, sink Sink) (*attemptResult, error) {
 	ar := &attemptResult{}
 	if meta != nil {
 		ar.meta = *meta
@@ -210,11 +240,12 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 	var problems []string
 	var lastCandidate []byte
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(ctx, systemPrompt, createUserMessage(transcript, refDSL, problems, loc), GenerationSchema(), ar)
+		resp, err := s.call(ctx, systemPrompt, createUserMessage(transcript, refDSL, problems, loc), GenerationSchema(), ar,
+			appEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
 			return nil, err
 		}
-		raw := extractJSON(resp.Text)
+		raw := fillDefaults(extractJSON(resp.Text))
 		app, perr := dsl.Parse(raw)
 		if perr == nil {
 			ar.raw = canon(raw)
@@ -239,7 +270,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 
 // generateEdit asks for a PatchDocument, validates with dsl.ApplyPatch, retries
 // with problems, then tries area-stripping, then downgrades to a full rewrite.
-func (s *Service) generateEdit(ctx context.Context, transcript string, env *appconfigclient.Envelope, loc Locale) (*attemptResult, error) {
+func (s *Service) generateEdit(ctx context.Context, transcript string, env *appconfigclient.Envelope, loc Locale, sink Sink) (*attemptResult, error) {
 	ar := &attemptResult{}
 	ar.meta.Model = s.Model
 	var problems []string
@@ -247,7 +278,8 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	var lastSummary string
 	for i := 0; i <= s.maxRegen(); i++ {
 		resp, err := s.call(ctx, systemPrompt+"\n"+editRules,
-			editUserMessage(transcript, env.Version, string(env.DSL), problems, loc), PatchGenerationSchema(), ar)
+			editUserMessage(transcript, env.Version, string(env.DSL), problems, loc), PatchGenerationSchema(), ar,
+			summaryEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
 			return nil, err
 		}
@@ -260,6 +292,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 			ar.meta.LastProblems = problems
 			continue
 		}
+		doc.Patch = fillPatchDefaults(doc.Patch, env.DSL)
 		next, _, perr := dsl.ApplyPatch(env.DSL, doc.Patch)
 		if perr == nil {
 			ar.raw = next
@@ -289,7 +322,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	meta := ar.meta
 	meta.DowngradedToFull = true
 	full := &Service{Claude: s.Claude, Store: s.Store, Model: s.Model, MaxRegenerations: -1, CallTimeout: s.CallTimeout}
-	fr, err := full.generateFull(ctx, transcript, string(env.DSL), &meta, loc)
+	fr, err := full.generateFull(ctx, transcript, string(env.DSL), &meta, loc, sink)
 	if err != nil {
 		var ge *Error
 		if errors.As(err, &ge) {
@@ -302,7 +335,8 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 }
 
 // call performs one Claude request and folds usage/attempts/latency into ar.
-func (s *Service) call(ctx context.Context, system, user string, schema json.RawMessage, ar *attemptResult) (*Response, error) {
+// onText (nil = non-streaming) receives the text deltas.
+func (s *Service) call(ctx context.Context, system, user string, schema json.RawMessage, ar *attemptResult, onText func(string)) (*Response, error) {
 	timeout := s.CallTimeout
 	if timeout == 0 {
 		timeout = 40 * time.Second
@@ -310,7 +344,7 @@ func (s *Service) call(ctx context.Context, system, user string, schema json.Raw
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	t := time.Now()
-	resp, err := s.Claude.Complete(cctx, Completion{System: system, Messages: []Message{{Role: "user", Content: user}}, Schema: schema})
+	resp, err := s.Claude.Complete(cctx, Completion{System: system, Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
 	ar.latency += time.Since(t)
 	ar.meta.Attempts++
 	ar.meta.Regenerations = ar.meta.Attempts - 1
@@ -318,6 +352,7 @@ func (s *Service) call(ctx context.Context, system, user string, schema json.Raw
 		return nil, mapClaudeErr(err)
 	}
 	ar.meta.Usage.Add(resp.Usage)
+	ar.meta.OutputChars += len(resp.Text)
 	if resp.StopReason == "refusal" {
 		msg := "the model declined this request"
 		if resp.StopDetails != nil && resp.StopDetails.Category != "" {
@@ -326,6 +361,82 @@ func (s *Service) call(ctx context.Context, system, user string, schema json.Raw
 		return nil, &Error{Status: http.StatusBadRequest, Code: "refused", Message: msg, Attempts: ar.meta.Attempts}
 	}
 	return resp, nil
+}
+
+// appEventWatcher returns the OnText hook for a create turn: when the
+// top-level `app` object has been streamed, it emits one Event with the
+// name / tabs and a provisional spoken line. nil sink = no streaming.
+func appEventWatcher(sink Sink, loc Locale, attempt int) func(string) {
+	if sink == nil {
+		return nil
+	}
+	w := newKeyWatcher("app")
+	return func(delta string) {
+		raw, ok := w.Feed(delta)
+		if !ok {
+			return
+		}
+		var meta dsl.AppMeta
+		if err := json.Unmarshal(raw, &meta); err != nil || strings.TrimSpace(meta.Name) == "" {
+			return
+		}
+		ev := Event{Type: "app", Attempt: attempt, Locale: loc, Name: meta.Name, Description: meta.Description}
+		for _, t := range meta.Tabs {
+			ev.Tabs = append(ev.Tabs, t.Title)
+		}
+		ev.Summary = draftSummary(&meta, loc)
+		sink(ev)
+	}
+}
+
+// summaryEventWatcher is the edit-turn counterpart: the PatchDocument is
+// written summary-first, so the spoken line is available before the ops.
+func summaryEventWatcher(sink Sink, loc Locale, attempt int) func(string) {
+	if sink == nil {
+		return nil
+	}
+	w := newKeyWatcher("summary")
+	return func(delta string) {
+		raw, ok := w.Feed(delta)
+		if !ok {
+			return
+		}
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil || strings.TrimSpace(s) == "" {
+			return
+		}
+		sink(Event{Type: "summary", Attempt: attempt, Locale: loc, Summary: strings.TrimSpace(s)})
+	}
+}
+
+// draftSummary is the provisional line read out while the screens are still
+// being generated: 「家計簿アプリを作っています。ホームと集計の2タブです。」 /
+// "Making a Budget Book app with 2 tabs: Home and Stats."
+func draftSummary(m *dsl.AppMeta, loc Locale) string {
+	titles := make([]string, 0, len(m.Tabs))
+	for _, t := range m.Tabs {
+		titles = append(titles, t.Title)
+	}
+	if loc == LocaleEN {
+		name := strings.TrimSpace(m.Name)
+		if !strings.HasSuffix(strings.ToLower(name), "app") {
+			name += " app"
+		}
+		s := "Making " + withArticle(name)
+		if len(titles) >= 2 {
+			s += fmt.Sprintf(" with %d tabs: %s", len(titles), joinEN(titles, "and"))
+		}
+		return s + "."
+	}
+	name := m.Name
+	if !strings.HasSuffix(name, "アプリ") {
+		name += "アプリ"
+	}
+	s := name + "を作っています。"
+	if len(titles) >= 2 {
+		s += fmt.Sprintf("%sの%dタブです。", joinJa(titles), len(titles))
+	}
+	return s
 }
 
 func problemsOf(err error, resp *Response) []string {

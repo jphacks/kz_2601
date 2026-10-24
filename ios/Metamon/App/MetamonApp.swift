@@ -28,8 +28,11 @@ struct MetamonApp: App {
         }
         document.appId = appId
         self.services = services
-        _runtime = State(initialValue: AppRuntime(document: document, services: services))
-        _session = State(initialValue: AuthSession(service: services.auth))
+        let runtime = AppRuntime(document: document, services: services)
+        let session = AuthSession(service: services.auth)
+        runtime.onSessionExpired = { session.expire() } // 401 が続いたらサインイン画面へ(#60)
+        _runtime = State(initialValue: runtime)
+        _session = State(initialValue: session)
     }
 
     var body: some Scene {

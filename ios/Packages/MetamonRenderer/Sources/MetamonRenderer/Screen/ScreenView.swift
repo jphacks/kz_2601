@@ -4,6 +4,7 @@ import MetamonDSL
 /// Route → Screen 定義を引いて描画する。NavigationStack の destination / sheet の中身。
 public struct ScreenView: View {
     @Environment(\.dslRuntime) private var rt
+    @Environment(\.formToolbarAccessory) private var formToolbarAccessory
     let route: Route
     @State private var form: FormDraft?
     @State private var locals = ScreenLocals()
@@ -19,6 +20,10 @@ public struct ScreenView: View {
                 .navigationTitle(screen.title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    // フォーム画面はホストの FAB を隠す代わりに、ナビバー右上(DSL のボタンより左)に小さな入口を置く(#83)
+                    if screen.entity != nil, let accessory = formToolbarAccessory {
+                        ToolbarItem(placement: .topBarTrailing) { accessory }
+                    }
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         ForEach(screen.toolbar.filter { tb in !FormSaveBar.pinned(in: screen).contains { $0.id == tb.id } }) { tb in
                             Button {
@@ -61,6 +66,19 @@ public struct ScreenView: View {
             }
             form = draft
         }
+    }
+}
+
+private struct FormToolbarAccessoryKey: EnvironmentKey {
+    static let defaultValue: AnyView? = nil
+}
+
+public extension EnvironmentValues {
+    /// フォーム画面(`screen.entity` あり・sheet/push どちらも)のナビバー右上にホストが差し込む小さな View(例: マイク)。
+    /// 左下の FAB が全幅ボタンに被るのを避けるため、フォーム画面ではホストが FAB を隠してこちらを入口にする(#83)。
+    var formToolbarAccessory: AnyView? {
+        get { self[FormToolbarAccessoryKey.self] }
+        set { self[FormToolbarAccessoryKey.self] = newValue }
     }
 }
 

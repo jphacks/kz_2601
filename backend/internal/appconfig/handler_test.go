@@ -340,3 +340,119 @@ func TestRecords(t *testing.T) {
 		t.Fatalf("entities: %d %s", r.code, r.raw)
 	}
 }
+
+// sharedKakeibo is the kakeibo example with the expense entity made public.
+func sharedKakeibo(t *testing.T) []byte {
+	t.Helper()
+	const anchor = `"id": "expense",`
+	raw := string(kakeibo(t))
+	if !strings.Contains(raw, anchor) {
+		t.Fatal("kakeibo example changed")
+	}
+	return []byte(strings.Replace(raw, anchor, anchor+` "scope": "public",`, 1))
+}
+
+func TestSharedRecords(t *testing.T) {
+	e := newEnv(t)
+	const app = "/v1/apps/SHARED-APP-1"
+	recs := app + "/entities/expense/records"
+
+	// reserved field on a public entity -> 422
+	bad := strings.Replace(string(sharedKakeibo(t)), `{ "id": "memo", "name": "メモ", "type": "string" }`, `{ "id": "author", "name": "投稿者", "type": "string" }`, 1)
+	e.do("u1", http.MethodGet, app+"/dsl", nil, nil)
+	r := e.do("u1", http.MethodPut, app+"/dsl", putBody([]byte(bad)), map[string]string{"If-Match": `"1"`})
+	if r.code != http.StatusUnprocessableEntity || !strings.Contains(string(r.raw), "reserved") {
+		t.Fatalf("reserved field: %d %s", r.code, r.raw)
+	}
+
+	// u1 publishes an app with a public entity
+	if r = e.do("u1", http.MethodPut, app+"/dsl", putBody(sharedKakeibo(t)), map[string]string{"If-Match": `"1"`}); r.code != http.StatusCreated {
+		t.Fatalf("put: %d %s", r.code, r.raw)
+	}
+
+	// u1 posts: author/authorName are set by the server (匿名 when omitted; data cannot carry them)
+	if r = e.do("u1", http.MethodPost, recs, `{"data":{"amount":100,"author":"x"}}`, nil); r.code != http.StatusBadRequest {
+		t.Fatalf("author in data must be an unknown field: %d %s", r.code, r.raw)
+	}
+	r = e.do("u1", http.MethodPost, recs, `{"data":{"amount":100,"memo":"u1の投稿"},"clientId":"c-1"}`, nil)
+	if r.code != http.StatusCreated || r.body["author"] != "u1" || r.body["authorName"] != "匿名" {
+		t.Fatalf("u1 create: %d %s", r.code, r.raw)
+	}
+	id1 := r.body["id"].(string)
+
+	// u2 opens the same appId: the published DSL is installed (not the initial one)
+	r = e.do("u2", http.MethodGet, app+"/dsl", nil, nil)
+	if r.code != http.StatusOK || r.version() != 1 {
+		t.Fatalf("u2 install: %d %s", r.code, r.raw)
+	}
+	if d, _ := r.body["dsl"].(map[string]any); len(d["entities"].([]any)) != 1 {
+		t.Fatalf("u2 must get the published dsl: %s", r.raw)
+	}
+	// u2 sees u1's post and adds their own (same clientId as u1 must not collide)
+	r = e.do("u2", http.MethodGet, recs, nil, nil)
+	if items, _ := r.body["items"].([]any); len(items) != 1 || items[0].(map[string]any)["author"] != "u1" {
+		t.Fatalf("u2 list: %d %s", r.code, r.raw)
+	}
+	r = e.do("u2", http.MethodPost, recs, `{"data":{"amount":200,"memo":"u2の投稿"},"clientId":"c-1","authorName":"  さくら "}`, nil)
+	if r.code != http.StatusCreated || r.body["author"] != "u2" || r.body["authorName"] != "さくら" || r.body["id"] == id1 {
+		t.Fatalf("u2 create: %d %s", r.code, r.raw)
+	}
+	id2 := r.body["id"].(string)
+	if r = e.do("u2", http.MethodPost, recs, `{"data":{"amount":1},"authorName":"`+strings.Repeat("あ", 65)+`"}`, nil); r.code != http.StatusBadRequest {
+		t.Fatalf("long authorName: %d %s", r.code, r.raw)
+	}
+	r = e.do("u1", http.MethodGet, recs+"?filterField=author&filterOp=eq&filterValue=u2", nil, nil)
+	if items, _ := r.body["items"].([]any); r.code != http.StatusOK || len(items) != 1 || items[0].(map[string]any)["id"] != id2 {
+		t.Fatalf("filter by author: %d %s", r.code, r.raw)
+	}
+
+	// only the author may update/delete; anyone may read
+	if r = e.do("u2", http.MethodPatch, recs+"/"+id1, `{"data":{"amount":999}}`, nil); r.code != http.StatusForbidden || r.errCode() != "forbidden" {
+		t.Fatalf("u2 patch u1's: %d %s", r.code, r.raw)
+	}
+	if r = e.do("u2", http.MethodDelete, recs+"/"+id1, nil, nil); r.code != http.StatusForbidden {
+		t.Fatalf("u2 delete u1's: %d %s", r.code, r.raw)
+	}
+	if r = e.do("u2", http.MethodGet, recs+"/"+id1, nil, nil); r.code != http.StatusOK || r.body["data"].(map[string]any)["amount"] != float64(100) {
+		t.Fatalf("u2 read u1's: %d %s", r.code, r.raw)
+	}
+	r = e.do("u1", http.MethodPatch, recs+"/"+id1, `{"data":{"amount":150}}`, nil)
+	if r.code != http.StatusOK || r.body["author"] != "u1" || r.body["data"].(map[string]any)["amount"] != float64(150) {
+		t.Fatalf("u1 patch own: %d %s", r.code, r.raw)
+	}
+
+	// delete-all on a shared entity removes only the caller's posts
+	if r = e.do("u2", http.MethodDelete, recs+"?confirm=true", nil, nil); r.code != http.StatusNoContent {
+		t.Fatalf("u2 delete all: %d %s", r.code, r.raw)
+	}
+	r = e.do("u1", http.MethodGet, recs, nil, nil)
+	if items, _ := r.body["items"].([]any); len(items) != 1 || items[0].(map[string]any)["id"] != id1 {
+		t.Fatalf("after u2 delete all: %s", r.raw)
+	}
+	if r = e.do("u1", http.MethodDelete, recs+"/"+id1, nil, nil); r.code != http.StatusNoContent {
+		t.Fatalf("u1 delete own: %d %s", r.code, r.raw)
+	}
+
+	// u2 editing their installed copy does not overwrite u1's published dsl
+	r = e.do("u2", http.MethodPatch, app+"/dsl", `[{"op":"replace","path":"/app/name","value":"u2版"}]`, map[string]string{"If-Match": `"1"`, "Content-Type": "application/json-patch+json"})
+	if r.code != http.StatusCreated {
+		t.Fatalf("u2 patch dsl: %d %s", r.code, r.raw)
+	}
+	r = e.do("u3", http.MethodGet, app+"/dsl", nil, nil)
+	if d, _ := r.body["dsl"].(map[string]any); d["app"].(map[string]any)["name"] == "u2版" {
+		t.Fatalf("u3 must install u1's version: %s", r.raw)
+	}
+
+	// private apps are untouched: another uid still gets the initial dsl and no records
+	const priv = "/v1/apps/PRIVATE-APP-1"
+	e.do("u1", http.MethodGet, priv+"/dsl", nil, nil)
+	e.do("u1", http.MethodPut, priv+"/dsl", putBody(kakeibo(t)), map[string]string{"If-Match": `"1"`})
+	r = e.do("u1", http.MethodPost, priv+"/entities/expense/records", `{"data":{"amount":1}}`, nil)
+	if r.code != http.StatusCreated || r.body["author"] != nil || r.body["authorName"] != nil {
+		t.Fatalf("private create must not carry author: %d %s", r.code, r.raw)
+	}
+	r = e.do("u2", http.MethodGet, priv+"/dsl", nil, nil)
+	if d, _ := r.body["dsl"].(map[string]any); r.code != http.StatusOK || len(d["entities"].([]any)) != 0 {
+		t.Fatalf("private app must not be installed by others: %d %s", r.code, r.raw)
+	}
+}

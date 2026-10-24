@@ -18,7 +18,7 @@ struct LabeledInput<Content: View>: View {
             if let label, !label.isEmpty {
                 Text(label)
                     .font(RenderTheme.Fonts.inputLabel)
-                    .foregroundStyle(focused ? AnyShapeStyle(RenderTheme.Colors.brandA) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(focused ? AnyShapeStyle(RenderTheme.Colors.brandText) : AnyShapeStyle(.secondary))
                     .padding(.leading, 2)
                     .animation(RenderTheme.Motion.select, value: focused)
             }

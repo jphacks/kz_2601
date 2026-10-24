@@ -2,26 +2,37 @@ package appconfig
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
+// Shared (scope: shared/public) records carry the poster.
+const (
+	defaultAuthorName = "匿名"
+	maxAuthorNameLen  = 64
+	authorField       = "author" // filterField for "my posts" on shared entities
+)
+
 type recordOut struct {
-	ID        string         `json:"id"`
-	Entity    string         `json:"entity"`
-	Data      map[string]any `json:"data"`
-	CreatedAt time.Time      `json:"createdAt"`
-	UpdatedAt time.Time      `json:"updatedAt"`
+	ID         string         `json:"id"`
+	Entity     string         `json:"entity"`
+	Data       map[string]any `json:"data"`
+	Author     string         `json:"author,omitempty"`
+	AuthorName string         `json:"authorName,omitempty"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	UpdatedAt  time.Time      `json:"updatedAt"`
 }
 
 func toRecordOut(r *store.Record) recordOut {
-	return recordOut{ID: r.ID, Entity: r.Entity, Data: r.Data, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+	return recordOut{ID: r.ID, Entity: r.Entity, Data: r.Data, Author: r.Author, AuthorName: r.AuthorName, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }
 
 func recordValue(r *store.Record, field string) any {
@@ -32,6 +43,28 @@ func recordValue(r *store.Record, field string) any {
 		return r.UpdatedAt.Format(time.RFC3339Nano)
 	}
 	return r.Data[field]
+}
+
+// recordSet picks the collection for an entity: the caller's own tree for
+// private entities, the app-wide apps_public tree for shared/public ones.
+func recordSet(r *http.Request, cur *store.App, ent *dsl.Entity, eid string) store.RecordSet {
+	if ent.IsShared() {
+		return store.PublicRecords(cur.ID, eid)
+	}
+	return store.PrivateRecords(uidOf(r), cur.ID, eid)
+}
+
+// ownRecord loads a record and, on shared entities, requires the caller to be
+// its author (403 otherwise). Private records are the caller's by construction.
+func (h *Handler) ownRecord(r *http.Request, rs store.RecordSet, ent *dsl.Entity, id string) (*store.Record, error) {
+	rec, err := h.store.GetRecord(r.Context(), rs, id)
+	if err != nil {
+		return nil, mapStoreErr(err, "record")
+	}
+	if ent.IsShared() && rec.Author != uidOf(r) {
+		return nil, apiErr(http.StatusForbidden, httpx.CodeForbidden, "only the author can modify this record").With("author", rec.Author)
+	}
+	return rec, nil
 }
 
 func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
@@ -67,7 +100,7 @@ func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	all, err := h.store.ListRecords(r.Context(), uidOf(r), cur.ID, eid, store.MaxRecordsPerEntity+1)
+	all, err := h.store.ListRecords(r.Context(), recordSet(r, cur, ent, eid), store.MaxRecordsPerEntity+1)
 	if err != nil {
 		fail(w, mapStoreErr(err, "entity"))
 		return
@@ -115,9 +148,20 @@ func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
 }
 
 // buildFilter compiles filterField/op/value into a predicate (nil = none).
+// On shared entities filterField=author (eq/neq, value = uid) selects posts
+// by one user, e.g. "my posts".
 func buildFilter(ent *dsl.Entity, field, op, value string) (func(*store.Record) bool, error) {
 	if field == "" && op == "" {
 		return nil, nil
+	}
+	if field == authorField && ent.IsShared() {
+		switch op {
+		case "eq":
+			return func(r *store.Record) bool { return r.Author == value }, nil
+		case "neq":
+			return func(r *store.Record) bool { return r.Author != value }, nil
+		}
+		return nil, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "filterOp for author must be eq or neq")
 	}
 	f := ent.FieldByID(field)
 	if f == nil {
@@ -185,8 +229,9 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Data     map[string]any `json:"data"`
-		ClientID string         `json:"clientId"`
+		Data       map[string]any `json:"data"`
+		ClientID   string         `json:"clientId"`
+		AuthorName string         `json:"authorName"` // shared entities only; "" -> 匿名
 	}
 	if !httpx.DecodeBody(w, r, &body) {
 		return
@@ -204,24 +249,38 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	id := store.NewID("rec_")
-	if body.ClientID != "" {
-		if len(body.ClientID) > 256 {
-			fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "clientId too long"))
+	if len(body.ClientID) > 256 {
+		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "clientId too long"))
+		return
+	}
+	rec := store.Record{ID: store.NewID("rec_"), Data: data, ClientID: body.ClientID}
+	clientKey := body.ClientID
+	if ent.IsShared() {
+		rec.Author = uidOf(r)
+		rec.AuthorName = strings.TrimSpace(body.AuthorName)
+		if rec.AuthorName == "" {
+			rec.AuthorName = defaultAuthorName
+		}
+		if utf8.RuneCountInString(rec.AuthorName) > maxAuthorNameLen {
+			fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "authorName too long"))
 			return
 		}
-		id = store.IDFromClientID(body.ClientID)
+		// the collection is shared, so two users' idempotency keys must not collide
+		clientKey = rec.Author + "/" + body.ClientID
 	}
-	rec, _, err := h.store.CreateRecord(r.Context(), uidOf(r), cur.ID, eid, store.Record{ID: id, Data: data, ClientID: body.ClientID})
+	if body.ClientID != "" {
+		rec.ID = store.IDFromClientID(clientKey)
+	}
+	out, _, err := h.store.CreateRecord(r.Context(), recordSet(r, cur, ent, eid), rec)
 	if err != nil {
 		fail(w, mapStoreErr(err, "entity"))
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, toRecordOut(rec))
+	httpx.WriteJSON(w, http.StatusCreated, toRecordOut(out))
 }
 
 func (h *Handler) getRecord(w http.ResponseWriter, r *http.Request) {
-	cur, _, eid, err := h.entityOf(r)
+	cur, ent, eid, err := h.entityOf(r)
 	if err != nil {
 		fail(w, err)
 		return
@@ -231,7 +290,7 @@ func (h *Handler) getRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	rec, err := h.store.GetRecord(r.Context(), uidOf(r), cur.ID, eid, rid)
+	rec, err := h.store.GetRecord(r.Context(), recordSet(r, cur, ent, eid), rid)
 	if err != nil {
 		fail(w, mapStoreErr(err, "record"))
 		return
@@ -265,9 +324,10 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	existing, err := h.store.GetRecord(r.Context(), uidOf(r), cur.ID, eid, rid)
+	rs := recordSet(r, cur, ent, eid)
+	existing, err := h.ownRecord(r, rs, ent, rid)
 	if err != nil {
-		fail(w, mapStoreErr(err, "record"))
+		fail(w, err)
 		return
 	}
 	merged := make(map[string]any, len(existing.Data)+len(delta))
@@ -291,7 +351,7 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	rec, err := h.store.UpdateRecord(r.Context(), uidOf(r), cur.ID, eid, rid, merged)
+	rec, err := h.store.UpdateRecord(r.Context(), rs, rid, merged)
 	if err != nil {
 		fail(w, mapStoreErr(err, "record"))
 		return
@@ -300,7 +360,7 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) deleteRecord(w http.ResponseWriter, r *http.Request) {
-	cur, _, eid, err := h.entityOf(r)
+	cur, ent, eid, err := h.entityOf(r)
 	if err != nil {
 		fail(w, err)
 		return
@@ -310,15 +370,24 @@ func (h *Handler) deleteRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	if err := h.store.DeleteRecord(r.Context(), uidOf(r), cur.ID, eid, rid); err != nil {
+	rs := recordSet(r, cur, ent, eid)
+	if ent.IsShared() {
+		if _, err := h.ownRecord(r, rs, ent, rid); err != nil {
+			fail(w, err)
+			return
+		}
+	}
+	if err := h.store.DeleteRecord(r.Context(), rs, rid); err != nil {
 		fail(w, mapStoreErr(err, "record"))
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// deleteAllRecords clears the entity. On shared entities only the caller's
+// own posts are removed (nobody can wipe everyone's data).
 func (h *Handler) deleteAllRecords(w http.ResponseWriter, r *http.Request) {
-	cur, _, eid, err := h.entityOf(r)
+	cur, ent, eid, err := h.entityOf(r)
 	if err != nil {
 		fail(w, err)
 		return
@@ -327,9 +396,29 @@ func (h *Handler) deleteAllRecords(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "confirm=true is required"))
 		return
 	}
-	if err := h.store.DeleteAllRecords(r.Context(), uidOf(r), cur.ID, eid); err != nil {
+	rs := recordSet(r, cur, ent, eid)
+	if !ent.IsShared() {
+		if err := h.store.DeleteAllRecords(r.Context(), rs); err != nil {
+			fail(w, mapStoreErr(err, "entity"))
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	all, err := h.store.ListRecords(r.Context(), rs, 0)
+	if err != nil {
 		fail(w, mapStoreErr(err, "entity"))
 		return
+	}
+	uid := uidOf(r)
+	for i := range all {
+		if all[i].Author != uid {
+			continue
+		}
+		if err := h.store.DeleteRecord(r.Context(), rs, all[i].ID); err != nil && !errors.Is(err, store.ErrNotFound) {
+			fail(w, err)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

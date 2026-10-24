@@ -44,7 +44,7 @@ struct AvatarLeaf: View {
             if initials.isEmpty {
                 Image(systemName: "person.fill").font(.system(size: diameter * 0.45)).foregroundStyle(RenderTheme.Colors.brandA.opacity(0.7))
             } else {
-                Text(initials).font(.system(size: diameter * 0.4, weight: .semibold, design: .rounded)).foregroundStyle(RenderTheme.brandGradient)
+                Text(initials).font(.system(size: diameter * 0.4, weight: .semibold, design: .rounded)).foregroundStyle(RenderTheme.Colors.brandText)
             }
         }
     }

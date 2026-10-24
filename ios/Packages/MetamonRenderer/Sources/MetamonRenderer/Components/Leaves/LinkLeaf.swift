@@ -10,7 +10,7 @@ struct LinkLeaf: View {
             if let url = c.url.flatMap(URL.init(string:)) {
                 Link(destination: url) {
                     Label(c.text ?? url.absoluteString, systemImage: "arrow.up.right.square")
-                        .foregroundStyle(RenderTheme.Colors.brandA)
+                        .foregroundStyle(RenderTheme.Colors.brandText)
                 }
             } else {
                 Text(c.text ?? "").foregroundStyle(.secondary)
