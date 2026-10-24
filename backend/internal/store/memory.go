@@ -27,9 +27,12 @@ type Memory struct {
 	public map[string]*memPublic
 	now    func() time.Time
 
-	shares  map[string]*Share      // shares/{token} (memory_share.go)
-	catalog map[string]*CatalogApp // public_apps/{appId}
-	hub     hub                    // change notifications for Watcher (watch.go)
+	shares   map[string]*Share          // shares/{token} (memory_share.go)
+	catalog  map[string]*CatalogApp     // public_apps/{appId}
+	releases map[string]*ReleaseRequest // release_requests/{id} (memory_release.go)
+	owners   map[string]string          // app_owners/{appId} -> uid (memory_owner.go)
+	installs map[string]string          // public_apps/{id}/installs/{uid} -> appId
+	hub      hub                        // change notifications for Watcher (watch.go)
 }
 
 // NewMemory returns an empty store.

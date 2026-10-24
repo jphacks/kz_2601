@@ -8,12 +8,18 @@ import MetamonDSL
 /// - 見た目: セル間ギャップ / 画面端余白は `RenderTheme.Spacing`、出現は index × stagger の遅延付きフェード(変身の受け側)。
 /// - 最下段(行 11〜12)の左端(A〜B 列)/ 右端(E〜F 列)に部品があれば、その上端(global 座標)を
 ///   `GridBottomObstructionKey` / `GridBottomTrailingObstructionKey` で上げる(ホストがマイク FAB を上に逃がすため・#83 / #52)。
+/// - 逆に背景扱いの背の高い部品(list 等)は FAB が上に浮くので、ホストが渡す `fabFrame` と重なる分だけ中身の末尾に余白を足す(#157)。
 public struct GridScreenLayout: View {
     let screen: Screen
     let ctx: RenderContext
 
     private let gap = RenderTheme.Spacing.gridGap
     private let inset = RenderTheme.Spacing.screenInset
+    /// キーボードの領域を含めた高さ(#143)。キーボードで可視領域が縮んでも行の高さはこれで決める
+    @State private var stableHeight: CGFloat = 0
+    /// フォーカスを得た入力欄(`keyboardAnchor` の id)。tick は同じ欄への再フォーカスでもスクロールさせるため
+    @State private var focusRequest: (key: String, tick: Int)?
+    @Environment(\.fabFrame) private var fabFrame
 
     public init(screen: Screen, ctx: RenderContext) {
         self.screen = screen
@@ -23,7 +29,8 @@ public struct GridScreenLayout: View {
     public var body: some View {
         GeometryReader { geo in
             let cellW = (geo.size.width - inset * 2) / CGFloat(GridArea.columns)
-            let cellH = (geo.size.height - inset * 2) / CGFloat(GridArea.visibleRows)
+            let layoutH = GridLayoutHeight.resolve(current: geo.size.height, stable: stableHeight)
+            let cellH = (layoutH - inset * 2) / CGFloat(GridArea.visibleRows)
             let placement = screen.gridPlacement
             let lastRow = placement.placed.map(\.area.row2).max() ?? 0
             let gridHeight = CGFloat(lastRow) * cellH
@@ -52,20 +59,48 @@ public struct GridScreenLayout: View {
             }
             .padding(inset)
             .frame(width: geo.size.width, alignment: .topLeading)
+            // 入力欄の外(部品の無い所)をタップしたらキーボードを閉じる
+            .background(Color.clear.contentShape(Rectangle()).onTapGesture { KeyboardState.dismiss() })
 
             Group {
                 if screen.isVoiceScreen {
                     content
                 } else {
-                    ScrollView {
-                        content
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            // area 無しで積んだ部品(全幅の list 等)は画面のスクロールの末尾に FAB ぶんの余白(#157)。
+                            // area だけの画面は高さぴったりなので足さない(足すと常に少しスクロールしてしまう)
+                            content
+                                .padding(.bottom, placement.stacked.isEmpty ? 0 : FabClearance.contentMargin(viewport: geo.frame(in: .global), fab: fabFrame))
+                        }
+                        .scrollDismissesKeyboard(.interactively)
+                        .scrollBounceBehavior(.basedOnSize)
+                        // キーボードが上がり切ってから、フォーカスした入力欄を可視領域(保存バーとキーボードの上)の中央へ
+                        .task(id: focusRequest?.tick) {
+                            guard let key = focusRequest?.key else { return }
+                            // 2 回目: キーボードのツールバー・保存バーの持ち上げが後から入って可視領域が変わるので、落ち着いた位置で合わせ直す
+                            for delay in [350, 350] {
+                                try? await Task.sleep(for: .milliseconds(delay))
+                                guard !Task.isCancelled, KeyboardState.shared.isVisible else { return }
+                                withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(key, anchor: .center) }
+                            }
+                        }
                     }
-                    .scrollDismissesKeyboard(.interactively)
-                    .scrollBounceBehavior(.basedOnSize)
+                    .environment(\.focusedInputReporter) { key in
+                        focusRequest = (key, (focusRequest?.tick ?? 0) + 1)
+                    }
                 }
             }
             .preference(key: GridBottomObstructionKey.self, value: bottomObstruction(geo: geo, cellH: cellH, placed: placement.placed.map(\.area)))
             .preference(key: GridBottomTrailingObstructionKey.self, value: bottomObstruction(geo: geo, cellH: cellH, placed: placement.placed.map(\.area), side: .trailing))
+        }
+        .background {
+            GeometryReader { full in
+                Color.clear
+                    .onAppear { stableHeight = full.size.height }
+                    .onChange(of: full.size.height) { _, h in stableHeight = h }
+            }
+            .ignoresSafeArea(.keyboard)
         }
     }
 
@@ -217,6 +252,9 @@ struct GridCell: View {
     private var hasLocalGrid: Bool { component.localGridPlacement != nil }
 
     @Environment(\.dslRuntime) private var rt
+    @Environment(\.fabFrame) private var fabFrame
+    /// 器の矩形(global)。マイク FAB と重なる分だけ中身の末尾に余白を足す(#157)
+    @State private var frame: CGRect = .zero
 
     /// list(または list だけの section)に行がある時は、カードを行の高さで止める(#131: 4 行なのにセルいっぱいの白い面が残っていた)。
     /// 空の時は従来どおり器の高さを渡し、空状態をセル全体に出す(#84)。
@@ -228,9 +266,10 @@ struct GridCell: View {
 
     var body: some View {
         if scrollsInside {
-            FadingScrollView(fillsViewport: !hugsContent) {
+            FadingScrollView(fillsViewport: !hugsContent, trailingMargin: FabClearance.contentMargin(viewport: frame, fab: fabFrame)) {
                 DSLView(component: component, ctx: ctx)
             }
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
         } else {
             DSLView(component: component, ctx: ctx)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -246,6 +285,8 @@ struct GridCell: View {
 /// 中身が器より低い時は器の高さを提案する(#84: 空の list / 行の少ない list がセル全体を使える)。
 private struct FadingScrollView<Content: View>: View {
     var fillsViewport = true
+    /// 中身の末尾に足す余白(マイク FAB の下に隠れる最後の行を、スクロールで FAB の上へ出す・#157)
+    var trailingMargin: CGFloat = 0
     @ViewBuilder var content: Content
     @State private var contentFrame: CGRect = .zero
     @State private var viewportHeight: CGFloat = 0
@@ -261,7 +302,7 @@ private struct FadingScrollView<Content: View>: View {
     var body: some View {
         ScrollView(.vertical) {
             content
-                .frame(minHeight: fillsViewport ? max(0, viewportHeight - bottomPad) : nil, alignment: .top)
+                .frame(minHeight: fillsViewport ? max(0, viewportHeight - bottomPad - trailingMargin) : nil, alignment: .top)
                 // 影が器の外にはみ出さないよう、カードの影ぶんだけ内側に余白
                 .padding(.bottom, bottomPad)
                 .background(
@@ -269,7 +310,13 @@ private struct FadingScrollView<Content: View>: View {
                         Color.clear.preference(key: ContentFrameKey.self, value: g.frame(in: .named("fadingScroll")))
                     }
                 )
+                // FAB ぶんの余白は中身の末尾に持つ(フェード判定には含めない)。contentMargins では末尾までスクロールしても最後の行が FAB の下に残った
+                .padding(.bottom, trailingMargin)
         }
+        #if DEBUG
+        // 撮影用(#157): `METAMON_SCROLL_CELLS_TO_END=1` でセル内スクロールを末尾から表示(FAB の上に最後の行が出るかを確認)
+        .defaultScrollAnchor(ProcessInfo.processInfo.environment["METAMON_SCROLL_CELLS_TO_END"] == "1" ? .bottom : nil)
+        #endif
         .coordinateSpace(name: "fadingScroll")
         .scrollBounceBehavior(.basedOnSize)
         .onPreferenceChange(ContentFrameKey.self) { contentFrame = $0 }

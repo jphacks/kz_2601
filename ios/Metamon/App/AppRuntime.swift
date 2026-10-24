@@ -105,7 +105,18 @@ final class AppRuntime: DSLRuntime {
     var clarifyEnabled: Bool = ClarifySettings.enabled {
         didSet { ClarifySettings.enabled = clarifyEnabled }
     }
+    /// 音声だけで進めている時、ready で自動生成するか(#160・既定 ON)。
+    var clarifyAutoBuild: Bool = ClarifySettings.autoBuild {
+        didSet { ClarifySettings.autoBuild = clarifyAutoBuild }
+    }
+    /// ready 後の自動生成待ち(要約カードを見せている 1.5 秒)。ボタンの文言を変える
+    var chatAutoBuildPending = false
+    /// 最後に吹き出しを足した入力手段(自動生成の判定)
+    @ObservationIgnored var chatLastInput: ClarifyFlow.InputSource?
+    /// 次のラリーの区間計測(録音停止・文字起こし完了の時刻。音声のときだけ)
+    @ObservationIgnored var chatTiming = ChatTiming()
     @ObservationIgnored var chatTask: Task<Void, Never>?
+    @ObservationIgnored var chatAutoBuildTask: Task<Void, Never>?
     /// リセットのたびに進める。古い応答(待っている間に「最初から」された等)を捨てるため
     @ObservationIgnored var chatEpoch = 0
 
@@ -372,7 +383,11 @@ final class AppRuntime: DSLRuntime {
             withAnimation(.easeInOut(duration: 0.3)) { errorCard = ErrorPresentation(kind: .offlineQueued, transcript: text) }
             return
         }
+        // 課金(#77): 新規作成(初期画面から)は 1 日の無料枠を消費する。枠切れなら上限シートを出して送らない。成功した時だけ数える
+        let metered = dsl.isVoiceOnly
+        if metered, !ProGate.shared.admitNewApp() { showVoiceSheet = false; return }
         await send(text)
+        if metered, !dsl.isVoiceOnly { ProGate.shared.recordNewApp() }
     }
 
     /// 復帰時の自動送信(`DeferredSend` から)。保留が生きていれば生成に進む。

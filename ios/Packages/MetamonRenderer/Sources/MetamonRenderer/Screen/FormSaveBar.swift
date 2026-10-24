@@ -9,6 +9,7 @@ struct FormSaveBar: ViewModifier {
     let screen: Screen
     let ctx: RenderContext
     @State private var phase: Phase = .idle
+    private let keyboard = KeyboardState.shared
 
     private enum Phase { case idle, saving, done }
 
@@ -56,11 +57,11 @@ struct FormSaveBar: ViewModifier {
         .accessibilityLabel(save.label)
         .padding(.horizontal, RenderTheme.Spacing.screenInset)
         .padding(.top, RenderTheme.Spacing.sm)
-        .padding(.bottom, RenderTheme.Spacing.sm)
+        .padding(.bottom, RenderTheme.Spacing.sm + (keyboard.isVisible ? KeyboardState.toolbarClearance : 0))
         .background {
             RenderTheme.Colors.canvas
                 .overlay(alignment: .top) { Hairline() }
-                .ignoresSafeArea(edges: .bottom)
+                .ignoresSafeArea(.container, edges: .bottom) // ホームインジケータ下だけ塗る(キーボードの裏まで伸ばさない)
         }
     }
 

@@ -2,7 +2,7 @@ SHELL := /bin/bash
 PROJECT ?= $(shell gcloud config get-value project 2>/dev/null)
 REGION  ?= asia-northeast1
 
-.PHONY: build vet test lint schema-sync dev emulator run-appconfig run-ai smoke-local smoke-stg smoke-prod
+.PHONY: build vet test lint schema-sync dev emulator run-appconfig run-ai smoke-local smoke-stg smoke-prod demo-check
 
 build:
 	go build ./...
@@ -74,3 +74,8 @@ SMOKE_PROD_ONLY    ?= kakeibo
 
 smoke-prod:
 	go run ./cmd/smoke -ai $(AI_PROD_URL) -appconfig $(APPCONFIG_PROD_URL) -firebase-api-key "$(FIREBASE_WEB_API_KEY)" -only $(SMOKE_PROD_ONLY) -cleanup
+
+# デモ前チェック兼ウォームアップ(#171)。curl だけで動く(Go 不要)。ENV=stg|prod、審査の 30 分前に ENV=prod で 1 回。
+ENV ?= stg
+demo-check:
+	../scripts/demo-check.sh $(ENV)

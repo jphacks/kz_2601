@@ -16,6 +16,21 @@ enum ClarifySettings {
         }
         set { UserDefaults.standard.set(newValue, forKey: key) }
     }
+
+    private static let autoBuildKey = "metamon.clarify.autoBuild"
+
+    /// 音声だけで進めている時、ready で自動生成するか(#160)。既定 ON(デモ本線は声だけで最後まで進むのが主役)。
+    /// `METAMON_CLARIFY_AUTOBUILD=0/1` があれば優先。
+    static var autoBuild: Bool {
+        get {
+            switch ProcessInfo.processInfo.environment["METAMON_CLARIFY_AUTOBUILD"] {
+            case "0": return false
+            case "1": return true
+            default: return UserDefaults.standard.object(forKey: autoBuildKey) as? Bool ?? true
+            }
+        }
+        set { UserDefaults.standard.set(newValue, forKey: autoBuildKey) }
+    }
 }
 
 /// 生成前の対話(#75 / backend #74 `POST /v1/chat`)。
@@ -36,11 +51,13 @@ extension AppRuntime {
     var isChatting: Bool { !chatBubbles.isEmpty }
 
     /// 音声画面からの発話の入口。初期画面 + 対話 ON + 通常の依頼(「元に戻して」等でない)なら対話へ、それ以外は従来どおり即生成。
-    func submitUtterance(_ text: String) async {
+    /// `source` = 入力手段(音声なら ready で自動生成・#160)、`timing` = 録音停止・文字起こし完了の時刻(区間ログ用)。
+    func submitUtterance(_ text: String, source: ClarifyFlow.InputSource = .text, timing: ChatTiming = ChatTiming()) async {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, morphJob == nil, !chatPending else { return }
         if routesToChat(text) {
-            await say(text)
+            chatTiming = timing
+            await say(text, source: source)
         } else {
             await morph(transcript: text)
         }
@@ -55,15 +72,13 @@ extension AppRuntime {
 
     /// ユーザー発話を 1 つ足して ai に聞く。応答(question / ready)を返す。失敗時は状態カード(origin = chat)を出して nil。
     @discardableResult
-    func say(_ text: String) async -> ChatTurn? {
-        let isFirst = chatBubbles.isEmpty
+    func say(_ text: String, source: ClarifyFlow.InputSource = .text) async -> ChatTurn? {
+        cancelAutoBuild()
+        chatLastInput = source
         withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
             chatBubbles.append(ChatBubble(role: .user, text: text))
         }
-        if isFirst {
-            // 新規会話: 前の会話(30 分以内に同じ appId で始めたもの)に追記されないよう先に消す
-            await services.ai.resetChat(appId: document.appId)
-        }
+        // 新規会話でも DELETE は待たない(古い会話への追記は応答の turn で検出してやり直す・#160 `ClarifyFlow.startConversation`)
         return await chatRound()
     }
 
@@ -75,6 +90,7 @@ extension AppRuntime {
 
     /// ready の内容で生成する(「この内容で作る」)。transcript が無ければこれまでの発話をつないで渡す。
     func buildFromChat() async {
+        cancelAutoBuild()
         let transcript = chatTurn?.transcript?.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = (transcript?.isEmpty == false ? transcript : nil) ?? fallbackTranscript
         guard !text.isEmpty else { return }
@@ -98,8 +114,10 @@ extension AppRuntime {
 
     /// 会話を捨てる(「最初から」・別アプリへの切替・生成開始)。サーバー側も `DELETE /v1/chat/{appId}`。
     func resetChat() {
+        cancelAutoBuild()
         chatTask?.cancel()
         chatTask = nil
+        chatLastInput = nil
         chatEpoch += 1
         let hadConversation = isChatting
         let appId = document.appId
@@ -125,12 +143,23 @@ extension AppRuntime {
         let epoch = chatEpoch
         let appId = document.appId
         let history = chatBubbles.map { ChatMessage(role: $0.role == .user ? .user : .assistant, text: $0.text) }
+        var timing = chatTiming
+        chatTiming = ChatTiming()
         withAnimation(.easeInOut(duration: 0.25)) {
             chatPending = true
             if errorCard?.origin == .chat { errorCard = nil }
         }
         do {
-            let turn = try await services.ai.chat(appId: appId, messages: history, locale: AppRuntime.generationLocale)
+            timing.postStarted = .now
+            let turn: ChatTurn
+            if history.count == 1, let first = history.first {
+                let started = try await ClarifyFlow.startConversation(ai: services.ai, appId: appId, first: first, locale: AppRuntime.generationLocale)
+                if started.retried { print("[Metamon] chat: stale conversation on server → cleared and resent") }
+                turn = started.turn
+            } else {
+                turn = try await services.ai.chat(appId: appId, messages: history, locale: AppRuntime.generationLocale)
+            }
+            timing.responded = .now
             guard epoch == chatEpoch else { return nil } // 待っている間に「最初から」/ 切替された
             print("[Metamon] chat: turn=\(turn.turn) kind=\(turn.kind.rawValue) source=\(turn.source ?? "-") text=\(turn.text)")
             withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
@@ -138,7 +167,13 @@ extension AppRuntime {
                 chatTurn = turn
                 chatBubbles.append(ChatBubble(role: .assistant, text: turn.text))
             }
+            await Task.yield() // 吹き出しの描画が始まるまで
+            timing.shown = .now
+            #if DEBUG
+            print("[Metamon] chat timing: turn=\(turn.turn) kind=\(turn.kind.rawValue) \(timing.summary)")
+            #endif
             SpeechReader.shared.speak(turn.text) // #43 AI の質問(録音中・OFF なら喋らない)
+            scheduleAutoBuildIfNeeded(turn)
             return turn
         } catch {
             guard epoch == chatEpoch else { return nil }
@@ -153,6 +188,28 @@ extension AppRuntime {
         }
     }
 
+    /// 音声だけで進めていて ready が来たら、要約カードを 1.5 秒見せてから生成へ(#160)。
+    /// その間に「最初から」・文字入力・ボタンタップがあれば取り消す(epoch / cancel)。
+    private func scheduleAutoBuildIfNeeded(_ turn: ChatTurn) {
+        guard ClarifyFlow.shouldAutoBuild(turn: turn, lastInput: chatLastInput, enabled: clarifyAutoBuild) else { return }
+        let epoch = chatEpoch
+        chatAutoBuildPending = true
+        print("[Metamon] chat: ready via voice → auto build in 1.5s")
+        chatAutoBuildTask = Task { [weak self] in
+            try? await Task.sleep(for: ClarifyFlow.autoBuildDelay)
+            guard let self, !Task.isCancelled, epoch == self.chatEpoch, self.chatAutoBuildPending, self.morphJob == nil else { return }
+            self.chatAutoBuildPending = false
+            self.chatAutoBuildTask = nil
+            await self.buildFromChat()
+        }
+    }
+
+    private func cancelAutoBuild() {
+        chatAutoBuildTask?.cancel()
+        chatAutoBuildTask = nil
+        chatAutoBuildPending = false
+    }
+
     // MARK: - DEBUG(ヘッドレス E2E)
 
     /// `METAMON_AUTO_TRANSCRIPT` の続き。対話に入ったら `METAMON_AUTO_REPLIES`(| 区切り)で質問に答え、尽きたら「このまま作る」。
@@ -165,7 +222,9 @@ extension AppRuntime {
         let env = ProcessInfo.processInfo.environment
         var replies = (env["METAMON_AUTO_REPLIES"] ?? "").split(separator: "|").map(String.init).filter { !$0.isEmpty }
         let pause = Double(env["METAMON_AUTO_PAUSE"] ?? "") ?? 2.5
-        var turn = await say(text)
+        // `METAMON_AUTO_SOURCE=voice` で音声入力として扱う(ready の自動生成・#160 の確認)
+        let source: ClarifyFlow.InputSource = env["METAMON_AUTO_SOURCE"] == "voice" ? .voice : .text
+        var turn = await say(text, source: source)
         var rounds = 0
         while let current = turn, current.kind == .question, rounds < 4 {
             rounds += 1
@@ -175,10 +234,15 @@ extension AppRuntime {
                 await buildNow()
                 return
             }
-            turn = await say(replies.removeFirst())
+            turn = await say(replies.removeFirst(), source: source)
         }
         guard turn != nil else {
             print("[Metamon] E2E: chat stopped (error card shown)")
+            return
+        }
+        if let auto = chatAutoBuildTask {
+            print("[Metamon] E2E: chat ready → waiting auto build")
+            await auto.value
             return
         }
         try? await Task.sleep(for: .seconds(pause))
@@ -198,5 +262,8 @@ enum ClarifyCopy {
     static var readyTitle: String { L10n.tr("この内容で作ります") }
     static var replyPlaceholder: String { L10n.tr("答えを文字で入力") }
     static var settingTitle: String { L10n.tr("作る前に質問する") }
+    static var autoBuildSettingTitle: String { L10n.tr("答えがそろったら自動で作る") }
+    static var autoBuildSettingFooter: String { L10n.tr("声だけで答えている時は、内容がそろうと少し待ってから自動で作り始めます。文字やチップで答えた時はボタンで作ります。") }
+    static var autoBuilding: String { L10n.tr("まもなく作ります…") }
     static var settingFooter: String { L10n.tr("ON にすると、新しいアプリを作る前に AI が 1〜3 個だけ質問します。「このまま作る」でいつでも飛ばせます。作ったアプリの変更は質問なしですぐ反映します。") }
 }

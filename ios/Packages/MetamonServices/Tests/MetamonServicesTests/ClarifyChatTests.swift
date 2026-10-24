@@ -59,4 +59,68 @@ final class ClarifyChatTests: XCTestCase {
         let t = try await MockAIClient(delay: .zero).chat(appId: "x", messages: [.init(role: .user, text: "家計簿アプリが欲しい。金額とカテゴリを記録したい")], locale: nil)
         XCTAssertEqual(t.kind, .ready)
     }
+
+    // MARK: - #160 体感速度
+
+    func testStartConversationDoesNotCallDeleteWhenServerIsFresh() async throws {
+        let ai = SpyChatAI(staleUserTurns: 0)
+        let r = try await ClarifyFlow.startConversation(ai: ai, appId: "a", first: .init(role: .user, text: "家計簿"), locale: nil)
+        let log = await ai.log
+        XCTAssertEqual(log, ["POST:1"], "DELETE を待たずに POST 1 回だけ")
+        XCTAssertEqual(r.turn.turn, 1)
+        XCTAssertFalse(r.retried)
+    }
+
+    func testStartConversationClearsAndResendsWhenAppendedToStaleConversation() async throws {
+        // 前の会話(ユーザー 2 発)が残っていて 1 件の POST が追記された → turn=3 → DELETE を待って送り直す
+        let ai = SpyChatAI(staleUserTurns: 2)
+        let r = try await ClarifyFlow.startConversation(ai: ai, appId: "a", first: .init(role: .user, text: "家計簿"), locale: nil)
+        let log = await ai.log
+        XCTAssertEqual(log, ["POST:1", "DELETE", "POST:1"])
+        XCTAssertEqual(r.turn.turn, 1)
+        XCTAssertTrue(r.retried)
+    }
+
+    func testAutoBuildOnlyWhenReadyViaVoiceAndEnabled() {
+        let ready = ChatTurn(kind: .ready, text: "では作りますね。", turn: 2, transcript: "家計簿")
+        let question = ChatTurn(kind: .question, text: "写真は?", turn: 1)
+        XCTAssertTrue(ClarifyFlow.shouldAutoBuild(turn: ready, lastInput: .voice, enabled: true))
+        XCTAssertFalse(ClarifyFlow.shouldAutoBuild(turn: ready, lastInput: .text, enabled: true), "文字入力はボタンで")
+        XCTAssertFalse(ClarifyFlow.shouldAutoBuild(turn: ready, lastInput: .chip, enabled: true), "チップはボタンで")
+        XCTAssertFalse(ClarifyFlow.shouldAutoBuild(turn: ready, lastInput: nil, enabled: true))
+        XCTAssertFalse(ClarifyFlow.shouldAutoBuild(turn: ready, lastInput: .voice, enabled: false), "設定 OFF")
+        XCTAssertFalse(ClarifyFlow.shouldAutoBuild(turn: question, lastInput: .voice, enabled: true), "質問中は進めない")
+    }
+
+    func testChatTimingSummary() {
+        let t0 = ContinuousClock.now
+        var t = ChatTiming(recordStopped: t0, transcribed: t0 + .milliseconds(1200))
+        t.postStarted = t0 + .milliseconds(1210)
+        t.responded = t0 + .milliseconds(3510)
+        t.shown = t0 + .milliseconds(3520)
+        XCTAssertEqual(t.summary, "stt=1200ms pre=10ms net=2300ms render=10ms total=3520ms")
+        XCTAssertTrue(ChatTiming().summary.hasPrefix("stt=- pre=- net=-"))
+    }
+}
+
+/// backend の `mergeHistory` を真似る: 1 件の POST はサーバーに残る会話へ追記、DELETE で消える。
+private actor SpyChatAI: AIClient {
+    private(set) var log: [String] = []
+    private var storedUserTurns: Int
+
+    init(staleUserTurns: Int) { storedUserTurns = staleUserTurns }
+
+    func morph(transcript: String, appId: String, currentVersion: Int) async throws -> MorphResult { throw URLError(.unsupportedURL) }
+
+    func chat(appId: String, messages: [ChatMessage], locale: String?) async throws -> ChatTurn {
+        log.append("POST:\(messages.count)")
+        let users = messages.filter { $0.role == .user }.count
+        storedUserTurns = messages.count > 1 ? users : storedUserTurns + users
+        return ChatTurn(kind: .question, text: "?", turn: storedUserTurns)
+    }
+
+    func resetChat(appId: String) async {
+        log.append("DELETE")
+        storedUserTurns = 0
+    }
 }

@@ -272,7 +272,21 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 		raw = fixButtonOverlap(raw) // before validation: saves a regeneration (#169)
 		app, perr := dsl.Parse(raw)
 		if perr == nil {
+			// Post-processing order (integration of #173 and #174; each step re-parses):
+			//   1. addMissingLists / fixEnglishUnits: existing content fixes.
+			//   2. fixLayoutRules (#174): moves mic-seat buttons right or into the
+			//      toolbar and fixes date titles on the model's own layout.
+			//   3. addMissingAddButtons (#173): runs after 2 so it sees the final
+			//      openers (a button moved to the toolbar still counts) and never
+			//      adds a toolbar button that 2 would then dedupe or move.
+			//   4. summarizeFor below (summary hints, #173) last, so the spoken
+			//      button positions describe the final layout.
 			if fixed := addMissingLists(raw, app); len(fixed) != len(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
+			if fixed := fixEnglishUnits(raw, loc); len(fixed) != len(raw) {
 				if fixedApp, err := dsl.Parse(fixed); err == nil {
 					raw, app = fixed, fixedApp
 				}
@@ -283,11 +297,6 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 				}
 			}
 			if fixed := addMissingAddButtons(raw, app, loc); len(fixed) != len(raw) {
-				if fixedApp, err := dsl.Parse(fixed); err == nil {
-					raw, app = fixed, fixedApp
-				}
-			}
-			if fixed := fixEnglishUnits(raw, loc); len(fixed) != len(raw) {
 				if fixedApp, err := dsl.Parse(fixed); err == nil {
 					raw, app = fixed, fixedApp
 				}

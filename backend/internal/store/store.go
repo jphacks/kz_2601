@@ -147,7 +147,9 @@ type Store interface {
 	DeleteRecord(ctx context.Context, rs RecordSet, id string) error
 	DeleteAllRecords(ctx context.Context, rs RecordSet) error
 
-	Sharing // share links + public catalog (share.go)
+	Sharing         // share links + public catalog (share.go)
+	ReleaseRequests // "ship this as its own app" requests (release.go)
+	Ownership       // appId creators + catalog installs (owner.go)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).

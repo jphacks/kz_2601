@@ -69,9 +69,10 @@ enum BuildConfig {
     static func make(environment: AppEnvironment = .current) -> Services {
         switch environment {
         case .mock:
-            return Services(
+            let appConfig = InMemoryAppConfigClient(seed: mockSeed)
+            var services = Services(
                 auth: MockAuthService(signedIn: true),
-                appConfig: InMemoryAppConfigClient(seed: mockSeed),
+                appConfig: appConfig,
                 ai: MockAIClient(),
                 sync: NoopDocumentSync(),
                 token: NoAuthTokenProvider(),
@@ -79,6 +80,13 @@ enum BuildConfig {
                 notifications: UserNotificationScheduler(),
                 isLive: false
             )
+            #if DEBUG
+            if DebugMockSharing.isEnabled { // UI テスト用(#165): 変身一覧に 2 件 + 端末内で完結するシェア
+                services.sharing = DebugSharingClient()
+                Task { await appConfig.setApps(DebugMockSharing.apps) }
+            }
+            #endif
+            return services
         case .live(let appConfigURL, let aiURL):
             let auth = makeAuth()
             let token: any TokenProvider = devToken ?? AuthTokenProvider(auth: auth)
@@ -96,6 +104,7 @@ enum BuildConfig {
                 isLive: appConfigURL != nil
             )
             services.sharing = appConfigURL.map { HTTPSharingClient(baseURL: $0, token: token) }
+            services.releaseRequests = appConfigURL.map { HTTPReleaseRequestClient(baseURL: $0, token: token) }
             return services
         }
     }

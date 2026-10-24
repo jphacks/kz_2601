@@ -33,6 +33,11 @@ public struct ScreenView: View {
                             }
                         }
                     }
+                    // 数値キーパッドには return が無いので、全入力共通でキーボード上に「完了」を出す(#143)
+                    ToolbarItemGroup(placement: .keyboard) {
+                        Spacer()
+                        Button(L("完了")) { KeyboardState.dismiss() }.fontWeight(.semibold)
+                    }
                     if route.stack == "sheet" || route.stack == "full", (rt.paths[route.stack] ?? []).isEmpty {
                         ToolbarItem(placement: .topBarLeading) {
                             Button(L("閉じる")) { rt.close(route) }
