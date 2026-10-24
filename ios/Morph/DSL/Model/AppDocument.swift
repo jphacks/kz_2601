@@ -81,8 +81,12 @@ struct AppMeta: Decodable, Sendable {
     var theme: Theme?
     var voiceEntry: VoiceEntry
     @Lossy var notifications: [NotificationSpec]
+    /// 2〜5 個ならタブバー表示。空なら単一スタック。
+    @Lossy var tabs: [Tab]
 
-    private enum Keys: String, CodingKey { case name, description, icon, theme, voiceEntry, notifications }
+    var hasTabs: Bool { tabs.count >= 2 }
+
+    private enum Keys: String, CodingKey { case name, description, icon, theme, voiceEntry, notifications, tabs }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
@@ -92,7 +96,16 @@ struct AppMeta: Decodable, Sendable {
         theme = try? c.decodeIfPresent(Theme.self, forKey: .theme)
         voiceEntry = try c.decodeIfPresent(VoiceEntry.self, forKey: .voiceEntry) ?? .floating
         _notifications = try c.decode(Lossy<NotificationSpec>.self, forKey: .notifications)
+        _tabs = try c.decode(Lossy<Tab>.self, forKey: .tabs)
     }
+}
+
+/// 下タブ 1 つ。各タブは `screen` を根にした独立の NavigationStack。
+struct Tab: Decodable, Identifiable, Sendable {
+    var id: String { screen }
+    var screen: String
+    var title: String
+    var icon: String?
 }
 
 struct Theme: Decodable, Sendable {

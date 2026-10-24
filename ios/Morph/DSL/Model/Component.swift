@@ -21,6 +21,9 @@ struct Component: Decodable, Identifiable, Sendable {
     var type: ComponentType
     /// デコード時の生の type 文字列(未知 type のプレースホルダ表示用)。
     var rawType: String
+    /// 画面グリッド上の矩形 "A1:C3"(Screen 直下のみ有効)。nil = グリッドの下に積む。
+    var area: String?
+    var gridArea: GridArea? { area.flatMap(GridArea.init) }
 
     // container
     var title: String?          // section / chart
@@ -61,7 +64,7 @@ struct Component: Decodable, Identifiable, Sendable {
     var size: String?           // voiceInput: compact|large / spacer: small|medium|large|flexible
 
     private enum Keys: String, CodingKey {
-        case id, type, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
+        case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
         case includeTime, source, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
         case kind, groupBy, bucket, prompt, size
     }
@@ -71,6 +74,7 @@ struct Component: Decodable, Identifiable, Sendable {
         rawType = try c.decodeIfPresent(String.self, forKey: .type) ?? ""
         type = ComponentType(rawValue: rawType) ?? .unknown
         id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        area = try? c.decodeIfPresent(String.self, forKey: .area)
         title = try? c.decodeIfPresent(String.self, forKey: .title)
         spacing = try? c.decodeIfPresent(String.self, forKey: .spacing)
         children = (try? c.decode(Lossy<Component>.self, forKey: .children).wrappedValue) ?? []
@@ -123,4 +127,33 @@ struct Filter: Decodable, Sendable {
     var field: String
     var op: String          // eq|neq|gt|gte|lt|lte|thisMonth|today
     var value: JSONValue?
+}
+
+/// `area` の解析結果。列は 0 始まり(A=0)、行は 1 始まり、両端含む。
+/// 画面は横 6 列(A-F)× 縦 N 行(1 行 = 可視高さ ÷ 12、13 行目以降は画面全体がスクロール)。
+struct GridArea: Equatable, Sendable {
+    static let columns = 6
+    static let visibleRows = 12
+
+    var col1: Int, row1: Int, col2: Int, row2: Int
+
+    init?(_ s: String) {
+        let parts = s.split(separator: ":")
+        guard parts.count == 2, let a = Self.cell(parts[0]), let b = Self.cell(parts[1]),
+              a.col <= b.col, a.row <= b.row else { return nil }
+        (col1, row1, col2, row2) = (a.col, a.row, b.col, b.row)
+    }
+
+    private static func cell(_ s: Substring) -> (col: Int, row: Int)? {
+        guard let first = s.first, let ascii = first.asciiValue, (65...70).contains(ascii),
+              let row = Int(s.dropFirst()), row >= 1 else { return nil }
+        return (Int(ascii) - 65, row)
+    }
+
+    var colSpan: Int { col2 - col1 + 1 }
+    var rowSpan: Int { row2 - row1 + 1 }
+
+    func overlaps(_ o: GridArea) -> Bool {
+        col1 <= o.col2 && o.col1 <= col2 && row1 <= o.row2 && o.row1 <= row2
+    }
 }

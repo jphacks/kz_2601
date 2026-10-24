@@ -29,6 +29,8 @@ final class AppRuntime {
     private(set) var loading: Set<String> = []
 
     var paths: [String: [Route]] = [:]
+    /// タブ表示時に選択中のタブ(= tab.screen)。
+    var selectedTab: String = ""
     var sheet: Route?
     var fullScreen: Route?
     var showVoiceSheet = false
@@ -48,7 +50,16 @@ final class AppRuntime {
     init(document: AppDocument, services: Services) {
         self.document = document
         self.services = services
+        self.selectedTab = Self.initialTab(document.dsl)
     }
+
+    /// initialScreen がタブの根ならそれ、違えば先頭タブ。
+    static func initialTab(_ dsl: AppDSL) -> String {
+        dsl.app.tabs.first { $0.screen == dsl.initialScreen }?.screen ?? dsl.app.tabs.first?.screen ?? ""
+    }
+
+    /// タブ用スタック名。
+    static func tabStack(_ screen: String) -> String { "tab:" + screen }
 
     // MARK: - Lifecycle
 
@@ -84,6 +95,7 @@ final class AppRuntime {
             self.sheet = nil
             self.fullScreen = nil
             self.showVoiceSheet = false
+            self.selectedTab = Self.initialTab(doc.dsl)
         }
         if animated {
             withAnimation(.spring(duration: 0.7, bounce: 0.15), swap)
@@ -153,7 +165,7 @@ final class AppRuntime {
         switch route.stack {
         case "sheet": sheet = nil
         case "full": fullScreen = nil
-        default: break
+        default: break // main / tab の根は閉じない
         }
     }
 

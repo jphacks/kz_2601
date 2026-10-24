@@ -67,6 +67,37 @@ final class DSLDecodingTests: XCTestCase {
         XCTAssertEqual(screen.components[1].action?.rawType, "teleport")
     }
 
+    func testGridAreasAreValidAndNonOverlapping() throws {
+        for name in ["initial", "kakeibo", "training", "walk"] {
+            let dsl = try load(name)
+            for s in dsl.screens {
+                var placed: [GridArea] = []
+                for c in s.components {
+                    guard let raw = c.area else { continue }
+                    let a = try XCTUnwrap(GridArea(raw), "\(name)/\(s.id): bad area \(raw)")
+                    XCTAssertFalse(placed.contains { $0.overlaps(a) }, "\(name)/\(s.id): \(raw) overlaps a sibling")
+                    placed.append(a)
+                }
+                XCTAssertFalse(placed.isEmpty, "\(name)/\(s.id): examples should use the grid")
+            }
+        }
+        XCTAssertEqual(GridArea("A1:C3").map { [$0.col1, $0.row1, $0.col2, $0.row2] }, [0, 1, 2, 3])
+        XCTAssertNil(GridArea("G1:G2"))
+        XCTAssertNil(GridArea("A0:B1"))
+        XCTAssertNil(GridArea("C3:A1"))
+        XCTAssertTrue(GridArea("A1:C3")!.overlaps(GridArea("C3:F6")!))
+        XCTAssertFalse(GridArea("A1:C3")!.overlaps(GridArea("D1:F3")!))
+    }
+
+    @MainActor func testTabs() throws {
+        let kakeibo = try load("kakeibo")
+        XCTAssertTrue(kakeibo.app.hasTabs)
+        XCTAssertEqual(kakeibo.app.tabs.map(\.screen), ["home", "stats"])
+        XCTAssertEqual(AppRuntime.initialTab(kakeibo), "home")
+        XCTAssertFalse(try load("walk").app.hasTabs)
+        XCTAssertFalse(try load("initial").app.hasTabs)
+    }
+
     func testEnvelopeDecodes() throws {
         let json = #"{"appId":"a1","version":7,"dsl":{"schemaVersion":1,"app":{"name":"x","voiceEntry":"none"},"initialScreen":"home","entities":[],"screens":[{"id":"home","title":"h","components":[]}]}}"#
         let doc = try AppDocument.decode(Data(json.utf8))
