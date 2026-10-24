@@ -1,4 +1,5 @@
 import Foundation
+import MetamonDSL
 import MetamonServices
 import MetamonRenderer
 
@@ -56,13 +57,21 @@ enum BuildConfig {
         return [env, plist].compactMap { $0 }.first { !$0.isEmpty } ?? "small"
     }
 
+    /// モックの初期レコード。DEBUG の見た目監査(#131)では DSL の entity からダミーを作る。
+    private static var mockSeed: [String: [Record]] {
+        #if DEBUG
+        if let seed = DebugDSLOverride.seed { return seed }
+        #endif
+        return MockSeed.demoRecords()
+    }
+
     @MainActor
     static func make(environment: AppEnvironment = .current) -> Services {
         switch environment {
         case .mock:
             return Services(
                 auth: MockAuthService(signedIn: true),
-                appConfig: InMemoryAppConfigClient(seed: MockSeed.demoRecords()),
+                appConfig: InMemoryAppConfigClient(seed: mockSeed),
                 ai: MockAIClient(),
                 sync: NoopDocumentSync(),
                 token: NoAuthTokenProvider(),

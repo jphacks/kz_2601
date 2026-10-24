@@ -29,7 +29,11 @@ public struct GridScreenLayout: View {
             let gridHeight = CGFloat(lastRow) * cellH
 
             let content = VStack(alignment: .leading, spacing: gap) {
-                if !placement.placed.isEmpty {
+                if screen.entity != nil, !placement.placed.isEmpty {
+                    // フォーム画面は area の行を「並び順と横幅」だけに使い、高さは中身なりにする(#131)。
+                    // AI が section を A1:F4 のように小さく取ると入力欄がセルで切れていたため
+                    FormFlowLayout(placed: placement.placed, cellW: cellW, cellH: cellH, ctx: ctx)
+                } else if !placement.placed.isEmpty {
                     ZStack(alignment: .topLeading) {
                         Color.clear.frame(width: geo.size.width - inset * 2, height: gridHeight)
                         ForEach(Array(placement.placed.enumerated()), id: \.element.component.id) { index, item in
@@ -71,6 +75,71 @@ public struct GridScreenLayout: View {
         guard rows > 0 else { return [:] }
         let bottom = geo.frame(in: .global).maxY - inset
         return [ctx.route.id: bottom - CGFloat(rows) * cellH + gap / 2]
+    }
+}
+
+/// フォーム画面の配置(#131)。行が重なる部品を 1 段にまとめ、段ごとに上から積む。
+/// 横位置・幅は area のまま(列 × cellW)、高さは中身なり。面を自前で埋める型(chart / map 等)だけ area の高さを保つ。
+/// 前の段から 3 行以上空いて下に置かれた部品(最下段の削除ボタン等)は、少し間を空けて続ける。
+struct FormFlowLayout: View {
+    let placed: [(component: Component, area: GridArea)]
+    let cellW: CGFloat
+    let cellH: CGFloat
+    let ctx: RenderContext
+
+    private let gap = RenderTheme.Spacing.gridGap
+
+    struct Band: Identifiable {
+        var id: String { items.map(\.component.id).joined(separator: "|") }
+        var items: [(component: Component, area: GridArea)]
+        var row1: Int
+        var row2: Int
+    }
+
+    /// row1 → col1 の順に並べ、行範囲が重なるものを同じ段にまとめる。
+    static func bands(_ placed: [(component: Component, area: GridArea)]) -> [Band] {
+        let sorted = placed.sorted { ($0.area.row1, $0.area.col1) < ($1.area.row1, $1.area.col1) }
+        var out: [Band] = []
+        for item in sorted {
+            if var last = out.last, item.area.row1 <= last.row2 {
+                last.items.append(item)
+                last.row2 = max(last.row2, item.area.row2)
+                out[out.count - 1] = last
+            } else {
+                out.append(Band(items: [item], row1: item.area.row1, row2: item.area.row2))
+            }
+        }
+        return out
+    }
+
+    var body: some View {
+        let bands = Self.bands(placed)
+        VStack(alignment: .leading, spacing: gap) {
+            ForEach(Array(bands.enumerated()), id: \.element.id) { index, band in
+                let detached = index > 0 && band.row1 - bands[index - 1].row2 > 2
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(Array(band.items.enumerated()), id: \.element.component.id) { i, item in
+                        let prevEnd = i == 0 ? 0 : band.items[i - 1].area.col2 + 1
+                        let lead = CGFloat(max(0, item.area.col1 - prevEnd)) * cellW
+                        cell(item.component, area: item.area)
+                            .frame(width: CGFloat(item.area.colSpan) * cellW - gap)
+                            .padding(.leading, lead + (i == 0 ? gap / 2 : gap))
+                    }
+                }
+                .padding(.top, detached ? RenderTheme.Spacing.md : 0)
+                .staggeredAppear(index: index)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func cell(_ c: Component, area: GridArea) -> some View {
+        switch c.type {
+        case .image, .mapView, .webView, .chart, .gauge, .calendar, .qrScanner, .list, .table, .timeline:
+            DSLView(component: c, ctx: ctx).frame(height: max(cellH * 2, CGFloat(area.rowSpan) * cellH - gap))
+        default:
+            DSLView(component: c, ctx: ctx).fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
@@ -128,6 +197,9 @@ private struct GridCell: View {
     let ctx: RenderContext
     @Environment(\.dynamicTypeSize) private var typeSize
 
+    /// 影がセルの外へ滲む幅(カード / ブランドボタンの影半径 + y)。ギャップ(10)を少し超えるが隣の面より下に描かれるので問題ない
+    static let shadowBleed: CGFloat = 16
+
     /// 通常サイズでは「中身が伸びる型」だけ内側スクロール。Dynamic Type のアクセシビリティサイズでは
     /// stat / button / 入力なども固定高のセルからはみ出すので、面を自前で埋める型以外は全部スクロールに逃がす。
     private var scrollsInside: Bool {
@@ -139,15 +211,26 @@ private struct GridCell: View {
         }
     }
 
+    @Environment(\.dslRuntime) private var rt
+
+    /// list(または list だけの section)に行がある時は、カードを行の高さで止める(#131: 4 行なのにセルいっぱいの白い面が残っていた)。
+    /// 空の時は従来どおり器の高さを渡し、空状態をセル全体に出す(#84)。
+    private var hugsContent: Bool {
+        let lists = component.type == .list ? [component]
+            : component.type == .section && !component.children.isEmpty && component.children.allSatisfy({ $0.type == .list }) ? component.children : []
+        return !lists.isEmpty && lists.allSatisfy { !rt.filteredRecords($0).isEmpty }
+    }
+
     var body: some View {
         if scrollsInside {
-            FadingScrollView {
+            FadingScrollView(fillsViewport: !hugsContent) {
                 DSLView(component: component, ctx: ctx)
             }
         } else {
             DSLView(component: component, ctx: ctx)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .clipped()
+                // 器の矩形で切るとカード/ボタンの影まで四角く切れて「薄い箱」が見える(#131)。影の分だけ外側まで描かせる
+                .mask(Rectangle().padding(-GridCell.shadowBleed))
         }
     }
 }
@@ -156,6 +239,7 @@ private struct GridCell: View {
 /// Reduce Motion ではフェードの切り替えをアニメーションせず即時に差し替える(マスク自体は「続きがある」合図なので残す)。
 /// 中身が器より低い時は器の高さを提案する(#84: 空の list / 行の少ない list がセル全体を使える)。
 private struct FadingScrollView<Content: View>: View {
+    var fillsViewport = true
     @ViewBuilder var content: Content
     @State private var contentFrame: CGRect = .zero
     @State private var viewportHeight: CGFloat = 0
@@ -171,7 +255,7 @@ private struct FadingScrollView<Content: View>: View {
     var body: some View {
         ScrollView(.vertical) {
             content
-                .frame(minHeight: max(0, viewportHeight - bottomPad), alignment: .top)
+                .frame(minHeight: fillsViewport ? max(0, viewportHeight - bottomPad) : nil, alignment: .top)
                 // 影が器の外にはみ出さないよう、カードの影ぶんだけ内側に余白
                 .padding(.bottom, bottomPad)
                 .background(
@@ -189,6 +273,8 @@ private struct FadingScrollView<Content: View>: View {
                     .onChange(of: g.size.height) { _, h in viewportHeight = h }
             }
         )
+        // 横は影の分だけ外に描かせる(角丸 clip で list カードの影が四角く切れていた・#131)。縦はフェードの位置を器の端に合わせる
+        .scrollClipDisabled()
         .mask(
             VStack(spacing: 0) {
                 LinearGradient(colors: [fadesTop ? .clear : .black, .black], startPoint: .top, endPoint: .bottom)
@@ -197,10 +283,10 @@ private struct FadingScrollView<Content: View>: View {
                 LinearGradient(colors: [.black, fadesBottom ? .clear : .black], startPoint: .top, endPoint: .bottom)
                     .frame(height: fade)
             }
+            .padding(.horizontal, -GridCell.shadowBleed)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: fadesTop)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: fadesBottom)
         )
-        .clipShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
     }
 }
 
