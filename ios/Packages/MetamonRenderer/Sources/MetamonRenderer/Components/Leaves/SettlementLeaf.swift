@@ -60,7 +60,8 @@ private struct TransferRow: View {
             Text(FieldCoding.currency(transfer.amount))
                 .font(RenderTheme.Fonts.rowTrailing)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .fixedSize()
+                .layoutPriority(1)
         }
         .padding(.horizontal, RenderTheme.Spacing.md)
         .padding(.vertical, RenderTheme.Spacing.row)

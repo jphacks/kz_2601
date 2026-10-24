@@ -84,6 +84,8 @@ public enum FieldCoding {
         let f = NumberFormatter()
         f.numberStyle = .decimal
         f.maximumFractionDigits = 0
-        return "¥" + (f.string(from: NSNumber(value: n)) ?? "0")
+        // 負は「-¥500」(「¥-500」にしない・割り勘の残高など)
+        let body = "¥" + (f.string(from: NSNumber(value: Swift.abs(n))) ?? "0")
+        return n < 0 && n.rounded() != 0 ? "-" + body : body
     }
 }
