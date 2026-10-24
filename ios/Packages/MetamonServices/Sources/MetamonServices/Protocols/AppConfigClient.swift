@@ -77,6 +77,8 @@ public struct AppSummary: Codable, Sendable, Equatable, Identifiable, Hashable {
 public protocol AppConfigClient: Sendable {
     /// `GET /v1/apps`(uid スコープ)。変身一覧(複数アプリ切替)が使う。実装が無ければ空。
     func listApps() async throws -> [AppSummary]
+    /// `DELETE /v1/apps/{appId}`(#180)。サーバーは物理削除し、自分のシェアリンク・「探す」掲載・共有データも消す。
+    func deleteApp(appId: String) async throws
     func fetchDocument(appId: String) async throws -> AppDocument
     /// ETag(`If-None-Match: "<version>"`)付き取得。サーバーが同じ version なら nil(304)。ホットリロードのポーリングが使う。
     func fetchDocumentIfChanged(appId: String, currentVersion: Int) async throws -> AppDocument?
@@ -95,6 +97,7 @@ public protocol AppConfigClient: Sendable {
 
 public extension AppConfigClient {
     func listApps() async throws -> [AppSummary] { [] }
+    func deleteApp(appId: String) async throws {}
 
     /// 冪等キーを使わない実装(インメモリ等)向けの既定。
     func create(appId: String, entity: String, data: [String: JSONValue], clientId: String) async throws -> Record {

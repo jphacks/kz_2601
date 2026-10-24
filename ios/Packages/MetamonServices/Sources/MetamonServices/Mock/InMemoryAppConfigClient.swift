@@ -24,6 +24,10 @@ public actor InMemoryAppConfigClient: AppConfigClient {
 
     public func setApps(_ apps: [AppSummary]) { self.apps = apps }
 
+    public func deleteApp(appId: String) async throws {
+        apps.removeAll { $0.id == appId }
+    }
+
     /// 履歴は持たない(モックの undo は `AppRuntime` のローカル履歴にフォールバックする)。
     public func listVersions(appId: String) async throws -> [VersionSummary] { [] }
 

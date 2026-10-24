@@ -27,7 +27,9 @@ final class AppRuntime: DSLRuntime {
     /// 変身一覧シート(#51: FAB 長押し / 「アプリ一覧」)。
     var showAppSwitcher = false
     /// 自分のアプリ一覧(`appsList()` が更新)。
-    private(set) var apps: [AppSummary] = []
+    var apps: [AppSummary] = []
+    /// 削除中のアプリを一覧から先に隠す(#180 楽観的 UI)。`AppRuntime+Delete.swift`
+    let appDeletion = OptimisticAppDeletion()
     private(set) var appsLoading = false
     /// 初期(音声)画面に来た経緯。挨拶文言(`Greeting`)の出し分けに使う。
     enum HomeEntry { case launch, newApp, home }
@@ -566,8 +568,8 @@ final class AppRuntime: DSLRuntime {
         return apps
     }
 
-    /// 一覧に出すアプリ(archived・未生成を除き、現在のアプリを先頭に)。
-    var visibleApps: [AppSummary] { AppSummary.visible(apps, current: document.appId) }
+    /// 一覧に出すアプリ(archived・未生成・削除中を除き、現在のアプリを先頭に)。
+    var visibleApps: [AppSummary] { AppSummary.visible(appDeletion.filter(apps), current: document.appId) }
 
     /// 別のアプリに切り替える: 今の画面をサムネに撮り → `DeviceAppID` を差し替え → `GET /dsl` → `apply()`(変身アニメ)。
     /// 記録(records)は `apply()` で破棄され、画面が要求する entity を `load(entities:)` の既存経路で読み直す。

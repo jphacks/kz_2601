@@ -154,6 +154,13 @@ public final class RecordSyncEngine {
         return await store.records(appId: appId, entity: entity)
     }
 
+    /// アプリ削除(#180): その appId の未送信キューとローカル DB を消す。サーバー削除が成功してから呼ぶ。
+    public func purge(appId: String) async {
+        await queue.discard(appId: appId)
+        await store.removeAll(appId: appId)
+        await refreshStatus()
+    }
+
     /// 削除。ローカルでは即座に一覧から消え(行は delete 待ちで残る)、送信成功で行も消える。
     public func delete(appId: String, entity: String, recordId: String) async -> [Record] {
         let result = await queue.enqueue(SyncOperation(appId: appId, entity: entity, recordId: recordId, kind: .delete))

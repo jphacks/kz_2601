@@ -144,6 +144,15 @@ public actor SyncQueue {
         return .appended
     }
 
+    /// appId の未送信を捨てる(アプリ削除 #180)。送信中の 1 件は止められないので残す(結果は届いても無害)。
+    @discardableResult
+    public func discard(appId: String) -> Int {
+        defer { persist() }
+        let before = ops.count
+        ops.removeAll { $0.appId == appId && $0.id != inFlight }
+        return before - ops.count
+    }
+
     // MARK: - Drain
 
     /// 停止(`isPaused`)を解除して流す。オンライン復帰・前面復帰・「今すぐ同期」から呼ぶ。
