@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "水分記録",
+    "description": "飲んだ量を記録し、今日の合計と回数をカードの中で左右に並べて見る(Container 内グリッドの見本・#81)",
+    "icon": "drop",
+    "theme": { "primaryColor": "#1E88E5" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "drinks",
+      "name": "飲んだ記録",
+      "titleField": "kind",
+      "fields": [
+        { "id": "amount", "name": "量", "type": "integer", "unit": "ml", "required": true, "defaultValue": 200 },
+        { "id": "kind", "name": "種類", "type": "enum", "options": ["水", "お茶", "コーヒー", "その他"], "defaultValue": "水" },
+        { "id": "date", "name": "日時", "type": "datetime", "defaultValue": "now" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "水分記録",
+      "toolbar": [
+        { "label": "追加", "icon": "plus", "action": { "type": "navigate", "screen": "drink_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        {
+          "type": "card", "id": "today", "area": "A1:F3", "title": "今日",
+          "children": [
+            { "type": "stat", "id": "total", "area": "A1:C2", "label": "今日の合計", "entity": "drinks", "aggregate": "sum", "field": "amount",
+              "filter": { "field": "date", "op": "today", "value": null } },
+            { "type": "stat", "id": "times", "area": "D1:F2", "label": "今日の記録", "entity": "drinks", "aggregate": "count",
+              "filter": { "field": "date", "op": "today", "value": null } }
+          ]
+        },
+        {
+          "type": "section", "id": "quick", "area": "A4:F5", "title": "記録する",
+          "children": [
+            { "type": "button", "id": "add", "area": "A1:C1", "label": "飲んだ", "icon": "plus", "style": "primary",
+              "action": { "type": "navigate", "screen": "drink_form", "presentation": "sheet" } },
+            { "type": "button", "id": "history", "area": "D1:F1", "label": "履歴", "icon": "clock", "style": "secondary",
+              "action": { "type": "navigate", "screen": "history", "presentation": "push" } }
+          ]
+        },
+        {
+          "type": "section", "id": "recent", "area": "A6:F12", "title": "今日の記録",
+          "children": [
+            { "type": "list", "entity": "drinks", "item": { "title": "kind", "subtitle": "date", "trailing": "amount" },
+              "filter": { "field": "date", "op": "today", "value": null }, "sort": { "field": "date", "direction": "desc" },
+              "emptyText": "まだ飲んでいません", "swipeToDelete": true,
+              "onItemTap": { "type": "navigate", "screen": "drink_form", "presentation": "push" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "history",
+      "title": "履歴",
+      "components": [
+        { "type": "list", "id": "all", "area": "A1:F12", "entity": "drinks", "item": { "title": "kind", "subtitle": "date", "trailing": "amount" },
+          "sort": { "field": "date", "direction": "desc" }, "emptyText": "記録がありません", "swipeToDelete": true,
+          "onItemTap": { "type": "navigate", "screen": "drink_form", "presentation": "push" } }
+      ]
+    },
+    {
+      "id": "drink_form",
+      "title": "飲んだ記録",
+      "entity": "drinks",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "drinks" } }],
+      "components": [
+        {
+          "type": "section", "id": "fields", "area": "A1:F4", "title": "内容",
+          "children": [
+            { "type": "numberField", "id": "amount_in", "area": "A1:C1", "field": "amount", "label": "量(ml)", "placeholder": "200" },
+            { "type": "picker", "id": "kind_in", "area": "D1:F1", "field": "kind", "label": "種類", "style": "menu" },
+            { "type": "datePicker", "id": "date_in", "area": "A2:F2", "field": "date", "label": "日時", "includeTime": true }
+          ]
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "drinks", "confirmMessage": "この記録を削除しますか？" } }
+      ]
+    }
+  ]
+}

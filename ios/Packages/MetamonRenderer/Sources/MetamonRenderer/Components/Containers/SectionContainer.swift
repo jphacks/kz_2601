@@ -19,12 +19,12 @@ struct SectionContainer: View {
                 // list / table など自前の面を持つ子だけなら見出し + そのまま(カードの中にカードを作らない)。
                 // セルの残り高さを子に渡す(#84: 空の list がセル全体を使えるように)
                 VStack(alignment: .leading, spacing: c.containerSpacing) {
-                    ForEach(c.children) { DSLView(component: $0, ctx: ctx) }
+                    if let placed = c.localGridPlacement { LocalGrid(placed: placed, ctx: ctx) } else { ForEach(c.children) { DSLView(component: $0, ctx: ctx) } }
                 }
                 .frame(maxHeight: .infinity, alignment: .top)
             } else {
                 VStack(alignment: .leading, spacing: c.containerSpacing) {
-                    ForEach(c.children) { DSLView(component: $0, ctx: ctx) }
+                    if let placed = c.localGridPlacement { LocalGrid(placed: placed, ctx: ctx) } else { ForEach(c.children) { DSLView(component: $0, ctx: ctx) } }
                 }
                 .renderCard()
             }

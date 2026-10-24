@@ -16,6 +16,7 @@ public enum DSLExamples {
         "bmi",
         "shopping",
         "navigation",
+        "water",
     ]
 
     /// 初期状態(音声画面のみ)の DSL 名。
