@@ -102,6 +102,10 @@ struct RootView: View {
                 .shadow(color: Theme.Colors.brandA.opacity(0.45), radius: 14, y: 6)
         }
         .accessibilityLabel("話しかけて変える")
+        // 生成中は画面と一緒に沈めて触れなくする(本体だけ薄くなり FAB だけ浮いて見えるのを防ぐ)
+        .opacity(rt.morphJob == nil ? 1 : 0.35)
+        .allowsHitTesting(rt.morphJob == nil)
+        .animation(.easeInOut(duration: 0.3), value: rt.morphJob == nil)
         .padding(.horizontal, Theme.Layout.fabHorizontalInset)
         .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: rt.dsl.app.hasTabs))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: Theme.Layout.fabAlignment)

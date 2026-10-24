@@ -45,8 +45,9 @@ ios/
 # ai をローカル起動(別 worktree で feature/ai-generate を checkout した backend/ で)
 set -a; source ~/Desktop/JPHACKS2026/.env; set +a; PORT=8081 go run ./cmd/ai
 
-# シミュレータ: localhost でよい
-xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' build CODE_SIGNING_ALLOWED=NO METAMON_AI_BASE_URL=http://127.0.0.1:8081
+# シミュレータ: localhost でよい(起動して使うビルドに CODE_SIGNING_ALLOWED=NO を付けない。
+# 付けると application-identifier entitlement が無くなり Firebase Auth のキーチェーンが -34018 で失敗 → サインイン画面に英語のエラーが出る。test だけなら付けてよい)
+xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' build METAMON_AI_BASE_URL=http://127.0.0.1:8081
 
 # 実機: Mac の LAN IP を渡す(ATS は NSAllowsLocalNetworking のみ許可。IP 直指定の http はこれで通る)
 IP=$(ipconfig getifaddr en0)
