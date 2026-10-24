@@ -93,6 +93,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.table) { c, _ in TableLeaf(c: c) }
         r.register(.timeline) { c, _ in TimelineLeaf(c: c) }
         r.register(.emptyState) { c, _ in EmptyStateLeaf(c: c) }
+        // leaf(Web)
+        r.register(.webView) { c, _ in WebViewLeaf(c: c) }
         return r
     }()
 }

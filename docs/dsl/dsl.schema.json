@@ -569,6 +569,9 @@
         },
         {
           "$ref": "#/$defs/TimerDisplay"
+        },
+        {
+          "$ref": "#/$defs/WebView"
         }
       ]
     },
@@ -2250,10 +2253,20 @@
         },
         "icon": {
           "type": "string"
+        },
+        "shareTo": {
+          "type": "string",
+          "enum": [
+            "any",
+            "line",
+            "slack",
+            "discord"
+          ],
+          "description": "送り先の preset(既定 any = OS 共有シート)。line は LINE の共有画面を直接開く(未インストールなら Web 版)。slack / discord は共有シートを開き、文面をチャンネル投稿向けのプレーンテキストに整える。(`target` は progressBar の数値キーなので別名)"
         }
       },
-      "description": "OS の共有シート(ShareLink)で文面と(任意で)写真を他のアプリや友人に送るボタン。日記の 1 件・記録のスコア・写真メモを共有したいアプリで選ぶ。",
-      "x-usage": "小さく画面下部の半幅(A11:C12)に、別のボタンと並べる。`field` や `{{...}}` を使う時だけ screen.entity が必要。"
+      "description": "文面と(任意で)写真を他のアプリや友人に送るボタン。`shareTo` で送り先を選べる: 「LINE で送りたい」→ shareTo line、「Slack に投げたい」→ slack、「Discord に」→ discord、指定が無ければ any(OS 共有シート)。日記の 1 件・記録のスコア・写真メモ・記事リンクを共有したいアプリで選ぶ。",
+      "x-usage": "小さく画面下部の半幅(A11:C12)に、別のボタンと並べる。送り先ごとにボタンを分ける時は hstack か grid の子に shareTo 違いで並べる。`field` や `{{...}}` を使う時だけ screen.entity が必要。"
     },
     "OpenUrlButton": {
       "type": "object",
@@ -2279,7 +2292,7 @@
         "url": {
           "type": "string",
           "format": "uri",
-          "description": "Safari(または対応アプリ)で開く https URL。"
+          "description": "開く URL。https のほか、他アプリ起動用のカスタムスキーム line:// slack:// discord:// tel: mailto: maps: comgooglemaps:// を使える(それ以外のスキームは不可)。"
         },
         "icon": {
           "type": "string"
@@ -2293,8 +2306,8 @@
           ]
         }
       },
-      "description": "固定 URL を開くリンクボタン(公式サイト・地図検索・レシピページなど)。button + openUrl アクションと同じ意味だが短く書け、リンク風に描画される。静的な外部リンクに選ぶ。",
-      "x-usage": "画面下部の帯(A11:F12)か card/section の子として置く。他の主要ボタンと見た目を揃えたい時は button + openUrl を使う。"
+      "description": "固定 URL を開くリンクボタン(公式サイト・地図検索・レシピページ・電話・メール・LINE/Slack/Discord アプリの起動など)。button + openUrl アクションと同じ意味だが短く書け、リンク風に描画される。静的な外部リンクに選ぶ。サイトをアプリ内に埋め込むなら webView。",
+      "x-usage": "画面下部の帯(A11:F12)か card/section の子として置く。「地図で開く」は maps:?q=<場所>、「電話する」は tel:<番号>、「LINE を開く」は line://。他の主要ボタンと見た目を揃えたい時は button + openUrl を使う。"
     },
     "MapView": {
       "type": "object",
@@ -2436,6 +2449,36 @@
       },
       "description": "大きな mm:ss 表示と 開始/一時停止/リセット。stopwatch はカウントアップ、countdown は seconds から 0 へ。筋トレのセット・プランク・ポモドーロ・料理・瞑想など時間を計るアプリで選ぶ。",
       "x-usage": "画面の主役として A2:F6、下にフォームの入力欄。フォーム画面で `field` を指定すると計測秒をレコードと一緒に保存できる。"
+    },
+    "WebView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "url"
+      ],
+      "properties": {
+        "type": {
+          "const": "webView"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "アプリ内で表示する https URL(http やカスタムスキームは不可)。"
+        },
+        "title": {
+          "type": "string",
+          "description": "任意: 上部ツールバーに出す見出し。省略時はページタイトル。"
+        }
+      },
+      "description": "外部サイトをアプリ内で表示する(WKWebView・戻る/進む/再読込の小ツールバー付き)。ニュース・地図サイト・公式ページ・時刻表など「○○を見たい」「○○のサイトを埋め込みたい」に選ぶ。Safari に飛ばすだけでよければ openUrlButton。",
+      "x-usage": "A1:F12 など大きめの area に 1 画面 1 つ。セル内で WebView 自身がスクロールするので list と同じ段に並べない。タブの 1 つを webView だけにするのが定石。"
     }
   }
 }

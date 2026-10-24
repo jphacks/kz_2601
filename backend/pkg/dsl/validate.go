@@ -384,6 +384,9 @@ func (a *App) Validate() error {
 				if c.Text == "" {
 					add("%s: shareButton needs text", where)
 				}
+				if !ShareTargets[c.ShareTo] {
+					add("%s: shareButton shareTo %q must be one of any|line|slack|discord", where, c.ShareTo)
+				}
 				if c.Field != "" {
 					if formEntity == nil {
 						add("%s: shareButton.field requires screen.entity", where)
@@ -394,6 +397,12 @@ func (a *App) Validate() error {
 			case CompOpenURLButton:
 				if c.Label == "" || c.URL == "" {
 					add("%s: openUrlButton needs label and url", where)
+				} else if !isOpenableURL(c.URL) {
+					add("%s: openUrlButton url %q must be https or one of the schemes %s", where, c.URL, strings.Join(OpenURLSchemes, ", "))
+				}
+			case CompWebView:
+				if !strings.HasPrefix(c.URL, "https://") {
+					add("%s: webView url %q must be an https URL", where, c.URL)
 				}
 			case CompMapView:
 				e := entities[c.Entity]
@@ -564,6 +573,31 @@ func collectSearchKeys(screenID string, comps []Component, add func(string, ...a
 
 func isHTTPURL(s string) bool {
 	return strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://")
+}
+
+// ShareTargets are the shareButton.shareTo presets ("" = any, the OS share sheet).
+var ShareTargets = map[string]bool{"": true, "any": true, "line": true, "slack": true, "discord": true}
+
+// OpenURLSchemes is the allowlist of non-https schemes an openUrlButton may
+// launch (other apps / system handlers). Keep in sync with the iOS
+// ExternalURLPolicy and Info.plist LSApplicationQueriesSchemes.
+var OpenURLSchemes = []string{"line", "slack", "discord", "tel", "mailto", "maps", "comgooglemaps"}
+
+// isOpenableURL accepts https URLs and allowlisted custom-scheme URLs.
+func isOpenableURL(s string) bool {
+	if strings.HasPrefix(s, "https://") {
+		return true
+	}
+	scheme, rest, ok := strings.Cut(s, ":")
+	if !ok || rest == "" {
+		return false
+	}
+	for _, allowed := range OpenURLSchemes {
+		if strings.EqualFold(scheme, allowed) {
+			return true
+		}
+	}
+	return false
 }
 
 // checkAggregateRef validates the entity/aggregate/field/filter trio shared by
