@@ -2,15 +2,37 @@
 #
 # !!! コスト注意 !!!
 #   macOS runner は Linux の 10倍の分単価(無料枠の消費も10倍換算)。
-#   - ios/ に変更が無い PR では macOS ジョブ自体を起動しない(ubuntu の軽いジョブで判定)
-#   - timeout-minutes: 25 をガードにし、暴走ビルドで枠を食い潰さない
-#     (iOS は「5分以内」の対象外。build + unit test が通ればよい。backend-ci は 5分厳守)
+#   - 変更の判定は ubuntu の軽いジョブで行い、関係ない変更では macOS ジョブ自体を起動しない
+#   - 「変更のあったモジュールのテストだけ」回す(下表)。UI テストは PR では回さない
+#   - timeout-minutes をガードにし、暴走ビルドで枠を食い潰さない
 #   - SwiftPM(SourcePackages) と DerivedData をキャッシュして時間と分単価を節約
+#
+# 変更の判定(dorny/paths-filter)→ 回すもの:
+#   | 変わった場所                                  | ジョブ          | テスト                                                    |
+#   |-----------------------------------------------|-----------------|-----------------------------------------------------------|
+#   | ios/Packages/MetamonDSL/** だけ               | ios-dsl         | `swift test`(MetamonDSLTests)。アプリのビルド・シミュレータ無し |
+#   | MetamonDSL + 他の iOS 変更                    | ios-xcode       | DSL / Renderer / Services / MetamonTests(DSL は全員の依存) |
+#   | ios/Packages/MetamonRenderer/**               | ios-xcode       | MetamonRendererTests + MetamonTests                       |
+#   | ios/Packages/MetamonServices/**               | ios-xcode       | MetamonServicesTests + MetamonTests                       |
+#   | app(*1)                                       | ios-xcode       | MetamonTests                                              |
+#   | ios/MetamonUITests/** だけ                    | ios-xcode       | なし(build-for-testing でコンパイルだけ確認)              |
+#   | .github/workflows/ios-ci.yml                  | ios-xcode       | ユニットテスト全部(UI 以外)                              |
+#   | 上記以外(ios/README.md, ios/scripts/** 等)    | なし            | なし(ios-ci は成功で終わる)                              |
+#   | develop / main への push(上記のどれかが変更) | ios-xcode       | 全部(UI テスト MetamonUITests を含む)                    |
+#   (*1) ios/Metamon/**, ios/MetamonWidget/**, ios/MetamonTests/**, ios/project.yml, ios/StoreKit/**,
+#        docs/dsl/examples/**(アプリにバンドルされる)
+#   PR では常に -skip-testing:MetamonUITests(`ui-tests` ラベル時だけ UI テストも足す)。
+#
+# UI テスト(MetamonUITests)を PR で回したい時: PR に `ui-tests` ラベルを付けて、ios-ci の
+#   「Re-run all jobs」をする(または次の push)。ラベルは判定ジョブが毎回 API で読み直す。
+#   `labeled` トリガーは使わない: 無関係なラベル付与で走行中の run が cancel され、
+#   スキップ(=成功扱い)の run で失敗が隠れるため。
 #
 # 設計メモ:
 # - workflow レベルの `paths:` は使わない(backend-ci.yml と同じ理由: required check が永遠に待ちになる)。
-# - ios/project.yml が無い間(別エージェントが作成中)はジョブごとスキップ。
-# - required check 名 = ジョブ名 `ios-ci`。
+# - required check 名 = ジョブ名 `ios-ci`(ubuntu の集約ジョブ)。macOS ジョブがスキップでも成功で終わる。
+# - ios/project.yml が無い間は macOS ジョブをスキップ。
+# - build-for-testing を 1 回 → test-without-building で対象ターゲットだけ -only-testing で回す。
 name: ios-ci
 
 on:
@@ -29,7 +51,7 @@ permissions:
 
 env:
   XCODEGEN_VERSION: "2.43.0"
-  # 空なら ios/project.yml の `name:` から自動取得(アプリ名は仮に Morph)
+  # 空なら ios/project.yml の `name:` から自動取得
   IOS_SCHEME: ""
 
 jobs:
@@ -37,45 +59,180 @@ jobs:
     name: ios-changes
     if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
     outputs:
-      run: ${{ (github.event_name == 'push' || steps.filter.outputs.ios == 'true') && steps.spec.outputs.exists == 'true' }}
+      # none / dsl / xcode
+      mode: ${{ steps.plan.outputs.mode }}
+      # test-without-building に渡す引数(-only-testing:… / -skip-testing:…)。空なら全テスト
+      test_args: ${{ steps.plan.outputs.test_args }}
+      # false なら build-for-testing だけ(コンパイル確認)
+      run_tests: ${{ steps.plan.outputs.run_tests }}
     steps:
       - uses: actions/checkout@v4
 
+      # push では github.event.before との差分、PR では base との差分
       - uses: dorny/paths-filter@v4
         id: filter
-        if: github.event_name == 'pull_request'
         with:
           filters: |
-            ios:
-              - 'ios/**'
+            dsl:
+              - 'ios/Packages/MetamonDSL/**'
+            renderer:
+              - 'ios/Packages/MetamonRenderer/**'
+            services:
+              - 'ios/Packages/MetamonServices/**'
+            app:
+              - 'ios/Metamon/**'
+              - 'ios/MetamonWidget/**'
+              - 'ios/MetamonTests/**'
+              - 'ios/project.yml'
+              - 'ios/StoreKit/**'
+              - 'docs/dsl/examples/**'
+            uitests:
+              - 'ios/MetamonUITests/**'
+            ci:
               - '.github/workflows/ios-ci.yml'
 
-      - name: ios/project.yml の存在チェック
-        id: spec
+      # Re-run でも最新のラベルを見るため、イベント payload ではなく API で読む
+      - name: ui-tests ラベルの確認
+        id: label
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
-          if [ -f ios/project.yml ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+          if gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}" --jq '.labels[].name' | grep -qx 'ui-tests'; then
+            echo "ui=true" >> "$GITHUB_OUTPUT"
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::ios/project.yml が無いため ios-ci をスキップします"
+            echo "ui=false" >> "$GITHUB_OUTPUT"
           fi
 
-  ios-ci:
-    name: ios-ci
+      - name: 回すジョブ / テストを決める
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          DSL: ${{ steps.filter.outputs.dsl }}
+          RENDERER: ${{ steps.filter.outputs.renderer }}
+          SERVICES: ${{ steps.filter.outputs.services }}
+          APP: ${{ steps.filter.outputs.app }}
+          UITESTS: ${{ steps.filter.outputs.uitests }}
+          CI_CHANGED: ${{ steps.filter.outputs.ci }}
+          UI_LABEL: ${{ steps.label.outputs.ui }}
+        run: |
+          set -euo pipefail
+          emit() {
+            {
+              echo "mode=$1"
+              echo "test_args=$2"
+              echo "run_tests=$3"
+            } >> "$GITHUB_OUTPUT"
+            echo "::notice::ios-ci plan: mode=$1 run_tests=$3 args=[$2]"
+          }
+
+          if [ ! -f ios/project.yml ]; then
+            echo "::notice::ios/project.yml が無いため ios-ci をスキップします"
+            emit none "" false
+            exit 0
+          fi
+
+          others=false
+          for v in "$RENDERER" "$SERVICES" "$APP" "$UITESTS" "$CI_CHANGED"; do
+            if [ "$v" = "true" ]; then others=true; fi
+          done
+          if [ "$DSL" != "true" ] && [ "$others" != "true" ]; then
+            emit none "" false
+            exit 0
+          fi
+
+          # develop / main への push: UI テストを含めて全部
+          if [ "$EVENT" = "push" ]; then
+            emit xcode "" true
+            exit 0
+          fi
+
+          ui="${UI_LABEL:-false}"
+
+          # PR で DSL だけ(ラベル無し): macOS の swift test だけ
+          if [ "$DSL" = "true" ] && [ "$others" != "true" ] && [ "$ui" != "true" ]; then
+            emit dsl "" true
+            exit 0
+          fi
+
+          targets=""
+          add() {
+            for t in "$@"; do
+              case " $targets " in *" $t "*) ;; *) targets="$targets $t" ;; esac
+            done
+          }
+          if [ "$CI_CHANGED" = "true" ] || [ "$DSL" = "true" ]; then
+            add MetamonDSLTests MetamonRendererTests MetamonServicesTests MetamonTests
+          fi
+          if [ "$RENDERER" = "true" ]; then add MetamonRendererTests MetamonTests; fi
+          if [ "$SERVICES" = "true" ]; then add MetamonServicesTests MetamonTests; fi
+          if [ "$APP" = "true" ]; then add MetamonTests; fi
+
+          if [ -z "$targets" ] && [ "$ui" != "true" ]; then
+            # UI テストだけの変更など: コンパイル確認のみ
+            emit xcode "" false
+            exit 0
+          fi
+
+          args=""
+          for t in $targets; do args="$args -only-testing:$t"; done
+          if [ "$ui" = "true" ]; then
+            args="$args -only-testing:MetamonUITests"
+          else
+            args="$args -skip-testing:MetamonUITests"
+          fi
+          emit xcode "${args# }" true
+
+  # DSL だけの変更: Foundation のみなので macOS の swift test で足りる(シミュレータ・アプリのビルド不要)
+  ios-dsl:
+    name: ios-dsl
     needs: ios-changes
-    if: needs.ios-changes.outputs.run == 'true'
-    # macos-26: Xcode 26 系。firebase-ios-sdk 13.x が swift-tools 6.2(= Xcode 26)を要求するため macos-15(Xcode 16)では解決不可。
-    # 分単価が高いので無駄に再実行しないこと。
+    if: needs.ios-changes.outputs.mode == 'dsl'
     runs-on: macos-26
-    timeout-minutes: 25
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - name: Xcode 26 を選択
         run: |
+          # shellcheck disable=SC2010,SC2012
           latest="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)"
+          # shellcheck disable=SC2012
+          if [ -z "$latest" ]; then latest="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)"; fi
+          if [ -n "$latest" ]; then sudo xcode-select -s "$latest"; fi
+          xcodebuild -version
+
+      - name: SwiftPM ビルドキャッシュ
+        uses: actions/cache@v4
+        with:
+          path: ios/Packages/MetamonDSL/.build
+          key: dsl-build-${{ runner.os }}-${{ hashFiles('ios/Packages/MetamonDSL/**/*.swift') }}
+          restore-keys: |
+            dsl-build-${{ runner.os }}-
+
+      - name: swift test (MetamonDSL)
+        working-directory: ios/Packages/MetamonDSL
+        run: swift test --parallel
+
+  ios-xcode:
+    name: ios-xcode
+    needs: ios-changes
+    if: needs.ios-changes.outputs.mode == 'xcode'
+    # macos-26: Xcode 26 系。firebase-ios-sdk 13.x が swift-tools 6.2(= Xcode 26)を要求するため macos-15(Xcode 16)では解決不可。
+    # 分単価が高いので無駄に再実行しないこと。push 時は UI テストを含むので上限を少し広めに取る。
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode 26 を選択
+        run: |
+          # shellcheck disable=SC2010,SC2012
+          latest="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)"
+          # shellcheck disable=SC2012
           if [ -z "$latest" ]; then latest="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)"; fi
           if [ -n "$latest" ]; then sudo xcode-select -s "$latest"; fi
           xcodebuild -version
@@ -96,7 +253,7 @@ jobs:
             "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
           unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
 
-      - name: スキーム名を決定
+      - name: スキーム名とシミュレータを決定
         id: scheme
         run: |
           set -euo pipefail
@@ -104,8 +261,12 @@ jobs:
           if [ -z "$scheme" ]; then
             scheme="$(awk '/^name:/{print $2; exit}' ios/project.yml | tr -d '"'"'")"
           fi
+          # 利用可能な最初の iPhone シミュレータ(イメージ更新でデバイス名が変わっても壊れない)
+          device="$(xcrun simctl list devices available -j \
+            | jq -r '[.devices[][] | select(.name | startswith("iPhone"))][0].name')"
           echo "scheme=$scheme" >> "$GITHUB_OUTPUT"
-          echo "scheme=$scheme"
+          echo "device=$device" >> "$GITHUB_OUTPUT"
+          echo "scheme=$scheme device=$device"
 
       - name: xcodegen generate
         working-directory: ios
@@ -130,16 +291,19 @@ jobs:
             dd-${{ runner.os }}-${{ hashFiles('ios/project.yml') }}-
             dd-${{ runner.os }}-
 
-      - name: xcodebuild build (iOS Simulator)
+      # アプリ + スキームの全テストターゲット(UI テスト含む)を 1 回だけビルド。実行は次の step。
+      # 具体的なシミュレータを destination にして 1 アーキだけビルドする(generic だと複数アーキで遅い)。
+      - name: xcodebuild build-for-testing
         working-directory: ios
         env:
           SCHEME: ${{ steps.scheme.outputs.scheme }}
+          DEVICE: ${{ steps.scheme.outputs.device }}
         run: |
           set -euo pipefail
-          xcodebuild build \
+          xcodebuild build-for-testing \
             -project "${SCHEME}.xcodeproj" \
             -scheme "${SCHEME}" \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination "platform=iOS Simulator,name=${DEVICE}" \
             -derivedDataPath DerivedData \
             -clonedSourcePackagesDirPath SourcePackages \
             -skipPackagePluginValidation \
@@ -150,47 +314,59 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
 
-      - name: ユニットテストの有無を判定
-        id: has-tests
-        working-directory: ios
-        run: |
-          if grep -qE 'bundle\.unit-test' project.yml; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::unit-test ターゲットが無いため test をスキップします"
-          fi
-
-      - name: xcodebuild test
-        if: steps.has-tests.outputs.run == 'true'
+      - name: xcodebuild test-without-building
+        if: needs.ios-changes.outputs.run_tests == 'true'
         working-directory: ios
         env:
           SCHEME: ${{ steps.scheme.outputs.scheme }}
+          DEVICE: ${{ steps.scheme.outputs.device }}
+          TEST_ARGS: ${{ needs.ios-changes.outputs.test_args }}
         run: |
           set -euo pipefail
-          # 利用可能な最初の iPhone シミュレータを使う(イメージ更新でデバイス名が変わっても壊れない)
-          device="$(xcrun simctl list devices available -j \
-            | jq -r '[.devices[][] | select(.name | startswith("iPhone"))][0].name')"
-          echo "destination device: $device"
-          xcodebuild test \
+          echo "test args: ${TEST_ARGS:-(全テスト)}"
+          # TEST_ARGS は判定ジョブが組んだ -only-testing:/-skip-testing: の並び。空白区切りで展開する
+          # shellcheck disable=SC2086
+          xcodebuild test-without-building \
             -project "${SCHEME}.xcodeproj" \
             -scheme "${SCHEME}" \
-            -destination "platform=iOS Simulator,name=${device}" \
+            -destination "platform=iOS Simulator,name=${DEVICE}" \
             -derivedDataPath DerivedData \
             -clonedSourcePackagesDirPath SourcePackages \
-            -skipPackagePluginValidation \
-            -skipMacroValidation \
-            -parallelizeTargets \
             -resultBundlePath TestResults.xcresult \
             -quiet \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            ${TEST_ARGS}
 
       - name: テスト結果をアップロード(失敗時)
-        if: failure() && steps.has-tests.outputs.run == 'true'
+        if: failure() && needs.ios-changes.outputs.run_tests == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: ios-test-results
           path: ios/TestResults.xcresult
           retention-days: 3
+
+  # required check。macOS ジョブがスキップでも成功、失敗/キャンセルなら失敗。
+  ios-ci:
+    name: ios-ci
+    needs: [ios-changes, ios-dsl, ios-xcode]
+    if: always() && (github.event_name == 'push' || github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: 結果を集約
+        env:
+          CHANGES: ${{ needs.ios-changes.result }}
+          DSL: ${{ needs.ios-dsl.result }}
+          XCODE: ${{ needs.ios-xcode.result }}
+          MODE: ${{ needs.ios-changes.outputs.mode }}
+        run: |
+          echo "mode=${MODE} ios-changes=${CHANGES} ios-dsl=${DSL} ios-xcode=${XCODE}"
+          if [ "$CHANGES" != "success" ]; then
+            echo "::error::ios-changes が ${CHANGES}"
+            exit 1
+          fi
+          for r in "$DSL" "$XCODE"; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error::macOS ジョブが ${r}"; exit 1 ;;
+            esac
+          done
