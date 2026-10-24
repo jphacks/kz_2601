@@ -67,6 +67,13 @@ struct VoiceFab: View {
                 }
             }
             .animation(.easeOut(duration: 0.25), value: bottom)
+            // 止まっている位置の矩形(global)。Renderer が背の高い list の末尾に FAB ぶんの余白を足すのに使う(#157)。
+            // ドラッグ中の位置は流さない(指に合わせて list の余白が揺れるため)。隠れている時は nil = 余白不要
+            .preference(key: VoiceFabFrameKey.self, value: hidden ? nil : CGRect(
+                x: geo.frame(in: .global).minX + rest.x - size / 2,
+                y: geo.frame(in: .global).minY + rest.y - size / 2,
+                width: size, height: size
+            ))
         }
         // 生成中は画面と一緒に沈めて触れなくする(本体だけ薄くなり FAB だけ浮いて見えるのを防ぐ)
         .opacity(isBusy ? 0.35 : 1)
@@ -225,4 +232,12 @@ struct VoiceFab: View {
         storedBottom = parts.count > 1 ? Double(parts[1]) ?? Double(FabDock.autoBottom) : Double(FabDock.autoBottom)
     }
     #endif
+}
+
+/// `VoiceFab` の止まっている位置(global)。隠れている / 出していない時は nil。RootView が Renderer の `fabFrame` に渡す(#157)。
+struct VoiceFabFrameKey: PreferenceKey {
+    static let defaultValue: CGRect? = nil
+    static func reduce(value: inout CGRect?, nextValue: () -> CGRect?) {
+        value = nextValue() ?? value
+    }
 }
