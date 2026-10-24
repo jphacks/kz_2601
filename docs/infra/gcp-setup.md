@@ -396,9 +396,9 @@ cd ..
 **▶ 実行**
 
 ```sh
-export APPCONFIG_URL="$(gcloud run services describe appconfig-stg --region="$REGION" --format='value(status.url)')"
+export APPCONFIG_BASE_URL="$(gcloud run services describe appconfig-stg --region="$REGION" --format='value(status.url)')"
 export BACKEND_IMAGE="$(gcloud run services describe appconfig-stg --region="$REGION" --format='value(spec.template.spec.containers[0].image)')"
-echo "$APPCONFIG_URL"; echo "$BACKEND_IMAGE"
+echo "$APPCONFIG_BASE_URL"; echo "$BACKEND_IMAGE"
 
 gcloud run deploy ai-stg \
   --image="$BACKEND_IMAGE" \
@@ -410,7 +410,7 @@ gcloud run deploy ai-stg \
   --cpu=1 --memory=512Mi \
   --min-instances=0 --max-instances=3 \
   --concurrency=20 --timeout=300 \
-  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=stg,APPCONFIG_URL=${APPCONFIG_URL}" \
+  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=stg,APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL}" \
   --set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest"
 ```
 
@@ -447,7 +447,7 @@ gcloud run services logs read ai-stg --region="$REGION" --limit=50
 | Firebase ID トークン検証 | `firebase.google.com/go/v4` の `auth.Client.VerifyIDToken`。公開鍵取得のみで IAM 権限は不要 |
 | Firestore | `cloud.google.com/go/firestore`、`(default)` DB。権限は `roles/datastore.user`(付与済み) |
 | Claude API キー | `ANTHROPIC_API_KEY` 環境変数(Secret Manager から注入) |
-| ai → appconfig | `APPCONFIG_URL`。当面はクライアントから受けた Firebase ID トークンをそのまま転送する想定(**要設計確認**: 後で Cloud Run の service-to-service ID トークンに切替可) |
+| ai → appconfig | `APPCONFIG_BASE_URL`。当面はクライアントから受けた Firebase ID トークンをそのまま転送する想定(**要設計確認**: 後で Cloud Run の service-to-service ID トークンに切替可) |
 
 ---
 
@@ -565,13 +565,13 @@ jobs:
 
       - name: Deploy ai
         run: |
-          APPCONFIG_URL="$(gcloud run services describe "appconfig-${ENV_SUFFIX}" --region="$REGION" --format='value(status.url)')"
+          APPCONFIG_BASE_URL="$(gcloud run services describe "appconfig-${ENV_SUFFIX}" --region="$REGION" --format='value(status.url)')"
           gcloud run deploy "ai-${ENV_SUFFIX}" \
             --image="$IMAGE" --command=/app/ai --region="$REGION" \
             --service-account="$RUN_SA" --allow-unauthenticated \
             --port=8080 --cpu=1 --memory=512Mi \
             --min-instances=0 --max-instances=3 --concurrency=20 --timeout=300 \
-            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=${ENV_SUFFIX},APPCONFIG_URL=${APPCONFIG_URL}" \
+            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=${ENV_SUFFIX},APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL}" \
             --set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest" \
             --quiet
 
@@ -638,7 +638,7 @@ gcloud auth application-default set-quota-project "$PROJECT_ID"
 GOOGLE_CLOUD_PROJECT=demo-kz2601
 FIRESTORE_EMULATOR_HOST=localhost:8089
 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099
-APPCONFIG_URL=http://localhost:8080
+APPCONFIG_BASE_URL=http://localhost:8080
 ANTHROPIC_API_KEY=sk-ant-...        # ai を動かす時だけ。Secret Manager と同じ値
 ```
 
@@ -795,6 +795,6 @@ gcloud run services update ai-prod --region="$REGION" --min-instances=0   # デ�
 | Firebase iOS アプリ Bundle ID | `jp.kz2601.metamon` |
 | Apple | App ID = Bundle ID、Key(Sign in with Apple)、Services ID `jp.kz2601.metamon.signin`(Web 用・任意) |
 | エミュレータ用プロジェクト | `demo-kz2601` |
-| Cloud Run 環境変数 | `GOOGLE_CLOUD_PROJECT`, `APP_ENV`(`stg`/`prod`), `APPCONFIG_URL`(ai のみ), `ANTHROPIC_API_KEY`(Secret) |
+| Cloud Run 環境変数 | `GOOGLE_CLOUD_PROJECT`, `APP_ENV`(`stg`/`prod`), `APPCONFIG_BASE_URL`(ai のみ), `ANTHROPIC_API_KEY`(Secret) |
 
 関連ファイル: `backend/Dockerfile`(両バイナリ同梱)、`backend/.gcloudignore`、`.gitignore`(plist / .p8 / .env を除外)。

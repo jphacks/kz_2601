@@ -76,6 +76,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          # AUTH_MODE 未設定 = firebase(Admin SDK で ID トークン検証)。Firestore は GOOGLE_CLOUD_PROJECT + run-backend SA の ADC。
           if [ -n "$INPUT_ENV" ]; then
             environment="$INPUT_ENV"
           elif [ "$REF_NAME" = "main" ]; then
@@ -153,10 +154,12 @@ jobs:
       - name: Deploy ai-${{ env.ENV_SUFFIX }}
         id: ai
         env:
-          APPCONFIG_URL: ${{ steps.appconfig.outputs.url }}
+          APPCONFIG_BASE_URL: ${{ steps.appconfig.outputs.url }}
         run: |
           set -euo pipefail
           # 同じイメージを /app/ai で起動。Claude 呼び出しは数十秒かかるので timeout=300
+          # APPCONFIG_BASE_URL は cmd/ai/main.go が読む名前(未設定だと ai はインメモリ stub で動き appconfig を叩かない)。
+          # ai → appconfig はクライアントの Firebase ID トークンをそのまま転送するので Cloud Run 間の追加認証は不要。
           gcloud run deploy "ai-${ENV_SUFFIX}" \
             --image="$IMAGE" \
             --command=/app/ai \
@@ -168,7 +171,7 @@ jobs:
             --cpu=1 --memory=512Mi \
             --min-instances=0 --max-instances=3 \
             --concurrency=20 --timeout=300 \
-            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=${ENV_SUFFIX},APPCONFIG_URL=${APPCONFIG_URL},GIT_SHA=${GITHUB_SHA}" \
+            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=${ENV_SUFFIX},APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL},GIT_SHA=${GITHUB_SHA}" \
             --set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest" \
             --quiet
           url="$(gcloud run services describe "ai-${ENV_SUFFIX}" \
@@ -178,11 +181,11 @@ jobs:
 
       - name: ヘルスチェック(GET /health が 200)
         env:
-          APPCONFIG_URL: ${{ steps.appconfig.outputs.url }}
+          APPCONFIG_BASE_URL: ${{ steps.appconfig.outputs.url }}
           AI_URL: ${{ steps.ai.outputs.url }}
         run: |
           set -euo pipefail
-          for url in "$APPCONFIG_URL" "$AI_URL"; do
+          for url in "$APPCONFIG_BASE_URL" "$AI_URL"; do
             curl -fsS --retry 5 --retry-delay 3 --retry-all-errors "${url}/health"
             echo " <- ${url}/health OK"
           done
@@ -190,7 +193,7 @@ jobs:
       - name: Job summary
         env:
           ENVIRONMENT: ${{ needs.deploy-changes.outputs.environment }}
-          APPCONFIG_URL: ${{ steps.appconfig.outputs.url }}
+          APPCONFIG_BASE_URL: ${{ steps.appconfig.outputs.url }}
           AI_URL: ${{ steps.ai.outputs.url }}
         run: |
           {
@@ -198,7 +201,7 @@ jobs:
             echo
             echo "| service | URL | health |"
             echo "|---|---|---|"
-            echo "| appconfig-${ENV_SUFFIX} | ${APPCONFIG_URL} | [/health](${APPCONFIG_URL}/health) 200 |"
+            echo "| appconfig-${ENV_SUFFIX} | ${APPCONFIG_BASE_URL} | [/health](${APPCONFIG_BASE_URL}/health) 200 |"
             echo "| ai-${ENV_SUFFIX} | ${AI_URL} | [/health](${AI_URL}/health) 200 |"
             echo
             echo "image: \`${IMAGE}\`"
