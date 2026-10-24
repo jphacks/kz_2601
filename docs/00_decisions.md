@@ -69,3 +69,5 @@ kz_2601/
 | 10/24 午前 | STT | WhisperKit(オンデバイス)で確定。不足時のみ OpenAI Whisper API |
 | 10/24 午前 | CI時間 | backend 5分以内必須。iOS は制限なし |
 | 10/24 午前 | 秘密管理 | publicリポ。APIキー・plist は .gitignore + gitleaks。ローカルは `~/Desktop/JPHACKS2026/.env`(リポ外) |
+| 10/24 昼 | iOSアプリ名 | **メタモン**(表示名)。内部識別子は `Metamon`(ターゲット/スキーム/Bundle ID `jp.kz2601.metamon`)。旧仮名 Morph は廃止。リネームは #5 の実機確認完了後に単独PRで |
+| 10/24 昼 | PRテンプレ | 「重点レビューファイル」節を追加。レビュアーが読む順と見どころを最大5ファイルで明示 |
