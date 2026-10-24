@@ -6,7 +6,7 @@ extension Color {
     static func semantic(_ name: String?) -> Color {
         switch name {
         case "secondary": .secondary
-        case "accent": .accentColor
+        case "accent": RenderTheme.Colors.brandA
         case "red": .red
         case "green": .green
         case "orange": .orange
