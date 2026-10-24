@@ -332,6 +332,7 @@ struct VoiceInputView: View {
             }
         case .listening:
             phase = .transcribing
+            let stoppedAt = ContinuousClock.now // #160 区間ログ
             SpeechReader.shared.recordingFinished()
             let text: String
             do {
@@ -354,7 +355,7 @@ struct VoiceInputView: View {
             }
             if rt.routesToChat(text) {
                 // 対話: 書き起こしはそのまま吹き出しになるので、タイプライター演出は挟まない
-                await morph(text)
+                await morph(text, voice: ChatTiming(recordStopped: stoppedAt, transcribed: .now))
                 return
             }
             transcript = text
@@ -380,11 +381,11 @@ struct VoiceInputView: View {
     }
 
     /// 初期画面は `submitUtterance`(対話 ON なら質問を挟む)、生成後のシート(edit)は従来どおり即反映。
-    private func morph(_ text: String) async {
+    private func morph(_ text: String, voice: ChatTiming? = nil) async {
         phase = .thinking
         SpeechReader.shared.stop()
         if isInitial {
-            await rt.submitUtterance(text)
+            await rt.submitUtterance(text, source: voice == nil ? .text : .voice, timing: voice ?? ChatTiming())
         } else {
             rt.showVoiceSheet = false
             await rt.morph(transcript: text, about: ScreenMapUI.shared.takeContext())

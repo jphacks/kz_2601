@@ -1242,6 +1242,23 @@
         }
       }
     },
+    "まもなく作ります…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Building shortly…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "まもなく作ります…"
+          }
+        }
+      }
+    },
     "みんなが作ったアプリを探す": {
       "extractionState": "manual",
       "localizations": {
@@ -3112,6 +3129,23 @@
         }
       }
     },
+    "声だけで答えている時は、内容がそろうと少し待ってから自動で作り始めます。文字やチップで答えた時はボタンで作ります。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you answer by voice, building starts automatically shortly after the details are complete. If you answer by typing or tapping a choice, use the button."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "声だけで答えている時は、内容がそろうと少し待ってから自動で作り始めます。文字やチップで答えた時はボタンで作ります。"
+          }
+        }
+      }
+    },
     "変更を反映しています…": {
       "extractionState": "manual",
       "localizations": {
@@ -4077,6 +4111,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "筋トレの記録"
+          }
+        }
+      }
+    },
+    "答えがそろったら自動で作る": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Build automatically when ready"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "答えがそろったら自動で作る"
           }
         }
       }

@@ -117,7 +117,7 @@ struct ClarifyChatView: View {
     private var actionButton: some View {
         if ready != nil {
             Button { Task { await rt.buildFromChat() } } label: {
-                Label(ClarifyCopy.buildButton, systemImage: "wand.and.stars")
+                Label(rt.chatAutoBuildPending ? ClarifyCopy.autoBuilding : ClarifyCopy.buildButton, systemImage: "wand.and.stars")
                     .font(.headline)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)

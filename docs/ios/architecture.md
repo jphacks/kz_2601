@@ -259,6 +259,7 @@ stateDiagram-v2
     Question --> Asking: 「このまま作る」(= "このまま作って" を送る → shortcut ready)
     Asking --> Ready: kind=ready
     Ready --> Generating: 「この内容で作る」→ generate(ready.transcript)
+    Ready --> Generating: 最後の入力がマイク + 自動で作る ON → 要約カードを 1.5 秒見せて自動(#160)
     Question --> Idle: 「最初から」(DELETE /v1/chat/{appId})
     Ready --> Idle: 「最初から」
     Generating --> [*]: 変身(GeneratingView → apply)
@@ -267,14 +268,15 @@ stateDiagram-v2
 | 項目 | 実装 |
 |---|---|
 | 契約 | `POST /v1/chat` `{appId, messages[{role,text}], locale?}` → `{kind: question\|ready, text, suggestions?, turn, brief?, transcript?, source}`。`DELETE /v1/chat/{appId}` → 204。generate は無変更で `ready.transcript` を `text`(iOS 実装は `transcript` キー。backend は両方受ける)に渡す |
-| 履歴 | iOS は手元の全履歴を毎回送る(2 件以上はサーバー状態を置き換える契約 → ai 再起動・30 分失効でも続く)。新規会話の 1 発目の前に `DELETE` して前の会話への追記を防ぐ |
+| 履歴 | iOS は手元の全履歴を毎回送る(2 件以上はサーバー状態を置き換える契約 → ai 再起動・30 分失効でも続く)。新規会話の 1 発目は `DELETE` を待たずに 1 件だけ POST し、応答の `turn != 1`(前の会話に追記された)の時だけ `DELETE` を await して送り直す(`MetamonServices/Clarify/ClarifyFlow.startConversation`・#160)。DELETE を投げっぱなしにしないのは、POST の後に届くと新しい会話の brief を消して「このまま作る」の即答が遅くなるため |
 | 状態 | `AppRuntime.chatBubbles` / `chatPending` / `chatTurn` / `clarifyEnabled`。ロジックは `App/AppRuntime+Clarify.swift`(`submitUtterance` / `say` / `buildNow` / `buildFromChat` / `resetChat`) |
 | UI | `Features/Voice/ClarifyChatView.swift`。右 = ユーザー(書き起こし)、左 = AI。最新の質問だけ title3 で大きく。質問中は選択肢チップ +「このまま作る」(常時)、ready は要約カード(brief: 名前・目的・記録する・見られる)+「この内容で作る」。入力は小さいマイク(録音は `VoiceInputView` のまま)+ 文字 |
 | 生成への受け渡し | `AppRuntime.generate(_:)`(意図判定を通さない。AI のまとめ文を「元に戻して」等に誤判定させない)。圏外保留・状態カードは既存どおり |
 | リセット | 「最初から」・生成開始・`apply()`(別アプリへの切替 / 新規 appId / 生成完了)で会話を捨てて `DELETE`。初期画面はシートではないので「閉じる」は無い |
 | エラー | 既存の状態カード(`ErrorPresentation.origin = .chat`)。主ボタン「もう一度」は同じ履歴を再送(生成ではない)。失敗タイトルは「質問をうまく用意できませんでした」。「このまま作る」で chat が落ちていたら、これまでの発話をつないで生成に進む |
-| 設定 | 設定 >「作る前に質問する」(既定 ON・UserDefaults)。`METAMON_CLARIFY=0/1` が優先 |
-| DEBUG | `METAMON_AUTO_TRANSCRIPT="日記" METAMON_AUTO_REPLIES="写真も残したい\|もう作って" METAMON_AUTO_PAUSE=5` で 質問 → 答え → … → ready →「この内容で作る」まで無人で通す(返答が尽きたら「このまま作る」)。`METAMON_CLARIFY=0` で従来の即生成 |
+| 設定 | 設定 >「作る前に質問する」(既定 ON・UserDefaults)。`METAMON_CLARIFY=0/1` が優先。その下に「答えがそろったら自動で作る」(既定 ON・`METAMON_CLARIFY_AUTOBUILD=0/1` が優先)。最後の入力がマイクの時だけ ready で自動生成(待ち中はボタンが「まもなく作ります…」、タップで即生成、「最初から」で取消)。文字・チップで答えた時は従来どおりボタン |
+| 計測 | DEBUG で 1 ラリーごとに `[Metamon] chat timing: turn=N kind=K stt= pre= net= render= total=`(録音停止 → 文字起こし完了 → POST 開始 → 応答受信 → 吹き出し表示。文字入力は stt/pre が `-`)。`ChatTiming`(MetamonServices) |
+| DEBUG | `METAMON_AUTO_TRANSCRIPT="日記" METAMON_AUTO_REPLIES="写真も残したい\|もう作って" METAMON_AUTO_PAUSE=5` で 質問 → 答え → … → ready →「この内容で作る」まで無人で通す(返答が尽きたら「このまま作る」)。`METAMON_CLARIFY=0` で従来の即生成。`METAMON_AUTO_SOURCE=voice` で音声入力として扱い、ready の自動生成を通す |
 
 ### エラー状態表(#60・2026-10-24 深夜)
 
