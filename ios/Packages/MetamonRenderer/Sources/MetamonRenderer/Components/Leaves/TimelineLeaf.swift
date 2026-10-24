@@ -11,7 +11,7 @@ struct TimelineLeaf: View {
         let entity = rt.dsl.entity(entityId)
         let dateField = c.dateField ?? ""
         let sort = Sort(field: dateField, direction: "desc")
-        let all = Aggregator.sorted(Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId)), by: sort, entity: entity)
+        let all = Aggregator.sorted(rt.filteredRecords(c), by: sort, entity: entity)
         let rows = (c.limit ?? 0) > 0 ? Array(all.prefix(c.limit!)) : all
         if rows.isEmpty {
             EmptyPlaceholder(icon: "clock", emptyText: "まだありません", state: rt.emptyState(for: entityId)) {
@@ -21,7 +21,7 @@ struct TimelineLeaf: View {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                     HStack(alignment: .top, spacing: 12) {
-                        Text(FieldCoding.display(row[dateField], field: entity?.field(dateField)))
+                        Text(rt.display(row[dateField], field: entity?.field(dateField)))
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .frame(width: 84, alignment: .trailing)
@@ -33,9 +33,9 @@ struct TimelineLeaf: View {
                         }
                         .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(FieldCoding.display(row[c.titleField ?? ""], field: entity?.field(c.titleField ?? ""))).font(.subheadline.weight(.medium))
+                            Text(rt.display(row[c.titleField ?? ""], field: entity?.field(c.titleField ?? ""))).font(.subheadline.weight(.medium))
                             if let sub = c.subtitleField {
-                                let s = FieldCoding.display(row[sub], field: entity?.field(sub))
+                                let s = rt.display(row[sub], field: entity?.field(sub))
                                 if !s.isEmpty { Text(s).font(.caption).foregroundStyle(.secondary) }
                             }
                         }

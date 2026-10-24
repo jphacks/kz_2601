@@ -20,7 +20,7 @@ struct CalendarLeaf: View {
     /// 日(startOfDay)→ その日のレコード
     private var byDay: [Date: [Record]] {
         var out: [Date: [Record]] = [:]
-        for r in rt.records(for: entityId) {
+        for r in rt.viewRecords(for: entityId) {
             guard let d = FieldCoding.date(from: r[dateField]) else { continue }
             out[cal.startOfDay(for: d), default: []].append(r)
         }

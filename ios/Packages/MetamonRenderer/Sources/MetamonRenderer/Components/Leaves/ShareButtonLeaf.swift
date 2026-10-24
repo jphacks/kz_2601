@@ -17,7 +17,7 @@ struct ShareButtonLeaf: View {
     private var rawText: String {
         var s = c.text ?? ""
         if let form = ctx.form {
-            for f in form.entity.fields {
+            for f in form.entity.storedFields {
                 let v = FieldCoding.display(form.values[f.id] ?? .null, field: f)
                 s = s.replacingOccurrences(of: "{{\(f.id)}}", with: v)
             }

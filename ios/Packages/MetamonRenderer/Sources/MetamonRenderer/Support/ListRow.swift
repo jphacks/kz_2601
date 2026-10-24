@@ -11,10 +11,11 @@ struct ListRow: View {
     let entity: Entity?
     var showsChevron = false
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.dslRuntime) private var rt
 
     private func text(_ fieldId: String?) -> String? {
         guard let fieldId else { return nil }
-        return FieldCoding.display(record[fieldId], field: entity?.field(fieldId))
+        return rt.display(record[fieldId], field: entity?.field(fieldId))
     }
 
     /// trailing が数値/通貨 field なら等幅・太めで右寄せ(金額が縦に揃う)。
@@ -22,7 +23,7 @@ struct ListRow: View {
         item?.trailing.flatMap { entity?.field($0)?.type.isNumeric } ?? false
     }
 
-    private var titleText: String { text(item?.title ?? entity?.titleField) ?? "" }
+    private var titleText: String { text(item?.title ?? entity?.displayTitleField) ?? "" }
     private var subtitleText: String? { text(item?.subtitle).flatMap { $0.isEmpty ? nil : $0 } }
     private var trailingText: String? { text(item?.trailing).flatMap { $0.isEmpty ? nil : $0 } }
 

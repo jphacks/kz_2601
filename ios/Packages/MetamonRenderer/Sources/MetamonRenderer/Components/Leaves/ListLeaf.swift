@@ -10,7 +10,7 @@ struct ListLeaf: View {
     var body: some View {
         let entityId = c.entity ?? ""
         let entity = rt.dsl.entity(entityId)
-        let filtered = Aggregator.sorted(Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId)), by: c.sort, entity: entity)
+        let filtered = Aggregator.sorted(rt.filteredRecords(c), by: c.sort, entity: entity)
         let rows = searched(filtered, entity: entity)
         if rows.isEmpty {
             EmptyPlaceholder(icon: "tray", emptyText: c.emptyText ?? "まだありません", state: rt.emptyState(for: entityId)) {
@@ -60,7 +60,7 @@ struct ListLeaf: View {
         guard let key = c.searchField, let q = ctx.locals?.values[key]?.trimmingCharacters(in: .whitespaces), !q.isEmpty else { return rows }
         let fields = [c.item?.title ?? entity?.titleField, c.item?.subtitle].compactMap { $0 }
         return rows.filter { r in
-            fields.contains { FieldCoding.display(r[$0], field: entity?.field($0)).localizedCaseInsensitiveContains(q) }
+            fields.contains { rt.display(r[$0], field: entity?.field($0)).localizedCaseInsensitiveContains(q) }
         }
     }
 }
