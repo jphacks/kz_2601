@@ -292,6 +292,11 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 					raw, app = fixed, fixedApp
 				}
 			}
+			if fixed := fixStatUnitLabels(raw); len(fixed) != len(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
 			ar.raw = canon(raw)
 			ar.summary = summarizeFor(app, loc)
 			ar.meta.Lint = app.Lint()
