@@ -1,0 +1,62 @@
+{
+  "identifier" : "7C1F2A9E",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "ja_JP",
+    "_storefront" : "JPN",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21500001",
+      "localizations" : [
+
+      ],
+      "name" : "Tailor It Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "500",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6739000001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "アプリの新規作成が無制限になります",
+              "displayName" : "Tailor It Pro",
+              "locale" : "ja"
+            },
+            {
+              "description" : "Unlimited new apps every day",
+              "displayName" : "Tailor It Pro",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "jp.kz2601.metamon.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Tailor It Pro Monthly",
+          "subscriptionGroupID" : "21500001",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

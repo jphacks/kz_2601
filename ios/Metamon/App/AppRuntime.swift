@@ -383,7 +383,11 @@ final class AppRuntime: DSLRuntime {
             withAnimation(.easeInOut(duration: 0.3)) { errorCard = ErrorPresentation(kind: .offlineQueued, transcript: text) }
             return
         }
+        // 課金(#77): 新規作成(初期画面から)は 1 日の無料枠を消費する。枠切れなら上限シートを出して送らない。成功した時だけ数える
+        let metered = dsl.isVoiceOnly
+        if metered, !ProGate.shared.admitNewApp() { showVoiceSheet = false; return }
         await send(text)
+        if metered, !dsl.isVoiceOnly { ProGate.shared.recordNewApp() }
     }
 
     /// 復帰時の自動送信(`DeferredSend` から)。保留が生きていれば生成に進む。
