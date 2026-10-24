@@ -11,7 +11,7 @@ public struct HTTPAccountClient: AccountClient {
     }
 
     public func deleteAccount() async throws {
-        // 全データの削除はサーバー側で数秒かかることがある
+        // アプリ・シェア・掲載の更新でサーバー側が数秒かかることがある
         _ = try await HTTP.send("DELETE", baseURL: baseURL, path: "v1/me", body: nil, token: token, timeout: 60)
     }
 }

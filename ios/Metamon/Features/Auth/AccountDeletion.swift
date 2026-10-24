@@ -5,7 +5,7 @@ import MetamonServices
 extension AuthSession {
     /// アカウント削除(#119・App Store 5.1.1(v))。匿名ユーザーも可。
     /// 1. Apple でサインインしたユーザーは Apple に再認証してもらい、そのコードでトークンを取り消す(失敗しても続行)
-    /// 2. `DELETE /v1/me`(サーバーの全データと認証ユーザー)。失敗したらここで止める(端末側は消さない=やり直せる)
+    /// 2. `DELETE /v1/me`(サーバーで論理削除。以後この uid は 410)。失敗したらここで止める(端末側は消さない=やり直せる)
     /// 3. 端末のデータを消してサインアウト → サインイン画面へ
     /// - Returns: 完了したら true。Apple の再認証をキャンセルしたら false(何も消していない)。
     func deleteAccount(account: any AccountClient, runtime: AppRuntime) async throws -> Bool {

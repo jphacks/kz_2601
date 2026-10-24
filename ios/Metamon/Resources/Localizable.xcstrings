@@ -1021,23 +1021,6 @@
         }
       }
     },
-    "すべてのアプリとデータが削除され、元に戻せません。": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "All your apps and data will be deleted. This can’t be undone."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "すべてのアプリとデータが削除され、元に戻せません。"
-          }
-        }
-      }
-    },
     "たとえば": {
       "extractionState": "manual",
       "localizations": {
@@ -1391,6 +1374,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "アカウント"
+          }
+        }
+      }
+    },
+    "アカウントとすべてのアプリが使えなくなります。元に戻せません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your account and all your apps will no longer be usable. This can’t be undone."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウントとすべてのアプリが使えなくなります。元に戻せません。"
           }
         }
       }
@@ -2738,19 +2738,19 @@
         }
       }
     },
-    "作ったアプリ・記録・共有リンク・「探す」への掲載をサーバーとこの端末から削除します。ほかの人と共有しているアプリでは、あなたの投稿だけが消えます。": {
+    "作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Deletes your apps, records, share links and Explore listings from the server and this device. In apps shared with others, only your posts are removed."
+            "value": "Your apps will no longer be usable, and your share links and Explore listings will be taken down. Data on this device is also erased. Posts in apps shared with others remain."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "作ったアプリ・記録・共有リンク・「探す」への掲載をサーバーとこの端末から削除します。ほかの人と共有しているアプリでは、あなたの投稿だけが消えます。"
+            "value": "作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。"
           }
         }
       }

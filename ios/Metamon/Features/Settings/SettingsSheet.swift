@@ -49,7 +49,7 @@ struct SettingsSheet: View {
             Button("削除する", role: .destructive) { deleteAccount() }
             Button("キャンセル", role: .cancel) {}
         } message: {
-            Text("すべてのアプリとデータが削除され、元に戻せません。")
+            Text("アカウントとすべてのアプリが使えなくなります。元に戻せません。")
         }
         .alert("アカウントを削除できませんでした", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
             Button("OK", role: .cancel) {}
@@ -78,7 +78,7 @@ struct SettingsSheet: View {
         #endif
     }
 
-    /// アカウント削除(#119・App Store 5.1.1(v))。サーバーの全データ → 端末のデータ → サインアウト。
+    /// アカウント削除(#119・App Store 5.1.1(v))。サーバーで論理削除 → 端末のデータ → サインアウト。
     @ViewBuilder
     private var deleteAccountSection: some View {
         if session.user != nil {
@@ -90,7 +90,7 @@ struct SettingsSheet: View {
                 .disabled(isDeleting)
                 .accessibilityIdentifier("settings.deleteAccount")
             } footer: {
-                Text("作ったアプリ・記録・共有リンク・「探す」への掲載をサーバーとこの端末から削除します。ほかの人と共有しているアプリでは、あなたの投稿だけが消えます。")
+                Text("作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。")
             }
         }
     }

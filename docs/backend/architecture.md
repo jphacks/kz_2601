@@ -244,19 +244,21 @@ func UID(ctx context.Context) string { s, _ := ctx.Value(ctxKey{}).(string); ret
 
 ### 4.1 アカウント削除(`DELETE /v1/me`・#119)
 
-App Store 審査ガイドライン 5.1.1(v)(アカウントを作れるアプリはアプリ内から削除を開始できること)への対応。iOS の設定シート「アカウントを削除」から呼ぶ。
+App Store 審査ガイドライン 5.1.1(v)(アカウントを作れるアプリはアプリ内から削除を開始できること)への対応。iOS の設定シート「アカウントを削除」から呼ぶ。**論理削除**(2026-10-25 ユーザー判断: 物理削除と Firebase Auth のユーザー削除はしない。Cloud Run に `roles/firebaseauth.admin` を足さずに済む)。
 
 | 対象 | 扱い |
 |---|---|
-| `users/{uid}` 配下すべて(apps・versions・records) | **物理削除**(発話の文字起こし `source.transcript` もここで消える) |
-| `apps_public/{appId}/entities/*/records` の `author == uid` | 物理削除。**他人の投稿は残す** |
-| `apps_public/{appId}`(`ownerUid == uid`) | ドキュメントのみ削除(配下の他人の投稿は残る) |
-| `shares/*`・`public_apps/*`(`ownerUid == uid`) | 物理削除(シェアリンクは 404 に、「探す」から消える) |
-| Firebase Auth のユーザー | 最後に Admin SDK の `DeleteUser`(ユーザー不在は成功扱い)。AUTH_MODE=dev では行わない |
+| `users/{uid}` | `{status: "deleted", deletedAt}` を書く(このドキュメントは他に書かれないので、無ければ有効なユーザー) |
+| `users/{uid}/apps/*` | `status: "archived"`(`DELETE /v1/apps/{appId}` と同じ)。versions・records は残る |
+| `shares/*`(`ownerUid == uid`) | `revoked: true`(受け取り側の取り込み・プレビューは 404) |
+| `public_apps/*`(`ownerUid == uid`) | 取り下げ(「探す」から消える) |
+| `apps_public/*`(共有アプリの DSL と共有レコード) | 残す。他人の投稿も自分の投稿も消えない |
+| Firebase Auth のユーザー | 削除しない |
 
-- **順序と冪等性**: 共有投稿は自分の apps 一覧を手がかりに探す(投稿には自分の private コピーが必須なため)ので、`users/{uid}` より先に消す。認証ユーザーは最後。どこで失敗しても同じトークンで再実行すれば残りを消して 204。2 回目以降も 204
-- **実装**: `store.Accounts.DeleteUserData`(`account.go` / `memory_account.go` / `firestore_account.go`)。Firestore は BulkWriter。Go クライアントに RecursiveDelete が無いので `Collections` → `DocumentRefs`(親が「missing」なドキュメントも列挙される)で再帰。`ownerUid` / `author` の等価クエリは自動の単一フィールドインデックスで足りる(collection group クエリは使わない=インデックス追加不要)
-- **権限**: Cloud Run の SA に Firebase Authentication 管理者(`roles/firebaseauth.admin`)が必要。ID トークン検証だけなら不要なロールなので、付与されていないと `DELETE /v1/me` はデータ削除後に 500 になる(再実行で回復)
+- **以後のリクエスト**: `appconfig.RejectDeleted`(auth.Middleware の内側)が削除済み uid の認証済みリクエストに **410 `account_deleted`** を返す。`DELETE /v1/me` だけは通して何度でも 204。uid ごとに「削除済み」は永続キャッシュ、「有効」は 30 秒キャッシュ(別インスタンスへの反映は最大 30 秒遅れる)
+- **冪等性**: 削除済みの印を最初に書き(トランザクションで最初の `deletedAt` を保持)、アプリ・シェア・掲載の更新は何度やっても同じ結果。途中で失敗しても再実行で終わる
+- **実装**: `store.Accounts`(`DeactivateUser` / `UserDeleted`。`account.go` / `memory_account.go` / `firestore_account.go`)。`ownerUid` の等価クエリだけなのでインデックス追加は不要
+- **注意**: Firebase Auth のユーザーを消さないので、**同じ Apple ID で再びサインインすると同じ uid になり、すべて 410 になる**(匿名は新しい uid になるので影響なし)。再登録を許すかどうかは未決
 - **Sign in with Apple のトークン取り消し**: iOS が削除直前に Apple の再認証で `authorizationCode` を得て `Auth.revokeToken(withAuthorizationCode:)`(Firebase が Apple の `auth/revoke` を呼ぶ)。Firebase コンソールの Apple プロバイダに Services ID・Team ID・Key ID・秘密鍵(OAuth コードフロー構成)が要る。失敗しても削除は続ける
 
 ## 5. DSL のバージョニングと差分適用
