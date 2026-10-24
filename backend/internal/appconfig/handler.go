@@ -39,11 +39,16 @@ type Handler struct {
 	cache map[string]*dsl.App // uid/appId/version -> parsed DSL (records validation)
 
 	eventsMax time.Duration // lifetime of one GET /events stream
+
+	users auth.UserDeleter // nil: DELETE /v1/me keeps the auth user (account.go)
 }
 
 // New builds the v1 router (a ServeMux so the caller can probe matches).
-func New(s store.Store) *http.ServeMux {
+func New(s store.Store, opts ...Option) *http.ServeMux {
 	h := &Handler{store: s, cache: map[string]*dsl.App{}, eventsMax: eventsMaxStream()}
+	for _, o := range opts {
+		o(h)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/apps", h.listApps)
 	mux.HandleFunc("POST /v1/apps", h.createApp)
@@ -78,6 +83,8 @@ func New(s store.Store) *http.ServeMux {
 	mux.HandleFunc("DELETE /v1/apps/{appId}/publish", h.unpublishApp)
 	mux.HandleFunc("GET /v1/public-apps", h.listPublicApps)
 	mux.HandleFunc("POST /v1/public-apps/{id}/install", h.installPublicApp)
+
+	mux.HandleFunc("DELETE /v1/me", h.deleteMe) // account deletion (#119): account.go
 	return mux
 }
 

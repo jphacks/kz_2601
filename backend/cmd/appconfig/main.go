@@ -34,7 +34,11 @@ func main() {
 	st, closeStore := newStore(ctx, project, logger)
 	defer closeStore()
 
-	handler := newHandler(auth.Middleware(verifier, mode), logger, appconfig.New(st), appconfig.SharePage(st))
+	var opts []appconfig.Option
+	if d, ok := verifier.(auth.UserDeleter); ok { // firebase mode: DELETE /v1/me also deletes the auth user
+		opts = append(opts, appconfig.WithUserDeleter(d))
+	}
+	handler := newHandler(auth.Middleware(verifier, mode), logger, appconfig.New(st, opts...), appconfig.SharePage(st))
 	server := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
