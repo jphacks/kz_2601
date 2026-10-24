@@ -98,6 +98,11 @@ type Client struct {
 	BaseURL    string
 	HTTP       *http.Client
 	MaxRetries int
+	// StructuredOutput sends Completion.Schema as output_config.format.
+	// Off by default: the API's grammar compiler rejects schemas of DSL size
+	// ("compiled grammar is too large" / "too many optional parameters"), so
+	// the schema goes into the prompt instead and dsl.Parse stays the gate.
+	StructuredOutput bool
 }
 
 // NewClient builds a client; apiKey is never logged.
@@ -169,7 +174,7 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 	if c.Effort != "" {
 		oc["effort"] = c.Effort
 	}
-	if len(req.Schema) > 0 {
+	if c.StructuredOutput && len(req.Schema) > 0 {
 		oc["format"] = map[string]any{"type": "json_schema", "schema": req.Schema}
 	}
 	if len(oc) > 0 {

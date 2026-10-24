@@ -42,8 +42,10 @@ func main() {
 		log.Printf("ai: APPCONFIG_BASE_URL unset; using in-memory DSL store")
 	}
 
+	claude := ai.NewClient(apiKey, model, effort)
+	claude.StructuredOutput = os.Getenv("CLAUDE_STRUCTURED_OUTPUT") == "1"
 	svc := &ai.Service{
-		Claude:      ai.NewClient(apiKey, model, effort),
+		Claude:      claude,
 		Store:       store,
 		Model:       model,
 		CallTimeout: time.Duration(timeoutSec) * time.Second,

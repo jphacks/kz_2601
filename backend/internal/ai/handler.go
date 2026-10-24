@@ -10,13 +10,16 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 )
 
-// NewHandler exposes POST /v1/generate and GET /healthz.
+// NewHandler exposes POST /v1/generate and GET /health.
+// Cloud Run's front end swallows /healthz, so /health is the one to probe.
 func NewHandler(svc *Service) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+	health := func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
-	})
+	}
+	mux.HandleFunc("GET /health", health)
+	mux.HandleFunc("GET /healthz", health)
 	mux.HandleFunc("POST /v1/generate", func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 		if err != nil {

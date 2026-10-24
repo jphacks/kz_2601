@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 func findKeyword(t *testing.T, v any, path string, bad map[string]bool, hits *[]string) {
@@ -66,10 +68,66 @@ func TestGenerationSchemaHasNoUnsupportedKeywords(t *testing.T) {
 	if props["patch"] == nil || props["summary"] == nil {
 		t.Fatal("patch schema root must expose patch and summary")
 	}
-	// Stat.format property survives (only the keyword is stripped).
-	stat := p["$defs"].(map[string]any)["Stat"].(map[string]any)["properties"].(map[string]any)
-	if stat["format"] == nil {
-		t.Fatal("Stat.format property must be kept")
+	// Leaf is flattened: one object whose `type` enum covers all 15 leaves,
+	// and the Stat `format` property survives (only the keyword is stripped).
+	leaf := p["$defs"].(map[string]any)["Leaf"].(map[string]any)
+	lp := leaf["properties"].(map[string]any)
+	if lp["format"] == nil || lp["text"] == nil || lp["entity"] == nil {
+		t.Fatalf("flattened leaf misses properties: %v", lp)
+	}
+	if en := lp["type"].(map[string]any)["enum"].([]any); len(en) != 15 {
+		t.Fatalf("leaf type enum: %v", en)
+	}
+	if _, ok := lp["children"]; ok {
+		t.Fatal("leaf must not have children")
+	}
+	comp := p["$defs"].(map[string]any)["Component"].(map[string]any)["properties"].(map[string]any)
+	if comp["children"] == nil || len(comp["type"].(map[string]any)["enum"].([]any)) != 18 {
+		t.Fatalf("component: %v", comp["type"])
+	}
+	for _, gone := range []string{"Container", "Text", "Stat"} {
+		if _, ok := p["$defs"].(map[string]any)[gone]; ok {
+			t.Fatalf("%s should be pruned", gone)
+		}
+	}
+	// Schemas stay small enough for the API grammar compiler.
+	if n := len(GenerationSchema()); n > 20000 {
+		t.Fatalf("generation schema too large: %d bytes", n)
+	}
+}
+
+// The relaxed schemas must still accept the canonical examples (they are a
+// superset of the strict schema), otherwise Claude could never emit them.
+func TestRelaxedSchemaAcceptsExamples(t *testing.T) {
+	c := jsonschema.NewCompiler()
+	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(GenerationSchema()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.AddResource("gen.json", doc); err != nil {
+		t.Fatal(err)
+	}
+	s, err := c.Compile("gen.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"initial", "kakeibo", "training", "walk"} {
+		raw, err := os.ReadFile("../../../docs/dsl/examples/" + name + ".json")
+		if err != nil {
+			t.Skip(err)
+		}
+		v, _ := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
+		if err := s.Validate(v); err != nil {
+			t.Errorf("%s rejected by relaxed schema: %v", name, err)
+		}
+	}
+}
+
+func TestExtractJSON(t *testing.T) {
+	for _, in := range []string{`{"a":1}`, "```json\n{\"a\":1}\n```", "はい、こちらです:\n{\"a\":1}\n以上"} {
+		if got := string(extractJSON(in)); got != `{"a":1}` {
+			t.Fatalf("extractJSON(%q) = %q", in, got)
+		}
 	}
 }
 

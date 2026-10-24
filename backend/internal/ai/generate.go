@@ -199,7 +199,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 		if err != nil {
 			return nil, err
 		}
-		raw := []byte(resp.Text)
+		raw := extractJSON(resp.Text)
 		app, perr := dsl.Parse(raw)
 		if perr == nil {
 			ar.raw = canon(raw)
@@ -237,7 +237,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 			return nil, err
 		}
 		var doc dsl.PatchDocument
-		if uerr := json.Unmarshal([]byte(resp.Text), &doc); uerr != nil {
+		if uerr := json.Unmarshal(extractJSON(resp.Text), &doc); uerr != nil {
 			problems = []string{"output is not a valid PatchDocument: " + uerr.Error()}
 			if resp.StopReason == "max_tokens" {
 				problems = append(problems, "output was truncated (max_tokens); make the patch smaller")
@@ -339,6 +339,21 @@ func applyUnchecked(current []byte, ops []dsl.PatchOp) ([]byte, bool) {
 		return nil, false
 	}
 	return next, true
+}
+
+// extractJSON tolerates a code fence or a short preamble around the JSON
+// (needed when the request runs without output_config.format).
+func extractJSON(text string) []byte {
+	t := strings.TrimSpace(text)
+	if strings.HasPrefix(t, "{") && strings.HasSuffix(t, "}") {
+		return []byte(t)
+	}
+	start := strings.Index(t, "{")
+	end := strings.LastIndex(t, "}")
+	if start >= 0 && end > start {
+		return []byte(t[start : end+1])
+	}
+	return []byte(t)
 }
 
 func canon(raw []byte) []byte {

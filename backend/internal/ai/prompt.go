@@ -12,10 +12,11 @@ import (
 //go:embed examples/kakeibo.json
 var fewShotKakeibo string
 
-// systemPrompt is static so the whole block is prompt-cacheable.
+// systemPrompt is static so the whole block is prompt-cacheable. It embeds
+// the (flattened) generation schema because the API cannot enforce it.
 var systemPrompt = strings.TrimSpace(`
 あなたは iOS アプリの Server-Driven UI 設計者です。ユーザーの日本語の発話(音声文字起こし)から、AppDSL v1 の JSON を生成または編集します。
-出力は指定された JSON Schema に厳密に従う JSON のみです。説明文は出力しません。
+出力は **JSON オブジェクト 1 つだけ**です。前置き・説明・コードフェンスは付けません。以下の JSON Schema と設計原則に厳密に従ってください。
 
 ## DSL の設計原則(必ず守る)
 - 構造は非再帰 2 段: Screen > Container(vstack/hstack/section) > Leaf。Container の中に Container は置けない。Leaf は children を持てない。
@@ -64,13 +65,17 @@ var systemPrompt = strings.TrimSpace(`
 - タブは「ホーム / 集計」「今日 / 履歴」のように 2〜3 個が扱いやすい。
 
 ## 例: 発話「家計簿アプリを作って。今月の合計と支出一覧、追加ボタンが欲しい。カテゴリ別の内訳も見たい」→ 出力
-` + "```json\n" + strings.TrimSpace(fewShotKakeibo) + "\n```")
+` + "```json\n" + strings.TrimSpace(fewShotKakeibo) + "\n```" + `
+
+## AppDSL の JSON Schema(Component は type ごとに該当するプロパティだけを使う)
+` + "```json\n" + string(GenerationSchema()) + "\n```")
 
 // editRules is appended to the system prompt for edit turns.
 var editRules = strings.TrimSpace(`
 
 ## 編集ターンのルール(JSON Patch RFC 6902)
-- 出力は {"patch": [...], "summary": "..."}。patch は「現在の DSL」に対する操作の配列(最大 50)。summary は変更内容を表す日本語の一文(iOS が読み上げる)。
+- 出力は {"patch": [{"op": "add|remove|replace|move|copy|test", "path": "/JSON/Pointer", "from"?: "...", "value"?: ...}], "summary": "..."} の JSON オブジェクト 1 つだけ。patch は「現在の DSL」に対する操作の配列(最大 50)。summary は変更内容を表す日本語の一文(iOS が読み上げる)。
+- value はプリミティブか、上の Schema の部分文書(Entity / Field / Screen / Component / Action / Tab / Notification など)かその配列。
 - 配列 index は「現在の DSL」のものをそのまま使う。末尾追加は "/-"。既存要素の置換は replace、削除は remove。
 - ユーザーが言及していない画面・entity・field・部品は触らない。entity の既存 field id はリネームしない。
 - 部品を追加・拡大するときは兄弟の area と重ならないようにする。必要なら隣接部品の area も replace で詰める。

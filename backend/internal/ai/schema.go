@@ -2,6 +2,7 @@ package ai
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
@@ -63,7 +64,188 @@ func Relax(raw []byte) (json.RawMessage, error) {
 		}
 	}
 	relaxSchema(root)
+	compact(root)
 	return json.Marshal(root)
+}
+
+// compact shrinks the grammar Claude has to compile: the 15-way Leaf anyOf
+// (expanded once per reference) exceeds the API's grammar size limit. Leaf
+// and Component become one flattened object (type enum + every property
+// optional) and PatchValue becomes primitives | flat node | arrays. Per-type
+// required props and combinations are enforced afterwards by dsl.Parse.
+func compact(root map[string]any) {
+	defs, _ := root["$defs"].(map[string]any)
+	if defs == nil {
+		return
+	}
+	leafNames := refNames(defs["Leaf"])
+	if len(leafNames) == 0 {
+		return
+	}
+	leafFlat := mergeObjects(defs, leafNames)
+	leafFlat["description"] = "Leaf component. `type` decides which other properties apply (see catalog); do not set unrelated properties."
+	defs["Leaf"] = leafFlat
+
+	compFlat := mergeObjects(defs, append([]string{"Container"}, leafNames...))
+	compFlat["properties"].(map[string]any)["children"] = map[string]any{
+		"type": "array", "items": map[string]any{"$ref": "#/$defs/Leaf"},
+		"description": "vstack/hstack/section only. Children stack vertically/horizontally and must not carry `area`.",
+	}
+	compFlat["description"] = "Screen-level component: a container (vstack/hstack/section with children) or a leaf."
+	defs["Component"] = compFlat
+	delete(defs, "Container")
+	for _, n := range leafNames {
+		delete(defs, n)
+	}
+
+	if _, ok := defs["PatchValue"]; ok {
+		node := mergeObjects(defs, []string{"AppMeta", "Tab", "Theme", "Notification", "Entity", "Field", "Screen", "ToolbarButton", "Action", "Component", "ListItem", "Sort", "Filter"})
+		node["description"] = "A DSL sub-document (entity, field, screen, component, action, tab, notification, ...). Set only the properties of that node kind."
+		defs["PatchNode"] = node
+		defs["PatchValue"] = map[string]any{
+			"description": "Primitive, DSL sub-document, or array of either.",
+			"anyOf": []any{
+				map[string]any{"type": "string"}, map[string]any{"type": "number"}, map[string]any{"type": "boolean"}, map[string]any{"type": "null"},
+				map[string]any{"$ref": "#/$defs/PatchNode"},
+				map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+				map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/PatchNode"}},
+			},
+		}
+	}
+	pruneDefs(root)
+}
+
+// refNames lists the $defs names referenced by a schema's anyOf.
+func refNames(s any) []string {
+	m, _ := s.(map[string]any)
+	arr, _ := m["anyOf"].([]any)
+	var out []string
+	for _, v := range arr {
+		if sub, ok := v.(map[string]any); ok {
+			if ref, ok := sub["$ref"].(string); ok {
+				out = append(out, strings.TrimPrefix(ref, "#/$defs/"))
+			}
+		}
+	}
+	return out
+}
+
+// mergeObjects unions the properties of several object defs. Colliding
+// property schemas with enum/const are unioned; otherwise the first wins.
+// `required` is reduced to the keys required by every input (usually `type`).
+func mergeObjects(defs map[string]any, names []string) map[string]any {
+	props := map[string]any{}
+	var order []string
+	reqCount := map[string]int{}
+	for _, n := range names {
+		d, _ := defs[n].(map[string]any)
+		p, _ := d["properties"].(map[string]any)
+		for _, k := range sortedKeys(p) {
+			ps, _ := p[k].(map[string]any)
+			if cur, ok := props[k].(map[string]any); ok {
+				props[k] = mergeProp(cur, ps)
+			} else {
+				props[k] = mergeProp(nil, ps)
+				order = append(order, k)
+			}
+		}
+		if req, ok := d["required"].([]any); ok {
+			for _, r := range req {
+				reqCount[r.(string)]++
+			}
+		}
+	}
+	var required []any
+	for _, k := range order {
+		if reqCount[k] == len(names) {
+			required = append(required, k)
+		}
+	}
+	out := map[string]any{"type": "object", "additionalProperties": false, "properties": props}
+	if len(required) > 0 {
+		out["required"] = required
+	}
+	return out
+}
+
+// mergeProp copies b (and unions enum/const into a if present).
+func mergeProp(a, b map[string]any) map[string]any {
+	cp := map[string]any{}
+	for k, v := range b {
+		cp[k] = v
+	}
+	if c, ok := cp["const"]; ok {
+		delete(cp, "const")
+		cp["type"] = "string"
+		cp["enum"] = []any{c}
+	}
+	if a == nil {
+		return cp
+	}
+	ae, aok := a["enum"].([]any)
+	be, bok := cp["enum"].([]any)
+	if aok && bok {
+		seen := map[any]bool{}
+		var union []any
+		for _, v := range append(append([]any{}, ae...), be...) {
+			if !seen[v] {
+				seen[v] = true
+				union = append(union, v)
+			}
+		}
+		a["enum"] = union
+		return a
+	}
+	if aok != bok { // enum vs free string: free string wins
+		delete(a, "enum")
+		if _, ok := a["type"]; !ok {
+			a["type"] = "string"
+		}
+	}
+	return a
+}
+
+func sortedKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// pruneDefs drops $defs not reachable from the root.
+func pruneDefs(root map[string]any) {
+	defs, _ := root["$defs"].(map[string]any)
+	seen := map[string]bool{}
+	var walk func(v any)
+	walk = func(v any) {
+		switch t := v.(type) {
+		case map[string]any:
+			if ref, ok := t["$ref"].(string); ok {
+				n := strings.TrimPrefix(ref, "#/$defs/")
+				if !seen[n] {
+					seen[n] = true
+					walk(defs[n])
+				}
+			}
+			for k, sub := range t {
+				if k != "$defs" {
+					walk(sub)
+				}
+			}
+		case []any:
+			for _, e := range t {
+				walk(e)
+			}
+		}
+	}
+	walk(root)
+	for n := range defs {
+		if !seen[n] {
+			delete(defs, n)
+		}
+	}
 }
 
 // relaxSchema walks one schema object. Keys under `properties`/`$defs` are
