@@ -10,6 +10,12 @@
 >
 > 前提: Mac に gcloud SDK 542 / firebase CLI 15.x / Go 1.24 / Docker(任意) が入っている。GCP への操作は **すべてあなたのアカウントで** 行う(Claude Code は実行しない)。
 
+> **進捗(2026-10-24)**: Step 0(0-1〜0-5)は Claude Code が実行済み。プロジェクト `jphacks-kz2601`(番号 `378953239426`)作成・課金リンク・API 有効化・SA 2つ・Artifact Registry `backend` 作成済み。**次にやるのは Step 1(Firebase)から。**
+>
+> **zsh で `#` 行を貼ると `command not found: #` が出る**のは無害だが、気になるなら先に `setopt interactivecomments` を実行しておく。
+>
+> **注意**: プロジェクトの表示名(`--name`)に `_` は使えない(ID だけでなく表示名にも文字種制限がある)。
+
 ## 目次
 1. [全体像](#1-全体像)
 2. [Step 0 事前準備](#2-step-0-事前準備)
@@ -89,7 +95,7 @@ flowchart LR
 |---|---|---|
 | `PROJECT_ID` | `jphacks-kz2601` | 取られていたら `jphacks-kz2601-2026` など |
 | `REGION` | `asia-northeast1` | 東京。Cloud Run / Firestore / Artifact Registry 全部これ |
-| `BUNDLE_ID` | `jp.jphacks.kz2601` | iOS の Bundle Identifier。Apple / Firebase / Xcode で **完全一致**させる |
+| `BUNDLE_ID` | `jp.kz2601.metamon` | iOS の Bundle Identifier。Apple / Firebase / Xcode で **完全一致**させる |
 | `GITHUB_REPO` | `jphacks/kz_2601` | WIF の条件に使う |
 
 **▶ 実行**(新しいターミナルを開くたびに貼る。`~/.zshrc` に入れてもよい)
@@ -97,7 +103,7 @@ flowchart LR
 ```sh
 export PROJECT_ID="jphacks-kz2601"
 export REGION="asia-northeast1"
-export BUNDLE_ID="jp.jphacks.kz2601"
+export BUNDLE_ID="jp.kz2601.metamon"
 export GITHUB_REPO="jphacks/kz_2601"
 export RUN_SA="run-backend@${PROJECT_ID}.iam.gserviceaccount.com"
 export DEPLOY_SA="github-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
@@ -114,7 +120,7 @@ export DEPLOY_SA="github-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
 ```sh
 gcloud auth login
 gcloud billing accounts list
-# ACCOUNT_ID 列をコピーして↓
+# OPEN が True の行の ACCOUNT_ID(例: 01BAFA-8017F4-58A712 の形式)をコピーして↓
 export BILLING_ACCOUNT="XXXXXX-XXXXXX-XXXXXX"
 ```
 
@@ -123,7 +129,7 @@ export BILLING_ACCOUNT="XXXXXX-XXXXXX-XXXXXX"
 **▶ 実行**
 
 ```sh
-gcloud projects create "$PROJECT_ID" --name="JPHACKS2026 kz_2601" --set-as-default
+gcloud projects create "$PROJECT_ID" --name="JPHACKS2026 kz2601" --set-as-default
 gcloud billing projects link "$PROJECT_ID" --billing-account="$BILLING_ACCOUNT"
 gcloud config set project "$PROJECT_ID"
 gcloud config set run/region "$REGION"
@@ -228,14 +234,14 @@ gcloud firestore databases describe --format='value(name,type,locationId)'
 
 **☐ あなたがやる**(https://developer.apple.com/account/resources/identifiers/list)
 
-1. **App ID を作る**: Identifiers → `+` → App IDs → App → Description 任意、Bundle ID = **Explicit** `jp.jphacks.kz2601` → Capabilities で **Sign In with Apple** にチェック → Register。
+1. **App ID を作る**: Identifiers → `+` → App IDs → App → Description 任意、Bundle ID = **Explicit** `jp.kz2601.metamon` → Capabilities で **Sign In with Apple** にチェック → Register。
    - 既に Xcode の自動署名で作られていれば、その App ID を Edit して Sign In with Apple を ON にするだけ。
 2. **Key を作る**(Firebase の OAuth code flow 設定用。iOS ネイティブのみなら省略可だが、後述の理由で作っておくことを推奨):
    Keys → `+` → Key Name 任意 → **Sign in with Apple** にチェック → Configure → Primary App ID に 1. の App ID → Save → Continue → Register → **`.p8` をダウンロード(1 回しか落とせない)**。
    - 控える値: **Key ID**(10 桁)、**Team ID**(右上のアカウント名横 / Membership に表示、10 桁)。
    - `.p8` は `~/DubVault` のような repo 外に保存。`.gitignore` で `*.p8` は除外済みだが repo 配下に置かない。
 3. **Services ID**(**Web / Android からもサインインする場合のみ必要**。iOS ネイティブのみの今回は原則不要):
-   Identifiers → `+` → Services IDs → Identifier `jp.jphacks.kz2601.signin` → Register → 一覧から開き Sign In with Apple を ON → Configure →
+   Identifiers → `+` → Services IDs → Identifier `jp.kz2601.metamon.signin` → Register → 一覧から開き Sign In with Apple を ON → Configure →
    Primary App ID = 1.、Domains and Subdomains = `<PROJECT_ID>.firebaseapp.com`、Return URLs = `https://<PROJECT_ID>.firebaseapp.com/__/auth/handler` → Next → Done → Continue → Save。
 
 > Apple Developer Program(有料・個人)が必須。無料アカウントでは Sign In with Apple capability が付けられない。
@@ -250,7 +256,7 @@ gcloud firestore databases describe --format='value(name,type,locationId)'
 
 | 欄 | 入れる値 | iOS ネイティブのみの場合 |
 |---|---|---|
-| Services ID | `jp.jphacks.kz2601.signin`(a-3 で作った場合) | 空欄で可(コンソールに "Apple プラットフォームでは省略可" 相当の注記があるはず。無ければ a-3 を作って入れる) |
+| Services ID | `jp.kz2601.metamon.signin`(a-3 で作った場合) | 空欄で可(コンソールに "Apple プラットフォームでは省略可" 相当の注記があるはず。無ければ a-3 を作って入れる) |
 | Apple チーム ID | Team ID(10 桁) | 任意だが入れておく |
 | キー ID | a-2 の Key ID | 任意だが入れておく |
 | 秘密鍵 | a-2 の `.p8` の中身(`-----BEGIN PRIVATE KEY-----` ごと貼る) | 任意だが入れておく |
@@ -767,8 +773,8 @@ gcloud run services update ai-prod --region="$REGION" --min-instances=0   # デ�
 | Artifact Registry | `asia-northeast1-docker.pkg.dev/<PROJECT_ID>/backend/backend:<sha>`(CI)、`…/cloud-run-source-deploy/…`(`--source` 自動作成) |
 | Secret | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`(任意) |
 | WIF | pool `github` / provider `github` |
-| Firebase iOS アプリ Bundle ID | `jp.jphacks.kz2601` |
-| Apple | App ID = Bundle ID、Key(Sign in with Apple)、Services ID `jp.jphacks.kz2601.signin`(Web 用・任意) |
+| Firebase iOS アプリ Bundle ID | `jp.kz2601.metamon` |
+| Apple | App ID = Bundle ID、Key(Sign in with Apple)、Services ID `jp.kz2601.metamon.signin`(Web 用・任意) |
 | エミュレータ用プロジェクト | `demo-kz2601` |
 | Cloud Run 環境変数 | `GOOGLE_CLOUD_PROJECT`, `APP_ENV`(`stg`/`prod`), `APPCONFIG_URL`(ai のみ), `ANTHROPIC_API_KEY`(Secret) |
 
