@@ -59,6 +59,11 @@ type Meta struct {
 	OutputChars      int        `json:"outputChars,omitempty"` // model text length (whitespace share diagnostics)
 	LastProblems     []string   `json:"lastProblems,omitempty"`
 	LogicPass        *LogicMeta `json:"logicPass,omitempty"` // set when the logic pass ran
+	// LintRetried: the first valid output had content warnings (dsl.Lint) and
+	// was regenerated once with them; Lint lists the warnings left in the
+	// returned document (create) or added by the patch (edit).
+	LintRetried bool     `json:"lintRetried,omitempty"`
+	Lint        []string `json:"lint,omitempty"`
 }
 
 // Event is a progress message emitted by GenerateStream before the Result,
@@ -250,22 +255,40 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 	ar.meta.Model = s.Model
 	var problems []string
 	var lastCandidate []byte
+	var linted *attemptResult // valid output kept while regenerating for its lint warnings
 	for i := 0; i <= s.maxRegen(); i++ {
 		resp, err := s.call(ctx, systemPrompt, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
 			appEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
 			return nil, err
 		}
-		raw := fillDefaults(extractJSON(resp.Text))
+		raw := dropFormPhotoPreviews(fillDefaults(extractJSON(resp.Text)))
 		app, perr := dsl.Parse(raw)
 		if perr == nil {
 			ar.raw = canon(raw)
 			ar.summary = summarizeFor(app, loc)
+			ar.meta.Lint = app.Lint()
+			if len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
+				// one retry for content problems; keep this output in case it fails
+				ar.meta.LintRetried = true
+				kept := *ar
+				linted = &kept
+				problems = lintProblems(ar.meta.Lint)
+				ar.meta.LastProblems = problems
+				continue
+			}
 			return ar, nil
+		}
+		if linted != nil {
+			break // the lint retry broke the document: keep the earlier valid one
 		}
 		lastCandidate = raw
 		problems = problemsOf(perr, resp)
 		ar.meta.LastProblems = problems
+	}
+	if linted != nil {
+		ar.raw, ar.summary, ar.meta.Lint = linted.raw, linted.summary, linted.meta.Lint
+		return ar, nil
 	}
 	if stripped, ok := stripAreas(lastCandidate); ok {
 		if app, perr := dsl.Parse(stripped); perr == nil {
@@ -287,6 +310,8 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	var problems []string
 	var lastOps []dsl.PatchOp
 	var lastSummary string
+	var linted *attemptResult
+	baseLint := lintOf(env.DSL)
 	for i := 0; i <= s.maxRegen(); i++ {
 		resp, err := s.call(ctx, systemPrompt+"\n"+editRules,
 			editUserMessage(transcript, env.Version, string(env.DSL), problems, loc), PatchGenerationSchema(), ar,
@@ -295,7 +320,11 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 			return nil, err
 		}
 		var doc dsl.PatchDocument
-		if uerr := json.Unmarshal(extractJSON(resp.Text), &doc); uerr != nil {
+		uerr := json.Unmarshal(extractJSON(resp.Text), &doc)
+		if uerr != nil && linted != nil {
+			break
+		}
+		if uerr != nil {
 			problems = []string{"output is not a valid PatchDocument: " + uerr.Error()}
 			if resp.StopReason == "max_tokens" {
 				problems = append(problems, "output was truncated (max_tokens); make the patch smaller")
@@ -308,12 +337,28 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 		if perr == nil {
 			ar.raw = next
 			ar.ops = doc.Patch
-			ar.summary = strings.TrimSpace(doc.Summary)
+			ar.summary = normalizeDigits(strings.TrimSpace(doc.Summary))
+			ar.meta.Lint = newLint(baseLint, lintOf(next))
+			if len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
+				ar.meta.LintRetried = true
+				kept := *ar
+				linted = &kept
+				problems = lintProblems(ar.meta.Lint)
+				ar.meta.LastProblems = problems
+				continue
+			}
 			return ar, nil
+		}
+		if linted != nil {
+			break
 		}
 		lastOps, lastSummary = doc.Patch, doc.Summary
 		problems = problemsOf(perr, resp)
 		ar.meta.LastProblems = problems
+	}
+	if linted != nil {
+		ar.raw, ar.ops, ar.summary, ar.meta.Lint = linted.raw, linted.ops, linted.summary, linted.meta.Lint
+		return ar, nil
 	}
 	// Fallback 1: apply the last patch unchecked, drop areas, re-validate.
 	if len(lastOps) > 0 {
@@ -625,7 +670,7 @@ func summarizeFor(a *dsl.App, loc Locale) string {
 	if loc == LocaleEN {
 		return summarizeEN(a)
 	}
-	return summarize(a)
+	return normalizeDigits(summarize(a))
 }
 
 // summarize renders the Japanese summary for a full generation

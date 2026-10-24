@@ -152,7 +152,11 @@ func writeProblems(b *strings.Builder, problems []string) {
 	if len(problems) == 0 {
 		return
 	}
-	b.WriteString("## 前回の出力は検証に失敗しました。以下の問題をすべて直して出力し直してください\n")
+	if isLintOnly(problems) {
+		b.WriteString("## 前回の出力は表示できますが、中身に以下の問題がありました。発話の要求を保ったまま直して出力し直してください\n")
+	} else {
+		b.WriteString("## 前回の出力は検証に失敗しました。以下の問題をすべて直して出力し直してください\n")
+	}
 	for _, p := range problems {
 		fmt.Fprintf(b, "- %s\n", p)
 	}
