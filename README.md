@@ -235,3 +235,6 @@ iOS アプリ(`ios/`)とバックエンド(`backend/`)を同居させたモノ�
 | `docs/` | 設計・運用ドキュメント(正典は `00_decisions.md`)。`dsl/`(DSL v1 スキーマ・examples)、`backend/`(設計・OpenAPI・ai-eval)、`ios/`、`infra/`、`03_demo_script.md` |
 | `.github/` | CI(backend-ci / ios-ci / secrets-scan / deploy-cloudrun)・PR/Issue テンプレート・CODEOWNERS |
 | `scripts/` | 運用スクリプト(`github/` ブランチ保護) |
+
+
+<!-- Automated fix for issue #121: iOS: FieldCoding.normalize が .null を返し、未入力の photo 等が null としてサーバーに送られる -->
