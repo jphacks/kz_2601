@@ -3,10 +3,22 @@ import Foundation
 /// 正典サンプル `docs/dsl/examples/*.json`(backend CI でも検証される 4 本)。
 /// アプリは xcodegen でこのディレクトリをそのままリソースにバンドルする(iOS 側にコピーを持たない=ドリフト防止)。
 public enum DSLExamples {
-    public static let names = ["initial", "kakeibo", "training", "walk", "gallery-input", "gallery-display"]
+    public static let names = [
+        "initial",
+        "kakeibo",
+        "training",
+        "walk",
+        "gallery-input",
+        "gallery-display",
+        "gallery-structure",
+    ]
 
     /// 初期状態(音声画面のみ)の DSL 名。
-    public static let initial = "initial"
+    /// 開発用: 環境変数 `METAMON_INITIAL_EXAMPLE`(simctl は `SIMCTL_CHILD_` 接頭辞)で同梱例を直接起動できる(ギャラリー確認用)。
+    public static var initial: String {
+        if let name = ProcessInfo.processInfo.environment["METAMON_INITIAL_EXAMPLE"], names.contains(name) { return name }
+        return "initial"
+    }
 
     public static func load(_ name: String, bundle: Bundle = .main) throws -> AppDSL {
         try AppDSL.bundled(name, bundle: bundle)

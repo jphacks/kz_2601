@@ -169,6 +169,20 @@ const (
 	CompVoiceInput  ComponentType = "voiceInput"
 	CompSpacer      ComponentType = "spacer"
 	CompDivider     ComponentType = "divider"
+	// structure containers (batch: structure/nav/native)
+	CompCard       ComponentType = "card"       // rounded surface + shadow
+	CompDisclosure ComponentType = "disclosure" // collapsible group
+	CompCarousel   ComponentType = "carousel"   // horizontal strip
+	CompGrid       ComponentType = "grid"       // 2-4 equal columns
+	// nav / native leaves
+	CompSearchBar      ComponentType = "searchBar"      // screen-local search text -> list.searchField
+	CompCalendar       ComponentType = "calendar"       // month view over entity.dateField
+	CompShareButton    ComponentType = "shareButton"    // ShareLink
+	CompOpenURLButton  ComponentType = "openUrlButton"  // fixed URL link
+	CompMapView        ComponentType = "mapView"        // MapKit pins from a location field
+	CompLocationButton ComponentType = "locationButton" // CoreLocation -> location field
+	CompQrScanner      ComponentType = "qrScanner"      // AVFoundation -> string field
+	CompTimerDisplay   ComponentType = "timerDisplay"   // stopwatch / countdown
 	// leaves: input batch
 	CompSlider      ComponentType = "slider"      // bounded numeric
 	CompStepper     ComponentType = "stepper"     // -/+ numeric
@@ -192,7 +206,16 @@ const (
 )
 
 // ContainerTypes lists component types that may have Children.
-var ContainerTypes = map[ComponentType]bool{CompVStack: true, CompHStack: true, CompSection: true}
+var ContainerTypes = map[ComponentType]bool{
+	CompVStack: true, CompHStack: true, CompSection: true,
+	CompCard: true, CompDisclosure: true, CompCarousel: true, CompGrid: true,
+}
+
+// Grid container column range.
+const (
+	MinGridContainerColumns = 2
+	MaxGridContainerColumns = 4
+)
 
 // Component is a flattened union of all component kinds. Which fields are
 // meaningful depends on Type (see docs/dsl/README.md).
@@ -242,6 +265,18 @@ type Component struct {
 	Prompt string `json:"prompt,omitempty"`
 	Size   string `json:"size,omitempty"`
 
+	// structure containers
+	Expanded    *bool  `json:"expanded,omitempty"`    // disclosure
+	ItemWidth   string `json:"itemWidth,omitempty"`   // carousel: small|medium|large
+	ColumnCount int    `json:"columnCount,omitempty"` // grid: 2..4 (`columns` is the table column list)
+
+	// nav / native leaves (URL / DateField / TitleField are shared with link / timeline below)
+	SearchField   string  `json:"searchField,omitempty"`   // list: searchBar.field on the same screen
+	OnDateTap     *Action `json:"onDateTap,omitempty"`     // calendar
+	LocationField string  `json:"locationField,omitempty"` // mapView
+	Zoom          string  `json:"zoom,omitempty"`          // mapView: near|city|wide
+	Mode          string  `json:"mode,omitempty"`          // timerDisplay: stopwatch|countdown
+	Seconds       int     `json:"seconds,omitempty"`       // timerDisplay countdown start
 	// input batch (slider / stepper / rating / textEditor). Pointers so that
 	// an explicit 0 round-trips through omitempty. Min/Max are shared with gauge.
 	Min      *float64 `json:"min,omitempty"`      // slider / stepper / gauge

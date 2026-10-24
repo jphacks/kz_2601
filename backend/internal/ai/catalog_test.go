@@ -56,10 +56,14 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 	for _, ct := range []dsl.ComponentType{dsl.CompVStack, dsl.CompHStack, dsl.CompSection, dsl.CompText, dsl.CompButton,
 		dsl.CompTextField, dsl.CompNumberField, dsl.CompDatePicker, dsl.CompPicker, dsl.CompToggle, dsl.CompPhotoField,
 		dsl.CompImage, dsl.CompList, dsl.CompStat, dsl.CompChart, dsl.CompVoiceInput, dsl.CompSpacer, dsl.CompDivider,
+		dsl.CompCard, dsl.CompDisclosure, dsl.CompCarousel, dsl.CompGrid,
+		dsl.CompSearchBar, dsl.CompCalendar, dsl.CompShareButton, dsl.CompOpenURLButton,
+		dsl.CompMapView, dsl.CompLocationButton, dsl.CompQrScanner, dsl.CompTimerDisplay,
 		dsl.CompSlider, dsl.CompStepper, dsl.CompTextEditor, dsl.CompSecureField, dsl.CompTimePicker, dsl.CompColorPicker, dsl.CompRating,
 		// display
 		dsl.CompLabel, dsl.CompIcon, dsl.CompProgressBar, dsl.CompGauge, dsl.CompBadge, dsl.CompLink, dsl.CompMarkdown,
-		dsl.CompAvatar, dsl.CompTable, dsl.CompTimeline, dsl.CompEmptyState} {
+		dsl.CompAvatar, dsl.CompTable, dsl.CompTimeline, dsl.CompEmptyState,
+	} {
 		goTypes[string(ct)] = true
 	}
 	for _, c := range components {
@@ -106,7 +110,7 @@ func TestCatalogRendering(t *testing.T) {
 	for _, want := range []string{
 		"- section: children / spacing(none|small|medium|large), title",
 		"- vstack: children / spacing(none|small|medium|large) —", // title is section-only (x-for)
-		"- list: entity, item{title} / emptyText, filter{field,op,value}, onItemTap, sort{field,direction}, swipeToDelete",
+		"- list: entity, item{title} / emptyText, filter{field,op,value}, onItemTap, searchField, sort{field,direction}, swipeToDelete",
 		"- stat: label, entity, aggregate(count|sum|avg|min|max) / field, filter{field,op,value}, format(plain|currency|percent)",
 		"- filter{field, op(eq|neq|gt|gte|lt|lte|thisMonth|today), value}",
 		"- navigate{screen / presentation(push|sheet|fullScreen)}",

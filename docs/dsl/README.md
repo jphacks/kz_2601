@@ -78,6 +78,20 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `voiceInput` | | `prompt`, `size`(compact/large) | | P0 |
 | `spacer` | | `size`(small/medium/large/flexible) | | P0 |
 | `divider` | | | | P0 |
+| `card`(Container) | `children` | `title`, `spacing` | | P1 |
+| `disclosure`(Container) | `children` | `title`, `expanded`, `spacing` | | P1 |
+| `carousel`(Container) | `children`(1 つ以上) | `itemWidth`(small/medium/large), `spacing` | | P1 |
+| `grid`(Container) | `children`(1 つ以上) | `columnCount`(2/3/4・`columns` は table の列定義なので別名), `spacing` | | P1 |
+| `searchBar` | `field`(画面ローカルの検索キー) | `placeholder` | | P1 |
+| `calendar` | `entity`, `dateField`(date/datetime) | `onDateTap`, `title` | | P1 |
+| `shareButton` | `text`(`{{fieldId}}` 可) | `field`, `label`, `icon` | `field`/`{{}}` 使用時のみ | P1 |
+| `openUrlButton` | `label`, `url` | `icon`, `style`(primary/secondary/plain) | | P1 |
+| `mapView` | `entity`, `locationField`(location) | `titleField`, `zoom`(near/city/wide), `onItemTap` | | P1 |
+| `locationButton` | `field`(location) | `label` | ○ | P1 |
+| `qrScanner` | `field`(string/text) | `label` | ○ | P1 |
+| `timerDisplay` | `mode`(stopwatch/countdown) | `seconds`(countdown 必須 >0), `field`(integer/number), `label` | `field` 使用時のみ | P1 |
+
+`list` は任意キー `searchField` を持ち、同じ画面の `searchBar.field` を指すと title/subtitle の部分一致で絞り込む(backend は対応する `searchBar` の存在を検証)。
 | `slider` | `field`(integer/number/currency), `min`, `max` | `label`, `step`(省略で連続・integer は 1) | ○ | P1 |
 | `stepper` | `field`(integer/number/currency) | `label`, `min`, `max`, `step`(既定 1) | ○ | P1 |
 | `textEditor` | `field`(string/text) | `placeholder`, `minLines`(既定 4) | ○ | P1 |
@@ -120,6 +134,13 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `cancelNotification` | `notificationId` | 予約を取消 |
 
 `confirmMessage` はどのアクションにも付けられ、先に確認ダイアログを出す。
+
+構造・ナビ・ネイティブ系の設計メモ(新規アクションは追加しない):
+
+- `shareButton` / `openUrlButton` / `locationButton` / `qrScanner` / `timerDisplay` は **Leaf 内で完結**し(ShareLink / `openURL` / CoreLocation / AVFoundation / Timer)、新しい `Action` 種別(`share` / `requestLocation` 等)は足さない。`ActionType` に case を足すとホスト(`AppRuntime.run` の網羅 switch)の改修が必須になるため。URL は既存の `openUrl` アクションで足りる。
+- `calendar.onDateTap` は既存の `navigate` を使う。行タップは recordId を渡して編集、「追加」はタップした日を `dateField` の初期値として Renderer 内の `FormPrefill` に積み、次に開いた新規フォームが 1 回だけ消費する(`Action` に params を増やさない)。
+- `searchBar.field` は entity の field ではなく**画面ローカルのキー**(`ScreenLocals`)。`list.searchField` で参照し、レコードには保存しない。
+- `mapView` は `latField`/`lngField` の 2 列ではなく既存の **`location` 型 field 1 つ**(`"lat,lng"`)を使う(`locationButton` の保存先と同じ表現・entity の field 数を増やさない)。既存 `map` Leaf は無かったので新設。
 
 ### 3.3 フィールド型と値(appconfig `RecordData` と一致)
 
