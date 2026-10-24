@@ -25,6 +25,7 @@ const (
 	ModeAuto   Mode = "auto"
 	ModeCreate Mode = "create"
 	ModeEdit   Mode = "edit"
+	ModeUndo   Mode = "undo" // restore the previous version, no Claude call
 )
 
 // Request is POST /v1/generate.
@@ -58,12 +59,13 @@ type Result struct {
 	AppID           string          `json:"appId"`
 	Version         int             `json:"version"`
 	PreviousVersion int             `json:"previousVersion"`
-	Mode            string          `json:"mode"` // full|patch
+	Mode            string          `json:"mode"` // full|patch|restore
+	RestoredFrom    int             `json:"restoredFrom,omitempty"`
 	DSL             json.RawMessage `json:"dsl"`
 	Patch           []dsl.PatchOp   `json:"patch,omitempty"`
 	Summary         string          `json:"summary"`
 	Transcript      string          `json:"transcript"`
-	Source          string          `json:"source"` // claude
+	Source          string          `json:"source"` // claude|restore
 	LatencyMs       Latency         `json:"latencyMs"`
 	Meta            Meta            `json:"meta"`
 }
@@ -127,11 +129,17 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 	}
 	mode := req.Mode
 	if mode == "" || mode == ModeAuto {
-		if isInitial(current) || wantsNewApp(transcript) {
+		switch {
+		case wantsUndo(transcript):
+			mode = ModeUndo
+		case isInitial(current) || wantsNewApp(transcript):
 			mode = ModeCreate
-		} else {
+		default:
 			mode = ModeEdit
 		}
+	}
+	if mode == ModeUndo {
+		return s.undo(ctx, req.AppID, transcript, env, started)
 	}
 
 	var ar *attemptResult
@@ -145,7 +153,7 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 	case ModeEdit:
 		ar, err = s.generateEdit(ctx, transcript, env)
 	default:
-		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "mode must be auto|create|edit"}
+		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "mode must be auto|create|edit|undo"}
 	}
 	if err != nil {
 		return nil, err
@@ -390,6 +398,77 @@ func wantsNewApp(t string) bool {
 		}
 	}
 	return false
+}
+
+// undoPrefixes are matched at the start of a short utterance only, so edits
+// such as 「一覧を元の位置に戻して」 or long sentences are never mistaken for undo.
+var undoPrefixes = []string{
+	"元に戻し", "もとに戻し", "元へ戻し", "戻して",
+	"取り消し", "取消", "アンドゥ", "undo",
+	"さっきのやめ", "さっきのをやめ", "さっきの変更をやめ", "さっきの変更を戻", "さっきの変更を元に戻",
+	"さっきのを戻", "さっきのを元に戻", "さっきのを取り消", "さっきの取り消",
+	"やっぱりやめ", "やっぱやめ",
+	"一つ前に戻", "ひとつ前に戻", "1つ前に戻", "一つ前の状態に戻", "ひとつ前の状態に戻", "前の状態に戻",
+}
+
+const undoMaxRunes = 16
+
+// wantsUndo is the keyword classifier for 「元に戻して」. No Claude call: the
+// utterance must be short and start with one of undoPrefixes.
+func wantsUndo(t string) bool {
+	s := strings.ToLower(strings.TrimSpace(t))
+	s = strings.TrimRight(s, "。．.!！?？、,…　 ")
+	if s == "" || len([]rune(s)) > undoMaxRunes {
+		return false
+	}
+	for _, p := range undoPrefixes {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// undo restores the state before the current version. When the current
+// version is itself a restore, it steps back from the version it restored
+// (so repeated 「戻して」 keeps going back instead of redoing). Version 1 is
+// the voice-only seed, so there is nothing to undo below version 2.
+func (s *Service) undo(ctx context.Context, appID, transcript string, env *appconfigclient.Envelope, started time.Time) (*Result, error) {
+	versions, err := s.Store.Versions(ctx, appID)
+	if err != nil {
+		return nil, mapStoreErr(err)
+	}
+	target := env.Version - 1
+	for _, v := range versions {
+		if v.Version == env.Version && v.Source != nil && v.Source.Kind == "restore" && v.Source.RestoredFrom > 0 {
+			target = v.Source.RestoredFrom - 1
+		}
+	}
+	res := &Result{
+		AppID:           appID,
+		Version:         env.Version,
+		PreviousVersion: env.Version,
+		Mode:            "restore",
+		DSL:             env.DSL,
+		Transcript:      transcript,
+		Source:          "restore",
+		Meta:            Meta{Model: s.Model},
+	}
+	if target < 1 {
+		res.Summary = "戻せる変更がありません。"
+		res.LatencyMs = Latency{Total: time.Since(started).Milliseconds()}
+		return res, nil
+	}
+	saved, err := s.Store.Restore(ctx, appID, target)
+	if err != nil {
+		return nil, mapStoreErr(err)
+	}
+	res.Version = saved.Version
+	res.RestoredFrom = target
+	res.DSL = saved.DSL
+	res.Summary = fmt.Sprintf("ひとつ前の状態(version %d)に戻しました。", target)
+	res.LatencyMs = Latency{Total: time.Since(started).Milliseconds()}
+	return res, nil
 }
 
 // summarize renders the Japanese summary for a full generation

@@ -183,6 +183,7 @@ const (
 	CompLocationButton ComponentType = "locationButton" // CoreLocation -> location field
 	CompQrScanner      ComponentType = "qrScanner"      // AVFoundation -> string field
 	CompTimerDisplay   ComponentType = "timerDisplay"   // stopwatch / countdown
+	CompWebView        ComponentType = "webView"        // in-app WKWebView (https only)
 	// leaves: input batch
 	CompSlider      ComponentType = "slider"      // bounded numeric
 	CompStepper     ComponentType = "stepper"     // -/+ numeric
@@ -277,6 +278,7 @@ type Component struct {
 	Zoom          string  `json:"zoom,omitempty"`          // mapView: near|city|wide
 	Mode          string  `json:"mode,omitempty"`          // timerDisplay: stopwatch|countdown
 	Seconds       int     `json:"seconds,omitempty"`       // timerDisplay countdown start
+	ShareTo       string  `json:"shareTo,omitempty"`       // shareButton: any|line|slack|discord (`target` is progressBar's number)
 	// input batch (slider / stepper / rating / textEditor). Pointers so that
 	// an explicit 0 round-trips through omitempty. Min/Max are shared with gauge.
 	Min      *float64 `json:"min,omitempty"`      // slider / stepper / gauge

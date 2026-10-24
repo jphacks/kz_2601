@@ -11,6 +11,7 @@ public enum DSLExamples {
         "gallery-input",
         "gallery-display",
         "gallery-structure",
+        "gallery-web",
     ]
 
     /// 初期状態(音声画面のみ)の DSL 名。

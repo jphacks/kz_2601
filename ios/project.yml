@@ -26,10 +26,11 @@ settings:
     ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     # バックエンド URL(Info.plist の MetamonAIBaseURL / MetamonAppConfigBaseURL に展開)。空=その側はモック/インメモリ。
-    # 既定の ai は staging(Cloud Run)。ローカル ai に向けるなら xcodebuild ... METAMON_AI_BASE_URL=http://127.0.0.1:8081(シミュレータ)。
+    # 既定は ai / appconfig とも staging(Cloud Run)。ローカルに向けるなら
+    #   xcodebuild ... METAMON_AI_BASE_URL=http://127.0.0.1:8081 METAMON_APPCONFIG_BASE_URL=http://127.0.0.1:8080(シミュレータ)。
     # 全モックで起動したい時は実行時の環境変数 METAMON_MOCK=1。
     METAMON_AI_BASE_URL: "https://ai-stg-378953239426.asia-northeast1.run.app"
-    METAMON_APPCONFIG_BASE_URL: ""
+    METAMON_APPCONFIG_BASE_URL: "https://appconfig-stg-378953239426.asia-northeast1.run.app"
 
 # ---- ローカル Swift Package(マルチモジュール。依存の向きは各 Package.swift で固定) ----
 #   MetamonDSL      : DSL モデル・グリッド計算・集計(Foundation のみ。macOS で `swift test` 可)

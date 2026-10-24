@@ -2,7 +2,7 @@ import Foundation
 import MetamonServices
 
 /// 起動環境。appconfig / ai の URL は別々に設定でき、どちらも無ければ全モックで動く。
-/// 既定(project.yml)は ai = staging(Cloud Run https)・appconfig = 未設定(インメモリ)。
+/// 既定(project.yml)は ai = staging・appconfig = staging(どちらも Cloud Run https)。
 /// - `METAMON_AI_BASE_URL`(env) / `MetamonAIBaseURL`(Info.plist): ai サービス(`POST /v1/generate`)
 /// - `METAMON_APPCONFIG_BASE_URL`(env) / `MetamonAppConfigBaseURL`(Info.plist): appconfig(DSL/records CRUD・ホットリロード)
 /// Info.plist の値は build setting `$(METAMON_*_BASE_URL)` から展開されるので、`xcodebuild ... METAMON_AI_BASE_URL=http://…` でも渡せる。
@@ -71,7 +71,7 @@ enum BuildConfig {
             )
         case .live(let appConfigURL, let aiURL):
             let auth = makeAuth()
-            let token = AuthTokenProvider(auth: auth)
+            let token: any TokenProvider = devToken ?? AuthTokenProvider(auth: auth)
             let appConfig: any AppConfigClient = appConfigURL.map { HTTPAppConfigClient(baseURL: $0, token: token) }
                 ?? InMemoryAppConfigClient(seed: MockSeed.demoRecords())
             let sync: any DocumentSync = (appConfig as? HTTPAppConfigClient).map { PollingDocumentSync(client: $0) } ?? NoopDocumentSync()
@@ -86,6 +86,18 @@ enum BuildConfig {
                 isLive: appConfigURL != nil
             )
         }
+    }
+
+    /// DEBUG のみ: `METAMON_DEV_UID=<uid>` で Bearer にその文字列を送る。`AUTH_MODE=dev` のローカル backend は Bearer をそのまま uid として扱うので、
+    /// シミュレータ E2E で端末固定の uid を使える(Firebase の ID トークンは 1 時間で変わり、dev モードでは別ユーザーに見えてしまう)。
+    static var devToken: (any TokenProvider)? {
+        #if DEBUG
+        if let uid = ProcessInfo.processInfo.environment["METAMON_DEV_UID"], !uid.isEmpty {
+            print("[Metamon] METAMON_DEV_UID=\(uid): Bearer に固定 uid を送ります(ローカル AUTH_MODE=dev 専用)")
+            return StaticTokenProvider(uid)
+        }
+        #endif
+        return nil
     }
 
     /// Firebase が初期化済みなら本物、plist 未同期なら警告してモック(固定 uid・Bearer 無し)。

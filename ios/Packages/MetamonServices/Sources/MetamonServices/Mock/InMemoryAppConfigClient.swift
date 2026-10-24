@@ -18,6 +18,13 @@ public actor InMemoryAppConfigClient: AppConfigClient {
         try document()
     }
 
+    /// 履歴は持たない(モックの undo は `AppRuntime` のローカル履歴にフォールバックする)。
+    public func listVersions(appId: String) async throws -> [VersionSummary] { [] }
+
+    public func restore(appId: String, toVersion version: Int) async throws -> AppDocument {
+        throw APIError.server(status: 404, code: "not_found", message: "version not found (in-memory)")
+    }
+
     public func list(appId: String, entity: String) async throws -> [Record] {
         tables[entity] ?? []
     }

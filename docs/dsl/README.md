@@ -51,11 +51,11 @@ AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: full
 Entity  { id, name, titleField?, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit? } }
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (33 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
+Leaf (42 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
-### 3.1 コンポーネント(48 種 = Container 7 + Leaf 41)
+### 3.1 コンポーネント(49 種 = Container 7 + Leaf 42)
 
 全種に共通の任意キー: `id`(画面内一意)・`area`(§3.4 のグリッド矩形。Screen 直下のみ有効)。用途・レイアウトの定石は `dsl.schema.json` 各定義の `description` / `x-usage` が正典(AI へのカタログはそこから生成。§4)。
 
@@ -84,12 +84,13 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `grid`(Container) | `children`(1 つ以上) | `columnCount`(2/3/4・`columns` は table の列定義なので別名), `spacing` | | P1 |
 | `searchBar` | `field`(画面ローカルの検索キー) | `placeholder` | | P1 |
 | `calendar` | `entity`, `dateField`(date/datetime) | `onDateTap`, `title` | | P1 |
-| `shareButton` | `text`(`{{fieldId}}` 可) | `field`, `label`, `icon` | `field`/`{{}}` 使用時のみ | P1 |
-| `openUrlButton` | `label`, `url` | `icon`, `style`(primary/secondary/plain) | | P1 |
+| `shareButton` | `text`(`{{fieldId}}` 可) | `field`, `label`, `icon`, `shareTo`(any/line/slack/discord・既定 any) | `field`/`{{}}` 使用時のみ | P1 |
+| `openUrlButton` | `label`, `url`(https か `line` `slack` `discord` `tel` `mailto` `maps` `comgooglemaps` スキーム) | `icon`, `style`(primary/secondary/plain) | | P1 |
 | `mapView` | `entity`, `locationField`(location) | `titleField`, `zoom`(near/city/wide), `onItemTap` | | P1 |
 | `locationButton` | `field`(location) | `label` | ○ | P1 |
 | `qrScanner` | `field`(string/text) | `label` | ○ | P1 |
 | `timerDisplay` | `mode`(stopwatch/countdown) | `seconds`(countdown 必須 >0), `field`(integer/number), `label` | `field` 使用時のみ | P1 |
+| `webView` | `url`(https のみ) | `title` | | P1 |
 
 `list` は任意キー `searchField` を持ち、同じ画面の `searchBar.field` を指すと title/subtitle の部分一致で絞り込む(backend は対応する `searchBar` の存在を検証)。
 | `slider` | `field`(integer/number/currency), `min`, `max` | `label`, `step`(省略で連続・integer は 1) | ○ | P1 |
@@ -138,6 +139,9 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 構造・ナビ・ネイティブ系の設計メモ(新規アクションは追加しない):
 
 - `shareButton` / `openUrlButton` / `locationButton` / `qrScanner` / `timerDisplay` は **Leaf 内で完結**し(ShareLink / `openURL` / CoreLocation / AVFoundation / Timer)、新しい `Action` 種別(`share` / `requestLocation` 等)は足さない。`ActionType` に case を足すとホスト(`AppRuntime.run` の網羅 switch)の改修が必須になるため。URL は既存の `openUrl` アクションで足りる。
+- **他アプリ連携(#37 最小版)**: `shareButton.shareTo` で送り先を選ぶ。`line` → `https://line.me/R/share?text=<urlencoded>` を `openURL`(LINE 未インストールなら Web 版に遷移・写真は送れないので文面のみ)。`slack` / `discord` → 公式に汎用の共有 URL スキームが無いので **OS 共有シート(ShareLink)を開き、文面をチャンネル投稿向けに整形**(`**` `#` 等の Markdown 記号を落としたプレーンテキスト + 先頭に 💬)。`any`(既定)は従来どおり。キー名が `target` でないのは `progressBar.target`(number)と JSON キーが衝突するため(`columnCount` と同じ理由)。**Slack/Discord への Incoming Webhook 直接投稿は後段(#37 中版: appconfig 側にユーザー設定として保存し `postWebhook` アクションから投稿)**で、この版には含めない。
+- `openUrlButton.url` は https のほか allowlist のカスタムスキーム(`line` `slack` `discord` `tel` `mailto` `maps` `comgooglemaps`)を許可する(backend `dsl.OpenURLSchemes` と iOS `ExternalURLPolicy` が同じ表・`line`/`slack`/`discord` は Info.plist `LSApplicationQueriesSchemes` にも登録)。`http://` や未知スキームは backend がエラー・iOS はプレースホルダ。
+- `webView` は `WKWebView` の `UIViewRepresentable`(戻る/進む/再読込の小ツールバー + 読み込みバー)。https 以外は不可。WKWebView 自身がスクロールするので `GridScreenLayout.scrollsInside` には**入れない**(セル内で二重スクロールしない)。ページ内リンクが allowlist のスキーム(tel: 等)なら OS に渡し、それ以外の非 http(s) は無視。実例: `examples/gallery-web.json`(webView + LINE/Slack/Discord/共有シートの 4 ボタン + maps/tel/mailto/line リンク)。
 - `calendar.onDateTap` は既存の `navigate` を使う。行タップは recordId を渡して編集、「追加」はタップした日を `dateField` の初期値として Renderer 内の `FormPrefill` に積み、次に開いた新規フォームが 1 回だけ消費する(`Action` に params を増やさない)。
 - `searchBar.field` は entity の field ではなく**画面ローカルのキー**(`ScreenLocals`)。`list.searchField` で参照し、レコードには保存しない。
 - `mapView` は `latField`/`lngField` の 2 列ではなく既存の **`location` 型 field 1 つ**(`"lat,lng"`)を使う(`locationButton` の保存先と同じ表現・entity の field 数を増やさない)。既存 `map` Leaf は無かったので新設。

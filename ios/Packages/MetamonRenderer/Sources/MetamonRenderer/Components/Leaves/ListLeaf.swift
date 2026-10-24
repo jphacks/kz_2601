@@ -13,14 +13,14 @@ struct ListLeaf: View {
         let filtered = Aggregator.sorted(Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId)), by: c.sort, entity: entity)
         let rows = searched(filtered, entity: entity)
         if rows.isEmpty {
-            Text(rt.loading.contains(entityId) ? "読み込み中…" : (c.emptyText ?? "まだありません"))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
+            let loading = rt.loading.contains(entityId)
+            EmptyPlaceholder(icon: "tray", text: loading ? "読み込み中…" : (c.emptyText ?? "まだありません"), loading: loading)
         } else {
-            LazyVStack(spacing: 8) {
-                ForEach(rows) { row in
-                    ListRow(item: c.item, record: row, entity: entity)
+            // 1 枚のカードに行を積み、行間は 1pt の hairline(iOS の inset grouped list と同じ読み味)
+            LazyVStack(spacing: 0) {
+                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                    if index > 0 { Hairline(inset: separatorInset) }
+                    ListRow(item: c.item, record: row, entity: entity, showsChevron: c.onItemTap != nil)
                         .contentShape(Rectangle())
                         .onTapGesture {
                             guard let action = c.onItemTap else { return }
@@ -35,7 +35,15 @@ struct ListLeaf: View {
                         }
                 }
             }
+            .renderCard(padding: 0)
         }
+    }
+
+    /// 先頭のアイコン/画像の幅ぶんセパレータを内側に寄せる。
+    private var separatorInset: CGFloat {
+        if c.item?.image != nil { return RenderTheme.Spacing.md + 52 + RenderTheme.Spacing.row }
+        if c.item?.icon != nil { return RenderTheme.Spacing.md + 32 + RenderTheme.Spacing.row }
+        return RenderTheme.Spacing.md
     }
 
     /// `searchField`(同画面の searchBar.field)の文字列で title/subtitle を部分一致(大小無視)フィルタ。

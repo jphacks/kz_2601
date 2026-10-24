@@ -20,7 +20,7 @@ struct QrScannerLeaf: View {
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+                .background(RenderTheme.Colors.surface, in: RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
                 TextField("シミュレータ用: 読み取り結果を手入力", text: form.string(field))
                     .textFieldStyle(.roundedBorder)
                     .font(.caption)

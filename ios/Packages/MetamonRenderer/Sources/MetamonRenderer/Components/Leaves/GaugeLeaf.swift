@@ -29,9 +29,8 @@ struct GaugeLeaf: View {
                 Text(unit.map { "\(label) (\($0))" } ?? label).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
-        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        .renderCard()
     }
 
     /// 端の目盛り: 大きい値は 30K のように短く(円形ゲージの幅に収める)。
