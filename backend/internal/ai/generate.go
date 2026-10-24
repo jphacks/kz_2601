@@ -274,6 +274,11 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 					raw, app = fixed, fixedApp
 				}
 			}
+			if fixed := addMissingAddButtons(raw, app, loc); len(fixed) != len(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
 			if fixed := fixEnglishUnits(raw, loc); len(fixed) != len(raw) {
 				if fixedApp, err := dsl.Parse(fixed); err == nil {
 					raw, app = fixed, fixedApp
