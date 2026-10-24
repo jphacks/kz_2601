@@ -34,8 +34,66 @@ public enum DailyCheck {
     }
 
     /// チェックを付けた/外した時に保存する値(付けたら今日の "YYYY-MM-DD"、外したら null)。
+    /// 履歴(#172)も残すなら `patch(_:field:on:today:)` を使う。
     public static func stored(_ on: Bool, today: Date) -> JSONValue {
         on ? .string(FieldCoding.dateFormatter.string(from: today)) : .null
+    }
+
+    // MARK: - 押した日の履歴(#172)
+
+    /// 履歴の保存キー(toggle field id + "__dates")。値は "YYYY-MM-DD" の昇順配列。DSL には宣言しない(appconfig が date field の隣として受ける)。
+    public static func historyKey(_ field: String) -> String { field + historySuffix }
+    public static let historySuffix = "__dates"
+    /// 履歴の上限(古い方から捨てる。1 年強)。appconfig の上限と揃える。
+    public static let maxHistory = 400
+
+    /// 押した日("YYYY-MM-DD")の昇順・重複なし。履歴の無い旧レコード(#132 の lastDoneDate だけ)は toggle の値 1 件として読む。
+    public static func dates(_ record: Record, field: String) -> [String] {
+        var set = Set<String>()
+        if case .array(let xs) = record[historyKey(field)] { for x in xs { if let d = day(x) { set.insert(d) } } }
+        if let d = day(record[field]) { set.insert(d) }
+        return set.sorted()
+    }
+
+    /// チェックを付けた/外した時に保存する差分(toggle field と履歴)。付けたら今日を足し、外したら今日を消す。
+    /// toggle field は後方互換で「最後にやった日」のまま: 付けたら今日、外したら残った最新日(無ければ null)。
+    public static func patch(_ record: Record, field: String, on: Bool, today: Date) -> [String: JSONValue] {
+        let t = FieldCoding.dateFormatter.string(from: today)
+        var ds = dates(record, field: field).filter { $0 != t }
+        if on { ds.append(t) }
+        ds = Array(ds.sorted().suffix(maxHistory))
+        let last: JSONValue = on ? .string(t) : (ds.last.map { .string($0) } ?? .null)
+        return [field: last, historyKey(field): ds.isEmpty ? .null : .array(ds.map { .string($0) })]
+    }
+
+    /// 連続日数。今日やっていれば今日から、まだなら昨日から遡って続いた日数(今日未チェックでも昨日までの連続は切らない)。
+    public static func streak(_ days: [String], today: Date, calendar: Calendar = .current) -> Int {
+        let set = Set(days)
+        var d = calendar.startOfDay(for: today)
+        if !set.contains(key(d)) { d = calendar.date(byAdding: .day, value: -1, to: d) ?? d }
+        var n = 0
+        while set.contains(key(d)), n <= maxHistory {
+            n += 1
+            guard let prev = calendar.date(byAdding: .day, value: -1, to: d) else { break }
+            d = prev
+        }
+        return n
+    }
+
+    /// 直近 n 日(今日を含む)にやった日数。n < 1 は 0。
+    public static func count(_ days: [String], lastDays n: Int, today: Date, calendar: Calendar = .current) -> Int {
+        guard n >= 1 else { return 0 }
+        let start = calendar.startOfDay(for: today)
+        let window = Set((0..<min(n, maxHistory)).compactMap { calendar.date(byAdding: .day, value: -$0, to: start).map(key) })
+        return Set(days).intersection(window).count
+    }
+
+    private static func key(_ d: Date) -> String { FieldCoding.dateFormatter.string(from: d) }
+
+    /// 保存値 → "YYYY-MM-DD"(RFC3339 は端末ローカルの日付)。空・形式外は nil。
+    private static func day(_ v: JSONValue) -> String? {
+        guard let s = v.stringValue, !s.isEmpty, let d = FieldCoding.date(from: v) else { return nil }
+        return s.contains("T") ? key(d) : String(s.prefix(10))
     }
 }
 

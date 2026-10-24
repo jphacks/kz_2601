@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -33,10 +34,24 @@ func invalidRecord(field, msg string) error {
 // Unknown keys are 400 (openapi), type/required problems are 422.
 func normalizeData(ent *dsl.Entity, in map[string]any, create bool) (map[string]any, error) {
 	out := make(map[string]any, len(ent.Fields))
-	for k := range in {
-		if ent.FieldByID(k) == nil {
+	for k, v := range in {
+		if ent.FieldByID(k) != nil {
+			continue
+		}
+		if !isHistoryKey(ent, k) {
 			return nil, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, fmt.Sprintf("unknown field %q", k)).With("field", k)
 		}
+		if v == nil {
+			if !create {
+				out[k] = nil // PATCH removes the history
+			}
+			continue
+		}
+		days, err := normalizeHistory(v)
+		if err != nil {
+			return nil, invalidRecord(k, err.Error())
+		}
+		out[k] = days
 	}
 	for i := range ent.Fields {
 		f := &ent.Fields[i]
@@ -69,6 +84,59 @@ func normalizeData(ent *dsl.Entity, in map[string]any, create bool) (map[string]
 			return nil, invalidRecord(f.ID, err.Error())
 		}
 		out[f.ID] = nv
+	}
+	return out, nil
+}
+
+// historySuffix marks the checked-day history iOS keeps next to the date
+// field of a list.item.toggle with resets "daily" (#172): "<field>__dates"
+// = ["YYYY-MM-DD", ...]. It is not declared in the DSL.
+const (
+	historySuffix = "__dates"
+	maxHistory    = 400
+)
+
+// isHistoryKey reports whether k is "<date field>__dates" of ent.
+func isHistoryKey(ent *dsl.Entity, k string) bool {
+	base, ok := strings.CutSuffix(k, historySuffix)
+	if !ok || base == "" {
+		return false
+	}
+	f := ent.FieldByID(base)
+	return f != nil && f.Type == dsl.FieldDate && f.Computed == nil
+}
+
+// normalizeHistory validates a history array: YYYY-MM-DD strings, sorted,
+// de-duplicated, the newest maxHistory kept.
+func normalizeHistory(v any) ([]any, error) {
+	arr, ok := v.([]any)
+	if !ok {
+		return nil, fmt.Errorf("must be an array of YYYY-MM-DD strings")
+	}
+	seen := make(map[string]bool, len(arr))
+	days := make([]string, 0, len(arr))
+	for _, x := range arr {
+		s, ok := x.(string)
+		if !ok {
+			return nil, fmt.Errorf("must be an array of YYYY-MM-DD strings")
+		}
+		t, err := time.Parse(dateLayout, s)
+		if err != nil {
+			return nil, fmt.Errorf("has %q; must be YYYY-MM-DD", s)
+		}
+		d := t.Format(dateLayout)
+		if !seen[d] {
+			seen[d] = true
+			days = append(days, d)
+		}
+	}
+	sort.Strings(days)
+	if len(days) > maxHistory {
+		days = days[len(days)-maxHistory:]
+	}
+	out := make([]any, len(days))
+	for i, d := range days {
+		out[i] = d
 	}
 	return out, nil
 }

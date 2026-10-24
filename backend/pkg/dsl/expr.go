@@ -333,6 +333,8 @@ var Ops = map[string]opSpec{
 	"daysBetween": {2, 2, tDate, tNum}, "daysUntil": {1, 1, tDate, tNum}, "addDays": {2, 2, tAny, tDate}, "hoursBetween": {2, 2, tAny, tNum},
 	"year": {1, 1, tDate, tNum}, "month": {1, 1, tDate, tNum}, "day": {1, 1, tDate, tNum}, "weekday": {1, 1, tDate, tNum},
 	"toNumber": {1, 1, tAny, tNum}, "toString": {1, 1, tAny, tStr}, "coalesce": {2, 2, tAny, tAny},
+	// daily check history (#172): arg 0 is {"ref": <resets daily toggle field>}
+	"streak": {1, 1, tDate, tNum}, "doneInDays": {2, 2, tAny, tNum},
 }
 
 // fieldKey identifies a field across entities ("members.balance").
@@ -346,7 +348,10 @@ type exprChecker struct {
 	entities map[string]*Entity
 	add      func(string, ...any)
 	deps     map[fieldKey]bool // computed fields this expression reads (cycle check)
-	tooDeep  bool
+	// daily: entity id -> field ids used as list.item.toggle with resets
+	// daily (streak / doneInDays read their history). nil = not checked.
+	daily   map[string]map[string]bool
+	tooDeep bool
 }
 
 func (c *exprChecker) dep(e *Entity, fid string) {
@@ -445,6 +450,8 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 			}
 		}
 		switch e.Op {
+		case "streak", "doneInDays":
+			c.checkDailyHistory(where, e, row)
 		case "gt", "gte", "lt", "lte":
 			if n == 2 && types[0] != tAny && types[1] != tAny && !accepts(types[0], types[1]) && !accepts(types[1], types[0]) {
 				c.add("%s: %s compares a %s with a %s; compare values of the same type", where, e.Op, types[0], types[1])
@@ -597,7 +604,7 @@ func entityIDs(m map[string]*Entity) string {
 
 // checkComputedFields validates every Field.computed (row context = its own
 // entity), ref fields, and rejects cycles among computed fields.
-func checkComputedFields(entities []Entity, byID map[string]*Entity, add func(string, ...any)) {
+func checkComputedFields(entities []Entity, byID map[string]*Entity, daily map[string]map[string]bool, add func(string, ...any)) {
 	graph := map[fieldKey][]fieldKey{}
 	for i := range entities {
 		e := &entities[i]
@@ -632,7 +639,7 @@ func checkComputedFields(entities []Entity, byID map[string]*Entity, add func(st
 			if f.DefaultValue != nil {
 				add("%s: computed fields are read-only; remove defaultValue", where)
 			}
-			c := &exprChecker{entities: byID, add: add, deps: map[fieldKey]bool{}}
+			c := &exprChecker{entities: byID, add: add, deps: map[fieldKey]bool{}, daily: daily}
 			got := c.check(where+".computed", f.Computed, e, 1)
 			if okType && !accepts(fieldExprType(f.Type), got) {
 				add("%s: computed expression yields a %s but the field type is %s; change the type or convert%s", where, got, f.Type, convertHint(fieldExprType(f.Type)))

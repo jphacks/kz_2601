@@ -26,6 +26,11 @@ enum ListToggle {
         daily ? DailyCheck.stored(on, today: today) : .bool(on)
     }
 
+    /// 保存する差分。daily は「最後にやった日」+ 押した日の履歴(#172: 付けたら今日を足し、外したら今日を消す)、それ以外は bool 1 つ。
+    static func patch(_ record: Record, field: String, on: Bool, daily: Bool, today: Date) -> [String: JSONValue] {
+        daily ? DailyCheck.patch(record, field: field, on: on, today: today) : [field: .bool(on)]
+    }
+
     /// 表示上の ON/OFF(保存待ちの値を優先)。bool 以外の保存値("true" / 1)も寛容に読む。
     static func isOn(_ record: Record, field: String, overrides: [String: Bool]) -> Bool {
         if let pending = overrides[record.id] { return pending }
