@@ -435,3 +435,24 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 | 更新頻度(制約) | 本体がフォアグラウンドで DSL 適用/レコード更新した時に即時 + 30 分毎のタイムライン再読込(値は前回のまま)。**本体を開かずにレコードが増えても(別端末・ホットリロード未受信)ウィジェットは古い**。値が変わらない時は reload しない(WidgetKit の 1 日の更新予算を節約) |
 | 実機署名 | App Group capability を **本体と拡張の 2 つの App ID** に付ける必要がある。`xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で付与される(有料 Program 必須)。通らない時は Apple Developer > Identifiers > App Groups で `group.jp.kz2601.metamon` を作成 → 両 App ID の Capabilities で App Groups にチェック |
 | シミュレータ | 署名なし(`CODE_SIGNING_ALLOWED=NO`)でも App Group の UserDefaults は動く。ウィジェットの配置はホーム画面長押し → + → 「Tailor It」 |
+
+## 13. アクセシビリティ最低限(Renderer・Issue #68)
+生成アプリ側(Renderer の全部品)で Dynamic Type・VoiceOver・コントラスト・Reduce Motion の最低線を守る。本体(`ios/Metamon/`)は対象外。
+
+| 観点 | 方針 | 実装箇所 |
+|---|---|---|
+| Dynamic Type | セル高は `area` 固定なので「文字を切る」のではなく**セル内スクロール(`FadingScrollView`)に逃がす**。アクセシビリティサイズ(`dynamicTypeSize.isAccessibilitySize`)では image/map/chart/gauge など面を自前で埋める型以外は全部内側スクロール。stat は数値 `minimumScaleFactor(0.6)`・ラベル縮小 1 行・カード余白を sm に詰めて 1 行高のセルでも数値が見える、button の高さ 48 は `@ScaledMetric` で追従し 2 行まで折り返し、list の行は trailing を下段に落とす(`AnyLayout`) | `Screen/GridScreenLayout.swift` `GridCell.scrollsInside` / `StatLeaf` / `ButtonLeaf.RenderButtonStyle` / `Support/ListRow.swift` / `BadgeLeaf` / `CalendarLeaf.dayCell` |
+| VoiceOver | 部品 1 つ = 1 要素で意味を読む。stat=「ラベル, 値」(`accessibilityLabel/Value`)、list 行=「title, subtitle, trailing」+ `isButton` と `accessibilityAction`(onTapGesture は VoiceOver から呼べないため)、photoField=「レシートを撮る, ボタン, カメラを開きます」、calendar の日=「10月24日 金曜日, 記録2件」+ `isSelected`、gauge/progressBar=ラベル+値。装飾(icon 部品・list のアイコン/chevron・timeline のレール・EmptyPlaceholder のアイコン・曜日行)は `accessibilityHidden(true)`。toggle/picker/slider/stepper/datePicker は SwiftUI 標準に任せる | 各 Leaf / `ListRow` / `PhotoView` |
+| コントラスト | schema の `SemanticColor` red/green/orange/blue はシステム色だとライトで 2.2〜4.0:1 しか無い。`SemanticPalette`(ライト/ダーク別の固定トーン)に置き換え、面(白 / #1C1C1E)と badge のピル(同色 15%)の両方で **4.5:1 以上**を `SemanticColorContrastTests` が検算する(表は下)。`RGB.readableForeground` は背景輝度で黒/白を返すヘルパー | `Support/SemanticColor.swift` / `Tests/MetamonRendererTests/SemanticColorContrastTests.swift` |
+| Reduce Motion | `StaggeredAppear`(変身の受け側)はスキップ済み。加えて `FadingScrollView` のフェード切替・button の押下スケール・calendar の月送り・progressBar の値変化を `accessibilityReduceMotion` で無効化(即時反映) | `GridScreenLayout` / `ButtonLeaf` / `CalendarLeaf` / `ProgressBarLeaf` |
+
+`SemanticPalette` のコントラスト比(WCAG 相対輝度、面 = secondarySystemGroupedBackground):
+
+| 色 | ライト(hex / 対白 / 対ピル) | ダーク(hex / 対#1C1C1E / 対ピル) | 旧システム色(ライト 対白) |
+|---|---|---|---|
+| red | #BE1C16 / 6.24 / 4.83 | #FF6961 / 6.03 / 4.84 | #FF3B30 / 3.55 |
+| green | #107030 / 6.21 / 4.98 | #48D66E / 9.01 / 6.66 | #34C759 / 2.22 |
+| orange | #964C00 / 6.31 / 5.03 | #FFAA3C / 8.97 / 6.64 | #FF9500 / 2.20 |
+| blue | #0054BE / 6.97 / 5.47 | #5AA0FF / 6.41 / 5.02 | #007AFF / 4.02 |
+
+既知の残課題: primary button の白文字 × AccentColor(#587AF0)は 3.85:1(本体の asset catalog 側。太字 17pt なので AA Large の 3:1 は満たす)。確認は `xcrun simctl ui <udid> content_size accessibility-large` / `appearance dark` で kakeibo・training・walk を表示して行う。
