@@ -281,6 +281,53 @@ final class MetamonUITests: XCTestCase {
         attachScreenshot("form-saved-list")
     }
 
+    // MARK: - テキスト入力(#196)
+
+    /// ソフトキーボードの上端(出ていなければ nil)。
+    private var keyboardTop: CGFloat? {
+        let kb = app.keyboards.firstMatch
+        return kb.exists ? kb.frame.minY : nil
+    }
+
+    func testChatComposerReturnInsertsNewlineAndGrows() {
+        launch(example: nil, ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "日記", "METAMON_AUTO_PAUSE": "600"])
+        XCTAssertTrue(app.buttons.matching(identifier: "chat.chip").firstMatch.waitForExistence(timeout: 15), "対話が始まらない")
+        let field = composerField
+        XCTAssertTrue(field.waitForExistence(timeout: 15), "対話の入力欄が無い")
+        field.tap()
+        field.typeText("one")
+        let oneLine = field.frame.height
+        field.typeText("\ntwo\nthree")
+        Thread.sleep(forTimeInterval: 0.5)
+        let value = field.value as? String ?? ""
+        XCTAssertTrue(value.contains("one\ntwo\nthree"), "return で改行が入らない(送信・確定になった?): \(value)")
+        XCTAssertGreaterThan(field.frame.height, oneLine + 20, "複数行で入力欄が伸びない")
+        XCTAssertFalse(element(labelBeginsWith: "あなた: one").exists, "return で送信された")
+        if let top = keyboardTop {
+            XCTAssertLessThanOrEqual(field.frame.maxY, top + 1, "キーボード表示中に入力欄が隠れている")
+        }
+        attachScreenshot("chat-composer-multiline")
+
+        app.buttons["composer.send"].tap()
+        XCTAssertTrue(element(labelBeginsWith: "あなた: one").waitForExistence(timeout: 15), "送信ボタンで送れない")
+        XCTAssertFalse((field.value as? String ?? "").contains("three"), "送信後に入力欄が空にならない")
+    }
+
+    func testDiaryBodyReturnInsertsNewlineAboveKeyboard() {
+        launch(example: "diary_ai", ["METAMON_AUTO_OPEN": "diary_form:push"])
+        let body = app.descendants(matching: .any)["field.body"].firstMatch
+        XCTAssertTrue(body.waitForExistence(timeout: 15), "日記の本文欄が無い")
+        body.tap()
+        body.typeText("a\nb\nc\nd\ne\nf")
+        Thread.sleep(forTimeInterval: 0.6)
+        let value = body.value as? String ?? ""
+        XCTAssertTrue(value.contains("a\nb\nc"), "本文に改行が入らない: \(value)")
+        if let top = keyboardTop {
+            XCTAssertLessThanOrEqual(body.frame.minY + 30, top, "編集中の本文欄がキーボードに隠れている")
+        }
+        attachScreenshot("diary-body-multiline")
+    }
+
     // MARK: - 生成中の表示(#182)
 
     /// 全画面の「変身中」(GeneratingView)
@@ -289,9 +336,8 @@ final class MetamonUITests: XCTestCase {
     /// 3 秒だと、音声シートが閉じる間や遅い CI で「出た」と気づくまでに完成してしまい誤検知になった(#200)
     private let slowAI = ["METAMON_MOCK_AI_DELAY": "6"]
 
-    private func textField(placeholder: String) -> XCUIElement {
-        app.textFields.matching(NSPredicate(format: "placeholderValue == %@", placeholder)).firstMatch
-    }
+    /// 音声画面・対話の文字入力(ChatComposer・#196)
+    private var composerField: XCUIElement { app.descendants(matching: .any)["composer.field"].firstMatch }
 
     /// 生成中の表示が `appearWithin` 秒以内に出て、完成まで出続け、消えたら生成したアプリ(マイク FAB)に切り替わる。
     /// 途中で初期画面に戻らないことは「消えた直後に初期画面の文字入力が無い」+「ある程度の時間出続けた」で見る。
@@ -309,7 +355,7 @@ final class MetamonUITests: XCTestCase {
         XCTAssertTrue(waitFor(generating, "exists == false", timeout: 30), "完成しても生成中の表示が消えない(\(name))", file: file, line: line)
         let visible = Date().timeIntervalSince(shown)
         XCTContext.runActivity(named: "morphProbe(\(name)) 完成後: \(probe.exists ? probe.label : "probe なし")") { _ in }
-        XCTAssertFalse(textField(placeholder: "または文字で入力").exists, "生成中の表示が消えて初期画面に戻った(\(name))", file: file, line: line)
+        XCTAssertFalse(composerField.exists, "生成中の表示が消えて初期画面に戻った(\(name))", file: file, line: line)
         // モックの待ちは 6 秒。気づくまでの遅れを引いても 1.5 秒は出続けるはず(すぐ消えたら途中で落ちている)
         XCTAssertGreaterThan(visible, 1.5, "生成中の表示が完成前に消えた(\(name)・\(visible) 秒)", file: file, line: line)
         XCTAssertTrue(fab.waitForExistence(timeout: 15), "完成後に生成したアプリに切り替わらない(\(name))", file: file, line: line)
@@ -318,7 +364,7 @@ final class MetamonUITests: XCTestCase {
     /// 対話なし(設定 OFF): 初期画面で文字入力して送ると、すぐ生成中になり完成で消える
     func testGeneratingShownWithoutChat() {
         launch(example: nil, slowAI.merging(["METAMON_CLARIFY": "0"]) { $1 })
-        let field = textField(placeholder: "または文字で入力")
+        let field = composerField // 複数行の入力欄(#196)は placeholder が出ないので id で探す
         XCTAssertTrue(field.waitForExistence(timeout: 15), "初期画面の文字入力が無い")
         field.tap()
         field.typeText("家計簿アプリを作って")
@@ -350,7 +396,7 @@ final class MetamonUITests: XCTestCase {
         waitForFab()
         fab.tap()
         XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開かない")
-        let field = textField(placeholder: "または文字で入力")
+        let field = composerField // 複数行の入力欄(#196)は placeholder が出ないので id で探す
         XCTAssertTrue(field.waitForExistence(timeout: 15), "シートの文字入力が無い")
         field.tap()
         field.typeText("筋トレの記録アプリを作って")
@@ -378,6 +424,6 @@ extension MetamonUITests {
         XCTAssertFalse(generating.exists, "カードの間は生成しない")
         attachScreenshot("paid-feature-card")
         app.buttons["paid.withoutFeature"].tap()
-        assertGeneratingThenDone("paid-without", appearWithin: 2)
+        assertGeneratingThenDone("paid-without")
     }
 }

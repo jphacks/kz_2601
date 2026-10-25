@@ -133,11 +133,13 @@ struct ShareAppSheet: View {
                 Text("「探す」から誰でも見つけてインストールできるようになります")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                // 説明は複数行(return で改行)、タグは 1 行(return で閉じる)・#196
                 TextField("ひとこと説明(任意)", text: $desc, axis: .vertical)
-                    .lineLimit(1...3)
-                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(2...5)
+                    .metamonInputField()
                 TextField("タグ(スペース区切り・任意) 例: 健康 習慣", text: $tags)
-                    .textFieldStyle(.roundedBorder)
+                    .submitLabel(.done)
+                    .metamonInputField()
                 Button { Task { await publish() } } label: {
                     Text("公開する")
                         .font(.subheadline.weight(.semibold))

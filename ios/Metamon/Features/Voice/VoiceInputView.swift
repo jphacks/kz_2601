@@ -54,20 +54,27 @@ struct VoiceInputView: View {
                     errorCard
                     transcriptCard
                     Spacer(minLength: Theme.Spacing.md)
-                    if !typing { examples }
-                    textEntry
-                    if isInitial, !typing { DiscoverEntry() } // 「探す」(#50)
+                }
+            }
+            // 例文・文字入力・「探す」は下に固定し、キーボードと同じアニメーションで一緒に上げる(#196)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !inChat {
+                    VStack(spacing: 0) {
+                        if !typing { examples }
+                        textEntry
+                        if isInitial, !typing { DiscoverEntry() } // 「探す」(#50)
+                    }
+                    .padding(.bottom, Theme.Spacing.sm)
                 }
             }
             .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.bottom, Theme.Spacing.md)
             .padding(.top, isInitial ? 0 : Theme.Spacing.md)
         }
         .animation(.spring(duration: 0.45, bounce: 0.15), value: phase)
         .animation(.spring(duration: 0.45, bounce: 0.15), value: transcript)
         .animation(.spring(duration: 0.45, bounce: 0.15), value: rt.errorCard)
         .animation(.spring(duration: 0.45, bounce: 0.15), value: inChat)
-        .animation(.easeOut(duration: 0.25), value: typing)
+        // typing には明示アニメーションを付けない: キーボードの持ち上げが別カーブで動いて入力欄が遅れて見えていた(#196)
         // 保険(#200): 初期画面から create が始まったら、この画面の上にも全画面の生成中表示を重ねる。
         // 本来は RootView がこの画面ごと GeneratingView に置き換えるが、CI(iOS 26.5)の声の自動生成では
         // RootView が morphJob の変化で作り直されず、対話画面のまま完成まで見えていた(この画面の中の部品は更新されていた)。
@@ -247,26 +254,10 @@ struct VoiceInputView: View {
         }
     }
 
+    /// 文字入力(#196): 伸びる複数行・return は改行・送信はボタン。送信すると対話か生成に進むのでキーボードは閉じる。
     private var textEntry: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            TextField("または文字で入力", text: $typed)
-                .focused($typing)
-                .submitLabel(.send)
-                .onSubmit { submitTyped() }
-                .padding(.horizontal, Theme.Spacing.md)
-                .frame(height: 44)
-                .background(Theme.Colors.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
-            Button(action: submitTyped) {
-                Image(systemName: "arrow.up")
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(typed.isEmpty ? AnyShapeStyle(Color.gray.opacity(0.4)) : AnyShapeStyle(Theme.brandGradient), in: Circle())
-            }
-            .disabled(typed.isEmpty || rt.isMorphing)
-            .accessibilityLabel("送信")
-        }
+        ChatComposer(placeholder: L10n.tr("または文字で入力"), text: $typed, focused: $typing,
+                     disabled: rt.isMorphing, keepsFocus: false) { submit($0) }
     }
 
     // MARK: - State
@@ -378,14 +369,6 @@ struct VoiceInputView: View {
         default:
             break
         }
-    }
-
-    private func submitTyped() {
-        let text = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        typed = ""
-        typing = false
-        submit(text)
     }
 
     private func submit(_ text: String) {
