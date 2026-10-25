@@ -2,70 +2,166 @@ import Foundation
 import UserNotifications
 import MetamonDSL
 
-/// `UNUserNotificationCenter` によるローカル通知(P0)。
-/// - `app.notifications[]`: DSL ロード毎に id 一致で置換・消えた id は取消(識別子 prefix `dsl.`)。
-/// - `scheduleNotification` アクション: 押下時に予約(同 prefix・同 id なら上書き)。
-/// - `once` で time が今日既に過ぎていれば翌日に発火。
+/// `UNUserNotificationCenter` によるローカル通知(#228)。
+/// - アプリごとの予約(`PlannedNotification`)を UserDefaults に持ち、別アプリに切り替えても前のアプリの通知を消さない。
+/// - 予約し直す時は全アプリ分から近い順に `NotificationPlanner.limit` 件だけ iOS に渡す(64 件を超えた分が黙って捨てられないように)。
+/// - 識別子は `dsl.<appId>.…`。それ以外(タイマー `timer.` 等)には触らない。
 public struct UserNotificationScheduler: NotificationScheduler {
-    public static let prefix = "dsl."
-
     public init() {}
 
-    public func sync(_ specs: [NotificationSpec]) async {
-        let center = UNUserNotificationCenter.current()
-        let pending = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(Self.prefix) }
-        let keep = Set(specs.map { Self.prefix + $0.id })
-        center.removePendingNotificationRequests(withIdentifiers: pending.filter { !keep.contains($0) })
-        guard !specs.isEmpty else { return }
-        await requestPermissionIfNeeded()
-        for s in specs { try? await schedule(s) }
+    public func sync(appId: String, specs: [NotificationSpec], records: [String: [Record]]) async -> NotificationSyncResult {
+        await NotificationRegistry.shared.set(appId, NotificationPlanner.plan(appId: appId, specs: specs, records: records))
+        return await apply(appId: appId)
     }
 
-    public func requestPermissionIfNeeded() async {
+    public func schedule(_ spec: NotificationSpec, appId: String) async throws -> Date? {
+        guard let p = NotificationPlanner.action(appId: appId, spec: spec) else { return nil }
+        await NotificationRegistry.shared.upsertAction(appId, p)
+        _ = await apply(appId: appId)
+        return p.nextFire(after: Date())
+    }
+
+    public func cancel(id: String, appId: String) async {
+        await NotificationRegistry.shared.remove(appId: appId, specId: id)
+        _ = await apply(appId: appId)
+    }
+
+    public func removeApp(_ appId: String) async {
+        await NotificationRegistry.shared.removeApp(appId)
+        _ = await apply(appId: appId)
+    }
+
+    public func removeAll() async {
+        await NotificationRegistry.shared.removeAll()
         let center = UNUserNotificationCenter.current()
-        if await center.notificationSettings().authorizationStatus == .notDetermined {
-            _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+        let ids = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(NotificationPlanner.prefix) }
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+    }
+
+    public func refresh(appId: String) async -> NotificationSyncResult { await apply(appId: appId) }
+
+    /// 全アプリ分を近い順に上限まで予約し直す。結果の upcoming は `appId` の分だけ。
+    private func apply(appId: String) async -> NotificationSyncResult {
+        let center = UNUserNotificationCenter.current()
+        let now = Date()
+        let all = await NotificationRegistry.shared.pruned(now: now)
+        let chosen = NotificationPlanner.select(all, now: now)
+        let want = Set(chosen.map(\.0.identifier))
+        let pending = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(NotificationPlanner.prefix) }
+        center.removePendingNotificationRequests(withIdentifiers: pending.filter { !want.contains($0) })
+        var denied = false
+        if !chosen.isEmpty {
+            denied = await !requestPermissionIfNeeded()
+        }
+        for (p, _) in chosen {
+            do {
+                try await center.add(Self.request(p))
+            } catch {
+                print("[Metamon] notification add failed id=\(p.identifier): \(error)")
+            }
+        }
+        let mine = NotificationPlanner.prefix + appId + "."
+        let upcoming = chosen.filter { $0.0.identifier.hasPrefix(mine) }.map { UpcomingNotification(title: $0.0.title, body: $0.0.body, date: $0.1) }
+        print("[Metamon] notifications scheduled: total=\(chosen.count) app=\(upcoming.count) next=\(upcoming.first.map { "\($0.date)" } ?? "-") denied=\(denied)")
+        return NotificationSyncResult(denied: denied, upcoming: upcoming)
+    }
+
+    /// 許可されていれば true。未決定ならここでダイアログを出す。
+    public func requestPermissionIfNeeded() async -> Bool {
+        let center = UNUserNotificationCenter.current()
+        switch await center.notificationSettings().authorizationStatus {
+        case .notDetermined:
+            return (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+        case .denied:
+            return false
+        default:
+            return true
         }
     }
 
-    public func schedule(_ s: NotificationSpec) async throws {
-        let center = UNUserNotificationCenter.current()
-        await requestPermissionIfNeeded()
+    static func request(_ p: PlannedNotification, calendar: Calendar = .current) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
-        content.title = s.title
-        content.body = s.body
+        content.title = p.title
+        content.body = p.body
         content.sound = .default
-
-        let (hour, minute) = Self.parseTime(s.time) ?? (9, 0)
-        var comps = DateComponents()
-        comps.hour = hour
-        comps.minute = minute
         let trigger: UNNotificationTrigger
-        switch s.repeat {
-        case .daily:
-            trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
-        case .weekly:
-            comps.weekday = Self.weekdayNumber(s.weekday)
-            trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
-        case .once:
-            let next = Calendar.current.nextDate(after: Date(), matching: comps, matchingPolicy: .nextTime) ?? Date().addingTimeInterval(60)
-            trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, next.timeIntervalSinceNow), repeats: false)
+        switch p.trigger {
+        case .at(let d):
+            trigger = UNCalendarNotificationTrigger(dateMatching: calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: d), repeats: false)
+        case .daily(let h, let m):
+            trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(hour: h, minute: m), repeats: true)
+        case .weekly(let w, let h, let m):
+            trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(hour: h, minute: m, weekday: w), repeats: true)
         }
-        try await center.add(UNNotificationRequest(identifier: Self.prefix + s.id, content: content, trigger: trigger))
+        return UNNotificationRequest(identifier: p.identifier, content: content, trigger: trigger)
     }
 
-    public func cancel(id: String) {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.prefix + id])
+    // 旧 API 互換(テスト)
+    public static func parseTime(_ t: String?) -> (Int, Int)? { NotificationPlanner.parseTime(t) }
+    public static func weekdayNumber(_ w: String?) -> Int { NotificationPlanner.weekdayNumber(w) }
+}
+
+/// アプリごとの予約の保存先(UserDefaults・直列化のため actor)。キー: appId(DSL 分)/ appId + "#action"(ボタン分)。
+actor NotificationRegistry {
+    static let shared = NotificationRegistry()
+    private static let key = "metamon.notifications.planned.v1"
+    private let defaults: UserDefaults
+    private var table: [String: [PlannedNotification]]
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        if let data = defaults.data(forKey: Self.key), let t = try? JSONDecoder().decode([String: [PlannedNotification]].self, from: data) {
+            table = t
+        } else {
+            table = [:]
+        }
     }
 
-    public static func parseTime(_ t: String?) -> (Int, Int)? {
-        guard let t else { return nil }
-        let p = t.split(separator: ":").compactMap { Int($0) }
-        guard p.count == 2, (0...23).contains(p[0]), (0...59).contains(p[1]) else { return nil }
-        return (p[0], p[1])
+    func set(_ appId: String, _ planned: [PlannedNotification]) {
+        table[appId] = planned
+        save()
     }
 
-    public static func weekdayNumber(_ w: String?) -> Int {
-        ["sun": 1, "mon": 2, "tue": 3, "wed": 4, "thu": 5, "fri": 6, "sat": 7][w ?? ""] ?? 2
+    func upsertAction(_ appId: String, _ p: PlannedNotification) {
+        var list = table[appId + "#action"] ?? []
+        list.removeAll { $0.identifier == p.identifier }
+        list.append(p)
+        table[appId + "#action"] = list
+        save()
+    }
+
+    func remove(appId: String, specId: String) {
+        let ids = [NotificationPlanner.identifier(appId: appId, specId: specId), NotificationPlanner.actionIdentifier(appId: appId, specId: specId)]
+        let recordPrefix = ids[0] + "."
+        for k in [appId, appId + "#action"] {
+            table[k]?.removeAll { ids.contains($0.identifier) || $0.identifier.hasPrefix(recordPrefix) }
+        }
+        save()
+    }
+
+    func removeApp(_ appId: String) {
+        table[appId] = nil
+        table[appId + "#action"] = nil
+        save()
+    }
+
+    func removeAll() {
+        table = [:]
+        save()
+    }
+
+    /// 過ぎた 1 回きりを捨てて、全件を返す。
+    func pruned(now: Date) -> [PlannedNotification] {
+        var changed = false
+        for (k, list) in table {
+            let kept = list.filter { $0.nextFire(after: now) != nil }
+            if kept.count != list.count { table[k] = kept; changed = true }
+        }
+        if changed { save() }
+        return table.values.flatMap { $0 }
+    }
+
+    private func save() {
+        if let data = try? JSONEncoder().encode(table) { defaults.set(data, forKey: Self.key) }
     }
 }

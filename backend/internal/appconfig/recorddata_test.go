@@ -70,3 +70,34 @@ func TestNormalizeDataDailyHistory(t *testing.T) {
 		}
 	}
 }
+
+// #235: the DSL has no array field type. An array sent to any declared field
+// is a 422 invalid_record (never a 500 or a silent store), and the workaround
+// "several values joined in one string" passes as a plain string.
+func TestNormalizeDataRejectsArrays(t *testing.T) {
+	ent := &dsl.Entity{ID: "book", Fields: []dsl.Field{
+		{ID: "title", Type: dsl.FieldString},
+		{ID: "memo", Type: dsl.FieldText},
+		{ID: "genre", Type: dsl.FieldEnum, Options: []string{"小説", "技術"}},
+		{ID: "author", Type: dsl.FieldRef, RefEntity: "authors"},
+		{ID: "pages", Type: dsl.FieldInteger},
+		{ID: "read_on", Type: dsl.FieldDate},
+	}}
+	for _, f := range ent.Fields {
+		for _, v := range []any{[]any{"小説", "技術"}, []any{}} {
+			_, err := normalizeData(ent, map[string]any{f.ID: v}, false)
+			ae, ok := err.(*apiError)
+			if !ok || ae.status != 422 || ae.code != "invalid_record" {
+				t.Errorf("%s (%s) = %v: want 422 invalid_record, got %v", f.ID, f.Type, v, err)
+			}
+		}
+	}
+	out, err := normalizeData(ent, map[string]any{"title": "小説, 技術"}, false)
+	if err != nil || out["title"] != "小説, 技術" {
+		t.Errorf("joined string: %v %v", out, err)
+	}
+	// only the undeclared daily-toggle history key ("<date>__dates", #172) takes an array
+	if _, err := normalizeData(ent, map[string]any{"read_on__dates": []any{"2026-10-24"}}, false); err != nil {
+		t.Errorf("history array: %v", err)
+	}
+}

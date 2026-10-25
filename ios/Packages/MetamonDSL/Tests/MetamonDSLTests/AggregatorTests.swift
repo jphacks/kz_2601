@@ -7,6 +7,18 @@ final class AggregatorTests: XCTestCase {
         Record(id: "2", data: ["amount": 50, "category": "交通", "date": "2000-01-01"]),
     ]
 
+    /// #235: ref の groupBy は id で束ね、label で参照先の見出しに置き換える(未指定なら id のまま)。
+    func testBucketsRelabelRefGroupBy() throws {
+        let c = try JSONDecoder().decode(Component.self, from: Data(#"{"type":"chart","entity":"book","kind":"pie","groupBy":"tag","aggregate":"count"}"#.utf8))
+        let rows = [Record(id: "1", data: ["tag": "t1"]), Record(id: "2", data: ["tag": "t1"]), Record(id: "3", data: ["tag": "t2"])]
+        let titles = ["t1": "小説", "t2": "技術"]
+        let b = Aggregator.buckets(c, entity: nil, records: rows, label: { titles[$0] ?? $0 })
+        XCTAssertEqual(b.map(\.key), ["t1", "t2"])
+        XCTAssertEqual(b.map(\.label), ["小説", "技術"])
+        XCTAssertEqual(b.map(\.value), [2, 1])
+        XCTAssertEqual(Aggregator.buckets(c, entity: nil, records: rows).map(\.label), ["t1", "t2"])
+    }
+
     func testAggregate() {
         XCTAssertEqual(Aggregator.aggregate("sum", field: "amount", over: records), 150)
         XCTAssertEqual(Aggregator.aggregate("avg", field: "amount", over: records), 75)

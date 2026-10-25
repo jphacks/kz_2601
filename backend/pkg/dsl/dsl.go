@@ -48,6 +48,14 @@ type Notification struct {
 	Repeat  string `json:"repeat"`            // once|daily|weekly
 	Time    string `json:"time,omitempty"`    // HH:MM local
 	Weekday string `json:"weekday,omitempty"` // mon..sun (weekly)
+	// Record-based (#228, app.notifications only): one notification per record
+	// of Entity at the time in Field (datetime / date / "HH:MM" string),
+	// shifted by OffsetMinutes (negative = before).
+	Entity        string `json:"entity,omitempty"`
+	Field         string `json:"field,omitempty"`
+	OffsetMinutes int    `json:"offsetMinutes,omitempty"`
+	TitleField    string `json:"titleField,omitempty"`   // record field shown as the body
+	EnabledField  string `json:"enabledField,omitempty"` // boolean field; false = skip the record
 }
 
 // VoiceEntry is how the user re-enters voice mode.

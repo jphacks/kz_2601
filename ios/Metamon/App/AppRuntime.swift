@@ -15,7 +15,15 @@ final class AppRuntime: DSLRuntime {
     var dsl: AppDSL { document.dsl }
 
     /// entity id → レコード(サーバーが正。ここはキャッシュ)
-    private(set) var records: [String: [Record]] = [:]
+    private(set) var records: [String: [Record]] = [:] {
+        didSet { if dsl.app.notifications.contains(where: \.isRecordBased) { scheduleNotificationSync() } } // #228 レコードの時刻から通知
+    }
+    /// このアプリの次に届く通知(設定画面に出す・#228)。
+    var upcomingNotifications: [UpcomingNotification] = []
+    /// 通知が許可されていない(予約しても届かない)。
+    var notificationsDenied = false
+    @ObservationIgnored var warnedNotificationsDenied = false
+    @ObservationIgnored var notificationSyncTask: Task<Void, Never>?
     private(set) var loading: Set<String> = []
     /// サーバーから取れず、ローカルにも無い entity(#85)。Renderer は空状態ではなく「読み込めませんでした(再試行)」を描く。
     private(set) var failed: Set<String> = []
@@ -198,7 +206,7 @@ final class AppRuntime: DSLRuntime {
             await restoreFromServer()
             startSync()
         }
-        Task { await services.notifications.sync(dsl.app.notifications) }
+        Task { await syncNotificationsNow() }
         #if DEBUG
         autoNavigateIfRequested() // `METAMON_AUTO_NAV`(#113)
         // ヘッドレス E2E 用: `METAMON_E2E_PRESS_PRIMARY_AFTER=<秒>` で、その時点で状態カードが出ていれば主ボタン(もう一度 等)を押す(#60)
@@ -362,6 +370,7 @@ final class AppRuntime: DSLRuntime {
         recordSync.setForeground(active)
         if active {
             startSync()
+            Task { await refreshNotifications() } // #228 届いた分の空き枠を埋める
             Task { await catchUpAfterBackground() } // #38: 背面中の取りこぼしを即取り直す(AppRuntime+Background)
         } else {
             syncTask?.cancel()
@@ -393,7 +402,7 @@ final class AppRuntime: DSLRuntime {
         } else {
             swap()
         }
-        Task { await services.notifications.sync(doc.dsl.app.notifications) }
+        scheduleNotificationSync()
         WidgetSnapshotWriter.write(dsl: doc.dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         IntentHost.shared.appsMayHaveChanged() // Siri のフレーズ候補(アプリ名)を引き直す(#80)
     }
@@ -965,13 +974,15 @@ final class AppRuntime: DSLRuntime {
         case .scheduleNotification:
             guard let spec = action.notification else { return }
             await attempt {
-                try await services.notifications.schedule(spec)
-                toast = L10n.tr("通知を予約しました(\(spec.time ?? ""))")
+                let next = try await services.notifications.schedule(spec, appId: document.appId)
+                await refreshNotifications()
+                toast = next.map { L10n.tr("通知を予約しました(\(NotificationCopy.when($0)))") } ?? L10n.tr("通知を予約できませんでした")
             }
 
         case .cancelNotification:
             guard let id = action.notificationId else { return }
-            services.notifications.cancel(id: id)
+            await services.notifications.cancel(id: id, appId: document.appId)
+            await refreshNotifications()
 
         case .unknown:
             toast = L10n.tr("未対応のアクション: \(action.rawType)")

@@ -138,7 +138,7 @@ func TestCatalogRendering(t *testing.T) {
 		"- scheduleNotification{notification{id,title,body,repeat}}",
 		"- voiceInput: / prompt, size(compact|large)",
 		"- divider: (追加キー無し) —",
-		"- notification{id, title, body, repeat(once|daily|weekly) / time, weekday(mon|tue|wed|thu|fri|sat|sun)}",
+		"- notification{id, title, body, repeat(once|daily|weekly) / enabledField, entity, field, offsetMinutes, time, titleField, weekday(mon|tue|wed|thu|fri|sat|sun)}",
 		"どの action にも付けられる任意キー: confirmMessage",
 		"### Entity の scope",
 		"- scope: private —",

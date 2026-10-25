@@ -265,6 +265,7 @@ func (a *App) Validate() error {
 		}
 		notifIDs[n.ID] = true
 		checkNotification(fmt.Sprintf("app.notifications[%d]", i), n, add)
+		checkRecordNotification(fmt.Sprintf("app.notifications[%d]", i), n, entities, add)
 	}
 
 	screens := map[string]bool{}
@@ -324,6 +325,9 @@ func (a *App) Validate() error {
 				add("%s: scheduleNotification needs notification", where)
 			} else {
 				checkNotification(where, act.Notification, add)
+				if act.Notification.Entity != "" {
+					add("%s: record-based notification (entity/field) belongs in app.notifications, not scheduleNotification", where)
+				}
 			}
 		case ActionCancelNotif:
 			if act.NotificationID == "" {
@@ -641,6 +645,41 @@ func checkNotification(where string, n *Notification, add func(string, ...any)) 
 	}
 	if n.Time != "" && !timeRe.MatchString(n.Time) {
 		add("%s: notification time %q must be HH:MM", where, n.Time)
+	}
+}
+
+// checkRecordNotification validates the record-based fields (#228).
+func checkRecordNotification(where string, n *Notification, entities map[string]*Entity, add func(string, ...any)) {
+	if n.Entity == "" {
+		if n.Field != "" || n.TitleField != "" || n.EnabledField != "" || n.OffsetMinutes != 0 {
+			add("%s: field/titleField/enabledField/offsetMinutes need entity", where)
+		}
+		return
+	}
+	e := entities[n.Entity]
+	if e == nil {
+		add("%s: notification entity %q does not exist", where, n.Entity)
+		return
+	}
+	f := e.FieldByID(n.Field)
+	switch {
+	case n.Field == "":
+		add("%s: record notification needs field (a datetime / date / HH:MM string field of %q)", where, n.Entity)
+	case f == nil:
+		add("%s: notification field %q does not exist in entity %q", where, n.Field, n.Entity)
+	case f.Type != FieldDatetime && f.Type != FieldDate && f.Type != FieldString:
+		add("%s: notification field %q must be datetime, date or string (HH:MM)", where, n.Field)
+	}
+	if n.TitleField != "" && e.FieldByID(n.TitleField) == nil {
+		add("%s: notification titleField %q does not exist in entity %q", where, n.TitleField, n.Entity)
+	}
+	if n.EnabledField != "" {
+		if ef := e.FieldByID(n.EnabledField); ef == nil || ef.Type != FieldBoolean {
+			add("%s: notification enabledField %q must be a boolean field of %q", where, n.EnabledField, n.Entity)
+		}
+	}
+	if n.OffsetMinutes < -10080 || n.OffsetMinutes > 10080 {
+		add("%s: offsetMinutes %d out of range (±10080)", where, n.OffsetMinutes)
 	}
 }
 

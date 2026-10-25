@@ -171,6 +171,34 @@ public struct NotificationSpec: Decodable, Identifiable, Sendable {
     public var time: String?
     /// mon..sun(weekly のみ)
     public var weekday: String?
+    /// レコードの時刻から通知(#228・app.notifications のみ): `entity` の各レコードの `field`
+    /// (datetime / date / "HH:mm" 文字列)に `offsetMinutes` を足した時刻。
+    public var entity: String?
+    public var field: String?
+    public var offsetMinutes: Int?
+    /// 本文に出すレコードの field(件名・アラーム名)
+    public var titleField: String?
+    /// boolean field。false のレコードは通知しない(アラームのオン/オフ)
+    public var enabledField: String?
+
+    public var isRecordBased: Bool { entity?.isEmpty == false && field?.isEmpty == false }
+
+    public init(
+        id: String, title: String, body: String = "", repeat: Repeat = .once, time: String? = nil, weekday: String? = nil,
+        entity: String? = nil, field: String? = nil, offsetMinutes: Int? = nil, titleField: String? = nil, enabledField: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.body = body
+        self.repeat = `repeat`
+        self.time = time
+        self.weekday = weekday
+        self.entity = entity
+        self.field = field
+        self.offsetMinutes = offsetMinutes
+        self.titleField = titleField
+        self.enabledField = enabledField
+    }
 }
 
 public struct Entity: Decodable, Identifiable, Sendable {
