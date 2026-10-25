@@ -256,6 +256,23 @@
         }
       }
     },
+    "(これまでに反映した変更)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(Changes applied so far)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(これまでに反映した変更)"
+          }
+        }
+      }
+    },
     "(オフライン・キャッシュ)": {
       "extractionState": "manual",
       "localizations": {
@@ -1051,6 +1068,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "ここから行ける"
+          }
+        }
+      }
+    },
+    "ここで反映しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applied here"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ここで反映しました"
+          }
+        }
+      }
+    },
+    "ここで反映しました(v%lld)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applied here (v%lld)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ここで反映しました(v%lld)"
           }
         }
       }
