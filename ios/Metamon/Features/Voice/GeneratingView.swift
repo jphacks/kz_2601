@@ -82,6 +82,8 @@ struct GeneratingView: View {
 
     private var header: some View {
         VStack(spacing: Theme.Spacing.sm) {
+            // #102: 作業中のツル(PC とスマホを数秒ごとに持ち替える)
+            CraneMascot(pose: Int(elapsed / 4) % 2 == 0 ? .pc : .phone, size: 96, sway: 3)
             Label("変身中", systemImage: "sparkles")
                 .font(.caption.weight(.semibold))
                 .textCase(.uppercase)

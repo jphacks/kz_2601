@@ -936,6 +936,23 @@
         }
       }
     },
+    "またね。いつでも戻ってきてください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See you! Come back anytime."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "またね。いつでも戻ってきてください"
+          }
+        }
+      }
+    },
     "おかえりなさい。\n今日は何を作りますか?": {
       "extractionState": "manual",
       "localizations": {

@@ -188,10 +188,7 @@ struct RootView: View {
     private var summaryCard: some View {
         if let banner = rt.summaryBanner {
             HStack(alignment: .top, spacing: Theme.Spacing.sm + 2) {
-                Image(systemName: "sparkles")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Theme.brandGradient)
-                    .padding(.top, 1)
+                CraneMascot(pose: .joy, size: 52, sway: 6) // #102
                 Text(banner.text)
                     .font(.subheadline.weight(.medium))
                     .fixedSize(horizontal: false, vertical: true)

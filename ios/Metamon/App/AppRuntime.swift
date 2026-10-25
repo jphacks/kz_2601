@@ -184,6 +184,10 @@ final class AppRuntime: DSLRuntime {
                 handle(primary, of: card)
             }
         }
+        // スクショ用: `METAMON_SHOW_ERROR_CARD=1` で圏外の状態カードを出す(焦りのツル・#102)
+        if ProcessInfo.processInfo.environment["METAMON_SHOW_ERROR_CARD"] == "1" {
+            errorCard = ErrorPresentation(kind: .offlineQueued, transcript: "家計簿アプリが欲しい")
+        }
         // ヘッドレス E2E 用: `METAMON_AUTO_TRANSCRIPT="家計簿アプリが欲しい"` で起動直後に 1 回だけ発話を投げる。
         // 対話が ON(#75)なら質問に `METAMON_AUTO_REPLIES`(| 区切り)で答え、ready で「この内容で作る」まで自動で進めて生成を待つ
         if let text = ProcessInfo.processInfo.environment["METAMON_AUTO_TRANSCRIPT"], !text.isEmpty {

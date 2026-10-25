@@ -14,8 +14,16 @@ struct SignInView: View {
 
             VStack(spacing: Theme.Spacing.lg) {
                 Spacer()
-                BrandMark(size: 96)
-                    .symbolEffect(.pulse, options: .repeating, isActive: session.isBusy)
+                if session.farewell {
+                    // ログアウト / アカウント削除の後(#102)
+                    CraneMascot(pose: .bye, size: 120, sway: 6)
+                    Text("またね。いつでも戻ってきてください")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                } else {
+                    BrandMark(size: 96)
+                        .symbolEffect(.pulse, options: .repeating, isActive: session.isBusy)
+                }
                 VStack(spacing: Theme.Spacing.sm) {
                     Text("Tailor It")
                         .font(.system(size: 40, weight: .bold, design: .rounded))
