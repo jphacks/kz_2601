@@ -193,6 +193,8 @@ public struct Entity: Decodable, Identifiable, Sendable {
 
 public enum FieldType: String, Decodable, Sendable {
     case string, text, integer, number, boolean, date, datetime, `enum`, currency, photo, location
+    /// 端末内の動画("video:<id>|<サムネイル data URL>"・#206)。`VideoValue` で読む。
+    case video
     /// 別 entity のレコード参照(保存値はレコード id 文字列・#101)。`Field.refEntity` が参照先。
     case ref
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .string) }

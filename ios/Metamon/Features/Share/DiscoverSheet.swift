@@ -171,6 +171,7 @@ enum ComponentIcon {
         case "toggle": "switch.2"
         case "photoField", "camera": "camera.fill"
         case "image": "photo"
+        case "videoField", "videoPlayer": "video.fill"
         case "map", "mapView", "locationButton": "map.fill"
         case "timer", "timerDisplay": "timer"
         case "webView": "safari"

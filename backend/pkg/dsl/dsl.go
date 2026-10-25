@@ -118,6 +118,7 @@ const (
 	FieldEnum     FieldType = "enum"
 	FieldCurrency FieldType = "currency"
 	FieldPhoto    FieldType = "photo"    // https URL uploaded by iOS to Firebase Storage
+	FieldVideo    FieldType = "video"    // "video:<id>|data:image/jpeg;base64,<thumb>" (movie stays on the device)
 	FieldLocation FieldType = "location" // "lat,lng"
 	FieldRef      FieldType = "ref"      // id of a record of Field.RefEntity
 )
@@ -195,8 +196,10 @@ const (
 	CompDatePicker  ComponentType = "datePicker"
 	CompPicker      ComponentType = "picker"
 	CompToggle      ComponentType = "toggle"
-	CompPhotoField  ComponentType = "photoField" // camera / library -> photo field
-	CompImage       ComponentType = "image"      // displays a photo field
+	CompPhotoField  ComponentType = "photoField"  // camera / library -> photo field
+	CompImage       ComponentType = "image"       // displays a photo field
+	CompVideoField  ComponentType = "videoField"  // camera (front/rear) / library -> video field
+	CompVideoPlayer ComponentType = "videoPlayer" // plays a video field
 	CompList        ComponentType = "list"
 	CompStat        ComponentType = "stat"
 	CompChart       ComponentType = "chart"
@@ -289,8 +292,9 @@ type Component struct {
 	Multiline   bool    `json:"multiline,omitempty"`
 	Unit        string  `json:"unit,omitempty"`
 	IncludeTime bool    `json:"includeTime,omitempty"`
-	Source      string  `json:"source,omitempty"` // photoField: camera|library|both
-	Height      string  `json:"height,omitempty"` // image: small|medium|large
+	Source      string  `json:"source,omitempty"`      // photoField / videoField: camera|library|both
+	MaxDuration int     `json:"maxDuration,omitempty"` // videoField: recording limit in seconds (default 60)
+	Height      string  `json:"height,omitempty"`      // image: small|medium|large
 
 	// data-bound (list / stat / chart)
 	Entity        string    `json:"entity,omitempty"`

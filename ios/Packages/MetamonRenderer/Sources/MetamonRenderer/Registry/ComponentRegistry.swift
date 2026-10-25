@@ -53,6 +53,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.toggle) { c, ctx in ToggleLeaf(c: c, ctx: ctx) }
         r.register(.photoField) { c, ctx in PhotoFieldLeaf(c: c, ctx: ctx) }
         r.register(.image) { c, ctx in ImageLeaf(c: c, ctx: ctx) }
+        r.register(.videoField) { c, ctx in VideoFieldLeaf(c: c, ctx: ctx) }
+        r.register(.videoPlayer) { c, ctx in VideoPlayerLeaf(c: c, ctx: ctx) }
         r.register(.list) { c, ctx in ListLeaf(c: c, ctx: ctx) }
         r.register(.stat) { c, _ in StatLeaf(c: c) }
         r.register(.chart) { c, _ in ChartLeaf(c: c) }

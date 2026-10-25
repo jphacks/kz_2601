@@ -74,6 +74,8 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `toggle` | `field`, `label` | | ○ | P0 |
 | `photoField` | `field`(photo) | `label`, `source`(camera/library/both) | ○ | P0 |
 | `image` | `field`(photo) | `height`(small/medium/large) | ○ | P0 |
+| `videoField` | `field`(video) | `label`, `source`(camera/library/both), `maxDuration`(秒・既定 60) | ○ | #206 |
+| `videoPlayer` | `field`(video) | `height`(small/medium/large) | ○ | #206 |
 | `list` | `entity`, `item{title}` | `item.subtitle/trailing/icon/image`, `sort`, `filter`, `emptyText`, `onItemTap`, `swipeToDelete` | | P0 |
 | `stat` | `label` + (`entity`+`aggregate` **または** `value`(Expr)) | `field`(count 以外必須), `by`(latest/earliest/distance/duration), `filter`, `format`(plain/currency/percent) | | P0 |
 | `chart` | `entity`, `kind`(bar/line/pie), `groupBy`, `aggregate` | `title`, `field`, `bucket`(day/week/month), `filter` | | P1 |

@@ -142,6 +142,20 @@ func TestDropFormPhotoPreviews(t *testing.T) {
 	if len(doc.Screens[1].Components) != 1 {
 		t.Fatal("non-form screens are untouched")
 	}
+	// videoField plays its own clip: a videoPlayer of the same field on the form is dropped (#206)
+	vin := `{"screens":[{"id":"form","entity":"clip","components":[
+	  {"type":"videoField","field":"video"},{"type":"videoPlayer","field":"video"},{"type":"image","field":"video"}]}]}`
+	var vdoc struct {
+		Screens []struct {
+			Components []map[string]any `json:"components"`
+		} `json:"screens"`
+	}
+	if err := json.Unmarshal(dropFormPhotoPreviews([]byte(vin)), &vdoc); err != nil {
+		t.Fatal(err)
+	}
+	if v := vdoc.Screens[0].Components; len(v) != 2 || v[0]["type"] != "videoField" || v[1]["type"] != "image" {
+		t.Fatalf("video form: %v", v)
+	}
 	// nothing to drop -> same bytes
 	kb := kakeibo(t)
 	if string(dropFormPhotoPreviews(kb)) != string(kb) {

@@ -8,6 +8,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     // leaf
     case text, button, textField, numberField, datePicker, picker, toggle
     case photoField, image, list, stat, chart, voiceInput, spacer, divider
+    // leaf(動画・#206)
+    case videoField, videoPlayer
     // container(構造系: card/disclosure/carousel/grid)
     case card, disclosure, carousel, grid
     // leaf(ナビ・ネイティブ系)
@@ -77,7 +79,8 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var multiline: Bool?
     public var unit: String?
     public var includeTime: Bool?
-    public var source: String?         // photoField: camera|library|both
+    public var source: String?         // photoField / videoField: camera|library|both
+    public var maxDuration: Int?       // videoField: 録画の上限秒(既定 60)
     public var height: String?         // image: small|medium|large
 
     // data-bound(list / stat / chart)
@@ -149,7 +152,7 @@ public struct Component: Decodable, Identifiable, Sendable {
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
-        case includeTime, source, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
+        case includeTime, source, maxDuration, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
         case kind, groupBy, bucket, prompt, size
         case expanded, itemWidth, columnCount
         case searchField, onDateTap, locationField, zoom, mode, seconds, shareTo
@@ -183,6 +186,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         unit = try? c.decodeIfPresent(String.self, forKey: .unit)
         includeTime = try? c.decodeIfPresent(Bool.self, forKey: .includeTime)
         source = try? c.decodeIfPresent(String.self, forKey: .source)
+        maxDuration = try? c.decodeIfPresent(Int.self, forKey: .maxDuration)
         height = try? c.decodeIfPresent(String.self, forKey: .height)
         entity = try? c.decodeIfPresent(String.self, forKey: .entity)
         item = try? c.decodeIfPresent(ListItem.self, forKey: .item)
