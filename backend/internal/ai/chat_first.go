@@ -49,6 +49,7 @@ type chatFirstReply struct {
 	Kind        string         `json:"kind"`
 	Text        string         `json:"text"`
 	Suggestions []string       `json:"suggestions"`
+	MultiSelect bool           `json:"multiSelect"` // #220
 	Options     []chatOptionIn `json:"options"`
 	Brief       Brief          `json:"brief"`
 	Transcript  string         `json:"transcript"`
@@ -72,11 +73,12 @@ func ChatEditSchema() json.RawMessage {
 	return json.RawMessage(`{
   "type": "object",
   "additionalProperties": false,
-  "required": ["kind", "text", "suggestions", "options", "transcript"],
+  "required": ["kind", "text", "suggestions", "multiSelect", "options", "transcript"],
   "properties": {
     "kind": {"type": "string", "enum": ["answer", "question", "proposal", "ready"]},
     "text": {"type": "string"},
     "suggestions": {"type": "array", "items": {"type": "string"}},
+    "multiSelect": {"type": "boolean"},
     ` + chatOptionsSchema + `,
     "transcript": {"type": "string"}
   }
@@ -88,11 +90,12 @@ func ChatCreateSchema() json.RawMessage {
 	return json.RawMessage(`{
   "type": "object",
   "additionalProperties": false,
-  "required": ["kind", "text", "suggestions", "options", "brief", "transcript"],
+  "required": ["kind", "text", "suggestions", "multiSelect", "options", "brief", "transcript"],
   "properties": {
     "kind": {"type": "string", "enum": ["answer", "question", "proposal", "ready"]},
     "text": {"type": "string"},
     "suggestions": {"type": "array", "items": {"type": "string"}},
+    "multiSelect": {"type": "boolean"},
     ` + chatOptionsSchema + `,
     "brief": {
       "type": "object",
@@ -345,8 +348,10 @@ func (s *Service) applyFirstReply(res *ChatResult, r *chatFirstReply, mode strin
 			text = loc.text().proposalText
 		}
 		res.Options = opts
+		res.MultiSelect = r.MultiSelect && len(opts) > 1 // #220
 	default: // question | answer
 		res.Suggestions = cleanSuggestions(r.Suggestions)
+		res.MultiSelect = r.MultiSelect && kind == "question" && len(res.Suggestions) > 1 // #220
 	}
 	res.Text = text
 	if res.Source == "" {
@@ -452,6 +457,9 @@ func partialFirstReply(prefix string) (chatFirstReply, bool) {
 	}
 	if json.Unmarshal(f["suggestions"], &r.Suggestions) != nil || json.Unmarshal(f["options"], &r.Options) != nil {
 		return r, false
+	}
+	if f["multiSelect"] != nil {
+		_ = json.Unmarshal(f["multiSelect"], &r.MultiSelect) // #220
 	}
 	if r.Kind == "proposal" && len(cleanOptions(r.Options)) == 0 {
 		return r, false
@@ -574,6 +582,11 @@ var chatEditSystemPrompt = strings.TrimSpace(`
   - **足りているものは聞かない**: 「金額を大きくして」「メモ欄を消して」「カテゴリに外食を足して」「集計タブに月ごとの金額の棒グラフを足して」のように何をどう変えるか分かる指示は今まで通り ready。対象がアプリに 1 つしか無い(数字のカードが 1 つだけ等)なら聞かずに ready。
   - 目的だけの相談(「見やすくして」「もっと便利にしたい」)は question にせず proposal で案を出す。
 
+## 複数選択(multiSelect、#220)
+- proposal: 案を**いくつ選んでも同時に反映できる**(足す系で互いに邪魔しない。例「グラフを足す」「予算バーを足す」「並べ替えを足す」)なら multiSelect=true。**どれか 1 つしか選べない**(同じ所を別の形に変える・両立しない。例「レイアウト A / B」「色を青に / 赤に」「数字を大きく / 小さく」)なら false。迷ったら false。
+- question: suggestions が**複数当てはまる**問い(「どの項目を一覧に出しますか?」「何を記録しますか?」)なら multiSelect=true。**1 つだけ選ぶ**問い(「どの単位で集計しますか?」「毎日と毎週どちら?」)なら false。
+- answer / ready では常に false。
+
 ## 選択肢(種類・カテゴリ)の変更(#194)
 - 選択肢そのものを足す・消す・名前を変える(「副業も足して」「ボーナスは要らない」「お小遣いを臨時収入に変えて」)→ ready。transcript「収入の『種類』の選択肢に『副業』を追加して。」のように、どの項目のどの選択肢をどうするかだけを書く。新しい項目・メモ欄・「その他」は足さない。
 - 使う人が後から増やせる・消せるようにしたい(「種類を自分で増やせるように」「カテゴリを自由に追加・削除したい」)→ ready。transcript「『種類』を自分で追加・削除できる一覧にして、入力フォームではその一覧から選ぶようにして。今の選択肢(お小遣い・給与・ボーナス)は初めから入れておいて。」。**文字の自由入力欄に変えない**(「選択式ではなく文字で入力」にしない)。
@@ -598,6 +611,11 @@ var chatCreateSystemPrompt = chatSystemPrompt + "\n\n" + strings.TrimSpace(`
 - suggestions は question / answer 以外では空配列。options は proposal 以外では空配列。
 - brief / transcript は毎回、現時点の理解で埋める(まだ何も分からなければ空文字・空配列)。
 
+## 複数選択(multiSelect、#220)
+- proposal: 案を**いくつ選んでも同時に反映できる**(足す系で互いに邪魔しない。例「グラフを足す」「予算バーを足す」「並べ替えを足す」)なら multiSelect=true。**どれか 1 つしか選べない**(同じ所を別の形に変える・両立しない。例「レイアウト A / B」「色を青に / 赤に」「数字を大きく / 小さく」)なら false。迷ったら false。
+- question: suggestions が**複数当てはまる**問い(「どの項目を一覧に出しますか?」「何を記録しますか?」)なら multiSelect=true。**1 つだけ選ぶ**問い(「どの単位で集計しますか?」「毎日と毎週どちら?」)なら false。
+- answer / ready では常に false。
+
 `+chatCapabilities)
 
 // chatCreateUserMessage renders the history for a chat-first create turn.
@@ -611,7 +629,7 @@ func chatCreateUserMessage(ms []ChatMessage, loc Locale, force, noMoreQuestions 
 	}
 	writeConversation(&b, ms)
 	writeProblems(&b, problems)
-	b.WriteString("## 出力\n{kind, text, suggestions, options, brief, transcript} の JSON。")
+	b.WriteString("## 出力\n{kind, text, suggestions, multiSelect, options, brief, transcript} の JSON。")
 	return b.String()
 }
 
@@ -624,7 +642,7 @@ func chatEditUserMessage(ms []ChatMessage, loc Locale, summary string, problems 
 	b.WriteString("\n")
 	writeConversation(&b, ms)
 	writeProblems(&b, problems)
-	b.WriteString("## 出力\n{kind, text, suggestions, options, transcript} の JSON。")
+	b.WriteString("## 出力\n{kind, text, suggestions, multiSelect, options, transcript} の JSON。")
 	return b.String()
 }
 

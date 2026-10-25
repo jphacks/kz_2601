@@ -15,6 +15,8 @@ struct ClarifyChatView: View {
     let onSend: (String) -> Void
 
     @State private var typed = ""
+    /// #220: 複数選択中の案・チップ。返事(吹き出しの数)が変わったら空に戻す
+    @State private var pick = MultiPick()
     @FocusState private var typing: Bool
 
     private var offer: ClarifyFlow.Offer { rt.chatTurn.map(ClarifyFlow.offer(for:)) ?? .none }
@@ -22,6 +24,8 @@ struct ClarifyChatView: View {
     private var proposals: [ChatOption] { if case .proposals(let options) = offer { return options } else { return [] } }
     private var busy: Bool { rt.chatPending || rt.isMorphing || rt.paidConfirm != nil }
     private var lastAssistantId: UUID? { rt.chatBubbles.last(where: { $0.role == .assistant })?.id }
+    private var multiSelect: Bool { rt.chatTurn?.isMultiSelect == true }
+    private var current: MultiPick { pick.key == rt.chatBubbles.count ? pick : MultiPick(key: rt.chatBubbles.count) }
 
     var body: some View {
         transcriptScroll
@@ -79,11 +83,14 @@ struct ClarifyChatView: View {
                     if !proposals.isEmpty, !rt.chatPending {
                         VStack(spacing: Theme.Spacing.sm) {
                             CraneMascot(pose: .idea, size: 64).frame(maxWidth: .infinity, alignment: .leading) // #102
+                            if multiSelect { MultiSelectHint() }
                             ForEach(Array(proposals.enumerated()), id: \.element.id) { index, option in
-                                ProposalCard(index: index + 1, option: option, disabled: busy) {
-                                    Task { await rt.choose(option) }
+                                ProposalCard(index: index + 1, option: option, disabled: busy,
+                                             selection: multiSelect ? current.options.contains(option.id) : nil) {
+                                    if multiSelect { toggle(option: option.id) } else { Task { await rt.choose(option) } }
                                 }
                             }
+                            if multiSelect { chooseSelectedButton }
                         }
                         .padding(.leading, 32)
                         .id("proposals")
@@ -138,27 +145,87 @@ struct ClarifyChatView: View {
         withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo(target, anchor: .bottom) }
     }
 
+    // MARK: - 複数選択(#220)
+
+    private func toggle(option id: String) {
+        var next = current
+        if next.options.contains(id) { next.options.remove(id) } else { next.options.insert(id) }
+        pick = next
+    }
+
+    private func toggle(chip: String) {
+        var next = current
+        if let i = next.chips.firstIndex(of: chip) { next.chips.remove(at: i) } else { next.chips.append(chip) }
+        pick = next
+    }
+
+    /// 選んだ案(画面の並び順)をつないで 1 回で反映する。0 件では押せない
+    private var chooseSelectedButton: some View {
+        let selected = proposals.filter { current.options.contains($0.id) }
+        let enabled = MultiSelect.canSubmit(selectedCount: selected.count) && !busy
+        return Button {
+            guard let combined = MultiSelect.combined(selected) else { return }
+            Task { await rt.choose(combined) }
+        } label: {
+            Label(L10n.tr("これでいく(\(selected.count) 件)"), systemImage: "wand.and.stars")
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(Theme.brandGradient, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.4)
+        .accessibilityIdentifier("chat.option.chooseSelected")
+    }
+
     // MARK: - 選択肢・ボタン
 
     @ViewBuilder
     private var suggestionChips: some View {
         if case .chips(let chips) = offer, !chips.isEmpty, !busy {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: Theme.Spacing.sm) {
-                    ForEach(chips, id: \.self) { chip in
-                        Button { onSend(chip) } label: {
-                            Text(chip)
+            let multi = multiSelect && rt.chatTurn?.kind == .question
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                if multi { MultiSelectHint() }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        ForEach(chips, id: \.self) { chip in
+                            let on = multi && current.chips.contains(chip)
+                            Button { if multi { toggle(chip: chip) } else { onSend(chip) } } label: {
+                                HStack(spacing: 4) {
+                                    if multi { Image(systemName: on ? "checkmark.circle.fill" : "circle") }
+                                    Text(chip)
+                                }
                                 .font(.subheadline.weight(.medium))
+                                .foregroundStyle(on ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
                                 .padding(.horizontal, Theme.Spacing.md)
                                 .padding(.vertical, Theme.Spacing.sm + 2)
-                                .background(Theme.Colors.surface, in: Capsule())
+                                .background(on ? AnyShapeStyle(Theme.brandGradient) : AnyShapeStyle(Theme.Colors.surface), in: Capsule())
                                 .overlay(Capsule().strokeBorder(Theme.Colors.brandA.opacity(0.35)))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("chat.chip")
+                            .accessibilityAddTraits(on ? .isSelected : [])
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("chat.chip")
                     }
+                    .padding(.horizontal, 1)
                 }
-                .padding(.horizontal, 1)
+                if multi {
+                    let enabled = MultiSelect.canSubmit(selectedCount: current.chips.count)
+                    Button { onSend(MultiSelect.joinedAnswer(current.chips)) } label: {
+                        Text(L10n.tr("決定"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 40)
+                            .background(Theme.brandGradient, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!enabled)
+                    .opacity(enabled ? 1 : 0.4)
+                    .accessibilityIdentifier("chat.chip.submit")
+                }
             }
             .transition(.opacity)
         }
@@ -398,14 +465,82 @@ private struct ReadyCard: View {
     }
 }
 
+/// #220: 複数選択中の案(id)・チップ(押した順)。key = その時の吹き出しの数
+private struct MultiPick {
+    var key = -1
+    var options: Set<String> = []
+    var chips: [String] = []
+}
+
+/// #220: 「いくつでも選べます」
+private struct MultiSelectHint: View {
+    var body: some View {
+        Label(L10n.tr("いくつでも選べます"), systemImage: "checklist")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 /// proposal の案 1 つ(#186)。タイトル・説明 +「これでいく」。押すまでアプリは変わらない。
+/// #220: selection が nil でない時(複数選択)はカード全体がチェックの切り替えになり、「これでいく」は下にまとめて出す。
 private struct ProposalCard: View {
     let index: Int
     let option: ChatOption
     let disabled: Bool
+    var selection: Bool?
     let onChoose: () -> Void
 
     var body: some View {
+        if let selected = selection {
+            Button(action: onChoose) {
+                HStack(alignment: .top, spacing: Theme.Spacing.sm) {
+                    content
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .font(.title2)
+                        .foregroundStyle(selected ? AnyShapeStyle(Theme.brandGradient) : AnyShapeStyle(.tertiary))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .metamonCard()
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                    .strokeBorder(Theme.Colors.brandA.opacity(selected ? 0.8 : 0), lineWidth: 2))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(disabled)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(selected ? .isSelected : [])
+            .accessibilityValue(selected ? L10n.tr("選択中") : L10n.tr("未選択"))
+            .accessibilityIdentifier("chat.option.toggle")
+        } else {
+            single
+        }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
+                Text(L10n.tr("案\(index)"))
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Theme.Spacing.sm)
+                    .padding(.vertical, 2)
+                    .background(Theme.brandGradient, in: Capsule())
+                Text(option.title)
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !option.detail.isEmpty {
+                Text(option.detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var single: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
                 Text(L10n.tr("案\(index)"))

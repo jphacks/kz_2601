@@ -176,6 +176,9 @@ public struct ChatTurn: Codable, Equatable, Sendable {
     public var transcript: String?
     /// proposal の時だけ。案 1〜3
     public var options: [ChatOption]?
+    /// #220: proposal の案 / question のチップを複数選べる(組み合わせられる時だけ true)。旧 backend は送らない(nil = 1 つ選択)
+    public var multiSelect: Bool?
+    public var isMultiSelect: Bool { multiSelect == true }
     public var locale: String?
     /// claude | shortcut | forced
     public var source: String?
@@ -190,7 +193,8 @@ public struct ChatTurn: Codable, Equatable, Sendable {
 
     public init(kind: Kind, text: String, suggestions: [String]? = nil, turn: Int, brief: ChatBrief? = nil,
                 transcript: String? = nil, options: [ChatOption]? = nil, locale: String? = nil, source: String? = nil, mode: String? = nil,
-                requiresPro: Bool? = nil, paidFeatures: [PaidFeature]? = nil, freeTranscript: String? = nil) {
+                requiresPro: Bool? = nil, paidFeatures: [PaidFeature]? = nil, freeTranscript: String? = nil, multiSelect: Bool? = nil) {
+        self.multiSelect = multiSelect
         self.requiresPro = requiresPro
         self.paidFeatures = paidFeatures
         self.freeTranscript = freeTranscript

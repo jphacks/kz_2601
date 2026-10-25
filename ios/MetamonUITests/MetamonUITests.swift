@@ -191,6 +191,51 @@ final class MetamonUITests: XCTestCase {
         attachScreenshot("chat-proposal-applied")
     }
 
+    // MARK: - 複数選択(#220)
+
+    func testMultiSelectProposalAppliesTwoIdeas() {
+        // 「機能を足したい」→ モック AI が組み合わせられる案を 3 つ(multiSelect)。2 つ選んで「これでいく(2 件)」
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "機能を足したい", "METAMON_AUTO_PAUSE": "600"])
+        let toggles = app.buttons.matching(identifier: "chat.option.toggle")
+        XCTAssertTrue(toggles.firstMatch.waitForExistence(timeout: 15), "複数選択の案のカードが出ない")
+        XCTAssertTrue(waitUntil(timeout: 15) { toggles.count == 3 }, "案のカードが 3 枚でない(\(toggles.count) 枚)")
+        XCTAssertFalse(app.buttons["chat.option.choose"].exists, "複数選択なのにカードごとの「これでいく」が出ている")
+        let submit = app.buttons["chat.option.chooseSelected"]
+        XCTAssertTrue(submit.exists, "「これでいく(N 件)」が無い")
+        XCTAssertFalse(submit.isEnabled, "0 件で「これでいく」が押せる")
+        attachScreenshot("multi220-proposal-none")
+
+        toggles.element(boundBy: 0).tap()
+        toggles.element(boundBy: 1).tap()
+        XCTAssertTrue(waitUntil(timeout: 5) { submit.isEnabled && submit.label.contains("2 件") }, "2 件選んでも「これでいく(2 件)」にならない(\(submit.label))")
+        XCTAssertEqual(toggles.element(boundBy: 0).value as? String, "選択中")
+        XCTAssertEqual(toggles.element(boundBy: 2).value as? String, "未選択")
+        XCTAssertTrue(voiceSheet.exists, "選んだだけで音声シートが閉じた")
+        attachScreenshot("multi220-proposal-two")
+
+        submit.tap()
+        XCTAssertTrue(waitFor(voiceSheet, "exists == false", timeout: 15), "「これでいく(2 件)」で生成が始まらない")
+        // モックは指示をそのまま要約に返す: 2 案の指示が 1 回の反映に入っている
+        let applied = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "円グラフ", "予算の進捗バー")).firstMatch
+        XCTAssertTrue(applied.waitForExistence(timeout: 15), "2 案が 1 回で反映されない")
+        attachScreenshot("multi220-proposal-applied")
+    }
+
+    func testMultiSelectChipsSendJoinedAnswer() {
+        launch(example: nil, ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "項目を選びたい", "METAMON_AUTO_PAUSE": "600"])
+        let chips = app.buttons.matching(identifier: "chat.chip")
+        XCTAssertTrue(chips.firstMatch.waitForExistence(timeout: 15), "質問のチップが出ない")
+        let submit = app.buttons["chat.chip.submit"]
+        XCTAssertTrue(submit.exists && !submit.isEnabled, "0 件で「決定」が押せる")
+        chips.element(boundBy: 0).tap()
+        XCTAssertTrue(element(labelBeginsWith: "AI: どの項目").exists, "1 つ押しただけで送られた")
+        chips.element(boundBy: 2).tap()
+        attachScreenshot("multi220-chips-two")
+        submit.tap()
+        XCTAssertTrue(element(labelBeginsWith: "あなた: 金額、メモ").waitForExistence(timeout: 15), "選んだ項目が「、」でつないで送られない")
+        XCTAssertTrue(app.buttons["chat.build"].waitForExistence(timeout: 15), "決定で次(この内容で作る)に進まない")
+    }
+
     // MARK: - チャット履歴(#210)
 
     func testChatHistoryRemainsAfterApply() {

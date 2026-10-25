@@ -919,6 +919,23 @@
         }
       }
     },
+    "いくつでも選べます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick as many as you like"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "いくつでも選べます"
+          }
+        }
+      }
+    },
     "いつでも解約できます(App Store の設定から)": {
       "extractionState": "manual",
       "localizations": {
@@ -1289,6 +1306,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "これでいく"
+          }
+        }
+      }
+    },
+    "これでいく(%lld 件)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go with these (%lld)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "これでいく(%lld 件)"
           }
         }
       }
@@ -4489,6 +4523,23 @@
         }
       }
     },
+    "未選択": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not selected"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未選択"
+          }
+        }
+      }
+    },
     "案%lld": {
       "extractionState": "manual",
       "localizations": {
@@ -4553,6 +4604,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "毎日、新しいアプリを無制限に作れます"
+          }
+        }
+      }
+    },
+    "決定": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "決定"
           }
         }
       }
@@ -5539,6 +5607,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "連絡先(任意) メールや SNS など"
+          }
+        }
+      }
+    },
+    "選択中": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択中"
           }
         }
       }

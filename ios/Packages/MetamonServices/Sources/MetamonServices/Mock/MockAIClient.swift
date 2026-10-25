@@ -31,6 +31,8 @@ public struct MockAIClient: AIClient {
     /// 対話のモック(状態は持たず、iOS が毎回送る全履歴だけで決める)。
     /// - 問いかけ(「?」「できる?」「可能?」「WebView」等)→ answer(アプリは変えない・#186)
     /// - 「見やすく」「おすすめ」→ proposal 2 案
+    /// - 「足したい」→ 組み合わせられる proposal 3 案(multiSelect・#220)
+    /// - create の 1 発目に「項目」→ 複数当てはまる question(multiSelect・#220)
     /// - edit: それ以外の指示(「金額を大きくして」)→ ready(transcript = その指示)
     /// - create: 1 発目が短い(≤10 字)なら 1 問だけ聞く。2 発目以降・go-ahead 語・長い 1 発目は ready。
     public func chat(appId: String, messages: [ChatMessage], locale: String?, mode: ChatMode?) async throws -> ChatTurn {
@@ -41,6 +43,14 @@ public struct MockAIClient: AIClient {
         let goAhead = Self.isGoAhead(last)
         let requests = users.filter { !Self.isGoAhead($0) && !Self.isQuestion($0) }
         let mode = mode ?? .create
+        if Self.wantsMultiProposal(last) {
+            return ChatTurn(kind: .proposal, text: "組み合わせて選べます。", turn: turn, options: Self.multiProposals,
+                            locale: "ja", source: "mock", mode: mode.rawValue, multiSelect: true)
+        }
+        if mode == .create, turn == 1, last.contains("項目") {
+            return ChatTurn(kind: .question, text: "どの項目を一覧に出しますか?", suggestions: ["金額", "日付", "メモ"],
+                            turn: turn, locale: "ja", source: "mock", mode: mode.rawValue, multiSelect: true)
+        }
         if Self.isQuestion(last) {
             return ChatTurn(kind: .answer, text: Self.answer(for: last), suggestions: mode == .edit ? ["金額を大きくして", "見やすくして"] : nil,
                             turn: turn, locale: "ja", source: "mock", mode: mode.rawValue)
@@ -88,6 +98,15 @@ public struct MockAIClient: AIClient {
         if t.hasSuffix("?") || t.hasSuffix("？") { return true }
         return ["できる", "可能", "ですか", "WebView", "どうなって"].contains { t.contains($0) }
     }
+
+    static func wantsMultiProposal(_ text: String) -> Bool { text.contains("足したい") }
+
+    /// #220: 足す系で互いに邪魔しない案(複数選んで 1 回で反映できる)
+    public static let multiProposals = [
+        ChatOption(id: "opt1", title: "グラフを足す", detail: "ホームにカテゴリ別の円グラフを置きます。", instruction: "ホームにカテゴリ別の円グラフを追加して"),
+        ChatOption(id: "opt2", title: "予算バーを足す", detail: "今月の予算の進み具合をバーで見せます。", instruction: "ホームに今月の予算の進捗バーを追加して"),
+        ChatOption(id: "opt3", title: "並べ替えを足す", detail: "一覧を金額の大きい順に並べ替えられます。", instruction: "一覧を金額で並べ替えられるようにして"),
+    ]
 
     static func wantsProposal(_ text: String) -> Bool {
         ["見やすく", "おすすめ", "オススメ", "案を"].contains { text.contains($0) }
