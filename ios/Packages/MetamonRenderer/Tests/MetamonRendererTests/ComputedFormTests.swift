@@ -29,7 +29,7 @@ final class ComputedFormTests: XCTestCase {
         let ctx = RenderContext(route: Route(screen: "expense_form"), form: form)
         let fields = try XCTUnwrap(dsl.screen("expense_form")?.components.first?.children)
         let overridden = fields.filter { FormFieldOverride.applies(to: $0, ctx: ctx) }.compactMap(\.field)
-        XCTAssertEqual(Set(overridden), ["payer"], "正典 warikan はフォームに computed を束縛しない(backend がエラーにする)")
+        XCTAssertEqual(Set(overridden), ["payer", "split_with"], "正典 warikan はフォームに computed を束縛しない(backend がエラーにする)")
         // それでも AI が computed に入力部品を置いた場合は読み取り専用行に差し替える(防御)
         let stray = try JSONDecoder().decode(Component.self, from: Data(#"{"type":"numberField","field":"per_person","label":"1人あたり"}"#.utf8))
         XCTAssertTrue(FormFieldOverride.applies(to: stray, ctx: ctx))

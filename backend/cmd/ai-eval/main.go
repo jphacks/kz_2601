@@ -1,7 +1,7 @@
 // ai-eval runs internal/ai/eval/cases.json against the real Claude API through
 // the same Service the ai server uses (in-memory store, no HTTP), and writes
 // per-case metrics + the resulting DSL as JSON. Edit cases are seeded with the
-// DSL produced by their `base` create case in the same run. `expect` keys:
+// DSL produced by their `base` case (create or an earlier edit) in the same run. `expect` keys:
 // photo / chart / calendar (bool), notification ("HH:MM" or "any"), substitution (bool:
 // the summary mentions 代替 / "replaced" because a requested part is not in
 // the catalog), scope ("public"|"shared"|"private": at least one entity has
@@ -16,6 +16,7 @@
 // each component type appears on some screen), lacks ([type, ...]: none of them appears, #212).
 // Health (#167): health ("steps"|"weight": a healthStat with that metric),
 // healthField (bool: some field has health "weight").
+// Warikan (#231): refs (bool: some field is type refs), deletable ([entity id, ...]: swipeToDelete list or deleteRecord).
 // Grid (#234): grid (bool: some gridTable is present).
 // Field cap (#221): keepEntity / keep ([field id, ...]) / growTo (see checkKeep).
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
@@ -230,7 +231,7 @@ func main() {
 		log.Fatal(err)
 	}
 	run := Run{Date: time.Now().Format("2006-01-02"), Model: *model, Effort: *effort, Tag: *tag, Stream: *stream}
-	created := map[string]json.RawMessage{} // create case id -> resulting DSL
+	created := map[string]json.RawMessage{} // case id -> resulting DSL (create or edit)
 
 	for rep := 1; rep <= max(*repeat, 1); rep++ {
 		for _, c := range cases {
@@ -345,9 +346,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkEnum(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkKeep(c.Expect, app, rec.Summary)...)
 	}
-	if c.Kind == "create" {
-		created[c.ID] = res.DSL
-	}
+	created[c.ID] = res.DSL // edits too, so an edit can build on an earlier edit (#229)
 	log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms first=%dms out=%d chars=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",
 		c.ID, rec.Attempts, rec.AreaFallback, rec.ClaudeMs, rec.FirstEventMs, rec.Usage.OutputTokens, rec.OutputChars,
 		rec.Metrics.Tabs, rec.Metrics.Screens, rec.Metrics.AreaRatio, rec.ExpectMisses, rec.Summary)
@@ -364,7 +363,7 @@ func measure(a *dsl.App) *Metrics {
 			if f.Computed != nil {
 				m.Computed = append(m.Computed, e.ID+"."+f.ID)
 			}
-			if f.Type == dsl.FieldRef {
+			if f.Type == dsl.FieldRef || f.Type == dsl.FieldRefs {
 				m.RefFields++
 			}
 			if f.Health != "" {
@@ -658,6 +657,22 @@ func checkNav(exp map[string]any, a *dsl.App, mode string) []string {
 			if !found {
 				miss = append(miss, fmt.Sprintf("tabHas!%v", v))
 			}
+		case "refs": // #231: some field is type refs (multi-select, e.g. expense.split_with)
+			found := false
+			for _, e := range a.Entities {
+				for _, f := range e.Fields {
+					found = found || f.Type == dsl.FieldRefs
+				}
+			}
+			if found != v.(bool) {
+				miss = append(miss, fmt.Sprintf("refs=%v", found))
+			}
+		case "deletable": // #231: each entity has a list with swipeToDelete or a deleteRecord button / toolbar
+			for _, w := range v.([]any) {
+				if !deletable(a, fmt.Sprint(w)) {
+					miss = append(miss, fmt.Sprintf("deletable!%v", w))
+				}
+			}
 		case "has", "lacks": // component types that must (#168) / must not (#212) appear on some screen
 			for _, w := range v.([]any) {
 				found := false
@@ -676,6 +691,28 @@ func checkNav(exp map[string]any, a *dsl.App, mode string) []string {
 	}
 	sort.Strings(miss)
 	return miss
+}
+
+// deletable: a list of entity swipes to delete, or a deleteRecord button / toolbar targets it (#231).
+func deletable(a *dsl.App, entity string) bool {
+	del := func(act *dsl.Action) bool {
+		return act != nil && act.Type == dsl.ActionDeleteRecord && act.Entity == entity
+	}
+	for _, s := range a.Screens {
+		for i := range s.Toolbar {
+			if del(&s.Toolbar[i].Action) {
+				return true
+			}
+		}
+		for _, c := range s.Components {
+			for _, x := range append([]dsl.Component{c}, c.Children...) {
+				if del(x.Action) || (x.Type == dsl.CompList && x.Entity == entity && x.SwipeToDelete) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // mentionsSubstitution: the ja template says 代替, the en one says "replaced".

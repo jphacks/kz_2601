@@ -43,10 +43,20 @@ public extension DSLRuntime {
 
     /// 表示用の文字列。type=ref は参照先レコードの見出しに解決する(未取得・削除済みは「—」)。
     func display(_ value: JSONValue, field: Field?) -> String {
+        if let field, field.type == .refs { return refsTitle(value, field: field) }
         guard let field, field.type == .ref else { return displayText(value, field: field) }
         guard let id = value.stringValue, !id.isEmpty else { return "" }
         // enum から ref に変えた後の古い記録は選択肢の名前そのものを持つので、そのまま出す(#194)
         return refTitle(id, entity: field.refEntity) ?? (field.options?.contains(id) == true ? id : FieldCoding.unavailable)
+    }
+
+    /// type=refs(#231): 選んだレコードの見出しを「、」で連結。削除済みは飛ばし、未選択(残り 0 件)は「全員」。
+    func refsTitle(_ value: JSONValue, field: Field) -> String {
+        let names = Aggregator.refIds(value).compactMap { refTitle($0, entity: field.refEntity) }
+        guard !names.isEmpty else { return L("全員") }
+        let list = ListFormatter()
+        list.locale = LanguagePreference.shared.locale
+        return list.string(from: names) ?? names.joined(separator: ", ")
     }
 
     /// 参照先 entity のレコード id → 見出し(titleField / 最初の string field)。

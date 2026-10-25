@@ -808,7 +808,7 @@ final class AppRuntime: DSLRuntime {
     /// type=ref の options(初期の選択肢・#194)を、参照先 entity がサーバーでも空の時に端末ごと一度だけレコードにする。
     private func seedRefOptions(_ entity: String, appId: String) async {
         guard let tf = dsl.entity(entity)?.displayTitleField else { return }
-        let names = dsl.entities.flatMap(\.fields).filter { $0.type == .ref && $0.refEntity == entity }.flatMap { $0.options ?? [] }
+        let names = dsl.entities.flatMap(\.fields).filter { ($0.type == .ref || $0.type == .refs) && $0.refEntity == entity }.flatMap { $0.options ?? [] }
         let key = "refSeed.\(appId).\(entity)"
         guard !names.isEmpty, !UserDefaults.standard.bool(forKey: key) else { return }
         UserDefaults.standard.set(true, forKey: key)

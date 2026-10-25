@@ -4,7 +4,7 @@ import Foundation
 /// 期間 filter(`today` / `thisWeek` / `thisMonth` / `thisYear`)は端末ローカル時刻基準。
 public enum Aggregator {
     /// iOS が解釈する `Filter.op`(schema の enum と一致させる。テストで突き合わせる)。
-    public static let filterOps: Set<String> = ["eq", "neq", "gt", "gte", "lt", "lte", "today", "thisWeek", "thisMonth", "thisYear"]
+    public static let filterOps: Set<String> = ["eq", "neq", "gt", "gte", "lt", "lte", "today", "thisWeek", "thisMonth", "thisYear", "contains"]
 
     /// `thisWeek` 用の暦: 週の始まりを**月曜に固定**する。
     /// 日本の暦・学校・職場の「今週」は月〜日で数えるのが一般的で、ロケール既定(ja_JP は日曜始まり)のままだと
@@ -37,6 +37,10 @@ public enum Aggregator {
         case "thisYear":
             guard let d = FieldCoding.date(from: v) else { return false }
             return calendar.isDate(d, equalTo: now, toGranularity: .year)
+        case "contains":
+            // type refs(#231): 選んだ id に value を含む。未選択(空・無し)= 全員なので常に一致
+            let ids = refIds(v)
+            return ids.isEmpty || ids.contains(f.value?.stringValue ?? "")
         case "eq": return v == f.value || v.displayString == (f.value ?? .null).displayString
         case "neq": return !(v == f.value || v.displayString == (f.value ?? .null).displayString)
         case "gt", "gte", "lt", "lte":
@@ -48,6 +52,15 @@ public enum Aggregator {
             default: return a <= b
             }
         default: return true
+        }
+    }
+
+    /// type refs の保存値 → id の配列(文字列 1 つは 1 件として読む)。
+    public static func refIds(_ v: JSONValue) -> [String] {
+        switch v {
+        case .array(let a): return a.compactMap { $0.stringValue }.filter { !$0.isEmpty }
+        case .string(let s): return s.isEmpty ? [] : [s]
+        default: return []
         }
     }
 
@@ -86,7 +99,7 @@ public enum Aggregator {
         case "currency": return FieldCoding.currency(value)
         case "percent": return String(format: "%.0f%%", value)
         default:
-            let s = value == value.rounded() ? String(Int(value)) : String(format: "%.1f", value)
+            let s = FieldCoding.plainNumber(value)
             return unit.map { s + " " + $0 } ?? s
         }
     }
