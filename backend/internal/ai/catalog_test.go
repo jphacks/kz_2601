@@ -71,6 +71,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompNearbyShare,
 		// location tracking
 		dsl.CompLocationTracker,
+		// device health
+		dsl.CompHealthStat,
 	} {
 		goTypes[string(ct)] = true
 	}

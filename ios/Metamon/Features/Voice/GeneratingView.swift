@@ -68,6 +68,9 @@ struct GeneratingView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("generating.create") // UI テスト(#182)
+        #if DEBUG
+        .onAppear { MorphProbe.generatingAppeared += 1 }
+        #endif
         .task(id: job.startedAt) {
             // 0.25s 刻みで経過秒を更新(文言切替と段階判定用。グリッドの描画は TimelineView が担う)
             while !Task.isCancelled {
@@ -131,6 +134,19 @@ struct GeneratingView: View {
     }
 }
 
+#if DEBUG
+/// UI テストの観測用カウンタ(RootView の `UITestMorphProbe` が読む・#200)
+@MainActor
+enum MorphProbe {
+    static var createStarted = 0
+    static var generatingAppeared = 0
+    /// RootView の body が create の生成中で評価された回数(0 なら RootView が morphJob の変化で作り直されていない)
+    static var rootCreateEvals = 0
+    /// VoiceInputView 側の保険(`GeneratingFallback`)が出た回数
+    static var fallbackAppeared = 0
+}
+#endif
+
 /// 6×12 のスケルトングリッド。セルが波のように順に光り、3 秒ごとに「レイアウト案」(ブロック)が入れ替わる。
 /// TimelineView(20fps) + 単純な sin で軽量に。
 struct SkeletonGrid: View {
@@ -148,11 +164,17 @@ struct SkeletonGrid: View {
 
     private var layoutIndex: Int { Int(elapsed / 3) % Self.layouts.count }
 
+    /// n セル分の長さ(間の gap 込み)。0 未満にしない
+    private static func span(_ n: Int, cell: CGFloat, gap: CGFloat) -> CGFloat {
+        max(0, CGFloat(n) * (cell + gap) - gap)
+    }
+
     var body: some View {
         GeometryReader { geo in
             let gap: CGFloat = 6
-            let cw = (geo.size.width - gap * CGFloat(Self.cols - 1)) / CGFloat(Self.cols)
-            let ch = (geo.size.height - gap * CGFloat(Self.rows - 1)) / CGFloat(Self.rows)
+            // 出し入れの途中は geo.size が 0 になり得る。負の幅は "Invalid frame dimension" になるので 0 で止める
+            let cw = max(0, (geo.size.width - gap * CGFloat(Self.cols - 1)) / CGFloat(Self.cols))
+            let ch = max(0, (geo.size.height - gap * CGFloat(Self.rows - 1)) / CGFloat(Self.rows))
             TimelineView(.periodic(from: .now, by: 1.0 / 20)) { tl in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 ZStack(alignment: .topLeading) {
@@ -173,8 +195,8 @@ struct SkeletonGrid: View {
                                 .fill(Theme.brandGradient.opacity(0.14))
                                 .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                                     .strokeBorder(Theme.Colors.brandB.opacity(0.5), lineWidth: 1))
-                                .frame(width: CGFloat(area.colSpan) * (cw + gap) - gap,
-                                       height: CGFloat(area.rowSpan) * (ch + gap) - gap)
+                                .frame(width: Self.span(area.colSpan, cell: cw, gap: gap),
+                                       height: Self.span(area.rowSpan, cell: ch, gap: gap))
                                 .offset(x: CGFloat(area.col1) * (cw + gap), y: CGFloat(area.row1 - 1) * (ch + gap))
                                 .transition(.opacity)
                         }

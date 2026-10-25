@@ -35,6 +35,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case nearbyShare
     // leaf(位置の記録・#168)
     case locationTracker
+    // leaf(ヘルスデータ・#167)
+    case healthStat
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -141,6 +143,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var max: Double?            // rating: 星の数(既定 5) / gauge
     public var step: Double?           // slider: 省略で連続 / stepper: 既定 1
     public var minLines: Int?          // textEditor: 最低表示行数(既定 4)
+    // healthStat(#167)。label / target は共用
+    public var metric: String?         // steps|weight
+    public var period: String?         // today(既定)|week
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
@@ -154,6 +159,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case nameField, balanceField
         case task, input, output, options
         case tone
+        case metric, period
     }
 
     public init(from decoder: Decoder) throws {
@@ -228,6 +234,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         dateField = try? c.decodeIfPresent(String.self, forKey: .dateField)
         titleField = try? c.decodeIfPresent(String.self, forKey: .titleField)
         subtitleField = try? c.decodeIfPresent(String.self, forKey: .subtitleField)
+        metric = try? c.decodeIfPresent(String.self, forKey: .metric)
+        period = try? c.decodeIfPresent(String.self, forKey: .period)
     }
 }
 

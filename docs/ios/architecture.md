@@ -663,12 +663,20 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 | Siri の聞き取り | `Info.plist` の `INAlternativeAppNames` に「テイラーイット」「テーラーイット」。フレーズは `CFBundleDevelopmentRegion = ja` なので日本語で直書き |
 | 背面起動の注意 | 記録追加は bootstrap 前でも動く(`recordSync.start()` を Intent 側で呼ぶ)。返した後にプロセスが止められても行とキューはファイルに残り、次回起動で送る。開く/話しかけるは bootstrap(`GET /dsl` の復元)と競合しないよう、準備前なら保留して `markReady()` で実行 |
 | E2E(DEBUG) | シミュレータはショートカットアプリのタップ自動化が無いので、`METAMON_E2E_INTENT=add:家計簿:ランチ 800円` / `open:筋トレ` / `talk` で起動直後に本物の Intent 型・Query 経由で実行する(`Features/Intents/IntentE2E.swift`) |
-| HealthKit | 未実装(後続)。App ID に HealthKit capability が要る(下記) |
+| HealthKit | 実装済み(#167・下記 §15.1) |
 
-HealthKit を足す時の手順(Apple アカウント操作が要るので未着手):
-1. `project.yml` の Metamon entitlements に `com.apple.developer.healthkit: true`、Info.plist に `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription`。
-2. `xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で App ID に HealthKit が付く(有料 Program 必須)。付かなければ Apple Developer > Identifiers > `jp.kz2601.metamon` > Capabilities で HealthKit にチェック → プロファイル再生成。
-3. 部品は DSL に `healthField`(歩数/体重の読み取り)を足す案(schema・ai・カタログの変更が要るので別 Issue)。歩数だけなら既存の `NSMotionUsageDescription`(CoreMotion の歩数計)で capability 無しに出せる。
+### 15.1 ヘルスデータ(`healthStat` / `Field.health`・Issue #167)
+
+| 項目 | 内容 |
+|---|---|
+| 部品 | `healthStat { metric: steps\|weight, period?: today\|week, label, target? }`(entity 不要)。today = 数値(steps は target で達成率バー)、week = 7 日のグラフ。書き込みは `Field.health: "weight"`(新規保存時にヘルスケアの体重へ 1 件) |
+| 歩数の読み方 | **CoreMotion(`CMPedometer`)を優先**(capability 不要・`NSMotionUsageDescription` だけ・端末に直近 7 日分)。歩数計の無い端末(シミュレータ)は HealthKit の `stepCount` を日ごとに合計 |
+| 体重 | HealthKit `bodyMass`(kg)。読み取りは直近 30 日(today)/ 7 日(week)の各日の最新値。書き込みは `AppRuntime.writeHealthFields`(`saveRecord` の直後・レコード保存とは独立) |
+| 実装 | `MetamonRenderer/Support/HealthData.swift`(`HealthDataSource` protocol・`LiveHealthData`・`MockHealthData`・`HealthData.source`)、`Components/Leaves/HealthStatLeaf.swift`、本体 `Features/Health/AppRuntime+Health.swift` |
+| 権限・不可時 | 初回表示で許可ダイアログ(モーションとフィットネス / ヘルスケア)。拒否 → 「ヘルスケアへのアクセスが許可されていません」、端末非対応 → 「この端末ではヘルスデータを使えません」、体重が 0 件 → 「ヘルスケアに体重の記録がありません」(HealthKit は読み取りの拒否をアプリに教えないので、拒否でも 0 件表示になる)。書き込み拒否は保存後のトースト |
+| モック | `METAMON_MOCK=1` で `MockHealthData`(今日 6,240 歩・7 日の歩数と 62.4→61.8 kg の固定値)。例 `METAMON_INITIAL_EXAMPLE=health METAMON_MOCK=1` |
+| 署名 | `project.yml` の Metamon entitlements に `com.apple.developer.healthkit: true` / `com.apple.developer.healthkit.access: []`、Info.plist に `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription` / `NSMotionUsageDescription`。`xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=CHP337D75C` の自動署名で App ID に HealthKit が付くことを確認済み(2026-10-25・プロファイルに `com.apple.developer.healthkit` が入る)。付かない場合は Apple Developer > Identifiers > `jp.kz2601.metamon` > Capabilities で HealthKit にチェック → プロファイル再生成 |
+| 実機での確認 | `METAMON_INITIAL_EXAMPLE=health` か「毎日の歩数を見たい」で生成 → 初回の許可で「許可」→ 今日の歩数・7 日の棒グラフ。体重タブで記録 → 「ヘルスケアにも保存しました」→ ヘルスケアアプリの体重に入る。設定 > プライバシー > モーションとフィットネスで OFF にすると拒否表示 |
 
 ## 16. 多言語対応(ja / en・Issue #44 / #45 の iOS 側)
 
@@ -849,7 +857,20 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 2. Entitlement `pro` を作り、上の商品を Offering に紐付け。
 3. iOS は `ProEntitlementStore` を RevenueCat SDK(`Purchases.configure` + `appUserID` = Firebase uid・`customerInfo.entitlements["pro"]`)の実装に差し替える。`ProGate` / UI はそのまま使える(権利の読み口が `isPro` だけなので)。
 4. サーバー側は RevenueCat の webhook か REST API で uid の権利を確認する。
-5. Issue #77 の「有料 API を使う機能だけ ¥500 の確認カード」(DSL の `requiresPaid`)は、非消耗型の商品を追加し Offering を分けて実装する(未着手)。
+5. 有料機能の確認カード(22.7)は同じ「Tailor It Pro」の権利を見るだけなので、RevenueCat に移しても変更不要。
+
+### 22.7 有料機能の確認カード(チャットの「これでいく」・Issue #77 の残り)
+有料のクラウド機能を使うアプリを作る時、生成の**前**に「〇〇には Tailor It Pro(¥500 / 月)が必要です」→「購入して作る」/「この機能なしで作る」を選んでもらう。
+
+| 項目 | 決定 |
+|---|---|
+| 何が有料か | backend の `paid_features.json`(1 か所・docs/backend/architecture.md §6.8)。初期は「みんなで共有するデータ」(共有データ型アプリ)だけ。iOS は判定を持たず、`POST /v1/chat` の ready の `requiresPro` / `paidFeatures` / `freeTranscript`、案の `options[].requiresPro` / `freeInstruction` を見るだけ |
+| 出す時 | ready の「これでいく」(`buildFromChat`・声の自動生成も含む)と案の「これでいく」(`choose`)。判定は `MetamonServices/Purchase/PaidFeatureCheck.swift`(純粋関数) |
+| 出さない時 | **Pro 会員** / **回数制限が無効の時(DEBUG ビルドの既定 = デモ端末)**。`METAMON_IAP_ENFORCE=1` で DEBUG でも出る(`ProGate.isEnforced` と同じ扱い・22.4)/ 旧 backend(`requiresPro` 無し)/ ready の transcript 以外の予備文で作る時 |
+| カード | `ClarifyChatView` の「これでいく」の位置(`PaidFeatureCard`・create は初期画面、edit は音声シートの中)。購入して作る = `ProEntitlementStore.purchase` → 成功したら有料機能込みの文で生成(キャンセル・承認待ちはカードに残る)/ この機能なしで作る = `freeTranscript`(`freeInstruction`)で生成 / × = チャットに戻る。話し直すとカードは閉じて次の応答で判定し直す |
+| 実装 | `Features/Purchase/AppRuntime+PaidFeature.swift`(`holdForPaidConfirm` / `purchaseAndBuild` / `buildWithoutPaidFeatures` / `dismissPaidConfirm`)。モック ai は「みんなで / 共有 / 掲示板 / 投稿」を含む ready に `requiresPro` を付ける |
+| テスト | `MetamonServicesTests/PaidFeatureCheckTests.swift`(出し分け・JSON の新旧)・`MetamonTests/PaidFeatureConfirmTests.swift`(カード → なしで作る・無効化中は出ない・やめる / 話し直し・案)・UI `testPaidFeatureCardBuildWithoutFeature` |
+| 限界(後続) | サーバー強制なし(22.3 と同じ)。チャット OFF の即生成・「このまま作る」の予備文はカードを通らない |
 
 ## 23. UI テスト(XCUITest・Issue #165)
 

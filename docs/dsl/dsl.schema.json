@@ -221,6 +221,13 @@
         "computed": {
           "$ref": "#/$defs/Expr",
           "description": "Read-only calculated field (never stored, never bound to inputs). Evaluated per record: `ref` reads this record's fields (\"id\" = record id). type must be number|integer|currency|string|boolean|date. Usable in list/table/stat/chart like a stored field."
+        },
+        "health": {
+          "type": "string",
+          "enum": [
+            "weight"
+          ],
+          "description": "保存した値をヘルスケアにも書き込む(weight=体重。field は number で unit kg)。「ヘルスケアにも保存」「ヘルスケアと連携」と言われた時だけ付ける。保存のたびに 1 件書き込み、失敗してもレコードの保存は成功する。"
         }
       }
     },
@@ -608,6 +615,9 @@
         },
         {
           "$ref": "#/$defs/LocationTracker"
+        },
+        {
+          "$ref": "#/$defs/HealthStat"
         }
       ]
     },
@@ -3003,6 +3013,53 @@
       },
       "description": "「記録を開始 / 記録を停止」ボタンと記録中の状態(経過時間・距離)。開始を押した間だけ現在地を entity に 1 点ずつ保存し、アプリを閉じても停止まで続く(既定 1 時間・最長 4 時間で自動停止)。散歩・ランニング・サイクリングのルート、移動ログ、軌跡を残したいアプリで選ぶ。1 回だけ現在地を入れたいなら locationButton。",
       "x-usage": "ホーム画面(screen.entity なし)に A9:F10 で 1 つ(最下 2 行の左 A-B はマイクの席なので空ける)。同じ画面に mapView{kind:\"route\",entity,locationField,dateField}(A3:F8)と stat{aggregate:\"distance\"} / stat{aggregate:\"duration\"}(field = location field、by = datetime field、今日なら filter today)を A1:F2 に並べる。entity は point{loc: location, at: datetime(required, defaultValue now)} のように点だけを持たせ、フォーム画面は作らない。"
+    },
+    "HealthStat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "metric",
+        "label"
+      ],
+      "properties": {
+        "type": {
+          "const": "healthStat"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "metric": {
+          "type": "string",
+          "enum": [
+            "steps",
+            "weight"
+          ],
+          "description": "steps=歩数(iPhone の歩数計が自動で数えている値。記録不要)/ weight=体重(ヘルスケアの最新値 kg)。"
+        },
+        "period": {
+          "type": "string",
+          "enum": [
+            "today",
+            "week"
+          ],
+          "description": "today=今日の値(体重は最新値・既定)/ week=直近 7 日の棒グラフと 1 日平均(体重は 7 日の推移)。"
+        },
+        "label": {
+          "type": "string",
+          "description": "カードの見出し(例: 今日の歩数)。"
+        },
+        "target": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "steps の 1 日の目標(例 8000)。today は達成率のバー、week は目標線。"
+        }
+      },
+      "description": "端末のヘルスデータを表示するカード。歩数は iPhone が自動で数えている値(entity も記録も不要)、体重はヘルスケアの最新値。「毎日の歩数を見たい」「今日何歩歩いた」「1 週間の歩数」「ヘルスケアの体重を見たい」など、自分で入力しない健康データを見たい時に選ぶ。権限が無い時・シミュレータでは理由を表示する。",
+      "x-usage": "entity 不要でどの画面にも置ける。today は stat と同じ大きさ(半幅 2〜3 行・例 A1:C3)、week はグラフなので全幅 4〜5 行(例 A4:F8)。目標の話があれば target。手入力の体重記録アプリで「ヘルスケアにも保存」と言われたら、体重 field に health: \"weight\" を付ける(このカードとは別)。"
     }
   }
 }

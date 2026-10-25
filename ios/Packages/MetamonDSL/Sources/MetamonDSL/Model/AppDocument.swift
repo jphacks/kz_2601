@@ -214,10 +214,12 @@ public struct Field: Decodable, Identifiable, Sendable {
     public var refEntity: String?
     /// 読み取り専用の算出フィールド(#101)。行コンテキスト = そのレコード。**Record には保存しない**。
     public var computed: Expr?
+    /// "weight": 保存した値をヘルスケアの体重にも書き込む(#167)。
+    public var health: String?
 
     public var isComputed: Bool { computed != nil }
 
-    private enum Keys: String, CodingKey { case id, name, type, required, options, defaultValue, unit, refEntity, computed }
+    private enum Keys: String, CodingKey { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
@@ -230,6 +232,7 @@ public struct Field: Decodable, Identifiable, Sendable {
         unit = try? c.decodeIfPresent(String.self, forKey: .unit)
         refEntity = try? c.decodeIfPresent(String.self, forKey: .refEntity)
         computed = try? c.decodeIfPresent(Expr.self, forKey: .computed)
+        health = try? c.decodeIfPresent(String.self, forKey: .health)
     }
 }
 

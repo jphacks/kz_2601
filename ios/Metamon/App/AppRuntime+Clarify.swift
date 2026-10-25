@@ -79,6 +79,7 @@ extension AppRuntime {
     @discardableResult
     func say(_ text: String, source: ClarifyFlow.InputSource = .text) async -> ChatTurn? {
         cancelAutoBuild()
+        clearPaidConfirm() // 話し直したら確認カードは閉じる(新しい応答で判定し直す)
         chatLastInput = source
         withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
             chatBubbles.append(ChatBubble(role: .user, text: text))
@@ -99,6 +100,7 @@ extension AppRuntime {
         let transcript = chatTurn?.transcript?.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = (transcript?.isEmpty == false ? transcript : nil) ?? fallbackTranscript
         guard !text.isEmpty else { return }
+        if holdForPaidConfirm(PaidFeatureCheck.confirmation(for: chatTurn, text: text, isPro: proGate.isPro, enforced: proGate.isEnforced)) { return }
         print("[Metamon] chat: build mode=\(chatMode.rawValue) transcript=\(text)")
         await runFromChat(text)
     }
@@ -108,6 +110,7 @@ extension AppRuntime {
         guard morphJob == nil, !chatPending else { return }
         let text = option.instruction.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        if holdForPaidConfirm(PaidFeatureCheck.confirmation(for: option, isPro: proGate.isPro, enforced: proGate.isEnforced)) { return }
         print("[Metamon] chat: choose option=\(option.id) mode=\(chatMode.rawValue) instruction=\(text)")
         await runFromChat(text)
     }
@@ -122,15 +125,20 @@ extension AppRuntime {
     }
 
     /// 会話を閉じて生成へ。edit は音声シートを閉じてから(本体側の生成中表示に任せる)、画面マップの文脈があれば先頭に付ける。
-    private func runFromChat(_ text: String) async {
+    func runFromChat(_ text: String) async {
         let mode = chatMode
-        resetChat()
         if mode == .edit {
+            resetChat()
             showVoiceSheet = false
             let prefix = ScreenMapUI.shared.takeContext().map(ScreenMapCopy.contextPrefix) ?? ""
             await generate(prefix + text)
         } else {
+            // create は全画面の生成中表示を先に出し、対話は完成(apply が消す)か生成しなかった時に消す。
+            // 先に対話を消すと、対話画面の撤去と生成中表示の挿入が重なって GeneratingView が描画されず、
+            // 完成まで初期画面が見えていた(#200)。生成中表示が全面を覆うので下の対話は見えない
+            cancelAutoBuild()
             await generate(text)
+            if isChatting { resetChat() } // 失敗・圏外で保留・無料枠切れ
         }
     }
 
@@ -154,6 +162,7 @@ extension AppRuntime {
         chatTask = nil
         chatLastInput = nil
         chatEpoch += 1
+        clearPaidConfirm()
         let hadConversation = isChatting
         let appId = document.appId
         withAnimation(.easeInOut(duration: 0.3)) {

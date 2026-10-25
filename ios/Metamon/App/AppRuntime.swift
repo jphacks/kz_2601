@@ -130,6 +130,17 @@ final class AppRuntime: DSLRuntime {
     /// リセットのたびに進める。古い応答(待っている間に「最初から」された等)を捨てるため
     @ObservationIgnored var chatEpoch = 0
 
+    // MARK: 有料機能の確認カード(#77)。ロジックは `Features/Purchase/AppRuntime+PaidFeature.swift`
+
+    /// 「これでいく」で有料機能を含むと分かった時のカード(nil = 出していない)。チャットの「これでいく」の位置に出す
+    var paidConfirm: PaidConfirmation?
+    /// カードの購入処理中
+    var paidConfirmBusy = false
+    /// カードの下に出す一言(承認待ち・購入できなかった等)
+    var paidConfirmMessage: String?
+    /// 課金の司令塔(既定は共有の 1 つ。テストで差し替える)
+    @ObservationIgnored var proGate: ProGate = .shared
+
     let services: Services
     /// レコードのローカル DB + 未送信キュー(Issue #48)。`records` はここから読み、書きはここに即反映してから裏で送る。
     let recordSync: RecordSyncEngine
@@ -395,9 +406,9 @@ final class AppRuntime: DSLRuntime {
         }
         // 課金(#77): 新規作成(初期画面から)は 1 日の無料枠を消費する。枠切れなら上限シートを出して送らない。成功した時だけ数える
         let metered = dsl.isVoiceOnly
-        if metered, !ProGate.shared.admitNewApp() { showVoiceSheet = false; return }
+        if metered, !proGate.admitNewApp() { showVoiceSheet = false; return }
         await send(text)
-        if metered, !dsl.isVoiceOnly { ProGate.shared.recordNewApp() }
+        if metered, !dsl.isVoiceOnly { proGate.recordNewApp() }
     }
 
     /// 復帰時の自動送信(`DeferredSend` から)。保留が生きていれば生成に進む。
@@ -414,6 +425,9 @@ final class AppRuntime: DSLRuntime {
             errorCard = nil
             morphJob = MorphJob(kind: MorphJob.kind(isVoiceOnly: dsl.isVoiceOnly, transcript: text), transcript: text, startedAt: .now)
         }
+        #if DEBUG
+        if morphJob?.kind == .create { MorphProbe.createStarted += 1 }
+        #endif
         interruptedByOffline = false
         let previous = document
         let task = Task { [services, appId = document.appId, version = document.version, locale = Self.generationLocale] in
@@ -828,8 +842,11 @@ final class AppRuntime: DSLRuntime {
                 return
             }
             // 楽観的 UI: ローカル DB に即反映して画面を進める。appconfig への送信は recordSync のキューが行う
-            records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: form.recordId, data: form.payload)
+            let payload = form.payload
+            let isNew = form.recordId == nil
+            records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: form.recordId, data: payload)
             WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)
             if let screen = action.screen {
                 navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
             } else {
