@@ -5,6 +5,8 @@ import MetamonDSL
 public actor InMemoryAppConfigClient: AppConfigClient {
     private var tables: [String: [Record]]
     private let document: @Sendable () throws -> AppDocument
+    /// `listApps` が返す一覧(モックの変身一覧用。既定は空。`setApps` で差し替え)。
+    private var apps: [AppSummary] = []
 
     /// - Parameters:
     ///   - seed: entity id → 初期レコード
@@ -16,6 +18,21 @@ public actor InMemoryAppConfigClient: AppConfigClient {
 
     public func fetchDocument(appId: String) async throws -> AppDocument {
         try document()
+    }
+
+    public func listApps() async throws -> [AppSummary] { apps }
+
+    public func setApps(_ apps: [AppSummary]) { self.apps = apps }
+
+    public func deleteApp(appId: String) async throws {
+        apps.removeAll { $0.id == appId }
+    }
+
+    /// 履歴は持たない(モックの undo は `AppRuntime` のローカル履歴にフォールバックする)。
+    public func listVersions(appId: String) async throws -> [VersionSummary] { [] }
+
+    public func restore(appId: String, toVersion version: Int) async throws -> AppDocument {
+        throw APIError.server(status: 404, code: "not_found", message: "version not found (in-memory)")
     }
 
     public func list(appId: String, entity: String) async throws -> [Record] {
@@ -60,6 +77,36 @@ public enum MockSeed {
             ],
             "memo": [
                 Record(id: "1", data: ["note": "きれいな紅葉", "date": .string(iso)], createdAt: iso),
+            ],
+            // shopping(#108): 未購入 3 件 + 購入済み 1 件(一覧の丸でチェック)
+            "groceries": [
+                Record(id: "g1", data: ["name": "牛乳", "category": "食品", "qty": 1, "done": false, "added": .string(today)], createdAt: iso),
+                Record(id: "g2", data: ["name": "卵", "category": "食品", "qty": 1, "done": false, "added": .string(today)], createdAt: iso),
+                Record(id: "g3", data: ["name": "トイレットペーパー", "category": "日用品", "qty": 2, "done": false, "added": .string(today)], createdAt: iso),
+                Record(id: "g4", data: ["name": "パン", "category": "食品", "qty": 1, "done": true, "added": .string(today)], createdAt: iso),
+            ],
+            // medicine(#132/#172): 今日まで 3 日連続の 1 件・昨日飲んだ 1 件(今日は未チェック・履歴なしの旧形式)・未服用 1 件
+            "medicine": [
+                Record(id: "d1", data: ["name": "血圧の薬", "timing": "朝", "taken_on": .string(today),
+                                        DailyCheck.historyKey("taken_on"): .array((0..<3).reversed().map { .string(FieldCoding.dateFormatter.string(from: now.addingTimeInterval(-86_400 * Double($0)))) })], createdAt: iso),
+                Record(id: "d2", data: ["name": "ビタミン剤", "timing": "昼", "taken_on": .string(FieldCoding.dateFormatter.string(from: now.addingTimeInterval(-86_400)))], createdAt: iso),
+                Record(id: "d3", data: ["name": "胃薬", "timing": "夜"], createdAt: iso),
+            ],
+            // warikan(#101): 3 人・3 件。合計 ¥15,000 → 1 人 ¥5,000、精算は じろう→たろう ¥5,000 / はなこ→たろう ¥500
+            "members": [
+                Record(id: "m1", data: ["name": "たろう"], createdAt: iso),
+                Record(id: "m2", data: ["name": "はなこ"], createdAt: iso),
+                Record(id: "m3", data: ["name": "じろう"], createdAt: iso),
+            ],
+            "expenses": [
+                Record(id: "e1", data: ["title": "宿", "amount": 9000, "payer": "m1", "date": .string(today)], createdAt: iso),
+                Record(id: "e2", data: ["title": "夕食", "amount": 4500, "payer": "m2", "date": .string(today)], createdAt: iso),
+                Record(id: "e3", data: ["title": "ガソリン", "amount": 1500, "payer": "m1", "date": .string(today)], createdAt: iso),
+            ],
+            // bmi(#101): 65kg/170cm → 22.5、70kg/175cm → 22.9
+            "body": [
+                Record(id: "b1", data: ["date": .string(today), "weight": 65, "height": 170], createdAt: iso),
+                Record(id: "b2", data: ["date": .string(today), "weight": 70, "height": 175], createdAt: iso),
             ],
         ]
     }

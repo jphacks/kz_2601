@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -36,6 +37,20 @@ type Completion struct {
 	Messages  []Message       // user/assistant turns
 	Schema    json.RawMessage // output_config.format json_schema
 	MaxTokens int
+	// OnText, when set, switches the call to `stream: true` and receives each
+	// text delta as it arrives (same goroutine, in order). The returned
+	// Response is still the complete message.
+	OnText func(delta string)
+	// Structured sends Schema as output_config.format for this call even when
+	// Client.StructuredOutput is off (small schemas such as ChatSchema compile).
+	Structured bool
+	// Per-call overrides of the client defaults (the clarify turn runs on its
+	// own model/effort, see ChatConfig). Empty = Client.Model / Client.Effort.
+	Model  string
+	Effort string
+	// Thinking, when set, is sent as thinking.type (adaptive|disabled|
+	// between_tools). Empty = omitted (the model default, adaptive).
+	Thinking string
 }
 
 // Usage is the token accounting of one call.
@@ -129,7 +144,23 @@ type wireRequest struct {
 	System       []wireBlock    `json:"system,omitempty"`
 	Messages     []Message      `json:"messages"`
 	OutputConfig map[string]any `json:"output_config,omitempty"`
+	Thinking     map[string]any `json:"thinking,omitempty"`
 	Fallbacks    string         `json:"fallbacks,omitempty"`
+	Stream       bool           `json:"stream,omitempty"`
+}
+
+type wireUsage struct {
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+}
+
+func (u wireUsage) usage() Usage { return Usage(u) }
+
+type wireError struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
 }
 
 type wireResponse struct {
@@ -140,19 +171,30 @@ type wireResponse struct {
 	} `json:"content"`
 	StopReason  string       `json:"stop_reason"`
 	StopDetails *StopDetails `json:"stop_details"`
-	Usage       struct {
-		InputTokens              int `json:"input_tokens"`
-		OutputTokens             int `json:"output_tokens"`
-		CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-		CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
-	} `json:"usage"`
-	Error *struct {
-		Type    string `json:"type"`
-		Message string `json:"message"`
-	} `json:"error"`
+	Usage       wireUsage    `json:"usage"`
+	Error       *wireError   `json:"error"`
+}
+
+// wireEvent is the union of the SSE event payloads we read.
+type wireEvent struct {
+	Type    string        `json:"type"`
+	Message *wireResponse `json:"message"` // message_start
+	Index   int           `json:"index"`
+	Delta   *struct {     // content_block_delta / message_delta
+		Type        string       `json:"type"`
+		Text        string       `json:"text"`
+		StopReason  string       `json:"stop_reason"`
+		StopDetails *StopDetails `json:"stop_details"`
+	} `json:"delta"`
+	ContentBlock *struct {
+		Type string `json:"type"`
+	} `json:"content_block"`
+	Usage *wireUsage `json:"usage"` // message_delta (cumulative output_tokens)
+	Error *wireError `json:"error"` // error event
 }
 
 // Complete performs one structured-output call with retry on 429/5xx/network.
+// A streaming call is retried only while nothing has been delivered to OnText.
 func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error) {
 	if c.APIKey == "" {
 		return nil, errors.New("anthropic: ANTHROPIC_API_KEY is not set")
@@ -161,20 +203,34 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 	if maxTokens == 0 {
 		maxTokens = defaultMaxTokens
 	}
+	model, effort := c.Model, c.Effort
+	if req.Model != "" {
+		model = req.Model
+	}
+	if req.Effort != "" {
+		effort = req.Effort
+	}
 	wr := wireRequest{
-		Model:     c.Model,
+		Model:     model,
 		MaxTokens: maxTokens,
 		Messages:  req.Messages,
-		Fallbacks: "default",
+		Stream:    req.OnText != nil,
+	}
+	// Haiku has no server-side refusal fallback: the parameter is not sent.
+	if !strings.HasPrefix(model, "claude-haiku") {
+		wr.Fallbacks = "default"
+	}
+	if req.Thinking != "" {
+		wr.Thinking = map[string]any{"type": req.Thinking}
 	}
 	if req.System != "" {
 		wr.System = []wireBlock{{Type: "text", Text: req.System, CacheControl: map[string]any{"type": "ephemeral"}}}
 	}
 	oc := map[string]any{}
-	if c.Effort != "" {
-		oc["effort"] = c.Effort
+	if effort != "" {
+		oc["effort"] = effort
 	}
-	if c.StructuredOutput && len(req.Schema) > 0 {
+	if (c.StructuredOutput || req.Structured) && len(req.Schema) > 0 {
 		oc["format"] = map[string]any{"type": "json_schema", "schema": req.Schema}
 	}
 	if len(oc) > 0 {
@@ -185,6 +241,15 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 		return nil, err
 	}
 
+	delivered := false
+	onText := req.OnText
+	if onText != nil {
+		inner := onText
+		onText = func(s string) {
+			delivered = true
+			inner(s)
+		}
+	}
 	var lastErr error
 	for attempt := 0; attempt <= c.MaxRetries; attempt++ {
 		if attempt > 0 {
@@ -199,7 +264,7 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 			case <-time.After(delay):
 			}
 		}
-		resp, err := c.once(ctx, body)
+		resp, err := c.once(ctx, body, onText)
 		if err == nil {
 			return resp, nil
 		}
@@ -208,7 +273,7 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 		if errors.As(err, &ae) && !ae.Retryable() {
 			return nil, err
 		}
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || delivered {
 			return nil, err
 		}
 		log.Printf("anthropic: attempt %d failed: %v", attempt+1, redact(err))
@@ -216,7 +281,7 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 	return nil, lastErr
 }
 
-func (c *Client) once(ctx context.Context, body []byte) (*Response, error) {
+func (c *Client) once(ctx context.Context, body []byte, onText func(string)) (*Response, error) {
 	base := c.BaseURL
 	if base == "" {
 		base = defaultBaseURL
@@ -229,18 +294,18 @@ func (c *Client) once(ctx context.Context, body []byte) (*Response, error) {
 	hreq.Header.Set("x-api-key", c.APIKey)
 	hreq.Header.Set("anthropic-version", anthropicVersion)
 	hreq.Header.Set("anthropic-beta", betaHeader)
+	if onText != nil {
+		hreq.Header.Set("Accept", "text/event-stream")
+	}
 	started := time.Now()
 	hresp, err := c.HTTP.Do(hreq)
 	if err != nil {
 		return nil, &APIError{Status: 599, Type: "connection_error", Message: err.Error()}
 	}
 	defer func() { _ = hresp.Body.Close() }()
-	data, err := io.ReadAll(io.LimitReader(hresp.Body, 8<<20))
-	if err != nil {
-		return nil, &APIError{Status: 599, Type: "read_error", Message: err.Error()}
-	}
-	var wresp wireResponse
 	if hresp.StatusCode >= 300 {
+		data, _ := io.ReadAll(io.LimitReader(hresp.Body, 1<<20))
+		var wresp wireResponse
 		_ = json.Unmarshal(data, &wresp)
 		ae := &APIError{Status: hresp.StatusCode, Type: "http_error", Message: http.StatusText(hresp.StatusCode)}
 		if wresp.Error != nil {
@@ -253,6 +318,26 @@ func (c *Client) once(ctx context.Context, body []byte) (*Response, error) {
 		}
 		return nil, ae
 	}
+	var out *Response
+	if onText != nil {
+		out, err = readStream(hresp.Body, onText)
+	} else {
+		out, err = readJSON(hresp.Body)
+	}
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("anthropic: model=%s stop=%s in=%d out=%d cache_read=%d stream=%v %dms",
+		out.Model, out.StopReason, out.Usage.InputTokens, out.Usage.OutputTokens, out.Usage.CacheReadInputTokens, onText != nil, time.Since(started).Milliseconds())
+	return out, nil
+}
+
+func readJSON(r io.Reader) (*Response, error) {
+	data, err := io.ReadAll(io.LimitReader(r, 8<<20))
+	if err != nil {
+		return nil, &APIError{Status: 599, Type: "read_error", Message: err.Error()}
+	}
+	var wresp wireResponse
 	if err := json.Unmarshal(data, &wresp); err != nil {
 		return nil, &APIError{Status: 599, Type: "decode_error", Message: err.Error()}
 	}
@@ -262,16 +347,96 @@ func (c *Client) once(ctx context.Context, body []byte) (*Response, error) {
 			sb.WriteString(b.Text)
 		}
 	}
-	out := &Response{Text: sb.String(), StopReason: wresp.StopReason, StopDetails: wresp.StopDetails, Model: wresp.Model}
-	out.Usage = Usage{
-		InputTokens:              wresp.Usage.InputTokens,
-		OutputTokens:             wresp.Usage.OutputTokens,
-		CacheReadInputTokens:     wresp.Usage.CacheReadInputTokens,
-		CacheCreationInputTokens: wresp.Usage.CacheCreationInputTokens,
+	return &Response{Text: sb.String(), StopReason: wresp.StopReason, StopDetails: wresp.StopDetails, Model: wresp.Model, Usage: wresp.Usage.usage()}, nil
+}
+
+// readStream consumes the SSE stream of one message: text deltas go to
+// onText, usage comes from message_start (input) and message_delta (output),
+// an `error` event aborts with its type (overloaded_error etc. are retryable).
+func readStream(r io.Reader, onText func(string)) (*Response, error) {
+	out := &Response{}
+	var text strings.Builder
+	textBlocks := map[int]bool{}
+	sc := bufio.NewScanner(r)
+	sc.Buffer(make([]byte, 64<<10), 8<<20)
+	var dataLines []string
+	flush := func() error {
+		if len(dataLines) == 0 {
+			return nil
+		}
+		data := strings.Join(dataLines, "\n")
+		dataLines = dataLines[:0]
+		var ev wireEvent
+		if err := json.Unmarshal([]byte(data), &ev); err != nil {
+			return &APIError{Status: 599, Type: "decode_error", Message: err.Error()}
+		}
+		switch ev.Type {
+		case "message_start":
+			if ev.Message != nil {
+				out.Model = ev.Message.Model
+				out.Usage = ev.Message.Usage.usage()
+			}
+		case "content_block_start":
+			textBlocks[ev.Index] = ev.ContentBlock != nil && ev.ContentBlock.Type == "text"
+		case "content_block_delta":
+			if ev.Delta != nil && ev.Delta.Type == "text_delta" && textBlocks[ev.Index] {
+				text.WriteString(ev.Delta.Text)
+				onText(ev.Delta.Text)
+			}
+		case "message_delta":
+			if ev.Delta != nil {
+				if ev.Delta.StopReason != "" {
+					out.StopReason = ev.Delta.StopReason
+				}
+				if ev.Delta.StopDetails != nil {
+					out.StopDetails = ev.Delta.StopDetails
+				}
+			}
+			if ev.Usage != nil {
+				out.Usage.OutputTokens = ev.Usage.OutputTokens
+			}
+		case "error":
+			status := 500
+			if ev.Error != nil && ev.Error.Type == "rate_limit_error" {
+				status = 429
+			}
+			msg := ""
+			if ev.Error != nil {
+				msg = ev.Error.Message
+			}
+			return &APIError{Status: status, Type: "stream_" + errType(ev.Error), Message: msg}
+		}
+		return nil
 	}
-	log.Printf("anthropic: model=%s stop=%s in=%d out=%d cache_read=%d %dms",
-		out.Model, out.StopReason, out.Usage.InputTokens, out.Usage.OutputTokens, out.Usage.CacheReadInputTokens, time.Since(started).Milliseconds())
+	for sc.Scan() {
+		line := sc.Text()
+		switch {
+		case line == "":
+			if err := flush(); err != nil {
+				return nil, err
+			}
+		case strings.HasPrefix(line, "data:"):
+			dataLines = append(dataLines, strings.TrimPrefix(strings.TrimPrefix(line, "data:"), " "))
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return nil, &APIError{Status: 599, Type: "read_error", Message: err.Error()}
+	}
+	if err := flush(); err != nil {
+		return nil, err
+	}
+	if out.StopReason == "" {
+		return nil, &APIError{Status: 599, Type: "stream_incomplete", Message: "stream ended without message_delta"}
+	}
+	out.Text = text.String()
 	return out, nil
+}
+
+func errType(e *wireError) string {
+	if e == nil || e.Type == "" {
+		return "error"
+	}
+	return e.Type
 }
 
 // redact keeps error logs free of anything that could echo request content.

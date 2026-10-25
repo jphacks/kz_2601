@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/santhosh-tekuri/jsonschema/v6/kind"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
@@ -108,13 +110,80 @@ func flatten(ve *jsonschema.ValidationError) []string {
 			out = append(out, loc+": "+v.ErrorKind.LocalizedString(errPrinter))
 			return
 		}
-		for _, c := range v.Causes {
+		causes := v.Causes
+		if _, ok := v.ErrorKind.(*kind.AnyOf); ok {
+			causes = deepestCauses(matchingTypeCauses(v.InstanceLocation, causes))
+		}
+		for _, c := range causes {
 			walk(c)
 		}
 	}
 	walk(ve)
 	if len(out) > 20 {
 		out = append(out[:20], fmt.Sprintf("...and %d more", len(out)-20))
+	}
+	return out
+}
+
+// matchingTypeCauses drops anyOf branches that failed on the node's own
+// `type` (a component def whose const did not match), so a stat with a bad
+// value reports the value, not 50 "type must be text/button/..." lines.
+// If every branch failed on type (unknown type), all are kept.
+func matchingTypeCauses(loc []string, causes []*jsonschema.ValidationError) []*jsonschema.ValidationError {
+	typeLoc := strings.Join(append(append([]string{}, loc...), "type"), "/")
+	var failsOnType func(v *jsonschema.ValidationError) bool
+	failsOnType = func(v *jsonschema.ValidationError) bool {
+		if len(v.Causes) == 0 {
+			return strings.Join(v.InstanceLocation, "/") == typeLoc
+		}
+		if _, ok := v.ErrorKind.(*kind.AnyOf); ok { // nested union: fails on type only if every branch does
+			for _, c := range v.Causes {
+				if !failsOnType(c) {
+					return false
+				}
+			}
+			return true
+		}
+		for _, c := range v.Causes {
+			if failsOnType(c) {
+				return true
+			}
+		}
+		return false
+	}
+	var out []*jsonschema.ValidationError
+	for _, c := range causes {
+		if !failsOnType(c) {
+			out = append(out, c)
+		}
+	}
+	if len(out) == 0 {
+		return causes
+	}
+	return out
+}
+
+// deepestCauses keeps the anyOf branches whose errors reach deepest into the
+// instance: for {"op":"median"} that is ".../op: value must be one of ..."
+// instead of one line per Expr shape that did not match ("best match").
+func deepestCauses(causes []*jsonschema.ValidationError) []*jsonschema.ValidationError {
+	var depth func(v *jsonschema.ValidationError) int
+	depth = func(v *jsonschema.ValidationError) int {
+		d := len(v.InstanceLocation)
+		for _, c := range v.Causes {
+			d = max(d, depth(c))
+		}
+		return d
+	}
+	best := -1
+	var out []*jsonschema.ValidationError
+	for _, c := range causes {
+		switch d := depth(c); {
+		case d > best:
+			best, out = d, []*jsonschema.ValidationError{c}
+		case d == best:
+			out = append(out, c)
+		}
 	}
 	return out
 }
@@ -157,6 +226,11 @@ func (a *App) Validate() error {
 		if len(e.Fields) > MaxFieldsPerEntity {
 			add("entity %q has too many fields", e.ID)
 		}
+		switch e.Scope {
+		case "", ScopePrivate, ScopeShared, ScopePublic:
+		default:
+			add("entity %q scope %q must be private, shared or public", e.ID, e.Scope)
+		}
 		seen := map[string]bool{}
 		for j, f := range e.Fields {
 			if !idRe.MatchString(f.ID) {
@@ -166,17 +240,22 @@ func (a *App) Validate() error {
 				add("entity %q duplicate field id %q", e.ID, f.ID)
 			}
 			seen[f.ID] = true
+			if e.IsShared() && slices.Contains(ReservedRecordFields, f.ID) {
+				add("entity %q field %q is reserved on %s entities (appconfig sets it from the signed-in user)", e.ID, f.ID, e.EffectiveScope())
+			}
 			if f.Type == FieldEnum && len(f.Options) == 0 {
 				add("entity %q field %q: enum needs options", e.ID, f.ID)
 			}
-			if f.Type != FieldEnum && len(f.Options) > 0 {
-				add("entity %q field %q: options only allowed for enum", e.ID, f.ID)
+			// ref: options = initial records of refEntity (their title values, #194)
+			if f.Type != FieldEnum && f.Type != FieldRef && len(f.Options) > 0 {
+				add("entity %q field %q: options only allowed for enum and ref", e.ID, f.ID)
 			}
 		}
 		if e.TitleField != "" && !seen[e.TitleField] {
 			add("entity %q titleField %q does not exist", e.ID, e.TitleField)
 		}
 	}
+	checkComputedFields(a.Entities, entities, DailyToggleFields(a), add)
 
 	notifIDs := map[string]bool{}
 	for i := range a.App.Notifications {
@@ -199,16 +278,16 @@ func (a *App) Validate() error {
 		screens[s.ID] = true
 	}
 	if !screens[a.InitialScreen] {
-		add("initialScreen %q does not exist", a.InitialScreen)
+		add("initialScreen %q does not exist; set it to one of the screen ids (%s)", a.InitialScreen, screenIDs(a))
 	}
 	if n := len(a.App.Tabs); n > 0 {
 		if n < 2 || n > MaxTabs {
-			add("app.tabs must have 2-%d tabs (got %d); omit tabs for a single-stack app", MaxTabs, n)
+			add("app.tabs must have 2-%d tabs (got %d): add another tab whose screen is a different top-level screen, merge screens to keep at most %d, or remove app.tabs entirely for a single-stack app", MaxTabs, n, MaxTabs)
 		}
 		seen := map[string]bool{}
 		for i, t := range a.App.Tabs {
 			if !screens[t.Screen] {
-				add("app.tabs[%d]: screen %q does not exist", i, t.Screen)
+				add("app.tabs[%d]: screen %q does not exist; point the tab at one of the screen ids (%s) or add that screen to screens", i, t.Screen, screenIDs(a))
 			}
 			if seen[t.Screen] {
 				add("app.tabs[%d]: screen %q is used by another tab", i, t.Screen)
@@ -227,14 +306,14 @@ func (a *App) Validate() error {
 		switch act.Type {
 		case ActionNavigate:
 			if !screens[act.Screen] {
-				add("%s: navigate target screen %q does not exist", where, act.Screen)
+				add("%s: navigate target screen %q does not exist; use one of the screen ids (%s) or add that screen to screens", where, act.Screen, screenIDs(a))
 			}
 		case ActionSaveRecord, ActionDeleteRecord:
 			if entities[act.Entity] == nil {
 				add("%s: %s entity %q does not exist", where, act.Type, act.Entity)
 			}
 			if act.Screen != "" && !screens[act.Screen] {
-				add("%s: then-screen %q does not exist", where, act.Screen)
+				add("%s: saveRecord then-screen %q does not exist; use one of the screen ids (%s) or omit screen to close the form after saving", where, act.Screen, screenIDs(a))
 			}
 		case ActionOpenURL:
 			if act.URL == "" {
@@ -301,6 +380,10 @@ func (a *App) Validate() error {
 			if len(c.Children) > 0 {
 				add("%s: %s cannot have children", where, c.Type)
 			}
+			if c.Filter != nil {
+				checkComponentFilterValue(where, c.Filter, entities, add)
+				checkComponentPeriodFilter(where, c, entities, add)
+			}
 			switch c.Type {
 			case CompText:
 				if c.Text == "" {
@@ -311,15 +394,24 @@ func (a *App) Validate() error {
 					add("%s: button needs label and action", where)
 				}
 				checkAction(where, c.Action)
-			case CompTextField, CompNumberField, CompDatePicker, CompPicker, CompToggle, CompPhotoField, CompImage:
+			case CompTextField, CompNumberField, CompDatePicker, CompPicker, CompToggle, CompPhotoField, CompImage, CompVideoField, CompVideoPlayer:
 				if formEntity == nil {
 					add("%s: %s requires screen.entity", where, c.Type)
 				} else if f := formEntity.FieldByID(c.Field); f == nil {
 					add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
-				} else if c.Type == CompPicker && f.Type != FieldEnum {
-					add("%s: picker field %q must be enum", where, c.Field)
+				} else if f.Computed != nil && c.Type != CompImage && c.Type != CompVideoPlayer {
+					add("%s: field %q is computed (read-only); inputs cannot bind to it. Bind a stored field or show it with list/table/stat", where, c.Field)
+				} else if c.Type == CompPicker && f.Type != FieldEnum && f.Type != FieldRef {
+					add("%s: picker field %q must be enum or ref", where, c.Field)
+				} else if c.Type != CompPicker && f.Type == FieldRef {
+					add("%s: field %q is type ref; use a picker to choose the %s record", where, c.Field, f.RefEntity)
 				} else if (c.Type == CompPhotoField || c.Type == CompImage) && f.Type != FieldPhoto {
 					add("%s: %s field %q must be type photo", where, c.Type, c.Field)
+				} else if (c.Type == CompVideoField || c.Type == CompVideoPlayer) && f.Type != FieldVideo {
+					add("%s: %s field %q must be type video", where, c.Type, c.Field)
+				}
+				if c.Type == CompVideoField && (c.MaxDuration < 0 || c.MaxDuration > 600) {
+					add("%s: videoField maxDuration must be 1..600 seconds", where)
 				}
 			case CompSlider, CompStepper, CompRating, CompTextEditor, CompSecureField, CompTimePicker, CompColorPicker:
 				checkInputBinding(where, c, formEntity, add)
@@ -338,6 +430,7 @@ func (a *App) Validate() error {
 						add("%s: list item field %q not in entity %q", where, fid, e.ID)
 					}
 				}
+				checkListToggle(where, c.Item, e, add)
 				if c.Sort != nil && e.FieldByID(c.Sort.Field) == nil {
 					add("%s: sort field %q not in entity %q", where, c.Sort.Field, e.ID)
 				}
@@ -348,7 +441,11 @@ func (a *App) Validate() error {
 				if c.SearchField != "" && !searchKeys[c.SearchField] {
 					add("%s: searchField %q has no matching searchBar (field) on screen %q", where, c.SearchField, s.ID)
 				}
-			case CompStat, CompChart:
+			case CompStat:
+				checkStat(where, c, entities, add)
+			case CompSettlement:
+				checkSettlement(where, c, entities, add)
+			case CompChart:
 				e := entities[c.Entity]
 				if e == nil {
 					add("%s: %s entity %q does not exist", where, c.Type, c.Entity)
@@ -357,7 +454,7 @@ func (a *App) Validate() error {
 				if c.Aggregate != "count" && e.FieldByID(c.Field) == nil {
 					add("%s: %s field %q not in entity %q (required unless aggregate=count)", where, c.Type, c.Field, e.ID)
 				}
-				if c.Type == CompChart && e.FieldByID(c.GroupBy) == nil {
+				if e.FieldByID(c.GroupBy) == nil {
 					add("%s: chart groupBy %q not in entity %q", where, c.GroupBy, e.ID)
 				}
 				if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
@@ -384,6 +481,9 @@ func (a *App) Validate() error {
 				if c.Text == "" {
 					add("%s: shareButton needs text", where)
 				}
+				if !ShareTargets[c.ShareTo] {
+					add("%s: shareButton shareTo %q must be one of any|line|slack|discord", where, c.ShareTo)
+				}
 				if c.Field != "" {
 					if formEntity == nil {
 						add("%s: shareButton.field requires screen.entity", where)
@@ -394,6 +494,12 @@ func (a *App) Validate() error {
 			case CompOpenURLButton:
 				if c.Label == "" || c.URL == "" {
 					add("%s: openUrlButton needs label and url", where)
+				} else if !isOpenableURL(c.URL) {
+					add("%s: openUrlButton url %q must be https or one of the schemes %s", where, c.URL, strings.Join(OpenURLSchemes, ", "))
+				}
+			case CompWebView:
+				if !strings.HasPrefix(c.URL, "https://") {
+					add("%s: webView url %q must be an https URL", where, c.URL)
 				}
 			case CompMapView:
 				e := entities[c.Entity]
@@ -409,12 +515,15 @@ func (a *App) Validate() error {
 				if c.TitleField != "" && e.FieldByID(c.TitleField) == nil {
 					add("%s: mapView titleField %q not in entity %q", where, c.TitleField, e.ID)
 				}
+				checkMapRoute(where, c, e, add)
 				checkAction(where+".onItemTap", c.OnItemTap)
 			case CompLocationButton, CompQrScanner:
 				if formEntity == nil {
 					add("%s: %s requires screen.entity", where, c.Type)
 				} else if f := formEntity.FieldByID(c.Field); f == nil {
 					add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
+				} else if f.Computed != nil {
+					add("%s: field %q is computed (read-only); inputs cannot bind to it", where, c.Field)
 				} else if c.Type == CompLocationButton && f.Type != FieldLocation {
 					add("%s: locationButton field %q must be type location", where, c.Field)
 				} else if c.Type == CompQrScanner && f.Type != FieldString && f.Type != FieldText {
@@ -435,8 +544,8 @@ func (a *App) Validate() error {
 						add("%s: timerDisplay.field requires screen.entity", where)
 					} else if f := formEntity.FieldByID(c.Field); f == nil {
 						add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
-					} else if f.Type != FieldInteger && f.Type != FieldNumber {
-						add("%s: timerDisplay field %q must be integer or number", where, c.Field)
+					} else if (f.Type != FieldInteger && f.Type != FieldNumber) || f.Computed != nil {
+						add("%s: timerDisplay field %q must be integer or number (stored, not computed)", where, c.Field)
 					}
 				}
 			case CompLabel:
@@ -486,6 +595,19 @@ func (a *App) Validate() error {
 			case CompEmptyState:
 				if c.Title == "" {
 					add("%s: emptyState needs title", where)
+				}
+			case CompAiButton:
+				checkAIButton(where, c, formEntity, entities, add)
+			case CompLocationTracker:
+				checkLocationTracker(where, c, entities, add)
+			case CompHealthStat:
+				checkHealthStat(where, c, add)
+			case CompNearbyShare:
+				if c.Label == "" {
+					add("%s: nearbyShare needs label", where)
+				}
+				if entities[c.Entity] == nil {
+					add("%s: nearbyShare entity %q does not exist", where, c.Entity)
 				}
 			default:
 				add("%s: unknown component type %q", where, c.Type)
@@ -566,6 +688,31 @@ func isHTTPURL(s string) bool {
 	return strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://")
 }
 
+// ShareTargets are the shareButton.shareTo presets ("" = any, the OS share sheet).
+var ShareTargets = map[string]bool{"": true, "any": true, "line": true, "slack": true, "discord": true}
+
+// OpenURLSchemes is the allowlist of non-https schemes an openUrlButton may
+// launch (other apps / system handlers). Keep in sync with the iOS
+// ExternalURLPolicy and Info.plist LSApplicationQueriesSchemes.
+var OpenURLSchemes = []string{"line", "slack", "discord", "tel", "mailto", "maps", "comgooglemaps"}
+
+// isOpenableURL accepts https URLs and allowlisted custom-scheme URLs.
+func isOpenableURL(s string) bool {
+	if strings.HasPrefix(s, "https://") {
+		return true
+	}
+	scheme, rest, ok := strings.Cut(s, ":")
+	if !ok || rest == "" {
+		return false
+	}
+	for _, allowed := range OpenURLSchemes {
+		if strings.EqualFold(scheme, allowed) {
+			return true
+		}
+	}
+	return false
+}
+
 // checkAggregateRef validates the entity/aggregate/field/filter trio shared by
 // the display components that reuse the stat aggregation path. ok=false when
 // the entity is missing (callers skip further checks).
@@ -586,9 +733,14 @@ func checkAggregateRef(where string, c *Component, entities map[string]*Entity, 
 }
 
 func checkProgressBar(where string, c *Component, entities map[string]*Entity, add func(string, ...any)) {
+	if c.Tone != "" && c.Tone != "positive" && c.Tone != "negative" {
+		add("%s: progressBar tone %q must be positive (goal) or negative (budget)", where, c.Tone)
+	}
 	if c.Value != nil {
-		if *c.Value < 0 || *c.Value > 1 {
-			add("%s: progressBar value %v must be within 0..1", where, *c.Value)
+		if v, ok := c.Value.Number(); !ok {
+			add("%s: progressBar value must be a number literal 0..1 (expressions are only for stat.value)", where)
+		} else if v < 0 || v > 1 {
+			add("%s: progressBar value %v must be within 0..1", where, v)
 		}
 		if c.Entity != "" {
 			add("%s: progressBar takes either value or entity, not both", where)
@@ -619,6 +771,9 @@ func checkGauge(where string, c *Component, entities map[string]*Entity, add fun
 		add("%s: gauge max %v must be greater than min %v", where, hi, lo)
 	}
 	if c.Value != nil {
+		if _, ok := c.Value.Number(); !ok {
+			add("%s: gauge value must be a number literal (expressions are only for stat.value)", where)
+		}
 		if c.Entity != "" {
 			add("%s: gauge takes either value or entity, not both", where)
 		}
@@ -703,6 +858,9 @@ func checkInputBinding(where string, c *Component, formEntity *Entity, add func(
 	if f == nil {
 		add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
 		return
+	}
+	if f.Computed != nil {
+		add("%s: field %q is computed (read-only); inputs cannot bind to it", where, c.Field)
 	}
 	allowed := inputFieldTypes[c.Type]
 	ok := false

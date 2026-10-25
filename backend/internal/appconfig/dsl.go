@@ -31,6 +31,13 @@ type versionSummary struct {
 	CreatedAt     time.Time     `json:"createdAt"`
 }
 
+// restoreResponse is VersionSummary plus the restored DSL (DSLEnvelope shape),
+// so clients get the new document without a follow-up GET /dsl.
+type restoreResponse struct {
+	versionSummary
+	DSL json.RawMessage `json:"dsl"`
+}
+
 func toSummary(v *store.Version) versionSummary {
 	return versionSummary{AppID: v.AppID, Version: v.Version, ParentVersion: v.ParentVersion, Source: v.Source, Patch: v.Patch, CreatedAt: v.CreatedAt}
 }
@@ -103,13 +110,16 @@ func (h *Handler) putDSL(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	raw := compact(body.DSL)
 	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
-		BaseVersion: base, DSL: compact(body.DSL), Name: app.App.Name, Source: normalizeSource(body.Source, "full"),
+		BaseVersion: base, DSL: raw, Name: app.App.Name, Source: normalizeSource(body.Source, "full"),
 	})
 	if err != nil {
 		fail(w, mapStoreErr(err, "app"))
 		return
 	}
+	h.claim(r, id)
+	h.publish(r, id, app, raw, v.Version)
 	w.Header().Set("ETag", etag(v.Version))
 	httpx.WriteJSON(w, http.StatusCreated, toSummary(v))
 }
@@ -163,6 +173,8 @@ func (h *Handler) patchDSL(w http.ResponseWriter, r *http.Request) {
 		fail(w, mapStoreErr(err, "app"))
 		return
 	}
+	h.claim(r, id)
+	h.publish(r, id, app, next, v.Version)
 	w.Header().Set("ETag", etag(v.Version))
 	httpx.WriteJSON(w, http.StatusCreated, dslEnvelope{AppID: id, Version: v.Version, DSL: v.DSL, Source: v.Source, CreatedAt: &v.CreatedAt})
 }
@@ -262,8 +274,10 @@ func (h *Handler) restoreVersion(w http.ResponseWriter, r *http.Request) {
 		fail(w, mapStoreErr(err, "app"))
 		return
 	}
+	h.claim(r, id)
+	h.publish(r, id, app, target.DSL, v.Version)
 	w.Header().Set("ETag", etag(v.Version))
-	httpx.WriteJSON(w, http.StatusCreated, toSummary(v))
+	httpx.WriteJSON(w, http.StatusCreated, restoreResponse{versionSummary: toSummary(v), DSL: v.DSL})
 }
 
 func (h *Handler) listEntities(w http.ResponseWriter, r *http.Request) {

@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-24",
+  "model": "claude-haiku-5-5",
+  "effort": "low",
+  "tag": "spot",
+  "cases": [
+    {
+      "id": "kakeibo_short",
+      "group": "ja",
+      "locale": "ja",
+      "ok": true,
+      "steps": [
+        {
+          "say": "家計簿",
+          "ok": true,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "レシートの写真も残しますか？",
+          "suggestions": [
+            "はい、写真も残す",
+            "いいえ、金額だけでいい",
+            "あとで決める"
+          ],
+          "claudeMs": 2182,
+          "totalMs": 2182,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 82,
+            "outputTokens": 188,
+            "cacheCreationInputTokens": 1368
+          }
+        }
+      ]
+    },
+    {
+      "id": "training_en_full",
+      "group": "en",
+      "locale": "en",
+      "ok": false,
+      "steps": [
+        {
+          "say": "A workout log for pushups and squats, remind me at 8 in the morning",
+          "ok": false,
+          "kind": "question",
+          "source": "claude",
+          "turn": 1,
+          "text": "Should I log reps and sets for each exercise?",
+          "suggestions": [
+            "Yes, reps and sets",
+            "Just reps",
+            "Just count the day"
+          ],
+          "claudeMs": 2772,
+          "totalMs": 2772,
+          "attempts": 1,
+          "usage": {
+            "inputTokens": 108,
+            "outputTokens": 204,
+            "cacheReadInputTokens": 1368
+          },
+          "misses": [
+            "kind=question (want ready)"
+          ]
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "cases": 2,
+    "casesOk": 1,
+    "steps": 2,
+    "stepsOk": 1,
+    "claudeCalls": 2,
+    "claudeP50Ms": 2772,
+    "claudeP95Ms": 2772,
+    "totalP50Ms": 2772
+  }
+}

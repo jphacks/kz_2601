@@ -20,6 +20,9 @@ tags:
   - { name: versions }
   - { name: entities }
   - { name: records }
+  - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。architecture.md §3.2' }
+  - { name: account, description: 'アカウント削除(#119)。architecture.md §4.1' }
+  - { name: release, description: 'リリース申請(#76)。architecture.md §3.3' }
 
 paths:
   /apps:
@@ -86,11 +89,47 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
       tags: [apps]
-      summary: アーカイブ (論理削除)
+      summary: アプリ削除 (物理削除・#180)
+      description: |
+        Firestore から**物理削除**する(元に戻せない)。消すのは**呼び出したユーザーが持ち主のもの**だけ:
+        - `users/{uid}/apps/{appId}` とその配下(`versions/*`・`entities/*/records/*`)
+        - 自分が発行したこのアプリのシェアリンク `shares/*`(`ownerUid == uid && appId`)
+        - 自分の「探す」掲載 `public_apps/{appId}` と配下の `installs/*`
+        - 自分の共有ミラー `apps_public/{appId}` と配下の共有レコード `entities/*/records/*`
+        Firestore は親を消してもサブコレクションが残るので、配下を辿って BulkWriter で消す。自分の木は最後に消す(途中で失敗しても再実行できる)。
+        **残すもの**: 他人が「探す」/シェアからインストール済みのコピー(別 appId・その人の木)、同じ appId に参加しているメンバー自身のコピー、
+        他人が持ち主の掲載/ミラー/シェア、`app_owners/{appId}`(作成者の記録。appId の乗っ取り防止のため残す)、リリース申請。
+        参加メンバーが消した場合は自分のコピーだけが消え、持ち主の掲載・シェア・共有レコードは残る。
+        他人のアプリは自分の木に無いので 404。消した後にもう一度呼ぶと 404。
       responses:
-        '204': { description: Archived }
+        '204': { description: Deleted }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /apps/{appId}/events:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [dsl]
+      summary: 変化通知(Server-Sent Events・ホットリロード用・#82)
+      description: |
+        「何が変わったか」だけを流す。本体は `GET /dsl` / `GET /records` で取り直す(読み取り権限は既存 API と同じ)。
+        backend は Firestore の snapshot listener(`users/{uid}/apps/{appId}` と、現行 DSL の各 entity の records
+        コレクション。public/shared entity は `apps_public/{appId}/...`)を持つ。records は `updatedAt` 降順 100 件の窓。
+        未知 appId は `GET /dsl` と同じく seed する。
+
+        ```
+        retry: 2000
+        event: hello    data: {"version":7,"entities":["post"]}
+        event: records  data: {"entity":"post"}
+        event: dsl      data: {"version":8}      # 直後に bye(entity 構成が変わり得るので張り直させる)
+        event: bye      data: {}                 # 予定終了(既定 50 秒・EVENTS_MAX_STREAM)。即再接続してよい
+        : ping                                   # 15 秒ごとの心拍
+        ```
+        `bye` 無しで切れたらリスナー障害。クライアントはポーリングに落としつつ指数バックオフで再接続する。
+      responses:
+        '200':
+          description: SSE ストリーム
+          content: { text/event-stream: { schema: { type: string } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
   /apps/{appId}/dsl:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
     get:
@@ -98,7 +137,11 @@ paths:
       summary: 現在の DSL (iOS ホットリロード用)
       description: |
         `If-None-Match: "<version>"` が現行と一致すれば 304。ETag は `"<currentVersion>"` (例 `"7"`)。
-        iOS は 2 秒ポーリングか Firestore リスナーで version 変化を検知してから取得する。
+        iOS は `GET /apps/{appId}/events`(SSE)で version 変化を知ってから取得する(フォールバックはポーリング)。
+
+        **共有アプリのインストール (#47)**: 自分の `users/{uid}/apps/{appId}` が無い appId で呼ぶと、他ユーザーが
+        `apps_public/{appId}` に公開した DSL (public/shared entity を含むアプリを PUT/PATCH した時に自動複製) があればそれを、
+        無ければ初期 DSL を version 1 として自分の下に作って返す。以後の編集は自分のコピーに対して行われる。
       parameters:
         - in: header
           name: If-None-Match
@@ -219,11 +262,15 @@ paths:
     post:
       tags: [versions]
       summary: ロールバック (該当バージョンの内容で新バージョンを作る・履歴は消さない)
+      description: |
+        応答は VersionSummary に復元後の `dsl` を足したもの(= DSLEnvelope と同じ形で読める)。
+        `source.kind=restore` / `source.restoredFrom` に元バージョンが入る。
+        クライアントは続けて `GET /dsl` を叩かずにこの本文をそのまま現行 DSL として使ってよい(#67)。
       responses:
         '201':
           description: Created
           headers: { ETag: { $ref: '#/components/headers/ETag' } }
-          content: { application/json: { schema: { $ref: '#/components/schemas/VersionSummary' } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RestoreResult' } } }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /apps/{appId}/entities:
@@ -273,6 +320,8 @@ paths:
       description: |
         既定は `createdAt desc`。`sort`/`filter` は DSL の List と同じ語彙。
         複合インデックスが無い組み合わせはサーバー側メモリソート (1 entity 上限 2000 件、超過は 413)。
+        public/shared entity は全ユーザーの投稿が返り、各レコードに `author`/`authorName` が付く。
+        `filterField=author&filterOp=eq&filterValue=<uid>` で特定ユーザー (自分) の投稿だけに絞れる。
       parameters:
         - { $ref: '#/components/parameters/PageSize' }
         - { $ref: '#/components/parameters/PageToken' }
@@ -296,7 +345,10 @@ paths:
     post:
       tags: [records]
       summary: レコード作成
-      description: '`data` は現行 DSL のフィールド定義で型検証・正規化。未知キーは 400。`required` 欠落は 422。'
+      description: |
+        `data` は現行 DSL のフィールド定義で型検証・正規化。未知キーは 400。`required` 欠落は 422。
+        entity.scope が public/shared なら誰でも作成でき、レスポンスの `author`(uid) と `authorName` はサーバーが付ける
+        (`data` に author/authorName は入れられない。冪等 id は uid+clientId から導出するので他人の clientId と衝突しない)。
       requestBody:
         required: true
         content:
@@ -307,6 +359,7 @@ paths:
               properties:
                 data: { $ref: '#/components/schemas/RecordData' }
                 clientId: { type: string, description: 冪等キー (同じ clientId の再送は既存を返す) }
+                authorName: { type: string, maxLength: 64, description: '投稿者の表示名 (public/shared entity のみ使われる。省略時 "匿名")' }
       responses:
         '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Record' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -315,6 +368,7 @@ paths:
     delete:
       tags: [records]
       summary: エンティティの全レコード削除 (デモリセット用・`?confirm=true` 必須)
+      description: public/shared entity では**自分が投稿したレコードだけ**削除する (他人の投稿は残る)。
       parameters: [{ in: query, name: confirm, required: true, schema: { type: boolean } }]
       responses:
         '204': { description: Deleted }
@@ -333,6 +387,7 @@ paths:
     patch:
       tags: [records]
       summary: レコード部分更新 (data のキー単位でマージ)
+      description: public/shared entity では `author == 自分` のレコードだけ更新できる (他人のは 403)。
       requestBody:
         required: true
         content:
@@ -343,19 +398,208 @@ paths:
               properties: { data: { $ref: '#/components/schemas/RecordData' } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Record' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/InvalidRecord' }
     delete:
       tags: [records]
       summary: レコード削除
+      description: public/shared entity では `author == 自分` のレコードだけ削除できる (他人のは 403)。
       responses:
         '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
-  /healthz:
+  /apps/{appId}/share:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    post:
+      tags: [sharing]
+      summary: シェアリンクを発行
+      description: |
+        自分のアプリ(`users/{uid}/apps/{appId}`)の**現行 DSL のスナップショット**を `shares/{token}` に保存し、推測不能なトークン(192 bit)を返す。
+        レコードは含まない。他人のアプリは自分の木に無いので 404。
+        publish と違い作成者に限らない(トークンは発行ごとに別でグローバルに占有するものが無く、共有アプリの参加者が友だちを招くため・#118)。
+        中身が初期 DSL のまま(生成前・GET /dsl で seed されただけ)のアプリは 400。
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Share' } } } }
+        '400': { description: 中身が初期 DSL のまま, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /shares/{token}:
+    parameters: [{ $ref: '#/components/parameters/ShareToken' }]
+    get:
+      tags: [sharing]
+      summary: シェアのプレビュー(import 前の確認用)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  name: { type: string }
+                  description: { type: string }
+                  dslVersion: { type: integer }
+                  components: { type: array, items: { type: string } }
+                  sharedData: { type: boolean, description: 'shared/public entity を含む(import すると元アプリの共有データに参加する)' }
+                  mine: { type: boolean }
+        '404': { description: 取り消し済み or 存在しない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    delete:
+      tags: [sharing]
+      summary: シェアリンクを取り消す(発行者のみ・冪等)
+      responses:
+        '204': { description: Revoked }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /shares/{token}/import:
+    parameters: [{ $ref: '#/components/parameters/ShareToken' }]
+    post:
+      tags: [sharing]
+      summary: シェアされたアプリを自分のアプリとして追加
+      description: |
+        認証済みなら誰でも可。スナップショットの DSL を自分の木に複製する(version 1 = 初期 → version 2 = 複製 DSL、`source.kind=import`)。**レコードは複製しない**。
+        - private entity だけのアプリ: **新しい appId**(UUID)に複製
+        - shared/public entity を含むアプリ: **元の appId のまま**参加(`joined: true`)。共有レコードは appId 単位(`apps_public/{appId}`・#93)なので、受け取った人も同じ投稿を見る。既に持っていれば何もせず返す(`created: false`)
+      responses:
+        '201': { description: Imported, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
+        '404': { description: 取り消し済み or 存在しない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /apps/{appId}/publish:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    post:
+      tags: [sharing]
+      summary: 「探す」に公開(作成 or 更新)
+      description: |
+        自分のアプリの現行 DSL を `public_apps/{appId}` に掲載する。再実行で DSL・説明を更新(installs は保持)。
+        **その appId の作成者だけ**が掲載できる(#153)。作成者 = その appId に最初に実コミット(生成 / PUT・PATCH /dsl / restore / 新規 appId への複製)した uid で、`app_owners/{appId}` に記録する。
+        GET /dsl で他人の appId を開いた(seed・共有アプリへの参加)だけ、または参加後に自分の木で編集しただけの人は 403。
+        記録の無い既存アプリは「探す」の掲載者 → `apps_public` の持ち主の順で作成者とみなし、どちらも無ければ最初に publish した人を作成者として記録する。
+        中身が初期 DSL のまま(components / entities が空)のアプリは 400。
+        name / description は省略時 DSL の `app.name` / `app.description`、authorName は省略時 "匿名"。
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 60 }
+                description: { type: string, maxLength: 300 }
+                tags: { type: array, maxItems: 8, items: { type: string, maxLength: 20 }, description: '先頭の # は除去' }
+                authorName: { type: string, maxLength: 64 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PublicApp' } } } }
+        '400': { description: 入力不備 / 中身が初期 DSL のまま, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { description: その appId の作成者ではない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [sharing]
+      summary: 非公開にする(掲載者のみ)
+      description: 通報/モデレーションは未実装。不適切な掲載はこの API で掲載者が取り下げる(運営側の強制削除は後続)。
+      responses:
+        '204': { description: Unpublished }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /public-apps:
+    get:
+      tags: [sharing]
+      summary: 公開アプリを検索
+      description: 名前・説明・タグ・作者名の部分一致(大文字小文字無視)。件数が少ない前提で最大 500 件をメモリ内で絞り込む(全文検索はしない)。
+      parameters:
+        - { in: query, name: q, schema: { type: string } }
+        - { in: query, name: sort, schema: { type: string, enum: [popular, new], default: popular }, description: 'popular = installs 降順 → 更新日時降順 / new = 更新日時降順' }
+        - { $ref: '#/components/parameters/PageSize' }
+        - { $ref: '#/components/parameters/PageToken' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/PublicApp' } }
+                  nextPageToken: { type: string }
+        '400': { description: sort が不正, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /public-apps/{id}/install:
+    parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+    post:
+      tags: [sharing]
+      summary: 公開アプリをインストール
+      description: |
+        import と同じ複製(レコード無し・共有データ付きは元 appId に参加)。
+        同じユーザーの 2 回目以降は新しく複製せず、最初に追加したアプリを返す(`created: false`・アーカイブ済みなら active に戻す)。
+        installs は uid ごとに 1 回だけ +1(掲載者本人は数えない・`public_apps/{id}/installs/{uid}` に記録・#154)。
+      responses:
+        '201': { description: Installed, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /me:
+    delete:
+      tags: [account]
+      summary: アカウント削除(論理削除・#119)
+      description: |
+        App Store 審査ガイドライン 5.1.1(v) 対応。**論理削除**(データは物理的には消さない):
+        - `users/{uid}` に `status: "deleted"`・`deletedAt` を付ける(再実行でも最初の `deletedAt` を保つ)
+        - 自分のアプリ(`users/{uid}/apps/*`)をすべて `status: "archived"` に(`DELETE /apps/{appId}` と同じ扱い)
+        - 自分のシェアリンク(`shares/*`)を取り消し(`revoked: true` → 受け取り側は 404)
+        - 自分の「探す」の掲載(`public_apps/*`)を取り下げ
+        - 共有データ(`apps_public/*` 配下)の自分の投稿は**残す**。Firebase Auth のユーザーも**削除しない**
+          (iOS が 204 の後にクライアント SDK で Firebase のユーザーを削除するので、同じ Apple ID で再サインインすると新しい uid になる)
+        以後この uid の認証済みリクエストは **410 `account_deleted`**(この `DELETE /me` だけは何度でも 204)。
+        冪等: 削除済みの印を最初に書くので、途中で失敗しても再実行で残りが終わる。
+        Sign in with Apple のトークン取り消しは iOS が Firebase(`Auth.revokeToken(withAuthorizationCode:)`)経由で行う。
+      responses:
+        '204': { description: 削除済み(2 回目以降も 204) }
+        '401': { description: 未認証, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '500': { description: 途中で失敗。再実行で続きが終わる, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /apps/{appId}/release-requests:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    post:
+      tags: [release]
+      summary: 単体アプリとしてのリリースを申請(所有者のみ・冪等)
+      description: |
+        自分のアプリの**現行 DSL のスナップショット**(version)と用途・連絡先を `release_requests/{id}` に `status=received` で保存する。
+        同じアプリの申請中(`declined` 以外)が既にあれば**何も書かずに既存を 200 で返す**(409 にしない)。`declined` の後は新しい申請を作れる。
+        他人のアプリは自分の木に無いので 404。status は API では変えず、管理者が Firestore コンソールで書き換える。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [purpose]
+              properties:
+                purpose: { type: string, minLength: 1, maxLength: 200, description: 用途の一言(前後の空白は除去) }
+                contact: { type: string, maxLength: 100, description: 連絡先(任意) }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ReleaseRequest' } } } }
+        '200': { description: 申請中が既にあった(既存を返す), content: { application/json: { schema: { $ref: '#/components/schemas/ReleaseRequest' } } } }
+        '400': { description: purpose が空・長すぎる / 未知のキー, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    get:
+      tags: [release]
+      summary: このアプリへの自分の申請(新しい順)
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/ReleaseRequest' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /release-requests:
+    get:
+      tags: [release]
+      summary: 自分の申請(全アプリ・新しい順・最大 200)
+      description: 変身一覧のカードに status バッジを 1 回の呼び出しで付けるため。
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/ReleaseRequest' } } } } } }
+
+  /health:
     get:
       security: []
       summary: liveness
+      description: Cloud Run(`*.run.app`)では `/healthz` が Google Front End に吸われてコンテナに届かないため `/health` を使う(`/healthz` はローカル用に残っている)。
       responses: { '200': { description: ok } }
 
 components:
@@ -365,10 +609,11 @@ components:
       scheme: bearer
       bearerFormat: Firebase ID token
   parameters:
-    AppId: { in: path, name: appId, required: true, schema: { type: string }, example: app_01HXYZ }
+    AppId: { in: path, name: appId, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$' }, example: app_01HXYZ, description: '`null` / `undefined` / `nil` / `none` / `nan` / `true` / `false`(大文字小文字無視)は 400(クライアントの未設定値で不要なアプリが seed されるのを防ぐ・#154)' }
     EntityId: { in: path, name: entityId, required: true, schema: { type: string }, example: expense }
     Version: { in: path, name: version, required: true, schema: { type: integer, minimum: 1 } }
     PageSize: { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+    ShareToken: { in: path, name: token, required: true, schema: { type: string }, example: H6-GGDdrAGTqrpqpbKhx4GG1ZT1VJ0Rb }
     PageToken: { in: query, name: pageToken, schema: { type: string }, description: 前レスポンスの nextPageToken (不透明文字列) }
   headers:
     ETag:
@@ -378,6 +623,12 @@ components:
     BadRequest: { description: 入力不正, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Unauthenticated: { description: トークン欠落/無効, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     NotFound: { description: 存在しない (他人のリソースも 404), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden:
+      description: 共有 (public/shared) レコードの author が自分ではない
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: forbidden, message: 'only the author can modify this record', details: { author: 'uid_of_poster' } } }
     VersionConflict:
       description: If-Match が現行と不一致
       content:
@@ -449,7 +700,7 @@ components:
       description: このバージョンが生まれた経緯
       required: [kind]
       properties:
-        kind: { type: string, enum: [ai, manual, restore, system] }
+        kind: { type: string, enum: [ai, manual, restore, system, import] }
         mode: { type: string, enum: [full, patch], description: 'full = PUT (初回/create/fallback), patch = PATCH (編集)' }
         transcript: { type: string, description: ユーザー発話 (ai) }
         summary: { type: string, description: 変更の一文要約 (iOS が読み上げ) }
@@ -468,11 +719,18 @@ components:
           description: このバージョンを作った RFC 6902 ops (PATCH 経由の時のみ)
           items: { $ref: '../dsl/dsl.schema.json#/$defs/PatchOp' }
         createdAt: { type: string, format: date-time }
+    RestoreResult:
+      description: restore の応答。VersionSummary + 復元後の dsl(DSLEnvelope と互換)
+      allOf:
+        - { $ref: '#/components/schemas/VersionSummary' }
+        - type: object
+          required: [dsl]
+          properties: { dsl: { $ref: '../dsl/dsl.schema.json' } }
     RecordData:
       type: object
-      description: 'キー = Field.id。値の型は Field.type に従う: string/text→string, integer/currency→integer, number→number, boolean→boolean, date→"YYYY-MM-DD", datetime→RFC3339, enum→options のいずれか, photo→https URL (iOS が Firebase Storage へ直接アップロード), location→"lat,lng"'
+      description: 'キー = Field.id。値の型は Field.type に従う: string/text→string, integer/currency→integer, number→number, boolean→boolean, date→"YYYY-MM-DD", datetime→RFC3339, enum→options のいずれか, photo→https URL (iOS が Firebase Storage へ直接アップロード), location→"lat,lng", ref→参照先レコードの id 文字列(存在は検査しない・iOS の未送信 "local-<clientId>" も形として受ける)。例外として date field の隣の "<field>__dates" は毎日チェックの押した日の履歴("YYYY-MM-DD" の配列・DSL に宣言しない・昇順/重複除去/最大 400 件に正規化・#172)'
       additionalProperties:
-        anyOf: [{ type: string }, { type: number }, { type: integer }, { type: boolean }, { type: 'null' }]
+        anyOf: [{ type: string }, { type: number }, { type: integer }, { type: boolean }, { type: 'null' }, { type: array, items: { type: string, format: date }, maxItems: 400 }]
       example: { amount: 1200, category: 食費, memo: ランチ, date: '2026-10-24' }
     Record:
       type: object
@@ -481,5 +739,55 @@ components:
         id: { type: string, example: rec_01HXYZ }
         entity: { type: string }
         data: { $ref: '#/components/schemas/RecordData' }
+        author: { type: string, description: '投稿者 uid。entity.scope が public/shared のレコードにだけ付く (private では省略)' }
+        authorName: { type: string, description: '投稿者の表示名。POST の authorName、無ければ "匿名"。public/shared のみ' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    Share:
+      type: object
+      required: [token, appId, name, dslVersion, url, webUrl]
+      properties:
+        token: { type: string }
+        appId: { type: string }
+        name: { type: string }
+        dslVersion: { type: integer, description: スナップショットした version }
+        url: { type: string, example: 'tailorit://import/H6-GGDdrAGTqrpqpbKhx4GG1ZT1VJ0Rb', description: iOS アプリで開く URL(QR もこれ) }
+        webUrl: { type: string, description: 'ブラウザ用フォールバック(認証不要の `GET /s/{token}`。アプリ名と「Tailor It で開く」ボタンだけで DSL は出さない)。`SHARE_WEB_BASE_URL` で上書き可' }
+        revoked: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    PublicApp:
+      type: object
+      required: [id, name, installs]
+      properties:
+        id: { type: string, description: 掲載者の appId }
+        name: { type: string }
+        description: { type: string }
+        tags: { type: array, items: { type: string } }
+        authorName: { type: string }
+        components: { type: array, items: { type: string }, description: '使っている部品の type(コンテナ・voiceInput を除く・最大 8)。カードのアイコン用' }
+        dslVersion: { type: integer }
+        installs: { type: integer }
+        mine: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ReleaseRequest:
+      type: object
+      required: [id, appId, name, dslVersion, purpose, status]
+      properties:
+        id: { type: string, example: rr_06GPVRYJ58VK8KN57T8W54M124 }
+        appId: { type: string }
+        name: { type: string, description: 申請時のアプリ名 }
+        dslVersion: { type: integer, description: スナップショットした version(DSL 本体はレスポンスに含めない) }
+        purpose: { type: string }
+        contact: { type: string }
+        status: { type: string, enum: [received, reviewing, planned, declined], description: 'received=受付 / reviewing=検討中 / planned=リリース予定 / declined=見送り。管理者がコンソールで変更' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, description: 'API が書いた時刻(コンソールで status を変えても自動では更新されない)' }
+    InstallResult:
+      description: AppWithDSL + 複製の結果
+      allOf:
+        - { $ref: '#/components/schemas/AppWithDSL' }
+        - type: object
+          properties:
+            joined: { type: boolean, description: 'true = 共有データ付きなので元の appId に参加した' }
+            created: { type: boolean, description: 'false = 既に持っていた(参加済み)' }

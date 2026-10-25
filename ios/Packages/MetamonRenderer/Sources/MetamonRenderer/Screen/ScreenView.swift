@@ -4,6 +4,7 @@ import MetamonDSL
 /// Route → Screen 定義を引いて描画する。NavigationStack の destination / sheet の中身。
 public struct ScreenView: View {
     @Environment(\.dslRuntime) private var rt
+    @Environment(\.formToolbarAccessory) private var formToolbarAccessory
     let route: Route
     @State private var form: FormDraft?
     @State private var locals = ScreenLocals()
@@ -14,12 +15,17 @@ public struct ScreenView: View {
         if let screen = rt.dsl.screen(route.screen) {
             let ctx = RenderContext(route: route, form: form, locals: locals)
             GridScreenLayout(screen: screen, ctx: ctx)
-                .background(Color(.systemGroupedBackground))
+                .background(RenderTheme.Colors.canvas)
+                .modifier(FormSaveBar(screen: screen, ctx: ctx)) // saveRecord は画面下の固定バーへ(#89)
                 .navigationTitle(screen.title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    // フォーム画面はホストの FAB を隠す代わりに、ナビバー右上(DSL のボタンより左)に小さな入口を置く(#83)
+                    if screen.entity != nil, let accessory = formToolbarAccessory {
+                        ToolbarItem(placement: .topBarTrailing) { accessory }
+                    }
                     ToolbarItemGroup(placement: .topBarTrailing) {
-                        ForEach(screen.toolbar) { tb in
+                        ForEach(screen.toolbar.filter { tb in !FormSaveBar.pinned(in: screen).contains { $0.id == tb.id } }) { tb in
                             Button {
                                 Task { await rt.run(tb.action, ctx.actionContext()) }
                             } label: {
@@ -27,21 +33,26 @@ public struct ScreenView: View {
                             }
                         }
                     }
+                    // 数値キーパッドには return が無いので、全入力共通でキーボード上に「完了」を出す(#143)
+                    ToolbarItemGroup(placement: .keyboard) {
+                        Spacer()
+                        Button(L("完了")) { KeyboardState.dismiss() }.fontWeight(.semibold)
+                    }
                     if route.stack == "sheet" || route.stack == "full", (rt.paths[route.stack] ?? []).isEmpty {
                         ToolbarItem(placement: .topBarLeading) {
-                            Button("閉じる") { rt.close(route) }
+                            Button(L("閉じる")) { rt.close(route) }
                         }
                     }
                 }
                 .task(id: route) {
-                    await rt.load(entities: screen.referencedEntities)
+                    await rt.load(entities: rt.dsl.entitiesNeeded(by: screen))
                     setUpForm(screen)
                 }
                 .refreshable {
-                    await rt.load(entities: screen.referencedEntities, force: true)
+                    await rt.load(entities: rt.dsl.entitiesNeeded(by: screen), force: true)
                 }
         } else {
-            ContentUnavailableView("画面がありません: \(route.screen)", systemImage: "questionmark.square.dashed")
+            ContentUnavailableView(L("画面がありません: \(route.screen)"), systemImage: "questionmark.square.dashed")
         }
     }
 
@@ -60,6 +71,19 @@ public struct ScreenView: View {
             }
             form = draft
         }
+    }
+}
+
+private struct FormToolbarAccessoryKey: EnvironmentKey {
+    static let defaultValue: AnyView? = nil
+}
+
+public extension EnvironmentValues {
+    /// フォーム画面(`screen.entity` あり・sheet/push どちらも)のナビバー右上にホストが差し込む小さな View(例: マイク)。
+    /// 左下の FAB が全幅ボタンに被るのを避けるため、フォーム画面ではホストが FAB を隠してこちらを入口にする(#83)。
+    var formToolbarAccessory: AnyView? {
+        get { self[FormToolbarAccessoryKey.self] }
+        set { self[FormToolbarAccessoryKey.self] = newValue }
     }
 }
 

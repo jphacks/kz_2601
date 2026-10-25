@@ -1,0 +1,2013 @@
+{
+  "date": "2026-10-25",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "tag": "stat-unit-after",
+  "cases": [
+    {
+      "id": "training_a",
+      "kind": "create",
+      "group": "demo-B",
+      "transcript": "筋トレの記録アプリ。腕立てとスクワットの回数を毎日つけて、朝8時にリマインドして",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5961,
+      "totalMs": 5965,
+      "outputChars": 2374,
+      "usage": {
+        "inputTokens": 135,
+        "outputTokens": 992,
+        "cacheCreationInputTokens": 31013
+      },
+      "summary": "筋トレ記録アプリを作りました。右下のボタンから筋トレを追加できます。毎朝8時に通知が届きます。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 11,
+        "topLevel": 5,
+        "withArea": 5,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "notifications": [
+          "daily@08:00"
+        ],
+        "scopes": [
+          "workout:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "workout_form: A1:F6 A11:F12"
+        ]
+      },
+      "dsl": {
+        "app": {
+          "description": "腕立てとスクワットの回数を毎日記録し、朝8時にリマインドする",
+          "icon": "figure.strengthtraining.traditional",
+          "name": "筋トレ記録",
+          "notifications": [
+            {
+              "body": "今日の腕立てとスクワットを記録しましょう。",
+              "id": "morning_reminder",
+              "repeat": "daily",
+              "time": "08:00",
+              "title": "筋トレの時間です"
+            }
+          ],
+          "theme": {
+            "primaryColor": "#E65100"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "defaultValue": "腕立て",
+                "id": "exercise",
+                "name": "種目",
+                "options": [
+                  "腕立て",
+                  "スクワット"
+                ],
+                "required": true,
+                "type": "enum"
+              },
+              {
+                "id": "reps",
+                "name": "回数",
+                "required": true,
+                "type": "integer",
+                "unit": "回"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "workout",
+            "name": "筋トレ",
+            "titleField": "exercise"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "sum",
+                    "entity": "workout",
+                    "field": "reps",
+                    "filter": {
+                      "field": "date",
+                      "op": "today",
+                      "value": null
+                    },
+                    "label": "今日の合計回数",
+                    "type": "stat"
+                  },
+                  {
+                    "aggregate": "count",
+                    "entity": "workout",
+                    "filter": {
+                      "field": "date",
+                      "op": "today",
+                      "value": null
+                    },
+                    "label": "今日の記録数",
+                    "type": "stat"
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "workout",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "exercise",
+                      "trailing": "reps"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "workout_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "記録",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "workout_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "記録を追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "筋トレ記録",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "workout_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F6",
+                "children": [
+                  {
+                    "field": "exercise",
+                    "label": "種目",
+                    "style": "segmented",
+                    "type": "picker"
+                  },
+                  {
+                    "field": "reps",
+                    "label": "回数",
+                    "max": 500,
+                    "min": 0,
+                    "step": 5,
+                    "type": "stepper"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "workout",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "workout",
+            "id": "workout_form",
+            "title": "筋トレを記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "workout",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "training_b",
+      "kind": "create",
+      "group": "demo-B",
+      "transcript": "毎日のトレーニングメニューと回数を残したい。忘れないように毎朝通知が欲しい",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5932,
+      "totalMs": 5936,
+      "outputChars": 2386,
+      "usage": {
+        "inputTokens": 129,
+        "outputTokens": 978,
+        "cacheReadInputTokens": 31013
+      },
+      "summary": "トレーニング記録アプリを作りました。右下のボタンからトレーニングを追加できます。毎朝8時に通知が届きます。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 11,
+        "topLevel": 5,
+        "withArea": 5,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "notifications": [
+          "daily@08:00"
+        ],
+        "scopes": [
+          "workout:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "workout_form: A1:F6 A11:F12"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "毎日のトレーニングメニューと回数を記録する。毎朝8時に通知でお知らせ",
+          "icon": "figure.strengthtraining.traditional",
+          "name": "トレーニング記録",
+          "notifications": [
+            {
+              "body": "今日のメニューと回数を記録しましょう。",
+              "id": "morning_reminder",
+              "repeat": "daily",
+              "time": "08:00",
+              "title": "トレーニングの時間です"
+            }
+          ],
+          "theme": {
+            "primaryColor": "#E65100"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "menu",
+                "name": "メニュー",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "reps",
+                "name": "回数",
+                "required": true,
+                "type": "integer",
+                "unit": "回"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "workout",
+            "name": "トレーニング",
+            "titleField": "menu"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "format": "plain",
+                    "label": "今日のメニュー数",
+                    "type": "stat",
+                    "value": {
+                      "agg": "count",
+                      "entity": "workout",
+                      "filter": {
+                        "field": "date",
+                        "op": "today",
+                        "value": null
+                      }
+                    }
+                  },
+                  {
+                    "aggregate": "sum",
+                    "entity": "workout",
+                    "field": "reps",
+                    "filter": {
+                      "field": "date",
+                      "op": "today",
+                      "value": null
+                    },
+                    "label": "今日の合計回数",
+                    "type": "stat"
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "workout",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "menu",
+                      "trailing": "reps"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "workout_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "記録",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "workout_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "記録を追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "トレーニング記録",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "workout_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F6",
+                "children": [
+                  {
+                    "field": "menu",
+                    "label": "メニュー",
+                    "placeholder": "腕立て伏せ",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "reps",
+                    "label": "回数",
+                    "type": "numberField",
+                    "unit": "回"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "workout",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "workout",
+            "id": "workout_form",
+            "title": "トレーニングを記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "workout",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "reading",
+      "kind": "create",
+      "group": "other",
+      "transcript": "読んだ本のタイトルと感想、読み終わった日を記録する読書記録アプリ",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5658,
+      "totalMs": 5661,
+      "outputChars": 1873,
+      "usage": {
+        "inputTokens": 125,
+        "outputTokens": 776,
+        "cacheReadInputTokens": 31013
+      },
+      "summary": "読書記録アプリを作りました。右下のボタンから本を追加できます。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 9,
+        "topLevel": 6,
+        "withArea": 6,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "book:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "book_form: A1:F6 A7:F10 A11:F12"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "読んだ本のタイトルと感想、読み終わった日を記録する",
+          "icon": "book",
+          "name": "読書記録",
+          "theme": {
+            "primaryColor": "#6D4C41"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "タイトル",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "review",
+                "name": "感想",
+                "type": "text"
+              },
+              {
+                "defaultValue": "now",
+                "id": "finished_on",
+                "name": "読み終わった日",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "book",
+            "name": "本",
+            "titleField": "title"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "id": "total",
+                "label": "読んだ本の数(冊)",
+                "type": "stat",
+                "value": {
+                  "agg": "count",
+                  "entity": "book"
+                }
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "book",
+                    "item": {
+                      "subtitle": "review",
+                      "title": "title",
+                      "trailing": "finished_on"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "book_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "finished_on"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "books",
+                "title": "読んだ本",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "book_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "本を追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "読書記録",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "book_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F6",
+                "children": [
+                  {
+                    "field": "title",
+                    "label": "タイトル",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "finished_on",
+                    "label": "読み終わった日",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "area": "A7:F10",
+                "field": "review",
+                "id": "review",
+                "placeholder": "感想を書く",
+                "type": "textEditor"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この本の記録を削除しますか？",
+                  "entity": "book",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "book",
+            "id": "book_form",
+            "title": "本を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "book",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "weight",
+      "kind": "create",
+      "group": "other",
+      "transcript": "体重を毎朝記録してグラフで推移を見たいアプリ",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 5346,
+      "totalMs": 5349,
+      "outputChars": 2280,
+      "usage": {
+        "inputTokens": 117,
+        "outputTokens": 975,
+        "cacheReadInputTokens": 31013
+      },
+      "summary": "体重記録アプリを作りました。今日と推移の2タブで、右下のボタンから体重を追加できます。",
+      "metrics": {
+        "tabs": 2,
+        "screens": 3,
+        "components": 12,
+        "topLevel": 6,
+        "withArea": 6,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": true,
+        "scopes": [
+          "body:private"
+        ],
+        "areas": [
+          "home: A1:F2 A3:F10 D11:F12",
+          "body_form: A1:F8 A11:F12",
+          "trend: A1:F8"
+        ]
+      },
+      "dsl": {
+        "app": {
+          "description": "毎朝の体重を記録して、グラフで推移を確認する",
+          "icon": "scalemass",
+          "name": "体重記録",
+          "tabs": [
+            {
+              "icon": "list.bullet",
+              "screen": "home",
+              "title": "今日"
+            },
+            {
+              "icon": "chart.xyaxis.line",
+              "screen": "trend",
+              "title": "推移"
+            }
+          ],
+          "theme": {
+            "primaryColor": "#00897B"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "id": "weight",
+                "name": "体重",
+                "required": true,
+                "type": "number",
+                "unit": "kg"
+              },
+              {
+                "id": "memo",
+                "name": "メモ",
+                "type": "string"
+              }
+            ],
+            "id": "body",
+            "name": "体重",
+            "titleField": "date"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "aggregate": "latest",
+                    "by": "date",
+                    "entity": "body",
+                    "field": "weight",
+                    "label": "今の体重",
+                    "type": "stat"
+                  },
+                  {
+                    "aggregate": "count",
+                    "entity": "body",
+                    "label": "記録回数",
+                    "type": "stat"
+                  }
+                ],
+                "id": "summary",
+                "type": "hstack"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "body",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "memo",
+                      "trailing": "weight"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "body_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "記録一覧",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "body_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "体重を記録",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "体重記録",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "body_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F8",
+                "children": [
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  },
+                  {
+                    "field": "weight",
+                    "label": "体重",
+                    "type": "numberField",
+                    "unit": "kg"
+                  },
+                  {
+                    "field": "memo",
+                    "label": "メモ",
+                    "placeholder": "朝食前",
+                    "type": "textField"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "body",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "body",
+            "id": "body_form",
+            "title": "体重を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "body",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "aggregate": "avg",
+                "area": "A1:F8",
+                "bucket": "day",
+                "entity": "body",
+                "field": "weight",
+                "groupBy": "date",
+                "id": "weight_trend",
+                "kind": "line",
+                "title": "体重の推移",
+                "type": "chart"
+              }
+            ],
+            "id": "trend",
+            "title": "推移"
+          }
+        ]
+      }
+    },
+    {
+      "id": "calendar",
+      "kind": "create",
+      "group": "calendar",
+      "transcript": "予定を登録してカレンダーで見たいアプリ",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 4813,
+      "totalMs": 4815,
+      "outputChars": 1559,
+      "usage": {
+        "inputTokens": 112,
+        "outputTokens": 653,
+        "cacheReadInputTokens": 31013
+      },
+      "summary": "予定カレンダーアプリを作りました。右下のボタンから予定を追加できます。",
+      "metrics": {
+        "tabs": 0,
+        "screens": 2,
+        "components": 7,
+        "topLevel": 5,
+        "withArea": 5,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 3,
+        "hasPhoto": false,
+        "hasChart": false,
+        "scopes": [
+          "event:private"
+        ],
+        "areas": [
+          "home: A1:F9 D11:F12",
+          "event_form: A1:F6 A7:F9 A11:F12"
+        ],
+        "hasCalendar": true
+      },
+      "dsl": {
+        "app": {
+          "description": "予定を登録して月カレンダーで確認する",
+          "icon": "calendar",
+          "name": "予定カレンダー",
+          "theme": {
+            "primaryColor": "#1565C0"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "title",
+                "name": "タイトル",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "id": "memo",
+                "name": "メモ",
+                "type": "text"
+              }
+            ],
+            "id": "event",
+            "name": "予定",
+            "titleField": "title"
+          }
+        ],
+        "initialScreen": "home",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "area": "A1:F9",
+                "dateField": "date",
+                "entity": "event",
+                "id": "cal",
+                "onDateTap": {
+                  "presentation": "push",
+                  "screen": "event_form",
+                  "type": "navigate"
+                },
+                "type": "calendar"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "event_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "予定を追加",
+                "type": "button"
+              }
+            ],
+            "id": "home",
+            "title": "予定カレンダー",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "event_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F6",
+                "children": [
+                  {
+                    "field": "title",
+                    "label": "タイトル",
+                    "placeholder": "打ち合わせ",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "area": "A7:F9",
+                "field": "memo",
+                "id": "memo",
+                "placeholder": "メモ",
+                "type": "textEditor"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この予定を削除しますか？",
+                  "entity": "event",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "event",
+            "id": "event_form",
+            "title": "予定を登録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "event",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "edit_calendar",
+      "kind": "edit",
+      "group": "calendar",
+      "transcript": "支出をカレンダー表示にして",
+      "locale": "ja",
+      "ok": true,
+      "mode": "patch",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 1818,
+      "totalMs": 1821,
+      "outputChars": 327,
+      "usage": {
+        "inputTokens": 1843,
+        "outputTokens": 136,
+        "cacheCreationInputTokens": 32754
+      },
+      "summary": "ホームの支出一覧をカレンダー表示に変えました。",
+      "metrics": {
+        "tabs": 2,
+        "screens": 3,
+        "components": 14,
+        "topLevel": 8,
+        "withArea": 8,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 1,
+        "fields": 5,
+        "hasPhoto": true,
+        "hasChart": true,
+        "scopes": [
+          "expense:private"
+        ],
+        "areas": [
+          "home: A1:F2 D11:F12 A3:F10",
+          "expense_form: A1:F7 A8:F9 A11:F12",
+          "stats: A1:F6 A7:F12"
+        ],
+        "hasCalendar": true
+      },
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/screens/0/components/2",
+          "value": {
+            "area": "A3:F10",
+            "dateField": "date",
+            "entity": "expense",
+            "id": "recent",
+            "onDateTap": {
+              "presentation": "push",
+              "screen": "expense_form",
+              "type": "navigate"
+            },
+            "title": "支出カレンダー",
+            "type": "calendar"
+          }
+        }
+      ],
+      "dsl": {
+        "schemaVersion": 1,
+        "app": {
+          "name": "家計簿",
+          "description": "コンビニなどで使ったお金を記録し、今月の合計とカテゴリ別の内訳を見る",
+          "icon": "yensign.circle",
+          "theme": {
+            "primaryColor": "#2E7D32"
+          },
+          "voiceEntry": "floating",
+          "tabs": [
+            {
+              "screen": "home",
+              "title": "ホーム",
+              "icon": "list.bullet.rectangle"
+            },
+            {
+              "screen": "stats",
+              "title": "集計",
+              "icon": "chart.pie"
+            }
+          ]
+        },
+        "initialScreen": "home",
+        "entities": [
+          {
+            "id": "expense",
+            "name": "支出",
+            "titleField": "memo",
+            "fields": [
+              {
+                "id": "amount",
+                "name": "金額",
+                "type": "currency",
+                "required": true,
+                "unit": "円"
+              },
+              {
+                "id": "category",
+                "name": "カテゴリ",
+                "type": "enum",
+                "required": true,
+                "options": [
+                  "食費",
+                  "交通",
+                  "日用品",
+                  "娯楽",
+                  "その他"
+                ],
+                "defaultValue": "食費"
+              },
+              {
+                "id": "memo",
+                "name": "メモ",
+                "type": "string"
+              },
+              {
+                "id": "date",
+                "name": "日付",
+                "type": "date",
+                "required": true,
+                "defaultValue": "now"
+              },
+              {
+                "id": "receipt",
+                "name": "レシート",
+                "type": "photo"
+              }
+            ]
+          }
+        ],
+        "screens": [
+          {
+            "id": "home",
+            "title": "家計簿",
+            "toolbar": [
+              {
+                "label": "追加",
+                "icon": "plus",
+                "action": {
+                  "type": "navigate",
+                  "screen": "expense_form",
+                  "presentation": "sheet"
+                }
+              }
+            ],
+            "components": [
+              {
+                "type": "hstack",
+                "id": "summary",
+                "area": "A1:F2",
+                "children": [
+                  {
+                    "type": "stat",
+                    "label": "今月の支出",
+                    "entity": "expense",
+                    "aggregate": "sum",
+                    "field": "amount",
+                    "format": "currency",
+                    "filter": {
+                      "field": "date",
+                      "op": "thisMonth",
+                      "value": null
+                    }
+                  },
+                  {
+                    "type": "stat",
+                    "label": "今月の件数",
+                    "entity": "expense",
+                    "aggregate": "count",
+                    "filter": {
+                      "field": "date",
+                      "op": "thisMonth",
+                      "value": null
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "button",
+                "id": "add",
+                "area": "D11:F12",
+                "label": "支出を追加",
+                "icon": "plus",
+                "action": {
+                  "type": "navigate",
+                  "screen": "expense_form",
+                  "presentation": "sheet"
+                }
+              },
+              {
+                "area": "A3:F10",
+                "dateField": "date",
+                "entity": "expense",
+                "id": "recent",
+                "onDateTap": {
+                  "presentation": "push",
+                  "screen": "expense_form",
+                  "type": "navigate"
+                },
+                "title": "支出カレンダー",
+                "type": "calendar"
+              }
+            ]
+          },
+          {
+            "id": "expense_form",
+            "title": "支出を記録",
+            "entity": "expense",
+            "toolbar": [
+              {
+                "label": "保存",
+                "icon": "checkmark",
+                "action": {
+                  "type": "saveRecord",
+                  "entity": "expense"
+                }
+              }
+            ],
+            "components": [
+              {
+                "type": "section",
+                "id": "fields",
+                "area": "A1:F7",
+                "title": "内容",
+                "children": [
+                  {
+                    "type": "numberField",
+                    "field": "amount",
+                    "label": "金額",
+                    "unit": "円"
+                  },
+                  {
+                    "type": "picker",
+                    "field": "category",
+                    "label": "カテゴリ",
+                    "style": "segmented"
+                  },
+                  {
+                    "type": "textField",
+                    "field": "memo",
+                    "label": "メモ",
+                    "placeholder": "コンビニ"
+                  },
+                  {
+                    "type": "datePicker",
+                    "field": "date",
+                    "label": "日付"
+                  }
+                ]
+              },
+              {
+                "type": "photoField",
+                "id": "receipt",
+                "area": "A8:F9",
+                "field": "receipt",
+                "label": "レシートを撮る",
+                "source": "camera"
+              },
+              {
+                "type": "button",
+                "id": "delete",
+                "area": "A11:F12",
+                "label": "削除",
+                "style": "destructive",
+                "action": {
+                  "type": "deleteRecord",
+                  "entity": "expense",
+                  "confirmMessage": "この支出を削除しますか？"
+                }
+              }
+            ]
+          },
+          {
+            "id": "stats",
+            "title": "集計",
+            "components": [
+              {
+                "type": "chart",
+                "id": "by_category",
+                "area": "A1:F6",
+                "title": "カテゴリ別(今月)",
+                "entity": "expense",
+                "kind": "pie",
+                "groupBy": "category",
+                "aggregate": "sum",
+                "field": "amount",
+                "filter": {
+                  "field": "date",
+                  "op": "thisMonth",
+                  "value": null
+                }
+              },
+              {
+                "type": "chart",
+                "id": "by_month",
+                "area": "A7:F12",
+                "title": "月ごとの支出",
+                "entity": "expense",
+                "kind": "bar",
+                "groupBy": "date",
+                "bucket": "month",
+                "aggregate": "sum",
+                "field": "amount"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "nav_gym",
+      "kind": "create",
+      "group": "nav",
+      "transcript": "ジムの記録アプリ。トレーニングの記録、体重の推移、自分のプロフィールの3つの画面をボトムバーで行き来したい",
+      "locale": "ja",
+      "ok": true,
+      "mode": "full",
+      "attempts": 1,
+      "regenerations": 0,
+      "areaFallback": false,
+      "claudeMs": 12316,
+      "totalMs": 12323,
+      "outputChars": 5893,
+      "usage": {
+        "inputTokens": 145,
+        "outputTokens": 2449,
+        "cacheReadInputTokens": 31013
+      },
+      "summary": "ジム記録アプリを作りました。トレーニング・体重・プロフィールの3タブで、右下のボタンからトレーニングを追加できます。",
+      "metrics": {
+        "tabs": 3,
+        "screens": 6,
+        "components": 28,
+        "topLevel": 15,
+        "withArea": 15,
+        "areaRatio": 1,
+        "fullScreenCnt": 0,
+        "entities": 3,
+        "fields": 11,
+        "hasPhoto": false,
+        "hasChart": true,
+        "scopes": [
+          "workout:private",
+          "body:private",
+          "profile:private"
+        ],
+        "areas": [
+          "workouts: A1:F2 A3:F10 D11:F12",
+          "workout_form: A1:F10 A11:F12",
+          "weight: A1:C2 D1:F2 A3:F7 A8:F12",
+          "body_form: A1:F4 A11:F12",
+          "profile: A1:F8 D11:F12",
+          "profile_form: A1:F8 A11:F12"
+        ],
+        "statValues": 1
+      },
+      "dsl": {
+        "app": {
+          "description": "トレーニングと体重を記録し、体重の推移とプロフィールを確認する",
+          "icon": "dumbbell",
+          "name": "ジム記録",
+          "tabs": [
+            {
+              "icon": "figure.strengthtraining.traditional",
+              "screen": "workouts",
+              "title": "トレーニング"
+            },
+            {
+              "icon": "scalemass",
+              "screen": "weight",
+              "title": "体重"
+            },
+            {
+              "icon": "person.crop.circle",
+              "screen": "profile",
+              "title": "プロフィール"
+            }
+          ],
+          "theme": {
+            "primaryColor": "#E65100"
+          },
+          "voiceEntry": "floating"
+        },
+        "entities": [
+          {
+            "fields": [
+              {
+                "id": "exercise",
+                "name": "種目",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "weight_kg",
+                "name": "重量",
+                "type": "number",
+                "unit": "kg"
+              },
+              {
+                "id": "reps",
+                "name": "回数",
+                "type": "integer",
+                "unit": "回"
+              },
+              {
+                "id": "sets",
+                "name": "セット数",
+                "type": "integer",
+                "unit": "セット"
+              },
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              }
+            ],
+            "id": "workout",
+            "name": "トレーニング",
+            "titleField": "exercise"
+          },
+          {
+            "fields": [
+              {
+                "defaultValue": "now",
+                "id": "date",
+                "name": "日付",
+                "required": true,
+                "type": "date"
+              },
+              {
+                "id": "weight",
+                "name": "体重",
+                "required": true,
+                "type": "number",
+                "unit": "kg"
+              }
+            ],
+            "id": "body",
+            "name": "体重",
+            "titleField": "date"
+          },
+          {
+            "fields": [
+              {
+                "id": "name",
+                "name": "名前",
+                "required": true,
+                "type": "string"
+              },
+              {
+                "id": "goal",
+                "name": "目標",
+                "type": "string"
+              },
+              {
+                "id": "target_weight",
+                "name": "目標体重",
+                "type": "number",
+                "unit": "kg"
+              },
+              {
+                "defaultValue": "now",
+                "id": "updated",
+                "name": "更新日",
+                "type": "date"
+              }
+            ],
+            "id": "profile",
+            "name": "プロフィール",
+            "titleField": "name"
+          }
+        ],
+        "initialScreen": "workouts",
+        "schemaVersion": 1,
+        "screens": [
+          {
+            "components": [
+              {
+                "aggregate": "count",
+                "area": "A1:F2",
+                "entity": "workout",
+                "filter": {
+                  "field": "date",
+                  "op": "thisWeek",
+                  "value": null
+                },
+                "id": "week_count",
+                "label": "今週のトレーニング数",
+                "type": "stat"
+              },
+              {
+                "area": "A3:F10",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "workout",
+                    "item": {
+                      "subtitle": "date",
+                      "title": "exercise",
+                      "trailing": "weight_kg"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "workout_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "recent",
+                "title": "最近の記録",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "workout_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "plus",
+                "id": "add",
+                "label": "記録を追加",
+                "type": "button"
+              }
+            ],
+            "id": "workouts",
+            "title": "トレーニング",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "workout_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F10",
+                "children": [
+                  {
+                    "field": "exercise",
+                    "label": "種目",
+                    "placeholder": "ベンチプレス",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "weight_kg",
+                    "label": "重量",
+                    "type": "numberField",
+                    "unit": "kg"
+                  },
+                  {
+                    "field": "reps",
+                    "label": "回数",
+                    "min": 1,
+                    "type": "stepper"
+                  },
+                  {
+                    "field": "sets",
+                    "label": "セット数",
+                    "min": 1,
+                    "type": "stepper"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "workout",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "workout",
+            "id": "workout_form",
+            "title": "トレーニングを記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "workout",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "aggregate": "latest",
+                "area": "A1:C2",
+                "by": "date",
+                "entity": "body",
+                "field": "weight",
+                "id": "current",
+                "label": "今の体重",
+                "type": "stat"
+              },
+              {
+                "area": "D1:F2",
+                "format": "plain",
+                "id": "change",
+                "label": "増減",
+                "type": "stat",
+                "value": {
+                  "args": [
+                    {
+                      "agg": "latest",
+                      "by": "date",
+                      "entity": "body",
+                      "field": "weight"
+                    },
+                    {
+                      "agg": "earliest",
+                      "by": "date",
+                      "entity": "body",
+                      "field": "weight"
+                    }
+                  ],
+                  "op": "sub"
+                }
+              },
+              {
+                "aggregate": "avg",
+                "area": "A3:F7",
+                "bucket": "day",
+                "entity": "body",
+                "field": "weight",
+                "groupBy": "date",
+                "id": "trend",
+                "kind": "line",
+                "title": "体重の推移",
+                "type": "chart"
+              },
+              {
+                "area": "A8:F12",
+                "children": [
+                  {
+                    "emptyText": "まだ記録がありません",
+                    "entity": "body",
+                    "item": {
+                      "title": "weight",
+                      "trailing": "date"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "body_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "date"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "history",
+                "title": "履歴",
+                "type": "section"
+              }
+            ],
+            "id": "weight",
+            "title": "体重",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "body_form",
+                  "type": "navigate"
+                },
+                "icon": "plus",
+                "label": "追加"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F4",
+                "children": [
+                  {
+                    "field": "weight",
+                    "label": "体重",
+                    "type": "numberField",
+                    "unit": "kg"
+                  },
+                  {
+                    "field": "date",
+                    "label": "日付",
+                    "type": "datePicker"
+                  }
+                ],
+                "id": "fields",
+                "title": "内容",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "この記録を削除しますか？",
+                  "entity": "body",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "body",
+            "id": "body_form",
+            "title": "体重を記録",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "body",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F8",
+                "children": [
+                  {
+                    "emptyText": "プロフィールを登録しましょう",
+                    "entity": "profile",
+                    "item": {
+                      "subtitle": "goal",
+                      "title": "name",
+                      "trailing": "target_weight"
+                    },
+                    "onItemTap": {
+                      "presentation": "push",
+                      "screen": "profile_form",
+                      "type": "navigate"
+                    },
+                    "sort": {
+                      "direction": "desc",
+                      "field": "updated"
+                    },
+                    "swipeToDelete": true,
+                    "type": "list"
+                  }
+                ],
+                "id": "me",
+                "title": "プロフィール",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "profile_form",
+                  "type": "navigate"
+                },
+                "area": "D11:F12",
+                "icon": "person.badge.plus",
+                "id": "edit",
+                "label": "プロフィールを登録",
+                "type": "button"
+              }
+            ],
+            "id": "profile",
+            "title": "プロフィール",
+            "toolbar": [
+              {
+                "action": {
+                  "presentation": "sheet",
+                  "screen": "profile_form",
+                  "type": "navigate"
+                },
+                "icon": "square.and.pencil",
+                "label": "編集"
+              }
+            ]
+          },
+          {
+            "components": [
+              {
+                "area": "A1:F8",
+                "children": [
+                  {
+                    "field": "name",
+                    "label": "名前",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "goal",
+                    "label": "目標",
+                    "placeholder": "筋肉をつける",
+                    "type": "textField"
+                  },
+                  {
+                    "field": "target_weight",
+                    "label": "目標体重",
+                    "type": "numberField",
+                    "unit": "kg"
+                  }
+                ],
+                "id": "fields",
+                "title": "自分について",
+                "type": "section"
+              },
+              {
+                "action": {
+                  "confirmMessage": "このプロフィールを削除しますか？",
+                  "entity": "profile",
+                  "type": "deleteRecord"
+                },
+                "area": "A11:F12",
+                "id": "delete",
+                "label": "削除",
+                "style": "destructive",
+                "type": "button"
+              }
+            ],
+            "entity": "profile",
+            "id": "profile_form",
+            "title": "プロフィール編集",
+            "toolbar": [
+              {
+                "action": {
+                  "entity": "profile",
+                  "type": "saveRecord"
+                },
+                "icon": "checkmark",
+                "label": "保存"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "n": 7,
+    "ok": 7,
+    "firstPass": 7,
+    "regenerated": 0,
+    "areaFallback": 0,
+    "failed": 0,
+    "expectMisses": 0,
+    "createP50Ms": 5932,
+    "createP95Ms": 12316,
+    "editP50Ms": 1818,
+    "avgOutputTokens": 994.1428571428571,
+    "avgCreateOutputTokens": 1137.1666666666667,
+    "avgEditOutputTokens": 136,
+    "avgCreateOutputChars": 2727.5,
+    "avgAreaRatio": 1,
+    "tabbedCreates": 2,
+    "calcCreates": 3
+  }
+}

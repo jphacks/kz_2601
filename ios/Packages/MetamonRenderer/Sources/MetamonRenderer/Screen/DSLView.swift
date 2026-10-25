@@ -14,10 +14,12 @@ public struct DSLView: View {
     }
 
     public var body: some View {
-        if let build = registry.builder(for: component.rawType) {
+        if FormFieldOverride.applies(to: component, ctx: ctx) {
+            FormFieldOverride.view(for: component, ctx: ctx)
+        } else if let build = registry.builder(for: component.rawType) {
             build(component, ctx)
         } else {
-            UnsupportedComponent(label: "未対応: \(component.rawType)")
+            UnsupportedComponent(label: L("未対応: \(component.rawType)"))
         }
     }
 }

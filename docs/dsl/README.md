@@ -2,6 +2,7 @@
 
 > **正典はこのフォルダ**: `dsl.schema.json`(JSON Schema draft 2020-12)+ `examples/{initial,kakeibo,training,walk}.json`(デモ3本+初期状態)+ `examples/gallery-*.json`(部品ギャラリー)。
 > Go 型は `backend/pkg/dsl`(`schema.json` を埋め込み・`make schema-sync` で同期・CI で byte 一致を検証)、Swift 型は `ios/Packages/MetamonDSL/Sources/MetamonDSL/Model`(examples をそのままバンドルしデコードテスト)。
+> **計算式(Expr・computed フィールド・stat.value・ref 型・settlement)は [`expressions.md`](expressions.md)**(#100)。実例 `examples/warikan.json` / `examples/bmi.json`。
 > backend 案 `docs/backend/dsl-proposal.md` と iOS 案 `docs/ios/dsl-proposal.md` は**すり合わせ前の記録**として残す。矛盾したら本書が勝つ。
 
 ## 1. 統一の原則(確定・議論不要)
@@ -40,7 +41,8 @@
 | 20 | 「元に戻して」 | `versions/{n}/restore` | `ai.prompt` で再生成 | **versions restore**(appconfig)。undo はスキーマに無し | 既存 API で済む。DSL に履歴概念を持ち込まない |
 | 21 | ID 形式 | `^[a-z][a-z0-9_-]{0,39}$`(Go で検証) | 任意 | **backend 案** | Firestore パス安全性。iOS は気にしない |
 | 23 | **画面レイアウト** | 上から積むスタック | 上から積むスタック(+`padding`) | **グリッド座標配置**(ユーザー決定)。Screen 直下の各コンポーネントに省略可能な `area:"A1:C3"`。詳細は §3.4 | 「全部品を長方形とみなし、A1〜C3 の正方形に入力欄を置く」ように AI/ユーザーが位置を調整できる DSL が理想 |
-| 24 | Container 内のグリッド | — | — | **v1 は Screen 直下 1 階層のみ**。Container の子は積むだけ(`area` を付けたら backend がエラー) | 実装が単純(GeometryReader 1 個)・非再帰 2 段と整合。ローカルグリッドは P1 で `area` の意味を広げるだけで互換 |
+| 24 | Container 内のグリッド | — | — | **card / section / vstack の子にも `area` を許す**(#81・§3.4)。Container の矩形を 6 列のローカルグリッドとみなす。入れ子は 1 段まで | 「カードの中で 2 列に並べたい」に応える。`area` の意味を広げるだけなので既存 DSL と互換(v1 は Screen 直下のみだった) |
+| 25 | **計算ロジック**(#100) | — | — | **小さな式ツリー `Expr`**(四則・ルート・比較・if・日付・agg)を `Field.computed` と `stat.value` に置ける。他 entity 参照は `Field.type:"ref"`+`refEntity`、精算は専用 Leaf `settlement`。変数・ループ等は持たない(割り切りは `expressions.md` §8) | 割り勘の「割る」が書けなかった。汎用言語にせず、よく使う演算だけ閉じた一覧で持つ |
 | 22 | 編集ターンの形 | `$defs/PatchDocument{patch,summary}`(構造化出力) | — | **backend 案**。`$defs/PatchValue` で value を閉じる | iOS には無関係(常にフル DSL) |
 
 ## 3. 構造
@@ -48,16 +50,16 @@
 ```
 AppDSL { schemaVersion:1, app:AppMeta, initialScreen, entities[], screens[] }
 AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: fullscreen|floating|none, notifications[]?, tabs[]?: {screen,title,icon?} }
-Entity  { id, name, titleField?, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit? } }
+Entity  { id, name, titleField?, scope?: private|shared|public, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit?, refEntity?, computed?: Expr, health?: "weight" } }
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (33 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
+Leaf (44 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
-### 3.1 コンポーネント(48 種 = Container 7 + Leaf 41)
+### 3.1 コンポーネント(51 種 = Container 7 + Leaf 44)
 
-全種に共通の任意キー: `id`(画面内一意)・`area`(§3.4 のグリッド矩形。Screen 直下のみ有効)。用途・レイアウトの定石は `dsl.schema.json` 各定義の `description` / `x-usage` が正典(AI へのカタログはそこから生成。§4)。
+全種に共通の任意キー: `id`(画面内一意)・`area`(§3.4 のグリッド矩形。Screen 直下と、card / section / vstack の子で有効)。用途・レイアウトの定石は `dsl.schema.json` 各定義の `description` / `x-usage` が正典(AI へのカタログはそこから生成。§4)。
 
 | type | 必須 | 任意 | 要 `screen.entity` | P |
 |---|---|---|---|---|
@@ -68,12 +70,14 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `textField` | `field` | `label`, `placeholder`, `multiline` | ○ | P0 |
 | `numberField` | `field` | `label`, `placeholder`, `unit` | ○ | P0 |
 | `datePicker` | `field` | `label`, `includeTime` | ○ | P0 |
-| `picker` | `field`(enum) | `label`, `style`(menu/segmented/wheel) | ○ | P0 |
+| `picker` | `field`(enum または ref) | `label`, `style`(menu/segmented/wheel) | ○ | P0 |
 | `toggle` | `field`, `label` | | ○ | P0 |
 | `photoField` | `field`(photo) | `label`, `source`(camera/library/both) | ○ | P0 |
 | `image` | `field`(photo) | `height`(small/medium/large) | ○ | P0 |
+| `videoField` | `field`(video) | `label`, `source`(camera/library/both), `maxDuration`(秒・既定 60) | ○ | #206 |
+| `videoPlayer` | `field`(video) | `height`(small/medium/large) | ○ | #206 |
 | `list` | `entity`, `item{title}` | `item.subtitle/trailing/icon/image`, `sort`, `filter`, `emptyText`, `onItemTap`, `swipeToDelete` | | P0 |
-| `stat` | `label`, `entity`, `aggregate` | `field`(count 以外必須), `filter`, `format`(plain/currency/percent) | | P0 |
+| `stat` | `label` + (`entity`+`aggregate` **または** `value`(Expr)) | `field`(count 以外必須), `by`(latest/earliest/distance/duration), `filter`, `format`(plain/currency/percent) | | P0 |
 | `chart` | `entity`, `kind`(bar/line/pie), `groupBy`, `aggregate` | `title`, `field`, `bucket`(day/week/month), `filter` | | P1 |
 | `voiceInput` | | `prompt`, `size`(compact/large) | | P0 |
 | `spacer` | | `size`(small/medium/large/flexible) | | P0 |
@@ -84,12 +88,13 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `grid`(Container) | `children`(1 つ以上) | `columnCount`(2/3/4・`columns` は table の列定義なので別名), `spacing` | | P1 |
 | `searchBar` | `field`(画面ローカルの検索キー) | `placeholder` | | P1 |
 | `calendar` | `entity`, `dateField`(date/datetime) | `onDateTap`, `title` | | P1 |
-| `shareButton` | `text`(`{{fieldId}}` 可) | `field`, `label`, `icon` | `field`/`{{}}` 使用時のみ | P1 |
-| `openUrlButton` | `label`, `url` | `icon`, `style`(primary/secondary/plain) | | P1 |
-| `mapView` | `entity`, `locationField`(location) | `titleField`, `zoom`(near/city/wide), `onItemTap` | | P1 |
+| `shareButton` | `text`(`{{fieldId}}` 可) | `field`, `label`, `icon`, `shareTo`(any/line/slack/discord・既定 any) | `field`/`{{}}` 使用時のみ | P1 |
+| `openUrlButton` | `label`, `url`(https か `line` `slack` `discord` `tel` `mailto` `maps` `comgooglemaps` スキーム) | `icon`, `style`(primary/secondary/plain) | | P1 |
+| `mapView` | `entity`, `locationField`(location) | `titleField`, `zoom`(near/city/wide), `onItemTap`, `kind`(pins/route・#168), `dateField`(route のみ) | | P1 |
 | `locationButton` | `field`(location) | `label` | ○ | P1 |
 | `qrScanner` | `field`(string/text) | `label` | ○ | P1 |
 | `timerDisplay` | `mode`(stopwatch/countdown) | `seconds`(countdown 必須 >0), `field`(integer/number), `label` | `field` 使用時のみ | P1 |
+| `webView` | `url`(https のみ) | `title` | | P1 |
 
 `list` は任意キー `searchField` を持ち、同じ画面の `searchBar.field` を指すと title/subtitle の部分一致で絞り込む(backend は対応する `searchBar` の存在を検証)。
 | `slider` | `field`(integer/number/currency), `min`, `max` | `label`, `step`(省略で連続・integer は 1) | ○ | P1 |
@@ -116,6 +121,11 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `table` | `entity`, `columns[{field,title?}]` | `sort`, `filter`, `limit` | | P1 |
 | `timeline` | `entity`, `dateField`(date/datetime), `titleField` | `subtitleField`, `filter`, `limit` | | P1 |
 | `emptyState` | `title` | `icon`, `message` | | P1 |
+| `settlement` | `entity`, `nameField`, `balanceField`(数値・通常は computed) | | | P1 |
+| `aiButton` | `task`(summarize\|classify\|rewrite\|extract\|suggest), `output`(string/text・classify は enum も可) | `label`, `input`(field)または `entity`+`limit`, `prompt`(`{{field}}` `{{input}}` 置換), `options`(classify 候補) | ✓ | P1 |
+| `nearbyShare` | `label`, `entity` | | | P2 |
+| `locationTracker` | `entity`, `locationField`(location) | `dateField`(datetime), `label`, `seconds`(自動停止・既定 3600) | | P3 |
+| `healthStat` | `metric`(steps\|weight), `label` | `period`(today\|week・既定 today), `target`(steps の 1 日の目標) | | P2 |
 
 `color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
@@ -138,9 +148,16 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 構造・ナビ・ネイティブ系の設計メモ(新規アクションは追加しない):
 
 - `shareButton` / `openUrlButton` / `locationButton` / `qrScanner` / `timerDisplay` は **Leaf 内で完結**し(ShareLink / `openURL` / CoreLocation / AVFoundation / Timer)、新しい `Action` 種別(`share` / `requestLocation` 等)は足さない。`ActionType` に case を足すとホスト(`AppRuntime.run` の網羅 switch)の改修が必須になるため。URL は既存の `openUrl` アクションで足りる。
+- **他アプリ連携(#37 最小版)**: `shareButton.shareTo` で送り先を選ぶ。`line` → `https://line.me/R/share?text=<urlencoded>` を `openURL`(LINE 未インストールなら Web 版に遷移・写真は送れないので文面のみ)。`slack` / `discord` → 公式に汎用の共有 URL スキームが無いので **OS 共有シート(ShareLink)を開き、文面をチャンネル投稿向けに整形**(`**` `#` 等の Markdown 記号を落としたプレーンテキスト + 先頭に 💬)。`any`(既定)は従来どおり。キー名が `target` でないのは `progressBar.target`(number)と JSON キーが衝突するため(`columnCount` と同じ理由)。**Slack/Discord への Incoming Webhook 直接投稿は後段(#37 中版: appconfig 側にユーザー設定として保存し `postWebhook` アクションから投稿)**で、この版には含めない。
+- **`locationTracker`(#168)**: 「記録を開始 / 記録を停止」と記録中の状態(経過時間・距離・点の数)。**開始を押した間だけ**現在地を `entity` に 1 点 = 1 レコード(`locationField` に "lat,lng"、`dateField` に時刻)で足す。アプリを閉じても停止まで続き、`seconds`(既定 1 時間・300〜14400 に丸める)で自動停止。権限は When In Use だけ。点の entity はフォーム不要(lint の「add form が無い」から除外)で、他の required field には defaultValue が要る(validate)。見せ方は既存部品の拡張だけ: `mapView.kind: "route"` で点を `dateField` の時刻順に線で結び、`stat.aggregate: "distance"`(m / km)/ `"duration"`(m:ss / h:mm:ss)を `field` = location field、`by` = 日時 field で集計する。**10 分以上空いた点は別の記録**として線を切り、距離・時間にも足さない(朝と夕方の散歩を 1 本にしない)。Expr の `agg` には足していない(必要になったら)。例: `examples/walk_route.json`。
+- **`nearbyShare`(#36)**: 近くの Tailor It 端末へ MultipeerConnectivity(Wi-Fi / Bluetooth 自動・インターネット不要)でレコードを送る。**送る範囲**: `screen.entity == entity` のフォーム画面なら入力中の 1 件(未保存でも今の値)、それ以外の画面ではその entity の新しい順 最大 50 件。**受け取り**: 受信側は前面にいて今のアプリが nearbyShare を使っている間だけ待ち受け(ローカルネットワーク許可ダイアログを無関係なアプリで出さないため)、招待を受けると「◯◯さんから「出席」3 件」の確認を出し、承認した時だけ接続する(暗号化必須)。取り込みは **同じ appId**、または **同じ entity id で保存フィールドの id+型が一致**する時だけ。未知のフィールドは捨てる。設計・実機手順は `docs/ios/architecture.md` §近距離共有。Leaf 内で完結し新しい Action は足さない(上と同じ理由)。
+- `openUrlButton.url` は https のほか allowlist のカスタムスキーム(`line` `slack` `discord` `tel` `mailto` `maps` `comgooglemaps`)を許可する(backend `dsl.OpenURLSchemes` と iOS `ExternalURLPolicy` が同じ表・`line`/`slack`/`discord` は Info.plist `LSApplicationQueriesSchemes` にも登録)。`http://` や未知スキームは backend がエラー・iOS はプレースホルダ。
+- `webView` は `WKWebView` の `UIViewRepresentable`(戻る/進む/再読込の小ツールバー + 読み込みバー)。https 以外は不可。WKWebView 自身がスクロールするので `GridScreenLayout.scrollsInside` には**入れない**(セル内で二重スクロールしない)。ページ内リンクが allowlist のスキーム(tel: 等)なら OS に渡し、それ以外の非 http(s) は無視。実例: `examples/gallery-web.json`(webView + LINE/Slack/Discord/共有シートの 4 ボタン + maps/tel/mailto/line リンク)。
 - `calendar.onDateTap` は既存の `navigate` を使う。行タップは recordId を渡して編集、「追加」はタップした日を `dateField` の初期値として Renderer 内の `FormPrefill` に積み、次に開いた新規フォームが 1 回だけ消費する(`Action` に params を増やさない)。
 - `searchBar.field` は entity の field ではなく**画面ローカルのキー**(`ScreenLocals`)。`list.searchField` で参照し、レコードには保存しない。
 - `mapView` は `latField`/`lngField` の 2 列ではなく既存の **`location` 型 field 1 つ**(`"lat,lng"`)を使う(`locationButton` の保存先と同じ表現・entity の field 数を増やさない)。既存 `map` Leaf は無かったので新設。
+- **`healthStat` / `Field.health`(#167)**: 端末のヘルスデータ。`healthStat` は **entity を持たない表示カード**で、歩数は iPhone の歩数計(CoreMotion・直近 7 日・capability 不要)、歩数計の無い端末(シミュレータ)はヘルスケアの歩数、体重はヘルスケアの最新値を読む。today は数値(steps は `target` で達成率バー)、week は 7 日のグラフ(steps は棒 + 目標線・weight は折れ線)。許可が無い・使えない端末は「ヘルスケアへのアクセスが許可されていません」等を表示。書き込みは部品ではなく **`Field.health: "weight"`**(number・unit kg): フォームで**新規**保存した時にヘルスケアの体重にも 1 件書く(編集保存では書かない・失敗してもレコードは保存済みでトーストだけ)。入力部品や `saveRecord` を増やさず「どの値をヘルスケアに出すか」をデータ側に 1 キーで持つため。実例: `examples/health.json`。設計は `docs/ios/architecture.md` §15.1。
+- `aiButton`(#78)は **オンデバイス完結の AI 部品**(Apple Intelligence / Foundation Models・iOS 26+)。データは端末外に出ず、クラウド API も課金も無い。結果は output field のドラフトに入るだけで保存はユーザー。非対応端末・Apple Intelligence OFF・モデル準備中は「この端末では AI を使えません」と理由付きで無効化。`Action` の `runAI` 案ではなく Leaf にしたのは、(1) 生成 AI が 1 部品で書き切れる(button + action の 2 段より短く、入力・出力 field を同じ場所で検証できる)、(2) 実行中スピナー・不可時の無効表示が部品の見た目に属する、(3) `ActionType` を増やすとホストの網羅 switch 改修が要る、の 3 点。実例: `examples/diary_ai.json`(本文 → 要約・気分の分類)。
 
 ### 3.3 フィールド型と値(appconfig `RecordData` と一致)
 
@@ -155,6 +172,8 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `enum` | `options` の 1 つ |
 | `photo` | `"data:image/jpeg;base64,..."`(v1)または https URL |
 | `location` | `"lat,lng"`(P1) |
+| `ref` | 参照先(`refEntity`)のレコード id 文字列。入力は picker |
+| (computed) | 保存しない。`Field.computed` の Expr を iOS が評価(`expressions.md`) |
 
 `defaultValue` は date/datetime で `"now"` を許可。
 
@@ -168,11 +187,39 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | 重なり禁止 | `area` を持つ兄弟同士でセルを共有したら **backend `Validate()` がエラー**。文言例: `screen "home" components[2] (id "recent") area A3:F10 overlaps screen "home" components[0] (id "summary") area A1:F4; areas of sibling components must not share cells`。範囲外(G 列・0 行・右下が左上より前・48 行超)も同様にエラーで列挙 → Claude 再生成に渡す |
 | セル内スクロール | セル = 長方形の器。可変長(`list`・`section`・`vstack`/`hstack`・長い `text`)は**器の内側でスクロール**(`scrollBounceBehavior(.basedOnSize)` なので短ければ動かない)。その他(入力・ボタン・stat・chart・image)は器に収めて `clipped` |
 | フォールバック(`area` 無し) | 従来どおり**上から積む**。同一画面で混在した場合は「`area` で使われた**最終行の次の行**から、全幅で上から順に積む」(決定的・LLM が配置を出し損ねても崩れない)。`area` が 1 つも無ければ 1 行目から積む |
-| Container 内 | **v1 はグリッドを Screen 直下 1 階層のみ**。Container の子は積むだけ。子に `area` を付けると backend がエラー(iOS は無視) |
+| Container 内(#81) | 子は既定で積む。**card / section / vstack だけ**は子にも `area` を付けられ、Container の中身の矩形を**ローカルグリッド**(A1 = Container の左上・横 6 列 = 中身の幅 ÷ 6・行は Container 自身の `area` の行数まで)として配置する。ルール: 子の**全部に付けるか全部付けないか**(一部だけはエラー)/ 子同士の重なり禁止 / 行は Container の行数以内(Container が `area` 無しで積まれている時は 48 行まで)/ **入れ子は 1 段まで**(hstack / grid / carousel / disclosure の子と孫には付けない)。用途は「カードの中で 2 列に並べる」(stat 2 枚・ボタン 2 つ)だけ。iOS: 通常画面では中身の高さ ÷ 子が使う最終行 を 1 行とし `GridCell` を再利用して絶対配置。フォーム画面(`FormFlowLayout`)と `area` 無しで積まれた Container の中では横位置と幅だけ効かせ、高さは中身なり(#139 の方針) |
 | タブとの関係 | グリッドは**タブ内の各 Screen の中身**の配置。直交する概念で、タブの有無に関係なく同じ |
 | iOS 実装 | `GridScreenLayout`: `GeometryReader` で `cellW = (幅-24)/6`、`cellH = (高さ-24)/12` を算出し、`area` 子を `.frame(width: colSpan*cellW-8, height: rowSpan*cellH-8).offset(...)` で絶対配置。`voiceInput` 画面(初期状態)は非スクロール |
 
 例(家計簿 home): 合計カード `A1:F2`・最近の支出(list・セル内スクロール) `A3:F10`・追加ボタン `D11:F12`。散歩メモ home: 今日 `A1:C2` / ぜんぶ `D1:F2` の 2 枚並び + 一覧 `A3:F12`。
+
+### 3.5 entity.scope = レコードを誰と共有するか(#47)
+
+| scope | 意味 | レコードの置き場(appconfig) | 書き込み権限 |
+|---|---|---|---|
+| `private`(省略時) | 本人だけ。家計簿・日記・体重など | `users/{uid}/apps/{appId}/entities/{e}/records` | 本人のみ(従来どおり) |
+| `public` | 誰でも読める・ログイン済みなら誰でも投稿できる。掲示板・みんなのランキング・共有リスト | `apps_public/{appId}/entities/{e}/records`(**appId だけで一意**。同じ appId を開いた全員が同じデータを見る) | create は全員、update/delete は投稿者本人のみ(他人のは 403) |
+| `shared` | 同じアプリを開いた人と共有 | **v1 では `public` と同じ扱い**(参加者限定=招待制は後段) | public と同じ |
+
+- public/shared のレコードには backend が **`author`(uid)と `authorName`(iOS が POST 時に任意送信・無ければ "匿名")を自動付与**し、`GET /records` のレコード最上位(`data` の外)で返す。ゆえに public/shared entity の field id に `author` / `authorName` は使えない(`Validate()` がエラー)。
+- public entity を 1 つでも含むアプリは、作成者の `PUT/PATCH /dsl`(と `POST /apps`・restore)で **`apps_public/{appId}` に DSL が複製**される。他ユーザーが同じ appId で `GET /v1/apps/{appId}/dsl` を開くと、自分の `users/{uid}/apps/{appId}` が無ければその DSL が**インストール**(自分の下に複製・version 1)される。以後の編集は各自のコピーに対して行われ、公開 DSL を上書きできるのは最初に公開したユーザーだけ。
+- 作り方: AI が「みんなで」「共有」「投稿」「ランキング」「掲示板」を聞いたら `scope:"public"`、個人の記録なら省略。iOS 側(投稿者名の表示・他人のレコードは編集不可・authorName の送信)は別 Issue。iOS のデコーダは未知キーを無視するので、未対応ビルドでも落ちない。
+
+### 3.6 ナビゲーション = 画面グラフの規則(#112 #114 #115)
+
+画面を頂点、`navigate`(button / toolbar / `list.onItemTap` / `calendar.onDateTap` / `mapView.onItemTap`)と `saveRecord.screen` を辺とする有向グラフで考える。根はタブがあれば `app.tabs[].screen`、無ければ `initialScreen`(タブがある時に `initialScreen` がタブの根でなければ iOS は先頭タブを開く)。実装は `backend/pkg/dsl/nav.go`(`NavEdges` / `Reachable` / `Unreachable` / `HasNav`)。
+
+| 規則 | 扱い | 理由 |
+|---|---|---|
+| `navigate.screen` / `saveRecord.screen` / `app.tabs[].screen` / `initialScreen` が存在する画面 id | **エラー**(`Validate`。メッセージに使える画面 id の一覧と直し方を入れ、AI の再生成プロンプトにそのまま渡す) | 押すと何も起きない・描画できない |
+| `app.tabs` は 0 個(省略)か 2〜5 個 | **エラー** | タブ 1 個は TabView として意味が無い・6 個以上はタブバーに入らない |
+| どの根からも辿れない画面 | 警告(`Lint`)。フォームは追加ボタンや `list.onItemTap` から辿れれば可(entity のフォームが 1 つも辿れない時は従来の「form screen is not reachable」1 件だけ) | 表示はできるので保存済み DSL を壊さない。声で直せばよい |
+| タブがあるのに `initialScreen` がタブの根でない | 警告 | 起動画面が意図と違う |
+| `fullScreen` で開く画面に戻る手段(`back` か、遷移先指定の無い `saveRecord`)が無い | 警告 | iOS は fullScreenCover に閉じるボタンを自動で付けないので閉じ込められる。push は OS の戻る、sheet は下スワイプで戻れるので対象外 |
+
+- 警告は `Meta.lint` に載るだけで再生成は起こさない(`AI_LINT_RETRY=1` の時だけ 1 回再生成)。
+- AI 側の基準(`internal/ai/prompt.go`): 役割の違う一覧・集計・設定はタブ(2〜4 個)、入力はフォーム画面を sheet、詳細は `list.onItemTap` で push、1 画面の直下は 8 部品まで、孤立画面を作らない。navigate はどこからどこへ飛んでもよい前提(タブの根へ飛んだらタブ切替は iOS 側 #113)。
+- 遷移を変える編集は JSON Patch のレシピで出す: 「B から C にも」= B の components に navigate C の button を add、「タブを足す」= `/screens/-` + `/app/tabs/-`(タブが無ければ `/app/tabs` を 2 個で add)、「タブを消す」= `/app/tabs/i` を remove(残り 1 個なら `/app/tabs` ごと remove し、辿れなくなる画面も remove)、「順番」= `/app/tabs` の move。eval は `cases.json` の `group: nav`(`expect` の `patch` / `unreachable` / `nav` / `tabs` / `tabOrder` / `tabHas`)。
 
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 

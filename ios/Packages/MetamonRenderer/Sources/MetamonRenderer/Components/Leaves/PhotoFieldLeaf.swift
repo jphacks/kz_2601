@@ -32,30 +32,34 @@ struct PhotoFieldLeaf: View {
 
         VStack(alignment: .leading, spacing: 8) {
             if hasPhoto {
-                PhotoView(value: value, height: 160)
-                HStack(spacing: 8) {
+                PhotoView(value: value, height: 160, accessibilityLabel: L("\(c.label ?? L("写真"))(添付済み)"))
+                HStack(spacing: RenderTheme.Spacing.sm) {
                     Button { start() } label: {
-                        Label("撮り直す", systemImage: "camera").frame(maxWidth: .infinity)
+                        Label(L("撮り直す"), systemImage: "camera").frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(RenderButtonStyle(kind: .secondary))
+                    .accessibilityHint(sourceHint)
                     Button(role: .destructive) { form.values[field] = .null } label: {
-                        Label("削除", systemImage: "trash").frame(maxWidth: .infinity)
+                        Label(L("削除"), systemImage: "trash").frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(RenderButtonStyle(kind: .destructive))
+                    .accessibilityLabel(L("\(c.label ?? L("写真"))を削除"))
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
             } else {
                 Button { start() } label: {
-                    Label(c.label ?? "写真を撮る / 選ぶ", systemImage: mode == .library ? "photo.on.rectangle" : "camera")
+                    Label(c.label ?? L("写真を撮る / 選ぶ"), systemImage: mode == .library ? "photo.on.rectangle" : "camera")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+                .buttonStyle(RenderButtonStyle(kind: .secondary))
+                // VoiceOver: 「レシートを撮る, ボタン, カメラを開きます」
+                .accessibilityLabel(c.label ?? L("写真を撮る / 選ぶ"))
+                .accessibilityHint(sourceHint)
             }
         }
-        .confirmationDialog(c.label ?? "写真", isPresented: $showChooser, titleVisibility: .hidden) {
-            Button("撮影") { openCamera() }
-            Button("写真から選ぶ") { showLibrary = true }
-            Button("キャンセル", role: .cancel) {}
+        .confirmationDialog(c.label ?? L("写真"), isPresented: $showChooser, titleVisibility: .hidden) {
+            Button(L("撮影")) { openCamera() }
+            Button(L("写真から選ぶ")) { showLibrary = true }
+            Button(L("キャンセル"), role: .cancel) {}
         }
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker { image in
@@ -73,18 +77,26 @@ struct PhotoFieldLeaf: View {
                 librarySelection = nil
             }
         }
-        .alert("カメラを使えません", isPresented: $showDenied) {
-            Button("設定を開く") {
+        .alert(L("カメラを使えません"), isPresented: $showDenied) {
+            Button(L("設定を開く")) {
                 if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
             }
-            Button("写真から選ぶ") { showLibrary = true }
-            Button("キャンセル", role: .cancel) {}
+            Button(L("写真から選ぶ")) { showLibrary = true }
+            Button(L("キャンセル"), role: .cancel) {}
         } message: {
-            Text("設定アプリでメタモンのカメラへのアクセスを許可してください。")
+            Text(L("設定アプリで Tailor It のカメラへのアクセスを許可してください。"))
         }
     }
 
     private var mode: PhotoSourceMode { PhotoSourceMode(raw: c.source) }
+
+    private var sourceHint: String {
+        switch PhotoSourcePolicy.plan(for: mode, cameraAvailable: CameraPicker.isAvailable) {
+        case .camera: L("カメラを開きます")
+        case .library: L("写真ライブラリを開きます")
+        case .choose: L("カメラか写真ライブラリを選びます")
+        }
+    }
 
     private func start() {
         switch PhotoSourcePolicy.plan(for: mode, cameraAvailable: CameraPicker.isAvailable) {

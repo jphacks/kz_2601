@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
@@ -35,6 +36,10 @@ type Request struct {
 	Transcript  string `json:"transcript"`
 	Text        string `json:"text,omitempty"` // alias used by openapi-ai.yaml
 	Mode        Mode   `json:"mode,omitempty"`
+	Locale      Locale `json:"locale,omitempty"` // ja|en; empty = detect from the transcript
+	// LogicPass overrides Service.LogicPass for this request: true = UI pass
+	// then a second call that adds calculations (logic.go). Create turns only.
+	LogicPass *bool `json:"logicPass,omitempty"`
 }
 
 // Latency is per-stage wall time in ms.
@@ -45,14 +50,39 @@ type Latency struct {
 
 // Meta is diagnostic detail about how the result was produced.
 type Meta struct {
-	Model            string   `json:"model"`
-	Attempts         int      `json:"attempts"`      // Claude calls made
-	Regenerations    int      `json:"regenerations"` // attempts - 1 (validation retries)
-	AreaFallback     bool     `json:"areaFallback"`  // areas stripped to pass validation
-	DowngradedToFull bool     `json:"downgradedToFull,omitempty"`
-	Usage            Usage    `json:"usage"`
-	LastProblems     []string `json:"lastProblems,omitempty"`
+	Model            string     `json:"model"`
+	Attempts         int        `json:"attempts"`      // Claude calls made
+	Regenerations    int        `json:"regenerations"` // attempts - 1 (validation retries)
+	AreaFallback     bool       `json:"areaFallback"`  // areas stripped to pass validation
+	DowngradedToFull bool       `json:"downgradedToFull,omitempty"`
+	Usage            Usage      `json:"usage"`
+	OutputChars      int        `json:"outputChars,omitempty"` // model text length (whitespace share diagnostics)
+	LastProblems     []string   `json:"lastProblems,omitempty"`
+	LogicPass        *LogicMeta `json:"logicPass,omitempty"` // set when the logic pass ran
+	// LintRetried: the first valid output had content warnings (dsl.Lint) and
+	// was regenerated once with them; Lint lists the warnings left in the
+	// returned document (create) or added by the patch (edit).
+	LintRetried bool     `json:"lintRetried,omitempty"`
+	Lint        []string `json:"lint,omitempty"`
 }
+
+// Event is a progress message emitted by GenerateStream before the Result,
+// as soon as the first top-level block of the model output is complete:
+// create turns send `app` (name / description / tabs + a provisional spoken
+// line), edit turns send `summary`. iOS can show and read them out while the
+// rest of the DSL is still being generated.
+type Event struct {
+	Type        string   `json:"type"` // app|summary
+	Attempt     int      `json:"attempt"`
+	Locale      Locale   `json:"locale"`
+	Name        string   `json:"name,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Tabs        []string `json:"tabs,omitempty"`
+	Summary     string   `json:"summary,omitempty"`
+}
+
+// Sink receives Events in order, on the calling goroutine.
+type Sink func(Event)
 
 // Result is the 200 body of POST /v1/generate.
 type Result struct {
@@ -64,6 +94,7 @@ type Result struct {
 	DSL             json.RawMessage `json:"dsl"`
 	Patch           []dsl.PatchOp   `json:"patch,omitempty"`
 	Summary         string          `json:"summary"`
+	Locale          Locale          `json:"locale"` // language of the UI strings and summary
 	Transcript      string          `json:"transcript"`
 	Source          string          `json:"source"` // claude|restore
 	LatencyMs       Latency         `json:"latencyMs"`
@@ -88,6 +119,18 @@ type Service struct {
 	Model            string
 	MaxRegenerations int           // validation-driven retries after the first attempt (default 2)
 	CallTimeout      time.Duration // per Claude call (default 40s)
+	// LogicPass enables the second "calculations only" call after a create
+	// (env AI_LOGIC_PASS=1; Request.LogicPass overrides per request).
+	LogicPass bool
+	// LintRetry regenerates once when the first valid output has content
+	// warnings (dsl.Lint). Off by default: warnings are only reported in
+	// Meta.Lint, and the user fixes the app by voice instead (env AI_LINT_RETRY=1).
+	LintRetry bool
+	// Chat is the model setup of the clarify turn (chat.go); zero = defaults.
+	ChatConfig ChatConfig
+
+	conv     *convStore // clarify conversations (chat.go); lazily created
+	convOnce sync.Once
 }
 
 func (s *Service) maxRegen() int {
@@ -111,6 +154,13 @@ type attemptResult struct {
 // Generate runs the pipeline: fetch current -> decide mode -> Claude ->
 // validate (retry) -> fallback -> save -> result.
 func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
+	return s.GenerateStream(ctx, req, nil)
+}
+
+// GenerateStream is Generate with Claude streaming: sink (if non-nil) gets
+// an Event as soon as the app block / summary has been generated; the Result
+// is still validated and saved before it is returned.
+func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*Result, error) {
 	started := time.Now()
 	transcript := strings.TrimSpace(req.Transcript)
 	if transcript == "" {
@@ -118,6 +168,10 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 	}
 	if req.AppID == "" || transcript == "" {
 		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "appId and transcript are required"}
+	}
+	loc, err := resolveLocale(req.Locale, transcript)
+	if err != nil {
+		return nil, err
 	}
 	env, err := s.Store.Get(ctx, req.AppID)
 	if err != nil {
@@ -139,19 +193,23 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 		}
 	}
 	if mode == ModeUndo {
-		return s.undo(ctx, req.AppID, transcript, env, started)
+		return s.undo(ctx, req.AppID, transcript, env, started, loc)
 	}
 
 	var ar *attemptResult
+	logic := s.logicEnabled(req)
 	switch mode {
 	case ModeCreate:
 		ref := ""
 		if !isInitial(current) {
 			ref = string(env.DSL)
 		}
-		ar, err = s.generateFull(ctx, transcript, ref, nil)
+		ar, err = s.generateFull(ctx, transcript, ref, nil, loc, sink, logic)
+		if err == nil && logic {
+			s.applyLogicPass(ctx, transcript, ar, loc)
+		}
 	case ModeEdit:
-		ar, err = s.generateEdit(ctx, transcript, env)
+		ar, err = s.generateEdit(ctx, transcript, env, loc, sink)
 	default:
 		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "mode must be auto|create|edit|undo"}
 	}
@@ -181,6 +239,7 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 		Mode:            src.Mode,
 		DSL:             saved.DSL,
 		Summary:         ar.summary,
+		Locale:          loc,
 		Transcript:      transcript,
 		Source:          "claude",
 		Meta:            ar.meta,
@@ -194,7 +253,7 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 
 // generateFull asks for a whole AppDSL; on validation problems it re-prompts
 // up to maxRegen times, then strips areas, then fails with the problems.
-func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, meta *Meta) (*attemptResult, error) {
+func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, meta *Meta, loc Locale, sink Sink, uiOnly bool) (*attemptResult, error) {
 	ar := &attemptResult{}
 	if meta != nil {
 		ar.meta = *meta
@@ -202,26 +261,80 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 	ar.meta.Model = s.Model
 	var problems []string
 	var lastCandidate []byte
+	var linted *attemptResult // valid output kept while regenerating for its lint warnings
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(ctx, systemPrompt, createUserMessage(transcript, refDSL, problems), GenerationSchema(), ar)
+		resp, err := s.call(ctx, systemPrompt, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
+			appEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
 			return nil, err
 		}
-		raw := extractJSON(resp.Text)
+		raw := dropFormPhotoPreviews(fillDefaults(extractJSON(resp.Text)))
+		raw = fixButtonOverlap(raw) // before validation: saves a regeneration (#169)
 		app, perr := dsl.Parse(raw)
 		if perr == nil {
+			// Post-processing order (integration of #173 and #174; each step re-parses):
+			//   1. addMissingLists / fixEnglishUnits: existing content fixes.
+			//   2. fixLayoutRules (#174): moves mic-seat buttons right or into the
+			//      toolbar and fixes date titles on the model's own layout.
+			//   3. addMissingAddButtons (#173): runs after 2 so it sees the final
+			//      openers (a button moved to the toolbar still counts) and never
+			//      adds a toolbar button that 2 would then dedupe or move.
+			//   4. summarizeFor below (summary hints, #173) last, so the spoken
+			//      button positions describe the final layout.
+			if fixed := addMissingLists(raw, app); len(fixed) != len(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
+			if fixed := fixEnglishUnits(raw, loc); len(fixed) != len(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
+			if fixed := fixLayoutRules(raw, app); string(fixed) != string(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
+			if fixed := addMissingAddButtons(raw, app, loc); len(fixed) != len(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
+			if fixed := fixStatUnitLabels(raw); len(fixed) != len(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
 			ar.raw = canon(raw)
-			ar.summary = summarize(app)
+			ar.summary = summarizeFor(app, loc)
+			ar.meta.Lint = app.Lint()
+			if s.LintRetry && len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
+				// one retry for content problems; keep this output in case it fails
+				ar.meta.LintRetried = true
+				kept := *ar
+				linted = &kept
+				problems = lintProblems(ar.meta.Lint)
+				ar.meta.LastProblems = problems
+				continue
+			}
 			return ar, nil
+		}
+		if linted != nil {
+			break // the lint retry broke the document: keep the earlier valid one
 		}
 		lastCandidate = raw
 		problems = problemsOf(perr, resp)
 		ar.meta.LastProblems = problems
 	}
+	if linted != nil {
+		ar.raw, ar.summary, ar.meta.Lint = linted.raw, linted.summary, linted.meta.Lint
+		return ar, nil
+	}
 	if stripped, ok := stripAreas(lastCandidate); ok {
 		if app, perr := dsl.Parse(stripped); perr == nil {
 			ar.raw = stripped
-			ar.summary = summarize(app)
+			ar.summary = summarizeFor(app, loc)
 			ar.meta.AreaFallback = true
 			return ar, nil
 		}
@@ -232,20 +345,27 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 
 // generateEdit asks for a PatchDocument, validates with dsl.ApplyPatch, retries
 // with problems, then tries area-stripping, then downgrades to a full rewrite.
-func (s *Service) generateEdit(ctx context.Context, transcript string, env *appconfigclient.Envelope) (*attemptResult, error) {
+func (s *Service) generateEdit(ctx context.Context, transcript string, env *appconfigclient.Envelope, loc Locale, sink Sink) (*attemptResult, error) {
 	ar := &attemptResult{}
 	ar.meta.Model = s.Model
 	var problems []string
 	var lastOps []dsl.PatchOp
 	var lastSummary string
+	var linted *attemptResult
+	baseLint := lintOf(env.DSL)
 	for i := 0; i <= s.maxRegen(); i++ {
 		resp, err := s.call(ctx, systemPrompt+"\n"+editRules,
-			editUserMessage(transcript, env.Version, string(env.DSL), problems), PatchGenerationSchema(), ar)
+			editUserMessage(transcript, env.Version, string(env.DSL), problems, loc), PatchGenerationSchema(), ar,
+			summaryEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
 			return nil, err
 		}
 		var doc dsl.PatchDocument
-		if uerr := json.Unmarshal(extractJSON(resp.Text), &doc); uerr != nil {
+		uerr := json.Unmarshal(extractJSON(resp.Text), &doc)
+		if uerr != nil && linted != nil {
+			break
+		}
+		if uerr != nil {
 			problems = []string{"output is not a valid PatchDocument: " + uerr.Error()}
 			if resp.StopReason == "max_tokens" {
 				problems = append(problems, "output was truncated (max_tokens); make the patch smaller")
@@ -253,16 +373,33 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 			ar.meta.LastProblems = problems
 			continue
 		}
+		doc.Patch = fillPatchDefaults(doc.Patch, env.DSL)
 		next, _, perr := dsl.ApplyPatch(env.DSL, doc.Patch)
 		if perr == nil {
 			ar.raw = next
 			ar.ops = doc.Patch
-			ar.summary = strings.TrimSpace(doc.Summary)
+			ar.summary = normalizeDigits(strings.TrimSpace(doc.Summary))
+			ar.meta.Lint = newLint(baseLint, lintOf(next))
+			if s.LintRetry && len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
+				ar.meta.LintRetried = true
+				kept := *ar
+				linted = &kept
+				problems = lintProblems(ar.meta.Lint)
+				ar.meta.LastProblems = problems
+				continue
+			}
 			return ar, nil
+		}
+		if linted != nil {
+			break
 		}
 		lastOps, lastSummary = doc.Patch, doc.Summary
 		problems = problemsOf(perr, resp)
 		ar.meta.LastProblems = problems
+	}
+	if linted != nil {
+		ar.raw, ar.ops, ar.summary, ar.meta.Lint = linted.raw, linted.ops, linted.summary, linted.meta.Lint
+		return ar, nil
 	}
 	// Fallback 1: apply the last patch unchecked, drop areas, re-validate.
 	if len(lastOps) > 0 {
@@ -282,7 +419,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	meta := ar.meta
 	meta.DowngradedToFull = true
 	full := &Service{Claude: s.Claude, Store: s.Store, Model: s.Model, MaxRegenerations: -1, CallTimeout: s.CallTimeout}
-	fr, err := full.generateFull(ctx, transcript, string(env.DSL), &meta)
+	fr, err := full.generateFull(ctx, transcript, string(env.DSL), &meta, loc, sink, false)
 	if err != nil {
 		var ge *Error
 		if errors.As(err, &ge) {
@@ -295,7 +432,8 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 }
 
 // call performs one Claude request and folds usage/attempts/latency into ar.
-func (s *Service) call(ctx context.Context, system, user string, schema json.RawMessage, ar *attemptResult) (*Response, error) {
+// onText (nil = non-streaming) receives the text deltas.
+func (s *Service) call(ctx context.Context, system, user string, schema json.RawMessage, ar *attemptResult, onText func(string)) (*Response, error) {
 	timeout := s.CallTimeout
 	if timeout == 0 {
 		timeout = 40 * time.Second
@@ -303,7 +441,7 @@ func (s *Service) call(ctx context.Context, system, user string, schema json.Raw
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	t := time.Now()
-	resp, err := s.Claude.Complete(cctx, Completion{System: system, Messages: []Message{{Role: "user", Content: user}}, Schema: schema})
+	resp, err := s.Claude.Complete(cctx, Completion{System: system, Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
 	ar.latency += time.Since(t)
 	ar.meta.Attempts++
 	ar.meta.Regenerations = ar.meta.Attempts - 1
@@ -311,6 +449,7 @@ func (s *Service) call(ctx context.Context, system, user string, schema json.Raw
 		return nil, mapClaudeErr(err)
 	}
 	ar.meta.Usage.Add(resp.Usage)
+	ar.meta.OutputChars += len(resp.Text)
 	if resp.StopReason == "refusal" {
 		msg := "the model declined this request"
 		if resp.StopDetails != nil && resp.StopDetails.Category != "" {
@@ -319,6 +458,82 @@ func (s *Service) call(ctx context.Context, system, user string, schema json.Raw
 		return nil, &Error{Status: http.StatusBadRequest, Code: "refused", Message: msg, Attempts: ar.meta.Attempts}
 	}
 	return resp, nil
+}
+
+// appEventWatcher returns the OnText hook for a create turn: when the
+// top-level `app` object has been streamed, it emits one Event with the
+// name / tabs and a provisional spoken line. nil sink = no streaming.
+func appEventWatcher(sink Sink, loc Locale, attempt int) func(string) {
+	if sink == nil {
+		return nil
+	}
+	w := newKeyWatcher("app")
+	return func(delta string) {
+		raw, ok := w.Feed(delta)
+		if !ok {
+			return
+		}
+		var meta dsl.AppMeta
+		if err := json.Unmarshal(raw, &meta); err != nil || strings.TrimSpace(meta.Name) == "" {
+			return
+		}
+		ev := Event{Type: "app", Attempt: attempt, Locale: loc, Name: meta.Name, Description: meta.Description}
+		for _, t := range meta.Tabs {
+			ev.Tabs = append(ev.Tabs, t.Title)
+		}
+		ev.Summary = draftSummary(&meta, loc)
+		sink(ev)
+	}
+}
+
+// summaryEventWatcher is the edit-turn counterpart: the PatchDocument is
+// written summary-first, so the spoken line is available before the ops.
+func summaryEventWatcher(sink Sink, loc Locale, attempt int) func(string) {
+	if sink == nil {
+		return nil
+	}
+	w := newKeyWatcher("summary")
+	return func(delta string) {
+		raw, ok := w.Feed(delta)
+		if !ok {
+			return
+		}
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil || strings.TrimSpace(s) == "" {
+			return
+		}
+		sink(Event{Type: "summary", Attempt: attempt, Locale: loc, Summary: strings.TrimSpace(s)})
+	}
+}
+
+// draftSummary is the provisional line read out while the screens are still
+// being generated: 「家計簿アプリを作っています。ホームと集計の2タブです。」 /
+// "Making a Budget Book app with 2 tabs: Home and Stats."
+func draftSummary(m *dsl.AppMeta, loc Locale) string {
+	titles := make([]string, 0, len(m.Tabs))
+	for _, t := range m.Tabs {
+		titles = append(titles, t.Title)
+	}
+	if loc == LocaleEN {
+		name := strings.TrimSpace(m.Name)
+		if !strings.HasSuffix(strings.ToLower(name), "app") {
+			name += " app"
+		}
+		s := "Making " + withArticle(name)
+		if len(titles) >= 2 {
+			s += fmt.Sprintf(" with %d tabs: %s", len(titles), joinEN(titles, "and"))
+		}
+		return s + "."
+	}
+	name := m.Name
+	if !strings.HasSuffix(name, "アプリ") {
+		name += "アプリ"
+	}
+	s := name + "を作っています。"
+	if len(titles) >= 2 {
+		s += fmt.Sprintf("%sの%dタブです。", joinJa(titles), len(titles))
+	}
+	return s
 }
 
 func problemsOf(err error, resp *Response) []string {
@@ -350,15 +565,20 @@ func applyUnchecked(current []byte, ops []dsl.PatchOp) ([]byte, bool) {
 }
 
 // extractJSON tolerates a code fence or a short preamble around the JSON
-// (needed when the request runs without output_config.format).
+// (needed when the request runs without output_config.format). Only the first
+// JSON value is taken, so trailing prose ("...}Wait, I also changed X") does
+// not fail with "invalid character after top-level value".
 func extractJSON(text string) []byte {
 	t := strings.TrimSpace(text)
-	if strings.HasPrefix(t, "{") && strings.HasSuffix(t, "}") {
+	start := strings.Index(t, "{")
+	if start < 0 {
 		return []byte(t)
 	}
-	start := strings.Index(t, "{")
-	end := strings.LastIndex(t, "}")
-	if start >= 0 && end > start {
+	var first json.RawMessage
+	if err := json.NewDecoder(strings.NewReader(t[start:])).Decode(&first); err == nil {
+		return first
+	}
+	if end := strings.LastIndex(t, "}"); end > start {
 		return []byte(t[start : end+1])
 	}
 	return []byte(t)
@@ -389,11 +609,17 @@ func isInitial(a *dsl.App) bool {
 	return true
 }
 
-var newAppPhrases = []string{"新しいアプリ", "作り直して", "作りなおして", "別のアプリ", "ゼロから", "一から"}
+// newAppPhrases anywhere in the utterance switch an existing app to a full
+// rebuild (ja and en; matched case-insensitively).
+var newAppPhrases = []string{
+	"新しいアプリ", "作り直して", "作りなおして", "別のアプリ", "ゼロから", "一から",
+	"new app", "different app", "another app", "start over", "start again", "from scratch", "rebuild",
+}
 
 func wantsNewApp(t string) bool {
+	s := strings.ToLower(t)
 	for _, p := range newAppPhrases {
-		if strings.Contains(t, p) {
+		if strings.Contains(s, p) {
 			return true
 		}
 	}
@@ -401,7 +627,8 @@ func wantsNewApp(t string) bool {
 }
 
 // undoPrefixes are matched at the start of a short utterance only, so edits
-// such as 「一覧を元の位置に戻して」 or long sentences are never mistaken for undo.
+// such as 「一覧を元の位置に戻して」 / "put the list back at the top" or long
+// sentences are never mistaken for undo.
 var undoPrefixes = []string{
 	"元に戻し", "もとに戻し", "元へ戻し", "戻して",
 	"取り消し", "取消", "アンドゥ", "undo",
@@ -409,16 +636,28 @@ var undoPrefixes = []string{
 	"さっきのを戻", "さっきのを元に戻", "さっきのを取り消", "さっきの取り消",
 	"やっぱりやめ", "やっぱやめ",
 	"一つ前に戻", "ひとつ前に戻", "1つ前に戻", "一つ前の状態に戻", "ひとつ前の状態に戻", "前の状態に戻",
+	// en ("undo" above also covers "undo that" / "undo the last change")
+	"revert", "roll back", "rollback", "go back", "take that back", "take it back",
+	"scrap that", "cancel that", "never mind", "nevermind", "forget that", "forget it",
 }
 
-const undoMaxRunes = 16
+// undoMaxRunes / undoMaxRunesEN bound the utterance length: 16 runes fits
+// 「さっきの変更を元に戻して」, 32 fits "go back to the previous version".
+const (
+	undoMaxRunes   = 16
+	undoMaxRunesEN = 32
+)
 
-// wantsUndo is the keyword classifier for 「元に戻して」. No Claude call: the
-// utterance must be short and start with one of undoPrefixes.
+// wantsUndo is the keyword classifier for 「元に戻して」 / "undo". No Claude
+// call: the utterance must be short and start with one of undoPrefixes.
 func wantsUndo(t string) bool {
 	s := strings.ToLower(strings.TrimSpace(t))
 	s = strings.TrimRight(s, "。．.!！?？、,…　 ")
-	if s == "" || len([]rune(s)) > undoMaxRunes {
+	limit := undoMaxRunes
+	if !hasJapanese(s) {
+		limit = undoMaxRunesEN
+	}
+	if s == "" || len([]rune(s)) > limit {
 		return false
 	}
 	for _, p := range undoPrefixes {
@@ -433,7 +672,7 @@ func wantsUndo(t string) bool {
 // version is itself a restore, it steps back from the version it restored
 // (so repeated 「戻して」 keeps going back instead of redoing). Version 1 is
 // the voice-only seed, so there is nothing to undo below version 2.
-func (s *Service) undo(ctx context.Context, appID, transcript string, env *appconfigclient.Envelope, started time.Time) (*Result, error) {
+func (s *Service) undo(ctx context.Context, appID, transcript string, env *appconfigclient.Envelope, started time.Time, loc Locale) (*Result, error) {
 	versions, err := s.Store.Versions(ctx, appID)
 	if err != nil {
 		return nil, mapStoreErr(err)
@@ -450,12 +689,13 @@ func (s *Service) undo(ctx context.Context, appID, transcript string, env *appco
 		PreviousVersion: env.Version,
 		Mode:            "restore",
 		DSL:             env.DSL,
+		Locale:          loc,
 		Transcript:      transcript,
 		Source:          "restore",
 		Meta:            Meta{Model: s.Model},
 	}
 	if target < 1 {
-		res.Summary = "戻せる変更がありません。"
+		res.Summary = loc.text().nothingToUndo
 		res.LatencyMs = Latency{Total: time.Since(started).Milliseconds()}
 		return res, nil
 	}
@@ -466,9 +706,17 @@ func (s *Service) undo(ctx context.Context, appID, transcript string, env *appco
 	res.Version = saved.Version
 	res.RestoredFrom = target
 	res.DSL = saved.DSL
-	res.Summary = fmt.Sprintf("ひとつ前の状態(version %d)に戻しました。", target)
+	res.Summary = fmt.Sprintf(loc.text().restored, target)
 	res.LatencyMs = Latency{Total: time.Since(started).Milliseconds()}
 	return res, nil
+}
+
+// summarizeFor picks the summary renderer for the locale (ja is the default).
+func summarizeFor(a *dsl.App, loc Locale) string {
+	if loc == LocaleEN {
+		return summarizeEN(a)
+	}
+	return normalizeDigits(summarize(a))
 }
 
 // summarize renders the Japanese summary for a full generation
@@ -494,8 +742,12 @@ func summarize(a *dsl.App) string {
 		for _, e := range a.Entities {
 			names = append(names, e.Name)
 		}
-		if where := addButtonHint(a); where != "" {
-			fmt.Fprintf(&b, "%sから%sを追加できます。", where, joinJa(names))
+		if hints := addHints(a, addButtonJa, addToolbarJa); len(hints) > 0 {
+			parts := make([]string, 0, len(hints))
+			for _, h := range hints {
+				parts = append(parts, fmt.Sprintf("%sから%sを", h.where, joinJa(h.entities)))
+			}
+			fmt.Fprintf(&b, "%s追加できます。", strings.Join(parts, "、"))
 		} else {
 			fmt.Fprintf(&b, "%sを記録できます。", joinJa(names))
 		}
@@ -533,35 +785,11 @@ func joinJa(items []string) string {
 	return strings.Join(items, "・")
 }
 
-// addButtonHint names where the "add" button is on the initial screen
-// ("右下のボタン", "右上の「追加」"), or "" when there is none.
-func addButtonHint(a *dsl.App) string {
-	forms := map[string]bool{}
-	for _, s := range a.Screens {
-		if s.Entity != "" {
-			forms[s.ID] = true
-		}
-	}
-	toForm := func(act *dsl.Action) bool {
-		return act != nil && act.Type == dsl.ActionNavigate && forms[act.Screen]
-	}
-	for _, s := range a.Screens {
-		if s.ID != a.InitialScreen {
-			continue
-		}
-		for _, c := range s.Components {
-			if c.Type == dsl.CompButton && toForm(c.Action) {
-				return areaPosition(c.Area) + "ボタン"
-			}
-		}
-		for _, tb := range s.Toolbar {
-			if toForm(&tb.Action) {
-				return "右上の「" + tb.Label + "」"
-			}
-		}
-	}
-	return ""
-}
+// addButtonJa / addToolbarJa phrase where an add control is ("右下のボタン",
+// "右上の「メンバー追加」").
+func addButtonJa(c *dsl.Component) string { return areaPosition(c.Area) + "ボタン" }
+
+func addToolbarJa(tb *dsl.ToolbarButton) string { return "右上の「" + tb.Label + "」" }
 
 // areaPosition turns a grid rectangle into "右下の" / "左上の" / "下の" / "".
 func areaPosition(area string) string {

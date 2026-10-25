@@ -10,24 +10,24 @@ struct TableLeaf: View {
         let entityId = c.entity ?? ""
         let entity = rt.dsl.entity(entityId)
         let columns = c.columns ?? []
-        let all = Aggregator.sorted(Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId)), by: c.sort, entity: entity)
+        let all = Aggregator.sorted(rt.filteredRecords(c), by: c.sort, entity: entity)
         let rows = (c.limit ?? 0) > 0 ? Array(all.prefix(c.limit!)) : all
         VStack(alignment: .leading, spacing: 0) {
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+            Grid(alignment: .leading, horizontalSpacing: RenderTheme.Spacing.row, verticalSpacing: 10) {
                 GridRow {
                     ForEach(Array(columns.enumerated()), id: \.offset) { _, col in
                         Text(col.title ?? entity?.field(col.field)?.name ?? col.field)
-                            .font(.caption.weight(.semibold))
+                            .font(RenderTheme.Fonts.tableHeader)
                             .foregroundStyle(.secondary)
                             .gridColumnAlignment(alignment(for: col, entity: entity))
                     }
                 }
-                Divider().gridCellUnsizedAxes(.horizontal)
+                Hairline().gridCellUnsizedAxes(.horizontal)
                 ForEach(rows) { row in
                     GridRow {
                         ForEach(Array(columns.enumerated()), id: \.offset) { _, col in
-                            Text(FieldCoding.display(row[col.field], field: entity?.field(col.field)))
-                                .font(.subheadline.monospacedDigit())
+                            Text(rt.display(row[col.field], field: entity?.field(col.field)))
+                                .font(RenderTheme.Fonts.tableCell)
                                 .lineLimit(1)
                                 .frame(maxWidth: .infinity, alignment: frameAlignment(for: col, entity: entity))
                         }
@@ -35,14 +35,13 @@ struct TableLeaf: View {
                 }
             }
             if rows.isEmpty {
-                Text(rt.loading.contains(entityId) ? "読み込み中…" : "まだありません")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity).padding(.vertical, 16)
+                EmptyPlaceholder(icon: "tablecells", emptyText: L("まだありません"), state: rt.emptyState(for: entityId)) {
+                    Task { await rt.load(entities: [entityId], force: true) }
+                }
+                    .padding(.top, RenderTheme.Spacing.sm)
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        .renderCard()
     }
 
     private func alignment(for col: TableColumnSpec, entity: Entity?) -> HorizontalAlignment {

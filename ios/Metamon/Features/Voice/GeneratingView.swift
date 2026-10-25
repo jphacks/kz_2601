@@ -19,22 +19,22 @@ enum GeneratingStage: Equatable {
     }
 
     /// 文言表(docs/ios/architecture.md §6 と同期)
-    static let normalMessages = [
-        "どんなアプリにするか考えています…",
-        "必要な画面とデータを決めています…",
-        "画面を組み立てています…",
-        "細部を整えています…",
-    ]
+    static var normalMessages: [String] { [
+        L10n.tr("どんなアプリにするか考えています…"),
+        L10n.tr("必要な画面とデータを決めています…"),
+        L10n.tr("画面を組み立てています…"),
+        L10n.tr("細部を整えています…"),
+    ] }
 
     func message(elapsed: TimeInterval, edit: Bool) -> String {
         switch self {
         case .normal:
-            if edit { return "変更を反映しています…" }
+            if edit { return L10n.tr("変更を反映しています…") }
             let i = Int(elapsed / 3) % Self.normalMessages.count
             return Self.normalMessages[i]
-        case .slow: return "もう少しかかっています…"
-        case .warning: return "時間がかかっています。もう少しだけお待ちください"
-        case .fallback: return "混み合っています。安全なテンプレートに切り替えています…"
+        case .slow: return L10n.tr("もう少しかかっています…")
+        case .warning: return L10n.tr("時間がかかっています。もう少しだけお待ちください")
+        case .fallback: return L10n.tr("混み合っています。安全なテンプレートに切り替えています…")
         }
     }
 }
@@ -66,6 +66,11 @@ struct GeneratingView: View {
             .padding(.vertical, Theme.Spacing.xl)
             .padding(.horizontal, Theme.Spacing.lg)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("generating.create") // UI テスト(#182)
+        #if DEBUG
+        .onAppear { MorphProbe.generatingAppeared += 1 }
+        #endif
         .task(id: job.startedAt) {
             // 0.25s 刻みで経過秒を更新(文言切替と段階判定用。グリッドの描画は TimelineView が担う)
             while !Task.isCancelled {
@@ -82,12 +87,20 @@ struct GeneratingView: View {
                 .textCase(.uppercase)
                 .tracking(1.2)
                 .foregroundStyle(Theme.brandGradient)
-            Text("「\(job.transcript)」")
+            Text("「\(displayTranscript)」")
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .minimumScaleFactor(0.8)
         }
+    }
+
+    /// 見出しには「別のアプリ。」などの切替キーワードを出さない(VoiceIntent.newAppPrefixes と同じ語)。
+    private var displayTranscript: String {
+        let prefixes = ["別のアプリ", "別アプリ", "新しいアプリ", "新規アプリ", "違うアプリ", "次のアプリ", "べつのアプリ", "あたらしいアプリ"]
+        guard let p = prefixes.first(where: { job.transcript.hasPrefix($0) }) else { return job.transcript }
+        let rest = job.transcript.dropFirst(p.count).trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+        return rest.isEmpty ? job.transcript : rest
     }
 
     private var footer: some View {
@@ -117,9 +130,22 @@ struct GeneratingView: View {
     }
 
     private var elapsedLabel: String {
-        String(format: "%.0f 秒", elapsed.rounded(.down))
+        L10n.tr("\(Int(elapsed.rounded(.down))) 秒")
     }
 }
+
+#if DEBUG
+/// UI テストの観測用カウンタ(RootView の `UITestMorphProbe` が読む・#200)
+@MainActor
+enum MorphProbe {
+    static var createStarted = 0
+    static var generatingAppeared = 0
+    /// RootView の body が create の生成中で評価された回数(0 なら RootView が morphJob の変化で作り直されていない)
+    static var rootCreateEvals = 0
+    /// VoiceInputView 側の保険(`GeneratingFallback`)が出た回数
+    static var fallbackAppeared = 0
+}
+#endif
 
 /// 6×12 のスケルトングリッド。セルが波のように順に光り、3 秒ごとに「レイアウト案」(ブロック)が入れ替わる。
 /// TimelineView(20fps) + 単純な sin で軽量に。
@@ -138,11 +164,17 @@ struct SkeletonGrid: View {
 
     private var layoutIndex: Int { Int(elapsed / 3) % Self.layouts.count }
 
+    /// n セル分の長さ(間の gap 込み)。0 未満にしない
+    private static func span(_ n: Int, cell: CGFloat, gap: CGFloat) -> CGFloat {
+        max(0, CGFloat(n) * (cell + gap) - gap)
+    }
+
     var body: some View {
         GeometryReader { geo in
             let gap: CGFloat = 6
-            let cw = (geo.size.width - gap * CGFloat(Self.cols - 1)) / CGFloat(Self.cols)
-            let ch = (geo.size.height - gap * CGFloat(Self.rows - 1)) / CGFloat(Self.rows)
+            // 出し入れの途中は geo.size が 0 になり得る。負の幅は "Invalid frame dimension" になるので 0 で止める
+            let cw = max(0, (geo.size.width - gap * CGFloat(Self.cols - 1)) / CGFloat(Self.cols))
+            let ch = max(0, (geo.size.height - gap * CGFloat(Self.rows - 1)) / CGFloat(Self.rows))
             TimelineView(.periodic(from: .now, by: 1.0 / 20)) { tl in
                 let t = tl.date.timeIntervalSinceReferenceDate
                 ZStack(alignment: .topLeading) {
@@ -163,8 +195,8 @@ struct SkeletonGrid: View {
                                 .fill(Theme.brandGradient.opacity(0.14))
                                 .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                                     .strokeBorder(Theme.Colors.brandB.opacity(0.5), lineWidth: 1))
-                                .frame(width: CGFloat(area.colSpan) * (cw + gap) - gap,
-                                       height: CGFloat(area.rowSpan) * (ch + gap) - gap)
+                                .frame(width: Self.span(area.colSpan, cell: cw, gap: gap),
+                                       height: Self.span(area.rowSpan, cell: ch, gap: gap))
                                 .offset(x: CGFloat(area.col1) * (cw + gap), y: CGFloat(area.row1 - 1) * (ch + gap))
                                 .transition(.opacity)
                         }
@@ -210,6 +242,8 @@ struct EditingIndicator: View {
             .background(.regularMaterial, in: Capsule())
             .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
             .shadow(color: Theme.Shadow.softColor, radius: 12, y: 6)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("generating.edit") // UI テスト(#182)
         }
         .animation(.easeInOut(duration: 0.3), value: stage)
         .task(id: job.startedAt) {

@@ -21,7 +21,9 @@ public enum PhotoCodec {
         return "data:image/jpeg;base64," + jpeg.base64EncodedString()
     }
 
+    /// video field の値(#206)はサムネイルを返すので、一覧の item.image / table でもそのまま 1 フレーム目が出る。
     public static func image(from value: JSONValue) -> UIImage? {
+        if let thumb = VideoValue(value)?.thumbnail { return image(from: .string(thumb)) }
         guard let s = value.stringValue, s.hasPrefix("data:"), let comma = s.firstIndex(of: ",") else { return nil }
         return Data(base64Encoded: String(s[s.index(after: comma)...])).flatMap(UIImage.init(data:))
     }
@@ -31,6 +33,12 @@ public enum PhotoCodec {
 struct PhotoView: View {
     let value: JSONValue
     var height: CGFloat
+    /// VoiceOver の読み上げ(省略時は「写真」。プレースホルダは「写真なし」)
+    var accessibilityLabel: String? = nil
+
+    private var hasPhoto: Bool {
+        PhotoCodec.image(from: value) != nil || (value.stringValue?.hasPrefix("http") ?? false)
+    }
 
     var body: some View {
         Group {
@@ -44,6 +52,18 @@ struct PhotoView: View {
         }
         .frame(height: height)
         .frame(maxWidth: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            // 動画のサムネイルには再生マーク(#206)
+            if VideoValue(value) != nil {
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: min(36, height * 0.4)))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, .black.opacity(0.35))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel ?? (hasPhoto ? L("写真") : L("写真なし")))
+        .accessibilityAddTraits(hasPhoto ? .isImage : [])
     }
 }

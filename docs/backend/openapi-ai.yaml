@@ -26,6 +26,18 @@ paths:
            検証 NG は最大 2 回再生成。patch が 3 回失敗したら full に降格 → それも失敗ならテンプレ fallback → 422
         5. appconfig が 409 なら最新を取り直して 1 回だけ再生成
         6. 新 DSL と要約を返す。iOS は返却 `dsl` を即時適用してよい (再 GET 不要)
+
+        **ストリーミング (`?stream=1`)**: 応答が `text/event-stream` になり、Claude の出力を逐次読んで
+        - `event: app` — create ターン。出力先頭の `app` ブロックが揃った時点 (実測 p50 ≈2.4s) で `{type, attempt, locale, name, description, tabs[], summary}`。`summary` は読み上げ用の仮の一文「家計簿アプリを作っています。ホームと集計の2タブです。」
+        - `event: summary` — edit ターン。PatchDocument は summary を先に書くので `{type, attempt, locale, summary}` が ops より先に届く
+        - `event: result` — JSON モードと同じ GenerateResponse (検証・保存後)
+        - `event: error` — JSON モードと同じ `{error:{code,message,details?,status}}` (HTTP は 200 のまま)
+        再生成が走ると app/summary イベントは attempt を変えてもう一度届くことがある (最新を採用)。
+      parameters:
+        - in: query
+          name: stream
+          schema: { type: string, enum: ['1', 'true'] }
+          description: 指定すると Server-Sent Events で app/summary → result|error の順に返す
       requestBody:
         required: true
         content:
@@ -62,6 +74,93 @@ paths:
                   details: { transcript: えーっと, attempts: 2, problems: ['screen "home" components[0]: list entity "x" does not exist'] }
         '429': { description: Claude/Whisper のレート制限 (Retry-After 付き), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
         '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+
+  /chat:
+    post:
+      summary: 生成前の対話 (clarify)。1 問だけ聞き返すか、要件が揃えば ready で生成用の transcript を返す
+      description: |
+        Issue #74 / G17。初回生成の前に数ラリーで要件を固める。`/generate` は無変更で、iOS は `ready.transcript` をそのまま `POST /generate`(mode auto/create)に渡す。
+        - `messages` は会話の全履歴でも最新のユーザー発話 1 件でもよい。2 件以上ならサーバーの会話状態を置き換え、1 件なら追記する
+        - 応答は `kind=question`(質問 1 文 + 選択肢 ≤3)か `kind=ready`(brief + transcript)。Claude が質問できるのは 3 ラリーまで、4 ラリー目は必ず ready
+        - 最新発話が「もう作って / それでいい / お任せ / just build it / go ahead」等の短い go-ahead なら Claude を呼ばず直前の理解で即 ready(`source=shortcut`)
+        - 会話状態は ai プロセス内(appId ごと・直近 10 メッセージ・30 分で消える)。永続化は後段
+
+        **チャット基本化 (#184 / #185)**: リクエストに `mode` か `capabilities: ["answer","proposal"]` があれば、question / ready に加えて
+        `answer`(質問への答え。アプリは変えない)と `proposal`(案 1〜3 個。`options[].instruction` を「これでいく」で `POST /generate` に渡す)も返す。
+        どちらも無いリクエスト(旧 iOS)は上の clarify の振る舞いのまま(新しい kind も `mode` / `options` も返さない)。
+        - `mode`: create | edit。省略時は appId に生成済みの DSL があれば edit、無ければ create(初期の音声画面だけの DSL は create 扱い)。edit を指定しても生成前なら create になる。応答の `mode` が実際に使ったもの
+        - edit: サーバーが今の DSL を appconfig から読んで要約し、部品カタログと「できる / できない」と一緒に Claude に渡す。明確な指示は聞き返さず `ready`(`transcript` = generate の edit にそのまま渡す変更指示)、質問は `answer`、曖昧な要望は `proposal`
+        - create: 既存の question / ready(曖昧なら 1 問・具体的ならすぐ ready・go-ahead は shortcut)に加え、「何が作れるの?」→ `answer`、「どんな感じがいい?」→ `proposal`(instruction = 作るアプリの依頼文)。質問は 3 回まで(answer / proposal は数えない)、それ以降の question は ready に寄せる(`source=forced`)
+        - create と edit で会話は別(mode が変わると会話状態を作り直す)。answer / question / proposal は本文がそろった時点で先に返す
+        - edit で DSL を読むので `Authorization` をそのまま appconfig に渡す
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChatRequest' }
+      responses:
+        '200':
+          description: 質問または ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatResponse' }
+              examples:
+                question:
+                  value: { kind: question, text: レシートの写真も残したいですか?, suggestions: [写真も残す, 文字だけでOK, お任せ], turn: 1, locale: ja, source: claude }
+                ready:
+                  value:
+                    kind: ready
+                    text: では作りますね。
+                    turn: 2
+                    locale: ja
+                    source: claude
+                    brief: { name: 筋トレ記録, purpose: 腕立てとスクワットの回数を毎日つける, entities: [トレーニング], features: [記録の一覧, 今日の合計回数, 毎朝8時の通知], native: [notification] }
+                    transcript: 筋トレ記録アプリを作って。腕立てとスクワットの回数と日付を記録して、記録の一覧と今日の合計回数を見たい。毎朝8時に通知してほしい。
+                answer:
+                  summary: edit の質問への答え (#185)
+                  value: { kind: answer, mode: edit, text: いいえ、WebView ではなく iOS のネイティブ画面で表示しています。, turn: 1, locale: ja, source: claude }
+                proposal:
+                  summary: edit の曖昧な要望への案 (#185)
+                  value:
+                    kind: proposal
+                    mode: edit
+                    text: こんな案はどうでしょう。
+                    turn: 1
+                    locale: ja
+                    source: claude
+                    options:
+                      - { id: opt1, title: 金額を大きく, detail: ホームの上の今月の支出を大きく表示します, instruction: ホーム画面の上の「今月の支出」の枠を広げて数字を大きく目立たせて。 }
+                      - { id: opt2, title: グラフで見せる, detail: ホームにカテゴリ別の円グラフを置きます, instruction: ホーム画面に今月のカテゴリ別の円グラフを追加して。 }
+                readyRequiresPro:
+                  summary: 有料機能 (みんなで共有するデータ) を含む ready (#77)
+                  value:
+                    kind: ready
+                    mode: create
+                    text: この内容で作りますね。
+                    turn: 2
+                    locale: ja
+                    source: claude
+                    brief: { name: サークル掲示板, purpose: サークルのみんなで予定を書き込む, entities: [投稿], features: [投稿の一覧], native: [] }
+                    transcript: サークルのみんなで予定を書き込める掲示板アプリを作って。
+                    requiresPro: true
+                    paidFeatures: [{ id: sharedData, title: みんなで共有するデータ, reason: みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。 }]
+                    freeTranscript: "サークルのみんなで予定を書き込める掲示板アプリを作って。\n(無料版で作る: 他のユーザーとデータを共有する機能は入れない。…)"
+                editReady:
+                  summary: edit の明確な指示 (#185)
+                  value: { kind: ready, mode: edit, text: メモ欄を消しますね。, turn: 1, locale: ja, source: claude, transcript: 支出を記録画面のメモ欄を消して。 }
+        '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
+        '429': { description: Claude のレート制限, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '502': { description: Claude の出力がスキーマに合わず 2 回とも失敗 (generation_failed), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+
+  /chat/{appId}:
+    delete:
+      summary: 対話の会話状態を消す (iOS が「最初から」「キャンセル」した時)
+      parameters:
+        - { name: appId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: 消した (存在しなくても 204) }
 
   /transcribe:
     post:
@@ -108,6 +207,10 @@ components:
       properties:
         appId: { type: string }
         text: { type: string, description: 文字起こし済みの発話 (WhisperKit 経由) }
+        locale:
+          type: string
+          enum: [ja, en]
+          description: UI 文言と summary の言語。省略時は発話にかな・漢字があれば ja、無ければ en(英語で話せば英語 UI)。それ以外の値は 400
         baseVersion:
           type: integer
           description: iOS が今表示している version。省略時はサーバー側で現行を取得 (競合検知を iOS が気にしない場合)
@@ -117,11 +220,17 @@ components:
           default: auto
           description: |
             create = 既存を捨てて新規アプリ (フル DSL / PUT)。edit = 既存を Patch で編集 (PATCH)。undo = 1 つ前に restore。
-            auto = 現行が初期状態なら create、それ以外は edit (「元に戻して」「新しく作り直して」はキーワードで判定)
+            auto = 現行が初期状態なら create、それ以外は edit (「元に戻して」/ "undo"・「新しく作り直して」/ "start over" はキーワードで判定)
+        logicPass:
+          type: boolean
+          description: |
+            計算ロジックの 2 パス目(#100・docs/dsl/expressions.md)。true = create の UI 生成後に「発話に必要な計算(Field.computed / stat.value / settlement / ref 型)だけを JSON Patch で足す」小さな呼び出しを追加する。
+            省略時はサーバー既定(env AI_LOGIC_PASS=1 で有効・既定は無効 = 1 パスで UI と計算を同時に生成)。edit / undo では無視。2 パス目が検証に通らなければ 1 パス目の結果を返す(失敗にしない)。
+            ?stream=1 の `event: app` は 1 パス目の app ブロックで従来どおり先に届き、2 パス目の結果は `event: result` の dsl に入る。
       example: { appId: app_01HXYZ, text: 家計簿アプリが欲しい。金額とカテゴリとメモを記録したい, baseVersion: 1 }
     GenerateResponse:
       type: object
-      required: [appId, version, mode, dsl, summary, source]
+      required: [appId, version, mode, dsl, summary, locale, source]
       properties:
         appId: { type: string }
         version: { type: integer, description: 新しく作られた version }
@@ -132,13 +241,14 @@ components:
           description: 実際に使われた適用モード (patch が full に降格した場合は full)。restore = undo で 1 つ前の version を復元(Claude を呼ばない)
         restoredFrom:
           type: integer
-          description: mode=restore の時、復元元の version。戻せる変更が無い時(version 1 のみ)は省略され version は変わらず summary が「戻せる変更がありません。」になる
+          description: mode=restore の時、復元元の version。戻せる変更が無い時(version 1 のみ)は省略され version は変わらず summary が「戻せる変更がありません。」(en は "There is nothing to undo.")になる
         patch:
           type: array
           description: mode=patch の時、適用した RFC 6902 ops (iOS は使わなくてよい。デバッグ・表示用)
           items: { $ref: '../dsl/dsl.schema.json#/$defs/PatchOp' }
         dsl: { $ref: '../dsl/dsl.schema.json', description: 適用後のフル DSL (iOS はこれを即適用) }
-        summary: { type: string, example: 家計簿アプリを作成しました。支出の記録と今月の合計、カテゴリ別の内訳が見られます }
+        summary: { type: string, description: iOS がそのまま読み上げる 1 文(locale の言語), example: 家計簿アプリを作成しました。支出の記録と今月の合計、カテゴリ別の内訳が見られます }
+        locale: { type: string, enum: [ja, en], description: UI 文言と summary の言語(リクエストの locale、省略時は発話から判定した値) }
         transcript: { type: string, description: 入力が audio の時の文字起こし }
         source:
           type: string
@@ -156,3 +266,111 @@ components:
         latencyMs:
           type: object
           properties: { transcribe: { type: integer }, claude: { type: integer }, total: { type: integer } }
+        meta:
+          type: object
+          description: 診断情報(model / attempts / usage など)。logicPass は 2 パス目を実行した時だけ入る
+          properties:
+            logicPass:
+              type: object
+              properties:
+                applied: { type: boolean, description: 計算の patch が検証を通って DSL に反映された }
+                ops: { type: integer }
+                attempts: { type: integer }
+                claudeMs: { type: integer }
+                problems: { type: array, items: { type: string }, description: 反映されなかった時の最後の検証エラー }
+    ChatMessage:
+      type: object
+      required: [role, text]
+      properties:
+        role: { type: string, enum: [user, assistant] }
+        text: { type: string }
+    ChatRequest:
+      type: object
+      required: [appId, messages]
+      properties:
+        appId: { type: string }
+        messages:
+          type: array
+          minItems: 1
+          description: 最後は user。全履歴(iOS が持つ分)か最新 1 件
+          items: { $ref: '#/components/schemas/ChatMessage' }
+        locale: { type: string, enum: [ja, en], description: 省略時はユーザー発話から判定 (かな・漢字があれば ja) }
+        mode:
+          type: string
+          enum: [create, edit]
+          description: '#185。省略時は生成済みの DSL があれば edit、無ければ create。これか capabilities を送ると answer / proposal が返りうる'
+        capabilities:
+          type: array
+          items: { type: string, enum: [answer, proposal] }
+          description: '#185。クライアントが表示できる追加の kind。mode を省いて自動判定に任せる新しい iOS はこれを送る'
+      example: { appId: app_01HXYZ, messages: [{ role: user, text: 家計簿 }] }
+    ChatOption:
+      type: object
+      required: [id, title, detail, instruction]
+      properties:
+        id: { type: string, description: opt1 / opt2 / opt3 }
+        title: { type: string, description: カードの見出し (短い) }
+        detail: { type: string, description: 何がどう変わるか 1 文 }
+        instruction: { type: string, description: 「これでいく」で POST /generate の text にそのまま渡す指示文 (edit = 変更内容、create = 作るアプリの依頼文) }
+        requiresPro: { type: boolean, description: '#77。この案が有料機能 (Tailor It Pro) を使う時だけ true (無料なら省略)。iOS は確認カードを出す' }
+        paidFeatures: { type: array, items: { $ref: '#/components/schemas/PaidFeature' }, description: '#77。requiresPro の時だけ' }
+        freeInstruction: { type: string, description: '#77。requiresPro の時だけ。有料機能を抜いた指示文 (「この機能なしで作る」で instruction の代わりに POST /generate へ)' }
+    PaidFeature:
+      type: object
+      description: '#77。有料機能 1 つ。一覧はサーバーの backend/internal/ai/paid_features.json (docs/backend/architecture.md「有料機能の判定」)'
+      required: [id, title, reason]
+      properties:
+        id: { type: string, description: 'sharedData (みんなで共有するデータ) など' }
+        title: { type: string, description: 'カードに出す名前 (locale の言語)。例: みんなで共有するデータ' }
+        reason: { type: string, description: なぜ有料か 1 文 (locale の言語) }
+    ChatBrief:
+      type: object
+      description: 現時点の要件理解 (iOS は表示に使ってもよい。生成には transcript を使う)
+      required: [name, purpose, entities, features, native]
+      properties:
+        name: { type: string, description: アプリ名 }
+        purpose: { type: string, description: 一文 }
+        entities: { type: array, items: { type: string }, description: 記録する項目 }
+        features: { type: array, items: { type: string }, description: 見たい一覧・集計・ボタンなど }
+        native:
+          type: array
+          items: { type: string }
+          description: 必要なネイティブ機能の英小文字キーワード (camera / notification / calendar / map / location / share …)。無ければ空配列
+    ChatResponse:
+      type: object
+      required: [kind, text, turn, locale, source]
+      properties:
+        kind: { type: string, enum: [question, ready, answer, proposal], description: 'answer / proposal は mode か capabilities を送った時だけ (#185)' }
+        mode: { type: string, enum: [create, edit], description: '#185 のリクエストの時だけ。実際に使った mode' }
+        options:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items: { $ref: '#/components/schemas/ChatOption' }
+          description: proposal の時だけ
+        text: { type: string, description: 'question: 質問文 (読み上げる)。ready: 「では作りますね。」/ "Got it, I''ll build it now."' }
+        suggestions:
+          type: array
+          maxItems: 3
+          items: { type: string }
+          description: question の時(と answer の時に任意で)。チップとして出す短い選択肢 (そのまま次の user text に使える)。answer では「グラフを追加して」のような、そのまま言える次の指示
+        turn: { type: integer, description: これまでのユーザー発話数 (1 始まり)。4 以上は必ず ready }
+        brief: { $ref: '#/components/schemas/ChatBrief', description: create の ready の時だけ }
+        transcript: { type: string, description: ready の時だけ。create = 要件を 1 段落にまとめた一人称の依頼文、edit = 変更指示。これを POST /generate の text に渡す }
+        requiresPro: { type: boolean, description: '#77。ready の transcript が有料機能 (Tailor It Pro) を使う時だけ true (無料なら省略・旧 iOS は無視してよい)。判定は transcript の語 (paid_features.json の keywords) で、edit で今のアプリが既に持つ機能は除く。課金の強制はしない (表示用)' }
+        paidFeatures: { type: array, items: { $ref: '#/components/schemas/PaidFeature' }, description: '#77。requiresPro の時だけ' }
+        freeTranscript: { type: string, description: '#77。requiresPro の時だけ。有料機能を抜いた依頼文 (transcript + 無料版の指示)。「この機能なしで作る」で transcript の代わりに POST /generate へ' }
+        locale: { type: string, enum: [ja, en] }
+        source:
+          type: string
+          enum: [claude, shortcut, forced]
+          description: shortcut = go-ahead 語で Claude を呼ばず即 ready。forced = 4 ラリー目 (または 1 発目の go-ahead、#185 の create では 4 回目の質問) で ready に寄せた
+        latencyMs:
+          type: object
+          properties: { claude: { type: integer }, total: { type: integer } }
+        firstTokenMs:
+          type: integer
+          description: 診断用。Claude の最初の出力トークンまでの ms(shortcut では省略)。#147
+        meta:
+          type: object
+          description: 診断用 (model / attempts / usage)。question を先に返した時(#147)は usage が 0(残りは裏で生成)

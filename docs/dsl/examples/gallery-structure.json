@@ -43,14 +43,14 @@
             { "type": "stat", "label": "今月", "entity": "memo", "aggregate": "count", "filter": { "field": "date", "op": "thisMonth", "value": null } },
             { "type": "stat", "label": "ぜんぶ", "entity": "memo", "aggregate": "count" }
           ] },
-        { "type": "carousel", "id": "tips", "area": "A7:F9", "itemWidth": "medium",
+        { "type": "carousel", "id": "tips", "area": "A7:F8", "itemWidth": "medium",
           "children": [
             { "type": "text", "text": "1. 横スクロール", "style": "headline" },
             { "type": "text", "text": "2. itemWidth で幅を変える", "style": "headline" },
             { "type": "text", "text": "3. 子は Leaf だけ", "style": "headline" },
             { "type": "button", "label": "メモを追加", "icon": "plus", "action": { "type": "navigate", "screen": "memo_form", "presentation": "sheet" } }
           ] },
-        { "type": "disclosure", "id": "more", "area": "A10:F12", "title": "disclosure(たたむ)", "expanded": false,
+        { "type": "disclosure", "id": "more", "area": "A9:F10", "title": "disclosure(たたむ)", "expanded": false,
           "children": [
             { "type": "text", "text": "開くと詳細が出る。注意書きや補足に", "style": "caption" },
             { "type": "openUrlButton", "label": "JPHACKS 公式", "url": "https://jphacks.com", "icon": "safari", "style": "plain" }
@@ -73,8 +73,8 @@
         { "type": "mapView", "id": "map", "area": "A12:F16", "entity": "memo", "locationField": "place", "titleField": "note", "zoom": "city",
           "onItemTap": { "type": "navigate", "screen": "memo_form", "presentation": "sheet" } },
         { "type": "timerDisplay", "id": "watch", "area": "A17:F19", "mode": "stopwatch", "label": "ストップウォッチ" },
-        { "type": "shareButton", "id": "share", "area": "A20:C21", "text": "メタモンで作ったアプリを見て！", "label": "共有", "icon": "square.and.arrow.up" },
-        { "type": "openUrlButton", "id": "site", "area": "D20:F21", "label": "公式サイト", "url": "https://jphacks.com", "icon": "safari", "style": "secondary" }
+        { "type": "shareButton", "id": "share", "area": "D20:F21", "text": "Tailor It で作ったアプリを見て！", "label": "共有", "icon": "square.and.arrow.up" },
+        { "type": "openUrlButton", "id": "site", "area": "D22:F23", "label": "公式サイト", "url": "https://jphacks.com", "icon": "safari", "style": "secondary" }
       ]
     },
     {

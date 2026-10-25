@@ -53,6 +53,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.toggle) { c, ctx in ToggleLeaf(c: c, ctx: ctx) }
         r.register(.photoField) { c, ctx in PhotoFieldLeaf(c: c, ctx: ctx) }
         r.register(.image) { c, ctx in ImageLeaf(c: c, ctx: ctx) }
+        r.register(.videoField) { c, ctx in VideoFieldLeaf(c: c, ctx: ctx) }
+        r.register(.videoPlayer) { c, ctx in VideoPlayerLeaf(c: c, ctx: ctx) }
         r.register(.list) { c, ctx in ListLeaf(c: c, ctx: ctx) }
         r.register(.stat) { c, _ in StatLeaf(c: c) }
         r.register(.chart) { c, _ in ChartLeaf(c: c) }
@@ -93,6 +95,17 @@ public struct ComponentRegistry: Sendable {
         r.register(.table) { c, _ in TableLeaf(c: c) }
         r.register(.timeline) { c, _ in TimelineLeaf(c: c) }
         r.register(.emptyState) { c, _ in EmptyStateLeaf(c: c) }
+        // leaf(計算・#101)
+        r.register(.settlement) { c, _ in SettlementLeaf(c: c) }
+        // leaf(Web)
+        r.register(.webView) { c, _ in WebViewLeaf(c: c) }
+        // leaf(オンデバイス AI・#78)
+        r.register(.aiButton) { c, ctx in AiButtonLeaf(c: c, ctx: ctx) }
+        // leaf(近距離共有・#36)
+        r.register(.nearbyShare) { c, ctx in NearbyShareLeaf(c: c, ctx: ctx) }
+        // leaf(位置の記録・#168)
+        r.register(.locationTracker) { c, ctx in LocationTrackerLeaf(c: c, ctx: ctx) }
+        r.register(.healthStat) { c, _ in HealthStatLeaf(c: c) }
         return r
     }()
 }

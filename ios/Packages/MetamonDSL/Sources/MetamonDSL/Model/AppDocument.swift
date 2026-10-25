@@ -50,6 +50,23 @@ public struct AppDSL: Decodable, Sendable {
     public func screen(_ id: String) -> Screen? { screens.first { $0.id == id } }
     public func entity(_ id: String) -> Entity? { entities.first { $0.id == id } }
 
+    /// 画面の描画に要る entity(部品が直接使うもの + computed / Stat.value の agg 先 + ref の参照先を推移的に)。
+    public func entitiesNeeded(by screen: Screen) -> Set<String> {
+        var out = screen.referencedEntities
+        for c in screen.allComponents { out.formUnion(c.valueExpr?.referencedEntities ?? []) }
+        var queue = Array(out)
+        while let id = queue.popLast() {
+            guard let e = entity(id) else { continue }
+            var next = Set<String>()
+            for f in e.fields {
+                next.formUnion(f.computed?.referencedEntities ?? [])
+                if let r = f.refEntity { next.insert(r) }
+            }
+            for n in next.subtracting(out) { out.insert(n); queue.append(n) }
+        }
+        return out
+    }
+
     /// 初期状態(音声画面のみ)か。
     public var isVoiceOnly: Bool { app.voiceEntry == .fullscreen }
 
@@ -71,11 +88,26 @@ public struct AppDSL: Decodable, Sendable {
 
     public static let fallback: AppDSL = {
         let json = """
-        {"schemaVersion":1,"app":{"name":"メタモン","voiceEntry":"none"},"initialScreen":"home","entities":[],
-         "screens":[{"id":"home","title":"メタモン","components":[{"type":"text","text":"DSL を読み込めませんでした"}]}]}
+        {"schemaVersion":1,"app":{"name":"Tailor It","voiceEntry":"none"},"initialScreen":"home","entities":[],
+         "screens":[{"id":"home","title":"Tailor It","components":[{"type":"text","text":"DSL を読み込めませんでした"}]}]}
         """
         return try! JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
     }()
+}
+
+extension AppDSL {
+    private enum Keys: String, CodingKey { case schemaVersion, app, initialScreen, entities, screens }
+
+    /// 毎日リセットのチェック(#132)の toggle field は、デコード時に新規作成の既定値(今日)を外す。
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        schemaVersion = try c.decode(Int.self, forKey: .schemaVersion)
+        app = try c.decode(AppMeta.self, forKey: .app)
+        initialScreen = try c.decode(String.self, forKey: .initialScreen)
+        _entities = try c.decode(Lossy<Entity>.self, forKey: .entities)
+        _screens = try c.decode(Lossy<Screen>.self, forKey: .screens)
+        clearDailyToggleDefaults()
+    }
 }
 
 public enum VoiceEntry: String, Decodable, Sendable {
@@ -99,7 +131,7 @@ public struct AppMeta: Decodable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
-        name = try c.decodeIfPresent(String.self, forKey: .name) ?? "メタモン"
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Tailor It"
         description = try c.decodeIfPresent(String.self, forKey: .description)
         icon = try c.decodeIfPresent(String.self, forKey: .icon)
         theme = try? c.decodeIfPresent(Theme.self, forKey: .theme)
@@ -148,10 +180,23 @@ public struct Entity: Decodable, Identifiable, Sendable {
     @Lossy public var fields: [Field]
 
     public func field(_ id: String) -> Field? { fields.first { $0.id == id } }
+
+    /// 保存対象(computed 以外)のフィールド。フォームのドラフト・送信はこちらだけ。
+    public var storedFields: [Field] { fields.filter { !$0.isComputed } }
+    public var computedFields: [Field] { fields.filter(\.isComputed) }
+
+    /// 一覧の見出しに使う field(titleField → 最初の string field → 最初の field)。
+    public var displayTitleField: String? {
+        titleField ?? storedFields.first { $0.type == .string }?.id ?? storedFields.first?.id
+    }
 }
 
 public enum FieldType: String, Decodable, Sendable {
     case string, text, integer, number, boolean, date, datetime, `enum`, currency, photo, location
+    /// 端末内の動画("video:<id>|<サムネイル data URL>"・#206)。`VideoValue` で読む。
+    case video
+    /// 別 entity のレコード参照(保存値はレコード id 文字列・#101)。`Field.refEntity` が参照先。
+    case ref
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .string) }
 
     public var isNumeric: Bool { self == .integer || self == .number || self == .currency }
@@ -167,6 +212,30 @@ public struct Field: Decodable, Identifiable, Sendable {
     /// リテラル既定値。date/datetime は "now" 可。
     public var defaultValue: JSONValue?
     public var unit: String?
+    /// type=ref の参照先 entity id。
+    public var refEntity: String?
+    /// 読み取り専用の算出フィールド(#101)。行コンテキスト = そのレコード。**Record には保存しない**。
+    public var computed: Expr?
+    /// "weight": 保存した値をヘルスケアの体重にも書き込む(#167)。
+    public var health: String?
+
+    public var isComputed: Bool { computed != nil }
+
+    private enum Keys: String, CodingKey { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? id
+        type = try c.decodeIfPresent(FieldType.self, forKey: .type) ?? .string
+        required = try? c.decodeIfPresent(Bool.self, forKey: .required)
+        options = try? c.decodeIfPresent([String].self, forKey: .options)
+        defaultValue = try? c.decodeIfPresent(JSONValue.self, forKey: .defaultValue)
+        unit = try? c.decodeIfPresent(String.self, forKey: .unit)
+        refEntity = try? c.decodeIfPresent(String.self, forKey: .refEntity)
+        computed = try? c.decodeIfPresent(Expr.self, forKey: .computed)
+        health = try? c.decodeIfPresent(String.self, forKey: .health)
+    }
 }
 
 public struct Screen: Decodable, Identifiable, Sendable {

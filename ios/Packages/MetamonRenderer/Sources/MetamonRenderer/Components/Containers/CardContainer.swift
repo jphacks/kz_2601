@@ -9,13 +9,10 @@ struct CardContainer: View {
     var body: some View {
         VStack(alignment: .leading, spacing: c.containerSpacing) {
             if let title = c.title, !title.isEmpty {
-                Text(title).font(.headline)
+                Text(title).font(RenderTheme.Fonts.cardTitle)
             }
-            ForEach(c.children) { DSLView(component: $0, ctx: ctx) }
+            if let placed = c.localGridPlacement { LocalGrid(placed: placed, ctx: ctx) } else { ForEach(c.children) { DSLView(component: $0, ctx: ctx) } }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
+        .renderCard()
     }
 }

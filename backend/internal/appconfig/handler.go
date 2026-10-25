@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
@@ -36,11 +37,13 @@ type Handler struct {
 
 	mu    sync.Mutex
 	cache map[string]*dsl.App // uid/appId/version -> parsed DSL (records validation)
+
+	eventsMax time.Duration // lifetime of one GET /events stream
 }
 
 // New builds the v1 router (a ServeMux so the caller can probe matches).
 func New(s store.Store) *http.ServeMux {
-	h := &Handler{store: s, cache: map[string]*dsl.App{}}
+	h := &Handler{store: s, cache: map[string]*dsl.App{}, eventsMax: eventsMaxStream()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/apps", h.listApps)
 	mux.HandleFunc("POST /v1/apps", h.createApp)
@@ -49,6 +52,7 @@ func New(s store.Store) *http.ServeMux {
 	mux.HandleFunc("DELETE /v1/apps/{appId}", h.deleteApp)
 
 	mux.HandleFunc("GET /v1/apps/{appId}/dsl", h.getDSL)
+	mux.HandleFunc("GET /v1/apps/{appId}/events", h.events)
 	mux.HandleFunc("PUT /v1/apps/{appId}/dsl", h.putDSL)
 	mux.HandleFunc("PATCH /v1/apps/{appId}/dsl", h.patchDSL)
 	mux.HandleFunc("GET /v1/apps/{appId}/versions", h.listVersions)
@@ -64,6 +68,22 @@ func New(s store.Store) *http.ServeMux {
 	mux.HandleFunc("GET /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.getRecord)
 	mux.HandleFunc("PATCH /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.patchRecord)
 	mux.HandleFunc("DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.deleteRecord)
+
+	// share links (#49) / public catalog (#50): share.go
+	mux.HandleFunc("POST /v1/apps/{appId}/share", h.createShare)
+	mux.HandleFunc("GET /v1/shares/{token}", h.getShare)
+	mux.HandleFunc("DELETE /v1/shares/{token}", h.revokeShare)
+	mux.HandleFunc("POST /v1/shares/{token}/import", h.importShare)
+	mux.HandleFunc("POST /v1/apps/{appId}/publish", h.publishApp)
+	mux.HandleFunc("DELETE /v1/apps/{appId}/publish", h.unpublishApp)
+	mux.HandleFunc("GET /v1/public-apps", h.listPublicApps)
+	mux.HandleFunc("POST /v1/public-apps/{id}/install", h.installPublicApp)
+
+	mux.HandleFunc("DELETE /v1/me", h.deleteMe) // account deletion (#119): account.go
+	// release requests (#76): release.go
+	mux.HandleFunc("POST /v1/apps/{appId}/release-requests", h.createReleaseRequest)
+	mux.HandleFunc("GET /v1/apps/{appId}/release-requests", h.listAppReleaseRequests)
+	mux.HandleFunc("GET /v1/release-requests", h.listMyReleaseRequests)
 	return mux
 }
 
@@ -96,6 +116,11 @@ func (e *apiError) With(k string, v any) *apiError {
 func fail(w http.ResponseWriter, err error) {
 	var ae *apiError
 	if errors.As(err, &ae) {
+		if ae.status == http.StatusBadRequest || ae.status == http.StatusUnprocessableEntity {
+			// 理由(field と msg)を残す: クライアントの保存失敗をログだけで追えるように
+			slog.Warn("appconfig: request rejected", slog.Int("status", ae.status), slog.String("code", ae.code),
+				slog.String("msg", ae.msg), slog.Any("details", ae.details), slog.String("requestId", w.Header().Get(httpx.RequestIDHeader)))
+		}
 		httpx.ErrorWithDetails(w, ae.status, ae.code, ae.msg, ae.details)
 		return
 	}
@@ -129,7 +154,7 @@ func uidOf(r *http.Request) string { return auth.UID(r.Context()) }
 
 func pathID(r *http.Request, name string) (string, error) {
 	v := r.PathValue(name)
-	if !idRe.MatchString(v) {
+	if !idRe.MatchString(v) || (name == "appId" && !validAppID(v)) {
 		return "", apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "invalid "+name)
 	}
 	return v, nil
@@ -192,16 +217,48 @@ func (p paging) next(got int) string {
 	return base64.RawURLEncoding.EncodeToString([]byte(strconv.Itoa(p.offset + p.size)))
 }
 
-// ensureApp loads the app, seeding version 1 (dsl.Initial) for unknown ids:
-// iOS uses a device-fixed UUID as appId and never calls POST /apps first.
+// ensureApp loads the app, seeding version 1 for unknown ids: iOS uses a
+// device-fixed UUID as appId and never calls POST /apps first. If another
+// user has published that appId (apps_public/{appId}, see publish), the seed
+// is their DSL instead of dsl.Initial — this is how a shared app is
+// "installed" under the caller's own uid.
 func (h *Handler) ensureApp(r *http.Request, appID string) (*store.App, error) {
+	ctx, uid := r.Context(), uidOf(r)
+	if app, err := h.store.GetApp(ctx, uid, appID); err == nil {
+		return app, nil
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return nil, err
+	}
 	init := dsl.Initial()
 	raw, err := json.Marshal(init)
 	if err != nil {
 		return nil, err
 	}
-	app, _, err := h.store.EnsureApp(r.Context(), uidOf(r), appID, raw, init.App.Name)
+	name := init.App.Name
+	if pub, err := h.store.GetPublicApp(ctx, appID); err == nil {
+		raw, name = pub.DSL, pub.Name
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return nil, err
+	}
+	app, _, err := h.store.EnsureApp(ctx, uid, appID, raw, name)
 	return app, err
+}
+
+// publish mirrors a committed DSL to apps_public/{appId} when it has shared
+// entities, so other users opening the same appId get it from ensureApp.
+// Failures are logged, not returned: the owner's private commit already
+// succeeded, and an appId first published by someone else is left alone.
+func (h *Handler) publish(r *http.Request, appID string, app *dsl.App, raw json.RawMessage, version int) {
+	if !app.HasSharedEntity() {
+		return
+	}
+	ok, err := h.store.PublishApp(r.Context(), uidOf(r), appID, raw, app.App.Name, version)
+	switch {
+	case err != nil:
+		slog.Error("appconfig: publish failed", slog.String("appId", appID), slog.Any("error", err))
+	case !ok:
+		slog.Warn("appconfig: appId already published by another user; not overwritten", slog.String("appId", appID))
+	}
 }
 
 // parsedDSL returns the typed DSL for an app version (cached).

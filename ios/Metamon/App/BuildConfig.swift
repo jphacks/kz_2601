@@ -1,8 +1,10 @@
 import Foundation
+import MetamonDSL
 import MetamonServices
+import MetamonRenderer
 
 /// 起動環境。appconfig / ai の URL は別々に設定でき、どちらも無ければ全モックで動く。
-/// 既定(project.yml)は ai = staging(Cloud Run https)・appconfig = 未設定(インメモリ)。
+/// 既定(project.yml)は ai = staging・appconfig = staging(どちらも Cloud Run https)。
 /// - `METAMON_AI_BASE_URL`(env) / `MetamonAIBaseURL`(Info.plist): ai サービス(`POST /v1/generate`)
 /// - `METAMON_APPCONFIG_BASE_URL`(env) / `MetamonAppConfigBaseURL`(Info.plist): appconfig(DSL/records CRUD・ホットリロード)
 /// Info.plist の値は build setting `$(METAMON_*_BASE_URL)` から展開されるので、`xcodebuild ... METAMON_AI_BASE_URL=http://…` でも渡せる。
@@ -23,6 +25,9 @@ enum AppEnvironment {
 /// **DI の入口**。`Services` はここで1回だけ組み立て、`MetamonApp` が `AppRuntime` と SwiftUI Environment(`\.services`)に渡す。
 /// Mock / 本番の差し替えはこのファイルだけで完結する(View / Runtime は protocol にしか依存しない)。
 enum BuildConfig {
+    /// ウィジェットと共有する App Group(entitlements と一致。実体は両ターゲット共通の `WidgetSnapshot`)。
+    static let appGroupID = WidgetSnapshot.appGroupID
+
     /// `METAMON_MOCK=1`(Scheme の環境変数)で URL 設定を無視して全モック起動(オフラインでの UI 確認用)。
     static var forceMock: Bool {
         ProcessInfo.processInfo.environment["METAMON_MOCK"] == "1"
@@ -52,27 +57,51 @@ enum BuildConfig {
         return [env, plist].compactMap { $0 }.first { !$0.isEmpty } ?? "small"
     }
 
+    /// モックの初期レコード。DEBUG の見た目監査(#131)では DSL の entity からダミーを作る。
+    private static var mockSeed: [String: [Record]] {
+        #if DEBUG
+        if let seed = DebugDSLOverride.seed { return seed }
+        #endif
+        return MockSeed.demoRecords()
+    }
+
+    /// モック ai の応答待ち。DEBUG では `METAMON_MOCK_AI_DELAY=<秒>` で延ばせる(生成中の表示の UI テスト・#182)。
+    private static var mockAIDelay: Duration {
+        #if DEBUG
+        if let s = ProcessInfo.processInfo.environment["METAMON_MOCK_AI_DELAY"].flatMap(Double.init), s >= 0 { return .milliseconds(Int(s * 1000)) }
+        #endif
+        return .seconds(1.2)
+    }
+
     @MainActor
     static func make(environment: AppEnvironment = .current) -> Services {
         switch environment {
         case .mock:
-            return Services(
+            let appConfig = InMemoryAppConfigClient(seed: mockSeed)
+            var services = Services(
                 auth: MockAuthService(signedIn: true),
-                appConfig: InMemoryAppConfigClient(seed: MockSeed.demoRecords()),
-                ai: MockAIClient(),
+                appConfig: appConfig,
+                ai: MockAIClient(delay: mockAIDelay),
                 sync: NoopDocumentSync(),
                 token: NoAuthTokenProvider(),
                 transcriber: makeTranscriber(),
                 notifications: UserNotificationScheduler(),
                 isLive: false
             )
+            #if DEBUG
+            if DebugMockSharing.isEnabled { // UI テスト用(#165): 変身一覧に 2 件 + 端末内で完結するシェア
+                services.sharing = DebugSharingClient()
+                Task { await appConfig.setApps(DebugMockSharing.apps) }
+            }
+            #endif
+            return services
         case .live(let appConfigURL, let aiURL):
             let auth = makeAuth()
-            let token = AuthTokenProvider(auth: auth)
+            let token: any TokenProvider = devToken ?? AuthTokenProvider(auth: auth)
             let appConfig: any AppConfigClient = appConfigURL.map { HTTPAppConfigClient(baseURL: $0, token: token) }
                 ?? InMemoryAppConfigClient(seed: MockSeed.demoRecords())
-            let sync: any DocumentSync = (appConfig as? HTTPAppConfigClient).map { PollingDocumentSync(client: $0) } ?? NoopDocumentSync()
-            return Services(
+            let sync: any DocumentSync = (appConfig as? HTTPAppConfigClient).map(makeSync) ?? NoopDocumentSync()
+            var services = Services(
                 auth: auth,
                 appConfig: appConfig,
                 ai: aiURL.map { HTTPAIClient(baseURL: $0, token: token) } ?? MockAIClient(),
@@ -82,7 +111,35 @@ enum BuildConfig {
                 notifications: UserNotificationScheduler(),
                 isLive: appConfigURL != nil
             )
+            services.sharing = appConfigURL.map { HTTPSharingClient(baseURL: $0, token: token) }
+            if let appConfigURL { services.account = HTTPAccountClient(baseURL: appConfigURL, token: token) } // #119
+            services.releaseRequests = appConfigURL.map { HTTPReleaseRequestClient(baseURL: $0, token: token) }
+            return services
         }
+    }
+
+    /// ホットリロード: SSE(`GET /events`)+ ポーリングのフォールバック(#82)。
+    /// DEBUG のみ `METAMON_REALTIME=0` で Day1 のポーリングだけに戻せる(比較・切り分け用)。
+    static func makeSync(_ client: HTTPAppConfigClient) -> any DocumentSync {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["METAMON_REALTIME"] == "0" {
+            print("[Metamon] METAMON_REALTIME=0: ポーリングのみ(5 秒)")
+            return PollingDocumentSync(client: client)
+        }
+        #endif
+        return RealtimeDocumentSync(client: client)
+    }
+
+    /// DEBUG のみ: `METAMON_DEV_UID=<uid>` で Bearer にその文字列を送る。`AUTH_MODE=dev` のローカル backend は Bearer をそのまま uid として扱うので、
+    /// シミュレータ E2E で端末固定の uid を使える(Firebase の ID トークンは 1 時間で変わり、dev モードでは別ユーザーに見えてしまう)。
+    static var devToken: (any TokenProvider)? {
+        #if DEBUG
+        if let uid = ProcessInfo.processInfo.environment["METAMON_DEV_UID"], !uid.isEmpty {
+            print("[Metamon] METAMON_DEV_UID=\(uid): Bearer に固定 uid を送ります(ローカル AUTH_MODE=dev 専用)")
+            return StaticTokenProvider(uid)
+        }
+        #endif
+        return nil
     }
 
     /// Firebase が初期化済みなら本物、plist 未同期なら警告してモック(固定 uid・Bearer 無し)。
@@ -98,7 +155,9 @@ enum BuildConfig {
         #if targetEnvironment(simulator)
         return MockTranscriber()
         #else
-        return WhisperKitRecognizer(model: whisperModel)
+        let recognizer = WhisperKitRecognizer(model: whisperModel)
+        recognizer.language = { LanguagePreference.shared.code } // 認識言語は UI 言語に合わせる(#45)
+        return recognizer
         #endif
     }
 }
@@ -121,5 +180,10 @@ enum DeviceAppID {
         let fresh = UUID().uuidString.lowercased()
         UserDefaults.standard.set(fresh, forKey: key)
         return fresh
+    }
+
+    /// 変身一覧からの切替用: 既存のアプリ(`GET /apps` の id)を現在のアプリにする。
+    static func set(_ appId: String) {
+        UserDefaults.standard.set(appId, forKey: key)
     }
 }

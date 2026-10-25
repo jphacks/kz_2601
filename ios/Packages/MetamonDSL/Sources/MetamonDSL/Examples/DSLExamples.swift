@@ -1,6 +1,6 @@
 import Foundation
 
-/// 正典サンプル `docs/dsl/examples/*.json`(backend CI でも検証される 4 本)。
+/// 正典サンプル `docs/dsl/examples/*.json`(backend CI でも検証される)。
 /// アプリは xcodegen でこのディレクトリをそのままリソースにバンドルする(iOS 側にコピーを持たない=ドリフト防止)。
 public enum DSLExamples {
     public static let names = [
@@ -11,6 +11,17 @@ public enum DSLExamples {
         "gallery-input",
         "gallery-display",
         "gallery-structure",
+        "gallery-web",
+        "warikan",
+        "bmi",
+        "shopping",
+        "navigation",
+        "diary_ai",
+        "medicine",
+        "attendance_nearby",
+        "water",
+        "walk_route",
+        "health",
     ]
 
     /// 初期状態(音声画面のみ)の DSL 名。

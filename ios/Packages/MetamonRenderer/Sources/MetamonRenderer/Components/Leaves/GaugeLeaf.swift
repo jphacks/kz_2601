@@ -24,14 +24,17 @@ struct GaugeLeaf: View {
             .gaugeStyle(.accessoryCircular)
             .scaleEffect(1.4)
             .frame(height: 80)
-            .tint(.accentColor)
+            .tint(Gradient(colors: [RenderTheme.Colors.brandA, RenderTheme.Colors.brandB]))
             if let label = c.label {
                 Text(unit.map { "\(label) (\($0))" } ?? label).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
         }
-        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        .renderCard()
+        // VoiceOver: 「体重 (kg), 62.5(範囲 40〜120)」と 1 要素で読む
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(unit.flatMap { u in c.label.map { "\($0) (\(u))" } } ?? c.label ?? L("ゲージ"))
+        .accessibilityValue(L("\(Aggregator.format(value, as: nil, unit: nil))(範囲 \(compact(lo))〜\(compact(hi)))"))
     }
 
     /// 端の目盛り: 大きい値は 30K のように短く(円形ゲージの幅に収める)。
@@ -44,9 +47,9 @@ struct GaugeLeaf: View {
         if let v = c.value { return (v, nil) }
         guard let entityId = c.entity else { return (0, nil) }
         let entity = rt.dsl.entity(entityId)
-        let rows = Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId))
+        let rows = rt.filteredRecords(c)
         let op = c.aggregate ?? "sum"
-        let unit = op == "count" ? "件" : c.field.flatMap { entity?.field($0)?.unit }
+        let unit = op == "count" ? L("件") : c.field.flatMap { entity?.field($0)?.unit }
         return (Aggregator.aggregate(op, field: c.field, over: rows), unit)
     }
 }

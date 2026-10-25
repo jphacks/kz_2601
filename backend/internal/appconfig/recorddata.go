@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -21,7 +23,40 @@ const (
 	maxStringLen = 4000
 	maxTextLen   = 20000
 	dateLayout   = "2006-01-02"
+	// maxRefLen bounds a type=ref value (a record id; server ids and iOS "local-<uuid>" are far shorter).
+	maxRefLen = 200
+	// maxVideoLen bounds a type=video value: "video:<id>|<thumbnail data URL>".
+	// iOS keeps the thumbnail around 20-40KB; the record stays far below Firestore's 1MB.
+	maxVideoLen = 200_000
 )
+
+// videoIDPattern is the on-device file id of a type=video value (iOS: UUID).
+var videoIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,80}$`)
+
+// checkVideoValue accepts "video:<id>" optionally followed by
+// "|data:image/...;base64,..." (first-frame thumbnail), or an https URL
+// (reserved for a future Firebase Storage upload). The movie itself never
+// reaches the backend (#206: Firestore documents are capped at 1MB).
+func checkVideoValue(s string) error {
+	if len(s) > maxVideoLen {
+		return fmt.Errorf("exceeds %d bytes", maxVideoLen)
+	}
+	if strings.HasPrefix(s, "https://") {
+		return nil
+	}
+	rest, ok := strings.CutPrefix(s, "video:")
+	if !ok {
+		return fmt.Errorf("must be \"video:<id>|data:image/...\" or an https URL")
+	}
+	id, thumb, hasThumb := strings.Cut(rest, "|")
+	if !videoIDPattern.MatchString(id) {
+		return fmt.Errorf("has an invalid video id")
+	}
+	if hasThumb && !strings.HasPrefix(thumb, "data:image/") {
+		return fmt.Errorf("thumbnail must be a data:image/... URL")
+	}
+	return nil
+}
 
 func invalidRecord(field, msg string) error {
 	return apiErr(http.StatusUnprocessableEntity, httpx.CodeInvalidRecord, fmt.Sprintf("field %q %s", field, msg)).With("field", field)
@@ -33,10 +68,24 @@ func invalidRecord(field, msg string) error {
 // Unknown keys are 400 (openapi), type/required problems are 422.
 func normalizeData(ent *dsl.Entity, in map[string]any, create bool) (map[string]any, error) {
 	out := make(map[string]any, len(ent.Fields))
-	for k := range in {
-		if ent.FieldByID(k) == nil {
+	for k, v := range in {
+		if ent.FieldByID(k) != nil {
+			continue
+		}
+		if !isHistoryKey(ent, k) {
 			return nil, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, fmt.Sprintf("unknown field %q", k)).With("field", k)
 		}
+		if v == nil {
+			if !create {
+				out[k] = nil // PATCH removes the history
+			}
+			continue
+		}
+		days, err := normalizeHistory(v)
+		if err != nil {
+			return nil, invalidRecord(k, err.Error())
+		}
+		out[k] = days
 	}
 	for i := range ent.Fields {
 		f := &ent.Fields[i]
@@ -69,6 +118,59 @@ func normalizeData(ent *dsl.Entity, in map[string]any, create bool) (map[string]
 			return nil, invalidRecord(f.ID, err.Error())
 		}
 		out[f.ID] = nv
+	}
+	return out, nil
+}
+
+// historySuffix marks the checked-day history iOS keeps next to the date
+// field of a list.item.toggle with resets "daily" (#172): "<field>__dates"
+// = ["YYYY-MM-DD", ...]. It is not declared in the DSL.
+const (
+	historySuffix = "__dates"
+	maxHistory    = 400
+)
+
+// isHistoryKey reports whether k is "<date field>__dates" of ent.
+func isHistoryKey(ent *dsl.Entity, k string) bool {
+	base, ok := strings.CutSuffix(k, historySuffix)
+	if !ok || base == "" {
+		return false
+	}
+	f := ent.FieldByID(base)
+	return f != nil && f.Type == dsl.FieldDate && f.Computed == nil
+}
+
+// normalizeHistory validates a history array: YYYY-MM-DD strings, sorted,
+// de-duplicated, the newest maxHistory kept.
+func normalizeHistory(v any) ([]any, error) {
+	arr, ok := v.([]any)
+	if !ok {
+		return nil, fmt.Errorf("must be an array of YYYY-MM-DD strings")
+	}
+	seen := make(map[string]bool, len(arr))
+	days := make([]string, 0, len(arr))
+	for _, x := range arr {
+		s, ok := x.(string)
+		if !ok {
+			return nil, fmt.Errorf("must be an array of YYYY-MM-DD strings")
+		}
+		t, err := time.Parse(dateLayout, s)
+		if err != nil {
+			return nil, fmt.Errorf("has %q; must be YYYY-MM-DD", s)
+		}
+		d := t.Format(dateLayout)
+		if !seen[d] {
+			seen[d] = true
+			days = append(days, d)
+		}
+	}
+	sort.Strings(days)
+	if len(days) > maxHistory {
+		days = days[len(days)-maxHistory:]
+	}
+	out := make([]any, len(days))
+	for i, d := range days {
+		out[i] = d
 	}
 	return out, nil
 }
@@ -187,10 +289,30 @@ func normalizeValue(f *dsl.Field, v any) (any, error) {
 			return nil, fmt.Errorf("must be one of %s", strings.Join(f.Options, ", "))
 		}
 		return s, nil
+	case dsl.FieldRef:
+		// id of a record of RefEntity. Existence is not checked: iOS may send a
+		// not-yet-synced "local-<clientId>" and the target can be deleted later.
+		s, ok := asString(v)
+		if !ok || strings.TrimSpace(s) == "" {
+			return nil, fmt.Errorf("must be a record id string")
+		}
+		if len(s) > maxRefLen {
+			return nil, fmt.Errorf("exceeds %d bytes", maxRefLen)
+		}
+		return s, nil
 	case dsl.FieldPhoto:
 		s, ok := asString(v)
 		if !ok || (!strings.HasPrefix(s, "data:image/") && !strings.HasPrefix(s, "https://")) {
 			return nil, fmt.Errorf("must be a data:image/... URL or https URL")
+		}
+		return s, nil
+	case dsl.FieldVideo:
+		s, ok := asString(v)
+		if !ok {
+			return nil, fmt.Errorf("must be a video value string")
+		}
+		if err := checkVideoValue(s); err != nil {
+			return nil, err
 		}
 		return s, nil
 	case dsl.FieldLocation:

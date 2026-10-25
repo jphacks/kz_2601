@@ -1,0 +1,397 @@
+{
+ "app": {
+  "description": "友達との旅行の支出をカテゴリ・支払った人・日付つきで記録し、合計とカテゴリ別の合計、誰が誰にいくら払うかの精算を自動で計算する",
+  "icon": "airplane",
+  "name": "旅行の割り勘",
+  "tabs": [
+   {
+    "icon": "list.bullet.rectangle",
+    "screen": "home",
+    "title": "支出"
+   },
+   {
+    "icon": "arrow.left.arrow.right",
+    "screen": "settle",
+    "title": "精算"
+   }
+  ],
+  "theme": {
+   "primaryColor": "#00897B"
+  },
+  "voiceEntry": "floating"
+ },
+ "entities": [
+  {
+   "fields": [
+    {
+     "id": "name",
+     "name": "名前",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "computed": {
+      "agg": "sum",
+      "entity": "expenses",
+      "field": "amount",
+      "filter": {
+       "field": "payer",
+       "op": "eq",
+       "value": {
+        "ref": "id"
+       }
+      }
+     },
+     "id": "paid",
+     "name": "支払済",
+     "type": "currency"
+    },
+    {
+     "computed": {
+      "args": [
+       {
+        "agg": "sum",
+        "entity": "expenses",
+        "field": "amount"
+       },
+       {
+        "agg": "count",
+        "entity": "members"
+       }
+      ],
+      "op": "div"
+     },
+     "id": "share",
+     "name": "負担額",
+     "type": "currency"
+    },
+    {
+     "computed": {
+      "args": [
+       {
+        "args": [
+         {
+          "ref": "paid"
+         },
+         {
+          "ref": "share"
+         }
+        ],
+        "op": "sub"
+       }
+      ],
+      "op": "round"
+     },
+     "id": "balance",
+     "name": "残高",
+     "type": "currency"
+    }
+   ],
+   "id": "members",
+   "name": "メンバー",
+   "titleField": "name"
+  },
+  {
+   "fields": [
+    {
+     "id": "amount",
+     "name": "金額",
+     "required": true,
+     "type": "currency",
+     "unit": "円"
+    },
+    {
+     "defaultValue": "交通費",
+     "id": "category",
+     "name": "カテゴリ",
+     "options": [
+      "交通費",
+      "食費",
+      "ホテル代",
+      "観光",
+      "その他"
+     ],
+     "required": true,
+     "type": "enum"
+    },
+    {
+     "id": "payer",
+     "name": "払った人",
+     "refEntity": "members",
+     "required": true,
+     "type": "ref"
+    },
+    {
+     "defaultValue": "now",
+     "id": "date",
+     "name": "日付",
+     "required": true,
+     "type": "date"
+    },
+    {
+     "id": "memo",
+     "name": "メモ",
+     "type": "string"
+    }
+   ],
+   "id": "expenses",
+   "name": "支出",
+   "titleField": "memo"
+  }
+ ],
+ "initialScreen": "home",
+ "schemaVersion": 1,
+ "screens": [
+  {
+   "components": [
+    {
+     "aggregate": "sum",
+     "area": "A1:F2",
+     "entity": "expenses",
+     "field": "amount",
+     "format": "currency",
+     "id": "total",
+     "label": "合計",
+     "type": "stat"
+    },
+    {
+     "aggregate": "sum",
+     "area": "A3:F6",
+     "entity": "expenses",
+     "field": "amount",
+     "groupBy": "category",
+     "id": "by_category",
+     "kind": "bar",
+     "title": "カテゴリ別の合計",
+     "type": "chart"
+    },
+    {
+     "area": "A7:F10",
+     "children": [
+      {
+       "emptyText": "まだ支出がありません",
+       "entity": "expenses",
+       "item": {
+        "subtitle": "category",
+        "title": "memo",
+        "trailing": "amount"
+       },
+       "onItemTap": {
+        "presentation": "push",
+        "screen": "expense_form",
+        "type": "navigate"
+       },
+       "sort": {
+        "direction": "desc",
+        "field": "date"
+       },
+       "swipeToDelete": true,
+       "type": "list"
+      }
+     ],
+     "id": "recent",
+     "title": "支出一覧",
+     "type": "section"
+    },
+    {
+     "action": {
+      "presentation": "sheet",
+      "screen": "expense_form",
+      "type": "navigate"
+     },
+     "area": "D11:F12",
+     "icon": "plus",
+     "id": "add",
+     "label": "支出を追加",
+     "type": "button"
+    }
+   ],
+   "id": "home",
+   "title": "旅行の割り勘",
+   "toolbar": [
+    {
+     "action": {
+      "presentation": "sheet",
+      "screen": "expense_form",
+      "type": "navigate"
+     },
+     "icon": "plus",
+     "label": "追加"
+    }
+   ]
+  },
+  {
+   "components": [
+    {
+     "area": "A1:F2",
+     "format": "currency",
+     "id": "per_person",
+     "label": "1人あたり",
+     "type": "stat",
+     "value": {
+      "args": [
+       {
+        "agg": "sum",
+        "entity": "expenses",
+        "field": "amount"
+       },
+       {
+        "agg": "count",
+        "entity": "members"
+       }
+      ],
+      "op": "div"
+     }
+    },
+    {
+     "area": "A3:F6",
+     "columns": [
+      {
+       "field": "name"
+      },
+      {
+       "field": "paid"
+      },
+      {
+       "field": "balance"
+      }
+     ],
+     "entity": "members",
+     "id": "members_table",
+     "type": "table"
+    },
+    {
+     "area": "A7:F10",
+     "balanceField": "balance",
+     "entity": "members",
+     "id": "settle_list",
+     "nameField": "name",
+     "title": "誰が誰にいくら払う",
+     "type": "settlement"
+    },
+    {
+     "action": {
+      "presentation": "sheet",
+      "screen": "member_form",
+      "type": "navigate"
+     },
+     "area": "D11:F12",
+     "icon": "person.badge.plus",
+     "id": "add_member",
+     "label": "メンバーを追加",
+     "type": "button"
+    }
+   ],
+   "id": "settle",
+   "title": "精算",
+   "toolbar": [
+    {
+     "action": {
+      "presentation": "sheet",
+      "screen": "member_form",
+      "type": "navigate"
+     },
+     "icon": "person.badge.plus",
+     "label": "メンバー追加"
+    }
+   ]
+  },
+  {
+   "components": [
+    {
+     "area": "A1:F10",
+     "children": [
+      {
+       "field": "amount",
+       "label": "金額",
+       "type": "numberField",
+       "unit": "円"
+      },
+      {
+       "field": "category",
+       "label": "カテゴリ",
+       "style": "menu",
+       "type": "picker"
+      },
+      {
+       "field": "payer",
+       "label": "払った人",
+       "style": "menu",
+       "type": "picker"
+      },
+      {
+       "field": "date",
+       "label": "日付",
+       "type": "datePicker"
+      },
+      {
+       "field": "memo",
+       "label": "メモ",
+       "placeholder": "新幹線",
+       "type": "textField"
+      }
+     ],
+     "id": "fields",
+     "title": "内容",
+     "type": "section"
+    },
+    {
+     "action": {
+      "confirmMessage": "この支出を削除しますか？",
+      "entity": "expenses",
+      "type": "deleteRecord"
+     },
+     "area": "A11:F12",
+     "id": "delete",
+     "label": "削除",
+     "style": "destructive",
+     "type": "button"
+    }
+   ],
+   "entity": "expenses",
+   "id": "expense_form",
+   "title": "支出を記録",
+   "toolbar": [
+    {
+     "action": {
+      "entity": "expenses",
+      "type": "saveRecord"
+     },
+     "icon": "checkmark",
+     "label": "保存"
+    }
+   ]
+  },
+  {
+   "components": [
+    {
+     "area": "A1:F3",
+     "children": [
+      {
+       "field": "name",
+       "label": "名前",
+       "placeholder": "たろう",
+       "type": "textField"
+      }
+     ],
+     "id": "fields",
+     "title": "メンバー",
+     "type": "section"
+    }
+   ],
+   "entity": "members",
+   "id": "member_form",
+   "title": "メンバーを追加",
+   "toolbar": [
+    {
+     "action": {
+      "entity": "members",
+      "type": "saveRecord"
+     },
+     "icon": "checkmark",
+     "label": "保存"
+    }
+   ]
+  }
+ ]
+}

@@ -1,5 +1,5 @@
 # xcodegen 定義。`cd ios && xcodegen generate` で Metamon.xcodeproj を生成する(.xcodeproj はコミットしない)。
-# ホーム画面の表示名(現在「メタモン」)は Metamon/Resources/Info.plist の CFBundleDisplayName だけで変えられる。
+# ホーム画面の表示名(正式名「Tailor It」・#62)は Metamon/Resources/Info.plist の CFBundleDisplayName だけで変えられる。
 # 内部識別子 `Metamon` / Bundle ID `jp.kz2601.metamon` は Firebase に登録済みなので変更しない。
 name: Metamon
 
@@ -26,10 +26,11 @@ settings:
     ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     # バックエンド URL(Info.plist の MetamonAIBaseURL / MetamonAppConfigBaseURL に展開)。空=その側はモック/インメモリ。
-    # 既定の ai は staging(Cloud Run)。ローカル ai に向けるなら xcodebuild ... METAMON_AI_BASE_URL=http://127.0.0.1:8081(シミュレータ)。
+    # 既定は ai / appconfig とも staging(Cloud Run)。ローカルに向けるなら
+    #   xcodebuild ... METAMON_AI_BASE_URL=http://127.0.0.1:8081 METAMON_APPCONFIG_BASE_URL=http://127.0.0.1:8080(シミュレータ)。
     # 全モックで起動したい時は実行時の環境変数 METAMON_MOCK=1。
     METAMON_AI_BASE_URL: "https://ai-stg-378953239426.asia-northeast1.run.app"
-    METAMON_APPCONFIG_BASE_URL: ""
+    METAMON_APPCONFIG_BASE_URL: "https://appconfig-stg-378953239426.asia-northeast1.run.app"
 
 # ---- ローカル Swift Package(マルチモジュール。依存の向きは各 Package.swift で固定) ----
 #   MetamonDSL      : DSL モデル・グリッド計算・集計(Foundation のみ。macOS で `swift test` 可)
@@ -52,6 +53,8 @@ targets:
     platform: iOS
     sources:
       - path: Metamon
+      # ウィジェットと共有する受け渡しモデル(WidgetSnapshot)。両ターゲットにコンパイルする
+      - path: MetamonWidget/Shared
       # DSL v1 の正典サンプル(docs/dsl/examples/*.json)をそのままバンドル。iOS 側にコピーを持たない(ドリフト防止)。
       - path: ../docs/dsl/examples
         buildPhase: resources
@@ -60,11 +63,17 @@ targets:
       - package: MetamonDSL
       - package: MetamonRenderer
       - package: MetamonServices
-    # Sign in with Apple。自動署名(-allowProvisioningUpdates)が App ID に capability を付与する(有料 Developer Program 必須)。
+      # ホーム画面ウィジェット(埋め込み)
+      - target: MetamonWidget
+    # Sign in with Apple + App Group(ウィジェットとの共有)。自動署名(-allowProvisioningUpdates)が App ID に capability を付与する(有料 Developer Program 必須)。
     entitlements:
       path: Metamon/Metamon.entitlements
       properties:
         com.apple.developer.applesignin: [Default]
+        com.apple.security.application-groups: [group.jp.kz2601.metamon]
+        # healthStat / Field.health(#167): 体重の読み書き・歩数の読み取り。自動署名で App ID に HealthKit が付く
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon
@@ -79,4 +88,64 @@ targets:
         - package: MetamonDSL/MetamonDSLTests
         - package: MetamonRenderer/MetamonRendererTests
         - package: MetamonServices/MetamonServicesTests
+        # アプリをホストにしたテスト(StoreKitTest の購入など、Bundle ID が要るもの・#77)
+        - MetamonTests
+        # 指の操作(タップ・ドラッグ・長押し)の UI テスト(#165)。手元で回す: docs/ios/architecture.md「UI テスト」
+        - name: MetamonUITests
+          parallelizable: false
       gatherCoverageData: false
+      # 課金(#77): Run 時の StoreKit をローカル構成ファイルにする(シミュレータでテスト購入できる・外部アカウント不要)。
+      # 本番(TestFlight / App Store)では使われない。商品 ID の正典は MetamonServices/Purchase/ProProducts.swift
+      storeKitConfiguration: StoreKit/TailorItPro.storekit
+
+  # アプリをホストにしたユニットテスト(#77: SKTestSession は Bundle ID を持つホストが無いと商品が取れない)。
+  MetamonTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: MetamonTests
+      # アプリの Scheme と同じ構成ファイルをテストバンドルにも入れる(SKTestSession(configurationFileNamed:) で読む)
+      - path: StoreKit/TailorItPro.storekit
+        buildPhase: resources
+    dependencies:
+      - target: Metamon
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.tests
+        TARGETED_DEVICE_FAMILY: "1"
+
+  # ホーム画面ウィジェット(WidgetKit)。本体が App Group に書いた集計済みスナップショットを描画するだけ(Renderer/DSL 非依存)。
+  # Bundle ID は本体の子(jp.kz2601.metamon.widget)。実機は App ID 2 つ + App Group を自動署名が作る(§docs/ios/architecture.md ウィジェット)。
+  MetamonWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: MetamonWidget
+    entitlements:
+      path: MetamonWidget/MetamonWidget.entitlements
+      properties:
+        com.apple.security.application-groups: [group.jp.kz2601.metamon]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.widget
+        PRODUCT_NAME: MetamonWidget
+        INFOPLIST_FILE: MetamonWidget/Info.plist
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
+        ENABLE_PREVIEWS: YES
+
+  # UI テスト(XCUITest・#165)。モック(METAMON_MOCK=1)+ DEBUG フックで起動し、FAB のドラッグ / 長押し・チップ・チェック丸・フォームを実際に指で操作する。
+  MetamonUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: MetamonUITests
+    dependencies:
+      - target: Metamon
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Metamon
+        TARGETED_DEVICE_FAMILY: "1"

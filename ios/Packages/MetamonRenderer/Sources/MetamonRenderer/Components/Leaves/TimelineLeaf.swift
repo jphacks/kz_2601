@@ -11,31 +11,31 @@ struct TimelineLeaf: View {
         let entity = rt.dsl.entity(entityId)
         let dateField = c.dateField ?? ""
         let sort = Sort(field: dateField, direction: "desc")
-        let all = Aggregator.sorted(Aggregator.apply(c.filter, entity: entity, to: rt.records(for: entityId)), by: sort, entity: entity)
+        let all = Aggregator.sorted(rt.filteredRecords(c), by: sort, entity: entity)
         let rows = (c.limit ?? 0) > 0 ? Array(all.prefix(c.limit!)) : all
         if rows.isEmpty {
-            Text(rt.loading.contains(entityId) ? "読み込み中…" : "まだありません")
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
+            EmptyPlaceholder(icon: "clock", emptyText: L("まだありません"), state: rt.emptyState(for: entityId)) {
+                Task { await rt.load(entities: [entityId], force: true) }
+            }
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                     HStack(alignment: .top, spacing: 12) {
-                        Text(FieldCoding.display(row[dateField], field: entity?.field(dateField)))
+                        Text(rt.display(row[dateField], field: entity?.field(dateField)))
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .frame(width: 84, alignment: .trailing)
                         VStack(spacing: 0) {
-                            Circle().fill(Color.accentColor).frame(width: 10, height: 10).padding(.top, 4)
+                            Circle().fill(RenderTheme.brandGradient).frame(width: 10, height: 10).padding(.top, 4)
                             if index < rows.count - 1 {
-                                Rectangle().fill(.quaternary).frame(width: 2).frame(maxHeight: .infinity)
+                                Rectangle().fill(RenderTheme.Colors.hairline).frame(width: 2).frame(maxHeight: .infinity)
                             }
                         }
+                        .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(FieldCoding.display(row[c.titleField ?? ""], field: entity?.field(c.titleField ?? ""))).font(.subheadline.weight(.medium))
+                            Text(rt.display(row[c.titleField ?? ""], field: entity?.field(c.titleField ?? ""))).font(.subheadline.weight(.semibold))
                             if let sub = c.subtitleField {
-                                let s = FieldCoding.display(row[sub], field: entity?.field(sub))
+                                let s = rt.display(row[sub], field: entity?.field(sub))
                                 if !s.isEmpty { Text(s).font(.caption).foregroundStyle(.secondary) }
                             }
                         }
@@ -43,11 +43,10 @@ struct TimelineLeaf: View {
                         Spacer(minLength: 0)
                     }
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityElement(children: .combine) // 「10/24, 朝ラン, 5km」と 1 行で読む
                 }
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        .renderCard()
         }
     }
 }

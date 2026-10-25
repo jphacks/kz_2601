@@ -34,7 +34,11 @@ func main() {
 	st, closeStore := newStore(ctx, project, logger)
 	defer closeStore()
 
-	handler := newHandler(auth.Middleware(verifier, mode), logger, appconfig.New(st))
+	// deleted accounts (DELETE /v1/me) get 410 on everything else: appconfig.RejectDeleted
+	authed := func(h http.Handler) http.Handler {
+		return auth.Middleware(verifier, mode)(appconfig.RejectDeleted(st, h))
+	}
+	handler := newHandler(authed, logger, appconfig.New(st), appconfig.SharePage(st))
 	server := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
@@ -115,13 +119,16 @@ func newStore(ctx context.Context, project string, logger *slog.Logger) (store.S
 	return fs, func() { _ = fs.Close() }
 }
 
-// newHandler mounts health (public) and the v1 API (authenticated). Unknown
-// /v1 paths and wrong methods are answered by the API mux before auth so
-// they stay 404/405 envelopes rather than 401.
-func newHandler(authMiddleware func(http.Handler) http.Handler, logger *slog.Logger, api *http.ServeMux) http.Handler {
+// newHandler mounts health and the share-link page (public) and the v1 API
+// (authenticated). Unknown /v1 paths and wrong methods are answered by the
+// API mux before auth so they stay 404/405 envelopes rather than 401.
+func newHandler(authMiddleware func(http.Handler) http.Handler, logger *slog.Logger, api *http.ServeMux, sharePage http.Handler) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", health)
 	mux.HandleFunc("GET /healthz", health)
+	if sharePage != nil {
+		mux.Handle("GET /s/{token}", sharePage) // web fallback of a share link (no DSL exposed)
+	}
 	authed := authMiddleware(api)
 	mux.Handle("/v1/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, pattern := api.Handler(r); pattern == "" {

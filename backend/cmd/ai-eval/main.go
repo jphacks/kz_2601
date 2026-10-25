@@ -2,11 +2,29 @@
 // the same Service the ai server uses (in-memory store, no HTTP), and writes
 // per-case metrics + the resulting DSL as JSON. Edit cases are seeded with the
 // DSL produced by their `base` create case in the same run. `expect` keys:
-// photo / chart (bool), notification ("HH:MM" or "any"), substitution (bool:
-// the summary mentions 代替 because a requested part is not in the catalog).
+// photo / chart / calendar (bool), notification ("HH:MM" or "any"), substitution (bool:
+// the summary mentions 代替 / "replaced" because a requested part is not in
+// the catalog), scope ("public"|"shared"|"private": at least one entity has
+// that scope), noShared (bool, #77: no shared/public entity), calc / computed / statValue / settlement / ref (bool, #100:
+// any calculation / Field.computed / stat.value / settlement leaf / ref field;
+// -logic-pass runs the 2nd calculations-only call). Navigation (#114):
+// patch (bool: stored as a JSON Patch, not a full rewrite), unreachable
+// (number of screens no tab / initial screen reaches, dsl.Unreachable),
+// nav (["from>to", ...]: a button / toolbar / item tap on `from` opens `to`),
+// tabs / tabsMin (number), tabOrder ("a,b": the first tab screens in order),
+// tabHas (component type on a tab root other than the first tab), has ([type, ...]:
+// each component type appears on some screen).
+// Health (#167): health ("steps"|"weight": a healthStat with that metric),
+// healthField (bool: some field has health "weight").
+// `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
+// otherwise the locale is detected from the transcript. English edits whose
+// base was not produced in the run are seeded with examples/expense_en.json.
 //
 //	set -a; source ../.env; set +a
 //	go run ./cmd/ai-eval -effort low -out ../docs/backend/ai-eval/raw
+//	go run ./cmd/ai-eval -stream -repeat 2 -only kakeibo_a,walk_a   # SSE path, time to first event
+//	go run ./cmd/ai-eval -compare-before 'raw/*-before-*.json' -compare-after 'raw/*-after-*.json'  # no API calls
+//	go run ./cmd/ai-eval -chat          # clarify phase (chat.go, chat_cases.json)
 package main
 
 import (
@@ -17,6 +35,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -31,6 +50,7 @@ type Case struct {
 	Kind       string         `json:"kind"` // create|edit
 	Group      string         `json:"group"`
 	Base       string         `json:"base,omitempty"`
+	Locale     string         `json:"locale,omitempty"` // ja|en; empty = detect
 	Transcript string         `json:"transcript"`
 	Note       string         `json:"note,omitempty"`
 	Expect     map[string]any `json:"expect,omitempty"`
@@ -49,7 +69,25 @@ type Metrics struct {
 	HasPhoto      bool     `json:"hasPhoto"`
 	HasChart      bool     `json:"hasChart"`
 	Notifications []string `json:"notifications,omitempty"` // repeat@time
+	Scopes        []string `json:"scopes,omitempty"`        // entityId:scope (effective)
 	Areas         []string `json:"areas"`                   // screenId: area list
+	// logic (#100)
+	Computed   []string `json:"computed,omitempty"` // entity.field of computed fields
+	StatValues int      `json:"statValues,omitempty"`
+	Settlement bool     `json:"settlement,omitempty"`
+	RefFields  int      `json:"refFields,omitempty"`
+	ProgressTo bool     `json:"progressTarget,omitempty"` // progressBar entity+target (aggregate-based rate)
+	// #177
+	HasCalendar bool     `json:"hasCalendar,omitempty"`
+	StatUnitDup []string `json:"statUnitDup,omitempty"` // non-count stat labels ending in "(field.unit)"
+	// #167
+	Health      []string `json:"health,omitempty"`      // healthStat metric:period
+	HealthField bool     `json:"healthField,omitempty"` // a field with health "weight"
+}
+
+// HasCalc reports whether the app computes anything beyond plain aggregate stats.
+func (m *Metrics) HasCalc() bool {
+	return len(m.Computed) > 0 || m.StatValues > 0 || m.Settlement || m.ProgressTo
 }
 
 type Record struct {
@@ -57,6 +95,8 @@ type Record struct {
 	Kind          string          `json:"kind"`
 	Group         string          `json:"group"`
 	Transcript    string          `json:"transcript"`
+	Locale        string          `json:"locale,omitempty"`
+	Repeat        int             `json:"repeat,omitempty"`
 	OK            bool            `json:"ok"`
 	Error         string          `json:"error,omitempty"`
 	Mode          string          `json:"mode,omitempty"`
@@ -66,11 +106,15 @@ type Record struct {
 	Downgraded    bool            `json:"downgradedToFull,omitempty"`
 	ClaudeMs      int64           `json:"claudeMs"`
 	TotalMs       int64           `json:"totalMs"`
+	FirstEventMs  int64           `json:"firstEventMs,omitempty"` // -stream: time to the app/summary event
+	FirstEvent    string          `json:"firstEvent,omitempty"`   // -stream: its provisional summary
+	OutputChars   int             `json:"outputChars,omitempty"`
 	Usage         ai.Usage        `json:"usage"`
 	Summary       string          `json:"summary,omitempty"`
 	LastProblems  []string        `json:"lastProblems,omitempty"`
 	Metrics       *Metrics        `json:"metrics,omitempty"`
 	ExpectMisses  []string        `json:"expectMisses,omitempty"`
+	LogicPass     *ai.LogicMeta   `json:"logicPass,omitempty"`
 	Patch         []dsl.PatchOp   `json:"patch,omitempty"`
 	DSL           json.RawMessage `json:"dsl,omitempty"`
 }
@@ -80,26 +124,30 @@ type Run struct {
 	Model   string   `json:"model"`
 	Effort  string   `json:"effort"`
 	Tag     string   `json:"tag,omitempty"`
+	Stream  bool     `json:"stream,omitempty"`
 	Cases   []Record `json:"cases"`
 	Summary Summary  `json:"summary"`
 }
 
 type Summary struct {
-	N             int     `json:"n"`
-	OK            int     `json:"ok"`
-	FirstPass     int     `json:"firstPass"` // ok && regenerations == 0 && !areaFallback
-	Regenerated   int     `json:"regenerated"`
-	AreaFallback  int     `json:"areaFallback"`
-	Failed        int     `json:"failed"`
-	ExpectMisses  int     `json:"expectMisses"`
-	CreateP50Ms   int64   `json:"createP50Ms"`
-	CreateP95Ms   int64   `json:"createP95Ms"`
-	EditP50Ms     int64   `json:"editP50Ms"`
-	AvgOutTokens  float64 `json:"avgOutputTokens"`
-	AvgCreateOut  float64 `json:"avgCreateOutputTokens"`
-	AvgEditOut    float64 `json:"avgEditOutputTokens"`
-	AvgAreaRatio  float64 `json:"avgAreaRatio"`
-	TabbedCreates int     `json:"tabbedCreates"`
+	N                 int     `json:"n"`
+	OK                int     `json:"ok"`
+	FirstPass         int     `json:"firstPass"` // ok && regenerations == 0 && !areaFallback
+	Regenerated       int     `json:"regenerated"`
+	AreaFallback      int     `json:"areaFallback"`
+	Failed            int     `json:"failed"`
+	ExpectMisses      int     `json:"expectMisses"`
+	CreateP50Ms       int64   `json:"createP50Ms"`
+	CreateP95Ms       int64   `json:"createP95Ms"`
+	EditP50Ms         int64   `json:"editP50Ms"`
+	CreateFirstP50Ms  int64   `json:"createFirstEventP50Ms,omitempty"`
+	AvgOutTokens      float64 `json:"avgOutputTokens"`
+	AvgCreateOut      float64 `json:"avgCreateOutputTokens"`
+	AvgEditOut        float64 `json:"avgEditOutputTokens"`
+	AvgCreateOutChars float64 `json:"avgCreateOutputChars,omitempty"`
+	AvgAreaRatio      float64 `json:"avgAreaRatio"`
+	TabbedCreates     int     `json:"tabbedCreates"`
+	CalcCreates       int     `json:"calcCreates"` // creates whose app computes something (Metrics.HasCalc)
 }
 
 func main() {
@@ -109,12 +157,65 @@ func main() {
 	outDir := flag.String("out", "../docs/backend/ai-eval/raw", "raw output directory")
 	only := flag.String("only", "", "comma-separated case ids to run (edits still need their base: pass it too or it falls back to examples/kakeibo.json)")
 	tag := flag.String("tag", "", "suffix for the output filename")
+	locale := flag.String("locale", "", "ja|en for every case (overrides per-case locale; empty = per-case or detected from the transcript)")
 	timeout := flag.Duration("timeout", 60*time.Second, "per Claude call timeout")
+	stream := flag.Bool("stream", false, "use GenerateStream (SSE path) and record the time to the first app/summary event")
+	repeat := flag.Int("repeat", 1, "run every selected case this many times (p50/p95 over all runs)")
+	cmpBefore := flag.String("compare-before", "", "glob of raw run files = before; with -compare-after prints a before/after table and exits (no API calls)")
+	cmpAfter := flag.String("compare-after", "", "glob of raw run files = after")
+	envFile := flag.String("env-file", "", "KEY=VALUE file to load into the environment first (e.g. ../.env); values are never printed")
+	logicPass := flag.Bool("logic-pass", false, "enable the 2nd calculations-only call after each create (same as AI_LOGIC_PASS=1)")
+	chat := flag.Bool("chat", false, "run the clarify-phase cases (internal/ai/eval/chat_cases.json unless -cases is set) through Service.Chat instead of /generate")
+	chatModel := flag.String("chat-model", "", "-chat: clarify model (empty = ai.DefaultChatModel, same as AI_CHAT_MODEL)")
+	chatEffort := flag.String("chat-effort", "", "-chat: clarify effort (empty = ai.DefaultChatEffort)")
+	chatThinking := flag.String("chat-thinking", "", "-chat: thinking.type adaptive|disabled|between_tools (empty = ai.DefaultChatThinking)")
+	chatCaps := flag.String("capabilities", "", "-chat: comma-separated capabilities (answer,proposal) sent by cases without their own mode/capabilities (#185)")
 	flag.Parse()
+	if *chat && *casesPath == "internal/ai/eval/cases.json" {
+		*casesPath = "internal/ai/eval/chat_cases.json"
+	}
 
+	if *cmpBefore != "" || *cmpAfter != "" {
+		if err := compare(*cmpBefore, *cmpAfter); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
+	if *envFile != "" {
+		if err := loadEnvFile(*envFile); err != nil {
+			log.Fatalf("env-file: %v", err)
+		}
+	}
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" {
 		log.Fatal("ANTHROPIC_API_KEY is not set")
+	}
+	filter := map[string]bool{}
+	for _, id := range strings.Split(*only, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			filter[id] = true
+		}
+	}
+	store := appconfigclient.NewMemory()
+	svc := &ai.Service{
+		Claude:      ai.NewClient(apiKey, *model, *effort),
+		Store:       store,
+		Model:       *model,
+		CallTimeout: *timeout,
+		LogicPass:   *logicPass,
+	}
+	ctx := context.Background()
+	if *chat {
+		svc.ChatConfig = ai.ChatConfig{Model: *chatModel, Effort: *chatEffort, Thinking: *chatThinking}
+		var caps []string
+		for _, c := range strings.Split(*chatCaps, ",") {
+			if c = strings.TrimSpace(c); c != "" {
+				caps = append(caps, c)
+			}
+		}
+		runChat(ctx, svc, *casesPath, *outDir, *tag, filter, caps)
+		return
 	}
 	raw, err := os.ReadFile(*casesPath)
 	if err != nil {
@@ -124,83 +225,20 @@ func main() {
 	if err := json.Unmarshal(raw, &cases); err != nil {
 		log.Fatal(err)
 	}
-	filter := map[string]bool{}
-	for _, id := range strings.Split(*only, ",") {
-		if id = strings.TrimSpace(id); id != "" {
-			filter[id] = true
-		}
-	}
-
-	store := appconfigclient.NewMemory()
-	svc := &ai.Service{
-		Claude:      ai.NewClient(apiKey, *model, *effort),
-		Store:       store,
-		Model:       *model,
-		CallTimeout: *timeout,
-	}
-	ctx := context.Background()
-	run := Run{Date: time.Now().Format("2006-01-02"), Model: *model, Effort: *effort, Tag: *tag}
+	run := Run{Date: time.Now().Format("2006-01-02"), Model: *model, Effort: *effort, Tag: *tag, Stream: *stream}
 	created := map[string]json.RawMessage{} // create case id -> resulting DSL
 
-	for _, c := range cases {
-		if len(filter) > 0 && !filter[c.ID] {
-			continue
+	for rep := 1; rep <= max(*repeat, 1); rep++ {
+		for _, c := range cases {
+			if len(filter) > 0 && !filter[c.ID] {
+				continue
+			}
+			rec := runCase(ctx, svc, store, c, *locale, *effort, *stream, created)
+			if *repeat > 1 {
+				rec.Repeat = rep
+			}
+			run.Cases = append(run.Cases, rec)
 		}
-		appID := fmt.Sprintf("eval-%s-%d", c.ID, time.Now().UnixNano())
-		mode := ai.ModeCreate
-		if c.Kind == "edit" {
-			mode = ai.ModeEdit
-			base, ok := created[c.Base]
-			if !ok {
-				base, err = os.ReadFile("internal/ai/examples/kakeibo.json")
-				if err != nil {
-					log.Fatal(err)
-				}
-				log.Printf("[%s] base %q not produced in this run; seeding examples/kakeibo.json", c.ID, c.Base)
-			}
-			if _, err := store.Put(ctx, appID, 0, base, appconfigclient.Source{Kind: "seed"}); err != nil {
-				log.Fatalf("[%s] seed: %v", c.ID, err)
-			}
-		}
-		log.Printf("[%s] %s effort=%s %q", c.ID, c.Kind, *effort, c.Transcript)
-		rec := Record{ID: c.ID, Kind: c.Kind, Group: c.Group, Transcript: c.Transcript}
-		started := time.Now()
-		res, err := svc.Generate(ctx, ai.Request{AppID: appID, Transcript: c.Transcript, Mode: mode})
-		rec.TotalMs = time.Since(started).Milliseconds()
-		if err != nil {
-			rec.Error = err.Error()
-			var ge *ai.Error
-			if e, ok := err.(*ai.Error); ok {
-				ge = e
-				rec.Attempts = ge.Attempts
-				rec.LastProblems = ge.Problems
-			}
-			log.Printf("[%s] FAIL %v", c.ID, err)
-		} else {
-			rec.OK = true
-			rec.Mode = res.Mode
-			rec.Attempts = res.Meta.Attempts
-			rec.Regenerations = res.Meta.Regenerations
-			rec.AreaFallback = res.Meta.AreaFallback
-			rec.Downgraded = res.Meta.DowngradedToFull
-			rec.ClaudeMs = res.LatencyMs.Claude
-			rec.Usage = res.Meta.Usage
-			rec.Summary = res.Summary
-			rec.LastProblems = res.Meta.LastProblems
-			rec.Patch = res.Patch
-			rec.DSL = res.DSL
-			if app, perr := dsl.Parse(res.DSL); perr == nil {
-				rec.Metrics = measure(app)
-				rec.ExpectMisses = checkExpect(c.Expect, rec.Metrics, rec.Summary)
-			}
-			if c.Kind == "create" {
-				created[c.ID] = res.DSL
-			}
-			log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms out=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",
-				c.ID, rec.Attempts, rec.AreaFallback, rec.ClaudeMs, rec.Usage.OutputTokens,
-				rec.Metrics.Tabs, rec.Metrics.Screens, rec.Metrics.AreaRatio, rec.ExpectMisses, rec.Summary)
-		}
-		run.Cases = append(run.Cases, rec)
 	}
 	run.Summary = summarize(run.Cases)
 
@@ -220,10 +258,114 @@ func main() {
 	fmt.Printf("\nwrote %s\n", path)
 }
 
+func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory, c Case, forceLocale, effort string, stream bool, created map[string]json.RawMessage) Record {
+	appID := fmt.Sprintf("eval-%s-%d", c.ID, time.Now().UnixNano())
+	mode := ai.ModeCreate
+	loc := ai.Locale(c.Locale)
+	if forceLocale != "" {
+		loc = ai.Locale(forceLocale)
+	}
+	if loc == "" {
+		loc = ai.DetectLocale(c.Transcript)
+	}
+	if c.Kind == "edit" {
+		mode = ai.ModeEdit
+		base, ok := created[c.Base]
+		if name, isExample := strings.CutPrefix(c.Base, "example:"); isExample {
+			var err error
+			if base, err = os.ReadFile(filepath.Join("internal/ai/examples", name+".json")); err != nil {
+				log.Fatal(err)
+			}
+			ok = true
+		}
+		if !ok {
+			seed := "internal/ai/examples/kakeibo.json"
+			if loc == ai.LocaleEN {
+				seed = "internal/ai/examples/expense_en.json"
+			}
+			var err error
+			base, err = os.ReadFile(seed)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("[%s] base %q not produced in this run; seeding %s", c.ID, c.Base, seed)
+		}
+		if _, err := store.Put(ctx, appID, 0, base, appconfigclient.Source{Kind: "seed"}); err != nil {
+			log.Fatalf("[%s] seed: %v", c.ID, err)
+		}
+	}
+	log.Printf("[%s] %s effort=%s locale=%s stream=%v %q", c.ID, c.Kind, effort, loc, stream, c.Transcript)
+	rec := Record{ID: c.ID, Kind: c.Kind, Group: c.Group, Transcript: c.Transcript, Locale: string(loc)}
+	started := time.Now()
+	req := ai.Request{AppID: appID, Transcript: c.Transcript, Mode: mode, Locale: loc}
+	var res *ai.Result
+	var err error
+	if stream {
+		res, err = svc.GenerateStream(ctx, req, func(ev ai.Event) {
+			if rec.FirstEventMs == 0 {
+				rec.FirstEventMs = time.Since(started).Milliseconds()
+				rec.FirstEvent = ev.Summary
+				log.Printf("[%s] first event %s at %dms: %q", c.ID, ev.Type, rec.FirstEventMs, ev.Summary)
+			}
+		})
+	} else {
+		res, err = svc.Generate(ctx, req)
+	}
+	rec.TotalMs = time.Since(started).Milliseconds()
+	if err != nil {
+		rec.Error = err.Error()
+		if ge, ok := err.(*ai.Error); ok {
+			rec.Attempts = ge.Attempts
+			rec.LastProblems = ge.Problems
+		}
+		log.Printf("[%s] FAIL %v", c.ID, err)
+		return rec
+	}
+	rec.OK = true
+	rec.Mode = res.Mode
+	rec.Attempts = res.Meta.Attempts
+	rec.Regenerations = res.Meta.Regenerations
+	rec.AreaFallback = res.Meta.AreaFallback
+	rec.Downgraded = res.Meta.DowngradedToFull
+	rec.ClaudeMs = res.LatencyMs.Claude
+	rec.OutputChars = res.Meta.OutputChars
+	rec.Usage = res.Meta.Usage
+	rec.Summary = res.Summary
+	rec.LastProblems = res.Meta.LastProblems
+	rec.LogicPass = res.Meta.LogicPass
+	rec.Patch = res.Patch
+	rec.DSL = res.DSL
+	if app, perr := dsl.Parse(res.DSL); perr == nil {
+		rec.Metrics = measure(app)
+		rec.ExpectMisses = append(checkExpect(c.Expect, rec.Metrics, rec.Summary), checkNav(c.Expect, app, rec.Mode)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkEnum(c.Expect, app)...)
+	}
+	if c.Kind == "create" {
+		created[c.ID] = res.DSL
+	}
+	log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms first=%dms out=%d chars=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",
+		c.ID, rec.Attempts, rec.AreaFallback, rec.ClaudeMs, rec.FirstEventMs, rec.Usage.OutputTokens, rec.OutputChars,
+		rec.Metrics.Tabs, rec.Metrics.Screens, rec.Metrics.AreaRatio, rec.ExpectMisses, rec.Summary)
+	return rec
+}
+
 func measure(a *dsl.App) *Metrics {
 	m := &Metrics{Tabs: len(a.App.Tabs), Screens: len(a.Screens), Entities: len(a.Entities)}
-	for _, e := range a.Entities {
+	for i := range a.Entities {
+		e := &a.Entities[i]
 		m.Fields += len(e.Fields)
+		m.Scopes = append(m.Scopes, e.ID+":"+string(e.EffectiveScope()))
+		for _, f := range e.Fields {
+			if f.Computed != nil {
+				m.Computed = append(m.Computed, e.ID+"."+f.ID)
+			}
+			if f.Type == dsl.FieldRef {
+				m.RefFields++
+			}
+			if f.Health != "" {
+				m.HealthField = true
+			}
+		}
 	}
 	for _, n := range a.App.Notifications {
 		m.Notifications = append(m.Notifications, n.Repeat+"@"+n.Time)
@@ -250,6 +392,24 @@ func measure(a *dsl.App) *Metrics {
 					m.HasPhoto = true
 				case dsl.CompChart:
 					m.HasChart = true
+				case dsl.CompSettlement:
+					m.Settlement = true
+				case dsl.CompCalendar:
+					m.HasCalendar = true
+				case dsl.CompHealthStat:
+					m.Health = append(m.Health, x.Metric+":"+x.Period)
+				case dsl.CompStat:
+					if x.Value != nil {
+						m.StatValues++
+					}
+					if u := fieldUnit(a, x.Entity, x.Field); u != "" && x.Aggregate != "" && x.Aggregate != "count" &&
+						(strings.HasSuffix(x.Label, "("+u+")") || strings.HasSuffix(x.Label, "（"+u+"）")) {
+						m.StatUnitDup = append(m.StatUnitDup, x.Aggregate+":"+x.Label)
+					}
+				case dsl.CompProgressBar:
+					if x.Entity != "" && x.Target != nil {
+						m.ProgressTo = true
+					}
 				}
 				if x.Action != nil && x.Action.Type == dsl.ActionScheduleNotif && x.Action.Notification != nil {
 					m.Notifications = append(m.Notifications, "action:"+x.Action.Notification.Repeat+"@"+x.Action.Notification.Time)
@@ -264,13 +424,35 @@ func measure(a *dsl.App) *Metrics {
 	return m
 }
 
+func fieldUnit(a *dsl.App, entity, field string) string {
+	if e := a.EntityByID(entity); e != nil {
+		if f := e.FieldByID(field); f != nil {
+			return f.Unit
+		}
+	}
+	return ""
+}
+
 func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 	var miss []string
 	for k, v := range exp {
 		switch k {
 		case "substitution": // a part missing from the catalog was requested: summary must say so
-			if strings.Contains(summary, "代替") != v.(bool) {
+			if mentionsSubstitution(summary) != v.(bool) {
 				miss = append(miss, fmt.Sprintf("substitution=%v", !v.(bool)))
+			}
+		case "health":
+			want, _ := v.(string)
+			if !slices.ContainsFunc(m.Health, func(h string) bool { return strings.HasPrefix(h, want+":") }) {
+				miss = append(miss, fmt.Sprintf("health=%v", m.Health))
+			}
+		case "healthField":
+			if m.HealthField != v.(bool) {
+				miss = append(miss, fmt.Sprintf("healthField=%v", m.HealthField))
+			}
+		case "calendar":
+			if m.HasCalendar != v.(bool) {
+				miss = append(miss, fmt.Sprintf("calendar=%v", m.HasCalendar))
 			}
 		case "photo":
 			if m.HasPhoto != v.(bool) {
@@ -291,10 +473,175 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 			if !found {
 				miss = append(miss, fmt.Sprintf("notification=%v (want %s)", m.Notifications, want))
 			}
+		case "calc": // computed / stat.value / settlement / progressBar target: any calculation at all
+			if m.HasCalc() != v.(bool) {
+				miss = append(miss, fmt.Sprintf("calc=%v", m.HasCalc()))
+			}
+		case "computed":
+			if (len(m.Computed) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("computed=%v", m.Computed))
+			}
+		case "statValue":
+			if (m.StatValues > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("statValue=%d", m.StatValues))
+			}
+		case "settlement":
+			if m.Settlement != v.(bool) {
+				miss = append(miss, fmt.Sprintf("settlement=%v", m.Settlement))
+			}
+		case "ref":
+			if (m.RefFields > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("ref=%d", m.RefFields))
+			}
+		case "noShared": // #77: 「この機能なしで作る」は shared / public の entity を作らない
+			for _, s := range m.Scopes {
+				if v.(bool) && (strings.HasSuffix(s, ":public") || strings.HasSuffix(s, ":shared")) {
+					miss = append(miss, fmt.Sprintf("noShared: scope=%v", m.Scopes))
+					break
+				}
+			}
+		case "scope":
+			want := fmt.Sprint(v)
+			found := false
+			for _, s := range m.Scopes {
+				if strings.HasSuffix(s, ":"+want) {
+					found = true
+				}
+			}
+			if !found {
+				miss = append(miss, fmt.Sprintf("scope=%v (want %s)", m.Scopes, want))
+			}
 		}
 	}
 	sort.Strings(miss)
 	return miss
+}
+
+// checkNav checks the navigation expect keys (#114) against the result.
+// checkEnum (#194): `enumField` "entity.field" is the choice field; optHas /
+// optNot check its options (enum choices or ref initial records), fields =
+// the entity's field count (no memo / extra field added), refPick = it became
+// a ref to a master entity with a form screen and initial options.
+func checkEnum(exp map[string]any, a *dsl.App) []string {
+	target, _ := exp["enumField"].(string)
+	if target == "" {
+		return nil
+	}
+	eid, fid, _ := strings.Cut(target, ".")
+	e := a.EntityByID(eid)
+	if e == nil || e.FieldByID(fid) == nil {
+		return []string{"enumField missing " + target}
+	}
+	f := e.FieldByID(fid)
+	var miss []string
+	strs := func(v any) (out []string) {
+		for _, s := range v.([]any) {
+			out = append(out, fmt.Sprint(s))
+		}
+		return out
+	}
+	for k, v := range exp {
+		switch k {
+		case "optHas", "optNot":
+			for _, w := range strs(v) {
+				if slices.Contains(f.Options, w) != (k == "optHas") {
+					miss = append(miss, fmt.Sprintf("%s %s (options=%v)", k, w, f.Options))
+				}
+			}
+		case "fields":
+			if n := int(v.(float64)); len(e.Fields) != n {
+				miss = append(miss, fmt.Sprintf("fields=%d (want %d)", len(e.Fields), n))
+			}
+		case "refPick":
+			form := false
+			for _, s := range a.Screens {
+				form = form || (f.RefEntity != "" && s.Entity == f.RefEntity)
+			}
+			if ok := f.Type == dsl.FieldRef && a.EntityByID(f.RefEntity) != nil && form && len(f.Options) > 0; ok != v.(bool) {
+				miss = append(miss, fmt.Sprintf("refPick=%v (type=%s ref=%s form=%v options=%d)", ok, f.Type, f.RefEntity, form, len(f.Options)))
+			}
+		}
+	}
+	return miss
+}
+
+func checkNav(exp map[string]any, a *dsl.App, mode string) []string {
+	var miss []string
+	num := func(v any) int { f, _ := v.(float64); return int(f) }
+	for k, v := range exp {
+		switch k {
+		case "patch":
+			if (mode == "patch") != v.(bool) {
+				miss = append(miss, "patch="+mode)
+			}
+		case "unreachable":
+			if u := a.Unreachable(); len(u) != num(v) {
+				miss = append(miss, fmt.Sprintf("unreachable=%v", u))
+			}
+		case "nav":
+			for _, e := range v.([]any) {
+				from, to, _ := strings.Cut(fmt.Sprint(e), ">")
+				if !a.HasNav(from, to) {
+					miss = append(miss, "nav!"+from+">"+to)
+				}
+			}
+		case "tabs", "tabsMin":
+			n := len(a.App.Tabs)
+			if (k == "tabs" && n != num(v)) || (k == "tabsMin" && n < num(v)) {
+				miss = append(miss, fmt.Sprintf("tabs=%d", n))
+			}
+		case "tabOrder":
+			want := strings.Split(fmt.Sprint(v), ",")
+			var got []string
+			for _, t := range a.App.Tabs {
+				got = append(got, t.Screen)
+			}
+			if len(got) < len(want) || strings.Join(got[:len(want)], ",") != strings.Join(want, ",") {
+				miss = append(miss, "tabOrder="+strings.Join(got, ","))
+			}
+		case "tabHas":
+			found := false
+			for i, t := range a.App.Tabs {
+				if i == 0 {
+					continue
+				}
+				for _, s := range a.Screens {
+					if s.ID != t.Screen {
+						continue
+					}
+					for _, c := range s.Components {
+						for _, x := range append([]dsl.Component{c}, c.Children...) {
+							found = found || string(x.Type) == fmt.Sprint(v)
+						}
+					}
+				}
+			}
+			if !found {
+				miss = append(miss, fmt.Sprintf("tabHas!%v", v))
+			}
+		case "has": // component types that must appear on some screen (#168)
+			for _, w := range v.([]any) {
+				found := false
+				for _, s := range a.Screens {
+					for _, c := range s.Components {
+						for _, x := range append([]dsl.Component{c}, c.Children...) {
+							found = found || string(x.Type) == fmt.Sprint(w)
+						}
+					}
+				}
+				if !found {
+					miss = append(miss, fmt.Sprintf("has!%v", w))
+				}
+			}
+		}
+	}
+	sort.Strings(miss)
+	return miss
+}
+
+// mentionsSubstitution: the ja template says 代替, the en one says "replaced".
+func mentionsSubstitution(summary string) bool {
+	return strings.Contains(summary, "代替") || strings.Contains(strings.ToLower(summary), "replaced")
 }
 
 func percentile(v []int64, p float64) int64 {
@@ -309,8 +656,8 @@ func percentile(v []int64, p float64) int64 {
 
 func summarize(recs []Record) Summary {
 	var s Summary
-	var createMs, editMs []int64
-	var outAll, outCreate, outEdit, nCreate, nEdit int
+	var createMs, editMs, firstMs []int64
+	var outAll, outCreate, outEdit, nCreate, nEdit, charsCreate int
 	var areaSum float64
 	var areaN int
 	for _, r := range recs {
@@ -335,10 +682,17 @@ func summarize(recs []Record) Summary {
 		outAll += r.Usage.OutputTokens
 		if r.Kind == "create" {
 			createMs = append(createMs, r.ClaudeMs)
+			if r.FirstEventMs > 0 {
+				firstMs = append(firstMs, r.FirstEventMs)
+			}
 			outCreate += r.Usage.OutputTokens
+			charsCreate += r.OutputChars
 			nCreate++
 			if r.Metrics != nil && r.Metrics.Tabs >= 2 {
 				s.TabbedCreates++
+			}
+			if r.Metrics != nil && r.Metrics.HasCalc() {
+				s.CalcCreates++
 			}
 		} else {
 			editMs = append(editMs, r.ClaudeMs)
@@ -353,11 +707,13 @@ func summarize(recs []Record) Summary {
 	s.CreateP50Ms = percentile(createMs, 0.5)
 	s.CreateP95Ms = percentile(createMs, 0.95)
 	s.EditP50Ms = percentile(editMs, 0.5)
+	s.CreateFirstP50Ms = percentile(firstMs, 0.5)
 	if s.OK > 0 {
 		s.AvgOutTokens = float64(outAll) / float64(s.OK)
 	}
 	if nCreate > 0 {
 		s.AvgCreateOut = float64(outCreate) / float64(nCreate)
+		s.AvgCreateOutChars = float64(charsCreate) / float64(nCreate)
 	}
 	if nEdit > 0 {
 		s.AvgEditOut = float64(outEdit) / float64(nEdit)
@@ -369,9 +725,9 @@ func summarize(recs []Record) Summary {
 }
 
 func printTable(run Run) {
-	fmt.Printf("\n## %s %s effort=%s\n\n", run.Date, run.Model, run.Effort)
-	fmt.Println("| id | kind | ok | att | fb | claude ms | in/out tok | tabs | scr | comp | area% | notif | misses | summary |")
-	fmt.Println("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+	fmt.Printf("\n## %s %s effort=%s stream=%v\n\n", run.Date, run.Model, run.Effort, run.Stream)
+	fmt.Println("| id | kind | loc | ok | att | fb | claude ms | first ms | in/out tok | tabs | scr | comp | area% | notif | misses | summary |")
+	fmt.Println("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 	for _, r := range run.Cases {
 		ok := "OK"
 		if !r.OK {
@@ -402,12 +758,175 @@ func printTable(run Run) {
 		if !r.OK {
 			sum = r.Error
 		}
-		fmt.Printf("| %s | %s | %s | %d | %s | %d | %d/%d | %s | %s | %s | %s | %s | %s | %s |\n",
-			r.ID, r.Kind, ok, r.Attempts, fb, r.ClaudeMs, r.Usage.InputTokens+r.Usage.CacheReadInputTokens+r.Usage.CacheCreationInputTokens,
+		first := "-"
+		if r.FirstEventMs > 0 {
+			first = fmt.Sprint(r.FirstEventMs)
+		}
+		fmt.Printf("| %s | %s | %s | %s | %d | %s | %d | %s | %d/%d | %s | %s | %s | %s | %s | %s | %s |\n",
+			r.ID, r.Kind, r.Locale, ok, r.Attempts, fb, r.ClaudeMs, first, r.Usage.InputTokens+r.Usage.CacheReadInputTokens+r.Usage.CacheCreationInputTokens,
 			r.Usage.OutputTokens, tabs, scr, comp, area, notif, misses, strings.ReplaceAll(sum, "|", "/"))
 	}
 	s := run.Summary
 	fmt.Printf("\nn=%d ok=%d firstPass=%d regenerated=%d areaFallback=%d failed=%d expectMisses=%d\n", s.N, s.OK, s.FirstPass, s.Regenerated, s.AreaFallback, s.Failed, s.ExpectMisses)
-	fmt.Printf("create p50=%dms p95=%dms | edit p50=%dms | avg out tokens all=%.0f create=%.0f edit=%.0f | avg area ratio=%.2f | tabbed creates=%d\n",
-		s.CreateP50Ms, s.CreateP95Ms, s.EditP50Ms, s.AvgOutTokens, s.AvgCreateOut, s.AvgEditOut, s.AvgAreaRatio, s.TabbedCreates)
+	fmt.Printf("create p50=%dms p95=%dms first-event p50=%dms | edit p50=%dms | avg out tokens all=%.0f create=%.0f edit=%.0f | avg create chars=%.0f | avg area ratio=%.2f | tabbed creates=%d | calc creates=%d\n",
+		s.CreateP50Ms, s.CreateP95Ms, s.CreateFirstP50Ms, s.EditP50Ms, s.AvgOutTokens, s.AvgCreateOut, s.AvgEditOut, s.AvgCreateOutChars, s.AvgAreaRatio, s.TabbedCreates, s.CalcCreates)
+	for _, r := range run.Cases {
+		if r.Metrics == nil {
+			continue
+		}
+		lp := "-"
+		if r.LogicPass != nil {
+			lp = fmt.Sprintf("applied=%v ops=%d att=%d %dms out=%d problems=%d", r.LogicPass.Applied, r.LogicPass.Ops, r.LogicPass.Attempts, r.LogicPass.ClaudeMs, r.LogicPass.Usage.OutputTokens, len(r.LogicPass.Problems))
+		}
+		fmt.Printf("logic %s: computed=%v statValue=%d settlement=%v ref=%d progressTarget=%v | pass2 %s\n",
+			r.ID, r.Metrics.Computed, r.Metrics.StatValues, r.Metrics.Settlement, r.Metrics.RefFields, r.Metrics.ProgressTo, lp)
+	}
+}
+
+// ---- compare ----------------------------------------------------------------
+
+type side struct {
+	name  string
+	recs  map[string][]Record // case id -> runs
+	order []string
+	all   []Record
+}
+
+func loadSide(name, glob string) (*side, error) {
+	files, err := filepath.Glob(glob)
+	if err != nil {
+		return nil, err
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("%s: no files match %q", name, glob)
+	}
+	s := &side{name: name, recs: map[string][]Record{}}
+	for _, f := range files {
+		raw, err := os.ReadFile(f)
+		if err != nil {
+			return nil, err
+		}
+		var run Run
+		if err := json.Unmarshal(raw, &run); err != nil {
+			return nil, fmt.Errorf("%s: %w", f, err)
+		}
+		for _, r := range run.Cases {
+			if _, seen := s.recs[r.ID]; !seen {
+				s.order = append(s.order, r.ID)
+			}
+			s.recs[r.ID] = append(s.recs[r.ID], r)
+			s.all = append(s.all, r)
+		}
+	}
+	return s, nil
+}
+
+func medianOf(recs []Record, f func(Record) int64) int64 {
+	var v []int64
+	for _, r := range recs {
+		if r.OK {
+			v = append(v, f(r))
+		}
+	}
+	return percentile(v, 0.5)
+}
+
+func okCount(recs []Record) (ok, first int) {
+	for _, r := range recs {
+		if r.OK {
+			ok++
+			if r.Regenerations == 0 && !r.AreaFallback {
+				first++
+			}
+		}
+	}
+	return ok, first
+}
+
+func pct(a, b int64) string {
+	if a == 0 {
+		return "-"
+	}
+	return fmt.Sprintf("%+.0f%%", float64(b-a)/float64(a)*100)
+}
+
+// compare prints per-case medians and the aggregate before/after table.
+func compare(beforeGlob, afterGlob string) error {
+	before, err := loadSide("before", beforeGlob)
+	if err != nil {
+		return err
+	}
+	after, err := loadSide("after", afterGlob)
+	if err != nil {
+		return err
+	}
+	ms := func(r Record) int64 { return r.ClaudeMs }
+	out := func(r Record) int64 { return int64(r.Usage.OutputTokens) }
+	first := func(r Record) int64 { return r.FirstEventMs }
+	fmt.Println("| id | kind | runs (before/after) | 一発通過 | Claude ms 中央値 before → after | 出力 tokens 中央値 before → after | first event ms (after) |")
+	fmt.Println("|---|---|---|---|---|---|---|")
+	ids := append([]string(nil), before.order...)
+	for _, id := range after.order {
+		if _, ok := before.recs[id]; !ok {
+			ids = append(ids, id)
+		}
+	}
+	for _, id := range ids {
+		b, a := before.recs[id], after.recs[id]
+		kind := ""
+		if len(b) > 0 {
+			kind = b[0].Kind
+		} else if len(a) > 0 {
+			kind = a[0].Kind
+		}
+		bOK, bFirst := okCount(b)
+		aOK, aFirst := okCount(a)
+		fe := "-"
+		if v := medianOf(a, first); v > 0 {
+			fe = fmt.Sprint(v)
+		}
+		fmt.Printf("| %s | %s | %d/%d | %d/%d → %d/%d | %d → %d (%s) | %d → %d (%s) | %s |\n",
+			id, kind, len(b), len(a), bFirst, bOK, aFirst, aOK,
+			medianOf(b, ms), medianOf(a, ms), pct(medianOf(b, ms), medianOf(a, ms)),
+			medianOf(b, out), medianOf(a, out), pct(medianOf(b, out), medianOf(a, out)), fe)
+	}
+	bs, as := summarize(before.all), summarize(after.all)
+	fmt.Println()
+	fmt.Println("| 指標 | before | after | 差 |")
+	fmt.Println("|---|---|---|---|")
+	fmt.Printf("| 一発通過 | %d/%d | %d/%d | |\n", bs.FirstPass, bs.N, as.FirstPass, as.N)
+	fmt.Printf("| create p50 (Claude ms) | %d | %d | %s |\n", bs.CreateP50Ms, as.CreateP50Ms, pct(bs.CreateP50Ms, as.CreateP50Ms))
+	fmt.Printf("| create p95 (Claude ms) | %d | %d | %s |\n", bs.CreateP95Ms, as.CreateP95Ms, pct(bs.CreateP95Ms, as.CreateP95Ms))
+	fmt.Printf("| create first-event p50 (ms) | %d | %d | |\n", bs.CreateFirstP50Ms, as.CreateFirstP50Ms)
+	fmt.Printf("| edit p50 (Claude ms) | %d | %d | %s |\n", bs.EditP50Ms, as.EditP50Ms, pct(bs.EditP50Ms, as.EditP50Ms))
+	fmt.Printf("| 平均出力 tokens (create) | %.0f | %.0f | %s |\n", bs.AvgCreateOut, as.AvgCreateOut, pct(int64(bs.AvgCreateOut), int64(as.AvgCreateOut)))
+	fmt.Printf("| 平均出力 tokens (edit) | %.0f | %.0f | %s |\n", bs.AvgEditOut, as.AvgEditOut, pct(int64(bs.AvgEditOut), int64(as.AvgEditOut)))
+	fmt.Printf("| 平均出力 chars (create) | %.0f | %.0f | |\n", bs.AvgCreateOutChars, as.AvgCreateOutChars)
+	fmt.Printf("| area 付与率 | %.2f | %.2f | |\n", bs.AvgAreaRatio, as.AvgAreaRatio)
+	fmt.Printf("| expect miss | %d | %d | |\n", bs.ExpectMisses, as.ExpectMisses)
+	return nil
+}
+
+// loadEnvFile sets KEY=VALUE lines (export prefix, quotes and # comments
+// allowed) that are not already set. Values are never logged.
+func loadEnvFile(path string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "export "))
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		k, v = strings.TrimSpace(k), strings.Trim(strings.TrimSpace(v), `"'`)
+		if _, set := os.LookupEnv(k); !set {
+			_ = os.Setenv(k, v)
+		}
+	}
+	return nil
 }

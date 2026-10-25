@@ -22,7 +22,7 @@ git push -u origin feature/voice-screen
 ## PR の出し方(Draft → Open)
 
 1. まず **Draft** で出す(`gh pr create --draft --base develop`)。Draft の間は backend-ci / ios-ci は走らない(secrets-scan だけ走る)。
-2. 動作確認が終わったら **Ready for review** にする → CI 発火(backend-ci は 5分以内厳守、ios-ci は build+test が通れば可・上限25分)。
+2. 動作確認が終わったら **Ready for review** にする → CI 発火(backend-ci は 5分以内厳守、ios-ci は変更のあったモジュールのテストだけ回す・上限30分。下の「ios-ci の仕組み」)。
 3. PR 本文はテンプレートに沿う(背景 / スコープ / 機能要件(docs/01 の ID) / 変更点 / 動作確認 / シナリオ / 後続対応 / チェック)。UI 変更はスクショ必須。
 4. `.github/CODEOWNERS` でレビュアーが自動アサインされるが **approve は必須ではない(0 approve)**。相手が忙しければ自分でマージしてよい。
 
@@ -68,12 +68,37 @@ gh pr create --base main --title "release: Day2 デモ版"
 
 scope は `ios` / `appconfig` / `ai` / `dsl` / `infra` あたり。1コミット1意図。`WIP` コミットは squash 前提なら可。
 
+## ios-ci の仕組み(変更のあったモジュールだけテスト)
+
+macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes` ジョブ(`dorny/paths-filter`)で変わった場所を見て、必要なテストだけ macOS で回す。required check は ubuntu の集約ジョブ `ios-ci`(macOS ジョブがスキップでも成功で終わる)。
+
+| 変わった場所 | macOS ジョブ | 回るテスト |
+|---|---|---|
+| `ios/Packages/MetamonDSL/**` だけ | `ios-dsl` | `swift test`(MetamonDSLTests)。アプリのビルド・シミュレータ無し |
+| MetamonDSL + 他の iOS 変更 | `ios-xcode` | MetamonDSLTests / MetamonRendererTests / MetamonServicesTests / MetamonTests |
+| `ios/Packages/MetamonRenderer/**` | `ios-xcode` | MetamonRendererTests + MetamonTests |
+| `ios/Packages/MetamonServices/**` | `ios-xcode` | MetamonServicesTests + MetamonTests |
+| アプリ(`ios/Metamon/**` `ios/MetamonWidget/**` `ios/MetamonTests/**` `ios/project.yml` `ios/StoreKit/**` `docs/dsl/examples/**`) | `ios-xcode` | MetamonTests |
+| `ios/MetamonUITests/**` だけ | `ios-xcode` | なし(build-for-testing でコンパイル確認のみ) |
+| `.github/workflows/ios-ci.yml` | `ios-xcode` | UI 以外のユニットテスト全部 |
+| 上記以外(`ios/README.md` `ios/scripts/**` 等) | なし | なし |
+| develop / main への push(上記のどれかが変更) | `ios-xcode` | 全部(UI テスト MetamonUITests 含む) |
+
+- `ios-xcode` は `xcodebuild build-for-testing` を 1 回 → `test-without-building -only-testing:<対象>` の順。
+- **UI テスト(MetamonUITests)は PR では回さない**(常に `-skip-testing:MetamonUITests`)。develop / main への push で回る。
+- PR で UI テストも回したい時は、PR に **`ui-tests` ラベル**を付けて、Checks タブの ios-ci で **Re-run all jobs**(または次の push)。判定ジョブが毎回 API でラベルを読み直す。ラベルを付けただけでは走らない(無関係なラベル操作で実行中の CI がキャンセルされるのを避けるため)。
+  ```sh
+  gh label create ui-tests --color 1D76DB --description "PR でも iOS の UI テストを回す"   # 初回だけ
+  gh pr edit <番号> --add-label ui-tests
+  gh run rerun <run-id>
+  ```
+
 ## CI が落ちた時の見方
 
 1. PR の Checks タブ → 赤い job をクリック → 失敗した step を開く(`::error` 行が要点)。
 2. 各 job の典型的な原因:
    - `backend-ci`: `golangci-lint` の指摘(未使用変数・エラー未処理)、`go test -race` のデータ競合。ローカルで `cd backend && go vet ./... && go test ./... -race` を先に通す。
-   - `ios-ci`: ビルドエラーはローカルの `xcodegen generate && xcodebuild build -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO` で再現。**タイムアウト(25分)** なら SwiftPM の依存が重い → キャッシュが効いているか(`SwiftPM キャッシュ` step の cache-hit)を見る。macOS runner は分単価が高いので、原因を特定せずに Re-run を連打しない。
+   - `ios-ci`: 実体は `ios-dsl` / `ios-xcode` ジョブ(`ios-ci` はその結果を集約するだけ)。赤い方を開く。DSL だけなら `cd ios/Packages/MetamonDSL && swift test` で再現。ビルドエラーはローカルの `xcodegen generate && xcodebuild build -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO` で再現。**タイムアウト(30分)** なら SwiftPM の依存が重い → キャッシュが効いているか(`SwiftPM キャッシュ` step の cache-hit)を見る。macOS runner は分単価が高いので、原因を特定せずに Re-run を連打しない。
    - `secrets-scan`: gitleaks が秘密らしき文字列を検出。**本物なら即座にキーを無効化(ローテート)**してから履歴を消す(`git filter-repo`)。誤検知なら `.gitleaksignore` に fingerprint を追加。
 3. 直して push すれば同じ PR の古い実行は自動キャンセルされ再実行される。
 4. どうしても原因不明なら `gh run view <run-id> --log-failed` でログを全部落として読む。
@@ -91,6 +116,7 @@ scope は `ios` / `appconfig` / `ai` / `dsl` / `infra` あたり。1コミット
 - push では `backend/**` かこの workflow 自身に変更がある時だけ本体ジョブが走る(`dorny/paths-filter`。workflow の `paths:` は required check 対策で使わない)。
 - 流れ: `backend/Dockerfile` を 1 回 `docker build`(appconfig / ai 両バイナリ同梱)→ Artifact Registry `asia-northeast1-docker.pkg.dev/jphacks-kz2601/backend/backend:<sha>` → 同じイメージで `appconfig-<env>` と `ai-<env>`(`--command=/app/ai`、`ANTHROPIC_API_KEY` は Secret Manager から注入)を `gcloud run deploy --image`。
 - 最後に両サービスの **`GET /health`** が 200 であることを確認し、URL を job summary に出す。**ヘルスパスは `/health`**(Cloud Run の Google Front End は `/healthz` をコンテナに届けず HTML 404 を返すため。`/healthz` はローカル用に残っている)。
+- その後 **スモーク(`backend/cmd/smoke`・非ブロッキング)** を流して表を job summary に貼る(失敗してもデプロイは成功扱い)。staging はデモ 3 本(Claude 3 回)、**production は家計簿 1 本だけ(`-only kakeibo`・Claude 2 回)+ `-cleanup`** で作った `smoke-*` アプリを `DELETE /v1/apps/{id}`(archive)する。認証は `FIREBASE_WEB_API_KEY`(repo Variable)で Firebase 匿名ユーザーの ID トークンを取る。手元から同じことをするには `cd backend && FIREBASE_WEB_API_KEY=<key> make smoke-stg` / `make smoke-prod`(#66)。
 - `--set-env-vars` / `--set-secrets` は全置換。手で足した env/secret は次のデプロイで消えるので、恒久的に要るものは workflow に書く。
 
 認証は Workload Identity Federation(鍵ファイル無し)。GitHub **Secrets は不要**で、repo Variables に以下を入れる(登録済み)。

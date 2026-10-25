@@ -115,7 +115,7 @@ func TestRelaxedSchemaAcceptsExamples(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"initial", "kakeibo", "training", "walk"} {
+	for _, name := range []string{"initial", "kakeibo", "training", "walk", "warikan", "bmi", "shopping", "diary_ai", "attendance_nearby", "water"} {
 		raw, err := os.ReadFile("../../../docs/dsl/examples/" + name + ".json")
 		if err != nil {
 			t.Skip(err)
@@ -128,7 +128,9 @@ func TestRelaxedSchemaAcceptsExamples(t *testing.T) {
 }
 
 func TestExtractJSON(t *testing.T) {
-	for _, in := range []string{`{"a":1}`, "```json\n{\"a\":1}\n```", "はい、こちらです:\n{\"a\":1}\n以上"} {
+	for _, in := range []string{`{"a":1}`, "```json\n{\"a\":1}\n```", "はい、こちらです:\n{\"a\":1}\n以上",
+		// edit output with trailing prose (invalid character 'W' after top-level value)
+		"{\"a\":1}What I changed: {nothing}", "{\"a\":1}\n\nWait, also {\"b\":2}"} {
 		if got := string(extractJSON(in)); got != `{"a":1}` {
 			t.Fatalf("extractJSON(%q) = %q", in, got)
 		}
@@ -155,7 +157,7 @@ func TestFewShotMatchesDocsExample(t *testing.T) {
 	if string(docs) != fewShotKakeibo {
 		t.Fatal("internal/ai/examples/kakeibo.json is out of sync with docs/dsl/examples/kakeibo.json")
 	}
-	if !strings.Contains(systemPrompt, `"name": "家計簿"`) || !strings.Contains(systemPrompt, "6 列") {
+	if !strings.Contains(systemPrompt, `"name":"家計簿"`) || !strings.Contains(systemPrompt, "6 列") {
 		t.Fatal("system prompt must embed the few-shot and the grid rules")
 	}
 }

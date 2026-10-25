@@ -17,7 +17,7 @@ struct SignInView: View {
                 BrandMark(size: 96)
                     .symbolEffect(.pulse, options: .repeating, isActive: session.isBusy)
                 VStack(spacing: Theme.Spacing.sm) {
-                    Text("メタモン")
+                    Text("Tailor It")
                         .font(.system(size: 40, weight: .bold, design: .rounded))
                         .brandText()
                     Text("話しかけるだけで、アプリが生まれ変わる")
@@ -70,6 +70,12 @@ struct SignInView: View {
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             }
         }
+        #if DEBUG
+        // ヘッドレス E2E 用: `METAMON_E2E_ANON=1` なら匿名サインインを自動で行う(シミュレータはタップ自動化が無い)
+        .task {
+            if ProcessInfo.processInfo.environment["METAMON_E2E_ANON"] == "1", session.user == nil { await session.signInAnonymously() }
+        }
+        #endif
         .animation(.default, value: session.errorMessage)
         .animation(.default, value: session.isBusy)
     }

@@ -34,6 +34,8 @@ public final class WhisperKitRecognizer: SpeechTranscriber {
     @ObservationIgnored private var watchdog: Task<Void, Never>?
     @ObservationIgnored private let logger = Logger(subsystem: "jp.kz2601.metamon", category: "voice")
     private var isRecording = false
+    /// 認識言語("ja" | "en")。録音ごとに読むので、アプリの言語設定を切り替えると次の発話から反映される(#45)。
+    @ObservationIgnored public var language: () -> String = { "ja" }
 
     public init(model: String) {
         variant = Self.resolveVariant(model)
@@ -220,7 +222,7 @@ public final class WhisperKitRecognizer: SpeechTranscriber {
         defer { status = .ready }
         let options = DecodingOptions(
             task: .transcribe,
-            language: "ja",
+            language: language(),
             usePrefillPrompt: true,
             detectLanguage: false,
             skipSpecialTokens: true,

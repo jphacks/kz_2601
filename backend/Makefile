@@ -2,7 +2,7 @@ SHELL := /bin/bash
 PROJECT ?= $(shell gcloud config get-value project 2>/dev/null)
 REGION  ?= asia-northeast1
 
-.PHONY: build vet test lint schema-sync dev emulator run-appconfig run-ai smoke-local smoke-stg
+.PHONY: build vet test lint schema-sync dev emulator run-appconfig run-ai smoke-local smoke-stg smoke-prod demo-check
 
 build:
 	go build ./...
@@ -65,3 +65,17 @@ smoke-local:
 # 匿名ユーザーの ID トークンを取る。無ければ health と 401 確認だけにフォールバック。
 smoke-stg:
 	go run ./cmd/smoke -ai $(AI_STG_URL) -appconfig $(APPCONFIG_STG_URL) -firebase-api-key "$(FIREBASE_WEB_API_KEY)" $(SMOKE_FLAGS)
+
+# production。Claude 費用を抑えるため家計簿 1 本(create → edit → undo・Claude 2 回)だけ、
+# 終了時に作った smoke-* アプリを archive(-cleanup・DELETE /v1/apps/{id})する。
+AI_PROD_URL        ?= https://ai-prod-zgciuf3iha-an.a.run.app
+APPCONFIG_PROD_URL ?= https://appconfig-prod-zgciuf3iha-an.a.run.app
+SMOKE_PROD_ONLY    ?= kakeibo
+
+smoke-prod:
+	go run ./cmd/smoke -ai $(AI_PROD_URL) -appconfig $(APPCONFIG_PROD_URL) -firebase-api-key "$(FIREBASE_WEB_API_KEY)" -only $(SMOKE_PROD_ONLY) -cleanup
+
+# デモ前チェック兼ウォームアップ(#171)。curl だけで動く(Go 不要)。ENV=stg|prod、審査の 30 分前に ENV=prod で 1 回。
+ENV ?= stg
+demo-check:
+	../scripts/demo-check.sh $(ENV)

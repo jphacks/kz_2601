@@ -8,6 +8,6 @@ struct VoiceInputLeaf: View {
     let c: Component
 
     var body: some View {
-        UnsupportedComponent(label: "voiceInput: アプリ本体が ComponentRegistry に登録してください")
+        UnsupportedComponent(label: L("voiceInput: アプリ本体が ComponentRegistry に登録してください"))
     }
 }

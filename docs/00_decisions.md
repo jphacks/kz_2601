@@ -72,4 +72,6 @@ kz_2601/
 | 10/24 昼 | DSL v1 統一(backend 案 × iOS 案) | **構造は backend 案(非再帰2段・閉じた enum・`additionalProperties:false`)、命名は iOS 案(camelCase・props フラット)**。`screens` は配列、`appId/version` は API 封筒、`voiceInput` は Leaf、`datePicker` 追加、式 `{{}}`/state は v1 に無し、写真は data URL(≤800px)、集計は iOS クライアント。正典 `docs/dsl/`(決定表 22 論点は `docs/dsl/README.md`) |
 | 10/24 昼 | 画面レイアウト・タブ | **グリッド座標配置**: 各 Screen = 横 A〜F の 6 列 × 縦 1 行=可視高さ÷12(13 行目以降はスクロール)。Screen 直下の部品に省略可能な `area:"A1:C3"`、兄弟の重なりは backend 検証でエラー(id と area を人間可読で列挙)、可変長はセル内スクロール、`area` 無しは最終使用行の次から積む。Container 内は積むだけ(v1)。**タブ(`app.tabs[]`)は v1 に残す**(「タブ無し」却下)。仕様は `docs/dsl/README.md` §3.4 |
 | 10/24 昼 | iOSアプリ名 | **メタモン**(表示名)。内部識別子は `Metamon`(ターゲット/スキーム/Bundle ID `jp.kz2601.metamon`)。旧仮名 Morph は廃止。リネームは #5 の実機確認完了後に単独PRで |
+| 10/24 夜 | 正式名(#62・#69) | **Tailor It**(表示名・UI 文言・README・台本・ピッチ)。由来は「あなたに合わせて仕立てる(tailor)」。仮名「メタモン」は商標リスク(Q6)もあり廃止。内部識別子(ターゲット `Metamon`・Bundle ID `jp.kz2601.metamon(.widget)`・App Group `group.jp.kz2601.metamon`・`Metamon{DSL,Renderer,Services}`・`METAMON_*`・Firebase 登録・Firestore パス)は変更しない。「変身」「変身一覧」の比喩は残す |
 | 10/24 昼 | PRテンプレ | 「重点レビューファイル」節を追加。レビュアーが読む順と見どころを最大5ファイルで明示 |
+| 10/24 夜 | マイク FAB の位置(#52) | **ピクチャーインピクチャー風に動かせる**。初期位置は左下(DSL の「追加」が右下 `D11:F12` に来るため)のまま、ドラッグで左右どちらの辺にも吸着・端に寄せると画面外に隠れて取っ手だけ残る。吸着した側の最下段 2 列に部品がある画面ではその上へ自動退避。位置・隠れ状態は端末に保存(アプリ共通)。詳細は `docs/ios/architecture.md` |

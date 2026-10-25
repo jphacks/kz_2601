@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "Expense Tracker",
+    "description": "Log what you spend and see this month's total at a glance",
+    "icon": "dollarsign.circle",
+    "theme": { "primaryColor": "#1565C0" },
+    "voiceEntry": "floating",
+    "notifications": [
+      { "id": "evening_reminder", "title": "Log today's expenses", "body": "Don't forget to add what you spent today.", "repeat": "daily", "time": "20:00" }
+    ]
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "expense",
+      "name": "Expense",
+      "titleField": "note",
+      "fields": [
+        { "id": "amount", "name": "Amount", "type": "currency", "required": true },
+        { "id": "category", "name": "Category", "type": "enum", "required": true, "options": ["Food", "Transport", "Shopping", "Fun", "Other"], "defaultValue": "Food" },
+        { "id": "note", "name": "Note", "type": "string" },
+        { "id": "date", "name": "Date", "type": "date", "required": true, "defaultValue": "now" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "Expenses",
+      "toolbar": [
+        { "label": "Add", "icon": "plus", "action": { "type": "navigate", "screen": "expense_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        { "type": "stat", "id": "total", "area": "A1:F2", "label": "Spent this month", "entity": "expense", "aggregate": "sum", "field": "amount", "format": "currency",
+          "filter": { "field": "date", "op": "thisMonth", "value": null } },
+        {
+          "type": "section", "id": "recent", "area": "A3:F10", "title": "Recent expenses",
+          "children": [
+            { "type": "list", "entity": "expense", "item": { "title": "note", "subtitle": "category", "trailing": "amount" },
+              "sort": { "field": "date", "direction": "desc" }, "emptyText": "No expenses yet", "swipeToDelete": true,
+              "onItemTap": { "type": "navigate", "screen": "expense_form", "presentation": "push" } }
+          ]
+        },
+        { "type": "button", "id": "add", "area": "D11:F12", "label": "Add expense", "icon": "plus",
+          "action": { "type": "navigate", "screen": "expense_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "expense_form",
+      "title": "New expense",
+      "entity": "expense",
+      "toolbar": [{ "label": "Save", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "expense" } }],
+      "components": [
+        {
+          "type": "section", "id": "fields", "area": "A1:F7", "title": "Details",
+          "children": [
+            { "type": "numberField", "field": "amount", "label": "Amount" },
+            { "type": "picker", "field": "category", "label": "Category", "style": "segmented" },
+            { "type": "textField", "field": "note", "label": "Note", "placeholder": "Coffee" },
+            { "type": "datePicker", "field": "date", "label": "Date" }
+          ]
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "Delete", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "expense", "confirmMessage": "Delete this expense?" } }
+      ]
+    }
+  ]
+}

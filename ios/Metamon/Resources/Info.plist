@@ -4,9 +4,21 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>ja</string>
-	<!-- ホーム画面に出る表示名はここ1箇所だけ。提出前に正式名を決める(商標要確認)。内部識別子 Metamon / Bundle ID jp.kz2601.metamon は Firebase 登録値なので変えない -->
+	<!-- ホーム画面に出る表示名(正式名 Tailor It・#62)はここ1箇所だけ。内部識別子 Metamon / Bundle ID jp.kz2601.metamon は Firebase 登録値なので変えない -->
 	<key>CFBundleDisplayName</key>
-	<string>メタモン</string>
+	<string>Tailor It</string>
+	<!-- Siri が「Tailor It」を聞き取れない時の別名(App Shortcuts のフレーズ「Tailor It で記録を追加」にも効く・#80) -->
+	<key>INAlternativeAppNames</key>
+	<array>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>テイラーイット</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>テーラーイット</string>
+		</dict>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -48,24 +60,68 @@
 		<true/>
 	</dict>
 
+	<!-- openUrlButton / shareButton(shareTo)が他アプリの起動可否を確認するためのスキーム(ExternalURLPolicy の allowlist と対応)。tel/mailto/maps は OS 標準で不要 -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>line</string>
+		<string>slack</string>
+		<string>discord</string>
+	</array>
+
+	<!-- シェアリンク(#49): tailorit://import/<token> で開くと import してそのアプリに変身する(RootView の SharingHooks) -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>jp.kz2601.metamon.share</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>tailorit</string>
+			</array>
+		</dict>
+	</array>
+
 	<!-- WhisperKit モデル名。空なら `small`(約500MB・日本語精度優先)。環境変数 METAMON_WHISPER_MODEL でも上書き可 -->
 	<key>MetamonWhisperModel</key>
 	<string></string>
 
+	<!-- バックグラウンド(#38): 裏の定期同期(BGAppRefreshTask)。識別子は AppRuntime+Background.swift の BackgroundRefresh.identifier と一致させる。
+	     fetch は Info.plist だけで有効になり、App ID 側の capability 操作は不要 -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>location</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>jp.kz2601.metamon.refresh</string>
+	</array>
+
 	<!-- ネイティブ機能の権限説明(P0: マイク/カメラ/通知、P1: 位置/モーション) -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>話しかけた内容からアプリを生成するために、マイクを使用します。</string>
+	<string>話しかけた内容からアプリを生成するため、また生成したアプリで動画の音声を録音するために、マイクを使用します。</string>
 	<key>NSCameraUsageDescription</key>
-	<string>生成したアプリで写真を撮影・記録するために、カメラを使用します。</string>
+	<string>生成したアプリで写真や動画を撮影・記録するために、カメラを使用します。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>生成したアプリで写真を選択・保存するために、写真ライブラリを使用します。</string>
+	<string>生成したアプリで写真や動画を選択・保存するために、写真ライブラリを使用します。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>撮影した写真を保存するために、写真ライブラリへの追加を使用します。</string>
+	<string>生成したアプリの共有ボタンから画像を写真に保存するために、写真ライブラリへの追加を使用します。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>生成したアプリで現在地を記録・表示するために、位置情報を使用します。</string>
+	<string>生成したアプリで現在地を記録・地図に表示するために使います。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
+	<!-- healthStat(#167): 歩数は CoreMotion の歩数計(capability 不要)。体重の読み書き・ヘルスケアの歩数は HealthKit -->
 	<key>NSMotionUsageDescription</key>
-	<string>生成したアプリで歩数や動きを記録するために、モーションデータを使用します。</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>オンデバイス音声認識が使えない場合の代替として、音声認識を使用します。</string>
+	<string>生成したアプリで今日や最近の歩数を表示するために、モーションとフィットネスのデータを使用します。</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>生成したアプリで歩数や体重を表示するために、ヘルスケアのデータを読み取ります。</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>生成したアプリで記録した体重をヘルスケアにも保存するために、ヘルスケアへ書き込みます。</string>
+	<!-- nearbyShare(#36): MultipeerConnectivity で近くの Tailor It 端末と記録を送り合う。サービス名は NearbyService.serviceType と一致させる -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>近くにいる Tailor It の端末を見つけて、記録をその場で送ったり受け取ったりするために、ローカルネットワークを使用します。</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_tailorit-mc._tcp</string>
+		<string>_tailorit-mc._udp</string>
+	</array>
 </dict>
 </plist>

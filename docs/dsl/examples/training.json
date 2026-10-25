@@ -49,7 +49,7 @@
           "groupBy": "date", "bucket": "week", "aggregate": "sum", "field": "reps" },
         { "type": "chart", "id": "by_exercise", "area": "A8:F10", "title": "種目別", "entity": "workout", "kind": "pie",
           "groupBy": "exercise", "aggregate": "sum", "field": "reps" },
-        { "type": "button", "id": "record", "area": "A11:F12", "label": "今日の記録を保存", "icon": "plus",
+        { "type": "button", "id": "record", "area": "D11:F12", "label": "今日の記録を保存", "icon": "plus",
           "action": { "type": "navigate", "screen": "workout_form", "presentation": "sheet" } }
       ]
     },

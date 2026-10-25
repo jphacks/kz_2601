@@ -1,30 +1,31 @@
 import SwiftUI
 import MetamonDSL
 
-/// `textEditor`: 複数行の自由記述。minLines(既定 4)ぶんの高さを確保し、空ならプレースホルダを重ねる。
+/// `textEditor`: 複数行の自由記述。minLines(既定 4)行ぶんの高さから文字に合わせて伸び、return で改行(#196)。
+/// `TextEditor` は内側に独自の余白があり、重ねたプレースホルダと入力文字の位置がずれるので、縦に伸びる `TextField` で描く。
+/// 見た目: 上ラベル + 左アイコン + フォーカス時ブランド色リング(textField と同じ器・余白)。
 struct TextEditorLeaf: View {
     let c: Component
     let ctx: RenderContext
+    @FocusState private var focused: Bool
 
     var body: some View {
         if let form = ctx.form, let field = c.field {
-            let text = form.string(field)
-            let minHeight = CGFloat(Swift.max(c.minLines ?? 4, 1)) * 22 + 16
-            ZStack(alignment: .topLeading) {
-                TextEditor(text: text)
-                    .scrollContentBackground(.hidden)
-                    .padding(4)
-                if text.wrappedValue.isEmpty, let placeholder = c.placeholder, !placeholder.isEmpty {
-                    Text(placeholder)
-                        .foregroundStyle(.tertiary)
-                        .padding(.top, 12)
-                        .padding(.leading, 9)
-                        .allowsHitTesting(false)
+            let icon = FieldIcon.infer(component: c, field: form.entity.field(field))
+            LabeledInput(label: c.label, focused: focused) {
+                HStack(alignment: .top, spacing: RenderTheme.Spacing.sm + 2) {
+                    InputIcon(name: icon, focused: focused)
+                        .padding(.top, 1) // 1 行目の文字の高さに合わせる
+                    TextField(c.placeholder ?? "", text: form.string(field), axis: .vertical)
+                        .lineLimit(TextInputRules.editorLines(minLines: c.minLines))
+                        .accessibilityIdentifier("field.\(field)") // 複数行の欄は placeholder が XCUITest に出ないので id で探す
+                        .textFieldStyle(.plain)
+                        .font(RenderTheme.Fonts.inputValue)
+                        .focused($focused)
+                        .keyboardAnchor(c, $focused)
                 }
+                .renderInputChrome(focused: focused)
             }
-            .frame(minHeight: minHeight)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color(.secondarySystemBackground)))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(.separator), lineWidth: 0.5))
         } else {
             NeedsForm(c: c)
         }

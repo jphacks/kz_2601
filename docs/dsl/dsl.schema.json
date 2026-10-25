@@ -127,6 +127,21 @@
           "type": "string",
           "description": "Field id used as the record title in lists."
         },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "private",
+            "shared",
+            "public"
+          ],
+          "description": "レコードを誰と共有するか(省略時 private)。みんなで投稿・ランキング・掲示板など、他のユーザーと同じデータを見たい時は public。private は本人だけ。shared は v1 では public と同じ扱い(参加者限定は後段)。",
+          "x-usage": "public/shared のレコードには backend が author(uid)と authorName を自動付与するので、field id に author / authorName は使えない。「みんなで」「共有」「投稿」「ランキング」「掲示板」と言われたら public、家計簿や日記のような個人記録は省略(private)。",
+          "x-enumDescriptions": {
+            "private": "本人だけが読み書きできる個人データ(既定)。家計簿・日記・体重など。",
+            "shared": "同じアプリを開いた人と共有(v1 は public と同じ)。",
+            "public": "誰でも読めて、ログインしていれば誰でも投稿できる。編集・削除は投稿者本人のみ。掲示板・みんなのランキング・共有リスト。"
+          }
+        },
         "fields": {
           "type": "array",
           "items": {
@@ -163,16 +178,18 @@
             "enum",
             "currency",
             "photo",
-            "location"
+            "video",
+            "location",
+            "ref"
           ],
-          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. location = \"lat,lng\" string (P1)."
+          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField."
         },
         "required": {
           "type": "boolean"
         },
         "options": {
           "type": "array",
-          "description": "Only for type=enum.",
+          "description": "type=enum: the choices. type=ref: initial records of refEntity (their titleField values), created once by the app when refEntity has no records (#194).",
           "items": {
             "type": "string"
           }
@@ -197,6 +214,21 @@
         "unit": {
           "type": "string",
           "description": "e.g. 円, kg"
+        },
+        "refEntity": {
+          "type": "string",
+          "description": "type=ref only: the entity id whose record this field points to."
+        },
+        "computed": {
+          "$ref": "#/$defs/Expr",
+          "description": "Read-only calculated field (never stored, never bound to inputs). Evaluated per record: `ref` reads this record's fields (\"id\" = record id). type must be number|integer|currency|string|boolean|date. Usable in list/table/stat/chart like a stored field."
+        },
+        "health": {
+          "type": "string",
+          "enum": [
+            "weight"
+          ],
+          "description": "保存した値をヘルスケアにも書き込む(weight=体重。field は number で unit kg)。「ヘルスケアにも保存」「ヘルスケアと連携」と言われた時だけ付ける。保存のたびに 1 件書き込み、失敗してもレコードの保存は成功する。"
         }
       }
     },
@@ -354,8 +386,8 @@
     "Container": {
       "type": "object",
       "additionalProperties": false,
-      "description": "子 Leaf を並べる器。1 段のみ(Container の中に Container は置けない)。Screen 直下で area を持ち、子は積むだけ(子に area は付けない)。",
-      "x-usage": "Container は Leaf と同じく Screen 直下に area で置く: card / section は全幅(例 A1:F3)、stat/button タイルの grid は A1:F4、画像やヒントの carousel は A1:F4、補足の disclosure は画面下部(A9:F12)。子に area は付けない。",
+      "description": "子 Leaf を並べる器。1 段のみ(Container の中に Container は置けない)。Screen 直下で area を持ち、子は既定で上から積む。card / section / vstack だけは子にも area を付けて、Container の矩形の中のローカルグリッド(A1 = Container の左上・6 列・行は Container 自身の行数まで)に並べられる(子の全部に付けるか全部付けないか)。",
+      "x-usage": "Container は Leaf と同じく Screen 直下に area で置く: card / section は全幅(例 A1:F3)、stat/button タイルの grid は A1:F4、画像やヒントの carousel は A1:F4、補足の disclosure は画面下部(A9:F12)。子は通常 area 無しで積む。カードの中で 2 列に並べたい時だけ子に area を付ける(例 card A1:F3 の子 stat を A1:C2 / D1:F2、section の子ボタン 2 つを A1:C1 / D1:F1)。",
       "required": [
         "type",
         "children"
@@ -475,6 +507,12 @@
           "$ref": "#/$defs/Image"
         },
         {
+          "$ref": "#/$defs/VideoField"
+        },
+        {
+          "$ref": "#/$defs/VideoPlayer"
+        },
+        {
           "$ref": "#/$defs/List"
         },
         {
@@ -569,6 +607,24 @@
         },
         {
           "$ref": "#/$defs/TimerDisplay"
+        },
+        {
+          "$ref": "#/$defs/WebView"
+        },
+        {
+          "$ref": "#/$defs/Settlement"
+        },
+        {
+          "$ref": "#/$defs/AiButton"
+        },
+        {
+          "$ref": "#/$defs/NearbyShare"
+        },
+        {
+          "$ref": "#/$defs/LocationTracker"
+        },
+        {
+          "$ref": "#/$defs/HealthStat"
         }
       ]
     },
@@ -790,7 +846,7 @@
       "type": "object",
       "additionalProperties": false,
       "description": "ON/OFF スイッチ(boolean field)。完了・済み・お気に入りなどのチェック。",
-      "x-usage": "「買ったらチェック」のような完了フラグはこれ。一覧側は filter(eq false)で未完了だけに絞れる。",
+      "x-usage": "完了フラグをフォームで編集するときに。一覧から 1 タップでチェックさせたいなら、同じ boolean field を list.item.toggle にも指定する(フォームを開かせない)。一覧側は filter(eq false)で未完了だけに絞れる。",
       "required": [
         "type",
         "field",
@@ -818,7 +874,7 @@
       "type": "object",
       "additionalProperties": false,
       "description": "entity のレコード一覧。行の表示は item に field id を割り当て、タップで onItemTap(通常はフォームへ navigate → 編集モード)。",
-      "x-usage": "可変長なので大きめの矩形 A3:F10 でセル内スクロール。sort は日付 desc が既定、swipeToDelete:true で削除。カレンダー / タイムライン / 履歴 / 日記風の表示は日付でソートした list で代替する。",
+      "x-usage": "可変長なので大きめの矩形 A3:F10 でセル内スクロール。sort は日付 desc が既定、swipeToDelete:true で削除。カレンダー / タイムライン / 履歴 / 日記風の表示は日付でソートした list で代替する。 「買ったらチェック」「飲んだらチェック」「済んだらチェック」のようなチェックリストは item.toggle に boolean field(行頭の丸を 1 タップで保存・フォーム不要)。未完了だけ見せるなら filter {field, op:eq, value:false}。",
       "required": [
         "type",
         "entity",
@@ -865,7 +921,7 @@
     "ListItem": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル。",
+      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル、toggle に boolean field で行頭のチェック丸(resets daily なら date field で毎日リセット)。",
       "required": [
         "title"
       ],
@@ -887,7 +943,18 @@
         },
         "image": {
           "type": "string",
-          "description": "Field id of a photo field shown as thumbnail."
+          "description": "Field id of a photo field shown as thumbnail (a video field shows its first-frame thumbnail)."
+        },
+        "toggle": {
+          "type": "string",
+          "description": "Field id of a stored boolean field. iOS draws a check circle at the row start; tapping it flips the value and saves that record immediately (no form). Checked rows are struck through and dimmed. With resets daily: a stored date field instead (checked = its value is today)."
+        },
+        "resets": {
+          "type": "string",
+          "enum": [
+            "daily"
+          ],
+          "description": "daily = a check that comes back unchecked every day (服薬・毎日の習慣). toggle must be a stored date field without defaultValue: tapping saves today's date, the row shows checked only while that date is today (device local), tapping again clears it. Today's done count = stat count filter {toggle field, op today}. iOS also keeps the checked days (history), so a computed integer on the same entity can show the streak {\"op\":\"streak\",\"args\":[{\"ref\":<toggle>}]} and the days done in the last n days {\"op\":\"doneInDays\",\"args\":[{\"ref\":<toggle>},7]}; totals = agg sum/max of those computed fields. Do not add a separate log entity for checks."
         }
       }
     },
@@ -915,7 +982,7 @@
     "Filter": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list / stat / chart のレコード絞り込み。op が thisMonth / today のときは value を null にする。",
+      "description": "list / stat / chart / agg のレコード絞り込み。op が today / thisWeek / thisMonth / thisYear(期間・端末ローカル。今週は月曜始まり)のときは value を null にし、field は date / datetime。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。",
       "required": [
         "field",
         "op",
@@ -935,8 +1002,22 @@
             "lt",
             "lte",
             "thisMonth",
-            "today"
-          ]
+            "today",
+            "thisWeek",
+            "thisYear"
+          ],
+          "x-enumDescriptions": {
+            "eq": "field == value",
+            "neq": "field != value",
+            "gt": "field > value",
+            "gte": "field >= value",
+            "lt": "field < value",
+            "lte": "field <= value",
+            "today": "今日(端末ローカル)。value は null",
+            "thisWeek": "今週 = 月曜 0:00 〜 日曜 24:00(端末ローカル)。value は null",
+            "thisMonth": "今月(端末ローカル)。value は null",
+            "thisYear": "今年 = 1/1 〜 12/31(端末ローカル)。value は null"
+          }
         },
         "value": {
           "anyOf": [
@@ -951,21 +1032,32 @@
             },
             {
               "type": "null"
+            },
+            {
+              "$ref": "#/$defs/ExprRef"
+            },
+            {
+              "$ref": "#/$defs/ExprAgg"
+            },
+            {
+              "$ref": "#/$defs/ExprOp"
+            },
+            {
+              "$ref": "#/$defs/ExprIf"
             }
-          ]
+          ],
+          "description": "Literal or Expr. null for today/thisWeek/thisMonth/thisYear. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id)."
         }
       }
     },
     "Stat": {
       "type": "object",
       "additionalProperties": false,
-      "description": "集計値 1 つのカード(件数・合計・平均・最小・最大)。今月の合計・今日の件数・平均体重など。",
-      "x-usage": "2〜3 枚を hstack に入れて A1:F2 に横並び、または単体で A1:C2 / D1:F2。filter で thisMonth / today(value は null)。金額は format currency。",
+      "description": "集計値 1 つのカード(件数・合計・平均・最小・最大・最新)、または計算式 value の結果。今月の合計・今日の件数・平均体重・今の体重・残り予算・1人あたりなど。",
+      "x-usage": "2〜3 枚を hstack に入れて A1:F2 に横並び、または単体で A1:C2 / D1:F2。filter で期間を絞る: 今日 today / 今週 thisWeek / 今月 thisMonth / 今年 thisYear(value は null)。ラベルに「今週」「今年」と書いたら必ず同じ期間の filter を付ける。金額は format currency。aggregate と value はどちらか一方: 単純な合計/件数は aggregate、差・割り算・条件分岐が要る時は value に Expr(例: 残り予算 {\"op\":\"sub\",\"args\":[50000,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]})。 「今の」「現在の」「最新の」「最後に」の値(今の体重・現在の予算・最後に水をやった日)は aggregate latest + by(並べる日付 field)+ field(返す値)。avg / max で代用しない。",
       "required": [
         "type",
-        "label",
-        "entity",
-        "aggregate"
+        "label"
       ],
       "properties": {
         "type": {
@@ -981,7 +1073,8 @@
           "type": "string"
         },
         "entity": {
-          "type": "string"
+          "type": "string",
+          "description": "Required with aggregate (omit with value)."
         },
         "aggregate": {
           "type": "string",
@@ -990,12 +1083,21 @@
             "sum",
             "avg",
             "min",
-            "max"
-          ]
+            "max",
+            "latest",
+            "earliest",
+            "distance",
+            "duration"
+          ],
+          "description": "Exactly one of aggregate or value. aggregate=count|sum|avg|min|max over entity(.field). latest/earliest = the field value of the newest/oldest record ordered by `by`. distance/duration (locationTracker points): field = the location field, by = the datetime field; distance = metres along the points in time order (shown as m / km), duration = recording time (shown as m:ss / h:mm:ss). Gaps of 10+ minutes split separate walks and are not counted."
         },
         "field": {
           "type": "string",
           "description": "Required unless aggregate=count."
+        },
+        "by": {
+          "type": "string",
+          "description": "aggregate latest/earliest/distance/duration only: date/datetime field id that orders the records (omit = the entity's first date field, else creation order). Same day = later created wins."
         },
         "filter": {
           "$ref": "#/$defs/Filter"
@@ -1006,7 +1108,12 @@
             "plain",
             "currency",
             "percent"
-          ]
+          ],
+          "description": "percent = `value` computes a ratio (0..1) and the app shows it ×100: 50% is 0.5, 142% is 1.42 (e.g. div(agg sum, 10000)). Never write 50 or mul(…,100) for 50%. Use percent only with value, not with aggregate."
+        },
+        "value": {
+          "$ref": "#/$defs/Expr",
+          "description": "Calculated value (alternative to aggregate/entity/field/filter). Screen scalar: `ref` is not allowed, use `agg`. e.g. remaining budget = sub(50000, agg sum thisMonth)."
         }
       }
     },
@@ -1270,6 +1377,81 @@
         }
       }
     },
+    "VideoField": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "カメラ(内カメ・外カメ切替可)/ ライブラリから動画を取り込み、video field に保存する入力。動画は端末内に保存し、レコードにはファイル名と 1 フレーム目のサムネイルだけを入れる。",
+      "x-usage": "「動画で残す・撮る」(筋トレのフォーム、子どもの成長、練習の記録など)に。撮るなら source camera、既存の動画を選ぶなら library、迷えば both。写真なら photoField。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "videoField"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Must be a video field of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "camera",
+            "library",
+            "both"
+          ]
+        },
+        "maxDuration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600,
+          "description": "Recording limit in seconds (default 60)."
+        }
+      }
+    },
+    "VideoPlayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "video field の動画を再生する(フォーム / 詳細画面)。入力ではない。撮影した端末でのみ再生でき、他の端末ではサムネイルを出す。",
+      "x-usage": "撮った動画を詳細画面で見返す時に。一覧のサムネイルは list.item.image に video field を指定する。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "videoPlayer"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "video field of the screen entity (form/detail screens)."
+        },
+        "height": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ]
+        }
+      }
+    },
     "PatchValue": {
       "description": "Values a patch may insert: primitives or DSL sub-documents (no free-form objects, to stay structured-output compatible).",
       "anyOf": [
@@ -1386,6 +1568,18 @@
           "items": {
             "$ref": "#/$defs/TableColumn"
           }
+        },
+        {
+          "$ref": "#/$defs/ExprRef"
+        },
+        {
+          "$ref": "#/$defs/ExprAgg"
+        },
+        {
+          "$ref": "#/$defs/ExprOp"
+        },
+        {
+          "$ref": "#/$defs/ExprIf"
         }
       ]
     },
@@ -1446,7 +1640,7 @@
     "Area": {
       "type": "string",
       "pattern": "^[A-F][1-9][0-9]*:[A-F][1-9][0-9]*$",
-      "description": "Grid rectangle on the screen's implicit grid, spreadsheet style 'A1:C3' = top-left cell : bottom-right cell. Columns A-F (screen width / 6), rows 1..N (row height = visible height / 12; rows > 12 make the screen scroll). Siblings with area must not overlap (Go validator). Only meaningful for direct children of a Screen; inside a Container children are stacked. Omit to stack below the grid (fallback)."
+      "description": "Grid rectangle on the screen's implicit grid, spreadsheet style 'A1:C3' = top-left cell : bottom-right cell. Columns A-F (screen width / 6), rows 1..N (row height = visible height / 12; rows > 12 make the screen scroll). Siblings with area must not overlap (Go validator). Omit to stack below the grid (fallback). Inside a card / section / vstack (#81) children may also carry area on a local grid: A1 = the container's top-left, columns A-F = container width / 6, rows 1..(the container's own row count). Either every child of that container has area or none does (stack). Only one level: no area on children of hstack / grid / carousel / disclosure."
     },
     "Tab": {
       "type": "object",
@@ -1831,10 +2025,18 @@
         },
         "filter": {
           "$ref": "#/$defs/Filter"
+        },
+        "tone": {
+          "type": "string",
+          "enum": [
+            "positive",
+            "negative"
+          ],
+          "description": "What reaching 100% means. positive = a goal (steps, study hours, savings): 100%+ is shown in the success color. negative = a budget / limit being used up (spending, calories): going over 100% is shown in the warning color. Omit only when neither applies."
         }
       },
       "description": "Horizontal bar showing progress toward a goal (ProgressView). Either a literal `value` (0..1) or entity aggregation `sum(field)/target`. Choose for budgets, habit streaks, goal completion.",
-      "x-usage": "Full width, 1-2 rows (e.g. A3:F4), directly under the stat/label it explains."
+      "x-usage": "Full width, 1-2 rows (e.g. A3:F4), directly under the stat/label it explains. Always set tone: 目標の達成(歩数・勉強時間・貯金)= positive、予算・上限の消化(支出・カロリー)= negative."
     },
     "Gauge": {
       "type": "object",
@@ -2250,10 +2452,20 @@
         },
         "icon": {
           "type": "string"
+        },
+        "shareTo": {
+          "type": "string",
+          "enum": [
+            "any",
+            "line",
+            "slack",
+            "discord"
+          ],
+          "description": "送り先の preset(既定 any = OS 共有シート)。line は LINE の共有画面を直接開く(未インストールなら Web 版)。slack / discord は共有シートを開き、文面をチャンネル投稿向けのプレーンテキストに整える。(`target` は progressBar の数値キーなので別名)"
         }
       },
-      "description": "OS の共有シート(ShareLink)で文面と(任意で)写真を他のアプリや友人に送るボタン。日記の 1 件・記録のスコア・写真メモを共有したいアプリで選ぶ。",
-      "x-usage": "小さく画面下部の半幅(A11:C12)に、別のボタンと並べる。`field` や `{{...}}` を使う時だけ screen.entity が必要。"
+      "description": "文面と(任意で)写真を他のアプリや友人に送るボタン。`shareTo` で送り先を選べる: 「LINE で送りたい」→ shareTo line、「Slack に投げたい」→ slack、「Discord に」→ discord、指定が無ければ any(OS 共有シート)。日記の 1 件・記録のスコア・写真メモ・記事リンクを共有したいアプリで選ぶ。",
+      "x-usage": "小さく画面下部の半幅(A11:C12)に、別のボタンと並べる。送り先ごとにボタンを分ける時は hstack か grid の子に shareTo 違いで並べる。`field` や `{{...}}` を使う時だけ screen.entity が必要。"
     },
     "OpenUrlButton": {
       "type": "object",
@@ -2279,7 +2491,7 @@
         "url": {
           "type": "string",
           "format": "uri",
-          "description": "Safari(または対応アプリ)で開く https URL。"
+          "description": "開く URL。https のほか、他アプリ起動用のカスタムスキーム line:// slack:// discord:// tel: mailto: maps: comgooglemaps:// を使える(それ以外のスキームは不可)。"
         },
         "icon": {
           "type": "string"
@@ -2293,8 +2505,8 @@
           ]
         }
       },
-      "description": "固定 URL を開くリンクボタン(公式サイト・地図検索・レシピページなど)。button + openUrl アクションと同じ意味だが短く書け、リンク風に描画される。静的な外部リンクに選ぶ。",
-      "x-usage": "画面下部の帯(A11:F12)か card/section の子として置く。他の主要ボタンと見た目を揃えたい時は button + openUrl を使う。"
+      "description": "固定 URL を開くリンクボタン(公式サイト・地図検索・レシピページ・電話・メール・LINE/Slack/Discord アプリの起動など)。button + openUrl アクションと同じ意味だが短く書け、リンク風に描画される。静的な外部リンクに選ぶ。サイトをアプリ内に埋め込むなら webView。",
+      "x-usage": "画面下部の帯(A11:F12)か card/section の子として置く。「地図で開く」は maps:?q=<場所>、「電話する」は tel:<番号>、「LINE を開く」は line://。他の主要ボタンと見た目を揃えたい時は button + openUrl を使う。"
     },
     "MapView": {
       "type": "object",
@@ -2337,6 +2549,18 @@
         "onItemTap": {
           "$ref": "#/$defs/Action",
           "description": "ピンのタップで実行。iOS が recordId を渡す。"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "pins",
+            "route"
+          ],
+          "description": "pins(既定)= レコードごとにピン / route = 点を dateField の時刻順に線で結ぶ(locationTracker の軌跡。10 分以上空いたら線を切る)。"
+        },
+        "dateField": {
+          "type": "string",
+          "description": "kind route のみ: 点を並べる datetime field(省略時は作成順)。"
         }
       },
       "description": "MapKit の地図。location 値を持つレコードごとにピンを立てる。訪問スポット記録・お店リスト・釣り/散歩の地点ログなど「場所を地図で見たい」アプリで選ぶ。フォーム側の locationButton と対で使う。",
@@ -2436,6 +2660,488 @@
       },
       "description": "大きな mm:ss 表示と 開始/一時停止/リセット。stopwatch はカウントアップ、countdown は seconds から 0 へ。筋トレのセット・プランク・ポモドーロ・料理・瞑想など時間を計るアプリで選ぶ。",
       "x-usage": "画面の主役として A2:F6、下にフォームの入力欄。フォーム画面で `field` を指定すると計測秒をレコードと一緒に保存できる。"
+    },
+    "WebView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "url"
+      ],
+      "properties": {
+        "type": {
+          "const": "webView"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "アプリ内で表示する https URL(http やカスタムスキームは不可)。"
+        },
+        "title": {
+          "type": "string",
+          "description": "任意: 上部ツールバーに出す見出し。省略時はページタイトル。"
+        }
+      },
+      "description": "外部サイトをアプリ内で表示する(WKWebView・戻る/進む/再読込の小ツールバー付き)。ニュース・地図サイト・公式ページ・時刻表など「○○を見たい」「○○のサイトを埋め込みたい」に選ぶ。Safari に飛ばすだけでよければ openUrlButton。",
+      "x-usage": "A1:F12 など大きめの area に 1 画面 1 つ。セル内で WebView 自身がスクロールするので list と同じ段に並べない。タブの 1 つを webView だけにするのが定石。"
+    },
+    "Settlement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "nameField",
+        "balanceField"
+      ],
+      "properties": {
+        "type": {
+          "const": "settlement"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "Card title (optional, e.g. 精算)."
+        },
+        "entity": {
+          "type": "string",
+          "description": "Entity whose records are the people (e.g. members)."
+        },
+        "nameField": {
+          "type": "string",
+          "description": "Field shown as the person's name."
+        },
+        "balanceField": {
+          "type": "string",
+          "description": "Numeric (usually computed) field: positive = should receive, negative = should pay."
+        }
+      },
+      "description": "割り勘の精算リスト。balance(正=受け取る・負=払う)から少ない送金回数になるよう貪欲法で列挙し「A → B ¥1,200」と表示する。割り勘・立替精算専用。",
+      "x-usage": "members entity に computed の paid / share / balance を作り、balanceField に balance を指定。全幅 3〜4 行(例 A7:F10)、members の table の下に置く。"
+    },
+    "Expr": {
+      "description": "計算式(式ツリー)。リテラル(number/string/boolean)・{ref}(行のフィールド値)・{agg}(エンティティの集計)・{op,args}(関数)・{if,then,else}。評価エラー(ゼロ除算・型不一致・参照先なし)は iOS で「—」表示。深さ 8 まで。",
+      "x-usage": "置き場所は Field.computed(行ごとの算出列・ref 可)と stat.value(画面のスカラー・ref 不可)。発話に計算(割る・差・率・残り・日数・BMI など)がある時だけ足す。",
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "$ref": "#/$defs/ExprRef"
+        },
+        {
+          "$ref": "#/$defs/ExprAgg"
+        },
+        {
+          "$ref": "#/$defs/ExprOp"
+        },
+        {
+          "$ref": "#/$defs/ExprIf"
+        }
+      ],
+      "x-recipes": [
+        "割り勘(members{name} + expenses{title,amount:currency,payer:ref→members,date}): members.computed paid = {\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"amount\",\"filter\":{\"field\":\"payer\",\"op\":\"eq\",\"value\":{\"ref\":\"id\"}}} / share = {\"op\":\"round\",\"args\":[{\"op\":\"div\",\"args\":[{\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"amount\"},{\"agg\":\"count\",\"entity\":\"members\"}]}]} / balance = {\"op\":\"sub\",\"args\":[{\"ref\":\"paid\"},{\"ref\":\"share\"}]}。ホームに stat(合計 aggregate sum・1人あたり value)+ members の table(name/paid/balance)+ settlement{entity:members,nameField:name,balanceField:balance}。支出フォームの payer は picker。",
+        "BMI(body{date,weight:number kg,height:number cm}): body.computed bmi(number) = {\"op\":\"div\",\"args\":[{\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"op\":\"div\",\"args\":[{\"ref\":\"weight\"},{\"op\":\"pow\",\"args\":[{\"op\":\"div\",\"args\":[{\"ref\":\"height\"},100]},2]}]},10]}]},10]}(小数 1 桁)。list の trailing / table の列に bmi。",
+        "今の値・最新の記録(今の体重・最後に水をやった日): stat{aggregate:latest,entity:body,field:weight,by:date}、式の中なら {\"agg\":\"latest\",\"entity\":\"body\",\"field\":\"weight\",\"by\":\"date\"}(by = 並べる日付 field、field = 返す値・computed 可)。今の BMI = latest の field に computed bmi。最初の記録は earliest(体重の増減 = sub(latest, earliest))。",
+        "残り予算: stat.value = {\"op\":\"sub\",\"args\":[<予算>,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]}。予算額が発話に無い/後で変えたいなら budget{amount:currency,date:date} entity を作り <予算> = {\"agg\":\"latest\",\"entity\":\"budget\",\"field\":\"amount\",\"by\":\"date\"}(最後に設定した額。max だと下げた予算が反映されない)。",
+        "達成率: stat{format:percent,value:{\"op\":\"div\",\"args\":[{\"agg\":\"sum\",\"entity\":\"saving\",\"field\":\"amount\"},<目標>]}}(percent は 0..1 を % 表示)+ progressBar{entity,field,target:<目標>}。",
+        "カウントダウン: exam{title,date:date} の computed days_left(integer) = {\"op\":\"daysUntil\",\"args\":[{\"ref\":\"date\"}]}。list の trailing に days_left、最も近い試験は stat.value = {\"agg\":\"min\",\"entity\":\"exam\",\"field\":\"days_left\",\"filter\":{\"field\":\"days_left\",\"op\":\"gte\",\"value\":0}}。",
+        "シフト・バイト代(shift{date,start:string \"HH:mm\"(timePicker),end:string \"HH:mm\",wage:currency 時給}): computed hours(number) = {\"op\":\"hoursBetween\",\"args\":[{\"ref\":\"start\"},{\"ref\":\"end\"}]}(22:00→翌 5:00 は 7)/ pay(currency) = {\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"ref\":\"hours\"},{\"ref\":\"wage\"}]}]}。今月の給料 = stat aggregate sum pay filter date thisMonth。時刻を toNumber しない。",
+        "マスタの値を記録で使う(家事の点数・商品の単価・科目の単位数): 記録 log{chore:ref→chores,...} の computed points(number) = {\"ref\":\"chore.points\"}(ref field 名 + . + 参照先の field・1 段だけ)。単価 × 個数 = {\"op\":\"mul\",\"args\":[{\"ref\":\"item.price\"},{\"ref\":\"qty\"}]}。記録側に同じ値の入力欄(stepper 等)を作らない。人ごとの合計は人 entity の computed agg sum に log.points を使う。",
+        "毎日チェックの連続日数・直近 7 日(服薬・習慣 medicine{name,taken_on:date} + list item {toggle:taken_on,resets:daily}): medicine.computed streak(integer) = {\"op\":\"streak\",\"args\":[{\"ref\":\"taken_on\"}]} / last7(integer) = {\"op\":\"doneInDays\",\"args\":[{\"ref\":\"taken_on\"},7]}(丸を押した日は iOS が履歴に残す・実施記録 entity は作らない)。list の trailing に streak、全体は stat.value {\"agg\":\"max\",\"entity\":\"medicine\",\"field\":\"streak\"}(最長の連続)/ {\"agg\":\"sum\",\"entity\":\"medicine\",\"field\":\"last7\"}(直近 7 日の合計回数)。"
+      ]
+    },
+    "ExprRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref"
+      ],
+      "description": "行コンテキスト(computed の対象レコード)のフィールド値。\"id\" はレコード id。\"<ref field>.<field>\"(ドット 1 つ)で ref field が指す先のレコードのフィールド値(例 {\"ref\":\"chore.points\"} = 選んだ家事の点数・参照先が無ければ空)。stat.value では使えない。",
+      "properties": {
+        "ref": {
+          "type": "string",
+          "description": "Field id of the current record, \"id\", or \"<refField>.<fieldId>\" (one level) to read the referenced record's field."
+        }
+      }
+    },
+    "ExprAgg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agg",
+        "entity"
+      ],
+      "description": "エンティティ全体(filter で絞り込み)の集計。count 以外は field 必須。filter は 1 つ、または配列(AND)。latest / earliest は by(日付 field)で並べて最新 / 最古の 1 件の field の値を返す(同じ日は後に作った方が新しい・0 件は空)。",
+      "properties": {
+        "agg": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum",
+            "avg",
+            "min",
+            "max",
+            "latest",
+            "earliest"
+          ]
+        },
+        "entity": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string",
+          "description": "Required unless agg=count. May be a computed field of that entity."
+        },
+        "by": {
+          "type": "string",
+          "description": "latest/earliest only: date/datetime field id that orders the records (omit = the entity's first date field, else creation order)."
+        },
+        "filter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Filter"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Filter"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ExprOp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "args"
+      ],
+      "description": "関数呼び出し。op は閉じた一覧(これ以外の関数は無い)。",
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": [
+            "add",
+            "sub",
+            "mul",
+            "div",
+            "mod",
+            "neg",
+            "abs",
+            "sqrt",
+            "pow",
+            "round",
+            "floor",
+            "ceil",
+            "min",
+            "max",
+            "clamp",
+            "eq",
+            "neq",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "and",
+            "or",
+            "not",
+            "concat",
+            "len",
+            "now",
+            "today",
+            "daysBetween",
+            "daysUntil",
+            "addDays",
+            "hoursBetween",
+            "year",
+            "month",
+            "day",
+            "weekday",
+            "toNumber",
+            "toString",
+            "coalesce",
+            "streak",
+            "doneInDays"
+          ],
+          "x-enumDescriptions": {
+            "add": "a+b+...(2 個以上)",
+            "sub": "a-b",
+            "mul": "a*b*...(2 個以上)",
+            "div": "a/b(b=0 は評価エラー)",
+            "mod": "a mod b",
+            "neg": "-a",
+            "abs": "|a|",
+            "sqrt": "√a(a<0 はエラー)",
+            "pow": "a の b 乗",
+            "round": "round(x) 四捨五入して整数 / round(x, n) 小数 n 桁",
+            "floor": "floor(x[, n]) 切り捨て(n = 小数桁)",
+            "ceil": "ceil(x[, n]) 切り上げ(n = 小数桁)",
+            "min": "最小(2 個以上)",
+            "max": "最大(2 個以上)",
+            "clamp": "clamp(x, lo, hi)",
+            "eq": "a == b(型が違えば数値か文字列に寄せて比べる: id と ref の比較用)",
+            "neq": "a != b(eq と同じ寄せ方)",
+            "gt": "a > b",
+            "gte": "a >= b",
+            "lt": "a < b",
+            "lte": "a <= b",
+            "and": "a かつ b(2 個)",
+            "or": "a または b(2 個)",
+            "not": "否定",
+            "concat": "文字列連結(2 個)",
+            "len": "文字数",
+            "now": "現在日時(引数なし)",
+            "today": "今日の日付(引数なし)",
+            "daysBetween": "daysBetween(a,b) = b - a の日数",
+            "daysUntil": "daysUntil(d) = d - 今日 の日数(過ぎたら負)",
+            "addDays": "addDays(d, n) = d の n 日後",
+            "hoursBetween": "hoursBetween(start, end) = \"HH:mm\" 同士の差の時間数(小数。30 分 = 0.5)。end < start は日付またぎとして +24h。勤務時間・睡眠時間に",
+            "year": "年",
+            "month": "月(1-12)",
+            "day": "日(1-31)",
+            "weekday": "曜日(1=日 ... 7=土)",
+            "toNumber": "数値に変換(不可ならエラー)",
+            "toString": "文字列に変換",
+            "coalesce": "coalesce(a,b) = a が空(null・空文字)/エラーなら b",
+            "streak": "streak({\"ref\":<毎日チェックの toggle field>}) = 連続日数(今日やっていれば今日から、まだなら昨日から遡る)。list.item.resets daily の toggle field だけ・computed(integer)で使う",
+            "doneInDays": "doneInDays({\"ref\":<毎日チェックの toggle field>}, n) = 直近 n 日(今日を含む)にチェックした日数(直近 7 日 = n 7)。list.item.resets daily の toggle field だけ・computed(integer)で使う"
+          }
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Expr"
+          },
+          "description": "now/today は []。"
+        }
+      }
+    },
+    "NearbyShare": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "label",
+        "entity"
+      ],
+      "properties": {
+        "type": {
+          "const": "nearbyShare"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string"
+        },
+        "entity": {
+          "type": "string",
+          "description": "送る entity。screen.entity と同じならフォームの今のレコード(1 件)、それ以外の画面ではその entity の新しい順 最大 50 件を送る。"
+        }
+      },
+      "description": "近くにいる Tailor It 端末(Wi-Fi / Bluetooth・インターネット不要)を探し、選んだ相手にこの画面のレコードをその場で送るボタン。相手が承認した時だけ届き、同じ entity(id とフィールド構成)を持つアプリならレコードとして追加される。「近くの人と共有」「その場で送る」「出席を取る」「名刺交換」「対戦結果を渡す」など、対面で記録を渡したいアプリで選ぶ。",
+      "x-usage": "フォーム画面なら保存ボタンの近く(A10:F11)に 1 つ。一覧画面なら下部の半幅(D11:F12)に。受け取る側も同じアプリ(同じ entity)を開いている必要がある。"
+    },
+    "ExprIf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "if",
+        "then",
+        "else"
+      ],
+      "description": "条件分岐。if が true なら then、それ以外は else。",
+      "properties": {
+        "if": {
+          "$ref": "#/$defs/Expr"
+        },
+        "then": {
+          "$ref": "#/$defs/Expr"
+        },
+        "else": {
+          "$ref": "#/$defs/Expr"
+        }
+      }
+    },
+    "AiButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "task",
+        "output"
+      ],
+      "properties": {
+        "type": {
+          "const": "aiButton"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string",
+          "description": "ボタン文言(省略時は task から自動: AI で要約 など)。"
+        },
+        "task": {
+          "type": "string",
+          "enum": [
+            "summarize",
+            "classify",
+            "rewrite",
+            "extract",
+            "suggest"
+          ],
+          "description": "summarize=要約 / classify=候補から 1 つ選ぶ / rewrite=言い換え・清書 / extract=要点や値の抜き出し / suggest=一言・アイデアの提案。"
+        },
+        "input": {
+          "type": "string",
+          "description": "AI に渡す screen.entity の field id。省略 = フォームの入力全部(output 以外)。entity と同時に指定しない。"
+        },
+        "entity": {
+          "type": "string",
+          "description": "集計入力: この entity の最近のレコード(limit 件)をまとめて AI に渡す(例: 過去の日記から傾向を一言)。input と同時に指定しない。"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "description": "entity 入力の件数(新しい順・既定 20)。"
+        },
+        "output": {
+          "type": "string",
+          "description": "結果を入れる screen.entity の field id(string/text、classify は enum も可)。フォームのドラフトに入るだけで保存はユーザーが行う。"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "追加の指示テンプレ。{{fieldId}} はフォームの値、{{input}} は入力全体に置換。例: 「{{body}} を 30 字で」。"
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": {
+            "type": "string"
+          },
+          "description": "classify の候補。output が enum field なら省略可(field の options を使う)。"
+        }
+      },
+      "description": "押すとオンデバイス AI(Apple Intelligence / Foundation Models)が走り、フォームの入力を要約・分類・言い換え・抜き出し・提案して output field に入れるボタン。無料・データは端末外に出ない。非対応端末では「この端末では AI を使えません」と無効表示。",
+      "x-usage": "フォーム画面のみ(screen.entity 必須)。発話に「要約して」「分類して」「気分を判定」「タグ付け」「一言で」「言い換えて」「丁寧に」「抜き出して」「提案して」「AI で」がある時に使う。entity に結果用の field(string/text、分類は enum)を足し、その入力欄の直上に 1 行(例 A7:F8)。1 画面 3 個まで。"
+    },
+    "LocationTracker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "locationField"
+      ],
+      "properties": {
+        "type": {
+          "const": "locationTracker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string",
+          "description": "点を保存する entity。1 点 = 1 レコード。location field と datetime field を持たせる。他の field は defaultValue があればその値、無ければ空で保存される(required にするなら defaultValue を付ける)。"
+        },
+        "locationField": {
+          "type": "string",
+          "description": "`entity` の location field。現在地が \"lat,lng\" で入る。"
+        },
+        "dateField": {
+          "type": "string",
+          "description": "`entity` の datetime field。記録した時刻が入る(mapView kind route の dateField と stat distance/duration の by に同じ field を使う)。"
+        },
+        "label": {
+          "type": "string",
+          "description": "開始ボタンの文言(既定「記録を開始」)。"
+        },
+        "seconds": {
+          "type": "integer",
+          "description": "自動停止までの秒数(既定 3600・300〜14400 に丸める)。"
+        }
+      },
+      "description": "「記録を開始 / 記録を停止」ボタンと記録中の状態(経過時間・距離)。開始を押した間だけ現在地を entity に 1 点ずつ保存し、アプリを閉じても停止まで続く(既定 1 時間・最長 4 時間で自動停止)。散歩・ランニング・サイクリングのルート、移動ログ、軌跡を残したいアプリで選ぶ。1 回だけ現在地を入れたいなら locationButton。",
+      "x-usage": "ホーム画面(screen.entity なし)に A9:F10 で 1 つ(最下 2 行の左 A-B はマイクの席なので空ける)。同じ画面に mapView{kind:\"route\",entity,locationField,dateField}(A3:F8)と stat{aggregate:\"distance\"} / stat{aggregate:\"duration\"}(field = location field、by = datetime field、今日なら filter today)を A1:F2 に並べる。entity は point{loc: location, at: datetime(required, defaultValue now)} のように点だけを持たせ、フォーム画面は作らない。"
+    },
+    "HealthStat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "metric",
+        "label"
+      ],
+      "properties": {
+        "type": {
+          "const": "healthStat"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "metric": {
+          "type": "string",
+          "enum": [
+            "steps",
+            "weight"
+          ],
+          "description": "steps=歩数(iPhone の歩数計が自動で数えている値。記録不要)/ weight=体重(ヘルスケアの最新値 kg)。"
+        },
+        "period": {
+          "type": "string",
+          "enum": [
+            "today",
+            "week"
+          ],
+          "description": "today=今日の値(体重は最新値・既定)/ week=直近 7 日の棒グラフと 1 日平均(体重は 7 日の推移)。"
+        },
+        "label": {
+          "type": "string",
+          "description": "カードの見出し(例: 今日の歩数)。"
+        },
+        "target": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "steps の 1 日の目標(例 8000)。today は達成率のバー、week は目標線。"
+        }
+      },
+      "description": "端末のヘルスデータを表示するカード。歩数は iPhone が自動で数えている値(entity も記録も不要)、体重はヘルスケアの最新値。「毎日の歩数を見たい」「今日何歩歩いた」「1 週間の歩数」「ヘルスケアの体重を見たい」など、自分で入力しない健康データを見たい時に選ぶ。権限が無い時・シミュレータでは理由を表示する。",
+      "x-usage": "entity 不要でどの画面にも置ける。today は stat と同じ大きさ(半幅 2〜3 行・例 A1:C3)、week はグラフなので全幅 4〜5 行(例 A4:F8)。目標の話があれば target。手入力の体重記録アプリで「ヘルスケアにも保存」と言われたら、体重 field に health: \"weight\" を付ける(このカードとは別)。"
     }
   }
 }

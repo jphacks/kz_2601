@@ -8,6 +8,7 @@
 |---|---|---|
 | v1 | 10/24 午前 | 初版(ゴール G1〜G13・デモ3本・F01〜F28・Q1〜Q5) |
 | v2 | 10/24 午後 | Q1〜Q5 の決定を反映(ユーザーデータ=Firestore / 改変=JSON Patch / カメラ+通知の両方 P0 / ログインあり)。**グリッド座標配置を中核要件に追加**(G3・F29〜F33)。タブナビ・versions restore・WhisperKit `small`・ホットリロード・アプリ名メタモン(F34〜F41)。デモ3本の表を `docs/dsl/examples/*.json` と一致させた。旧記述(ローカル保存・フル再生成・Morph・再帰レンダラー)を削除 |
+| v3 | 10/24 夜 | 正式名 **Tailor It** に決定(#62/#69)。F40 を更新・Q6 を決着。G18 ウィジェットは実機確認済み(#39) |
 
 ## 1. 2日間のゴール
 
@@ -31,7 +32,8 @@
 | Could | G14 | 位置情報 + 地図 | Field `location` と `map` Leaf(DSL は P1 枠を予約済み) |
 | Could | G15 | 他アプリ連携 | Share Sheet / Shortcuts / HealthKit |
 | Could | G16 | 複数アプリの保持と切替 | 現状は **1 ユーザー 1 アプリ**前提 |
-| Could | **G17** | **生成前の対話(数ラリーで要件を固めてから作る)** | **実機で一発生成を試した所感(10/24)。「このアプリ、カメラ使える?」のような質問に答えてから生成したい。ai に `mode: clarify` を足し、確認質問→回答→生成の会話状態を appconfig に持つ。必達ではない** |
+| Could | G18 | ホーム画面ウィジェット(**実装済み**・Issue #39) | 生成アプリの `stat` 先頭 3 個を本体が集計し App Group 経由で WidgetKit に表示(small=1 個/medium=3 個)。制約: 更新は本体起動中のみ・DSL の動的描画はしない(`docs/ios/architecture.md` §12) |
+| Could | **G17** | **生成前の対話(数ラリーで要件を固めてから作る)** | **backend 実装済み(10/24・Issue #74)**: `POST /v1/chat` が 1 問+選択肢で聞き返し、揃えば `ready` の `transcript` を既存 create に渡す。最大 3 ラリー・「もう作って」で即 ready・会話状態は ai 内 30 分(appconfig 永続化は後段)。eval 6 本全通過・p50 2.4s(`docs/backend/ai-eval/2026-10-24-chat.md`)。**iOS 側は #75** |
 
 **グリッド配置を必達に含める判断**: 「AI が画面をレイアウトする」ことが審査での差別化点なので、**「`area` 付き DSL を描画できる」(G3・iOS 側)は必達**にする。実装は `GeometryReader` 1 個で有界(Screen 直下 1 階層のみ)であり、デモ3本の seed(F19)は手書きで正しい `area` を持つため、Claude の出力品質に依存せずデモで見せられる。一方 **「Claude が破綻なく `area` を出す」(G10)はストレッチ**に置く。LLM の座標出力は揺れるため、失敗時は backend が重なり/範囲外をエラー列挙→再生成 1 回→それでもダメなら `area` を全部落として「上から積む」決定的フォールバック(F31)で必達を守る。
 
@@ -95,7 +97,7 @@
 | **F37** | **`GET/POST/PATCH/DELETE /apps/{appId}/entities/{entityId}/records[/{recordId}]`(Firestore・uid スコープ・`RecordData` は §3.3 のフィールド型)** | **P0** | appconfig | F07,F22 |
 | **F38** | **iOS クライアント集計 `stat`(count/sum/avg/min/max・`thisMonth`/`today` は端末ローカル時刻)** | **P0** | iOS | F12 |
 | **F39** | **ホットリロード: Day1 は `GET /apps/{appId}/dsl` ポーリングで version 比較、Day2 に Firestore リスナー(iOS 直読は DSL ドキュメントのみ読取許可)** | **P1** | iOS+infra | F07 |
-| **F40** | **アプリ名「メタモン」(内部 `Metamon`・Bundle ID `jp.kz2601.metamon`)。#5 の実機確認後に単独 PR でリネーム。商標リスクは提出前に判断(§6 Q6)** | **P1** | iOS | — |
+| **F40** | **アプリ名「Tailor It」(正式名・#62/#69。表示名・UI 文言・README・台本を統一。内部識別子 `Metamon`・Bundle ID `jp.kz2601.metamon` は維持)** | **P1** | iOS | 済 |
 | **F41** | **1 ユーザー 1 アプリ: uid→appId を固定で解決(`POST /apps` は初回のみ)。一覧 UI は作らない** | **P0** | appconfig+iOS | F22 |
 
 ### 3.1 コンポーネント目録(18 種 = Container 3 + Leaf 15。詳細は `docs/dsl/README.md` §3.1)
@@ -149,7 +151,7 @@ v1 の Q1〜Q5 は **決着**(詳細は `00_decisions.md` 判断ログ): Q1 ユ�
 
 | # | 論点 | 選択肢 | 補佐の推奨 |
 |---|---|---|---|
-| Q6 | アプリ名「メタモン」の商標リスク(ポケモン関連の既存商標) | a) 提出前に別名へ / b) 表示名のみ変更し内部 `Metamon` は維持 / c) そのまま | **b**。コードは触らず表示名と README だけで対処できる。提出(Day2 午後)前に決める |
+| Q6 | 仮名「メタモン」の商標リスク(ポケモン関連の既存商標) | a) 提出前に別名へ / b) 表示名のみ変更し内部 `Metamon` は維持 / c) そのまま | **a+b で決着(#62)**。正式名 **Tailor It** へ表示名・文言を変更し、内部 `Metamon` は維持 |
 | Q7 | Day1 夜にカメラ(F14)が遅れていた場合 | a) カメラを P1 に落とし通知だけで G6 成立 / b) 両方 P0 を維持して Day2 午前も続ける | **a** を発動する時刻を Day1 22:00 と決めておく |
 | Q8 | 審査本番の順序 | a) A→B→C(本書案) / b) B→A→C(v1 案) | **a**。C の位置情報が P1 に落ちリスクが下がった |
 | Q9 | F39 Firestore リスナー(iOS が DSL ドキュメントを直読)を許すか | a) 許す(ルールで該当パスのみ read 許可) / b) ポーリングのまま | **a** は Day2 午前に余裕があれば。無ければ b で問題ない |

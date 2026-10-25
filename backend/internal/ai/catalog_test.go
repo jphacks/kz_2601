@@ -58,11 +58,23 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompImage, dsl.CompList, dsl.CompStat, dsl.CompChart, dsl.CompVoiceInput, dsl.CompSpacer, dsl.CompDivider,
 		dsl.CompCard, dsl.CompDisclosure, dsl.CompCarousel, dsl.CompGrid,
 		dsl.CompSearchBar, dsl.CompCalendar, dsl.CompShareButton, dsl.CompOpenURLButton,
-		dsl.CompMapView, dsl.CompLocationButton, dsl.CompQrScanner, dsl.CompTimerDisplay,
+		dsl.CompMapView, dsl.CompLocationButton, dsl.CompQrScanner, dsl.CompTimerDisplay, dsl.CompWebView,
 		dsl.CompSlider, dsl.CompStepper, dsl.CompTextEditor, dsl.CompSecureField, dsl.CompTimePicker, dsl.CompColorPicker, dsl.CompRating,
 		// display
 		dsl.CompLabel, dsl.CompIcon, dsl.CompProgressBar, dsl.CompGauge, dsl.CompBadge, dsl.CompLink, dsl.CompMarkdown,
 		dsl.CompAvatar, dsl.CompTable, dsl.CompTimeline, dsl.CompEmptyState,
+		// logic
+		dsl.CompSettlement,
+		// on-device AI
+		dsl.CompAiButton,
+		// peer-to-peer
+		dsl.CompNearbyShare,
+		// location tracking
+		dsl.CompLocationTracker,
+		// device health
+		dsl.CompHealthStat,
+		// video (#206)
+		dsl.CompVideoField, dsl.CompVideoPlayer,
 	} {
 		goTypes[string(ct)] = true
 	}
@@ -111,8 +123,13 @@ func TestCatalogRendering(t *testing.T) {
 		"- section: children / spacing(none|small|medium|large), title",
 		"- vstack: children / spacing(none|small|medium|large) —", // title is section-only (x-for)
 		"- list: entity, item{title} / emptyText, filter{field,op,value}, onItemTap, searchField, sort{field,direction}, swipeToDelete",
-		"- stat: label, entity, aggregate(count|sum|avg|min|max) / field, filter{field,op,value}, format(plain|currency|percent)",
-		"- filter{field, op(eq|neq|gt|gte|lt|lte|thisMonth|today), value}",
+		"- stat: label / aggregate(count|sum|avg|min|max|latest|earliest|distance|duration), by, entity, field, filter{field,op,value}, format(plain|currency|percent), value",
+		"- settlement: entity, nameField, balanceField / title —",
+		"### 計算式 Expr",
+		"- {\"op\":\"daysUntil\"",
+		"- {\"agg\":",
+		"レシピ",
+		"- filter{field, op(eq|neq|gt|gte|lt|lte|thisMonth|today|thisWeek|thisYear), value}",
 		"- navigate{screen / presentation(push|sheet|fullScreen)}",
 		"- saveRecord{entity / screen}",
 		"- back{(追加キー無し)}",
@@ -121,6 +138,9 @@ func TestCatalogRendering(t *testing.T) {
 		"- divider: (追加キー無し) —",
 		"- notification{id, title, body, repeat(once|daily|weekly) / time, weekday(mon|tue|wed|thu|fri|sat|sun)}",
 		"どの action にも付けられる任意キー: confirmMessage",
+		"### Entity の scope",
+		"- scope: private —",
+		"- scope: public —",
 	} {
 		if !strings.Contains(catalog, want) {
 			t.Errorf("catalog lacks %q\n%s", want, catalog)

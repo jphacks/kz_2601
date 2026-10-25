@@ -1,0 +1,20 @@
+[
+  {"id": "d_kakeibo", "kind": "create", "group": "main-A", "transcript": "毎日の出費をメモできる家計簿アプリを作って。今月いくら使ったかと支出の一覧、カテゴリ別のグラフも見たい。レシートの写真も残せるようにして", "expect": {"photo": true, "chart": true}},
+  {"id": "d_bigger_total", "kind": "edit", "group": "main-A", "base": "d_kakeibo", "transcript": "今月の合計をもっと大きく表示して", "expect": {"patch": true}},
+  {"id": "d_button_topleft", "kind": "edit", "group": "main-A", "base": "d_kakeibo", "transcript": "追加ボタンを左上に移して", "note": "本線の改変が失敗した時の代替", "expect": {"patch": true}},
+  {"id": "d_cafe", "kind": "edit", "group": "main-A", "base": "d_kakeibo", "transcript": "カテゴリにカフェを追加して", "note": "5 分版", "expect": {"patch": true}},
+  {"id": "d_kakeibo_short", "kind": "create", "group": "main-A", "transcript": "家計簿", "note": "本線 A の逃げ道"},
+  {"id": "d_training", "kind": "create", "group": "main-B", "transcript": "別のアプリ。筋トレの記録アプリ。腕立てとスクワットの回数を毎日つけて、朝8時にリマインドして", "expect": {"notification": "08:00"}},
+  {"id": "d_notify_21", "kind": "edit", "group": "main-B", "base": "d_training", "transcript": "毎晩9時に記録を忘れないよう通知して", "note": "5 分版(本番は今の時刻+2 分)", "expect": {"notification": "21:00", "patch": true}},
+  {"id": "d_walk", "kind": "create", "group": "main-C", "transcript": "別のアプリ。散歩で見つけたいい場所を写真とひとことで残すメモアプリ。夜に見返したい", "expect": {"photo": true}},
+  {"id": "d_walk_calendar", "kind": "edit", "group": "main-C", "base": "d_walk", "transcript": "カレンダーで見たい", "note": "5 分版。calendar 部品(#25)が出るか"},
+  {"id": "s_warikan", "kind": "create", "group": "safe", "transcript": "旅行の割り勘アプリ。メンバーごとに誰がいくら払ったかと精算額が見たい", "expect": {"calc": true, "settlement": true}},
+  {"id": "s_shift", "kind": "create", "group": "safe", "transcript": "シフト管理アプリ。出勤した日と開始時刻と終了時刻を入れたら勤務時間を自動で出して、時給1200円で今月の給料がいくらか見たい", "expect": {"calc": true, "computed": true}},
+  {"id": "s_reading", "kind": "create", "group": "safe", "transcript": "読書の記録。読み終わった本を登録して、今年何冊読んだかと、年間50冊の目標まであと何冊かを出して", "expect": {"calc": true}},
+  {"id": "s_shopping", "kind": "create", "group": "safe", "transcript": "買い物リスト。買うものを追加して、買ったらチェックできるようにして"},
+  {"id": "s_medicine", "kind": "create", "group": "safe", "transcript": "服薬チェックアプリ。毎日飲む薬を登録して、飲んだら一覧でチェック、今日何回飲んだか分かるようにして"},
+  {"id": "s_nav_link", "kind": "edit", "group": "safe", "base": "d_kakeibo", "transcript": "集計の画面からも支出を追加できるようにして", "note": "§1.1 案 1。生成した家計簿を土台にする(タブ名が「集計」でない時の挙動も見る)", "expect": {"patch": true, "unreachable": 0}},
+  {"id": "en_walk", "kind": "create", "group": "safe-en", "locale": "en", "transcript": "A walk journal. Save a photo of each nice spot I find with a one-line comment", "expect": {"photo": true}},
+  {"id": "en_shopping", "kind": "create", "group": "safe-en", "locale": "en", "transcript": "Make a shopping list. Let me add things to buy, check them off right in the list when I buy them, and only show what I haven't bought yet"},
+  {"id": "en_reading", "kind": "create", "group": "safe-en", "locale": "en", "transcript": "A reading log. Let me add books when I finish them, and show how many I've read this year and how many more I need to hit my goal of 50 books a year", "expect": {"calc": true}}
+]

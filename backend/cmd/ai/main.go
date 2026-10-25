@@ -49,6 +49,14 @@ func main() {
 		Store:       store,
 		Model:       model,
 		CallTimeout: time.Duration(timeoutSec) * time.Second,
+		LogicPass:   os.Getenv("AI_LOGIC_PASS") == "1", // UI pass + calculations pass (#100)
+		LintRetry:   os.Getenv("AI_LINT_RETRY") == "1", // off: lint warnings are reported only
+		// clarify turn (#147): its own model/effort/thinking; empty = ai.DefaultChat*
+		ChatConfig: ai.ChatConfig{
+			Model:    os.Getenv("AI_CHAT_MODEL"),
+			Effort:   os.Getenv("AI_CHAT_EFFORT"),
+			Thinking: os.Getenv("AI_CHAT_THINKING"),
+		},
 	}
 	srv := &http.Server{
 		Addr:              ":" + port,
@@ -56,6 +64,6 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      time.Duration(timeoutSec)*time.Second*3 + 10*time.Second,
 	}
-	log.Printf("ai listening on :%s (model=%s effort=%s)", port, model, effort)
+	log.Printf("ai listening on :%s (model=%s effort=%s logicPass=%v chat=%+v)", port, model, effort, svc.LogicPass, svc.ChatConfig)
 	log.Fatal(srv.ListenAndServe())
 }

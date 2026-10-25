@@ -10,8 +10,14 @@ struct CalendarLeaf: View {
     let ctx: RenderContext
     @State private var month: Date = Calendar.current.startOfMonth(for: .now)
     @State private var selected: Date = Calendar.current.startOfDay(for: .now)
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var cal: Calendar { Calendar.current }
+    /// 曜日記号もアプリの表示言語に合わせる(#44)
+    private var cal: Calendar {
+        var c = Calendar.current
+        c.locale = LanguagePreference.shared.locale
+        return c
+    }
     private var entityId: String { c.entity ?? "" }
     private var entity: Entity? { rt.dsl.entity(entityId) }
     private var dateField: String { c.dateField ?? "" }
@@ -19,7 +25,7 @@ struct CalendarLeaf: View {
     /// 日(startOfDay)→ その日のレコード
     private var byDay: [Date: [Record]] {
         var out: [Date: [Record]] = [:]
-        for r in rt.records(for: entityId) {
+        for r in rt.viewRecords(for: entityId) {
             guard let d = FieldCoding.date(from: r[dateField]) else { continue }
             out[cal.startOfDay(for: d), default: []].append(r)
         }
@@ -35,24 +41,28 @@ struct CalendarLeaf: View {
             Divider()
             dayList(days[selected] ?? [])
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        .renderCard()
     }
 
     private var header: some View {
         HStack {
             if let title = c.title, !title.isEmpty {
-                Text(title).font(.caption).foregroundStyle(.secondary)
+                Text(title).font(RenderTheme.Fonts.sectionTitle).foregroundStyle(.secondary)
             }
             Spacer()
-            Button { shift(-1) } label: { Image(systemName: "chevron.left") }
-            Text(month.formatted(.dateTime.year().month(.wide)))
+            Button { shift(-1) } label: { Image(systemName: "chevron.left").font(.body.weight(.semibold)).frame(minWidth: 32, minHeight: 32) }
+                .accessibilityLabel(L("前の月"))
+            Text(month.formatted(.dateTime.year().month(.wide).locale(LanguagePreference.shared.locale)))
                 .font(.headline.monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
                 .frame(minWidth: 110)
-            Button { shift(1) } label: { Image(systemName: "chevron.right") }
+                .accessibilityAddTraits(.isHeader)
+            Button { shift(1) } label: { Image(systemName: "chevron.right").font(.body.weight(.semibold)).frame(minWidth: 32, minHeight: 32) }
+                .accessibilityLabel(L("次の月"))
         }
         .buttonStyle(.plain)
+        .foregroundStyle(.primary)
     }
 
     private var weekdayRow: some View {
@@ -65,6 +75,7 @@ struct CalendarLeaf: View {
                     .frame(maxWidth: .infinity)
             }
         }
+        .accessibilityHidden(true) // 曜日は各日のラベルに含めて読むので見出し行は飛ばす
     }
 
     private func monthGrid(_ days: [Date: [Record]]) -> some View {
@@ -72,7 +83,7 @@ struct CalendarLeaf: View {
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 4) {
             ForEach(Array(cells.enumerated()), id: \.offset) { _, date in
                 if let date {
-                    dayCell(date, hasRecords: days[date] != nil)
+                    dayCell(date, recordCount: days[date]?.count ?? 0)
                 } else {
                     Color.clear.frame(height: 36)
                 }
@@ -80,9 +91,11 @@ struct CalendarLeaf: View {
         }
     }
 
-    private func dayCell(_ date: Date, hasRecords: Bool) -> some View {
+    /// VoiceOver: 「10月24日 金曜日, 記録2件(, 今日)(, 選択中)」。日の数字は Dynamic Type で 36pt 枠に収まるよう縮小。
+    private func dayCell(_ date: Date, recordCount: Int) -> some View {
         let isSelected = date == selected
         let isToday = cal.isDateInToday(date)
+        let hasRecords = recordCount > 0
         return Button {
             selected = date
         } label: {
@@ -90,35 +103,48 @@ struct CalendarLeaf: View {
                 Text("\(cal.component(.day, from: date))")
                     .font(.callout.monospacedDigit())
                     .fontWeight(isToday ? .bold : .regular)
-                    .foregroundStyle(isSelected ? Color.white : (isToday ? Color.accentColor : Color.primary))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .foregroundStyle(isSelected ? Color.white : (isToday ? RenderTheme.Colors.brandText : Color.primary))
                 Circle()
-                    .fill(hasRecords ? (isSelected ? Color.white : Color.accentColor) : Color.clear)
+                    .fill(hasRecords ? (isSelected ? Color.white : RenderTheme.Colors.brandA) : Color.clear)
                     .frame(width: 5, height: 5)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 36)
-            .background(isSelected ? Color.accentColor : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+            .background(isSelected ? AnyShapeStyle(RenderTheme.brandFill) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(date.formatted(.dateTime.month().day().weekday(.wide).locale(LanguagePreference.shared.locale)) + (isToday ? L("、今日") : ""))
+        .accessibilityValue(hasRecords ? L("記録\(recordCount)件") : L("記録なし"))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func dayList(_ rows: [Record]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(selected.formatted(.dateTime.month().day().weekday()))
+                Text(selected.formatted(.dateTime.month().day().weekday().locale(LanguagePreference.shared.locale)))
                     .font(.subheadline.weight(.semibold))
                 Spacer()
                 if c.onDateTap != nil {
                     Button {
                         addOnSelectedDay()
                     } label: {
-                        Label("追加", systemImage: "plus").font(.subheadline)
+                        Label(L("追加"), systemImage: "plus").font(.subheadline.weight(.semibold)).foregroundStyle(RenderTheme.Colors.brandText)
                     }
                 }
             }
             if rows.isEmpty {
-                Text(rt.loading.contains(entityId) ? "読み込み中…" : "予定はありません")
-                    .font(.caption).foregroundStyle(.secondary)
+                switch rt.emptyState(for: entityId) {
+                case .loading: Text(EmptyPlaceholder.loadingText).font(.caption).foregroundStyle(.secondary)
+                case .unavailable:
+                    HStack(spacing: RenderTheme.Spacing.sm) {
+                        Text(EmptyPlaceholder.unavailableText).font(.caption).foregroundStyle(.secondary)
+                        Button(EmptyPlaceholder.retryLabel) { Task { await rt.load(entities: [entityId], force: true) } }
+                            .font(.caption.weight(.semibold))
+                    }
+                case .empty: Text(L("予定はありません")).font(.caption).foregroundStyle(.secondary)
+                }
             } else {
                 ForEach(rows) { row in
                     ListRow(item: ListItem(title: entity?.titleField ?? dateField), record: row, entity: entity)
@@ -136,7 +162,7 @@ struct CalendarLeaf: View {
 
     private func shift(_ delta: Int) {
         if let m = cal.date(byAdding: .month, value: delta, to: month) {
-            withAnimation(.snappy) { month = cal.startOfMonth(for: m) }
+            withAnimation(reduceMotion ? nil : .snappy) { month = cal.startOfMonth(for: m) }
         }
     }
 

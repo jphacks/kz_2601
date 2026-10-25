@@ -22,14 +22,14 @@ public final class FormDraft {
     public func reset() {
         recordId = nil
         values = [:]
-        for f in entity.fields {
+        for f in entity.storedFields {
             values[f.id] = FieldCoding.defaultValue(for: f)
         }
     }
 
     public func load(_ record: Record) {
         recordId = record.id
-        for f in entity.fields {
+        for f in entity.storedFields {
             values[f.id] = record.data[f.id] ?? FieldCoding.defaultValue(for: f)
         }
     }
@@ -37,7 +37,8 @@ public final class FormDraft {
     /// appconfig に送る `data`(Field.type に合わせて正規化・空は落とす)。
     public var payload: [String: JSONValue] {
         var out: [String: JSONValue] = [:]
-        for f in entity.fields {
+        // computed は保存しない(#101)
+        for f in entity.storedFields {
             if let v = FieldCoding.normalize(values[f.id] ?? .null, for: f) { out[f.id] = v }
         }
         return out
@@ -45,7 +46,7 @@ public final class FormDraft {
 
     /// required 未入力のフィールド名。
     public var missingRequired: [String] {
-        entity.fields.filter { ($0.required ?? false) && FieldCoding.normalize(values[$0.id] ?? .null, for: $0) == nil }.map(\.name)
+        entity.storedFields.filter { ($0.required ?? false) && FieldCoding.normalize(values[$0.id] ?? .null, for: $0) == nil }.map(\.name)
     }
 }
 
