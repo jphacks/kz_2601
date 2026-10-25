@@ -93,5 +93,19 @@
   {"id": "edit_clear_memo", "group": "edit-vague", "base": "internal/ai/examples/kakeibo.json", "mode": "edit", "note": "#211 明確な指示は今まで通り ready → generate で変化あり",
    "steps": [{"say": "メモ欄を消して", "expect": "ready", "generate": true}]},
   {"id": "edit_clear_chart", "group": "edit-vague", "base": "internal/ai/examples/kakeibo.json", "mode": "edit", "note": "#211 中身まで言った依頼は聞き返さない。家計簿には月ごとの金額の棒グラフが既にあるので answer で「既にある」と言う(何も変わらない ready を出さない)",
-   "steps": [{"say": "集計タブに月ごとの金額の棒グラフを足して", "expect": "answer", "textAny": ["すでに", "既に"]}]}
+   "steps": [{"say": "集計タブに月ごとの金額の棒グラフを足して", "expect": "answer", "textAny": ["すでに", "既に"]}]},
+  {"id": "cap_streak", "group": "cap", "base": "internal/ai/examples/kakeibo.json", "capabilities": ["answer", "proposal"], "note": "#230 連続日数(streak #192)はできる。答えと generate を突き合わせる",
+   "steps": [{"say": "毎日つけたかの連続日数って出せる?", "expect": "answer", "textAny": ["できます", "可能"], "textNot": ["できません"], "genSay": "家計簿をつけた日にチェックする『記録した』のオンオフを足して、ホームに連続日数を表示して。", "genHas": ["streak"]}]},
+  {"id": "cap_streak_create", "group": "cap", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#230 create(部品カタログが無いプロンプト)でも連続日数はできると答える",
+   "steps": [{"say": "連続日数って出せる?", "expect": "answer", "textAny": ["できます", "可能"], "textNot": ["できません"]}]},
+  {"id": "cap_video", "group": "cap", "base": "internal/ai/examples/kakeibo.json", "capabilities": ["answer", "proposal"], "note": "#230 動画(videoField #207)はできる",
+   "steps": [{"say": "動画も撮って残せる?", "expect": "answer", "textAny": ["できます", "可能"], "textNot": ["できません"], "genSay": "支出の入力フォームに、動画を撮って残す欄を足して。", "genHas": ["videoField"]}]},
+  {"id": "cap_place_search", "group": "cap", "base": "internal/ai/examples/kakeibo.json", "capabilities": ["answer", "proposal"], "note": "#230 場所の検索と登録(locationPicker #217)はできる",
+   "steps": [{"say": "お店の場所を検索して登録できる?", "expect": "answer", "textAny": ["できます", "可能"], "textNot": ["できません"], "genSay": "支出の入力フォームに、お店の場所を検索して登録する欄を足して。", "genHas": ["locationPicker"]}]},
+  {"id": "cap_steps", "group": "cap", "base": "internal/ai/examples/kakeibo.json", "capabilities": ["answer", "proposal"], "note": "#230 歩数(healthStat #201)はできる",
+   "steps": [{"say": "今日の歩数も出せる?", "expect": "answer", "textAny": ["できます", "可能"], "textNot": ["できません"], "genSay": "ホームに今日の歩数を表示して。", "genHas": ["healthStat"]}]},
+  {"id": "cap_multiselect", "group": "cap", "base": "internal/ai/examples/kakeibo.json", "capabilities": ["answer", "proposal"], "note": "#230 1 つの項目で複数の選択肢を選ぶ入力は DSL に無い(picker は 1 つ)→ できない + 代わり。generate は記録だけ",
+   "steps": [{"say": "カテゴリを複数選べるようにできる?", "expect": "answer", "textAny": ["できません"], "genSay": "カテゴリを複数選べるようにして。"}]},
+  {"id": "cap_route", "group": "cap", "base": "internal/ai/examples/kakeibo.json", "capabilities": ["answer", "proposal"], "note": "#230 経路案内はできない。generate は記録だけ",
+   "steps": [{"say": "登録したお店までの経路案内はできる?", "expect": "answer", "textAny": ["できません"], "genSay": "登録したお店までの経路案内をできるようにして。"}]}
 ]

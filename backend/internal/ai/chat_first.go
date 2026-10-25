@@ -540,20 +540,19 @@ func writeComponents(b *strings.Builder, cs []dsl.Component, indent string) {
 	}
 }
 
-// chatCapabilities is what the DSL can and cannot do, for answers. Hand
-// written: the catalog lists the parts, this lists the facts users ask about.
+// chatCapabilities is the hand-written part of what the DSL can and cannot
+// do: how the app works and its limits (#230: the list of parts, ops and
+// actions is not written here; it comes from the schema, see
+// chatCapabilityIndex / catalog, so it never falls behind the generator).
 var chatCapabilities = strings.TrimSpace(`
 ## このアプリの仕組み(質問への答えの根拠)
 - アプリは iOS の SwiftUI でネイティブに描画している(Server-Driven UI: 画面の設計図 JSON を AI が作り、iOS がそれを部品に組み立てる)。**WebView ではない**。webView 部品がある画面のその枠だけ WKWebView で https のページを表示する。
 - 変えられる単位: 画面(最大 12)・下のタブ(2〜5)・記録の種類 entity(最大 6、項目は 40 まで)・部品・計算・通知・テーマ色・アイコン・アプリ名。声やチャットで頼むと AI が設計図を書き換える。
 - 項目数の上限(#221): 今のアプリの entity 行の「項目 n/40」に足すと 40 を超える追加は ready にしない(生成 AI が既存の項目を消して収めてしまう)。proposal で 2 案: どれかの項目を消して足す案(消す項目名を入れる)と、足す項目を別の記録の種類(画面)に分ける案。
-- 部品の大きさ・位置: 各画面は横 A〜F の 6 列 × 縦 12 行のグリッドで、部品の枠(area)を広げる・狭める・動かすことができる。文字の大きさは text の style(title / headline / body / caption の 4 段)。画像の高さは small / medium / large。**フォントのポイント数・好きなフォント・アニメーション・自由なレイアウト(重ね合わせ)は指定できない**。色はテーマ色と決まった色名(semantic color)だけ。
-- 記録と表示: 入力(文字・数字・金額・日付・時刻・選択肢・オンオフ・写真・スライダー・星・色など)、一覧(並べ替え・絞り込み・検索・スワイプ削除・タップで編集・ワンタップのチェック)、表・タイムライン・月のカレンダー表示。
-- 集計と計算: 合計・件数・平均・最大・最小・最新・最初、今日 / 今週 / 今月 / 今年 / 直近 7 日の絞り込み、グラフ(棒・折れ線・円。カテゴリ別・日 / 週 / 月ごと)、進捗バー・ゲージ、計算式(四則演算・日付の差・時刻の差・条件分岐・マスタの値の参照)、割り勘の精算(誰が誰にいくら)。
-- 端末の機能: カメラ / 写真、ローカル通知(1 回・毎日・毎週)、地図(記録の場所にピン。**経路案内・ナビはできない**。地図アプリで開くボタンは置ける)、現在地、散歩などの道のりの記録(開始を押した間だけ・地図に線と距離 / 時間)、QR 読み取り、ストップウォッチ / カウントダウン、共有(LINE / Slack / Discord / その他)、URL・電話・メールを開くボタン、端末内 AI ボタン(要約・分類・書き換え・抽出・提案。データは端末から出ない)、近くの iPhone へ記録を送る。
-- みんなで使う: entity を public にすると、アプリを使う他の人と同じ記録を見て投稿できる。**家族だけ・招待した人だけに限る設定はまだ無い**(誰でも読める)。**誰が投稿したか(投稿者名)は画面に出せない**(一覧・表・詳細のどこにも表示できない。代わり → 入力フォームに「名前」や「使った人」の選択項目を足す)。各自の記録は private(既定)。
-- できないこと(聞かれたら正直に「できません」と言い、近い代わりを添える): 外部サービスの自動取得(天気・株価・ニュースの API。代わり → webView でそのサイトを表示)、ログイン・課金・決済、サーバーからのプッシュ通知(代わり → 時刻指定のローカル通知)、ウィジェット・Apple Watch、連続日数(代わり → 直近 7 日の記録数)、順位番号(代わり → 合計の降順の表)、一括削除などの一括操作(代わり → スワイプ削除)、タイマーの自動切り替え、ファイル書き出し(代わり → 共有ボタン)、経路案内、投稿者名の表示(代わり → 「使った人」の項目)。
-`)
+- 部品の大きさ・位置: 各画面は横 A〜F の 6 列 × 縦 12 行のグリッドで、部品の枠(area)を広げる・狭める・動かすことができる。文字の大きさは text の style(title / headline / body / caption の 4 段)。画像の高さは small / medium / large。色はテーマ色と決まった色名(semantic color)だけ。
+- できる・できないの決め方: 部品・計算式の op・ボタンの動作・項目の型は「できることの索引」と「部品カタログ」(どちらもスキーマから自動生成)が正典。そこにある部品や op で組み立てられることは「できます」と答える(例: 連続日数 = streak、直近 n 日にやった日数 = doneInDays、動画 = videoField、歩数 = healthStat、場所の検索 = locationPicker、道のりの記録 = locationTracker)。毎日の通知はアプリの通知設定(1 回・毎日・毎週のローカル通知)。
+- みんなで使う: entity を public にすると、アプリを使う他の人と同じ記録を見て投稿できる(誰でも読める)。**誰が投稿したか(投稿者名)は画面に出せない**(一覧・表・詳細のどこにも表示できない)。各自の記録は private(既定)。
+` + chatLimitsText())
 
 var chatEditSystemPrompt = strings.TrimSpace(`
 あなたは「声で変わる自分専用アプリ」の相談相手です。ユーザーはすでに iOS アプリを持っていて、そのアプリについて質問したり、変えたいことを相談したりします。user ターンの「## 今のアプリ」(設計図の要約)と「## 会話」を読み、JSON オブジェクト 1 つだけを返します。あなたはアプリを直接変えません。アプリが変わるのは、ユーザーが ready の transcript か案の instruction で生成を実行した時だけです。
@@ -616,7 +615,7 @@ var chatCreateSystemPrompt = chatSystemPrompt + "\n\n" + strings.TrimSpace(`
 - question: suggestions が**複数当てはまる**問い(「どの項目を一覧に出しますか?」「何を記録しますか?」)なら multiSelect=true。**1 つだけ選ぶ**問い(「どの単位で集計しますか?」「毎日と毎週どちら?」)なら false。
 - answer / ready では常に false。
 
-`+chatCapabilities)
+`+chatCapabilities+"\n\n"+chatCapabilityIndex)
 
 // chatCreateUserMessage renders the history for a chat-first create turn.
 func chatCreateUserMessage(ms []ChatMessage, loc Locale, force, noMoreQuestions bool, problems []string) string {
