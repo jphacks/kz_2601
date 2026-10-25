@@ -82,7 +82,7 @@ Expr := number | string | boolean
 
 `streak` / `doneInDays` の第 1 引数は**値ではなく field の指定**: `list.item.resets: "daily"` の toggle に使われている同 entity の date field を `{"ref": ...}` で渡す(iOS はその行の「押した日の履歴」を読む・§7.5)。computed(integer)で使い、全体の値は stat.value の `agg sum / max` でその computed を集計する。stat.value 直下では行が無いので使えない。
 
-時刻引数(`hoursBetween`)は `"HH:mm"`(`"H:mm"`・`"HH:mm:ss"` も可)の文字列 = `timePicker` が string field に保存する形。datetime を渡したときは**その時刻部分だけ**を使う(日付は無視)。数値・真偽は backend が拒否する(`toNumber("09:30")` は 9.5 にならないので、時刻を数値化して引き算しない)。日付をまたいで 24 時間以上働く・2 日以上空く計算は対象外(§8)。
+時刻引数(`hoursBetween`)は `"HH:mm"`(`"H:mm"`・`"HH:mm:ss"` も可)の文字列 = `timePicker` が string field に保存する形。datetime を渡したときは**その時刻部分だけ**を使う(日付は無視)。数値・真偽は backend が拒否する(`toNumber("09:30")` は 9.5 にならないので、時刻を数値化して引き算しない)。日付をまたいで 24 時間以上働く・2 日以上空く計算は対象外(§8)。iOS の `timePicker` は未入力の時も今の時刻を表示するので、表示中の時刻をそのまま保存値にする(触らずに保存して時刻が空 = 勤務時間「—」にならない・#229)。
 
 ## 4. 置き場所
 
@@ -148,7 +148,12 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
 3.5. **今の値**: 今の体重 = stat `aggregate: latest, field: weight, by: date`。今の BMI = latest の field に computed bmi。増減 = `sub(latest, earliest)`。
 3.6. **マスタの値**: 家事の点数 = log の computed `{"ref":"chore.points"}`、売上 = `mul({"ref":"item.price"}, {"ref":"qty"})`。
 4. **達成率**: stat{format:percent, value: `div(agg sum, 目標)`} + progressBar{entity, field, target}。
-5. **シフト・バイト代**: shift{date, start/end: string `"HH:mm"`(timePicker), wage: currency}。computed `hours` = `hoursBetween(ref start, ref end)`、`pay` = `round(hours * wage)`。今月の給料 = stat sum pay filter date thisMonth。
+5. **シフト・バイト代**: shift{date, start/end: string `"HH:mm"`(timePicker), wage: currency}。computed `hours` = `hoursBetween(ref start, ref end)`、`pay` = `round(hours * wage)`。今月の勤務時間 / 給料 = stat sum hours / pay filter date thisMonth。
+   - **休憩を引く**(#229): `break_min: integer`(unit「分」)を足し、`hours` = `max(sub(hoursBetween(start, end), div(coalesce(ref break_min, 0), 60)), 0)`。coalesce が無いと、休憩欄を足す前の記録が「—」になる。休憩は `hours` の式に入れ、`pay` は `round(hours * wage)` のまま(currency の computed が `hoursBetween` を使って `mul` しないと backend が拒否する)。休憩を開始・終了の時刻で持つなら `sub(hoursBetween(start, end), coalesce(hoursBetween(break_start, break_end), 0))`。
+   - **夜勤**: `hoursBetween` が日付またぎ(22:00→06:00 = 8)を扱うので式は変えない。今月の判定は `date`(出勤日)で行う。
+   - 時給は記録の field(`wage` の defaultValue に時給)・式の定数(`mul(ref hours, 1100)`)・マスタ(`ref job.wage`)のどれでもよい。
+   - 表示: hours は小数 2 桁まで(7.25 時間)・pay は ¥ と桁区切り(currency の unit「円」は付け足さない・#150)。
+   - 時刻を `sub` で引くと backend は `hoursBetween` を使うよう返す(`toNumber("09:30")` は 9.5 にならない)。
 6. **カウントダウン**: computed `days_left` = `daysUntil(ref date)`、最も近い予定 = `agg min days_left filter days_left gte 0`。
 7. **毎日チェックの連続日数・直近 7 日**(`examples/medicine.json`): medicine{name, taken_on: date} + list `item: {"toggle":"taken_on","resets":"daily","trailing":"streak"}`。
    - `streak`(integer・unit 日) = `{"op":"streak","args":[{"ref":"taken_on"}]}`

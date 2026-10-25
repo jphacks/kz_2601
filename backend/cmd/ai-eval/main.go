@@ -1,7 +1,7 @@
 // ai-eval runs internal/ai/eval/cases.json against the real Claude API through
 // the same Service the ai server uses (in-memory store, no HTTP), and writes
 // per-case metrics + the resulting DSL as JSON. Edit cases are seeded with the
-// DSL produced by their `base` create case in the same run. `expect` keys:
+// DSL produced by their `base` case (create or an earlier edit) in the same run. `expect` keys:
 // photo / chart / calendar (bool), notification ("HH:MM" or "any"), substitution (bool:
 // the summary mentions 代替 / "replaced" because a requested part is not in
 // the catalog), scope ("public"|"shared"|"private": at least one entity has
@@ -230,7 +230,7 @@ func main() {
 		log.Fatal(err)
 	}
 	run := Run{Date: time.Now().Format("2006-01-02"), Model: *model, Effort: *effort, Tag: *tag, Stream: *stream}
-	created := map[string]json.RawMessage{} // create case id -> resulting DSL
+	created := map[string]json.RawMessage{} // case id -> resulting DSL (create or edit)
 
 	for rep := 1; rep <= max(*repeat, 1); rep++ {
 		for _, c := range cases {
@@ -345,9 +345,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkEnum(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkKeep(c.Expect, app, rec.Summary)...)
 	}
-	if c.Kind == "create" {
-		created[c.ID] = res.DSL
-	}
+	created[c.ID] = res.DSL // edits too, so an edit can build on an earlier edit (#229)
 	log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms first=%dms out=%d chars=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",
 		c.ID, rec.Attempts, rec.AreaFallback, rec.ClaudeMs, rec.FirstEventMs, rec.Usage.OutputTokens, rec.OutputChars,
 		rec.Metrics.Tabs, rec.Metrics.Screens, rec.Metrics.AreaRatio, rec.ExpectMisses, rec.Summary)

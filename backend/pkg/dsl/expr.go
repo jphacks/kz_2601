@@ -443,7 +443,7 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 				}
 			}
 			if !accepts(want, types[i]) {
-				c.add("%s: %s expects a %s but got a %s%s", aw, e.Op, want, types[i], convertHint(want))
+				c.add("%s: %s expects a %s but got a %s%s", aw, e.Op, want, types[i], argHint(e.Op, want, types[i]))
 			}
 			if e.Op == "hoursBetween" {
 				c.checkHoursBetweenArg(aw, types[i])
@@ -566,6 +566,16 @@ func (c *exprChecker) checkFilter(where string, f *Filter, e *Entity, row *Entit
 	}
 }
 
+// argHint: subtracting times / dates is hoursBetween / daysBetween, never
+// toNumber ("09:30" is not 9.5 and a date is not a number). #229: the generic
+// toNumber hint led retries to {"op":"sub","args":[toNumber(end),toNumber(start)]}.
+func argHint(op string, want, got exprType) string {
+	if want == tNum && (got == tStr || got == tDate) && (op == "sub" || op == "add") {
+		return ` (to get the hours between two "HH:mm" times or datetimes use {"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]}; days between dates use daysBetween; do not toNumber a time)`
+	}
+	return convertHint(want)
+}
+
 func convertHint(want exprType) string {
 	switch want {
 	case tNum:
@@ -645,6 +655,7 @@ func checkComputedFields(entities []Entity, byID map[string]*Entity, daily map[s
 			if okType && !accepts(fieldExprType(f.Type), got) {
 				add("%s: computed expression yields a %s but the field type is %s; change the type or convert%s", where, got, f.Type, convertHint(fieldExprType(f.Type)))
 			}
+			checkPayFromHours(where, f, add)
 			key := fieldKey{e.ID, f.ID}
 			for d := range c.deps {
 				graph[key] = append(graph[key], d)

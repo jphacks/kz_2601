@@ -88,6 +88,31 @@ func (c *exprChecker) checkHoursBetweenArg(where string, got exprType) {
 	}
 }
 
+// checkPayFromHours (#229): a currency field computed from hoursBetween is
+// money, so it must multiply hours by a wage. An edit ("休憩も引いて") wrote the
+// net-hours formula into pay, showing ¥7 for a 7-hour shift.
+func checkPayFromHours(where string, f *Field, add func(string, ...any)) {
+	if f.Type == FieldCurrency && exprUsesOp(f.Computed, "hoursBetween") && !exprUsesOp(f.Computed, "mul") {
+		add("%s: a currency field computed from hoursBetween is hours, not money; multiply by the wage, e.g. {\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"ref\":\"hours\"},{\"ref\":\"wage\"}]}]}, and put the break deduction in the hours field", where)
+	}
+}
+
+// exprUsesOp reports whether op appears anywhere in e.
+func exprUsesOp(e *Expr, op string) bool {
+	if e == nil {
+		return false
+	}
+	if e.Kind == ExprOp && e.Op == op {
+		return true
+	}
+	for i := range e.Args {
+		if exprUsesOp(&e.Args[i], op) {
+			return true
+		}
+	}
+	return exprUsesOp(e.If, op) || exprUsesOp(e.Then, op) || exprUsesOp(e.Else, op)
+}
+
 // MaxDoneInDays bounds doneInDays' n (iOS keeps about a year of history).
 const MaxDoneInDays = 366
 
