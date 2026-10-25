@@ -86,7 +86,7 @@ public enum Aggregator {
         case "currency": return FieldCoding.currency(value)
         case "percent": return String(format: "%.0f%%", value)
         default:
-            let s = value == value.rounded() ? String(Int(value)) : String(format: "%.1f", value)
+            let s = FieldCoding.plainNumber(value)
             return unit.map { s + " " + $0 } ?? s
         }
     }
