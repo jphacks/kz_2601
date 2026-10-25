@@ -313,18 +313,22 @@ final class MetamonUITests: XCTestCase {
         XCTAssertFalse((field.value as? String ?? "").contains("three"), "送信後に入力欄が空にならない")
     }
 
+    /// 返事待ちの間にキーボードを出して測るための、モックの対話の待ち(秒)。CI(macos-26)は XCUI の問い合わせが 1 回 0.3〜1 秒と遅く、
+    /// 16 秒では送信 → キーボード表示 → 計測の前に返事が届いた(run 40158670179)。余裕を見て 40 秒
+    private let kbReplyDelay = "40"
+
     /// 返事待ちの間にキーボードを出しても、返事が届いた後も、入力欄はキーボードのすぐ上にあってタップできる(#208)。
     /// edit = 作ったアプリの音声シート、create = 初期画面の対話。モックの対話の待ちを延ばして返事待ちの間に操作する。
     func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_edit() {
         launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "見やすくして", "METAMON_AUTO_PAUSE": "600",
-                                    "METAMON_MOCK_AI_DELAY": "16"])
+                                    "METAMON_MOCK_AI_DELAY": kbReplyDelay])
         assertComposerAboveKeyboardAcrossReply("edit", replied: app.buttons.matching(identifier: "chat.option.choose").firstMatch,
                                                 userBubble: "あなた: 見やすくして")
     }
 
     /// 実機の手順どおり: FAB → シートの文字入力で 1 つ目を打って送る(キーボードが閉じる)→ 返事待ちの間に対話の入力欄をタップ
     func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_editTyped() {
-        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": "16"])
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": kbReplyDelay])
         waitForFab()
         fab.tap()
         XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開かない")
@@ -339,7 +343,7 @@ final class MetamonUITests: XCTestCase {
 
     /// 1 つ目を声で(シミュレータのマイクはダミーの定型文)
     func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_editVoice() {
-        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": "16"])
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": kbReplyDelay])
         waitForFab()
         fab.tap()
         XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開かない")
@@ -356,7 +360,7 @@ final class MetamonUITests: XCTestCase {
     }
 
     func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_createTyped() {
-        launch(example: nil, ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": "16"])
+        launch(example: nil, ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": kbReplyDelay])
         let field = composerField
         XCTAssertTrue(field.waitForExistence(timeout: 15), "初期画面の文字入力が無い")
         field.tap()
@@ -368,7 +372,7 @@ final class MetamonUITests: XCTestCase {
 
     func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_create() {
         launch(example: nil, ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "日記", "METAMON_AUTO_PAUSE": "600",
-                              "METAMON_MOCK_AI_DELAY": "16"])
+                              "METAMON_MOCK_AI_DELAY": kbReplyDelay])
         assertComposerAboveKeyboardAcrossReply("create", replied: app.buttons.matching(identifier: "chat.chip").firstMatch,
                                                 userBubble: "あなた: 日記")
     }
@@ -404,7 +408,7 @@ final class MetamonUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(gapWaiting, -1, "返事待ち: 入力欄がキーボードに隠れている", file: file, line: line)
         XCTAssertLessThanOrEqual(gapWaiting, 80, "返事待ち: 入力欄がキーボードから離れすぎ(二重に持ち上がっている)", file: file, line: line)
 
-        XCTAssertTrue(replied.waitForExistence(timeout: 20), "返事が届かない", file: file, line: line)
+        XCTAssertTrue(replied.waitForExistence(timeout: 60), "返事が届かない", file: file, line: line)
         Thread.sleep(forTimeInterval: 0.8) // 返事の吹き出し・スクロールのアニメーション
         settle()
         XCTAssertTrue(kb.exists, "返事が届いたらキーボードが閉じた", file: file, line: line)
