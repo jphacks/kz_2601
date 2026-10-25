@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
+#if !APP_STORE_REVIEW
 import Foundation
 import MetamonDSL
 import MetamonRenderer
@@ -20,3 +22,4 @@ extension AppRuntime {
         }
     }
 }
+#endif

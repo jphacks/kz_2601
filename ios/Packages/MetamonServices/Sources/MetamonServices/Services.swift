@@ -13,12 +13,16 @@ public struct Services {
     public var notifications: any NotificationScheduler
     /// true なら起動時にサーバー(appconfig)から DSL を取得し、ホットリロードを開始する。
     public var isLive: Bool
+    #if !APP_STORE_REVIEW // 審査用ビルドはシェア / 探す / リリース申請をバイナリから外す(#245)
     /// シェア / 「探す」(#49 #50)。appconfig が live の時だけ(モックでは nil = 導線を出さない)。
     public var sharing: (any SharingClient)?
+    #endif
     /// アカウント削除(#119)。live では `HTTPAccountClient`、それ以外はモック(成功のみ)。
     public var account: any AccountClient = MockAccountClient()
+    #if !APP_STORE_REVIEW
     /// リリース申請(#76)。sharing と同じく live の時だけ。
     public var releaseRequests: (any ReleaseRequestClient)?
+    #endif
 
     public init(
         auth: any AuthService,

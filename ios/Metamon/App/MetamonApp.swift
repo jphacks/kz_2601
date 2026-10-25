@@ -21,7 +21,11 @@ struct MetamonApp: App {
         FirebaseBootstrap.configureIfAvailable()
         UNUserNotificationCenter.current().delegate = ForegroundNotificationPresenter.shared // 前面でも通知を出す(#228)
         let services = BuildConfig.make()
+        #if !APP_STORE_REVIEW
         if BuildConfig.forceMock { HealthData.source = MockHealthData() } // healthStat(#167)は固定値
+        #else
+        _ = ReviewBuildPackageMarker.self // パッケージにも APP_STORE_REVIEW が渡っていることをコンパイル時に保証(#245)
+        #endif
         let appId = DeviceAppID.current
         var document: AppDocument
         if services.isLive, let cached = DocumentCache.shared.load(appId: appId) {

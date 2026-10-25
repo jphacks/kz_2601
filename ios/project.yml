@@ -11,6 +11,14 @@ options:
   createIntermediateGroups: true
   generateEmptyDirectories: true
 
+# 構成: Debug / Release は今まで通り(全機能)。Review = App Store 審査用(#245・APP_STORE_REVIEW)。
+# Review は審査で危ない機能をバイナリから外す。ビルドは必ず scripts/build-review.sh で(ローカル Swift Package にも
+# コンパイル条件を渡すため。Xcode の GUI だけで Review をビルドするとコンパイルエラーで止まる=取りこぼし防止)。docs/ios/review-build.md
+configs:
+  Debug: debug
+  Release: release
+  Review: release
+
 settings:
   base:
     # Swift 6 コンパイラ + Swift 5 言語モード。strict concurrency は targeted(警告止まり)でハッカソン速度を優先。
@@ -66,22 +74,34 @@ targets:
       # ホーム画面ウィジェット(埋め込み)
       - target: MetamonWidget
     # Sign in with Apple + App Group(ウィジェットとの共有)。自動署名(-allowProvisioningUpdates)が App ID に capability を付与する(有料 Developer Program 必須)。
-    entitlements:
-      path: Metamon/Metamon.entitlements
-      properties:
-        com.apple.developer.applesignin: [Default]
-        com.apple.security.application-groups: [group.jp.kz2601.metamon]
-        # healthStat / Field.health(#167): 体重の読み書き・歩数の読み取り。自動署名で App ID に HealthKit が付く
-        com.apple.developer.healthkit: true
-        com.apple.developer.healthkit.access: []
+    # 中身: Sign in with Apple / App Group / HealthKit(healthStat / Field.health・#167。自動署名で App ID に HealthKit が付く)。
+    # 構成ごとに別ファイルにするため xcodegen の `entitlements:` ではなく CODE_SIGN_ENTITLEMENTS で指定する(#245)。
+    # Review(審査用)は HealthKit を外した Metamon/Metamon-Review.entitlements。
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon
         PRODUCT_NAME: Metamon
         INFOPLIST_FILE: Metamon/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Metamon/Metamon.entitlements
         TARGETED_DEVICE_FAMILY: "1"
         ENABLE_PREVIEWS: YES
         SWIFT_EMIT_LOC_STRINGS: YES
+      configs:
+        # App Store 審査用(#245): コード・部品の登録・権限の説明・entitlement(HealthKit)を外す
+        Review:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE_REVIEW"
+          CODE_SIGN_ENTITLEMENTS: Metamon/Metamon-Review.entitlements
+          METAMON_APP_STORE_REVIEW: "YES"
+          # 下の strip-review-plist.sh が出来上がった Info.plist を書き換えるため(Review だけ)
+          ENABLE_USER_SCRIPT_SANDBOXING: NO
+    postBuildScripts:
+      # Review 構成だけ Info.plist から外した機能の権限の説明を消す(Debug / Release では何もしない・#245)
+      - name: Strip review-only Info.plist keys
+        script: '"${SRCROOT}/scripts/strip-review-plist.sh"'
+        inputFiles:
+          - $(SRCROOT)/scripts/strip-review-plist.sh
+          - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)
+        basedOnDependencyAnalysis: false
     scheme:
       # 各モジュールのユニットテストを `xcodebuild -scheme Metamon test` で一括実行する。
       testTargets:
@@ -149,3 +169,18 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: Metamon
         TARGETED_DEVICE_FAMILY: "1"
+
+# App Store 審査用の scheme(#245)。Run / Archive とも Review 構成。テストは通常の scheme `Metamon` で回す。
+schemes:
+  Metamon-Review:
+    build:
+      targets:
+        Metamon: all
+    run:
+      config: Review
+    profile:
+      config: Review
+    analyze:
+      config: Review
+    archive:
+      config: Review

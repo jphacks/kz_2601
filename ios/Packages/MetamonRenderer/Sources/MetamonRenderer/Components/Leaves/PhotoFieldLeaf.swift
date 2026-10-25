@@ -56,6 +56,7 @@ struct PhotoFieldLeaf: View {
                 .accessibilityHint(sourceHint)
             }
         }
+        #if !APP_STORE_REVIEW
         .confirmationDialog(c.label ?? L("写真"), isPresented: $showChooser, titleVisibility: .hidden) {
             Button(L("撮影")) { openCamera() }
             Button(L("写真から選ぶ")) { showLibrary = true }
@@ -67,6 +68,7 @@ struct PhotoFieldLeaf: View {
             }
             .ignoresSafeArea()
         }
+        #endif
         .photosPicker(isPresented: $showLibrary, selection: $librarySelection, matching: .images)
         .onChange(of: librarySelection) { _, item in
             guard let item else { return }
@@ -77,6 +79,7 @@ struct PhotoFieldLeaf: View {
                 librarySelection = nil
             }
         }
+        #if !APP_STORE_REVIEW
         .alert(L("カメラを使えません"), isPresented: $showDenied) {
             Button(L("設定を開く")) {
                 if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
@@ -86,12 +89,22 @@ struct PhotoFieldLeaf: View {
         } message: {
             Text(L("設定アプリで Tailor It のカメラへのアクセスを許可してください。"))
         }
+        #endif
     }
 
     private var mode: PhotoSourceMode { PhotoSourceMode(raw: c.source) }
 
+    /// 審査用ビルド(APP_STORE_REVIEW・#245)は撮影をバイナリから外し、常にライブラリから選ぶ。
+    private static var cameraAvailable: Bool {
+        #if APP_STORE_REVIEW
+        false
+        #else
+        CameraPicker.isAvailable
+        #endif
+    }
+
     private var sourceHint: String {
-        switch PhotoSourcePolicy.plan(for: mode, cameraAvailable: CameraPicker.isAvailable) {
+        switch PhotoSourcePolicy.plan(for: mode, cameraAvailable: Self.cameraAvailable) {
         case .camera: L("カメラを開きます")
         case .library: L("写真ライブラリを開きます")
         case .choose: L("カメラか写真ライブラリを選びます")
@@ -99,7 +112,7 @@ struct PhotoFieldLeaf: View {
     }
 
     private func start() {
-        switch PhotoSourcePolicy.plan(for: mode, cameraAvailable: CameraPicker.isAvailable) {
+        switch PhotoSourcePolicy.plan(for: mode, cameraAvailable: Self.cameraAvailable) {
         case .camera: openCamera()
         case .library: showLibrary = true
         case .choose: showChooser = true
@@ -108,7 +121,11 @@ struct PhotoFieldLeaf: View {
 
     private func openCamera() {
         Task { @MainActor in
+            #if APP_STORE_REVIEW
+            showLibrary = true
+            #else
             if await CameraPicker.requestAccess() { showCamera = true } else { showDenied = true }
+            #endif
         }
     }
 }

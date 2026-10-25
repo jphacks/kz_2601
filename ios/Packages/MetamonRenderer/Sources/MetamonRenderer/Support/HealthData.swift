@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
+#if !APP_STORE_REVIEW
 import Foundation
 #if os(iOS)
 import CoreMotion
@@ -195,3 +197,4 @@ public final class LiveHealthData: HealthDataSource, @unchecked Sendable {
     }
     #endif
 }
+#endif
