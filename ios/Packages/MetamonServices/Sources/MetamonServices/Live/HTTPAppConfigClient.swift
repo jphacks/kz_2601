@@ -34,6 +34,8 @@ public struct HTTPAppConfigClient: AppConfigClient {
     private struct CreateBody: Encodable {
         var data: [String: JSONValue]
         var clientId: String
+        /// nil はキーごと送らない(backend が「匿名」を付ける)
+        var authorName: String?
     }
 
     // MARK: - Apps
@@ -115,7 +117,11 @@ public struct HTTPAppConfigClient: AppConfigClient {
     }
 
     public func create(appId: String, entity: String, data: [String: JSONValue], clientId: String) async throws -> Record {
-        let body = CreateBody(data: data, clientId: clientId)
+        try await create(appId: appId, entity: entity, data: data, clientId: clientId, authorName: nil)
+    }
+
+    public func create(appId: String, entity: String, data: [String: JSONValue], clientId: String, authorName: String?) async throws -> Record {
+        let body = CreateBody(data: data, clientId: clientId, authorName: authorName)
         let path = "v1/apps/\(appId)/entities/\(entity)/records"
         do {
             return try await decodeRecord(try await request("POST", path, body: body))

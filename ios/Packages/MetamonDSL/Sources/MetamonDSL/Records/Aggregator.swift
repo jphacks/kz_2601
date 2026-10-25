@@ -22,6 +22,12 @@ public enum Aggregator {
     }
 
     public static func matches(_ f: Filter, record: Record, field: Field?, now: Date = DSLClock.now(), calendar: Calendar = .current) -> Bool {
+        if f.field == RecordValue.author {
+            // 投稿者の uid と比べる(value は `resolvingMe` で uid にしたもの・#251)。作者の無い行は作者 ""。uid に置き換わっていない me はどれにも一致しない
+            guard let uid = f.value?.stringValue else { return false }
+            let same = (record.author ?? "") == uid
+            return f.op == "neq" ? !same : same
+        }
         let v = record[f.field]
         switch f.op {
         case "thisMonth":

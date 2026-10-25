@@ -30,15 +30,17 @@ public extension DSLRuntime {
     }
 
     /// 部品の entity + filter(単体/配列・value の Expr 可)を適用した表示用レコード。
+    /// `{"me": true}`(#251)はサインイン中の uid に置き換えて投稿者と比べる。
     func filteredRecords(_ c: Component) -> [Record] {
         let entityId = c.entity ?? ""
         let rows = viewRecords(for: entityId)
         guard !c.filters.isEmpty else { return rows }
-        if c.filters.allSatisfy({ $0.valueExpr == nil }) {
+        let filters = c.filters.map { $0.resolvingMe(uid: currentUserId) }
+        if filters.allSatisfy({ $0.valueExpr == nil }) {
             let entity = dsl.entity(entityId)
-            return rows.filter { r in c.filters.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field)) } }
+            return rows.filter { r in filters.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field)) } }
         }
-        return evaluator().apply(c.filters, entity: dsl.entity(entityId), to: rows)
+        return evaluator().apply(filters, entity: dsl.entity(entityId), to: rows)
     }
 
     /// 表示用の文字列。type=ref は参照先レコードの見出しに解決する(未取得・削除済みは「—」)。

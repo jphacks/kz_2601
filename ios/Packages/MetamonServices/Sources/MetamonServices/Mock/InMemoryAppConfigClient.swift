@@ -46,6 +46,16 @@ public actor InMemoryAppConfigClient: AppConfigClient {
         return record
     }
 
+    /// 表示名付きの作成(#250)。appconfig と同じく作者を付ける(scope は知らないので、表示名が来た時だけ。作者はモックの uid)。
+    public func create(appId: String, entity: String, data: [String: JSONValue], clientId: String, authorName: String?) async throws -> Record {
+        var record = try await create(appId: appId, entity: entity, data: data)
+        guard let authorName, let i = tables[entity]?.lastIndex(where: { $0.id == record.id }) else { return record }
+        record.author = MockAuthService.fixedUID
+        record.authorName = authorName
+        tables[entity]![i] = record
+        return record
+    }
+
     public func update(appId: String, entity: String, id: String, data: [String: JSONValue]) async throws -> Record {
         guard let i = tables[entity]?.firstIndex(where: { $0.id == id }) else {
             throw APIError.http(status: 404, body: "\(entity)/\(id) not found")
