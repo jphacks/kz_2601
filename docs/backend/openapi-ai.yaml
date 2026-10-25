@@ -250,6 +250,12 @@ components:
         summary: { type: string, description: iOS がそのまま読み上げる 1 文(locale の言語), example: 家計簿アプリを作成しました。支出の記録と今月の合計、カテゴリ別の内訳が見られます }
         locale: { type: string, enum: [ja, en], description: UI 文言と summary の言語(リクエストの locale、省略時は発話から判定した値) }
         transcript: { type: string, description: 入力が audio の時の文字起こし }
+        unchanged:
+          type: boolean
+          description: |
+            #211。edit で生成しても何も変わらなかった時だけ true(変化があれば省略)。保存しないので version == previousVersion、patch は省略、dsl は今の DSL のまま。
+            summary に理由と代わりを入れる(「項目は変更できませんでした。理由: 何の項目を足すか決まっていないため。『支払い方法の項目を足して』のように言ってもらえれば変えられます。」)。
+            iOS はアプリを適用し直さず、チャットから来た依頼なら会話に理由の吹き出しを足して開き直す(続けて話せる)。旧 iOS は無視してよい(summary をバナーに出すだけ)。
         source:
           type: string
           enum: [claude, restore, fallback_template]

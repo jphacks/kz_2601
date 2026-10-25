@@ -13,7 +13,7 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     // container(構造系: card/disclosure/carousel/grid)
     case card, disclosure, carousel, grid
     // leaf(ナビ・ネイティブ系)
-    case searchBar, calendar, shareButton, openUrlButton, mapView, locationButton, qrScanner, timerDisplay
+    case searchBar, calendar, shareButton, openUrlButton, mapView, locationButton, locationPicker, qrScanner, timerDisplay
     case webView
     // leaf: 入力系バッチ
     case slider, stepper, textEditor, secureField, timePicker, colorPicker, rating
@@ -110,7 +110,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var value: Double?          // progressBar(0..1)/ gauge のリテラル値
     public var valueExpr: Expr?        // stat: `value` に Expr(aggregate の代替・#101)。数値リテラルも入る
     // settlement(#101)
-    public var nameField: String?
+    public var nameField: String?      // settlement / locationPicker(場所の名前の string field・#212)
     public var balanceField: String?
     // aiButton(#78)。label / prompt / entity / limit は共用
     public var task: String?           // summarize|classify|rewrite|extract|suggest

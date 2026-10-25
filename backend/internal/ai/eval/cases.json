@@ -12,6 +12,10 @@
    "expect": {"photo": true}},
   {"id": "walk_route", "kind": "create", "group": "demo-C", "transcript": "散歩のルートを記録したい。今日どれくらい歩いたかも見たい",
    "expect": {"has": ["locationTracker", "mapView"]}, "note": "#168 locationTracker + mapView kind route + stat distance"},
+  {"id": "place_pick", "kind": "create", "group": "place", "transcript": "行きたいお店リストを作りたい。お店を検索して登録して、地図で見たい",
+   "expect": {"has": ["locationPicker", "mapView"], "lacks": ["locationButton"]}, "note": "#212 現在地以外の場所 = locationPicker(nameField)"},
+  {"id": "place_here", "kind": "create", "group": "place", "transcript": "今いる場所をワンタップで記録して、あとで地図で見返したい",
+   "expect": {"has": ["locationButton"], "lacks": ["locationPicker"]}, "note": "#212 現在地 = locationButton のまま"},
   {"id": "video_form", "kind": "create", "group": "video", "transcript": "筋トレのフォームを動画で残したい。種目と日付も記録して見返したい",
    "expect": {"has": ["videoField"], "photo": false}, "note": "#206 video field + videoField(内カメ/外カメ)"},
   {"id": "video_kids", "kind": "create", "group": "video", "transcript": "子どもの成長を動画で記録したい",
@@ -81,5 +85,9 @@
   {"id": "health_steps", "kind": "create", "group": "health", "transcript": "毎日の歩数を見たい。目標は8000歩で、1週間の推移もグラフで見たい",
    "expect": {"health": "steps"}},
   {"id": "health_weight", "kind": "create", "group": "health", "transcript": "体重を毎朝記録して、ヘルスケアにも保存したい。推移もグラフで見たい",
-   "expect": {"healthField": true}}
+   "expect": {"healthField": true}},
+  {"id": "field_cap_add2", "kind": "edit", "group": "fieldcap", "base": "example:checkup19", "transcript": "MCVとMCHを追加して",
+   "expect": {"patch": true, "unreachable": 0, "keepEntity": "checkup", "keep": ["date","height","weight","bmi","sbp","dbp","wbc","rbc","hgb","hct","plt","ast","alt","ggt","ldl","hdl","tg","egfr","ua"], "growTo": 21}, "note": "#221 19 項目に 2 つ足す: 全部残して 21 か、消さずに上限を伝える"},
+  {"id": "field_cap_full", "kind": "edit", "group": "fieldcap", "base": "example:checkup39", "transcript": "MCVとMCHを追加して",
+   "expect": {"patch": true, "unreachable": 0, "keepEntity": "checkup", "keep": ["date", "height", "weight", "bmi", "sbp", "dbp", "wbc", "rbc", "hgb", "hct", "plt", "ast", "alt", "ggt", "ldl", "hdl", "tg", "egfr", "ua", "fbs", "hba1c", "cre", "bun", "tc", "alp", "ldh", "tp", "alb", "tbil", "na", "k", "cl", "ca", "fe", "crp", "waist", "pulse", "eye_l", "eye_r"], "growTo": 41}, "note": "#221 39 項目 + 2 は上限 40 を超える: 既存を消さずに上限を伝える"}
 ]

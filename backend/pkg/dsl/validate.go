@@ -30,7 +30,7 @@ func SchemaJSON() []byte { return schemaJSON }
 const (
 	MaxScreens            = 12
 	MaxEntities           = 6
-	MaxFieldsPerEntity    = 20
+	MaxFieldsPerEntity    = 40 // computed fields count too (#221: 20 made edits drop existing fields)
 	MaxComponentsPerLevel = 30
 	MaxDSLBytes           = 64 << 10
 	MaxTabs               = 5
@@ -224,7 +224,7 @@ func (a *App) Validate() error {
 			add("entity %q has no fields", e.ID)
 		}
 		if len(e.Fields) > MaxFieldsPerEntity {
-			add("entity %q has too many fields", e.ID)
+			add("entity %q has too many fields (%d > %d)", e.ID, len(e.Fields), MaxFieldsPerEntity)
 		}
 		switch e.Scope {
 		case "", ScopePrivate, ScopeShared, ScopePublic:
@@ -529,6 +529,8 @@ func (a *App) Validate() error {
 				} else if c.Type == CompQrScanner && f.Type != FieldString && f.Type != FieldText {
 					add("%s: qrScanner field %q must be string or text", where, c.Field)
 				}
+			case CompLocationPicker: // #212
+				checkLocationPicker(where, c, formEntity, add)
 			case CompTimerDisplay:
 				switch c.Mode {
 				case "stopwatch":

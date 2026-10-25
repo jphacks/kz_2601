@@ -153,6 +153,7 @@ struct ErrorCard: View {
                 .padding(.top, Theme.Spacing.xs)
             }
             Spacer(minLength: 0)
+            CraneMascot(pose: .panic, size: compact ? 52 : 68, sway: 3) // #102
         }
         .metamonCard(padding: compact ? Theme.Spacing.md : Theme.Spacing.md + Theme.Spacing.xs)
         .accessibilityElement(children: .contain)

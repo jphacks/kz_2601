@@ -128,10 +128,14 @@ extension AppRuntime {
     func runFromChat(_ text: String) async {
         let mode = chatMode
         if mode == .edit {
+            // 何も変わらなかった時(#211)はこの会話に理由を足して開き直す(`presentUnchanged`)
+            let bubbles = chatBubbles
             resetChat()
             showVoiceSheet = false
             let prefix = ScreenMapUI.shared.takeContext().map(ScreenMapCopy.contextPrefix) ?? ""
+            chatReturnOnUnchanged = bubbles
             await generate(prefix + text)
+            chatReturnOnUnchanged = nil
         } else {
             // create は全画面の生成中表示を先に出し、対話は完成(apply が消す)か生成しなかった時に消す。
             // 先に対話を消すと、対話画面の撤去と生成中表示の挿入が重なって GeneratingView が描画されず、
@@ -157,6 +161,7 @@ extension AppRuntime {
 
     /// 会話を捨てる(「最初から」・別アプリへの切替・生成開始)。サーバー側も `DELETE /v1/chat/{appId}`。
     func resetChat() {
+        archiveLiveChat() // #210 閉じた会話として残す(「最初から」は `restartChat` で消す)
         cancelAutoBuild()
         chatTask?.cancel()
         chatTask = nil
@@ -193,7 +198,7 @@ extension AppRuntime {
         let epoch = chatEpoch
         let appId = document.appId
         let mode = chatMode
-        let history = chatBubbles.map { ChatMessage(role: $0.role == .user ? .user : .assistant, text: $0.text) }
+        let history = chatContextMessages // #210 過去の変更の要約 + 最後の反映以降 + 今の会話
         var timing = chatTiming
         chatTiming = ChatTiming()
         withAnimation(.easeInOut(duration: 0.25)) {

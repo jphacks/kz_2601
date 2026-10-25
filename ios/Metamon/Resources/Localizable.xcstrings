@@ -256,6 +256,23 @@
         }
       }
     },
+    "(これまでに反映した変更)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(Changes applied so far)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(これまでに反映した変更)"
+          }
+        }
+      }
+    },
     "(オフライン・キャッシュ)": {
       "extractionState": "manual",
       "localizations": {
@@ -320,6 +337,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "(全画面)"
+          }
+        }
+      }
+    },
+    "1つ前に戻しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Went back one step"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1つ前に戻しました"
+          }
+        }
+      }
+    },
+    "1つ前に戻す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo last change"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1つ前に戻す"
           }
         }
       }
@@ -953,6 +1004,23 @@
         }
       }
     },
+    "またね。いつでも戻ってきてください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See you! Come back anytime."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "またね。いつでも戻ってきてください"
+          }
+        }
+      }
+    },
     "おかえりなさい。\n今日は何を作りますか?": {
       "extractionState": "manual",
       "localizations": {
@@ -1017,6 +1085,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "ここから行ける"
+          }
+        }
+      }
+    },
+    "ここで反映しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applied here"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ここで反映しました"
+          }
+        }
+      }
+    },
+    "ここで反映しました(v%lld)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applied here (v%lld)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ここで反映しました(v%lld)"
           }
         }
       }
@@ -1446,23 +1548,6 @@
         }
       }
     },
-    "ひとつ前の状態(version %lld)に戻しました": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restored the previous version (version %lld)"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ひとつ前の状態(version %lld)に戻しました"
-          }
-        }
-      }
-    },
     "ひとつ前の状態に戻す": {
       "extractionState": "manual",
       "localizations": {
@@ -1646,6 +1731,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "やめる"
+          }
+        }
+      }
+    },
+    "やり直しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Redid the change"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "やり直しました"
+          }
+        }
+      }
+    },
+    "やり直す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Redo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "やり直す"
+          }
+        }
+      }
+    },
+    "やり直せませんでした": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't redo the change"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "やり直せませんでした"
           }
         }
       }
@@ -3278,6 +3414,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "元に戻して"
+          }
+        }
+      }
+    },
+    "元に戻す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "元に戻す"
           }
         }
       }
