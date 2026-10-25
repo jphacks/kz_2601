@@ -761,9 +761,9 @@ final class AppRuntime: DSLRuntime {
                 guard appId == document.appId else { return }
                 toast = L10n.tr("他の端末で変更されていたため、サーバーの内容に合わせました")
                 await refresh(entity)
-            case .rejected(let appId, let entity, let message):
+            case .rejected(let appId, let entity, let message, let field):
                 guard appId == document.appId else { return }
-                toast = L10n.tr("保存できませんでした: \(message)")
+                toast = rejectedToast(entity: entity, field: field, message: message)
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
             case .paused(let pending):
@@ -883,6 +883,15 @@ final class AppRuntime: DSLRuntime {
     }
 
     /// appconfig のエラー封筒を人向けに。422 `invalid_record` は `details.field` を DSL の Field 名に引き直して「どの項目か」を出す。
+    /// 同期キューで保存が弾かれた時の toast。項目が分かれば「払った人」のように名前で出す(英語の field id を見せない)。
+    func rejectedToast(entity: String, field: String?, message: String) -> String {
+        guard let field else { return L10n.tr("保存できませんでした: \(message)") }
+        let name = dsl.entity(entity)?.field(field)?.name ?? field
+        // サーバー文言の `field "payer" ` 前置きは名前と重複するので落とす
+        let reason = message.replacingOccurrences(of: "field \"\(field)\" ", with: "")
+        return L10n.tr("保存できませんでした: \(L10n.tr("「\(name)」の入力を確認してください(\(reason))"))")
+    }
+
     func message(for error: Error, entity: String?) -> String {
         guard let api = error as? APIError else { return error.localizedDescription }
         if api.code == "invalid_record" || (api.status == 400 && api.field != nil), let fieldId = api.field {

@@ -32,8 +32,8 @@ public enum SyncEvent: Sendable, Equatable {
     case sent(appId: String, entity: String)
     /// 競合(404/409 等)。サーバー優先でローカルの未送信印を落とした。entity をサーバーから引き直すこと
     case conflict(appId: String, entity: String, message: String)
-    /// サーバーが内容を拒否(400/422)。操作は破棄し、create はローカル行も消した
-    case rejected(appId: String, entity: String, message: String)
+    /// サーバーが内容を拒否(400/422)。操作は破棄し、create はローカル行も消した。`field` は弾かれた Field.id(`details.field`)
+    case rejected(appId: String, entity: String, message: String, field: String? = nil)
     /// 連続失敗が上限に達し、次のトリガー(オンライン復帰 / 前面復帰 / 今すぐ同期)まで停止
     case paused(pending: Int)
     /// キューが空になった
@@ -183,7 +183,8 @@ public actor SyncQueue {
                 case .rejected(let message):
                     await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
                     finish(op)
-                    emit(.rejected(appId: op.appId, entity: op.entity, message: message))
+                    print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) rejected: \(message)")
+                    emit(.rejected(appId: op.appId, entity: op.entity, message: message, field: (error as? APIError)?.field))
                 case .transient:
                     ops[0].attempts += 1
                     persist()
@@ -208,13 +209,14 @@ public actor SyncQueue {
 
     private func perform(_ op: SyncOperation) async throws {
         let serverId = aliases[op.recordId] ?? op.recordId
+        let data = resolvingAliases(op.data)
         switch op.kind {
         case .create:
-            let rec = try await client.create(appId: op.appId, entity: op.entity, data: op.data, clientId: op.id)
+            let rec = try await client.create(appId: op.appId, entity: op.entity, data: data, clientId: op.id)
             aliases[op.recordId] = rec.id
             await store.markSynced(appId: op.appId, entity: op.entity, localId: op.recordId, server: rec)
         case .update:
-            let rec = try await client.update(appId: op.appId, entity: op.entity, id: serverId, data: op.data)
+            let rec = try await client.update(appId: op.appId, entity: op.entity, id: serverId, data: data)
             await store.markSynced(appId: op.appId, entity: op.entity, localId: op.recordId, server: rec)
         case .delete:
             do {
@@ -226,6 +228,15 @@ public actor SyncQueue {
             aliases[op.recordId] = nil
         case .none:
             break
+        }
+    }
+
+    /// 値に残った仮 id(`local-<clientId>`)を送信済みのサーバー id に差し替える。
+    /// 未送信のメンバーを選んだ支出の type=ref(払った人)などは、積んだ時点では仮 id のまま入っている。
+    func resolvingAliases(_ data: [String: JSONValue]) -> [String: JSONValue] {
+        data.mapValues { v in
+            if case .string(let s) = v, s.hasPrefix("local-"), let real = aliases[s] { return .string(real) }
+            return v
         }
     }
 
