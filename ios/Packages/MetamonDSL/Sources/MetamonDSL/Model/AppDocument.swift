@@ -60,7 +60,7 @@ public struct AppDSL: Decodable, Sendable {
             var next = Set<String>()
             for f in e.fields {
                 next.formUnion(f.computed?.referencedEntities ?? [])
-                if let r = f.refEntity { next.insert(r) }
+                if let r = f.refEntity { next.insert(r) } // ref / refs
             }
             for n in next.subtracting(out) { out.insert(n); queue.append(n) }
         }
@@ -225,6 +225,9 @@ public enum FieldType: String, Decodable, Sendable {
     case video
     /// 別 entity のレコード参照(保存値はレコード id 文字列・#101)。`Field.refEntity` が参照先。
     case ref
+    /// 別 entity のレコードの複数選択(保存値はレコード id の配列・#231)。空 / 無し = 全員(割り勘する人)。
+    /// 式では `len`(選んだ件数)と filter op `contains` だけが読む。
+    case refs
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .string) }
 
     public var isNumeric: Bool { self == .integer || self == .number || self == .currency }
@@ -240,7 +243,7 @@ public struct Field: Decodable, Identifiable, Sendable {
     /// リテラル既定値。date/datetime は "now" 可。
     public var defaultValue: JSONValue?
     public var unit: String?
-    /// type=ref の参照先 entity id。
+    /// type=ref / refs の参照先 entity id。
     public var refEntity: String?
     /// 読み取り専用の算出フィールド(#101)。行コンテキスト = そのレコード。**Record には保存しない**。
     public var computed: Expr?

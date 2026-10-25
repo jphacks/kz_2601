@@ -22,7 +22,7 @@ public enum FieldCoding {
         switch f.type {
         case .boolean: return .bool(false)
         case .enum: return f.options?.first.map { .string($0) } ?? .null
-        case .ref: return .null
+        case .ref, .refs: return .null
         case .date, .datetime: return .string(encode(Date(), for: f))
         default: return .null
         }
@@ -50,6 +50,10 @@ public enum FieldCoding {
             return nil
         case .boolean:
             return .bool(v.truthy)
+        case .refs:
+            // id の配列(#231)。未選択はキーごと落とす(= 全員)
+            let ids = Aggregator.refIds(v)
+            return ids.isEmpty ? Optional<JSONValue>.none : .array(ids.map { .string($0) })
         default:
             if let s = v.stringValue { return s.isEmpty ? nil : .string(s) }
             // JSONValue は ExpressibleByNilLiteral のため三項の `nil` は `.null` になる(#121)。Optional.none を明示する。
