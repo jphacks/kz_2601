@@ -823,8 +823,11 @@ final class AppRuntime: DSLRuntime {
                 return
             }
             // 楽観的 UI: ローカル DB に即反映して画面を進める。appconfig への送信は recordSync のキューが行う
-            records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: form.recordId, data: form.payload)
+            let payload = form.payload
+            let isNew = form.recordId == nil
+            records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: form.recordId, data: payload)
             WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)
             if let screen = action.screen {
                 navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
             } else {

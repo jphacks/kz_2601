@@ -2517,6 +2517,40 @@
         }
       }
     },
+    "ヘルスケアにも保存しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Also saved to Health"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ヘルスケアにも保存しました"
+          }
+        }
+      }
+    },
+    "ヘルスケアに保存できませんでした(%@)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save to Health (%@)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ヘルスケアに保存できませんでした(%@)"
+          }
+        }
+      }
+    },
     "ボタン「%@」": {
       "extractionState": "manual",
       "localizations": {

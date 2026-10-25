@@ -663,12 +663,20 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 | Siri の聞き取り | `Info.plist` の `INAlternativeAppNames` に「テイラーイット」「テーラーイット」。フレーズは `CFBundleDevelopmentRegion = ja` なので日本語で直書き |
 | 背面起動の注意 | 記録追加は bootstrap 前でも動く(`recordSync.start()` を Intent 側で呼ぶ)。返した後にプロセスが止められても行とキューはファイルに残り、次回起動で送る。開く/話しかけるは bootstrap(`GET /dsl` の復元)と競合しないよう、準備前なら保留して `markReady()` で実行 |
 | E2E(DEBUG) | シミュレータはショートカットアプリのタップ自動化が無いので、`METAMON_E2E_INTENT=add:家計簿:ランチ 800円` / `open:筋トレ` / `talk` で起動直後に本物の Intent 型・Query 経由で実行する(`Features/Intents/IntentE2E.swift`) |
-| HealthKit | 未実装(後続)。App ID に HealthKit capability が要る(下記) |
+| HealthKit | 実装済み(#167・下記 §15.1) |
 
-HealthKit を足す時の手順(Apple アカウント操作が要るので未着手):
-1. `project.yml` の Metamon entitlements に `com.apple.developer.healthkit: true`、Info.plist に `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription`。
-2. `xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で App ID に HealthKit が付く(有料 Program 必須)。付かなければ Apple Developer > Identifiers > `jp.kz2601.metamon` > Capabilities で HealthKit にチェック → プロファイル再生成。
-3. 部品は DSL に `healthField`(歩数/体重の読み取り)を足す案(schema・ai・カタログの変更が要るので別 Issue)。歩数だけなら既存の `NSMotionUsageDescription`(CoreMotion の歩数計)で capability 無しに出せる。
+### 15.1 ヘルスデータ(`healthStat` / `Field.health`・Issue #167)
+
+| 項目 | 内容 |
+|---|---|
+| 部品 | `healthStat { metric: steps\|weight, period?: today\|week, label, target? }`(entity 不要)。today = 数値(steps は target で達成率バー)、week = 7 日のグラフ。書き込みは `Field.health: "weight"`(新規保存時にヘルスケアの体重へ 1 件) |
+| 歩数の読み方 | **CoreMotion(`CMPedometer`)を優先**(capability 不要・`NSMotionUsageDescription` だけ・端末に直近 7 日分)。歩数計の無い端末(シミュレータ)は HealthKit の `stepCount` を日ごとに合計 |
+| 体重 | HealthKit `bodyMass`(kg)。読み取りは直近 30 日(today)/ 7 日(week)の各日の最新値。書き込みは `AppRuntime.writeHealthFields`(`saveRecord` の直後・レコード保存とは独立) |
+| 実装 | `MetamonRenderer/Support/HealthData.swift`(`HealthDataSource` protocol・`LiveHealthData`・`MockHealthData`・`HealthData.source`)、`Components/Leaves/HealthStatLeaf.swift`、本体 `Features/Health/AppRuntime+Health.swift` |
+| 権限・不可時 | 初回表示で許可ダイアログ(モーションとフィットネス / ヘルスケア)。拒否 → 「ヘルスケアへのアクセスが許可されていません」、端末非対応 → 「この端末ではヘルスデータを使えません」、体重が 0 件 → 「ヘルスケアに体重の記録がありません」(HealthKit は読み取りの拒否をアプリに教えないので、拒否でも 0 件表示になる)。書き込み拒否は保存後のトースト |
+| モック | `METAMON_MOCK=1` で `MockHealthData`(今日 6,240 歩・7 日の歩数と 62.4→61.8 kg の固定値)。例 `METAMON_INITIAL_EXAMPLE=health METAMON_MOCK=1` |
+| 署名 | `project.yml` の Metamon entitlements に `com.apple.developer.healthkit: true` / `com.apple.developer.healthkit.access: []`、Info.plist に `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription` / `NSMotionUsageDescription`。`xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=CHP337D75C` の自動署名で App ID に HealthKit が付くことを確認済み(2026-10-25・プロファイルに `com.apple.developer.healthkit` が入る)。付かない場合は Apple Developer > Identifiers > `jp.kz2601.metamon` > Capabilities で HealthKit にチェック → プロファイル再生成 |
+| 実機での確認 | `METAMON_INITIAL_EXAMPLE=health` か「毎日の歩数を見たい」で生成 → 初回の許可で「許可」→ 今日の歩数・7 日の棒グラフ。体重タブで記録 → 「ヘルスケアにも保存しました」→ ヘルスケアアプリの体重に入る。設定 > プライバシー > モーションとフィットネスで OFF にすると拒否表示 |
 
 ## 16. 多言語対応(ja / en・Issue #44 / #45 の iOS 側)
 

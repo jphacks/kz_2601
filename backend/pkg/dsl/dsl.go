@@ -133,6 +133,7 @@ type Field struct {
 	Unit         string    `json:"unit,omitempty"`
 	RefEntity    string    `json:"refEntity,omitempty"` // type=ref: target entity id
 	Computed     *Expr     `json:"computed,omitempty"`  // read-only calculated field (row context = this record)
+	Health       string    `json:"health,omitempty"`    // "weight": also write the saved value to HealthKit (#167)
 }
 
 // Screen is one navigable page.
@@ -243,6 +244,8 @@ const (
 	CompAiButton ComponentType = "aiButton" // Foundation Models -> form field (never leaves the device)
 	// peer-to-peer
 	CompNearbyShare ComponentType = "nearbyShare" // MultipeerConnectivity: send records to a nearby device
+	// device health (#167)
+	CompHealthStat ComponentType = "healthStat" // CoreMotion steps / HealthKit weight (no entity)
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -350,7 +353,19 @@ type Component struct {
 	Input   string   `json:"input,omitempty"`   // form field fed to the model ("" = whole draft)
 	Output  string   `json:"output,omitempty"`  // form field the result is written to
 	Options []string `json:"options,omitempty"` // classify candidates (else the enum output field's options)
+
+	// healthStat (#167). Label / Target are shared.
+	Metric string `json:"metric,omitempty"` // steps|weight
+	Period string `json:"period,omitempty"` // today|week (default today)
 }
+
+// HealthMetrics / HealthPeriods are the closed sets of healthStat values;
+// HealthFieldKinds the Field.health values.
+var (
+	HealthMetrics    = map[string]bool{"steps": true, "weight": true}
+	HealthPeriods    = map[string]bool{"": true, "today": true, "week": true}
+	HealthFieldKinds = map[string]bool{"weight": true}
+)
 
 // AITasks is the closed set of aiButton.task values.
 var AITasks = map[string]bool{"summarize": true, "classify": true, "rewrite": true, "extract": true, "suggest": true}

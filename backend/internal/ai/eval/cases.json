@@ -69,5 +69,9 @@
   {"id": "enum_user", "kind": "edit", "group": "enum", "base": "example:okozukai", "transcript": "種類を自分で増やせるようにして",
    "expect": {"patch": true, "unreachable": 0, "enumField": "income.kind", "refPick": true, "optHas": ["お小遣い", "給与", "ボーナス"], "fields": 4}, "note": "#194 マスタ entity + ref + 初期の選択肢"},
   {"id": "enum_user2", "kind": "edit", "group": "enum", "base": "example:kakeibo", "transcript": "カテゴリを自由に追加したり消したりできるようにしたい",
-   "expect": {"patch": true, "unreachable": 0, "enumField": "expense.category", "refPick": true, "optHas": ["食費"], "fields": 5}}
+   "expect": {"patch": true, "unreachable": 0, "enumField": "expense.category", "refPick": true, "optHas": ["食費"], "fields": 5}},
+  {"id": "health_steps", "kind": "create", "group": "health", "transcript": "毎日の歩数を見たい。目標は8000歩で、1週間の推移もグラフで見たい",
+   "expect": {"health": "steps"}},
+  {"id": "health_weight", "kind": "create", "group": "health", "transcript": "体重を毎朝記録して、ヘルスケアにも保存したい。推移もグラフで見たい",
+   "expect": {"healthField": true}}
 ]

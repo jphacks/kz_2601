@@ -101,6 +101,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.aiButton) { c, ctx in AiButtonLeaf(c: c, ctx: ctx) }
         // leaf(近距離共有・#36)
         r.register(.nearbyShare) { c, ctx in NearbyShareLeaf(c: c, ctx: ctx) }
+        r.register(.healthStat) { c, _ in HealthStatLeaf(c: c) }
         return r
     }()
 }

@@ -221,6 +221,13 @@
         "computed": {
           "$ref": "#/$defs/Expr",
           "description": "Read-only calculated field (never stored, never bound to inputs). Evaluated per record: `ref` reads this record's fields (\"id\" = record id). type must be number|integer|currency|string|boolean|date. Usable in list/table/stat/chart like a stored field."
+        },
+        "health": {
+          "type": "string",
+          "enum": [
+            "weight"
+          ],
+          "description": "保存した値をヘルスケアにも書き込む(weight=体重。field は number で unit kg)。「ヘルスケアにも保存」「ヘルスケアと連携」と言われた時だけ付ける。保存のたびに 1 件書き込み、失敗してもレコードの保存は成功する。"
         }
       }
     },
@@ -605,6 +612,9 @@
         },
         {
           "$ref": "#/$defs/NearbyShare"
+        },
+        {
+          "$ref": "#/$defs/HealthStat"
         }
       ]
     },
@@ -2944,6 +2954,53 @@
       },
       "description": "押すとオンデバイス AI(Apple Intelligence / Foundation Models)が走り、フォームの入力を要約・分類・言い換え・抜き出し・提案して output field に入れるボタン。無料・データは端末外に出ない。非対応端末では「この端末では AI を使えません」と無効表示。",
       "x-usage": "フォーム画面のみ(screen.entity 必須)。発話に「要約して」「分類して」「気分を判定」「タグ付け」「一言で」「言い換えて」「丁寧に」「抜き出して」「提案して」「AI で」がある時に使う。entity に結果用の field(string/text、分類は enum)を足し、その入力欄の直上に 1 行(例 A7:F8)。1 画面 3 個まで。"
+    },
+    "HealthStat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "metric",
+        "label"
+      ],
+      "properties": {
+        "type": {
+          "const": "healthStat"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "metric": {
+          "type": "string",
+          "enum": [
+            "steps",
+            "weight"
+          ],
+          "description": "steps=歩数(iPhone の歩数計が自動で数えている値。記録不要)/ weight=体重(ヘルスケアの最新値 kg)。"
+        },
+        "period": {
+          "type": "string",
+          "enum": [
+            "today",
+            "week"
+          ],
+          "description": "today=今日の値(体重は最新値・既定)/ week=直近 7 日の棒グラフと 1 日平均(体重は 7 日の推移)。"
+        },
+        "label": {
+          "type": "string",
+          "description": "カードの見出し(例: 今日の歩数)。"
+        },
+        "target": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "steps の 1 日の目標(例 8000)。today は達成率のバー、week は目標線。"
+        }
+      },
+      "description": "端末のヘルスデータを表示するカード。歩数は iPhone が自動で数えている値(entity も記録も不要)、体重はヘルスケアの最新値。「毎日の歩数を見たい」「今日何歩歩いた」「1 週間の歩数」「ヘルスケアの体重を見たい」など、自分で入力しない健康データを見たい時に選ぶ。権限が無い時・シミュレータでは理由を表示する。",
+      "x-usage": "entity 不要でどの画面にも置ける。today は stat と同じ大きさ(半幅 2〜3 行・例 A1:C3)、week はグラフなので全幅 4〜5 行(例 A4:F8)。目標の話があれば target。手入力の体重記録アプリで「ヘルスケアにも保存」と言われたら、体重 field に health: \"weight\" を付ける(このカードとは別)。"
     }
   }
 }
