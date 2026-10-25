@@ -144,6 +144,7 @@ type Field struct {
 	RefEntity    string    `json:"refEntity,omitempty"` // type=ref/refs: target entity id
 	Computed     *Expr     `json:"computed,omitempty"`  // read-only calculated field (row context = this record)
 	Health       string    `json:"health,omitempty"`    // "weight": also write the saved value to HealthKit (#167)
+	Hidden       bool      `json:"hidden,omitempty"`    // not shown to answerers (quiz answer key); computed may compare it (#262)
 }
 
 // Screen is one navigable page.
