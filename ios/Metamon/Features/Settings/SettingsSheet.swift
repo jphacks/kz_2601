@@ -24,6 +24,7 @@ struct SettingsSheet: View {
                 clarifySection
                 speechSection
                 appSection
+                if !rt.dsl.app.notifications.isEmpty { notificationSection }
                 syncSection
                 connectionSection
                 if !Self.e2eDeleteAccount { deleteAccountSection }
@@ -227,6 +228,37 @@ struct SettingsSheet: View {
         } footer: {
             Text(L10n.tr("現在: \(rt.dsl.app.name)(v\(rt.document.version))") + (rt.isOffline ? L10n.tr("・オフライン(キャッシュ表示)") : "") + "\n" + L10n.tr("「元に戻して」と話しても同じ。「別のアプリ。…」と話すと新しいアプリとして作ります。"))
         }
+    }
+
+    /// このアプリの次の通知(#228): 予約が本当に入っているかをここで確かめられる。
+    private var notificationSection: some View {
+        Section {
+            if rt.notificationsDenied {
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                } label: {
+                    Label("通知がオフです(タップで設定を開く)", systemImage: "bell.slash")
+                }
+            }
+            if rt.upcomingNotifications.isEmpty {
+                Text("予約中の通知はありません").foregroundStyle(.secondary)
+            }
+            ForEach(Array(rt.upcomingNotifications.prefix(5).enumerated()), id: \.offset) { _, n in
+                LabeledContent {
+                    Text(NotificationCopy.when(n.date)).monospacedDigit()
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(n.title)
+                        if !n.body.isEmpty { Text(n.body).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                    }
+                }
+            }
+        } header: {
+            Text("次の通知")
+        } footer: {
+            Text("アプリを閉じていても、この時刻に届きます。")
+        }
+        .task { await rt.refreshNotifications() }
     }
 
     /// レコードの同期状態(Issue #48): 最新 / 未送信 N 件 / オフライン。「今すぐ同期」でキューを流し直す。

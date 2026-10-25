@@ -19,6 +19,7 @@ extension AppRuntime {
             keys.forEach(defaults.removeObject(forKey:))
         }
         let center = UNUserNotificationCenter.current()
+        await services.notifications.removeAll()        // アプリごとの予約(#228)
         center.removeAllPendingNotificationRequests()
         center.removeAllDeliveredNotifications()
         resetToInitial()                                // 新しい appId を発行して初期 DSL に(UserDefaults を消した後に)
