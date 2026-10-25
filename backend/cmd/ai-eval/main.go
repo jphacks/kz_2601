@@ -22,7 +22,11 @@
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
+// M0 (#281): shared (bool: some entity is shared or public, whichever the model
+// picks). Keys and types are listed in expect.go; -check validates a cases
+// file without the API, and every run ends with the pass rate per group.
 //
+//	go run ./cmd/ai-eval -check -cases internal/ai/eval/m0disc_cases.json  # no API calls
 //	set -a; source ../.env; set +a
 //	go run ./cmd/ai-eval -effort low -out ../docs/backend/ai-eval/raw
 //	go run ./cmd/ai-eval -stream -repeat 2 -only kakeibo_a,walk_a   # SSE path, time to first event
@@ -175,6 +179,7 @@ func main() {
 	chatEffort := flag.String("chat-effort", "", "-chat: clarify effort (empty = ai.DefaultChatEffort)")
 	chatThinking := flag.String("chat-thinking", "", "-chat: thinking.type adaptive|disabled|between_tools (empty = ai.DefaultChatThinking)")
 	chatCaps := flag.String("capabilities", "", "-chat: comma-separated capabilities (answer,proposal) sent by cases without their own mode/capabilities (#185)")
+	check := flag.Bool("check", false, "validate the cases file (ids, bases, expect keys and types) and exit (no API calls, #281)")
 	flag.Parse()
 	if *chat && *casesPath == "internal/ai/eval/cases.json" {
 		*casesPath = "internal/ai/eval/chat_cases.json"
@@ -184,6 +189,13 @@ func main() {
 		if err := compare(*cmpBefore, *cmpAfter); err != nil {
 			log.Fatal(err)
 		}
+		return
+	}
+	if err := checkCasesFile(*casesPath, *chat); err != nil {
+		log.Fatal(err)
+	}
+	if *check {
+		fmt.Printf("ok %s\n", *casesPath)
 		return
 	}
 
@@ -260,6 +272,11 @@ func main() {
 		log.Fatal(err)
 	}
 	printTable(run)
+	hasExpect := map[string]bool{}
+	for _, c := range cases {
+		hasExpect[c.ID] = len(c.Expect) > 0
+	}
+	printPassByGroup(passByGroup(run.Cases, hasExpect))
 	fmt.Printf("\nwrote %s\n", path)
 }
 
@@ -443,6 +460,13 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 	var miss []string
 	for k, v := range exp {
 		switch k {
+		case "shared": // #281: shared with others, public or shared alike
+			found := slices.ContainsFunc(m.Scopes, func(s string) bool {
+				return strings.HasSuffix(s, ":public") || strings.HasSuffix(s, ":shared")
+			})
+			if found != v.(bool) {
+				miss = append(miss, fmt.Sprintf("shared=%v", m.Scopes))
+			}
 		case "substitution": // a part missing from the catalog was requested: summary must say so
 			if mentionsSubstitution(summary) != v.(bool) {
 				miss = append(miss, fmt.Sprintf("substitution=%v", !v.(bool)))
