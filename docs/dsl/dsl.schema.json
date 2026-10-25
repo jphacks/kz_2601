@@ -135,7 +135,7 @@
             "public"
           ],
           "description": "レコードを誰と共有するか(省略時 private)。みんなで投稿・ランキング・掲示板など、他のユーザーと同じデータを見たい時は public。private は本人だけ。shared は v1 では public と同じ扱い(参加者限定は後段)。",
-          "x-usage": "public/shared のレコードには backend が author(uid)と authorName を自動付与するので、field id に author / authorName は使えない。「みんなで」「共有」「投稿」「ランキング」「掲示板」と言われたら public、家計簿や日記のような個人記録は省略(private)。",
+          "x-usage": "public/shared のレコードには backend が author(uid)と authorName を自動付与するので、field id に author / authorName は使えない。「みんなで」「共有」「投稿」「ランキング」「掲示板」と言われたら public、家計簿や日記のような個人記録は省略(private)。 投稿者名は名前の入力欄(member_name / person / staff_name / 投稿者 など)を作らず、一覧で予約値 $author を表示する(本人が設定した表示名を backend が付ける・なりすましできない)。「自分の投稿だけ」「マイページ」は filter {\"field\":\"$author\",\"op\":\"eq\",\"value\":{\"me\":true}}。",
           "x-enumDescriptions": {
             "private": "本人だけが読み書きできる個人データ(既定)。家計簿・日記・体重など。",
             "shared": "同じアプリを開いた人と共有(v1 は public と同じ)。",
@@ -161,6 +161,10 @@
             "$ref": "#/$defs/Field"
           }
         }
+      },
+      "x-recordValues": {
+        "$author": "投稿者の表示名(public/shared の entity だけ)。本人がアプリの設定で決めた名前、未設定なら「匿名」。list.item の title/subtitle/trailing・table.columns の field・timeline の titleField/subtitleField に書ける。filter の field に書くと投稿者で絞り込む(value は {\"me\": true} = 自分。op eq = 自分の投稿 / neq = 他の人の投稿)。",
+        "$createdAt": "レコードを作った日時(datetime・全 entity)。list.item の title/subtitle/trailing・table.columns の field・timeline の titleField/subtitleField/dateField・list/table の sort.field に書ける。"
       }
     },
     "Field": {
@@ -948,15 +952,15 @@
       "properties": {
         "title": {
           "type": "string",
-          "description": "Field id."
+          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at)."
         },
         "subtitle": {
           "type": "string",
-          "description": "Field id."
+          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at)."
         },
         "trailing": {
           "type": "string",
-          "description": "Field id (e.g. amount, date)."
+          "description": "Field id (e.g. amount, date), or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at)."
         },
         "icon": {
           "type": "string"
@@ -988,7 +992,8 @@
       ],
       "properties": {
         "field": {
-          "type": "string"
+          "type": "string",
+          "description": "Field id, or \"$createdAt\" (posted at)."
         },
         "direction": {
           "type": "string",
@@ -1002,7 +1007,7 @@
     "Filter": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list / stat / chart / agg のレコード絞り込み。op が today / thisWeek / thisMonth / thisYear(期間・端末ローカル。今週は月曜始まり)のときは value を null にし、field は date / datetime。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。",
+      "description": "list / stat / chart / agg のレコード絞り込み。op が today / thisWeek / thisMonth / thisYear(期間・端末ローカル。今週は月曜始まり)のときは value を null にし、field は date / datetime。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。 「自分の投稿だけ」は field \"$author\"・value {\"me\": true}・op eq(public/shared の entity のみ)。",
       "required": [
         "field",
         "op",
@@ -1010,7 +1015,8 @@
       ],
       "properties": {
         "field": {
-          "type": "string"
+          "type": "string",
+          "description": "Field id, or \"$author\" (public/shared entity: the poster; value {\"me\": true}, op eq = my posts / neq = others' posts)."
         },
         "op": {
           "type": "string",
@@ -1066,9 +1072,12 @@
             },
             {
               "$ref": "#/$defs/ExprIf"
+            },
+            {
+              "$ref": "#/$defs/FilterMe"
             }
           ],
-          "description": "Literal or Expr. null for today/thisWeek/thisMonth/thisYear. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id)."
+          "description": "Literal or Expr. null for today/thisWeek/thisMonth/thisYear. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id). {\"me\": true} = the signed-in user (only with field \"$author\")."
         }
       }
     },
@@ -2277,7 +2286,7 @@
       "properties": {
         "field": {
           "type": "string",
-          "description": "Field id of the table entity."
+          "description": "Field id of the table entity, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at)."
         },
         "title": {
           "type": "string",
@@ -2351,13 +2360,15 @@
         },
         "dateField": {
           "type": "string",
-          "description": "date/datetime field; newest first."
+          "description": "date/datetime field, or \"$createdAt\" (posted at); newest first."
         },
         "titleField": {
-          "type": "string"
+          "type": "string",
+          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at)."
         },
         "subtitleField": {
-          "type": "string"
+          "type": "string",
+          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at)."
         },
         "filter": {
           "$ref": "#/$defs/Filter"
@@ -3301,6 +3312,19 @@
       },
       "description": "端末のヘルスデータを表示するカード。歩数は iPhone が自動で数えている値(entity も記録も不要)、体重はヘルスケアの最新値。「毎日の歩数を見たい」「今日何歩歩いた」「1 週間の歩数」「ヘルスケアの体重を見たい」など、自分で入力しない健康データを見たい時に選ぶ。権限が無い時・シミュレータでは理由を表示する。",
       "x-usage": "entity 不要でどの画面にも置ける。today は stat と同じ大きさ(半幅 2〜3 行・例 A1:C3)、week はグラフなので全幅 4〜5 行(例 A4:F8)。目標の話があれば target。手入力の体重記録アプリで「ヘルスケアにも保存」と言われたら、体重 field に health: \"weight\" を付ける(このカードとは別)。"
+    },
+    "FilterMe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "me"
+      ],
+      "properties": {
+        "me": {
+          "const": true
+        }
+      },
+      "description": "filter の value に書く「自分」。field \"$author\"(public/shared の entity)と op eq(自分の投稿)/ neq(他の人の投稿)でだけ使う。"
     }
   }
 }

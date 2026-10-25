@@ -548,6 +548,10 @@ func (c *exprChecker) checkAgg(where string, a *AggExpr, row *Entity, depth int)
 // checkFilter validates field/op/value of a filter over entity e. The value
 // may be an Expr evaluated in the outer row context (row).
 func (c *exprChecker) checkFilter(where string, f *Filter, e *Entity, row *Entity, depth int) {
+	if f.Field == RecordAuthor || isMeValue(f.Value) {
+		c.add(`%s: %q / {"me":true} (only my posts) works only as the filter of a list/table/timeline/stat/chart component, not inside agg; put it on the component (e.g. stat aggregate count with filter {"field":"$author","op":"eq","value":{"me":true}})`, where, RecordAuthor)
+		return
+	}
 	if fld := e.FieldByID(f.Field); fld == nil {
 		c.add("%s: field %q not in entity %q (fields: %s)", where, f.Field, e.ID, fieldIDs(e))
 	} else {
