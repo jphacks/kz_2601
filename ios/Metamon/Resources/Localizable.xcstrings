@@ -5933,6 +5933,142 @@
           }
         }
       }
+    },
+    "今日はここまでです": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That's all for today"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日はここまでです"
+          }
+        }
+      }
+    },
+    "本日の受付を終了しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We've paused new requests for today"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本日の受付を終了しました"
+          }
+        }
+      }
+    },
+    "利用が集中したため、新しい生成を止めています。%@に再開します": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demand is high, so new requests are paused. We'll reopen at %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用が集中したため、新しい生成を止めています。%@に再開します"
+          }
+        }
+      }
+    },
+    "このネットワークからの今日の上限に達しました。サインインすると続けて使えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This network has reached today's limit. Sign in to keep going"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このネットワークからの今日の上限に達しました。サインインすると続けて使えます"
+          }
+        }
+      }
+    },
+    "今日の上限(%lld回分)に達しました。%@からまた使えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You've reached today's limit (%lld). You can continue from %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日の上限(%lld回分)に達しました。%@からまた使えます"
+          }
+        }
+      }
+    },
+    "今日の上限に達しました。%@からまた使えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You've reached today's limit. You can continue from %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日の上限に達しました。%@からまた使えます"
+          }
+        }
+      }
+    },
+    "。サインインすると上限が増えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ". Sign in to get a higher limit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "。サインインすると上限が増えます"
+          }
+        }
+      }
+    },
+    "明日": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tomorrow"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "明日"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
