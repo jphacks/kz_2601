@@ -276,6 +276,22 @@ components:
           type: object
           description: 診断情報(model / attempts / usage など)。logicPass は 2 パス目を実行した時だけ入る
           properties:
+            publicPersonalData:
+              type: array
+              description: |
+                #253。この生成で新しく「誰でも見られる」(public / shared の entity)になった、個人の情報らしい field(無ければ省略)。
+                作成は全部、修正は今回 public になった分だけ。summary にも「「名前」「電話番号」のような個人の情報も公開されます。…」が入る。
+                iOS はこれがある時に確認ダイアログ(公開のまま / その欄を消す / 自分だけにする)を出せる。旧 iOS は無視してよい。
+              items:
+                type: object
+                required: [entity, entityName, field, fieldName, kind]
+                properties:
+                  entity: { type: string, description: entity id }
+                  entityName: { type: string }
+                  field: { type: string, description: field id }
+                  fieldName: { type: string, description: 表示名(ダイアログにそのまま出せる) }
+                  kind: { type: string, enum: [name, phone, address, email, birthday, location] }
+              example: [{ entity: reservations, entityName: 予約, field: phone, fieldName: 電話番号, kind: phone }]
             logicPass:
               type: object
               properties:
@@ -367,6 +383,10 @@ components:
         requiresPro: { type: boolean, description: '#77。ready の transcript が有料機能 (Tailor It Pro) を使う時だけ true (無料なら省略・旧 iOS は無視してよい)。判定は transcript の語 (paid_features.json の keywords) で、edit で今のアプリが既に持つ機能は除く。課金の強制はしない (表示用)' }
         paidFeatures: { type: array, items: { $ref: '#/components/schemas/PaidFeature' }, description: '#77。requiresPro の時だけ' }
         freeTranscript: { type: string, description: '#77。requiresPro の時だけ。有料機能を抜いた依頼文 (transcript + 無料版の指示)。「この機能なしで作る」で transcript の代わりに POST /generate へ' }
+        confirmPublic:
+          type: array
+          items: { type: string, enum: [name, phone, address, email, birthday, location] }
+          description: '#253。question の時だけ。Claude が ready と判断した依頼が、個人の情報(この種類)を誰でも見られる記録に入れるため、サーバーが ready の代わりに「〜のような個人の情報が、アプリを開いた人なら誰でも見られる記録に入ります。公開してよいですか?」と確かめた。suggestions は 公開してよい / 個人の情報は入れない / 自分だけの記録にする。会話で 1 回だけ (shortcut / forced の ready には出さない)。旧 iOS は普通の question として扱えばよい'
         locale: { type: string, enum: [ja, en] }
         source:
           type: string
