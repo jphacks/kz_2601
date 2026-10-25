@@ -103,6 +103,13 @@ public enum MockSeed {
                 Record(id: "e2", data: ["title": "夕食", "amount": 4500, "payer": "m2", "date": .string(today)], createdAt: iso),
                 Record(id: "e3", data: ["title": "ガソリン", "amount": 1500, "payer": "m1", "date": .string(today)], createdAt: iso),
             ],
+            // timetable(#234): 月1・水2(同じマスに 2 件 → 「+1」)・金3
+            "lecture": [
+                Record(id: "l1", data: ["subject": "線形代数", "weekday": "月", "period": 1, "room": "A101"], createdAt: iso),
+                Record(id: "l2", data: ["subject": "英語", "weekday": "水", "period": 2, "room": "B203"], createdAt: iso),
+                Record(id: "l3", data: ["subject": "英語演習", "weekday": "水", "period": 2, "room": "B204"], createdAt: iso),
+                Record(id: "l4", data: ["subject": "プログラミング", "weekday": "金", "period": 3, "room": "PC室"], createdAt: iso),
+            ],
             // bmi(#101): 65kg/170cm → 22.5、70kg/175cm → 22.9
             "body": [
                 Record(id: "b1", data: ["date": .string(today), "weight": 65, "height": 170], createdAt: iso),

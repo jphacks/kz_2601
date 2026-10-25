@@ -297,7 +297,7 @@ func lint(a *app) []string {
 	}
 	for _, c := range a.comps {
 		switch str(c.c, "type") {
-		case "list", "table", "timeline", "calendar", "mapView", "settlement":
+		case "list", "table", "timeline", "calendar", "mapView", "settlement", "gridTable":
 			shown[str(c.c, "entity")] = true
 		}
 	}

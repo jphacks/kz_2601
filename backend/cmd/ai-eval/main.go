@@ -16,6 +16,7 @@
 // each component type appears on some screen), lacks ([type, ...]: none of them appears, #212).
 // Health (#167): health ("steps"|"weight": a healthStat with that metric),
 // healthField (bool: some field has health "weight").
+// Grid (#234): grid (bool: some gridTable is present).
 // Field cap (#221): keepEntity / keep ([field id, ...]) / growTo (see checkKeep).
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
@@ -79,7 +80,9 @@ type Metrics struct {
 	RefFields  int      `json:"refFields,omitempty"`
 	ProgressTo bool     `json:"progressTarget,omitempty"` // progressBar entity+target (aggregate-based rate)
 	// #177
-	HasCalendar bool     `json:"hasCalendar,omitempty"`
+	HasCalendar bool `json:"hasCalendar,omitempty"`
+	// #234: gridTable columnField:rowField
+	Grid        []string `json:"grid,omitempty"`
 	StatUnitDup []string `json:"statUnitDup,omitempty"` // non-count stat labels ending in "(field.unit)"
 	// #167
 	Health      []string `json:"health,omitempty"`      // healthStat metric:period
@@ -398,6 +401,8 @@ func measure(a *dsl.App) *Metrics {
 					m.Settlement = true
 				case dsl.CompCalendar:
 					m.HasCalendar = true
+				case dsl.CompGridTable:
+					m.Grid = append(m.Grid, x.ColumnField+":"+x.RowField)
 				case dsl.CompHealthStat:
 					m.Health = append(m.Health, x.Metric+":"+x.Period)
 				case dsl.CompStat:
@@ -451,6 +456,10 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 		case "healthField":
 			if m.HealthField != v.(bool) {
 				miss = append(miss, fmt.Sprintf("healthField=%v", m.HealthField))
+			}
+		case "grid":
+			if (len(m.Grid) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("grid=%v", m.Grid))
 			}
 		case "calendar":
 			if m.HasCalendar != v.(bool) {

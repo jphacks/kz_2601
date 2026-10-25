@@ -69,6 +69,7 @@ public struct ComponentRegistry: Sendable {
         // leaf(ナビ・ネイティブ系)
         r.register(.searchBar) { c, ctx in SearchBarLeaf(c: c, ctx: ctx) }
         r.register(.calendar) { c, ctx in CalendarLeaf(c: c, ctx: ctx) }
+        r.register(.gridTable) { c, ctx in GridTableLeaf(c: c, ctx: ctx) }
         r.register(.shareButton) { c, ctx in ShareButtonLeaf(c: c, ctx: ctx) }
         r.register(.openUrlButton) { c, _ in OpenUrlButtonLeaf(c: c) }
         r.register(.mapView) { c, ctx in MapViewLeaf(c: c, ctx: ctx) }
