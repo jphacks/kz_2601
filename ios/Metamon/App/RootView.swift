@@ -196,6 +196,7 @@ struct RootView: View {
                     .font(.subheadline.weight(.medium))
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
+                if let action = banner.action { SummaryBannerActionButton(action: action) } // #209 元に戻す / やり直す
             }
             .metamonCard(padding: Theme.Spacing.md)
             .padding(.horizontal, Theme.Spacing.md)
@@ -204,8 +205,11 @@ struct RootView: View {
             .onTapGesture { withAnimation { rt.summaryBanner = nil } }
             .task(id: banner.id) {
                 // 文字数に応じて 3〜5 秒(読み上げを読み切れる長さ)
-                let seconds = min(5.0, max(3.0, Double(banner.text.count) / 12))
+                // ボタン付き(#209)は押す余裕を持たせて 6 秒以上
+                let seconds = max(banner.action == nil ? 3.0 : 6.0, min(5.0, Double(banner.text.count) / 12))
                 try? await Task.sleep(for: .seconds(seconds))
+                // 次のバナーに差し替わって取り消された時は消さない(新しい方まで消えていた・#209)
+                guard !Task.isCancelled else { return }
                 withAnimation(.easeInOut(duration: 0.35)) { rt.summaryBanner = nil }
             }
         }
