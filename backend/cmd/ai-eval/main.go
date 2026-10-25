@@ -19,6 +19,7 @@
 // Warikan (#231): refs (bool: some field is type refs), deletable ([entity id, ...]: swipeToDelete list or deleteRecord).
 // Grid (#234): grid (bool: some gridTable is present).
 // Field cap (#221): keepEntity / keep ([field id, ...]) / growTo (see checkKeep).
+// Parent -> child (#256): prefillRef (bool: some navigate opens a child form with prefillRef).
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
@@ -88,6 +89,8 @@ type Metrics struct {
 	// #167
 	Health      []string `json:"health,omitempty"`      // healthStat metric:period
 	HealthField bool     `json:"healthField,omitempty"` // a field with health "weight"
+	// #256: screen>childForm.refField of navigate.prefillRef
+	PrefillRefs []string `json:"prefillRefs,omitempty"`
 }
 
 // HasCalc reports whether the app computes anything beyond plain aggregate stats.
@@ -355,6 +358,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 
 func measure(a *dsl.App) *Metrics {
 	m := &Metrics{Tabs: len(a.App.Tabs), Screens: len(a.Screens), Entities: len(a.Entities)}
+	m.PrefillRefs = prefillRefs(a)
 	for i := range a.Entities {
 		e := &a.Entities[i]
 		m.Fields += len(e.Fields)
@@ -459,6 +463,10 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 		case "grid":
 			if (len(m.Grid) > 0) != v.(bool) {
 				miss = append(miss, fmt.Sprintf("grid=%v", m.Grid))
+			}
+		case "prefillRef": // #256
+			if (len(m.PrefillRefs) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("prefillRef=%v", m.PrefillRefs))
 			}
 		case "calendar":
 			if m.HasCalendar != v.(bool) {
