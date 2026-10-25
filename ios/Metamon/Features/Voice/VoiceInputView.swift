@@ -136,6 +136,8 @@ struct VoiceInputView: View {
                     BrandMark(size: 28)
                     Text("Tailor It").font(.headline.weight(.bold))
                 }
+            } else {
+                UndoHeaderButtons() // #209 修正チャットの上部に「1つ前に戻す」
             }
             Spacer()
             if inChat {

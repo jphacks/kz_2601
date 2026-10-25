@@ -85,11 +85,23 @@ final class AppRuntime: DSLRuntime {
 
     /// 変身直後に画面上部へ数秒出す要約(読み上げ文)。位置ヒントがあれば該当領域をハイライトする。
     struct SummaryBanner: Identifiable, Equatable {
+        /// バナーに添えるボタン(#209)。undo = 「元に戻す」(修正の直後)/ redo = 「やり直す」(戻した直後)
+        enum Action: Equatable { case undo, redo }
         let id = UUID()
         var text: String
         var highlight: UnitPoint?
+        var action: Action? = nil
     }
     var summaryBanner: SummaryBanner?
+
+    /// 「やり直す」の戻り先(#209)。戻す直前の版。サーバー経由なら `version` を restore、ローカルなら `document` を当て直す。
+    struct RedoPoint {
+        var version: Int
+        var document: AppDocument
+        var viaServer: Bool
+    }
+    /// 戻した直後だけ持つ。新しい DSL が当たったら(`apply`)消える
+    private(set) var redoPoint: RedoPoint?
 
     /// サーバー(appconfig)に届かず、ローカルキャッシュの DSL を表示している。
     private(set) var isOffline = false
@@ -150,7 +162,8 @@ final class AppRuntime: DSLRuntime {
     @ObservationIgnored private var morphTask: Task<MorphResult, Error>?
     @ObservationIgnored private var isForeground = true
     /// 「元に戻して」のフォールバック(appconfig が versions を持たない mock / 未デプロイ時)。直近 10 件。
-    @ObservationIgnored private var localHistory: [AppDocument] = []
+    /// 「1 つ前に戻す」ボタンの出し分けに使うので観測する(#209)。
+    private var localHistory: [AppDocument] = []
 
     init(document: AppDocument, services: Services) {
         self.document = document
@@ -358,6 +371,7 @@ final class AppRuntime: DSLRuntime {
             self.showVoiceSheet = false
             self.selectedTab = doc.dsl.initialTab
             self.morphJob = nil
+            self.redoPoint = nil // 戻した後に別の版が当たったら「やり直す」は無効(undo / redo は apply の後で付け直す)
         }
         if animated {
             withAnimation(.spring(duration: 0.65, bounce: 0.12), swap)
@@ -447,7 +461,7 @@ final class AppRuntime: DSLRuntime {
             apply(result.document) // withAnimation の中で morphJob = nil も行う
             startSync()
             if let summary = result.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
-                summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary))
+                summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary), action: canUndo ? .undo : nil)
                 SpeechReader.shared.speak(summary) // #43(設定 OFF なら何もしない)
             }
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
@@ -529,10 +543,18 @@ final class AppRuntime: DSLRuntime {
         morphTask?.cancel()
     }
 
+    /// 「1 つ前に戻す」を押せるか(#209)。作ったアプリで、サーバーに前の版がある(version > 1)か端末の履歴がある時。
+    var canUndo: Bool {
+        !dsl.isVoiceOnly && ((services.isLive && document.version > 1) || !localHistory.isEmpty)
+    }
+
     /// 「元に戻して」(G11)。appconfig の `GET /versions` で直前の version を取り `POST /versions/{n}/restore`。
     /// サーバーが履歴を返せない時(mock / 未デプロイ)はローカル履歴にフォールバックする。
-    func undo() async {
-        guard morphJob == nil else { return }
+    /// 戻している間は `morphJob` が立つので二重には走らない。戻した後は「やり直す」用に戻す前の版を覚える(#209)。
+    /// `expectedVersion`: ボタンを押した時点の版。押した後に版が変わっていたら(連打で 2 回目が来た等)何もしない。
+    func undo(expectedVersion: Int? = nil) async {
+        guard morphJob == nil, expectedVersion == nil || expectedVersion == document.version else { return }
+        let before = document
         withAnimation(.easeInOut(duration: 0.35)) {
             morphJob = MorphJob(kind: .edit, transcript: L10n.tr("元に戻して"), startedAt: .now)
         }
@@ -548,7 +570,9 @@ final class AppRuntime: DSLRuntime {
                 let doc = try await services.appConfig.restore(appId: document.appId, toVersion: target.version)
                 apply(doc)
                 startSync()
-                summaryBanner = SummaryBanner(text: L10n.tr("ひとつ前の状態(version \(target.version))に戻しました"), highlight: nil)
+                // restore は新しい版を作るので、「やり直す」は戻す前の版(current)をもう一度 restore すればよい
+                redoPoint = RedoPoint(version: current.version, document: before, viaServer: true)
+                summaryBanner = SummaryBanner(text: L10n.tr("1つ前に戻しました"), highlight: nil, action: .redo)
                 print("[Metamon] undo ok: restored from version \(target.version) → new version \(doc.version)")
                 return
             } catch {
@@ -561,7 +585,33 @@ final class AppRuntime: DSLRuntime {
             return
         }
         apply(previous)
-        summaryBanner = SummaryBanner(text: L10n.tr("ひとつ前の状態(version \(previous.version))に戻しました"), highlight: nil)
+        redoPoint = RedoPoint(version: before.version, document: before, viaServer: false)
+        summaryBanner = SummaryBanner(text: L10n.tr("1つ前に戻しました"), highlight: nil, action: .redo)
+    }
+
+    /// 「やり直す」(#209): 戻す前の版に戻る。サーバー経由で戻したならその版を restore、端末の履歴で戻したなら当て直す。
+    func redo(expectedVersion: Int? = nil) async {
+        guard morphJob == nil, expectedVersion == nil || expectedVersion == document.version, let point = redoPoint else { return }
+        let current = document
+        withAnimation(.easeInOut(duration: 0.35)) {
+            morphJob = MorphJob(kind: .edit, transcript: L10n.tr("やり直す"), startedAt: .now)
+        }
+        if point.viaServer {
+            do {
+                let doc = try await services.appConfig.restore(appId: document.appId, toVersion: point.version)
+                apply(doc)
+                startSync()
+            } catch {
+                print("[Metamon] redo failed: \(error)")
+                withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
+                toast = L10n.tr("やり直せませんでした")
+                return
+            }
+        } else {
+            remember(current)
+            apply(point.document)
+        }
+        summaryBanner = SummaryBanner(text: L10n.tr("やり直しました"), highlight: nil, action: canUndo ? .undo : nil)
     }
 
     private func remember(_ doc: AppDocument) {
