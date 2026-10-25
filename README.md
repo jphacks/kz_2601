@@ -4,10 +4,47 @@
 
 > 名前の由来: **あなたに合わせて仕立てる(tailor)**。話しかけた人の生活に合わせて、アプリ自身が仕立て直される。内部識別子(ターゲット名 `Metamon`・Bundle ID `jp.kz2601.metamon`・App Group・`Metamon*` パッケージ・`METAMON_*` 環境変数)は Firebase 登録に紐づくため `Metamon` のまま。
 
-[![IMAGE ALT TEXT HERE](https://jphacks.com/wp-content/uploads/2026/07/IMG_5316.png)](https://www.youtube.com/watch?v=piaNsc6ilBI)
+<!-- TODO: デモ動画(YouTube)のサムネイル付きリンクをここに置く。JPHACKS テンプレの書式: [![IMAGE ALT TEXT HERE](サムネイル画像の URL)](YouTube の URL)。写すもの: マイクに話す → 生成中 → 家計簿に変わる → 「合計をもっと大きく」で動く → 「元に戻す」、までを 30〜60 秒で -->
 
-> **話しかけるだけで、その場でアプリが生まれ変わる iOS アプリ。**
-> 初期画面はマイク 1 つ。「コンビニで使ったお金を記録する家計簿が欲しい。レシートの写真も残したい」と話すと、数秒後にアプリ自身がその家計簿に変わる。もう一度「合計をもっと大きく」と話せば、その場でレイアウトが動く。
+### 話すと、アプリが変わる。声とチャットで、自分専用のアプリをその場で作って直せる iOS アプリ。
+
+初期画面はマイク 1 つ。「毎日の出費をメモできる家計簿が欲しい。レシートの写真も残したい」と話すと、数秒後にアプリ自身がその家計簿に変わります。もう一度「今月の合計をもっと大きく」と話せば、その場でレイアウトが動きます。生成 AI がコードを書くのではなく、**画面の定義(DSL)を生成して、手元の SwiftUI がネイティブ部品で描く**(Server-Driven UI)ので、ビルドも App Store 審査も要りません。
+
+| 1. 話す | 2. 作る | 3. 使う |
+|:---:|:---:|:---:|
+| <img src="docs/images/readme/greeting.jpg" width="230" alt="初期画面。マイクのボタンと入力例"> | <img src="docs/images/readme/generating.jpg" width="230" alt="生成中。6 列グリッドに部品の枠が出てくる"> | <img src="docs/images/readme/completed.jpg" width="230" alt="できあがった家計簿。今月の支出・一覧・追加ボタン"> |
+| マイクを押して話す(文字入力も可) | 画面の枠が先に出て、数秒で完成 | 入力・保存・一覧・集計がそのまま動く |
+
+<sub>スクショはシミュレータ(同梱サンプルのモック接続)。1 枚目は英語 UI の設定時。</sub>
+<!-- TODO: 実機・日本語 UI・staging 接続で同じ 3 枚(初期画面 / 生成中 / 完成した家計簿)を撮り直して差し替える。縦長スクショを長辺 1000px の JPEG(1 枚 300KB 以下)に -->
+
+## 目次
+
+- [10 秒でわかる Tailor It](#10-秒でわかる-tailor-it)
+- [製品概要](#製品概要)
+  - [背景(製品開発のきっかけ、課題等)](#背景製品開発のきっかけ課題等)
+  - [製品説明(具体的な製品の説明)](#製品説明具体的な製品の説明)
+  - [特長](#特長)
+  - [解決出来ること](#解決出来ること)
+  - [今後の展望](#今後の展望)
+  - [注力したこと(こだわり等)](#注力したことこだわり等)
+- [審査員向け: 試し方](#審査員向け-試し方)
+- [開発技術](#開発技術)
+  - [活用した技術](#活用した技術)
+  - [独自技術](#独自技術)
+- [アーキテクチャ](#アーキテクチャ)
+- [セットアップ](#セットアップ)
+- [リポジトリ構成とドキュメント](#リポジトリ構成とドキュメント)
+
+## 10 秒でわかる Tailor It
+
+| | |
+|---|---|
+| **何をする?** | 話した(書いた)内容から、自分専用の小さなアプリをその場で作り、声やチャットで直し続けられる |
+| **どう動く?** | 端末内で音声認識 → Claude が UI 定義(DSL JSON)を生成 → Go が厳密に検証 → iOS がネイティブ部品で描画 |
+| **何が作れる?** | 家計簿・筋トレ記録・散歩メモ・割り勘・シフト管理・読書記録・買い物リストなど(いずれも eval 済み)。カメラ・通知・地図・動画・ヘルスケアも部品として AI が選ぶ |
+| **どれくらい速い?** | 新規作成 p50 **6.6 秒**、2 回目以降の改変 p50 **1.7 秒**([`2026-10-24.md`](docs/backend/ai-eval/2026-10-24.md)) |
+| **どれくらい正しい?** | 検証の一発通過 **100%**(16 発話 × 2 条件)。頼んだ機能の充足は品質監査で **49% → 91%**([`2026-10-24-audit3.md`](docs/backend/ai-eval/2026-10-24-audit3.md)) |
 
 ## 製品概要
 ### 背景(製品開発のきっかけ、課題等）
@@ -19,40 +56,50 @@
 | App Store で探す | 自分の生活にぴったり合うものは無い。多機能すぎる・広告・会員登録 |
 | 自分で作る | Xcode・Swift・API・配布。「記録したいだけ」の人には高すぎるハードル |
 
+Web なら AI に頼んで小さなツールを作る人は増えましたが、**モバイルは今もハードルが高い**ままです。しかも日常の困りごとは、カメラ・通知・位置情報のような**スマホのネイティブ機能**と結びついています。
+
 欲しいのは「アプリ」ではなく、**自分の生活に合った道具**です。家計簿も筋トレ記録も散歩メモも、本質は「入力欄が数個と一覧と集計」。違うのはフィールドとレイアウトと、カメラや通知のようなネイティブ機能の組み合わせだけ。
 
-それなら **一度インストールしたアプリが、話しかけるたびに"その道具"に変身すればいい**。生成 AI がコードを書いて配布するのではなく、**画面の定義(DSL)を生成して、手元の iOS アプリがその場で描画する**。これが本アプリの出発点です。
+それなら **一度インストールしたアプリが、話しかけるたびに"その道具"に変身すればいい**。これが本アプリの出発点です。
 
 ### 製品説明（具体的な製品の説明）
 
-1 画面の音声入力から始まり、発話が数秒でネイティブ iOS アプリになります。
+1 画面の音声入力から始まり、発話が数秒でネイティブ iOS アプリになります。作ったあとは、**チャットで相談しながら**直せます。
 
 ```mermaid
 flowchart LR
-  U[発話] --> W["WhisperKit<br/>オンデバイス音声認識"]
-  W --> AI["ai (Cloud Run / Go)<br/>Claude が UI 定義 (DSL JSON) を生成"]
+  U[話す / 書く] --> W["WhisperKit<br/>オンデバイス音声認識"]
+  W --> C["チャットで相談<br/>足りない点だけ聞き返す・案を出す"]
+  C --> AI["ai (Cloud Run / Go)<br/>Claude が DSL JSON を生成"]
   AI --> V["Go で厳密検証<br/>スキーマ・参照・グリッド重なり"]
   V -- NG --> AI
   V -- OK --> R["iOS がその場で描画<br/>(Server-Driven UI)"]
-  R --> U2["2 回目の発話<br/>「合計をもっと大きく」"]
+  R --> U2["「合計をもっと大きく」"]
   U2 --> P["JSON Patch (RFC 6902)<br/>差分だけ生成・適用"]
   P --> R
 ```
 
-| ステップ | 何が起きるか | 実測 |
+| ステップ | 何が起きるか | 実測・根拠 |
 |---|---|---|
-| 1. 話す | マイクボタンを押して話す。WhisperKit(`small`)が端末内で文字起こし。文字入力に切替可 | オンデバイス・事前 DL |
-| 2. 生成 | `POST /v1/generate` が Claude(`claude-sonnet-5-5`)に部品カタログ + few-shot を渡し、DSL v1 JSON を生成 | create p50 **6.6 秒** / p95 8.7 秒 |
-| 3. 検証 | Go がスキーマ・id 参照・enum・**グリッド座標の重なり/範囲外**を全件列挙して検証。NG ならエラー一覧を添えて再生成(最大 2 回) | 16 発話 × 2 条件で一発通過 **100%** |
-| 4. 描画 | iOS が DSL を受け取り、タブ・画面・部品を SwiftUI で即描画。入力→保存→一覧・集計が動く | 部品 48 種 + アクション 9 種 |
-| 5. 育てる | 2 回目以降の発話は **JSON Patch(RFC 6902)** の差分生成。「ここをもっと大きく」「カテゴリにカフェを追加」も通る | edit p50 **1.7 秒** |
+| 1. 話す | マイクを押して話す。WhisperKit(`small`)が端末内で文字起こし。文字入力にも切り替えられる | オンデバイス・音声は端末外に出ない |
+| 2. 相談 | 足りない点だけ 1〜3 問聞き返す。「見やすくして」のようなあいまいな依頼には案のカードを出し、「これでいく」で決める(設定でオフ可) | チャット eval 24/24([`2026-10-25-chat-first.md`](docs/backend/ai-eval/2026-10-25-chat-first.md))・#105 #191 |
+| 3. 生成 | `POST /v1/generate` が Claude(`claude-sonnet-5-5`)に部品カタログ + few-shot を渡し、DSL v1 JSON を生成。画面の枠は約 2.4 秒で出始める | create p50 **6.6 秒** / p95 8.7 秒・#94 |
+| 4. 検証 | Go がスキーマ・id 参照・enum・**グリッド座標の重なり/範囲外**を全件列挙。NG ならエラー一覧を添えて再生成(最大 2 回) | 16 発話 × 2 条件で一発通過 **100%** |
+| 5. 描画 | iOS が DSL を受け取り、タブ・画面・部品を SwiftUI で即描画。入力→保存→一覧・集計が動く | 部品 **57 種**(Container 7 + Leaf 50)+ アクション 9 種 |
+| 6. 育てる | 2 回目以降は **JSON Patch** の差分生成。「カテゴリにカフェを追加」「集計の画面からも追加できるように」も通る。直後の「元に戻す」「やり直す」で行き来できる | edit p50 **1.7 秒**・#218 |
 
 アプリ本体にはコードが増えません。増えるのは DSL JSON の version だけです(保存先は Firestore・#32)。
 
+| チャットで聞く | 案を選んで直す | 直後に戻せる |
+|:---:|:---:|:---:|
+| <img src="docs/images/readme/answer.jpg" width="230" alt="作ったアプリについて質問するとチャットで答える"> | <img src="docs/images/readme/proposal.jpg" width="230" alt="「見やすくして」に対して案 1・案 2 のカードと「これでいく」"> | <img src="docs/images/readme/undo.jpg" width="230" alt="反映直後の要約に「元に戻す」ボタン"> |
+| 「これ WebView?」のような質問にも答える | あいまいな依頼は案のカードに | 反映の要約に「元に戻す」 |
+
 ### 特長
+
 #### 1. 特長1 AI が画面を"レイアウト"する
 
-LLM に「何の部品を置くか」だけでなく、**どこに置くか**まで決めさせます。各画面は **横 A〜F の 6 列 × 縦 12 行(可視高さ基準・13 行目以降はスクロール)** のグリッドで、部品はスプレッドシート記法 `area:"A1:C3"` で矩形を指定します。
+LLM に「何の部品を置くか」だけでなく、**どこに置くか**まで決めさせます。各画面は **横 A〜F の 6 列 × 縦 12 行(13 行目以降はスクロール)** のグリッドで、部品はスプレッドシート記法 `area:"A1:C3"` で矩形を指定します。カード・セクションの中でも 2 列に並べられます(#161)。
 
 ```jsonc
 { "type": "hstack", "area": "A1:F2", "children": [ { "type": "stat", "label": "今月の支出", "aggregate": "sum" } ] },
@@ -62,140 +109,154 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 
 - **重なりはサーバーが検出し、人間可読なエラーで再生成に回す**(例 `components[2] (id "recent") area A3:F10 overlaps components[0] (id "summary") area A1:F4`)。
 - **`area` を省略した部品は「最後に使われた行の次」から全幅で積む**決定的フォールバック。LLM が座標を出し損ねても画面は崩れません。
-- 実測(`docs/backend/ai-eval/`): 全ランで重なり・範囲外ゼロ、Screen 直下部品の `area` 付与率 100%。「追加ボタンを左上に移して」のような座標操作の編集も一発で整合しました。
+- 実測: 全ランで重なり・範囲外ゼロ、Screen 直下部品の `area` 付与率 100%([`2026-10-24.md`](docs/backend/ai-eval/2026-10-24.md))。
 
-#### 2. 特長2 ネイティブ機能も"生成"される
+#### 2. 特長2 ネイティブ機能も、計算も"生成"される
 
-生成されるのは Web ページではなく、**ネイティブ部品の組み合わせ**です。部品は **48 種(Container 7 + Leaf 41)+ アクション 9 種**。カメラ撮影(`photoField`)、ローカル通知(`app.notifications` / `scheduleNotification`)、**カレンダー**(`calendar`)、**地図**(`mapView`)、**現在地**(`locationButton`)、**QR スキャナ**(`qrScanner`)、共有シート、タイマー、Swift Charts のグラフ、日付・時刻ピッカー、ゲージ、タイムライン、テーブルなどを AI が選んで配置します。
+生成されるのは Web ページではなく、**ネイティブ部品の組み合わせ**です。部品は **57 種 + アクション 9 種**。AI が用途に合わせて選んで配置します。
 
 | 種別 | 例 |
 |---|---|
-| 構造 | `vstack` `hstack` `section` `card` `disclosure` `carousel` `grid` |
-| 入力 | `textField` `numberField` `datePicker` `timePicker` `picker` `toggle` `slider` `stepper` `rating` `colorPicker` `photoField` `searchBar` |
-| 表示 | `text` `label` `icon` `image` `badge` `progressBar` `gauge` `markdown` `avatar` `emptyState` |
-| データ | `list`(検索バー連動) `table` `timeline` `calendar` `stat`(端末集計) `chart`(bar/line/pie) |
-| ネイティブ | カメラ撮影 / 写真選択(`photoField` → `image`・UIImagePickerController・権限拒否時は設定への導線)、ローカル通知(daily/weekly/once)、地図(`mapView`・MapKit)、現在地(`locationButton`・CoreLocation → `"lat,lng"`)、QR スキャナ(`qrScanner`・AVFoundation)、共有シート(`shareButton`)、Safari(`openUrlButton` / `openUrl`)、タイマー(`timerDisplay`)、音声再入力(`voiceInput`)、オンデバイス AI(`aiButton`・Apple Intelligence / Foundation Models で要約・分類・言い換え。**端末内で完結し、データは端末外に出ない**) |
+| 構造 | `vstack` `hstack` `section` `card` `disclosure` `carousel` `grid`、タブ |
+| 入力 | `textField` `numberField` `datePicker` `timePicker` `picker` `toggle` `slider` `stepper` `rating` `colorPicker` `photoField` `videoField` `searchBar` |
+| 表示・データ | `list`(検索連動・ワンタップでチェック) `table` `timeline` `calendar` `stat`(端末集計) `chart`(bar/line/pie) `gauge` `progressBar` `settlement`(割り勘の精算) |
+| ネイティブ | カメラ撮影・写真、動画の撮影・再生(`videoField` / `videoPlayer`・#206)、ローカル通知、地図(`mapView`)、現在地(`locationButton`)、**場所の検索・地図で選ぶ**(`locationPicker`・#217)、位置の継続記録と軌跡(`locationTracker`・#168)、歩数・体重とヘルスケアへの保存(`healthStat`・#167)、QR スキャナ、共有シート、タイマー(背面でも正確・#136)、近くの端末へ送る(`nearbyShare`・#138)、**端末内 AI**(`aiButton`・Apple Intelligence で要約・分類。データは端末外に出ない・#137) |
 
-48 種すべてが Go 検証・iOS 描画・AI カタログに揃っています(シミュレータで全種を目視)。実機でしか確認できない QR の読取・GPS の実取得・共有先・タイマーのバックグラウンド継続は**実機検証が一部未了**です。
+| 場所を地図で選ぶ | 動画を記録する |
+|:---:|:---:|
+| <img src="docs/images/readme/place.jpg" width="230" alt="場所を検索し、地図のピンで決める画面"> | <img src="docs/images/readme/video.jpg" width="230" alt="動画付きの記録一覧"> |
 
-部品を 1 つ足す手順は **3 ステップ**。JSON Schema に定義(`description` / `x-usage` 付き)→ iOS に View を 1 ファイル + レジストリ 1 行 → テスト。**AI へ渡す部品カタログはスキーマから自動生成**され、Go の検証・iOS の描画・AI のカタログの 3 者がズレるとテストが赤になります。カタログに無い部品を頼まれても、最も近い部品で代替して「○○は△△で代替しました」と読み上げます(カレンダーが無かった時点の実測: 「カレンダー表示は日付順の一覧で代替しました」。現在は `calendar` が本物の部品として選ばれます)。
+**画面だけでなく計算も作れます**。式 DSL(#117)で、割り勘の精算・BMI・残り予算・勤務時間 × 時給・今年の合計・目標までの残り・連続日数(#172)を、発話だけで組み立てます。
 
-#### 3. 特長3 その場で変わる・壊れない
+部品を 1 つ足す手順は **3 ステップ**(JSON Schema に定義 → iOS に View 1 ファイル + レジストリ 1 行 → テスト)。**AI へ渡す部品カタログはスキーマから自動生成**され、Go 検証・iOS 描画・AI カタログの 3 者がズレるとテストが赤になります。カタログに無い部品を頼まれても、近い部品で代替して「○○は△△で代替しました」と正直に伝えます。
+
+#### 3. 特長3 チャットで相談しながら育てる
 
 | 工夫 | 内容 |
 |---|---|
-| Server-Driven UI | 画面・遷移・部品はすべてアプリに事前ビルド済み。AI は DSL JSON を書くだけなので、App Store 審査もビルドも不要で**その場で**変わる |
-| オンデバイス音声認識 | WhisperKit(`small`・argmax-oss-swift)を端末内で実行。音声は外に出さず、会場 Wi-Fi に依存しない |
-| オンデバイス AI 部品 | `aiButton` を押すと Apple Intelligence の Foundation Models(iOS 26+)が端末内で入力を要約・分類し、フォームの欄に入れる(保存はユーザー)。**クラウド API を呼ばないので無料・データは端末外に出ない**。非対応端末・Apple Intelligence OFF では「この端末では AI を使えません」と理由付きで無効化 |
-| 「生成用スキーマ + Go 厳密検証」 | Claude の構造化出力は DSL 規模のスキーマを受け付けない(実測: 任意プロパティ 16 個で `Schema is too complex`)。そこで正典スキーマから**生成用の緩和スキーマを機械導出してプロンプトに載せ、強制は Go 側に一本化**。再生成ループ(最大 2 回)→ `area` を全部落として再検証、の順に必ず着地する |
-| backend 厳格・iOS 寛容 | 未知の type や不正な `area` を iOS が受け取っても落ちない(プレースホルダ/無視)。古いビルドでも新しい DSL で死なない二重防御 |
-| 差分で育つ | 2 回目以降は JSON Patch。言及していない画面・entity は構造的に保持され、出力トークンが小さいので速い(edit p50 1.7 秒) |
-| 実測 | 16 発話 × effort low/high の 32 回 + 回帰 8 回で検証一発通過 **100%**、再生成 0、`area` フォールバック 0、新規 p50 6.6 秒 |
+| 足りない点だけ聞く | 作る前に 1〜3 問だけ確認。種類だけの短い依頼(「家計簿」)には 1 問、具体的な依頼はすぐ作る。設定でオフにできる(#92 #105) |
+| 案のカード | 「見やすくして」のようなあいまいな依頼には案を 2 つほど出し、「これでいく」で反映(#189 #191) |
+| 理由を言う | 指示が足りない時は理由を言って聞き返し、何も変わらない時も黙らず理由を返す(#211) |
+| 戻せる・残る | 直後に「元に戻す」「やり直す」(#218)。チャット履歴はアプリごとに残り、反映の区切りが見える(#222) |
+| 画面のつながりも | 「集計の画面からも支出を追加できるように」が 1.6 秒の差分で通る。画面マップで画面を選んで直せる(#128 #144) |
 
-### 10/24 に追加した機能(一覧)
+#### 4. 特長4 その場で変わる・壊れない
 
-| 機能 | 内容 | PR |
-|---|---|---|
-| 計算ロジック(式 DSL) | 割り勘の精算・BMI・残り予算・時刻の差 × 時給・今週 / 今年の集計・一覧からワンタップでチェック | #117 #127(最新の 1 件・ref 先の値・毎日リセットのチェックは #141 レビュー中) |
-| 生成前の対話 | 足りない点だけ 1〜3 問聞いてから作る(設定でオフ可) | #92 #105 |
-| 画面の分け方と遷移 | 「B からも C へ」を声で直せる。タブの根へはタブ切替、何周しても戻るボタンが深くならない | #126 #128(画面マップは #144 レビュー中) |
-| シェア / 探す | QR・リンクで渡す、公開アプリを探して入れる。共有データはほぼリアルタイムに他端末へ | #104 #118 |
-| Siri / ショートカット | 「Tailor It で家計簿に記録」で記録を追加・アプリを開く | #120 |
-| 読み上げ・英語 | 挨拶・質問・完成の要約を読み上げ(既定 OFF)。UI・生成・音声認識の日英切替 | #125 #129(英語の生成品質は #149 レビュー中) |
-| オフライン・背面 | 圏外でも記録を先に保存して後で同期。タイマーは背面でも正確で終了時に通知 | #70 #136 |
-| 生成品質 | 品質監査で機能の充足 49% → 88%・嘘ラベル 7/20 → 0/20(`docs/backend/ai-eval/2026-10-24-audit2.md`) | #111 #124 #135 |
-| レビュー中 | 端末内の AI で要約・分類する部品(iPhone 15 Pro 以降)、近くの端末へ記録を送る、単体アプリとしてのリリース申請 | #137 #138 #145 |
+| 工夫 | 内容 |
+|---|---|
+| Server-Driven UI | 画面・遷移・部品はアプリに事前ビルド済み。AI は DSL JSON を書くだけなので、ビルドも審査も不要で**その場で**変わる |
+| オンデバイス音声認識 | WhisperKit(`small`)を端末内で実行。音声は外に出さず、会場 Wi-Fi に依存しない |
+| 生成用スキーマ + Go 厳密検証 | Claude の構造化出力は DSL 規模のスキーマを受け付けない(実測: 任意プロパティ 16 個で `Schema is too complex`)。正典スキーマから**生成用の緩和スキーマを機械導出**し、強制は Go 側に一本化。再生成(最大 2 回)→ `area` を落として再検証、の順に必ず着地する |
+| backend 厳格・iOS 寛容 | 未知の type や不正な `area` を iOS が受け取っても落ちない(プレースホルダ/無視)。古いビルドでも新しい DSL で死なない |
+| 失敗しても止まらない | 圏外でも記録を先に保存して後で同期(#70)。401 再取得・429/圏外の自動再送・「もう一度」(#96) |
 
 ### 解決出来ること
 
-- **非エンジニアが"自分専用の小さなアプリ"を即席で持てる**。家計簿・トレーニング記録・散歩メモ・読書記録・水分記録・買い物リスト・体重記録(いずれも eval 済み)。
-- **「ここをこうして」が通る**。設定画面を探す代わりに、話せばレイアウト・フィールド・通知時刻が変わる。
-- **データは残る設計**。記録(records)は uid に紐付けて保存する設計(appconfig が Firestore に保存・#32)。端末内にも先に保存し、圏外でも後で同期する(#70)。アプリ自体が変わってもフィールド id を維持するので既存レコードは消えない。
+| | これまで | 本アプリ |
+|---|---|---|
+| 欲しい道具を手に入れる | App Store で探して妥協する / 作るなら Xcode と Swift | **話すだけで、自分専用の小さなアプリがその場でできる** |
+| 使いながら直す | 設定画面を探す・開発者に要望を出す | **「ここをこうして」と話せば、レイアウト・項目・通知時刻・画面のつながりが変わる** |
+| データ | アプリを替えると記録が散らばる | 記録は uid に紐付けて Firestore に保存(#32)。アプリが変わってもフィールド id を維持するので既存の記録は消えない |
+| 生活の中で使う | 毎回アプリを開いて入力 | Siri / ショートカットから記録(#120)、ホーム画面ウィジェット(#55)、QR・リンクで家族や友人に共有(#118) |
 
 ### 今後の展望
 
-| ID | 展望 | 状態 |
-|---|---|---|
-| G17 | **生成前の対話**。「このアプリ、カメラ使える?」のような確認質問に答えてから生成する `POST /v1/chat`(1 問+選択肢・最大 3 ラリー・「もう作って」で即 ready) | **実装済み**(backend #74 / iOS #105。設定でオフにもできる) |
-| G14 | 位置情報 + 地図(`mapView` / `locationButton`・`location` フィールド) | 実装済み(実 GPS の実機検証は一部未) |
-| G16 | 複数アプリの保持と音声切替 | **実装済み**(変身一覧・#72) |
-| G11 | 「元に戻して」で `versions/{n}/restore` | **実装済み**(Claude を呼ばず 1 つ前の version に戻す・#53) |
-| G18 | ホーム画面ウィジェット(生成アプリの `stat` 先頭 3 個を App Group 経由で WidgetKit に表示・small=1 個/medium=3 個) | **実装済み**(Issue #39・実機確認済み。更新は本体起動中のみ) |
-| — | 生成したアプリの共有(DSL JSON はただの文書なので URL 1 本で配れる) | **実装済み**(QR / リンク・公開アプリを探す・#118) |
-| — | appconfig の Firestore 永続化(DSL version 履歴・records) | **実装済み**(#32・staging 接続 #57) |
-| — | Container 内グリッド | 予定(Firestore リスナー + SSE のホットリロードは実装済み・#104) |
+| 展望 | 状態 |
+|---|---|
+| 作ったアプリを**単体のアプリとしてリリース**する | 申請の受付(申請 API・変身一覧の申請シート)は実装済み(#145)。審査・配布の仕組みはこれから |
+| アプリ内課金「Tailor It Pro」 | 有料機能(共有データ)を含む時の確認カードと購入の流れは実装済み(#166 #204)。サーバー側のレシート検証はこれから |
+| DSL の表現力 | 連続日数(#172)・計算(#117)は実装済み。タイマーの自動切り替え・一括削除など、DSL で表せない依頼が品質監査で残っている([`audit3`](docs/backend/ai-eval/2026-10-24-audit3.md) §6) |
+| 実機での検証 | QR の読取・実 GPS・共有先・Siri の音声実行・近距離共有の 2 台など、**実機検証が一部未了**のものを詰める |
 
 ### 注力したこと（こだわり等）
+
 * **DSL を唯一の正典にした設計**。`docs/dsl/dsl.schema.json` から Go 型(埋め込み・CI で byte 一致)、Swift 型(examples をバンドルしてデコードテスト)、AI 向け部品カタログの 3 つを導出し、二重定義を禁止。iOS と backend の契約ズレを構造的に防いだ。
-* **スキーマ → カタログ自動生成**。手書きのプロンプトを捨て、`description` / `x-usage` / `x-enumDescriptions` から起動時に生成。system prompt は約 9.8K tokens で `cache_control` により 2 回目以降はキャッシュ読み。
-* **数値で決める**。effort low/high・Sonnet/Opus を 16 発話で比較し、通過率が同じで遅いだけの high を捨てて low に固定(`docs/backend/ai-eval/2026-10-24.md`)。未要求のグラフ・通知を足す癖もここで発見してプロンプトで抑制。
-* **2 日間の demo-first 運用**。マージ済み PR 25 本・コミット 100 超。backend CI は 5 分以内、`develop` への push で Cloud Run staging に自動デプロイ(Workload Identity Federation・鍵ファイル無し)。public リポのため秘密は `.gitignore` + gitleaks の二重防御。
-* **失敗しても止まらない UX**。WhisperKit 未 DL/失敗時は文字入力へ、Claude 失敗時は再生成→`area` 落とし、未知の部品はプレースホルダ。デモ用に `METAMON_MOCK=1` の全モック起動(同梱サンプル DSL)も用意。
+* **品質を数字で測って直した**。同じ発話セットを手で採点し、頼んだ機能の充足 49% → 91%、全部満たしたアプリ 2/20 → 14/20、中身と違うラベル 7/20 → 0/20([`audit2`](docs/backend/ai-eval/2026-10-24-audit2.md) / [`audit3`](docs/backend/ai-eval/2026-10-24-audit3.md)。1 周ずつの比較なので ±1 件は揺れる)。英語 12 本でも充足 95%。effort low/high・Sonnet/Opus も比較し、通過率が同じで遅いだけの high を捨てて low に固定。
+* **速さ**。出力トークン −26%(compact JSON + 既定値補完)とストリーミングで画面の枠を約 2.4 秒で表示(#94)、対話の質問は最初のトークン以降 955ms → 340ms(#159)。system prompt は `cache_control` で 2 回目以降キャッシュ読み。
+* **2 日間でマージ済み PR 109 本**。backend CI は 5 分以内、`develop` への push で Cloud Run staging に自動デプロイ(Workload Identity Federation・鍵ファイル無し)、デプロイ後にスモークテスト。public リポのため秘密は `.gitignore` + gitleaks の二重防御。
+* **アクセシビリティと多言語**。AA コントラストのパレット・Dynamic Type・VoiceOver ラベル・視差効果を減らす設定に対応(#98)。日本語 / English を即時切替(#129)。
+
+## 審査員向け: 試し方
+
+<!-- TODO: TestFlight など配布リンクがあればここに追記する(無ければこのコメントを消す) -->
+
+**シミュレータ(API キー不要・全モック)**: 下の [iOS のセットアップ](#iosxcode-16--xcodegen) で `METAMON_MOCK=1` を付けて起動すると、同梱サンプル DSL で生成・改変の流れを一通り触れます。
+
+**話してみてほしい内容**([`docs/03_demo_script.md`](docs/03_demo_script.md) §3.4。すべて eval で 1 回で通過したもの):
+
+| 見たい機能 | 話す内容(このまま) |
+|---|---|
+| 新規作成 | 毎日の出費をメモできる家計簿アプリを作って。今月いくら使ったかと支出の一覧、カテゴリ別のグラフも見たい。レシートの写真も残せるようにして |
+| 見た目を直す | 今月の合計をもっと大きく表示して / 追加ボタンを左上に移して |
+| 項目を直す | カテゴリにカフェを追加して |
+| 戻す | 元に戻して |
+| 通知 | 筋トレの記録アプリ。腕立てとスクワットの回数を毎日つけて、朝8時にリマインドして |
+| カメラ | 散歩で見つけたいい場所を写真とひとことで残すメモアプリ。夜に見返したい |
+| 計算 | 旅行の割り勘アプリ。メンバーごとに誰がいくら払ったかと精算額が見たい |
+| 画面のつながり | 集計の画面からも支出を追加できるようにして |
+| 英語 | A walk journal. Save a photo of each nice spot I find with a one-line comment |
 
 ## 開発技術
 ### 活用した技術
 #### API・データ
-* Claude API(`claude-sonnet-5-5`・`anthropic-version: 2026-10-21`・生 HTTP・prompt caching・`fallbacks: "default"`)
+* Claude API(`claude-sonnet-5-5`・生 HTTP・prompt caching・ストリーミング)
 * Firebase Auth(Sign in with Apple / 匿名認証。Go 側は ID トークン検証のみ)
-* Firestore(Native mode・DSL version 履歴と records の保存先)
-* Cloud Run(`appconfig-{stg,prod}` / `ai-{stg,prod}`・asia-northeast1)、Secret Manager(`ANTHROPIC_API_KEY`)、Artifact Registry、Workload Identity Federation
+* Firestore(Native mode・DSL version 履歴・records・共有データ。リスナー + SSE で他端末に約 0.5 秒で反映・#104)
+* Cloud Run(`appconfig` / `ai` × stg/prod・asia-northeast1)、Secret Manager、Artifact Registry、Workload Identity Federation
 * JSON Schema draft 2020-12(DSL v1)、JSON Patch RFC 6902
 
 #### フレームワーク・ライブラリ・モジュール
-* SwiftUI(iOS 17+)、Swift Charts、UserNotifications、PhotosUI、UIKit(UIImagePickerController)、MapKit、CoreLocation、AVFoundation
-* FoundationModels(iOS 26+・Apple Intelligence のオンデバイス LLM。`aiButton` だけが使い、canImport + `#available` + weak link で iOS 17〜25 でも起動可)
-* WhisperKit(argmax-oss-swift 1.1.1・`small` モデル・CoreML/ANE)
-* Go 1.24(Claude 呼び出しは `net/http` 直叩き。依存は `santhosh-tekuri/jsonschema/v6` と `evanphx/json-patch/v5` のみ)
+* SwiftUI(iOS 17+)、Swift Charts、UserNotifications、PhotosUI、UIKit(UIImagePickerController)、AVFoundation、MapKit、CoreLocation、CoreMotion、HealthKit、MultipeerConnectivity、WidgetKit、App Intents(Siri / ショートカット)、StoreKit
+* FoundationModels(iOS 26+・Apple Intelligence のオンデバイス LLM。`aiButton` だけが使い、iOS 17〜25 でも起動可)
+* WhisperKit(argmax-oss-swift・`small` モデル・CoreML/ANE)
+* Go(Claude 呼び出しは `net/http` 直叩き。外部依存は `santhosh-tekuri/jsonschema/v6` と `evanphx/json-patch/v5` のみ)
 * xcodegen(`.xcodeproj` をコミットしない)、ローカル Swift Package × 3(マルチモジュール)
-* GitHub Actions(backend-ci / ios-ci / secrets-scan / deploy-cloudrun)、golangci-lint、gitleaks、Firebase Emulator Suite
+* GitHub Actions(backend-ci / ios-ci / secrets-scan / deploy-cloudrun)、golangci-lint、gitleaks、Firebase Emulator Suite、XCUITest
 
 #### デバイス
-* iPhone(実機 iPhone 13 で検証。iOS 17+)
-* マイク(AVFoundation → WhisperKit オンデバイス認識)
-* カメラ(UIImagePickerController・背面カメラで撮影 → ≤800px の data URL に縮小)/ フォトライブラリ(PhotosPicker)
-* ローカル通知(UNUserNotificationCenter・daily / weekly / once)
-* 位置情報(CoreLocation・1 回取得 → `"lat,lng"`)・地図(MapKit)
-* QR コード読取(AVFoundation・実機のみ)
-* Apple Intelligence(Foundation Models・オンデバイス LLM。iPhone 15 Pro 以降 / iOS 26+。`aiButton` の要約・分類を端末内で実行し、データは端末外に出ない)
+* iPhone(iOS 17+。実機は iPhone 13 で検証・デモ端末は iPhone 16)
+* マイク(WhisperKit オンデバイス認識)、カメラ(写真・動画)、フォトライブラリ
+* 位置情報・地図、モーションセンサー(歩数)、ヘルスケア
+* Apple Intelligence(iPhone 15 Pro 以降 / iOS 26+。`aiButton` の要約・分類を端末内で実行)
 
 ### 独自技術
 #### ハッカソンで開発した独自機能・技術
 
 | 独自技術 | 内容 | 場所 | 代表 PR |
 |---|---|---|---|
-| **DSL v1 + グリッド座標配置** | 非再帰 2 段(Screen > Container > Leaf)・閉じた enum・`additionalProperties:false` の UI 定義言語。`area:"A1:C3"` による 6 列グリッド配置、タブ、宣言的通知、22 論点の決定表 | [`docs/dsl/`](docs/dsl/README.md)、[`backend/pkg/dsl/`](backend/pkg/dsl)(`validate.go` 重なり検証・`grid.go`・`patch.go`) | [#8](https://github.com/jphacks/kz_2601/pull/8) DSL v1 統一 + グリッド、[#6](https://github.com/jphacks/kz_2601/pull/6) pkg/dsl 検証・JSON Patch |
-| **生成パイプライン** | 発話 → Claude → フル DSL / JSON Patch → 厳密検証 → 再生成ループ → `area` フォールバック。生成用スキーマの機械導出(`Relax`)、読み上げ用 summary | [`backend/internal/ai/`](backend/internal/ai)(`generate.go` `schema.go` `prompt.go`) | [#17](https://github.com/jphacks/kz_2601/pull/17) `POST /v1/generate`、[#19](https://github.com/jphacks/kz_2601/pull/19) 16 発話 eval + プロンプト改善 |
-| **スキーマ駆動の部品カタログ** | `dsl.schema.json` の `description` / `x-usage` から AI 向けカタログを自動生成。無い部品は代替して summary で言及。抜けは `catalog_test.go` と iOS `ComponentRegistryTests` で検出 | [`backend/internal/ai/catalog.go`](backend/internal/ai/catalog.go) | [#20](https://github.com/jphacks/kz_2601/pull/20) |
-| **レンダラー + レジストリ** | `ComponentRegistry`(type 文字列 → View の辞書・`switch` 無し)、`GridScreenLayout`(GeometryReader 1 個で絶対配置・セル内スクロール)、`DSLNavigationRoot`(タブ/スタック/sheet)。1 部品 = 1 ファイル | [`ios/Packages/MetamonRenderer/`](ios/Packages/MetamonRenderer) | [#18](https://github.com/jphacks/kz_2601/pull/18) マルチモジュール化 + DI |
-| **部品 48 種** | 入力系 7 種(slider/stepper/textEditor/secureField/timePicker/colorPicker/rating)、表示系 11 種(label/icon/progressBar/gauge/badge/link/markdown/avatar/table/timeline/emptyState)、構造・ナビ・ネイティブ系 12 種(card/disclosure/carousel/grid/searchBar/calendar/shareButton/openUrlButton/mapView/locationButton/qrScanner/timerDisplay)をスキーマ・Go 検証・iOS View の 3 点セットで追加 | `docs/dsl/examples/gallery-*.json` | [#23](https://github.com/jphacks/kz_2601/pull/23) 入力系、[#24](https://github.com/jphacks/kz_2601/pull/24) 表示系、[#25](https://github.com/jphacks/kz_2601/pull/25) 構造・ナビ・ネイティブ系 |
-| **実機カメラ撮影** | `photoField` の `source: camera/library/both` に応じてカメラ起動 / 写真選択 / 選択ダイアログ。カメラ無し端末は自動フォールバック、権限拒否時は設定アプリへの導線、サムネイル + 撮り直し。縮小は ≤800px 固定(画面倍率バグ修正で保存量 約 1/9) | [`ios/Packages/MetamonRenderer/Sources/MetamonRenderer/Support/`](ios/Packages/MetamonRenderer/Sources/MetamonRenderer/Support)(`CameraPicker.swift` `PhotoSourcePolicy.swift` `PhotoCodec.swift`) | [#29](https://github.com/jphacks/kz_2601/pull/29) |
-| **オンデバイス音声認識 + 実機接続** | WhisperKit `small` の事前 DL・進捗表示・文字入力フォールバック。Firebase Auth と staging ai への実機接続 | [`ios/Packages/MetamonServices/`](ios/Packages/MetamonServices) | [#10](https://github.com/jphacks/kz_2601/pull/10) WhisperKit、[#21](https://github.com/jphacks/kz_2601/pull/21) Firebase Auth + 実 ai 接続 |
-| **インフラ / CI** | Cloud Run × 2・WIF・Secret Manager の手順書、`develop` → staging / `main` → prod の自動デプロイ、5 分以内の backend CI | [`docs/infra/gcp-setup.md`](docs/infra/gcp-setup.md)、[`.github/workflows/`](.github/workflows) | [#2](https://github.com/jphacks/kz_2601/pull/2) CI、[#3](https://github.com/jphacks/kz_2601/pull/3) GCP、[#16](https://github.com/jphacks/kz_2601/pull/16) deploy |
+| **DSL v1 + グリッド座標配置** | 非再帰 2 段(Screen > Container > Leaf)・閉じた enum・`additionalProperties:false` の UI 定義言語。`area:"A1:C3"` の 6 列グリッド、タブ、宣言的通知、式 DSL | [`docs/dsl/`](docs/dsl/README.md)、[`backend/pkg/dsl/`](backend/pkg/dsl) | [#8](https://github.com/jphacks/kz_2601/pull/8)、[#6](https://github.com/jphacks/kz_2601/pull/6)、[#117](https://github.com/jphacks/kz_2601/pull/117) |
+| **生成パイプライン** | 発話 → Claude → フル DSL / JSON Patch → 厳密検証 → 再生成 → `area` フォールバック。生成用スキーマの機械導出(`Relax`)、ストリーミング | [`backend/internal/ai/`](backend/internal/ai) | [#17](https://github.com/jphacks/kz_2601/pull/17)、[#94](https://github.com/jphacks/kz_2601/pull/94) |
+| **チャット基本化** | `POST /v1/chat` の question / answer / proposal / ready。作る時も直す時もチャットで相談し、案のカードから反映 | [`backend/internal/ai/`](backend/internal/ai)、[`docs/ios/architecture.md`](docs/ios/architecture.md) | [#189](https://github.com/jphacks/kz_2601/pull/189)、[#191](https://github.com/jphacks/kz_2601/pull/191) |
+| **スキーマ駆動の部品カタログ** | `dsl.schema.json` の `description` / `x-usage` から AI 向けカタログを自動生成。抜けはテストで検出 | [`backend/internal/ai/catalog.go`](backend/internal/ai/catalog.go) | [#20](https://github.com/jphacks/kz_2601/pull/20) |
+| **レンダラー + レジストリ** | `ComponentRegistry`(type → View の辞書・`switch` 無し)、`GridScreenLayout`(GeometryReader 1 個で絶対配置)、`DSLNavigationRoot`(タブ/スタック/sheet)。1 部品 = 1 ファイル | [`ios/Packages/MetamonRenderer/`](ios/Packages/MetamonRenderer) | [#18](https://github.com/jphacks/kz_2601/pull/18) |
+| **品質監査ツール** | 発話セットで生成し、頼んだ機能の欠落・嘘ラベルを判定する `ai-eval` / `ai-audit` | [`backend/cmd/`](backend/cmd)、[`docs/backend/ai-eval/`](docs/backend/ai-eval) | [#19](https://github.com/jphacks/kz_2601/pull/19)、[#111](https://github.com/jphacks/kz_2601/pull/111) |
+| **オフライン + ホットリロード** | 記録のローカル先出し・同期キュー、Firestore リスナー + SSE で共有データを他端末に反映 | [`ios/Packages/MetamonServices/`](ios/Packages/MetamonServices) | [#70](https://github.com/jphacks/kz_2601/pull/70)、[#104](https://github.com/jphacks/kz_2601/pull/104) |
+| **インフラ / CI** | Cloud Run × 2・WIF・Secret Manager、`develop` → staging / `main` → prod の自動デプロイとスモーク | [`docs/infra/gcp-setup.md`](docs/infra/gcp-setup.md)、[`.github/workflows/`](.github/workflows) | [#16](https://github.com/jphacks/kz_2601/pull/16)、[#71](https://github.com/jphacks/kz_2601/pull/71) |
 
-* 設計判断の記録: [`docs/00_decisions.md`](docs/00_decisions.md)(正典)、[`docs/01_goals_and_requirements.md`](docs/01_goals_and_requirements.md)(ゴール・デモ 3 本・要件 F01〜F41)
-* 生成品質・速度の実測: [`docs/backend/ai-eval/2026-10-24.md`](docs/backend/ai-eval/2026-10-24.md)、[`2026-10-24-catalog.md`](docs/backend/ai-eval/2026-10-24-catalog.md)(生 JSON は `raw/`)
-* 審査デモ台本: [`docs/03_demo_script.md`](docs/03_demo_script.md)
-* 10/25 のリリースノートと朝のリリース手順: [`docs/release/2026-10-25-release-notes.md`](docs/release/2026-10-25-release-notes.md)、[`docs/release/2026-10-25-runbook.md`](docs/release/2026-10-25-runbook.md)
+#### 製品に取り入れた研究内容(データ・ソフトウェアなど)
+
+* 生成品質・速度の実測は、すべて生 JSON 付きで公開しています: [`docs/backend/ai-eval/`](docs/backend/ai-eval)(`2026-10-24.md` 速度と通過率、`audit2` / `audit3` 品質監査、`english` 英語、`2026-10-25-chat-first` チャット)
 
 ## アーキテクチャ
 
 ```mermaid
 flowchart LR
   subgraph iOS["iOS (SwiftUI・マルチモジュール)"]
-    W["WhisperKit<br/>オンデバイス STT"] --> App["Metamon (アプリ本体)<br/>AppRuntime / VoiceInputView"]
+    W["WhisperKit<br/>オンデバイス STT"] --> App["Metamon (アプリ本体)<br/>AppRuntime / チャット"]
     FM["Foundation Models<br/>オンデバイス AI (aiButton)"] --> Ren
     App --> Ren["MetamonRenderer<br/>ComponentRegistry / GridScreenLayout"]
-    App --> Svc["MetamonServices<br/>HTTP / Firebase Auth / 通知"]
-    Ren --> DSL["MetamonDSL<br/>Codable / GridArea / Aggregator"]
+    App --> Svc["MetamonServices<br/>HTTP / Firebase Auth / 通知 / オフライン同期"]
+    Ren --> DSL["MetamonDSL<br/>Codable / GridArea / 式"]
     Svc --> DSL
   end
   subgraph GCP["GCP (Cloud Run / asia-northeast1)"]
-    AI["ai (Go)<br/>generate / validate / patch"]
-    AC["appconfig (Go)<br/>DSL version / records"]
+    AI["ai (Go)<br/>chat / generate / validate / patch"]
+    AC["appconfig (Go)<br/>DSL version / records / share"]
     FS[("Firestore")]
     SM["Secret Manager"]
   end
-  Svc -- "Bearer: Firebase ID token<br/>POST /v1/generate" --> AI
+  Svc -- "Bearer: Firebase ID token<br/>POST /v1/chat・/v1/generate" --> AI
+  Svc -- "records / versions / SSE" --> AC
   AI -- "PUT / PATCH /apps/{id}/dsl" --> AC
   AC --> FS
   AI -- "messages.create" --> CL[(Claude API)]
@@ -204,11 +265,11 @@ flowchart LR
   GH["GitHub Actions<br/>develop→stg / main→prod (WIF)"] -. deploy .-> GCP
 ```
 
-iOS 側の依存の向きは `App → Renderer → DSL`、`App → Services → DSL`。Renderer は Services を知らず、`DSLRuntime` protocol 経由でアプリ本体から能力を注入されます(詳細: [`docs/ios/architecture.md`](docs/ios/architecture.md))。backend は単一 Go モジュールに `cmd/appconfig` と `cmd/ai` を置き、共有型 `pkg/dsl` に検証・JSON Patch を集約(詳細: [`docs/backend/architecture.md`](docs/backend/architecture.md))。
+iOS の依存の向きは `App → Renderer → DSL`、`App → Services → DSL`。Renderer は Services を知らず、`DSLRuntime` protocol 経由で能力を注入されます(詳細: [`docs/ios/architecture.md`](docs/ios/architecture.md))。backend は単一 Go モジュールに `cmd/appconfig` と `cmd/ai` を置き、共有型 `pkg/dsl` に検証・JSON Patch を集約(詳細: [`docs/backend/architecture.md`](docs/backend/architecture.md))。API は [`openapi-ai.yaml`](docs/backend/openapi-ai.yaml) / [`openapi-appconfig.yaml`](docs/backend/openapi-appconfig.yaml)。
 
 ## セットアップ
 
-### backend(Go 1.24)
+### backend(Go)
 
 ```sh
 cd backend
@@ -217,7 +278,7 @@ make build vet test            # CI と同じ(schema-check + go test)
 set -a; source ~/Desktop/JPHACKS2026/.env; set +a   # リポ外の .env(ANTHROPIC_API_KEY=...)
 PORT=8081 go run ./cmd/ai
 curl -s localhost:8081/health
-# 生成品質 eval(実 API・16 発話)
+# 生成品質 eval(実 API)
 go run ./cmd/ai-eval -effort low -model claude-sonnet-5-5 -tag local
 ```
 
@@ -230,31 +291,41 @@ METAMON_TEAM_ID=<TEAM_ID> xcodegen generate     # .xcodeproj 生成(コミット
 open Metamon.xcodeproj                          # 既定で ai は staging(Cloud Run)に接続
 # シミュレータ(音声は MockTranscriber + 文字入力)
 xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' build CODE_SIGNING_ALLOWED=NO
-# テスト(3 パッケージ一括)
+# テスト
 xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' test CODE_SIGNING_ALLOWED=NO
 ```
 
-- 実機では初回起動時に WhisperKit `small` モデルを DL します(進捗バー表示・一度 DL すればオフラインでロード)。
-- `METAMON_AI_BASE_URL` / `METAMON_APPCONFIG_BASE_URL` を空にするとその側はモック(同梱サンプル DSL / インメモリ)。`METAMON_MOCK=1` で全モック起動。
-- **対応言語: 日本語 / English**(#44 #45)。端末の言語で自動切替し、設定 >「言語」で 自動 / 日本語 / English をアプリ内で即時に切り替えられます。English を選ぶと新しく作るアプリ・対話の質問・音声認識も英語になります(作成済みアプリの文言はそのまま)。
+- `METAMON_MOCK=1` で全モック起動(同梱サンプル DSL・API キー不要)。`METAMON_AI_BASE_URL` / `METAMON_APPCONFIG_BASE_URL` を空にするとその側だけモック。
+- 実機では初回起動時に WhisperKit `small` モデルを DL します(進捗表示・一度 DL すればオフラインでロード)。
+- 対応言語: 日本語 / English。設定 >「言語」で即時に切り替え、生成・対話・音声認識も連動します(#129)。
 
 ### secrets の置き方(public リポ)
 
 | 秘密 | 置き場 | 流し込み |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | ローカル: `~/Desktop/JPHACKS2026/.env`(リポ外)/ 本番: GCP Secret Manager | Cloud Run に `--set-secrets` で環境変数注入。iOS はキーを持たない |
-| `GoogleService-Info.plist` | `~/Desktop/JPHACKS2026/secrets/`(リポ外) | `ios/scripts/sync-firebase-plist.sh` がコピーし `git check-ignore` で無視を確認 |
-| GCP 認証 | 鍵ファイル無し | GitHub Actions は Workload Identity Federation(`assertion.repository == 'jphacks/kz_2601'`) |
+| `ANTHROPIC_API_KEY` | ローカル: リポ外の `.env` / 本番: GCP Secret Manager | Cloud Run に `--set-secrets` で注入。iOS はキーを持たない |
+| `GoogleService-Info.plist` | リポ外 | `ios/scripts/sync-firebase-plist.sh` がコピーし `git check-ignore` で無視を確認 |
+| GCP 認証 | 鍵ファイル無し | GitHub Actions は Workload Identity Federation(`jphacks/kz_2601` に限定) |
 
 `.gitignore` + `secrets-scan.yml`(gitleaks)で二重防御。GCP の構築手順は [`docs/infra/gcp-setup.md`](docs/infra/gcp-setup.md)。
 
-## リポジトリ構成
-iOS アプリ(`ios/`)とバックエンド(`backend/`)を同居させたモノレポ。詳細は [docs/00_decisions.md](docs/00_decisions.md)。
+## リポジトリ構成とドキュメント
+
+iOS アプリ(`ios/`)とバックエンド(`backend/`)を同居させたモノレポ。
 
 | パス | 内容 |
 |---|---|
-| `ios/` | iOS アプリ本体(Swift / SwiftUI、xcodegen)。`Packages/{MetamonDSL,MetamonRenderer,MetamonServices}` のローカル Swift Package 3 つ + 薄いアプリ本体 `Metamon/` |
-| `backend/` | Go サービス群(`cmd/appconfig`, `cmd/ai`, `cmd/ai-eval`)、共有型 `pkg/dsl`、生成パイプライン `internal/ai`、Cloud Run 用 `Dockerfile` |
-| `docs/` | 設計・運用ドキュメント(正典は `00_decisions.md`)。`dsl/`(DSL v1 スキーマ・examples)、`backend/`(設計・OpenAPI・ai-eval)、`ios/`、`infra/`、`03_demo_script.md` |
-| `.github/` | CI(backend-ci / ios-ci / secrets-scan / deploy-cloudrun)・PR/Issue テンプレート・CODEOWNERS |
+| `ios/` | iOS アプリ本体(SwiftUI、xcodegen)。`Packages/{MetamonDSL,MetamonRenderer,MetamonServices}` + 薄いアプリ本体 `Metamon/` + ウィジェット・UI テスト |
+| `backend/` | Go サービス群(`cmd/appconfig`, `cmd/ai`, `cmd/ai-eval`, `cmd/ai-audit`)、共有型 `pkg/dsl`、生成パイプライン `internal/ai` |
+| `docs/` | 設計・運用ドキュメント(正典は `00_decisions.md`) |
+| `.github/` | CI・PR/Issue テンプレート・CODEOWNERS |
 | `scripts/` | 運用スクリプト(`github/` ブランチ保護) |
+
+| ドキュメント | 内容 |
+|---|---|
+| [`docs/00_decisions.md`](docs/00_decisions.md) | 決定事項(正典)・判断ログ |
+| [`docs/01_goals_and_requirements.md`](docs/01_goals_and_requirements.md) | ゴール・要件 |
+| [`docs/dsl/README.md`](docs/dsl/README.md) | DSL v1 の決定表・グリッド仕様・部品一覧 |
+| [`docs/backend/ai-eval/`](docs/backend/ai-eval) | 生成品質・速度の実測 |
+| [`docs/03_demo_script.md`](docs/03_demo_script.md) | 審査デモ台本 |
+| [`docs/release/2026-10-25-release-notes.md`](docs/release/2026-10-25-release-notes.md) | 10/25 のリリースノート |
