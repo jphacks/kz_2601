@@ -1,22 +1,22 @@
 <div align="center">
 
-<img src="docs/images/readme/icon.png" width="240" alt="Tailor It のアイコン">
+<p><img src="docs/images/readme/icon.png" width="240" alt="Tailor It のアイコン"></p>
 
+<p>
 <a href="https://tailor-it.app/">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/title-dark.png">
-    <img src="docs/images/readme/title-light.png" width="330" alt="Tailor It">
+    <img src="docs/images/readme/title-light.png" width="300" alt="Tailor It">
   </picture>
 </a>
+</p>
 
 <h4>ひと声で、あなた仕立て。</h4>
 
 話すとアプリが変わる iOS アプリ。<br>
 声とチャットで、自分専用のアプリをその場で作って直せます。
 
-<img src="docs/images/readme/demo.gif" width="300" alt="デモ。マイクに話すと、ドライブの記録アプリが地図付きでできあがる">
-
-<sub>「ドライブの記録ができるアプリが欲しい」と話すと、地図付きのアプリができます。</sub>
+<p><a href="https://tailor-it.app/">https://tailor-it.app</a></p>
 
 </div>
 
@@ -28,6 +28,17 @@
 | マイクを押して話す | 数秒で画面ができる | 入力・保存・集計が<br>そのまま動く |
 
 ## 製品概要
+
+<table align="center">
+<tr>
+<td align="center"><img src="docs/images/readme/demo.gif" width="260" alt="話すと、ドライブの記録アプリが地図付きでできあがる"></td>
+<td align="center"><img src="docs/images/readme/edit.gif" width="260" alt="ダークモードを頼むと案が 3 つ出て、選ぶと色が変わる。続けてグラフを頼むと円グラフが加わる"></td>
+</tr>
+<tr>
+<td align="center"><sub>話すだけで、地図付きの<br>ドライブの記録アプリができる</sub></td>
+<td align="center"><sub>案を選んで色を変え、<br>続けて円グラフを足す</sub></td>
+</tr>
+</table>
 
 ### 課題設定
 
@@ -45,11 +56,6 @@ Web サービスは、[Lovable](https://lovable.dev/) や [v0](https://v0.app/) 
 「合計をもっと大きく」と話せば、使いながら直せます。<br>
 アプリが変わっても、それまでの記録は消えません。
 
-<p align="center">
-  <img src="docs/images/readme/edit.gif" width="300" alt="使いながら直す様子。ダークモードを頼むと案が 3 つ出て、選ぶと色が変わる。続けてグラフを頼むと円グラフが加わる">
-</p>
-
-<p align="center"><sub>「ダークモードにして」には、できる範囲の案を 3 つ出します。<br>選んだ案で色が変わり、続けて「グラフを追加して」と頼むと円グラフが加わります。</sub></p>
 
 **特長**
 
@@ -78,7 +84,7 @@ flowchart LR
   P --> R
 ```
 
-- **マス目でレイアウトを決める**: 6 列 × 12 行のマス目に、部品ごとに `A1:C3` のような書き方で置き場所を決める。<br>
+- **マス目でレイアウトを決める**: 画面をマス目に分け、部品ごとに座標を決めて置き場所を設定する。<br>
   重なりはサーバーが見つけて作り直させる。
 - **[57 種の部品](docs/README-details.md#2-ネイティブ機能も計算も生成される)**: カメラ・動画・通知・地図などの部品と、[計算の式](docs/dsl/expressions.md)を組み合わせる。
 - **壊れない**: 画面の定義は Go で書いたサーバーが厳しく検査し、iOS は知らない部品が届いても落ちない。
@@ -86,18 +92,6 @@ flowchart LR
   ズレるとテストが落ちる。
 - **速さにこだわった**: 出力を軽くし、ストリーミングで画面の枠を約 2.4 秒で出す。<br>
   [速さの計測](docs/backend/ai-eval/2026-10-24-latency.md)
-
-**注力したこと: 品質を数字で測って直しました。**<br>
-同じ依頼のセットで作らせ、手で採点しています。<br>
-結果は [品質の監査 第 2 弾](docs/backend/ai-eval/2026-10-24-audit2.md) と [第 3 弾](docs/backend/ai-eval/2026-10-24-audit3.md) にあります。
-
-| 指標 | 改善前 | 改善後 |
-|---|---:|---:|
-| 頼んだ機能が入っている割合 | 49% | 91% |
-| 頼んだ機能が全部入ったアプリ | 2/20 | 14/20 |
-| 中身と違うラベル | 7/20 | 0/20 |
-
-<sub>速さは中央値で、新規作成 6.6 秒・修正 1.7 秒です。<br>[生成の品質と速さの計測](docs/backend/ai-eval/2026-10-24.md)</sub>
 
 ### 使用技術
 
@@ -118,7 +112,7 @@ flowchart LR
 
 #### 独自技術
 
-- **[DSL v1](docs/dsl/README.md) とマス目配置**: 画面を表す JSON の仕様と、`A1:C3` での配置
+- **[DSL v1](docs/dsl/README.md) とマス目配置**: 画面を表す JSON の仕様と、座標での部品の配置
 - **[生成パイプライン](backend/internal/ai)**: 作る → 検査 → 作り直す。<br>
   修正は JSON Patch で差分だけ作る
 - **[部品一覧の自動生成](backend/internal/ai/catalog.go)**: AI に渡す部品の説明をスキーマから作る
@@ -133,6 +127,34 @@ flowchart LR
 - 作ったアプリを単体のアプリとして公開する。
 - 有料版「Tailor It Pro」。
 - タイマーの自動切り替えのような、今の DSL で表せない依頼に対応する。
+
+### 注力したこと
+
+品質を数字で測って直しました。<br>
+同じ依頼のセットで作らせ、手で採点しています。<br>
+結果は [品質の監査 第 2 弾](docs/backend/ai-eval/2026-10-24-audit2.md) と [第 3 弾](docs/backend/ai-eval/2026-10-24-audit3.md) にあります。
+
+| 指標 | 改善前 | 改善後 |
+|---|---:|---:|
+| 頼んだ機能が入っている割合 | 49% | 91% |
+| 頼んだ機能が全部入ったアプリ | 2/20 | 14/20 |
+| 中身と違うラベル | 7/20 | 0/20 |
+
+<sub>速さは中央値で、新規作成 6.6 秒・修正 1.7 秒です。<br>[生成の品質と速さの計測](docs/backend/ai-eval/2026-10-24.md)</sub>
+
+### アピールポイント
+
+1. **アプリ全体をサーバードリブン UI で作った**<br>
+   モバイルで広がっているサーバードリブン UI を iOS で実装し、一部の画面ではなく、アプリ全体をこの方式で描いています。
+2. **スマホならではの機能を自由に組み合わせられる**<br>
+   カメラ・位置情報・通知・ウィジェット・近くの端末との共有・Siri やショートカットとの連携などを、部品として使えます。
+3. **伸ばせるクラウドの設計**<br>
+   GCP の Cloud Run を staging と本番に分け、JSON の形のデータに合う Firestore と、Sign in with Apple を使っています。<br>
+   ユーザーが増えても広げられる構成です。
+4. **収益を見据えた設計**<br>
+   一定の範囲までは無料で使え、みんなで書き込む共有のアプリや、たくさん作る使い方は有料版の対象にしています。
+5. **1 つのアプリに、いくつものアプリが入る**<br>
+   アプリを増やしても、中で部品の組み合わせを切り替えるだけなので、アプリのサイズは増えません。
 
 ## 審査員向け: 試し方
 
