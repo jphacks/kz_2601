@@ -69,5 +69,17 @@
   {"id": "edit_enum_user", "group": "enum", "base": "internal/ai/examples/okozukai.json", "mode": "edit", "note": "#194 自分で増やせる → 自由入力にしない",
    "steps": [{"say": "種類を自分で増やせるようにして", "expect": "ready", "generate": true, "genNot": ["文字", "自由に入力", "メモ"]}]},
   {"id": "edit_enum_vague", "group": "enum", "base": "internal/ai/examples/okozukai.json", "mode": "edit", "note": "#194 どちらか分からない → 案",
-   "steps": [{"say": "種類をもっと増やしたい", "expect": "proposal", "generate": true, "genNot": ["メモ", "文字"]}]}
+   "steps": [{"say": "種類をもっと増やしたい", "expect": "proposal", "generate": true, "genNot": ["メモ", "文字"]}]},
+  {"id": "edit_vague_graph", "group": "edit-vague", "base": "internal/ai/examples/kakeibo.json", "mode": "edit", "note": "#211 足す物は決まっているが中身(何の数字・どう分けるか)が無い → question。チップは今のアプリの項目から。答えたら ready → generate で変化あり",
+   "steps": [{"say": "グラフを足して", "expect": "question", "suggAny": ["金額", "カテゴリ", "件数", "日", "月", "週", "メモ"]}, {"say": "金額を日ごとに", "expect": "ready", "generate": true}]},
+  {"id": "edit_vague_field", "group": "edit-vague", "base": "internal/ai/examples/kakeibo.json", "mode": "edit", "note": "#211 何の項目か無い → question(何が足りないか・なぜ要るか)",
+   "steps": [{"say": "項目を足して", "expect": "question", "textAny": ["項目"]}]},
+  {"id": "edit_vague_notify", "group": "edit-vague", "base": "internal/ai/examples/kakeibo.json", "mode": "edit", "note": "#211 いつ何を知らせるか無い → question",
+   "steps": [{"say": "通知して", "expect": "question", "textAny": ["いつ", "何時", "時刻", "毎日"]}]},
+  {"id": "edit_vague_benri", "group": "edit-vague", "base": "internal/ai/examples/kakeibo.json", "mode": "edit", "note": "#211 目的だけの相談は今まで通り proposal(過剰に聞き返さない)。案 1 を generate",
+   "steps": [{"say": "もっと便利にして", "expect": "proposal", "generate": true}]},
+  {"id": "edit_clear_memo", "group": "edit-vague", "base": "internal/ai/examples/kakeibo.json", "mode": "edit", "note": "#211 明確な指示は今まで通り ready → generate で変化あり",
+   "steps": [{"say": "メモ欄を消して", "expect": "ready", "generate": true}]},
+  {"id": "edit_clear_chart", "group": "edit-vague", "base": "internal/ai/examples/kakeibo.json", "mode": "edit", "note": "#211 中身まで言った依頼は聞き返さない。家計簿には月ごとの金額の棒グラフが既にあるので answer で「既にある」と言う(何も変わらない ready を出さない)",
+   "steps": [{"say": "集計タブに月ごとの金額の棒グラフを足して", "expect": "answer", "textAny": ["すでに", "既に"]}]}
 ]
