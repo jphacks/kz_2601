@@ -110,7 +110,7 @@ public enum NearbyShare {
         return records.prefix(maxReceiveRecords).compactMap { data in
             var out: [String: JSONValue] = [:]
             for (key, value) in data {
-                guard let f = fields[key], accepts(value, f.type), !(f.type == .ref && !sameApp) else { continue }
+                guard let f = fields[key], accepts(value, f.type), !((f.type == .ref || f.type == .refs) && !sameApp) else { continue }
                 out[key] = value
             }
             return out.isEmpty ? nil : out
@@ -122,7 +122,7 @@ public enum NearbyShare {
         case (.integer, .number), (.number, .number), (.currency, .number): true
         case (.boolean, .bool): true
         case (.string, .string), (.text, .string), (.date, .string), (.datetime, .string),
-             (.enum, .string), (.photo, .string), (.video, .string), (.location, .string), (.ref, .string): true
+             (.enum, .string), (.photo, .string), (.video, .string), (.location, .string), (.ref, .string), (.refs, .array): true
         default: false
         }
     }
