@@ -343,7 +343,7 @@ func isTargetLabel(label string) bool {
 
 // listTypes show an entity's records one by one.
 var listTypes = map[ComponentType]bool{
-	CompList: true, CompTable: true, CompTimeline: true, CompCalendar: true, CompMapView: true, CompSettlement: true,
+	CompList: true, CompTable: true, CompTimeline: true, CompCalendar: true, CompMapView: true, CompSettlement: true, CompGridTable: true,
 }
 
 func (l *linter) entityReach() {
@@ -382,7 +382,7 @@ func formScreens(a *App) map[string][]string {
 
 // UnlistedEntities returns, in entity order, the entities whose records no
 // reachable screen lists (list / table / timeline / calendar / mapView /
-// settlement), excluding single-value setting entities (budget, goal).
+// settlement / gridTable), excluding single-value setting entities (budget, goal).
 func (a *App) UnlistedEntities() []string {
 	targets := a.Reachable()
 	listed := map[string]bool{}

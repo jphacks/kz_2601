@@ -95,5 +95,9 @@
   {"id": "shift_break", "kind": "edit", "group": "shift", "base": "shift_pay", "transcript": "休憩時間も引いて",
    "expect": {"computed": true}, "note": "#229 break_min(分)を足し hours = max(hoursBetween − coalesce(break_min,0)/60, 0)"},
   {"id": "shift_night", "kind": "edit", "group": "shift", "base": "shift_break", "transcript": "夜勤もある",
-   "expect": {"computed": true}, "note": "#229 hoursBetween が日付またぎを扱うので式は変えなくてよい(休憩の式を消さない)"}
+   "expect": {"computed": true}, "note": "#229 hoursBetween が日付またぎを扱うので式は変えなくてよい(休憩の式を消さない)"},
+  {"id": "grid_timetable", "kind": "create", "group": "grid", "transcript": "大学の時間割を作りたい。月曜から金曜で1限から6限まで、教室も書きたい",
+   "expect": {"grid": true, "unreachable": 0}, "note": "#234 曜日 x 時限の gridTable"},
+  {"id": "grid_shift", "kind": "create", "group": "grid", "transcript": "バイトの週のシフト表を作りたい。曜日ごとに早番と遅番に誰が入るか見たい",
+   "expect": {"grid": true, "unreachable": 0}, "note": "#234 曜日 x シフト帯(enum)の gridTable"}
 ]
