@@ -11,7 +11,7 @@
 | **非再帰** | `Screen > Container(vstack/hstack/section) > Leaf` の **2 段固定**。Leaf は children を持てない | Claude 構造化出力は**再帰スキーマ非対応**。iOS レンダラーも有界で済む |
 | `type` で判別 | 全コンポーネント・アクションは `type` の `const/enum` で閉じる | discriminator が1箇所、Swift の `enum Codable` に素直に落ちる |
 | enum で閉じる | スタイル・集計・フィルタ演算子・遷移方法は全て enum | AI が勝手な値を発明しない |
-| 制約は Go 側 | `minItems/maxLength/pattern` を**スキーマに書かない**。上限(画面12・entity6・フィールド20・1段30個)と id 形式(`^[a-z][a-z0-9_-]{0,39}$`)は `dsl.Validate()` | 構造化出力が数値/文字列制約を受け付けないため、同じ JSON を Claude にもバリデータにも使える |
+| 制約は Go 側 | `minItems/maxLength/pattern` を**スキーマに書かない**。上限(画面12・entity6・フィールド40・1段30個)と id 形式(`^[a-z][a-z0-9_-]{0,39}$`)は `dsl.Validate()` | 構造化出力が数値/文字列制約を受け付けないため、同じ JSON を Claude にもバリデータにも使える |
 | `additionalProperties: false` | 全オブジェクト | 構造化出力の必須条件・未知プロパティ混入防止 |
 | 参照は id 文字列 | 画面遷移・entity・field は全て id 参照。整合性は `Validate()` が検査(存在しない画面へ navigate 等を列挙して AI に返す) | |
 | データは DSL 外 | DSL は**定義のみ**。レコード(家計簿の明細)は appconfig の `records` API | DSL が肥大化しない・AI がデータを壊せない |
