@@ -116,6 +116,11 @@ func (e *apiError) With(k string, v any) *apiError {
 func fail(w http.ResponseWriter, err error) {
 	var ae *apiError
 	if errors.As(err, &ae) {
+		if ae.status == http.StatusBadRequest || ae.status == http.StatusUnprocessableEntity {
+			// 理由(field と msg)を残す: クライアントの保存失敗をログだけで追えるように
+			slog.Warn("appconfig: request rejected", slog.Int("status", ae.status), slog.String("code", ae.code),
+				slog.String("msg", ae.msg), slog.Any("details", ae.details), slog.String("requestId", w.Header().Get(httpx.RequestIDHeader)))
+		}
 		httpx.ErrorWithDetails(w, ae.status, ae.code, ae.msg, ae.details)
 		return
 	}

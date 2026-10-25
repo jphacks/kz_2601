@@ -22,6 +22,8 @@ const (
 	maxStringLen = 4000
 	maxTextLen   = 20000
 	dateLayout   = "2006-01-02"
+	// maxRefLen bounds a type=ref value (a record id; server ids and iOS "local-<uuid>" are far shorter).
+	maxRefLen = 200
 )
 
 func invalidRecord(field, msg string) error {
@@ -253,6 +255,17 @@ func normalizeValue(f *dsl.Field, v any) (any, error) {
 				}
 			}
 			return nil, fmt.Errorf("must be one of %s", strings.Join(f.Options, ", "))
+		}
+		return s, nil
+	case dsl.FieldRef:
+		// id of a record of RefEntity. Existence is not checked: iOS may send a
+		// not-yet-synced "local-<clientId>" and the target can be deleted later.
+		s, ok := asString(v)
+		if !ok || strings.TrimSpace(s) == "" {
+			return nil, fmt.Errorf("must be a record id string")
+		}
+		if len(s) > maxRefLen {
+			return nil, fmt.Errorf("exceeds %d bytes", maxRefLen)
 		}
 		return s, nil
 	case dsl.FieldPhoto:
