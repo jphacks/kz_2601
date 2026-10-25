@@ -122,6 +122,8 @@ func toShareOut(r *http.Request, s *store.Share) shareOut {
 // can be shared. Unlike publish this is not creator-only: a share is keyed by
 // a fresh token (nothing global to squat) and members of a shared app may
 // invite others to it (#118). A blank copy (e.g. a bare GET /dsl seed) is 400.
+// Apps with scope:"shared" entities can only be shared by their participants
+// (#254), or anyone who opened the appId could invite themselves in.
 func (h *Handler) createShare(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r, "appId")
 	if err != nil {
@@ -141,6 +143,12 @@ func (h *Handler) createShare(w http.ResponseWriter, r *http.Request) {
 	if isBlank(parsed) {
 		fail(w, blankErr("sharing"))
 		return
+	}
+	if hasSharedScope(parsed) {
+		if err := h.requireMember(r, app); err != nil {
+			fail(w, err)
+			return
+		}
 	}
 	tok, err := newShareToken()
 	if err != nil {
@@ -211,18 +219,34 @@ func (h *Handler) revokeShare(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// importShare: POST /v1/shares/{token}/import.
+// importShare: POST /v1/shares/{token}/import. For apps with scope:"shared"
+// entities this is also how one joins the participants (#254): the caller is
+// added to apps_public/{appId}/members, as long as the link's issuer still
+// participates. Body (optional): {"displayName"} shown in the member list.
 func (h *Handler) importShare(w http.ResponseWriter, r *http.Request) {
 	s, err := h.liveShare(r)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	res, err := h.installCopy(r, s.AppID, s.DSL, "シェアから追加")
+	name, ok := importName(w, r)
+	if !ok {
+		return
+	}
+	member := false
+	if a, err := dsl.Parse(s.DSL); err == nil && hasSharedScope(a) {
+		if err := h.join(r, s.AppID, s.OwnerUID, name); err != nil {
+			fail(w, err)
+			return
+		}
+		member = true
+	}
+	res, err := h.installCopy(r, s.AppID, s.DSL, "シェアから追加", true)
 	if err != nil {
 		fail(w, err)
 		return
 	}
+	res.Member = member
 	httpx.WriteJSON(w, http.StatusCreated, res)
 }
 
@@ -234,6 +258,8 @@ type installResult struct {
 	Joined bool `json:"joined"`
 	// Created is false when the caller already had that (joined) appId.
 	Created bool `json:"created"`
+	// Member: the caller now participates in the app's scope:"shared" data (#254).
+	Member bool `json:"member"`
 }
 
 // installCopy puts srcDSL into the caller's tree. Private-only apps get a new
@@ -242,15 +268,23 @@ type installResult struct {
 // would hand the receiver an empty board instead of the community they were
 // invited to — the same "install" #93 already performs for GET /dsl.
 //
+// viaLink is false for the public catalog: scope:"shared" data is for the
+// people a participant invited (#254), so a catalog app whose only shared
+// entities are scope:"shared" becomes an independent copy (new appId, the
+// installer is its creator) instead of joining the publisher's family data.
+//
 // The copy is written as version 2 on top of the initial version 1 so iOS
 // does not treat it as a blank, never-generated app (AppSummary.isBlank).
-func (h *Handler) installCopy(r *http.Request, srcAppID string, srcDSL json.RawMessage, note string) (*installResult, error) {
+func (h *Handler) installCopy(r *http.Request, srcAppID string, srcDSL json.RawMessage, note string, viaLink bool) (*installResult, error) {
 	ctx, uid := r.Context(), uidOf(r)
 	app, err := dsl.Parse(srcDSL)
 	if err != nil {
 		return nil, invalidDSL(err)
 	}
 	joined := app.HasSharedEntity()
+	if !viaLink {
+		joined = hasPublicScope(app)
+	}
 	id := newAppID()
 	if joined {
 		id = srcAppID
@@ -514,7 +548,7 @@ func (h *Handler) installPublicApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	res, err := h.installCopy(r, c.ID, c.DSL, "「探す」から追加")
+	res, err := h.installCopy(r, c.ID, c.DSL, "「探す」から追加", false)
 	if err != nil {
 		fail(w, err)
 		return
