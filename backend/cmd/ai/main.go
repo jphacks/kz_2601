@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/ai"
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
+	"github.com/jphacks/kz_2601/backend/internal/auth"
 )
 
 func env(key, def string) string {
@@ -57,6 +59,9 @@ func main() {
 			Effort:   os.Getenv("AI_CHAT_EFFORT"),
 			Thinking: os.Getenv("AI_CHAT_THINKING"),
 		},
+		// /v1/chat callers (#286): AUTH_MODE=firebase (default) | dev
+		Verifier: auth.VerifierFromEnv(context.Background(), env("AUTH_MODE", auth.ModeFirebase), os.Getenv("GOOGLE_CLOUD_PROJECT")),
+		AuthMode: env("AUTH_MODE", auth.ModeFirebase),
 	}
 	srv := &http.Server{
 		Addr:              ":" + port,

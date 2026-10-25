@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -171,9 +172,9 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 			defaultPaidCatalog.annotate(out, app)
 		}
 	}()
-	store := s.conversations()
-	store.wait(ctx, req.AppID, s.chatTimeout())
-	cv := store.get(req.AppID)
+	store, key := s.conversations(), convKey(auth.UID(ctx), req.AppID)
+	store.wait(ctx, key, s.chatTimeout())
+	cv := store.get(key)
 	if cv == nil || cv.mode != mode {
 		// a create conversation does not carry over into editing (and back)
 		cv = &conversation{mode: mode}
@@ -210,7 +211,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 			res.Brief = cv.brief
 			res.Transcript = cv.transcript
 			cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: res.Text})
-			store.put(req.AppID, cv)
+			store.put(key, cv)
 			res.LatencyMs = Latency{Total: time.Since(started).Milliseconds()}
 			return res, nil
 		}
@@ -258,11 +259,11 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 		}
 		cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: historyText(res)})
 		if mode == chatModeCreate {
-			pending := store.begin(req.AppID)
-			store.put(req.AppID, cv)
+			pending := store.begin(key)
+			store.put(key, cv)
 			go func() {
 				a := <-done
-				store.finish(req.AppID, pending, cv, func(c *conversation) {
+				store.finish(key, pending, cv, func(c *conversation) {
 					if a.reply != nil {
 						b := cleanBrief(a.reply.Brief)
 						c.brief, c.transcript = &b, transcriptOr(a.reply.Transcript, userTexts)
@@ -270,7 +271,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 				})
 			}()
 		} else {
-			store.put(req.AppID, cv)
+			store.put(key, cv)
 			go func() { <-done }()
 		}
 		res.LatencyMs = Latency{Claude: time.Since(callStart).Milliseconds(), Total: time.Since(started).Milliseconds()}
@@ -306,7 +307,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 		cv.questions++
 	}
 	cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: historyText(res)})
-	store.put(req.AppID, cv)
+	store.put(key, cv)
 	res.LatencyMs = Latency{Claude: ar.latency.Milliseconds(), Total: time.Since(started).Milliseconds()}
 	return res, nil
 }
