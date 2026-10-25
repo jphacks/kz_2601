@@ -95,6 +95,9 @@ type ChatResult struct {
 	Suggestions []string `json:"suggestions,omitempty"`
 	// Options: proposal only, 1..3 ideas; Instruction goes to POST /v1/generate.
 	Options []ChatOption `json:"options,omitempty"`
+	// MultiSelect (#220): proposal options / question suggestions can be
+	// combined (pick several). Omitted = pick one (old iOS behaviour).
+	MultiSelect bool `json:"multiSelect,omitempty"`
 	// Mode: create|edit, set only for chat-first requests (#185).
 	Mode       string  `json:"mode,omitempty"`
 	Turn       int     `json:"turn"` // 1-based count of user messages so far

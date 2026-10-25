@@ -348,6 +348,7 @@ components:
           maxItems: 3
           items: { $ref: '#/components/schemas/ChatOption' }
           description: proposal の時だけ
+        multiSelect: { type: boolean, description: '#220。proposal の options / question の suggestions を複数選んでよい時だけ true (組み合わせられる案・複数当てはまる質問)。両立しない時は省略。iOS は proposal なら選んだ案の instruction を「・」でつないで 1 回の POST /generate、question なら選んだ項目を「、」でつないだ回答を送る。旧 iOS は無視して 1 つ選択のまま' }
         text: { type: string, description: 'question: 質問文 (読み上げる)。ready: 「では作りますね。」/ "Got it, I''ll build it now."' }
         suggestions:
           type: array

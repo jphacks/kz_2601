@@ -44,6 +44,11 @@ type ChatStep struct {
 	// OptionsNot / GenNot: see the comment above.
 	OptionsNot []string `json:"optionsNot,omitempty"`
 	GenNot     []string `json:"genNot,omitempty"`
+	// Multi (#220): expected multiSelect (nil = not checked).
+	Multi *bool `json:"multi,omitempty"`
+	// GenerateAll (#220): with generate, a multiSelect proposal sends every
+	// option joined as iOS does for 「これでいく(N 件)」.
+	GenerateAll bool `json:"generateAll,omitempty"`
 }
 
 type ChatCase struct {
@@ -79,6 +84,7 @@ type ChatStepRecord struct {
 	Text        string          `json:"text,omitempty"`
 	Suggestions []string        `json:"suggestions,omitempty"`
 	Options     []ai.ChatOption `json:"options,omitempty"`
+	MultiSelect bool            `json:"multiSelect,omitempty"`
 	Mode        string          `json:"mode,omitempty"`
 	Gen         *ChatGenRecord  `json:"generate,omitempty"`
 	Brief       *ai.Brief       `json:"brief,omitempty"`
@@ -182,7 +188,7 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string
 			}
 			sr.Kind, sr.Source, sr.Turn, sr.Text = res.Kind, res.Source, res.Turn, res.Text
 			sr.Suggestions, sr.Brief, sr.Transcript = res.Suggestions, res.Brief, res.Transcript
-			sr.Options, sr.Mode = res.Options, res.Mode
+			sr.Options, sr.Mode, sr.MultiSelect = res.Options, res.Mode, res.MultiSelect
 			sr.ClaudeMs, sr.Attempts, sr.Usage = res.LatencyMs.Claude, res.Meta.Attempts, res.Meta.Usage
 			sr.FirstTokMs = res.FirstTokenMs
 			if rec.Locale == "" {
@@ -190,7 +196,7 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string
 			}
 			sr.Misses = checkChatStep(st, res)
 			if st.Generate && base != nil {
-				sr.Gen = generateFromChat(ctx, svc, c.ID, base, res)
+				sr.Gen = generateFromChat(ctx, svc, c.ID, base, res, st.GenerateAll)
 				if !sr.Gen.OK {
 					sr.Misses = append(sr.Misses, "generate failed: "+sr.Gen.Error)
 				}
@@ -204,8 +210,8 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string
 			if !sr.OK {
 				rec.OK = false
 			}
-			log.Printf("[%s] %s/%s mode=%s turn=%d claude=%dms total=%dms misses=%v text=%q sugg=%v options=%v transcript=%q",
-				c.ID, res.Kind, res.Source, res.Mode, res.Turn, sr.ClaudeMs, sr.TotalMs, sr.Misses, res.Text, res.Suggestions, res.Options, res.Transcript)
+			log.Printf("[%s] %s/%s mode=%s turn=%d claude=%dms total=%dms misses=%v text=%q sugg=%v options=%v multi=%v transcript=%q",
+				c.ID, res.Kind, res.Source, res.Mode, res.Turn, sr.ClaudeMs, sr.TotalMs, sr.Misses, res.Text, res.Suggestions, res.Options, res.MultiSelect, res.Transcript)
 			rec.Steps = append(rec.Steps, sr)
 		}
 		run.Cases = append(run.Cases, rec)
@@ -230,9 +236,11 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string
 
 // generateFromChat runs /generate (edit) with what 「これでいく」 / ready
 // would send, on a fresh copy of the base DSL.
-func generateFromChat(ctx context.Context, svc *ai.Service, caseID string, base []byte, res *ai.ChatResult) *ChatGenRecord {
+func generateFromChat(ctx context.Context, svc *ai.Service, caseID string, base []byte, res *ai.ChatResult, all bool) *ChatGenRecord {
 	g := &ChatGenRecord{}
 	switch {
+	case res.Kind == "proposal" && all && res.MultiSelect:
+		g.Instruction = joinInstructions(res.Options)
 	case res.Kind == "proposal" && len(res.Options) > 0:
 		g.Instruction = res.Options[0].Instruction
 	case res.Kind == "ready":
@@ -294,6 +302,9 @@ func checkChatStep(st ChatStep, res *ai.ChatResult) []string {
 				miss = append(miss, "empty option")
 			}
 		}
+	}
+	if st.Multi != nil && res.MultiSelect != *st.Multi {
+		miss = append(miss, fmt.Sprintf("multiSelect=%v (want %v)", res.MultiSelect, *st.Multi))
 	}
 	if st.Expect != "" && res.Kind != st.Expect {
 		miss = append(miss, "kind="+res.Kind+" (want "+st.Expect+")")
@@ -417,3 +428,15 @@ func printChatTable(run ChatRun) {
 }
 
 func cell(s string) string { return strings.ReplaceAll(strings.ReplaceAll(s, "|", "/"), "\n", " ") }
+
+// joinInstructions mirrors iOS ChatOption.joinedInstruction (#220).
+func joinInstructions(opts []ai.ChatOption) string {
+	if len(opts) == 1 {
+		return opts[0].Instruction
+	}
+	lines := make([]string, len(opts))
+	for i, o := range opts {
+		lines[i] = "・" + o.Instruction
+	}
+	return strings.Join(lines, "\n")
+}

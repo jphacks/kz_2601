@@ -69,5 +69,13 @@
   {"id": "edit_enum_user", "group": "enum", "base": "internal/ai/examples/okozukai.json", "mode": "edit", "note": "#194 自分で増やせる → 自由入力にしない",
    "steps": [{"say": "種類を自分で増やせるようにして", "expect": "ready", "generate": true, "genNot": ["文字", "自由に入力", "メモ"]}]},
   {"id": "edit_enum_vague", "group": "enum", "base": "internal/ai/examples/okozukai.json", "mode": "edit", "note": "#194 どちらか分からない → 案",
-   "steps": [{"say": "種類をもっと増やしたい", "expect": "proposal", "generate": true, "genNot": ["メモ", "文字"]}]}
+   "steps": [{"say": "種類をもっと増やしたい", "expect": "proposal", "generate": true, "genNot": ["メモ", "文字"]}]},
+  {"id": "multi_add_home", "group": "multi", "base": "internal/ai/examples/kakeibo.json", "mode": "edit", "note": "#220 足す系の案 → multiSelect。全部つないで 1 回で generate",
+   "steps": [{"say": "ホームにもっと情報を足したい。何を追加するといい?", "expect": "proposal", "multi": true, "generate": true, "generateAll": true}]},
+  {"id": "multi_add_stats", "group": "multi", "base": "internal/ai/examples/kakeibo.json", "mode": "edit", "note": "#220 集計タブに足すものの案 → multiSelect",
+   "steps": [{"say": "集計タブを充実させたい。足せるものを提案して", "expect": "proposal", "multi": true}]},
+  {"id": "single_color", "group": "multi", "base": "internal/ai/examples/kakeibo.json", "mode": "edit", "note": "#220 色の案は両立しない → 単一",
+   "steps": [{"say": "テーマの色を変えたい。どの色がいいかな?", "expect": "proposal", "multi": false}]},
+  {"id": "single_layout", "group": "multi", "base": "internal/ai/examples/kakeibo.json", "mode": "edit", "note": "#220 ホームの並べ方の案は両立しない → 単一",
+   "steps": [{"say": "ホームの部品の並べ方を変えたい。どんな配置がいい?", "expect": "proposal", "multi": false}]}
 ]
