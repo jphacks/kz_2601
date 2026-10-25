@@ -19,6 +19,7 @@ struct MetamonApp: App {
         // Firebase は Services 組み立てより前に初期化(plist が無ければ警告してモック認証に落ちる)
         FirebaseBootstrap.configureIfAvailable()
         let services = BuildConfig.make()
+        if BuildConfig.forceMock { HealthData.source = MockHealthData() } // healthStat(#167)は固定値
         let appId = DeviceAppID.current
         var document: AppDocument
         if services.isLive, let cached = DocumentCache.shared.load(appId: appId) {

@@ -5,7 +5,7 @@
 // photo / chart / calendar (bool), notification ("HH:MM" or "any"), substitution (bool:
 // the summary mentions 代替 / "replaced" because a requested part is not in
 // the catalog), scope ("public"|"shared"|"private": at least one entity has
-// that scope), calc / computed / statValue / settlement / ref (bool, #100:
+// that scope), noShared (bool, #77: no shared/public entity), calc / computed / statValue / settlement / ref (bool, #100:
 // any calculation / Field.computed / stat.value / settlement leaf / ref field;
 // -logic-pass runs the 2nd calculations-only call). Navigation (#114):
 // patch (bool: stored as a JSON Patch, not a full rewrite), unreachable
@@ -13,6 +13,8 @@
 // nav (["from>to", ...]: a button / toolbar / item tap on `from` opens `to`),
 // tabs / tabsMin (number), tabOrder ("a,b": the first tab screens in order),
 // tabHas (component type on a tab root other than the first tab).
+// Health (#167): health ("steps"|"weight": a healthStat with that metric),
+// healthField (bool: some field has health "weight").
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
@@ -77,6 +79,9 @@ type Metrics struct {
 	// #177
 	HasCalendar bool     `json:"hasCalendar,omitempty"`
 	StatUnitDup []string `json:"statUnitDup,omitempty"` // non-count stat labels ending in "(field.unit)"
+	// #167
+	Health      []string `json:"health,omitempty"`      // healthStat metric:period
+	HealthField bool     `json:"healthField,omitempty"` // a field with health "weight"
 }
 
 // HasCalc reports whether the app computes anything beyond plain aggregate stats.
@@ -356,6 +361,9 @@ func measure(a *dsl.App) *Metrics {
 			if f.Type == dsl.FieldRef {
 				m.RefFields++
 			}
+			if f.Health != "" {
+				m.HealthField = true
+			}
 		}
 	}
 	for _, n := range a.App.Notifications {
@@ -387,6 +395,8 @@ func measure(a *dsl.App) *Metrics {
 					m.Settlement = true
 				case dsl.CompCalendar:
 					m.HasCalendar = true
+				case dsl.CompHealthStat:
+					m.Health = append(m.Health, x.Metric+":"+x.Period)
 				case dsl.CompStat:
 					if x.Value != nil {
 						m.StatValues++
@@ -430,6 +440,15 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 			if mentionsSubstitution(summary) != v.(bool) {
 				miss = append(miss, fmt.Sprintf("substitution=%v", !v.(bool)))
 			}
+		case "health":
+			want, _ := v.(string)
+			if !slices.ContainsFunc(m.Health, func(h string) bool { return strings.HasPrefix(h, want+":") }) {
+				miss = append(miss, fmt.Sprintf("health=%v", m.Health))
+			}
+		case "healthField":
+			if m.HealthField != v.(bool) {
+				miss = append(miss, fmt.Sprintf("healthField=%v", m.HealthField))
+			}
 		case "calendar":
 			if m.HasCalendar != v.(bool) {
 				miss = append(miss, fmt.Sprintf("calendar=%v", m.HasCalendar))
@@ -472,6 +491,13 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 		case "ref":
 			if (m.RefFields > 0) != v.(bool) {
 				miss = append(miss, fmt.Sprintf("ref=%d", m.RefFields))
+			}
+		case "noShared": // #77: 「この機能なしで作る」は shared / public の entity を作らない
+			for _, s := range m.Scopes {
+				if v.(bool) && (strings.HasSuffix(s, ":public") || strings.HasSuffix(s, ":shared")) {
+					miss = append(miss, fmt.Sprintf("noShared: scope=%v", m.Scopes))
+					break
+				}
 			}
 		case "scope":
 			want := fmt.Sprint(v)

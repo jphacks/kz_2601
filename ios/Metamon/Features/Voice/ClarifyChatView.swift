@@ -20,7 +20,7 @@ struct ClarifyChatView: View {
     private var offer: ClarifyFlow.Offer { rt.chatTurn.map(ClarifyFlow.offer(for:)) ?? .none }
     private var ready: ChatTurn? { if case .confirm = offer { return rt.chatTurn } else { return nil } }
     private var proposals: [ChatOption] { if case .proposals(let options) = offer { return options } else { return [] } }
-    private var busy: Bool { rt.chatPending || rt.isMorphing }
+    private var busy: Bool { rt.chatPending || rt.isMorphing || rt.paidConfirm != nil }
     private var lastAssistantId: UUID? { rt.chatBubbles.last(where: { $0.role == .assistant })?.id }
 
     var body: some View {
@@ -33,8 +33,13 @@ struct ClarifyChatView: View {
                         ErrorCard(presentation: card)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
-                    suggestionChips
-                    actionButton
+                    if let paid = rt.paidConfirm {
+                        PaidFeatureCard(confirmation: paid)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    } else {
+                        suggestionChips
+                        actionButton
+                    }
                     inputRow
                 }
                 .padding(.bottom, Theme.Spacing.sm)
@@ -210,6 +215,72 @@ struct ClarifyChatView: View {
 }
 
 // MARK: - Parts
+
+/// 有料機能の確認カード(#77)。「〇〇には Tailor It Pro(¥500 / 月)が必要です」→ 購入して作る / この機能なしで作る。
+private struct PaidFeatureCard: View {
+    @Environment(AppRuntime.self) private var rt
+    let confirmation: PaidConfirmation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            HStack(alignment: .top) {
+                Label(L10n.tr("\(confirmation.featureNames)には Tailor It Pro(\(rt.proMonthlyPrice) / 月)が必要です"), systemImage: "crown.fill")
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("paid.headline")
+                Spacer(minLength: Theme.Spacing.sm)
+                Button { rt.dismissPaidConfirm() } label: {
+                    Image(systemName: "xmark.circle.fill").font(.title3).foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.tr("やめる"))
+                .accessibilityIdentifier("paid.cancel")
+            }
+            ForEach(confirmation.features) { feature in
+                if !feature.reason.isEmpty {
+                    Text(feature.reason)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Button { Task { await rt.purchaseAndBuild() } } label: {
+                HStack(spacing: Theme.Spacing.sm) {
+                    if rt.paidConfirmBusy { ProgressView().tint(.white) }
+                    Text(L10n.tr("購入して作る")).font(.headline)
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(Theme.brandGradient, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(rt.paidConfirmBusy)
+            .accessibilityIdentifier("paid.purchase")
+            Button { Task { await rt.buildWithoutPaidFeatures() } } label: {
+                Text(L10n.tr("この機能なしで作る"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.Colors.brandA)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+                    .background(Theme.Colors.surface, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Theme.Colors.brandA.opacity(0.4)))
+            }
+            .buttonStyle(.plain)
+            .disabled(rt.paidConfirmBusy)
+            .accessibilityIdentifier("paid.withoutFeature")
+            if let message = rt.paidConfirmMessage {
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("paid.message")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .metamonCard()
+    }
+}
 
 private struct BubbleRow: View {
     let bubble: AppRuntime.ChatBubble

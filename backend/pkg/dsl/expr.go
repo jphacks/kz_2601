@@ -621,6 +621,7 @@ func checkComputedFields(entities []Entity, byID map[string]*Entity, daily map[s
 			} else if f.RefEntity != "" {
 				add("%s: refEntity is only allowed on type ref", where)
 			}
+			checkHealthField(where, f, add)
 			if f.Computed == nil {
 				continue
 			}

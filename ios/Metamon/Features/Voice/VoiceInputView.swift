@@ -75,6 +75,18 @@ struct VoiceInputView: View {
         .animation(.spring(duration: 0.45, bounce: 0.15), value: rt.errorCard)
         .animation(.spring(duration: 0.45, bounce: 0.15), value: inChat)
         // typing には明示アニメーションを付けない: キーボードの持ち上げが別カーブで動いて入力欄が遅れて見えていた(#196)
+        // 保険(#200): 初期画面から create が始まったら、この画面の上にも全画面の生成中表示を重ねる。
+        // 本来は RootView がこの画面ごと GeneratingView に置き換えるが、CI(iOS 26.5)の声の自動生成では
+        // RootView が morphJob の変化で作り直されず、対話画面のまま完成まで見えていた(この画面の中の部品は更新されていた)。
+        // RootView が正しく置き換えればこの画面ごと消えるので、二重に残ることはない
+        .overlay {
+            if isInitial, let job = rt.morphJob, job.kind == .create {
+                GeneratingView(job: job)
+                    #if DEBUG
+                    .onAppear { MorphProbe.fallbackAppeared += 1 }
+                    #endif
+            }
+        }
         .sheet(isPresented: $showSettings) { SettingsSheet() }
         .onTapGesture { typing = false }
         // #43 初期画面の挨拶を読み上げ(対話中・生成中・生成後のシートでは読まない)

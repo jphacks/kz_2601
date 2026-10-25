@@ -592,6 +592,8 @@ func (a *App) Validate() error {
 				}
 			case CompAiButton:
 				checkAIButton(where, c, formEntity, entities, add)
+			case CompHealthStat:
+				checkHealthStat(where, c, add)
 			case CompNearbyShare:
 				if c.Label == "" {
 					add("%s: nearbyShare needs label", where)

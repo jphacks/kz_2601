@@ -51,8 +51,8 @@ public struct MockAIClient: AIClient {
         }
         if mode == .edit {
             let instruction = goAhead ? requests.joined(separator: "。") : last
-            return ChatTurn(kind: .ready, text: "この内容で変えますね。", turn: turn,
-                            transcript: instruction.isEmpty ? last : instruction, locale: "ja", source: goAhead ? "shortcut" : "mock")
+            return Self.markingPaid(ChatTurn(kind: .ready, text: "この内容で変えますね。", turn: turn,
+                                             transcript: instruction.isEmpty ? last : instruction, locale: "ja", source: goAhead ? "shortcut" : "mock"))
         }
         if turn == 1, !goAhead, last.count <= 10 {
             return ChatTurn(kind: .question, text: "写真も一緒に残したいですか?", suggestions: ["写真も残す", "文字だけでOK", "お任せ"],
@@ -61,9 +61,24 @@ public struct MockAIClient: AIClient {
         let transcript = requests.isEmpty ? "家計簿アプリを作って。" : requests.joined(separator: "。")
         let name = Self.sampleName(for: transcript)
         let title = ["training": "筋トレ記録", "walk": "散歩記録", "kakeibo": "家計簿", "shopping": "買い物リスト", "medicine": "服薬チェック"][name] ?? "記録アプリ"
-        return ChatTurn(kind: .ready, text: "では作りますね。", turn: turn,
-                        brief: ChatBrief(name: title, purpose: requests.first ?? title, entities: [], features: requests.dropFirst().map { $0 }),
-                        transcript: transcript, locale: "ja", source: goAhead ? "shortcut" : "mock")
+        return Self.markingPaid(ChatTurn(kind: .ready, text: "では作りますね。", turn: turn,
+                                         brief: ChatBrief(name: title, purpose: requests.first ?? title, entities: [], features: requests.dropFirst().map { $0 }),
+                                         transcript: transcript, locale: "ja", source: goAhead ? "shortcut" : "mock"))
+    }
+
+    /// 有料機能(#77)のモック。backend `paid_features.json` の sharedData の代表的な語だけ見る。
+    static let paidKeywords = ["みんなで", "共有", "掲示板", "投稿"]
+    static let freeSuffix = "(無料版で作る: 他のユーザーとデータを共有する機能は入れない)"
+    public static let sharedDataFeature = PaidFeature(id: "sharedData", title: "みんなで共有するデータ",
+                                                      reason: "みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。")
+
+    static func markingPaid(_ turn: ChatTurn) -> ChatTurn {
+        guard turn.kind == .ready, let t = turn.transcript, paidKeywords.contains(where: t.contains) else { return turn }
+        var out = turn
+        out.requiresPro = true
+        out.paidFeatures = [sharedDataFeature]
+        out.freeTranscript = t + "\n" + freeSuffix
+        return out
     }
 
     public func resetChat(appId: String) async {}

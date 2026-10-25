@@ -131,6 +131,20 @@ paths:
                     options:
                       - { id: opt1, title: 金額を大きく, detail: ホームの上の今月の支出を大きく表示します, instruction: ホーム画面の上の「今月の支出」の枠を広げて数字を大きく目立たせて。 }
                       - { id: opt2, title: グラフで見せる, detail: ホームにカテゴリ別の円グラフを置きます, instruction: ホーム画面に今月のカテゴリ別の円グラフを追加して。 }
+                readyRequiresPro:
+                  summary: 有料機能 (みんなで共有するデータ) を含む ready (#77)
+                  value:
+                    kind: ready
+                    mode: create
+                    text: この内容で作りますね。
+                    turn: 2
+                    locale: ja
+                    source: claude
+                    brief: { name: サークル掲示板, purpose: サークルのみんなで予定を書き込む, entities: [投稿], features: [投稿の一覧], native: [] }
+                    transcript: サークルのみんなで予定を書き込める掲示板アプリを作って。
+                    requiresPro: true
+                    paidFeatures: [{ id: sharedData, title: みんなで共有するデータ, reason: みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。 }]
+                    freeTranscript: "サークルのみんなで予定を書き込める掲示板アプリを作って。\n(無料版で作る: 他のユーザーとデータを共有する機能は入れない。…)"
                 editReady:
                   summary: edit の明確な指示 (#185)
                   value: { kind: ready, mode: edit, text: メモ欄を消しますね。, turn: 1, locale: ja, source: claude, transcript: 支出を記録画面のメモ欄を消して。 }
@@ -298,6 +312,17 @@ components:
         title: { type: string, description: カードの見出し (短い) }
         detail: { type: string, description: 何がどう変わるか 1 文 }
         instruction: { type: string, description: 「これでいく」で POST /generate の text にそのまま渡す指示文 (edit = 変更内容、create = 作るアプリの依頼文) }
+        requiresPro: { type: boolean, description: '#77。この案が有料機能 (Tailor It Pro) を使う時だけ true (無料なら省略)。iOS は確認カードを出す' }
+        paidFeatures: { type: array, items: { $ref: '#/components/schemas/PaidFeature' }, description: '#77。requiresPro の時だけ' }
+        freeInstruction: { type: string, description: '#77。requiresPro の時だけ。有料機能を抜いた指示文 (「この機能なしで作る」で instruction の代わりに POST /generate へ)' }
+    PaidFeature:
+      type: object
+      description: '#77。有料機能 1 つ。一覧はサーバーの backend/internal/ai/paid_features.json (docs/backend/architecture.md「有料機能の判定」)'
+      required: [id, title, reason]
+      properties:
+        id: { type: string, description: 'sharedData (みんなで共有するデータ) など' }
+        title: { type: string, description: 'カードに出す名前 (locale の言語)。例: みんなで共有するデータ' }
+        reason: { type: string, description: なぜ有料か 1 文 (locale の言語) }
     ChatBrief:
       type: object
       description: 現時点の要件理解 (iOS は表示に使ってもよい。生成には transcript を使う)
@@ -332,6 +357,9 @@ components:
         turn: { type: integer, description: これまでのユーザー発話数 (1 始まり)。4 以上は必ず ready }
         brief: { $ref: '#/components/schemas/ChatBrief', description: create の ready の時だけ }
         transcript: { type: string, description: ready の時だけ。create = 要件を 1 段落にまとめた一人称の依頼文、edit = 変更指示。これを POST /generate の text に渡す }
+        requiresPro: { type: boolean, description: '#77。ready の transcript が有料機能 (Tailor It Pro) を使う時だけ true (無料なら省略・旧 iOS は無視してよい)。判定は transcript の語 (paid_features.json の keywords) で、edit で今のアプリが既に持つ機能は除く。課金の強制はしない (表示用)' }
+        paidFeatures: { type: array, items: { $ref: '#/components/schemas/PaidFeature' }, description: '#77。requiresPro の時だけ' }
+        freeTranscript: { type: string, description: '#77。requiresPro の時だけ。有料機能を抜いた依頼文 (transcript + 無料版の指示)。「この機能なしで作る」で transcript の代わりに POST /generate へ' }
         locale: { type: string, enum: [ja, en] }
         source:
           type: string

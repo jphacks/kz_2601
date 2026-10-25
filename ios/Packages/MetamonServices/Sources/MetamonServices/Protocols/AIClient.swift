@@ -92,15 +92,24 @@ public struct ChatOption: Codable, Equatable, Sendable, Identifiable {
     public var detail: String
     /// edit なら変更内容、create なら作るアプリの要約
     public var instruction: String
+    /// #77: この案が有料機能(Tailor It Pro)を使う。旧 backend は送らない(nil = 無料)
+    public var requiresPro: Bool?
+    public var paidFeatures: [PaidFeature]?
+    /// #77: 有料機能を抜いた指示文(「この機能なしで作る」)
+    public var freeInstruction: String?
 
-    public init(id: String, title: String, detail: String = "", instruction: String) {
+    public init(id: String, title: String, detail: String = "", instruction: String,
+                requiresPro: Bool? = nil, paidFeatures: [PaidFeature]? = nil, freeInstruction: String? = nil) {
         self.id = id
         self.title = title
         self.detail = detail
         self.instruction = instruction
+        self.requiresPro = requiresPro
+        self.paidFeatures = paidFeatures
+        self.freeInstruction = freeInstruction
     }
 
-    enum CodingKeys: String, CodingKey { case id, title, detail, instruction }
+    enum CodingKeys: String, CodingKey { case id, title, detail, instruction, requiresPro, paidFeatures, freeInstruction }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -108,6 +117,34 @@ public struct ChatOption: Codable, Equatable, Sendable, Identifiable {
         detail = try c.decodeIfPresent(String.self, forKey: .detail) ?? ""
         instruction = try c.decodeIfPresent(String.self, forKey: .instruction) ?? title
         id = try c.decodeIfPresent(String.self, forKey: .id) ?? title
+        requiresPro = try? c.decodeIfPresent(Bool.self, forKey: .requiresPro)
+        paidFeatures = try? c.decodeIfPresent([PaidFeature].self, forKey: .paidFeatures)
+        freeInstruction = try? c.decodeIfPresent(String.self, forKey: .freeInstruction)
+    }
+}
+
+/// 有料機能 1 つ(#77・openapi `PaidFeature`)。一覧はサーバーの `paid_features.json`。
+public struct PaidFeature: Codable, Equatable, Sendable, Identifiable {
+    /// sharedData など
+    public var id: String
+    /// カードに出す名前(例: みんなで共有するデータ)
+    public var title: String
+    /// なぜ有料か 1 文
+    public var reason: String
+
+    public init(id: String, title: String, reason: String = "") {
+        self.id = id
+        self.title = title
+        self.reason = reason
+    }
+
+    enum CodingKeys: String, CodingKey { case id, title, reason }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? id
+        reason = try c.decodeIfPresent(String.self, forKey: .reason) ?? ""
     }
 }
 
@@ -142,9 +179,18 @@ public struct ChatTurn: Codable, Equatable, Sendable {
     /// 実際に使った mode(#185・chat-first のリクエストの時だけ)。edit を送っても未生成なら create。知らない値は nil 扱い
     public var mode: String?
     public var resolvedMode: ChatMode? { mode.flatMap(ChatMode.init(rawValue:)) }
+    /// #77: ready の transcript が有料機能(Tailor It Pro)を使う。旧 backend は送らない(nil = 無料)
+    public var requiresPro: Bool?
+    public var paidFeatures: [PaidFeature]?
+    /// #77: 有料機能を抜いた依頼文(「この機能なしで作る」で transcript の代わりに generate へ)
+    public var freeTranscript: String?
 
     public init(kind: Kind, text: String, suggestions: [String]? = nil, turn: Int, brief: ChatBrief? = nil,
-                transcript: String? = nil, options: [ChatOption]? = nil, locale: String? = nil, source: String? = nil, mode: String? = nil) {
+                transcript: String? = nil, options: [ChatOption]? = nil, locale: String? = nil, source: String? = nil, mode: String? = nil,
+                requiresPro: Bool? = nil, paidFeatures: [PaidFeature]? = nil, freeTranscript: String? = nil) {
+        self.requiresPro = requiresPro
+        self.paidFeatures = paidFeatures
+        self.freeTranscript = freeTranscript
         self.kind = kind
         self.text = text
         self.suggestions = suggestions
