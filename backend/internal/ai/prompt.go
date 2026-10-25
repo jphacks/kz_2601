@@ -53,12 +53,13 @@ var systemPrompt = strings.TrimSpace(`
 - entity.scope: 「みんなで」「共有」「投稿」「ランキング」「掲示板」「友達と」のように**他のユーザーと同じデータを見る**用途は scope:"public"(投稿者の author/authorName は backend が付けるので field に入れない)。家計簿・日記・体重のような個人の記録は scope を省略(private)。
 - アクション: navigate.screen は存在する画面 id。saveRecord/deleteRecord は entity 必須。フォーム画面には toolbar に saveRecord ボタンを置く。list.onItemTap で navigate するとフォームが編集モードになる。
 - id は ^[a-z][a-z0-9_-]{0,39}$(英小文字始まり・snake_case)。画面 id・entity id・field id・component id はそれぞれのスコープで一意。
-- 上限: 画面 12・entity 6・entity あたり field 20・1 階層あたり component 30。
+- 上限: 画面 12・entity 6・entity あたり field 40(computed も数える)・1 階層あたり component 30。入力部品が 30 を超えるフォームは section を 2 つに分ける。
 - 金額は type "currency"(unit "円")。日付は type "date"。写真は type "photo" + photoField(source camera)。「動画で残す・撮る」(筋トレのフォーム、子どもの成長、練習・演奏の記録)は type "video" + フォームに videoField(source both・内カメ/外カメは撮影画面で切り替えられる)、詳細の再生は同じ field の videoPlayer、一覧は list.item.image にその video field(1 フレーム目のサムネイル)。写真しか言われていなければ video にしない。
 - リマインド(「毎朝8時に通知」など)は app.notifications[] に {id,title,body,repeat:daily,time:"08:00"} として宣言する。
 - 「歩数を見たい」「今日何歩」は healthStat(metric steps・entity も入力フォームも作らない。週の推移は period week)。体重を手で記録するアプリで「ヘルスケアにも保存/連携」と言われたら、体重 field(number・unit kg)に health:"weight" を付ける(ヘルスケアの体重を見るだけなら healthStat metric weight)。
 - 「○○のサイト/ニュースを見たい」は webView(実在する https URL。分からなければ公式トップ)。「LINE/Slack/Discord で送りたい」は shareButton の shareTo(line|slack|discord)。「地図で開く/電話/メール」は openUrlButton の maps:/tel:/mailto:。
 - 「散歩/ランニング/サイクリングのルート・道のり・軌跡を記録」「移動ログ」「どれだけ歩いたか」は locationTracker(開始を押した間だけ位置を保存)。entity は点だけ point{loc: location, at: datetime(required, defaultValue now)}(フォーム画面は作らない)、ホームに stat{aggregate:distance,field:loc,by:at} と stat{aggregate:duration,...}(今日なら filter today)+ mapView{kind:route,locationField:loc,dateField:at} + locationTracker{entity,locationField,dateField}。「場所を 1 回メモ」は locationButton(こちらではない)。
+- 場所の入力(#212): 「行きたいお店/カフェリスト」「旅行で行く場所・行き先を地図で管理」「訪問先・行った場所の記録」のように**現在地以外の場所を登録する**用途は locationPicker{field: location の field, nameField: 場所の名前の string field}(検索・地図のピン・現在地から選べる)。entity は例 spot{name: string(場所の名前), place: location(required), ...}、ホームに mapView{locationField:place,titleField:name} + list(item.title name)。「今いる場所を記録」「駐車した位置」「釣れた場所(その場で)」のように**今いる場所**だけなら locationButton。1 つのフォームに両方は置かない。
 - **発話に無い機能を足さない**(2026-10-24 eval: 読書/水分/筋トレで未要求の集計タブ+chart、散歩/体重で未要求の毎日通知が付いた):
   - chart と集計タブは「グラフ・推移・内訳・割合」のように可視化を求められた時だけ。ただし「科目ごと」「カテゴリ別」「月ごと」の**合計**を求められたら、ホームに chart(kind bar・groupBy その field・月ごとは日付 field + bucket month)を 1 つ置いて出す(集計タブは作らない)。求められていなければ stat + list のホーム画面とフォーム画面(必要ならタブ無し)で済ませる。
   - app.notifications は「通知・リマインド・知らせて・忘れないように」と言われた時だけ。「毎朝記録する」「夜に見返したい」は使う時間の説明であって毎日の通知の依頼ではない。後者は任意で押せる scheduleNotification ボタン(repeat once)程度に留める。
@@ -142,10 +143,13 @@ var editRules = strings.TrimSpace(`
 - value の部分文書でも上の既定値(presentation / filter.value / sort.direction / swipeToDelete / aggregate / defaultValue)は省略してよい(サーバーが補完)。
 - summary は iOS がそのまま読み上げる自然な 1 文。locale ja なら日本語(40 字程度まで・「。」で終える)「カテゴリにカフェを追加しました。」「追加ボタンを左上に移しました。」、locale en なら英語(80 字程度まで・ピリオドで終える)"Added Cafe to the categories." "Moved the add button to the top left." のように何がどう変わったかだけを言う。経緯や補足説明は書かない。
 - すでに満たされている場合は、その値を確認する test 操作 1 つだけの patch にし(空の patch は不可)、summary は「すでに〜になっています。」/ "It's already ..." と短く答える。
+- **指示の中身が足りず何を足すか決められない時**(「項目を足して」で何の項目か無い等)は、勝手に決めた変更も既存の確認だけで済ませることもせず、test 操作 1 つだけの patch にし、summary を「〜は変更できませんでした。理由: 〇〇が決まっていないため。『△△』のように言ってもらえれば変えられます。」(80 字以内)にする(#211)。ただし今のアプリの項目から自然に 1 つに決まるもの(「グラフを足して」→ 既存のグラフと違う分け方の金額のグラフ等)は作ってよい。
+- **指示が DSL でできない時**は、できる部分だけ変える。全部できなければ test 操作 1 つだけの patch にし、summary を「〜は変更できませんでした。理由: 〇〇はできないため。代わりに△△ならできます。」(80 字以内)にする。一部を省いた時も summary に「〜はできないため省きました。」と書く(#211)。
 - 部品を消した結果その画面が空になるなら、その画面と対応する tab も remove する(空のタブを残さない)。
 - value はプリミティブか、上の Schema の部分文書(Entity / Field / Screen / Component / Action / Tab / Notification など)かその配列。
 - 配列 index は「現在の DSL」のものをそのまま使う。末尾追加は "/-"。既存要素の置換は replace、削除は remove。
 - ユーザーが言及していない画面・entity・field・部品は触らない。entity の既存 field id はリネームしない。
+- **依頼に無い既存の field・画面・部品を消して上限に収めない**(#221: 「MCV と MCH を追加」で eGFR と尿酸が黙って消えた)。上限(field 40・画面 12・entity 6)を超える時は削除せず、入らない分は足さずに test 操作 1 つだけの patch にし、summary を「項目数の上限のため○○は追加できませんでした。どれかを消すか、別の記録に分ければ足せます。」(en: "Couldn't add ... because of the field limit. Remove one or split into another record.")にする。
 - 部品を追加・拡大するときは兄弟の area と重ならないようにする。必要なら隣接部品の area も replace で詰める。
 - 「もっと大きく」= area の行数/列数を増やす(例 A1:F2 → A1:F4)、周囲の部品を下にずらす。
 - フォームに入力部品を足す場合は、entity に field を add してから、フォーム画面の section.children に部品を add する。

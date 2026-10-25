@@ -35,6 +35,7 @@ extension AuthSession {
             wipeLocal: { await runtime.wipeLocalData() }
         )
         signOut() // セッションの表示を即反映(サインアウト済みでも安全)
+        farewell = true // #102
         return true
     }
 }

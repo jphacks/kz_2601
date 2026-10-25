@@ -287,7 +287,7 @@ func lint(a *app) []string {
 		}
 	}
 	// entities: add path / display path / required inputs / never-input fields
-	inputTypes := []string{"textField", "numberField", "datePicker", "picker", "toggle", "photoField", "slider", "stepper", "textEditor", "secureField", "timePicker", "colorPicker", "rating", "locationButton", "qrScanner", "timerDisplay"}
+	inputTypes := []string{"textField", "numberField", "datePicker", "picker", "toggle", "photoField", "slider", "stepper", "textEditor", "secureField", "timePicker", "colorPicker", "rating", "locationButton", "locationPicker", "qrScanner", "timerDisplay"}
 	shown := map[string]bool{}
 	formOf := map[string][]string{}
 	for id, s := range a.screens {

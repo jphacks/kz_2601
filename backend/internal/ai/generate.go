@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -97,8 +98,12 @@ type Result struct {
 	Locale          Locale          `json:"locale"` // language of the UI strings and summary
 	Transcript      string          `json:"transcript"`
 	Source          string          `json:"source"` // claude|restore
-	LatencyMs       Latency         `json:"latencyMs"`
-	Meta            Meta            `json:"meta"`
+	// Unchanged (#211): the generation produced no change (only `test` ops, or
+	// the same DSL). Nothing is saved: version == previousVersion and summary
+	// says why (「〜は変更できませんでした。理由: …。代わりに…」). Omitted when false.
+	Unchanged bool    `json:"unchanged,omitempty"`
+	LatencyMs Latency `json:"latencyMs"`
+	Meta      Meta    `json:"meta"`
 }
 
 // Error is a failure mapped to an HTTP status and error code.
@@ -217,6 +222,19 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 		return nil, err
 	}
 
+	if mode == ModeEdit && len(ar.ops) > 0 && sameDSL(env.DSL, ar.raw) {
+		// #211: a no-op is not saved as a new version; the summary tells the user why.
+		summary := ar.summary
+		if summary == "" {
+			summary = loc.text().unchanged
+		}
+		return &Result{
+			AppID: req.AppID, Version: env.Version, PreviousVersion: env.Version, Mode: "patch",
+			DSL: env.DSL, Summary: summary, Locale: loc, Transcript: transcript, Source: "claude",
+			Meta: ar.meta, Unchanged: true,
+			LatencyMs: Latency{Claude: ar.latency.Milliseconds(), Total: time.Since(started).Milliseconds()},
+		}, nil
+	}
 	src := appconfigclient.Source{Kind: "ai", Transcript: transcript, Summary: ar.summary, Model: s.Model}
 	var saved *appconfigclient.Envelope
 	if len(ar.ops) > 0 && !ar.meta.AreaFallback {
@@ -884,4 +902,14 @@ func mapClaudeErr(err error) error {
 		return &Error{Status: http.StatusGatewayTimeout, Code: "upstream_timeout", Message: "Claude call timed out"}
 	}
 	return &Error{Status: http.StatusServiceUnavailable, Code: "upstream_unavailable", Message: err.Error()}
+}
+
+// sameDSL reports whether two DSL documents are equal as JSON values (key
+// order and whitespace ignored).
+func sameDSL(a, b []byte) bool {
+	var x, y any
+	if json.Unmarshal(a, &x) != nil || json.Unmarshal(b, &y) != nil {
+		return false
+	}
+	return reflect.DeepEqual(x, y)
 }

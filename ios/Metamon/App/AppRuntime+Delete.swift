@@ -25,6 +25,7 @@ extension AppRuntime {
         await recordSync.purge(appId: app.id)
         DocumentCache.shared.remove(appId: app.id)
         AppThumbnailStore.shared.remove(appId: app.id)
+        chatHistoryStore.remove(appId: app.id)          // チャット履歴(#210)
         toast = L10n.tr("「\(app.name)」を削除しました")
         print("[Metamon] deleted app: \(app.id) fallback=\(String(describing: fallback))")
     }

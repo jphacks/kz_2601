@@ -9,7 +9,9 @@ import MetamonServices
 @MainActor
 @Observable
 final class AppRuntime: DSLRuntime {
-    private(set) var document: AppDocument
+    private(set) var document: AppDocument {
+        didSet { if oldValue.appId != document.appId { reloadChatHistory() } } // #210 アプリごとのチャット履歴
+    }
     var dsl: AppDSL { document.dsl }
 
     /// entity id → レコード(サーバーが正。ここはキャッシュ)
@@ -85,11 +87,23 @@ final class AppRuntime: DSLRuntime {
 
     /// 変身直後に画面上部へ数秒出す要約(読み上げ文)。位置ヒントがあれば該当領域をハイライトする。
     struct SummaryBanner: Identifiable, Equatable {
+        /// バナーに添えるボタン(#209)。undo = 「元に戻す」(修正の直後)/ redo = 「やり直す」(戻した直後)
+        enum Action: Equatable { case undo, redo }
         let id = UUID()
         var text: String
         var highlight: UnitPoint?
+        var action: Action? = nil
     }
     var summaryBanner: SummaryBanner?
+
+    /// 「やり直す」の戻り先(#209)。戻す直前の版。サーバー経由なら `version` を restore、ローカルなら `document` を当て直す。
+    struct RedoPoint {
+        var version: Int
+        var document: AppDocument
+        var viaServer: Bool
+    }
+    /// 戻した直後だけ持つ。新しい DSL が当たったら(`apply`)消える
+    private(set) var redoPoint: RedoPoint?
 
     /// サーバー(appconfig)に届かず、ローカルキャッシュの DSL を表示している。
     private(set) var isOffline = false
@@ -106,11 +120,21 @@ final class AppRuntime: DSLRuntime {
         var kind: ChatTurn.Kind? = nil
     }
     /// 会話中の吹き出し(空 = 対話していない)。初期画面(create)と生成後の音声シート(edit・#186)で使う。
-    var chatBubbles: [ChatBubble] = []
+    var chatBubbles: [ChatBubble] = [] {
+        didSet { if chatBubbles != oldValue { persistChatHistory() } } // #210 再起動しても続きが見えるよう吹き出しごとに保存
+    }
+    /// 閉じた会話と反映の区切り(#210・`AppRuntime+ChatHistory.swift`)。今の会話(`chatBubbles`)は含まない
+    var chatHistory: [ChatHistoryEntry] = []
+    /// 履歴の保存先(テストで差し替える)
+    @ObservationIgnored var chatHistoryStore: ChatHistoryStore = .forRuntime() {
+        didSet { reloadChatHistory() }
+    }
     /// `POST /v1/chat` の応答待ち
     var chatPending = false
     /// 直近の応答。question = チップ / proposal = 案のカード / ready = 要約 +「これでいく」(`ClarifyFlow.offer`)
     var chatTurn: ChatTurn?
+    /// edit のチャットから生成に回した時の会話(#211)。生成しても何も変わらなかったら、この会話に理由の吹き出しを足して音声シートを開き直す
+    var chatReturnOnUnchanged: [ChatBubble]?
     /// 生成・改変の前にチャットで相談するか(設定で切替・既定 ON・#186)。OFF は create も edit も従来どおり即反映。
     var clarifyEnabled: Bool = ClarifySettings.enabled {
         didSet { ClarifySettings.enabled = clarifyEnabled }
@@ -148,7 +172,8 @@ final class AppRuntime: DSLRuntime {
     @ObservationIgnored private var morphTask: Task<MorphResult, Error>?
     @ObservationIgnored private var isForeground = true
     /// 「元に戻して」のフォールバック(appconfig が versions を持たない mock / 未デプロイ時)。直近 10 件。
-    @ObservationIgnored private var localHistory: [AppDocument] = []
+    /// 「1 つ前に戻す」ボタンの出し分けに使うので観測する(#209)。
+    private var localHistory: [AppDocument] = []
 
     init(document: AppDocument, services: Services) {
         self.document = document
@@ -157,6 +182,7 @@ final class AppRuntime: DSLRuntime {
         self.deferredMorph = DeferredSend(connectivity: recordSync.connectivity)
         self.selectedTab = document.dsl.initialTab
         recordSync.onEvent = { [weak self] event in self?.handle(event) }
+        reloadChatHistory()
     }
 
     // MARK: - Lifecycle
@@ -183,6 +209,10 @@ final class AppRuntime: DSLRuntime {
                 print("[Metamon] E2E: pressing primary \(primary) on \(card.kind)")
                 handle(primary, of: card)
             }
+        }
+        // スクショ用: `METAMON_SHOW_ERROR_CARD=1` で圏外の状態カードを出す(焦りのツル・#102)
+        if ProcessInfo.processInfo.environment["METAMON_SHOW_ERROR_CARD"] == "1" {
+            errorCard = ErrorPresentation(kind: .offlineQueued, transcript: "家計簿アプリが欲しい")
         }
         // ヘッドレス E2E 用: `METAMON_AUTO_TRANSCRIPT="家計簿アプリが欲しい"` で起動直後に 1 回だけ発話を投げる。
         // 対話が ON(#75)なら質問に `METAMON_AUTO_REPLIES`(| 区切り)で答え、ready で「この内容で作る」まで自動で進めて生成を待つ
@@ -356,6 +386,7 @@ final class AppRuntime: DSLRuntime {
             self.showVoiceSheet = false
             self.selectedTab = doc.dsl.initialTab
             self.morphJob = nil
+            self.redoPoint = nil // 戻した後に別の版が当たったら「やり直す」は無効(undo / redo は apply の後で付け直す)
         }
         if animated {
             withAnimation(.spring(duration: 0.65, bounce: 0.12), swap)
@@ -437,11 +468,16 @@ final class AppRuntime: DSLRuntime {
         defer { morphTask = nil }
         do {
             let result = try await task.value
+            if result.unchanged {
+                presentUnchanged(result.summary)
+                return
+            }
             remember(previous)
             apply(result.document) // withAnimation の中で morphJob = nil も行う
+            noteChatApplied(version: result.document.version, summary: result.summary) // #210 反映の区切り
             startSync()
             if let summary = result.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
-                summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary))
+                summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary), action: canUndo ? .undo : nil)
                 SpeechReader.shared.speak(summary) // #43(設定 OFF なら何もしない)
             }
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
@@ -452,6 +488,26 @@ final class AppRuntime: DSLRuntime {
             withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
             await present(failure, transcript: text)
         }
+    }
+
+    /// 生成しても何も変わらなかった時(#211)。保存されていないので適用も履歴も触らず、理由を伝える。
+    /// チャットから来たなら会話に吹き出しを足して開き直し(続けて話せる)、それ以外は要約バナーに出す。
+    private func presentUnchanged(_ summary: String?) {
+        let trimmed = summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let reason = trimmed.isEmpty ? L10n.tr("変更できませんでした。何をどう変えるか、もう少し詳しく教えてください。") : trimmed
+        print("[Metamon] morph unchanged: \(reason)")
+        withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
+        if let bubbles = chatReturnOnUnchanged {
+            chatReturnOnUnchanged = nil
+            withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
+                chatTurn = nil
+                chatBubbles = bubbles + [ChatBubble(role: .assistant, text: reason, kind: .answer)]
+            }
+            showVoiceSheet = true
+        } else {
+            summaryBanner = SummaryBanner(text: reason, highlight: nil)
+        }
+        SpeechReader.shared.speak(reason)
     }
 
     /// 失敗の分類ごとに「次の一手」を出す。conflict は最新を取り直して短いバナー、cancelled は軽微なのでトースト、それ以外は状態カード。
@@ -503,10 +559,18 @@ final class AppRuntime: DSLRuntime {
         morphTask?.cancel()
     }
 
+    /// 「1 つ前に戻す」を押せるか(#209)。作ったアプリで、サーバーに前の版がある(version > 1)か端末の履歴がある時。
+    var canUndo: Bool {
+        !dsl.isVoiceOnly && ((services.isLive && document.version > 1) || !localHistory.isEmpty)
+    }
+
     /// 「元に戻して」(G11)。appconfig の `GET /versions` で直前の version を取り `POST /versions/{n}/restore`。
     /// サーバーが履歴を返せない時(mock / 未デプロイ)はローカル履歴にフォールバックする。
-    func undo() async {
-        guard morphJob == nil else { return }
+    /// 戻している間は `morphJob` が立つので二重には走らない。戻した後は「やり直す」用に戻す前の版を覚える(#209)。
+    /// `expectedVersion`: ボタンを押した時点の版。押した後に版が変わっていたら(連打で 2 回目が来た等)何もしない。
+    func undo(expectedVersion: Int? = nil) async {
+        guard morphJob == nil, expectedVersion == nil || expectedVersion == document.version else { return }
+        let before = document
         withAnimation(.easeInOut(duration: 0.35)) {
             morphJob = MorphJob(kind: .edit, transcript: L10n.tr("元に戻して"), startedAt: .now)
         }
@@ -522,7 +586,9 @@ final class AppRuntime: DSLRuntime {
                 let doc = try await services.appConfig.restore(appId: document.appId, toVersion: target.version)
                 apply(doc)
                 startSync()
-                summaryBanner = SummaryBanner(text: L10n.tr("ひとつ前の状態(version \(target.version))に戻しました"), highlight: nil)
+                // restore は新しい版を作るので、「やり直す」は戻す前の版(current)をもう一度 restore すればよい
+                redoPoint = RedoPoint(version: current.version, document: before, viaServer: true)
+                summaryBanner = SummaryBanner(text: L10n.tr("1つ前に戻しました"), highlight: nil, action: .redo)
                 print("[Metamon] undo ok: restored from version \(target.version) → new version \(doc.version)")
                 return
             } catch {
@@ -535,7 +601,33 @@ final class AppRuntime: DSLRuntime {
             return
         }
         apply(previous)
-        summaryBanner = SummaryBanner(text: L10n.tr("ひとつ前の状態(version \(previous.version))に戻しました"), highlight: nil)
+        redoPoint = RedoPoint(version: before.version, document: before, viaServer: false)
+        summaryBanner = SummaryBanner(text: L10n.tr("1つ前に戻しました"), highlight: nil, action: .redo)
+    }
+
+    /// 「やり直す」(#209): 戻す前の版に戻る。サーバー経由で戻したならその版を restore、端末の履歴で戻したなら当て直す。
+    func redo(expectedVersion: Int? = nil) async {
+        guard morphJob == nil, expectedVersion == nil || expectedVersion == document.version, let point = redoPoint else { return }
+        let current = document
+        withAnimation(.easeInOut(duration: 0.35)) {
+            morphJob = MorphJob(kind: .edit, transcript: L10n.tr("やり直す"), startedAt: .now)
+        }
+        if point.viaServer {
+            do {
+                let doc = try await services.appConfig.restore(appId: document.appId, toVersion: point.version)
+                apply(doc)
+                startSync()
+            } catch {
+                print("[Metamon] redo failed: \(error)")
+                withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
+                toast = L10n.tr("やり直せませんでした")
+                return
+            }
+        } else {
+            remember(current)
+            apply(point.document)
+        }
+        summaryBanner = SummaryBanner(text: L10n.tr("やり直しました"), highlight: nil, action: canUndo ? .undo : nil)
     }
 
     private func remember(_ doc: AppDocument) {

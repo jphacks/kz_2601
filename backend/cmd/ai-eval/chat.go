@@ -44,6 +44,9 @@ type ChatStep struct {
 	// OptionsNot / GenNot: see the comment above.
 	OptionsNot []string `json:"optionsNot,omitempty"`
 	GenNot     []string `json:"genNot,omitempty"`
+	// SuggAny (#211): every suggestion chip contains at least one of these
+	// (the current app's field names), so a chip answers the question.
+	SuggAny []string `json:"suggAny,omitempty"`
 }
 
 type ChatCase struct {
@@ -65,6 +68,7 @@ type ChatGenRecord struct {
 	Mode        string   `json:"mode,omitempty"`
 	Summary     string   `json:"summary,omitempty"`
 	Ops         int      `json:"ops"`
+	Unchanged   bool     `json:"unchanged,omitempty"` // #211: generate made no change
 	TotalMs     int64    `json:"totalMs"`
 	Lint        []string `json:"lint,omitempty"`
 }
@@ -194,6 +198,9 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string
 				if !sr.Gen.OK {
 					sr.Misses = append(sr.Misses, "generate failed: "+sr.Gen.Error)
 				}
+				if sr.Gen.Unchanged {
+					sr.Misses = append(sr.Misses, "generate unchanged: "+sr.Gen.Summary)
+				}
 				for _, w := range st.GenNot {
 					if strings.Contains(sr.Gen.Summary, w) {
 						sr.Misses = append(sr.Misses, "generate summary has "+w)
@@ -254,6 +261,7 @@ func generateFromChat(ctx context.Context, svc *ai.Service, caseID string, base 
 		return g
 	}
 	g.OK, g.Mode, g.Summary, g.Ops, g.Lint = true, out.Mode, out.Summary, len(out.Patch), out.Meta.Lint
+	g.Unchanged = out.Unchanged
 	log.Printf("[%s] generate %s ops=%d %dms summary=%q", caseID, out.Mode, g.Ops, g.TotalMs, out.Summary)
 	return g
 }
@@ -300,6 +308,17 @@ func checkChatStep(st ChatStep, res *ai.ChatResult) []string {
 	}
 	if st.Source != "" && res.Source != st.Source {
 		miss = append(miss, "source="+res.Source+" (want "+st.Source+")")
+	}
+	if res.Kind == "question" && len(st.SuggAny) > 0 {
+		for _, sg := range res.Suggestions {
+			hit := false
+			for _, w := range st.SuggAny {
+				hit = hit || strings.Contains(sg, w)
+			}
+			if !hit {
+				miss = append(miss, "suggestion not from the app: "+sg)
+			}
+		}
 	}
 	if res.Kind == "question" {
 		if strings.TrimSpace(res.Text) == "" {
@@ -393,7 +412,7 @@ func printChatTable(run ChatRun) {
 				sugg += " transcript=" + st.Transcript
 			}
 			if st.Gen != nil {
-				sugg += fmt.Sprintf(" → generate ok=%v %s %dms %s", st.Gen.OK, st.Gen.Mode, st.Gen.TotalMs, st.Gen.Summary+st.Gen.Error)
+				sugg += fmt.Sprintf(" → generate ok=%v unchanged=%v %s %dms %s", st.Gen.OK, st.Gen.Unchanged, st.Gen.Mode, st.Gen.TotalMs, st.Gen.Summary+st.Gen.Error)
 			}
 			fmt.Printf("| %s | %s | %d | %s | %s | %s | %d | %d | %d | %d/%d | %s | %s | %s | %s |\n",
 				r.ID, r.Locale, i+1, cell(st.Say), kind, st.Source, st.Turn, st.ClaudeMs, st.FirstTokMs,

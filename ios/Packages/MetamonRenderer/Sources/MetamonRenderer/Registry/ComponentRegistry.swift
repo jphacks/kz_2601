@@ -73,6 +73,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.openUrlButton) { c, _ in OpenUrlButtonLeaf(c: c) }
         r.register(.mapView) { c, ctx in MapViewLeaf(c: c, ctx: ctx) }
         r.register(.locationButton) { c, ctx in LocationButtonLeaf(c: c, ctx: ctx) }
+        r.register(.locationPicker) { c, ctx in LocationPickerLeaf(c: c, ctx: ctx) }
         r.register(.qrScanner) { c, ctx in QrScannerLeaf(c: c, ctx: ctx) }
         r.register(.timerDisplay) { c, ctx in TimerDisplayLeaf(c: c, ctx: ctx) }
         // leaf: 入力系バッチ

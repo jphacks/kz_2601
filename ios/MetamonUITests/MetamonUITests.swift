@@ -191,6 +191,36 @@ final class MetamonUITests: XCTestCase {
         attachScreenshot("chat-proposal-applied")
     }
 
+    // MARK: - チャット履歴(#210)
+
+    func testChatHistoryRemainsAfterApply() {
+        // 案の「これでいく」で反映 → シートを開き直すと、前の会話と「ここで反映しました(vN)・要約」の区切りが見える
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "見やすくして", "METAMON_AUTO_PAUSE": "600"])
+        let choose = app.buttons.matching(identifier: "chat.option.choose")
+        XCTAssertTrue(choose.firstMatch.waitForExistence(timeout: 15), "案のカードの「これでいく」が出ない")
+        XCTAssertTrue(waitUntil(timeout: 15) { choose.count == 2 }, "案のカードが 2 枚でない")
+        attachScreenshot("history-1-before-apply")
+        choose.firstMatch.tap()
+        XCTAssertTrue(waitFor(voiceSheet, "exists == false", timeout: 15), "「これでいく」で音声シートが閉じない")
+        let applied = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "反映しました")).firstMatch
+        XCTAssertTrue(applied.waitForExistence(timeout: 15), "改変されない")
+        attachScreenshot("history-2-applied")
+
+        waitForFab()
+        fab.tap()
+        XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開き直せない")
+        let divider = app.descendants(matching: .any)["chat.history.applied"]
+        XCTAssertTrue(divider.waitForExistence(timeout: 15), "反映の区切りが見えない")
+        XCTAssertTrue(divider.label.contains("ここで反映しました(v"), "区切りの文言: \(divider.label)")
+        XCTAssertTrue(element(labelBeginsWith: "あなた: 見やすくして").exists, "前の会話が見えない")
+        XCTAssertTrue(app.buttons["chat.restart"].exists, "「最初から」が無い")
+        attachScreenshot("history-3-reopened")
+
+        app.buttons["chat.restart"].tap()
+        XCTAssertTrue(waitFor(divider, "exists == false", timeout: 15), "「最初から」で履歴が消えない")
+        attachScreenshot("history-4-restarted")
+    }
+
     // MARK: - 一覧のチェック丸(#127)
 
     func testListCheckCircleMarksDone() {
@@ -544,5 +574,60 @@ extension MetamonUITests {
         attachScreenshot("paid-feature-card")
         app.buttons["paid.withoutFeature"].tap()
         assertGeneratingThenDone("paid-without")
+    }
+}
+
+// MARK: - 1 つ前に戻す / やり直す(#209)
+
+extension MetamonUITests {
+    private func text(_ label: String) -> XCUIElement {
+        app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", label)).firstMatch
+    }
+
+    /// 家計簿で修正(モックは「筋トレの記録」でトレーニング記録に変わる)→ 要約の「元に戻す」で家計簿に戻る →「やり直す」で再び修正後に。
+    /// 修正チャット(音声シート)の上部の「1つ前に戻す」も、戻せる版が無い時は押せない。
+    func testUndoFromSummaryBannerAndRedo() {
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "0", "METAMON_MOCK_AI_DELAY": "0.5"])
+        waitForFab()
+        XCTAssertTrue(text("最近の支出").waitForExistence(timeout: 15), "家計簿で起動していない")
+        fab.tap()
+        XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開かない")
+        let headerUndo = app.buttons["voice.undo"]
+        XCTAssertTrue(headerUndo.exists, "修正チャットの上部に「1つ前に戻す」が無い")
+        XCTAssertFalse(headerUndo.isEnabled, "戻せる版が無いのに押せる")
+        attachScreenshot("undo-header-disabled")
+
+        let field = composerField
+        XCTAssertTrue(field.waitForExistence(timeout: 15), "シートの文字入力が無い")
+        field.tap()
+        field.typeText("筋トレの記録")
+        app.buttons["送信"].firstMatch.tap()
+
+        let undo = app.buttons["banner.undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 20), "修正直後の要約に「元に戻す」が出ない")
+        XCTAssertTrue(text("反映しました").exists, "要約が出ていない")
+        XCTAssertFalse(text("最近の支出").exists, "修正が反映されていない")
+        attachScreenshot("undo-banner-after-edit")
+        undo.tap()
+
+        XCTAssertTrue(text("1つ前に戻しました").waitForExistence(timeout: 15), "「1つ前に戻しました」が出ない")
+        XCTAssertTrue(text("最近の支出").waitForExistence(timeout: 15), "前の画面(家計簿)に戻らない")
+        let redo = app.buttons["banner.redo"]
+        XCTAssertTrue(redo.exists, "戻した後に「やり直す」が無い")
+        attachScreenshot("undo-banner-restored")
+        redo.tap()
+
+        XCTAssertTrue(text("やり直しました").waitForExistence(timeout: 15), "「やり直しました」が出ない")
+        XCTAssertTrue(waitFor(text("最近の支出"), "exists == false", timeout: 15), "やり直すで修正後に戻らない")
+        attachScreenshot("undo-redo-done")
+
+        // 修正チャットの上部からも戻せる
+        fab.tap()
+        XCTAssertTrue(headerUndo.waitForExistence(timeout: 15), "音声シートが開かない")
+        XCTAssertTrue(headerUndo.isEnabled, "戻せる版があるのに押せない")
+        attachScreenshot("undo-header-enabled")
+        headerUndo.tap()
+        XCTAssertTrue(text("最近の支出").waitForExistence(timeout: 15), "上部の「1つ前に戻す」で前の画面に戻らない")
+        attachScreenshot("undo-header-restored")
     }
 }

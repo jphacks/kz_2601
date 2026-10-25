@@ -603,6 +603,9 @@
           "$ref": "#/$defs/LocationButton"
         },
         {
+          "$ref": "#/$defs/LocationPicker"
+        },
+        {
           "$ref": "#/$defs/QrScanner"
         },
         {
@@ -2593,6 +2596,38 @@
       },
       "description": "現在地(GPS)を 1 回取得してフォームの location field に保存するボタン。散歩メモ・駐車位置・釣果など「どこで起きたか」を記録するアプリのフォーム画面で選ぶ。",
       "x-usage": "フォーム画面のみ(screen.entity 必須)。他の入力欄の近くに 1 行(A8:F9)。ホーム側の mapView と対で使う。"
+    },
+    "LocationPicker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "locationPicker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "screen.entity の location field。選んだ場所が \"lat,lng\" で入る(locationButton と同じ形)。"
+        },
+        "label": {
+          "type": "string"
+        },
+        "nameField": {
+          "type": "string",
+          "description": "任意: screen.entity の string field。選んだ場所の名前(店名・地名)が入る。一覧の title にすると見やすい。"
+        }
+      },
+      "description": "場所を選ぶ入力欄。タップでシートが開き、店名・地名・住所で検索するか、地図を動かして中央のピンで決める(現在地ボタンもある)。行きたいお店リスト・旅行の行き先・訪問先の記録など「現在地以外の場所を登録したい」アプリのフォーム画面で選ぶ。今いる場所だけでよいなら locationButton。",
+      "x-usage": "フォーム画面のみ(screen.entity 必須)。名前の入力欄の近くに A3:F6 程度(選んだ場所の小さな地図が出る)。nameField に場所の名前用の string field を指定し、ホームは mapView(titleField に同じ field)と list で使う。"
     },
     "QrScanner": {
       "type": "object",
