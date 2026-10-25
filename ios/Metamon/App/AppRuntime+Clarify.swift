@@ -124,13 +124,18 @@ extension AppRuntime {
     /// 会話を閉じて生成へ。edit は音声シートを閉じてから(本体側の生成中表示に任せる)、画面マップの文脈があれば先頭に付ける。
     private func runFromChat(_ text: String) async {
         let mode = chatMode
-        resetChat()
         if mode == .edit {
+            resetChat()
             showVoiceSheet = false
             let prefix = ScreenMapUI.shared.takeContext().map(ScreenMapCopy.contextPrefix) ?? ""
             await generate(prefix + text)
         } else {
+            // create は全画面の生成中表示を先に出し、対話は完成(apply が消す)か生成しなかった時に消す。
+            // 先に対話を消すと、対話画面の撤去と生成中表示の挿入が重なって GeneratingView が描画されず、
+            // 完成まで初期画面が見えていた(#200)。生成中表示が全面を覆うので下の対話は見えない
+            cancelAutoBuild()
             await generate(text)
+            if isChatting { resetChat() } // 失敗・圏外で保留・無料枠切れ
         }
     }
 
