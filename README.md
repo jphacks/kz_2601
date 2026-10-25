@@ -16,7 +16,6 @@
 話すとアプリが変わる iOS アプリ。<br>
 声とチャットで、自分専用のアプリをその場で作って直せます。
 
-<p><a href="https://tailor-it.app/">https://tailor-it.app</a></p>
 
 </div>
 
@@ -50,21 +49,22 @@ Web サービスは、[Lovable](https://lovable.dev/) や [v0](https://v0.app/) 
 
 ### ソリューション
 
-話しかけるだけで、自分専用のアプリがその場で手に入るようにしました。
+話しかけるだけで、自分専用の、自分に一番合うアプリを自分で作れるようにしました。
 
-合うアプリを探して妥協する代わりに、話すだけで家計簿や筋トレ記録のようなアプリができます。<br>
+たとえば家計簿や筋トレ記録のようなアプリを作り、<br>
 「合計をもっと大きく」と話せば、使いながら直せます。<br>
 アプリが変わっても、それまでの記録は消えません。
-
 
 **特長**
 
 - **チャットで相談しながら育てる**: 足りない点だけ聞き返し、「見やすくして」のようなあいまいな依頼には案を出す。<br>
   気に入らなければ「元に戻す」で戻せる。
-- **スマホの機能も、計算も使える**: カメラ・動画・通知・地図などを組み込める。<br>
+- **スマホならではの機能も、計算も使える**: カメラ・位置情報・地図・通知・ウィジェット・<br>
+  Bluetooth や Wi-Fi での近くの端末との共有・Siri やショートカットとの連携などを組み込める。<br>
   割り勘の精算や BMI のような計算も、話すだけでできる。
-- **画面の配置まで整う**: 項目を並べるだけでなく、見やすい配置の画面ができる。
-- **声は外に出ない**: 音声の文字起こしは端末の中で行う。
+- **作ったアプリを共有できる**: リンクで、作ったアプリを他の人に渡せる。
+- **他の人が作ったアプリを使える**: みんなが公開したアプリを探して、自分の端末に入れられる。
+- **リリースの申請まで出せる**: 気に入ったアプリは、単体のアプリとしてリリースを申請できる。
 
 ### 仕組み
 
@@ -97,16 +97,18 @@ flowchart LR
 
 #### 活用した技術
 
-- **API・データ**:
-  - [Claude API](https://platform.claude.com/docs/en/api/overview) のモデル `claude-sonnet-5-5`
-  - [Firebase Auth](https://firebase.google.com/docs/auth) / [Firestore](https://firebase.google.com/docs/firestore)
-  - [Cloud Run](https://cloud.google.com/run) / [Secret Manager](https://cloud.google.com/security/products/secret-manager) / [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation)
-- **フレームワーク・ライブラリ**:
-  - [SwiftUI](https://developer.apple.com/xcode/swiftui/)、[Swift Charts](https://developer.apple.com/documentation/charts)、[MapKit](https://developer.apple.com/documentation/mapkit)、[HealthKit](https://developer.apple.com/documentation/healthkit)、[WidgetKit](https://developer.apple.com/documentation/widgetkit)、[App Intents](https://developer.apple.com/documentation/appintents) ほか
+- **iOS**:
+  - [SwiftUI](https://developer.apple.com/xcode/swiftui/)、[Swift Charts](https://developer.apple.com/documentation/charts)、[MapKit](https://developer.apple.com/documentation/mapkit)、[WidgetKit](https://developer.apple.com/documentation/widgetkit)、[App Intents](https://developer.apple.com/documentation/appintents)、[HealthKit](https://developer.apple.com/documentation/healthkit) ほか
   - 端末内で音声認識する [WhisperKit](https://github.com/argmaxinc/argmax-oss-swift)、端末内の AI の [Foundation Models](https://developer.apple.com/documentation/foundationmodels)
+  - 対象は iOS 17 以降の iPhone
+- **バックエンド・AI**:
   - [Go](https://go.dev/)。外部ライブラリは [JSON Schema](https://json-schema.org/) の検証と [JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902) の 2 つだけ
+  - [Claude API](https://platform.claude.com/docs/en/api/overview) のモデル `claude-sonnet-5-5`
+- **クラウド・データ**:
+  - [Cloud Run](https://cloud.google.com/run)、[Secret Manager](https://cloud.google.com/security/products/secret-manager)、[Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation)
+  - [Firebase Auth](https://firebase.google.com/docs/auth) と Sign in with Apple、[Firestore](https://firebase.google.com/docs/firestore)
+- **開発・CI**:
   - [GitHub Actions](https://github.com/features/actions)、[gitleaks](https://github.com/gitleaks/gitleaks)、[xcodegen](https://github.com/yonaskolb/XcodeGen)
-- **デバイス**: iOS 17 以降の iPhone、マイク・カメラ・位置情報・ヘルスケア
 
 全一覧は [活用した技術の全一覧](docs/README-details.md#活用した技術全一覧) にあります。
 
@@ -130,17 +132,37 @@ flowchart LR
 
 ### 注力したこと
 
-品質を数字で測って直しました。<br>
-同じ依頼のセットで作らせ、手で採点しています。<br>
-結果は [品質の監査 第 2 弾](docs/backend/ai-eval/2026-10-24-audit2.md) と [第 3 弾](docs/backend/ai-eval/2026-10-24-audit3.md) にあります。
+1. **品質を数字で測って直した**<br>
+   同じ依頼のセットで作らせて手で採点し、改善を重ねました。<br>
+   結果は [品質の監査 第 2 弾](docs/backend/ai-eval/2026-10-24-audit2.md) と [第 3 弾](docs/backend/ai-eval/2026-10-24-audit3.md) にあります。
 
-| 指標 | 改善前 | 改善後 |
-|---|---:|---:|
-| 頼んだ機能が入っている割合 | 49% | 91% |
-| 頼んだ機能が全部入ったアプリ | 2/20 | 14/20 |
-| 中身と違うラベル | 7/20 | 0/20 |
+   | 指標 | 改善前 | 改善後 |
+   |---|---:|---:|
+   | 頼んだ機能が入っている割合 | 49% | 91% |
+   | 頼んだ機能が全部入ったアプリ | 2/20 | 14/20 |
+   | 中身と違うラベル | 7/20 | 0/20 |
 
-<sub>速さは中央値で、新規作成 6.6 秒・修正 1.7 秒です。<br>[生成の品質と速さの計測](docs/backend/ai-eval/2026-10-24.md)</sub>
+2. **CI を徹底した**<br>
+   iOS のビルドとテスト、Go のテストと静的解析、秘密情報の検出を、すべての PR で自動で回しています。<br>
+   変更のあったモジュールだけを選んでテストし、develop に入る時は UI テストまで通します。
+3. **テストをたくさん書いた**<br>
+   iOS で 400 件以上、Go で 450 件以上のテストがあり、壊れたらすぐ分かるようにしています。
+4. **1 つのスキーマを正典にした**<br>
+   Go の検査・iOS の型・AI への部品一覧を同じ [スキーマ](docs/dsl/dsl.schema.json) から作り、ズレるとテストが落ちます。
+5. **速さにこだわった**<br>
+   中央値で、新規作成 6.6 秒・修正 1.7 秒です。画面の枠は約 2.4 秒で出ます。<br>
+   [生成の品質と速さの計測](docs/backend/ai-eval/2026-10-24.md)
+
+## 審査員向け
+
+### 試し方
+
+<!-- TODO: TestFlight など配布リンクがあればここに追記する(無ければこのコメントを消す) -->
+
+シミュレータなら API キー無しで試せます。<br>
+`METAMON_MOCK=1` を付けて起動してください。手順は [セットアップ](docs/README-details.md#セットアップ) にあります。
+
+話す内容の例は [話してみてほしい内容](docs/README-details.md#話してみてほしい内容) にあります。
 
 ### アピールポイント
 
@@ -155,15 +177,6 @@ flowchart LR
    一定の範囲までは無料で使え、みんなで書き込む共有のアプリや、たくさん作る使い方は有料版の対象にしています。
 5. **1 つのアプリに、いくつものアプリが入る**<br>
    アプリを増やしても、中で部品の組み合わせを切り替えるだけなので、アプリのサイズは増えません。
-
-## 審査員向け: 試し方
-
-<!-- TODO: TestFlight など配布リンクがあればここに追記する(無ければこのコメントを消す) -->
-
-シミュレータなら API キー無しで試せます。<br>
-`METAMON_MOCK=1` を付けて起動してください。手順は [セットアップ](docs/README-details.md#セットアップ) にあります。
-
-話す内容の例は [話してみてほしい内容](docs/README-details.md#話してみてほしい内容) にあります。
 
 ## もっと詳しく
 
