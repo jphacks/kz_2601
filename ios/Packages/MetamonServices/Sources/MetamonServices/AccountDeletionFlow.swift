@@ -31,3 +31,39 @@ public enum AccountDeletionFlow {
         do { try auth.signOut() } catch { print("[Metamon] signOut after delete failed: \(error)") }
     }
 }
+
+/// アカウント削除の前の Sign in with Apple の後始末(#119 / #246・App Store 5.1.1(v))。
+/// 直前の Apple 再認証で得た値で Firebase を再認証し、`authorizationCode` で Apple のトークンを失効させる。
+/// 失効は Firebase Auth の `revokeToken(withAuthorizationCode:)` が Apple の `auth/token` → `auth/revoke` を代行する
+/// (client secret を作る .p8 鍵は Firebase コンソールの Apple プロバイダに登録 = リポジトリ・端末・backend に鍵を置かない)。
+/// どちらが失敗しても削除は続ける(結果は戻り値で返し、ログだけ残す)。
+public enum AppleTokenRevocation {
+    public struct Outcome: Equatable, Sendable {
+        public var reauthenticated: Bool
+        public var revoked: Bool
+
+        public init(reauthenticated: Bool, revoked: Bool) {
+            self.reauthenticated = reauthenticated
+            self.revoked = revoked
+        }
+    }
+
+    @MainActor
+    public static func run(auth: any AuthService, authorizationCode: String, idToken: String, nonce: String) async -> Outcome {
+        var outcome = Outcome(reauthenticated: false, revoked: false)
+        do {
+            try await auth.reauthenticateWithApple(idToken: idToken, nonce: nonce)
+            outcome.reauthenticated = true
+        } catch {
+            print("[Metamon] Firebase reauthenticate failed (continuing): \(error)")
+        }
+        do {
+            try await auth.revokeAppleToken(authorizationCode: authorizationCode)
+            outcome.revoked = true
+        } catch {
+            // Firebase の Apple プロバイダに OAuth コードフロー(Services ID・Team ID・Key ID・秘密鍵)が無いと失敗する
+            print("[Metamon] Apple token revoke failed (continuing): \(error)")
+        }
+        return outcome
+    }
+}

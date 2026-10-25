@@ -59,6 +59,11 @@ targets:
       - path: ../docs/dsl/examples
         buildPhase: resources
         type: group
+      # プライバシーポリシー・利用規約(#246)。公開 URL が決まるまでアプリ内で同梱版を表示する
+      - path: ../docs/legal
+        buildPhase: resources
+        type: group
+        includes: ["privacy-policy.md", "terms.md"]
     dependencies:
       - package: MetamonDSL
       - package: MetamonRenderer

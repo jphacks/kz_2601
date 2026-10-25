@@ -26,6 +26,7 @@ struct SettingsSheet: View {
                 appSection
                 if !rt.dsl.app.notifications.isEmpty { notificationSection }
                 syncSection
+                PrivacySettingsSection() // #246: AI への送信の同意・プライバシーポリシー・利用規約
                 connectionSection
                 if !Self.e2eDeleteAccount { deleteAccountSection }
             }
@@ -173,6 +174,9 @@ struct SettingsSheet: View {
             }
             if case .failed = services.transcriber.status {
                 Button("再試行") { Task { try? await services.transcriber.prepare() } }
+            }
+            if case .notDownloaded = services.transcriber.status, services.transcriber.needsDownload { // #246: 確認で「あとで」を選んだ人
+                Button("ダウンロード(約\(AppRuntime.voiceModelMegabytes)MB)") { rt.approveModelDownload() }
             }
         }
     }

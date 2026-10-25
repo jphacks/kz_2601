@@ -31,12 +31,15 @@ public protocol SpeechTranscriber: AnyObject {
     func stopAndTranscribe() async throws -> String
     /// 直近の録音/認識の診断(録音秒数・サンプル数・音量・AVAudioSession・権限・モデル状態)。未実装なら nil。
     var lastDiagnostics: TranscriberDiagnostics? { get }
+    /// 端末にモデルが無く、prepare するとダウンロードが始まるか(#246: その前にサイズを示して確認する)。
+    var needsDownload: Bool { get }
 }
 
 public extension SpeechTranscriber {
     var status: TranscriberStatus { isReady ? .ready : .loading }
     var downloadProgress: Double { 0 }
     var lastDiagnostics: TranscriberDiagnostics? { nil }
+    var needsDownload: Bool { false }
 }
 
 /// 「音声を聞き取れませんでした」の理由を画面とログに出すための診断情報。
