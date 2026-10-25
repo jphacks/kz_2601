@@ -10,12 +10,22 @@ struct ButtonLeaf: View {
     let ctx: RenderContext
 
     /// 新規フォーム(recordId 無し)では `deleteRecord` を隠す。削除対象が無いので押しても何も起きないため。
-    static func isVisible(action: Action?, isEditing: Bool) -> Bool {
-        action?.type != .deleteRecord || isEditing
+    /// 他人の共有レコード(#249)では、更新できなければ `saveRecord`、作った人でなければ `deleteRecord` を隠す。
+    static func isVisible(action: Action?, isEditing: Bool, readOnly: Bool = false, canDelete: Bool = true) -> Bool {
+        switch action?.type {
+        case .deleteRecord: isEditing && canDelete
+        case .saveRecord: !readOnly
+        default: true
+        }
+    }
+
+    @MainActor
+    static func isVisible(action: Action?, form: FormDraft?) -> Bool {
+        isVisible(action: action, isEditing: form?.isEditing ?? false, readOnly: form?.isReadOnly ?? false, canDelete: form?.canDelete ?? true)
     }
 
     var body: some View {
-        if Self.isVisible(action: c.action, isEditing: ctx.form?.isEditing ?? false) {
+        if Self.isVisible(action: c.action, form: ctx.form) {
             styled
         }
     }

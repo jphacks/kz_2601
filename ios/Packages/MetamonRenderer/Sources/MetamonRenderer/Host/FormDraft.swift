@@ -10,6 +10,10 @@ public final class FormDraft {
     public let entity: Entity
     public private(set) var recordId: String?
     public var values: [String: JSONValue] = [:]
+    /// 他人の共有レコードを開いた(#249)。保存バーを理由の表示に替え、保存ボタンを隠す。
+    public var isReadOnly = false
+    /// 削除ボタンを出してよいか(共有レコードは作った人だけ)。
+    public var canDelete = true
 
     public init(entity: Entity, record: Record? = nil) {
         self.entity = entity

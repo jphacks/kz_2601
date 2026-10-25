@@ -29,6 +29,10 @@ public protocol DSLRuntime: AnyObject, Observable {
     func pathBinding(_ stack: String) -> Binding<[Route]>
     /// `nearbyShare`(#36): 近くの端末を探すシートを開き、選んだ相手に `records`(entity の保存フィールドのみ)を送る。
     func shareNearby(entity: String, records: [[String: JSONValue]])
+    /// サインイン中の uid(共有レコードの作者判定・#249)。nil なら判定しない(全部変更できる扱い)。
+    var currentUserId: String? { get }
+    /// 変更できないレコード(他人の共有レコード)を触った時。ホストが「作った人だけが変更できます」を出す。
+    func notifyReadOnly(entity: String)
 }
 
 public extension DSLRuntime {
@@ -39,6 +43,18 @@ public extension DSLRuntime {
     func createRecord(entity: String, data: [String: JSONValue]) async -> Bool { false }
     /// 既定は何もしない(プレビュー・テスト用ランタイム)。
     func shareNearby(entity: String, records: [[String: JSONValue]]) {}
+    var currentUserId: String? { nil }
+    func notifyReadOnly(entity: String) {}
+
+    /// 自分が更新できるレコードか(#249 / #252)。他人の共有レコードは entity.edit が members の時だけ。
+    func canEdit(entity: String, record: Record) -> Bool {
+        RecordPermission.canEdit(record, in: dsl.entity(entity), uid: currentUserId)
+    }
+
+    /// 自分が削除できるレコードか。共有レコードは作った人だけ。
+    func canDelete(entity: String, record: Record) -> Bool {
+        RecordPermission.canDelete(record, in: dsl.entity(entity), uid: currentUserId)
+    }
 
     /// 部品が共通で使う空状態の判定: 読み込み中 / 取得失敗 / 本当に空。
     func emptyState(for entity: String) -> EmptyState {
