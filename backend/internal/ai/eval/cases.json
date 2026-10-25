@@ -15,6 +15,8 @@
   {"id": "shopping", "kind": "create", "group": "other", "transcript": "買い物リスト。買うものを追加して、買ったらチェックできるようにして"},
   {"id": "shopping_shared", "kind": "create", "group": "shared", "transcript": "友達と共有する買い物リスト。みんなで買うものを追加して、買ったらチェックできるようにして", "note": "共有 → entity.scope public",
    "expect": {"scope": "public"}},
+  {"id": "shopping_shared_free", "kind": "create", "group": "shared", "transcript": "友達と共有する買い物リスト。みんなで買うものを追加して、買ったらチェックできるようにして\n(無料版で作る: 他のユーザーとデータを共有する機能は入れない。みんなで書き込む・投稿・ランキングの共有はせず、すべて自分だけの記録として作る。entity の scope は省略して private にする)", "note": "#77「この機能なしで作る」= shopping_shared + paid_features.json の withoutInstruction → 共有 entity を作らない",
+   "expect": {"noShared": true}},
   {"id": "weight", "kind": "create", "group": "other", "transcript": "体重を毎朝記録してグラフで推移を見たいアプリ", "expect": {"chart": true}},
   {"id": "calendar", "kind": "create", "group": "calendar", "transcript": "予定を登録してカレンダーで見たいアプリ", "note": "カレンダー部品(#25)で月表示する。代替の申告は出さない",
    "expect": {"calendar": true, "substitution": false}},

@@ -107,6 +107,12 @@ type ChatResult struct {
 	// token (diagnostics; 0 for shortcut turns).
 	FirstTokenMs int64 `json:"firstTokenMs,omitempty"`
 	Meta         Meta  `json:"meta"`
+	// RequiresPro (#77): ready whose transcript needs Tailor It Pro
+	// (paid_features.json). FreeTranscript = the transcript without those
+	// features, for 「この機能なしで作る」. Advisory only (no server gate).
+	RequiresPro    bool          `json:"requiresPro,omitempty"`
+	PaidFeatures   []PaidFeature `json:"paidFeatures,omitempty"`
+	FreeTranscript string        `json:"freeTranscript,omitempty"`
 }
 
 // chatReply is the structured output Claude returns.
@@ -273,7 +279,7 @@ func (s *Service) ClearChat(appID string) { s.conversations().delete(appID) }
 // material for a later shortcut ready) finish in the background and are
 // stored then. The next turn on the same appId waits for that (the user is
 // still answering, so in practice it is already done).
-func (s *Service) Chat(ctx context.Context, req ChatRequest) (*ChatResult, error) {
+func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, err error) {
 	started := time.Now()
 	if req.AppID == "" {
 		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "appId is required"}
@@ -285,6 +291,12 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (*ChatResult, error
 	if wantsChatFirst(req) {
 		return s.chatFirst(ctx, req, incoming, started)
 	}
+	// #77: ready は transcript から有料機能を判定する(旧 clarify は create のみ)
+	defer func() {
+		if err == nil {
+			defaultPaidCatalog.annotate(out, nil)
+		}
+	}()
 	store := s.conversations()
 	store.wait(ctx, req.AppID, s.chatTimeout())
 	cv := store.get(req.AppID)

@@ -37,6 +37,10 @@ type ChatOption struct {
 	Title       string `json:"title"`
 	Detail      string `json:"detail"`
 	Instruction string `json:"instruction"`
+	// #77: same as ChatResult.RequiresPro, per idea.
+	RequiresPro     bool          `json:"requiresPro,omitempty"`
+	PaidFeatures    []PaidFeature `json:"paidFeatures,omitempty"`
+	FreeInstruction string        `json:"freeInstruction,omitempty"`
 }
 
 // chatFirstReply is the structured output of a chat-first turn. Brief is
@@ -153,11 +157,17 @@ func (s *Service) chatMode(ctx context.Context, req ChatRequest) (string, *dsl.A
 }
 
 // chatFirst runs one chat-first turn (create or edit).
-func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []ChatMessage, started time.Time) (*ChatResult, error) {
+func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []ChatMessage, started time.Time) (out *ChatResult, err error) {
 	mode, app, err := s.chatMode(ctx, req)
 	if err != nil {
 		return nil, err
 	}
+	// #77: ready / proposal に有料機能の判定を付ける(edit で今のアプリが既に持つ機能は除く)
+	defer func() {
+		if err == nil {
+			defaultPaidCatalog.annotate(out, app)
+		}
+	}()
 	store := s.conversations()
 	store.wait(ctx, req.AppID, s.chatTimeout())
 	cv := store.get(req.AppID)

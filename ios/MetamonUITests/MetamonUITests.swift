@@ -358,3 +358,26 @@ final class MetamonUITests: XCTestCase {
         assertGeneratingThenDone("from-app")
     }
 }
+
+// MARK: - 有料機能の確認カード(#77)
+
+extension MetamonUITests {
+    /// 課金を有効(`METAMON_IAP_ENFORCE=1`)にして「みんなで書き込む掲示板」を相談 →「これでいく」で確認カード →
+    /// 「この機能なしで作る」で生成が始まり、アプリができる。無料枠に当たらないよう `METAMON_IAP_FREE_LIMIT` を大きくする。
+    func testPaidFeatureCardBuildWithoutFeature() {
+        launch(example: nil, slowAI.merging(["METAMON_CLARIFY": "1", "METAMON_IAP_ENFORCE": "1", "METAMON_IAP_FREE_LIMIT": "1000",
+                                             "METAMON_AUTO_TRANSCRIPT": "サークルのみんなで予定を書き込める掲示板アプリを作って",
+                                             "METAMON_AUTO_PAUSE": "600"]) { $1 })
+        let build = app.buttons["chat.build"]
+        XCTAssertTrue(build.waitForExistence(timeout: 15), "「これでいく」が出ない")
+        build.tap()
+        let headline = app.descendants(matching: .any).matching(identifier: "paid.headline").firstMatch
+        XCTAssertTrue(headline.waitForExistence(timeout: 5), "有料機能の確認カードが出ない")
+        XCTAssertTrue(headline.label.contains("Tailor It Pro"), "見出し: \(headline.label)")
+        XCTAssertTrue(app.buttons["paid.purchase"].exists, "「購入して作る」が無い")
+        XCTAssertFalse(generating.exists, "カードの間は生成しない")
+        attachScreenshot("paid-feature-card")
+        app.buttons["paid.withoutFeature"].tap()
+        assertGeneratingThenDone("paid-without", appearWithin: 2)
+    }
+}
