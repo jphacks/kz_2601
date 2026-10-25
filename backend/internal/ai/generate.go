@@ -51,6 +51,10 @@ type Latency struct {
 
 // Meta is diagnostic detail about how the result was produced.
 type Meta struct {
+	// PublicPersonalData (#253): personal-data-like fields that became readable
+	// by anyone in this generation (iOS can ask before keeping them public).
+	PublicPersonalData []PublicPersonalData `json:"publicPersonalData,omitempty"`
+	// Diagnostics below.
 	Model            string     `json:"model"`
 	Attempts         int        `json:"attempts"`      // Claude calls made
 	Regenerations    int        `json:"regenerations"` // attempts - 1 (validation retries)
@@ -215,11 +219,13 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 		}
 		if err == nil {
 			ar.summary = withShareNote(ar.summary, transcript, nil, ar.raw, loc) // #259 #215
+			notePublicPII(ar, nil, loc)                                          // #253
 		}
 	case ModeEdit:
 		ar, err = s.generateEdit(ctx, transcript, env, loc, sink)
 		if err == nil {
 			ar.summary = withShareNote(ar.summary, transcript, env.DSL, ar.raw, loc) // #259 #215
+			notePublicPII(ar, env.DSL, loc)                                          // #253
 		}
 	default:
 		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "mode must be auto|create|edit|undo"}

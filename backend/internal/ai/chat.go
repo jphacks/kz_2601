@@ -116,6 +116,9 @@ type ChatResult struct {
 	RequiresPro    bool          `json:"requiresPro,omitempty"`
 	PaidFeatures   []PaidFeature `json:"paidFeatures,omitempty"`
 	FreeTranscript string        `json:"freeTranscript,omitempty"`
+	// ConfirmPublic (#253): question that asks before personal data (kinds:
+	// name|phone|address|email|birthday|location) goes into public records.
+	ConfirmPublic []string `json:"confirmPublic,omitempty"`
 }
 
 // chatReply is the structured output Claude returns.
@@ -419,6 +422,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 		}
 		res.Brief = &brief
 		res.Transcript = transcript
+		guardPublicPII(res, cv.messages, false, loc) // #253
 	} else {
 		res.Kind = "question"
 		res.Text = strings.TrimSpace(reply.Text)

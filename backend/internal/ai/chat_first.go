@@ -298,6 +298,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 	res.Meta = ar.meta
 	res.Source = "claude"
 	s.applyFirstReply(res, att.reply, mode, loc, userTexts, force, noMoreQuestions)
+	guardPublicPII(res, cv.messages, app != nil && anyShared(app), loc) // #253
 	if mode == chatModeCreate {
 		b := cleanBrief(att.reply.Brief)
 		cv.brief, cv.transcript = &b, transcriptOr(att.reply.Transcript, userTexts)
