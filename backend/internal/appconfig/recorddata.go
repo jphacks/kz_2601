@@ -25,6 +25,8 @@ const (
 	dateLayout   = "2006-01-02"
 	// maxRefLen bounds a type=ref value (a record id; server ids and iOS "local-<uuid>" are far shorter).
 	maxRefLen = 200
+	// maxRefs bounds a type=refs array (members of one split).
+	maxRefs = 200
 	// maxVideoLen bounds a type=video value: "video:<id>|<thumbnail data URL>".
 	// iOS keeps the thumbnail around 20-40KB; the record stays far below Firestore's 1MB.
 	maxVideoLen = 200_000
@@ -300,6 +302,32 @@ func normalizeValue(f *dsl.Field, v any) (any, error) {
 			return nil, fmt.Errorf("exceeds %d bytes", maxRefLen)
 		}
 		return s, nil
+	case dsl.FieldRefs:
+		// ids of RefEntity records (#231). [] = everyone. Duplicates and blanks are dropped.
+		arr, ok := v.([]any)
+		if !ok {
+			return nil, fmt.Errorf("must be an array of record id strings")
+		}
+		if len(arr) > maxRefs {
+			return nil, fmt.Errorf("has more than %d ids", maxRefs)
+		}
+		seen := make(map[string]bool, len(arr))
+		out := make([]any, 0, len(arr))
+		for _, x := range arr {
+			s, ok := asString(x)
+			if !ok {
+				return nil, fmt.Errorf("must be an array of record id strings")
+			}
+			if len(s) > maxRefLen {
+				return nil, fmt.Errorf("has an id over %d bytes", maxRefLen)
+			}
+			if strings.TrimSpace(s) == "" || seen[s] {
+				continue
+			}
+			seen[s] = true
+			out = append(out, s)
+		}
+		return out, nil
 	case dsl.FieldPhoto:
 		s, ok := asString(v)
 		if !ok || (!strings.HasPrefix(s, "data:image/") && !strings.HasPrefix(s, "https://")) {

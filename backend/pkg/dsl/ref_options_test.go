@@ -17,7 +17,7 @@ func TestRefOptionsAllowed(t *testing.T) {
 		t.Fatalf("ref options should validate: %v", err)
 	}
 	app.Entities[0].Fields[0].Options = []string{"x"}
-	if err := app.Validate(); err == nil || !strings.Contains(err.Error(), "options only allowed for enum and ref") {
+	if err := app.Validate(); err == nil || !strings.Contains(err.Error(), "options only allowed for enum, ref and refs") {
 		t.Fatalf("string options should fail, got %v", err)
 	}
 }

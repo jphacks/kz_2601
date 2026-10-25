@@ -4,6 +4,8 @@
 
 ## 結論
 
+> **追記(#231)**: 複数の ref は field type `refs`(値 = refEntity のレコード id の文字列配列・未選択/空 = 全員)として入った。filter op `contains`(空は常に一致)・`len`(選んだ件数・残り 0 件なら参照先の全件数)。appconfig は id 文字列の配列だけ受ける(重複・空文字は落とす・上限 200)。下の表は #231 前の状態。
+
 - **DSL に配列の field 型は無い。** field の type は `string text integer number boolean date datetime enum currency photo video location ref` の 13 種で、どれも値は 1 つ(schema `Field.type`・Go `dsl.Field*`・iOS `FieldCoding`)。
 - 今は **「値 1 つ = 1 件の子 entity(親を ref で指す)」** で表す。割り勘の `payer`(ref 1 つ)と同じ仕組みを、中間の entity に使う形。
 - 子 entity なら集計・グラフ・件数はおおむね作れる。できないのは **複数選択の入力部品** と **親の画面に、その親の子だけの一覧を出すこと**。
