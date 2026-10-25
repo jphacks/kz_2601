@@ -128,10 +128,14 @@ extension AppRuntime {
     func runFromChat(_ text: String) async {
         let mode = chatMode
         if mode == .edit {
+            // 何も変わらなかった時(#211)はこの会話に理由を足して開き直す(`presentUnchanged`)
+            let bubbles = chatBubbles
             resetChat()
             showVoiceSheet = false
             let prefix = ScreenMapUI.shared.takeContext().map(ScreenMapCopy.contextPrefix) ?? ""
+            chatReturnOnUnchanged = bubbles
             await generate(prefix + text)
+            chatReturnOnUnchanged = nil
         } else {
             // create は全画面の生成中表示を先に出し、対話は完成(apply が消す)か生成しなかった時に消す。
             // 先に対話を消すと、対話画面の撤去と生成中表示の挿入が重なって GeneratingView が描画されず、

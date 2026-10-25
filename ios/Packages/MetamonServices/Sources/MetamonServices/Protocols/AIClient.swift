@@ -7,11 +7,14 @@ public struct MorphResult: Sendable {
     public var summary: String?
     /// full | patch(サーバーがどう変えたか。診断用)
     public var mode: String?
+    /// 生成しても何も変わらなかった(#211)。サーバーは保存せず、`summary` に「〜は変更できませんでした。理由: …」を入れる。旧サーバーは送らない(false)
+    public var unchanged: Bool
 
-    public init(document: AppDocument, summary: String? = nil, mode: String? = nil) {
+    public init(document: AppDocument, summary: String? = nil, mode: String? = nil, unchanged: Bool = false) {
         self.document = document
         self.summary = summary
         self.mode = mode
+        self.unchanged = unchanged
     }
 }
 
