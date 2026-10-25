@@ -1267,7 +1267,7 @@
     "Notification": {
       "type": "object",
       "additionalProperties": false,
-      "description": "ローカル通知 1 件。app.notifications(定期)と scheduleNotification(その場で予約)で共通。time は HH:MM。",
+      "description": "ローカル通知 1 件。app.notifications(定期 / entity+field でレコードの時刻から)と scheduleNotification(その場で予約)で共通。time は HH:MM。",
       "required": [
         "id",
         "title",
@@ -1308,6 +1308,26 @@
             "sun"
           ],
           "description": "weekly only."
+        },
+        "entity": {
+          "$ref": "#/$defs/Id",
+          "description": "app.notifications only. Record-based: one notification per record of this entity, at the time in `field` (alarms / reminders whose time the user sets, 'N minutes before the event')."
+        },
+        "field": {
+          "$ref": "#/$defs/Id",
+          "description": "With entity: the record's time field. datetime (event start / reminder at), date (fires at `time` or 09:00 that day) or string HH:mm from timePicker (alarm time)."
+        },
+        "offsetMinutes": {
+          "type": "integer",
+          "description": "With entity: shift from the record's time in minutes. -10 = 10 minutes before."
+        },
+        "titleField": {
+          "$ref": "#/$defs/Id",
+          "description": "With entity: record field shown in the notification body (e.g. the event title / alarm label)."
+        },
+        "enabledField": {
+          "$ref": "#/$defs/Id",
+          "description": "With entity: boolean field; records where it is false are not notified (alarm on/off)."
         }
       }
     },

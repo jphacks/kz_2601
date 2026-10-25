@@ -99,7 +99,8 @@ public enum Aggregator {
     }
 
     /// chart: groupBy(enum or 日付 field)でグループ化して集計。日付は `bucket`(day|week|month)で丸める。
-    public static func buckets(_ c: Component, entity: Entity?, records: [Record]) -> [Bucket] {
+    /// `label` は日付以外の値 → 表示名(ref の groupBy はレコード id で束ねるので、参照先の見出しを渡す・#235)。
+    public static func buckets(_ c: Component, entity: Entity?, records: [Record], label relabel: ((String) -> String)? = nil) -> [Bucket] {
         guard let groupBy = c.groupBy else { return [] }
         let field = entity?.field(groupBy)
         var groups: [String: (label: String, rows: [Record])] = [:]
@@ -112,7 +113,7 @@ public enum Aggregator {
                 (key, label) = dateBucket(d, c.bucket ?? "day")
             } else {
                 key = v.displayString
-                label = key
+                label = relabel?(key) ?? key
             }
             if groups[key] == nil { order.append(key) }
             groups[key, default: (label, [])].rows.append(r)
