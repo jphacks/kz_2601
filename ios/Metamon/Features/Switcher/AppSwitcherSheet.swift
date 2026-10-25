@@ -78,9 +78,7 @@ struct AppSwitcherSheet: View {
             .scrollDisabled(true)
         } else if apps.isEmpty {
             VStack(spacing: Theme.Spacing.sm) {
-                Image(systemName: "square.stack.3d.up.slash")
-                    .font(.title)
-                    .foregroundStyle(Theme.brandGradient)
+                CraneMascot(pose: .point, size: 72) // #102
                 Text(Greeting.switcherEmpty)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)

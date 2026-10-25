@@ -73,6 +73,7 @@ struct ClarifyChatView: View {
                     }
                     if !proposals.isEmpty, !rt.chatPending {
                         VStack(spacing: Theme.Spacing.sm) {
+                            CraneMascot(pose: .idea, size: 64).frame(maxWidth: .infinity, alignment: .leading) // #102
                             ForEach(Array(proposals.enumerated()), id: \.element.id) { index, option in
                                 ProposalCard(index: index + 1, option: option, disabled: busy) {
                                     Task { await rt.choose(option) }
@@ -430,6 +431,7 @@ private struct TypingIndicator: View {
         TimelineView(.animation(minimumInterval: 1.0 / 20)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
             HStack(spacing: Theme.Spacing.sm) {
+                CraneMascot(pose: .tea, size: 44, sway: 0) // #102
                 dots(t)
                 Text(ClarifyCopy.thinking)
                     .font(.footnote)

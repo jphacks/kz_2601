@@ -11,6 +11,8 @@ final class AuthSession {
     private(set) var user: AuthUser?
     private(set) var isBusy = false
     var errorMessage: String?
+    /// 自分でログアウト / アカウント削除した直後か(サインイン画面でバイバイのツルを出す・#102)
+    var farewell = false
 
     let service: any AuthService
 
@@ -26,6 +28,10 @@ final class AuthSession {
         if user == nil, ProcessInfo.processInfo.environment["METAMON_AUTO_ANON"] == "1" {
             await signInAnonymously()
             print("[Metamon] auto anonymous sign-in → \(user.map { "uid=\($0.uid)" } ?? "failed: \(errorMessage ?? "?")")")
+        }
+        // スクショ用: `METAMON_AUTO_SIGNOUT=1` で 2 秒後にログアウト(バイバイのツル・#102)
+        if ProcessInfo.processInfo.environment["METAMON_AUTO_SIGNOUT"] == "1" {
+            Task { try? await Task.sleep(for: .seconds(2)); signOut() }
         }
         #endif
         for await u in service.stateChanges() {
@@ -55,9 +61,11 @@ final class AuthSession {
     }
 
     func signOut() {
+        let wasSignedIn = user != nil
         do {
             try service.signOut()
             user = service.currentUser
+            farewell = wasSignedIn
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -66,6 +74,7 @@ final class AuthSession {
     /// セッション切れ(#60: トークン再取得後も 401)。サインアウトしてサインイン画面に理由を出す。
     func expire() {
         signOut()
+        farewell = false
         errorMessage = ErrorCopy.sessionExpiredSignIn
         print("[Metamon] session expired → sign-in screen")
     }

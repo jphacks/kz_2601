@@ -169,6 +169,7 @@ struct VoiceInputView: View {
 
     private var heading: some View {
         VStack(spacing: Theme.Spacing.sm) {
+            if isInitial, prompt == nil { CraneMascot(pose: .happy, size: 76) } // #102
             Text(prompt ?? greeting.title)
                 .font(.system(size: 30, weight: .bold, design: .rounded))
                 .multilineTextAlignment(.center)
