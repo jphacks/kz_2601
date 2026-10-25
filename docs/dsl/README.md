@@ -199,6 +199,13 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 ### 3.5 entity.scope = レコードを誰と共有するか(#47)
 
+**共有の依頼の扱い(#259 #215)**: 語の表は `backend/internal/ai/share_intent.go` の 1 か所で、生成(作成・編集)のプロンプト、チャットのプロンプト、有料機能の判定(`paid.go`)、サーバーの点検が同じ表を読む。
+
+- 「友達のスマホからも」「みんなで」「〜と共有」= 他の人と同じ記録を使う → **作成でも編集でも** その entity を `public`。編集は `{"op":"add","path":"/entities/<i>/scope","value":"public"}`(既にあれば replace)。編集が「できない」と返して全 entity が private のままなら、サーバーがレシピを添えて 1 回だけ作り直させる。
+- 「家族だけ」「招待した人だけ」= 限定の共有は v1 に無い(D-06)。public にする時は summary に「限られた人だけで共有することは今はできないため、○○はアプリを開いた人なら誰でも見られる公開にしました。」が必ず入る(黙って公開にしない)。private のままなら「…記録は自分だけのままです。」が入る。チャットは ready の前に確認する。
+- 新しく public / shared になった entity があれば、サーバーが summary に「○○は、このアプリを開いた人なら誰でも見られます(みんなに公開)。」を足す(D-05 の文言・すでに言っていれば足さない)。
+- 「自分だけ」「非公開」「共有をやめて」は scope を remove。「LINE で送る」「共有ボタン」は scope ではなく shareButton。
+
 | scope | 意味 | レコードの置き場(appconfig) | 書き込み権限 |
 |---|---|---|---|
 | `private`(省略時) | 本人だけ。家計簿・日記・体重など | `users/{uid}/apps/{appId}/entities/{e}/records` | 本人のみ(従来どおり) |
