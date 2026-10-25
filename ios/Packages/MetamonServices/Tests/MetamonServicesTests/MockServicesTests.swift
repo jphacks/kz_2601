@@ -150,6 +150,20 @@ final class MockServicesTests: XCTestCase {
         XCTAssertEqual(r.document.dsl.app.name, "家計簿")
         XCTAssertEqual(r.summary, "家計簿アプリを作成しました")
         XCTAssertEqual(r.mode, "full")
+        XCTAssertFalse(r.unchanged) // 省略 = 変化あり(旧サーバー)
+    }
+
+    /// #211: 変化なしの生成は unchanged=true と理由入りの summary
+    func testHTTPAIClientParsesUnchanged() throws {
+        let json = """
+        {"appId":"dev-1","version":2,"previousVersion":2,"mode":"patch",
+         "dsl":{"schemaVersion":1,"app":{"name":"家計簿","voiceEntry":"floating"},"initialScreen":"home","entities":[],
+                "screens":[{"id":"home","title":"ホーム","components":[{"type":"text","text":"hi"}]}]},
+         "summary":"項目は変更できませんでした。理由: 何の項目か決まっていないため。","locale":"ja","source":"claude","unchanged":true}
+        """
+        let r = try HTTPAIClient.parse(Data(json.utf8), appId: "fallback")
+        XCTAssertTrue(r.unchanged)
+        XCTAssertEqual(r.document.version, 2)
     }
 
     func testGenerateBodyShape() throws {

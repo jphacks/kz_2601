@@ -111,6 +111,8 @@ final class AppRuntime: DSLRuntime {
     var chatPending = false
     /// 直近の応答。question = チップ / proposal = 案のカード / ready = 要約 +「これでいく」(`ClarifyFlow.offer`)
     var chatTurn: ChatTurn?
+    /// edit のチャットから生成に回した時の会話(#211)。生成しても何も変わらなかったら、この会話に理由の吹き出しを足して音声シートを開き直す
+    var chatReturnOnUnchanged: [ChatBubble]?
     /// 生成・改変の前にチャットで相談するか(設定で切替・既定 ON・#186)。OFF は create も edit も従来どおり即反映。
     var clarifyEnabled: Bool = ClarifySettings.enabled {
         didSet { ClarifySettings.enabled = clarifyEnabled }
@@ -437,6 +439,10 @@ final class AppRuntime: DSLRuntime {
         defer { morphTask = nil }
         do {
             let result = try await task.value
+            if result.unchanged {
+                presentUnchanged(result.summary)
+                return
+            }
             remember(previous)
             apply(result.document) // withAnimation の中で morphJob = nil も行う
             startSync()
@@ -452,6 +458,26 @@ final class AppRuntime: DSLRuntime {
             withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
             await present(failure, transcript: text)
         }
+    }
+
+    /// 生成しても何も変わらなかった時(#211)。保存されていないので適用も履歴も触らず、理由を伝える。
+    /// チャットから来たなら会話に吹き出しを足して開き直し(続けて話せる)、それ以外は要約バナーに出す。
+    private func presentUnchanged(_ summary: String?) {
+        let trimmed = summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let reason = trimmed.isEmpty ? L10n.tr("変更できませんでした。何をどう変えるか、もう少し詳しく教えてください。") : trimmed
+        print("[Metamon] morph unchanged: \(reason)")
+        withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
+        if let bubbles = chatReturnOnUnchanged {
+            chatReturnOnUnchanged = nil
+            withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
+                chatTurn = nil
+                chatBubbles = bubbles + [ChatBubble(role: .assistant, text: reason, kind: .answer)]
+            }
+            showVoiceSheet = true
+        } else {
+            summaryBanner = SummaryBanner(text: reason, highlight: nil)
+        }
+        SpeechReader.shared.speak(reason)
     }
 
     /// 失敗の分類ごとに「次の一手」を出す。conflict は最新を取り直して短いバナー、cancelled は軽微なのでトースト、それ以外は状態カード。

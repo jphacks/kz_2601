@@ -142,6 +142,8 @@ var editRules = strings.TrimSpace(`
 - value の部分文書でも上の既定値(presentation / filter.value / sort.direction / swipeToDelete / aggregate / defaultValue)は省略してよい(サーバーが補完)。
 - summary は iOS がそのまま読み上げる自然な 1 文。locale ja なら日本語(40 字程度まで・「。」で終える)「カテゴリにカフェを追加しました。」「追加ボタンを左上に移しました。」、locale en なら英語(80 字程度まで・ピリオドで終える)"Added Cafe to the categories." "Moved the add button to the top left." のように何がどう変わったかだけを言う。経緯や補足説明は書かない。
 - すでに満たされている場合は、その値を確認する test 操作 1 つだけの patch にし(空の patch は不可)、summary は「すでに〜になっています。」/ "It's already ..." と短く答える。
+- **指示の中身が足りず何を足すか決められない時**(「項目を足して」で何の項目か無い等)は、勝手に決めた変更も既存の確認だけで済ませることもせず、test 操作 1 つだけの patch にし、summary を「〜は変更できませんでした。理由: 〇〇が決まっていないため。『△△』のように言ってもらえれば変えられます。」(80 字以内)にする(#211)。ただし今のアプリの項目から自然に 1 つに決まるもの(「グラフを足して」→ 既存のグラフと違う分け方の金額のグラフ等)は作ってよい。
+- **指示が DSL でできない時**は、できる部分だけ変える。全部できなければ test 操作 1 つだけの patch にし、summary を「〜は変更できませんでした。理由: 〇〇はできないため。代わりに△△ならできます。」(80 字以内)にする。一部を省いた時も summary に「〜はできないため省きました。」と書く(#211)。
 - 部品を消した結果その画面が空になるなら、その画面と対応する tab も remove する(空のタブを残さない)。
 - value はプリミティブか、上の Schema の部分文書(Entity / Field / Screen / Component / Action / Tab / Notification など)かその配列。
 - 配列 index は「現在の DSL」のものをそのまま使う。末尾追加は "/-"。既存要素の置換は replace、削除は remove。
