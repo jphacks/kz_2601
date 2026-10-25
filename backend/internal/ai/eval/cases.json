@@ -89,5 +89,11 @@
   {"id": "field_cap_add2", "kind": "edit", "group": "fieldcap", "base": "example:checkup19", "transcript": "MCVとMCHを追加して",
    "expect": {"patch": true, "unreachable": 0, "keepEntity": "checkup", "keep": ["date","height","weight","bmi","sbp","dbp","wbc","rbc","hgb","hct","plt","ast","alt","ggt","ldl","hdl","tg","egfr","ua"], "growTo": 21}, "note": "#221 19 項目に 2 つ足す: 全部残して 21 か、消さずに上限を伝える"},
   {"id": "field_cap_full", "kind": "edit", "group": "fieldcap", "base": "example:checkup39", "transcript": "MCVとMCHを追加して",
-   "expect": {"patch": true, "unreachable": 0, "keepEntity": "checkup", "keep": ["date", "height", "weight", "bmi", "sbp", "dbp", "wbc", "rbc", "hgb", "hct", "plt", "ast", "alt", "ggt", "ldl", "hdl", "tg", "egfr", "ua", "fbs", "hba1c", "cre", "bun", "tc", "alp", "ldh", "tp", "alb", "tbil", "na", "k", "cl", "ca", "fe", "crp", "waist", "pulse", "eye_l", "eye_r"], "growTo": 41}, "note": "#221 39 項目 + 2 は上限 40 を超える: 既存を消さずに上限を伝える"}
+   "expect": {"patch": true, "unreachable": 0, "keepEntity": "checkup", "keep": ["date", "height", "weight", "bmi", "sbp", "dbp", "wbc", "rbc", "hgb", "hct", "plt", "ast", "alt", "ggt", "ldl", "hdl", "tg", "egfr", "ua", "fbs", "hba1c", "cre", "bun", "tc", "alp", "ldh", "tp", "alb", "tbil", "na", "k", "cl", "ca", "fe", "crp", "waist", "pulse", "eye_l", "eye_r"], "growTo": 41}, "note": "#221 39 項目 + 2 は上限 40 を超える: 既存を消さずに上限を伝える"},
+  {"id": "shift_pay", "kind": "create", "group": "shift", "transcript": "バイトのシフトを記録して、今月の勤務時間の合計と給料を出したい。時給は 1100 円",
+   "expect": {"calc": true, "computed": true}, "note": "#229 hoursBetween で 1 件ごとの勤務時間・round(hours × 1100)・stat sum hours / pay thisMonth"},
+  {"id": "shift_break", "kind": "edit", "group": "shift", "base": "shift_pay", "transcript": "休憩時間も引いて",
+   "expect": {"computed": true}, "note": "#229 break_min(分)を足し hours = max(hoursBetween − coalesce(break_min,0)/60, 0)"},
+  {"id": "shift_night", "kind": "edit", "group": "shift", "base": "shift_break", "transcript": "夜勤もある",
+   "expect": {"computed": true}, "note": "#229 hoursBetween が日付またぎを扱うので式は変えなくてよい(休憩の式を消さない)"}
 ]
