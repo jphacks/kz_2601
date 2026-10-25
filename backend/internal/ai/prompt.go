@@ -53,7 +53,7 @@ var systemPrompt = strings.TrimSpace(`
 - entity.scope: 「みんなで」「共有」「投稿」「ランキング」「掲示板」「友達と」のように**他のユーザーと同じデータを見る**用途は scope:"public"(投稿者の author/authorName は backend が付けるので field に入れない)。家計簿・日記・体重のような個人の記録は scope を省略(private)。
 - アクション: navigate.screen は存在する画面 id。saveRecord/deleteRecord は entity 必須。フォーム画面には toolbar に saveRecord ボタンを置く。list.onItemTap で navigate するとフォームが編集モードになる。
 - id は ^[a-z][a-z0-9_-]{0,39}$(英小文字始まり・snake_case)。画面 id・entity id・field id・component id はそれぞれのスコープで一意。
-- 上限: 画面 12・entity 6・entity あたり field 20・1 階層あたり component 30。
+- 上限: 画面 12・entity 6・entity あたり field 40(computed も数える)・1 階層あたり component 30。入力部品が 30 を超えるフォームは section を 2 つに分ける。
 - 金額は type "currency"(unit "円")。日付は type "date"。写真は type "photo" + photoField(source camera)。「動画で残す・撮る」(筋トレのフォーム、子どもの成長、練習・演奏の記録)は type "video" + フォームに videoField(source both・内カメ/外カメは撮影画面で切り替えられる)、詳細の再生は同じ field の videoPlayer、一覧は list.item.image にその video field(1 フレーム目のサムネイル)。写真しか言われていなければ video にしない。
 - リマインド(「毎朝8時に通知」など)は app.notifications[] に {id,title,body,repeat:daily,time:"08:00"} として宣言する。
 - 「歩数を見たい」「今日何歩」は healthStat(metric steps・entity も入力フォームも作らない。週の推移は period week)。体重を手で記録するアプリで「ヘルスケアにも保存/連携」と言われたら、体重 field(number・unit kg)に health:"weight" を付ける(ヘルスケアの体重を見るだけなら healthStat metric weight)。
@@ -149,6 +149,7 @@ var editRules = strings.TrimSpace(`
 - value はプリミティブか、上の Schema の部分文書(Entity / Field / Screen / Component / Action / Tab / Notification など)かその配列。
 - 配列 index は「現在の DSL」のものをそのまま使う。末尾追加は "/-"。既存要素の置換は replace、削除は remove。
 - ユーザーが言及していない画面・entity・field・部品は触らない。entity の既存 field id はリネームしない。
+- **依頼に無い既存の field・画面・部品を消して上限に収めない**(#221: 「MCV と MCH を追加」で eGFR と尿酸が黙って消えた)。上限(field 40・画面 12・entity 6)を超える時は削除せず、入らない分は足さずに test 操作 1 つだけの patch にし、summary を「項目数の上限のため○○は追加できませんでした。どれかを消すか、別の記録に分ければ足せます。」(en: "Couldn't add ... because of the field limit. Remove one or split into another record.")にする。
 - 部品を追加・拡大するときは兄弟の area と重ならないようにする。必要なら隣接部品の area も replace で詰める。
 - 「もっと大きく」= area の行数/列数を増やす(例 A1:F2 → A1:F4)、周囲の部品を下にずらす。
 - フォームに入力部品を足す場合は、entity に field を add してから、フォーム画面の section.children に部品を add する。

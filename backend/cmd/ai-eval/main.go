@@ -16,6 +16,7 @@
 // each component type appears on some screen), lacks ([type, ...]: none of them appears, #212).
 // Health (#167): health ("steps"|"weight": a healthStat with that metric),
 // healthField (bool: some field has health "weight").
+// Field cap (#221): keepEntity / keep ([field id, ...]) / growTo (see checkKeep).
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
@@ -339,6 +340,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.Metrics = measure(app)
 		rec.ExpectMisses = append(checkExpect(c.Expect, rec.Metrics, rec.Summary), checkNav(c.Expect, app, rec.Mode)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkEnum(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkKeep(c.Expect, app, rec.Summary)...)
 	}
 	if c.Kind == "create" {
 		created[c.ID] = res.DSL
@@ -522,6 +524,34 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 // optNot check its options (enum choices or ref initial records), fields =
 // the entity's field count (no memo / extra field added), refPick = it became
 // a ref to a master entity with a form screen and initial options.
+// checkKeep (#221): keepEntity / keep list the fields that must survive the
+// edit; growTo is the field count when every requested field was added. The
+// edit passes when nothing in keep was removed and either the entity reached
+// growTo or the summary says the cap blocked it (上限 / "limit").
+func checkKeep(exp map[string]any, a *dsl.App, summary string) []string {
+	eid, _ := exp["keepEntity"].(string)
+	if eid == "" {
+		return nil
+	}
+	e := a.EntityByID(eid)
+	if e == nil {
+		return []string{"keepEntity missing " + eid}
+	}
+	var miss []string
+	if keep, ok := exp["keep"].([]any); ok {
+		for _, k := range keep {
+			if e.FieldByID(fmt.Sprint(k)) == nil {
+				miss = append(miss, "removed "+fmt.Sprint(k))
+			}
+		}
+	}
+	if g, ok := exp["growTo"].(float64); ok && len(e.Fields) < int(g) &&
+		!strings.Contains(summary, "上限") && !strings.Contains(strings.ToLower(summary), "limit") {
+		miss = append(miss, fmt.Sprintf("fields=%d < %d and summary does not mention the cap", len(e.Fields), int(g)))
+	}
+	return miss
+}
+
 func checkEnum(exp map[string]any, a *dsl.App) []string {
 	target, _ := exp["enumField"].(string)
 	if target == "" {
