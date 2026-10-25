@@ -63,12 +63,14 @@ public enum FieldCoding {
         public var yes: String
         public var no: String
         public var photo: String
-        public init(yes: String, no: String, photo: String) {
+        public var video: String
+        public init(yes: String, no: String, photo: String, video: String = "動画") {
             self.yes = yes
             self.no = no
             self.photo = photo
+            self.video = video
         }
-        public static let ja = Words(yes: "はい", no: "いいえ", photo: "写真")
+        public static let ja = Words(yes: "はい", no: "いいえ", photo: "写真", video: "動画")
     }
 
     /// 一覧・集計の表示用整形。`locale` / `now` は日付の書式(言語・今年なら年を省く)にだけ使う。`words` は boolean / photo の語。
@@ -91,6 +93,7 @@ public enum FieldCoding {
             return displayDate(d, withTime: field.type == .datetime, locale: locale, now: now)
         case .boolean: return v.truthy ? words.yes : words.no
         case .photo: return v.isNull ? "" : words.photo
+        case .video: return v.isNull ? "" : words.video
         default: return v.displayString
         }
     }

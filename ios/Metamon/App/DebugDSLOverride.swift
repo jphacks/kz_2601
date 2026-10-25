@@ -79,6 +79,9 @@ enum DummyRecords {
         case .ref:
             guard let target = f.refEntity, dsl.entity(target) != nil else { return nil }
             return .string("\(target)-\(i % 3 + 1)")
+        case .video:
+            // 別の端末で撮った動画(この端末にファイルが無い)の見え方を確かめる(#206)
+            return .string("video:dummy-\(i)")
         case .photo, .location:
             return nil
         }

@@ -178,10 +178,11 @@
             "enum",
             "currency",
             "photo",
+            "video",
             "location",
             "ref"
           ],
-          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField."
+          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField."
         },
         "required": {
           "type": "boolean"
@@ -504,6 +505,12 @@
         },
         {
           "$ref": "#/$defs/Image"
+        },
+        {
+          "$ref": "#/$defs/VideoField"
+        },
+        {
+          "$ref": "#/$defs/VideoPlayer"
         },
         {
           "$ref": "#/$defs/List"
@@ -936,7 +943,7 @@
         },
         "image": {
           "type": "string",
-          "description": "Field id of a photo field shown as thumbnail."
+          "description": "Field id of a photo field shown as thumbnail (a video field shows its first-frame thumbnail)."
         },
         "toggle": {
           "type": "string",
@@ -1359,6 +1366,81 @@
         "field": {
           "type": "string",
           "description": "photo field of the screen entity (form/detail screens)."
+        },
+        "height": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ]
+        }
+      }
+    },
+    "VideoField": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "カメラ(内カメ・外カメ切替可)/ ライブラリから動画を取り込み、video field に保存する入力。動画は端末内に保存し、レコードにはファイル名と 1 フレーム目のサムネイルだけを入れる。",
+      "x-usage": "「動画で残す・撮る」(筋トレのフォーム、子どもの成長、練習の記録など)に。撮るなら source camera、既存の動画を選ぶなら library、迷えば both。写真なら photoField。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "videoField"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Must be a video field of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "camera",
+            "library",
+            "both"
+          ]
+        },
+        "maxDuration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600,
+          "description": "Recording limit in seconds (default 60)."
+        }
+      }
+    },
+    "VideoPlayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "video field の動画を再生する(フォーム / 詳細画面)。入力ではない。撮影した端末でのみ再生でき、他の端末ではサムネイルを出す。",
+      "x-usage": "撮った動画を詳細画面で見返す時に。一覧のサムネイルは list.item.image に video field を指定する。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "videoPlayer"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "video field of the screen entity (form/detail screens)."
         },
         "height": {
           "type": "string",
