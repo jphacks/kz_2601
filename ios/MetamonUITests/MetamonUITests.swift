@@ -313,6 +313,121 @@ final class MetamonUITests: XCTestCase {
         XCTAssertFalse((field.value as? String ?? "").contains("three"), "送信後に入力欄が空にならない")
     }
 
+    /// 返事待ちの間にキーボードを出しても、返事が届いた後も、入力欄はキーボードのすぐ上にあってタップできる(#208)。
+    /// edit = 作ったアプリの音声シート、create = 初期画面の対話。モックの対話の待ちを延ばして返事待ちの間に操作する。
+    func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_edit() {
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "見やすくして", "METAMON_AUTO_PAUSE": "600",
+                                    "METAMON_MOCK_AI_DELAY": "16"])
+        assertComposerAboveKeyboardAcrossReply("edit", replied: app.buttons.matching(identifier: "chat.option.choose").firstMatch,
+                                                userBubble: "あなた: 見やすくして")
+    }
+
+    /// 実機の手順どおり: FAB → シートの文字入力で 1 つ目を打って送る(キーボードが閉じる)→ 返事待ちの間に対話の入力欄をタップ
+    func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_editTyped() {
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": "16"])
+        waitForFab()
+        fab.tap()
+        XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開かない")
+        let field = composerField
+        XCTAssertTrue(field.waitForExistence(timeout: 15), "シートの文字入力が無い")
+        field.tap()
+        field.typeText("見やすくして")
+        app.buttons["composer.send"].tap()
+        assertComposerAboveKeyboardAcrossReply("editTyped", replied: app.buttons.matching(identifier: "chat.option.choose").firstMatch,
+                                                userBubble: "あなた: 見やすくして")
+    }
+
+    /// 1 つ目を声で(シミュレータのマイクはダミーの定型文)
+    func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_editVoice() {
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": "16"])
+        waitForFab()
+        fab.tap()
+        XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開かない")
+        let mic = app.buttons["マイク。タップして話す"].firstMatch
+        XCTAssertTrue(mic.waitForExistence(timeout: 30), "マイクが無い")
+        mic.tap()
+        let stop = app.buttons["録音中。タップで終了"].firstMatch
+        XCTAssertTrue(stop.waitForExistence(timeout: 10), "録音が始まらない")
+        Thread.sleep(forTimeInterval: 1.5)
+        stop.tap()
+        let replied = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@",
+            ["chat.option.choose", "chat.chip", "chat.applyNow", "chat.build"])).firstMatch
+        assertComposerAboveKeyboardAcrossReply("editVoice", replied: replied, userBubble: "あなた: ")
+    }
+
+    func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_createTyped() {
+        launch(example: nil, ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": "16"])
+        let field = composerField
+        XCTAssertTrue(field.waitForExistence(timeout: 15), "初期画面の文字入力が無い")
+        field.tap()
+        field.typeText("日記")
+        app.buttons["composer.send"].tap()
+        assertComposerAboveKeyboardAcrossReply("createTyped", replied: app.buttons.matching(identifier: "chat.chip").firstMatch,
+                                                userBubble: "あなた: 日記")
+    }
+
+    func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_create() {
+        launch(example: nil, ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "日記", "METAMON_AUTO_PAUSE": "600",
+                              "METAMON_MOCK_AI_DELAY": "16"])
+        assertComposerAboveKeyboardAcrossReply("create", replied: app.buttons.matching(identifier: "chat.chip").firstMatch,
+                                                userBubble: "あなた: 日記")
+    }
+
+    private func assertComposerAboveKeyboardAcrossReply(_ name: String, replied: XCUIElement, userBubble: String,
+                                                        file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(element(labelBeginsWith: userBubble).waitForExistence(timeout: 20), "1 つ目の発話が吹き出しに出ない", file: file, line: line)
+        let field = composerField
+        XCTAssertTrue(field.waitForExistence(timeout: 10), "対話の入力欄が無い", file: file, line: line)
+        attachScreenshot("kb208-\(name)-sent")
+        XCTAssertFalse(replied.exists, "返事待ちの前に返事が届いた(待ちが短い)", file: file, line: line)
+        field.tap()
+        let kb = app.keyboards.firstMatch
+        XCTAssertTrue(kb.waitForExistence(timeout: 5), "ソフトウェアキーボードが出ない(ハードウェアキーボード接続を切る)", file: file, line: line)
+        // キーボードと入力欄のアニメーションが落ち着くまで(frame が 2 回続けて同じ)
+        func settle() {
+            var last = CGRect.null
+            _ = waitUntil(timeout: 5) {
+                let now = field.frame
+                defer { last = now }
+                return now == last
+            }
+        }
+        settle()
+        // 入力欄の外枠の下端 = 送信ボタン(44pt 角)の下端。XCUI の keyboard.frame は候補バーを含まない iOS 26 の値なので、
+        // 「キーボードのすぐ上」= 0〜80pt の範囲、「動かない」= 返事の前後で差 2pt 以内で見る
+        let send = app.buttons["composer.send"]
+        let gapWaiting = kb.frame.minY - send.frame.maxY
+        XCTContext.runActivity(named: "#208 \(name) 返事待ち: send=\(send.frame) keyboardTop=\(kb.frame.minY) gap=\(gapWaiting)") { _ in }
+        print("[#208] \(name) waiting send=\(send.frame) keyboardTop=\(kb.frame.minY) gap=\(gapWaiting)")
+        attachScreenshot("kb208-\(name)-waiting")
+        XCTAssertFalse(replied.exists, "キーボードを出す前に返事が届いた(待ちが短い)", file: file, line: line)
+        XCTAssertGreaterThanOrEqual(gapWaiting, -1, "返事待ち: 入力欄がキーボードに隠れている", file: file, line: line)
+        XCTAssertLessThanOrEqual(gapWaiting, 80, "返事待ち: 入力欄がキーボードから離れすぎ(二重に持ち上がっている)", file: file, line: line)
+
+        XCTAssertTrue(replied.waitForExistence(timeout: 20), "返事が届かない", file: file, line: line)
+        Thread.sleep(forTimeInterval: 0.8) // 返事の吹き出し・スクロールのアニメーション
+        settle()
+        XCTAssertTrue(kb.exists, "返事が届いたらキーボードが閉じた", file: file, line: line)
+        let gapReplied = kb.frame.minY - send.frame.maxY
+        XCTContext.runActivity(named: "#208 \(name) 返事後: send=\(send.frame) keyboardTop=\(kb.frame.minY) gap=\(gapReplied)") { _ in }
+        print("[#208] \(name) replied send=\(send.frame) keyboardTop=\(kb.frame.minY) gap=\(gapReplied)")
+        attachScreenshot("kb208-\(name)-replied")
+        XCTAssertGreaterThanOrEqual(gapReplied, -1, "返事後: 入力欄がキーボードに隠れている", file: file, line: line)
+        XCTAssertLessThanOrEqual(gapReplied, 80, "返事後: 入力欄がキーボードから離れすぎ", file: file, line: line)
+        XCTAssertEqual(gapReplied, gapWaiting, accuracy: 2, "返事が届いて入力欄が動いた", file: file, line: line)
+        // 一覧だけが伸びて最新(案のカードなら 2 枚目の「これでいく」)まで見えている
+        let cards = app.buttons.matching(identifier: "chat.option.choose")
+        if cards.count == 2 {
+            let lastCard = cards.element(boundBy: 1)
+            XCTAssertTrue(waitUntil(timeout: 3) { lastCard.frame.maxY <= send.frame.minY + 1 },
+                          "返事後: 最新の案がスクロールされず入力欄の裏にある(\(lastCard.frame))", file: file, line: line)
+        }
+        // タップして打てる
+        field.tap()
+        field.typeText("ok")
+        XCTAssertTrue((field.value as? String ?? "").contains("ok"), "返事後に入力欄へ打てない", file: file, line: line)
+    }
+
     func testDiaryBodyReturnInsertsNewlineAboveKeyboard() {
         launch(example: "diary_ai", ["METAMON_AUTO_OPEN": "diary_form:push"])
         let body = app.descendants(matching: .any)["field.body"].firstMatch

@@ -99,8 +99,10 @@ struct ClarifyChatView: View {
                 .padding(.vertical, Theme.Spacing.sm)
             }
             .scrollDismissesKeyboard(.interactively)
-            .onChange(of: rt.chatBubbles.count) { scrollToEnd(proxy) }
-            .onChange(of: rt.chatPending) { scrollToEnd(proxy) }
+            // 中身が伸びても下端(最新)に寄せたまま。入力欄は safeAreaInset 側なので動かない(#208)
+            .defaultScrollAnchor(.bottom)
+            .onChange(of: rt.chatBubbles.count) { scrollToEndAfterLayout(proxy) }
+            .onChange(of: rt.chatPending) { scrollToEndAfterLayout(proxy) }
             // キーボードが上がると吹き出し欄が縮むので、最新の吹き出しを見せ直す(#143)
             .onChange(of: typing) { _, isTyping in
                 guard isTyping else { return }
@@ -109,6 +111,16 @@ struct ClarifyChatView: View {
                     scrollToEnd(proxy)
                 }
             }
+        }
+    }
+
+    /// 返事と一緒に差し込まれる案のカード・要約カードは、同じ更新では id がまだ配置されておらず scrollTo が空振りする(#208)。
+    /// 配置を 1 回待ってから最新までスクロールする
+    private func scrollToEndAfterLayout(_ proxy: ScrollViewProxy) {
+        scrollToEnd(proxy)
+        Task {
+            try? await Task.sleep(for: .milliseconds(120))
+            scrollToEnd(proxy)
         }
     }
 
