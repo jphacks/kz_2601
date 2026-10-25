@@ -591,6 +591,9 @@
           "$ref": "#/$defs/Calendar"
         },
         {
+          "$ref": "#/$defs/GridTable"
+        },
+        {
           "$ref": "#/$defs/ShareButton"
         },
         {
@@ -2424,6 +2427,91 @@
       },
       "description": "月カレンダー(カレンダービュー)。entity のレコードを dateField の日に載せ、レコードのある日に点を打つ。日をタップするとその日のレコード一覧が下に出る。一覧の行タップ = onDateTap を recordId 付きで実行(編集)、「追加」= onDateTap をタップした日を dateField の初期値にして実行(新規)。予定・スケジュール・日記・習慣/トレーニング記録・シフト・締切など「日付のある記録を月表示で見たい」時に必ずこれを選ぶ(list+datePicker で代替しない)。",
       "x-usage": "画面の主役として A1:F9 に置き、下に stat や追加ボタン(A10:F12)。onDateTap は通常 entity のフォーム画面への navigate(presentation: sheet)。"
+    },
+    "GridTable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "columnField",
+        "rowField",
+        "titleField"
+      ],
+      "properties": {
+        "type": {
+          "const": "gridTable"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "columnField": {
+          "type": "string",
+          "description": "横軸(列)に使う `entity` の field。enum(例: 曜日 [月,火,水,木,金])なら options の順に列が並ぶ。string なら columnValues 必須。"
+        },
+        "rowField": {
+          "type": "string",
+          "description": "縦軸(行)に使う `entity` の field。integer(例: 時限 1〜6)なら rowRange で範囲、enum(例: シフト帯 [朝,昼,夜])なら options の順に行が並ぶ。string なら rowValues 必須。"
+        },
+        "titleField": {
+          "type": "string",
+          "description": "マスに大きく出す field(例: 科目名・担当者・メニュー)。"
+        },
+        "subtitleField": {
+          "type": "string",
+          "description": "マスに小さく出す field(例: 教室・時間・メモ)。任意。"
+        },
+        "columnValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "maxItems": 14,
+          "description": "列見出し(=columnField の値)を明示する。省略時は enum の options。enum では options の一部だけ・順番の入れ替えに使う(例: 土日を出さない)。"
+        },
+        "rowValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "maxItems": 24,
+          "description": "行見出し(=rowField の値)を明示する。enum / string の rowField 用。省略時は enum の options。"
+        },
+        "rowRange": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "from",
+            "to"
+          ],
+          "properties": {
+            "from": {
+              "type": "integer"
+            },
+            "to": {
+              "type": "integer"
+            }
+          },
+          "description": "integer の rowField の行範囲(両端を含む・最大 24 行)。例: 1〜6 限は {\"from\":1,\"to\":6}。省略時は 1〜6(記録がそれより大きければそこまで)。"
+        },
+        "onItemTap": {
+          "$ref": "#/$defs/Action",
+          "description": "マスのタップで実行(通常は entity のフォーム画面への navigate)。記録のあるマス = recordId 付き(編集)、空のマス = その列・行の値を columnField / rowField の初期値にして新規。"
+        }
+      },
+      "description": "時間割・週のシフト表のような 2 軸のマス目(グリッド表)。entity のレコードを columnField(横=列・例: 曜日)と rowField(縦=行・例: 時限)の値でマスに置き、マスに titleField(+ subtitleField)を出す。今日の曜日の列を強調。空のマスをタップ = その曜日・時限が入った追加フォーム、記録のマス = 編集。1 マスに複数あれば先頭 + 「+n」。大学・学校の時間割、週のシフト表、曜日ごとの部活の練習メニュー・献立・ゴミ出し・習い事など「曜日 × 時限/時間帯」で決まった予定を一覧したい時に必ずこれを選ぶ(曜日ごとの画面・list で代替しない)。日付の決まった予定は calendar。",
+      "x-usage": "画面の主役として A1:F10 前後の大きなセルに置く(行が多ければ中で縦スクロール、列が多ければ横スクロール)。columnField は曜日の enum([月,火,水,木,金] や [月,火,水,木,金,土,日])、rowField は時限の integer + rowRange か時間帯の enum。onItemTap は entity のフォーム画面への navigate(presentation: sheet)。フォームには columnField / rowField の picker / stepper も置く。"
     },
     "ShareButton": {
       "type": "object",

@@ -214,6 +214,7 @@ const (
 	// nav / native leaves
 	CompSearchBar      ComponentType = "searchBar"      // screen-local search text -> list.searchField
 	CompCalendar       ComponentType = "calendar"       // month view over entity.dateField
+	CompGridTable      ComponentType = "gridTable"      // timetable: columnField x rowField cells (#234)
 	CompShareButton    ComponentType = "shareButton"    // ShareLink
 	CompOpenURLButton  ComponentType = "openUrlButton"  // fixed URL link
 	CompMapView        ComponentType = "mapView"        // MapKit pins from a location field
@@ -364,6 +365,19 @@ type Component struct {
 	// healthStat (#167). Label / Target are shared.
 	Metric string `json:"metric,omitempty"` // steps|weight
 	Period string `json:"period,omitempty"` // today|week (default today)
+
+	// gridTable (#234). Entity / TitleField / SubtitleField / OnItemTap are shared.
+	ColumnField  string     `json:"columnField,omitempty"`  // x axis (e.g. weekday enum)
+	RowField     string     `json:"rowField,omitempty"`     // y axis (e.g. period integer)
+	ColumnValues []string   `json:"columnValues,omitempty"` // explicit column headers (else enum options)
+	RowValues    []string   `json:"rowValues,omitempty"`    // explicit row headers for enum/string rowField
+	RowRange     *GridRange `json:"rowRange,omitempty"`     // integer rowField range (default 1..6)
+}
+
+// GridRange is an inclusive integer range of gridTable rows.
+type GridRange struct {
+	From int `json:"from"`
+	To   int `json:"to"`
 }
 
 // HealthMetrics / HealthPeriods are the closed sets of healthStat values;

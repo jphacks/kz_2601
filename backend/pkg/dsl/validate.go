@@ -594,6 +594,9 @@ func (a *App) Validate() error {
 				checkTable(where, c, entities, add)
 			case CompTimeline:
 				checkTimeline(where, c, entities, add)
+			case CompGridTable:
+				checkGridTable(where, c, entities, add)
+				checkAction(where+".onItemTap", c.OnItemTap)
 			case CompEmptyState:
 				if c.Title == "" {
 					add("%s: emptyState needs title", where)

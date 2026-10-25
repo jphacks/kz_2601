@@ -73,6 +73,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompLocationTracker,
 		// device health
 		dsl.CompHealthStat,
+		// timetable
+		dsl.CompGridTable,
 		// video (#206)
 		dsl.CompVideoField, dsl.CompVideoPlayer,
 	} {
