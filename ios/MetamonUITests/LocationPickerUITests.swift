@@ -26,7 +26,7 @@ final class LocationPickerUITests: XCTestCase {
 
     func testSearchPickShowsNameAndSaves() {
         app = XCUIApplication()
-        app.launchEnvironment = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto", "METAMON_INITIAL_EXAMPLE": "shops"]
+        app.launchEnvironment = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto", "METAMON_AI_CONSENT": "granted", "METAMON_INITIAL_EXAMPLE": "shops"]
         app.launchArguments = ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP", "-metamon.appLanguage", "ja"]
         app.launch()
 

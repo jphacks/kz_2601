@@ -160,6 +160,7 @@ struct RootView: View {
             }
         }
         #endif
+        .modifier(ConsentHost()) // #246: AI への送信の同意・音声モデルのダウンロード確認
         .alert(item: $rt.confirm) { confirm in
             Alert(title: Text(confirm.message),
                   primaryButton: .destructive(Text("実行")) { Task { await confirm.perform() } },

@@ -65,6 +65,9 @@ public final class WhisperKitRecognizer: SpeechTranscriber {
         return ok ? folder : nil
     }
 
+    /// モデル未取得で、prepare がダウンロードを始めるか(#246)。
+    public var needsDownload: Bool { pipe == nil && localModelFolder == nil }
+
     private func log(_ message: String) {
         print("[Voice] \(message)")
         logger.notice("\(message, privacy: .public)")

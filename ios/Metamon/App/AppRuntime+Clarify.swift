@@ -78,6 +78,7 @@ extension AppRuntime {
     /// ユーザー発話を 1 つ足して ai に聞く。応答(question / ready)を返す。失敗時は状態カード(origin = chat)を出して nil。
     @discardableResult
     func say(_ text: String, source: ClarifyFlow.InputSource = .text) async -> ChatTurn? {
+        guard requireAIConsent() else { return nil } // #246: 同意前は吹き出しも足さない
         cancelAutoBuild()
         clearPaidConfirm() // 話し直したら確認カードは閉じる(新しい応答で判定し直す)
         chatLastInput = source
@@ -195,6 +196,7 @@ extension AppRuntime {
     }
 
     private func chatRound() async -> ChatTurn? {
+        guard requireAIConsent() else { return nil }
         let epoch = chatEpoch
         let appId = document.appId
         let mode = chatMode

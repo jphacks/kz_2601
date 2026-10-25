@@ -34,6 +34,12 @@ final class AppRuntime: DSLRuntime {
     var sheet: Route?
     var fullScreen: Route?
     var showVoiceSheet = false
+    /// 第三者 AI への送信の同意(#246)。アプリ本体(MetamonApp)が `.shared` を入れる。nil(ユニットテスト等)は同意済み扱い。
+    @ObservationIgnored var aiConsent: AIConsentStore?
+    /// 同意の画面を出す(初回起動 / 同意前に生成・対話しようとした時)。
+    var showAIConsent = false
+    /// 音声モデルのダウンロード確認(#246・4.2.3(ii))。端末にモデルが無く未承認の時だけ立つ。
+    var showModelDownloadConfirm = false
     /// 変身一覧シート(#51: FAB 長押し / 「アプリ一覧」)。
     var showAppSwitcher = false
     /// 自分のアプリ一覧(`appsList()` が更新)。
@@ -199,7 +205,7 @@ final class AppRuntime: DSLRuntime {
     /// サーバーに届かなければ最後に取得した DSL(`DocumentCache`)を出し、トーストで「オフライン」を知らせる。
     /// 通知の同期(許可ダイアログを出し得る)は復元・同期の **後ろで await せずに** 回す(#86: ダイアログ待ちで復元が止まらない)。
     func bootstrap() async {
-        Task { try? await services.transcriber.prepare() }
+        prepareTranscriberIfAllowed()
         recordSync.start()
         observeConnectivity()
         if services.isLive {
@@ -437,7 +443,7 @@ final class AppRuntime: DSLRuntime {
 
     /// 意図判定を済ませた依頼文を生成に回す(対話の ready からも直接ここへ: AI がまとめた文を「元に戻して」等と誤判定しないため)。
     func generate(_ text: String) async {
-        guard morphJob == nil else { return }
+        guard morphJob == nil, requireAIConsent() else { return }
         // 圏外(#60): 送らずに保留し、状態カード「接続が戻ったら自動で送ります」。復帰で 1 回だけ自動送信(モックは常にオンライン)
         if services.isLive || recordSync.connectivity is ManualConnectivity,
            deferredMorph.holdIfOffline(text, send: { [weak self] queued in await self?.sendDeferred(queued) }) {
@@ -460,7 +466,7 @@ final class AppRuntime: DSLRuntime {
 
     /// ai に送って適用する本体。失敗は `FailureKind` で分類して状態カードに(トーストは使わない)。
     private func send(_ text: String) async {
-        guard morphJob == nil else { return }
+        guard morphJob == nil, requireAIConsent() else { return }
         withAnimation(.easeInOut(duration: 0.35)) {
             errorCard = nil
             morphJob = MorphJob(kind: MorphJob.kind(isVoiceOnly: dsl.isVoiceOnly, transcript: text), transcript: text, startedAt: .now)
