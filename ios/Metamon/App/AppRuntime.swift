@@ -40,6 +40,12 @@ final class AppRuntime: DSLRuntime {
     var showAIConsent = false
     /// 音声モデルのダウンロード確認(#246・4.2.3(ii))。端末にモデルが無く未承認の時だけ立つ。
     var showModelDownloadConfirm = false
+    /// 初回のチュートリアル(#274)。MetamonApp が `.shared` を入れる。nil(ユニットテスト等)は見た扱い。
+    @ObservationIgnored var tutorial: FirstRunTutorialStore?
+    /// チュートリアルを出す(初回の同意のあと / 設定の「使い方を見る」)。
+    var showTutorial = false
+    /// 最初のアプリができた直後の「こう言うと直せます」(#274・1 回だけ)。
+    var showFirstEditHint = false
     /// 変身一覧シート(#51: FAB 長押し / 「アプリ一覧」)。
     var showAppSwitcher = false
     /// 自分のアプリ一覧(`appsList()` が更新)。
@@ -476,6 +482,7 @@ final class AppRuntime: DSLRuntime {
         #endif
         interruptedByOffline = false
         let previous = document
+        let createdFromInitial = previous.dsl.isVoiceOnly
         let task = Task { [services, appId = document.appId, version = document.version, locale = Self.generationLocale] in
             try await services.ai.morph(transcript: text, appId: appId, currentVersion: version, locale: locale)
         }
@@ -495,6 +502,7 @@ final class AppRuntime: DSLRuntime {
                 summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary), action: canUndo ? .undo : nil)
                 SpeechReader.shared.speak(summary) // #43(設定 OFF なら何もしない)
             }
+            scheduleFirstEditHint(createdFromInitial: createdFromInitial) // #274 最初のアプリの直後に 1 回だけ
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
         } catch {
             let failure: FailureKind = interruptedByOffline ? .offline : FailureKind.classify(error)
