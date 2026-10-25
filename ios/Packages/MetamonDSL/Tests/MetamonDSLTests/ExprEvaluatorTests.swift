@@ -185,9 +185,10 @@ final class ExprEvaluatorTests: XCTestCase {
     func testZeroMembersShareIsNil() throws {
         let (dsl, _) = try warikan()
         let ev = ExprEvaluator(dsl: dsl, records: { _ in [] })
-        let row = ExprEvaluator.Row(entity: dsl.entity("members"), record: Record(id: "x", data: [:]), memoizable: false)
-        XCTAssertNil(ev.fieldValue("share", row: row), "0 人で割る = —")
-        XCTAssertEqual(FieldCoding.display(.null, field: dsl.entity("members")?.field("share")), "—")
+        // #231: 1人あたり = 金額 / 割り勘する人数(未選択 = 全員 = 0 人)
+        let row = ExprEvaluator.Row(entity: dsl.entity("expenses"), record: Record(id: "x", data: ["amount": 1000]), memoizable: false)
+        XCTAssertNil(ev.fieldValue("per_person", row: row), "0 人で割る = —")
+        XCTAssertEqual(FieldCoding.display(.null, field: dsl.entity("expenses")?.field("per_person")), "—")
     }
 
     func testCycleIsNil() throws {
