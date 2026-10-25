@@ -23,6 +23,7 @@ extension AppRuntime {
             return
         }
         await recordSync.purge(appId: app.id)
+        await services.notifications.removeApp(app.id)  // そのアプリの通知(#228)
         DocumentCache.shared.remove(appId: app.id)
         AppThumbnailStore.shared.remove(appId: app.id)
         chatHistoryStore.remove(appId: app.id)          // チャット履歴(#210)

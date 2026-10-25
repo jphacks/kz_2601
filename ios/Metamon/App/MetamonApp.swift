@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 import MetamonDSL
 import MetamonRenderer
 import MetamonServices
@@ -18,6 +19,7 @@ struct MetamonApp: App {
     init() {
         // Firebase は Services 組み立てより前に初期化(plist が無ければ警告してモック認証に落ちる)
         FirebaseBootstrap.configureIfAvailable()
+        UNUserNotificationCenter.current().delegate = ForegroundNotificationPresenter.shared // 前面でも通知を出す(#228)
         let services = BuildConfig.make()
         if BuildConfig.forceMock { HealthData.source = MockHealthData() } // healthStat(#167)は固定値
         let appId = DeviceAppID.current
