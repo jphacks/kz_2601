@@ -58,10 +58,14 @@ public actor RecordStore {
     /// "appId/entity" → 行(メモリキャッシュ。ファイルは書き込みのたびに atomic 更新)
     private var tables: [String: [LocalRecord]] = [:]
 
-    public init(directory: URL? = nil) {
+    /// video field の動画ファイル置き場(#206)。行を消す時に一緒に消す。
+    public nonisolated let videos: LocalVideoStore
+
+    public init(directory: URL? = nil, videos: LocalVideoStore = .shared) {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         self.directory = directory ?? base.appendingPathComponent("metamon-records", isDirectory: true)
+        self.videos = videos
     }
 
     // MARK: - Read
@@ -139,15 +143,29 @@ public actor RecordStore {
     }
 
     /// テスト/リセット用。appId が変わっても旧 appId の行は消さない(サーバーにも残っているため)ので通常は呼ばない。
+    /// アプリ削除(#180)でも使う。その appId の端末内動画(#206)も消す。
     public func removeAll(appId: String) {
-        for key in tables.keys where key.hasPrefix(appId + "/") { tables[key] = nil }
-        try? FileManager.default.removeItem(at: directory.appendingPathComponent(Self.safe(appId), isDirectory: true))
+        let dir = directory.appendingPathComponent(Self.safe(appId), isDirectory: true)
+        var ids = Set<String>()
+        for key in tables.keys where key.hasPrefix(appId + "/") {
+            tables[key]?.forEach { ids.formUnion(VideoValue.localIDs(in: $0.data)) }
+            tables[key] = nil
+        }
+        // まだ読み込んでいない entity のファイルも見る
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        for file in files where file.pathExtension == "json" {
+            let rows = (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode([LocalRecord].self, from: $0) } ?? []
+            rows.forEach { ids.formUnion(VideoValue.localIDs(in: $0.data)) }
+        }
+        videos.remove(ids)
+        try? FileManager.default.removeItem(at: dir)
     }
 
-    /// アカウント削除用(#119): 全 appId の行とファイルを消す。
+    /// アカウント削除用(#119): 全 appId の行とファイル・端末内動画(#206)を消す。
     public func removeEverything() {
         tables = [:]
         try? FileManager.default.removeItem(at: directory)
+        videos.removeAll()
     }
 
     // MARK: - Files
