@@ -22,6 +22,7 @@ enum FieldIcon {
             return "number"
         case .enum: return "list.bullet"
         case .photo: return "camera"
+        case .video: return "video"
         case .location: return "mappin.and.ellipse"
         case .boolean: return "checkmark.circle"
         case .text: return "note.text"

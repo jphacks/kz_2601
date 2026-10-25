@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,7 +25,38 @@ const (
 	dateLayout   = "2006-01-02"
 	// maxRefLen bounds a type=ref value (a record id; server ids and iOS "local-<uuid>" are far shorter).
 	maxRefLen = 200
+	// maxVideoLen bounds a type=video value: "video:<id>|<thumbnail data URL>".
+	// iOS keeps the thumbnail around 20-40KB; the record stays far below Firestore's 1MB.
+	maxVideoLen = 200_000
 )
+
+// videoIDPattern is the on-device file id of a type=video value (iOS: UUID).
+var videoIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,80}$`)
+
+// checkVideoValue accepts "video:<id>" optionally followed by
+// "|data:image/...;base64,..." (first-frame thumbnail), or an https URL
+// (reserved for a future Firebase Storage upload). The movie itself never
+// reaches the backend (#206: Firestore documents are capped at 1MB).
+func checkVideoValue(s string) error {
+	if len(s) > maxVideoLen {
+		return fmt.Errorf("exceeds %d bytes", maxVideoLen)
+	}
+	if strings.HasPrefix(s, "https://") {
+		return nil
+	}
+	rest, ok := strings.CutPrefix(s, "video:")
+	if !ok {
+		return fmt.Errorf("must be \"video:<id>|data:image/...\" or an https URL")
+	}
+	id, thumb, hasThumb := strings.Cut(rest, "|")
+	if !videoIDPattern.MatchString(id) {
+		return fmt.Errorf("has an invalid video id")
+	}
+	if hasThumb && !strings.HasPrefix(thumb, "data:image/") {
+		return fmt.Errorf("thumbnail must be a data:image/... URL")
+	}
+	return nil
+}
 
 func invalidRecord(field, msg string) error {
 	return apiErr(http.StatusUnprocessableEntity, httpx.CodeInvalidRecord, fmt.Sprintf("field %q %s", field, msg)).With("field", field)
@@ -272,6 +304,15 @@ func normalizeValue(f *dsl.Field, v any) (any, error) {
 		s, ok := asString(v)
 		if !ok || (!strings.HasPrefix(s, "data:image/") && !strings.HasPrefix(s, "https://")) {
 			return nil, fmt.Errorf("must be a data:image/... URL or https URL")
+		}
+		return s, nil
+	case dsl.FieldVideo:
+		s, ok := asString(v)
+		if !ok {
+			return nil, fmt.Errorf("must be a video value string")
+		}
+		if err := checkVideoValue(s); err != nil {
+			return nil, err
 		}
 		return s, nil
 	case dsl.FieldLocation:

@@ -48,13 +48,13 @@ var systemPrompt = strings.TrimSpace(`
   - Container の子は通常 area 無しで積む(例外は下の「Container 内のグリッド」)。
   - 迷ったら area を省略してよい(省略した部品は最後に使われた行の次から全幅で上から積まれる)。
 - タブ: app.tabs は 0 個(省略)または 2〜5 個(「ホーム / 集計」「今日 / 履歴」のように 2〜3 個が扱いやすい)。各 tab.screen は screens に存在する id で、重複不可。initialScreen は screens に存在する id。
-- entity/field 束縛: 入力部品(textField/numberField/datePicker/picker/toggle/photoField/image)は screen.entity が設定された画面にのみ置き、field はその entity の field id。picker は enum field、photoField/image は photo field。
+- entity/field 束縛: 入力部品(textField/numberField/datePicker/picker/toggle/photoField/image/videoField/videoPlayer)は screen.entity が設定された画面にのみ置き、field はその entity の field id。picker は enum field、photoField/image は photo field、videoField/videoPlayer は video field。
   list/stat/chart の entity は entities の id、item.title/subtitle/trailing/image・sort.field・filter.field・stat.field・chart.groupBy はその entity の field id。stat は aggregate=count 以外 field 必須。
 - entity.scope: 「みんなで」「共有」「投稿」「ランキング」「掲示板」「友達と」のように**他のユーザーと同じデータを見る**用途は scope:"public"(投稿者の author/authorName は backend が付けるので field に入れない)。家計簿・日記・体重のような個人の記録は scope を省略(private)。
 - アクション: navigate.screen は存在する画面 id。saveRecord/deleteRecord は entity 必須。フォーム画面には toolbar に saveRecord ボタンを置く。list.onItemTap で navigate するとフォームが編集モードになる。
 - id は ^[a-z][a-z0-9_-]{0,39}$(英小文字始まり・snake_case)。画面 id・entity id・field id・component id はそれぞれのスコープで一意。
 - 上限: 画面 12・entity 6・entity あたり field 20・1 階層あたり component 30。
-- 金額は type "currency"(unit "円")。日付は type "date"。写真は type "photo" + photoField(source camera)。
+- 金額は type "currency"(unit "円")。日付は type "date"。写真は type "photo" + photoField(source camera)。「動画で残す・撮る」(筋トレのフォーム、子どもの成長、練習・演奏の記録)は type "video" + フォームに videoField(source both・内カメ/外カメは撮影画面で切り替えられる)、詳細の再生は同じ field の videoPlayer、一覧は list.item.image にその video field(1 フレーム目のサムネイル)。写真しか言われていなければ video にしない。
 - リマインド(「毎朝8時に通知」など)は app.notifications[] に {id,title,body,repeat:daily,time:"08:00"} として宣言する。
 - 「歩数を見たい」「今日何歩」は healthStat(metric steps・entity も入力フォームも作らない。週の推移は period week)。体重を手で記録するアプリで「ヘルスケアにも保存/連携」と言われたら、体重 field(number・unit kg)に health:"weight" を付ける(ヘルスケアの体重を見るだけなら healthStat metric weight)。
 - 「○○のサイト/ニュースを見たい」は webView(実在する https URL。分からなければ公式トップ)。「LINE/Slack/Discord で送りたい」は shareButton の shareTo(line|slack|discord)。「地図で開く/電話/メール」は openUrlButton の maps:/tel:/mailto:。
@@ -86,7 +86,7 @@ var systemPrompt = strings.TrimSpace(`
   - **分類つきの記録の内訳**: 「カテゴリ別に記録」「種類ごとに記録」のように enum の分類で記録し、合計や今月いくらかも求められたら、その分類の合計 chart(kind pie か bar・groupBy その enum・stat と同じ期間 filter)をホームに 1 つ置く。
   - **count の単位**: stat の aggregate count は iOS が単位「件」を付ける。「回」「冊」「セット」「日」など件が合わない数は stat.value = {"agg":"count","entity":...,"filter"?:...}(単位なしの数字)にして、単位はラベルに書いてよい(例 label「今日のセット数(回)」)。
   - **sum / avg / max / min / latest の単位**(#177: 「今日の合計回数(回)」が「3 回」と二重になった): 値には iOS が field.unit を付ける。ラベルに単位を書かない(label「今日の合計回数」・field reps の unit「回」→「3 回」)。ラベルに単位を書くのは count の stat.value だけ。
-  - **フォーム**: 写真は photoField だけ(撮影後に自前でプレビューを出すので、同じ field の image を重ねない)。section の area は詰める(行数 = 子の数 + 1 が目安。中身 4 項目なら 5 行)か、フォームは area を省略して上から積む。部品の間に空き行を作らない。
+  - **フォーム**: 写真は photoField だけ(撮影後に自前でプレビューを出すので、同じ field の image を重ねない)。動画も videoField だけでよい(撮影後に自前で再生できる。videoPlayer は別の詳細画面で使う)。section の area は詰める(行数 = 子の数 + 1 が目安。中身 4 項目なら 5 行)か、フォームは area を省略して上から積む。部品の間に空き行を作らない。
   - 表示文字列・description の数字は半角(「2タブ」「3万円」)。
 - **画面の分け方とナビゲーション**(#112: 1 画面に詰め込みがちだった):
   - 発話に**役割の違う画面**(記録の一覧・集計やグラフ・目標や設定・メンバー等のマスタ一覧)が 2 つ以上あるなら、それぞれを画面にして app.tabs(2〜4 個)で分ける。「タブ」「ボトムバー」「別の画面」「切り替えたい」と言われたら必ず tabs にする。役割を発話に無いのに増やさない(上の「発話に無い機能を足さない」が優先)。

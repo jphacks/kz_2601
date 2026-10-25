@@ -394,12 +394,12 @@ func (a *App) Validate() error {
 					add("%s: button needs label and action", where)
 				}
 				checkAction(where, c.Action)
-			case CompTextField, CompNumberField, CompDatePicker, CompPicker, CompToggle, CompPhotoField, CompImage:
+			case CompTextField, CompNumberField, CompDatePicker, CompPicker, CompToggle, CompPhotoField, CompImage, CompVideoField, CompVideoPlayer:
 				if formEntity == nil {
 					add("%s: %s requires screen.entity", where, c.Type)
 				} else if f := formEntity.FieldByID(c.Field); f == nil {
 					add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
-				} else if f.Computed != nil && c.Type != CompImage {
+				} else if f.Computed != nil && c.Type != CompImage && c.Type != CompVideoPlayer {
 					add("%s: field %q is computed (read-only); inputs cannot bind to it. Bind a stored field or show it with list/table/stat", where, c.Field)
 				} else if c.Type == CompPicker && f.Type != FieldEnum && f.Type != FieldRef {
 					add("%s: picker field %q must be enum or ref", where, c.Field)
@@ -407,6 +407,11 @@ func (a *App) Validate() error {
 					add("%s: field %q is type ref; use a picker to choose the %s record", where, c.Field, f.RefEntity)
 				} else if (c.Type == CompPhotoField || c.Type == CompImage) && f.Type != FieldPhoto {
 					add("%s: %s field %q must be type photo", where, c.Type, c.Field)
+				} else if (c.Type == CompVideoField || c.Type == CompVideoPlayer) && f.Type != FieldVideo {
+					add("%s: %s field %q must be type video", where, c.Type, c.Field)
+				}
+				if c.Type == CompVideoField && (c.MaxDuration < 0 || c.MaxDuration > 600) {
+					add("%s: videoField maxDuration must be 1..600 seconds", where)
 				}
 			case CompSlider, CompStepper, CompRating, CompTextEditor, CompSecureField, CompTimePicker, CompColorPicker:
 				checkInputBinding(where, c, formEntity, add)
