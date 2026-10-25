@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "app": { "name": "フォーム記録", "icon": "video", "voiceEntry": "floating" },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "clips",
+      "name": "フォーム動画",
+      "titleField": "exercise",
+      "fields": [
+        { "id": "exercise", "name": "種目", "type": "string", "required": true },
+        { "id": "video", "name": "動画", "type": "video" },
+        { "id": "date", "name": "日付", "type": "date", "defaultValue": "now" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "フォーム記録",
+      "toolbar": [{ "label": "追加", "icon": "plus", "action": { "type": "navigate", "screen": "form", "presentation": "sheet" } }],
+      "components": [
+        {
+          "type": "list", "id": "clips", "area": "A1:F12", "entity": "clips",
+          "item": { "title": "exercise", "subtitle": "date", "image": "video" },
+          "onItemTap": { "type": "navigate", "screen": "form" }
+        }
+      ]
+    },
+    {
+      "id": "form",
+      "title": "動画を撮る",
+      "entity": "clips",
+      "toolbar": [{ "label": "保存", "action": { "type": "saveRecord", "entity": "clips" } }],
+      "components": [
+        { "type": "textField", "id": "exercise", "field": "exercise", "label": "種目" },
+        { "type": "videoField", "id": "video", "field": "video", "label": "フォームを撮る", "source": "both", "maxDuration": 60 },
+        { "type": "videoPlayer", "id": "player", "field": "video", "height": "medium" },
+        { "type": "datePicker", "id": "date", "field": "date", "label": "日付" }
+      ]
+    }
+  ]
+}

@@ -74,6 +74,10 @@ func normalizeDigits(s string) string { return digitWidth.Replace(s) }
 // dropFormPhotoPreviews removes an `image` bound to a photo field that a
 // photoField on the same form screen already binds: photoField shows its own
 // preview, so the photo appeared twice (#87-3). Invalid JSON is returned as is.
+// inputPreview maps an input that previews its own value to the display
+// component that would duplicate it on the same form.
+var inputPreview = map[string]string{"photoField": "image", "videoField": "videoPlayer"}
+
 func dropFormPhotoPreviews(raw []byte) []byte {
 	var doc map[string]any
 	if err := json.Unmarshal(raw, &doc); err != nil {
@@ -87,11 +91,16 @@ func dropFormPhotoPreviews(raw []byte) []byte {
 			continue
 		}
 		comps, _ := sm["components"].([]any)
-		photo := map[string]bool{}
+		// preview type -> fields already bound by its input (videoField plays its own clip, #206)
+		photo := map[string]map[string]bool{}
 		eachComp(comps, func(c map[string]any) {
-			if c["type"] == "photoField" {
+			t, _ := c["type"].(string)
+			if pv, ok := inputPreview[t]; ok {
 				if f, _ := c["field"].(string); f != "" {
-					photo[f] = true
+					if photo[pv] == nil {
+						photo[pv] = map[string]bool{}
+					}
+					photo[pv][f] = true
 				}
 			}
 		})
@@ -100,7 +109,8 @@ func dropFormPhotoPreviews(raw []byte) []byte {
 		}
 		dup := func(c map[string]any) bool {
 			f, _ := c["field"].(string)
-			return c["type"] == "image" && photo[f]
+			t, _ := c["type"].(string)
+			return photo[t][f]
 		}
 		var kept []any
 		for _, c := range comps {
