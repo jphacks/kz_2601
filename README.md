@@ -1,4 +1,4 @@
-# Tailor It
+# [Tailor It](https://tailor-it.app/)
 
 <!-- プロダクト名は上の H1 と次の由来の行だけに書く(本文は「本アプリ」で統一)。 -->
 
