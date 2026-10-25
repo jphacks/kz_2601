@@ -222,9 +222,9 @@ jobs:
     needs: ios-changes
     if: needs.ios-changes.outputs.mode == 'xcode'
     # macos-26: Xcode 26 系。firebase-ios-sdk 13.x が swift-tools 6.2(= Xcode 26)を要求するため macos-15(Xcode 16)では解決不可。
-    # 分単価が高いので無駄に再実行しないこと。push 時は UI テストを含むので上限を少し広めに取る。
+    # 分単価が高いので無駄に再実行しないこと。push 時は UI テストを含むので上限を広めに取る(UI テスト全部で約 31 分かかり 30 分で時間切れになったため 50 分)。
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
 
