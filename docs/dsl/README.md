@@ -88,6 +88,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `grid`(Container) | `children`(1 つ以上) | `columnCount`(2/3/4・`columns` は table の列定義なので別名), `spacing` | | P1 |
 | `searchBar` | `field`(画面ローカルの検索キー) | `placeholder` | | P1 |
 | `calendar` | `entity`, `dateField`(date/datetime) | `onDateTap`, `title` | | P1 |
+| `gridTable` | `entity`, `columnField`(enum/string), `rowField`(integer/enum/string), `titleField` | `subtitleField`, `columnValues`, `rowValues`, `rowRange`{from,to}(integer・既定 1〜6・最大 24 行), `onItemTap`, `title` | string の軸は `columnValues`/`rowValues` 必須 | P1 |
 | `shareButton` | `text`(`{{fieldId}}` 可) | `field`, `label`, `icon`, `shareTo`(any/line/slack/discord・既定 any) | `field`/`{{}}` 使用時のみ | P1 |
 | `openUrlButton` | `label`, `url`(https か `line` `slack` `discord` `tel` `mailto` `maps` `comgooglemaps` スキーム) | `icon`, `style`(primary/secondary/plain) | | P1 |
 | `mapView` | `entity`, `locationField`(location) | `titleField`, `zoom`(near/city/wide), `onItemTap`, `kind`(pins/route・#168), `dateField`(route のみ) | | P1 |
@@ -155,6 +156,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 - `openUrlButton.url` は https のほか allowlist のカスタムスキーム(`line` `slack` `discord` `tel` `mailto` `maps` `comgooglemaps`)を許可する(backend `dsl.OpenURLSchemes` と iOS `ExternalURLPolicy` が同じ表・`line`/`slack`/`discord` は Info.plist `LSApplicationQueriesSchemes` にも登録)。`http://` や未知スキームは backend がエラー・iOS はプレースホルダ。
 - `webView` は `WKWebView` の `UIViewRepresentable`(戻る/進む/再読込の小ツールバー + 読み込みバー)。https 以外は不可。WKWebView 自身がスクロールするので `GridScreenLayout.scrollsInside` には**入れない**(セル内で二重スクロールしない)。ページ内リンクが allowlist のスキーム(tel: 等)なら OS に渡し、それ以外の非 http(s) は無視。実例: `examples/gallery-web.json`(webView + LINE/Slack/Discord/共有シートの 4 ボタン + maps/tel/mailto/line リンク)。
 - `calendar.onDateTap` は既存の `navigate` を使う。行タップは recordId を渡して編集、「追加」はタップした日を `dateField` の初期値として Renderer 内の `FormPrefill` に積み、次に開いた新規フォームが 1 回だけ消費する(`Action` に params を増やさない)。
+- `gridTable`(#234)は時間割のマス目。列 = columnField の値(enum の options か columnValues)、行 = rowField の値(integer は rowRange、enum は options か rowValues)。マスのタップは `onItemTap`: 記録 1 件 = recordId 付きで編集、空き = 列・行の値を `FormPrefill` に積んで新規、複数 = メニュー(各記録の編集 + 追加)。1 マスに複数ある時は先頭 + 「+n」。列見出しが曜日なら今日の列を強調。列が画面幅に収まらなければ横スクロール、縦は `GridCell` の内側スクロール。配置計算は iOS `GridTableLayout`(MetamonDSL)。実例: `examples/timetable.json`。
 - `searchBar.field` は entity の field ではなく**画面ローカルのキー**(`ScreenLocals`)。`list.searchField` で参照し、レコードには保存しない。
 - `mapView` は `latField`/`lngField` の 2 列ではなく既存の **`location` 型 field 1 つ**(`"lat,lng"`)を使う(`locationButton` の保存先と同じ表現・entity の field 数を増やさない)。既存 `map` Leaf は無かったので新設。
 - **`locationPicker`(#212)**: 現在地以外の場所を選ぶ入力欄。シートで店名・地名・住所を検索(MapKit `MKLocalSearch`・API キー不要)/ 地図を動かして中央のピン / 現在地 から選ぶ。保存は `locationButton` と同じ `"lat,lng"`(値の形を増やさない=mapView・appconfig の検証はそのまま)。場所の名前は任意の `nameField`(string field)に入れる(ピン・現在地で名前が無い時は打った名前を消さない)。「今いる場所」だけなら `locationButton`。モック(`METAMON_MOCK=1`)の検索は固定 3 件。

@@ -95,5 +95,9 @@
   {"id": "field_cap_add2", "kind": "edit", "group": "fieldcap", "base": "example:checkup19", "transcript": "MCVとMCHを追加して",
    "expect": {"patch": true, "unreachable": 0, "keepEntity": "checkup", "keep": ["date","height","weight","bmi","sbp","dbp","wbc","rbc","hgb","hct","plt","ast","alt","ggt","ldl","hdl","tg","egfr","ua"], "growTo": 21}, "note": "#221 19 項目に 2 つ足す: 全部残して 21 か、消さずに上限を伝える"},
   {"id": "field_cap_full", "kind": "edit", "group": "fieldcap", "base": "example:checkup39", "transcript": "MCVとMCHを追加して",
-   "expect": {"patch": true, "unreachable": 0, "keepEntity": "checkup", "keep": ["date", "height", "weight", "bmi", "sbp", "dbp", "wbc", "rbc", "hgb", "hct", "plt", "ast", "alt", "ggt", "ldl", "hdl", "tg", "egfr", "ua", "fbs", "hba1c", "cre", "bun", "tc", "alp", "ldh", "tp", "alb", "tbil", "na", "k", "cl", "ca", "fe", "crp", "waist", "pulse", "eye_l", "eye_r"], "growTo": 41}, "note": "#221 39 項目 + 2 は上限 40 を超える: 既存を消さずに上限を伝える"}
+   "expect": {"patch": true, "unreachable": 0, "keepEntity": "checkup", "keep": ["date", "height", "weight", "bmi", "sbp", "dbp", "wbc", "rbc", "hgb", "hct", "plt", "ast", "alt", "ggt", "ldl", "hdl", "tg", "egfr", "ua", "fbs", "hba1c", "cre", "bun", "tc", "alp", "ldh", "tp", "alb", "tbil", "na", "k", "cl", "ca", "fe", "crp", "waist", "pulse", "eye_l", "eye_r"], "growTo": 41}, "note": "#221 39 項目 + 2 は上限 40 を超える: 既存を消さずに上限を伝える"},
+  {"id": "grid_timetable", "kind": "create", "group": "grid", "transcript": "大学の時間割を作りたい。月曜から金曜で1限から6限まで、教室も書きたい",
+   "expect": {"grid": true, "unreachable": 0}, "note": "#234 曜日 x 時限の gridTable"},
+  {"id": "grid_shift", "kind": "create", "group": "grid", "transcript": "バイトの週のシフト表を作りたい。曜日ごとに早番と遅番に誰が入るか見たい",
+   "expect": {"grid": true, "unreachable": 0}, "note": "#234 曜日 x シフト帯(enum)の gridTable"}
 ]
