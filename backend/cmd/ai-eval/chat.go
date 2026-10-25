@@ -52,6 +52,13 @@ type ChatStep struct {
 	// SuggAny (#211): every suggestion chip contains at least one of these
 	// (the current app's field names), so a chip answers the question.
 	SuggAny []string `json:"suggAny,omitempty"`
+	// GenSay / GenHas (#230): for a "できる?" answer, send GenSay (the
+	// direct request) to Service.Generate on a copy of the base and require
+	// every GenHas string in the resulting DSL, so the answer and what
+	// generate really builds can be compared. Without GenHas the outcome is
+	// only recorded (for "できません" answers).
+	GenSay string   `json:"genSay,omitempty"`
+	GenHas []string `json:"genHas,omitempty"`
 }
 
 type ChatCase struct {
@@ -76,6 +83,7 @@ type ChatGenRecord struct {
 	Unchanged   bool     `json:"unchanged,omitempty"` // #211: generate made no change
 	TotalMs     int64    `json:"totalMs"`
 	Lint        []string `json:"lint,omitempty"`
+	dsl         string   // resulting DSL, checked by GenHas (not written to raw output)
 }
 
 type ChatStepRecord struct {
@@ -199,6 +207,14 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string
 				rec.Locale = string(res.Locale)
 			}
 			sr.Misses = checkChatStep(st, res)
+			if st.GenSay != "" && base != nil {
+				sr.Gen = generateWith(ctx, svc, c.ID, base, st.GenSay, res.Locale)
+				for _, w := range st.GenHas {
+					if !sr.Gen.OK || sr.Gen.Unchanged || !strings.Contains(sr.Gen.dsl, w) {
+						sr.Misses = append(sr.Misses, "generate lacks "+w)
+					}
+				}
+			}
 			if st.Generate && base != nil {
 				sr.Gen = generateFromChat(ctx, svc, c.ID, base, res, st.GenerateAll)
 				if !sr.Gen.OK {
@@ -256,20 +272,29 @@ func generateFromChat(ctx context.Context, svc *ai.Service, caseID string, base 
 		g.Error = "nothing to generate (kind " + res.Kind + ")"
 		return g
 	}
+	return runGenerate(ctx, svc, caseID, base, g, res.Locale)
+}
+
+// generateWith runs /generate (edit) with a fixed instruction (#230 GenSay).
+func generateWith(ctx context.Context, svc *ai.Service, caseID string, base []byte, instruction string, loc ai.Locale) *ChatGenRecord {
+	return runGenerate(ctx, svc, caseID, base, &ChatGenRecord{Instruction: instruction}, loc)
+}
+
+func runGenerate(ctx context.Context, svc *ai.Service, caseID string, base []byte, g *ChatGenRecord, loc ai.Locale) *ChatGenRecord {
 	appID := fmt.Sprintf("gen-%s-%d", caseID, time.Now().UnixNano())
 	if _, err := svc.Store.Put(ctx, appID, 0, base, appconfigclient.Source{Kind: "seed"}); err != nil {
 		g.Error = err.Error()
 		return g
 	}
 	started := time.Now()
-	out, err := svc.Generate(ctx, ai.Request{AppID: appID, Transcript: g.Instruction, Mode: ai.ModeEdit, Locale: res.Locale})
+	out, err := svc.Generate(ctx, ai.Request{AppID: appID, Transcript: g.Instruction, Mode: ai.ModeEdit, Locale: loc})
 	g.TotalMs = time.Since(started).Milliseconds()
 	if err != nil {
 		g.Error = err.Error()
 		return g
 	}
 	g.OK, g.Mode, g.Summary, g.Ops, g.Lint = true, out.Mode, out.Summary, len(out.Patch), out.Meta.Lint
-	g.Unchanged = out.Unchanged
+	g.Unchanged, g.dsl = out.Unchanged, string(out.DSL)
 	log.Printf("[%s] generate %s ops=%d %dms summary=%q", caseID, out.Mode, g.Ops, g.TotalMs, out.Summary)
 	return g
 }
