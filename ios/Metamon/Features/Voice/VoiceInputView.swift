@@ -23,7 +23,7 @@ struct VoiceInputView: View {
     /// 初期状態(全画面)か、生成後のシート(改変)か。
     private var isInitial: Bool { rt.dsl.isVoiceOnly }
     /// 対話中(初期画面の新規作成も、生成後のシートの改変も・#186)。
-    private var inChat: Bool { rt.isChatting }
+    private var inChat: Bool { rt.isChatting || (!isInitial && rt.hasChatHistory) } // #210 生成後のシートは履歴があれば続きを見せる
 
     /// 見出し・サブ文言(#42)。初回/再訪/新規/戻る/改変 × 時間帯。`prompt`(DSL の voiceInput.prompt)があれば見出しだけ上書き。
     private var greeting: Greeting.Copy {
@@ -139,7 +139,7 @@ struct VoiceInputView: View {
             }
             Spacer()
             if inChat {
-                Button { rt.resetChat() } label: {
+                Button { rt.restartChat() } label: {
                     Label(ClarifyCopy.restart, systemImage: "arrow.counterclockwise")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)

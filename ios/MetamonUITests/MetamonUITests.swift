@@ -191,6 +191,36 @@ final class MetamonUITests: XCTestCase {
         attachScreenshot("chat-proposal-applied")
     }
 
+    // MARK: - チャット履歴(#210)
+
+    func testChatHistoryRemainsAfterApply() {
+        // 案の「これでいく」で反映 → シートを開き直すと、前の会話と「ここで反映しました(v2)」の区切りが見える
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "見やすくして", "METAMON_AUTO_PAUSE": "600"])
+        let choose = app.buttons.matching(identifier: "chat.option.choose")
+        XCTAssertTrue(choose.firstMatch.waitForExistence(timeout: 15), "案のカードの「これでいく」が出ない")
+        XCTAssertTrue(waitUntil(timeout: 15) { choose.count == 2 }, "案のカードが 2 枚でない")
+        attachScreenshot("history-1-before-apply")
+        choose.firstMatch.tap()
+        XCTAssertTrue(waitFor(voiceSheet, "exists == false", timeout: 15), "「これでいく」で音声シートが閉じない")
+        let applied = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "反映しました")).firstMatch
+        XCTAssertTrue(applied.waitForExistence(timeout: 15), "改変されない")
+        attachScreenshot("history-2-applied")
+
+        waitForFab()
+        fab.tap()
+        XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開き直せない")
+        let divider = app.descendants(matching: .any)["chat.history.applied"]
+        XCTAssertTrue(divider.waitForExistence(timeout: 15), "反映の区切りが見えない")
+        XCTAssertTrue(divider.label.contains("ここで反映しました(v2)"), "区切りの文言: \(divider.label)")
+        XCTAssertTrue(element(labelBeginsWith: "あなた: 見やすくして").exists, "前の会話が見えない")
+        XCTAssertTrue(app.buttons["chat.restart"].exists, "「最初から」が無い")
+        attachScreenshot("history-3-reopened")
+
+        app.buttons["chat.restart"].tap()
+        XCTAssertTrue(waitFor(divider, "exists == false", timeout: 15), "「最初から」で履歴が消えない")
+        attachScreenshot("history-4-restarted")
+    }
+
     // MARK: - 一覧のチェック丸(#127)
 
     func testListCheckCircleMarksDone() {

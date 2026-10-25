@@ -60,6 +60,11 @@ struct ClarifyChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: Theme.Spacing.md) {
+                    // 閉じた会話と反映の区切り(#210)。今の会話の上に続けて出す
+                    ForEach(rt.chatHistory) { entry in
+                        HistoryRow(entry: entry)
+                            .id(entry.id)
+                    }
                     ForEach(rt.chatBubbles) { bubble in
                         BubbleRow(bubble: bubble, emphasized: bubble.id == lastAssistantId && rt.chatTurn?.kind == .question)
                             .id(bubble.id)
@@ -127,7 +132,7 @@ struct ClarifyChatView: View {
         let target: AnyHashable? = rt.chatPending ? "pending"
             : ready != nil ? "ready"
             : !proposals.isEmpty ? "proposals"
-            : rt.chatBubbles.last.map { AnyHashable($0.id) }
+            : rt.chatBubbles.last.map { AnyHashable($0.id) } ?? rt.chatHistory.last.map { AnyHashable($0.id) }
         guard let target else { return }
         withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo(target, anchor: .bottom) }
     }
@@ -325,6 +330,37 @@ private struct BubbleRow: View {
 
     private var background: AnyShapeStyle {
         bubble.role == .user ? AnyShapeStyle(Theme.brandGradient) : AnyShapeStyle(Theme.Colors.surface)
+    }
+}
+
+/// 閉じた会話の 1 件(#210)。吹き出しは今の会話と同じ見た目、反映は区切り線 +「ここで反映しました(v3)・〜」。
+private struct HistoryRow: View {
+    let entry: ChatHistoryEntry
+
+    var body: some View {
+        switch entry.kind {
+        case .user:
+            BubbleRow(bubble: .init(role: .user, text: entry.text), emphasized: false)
+        case .assistant:
+            BubbleRow(bubble: .init(role: .assistant, text: entry.text), emphasized: false)
+        case .applied:
+            HStack(spacing: Theme.Spacing.sm) {
+                line
+                Label(ChatContext.dividerText(entry), systemImage: "checkmark.circle.fill")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                line
+            }
+            .padding(.vertical, Theme.Spacing.xs)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("chat.history.applied")
+        }
+    }
+
+    private var line: some View {
+        Rectangle().fill(Theme.Colors.hairline).frame(height: 1).frame(minWidth: 16)
     }
 }
 

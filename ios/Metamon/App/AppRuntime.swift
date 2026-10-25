@@ -9,7 +9,9 @@ import MetamonServices
 @MainActor
 @Observable
 final class AppRuntime: DSLRuntime {
-    private(set) var document: AppDocument
+    private(set) var document: AppDocument {
+        didSet { if oldValue.appId != document.appId { reloadChatHistory() } } // #210 アプリごとのチャット履歴
+    }
     var dsl: AppDSL { document.dsl }
 
     /// entity id → レコード(サーバーが正。ここはキャッシュ)
@@ -106,7 +108,15 @@ final class AppRuntime: DSLRuntime {
         var kind: ChatTurn.Kind? = nil
     }
     /// 会話中の吹き出し(空 = 対話していない)。初期画面(create)と生成後の音声シート(edit・#186)で使う。
-    var chatBubbles: [ChatBubble] = []
+    var chatBubbles: [ChatBubble] = [] {
+        didSet { if chatBubbles != oldValue { persistChatHistory() } } // #210 再起動しても続きが見えるよう吹き出しごとに保存
+    }
+    /// 閉じた会話と反映の区切り(#210・`AppRuntime+ChatHistory.swift`)。今の会話(`chatBubbles`)は含まない
+    var chatHistory: [ChatHistoryEntry] = []
+    /// 履歴の保存先(テストで差し替える)
+    @ObservationIgnored var chatHistoryStore: ChatHistoryStore = .shared {
+        didSet { reloadChatHistory() }
+    }
     /// `POST /v1/chat` の応答待ち
     var chatPending = false
     /// 直近の応答。question = チップ / proposal = 案のカード / ready = 要約 +「これでいく」(`ClarifyFlow.offer`)
@@ -157,6 +167,7 @@ final class AppRuntime: DSLRuntime {
         self.deferredMorph = DeferredSend(connectivity: recordSync.connectivity)
         self.selectedTab = document.dsl.initialTab
         recordSync.onEvent = { [weak self] event in self?.handle(event) }
+        reloadChatHistory()
     }
 
     // MARK: - Lifecycle
@@ -439,6 +450,7 @@ final class AppRuntime: DSLRuntime {
             let result = try await task.value
             remember(previous)
             apply(result.document) // withAnimation の中で morphJob = nil も行う
+            noteChatApplied(version: result.document.version, summary: result.summary) // #210 反映の区切り
             startSync()
             if let summary = result.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
                 summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary))

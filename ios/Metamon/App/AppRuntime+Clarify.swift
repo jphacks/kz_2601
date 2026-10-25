@@ -157,6 +157,7 @@ extension AppRuntime {
 
     /// 会話を捨てる(「最初から」・別アプリへの切替・生成開始)。サーバー側も `DELETE /v1/chat/{appId}`。
     func resetChat() {
+        archiveLiveChat() // #210 閉じた会話として残す(「最初から」は `restartChat` で消す)
         cancelAutoBuild()
         chatTask?.cancel()
         chatTask = nil
@@ -193,7 +194,7 @@ extension AppRuntime {
         let epoch = chatEpoch
         let appId = document.appId
         let mode = chatMode
-        let history = chatBubbles.map { ChatMessage(role: $0.role == .user ? .user : .assistant, text: $0.text) }
+        let history = chatContextMessages // #210 過去の変更の要約 + 最後の反映以降 + 今の会話
         var timing = chatTiming
         chatTiming = ChatTiming()
         withAnimation(.easeInOut(duration: 0.25)) {
