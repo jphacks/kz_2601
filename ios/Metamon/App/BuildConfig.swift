@@ -167,10 +167,14 @@ enum BuildConfig {
 enum DeviceAppID {
     private static let key = "metamon.appId"
 
+    /// この起動で初めて appId を発行したか(インストール直後・#276)。サインイン後にサーバーの最近のアプリを開く判定に使う。
+    private(set) static var issuedThisLaunch = false
+
     static var current: String {
         if let saved = UserDefaults.standard.string(forKey: key), !saved.isEmpty { return saved }
         let fresh = UUID().uuidString.lowercased()
         UserDefaults.standard.set(fresh, forKey: key)
+        issuedThisLaunch = true
         return fresh
     }
 
