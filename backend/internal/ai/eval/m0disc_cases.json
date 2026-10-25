@@ -1,14 +1,14 @@
 [
   {"id": "d_friends_vague", "kind": "create", "group": "m0-social", "transcript": "友達と使えるやつ作って", "note": "ふわっと・共有"},
-  {"id": "d_sns_post", "kind": "create", "group": "m0-social", "transcript": "写真と一言を投稿して、友達がいいねとコメントできるSNSみたいなアプリ", "expect": {"photo": true, "scope": "public"}},
+  {"id": "d_sns_post", "kind": "create", "group": "m0-social", "transcript": "写真と一言を投稿して、友達がいいねとコメントできるSNSみたいなアプリ", "expect": {"photo": true, "scope": "public", "authorShown": true, "nameInput": false}},
   {"id": "d_sns_follow", "kind": "create", "group": "m0-social", "transcript": "フォローした人の投稿だけがタイムラインに流れるアプリ。プロフィールも作りたい", "note": "フォロー・タイムライン"},
   {"id": "d_group_chat", "kind": "create", "group": "m0-social", "transcript": "サークルのみんなでチャットできるアプリ。新しいメッセージが来たら通知してほしい", "note": "チャット・プッシュ"},
-  {"id": "d_circle_attend", "kind": "create", "group": "m0-social", "transcript": "サークルの練習の出欠をメンバーが各自で〇×つけられるやつ。誰が来るか一覧で見たい", "expect": {"scope": "shared"}},
+  {"id": "d_circle_attend", "kind": "create", "group": "m0-social", "transcript": "サークルの練習の出欠をメンバーが各自で〇×つけられるやつ。誰が来るか一覧で見たい", "expect": {"scope": "shared", "authorShown": true, "nameInput": false}},
   {"id": "d_family_todo", "kind": "create", "group": "m0-social", "transcript": "家族で共有する家事分担のアプリ。誰が何をやったか分かって、終わったらチェック", "expect": {"editMembers": true}, "note": "家族限定の共有・#252 他の家族も完了にできる"},
   {"id": "d_ranking", "kind": "create", "group": "m0-social", "transcript": "ラーメン屋の評価をみんなで投稿して点数のランキングが見られるアプリ", "expect": {"scope": "public", "editMembers": false}},
   {"id": "d_dm", "kind": "create", "group": "m0-social", "transcript": "特定の友達と1対1でメッセージを送り合えるアプリ", "note": "ユーザー間DM"},
   {"id": "d_reserve", "kind": "create", "group": "m0-booking", "transcript": "美容室の予約を受け付けるアプリ。お客さんが空いてる時間を選んで予約できて、同じ時間に2人入らないようにしたい", "note": "予約・排他"},
-  {"id": "d_event_rsvp", "kind": "create", "group": "m0-booking", "transcript": "飲み会の日程調整。候補日を出してみんなが〇△×で答えられるやつ", "note": "調整さん"},
+  {"id": "d_event_rsvp", "kind": "create", "group": "m0-booking", "transcript": "飲み会の日程調整。候補日を出してみんなが〇△×で答えられるやつ", "expect": {"nameInput": false}, "note": "調整さん・#250 名前は $author"},
   {"id": "d_inventory", "kind": "create", "group": "m0-work", "transcript": "お店の在庫管理。商品ごとの在庫数を管理して、入荷と出荷で数が増減して、少なくなったら教えて", "note": "在庫の増減・閾値通知"},
   {"id": "d_shift", "kind": "create", "group": "m0-work", "transcript": "バイトのシフト希望をスタッフが出して、店長が確定できるアプリ", "expect": {"editMembers": true}, "note": "役割・権限・#252 役割は無いので members で代替"},
   {"id": "d_task_team", "kind": "create", "group": "m0-work", "transcript": "チームのタスク管理。担当者と期限と状態を決めて、期限が近いものを上に出したい"},
@@ -31,6 +31,6 @@
   {"id": "d_lost_found", "kind": "create", "group": "m0-social", "transcript": "大学の落とし物掲示板。拾った物を写真と場所で投稿して、持ち主が見つかったら解決にする", "expect": {"scope": "public", "photo": true, "editMembers": true}},
   {"id": "d_edit_like", "kind": "edit", "base": "d_lost_found", "group": "m0-edit", "transcript": "投稿にいいねボタンを付けて、いいねの数も出して"},
   {"id": "d_edit_comment", "kind": "edit", "base": "d_ranking", "group": "m0-edit", "transcript": "それぞれのお店にみんながコメントを書けるようにして"},
-  {"id": "d_edit_mine_only", "kind": "edit", "base": "d_lost_found", "group": "m0-edit", "transcript": "自分が投稿したものだけ見られるタブを足して"},
+  {"id": "d_edit_mine_only", "kind": "edit", "base": "d_lost_found", "group": "m0-edit", "transcript": "自分が投稿したものだけ見られるタブを足して", "expect": {"meFilter": true, "patch": true}},
   {"id": "d_edit_notify_new", "kind": "edit", "base": "d_circle_attend", "group": "m0-edit", "transcript": "誰かが出欠をつけたら私に通知が来るようにして"}
 ]
