@@ -7,9 +7,12 @@ private actor RecordingClient: AppConfigClient {
     var calls: [String] = []
     var failures = 0
     var byClientId: [String: Record] = [:]
+    /// create で返す拒否(422 等)。entity ごと
+    var rejectCreate: [String: APIError] = [:]
     let inner = InMemoryAppConfigClient()
 
     func setFailures(_ n: Int) { failures = n }
+    func setRejectCreate(_ entity: String, _ e: APIError) { rejectCreate[entity] = e }
 
     private func gate(_ name: String) throws {
         calls.append(name)
@@ -31,6 +34,7 @@ private actor RecordingClient: AppConfigClient {
     }
     func create(appId: String, entity: String, data: [String: JSONValue], clientId: String) async throws -> Record {
         try gate("create:\(clientId)")
+        if let e = rejectCreate[entity] { throw e }
         if let existing = byClientId[clientId] { return existing }
         let r = try await inner.create(appId: appId, entity: entity, data: data)
         byClientId[clientId] = r
@@ -212,6 +216,46 @@ final class RecordSyncTests: XCTestCase {
         XCTAssertEqual(row?.pendingOp, PendingOp.none, "未送信印を落とし、次の pull でサーバー版に置き換わる")
         let count = await queue.count
         XCTAssertEqual(count, 0)
+    }
+
+    /// 旅行の割り勘: 未送信のメンバーを「払った人」に選んだ支出は、メンバーの送信後にサーバー id で送る。
+    func testSyncQueueResolvesLocalRefIdAfterReferencedCreate() async throws {
+        let client = RecordingClient()
+        let store = RecordStore(directory: dir)
+        let queue = SyncQueue(directory: dir, store: store, client: client, policy: .immediate)
+        await queue.enqueue(SyncOperation(id: "m1", appId: "a", entity: "members", recordId: "local-m1", kind: .create, data: ["name": "たろう"]))
+        await queue.enqueue(SyncOperation(id: "e1", appId: "a", entity: "expenses", recordId: "local-e1", kind: .create,
+                                          data: ["amount": 3000, "payer": "local-m1", "memo": "local-は普通の文字"]))
+        await queue.drain()
+        let created = await client.byClientId
+        let memberId = try XCTUnwrap(created["m1"]?.id)
+        XCTAssertFalse(memberId.hasPrefix("local-"))
+        XCTAssertEqual(created["e1"]?.data["payer"], .string(memberId), "仮 id はサーバー id に差し替えて送る")
+        XCTAssertEqual(created["e1"]?.data["memo"], .string("local-は普通の文字"), "別名に無い文字列はそのまま")
+    }
+
+    /// 422 で弾かれたら操作とローカル行を捨て、どの項目か(details.field)を UI に渡す。
+    func testSyncQueueRejectedEmitsFieldAndDropsCreate() async throws {
+        let client = RecordingClient()
+        await client.setRejectCreate("expenses", APIError.server(status: 422, code: "invalid_record",
+                                                                message: "field \"payer\" is required", details: ["field": .string("payer")]))
+        let store = RecordStore(directory: dir)
+        let queue = SyncQueue(directory: dir, store: store, client: client, policy: .immediate)
+        await store.upsert(LocalRecord(appId: "a", entity: "expenses", recordId: "local-e1", data: ["amount": 1], pendingOp: .create, clientId: "e1"))
+        let events = await queue.events()
+        await queue.enqueue(SyncOperation(id: "e1", appId: "a", entity: "expenses", recordId: "local-e1", kind: .create, data: ["amount": 1]))
+        await queue.drain()
+        var it = events.makeAsyncIterator()
+        let first = await it.next()
+        guard case .rejected(let appId, let entity, let message, let field)? = first else {
+            return XCTFail("expected rejected, got \(String(describing: first))")
+        }
+        XCTAssertEqual([appId, entity, field], ["a", "expenses", "payer"])
+        XCTAssertEqual(message, "field \"payer\" is required")
+        let count = await queue.count
+        XCTAssertEqual(count, 0, "拒否された操作は再送しない(キューに詰まらない)")
+        let rows = await store.records(appId: "a", entity: "expenses")
+        XCTAssertTrue(rows.isEmpty, "拒否された create のローカル行は消える")
     }
 
     func testClassify() {
