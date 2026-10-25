@@ -22,7 +22,7 @@ final class MetamonUITests: XCTestCase {
     private func launch(example: String?, _ extra: [String: String] = [:]) -> XCUIApplication {
         let app = XCUIApplication()
         // METAMON_UI_PROBE: 生成中の表示が出ない時の切り分け用に、morphJob の状態を読める観測点を置く(#200)
-        var env = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto", "METAMON_UI_PROBE": "1"]
+        var env = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto", "METAMON_UI_PROBE": "1", "METAMON_AI_CONSENT": "granted"]
         if let example { env["METAMON_INITIAL_EXAMPLE"] = example }
         env.merge(extra) { _, new in new }
         app.launchEnvironment = env
