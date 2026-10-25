@@ -1,0 +1,154 @@
+{
+  "app": {
+    "description": "行ってみたいお店を検索・地図で選んで登録し、地図と一覧で見返す(#212 locationPicker)",
+    "icon": "mappin.and.ellipse",
+    "name": "行きたいお店リスト",
+    "theme": {
+      "primaryColor": "#E64A19"
+    },
+    "voiceEntry": "floating"
+  },
+  "entities": [
+    {
+      "fields": [
+        {
+          "id": "name",
+          "name": "お店の名前",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "id": "place",
+          "name": "場所",
+          "required": true,
+          "type": "location"
+        },
+        {
+          "id": "memo",
+          "name": "メモ",
+          "type": "text"
+        }
+      ],
+      "id": "shop",
+      "name": "お店",
+      "titleField": "name"
+    }
+  ],
+  "initialScreen": "home",
+  "schemaVersion": 1,
+  "screens": [
+    {
+      "components": [
+        {
+          "area": "A1:F6",
+          "entity": "shop",
+          "id": "map",
+          "kind": "pins",
+          "locationField": "place",
+          "titleField": "name",
+          "type": "mapView"
+        },
+        {
+          "area": "A7:F10",
+          "children": [
+            {
+              "emptyText": "まだお店がありません",
+              "entity": "shop",
+              "item": {
+                "subtitle": "memo",
+                "title": "name"
+              },
+              "onItemTap": {
+                "presentation": "push",
+                "screen": "shop_form",
+                "type": "navigate"
+              },
+              "swipeToDelete": true,
+              "type": "list"
+            }
+          ],
+          "id": "shops",
+          "title": "お店一覧",
+          "type": "section"
+        },
+        {
+          "action": {
+            "presentation": "sheet",
+            "screen": "shop_form",
+            "type": "navigate"
+          },
+          "area": "D11:F12",
+          "icon": "plus",
+          "id": "add",
+          "label": "お店を追加",
+          "type": "button"
+        }
+      ],
+      "id": "home",
+      "title": "行きたいお店",
+      "toolbar": [
+        {
+          "action": {
+            "presentation": "sheet",
+            "screen": "shop_form",
+            "type": "navigate"
+          },
+          "icon": "plus",
+          "label": "追加"
+        }
+      ]
+    },
+    {
+      "components": [
+        {
+          "area": "A1:F2",
+          "field": "name",
+          "id": "name_in",
+          "label": "お店の名前",
+          "placeholder": "カフェ",
+          "type": "textField"
+        },
+        {
+          "area": "A3:F6",
+          "field": "place",
+          "id": "place_in",
+          "label": "場所を検索",
+          "nameField": "name",
+          "type": "locationPicker"
+        },
+        {
+          "area": "A7:F9",
+          "field": "memo",
+          "id": "memo_in",
+          "placeholder": "メモ",
+          "type": "textEditor"
+        },
+        {
+          "action": {
+            "confirmMessage": "このお店を削除しますか？",
+            "entity": "shop",
+            "type": "deleteRecord"
+          },
+          "area": "A11:F12",
+          "id": "delete",
+          "label": "削除",
+          "style": "destructive",
+          "type": "button"
+        }
+      ],
+      "entity": "shop",
+      "id": "shop_form",
+      "title": "お店を登録",
+      "toolbar": [
+        {
+          "action": {
+            "entity": "shop",
+            "type": "saveRecord"
+          },
+          "icon": "checkmark",
+          "label": "保存"
+        }
+      ]
+    }
+  ]
+}
