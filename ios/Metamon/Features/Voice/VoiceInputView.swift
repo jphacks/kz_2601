@@ -37,42 +37,32 @@ struct VoiceInputView: View {
             VStack(spacing: 0) {
                 topBar
                 if inChat {
-                    // 対話(#75 / #186): 吹き出し + 答え / 質問チップ / 案のカード / 要約 +「これでいく」
+                    // 対話(#75 / #186): 吹き出し + 答え / 質問チップ / 案のカード / 要約 +「これでいく」。
+                    // 入力欄のキーボード追従は ClarifyChatView の safeAreaInset だけに任せる(#208):
+                    // ここで safeAreaInset や phase のアニメーションを重ねると、返事が届いた瞬間(phase: thinking → idle)に
+                    // キーボード分の安全領域ごとアニメーションし直して入力欄がずれうる
                     ClarifyChatView(micMode: micMode, statusText: statusText, onMic: { Task { await toggle() } },
                                     onSend: { submit($0) })
                         .transition(.opacity)
                 } else {
-                    Spacer(minLength: Theme.Spacing.md)
-                    ScreenContextChip() // 画面マップで選んだ画面(#116)
-                    heading
-                    Spacer(minLength: Theme.Spacing.lg)
-                    // 文字入力中はマイク・例文・「探す」を畳み、入力欄をキーボードの直上に置く(縦に収まらず入力欄が隠れていた・#143)
-                    if !typing {
-                        micSection
-                        Spacer(minLength: Theme.Spacing.lg)
-                    }
-                    errorCard
-                    transcriptCard
-                    Spacer(minLength: Theme.Spacing.md)
-                }
-            }
-            // 例文・文字入力・「探す」は下に固定し、キーボードと同じアニメーションで一緒に上げる(#196)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if !inChat {
-                    VStack(spacing: 0) {
-                        if !typing { examples }
-                        textEntry
-                        if isInitial, !typing { DiscoverEntry() } // 「探す」(#50)
-                    }
-                    .padding(.bottom, Theme.Spacing.sm)
+                    idleContent
+                        // 例文・文字入力・「探す」は下に固定し、キーボードと同じアニメーションで一緒に上げる(#196)
+                        .safeAreaInset(edge: .bottom, spacing: 0) {
+                            VStack(spacing: 0) {
+                                if !typing { examples }
+                                textEntry
+                                if isInitial, !typing { DiscoverEntry() } // 「探す」(#50)
+                            }
+                            .padding(.bottom, Theme.Spacing.sm)
+                        }
+                        .animation(.spring(duration: 0.45, bounce: 0.15), value: phase)
+                        .animation(.spring(duration: 0.45, bounce: 0.15), value: transcript)
+                        .animation(.spring(duration: 0.45, bounce: 0.15), value: rt.errorCard)
                 }
             }
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.top, isInitial ? 0 : Theme.Spacing.md)
         }
-        .animation(.spring(duration: 0.45, bounce: 0.15), value: phase)
-        .animation(.spring(duration: 0.45, bounce: 0.15), value: transcript)
-        .animation(.spring(duration: 0.45, bounce: 0.15), value: rt.errorCard)
         .animation(.spring(duration: 0.45, bounce: 0.15), value: inChat)
         // typing には明示アニメーションを付けない: キーボードの持ち上げが別カーブで動いて入力欄が遅れて見えていた(#196)
         // 保険(#200): 初期画面から create が始まったら、この画面の上にも全画面の生成中表示を重ねる。
@@ -120,6 +110,24 @@ struct VoiceInputView: View {
     }
 
     // MARK: - Sections
+
+    /// 対話の前(マイク・見出し・書き起こし)。
+    private var idleContent: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: Theme.Spacing.md)
+            ScreenContextChip() // 画面マップで選んだ画面(#116)
+            heading
+            Spacer(minLength: Theme.Spacing.lg)
+            // 文字入力中はマイク・例文・「探す」を畳み、入力欄をキーボードの直上に置く(縦に収まらず入力欄が隠れていた・#143)
+            if !typing {
+                micSection
+                Spacer(minLength: Theme.Spacing.lg)
+            }
+            errorCard
+            transcriptCard
+            Spacer(minLength: Theme.Spacing.md)
+        }
+    }
 
     private var topBar: some View {
         HStack {
