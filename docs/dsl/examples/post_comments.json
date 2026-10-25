@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "ひとこと投稿",
+    "description": "ひとことを投稿し、投稿の画面からコメントを書く(親の投稿が入った状態でコメントのフォームが開く)",
+    "icon": "bubble.left.and.bubble.right",
+    "theme": { "primaryColor": "#5E35B1" },
+    "voiceEntry": "floating",
+    "tabs": [
+      { "screen": "home", "title": "投稿", "icon": "text.bubble" },
+      { "screen": "comments", "title": "コメント", "icon": "bubble.left" }
+    ]
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "posts",
+      "name": "投稿",
+      "titleField": "body",
+      "scope": "public",
+      "fields": [
+        { "id": "body", "name": "ひとこと", "type": "string", "required": true },
+        { "id": "posted", "name": "投稿日", "type": "datetime", "defaultValue": "now" },
+        { "id": "comment_count", "name": "コメント数", "type": "integer", "unit": "件",
+          "computed": { "agg": "count", "entity": "post_comments", "filter": { "field": "post", "op": "eq", "value": { "ref": "id" } } } }
+      ]
+    },
+    {
+      "id": "post_comments",
+      "name": "コメント",
+      "titleField": "text",
+      "scope": "public",
+      "fields": [
+        { "id": "post", "name": "投稿", "type": "ref", "refEntity": "posts", "required": true },
+        { "id": "text", "name": "コメント", "type": "string", "required": true },
+        { "id": "commented", "name": "日時", "type": "datetime", "defaultValue": "now" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "投稿",
+      "toolbar": [
+        { "label": "投稿", "icon": "square.and.pencil", "action": { "type": "navigate", "screen": "post_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        { "type": "list", "id": "posts", "area": "A1:F12", "entity": "posts",
+          "item": { "title": "body", "subtitle": "posted", "trailing": "comment_count" },
+          "sort": { "field": "posted", "direction": "desc" }, "emptyText": "まだ投稿がありません", "swipeToDelete": true,
+          "onItemTap": { "type": "navigate", "screen": "post_form", "presentation": "push" } }
+      ]
+    },
+    {
+      "id": "post_form",
+      "title": "投稿",
+      "entity": "posts",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "posts" } }],
+      "components": [
+        { "type": "textField", "field": "body", "label": "ひとこと", "placeholder": "今日のできごと" },
+        { "type": "button", "id": "write_comment", "label": "コメントを書く", "icon": "bubble.left",
+          "action": { "type": "navigate", "screen": "comment_form", "presentation": "sheet", "prefillRef": "post" } }
+      ]
+    },
+    {
+      "id": "comments",
+      "title": "コメント",
+      "components": [
+        { "type": "list", "id": "comments", "area": "A1:F12", "entity": "post_comments",
+          "item": { "title": "text", "subtitle": "post", "trailing": "commented" },
+          "sort": { "field": "commented", "direction": "desc" }, "emptyText": "まだコメントがありません", "swipeToDelete": true,
+          "onItemTap": { "type": "navigate", "screen": "comment_form", "presentation": "push" } }
+      ]
+    },
+    {
+      "id": "comment_form",
+      "title": "コメント",
+      "entity": "post_comments",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "post_comments" } }],
+      "components": [
+        { "type": "picker", "field": "post", "label": "投稿", "style": "menu" },
+        { "type": "textField", "field": "text", "label": "コメント", "placeholder": "いいですね" }
+      ]
+    }
+  ]
+}

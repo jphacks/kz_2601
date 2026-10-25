@@ -16,6 +16,7 @@ public enum DSLExamples {
         "bmi",
         "shopping",
         "navigation",
+        "post_comments",
         "diary_ai",
         "medicine",
         "attendance_nearby",

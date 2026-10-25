@@ -187,6 +187,7 @@ type Action struct {
 	ConfirmMessage string        `json:"confirmMessage,omitempty"`
 	Notification   *Notification `json:"notification,omitempty"`   // scheduleNotification
 	NotificationID string        `json:"notificationId,omitempty"` // cancelNotification
+	PrefillRef     string        `json:"prefillRef,omitempty"`     // navigate: ref field of the target form set to the current record (#256)
 }
 
 // ComponentType discriminates Component.
