@@ -39,6 +39,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case locationTracker
     // leaf(ヘルスデータ・#167)
     case healthStat
+    // leaf(時間割のマス目・#234)
+    case gridTable
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -149,6 +151,12 @@ public struct Component: Decodable, Identifiable, Sendable {
     // healthStat(#167)。label / target は共用
     public var metric: String?         // steps|weight
     public var period: String?         // today(既定)|week
+    // gridTable(#234)。entity / titleField / subtitleField / onItemTap は共用
+    public var columnField: String?    // 横軸(例: 曜日 enum)
+    public var rowField: String?       // 縦軸(例: 時限 integer)
+    public var columnValues: [String]? // 列見出しの明示(nil = enum の options)
+    public var rowValues: [String]?    // enum / string の行見出しの明示
+    public var rowRange: GridRange?    // integer の行範囲(nil = 1…6)
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
@@ -163,6 +171,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case task, input, output, options
         case tone
         case metric, period
+        case columnField, rowField, columnValues, rowValues, rowRange
     }
 
     public init(from decoder: Decoder) throws {
@@ -240,6 +249,22 @@ public struct Component: Decodable, Identifiable, Sendable {
         subtitleField = try? c.decodeIfPresent(String.self, forKey: .subtitleField)
         metric = try? c.decodeIfPresent(String.self, forKey: .metric)
         period = try? c.decodeIfPresent(String.self, forKey: .period)
+        columnField = try? c.decodeIfPresent(String.self, forKey: .columnField)
+        rowField = try? c.decodeIfPresent(String.self, forKey: .rowField)
+        columnValues = try? c.decodeIfPresent([String].self, forKey: .columnValues)
+        rowValues = try? c.decodeIfPresent([String].self, forKey: .rowValues)
+        rowRange = try? c.decodeIfPresent(GridRange.self, forKey: .rowRange)
+    }
+}
+
+/// `gridTable.rowRange`: integer の行範囲(両端を含む)。
+public struct GridRange: Decodable, Sendable, Hashable {
+    public var from: Int
+    public var to: Int
+
+    public init(from: Int, to: Int) {
+        self.from = from
+        self.to = to
     }
 }
 

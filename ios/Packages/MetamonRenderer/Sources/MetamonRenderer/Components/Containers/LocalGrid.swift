@@ -28,7 +28,7 @@ struct LocalGrid: View {
     @ViewBuilder
     private func flowCell(_ c: Component, area: GridArea) -> some View {
         switch c.type {
-        case .image, .mapView, .webView, .chart, .gauge, .calendar, .qrScanner, .list, .table, .timeline:
+        case .image, .mapView, .webView, .chart, .gauge, .calendar, .gridTable, .qrScanner, .list, .table, .timeline:
             DSLView(component: c, ctx: ctx).frame(height: max(120, CGFloat(area.rowSpan) * 60))
         default:
             DSLView(component: c, ctx: ctx).fixedSize(horizontal: false, vertical: true)
