@@ -495,7 +495,7 @@ func summarizeApp(a *dsl.App) string {
 	}
 	for _, e := range a.Entities {
 		scope := string(e.EffectiveScope())
-		fmt.Fprintf(&b, "- %s「%s」(scope %s)\n", e.ID, e.Name, scope)
+		fmt.Fprintf(&b, "- %s「%s」(scope %s・項目 %d/%d)\n", e.ID, e.Name, scope, len(e.Fields), dsl.MaxFieldsPerEntity)
 		for _, f := range e.Fields {
 			raw, _ := json.Marshal(f)
 			fmt.Fprintf(&b, "  - %s\n", raw)
@@ -537,7 +537,8 @@ func writeComponents(b *strings.Builder, cs []dsl.Component, indent string) {
 var chatCapabilities = strings.TrimSpace(`
 ## このアプリの仕組み(質問への答えの根拠)
 - アプリは iOS の SwiftUI でネイティブに描画している(Server-Driven UI: 画面の設計図 JSON を AI が作り、iOS がそれを部品に組み立てる)。**WebView ではない**。webView 部品がある画面のその枠だけ WKWebView で https のページを表示する。
-- 変えられる単位: 画面(最大 12)・下のタブ(2〜5)・記録の種類 entity(最大 6、項目は 20 まで)・部品・計算・通知・テーマ色・アイコン・アプリ名。声やチャットで頼むと AI が設計図を書き換える。
+- 変えられる単位: 画面(最大 12)・下のタブ(2〜5)・記録の種類 entity(最大 6、項目は 40 まで)・部品・計算・通知・テーマ色・アイコン・アプリ名。声やチャットで頼むと AI が設計図を書き換える。
+- 項目数の上限(#221): 今のアプリの entity 行の「項目 n/40」に足すと 40 を超える追加は ready にしない(生成 AI が既存の項目を消して収めてしまう)。proposal で 2 案: どれかの項目を消して足す案(消す項目名を入れる)と、足す項目を別の記録の種類(画面)に分ける案。
 - 部品の大きさ・位置: 各画面は横 A〜F の 6 列 × 縦 12 行のグリッドで、部品の枠(area)を広げる・狭める・動かすことができる。文字の大きさは text の style(title / headline / body / caption の 4 段)。画像の高さは small / medium / large。**フォントのポイント数・好きなフォント・アニメーション・自由なレイアウト(重ね合わせ)は指定できない**。色はテーマ色と決まった色名(semantic color)だけ。
 - 記録と表示: 入力(文字・数字・金額・日付・時刻・選択肢・オンオフ・写真・スライダー・星・色など)、一覧(並べ替え・絞り込み・検索・スワイプ削除・タップで編集・ワンタップのチェック)、表・タイムライン・月のカレンダー表示。
 - 集計と計算: 合計・件数・平均・最大・最小・最新・最初、今日 / 今週 / 今月 / 今年 / 直近 7 日の絞り込み、グラフ(棒・折れ線・円。カテゴリ別・日 / 週 / 月ごと)、進捗バー・ゲージ、計算式(四則演算・日付の差・時刻の差・条件分岐・マスタの値の参照)、割り勘の精算(誰が誰にいくら)。

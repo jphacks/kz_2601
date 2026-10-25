@@ -208,7 +208,7 @@ func TestSummarizeApp_Kakeibo(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := summarizeApp(app)
-	for _, want := range []string{"expense「支出」(scope private)", `"id":"memo"`, "画面 expense_form「支出を記録」・expense の入力フォーム",
+	for _, want := range []string{"expense「支出」(scope private・項目 ", `"id":"memo"`, "画面 expense_form「支出を記録」・expense の入力フォーム",
 		`"type":"chart"`, `"label":"今月の支出"`, "通知: なし", "ツールバー"} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("summary lacks %q:\n%s", want, s)
