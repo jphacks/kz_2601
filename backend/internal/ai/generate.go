@@ -213,8 +213,14 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 		if err == nil && logic {
 			s.applyLogicPass(ctx, transcript, ar, loc)
 		}
+		if err == nil {
+			ar.summary = withShareNote(ar.summary, transcript, nil, ar.raw, loc) // #259 #215
+		}
 	case ModeEdit:
 		ar, err = s.generateEdit(ctx, transcript, env, loc, sink)
+		if err == nil {
+			ar.summary = withShareNote(ar.summary, transcript, env.DSL, ar.raw, loc) // #259 #215
+		}
 	default:
 		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "mode must be auto|create|edit|undo"}
 	}
@@ -398,11 +404,20 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 			ar.ops = doc.Patch
 			ar.summary = normalizeDigits(strings.TrimSpace(doc.Summary))
 			ar.meta.Lint = newLint(baseLint, lintOf(next))
-			if s.LintRetry && len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
-				ar.meta.LintRetried = true
+			lintRetry := s.LintRetry && len(ar.meta.Lint) > 0
+			// #259: a share request answered with "できない" gets one retry even with LintRetry off
+			shareProblem := shareEditProblem(transcript, env.DSL, next)
+			if (lintRetry || shareProblem != "") && linted == nil && i < s.maxRegen() {
 				kept := *ar
 				linted = &kept
-				problems = lintProblems(ar.meta.Lint)
+				problems = nil
+				if lintRetry {
+					ar.meta.LintRetried = true
+					problems = lintProblems(ar.meta.Lint)
+				}
+				if shareProblem != "" {
+					problems = append(problems, shareProblem)
+				}
 				ar.meta.LastProblems = problems
 				continue
 			}
