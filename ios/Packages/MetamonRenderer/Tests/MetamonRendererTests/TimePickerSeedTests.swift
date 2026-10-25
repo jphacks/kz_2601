@@ -34,9 +34,16 @@ final class TimePickerSeedTests: XCTestCase {
 
     @MainActor func testSeedsDatetimeAsRFC3339() throws {
         let draft = FormDraft(entity: try shift())
+        // datetime は初期化で既定値(今)が入るので、空にしてから seed を確かめる
+        let initial = draft.values["at"]
+        draft.seedTimeIfEmpty("at", now: morning)
+        XCTAssertEqual(draft.values["at"], initial, "既定値の入った datetime は上書きしない")
+        draft.values["at"] = .null
         draft.seedTimeIfEmpty("at", now: morning)
         let saved = try XCTUnwrap(draft.values["at"]?.stringValue)
         XCTAssertTrue(saved.contains("T"), "datetime は RFC3339")
-        XCTAssertEqual(FieldCoding.date(from: .string(saved)).map { Calendar.current.component(.minute, from: $0) }, 5)
+        XCTAssertEqual(saved, FieldCoding.datetimeFormatter.string(from: morning), "datePicker の datetime と同じ形")
+        // タイムゾーンに依らず同じ瞬間に戻る
+        XCTAssertEqual(FieldCoding.date(from: .string(saved)), morning)
     }
 }
