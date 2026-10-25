@@ -13,7 +13,7 @@
 // nav (["from>to", ...]: a button / toolbar / item tap on `from` opens `to`),
 // tabs / tabsMin (number), tabOrder ("a,b": the first tab screens in order),
 // tabHas (component type on a tab root other than the first tab), has ([type, ...]:
-// each component type appears on some screen).
+// each component type appears on some screen), lacks ([type, ...]: none of them appears, #212).
 // Health (#167): health ("steps"|"weight": a healthStat with that metric),
 // healthField (bool: some field has health "weight").
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
@@ -619,7 +619,7 @@ func checkNav(exp map[string]any, a *dsl.App, mode string) []string {
 			if !found {
 				miss = append(miss, fmt.Sprintf("tabHas!%v", v))
 			}
-		case "has": // component types that must appear on some screen (#168)
+		case "has", "lacks": // component types that must (#168) / must not (#212) appear on some screen
 			for _, w := range v.([]any) {
 				found := false
 				for _, s := range a.Screens {
@@ -629,8 +629,8 @@ func checkNav(exp map[string]any, a *dsl.App, mode string) []string {
 						}
 					}
 				}
-				if !found {
-					miss = append(miss, fmt.Sprintf("has!%v", w))
+				if found != (k == "has") {
+					miss = append(miss, fmt.Sprintf("%s!%v", k, w))
 				}
 			}
 		}

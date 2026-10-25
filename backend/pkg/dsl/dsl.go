@@ -218,6 +218,7 @@ const (
 	CompOpenURLButton  ComponentType = "openUrlButton"  // fixed URL link
 	CompMapView        ComponentType = "mapView"        // MapKit pins from a location field
 	CompLocationButton ComponentType = "locationButton" // CoreLocation -> location field
+	CompLocationPicker ComponentType = "locationPicker" // search / map pin -> location field (+ nameField) (#212)
 	CompQrScanner      ComponentType = "qrScanner"      // AVFoundation -> string field
 	CompTimerDisplay   ComponentType = "timerDisplay"   // stopwatch / countdown
 	CompWebView        ComponentType = "webView"        // in-app WKWebView (https only)
@@ -350,7 +351,7 @@ type Component struct {
 	TitleField    string        `json:"titleField,omitempty"`    // timeline
 	SubtitleField string        `json:"subtitleField,omitempty"` // timeline
 
-	// settlement
+	// settlement / locationPicker (#212: place name string field)
 	NameField    string `json:"nameField,omitempty"`
 	BalanceField string `json:"balanceField,omitempty"`
 
