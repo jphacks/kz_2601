@@ -153,6 +153,10 @@ struct StatLeaf: View {
         if !isLoading, !unavailable, Aggregator.isPick(c.aggregate) {
             formatted = Aggregator.pickText(c, entity: entity, records: rows) ?? EmptyPlaceholder.unavailableValue
         }
+        // distance / duration(#168): locationTracker の点列を時刻順に繋いだ距離・時間(10 分以上空いたら別の記録)
+        if !isLoading, !unavailable, Track.isTrackAggregate(c.aggregate) {
+            formatted = Track.format(c.aggregate, Track.aggregate(c.aggregate, records: rows, locationField: c.field, by: c.by))
+        }
         return (formatted, isLoading, unavailable)
     }
 

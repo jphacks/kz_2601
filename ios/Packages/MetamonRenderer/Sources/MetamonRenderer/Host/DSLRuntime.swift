@@ -22,6 +22,8 @@ public protocol DSLRuntime: AnyObject, Observable {
     /// 既存レコードの一部フィールドだけを保存する(`list.item.toggle` のワンタップ チェック #108)。
     /// ローカル DB に即反映して同期キューが送る(フォームの saveRecord と同じ経路)。保存できなければ false(呼び出し側が表示を戻す)。
     func updateRecord(entity: String, recordId: String, data: [String: JSONValue]) async -> Bool
+    /// フォームを通さずに 1 件追加する(`locationTracker` の位置 1 点・#168)。経路は saveRecord と同じ(ローカル DB → 同期キュー)。
+    func createRecord(entity: String, data: [String: JSONValue]) async -> Bool
     /// back: スタックに積まれていれば pop、モーダルの最下層なら dismiss
     func close(_ route: Route)
     func pathBinding(_ stack: String) -> Binding<[Route]>
@@ -34,6 +36,7 @@ public extension DSLRuntime {
     var failed: Set<String> { [] }
     /// 既定は保存しない(プレビュー・テスト用のランタイム)。
     func updateRecord(entity: String, recordId: String, data: [String: JSONValue]) async -> Bool { false }
+    func createRecord(entity: String, data: [String: JSONValue]) async -> Bool { false }
     /// 既定は何もしない(プレビュー・テスト用ランタイム)。
     func shareNearby(entity: String, records: [[String: JSONValue]]) {}
 

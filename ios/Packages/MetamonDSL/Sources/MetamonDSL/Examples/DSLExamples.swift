@@ -20,6 +20,7 @@ public enum DSLExamples {
         "medicine",
         "attendance_nearby",
         "water",
+        "walk_route",
         "health",
     ]
 

@@ -614,6 +614,9 @@
           "$ref": "#/$defs/NearbyShare"
         },
         {
+          "$ref": "#/$defs/LocationTracker"
+        },
+        {
           "$ref": "#/$defs/HealthStat"
         }
       ]
@@ -1075,9 +1078,11 @@
             "min",
             "max",
             "latest",
-            "earliest"
+            "earliest",
+            "distance",
+            "duration"
           ],
-          "description": "Exactly one of aggregate or value. aggregate=count|sum|avg|min|max over entity(.field). latest/earliest = the field value of the newest/oldest record ordered by `by`."
+          "description": "Exactly one of aggregate or value. aggregate=count|sum|avg|min|max over entity(.field). latest/earliest = the field value of the newest/oldest record ordered by `by`. distance/duration (locationTracker points): field = the location field, by = the datetime field; distance = metres along the points in time order (shown as m / km), duration = recording time (shown as m:ss / h:mm:ss). Gaps of 10+ minutes split separate walks and are not counted."
         },
         "field": {
           "type": "string",
@@ -1085,7 +1090,7 @@
         },
         "by": {
           "type": "string",
-          "description": "aggregate latest/earliest only: date/datetime field id that orders the records (omit = the entity's first date field, else creation order). Same day = later created wins."
+          "description": "aggregate latest/earliest/distance/duration only: date/datetime field id that orders the records (omit = the entity's first date field, else creation order). Same day = later created wins."
         },
         "filter": {
           "$ref": "#/$defs/Filter"
@@ -2462,6 +2467,18 @@
         "onItemTap": {
           "$ref": "#/$defs/Action",
           "description": "ピンのタップで実行。iOS が recordId を渡す。"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "pins",
+            "route"
+          ],
+          "description": "pins(既定)= レコードごとにピン / route = 点を dateField の時刻順に線で結ぶ(locationTracker の軌跡。10 分以上空いたら線を切る)。"
+        },
+        "dateField": {
+          "type": "string",
+          "description": "kind route のみ: 点を並べる datetime field(省略時は作成順)。"
         }
       },
       "description": "MapKit の地図。location 値を持つレコードごとにピンを立てる。訪問スポット記録・お店リスト・釣り/散歩の地点ログなど「場所を地図で見たい」アプリで選ぶ。フォーム側の locationButton と対で使う。",
@@ -2954,6 +2971,48 @@
       },
       "description": "押すとオンデバイス AI(Apple Intelligence / Foundation Models)が走り、フォームの入力を要約・分類・言い換え・抜き出し・提案して output field に入れるボタン。無料・データは端末外に出ない。非対応端末では「この端末では AI を使えません」と無効表示。",
       "x-usage": "フォーム画面のみ(screen.entity 必須)。発話に「要約して」「分類して」「気分を判定」「タグ付け」「一言で」「言い換えて」「丁寧に」「抜き出して」「提案して」「AI で」がある時に使う。entity に結果用の field(string/text、分類は enum)を足し、その入力欄の直上に 1 行(例 A7:F8)。1 画面 3 個まで。"
+    },
+    "LocationTracker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "locationField"
+      ],
+      "properties": {
+        "type": {
+          "const": "locationTracker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string",
+          "description": "点を保存する entity。1 点 = 1 レコード。location field と datetime field を持たせる。他の field は defaultValue があればその値、無ければ空で保存される(required にするなら defaultValue を付ける)。"
+        },
+        "locationField": {
+          "type": "string",
+          "description": "`entity` の location field。現在地が \"lat,lng\" で入る。"
+        },
+        "dateField": {
+          "type": "string",
+          "description": "`entity` の datetime field。記録した時刻が入る(mapView kind route の dateField と stat distance/duration の by に同じ field を使う)。"
+        },
+        "label": {
+          "type": "string",
+          "description": "開始ボタンの文言(既定「記録を開始」)。"
+        },
+        "seconds": {
+          "type": "integer",
+          "description": "自動停止までの秒数(既定 3600・300〜14400 に丸める)。"
+        }
+      },
+      "description": "「記録を開始 / 記録を停止」ボタンと記録中の状態(経過時間・距離)。開始を押した間だけ現在地を entity に 1 点ずつ保存し、アプリを閉じても停止まで続く(既定 1 時間・最長 4 時間で自動停止)。散歩・ランニング・サイクリングのルート、移動ログ、軌跡を残したいアプリで選ぶ。1 回だけ現在地を入れたいなら locationButton。",
+      "x-usage": "ホーム画面(screen.entity なし)に A9:F10 で 1 つ(最下 2 行の左 A-B はマイクの席なので空ける)。同じ画面に mapView{kind:\"route\",entity,locationField,dateField}(A3:F8)と stat{aggregate:\"distance\"} / stat{aggregate:\"duration\"}(field = location field、by = datetime field、今日なら filter today)を A1:F2 に並べる。entity は point{loc: location, at: datetime(required, defaultValue now)} のように点だけを持たせ、フォーム画面は作らない。"
     },
     "HealthStat": {
       "type": "object",

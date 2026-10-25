@@ -510,6 +510,7 @@ func (a *App) Validate() error {
 				if c.TitleField != "" && e.FieldByID(c.TitleField) == nil {
 					add("%s: mapView titleField %q not in entity %q", where, c.TitleField, e.ID)
 				}
+				checkMapRoute(where, c, e, add)
 				checkAction(where+".onItemTap", c.OnItemTap)
 			case CompLocationButton, CompQrScanner:
 				if formEntity == nil {
@@ -592,6 +593,8 @@ func (a *App) Validate() error {
 				}
 			case CompAiButton:
 				checkAIButton(where, c, formEntity, entities, add)
+			case CompLocationTracker:
+				checkLocationTracker(where, c, entities, add)
 			case CompHealthStat:
 				checkHealthStat(where, c, add)
 			case CompNearbyShare:

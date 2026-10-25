@@ -353,8 +353,11 @@ func (l *linter) entityReach() {
 	for _, id := range l.app.UnlistedEntities() {
 		unlisted[id] = true
 	}
+	tracked := trackedEntities(l.app, targets)
 	for _, e := range l.app.Entities {
 		switch fs := forms[e.ID]; {
+		case len(fs) == 0 && tracked[e.ID]:
+			// locationTracker adds the points (#168): no form needed
 		case len(fs) == 0:
 			l.add(`entity %q has no add form: add a form screen (screen.entity %q with inputs and a saveRecord toolbar button) and a navigate button to it, or remove the entity (a master list such as members must be addable, then referenced with type ref)`, e.ID, e.ID)
 		case !anyOf(fs, targets):

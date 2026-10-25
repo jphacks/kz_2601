@@ -90,6 +90,7 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
+		<string>location</string>
 	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
@@ -106,7 +107,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>生成したアプリの共有ボタンから画像を写真に保存するために、写真ライブラリへの追加を使用します。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>生成したアプリで現在地を記録・表示するために、位置情報を使用します。</string>
+	<string>生成したアプリで現在地を記録・地図に表示するために使います。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
 	<!-- healthStat(#167): 歩数は CoreMotion の歩数計(capability 不要)。体重の読み書き・ヘルスケアの歩数は HealthKit -->
 	<key>NSMotionUsageDescription</key>
 	<string>生成したアプリで今日や最近の歩数を表示するために、モーションとフィットネスのデータを使用します。</string>
