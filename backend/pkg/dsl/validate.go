@@ -246,9 +246,9 @@ func (a *App) Validate() error {
 			if f.Type == FieldEnum && len(f.Options) == 0 {
 				add("entity %q field %q: enum needs options", e.ID, f.ID)
 			}
-			// ref: options = initial records of refEntity (their title values, #194)
-			if f.Type != FieldEnum && f.Type != FieldRef && len(f.Options) > 0 {
-				add("entity %q field %q: options only allowed for enum and ref", e.ID, f.ID)
+			// ref / refs: options = initial records of refEntity (their title values, #194)
+			if f.Type != FieldEnum && f.Type != FieldRef && f.Type != FieldRefs && len(f.Options) > 0 {
+				add("entity %q field %q: options only allowed for enum, ref and refs", e.ID, f.ID)
 			}
 		}
 		if e.TitleField != "" && !seen[e.TitleField] {
@@ -405,10 +405,10 @@ func (a *App) Validate() error {
 					add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
 				} else if f.Computed != nil && c.Type != CompImage && c.Type != CompVideoPlayer {
 					add("%s: field %q is computed (read-only); inputs cannot bind to it. Bind a stored field or show it with list/table/stat", where, c.Field)
-				} else if c.Type == CompPicker && f.Type != FieldEnum && f.Type != FieldRef {
-					add("%s: picker field %q must be enum or ref", where, c.Field)
-				} else if c.Type != CompPicker && f.Type == FieldRef {
-					add("%s: field %q is type ref; use a picker to choose the %s record", where, c.Field, f.RefEntity)
+				} else if c.Type == CompPicker && f.Type != FieldEnum && f.Type != FieldRef && f.Type != FieldRefs {
+					add("%s: picker field %q must be enum, ref or refs", where, c.Field)
+				} else if c.Type != CompPicker && (f.Type == FieldRef || f.Type == FieldRefs) {
+					add("%s: field %q is type %s; use a picker to choose the %s record", where, c.Field, f.Type, f.RefEntity)
 				} else if (c.Type == CompPhotoField || c.Type == CompImage) && f.Type != FieldPhoto {
 					add("%s: %s field %q must be type photo", where, c.Type, c.Field)
 				} else if (c.Type == CompVideoField || c.Type == CompVideoPlayer) && f.Type != FieldVideo {

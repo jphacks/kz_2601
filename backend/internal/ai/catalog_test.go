@@ -129,7 +129,7 @@ func TestCatalogRendering(t *testing.T) {
 		"- {\"op\":\"daysUntil\"",
 		"- {\"agg\":",
 		"レシピ",
-		"- filter{field, op(eq|neq|gt|gte|lt|lte|thisMonth|today|thisWeek|thisYear), value}",
+		"- filter{field, op(eq|neq|gt|gte|lt|lte|thisMonth|today|thisWeek|thisYear|contains), value}",
 		"- navigate{screen / presentation(push|sheet|fullScreen)}",
 		"- saveRecord{entity / screen}",
 		"- back{(追加キー無し)}",

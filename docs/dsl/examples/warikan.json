@@ -19,9 +19,8 @@
           "computed": { "agg": "sum", "entity": "expenses", "field": "amount",
                         "filter": { "field": "payer", "op": "eq", "value": { "ref": "id" } } } },
         { "id": "share", "name": "負担額", "type": "currency",
-          "computed": { "op": "div", "args": [
-            { "agg": "sum", "entity": "expenses", "field": "amount" },
-            { "agg": "count", "entity": "members" } ] } },
+          "computed": { "agg": "sum", "entity": "expenses", "field": "per_person",
+                        "filter": { "field": "split_with", "op": "contains", "value": { "ref": "id" } } } },
         { "id": "balance", "name": "残高", "type": "currency",
           "computed": { "op": "round", "args": [ { "op": "sub", "args": [ { "ref": "paid" }, { "ref": "share" } ] } ] } }
       ]
@@ -34,9 +33,10 @@
         { "id": "title", "name": "内容", "type": "string", "required": true },
         { "id": "amount", "name": "金額", "type": "currency", "required": true, "unit": "円" },
         { "id": "payer", "name": "払った人", "type": "ref", "refEntity": "members", "required": true },
+        { "id": "split_with", "name": "割り勘する人", "type": "refs", "refEntity": "members" },
         { "id": "date", "name": "日付", "type": "date", "defaultValue": "now" },
         { "id": "per_person", "name": "1人あたり", "type": "currency",
-          "computed": { "op": "div", "args": [ { "ref": "amount" }, { "agg": "count", "entity": "members" } ] } }
+          "computed": { "op": "div", "args": [ { "ref": "amount" }, { "op": "len", "args": [ { "ref": "split_with" } ] } ] } }
       ]
     }
   ],
@@ -58,8 +58,14 @@
                 { "agg": "count", "entity": "members" } ] } }
           ]
         },
-        { "type": "table", "id": "members_table", "area": "A3:F5", "entity": "members",
-          "columns": [ { "field": "name" }, { "field": "paid" }, { "field": "balance" } ] },
+        {
+          "type": "section", "id": "members", "area": "A3:F5", "title": "メンバー",
+          "children": [
+            { "type": "list", "entity": "members", "item": { "title": "name", "subtitle": "paid", "trailing": "balance" },
+              "emptyText": "メンバーを追加してください", "swipeToDelete": true,
+              "onItemTap": { "type": "navigate", "screen": "member_form", "presentation": "push" } }
+          ]
+        },
         { "type": "settlement", "id": "settle", "area": "A6:F8", "entity": "members", "nameField": "name", "balanceField": "balance" },
         {
           "type": "section", "id": "recent", "area": "A9:F10", "title": "支出",
@@ -85,6 +91,7 @@
             { "type": "textField", "field": "title", "label": "内容", "placeholder": "夕食" },
             { "type": "numberField", "field": "amount", "label": "金額", "unit": "円" },
             { "type": "picker", "field": "payer", "label": "払った人", "style": "menu" },
+            { "type": "picker", "field": "split_with", "label": "割り勘する人(未選択 = 全員)" },
             { "type": "datePicker", "field": "date", "label": "日付" }
           ]
         },
@@ -94,7 +101,7 @@
     },
     {
       "id": "member_form",
-      "title": "メンバーを追加",
+      "title": "メンバー",
       "entity": "members",
       "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "members" } }],
       "components": [
@@ -103,7 +110,9 @@
           "children": [
             { "type": "textField", "field": "name", "label": "名前", "placeholder": "たろう" }
           ]
-        }
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "members", "confirmMessage": "このメンバーを削除しますか？" } }
       ]
     }
   ]

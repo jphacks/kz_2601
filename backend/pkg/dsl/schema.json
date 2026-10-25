@@ -180,9 +180,10 @@
             "photo",
             "video",
             "location",
-            "ref"
+            "ref",
+            "refs"
           ],
-          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField."
+          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField. refs = array of record ids of `refEntity` (multi-select, e.g. expense.split_with -> members: who shares this expense); [] or missing = everyone; filter it with op contains, count it with op len."
         },
         "required": {
           "type": "boolean"
@@ -217,7 +218,7 @@
         },
         "refEntity": {
           "type": "string",
-          "description": "type=ref only: the entity id whose record this field points to."
+          "description": "type=ref / refs only: the entity id whose record(s) this field points to."
         },
         "computed": {
           "$ref": "#/$defs/Expr",
@@ -1007,7 +1008,8 @@
             "thisMonth",
             "today",
             "thisWeek",
-            "thisYear"
+            "thisYear",
+            "contains"
           ],
           "x-enumDescriptions": {
             "eq": "field == value",
@@ -1019,7 +1021,8 @@
             "today": "今日(端末ローカル)。value は null",
             "thisWeek": "今週 = 月曜 0:00 〜 日曜 24:00(端末ローカル)。value は null",
             "thisMonth": "今月(端末ローカル)。value は null",
-            "thisYear": "今年 = 1/1 〜 12/31(端末ローカル)。value は null"
+            "thisYear": "今年 = 1/1 〜 12/31(端末ローカル)。value は null",
+            "contains": "type refs の field が value(レコード id)を含む。空の refs = 全員なので常に一致"
           }
         },
         "value": {
@@ -2812,7 +2815,7 @@
         }
       ],
       "x-recipes": [
-        "割り勘(members{name} + expenses{title,amount:currency,payer:ref→members,date}): members.computed paid = {\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"amount\",\"filter\":{\"field\":\"payer\",\"op\":\"eq\",\"value\":{\"ref\":\"id\"}}} / share = {\"op\":\"round\",\"args\":[{\"op\":\"div\",\"args\":[{\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"amount\"},{\"agg\":\"count\",\"entity\":\"members\"}]}]} / balance = {\"op\":\"sub\",\"args\":[{\"ref\":\"paid\"},{\"ref\":\"share\"}]}。ホームに stat(合計 aggregate sum・1人あたり value)+ members の table(name/paid/balance)+ settlement{entity:members,nameField:name,balanceField:balance}。支出フォームの payer は picker。",
+        "割り勘(members{name} + expenses{title,amount:currency,payer:ref→members,split_with:refs→members 割り勘する人・未選択 = 全員,date}): expenses.computed per_person = {\"op\":\"div\",\"args\":[{\"ref\":\"amount\"},{\"op\":\"len\",\"args\":[{\"ref\":\"split_with\"}]}]}(len = 選んだ人数・未選択なら全員の人数) / members.computed paid = {\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"amount\",\"filter\":{\"field\":\"payer\",\"op\":\"eq\",\"value\":{\"ref\":\"id\"}}} / share = {\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"per_person\",\"filter\":{\"field\":\"split_with\",\"op\":\"contains\",\"value\":{\"ref\":\"id\"}}} / balance = {\"op\":\"round\",\"args\":[{\"op\":\"sub\",\"args\":[{\"ref\":\"paid\"},{\"ref\":\"share\"}]}]}。ホームに stat(合計 aggregate sum)+ members の list(title name・trailing balance・swipeToDelete・onItemTap で member_form)+ settlement{entity:members,nameField:name,balanceField:balance}。支出フォームの payer と split_with は picker、member_form に deleteRecord ボタン(メンバーを消せる)。中間 entity(splits)は作らない。",
         "BMI(body{date,weight:number kg,height:number cm}): body.computed bmi(number) = {\"op\":\"div\",\"args\":[{\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"op\":\"div\",\"args\":[{\"ref\":\"weight\"},{\"op\":\"pow\",\"args\":[{\"op\":\"div\",\"args\":[{\"ref\":\"height\"},100]},2]}]},10]}]},10]}(小数 1 桁)。list の trailing / table の列に bmi。",
         "今の値・最新の記録(今の体重・最後に水をやった日): stat{aggregate:latest,entity:body,field:weight,by:date}、式の中なら {\"agg\":\"latest\",\"entity\":\"body\",\"field\":\"weight\",\"by\":\"date\"}(by = 並べる日付 field、field = 返す値・computed 可)。今の BMI = latest の field に computed bmi。最初の記録は earliest(体重の増減 = sub(latest, earliest))。",
         "残り予算: stat.value = {\"op\":\"sub\",\"args\":[<予算>,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]}。予算額が発話に無い/後で変えたいなら budget{amount:currency,date:date} entity を作り <予算> = {\"agg\":\"latest\",\"entity\":\"budget\",\"field\":\"amount\",\"by\":\"date\"}(最後に設定した額。max だと下げた予算が反映されない)。",
@@ -2964,7 +2967,7 @@
             "or": "a または b(2 個)",
             "not": "否定",
             "concat": "文字列連結(2 個)",
-            "len": "文字数",
+            "len": "文字数(type refs の field なら選んだ件数・空 = 参照先の全件数)",
             "now": "現在日時(引数なし)",
             "today": "今日の日付(引数なし)",
             "daysBetween": "daysBetween(a,b) = b - a の日数",

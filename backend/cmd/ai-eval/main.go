@@ -16,6 +16,7 @@
 // each component type appears on some screen), lacks ([type, ...]: none of them appears, #212).
 // Health (#167): health ("steps"|"weight": a healthStat with that metric),
 // healthField (bool: some field has health "weight").
+// Warikan (#231): refs (bool: some field is type refs), deletable ([entity id, ...]: swipeToDelete list or deleteRecord).
 // Field cap (#221): keepEntity / keep ([field id, ...]) / growTo (see checkKeep).
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
@@ -361,7 +362,7 @@ func measure(a *dsl.App) *Metrics {
 			if f.Computed != nil {
 				m.Computed = append(m.Computed, e.ID+"."+f.ID)
 			}
-			if f.Type == dsl.FieldRef {
+			if f.Type == dsl.FieldRef || f.Type == dsl.FieldRefs {
 				m.RefFields++
 			}
 			if f.Health != "" {
@@ -649,6 +650,22 @@ func checkNav(exp map[string]any, a *dsl.App, mode string) []string {
 			if !found {
 				miss = append(miss, fmt.Sprintf("tabHas!%v", v))
 			}
+		case "refs": // #231: some field is type refs (multi-select, e.g. expense.split_with)
+			found := false
+			for _, e := range a.Entities {
+				for _, f := range e.Fields {
+					found = found || f.Type == dsl.FieldRefs
+				}
+			}
+			if found != v.(bool) {
+				miss = append(miss, fmt.Sprintf("refs=%v", found))
+			}
+		case "deletable": // #231: each entity has a list with swipeToDelete or a deleteRecord button / toolbar
+			for _, w := range v.([]any) {
+				if !deletable(a, fmt.Sprint(w)) {
+					miss = append(miss, fmt.Sprintf("deletable!%v", w))
+				}
+			}
 		case "has", "lacks": // component types that must (#168) / must not (#212) appear on some screen
 			for _, w := range v.([]any) {
 				found := false
@@ -667,6 +684,28 @@ func checkNav(exp map[string]any, a *dsl.App, mode string) []string {
 	}
 	sort.Strings(miss)
 	return miss
+}
+
+// deletable: a list of entity swipes to delete, or a deleteRecord button / toolbar targets it (#231).
+func deletable(a *dsl.App, entity string) bool {
+	del := func(act *dsl.Action) bool {
+		return act != nil && act.Type == dsl.ActionDeleteRecord && act.Entity == entity
+	}
+	for _, s := range a.Screens {
+		for i := range s.Toolbar {
+			if del(&s.Toolbar[i].Action) {
+				return true
+			}
+		}
+		for _, c := range s.Components {
+			for _, x := range append([]dsl.Component{c}, c.Children...) {
+				if del(x.Action) || (x.Type == dsl.CompList && x.Entity == entity && x.SwipeToDelete) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // mentionsSubstitution: the ja template says 代替, the en one says "replaced".

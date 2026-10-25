@@ -435,7 +435,7 @@ func (l *linter) settingEntities() map[string]bool {
 	}
 	for i := range l.app.Entities {
 		for _, f := range l.app.Entities[i].Fields {
-			if f.Type == FieldRef {
+			if f.Type == FieldRef || f.Type == FieldRefs {
 				other[f.RefEntity] = true
 			}
 			aggs(f.Computed)

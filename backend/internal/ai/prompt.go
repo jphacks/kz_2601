@@ -69,6 +69,7 @@ var systemPrompt = strings.TrimSpace(`
   - レコードごとの算出列(支払済・残高・BMI・残り日数)は Field.computed(ref で同じレコードのフィールド・"id" でレコード id)。画面に 1 つの値(1人あたり・残り予算・達成率)は stat.value(ref 不可・agg を使う)。単純な合計/件数は従来どおり stat.aggregate。
   - 他の entity のレコードを指す項目(支出の「払った人」→メンバー)は type "ref" + refEntity。フォームでは picker で選ぶ。
   - 割り勘・立替の「誰が誰にいくら」は settlement(members の computed balance を balanceField に)。精算は最大で「人数−1」行出るので area は 3 行以上(2 行だと 1 行目しか見えない)。
+  - **割り勘のメンバーの削除と「誰の分か」(#231・few-shot の割り勘の通り)**: メンバーは消せるようにする。members は table ではなく list(item.title name・swipeToDelete・onItemTap で member_form を push)で出し、member_form に deleteRecord ボタン(confirmMessage「このメンバーを削除しますか？」)を置く(table だけだと消せない)。「割り勘する人」「誰の分か」「一部の人だけで割る」「人ごとに分けたい」は支出に type "refs" + refEntity members の field(id split_with・名前「割り勘する人」・required なし・未選択 = 全員)を足し、フォームは picker(複数選べる)。支出の per_person = {"op":"div","args":[{"ref":"amount"},{"op":"len","args":[{"ref":"split_with"}]}]}(len = 選んだ人数・未選択なら全員の人数)、members の share = {"agg":"sum","entity":"expenses","field":"per_person","filter":{"field":"split_with","op":"contains","value":{"ref":"id"}}}(未選択の支出は全員に一致)、balance = round(paid − share)。refs を読めるのは len と filter op contains だけ。支出×メンバーを 1 行ずつ持つ中間 entity(splits / shares 等)は作らない(1 人ずつ登録し直しになる)。
   - op はカタログの一覧だけ。計算が要らない発話には computed / stat.value を足さない。
   - 式を書けるのは computed・stat.value・agg の filter.value だけ。progressBar / gauge の value は数値リテラルのみ(率のバーは progressBar{entity,field,target})。
 - **中身を正しく**(2026-10-24 品質監査 #107: 死にボタンは 0 件だが、ラベルと中身が違う・黙って取りこぼす・計算をユーザーにさせる、が残った):

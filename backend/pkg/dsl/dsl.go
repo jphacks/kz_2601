@@ -129,6 +129,7 @@ const (
 	FieldVideo    FieldType = "video"    // "video:<id>|data:image/jpeg;base64,<thumb>" (movie stays on the device)
 	FieldLocation FieldType = "location" // "lat,lng"
 	FieldRef      FieldType = "ref"      // id of a record of Field.RefEntity
+	FieldRefs     FieldType = "refs"     // ids of records of Field.RefEntity (multi-select, #231); [] = everyone
 )
 
 // Field is one column of an Entity.
@@ -140,7 +141,7 @@ type Field struct {
 	Options      []string  `json:"options,omitempty"`
 	DefaultValue any       `json:"defaultValue,omitempty"` // string|number|bool|nil; "now" for date types
 	Unit         string    `json:"unit,omitempty"`
-	RefEntity    string    `json:"refEntity,omitempty"` // type=ref: target entity id
+	RefEntity    string    `json:"refEntity,omitempty"` // type=ref/refs: target entity id
 	Computed     *Expr     `json:"computed,omitempty"`  // read-only calculated field (row context = this record)
 	Health       string    `json:"health,omitempty"`    // "weight": also write the saved value to HealthKit (#167)
 }
