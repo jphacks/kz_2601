@@ -114,7 +114,7 @@ final class AppRuntime: DSLRuntime {
     /// 閉じた会話と反映の区切り(#210・`AppRuntime+ChatHistory.swift`)。今の会話(`chatBubbles`)は含まない
     var chatHistory: [ChatHistoryEntry] = []
     /// 履歴の保存先(テストで差し替える)
-    @ObservationIgnored var chatHistoryStore: ChatHistoryStore = .shared {
+    @ObservationIgnored var chatHistoryStore: ChatHistoryStore = .forRuntime() {
         didSet { reloadChatHistory() }
     }
     /// `POST /v1/chat` の応答待ち

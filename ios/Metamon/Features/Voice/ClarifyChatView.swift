@@ -348,6 +348,7 @@ private struct HistoryRow: View {
                 line
                 Label(ChatContext.dividerText(entry), systemImage: "checkmark.circle.fill")
                     .font(.caption.weight(.medium))
+                    .frame(maxWidth: .infinity)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -360,7 +361,7 @@ private struct HistoryRow: View {
     }
 
     private var line: some View {
-        Rectangle().fill(Theme.Colors.hairline).frame(height: 1).frame(minWidth: 16)
+        Rectangle().fill(Theme.Colors.hairline).frame(width: 20, height: 1)
     }
 }
 

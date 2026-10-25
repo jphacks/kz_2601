@@ -14,20 +14,35 @@ struct ChatHistoryEntry: Codable, Equatable, Identifiable, Sendable {
 
 /// 履歴の保存先。UserDefaults に appId ごとの JSON(直近 `limit` 件)。
 /// アプリ削除(#195 purge)で `remove(appId:)`、アカウント削除(wipe)で `removeAll()`。
-/// モック起動(`METAMON_MOCK=1`・UI テスト)は前の起動の履歴を持ち込まないよう、起動ごとに消える専用の suite を使う。
+/// モック起動(`METAMON_MOCK=1`・UI テスト)とユニットテストは、前の起動・別のテストの履歴を持ち込まないようメモリだけに置く
+/// (`AppRuntime` ごとに新しい保存先。`METAMON_KEEP_CHAT_HISTORY=1` なら実機と同じ UserDefaults)。
 final class ChatHistoryStore: @unchecked Sendable {
     static let limit = 30
     static let keyPrefix = "metamon.chatHistory."
-    static let shared = ChatHistoryStore(defaults: ChatHistoryStore.defaultDefaults())
+    static let shared = ChatHistoryStore(defaults: .standard)
 
-    private let defaults: UserDefaults
+    /// `AppRuntime` の既定の保存先。
+    static func forRuntime() -> ChatHistoryStore {
+        let env = ProcessInfo.processInfo.environment
+        let isTest = env["METAMON_MOCK"] == "1" || env["XCTestConfigurationFilePath"] != nil
+        return isTest && env["METAMON_KEEP_CHAT_HISTORY"] != "1" ? ChatHistoryStore() : shared
+    }
+
+    private let defaults: UserDefaults?
+    private var memory: [String: Data] = [:]
+    private let lock = NSLock()
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
     }
 
+    /// メモリだけ(テスト・モック)。
+    init() {
+        self.defaults = nil
+    }
+
     func load(appId: String) -> [ChatHistoryEntry] {
-        guard let data = defaults.data(forKey: Self.keyPrefix + appId),
+        guard let data = read(Self.keyPrefix + appId),
               let entries = try? JSONDecoder().decode([ChatHistoryEntry].self, from: data) else { return [] }
         return Self.trimmed(entries)
     }
@@ -35,14 +50,15 @@ final class ChatHistoryStore: @unchecked Sendable {
     func save(_ entries: [ChatHistoryEntry], appId: String) {
         let kept = Self.trimmed(entries)
         guard !kept.isEmpty else { return remove(appId: appId) }
-        if let data = try? JSONEncoder().encode(kept) { defaults.set(data, forKey: Self.keyPrefix + appId) }
+        if let data = try? JSONEncoder().encode(kept) { write(data, Self.keyPrefix + appId) }
     }
 
     func remove(appId: String) {
-        defaults.removeObject(forKey: Self.keyPrefix + appId)
+        write(nil, Self.keyPrefix + appId)
     }
 
     func removeAll() {
+        guard let defaults else { return lock.withLock { memory = [:] } }
         defaults.dictionaryRepresentation().keys
             .filter { $0.hasPrefix(Self.keyPrefix) }
             .forEach(defaults.removeObject(forKey:))
@@ -53,13 +69,14 @@ final class ChatHistoryStore: @unchecked Sendable {
         entries.count > limit ? Array(entries.suffix(limit)) : entries
     }
 
-    private static func defaultDefaults() -> UserDefaults {
-        let env = ProcessInfo.processInfo.environment
-        let suite = "metamon.chatHistory.mock"
-        guard env["METAMON_MOCK"] == "1", env["METAMON_KEEP_CHAT_HISTORY"] != "1",
-              let mock = UserDefaults(suiteName: suite) else { return .standard }
-        mock.removePersistentDomain(forName: suite)
-        return mock
+    private func read(_ key: String) -> Data? {
+        guard let defaults else { return lock.withLock { memory[key] } }
+        return defaults.data(forKey: key)
+    }
+
+    private func write(_ data: Data?, _ key: String) {
+        guard let defaults else { return lock.withLock { memory[key] = data } }
+        if let data { defaults.set(data, forKey: key) } else { defaults.removeObject(forKey: key) }
     }
 }
 

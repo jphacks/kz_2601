@@ -60,7 +60,8 @@ final class ChatHistoryTests: XCTestCase {
         let divider = try XCTUnwrap(rt.chatHistory.last)
         XCTAssertEqual(divider.version, 2)
         XCTAssertEqual(divider.text, "「金額を大きくして」を反映しました(モック)", "要約は generate の summary")
-        XCTAssertTrue(ChatContext.dividerText(divider).hasPrefix("ここで反映しました(v2)"))
+        XCTAssertTrue(ChatContext.dividerText(divider).contains("v2"))
+        XCTAssertTrue(ChatContext.dividerText(divider).hasSuffix("・" + divider.text))
 
         // 再起動相当: 同じ保存先から別の AppRuntime で読み直す
         let reopened = try makeEditRuntime()
@@ -96,7 +97,7 @@ final class ChatHistoryTests: XCTestCase {
         let messages = ChatContext.messages(history: history, live: [ChatMessage(role: .user, text: "今の指示")])
         XCTAssertEqual(messages.count, 3, "要約 1 + 最後の反映以降 1 + 今の会話 1")
         XCTAssertEqual(messages[0].role, .assistant)
-        XCTAssertTrue(messages[0].text.hasPrefix("(これまでに反映した変更)"))
+        XCTAssertTrue(messages[0].text.hasPrefix(L10n.tr("(これまでに反映した変更)") + "\n"))
         XCTAssertEqual(messages[0].text.split(separator: "\n").count, 1 + ChatContext.maxSummaries, "要約は最大 5 件")
         XCTAssertTrue(messages[0].text.contains("v4: 変更4") && messages[0].text.contains("v8: 変更8"))
         XCTAssertFalse(messages[0].text.contains("v3:"))

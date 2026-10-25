@@ -194,7 +194,7 @@ final class MetamonUITests: XCTestCase {
     // MARK: - チャット履歴(#210)
 
     func testChatHistoryRemainsAfterApply() {
-        // 案の「これでいく」で反映 → シートを開き直すと、前の会話と「ここで反映しました(v2)」の区切りが見える
+        // 案の「これでいく」で反映 → シートを開き直すと、前の会話と「ここで反映しました(vN)・要約」の区切りが見える
         launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "見やすくして", "METAMON_AUTO_PAUSE": "600"])
         let choose = app.buttons.matching(identifier: "chat.option.choose")
         XCTAssertTrue(choose.firstMatch.waitForExistence(timeout: 15), "案のカードの「これでいく」が出ない")
@@ -211,7 +211,7 @@ final class MetamonUITests: XCTestCase {
         XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開き直せない")
         let divider = app.descendants(matching: .any)["chat.history.applied"]
         XCTAssertTrue(divider.waitForExistence(timeout: 15), "反映の区切りが見えない")
-        XCTAssertTrue(divider.label.contains("ここで反映しました(v2)"), "区切りの文言: \(divider.label)")
+        XCTAssertTrue(divider.label.contains("ここで反映しました(v"), "区切りの文言: \(divider.label)")
         XCTAssertTrue(element(labelBeginsWith: "あなた: 見やすくして").exists, "前の会話が見えない")
         XCTAssertTrue(app.buttons["chat.restart"].exists, "「最初から」が無い")
         attachScreenshot("history-3-reopened")
