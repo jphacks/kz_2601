@@ -22,6 +22,7 @@ public enum DSLExamples {
         "water",
         "walk_route",
         "health",
+        "shops",
     ]
 
     /// 初期状態(音声画面のみ)の DSL 名。
