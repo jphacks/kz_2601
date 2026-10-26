@@ -24,7 +24,11 @@ struct MetamonApp: App {
         // #246(5.1.2(i)): 同意が無ければ ai へ一切送らない。どの入口(Siri 等)から呼ばれても効くよう Services の ai を包む
         AIConsentDebug.applyLaunchOverride()
         services.ai = ConsentGatedAIClient(base: services.ai) { AIConsentStore.isGranted(in: .standard) }
+        #if !APP_STORE_REVIEW
         if BuildConfig.forceMock { HealthData.source = MockHealthData() } // healthStat(#167)は固定値
+        #else
+        _ = ReviewBuildPackageMarker.self // パッケージにも APP_STORE_REVIEW が渡っていることをコンパイル時に保証(#245)
+        #endif
         let appId = DeviceAppID.current
         var document: AppDocument
         if services.isLive, let cached = DocumentCache.shared.load(appId: appId) {

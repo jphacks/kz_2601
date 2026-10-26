@@ -103,16 +103,22 @@ struct RootView: View {
         .sheet(item: $rt.sheet) { route in
             ScreenStack(root: route)
                 .modifier(HostSheets(onModal: true))
+                #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
+                #endif
         }
         .fullScreenCover(item: $rt.fullScreen) { route in
             ScreenStack(root: route)
                 .modifier(HostSheets(onModal: true))
+                #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
+                #endif
         }
         .modifier(HostSheets(onModal: false))
+        #if !APP_STORE_REVIEW // 審査用ビルドはシェアリンク・探す・近くの端末との共有を外す(#245)
         .modifier(SharingHooks()) // シェアリンク受信・「探す」シート(#49 #50)
         .modifier(NearbySheets(onModal: false)) // 近くの端末と送り合う(#36)
+        #endif
         .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
         .onChange(of: rt.document.version) {
