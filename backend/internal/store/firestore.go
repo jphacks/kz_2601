@@ -80,11 +80,12 @@ type appDoc struct {
 	UpdatedAt      time.Time      `firestore:"updatedAt"`
 	DSL            map[string]any `firestore:"dsl"`
 	DSLJSON        string         `firestore:"dslJson"`
+	SortIndex      int64          `firestore:"sortIndex,omitempty"`
 }
 
 func (d *appDoc) toApp(id string) *App {
 	return &App{ID: id, Name: d.Name, CurrentVersion: int(d.CurrentVersion), Status: d.Status,
-		CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, DSL: json.RawMessage(d.DSLJSON)}
+		CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, SortIndex: int(d.SortIndex), DSL: json.RawMessage(d.DSLJSON)}
 }
 
 type versionDoc struct {
@@ -278,6 +279,33 @@ func (f *Firestore) UpdateAppMeta(ctx context.Context, uid, appID string, name, 
 		return nil, err
 	}
 	return f.GetApp(ctx, uid, appID)
+}
+
+// ReorderApps implements Store. One transaction, so a list is never left
+// half-reordered (the handler caps ids well below the 500-write limit).
+func (f *Firestore) ReorderApps(ctx context.Context, uid string, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	refs := make([]*firestore.DocumentRef, len(ids))
+	for i, id := range ids {
+		refs[i] = f.appRef(uid, id)
+	}
+	return f.c.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
+		snaps, err := tx.GetAll(refs)
+		if err != nil {
+			return err
+		}
+		for i, snap := range snaps {
+			if !snap.Exists() {
+				continue
+			}
+			if err := tx.Update(refs[i], []firestore.Update{{Path: "sortIndex", Value: i + 1}}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // CommitVersion implements Store.
