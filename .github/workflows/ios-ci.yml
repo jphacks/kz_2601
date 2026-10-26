@@ -68,7 +68,7 @@ jobs:
       # false なら build-for-testing だけ(コンパイル確認)
       run_tests: ${{ steps.plan.outputs.run_tests }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # push では github.event.before との差分、PR では base との差分
       - uses: dorny/paths-filter@v4
@@ -194,7 +194,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Xcode 26 を選択
         run: |
@@ -226,7 +226,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Xcode 26 を選択
         run: |
