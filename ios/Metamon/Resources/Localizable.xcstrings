@@ -154,6 +154,23 @@
         }
       }
     },
+    "%@は、アプリを開いた人なら誰でも見られます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anyone who opens the app can see %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@は、アプリを開いた人なら誰でも見られます。"
+          }
+        }
+      }
+    },
     "%@をインストール": {
       "extractionState": "manual",
       "localizations": {
@@ -1000,6 +1017,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "うまく伝わりませんでした"
+          }
+        }
+      }
+    },
+    "この欄を消す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove these fields"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この欄を消す"
           }
         }
       }
@@ -3401,6 +3435,23 @@
         }
       }
     },
+    "個人の情報も公開されます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personal info will be public too"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "個人の情報も公開されます"
+          }
+        }
+      }
+    },
     "元に戻して": {
       "extractionState": "manual",
       "localizations": {
@@ -3533,6 +3584,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "公開できませんでした: %@"
+          }
+        }
+      }
+    },
+    "公開のままにする": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep it public"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "公開のままにする"
+          }
+        }
+      }
+    },
+    "公開の記録の確認": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check before making it public"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "公開の記録の確認"
           }
         }
       }
@@ -5148,6 +5233,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "聞いています… もう一度タップで終了"
+          }
+        }
+      }
+    },
+    "自分だけにする": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make it private"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自分だけにする"
           }
         }
       }
