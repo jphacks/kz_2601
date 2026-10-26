@@ -1,5 +1,6 @@
 import Foundation
 import MetamonServices
+import MetamonRenderer
 
 /// エラー時の文言(#60)。`Greeting` と同じく **ここにだけ** 置く(多言語化 #44 / リネーム #69 ではこのファイルを差し替える)。
 /// 原則: 1 文で「何が起きたか + 次に何をすればいいか」。主ボタンは動詞 1 語〜2 語。
@@ -14,6 +15,32 @@ enum ErrorCopy {
     static var busyBody: String { L10n.tr("少し時間をおいて、もう一度お試しください") }
     static func busyBody(retryAfter seconds: TimeInterval) -> String {
         L10n.tr("\(Int(seconds.rounded(.up))) 秒ほど待ってから、もう一度お試しください")
+    }
+    // 1 日の上限(#280・429 rate_limited)
+    static var rateLimitedTitle: String { L10n.tr("今日はここまでです") }
+    static var rateLimitedGlobalTitle: String { L10n.tr("本日の受付を終了しました") }
+    static func rateLimitedBody(_ info: RateLimitInfo, timeZone: TimeZone = .current) -> String {
+        let when = info.resetAt.map { resetTime($0, timeZone: timeZone) } ?? L10n.tr("明日")
+        switch info.scope {
+        case .global:
+            return L10n.tr("利用が集中したため、新しい生成を止めています。\(when)に再開します")
+        case .ip:
+            return L10n.tr("このネットワークからの今日の上限に達しました。サインインすると続けて使えます")
+        case .user:
+            var body = info.limit.map { L10n.tr("今日の上限(\($0)回分)に達しました。\(when)からまた使えます") }
+                ?? L10n.tr("今日の上限に達しました。\(when)からまた使えます")
+            if info.isAnonymous { body += L10n.tr("。サインインすると上限が増えます") }
+            return body
+        }
+    }
+    /// 「10月26日 0:00」(英語表示なら "Oct 26, 0:00")
+    static func resetTime(_ date: Date, timeZone: TimeZone = .current) -> String {
+        let english = LanguagePreference.shared.code == "en"
+        let f = DateFormatter()
+        f.locale = Locale(identifier: english ? "en_US_POSIX" : "ja_JP")
+        f.timeZone = timeZone
+        f.dateFormat = english ? "MMM d, H:mm" : "M月d日 H:mm"
+        return f.string(from: date)
     }
     static var timeoutTitle: String { L10n.tr("時間がかかりすぎました") }
     static var timeoutBody: String { L10n.tr("サーバーの応答がありませんでした。もう一度お試しください") }

@@ -42,6 +42,11 @@ type Request struct {
 	// LogicPass overrides Service.LogicPass for this request: true = UI pass
 	// then a second call that adds calculations (logic.go). Create turns only.
 	LogicPass *bool `json:"logicPass,omitempty"`
+	// AllowedComponents (#245): component types (container + leaf) the client
+	// can render; omitted/empty = all. DisabledFeatures: fieldHealth |
+	// cameraCapture (unknown values ignored). See restrict.go.
+	AllowedComponents []string `json:"allowedComponents,omitempty"`
+	DisabledFeatures  []string `json:"disabledFeatures,omitempty"`
 }
 
 // Latency is per-stage wall time in ms.
@@ -66,6 +71,9 @@ type Meta struct {
 	// returned document (create) or added by the patch (edit).
 	LintRetried bool     `json:"lintRetried,omitempty"`
 	Lint        []string `json:"lint,omitempty"`
+	// Restricted (#245): what the build restriction removed from the output
+	// after generation (disallowed parts, Field.health, camera sources).
+	Restricted []string `json:"restricted,omitempty"`
 }
 
 // Event is a progress message emitted by GenerateStream before the Result,
@@ -160,6 +168,9 @@ type attemptResult struct {
 	summary string
 	meta    Meta
 	latency time.Duration
+	// forceFull: the DSL was changed after the patch (build restriction), so
+	// it is saved as a full document instead of the model's ops.
+	forceFull bool
 }
 
 // Generate runs the pipeline: fetch current -> decide mode -> Claude ->
@@ -173,6 +184,8 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 // is still validated and saved before it is returned.
 func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*Result, error) {
 	started := time.Now()
+	restrict := NewRestriction(req.AllowedComponents, req.DisabledFeatures)
+	ctx = withRestriction(ctx, restrict)
 	transcript := strings.TrimSpace(req.Transcript)
 	if transcript == "" {
 		transcript = strings.TrimSpace(req.Text)
@@ -227,6 +240,9 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 	if err != nil {
 		return nil, err
 	}
+	if err := applyRestriction(ar, restrict, mode == ModeCreate, loc); err != nil {
+		return nil, err
+	}
 
 	if mode == ModeEdit && len(ar.ops) > 0 && sameDSL(env.DSL, ar.raw) {
 		// #211: a no-op is not saved as a new version; the summary tells the user why.
@@ -243,7 +259,7 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 	}
 	src := appconfigclient.Source{Kind: "ai", Transcript: transcript, Summary: ar.summary, Model: s.Model}
 	var saved *appconfigclient.Envelope
-	if len(ar.ops) > 0 && !ar.meta.AreaFallback {
+	if len(ar.ops) > 0 && !ar.meta.AreaFallback && !ar.forceFull {
 		src.Mode = "patch"
 		saved, err = s.Store.Patch(ctx, req.AppID, env.Version, ar.ops, src)
 	} else {
@@ -295,6 +311,16 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 		raw := dropFormPhotoPreviews(fillDefaults(extractJSON(resp.Text)))
 		raw = fixButtonOverlap(raw) // before validation: saves a regeneration (#169)
 		app, perr := dsl.Parse(raw)
+		if perr == nil && linted == nil && i < s.maxRegen() {
+			// #245: a part this build cannot render is a validation problem;
+			// on the last attempt it is accepted and removed by applyRestriction.
+			if v := restrictionViolations(raw, nil, restrictionFrom(ctx)); len(v) > 0 {
+				lastCandidate = raw
+				problems = v
+				ar.meta.LastProblems = problems
+				continue
+			}
+		}
 		if perr == nil {
 			// Post-processing order (integration of #173 and #174; each step re-parses):
 			//   1. addMissingLists / fixEnglishUnits: existing content fixes.
@@ -399,6 +425,16 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 		}
 		doc.Patch = fillPatchDefaults(doc.Patch, env.DSL)
 		next, _, perr := dsl.ApplyPatch(env.DSL, doc.Patch)
+		if perr == nil && linted == nil && i < s.maxRegen() {
+			// #245: the patch may not add parts this build cannot render
+			// (ones already in the app are removed by applyRestriction).
+			if v := restrictionViolations(next, env.DSL, restrictionFrom(ctx)); len(v) > 0 {
+				lastOps, lastSummary = doc.Patch, doc.Summary
+				problems = v
+				ar.meta.LastProblems = problems
+				continue
+			}
+		}
 		if perr == nil {
 			ar.raw = next
 			ar.ops = doc.Patch
@@ -455,6 +491,29 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	return fr, nil
 }
 
+// applyRestriction (#245) removes what the build cannot render from the final
+// DSL (after retries, logic pass and fallbacks). A changed patch result is
+// saved as a full document; create turns get a fresh summary.
+func applyRestriction(ar *attemptResult, r Restriction, create bool, loc Locale) error {
+	out, notes, changed := enforceRestriction(ar.raw, r)
+	if !changed {
+		return nil
+	}
+	app, err := dsl.Parse(out)
+	if err != nil {
+		return &Error{Status: http.StatusBadRequest, Code: "generation_failed",
+			Message:  "could not produce a valid app without the parts this app version cannot use",
+			Problems: append(notes, err.Error()), Attempts: ar.meta.Attempts}
+	}
+	ar.raw = canon(out)
+	ar.forceFull = true
+	ar.meta.Restricted = notes
+	if create || ar.summary == "" {
+		ar.summary = summarizeFor(app, loc)
+	}
+	return nil
+}
+
 // call performs one Claude request and folds usage/attempts/latency into ar.
 // onText (nil = non-streaming) receives the text deltas.
 func (s *Service) call(ctx context.Context, system, user string, schema json.RawMessage, ar *attemptResult, onText func(string)) (*Response, error) {
@@ -465,6 +524,7 @@ func (s *Service) call(ctx context.Context, system, user string, schema json.Raw
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	t := time.Now()
+	system, schema = restrictPrompt(ctx, system), restrictSchema(ctx, schema)
 	resp, err := s.Claude.Complete(cctx, Completion{System: system, Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
 	ar.latency += time.Since(t)
 	ar.meta.Attempts++

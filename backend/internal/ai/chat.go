@@ -80,6 +80,10 @@ type ChatRequest struct {
 	// question / ready ("answer", "proposal"). Old clients send neither Mode
 	// nor Capabilities and get the clarify behaviour unchanged.
 	Capabilities []string `json:"capabilities,omitempty"`
+	// AllowedComponents / DisabledFeatures (#245): same contract as Request
+	// (build restriction; omitted = no restriction). Not related to Capabilities.
+	AllowedComponents []string `json:"allowedComponents,omitempty"`
+	DisabledFeatures  []string `json:"disabledFeatures,omitempty"`
 }
 
 // Brief is the structured understanding of the requested app.
@@ -330,6 +334,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 	if req.AppID == "" {
 		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "appId is required"}
 	}
+	ctx = withRestriction(ctx, NewRestriction(req.AllowedComponents, req.DisabledFeatures))
 	incoming, err := normalizeMessages(req.Messages)
 	if err != nil {
 		return nil, err
@@ -589,6 +594,7 @@ func (s *Service) callChatWith(ctx context.Context, cfg ChatConfig, system strin
 	defer cancel()
 	t := time.Now()
 	var ttft time.Duration
+	system, schema = restrictPrompt(ctx, system), restrictSchema(ctx, schema)
 	resp, err := s.Claude.Complete(cctx, Completion{
 		System:     system,
 		Messages:   []Message{{Role: "user", Content: user}},
