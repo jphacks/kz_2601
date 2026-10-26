@@ -4,6 +4,7 @@ import MetamonDSL
 /// `list`: entity のレコード一覧(filter/sort はクライアント側)。行タップで `onItemTap`、長押しで削除(swipeToDelete)。
 /// 保存で増えた行(前回描画に無かった id)はブランドの薄い色で 1.2 秒ハイライト(Reduce Motion では省略)。
 /// `item.toggle`(#108): 行頭の丸で boolean を反転して即保存(楽観的 UI。失敗したら戻す)。
+/// 他人の共有レコード(#249): 丸は薄く描いて押すと理由を出し、長押しの削除は出さない(`RecordPermission`)。
 struct ListLeaf: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -34,9 +35,11 @@ struct ListLeaf: View {
             LazyVStack(spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                     if index > 0 { Hairline(inset: separatorInset) }
+                    let editable = rt.canEdit(entity: entityId, record: row)
                     ListRow(item: c.item, record: row, entity: entity, showsChevron: c.onItemTap != nil,
                             toggleOn: toggleField.map { ListToggle.isOn(row, field: $0.id, daily: ListToggle.isDaily(c.item), overrides: toggleOverrides, today: today) },
-                            onToggle: toggleField.map { f in { toggle(row, field: f.id, entity: entityId) } })
+                            onToggle: toggleField.map { f in { editable ? toggle(row, field: f.id, entity: entityId) : rt.notifyReadOnly(entity: entityId) } },
+                            toggleEnabled: editable)
                         .background(highlightedId == row.id ? RenderTheme.Colors.brandSoft : Color.clear)
                         .contentShape(Rectangle())
                         .onTapGesture { open(row) }
@@ -45,7 +48,7 @@ struct ListLeaf: View {
                         .accessibilityHint(c.onItemTap != nil ? L("ダブルタップで開きます") : "")
                         .accessibilityAction { open(row) }
                         .contextMenu {
-                            if c.swipeToDelete == true {
+                            if c.swipeToDelete == true, rt.canDelete(entity: entityId, record: row) {
                                 Button(L("削除"), systemImage: "trash", role: .destructive) {
                                     Task { await rt.run(Action(type: .deleteRecord, entity: entityId), ctx.actionContext(recordId: row.id)) }
                                 }

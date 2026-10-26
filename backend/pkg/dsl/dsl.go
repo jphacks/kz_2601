@@ -81,7 +81,23 @@ type Entity struct {
 	Name       string      `json:"name"`
 	TitleField string      `json:"titleField,omitempty"`
 	Scope      EntityScope `json:"scope,omitempty"` // "" = private
+	Edit       EntityEdit  `json:"edit,omitempty"`  // "" = author (shared/public only)
 	Fields     []Field     `json:"fields"`
+}
+
+// EntityEdit says who may update a shared/public record. Deleting is always
+// the author's alone.
+type EntityEdit string
+
+const (
+	EditAuthor  EntityEdit = "author"  // only the record's author (default)
+	EditMembers EntityEdit = "members" // anyone who opened the app (#252)
+)
+
+// MembersCanEdit reports whether non-authors may PATCH this entity's records.
+// Private entities ignore edit.
+func (e *Entity) MembersCanEdit() bool {
+	return e.IsShared() && e.Edit == EditMembers
 }
 
 // EntityScope says who shares an entity's records.

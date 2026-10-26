@@ -18,11 +18,13 @@ public struct LocalRecord: Codable, Sendable, Equatable, Identifiable {
     public var pendingOp: PendingOp
     /// 作成の冪等キー(= 未送信 create の仮 id の元)。サーバー採番後は参照用に残す。
     public var clientId: String?
+    /// 作った人の uid(shared / public の entity だけ・#249)。未送信 create と旧データは nil。
+    public var author: String?
 
     public var id: String { recordId }
 
     public init(appId: String, entity: String, recordId: String, data: [String: JSONValue],
-                createdAt: String? = nil, updatedAt: String? = nil, pendingOp: PendingOp = .none, clientId: String? = nil) {
+                createdAt: String? = nil, updatedAt: String? = nil, pendingOp: PendingOp = .none, clientId: String? = nil, author: String? = nil) {
         self.appId = appId
         self.entity = entity
         self.recordId = recordId
@@ -31,15 +33,16 @@ public struct LocalRecord: Codable, Sendable, Equatable, Identifiable {
         self.updatedAt = updatedAt
         self.pendingOp = pendingOp
         self.clientId = clientId
+        self.author = author
     }
 
     public init(appId: String, entity: String, server record: Record) {
         self.init(appId: appId, entity: entity, recordId: record.id, data: record.data,
-                  createdAt: record.createdAt, updatedAt: record.updatedAt)
+                  createdAt: record.createdAt, updatedAt: record.updatedAt, author: record.author)
     }
 
     /// Renderer に渡す形。
-    public var record: Record { Record(id: recordId, data: data, createdAt: createdAt, updatedAt: updatedAt) }
+    public var record: Record { Record(id: recordId, data: data, createdAt: createdAt, updatedAt: updatedAt, author: author) }
 
     /// 未送信 create の仮 id(`local-<clientId>`)。サーバー採番後に差し替わる。
     public static func temporaryId(clientId: String) -> String { "local-\(clientId)" }

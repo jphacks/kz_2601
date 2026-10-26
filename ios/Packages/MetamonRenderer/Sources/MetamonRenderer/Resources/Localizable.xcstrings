@@ -1887,6 +1887,23 @@
           }
         }
       }
+    },
+    "このデータは作った人だけが変更できます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only the person who created this can change it"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデータは作った人だけが変更できます"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

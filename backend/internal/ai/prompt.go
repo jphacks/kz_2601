@@ -51,6 +51,7 @@ var systemPrompt = strings.TrimSpace(`
 - entity/field 束縛: 入力部品(textField/numberField/datePicker/picker/toggle/photoField/image/videoField/videoPlayer)は screen.entity が設定された画面にのみ置き、field はその entity の field id。picker は enum field、photoField/image は photo field、videoField/videoPlayer は video field。
   list/stat/chart の entity は entities の id、item.title/subtitle/trailing/image・sort.field・filter.field・stat.field・chart.groupBy はその entity の field id。stat は aggregate=count 以外 field 必須。
 - entity.scope: 「みんなで」「共有」「投稿」「ランキング」「掲示板」「友達と」のように**他のユーザーと同じデータを見る**用途は scope:"public"(投稿者の author/authorName は backend が付けるので field に入れない)。家計簿・日記・体重のような個人の記録は scope を省略(private)。
+- entity.edit(#252): public/shared のレコードは既定で作った人だけが更新できる。家事分担の「終わった」チェック・共有の買い物リスト・出欠の〇×・落とし物の「解決」・シフトの「確定」のように**作った人以外が同じレコードのトグルや値を変える**設計なら、その entity に edit:"members" を付ける(削除は作った人だけのまま)。投稿・口コミ・ランキングの点数は付けない(本人以外に書き換えさせない)。編集ターンで edit を変えた時は summary に「家事は参加者の誰でも更新できるようにしました。削除は作った人だけです。」のように一言添える(新規作成の読み上げには自動で入る)。「店長だけが確定できる」のような役割ごとの権限は無いので、頼まれたら edit:"members" で代替し、その旨を書く。
 - アクション: navigate.screen は存在する画面 id。saveRecord/deleteRecord は entity 必須。フォーム画面には toolbar に saveRecord ボタンを置く。list.onItemTap で navigate するとフォームが編集モードになる。
 - id は ^[a-z][a-z0-9_-]{0,39}$(英小文字始まり・snake_case)。画面 id・entity id・field id・component id はそれぞれのスコープで一意。
 - 上限: 画面 12・entity 6・entity あたり field 40(computed も数える)・1 階層あたり component 30。入力部品が 30 を超えるフォームは section を 2 つに分ける。

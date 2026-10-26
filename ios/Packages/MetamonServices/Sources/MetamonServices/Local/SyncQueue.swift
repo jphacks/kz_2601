@@ -34,6 +34,9 @@ public enum SyncEvent: Sendable, Equatable {
     case conflict(appId: String, entity: String, message: String)
     /// サーバーが内容を拒否(400/422)。操作は破棄し、create はローカル行も消した。`field` は弾かれた Field.id(`details.field`)
     case rejected(appId: String, entity: String, message: String, field: String? = nil)
+    /// 共有レコードを作った人以外が変えようとした(403・#249)。操作は破棄して未送信印を落とした。
+    /// ローカルには楽観的に書いた値が残るので、entity をサーバーから引き直すこと
+    case forbidden(appId: String, entity: String)
     /// 連続失敗が上限に達し、次のトリガー(オンライン復帰 / 前面復帰 / 今すぐ同期)まで停止
     case paused(pending: Int)
     /// キューが空になった
@@ -180,6 +183,11 @@ public actor SyncQueue {
                     await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
                     finish(op)
                     emit(.conflict(appId: op.appId, entity: op.entity, message: (error as? APIError)?.errorDescription ?? "\(error)"))
+                case .forbidden:
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
+                    finish(op)
+                    print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) forbidden (not the author)")
+                    emit(.forbidden(appId: op.appId, entity: op.entity))
                 case .rejected(let message):
                     await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
                     finish(op)
@@ -240,13 +248,14 @@ public actor SyncQueue {
         }
     }
 
-    enum Outcome: Equatable { case transient, conflict, rejected(String) }
+    enum Outcome: Equatable { case transient, conflict, forbidden, rejected(String) }
 
-    /// 通信断・5xx・401(トークン更新待ち)・429 は再試行。404/409/412 は競合(サーバー優先)。他の 4xx は内容の拒否。
+    /// 通信断・5xx・401(トークン更新待ち)・429 は再試行。404/409/412 は競合(サーバー優先)。403 は作った人以外の変更(#249)。他の 4xx は内容の拒否。
     static func classify(_ error: Error) -> Outcome {
         guard let api = error as? APIError, let status = api.status else { return .transient }
         switch status {
         case 404, 409, 412: return .conflict
+        case 403: return .forbidden
         case 401, 408, 425, 429: return .transient
         case 400..<500: return .rejected(api.errorDescription ?? "HTTP \(status)")
         default: return .transient
