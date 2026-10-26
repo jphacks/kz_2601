@@ -71,6 +71,7 @@ type Record struct {
 	ClientID   string         `json:"clientId,omitempty"`
 	Author     string         `json:"author,omitempty"`     // uid of the poster (shared/public)
 	AuthorName string         `json:"authorName,omitempty"` // display name chosen by the poster
+	MarkCounts map[string]int `json:"markCounts,omitempty"` // mark id -> how many people set it (#255, marks.go)
 	CreatedAt  time.Time      `json:"createdAt"`
 	UpdatedAt  time.Time      `json:"updatedAt"`
 }
@@ -152,6 +153,7 @@ type Store interface {
 	Accounts        // account deletion (account.go)
 	Ownership       // appId creators + catalog installs (owner.go)
 	Purger          // physical app deletion (purge.go)
+	Marks           // per-user like / save toggles on shared records (marks.go)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).
