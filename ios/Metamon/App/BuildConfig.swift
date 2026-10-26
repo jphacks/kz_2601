@@ -90,7 +90,9 @@ enum BuildConfig {
             )
             #if DEBUG
             if DebugMockSharing.isEnabled { // UI テスト用(#165): 変身一覧に 2 件 + 端末内で完結するシェア
+                #if !APP_STORE_REVIEW
                 services.sharing = DebugSharingClient()
+                #endif
                 Task { await appConfig.setApps(DebugMockSharing.apps) }
             }
             #endif
@@ -111,9 +113,11 @@ enum BuildConfig {
                 notifications: UserNotificationScheduler(),
                 isLive: appConfigURL != nil
             )
-            services.sharing = appConfigURL.map { HTTPSharingClient(baseURL: $0, token: token) }
             if let appConfigURL { services.account = HTTPAccountClient(baseURL: appConfigURL, token: token) } // #119
+            #if !APP_STORE_REVIEW // 審査用ビルドはシェア / 探す / リリース申請を外す(#245)
+            services.sharing = appConfigURL.map { HTTPSharingClient(baseURL: $0, token: token) }
             services.releaseRequests = appConfigURL.map { HTTPReleaseRequestClient(baseURL: $0, token: token) }
+            #endif
             return services
         }
     }
