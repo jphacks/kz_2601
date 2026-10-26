@@ -1004,6 +1004,23 @@
         }
       }
     },
+    "ほかの人が追加・更新しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added or updated by others"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ほかの人が追加・更新しました"
+          }
+        }
+      }
+    },
     "またね。いつでも戻ってきてください": {
       "extractionState": "manual",
       "localizations": {
@@ -4349,6 +4366,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "新着"
+          }
+        }
+      }
+    },
+    "新着 %lld 件": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld new"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新着 %lld 件"
           }
         }
       }
