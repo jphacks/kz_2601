@@ -10,8 +10,10 @@ struct AppSwitcherSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var thumbs = AppThumbnailStore.shared
     @State private var selected: String?
+    #if !APP_STORE_REVIEW
     @State private var sharingUI = SharingUI.shared
     @State private var releaseUI = ReleaseUI.shared
+    #endif
 
     private var apps: [AppSummary] { rt.visibleApps }
     private var showSkeleton: Bool { rt.appsLoading && apps.isEmpty }
@@ -34,10 +36,12 @@ struct AppSwitcherSheet: View {
         .presentationDragIndicator(.visible)
         .sensoryFeedback(.selection, trigger: selected)
         .task { await rt.appsList() }
+        #if !APP_STORE_REVIEW // 審査用ビルドはシェア / リリース申請を外す(#245)
         .task { await releaseUI.refresh(rt.services.releaseRequests) }
         .sheet(item: $sharingUI.shareTarget) { ShareAppSheet(app: $0) }
-        .screenMapSheet { ScreenMapUI.shared.closeSwitcherThenTalk(rt) } // #116
         .sheet(item: $releaseUI.target) { ReleaseRequestSheet(app: $0) }
+        #endif
+        .screenMapSheet { ScreenMapUI.shared.closeSwitcherThenTalk(rt) } // #116
     }
 
     // MARK: - Sections
