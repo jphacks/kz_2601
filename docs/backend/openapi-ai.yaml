@@ -227,6 +227,8 @@ components:
             計算ロジックの 2 パス目(#100・docs/dsl/expressions.md)。true = create の UI 生成後に「発話に必要な計算(Field.computed / stat.value / settlement / ref 型)だけを JSON Patch で足す」小さな呼び出しを追加する。
             省略時はサーバー既定(env AI_LOGIC_PASS=1 で有効・既定は無効 = 1 パスで UI と計算を同時に生成)。edit / undo では無視。2 パス目が検証に通らなければ 1 パス目の結果を返す(失敗にしない)。
             ?stream=1 の `event: app` は 1 パス目の app ブロックで従来どおり先に届き、2 パス目の結果は `event: result` の dsl に入る。
+        allowedComponents: { $ref: '#/components/schemas/AllowedComponents' }
+        disabledFeatures: { $ref: '#/components/schemas/DisabledFeatures' }
       example: { appId: app_01HXYZ, text: 家計簿アプリが欲しい。金額とカテゴリとメモを記録したい, baseVersion: 1 }
     GenerateResponse:
       type: object
@@ -284,6 +286,26 @@ components:
                 attempts: { type: integer }
                 claudeMs: { type: integer }
                 problems: { type: array, items: { type: string }, description: 反映されなかった時の最後の検証エラー }
+            restricted:
+              type: array
+              items: { type: string }
+              description: '#245。allowedComponents / disabledFeatures により生成後に取り除いた・直した内容(例 "removed 2 healthStat"・"camera source -> library on 1 component(s)")。何もしなければ省略'
+    AllowedComponents:
+      type: array
+      items: { type: string }
+      description: |
+        #245。このクライアント(ビルド)が描画できる部品 type(Container と Leaf の type 文字列)の allowlist。**省略または空 = 全部品 OK**(旧 iOS 互換)。
+        制限がある時、AI に渡す部品カタログ・できることの索引から許可外の部品を外し、生成結果に許可外の部品があれば検証エラーとして再生成させ、最後の試行でも残れば取り除く。
+        edit では許可外の部品を新しく足す patch は再生成させ、今の DSL に既にある許可外の部品は取り除いて full で保存する。未知の type は無視(既知の type が 1 つも無ければ制限なし扱い)。
+        generate と chat で同じ値を送る。chat の `capabilities`(返答の種類)とは別物。
+      example: [vstack, hstack, section, text, button, list, stat, chart, textField, numberField, photoField]
+    DisabledFeatures:
+      type: array
+      items: { type: string }
+      description: |
+        #245。部品単位より細かく無効にする機能。既知の値: `fieldHealth`(Field.health を使わない。生成結果の health 属性は落とす)、
+        `cameraCapture`(photoField / videoField の source に camera / both を使わない = library のみ。生成結果は library に直す)。未知の値は無視。省略 = 何も無効にしない。
+      example: [fieldHealth, cameraCapture]
     ChatMessage:
       type: object
       required: [role, text]
@@ -309,6 +331,8 @@ components:
           type: array
           items: { type: string, enum: [answer, proposal] }
           description: '#185。クライアントが表示できる追加の kind。mode を省いて自動判定に任せる新しい iOS はこれを送る'
+        allowedComponents: { $ref: '#/components/schemas/AllowedComponents' }
+        disabledFeatures: { $ref: '#/components/schemas/DisabledFeatures' }
       example: { appId: app_01HXYZ, messages: [{ role: user, text: 家計簿 }] }
     ChatOption:
       type: object
