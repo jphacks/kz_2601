@@ -104,11 +104,13 @@ struct RootView: View {
             ScreenStack(root: route)
                 .modifier(HostSheets(onModal: true))
                 .modifier(NearbySheets(onModal: true))
+                .modifier(ToastHost(onModal: true))
         }
         .fullScreenCover(item: $rt.fullScreen) { route in
             ScreenStack(root: route)
                 .modifier(HostSheets(onModal: true))
                 .modifier(NearbySheets(onModal: true))
+                .modifier(ToastHost(onModal: true))
         }
         .modifier(HostSheets(onModal: false))
         .modifier(SharingHooks()) // シェアリンク受信・「探す」シート(#49 #50)
@@ -162,7 +164,7 @@ struct RootView: View {
         }
         .overlay(alignment: .top) { summaryCard }
         .overlay(alignment: .top) { errorCardOverlay }
-        .overlay(alignment: .bottom) { toast }
+        .modifier(ToastHost(onModal: false))
         .onChange(of: scenePhase) { _, phase in
             rt.setForeground(phase == .active) // ホットリロードのポーリングは前面時のみ
         }
@@ -225,24 +227,32 @@ struct RootView: View {
                 .zIndex(4)
         }
     }
+}
 
-    @ViewBuilder
-    private var toast: some View {
-        if let message = rt.toast {
-            Text(message)
-                .font(.footnote.weight(.medium))
-                .padding(.horizontal, Theme.Spacing.md).padding(.vertical, Theme.Spacing.sm + 2)
-                .background(.regularMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Theme.Spacing.md)
-                // マイク FAB と DSL の最下段(行 11〜12 のボタン)の上に出す(被せない)。タブ無しでも同じ高さ
-                .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .task(id: message) {
-                    try? await Task.sleep(for: .seconds(3))
-                    withAnimation { rt.toast = nil }
-                }
+/// 下部の toast。モーダル(sheet / fullScreen)が開いている間はその中に出す(根の overlay はモーダルに隠れる)。
+private struct ToastHost: ViewModifier {
+    let onModal: Bool
+    @Environment(AppRuntime.self) private var rt
+
+    func body(content: Content) -> some View {
+        let active = onModal == (rt.sheet != nil || rt.fullScreen != nil)
+        content.overlay(alignment: .bottom) {
+            if active, let message = rt.toast {
+                Text(message)
+                    .font(.footnote.weight(.medium))
+                    .padding(.horizontal, Theme.Spacing.md).padding(.vertical, Theme.Spacing.sm + 2)
+                    .background(.regularMaterial, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    // マイク FAB と DSL の最下段(行 11〜12 のボタン)の上に出す(被せない)。タブ無しでも同じ高さ
+                    .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .task(id: message) {
+                        try? await Task.sleep(for: .seconds(3))
+                        withAnimation { rt.toast = nil }
+                    }
+            }
         }
     }
 }
