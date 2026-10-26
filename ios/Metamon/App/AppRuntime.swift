@@ -940,6 +940,11 @@ final class AppRuntime: DSLRuntime {
                 toast = L10n.tr("送信に失敗しました(未送信 \(pending) 件)。接続を確認してください")
             case .drained:
                 break
+            case .notMember(let appId, let entity):
+                guard appId == document.appId else { return }
+                toast = SharedAccessDenial.notMember.message // 送信待ちには残さず、楽観的に出した分を戻す
+                records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records)
             }
         }
     }
@@ -1098,6 +1103,7 @@ final class AppRuntime: DSLRuntime {
 
     func message(for error: Error, entity: String?) -> String {
         guard let api = error as? APIError else { return error.localizedDescription }
+        if let denial = SharedAccessDenial(api) { return denial.message } // #254
         if api.code == "invalid_record" || (api.status == 400 && api.field != nil), let fieldId = api.field {
             let name = entity.flatMap { dsl.entity($0)?.field(fieldId)?.name } ?? fieldId
             return L10n.tr("「\(name)」の入力を確認してください(\(api.errorDescription ?? ""))")
