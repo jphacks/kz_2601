@@ -52,8 +52,33 @@ enum Greeting {
     static var newAppAction: String { L10n.tr("新しいアプリ") }
     static var homeAction: String { L10n.tr("Tailor It に戻る(初期画面)") }
 
-    /// 例文チップ。
-    static var createExamples: [String] { [L10n.tr("家計簿アプリが欲しい"), L10n.tr("筋トレの記録"), L10n.tr("散歩の写真メモ")] }
+    /// 例文チップのカテゴリ(#274)。初期画面で上の行がカテゴリ、下の行がそのカテゴリの例。
+    struct ExampleCategory: Identifiable, Equatable {
+        var id: String
+        var title: String
+        var examples: [String]
+    }
+
+    /// 記録・習慣・お金・家族/友達と・ゲーム。家族/友達と は共有して使う例(割り勘・出欠・みんなの掲示板)。
+    /// 審査用の版(シェアが外れる・#245)では「みんなの掲示板」を出さない(割り勘・出欠は 1 人でも使える)。
+    static func createExampleCategories(sharingAvailable: Bool = FirstRunTutorial.sharingAvailable) -> [ExampleCategory] {
+        var together = [L10n.tr("友達と割り勘"), L10n.tr("サークルの出欠")]
+        if sharingAvailable { together.append(L10n.tr("みんなの掲示板")) }
+        return [
+            ExampleCategory(id: "record", title: L10n.tr("記録"),
+                            examples: [L10n.tr("筋トレの記録"), L10n.tr("散歩の写真メモ"), L10n.tr("読んだ本のメモ")]),
+            ExampleCategory(id: "habit", title: L10n.tr("習慣"),
+                            examples: [L10n.tr("毎日の水の量"), L10n.tr("薬の飲み忘れ防止"), L10n.tr("早起きチェック")]),
+            ExampleCategory(id: "money", title: L10n.tr("お金"),
+                            examples: [L10n.tr("家計簿アプリが欲しい"), L10n.tr("おこづかい帳"), L10n.tr("サブスクの管理")]),
+            ExampleCategory(id: "together", title: L10n.tr("家族・友達と"), examples: together),
+            ExampleCategory(id: "game", title: L10n.tr("ゲーム"),
+                            examples: [L10n.tr("ボードゲームの勝ち負け記録"), L10n.tr("ボウリングのスコア表")]),
+        ]
+    }
+
+    /// 例文チップ(最初のカテゴリ)。
+    static var createExamples: [String] { createExampleCategories().first?.examples ?? [] }
     static var editExamples: [String] { [L10n.tr("ダークモードにして"), L10n.tr("グラフを追加して"), L10n.tr("メモ欄を増やして")] }
     static var examplesLabel: String { L10n.tr("たとえば") }
     static var editExamplesLabel: String { L10n.tr("たとえば、こんな変更") }
