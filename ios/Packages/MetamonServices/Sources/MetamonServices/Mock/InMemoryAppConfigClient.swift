@@ -103,6 +103,13 @@ public enum MockSeed {
                 Record(id: "e2", data: ["title": "夕食", "amount": 4500, "payer": "m2", "date": .string(today)], createdAt: iso),
                 Record(id: "e3", data: ["title": "ガソリン", "amount": 1500, "payer": "m1", "date": .string(today)], createdAt: iso),
             ],
+            // dinner(#263): randomPicker の候補 4 件
+            "dish": [
+                Record(id: "d1", data: ["name": "カレー", "genre": "洋食", "memo": "辛口"], createdAt: iso),
+                Record(id: "d2", data: ["name": "肉じゃが", "genre": "和食"], createdAt: iso),
+                Record(id: "d3", data: ["name": "麻婆豆腐", "genre": "中華"], createdAt: iso),
+                Record(id: "d4", data: ["name": "焼き魚", "genre": "和食", "memo": "鮭"], createdAt: iso),
+            ],
             // timetable(#234): 月1・水2(同じマスに 2 件 → 「+1」)・金3
             "lecture": [
                 Record(id: "l1", data: ["subject": "線形代数", "weekday": "月", "period": 1, "room": "A101"], createdAt: iso),
