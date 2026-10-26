@@ -281,6 +281,8 @@ const (
 	CompNearbyShare ComponentType = "nearbyShare" // MultipeerConnectivity: send records to a nearby device
 	// location tracking (#168): start/stop recording points while the user opts in
 	CompLocationTracker ComponentType = "locationTracker"
+	// chat (#260): bubbles oldest-first + a pinned input bar that saves a record
+	CompChatThread ComponentType = "chatThread"
 	// device health (#167)
 	CompHealthStat ComponentType = "healthStat" // CoreMotion steps / HealthKit weight (no entity)
 )
@@ -402,6 +404,10 @@ type Component struct {
 	ColumnValues []string   `json:"columnValues,omitempty"` // explicit column headers (else enum options)
 	RowValues    []string   `json:"rowValues,omitempty"`    // explicit row headers for enum/string rowField
 	RowRange     *GridRange `json:"rowRange,omitempty"`     // integer rowField range (default 1..6)
+
+	// chatThread (#260). Entity / Placeholder / EmptyText are shared.
+	TextField  string `json:"textField,omitempty"`  // message body (string/text field)
+	PhotoField string `json:"photoField,omitempty"` // optional photo field
 }
 
 // GridRange is an inclusive integer range of gridTable rows.

@@ -37,6 +37,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case nearbyShare
     // leaf(位置の記録・#168)
     case locationTracker
+    // leaf(チャット・#260)
+    case chatThread
     // leaf(ヘルスデータ・#167)
     case healthStat
     // leaf(時間割のマス目・#234)
@@ -159,6 +161,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var columnValues: [String]? // 列見出しの明示(nil = enum の options)
     public var rowValues: [String]?    // enum / string の行見出しの明示
     public var rowRange: GridRange?    // integer の行範囲(nil = 1…6)
+    // chatThread(#260)。entity / placeholder / emptyText は共用
+    public var textField: String?      // 本文の string / text field
+    public var photoField: String?     // 任意の photo field
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
@@ -174,6 +179,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case tone
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
+        case textField, photoField
     }
 
     public init(from decoder: Decoder) throws {
@@ -256,6 +262,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         columnValues = try? c.decodeIfPresent([String].self, forKey: .columnValues)
         rowValues = try? c.decodeIfPresent([String].self, forKey: .rowValues)
         rowRange = try? c.decodeIfPresent(GridRange.self, forKey: .rowRange)
+        textField = try? c.decodeIfPresent(String.self, forKey: .textField)
+        photoField = try? c.decodeIfPresent(String.self, forKey: .photoField)
     }
 }
 
