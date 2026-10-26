@@ -648,6 +648,9 @@
           "$ref": "#/$defs/LocationTracker"
         },
         {
+          "$ref": "#/$defs/ChatThread"
+        },
+        {
           "$ref": "#/$defs/HealthStat"
         }
       ]
@@ -3265,6 +3268,48 @@
       },
       "description": "「記録を開始 / 記録を停止」ボタンと記録中の状態(経過時間・距離)。開始を押した間だけ現在地を entity に 1 点ずつ保存し、アプリを閉じても停止まで続く(既定 1 時間・最長 4 時間で自動停止)。散歩・ランニング・サイクリングのルート、移動ログ、軌跡を残したいアプリで選ぶ。1 回だけ現在地を入れたいなら locationButton。",
       "x-usage": "ホーム画面(screen.entity なし)に A9:F10 で 1 つ(最下 2 行の左 A-B はマイクの席なので空ける)。同じ画面に mapView{kind:\"route\",entity,locationField,dateField}(A3:F8)と stat{aggregate:\"distance\"} / stat{aggregate:\"duration\"}(field = location field、by = datetime field、今日なら filter today)を A1:F2 に並べる。entity は point{loc: location, at: datetime(required, defaultValue now)} のように点だけを持たせ、フォーム画面は作らない。"
+    },
+    "ChatThread": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "textField"
+      ],
+      "properties": {
+        "type": {
+          "const": "chatThread"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string",
+          "description": "メッセージを保存する entity。1 メッセージ = 1 レコード。みんなで話すなら scope public。送信者名・送信時刻は予約値 $author / $createdAt を使うので、名前や日時の field は作らない。"
+        },
+        "textField": {
+          "type": "string",
+          "description": "`entity` の string / text field。メッセージ本文が入る。"
+        },
+        "photoField": {
+          "type": "string",
+          "description": "`entity` の photo field(任意)。書くと入力欄に写真ボタンが出て、写真付きで送れる。"
+        },
+        "placeholder": {
+          "type": "string",
+          "description": "入力欄の薄い文字(既定「メッセージ」)。"
+        },
+        "emptyText": {
+          "type": "string",
+          "description": "まだメッセージが無い時の文言(既定「まだメッセージはありません」)。"
+        }
+      },
+      "description": "LINE のようなチャット画面。メッセージを吹き出しで古い順に上から下へ積み(最新が一番下)、自分の分は右・相手の分は左に送信者名付きで出し、画面下に固定の入力欄から送る(送信 = その entity に 1 件保存・フォーム画面は不要)。ほかの人のメッセージはリアルタイムで届く。グループチャット・1 対 1 のメッセージ・連絡のやり取りで選ぶ。投稿を一覧で眺めるだけなら list。",
+      "x-usage": "チャット用のタブかホーム画面に A1:F12 で 1 つだけ置き、同じ画面に他の部品を置かない(左下のマイクは入力欄の左に避けて表示される)。entity は message{text: text(required), photo?: photo} + scope:\"public\" だけ。名前・日時の field、フォーム画面、追加ボタン、list は作らない。entity の他の required field には defaultValue を付ける。"
     },
     "HealthStat": {
       "type": "object",

@@ -619,6 +619,8 @@ func (a *App) Validate() error {
 				checkAIButton(where, c, formEntity, entities, add)
 			case CompLocationTracker:
 				checkLocationTracker(where, c, entities, add)
+			case CompChatThread:
+				checkChatThread(where, c, entities, add)
 			case CompHealthStat:
 				checkHealthStat(where, c, add)
 			case CompNearbyShare:
