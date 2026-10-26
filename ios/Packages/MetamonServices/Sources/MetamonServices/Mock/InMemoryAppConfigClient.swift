@@ -88,6 +88,8 @@ public enum MockSeed {
             "memo": [
                 Record(id: "1", data: ["note": "きれいな紅葉", "date": .string(iso)], createdAt: iso),
             ],
+            // chat(#260): 相手 2 人 + 自分(モックの uid)の会話。古い順に下へ積む
+            "messages": chatSeed(now: now),
             // shopping(#108): 未購入 3 件 + 購入済み 1 件(一覧の丸でチェック)
             "groceries": [
                 Record(id: "g1", data: ["name": "牛乳", "category": "食品", "qty": 1, "done": false, "added": .string(today)], createdAt: iso),
