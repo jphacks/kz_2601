@@ -788,6 +788,9 @@ final class AppRuntime: DSLRuntime {
 
     func records(for entity: String) -> [Record] { records[entity] ?? [] }
 
+    /// `Field.hidden`(#262)の入力を作者のフォームにだけ出すための自分の uid。
+    var currentUid: String? { services.auth.currentUser?.uid }
+
     /// 一覧のワンタップ チェック(#108 list.item.toggle)。saveRecord と同じくローカル DB に即反映し、送信は同期キュー。
     /// 表示中に無いレコード(削除済み等)は保存しない(save は recordId が見つからないと新規作成になるため)。
     func updateRecord(entity: String, recordId: String, data: [String: JSONValue]) async -> Bool {
