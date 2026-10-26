@@ -70,6 +70,7 @@ struct AppCardActions: View {
                     Label("削除", systemImage: "trash")
                 }
                 .accessibilityIdentifier("switcher.delete")
+                AppManageMenuItems(app: app) // #277 名前を変える・複製・並べ替え
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.footnote.weight(.bold))
