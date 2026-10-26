@@ -26,7 +26,11 @@ struct MetamonApp: App {
         FirstRunTutorialStore.shared.applyLaunchOverride() // #274(DEBUG のみ)
         _ = ExpensiveNetworkProbe.shared // 音声モデルの確認(#275)より前に回線の種類の監視を始める
         services.ai = ConsentGatedAIClient(base: services.ai) { AIConsentStore.isGranted(in: .standard) }
+        #if !APP_STORE_REVIEW
         if BuildConfig.forceMock { HealthData.source = MockHealthData() } // healthStat(#167)は固定値
+        #else
+        _ = ReviewBuildPackageMarker.self // パッケージにも APP_STORE_REVIEW が渡っていることをコンパイル時に保証(#245)
+        #endif
         let appId = DeviceAppID.current
         var document: AppDocument
         if services.isLive, let cached = DocumentCache.shared.load(appId: appId) {

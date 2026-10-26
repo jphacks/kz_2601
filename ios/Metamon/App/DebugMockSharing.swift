@@ -13,6 +13,7 @@ enum DebugMockSharing {
     ]
 }
 
+#if !APP_STORE_REVIEW
 /// 通信しない `SharingClient`。リンクは固定トークン。
 struct DebugSharingClient: SharingClient {
     func share(appId: String) async throws -> ShareInfo {
@@ -29,4 +30,5 @@ struct DebugSharingClient: SharingClient {
     func searchPublicApps(query: String, sort: String) async throws -> [PublicAppListing] { [] }
     func install(publicAppId: String) async throws -> InstalledApp { InstalledApp(appId: publicAppId, name: publicAppId) }
 }
+#endif // !APP_STORE_REVIEW
 #endif

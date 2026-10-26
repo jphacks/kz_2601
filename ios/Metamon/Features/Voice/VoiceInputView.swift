@@ -53,7 +53,9 @@ struct VoiceInputView: View {
                             VStack(spacing: 0) {
                                 if !typing { examples }
                                 textEntry
+                                #if !APP_STORE_REVIEW
                                 if isInitial, !typing { DiscoverEntry() } // 「探す」(#50)
+                                #endif
                             }
                             .padding(.bottom, Theme.Spacing.sm)
                         }

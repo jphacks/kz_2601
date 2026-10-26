@@ -961,7 +961,9 @@ final class AppRuntime: DSLRuntime {
             let isNew = form.recordId == nil
             records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: form.recordId, data: payload)
             WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            #if !APP_STORE_REVIEW
             writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)
+            #endif
             if let screen = action.screen {
                 navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
             } else {
