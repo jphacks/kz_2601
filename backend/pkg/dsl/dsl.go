@@ -82,6 +82,7 @@ type Entity struct {
 	TitleField string      `json:"titleField,omitempty"`
 	Scope      EntityScope `json:"scope,omitempty"` // "" = private
 	Edit       EntityEdit  `json:"edit,omitempty"`  // "" = author (shared/public only)
+	Marks      []Mark      `json:"marks,omitempty"` // per-user toggles: like / save (#255, shared/public only)
 	Fields     []Field     `json:"fields"`
 }
 
@@ -429,6 +430,7 @@ type ListItem struct {
 	Trailing string `json:"trailing,omitempty"`
 	Icon     string `json:"icon,omitempty"`
 	Image    string `json:"image,omitempty"`  // photo field id -> thumbnail
+	Mark     string `json:"mark,omitempty"`   // entity mark id -> like/save toggle with count (#255)
 	Toggle   string `json:"toggle,omitempty"` // boolean field id -> one-tap check circle (#108)
 	Resets   string `json:"resets,omitempty"` // "daily": toggle is a date field, checked = today (#132)
 }

@@ -236,6 +236,7 @@ func (a *App) Validate() error {
 		default:
 			add("entity %q edit %q must be author or members", e.ID, e.Edit)
 		}
+		checkEntityMarks(e, add)
 		seen := map[string]bool{}
 		for j, f := range e.Fields {
 			if !idRe.MatchString(f.ID) {
@@ -443,6 +444,7 @@ func (a *App) Validate() error {
 					add("%s: list item field %q not in entity %q", where, c.Item.Image, e.ID)
 				}
 				checkListToggle(where, c.Item, e, add)
+				checkListMark(where, c.Item, e, add)
 				if c.Sort != nil {
 					if msg := valueErr(e, "sort field", c.Sort.Field); msg != "" {
 						add("%s: %s", where, msg)
