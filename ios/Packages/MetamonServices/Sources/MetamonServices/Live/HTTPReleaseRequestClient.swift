@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
+#if !APP_STORE_REVIEW
 import Foundation
 
 /// appconfig の release-requests API(#76)。
@@ -27,3 +29,4 @@ public struct HTTPReleaseRequestClient: ReleaseRequestClient {
         return try JSONDecoder().decode(ListResponse.self, from: data).items
     }
 }
+#endif
