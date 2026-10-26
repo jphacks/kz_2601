@@ -6,6 +6,10 @@ info:
     音声/文字 → Claude → DSL JSON 生成 → appconfig へ反映。
     - 認証・エラー形式・ページングは appconfig と同一 (`openapi-appconfig.yaml` の `Error` を再利用)。
     - ai は受け取った Bearer をそのまま appconfig へ転送する。
+    - `POST /generate` と `POST /chat` は ai 自身も ID トークンを検証し、利用者ごと・1 日ごとの上限を数える (#280)。
+      上限に当たると 429 `rate_limited`(`RateLimited`)。重さ: chat 1 往復 = 1、generate の修正 = 2、新規作成(create/auto)= 3、undo = 0。
+      既定の上限: 匿名 30 / サインイン済み 60 / Pro 300(サーバーでの Pro 判定は未実装)/ 匿名の同一 IP 300 / 環境全体 2000。日付は 0:00 JST で切り替わる。
+      成功時も `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset`(Unix 秒)を返す。
 servers:
   - url: http://localhost:8081/v1
   - url: https://ai-REPLACE.a.run.app/v1
@@ -72,7 +76,7 @@ paths:
                   code: generation_failed
                   message: could not produce a valid app from the request
                   details: { transcript: えーっと, attempts: 2, problems: ['screen "home" components[0]: list entity "x" does not exist'] }
-        '429': { description: Claude/Whisper のレート制限 (Retry-After 付き), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '429': { $ref: '#/components/responses/RateLimited' }
         '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
 
   /chat:
@@ -150,7 +154,7 @@ paths:
                   value: { kind: ready, mode: edit, text: メモ欄を消しますね。, turn: 1, locale: ja, source: claude, transcript: 支出を記録画面のメモ欄を消して。 }
         '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
         '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
-        '429': { description: Claude のレート制限, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '429': { $ref: '#/components/responses/RateLimited' }
         '502': { description: Claude の出力がスキーマに合わず 2 回とも失敗 (generation_failed), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
         '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
 
@@ -200,7 +204,44 @@ paths:
 components:
   securitySchemes:
     firebaseAuth: { type: http, scheme: bearer, bearerFormat: Firebase ID token }
+  responses:
+    RateLimited:
+      description: |
+        1 日の上限に達した (#280)。`code: rate_limited`、`details` は `RateLimitDetails`。
+        Claude 側のレート制限の受け渡しも同じ 429 だが、その時は `details.scope` が無い。
+      headers:
+        Retry-After: { description: 次に使えるまでの秒数, schema: { type: integer } }
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: './openapi-appconfig.yaml#/components/schemas/Error'
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      details: { $ref: '#/components/schemas/RateLimitDetails' }
+          example:
+            error:
+              code: rate_limited
+              message: 今日の利用上限(30)に達しました。10月26日 0:00からまた使えます。サインインすると上限が増えます。
+              details: { scope: user, tier: anonymous, limit: 30, used: 29, remaining: 1, resetAt: '2026-10-25T15:00:00Z', retryAfterSec: 3600 }
   schemas:
+    RateLimitDetails:
+      type: object
+      required: [scope, tier, limit, used, remaining, resetAt, retryAfterSec]
+      properties:
+        scope:
+          type: string
+          enum: [user, ip, global]
+          description: user = 利用者の 1 日の上限 / ip = 同じネットワークの匿名利用の上限 / global = 環境全体の費用ブレーカー
+        tier: { type: string, enum: [anonymous, signed_in, pro] }
+        limit: { type: integer, description: 当たった上限 (単位/日) }
+        used: { type: integer, description: 今日使った単位 }
+        remaining: { type: integer, description: 残り (今回の依頼の重さより小さい) }
+        resetAt: { type: string, format: date-time, description: 次に使える時刻 (翌 0:00 JST) }
+        retryAfterSec: { type: integer }
     GenerateRequest:
       type: object
       required: [appId, text]
