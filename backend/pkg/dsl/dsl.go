@@ -89,7 +89,7 @@ type EntityScope string
 
 const (
 	ScopePrivate EntityScope = "private" // owner only (default)
-	ScopeShared  EntityScope = "shared"  // v1: same as public; participant-only later
+	ScopeShared  EntityScope = "shared"  // creator + people who joined by share link (#388)
 	ScopePublic  EntityScope = "public"  // anyone can read; signed-in users can post
 )
 
