@@ -296,8 +296,10 @@ public struct ListItem: Decodable, Sendable {
     public var toggle: String?
     /// "daily" = toggle は date field。押すと今日の日付を保存し、値が今日の間だけ済み(#132)
     public var resets: String?
+    /// entity.marks の id → 行の右端にいいね・保存のトグルと件数(#255・1 人 1 回)
+    public var mark: String?
 
-    public init(title: String, subtitle: String? = nil, trailing: String? = nil, icon: String? = nil, image: String? = nil, toggle: String? = nil, resets: String? = nil) {
+    public init(title: String, subtitle: String? = nil, trailing: String? = nil, icon: String? = nil, image: String? = nil, toggle: String? = nil, resets: String? = nil, mark: String? = nil) {
         self.title = title
         self.subtitle = subtitle
         self.trailing = trailing
@@ -305,6 +307,7 @@ public struct ListItem: Decodable, Sendable {
         self.image = image
         self.toggle = toggle
         self.resets = resets
+        self.mark = mark
     }
 }
 

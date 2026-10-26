@@ -209,6 +209,8 @@ public struct Entity: Decodable, Identifiable, Sendable {
     public var scope: String?
     /// 共有レコードを誰が更新できるか(#252): "author"(省略時)/ "members"。削除はどちらでも作った人だけ。
     public var edit: String?
+    /// 1 人 1 回の印(いいね・保存・#255)。shared / public の entity だけ。
+    @Lossy public var marks: [Mark] = []
     @Lossy public var fields: [Field]
 
     /// field id、または予約値(`$author` / `$createdAt`・#250)の仮 Field。

@@ -174,6 +174,28 @@ public final class RecordSyncEngine {
         return await store.records(appId: appId, entity: entity)
     }
 
+    /// 印を付ける / 外す(#255)。押した瞬間にローカルの件数と状態を変え、サーバーの `{count, mine}` で確定する。
+    /// 失敗したら元に戻して投げる。印は送信待ちの列に積まない(オフライン・未送信の自分の投稿では `MarkError`)。
+    @discardableResult
+    public func toggleMark(appId: String, entity: String, recordId: String, mark: String) async throws -> MarkState {
+        guard let row = await store.row(appId: appId, entity: entity, recordId: recordId), row.pendingOp != .delete else {
+            throw MarkError.notFound
+        }
+        guard !row.isTemporary else { throw MarkError.notSynced }
+        guard isOnline else { throw MarkError.offline }
+        let before = row.record.markState(mark)
+        let next = before.toggled()
+        await store.setMark(appId: appId, entity: entity, recordId: recordId, mark: mark, state: next)
+        do {
+            let server = try await client.setMark(appId: appId, entity: entity, id: recordId, mark: mark, on: next.mine)
+            await store.setMark(appId: appId, entity: entity, recordId: recordId, mark: mark, state: server)
+            return server
+        } catch {
+            await store.setMark(appId: appId, entity: entity, recordId: recordId, mark: mark, state: before)
+            throw error
+        }
+    }
+
     /// アプリ削除(#180): その appId の未送信キューとローカル DB を消す。サーバー削除が成功してから呼ぶ。
     public func purge(appId: String) async {
         await queue.discard(appId: appId)
@@ -196,4 +218,14 @@ public final class RecordSyncEngine {
         kick()
         return await store.records(appId: appId, entity: entity)
     }
+}
+
+/// 印を付けられない理由(#255)。
+public enum MarkError: Error, Equatable, Sendable {
+    /// オフライン(印は送信待ちに積まない)
+    case offline
+    /// 自分の投稿がまだ送信されていない(サーバーにレコードが無い)
+    case notSynced
+    /// ローカルにレコードが無い(削除済み)
+    case notFound
 }

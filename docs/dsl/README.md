@@ -52,6 +52,7 @@ AppDSL { schemaVersion:1, app:AppMeta, initialScreen, entities[], screens[] }
 AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: fullscreen|floating|none, notifications[]?, tabs[]?: {screen,title,icon?} }
 Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|members, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit?, refEntity?, computed?: Expr, health?: "weight" } }
   予約値(field id の代わり): $author(共有 entity の投稿者)・$createdAt(作成日時)— §3.5
+  Entity.marks?: [{ id, icon, label }](共有 entity の 1 人 1 回の印・いいね / 保存)・ListItem.mark? / 予約値 $marks.<id>(件数・自分が付けたか)— §3.5
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
 Leaf (44 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
@@ -240,6 +241,22 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - **投稿者名に何を出すか**: iOS の設定「投稿に表示する名前」に本人が入れた名前だけ。共有 entity に初めて投稿する時に聞き(「匿名のまま」も選べる)、未設定・空なら送らず backend が「匿名」を付ける。Apple の氏名・メールアドレス・端末名は送らない(本人が公開すると決めていない個人情報を他人に見せない)。名前を後で変えても、過去の投稿の表示名は投稿時のまま(backend は create 時だけ受け取る)。
 - iOS は共有 entity のレコードを作る時、ローカル行にも自分の uid と表示名を入れる(未送信のうちから「自分の投稿」に出る・作者判定も同じ)。
 - AI: 共有 entity に名前の手入力欄(member_name / person / staff_name 等)を作らず `$author` を表示する。ai-eval の `authorShown` / `nameInput` / `meFilter`(`m0disc_cases.json`)。
+
+#### 自分だけの印 `marks`(#255)
+
+いいね・保存・お気に入り・既読のように、**1 人 1 回のトグル**で共有レコードに付ける印。印はレコードの `data` ではなく appconfig が「誰が付けたか」を記録するので、押すたびに件数が増えたり、他人の印を付けたりできない。public / shared の entity だけ(private は自分の記録なので boolean field + `list.item.toggle` を使う)。実例: `examples/recipes.json`(みんなのレシピ)。
+
+| 書く場所 | 形 | 意味 |
+|---|---|---|
+| `entity.marks` | `[{ "id": "like", "icon": "heart", "label": "いいね" }]`(3 個まで。icon は heart / star / bookmark / thumbsup / check / eye / flag) | その entity に付けられる印 |
+| `list.item.mark` | `"like"` | 行の右端にアイコンと件数のトグル。他人の投稿にも付けられる(楽観的に反映・失敗したら戻す) |
+| `$marks.<id>` | `list.item` の title / subtitle / trailing・`table.columns[].field`・`list` / `table` の `sort.field` | 件数(integer)。`sort` を desc で「いいねの多い順」 |
+| 部品の `filter` | `{"field":"$marks.save","op":"eq","value":{"me":true}}` | 自分が付けたものだけ(`op:"neq"` = まだ付けていない = 未読)。stat の件数にも使える |
+
+- **いいね数の集計(agg)との関係**: 印はレコードではないので、computed の `agg` からは数えられない(`agg` の filter に `$marks.<id>` を書くと `Validate()` がエラー)。件数は `$marks.<id>` で出す。いいね用の子 entity + ref + `agg count` は作らない(1 人で何回でも押せる・別の画面で親を選び直すフォームになる)。コメント・出欠のように中身のある記録は今まで通り子 entity。
+- appconfig: `PUT` / `DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}` で自分の印を付ける / 外す(どちらも冪等・`{count, mine}` を返す)。`GET /records` と `GET /records/{id}` はレコード最上位に `marks: {"<markId>": {"count": n, "mine": bool}}` を付ける。Firestore は `…/records/{id}/marks/{markId}`(`count`)と `…/marks/{markId}/by/{uid}`。レコードを消すと印も消える。
+- iOS: 一覧の行のトグルは押した瞬間に件数と塗りを変え、サーバーの `{count, mine}` で確定する(失敗したら戻して理由を出す)。オフラインの間は付けられない(送信待ちの列には積まない)。自分の未送信の投稿にもまだ付けられない。
+- AI: 「いいね」「お気に入り」「保存」「既読」は marks を使い、子 entity を作らない。ai-eval の `mark` / `markedByMe` / `markEntity`(`m0disc_cases.json`)。
 
 ### 3.6 ナビゲーション = 画面グラフの規則(#112 #114 #115)
 

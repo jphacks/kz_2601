@@ -29,6 +29,7 @@ public enum DSLExamples {
             "timetable",
             "dinner",
             "board",
+            "recipes",
         ]
         #if APP_STORE_REVIEW
         return all.filter { !reviewExcluded.contains($0) }

@@ -33,6 +33,8 @@ public protocol DSLRuntime: AnyObject, Observable {
     var currentUserId: String? { get }
     /// 変更できないレコード(他人の共有レコード)を触った時。ホストが「作った人だけが変更できます」を出す。
     func notifyReadOnly(entity: String)
+    /// 自分の印(いいね・保存 #255)を付け外しする。確定した状態を返し、付けられなければ nil(ホストが理由を出す)。
+    func toggleMark(entity: String, recordId: String, mark: String) async -> MarkState?
 }
 
 public extension DSLRuntime {
@@ -45,6 +47,8 @@ public extension DSLRuntime {
     func shareNearby(entity: String, records: [[String: JSONValue]]) {}
     var currentUserId: String? { nil }
     func notifyReadOnly(entity: String) {}
+    /// 既定は付けない(プレビュー・テスト用ランタイム)。
+    func toggleMark(entity: String, recordId: String, mark: String) async -> MarkState? { nil }
 
     /// 自分が更新できるレコードか(#249 / #252)。他人の共有レコードは entity.edit が members の時だけ。
     func canEdit(entity: String, record: Record) -> Bool {

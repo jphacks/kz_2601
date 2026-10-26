@@ -155,6 +155,15 @@
             "members": "同じアプリを開いた人なら誰でも更新できる(削除は作った人だけ)。家事の完了・共有リストのチェック・出欠・解決トグル。"
           }
         },
+        "marks": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/Mark"
+          },
+          "description": "1 人 1 回のトグルで付ける「自分だけの印」(いいね・保存・お気に入り・既読・行きたい)。public/shared の entity だけ。印はレコードの項目ではなく、誰が付けたかを backend が記録する(押すたびに増えない・付け外しできる・件数は自動で数える)。list.item.mark に id を書くと、行の右端にアイコンと件数のトグルが出る。",
+          "x-usage": "「いいね」「お気に入り」「保存」「ブックマーク」「既読」「行きたい」と言われたら marks を使う。いいね用・保存用の別 entity、親を指す ref、件数の computed(agg count)は作らない(1 人で何回でも押せてしまう・全項目の打ち直しになる)。件数は $marks.<id>(table の列 / sort で多い順。行のトグルにも件数が出るので list.item.trailing には要らない)。「保存したもの」「お気に入り一覧」「既読にしたもの」は filter {\"field\":\"$marks.<id>\",\"op\":\"eq\",\"value\":{\"me\":true}} の一覧(op neq = まだ付けていない = 未読)。その一覧の item にも同じ mark を書く(そこで外せる)。private の entity には書かない(自分だけの記録の「済み」は boolean field + list.item.toggle)。コメント・出欠のように中身のある記録は今まで通り別 entity。"
+        },
         "fields": {
           "type": "array",
           "items": {
@@ -164,7 +173,8 @@
       },
       "x-recordValues": {
         "$author": "投稿者の表示名(public/shared の entity だけ)。本人がアプリの設定で決めた名前、未設定なら「匿名」。list.item の title/subtitle/trailing・table.columns の field・timeline の titleField/subtitleField に書ける。filter の field に書くと投稿者で絞り込む(value は {\"me\": true} = 自分。op eq = 自分の投稿 / neq = 他の人の投稿)。",
-        "$createdAt": "レコードを作った日時(datetime・全 entity)。list.item の title/subtitle/trailing・table.columns の field・timeline の titleField/subtitleField/dateField・list/table の sort.field に書ける。"
+        "$createdAt": "レコードを作った日時(datetime・全 entity)。list.item の title/subtitle/trailing・table.columns の field・timeline の titleField/subtitleField/dateField・list/table の sort.field に書ける。",
+        "$marks.<id>": "entity の marks の印の件数(integer・public/shared の entity)。<id> は marks の id(例 $marks.like)。list.item の title/subtitle/trailing・table.columns の field・list/table の sort.field(多い順 = desc)に書ける。filter の field に書くと、value {\"me\": true} と op eq で自分が付けたものだけ、op neq でまだ付けていないものに絞る。"
       }
     },
     "Field": {
@@ -959,22 +969,22 @@
     "ListItem": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル、toggle に boolean field で行頭のチェック丸(resets daily なら date field で毎日リセット)。",
+      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル、toggle に boolean field で行頭のチェック丸(resets daily なら date field で毎日リセット)。 mark に entity の marks の id を書くと、行の右端にいいね・保存などのトグルと件数(1 人 1 回)。",
       "required": [
         "title"
       ],
       "properties": {
         "title": {
           "type": "string",
-          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at)."
+          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at), or \"$marks.<id>\" (mark count)."
         },
         "subtitle": {
           "type": "string",
-          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at)."
+          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at), or \"$marks.<id>\" (mark count)."
         },
         "trailing": {
           "type": "string",
-          "description": "Field id (e.g. amount, date), or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at)."
+          "description": "Field id (e.g. amount, date), or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at), or \"$marks.<id>\" (mark count)."
         },
         "icon": {
           "type": "string"
@@ -982,6 +992,10 @@
         "image": {
           "type": "string",
           "description": "Field id of a photo field shown as thumbnail (a video field shows its first-frame thumbnail)."
+        },
+        "mark": {
+          "type": "string",
+          "description": "Mark id from the list entity's marks (public/shared entity). iOS draws the mark's icon and count at the row end; tapping it adds or removes the signed-in user's mark immediately (once per person, no form, other people's posts too)."
         },
         "toggle": {
           "type": "string",
@@ -1007,7 +1021,7 @@
       "properties": {
         "field": {
           "type": "string",
-          "description": "Field id, or \"$createdAt\" (posted at)."
+          "description": "Field id, or \"$createdAt\" (posted at) / \"$marks.<id>\" (mark count, e.g. most liked first with desc)."
         },
         "direction": {
           "type": "string",
@@ -1021,7 +1035,7 @@
     "Filter": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list / stat / chart / agg のレコード絞り込み。op が today / thisWeek / thisMonth / thisYear(期間・端末ローカル。今週は月曜始まり)のときは value を null にし、field は date / datetime。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。 「自分の投稿だけ」は field \"$author\"・value {\"me\": true}・op eq(public/shared の entity のみ)。",
+      "description": "list / stat / chart / agg のレコード絞り込み。op が today / thisWeek / thisMonth / thisYear(期間・端末ローカル。今週は月曜始まり)のときは value を null にし、field は date / datetime。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。 「自分の投稿だけ」は field \"$author\"・value {\"me\": true}・op eq(public/shared の entity のみ)。 「自分が保存した / いいねしたもの」は field \"$marks.<id>\"・value {\"me\": true}・op eq(neq = まだ付けていない)。",
       "required": [
         "field",
         "op",
@@ -1030,7 +1044,7 @@
       "properties": {
         "field": {
           "type": "string",
-          "description": "Field id, or \"$author\" (public/shared entity: the poster; value {\"me\": true}, op eq = my posts / neq = others' posts)."
+          "description": "Field id, or \"$author\" (public/shared entity: the poster; value {\"me\": true}, op eq = my posts / neq = others' posts), or \"$marks.<id>\" (public/shared entity with that mark: value {\"me\": true}, op eq = marked by me / neq = not marked by me)."
         },
         "op": {
           "type": "string",
@@ -1091,7 +1105,7 @@
               "$ref": "#/$defs/FilterMe"
             }
           ],
-          "description": "Literal or Expr. null for today/thisWeek/thisMonth/thisYear. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id). {\"me\": true} = the signed-in user (only with field \"$author\")."
+          "description": "Literal or Expr. null for today/thisWeek/thisMonth/thisYear. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id). {\"me\": true} = the signed-in user (only with field \"$author\" or \"$marks.<id>\")."
         }
       }
     },
@@ -2300,7 +2314,7 @@
       "properties": {
         "field": {
           "type": "string",
-          "description": "Field id of the table entity, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at)."
+          "description": "Field id of the table entity, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at) / \"$marks.<id>\" (mark count)."
         },
         "title": {
           "type": "string",
@@ -3404,7 +3418,48 @@
           "const": true
         }
       },
-      "description": "filter の value に書く「自分」。field \"$author\"(public/shared の entity)と op eq(自分の投稿)/ neq(他の人の投稿)でだけ使う。"
+      "description": "filter の value に書く「自分」。field \"$author\"(自分の投稿)か \"$marks.<id>\"(自分が印を付けたもの)と、op eq / neq でだけ使う(public/shared の entity)。"
+    },
+    "Mark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "icon",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "icon": {
+          "type": "string",
+          "enum": [
+            "heart",
+            "star",
+            "bookmark",
+            "thumbsup",
+            "check",
+            "eye",
+            "flag"
+          ],
+          "description": "行に出すアイコン(付けると塗りつぶし)。",
+          "x-enumDescriptions": {
+            "heart": "いいね・好き",
+            "star": "お気に入り",
+            "bookmark": "保存・あとで見る",
+            "thumbsup": "役に立った・賛成",
+            "check": "既読・やった",
+            "eye": "見た",
+            "flag": "行きたい・気になる"
+          }
+        },
+        "label": {
+          "type": "string",
+          "description": "ボタンと読み上げの名前(いいね・保存・既読)。ユーザーの言語で。"
+        }
+      },
+      "description": "entity の印 1 つ(marks の要素)。id は like / save / read など entity 内で一意。1 人 1 回のトグルで、件数と「自分が付けたか」を backend が持つ。"
     }
   }
 }
