@@ -46,8 +46,6 @@ public struct AppDSL: Decodable, Sendable {
     public var initialScreen: String
     @Lossy public var entities: [Entity]
     @Lossy public var screens: [Screen]
-    /// entity id → `scope`(#253 の公開表示用。読むのは `scope(of:)`・EntityScope.swift)
-    public var entityScopes: [String: String] = [:]
 
     public func screen(_ id: String) -> Screen? { screens.first { $0.id == id } }
     public func entity(_ id: String) -> Entity? { entities.first { $0.id == id } }
@@ -108,7 +106,6 @@ extension AppDSL {
         initialScreen = try c.decode(String.self, forKey: .initialScreen)
         _entities = try c.decode(Lossy<Entity>.self, forKey: .entities)
         _screens = try c.decode(Lossy<Screen>.self, forKey: .screens)
-        entityScopes = EntityScopeProbe.scopes((try? c.decode(Lossy<EntityScopeProbe>.self, forKey: .entities))?.wrappedValue ?? [])
         clearDailyToggleDefaults()
     }
 }
@@ -282,6 +279,7 @@ public struct Field: Decodable, Identifiable, Sendable {
         self.id = id
         self.name = name
         self.type = type
+        self.hidden = false
     }
 
     public init(from decoder: Decoder) throws {
