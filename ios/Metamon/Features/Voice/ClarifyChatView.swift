@@ -383,17 +383,20 @@ private struct BubbleRow: View {
                     .background(Theme.Colors.surface, in: Circle())
                     .frame(maxHeight: .infinity, alignment: .top)
             }
-            Text(bubble.text)
-                .font(emphasized ? .title3.weight(.semibold) : .body)
-                .foregroundStyle(bubble.role == .user ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-                .padding(.horizontal, Theme.Spacing.md)
-                .padding(.vertical, Theme.Spacing.sm + 2)
-                .background(background, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                if bubble.confirmsPublic { PublicConfirmTag() } // #253 公開してよいかの確認
+                Text(bubble.text)
+                    .font(emphasized ? .title3.weight(.semibold) : .body)
+                    .foregroundStyle(bubble.role == .user ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            }
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.sm + 2)
+            .background(background, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .fixedSize(horizontal: false, vertical: true)
             if bubble.role == .assistant { Spacer(minLength: 32) }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel((bubble.role == .user ? L10n.tr("あなた: ") : "AI: ") + bubble.text)
+        .accessibilityLabel((bubble.role == .user ? L10n.tr("あなた: ") : "AI: ") + (bubble.confirmsPublic ? L10n.tr("公開の記録の確認") + "。" : "") + bubble.text)
     }
 
     private var background: AnyShapeStyle {
