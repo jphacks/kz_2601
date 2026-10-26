@@ -206,7 +206,7 @@ jobs:
           xcodebuild -version
 
       - name: SwiftPM ビルドキャッシュ
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ios/Packages/MetamonDSL/.build
           key: dsl-build-${{ runner.os }}-${{ hashFiles('ios/Packages/MetamonDSL/**/*.swift') }}
@@ -240,7 +240,7 @@ jobs:
       # Homebrew より GitHub Release のバイナリ取得の方が速い(数秒)。バージョン固定でキャッシュ。
       - name: xcodegen キャッシュ
         id: xcodegen-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/xcodegen
           key: xcodegen-${{ env.XCODEGEN_VERSION }}
@@ -274,7 +274,7 @@ jobs:
           "$RUNNER_TEMP/xcodegen/bin/xcodegen" generate --quiet
 
       - name: SwiftPM キャッシュ
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ios/SourcePackages
           key: spm-${{ runner.os }}-${{ hashFiles('ios/project.yml', 'ios/**/Package.resolved') }}
@@ -283,7 +283,7 @@ jobs:
 
       # DerivedData は数百MB〜になる。リポジトリのキャッシュ上限(10GB)を圧迫したら外す。
       - name: DerivedData キャッシュ
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ios/DerivedData
           key: dd-${{ runner.os }}-${{ hashFiles('ios/project.yml') }}-${{ github.sha }}
