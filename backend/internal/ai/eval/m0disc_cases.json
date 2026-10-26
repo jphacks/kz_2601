@@ -1,6 +1,6 @@
 [
   {"id": "d_friends_vague", "kind": "create", "group": "m0-social", "transcript": "友達と使えるやつ作って", "note": "ふわっと・共有"},
-  {"id": "d_sns_post", "kind": "create", "group": "m0-social", "transcript": "写真と一言を投稿して、友達がいいねとコメントできるSNSみたいなアプリ", "expect": {"photo": true, "scope": "public", "authorShown": true, "nameInput": false}},
+  {"id": "d_sns_post", "kind": "create", "group": "m0-social", "transcript": "写真と一言を投稿して、友達がいいねとコメントできるSNSみたいなアプリ", "expect": {"photo": true, "scope": "public", "authorShown": true, "nameInput": false, "mark": true, "markEntity": false}},
   {"id": "d_sns_follow", "kind": "create", "group": "m0-social", "transcript": "フォローした人の投稿だけがタイムラインに流れるアプリ。プロフィールも作りたい", "note": "フォロー・タイムライン"},
   {"id": "d_group_chat", "kind": "create", "group": "m0-social", "transcript": "サークルのみんなでチャットできるアプリ。新しいメッセージが来たら通知してほしい", "note": "チャット・プッシュ"},
   {"id": "d_circle_attend", "kind": "create", "group": "m0-social", "transcript": "サークルの練習の出欠をメンバーが各自で〇×つけられるやつ。誰が来るか一覧で見たい", "expect": {"scope": "shared", "authorShown": true, "nameInput": false}},
@@ -27,9 +27,9 @@
   {"id": "d_video_diary", "kind": "create", "group": "m0-media", "transcript": "1日1秒の動画日記。毎日短い動画を撮ってためていきたい"},
   {"id": "d_split_trip", "kind": "create", "group": "m0-money", "transcript": "旅行の割り勘。友達それぞれが払った分を入力して、最後に誰が誰にいくら払えばいいか出して、友達のスマホからも入力したい"},
   {"id": "d_subscription", "kind": "create", "group": "m0-money", "transcript": "サブスクの管理。毎月いくら払ってるか、次の更新日の前日に通知"},
-  {"id": "d_recipe_share", "kind": "create", "group": "m0-social", "transcript": "自分のレシピを公開して、ほかの人のレシピも見られて、気に入ったのを保存できるアプリ", "note": "公開+個人の保存"},
+  {"id": "d_recipe_share", "kind": "create", "group": "m0-social", "transcript": "自分のレシピを公開して、ほかの人のレシピも見られて、気に入ったのを保存できるアプリ", "note": "公開+個人の保存", "expect": {"scope": "public", "mark": true, "markedByMe": true, "markEntity": false}},
   {"id": "d_lost_found", "kind": "create", "group": "m0-social", "transcript": "大学の落とし物掲示板。拾った物を写真と場所で投稿して、持ち主が見つかったら解決にする", "expect": {"scope": "public", "photo": true, "editMembers": true}},
-  {"id": "d_edit_like", "kind": "edit", "base": "d_lost_found", "group": "m0-edit", "transcript": "投稿にいいねボタンを付けて、いいねの数も出して"},
+  {"id": "d_edit_like", "kind": "edit", "base": "d_lost_found", "group": "m0-edit", "transcript": "投稿にいいねボタンを付けて、いいねの数も出して", "expect": {"mark": true, "markEntity": false, "patch": true}},
   {"id": "d_edit_comment", "kind": "edit", "base": "d_ranking", "group": "m0-edit", "transcript": "それぞれのお店にみんながコメントを書けるようにして"},
   {"id": "d_edit_mine_only", "kind": "edit", "base": "d_lost_found", "group": "m0-edit", "transcript": "自分が投稿したものだけ見られるタブを足して", "expect": {"meFilter": true, "patch": true}},
   {"id": "d_edit_notify_new", "kind": "edit", "base": "d_circle_attend", "group": "m0-edit", "transcript": "誰かが出欠をつけたら私に通知が来るようにして"}
