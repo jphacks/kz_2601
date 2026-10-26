@@ -833,6 +833,11 @@ final class AppRuntime: DSLRuntime {
         return true
     }
 
+    /// ローカル DB の内容で entity の表示を差し替える(印の付け外し #255: AppRuntime+Marks.swift)。
+    func reloadCached(_ entity: String) async {
+        records[entity] = await recordSync.cached(appId: document.appId, entity: entity)
+    }
+
     /// `locationTracker`(#168)の位置 1 点。フォームを通さず 1 件足す(saveRecord と同じくローカル DB に即反映・送信は同期キュー)。
     func createRecord(entity: String, data: [String: JSONValue]) async -> Bool {
         guard dsl.entity(entity) != nil else { return false }

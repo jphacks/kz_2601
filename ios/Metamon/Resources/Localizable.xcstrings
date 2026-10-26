@@ -987,6 +987,23 @@
         }
       }
     },
+    "うまく付けられませんでした。もう一度お試しください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save that. Please try again"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "うまく付けられませんでした。もう一度お試しください"
+          }
+        }
+      }
+    },
     "うまく伝わりませんでした": {
       "extractionState": "manual",
       "localizations": {
@@ -2122,6 +2139,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "オフラインです"
+          }
+        }
+      }
+    },
+    "オフラインのあいだは付けられません": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can't add this while offline"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフラインのあいだは付けられません"
           }
         }
       }
@@ -5522,6 +5556,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "送信"
+          }
+        }
+      }
+    },
+    "送信が終わってから付けられます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can add this once your post has been sent"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送信が終わってから付けられます"
           }
         }
       }
