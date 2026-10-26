@@ -622,6 +622,9 @@
           "$ref": "#/$defs/Settlement"
         },
         {
+          "$ref": "#/$defs/RandomPicker"
+        },
+        {
           "$ref": "#/$defs/AiButton"
         },
         {
@@ -2875,6 +2878,56 @@
       },
       "description": "割り勘の精算リスト。balance(正=受け取る・負=払う)から少ない送金回数になるよう貪欲法で列挙し「A → B ¥1,200」と表示する。割り勘・立替精算専用。",
       "x-usage": "members entity に computed の paid / share / balance を作り、balanceField に balance を指定。全幅 3〜4 行(例 A7:F10)、members の table の下に置く。"
+    },
+    "RandomPicker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "titleField"
+      ],
+      "properties": {
+        "type": {
+          "const": "randomPicker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "カードの見出し(任意・例: 今日の晩ごはん)。"
+        },
+        "entity": {
+          "type": "string",
+          "description": "候補のレコードが入った entity(例: 料理 dish・メンバー member)。"
+        },
+        "titleField": {
+          "type": "string",
+          "description": "選ばれた 1 件として大きく出す field(例: 料理名・名前)。"
+        },
+        "subtitleField": {
+          "type": "string",
+          "description": "選ばれた 1 件の下に小さく出す field(例: ジャンル・メモ)。任意。"
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter",
+          "description": "候補の絞り込み(例: 和食だけ・まだ食べていないものだけ)。省略 = 全件。"
+        },
+        "label": {
+          "type": "string",
+          "description": "ボタンの文言(既定「ランダムに決める」)。例: 今日の晩ごはんを決める・くじを引く。"
+        },
+        "onItemTap": {
+          "$ref": "#/$defs/Action",
+          "description": "選ばれた 1 件のタップで実行(通常は entity のフォーム画面への navigate・recordId 付きで詳細/編集)。任意。"
+        }
+      },
+      "description": "ランダムに 1 件を選ぶ部品(くじ・抽選・ルーレット・今日の晩ごはん決め)。ボタンを押すたびに entity のレコード(filter で絞れる)から 1 件を短いシャッフル演出付きで選び、titleField(+ subtitleField)を大きく出す。前回と同じ 1 件は続けて出さない(候補が 2 件以上のとき)。結果は保存しない(画面を離れると消える・再描画では変わらない)。「ランダムで決めて」「今日の晩ごはん・ランチを決める」「くじ引き」「当番・順番・席を決める」「ガチャ」の時に必ずこれを選ぶ(list だけで代替しない・計算式 Expr に乱数は無い)。",
+      "x-usage": "候補を登録する list と同じ画面に置く: randomPicker を上に A1:F5、候補の list を A6:F10、追加ボタンは右下(D11:F12)。entity は例 dish{name: string(required), genre: enum(任意)}、titleField に name。label は「今日の晩ごはんを決める」のように動詞で。onItemTap は通常 list と同じフォームへの navigate(sheet)。"
     },
     "Expr": {
       "description": "計算式(式ツリー)。リテラル(number/string/boolean)・{ref}(行のフィールド値)・{agg}(エンティティの集計)・{op,args}(関数)・{if,then,else}。評価エラー(ゼロ除算・型不一致・参照先なし)は iOS で「—」表示。深さ 8 まで。",
