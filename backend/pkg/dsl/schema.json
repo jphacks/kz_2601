@@ -2269,6 +2269,17 @@
         "title": {
           "type": "string",
           "description": "Header text; defaults to the field name."
+        },
+        "aggregate": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum",
+            "avg",
+            "min",
+            "max"
+          ],
+          "description": "Only with table.groupBy: this column shows the per-group count / sum / avg / min / max of `field` (count ignores the value, so use the groupBy field). Omit on the group-name column (field = groupBy)."
         }
       }
     },
@@ -2308,11 +2319,15 @@
         },
         "limit": {
           "type": "integer",
-          "description": "Max rows shown (default all)."
+          "description": "Max rows shown (default all). With groupBy: max groups (top N of the ranking)."
+        },
+        "groupBy": {
+          "type": "string",
+          "description": "Field id (string / enum / ref / boolean / integer / date) to group records by: one row per distinct value. Columns are then the group name ({field: groupBy}) plus aggregate columns ({field, aggregate}). sort.field = an aggregate column's field (or the groupBy field to sort by count if a count column exists, else by name); default = first aggregate column, descending."
         }
       },
-      "description": "Compact rows x columns grid of records (SwiftUI Grid) with a header row; columns = [{field, title?}] (2-4 columns fit a phone). Choose over `list` when several numeric columns must be compared at a glance (date / item / amount).",
-      "x-usage": "Full width, 4-6 rows (e.g. A1:F5). Scrolls inside its cell when longer."
+      "description": "Compact rows x columns grid of records (SwiftUI Grid) with a header row; columns = [{field, title?}] (2-4 columns fit a phone). Choose over `list` when several numeric columns must be compared at a glance (date / item / amount). With `groupBy` it becomes a per-group summary (one row per shop / person / category with avg / sum / count columns), e.g. a ranking of the average score per shop or the total per person.",
+      "x-usage": "Full width, 4-6 rows (e.g. A1:F5). Scrolls inside its cell when longer. 「店ごと」「人ごと」「〜別のランキング・合計・平均」で同じ値の記録を 1 行にまとめたい時は groupBy + 集計列: {\"type\":\"table\",\"entity\":\"review\",\"groupBy\":\"shop\",\"columns\":[{\"field\":\"shop\",\"title\":\"店\"},{\"field\":\"score\",\"aggregate\":\"avg\",\"title\":\"平均点\"},{\"field\":\"shop\",\"aggregate\":\"count\",\"title\":\"件数\"}],\"sort\":{\"field\":\"score\",\"direction\":\"desc\"}}。sort.field は集計列の field(件数順なら groupBy の field)。投稿 1 件ずつの list は別に置いてよい(フォームへの onItemTap はそちら)。"
     },
     "Timeline": {
       "type": "object",
