@@ -47,6 +47,10 @@ func main() {
 		log.Printf("ai: APPCONFIG_BASE_URL unset; using in-memory DSL store")
 	}
 
+	// one verifier for /v1/chat callers (#286) and the rate limiter (#280)
+	authMode := env("AUTH_MODE", auth.ModeFirebase)
+	verifier := auth.VerifierFromEnv(context.Background(), authMode, os.Getenv("GOOGLE_CLOUD_PROJECT"))
+
 	claude := ai.NewClient(apiKey, model, effort)
 	claude.StructuredOutput = os.Getenv("CLAUDE_STRUCTURED_OUTPUT") == "1"
 	svc := &ai.Service{
@@ -63,12 +67,12 @@ func main() {
 			Thinking: os.Getenv("AI_CHAT_THINKING"),
 		},
 		// /v1/chat callers (#286): AUTH_MODE=firebase (default) | dev
-		Verifier: auth.VerifierFromEnv(context.Background(), env("AUTH_MODE", auth.ModeFirebase), os.Getenv("GOOGLE_CLOUD_PROJECT")),
-		AuthMode: env("AUTH_MODE", auth.ModeFirebase),
+		Verifier: verifier,
+		AuthMode: authMode,
 	}
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           withRateLimit(ai.NewHandler(svc)),
+		Handler:           withRateLimit(ai.NewHandler(svc), verifier),
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      time.Duration(timeoutSec)*time.Second*3 + 10*time.Second,
 	}
@@ -85,7 +89,7 @@ func main() {
 //	RATE_LIMIT_COLLECTION  Firestore collection (default rateLimits)
 //
 // Limits/weights: ratelimit.ConfigFromEnv.
-func withRateLimit(h http.Handler) http.Handler {
+func withRateLimit(h http.Handler, verifier auth.IdentityVerifier) http.Handler {
 	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	mode := env("AUTH_MODE", auth.ModeFirebase)
 	switch os.Getenv("RATE_LIMIT") {
@@ -103,16 +107,6 @@ func withRateLimit(h http.Handler) http.Handler {
 		log.Fatalf("ai: %v", err)
 	}
 	ctx := context.Background()
-
-	var verifier auth.IdentityVerifier = auth.NotConfigured{}
-	if mode == auth.ModeDev {
-		log.Printf("warning: AUTH_MODE=dev: bearer tokens are trusted as uids; never use in production")
-		verifier = auth.DevVerifier{}
-	} else if v, err := auth.NewFirebaseVerifier(ctx, project); err != nil {
-		log.Printf("ai: firebase verifier init failed: %v (generate/chat will answer 401)", err)
-	} else {
-		verifier = v
-	}
 
 	var store ratelimit.Store = ratelimit.NewMemory()
 	storeName := "memory"
