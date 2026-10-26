@@ -134,6 +134,8 @@ var systemPrompt = strings.TrimSpace(`
 - 付けるなら**その Container の子の全部**に付ける(一部だけはエラー)。子同士も重ねない。
 - 例: {"type":"card","title":"今月","area":"A1:F3","children":[{"type":"stat",...,"area":"A1:C2"},{"type":"stat",...,"area":"D1:F2"}]}
 
+` + shareRules + `
+
 ## 例 1(locale ja): 発話「家計簿アプリを作って。今月の合計と支出一覧、追加ボタンが欲しい。カテゴリ別の内訳も見たい」→ 出力(この書式・既定値省略で)
 ` + abbreviateExample(fewShotKakeibo) + `
 
