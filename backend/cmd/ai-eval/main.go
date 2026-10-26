@@ -68,6 +68,7 @@ type Case struct {
 	Transcript string         `json:"transcript"`
 	Note       string         `json:"note,omitempty"`
 	Expect     map[string]any `json:"expect,omitempty"`
+	Needs      []string       `json:"needs,omitempty"` // audit_cases: human checklist only, not checked
 }
 
 type Metrics struct {
