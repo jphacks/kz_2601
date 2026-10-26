@@ -77,17 +77,24 @@ paths:
     patch:
       tags: [apps]
       summary: メタ更新 (名前・status)
+      description: |
+        `name`(変身一覧の「名前を変える」・#277)は前後の空白を除いて 1〜40 文字。名前は `dsl.app.name` にも書き込み、
+        **新しい version として積む**(`source.kind=manual`・`mode=patch`・`patch=[{op:add,path:/app/name}]`)。
+        DSL の書き込みは毎回 `dsl.app.name` をアプリの名前に写すので、メタだけ変えると次の音声編集で元に戻るため。
+        同じ名前なら version は進めない。`status` だけの時は version を進めない。
       requestBody:
         content:
           application/json:
             schema:
               type: object
               properties:
-                name: { type: string }
+                name: { type: string, minLength: 1, maxLength: 40 }
                 status: { type: string, enum: [active, archived] }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AppSummary' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 名前の書き込み中に別の版が積まれた(取り直して再送), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     delete:
       tags: [apps]
       summary: アプリ削除 (物理削除・#180)
@@ -104,6 +111,51 @@ paths:
         他人のアプリは自分の木に無いので 404。消した後にもう一度呼ぶと 404。
       responses:
         '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /apps/order:
+    put:
+      tags: [apps]
+      summary: 変身一覧の並び順を保存 (#277)
+      description: |
+        `ids` はユーザーが並べた順。各アプリの `sortIndex` を 位置+1 にする(1 が先頭)。`ids` に無いアプリは今の `sortIndex` のまま
+        (新しく作ったアプリは `sortIndex` を持たず、iOS は先頭に出す)。自分の木に無い id は飛ばす。`updatedAt` は変えない。
+        並び順はサーバー(`users/{uid}/apps/{appId}.sortIndex`)に持つので、Apple ID に引き継いだ uid(#276)なら機種変更でも残る。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, maxItems: 400, uniqueItems: true, items: { type: string } }
+      responses:
+        '204': { description: Saved }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /apps/{appId}/duplicate:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    post:
+      tags: [apps]
+      summary: アプリを複製 (#277)
+      description: |
+        今の DSL(画面の定義)だけを**新しい appId** に複製する(version 1 = 初期 → version 2 = 複製、`source.kind=import`)。
+        **記録(レコード)は複製しない**。shared/public entity を含むアプリも新しい appId になる(シェアの取り込みと違い、元の共有ボードには参加しない)。
+        `name` を省略すると元の名前。名前は `dsl.app.name` にも書く。
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 1, maxLength: 40 }
+      responses:
+        '201':
+          description: Created
+          headers: { ETag: { $ref: '#/components/headers/ETag' } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AppWithDSL' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /apps/{appId}/events:
@@ -742,6 +794,7 @@ components:
         status: { type: string, enum: [active, archived] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        sortIndex: { type: integer, minimum: 1, description: '変身一覧で自分が並べた位置(1 が先頭・#277)。並べ替えたことが無いアプリには無い' }
     AppWithDSL:
       allOf:
         - { $ref: '#/components/schemas/AppSummary' }

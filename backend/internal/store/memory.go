@@ -183,6 +183,18 @@ func (m *Memory) UpdateAppMeta(_ context.Context, uid, appID string, name, statu
 	return a.snapshot(), nil
 }
 
+// ReorderApps implements Store.
+func (m *Memory) ReorderApps(_ context.Context, uid string, ids []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, id := range ids {
+		if a := m.get(uid, id); a != nil {
+			a.app.SortIndex = i + 1
+		}
+	}
+	return nil
+}
+
 // CommitVersion implements Store.
 func (m *Memory) CommitVersion(_ context.Context, uid, appID string, c Commit) (*Version, error) {
 	m.mu.Lock()
