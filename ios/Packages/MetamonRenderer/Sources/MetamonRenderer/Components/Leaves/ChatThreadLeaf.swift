@@ -154,10 +154,20 @@ struct ChatThreadLeaf: View {
         !sending && (!draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || photo != nil)
     }
 
+    /// 送る 1 件に入れる他の field の既定値(defaultValue を持つ保存 field だけ)。
+    /// LocationTrackerLeaf.baseData と同じ中身だが、あちらは審査用ビルド(APP_STORE_REVIEW)で外れるのでここに持つ。
+    static func defaultData(_ entity: Entity, skipping: [String]) -> [String: JSONValue] {
+        var out: [String: JSONValue] = [:]
+        for f in entity.fields where f.computed == nil && f.defaultValue != nil && !skipping.contains(f.id) {
+            out[f.id] = FieldCoding.defaultValue(for: f)
+        }
+        return out
+    }
+
     private func send(entity: Entity, textField: String) {
         let skip = [textField, c.photoField].compactMap { $0 }
         guard let data = ChatThread.message(text: draft, photo: photo, textField: textField, photoField: c.photoField,
-                                            base: LocationTrackerLeaf.baseData(entity, skipping: skip)) else { return }
+                                            base: Self.defaultData(entity, skipping: skip)) else { return }
         sending = true
         let rt = rt
         Task {
