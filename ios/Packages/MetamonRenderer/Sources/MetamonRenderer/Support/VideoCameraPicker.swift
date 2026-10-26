@@ -4,6 +4,8 @@ import AVFoundation
 import UniformTypeIdentifiers
 import CoreTransferable
 
+// 審査用ビルド(APP_STORE_REVIEW・#245)では撮影をバイナリから外す(ライブラリから選ぶ PickedMovie は残す)。
+#if !APP_STORE_REVIEW
 /// 動画撮影の `UIImagePickerController`(#206)。標準のカメラ UI に内カメ / 外カメの切り替えボタンがある。
 /// 録画の上限は `maxDuration` 秒、画質は中程度(`.typeMedium`)。権限は呼び出し側で `requestAccess()` を先に確認する。
 struct VideoCameraPicker: UIViewControllerRepresentable {
@@ -56,6 +58,7 @@ struct VideoCameraPicker: UIViewControllerRepresentable {
         }
     }
 }
+#endif
 
 /// PhotosPicker で選んだ動画を一時ファイルとして受け取る。
 struct PickedMovie: Transferable {

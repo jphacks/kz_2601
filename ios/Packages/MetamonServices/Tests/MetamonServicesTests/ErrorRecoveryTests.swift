@@ -171,6 +171,29 @@ final class ErrorRecoveryTests: XCTestCase {
         XCTAssertEqual(StubURLProtocol.requests.count, 2)
     }
 
+    /// #280: ai の 1 日の上限(429 rate_limited + details.scope)は混雑ではなく「今日はここまで」。自動再送もしない。
+    func test429RateLimitedSurfacesDailyLimit() async throws {
+        let body = #"{"error":{"code":"rate_limited","message":"今日の利用上限(30)に達しました。","details":{"scope":"user","tier":"anonymous","limit":30,"used":29,"remaining":1,"resetAt":"2026-10-25T15:00:00Z","retryAfterSec":3600}}}"#
+        StubURLProtocol.reset([.init(status: 429, body: body, headers: ["Retry-After": "3600"])])
+        do {
+            _ = try await HTTP.send("POST", baseURL: base, path: "v1/generate", body: Body(transcript: "x"), token: StaticTokenProvider("u"))
+            XCTFail("expected 429")
+        } catch {
+            let api = try XCTUnwrap(error as? APIError)
+            let info = try XCTUnwrap(api.rateLimit)
+            XCTAssertEqual(info.scope, .user)
+            XCTAssertTrue(info.isAnonymous)
+            XCTAssertEqual(info.limit, 30)
+            XCTAssertEqual(info.remaining, 1)
+            XCTAssertEqual(info.resetAt, ISO8601DateFormatter().date(from: "2026-10-25T15:00:00Z"))
+            guard case .rateLimited(let got) = FailureKind.classify(error) else { return XCTFail("\(FailureKind.classify(error))") }
+            XCTAssertEqual(got, info)
+            XCTAssertFalse(FailureKind.classify(error).isRetryable, "もう一度では解けない")
+        }
+        XCTAssertEqual(sleeps.waits, [], "上限の 429 は待って再送しない")
+        XCTAssertEqual(StubURLProtocol.requests.count, 1)
+    }
+
     func test429WithoutHeaderUsesDefaultWaitAndLongWaitIsNotAutoRetried() async throws {
         StubURLProtocol.reset([.init(status: 429, body: ""), .init(status: 200, body: "{}")])
         _ = try await HTTP.send("GET", baseURL: base, path: "v1/apps", body: nil, token: NoAuthTokenProvider())
