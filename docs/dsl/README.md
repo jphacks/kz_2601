@@ -211,6 +211,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 - 「友達のスマホからも」「みんなで」「〜と共有」= 他の人と同じ記録を使う → **作成でも編集でも** その entity を `public`。編集は `{"op":"add","path":"/entities/<i>/scope","value":"public"}`(既にあれば replace)。編集が「できない」と返して全 entity が private のままなら、サーバーがレシピを添えて 1 回だけ作り直させる。
 - 「家族だけ」「招待した人だけ」= 限定の共有は v1 に無い(D-06)。public にする時は summary に「限られた人だけで共有することは今はできないため、○○はアプリを開いた人なら誰でも見られる公開にしました。」が必ず入る(黙って公開にしない)。private のままなら「…記録は自分だけのままです。」が入る。チャットは ready の前に確認する。
 - 新しく public / shared になった entity があれば、サーバーが summary に「○○は、このアプリを開いた人なら誰でも見られます(みんなに公開)。」を足す(D-05 の文言・すでに言っていれば足さない)。
+- **個人の情報(#253)**: public / shared の entity に名前・電話番号・住所・メールアドレス・誕生日・居場所らしい field(`backend/internal/ai/public_pii.go` が field の id・name・型で判定。ペットの名前・商品名は対象外)が新しく入ったら、サーバーが上の一文の後に「「名前」「電話番号」のような個人の情報も公開されます。ほかの人に見られてよいか確かめてください。」を足し、応答の `meta.publicPersonalData` に field ごとの警告を入れる(iOS が確認ダイアログを出せる)。チャットは依頼文と brief からこれを読み取り、ready の前に 1 回だけ question で確かめる(`confirmPublic`)。
 - 「自分だけ」「非公開」「共有をやめて」は scope を remove。「LINE で送る」「共有ボタン」は scope ではなく shareButton。
 
 | scope | 意味 | レコードの置き場(appconfig) | 書き込み権限 |

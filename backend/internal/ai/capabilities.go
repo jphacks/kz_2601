@@ -223,5 +223,5 @@ func chatLimitsText() string {
 		}
 		parts = append(parts, l.What+"(代わり → "+l.Instead+")")
 	}
-	return "- できないこと(聞かれたら正直に「できません」と言い、近い代わりを添える。**ここに無く、索引や部品カタログにあるものは「できます」**): " + strings.Join(parts, "、") + "。\n" + shareChatRule
+	return "- できないこと(聞かれたら正直に「できません」と言い、近い代わりを添える。**ここに無く、索引や部品カタログにあるものは「できます」**): " + strings.Join(parts, "、") + "。\n" + shareChatRule + "\n" + publicPIIChatRule
 }
