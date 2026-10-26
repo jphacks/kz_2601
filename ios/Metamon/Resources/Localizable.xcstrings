@@ -4268,6 +4268,40 @@
         }
       }
     },
+    "先に保存してください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save this first"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先に保存してください"
+          }
+        }
+      }
+    },
+    "先に「%@」を保存してください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save the %@ first"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先に「%@」を保存してください"
+          }
+        }
+      }
+    },
     "保存できませんでした: %@": {
       "extractionState": "manual",
       "localizations": {
