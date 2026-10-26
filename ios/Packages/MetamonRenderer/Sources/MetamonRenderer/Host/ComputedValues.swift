@@ -23,24 +23,31 @@ public extension DSLRuntime {
         return ev
     }
 
-    /// computed 合成済みのレコード。
+    /// computed 合成済みの表示用レコード。hidden(#262)の値は落とす(computed はその前に元の値で評価済み)。
     func viewRecords(for entity: String) -> [Record] {
-        guard dsl.entity(entity)?.computedFields.isEmpty == false else { return records(for: entity) }
-        return evaluator().viewRecords(for: entity)
+        HiddenFields.redact(unredactedViewRecords(for: entity), in: dsl.entity(entity))
     }
 
-    /// 部品の entity + filter(単体/配列・value の Expr 可)を適用した表示用レコード。
+    /// 部品の entity + filter(単体/配列・value の Expr 可)を適用した表示用レコード。filter は hidden を落とす前に当てる。
     /// `{"me": true}`(#251)はサインイン中の uid に置き換えて投稿者と比べる。
     func filteredRecords(_ c: Component) -> [Record] {
         let entityId = c.entity ?? ""
-        let rows = viewRecords(for: entityId)
-        guard !c.filters.isEmpty else { return rows }
+        let entity = dsl.entity(entityId)
+        let rows = unredactedViewRecords(for: entityId)
+        guard !c.filters.isEmpty else { return HiddenFields.redact(rows, in: entity) }
         let filters = c.filters.map { $0.resolvingMe(uid: currentUserId) }
+        let filtered: [Record]
         if filters.allSatisfy({ $0.valueExpr == nil }) {
-            let entity = dsl.entity(entityId)
-            return rows.filter { r in filters.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field)) } }
+            filtered = rows.filter { r in filters.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field)) } }
+        } else {
+            filtered = evaluator().apply(filters, entity: entity, to: rows)
         }
-        return evaluator().apply(filters, entity: dsl.entity(entityId), to: rows)
+        return HiddenFields.redact(filtered, in: entity)
+    }
+
+    private func unredactedViewRecords(for entity: String) -> [Record] {
+        guard dsl.entity(entity)?.computedFields.isEmpty == false else { return records(for: entity) }
+        return evaluator().viewRecords(for: entity)
     }
 
     /// 表示用の文字列。type=ref は参照先レコードの見出しに解決する(未取得・削除済みは「—」)。
