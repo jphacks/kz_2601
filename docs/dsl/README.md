@@ -120,7 +120,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `link` | `text`, `url`(http(s)) | | | P1 |
 | `markdown` | `text`(インライン markdown) | | | P1 |
 | `avatar` | | `image`(https/data URL), `field`(photo・要 screen.entity), `name`(イニシャル), `size` | △(`field` 時) | P1 |
-| `table` | `entity`, `columns[{field,title?}]` | `sort`, `filter`, `limit` | | P1 |
+| `table` | `entity`, `columns[{field,title?,aggregate?}]` | `sort`, `filter`, `limit`, `groupBy`(#261) | | P1 |
 | `timeline` | `entity`, `dateField`(date/datetime), `titleField` | `subtitleField`, `filter`, `limit` | | P1 |
 | `emptyState` | `title` | `icon`, `message` | | P1 |
 | `settlement` | `entity`, `nameField`, `balanceField`(数値・通常は computed) | | | P1 |
@@ -162,6 +162,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 - **`locationPicker`(#212)**: 現在地以外の場所を選ぶ入力欄。シートで店名・地名・住所を検索(MapKit `MKLocalSearch`・API キー不要)/ 地図を動かして中央のピン / 現在地 から選ぶ。保存は `locationButton` と同じ `"lat,lng"`(値の形を増やさない=mapView・appconfig の検証はそのまま)。場所の名前は任意の `nameField`(string field)に入れる(ピン・現在地で名前が無い時は打った名前を消さない)。「今いる場所」だけなら `locationButton`。モック(`METAMON_MOCK=1`)の検索は固定 3 件。
 - **`healthStat` / `Field.health`(#167)**: 端末のヘルスデータ。`healthStat` は **entity を持たない表示カード**で、歩数は iPhone の歩数計(CoreMotion・直近 7 日・capability 不要)、歩数計の無い端末(シミュレータ)はヘルスケアの歩数、体重はヘルスケアの最新値を読む。today は数値(steps は `target` で達成率バー)、week は 7 日のグラフ(steps は棒 + 目標線・weight は折れ線)。許可が無い・使えない端末は「ヘルスケアへのアクセスが許可されていません」等を表示。書き込みは部品ではなく **`Field.health: "weight"`**(number・unit kg): フォームで**新規**保存した時にヘルスケアの体重にも 1 件書く(編集保存では書かない・失敗してもレコードは保存済みでトーストだけ)。入力部品や `saveRecord` を増やさず「どの値をヘルスケアに出すか」をデータ側に 1 キーで持つため。実例: `examples/health.json`。設計は `docs/ios/architecture.md` §15.1。
 - `aiButton`(#78)は **オンデバイス完結の AI 部品**(Apple Intelligence / Foundation Models・iOS 26+)。データは端末外に出ず、クラウド API も課金も無い。結果は output field のドラフトに入るだけで保存はユーザー。非対応端末・Apple Intelligence OFF・モデル準備中は「この端末では AI を使えません」と理由付きで無効化。`Action` の `runAI` 案ではなく Leaf にしたのは、(1) 生成 AI が 1 部品で書き切れる(button + action の 2 段より短く、入力・出力 field を同じ場所で検証できる)、(2) 実行中スピナー・不可時の無効表示が部品の見た目に属する、(3) `ActionType` を増やすとホストの網羅 switch 改修が要る、の 3 点。実例: `examples/diary_ai.json`(本文 → 要約・気分の分類)。
+- **`table.groupBy`(#261)**: 同じ値のレコードを 1 行にまとめる集計表(「店ごとの平均点・件数でランキング」)。列は groupBy の field の列(グループ名・aggregate なし)+ `aggregate`(count / sum / avg / min / max)付きの列だけ。groupBy にできるのは string / enum / ref / boolean / integer / date。`sort.field` は集計列の field(同じ field の集計列が複数なら先頭)、集計列に無ければ groupBy の field = グループ名順。sort 省略 = 最初の集計列の降順、`limit` は上位 N グループ。値が空のレコードはどの行にも入れない。avg / min / max は数値が無ければ「—」、avg は小数 1 桁。iOS は `TableGrouping`(MetamonDSL)でクライアント集計(chart.groupBy と同じ)。新しい部品・Expr ではなく table の拡張にしたのは、(1) 表の見出し・行の描画をそのまま使える、(2) chart / stat と同じ aggregate 語彙で AI が書ける、(3) 古い iOS は `groupBy` と列の `aggregate` を無視して従来のレコード表として描く(落ちない・未知 type のプレースホルダにもならない)ため。マスタ entity の computed `agg` + table(人ごとの合計)も引き続き使える。実例: `examples/ranking.json`。
 
 ### 3.3 フィールド型と値(appconfig `RecordData` と一致)
 
