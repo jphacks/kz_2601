@@ -12,9 +12,11 @@ public enum ModelDownloadConsent {
         case ask
     }
 
-    public static func decide(needsDownload: Bool, defaults: UserDefaults = .standard) -> Decision {
+    /// `isExpensiveNetwork`: モバイル回線では、前に承認していても聞き直す(#275・Wi-Fi を待てるように)。
+    public static func decide(needsDownload: Bool, isExpensiveNetwork: Bool = false,
+                              defaults: UserDefaults = .standard) -> Decision {
         guard needsDownload else { return .prepare }
-        return isApproved(defaults) ? .prepare : .ask
+        return isApproved(defaults) && !isExpensiveNetwork ? .prepare : .ask
     }
 
     public static func isApproved(_ defaults: UserDefaults = .standard) -> Bool {

@@ -32,7 +32,8 @@ extension AppRuntime {
 
     /// 起動時: モデルが端末にあれば温める。無ければサイズを示して確認してから(承認済みなら聞かない)。
     func prepareTranscriberIfAllowed() {
-        switch ModelDownloadConsent.decide(needsDownload: services.transcriber.needsDownload) {
+        switch ModelDownloadConsent.decide(needsDownload: services.transcriber.needsDownload,
+                                           isExpensiveNetwork: ExpensiveNetworkProbe.shared.isExpensive) { // #275
         case .prepare:
             Task { try? await services.transcriber.prepare() }
         case .ask:
@@ -46,6 +47,13 @@ extension AppRuntime {
         ModelDownloadConsent.approve()
         showModelDownloadConfirm = false
         Task { try? await services.transcriber.prepare() }
+    }
+
+    /// 確認に添える注意(モバイル回線・空き容量・#275)。確認を出す時に読む。
+    var modelDownloadAdvice: ModelDownloadAdvice {
+        ModelDownloadAdvice.evaluate(megabytes: Self.voiceModelMegabytes,
+                                     isExpensiveNetwork: ExpensiveNetworkProbe.shared.isExpensive,
+                                     availableBytes: ModelDownloadAdvice.availableBytesOnDevice())
     }
 
     /// 確認の文言に出すおおよそのサイズ(MB)。

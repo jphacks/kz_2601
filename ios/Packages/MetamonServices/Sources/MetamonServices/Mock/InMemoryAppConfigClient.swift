@@ -145,6 +145,11 @@ public enum MockSeed {
                 Record(id: "l3", data: ["subject": "英語演習", "weekday": "水", "period": 2, "room": "B204"], createdAt: iso),
                 Record(id: "l4", data: ["subject": "プログラミング", "weekday": "金", "period": 3, "room": "PC室"], createdAt: iso),
             ],
+            // post_comments(#256): 投稿 2 件(投稿のフォーム →「コメントを書く」で親が入る)
+            "posts": [
+                Record(id: "post1", data: ["body": "金沢でハッカソンに参加中", "posted": .string(iso)], createdAt: iso),
+                Record(id: "post2", data: ["body": "新しいカフェを見つけた", "posted": .string(iso)], createdAt: iso),
+            ],
             // bmi(#101): 65kg/170cm → 22.5、70kg/175cm → 22.9
             "body": [
                 Record(id: "b1", data: ["date": .string(today), "weight": 65, "height": 170], createdAt: iso),
