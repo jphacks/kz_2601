@@ -205,6 +205,23 @@
         }
       }
     },
+    "%lld 人": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld people"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 人"
+          }
+        }
+      }
+    },
     "%lld 回(制限なし)": {
       "extractionState": "manual",
       "localizations": {
@@ -596,6 +613,23 @@
         }
       }
     },
+    "。参加している人の記録も見られます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ". You can also see records from everyone in it"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "。参加している人の記録も見られます"
+          }
+        }
+      }
+    },
     "「%@」": {
       "extractionState": "manual",
       "localizations": {
@@ -626,6 +660,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "「%@」というアプリは見つかりませんでした"
+          }
+        }
+      }
+    },
+    "「%@」に参加しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Joined “%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」に参加しました"
+          }
+        }
+      }
+    },
+    "「%@」に参加しますか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Join “%@”?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」に参加しますか?"
           }
         }
       }
@@ -817,6 +885,40 @@
         }
       }
     },
+    "「%@」を外しました。あなたのシェアリンクはまだ使えるので、そのリンクからまた参加できます。リンクも止めますか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed “%@”. Your share link still works, so they could join again with it. Turn off the link too?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」を外しました。あなたのシェアリンクはまだ使えるので、そのリンクからまた参加できます。リンクも止めますか?"
+          }
+        }
+      }
+    },
+    "「%@」を外しますか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove “%@”?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」を外しますか?"
+          }
+        }
+      }
+    },
     "「元に戻して」と話しても同じ。「別のアプリ。…」と話すと新しいアプリとして作ります。": {
       "extractionState": "manual",
       "localizations": {
@@ -902,6 +1004,23 @@
         }
       }
     },
+    "あなた": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あなた"
+          }
+        }
+      }
+    },
     "あなた: ": {
       "extractionState": "manual",
       "localizations": {
@@ -915,6 +1034,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "あなた: "
+          }
+        }
+      }
+    },
+    "あなたが付けた記録も、参加している人に見えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Records you add are visible to them too"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あなたが付けた記録も、参加している人に見えます"
           }
         }
       }
@@ -1000,6 +1136,125 @@
           "stringUnit": {
             "state": "translated",
             "value": "うまく伝わりませんでした"
+          }
+        }
+      }
+    },
+    "このリンクを送った人はもう参加していないため、参加できません。参加している人に新しいリンクをもらってください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The person who sent this link has left this share, so you can't join with it. Ask someone who's still in it for a new link."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このリンクを送った人はもう参加していないため、参加できません。参加している人に新しいリンクをもらってください"
+          }
+        }
+      }
+    },
+    "この共有から抜けました。もう一度参加するには、参加している人に招待リンクをもらってください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You left this share. To join again, ask someone in it for an invite link."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この共有から抜けました。もう一度参加するには、参加している人に招待リンクをもらってください"
+          }
+        }
+      }
+    },
+    "この共有から抜けますか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leave this share?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この共有から抜けますか?"
+          }
+        }
+      }
+    },
+    "この共有から抜ける": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leave this share"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この共有から抜ける"
+          }
+        }
+      }
+    },
+    "この共有に参加していません。招待リンクから参加してください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You haven't joined this share. Join from an invite link."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この共有に参加していません。招待リンクから参加してください"
+          }
+        }
+      }
+    },
+    "この共有の記録を見られるのは、ここにいる人だけです": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only the people listed here can see this share's records"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この共有の記録を見られるのは、ここにいる人だけです"
+          }
+        }
+      }
+    },
+    "そのままにする": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep it"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "そのままにする"
           }
         }
       }
@@ -3299,6 +3554,23 @@
         }
       }
     },
+    "作成者": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Creator"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作成者"
+          }
+        }
+      }
+    },
     "使えるマイクが見つかりません(他のアプリが使用中か、入力ルートがありません)": {
       "extractionState": "manual",
       "localizations": {
@@ -3329,6 +3601,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "使用中"
+          }
+        }
+      }
+    },
+    "例: 父、たろう": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "e.g. Dad, Taro"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "例: 父、たろう"
           }
         }
       }
@@ -3571,6 +3860,23 @@
         }
       }
     },
+    "共有シートから、いつでも抜けられます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can leave anytime from the share sheet"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有シートから、いつでも抜けられます"
+          }
+        }
+      }
+    },
     "再試行": {
       "extractionState": "manual",
       "localizations": {
@@ -3758,6 +4064,142 @@
         }
       }
     },
+    "参加している人": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "People in this share"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加している人"
+          }
+        }
+      }
+    },
+    "参加している人が上限(100 人)に達しているため、参加できません": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This share is full (100 people), so you can't join."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加している人が上限(100 人)に達しているため、参加できません"
+          }
+        }
+      }
+    },
+    "参加している人が付けた記録が見られます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can see the records added by people in this share"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加している人が付けた記録が見られます"
+          }
+        }
+      }
+    },
+    "参加している人の一覧に、下の名前で出ます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You appear in the member list with the name below"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加している人の一覧に、下の名前で出ます"
+          }
+        }
+      }
+    },
+    "参加している人を読み込めませんでした: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the people in this share: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加している人を読み込めませんでした: %@"
+          }
+        }
+      }
+    },
+    "参加しない": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加しない"
+          }
+        }
+      }
+    },
+    "参加する": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Join"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加する"
+          }
+        }
+      }
+    },
+    "参加すると": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you join"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加すると"
+          }
+        }
+      }
+    },
     "反対側へ移動": {
       "extractionState": "manual",
       "localizations": {
@@ -3809,6 +4251,23 @@
         }
       }
     },
+    "受け取った人はリンクから参加して、記録を一緒に使えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recipients join with the link and share the records with you"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "受け取った人はリンクから参加して、記録を一緒に使えます"
+          }
+        }
+      }
+    },
     "受け取った人は自分のアプリとして使えます(記録は共有されません)": {
       "extractionState": "manual",
       "localizations": {
@@ -3856,6 +4315,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "同期"
+          }
+        }
+      }
+    },
+    "名前なし": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No name"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名前なし"
           }
         }
       }
@@ -3924,6 +4400,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "変身中"
+          }
+        }
+      }
+    },
+    "外した人は、この共有の記録を見られなくなります。その人の端末のアプリと、これまでの記録は残ります。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "They will no longer see this share's records. The app on their device and the records they added stay."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外した人は、この共有の記録を見られなくなります。その人の端末のアプリと、これまでの記録は残ります。"
+          }
+        }
+      }
+    },
+    "外す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外す"
+          }
+        }
+      }
+    },
+    "外せませんでした。元に戻しました: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't remove them, so the list was restored: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外せませんでした。元に戻しました: %@"
           }
         }
       }
@@ -4094,6 +4621,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "承認待ちです。承認されると自動で Pro になります。"
+          }
+        }
+      }
+    },
+    "抜けられませんでした。元に戻しました: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't leave, so nothing changed: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "抜けられませんでした。元に戻しました: %@"
+          }
+        }
+      }
+    },
+    "抜ける": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leave"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "抜ける"
+          }
+        }
+      }
+    },
+    "抜けると、参加している人の記録は見られなくなります。もう一度参加するには招待リンクが要ります。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "After leaving, you can no longer see their records. You'll need an invite link to join again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "抜けると、参加している人の記録は見られなくなります。もう一度参加するには招待リンクが要ります。"
           }
         }
       }
@@ -5033,6 +5611,23 @@
         }
       }
     },
+    "空欄のままなら、名前なしで一覧に出ます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If left blank, you appear without a name"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "空欄のままなら、名前なしで一覧に出ます"
+          }
+        }
+      }
+    },
     "端に隠す": {
       "extractionState": "manual",
       "localizations": {
@@ -5165,6 +5760,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "自動"
+          }
+        }
+      }
+    },
+    "表示名(任意)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Display name (optional)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "表示名(任意)"
           }
         }
       }

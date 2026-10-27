@@ -13,6 +13,8 @@ final class SharingUI {
     var shareTarget: AppSummary?
     /// appId → 発行済みのシェアリンク(開くたびにトークンを増やさない)
     var issued: [String: ShareInfo] = [:]
+    /// 記録を共有するアプリのリンクを開いた時の参加の確認(#254・`JoinShareSheet`)
+    var pendingJoin: PendingJoin?
 }
 
 extension AppRuntime {
@@ -32,14 +34,43 @@ extension AppRuntime {
             toast = L10n.tr("シェアリンクはサーバー接続時のみ開けます")
             return
         }
+        // #254: 記録を共有するアプリは、参加すると何が見えるかを先に見せて表示名を聞く(プレビューが取れなければ従来どおり)
+        if let membership = sharing as? any MembershipClient,
+           let preview = try? await membership.previewShare(token: token),
+           preview.sharedData, !preview.mine {
+            SharingUI.shared.pendingJoin = PendingJoin(token: token, preview: preview)
+            return
+        }
         do {
             let app = try await sharing.importShare(token: token)
             await adopt(app, banner: L10n.tr("シェアされた「\(app.name)」を追加しました"))
         } catch {
-            toast = (error as? APIError)?.status == 404
-                ? L10n.tr("このシェアリンクは取り消されたか、存在しません")
-                : L10n.tr("シェアされたアプリを開けませんでした: \(error.localizedDescription)")
+            toast = Self.importFailureMessage(error)
         }
+    }
+
+    /// 確認画面の「参加する」。成功したらシートを閉じて変身し nil、失敗したら画面に出す文言を返す(シートは開いたまま)。
+    func joinShared(_ join: PendingJoin, displayName: String) async -> String? {
+        guard let membership = services.sharing as? any MembershipClient else {
+            return L10n.tr("シェアリンクはサーバー接続時のみ開けます")
+        }
+        SharedDisplayName.remember(displayName)
+        do {
+            let app = try await membership.importShare(token: join.token, displayName: displayName)
+            SharingUI.shared.pendingJoin = nil
+            await adopt(app, banner: L10n.tr("「\(app.name)」に参加しました"))
+            return nil
+        } catch {
+            return Self.importFailureMessage(error)
+        }
+    }
+
+    /// import の失敗。403 の参加の理由(#254)・取り消し済み(404)・その他。
+    static func importFailureMessage(_ error: Error) -> String {
+        if let denial = SharedAccessDenial(error) { return denial.message }
+        return (error as? APIError)?.status == 404
+            ? L10n.tr("このシェアリンクは取り消されたか、存在しません")
+            : L10n.tr("シェアされたアプリを開けませんでした: \(error.localizedDescription)")
     }
 
     func installPublic(_ listing: PublicAppListing) async {
@@ -59,7 +90,8 @@ extension AppRuntime {
             await switchApp(to: app.appId, afterSheetDismiss: true)
         }
         guard document.appId == app.appId else { return } // 切替に失敗(トーストは switchApp が出す)
-        summaryBanner = SummaryBanner(text: banner + (app.joined ? L10n.tr("。みんなの投稿も見られます") : ""), highlight: nil)
+        let extra = app.member ? L10n.tr("。参加している人の記録も見られます") : app.joined ? L10n.tr("。みんなの投稿も見られます") : ""
+        summaryBanner = SummaryBanner(text: banner + extra, highlight: nil)
         await appsList()
     }
 }
@@ -73,6 +105,7 @@ struct SharingHooks: ViewModifier {
         content
             .onOpenURL { url in Task { await rt.openShareURL(url) } }
             .sheet(isPresented: $ui.showDiscover) { DiscoverSheet() }
+            .sheet(item: $ui.pendingJoin) { JoinShareSheet(join: $0) }
             #if DEBUG
             .task { await debugHooks() }
             .modifier(ReleaseRequestHooks())

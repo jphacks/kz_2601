@@ -38,6 +38,8 @@ public enum SyncEvent: Sendable, Equatable {
     case paused(pending: Int)
     /// キューが空になった
     case drained
+    /// 共有(scope:shared)のデータに参加していない(403 `not_member`・#254)。操作は破棄し、create はローカル行も消した
+    case notMember(appId: String, entity: String)
 }
 
 /// 指数バックオフ: base × multiplier^(attempt-1)。attempt は 1 始まり。
@@ -175,6 +177,13 @@ public actor SyncQueue {
                 finish(op)
                 emit(.sent(appId: op.appId, entity: op.entity))
             } catch {
+                if SharedAccessDenial(error) == .notMember { // #378 の「作った人だけ」の 403 より先に見分ける
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
+                    finish(op)
+                    print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) not a member")
+                    emit(.notMember(appId: op.appId, entity: op.entity))
+                    continue
+                }
                 switch Self.classify(error) {
                 case .conflict:
                     await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)

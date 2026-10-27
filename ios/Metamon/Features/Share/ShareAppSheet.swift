@@ -19,12 +19,17 @@ struct ShareAppSheet: View {
     @State private var tags = ""
     @State private var busy = false
     @State private var copied = false
+    @State private var members: SharedMembersModel?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                 header
                 linkSection
+                if let members, members.isVisible { // #254: 共有の記録があるアプリだけ
+                    SharedMembersSection(model: members, onRevokeLink: { if let share { await revoke(share) } },
+                                         onLeft: { ui.issued[app.id] = nil; share = nil; shareError = SharedAccessDenial.notMember.message })
+                }
                 publishSection
             }
             .padding(Theme.Spacing.lg)
@@ -34,6 +39,12 @@ struct ShareAppSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .task { await load() }
+        .task {
+            guard let client = services.sharing as? any MembershipClient else { return }
+            let model = SharedMembersModel(appId: app.id, client: client)
+            members = model
+            await model.load()
+        }
     }
 
     // MARK: - Sections
@@ -43,7 +54,9 @@ struct ShareAppSheet: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text("「\(app.name)」をシェア")
                     .font(.system(size: 22, weight: .bold, design: .rounded))
-                Text("受け取った人は自分のアプリとして使えます(記録は共有されません)")
+                Text(members?.isVisible == true
+                     ? L10n.tr("受け取った人はリンクから参加して、記録を一緒に使えます")
+                     : L10n.tr("受け取った人は自分のアプリとして使えます(記録は共有されません)"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -175,7 +188,7 @@ struct ShareAppSheet: View {
             share = s
             print("[Metamon] share issued: \(s.url)")
         } catch {
-            shareError = L10n.tr("リンクを作れませんでした: \(error.localizedDescription)")
+            shareError = SharedAccessDenial(error)?.message ?? L10n.tr("リンクを作れませんでした: \(error.localizedDescription)")
         }
     }
 
