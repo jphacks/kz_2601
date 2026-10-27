@@ -17,6 +17,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch/v5"
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
+	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -70,6 +71,9 @@ type Meta struct {
 	// returned document (create) or added by the patch (edit).
 	LintRetried bool     `json:"lintRetried,omitempty"`
 	Lint        []string `json:"lint,omitempty"`
+	// Omissions (#257): requested parts the app does not do and the model did
+	// not mention; the summary got a fixed sentence for each.
+	Omissions []string `json:"omissions,omitempty"`
 	// Restricted (#245): what the build restriction removed from the output
 	// after generation (disallowed parts, Field.health, camera sources).
 	Restricted []string `json:"restricted,omitempty"`
@@ -141,6 +145,11 @@ type Service struct {
 	LintRetry bool
 	// Chat is the model setup of the clarify turn (chat.go); zero = defaults.
 	ChatConfig ChatConfig
+	// Verifier checks the caller's ID token on /v1/chat (#286): the
+	// conversation is kept per uid, and DELETE /v1/chat/{appId} needs one.
+	// nil = no caller is ever verified (DELETE answers 401).
+	Verifier auth.TokenVerifier
+	AuthMode string // auth.ModeDev also accepts X-Debug-Uid with the emulator
 
 	conv     *convStore // clarify conversations (chat.go); lazily created
 	convOnce sync.Once
@@ -238,6 +247,8 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 		return nil, err
 	}
 
+	s.noteOmissions(transcript, ar, loc)
+
 	if mode == ModeEdit && len(ar.ops) > 0 && sameDSL(env.DSL, ar.raw) {
 		// #211: a no-op is not saved as a new version; the summary tells the user why.
 		summary := ar.summary
@@ -283,6 +294,29 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 	}
 	res.LatencyMs = Latency{Claude: ar.latency.Milliseconds(), Total: time.Since(started).Milliseconds()}
 	return res, nil
+}
+
+// noteOmissions appends a fixed sentence to the summary for each part of the
+// request the final app leaves out without saying so (#257).
+func (s *Service) noteOmissions(transcript string, ar *attemptResult, loc Locale) {
+	app, err := dsl.Parse(ar.raw)
+	if err != nil {
+		return
+	}
+	om := omissions(transcript, app, ar.summary+"\n"+app.App.Description, true)
+	if len(om) == 0 {
+		return
+	}
+	ar.meta.Omissions = omissionIDs(om)
+	note := omissionNote(om, transcript, loc)
+	switch {
+	case ar.summary == "":
+		ar.summary = note
+	case loc == LocaleEN:
+		ar.summary = strings.TrimSpace(ar.summary) + " " + note
+	default:
+		ar.summary = strings.TrimSpace(ar.summary) + note
+	}
 }
 
 // generateFull asks for a whole AppDSL; on validation problems it re-prompts
@@ -353,12 +387,14 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			ar.raw = canon(raw)
 			ar.summary = summarizeFor(app, loc)
 			ar.meta.Lint = app.Lint()
-			if s.LintRetry && len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
+			// #257: parts of the request dropped without a word count as content problems too
+			om := omissions(transcript, app, app.App.Description, !uiOnly)
+			if s.LintRetry && len(ar.meta.Lint)+len(om) > 0 && linted == nil && i < s.maxRegen() {
 				// one retry for content problems; keep this output in case it fails
 				ar.meta.LintRetried = true
 				kept := *ar
 				linted = &kept
-				problems = lintProblems(ar.meta.Lint)
+				problems = lintProblems(append(append([]string(nil), ar.meta.Lint...), omissionProblems(om)...))
 				ar.meta.LastProblems = problems
 				continue
 			}
@@ -846,14 +882,9 @@ func summarize(a *dsl.App) string {
 // asks Claude to leave in app.description when a requested part is not in the
 // catalog (create turns have no model-written summary; edit turns put it in
 // PatchDocument.summary directly).
+// #257: "○○は今はできません。" sentences are read out the same way.
 func substitutionNote(description string) string {
-	var out strings.Builder
-	for _, sentence := range strings.SplitAfter(description, "。") {
-		if strings.Contains(sentence, "代替") {
-			out.WriteString(strings.TrimSpace(sentence))
-		}
-	}
-	return out.String()
+	return strings.Join(honestNote(description, "。"), "")
 }
 
 // joinJa joins 2 items with と, more with ・.

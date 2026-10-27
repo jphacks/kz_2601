@@ -30,6 +30,8 @@ public struct HTTPAppConfigClient: AppConfigClient {
         var items: [AppSummary]
         var nextPageToken: String?
     }
+    private struct NameBody: Encodable { var name: String }
+    private struct OrderBody: Encodable { var ids: [String] }
     private struct RecordBody: Encodable { var data: [String: JSONValue] }
     private struct CreateBody: Encodable {
         var data: [String: JSONValue]
@@ -58,6 +60,26 @@ public struct HTTPAppConfigClient: AppConfigClient {
     public func deleteApp(appId: String) async throws {
         _ = try await request("DELETE", "v1/apps/\(appId)")
         AppListCache.shared.store(AppListCache.shared.load().filter { $0.id != appId })
+    }
+
+    /// `PATCH /v1/apps/{appId}`(名前・#277)。オフライン用の一覧キャッシュも書き換える。
+    public func renameApp(appId: String, name: String) async throws -> AppSummary {
+        let app = try JSONDecoder().decode(AppSummary.self, from: try await request("PATCH", "v1/apps/\(appId)", body: NameBody(name: name)))
+        AppListCache.shared.store(AppListCache.shared.load().map { $0.id == appId ? app : $0 })
+        return app
+    }
+
+    /// `POST /v1/apps/{appId}/duplicate`(#277)。応答は AppWithDSL だが一覧に要る AppSummary だけ読む。
+    public func duplicateApp(appId: String, name: String) async throws -> AppSummary {
+        let app = try JSONDecoder().decode(AppSummary.self, from: try await request("POST", "v1/apps/\(appId)/duplicate", body: NameBody(name: name)))
+        AppListCache.shared.store(AppListCache.shared.load() + [app])
+        return app
+    }
+
+    /// `PUT /v1/apps/order`(#277)。
+    public func reorderApps(ids: [String]) async throws {
+        _ = try await request("PUT", "v1/apps/order", body: OrderBody(ids: ids))
+        AppListCache.shared.store(AppListEdit.applyingOrder(ids, to: AppListCache.shared.load()))
     }
 
     // MARK: - DSL

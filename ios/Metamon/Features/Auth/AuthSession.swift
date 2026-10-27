@@ -13,6 +13,10 @@ final class AuthSession {
     var errorMessage: String?
     /// 自分でログアウト / アカウント削除した直後か(サインイン画面でバイバイのツルを出す・#102)
     var farewell = false
+    /// 匿名 → Apple の引き継ぎ(#276)で、その Apple ID が既に別のアカウントにあった。切り替えるかを確認する
+    var linkConflict = false
+    /// 引き継ぎの失敗理由(設定・案内シートに出す。サインイン画面の `errorMessage` とは分ける)
+    var linkError: String?
 
     let service: any AuthService
 
@@ -46,14 +50,68 @@ final class AuthSession {
             if (error as? ASAuthorizationError)?.code == .canceled { return }
             errorMessage = error.localizedDescription
         case .success(let authorization):
-            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-                  let data = credential.identityToken,
-                  let idToken = String(data: data, encoding: .utf8) else {
+            guard let apple = Self.appleToken(authorization) else {
                 errorMessage = AuthError.invalidAppleCredential.localizedDescription
                 return
             }
-            await perform { try await service.signInWithApple(idToken: idToken, nonce: nonce, fullName: credential.fullName) }
+            await perform { try await service.signInWithApple(idToken: apple.idToken, nonce: nonce, fullName: apple.fullName) }
         }
+    }
+
+    /// 匿名 → Apple の引き継ぎ(#276)。`SignInWithAppleButton` の completion を受けて Firebase で link する(uid はそのまま)。
+    /// - Returns: 引き継げたら true。キャンセル・失敗・既に別アカウント(`linkConflict` が立つ)は false。
+    @discardableResult
+    func completeAppleLink(_ result: Result<ASAuthorization, Error>, nonce: String) async -> Bool {
+        switch result {
+        case .failure(let error):
+            if (error as? ASAuthorizationError)?.code != .canceled { linkError = error.localizedDescription }
+            return false
+        case .success(let authorization):
+            guard let apple = Self.appleToken(authorization) else {
+                linkError = AuthError.invalidAppleCredential.localizedDescription
+                return false
+            }
+            return await linkApple(idToken: apple.idToken, nonce: nonce, fullName: apple.fullName)
+        }
+    }
+
+    /// Apple の idToken で今の匿名ユーザーに Apple を結びつける。
+    @discardableResult
+    func linkApple(idToken: String, nonce: String, fullName: PersonNameComponents?) async -> Bool {
+        isBusy = true
+        defer { isBusy = false }
+        linkError = nil
+        do {
+            user = try await service.linkWithApple(idToken: idToken, nonce: nonce, fullName: fullName)
+            return true
+        } catch AuthError.credentialAlreadyInUse {
+            linkConflict = true
+        } catch {
+            linkError = error.localizedDescription
+        }
+        return false
+    }
+
+    /// `linkConflict` の後、その Apple ID の既存アカウントへ切り替える。匿名で作ったアプリはこの端末から見えなくなる。
+    @discardableResult
+    func switchToExistingAppleAccount() async -> Bool {
+        isBusy = true
+        defer { isBusy = false }
+        linkError = nil
+        do {
+            user = try await service.switchToPendingAppleAccount()
+            return true
+        } catch {
+            linkError = error.localizedDescription
+            return false
+        }
+    }
+
+    private static func appleToken(_ authorization: ASAuthorization) -> (idToken: String, fullName: PersonNameComponents?)? {
+        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let data = credential.identityToken,
+              let idToken = String(data: data, encoding: .utf8) else { return nil }
+        return (idToken, credential.fullName)
     }
 
     func signInAnonymously() async {

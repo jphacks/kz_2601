@@ -3,8 +3,8 @@
 // per-case metrics + the resulting DSL as JSON. Edit cases are seeded with the
 // DSL produced by their `base` case (create or an earlier edit) in the same run. `expect` keys:
 // photo / chart / calendar (bool), notification ("HH:MM" or "any"), substitution (bool:
-// the summary mentions 代替 / "replaced" because a requested part is not in
-// the catalog), scope ("public"|"shared"|"private": at least one entity has
+// the summary mentions 代替 / できません / "replaced" because a requested part is not in
+// the catalog or not possible, #257), scope ("public"|"shared"|"private": at least one entity has
 // that scope), editMembers (bool, #252: some shared entity has edit members),
 // noShared (bool, #77: no shared/public entity), calc / computed / statValue / settlement / ref (bool, #100:
 // any calculation / Field.computed / stat.value / settlement leaf / ref field;
@@ -19,11 +19,18 @@
 // healthField (bool: some field has health "weight").
 // Warikan (#231): refs (bool: some field is type refs), deletable ([entity id, ...]: swipeToDelete list or deleteRecord).
 // Grid (#234): grid (bool: some gridTable is present).
+// Omission (#257): noOmission (bool: the model met or honestly declined every
+// requested part itself; Meta.Omissions = parts the server had to note).
 // Field cap (#221): keepEntity / keep ([field id, ...]) / growTo (see checkKeep).
+// Parent -> child (#256): prefillRef (bool: some navigate opens a child form with prefillRef).
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
+// M0 (#281): shared (bool: some entity is shared or public, whichever the model
+// picks). Keys and types are listed in expect.go; -check validates a cases
+// file without the API, and every run ends with the pass rate per group.
 //
+//	go run ./cmd/ai-eval -check -cases internal/ai/eval/m0disc_cases.json  # no API calls
 //	set -a; source ../.env; set +a
 //	go run ./cmd/ai-eval -effort low -out ../docs/backend/ai-eval/raw
 //	go run ./cmd/ai-eval -stream -repeat 2 -only kakeibo_a,walk_a   # SSE path, time to first event
@@ -58,6 +65,7 @@ type Case struct {
 	Transcript string         `json:"transcript"`
 	Note       string         `json:"note,omitempty"`
 	Expect     map[string]any `json:"expect,omitempty"`
+	Needs      []string       `json:"needs,omitempty"` // audit_cases: human checklist only, not checked
 }
 
 type Metrics struct {
@@ -90,6 +98,8 @@ type Metrics struct {
 	// #167
 	Health      []string `json:"health,omitempty"`      // healthStat metric:period
 	HealthField bool     `json:"healthField,omitempty"` // a field with health "weight"
+	// #256: screen>childForm.refField of navigate.prefillRef
+	PrefillRefs []string `json:"prefillRefs,omitempty"`
 }
 
 // HasCalc reports whether the app computes anything beyond plain aggregate stats.
@@ -119,6 +129,8 @@ type Record struct {
 	Usage         ai.Usage        `json:"usage"`
 	Summary       string          `json:"summary,omitempty"`
 	LastProblems  []string        `json:"lastProblems,omitempty"`
+	LintRetried   bool            `json:"lintRetried,omitempty"`
+	Omissions     []string        `json:"omissions,omitempty"` // #257: the server appended a note for these
 	Metrics       *Metrics        `json:"metrics,omitempty"`
 	ExpectMisses  []string        `json:"expectMisses,omitempty"`
 	LogicPass     *ai.LogicMeta   `json:"logicPass,omitempty"`
@@ -177,6 +189,7 @@ func main() {
 	chatEffort := flag.String("chat-effort", "", "-chat: clarify effort (empty = ai.DefaultChatEffort)")
 	chatThinking := flag.String("chat-thinking", "", "-chat: thinking.type adaptive|disabled|between_tools (empty = ai.DefaultChatThinking)")
 	chatCaps := flag.String("capabilities", "", "-chat: comma-separated capabilities (answer,proposal) sent by cases without their own mode/capabilities (#185)")
+	check := flag.Bool("check", false, "validate the cases file (ids, bases, expect keys and types) and exit (no API calls, #281)")
 	flag.Parse()
 	if *chat && *casesPath == "internal/ai/eval/cases.json" {
 		*casesPath = "internal/ai/eval/chat_cases.json"
@@ -186,6 +199,13 @@ func main() {
 		if err := compare(*cmpBefore, *cmpAfter); err != nil {
 			log.Fatal(err)
 		}
+		return
+	}
+	if err := checkCasesFile(*casesPath, *chat); err != nil {
+		log.Fatal(err)
+	}
+	if *check {
+		fmt.Printf("ok %s\n", *casesPath)
 		return
 	}
 
@@ -262,6 +282,11 @@ func main() {
 		log.Fatal(err)
 	}
 	printTable(run)
+	hasExpect := map[string]bool{}
+	for _, c := range cases {
+		hasExpect[c.ID] = len(c.Expect) > 0
+	}
+	printPassByGroup(passByGroup(run.Cases, hasExpect))
 	fmt.Printf("\nwrote %s\n", path)
 }
 
@@ -339,6 +364,8 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 	rec.Usage = res.Meta.Usage
 	rec.Summary = res.Summary
 	rec.LastProblems = res.Meta.LastProblems
+	rec.LintRetried = res.Meta.LintRetried
+	rec.Omissions = res.Meta.Omissions
 	rec.LogicPass = res.Meta.LogicPass
 	rec.Patch = res.Patch
 	rec.DSL = res.DSL
@@ -347,6 +374,9 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(checkExpect(c.Expect, rec.Metrics, rec.Summary), checkNav(c.Expect, app, rec.Mode)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkEnum(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkKeep(c.Expect, app, rec.Summary)...)
+		if v, ok := c.Expect["noOmission"].(bool); ok && v && len(rec.Omissions) > 0 {
+			rec.ExpectMisses = append(rec.ExpectMisses, fmt.Sprintf("omissions=%v", rec.Omissions))
+		}
 	}
 	created[c.ID] = res.DSL // edits too, so an edit can build on an earlier edit (#229)
 	log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms first=%dms out=%d chars=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",
@@ -357,6 +387,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 
 func measure(a *dsl.App) *Metrics {
 	m := &Metrics{Tabs: len(a.App.Tabs), Screens: len(a.Screens), Entities: len(a.Entities)}
+	m.PrefillRefs = prefillRefs(a)
 	for i := range a.Entities {
 		e := &a.Entities[i]
 		m.Fields += len(e.Fields)
@@ -448,6 +479,13 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 	var miss []string
 	for k, v := range exp {
 		switch k {
+		case "shared": // #281: shared with others, public or shared alike
+			found := slices.ContainsFunc(m.Scopes, func(s string) bool {
+				return strings.HasSuffix(s, ":public") || strings.HasSuffix(s, ":shared")
+			})
+			if found != v.(bool) {
+				miss = append(miss, fmt.Sprintf("shared=%v", m.Scopes))
+			}
 		case "substitution": // a part missing from the catalog was requested: summary must say so
 			if mentionsSubstitution(summary) != v.(bool) {
 				miss = append(miss, fmt.Sprintf("substitution=%v", !v.(bool)))
@@ -464,6 +502,10 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 		case "grid":
 			if (len(m.Grid) > 0) != v.(bool) {
 				miss = append(miss, fmt.Sprintf("grid=%v", m.Grid))
+			}
+		case "prefillRef": // #256
+			if (len(m.PrefillRefs) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("prefillRef=%v", m.PrefillRefs))
 			}
 		case "calendar":
 			if m.HasCalendar != v.(bool) {
@@ -726,7 +768,11 @@ func deletable(a *dsl.App, entity string) bool {
 
 // mentionsSubstitution: the ja template says 代替, the en one says "replaced".
 func mentionsSubstitution(summary string) bool {
-	return strings.Contains(summary, "代替") || strings.Contains(strings.ToLower(summary), "replaced")
+	if strings.Contains(summary, "代替") || strings.Contains(summary, "できません") || strings.Contains(summary, "できない") {
+		return true
+	}
+	l := strings.ToLower(summary)
+	return strings.Contains(l, "replaced") || strings.Contains(l, "isn't possible") || strings.Contains(l, "can't")
 }
 
 func percentile(v []int64, p float64) int64 {

@@ -263,21 +263,9 @@ func (h *Handler) installCopy(r *http.Request, srcAppID string, srcDSL json.RawM
 			return nil, err
 		}
 	}
-	init := dsl.Initial()
-	initRaw, err := json.Marshal(init)
+	v, err := h.seedCopy(r, id, compact(srcDSL), app.App.Name, &store.Source{Kind: "import", Mode: "full", Summary: note})
 	if err != nil {
 		return nil, err
-	}
-	if _, _, err := h.store.EnsureApp(ctx, uid, id, initRaw, init.App.Name); err != nil {
-		return nil, err
-	}
-	raw := compact(srcDSL)
-	v, err := h.store.CommitVersion(ctx, uid, id, store.Commit{
-		BaseVersion: 1, DSL: raw, Name: app.App.Name,
-		Source: &store.Source{Kind: "import", Mode: "full", Summary: note},
-	})
-	if err != nil {
-		return nil, mapStoreErr(err, "app")
 	}
 	if !joined {
 		h.claim(r, id) // a fresh appId: the installer is its creator

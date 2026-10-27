@@ -134,6 +134,32 @@ final class MockServicesTests: XCTestCase {
         XCTAssertEqual(second??.uid, MockAuthService.fixedUID)
     }
 
+    /// #276: link は uid を保ったまま匿名でなくする。使用中の Apple ID は credentialAlreadyInUse → 切り替えで既存 uid。
+    func testMockAuthLinkWithApple() async throws {
+        let auth = MockAuthService(signedIn: true)
+        let linked = try await auth.linkWithApple(idToken: "t", nonce: "n", fullName: nil)
+        XCTAssertEqual(linked.uid, MockAuthService.fixedUID)
+        XCTAssertFalse(linked.isAnonymous)
+        do {
+            _ = try await auth.linkWithApple(idToken: "t", nonce: "n", fullName: nil)
+            XCTFail("2 回目は alreadyLinked")
+        } catch AuthError.alreadyLinked {}
+
+        let inUse = MockAuthService(signedIn: true)
+        inUse.appleIDInUse = true
+        do {
+            _ = try await inUse.linkWithApple(idToken: "t", nonce: "n", fullName: nil)
+            XCTFail("使用中の Apple ID は credentialAlreadyInUse")
+        } catch AuthError.credentialAlreadyInUse {}
+        XCTAssertEqual(inUse.currentUser?.isAnonymous, true)
+        let switched = try await inUse.switchToPendingAppleAccount()
+        XCTAssertEqual(switched.uid, MockAuthService.existingAppleUID)
+        do {
+            _ = try await inUse.switchToPendingAppleAccount()
+            XCTFail("資格情報は 1 回だけ")
+        } catch AuthError.noPendingAppleAccount {}
+    }
+
     // MARK: - ai 契約
 
     func testHTTPAIClientParsesGenerateResponse() throws {
