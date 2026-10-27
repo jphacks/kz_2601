@@ -18,6 +18,7 @@ type appSummary struct {
 	Status         string    `json:"status"`
 	CreatedAt      time.Time `json:"createdAt"`
 	UpdatedAt      time.Time `json:"updatedAt"`
+	SortIndex      int       `json:"sortIndex,omitempty"`
 }
 
 type appWithDSL struct {
@@ -26,7 +27,7 @@ type appWithDSL struct {
 }
 
 func summary(a *store.App) appSummary {
-	return appSummary{ID: a.ID, Name: a.Name, CurrentVersion: a.CurrentVersion, Status: a.Status, CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt}
+	return appSummary{ID: a.ID, Name: a.Name, CurrentVersion: a.CurrentVersion, Status: a.Status, CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt, SortIndex: a.SortIndex}
 }
 
 func (h *Handler) listApps(w http.ResponseWriter, r *http.Request) {
@@ -143,7 +144,23 @@ func (h *Handler) patchApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "status must be active or archived"))
 		return
 	}
-	app, err := h.store.UpdateAppMeta(r.Context(), uidOf(r), id, body.Name, body.Status)
+	if body.Name != nil {
+		name, err := appName(*body.Name)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		if err := h.rename(r, id, name); err != nil {
+			fail(w, err)
+			return
+		}
+	}
+	var app *store.App
+	if body.Status != nil {
+		app, err = h.store.UpdateAppMeta(r.Context(), uidOf(r), id, nil, body.Status)
+	} else {
+		app, err = h.store.GetApp(r.Context(), uidOf(r), id)
+	}
 	if err != nil {
 		fail(w, mapStoreErr(err, "app"))
 		return

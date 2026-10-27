@@ -1,6 +1,8 @@
 import SwiftUI
 import MetamonServices
 
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではリリース申請を外す。
+#if !APP_STORE_REVIEW
 /// リリース申請(#76)の UI 状態。変身一覧のカードのバッジとシートで共有する。
 @MainActor
 @Observable
@@ -41,19 +43,23 @@ extension ReleaseStatus {
         }
     }
 }
+#endif
 
 /// 変身一覧のカード右上: 「…」メニュー(シェア・公開 / リリース申請)+ 申請済みなら status の小さなバッジ。
 struct AppCardActions: View {
     let app: AppSummary
     @Environment(AppRuntime.self) private var rt
+    #if !APP_STORE_REVIEW
     @State private var sharingUI = SharingUI.shared
     @State private var releaseUI = ReleaseUI.shared
+    #endif
     /// 削除の確認ダイアログ(#180)
     @State private var confirmingDelete = false
 
     var body: some View {
         VStack(alignment: .trailing, spacing: Theme.Spacing.xs) {
             Menu {
+                #if !APP_STORE_REVIEW // 審査用ビルドはシェア・公開 / リリース申請を外す(#245)
                 if rt.canShare {
                     Button { sharingUI.shareTarget = app } label: {
                         Label("シェア・公開", systemImage: "square.and.arrow.up")
@@ -66,10 +72,12 @@ struct AppCardActions: View {
                     }
                 }
                 Divider()
+                #endif
                 Button(role: .destructive) { confirmingDelete = true } label: {
                     Label("削除", systemImage: "trash")
                 }
                 .accessibilityIdentifier("switcher.delete")
+                AppManageMenuItems(app: app) // #277 名前を変える・複製・並べ替え
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.footnote.weight(.bold))
@@ -80,9 +88,11 @@ struct AppCardActions: View {
             }
             .accessibilityLabel(L10n.tr("\(app.name)のメニュー"))
             .accessibilityIdentifier("switcher.cardMenu")
+            #if !APP_STORE_REVIEW
             if let req = releaseUI.byApp[app.id] {
                 ReleaseStatusBadge(status: req.kind)
             }
+            #endif
         }
         .padding(Theme.Spacing.sm)
         .alert(L10n.tr("「\(app.name)」を削除しますか?"), isPresented: $confirmingDelete) {
@@ -92,15 +102,21 @@ struct AppCardActions: View {
             .accessibilityIdentifier("switcher.delete.confirm")
             Button("キャンセル", role: .cancel) {}
         } message: {
+            #if APP_STORE_REVIEW
+            Text("元に戻せません。")
+            #else
             if rt.document.appId == app.id {
                 Text("元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ初期画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。")
             } else {
                 Text("元に戻せません。シェアリンクと「探す」への掲載も取り下げます。")
             }
+            #endif
         }
     }
 }
 
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではリリース申請を外す。
+#if !APP_STORE_REVIEW
 struct ReleaseStatusBadge: View {
     let status: ReleaseStatus
 
@@ -312,4 +328,5 @@ struct ReleaseRequestHooks: ViewModifier {
         }
     }
 }
+#endif
 #endif
