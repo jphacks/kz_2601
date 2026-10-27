@@ -541,6 +541,8 @@ func (a *App) Validate() error {
 				}
 			case CompLocationPicker: // #212
 				checkLocationPicker(where, c, formEntity, add)
+			case CompRouteGuide: // #411
+				checkRouteGuide(where, c, formEntity, entities, add)
 			case CompTimerDisplay:
 				switch c.Mode {
 				case "stopwatch":

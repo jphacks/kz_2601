@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "ドライブの行き先",
+    "description": "行きたい場所を検索して登録し、選んだ行き先まで経路と曲がる所を音声で案内する(#411 routeGuide)",
+    "icon": "car.fill",
+    "theme": { "primaryColor": "#1E88E5" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "spot",
+      "name": "行き先",
+      "titleField": "name",
+      "fields": [
+        { "id": "name", "name": "名前", "type": "string", "required": true },
+        { "id": "place", "name": "場所", "type": "location", "required": true },
+        { "id": "memo", "name": "メモ", "type": "string" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "ドライブ",
+      "toolbar": [
+        { "label": "追加", "icon": "plus", "action": { "type": "navigate", "screen": "spot_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        {
+          "type": "routeGuide", "id": "guide", "area": "A1:F7", "title": "目的地まで案内",
+          "entity": "spot", "locationField": "place", "titleField": "name", "mode": "automobile"
+        },
+        {
+          "type": "section", "id": "spots", "area": "A8:F10", "title": "行き先",
+          "children": [
+            {
+              "type": "list", "entity": "spot",
+              "item": { "title": "name", "subtitle": "memo" },
+              "emptyText": "行き先を追加してください",
+              "onItemTap": { "type": "navigate", "screen": "spot_form", "presentation": "push" },
+              "swipeToDelete": true
+            }
+          ]
+        },
+        { "type": "button", "id": "add", "area": "D11:F12", "label": "行き先を追加", "icon": "plus",
+          "action": { "type": "navigate", "screen": "spot_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "spot_form",
+      "title": "行き先",
+      "entity": "spot",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "spot" } }],
+      "components": [
+        { "type": "textField", "id": "name_in", "area": "A1:F2", "field": "name", "label": "名前", "placeholder": "海の見える公園" },
+        { "type": "locationPicker", "id": "place_in", "area": "A3:F5", "field": "place", "nameField": "name", "label": "場所を検索" },
+        { "type": "routeGuide", "id": "guide_here", "area": "A6:F10", "locationField": "place", "titleField": "name" },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "spot", "confirmMessage": "この行き先を削除しますか？" } }
+      ]
+    }
+  ]
+}

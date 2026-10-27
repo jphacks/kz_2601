@@ -634,6 +634,9 @@
           "$ref": "#/$defs/LocationPicker"
         },
         {
+          "$ref": "#/$defs/RouteGuide"
+        },
+        {
           "$ref": "#/$defs/QrScanner"
         },
         {
@@ -2781,6 +2784,58 @@
       },
       "description": "場所を選ぶ入力欄。タップでシートが開き、店名・地名・住所で検索するか、地図を動かして中央のピンで決める(現在地ボタンもある)。行きたいお店リスト・旅行の行き先・訪問先の記録など「現在地以外の場所を登録したい」アプリのフォーム画面で選ぶ。今いる場所だけでよいなら locationButton。",
       "x-usage": "フォーム画面のみ(screen.entity 必須)。名前の入力欄の近くに A3:F6 程度(選んだ場所の小さな地図が出る)。nameField に場所の名前用の string field を指定し、ホームは mapView(titleField に同じ field)と list で使う。"
+    },
+    "RouteGuide": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "routeGuide"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "カードの見出し(任意・例: 目的地まで案内)。"
+        },
+        "locationField": {
+          "type": "string",
+          "description": "目的地の location field(\"lat,lng\")。entity 省略時は screen.entity のレコード(詳細・フォーム画面で開いている 1 件。同じフォームの locationPicker で選んだ場所もそのまま使える)。address とどちらか一方。"
+        },
+        "entity": {
+          "type": "string",
+          "description": "目的地の候補にするレコードの entity。指定すると部品の中で候補(titleField の名前)から目的地を選ぶ(ホームに置く時)。省略 = screen.entity の今のレコード。"
+        },
+        "titleField": {
+          "type": "string",
+          "description": "目的地の名前にする field(例: 場所の名前)。任意。"
+        },
+        "address": {
+          "type": "string",
+          "description": "固定の目的地(住所・施設名。MapKit で検索)。locationField とどちらか一方。例: 「金沢駅」「石川県金沢市広坂1-1-1」。"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "automobile",
+            "walking"
+          ],
+          "description": "最初の移動手段: automobile 車(既定)/ walking 徒歩。案内中も画面で切り替えられる。"
+        },
+        "label": {
+          "type": "string",
+          "description": "開始ボタンの文言(既定「案内を開始」)。"
+        }
+      },
+      "description": "目的地までの道案内(ナビ)。MapKit で経路を出して地図に線を引き、次に曲がる所・そこまでの距離・残りの距離・到着の予想時刻を現在地に合わせて進める。音声案内(オン・オフ)・車/徒歩の切り替え・道を外れたら経路を引き直す。使用中の位置だけ使う(背面では案内しない)。車線・渋滞の回避など Google マップと同じ精度は無い(MapKit の範囲)。「ナビ」「道案内」「目的地まで案内」「ドライブ」「行き方を教えて」の時に必ずこれを選ぶ(mapView や openUrlButton で地図アプリへ飛ばすだけで代替しない)。",
+      "x-usage": "目的地は 3 通り: (1) 行き先リストのホームに routeGuide{entity: spot, locationField: place, titleField: name}(A1:F7・候補から選ぶ)+ spot の list(A8:F10)+ 追加ボタン(D11:F12)、(2) spot の詳細/フォーム画面(screen.entity)に routeGuide{locationField: place, titleField: name}(locationPicker で選んだ場所へそのまま案内)、(3) 行き先が決まっているなら routeGuide{address: \"金沢駅\"}。entity は例 spot{name: string(required), place: location(required)}、フォームは locationPicker{field: place, nameField: name}。徒歩の道案内なら mode walking。"
     },
     "QrScanner": {
       "type": "object",
