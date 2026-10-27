@@ -49,6 +49,7 @@ struct MetamonApp: App {
         runtime.tutorial = .shared
         let session = AuthSession(service: services.auth)
         runtime.onSessionExpired = { session.expire() } // 401 が続いたらサインイン画面へ(#60)
+        runtime.isAnonymousUser = { session.user?.isAnonymous == true } // 引き継ぎの案内(#276)
         IntentHost.shared.register(runtime) // Siri / ショートカット(#80)は本体プロセス内でこの runtime を使う
         _runtime = State(initialValue: runtime)
         _session = State(initialValue: session)

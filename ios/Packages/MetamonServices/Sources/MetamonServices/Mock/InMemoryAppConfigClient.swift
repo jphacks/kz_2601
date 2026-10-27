@@ -28,6 +28,29 @@ public actor InMemoryAppConfigClient: AppConfigClient {
         apps.removeAll { $0.id == appId }
     }
 
+    public func renameApp(appId: String, name: String) async throws -> AppSummary {
+        guard let i = apps.firstIndex(where: { $0.id == appId }) else {
+            throw APIError.server(status: 404, code: "not_found", message: "app not found (in-memory)")
+        }
+        apps[i].name = name
+        apps[i].currentVersion += 1
+        return apps[i]
+    }
+
+    public func duplicateApp(appId: String, name: String) async throws -> AppSummary {
+        guard apps.contains(where: { $0.id == appId }) else {
+            throw APIError.server(status: 404, code: "not_found", message: "app not found (in-memory)")
+        }
+        let now = ISO8601DateFormatter().string(from: .now)
+        let copy = AppSummary(id: UUID().uuidString.lowercased(), name: name, currentVersion: 2, createdAt: now, updatedAt: now)
+        apps.append(copy)
+        return copy
+    }
+
+    public func reorderApps(ids: [String]) async throws {
+        apps = AppListEdit.applyingOrder(ids, to: apps)
+    }
+
     /// 履歴は持たない(モックの undo は `AppRuntime` のローカル履歴にフォールバックする)。
     public func listVersions(appId: String) async throws -> [VersionSummary] { [] }
 
