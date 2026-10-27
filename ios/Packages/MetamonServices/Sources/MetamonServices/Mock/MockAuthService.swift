@@ -4,6 +4,12 @@ import Foundation
 /// `signedIn: false` で起動するとサインイン画面の動線を Firebase 無しで確認できる。
 public final class MockAuthService: AuthService, @unchecked Sendable {
     public static let fixedUID = "mock00-fixed-uid"
+    /// 引き継ぎ(#276)で「既に別のアカウントにある」Apple ID の既存 uid。
+    public static let existingAppleUID = "mock00-apple-uid"
+
+    /// true なら `linkWithApple` が `credentialAlreadyInUse` で失敗する(既に別のアカウントにある Apple ID を再現)。
+    public var appleIDInUse = false
+    private var hasPending = false
 
     private let lock = NSLock()
     private var user: AuthUser?
@@ -38,6 +44,28 @@ public final class MockAuthService: AuthService, @unchecked Sendable {
     }
 
     public func signOut() throws { _ = set(nil) }
+
+    /// uid を保ったまま匿名でなくする(Firebase の link と同じ)。
+    public func linkWithApple(idToken: String, nonce: String, fullName: PersonNameComponents?) async throws -> AuthUser {
+        guard let current = currentUser else {
+            return try await signInWithApple(idToken: idToken, nonce: nonce, fullName: fullName)
+        }
+        guard current.isAnonymous else { throw AuthError.alreadyLinked }
+        if lock.withLock({ appleIDInUse }) {
+            lock.withLock { hasPending = true }
+            throw AuthError.credentialAlreadyInUse
+        }
+        return set(AuthUser(uid: current.uid, isAnonymous: false, displayName: current.displayName))
+    }
+
+    public func switchToPendingAppleAccount() async throws -> AuthUser {
+        let pending = lock.withLock { () -> Bool in
+            defer { hasPending = false }
+            return hasPending
+        }
+        guard pending else { throw AuthError.noPendingAppleAccount }
+        return set(AuthUser(uid: Self.existingAppleUID, isAnonymous: false))
+    }
 
     /// モックはトークンを持たない(Authorization ヘッダ無しで送る)。
     public func idToken(forceRefresh: Bool) async throws -> String? { nil }

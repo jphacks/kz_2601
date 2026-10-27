@@ -161,10 +161,15 @@ paths:
   /chat/{appId}:
     delete:
       summary: 対話の会話状態を消す (iOS が「最初から」「キャンセル」した時)
+      description: |
+        会話の状態は ID トークンの uid ごとに持つ (#286)。消せるのは呼んだ本人の会話だけ。
+        トークンが無い・不正なら 401。本人の会話が無く、その appId に他の利用者の会話だけがあれば 403 (何も消さない)。
       parameters:
         - { name: appId, in: path, required: true, schema: { type: string } }
       responses:
-        '204': { description: 消した (存在しなくても 204) }
+        '204': { description: 消した (本人の会話が存在しなくても 204) }
+        '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './openapi-appconfig.yaml#/components/responses/Forbidden' }
 
   /transcribe:
     post:

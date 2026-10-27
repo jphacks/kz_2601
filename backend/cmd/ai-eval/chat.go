@@ -31,7 +31,8 @@ import (
 // whether it went through. `optionsNot` (no option's title / detail /
 // instruction contains any of them) and `genNot` (the generate summary
 // contains none of them, e.g. 「省き」 = a part was dropped) catch ideas that
-// mix in something the DSL cannot do.
+// mix in something the DSL cannot do. Every step also fails when a
+// Japanese reply / chip / idea still shows a DSL name (#258, ai.LeakedTerms).
 
 type ChatStep struct {
 	Say      string   `json:"say"`
@@ -316,6 +317,18 @@ func checkChatStep(st ChatStep, res *ai.ChatResult) []string {
 	for _, w := range st.TextNot {
 		if strings.Contains(lower, strings.ToLower(w)) {
 			miss = append(miss, "text has "+w)
+		}
+	}
+	// #258: the user never reads DSL names (text, chips, idea titles / details)
+	if res.Locale != ai.LocaleEN {
+		shown := append([]string{res.Text}, res.Suggestions...)
+		for _, o := range res.Options {
+			shown = append(shown, o.Title, o.Detail)
+		}
+		for _, s := range shown {
+			if left := ai.LeakedTerms(s); len(left) > 0 {
+				miss = append(miss, fmt.Sprintf("dsl terms %v in %q", left, s))
+			}
 		}
 	}
 	for _, o := range res.Options {

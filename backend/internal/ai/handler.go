@@ -8,6 +8,8 @@ import (
 	"net/http"
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
+	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
 
 // NewHandler exposes POST /v1/generate, POST /v1/chat, DELETE /v1/chat/{appId}
@@ -60,7 +62,9 @@ func NewHandler(svc *Service) http.Handler {
 		}
 		writeJSON(w, http.StatusOK, res)
 	})
-	mux.HandleFunc("POST /v1/chat", func(w http.ResponseWriter, r *http.Request) {
+	// /v1/chat: the caller (if the token verifies) owns the conversation (#286)
+	caller := auth.Optional(svc.Verifier, svc.AuthMode)
+	mux.Handle("POST /v1/chat", caller(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 		if err != nil {
 			writeErr(w, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "cannot read body"})
@@ -81,11 +85,21 @@ func NewHandler(svc *Service) http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, res)
-	})
-	mux.HandleFunc("DELETE /v1/chat/{appId}", func(w http.ResponseWriter, r *http.Request) {
-		svc.ClearChat(r.PathValue("appId"))
+	})))
+	// Only the caller's own conversation can be cleared: no token 401,
+	// another user's conversation 403, otherwise 204 (#286).
+	mux.Handle("DELETE /v1/chat/{appId}", caller(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uid := auth.UID(r.Context())
+		if uid == "" {
+			writeErr(w, &Error{Status: http.StatusUnauthorized, Code: httpx.CodeUnauthenticated, Message: "missing or invalid bearer token"})
+			return
+		}
+		if err := svc.ClearChat(uid, r.PathValue("appId")); errors.Is(err, ErrNotOwner) {
+			writeErr(w, &Error{Status: http.StatusForbidden, Code: httpx.CodeForbidden, Message: err.Error()})
+			return
+		}
 		w.WriteHeader(http.StatusNoContent)
-	})
+	})))
 	return mux
 }
 
