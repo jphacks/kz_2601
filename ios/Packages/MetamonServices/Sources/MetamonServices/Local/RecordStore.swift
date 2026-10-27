@@ -22,6 +22,8 @@ public struct LocalRecord: Codable, Sendable, Equatable, Identifiable {
     public var author: String?
     /// 投稿者の表示名(shared / public・#250)。自分の未送信 create は送る予定の名前。
     public var authorName: String?
+    /// 印の状態(#255)。サーバーの値か、押した直後の楽観的な値。
+    public var marks: [String: MarkState]?
 
     public var id: String { recordId }
 
@@ -43,11 +45,12 @@ public struct LocalRecord: Codable, Sendable, Equatable, Identifiable {
     public init(appId: String, entity: String, server record: Record) {
         self.init(appId: appId, entity: entity, recordId: record.id, data: record.data,
                   createdAt: record.createdAt, updatedAt: record.updatedAt, author: record.author, authorName: record.authorName)
+        marks = record.marks
     }
 
     /// Renderer に渡す形。
     public var record: Record {
-        Record(id: recordId, data: data, createdAt: createdAt, updatedAt: updatedAt, author: author, authorName: authorName)
+        Record(id: recordId, data: data, createdAt: createdAt, updatedAt: updatedAt, author: author, authorName: authorName, marks: marks)
     }
 
     /// 未送信 create の仮 id(`local-<clientId>`)。サーバー採番後に差し替わる。
@@ -135,12 +138,24 @@ public actor RecordStore {
     /// 同期完了: 仮 id の行をサーバーのレコードに差し替える(create)/ pendingOp を落とす(update)。
     public func markSynced(appId: String, entity: String, localId: String, server: Record) {
         var t = table(appId, entity)
+        let kept = t.first { $0.recordId == localId }?.marks // サーバーが marks を返さない応答(作成)でも印を消さない
         t.removeAll { $0.recordId == localId }
         t.removeAll { $0.recordId == server.id }
         var row = LocalRecord(appId: appId, entity: entity, server: server)
         row.clientId = localId.hasPrefix("local-") ? String(localId.dropFirst("local-".count)) : nil
+        if row.marks == nil { row.marks = kept }
         t.append(row)
         save(appId, entity, t)
+    }
+
+    /// 印の状態だけを書き換える(#255・押した直後の楽観的な値 / サーバーの確定値 / 失敗時の戻し)。行が無ければ false。
+    @discardableResult
+    public func setMark(appId: String, entity: String, recordId: String, mark: String, state: MarkState) -> Bool {
+        var t = table(appId, entity)
+        guard let i = t.firstIndex(where: { $0.recordId == recordId }) else { return false }
+        t[i].marks = (t[i].marks ?? [:]).merging([mark: state]) { _, new in new }
+        save(appId, entity, t)
+        return true
     }
 
     /// 送信を諦めた(サーバーに拒否された)時: create は行ごと消し、update/delete は pendingOp を戻す。

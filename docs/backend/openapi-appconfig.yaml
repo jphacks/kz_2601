@@ -466,6 +466,26 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}:
+    parameters:
+      - { $ref: '#/components/parameters/AppId' }
+      - { $ref: '#/components/parameters/EntityId' }
+      - { in: path, name: recordId, required: true, schema: { type: string } }
+      - { in: path, name: markId, required: true, schema: { type: string }, description: 'entity.marks の id (例 like / save)' }
+    put:
+      tags: [records]
+      summary: 自分の印を付ける (#255・冪等)
+      description: public/shared の entity で、現行 DSL の entity.marks に宣言された印だけ。1 人 1 回 (2 回目は件数を増やさない)。他人のレコードにも付けられる (entity.edit は関係しない)。
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/MarkState' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [records]
+      summary: 自分の印を外す (#255・冪等)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/MarkState' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /apps/{appId}/share:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
     post:
@@ -856,8 +876,15 @@ components:
         data: { $ref: '#/components/schemas/RecordData' }
         author: { type: string, description: '投稿者 uid。entity.scope が public/shared のレコードにだけ付く (private では省略)' }
         authorName: { type: string, description: '投稿者の表示名。POST の authorName、無ければ "匿名"。public/shared のみ' }
+        marks: { type: object, additionalProperties: { $ref: '#/components/schemas/MarkState' }, description: 'entity.marks の印ごとの状態 (#255)。marks を宣言した public/shared entity の GET / PATCH だけ。宣言した印は件数 0 でも必ず入る' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    MarkState:
+      type: object
+      required: [count, mine]
+      properties:
+        count: { type: integer, minimum: 0, description: '印を付けている人数' }
+        mine: { type: boolean, description: '呼び出した本人が付けているか' }
     Share:
       type: object
       required: [token, appId, name, dslVersion, url, webUrl]

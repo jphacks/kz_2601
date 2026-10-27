@@ -51,6 +51,10 @@ var expectKeys = map[string]expectKind{
 	"authorShown":  expectBool, // #250 (PR #384)
 	"nameInput":    expectBool, // #250 (PR #384)
 	"meFilter":     expectBool, // #251 (PR #384)
+	// checkMarks (#255, PR #398)
+	"mark":       expectBool,
+	"markedByMe": expectBool,
+	"markEntity": expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

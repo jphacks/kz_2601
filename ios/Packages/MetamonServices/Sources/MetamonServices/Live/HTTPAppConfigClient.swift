@@ -161,6 +161,11 @@ public struct HTTPAppConfigClient: AppConfigClient {
         _ = try await request("DELETE", "v1/apps/\(appId)/entities/\(entity)/records/\(id)")
     }
 
+    public func setMark(appId: String, entity: String, id: String, mark: String, on: Bool) async throws -> MarkState {
+        let data = try await request(on ? "PUT" : "DELETE", "v1/apps/\(appId)/entities/\(entity)/records/\(id)/marks/\(mark)")
+        return try JSONDecoder().decode(MarkState.self, from: data)
+    }
+
     static func isRetryable(_ error: URLError) -> Bool {
         [.timedOut, .networkConnectionLost, .cannotConnectToHost, .notConnectedToInternet].contains(error.code)
     }
