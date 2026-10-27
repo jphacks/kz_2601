@@ -55,6 +55,7 @@ var dslTerms = []dslTerm{
 	{"videoField", "動画の欄", "video box"},
 	{"locationPicker", "場所の検索", "place search"},
 	{"locationTracker", "道のりの記録", "route tracker"},
+	{"dashcam", "ドラレコ", ""},
 	{"healthStat", "ヘルスケアの数字", "Health data card"},
 	{"hstack", "横並び", "row"},
 	{"vstack", "縦並び", "column"},
