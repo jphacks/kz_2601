@@ -948,6 +948,16 @@ final class AppRuntime: DSLRuntime {
         switch action.type {
         case .navigate:
             guard let screen = action.screen else { return }
+            if let ref = action.prefillRef {
+                // 親から子を作る(#256): 今のレコードを子フォームの ref に積み、子は新規で開く(recordId は渡さない)
+                guard let parentId = ctx.currentRecordId else {
+                    toast = unsavedParentToast(ctx)
+                    return
+                }
+                FormPrefill.set([ref: .string(parentId)])
+                navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
+                return
+            }
             navigate(to: screen, presentation: action.presentation, recordId: ctx.recordId, from: ctx.route)
 
         case .back:
@@ -1010,6 +1020,12 @@ final class AppRuntime: DSLRuntime {
         case .unknown:
             toast = L10n.tr("未対応のアクション: \(action.rawType)")
         }
+    }
+
+    /// prefillRef の親が未保存(新規フォームの button / toolbar)。子は親の id が無いと作れないので先に保存してもらう。
+    func unsavedParentToast(_ ctx: ActionContext) -> String {
+        let name = ctx.form?.entity.name ?? ""
+        return name.isEmpty ? L10n.tr("先に保存してください") : L10n.tr("先に「\(name)」を保存してください")
     }
 
     private func attempt(entity: String? = nil, _ body: () async throws -> Void) async {
