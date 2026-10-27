@@ -134,11 +134,11 @@
             "shared",
             "public"
           ],
-          "description": "レコードを誰と共有するか(省略時 private)。みんなで投稿・ランキング・掲示板など、他のユーザーと同じデータを見たい時は public。private は本人だけ。shared は v1 では public と同じ扱い(参加者限定は後段)。",
-          "x-usage": "public/shared のレコードには backend が author(uid)と authorName を自動付与するので、field id に author / authorName は使えない。「みんなで」「共有」「投稿」「ランキング」「掲示板」と言われたら public、家計簿や日記のような個人記録は省略(private)。 投稿者名は名前の入力欄(member_name / person / staff_name / 投稿者 など)を作らず、一覧で予約値 $author を表示する(本人が設定した表示名を backend が付ける・なりすましできない)。「自分の投稿だけ」「マイページ」は filter {\"field\":\"$author\",\"op\":\"eq\",\"value\":{\"me\":true}}。",
+          "description": "レコードを誰と共有するか(省略時 private)。みんなで投稿・ランキング・掲示板など、他のユーザーと同じデータを見たい時は public。家族・サークル・チームなど決まった人だけで使う時は shared(作成者とシェアリンクで参加した人だけ)。private は本人だけ。",
+          "x-usage": "public/shared のレコードには backend が author(uid)と authorName を自動付与するので、field id に author / authorName は使えない。「家族で」「家族だけ」「サークルで」「チームで」「招待した人だけ」のように決まった人だけなら shared、「みんなで」「共有」「投稿」「ランキング」「掲示板」と言われたら public、家計簿や日記のような個人記録は省略(private)。 投稿者名は名前の入力欄(member_name / person / staff_name / 投稿者 など)を作らず、一覧で予約値 $author を表示する(本人が設定した表示名を backend が付ける・なりすましできない)。「自分の投稿だけ」「マイページ」は filter {\"field\":\"$author\",\"op\":\"eq\",\"value\":{\"me\":true}}。",
           "x-enumDescriptions": {
             "private": "本人だけが読み書きできる個人データ(既定)。家計簿・日記・体重など。",
-            "shared": "同じアプリを開いた人と共有(v1 は public と同じ)。",
+            "shared": "作成者と、シェアリンクで参加した人だけが読み書きできる。家族の家事分担・サークルの出欠・チームのタスク。",
             "public": "誰でも読めて、ログインしていれば誰でも投稿できる。編集・削除は投稿者本人のみ(edit で参加者全員の編集を許せる)。掲示板・みんなのランキング・共有リスト。"
           }
         },
