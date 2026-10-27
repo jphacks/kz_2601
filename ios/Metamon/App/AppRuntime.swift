@@ -40,6 +40,12 @@ final class AppRuntime: DSLRuntime {
     var showAIConsent = false
     /// 音声モデルのダウンロード確認(#246・4.2.3(ii))。端末にモデルが無く未承認の時だけ立つ。
     var showModelDownloadConfirm = false
+    /// 初回のチュートリアル(#274)。MetamonApp が `.shared` を入れる。nil(ユニットテスト等)は見た扱い。
+    @ObservationIgnored var tutorial: FirstRunTutorialStore?
+    /// チュートリアルを出す(初回の同意のあと / 設定の「使い方を見る」)。
+    var showTutorial = false
+    /// 最初のアプリができた直後の「こう言うと直せます」(#274・1 回だけ)。
+    var showFirstEditHint = false
     /// 変身一覧シート(#51: FAB 長押し / 「アプリ一覧」)。
     var showAppSwitcher = false
     /// 自分のアプリ一覧(`appsList()` が更新)。
@@ -495,6 +501,7 @@ final class AppRuntime: DSLRuntime {
         #endif
         interruptedByOffline = false
         let previous = document
+        let createdFromInitial = previous.dsl.isVoiceOnly
         let task = Task { [services, appId = document.appId, version = document.version, locale = Self.generationLocale] in
             try await services.ai.morph(transcript: text, appId: appId, currentVersion: version, locale: locale)
         }
@@ -515,6 +522,7 @@ final class AppRuntime: DSLRuntime {
                 summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary), action: canUndo ? .undo : nil)
                 SpeechReader.shared.speak(summary) // #43(設定 OFF なら何もしない)
             }
+            scheduleFirstEditHint(createdFromInitial: createdFromInitial) // #274 最初のアプリの直後に 1 回だけ
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
         } catch {
             let failure: FailureKind = interruptedByOffline ? .offline : FailureKind.classify(error)
@@ -808,7 +816,7 @@ final class AppRuntime: DSLRuntime {
 
     func records(for entity: String) -> [Record] { records[entity] ?? [] }
 
-    /// 共有レコードの作者判定に使う uid(#249)。
+    /// 共有レコードの作者判定(#249)と、`Field.hidden`(#262)の入力を作者のフォームにだけ出すのに使う uid。
     var currentUserId: String? { services.auth.currentUser?.uid }
 
     /// shared / public の entity に作るレコードの投稿者(#250): ローカル行の作者(uid)と、送る表示名(設定の名前だけ・未設定は nil)。
@@ -985,6 +993,16 @@ final class AppRuntime: DSLRuntime {
         switch action.type {
         case .navigate:
             guard let screen = action.screen else { return }
+            if let ref = action.prefillRef {
+                // 親から子を作る(#256): 今のレコードを子フォームの ref に積み、子は新規で開く(recordId は渡さない)
+                guard let parentId = ctx.currentRecordId else {
+                    toast = unsavedParentToast(ctx)
+                    return
+                }
+                FormPrefill.set([ref: .string(parentId)])
+                navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
+                return
+            }
             navigate(to: screen, presentation: action.presentation, recordId: ctx.recordId, from: ctx.route)
 
         case .back:
@@ -1061,6 +1079,12 @@ final class AppRuntime: DSLRuntime {
         case .unknown:
             toast = L10n.tr("未対応のアクション: \(action.rawType)")
         }
+    }
+
+    /// prefillRef の親が未保存(新規フォームの button / toolbar)。子は親の id が無いと作れないので先に保存してもらう。
+    func unsavedParentToast(_ ctx: ActionContext) -> String {
+        let name = ctx.form?.entity.name ?? ""
+        return name.isEmpty ? L10n.tr("先に保存してください") : L10n.tr("先に「\(name)」を保存してください")
     }
 
     private func attempt(entity: String? = nil, _ body: () async throws -> Void) async {

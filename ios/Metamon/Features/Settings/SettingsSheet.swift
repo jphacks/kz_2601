@@ -238,6 +238,13 @@ struct SettingsSheet: View {
             }
             .disabled(rt.isMorphing)
             ScreenMapSettingsRow() // #116
+            Button {
+                dismiss()
+                rt.replayTutorial() // #274
+            } label: {
+                Label("使い方を見る", systemImage: "questionmark.circle")
+            }
+            .accessibilityIdentifier("settings.tutorial")
             Button(role: .destructive) { confirmReset = true } label: {
                 Label("アプリをリセット(初期状態に戻す)", systemImage: "arrow.counterclockwise")
             }

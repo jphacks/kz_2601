@@ -205,6 +205,23 @@
         }
       }
     },
+    "%lld / %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld / %2$lld"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld / %lld"
+          }
+        }
+      }
+    },
     "%lld / %lld 回": {
       "extractionState": "manual",
       "localizations": {
@@ -1038,6 +1055,23 @@
         }
       }
     },
+    "いまはモバイル回線です。通信量が多いので、Wi-Fi につないでからがおすすめです。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You’re on a cellular connection. This uses a lot of data, so connecting to Wi-Fi first is recommended."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "いまはモバイル回線です。通信量が多いので、Wi-Fi につないでからがおすすめです。"
+          }
+        }
+      }
+    },
     "いま使っているのが「%@」です": {
       "extractionState": "manual",
       "localizations": {
@@ -1140,6 +1174,23 @@
         }
       }
     },
+    "おこづかい帳": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allowance book"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "おこづかい帳"
+          }
+        }
+      }
+    },
     "おはようございます": {
       "extractionState": "manual",
       "localizations": {
@@ -1153,6 +1204,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "おはようございます"
+          }
+        }
+      }
+    },
+    "お金": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Money"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "お金"
+          }
+        }
+      }
+    },
+    "こう話すと直せます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try saying this to change it"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "こう話すと直せます"
           }
         }
       }
@@ -1514,6 +1599,40 @@
         }
       }
     },
+    "できたアプリの画面にあるマイクから「ボタンを大きくして」「メモ欄を足して」と話すと直せます。気に入らなければ「元に戻して」で戻せます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the mic on your app’s screen and say “Make the buttons bigger” or “Add a notes field.” Don’t like it? Say “Undo.”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "できたアプリの画面にあるマイクから「ボタンを大きくして」「メモ欄を足して」と話すと直せます。気に入らなければ「元に戻して」で戻せます。"
+          }
+        }
+      }
+    },
+    "とじる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "とじる"
+          }
+        }
+      }
+    },
     "どこからも行けない画面": {
       "extractionState": "manual",
       "localizations": {
@@ -1612,6 +1731,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "なし"
+          }
+        }
+      }
+    },
+    "はじめる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get started"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "はじめる"
           }
         }
       }
@@ -1748,6 +1884,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "みんなに公開"
+          }
+        }
+      }
+    },
+    "みんなの掲示板": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group message board"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "みんなの掲示板"
           }
         }
       }
@@ -2313,6 +2466,23 @@
         }
       }
     },
+    "ゲーム": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Games"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ゲーム"
+          }
+        }
+      }
+    },
     "コピー": {
       "extractionState": "manual",
       "localizations": {
@@ -2411,6 +2581,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "サインインの有効期限が切れました。もう一度サインインしてください"
+          }
+        }
+      }
+    },
+    "サブスクの管理": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subscription tracker"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サブスクの管理"
+          }
+        }
+      }
+    },
+    "サークルの出欠": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Club attendance"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サークルの出欠"
           }
         }
       }
@@ -2581,6 +2785,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "シートで開く"
+          }
+        }
+      }
+    },
+    "スキップ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skip"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "スキップ"
           }
         }
       }
@@ -2840,6 +3061,23 @@
         }
       }
     },
+    "ボウリングのスコア表": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bowling scorecard"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボウリングのスコア表"
+          }
+        }
+      }
+    },
     "ボタン「%@」": {
       "extractionState": "manual",
       "localizations": {
@@ -2853,6 +3091,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "ボタン「%@」"
+          }
+        }
+      }
+    },
+    "ボタンを大きくして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make the buttons bigger"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボタンを大きくして"
+          }
+        }
+      }
+    },
+    "ボードゲームの勝ち負け記録": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Board game win/loss log"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボードゲームの勝ち負け記録"
           }
         }
       }
@@ -2908,6 +3180,40 @@
         }
       }
     },
+    "マイクをタップして「家計簿が欲しい」のように話すだけ。文字で入力しても作れます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap the mic and say something like “I want a budget app.” You can also type it."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "マイクをタップして「家計簿が欲しい」のように話すだけ。文字で入力しても作れます。"
+          }
+        }
+      }
+    },
+    "マイクを長押しすると、作ったアプリの一覧が開きます。「アプリ一覧」と話しても開けます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Long-press the mic to open the list of your apps. You can also say “App list.”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "マイクを長押しすると、作ったアプリの一覧が開きます。「アプリ一覧」と話しても開けます。"
+          }
+        }
+      }
+    },
     "メモ欄を増やして": {
       "extractionState": "manual",
       "localizations": {
@@ -2921,6 +3227,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "メモ欄を増やして"
+          }
+        }
+      }
+    },
+    "メモ欄を足して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a notes field"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "メモ欄を足して"
           }
         }
       }
@@ -3469,6 +3792,23 @@
         }
       }
     },
+    "作ったアプリは一覧で切り替え": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch apps from the list"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作ったアプリは一覧で切り替え"
+          }
+        }
+      }
+    },
     "作ったアプリへの「ここを変えて」はこれまでどおり無料": {
       "extractionState": "manual",
       "localizations": {
@@ -3482,6 +3822,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "作ったアプリへの「ここを変えて」はこれまでどおり無料"
+          }
+        }
+      }
+    },
+    "使い方を見る": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How to use"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使い方を見る"
           }
         }
       }
@@ -3567,6 +3924,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "保存するフォームがありません"
+          }
+        }
+      }
+    },
+    "先に保存してください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save this first"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先に保存してください"
+          }
+        }
+      }
+    },
+    "先に「%@」を保存してください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save the %@ first"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先に「%@」を保存してください"
           }
         }
       }
@@ -3911,6 +4302,23 @@
         }
       }
     },
+    "割り勘や出欠のアプリは、シェアすると友達や家族と一緒に使えます。マイクを長押しすると、作ったアプリの一覧が開きます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share apps like bill splitting or attendance to use them with friends and family. Long-press the mic to open the list of your apps."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "割り勘や出欠のアプリは、シェアすると友達や家族と一緒に使えます。マイクを長押しすると、作ったアプリの一覧が開きます。"
+          }
+        }
+      }
+    },
     "匿名": {
       "extractionState": "manual",
       "localizations": {
@@ -3958,6 +4366,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "単体アプリとしてリリースを申請"
+          }
+        }
+      }
+    },
+    "友達と使える・一覧で切り替え": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use with friends, switch from the list"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "友達と使える・一覧で切り替え"
+          }
+        }
+      }
+    },
+    "友達と割り勘": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Split the bill with friends"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "友達と割り勘"
           }
         }
       }
@@ -4166,6 +4608,40 @@
         }
       }
     },
+    "声で話すには、声を文字にするモデル(約%lldMB)が必要です。\n下の欄に文字で入力すれば、今すぐ作れます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talking needs a voice-to-text model (about %lld MB).\nType in the box below to start right now."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "声で話すには、声を文字にするモデル(約%lldMB)が必要です。\n下の欄に文字で入力すれば、今すぐ作れます。"
+          }
+        }
+      }
+    },
+    "声を文字にする準備(初回だけ約%lldMB)が終わる前でも、文字ならすぐに作れます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Even before voice setup finishes (about %lld MB, first time only), you can start right away by typing."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "声を文字にする準備(初回だけ約%lldMB)が終わる前でも、文字ならすぐに作れます。"
+          }
+        }
+      }
+    },
     "変更を反映しています…": {
       "extractionState": "manual",
       "localizations": {
@@ -4264,6 +4740,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "実行"
+          }
+        }
+      }
+    },
+    "家族・友達と": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With family & friends"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "家族・友達と"
           }
         }
       }
@@ -4506,6 +4999,40 @@
         }
       }
     },
+    "文字で入力(今すぐ作れます)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type here (works right away)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字で入力(今すぐ作れます)"
+          }
+        }
+      }
+    },
+    "文字入力なら、このまま作れます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can still make apps by typing"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字入力なら、このまま作れます"
+          }
+        }
+      }
+    },
     "文字起こしに失敗しました: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -4689,6 +5216,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "日付のタップ"
+          }
+        }
+      }
+    },
+    "早起きチェック": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Early-rising check"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "早起きチェック"
           }
         }
       }
@@ -4931,6 +5475,23 @@
         }
       }
     },
+    "次へ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次へ"
+          }
+        }
+      }
+    },
     "次回更新": {
       "extractionState": "manual",
       "localizations": {
@@ -4961,6 +5522,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "毎日、新しいアプリを無制限に作れます"
+          }
+        }
+      }
+    },
+    "毎日の水の量": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daily water intake"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎日の水の量"
           }
         }
       }
@@ -5305,6 +5883,23 @@
         }
       }
     },
+    "画面のマイクをタップして、話しかけてください。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap the mic on the screen and talk."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面のマイクをタップして、話しかけてください。"
+          }
+        }
+      }
+    },
     "画面の指定を外す": {
       "extractionState": "manual",
       "localizations": {
@@ -5386,6 +5981,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "画面マップ"
+          }
+        }
+      }
+    },
+    "空き容量が足りません(あと約%lldMB 必要です)。写真やアプリを整理してから試してください。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not enough storage (about %lld MB more needed). Free up some photos or apps and try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "空き容量が足りません(あと約%lldMB 必要です)。写真やアプリを整理してから試してください。"
           }
         }
       }
@@ -5475,6 +6087,23 @@
         }
       }
     },
+    "習慣": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Habits"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "習慣"
+          }
+        }
+      }
+    },
     "考えています…": {
       "extractionState": "manual",
       "localizations": {
@@ -5543,6 +6172,23 @@
         }
       }
     },
+    "薬の飲み忘れ防止": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Medicine reminders"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "薬の飲み忘れ防止"
+          }
+        }
+      }
+    },
     "見られる": {
       "extractionState": "manual",
       "localizations": {
@@ -5607,6 +6253,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "言語"
+          }
+        }
+      }
+    },
+    "記録": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logs"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録"
           }
         }
       }
@@ -5794,6 +6457,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "読み込めませんでした: %@"
+          }
+        }
+      }
+    },
+    "読んだ本のメモ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading notes"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "読んだ本のメモ"
           }
         }
       }
@@ -6172,6 +6852,23 @@
         }
       }
     },
+    "音声の準備中です(文字ならすぐ作れます)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing voice (you can type right away)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声の準備中です(文字ならすぐ作れます)"
+          }
+        }
+      }
+    },
     "音声を聞き取れませんでした%@。もう一度はっきり話してください": {
       "extractionState": "manual",
       "localizations": {
@@ -6223,19 +6920,19 @@
         }
       }
     },
-    "音声モデルをダウンロード中 %lld%%\n初回のみ約500MB(Wi-Fi 推奨)": {
+    "音声モデルをダウンロード": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Downloading the voice model %lld%%\nAbout 500 MB, first time only (Wi-Fi recommended)"
+            "value": "Download voice model"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "音声モデルをダウンロード中 %lld%%\n初回のみ約500MB(Wi-Fi 推奨)"
+            "value": "音声モデルをダウンロード"
           }
         }
       }
@@ -6372,6 +7069,74 @@
           "stringUnit": {
             "state": "translated",
             "value": "話した内容・入力した文(端末内で文字にしたもの。音声そのものは送りません)"
+          }
+        }
+      }
+    },
+    "話した声を端末の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字入力ならすぐにアプリを作れます。設定からいつでもダウンロードできます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This model turns your voice into text on this device (about %lld MB, first time only). While it downloads, or even without it, you can make apps right away by typing. You can download it anytime in Settings."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話した声を端末の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字入力ならすぐにアプリを作れます。設定からいつでもダウンロードできます。"
+          }
+        }
+      }
+    },
+    "話してみる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try talking"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話してみる"
+          }
+        }
+      }
+    },
+    "話すと、アプリができる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk, and an app appears"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話すと、アプリができる"
+          }
+        }
+      }
+    },
+    "話すと、直せる・戻せる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk to change it, or undo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話すと、直せる・戻せる"
           }
         }
       }
@@ -6546,6 +7311,23 @@
         }
       }
     },
+    "音声モデルをダウンロード中 %lld%%(初回のみ約%lldMB)\n待たなくても、下の欄に文字で入力すれば作れます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading the voice model %1$lld%% (about %2$lld MB, first time only)\nNo need to wait — type in the box below to start"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声モデルをダウンロード中 %lld%%(初回のみ約%lldMB)\n待たなくても、下の欄に文字で入力すれば作れます"
+          }
+        }
+      }
+    },
     "ダウンロード": {
       "extractionState": "manual",
       "localizations": {
@@ -6559,23 +7341,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "ダウンロード"
-          }
-        }
-      }
-    },
-    "話した声を端末の中で文字にするためのモデルです(約%lldMB・初回のみ)。Wi-Fi をおすすめします。ダウンロードしなくても文字入力で使えます。設定からいつでもダウンロードできます。": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This model turns your voice into text on this device (about %lld MB, first time only). Wi-Fi is recommended. You can still type without it, and download it later in Settings."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "話した声を端末の中で文字にするためのモデルです(約%lldMB・初回のみ)。Wi-Fi をおすすめします。ダウンロードしなくても文字入力で使えます。設定からいつでもダウンロードできます。"
           }
         }
       }

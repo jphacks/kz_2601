@@ -11,6 +11,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/store"
+	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
 // Server-Sent Events for hot reload (G13 Day2 / #82). The stream only says
@@ -73,8 +74,22 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 	changed := make(chan string, len(app.Entities)+1)
 	broken := make(chan struct{})
 	entities := make([]string, 0, len(app.Entities))
+	member := true // non-participants get no signals from scope:"shared" entities (#254)
+	if hasSharedScope(app) {
+		if err := h.requireMember(r, cur); err != nil {
+			var ae *apiError
+			if !errors.As(err, &ae) {
+				fail(w, err)
+				return
+			}
+			member = false
+		}
+	}
 	for i := range app.Entities {
 		ent := &app.Entities[i]
+		if !member && ent.EffectiveScope() == dsl.ScopeShared {
+			continue
+		}
 		ch, err := watcher.WatchRecords(ctx, recordSet(r, cur, ent, ent.ID))
 		if err != nil {
 			fail(w, err)

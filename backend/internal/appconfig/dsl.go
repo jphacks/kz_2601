@@ -300,7 +300,7 @@ func (h *Handler) listEntities(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getEntity(w http.ResponseWriter, r *http.Request) {
-	_, ent, _, err := h.entityOf(r)
+	_, ent, _, err := h.resolveEntity(r)
 	if err != nil {
 		fail(w, err)
 		return
@@ -308,8 +308,21 @@ func (h *Handler) getEntity(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, ent)
 }
 
-// entityOf resolves appId/entityId from the path against the current DSL.
+// entityOf resolves the entity of a records route: resolveEntity plus, on
+// scope:"shared" entities, the participant check (#254, members.go).
 func (h *Handler) entityOf(r *http.Request) (*store.App, *dsl.Entity, string, error) {
+	cur, ent, eid, err := h.resolveEntity(r)
+	if err == nil && ent.EffectiveScope() == dsl.ScopeShared {
+		err = h.requireMember(r, cur)
+	}
+	if err != nil {
+		return nil, nil, "", err
+	}
+	return cur, ent, eid, nil
+}
+
+// resolveEntity resolves appId/entityId from the path against the current DSL.
+func (h *Handler) resolveEntity(r *http.Request) (*store.App, *dsl.Entity, string, error) {
 	id, err := pathID(r, "appId")
 	if err != nil {
 		return nil, nil, "", err

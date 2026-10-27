@@ -131,4 +131,15 @@ final class DSLDecodingTests: XCTestCase {
         XCTAssertEqual(history.components.first { $0.id == "empty" }?.message, "レシートを撮ると、ここに並びます")
         XCTAssertEqual(overview.referencedEntities, ["expense"])
     }
+
+    /// 親から子を作る(#256): navigate.prefillRef を読み、無い navigate は nil のまま。
+    func testPrefillRefDecodes() throws {
+        let dsl = try load("post_comments")
+        let form = try XCTUnwrap(dsl.screen("post_form"))
+        let button = try XCTUnwrap(form.allComponents.first { $0.id == "write_comment" })
+        XCTAssertEqual(button.action?.type, .navigate)
+        XCTAssertEqual(button.action?.prefillRef, "post")
+        XCTAssertEqual(button.action?.screen, "comment_form")
+        XCTAssertNil(dsl.screen("home")?.toolbar.first?.action.prefillRef)
+    }
 }
