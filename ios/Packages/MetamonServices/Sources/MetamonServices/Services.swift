@@ -13,12 +13,16 @@ public struct Services {
     public var notifications: any NotificationScheduler
     /// true なら起動時にサーバー(appconfig)から DSL を取得し、ホットリロードを開始する。
     public var isLive: Bool
+    #if !APP_STORE_REVIEW // 審査用ビルドはシェア / 探す / リリース申請をバイナリから外す(#245)
     /// シェア / 「探す」(#49 #50)。appconfig が live の時だけ(モックでは nil = 導線を出さない)。
     public var sharing: (any SharingClient)?
+    #endif
     /// アカウント削除(#119)。live では `HTTPAccountClient`、それ以外はモック(成功のみ)。
     public var account: any AccountClient = MockAccountClient()
+    #if !APP_STORE_REVIEW
     /// リリース申請(#76)。sharing と同じく live の時だけ。
     public var releaseRequests: (any ReleaseRequestClient)?
+    #endif
 
     public init(
         auth: any AuthService,
@@ -81,6 +85,55 @@ public enum APIError: LocalizedError {
         if case .server(_, _, _, let d) = self, case .number(let s)? = d[Self.retryAfterKey] { return s }
         return nil
     }
+
+    /// ai の 1 日の上限(#280・429 `rate_limited` + `details.scope`)。Claude 側の混雑の 429 は nil(= busy)。
+    public var rateLimit: RateLimitInfo? {
+        guard case .server(429, "rate_limited", _, let d) = self, case .string(let scope)? = d["scope"] else { return nil }
+        func int(_ key: String) -> Int? {
+            if case .number(let n)? = d[key] { return Int(n) }
+            return nil
+        }
+        var resetAt: Date?
+        if case .string(let raw)? = d["resetAt"] { resetAt = ISO8601DateFormatter().date(from: raw) }
+        if resetAt == nil, let wait = int("retryAfterSec") ?? retryAfter.map(Int.init) {
+            resetAt = Date(timeIntervalSinceNow: TimeInterval(wait))
+        }
+        var tier: String?
+        if case .string(let t)? = d["tier"] { tier = t }
+        return RateLimitInfo(scope: RateLimitInfo.Scope(rawValue: scope) ?? .user, tier: tier,
+                             limit: int("limit"), remaining: int("remaining"), resetAt: resetAt)
+    }
+}
+
+/// サーバーの 1 日の上限に当たった時の中身(#280・openapi-ai.yaml `RateLimitDetails`)。
+public struct RateLimitInfo: Equatable, Sendable {
+    public enum Scope: String, Sendable {
+        /// 利用者の 1 日の上限
+        case user
+        /// 同じネットワークからの匿名利用の上限(サインインで外れる)
+        case ip
+        /// 環境全体の費用ブレーカー(全員が止まる)
+        case global
+    }
+
+    public var scope: Scope
+    /// anonymous | signed_in | pro
+    public var tier: String?
+    /// 1 日の上限(単位)
+    public var limit: Int?
+    public var remaining: Int?
+    /// 次に使える時刻(翌 0:00 JST)
+    public var resetAt: Date?
+
+    public init(scope: Scope, tier: String? = nil, limit: Int? = nil, remaining: Int? = nil, resetAt: Date? = nil) {
+        self.scope = scope
+        self.tier = tier
+        self.limit = limit
+        self.remaining = remaining
+        self.resetAt = resetAt
+    }
+
+    public var isAnonymous: Bool { tier == "anonymous" }
 }
 
 /// 失敗の種類(#60)。UI の状態カード(`ErrorPresentation`)はこの分類だけを見て文言と主ボタンを決める。
@@ -94,6 +147,8 @@ public enum FailureKind: Equatable, Sendable {
     case sessionExpired
     /// 混雑・一時障害(429 / 500 / 502 / 503)。`retryAfter` はサーバー指示の待ち秒
     case busy(retryAfter: TimeInterval?)
+    /// 今日の上限に達した(#280・429 `rate_limited`)。「もう一度」では解けないので再試行させない
+    case rateLimited(RateLimitInfo)
     /// 409 version 競合。最新を取り直して再適用する
     case conflict
     /// Task キャンセル(ユーザー操作)
@@ -116,6 +171,7 @@ public enum FailureKind: Equatable, Sendable {
             }
         }
         if let api = error as? APIError {
+            if let info = api.rateLimit { return .rateLimited(info) }
             switch api.status {
             case 401: return .sessionExpired
             case 409: return .conflict

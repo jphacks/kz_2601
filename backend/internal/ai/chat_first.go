@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -171,9 +172,9 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 			defaultPaidCatalog.annotate(out, app)
 		}
 	}()
-	store := s.conversations()
-	store.wait(ctx, req.AppID, s.chatTimeout())
-	cv := store.get(req.AppID)
+	store, key := s.conversations(), convKey(auth.UID(ctx), req.AppID)
+	store.wait(ctx, key, s.chatTimeout())
+	cv := store.get(key)
 	if cv == nil || cv.mode != mode {
 		// a create conversation does not carry over into editing (and back)
 		cv = &conversation{mode: mode}
@@ -209,8 +210,9 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 			res.Text = loc.text().readyText
 			res.Brief = cv.brief
 			res.Transcript = cv.transcript
+			plainChatResult(res) // #258
 			cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: res.Text})
-			store.put(req.AppID, cv)
+			store.put(key, cv)
 			res.LatencyMs = Latency{Total: time.Since(started).Milliseconds()}
 			return res, nil
 		}
@@ -258,11 +260,11 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 		}
 		cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: historyText(res)})
 		if mode == chatModeCreate {
-			pending := store.begin(req.AppID)
-			store.put(req.AppID, cv)
+			pending := store.begin(key)
+			store.put(key, cv)
 			go func() {
 				a := <-done
-				store.finish(req.AppID, pending, cv, func(c *conversation) {
+				store.finish(key, pending, cv, func(c *conversation) {
 					if a.reply != nil {
 						b := cleanBrief(a.reply.Brief)
 						c.brief, c.transcript = &b, transcriptOr(a.reply.Transcript, userTexts)
@@ -270,7 +272,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 				})
 			}()
 		} else {
-			store.put(req.AppID, cv)
+			store.put(key, cv)
 			go func() { <-done }()
 		}
 		res.LatencyMs = Latency{Claude: time.Since(callStart).Milliseconds(), Total: time.Since(started).Milliseconds()}
@@ -306,7 +308,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 		cv.questions++
 	}
 	cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: historyText(res)})
-	store.put(req.AppID, cv)
+	store.put(key, cv)
 	res.LatencyMs = Latency{Claude: ar.latency.Milliseconds(), Total: time.Since(started).Milliseconds()}
 	return res, nil
 }
@@ -357,6 +359,7 @@ func (s *Service) applyFirstReply(res *ChatResult, r *chatFirstReply, mode strin
 	if res.Source == "" {
 		res.Source = "claude"
 	}
+	plainChatResult(res) // #258
 }
 
 // cleanOptions trims, drops ideas without a title or instruction, caps at 3
@@ -551,8 +554,18 @@ var chatCapabilities = strings.TrimSpace(`
 - 項目数の上限(#221): 今のアプリの entity 行の「項目 n/40」に足すと 40 を超える追加は ready にしない(生成 AI が既存の項目を消して収めてしまう)。proposal で 2 案: どれかの項目を消して足す案(消す項目名を入れる)と、足す項目を別の記録の種類(画面)に分ける案。
 - 部品の大きさ・位置: 各画面は横 A〜F の 6 列 × 縦 12 行のグリッドで、部品の枠(area)を広げる・狭める・動かすことができる。文字の大きさは text の style(title / headline / body / caption の 4 段)。画像の高さは small / medium / large。色はテーマ色と決まった色名(semantic color)だけ。
 - できる・できないの決め方: 部品・計算式の op・ボタンの動作・項目の型は「できることの索引」と「部品カタログ」(どちらもスキーマから自動生成)が正典。そこにある部品や op で組み立てられることは「できます」と答える(例: 連続日数 = streak、直近 n 日にやった日数 = doneInDays、動画 = videoField、歩数 = healthStat、場所の検索 = locationPicker、道のりの記録 = locationTracker)。毎日の通知はアプリの通知設定(1 回・毎日・毎週のローカル通知)。
-- みんなで使う: entity を public にすると、アプリを使う他の人と同じ記録を見て投稿できる(誰でも読める)。誰が投稿したか(投稿者名)は一覧・表・タイムラインに出せる($author: 各自がアプリの設定で決めた表示名・未設定は「匿名」。名前の入力欄は要らない)。「自分の投稿だけ」のタブや件数も作れる。各自の記録は private(既定)。
+- みんなで使う: entity を public(ユーザーには「みんなに公開」と言う)にすると、アプリを使う他の人と同じ記録を見て投稿できる(誰でも読める)。誰が投稿したか(投稿者名)は一覧・表・タイムラインに出せる($author: 各自がアプリの設定で決めた表示名・未設定は「匿名」。名前の入力欄は要らない)。「自分の投稿だけ」のタブや件数も作れる。各自の記録は private(「自分だけ」・既定)。**みんなに公開の記録は作った人だけが変更・削除できる**(他の人のレコードにチェック・確定は押せない。「店長だけが確定」のような役割・権限も今はできない)。
 ` + chatLimitsText())
+
+// chatPlainWords (#258): the user is not an engineer; the catalog names below
+// are for reasoning only (plainTerms in chat_terms.go is the safety net).
+var chatPlainWords = strings.TrimSpace(`
+## 言葉づかい(#258・text / suggestions / 案の title・detail・instruction / transcript に必ず適用)
+- 使う人はエンジニアではない。**設計図の英語の名前(scope 名・型名・部品の type 名・計算式の op 名・entity / field / computed など)を一切書かない**。括弧で添える(「折りたたみ(disclosure)」)のも不可。画面に見える言葉と普通の日本語で言う。
+- 言い換え: public → みんなに公開 / private → 自分だけ / shared → 参加した人だけ / entity → 記録の種類 / field → 項目 / computed・op → 計算 / disclosure → 折りたたみ / stat → 数字のカード / list → 一覧 / ref → ほかの記録から選ぶ項目 / notifications → 通知。
+- 例: ×「public の記録で投稿が流れる掲示板」→ ○「みんなに公開の記録で、投稿が流れる掲示板」。×「支出を public にして」→ ○「支出をみんなに公開して」。×「乱数の計算式(op)は無いので」→ ○「ランダムに選ぶ計算は無いので」。
+- locale en も同じ(record type / item / calculation / everyone can see / only me。"entity" "field" "op" "scope" と書かない)。案の instruction と transcript も生成中の画面に表示されるので同じ(「支出をみんなに公開して」のように画面の言葉で書けば生成 AI に伝わる)。
+`)
 
 var chatEditSystemPrompt = strings.TrimSpace(`
 あなたは「声で変わる自分専用アプリ」の相談相手です。ユーザーはすでに iOS アプリを持っていて、そのアプリについて質問したり、変えたいことを相談したりします。user ターンの「## 今のアプリ」(設計図の要約)と「## 会話」を読み、JSON オブジェクト 1 つだけを返します。あなたはアプリを直接変えません。アプリが変わるのは、ユーザーが ready の transcript か案の instruction で生成を実行した時だけです。
@@ -599,6 +612,8 @@ var chatEditSystemPrompt = strings.TrimSpace(`
 
 ` + chatCapabilities + `
 
+` + chatPlainWords + `
+
 ## 部品カタログ(設計図で使える部品の全部。ここに無い部品は作れない)
 ` + catalog)
 
@@ -615,7 +630,7 @@ var chatCreateSystemPrompt = chatSystemPrompt + "\n\n" + strings.TrimSpace(`
 - question: suggestions が**複数当てはまる**問い(「どの項目を一覧に出しますか?」「何を記録しますか?」)なら multiSelect=true。**1 つだけ選ぶ**問い(「どの単位で集計しますか?」「毎日と毎週どちら?」)なら false。
 - answer / ready では常に false。
 
-`+chatCapabilities+"\n\n"+chatCapabilityIndex)
+`+chatCapabilities+"\n\n"+chatPlainWords+"\n\n"+chatCapabilityIndex)
 
 // chatCreateUserMessage renders the history for a chat-first create turn.
 func chatCreateUserMessage(ms []ChatMessage, loc Locale, force, noMoreQuestions bool, problems []string) string {

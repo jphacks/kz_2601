@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
+#if !APP_STORE_REVIEW
 import Foundation
 
 /// appconfig の share / public-apps API(docs/backend/openapi-appconfig.yaml・#49 #50)。
@@ -58,3 +60,4 @@ public struct HTTPSharingClient: SharingClient {
         try await HTTP.send(method, baseURL: baseURL, path: path, body: body, token: token, timeout: 20)
     }
 }
+#endif

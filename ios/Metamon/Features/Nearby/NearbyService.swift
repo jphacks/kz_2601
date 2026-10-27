@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
+#if !APP_STORE_REVIEW
 import Foundation
 import MultipeerConnectivity
 import Observation
@@ -238,3 +240,4 @@ extension NearbyService: MCSessionDelegate {
     nonisolated func session(_ session: MCSession, didStartReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, with progress: Progress) {}
     nonisolated func session(_ session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, at localURL: URL?, withError error: Error?) {}
 }
+#endif

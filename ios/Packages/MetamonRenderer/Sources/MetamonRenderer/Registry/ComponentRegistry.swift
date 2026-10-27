@@ -103,6 +103,9 @@ public struct ComponentRegistry: Sendable {
         r.register(.webView) { c, _ in WebViewLeaf(c: c) }
         // leaf(オンデバイス AI・#78)
         r.register(.aiButton) { c, ctx in AiButtonLeaf(c: c, ctx: ctx) }
+        #if !APP_STORE_REVIEW
+        // 審査用ビルド(APP_STORE_REVIEW・#245)では登録しない(4.7.2: ネイティブ API を DSL に出さない)。
+        // 届いた DSL に含まれていても未知 type のプレースホルダになる。
         // leaf(近距離共有・#36)
         r.register(.nearbyShare) { c, ctx in NearbyShareLeaf(c: c, ctx: ctx) }
         // leaf(位置の記録・#168)
@@ -110,9 +113,15 @@ public struct ComponentRegistry: Sendable {
         // leaf(チャット・#260)
         r.register(.chatThread) { c, ctx in ChatThreadLeaf(c: c, ctx: ctx) }
         r.register(.healthStat) { c, _ in HealthStatLeaf(c: c) }
+        #endif
         return r
     }()
 }
+
+#if APP_STORE_REVIEW
+/// アプリ本体(APP_STORE_REVIEW)がこれを参照する。パッケージに条件が渡っていないとコンパイルが落ちる(取りこぼし検知)。
+public enum ReviewBuildPackageMarker {}
+#endif
 
 private struct ComponentRegistryKey: EnvironmentKey {
     static let defaultValue: ComponentRegistry = .standard

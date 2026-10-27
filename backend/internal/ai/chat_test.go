@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jphacks/kz_2601/backend/internal/auth"
 )
 
 const (
@@ -289,10 +291,11 @@ func TestWantsBuildNow(t *testing.T) {
 
 func TestChatHandler_RoundTripAndDelete(t *testing.T) {
 	svc, _ := newChatSvc(questionReply)
+	svc.Verifier = auth.DevVerifier{}
 	h := NewHandler(svc)
 	body := `{"appId":"a1","messages":[{"role":"user","text":"家計簿"}]}`
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/chat", strings.NewReader(body)))
+	h.ServeHTTP(rec, bearer(httptest.NewRequest(http.MethodPost, "/v1/chat", strings.NewReader(body)), "u1"))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
@@ -308,8 +311,8 @@ func TestChatHandler_RoundTripAndDelete(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodDelete, "/v1/chat/a1", nil))
-	if rec.Code != http.StatusNoContent || svc.conv.get("a1") != nil {
+	h.ServeHTTP(rec, bearer(httptest.NewRequest(http.MethodDelete, "/v1/chat/a1", nil), "u1"))
+	if rec.Code != http.StatusNoContent || svc.conv.get(convKey("u1", "a1")) != nil {
 		t.Fatalf("delete: %d", rec.Code)
 	}
 

@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "みんなのクイズ",
+    "description": "友達と問題を出し合い、回答を選ぶと正解と比べて点数が自動で入る。ランキングで合計点を競う",
+    "icon": "questionmark.bubble",
+    "theme": { "primaryColor": "#6A1B9A" },
+    "voiceEntry": "floating",
+    "tabs": [
+      { "screen": "home", "title": "問題", "icon": "list.bullet" },
+      { "screen": "ranking", "title": "ランキング", "icon": "trophy" }
+    ]
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "questions",
+      "name": "問題",
+      "titleField": "text",
+      "scope": "public",
+      "fields": [
+        { "id": "text", "name": "問題文", "type": "string", "required": true },
+        { "id": "choices", "name": "選択肢", "type": "text" },
+        { "id": "correct", "name": "正解", "type": "enum", "options": ["A", "B", "C", "D"], "required": true, "hidden": true },
+        { "id": "points", "name": "配点", "type": "integer", "defaultValue": 10, "unit": "点" }
+      ]
+    },
+    {
+      "id": "players",
+      "name": "参加者",
+      "titleField": "name",
+      "scope": "public",
+      "fields": [
+        { "id": "name", "name": "名前", "type": "string", "required": true },
+        { "id": "total", "name": "合計点", "type": "integer", "unit": "点",
+          "computed": { "agg": "sum", "entity": "answers", "field": "score",
+                        "filter": { "field": "player", "op": "eq", "value": { "ref": "id" } } } }
+      ]
+    },
+    {
+      "id": "answers",
+      "name": "回答",
+      "titleField": "question",
+      "scope": "public",
+      "fields": [
+        { "id": "question", "name": "問題", "type": "ref", "refEntity": "questions", "required": true },
+        { "id": "player", "name": "回答者", "type": "ref", "refEntity": "players", "required": true },
+        { "id": "choice", "name": "回答", "type": "enum", "options": ["A", "B", "C", "D"], "required": true },
+        { "id": "is_correct", "name": "正解した", "type": "boolean",
+          "computed": { "op": "eq", "args": [ { "ref": "choice" }, { "ref": "question.correct" } ] } },
+        { "id": "score", "name": "点数", "type": "integer", "unit": "点",
+          "computed": { "if": { "ref": "is_correct" }, "then": { "ref": "question.points" }, "else": 0 } }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "問題",
+      "toolbar": [
+        { "label": "問題を追加", "icon": "plus", "action": { "type": "navigate", "screen": "question_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        {
+          "type": "section", "id": "questions", "area": "A1:F10", "title": "問題",
+          "children": [
+            { "type": "list", "entity": "questions", "item": { "title": "text", "subtitle": "choices", "trailing": "points" },
+              "emptyText": "まだ問題がありません", "swipeToDelete": true,
+              "onItemTap": { "type": "navigate", "screen": "question_form", "presentation": "push" } }
+          ]
+        },
+        { "type": "button", "id": "answer", "area": "D11:F12", "label": "回答する", "icon": "hand.raised",
+          "action": { "type": "navigate", "screen": "answer_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "ranking",
+      "title": "ランキング",
+      "toolbar": [
+        { "label": "参加者を追加", "icon": "person.badge.plus", "action": { "type": "navigate", "screen": "player_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        {
+          "type": "section", "id": "board", "area": "A1:F5", "title": "合計点",
+          "children": [
+            { "type": "table", "entity": "players",
+              "columns": [ { "field": "name", "title": "名前" }, { "field": "total", "title": "合計点" } ],
+              "sort": { "field": "total", "direction": "desc" } }
+          ]
+        },
+        {
+          "type": "section", "id": "answers", "area": "A6:F10", "title": "回答",
+          "children": [
+            { "type": "list", "entity": "answers", "item": { "title": "question", "subtitle": "player", "trailing": "score" },
+              "emptyText": "まだ回答がありません", "swipeToDelete": true,
+              "onItemTap": { "type": "navigate", "screen": "answer_form", "presentation": "push" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "question_form",
+      "title": "問題",
+      "entity": "questions",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "questions" } }],
+      "components": [
+        {
+          "type": "section", "id": "fields", "area": "A1:F9", "title": "問題",
+          "children": [
+            { "type": "textField", "field": "text", "label": "問題文", "placeholder": "日本でいちばん高い山は？" },
+            { "type": "textField", "field": "choices", "label": "選択肢", "placeholder": "A 富士山 / B 北岳 / C 槍ヶ岳 / D 立山", "multiline": true },
+            { "type": "picker", "field": "correct", "label": "正解", "style": "segmented" },
+            { "type": "stepper", "field": "points", "label": "配点", "min": 1, "max": 100, "step": 1 }
+          ]
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "questions", "confirmMessage": "この問題を削除しますか？" } }
+      ]
+    },
+    {
+      "id": "answer_form",
+      "title": "回答",
+      "entity": "answers",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "answers" } }],
+      "components": [
+        {
+          "type": "section", "id": "fields", "area": "A1:F7", "title": "回答",
+          "children": [
+            { "type": "picker", "field": "question", "label": "問題", "style": "menu" },
+            { "type": "picker", "field": "player", "label": "回答者", "style": "menu" },
+            { "type": "picker", "field": "choice", "label": "回答", "style": "segmented" }
+          ]
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "answers", "confirmMessage": "この回答を削除しますか？" } }
+      ]
+    },
+    {
+      "id": "player_form",
+      "title": "参加者",
+      "entity": "players",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "players" } }],
+      "components": [
+        {
+          "type": "section", "id": "fields", "area": "A1:F3", "title": "参加者",
+          "children": [
+            { "type": "textField", "field": "name", "label": "名前", "placeholder": "たろう" }
+          ]
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "players", "confirmMessage": "この参加者を削除しますか？" } }
+      ]
+    }
+  ]
+}

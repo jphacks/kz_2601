@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
+#if !APP_STORE_REVIEW
 import Foundation
 
 /// リリース申請(#76)の 1 件。`status` は管理者が Firestore コンソールで書き換える(received → reviewing → planned / declined)。
@@ -46,3 +48,4 @@ public protocol ReleaseRequestClient: Sendable {
     /// 自分の申請(全アプリ・新しい順)
     func myRequests() async throws -> [ReleaseRequest]
 }
+#endif
