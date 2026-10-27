@@ -81,7 +81,8 @@ func (l *Limiter) Middleware(verifier auth.IdentityVerifier) func(http.Handler) 
 				writeLimited(w, dec, l.cfg.Now())
 				return
 			}
-			next.ServeHTTP(w, r)
+			// verified here: auth.Optional in the handler keeps this uid instead of verifying again
+			next.ServeHTTP(w, r.WithContext(auth.ContextWithUID(r.Context(), id.UID)))
 		})
 	}
 }

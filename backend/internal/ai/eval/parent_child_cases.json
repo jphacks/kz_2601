@@ -1,0 +1,8 @@
+[
+  {"id": "pc_sns_post", "kind": "create", "group": "m0-parent-child", "transcript": "写真と一言を投稿して、友達がいいねとコメントできるSNSみたいなアプリ", "expect": {"prefillRef": true, "ref": true}, "note": "#256 d_sns_post: 投稿の詳細から「コメントを書く」"},
+  {"id": "pc_circle_attend", "kind": "create", "group": "m0-parent-child", "transcript": "サークルの練習の出欠をメンバーが各自で〇×つけられるやつ。誰が来るか一覧で見たい", "expect": {"prefillRef": true, "ref": true}, "note": "#256 d_circle_attend: 練習の詳細から出欠を答える"},
+  {"id": "pc_event_rsvp", "kind": "create", "group": "m0-parent-child", "transcript": "飲み会の日程調整。候補日を出してみんなが〇△×で答えられるやつ", "expect": {"prefillRef": true, "ref": true}, "note": "#256 d_event_rsvp: 候補日の詳細から回答"},
+  {"id": "pc_quiz_game", "kind": "create", "group": "m0-parent-child", "transcript": "友達と遊べるクイズゲーム。問題を作って出し合って点数を競いたい", "expect": {"prefillRef": true}, "note": "#256 d_quiz_game: 問題一覧の onItemTap が回答フォームを開くのは検証エラー。prefillRef で回答を作る"},
+  {"id": "pc_ranking", "kind": "create", "group": "m0-parent-child", "transcript": "ラーメン屋の評価をみんなで投稿して点数のランキングが見られるアプリ", "note": "pc_edit_comment の base"},
+  {"id": "pc_edit_comment", "kind": "edit", "base": "pc_ranking", "group": "m0-parent-child", "transcript": "それぞれのお店にみんながコメントを書けるようにして", "expect": {"prefillRef": true, "patch": true}, "note": "#256 d_edit_comment: お店の詳細に prefillRef のボタンを足す"}
+]

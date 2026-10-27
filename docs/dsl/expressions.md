@@ -133,6 +133,7 @@ Expr := number | string | boolean
 | `list.item.resets` | `... with resets daily must be a date field (got boolean)` / `... is a date field; add "resets":"daily"` / `... must not have defaultValue` |
 | `streak` / `doneInDays` | `streak needs {"ref": <daily check field>} of this entity` / `"started" is not a daily check; streak only works on a field used as list item.toggle with "resets":"daily"` / `number of days must be an integer literal 1..366` |
 | Stat 排他 | `stat takes either aggregate or value, not both` / `stat needs aggregate (with entity) or value` |
+| `Field.hidden`(§7.6) | `list item.trailing "correct" of entity "questions" is hidden ...` / `computed shows hidden field questions.correct; a hidden value may only be compared ...` / `a computed field cannot be hidden` |
 
 ## 7. レシピ
 
@@ -160,6 +161,12 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
    - `last7`(integer・unit 回) = `{"op":"doneInDays","args":[{"ref":"taken_on"},7]}`
    - 全体: 最長の連続 = stat.value `{"agg":"max","entity":"medicine","field":"streak"}`、直近 7 日の合計回数 = `{"agg":"sum","entity":"medicine","field":"last7"}`。実施記録 entity は作らない(丸を押しても増えず二重入力になる)。
 
+8. **クイズの自動採点**(#262・`backend/internal/ai/examples/quiz.json`): questions{text, choices, correct: enum A〜D **hidden**, points} + players{name} + answers{question: ref→questions, player: ref→players, choice: enum A〜D}。友達と遊ぶなら 3 つとも `scope: "public"`。
+   - `is_correct`(boolean) = `{"op":"eq","args":[{"ref":"choice"},{"ref":"question.correct"}]}`
+   - `score`(integer) = `{"if":{"ref":"is_correct"},"then":{"ref":"question.points"},"else":0}`
+   - ランキング: players の `total` = `{"agg":"sum","entity":"answers","field":"score","filter":{"field":"player","op":"eq","value":{"ref":"id"}}}` を table で `sort desc`。
+   - 回答フォームは picker で問題・回答者・選択肢を選ぶ(点数の入力欄は作らない)。正解は §7.6 の hidden で一覧に出さない。
+
 ## 7.5 一覧のワンタップ チェック(`list.item.toggle`, #108)
 
 式ではないが、同じ「状態を変える最小の仕組み」としてここに置く。
@@ -186,6 +193,14 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
 - 割り切り: 1 日に同じ項目を 2 回以上は持てない(朝・夜は項目を分ける)。履歴は押した日だけで時刻は持たない。別端末で同じ日に同時に押した場合は後勝ち(配列ごと上書き)。
 - iOS の「今日」は DEBUG ビルドだけ環境変数 `METAMON_DEBUG_TODAY=YYYY-MM-DD` で差し替えられる(日付境界の確認用)。
 - 実例: `examples/medicine.json`。
+
+## 7.6 回答者に見せない項目(`Field.hidden`, #262)
+
+- `hidden: true` の field は作者がフォームで入れるだけで、一覧(list.item)・表(table.columns)・グラフ(stat / chart / progressBar / gauge の field・groupBy)・timeline / gridTable・searchField・entity の titleField に出さない。
+- 式では**比較(`eq` `neq` `gt` `gte` `lt` `lte`)の中でだけ**読める。正誤(`eq(choice, question.correct)`)は出せるが、正解を写す computed(`{"ref":"question.correct"}` だけ・`if` の分岐で返す)や、hidden field の `agg`(count 以外)は backend が拒否する。
+- computed には付けない(隠すのは読む元の保存される field)。
+- **厳密な秘匿ではない**: 値はレコードとして全員の端末に届く(画面に出さないだけ)。サーバー側で回答者に返さない形は M4。
+- iOS の対応(一覧・詳細で出さない・作者以外のフォームで出さない)は後続。未対応ビルドは未知キーを無視するので落ちない(値は通常の field として出る)。
 
 ## 8. 割り切り(やらないこと)
 
