@@ -71,6 +71,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.calendar) { c, ctx in CalendarLeaf(c: c, ctx: ctx) }
         r.register(.gridTable) { c, ctx in GridTableLeaf(c: c, ctx: ctx) }
         r.register(.randomPicker) { c, ctx in RandomPickerLeaf(c: c, ctx: ctx) }
+        r.register(.routeGuide) { c, ctx in RouteGuideLeaf(c: c, ctx: ctx) }
         r.register(.shareButton) { c, ctx in ShareButtonLeaf(c: c, ctx: ctx) }
         r.register(.openUrlButton) { c, _ in OpenUrlButtonLeaf(c: c) }
         r.register(.mapView) { c, ctx in MapViewLeaf(c: c, ctx: ctx) }

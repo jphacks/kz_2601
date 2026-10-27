@@ -43,6 +43,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case gridTable
     // leaf(ランダムに 1 件選ぶ・#263)。entity / title / titleField / subtitleField / filter / label / onItemTap は共用
     case randomPicker
+    // leaf(目的地までの道案内・#411)。title / label / entity / locationField / titleField / mode は共用
+    case routeGuide
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -142,7 +144,8 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var onDateTap: Action?      // calendar
     public var locationField: String?  // mapView / locationTracker
     public var zoom: String?           // mapView: near|city|wide(mapView の kind: pins|route・#168)
-    public var mode: String?           // timerDisplay: stopwatch|countdown
+    public var mode: String?           // timerDisplay: stopwatch|countdown / routeGuide: automobile|walking
+    public var address: String?        // routeGuide: 固定の目的地(住所・施設名)
     public var seconds: Int?           // timerDisplay countdown 初期秒
     public var shareTo: String?        // shareButton: any|line|slack|discord(`target` は progressBar の数値)
     // 入力系バッチ(slider / stepper / rating / textEditor)
@@ -165,7 +168,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case includeTime, source, maxDuration, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
         case kind, groupBy, bucket, prompt, size
         case expanded, itemWidth, columnCount
-        case searchField, onDateTap, locationField, zoom, mode, seconds, shareTo
+        case searchField, onDateTap, locationField, zoom, mode, address, seconds, shareTo
         case name, color, value, target, url, image, message, columns, limit, dateField, titleField, subtitleField
         case min, max, step, minLines
         case by
@@ -223,6 +226,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         locationField = try? c.decodeIfPresent(String.self, forKey: .locationField)
         zoom = try? c.decodeIfPresent(String.self, forKey: .zoom)
         mode = try? c.decodeIfPresent(String.self, forKey: .mode)
+        address = try? c.decodeIfPresent(String.self, forKey: .address)
         seconds = try? c.decodeIfPresent(Int.self, forKey: .seconds)
         shareTo = try? c.decodeIfPresent(String.self, forKey: .shareTo)
         min = try? c.decodeIfPresent(Double.self, forKey: .min)
