@@ -23,6 +23,7 @@ tags:
   - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。architecture.md §3.2' }
   - { name: account, description: 'アカウント削除(#119)。architecture.md §4.1' }
   - { name: release, description: 'リリース申請(#76)。architecture.md §3.3' }
+  - { name: members, description: 'scope:shared の参加者(#254)。architecture.md §3.4' }
 
 paths:
   /apps:
@@ -374,6 +375,7 @@ paths:
         複合インデックスが無い組み合わせはサーバー側メモリソート (1 entity 上限 2000 件、超過は 413)。
         public/shared entity は全ユーザーの投稿が返り、各レコードに `author`/`authorName` が付く。
         `filterField=author&filterOp=eq&filterValue=<uid>` で特定ユーザー (自分) の投稿だけに絞れる。
+        **scope:shared の entity は作成者と参加者だけ**が読み書きできる (この entity の records の全操作で同じ・それ以外は 403 `not_member`・#254)。public は従来どおり誰でも。
       parameters:
         - { $ref: '#/components/parameters/PageSize' }
         - { $ref: '#/components/parameters/PageToken' }
@@ -393,6 +395,7 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/Record' } }
                   nextPageToken: { type: string }
+        '403': { $ref: '#/components/responses/NotMember' }
         '404': { $ref: '#/components/responses/NotFound' }
     post:
       tags: [records]
@@ -415,6 +418,7 @@ paths:
       responses:
         '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Record' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/NotMember' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/InvalidRecord' }
     delete:
@@ -472,9 +476,11 @@ paths:
         レコードは含まない。他人のアプリは自分の木に無いので 404。
         publish と違い作成者に限らない(トークンは発行ごとに別でグローバルに占有するものが無く、共有アプリの参加者が友だちを招くため・#118)。
         中身が初期 DSL のまま(生成前・GET /dsl で seed されただけ)のアプリは 400。
+        scope:shared の entity を含むアプリは**作成者と参加者だけ**が発行できる(appId を知っているだけの人が自分を招けないように・#254)。それ以外は 403 `not_member`。
       responses:
         '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Share' } } } }
         '400': { description: 中身が初期 DSL のまま, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { $ref: '#/components/responses/NotMember' }
         '404': { $ref: '#/components/responses/NotFound' }
   /shares/{token}:
     parameters: [{ $ref: '#/components/parameters/ShareToken' }]
@@ -513,8 +519,19 @@ paths:
         認証済みなら誰でも可。スナップショットの DSL を自分の木に複製する(version 1 = 初期 → version 2 = 複製 DSL、`source.kind=import`)。**レコードは複製しない**。
         - private entity だけのアプリ: **新しい appId**(UUID)に複製
         - shared/public entity を含むアプリ: **元の appId のまま**参加(`joined: true`)。共有レコードは appId 単位(`apps_public/{appId}`・#93)なので、受け取った人も同じ投稿を見る。既に持っていれば何もせず返す(`created: false`)
+        - scope:shared の entity を含むアプリ: 呼び出したユーザーを**参加者**(`apps_public/{appId}/members/{uid}`)に入れる(`member: true`・#254)。既に参加していれば表示名だけ更新。
+          リンクの発行者がもう参加者でない(作成者に外された・自分で抜けた)場合は 403(`details.reason: inviter_left`)で、アプリも追加しない。参加者が 100 人に達していれば 403(`members_full`)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string, maxLength: 64, description: '参加者一覧に出す名前(任意・scope:shared のアプリだけで使う)' }
       responses:
         '201': { description: Imported, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
+        '403': { description: 'リンクの発行者が参加者でない(inviter_left) / 参加者が上限(members_full)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '404': { description: 取り消し済み or 存在しない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /apps/{appId}/publish:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -578,12 +595,51 @@ paths:
       tags: [sharing]
       summary: 公開アプリをインストール
       description: |
-        import と同じ複製(レコード無し・共有データ付きは元 appId に参加)。
+        import と同じ複製(レコード無し・public の entity を含めば元 appId に参加)。
+        「探す」は誰でも見られるので、**共有が scope:shared だけのアプリは新しい appId の独立コピー**になり、追加した人がその作成者になる(掲載者の家族のデータには参加しない・#254)。
+        public と shared の両方を含むアプリは元 appId に参加するが、参加者ではないので shared の entity は 403 `not_member`。
         同じユーザーの 2 回目以降は新しく複製せず、最初に追加したアプリを返す(`created: false`・アーカイブ済みなら active に戻す)。
         installs は uid ごとに 1 回だけ +1(掲載者本人は数えない・`public_apps/{id}/installs/{uid}` に記録・#154)。
       responses:
         '201': { description: Installed, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /apps/{appId}/members:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [members]
+      summary: 参加者一覧(作成者と参加者だけ)
+      description: |
+        作成者(`app_owners`・ドキュメント無しで常に参加者)を先頭に、参加した順で返す(最大 100 人)。
+        参加は `POST /shares/{token}/import`。作成者・参加者以外は 403 `not_member`。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, role]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Member' } }
+                  role: { type: string, enum: [owner, member], description: 呼び出したユーザーの立場 }
+        '403': { $ref: '#/components/responses/NotMember' }
+  /apps/{appId}/members/{uid}:
+    parameters:
+      - { $ref: '#/components/parameters/AppId' }
+      - { in: path, name: uid, required: true, schema: { type: string }, description: '外す人の uid。`me` で自分(退出)' }
+    delete:
+      tags: [members]
+      summary: 参加者を外す / 自分が抜ける
+      description: |
+        `me`(または自分の uid)は退出で、参加していなくても 204(冪等)。他人を外せるのは**作成者だけ**。作成者は抜けられない(400・アプリを消す)。
+        外された人が発行したシェアリンクでは以後参加できない。作成者自身が発行したリンクは取り消すまで有効なので、外した人に再参加されたくなければ `DELETE /shares/{token}` も行う。
+        外された人の端末のアプリ(自分の木のコピー)と、その人の過去の投稿は残る。
+      responses:
+        '204': { description: Removed }
+        '400': { description: 作成者は抜けられない / uid が不正, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { description: 作成者以外が他人を外そうとした, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { description: その uid は参加者ではない(他人を外す時), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /me:
     delete:
@@ -706,6 +762,12 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: invalid_record, message: 'field "amount" is required', details: { field: amount } } }
+    NotMember:
+      description: scope:shared のデータに参加していない(作成者でも参加者でもない・#254)。シェアリンクから参加すれば読める
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: forbidden, message: 'join this app with a share link to see its shared data', details: { reason: not_member } } }
   schemas:
     Error:
       type: object
@@ -844,3 +906,14 @@ components:
           properties:
             joined: { type: boolean, description: 'true = 共有データ付きなので元の appId に参加した' }
             created: { type: boolean, description: 'false = 既に持っていた(参加済み)' }
+            member: { type: boolean, description: 'true = scope:shared のデータの参加者になった(import だけ・#254)' }
+    Member:
+      type: object
+      required: [uid, displayName, role, you]
+      properties:
+        uid: { type: string }
+        displayName: { type: string, description: 'import 時の displayName(無ければ空。作成者は常に空)' }
+        role: { type: string, enum: [owner, member] }
+        via: { type: string, enum: [share, legacy], description: 'share = リンクで参加 / legacy = #254 以前からアプリを持っていた(移行)。作成者には無い' }
+        joinedAt: { type: string, format: date-time, description: 作成者には無い }
+        you: { type: boolean, description: 呼び出したユーザー本人 }

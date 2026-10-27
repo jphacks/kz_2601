@@ -29,6 +29,8 @@ public protocol DSLRuntime: AnyObject, Observable {
     func pathBinding(_ stack: String) -> Binding<[Route]>
     /// `nearbyShare`(#36): 近くの端末を探すシートを開き、選んだ相手に `records`(entity の保存フィールドのみ)を送る。
     func shareNearby(entity: String, records: [[String: JSONValue]])
+    /// サインイン中の uid。`Field.hidden`(#262)の入力を作者のフォームにだけ出すのに使う。分からなければ nil。
+    var currentUid: String? { get }
 }
 
 public extension DSLRuntime {
@@ -39,6 +41,8 @@ public extension DSLRuntime {
     func createRecord(entity: String, data: [String: JSONValue]) async -> Bool { false }
     /// 既定は何もしない(プレビュー・テスト用ランタイム)。
     func shareNearby(entity: String, records: [[String: JSONValue]]) {}
+    /// 既定は不明(プレビュー・テスト用ランタイム)。
+    var currentUid: String? { nil }
 
     /// 部品が共通で使う空状態の判定: 読み込み中 / 取得失敗 / 本当に空。
     func emptyState(for entity: String) -> EmptyState {
