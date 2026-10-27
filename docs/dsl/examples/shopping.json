@@ -26,9 +26,6 @@
     {
       "id": "home",
       "title": "買い物リスト",
-      "toolbar": [
-        { "label": "追加", "icon": "plus", "action": { "type": "navigate", "screen": "item_form", "presentation": "sheet" } }
-      ],
       "components": [
         {
           "type": "hstack", "id": "summary", "area": "A1:F2",

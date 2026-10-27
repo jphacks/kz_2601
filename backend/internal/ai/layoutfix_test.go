@@ -75,10 +75,10 @@ func TestFixLayoutRulesSeatTakenGoesToToolbar(t *testing.T) {
 		t.Fatalf("button areas = %v, want only the right one", got)
 	}
 	tb := home["toolbar"].([]any)
-	if len(tb) != 2 || tb[1].(map[string]any)["label"] != "グラフ" {
+	if len(tb) != 1 || tb[0].(map[string]any)["label"] != "グラフ" { // kakeibo has no toolbar ＋ (#416)
 		t.Fatalf("toolbar = %v, want the seat button appended", tb)
 	}
-	if fixed := fixLayoutRules(fixLayoutRules(raw, app), app); len(homeOf(t, fixed)["toolbar"].([]any)) != 2 {
+	if fixed := fixLayoutRules(fixLayoutRules(raw, app), app); len(homeOf(t, fixed)["toolbar"].([]any)) != 1 {
 		t.Fatal("second pass must not duplicate the toolbar button")
 	}
 }

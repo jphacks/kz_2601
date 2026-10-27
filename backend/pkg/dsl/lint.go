@@ -18,6 +18,7 @@ import (
 //   - stat label says 今日/今週/今月/今年 (today/this week/this month/this
 //     year) but the filter is missing or another period
 //   - screen graph (nav.go): unreachable screens, fullScreen without a way back
+//   - a toolbar item opening the same form as a button on the screen (#416)
 func (a *App) Lint() []string {
 	l := &linter{app: a, entities: map[string]*Entity{}}
 	for i := range a.Entities {
@@ -28,6 +29,7 @@ func (a *App) Lint() []string {
 	l.entityReach()
 	l.navGraph()
 	l.micSeat()
+	l.dupAddControls()
 	return l.out
 }
 

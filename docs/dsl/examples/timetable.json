@@ -26,9 +26,6 @@
     {
       "id": "home",
       "title": "時間割",
-      "toolbar": [
-        { "label": "追加", "icon": "plus", "action": { "type": "navigate", "screen": "lecture_form", "presentation": "sheet" } }
-      ],
       "components": [
         {
           "type": "gridTable", "id": "week", "area": "A1:F10", "title": "今週の時間割",
