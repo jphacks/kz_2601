@@ -27,13 +27,14 @@ type Memory struct {
 	public map[string]*memPublic
 	now    func() time.Time
 
-	shares   map[string]*Share          // shares/{token} (memory_share.go)
-	catalog  map[string]*CatalogApp     // public_apps/{appId}
-	releases map[string]*ReleaseRequest // release_requests/{id} (memory_release.go)
-	owners   map[string]string          // app_owners/{appId} -> uid (memory_owner.go)
-	installs map[string]string          // public_apps/{id}/installs/{uid} -> appId
-	hub      hub                        // change notifications for Watcher (watch.go)
-	deleted  map[string]bool            // uids that called DELETE /v1/me (memory_account.go)
+	shares   map[string]*Share             // shares/{token} (memory_share.go)
+	catalog  map[string]*CatalogApp        // public_apps/{appId}
+	releases map[string]*ReleaseRequest    // release_requests/{id} (memory_release.go)
+	owners   map[string]string             // app_owners/{appId} -> uid (memory_owner.go)
+	installs map[string]string             // public_apps/{id}/installs/{uid} -> appId
+	members  map[string]map[string]*Member // apps_public/{appId}/members/{uid} (memory_member.go)
+	hub      hub                           // change notifications for Watcher (watch.go)
+	deleted  map[string]bool               // uids that called DELETE /v1/me (memory_account.go)
 }
 
 // NewMemory returns an empty store.
@@ -180,6 +181,18 @@ func (m *Memory) UpdateAppMeta(_ context.Context, uid, appID string, name, statu
 	}
 	a.app.UpdatedAt = m.now().UTC()
 	return a.snapshot(), nil
+}
+
+// ReorderApps implements Store.
+func (m *Memory) ReorderApps(_ context.Context, uid string, ids []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, id := range ids {
+		if a := m.get(uid, id); a != nil {
+			a.app.SortIndex = i + 1
+		}
+	}
+	return nil
 }
 
 // CommitVersion implements Store.

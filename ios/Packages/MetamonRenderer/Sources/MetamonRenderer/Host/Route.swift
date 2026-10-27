@@ -30,6 +30,9 @@ public struct ActionContext {
         self.form = form
         self.recordId = recordId
     }
+
+    /// 今のレコード: 行タップならその行、フォーム画面の button / toolbar なら編集中のレコード(新規・未保存なら nil)。
+    @MainActor public var currentRecordId: String? { recordId ?? form?.recordId }
 }
 
 /// 描画中の文脈。画面 route と(フォーム画面なら)ドラフト、画面ローカル状態(searchBar など)。

@@ -39,6 +39,7 @@ type App struct {
 	CreatedAt      time.Time       `json:"createdAt"`
 	UpdatedAt      time.Time       `json:"updatedAt"`
 	DSL            json.RawMessage `json:"dsl,omitempty"`
+	SortIndex      int             `json:"sortIndex,omitempty"` // manual list position (1 = first, 0 = never reordered, #277)
 }
 
 // Source mirrors VersionSource in openapi-appconfig.yaml.
@@ -127,6 +128,10 @@ type Store interface {
 	// EnsureApp returns the app, creating it at version 1 with initial DSL if absent.
 	EnsureApp(ctx context.Context, uid, appID string, initial json.RawMessage, name string) (app *App, created bool, err error)
 	UpdateAppMeta(ctx context.Context, uid, appID string, name, status *string) (*App, error)
+	// ReorderApps sets SortIndex = position+1 for each listed app the caller
+	// has (unknown ids are skipped, unlisted apps keep theirs). It does not
+	// touch updatedAt, which stays "last changed".
+	ReorderApps(ctx context.Context, uid string, ids []string) error
 	CommitVersion(ctx context.Context, uid, appID string, c Commit) (*Version, error)
 	ListVersions(ctx context.Context, uid, appID string, limit, offset int) ([]Version, error)
 	GetVersion(ctx context.Context, uid, appID string, n int) (*Version, error)
@@ -151,6 +156,7 @@ type Store interface {
 	ReleaseRequests // "ship this as its own app" requests (release.go)
 	Accounts        // account deletion (account.go)
 	Ownership       // appId creators + catalog installs (owner.go)
+	Membership      // shared-app participants (member.go)
 	Purger          // physical app deletion (purge.go)
 }
 

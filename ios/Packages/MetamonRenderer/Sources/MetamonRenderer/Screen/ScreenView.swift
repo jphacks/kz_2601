@@ -45,6 +45,8 @@ public struct ScreenView: View {
                     }
                 }
                 .task(id: route) {
+                    // 新規フォームは読み込みを待たずに用意する(FormPrefill は数秒で失効するため、通信待ちで落とさない)
+                    if route.recordId == nil { setUpForm(screen) }
                     await rt.load(entities: rt.dsl.entitiesNeeded(by: screen))
                     setUpForm(screen)
                 }

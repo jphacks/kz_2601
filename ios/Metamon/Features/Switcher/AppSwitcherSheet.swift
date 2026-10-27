@@ -31,6 +31,7 @@ struct AppSwitcherSheet: View {
             Spacer(minLength: Theme.Spacing.md)
         }
         .background(Theme.Colors.canvas.ignoresSafeArea())
+        .modifier(AppRenameAlert()) // #277
         .presentationDetents([.height(500)])
         .presentationDragIndicator(.visible)
         .sensoryFeedback(.selection, trigger: selected)
@@ -101,6 +102,7 @@ struct AppSwitcherSheet: View {
                         }
                         .overlay(alignment: .topTrailing) { AppCardActions(app: app) }
                         .overlay(alignment: .bottomTrailing) { if app.id == rt.document.appId { ScreenMapCardButton() } } // #116
+                        .modifier(AppCardReorder(app: app)) // #277 長押しでドラッグして並べ替え
                     }
                 }
                 .padding(.horizontal, Theme.Spacing.lg)

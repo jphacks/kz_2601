@@ -54,7 +54,7 @@ jobs:
       environment: ${{ steps.target.outputs.environment }}
       suffix: ${{ steps.target.outputs.suffix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: github.event_name == 'push'
         with:
           fetch-depth: 20
@@ -110,7 +110,7 @@ jobs:
       ENV_SUFFIX: ${{ needs.deploy-changes.outputs.suffix }}
       IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/backend/backend:${{ github.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: GCP 認証(Workload Identity Federation)
         uses: google-github-actions/auth@v3
