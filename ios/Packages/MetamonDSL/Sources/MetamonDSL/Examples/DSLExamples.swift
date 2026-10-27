@@ -28,6 +28,7 @@ public enum DSLExamples {
             "chat",
             "shops",
             "timetable",
+            "dinner",
             "board",
             "recipes",
         ]

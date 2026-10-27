@@ -174,6 +174,7 @@ struct RootView: View {
         .overlay(alignment: .top) { summaryCard }
         .overlay(alignment: .top) { errorCardOverlay }
         .modifier(ToastHost(onModal: false))
+        .modifier(NewItemsHost()) // #268: 開いた直後に他の人の新着の数
         .onChange(of: scenePhase) { _, phase in
             rt.setForeground(phase == .active) // ホットリロードのポーリングは前面時のみ
         }

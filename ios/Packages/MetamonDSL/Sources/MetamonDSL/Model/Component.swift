@@ -43,6 +43,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case healthStat
     // leaf(時間割のマス目・#234)
     case gridTable
+    // leaf(ランダムに 1 件選ぶ・#263)。entity / title / titleField / subtitleField / filter / label / onItemTap は共用
+    case randomPicker
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }

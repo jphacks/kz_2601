@@ -65,6 +65,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompAvatar, dsl.CompTable, dsl.CompTimeline, dsl.CompEmptyState,
 		// logic
 		dsl.CompSettlement,
+		// random pick (#263)
+		dsl.CompRandomPicker,
 		// on-device AI
 		dsl.CompAiButton,
 		// peer-to-peer

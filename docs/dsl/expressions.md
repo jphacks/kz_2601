@@ -215,5 +215,6 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
 - サーバー側評価・集計 API(評価は iOS。件数が増えたら README 決定表 #10 の集計 API と合わせて検討)。
 - progressBar/gauge の `value`/`target` を Expr にすること(stat.value で代替可能・iOS 契約の拡大を避けた。必要なら後段で)。
 - タイムゾーン指定・通貨換算。
+- 乱数(`random` op)。式は描画・レコード再取得のたびに評価されるので、乱数を入れると表示のたびに値が変わる。「ランダムに 1 件選ぶ」は専用 Leaf `randomPicker`(#263・ボタンを押した時だけ選び、部品の表示状態に持つ)で書く。
 
 op を増やすときは `dsl.schema.json`(`ExprOp.op` の enum と x-enumDescriptions)、`backend/pkg/dsl/expr.go`(`Ops`)、本書 §3、iOS の評価器を同時に更新する。
