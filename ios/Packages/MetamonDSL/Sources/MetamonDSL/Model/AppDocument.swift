@@ -279,6 +279,7 @@ public struct Field: Decodable, Identifiable, Sendable {
         self.id = id
         self.name = name
         self.type = type
+        self.hidden = false
     }
 
     public init(from decoder: Decoder) throws {
