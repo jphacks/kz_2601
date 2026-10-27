@@ -608,6 +608,9 @@ func (a *App) Validate() error {
 			case CompGridTable:
 				checkGridTable(where, c, entities, add)
 				checkAction(where+".onItemTap", c.OnItemTap)
+			case CompRandomPicker:
+				checkRandomPicker(where, c, entities, add)
+				checkAction(where+".onItemTap", c.OnItemTap)
 			case CompEmptyState:
 				if c.Title == "" {
 					add("%s: emptyState needs title", where)

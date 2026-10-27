@@ -272,6 +272,8 @@ const (
 	CompEmptyState  ComponentType = "emptyState"
 	// logic
 	CompSettlement ComponentType = "settlement" // greedy "A pays B" list from a balance field
+	// random pick (#263): one record per button press, not saved
+	CompRandomPicker ComponentType = "randomPicker"
 	// on-device AI (#78)
 	CompAiButton ComponentType = "aiButton" // Foundation Models -> form field (never leaves the device)
 	// peer-to-peer
