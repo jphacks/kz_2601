@@ -822,7 +822,7 @@ final class AppRuntime: DSLRuntime {
 
     func records(for entity: String) -> [Record] { records[entity] ?? [] }
 
-    /// 共有レコードの作者判定に使う uid(#249)。
+    /// 共有レコードの作者判定(#249)と、`Field.hidden`(#262)の入力を作者のフォームにだけ出すのに使う uid。
     var currentUserId: String? { services.auth.currentUser?.uid }
 
     /// shared / public の entity に作るレコードの投稿者(#250): ローカル行の作者(uid)と、送る表示名(設定の名前だけ・未設定は nil)。
