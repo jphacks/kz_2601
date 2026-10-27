@@ -312,7 +312,7 @@
             "cancelNotification"
           ],
           "x-enumDescriptions": {
-            "navigate": "画面遷移。list.onItemTap からは recordId が暗黙に渡り、遷移先フォームが編集モードになる。",
+            "navigate": "画面遷移。list.onItemTap からは recordId が暗黙に渡り、遷移先フォームが編集モードになる(だから onItemTap の遷移先は同じ entity のフォーム)。prefillRef を付けると今のレコード(タップした行・ボタンのあるフォームのレコード)を子フォームの ref に入れて新規で開く。",
             "back": "前の画面へ戻る(push なら pop、モーダルなら dismiss)。",
             "saveRecord": "フォームのドラフトを保存(新規 POST / 編集 PATCH)して screen へ、無ければ back。フォーム画面の toolbar に置く。",
             "deleteRecord": "現在のレコードを削除して back。confirmMessage を付けるのが定石。",
@@ -373,6 +373,13 @@
           "description": "cancelNotification only.",
           "x-for": {
             "cancelNotification": "required"
+          }
+        },
+        "prefillRef": {
+          "type": "string",
+          "description": "親から子を作る(#256)。遷移先フォーム(screen.entity)の ref field id。今のレコード(list / mapView の onItemTap ならタップした行、button / toolbar ならその画面のフォームのレコード)を入れて新規で開く。ref の refEntity は今のレコードの entity。遷移先フォームにはその field の picker を残す。calendar / gridTable では使えない。",
+          "x-for": {
+            "navigate": "optional"
           }
         }
       }
