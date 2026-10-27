@@ -132,13 +132,7 @@ func summarizeEN(a *dsl.App) string {
 // write "X was replaced with Y." in app.description when a requested part
 // is not in the catalog.
 func substitutionNoteEN(description string) string {
-	var out []string
-	for _, sentence := range strings.SplitAfter(description, ".") {
-		if strings.Contains(strings.ToLower(sentence), "replaced") {
-			out = append(out, strings.TrimSpace(sentence))
-		}
-	}
-	return strings.Join(out, " ")
+	return strings.Join(honestNote(description, "."), " ")
 }
 
 // withArticle prefixes "a"/"an" by the first letter.

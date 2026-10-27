@@ -384,6 +384,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 		res.Text = loc.text().readyText
 		res.Brief = cv.brief
 		res.Transcript = cv.transcript
+		plainChatResult(res) // #258
 		cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: res.Text})
 		store.put(key, cv)
 		res.LatencyMs = Latency{Total: time.Since(started).Milliseconds()}
@@ -409,6 +410,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 			res.Kind, res.Source = "question", "claude"
 			res.Text = strings.TrimSpace(q.reply.Text)
 			res.Suggestions = cleanSuggestions(q.reply.Suggestions)
+			plainChatResult(res) // #258
 			res.FirstTokenMs = q.ttft.Milliseconds()
 			res.Meta = Meta{Model: cfg.Model, Attempts: 1}
 			cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: res.Text})
@@ -472,6 +474,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 		res.Text = strings.TrimSpace(reply.Text)
 		res.Suggestions = cleanSuggestions(reply.Suggestions)
 	}
+	plainChatResult(res) // #258
 	cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: res.Text})
 	store.put(key, cv)
 	res.LatencyMs = Latency{Claude: ar.latency.Milliseconds(), Total: time.Since(started).Milliseconds()}
