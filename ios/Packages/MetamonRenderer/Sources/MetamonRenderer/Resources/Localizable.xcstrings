@@ -2023,6 +2023,74 @@
           }
         }
       }
+    },
+    "ランダムに決める": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick at random"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ランダムに決める"
+          }
+        }
+      }
+    },
+    "ボタンを押すと 1 つ選びます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Press the button to pick one"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボタンを押すと 1 つ選びます"
+          }
+        }
+      }
+    },
+    "候補がありません": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No candidates yet"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "候補がありません"
+          }
+        }
+      }
+    },
+    "タップで詳しく見る": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap to see details"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タップで詳しく見る"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

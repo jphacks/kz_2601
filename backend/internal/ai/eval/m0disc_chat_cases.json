@@ -15,8 +15,8 @@
    "steps": [{"say": "予約アプリで、同じ時間に2人予約できないようにできる?", "textAny": ["できません", "できない", "出せません"], "textNot": ["public", "private", "shared", "entity", "scope", "disclosure", "computed"]}]},
   {"id": "dc_role_can", "group": "m0-work", "mode": "create", "capabilities": ["answer", "proposal"], "note": "管理者だけが確定できる(役割・権限)はできるか",
    "steps": [{"say": "シフト表で、店長だけが確定ボタンを押せるようにできる?", "textAny": ["できません", "できない", "出せません"], "textNot": ["public", "private", "shared", "entity", "scope", "disclosure", "computed"]}]},
-  {"id": "dc_random_can", "group": "m0-game", "mode": "create", "capabilities": ["answer", "proposal"], "note": "ランダムに選ぶ(ガチャ・くじ)はできるか",
-   "steps": [{"say": "登録したメニューからランダムに1つ選んでくれる機能ってできる?", "textNot": ["public", "private", "shared", "entity", "scope", "disclosure", "computed"]}]},
+  {"id": "dc_random_can", "group": "m0-game", "mode": "create", "capabilities": ["answer", "proposal"], "note": "ランダムに選ぶ(ガチャ・くじ)はできるか(#263: randomPicker があるので「できます」)",
+   "steps": [{"say": "登録したメニューからランダムに1つ選んでくれる機能ってできる?", "textNot": ["できません", "乱数の計算式は無い", "public", "private", "shared", "entity", "scope", "disclosure", "computed"]}]},
   {"id": "dc_flashcard_can", "group": "m0-study", "mode": "create", "capabilities": ["answer", "proposal"], "note": "カードをめくる(表裏)・覚えてないものだけ出題 はできるか",
    "steps": [{"say": "単語カードみたいに、タップでめくって裏の意味を見る機能はできる?", "textNot": ["public", "private", "shared", "entity", "scope", "disclosure", "computed"]}]}
 ]
