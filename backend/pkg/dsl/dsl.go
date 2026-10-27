@@ -81,7 +81,23 @@ type Entity struct {
 	Name       string      `json:"name"`
 	TitleField string      `json:"titleField,omitempty"`
 	Scope      EntityScope `json:"scope,omitempty"` // "" = private
+	Edit       EntityEdit  `json:"edit,omitempty"`  // "" = author (shared/public only)
 	Fields     []Field     `json:"fields"`
+}
+
+// EntityEdit says who may update a shared/public record. Deleting is always
+// the author's alone.
+type EntityEdit string
+
+const (
+	EditAuthor  EntityEdit = "author"  // only the record's author (default)
+	EditMembers EntityEdit = "members" // anyone who opened the app (#252)
+)
+
+// MembersCanEdit reports whether non-authors may PATCH this entity's records.
+// Private entities ignore edit.
+func (e *Entity) MembersCanEdit() bool {
+	return e.IsShared() && e.Edit == EditMembers
 }
 
 // EntityScope says who shares an entity's records.
@@ -89,7 +105,7 @@ type EntityScope string
 
 const (
 	ScopePrivate EntityScope = "private" // owner only (default)
-	ScopeShared  EntityScope = "shared"  // v1: same as public; participant-only later
+	ScopeShared  EntityScope = "shared"  // creator + people who joined by share link (#388)
 	ScopePublic  EntityScope = "public"  // anyone can read; signed-in users can post
 )
 
@@ -404,8 +420,9 @@ var AITasks = map[string]bool{"summarize": true, "classify": true, "rewrite": tr
 
 // TableColumn is one column of a table component.
 type TableColumn struct {
-	Field string `json:"field"`
-	Title string `json:"title,omitempty"`
+	Field     string `json:"field"`
+	Title     string `json:"title,omitempty"`
+	Aggregate string `json:"aggregate,omitempty"` // with table.groupBy: count|sum|avg|min|max (#261)
 }
 
 // ListItem maps record fields onto a list row.
