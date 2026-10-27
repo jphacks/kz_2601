@@ -333,12 +333,21 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			ar.raw = canon(raw)
 			ar.summary = summarizeFor(app, loc)
 			ar.meta.Lint = app.Lint()
-			if s.LintRetry && len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
+			lintRetry := s.LintRetry && len(ar.meta.Lint) > 0
+			// #254: "家族だけ" without a shared entity gets one retry even with LintRetry off
+			shareProblem := shareCreateProblem(transcript, ar.raw)
+			if (lintRetry || shareProblem != "") && linted == nil && i < s.maxRegen() {
 				// one retry for content problems; keep this output in case it fails
-				ar.meta.LintRetried = true
 				kept := *ar
 				linted = &kept
-				problems = lintProblems(ar.meta.Lint)
+				problems = nil
+				if lintRetry {
+					ar.meta.LintRetried = true
+					problems = lintProblems(ar.meta.Lint)
+				}
+				if shareProblem != "" {
+					problems = append(problems, shareProblem)
+				}
 				ar.meta.LastProblems = problems
 				continue
 			}
