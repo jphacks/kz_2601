@@ -126,6 +126,27 @@ func BuildCatalog(schema []byte) (string, error) {
 			}
 		}
 	}
+
+	// #252: who may update shared records
+	edits := enumValues(entity, "edit")
+	if len(edits) == 0 {
+		return "", fmt.Errorf("schema has no $defs/Entity.properties.edit enum")
+	}
+	b.WriteString("### Entity の edit(public/shared のレコードを誰が更新できるか・省略時 author)\n")
+	for _, v := range edits {
+		fmt.Fprintf(&b, "- edit: %s", v)
+		if d := enumDescOf(entity, "edit", v); d != "" {
+			b.WriteString(" — " + d)
+		}
+		b.WriteString("\n")
+	}
+	if props, _ := entity["properties"].(map[string]any); props != nil {
+		if ep, _ := props["edit"].(map[string]any); ep != nil {
+			if usage, _ := ep[keyUsage].(string); usage != "" {
+				fmt.Fprintf(&b, "  使い方: %s\n", usage)
+			}
+		}
+	}
 	if err := writeExprCatalog(&b, defs); err != nil {
 		return "", err
 	}

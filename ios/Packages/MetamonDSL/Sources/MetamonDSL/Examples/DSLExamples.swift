@@ -9,6 +9,7 @@ public enum DSLExamples {
             "kakeibo",
             "training",
             "walk",
+            "ranking",
             "gallery-input",
             "gallery-display",
             "gallery-structure",

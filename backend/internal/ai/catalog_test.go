@@ -143,6 +143,9 @@ func TestCatalogRendering(t *testing.T) {
 		"### Entity の scope",
 		"- scope: private —",
 		"- scope: public —",
+		"### Entity の edit",
+		"- edit: author —",
+		"- edit: members —",
 	} {
 		if !strings.Contains(catalog, want) {
 			t.Errorf("catalog lacks %q\n%s", want, catalog)

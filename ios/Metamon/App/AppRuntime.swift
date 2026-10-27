@@ -143,6 +143,8 @@ final class AppRuntime: DSLRuntime {
         var text: String
         /// assistant の時だけ。応答の kind(答えをもらった質問を依頼文から除くのに使う)
         var kind: ChatTurn.Kind? = nil
+        /// 個人の情報を公開してよいかの確認(#253 `confirmPublic`)。吹き出しに公開の印を付ける
+        var confirmsPublic = false
     }
     /// 会話中の吹き出し(空 = 対話していない)。初期画面(create)と生成後の音声シート(edit・#186)で使う。
     var chatBubbles: [ChatBubble] = [] {
@@ -189,6 +191,9 @@ final class AppRuntime: DSLRuntime {
     var paidConfirmMessage: String?
     /// 課金の司令塔(既定は共有の 1 つ。テストで差し替える)
     @ObservationIgnored var proGate: ProGate = .shared
+
+    /// 生成直後の「個人の情報も公開されます」の確認(#253・nil = 出していない)。`Features/Privacy/AppRuntime+PublicData.swift`
+    var publicDataPrompt: PublicDataPrompt?
 
     let services: Services
     /// レコードのローカル DB + 未送信キュー(Issue #48)。`records` はここから読み、書きはここに即反映してから裏で送る。
@@ -504,6 +509,7 @@ final class AppRuntime: DSLRuntime {
             apply(result.document) // withAnimation の中で morphJob = nil も行う
             if previous.dsl.isVoiceOnly { offerAccountLinkIfNeeded() } // #276
             noteChatApplied(version: result.document.version, summary: result.summary) // #210 反映の区切り
+            notePublicPersonalData(result) // #253 公開の記録に個人の情報が入ったら確認
             startSync()
             if let summary = result.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
                 summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary), action: canUndo ? .undo : nil)
@@ -803,13 +809,26 @@ final class AppRuntime: DSLRuntime {
 
     func records(for entity: String) -> [Record] { records[entity] ?? [] }
 
-    /// `Field.hidden`(#262)の入力を作者のフォームにだけ出すための自分の uid。
-    var currentUid: String? { services.auth.currentUser?.uid }
+    /// 共有レコードの作者判定(#249)と、`Field.hidden`(#262)の入力を作者のフォームにだけ出すのに使う uid。
+    var currentUserId: String? { services.auth.currentUser?.uid }
+
+    /// 他人の共有レコードを変えようとした時の一言(#249)。端末で止めた時もサーバーの 403 でも同じ文言。
+    func notifyReadOnly(entity: String) {
+        toast = L10n.tr("このデータは作った人だけが変更できます")
+    }
+
+    private func record(_ entity: String, _ id: String) -> Record? {
+        records[entity]?.first { $0.id == id }
+    }
 
     /// 一覧のワンタップ チェック(#108 list.item.toggle)。saveRecord と同じくローカル DB に即反映し、送信は同期キュー。
     /// 表示中に無いレコード(削除済み等)は保存しない(save は recordId が見つからないと新規作成になるため)。
     func updateRecord(entity: String, recordId: String, data: [String: JSONValue]) async -> Bool {
-        guard records[entity]?.contains(where: { $0.id == recordId }) == true else { return false }
+        guard let current = record(entity, recordId) else { return false }
+        guard canEdit(entity: entity, record: current) else {
+            notifyReadOnly(entity: entity)
+            return false
+        }
         records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: recordId, data: data)
         WidgetSnapshotWriter.write(dsl: dsl, records: records)
         return true
@@ -894,6 +913,10 @@ final class AppRuntime: DSLRuntime {
                 guard appId == document.appId else { return }
                 toast = L10n.tr("他の端末で変更されていたため、サーバーの内容に合わせました")
                 await refresh(entity)
+            case .forbidden(let appId, let entity):
+                guard appId == document.appId else { return }
+                notifyReadOnly(entity: entity)
+                await refresh(entity) // 楽観的に書いた値をサーバーの内容に戻す
             case .rejected(let appId, let entity, let message, let field):
                 guard appId == document.appId else { return }
                 toast = rejectedToast(entity: entity, field: field, message: message)
@@ -976,6 +999,10 @@ final class AppRuntime: DSLRuntime {
                 toast = L10n.tr("\(missing.joined(separator: L10n.tr("・"))) を入力してください")
                 return
             }
+            if let id = form.recordId, let current = record(entity, id), !canEdit(entity: entity, record: current) {
+                notifyReadOnly(entity: entity) // 送信待ちに積まない(#249)
+                return
+            }
             // 楽観的 UI: ローカル DB に即反映して画面を進める。appconfig への送信は recordSync のキューが行う
             let payload = form.payload
             let isNew = form.recordId == nil
@@ -993,6 +1020,10 @@ final class AppRuntime: DSLRuntime {
         case .deleteRecord:
             guard let entity = action.entity ?? ctx.form?.entity.id,
                   let id = ctx.recordId ?? ctx.form?.recordId else { return }
+            if let current = record(entity, id), !canDelete(entity: entity, record: current) {
+                notifyReadOnly(entity: entity)
+                return
+            }
             records[entity] = await recordSync.delete(appId: document.appId, entity: entity, recordId: id)
             WidgetSnapshotWriter.write(dsl: dsl, records: records)
             if ctx.recordId == nil { close(ctx.route) } // フォーム上からの削除は画面を閉じる

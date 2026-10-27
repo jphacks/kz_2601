@@ -15,7 +15,7 @@ public struct DSLView: View {
     }
 
     public var body: some View {
-        if let form = ctx.form, form.hides(component, currentUid: rt.currentUid) {
+        if let form = ctx.form, form.hides(component, currentUid: rt.currentUserId) {
             // 回答者に見せない項目(#262): 作者以外のフォームでは入力ごと出さない(値はドラフトに残り、比較の式は読める)
             EmptyView()
         } else if FormFieldOverride.applies(to: component, ctx: ctx) {

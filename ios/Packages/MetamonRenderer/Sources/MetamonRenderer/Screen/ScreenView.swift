@@ -17,6 +17,7 @@ public struct ScreenView: View {
             GridScreenLayout(screen: screen, ctx: ctx)
                 .background(RenderTheme.Colors.canvas)
                 .modifier(FormSaveBar(screen: screen, ctx: ctx)) // saveRecord は画面下の固定バーへ(#89)
+                .modifier(PublicFormNotice(screen: screen)) // #253 公開の entity のフォームに「誰でも見られます」
                 .navigationTitle(screen.title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -25,7 +26,7 @@ public struct ScreenView: View {
                         ToolbarItem(placement: .topBarTrailing) { accessory }
                     }
                     ToolbarItemGroup(placement: .topBarTrailing) {
-                        ForEach(screen.toolbar.filter { tb in !FormSaveBar.pinned(in: screen).contains { $0.id == tb.id } }) { tb in
+                        ForEach(screen.toolbar.filter { tb in !FormSaveBar.pinned(in: screen).contains { $0.id == tb.id } && ButtonLeaf.isVisible(action: tb.action, form: form) }) { tb in
                             Button {
                                 Task { await rt.run(tb.action, ctx.actionContext()) }
                             } label: {
@@ -67,6 +68,10 @@ public struct ScreenView: View {
         let record = route.recordId.flatMap { id in rt.records(for: entityId).first { $0.id == id } }
         if form == nil || form?.entity.id != entityId || form?.recordId != record?.id {
             let draft = FormDraft(entity: entity, record: record)
+            if let record {
+                draft.isReadOnly = !rt.canEdit(entity: entityId, record: record)
+                draft.canDelete = rt.canDelete(entity: entityId, record: record)
+            }
             if record == nil {
                 // calendar の日付タップなど、直前に積まれた初期値を新規フォームだけが受け取る
                 for (k, v) in FormPrefill.consume(for: entity) { draft.values[k] = v }

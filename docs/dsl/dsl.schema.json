@@ -134,12 +134,25 @@
             "shared",
             "public"
           ],
-          "description": "レコードを誰と共有するか(省略時 private)。みんなで投稿・ランキング・掲示板など、他のユーザーと同じデータを見たい時は public。private は本人だけ。shared は v1 では public と同じ扱い(参加者限定は後段)。",
-          "x-usage": "public/shared のレコードには backend が author(uid)と authorName を自動付与するので、field id に author / authorName は使えない。「みんなで」「共有」「投稿」「ランキング」「掲示板」と言われたら public、家計簿や日記のような個人記録は省略(private)。",
+          "description": "レコードを誰と共有するか(省略時 private)。みんなで投稿・ランキング・掲示板など、他のユーザーと同じデータを見たい時は public。家族・サークル・チームなど決まった人だけで使う時は shared(作成者とシェアリンクで参加した人だけ)。private は本人だけ。",
+          "x-usage": "public/shared のレコードには backend が author(uid)と authorName を自動付与するので、field id に author / authorName は使えない。「家族で」「家族だけ」「サークルで」「チームで」「招待した人だけ」のように決まった人だけなら shared、「みんなで」「共有」「投稿」「ランキング」「掲示板」と言われたら public、家計簿や日記のような個人記録は省略(private)。",
           "x-enumDescriptions": {
             "private": "本人だけが読み書きできる個人データ(既定)。家計簿・日記・体重など。",
-            "shared": "同じアプリを開いた人と共有(v1 は public と同じ)。",
-            "public": "誰でも読めて、ログインしていれば誰でも投稿できる。編集・削除は投稿者本人のみ。掲示板・みんなのランキング・共有リスト。"
+            "shared": "作成者と、シェアリンクで参加した人だけが読み書きできる。家族の家事分担・サークルの出欠・チームのタスク。",
+            "public": "誰でも読めて、ログインしていれば誰でも投稿できる。編集・削除は投稿者本人のみ(edit で参加者全員の編集を許せる)。掲示板・みんなのランキング・共有リスト。"
+          }
+        },
+        "edit": {
+          "type": "string",
+          "enum": [
+            "author",
+            "members"
+          ],
+          "description": "public/shared のレコードを誰が更新できるか(省略時 author)。削除はどちらでも作った人だけ。private の entity では意味を持たない。",
+          "x-usage": "家事分担の「終わった」チェック・共有の買い物リストのチェック・出欠の〇×・落とし物の「解決」・シフトの「確定」のように、作った人以外が同じレコードのトグルや値を変える用途は members。掲示板の投稿・ランキングの点数・口コミのように本人の投稿を他人に書き換えられたくないものは省略(author)。private の entity には書かない。",
+          "x-enumDescriptions": {
+            "author": "作った人だけが更新できる(既定)。投稿・口コミ・ランキングの点数。",
+            "members": "同じアプリを開いた人なら誰でも更新できる(削除は作った人だけ)。家事の完了・共有リストのチェック・出欠・解決トグル。"
           }
         },
         "fields": {
@@ -2280,6 +2293,17 @@
         "title": {
           "type": "string",
           "description": "Header text; defaults to the field name."
+        },
+        "aggregate": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum",
+            "avg",
+            "min",
+            "max"
+          ],
+          "description": "Only with table.groupBy: this column shows the per-group count / sum / avg / min / max of `field` (count ignores the value, so use the groupBy field). Omit on the group-name column (field = groupBy)."
         }
       }
     },
@@ -2319,11 +2343,15 @@
         },
         "limit": {
           "type": "integer",
-          "description": "Max rows shown (default all)."
+          "description": "Max rows shown (default all). With groupBy: max groups (top N of the ranking)."
+        },
+        "groupBy": {
+          "type": "string",
+          "description": "Field id (string / enum / ref / boolean / integer / date) to group records by: one row per distinct value. Columns are then the group name ({field: groupBy}) plus aggregate columns ({field, aggregate}). sort.field = an aggregate column's field (or the groupBy field to sort by count if a count column exists, else by name); default = first aggregate column, descending."
         }
       },
-      "description": "Compact rows x columns grid of records (SwiftUI Grid) with a header row; columns = [{field, title?}] (2-4 columns fit a phone). Choose over `list` when several numeric columns must be compared at a glance (date / item / amount).",
-      "x-usage": "Full width, 4-6 rows (e.g. A1:F5). Scrolls inside its cell when longer."
+      "description": "Compact rows x columns grid of records (SwiftUI Grid) with a header row; columns = [{field, title?}] (2-4 columns fit a phone). Choose over `list` when several numeric columns must be compared at a glance (date / item / amount). With `groupBy` it becomes a per-group summary (one row per shop / person / category with avg / sum / count columns), e.g. a ranking of the average score per shop or the total per person.",
+      "x-usage": "Full width, 4-6 rows (e.g. A1:F5). Scrolls inside its cell when longer. 「店ごと」「人ごと」「〜別のランキング・合計・平均」で同じ値の記録を 1 行にまとめたい時は groupBy + 集計列: {\"type\":\"table\",\"entity\":\"review\",\"groupBy\":\"shop\",\"columns\":[{\"field\":\"shop\",\"title\":\"店\"},{\"field\":\"score\",\"aggregate\":\"avg\",\"title\":\"平均点\"},{\"field\":\"shop\",\"aggregate\":\"count\",\"title\":\"件数\"}],\"sort\":{\"field\":\"score\",\"direction\":\"desc\"}}。sort.field は集計列の field(件数順なら groupBy の field)。投稿 1 件ずつの list は別に置いてよい(フォームへの onItemTap はそちら)。"
     },
     "Timeline": {
       "type": "object",

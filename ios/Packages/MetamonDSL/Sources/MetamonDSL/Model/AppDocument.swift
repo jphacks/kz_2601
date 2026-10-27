@@ -46,6 +46,8 @@ public struct AppDSL: Decodable, Sendable {
     public var initialScreen: String
     @Lossy public var entities: [Entity]
     @Lossy public var screens: [Screen]
+    /// entity id → `scope`(#253 の公開表示用。読むのは `scope(of:)`・EntityScope.swift)
+    public var entityScopes: [String: String] = [:]
 
     public func screen(_ id: String) -> Screen? { screens.first { $0.id == id } }
     public func entity(_ id: String) -> Entity? { entities.first { $0.id == id } }
@@ -106,6 +108,7 @@ extension AppDSL {
         initialScreen = try c.decode(String.self, forKey: .initialScreen)
         _entities = try c.decode(Lossy<Entity>.self, forKey: .entities)
         _screens = try c.decode(Lossy<Screen>.self, forKey: .screens)
+        entityScopes = EntityScopeProbe.scopes((try? c.decode(Lossy<EntityScopeProbe>.self, forKey: .entities))?.wrappedValue ?? [])
         clearDailyToggleDefaults()
     }
 }
@@ -205,9 +208,18 @@ public struct Entity: Decodable, Identifiable, Sendable {
     public var id: String
     public var name: String
     public var titleField: String?
+    /// "private"(省略時)/ "shared" / "public"。未知の値は private 扱い。
+    public var scope: String?
+    /// 共有レコードを誰が更新できるか(#252): "author"(省略時)/ "members"。削除はどちらでも作った人だけ。
+    public var edit: String?
     @Lossy public var fields: [Field]
 
     public func field(_ id: String) -> Field? { fields.first { $0.id == id } }
+
+    /// レコードが appId 共通の置き場にあり、他の人のレコードも混ざる(shared / public)。
+    public var isShared: Bool { scope == "shared" || scope == "public" }
+    /// 作った人以外も更新できる(shared / public かつ edit:"members")。
+    public var membersCanEdit: Bool { isShared && edit == "members" }
 
     /// 保存対象(computed 以外)のフィールド。フォームのドラフト・送信はこちらだけ。
     public var storedFields: [Field] { fields.filter { !$0.isComputed } }

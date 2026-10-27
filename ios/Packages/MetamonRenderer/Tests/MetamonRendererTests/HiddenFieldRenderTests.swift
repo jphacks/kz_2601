@@ -13,12 +13,12 @@ private final class QuizRuntime: DSLRuntime {
     var selectedTab = ""
     var loading: Set<String> = []
     var store: [String: [Record]]
-    var currentUid: String?
+    var currentUserId: String?
 
     init(dsl: AppDSL, store: [String: [Record]], currentUid: String?) {
         self.dsl = dsl
         self.store = store
-        self.currentUid = currentUid
+        self.currentUserId = currentUid
     }
 
     func records(for entity: String) -> [Record] { store[entity] ?? [] }
