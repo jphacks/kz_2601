@@ -51,6 +51,7 @@
 AppDSL { schemaVersion:1, app:AppMeta, initialScreen, entities[], screens[] }
 AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: fullscreen|floating|none, notifications[]?, tabs[]?: {screen,title,icon?} }
 Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|members, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit?, refEntity?, computed?: Expr, health?: "weight" } }
+  予約値(field id の代わり): $author(共有 entity の投稿者)・$createdAt(作成日時)— §3.5
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
 Leaf (44 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
@@ -220,7 +221,21 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 - public entity を 1 つでも含むアプリは、作成者の `PUT/PATCH /dsl`(と `POST /apps`・restore)で **`apps_public/{appId}` に DSL が複製**される。他ユーザーが同じ appId で `GET /v1/apps/{appId}/dsl` を開くと、自分の `users/{uid}/apps/{appId}` が無ければその DSL が**インストール**(自分の下に複製・version 1)される。以後の編集は各自のコピーに対して行われ、公開 DSL を上書きできるのは最初に公開したユーザーだけ。
 - **`entity.edit`(#252)**: public/shared のレコードを誰が更新できるか。`author`(省略時)は投稿者本人だけ、`members` は同じ appId を開いた全員が PATCH できる。削除はどちらでも投稿者本人だけ。private では意味を持たない(書いても無視)。家事分担の完了・共有の買い物リスト・出欠・落とし物の解決・シフトの確定のように「みんなで 1 つのレコードを更新する」用途で使う。参加者を招待制で絞るのは D-06 で別途。
 - iOS(#249): `Record.author` と自分の uid を比べ、変更できないレコードでは一覧のチェックを薄く表示して押すと理由を出し、長押し削除を出さず、フォームの保存ボタンを「このデータは作った人だけが変更できます」に置き換える。サーバーが 403 を返した時も同じ文言を出し、送信待ちに残さずサーバーの内容に戻す。
-- 作り方: AI が「みんなで」「共有」「投稿」「ランキング」「掲示板」を聞いたら `scope:"public"`、個人の記録なら省略。iOS 側の投稿者名の表示・authorName の送信は別 Issue。iOS のデコーダは未知キーを無視するので、未対応ビルドでも落ちない。
+- 作り方: AI が「みんなで」「共有」「投稿」「ランキング」「掲示板」を聞いたら `scope:"public"`、個人の記録なら省略。iOS のデコーダは未知キーを無視するので、未対応ビルドでも落ちない。
+
+#### レコードの予約値 `$author` / `$createdAt`(#250 #251)
+
+field id の代わりに書ける、どのレコードにもある値。`$` 始まりなので field id(`^[a-z]…`)とぶつからない。正典は `dsl.schema.json` の `$defs/Entity` `x-recordValues`(AI カタログはそこから生成・Go の `dsl.RecordValues` とテストで突き合わせる)。実例: `examples/board.json`(落とし物掲示板)。
+
+| 値 | 中身 | 書ける場所 | 使える entity |
+|---|---|---|---|
+| `$author` | 投稿者の表示名(`authorName`)。絞り込みでは投稿者の uid(`author`)と比べる | `list.item` の title / subtitle / trailing・`table.columns[].field`・`timeline` の titleField / subtitleField・部品の `filter.field` | public / shared だけ(private は全部自分の記録なので `Validate()` がエラー) |
+| `$createdAt` | レコードを作った日時(datetime) | 上の表示箇所 + `timeline.dateField`・`list` / `table` の `sort.field` | 全部 |
+
+- **自分の投稿だけ**: 部品の filter に `{"field":"$author","op":"eq","value":{"me":true}}`(他の人の分は `op:"neq"`)。`{"me":true}` は `$author` 専用で、`$author` の filter はこの形だけ。list / table / timeline / stat(件数)/ chart など部品の filter で使え、agg 式の中では使えない(iOS の評価器に uid を渡さないため。自分の件数は stat `aggregate:"count"` + 同じ filter)。iOS はサインイン中の uid に置き換えて `Record.author` と比べる。appconfig の `filterField=author`(eq / neq・値 = uid)と同じ意味。
+- **投稿者名に何を出すか**: iOS の設定「投稿に表示する名前」に本人が入れた名前だけ。共有 entity に初めて投稿する時に聞き(「匿名のまま」も選べる)、未設定・空なら送らず backend が「匿名」を付ける。Apple の氏名・メールアドレス・端末名は送らない(本人が公開すると決めていない個人情報を他人に見せない)。名前を後で変えても、過去の投稿の表示名は投稿時のまま(backend は create 時だけ受け取る)。
+- iOS は共有 entity のレコードを作る時、ローカル行にも自分の uid と表示名を入れる(未送信のうちから「自分の投稿」に出る・作者判定も同じ)。
+- AI: 共有 entity に名前の手入力欄(member_name / person / staff_name 等)を作らず `$author` を表示する。ai-eval の `authorShown` / `nameInput` / `meFilter`(`m0disc_cases.json`)。
 
 ### 3.6 ナビゲーション = 画面グラフの規則(#112 #114 #115)
 

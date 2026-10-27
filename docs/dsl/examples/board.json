@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "落とし物掲示板",
+    "description": "拾った物をみんなで投稿し、持ち主が見つかったら解決にする。投稿者名は設定の表示名が自動で付き、自分の投稿だけのタブもある(#250 #251)",
+    "icon": "magnifyingglass",
+    "theme": { "primaryColor": "#3949AB" },
+    "voiceEntry": "floating",
+    "tabs": [
+      { "screen": "home", "title": "みんな", "icon": "person.3" },
+      { "screen": "mine", "title": "自分の投稿", "icon": "person.crop.circle" }
+    ]
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "items",
+      "name": "落とし物",
+      "titleField": "title",
+      "scope": "public",
+      "edit": "members",
+      "fields": [
+        { "id": "title", "name": "落とし物", "type": "string", "required": true },
+        { "id": "place", "name": "拾った場所", "type": "string" },
+        { "id": "photo", "name": "写真", "type": "photo" },
+        { "id": "solved", "name": "解決", "type": "boolean", "defaultValue": false }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "落とし物掲示板",
+      "toolbar": [
+        { "label": "投稿", "icon": "plus", "action": { "type": "navigate", "screen": "item_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        {
+          "type": "section", "id": "all", "area": "A1:F10", "title": "みんなの投稿",
+          "children": [
+            { "type": "list", "entity": "items",
+              "item": { "title": "title", "subtitle": "$author", "trailing": "$createdAt", "image": "photo", "toggle": "solved" },
+              "sort": { "field": "$createdAt", "direction": "desc" }, "emptyText": "まだ投稿がありません",
+              "onItemTap": { "type": "navigate", "screen": "item_form", "presentation": "push" } }
+          ]
+        },
+        { "type": "button", "id": "add", "area": "D11:F12", "label": "投稿", "icon": "plus",
+          "action": { "type": "navigate", "screen": "item_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "mine",
+      "title": "自分の投稿",
+      "components": [
+        { "type": "stat", "id": "count", "area": "A1:F2", "label": "自分の投稿", "entity": "items", "aggregate": "count",
+          "filter": { "field": "$author", "op": "eq", "value": { "me": true } } },
+        {
+          "type": "section", "id": "list", "area": "A3:F12", "title": "投稿したもの",
+          "children": [
+            { "type": "table", "entity": "items",
+              "columns": [{ "field": "title" }, { "field": "place" }, { "field": "$createdAt", "title": "投稿日時" }],
+              "filter": { "field": "$author", "op": "eq", "value": { "me": true } },
+              "sort": { "field": "$createdAt", "direction": "desc" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "item_form",
+      "title": "落とし物",
+      "entity": "items",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "items" } }],
+      "components": [
+        {
+          "type": "section", "id": "fields", "area": "A1:F9", "title": "内容",
+          "children": [
+            { "type": "textField", "field": "title", "label": "落とし物", "placeholder": "青い傘" },
+            { "type": "textField", "field": "place", "label": "拾った場所", "placeholder": "図書館の入口" },
+            { "type": "photoField", "field": "photo", "label": "写真" },
+            { "type": "toggle", "field": "solved", "label": "持ち主が見つかった" }
+          ]
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "items", "confirmMessage": "この投稿を削除しますか？" } }
+      ]
+    }
+  ]
+}

@@ -40,7 +40,7 @@ func checkStat(where string, c *Component, entities map[string]*Entity, add func
 	case c.By != "":
 		add("%s: by is only for aggregate latest/earliest/distance/duration (remove it)", where)
 	}
-	if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
+	if c.Filter != nil && !hasFilterField(e, c.Filter.Field) {
 		add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
 	}
 }

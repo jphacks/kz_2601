@@ -409,74 +409,6 @@
         }
       }
     },
-    "AI との会話の履歴": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your conversation with the AI"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI との会話の履歴"
-          }
-        }
-      }
-    },
-    "AI へのデータ送信": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sending data to AI"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI へのデータ送信"
-          }
-        }
-      }
-    },
-    "AI へのデータ送信について": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "About sending data to AI"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI へのデータ送信について"
-          }
-        }
-      }
-    },
-    "AI への送信の同意を取り消しますか？": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Withdraw consent to send data to AI?"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI への送信の同意を取り消しますか？"
-          }
-        }
-      }
-    },
     "Apple でサインイン済み": {
       "extractionState": "manual",
       "localizations": {
@@ -1055,23 +987,6 @@
         }
       }
     },
-    "あとで": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not now"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "あとで"
-          }
-        }
-      }
-    },
     "あなた: ": {
       "extractionState": "manual",
       "localizations": {
@@ -1187,6 +1102,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "うまく伝わりませんでした"
+          }
+        }
+      }
+    },
+    "またね。いつでも戻ってきてください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See you! Come back anytime."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "またね。いつでも戻ってきてください"
           }
         }
       }
@@ -1442,40 +1374,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "このシェアリンクは取り消されたか、存在しません"
-          }
-        }
-      }
-    },
-    "このデータは作った人だけが変更できます": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Only the person who created this can change it"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "このデータは作った人だけが変更できます"
-          }
-        }
-      }
-    },
-    "このネットワークからの今日の上限に達しました。サインインすると続けて使えます": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This network has reached today's limit. Sign in to keep going"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "このネットワークからの今日の上限に達しました。サインインすると続けて使えます"
           }
         }
       }
@@ -1871,23 +1769,6 @@
         }
       }
     },
-    "またね。いつでも戻ってきてください": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "See you! Come back anytime."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "またね。いつでも戻ってきてください"
-          }
-        }
-      }
-    },
     "または文字で入力": {
       "extractionState": "manual",
       "localizations": {
@@ -2262,23 +2143,6 @@
         }
       }
     },
-    "アプリの生成と対話が使えなくなります。もう一度同意すると使えます。": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "App generation and chat will be disabled until you agree again."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "アプリの生成と対話が使えなくなります。もう一度同意すると使えます。"
-          }
-        }
-      }
-    },
     "アプリをリセット(初期状態に戻す)": {
       "extractionState": "manual",
       "localizations": {
@@ -2292,40 +2156,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "アプリをリセット(初期状態に戻す)"
-          }
-        }
-      }
-    },
-    "アプリを作る・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "When you build or edit an app, the following is sent to Anthropic's AI (Claude)."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "アプリを作る・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。"
-          }
-        }
-      }
-    },
-    "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります。同意を取り消すと、生成と対話が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "When you build or edit an app, what you said, the conversation and the app design are sent to Anthropic's AI. If you withdraw consent, generation and chat are disabled (viewing and recording still work). Data already sent cannot be recalled."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります。同意を取り消すと、生成と対話が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
           }
         }
       }
@@ -3044,40 +2874,6 @@
         }
       }
     },
-    "ダウンロード": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ダウンロード"
-          }
-        }
-      }
-    },
-    "ダウンロード(約%lldMB)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download (about %lld MB)"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ダウンロード(約%lldMB)"
-          }
-        }
-      }
-    },
     "ダウンロード中 %lld%%": {
       "extractionState": "manual",
       "localizations": {
@@ -3176,40 +2972,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "フォーム"
-          }
-        }
-      }
-    },
-    "プライバシー": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Privacy"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "プライバシー"
-          }
-        }
-      }
-    },
-    "プライバシーポリシー": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Privacy Policy"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "プライバシーポリシー"
           }
         }
       }
@@ -3843,23 +3605,6 @@
         }
       }
     },
-    "今のアプリの設計(画面・項目・アプリ名など)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The current app design (screens, fields, app name, etc.)"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "今のアプリの設計(画面・項目・アプリ名など)"
-          }
-        }
-      }
-    },
     "今のバージョンの画面構成が一緒に送られます(記録の中身は送られません)": {
       "extractionState": "manual",
       "localizations": {
@@ -4455,23 +4200,6 @@
         }
       }
     },
-    "利用規約": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Terms of Use"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "利用規約"
-          }
-        }
-      }
-    },
     "削除": {
       "extractionState": "manual",
       "localizations": {
@@ -4659,23 +4387,6 @@
         }
       }
     },
-    "取り消す": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Withdraw"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "取り消す"
-          }
-        }
-      }
-    },
     "取り消せませんでした: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -4757,74 +4468,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "右へ移動"
-          }
-        }
-      }
-    },
-    "同意した日時": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agreed on"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "同意した日時"
-          }
-        }
-      }
-    },
-    "同意して使う": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agree and continue"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "同意して使う"
-          }
-        }
-      }
-    },
-    "同意を取り消す": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Withdraw consent"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "同意を取り消す"
-          }
-        }
-      }
-    },
-    "同意済み": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agreed"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "同意済み"
           }
         }
       }
@@ -5407,23 +5050,6 @@
         }
       }
     },
-    "文書を読み込めませんでした": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn't load the document"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "文書を読み込めませんでした"
-          }
-        }
-      }
-    },
     "新しい appId で音声画面から作り始めます": {
       "extractionState": "manual",
       "localizations": {
@@ -5709,23 +5335,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "未ダウンロード"
-          }
-        }
-      }
-    },
-    "未同意": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not agreed"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未同意"
           }
         }
       }
@@ -6631,23 +6240,6 @@
         }
       }
     },
-    "記録したデータ(数値・メモ・写真など)の中身は送りません。同意しなくても、作ったアプリの閲覧・記録はできます。生成と対話だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The contents of your records (numbers, notes, photos, etc.) are not sent. Without consent you can still view and record in your apps; only generation and chat are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled)."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "記録したデータ(数値・メモ・写真など)の中身は送りません。同意しなくても、作ったアプリの閲覧・記録はできます。生成と対話だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"
-          }
-        }
-      }
-    },
     "記録する": {
       "extractionState": "manual",
       "localizations": {
@@ -6767,91 +6359,6 @@
         }
       }
     },
-    "話した内容・入力した文(端末内で文字にしたもの。音声そのものは送りません)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "What you said or typed (transcribed on this device; audio itself is never sent)"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "話した内容・入力した文(端末内で文字にしたもの。音声そのものは送りません)"
-          }
-        }
-      }
-    },
-    "話した声を端末の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字入力ならすぐにアプリを作れます。設定からいつでもダウンロードできます。": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This model turns your voice into text on this device (about %lld MB, first time only). While it downloads, or even without it, you can make apps right away by typing. You can download it anytime in Settings."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "話した声を端末の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字入力ならすぐにアプリを作れます。設定からいつでもダウンロードできます。"
-          }
-        }
-      }
-    },
-    "話してみる": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Try talking"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "話してみる"
-          }
-        }
-      }
-    },
-    "話すと、アプリができる": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Talk, and an app appears"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "話すと、アプリができる"
-          }
-        }
-      }
-    },
-    "話すと、直せる・戻せる": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Talk to change it, or undo"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "話すと、直せる・戻せる"
-          }
-        }
-      }
-    },
     "認識中": {
       "extractionState": "manual",
       "localizations": {
@@ -6865,23 +6372,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "認識中"
-          }
-        }
-      }
-    },
-    "説明を読んで同意する": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Read and agree"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "説明を読んで同意する"
           }
         }
       }
@@ -7035,23 +6525,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "購入を復元しました。"
-          }
-        }
-      }
-    },
-    "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作るためだけに使います。": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Destination: Anthropic, PBC (USA), via Tailor It's server (Google Cloud). It is used only to build your app."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作るためだけに使います。"
           }
         }
       }
@@ -7413,40 +6886,6 @@
         }
       }
     },
-    "音声モデルをダウンロードしますか？": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download the voice model?"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "音声モデルをダウンロードしますか？"
-          }
-        }
-      }
-    },
-    "音声モデルをダウンロード中 %lld%%(初回のみ約%lldMB)\n待たなくても、下の欄に文字で入力すれば作れます": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Downloading the voice model %1$lld%% (about %2$lld MB, first time only)\nNo need to wait — type in the box below to start"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "音声モデルをダウンロード中 %lld%%(初回のみ約%lldMB)\n待たなくても、下の欄に文字で入力すれば作れます"
-          }
-        }
-      }
-    },
     "音声モデルを準備中": {
       "extractionState": "manual",
       "localizations": {
@@ -7528,6 +6967,669 @@
           "stringUnit": {
             "state": "translated",
             "value": "音量%llddB"
+          }
+        }
+      }
+    },
+    "AI へのデータ送信について": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About sending data to AI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI へのデータ送信について"
+          }
+        }
+      }
+    },
+    "アプリを作る・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you build or edit an app, the following is sent to Anthropic's AI (Claude)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリを作る・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。"
+          }
+        }
+      }
+    },
+    "話した内容・入力した文(端末内で文字にしたもの。音声そのものは送りません)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What you said or typed (transcribed on this device; audio itself is never sent)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話した内容・入力した文(端末内で文字にしたもの。音声そのものは送りません)"
+          }
+        }
+      }
+    },
+    "話した声を端末の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字入力ならすぐにアプリを作れます。設定からいつでもダウンロードできます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This model turns your voice into text on this device (about %lld MB, first time only). While it downloads, or even without it, you can make apps right away by typing. You can download it anytime in Settings."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話した声を端末の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字入力ならすぐにアプリを作れます。設定からいつでもダウンロードできます。"
+          }
+        }
+      }
+    },
+    "話してみる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try talking"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話してみる"
+          }
+        }
+      }
+    },
+    "話すと、アプリができる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk, and an app appears"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話すと、アプリができる"
+          }
+        }
+      }
+    },
+    "話すと、直せる・戻せる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk to change it, or undo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話すと、直せる・戻せる"
+          }
+        }
+      }
+    },
+    "AI との会話の履歴": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your conversation with the AI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI との会話の履歴"
+          }
+        }
+      }
+    },
+    "今のアプリの設計(画面・項目・アプリ名など)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The current app design (screens, fields, app name, etc.)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今のアプリの設計(画面・項目・アプリ名など)"
+          }
+        }
+      }
+    },
+    "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作るためだけに使います。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Destination: Anthropic, PBC (USA), via Tailor It's server (Google Cloud). It is used only to build your app."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作るためだけに使います。"
+          }
+        }
+      }
+    },
+    "記録したデータ(数値・メモ・写真など)の中身は送りません。同意しなくても、作ったアプリの閲覧・記録はできます。生成と対話だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The contents of your records (numbers, notes, photos, etc.) are not sent. Without consent you can still view and record in your apps; only generation and chat are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録したデータ(数値・メモ・写真など)の中身は送りません。同意しなくても、作ったアプリの閲覧・記録はできます。生成と対話だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"
+          }
+        }
+      }
+    },
+    "同意して使う": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agree and continue"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意して使う"
+          }
+        }
+      }
+    },
+    "あとで": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あとで"
+          }
+        }
+      }
+    },
+    "プライバシーポリシー": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy Policy"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プライバシーポリシー"
+          }
+        }
+      }
+    },
+    "利用規約": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terms of Use"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用規約"
+          }
+        }
+      }
+    },
+    "文書を読み込めませんでした": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the document"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文書を読み込めませんでした"
+          }
+        }
+      }
+    },
+    "音声モデルをダウンロードしますか？": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download the voice model?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声モデルをダウンロードしますか？"
+          }
+        }
+      }
+    },
+    "音声モデルをダウンロード中 %lld%%(初回のみ約%lldMB)\n待たなくても、下の欄に文字で入力すれば作れます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading the voice model %1$lld%% (about %2$lld MB, first time only)\nNo need to wait — type in the box below to start"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声モデルをダウンロード中 %lld%%(初回のみ約%lldMB)\n待たなくても、下の欄に文字で入力すれば作れます"
+          }
+        }
+      }
+    },
+    "ダウンロード": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ダウンロード"
+          }
+        }
+      }
+    },
+    "ダウンロード(約%lldMB)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download (about %lld MB)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ダウンロード(約%lldMB)"
+          }
+        }
+      }
+    },
+    "AI へのデータ送信": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending data to AI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI へのデータ送信"
+          }
+        }
+      }
+    },
+    "同意済み": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agreed"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意済み"
+          }
+        }
+      }
+    },
+    "未同意": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not agreed"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未同意"
+          }
+        }
+      }
+    },
+    "同意した日時": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agreed on"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意した日時"
+          }
+        }
+      }
+    },
+    "同意を取り消す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Withdraw consent"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意を取り消す"
+          }
+        }
+      }
+    },
+    "説明を読んで同意する": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read and agree"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "説明を読んで同意する"
+          }
+        }
+      }
+    },
+    "プライバシー": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プライバシー"
+          }
+        }
+      }
+    },
+    "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります。同意を取り消すと、生成と対話が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you build or edit an app, what you said, the conversation and the app design are sent to Anthropic's AI. If you withdraw consent, generation and chat are disabled (viewing and recording still work). Data already sent cannot be recalled."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります。同意を取り消すと、生成と対話が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
+          }
+        }
+      }
+    },
+    "AI への送信の同意を取り消しますか？": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Withdraw consent to send data to AI?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI への送信の同意を取り消しますか？"
+          }
+        }
+      }
+    },
+    "取り消す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Withdraw"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取り消す"
+          }
+        }
+      }
+    },
+    "アプリの生成と対話が使えなくなります。もう一度同意すると使えます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App generation and chat will be disabled until you agree again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリの生成と対話が使えなくなります。もう一度同意すると使えます。"
+          }
+        }
+      }
+    },
+    "このデータは作った人だけが変更できます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only the person who created this can change it"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデータは作った人だけが変更できます"
+          }
+        }
+      }
+    },
+    "このネットワークからの今日の上限に達しました。サインインすると続けて使えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This network has reached today's limit. Sign in to keep going"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このネットワークからの今日の上限に達しました。サインインすると続けて使えます"
+          }
+        }
+      }
+    },
+    "投稿に表示する名前": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name shown on your posts"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "投稿に表示する名前"
+          }
+        }
+      }
+    },
+    "みんなで使うアプリに投稿すると、この名前がほかの人にも表示されます。空なら「匿名」です。Apple ID の名前やメールアドレスは表示しません。変えても、これまでの投稿の名前は変わりません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you post to an app you use with others, they see this name. Leave it empty to post as \"Anonymous\". Your Apple ID name and email address are never shown. Changing it does not rename your earlier posts."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "みんなで使うアプリに投稿すると、この名前がほかの人にも表示されます。空なら「匿名」です。Apple ID の名前やメールアドレスは表示しません。変えても、これまでの投稿の名前は変わりません。"
+          }
+        }
+      }
+    },
+    "ニックネーム": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nickname"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ニックネーム"
+          }
+        }
+      }
+    },
+    "この名前で投稿": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Post with this name"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この名前で投稿"
+          }
+        }
+      }
+    },
+    "匿名で投稿": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Post anonymously"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匿名で投稿"
+          }
+        }
+      }
+    },
+    "ほかの人の一覧にこの名前が表示されます。Apple ID の名前やメールアドレスは表示しません。あとから設定で変えられます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Others will see this name in the list. Your Apple ID name and email address are never shown. You can change it later in Settings."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ほかの人の一覧にこの名前が表示されます。Apple ID の名前やメールアドレスは表示しません。あとから設定で変えられます。"
           }
         }
       }

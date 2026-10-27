@@ -20,11 +20,14 @@ public struct LocalRecord: Codable, Sendable, Equatable, Identifiable {
     public var clientId: String?
     /// 作った人の uid(shared / public の entity だけ・#249)。未送信 create と旧データは nil。`Field.hidden` の表示判定にも使う(#262)。
     public var author: String?
+    /// 投稿者の表示名(shared / public・#250)。自分の未送信 create は送る予定の名前。
+    public var authorName: String?
 
     public var id: String { recordId }
 
     public init(appId: String, entity: String, recordId: String, data: [String: JSONValue],
-                createdAt: String? = nil, updatedAt: String? = nil, pendingOp: PendingOp = .none, clientId: String? = nil, author: String? = nil) {
+                createdAt: String? = nil, updatedAt: String? = nil, pendingOp: PendingOp = .none, clientId: String? = nil,
+                author: String? = nil, authorName: String? = nil) {
         self.appId = appId
         self.entity = entity
         self.recordId = recordId
@@ -34,15 +37,18 @@ public struct LocalRecord: Codable, Sendable, Equatable, Identifiable {
         self.pendingOp = pendingOp
         self.clientId = clientId
         self.author = author
+        self.authorName = authorName
     }
 
     public init(appId: String, entity: String, server record: Record) {
         self.init(appId: appId, entity: entity, recordId: record.id, data: record.data,
-                  createdAt: record.createdAt, updatedAt: record.updatedAt, author: record.author)
+                  createdAt: record.createdAt, updatedAt: record.updatedAt, author: record.author, authorName: record.authorName)
     }
 
     /// Renderer に渡す形。
-    public var record: Record { Record(id: recordId, data: data, createdAt: createdAt, updatedAt: updatedAt, author: author) }
+    public var record: Record {
+        Record(id: recordId, data: data, createdAt: createdAt, updatedAt: updatedAt, author: author, authorName: authorName)
+    }
 
     /// 未送信 create の仮 id(`local-<clientId>`)。サーバー採番後に差し替わる。
     public static func temporaryId(clientId: String) -> String { "local-\(clientId)" }

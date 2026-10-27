@@ -39,7 +39,7 @@ enum DebugDSLOverride {
 /// entity の field 型からそれらしいダミー値を作る。長い文字列・大きい金額を混ぜて崩れを炙り出す。
 enum DummyRecords {
     static func make(for dsl: AppDSL, count: Int, now: Date = .now) -> [String: [Record]] {
-        let iso = ISO8601DateFormatter().string(from: now)
+        let iso = ISO8601DateFormatter()
         var out: [String: [Record]] = [:]
         for entity in dsl.entities {
             out[entity.id] = (0..<count).map { i in
@@ -47,11 +47,22 @@ enum DummyRecords {
                 for f in entity.storedFields {
                     if let v = value(for: f, entity: entity, index: i, dsl: dsl, now: now) { data[f.id] = v }
                 }
-                return Record(id: "\(entity.id)-\(i + 1)", data: data, createdAt: iso)
+                // 新しい順に 1 時間ずつ前(`$createdAt` の並びと表示を確かめる・#250)
+                let created = iso.string(from: now.addingTimeInterval(Double(-i) * 3600))
+                var record = Record(id: "\(entity.id)-\(i + 1)", data: data, createdAt: created)
+                if entity.isShared {
+                    // 共有 entity: 偶数番は自分(モックの uid)、奇数番はほかの人の投稿
+                    let mine = i % 2 == 0
+                    record.author = mine ? MockAuthService.fixedUID : "dummy-member-\(i)"
+                    record.authorName = mine ? (AuthorProfile.name ?? RecordSyncEngine.anonymousName) : otherNames[i % otherNames.count]
+                }
+                return record
             }
         }
         return out
     }
+
+    private static let otherNames = ["さくら", "たけし", "匿名"]
 
     /// 1 件目・3 件目… は自分、2 件目・4 件目… は別の人の投稿にする。
     static func alternatingAuthors(_ seed: [String: [Record]]) -> [String: [Record]] {

@@ -326,6 +326,7 @@ private struct HostSheets: ViewModifier {
             .sheet(isPresented: Binding(get: { active && rt.showAppSwitcher }, set: { rt.showAppSwitcher = $0 })) {
                 AppSwitcherSheet()
             }
+            .modifier(AuthorNamePromptModifier(active: active)) // 共有アプリへの初投稿で表示名を聞く(#250)
     }
 }
 

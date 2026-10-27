@@ -211,7 +211,8 @@ public struct Entity: Decodable, Identifiable, Sendable {
     public var edit: String?
     @Lossy public var fields: [Field]
 
-    public func field(_ id: String) -> Field? { fields.first { $0.id == id } }
+    /// field id、または予約値(`$author` / `$createdAt`・#250)の仮 Field。
+    public func field(_ id: String) -> Field? { fields.first { $0.id == id } ?? RecordValue.field(id, in: self) }
 
     /// レコードが appId 共通の置き場にあり、他の人のレコードも混ざる(shared / public)。
     public var isShared: Bool { scope == "shared" || scope == "public" }
@@ -270,6 +271,14 @@ public struct Field: Decodable, Identifiable, Sendable {
     public var isComputed: Bool { computed != nil }
 
     private enum Keys: String, CodingKey { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health, hidden }
+
+    /// 予約値の仮 Field 用(`RecordValue`)。
+    init(id: String, name: String, type: FieldType) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.hidden = false
+    }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)

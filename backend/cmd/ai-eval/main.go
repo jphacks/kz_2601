@@ -6,6 +6,8 @@
 // the summary mentions 代替 / できません / "replaced" because a requested part is not in
 // the catalog or not possible, #257), scope ("public"|"shared"|"private": at least one entity has
 // that scope), editMembers (bool, #252: some shared entity has edit members),
+// authorShown (bool, #250: a list/table/timeline shows $author), nameInput (bool, #250:
+// a shared entity has a typed-in person-name field), meFilter (bool, #251: a component filters by $author),
 // noShared (bool, #77: no shared/public entity), calc / computed / statValue / settlement / ref (bool, #100:
 // any calculation / Field.computed / stat.value / settlement leaf / ref field;
 // -logic-pass runs the 2nd calculations-only call). Navigation (#114):
@@ -84,6 +86,9 @@ type Metrics struct {
 	Notifications []string `json:"notifications,omitempty"` // repeat@time
 	Scopes        []string `json:"scopes,omitempty"`        // entityId:scope (effective)
 	EditMembers   []string `json:"editMembers,omitempty"`   // shared entity ids with edit:members (#252)
+	AuthorShown   []string `json:"authorShown,omitempty"`   // screen:type showing $author (#250)
+	NameInputs    []string `json:"nameInputs,omitempty"`    // shared entity.field that looks like a typed name (#250)
+	MeFilter      []string `json:"meFilter,omitempty"`      // screen:type filtering by $author (#251)
 	Areas         []string `json:"areas"`                   // screenId: area list
 	// logic (#100)
 	Computed   []string `json:"computed,omitempty"` // entity.field of computed fields
@@ -461,6 +466,8 @@ func measure(a *dsl.App) *Metrics {
 		}
 		m.Areas = append(m.Areas, s.ID+": "+strings.Join(areas, " "))
 	}
+	m.AuthorShown, m.MeFilter = authorUses(a)
+	m.NameInputs = nameInputs(a)
 	if m.TopLevel > 0 {
 		m.AreaRatio = float64(m.WithArea) / float64(m.TopLevel)
 	}
@@ -561,6 +568,18 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 		case "editMembers": // #252: true = some shared entity is edit:members, false = none
 			if (len(m.EditMembers) > 0) != v.(bool) {
 				miss = append(miss, fmt.Sprintf("editMembers=%v", m.EditMembers))
+			}
+		case "authorShown": // #250
+			if (len(m.AuthorShown) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("authorShown=%v", m.AuthorShown))
+			}
+		case "nameInput": // #250: false = no typed-in name field on shared entities
+			if (len(m.NameInputs) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("nameInput=%v", m.NameInputs))
+			}
+		case "meFilter": // #251
+			if (len(m.MeFilter) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("meFilter=%v", m.MeFilter))
 			}
 		case "scope":
 			want := fmt.Sprint(v)

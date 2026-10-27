@@ -48,6 +48,9 @@ var expectKeys = map[string]expectKind{
 	"noOmission":   expectBool,   // #257 (PR #379)
 	"scopeNot":     expectString, // #254 (PR #405)
 	"summaryHas":   expectStrings,
+	"authorShown":  expectBool, // #250 (PR #384)
+	"nameInput":    expectBool, // #250 (PR #384)
+	"meFilter":     expectBool, // #251 (PR #384)
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

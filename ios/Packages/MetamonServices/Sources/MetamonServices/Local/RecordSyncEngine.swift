@@ -144,8 +144,14 @@ public final class RecordSyncEngine {
 
     // MARK: - Write(楽観的)
 
+    /// 表示名を送らなかった投稿に backend が付ける名前(appconfig `defaultAuthorName`)。送信前のローカル行にも同じものを出す。
+    nonisolated public static let anonymousName = "匿名"
+
     /// 作成(`recordId == nil`)または更新。ローカルに即反映し、更新後の一覧を返す。送信はキューが行う。
-    public func save(appId: String, entity: String, recordId: String?, data: [String: JSONValue]) async -> [Record] {
+    /// - Parameter author: shared / public の entity に作る時の投稿者(#250)。uid はローカル行の作者判定と「自分の投稿」用、
+    ///   name は POST で送る表示名(nil なら送らない)。更新では使わない。
+    public func save(appId: String, entity: String, recordId: String?, data: [String: JSONValue],
+                     author: (uid: String?, name: String?)? = nil) async -> [Record] {
         let now = ISO8601DateFormatter().string(from: .now)
         if let recordId, var row = await store.row(appId: appId, entity: entity, recordId: recordId) {
             let oldVideos = VideoValue.localIDs(in: row.data)
@@ -158,9 +164,11 @@ public final class RecordSyncEngine {
         } else {
             let clientId = UUID().uuidString.lowercased()
             let row = LocalRecord(appId: appId, entity: entity, recordId: LocalRecord.temporaryId(clientId: clientId), data: data,
-                                  createdAt: now, updatedAt: now, pendingOp: .create, clientId: clientId)
+                                  createdAt: now, updatedAt: now, pendingOp: .create, clientId: clientId,
+                                  author: author?.uid, authorName: author.map { $0.name ?? Self.anonymousName })
             await store.upsert(row)
-            await queue.enqueue(SyncOperation(id: clientId, appId: appId, entity: entity, recordId: row.recordId, kind: .create, data: data))
+            await queue.enqueue(SyncOperation(id: clientId, appId: appId, entity: entity, recordId: row.recordId, kind: .create, data: data,
+                                              authorName: author?.name))
         }
         kick()
         return await store.records(appId: appId, entity: entity)
