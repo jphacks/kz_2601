@@ -18,7 +18,7 @@ public struct LocalRecord: Codable, Sendable, Equatable, Identifiable {
     public var pendingOp: PendingOp
     /// 作成の冪等キー(= 未送信 create の仮 id の元)。サーバー採番後は参照用に残す。
     public var clientId: String?
-    /// 作った人の uid(shared / public の entity だけ・#249)。未送信 create と旧データは nil。
+    /// 作った人の uid(shared / public の entity だけ・#249)。未送信 create と旧データは nil。`Field.hidden` の表示判定にも使う(#262)。
     public var author: String?
     /// 投稿者の表示名(shared / public・#250)。自分の未送信 create は送る予定の名前。
     public var authorName: String?

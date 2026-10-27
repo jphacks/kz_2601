@@ -121,6 +121,19 @@ final class RecordSyncTests: XCTestCase {
         XCTAssertEqual(synced?.clientId, "x")
     }
 
+    /// #262: サーバーの author(投稿者 uid)をローカル DB に残し、再起動後も Renderer に渡す(hidden の表示判定に使う)。
+    func testRecordStoreKeepsAuthor() async throws {
+        let store = RecordStore(directory: dir)
+        let shown = await store.replace(appId: "a", entity: "q", with: [Record(id: "s1", data: ["correct": "B"], createdAt: "1", author: "teacher")])
+        XCTAssertEqual(shown.first?.author, "teacher")
+        let reopened = RecordStore(directory: dir)
+        let again = await reopened.records(appId: "a", entity: "q")
+        XCTAssertEqual(again.first?.author, "teacher", "ファイル永続化後も残る")
+        // 旧形式(author キー無し)のファイルも読める
+        let legacy = try JSONDecoder().decode(LocalRecord.self, from: Data(#"{"appId":"a","entity":"q","recordId":"1","data":{},"pendingOp":"none"}"#.utf8))
+        XCTAssertNil(legacy.author)
+    }
+
     // MARK: - SyncQueue
 
     func testSyncQueueSendsInOrder() async throws {
