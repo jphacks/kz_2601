@@ -256,6 +256,7 @@ func (a *App) Validate() error {
 		}
 	}
 	checkComputedFields(a.Entities, entities, DailyToggleFields(a), add)
+	checkHiddenFields(a, entities, add)
 
 	notifIDs := map[string]bool{}
 	for i := range a.App.Notifications {
@@ -626,6 +627,7 @@ func (a *App) Validate() error {
 			walk(fmt.Sprintf("screen %q components[%d]", s.ID, i), &s.Components[i], 0)
 		}
 	}
+	checkRecordNav(a, entities, add) // #256
 
 	if len(p) > 0 {
 		return &ValidationError{Problems: p}

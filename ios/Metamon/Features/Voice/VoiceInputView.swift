@@ -16,6 +16,8 @@ struct VoiceInputView: View {
     @State private var transcript = ""
     @State private var typed = ""
     @State private var showSettings = false
+    /// 初期画面の例文のカテゴリ(#274)
+    @State private var exampleCategory = "record"
     @FocusState private var typing: Bool
 
     enum Phase { case idle, listening, transcribing, thinking }
@@ -51,7 +53,9 @@ struct VoiceInputView: View {
                             VStack(spacing: 0) {
                                 if !typing { examples }
                                 textEntry
+                                #if !APP_STORE_REVIEW
                                 if isInitial, !typing { DiscoverEntry() } // 「探す」(#50)
+                                #endif
                             }
                             .padding(.bottom, Theme.Spacing.sm)
                         }
@@ -242,9 +246,10 @@ struct VoiceInputView: View {
                 Text(isInitial ? Greeting.examplesLabel : Greeting.editExamplesLabel)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary)
+                if isInitial { exampleCategoryPicker }
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: Theme.Spacing.sm) {
-                        ForEach(isInitial ? Greeting.createExamples : Greeting.editExamples, id: \.self) { ex in
+                        ForEach(exampleChips, id: \.self) { ex in
                             Button { submit(ex) } label: {
                                 Text(ex)
                                     .font(.subheadline)
@@ -259,15 +264,53 @@ struct VoiceInputView: View {
                     }
                     .padding(.horizontal, 1)
                 }
+                .id(exampleCategory) // カテゴリを替えたら先頭から見せる
             }
             .padding(.bottom, Theme.Spacing.md)
             .transition(.opacity)
         }
     }
 
+    private var exampleCategories: [Greeting.ExampleCategory] { Greeting.createExampleCategories() }
+
+    private var exampleChips: [String] {
+        guard isInitial else { return Greeting.editExamples }
+        return exampleCategories.first { $0.id == exampleCategory }?.examples ?? Greeting.createExamples
+    }
+
+    /// 例文のカテゴリ(記録・習慣・お金・家族/友達と・ゲーム・#274)。選んだカテゴリの例が下の行に並ぶ。
+    private var exampleCategoryPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Theme.Spacing.xs) {
+                ForEach(exampleCategories) { category in
+                    let selected = category.id == exampleCategory
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { exampleCategory = category.id }
+                    } label: {
+                        Text(category.title)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(selected ? Color.white : Color.secondary)
+                            .padding(.horizontal, Theme.Spacing.sm + 4)
+                            .padding(.vertical, Theme.Spacing.xs + 2)
+                            .background {
+                                if selected { Capsule().fill(Theme.brandGradient) }
+                            }
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                    .accessibilityIdentifier("examples.category.\(category.id)")
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+    }
+
     /// 文字入力(#196): 伸びる複数行・return は改行・送信はボタン。送信すると対話か生成に進むのでキーボードは閉じる。
     private var textEntry: some View {
-        ChatComposer(placeholder: L10n.tr("または文字で入力"), text: $typed, focused: $typing,
+        // 音声の準備ができるまでは、文字ですぐ作れることを入力欄でも伝える(#275)
+        ChatComposer(placeholder: transcriber.isReady ? L10n.tr("または文字で入力") : VoiceModelCopy.textPlaceholder,
+                     text: $typed, focused: $typing,
                      disabled: rt.isMorphing, keepsFocus: false) { submit($0) }
     }
 
@@ -287,15 +330,30 @@ struct VoiceInputView: View {
     @ViewBuilder
     private var modelStatusView: some View {
         switch transcriber.status {
+        case .notDownloaded where !ModelDownloadConsent.isApproved() || ExpensiveNetworkProbe.shared.isExpensive:
+            // 確認で「あとで」を選んだ / モバイル回線で待っている(#275): 文字で始められることを先に伝える
+            VStack(spacing: Theme.Spacing.sm) {
+                Text(VoiceModelCopy.textFirst)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(VoiceModelCopy.downloadButton) { rt.showModelDownloadConfirm = true }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("voice.modelDownload")
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
         case .notDownloaded, .downloading:
             VStack(spacing: Theme.Spacing.sm) {
                 ProgressView(value: transcriber.downloadProgress)
                     .progressViewStyle(.linear)
                     .tint(Theme.Colors.brandA)
-                Text("音声モデルをダウンロード中 \(Int(transcriber.downloadProgress * 100))%\n初回のみ約500MB(Wi-Fi 推奨)")
+                Text(VoiceModelCopy.downloading(percent: Int(transcriber.downloadProgress * 100)))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, Theme.Spacing.lg)
         case .loading:
@@ -312,6 +370,9 @@ struct VoiceInputView: View {
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
+                Text(VoiceModelCopy.textStillWorks)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Button("再試行") { Task { try? await transcriber.prepare() } }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
@@ -324,7 +385,7 @@ struct VoiceInputView: View {
 
     private var statusText: String {
         switch phase {
-        case .idle: return transcriber.isReady ? L10n.tr("タップして話す") : L10n.tr("音声モデルを準備中…")
+        case .idle: return transcriber.isReady ? L10n.tr("タップして話す") : VoiceModelCopy.notReadyStatus
         case .listening: return L10n.tr("聞いています… もう一度タップで終了")
         case .transcribing: return L10n.tr("文字起こし中…")
         case .thinking: return rt.isChatting ? ClarifyCopy.thinking : L10n.tr("アプリを考えています…")
@@ -401,6 +462,21 @@ struct VoiceInputView: View {
         phase = .idle
         if rt.isChatting { transcript = "" }
     }
+}
+
+/// 音声モデルの準備中・未ダウンロードの文言(#275)。文字入力ならすぐ作れることを前に出す。
+@MainActor
+enum VoiceModelCopy {
+    static var textFirst: String {
+        L10n.tr("声で話すには、声を文字にするモデル(約\(AppRuntime.voiceModelMegabytes)MB)が必要です。\n下の欄に文字で入力すれば、今すぐ作れます。")
+    }
+    static var downloadButton: String { L10n.tr("音声モデルをダウンロード") }
+    static func downloading(percent: Int) -> String {
+        L10n.tr("音声モデルをダウンロード中 \(percent)%(初回のみ約\(AppRuntime.voiceModelMegabytes)MB)\n待たなくても、下の欄に文字で入力すれば作れます")
+    }
+    static var textStillWorks: String { L10n.tr("文字入力なら、このまま作れます") }
+    static var notReadyStatus: String { L10n.tr("音声の準備中です(文字ならすぐ作れます)") }
+    static var textPlaceholder: String { L10n.tr("文字で入力(今すぐ作れます)") }
 }
 
 #Preview {

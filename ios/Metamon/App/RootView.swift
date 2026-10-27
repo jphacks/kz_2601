@@ -103,16 +103,24 @@ struct RootView: View {
         .sheet(item: $rt.sheet) { route in
             ScreenStack(root: route)
                 .modifier(HostSheets(onModal: true))
+                #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
+                #endif
+                .modifier(ToastHost(onModal: true))
         }
         .fullScreenCover(item: $rt.fullScreen) { route in
             ScreenStack(root: route)
                 .modifier(HostSheets(onModal: true))
+                #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
+                #endif
+                .modifier(ToastHost(onModal: true))
         }
         .modifier(HostSheets(onModal: false))
+        #if !APP_STORE_REVIEW // 審査用ビルドはシェアリンク・探す・近くの端末との共有を外す(#245)
         .modifier(SharingHooks()) // シェアリンク受信・「探す」シート(#49 #50)
         .modifier(NearbySheets(onModal: false)) // 近くの端末と送り合う(#36)
+        #endif
         .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
         .onChange(of: rt.document.version) {
@@ -155,6 +163,8 @@ struct RootView: View {
         }
         #endif
         .modifier(ConsentHost()) // #246: AI への送信の同意・音声モデルのダウンロード確認
+        .modifier(AccountLinkPromptHost()) // #276: 匿名で初めて作った後の「引き継ぎのためにサインイン」
+        .modifier(TutorialHost()) // #274: 同意のあとに初回のチュートリアル・最初のアプリの直後に直し方の例
         .alert(item: $rt.confirm) { confirm in
             Alert(title: Text(confirm.message),
                   primaryButton: .destructive(Text("実行")) { Task { await confirm.perform() } },
@@ -162,7 +172,7 @@ struct RootView: View {
         }
         .overlay(alignment: .top) { summaryCard }
         .overlay(alignment: .top) { errorCardOverlay }
-        .overlay(alignment: .bottom) { toast }
+        .modifier(ToastHost(onModal: false))
         .onChange(of: scenePhase) { _, phase in
             rt.setForeground(phase == .active) // ホットリロードのポーリングは前面時のみ
         }
@@ -225,24 +235,32 @@ struct RootView: View {
                 .zIndex(4)
         }
     }
+}
 
-    @ViewBuilder
-    private var toast: some View {
-        if let message = rt.toast {
-            Text(message)
-                .font(.footnote.weight(.medium))
-                .padding(.horizontal, Theme.Spacing.md).padding(.vertical, Theme.Spacing.sm + 2)
-                .background(.regularMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Theme.Spacing.md)
-                // マイク FAB と DSL の最下段(行 11〜12 のボタン)の上に出す(被せない)。タブ無しでも同じ高さ
-                .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .task(id: message) {
-                    try? await Task.sleep(for: .seconds(3))
-                    withAnimation { rt.toast = nil }
-                }
+/// 下部の toast。モーダル(sheet / fullScreen)が開いている間はその中に出す(根の overlay はモーダルに隠れる)。
+private struct ToastHost: ViewModifier {
+    let onModal: Bool
+    @Environment(AppRuntime.self) private var rt
+
+    func body(content: Content) -> some View {
+        let active = onModal == (rt.sheet != nil || rt.fullScreen != nil)
+        content.overlay(alignment: .bottom) {
+            if active, let message = rt.toast {
+                Text(message)
+                    .font(.footnote.weight(.medium))
+                    .padding(.horizontal, Theme.Spacing.md).padding(.vertical, Theme.Spacing.sm + 2)
+                    .background(.regularMaterial, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    // マイク FAB と DSL の最下段(行 11〜12 のボタン)の上に出す(被せない)。タブ無しでも同じ高さ
+                    .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .task(id: message) {
+                        try? await Task.sleep(for: .seconds(3))
+                        withAnimation { rt.toast = nil }
+                    }
+            }
         }
     }
 }

@@ -3,18 +3,21 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jphacks/kz_2601/backend/internal/auth"
 )
 
 // Clarify phase (Issue #74): a few short question/answer turns before the
 // first generation. POST /v1/chat returns either one question with
 // suggestions or `ready` with a brief and a transcript that iOS passes to the
 // existing POST /v1/generate (mode auto/create). Conversation state lives in
-// this process (map[appId], last 10 messages, 30 min TTL); persistence in
+// this process (per uid+appId, last 10 messages, 30 min TTL); persistence in
 // appconfig is deferred.
 
 const (
@@ -77,6 +80,10 @@ type ChatRequest struct {
 	// question / ready ("answer", "proposal"). Old clients send neither Mode
 	// nor Capabilities and get the clarify behaviour unchanged.
 	Capabilities []string `json:"capabilities,omitempty"`
+	// AllowedComponents / DisabledFeatures (#245): same contract as Request
+	// (build restriction; omitted = no restriction). Not related to Capabilities.
+	AllowedComponents []string `json:"allowedComponents,omitempty"`
+	DisabledFeatures  []string `json:"disabledFeatures,omitempty"`
 }
 
 // Brief is the structured understanding of the requested app.
@@ -246,10 +253,40 @@ func (c *convStore) put(appID string, cv *conversation) {
 	c.m[appID] = cv
 }
 
-func (c *convStore) delete(appID string) {
+// convKey is the store key of uid's conversation on appID (#286): each caller
+// has their own, so one user can neither read nor clear another's. uid ""
+// (no verified token) keeps the bare appID.
+func convKey(uid, appID string) string {
+	if uid == "" {
+		return appID
+	}
+	return uid + "\x00" + appID
+}
+
+func appIDOf(key string) string {
+	if i := strings.IndexByte(key, 0); i >= 0 {
+		return key[i+1:]
+	}
+	return key
+}
+
+// clear deletes uid's conversation on appID. When uid has none but someone
+// else has one, it reports foreign (and deletes nothing).
+func (c *convStore) clear(uid, appID string) (foreign bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	delete(c.m, appID)
+	c.sweep()
+	key := convKey(uid, appID)
+	if _, ok := c.m[key]; ok {
+		delete(c.m, key)
+		return false
+	}
+	for k := range c.m {
+		if appIDOf(k) == appID {
+			return true
+		}
+	}
+	return false
 }
 
 // sweep drops expired conversations; called with mu held.
@@ -271,8 +308,18 @@ func (s *Service) conversations() *convStore {
 	return s.conv
 }
 
-// ClearChat forgets the conversation for appID (DELETE /v1/chat/{appId}).
-func (s *Service) ClearChat(appID string) { s.conversations().delete(appID) }
+// ErrNotOwner: the conversation on that appId belongs to another user.
+var ErrNotOwner = errors.New("the conversation belongs to another user")
+
+// ClearChat forgets uid's conversation on appID (DELETE /v1/chat/{appId}).
+// Nothing to clear is not an error; only another user's conversation is
+// (ErrNotOwner), and it is left untouched.
+func (s *Service) ClearChat(uid, appID string) error {
+	if s.conversations().clear(uid, appID) {
+		return ErrNotOwner
+	}
+	return nil
+}
 
 // Chat runs one clarify turn.
 //
@@ -287,6 +334,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 	if req.AppID == "" {
 		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "appId is required"}
 	}
+	ctx = withRestriction(ctx, NewRestriction(req.AllowedComponents, req.DisabledFeatures))
 	incoming, err := normalizeMessages(req.Messages)
 	if err != nil {
 		return nil, err
@@ -300,9 +348,9 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 			defaultPaidCatalog.annotate(out, nil)
 		}
 	}()
-	store := s.conversations()
-	store.wait(ctx, req.AppID, s.chatTimeout())
-	cv := store.get(req.AppID)
+	store, key := s.conversations(), convKey(auth.UID(ctx), req.AppID)
+	store.wait(ctx, key, s.chatTimeout())
+	cv := store.get(key)
 	if cv == nil {
 		cv = &conversation{}
 	}
@@ -336,8 +384,9 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 		res.Text = loc.text().readyText
 		res.Brief = cv.brief
 		res.Transcript = cv.transcript
+		plainChatResult(res) // #258
 		cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: res.Text})
-		store.put(req.AppID, cv)
+		store.put(key, cv)
 		res.LatencyMs = Latency{Total: time.Since(started).Milliseconds()}
 		return res, nil
 	}
@@ -361,14 +410,15 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 			res.Kind, res.Source = "question", "claude"
 			res.Text = strings.TrimSpace(q.reply.Text)
 			res.Suggestions = cleanSuggestions(q.reply.Suggestions)
+			plainChatResult(res) // #258
 			res.FirstTokenMs = q.ttft.Milliseconds()
 			res.Meta = Meta{Model: cfg.Model, Attempts: 1}
 			cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: res.Text})
-			pending := store.begin(req.AppID)
-			store.put(req.AppID, cv)
+			pending := store.begin(key)
+			store.put(key, cv)
 			go func() {
 				a := <-done
-				store.finish(req.AppID, pending, cv, func(c *conversation) {
+				store.finish(key, pending, cv, func(c *conversation) {
 					if a.reply != nil {
 						b := cleanBrief(a.reply.Brief)
 						c.brief, c.transcript = &b, transcriptOr(a.reply.Transcript, userTexts)
@@ -424,8 +474,9 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 		res.Text = strings.TrimSpace(reply.Text)
 		res.Suggestions = cleanSuggestions(reply.Suggestions)
 	}
+	plainChatResult(res) // #258
 	cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: res.Text})
-	store.put(req.AppID, cv)
+	store.put(key, cv)
 	res.LatencyMs = Latency{Claude: ar.latency.Milliseconds(), Total: time.Since(started).Milliseconds()}
 	return res, nil
 }
@@ -546,6 +597,7 @@ func (s *Service) callChatWith(ctx context.Context, cfg ChatConfig, system strin
 	defer cancel()
 	t := time.Now()
 	var ttft time.Duration
+	system, schema = restrictPrompt(ctx, system), restrictSchema(ctx, schema)
 	resp, err := s.Claude.Complete(cctx, Completion{
 		System:     system,
 		Messages:   []Message{{Role: "user", Content: user}},

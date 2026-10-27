@@ -28,6 +28,29 @@ public actor InMemoryAppConfigClient: AppConfigClient {
         apps.removeAll { $0.id == appId }
     }
 
+    public func renameApp(appId: String, name: String) async throws -> AppSummary {
+        guard let i = apps.firstIndex(where: { $0.id == appId }) else {
+            throw APIError.server(status: 404, code: "not_found", message: "app not found (in-memory)")
+        }
+        apps[i].name = name
+        apps[i].currentVersion += 1
+        return apps[i]
+    }
+
+    public func duplicateApp(appId: String, name: String) async throws -> AppSummary {
+        guard apps.contains(where: { $0.id == appId }) else {
+            throw APIError.server(status: 404, code: "not_found", message: "app not found (in-memory)")
+        }
+        let now = ISO8601DateFormatter().string(from: .now)
+        let copy = AppSummary(id: UUID().uuidString.lowercased(), name: name, currentVersion: 2, createdAt: now, updatedAt: now)
+        apps.append(copy)
+        return copy
+    }
+
+    public func reorderApps(ids: [String]) async throws {
+        apps = AppListEdit.applyingOrder(ids, to: apps)
+    }
+
     /// 履歴は持たない(モックの undo は `AppRuntime` のローカル履歴にフォールバックする)。
     public func listVersions(appId: String) async throws -> [VersionSummary] { [] }
 
@@ -109,6 +132,11 @@ public enum MockSeed {
                 Record(id: "l2", data: ["subject": "英語", "weekday": "水", "period": 2, "room": "B203"], createdAt: iso),
                 Record(id: "l3", data: ["subject": "英語演習", "weekday": "水", "period": 2, "room": "B204"], createdAt: iso),
                 Record(id: "l4", data: ["subject": "プログラミング", "weekday": "金", "period": 3, "room": "PC室"], createdAt: iso),
+            ],
+            // post_comments(#256): 投稿 2 件(投稿のフォーム →「コメントを書く」で親が入る)
+            "posts": [
+                Record(id: "post1", data: ["body": "金沢でハッカソンに参加中", "posted": .string(iso)], createdAt: iso),
+                Record(id: "post2", data: ["body": "新しいカフェを見つけた", "posted": .string(iso)], createdAt: iso),
             ],
             // bmi(#101): 65kg/170cm → 22.5、70kg/175cm → 22.9
             "body": [

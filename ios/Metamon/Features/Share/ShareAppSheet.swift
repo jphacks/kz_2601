@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
+#if !APP_STORE_REVIEW
 import SwiftUI
 import CoreImage.CIFilterBuiltins
 import MetamonServices
@@ -255,3 +257,4 @@ struct QRCodeImage: View {
         return UIImage(cgImage: cg)
     }
 }
+#endif

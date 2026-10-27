@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
+#if !APP_STORE_REVIEW
 import Foundation
 
 /// `POST /v1/apps/{appId}/share` の応答(#49)。`url` = `tailorit://import/<token>`、`webUrl` = ブラウザ用フォールバック(`/s/<token>`)。
@@ -99,3 +101,4 @@ public enum ShareURL {
         return token
     }
 }
+#endif

@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
+#if !APP_STORE_REVIEW
 import SwiftUI
 import MetamonServices
 
@@ -141,3 +143,4 @@ struct SharingHooks: ViewModifier {
     }
     #endif
 }
+#endif
