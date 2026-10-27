@@ -8279,6 +8279,397 @@
           }
         }
       }
+    },
+    "共有・オンラインの機能と、新しいアプリを、いくつでも": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shared, online features and unlimited new apps"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有・オンラインの機能と、新しいアプリを、いくつでも"
+          }
+        }
+      }
+    },
+    "「%@」には Tailor It Pro が必要です": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” requires Tailor It Pro"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」には Tailor It Pro が必要です"
+          }
+        }
+      }
+    },
+    "「%@」に参加するには Tailor It Pro が必要です": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Joining “%@” requires Tailor It Pro"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」に参加するには Tailor It Pro が必要です"
+          }
+        }
+      }
+    },
+    "みんなで共有するデータ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shared data"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "みんなで共有するデータ"
+          }
+        }
+      }
+    },
+    "みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data that everyone writes is stored in the cloud and synced to every device, which costs server resources."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。"
+          }
+        }
+      }
+    },
+    "Pro でできること": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What you get with Pro"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro でできること"
+          }
+        }
+      }
+    },
+    "みんなで書き込める共有のデータ(掲示板・ランキング・割り勘など)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shared data everyone can write to (boards, rankings, split bills and more)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "みんなで書き込める共有のデータ(掲示板・ランキング・割り勘など)"
+          }
+        }
+      }
+    },
+    "シェアされたアプリに参加して、同じデータを使えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Join shared apps and use the same data"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "シェアされたアプリに参加して、同じデータを使えます"
+          }
+        }
+      }
+    },
+    "1 か月ごとの自動更新": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-renews every month"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 か月ごとの自動更新"
+          }
+        }
+      }
+    },
+    "%@ / 月": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ / month"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ / 月"
+          }
+        }
+      }
+    },
+    "月額の自動更新サブスクリプションです。お支払いは購入の確定時に Apple ID に請求されます。期間終了の 24 時間前までに解約しない限り自動で更新され、更新分は終了前の 24 時間以内に請求されます。解約は App Store のアカウント設定からいつでもできます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is a monthly auto-renewing subscription. Payment is charged to your Apple ID at confirmation of purchase. It renews automatically unless canceled at least 24 hours before the end of the current period, and the renewal is charged within 24 hours before the period ends. You can cancel anytime in your App Store account settings."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "月額の自動更新サブスクリプションです。お支払いは購入の確定時に Apple ID に請求されます。期間終了の 24 時間前までに解約しない限り自動で更新され、更新分は終了前の 24 時間以内に請求されます。解約は App Store のアカウント設定からいつでもできます。"
+          }
+        }
+      }
+    },
+    "閉じると、共有の機能を外して自分だけの記録にします。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you close this, sharing is removed and your records stay private to you."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閉じると、共有の機能を外して自分だけの記録にします。"
+          }
+        }
+      }
+    },
+    "閉じても、まだ作りません。「この機能なしで作る」か「やめる」を選べます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Closing won't build anything yet. You can then choose \"Build without this feature\" or \"Cancel\"."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閉じても、まだ作りません。「この機能なしで作る」か「やめる」を選べます。"
+          }
+        }
+      }
+    },
+    "購入して作る": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buy and build"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "購入して作る"
+          }
+        }
+      }
+    },
+    "この機能なしで作る": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Build without this feature"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この機能なしで作る"
+          }
+        }
+      }
+    },
+    "%@には Tailor It Pro(%@ / 月)が必要です": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ requires Tailor It Pro (%2$@ / month)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@には Tailor It Pro(%@ / 月)が必要です"
+          }
+        }
+      }
+    },
+    "閉じると、元の版に戻します。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you close this, the app goes back to the previous version."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閉じると、元の版に戻します。"
+          }
+        }
+      }
+    },
+    "共有の機能は Tailor It Pro が必要なため、元の版に戻しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sharing requires Tailor It Pro, so the app went back to the previous version"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有の機能は Tailor It Pro が必要なため、元の版に戻しました"
+          }
+        }
+      }
+    },
+    "共有の機能を外して、自分だけの記録にしました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed sharing. Your records are now private to you"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有の機能を外して、自分だけの記録にしました"
+          }
+        }
+      }
+    },
+    "共有の機能は Tailor It Pro が必要なため、元に戻しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sharing requires Tailor It Pro, so the change was undone"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有の機能は Tailor It Pro が必要なため、元に戻しました"
+          }
+        }
+      }
+    },
+    "閉じると参加しません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you close this, you won't join."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閉じると参加しません。"
+          }
+        }
+      }
+    },
+    "「%@」には参加しませんでした。参加には Tailor It Pro が必要です": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You didn't join “%@”. Joining requires Tailor It Pro"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」には参加しませんでした。参加には Tailor It Pro が必要です"
+          }
+        }
+      }
+    },
+    "課金の制限を無効にする(デモ用・回数と有料機能)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disable purchase limits (demo: daily limit and paid features)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "課金の制限を無効にする(デモ用・回数と有料機能)"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -467,7 +467,12 @@ final class AppRuntime: DSLRuntime {
             withAnimation(.easeInOut(duration: 0.3)) { errorCard = ErrorPresentation(kind: .offlineQueued, transcript: text) }
             return
         }
-        // 課金(#77): 新規作成(初期画面から)は 1 日の無料枠を消費する。枠切れなら上限シートを出して送らない。成功した時だけ数える
+        await sendMetered(text)
+    }
+
+    /// 課金(#77): 新規作成(初期画面から)は 1 日の無料枠を消費する。枠切れなら上限シートを出して送らない。成功した時だけ数える。
+    /// 圏外の保留の自動送信・状態カードの「もう一度」もここを通す(#414: 枠を素通りしない)。
+    private func sendMetered(_ text: String) async {
         let metered = dsl.isVoiceOnly
         if metered, !proGate.admitNewApp() { showVoiceSheet = false; return }
         await send(text)
@@ -478,11 +483,12 @@ final class AppRuntime: DSLRuntime {
     private func sendDeferred(_ text: String) async {
         guard errorCard?.kind == .offlineQueued, errorCard?.transcript == text else { return }
         print("[Metamon] back online → sending deferred transcript")
-        await send(text)
+        await sendMetered(text)
     }
 
     /// ai に送って適用する本体。失敗は `FailureKind` で分類して状態カードに(トーストは使わない)。
-    private func send(_ text: String) async {
+    /// `gatePaid`: 適用の後に、共有の記録が新しく入っていれば課金画面を通す(#414・`AppRuntime+PaidGate.swift`)
+    func send(_ text: String, gatePaid: Bool = true) async {
         guard morphJob == nil, requireAIConsent() else { return }
         withAnimation(.easeInOut(duration: 0.35)) {
             errorCard = nil
@@ -517,6 +523,7 @@ final class AppRuntime: DSLRuntime {
             }
             scheduleFirstEditHint(createdFromInitial: createdFromInitial) // #274 最初のアプリの直後に 1 回だけ
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
+            if gatePaid { await gatePaidGeneration(before: previous) } // #414
         } catch {
             let failure: FailureKind = interruptedByOffline ? .offline : FailureKind.classify(error)
             interruptedByOffline = false
@@ -577,7 +584,7 @@ final class AppRuntime: DSLRuntime {
         case .retry, .sendNow:
             deferredMorph.cancel()
             withAnimation(.easeInOut(duration: 0.3)) { errorCard = nil }
-            Task { await send(card.transcript) }
+            Task { await sendMetered(card.transcript) }
         case .signIn:
             withAnimation(.easeInOut(duration: 0.3)) { errorCard = nil }
             onSessionExpired?()
@@ -626,6 +633,7 @@ final class AppRuntime: DSLRuntime {
                 redoPoint = RedoPoint(version: current.version, document: before, viaServer: true)
                 summaryBanner = SummaryBanner(text: L10n.tr("1つ前に戻しました"), highlight: nil, action: .redo)
                 print("[Metamon] undo ok: restored from version \(target.version) → new version \(doc.version)")
+                await gatePaidRestore(before: before) // #414 共有の版に戻した時も課金画面を通す
                 return
             } catch {
                 print("[Metamon] undo via server failed, falling back to local history: \(error)")
@@ -639,6 +647,7 @@ final class AppRuntime: DSLRuntime {
         apply(previous)
         redoPoint = RedoPoint(version: before.version, document: before, viaServer: false)
         summaryBanner = SummaryBanner(text: L10n.tr("1つ前に戻しました"), highlight: nil, action: .redo)
+        await gatePaidRestore(before: before)
     }
 
     /// 「やり直す」(#209): 戻す前の版に戻る。サーバー経由で戻したならその版を restore、端末の履歴で戻したなら当て直す。
@@ -664,6 +673,7 @@ final class AppRuntime: DSLRuntime {
             apply(point.document)
         }
         summaryBanner = SummaryBanner(text: L10n.tr("やり直しました"), highlight: nil, action: canUndo ? .undo : nil)
+        await gatePaidRestore(before: current)
     }
 
     private func remember(_ doc: AppDocument) {
