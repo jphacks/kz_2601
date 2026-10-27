@@ -609,6 +609,7 @@ func (a *App) Validate() error {
 				}
 			case CompTable:
 				checkTable(where, c, entities, add)
+				checkTableGroup(where, c, entities, add)
 			case CompTimeline:
 				checkTimeline(where, c, entities, add)
 			case CompGridTable:

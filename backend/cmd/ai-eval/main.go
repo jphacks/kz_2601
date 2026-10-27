@@ -381,6 +381,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkEnum(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkKeep(c.Expect, app, rec.Summary)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMarks(c.Expect, app)...) // #255: marks.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkGroupBy(c.Expect, app)...)
 		if v, ok := c.Expect["noOmission"].(bool); ok && v && len(rec.Omissions) > 0 {
 			rec.ExpectMisses = append(rec.ExpectMisses, fmt.Sprintf("omissions=%v", rec.Omissions))
 		}

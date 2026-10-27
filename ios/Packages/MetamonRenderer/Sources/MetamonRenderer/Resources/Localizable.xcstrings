@@ -86,6 +86,40 @@
         }
       }
     },
+    "このデータは参加者だけが見られます(共有)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only participants can see this data (shared)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデータは参加者だけが見られます(共有)"
+          }
+        }
+      }
+    },
+    "このデータは誰でも見られます(公開)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anyone can see this data (public)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデータは誰でも見られます(公開)"
+          }
+        }
+      }
+    },
     "チェック済み": {
       "extractionState": "manual",
       "localizations": {
@@ -490,6 +524,91 @@
           "stringUnit": {
             "state": "translated",
             "value": "まだありません"
+          }
+        }
+      }
+    },
+    "件数": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Count"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "件数"
+          }
+        }
+      }
+    },
+    "%@の合計": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@の合計"
+          }
+        }
+      }
+    },
+    "%@の平均": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avg %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@の平均"
+          }
+        }
+      }
+    },
+    "%@の最小": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Min %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@の最小"
+          }
+        }
+      }
+    },
+    "%@の最大": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Max %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@の最大"
           }
         }
       }

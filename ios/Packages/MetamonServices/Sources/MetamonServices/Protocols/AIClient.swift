@@ -9,12 +9,16 @@ public struct MorphResult: Sendable {
     public var mode: String?
     /// 生成しても何も変わらなかった(#211)。サーバーは保存せず、`summary` に「〜は変更できませんでした。理由: …」を入れる。旧サーバーは送らない(false)
     public var unchanged: Bool
+    /// #253: 新しく誰でも見られる記録に入った個人の情報の欄(`meta.publicPersonalData`)。旧サーバーは送らない(空)
+    public var publicPersonalData: [PublicPersonalField]
 
-    public init(document: AppDocument, summary: String? = nil, mode: String? = nil, unchanged: Bool = false) {
+    public init(document: AppDocument, summary: String? = nil, mode: String? = nil, unchanged: Bool = false,
+                publicPersonalData: [PublicPersonalField] = []) {
         self.document = document
         self.summary = summary
         self.mode = mode
         self.unchanged = unchanged
+        self.publicPersonalData = publicPersonalData
     }
 }
 
@@ -190,10 +194,16 @@ public struct ChatTurn: Codable, Equatable, Sendable {
     public var paidFeatures: [PaidFeature]?
     /// #77: 有料機能を抜いた依頼文(「この機能なしで作る」で transcript の代わりに generate へ)
     public var freeTranscript: String?
+    /// #253: question の時だけ。個人の情報(name / phone など)を誰でも見られる記録に入れてよいかの確認。旧 backend は送らない
+    public var confirmPublic: [String]?
+    /// 公開してよいかの確認の質問か(吹き出しに公開の印を付ける)
+    public var isPublicConfirm: Bool { kind == .question && !(confirmPublic ?? []).isEmpty }
 
     public init(kind: Kind, text: String, suggestions: [String]? = nil, turn: Int, brief: ChatBrief? = nil,
                 transcript: String? = nil, options: [ChatOption]? = nil, locale: String? = nil, source: String? = nil, mode: String? = nil,
-                requiresPro: Bool? = nil, paidFeatures: [PaidFeature]? = nil, freeTranscript: String? = nil, multiSelect: Bool? = nil) {
+                requiresPro: Bool? = nil, paidFeatures: [PaidFeature]? = nil, freeTranscript: String? = nil, multiSelect: Bool? = nil,
+                confirmPublic: [String]? = nil) {
+        self.confirmPublic = confirmPublic
         self.multiSelect = multiSelect
         self.requiresPro = requiresPro
         self.paidFeatures = paidFeatures

@@ -280,10 +280,13 @@ public struct GridRange: Decodable, Sendable, Hashable {
 public struct TableColumnSpec: Decodable, Sendable {
     public var field: String
     public var title: String?
+    /// `table.groupBy` 時の集計(count|sum|avg|min|max・#261)。nil = グループ名の列
+    public var aggregate: String?
 
-    public init(field: String, title: String? = nil) {
+    public init(field: String, title: String? = nil, aggregate: String? = nil) {
         self.field = field
         self.title = title
+        self.aggregate = aggregate
     }
 }
 
