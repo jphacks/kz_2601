@@ -22,6 +22,7 @@
 // requested part itself; Meta.Omissions = parts the server had to note).
 // Field cap (#221): keepEntity / keep ([field id, ...]) / growTo (see checkKeep).
 // Parent -> child (#256): prefillRef (bool: some navigate opens a child form with prefillRef).
+// Share (#254): scopeNot (no entity has that scope), summaryHas ([text, ...]: each is in the summary).
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
@@ -562,6 +563,20 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 			}
 			if !found {
 				miss = append(miss, fmt.Sprintf("scope=%v (want %s)", m.Scopes, want))
+			}
+		case "scopeNot": // #254: 「家族だけ」は public にしない
+			for _, s := range m.Scopes {
+				if strings.HasSuffix(s, ":"+fmt.Sprint(v)) {
+					miss = append(miss, fmt.Sprintf("scopeNot=%v (got %s)", v, s))
+					break
+				}
+			}
+		case "summaryHas":
+			ws, _ := v.([]any)
+			for _, w := range ws {
+				if !strings.Contains(summary, fmt.Sprint(w)) {
+					miss = append(miss, fmt.Sprintf("summaryHas: %q", w))
+				}
 			}
 		}
 	}
