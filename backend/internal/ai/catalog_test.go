@@ -132,7 +132,7 @@ func TestCatalogRendering(t *testing.T) {
 		"- {\"agg\":",
 		"レシピ",
 		"- filter{field, op(eq|neq|gt|gte|lt|lte|thisMonth|today|thisWeek|thisYear|contains), value}",
-		"- navigate{screen / presentation(push|sheet|fullScreen)}",
+		"- navigate{screen / prefillRef, presentation(push|sheet|fullScreen)}",
 		"- saveRecord{entity / screen}",
 		"- back{(追加キー無し)}",
 		"- scheduleNotification{notification{id,title,body,repeat}}",

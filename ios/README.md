@@ -58,6 +58,10 @@ xcrun devicectl device process launch --device 150ACFA5-8AF6-569A-8EBD-47283A3D1
 ```
 - appId は端末ごとに固定(初回起動で UUID を生成し `UserDefaults` に保存)。ai のインメモリ store は再起動で消えるが、未知の appId は初期状態として扱われるので再生成すれば続きから使える(version ズレは 409 → 現行基準で 1 回リトライ)。
 
+## App Store 審査用の版(#245)
+
+審査で危ない機能(HealthKit・背面の位置の記録・近くの端末との共有・カメラの撮影・探す・共有リンク・リリース申請)をバイナリから外した版は `./scripts/build-review.sh build|archive` で作る(scheme `Metamon-Review` / 構成 Review)。詳細は [docs/ios/review-build.md](../docs/ios/review-build.md)。
+
 ## テスト
 
 ```sh

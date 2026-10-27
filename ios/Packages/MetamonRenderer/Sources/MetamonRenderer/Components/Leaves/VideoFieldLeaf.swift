@@ -69,6 +69,7 @@ struct VideoFieldLeaf: View {
                 Text(L("動画を保存できませんでした。もう一度お試しください。")).font(.caption).foregroundStyle(.red)
             }
         }
+        #if !APP_STORE_REVIEW
         .confirmationDialog(c.label ?? L("動画"), isPresented: $showChooser, titleVisibility: .hidden) {
             Button(L("撮影")) { openCamera() }
             Button(L("ライブラリから選ぶ")) { showLibrary = true }
@@ -80,6 +81,7 @@ struct VideoFieldLeaf: View {
             }
             .ignoresSafeArea()
         }
+        #endif
         .photosPicker(isPresented: $showLibrary, selection: $librarySelection, matching: .videos)
         .onChange(of: librarySelection) { _, item in
             guard let item else { return }
@@ -94,6 +96,7 @@ struct VideoFieldLeaf: View {
                 librarySelection = nil
             }
         }
+        #if !APP_STORE_REVIEW
         .alert(L("カメラを使えません"), isPresented: $showDenied) {
             Button(L("設定を開く")) {
                 if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
@@ -103,6 +106,7 @@ struct VideoFieldLeaf: View {
         } message: {
             Text(L("設定アプリで Tailor It のカメラへのアクセスを許可してください。"))
         }
+        #endif
     }
 
     private func ingest(_ url: URL, form: FormDraft, field: String) {
@@ -123,7 +127,16 @@ struct VideoFieldLeaf: View {
 
     private var mode: PhotoSourceMode { PhotoSourceMode(raw: c.source) }
 
-    private var plan: PhotoCapturePlan { PhotoSourcePolicy.plan(for: mode, cameraAvailable: VideoCameraPicker.isAvailable) }
+    /// 審査用ビルド(APP_STORE_REVIEW・#245)は撮影をバイナリから外し、常にライブラリから選ぶ。
+    private static var cameraAvailable: Bool {
+        #if APP_STORE_REVIEW
+        false
+        #else
+        VideoCameraPicker.isAvailable
+        #endif
+    }
+
+    private var plan: PhotoCapturePlan { PhotoSourcePolicy.plan(for: mode, cameraAvailable: Self.cameraAvailable) }
 
     private var sourceHint: String {
         switch plan {
@@ -143,7 +156,11 @@ struct VideoFieldLeaf: View {
 
     private func openCamera() {
         Task { @MainActor in
+            #if APP_STORE_REVIEW
+            showLibrary = true
+            #else
             if await VideoCameraPicker.requestAccess() { showCamera = true } else { showDenied = true }
+            #endif
         }
     }
 }

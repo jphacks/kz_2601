@@ -972,3 +972,4 @@ go run ./cmd/ai-eval -chat -env-file ../../.env -cases internal/ai/eval/m0disc_c
 
 - 1 回の実行で生成 34 回 + チャット 12 回程度。raw JSON はリポジトリに置かない。
 - 今回は 3 並列(-only で分割)で約 2 分。編集ケース(d_edit_*)は `base` の作成ケースを同じ実行に含める。
+- 期待値つきの回帰としての使い方(`-check`・リリース判定の数字・D-xx ごとに足す期待値)は [docs/backend/ai-eval/m0disc-regression.md](../backend/ai-eval/m0disc-regression.md)(#281)。

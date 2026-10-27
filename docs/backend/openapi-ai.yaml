@@ -6,6 +6,10 @@ info:
     音声/文字 → Claude → DSL JSON 生成 → appconfig へ反映。
     - 認証・エラー形式・ページングは appconfig と同一 (`openapi-appconfig.yaml` の `Error` を再利用)。
     - ai は受け取った Bearer をそのまま appconfig へ転送する。
+    - `POST /generate` と `POST /chat` は ai 自身も ID トークンを検証し、利用者ごと・1 日ごとの上限を数える (#280)。
+      上限に当たると 429 `rate_limited`(`RateLimited`)。重さ: chat 1 往復 = 1、generate の修正 = 2、新規作成(create/auto)= 3、undo = 0。
+      既定の上限: 匿名 30 / サインイン済み 60 / Pro 300(サーバーでの Pro 判定は未実装)/ 匿名の同一 IP 300 / 環境全体 2000。日付は 0:00 JST で切り替わる。
+      成功時も `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset`(Unix 秒)を返す。
 servers:
   - url: http://localhost:8081/v1
   - url: https://ai-REPLACE.a.run.app/v1
@@ -72,7 +76,7 @@ paths:
                   code: generation_failed
                   message: could not produce a valid app from the request
                   details: { transcript: えーっと, attempts: 2, problems: ['screen "home" components[0]: list entity "x" does not exist'] }
-        '429': { description: Claude/Whisper のレート制限 (Retry-After 付き), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '429': { $ref: '#/components/responses/RateLimited' }
         '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
 
   /chat:
@@ -150,17 +154,22 @@ paths:
                   value: { kind: ready, mode: edit, text: メモ欄を消しますね。, turn: 1, locale: ja, source: claude, transcript: 支出を記録画面のメモ欄を消して。 }
         '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
         '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
-        '429': { description: Claude のレート制限, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '429': { $ref: '#/components/responses/RateLimited' }
         '502': { description: Claude の出力がスキーマに合わず 2 回とも失敗 (generation_failed), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
         '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
 
   /chat/{appId}:
     delete:
       summary: 対話の会話状態を消す (iOS が「最初から」「キャンセル」した時)
+      description: |
+        会話の状態は ID トークンの uid ごとに持つ (#286)。消せるのは呼んだ本人の会話だけ。
+        トークンが無い・不正なら 401。本人の会話が無く、その appId に他の利用者の会話だけがあれば 403 (何も消さない)。
       parameters:
         - { name: appId, in: path, required: true, schema: { type: string } }
       responses:
-        '204': { description: 消した (存在しなくても 204) }
+        '204': { description: 消した (本人の会話が存在しなくても 204) }
+        '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './openapi-appconfig.yaml#/components/responses/Forbidden' }
 
   /transcribe:
     post:
@@ -200,7 +209,44 @@ paths:
 components:
   securitySchemes:
     firebaseAuth: { type: http, scheme: bearer, bearerFormat: Firebase ID token }
+  responses:
+    RateLimited:
+      description: |
+        1 日の上限に達した (#280)。`code: rate_limited`、`details` は `RateLimitDetails`。
+        Claude 側のレート制限の受け渡しも同じ 429 だが、その時は `details.scope` が無い。
+      headers:
+        Retry-After: { description: 次に使えるまでの秒数, schema: { type: integer } }
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: './openapi-appconfig.yaml#/components/schemas/Error'
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      details: { $ref: '#/components/schemas/RateLimitDetails' }
+          example:
+            error:
+              code: rate_limited
+              message: 今日の利用上限(30)に達しました。10月26日 0:00からまた使えます。サインインすると上限が増えます。
+              details: { scope: user, tier: anonymous, limit: 30, used: 29, remaining: 1, resetAt: '2026-10-25T15:00:00Z', retryAfterSec: 3600 }
   schemas:
+    RateLimitDetails:
+      type: object
+      required: [scope, tier, limit, used, remaining, resetAt, retryAfterSec]
+      properties:
+        scope:
+          type: string
+          enum: [user, ip, global]
+          description: user = 利用者の 1 日の上限 / ip = 同じネットワークの匿名利用の上限 / global = 環境全体の費用ブレーカー
+        tier: { type: string, enum: [anonymous, signed_in, pro] }
+        limit: { type: integer, description: 当たった上限 (単位/日) }
+        used: { type: integer, description: 今日使った単位 }
+        remaining: { type: integer, description: 残り (今回の依頼の重さより小さい) }
+        resetAt: { type: string, format: date-time, description: 次に使える時刻 (翌 0:00 JST) }
+        retryAfterSec: { type: integer }
     GenerateRequest:
       type: object
       required: [appId, text]
@@ -227,6 +273,8 @@ components:
             計算ロジックの 2 パス目(#100・docs/dsl/expressions.md)。true = create の UI 生成後に「発話に必要な計算(Field.computed / stat.value / settlement / ref 型)だけを JSON Patch で足す」小さな呼び出しを追加する。
             省略時はサーバー既定(env AI_LOGIC_PASS=1 で有効・既定は無効 = 1 パスで UI と計算を同時に生成)。edit / undo では無視。2 パス目が検証に通らなければ 1 パス目の結果を返す(失敗にしない)。
             ?stream=1 の `event: app` は 1 パス目の app ブロックで従来どおり先に届き、2 パス目の結果は `event: result` の dsl に入る。
+        allowedComponents: { $ref: '#/components/schemas/AllowedComponents' }
+        disabledFeatures: { $ref: '#/components/schemas/DisabledFeatures' }
       example: { appId: app_01HXYZ, text: 家計簿アプリが欲しい。金額とカテゴリとメモを記録したい, baseVersion: 1 }
     GenerateResponse:
       type: object
@@ -284,6 +332,26 @@ components:
                 attempts: { type: integer }
                 claudeMs: { type: integer }
                 problems: { type: array, items: { type: string }, description: 反映されなかった時の最後の検証エラー }
+            restricted:
+              type: array
+              items: { type: string }
+              description: '#245。allowedComponents / disabledFeatures により生成後に取り除いた・直した内容(例 "removed 2 healthStat"・"camera source -> library on 1 component(s)")。何もしなければ省略'
+    AllowedComponents:
+      type: array
+      items: { type: string }
+      description: |
+        #245。このクライアント(ビルド)が描画できる部品 type(Container と Leaf の type 文字列)の allowlist。**省略または空 = 全部品 OK**(旧 iOS 互換)。
+        制限がある時、AI に渡す部品カタログ・できることの索引から許可外の部品を外し、生成結果に許可外の部品があれば検証エラーとして再生成させ、最後の試行でも残れば取り除く。
+        edit では許可外の部品を新しく足す patch は再生成させ、今の DSL に既にある許可外の部品は取り除いて full で保存する。未知の type は無視(既知の type が 1 つも無ければ制限なし扱い)。
+        generate と chat で同じ値を送る。chat の `capabilities`(返答の種類)とは別物。
+      example: [vstack, hstack, section, text, button, list, stat, chart, textField, numberField, photoField]
+    DisabledFeatures:
+      type: array
+      items: { type: string }
+      description: |
+        #245。部品単位より細かく無効にする機能。既知の値: `fieldHealth`(Field.health を使わない。生成結果の health 属性は落とす)、
+        `cameraCapture`(photoField / videoField の source に camera / both を使わない = library のみ。生成結果は library に直す)。未知の値は無視。省略 = 何も無効にしない。
+      example: [fieldHealth, cameraCapture]
     ChatMessage:
       type: object
       required: [role, text]
@@ -309,6 +377,8 @@ components:
           type: array
           items: { type: string, enum: [answer, proposal] }
           description: '#185。クライアントが表示できる追加の kind。mode を省いて自動判定に任せる新しい iOS はこれを送る'
+        allowedComponents: { $ref: '#/components/schemas/AllowedComponents' }
+        disabledFeatures: { $ref: '#/components/schemas/DisabledFeatures' }
       example: { appId: app_01HXYZ, messages: [{ role: user, text: 家計簿 }] }
     ChatOption:
       type: object
