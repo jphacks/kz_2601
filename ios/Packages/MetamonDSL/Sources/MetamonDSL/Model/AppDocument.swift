@@ -216,10 +216,15 @@ public struct Entity: Decodable, Identifiable, Sendable {
     public var storedFields: [Field] { fields.filter { !$0.isComputed } }
     public var computedFields: [Field] { fields.filter(\.isComputed) }
 
-    /// 一覧の見出しに使う field(titleField → 最初の string field → 最初の field)。
+    /// 一覧の見出しに使う field(titleField → 最初の string field → 最初の field)。hidden の field は見出しにしない(#262)。
     public var displayTitleField: String? {
-        titleField ?? storedFields.first { $0.type == .string }?.id ?? storedFields.first?.id
+        let visible = storedFields.filter { !$0.hidden }
+        if let titleField, field(titleField)?.hidden != true { return titleField }
+        return visible.first { $0.type == .string }?.id ?? visible.first?.id
     }
+
+    /// hidden(#262)の field id。
+    public var hiddenFieldIds: Set<String> { Set(fields.filter(\.hidden).map(\.id)) }
 }
 
 public enum FieldType: String, Decodable, Sendable {
@@ -252,10 +257,13 @@ public struct Field: Decodable, Identifiable, Sendable {
     public var computed: Expr?
     /// "weight": 保存した値をヘルスケアの体重にも書き込む(#167)。
     public var health: String?
+    /// 回答者に見せない項目(クイズの正解・#262)。レコードの作者のフォームにだけ出し、一覧・表・グラフ・見出しには出さない。
+    /// 式(比較)からは読める。値は端末に届いているので厳密な秘匿ではない(docs/dsl/expressions.md §7.6)。
+    public var hidden: Bool
 
     public var isComputed: Bool { computed != nil }
 
-    private enum Keys: String, CodingKey { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health }
+    private enum Keys: String, CodingKey { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health, hidden }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
@@ -269,6 +277,7 @@ public struct Field: Decodable, Identifiable, Sendable {
         refEntity = try? c.decodeIfPresent(String.self, forKey: .refEntity)
         computed = try? c.decodeIfPresent(Expr.self, forKey: .computed)
         health = try? c.decodeIfPresent(String.self, forKey: .health)
+        hidden = (try? c.decodeIfPresent(Bool.self, forKey: .hidden)) ?? false
     }
 }
 
