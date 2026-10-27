@@ -24,6 +24,7 @@ public enum DSLExamples {
             "water",
             "walk_route",
             "health",
+            "chat",
             "shops",
             "timetable",
             "board",

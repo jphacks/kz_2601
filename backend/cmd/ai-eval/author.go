@@ -58,6 +58,9 @@ func showsAuthor(c *dsl.Component) bool {
 	if c.Item != nil && (c.Item.Title == dsl.RecordAuthor || c.Item.Subtitle == dsl.RecordAuthor || c.Item.Trailing == dsl.RecordAuthor) {
 		return true
 	}
+	if c.Type == dsl.CompChatThread { // bubbles carry the sender's name (#260)
+		return true
+	}
 	if c.Type == dsl.CompTimeline && (c.TitleField == dsl.RecordAuthor || c.SubtitleField == dsl.RecordAuthor) {
 		return true
 	}
