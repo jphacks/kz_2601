@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
+#if !APP_STORE_REVIEW
 import SwiftUI
 import MetamonDSL
 
@@ -34,3 +36,4 @@ struct NearbyShareLeaf: View {
         .accessibilityHint(rows.isEmpty ? "送る記録がありません" : "近くの端末を探して \(rows.count) 件を送ります")
     }
 }
+#endif

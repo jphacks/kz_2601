@@ -77,6 +77,11 @@ final class AppRuntime: DSLRuntime {
     }
     /// 401 が再取得後も続いた時(セッション切れ)。`MetamonApp` が `AuthSession.expire()` を結ぶ。
     @ObservationIgnored var onSessionExpired: (@MainActor () -> Void)?
+    /// 今のユーザーが匿名か(#276: 引き継ぎの案内)。`MetamonApp` が `AuthSession` を結ぶ。nil は匿名でない扱い。
+    @ObservationIgnored var isAnonymousUser: (@MainActor () -> Bool)?
+    /// 匿名ユーザーが初めてアプリを作った後に 1 回だけ出す「引き継ぎのためにサインイン」(#276・`AccountLinkPromptHost`)。
+    var showLinkPrompt = false
+    @ObservationIgnored var linkPromptDelay: Duration = .seconds(2.5)
     /// 圏外で送れなかった発話を 1 件保留し、復帰で 1 回だけ送る。
     @ObservationIgnored private let deferredMorph: DeferredSend<String>
     @ObservationIgnored private var connectivityTask: Task<Void, Never>?
@@ -210,6 +215,7 @@ final class AppRuntime: DSLRuntime {
         observeConnectivity()
         if services.isLive {
             await restoreFromServer()
+            if DeviceAppID.issuedThisLaunch { await resumeLatestAppIfEmpty() } // #276: 再インストール後のサインイン
             startSync()
         }
         Task { await syncNotificationsNow() }
@@ -489,6 +495,7 @@ final class AppRuntime: DSLRuntime {
             }
             remember(previous)
             apply(result.document) // withAnimation の中で morphJob = nil も行う
+            if previous.dsl.isVoiceOnly { offerAccountLinkIfNeeded() } // #276
             noteChatApplied(version: result.document.version, summary: result.summary) // #210 反映の区切り
             startSync()
             if let summary = result.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
@@ -963,7 +970,9 @@ final class AppRuntime: DSLRuntime {
             let isNew = form.recordId == nil
             records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: form.recordId, data: payload)
             WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            #if !APP_STORE_REVIEW
             writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)
+            #endif
             if let screen = action.screen {
                 navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
             } else {
