@@ -13,17 +13,21 @@ import (
 
 func TestClassifyShareIntent(t *testing.T) {
 	for in, want := range map[string]shareIntent{
-		"旅行の割り勘。友達のスマホからも入力したい":          shareEveryone,
-		"この割り勘を友達のスマホからも入力できるようにして":      shareEveryone,
-		"家族で共有する家事分担のアプリ":                shareEveryone,
-		"この家計簿を家族だけで共有して":                shareLimited,
-		"招待した人だけが見られるようにして":              shareLimited,
-		"Share this with my family only": shareLimited,
-		"この記録は自分だけにして":                   sharePrivate,
-		"LINE で共有できるボタンを付けて":             shareNone,
-		"家族の誕生日を記録したい":                   shareNone,
-		"カテゴリにカフェを追加して":                  shareNone,
-		"Let me share with my friends":   shareEveryone,
+		"旅行の割り勘。友達のスマホからも入力したい":             shareEveryone,
+		"この割り勘を友達のスマホからも入力できるようにして":         shareEveryone,
+		"家族で共有する家事分担のアプリ":                   shareLimited,
+		"犬の散歩とごはんの記録を家族みんなでつけたい。写真も残す":      shareLimited,
+		"サークルの練習の出欠をメンバーが各自で〇×つけられるやつ":      shareLimited,
+		"ラーメン屋の評価をみんなで投稿して点数のランキングが見られるアプリ": shareEveryone,
+		"家族も喜ぶ献立のアプリ":                       shareNone,
+		"この家計簿を家族だけで共有して":                   shareLimited,
+		"招待した人だけが見られるようにして":                 shareLimited,
+		"Share this with my family only":    shareLimited,
+		"この記録は自分だけにして":                      sharePrivate,
+		"LINE で共有できるボタンを付けて":                shareNone,
+		"家族の誕生日を記録したい":                      shareNone,
+		"カテゴリにカフェを追加して":                     shareNone,
+		"Let me share with my friends":      shareEveryone,
 		"家族だけで共有して(無料版で作る: 他のユーザーとデータを共有する機能は入れない。みんなで書き込む・投稿はせず、すべて自分だけの記録として作る)": sharePrivate,
 	} {
 		if got := classifyShareIntent(in); got != want {
@@ -44,7 +48,7 @@ func TestShareRules_InEveryPrompt(t *testing.T) {
 			t.Errorf("%s prompt lacks shareChatRule", name)
 		}
 	}
-	for _, w := range []string{"友達のスマホ", "家族だけ", "/entities/<i>/scope"} {
+	for _, w := range []string{"友達のスマホ", "家族だけ", "/entities/<i>/scope", `scope:"shared"`} {
 		if !strings.Contains(shareRules, w) {
 			t.Errorf("shareRules lacks %q", w)
 		}
@@ -146,25 +150,112 @@ func TestShare_NoRetryForOtherEdits(t *testing.T) {
 	}
 }
 
-// #215: "family only" may become public only with the limit said aloud.
-func TestShare_FamilyOnlyIsNotSilentPublic(t *testing.T) {
-	const note = "限られた人だけで共有することは今はできないため"
-	createSvc, _ := newSvc(&fakeCaller{replies: []string{string(warikanWithScope(t, "public"))}})
+const sharedPatch = `{"summary":"支出を家族と共有できるようにしました。","patch":[{"op":"add","path":"/entities/0/scope","value":"shared"},{"op":"add","path":"/entities/1/scope","value":"shared"}]}`
+const sharedNote = "作った人とリンクで招待した人だけが見られます"
+
+// #215 #254: "family only" becomes shared (link members, #388), never a silent
+// public. Create and edit agree; a public answer is regenerated once.
+func TestShare_FamilyOnlyIsShared(t *testing.T) {
+	cf := &fakeCaller{replies: []string{string(warikanWithScope(t, "public")), string(warikanWithScope(t, "shared"))}}
+	createSvc, _ := newSvc(cf)
 	created, err := createSvc.Generate(context.Background(), Request{AppID: "c1", Transcript: "家族だけで共有する割り勘アプリを作って"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(created.Summary, note) {
+	if len(cf.calls) != 2 || !strings.Contains(cf.calls[1].Messages[0].Content, `scope:"shared"`) {
+		t.Fatalf("a public answer should be retried toward shared, calls=%d", len(cf.calls))
+	}
+	if !strings.Contains(created.Summary, sharedNote) || strings.Contains(created.Summary, "誰でも見られ") {
 		t.Errorf("create summary: %s", created.Summary)
 	}
 
-	svc, f := editSvc(t, warikanWithScope(t, ""), declinedSharePatch, sharePatch)
+	publicPatch := strings.ReplaceAll(sharedPatch, `"shared"`, `"public"`)
+	svc, f := editSvc(t, warikanWithScope(t, ""), publicPatch, sharedPatch)
 	edited, err := svc.Generate(context.Background(), Request{AppID: "a1", Transcript: "この割り勘を家族だけで共有して"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(f.calls) != 2 || !strings.Contains(edited.Summary, note) {
+	if len(f.calls) != 2 || !strings.Contains(edited.Summary, sharedNote) {
 		t.Errorf("edit calls=%d summary: %s", len(f.calls), edited.Summary)
+	}
+	cs, es := scopesOf(t, created.DSL), scopesOf(t, edited.DSL)
+	for id, s := range cs {
+		if s != dsl.ScopeShared || es[id] != s {
+			t.Errorf("entity %s: create %s, edit %s", id, s, es[id])
+		}
+	}
+}
+
+// The three answers (#254 完了の条件): family → shared, everyone → public,
+// only me → private, the same for create and edit.
+func TestShare_ScopeByIntent(t *testing.T) {
+	removePatch := `{"summary":"自分だけの記録にしました。","patch":[{"op":"remove","path":"/entities/0/scope"},{"op":"remove","path":"/entities/1/scope"}]}`
+	for _, c := range []struct {
+		say, editSay string
+		want         dsl.EntityScope
+		base         string // edit base scope
+		edit         []string
+		note         string
+	}{
+		{"家族で共有する割り勘アプリ", "この割り勘を家族で共有して", dsl.ScopeShared, "", []string{declinedSharePatch, sharedPatch}, sharedNote},
+		{"旅行の割り勘。みんなで入力したい", "この割り勘をみんなで入力できるようにして", dsl.ScopePublic, "", []string{declinedSharePatch, sharePatch}, "誰でも見られます"},
+		{"自分だけの割り勘メモ", "この割り勘を自分だけにして", dsl.ScopePrivate, "public", []string{removePatch}, ""},
+	} {
+		t.Run(string(c.want), func(t *testing.T) {
+			scope := string(c.want)
+			if c.want == dsl.ScopePrivate {
+				scope = ""
+			}
+			createSvc, _ := newSvc(&fakeCaller{replies: []string{string(warikanWithScope(t, scope))}})
+			created, err := createSvc.Generate(context.Background(), Request{AppID: "c1", Transcript: c.say})
+			if err != nil {
+				t.Fatal(err)
+			}
+			svc, f := editSvc(t, warikanWithScope(t, c.base), c.edit...)
+			edited, err := svc.Generate(context.Background(), Request{AppID: "a1", Transcript: c.editSay})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(f.calls) != len(c.edit) {
+				t.Errorf("edit calls=%d want %d", len(f.calls), len(c.edit))
+			}
+			for name, raw := range map[string][]byte{"create": created.DSL, "edit": edited.DSL} {
+				for id, s := range scopesOf(t, raw) {
+					if s != c.want {
+						t.Errorf("%s %s: scope %s want %s", name, id, s, c.want)
+					}
+				}
+			}
+			for name, s := range map[string]string{"create": created.Summary, "edit": edited.Summary} {
+				if c.note != "" && !strings.Contains(s, c.note) {
+					t.Errorf("%s summary lacks %q: %s", name, c.note, s)
+				}
+				if c.want != dsl.ScopePublic && strings.Contains(s, "誰でも見られ") {
+					t.Errorf("%s summary says public: %s", name, s)
+				}
+			}
+		})
+	}
+}
+
+func TestShareEditProblem(t *testing.T) {
+	private, public, shared := warikanWithScope(t, ""), warikanWithScope(t, "public"), warikanWithScope(t, "shared")
+	for _, c := range []struct {
+		say           string
+		before, after []byte
+		want          string // "" = no problem, else a substring
+	}{
+		{"この割り勘を家族だけで共有して", private, public, `"value":"shared"`},
+		{"この割り勘を家族だけで共有して", public, public, `"value":"shared"`},
+		{"この割り勘を家族だけで共有して", private, shared, ""},
+		{"この割り勘を友達のスマホからも入力できるようにして", private, private, `"value":"public"`},
+		{"この割り勘を友達のスマホからも入力できるようにして", shared, shared, ""},
+		{"カテゴリにカフェを追加して", private, private, ""},
+	} {
+		got := shareEditProblem(c.say, c.before, c.after)
+		if (c.want == "") != (got == "") || !strings.Contains(got, c.want) {
+			t.Errorf("%q: %q", c.say, got)
+		}
 	}
 }
 
@@ -183,9 +274,23 @@ func TestWithShareNote(t *testing.T) {
 	if got := withShareNote("家計簿を作りました。", "家族だけで使う家計簿", nil, private, LocaleJA); !strings.Contains(got, "記録は自分だけのままです") {
 		t.Errorf("family-only left private should say so: %s", got)
 	}
-	en := withShareNote("Shared it.", "share this with my family only", private, public, LocaleEN)
-	if !strings.Contains(en, "isn't available yet") || !strings.Contains(en, "anyone who opens this app can see") {
-		t.Errorf("en: %s", en)
+	shared := warikanWithScope(t, "shared")
+	for _, before := range [][]byte{private, public} {
+		got := withShareNote("x。", "家族だけで共有して", before, shared, LocaleJA)
+		if !strings.Contains(got, "は、"+sharedNote) || strings.Contains(got, "誰でも見られ") {
+			t.Errorf("shared should say link members only: %s", got)
+		}
+	}
+	if got := withShareNote("x。", "家族だけで共有して", shared, shared, LocaleJA); got != "x。" {
+		t.Errorf("already shared should keep the summary: %s", got)
+	}
+	en := withShareNote("Shared it.", "share this with my family only", private, shared, LocaleEN)
+	if !strings.Contains(en, "people you invite with the share link") || strings.Contains(en, "Anyone") {
+		t.Errorf("en shared: %s", en)
+	}
+	en = withShareNote("Shared it.", "share with my friends", private, public, LocaleEN)
+	if !strings.Contains(en, "Anyone who opens this app can see") {
+		t.Errorf("en public: %s", en)
 	}
 }
 

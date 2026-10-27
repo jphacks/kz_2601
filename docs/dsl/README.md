@@ -135,7 +135,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 | type | フィールド | iOS の挙動 |
 |---|---|---|
-| `navigate` | `screen`, `presentation?`(push/sheet/fullScreen) | 遷移。`list.onItemTap` からは **recordId を暗黙に渡し**遷移先フォームが編集モードになる |
+| `navigate` | `screen`, `presentation?`(push/sheet/fullScreen), `prefillRef?` | 遷移。`list.onItemTap` からは **recordId を暗黙に渡し**遷移先フォームが編集モードになる(だから遷移先は同じ entity のフォーム)。`prefillRef` 付きは**親から子を作る**: 今のレコードを子フォームの ref に入れて新規で開く(下の「親から子を作る」) |
 | `back` | | スタックがあれば pop、モーダル最下層なら dismiss |
 | `saveRecord` | `entity`, `screen?` | ドラフトを POST(新規)/PATCH(編集)→ レコード再取得 → `screen` へ、無ければ `back` |
 | `deleteRecord` | `entity`, `confirmMessage?` | 現在の recordId を DELETE → back。list の長押し削除も同じ |
@@ -156,6 +156,9 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 - `openUrlButton.url` は https のほか allowlist のカスタムスキーム(`line` `slack` `discord` `tel` `mailto` `maps` `comgooglemaps`)を許可する(backend `dsl.OpenURLSchemes` と iOS `ExternalURLPolicy` が同じ表・`line`/`slack`/`discord` は Info.plist `LSApplicationQueriesSchemes` にも登録)。`http://` や未知スキームは backend がエラー・iOS はプレースホルダ。
 - `webView` は `WKWebView` の `UIViewRepresentable`(戻る/進む/再読込の小ツールバー + 読み込みバー)。https 以外は不可。WKWebView 自身がスクロールするので `GridScreenLayout.scrollsInside` には**入れない**(セル内で二重スクロールしない)。ページ内リンクが allowlist のスキーム(tel: 等)なら OS に渡し、それ以外の非 http(s) は無視。実例: `examples/gallery-web.json`(webView + LINE/Slack/Discord/共有シートの 4 ボタン + maps/tel/mailto/line リンク)。
 - `calendar.onDateTap` は既存の `navigate` を使う。行タップは recordId を渡して編集、「追加」はタップした日を `dateField` の初期値として Renderer 内の `FormPrefill` に積み、次に開いた新規フォームが 1 回だけ消費する(`Action` に params を増やさない)。
+- **親から子を作る(#256)**: コメント・回答・出欠・いいねのような「親のレコードに付く子のレコード」は、子の entity に親を指す `ref` field(例 `post_comments.post` → `posts`)を置き、`navigate` に `prefillRef: "<その ref field id>"` を付けて子のフォームを開く。**今のレコード** = `list` / `mapView` の `onItemTap` ならタップした行、`button` / `toolbar` ならその画面(`screen.entity`)のフォームのレコード。iOS は今のレコードの id を `FormPrefill` に積み、子のフォームを**新規**で開いて ref に 1 回だけ入れる(recordId は渡さない)。実例: `examples/post_comments.json`(投稿のフォームの「コメントを書く」)。
+  - 検証(`backend/pkg/dsl/prefill_ref.go`・エラー): `list` / `mapView` / `gridTable` の `onItemTap` と `calendar.onDateTap` が**別 entity のフォーム**へ `prefillRef` 無しで行く(タップした行の id で別 entity のフォームが編集モードで開き、該当レコードが無い。旧 d_quiz_game の問題一覧 → 回答フォーム)。メッセージに「同じ entity のフォームへ向ける / `prefillRef` に使える ref field」を入れ、AI の再生成にそのまま渡す。
+  - `prefillRef` の条件: 遷移先は `screen.entity` のあるフォーム・field はその entity の保存される `ref`(`refs` / computed 不可)・`refEntity` が今のレコードの entity・遷移先フォームにその field の `picker` を残す(親が見えて選び直せる。prefillRef を知らない古い iOS でも保存できる)・`screen.entity` の無い画面の button / toolbar と、`calendar` / `gridTable` のタップ(自前で日付・マスを `FormPrefill` に積む)では使えない。
 - `gridTable`(#234)は時間割のマス目。列 = columnField の値(enum の options か columnValues)、行 = rowField の値(integer は rowRange、enum は options か rowValues)。マスのタップは `onItemTap`: 記録 1 件 = recordId 付きで編集、空き = 列・行の値を `FormPrefill` に積んで新規、複数 = メニュー(各記録の編集 + 追加)。1 マスに複数ある時は先頭 + 「+n」。列見出しが曜日なら今日の列を強調。列が画面幅に収まらなければ横スクロール、縦は `GridCell` の内側スクロール。配置計算は iOS `GridTableLayout`(MetamonDSL)。実例: `examples/timetable.json`。
 - `searchBar.field` は entity の field ではなく**画面ローカルのキー**(`ScreenLocals`)。`list.searchField` で参照し、レコードには保存しない。
 - `mapView` は `latField`/`lngField` の 2 列ではなく既存の **`location` 型 field 1 つ**(`"lat,lng"`)を使う(`locationButton` の保存先と同じ表現・entity の field 数を増やさない)。既存 `map` Leaf は無かったので新設。
@@ -199,10 +202,10 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 ### 3.5 entity.scope = レコードを誰と共有するか(#47)
 
-**共有の依頼の扱い(#259 #215)**: 語の表は `backend/internal/ai/share_intent.go` の 1 か所で、生成(作成・編集)のプロンプト、チャットのプロンプト、有料機能の判定(`paid.go`)、サーバーの点検が同じ表を読む。
+**共有の依頼の扱い(#259 #215 #254)**: 語の表は `backend/internal/ai/share_intent.go` の 1 か所で、生成(作成・編集)のプロンプト、チャットのプロンプト、有料機能の判定(`paid.go`)、サーバーの点検が同じ表を読む。
 
 - 「友達のスマホからも」「みんなで」「〜と共有」= 他の人と同じ記録を使う → **作成でも編集でも** その entity を `public`。編集は `{"op":"add","path":"/entities/<i>/scope","value":"public"}`(既にあれば replace)。編集が「できない」と返して全 entity が private のままなら、サーバーがレシピを添えて 1 回だけ作り直させる。
-- 「家族だけ」「招待した人だけ」= 限定の共有は v1 に無い(D-06)。public にする時は summary に「限られた人だけで共有することは今はできないため、○○はアプリを開いた人なら誰でも見られる公開にしました。」が必ず入る(黙って公開にしない)。private のままなら「…記録は自分だけのままです。」が入る。チャットは ready の前に確認する。
+- 「家族だけ」「家族で共有」「家族みんなで」「サークルで」「チームで」「招待した人だけ」= 決まった人だけの共有 → **作成でも編集でも** その entity を `shared`(#388 で作成者とシェアリンクで参加した人だけになった・D-06)。public にはしない: 作成で shared が 1 つも無い / 編集で shared にならなかった時は、サーバーが `"value":"shared"` のレシピを添えて 1 回だけ作り直させる。新しく shared になった entity があれば summary に「○○は、作った人とリンクで招待した人だけが見られます(共有シートからリンクを送って招待)。」が入る(下の「誰でも見られます」は public になった entity だけ)。private のままなら「共有の設定は変えていないため、記録は自分だけのままです。」が入る。チャットは「できる」と答え、公開の確認はしない。
 - 新しく public / shared になった entity があれば、サーバーが summary に「○○は、このアプリを開いた人なら誰でも見られます(みんなに公開)。」を足す(D-05 の文言・すでに言っていれば足さない)。
 - **個人の情報(#253)**: public / shared の entity に名前・電話番号・住所・メールアドレス・誕生日・居場所らしい field(`backend/internal/ai/public_pii.go` が field の id・name・型で判定。ペットの名前・商品名は対象外)が新しく入ったら、サーバーが上の一文の後に「「名前」「電話番号」のような個人の情報も公開されます。ほかの人に見られてよいか確かめてください。」を足し、応答の `meta.publicPersonalData` に field ごとの警告を入れる(iOS が確認ダイアログを出せる)。チャットは依頼文と brief からこれを読み取り、ready の前に 1 回だけ question で確かめる(`confirmPublic`)。
 - 「自分だけ」「非公開」「共有をやめて」は scope を remove。「LINE で送る」「共有ボタン」は scope ではなく shareButton。

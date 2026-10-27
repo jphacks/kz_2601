@@ -89,7 +89,7 @@ type EntityScope string
 
 const (
 	ScopePrivate EntityScope = "private" // owner only (default)
-	ScopeShared  EntityScope = "shared"  // v1: same as public; participant-only later
+	ScopeShared  EntityScope = "shared"  // creator + people who joined by share link (#388)
 	ScopePublic  EntityScope = "public"  // anyone can read; signed-in users can post
 )
 
@@ -144,6 +144,7 @@ type Field struct {
 	RefEntity    string    `json:"refEntity,omitempty"` // type=ref/refs: target entity id
 	Computed     *Expr     `json:"computed,omitempty"`  // read-only calculated field (row context = this record)
 	Health       string    `json:"health,omitempty"`    // "weight": also write the saved value to HealthKit (#167)
+	Hidden       bool      `json:"hidden,omitempty"`    // not shown to answerers (quiz answer key); computed may compare it (#262)
 }
 
 // Screen is one navigable page.
@@ -187,6 +188,7 @@ type Action struct {
 	ConfirmMessage string        `json:"confirmMessage,omitempty"`
 	Notification   *Notification `json:"notification,omitempty"`   // scheduleNotification
 	NotificationID string        `json:"notificationId,omitempty"` // cancelNotification
+	PrefillRef     string        `json:"prefillRef,omitempty"`     // navigate: ref field of the target form set to the current record (#256)
 }
 
 // ComponentType discriminates Component.
