@@ -44,8 +44,10 @@ var expectKeys = map[string]expectKind{
 	"noShared":     expectBool,
 	"shared":       expectBool,
 	"scope":        expectString,
-	"editMembers":  expectBool, // #252 (PR #378)
-	"noOmission":   expectBool, // #257 (PR #379)
+	"editMembers":  expectBool,   // #252 (PR #378)
+	"noOmission":   expectBool,   // #257 (PR #379)
+	"scopeNot":     expectString, // #254 (PR #405)
+	"summaryHas":   expectStrings,
 	// checkGroupBy (#261, PR #404)
 	"groupedTable": expectBool,
 	// checkNav

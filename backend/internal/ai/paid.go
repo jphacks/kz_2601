@@ -97,14 +97,32 @@ func (c *PaidCatalog) Detect(text string, loc Locale) []PaidFeature {
 		for _, ex := range f.ExcludeKeywords {
 			s = strings.ReplaceAll(s, strings.ToLower(ex), " ")
 		}
+		hit := false
 		for _, kw := range f.Keywords {
 			if kw != "" && strings.Contains(s, strings.ToLower(kw)) {
-				out = append(out, f.public(loc))
+				hit = true
 				break
 			}
 		}
+		// #259: the share words that make generation pick scope public count too
+		if !hit && sharesData(f.DSLEntityScopes) {
+			in := classifyShareIntent(text)
+			hit = in == shareEveryone || in == shareLimited
+		}
+		if hit {
+			out = append(out, f.public(loc))
+		}
 	}
 	return out
+}
+
+func sharesData(scopes []string) bool {
+	for _, s := range scopes {
+		if s == string(dsl.ScopePublic) || s == string(dsl.ScopeShared) {
+			return true
+		}
+	}
+	return false
 }
 
 // InApp returns the paid features a DSL actually uses (`dslEntityScopes`).
