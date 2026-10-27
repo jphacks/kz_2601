@@ -132,6 +132,8 @@ final class AppRuntime: DSLRuntime {
         var text: String
         /// assistant の時だけ。応答の kind(答えをもらった質問を依頼文から除くのに使う)
         var kind: ChatTurn.Kind? = nil
+        /// 個人の情報を公開してよいかの確認(#253 `confirmPublic`)。吹き出しに公開の印を付ける
+        var confirmsPublic = false
     }
     /// 会話中の吹き出し(空 = 対話していない)。初期画面(create)と生成後の音声シート(edit・#186)で使う。
     var chatBubbles: [ChatBubble] = [] {
@@ -178,6 +180,9 @@ final class AppRuntime: DSLRuntime {
     var paidConfirmMessage: String?
     /// 課金の司令塔(既定は共有の 1 つ。テストで差し替える)
     @ObservationIgnored var proGate: ProGate = .shared
+
+    /// 生成直後の「個人の情報も公開されます」の確認(#253・nil = 出していない)。`Features/Privacy/AppRuntime+PublicData.swift`
+    var publicDataPrompt: PublicDataPrompt?
 
     let services: Services
     /// レコードのローカル DB + 未送信キュー(Issue #48)。`records` はここから読み、書きはここに即反映してから裏で送る。
@@ -490,6 +495,7 @@ final class AppRuntime: DSLRuntime {
             remember(previous)
             apply(result.document) // withAnimation の中で morphJob = nil も行う
             noteChatApplied(version: result.document.version, summary: result.summary) // #210 反映の区切り
+            notePublicPersonalData(result) // #253 公開の記録に個人の情報が入ったら確認
             startSync()
             if let summary = result.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
                 summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary), action: canUndo ? .undo : nil)

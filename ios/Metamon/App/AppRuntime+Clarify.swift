@@ -223,7 +223,7 @@ extension AppRuntime {
             withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
                 chatPending = false
                 chatTurn = turn
-                chatBubbles.append(ChatBubble(role: .assistant, text: turn.text, kind: turn.kind))
+                chatBubbles.append(ChatBubble(role: .assistant, text: turn.text, kind: turn.kind, confirmsPublic: turn.isPublicConfirm))
             }
             await Task.yield() // 吹き出しの描画が始まるまで
             timing.shown = .now

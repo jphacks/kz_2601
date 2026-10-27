@@ -55,7 +55,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.image) { c, ctx in ImageLeaf(c: c, ctx: ctx) }
         r.register(.videoField) { c, ctx in VideoFieldLeaf(c: c, ctx: ctx) }
         r.register(.videoPlayer) { c, ctx in VideoPlayerLeaf(c: c, ctx: ctx) }
-        r.register(.list) { c, ctx in ListLeaf(c: c, ctx: ctx) }
+        r.register(.list) { c, ctx in ListLeaf(c: c, ctx: ctx).publicDataNotice(entity: c.entity) } // #253 公開の表示
         r.register(.stat) { c, _ in StatLeaf(c: c) }
         r.register(.chart) { c, _ in ChartLeaf(c: c) }
         r.register(.voiceInput) { c, _ in VoiceInputLeaf(c: c) }

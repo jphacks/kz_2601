@@ -36,6 +36,19 @@ public struct HTTPAIClient: AIClient {
         var summary: String?
         /// #211。省略 = 変化あり
         var unchanged: Bool?
+        var meta: Meta?
+
+        struct Meta: Decodable {
+            /// #253。壊れていても生成は捨てない(`try?`)
+            var publicPersonalData: [PublicPersonalField]?
+
+            enum CodingKeys: String, CodingKey { case publicPersonalData }
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                publicPersonalData = try? c.decodeIfPresent([PublicPersonalField].self, forKey: .publicPersonalData)
+            }
+        }
     }
 
     public func morph(transcript: String, appId: String, currentVersion: Int) async throws -> MorphResult {
@@ -89,7 +102,8 @@ public struct HTTPAIClient: AIClient {
     static func parse(_ data: Data, appId: String) throws -> MorphResult {
         let res = try JSONDecoder().decode(GenerateResponse.self, from: data)
         let doc = AppDocument(appId: res.appId ?? appId, version: res.version, dsl: res.dsl)
-        return MorphResult(document: doc, summary: res.summary, mode: res.mode, unchanged: res.unchanged ?? false)
+        return MorphResult(document: doc, summary: res.summary, mode: res.mode, unchanged: res.unchanged ?? false,
+                           publicPersonalData: res.meta?.publicPersonalData ?? [])
     }
 
     /// generate 応答から appconfig の `DSLEnvelope` 形(`{appId, version, dsl}`)のバイト列を切り出す(キャッシュ用)。
