@@ -9,6 +9,8 @@ import MetamonDSL
 public final class FormDraft {
     public let entity: Entity
     public private(set) var recordId: String?
+    /// 編集中レコードの投稿者 uid(public/shared entity のみ)。新規・private は nil。
+    public private(set) var author: String?
     public var values: [String: JSONValue] = [:]
 
     public init(entity: Entity, record: Record? = nil) {
@@ -21,6 +23,7 @@ public final class FormDraft {
 
     public func reset() {
         recordId = nil
+        author = nil
         values = [:]
         for f in entity.storedFields {
             values[f.id] = FieldCoding.defaultValue(for: f)
@@ -29,9 +32,22 @@ public final class FormDraft {
 
     public func load(_ record: Record) {
         recordId = record.id
+        author = record.author
         for f in entity.storedFields {
             values[f.id] = record.data[f.id] ?? FieldCoding.defaultValue(for: f)
         }
+    }
+
+    /// `Field.hidden`(#262)の入力を出してよいか(新規 / 自分が投稿したレコード)。
+    public func showsHiddenFields(currentUid: String?) -> Bool {
+        guard isEditing else { return true }
+        return HiddenFields.canEdit(record: Record(id: recordId ?? "", data: [:], author: author), currentUid: currentUid)
+    }
+
+    /// 部品 `c` が束縛する field が、このドラフトでは隠す hidden field か。
+    public func hides(_ c: Component, currentUid: String?) -> Bool {
+        guard let fid = c.field, c.entity == nil || c.entity == entity.id, entity.field(fid)?.hidden == true else { return false }
+        return !showsHiddenFields(currentUid: currentUid)
     }
 
     /// appconfig に送る `data`(Field.type に合わせて正規化・空は落とす)。
