@@ -123,6 +123,7 @@ struct RootView: View {
         #endif
         .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
+        .modifier(PublicDataPromptHost()) // #253 生成直後の「個人の情報も公開されます」
         .onChange(of: rt.document.version) {
             // 変身(apply)が落ち着いてから今の画面をサムネに撮る(変身一覧カード用)
             Task {
