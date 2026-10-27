@@ -1,12 +1,12 @@
 import Foundation
 
-/// 生成アプリのユーザーデータ1件(appconfig `Record`: {id, entity, data, author, createdAt, updatedAt})。`data` のキーは Field.id。
+/// 生成アプリのユーザーデータ1件(appconfig `Record`: {id, entity, data, author?, createdAt, updatedAt})。`data` のキーは Field.id。
 public struct Record: Decodable, Identifiable, Hashable, Sendable {
     public var id: String
     public var data: [String: JSONValue]
     public var createdAt: String?
     public var updatedAt: String?
-    /// 投稿者の uid(public/shared entity でサーバーが付ける)。private entity・未送信の行は nil。
+    /// 作った人の uid(shared / public の entity だけ backend が付ける・#249)。未送信の自分のレコードは nil。
     public var author: String?
 
     public init(id: String, data: [String: JSONValue], createdAt: String? = nil, updatedAt: String? = nil, author: String? = nil) {

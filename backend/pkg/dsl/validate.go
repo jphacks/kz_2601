@@ -231,6 +231,11 @@ func (a *App) Validate() error {
 		default:
 			add("entity %q scope %q must be private, shared or public", e.ID, e.Scope)
 		}
+		switch e.Edit {
+		case "", EditAuthor, EditMembers:
+		default:
+			add("entity %q edit %q must be author or members", e.ID, e.Edit)
+		}
 		seen := map[string]bool{}
 		for j, f := range e.Fields {
 			if !idRe.MatchString(f.ID) {

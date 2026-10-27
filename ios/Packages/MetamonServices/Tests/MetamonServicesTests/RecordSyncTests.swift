@@ -9,10 +9,13 @@ private actor RecordingClient: AppConfigClient {
     var byClientId: [String: Record] = [:]
     /// create で返す拒否(422 等)。entity ごと
     var rejectCreate: [String: APIError] = [:]
+    /// update で返す拒否(403 等)。entity ごと
+    var rejectUpdate: [String: APIError] = [:]
     let inner = InMemoryAppConfigClient()
 
     func setFailures(_ n: Int) { failures = n }
     func setRejectCreate(_ entity: String, _ e: APIError) { rejectCreate[entity] = e }
+    func setRejectUpdate(_ entity: String, _ e: APIError) { rejectUpdate[entity] = e }
 
     private func gate(_ name: String) throws {
         calls.append(name)
@@ -42,6 +45,7 @@ private actor RecordingClient: AppConfigClient {
     }
     func update(appId: String, entity: String, id: String, data: [String: JSONValue]) async throws -> Record {
         try gate("update:\(id)")
+        if let e = rejectUpdate[entity] { throw e }
         return try await inner.update(appId: appId, entity: entity, id: id, data: data)
     }
     func delete(appId: String, entity: String, id: String) async throws {
@@ -271,7 +275,33 @@ final class RecordSyncTests: XCTestCase {
         XCTAssertTrue(rows.isEmpty, "拒否された create のローカル行は消える")
     }
 
+    /// #249: 他人の共有レコードの更新は 403。キューに残さず(再送しない)、未送信印を落として forbidden を UI に渡す。
+    func testSyncQueueForbiddenDropsUpdateAndEmitsForbidden() async throws {
+        let client = RecordingClient()
+        await client.setRejectUpdate("chores", APIError.server(status: 403, code: "forbidden", message: "only the author can modify this record"))
+        let store = RecordStore(directory: dir)
+        let queue = SyncQueue(directory: dir, store: store, client: client, policy: .immediate)
+        await store.upsert(LocalRecord(appId: "a", entity: "chores", recordId: "r1", data: ["done": true], pendingOp: .update, author: "other"))
+        let events = await queue.events()
+        await queue.enqueue(SyncOperation(appId: "a", entity: "chores", recordId: "r1", kind: .update, data: ["done": true]))
+        await queue.drain()
+        var it = events.makeAsyncIterator()
+        let first = await it.next()
+        guard case .forbidden(let appId, let entity)? = first else {
+            return XCTFail("expected forbidden, got \(String(describing: first))")
+        }
+        XCTAssertEqual([appId, entity], ["a", "chores"])
+        let count = await queue.count
+        XCTAssertEqual(count, 0, "403 は再送しない(送信待ちに積まない)")
+        let calls = await client.calls
+        XCTAssertEqual(calls, ["update:r1"], "1 回だけ送って諦める")
+        let row = await store.row(appId: "a", entity: "chores", recordId: "r1")
+        XCTAssertEqual(row?.pendingOp, PendingOp.none, "未送信印を落とす(次の pull でサーバーの値に戻る)")
+        XCTAssertEqual(row?.author, "other")
+    }
+
     func testClassify() {
+        XCTAssertEqual(SyncQueue.classify(APIError.server(status: 403, code: "forbidden", message: "only the author can modify this record")), .forbidden)
         XCTAssertEqual(SyncQueue.classify(URLError(.notConnectedToInternet)), .transient)
         XCTAssertEqual(SyncQueue.classify(APIError.http(status: 503, body: "")), .transient)
         XCTAssertEqual(SyncQueue.classify(APIError.http(status: 401, body: "")), .transient)

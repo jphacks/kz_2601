@@ -897,6 +897,7 @@ func summarize(a *dsl.App) string {
 			fmt.Fprintf(&b, "%sに通知が届きます。", when)
 		}
 	}
+	b.WriteString(editNoteJa(a))
 	b.WriteString(substitutionNote(a.App.Description))
 	return b.String()
 }

@@ -50,7 +50,7 @@
 ```
 AppDSL { schemaVersion:1, app:AppMeta, initialScreen, entities[], screens[] }
 AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: fullscreen|floating|none, notifications[]?, tabs[]?: {screen,title,icon?} }
-Entity  { id, name, titleField?, scope?: private|shared|public, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit?, refEntity?, computed?: Expr, health?: "weight" } }
+Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|members, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit?, refEntity?, computed?: Expr, health?: "weight" } }
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
 Leaf (44 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
@@ -212,13 +212,15 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | scope | 意味 | レコードの置き場(appconfig) | 書き込み権限 |
 |---|---|---|---|
 | `private`(省略時) | 本人だけ。家計簿・日記・体重など | `users/{uid}/apps/{appId}/entities/{e}/records` | 本人のみ(従来どおり) |
-| `public` | 誰でも読める・ログイン済みなら誰でも投稿できる。掲示板・みんなのランキング・共有リスト | `apps_public/{appId}/entities/{e}/records`(**appId だけで一意**。同じ appId を開いた全員が同じデータを見る) | create は全員、update/delete は投稿者本人のみ(他人のは 403) |
+| `public` | 誰でも読める・ログイン済みなら誰でも投稿できる。掲示板・みんなのランキング・共有リスト | `apps_public/{appId}/entities/{e}/records`(**appId だけで一意**。同じ appId を開いた全員が同じデータを見る) | create は全員、update は投稿者本人のみ(`edit:"members"` なら参加者全員)、delete は投稿者本人のみ(他人のは 403) |
 | `shared` | 同じアプリを開いた人と共有 | **v1 では `public` と同じ扱い**(参加者限定=招待制は後段) | public と同じ |
 
 - public/shared のレコードには backend が **`author`(uid)と `authorName`(iOS が POST 時に任意送信・無ければ "匿名")を自動付与**し、`GET /records` のレコード最上位(`data` の外)で返す。ゆえに public/shared entity の field id に `author` / `authorName` は使えない(`Validate()` がエラー)。
 - **`shared` の参加者(#254)**: 上の表の「v1 では public と同じ扱い」は #254 で変わった。`shared` の records は**作成者とシェアリンク / QR で参加した人だけ**が読み書きでき、それ以外は 403(`details.reason: not_member`)。置き場は public と同じ `apps_public/{appId}`。参加は `POST /shares/{token}/import`、退出・一覧は `/apps/{appId}/members`。家族・サークル・友達・チームは `shared`、不特定多数(掲示板・ランキング)は `public`。詳細と移行は [architecture.md §3.4](../backend/architecture.md)。
 - public entity を 1 つでも含むアプリは、作成者の `PUT/PATCH /dsl`(と `POST /apps`・restore)で **`apps_public/{appId}` に DSL が複製**される。他ユーザーが同じ appId で `GET /v1/apps/{appId}/dsl` を開くと、自分の `users/{uid}/apps/{appId}` が無ければその DSL が**インストール**(自分の下に複製・version 1)される。以後の編集は各自のコピーに対して行われ、公開 DSL を上書きできるのは最初に公開したユーザーだけ。
-- 作り方: AI が「みんなで」「共有」「投稿」「ランキング」「掲示板」を聞いたら `scope:"public"`、個人の記録なら省略。iOS 側(投稿者名の表示・他人のレコードは編集不可・authorName の送信)は別 Issue。iOS のデコーダは未知キーを無視するので、未対応ビルドでも落ちない。
+- **`entity.edit`(#252)**: public/shared のレコードを誰が更新できるか。`author`(省略時)は投稿者本人だけ、`members` は同じ appId を開いた全員が PATCH できる。削除はどちらでも投稿者本人だけ。private では意味を持たない(書いても無視)。家事分担の完了・共有の買い物リスト・出欠・落とし物の解決・シフトの確定のように「みんなで 1 つのレコードを更新する」用途で使う。参加者を招待制で絞るのは D-06 で別途。
+- iOS(#249): `Record.author` と自分の uid を比べ、変更できないレコードでは一覧のチェックを薄く表示して押すと理由を出し、長押し削除を出さず、フォームの保存ボタンを「このデータは作った人だけが変更できます」に置き換える。サーバーが 403 を返した時も同じ文言を出し、送信待ちに残さずサーバーの内容に戻す。
+- 作り方: AI が「みんなで」「共有」「投稿」「ランキング」「掲示板」を聞いたら `scope:"public"`、個人の記録なら省略。iOS 側の投稿者名の表示・authorName の送信は別 Issue。iOS のデコーダは未知キーを無視するので、未対応ビルドでも落ちない。
 
 ### 3.6 ナビゲーション = 画面グラフの規則(#112 #114 #115)
 
