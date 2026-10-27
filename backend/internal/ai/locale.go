@@ -122,6 +122,7 @@ func summarizeEN(a *dsl.App) string {
 			fmt.Fprintf(&b, " You'll get a reminder %s.", when)
 		}
 	}
+	b.WriteString(editNoteEN(a))
 	if note := substitutionNoteEN(a.App.Description); note != "" {
 		b.WriteString(" " + note)
 	}

@@ -150,6 +150,15 @@ public enum MockSeed {
                 Record(id: "b1", data: ["date": .string(today), "weight": 65, "height": 170], createdAt: iso),
                 Record(id: "b2", data: ["date": .string(today), "weight": 70, "height": 175], createdAt: iso),
             ],
+            // ranking(#261): 麺屋こがね 3 件(平均 4.3)・らーめん大将 2 件(平均 3.5)・中華そば 一番 1 件(5)→ 店ごとに 1 行
+            "review": [
+                Record(id: "r1", data: ["shop": "麺屋こがね", "score": 5, "comment": "スープが濃厚", "date": .string(today)], createdAt: iso),
+                Record(id: "r2", data: ["shop": "らーめん大将", "score": 3, "comment": "麺が少し柔らかめ", "date": .string(today)], createdAt: iso),
+                Record(id: "r3", data: ["shop": "麺屋こがね", "score": 4, "comment": "チャーシューが絶品", "date": .string(today)], createdAt: iso),
+                Record(id: "r4", data: ["shop": "中華そば 一番", "score": 5, "comment": "あっさり系の名店", "date": .string(today)], createdAt: iso),
+                Record(id: "r5", data: ["shop": "麺屋こがね", "score": 4, "comment": "行列は 20 分", "date": .string(today)], createdAt: iso),
+                Record(id: "r6", data: ["shop": "らーめん大将", "score": 4, "comment": "替え玉無料", "date": .string(today)], createdAt: iso),
+            ],
         ]
     }
 }

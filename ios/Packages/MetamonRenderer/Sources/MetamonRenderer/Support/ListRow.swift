@@ -14,6 +14,8 @@ struct ListRow: View {
     var showsChevron = false
     var toggleOn: Bool? = nil
     var onToggle: (() -> Void)? = nil
+    /// false なら丸を薄く描く(他人の共有レコード・#249)。押すと onToggle が理由を出す
+    var toggleEnabled = true
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.dslRuntime) private var rt
 
@@ -55,6 +57,7 @@ struct ListRow: View {
             Image(systemName: on ? "checkmark.circle.fill" : "circle")
                 .font(.title2)
                 .foregroundStyle(on ? RenderTheme.Colors.brandA : Color.secondary)
+                .opacity(toggleEnabled ? 1 : 0.4)
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: 28, height: 28)
                 .padding(8)

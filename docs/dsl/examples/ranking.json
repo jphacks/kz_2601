@@ -1,0 +1,176 @@
+{
+  "app": {
+    "description": "ラーメン屋の評価をみんなで投稿し、店ごとの平均点・件数でランキングする(#261 table.groupBy)",
+    "icon": "trophy",
+    "name": "ラーメンランキング",
+    "theme": {
+      "primaryColor": "#D84315"
+    },
+    "voiceEntry": "floating"
+  },
+  "entities": [
+    {
+      "fields": [
+        {
+          "id": "shop",
+          "name": "お店",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "id": "score",
+          "name": "点数",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "id": "comment",
+          "name": "コメント",
+          "type": "text"
+        },
+        {
+          "defaultValue": "now",
+          "id": "date",
+          "name": "日付",
+          "type": "date"
+        }
+      ],
+      "id": "review",
+      "name": "評価",
+      "scope": "public",
+      "titleField": "shop"
+    }
+  ],
+  "initialScreen": "home",
+  "schemaVersion": 1,
+  "screens": [
+    {
+      "components": [
+        {
+          "area": "A1:F5",
+          "children": [
+            {
+              "columns": [
+                {
+                  "field": "shop",
+                  "title": "お店"
+                },
+                {
+                  "aggregate": "avg",
+                  "field": "score",
+                  "title": "平均点"
+                },
+                {
+                  "aggregate": "count",
+                  "field": "shop",
+                  "title": "件数"
+                }
+              ],
+              "entity": "review",
+              "groupBy": "shop",
+              "id": "ranking",
+              "limit": 10,
+              "sort": {
+                "direction": "desc",
+                "field": "score"
+              },
+              "type": "table"
+            }
+          ],
+          "id": "ranking_card",
+          "title": "お店ランキング",
+          "type": "section"
+        },
+        {
+          "area": "A6:F10",
+          "children": [
+            {
+              "emptyText": "まだ評価がありません",
+              "entity": "review",
+              "item": {
+                "subtitle": "comment",
+                "title": "shop",
+                "trailing": "score"
+              },
+              "onItemTap": {
+                "presentation": "push",
+                "screen": "review_form",
+                "type": "navigate"
+              },
+              "sort": {
+                "direction": "desc",
+                "field": "date"
+              },
+              "type": "list"
+            }
+          ],
+          "id": "recent",
+          "title": "新着の評価",
+          "type": "section"
+        },
+        {
+          "action": {
+            "presentation": "sheet",
+            "screen": "review_form",
+            "type": "navigate"
+          },
+          "area": "D11:F12",
+          "icon": "plus",
+          "id": "add",
+          "label": "評価する",
+          "style": "primary",
+          "type": "button"
+        }
+      ],
+      "id": "home",
+      "title": "ラーメンランキング"
+    },
+    {
+      "components": [
+        {
+          "area": "A1:F2",
+          "field": "shop",
+          "id": "shop_in",
+          "label": "お店",
+          "placeholder": "麺屋〇〇",
+          "type": "textField"
+        },
+        {
+          "area": "A3:F4",
+          "field": "score",
+          "id": "score_in",
+          "label": "点数",
+          "max": 5,
+          "type": "rating"
+        },
+        {
+          "area": "A5:F8",
+          "field": "comment",
+          "id": "comment_in",
+          "placeholder": "スープ・麺・接客など",
+          "type": "textEditor"
+        },
+        {
+          "area": "A9:F10",
+          "field": "date",
+          "id": "date_in",
+          "label": "日付",
+          "type": "datePicker"
+        }
+      ],
+      "entity": "review",
+      "id": "review_form",
+      "title": "評価を投稿",
+      "toolbar": [
+        {
+          "action": {
+            "entity": "review",
+            "type": "saveRecord"
+          },
+          "icon": "checkmark",
+          "label": "保存"
+        }
+      ]
+    }
+  ]
+}

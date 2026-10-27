@@ -20,6 +20,9 @@ public struct MockAIClient: AIClient {
 
     public func morph(transcript: String, appId: String, currentVersion: Int) async throws -> MorphResult {
         try await Task.sleep(for: delay)
+        if MockPublicData.matches(transcript) { // #253 公開の記録に個人の情報
+            return try MockPublicData.morph(transcript: transcript, appId: appId, version: currentVersion + 1)
+        }
         let name = Self.sampleName(for: transcript)
         var doc = try DSLExamples.document(name, version: currentVersion + 1)
         doc.appId = appId
@@ -53,6 +56,7 @@ public struct MockAIClient: AIClient {
             return ChatTurn(kind: .question, text: "どの項目を一覧に出しますか?", suggestions: ["金額", "日付", "メモ"],
                             turn: turn, locale: "ja", source: "mock", mode: mode.rawValue, multiSelect: true)
         }
+        if let confirm = MockPublicData.confirmTurn(messages: messages, turn: turn, mode: mode) { return confirm } // #253
         if Self.isQuestion(last) {
             return ChatTurn(kind: .answer, text: Self.answer(for: last), suggestions: mode == .edit ? ["金額を大きくして", "見やすくして"] : nil,
                             turn: turn, locale: "ja", source: "mock", mode: mode.rawValue)

@@ -5,7 +5,8 @@
 // photo / chart / calendar (bool), notification ("HH:MM" or "any"), substitution (bool:
 // the summary mentions 代替 / できません / "replaced" because a requested part is not in
 // the catalog or not possible, #257), scope ("public"|"shared"|"private": at least one entity has
-// that scope), noShared (bool, #77: no shared/public entity), calc / computed / statValue / settlement / ref (bool, #100:
+// that scope), editMembers (bool, #252: some shared entity has edit members),
+// noShared (bool, #77: no shared/public entity), calc / computed / statValue / settlement / ref (bool, #100:
 // any calculation / Field.computed / stat.value / settlement leaf / ref field;
 // -logic-pass runs the 2nd calculations-only call). Navigation (#114):
 // patch (bool: stored as a JSON Patch, not a full rewrite), unreachable
@@ -82,6 +83,7 @@ type Metrics struct {
 	HasChart      bool     `json:"hasChart"`
 	Notifications []string `json:"notifications,omitempty"` // repeat@time
 	Scopes        []string `json:"scopes,omitempty"`        // entityId:scope (effective)
+	EditMembers   []string `json:"editMembers,omitempty"`   // shared entity ids with edit:members (#252)
 	Areas         []string `json:"areas"`                   // screenId: area list
 	// logic (#100)
 	Computed   []string `json:"computed,omitempty"` // entity.field of computed fields
@@ -373,6 +375,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(checkExpect(c.Expect, rec.Metrics, rec.Summary), checkNav(c.Expect, app, rec.Mode)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkEnum(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkKeep(c.Expect, app, rec.Summary)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkGroupBy(c.Expect, app)...)
 		if v, ok := c.Expect["noOmission"].(bool); ok && v && len(rec.Omissions) > 0 {
 			rec.ExpectMisses = append(rec.ExpectMisses, fmt.Sprintf("omissions=%v", rec.Omissions))
 		}
@@ -391,6 +394,9 @@ func measure(a *dsl.App) *Metrics {
 		e := &a.Entities[i]
 		m.Fields += len(e.Fields)
 		m.Scopes = append(m.Scopes, e.ID+":"+string(e.EffectiveScope()))
+		if e.MembersCanEdit() {
+			m.EditMembers = append(m.EditMembers, e.ID)
+		}
 		for _, f := range e.Fields {
 			if f.Computed != nil {
 				m.Computed = append(m.Computed, e.ID+"."+f.ID)
@@ -552,6 +558,10 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 					miss = append(miss, fmt.Sprintf("noShared: scope=%v", m.Scopes))
 					break
 				}
+			}
+		case "editMembers": // #252: true = some shared entity is edit:members, false = none
+			if (len(m.EditMembers) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("editMembers=%v", m.EditMembers))
 			}
 		case "scope":
 			want := fmt.Sprint(v)

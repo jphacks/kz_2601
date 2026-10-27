@@ -82,7 +82,7 @@ struct AiButtonLeaf: View {
                 source = e
                 records = HiddenFields.redact(rt.records(for: id), in: e) // 回答者に見せない項目(#262)は AI の出力に混ぜない
             }
-            let values = form.showsHiddenFields(currentUid: rt.currentUid) ? form.values : HiddenFields.redact(form.values, in: form.entity)
+            let values = form.showsHiddenFields(currentUid: rt.currentUserId) ? form.values : HiddenFields.redact(form.values, in: form.entity)
             let request = try AIRequestBuilder.build(c, entity: form.entity, values: values, sourceEntity: source, records: records)
             let result = try await OnDeviceAI.run(request)
             withAnimation(RenderTheme.Motion.select) { form.values[output] = .string(result) }

@@ -732,7 +732,7 @@ components:
     Unauthenticated: { description: トークン欠落/無効, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     NotFound: { description: 存在しない (他人のリソースも 404), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Forbidden:
-      description: 共有 (public/shared) レコードの author が自分ではない
+      description: 共有 (public/shared) レコードの author が自分ではない。entity.edit が members なら PATCH は通り、DELETE だけが 403 になる
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
