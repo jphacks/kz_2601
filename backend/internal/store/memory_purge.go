@@ -31,6 +31,7 @@ func (m *Memory) PurgeApp(_ context.Context, uid, appID string) (PurgeResult, er
 	}
 	if p, ok := m.public[appID]; ok && p.app != nil && p.app.OwnerUID == uid {
 		delete(m.public, appID)
+		delete(m.members, appID) // Firestore deletes the mirror's members subcollection with it
 		res.Mirror = true
 	}
 	res.Versions = len(a.versions)

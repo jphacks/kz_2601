@@ -30,3 +30,32 @@ public struct Record: Decodable, Identifiable, Hashable, Sendable {
 
     public subscript(field: String) -> JSONValue { data[field] ?? .null }
 }
+
+/// `Field.hidden`(#262・クイズの正解)を誰に見せるか。値は端末に届いているので画面に出さないだけ(厳密な秘匿ではない)。
+public enum HiddenFields {
+    /// フォームで hidden の入力を出してよいか。
+    /// - 新規(record 無し): 入力する本人が作者になるので出す
+    /// - author 無し: private entity / 未送信の自分の行なので出す
+    /// - author 有り: 自分の uid と一致する時だけ出す(自分の uid が分からなければ出さない)
+    public static func canEdit(record: Record?, currentUid: String?) -> Bool {
+        guard let author = record?.author, !author.isEmpty else { return true }
+        guard let currentUid, !currentUid.isEmpty else { return false }
+        return author == currentUid
+    }
+
+    /// 表示用レコードから hidden の値を落とす(一覧・表・グラフ・カレンダー等)。式の評価は元のレコードで行うので採点は動く。
+    public static func redact(_ records: [Record], in entity: Entity?) -> [Record] {
+        guard let hidden = entity?.hiddenFieldIds, !hidden.isEmpty else { return records }
+        return records.map { r in
+            var out = r
+            for id in hidden { out.data.removeValue(forKey: id) }
+            return out
+        }
+    }
+
+    /// hidden の値を落とした `data`(フォームの値を端末内 AI へ渡す時など)。
+    public static func redact(_ data: [String: JSONValue], in entity: Entity?) -> [String: JSONValue] {
+        guard let hidden = entity?.hiddenFieldIds, !hidden.isEmpty else { return data }
+        return data.filter { !hidden.contains($0.key) }
+    }
+}

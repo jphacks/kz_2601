@@ -149,7 +149,13 @@ func New(cfg Config, store Store, pro ProChecker) *Limiter {
 	if store == nil {
 		store = NewMemory()
 	}
-	return &Limiter{cfg: cfg, store: store, fallback: NewMemory(), pro: pro, log: slog.Default()}
+	// Memory expires entries by its own clock; keep it on the limiter's.
+	if m, ok := store.(*Memory); ok {
+		m.now = cfg.Now
+	}
+	fallback := NewMemory()
+	fallback.now = cfg.Now
+	return &Limiter{cfg: cfg, store: store, fallback: fallback, pro: pro, log: slog.Default()}
 }
 
 // Config returns the effective configuration.
