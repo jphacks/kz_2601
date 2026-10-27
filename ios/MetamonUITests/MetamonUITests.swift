@@ -599,26 +599,102 @@ final class MetamonUITests: XCTestCase {
     }
 }
 
-// MARK: - 有料機能の確認カード(#77)
+// MARK: - 有料機能の確認カード(#77)・課金画面(#414)
 
 extension MetamonUITests {
-    /// 課金を有効(`METAMON_IAP_ENFORCE=1`)にして「みんなで書き込む掲示板」を相談 →「これでいく」で確認カード →
-    /// 「この機能なしで作る」で生成が始まり、アプリができる。無料枠に当たらないよう `METAMON_IAP_FREE_LIMIT` を大きくする。
-    func testPaidFeatureCardBuildWithoutFeature() {
-        launch(example: nil, slowAI.merging(["METAMON_CLARIFY": "1", "METAMON_IAP_ENFORCE": "1", "METAMON_IAP_FREE_LIMIT": "1000",
-                                             "METAMON_AUTO_TRANSCRIPT": "サークルのみんなで予定を書き込める掲示板アプリを作って",
-                                             "METAMON_AUTO_PAUSE": "600"]) { $1 })
+    /// 課金の制限を有効にし、購入は端末内のモック(`METAMON_MOCK_STORE=1`・¥500)で即成功させる。無料枠に当たらないよう回数は大きく。
+    private var paidEnv: [String: String] {
+        slowAI.merging(["METAMON_IAP_ENFORCE": "1", "METAMON_IAP_FREE_LIMIT": "1000", "METAMON_MOCK_STORE": "1"]) { $1 }
+    }
+
+    private var paywallHeadline: XCUIElement { app.descendants(matching: .any).matching(identifier: "paywall.headline").firstMatch }
+    private var publicNotice: XCUIElement { app.descendants(matching: .any)["publicDataNotice"].firstMatch }
+
+    /// 「みんなで書き込む掲示板」を相談 →「これでいく」まで(確認カードと課金画面が出る直前)。
+    private func launchSharedBoardChat() {
+        launch(example: nil, paidEnv.merging(["METAMON_CLARIFY": "1",
+                                              "METAMON_AUTO_TRANSCRIPT": "サークルのみんなで予定を書き込める掲示板アプリを作って",
+                                              "METAMON_AUTO_PAUSE": "600"]) { $1 })
         let build = app.buttons["chat.build"]
         XCTAssertTrue(build.waitForExistence(timeout: 15), "「これでいく」が出ない")
         build.tap()
+    }
+
+    /// 課金画面の中身(何ができるか・価格・購入・復元・規約とプライバシー)
+    private func assertPaywallContent(_ name: String, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(paywallHeadline.waitForExistence(timeout: 10), "課金画面が出ない(\(name))", file: file, line: line)
+        XCTAssertTrue(paywallHeadline.label.contains("Tailor It Pro"), "見出し: \(paywallHeadline.label)", file: file, line: line)
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.benefits"].exists, "Pro でできることが無い", file: file, line: line)
+        let price = app.descendants(matching: .any)["paywall.price"].firstMatch
+        XCTAssertTrue(price.waitForExistence(timeout: 10), "価格が無い", file: file, line: line)
+        XCTAssertTrue(price.label.contains("¥500"), "価格: \(price.label)", file: file, line: line)
+        XCTAssertTrue(app.buttons["paywall.purchase"].isEnabled, "購入ボタンが押せない", file: file, line: line)
+        XCTAssertTrue(app.buttons["paywall.restore"].exists, "復元が無い", file: file, line: line)
+        XCTAssertTrue(app.descendants(matching: .any)["legal.terms"].exists, "利用規約へのリンクが無い", file: file, line: line)
+        XCTAssertTrue(app.descendants(matching: .any)["legal.privacy-policy"].exists, "プライバシーポリシーへのリンクが無い", file: file, line: line)
+        attachScreenshot("paywall-\(name)")
+    }
+
+    /// 下までスクロールして、自動更新の説明・規約のリンクを残す(購入ボタンは画面外になるので、この後は閉じるだけ)
+    private func scrollPaywallToBottom(_ name: String, file: StaticString = #filePath, line: UInt = #line) {
+        app.swipeUp()
+        XCTAssertTrue(app.descendants(matching: .any)["legal.terms"].isHittable, "利用規約へのリンクが押せない", file: file, line: line)
+        attachScreenshot("paywall-\(name)-bottom")
+    }
+
+    /// 購入 →「Pro になりました」→ 課金画面が自動で閉じる
+    private func purchaseOnPaywall(file: StaticString = #filePath, line: UInt = #line) {
+        app.buttons["paywall.purchase"].tap()
+        let pro = app.descendants(matching: .any)["paywall.pro"].firstMatch
+        XCTAssertTrue(pro.waitForExistence(timeout: 10), "購入しても Pro にならない", file: file, line: line)
+        attachScreenshot("paywall-purchased")
+        XCTAssertTrue(waitFor(paywallHeadline, "exists == false", timeout: 10), "購入後に課金画面が閉じない", file: file, line: line)
+    }
+
+    /// Pro でない → 有料機能(共有)のアプリを相談 →「これでいく」で課金画面 → モック購入 → 共有の掲示板ができる(誰でも見られる表示)
+    func testPaidFeaturePaywallPurchaseThenBuildsSharedApp() {
+        launchSharedBoardChat()
+        assertPaywallContent("chat")
+        XCTAssertTrue(paywallHeadline.label.contains("みんなで共有するデータ"), "見出しに機能名が無い: \(paywallHeadline.label)")
+        XCTAssertFalse(generating.exists, "課金画面の間は生成しない")
+        purchaseOnPaywall()
+        assertGeneratingThenDone("paid-purchased")
+        XCTAssertTrue(publicNotice.waitForExistence(timeout: 15), "購入後に共有(誰でも見られる)の掲示板ができていない")
+        attachScreenshot("paid-shared-app")
+    }
+
+    /// 課金画面を閉じる → 確認カードに戻る(まだ作らない)→「この機能なしで作る」で自分だけの記録のアプリができる
+    func testPaidFeatureCardBuildWithoutFeature() {
+        launchSharedBoardChat()
+        assertPaywallContent("chat-before-close")
+        app.buttons["paywall.close"].tap()
         let headline = app.descendants(matching: .any).matching(identifier: "paid.headline").firstMatch
-        XCTAssertTrue(headline.waitForExistence(timeout: 5), "有料機能の確認カードが出ない")
+        XCTAssertTrue(headline.waitForExistence(timeout: 5), "課金画面を閉じたら確認カードに戻らない")
         XCTAssertTrue(headline.label.contains("Tailor It Pro"), "見出し: \(headline.label)")
         XCTAssertTrue(app.buttons["paid.purchase"].exists, "「購入して作る」が無い")
-        XCTAssertFalse(generating.exists, "カードの間は生成しない")
+        XCTAssertFalse(generating.exists, "閉じただけで生成した")
         attachScreenshot("paid-feature-card")
         app.buttons["paid.withoutFeature"].tap()
         assertGeneratingThenDone("paid-without")
+        XCTAssertFalse(publicNotice.exists, "この機能なしで作ったのに共有の記録がある")
+    }
+
+    /// チャットを通らない即生成(設定 OFF)でも、共有の記録ができたら課金画面。閉じると共有を外す修正が走る
+    func testDirectGenerationWithSharedDataGoesThroughPaywall() {
+        launch(example: nil, paidEnv.merging(["METAMON_CLARIFY": "0", "METAMON_MOCK_AI_DELAY": "2"]) { $1 })
+        let field = composerField
+        XCTAssertTrue(field.waitForExistence(timeout: 15), "初期画面の文字入力が無い")
+        field.tap()
+        field.typeText("みんなの掲示板アプリを作って")
+        app.buttons["送信"].firstMatch.tap()
+        assertPaywallContent("direct")
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.closeNote"].exists, "閉じた時の説明が無い")
+        scrollPaywallToBottom("direct")
+        app.buttons["paywall.close"].tap()
+        let dropped = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "自分だけの記録にしました")).firstMatch
+        XCTAssertTrue(dropped.waitForExistence(timeout: 20), "閉じても共有を外さない")
+        XCTAssertFalse(publicNotice.exists, "買っていないのに共有の記録が残っている")
+        attachScreenshot("direct-dropped-shared")
     }
 }
 

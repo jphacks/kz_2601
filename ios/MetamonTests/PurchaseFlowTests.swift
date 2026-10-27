@@ -57,6 +57,8 @@ final class PurchaseFlowTests: XCTestCase {
         XCTAssertFalse(gate.admitNewApp())
         try await Task.sleep(for: .milliseconds(700))
         XCTAssertTrue(gate.paywallPresented)
+        XCTAssertEqual(gate.paywall?.reason, .limitReached)
+        gate.finishPaywall()
 
         await gate.store.loadProducts()
         try XCTSkipIf(gate.store.products.isEmpty, Self.headlessNote)
