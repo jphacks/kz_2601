@@ -52,7 +52,10 @@ struct AIConsentView: View {
                     .controlSize(.large)
                     .tint(Theme.Colors.brandA)
                     .accessibilityIdentifier("consent.agree")
-                    Button("あとで") { dismiss() }
+                    Button("あとで") {
+                        rt.aiConsent?.markPrompted() // 閉じる前に記録(閉じた直後のチュートリアル判定・#274)
+                        dismiss()
+                    }
                         .accessibilityIdentifier("consent.later")
                 }
                 .padding(Theme.Spacing.lg)
@@ -60,7 +63,7 @@ struct AIConsentView: View {
             }
         }
         .interactiveDismissDisabled()
-        .onDisappear { rt.aiConsent?.markPrompted() }
+        .onDisappear { rt.aiConsent?.markPrompted() } // 閉じたあとのチュートリアル(#274)は TutorialHost
         .accessibilityIdentifier("consent.sheet")
     }
 
