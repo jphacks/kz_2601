@@ -32,7 +32,7 @@
   {"id": "d_edit_like", "kind": "edit", "base": "d_lost_found", "group": "m0-edit", "transcript": "投稿にいいねボタンを付けて、いいねの数も出して"},
   {"id": "d_edit_comment", "kind": "edit", "base": "d_ranking", "group": "m0-edit", "transcript": "それぞれのお店にみんながコメントを書けるようにして", "expect": {"shared": true}},
   {"id": "d_edit_mine_only", "kind": "edit", "base": "d_lost_found", "group": "m0-edit", "transcript": "自分が投稿したものだけ見られるタブを足して", "expect": {"substitution": true, "meFilter": true, "patch": true}},
-  {"id": "d_edit_notify_new", "kind": "edit", "base": "d_circle_attend", "group": "m0-edit", "transcript": "誰かが出欠をつけたら私に通知が来るようにして", "expect": {"substitution": true}}
+  {"id": "d_edit_notify_new", "kind": "edit", "base": "d_circle_attend", "group": "m0-edit", "transcript": "誰かが出欠をつけたら私に通知が来るようにして", "expect": {"substitution": true}},
   {"id": "d_edit_share_split", "kind": "edit", "base": "example:warikan", "group": "m0-edit", "transcript": "この割り勘を友達のスマホからも入力できるようにして", "expect": {"scope": "public", "patch": true}, "note": "#259 作成(d_split_trip)と同じく public・summary に公開範囲"},
   {"id": "d_edit_family_only", "kind": "edit", "base": "example:kakeibo", "group": "m0-edit", "transcript": "この家計簿を家族だけで共有して", "expect": {"scope": "shared", "scopeNot": "public", "patch": true, "summaryHas": ["招待した人だけが見られます"]}, "note": "#215 #254 公開にせず shared・summary に「リンクで招待した人だけ」"}
 ]
