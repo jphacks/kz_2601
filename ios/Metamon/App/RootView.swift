@@ -107,6 +107,7 @@ struct RootView: View {
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
                 #endif
+                .modifier(ToastHost(onModal: true))
         }
         .fullScreenCover(item: $rt.fullScreen) { route in
             ScreenStack(root: route)
@@ -115,6 +116,7 @@ struct RootView: View {
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
                 #endif
+                .modifier(ToastHost(onModal: true))
         }
         .modifier(HostSheets(onModal: false))
         #if !APP_STORE_REVIEW // 審査用ビルドはシェアリンク・探す・近くの端末との共有を外す(#245)
