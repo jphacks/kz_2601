@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "置くだけドラレコ",
+    "description": "スマホスタンドに横向きで置くと自動で録画を始めるドラレコ。直近 10 分だけ残し、衝撃があった前後は保存する(#410)",
+    "icon": "car.fill",
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [],
+  "screens": [
+    {
+      "id": "home",
+      "title": "ドラレコ",
+      "components": [
+        { "type": "dashcam", "id": "recorder", "area": "A1:F10", "title": "ドラレコ", "keepMinutes": 10, "maxStorageMB": 2000, "impactG": 2.5, "autoStart": ["landscape", "still"] }
+      ]
+    }
+  ]
+}

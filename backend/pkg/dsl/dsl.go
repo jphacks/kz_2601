@@ -280,6 +280,8 @@ const (
 	CompNearbyShare ComponentType = "nearbyShare" // MultipeerConnectivity: send records to a nearby device
 	// location tracking (#168): start/stop recording points while the user opts in
 	CompLocationTracker ComponentType = "locationTracker"
+	// dashcam (#410): rear camera loop recording, impact save, auto start
+	CompDashcam ComponentType = "dashcam"
 	// device health (#167)
 	CompHealthStat ComponentType = "healthStat" // CoreMotion steps / HealthKit weight (no entity)
 )
@@ -401,6 +403,13 @@ type Component struct {
 	ColumnValues []string   `json:"columnValues,omitempty"` // explicit column headers (else enum options)
 	RowValues    []string   `json:"rowValues,omitempty"`    // explicit row headers for enum/string rowField
 	RowRange     *GridRange `json:"rowRange,omitempty"`     // integer rowField range (default 1..6)
+
+	// dashcam (#410). Title is shared. Zero = iOS default.
+	KeepMinutes  int      `json:"keepMinutes,omitempty"`  // loop length (default 10)
+	MaxStorageMB int      `json:"maxStorageMB,omitempty"` // storage cap (default 2000)
+	ImpactG      float64  `json:"impactG,omitempty"`      // impact threshold in G (default 2.5)
+	AutoStart    []string `json:"autoStart,omitempty"`    // landscape|still|charging, all must hold
+	Audio        bool     `json:"audio,omitempty"`        // also record the microphone
 }
 
 // GridRange is an inclusive integer range of gridTable rows.
