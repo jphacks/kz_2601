@@ -82,6 +82,7 @@ var capabilityWords = map[string]string{
 	"体重": "healthStat", "ヘルスケア": "healthStat", "場所": "locationPicker", "検索": "searchBar",
 	"道のり": "locationTracker", "地図": "mapView", "QR": "qrScanner", "グラフ": "chart",
 	"カレンダー": "calendar", "割り勘": "settlement", "タイマー表示": "timerDisplay",
+	"ナビ": "routeGuide", "道案内": "routeGuide", "経路案内": "routeGuide",
 }
 
 func TestChatLimits_NoConflictWithSchema(t *testing.T) {
