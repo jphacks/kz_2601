@@ -34,14 +34,17 @@ public struct AppSummary: Codable, Sendable, Equatable, Identifiable, Hashable {
     public var status: String
     public var createdAt: String?
     public var updatedAt: String?
+    /// 変身一覧で自分が並べた位置(1 が先頭・#277)。並べ替えたことが無ければ nil。
+    public var sortIndex: Int?
 
-    public init(id: String, name: String, currentVersion: Int, status: String = "active", createdAt: String? = nil, updatedAt: String? = nil) {
+    public init(id: String, name: String, currentVersion: Int, status: String = "active", createdAt: String? = nil, updatedAt: String? = nil, sortIndex: Int? = nil) {
         self.id = id
         self.name = name
         self.currentVersion = currentVersion
         self.status = status
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.sortIndex = sortIndex
     }
 
     public var isArchived: Bool { status == "archived" }
@@ -57,16 +60,29 @@ public struct AppSummary: Codable, Sendable, Equatable, Identifiable, Hashable {
     private static let iso = ISO8601DateFormatter()
     static func parseDate(_ s: String) -> Date? { isoFractional.date(from: s) ?? iso.date(from: s) }
 
-    /// 変身一覧に出す並び: archived と未生成(blank)を除き、現在のアプリは常に含めて先頭、残りは更新日時の新しい順。
+    /// 変身一覧に出す並び: archived と未生成(blank)を除く(現在のアプリは常に含める)。
+    /// - 自分で並べたことがある(どれかに `sortIndex` がある・#277): 並べた後に増えたアプリ(`sortIndex` なし)を新しい順で先頭、続けて並べた順
+    /// - 無い: 現在のアプリを先頭、残りは更新日時の新しい順
     public static func visible(_ apps: [AppSummary], current: String?) -> [AppSummary] {
         var seen = Set<String>()
         let kept = apps.filter { app in
             guard seen.insert(app.id).inserted, !app.isArchived else { return false }
             return app.id == current || !app.isBlank
         }
+        let newer: (AppSummary, AppSummary) -> Bool = { ($0.updatedDate ?? .distantPast) > ($1.updatedDate ?? .distantPast) }
+        if kept.contains(where: { $0.sortIndex != nil }) {
+            return kept.sorted { a, b in
+                switch (a.sortIndex, b.sortIndex) {
+                case let (x?, y?): return x != y ? x < y : newer(a, b)
+                case (nil, _?): return true
+                case (_?, nil): return false
+                case (nil, nil): return newer(a, b)
+                }
+            }
+        }
         return kept.sorted { a, b in
             if (a.id == current) != (b.id == current) { return a.id == current }
-            return (a.updatedDate ?? .distantPast) > (b.updatedDate ?? .distantPast)
+            return newer(a, b)
         }
     }
 }
@@ -79,6 +95,12 @@ public protocol AppConfigClient: Sendable {
     func listApps() async throws -> [AppSummary]
     /// `DELETE /v1/apps/{appId}`(#180)。サーバーは物理削除し、自分のシェアリンク・「探す」掲載・共有データも消す。
     func deleteApp(appId: String) async throws
+    /// `PATCH /v1/apps/{appId}` の `name`(#277)。サーバーは `dsl.app.name` にも書き、新しい version として積む。
+    func renameApp(appId: String, name: String) async throws -> AppSummary
+    /// `POST /v1/apps/{appId}/duplicate`(#277)。画面の定義だけを新しい appId に複製する(記録は複製しない)。
+    func duplicateApp(appId: String, name: String) async throws -> AppSummary
+    /// `PUT /v1/apps/order`(#277)。並べた順(先頭から)を保存する。
+    func reorderApps(ids: [String]) async throws
     func fetchDocument(appId: String) async throws -> AppDocument
     /// ETag(`If-None-Match: "<version>"`)付き取得。サーバーが同じ version なら nil(304)。ホットリロードのポーリングが使う。
     func fetchDocumentIfChanged(appId: String, currentVersion: Int) async throws -> AppDocument?
@@ -107,6 +129,9 @@ public extension AppConfigClient {
         throw APIError.server(status: 501, code: "unsupported", message: "marks are not supported by this client")
     }
     func deleteApp(appId: String) async throws {}
+    func renameApp(appId: String, name: String) async throws -> AppSummary { throw AppListEdit.unsupported }
+    func duplicateApp(appId: String, name: String) async throws -> AppSummary { throw AppListEdit.unsupported }
+    func reorderApps(ids: [String]) async throws { throw AppListEdit.unsupported }
 
     /// 冪等キーを使わない実装(インメモリ等)向けの既定。
     func create(appId: String, entity: String, data: [String: JSONValue], clientId: String) async throws -> Record {

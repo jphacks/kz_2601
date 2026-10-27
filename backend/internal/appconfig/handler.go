@@ -50,6 +50,8 @@ func New(s store.Store) *http.ServeMux {
 	mux.HandleFunc("GET /v1/apps/{appId}", h.getApp)
 	mux.HandleFunc("PATCH /v1/apps/{appId}", h.patchApp)
 	mux.HandleFunc("DELETE /v1/apps/{appId}", h.deleteApp)
+	mux.HandleFunc("PUT /v1/apps/order", h.reorderApps)               // #277 manage.go
+	mux.HandleFunc("POST /v1/apps/{appId}/duplicate", h.duplicateApp) // #277 manage.go
 
 	mux.HandleFunc("GET /v1/apps/{appId}/dsl", h.getDSL)
 	mux.HandleFunc("GET /v1/apps/{appId}/events", h.events)

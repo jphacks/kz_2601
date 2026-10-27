@@ -95,7 +95,9 @@ func TestChat_ClearDuringBackgroundDropsUpdate(t *testing.T) {
 	if _, err := svc.Chat(context.Background(), ChatRequest{AppID: "e3", Messages: user("家計簿")}); err != nil {
 		t.Fatal(err)
 	}
-	svc.ClearChat("e3")
+	if err := svc.ClearChat("", "e3"); err != nil {
+		t.Fatal(err)
+	}
 	close(g.release)
 	svc.conversations().wait(context.Background(), "e3", time.Second)
 	if cv := svc.conversations().get("e3"); cv != nil {

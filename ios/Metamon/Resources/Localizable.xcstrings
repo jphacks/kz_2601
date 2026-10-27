@@ -137,6 +137,23 @@
         }
       }
     },
+    "%@のコピー": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ Copy"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@のコピー"
+          }
+        }
+      }
+    },
     "%@のメニュー": {
       "extractionState": "manual",
       "localizations": {
@@ -596,6 +613,23 @@
         }
       }
     },
+    "。サインインすると上限が増えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ". Sign in to get a higher limit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "。サインインすると上限が増えます"
+          }
+        }
+      }
+    },
     "「%@」": {
       "extractionState": "manual",
       "localizations": {
@@ -749,6 +783,23 @@
         }
       }
     },
+    "「%@」を作りました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Created “%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」を作りました"
+          }
+        }
+      }
+    },
     "「%@」を削除しました": {
       "extractionState": "manual",
       "localizations": {
@@ -813,6 +864,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "「%@」を単体アプリに"
+          }
+        }
+      }
+    },
+    "「%@」を複製できませんでした: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't duplicate “%@”: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」を複製できませんでした: %@"
           }
         }
       }
@@ -1918,6 +1986,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "アプリが更新されました(version %lld)"
+          }
+        }
+      }
+    },
+    "アプリの名前": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App name"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリの名前"
           }
         }
       }
@@ -3146,6 +3231,23 @@
         }
       }
     },
+    "並び順を保存できませんでした: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save the order: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "並び順を保存できませんでした: %@"
+          }
+        }
+      }
+    },
     "中止": {
       "extractionState": "manual",
       "localizations": {
@@ -3231,6 +3333,40 @@
         }
       }
     },
+    "今日の上限(%lld回分)に達しました。%@からまた使えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You've reached today's limit (%lld). You can continue from %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日の上限(%lld回分)に達しました。%@からまた使えます"
+          }
+        }
+      }
+    },
+    "今日の上限に達しました。%@からまた使えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You've reached today's limit. You can continue from %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日の上限に達しました。%@からまた使えます"
+          }
+        }
+      }
+    },
     "今日の新規作成": {
       "extractionState": "manual",
       "localizations": {
@@ -3261,6 +3397,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "今日の無料作成(%lld 回)を使い切りました"
+          }
+        }
+      }
+    },
+    "今日はここまでです": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That's all for today"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日はここまでです"
           }
         }
       }
@@ -3673,6 +3826,23 @@
         }
       }
     },
+    "利用が集中したため、新しい生成を止めています。%@に再開します": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demand is high, so new requests are paused. We'll reopen at %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用が集中したため、新しい生成を止めています。%@に再開します"
+          }
+        }
+      }
+    },
     "削除": {
       "extractionState": "manual",
       "localizations": {
@@ -3877,6 +4047,23 @@
         }
       }
     },
+    "右へ移動": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Right"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "右へ移動"
+          }
+        }
+      }
+    },
     "同期": {
       "extractionState": "manual",
       "localizations": {
@@ -3894,6 +4081,57 @@
         }
       }
     },
+    "名前は1〜%lld文字で入力してください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a name of 1–%lld characters"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名前は1〜%lld文字で入力してください"
+          }
+        }
+      }
+    },
+    "名前を変えられませんでした: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't rename: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名前を変えられませんでした: %@"
+          }
+        }
+      }
+    },
+    "名前を変える": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名前を変える"
+          }
+        }
+      }
+    },
     "回数制限を無効にする(デモ用)": {
       "extractionState": "manual",
       "localizations": {
@@ -3907,6 +4145,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "回数制限を無効にする(デモ用)"
+          }
+        }
+      }
+    },
+    "変更": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "変更"
           }
         }
       }
@@ -3941,6 +4196,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "変身一覧"
+          }
+        }
+      }
+    },
+    "変身一覧とアプリの上に出る名前です(%lld文字まで)。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shown in your app list and at the top of the app (up to %lld characters)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "変身一覧とアプリの上に出る名前です(%lld文字まで)。"
           }
         }
       }
@@ -4060,6 +4332,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "少し時間をおいて、もう一度お試しください"
+          }
+        }
+      }
+    },
+    "左へ移動": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Left"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "左へ移動"
           }
         }
       }
@@ -4404,6 +4693,23 @@
         }
       }
     },
+    "明日": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tomorrow"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "明日"
+          }
+        }
+      }
+    },
     "時間がかかっています。もう少しだけお待ちください": {
       "extractionState": "manual",
       "localizations": {
@@ -4570,6 +4876,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "未選択"
+          }
+        }
+      }
+    },
+    "本日の受付を終了しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We've paused new requests for today"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本日の受付を終了しました"
           }
         }
       }
@@ -5199,6 +5522,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "自動"
+          }
+        }
+      }
+    },
+    "複製": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicate"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "複製"
           }
         }
       }
@@ -6457,6 +6797,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "このデータは作った人だけが変更できます"
+          }
+        }
+      }
+    },
+    "このネットワークからの今日の上限に達しました。サインインすると続けて使えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This network has reached today's limit. Sign in to keep going"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このネットワークからの今日の上限に達しました。サインインすると続けて使えます"
           }
         }
       }

@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
+#if !APP_STORE_REVIEW
 import SwiftUI
 import MetamonDSL
 
@@ -126,3 +128,4 @@ struct LocationTrackerLeaf: View {
         return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%02d:%02d", s / 60, s % 60)
     }
 }
+#endif

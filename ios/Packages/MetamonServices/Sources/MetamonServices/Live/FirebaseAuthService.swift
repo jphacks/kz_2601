@@ -25,6 +25,9 @@ public enum FirebaseBootstrap {
 /// Firebase Auth 実装。Sign in with Apple(credential 交換)と匿名認証、ID トークン供給。
 public final class FirebaseAuthService: AuthService, @unchecked Sendable {
     private let auth: Auth
+    /// 引き継ぎ(#276)で credentialAlreadyInUse になった時の Apple の資格情報(Apple の nonce は 1 回限りなので、Firebase が返す更新済みのものを使う)。
+    private let lock = NSLock()
+    private var pendingAppleCredential: AuthCredential?
 
     /// Firebase 未初期化なら nil(呼び出し側が Mock に落とす)。
     public init?() {
@@ -80,6 +83,34 @@ public final class FirebaseAuthService: AuthService, @unchecked Sendable {
         guard let user = auth.currentUser else { return }
         let credential = OAuthProvider.appleCredential(withIDToken: idToken, rawNonce: nonce, fullName: nil)
         _ = try await user.reauthenticate(with: credential)
+    }
+
+    public func linkWithApple(idToken: String, nonce: String, fullName: PersonNameComponents?) async throws -> AuthUser {
+        guard let user = auth.currentUser else {
+            return try await signInWithApple(idToken: idToken, nonce: nonce, fullName: fullName)
+        }
+        guard user.isAnonymous else { throw AuthError.alreadyLinked }
+        let credential = OAuthProvider.appleCredential(withIDToken: idToken, rawNonce: nonce, fullName: fullName)
+        do {
+            let result = try await user.link(with: credential)
+            try? await result.user.reload() // isAnonymous / providerData を最新に
+            return AuthUser(auth.currentUser ?? result.user)
+        } catch let error as NSError where error.code == AuthErrorCode.credentialAlreadyInUse.rawValue {
+            let updated = error.userInfo[AuthErrorUserInfoUpdatedCredentialKey] as? AuthCredential
+            lock.withLock { pendingAppleCredential = updated }
+            throw AuthError.credentialAlreadyInUse
+        } catch let error as NSError where error.code == AuthErrorCode.providerAlreadyLinked.rawValue {
+            throw AuthError.alreadyLinked
+        }
+    }
+
+    public func switchToPendingAppleAccount() async throws -> AuthUser {
+        let credential = lock.withLock { () -> AuthCredential? in
+            defer { pendingAppleCredential = nil }
+            return pendingAppleCredential
+        }
+        guard let credential else { throw AuthError.noPendingAppleAccount }
+        return AuthUser(try await auth.signIn(with: credential).user)
     }
 }
 

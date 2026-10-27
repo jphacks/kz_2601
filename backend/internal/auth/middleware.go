@@ -73,7 +73,7 @@ func debugUIDAllowed(mode string) bool {
 }
 
 func withUID(r *http.Request, uid string) *http.Request {
-	return r.WithContext(context.WithValue(r.Context(), ctxKey{}, uid))
+	return r.WithContext(ContextWithUID(r.Context(), uid))
 }
 
 func UID(ctx context.Context) string {

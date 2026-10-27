@@ -26,6 +26,9 @@ public struct HTTPAIClient: AIClient {
         var mode = "auto"
         /// ja | en。nil は送らない(サーバーが発話から判定)
         var locale: String?
+        /// 使ってよい部品の allowlist と無効な機能(#245)。通常ビルドは nil = 送らない(全部使える)
+        var allowedComponents: [String]? = ClientCapabilities.allowedComponents
+        var disabledFeatures: [String]? = ClientCapabilities.disabledFeatures
     }
 
     struct GenerateResponse: Decodable {
@@ -71,6 +74,9 @@ public struct HTTPAIClient: AIClient {
         var mode: ChatMode?
         /// iOS が表示できる追加の kind(#184)。backend はここに無い kind を返さない
         var capabilities: [String] = ChatCapability.all
+        /// 使ってよい部品の allowlist と無効な機能(#245)。通常ビルドは nil = 送らない
+        var allowedComponents: [String]? = ClientCapabilities.allowedComponents
+        var disabledFeatures: [String]? = ClientCapabilities.disabledFeatures
     }
 
     /// `POST {base}/v1/chat`(契約: backend/internal/ai/chat.go の `ChatRequest` / `ChatResult`・#184 会話の取り決め)。

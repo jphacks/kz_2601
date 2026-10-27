@@ -120,7 +120,7 @@ struct SettingsSheet: View {
     }
 
     private var accountSection: some View {
-        Section("アカウント") {
+        Section {
             if let user = session.user {
                 HStack(spacing: Theme.Spacing.md) {
                     Image(systemName: user.isAnonymous ? "person.crop.circle.dashed" : "apple.logo")
@@ -138,12 +138,26 @@ struct SettingsSheet: View {
                             .textSelection(.enabled)
                     }
                 }
+                if user.isAnonymous {
+                    // #276: uid を保ったまま Apple に昇格(作ったアプリとデータはそのまま)
+                    AppleLinkButton()
+                        .listRowInsets(EdgeInsets(top: Theme.Spacing.sm, leading: Theme.Spacing.md, bottom: Theme.Spacing.sm, trailing: Theme.Spacing.md))
+                    if let message = session.linkError {
+                        Text(message).font(.footnote).foregroundStyle(.red)
+                    }
+                }
                 Button("ログアウト", role: .destructive) {
                     session.signOut()
                     dismiss()
                 }
             } else {
                 Text("サインインしていません").foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("アカウント")
+        } footer: {
+            if session.user?.isAnonymous == true {
+                Text("Apple でサインインすると、作ったアプリとデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、作ったアプリに戻れません。")
             }
         }
     }

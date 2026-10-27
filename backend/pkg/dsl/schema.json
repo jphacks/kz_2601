@@ -257,6 +257,10 @@
             "weight"
           ],
           "description": "保存した値をヘルスケアにも書き込む(weight=体重。field は number で unit kg)。「ヘルスケアにも保存」「ヘルスケアと連携」と言われた時だけ付ける。保存のたびに 1 件書き込み、失敗してもレコードの保存は成功する。"
+        },
+        "hidden": {
+          "type": "boolean",
+          "description": "回答者に見せない項目(クイズの正解など・#262)。作者がフォームで入れ、一覧・表・グラフ・titleField には出さない。computed では比較(eq / neq / gt / gte / lt / lte)の中でだけ読める(正誤 = eq(回答, 問題.正解))。computed には付けない。画面に出さないだけで値は端末に届く(厳密な秘匿ではない)。"
         }
       }
     },
@@ -335,7 +339,7 @@
             "cancelNotification"
           ],
           "x-enumDescriptions": {
-            "navigate": "画面遷移。list.onItemTap からは recordId が暗黙に渡り、遷移先フォームが編集モードになる。",
+            "navigate": "画面遷移。list.onItemTap からは recordId が暗黙に渡り、遷移先フォームが編集モードになる(だから onItemTap の遷移先は同じ entity のフォーム)。prefillRef を付けると今のレコード(タップした行・ボタンのあるフォームのレコード)を子フォームの ref に入れて新規で開く。",
             "back": "前の画面へ戻る(push なら pop、モーダルなら dismiss)。",
             "saveRecord": "フォームのドラフトを保存(新規 POST / 編集 PATCH)して screen へ、無ければ back。フォーム画面の toolbar に置く。",
             "deleteRecord": "現在のレコードを削除して back。confirmMessage を付けるのが定石。",
@@ -396,6 +400,13 @@
           "description": "cancelNotification only.",
           "x-for": {
             "cancelNotification": "required"
+          }
+        },
+        "prefillRef": {
+          "type": "string",
+          "description": "親から子を作る(#256)。遷移先フォーム(screen.entity)の ref field id。今のレコード(list / mapView の onItemTap ならタップした行、button / toolbar ならその画面のフォームのレコード)を入れて新規で開く。ref の refEntity は今のレコードの entity。遷移先フォームにはその field の picker を残す。calendar / gridTable では使えない。",
+          "x-for": {
+            "navigate": "optional"
           }
         }
       }
@@ -2949,7 +2960,8 @@
         "カウントダウン: exam{title,date:date} の computed days_left(integer) = {\"op\":\"daysUntil\",\"args\":[{\"ref\":\"date\"}]}。list の trailing に days_left、最も近い試験は stat.value = {\"agg\":\"min\",\"entity\":\"exam\",\"field\":\"days_left\",\"filter\":{\"field\":\"days_left\",\"op\":\"gte\",\"value\":0}}。",
         "シフト・バイト代(shift{date,start:string \"HH:mm\"(timePicker),end:string \"HH:mm\",wage:currency 時給}): computed hours(number) = {\"op\":\"hoursBetween\",\"args\":[{\"ref\":\"start\"},{\"ref\":\"end\"}]}(22:00→翌 5:00 は 7)/ pay(currency) = {\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"ref\":\"hours\"},{\"ref\":\"wage\"}]}]}。今月の給料 = stat aggregate sum pay filter date thisMonth。休憩(分)を引く = hours = max(hoursBetween(start,end) − coalesce(break_min,0) / 60, 0)(break_min:integer unit 分)。夜勤は式を変えない。時刻を toNumber / sub しない。",
         "マスタの値を記録で使う(家事の点数・商品の単価・科目の単位数): 記録 log{chore:ref→chores,...} の computed points(number) = {\"ref\":\"chore.points\"}(ref field 名 + . + 参照先の field・1 段だけ)。単価 × 個数 = {\"op\":\"mul\",\"args\":[{\"ref\":\"item.price\"},{\"ref\":\"qty\"}]}。記録側に同じ値の入力欄(stepper 等)を作らない。人ごとの合計は人 entity の computed agg sum に log.points を使う。",
-        "毎日チェックの連続日数・直近 7 日(服薬・習慣 medicine{name,taken_on:date} + list item {toggle:taken_on,resets:daily}): medicine.computed streak(integer) = {\"op\":\"streak\",\"args\":[{\"ref\":\"taken_on\"}]} / last7(integer) = {\"op\":\"doneInDays\",\"args\":[{\"ref\":\"taken_on\"},7]}(丸を押した日は iOS が履歴に残す・実施記録 entity は作らない)。list の trailing に streak、全体は stat.value {\"agg\":\"max\",\"entity\":\"medicine\",\"field\":\"streak\"}(最長の連続)/ {\"agg\":\"sum\",\"entity\":\"medicine\",\"field\":\"last7\"}(直近 7 日の合計回数)。"
+        "毎日チェックの連続日数・直近 7 日(服薬・習慣 medicine{name,taken_on:date} + list item {toggle:taken_on,resets:daily}): medicine.computed streak(integer) = {\"op\":\"streak\",\"args\":[{\"ref\":\"taken_on\"}]} / last7(integer) = {\"op\":\"doneInDays\",\"args\":[{\"ref\":\"taken_on\"},7]}(丸を押した日は iOS が履歴に残す・実施記録 entity は作らない)。list の trailing に streak、全体は stat.value {\"agg\":\"max\",\"entity\":\"medicine\",\"field\":\"streak\"}(最長の連続)/ {\"agg\":\"sum\",\"entity\":\"medicine\",\"field\":\"last7\"}(直近 7 日の合計回数)。",
+        "クイズの自動採点(#262・questions{text:string 問題文,choices:text 選択肢「A 東京 / B 大阪 …」,correct:enum A/B/C/D hidden:true 正解,points:integer} + players{name} + answers{question:ref→questions,player:ref→players,choice:enum A/B/C/D}・3 つとも scope public): answers.computed is_correct(boolean) = {\"op\":\"eq\",\"args\":[{\"ref\":\"choice\"},{\"ref\":\"question.correct\"}]} / score(integer) = {\"if\":{\"ref\":\"is_correct\"},\"then\":{\"ref\":\"question.points\"},\"else\":0} / players.computed total(integer) = {\"agg\":\"sum\",\"entity\":\"answers\",\"field\":\"score\",\"filter\":{\"field\":\"player\",\"op\":\"eq\",\"value\":{\"ref\":\"id\"}}}。正解は hidden の field にして一覧・表に出さない(回答の一覧は is_correct / score を出す・正解を写すだけの computed は作らない)。回答フォームは picker で問題・回答者・選択肢を選ぶ(点数の入力欄は作らない)。ランキング = players の table を total で sort desc。"
       ]
     },
     "ExprRef": {
