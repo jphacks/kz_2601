@@ -99,13 +99,13 @@
 
 	<!-- ネイティブ機能の権限説明(P0: マイク/カメラ/通知、P1: 位置/モーション) -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>話しかけた内容からアプリを生成するため、また生成したアプリで動画の音声を録音するために、マイクを使用します。</string>
+	<string>話しかけた内容からアプリを生成するため、また生成したアプリで動画やドラレコの音声を録音するために、マイクを使用します。</string>
 	<key>NSCameraUsageDescription</key>
-	<string>生成したアプリで写真や動画を撮影・記録するために、カメラを使用します。</string>
+	<string>生成したアプリで写真や動画を撮影・記録するため、またドラレコとして画面を出している間に録画するために、カメラを使用します。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>生成したアプリで写真や動画を選択・保存するために、写真ライブラリを使用します。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>生成したアプリの共有ボタンから画像を写真に保存するために、写真ライブラリへの追加を使用します。</string>
+	<string>生成したアプリの共有ボタンから画像を、ドラレコで保存した映像を写真に保存するために、写真ライブラリへの追加を使用します。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>生成したアプリで現在地を記録・地図に表示するために使います。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
 	<!-- healthStat(#167): 歩数は CoreMotion の歩数計(capability 不要)。体重の読み書き・ヘルスケアの歩数は HealthKit -->

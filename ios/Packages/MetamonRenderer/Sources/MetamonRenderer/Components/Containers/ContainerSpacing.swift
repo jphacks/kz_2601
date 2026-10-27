@@ -10,7 +10,7 @@ extension Component {
     /// 自分でカード(面)を描く部品。section がこれだけを子に持つ時は二重カードにしない。
     var rendersOwnSurface: Bool {
         switch type {
-        case .list, .table, .timeline, .card, .stat, .chart, .calendar, .gridTable, .randomPicker, .progressBar, .gauge, .timerDisplay, .disclosure, .carousel, .mapView, .emptyState: true
+        case .list, .table, .timeline, .card, .stat, .chart, .calendar, .gridTable, .randomPicker, .dashcam, .progressBar, .gauge, .timerDisplay, .disclosure, .carousel, .mapView, .emptyState: true
         default: false
         }
     }

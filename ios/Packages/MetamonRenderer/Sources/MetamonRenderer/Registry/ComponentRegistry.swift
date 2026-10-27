@@ -112,6 +112,8 @@ public struct ComponentRegistry: Sendable {
         // leaf(位置の記録・#168)
         r.register(.locationTracker) { c, ctx in LocationTrackerLeaf(c: c, ctx: ctx) }
         r.register(.healthStat) { c, _ in HealthStatLeaf(c: c) }
+        // leaf(ドラレコ・#410)
+        r.register(.dashcam) { c, ctx in DashcamLeaf(c: c, ctx: ctx) }
         #endif
         return r
     }()

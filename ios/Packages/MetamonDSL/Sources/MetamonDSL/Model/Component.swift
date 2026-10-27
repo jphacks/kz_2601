@@ -43,6 +43,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case gridTable
     // leaf(ランダムに 1 件選ぶ・#263)。entity / title / titleField / subtitleField / filter / label / onItemTap は共用
     case randomPicker
+    // leaf(ドラレコ・#410)。title は共用
+    case dashcam
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -159,6 +161,12 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var columnValues: [String]? // 列見出しの明示(nil = enum の options)
     public var rowValues: [String]?    // enum / string の行見出しの明示
     public var rowRange: GridRange?    // integer の行範囲(nil = 1…6)
+    // dashcam(#410)。title は共用。nil = 既定値(DashcamConfig)
+    public var keepMinutes: Int?       // ループで残す分数
+    public var maxStorageMB: Int?      // 録画の容量上限
+    public var impactG: Double?        // 衝撃の閾値(重力を除いた G)
+    public var autoStart: [String]?    // landscape|still|charging(全部が続いたら開始)
+    public var audio: Bool?            // マイクも録る
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
@@ -174,6 +182,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case tone
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
+        case keepMinutes, maxStorageMB, impactG, autoStart, audio
     }
 
     public init(from decoder: Decoder) throws {
@@ -256,6 +265,11 @@ public struct Component: Decodable, Identifiable, Sendable {
         columnValues = try? c.decodeIfPresent([String].self, forKey: .columnValues)
         rowValues = try? c.decodeIfPresent([String].self, forKey: .rowValues)
         rowRange = try? c.decodeIfPresent(GridRange.self, forKey: .rowRange)
+        keepMinutes = try? c.decodeIfPresent(Int.self, forKey: .keepMinutes)
+        maxStorageMB = try? c.decodeIfPresent(Int.self, forKey: .maxStorageMB)
+        impactG = try? c.decodeIfPresent(Double.self, forKey: .impactG)
+        autoStart = try? c.decodeIfPresent([String].self, forKey: .autoStart)
+        audio = try? c.decodeIfPresent(Bool.self, forKey: .audio)
     }
 }
 

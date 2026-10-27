@@ -30,7 +30,8 @@
 | バックグラウンドでの位置の記録(`locationTracker`) | 部品と登録 / `LocationTracking`、`UIBackgroundModes` の `location` | 4.7.2・5.1.5・2.5.4 |
 | 近くの端末との共有(`nearbyShare`・MultipeerConnectivity) | 部品と登録 / `Features/Nearby` 全部、`NSLocalNetworkUsageDescription` / `NSBonjourServices` | 4.7.2 |
 | DSL から使うカメラの撮影(`photoField` / `videoField`) | `CameraPicker` / `VideoCameraPicker`、撮影の選択肢 | 4.7.2・2.5.14 |
-| 外した部品を使う同梱の例 | `health` / `walk_route` / `attendance_nearby`(`DSLExamples.reviewExcluded`) | 上と同じ |
+| ドラレコ(`dashcam`・#410。カメラの常時録画・CoreMotion) | 部品と登録 / `DashcamRecorder`、写真への追加の説明文から「ドラレコ」を外す | 4.7.2・2.5.14 |
+| 外した部品を使う同梱の例 | `health` / `walk_route` / `attendance_nearby` / `dashcam`(`DSLExamples.reviewExcluded`) | 上と同じ |
 
 **残すもの**
 - `photoField` / `videoField` は、**写真ライブラリから選ぶ**機能だけ残す。PhotosPicker は別プロセスで動き、権限の確認も要らない。
@@ -96,7 +97,7 @@ otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|CoreMotion'
 #   → 何も出ないこと
 strings "$APP/Metamon" | grep -E 'HKHealthStore|MCSession|CMPedometer|UIImagePickerController|release-requests|public-apps'
 #   → 何も出ないこと
-ls "$APP" | grep -E '^(health|walk_route|attendance_nearby)\.json$'
+ls "$APP" | grep -E '^(health|walk_route|attendance_nearby|dashcam)\.json$'
 #   → 何も出ないこと
 ```
 
