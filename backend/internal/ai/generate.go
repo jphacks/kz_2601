@@ -17,6 +17,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch/v5"
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
+	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -141,6 +142,11 @@ type Service struct {
 	LintRetry bool
 	// Chat is the model setup of the clarify turn (chat.go); zero = defaults.
 	ChatConfig ChatConfig
+	// Verifier checks the caller's ID token on /v1/chat (#286): the
+	// conversation is kept per uid, and DELETE /v1/chat/{appId} needs one.
+	// nil = no caller is ever verified (DELETE answers 401).
+	Verifier auth.TokenVerifier
+	AuthMode string // auth.ModeDev also accepts X-Debug-Uid with the emulator
 
 	conv     *convStore // clarify conversations (chat.go); lazily created
 	convOnce sync.Once
