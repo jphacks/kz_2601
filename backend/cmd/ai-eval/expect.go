@@ -48,6 +48,8 @@ var expectKeys = map[string]expectKind{
 	"noOmission":   expectBool,   // #257 (PR #379)
 	"scopeNot":     expectString, // #254 (PR #405)
 	"summaryHas":   expectStrings,
+	// checkGroupBy (#261, PR #404)
+	"groupedTable": expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

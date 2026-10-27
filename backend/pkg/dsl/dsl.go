@@ -420,8 +420,9 @@ var AITasks = map[string]bool{"summarize": true, "classify": true, "rewrite": tr
 
 // TableColumn is one column of a table component.
 type TableColumn struct {
-	Field string `json:"field"`
-	Title string `json:"title,omitempty"`
+	Field     string `json:"field"`
+	Title     string `json:"title,omitempty"`
+	Aggregate string `json:"aggregate,omitempty"` // with table.groupBy: count|sum|avg|min|max (#261)
 }
 
 // ListItem maps record fields onto a list row.

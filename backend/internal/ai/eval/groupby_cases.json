@@ -1,0 +1,6 @@
+[
+  {"id": "g_ranking", "kind": "create", "group": "groupby", "transcript": "ラーメン屋の評価をみんなで投稿して点数のランキングが見られるアプリ", "note": "#261 d_ranking: 同じ店は 1 行(平均点・件数)", "expect": {"scope": "public", "groupedTable": true, "substitution": false}},
+  {"id": "g_ranking_count", "kind": "edit", "base": "g_ranking", "group": "groupby", "transcript": "ランキングを評価の件数が多い順にして", "note": "#261 sort を件数列へ", "expect": {"patch": true, "groupedTable": true}},
+  {"id": "g_books_author", "kind": "create", "group": "groupby", "transcript": "読んだ本を記録して、著者ごとに何冊読んだか多い順に見たい", "note": "#261 string の groupBy + count", "expect": {"groupedTable": true, "substitution": false}},
+  {"id": "g_gym_best", "kind": "create", "group": "groupby", "transcript": "筋トレの記録。種目ごとの最高重量と回数の合計を一覧で見たい", "note": "#261 enum の groupBy + max / sum", "expect": {"groupedTable": true}}
+]
