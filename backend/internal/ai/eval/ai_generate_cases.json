@@ -1,0 +1,6 @@
+[
+  {"id": "ag_batsu", "kind": "create", "group": "aigenerate", "transcript": "罰ゲームのアイデアを出してくれるボタン", "note": "#417 aiButton generate・list(既定 3 / 言われた数)。randomPicker・固定の list にしない", "expect": {"aiGenerate": "list", "lacks": ["randomPicker"]}},
+  {"id": "ag_batsu_five", "kind": "edit", "base": "ag_batsu", "group": "aigenerate", "transcript": "案を5つにして", "note": "#417 count だけ直す patch", "expect": {"patch": true, "aiGenerate": "list"}},
+  {"id": "ag_fridge", "kind": "create", "group": "aigenerate", "transcript": "冷蔵庫の中身から献立を提案", "note": "#417 食材の entity を材料(entity 入力)に fields(主菜・副菜など)か list", "expect": {"aiGenerate": "any", "aiGenerateEntity": true}},
+  {"id": "ag_cheer", "kind": "create", "group": "aigenerate", "transcript": "落ち込んだ時に押すと励ましの一言をくれるアプリ", "note": "#417 line", "expect": {"aiGenerate": "line"}}
+]

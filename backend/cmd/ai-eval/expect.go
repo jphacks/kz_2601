@@ -9,6 +9,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
 // Expect format check and the per-group pass rate (#281). Both run without
@@ -81,6 +83,9 @@ var expectKeys = map[string]expectKind{
 	// checkAudio (#420)
 	"audio":       expectBool,
 	"audioInList": expectBool,
+	// checkAIGenerate (#417): aigen.go
+	"aiGenerate":       expectString, // line|list|fields|any
+	"aiGenerateEntity": expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,
@@ -163,6 +168,10 @@ func validateExpect(exp map[string]any) []string {
 		case "qrSource":
 			if s := v.(string); !qrSources[s] {
 				bad = append(bad, "qrSource must be text|field|value|record|any: "+s)
+			}
+		case "aiGenerate":
+			if s := v.(string); s != "any" && !dsl.AIShapes[s] {
+				bad = append(bad, "aiGenerate must be line|list|fields|any: "+s)
 			}
 		}
 	}

@@ -26,6 +26,8 @@ func (w Weights) Weight(r *http.Request, body []byte) int {
 	switch r.URL.Path {
 	case "/v1/chat":
 		return w.Chat
+	case "/v1/text":
+		return w.Text
 	case "/v1/generate":
 		var req struct {
 			Mode string `json:"mode"`
@@ -43,7 +45,7 @@ func (w Weights) Weight(r *http.Request, body []byte) int {
 	return -1
 }
 
-// Middleware guards POST /v1/generate and POST /v1/chat: it verifies the
+// Middleware guards POST /v1/generate, /v1/chat and /v1/text: it verifies the
 // Firebase ID token (401 without one), charges the request and answers 429
 // `rate_limited` when a daily limit is reached. Other routes pass through.
 // The body is read once and handed on unchanged.

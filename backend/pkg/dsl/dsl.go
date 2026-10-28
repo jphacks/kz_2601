@@ -286,7 +286,7 @@ const (
 	// random pick (#263): one record per button press, not saved
 	CompRandomPicker ComponentType = "randomPicker"
 	// on-device AI (#78)
-	CompAiButton ComponentType = "aiButton" // Foundation Models -> form field (never leaves the device)
+	CompAiButton ComponentType = "aiButton" // Foundation Models -> form field; task generate may fall back to /v1/text (#417)
 	// peer-to-peer
 	CompNearbyShare ComponentType = "nearbyShare" // MultipeerConnectivity: send records to a nearby device
 	// location tracking (#168): start/stop recording points while the user opts in
@@ -409,6 +409,9 @@ type Component struct {
 	Input   string   `json:"input,omitempty"`   // form field fed to the model ("" = whole draft)
 	Output  string   `json:"output,omitempty"`  // form field the result is written to
 	Options []string `json:"options,omitempty"` // classify candidates (else the enum output field's options)
+	Shape   string   `json:"shape,omitempty"`   // generate (#417): line|list|fields
+	Count   int      `json:"count,omitempty"`   // generate list: number of items
+	Items   []string `json:"items,omitempty"`   // generate fields: item names
 
 	// healthStat (#167). Label / Target are shared.
 	Metric string `json:"metric,omitempty"` // steps|weight
@@ -462,7 +465,7 @@ var (
 )
 
 // AITasks is the closed set of aiButton.task values.
-var AITasks = map[string]bool{"summarize": true, "classify": true, "rewrite": true, "extract": true, "suggest": true}
+var AITasks = map[string]bool{"summarize": true, "classify": true, "rewrite": true, "extract": true, "suggest": true, "generate": true}
 
 // TableColumn is one column of a table component.
 type TableColumn struct {

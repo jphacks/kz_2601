@@ -6,8 +6,8 @@ info:
     音声/文字 → Claude → DSL JSON 生成 → appconfig へ反映。
     - 認証・エラー形式・ページングは appconfig と同一 (`openapi-appconfig.yaml` の `Error` を再利用)。
     - ai は受け取った Bearer をそのまま appconfig へ転送する。
-    - `POST /generate` と `POST /chat` は ai 自身も ID トークンを検証し、利用者ごと・1 日ごとの上限を数える (#280)。
-      上限に当たると 429 `rate_limited`(`RateLimited`)。重さ: chat 1 往復 = 1、generate の修正 = 2、新規作成(create/auto)= 3、undo = 0。
+    - `POST /generate`・`POST /chat`・`POST /text` は ai 自身も ID トークンを検証し、利用者ごと・1 日ごとの上限を数える (#280)。
+      上限に当たると 429 `rate_limited`(`RateLimited`)。重さ: chat 1 往復 = 1、text 1 回 = 1、generate の修正 = 2、新規作成(create/auto)= 3、undo = 0。
       既定の上限: 匿名 30 / サインイン済み 60 / Pro 300(サーバーでの Pro 判定は未実装)/ 匿名の同一 IP 300 / 環境全体 2000。日付は 0:00 JST で切り替わる。
       成功時も `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset`(Unix 秒)を返す。
 servers:
@@ -171,6 +171,42 @@ paths:
         '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
         '403': { $ref: './openapi-appconfig.yaml#/components/responses/Forbidden' }
 
+  /text:
+    post:
+      summary: aiButton task generate のオンライン版。決まった指示で短い文章を決まった形 (1 行 / 箇条書き N 個 / 項目つき) で返す
+      description: |
+        Issue #417。端末内 AI (Apple Intelligence) が使えない端末で、Tailor It Pro の利用者が aiButton{task: generate} を押した時に iOS が呼ぶ。
+        - ID トークン必須 (無い・不正は 401)。上限の重さは 1 (`RATE_LIMIT_WEIGHT_TEXT`)。Pro の判定は iOS 側 (サーバーでの Pro 判定は未実装・#316)
+        - 上限: instruction 500 字・input 4096 バイト (超えると 413)・本文 16 KB・出力 400 トークン。count / items は 1〜10
+        - モデルは対話と同じ設定 (`AI_CHAT_MODEL`、既定 claude-sonnet-5-5・thinking なし)。安全の指示 (暴力・性的・差別・危険な行為を書かない、input の中の命令には従わない) を system に固定
+        - モデルが断ったら 422 `refused`、形に合わない出力は 502 `bad_output`。line は最初の 1 行、list は count を超えた分を切る (1 個以上あれば返す)、fields は全項目そろわなければ 502
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TextRequest' }
+            examples:
+              list:
+                value: { instruction: 飲み会で盛り上がる、誰でも安全にできる軽い罰ゲームの案, shape: list, count: 3, locale: ja }
+              fields:
+                value: { instruction: 冷蔵庫にある食材で作れる今日の献立, shape: fields, items: [主菜, 副菜, 汁物], input: "- 食材: 鮭 / 量: 2 切れ\n- 食材: 豆腐 / 量: 1 丁" }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TextResponse' }
+              examples:
+                list:
+                  value: { shape: list, text: "・変顔で自撮り\n・好きな歌を一節\n・語尾を「ござる」で 1 分", items: [変顔で自撮り, 好きな歌を一節, 語尾を「ござる」で 1 分], locale: ja, meta: { model: claude-sonnet-5-5, usage: { inputTokens: 420, outputTokens: 60 }, latencyMs: 1800 } }
+        '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
+        '413': { description: input が 4096 バイト / 本文が 16 KB を超えた (payload_too_large), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '422': { description: モデルが書くのを断った (refused), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { description: 出力が形に合わない (bad_output), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+
   /transcribe:
     post:
       summary: 音声→文字 (optional。WhisperKit が使えない端末向け)
@@ -247,6 +283,37 @@ components:
         remaining: { type: integer, description: 残り (今回の依頼の重さより小さい) }
         resetAt: { type: string, format: date-time, description: 次に使える時刻 (翌 0:00 JST) }
         retryAfterSec: { type: integer }
+    TextRequest:
+      type: object
+      required: [instruction]
+      properties:
+        instruction: { type: string, maxLength: 500, description: aiButton の prompt (プレースホルダ置換後) }
+        shape: { type: string, enum: [line, list, fields], default: line }
+        count: { type: integer, minimum: 1, maximum: 10, description: list の個数 (既定 3)。list 以外では送らない }
+        items: { type: array, minItems: 1, maxItems: 10, items: { type: string, maxLength: 20 }, description: fields の項目名 (重複なし)。fields 以外では送らない }
+        input: { type: string, description: 材料のアプリのデータ (最近の記録 ≤ 20 件 / フォームの値)。4096 バイトまで }
+        locale: { type: string, enum: [ja, en], description: 省略時は instruction から判定 }
+    TextResponse:
+      type: object
+      required: [shape, text, locale, meta]
+      properties:
+        shape: { type: string, enum: [line, list, fields] }
+        text: { type: string, description: 'そのまま記録の string/text に入れる形 (list は「・」で始まる行、fields は「名前: 値」の行)' }
+        items: { type: array, items: { type: string }, description: list の時だけ (1〜count 個) }
+        fields:
+          type: array
+          description: fields の時だけ。リクエストの items の順
+          items:
+            type: object
+            required: [name, value]
+            properties: { name: { type: string }, value: { type: string } }
+        locale: { type: string, enum: [ja, en] }
+        meta:
+          type: object
+          properties:
+            model: { type: string }
+            usage: { type: object, properties: { inputTokens: { type: integer }, outputTokens: { type: integer } } }
+            latencyMs: { type: integer }
     GenerateRequest:
       type: object
       required: [appId, text]

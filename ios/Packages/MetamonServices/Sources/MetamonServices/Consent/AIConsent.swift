@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import MetamonDSL
 
 /// 第三者 AI(Anthropic の Claude)へ話した内容などを送ることへの同意(#246・App Store 5.1.2(i))。
 /// 端末の UserDefaults に「同意した説明の版」と日時を保存する。説明の中身を変えたら `currentVersion` を上げると全員に出し直す。
@@ -94,5 +95,10 @@ public struct ConsentGatedAIClient: AIClient {
     public func resetChat(appId: String) async {
         guard isGranted() else { return }
         await base.resetChat(appId: appId)
+    }
+
+    public func text(_ request: AITextRequest) async throws -> AITextResult {
+        guard isGranted() else { throw AIConsentError.notGranted }
+        return try await base.text(request)
     }
 }

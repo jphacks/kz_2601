@@ -799,10 +799,25 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 | 入力 | `input` field の値 / 省略時はフォーム全体(output 以外・写真/位置は除く)/ `entity` 指定時はそのレコードの新しい順 `limit` 件(既定 20)。上限 3000 文字(モデルのコンテキスト約 4k トークン) |
 | 出力 | `output` field の**ドラフト**に入れるだけ。保存はユーザーが保存ボタンで行う。classify は候補に正規化(候補外なら入れずにエラー表示) |
 | 可用性 | `SystemLanguageModel.default.availability` を表示時・前面復帰時に再評価。`deviceNotEligible` / `appleIntelligenceNotEnabled` / `modelNotReady` / iOS 26 未満 → ボタン無効 +「この端末では AI を使えません: 理由」 |
-| ビルド | FoundationModels を触るのは `Support/OnDeviceAI.swift` だけ。`#if canImport(FoundationModels)` + `if #available(iOS 26, *)`、フレームワークは weak link(`LC_LOAD_WEAK_DYLIB` を確認済み)なので deployment target は iOS 17 のまま |
+| ビルド | FoundationModels を触るのは `Support/OnDeviceAI.swift` と `Support/AIGenerate.swift`(#417)だけ。`#if canImport(FoundationModels)` + `if #available(iOS 26, *)`、フレームワークは weak link(`LC_LOAD_WEAK_DYLIB` を確認済み)なので deployment target は iOS 17 のまま |
 | テスト | `AiButtonTests`(可用性→文言の分岐・SDK の Availability からの写像・リクエスト組み立て・classify 正規化)。モデル実行そのものは実機で確認 |
 
 実機での確認: Apple Intelligence 対応機(iPhone 15 Pro 以降・iOS 26+)で 設定 > Apple Intelligence と Siri を ON → モデルのダウンロード完了を待つ → `METAMON_INITIAL_EXAMPLE=diary_ai` か「AI 日記を作って」で生成 → 「書く」→ 本文を入力 →「AI で要約」「気分を判定」。機内モードでも動くこと(=端末外に出ていない)を確認する。
+
+### 18.1 決まった形で書かせる `task: "generate"`(Issue #417)
+
+罰ゲームの案・今日の献立・励ましの一言のように、DSL に固定した指示(`prompt`)で AI に**新しく**書かせる。上の 4 つ(要約など)と違い、端末内 AI が無い端末ではオンライン(ai の `POST /v1/text`・Tailor It Pro)で代わりに書く。
+
+| 項目 | 内容 |
+|---|---|
+| 部品 | `AiButtonLeaf` が task generate を `AiGenerateLeaf` に渡す。フォーム不要。結果は `AITextResultView`(line = 1 文 / list = 箇条書き / fields = 項目名と値・セルに収まらなければ中でスクロール)。`output` があればフォームのドラフトにも入れる(保存は利用者) |
+| どこで書くか | `AIGenerateRoute.choose`: 端末内 AI が使える → 端末内(無料・端末外に出ない)/ 使えない → ホストのオンライン版 / オンラインの無いホスト(プレビュー)→ 理由を出して無効。`METAMON_MOCK=1` は常にホストのモック(`MockAIClient.text` が決まった文を返す) |
+| オンライン版 | `DSLRuntime.generateAIText`(`AppRuntime+AIText.swift`)→ `AITextGate`: 同意が無い → 同意画面 / Pro でない(課金の制限が有効な時)→ 課金画面(`requestProForAIText` の 1 か所。#429 の `ProGate.requestPro` が入ったら差し替える)/ どちらも OK → `services.ai.text`。サーバーの理由は `HTTPAIClient.textError` で画面の文言に(上限はサーバーの日本語のまま) |
+| 依頼 | `AIGenerateBuilder`: 指示は `{{field}}` をフォームの値に置き換えて 500 字まで、`{{input}}` は「下の材料」に置き換え、材料(`entity` の新しい順 20 件まで / `input` field)は別に 4 KB(UTF-8)まで |
+| 形の検証 | `AITextResult.normalize`(MetamonDSL・backend の `parseTextOutput` と同じ規則)。端末内 AI は形ごとの `DynamicGenerationSchema`(fields の名前は f0, f1…)で構造化出力 |
+| テスト | `AITextTests`(形の解釈・切り詰め・例の読み込み)・`AiGenerateTests`(経路・依頼・描画)・`AITextGateTests`(同意 → Pro・モック・エラーの文言)。端末内 AI の実行は実機で確認 |
+
+確認: `METAMON_MOCK=1 METAMON_INITIAL_EXAMPLE=ai_ideas`(罰ゲーム 5 個・励まし・冷蔵庫タブの献立)。
 
 ## 19. 近距離共有(nearbyShare・MultipeerConnectivity / Issue #36)
 

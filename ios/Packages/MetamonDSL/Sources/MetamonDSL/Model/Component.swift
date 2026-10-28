@@ -129,10 +129,13 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var nameField: String?      // settlement / locationPicker(場所の名前の string field・#212)
     public var balanceField: String?
     // aiButton(#78)。label / prompt / entity / limit は共用
-    public var task: String?           // summarize|classify|rewrite|extract|suggest
+    public var task: String?           // summarize|classify|rewrite|extract|suggest|generate
     public var input: String?          // AI に渡す field(nil = フォーム全体)
     public var output: String?         // 結果を入れる field
     public var options: [String]?      // classify の候補(nil = enum field の options)
+    public var shape: String?          // generate(#417): line|list|fields
+    public var count: Int?             // generate list の個数
+    public var items: [String]?        // generate fields の項目名
     public var target: Double?         // progressBar entity モードの分母
     public var tone: String?           // progressBar: positive(目標)| negative(予算)・#140
     public var url: String?            // link
@@ -199,7 +202,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case min, max, step, minLines
         case by
         case nameField, balanceField
-        case task, input, output, options
+        case task, input, output, options, shape, count, items
         case tone
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
@@ -272,6 +275,9 @@ public struct Component: Decodable, Identifiable, Sendable {
         input = try? c.decodeIfPresent(String.self, forKey: .input)
         output = try? c.decodeIfPresent(String.self, forKey: .output)
         options = try? c.decodeIfPresent([String].self, forKey: .options)
+        shape = try? c.decodeIfPresent(String.self, forKey: .shape)
+        count = try? c.decodeIfPresent(Int.self, forKey: .count)
+        items = try? c.decodeIfPresent([String].self, forKey: .items)
         target = try? c.decodeIfPresent(Double.self, forKey: .target)
         tone = try? c.decodeIfPresent(String.self, forKey: .tone)
         url = try? c.decodeIfPresent(String.self, forKey: .url)

@@ -37,6 +37,10 @@ public protocol DSLRuntime: AnyObject, Observable {
     func toggleMark(entity: String, recordId: String, mark: String) async -> MarkState?
     /// `timerDisplay.liveActivity`(#423): タイマーの開始・一時停止・リセット・終了をロック画面 / Dynamic Island に映す。
     func timerActivity(_ update: TimerActivityUpdate)
+    /// aiButton generate(#417)のオンライン版。端末内 AI が使えない時だけ呼ぶ。同意・Pro の確認(画面を出す)もホストが持つ。
+    func generateAIText(_ request: AITextRequest) async throws -> AITextResult
+    /// オンライン版を持つホストか(プレビュー・テストは false = 端末内 AI だけ)。
+    var supportsOnlineAIText: Bool { get }
 }
 
 public extension DSLRuntime {
@@ -53,6 +57,8 @@ public extension DSLRuntime {
     func toggleMark(entity: String, recordId: String, mark: String) async -> MarkState? { nil }
     /// 既定は何もしない(プレビュー・テスト用ランタイム)。
     func timerActivity(_ update: TimerActivityUpdate) {}
+    func generateAIText(_ request: AITextRequest) async throws -> AITextResult { throw AITextError.unsupported }
+    var supportsOnlineAIText: Bool { false }
 
     /// 自分が更新できるレコードか(#249 / #252)。他人の共有レコードは entity.edit が members の時だけ。
     func canEdit(entity: String, record: Record) -> Bool {
