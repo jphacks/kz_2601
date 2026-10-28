@@ -1,0 +1,8 @@
+[
+  {"id": "mc_spotify", "group": "music", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#412 Spotify で流したい → 開くだけ・操作できないと正直に(Apple Music を代わりに)",
+   "steps": [{"say": "Spotify で流したい", "textAny": ["開く", "開け", "できません", "できない"], "textNot": ["Spotify を操作できます", "Spotify で再生できます", "public", "private", "shared", "entity", "scope", "disclosure", "computed"]}]},
+  {"id": "mc_drive_requests_can", "group": "music", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#412 友だちのスマホから曲をリクエストできるか → できる",
+   "steps": [{"say": "ドライブで音楽を流して、友だちのスマホから曲をリクエストできる?", "textAny": ["できます", "できる"], "textNot": ["できません", "public", "private", "shared", "entity", "scope", "disclosure", "computed"]}]},
+  {"id": "mc_bluetooth_can", "group": "music", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#412 Bluetooth で友だちの端末の音を流す → できない・リクエストで代替",
+   "steps": [{"say": "友だちのスマホと Bluetooth でつないで、友だちの曲をそのまま車で鳴らせる?", "textAny": ["できません", "できない"], "textNot": ["public", "private", "shared", "entity", "scope", "disclosure", "computed"]}]}
+]
