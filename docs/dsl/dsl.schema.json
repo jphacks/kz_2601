@@ -3258,8 +3258,7 @@
       "additionalProperties": false,
       "required": [
         "type",
-        "task",
-        "output"
+        "task"
       ],
       "properties": {
         "type": {
@@ -3273,7 +3272,7 @@
         },
         "label": {
           "type": "string",
-          "description": "ボタン文言(省略時は task から自動: AI で要約 など)。"
+          "description": "ボタン文言(省略時は task から自動: AI で要約 など)。generate は「罰ゲームを考えて」のように動詞で。"
         },
         "task": {
           "type": "string",
@@ -3282,9 +3281,10 @@
             "classify",
             "rewrite",
             "extract",
-            "suggest"
+            "suggest",
+            "generate"
           ],
-          "description": "summarize=要約 / classify=候補から 1 つ選ぶ / rewrite=言い換え・清書 / extract=要点や値の抜き出し / suggest=一言・アイデアの提案。"
+          "description": "summarize=要約 / classify=候補から 1 つ選ぶ / rewrite=言い換え・清書 / extract=要点や値の抜き出し / suggest=フォームの入力から一言・アイデア / generate=決まった指示(prompt)で新しく書かせる(罰ゲームの案・今日の献立・励ましの一言。結果はボタンの下に出る・shape で形を決める)。"
         },
         "input": {
           "type": "string",
@@ -3292,21 +3292,21 @@
         },
         "entity": {
           "type": "string",
-          "description": "集計入力: この entity の最近のレコード(limit 件)をまとめて AI に渡す(例: 過去の日記から傾向を一言)。input と同時に指定しない。"
+          "description": "集計入力: この entity の最近のレコード(limit 件)をまとめて AI に渡す(例: 過去の日記から傾向を一言 / 冷蔵庫の中身から献立)。input と同時に指定しない。"
         },
         "limit": {
           "type": "integer",
           "minimum": 1,
           "maximum": 50,
-          "description": "entity 入力の件数(新しい順・既定 20)。"
+          "description": "entity 入力の件数(新しい順・既定 20。generate は 20 まで)。"
         },
         "output": {
           "type": "string",
-          "description": "結果を入れる screen.entity の field id(string/text、classify は enum も可)。フォームのドラフトに入るだけで保存はユーザーが行う。"
+          "description": "結果を入れる screen.entity の field id(string/text、classify は enum も可)。フォームのドラフトに入るだけで保存はユーザーが行う。generate 以外は必須。generate は任意(省略 = ボタンの下に出すだけ・保存しない)。"
         },
         "prompt": {
           "type": "string",
-          "description": "追加の指示テンプレ。{{fieldId}} はフォームの値、{{input}} は入力全体に置換。例: 「{{body}} を 30 字で」。"
+          "description": "指示テンプレ。{{fieldId}} はフォームの値、{{input}} は入力全体に置換。例: 「{{body}} を 30 字で」。generate では必須で、これが AI への固定の指示(500 字まで。例: 「飲み会で盛り上がる、誰でもできる軽い罰ゲームの案」)。"
         },
         "options": {
           "type": "array",
@@ -3316,10 +3316,34 @@
             "type": "string"
           },
           "description": "classify の候補。output が enum field なら省略可(field の options を使う)。"
+        },
+        "shape": {
+          "type": "string",
+          "enum": [
+            "line",
+            "list",
+            "fields"
+          ],
+          "description": "generate の出力の形(既定 line)。line=1 行 / list=箇条書き count 個 / fields=items の名前ごとに 1 つ(例: 主菜・副菜・汁物)。"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "generate の shape list の個数(既定 3)。「5 つ」と言われたら 5。"
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "type": "string"
+          },
+          "description": "generate の shape fields の項目名(1〜10 個・各 20 字まで)。例: [\"主菜\",\"副菜\",\"汁物\"]。"
         }
       },
-      "description": "押すとオンデバイス AI(Apple Intelligence / Foundation Models)が走り、フォームの入力を要約・分類・言い換え・抜き出し・提案して output field に入れるボタン。無料・データは端末外に出ない。非対応端末では「この端末では AI を使えません」と無効表示。",
-      "x-usage": "フォーム画面のみ(screen.entity 必須)。発話に「要約して」「分類して」「気分を判定」「タグ付け」「一言で」「言い換えて」「丁寧に」「抜き出して」「提案して」「AI で」がある時に使う。entity に結果用の field(string/text、分類は enum)を足し、その入力欄の直上に 1 行(例 A7:F8)。1 画面 3 個まで。"
+      "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はオンデバイス AI(Apple Intelligence / Foundation Models)だけでフォームの入力を処理して output field に入れる(無料・データは端末外に出ない・非対応端末では「この端末では AI を使えません」)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",
+      "x-usage": "summarize〜suggest はフォーム画面のみ(screen.entity 必須)。発話に「要約して」「分類して」「気分を判定」「タグ付け」「一言で」「言い換えて」「丁寧に」「抜き出して」「AI で」がある時に使う。entity に結果用の field(string/text、分類は enum)を足し、その入力欄の直上に 1 行(例 A7:F8)。generate は「〜の案を出してくれるボタン」「今日の献立を提案」「励ましの一言」「お題を考えて」の時: どの画面でもよく、結果を表示する高さを取る(line は 3 行・list/fields は 5〜6 行 例 A1:F6)。記録を材料にするなら entity(+limit)、結果を記録に残したい時だけフォーム画面で output。1 画面 3 個まで。"
     },
     "LocationTracker": {
       "type": "object",
