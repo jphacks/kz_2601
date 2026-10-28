@@ -1,0 +1,7 @@
+[
+  {"id": "s_level", "kind": "create", "group": "sensor", "transcript": "スマホの傾きを測る水平器", "note": "#419 tilt の水平器(style level)", "expect": {"sensor": ["tilt"], "substitution": false}},
+  {"id": "s_pressure_log", "kind": "create", "group": "sensor", "transcript": "気圧と高度を記録", "note": "#419 pressure / altitude を entity に保存", "expect": {"sensor": ["pressure", "altitude"], "sensorSave": true}},
+  {"id": "s_tilt_alert", "kind": "create", "group": "sensor", "transcript": "運転中にスマホの傾きが30度を超えたら警告して", "note": "#419 threshold above 30", "expect": {"sensor": ["tilt"], "sensorThreshold": true}},
+  {"id": "s_temperature", "kind": "create", "group": "sensor", "transcript": "温度を測りたい", "note": "#419 iPhone に温度センサーは無い: 正直に断り、別のセンサーで偽らない", "expect": {"sensorDecline": true, "lacks": ["sensorValue"]}},
+  {"id": "s_humidity_room", "kind": "create", "group": "sensor", "transcript": "部屋の湿度と気温を毎日記録したい", "note": "#419 手入力の記録 + センサーが無い旨", "expect": {"sensorDecline": true}}
+]

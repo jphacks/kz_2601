@@ -50,6 +50,11 @@ var expectKeys = map[string]expectKind{
 	"summaryHas":   expectStrings,
 	// checkGroupBy (#261, PR #404)
 	"groupedTable": expectBool,
+	// checkSensor (#419)
+	"sensor":          expectStrings,
+	"sensorSave":      expectBool,
+	"sensorThreshold": expectBool,
+	"sensorDecline":   expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

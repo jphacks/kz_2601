@@ -1,0 +1,8 @@
+[
+  {"id": "sc_temperature", "group": "sensor", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#419 温度は測れないと正直に答えるか",
+   "steps": [{"say": "温度を測りたい", "textAny": ["測れません", "センサーが無い", "センサーがない", "できません"], "textNot": ["sensorValue"]}]},
+  {"id": "sc_humidity_can", "group": "sensor", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#419 湿度は測れる? → できません",
+   "steps": [{"say": "スマホで湿度って測れる?", "expect": "answer", "textAny": ["測れません", "センサーが無い", "センサーがない", "できません"]}]},
+  {"id": "sc_tilt_can", "group": "sensor", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#419 傾きは測れる → できます",
+   "steps": [{"say": "スマホの傾きって測れる?", "expect": "answer", "textAny": ["できます", "測れます"], "textNot": ["sensorValue"]}]}
+]
