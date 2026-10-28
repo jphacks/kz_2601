@@ -336,7 +336,9 @@
             "openUrl",
             "resetForm",
             "scheduleNotification",
-            "cancelNotification"
+            "cancelNotification",
+            "startActivity",
+            "endActivity"
           ],
           "x-enumDescriptions": {
             "navigate": "画面遷移。list.onItemTap からは recordId が暗黙に渡り、遷移先フォームが編集モードになる(だから onItemTap の遷移先は同じ entity のフォーム)。prefillRef を付けると今のレコード(タップした行・ボタンのあるフォームのレコード)を子フォームの ref に入れて新規で開く。",
@@ -347,7 +349,9 @@
             "openUrl": "URL を Safari で開く。",
             "resetForm": "フォームのドラフトを既定値に戻す。",
             "scheduleNotification": "ローカル通知をその場で予約(dsl.<id> で置換)。任意で押すリマインドはこれ。毎日の定期通知は app.notifications に宣言する。",
-            "cancelNotification": "予約した通知を取り消す。"
+            "cancelNotification": "予約した通知を取り消す。",
+            "startActivity": "ロック画面と Dynamic Island に「いま◯◯中」を出す(ライブアクティビティ・#423)。activity の title と、任意で残り時間(minutes)・数字(stat)。アプリを閉じても時間は進み、stat は記録を足すたびに更新される。同じアプリで出し直すと前のものを置き換える。タイマー部品の時間を出すだけなら timerDisplay.liveActivity の方が短い。",
+            "endActivity": "startActivity で出したロック画面の表示を消す(「終わった」「到着」ボタンに)。"
           }
         },
         "screen": {
@@ -407,6 +411,13 @@
           "description": "親から子を作る(#256)。遷移先フォーム(screen.entity)の ref field id。今のレコード(list / mapView の onItemTap ならタップした行、button / toolbar ならその画面のフォームのレコード)を入れて新規で開く。ref の refEntity は今のレコードの entity。遷移先フォームにはその field の picker を残す。calendar / gridTable では使えない。",
           "x-for": {
             "navigate": "optional"
+          }
+        },
+        "activity": {
+          "$ref": "#/$defs/Activity",
+          "description": "startActivity only.",
+          "x-for": {
+            "startActivity": "required"
           }
         }
       }
@@ -2872,10 +2883,14 @@
         },
         "label": {
           "type": "string"
+        },
+        "liveActivity": {
+          "type": "boolean",
+          "description": "true で、動いている間ロック画面と Dynamic Island に残り時間 / 経過時間を出す(アプリを閉じても数え続ける・#423)。「ロック画面に出したい」「画面を消しても見たい」「Dynamic Island に」と言われたら付ける。"
         }
       },
       "description": "大きな mm:ss 表示と 開始/一時停止/リセット。stopwatch はカウントアップ、countdown は seconds から 0 へ。筋トレのセット・プランク・ポモドーロ・料理・瞑想など時間を計るアプリで選ぶ。",
-      "x-usage": "画面の主役として A2:F6、下にフォームの入力欄。フォーム画面で `field` を指定すると計測秒をレコードと一緒に保存できる。"
+      "x-usage": "画面の主役として A2:F6、下にフォームの入力欄。フォーム画面で `field` を指定すると計測秒をレコードと一緒に保存できる。 ロック画面にも出すなら liveActivity: true。"
     },
     "WebView": {
       "type": "object",
@@ -3505,6 +3520,36 @@
         }
       },
       "description": "entity の印 1 つ(marks の要素)。id は like / save / read など entity 内で一意。1 人 1 回のトグルで、件数と「自分が付けたか」を backend が持つ。"
+    },
+    "Activity": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "startActivity でロック画面と Dynamic Island に出す内容。minutes を省くと押した時からの経過時間を数える。",
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "大きく出す一言(例「ラーメン待ち」「ランニング中」「運転中」)。"
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "任意: 小さく添える一行(例「かため・3 分」)。"
+        },
+        "icon": {
+          "type": "string",
+          "description": "任意: SF Symbols 名(例 flame / figure.run / car)。省略時 timer。"
+        },
+        "minutes": {
+          "type": "integer",
+          "description": "任意: 今から N 分後を終わりとして残り時間を数える(1〜480)。省略すると経過時間。"
+        },
+        "stat": {
+          "type": "string",
+          "description": "任意: 同じアプリの stat か progressBar 部品の id。その数字(progressBar は進み具合)を添え、記録が増えるたびに更新する。"
+        }
+      }
     }
   }
 }

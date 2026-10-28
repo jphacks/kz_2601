@@ -340,7 +340,9 @@ func (a *App) Validate() error {
 			if act.NotificationID == "" {
 				add("%s: cancelNotification needs notificationId", where)
 			}
-		case ActionBack, ActionOpenVoice, ActionResetForm:
+		case ActionStartActivity:
+			checkActivity(where, act.Activity, a, add) // #423: live_activity.go
+		case ActionBack, ActionOpenVoice, ActionResetForm, ActionEndActivity:
 		default:
 			add("%s: unknown action type %q", where, act.Type)
 		}
