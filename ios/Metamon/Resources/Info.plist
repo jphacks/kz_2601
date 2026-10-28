@@ -100,6 +100,8 @@
 	<!-- ネイティブ機能の権限説明(P0: マイク/カメラ/通知、P1: 位置/モーション) -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>話しかけた内容からアプリを生成するため、また生成したアプリで動画の音声を録音するために、マイクを使用します。</string>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>生成したアプリの音楽プレーヤーで、Apple Music の曲を検索して再生するために使用します。</string>
 	<key>NSCameraUsageDescription</key>
 	<string>生成したアプリで写真や動画を撮影・記録するために、カメラを使用します。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -117,7 +119,7 @@
 	<string>生成したアプリで記録した体重をヘルスケアにも保存するために、ヘルスケアへ書き込みます。</string>
 	<!-- nearbyShare(#36): MultipeerConnectivity で近くの Tailor It 端末と記録を送り合う。サービス名は NearbyService.serviceType と一致させる -->
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>近くにいる Tailor It の端末を見つけて、記録をその場で送ったり受け取ったりするために、ローカルネットワークを使用します。</string>
+	<string>近くにいる Tailor It の端末を見つけて、記録や曲のリクエストをその場で送ったり受け取ったりするために、ローカルネットワークを使用します。</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_tailorit-mc._tcp</string>

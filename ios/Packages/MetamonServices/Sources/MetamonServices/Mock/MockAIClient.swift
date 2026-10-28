@@ -14,6 +14,7 @@ public struct MockAIClient: AIClient {
         if transcript.contains("薬") || transcript.contains("服薬") { return "medicine" }
         if transcript.contains("時間割") || transcript.contains("時限") { return "timetable" }
         if transcript.contains("ランダム") || transcript.contains("くじ") || transcript.contains("晩ごはん") { return "dinner" }
+        if transcript.contains("音楽") || transcript.contains("BGM") { return "drive_music" }
         if transcript.contains("最初") || transcript.contains("戻") { return "initial" }
         return "kakeibo"
     }

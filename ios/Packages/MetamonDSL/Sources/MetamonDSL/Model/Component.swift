@@ -45,6 +45,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case gridTable
     // leaf(ランダムに 1 件選ぶ・#263)。entity / title / titleField / subtitleField / filter / label / onItemTap は共用
     case randomPicker
+    // leaf(Apple Music の再生と友だちからの曲リクエスト・#412)。title は共用
+    case musicPlayer
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -164,6 +166,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     // chatThread(#260)。entity / placeholder / emptyText は共用
     public var textField: String?      // 本文の string / text field
     public var photoField: String?     // 任意の photo field
+    // musicPlayer(#412)
+    public var allowRequests: Bool?    // 近くの端末から曲のリクエストを受ける
+    public var autoAccept: Bool?       // リクエストを確認せずに再生待ちへ
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
@@ -180,6 +185,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
         case textField, photoField
+        case allowRequests, autoAccept
     }
 
     public init(from decoder: Decoder) throws {
@@ -264,6 +270,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         rowRange = try? c.decodeIfPresent(GridRange.self, forKey: .rowRange)
         textField = try? c.decodeIfPresent(String.self, forKey: .textField)
         photoField = try? c.decodeIfPresent(String.self, forKey: .photoField)
+        allowRequests = try? c.decodeIfPresent(Bool.self, forKey: .allowRequests)
+        autoAccept = try? c.decodeIfPresent(Bool.self, forKey: .autoAccept)
     }
 }
 
