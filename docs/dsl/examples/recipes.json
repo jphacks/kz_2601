@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "みんなのレシピ",
+    "description": "レシピをみんなで公開し、気に入ったものを保存する。保存は 1 人 1 回のトグルで、保存したレシピだけのタブと、よく保存されている順の一覧がある(#255)",
+    "icon": "fork.knife",
+    "theme": { "primaryColor": "#E65100" },
+    "voiceEntry": "floating",
+    "tabs": [
+      { "screen": "home", "title": "みんな", "icon": "person.3" },
+      { "screen": "popular", "title": "人気", "icon": "flame" },
+      { "screen": "saved", "title": "保存した", "icon": "bookmark" }
+    ]
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "recipes",
+      "name": "レシピ",
+      "titleField": "title",
+      "scope": "public",
+      "marks": [{ "id": "save", "icon": "bookmark", "label": "保存" }],
+      "fields": [
+        { "id": "title", "name": "料理名", "type": "string", "required": true },
+        { "id": "minutes", "name": "調理時間", "type": "integer", "unit": "分" },
+        { "id": "steps", "name": "作り方", "type": "string" },
+        { "id": "photo", "name": "写真", "type": "photo" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "みんなのレシピ",
+      "toolbar": [
+        { "label": "投稿", "icon": "plus", "action": { "type": "navigate", "screen": "recipe_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        {
+          "type": "section", "id": "all", "area": "A1:F10", "title": "新着",
+          "children": [
+            { "type": "list", "entity": "recipes",
+              "item": { "title": "title", "subtitle": "$author", "image": "photo", "mark": "save" },
+              "sort": { "field": "$createdAt", "direction": "desc" }, "emptyText": "まだレシピがありません",
+              "onItemTap": { "type": "navigate", "screen": "recipe_form", "presentation": "push" } }
+          ]
+        },
+        { "type": "button", "id": "add", "area": "D11:F12", "label": "投稿", "icon": "plus",
+          "action": { "type": "navigate", "screen": "recipe_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "popular",
+      "title": "よく保存されているレシピ",
+      "components": [
+        {
+          "type": "section", "id": "ranking", "area": "A1:F12", "title": "保存の多い順",
+          "children": [
+            { "type": "table", "entity": "recipes",
+              "columns": [{ "field": "title" }, { "field": "$author", "title": "投稿者" }, { "field": "$marks.save", "title": "保存" }],
+              "sort": { "field": "$marks.save", "direction": "desc" }, "limit": 20 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "saved",
+      "title": "保存したレシピ",
+      "components": [
+        { "type": "stat", "id": "count", "area": "A1:F2", "label": "保存したレシピ", "entity": "recipes", "aggregate": "count",
+          "filter": { "field": "$marks.save", "op": "eq", "value": { "me": true } } },
+        {
+          "type": "section", "id": "list", "area": "A3:F12", "title": "保存したもの",
+          "children": [
+            { "type": "list", "entity": "recipes",
+              "item": { "title": "title", "subtitle": "$author", "trailing": "minutes", "image": "photo", "mark": "save" },
+              "filter": { "field": "$marks.save", "op": "eq", "value": { "me": true } },
+              "emptyText": "みんなのレシピの栞マークで保存できます",
+              "onItemTap": { "type": "navigate", "screen": "recipe_form", "presentation": "push" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "recipe_form",
+      "title": "レシピ",
+      "entity": "recipes",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "recipes" } }],
+      "components": [
+        {
+          "type": "section", "id": "fields", "area": "A1:F10", "title": "内容",
+          "children": [
+            { "type": "textField", "field": "title", "label": "料理名", "placeholder": "肉じゃが" },
+            { "type": "numberField", "field": "minutes", "label": "調理時間" },
+            { "type": "textEditor", "field": "steps", "placeholder": "作り方" },
+            { "type": "photoField", "field": "photo", "label": "写真" }
+          ]
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "recipes", "confirmMessage": "このレシピを削除しますか？" } }
+      ]
+    }
+  ]
+}

@@ -236,6 +236,7 @@ func (a *App) Validate() error {
 		default:
 			add("entity %q edit %q must be author or members", e.ID, e.Edit)
 		}
+		checkEntityMarks(e, add)
 		seen := map[string]bool{}
 		for j, f := range e.Fields {
 			if !idRe.MatchString(f.ID) {
@@ -390,7 +391,7 @@ func (a *App) Validate() error {
 			if len(c.Children) > 0 {
 				add("%s: %s cannot have children", where, c.Type)
 			}
-			if c.Filter != nil {
+			if c.Filter != nil && !checkMeFilter(where, c.Filter, entities[c.Entity], add) {
 				checkComponentFilterValue(where, c.Filter, entities, add)
 				checkComponentPeriodFilter(where, c, entities, add)
 			}
@@ -435,16 +436,22 @@ func (a *App) Validate() error {
 					add("%s: list needs item", where)
 					break
 				}
-				for _, fid := range []string{c.Item.Title, c.Item.Subtitle, c.Item.Trailing, c.Item.Image} {
-					if fid != "" && e.FieldByID(fid) == nil {
-						add("%s: list item field %q not in entity %q", where, fid, e.ID)
+				for _, fid := range []string{c.Item.Title, c.Item.Subtitle, c.Item.Trailing} {
+					if msg := valueErr(e, "field", fid); fid != "" && msg != "" {
+						add("%s: list item %s", where, msg)
 					}
 				}
-				checkListToggle(where, c.Item, e, add)
-				if c.Sort != nil && e.FieldByID(c.Sort.Field) == nil {
-					add("%s: sort field %q not in entity %q", where, c.Sort.Field, e.ID)
+				if c.Item.Image != "" && e.FieldByID(c.Item.Image) == nil {
+					add("%s: list item field %q not in entity %q", where, c.Item.Image, e.ID)
 				}
-				if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
+				checkListToggle(where, c.Item, e, add)
+				checkListMark(where, c.Item, e, add)
+				if c.Sort != nil {
+					if msg := valueErr(e, "sort field", c.Sort.Field); msg != "" {
+						add("%s: %s", where, msg)
+					}
+				}
+				if c.Filter != nil && !hasFilterField(e, c.Filter.Field) {
 					add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
 				}
 				checkAction(where+".onItemTap", c.OnItemTap)
@@ -467,7 +474,7 @@ func (a *App) Validate() error {
 				if e.FieldByID(c.GroupBy) == nil {
 					add("%s: chart groupBy %q not in entity %q", where, c.GroupBy, e.ID)
 				}
-				if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
+				if c.Filter != nil && !hasFilterField(e, c.Filter.Field) {
 					add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
 				}
 			case CompVoiceInput, CompSpacer, CompDivider:
@@ -619,6 +626,8 @@ func (a *App) Validate() error {
 				checkAIButton(where, c, formEntity, entities, add)
 			case CompLocationTracker:
 				checkLocationTracker(where, c, entities, add)
+			case CompChatThread:
+				checkChatThread(where, c, entities, add)
 			case CompHealthStat:
 				checkHealthStat(where, c, add)
 			case CompNearbyShare:
@@ -781,7 +790,7 @@ func checkAggregateRef(where string, c *Component, entities map[string]*Entity, 
 	if c.Aggregate != "count" && e.FieldByID(c.Field) == nil {
 		add("%s: %s field %q not in entity %q (required unless aggregate=count)", where, c.Type, c.Field, e.ID)
 	}
-	if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
+	if c.Filter != nil && !hasFilterField(e, c.Filter.Field) {
 		add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
 	}
 	return e, true
@@ -851,14 +860,16 @@ func checkTable(where string, c *Component, entities map[string]*Entity, add fun
 		add("%s: table needs at least one column", where)
 	}
 	for i, col := range c.Columns {
-		if e.FieldByID(col.Field) == nil {
-			add("%s: columns[%d] field %q not in entity %q", where, i, col.Field, e.ID)
+		if msg := valueErr(e, "field", col.Field); msg != "" {
+			add("%s: columns[%d] %s", where, i, msg)
 		}
 	}
-	if c.Sort != nil && e.FieldByID(c.Sort.Field) == nil {
-		add("%s: sort field %q not in entity %q", where, c.Sort.Field, e.ID)
+	if c.Sort != nil {
+		if msg := valueErr(e, "sort field", c.Sort.Field); msg != "" {
+			add("%s: %s", where, msg)
+		}
 	}
-	if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
+	if c.Filter != nil && !hasFilterField(e, c.Filter.Field) {
 		add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
 	}
 	if c.Limit < 0 {
@@ -872,18 +883,20 @@ func checkTimeline(where string, c *Component, entities map[string]*Entity, add 
 		add("%s: timeline entity %q does not exist", where, c.Entity)
 		return
 	}
-	if f := e.FieldByID(c.DateField); f == nil {
+	if c.DateField == RecordCreatedAt {
+		// posted time (a datetime)
+	} else if f := e.FieldByID(c.DateField); f == nil {
 		add("%s: dateField %q not in entity %q", where, c.DateField, e.ID)
 	} else if f.Type != FieldDate && f.Type != FieldDatetime {
 		add("%s: dateField %q must be date or datetime", where, c.DateField)
 	}
-	if e.FieldByID(c.TitleField) == nil {
-		add("%s: titleField %q not in entity %q", where, c.TitleField, e.ID)
+	if msg := valueErr(e, "titleField", c.TitleField); msg != "" {
+		add("%s: %s", where, msg)
 	}
-	if c.SubtitleField != "" && e.FieldByID(c.SubtitleField) == nil {
-		add("%s: subtitleField %q not in entity %q", where, c.SubtitleField, e.ID)
+	if msg := valueErr(e, "subtitleField", c.SubtitleField); c.SubtitleField != "" && msg != "" {
+		add("%s: %s", where, msg)
 	}
-	if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
+	if c.Filter != nil && !hasFilterField(e, c.Filter.Field) {
 		add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
 	}
 	if c.Limit < 0 {
