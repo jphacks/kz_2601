@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "レシート家計簿",
+    "description": "レシートを撮ると、金額・日付・お店の文字を端末内の AI が読み取って入力する家計簿。分類も写真から選ぶ",
+    "icon": "doc.text.viewfinder",
+    "theme": { "primaryColor": "#2E7D32" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "expense",
+      "name": "支出",
+      "titleField": "category",
+      "fields": [
+        { "id": "receipt", "name": "レシート", "type": "photo" },
+        { "id": "amount", "name": "金額", "type": "currency", "unit": "円", "required": true },
+        { "id": "date", "name": "日付", "type": "date", "defaultValue": "now" },
+        { "id": "category", "name": "分類", "type": "enum", "options": ["食費", "日用品", "交通", "外食", "その他"], "defaultValue": "食費" },
+        { "id": "memo", "name": "レシートの文字", "type": "text" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "レシート家計簿",
+      "toolbar": [
+        { "label": "追加", "icon": "plus", "action": { "type": "navigate", "screen": "expense_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        { "type": "stat", "id": "month", "area": "A1:F2", "label": "今月の合計", "entity": "expense", "aggregate": "sum", "field": "amount", "format": "currency",
+          "filter": { "field": "date", "op": "thisMonth", "value": null } },
+        {
+          "type": "list", "id": "expenses", "area": "A3:F10",
+          "entity": "expense",
+          "item": { "title": "category", "subtitle": "date", "trailing": "amount", "image": "receipt" },
+          "sort": { "field": "date", "direction": "desc" },
+          "emptyText": "レシートを撮って追加してください",
+          "onItemTap": { "type": "navigate", "screen": "expense_form", "presentation": "sheet" },
+          "swipeToDelete": true
+        },
+        { "type": "button", "id": "add", "area": "D11:F12", "label": "レシートを撮る", "icon": "camera",
+          "action": { "type": "navigate", "screen": "expense_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "expense_form",
+      "title": "支出",
+      "entity": "expense",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "expense" } }],
+      "components": [
+        {
+          "type": "photoField", "id": "shot", "area": "A1:F4", "field": "receipt", "label": "レシートを撮る", "source": "both",
+          "analyze": [
+            { "kind": "amount", "into": "amount" },
+            { "kind": "date", "into": "date" },
+            { "kind": "classify", "into": "category" },
+            { "kind": "text", "into": "memo" }
+          ]
+        },
+        {
+          "type": "section", "id": "values", "area": "A5:F10", "title": "読み取った内容(確認して保存)",
+          "children": [
+            { "type": "numberField", "field": "amount", "label": "金額", "unit": "円" },
+            { "type": "datePicker", "field": "date", "label": "日付" },
+            { "type": "picker", "field": "category", "label": "分類", "style": "menu" },
+            { "type": "textField", "field": "memo", "label": "レシートの文字", "multiline": true }
+          ]
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "expense", "confirmMessage": "この支出を削除しますか？" } }
+      ]
+    }
+  ]
+}

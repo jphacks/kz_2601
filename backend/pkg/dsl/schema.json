@@ -1367,8 +1367,8 @@
     "PhotoField": {
       "type": "object",
       "additionalProperties": false,
-      "description": "カメラ / ライブラリから写真を取り込んで photo field に保存する入力。",
-      "x-usage": "「写真を撮る・残す」は source camera、既存の写真を選ぶなら library、迷えば both。",
+      "description": "カメラ / ライブラリから写真を取り込んで photo field に保存する入力。写真の文字・金額・日付・分類・説明・体の関節の角度を端末内の AI で読み取り、同じレコードの他の項目に入れられる(analyze)。",
+      "x-usage": "「写真を撮る・残す」は source camera、既存の写真を選ぶなら library、迷えば both。「撮ったら読み取って」「レシートを撮ったら金額を入れて」「写真から分類」「フォームをチェック」なら analyze:[{kind, into}] を付け、読み取った値を入れる field(into)を同じ entity に足して、その入力欄も同じフォームに置く(読み取り結果は確認・修正できる)。レシート → {kind:amount, into:金額(currency)} + {kind:date, into:日付} (+ {kind:text, into:メモ})。写っている物の種類 → {kind:classify, into:enum field}。筋トレ・ストレッチのフォーム → {kind:jointAngle, joint:knee 等, into:角度(number)}(写真に関節の点と線を重ねて出す)。",
       "required": [
         "type",
         "field"
@@ -1397,6 +1397,15 @@
             "library",
             "both"
           ]
+        },
+        "analyze": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/PhotoAnalyze"
+          },
+          "description": "写真を撮った・選んだ直後に端末内で読み取り、into の field に入れる(読み取れなかった項目は今の値のまま。「もう一度読み取る」で読み直せる)。保存はユーザー。"
         }
       }
     },
@@ -3381,6 +3390,67 @@
       },
       "description": "端末のヘルスデータを表示するカード。歩数は iPhone が自動で数えている値(entity も記録も不要)、体重はヘルスケアの最新値。「毎日の歩数を見たい」「今日何歩歩いた」「1 週間の歩数」「ヘルスケアの体重を見たい」など、自分で入力しない健康データを見たい時に選ぶ。権限が無い時・シミュレータでは理由を表示する。",
       "x-usage": "entity 不要でどの画面にも置ける。today は stat と同じ大きさ(半幅 2〜3 行・例 A1:C3)、week はグラフなので全幅 4〜5 行(例 A4:F8)。目標の話があれば target。手入力の体重記録アプリで「ヘルスケアにも保存」と言われたら、体重 field に health: \"weight\" を付ける(このカードとは別)。"
+    },
+    "PhotoAnalyze": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "into"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "text",
+            "amount",
+            "date",
+            "classify",
+            "describe",
+            "jointAngle"
+          ],
+          "x-enumDescriptions": {
+            "text": "写真の文字(日本語・英語)をそのまま読む(OCR)。into は string / text。",
+            "amount": "レシート・値札の金額(合計の行・無ければ ¥/円 の付いた一番大きい額)。into は currency / integer / number。",
+            "date": "レシート・書類の日付(2026/10/28・2026年10月28日 など)。into は date / datetime。",
+            "classify": "写っている物と文字から候補を 1 つ選ぶ。into は enum(候補はその options)か、options 付きの string / text。",
+            "describe": "写っているものを短い文で説明する。into は string / text。",
+            "jointAngle": "人の体の関節(joint)の角度(度・0〜180)。写真に関節の点と線を重ねて出す。into は number / integer。"
+          }
+        },
+        "into": {
+          "type": "string",
+          "description": "結果を入れる screen.entity の field id(保存される field・photo field 自身は不可)。"
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": {
+            "type": "string"
+          },
+          "description": "classify のみ: 候補。into が enum なら省略可(その options を使う)。"
+        },
+        "joint": {
+          "type": "string",
+          "enum": [
+            "knee",
+            "elbow",
+            "hip",
+            "shoulder",
+            "leftKnee",
+            "rightKnee",
+            "leftElbow",
+            "rightElbow",
+            "leftHip",
+            "rightHip",
+            "leftShoulder",
+            "rightShoulder"
+          ],
+          "description": "jointAngle のみ(必須): 角度を測る関節。knee / elbow / hip / shoulder は左右のうちよく写っている方。"
+        }
+      },
+      "description": "写真から読み取る 1 項目(kind)と、結果を入れる field(into)。"
     }
   }
 }

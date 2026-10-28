@@ -401,6 +401,18 @@ type Component struct {
 	ColumnValues []string   `json:"columnValues,omitempty"` // explicit column headers (else enum options)
 	RowValues    []string   `json:"rowValues,omitempty"`    // explicit row headers for enum/string rowField
 	RowRange     *GridRange `json:"rowRange,omitempty"`     // integer rowField range (default 1..6)
+
+	// photoField (#418): on-device reading of the picked photo into other fields.
+	Analyze []PhotoAnalyze `json:"analyze,omitempty"`
+}
+
+// PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the
+// form field it goes into (Into).
+type PhotoAnalyze struct {
+	Kind    string   `json:"kind"` // text|amount|date|classify|describe|jointAngle
+	Into    string   `json:"into"`
+	Options []string `json:"options,omitempty"` // classify candidates (else the enum into's options)
+	Joint   string   `json:"joint,omitempty"`   // jointAngle: knee|elbow|hip|shoulder (+ left/right)
 }
 
 // GridRange is an inclusive integer range of gridTable rows.

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "フォームチェック",
+    "description": "スクワットの写真から膝と腰の角度を端末内で測り、フォームの記録を残す",
+    "icon": "figure.strengthtraining.functional",
+    "theme": { "primaryColor": "#6A1B9A" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "check",
+      "name": "フォーム",
+      "titleField": "exercise",
+      "fields": [
+        { "id": "photo", "name": "写真", "type": "photo" },
+        { "id": "exercise", "name": "種目", "type": "enum", "options": ["スクワット", "腕立て伏せ", "ランジ"], "defaultValue": "スクワット" },
+        { "id": "knee_angle", "name": "膝の角度", "type": "number", "unit": "度" },
+        { "id": "hip_angle", "name": "腰の角度", "type": "number", "unit": "度" },
+        { "id": "date", "name": "日付", "type": "date", "defaultValue": "now" },
+        { "id": "memo", "name": "メモ", "type": "string" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "フォームチェック",
+      "toolbar": [
+        { "label": "追加", "icon": "plus", "action": { "type": "navigate", "screen": "check_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        { "type": "stat", "id": "avg_knee", "area": "A1:C2", "label": "膝の角度(平均)", "entity": "check", "aggregate": "avg", "field": "knee_angle" },
+        { "type": "stat", "id": "count", "area": "D1:F2", "label": "記録", "entity": "check", "aggregate": "count" },
+        {
+          "type": "list", "id": "checks", "area": "A3:F10",
+          "entity": "check",
+          "item": { "title": "exercise", "subtitle": "date", "trailing": "knee_angle", "image": "photo" },
+          "sort": { "field": "date", "direction": "desc" },
+          "emptyText": "写真を撮ってフォームを記録しましょう",
+          "onItemTap": { "type": "navigate", "screen": "check_form", "presentation": "sheet" },
+          "swipeToDelete": true
+        },
+        { "type": "button", "id": "add", "area": "D11:F12", "label": "フォームを撮る", "icon": "camera",
+          "action": { "type": "navigate", "screen": "check_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "check_form",
+      "title": "フォーム",
+      "entity": "check",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "check" } }],
+      "components": [
+        {
+          "type": "photoField", "id": "shot", "area": "A1:F5", "field": "photo", "label": "横から全身を撮る", "source": "both",
+          "analyze": [
+            { "kind": "jointAngle", "joint": "knee", "into": "knee_angle" },
+            { "kind": "jointAngle", "joint": "hip", "into": "hip_angle" }
+          ]
+        },
+        {
+          "type": "section", "id": "values", "area": "A6:F10", "title": "測った角度",
+          "children": [
+            { "type": "picker", "field": "exercise", "label": "種目", "style": "segmented" },
+            { "type": "numberField", "field": "knee_angle", "label": "膝の角度", "unit": "度" },
+            { "type": "numberField", "field": "hip_angle", "label": "腰の角度", "unit": "度" },
+            { "type": "textField", "field": "memo", "label": "メモ" }
+          ]
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "check", "confirmMessage": "この記録を削除しますか？" } }
+      ]
+    }
+  ]
+}
