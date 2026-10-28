@@ -95,18 +95,23 @@ final class QRCodeTests: XCTestCase {
         let c = try component(#"{"type":"qrCode","field":"number","label":"受付で見せてください","title":"会員証"}"#)
         let ctx = RenderContext(route: Route(screen: "card_form"), form: form)
 
-        func render() throws -> UIImage {
+        // QR_SHOT_DIR(xcodebuild では TEST_RUNNER_QR_SHOT_DIR)があれば PNG も書き出す(PR のスクショ用)
+        func render(_ name: String) throws -> UIImage {
             let r = ImageRenderer(content: QrCodeLeaf(c: c, ctx: ctx).frame(width: 320, height: 480).background(Color.white))
             r.scale = 2
-            return try XCTUnwrap(r.uiImage, "描画できない")
+            let img = try XCTUnwrap(r.uiImage, "描画できない")
+            if let dir = ProcessInfo.processInfo.environment["QR_SHOT_DIR"], !dir.isEmpty {
+                try? img.pngData()?.write(to: URL(fileURLWithPath: dir).appending(path: "qrcode-\(name).png"))
+            }
+            return img
         }
-        XCTAssertEqual(decode(try render()), [], "空なのに QR が出た")
+        XCTAssertEqual(decode(try render("empty")), [], "空なのに QR が出た")
 
         form.values["number"] = "00123"
-        XCTAssertEqual(decode(try render()), ["00123"], "描いた QR が読めない")
+        XCTAssertEqual(decode(try render("filled")), ["00123"], "描いた QR が読めない")
 
         form.values["number"] = .string(String(repeating: "あ", count: 1000))
-        XCTAssertEqual(decode(try render()), [], "長すぎる値で QR が出た")
+        XCTAssertEqual(decode(try render("too-long")), [], "長すぎる値で QR が出た")
 
         // レジストリ経由でも未知 type のプレースホルダにならない
         XCTAssertNotNil(ComponentRegistry.standard.builder(for: "qrCode"))
