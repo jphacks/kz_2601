@@ -164,6 +164,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     // chatThread(#260)。entity / placeholder / emptyText は共用
     public var textField: String?      // 本文の string / text field
     public var photoField: String?     // 任意の photo field
+    // nearbyShare passby(#425)。entity / mode / limit は共用
+    public var fields: [String]?       // 交換する field id(明示したものだけ送る)
+    public var distance: Bool?         // UWB で距離・方向を出す
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
@@ -180,6 +183,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
         case textField, photoField
+        case fields, distance
     }
 
     public init(from decoder: Decoder) throws {
@@ -264,6 +268,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         rowRange = try? c.decodeIfPresent(GridRange.self, forKey: .rowRange)
         textField = try? c.decodeIfPresent(String.self, forKey: .textField)
         photoField = try? c.decodeIfPresent(String.self, forKey: .photoField)
+        fields = try? c.decodeIfPresent([String].self, forKey: .fields)
+        distance = try? c.decodeIfPresent(Bool.self, forKey: .distance)
     }
 }
 
