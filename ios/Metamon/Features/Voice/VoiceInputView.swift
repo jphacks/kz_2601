@@ -16,6 +16,8 @@ struct VoiceInputView: View {
     @State private var transcript = ""
     @State private var typed = ""
     @State private var showSettings = false
+    /// 頼み方のコツ(#415)
+    @State private var showTips = false
     /// 初期画面の例文のカテゴリ(#274)
     @State private var exampleCategory = "record"
     @FocusState private var typing: Bool
@@ -82,6 +84,18 @@ struct VoiceInputView: View {
             }
         }
         .sheet(isPresented: $showSettings) { SettingsSheet() }
+        .sheet(isPresented: $showTips) {
+            PromptTipsSheet { text in
+                showTips = false
+                insertDraft(text)
+            }
+        }
+        // 設定の「頼み方のコツ」で選んだ例(対話中は ClarifyChatView が受け取る)
+        .onChange(of: rt.composerDraft, initial: true) { _, draft in
+            guard let draft, !inChat else { return }
+            rt.composerDraft = nil
+            insertDraft(draft)
+        }
         .onTapGesture { typing = false }
         // #43 初期画面の挨拶を読み上げ(対話中・生成中・生成後のシートでは読まない)
         .task(id: "\(isInitial)|\(inChat)|\(greeting.title)") {
@@ -243,9 +257,13 @@ struct VoiceInputView: View {
         // 状態カードが出ている間は例文を引っ込める(縦に詰まって見出しが潰れるのを防ぎ、「次の一手」をカードに絞る)
         if phase == .idle, rt.errorCard == nil {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text(isInitial ? Greeting.examplesLabel : Greeting.editExamplesLabel)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                HStack {
+                    Text(isInitial ? Greeting.examplesLabel : Greeting.editExamplesLabel)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    PromptTipsLink { showTips = true }
+                }
                 if isInitial { exampleCategoryPicker }
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: Theme.Spacing.sm) {
@@ -440,6 +458,15 @@ struct VoiceInputView: View {
             await morph(text)
         default:
             break
+        }
+    }
+
+    /// 例文を入力欄に入れてキーボードを出す(送らない・#415)。シートが閉じきってからフォーカスする。
+    private func insertDraft(_ text: String) {
+        typed = text
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(500))
+            typing = true
         }
     }
 

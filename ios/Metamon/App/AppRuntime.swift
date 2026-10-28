@@ -46,6 +46,8 @@ final class AppRuntime: DSLRuntime {
     var showTutorial = false
     /// 最初のアプリができた直後の「こう言うと直せます」(#274・1 回だけ)。
     var showFirstEditHint = false
+    /// 「頼み方のコツ」(#415)で選んだ例。音声画面か対話の入力欄が受け取って空に戻す(送信はしない)。
+    var composerDraft: String?
     /// 変身一覧シート(#51: FAB 長押し / 「アプリ一覧」)。
     var showAppSwitcher = false
     /// 自分のアプリ一覧(`appsList()` が更新)。
