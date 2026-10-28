@@ -52,19 +52,36 @@
         }
       }
     },
-    "作ったアプリの集計(今月の支出など)をホーム画面に表示します。": {
+    "アプリを作ると数字が出ます": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Shows totals from your app (like this month's spending) on the Home Screen."
+            "value": "Make an app to see its numbers"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "作ったアプリの集計(今月の支出など)をホーム画面に表示します。"
+            "value": "アプリを作ると数字が出ます"
+          }
+        }
+      }
+    },
+    "作ったアプリの集計(今月の支出など)をホーム画面とロック画面に表示します。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows totals from your app (like this month's spending) on the Home Screen and Lock Screen."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作ったアプリの集計(今月の支出など)をホーム画面とロック画面に表示します。"
           }
         }
       }

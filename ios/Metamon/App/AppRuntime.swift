@@ -16,7 +16,10 @@ final class AppRuntime: DSLRuntime {
 
     /// entity id → レコード(サーバーが正。ここはキャッシュ)
     private(set) var records: [String: [Record]] = [:] {
-        didSet { if dsl.app.notifications.contains(where: \.isRecordBased) { scheduleNotificationSync() } } // #228 レコードの時刻から通知
+        didSet {
+            if dsl.app.notifications.contains(where: \.isRecordBased) { scheduleNotificationSync() } // #228 レコードの時刻から通知
+            refreshLiveActivityStats() // #423 ロック画面の数字
+        }
     }
     /// このアプリの次に届く通知(設定画面に出す・#228)。
     var upcomingNotifications: [UpcomingNotification] = []
@@ -1086,6 +1089,13 @@ final class AppRuntime: DSLRuntime {
             guard let id = action.notificationId else { return }
             await services.notifications.cancel(id: id, appId: document.appId)
             await refreshNotifications()
+
+        case .startActivity:
+            guard let spec = action.activity else { return }
+            await startActivity(spec)
+
+        case .endActivity:
+            await endActivity()
 
         case .unknown:
             toast = L10n.tr("未対応のアクション: \(action.rawType)")

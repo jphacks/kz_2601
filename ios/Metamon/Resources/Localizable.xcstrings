@@ -8432,6 +8432,57 @@
           }
         }
       }
+    },
+    "一時停止中": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一時停止中"
+          }
+        }
+      }
+    },
+    "終わりました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終わりました"
+          }
+        }
+      }
+    },
+    "ロック画面への表示が設定でオフになっています(設定 > Tailor It > ライブアクティビティ)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live Activities are turned off in Settings (Settings > Tailor It > Live Activities)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ロック画面への表示が設定でオフになっています(設定 > Tailor It > ライブアクティビティ)"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
