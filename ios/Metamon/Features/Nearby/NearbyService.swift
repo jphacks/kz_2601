@@ -195,6 +195,13 @@ extension NearbyService: MCNearbyServiceAdvertiserDelegate {
             // Header が無い・読めない招待(Tailor It 以外 / 壊れたデータ)と、確認中の二重招待は黙って断る
             guard let header, self.incoming == nil else { invitationHandler(false, nil); return }
             let decision = self.decide?(header) ?? .reject(reason: "今は受け取れません")
+            // 曲のリクエスト(#412)は確認を出さずに受ける(承認は musicPlayer の一覧・autoAccept)。受けられないアプリなら黙って断る
+            if header.song != nil {
+                guard case .accept = decision else { invitationHandler(false, nil); return }
+                self.accepted[peerID] = decision
+                invitationHandler(true, self.session)
+                return
+            }
             self.incoming = Incoming(header: header, decision: decision, peer: peerID, respond: invitationHandler)
         }
     }

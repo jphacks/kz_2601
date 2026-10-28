@@ -650,6 +650,8 @@ func (a *App) Validate() error {
 				if c.Threshold != nil {
 					checkAction(where+".threshold.action", c.Threshold.Action)
 				}
+			case CompMusicPlayer:
+				checkMusicPlayer(where, c, add)
 			case CompNearbyShare:
 				checkNearbyShare(where, c, entities, add) // nearby.go
 			default:
@@ -662,6 +664,7 @@ func (a *App) Validate() error {
 	}
 	checkRecordNav(a, entities, add) // #256
 	checkDashcamCount(a, add)        // #410
+	checkMusicPlayerCount(a, add)
 
 	if len(p) > 0 {
 		return &ValidationError{Problems: p}

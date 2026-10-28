@@ -89,6 +89,9 @@ var expectKeys = map[string]expectKind{
 	// checkNearby (#425)
 	"passby":         expectBool,
 	"passbyDistance": expectBool,
+	// checkMusic (#412)
+	"musicRequests":   expectBool,
+	"musicAutoAccept": expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

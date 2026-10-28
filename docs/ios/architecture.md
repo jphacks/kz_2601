@@ -864,6 +864,29 @@ Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-
 - 確認: `NearbyPassbyTests`(MetamonDSL)/ `NearbyPassbyRenderTests`(Renderer)/ `PassbyControllerTests`(MetamonTests・通信路を差し替え)。
 - 実機 2 台(UWB は iPhone 11 以降・SE を除く): 両方で同じアプリを開き、プロフィールを 1 件書く → すれ違いの画面でスイッチをオン → 同意 → ローカルネットワークと Nearby Interaction の許可 → 数秒で相手が一覧に出て、プロフィールの一覧に相手が増える。distance なら距離と矢印が動く。片方をホームに戻すと止まり、戻ると再開する。
 
+### 19.2 音楽プレーヤーと友だちからの曲リクエスト(`musicPlayer`・Issue #412)
+
+運転中に音楽を流し、同乗の友だちのスマホから曲を足す。**音はこの端末だけが鳴らす**(iOS は端末どうしで音声を中継できない。Bluetooth で友だちの端末をつないで流す形は不可)。
+
+| leaf | `MusicPlayerLeaf`(Renderer) | 今の曲(ジャケット・曲名・アーティスト)・前へ / 再生・一時停止 / 次へ・承認待ちのリクエスト(追加 / 見送る / Spotify で探す)・再生待ち。「曲を探す」シートで検索して追加、または近くの人にリクエスト。前面の間は 1 秒ごとに状態を読み直す |
+| 状態 | `MusicSession.shared`(Renderer・`@Observable`) | 再生元・今の状態・承認待ち(`MusicRequestInbox`)。部品とアプリ本体(近距離の受信)が同じものを使う |
+| 再生元 | `MusicPlayback` protocol → `AppleMusicPlayback`(MusicKit `ApplicationMusicPlayer` + `MusicCatalogSearchRequest`)/ `FakeMusicPlayback`(テスト・`METAMON_MOCK=1`) | id があればカタログから、無ければ「曲名 アーティスト」の検索の 1 曲目を再生待ちの最後へ。空なら再生を始める |
+| データ・判定 | `MusicSong` / `MusicRequestRules` / `MusicRequestInbox` / `MusicLinks`(MetamonDSL・純粋ロジック) | 曲名・アーティスト各 100 文字・id 40 文字(英数字とドット)・ジャケットは https だけ。承認待ちは 20 件まで(古い順に捨てる)。同じ曲(id か 曲名 + アーティスト)は重ねない |
+| 通信 | 既存の `NearbyService`(`NearbyShare.Header.song`) | 曲は招待の context(Header)に載せ、レコードは送らない。受ける側は確認ダイアログを出さずに接続し、Ack を返す(承認は部品の一覧で・`autoAccept` ならそのまま再生待ちへ)。受けないアプリ(allowRequests の musicPlayer が無い)なら黙って断る。古い端末は `song` を無視し「このアプリには「曲のリクエスト」がない」で断る |
+
+- 待ち受けは `nearbyShare` と同じく前面 & 今のアプリが受ける部品を持つ間だけ(`AppDSL.usesNearbyReceive` = nearbyShare か allowRequests の musicPlayer)。
+- **イヤホンのボタン・ロック画面・コントロールセンター**: `ApplicationMusicPlayer` はシステムの再生 UI(Now Playing)に出るので、OS がそのまま操作する(アプリ側に `MPRemoteCommandCenter` の実装は要らない)。再生はシステム側なので Background Modes の audio は付けていない(アプリを閉じても続くかは実機で確認する)。
+- 使えない時の表示(`MusicAvailability`): 未確認 →「Apple Music を使う」ボタン / 拒否 → 設定の場所 / 制限 / 契約なし(検索とリクエストはできる・再生はできない)/ 使えない端末。
+- **Spotify は開くだけ**: Spotify iOS SDK(App Remote)は入れない。Spotify の開発者登録(クライアント ID・リダイレクト URI)・Premium・開発モードは登録した少人数だけ・一般公開には Spotify の審査が要り、端末の Spotify アプリが前面にいる間しか操作できないため。リクエストの行と検索シートに `https://open.spotify.com/search/<曲名 アーティスト>` のリンクだけ出す(Spotify アプリがあれば OS がアプリで開く・`LSApplicationQueriesSchemes` 不要)。
+- Info.plist: `NSAppleMusicUsageDescription`(審査用ビルドでも残す)。`NSLocalNetworkUsageDescription` は文言に「曲のリクエスト」を足した。
+- **人の作業(Apple Developer)**: App ID `jp.kz2601.metamon` の **App Services → MusicKit** を有効にする(Certificates, Identifiers & Profiles → Identifiers → App ID → App Services タブ)。MusicKit は entitlement ファイルではなく App ID 側の設定で、無いとカタログの検索・再生が失敗する(開発者トークンは OS が自動で作る)。自動署名の `-allowProvisioningUpdates` では付かない。
+- 審査用ビルド(`APP_STORE_REVIEW`): 再生は残し、リクエストの UI(送る・承認待ち)を部品の中で外す(`Features/Nearby` ごと外れるので受信もしない)。AI 側は allowedComponents に nearbyShare が無い時、allowRequests を使わないよう制限の注記を足す(`backend/internal/ai/music_rules.go`)。
+
+確認:
+- 単体: `MusicRequestTests`(MetamonDSL・検証・承認待ち・近距離の判定・Spotify のリンク)、`MusicPlayerTests`(Renderer・偽のプレーヤーで再生待ち・リクエストの受け取り・契約なし・描画)。
+- シミュレータ: `METAMON_INITIAL_EXAMPLE=drive_music METAMON_MOCK=1` で偽のカタログ(音は出ない)。MusicKit の実際の再生はシミュレータ不可。
+- 実機 2 台(要 MusicKit の App Service と Apple Music の契約): 両方で「ドライブ BGM」を開く → 受ける側で「Apple Music を使う」→ 許可 → 曲を探して再生 → 送る側で「曲を探す」→ 曲名でリクエスト → 相手の名前をタップ → 受ける側の「リクエスト」に出る → 「追加」で再生待ちへ。イヤホンのボタン・ロック画面での一時停止 / 次へも確認する。
+
 ## 20. 画面マップ(Issue #116)
 
 作ったアプリの画面のつながりを図で見せ、選んだ画面を文脈にして声で直す。

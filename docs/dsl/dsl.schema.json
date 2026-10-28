@@ -741,6 +741,9 @@
         },
         {
           "$ref": "#/$defs/SensorValue"
+        },
+        {
+          "$ref": "#/$defs/MusicPlayer"
         }
       ]
     },
@@ -4030,6 +4033,38 @@
         }
       },
       "description": "写真から読み取る 1 項目(kind)と、結果を入れる field(into)。"
+    },
+    "MusicPlayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "musicPlayer"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "カードの見出し(任意・例: ドライブ BGM)。"
+        },
+        "allowRequests": {
+          "type": "boolean",
+          "description": "true = 近くにいる友だちの端末(同じアプリを開いた Tailor It・Wi-Fi / Bluetooth・インターネット不要)から曲のリクエストを受け付ける。届いたリクエストは承認するとこの端末の再生待ちに入る。既定 false。"
+        },
+        "autoAccept": {
+          "type": "boolean",
+          "description": "allowRequests のとき、届いたリクエストを確認せずに再生待ちへ入れる(運転中で画面を触れない時)。既定 false = 1 曲ずつ承認。"
+        }
+      },
+      "description": "Apple Music の音楽プレーヤー。曲を検索して再生待ちに入れ、再生・一時停止・次へ・前へと、今の曲(曲名・アーティスト・ジャケット)と再生待ちを表示する。イヤホンのボタン・ロック画面でも操作できる。allowRequests で近くの友だちの端末から曲のリクエストを受けられる。「音楽を流す」「ドライブの BGM」「プレイリスト」「友だちが曲を入れられる」の時に選ぶ。再生には Apple Music の契約が要る。Spotify は曲名で Spotify アプリを開くことだけでき、再生・操作はできない。entity は要らない。",
+      "x-usage": "entity 不要。1 アプリに 1 つだけ。ホーム(またはタブ)に全幅で大きく置く(例 A1:F12。他の部品と並べるなら A1:F8)。友だちから曲を入れたい話があれば allowRequests: true、運転中で確認できない・勝手に入れていいなら autoAccept: true も。"
     }
   }
 }

@@ -26,6 +26,7 @@ struct MetamonApp: App {
         FirstRunTutorialStore.shared.applyLaunchOverride() // #274(DEBUG のみ)
         _ = ExpensiveNetworkProbe.shared // 音声モデルの確認(#275)より前に回線の種類の監視を始める
         services.ai = ConsentGatedAIClient(base: services.ai) { AIConsentStore.isGranted(in: .standard) }
+        if BuildConfig.forceMock { MusicSession.shared.player = FakeMusicPlayback() } // musicPlayer(#412)は音を出さない偽物
         #if !APP_STORE_REVIEW
         if BuildConfig.forceMock { HealthData.source = MockHealthData() } // healthStat(#167)は固定値
         if BuildConfig.forceMock { SensorData.source = MockSensorData() } // sensorValue(#419)は決まった波形

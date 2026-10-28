@@ -82,6 +82,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompHealthStat,
 		// device sensors (#419)
 		dsl.CompSensorValue,
+		// music (#412)
+		dsl.CompMusicPlayer,
 		// timetable
 		dsl.CompGridTable,
 		// video (#206)

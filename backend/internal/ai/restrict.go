@@ -294,6 +294,9 @@ func restrictionNote(r Restriction) string {
 	if r.noHealth {
 		b.WriteString("- Field の health 属性は使わない(ヘルスケアへの書き込みはできない。値はアプリ内の記録として保存するだけ)。\n")
 	}
+	if r.disallowed[string(dsl.CompNearbyShare)] {
+		b.WriteString(musicNoRequestsNote) // #412
+	}
 	if r.noCamera {
 		b.WriteString("- photoField / videoField の source は library だけ(カメラで撮影はできない。写真・動画はライブラリから選ぶ)。camera / both は使わない。\n")
 	}

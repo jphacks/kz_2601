@@ -55,6 +55,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case dashcam
     // leaf(端末のセンサー・#419)。label / style / min / max / entity / field / dateField / seconds / limit は共用
     case sensorValue
+    // leaf(Apple Music の再生と友だちからの曲リクエスト・#412)。title は共用
+    case musicPlayer
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -193,6 +195,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     // nearbyShare passby(#425)。entity / mode / limit は共用
     public var fields: [String]?       // 交換する field id(明示したものだけ送る)
     public var distance: Bool?         // UWB で距離・方向を出す
+    // musicPlayer(#412)
+    public var allowRequests: Bool?    // 近くの端末から曲のリクエストを受ける
+    public var autoAccept: Bool?       // リクエストを確認せずに再生待ちへ
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
@@ -210,7 +215,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
         case textField, photoField
-        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance
+        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance, allowRequests, autoAccept
     }
 
     public init(from decoder: Decoder) throws {
@@ -310,6 +315,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         analyze = ((try? c.decodeIfPresent(Lossy<PhotoAnalyze>.self, forKey: .analyze))?.wrappedValue ?? []).filter { $0.kind != .unknown }
         fields = try? c.decodeIfPresent([String].self, forKey: .fields)
         distance = try? c.decodeIfPresent(Bool.self, forKey: .distance)
+        allowRequests = try? c.decodeIfPresent(Bool.self, forKey: .allowRequests)
+        autoAccept = try? c.decodeIfPresent(Bool.self, forKey: .autoAccept)
     }
 }
 

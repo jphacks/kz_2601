@@ -299,6 +299,8 @@ const (
 	CompHealthStat ComponentType = "healthStat" // CoreMotion steps / HealthKit weight (no entity)
 	// device sensors (#419): CoreMotion / CMAltimeter live value, optional save
 	CompSensorValue ComponentType = "sensorValue"
+	// music (#412): Apple Music player + song requests from nearby friends
+	CompMusicPlayer ComponentType = "musicPlayer"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -443,6 +445,10 @@ type Component struct {
 	// nearbyShare passby (#425). Entity / Mode / Limit are shared.
 	Fields   []string `json:"fields,omitempty"`   // passby: field ids exchanged (explicit allowlist)
 	Distance bool     `json:"distance,omitempty"` // passby: UWB distance / direction to a connected peer
+
+	// musicPlayer (#412). Title is shared.
+	AllowRequests bool `json:"allowRequests,omitempty"` // accept song requests from nearby devices
+	AutoAccept    bool `json:"autoAccept,omitempty"`    // queue requests without asking
 }
 
 // PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the
@@ -452,7 +458,6 @@ type PhotoAnalyze struct {
 	Into    string   `json:"into"`
 	Options []string `json:"options,omitempty"` // classify candidates (else the enum into's options)
 	Joint   string   `json:"joint,omitempty"`   // jointAngle: knee|elbow|hip|shoulder (+ left/right)
-
 }
 
 // GridRange is an inclusive integer range of gridTable rows.

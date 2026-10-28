@@ -22,6 +22,7 @@ public struct MockAIClient: AIClient {
         #if !APP_STORE_REVIEW
         if transcript.contains("傾き") || transcript.contains("水平器") || transcript.contains("気圧") { return "sensors" } // #419
         #endif
+        if transcript.contains("音楽") || transcript.contains("BGM") { return "drive_music" }
         if transcript.contains("最初") || transcript.contains("戻") { return "initial" }
         return "kakeibo"
     }

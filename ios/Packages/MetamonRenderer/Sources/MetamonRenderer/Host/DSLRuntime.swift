@@ -29,6 +29,8 @@ public protocol DSLRuntime: AnyObject, Observable {
     func pathBinding(_ stack: String) -> Binding<[Route]>
     /// `nearbyShare`(#36): 近くの端末を探すシートを開き、選んだ相手に `records`(entity の保存フィールドのみ)を送る。
     func shareNearby(entity: String, records: [[String: JSONValue]])
+    /// `musicPlayer`(#412): 近くの端末を探すシートを開き、選んだ相手に曲のリクエストを送る。
+    func requestSong(_ song: MusicSong)
     /// サインイン中の uid(共有レコードの作者判定・#249、`Field.hidden` の表示判定・#262)。nil なら判定しない(全部変更できる扱い)。
     var currentUserId: String? { get }
     /// 変更できないレコード(他人の共有レコード)を触った時。ホストが「作った人だけが変更できます」を出す。
@@ -51,6 +53,7 @@ public extension DSLRuntime {
     func createRecord(entity: String, data: [String: JSONValue]) async -> Bool { false }
     /// 既定は何もしない(プレビュー・テスト用ランタイム)。
     func shareNearby(entity: String, records: [[String: JSONValue]]) {}
+    func requestSong(_ song: MusicSong) {}
     var currentUserId: String? { nil }
     func notifyReadOnly(entity: String) {}
     /// 既定は付けない(プレビュー・テスト用ランタイム)。

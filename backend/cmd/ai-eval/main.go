@@ -403,6 +403,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAudio(c.Expect, app)...)      // #420: audio.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAIGenerate(c.Expect, app)...) // #417: aigen.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkNearby(c.Expect, app)...)     // #425: nearby.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkMusic(c.Expect, app)...)      // #412: music.go
 	}
 	created[c.ID] = res.DSL // edits too, so an edit can build on an earlier edit (#229)
 	log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms first=%dms out=%d chars=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",

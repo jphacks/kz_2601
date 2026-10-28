@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "ドライブ BGM",
+    "description": "運転中に Apple Music で音楽を流し、同乗の友だちのスマホから曲をリクエストして再生待ちに入れる(#412)",
+    "icon": "car.fill",
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [],
+  "screens": [
+    {
+      "id": "home",
+      "title": "ドライブ BGM",
+      "components": [
+        { "type": "musicPlayer", "id": "player", "area": "A1:F12", "title": "ドライブ BGM", "allowRequests": true }
+      ]
+    }
+  ]
+}

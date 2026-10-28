@@ -106,6 +106,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.webView) { c, _ in WebViewLeaf(c: c) }
         // leaf(オンデバイス AI・#78)
         r.register(.aiButton) { c, ctx in AiButtonLeaf(c: c, ctx: ctx) }
+        // leaf(Apple Music・#412)。友だちからのリクエストの UI は部品の中で審査用ビルドから外す
+        r.register(.musicPlayer) { c, _ in MusicPlayerLeaf(c: c) }
         #if !APP_STORE_REVIEW
         // 審査用ビルド(APP_STORE_REVIEW・#245)では登録しない(4.7.2: ネイティブ API を DSL に出さない)。
         // 届いた DSL に含まれていても未知 type のプレースホルダになる。
