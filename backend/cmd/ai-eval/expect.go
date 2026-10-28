@@ -58,6 +58,9 @@ var expectKeys = map[string]expectKind{
 	"markEntity": expectBool,
 	// checkGroupBy (#261, PR #404)
 	"groupedTable": expectBool,
+	// checkAudio (#420)
+	"audio":       expectBool,
+	"audioInList": expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

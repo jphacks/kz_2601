@@ -1,0 +1,7 @@
+[
+  {"id": "a_meeting", "kind": "create", "group": "audio", "transcript": "会議を録音してメモと一緒に残したい", "note": "#420 録音 + メモを同じフォームに・一覧の行で再生", "expect": {"audio": true, "audioInList": true, "has": ["audioRecorder", "textEditor", "list"], "unreachable": 0}},
+  {"id": "a_voice_memo", "kind": "create", "group": "audio", "transcript": "ボイスメモ", "note": "#420 一言だけ。voiceInput や文字だけのメモにしない", "expect": {"audio": true, "audioInList": true, "has": ["audioRecorder", "list"], "unreachable": 0}},
+  {"id": "a_lecture", "kind": "create", "group": "audio", "transcript": "授業を1時間くらい録音して、科目ごとに残したい", "note": "#420 長さ(maxDuration 3600)と科目の選択肢", "expect": {"audio": true, "has": ["audioRecorder", "picker"], "unreachable": 0}},
+  {"id": "a_notes", "kind": "create", "group": "audio", "transcript": "思いついたことを書き留めるメモ帳。タイトルと本文だけ", "note": "a_edit_add の土台(録音なし)", "expect": {"audio": false}},
+  {"id": "a_edit_add", "kind": "edit", "base": "a_notes", "group": "audio", "transcript": "メモに声でも録音して残せるようにして", "note": "#420 既存のフォームに audio field + audioRecorder を足す", "expect": {"patch": true, "audio": true, "unreachable": 0}}
+]
