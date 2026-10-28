@@ -20,9 +20,11 @@ extension AppRuntime {
         }
     }
 
-    /// 課金画面の差し込み口(1 か所)。#429 の `ProGate.requestPro(_:placement:closeNote:)` が入ったらそれに置き換える。
+    /// 課金画面の差し込み口(1 か所)。#429 の `ProGate.requestPro` で出す(閉じるのは待たない。押し直しで再実行)。
     func requestProForAIText() {
         print("[Metamon] IAP: aiButton generate needs Pro (no on-device AI) → paywall")
-        proGate.paywallPresented = true
+        let feature = PaidFeature(id: "aiText", title: L10n.tr("オンラインの AI で書く"),
+                                  reason: L10n.tr("この端末では AI を端末内で動かせないため、サーバーの AI を使います。"))
+        Task { _ = await proGate.requestPro(.paidFeature([feature]), closeNote: L10n.tr("閉じると、この端末では AI で書くボタンは使えません。")) }
     }
 }

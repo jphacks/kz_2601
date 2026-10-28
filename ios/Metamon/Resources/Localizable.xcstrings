@@ -9656,6 +9656,57 @@
           }
         }
       }
+    },
+    "オンラインの AI で書く": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Writing with online AI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オンラインの AI で書く"
+          }
+        }
+      }
+    },
+    "この端末では AI を端末内で動かせないため、サーバーの AI を使います。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device can't run AI on-device, so the server's AI is used instead."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この端末では AI を端末内で動かせないため、サーバーの AI を使います。"
+          }
+        }
+      }
+    },
+    "閉じると、この端末では AI で書くボタンは使えません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you close this, the AI writing button stays unavailable on this device."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閉じると、この端末では AI で書くボタンは使えません。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
