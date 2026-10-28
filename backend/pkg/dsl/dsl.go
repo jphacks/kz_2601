@@ -258,6 +258,7 @@ const (
 	CompLocationPicker ComponentType = "locationPicker" // search / map pin -> location field (+ nameField) (#212)
 	CompRouteGuide     ComponentType = "routeGuide"     // MapKit turn-by-turn guidance to a destination (#411)
 	CompQrScanner      ComponentType = "qrScanner"      // AVFoundation -> string field
+	CompQrCode         ComponentType = "qrCode"         // CoreImage QR from text / field / value (#422)
 	CompTimerDisplay   ComponentType = "timerDisplay"   // stopwatch / countdown
 	CompWebView        ComponentType = "webView"        // in-app WKWebView (https only)
 	// leaves: input batch

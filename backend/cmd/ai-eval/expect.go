@@ -74,6 +74,8 @@ var expectKeys = map[string]expectKind{
 	// checkLiveActivity (#423)
 	"liveTimer":       expectBool,
 	"activityButtons": expectBool,
+	// checkQR (#422)
+	"qrSource": expectString,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,
@@ -152,6 +154,10 @@ func validateExpect(exp map[string]any) []string {
 		case "export":
 			if s := v.(string); s != "csv" && s != "pdf" && s != "both" {
 				bad = append(bad, "export must be csv|pdf|both: "+s)
+			}
+		case "qrSource":
+			if s := v.(string); !qrSources[s] {
+				bad = append(bad, "qrSource must be text|field|value|record|any: "+s)
 			}
 		}
 	}

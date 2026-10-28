@@ -178,6 +178,7 @@ enum ComponentIcon {
         case "timer", "timerDisplay": "timer"
         case "webView": "safari"
         case "qrScanner": "qrcode.viewfinder"
+        case "qrCode": "qrcode"
         case "progress", "gauge": "gauge.with.dots.needle.50percent"
         case "text": "text.alignleft"
         default: "square.grid.2x2"
