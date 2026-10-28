@@ -30,6 +30,7 @@ func (a *App) Lint() []string {
 	l.navGraph()
 	l.micSeat()
 	l.dupAddControls()
+	l.privateChat()
 	return l.out
 }
 
@@ -346,6 +347,7 @@ func isTargetLabel(label string) bool {
 // listTypes show an entity's records one by one.
 var listTypes = map[ComponentType]bool{
 	CompList: true, CompTable: true, CompTimeline: true, CompCalendar: true, CompMapView: true, CompSettlement: true, CompGridTable: true,
+	CompChatThread: true,
 }
 
 func (l *linter) entityReach() {
@@ -356,6 +358,9 @@ func (l *linter) entityReach() {
 		unlisted[id] = true
 	}
 	tracked := trackedEntities(l.app, targets)
+	for id := range chatEntities(l.app, targets) {
+		tracked[id] = true // chatThread sends the messages (#260): no form needed
+	}
 	for _, e := range l.app.Entities {
 		switch fs := forms[e.ID]; {
 		case len(fs) == 0 && tracked[e.ID]:
@@ -384,7 +389,7 @@ func formScreens(a *App) map[string][]string {
 
 // UnlistedEntities returns, in entity order, the entities whose records no
 // reachable screen lists (list / table / timeline / calendar / mapView /
-// settlement / gridTable), excluding single-value setting entities (budget, goal).
+// settlement / gridTable / chatThread), excluding single-value setting entities (budget, goal).
 func (a *App) UnlistedEntities() []string {
 	targets := a.Reachable()
 	listed := map[string]bool{}

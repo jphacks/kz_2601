@@ -72,6 +72,8 @@ func New(s store.Store) *http.ServeMux {
 	mux.HandleFunc("GET /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.getRecord)
 	mux.HandleFunc("PATCH /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.patchRecord)
 	mux.HandleFunc("DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.deleteRecord)
+	mux.HandleFunc("PUT /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}", h.putMark)       // #255: marks.go
+	mux.HandleFunc("DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}", h.deleteMark) // #255
 
 	// share links (#49) / public catalog (#50): share.go
 	mux.HandleFunc("POST /v1/apps/{appId}/share", h.createShare)
