@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "サークルのチャット",
+    "description": "サークルのみんなでメッセージを送り合う。自分の吹き出しは右、ほかの人は左に名前付きで出て、新しいメッセージが下に届く(#260)",
+    "icon": "bubble.left.and.bubble.right",
+    "theme": { "primaryColor": "#00897B" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "messages",
+      "name": "メッセージ",
+      "titleField": "text",
+      "scope": "public",
+      "fields": [
+        { "id": "text", "name": "本文", "type": "text", "required": true },
+        { "id": "photo", "name": "写真", "type": "photo" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "サークルのチャット",
+      "components": [
+        { "type": "chatThread", "id": "chat", "area": "A1:F12", "entity": "messages", "textField": "text", "photoField": "photo",
+          "placeholder": "メッセージを入力", "emptyText": "最初のメッセージを送ってみましょう" }
+      ]
+    }
+  ]
+}

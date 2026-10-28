@@ -47,8 +47,16 @@ var expectKeys = map[string]expectKind{
 	"scope":        expectString,
 	"editMembers":  expectBool,   // #252 (PR #378)
 	"noOmission":   expectBool,   // #257 (PR #379)
+	"authorShown":  expectBool,   // #250 (PR #384)
+	"nameInput":    expectBool,   // #250 (PR #384)
+	"meFilter":     expectBool,   // #251 (PR #384)
 	"scopeNot":     expectString, // #254 (PR #405)
 	"summaryHas":   expectStrings,
+	"prefillRef":   expectBool, // #256 (PR #387)
+	// checkMarks (#255, PR #398)
+	"mark":       expectBool,
+	"markedByMe": expectBool,
+	"markEntity": expectBool,
 	// checkGroupBy (#261, PR #404)
 	"groupedTable": expectBool,
 	// checkRoute (#411)

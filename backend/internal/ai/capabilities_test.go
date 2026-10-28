@@ -81,7 +81,7 @@ var capabilityWords = map[string]string{
 	"連続日数": "streak", "直近": "doneInDays", "動画": "videoField", "歩数": "healthStat",
 	"体重": "healthStat", "ヘルスケア": "healthStat", "場所": "locationPicker", "検索": "searchBar",
 	"道のり": "locationTracker", "地図": "mapView", "QR": "qrScanner", "グラフ": "chart",
-	"カレンダー": "calendar", "割り勘": "settlement", "タイマー表示": "timerDisplay",
+	"カレンダー": "calendar", "割り勘": "settlement", "タイマー表示": "timerDisplay", "チャット": "chatThread",
 	"ナビ": "routeGuide", "道案内": "routeGuide", "経路案内": "routeGuide",
 }
 

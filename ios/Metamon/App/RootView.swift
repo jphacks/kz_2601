@@ -103,6 +103,7 @@ struct RootView: View {
         .sheet(item: $rt.sheet) { route in
             ScreenStack(root: route)
                 .modifier(HostSheets(onModal: true))
+                .modifier(ToastHost(onModal: true))
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
                 #endif
@@ -111,6 +112,7 @@ struct RootView: View {
         .fullScreenCover(item: $rt.fullScreen) { route in
             ScreenStack(root: route)
                 .modifier(HostSheets(onModal: true))
+                .modifier(ToastHost(onModal: true))
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
                 #endif
@@ -328,6 +330,7 @@ private struct HostSheets: ViewModifier {
             .sheet(isPresented: Binding(get: { active && rt.showAppSwitcher }, set: { rt.showAppSwitcher = $0 })) {
                 AppSwitcherSheet()
             }
+            .modifier(AuthorNamePromptModifier(active: active)) // 共有アプリへの初投稿で表示名を聞く(#250)
     }
 }
 

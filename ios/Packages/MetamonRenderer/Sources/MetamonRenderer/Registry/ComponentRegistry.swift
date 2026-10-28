@@ -112,6 +112,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.nearbyShare) { c, ctx in NearbyShareLeaf(c: c, ctx: ctx) }
         // leaf(位置の記録・#168)
         r.register(.locationTracker) { c, ctx in LocationTrackerLeaf(c: c, ctx: ctx) }
+        // leaf(チャット・#260)
+        r.register(.chatThread) { c, ctx in ChatThreadLeaf(c: c, ctx: ctx) }
         r.register(.healthStat) { c, _ in HealthStatLeaf(c: c) }
         #endif
         return r

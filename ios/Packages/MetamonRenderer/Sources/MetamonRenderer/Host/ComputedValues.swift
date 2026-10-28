@@ -29,16 +29,18 @@ public extension DSLRuntime {
     }
 
     /// 部品の entity + filter(単体/配列・value の Expr 可)を適用した表示用レコード。filter は hidden を落とす前に当てる。
+    /// `{"me": true}`(#251)はサインイン中の uid に置き換えて投稿者と比べる。
     func filteredRecords(_ c: Component) -> [Record] {
         let entityId = c.entity ?? ""
         let entity = dsl.entity(entityId)
         let rows = unredactedViewRecords(for: entityId)
         guard !c.filters.isEmpty else { return HiddenFields.redact(rows, in: entity) }
+        let filters = c.filters.map { $0.resolvingMe(uid: currentUserId) }
         let filtered: [Record]
-        if c.filters.allSatisfy({ $0.valueExpr == nil }) {
-            filtered = rows.filter { r in c.filters.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field)) } }
+        if filters.allSatisfy({ $0.valueExpr == nil }) {
+            filtered = rows.filter { r in filters.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field)) } }
         } else {
-            filtered = evaluator().apply(c.filters, entity: entity, to: rows)
+            filtered = evaluator().apply(filters, entity: entity, to: rows)
         }
         return HiddenFields.redact(filtered, in: entity)
     }
