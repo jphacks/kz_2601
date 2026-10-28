@@ -37,8 +37,8 @@ final class ScreenGraphTests: XCTestCase {
         let g = ScreenGraph(dsl: try example("kakeibo"))
         XCTAssertEqual(g.nodes.count, 3)
         XCTAssertEqual(g.rows, [["home", "stats"], ["expense_form"]])
-        // ツールバー(シート)・追加ボタン(シート)・行タップ(push)の 3 辺 → 矢印 1 本
-        XCTAssertEqual(g.edges.filter { $0.from == "home" && $0.to == "expense_form" }.count, 3)
+        // 追加ボタン(シート)・行タップ(push)の 2 辺 → 矢印 1 本(右上の＋は重複なので置かない・#416)
+        XCTAssertEqual(g.edges.filter { $0.from == "home" && $0.to == "expense_form" }.count, 2)
         XCTAssertEqual(pairs(g), ["home->expense_form"])
         XCTAssertEqual(g.links[0].isModal, false, "push を含むので実線")
         XCTAssertTrue(g.links[0].edges.contains { $0.trigger == .itemTap })

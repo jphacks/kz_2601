@@ -26,6 +26,7 @@
 // requested part itself; Meta.Omissions = parts the server had to note).
 // Field cap (#221): keepEntity / keep ([field id, ...]) / growTo (see checkKeep).
 // Parent -> child (#256): prefillRef (bool: some navigate opens a child form with prefillRef).
+// Add button (#416): oneAdd (bool: no toolbar ＋ opens the same form as a button on its screen).
 // Share (#254): scopeNot (no entity has that scope), summaryHas ([text, ...]: each is in the summary).
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. English edits whose
@@ -107,6 +108,8 @@ type Metrics struct {
 	HealthField bool     `json:"healthField,omitempty"` // a field with health "weight"
 	// #256: screen>childForm.refField of navigate.prefillRef
 	PrefillRefs []string `json:"prefillRefs,omitempty"`
+	// #416: screen>toolbar label of a toolbar ＋ duplicating a button on its screen
+	DupAdd []string `json:"dupAdd,omitempty"`
 }
 
 // HasCalc reports whether the app computes anything beyond plain aggregate stats.
@@ -399,6 +402,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 func measure(a *dsl.App) *Metrics {
 	m := &Metrics{Tabs: len(a.App.Tabs), Screens: len(a.Screens), Entities: len(a.Entities)}
 	m.PrefillRefs = prefillRefs(a)
+	m.DupAdd = dupAddToolbars(a)
 	for i := range a.Entities {
 		e := &a.Entities[i]
 		m.Fields += len(e.Fields)
@@ -515,6 +519,10 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 		case "grid":
 			if (len(m.Grid) > 0) != v.(bool) {
 				miss = append(miss, fmt.Sprintf("grid=%v", m.Grid))
+			}
+		case "oneAdd": // #416: no screen has two add controls for one form
+			if (len(m.DupAdd) == 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("oneAdd=%v", m.DupAdd))
 			}
 		case "prefillRef": // #256
 			if (len(m.PrefillRefs) > 0) != v.(bool) {

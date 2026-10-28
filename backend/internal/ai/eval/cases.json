@@ -1,7 +1,8 @@
 [
   {"id": "kakeibo_a", "kind": "create", "group": "demo-A", "transcript": "毎日の出費をメモできる家計簿アプリを作って。今月いくら使ったかと支出の一覧、カテゴリ別のグラフも見たい。レシートの写真も残せるようにして",
-   "expect": {"photo": true, "chart": true}},
-  {"id": "kakeibo_short", "kind": "create", "group": "demo-A", "transcript": "家計簿", "note": "曖昧・短い発話"},
+   "expect": {"photo": true, "chart": true, "oneAdd": true}},
+  {"id": "kakeibo_short", "kind": "create", "group": "demo-A", "transcript": "家計簿", "note": "曖昧・短い発話", "expect": {"oneAdd": true}},
+  {"id": "reading_oneadd", "kind": "create", "group": "add-button", "transcript": "読んだ本を記録するだけの簡単なアプリ。追加ボタンと一覧があればいい", "note": "#416 右上の＋と右下の追加ボタンを重ねない", "expect": {"oneAdd": true}},
   {"id": "training_a", "kind": "create", "group": "demo-B", "transcript": "筋トレの記録アプリ。腕立てとスクワットの回数を毎日つけて、朝8時にリマインドして",
    "expect": {"notification": "08:00"}},
   {"id": "training_b", "kind": "create", "group": "demo-B", "transcript": "毎日のトレーニングメニューと回数を残したい。忘れないように毎朝通知が欲しい",
