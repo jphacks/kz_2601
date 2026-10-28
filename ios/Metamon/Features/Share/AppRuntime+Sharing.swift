@@ -40,6 +40,10 @@ extension AppRuntime {
         if let membership = sharing as? any MembershipClient,
            let preview = try? await membership.previewShare(token: token),
            preview.sharedData, !preview.mine {
+            // #414: 記録を共有するアプリへの参加は Tailor It Pro。参加の確認より先に課金画面
+            if PaidGate.joinNeedsPaywall(preview, isPro: proGate.isPro, enforced: proGate.isEnforced) {
+                guard await admitSharedApp(name: preview.name) else { return }
+            }
             SharingUI.shared.pendingJoin = PendingJoin(token: token, preview: preview)
             return
         }
@@ -67,6 +71,13 @@ extension AppRuntime {
         }
     }
 
+    /// 共有アプリへの参加の課金画面(#414)。買わずに閉じたら参加しない。
+    private func admitSharedApp(name: String, after delay: Duration = .zero) async -> Bool {
+        let pro = await proGate.requestPro(.join(appName: name), closeNote: L10n.tr("閉じると参加しません。"), after: delay)
+        if !pro { toast = L10n.tr("「\(name)」には参加しませんでした。参加には Tailor It Pro が必要です") }
+        return pro
+    }
+
     /// import の失敗。403 の参加の理由(#254)・取り消し済み(404)・その他。
     static func importFailureMessage(_ error: Error) -> String {
         if let denial = SharedAccessDenial(error) { return denial.message }
@@ -88,6 +99,11 @@ extension AppRuntime {
     /// import / install の結果に切り替える(変身アニメは switchApp)。共有データ付きは「みんなと同じデータ」を一言添える。
     private func adopt(_ app: InstalledApp, banner: String) async {
         print("[Metamon] adopt shared app: appId=\(app.appId) joined=\(app.joined)")
+        // #414: プレビューが無かった import・公開アプリのインストールは、結果を見てから課金画面(買わなければ開かない)
+        if PaidGate.installedNeedsPaywall(app, isPro: proGate.isPro, enforced: proGate.isEnforced) {
+            SharingUI.shared.showDiscover = false
+            guard await admitSharedApp(name: app.name, after: .milliseconds(550)) else { return }
+        }
         if app.appId != document.appId {
             await switchApp(to: app.appId, afterSheetDismiss: true)
         }

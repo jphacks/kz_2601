@@ -870,7 +870,27 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 | カード | `ClarifyChatView` の「これでいく」の位置(`PaidFeatureCard`・create は初期画面、edit は音声シートの中)。購入して作る = `ProEntitlementStore.purchase` → 成功したら有料機能込みの文で生成(キャンセル・承認待ちはカードに残る)/ この機能なしで作る = `freeTranscript`(`freeInstruction`)で生成 / × = チャットに戻る。話し直すとカードは閉じて次の応答で判定し直す |
 | 実装 | `Features/Purchase/AppRuntime+PaidFeature.swift`(`holdForPaidConfirm` / `purchaseAndBuild` / `buildWithoutPaidFeatures` / `dismissPaidConfirm`)。モック ai は「みんなで / 共有 / 掲示板 / 投稿」を含む ready に `requiresPro` を付ける |
 | テスト | `MetamonServicesTests/PaidFeatureCheckTests.swift`(出し分け・JSON の新旧)・`MetamonTests/PaidFeatureConfirmTests.swift`(カード → なしで作る・無効化中は出ない・やめる / 話し直し・案)・UI `testPaidFeatureCardBuildWithoutFeature` |
-| 限界(後続) | サーバー強制なし(22.3 と同じ)。チャット OFF の即生成・「このまま作る」の予備文はカードを通らない |
+| 限界(後続) | サーバー強制なし(22.3 と同じ)。チャットを通らない経路は 22.8 の「生成の後の判定」で課金画面を通す |
+
+### 22.8 有料機能は必ず課金画面を通す(Issue #414)
+共有・オンラインなど、サーバーに負荷のかかる有料機能を使う全経路で、Pro でなければ課金画面(`PaywallSheet`)に進む。判定は `MetamonServices/Purchase/PaidGate.swift`(純粋関数)、表示は `ProGate.requestPro(_:placement:closeNote:)`(課金画面を出し、閉じるまで待って「Pro になったか」を返す)。
+
+| 経路 | いつ判定 | 閉じた(買わなかった)時 |
+|---|---|---|
+| チャットの「これでいく」(ready / 案 / 複数選択・声の自動生成) | 生成の前(backend の `requiresPro`) | 確認カード(22.7)に戻る。何も作らない。「この機能なしで作る」/「やめる」/ もう一度「購入して作る」 |
+| チャットを通らない生成(チャット OFF・「別のアプリ」・予備文の「このまま作る / このまま反映」・圏外の保留・状態カードの再送・#253 の修正) | 生成の後(できた DSL に shared / public の entity が**新しく**入ったか。もとから共有のアプリの修正は聞き直さない) | 共有を外す修正(`PaidGate.dropSharedDataInstruction`)を送る。外せなければ前の版へ(新規作成なら初期画面) |
+| 元に戻す / やり直す で共有の版に戻った | 戻した後 | 戻す前の版へ |
+| シェアリンクを開く(記録を共有するアプリ・自分のでない) | 参加の確認(#254)の前(`ShareLinkPreview.sharedData`) | 参加しない |
+| プレビューの無い import・「探す」の公開アプリのインストール | import / install の後(`InstalledApp.joined / member`) | そのアプリに切り替えない(一覧には残る) |
+| 新規作成の無料枠 | 生成の前(`admitNewApp`) | 送らない。圏外の保留の自動送信・状態カードの再送も枠を通す(`sendMetered`) |
+
+- 課金画面の中身: 見出し(理由ごと)・なぜ有料か・プラン名 / 期間 / 価格(`ProOffer`)・購入・復元・閉じたらどうなるか・Pro でできること・自動更新の説明・利用規約 / プライバシーポリシー(`LegalDocumentLink`。公開 URL が決まるまでは同梱文書)。
+- 出す場所: 確認カードの課金画面は `ClarifyChatView`(音声シートの中にも重ねられる・placement `.chat`)、それ以外は `PaywallHost`(placement `.root`。音声シートは閉じてから出す)。
+- オンデバイスの `aiButton`(§18)はサーバーを使わないので無料。
+- 課金の制限の無効化(DEBUG の既定・22.4)中は、回数も有料機能も課金画面を出さない。設定のトグル名は「課金の制限を無効にする(デモ用・回数と有料機能)」。
+- モックのストア: DEBUG で `METAMON_MOCK_STORE=1` なら App Store に触れず購入が即成功(¥500)。DEBUG のシミュレータは StoreKit の商品が取れなければ自動でモック(`simctl launch` で起動した時)。`0` で常に StoreKit。Release は常に StoreKit。
+- テスト: `MetamonServicesTests/PaidGateTests.swift`(判定・モックのストア)・`MetamonTests/PaidGateFlowTests.swift`(チャット / 即生成 / 修正 / 元に戻す / 無効化中)・UI `testPaidFeaturePaywallPurchaseThenBuildsSharedApp`(未購入 → 課金画面 → モック購入 → 共有の掲示板ができる)・`testPaidFeatureCardBuildWithoutFeature`・`testDirectGenerationWithSharedDataGoesThroughPaywall`。モック ai の「掲示板」は public のひとこと投稿を返す(無料版・「自分だけ」の指示なら家計簿)。
+- 限界(後続): サーバー側で止める(#316)。Pro が切れた後に、自分で作った共有アプリを開く経路は止めていない(自分のデータが見られなくなるため・要判断)。
 
 ## 23. UI テスト(XCUITest・Issue #165)
 
