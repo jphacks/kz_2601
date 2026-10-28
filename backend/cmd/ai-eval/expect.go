@@ -86,6 +86,9 @@ var expectKeys = map[string]expectKind{
 	// checkAIGenerate (#417): aigen.go
 	"aiGenerate":       expectString, // line|list|fields|any
 	"aiGenerateEntity": expectBool,
+	// checkNearby (#425)
+	"passby":         expectBool,
+	"passbyDistance": expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

@@ -1,0 +1,4 @@
+[
+  {"id": "n_passby_profile", "kind": "create", "group": "nearby", "transcript": "すれ違った人とプロフィールを交換", "note": "#425 nearbyShare mode passby + 明示した fields だけ", "expect": {"has": ["nearbyShare"], "passby": true, "noShared": true}},
+  {"id": "n_distance_friends", "kind": "create", "group": "nearby", "transcript": "近くの友だちとの距離を表示", "note": "#425 passby + distance(UWB)", "expect": {"has": ["nearbyShare"], "passby": true, "passbyDistance": true}}
+]

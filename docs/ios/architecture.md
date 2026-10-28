@@ -847,6 +847,23 @@ Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-
 - シミュレータ 2 台(同じ Mac)で送受信できた。DEBUG 用の環境変数: 送信側 `METAMON_AUTO_NEARBY_SEND=<entity>`(起動 3 秒後にシートを開き最初の相手へ送る)/ 受信側 `METAMON_AUTO_NEARBY_ACCEPT=1`(確認を 2 秒見せて受け取る)。例は `METAMON_INITIAL_EXAMPLE=attendance_nearby METAMON_MOCK=1`。
 - 実機 2 台: 両方に同じビルドを入れ、両方で同じアプリ(例: 出席カード)を開く → 初回はローカルネットワークの許可を「許可」→ 送る側で「近くの先生に送る」→ 相手の名前をタップ → 受け取る側で「受け取る」→ 一覧に増え、送る側に「◯◯さんに N 件届きました」。Wi-Fi と Bluetooth はオンにしておく(同じ Wi-Fi でなくてよい)。
 
+### 19.1 すれ違い通信(nearbyShare mode:passby・#425)
+
+新しい部品ではなく `nearbyShare` のモード(MultipeerConnectivity と審査用ビルドでの除外を共有し、型・Registry を増やさない)。
+
+| 役割 | 実装 | 中身 |
+|---|---|---|
+| leaf | `NearbyPassbyLeaf`(Renderer・`NearbyShareLeaf` が mode で振り分け) | スイッチ・初回の同意(送る項目名を並べる)・「近くの人を探しています」の表示・裏に回ると止まる案内・距離と方向・会った人の一覧。表示中かつ前面(`scenePhase != .background`)の間だけ `attach`、離れたら `detach` |
+| 境界 | `NearbyPassbyController` / `NearbyPassbyHost.controller`(Renderer) | HealthData.source と同じ差し込み口。既定は通信しない `StaticNearbyPassbyController` |
+| データ・判定 | `NearbyPassby`(MetamonDSL・純粋ロジック) | 送る field(明示 ∩ 保存 − hidden − photo/video/ref/refs)、自分の記録だけ新しい順 `limit` 件・16 KB、受信の sanitize、台帳(`senderId|recordId` → 保存した内容・会った人)、同意、cooldown(同じ相手とは 10 分に 1 回) |
+| 本体 | `PassbyController`(`Features/Nearby/`) | 同意・オン/オフ・senderId(端末ごとのランダム ID)・アプリごとの台帳を UserDefaults に保存。受け取りは `createRecord` / 内容で探して `updateRecord`(仮 id は同期で変わるので `reloadCached` してから) |
+| 通信 | `MCPassbyTransport` / `MockPassbyTransport`(`METAMON_MOCK=1`) | serviceType `tailorit-pb`。discoveryInfo に appId のハッシュと senderId、senderId の小さい側だけが招待、相手ごとに暗号化必須の MCSession。交換したら切る。`distance` の時はつないだまま `NIDiscoveryToken` を送り合い `NINearbyPeerConfiguration` で測る |
+
+- 非対応端末(`NISession.deviceCapabilities.supportsPreciseDistanceMeasurement == false`)は距離の欄を一言だけにする。シミュレータは MultipeerConnectivity は動く(同じ Mac の 2 台で交換できる)が UWB は無い。`METAMON_MOCK=1` は 1.5 秒後に「テスト花子」と会ったことにし、距離・方向を 1 秒ごとに動かす(保存・重複除けは本物と同じ経路)。
+- Info.plist: `NSBonjourServices` に `_tailorit-pb._tcp` / `_udp`、`NSNearbyInteractionUsageDescription`。審査用ビルドでは全部外す(`strip-review-plist.sh`)。
+- 確認: `NearbyPassbyTests`(MetamonDSL)/ `NearbyPassbyRenderTests`(Renderer)/ `PassbyControllerTests`(MetamonTests・通信路を差し替え)。
+- 実機 2 台(UWB は iPhone 11 以降・SE を除く): 両方で同じアプリを開き、プロフィールを 1 件書く → すれ違いの画面でスイッチをオン → 同意 → ローカルネットワークと Nearby Interaction の許可 → 数秒で相手が一覧に出て、プロフィールの一覧に相手が増える。distance なら距離と矢印が動く。片方をホームに戻すと止まり、戻ると再開する。
+
 ## 20. 画面マップ(Issue #116)
 
 作ったアプリの画面のつながりを図で見せ、選んだ画面を文脈にして声で直す。

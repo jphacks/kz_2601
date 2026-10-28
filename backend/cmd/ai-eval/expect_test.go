@@ -13,7 +13,7 @@ import (
 const casesDir = "../../internal/ai/eval"
 
 func TestCaseFilesValid(t *testing.T) {
-	for _, f := range []string{"cases.json", "demo_cases.json", "m0disc_cases.json", "audit_cases.json", "audit_en_cases.json", "groupby_cases.json", "parent_child_cases.json", "route_cases.json", "dashcam_cases.json", "export_cases.json", "tips_cases.json", "sensor_cases.json", "live_activity_cases.json", "qr_cases.json", "photo_ai_cases.json", "audio_cases.json", "ai_generate_cases.json"} {
+	for _, f := range []string{"cases.json", "demo_cases.json", "m0disc_cases.json", "audit_cases.json", "audit_en_cases.json", "groupby_cases.json", "parent_child_cases.json", "route_cases.json", "dashcam_cases.json", "export_cases.json", "tips_cases.json", "sensor_cases.json", "live_activity_cases.json", "qr_cases.json", "photo_ai_cases.json", "audio_cases.json", "ai_generate_cases.json", "nearby_cases.json"} {
 		if err := checkCasesFile(filepath.Join(casesDir, f), false); err != nil {
 			t.Error(err)
 		}

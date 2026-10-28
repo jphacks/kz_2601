@@ -3431,11 +3431,37 @@
         },
         "entity": {
           "type": "string",
-          "description": "送る entity。screen.entity と同じならフォームの今のレコード(1 件)、それ以外の画面ではその entity の新しい順 最大 50 件を送る。"
+          "description": "送る entity。send: screen.entity と同じならフォームの今のレコード(1 件)、それ以外の画面ではその entity の新しい順 最大 50 件を送る。passby: 自分の記録(受け取った記録は除く)の新しい順 limit 件を送り、受け取った記録もこの entity に追加する(scope は private のみ)。"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "send",
+            "passby"
+          ],
+          "description": "send(既定)= ボタンを押して相手を選んで送る。passby = すれ違い通信: この画面を開いていてオンにしている間、近くで同じアプリを開いている人と自動で記録を交換し、会った人と日時の一覧を出す(アプリを裏に回すと止まる)。"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "passby で送る field id(必須)。ここに書いた entity の保存 field だけを送る。hidden・photo・video・ref・refs・computed は指定できない。"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "description": "passby で 1 回に送る件数(既定 1 = 最新のプロフィール 1 件)。最大 20 件・16 KB。"
+        },
+        "distance": {
+          "type": "boolean",
+          "description": "passby で、つながった相手との距離と方向(Nearby Interaction・UWB)を出す。対応端末(iPhone 11 以降・SE を除く)だけ。"
         }
       },
-      "description": "近くにいる Tailor It 端末(Wi-Fi / Bluetooth・インターネット不要)を探し、選んだ相手にこの画面のレコードをその場で送るボタン。相手が承認した時だけ届き、同じ entity(id とフィールド構成)を持つアプリならレコードとして追加される。「近くの人と共有」「その場で送る」「出席を取る」「名刺交換」「対戦結果を渡す」など、対面で記録を渡したいアプリで選ぶ。",
-      "x-usage": "フォーム画面なら保存ボタンの近く(A10:F11)に 1 つ。一覧画面なら下部の半幅(D11:F12)に。受け取る側も同じアプリ(同じ entity)を開いている必要がある。"
+      "description": "近くにいる Tailor It 端末(Wi-Fi / Bluetooth・インターネット不要)と記録をその場でやり取りする。send(既定)は相手を選んで送るボタンで、相手が承認した時だけ届き、同じ entity(id とフィールド構成)を持つアプリならレコードとして追加される。「近くの人と共有」「その場で送る」「出席を取る」「名刺交換」「対戦結果を渡す」など、対面で記録を渡したいアプリで選ぶ。mode:passby は「すれ違い通信」: 画面を開いている間、近くで同じアプリを開いている人と fields に書いた項目だけを自動で交換し、会った人の一覧を出す(「すれ違った人とプロフィールを交換」)。distance:true で近くの人との距離・方向も出す(「近くの友だちとの距離を表示」)。",
+      "x-usage": "send: フォーム画面なら保存ボタンの近く(A10:F11)に 1 つ。一覧画面なら下部の半幅(D11:F12)に。受け取る側も同じアプリ(同じ entity)を開いている必要がある。passby: 専用の画面(タブ)に全幅・縦長(A1:F8 など)で 1 つ。entity は自分のプロフィール(名前・ひとことなど)を入れる private の entity で、プロフィールを書くフォーム画面への導線も置く。"
     },
     "ExprIf": {
       "type": "object",

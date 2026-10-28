@@ -439,6 +439,10 @@ type Component struct {
 	Threshold *SensorThreshold `json:"threshold,omitempty"`
 	// photoField (#418): on-device reading of the picked photo into other fields.
 	Analyze []PhotoAnalyze `json:"analyze,omitempty"`
+
+	// nearbyShare passby (#425). Entity / Mode / Limit are shared.
+	Fields   []string `json:"fields,omitempty"`   // passby: field ids exchanged (explicit allowlist)
+	Distance bool     `json:"distance,omitempty"` // passby: UWB distance / direction to a connected peer
 }
 
 // PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the
@@ -448,6 +452,7 @@ type PhotoAnalyze struct {
 	Into    string   `json:"into"`
 	Options []string `json:"options,omitempty"` // classify candidates (else the enum into's options)
 	Joint   string   `json:"joint,omitempty"`   // jointAngle: knee|elbow|hip|shoulder (+ left/right)
+
 }
 
 // GridRange is an inclusive integer range of gridTable rows.

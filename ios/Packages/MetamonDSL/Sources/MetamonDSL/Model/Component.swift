@@ -190,6 +190,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var threshold: SensorThreshold?
     // photoField(#418): 写真から読み取って他の field に入れる。壊れた項目だけ落とす
     public var analyze: [PhotoAnalyze] = []
+    // nearbyShare passby(#425)。entity / mode / limit は共用
+    public var fields: [String]?       // 交換する field id(明示したものだけ送る)
+    public var distance: Bool?         // UWB で距離・方向を出す
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
@@ -207,7 +210,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
         case textField, photoField
-        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze
+        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance
     }
 
     public init(from decoder: Decoder) throws {
@@ -305,6 +308,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         sensor = try? c.decodeIfPresent(String.self, forKey: .sensor)
         threshold = try? c.decodeIfPresent(SensorThreshold.self, forKey: .threshold)
         analyze = ((try? c.decodeIfPresent(Lossy<PhotoAnalyze>.self, forKey: .analyze))?.wrappedValue ?? []).filter { $0.kind != .unknown }
+        fields = try? c.decodeIfPresent([String].self, forKey: .fields)
+        distance = try? c.decodeIfPresent(Bool.self, forKey: .distance)
     }
 }
 

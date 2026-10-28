@@ -651,12 +651,7 @@ func (a *App) Validate() error {
 					checkAction(where+".threshold.action", c.Threshold.Action)
 				}
 			case CompNearbyShare:
-				if c.Label == "" {
-					add("%s: nearbyShare needs label", where)
-				}
-				if entities[c.Entity] == nil {
-					add("%s: nearbyShare entity %q does not exist", where, c.Entity)
-				}
+				checkNearbyShare(where, c, entities, add) // nearby.go
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}

@@ -121,12 +121,18 @@
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>生成したアプリで記録した体重をヘルスケアにも保存するために、ヘルスケアへ書き込みます。</string>
 	<!-- nearbyShare(#36): MultipeerConnectivity で近くの Tailor It 端末と記録を送り合う。サービス名は NearbyService.serviceType と一致させる -->
+	<!-- すれ違い通信(#425): _tailorit-pb は MCPassbyTransport.serviceType と一致させる -->
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>近くにいる Tailor It の端末を見つけて、記録をその場で送ったり受け取ったりするために、ローカルネットワークを使用します。</string>
+	<string>近くにいる Tailor It の端末を見つけて、記録をその場で送ったり受け取ったり、すれ違い通信で交換したりするために、ローカルネットワークを使用します。</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_tailorit-mc._tcp</string>
 		<string>_tailorit-mc._udp</string>
+		<string>_tailorit-pb._tcp</string>
+		<string>_tailorit-pb._udp</string>
 	</array>
+	<!-- すれ違い通信の distance(#425): Nearby Interaction(UWB)で近くの人との距離・方向を測る -->
+	<key>NSNearbyInteractionUsageDescription</key>
+	<string>生成したアプリで、すれ違い通信でつながった近くの人との距離と方向を表示するために使います。</string>
 </dict>
 </plist>
