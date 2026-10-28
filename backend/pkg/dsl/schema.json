@@ -1368,7 +1368,7 @@
       "type": "object",
       "additionalProperties": false,
       "description": "カメラ / ライブラリから写真を取り込んで photo field に保存する入力。写真の文字・金額・日付・分類・説明・体の関節の角度を端末内の AI で読み取り、同じレコードの他の項目に入れられる(analyze)。",
-      "x-usage": "「写真を撮る・残す」は source camera、既存の写真を選ぶなら library、迷えば both。「撮ったら読み取って」「レシートを撮ったら金額を入れて」「写真から分類」「フォームをチェック」なら analyze:[{kind, into}] を付け、読み取った値を入れる field(into)を同じ entity に足して、その入力欄も同じフォームに置く(読み取り結果は確認・修正できる)。レシート → {kind:amount, into:金額(currency)} + {kind:date, into:日付} (+ {kind:text, into:メモ})。写っている物の種類 → {kind:classify, into:enum field}。筋トレ・ストレッチのフォーム → {kind:jointAngle, joint:knee 等, into:角度(number)}(写真に関節の点と線を重ねて出す)。",
+      "x-usage": "「写真を撮る・残す」は source camera、既存の写真を選ぶなら library、迷えば both。「撮ったら読み取って」「レシートを撮ったら金額を入れて」「写真から分類」「フォームをチェック」なら analyze:[{kind, into}] を付け、読み取った値を入れる field(into)を同じ entity に足して、その入力欄も同じフォームに置く(読み取り結果は確認・修正できる)。analyze 付きの photoField は全幅 5〜6 行(例 A1:F5)。レシート → {kind:amount, into:金額(currency)} + {kind:date, into:日付} (+ {kind:text, into:メモ})。写っている物の種類 → {kind:classify, into:enum field}。筋トレ・ストレッチのフォーム → {kind:jointAngle, joint:knee 等, into:角度(number)}(写真に関節の点と線を重ねて出す)。",
       "required": [
         "type",
         "field"

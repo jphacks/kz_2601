@@ -15,7 +15,7 @@ var photoAIRules = strings.TrimSpace(`
   - classify: 候補から 1 つ → enum(options はその field の options)か、string / text + options(2〜12)。
   - describe: 写っているものの短い説明 → string / text。
   - jointAngle: 人の関節の角度(度)→ number(unit 度)/ integer。joint 必須: knee / elbow / hip / shoulder(左右のよく写っている方)か leftKnee / rightElbow など。写真に関節の点と線を重ねて表示する。
-- 形の例: 家計簿のレシート = expense{receipt: photo, amount: currency(required), date: date(defaultValue now), category: enum, memo: text} + フォームに photoField{field: receipt, source: camera, analyze: [{kind: amount, into: amount}, {kind: date, into: date}, {kind: classify, into: category}]}(A1:F4)+ 金額・日付・分類の入力欄。筋トレのフォーム = check{photo: photo, knee_angle: number(unit 度), hip_angle: number, date} + photoField{field: photo, analyze: [{kind: jointAngle, joint: knee, into: knee_angle}, {kind: jointAngle, joint: hip, into: hip_angle}]} + 角度の numberField、ホームに角度の stat(avg)や list.trailing。
+- 形の例: 家計簿のレシート = expense{receipt: photo, amount: currency(required), date: date(defaultValue now), category: enum, memo: text} + フォームに photoField{field: receipt, source: camera, analyze: [{kind: amount, into: amount}, {kind: date, into: date}, {kind: classify, into: category}]}(全幅 5〜6 行・例 A1:F5)+ 金額・日付・分類の入力欄。筋トレのフォーム = check{photo: photo, knee_angle: number(unit 度), hip_angle: number, date} + photoField{field: photo, analyze: [{kind: jointAngle, joint: knee, into: knee_angle}, {kind: jointAngle, joint: hip, into: hip_angle}]} + 角度の numberField、ホームに角度の stat(avg)や list.trailing。
 - 既存アプリへの「レシートを読み取れるようにして」「写真から金額を入れて」は、既存の photoField に analyze を add し、足りない into の field と入力欄だけ足す(写真の field が無ければ photo field と photoField も足す)。
 - **できないこと**(求められたら summary で正直に伝える): 動画やカメラの映像を見ながらの回数カウント・リアルタイムのフォーム判定(写真 1 枚ずつの角度だけ)、レシートの品目ごとの明細を別々のレコードに分ける、顔で人を見分ける。
 `)

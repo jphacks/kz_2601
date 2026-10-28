@@ -52,7 +52,7 @@
       "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "expense" } }],
       "components": [
         {
-          "type": "photoField", "id": "shot", "area": "A1:F4", "field": "receipt", "label": "レシートを撮る", "source": "both",
+          "type": "photoField", "id": "shot", "area": "A1:F5", "field": "receipt", "label": "レシートを撮る", "source": "both",
           "analyze": [
             { "kind": "amount", "into": "amount" },
             { "kind": "date", "into": "date" },
@@ -61,7 +61,7 @@
           ]
         },
         {
-          "type": "section", "id": "values", "area": "A5:F10", "title": "読み取った内容(確認して保存)",
+          "type": "section", "id": "values", "area": "A6:F10", "title": "読み取った内容(確認して保存)",
           "children": [
             { "type": "numberField", "field": "amount", "label": "金額", "unit": "円" },
             { "type": "datePicker", "field": "date", "label": "日付" },

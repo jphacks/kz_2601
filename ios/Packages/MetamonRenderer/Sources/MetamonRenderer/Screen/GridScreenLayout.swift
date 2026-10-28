@@ -245,6 +245,8 @@ struct GridCell: View {
         // hstack は通常サイズでは器に収める(stat を横に並べる定番。スクロールにすると高さが無制限になり、stat の数値がセル高さで縮まず下が切れる・#89)
         case .list, .section, .vstack, .text, .table, .timeline, .markdown, .card, .disclosure, .grid, .calendar, .gridTable, .settlement: true
         case .image, .mapView, .webView, .chart, .gauge, .spacer, .divider, .qrScanner, .voiceInput: false
+        // 読み取り(#418)の操作と結果の分だけ背が伸びるので、セルに収まらなければ中でスクロール
+        case .photoField: !component.analyze.isEmpty || typeSize.isAccessibilitySize
         default: typeSize.isAccessibilitySize
         }
     }

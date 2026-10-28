@@ -18,8 +18,7 @@
         { "id": "exercise", "name": "種目", "type": "enum", "options": ["スクワット", "腕立て伏せ", "ランジ"], "defaultValue": "スクワット" },
         { "id": "knee_angle", "name": "膝の角度", "type": "number", "unit": "度" },
         { "id": "hip_angle", "name": "腰の角度", "type": "number", "unit": "度" },
-        { "id": "date", "name": "日付", "type": "date", "defaultValue": "now" },
-        { "id": "memo", "name": "メモ", "type": "string" }
+        { "id": "date", "name": "日付", "type": "date", "defaultValue": "now" }
       ]
     }
   ],
@@ -53,19 +52,18 @@
       "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "check" } }],
       "components": [
         {
-          "type": "photoField", "id": "shot", "area": "A1:F5", "field": "photo", "label": "横から全身を撮る", "source": "both",
+          "type": "photoField", "id": "shot", "area": "A1:F6", "field": "photo", "label": "横から全身を撮る", "source": "both",
           "analyze": [
             { "kind": "jointAngle", "joint": "knee", "into": "knee_angle" },
             { "kind": "jointAngle", "joint": "hip", "into": "hip_angle" }
           ]
         },
         {
-          "type": "section", "id": "values", "area": "A6:F10", "title": "測った角度",
+          "type": "section", "id": "values", "area": "A7:F10", "title": "測った角度",
           "children": [
             { "type": "picker", "field": "exercise", "label": "種目", "style": "segmented" },
             { "type": "numberField", "field": "knee_angle", "label": "膝の角度", "unit": "度" },
-            { "type": "numberField", "field": "hip_angle", "label": "腰の角度", "unit": "度" },
-            { "type": "textField", "field": "memo", "label": "メモ" }
+            { "type": "numberField", "field": "hip_angle", "label": "腰の角度", "unit": "度" }
           ]
         },
         { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",

@@ -38,12 +38,13 @@ struct PhotoFieldLeaf: View {
     @ViewBuilder
     private func content(form: FormDraft, field: String) -> some View {
         let value = form.values[field] ?? .null
-        let hasPhoto = PhotoCodec.image(from: value) != nil || (value.stringValue?.hasPrefix("http") ?? false)
+        let decoded = PhotoCodec.image(from: value)
+        let hasPhoto = decoded != nil || (value.stringValue?.hasPrefix("http") ?? false)
 
         VStack(alignment: .leading, spacing: 8) {
             if hasPhoto {
-                if wantsPose, let pose, let image = PhotoCodec.image(from: value) {
-                    PosePhotoView(image: image, pose: pose, height: 220)
+                if wantsPose, let pose, let decoded {
+                    PosePhotoView(image: decoded, pose: pose, height: 200)
                 } else {
                     PhotoView(value: value, height: 160, accessibilityLabel: L("\(c.label ?? L("写真"))(添付済み)"))
                 }
@@ -64,7 +65,7 @@ struct PhotoFieldLeaf: View {
                     .accessibilityLabel(L("\(c.label ?? L("写真"))を削除"))
                 }
                 if !c.analyze.isEmpty {
-                    readControls(form: form, field: field, canRead: PhotoCodec.image(from: value) != nil)
+                    readControls(form: form, field: field, canRead: decoded != nil)
                 }
             } else {
                 Button { start() } label: {
