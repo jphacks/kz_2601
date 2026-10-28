@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
 // Expect format check and the per-group pass rate (#281). Both run without
@@ -58,6 +60,9 @@ var expectKeys = map[string]expectKind{
 	"markEntity": expectBool,
 	// checkGroupBy (#261, PR #404)
 	"groupedTable": expectBool,
+	// checkAIGenerate (#417): aigen.go
+	"aiGenerate":       expectString, // line|list|fields|any
+	"aiGenerateEntity": expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,
@@ -122,6 +127,10 @@ func validateExpect(exp map[string]any) []string {
 		case "scope":
 			if s := v.(string); s != "public" && s != "shared" && s != "private" {
 				bad = append(bad, "scope must be public|shared|private: "+s)
+			}
+		case "aiGenerate":
+			if s := v.(string); s != "any" && !dsl.AIShapes[s] {
+				bad = append(bad, "aiGenerate must be line|list|fields|any: "+s)
 			}
 		}
 	}
