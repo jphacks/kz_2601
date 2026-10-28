@@ -651,6 +651,9 @@
           "$ref": "#/$defs/QrScanner"
         },
         {
+          "$ref": "#/$defs/QrCode"
+        },
+        {
           "$ref": "#/$defs/TimerDisplay"
         },
         {
@@ -2837,6 +2840,47 @@
       },
       "description": "カメラで QR / バーコードを読み取り、文字列をフォームの文字 field に入れる(実機専用・シミュレータはプレースホルダ+手入力)。在庫管理・チケット受付・本の ISBN・URL 取り込みで選ぶ。",
       "x-usage": "フォーム画面のみ(screen.entity 必須)。結果を表示する textField の上に 1 行(A3:F4)。"
+    },
+    "QrCode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "qrCode"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "QR の上の見出し(任意・例: 会員証)。"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "QR にする固定の文字・URL(例: https://example.com)。screen.entity がある画面では `{{fieldId}}` をそのレコードの値で置換する(例: https://x.com/{{account}})。text / field / value のどれか 1 つだけ。"
+        },
+        "field": {
+          "type": "string",
+          "description": "QR にする screen.entity の field(会員番号・URL・チケット番号など。photo / video / refs 不可)。表示中のレコード(フォーム・詳細)の値で作る。"
+        },
+        "value": {
+          "$ref": "#/$defs/Expr",
+          "description": "QR にする値を計算式で(例: concat で文字をつなぐ)。screen.entity がある画面では ref でそのレコードの field を読める。"
+        },
+        "label": {
+          "type": "string",
+          "description": "QR の下の小さな説明(任意・例: 受付でこの QR を見せてください)。"
+        }
+      },
+      "description": "文字・URL・レコードの値から QR コードを作って表示する(読み取りは qrScanner)。長押しまたはボタンで写真に保存・共有できる。値が空なら案内を出す。会員証・チケット・自分の SNS や Web の URL・連絡先・Wi-Fi・受付番号を「QR で見せたい / QR にしたい」に選ぶ。",
+      "x-usage": "値は text(固定)/ field(画面のレコード)/ value(計算式)のどれか 1 つ。ユーザー本人の URL・番号など生成時に分からない値は text に例を書かず、entity の string field に入力させて field で出す(フォーム画面の textField の下に qrCode)。固定の 1 つ(お店の URL 等)ならホームに text で。正方形に近い area(例 B3:E8)、下に label。"
     },
     "TimerDisplay": {
       "type": "object",
