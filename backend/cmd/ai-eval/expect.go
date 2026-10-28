@@ -58,6 +58,8 @@ var expectKeys = map[string]expectKind{
 	"markEntity": expectBool,
 	// checkGroupBy (#261, PR #404)
 	"groupedTable": expectBool,
+	// checkQR (#422)
+	"qrSource": expectString,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,
@@ -122,6 +124,10 @@ func validateExpect(exp map[string]any) []string {
 		case "scope":
 			if s := v.(string); s != "public" && s != "shared" && s != "private" {
 				bad = append(bad, "scope must be public|shared|private: "+s)
+			}
+		case "qrSource":
+			if s := v.(string); !qrSources[s] {
+				bad = append(bad, "qrSource must be text|field|value|record|any: "+s)
 			}
 		}
 	}

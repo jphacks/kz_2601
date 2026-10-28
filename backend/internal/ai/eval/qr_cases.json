@@ -1,0 +1,7 @@
+[
+  {"id": "q_member_card", "kind": "create", "group": "qr", "transcript": "会員証の QR を出したい", "note": "#422 会員番号は入力させて field で QR(例の番号を text に書かない)", "expect": {"has": ["qrCode"], "qrSource": "record", "unreachable": 0}},
+  {"id": "q_sns_url", "kind": "create", "group": "qr", "transcript": "自分の SNS の URL を QR にして見せたい", "note": "#422 本人の URL は分からないので入力 → field / {{}} / ref", "expect": {"has": ["qrCode"], "qrSource": "record", "unreachable": 0}},
+  {"id": "q_shop_site", "kind": "create", "group": "qr", "transcript": "うちのカフェの公式サイト https://cafe.example.jp を QR で出して、お客さんに読み取ってもらいたい", "note": "#422 生成時に分かる固定 URL は text", "expect": {"has": ["qrCode"], "qrSource": "text"}},
+  {"id": "q_ticket_checkin", "kind": "create", "group": "qr", "transcript": "イベントの受付アプリ。参加者ごとにチケットの QR を出して、受付ではその QR をカメラで読んで来たかどうか記録したい", "note": "#422 qrCode(出す)と qrScanner(読む)の組み合わせ", "expect": {"has": ["qrCode", "qrScanner"], "qrSource": "record", "unreachable": 0}},
+  {"id": "q_edit_add_qr", "kind": "edit", "base": "q_member_card", "group": "qr", "transcript": "QR の下に「受付で見せてください」と出して", "note": "#422 既存の qrCode に label", "expect": {"patch": true, "has": ["qrCode"]}}
+]
