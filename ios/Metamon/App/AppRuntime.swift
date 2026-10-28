@@ -63,6 +63,8 @@ final class AppRuntime: DSLRuntime {
         var perform: @MainActor () async -> Void
     }
     var confirm: Confirm?
+    /// 書き出したファイル(#421)。立つと共有シートを開く(`RootView` の HostSheets)。
+    var exportFile: ExportFile?
     /// 軽微な通知(下部カプセル・保存失敗など)。生成の失敗はこちらではなく `errorCard`、生成の summary は `summaryBanner`。
     var toast: String? {
         didSet {
@@ -1055,6 +1057,9 @@ final class AppRuntime: DSLRuntime {
             guard let id = action.notificationId else { return }
             await services.notifications.cancel(id: id, appId: document.appId)
             await refreshNotifications()
+
+        case .export:
+            await export(action, ctx)
 
         case .unknown:
             toast = L10n.tr("未対応のアクション: \(action.rawType)")

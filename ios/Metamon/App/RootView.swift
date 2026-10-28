@@ -328,6 +328,11 @@ private struct HostSheets: ViewModifier {
             .sheet(isPresented: Binding(get: { active && rt.showAppSwitcher }, set: { rt.showAppSwitcher = $0 })) {
                 AppSwitcherSheet()
             }
+            .sheet(item: Binding(get: { active ? rt.exportFile : nil }, set: { rt.exportFile = $0 })) { file in
+                ActivityView(items: [file.url])
+                    .presentationDetents([.medium, .large])
+                    .ignoresSafeArea()
+            }
     }
 }
 

@@ -3,6 +3,8 @@ import Foundation
 public enum ActionType: String, Decodable, Sendable {
     case navigate, back, saveRecord, deleteRecord, openVoice, openUrl, resetForm
     case scheduleNotification, cancelNotification
+    /// 記録を CSV / PDF にして共有シートへ(#421)
+    case export
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -31,9 +33,18 @@ public struct Action: Decodable, Sendable {
     public var notification: NotificationSpec?
     /// cancelNotification
     public var notificationId: String?
+    /// export: "csv" | "pdf"
+    public var format: String?
+    /// export: 書き出すレコードの絞り込み(単体 / 配列どちらも読む・AND)
+    public var filters: [Filter] = []
+    /// export: 書き出す列(省略で全項目)
+    public var fields: [String]?
+    /// export: ファイル名・PDF の見出し
+    public var title: String?
 
     private enum Keys: String, CodingKey {
         case type, screen, presentation, prefillRef, entity, url, confirmMessage, notification, notificationId
+        case format, filter, fields, title
     }
 
     public init(from decoder: Decoder) throws {
@@ -48,6 +59,10 @@ public struct Action: Decodable, Sendable {
         confirmMessage = try? c.decodeIfPresent(String.self, forKey: .confirmMessage)
         notification = try? c.decodeIfPresent(NotificationSpec.self, forKey: .notification)
         notificationId = try? c.decodeIfPresent(String.self, forKey: .notificationId)
+        format = try? c.decodeIfPresent(String.self, forKey: .format)
+        filters = Filter.decodeOneOrMany(c, forKey: .filter)
+        fields = try? c.decodeIfPresent([String].self, forKey: .fields)
+        title = try? c.decodeIfPresent(String.self, forKey: .title)
     }
 
     /// DSL 外でクライアントが合成するアクション(例: list の長押し削除)。
