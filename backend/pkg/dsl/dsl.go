@@ -192,6 +192,7 @@ const (
 	ActionResetForm     ActionType = "resetForm"
 	ActionScheduleNotif ActionType = "scheduleNotification"
 	ActionCancelNotif   ActionType = "cancelNotification"
+	ActionExport        ActionType = "export"
 )
 
 // Action is a non-nesting side effect triggered by buttons/list taps.
@@ -205,6 +206,10 @@ type Action struct {
 	Notification   *Notification `json:"notification,omitempty"`   // scheduleNotification
 	NotificationID string        `json:"notificationId,omitempty"` // cancelNotification
 	PrefillRef     string        `json:"prefillRef,omitempty"`     // navigate: ref field of the target form set to the current record (#256)
+	Format         string        `json:"format,omitempty"`         // export: csv|pdf (#421)
+	Filter         *Filter       `json:"filter,omitempty"`         // export
+	Fields         []string      `json:"fields,omitempty"`         // export: columns (default all but photo/video)
+	Title          string        `json:"title,omitempty"`          // export: file name / PDF heading
 }
 
 // ComponentType discriminates Component.
