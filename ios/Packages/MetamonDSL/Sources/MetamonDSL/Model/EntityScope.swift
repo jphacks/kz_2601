@@ -15,17 +15,6 @@ public enum EntityScope: String, Sendable {
 }
 
 public extension AppDSL {
-    func scope(of entityId: String) -> EntityScope { EntityScope(raw: entityScopes[entityId]) }
-}
-
-/// `entities[]` から id と scope だけを読む(Entity 本体のデコードとは独立。壊れた要素は飛ばす)。
-struct EntityScopeProbe: Decodable {
-    var id: String
-    var scope: String?
-
-    static func scopes(_ probes: [EntityScopeProbe]) -> [String: String] {
-        var out: [String: String] = [:]
-        for p in probes { if let s = p.scope { out[p.id] = s } }
-        return out
-    }
+    /// `Entity.scope`(#249)を読む。entity が無ければ private。
+    func scope(of entityId: String) -> EntityScope { EntityScope(raw: entity(entityId)?.scope) }
 }
