@@ -66,6 +66,11 @@ var expectKeys = map[string]expectKind{
 	"dashcamAuto": expectBool,
 	// checkExport (#421)
 	"export": expectString,
+	// checkSensor (#419)
+	"sensor":          expectStrings,
+	"sensorSave":      expectBool,
+	"sensorThreshold": expectBool,
+	"sensorDecline":   expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

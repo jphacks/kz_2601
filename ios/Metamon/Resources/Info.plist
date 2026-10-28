@@ -109,8 +109,9 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>生成したアプリで現在地を記録・地図に表示したり、目的地まで道案内したりするために使います。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
 	<!-- healthStat(#167): 歩数は CoreMotion の歩数計(capability 不要)。体重の読み書き・ヘルスケアの歩数は HealthKit -->
+	<!-- sensorValue(#419): 気圧・高度(CMAltimeter)。傾き・加速度(device motion)は許可不要 -->
 	<key>NSMotionUsageDescription</key>
-	<string>生成したアプリで今日や最近の歩数を表示するために、モーションとフィットネスのデータを使用します。</string>
+	<string>生成したアプリで今日や最近の歩数、気圧や高度の変化を表示・記録するために、モーションとフィットネスのデータを使用します。</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>生成したアプリで歩数や体重を表示するために、ヘルスケアのデータを読み取ります。</string>
 	<key>NSHealthUpdateUsageDescription</key>

@@ -293,6 +293,8 @@ const (
 	CompDashcam ComponentType = "dashcam"
 	// device health (#167)
 	CompHealthStat ComponentType = "healthStat" // CoreMotion steps / HealthKit weight (no entity)
+	// device sensors (#419): CoreMotion / CMAltimeter live value, optional save
+	CompSensorValue ComponentType = "sensorValue"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -423,6 +425,10 @@ type Component struct {
 	ImpactG      float64  `json:"impactG,omitempty"`      // impact threshold in G (default 2.5)
 	AutoStart    []string `json:"autoStart,omitempty"`    // landscape|still|charging, all must hold
 	Audio        bool     `json:"audio,omitempty"`        // also record the microphone
+	// sensorValue (#419). Label / Style / Min / Max / Entity / Field / DateField /
+	// Seconds (log interval) / Limit (log count) are shared.
+	Sensor    string           `json:"sensor,omitempty"`
+	Threshold *SensorThreshold `json:"threshold,omitempty"`
 }
 
 // GridRange is an inclusive integer range of gridTable rows.

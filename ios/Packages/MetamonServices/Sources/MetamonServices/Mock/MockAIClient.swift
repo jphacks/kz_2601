@@ -16,6 +16,9 @@ public struct MockAIClient: AIClient {
         if transcript.contains("ナビ") || transcript.contains("道案内") || transcript.contains("ドライブ") { return "drive" }
         if transcript.contains("ランダム") || transcript.contains("くじ") || transcript.contains("晩ごはん") { return "dinner" }
         if transcript.contains("ドラレコ") || transcript.contains("車載"), DSLExamples.names.contains("dashcam") { return "dashcam" } // #410(審査用の版には無い)
+        #if !APP_STORE_REVIEW
+        if transcript.contains("傾き") || transcript.contains("水平器") || transcript.contains("気圧") { return "sensors" } // #419
+        #endif
         if transcript.contains("最初") || transcript.contains("戻") { return "initial" }
         return "kakeibo"
     }

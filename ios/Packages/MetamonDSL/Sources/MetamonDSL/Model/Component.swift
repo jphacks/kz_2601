@@ -49,6 +49,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case routeGuide
     // leaf(ドラレコ・#410)。title は共用
     case dashcam
+    // leaf(端末のセンサー・#419)。label / style / min / max / entity / field / dateField / seconds / limit は共用
+    case sensorValue
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -175,6 +177,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var impactG: Double?        // 衝撃の閾値(重力を除いた G)
     public var autoStart: [String]?    // landscape|still|charging(全部が続いたら開始)
     public var audio: Bool?            // マイクも録る
+    // sensorValue(#419)
+    public var sensor: String?         // tilt|pitch|roll|acceleration|rotation|pressure|altitude
+    public var threshold: SensorThreshold?
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
@@ -191,7 +196,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
         case textField, photoField
-        case keepMinutes, maxStorageMB, impactG, autoStart, audio
+        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold
     }
 
     public init(from decoder: Decoder) throws {
@@ -282,6 +287,25 @@ public struct Component: Decodable, Identifiable, Sendable {
         impactG = try? c.decodeIfPresent(Double.self, forKey: .impactG)
         autoStart = try? c.decodeIfPresent([String].self, forKey: .autoStart)
         audio = try? c.decodeIfPresent(Bool.self, forKey: .audio)
+        sensor = try? c.decodeIfPresent(String.self, forKey: .sensor)
+        threshold = try? c.decodeIfPresent(SensorThreshold.self, forKey: .threshold)
+    }
+}
+
+/// `sensorValue.threshold`(#419): above / below を超えた瞬間に 1 回だけ発火。
+public struct SensorThreshold: Decodable, Sendable {
+    public var above: Double?
+    public var below: Double?
+    public var message: String?
+    public var save: Bool?
+    public var action: Action?
+
+    public init(above: Double? = nil, below: Double? = nil, message: String? = nil, save: Bool? = nil, action: Action? = nil) {
+        self.above = above
+        self.below = below
+        self.message = message
+        self.save = save
+        self.action = action
     }
 }
 

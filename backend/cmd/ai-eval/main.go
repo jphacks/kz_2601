@@ -389,6 +389,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRoute(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkDashcam(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkExport(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkSensor(c.Expect, app, rec.Summary)...)
 		if v, ok := c.Expect["noOmission"].(bool); ok && v && len(rec.Omissions) > 0 {
 			rec.ExpectMisses = append(rec.ExpectMisses, fmt.Sprintf("omissions=%v", rec.Omissions))
 		}

@@ -73,7 +73,8 @@ func checkTrackStat(where string, c *Component, e *Entity, add func(string, ...a
 	checkPickBy(where, c.Aggregate, c.By, e, add)
 }
 
-// trackedEntities: entities a locationTracker on a reachable screen writes.
+// trackedEntities: entities a locationTracker or a saving sensorValue (#419)
+// on a reachable screen writes without a form.
 func trackedEntities(a *App, reach map[string]bool) map[string]bool {
 	out := map[string]bool{}
 	for _, s := range a.Screens {
@@ -81,7 +82,7 @@ func trackedEntities(a *App, reach map[string]bool) map[string]bool {
 			continue
 		}
 		eachScreenComponent(s.Components, func(_ string, c *Component) {
-			if c.Type == CompLocationTracker {
+			if c.Type == CompLocationTracker || (c.Type == CompSensorValue && c.Entity != "") {
 				out[c.Entity] = true
 			}
 		})

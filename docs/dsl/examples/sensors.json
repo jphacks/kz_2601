@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "水平器と気圧",
+    "description": "スマホの傾きを水平器で見て、気圧を一定間隔で記録する",
+    "icon": "level",
+    "theme": { "primaryColor": "#00796B" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "reading",
+      "name": "気圧の記録",
+      "fields": [
+        { "id": "hpa", "name": "気圧", "type": "number", "unit": "hPa", "required": true },
+        { "id": "at", "name": "時刻", "type": "datetime", "required": true, "defaultValue": "now" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "水平器と気圧",
+      "components": [
+        { "type": "sensorValue", "id": "level", "area": "A1:F5", "sensor": "tilt", "label": "傾き", "style": "level",
+          "threshold": { "above": 30, "message": "傾きすぎです" } },
+        { "type": "sensorValue", "id": "pressure", "area": "A6:C8", "sensor": "pressure", "label": "今の気圧",
+          "entity": "reading", "field": "hpa", "dateField": "at", "seconds": 60, "limit": 120 },
+        { "type": "sensorValue", "id": "altitude", "area": "D6:F8", "sensor": "altitude", "label": "高度の変化" },
+        { "type": "list", "id": "log", "area": "A9:F10", "entity": "reading",
+          "item": { "title": "hpa", "subtitle": "at" },
+          "sort": { "field": "at", "direction": "desc" }, "swipeToDelete": true, "emptyText": "記録を開始すると気圧がここに並びます" }
+      ]
+    }
+  ]
+}

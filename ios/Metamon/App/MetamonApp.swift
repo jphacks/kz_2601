@@ -28,6 +28,7 @@ struct MetamonApp: App {
         services.ai = ConsentGatedAIClient(base: services.ai) { AIConsentStore.isGranted(in: .standard) }
         #if !APP_STORE_REVIEW
         if BuildConfig.forceMock { HealthData.source = MockHealthData() } // healthStat(#167)は固定値
+        if BuildConfig.forceMock { SensorData.source = MockSensorData() } // sensorValue(#419)は決まった波形
         #else
         _ = ReviewBuildPackageMarker.self // パッケージにも APP_STORE_REVIEW が渡っていることをコンパイル時に保証(#245)
         #endif

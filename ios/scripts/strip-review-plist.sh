@@ -7,7 +7,7 @@ set -eu
 PLIST="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
 PB=/usr/libexec/PlistBuddy
 
-# HealthKit / 位置の常時・背面 / 近くの端末(ローカルネットワーク・Bonjour)/ 歩数計(healthStat のみが使う)/ 共有リンクの URL スキーム
+# HealthKit / 位置の常時・背面 / 近くの端末(ローカルネットワーク・Bonjour)/ モーション(healthStat の歩数計・sensorValue の気圧計)/ 共有リンクの URL スキーム
 for key in NSHealthShareUsageDescription NSHealthUpdateUsageDescription NSHealthClinicalHealthRecordsShareUsageDescription \
            NSLocationAlwaysUsageDescription NSLocationAlwaysAndWhenInUseUsageDescription \
            NSLocalNetworkUsageDescription NSBonjourServices NSMotionUsageDescription CFBundleURLTypes; do
@@ -27,7 +27,7 @@ done
 "$PB" -c "Set :NSPhotoLibraryAddUsageDescription 生成したアプリの共有ボタンから画像を写真に保存するために、写真ライブラリへの追加を使用します。" "$PLIST"
 
 # 外した部品を使う同梱の例(docs/dsl/examples)もバンドルから外す(DSLExamples.reviewExcluded と一致させる)
-for name in attendance_nearby walk_route health dashcam; do
+for name in attendance_nearby walk_route health dashcam sensors; do
   rm -f "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/${name}.json"
 done
 echo "strip-review-plist: removed review-excluded keys from ${PLIST}"

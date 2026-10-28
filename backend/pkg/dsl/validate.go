@@ -636,6 +636,11 @@ func (a *App) Validate() error {
 				checkHealthStat(where, c, add)
 			case CompDashcam:
 				checkDashcam(where, c, add)
+			case CompSensorValue:
+				checkSensorValue(where, c, entities, add)
+				if c.Threshold != nil {
+					checkAction(where+".threshold.action", c.Threshold.Action)
+				}
 			case CompNearbyShare:
 				if c.Label == "" {
 					add("%s: nearbyShare needs label", where)
