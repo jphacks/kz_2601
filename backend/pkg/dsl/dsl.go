@@ -282,6 +282,8 @@ const (
 	CompLocationTracker ComponentType = "locationTracker"
 	// device health (#167)
 	CompHealthStat ComponentType = "healthStat" // CoreMotion steps / HealthKit weight (no entity)
+	// device sensors (#419): CoreMotion / CMAltimeter live value, optional save
+	CompSensorValue ComponentType = "sensorValue"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -401,6 +403,11 @@ type Component struct {
 	ColumnValues []string   `json:"columnValues,omitempty"` // explicit column headers (else enum options)
 	RowValues    []string   `json:"rowValues,omitempty"`    // explicit row headers for enum/string rowField
 	RowRange     *GridRange `json:"rowRange,omitempty"`     // integer rowField range (default 1..6)
+
+	// sensorValue (#419). Label / Style / Min / Max / Entity / Field / DateField /
+	// Seconds (log interval) / Limit (log count) are shared.
+	Sensor    string           `json:"sensor,omitempty"`
+	Threshold *SensorThreshold `json:"threshold,omitempty"`
 }
 
 // GridRange is an inclusive integer range of gridTable rows.

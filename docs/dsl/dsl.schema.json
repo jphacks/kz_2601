@@ -659,6 +659,9 @@
         },
         {
           "$ref": "#/$defs/HealthStat"
+        },
+        {
+          "$ref": "#/$defs/SensorValue"
         }
       ]
     },
@@ -3381,6 +3384,125 @@
       },
       "description": "端末のヘルスデータを表示するカード。歩数は iPhone が自動で数えている値(entity も記録も不要)、体重はヘルスケアの最新値。「毎日の歩数を見たい」「今日何歩歩いた」「1 週間の歩数」「ヘルスケアの体重を見たい」など、自分で入力しない健康データを見たい時に選ぶ。権限が無い時・シミュレータでは理由を表示する。",
       "x-usage": "entity 不要でどの画面にも置ける。today は stat と同じ大きさ(半幅 2〜3 行・例 A1:C3)、week はグラフなので全幅 4〜5 行(例 A4:F8)。目標の話があれば target。手入力の体重記録アプリで「ヘルスケアにも保存」と言われたら、体重 field に health: \"weight\" を付ける(このカードとは別)。"
+    },
+    "SensorValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "sensor",
+        "label"
+      ],
+      "properties": {
+        "type": {
+          "const": "sensorValue"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "sensor": {
+          "type": "string",
+          "enum": [
+            "tilt",
+            "pitch",
+            "roll",
+            "acceleration",
+            "rotation",
+            "pressure",
+            "altitude"
+          ],
+          "x-enumDescriptions": {
+            "tilt": "傾き(水平からの角度・0〜90°)。水平器・スマホの角度。",
+            "pitch": "前後の傾き(-90〜90°)。",
+            "roll": "左右の傾き(-180〜180°)。",
+            "acceleration": "揺れ・加速度の大きさ(G・重力は除く)。急ブレーキ・衝撃・振動。",
+            "rotation": "回転の速さ(°/s・ジャイロ)。",
+            "pressure": "気圧(hPa・気圧計)。",
+            "altitude": "高度の変化(m・画面を開いた時を 0 とした相対値。標高ではない)。"
+          },
+          "description": "表示する iPhone のセンサー値。温度・湿度は iPhone にセンサーが無いので無い。"
+        },
+        "label": {
+          "type": "string",
+          "description": "カードの見出し(例: 傾き・今の気圧)。"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "number",
+            "gauge",
+            "level"
+          ],
+          "description": "number=大きな数字(既定)/ gauge=範囲のメーター(min〜max)/ level=水平器の泡(sensor tilt のみ)。"
+        },
+        "min": {
+          "type": "number",
+          "description": "gauge の下限(省略時はセンサーごとの既定)。"
+        },
+        "max": {
+          "type": "number",
+          "description": "gauge の上限(省略時はセンサーごとの既定・min より大きい)。"
+        },
+        "entity": {
+          "type": "string",
+          "description": "値を保存する entity(任意)。指定すると「今の値を記録」ボタンが出て、1 回 = 1 レコード。"
+        },
+        "field": {
+          "type": "string",
+          "description": "entity の number field。記録した時の値(単位はセンサーの単位)が入る。entity と一緒に必須。"
+        },
+        "dateField": {
+          "type": "string",
+          "description": "entity の datetime field。記録した時刻が入る(任意)。"
+        },
+        "seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "description": "一定間隔の記録(秒・1〜3600)。指定すると「記録を開始/停止」が出て、画面を開いている間だけ間隔ごとに 1 件保存する。entity が要る。"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "一定間隔の記録の上限件数(既定 60・1〜1000)。達したら自動で止まる。seconds が要る。"
+        },
+        "threshold": {
+          "$ref": "#/$defs/SensorThreshold"
+        }
+      },
+      "description": "iPhone のセンサー(傾き・加速度・回転・気圧・高度)の今の値を表示するカード。画面を開いている間だけ測る(最大 10 回/秒)。entity を付けると今の値を記録でき、seconds で一定間隔の記録、threshold で「30° を超えたら知らせる」ができる。「水平器」「スマホの傾き」「揺れ・振動・衝撃を測る」「気圧」「高度・何階分登った」の時に選ぶ。温度・湿度は測れない(iPhone にセンサーが無い)。センサーの無い端末では「このセンサーはこの端末では使えません」と出る。",
+      "x-usage": "数字だけなら半幅 3 行(A1:C3)、gauge / level は全幅 4〜5 行(A1:F5)。記録するなら entity は例 reading{value: number(unit は °/G/hPa/m), at: datetime(required, defaultValue now)} にしてフォーム画面は作らず、同じ画面に list か chart(A6:F10)を置く。threshold は「傾きすぎ」「揺れが大きい」を知らせたい時だけ。"
+    },
+    "SensorThreshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "above": {
+          "type": "number",
+          "description": "値がこれを超えたら発火(例 tilt 30)。"
+        },
+        "below": {
+          "type": "number",
+          "description": "値がこれを下回ったら発火。"
+        },
+        "message": {
+          "type": "string",
+          "description": "発火した時にカードに出す警告(例: 傾きすぎです)。省略時は既定文。"
+        },
+        "save": {
+          "type": "boolean",
+          "description": "true = 発火した時の値を entity に 1 件保存(entity が要る)。"
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "発火した時に実行する動作(任意)。navigate / scheduleNotification / cancelNotification のみ。"
+        }
+      },
+      "description": "sensorValue のしきい値。above / below のどちらかは必須。条件に入った瞬間だけ 1 回発火し(警告表示 + 振動)、条件から出るまで再発火しない(最短 3 秒おき)。"
     }
   }
 }
