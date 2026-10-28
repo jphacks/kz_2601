@@ -35,6 +35,11 @@ struct ListRow: View {
 
     private var titleText: String { text(item?.title ?? entity?.displayTitleField) ?? "" }
     private var subtitleText: String? { text(item?.subtitle).flatMap { $0.isEmpty ? nil : $0 } }
+    /// trailing が audio field なら行に再生ボタン(#420)。
+    private var trailingAudio: JSONValue? {
+        guard let f = item?.trailing, entity?.field(f)?.type == .audio, AudioValue(record[f]) != nil else { return nil }
+        return record[f]
+    }
     private var trailingText: String? { text(item?.trailing).flatMap { $0.isEmpty ? nil : $0 } }
 
     /// subtitle / title のどちらかが enum(カテゴリ)なら、その値から色を決める。
@@ -152,7 +157,9 @@ struct ListRow: View {
                     }
                 }
                 if !stacked { Spacer(minLength: RenderTheme.Spacing.sm) }
-                if let trailing = trailingText {
+                if let audio = trailingAudio {
+                    AudioPlayButton(value: audio) // #420
+                } else if let trailing = trailingText {
                     Text(trailing)
                         .font(trailingIsNumeric ? RenderTheme.Fonts.rowTrailing : .subheadline.monospacedDigit())
                         .foregroundStyle(trailingIsNumeric ? .primary : .secondary)
@@ -181,6 +188,9 @@ struct ListRow: View {
         .accessibilityActions {
             if let onToggle {
                 Button(checked ? "チェックを外す" : "チェックする", action: onToggle)
+            }
+            if let audio = trailingAudio.flatMap(AudioValue.init) {
+                Button(L("録音を再生")) { AudioPlayback.shared.toggle(audio) }
             }
             if let mark, let st = markState, let onMark {
                 Button(st.mine ? L("\(mark.label)を外す") : L("\(mark.label)を付ける"), action: onMark)

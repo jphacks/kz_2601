@@ -114,6 +114,8 @@ public struct ComponentRegistry: Sendable {
         // leaf(チャット・#260)
         r.register(.chatThread) { c, ctx in ChatThreadLeaf(c: c, ctx: ctx) }
         r.register(.healthStat) { c, _ in HealthStatLeaf(c: c) }
+        // leaf(録音・#420)
+        r.register(.audioRecorder) { c, ctx in AudioRecorderLeaf(c: c, ctx: ctx) }
         #endif
         return r
     }()

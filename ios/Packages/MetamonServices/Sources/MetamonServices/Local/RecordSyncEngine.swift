@@ -57,7 +57,8 @@ public final class RecordSyncEngine {
         let dir = directory ?? base.appendingPathComponent("metamon-records", isDirectory: true)
         // 動画(#206)は既定なら Application Support/metamon-videos、テストで directory を渡したらその下
         let videos = directory.map { LocalVideoStore(directory: $0.appendingPathComponent("videos", isDirectory: true)) } ?? .shared
-        let store = RecordStore(directory: dir, videos: videos)
+        let audios = directory.map { LocalAudioStore(directory: $0.appendingPathComponent("audio", isDirectory: true)) } ?? .shared
+        let store = RecordStore(directory: dir, videos: videos, audios: audios)
         self.init(store: store, queue: SyncQueue(directory: dir, store: store, client: client), client: client, connectivity: connectivity)
     }
 
@@ -155,8 +156,10 @@ public final class RecordSyncEngine {
         let now = ISO8601DateFormatter().string(from: .now)
         if let recordId, var row = await store.row(appId: appId, entity: entity, recordId: recordId) {
             let oldVideos = VideoValue.localIDs(in: row.data)
+            let oldAudios = AudioValue.localIDs(in: row.data)
             row.data.merge(data) { _, new in new } // PATCH と同じくキー単位でマージ(DSL から消えた項目も保持)
             store.videos.remove(oldVideos.subtracting(VideoValue.localIDs(in: row.data))) // 撮り直し・削除した動画(#206)
+            store.audios.remove(oldAudios.subtracting(AudioValue.localIDs(in: row.data))) // 録り直し・削除した録音(#420)
             row.updatedAt = now
             if row.pendingOp != .create { row.pendingOp = .update }
             await store.upsert(row)
@@ -207,6 +210,7 @@ public final class RecordSyncEngine {
     public func delete(appId: String, entity: String, recordId: String) async -> [Record] {
         if let row = await store.row(appId: appId, entity: entity, recordId: recordId) {
             store.videos.remove(VideoValue.localIDs(in: row.data)) // 端末内の動画ファイル(#206)
+            store.audios.remove(AudioValue.localIDs(in: row.data)) // 端末内の録音(#420)
         }
         let result = await queue.enqueue(SyncOperation(appId: appId, entity: entity, recordId: recordId, kind: .delete))
         if result == .cancelledCreate {
