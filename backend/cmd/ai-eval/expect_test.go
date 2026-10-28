@@ -12,7 +12,7 @@ import (
 const casesDir = "../../internal/ai/eval"
 
 func TestCaseFilesValid(t *testing.T) {
-	for _, f := range []string{"cases.json", "demo_cases.json", "m0disc_cases.json", "audit_cases.json", "audit_en_cases.json", "groupby_cases.json", "parent_child_cases.json"} {
+	for _, f := range []string{"cases.json", "demo_cases.json", "m0disc_cases.json", "audit_cases.json", "audit_en_cases.json", "groupby_cases.json", "parent_child_cases.json", "route_cases.json"} {
 		if err := checkCasesFile(filepath.Join(casesDir, f), false); err != nil {
 			t.Error(err)
 		}
@@ -80,6 +80,8 @@ func TestValidateExpect(t *testing.T) {
 		"list of numbers":  {"lacks": []any{1.0}},
 		"keep alone":       {"keep": []any{"a"}},
 		"optHas alone":     {"optHas": []any{"a"}},
+		"bad routeDest":    {"routeDest": "map"},
+		"bad routeMode":    {"routeMode": "bicycle"},
 	} {
 		if bad := validateExpect(exp); len(bad) == 0 {
 			t.Errorf("%s: accepted %v", name, exp)

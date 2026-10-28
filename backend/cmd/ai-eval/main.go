@@ -21,6 +21,7 @@
 // healthField (bool: some field has health "weight").
 // Warikan (#231): refs (bool: some field is type refs), deletable ([entity id, ...]: swipeToDelete list or deleteRecord).
 // Grid (#234): grid (bool: some gridTable is present).
+// Route guide (#411): routeDest / routeMode (see route.go).
 // Omission (#257): noOmission (bool: the model met or honestly declined every
 // requested part itself; Meta.Omissions = parts the server had to note).
 // Field cap (#221): keepEntity / keep ([field id, ...]) / growTo (see checkKeep).
@@ -380,6 +381,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(checkExpect(c.Expect, rec.Metrics, rec.Summary), checkNav(c.Expect, app, rec.Mode)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkEnum(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkKeep(c.Expect, app, rec.Summary)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkRoute(c.Expect, app)...)
 		if v, ok := c.Expect["noOmission"].(bool); ok && v && len(rec.Omissions) > 0 {
 			rec.ExpectMisses = append(rec.ExpectMisses, fmt.Sprintf("omissions=%v", rec.Omissions))
 		}

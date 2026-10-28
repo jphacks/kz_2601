@@ -82,6 +82,7 @@ var capabilityWords = map[string]string{
 	"体重": "healthStat", "ヘルスケア": "healthStat", "場所": "locationPicker", "検索": "searchBar",
 	"道のり": "locationTracker", "地図": "mapView", "QR": "qrScanner", "グラフ": "chart",
 	"カレンダー": "calendar", "割り勘": "settlement", "タイマー表示": "timerDisplay", "チャット": "chatThread",
+	"ナビ": "routeGuide", "道案内": "routeGuide", "経路案内": "routeGuide",
 }
 
 func TestChatLimits_NoConflictWithSchema(t *testing.T) {
@@ -124,9 +125,9 @@ func TestChatLimits_NoConflictWithSchema(t *testing.T) {
 
 func TestShortDesc(t *testing.T) {
 	for in, want := range map[string]string{
-		"区切り線。":                 "区切り線",
+		"区切り線。":                    "区切り線",
 		"A single symbol. Use it.": "A single symbol。Use it",
-		"場所を選ぶ入力欄。タップで開く。":      "場所を選ぶ入力欄。タップで開く",
+		"場所を選ぶ入力欄。タップで開く。":         "場所を選ぶ入力欄。タップで開く",
 	} {
 		if got := shortDesc(in); got != want {
 			t.Errorf("shortDesc(%q) = %q, want %q", in, got, want)

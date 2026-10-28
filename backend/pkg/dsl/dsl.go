@@ -248,6 +248,7 @@ const (
 	CompMapView        ComponentType = "mapView"        // MapKit pins from a location field
 	CompLocationButton ComponentType = "locationButton" // CoreLocation -> location field
 	CompLocationPicker ComponentType = "locationPicker" // search / map pin -> location field (+ nameField) (#212)
+	CompRouteGuide     ComponentType = "routeGuide"     // MapKit turn-by-turn guidance to a destination (#411)
 	CompQrScanner      ComponentType = "qrScanner"      // AVFoundation -> string field
 	CompTimerDisplay   ComponentType = "timerDisplay"   // stopwatch / countdown
 	CompWebView        ComponentType = "webView"        // in-app WKWebView (https only)
@@ -359,7 +360,8 @@ type Component struct {
 	OnDateTap     *Action `json:"onDateTap,omitempty"`     // calendar
 	LocationField string  `json:"locationField,omitempty"` // mapView
 	Zoom          string  `json:"zoom,omitempty"`          // mapView: near|city|wide
-	Mode          string  `json:"mode,omitempty"`          // timerDisplay: stopwatch|countdown
+	Mode          string  `json:"mode,omitempty"`          // timerDisplay: stopwatch|countdown / routeGuide: automobile|walking
+	Address       string  `json:"address,omitempty"`       // routeGuide: fixed destination (address / place name)
 	Seconds       int     `json:"seconds,omitempty"`       // timerDisplay countdown start / locationTracker auto stop
 	ShareTo       string  `json:"shareTo,omitempty"`       // shareButton: any|line|slack|discord (`target` is progressBar's number)
 	// input batch (slider / stepper / rating / textEditor). Pointers so that

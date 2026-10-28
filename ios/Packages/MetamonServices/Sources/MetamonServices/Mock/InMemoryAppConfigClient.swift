@@ -151,6 +151,11 @@ public enum MockSeed {
                 Record(id: "e2", data: ["title": "夕食", "amount": 4500, "payer": "m2", "date": .string(today)], createdAt: iso),
                 Record(id: "e3", data: ["title": "ガソリン", "amount": 1500, "payer": "m1", "date": .string(today)], createdAt: iso),
             ],
+            // drive(#411): routeGuide の行き先(モックの現在地 = 金沢駅の近く)
+            "spot": [
+                Record(id: "s1", data: ["name": "兼六園", "place": "36.562128,136.662652", "memo": "駐車場は桂坂"], createdAt: iso),
+                Record(id: "s2", data: ["name": "近江町市場", "place": "36.571476,136.656650"], createdAt: iso),
+            ],
             // dinner(#263): randomPicker の候補 4 件
             "dish": [
                 Record(id: "d1", data: ["name": "カレー", "genre": "洋食", "memo": "辛口"], createdAt: iso),
