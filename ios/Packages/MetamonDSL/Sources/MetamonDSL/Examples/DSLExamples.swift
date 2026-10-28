@@ -20,6 +20,7 @@ public enum DSLExamples {
             "navigation",
             "post_comments",
             "diary_ai",
+            "ai_ideas",
             "medicine",
             "attendance_nearby",
             "water",

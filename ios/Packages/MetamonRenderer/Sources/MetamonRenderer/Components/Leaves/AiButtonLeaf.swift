@@ -15,7 +15,9 @@ struct AiButtonLeaf: View {
     @State private var done = false
 
     var body: some View {
-        if let form = ctx.form {
+        if c.task == "generate" {
+            AiGenerateLeaf(c: c, ctx: ctx) // #417: フォーム不要・結果をボタンの下に出す
+        } else if let form = ctx.form {
             VStack(alignment: .leading, spacing: 4) {
                 Button {
                     Task { await run(form) }
