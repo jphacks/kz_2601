@@ -15,6 +15,8 @@ struct ListLeaf: View {
     /// 保存待ちのチェック状態(recordId → 新しい値)。`ListToggle` 参照
     @State private var toggleOverrides: [String: Bool] = [:]
     @State private var toggleTaps = 0
+    /// 押した直後の印の表示(recordId → 楽観的な状態・#255)。確定したら外す
+    @State private var markOverrides: [String: MarkState] = [:]
 
     var body: some View {
         let entityId = c.entity ?? ""
@@ -23,6 +25,7 @@ struct ListLeaf: View {
         let rows = searched(filtered, entity: entity)
         let ids = rows.map(\.id)
         let toggleField = ListToggle.field(c.item, in: entity)
+        let mark = c.item?.mark.flatMap { id in entity?.isShared == true ? entity?.mark(id) : nil }
         let today = DSLClock.now()
         if rows.isEmpty {
             EmptyPlaceholder(icon: "tray", emptyText: c.emptyText ?? L("まだありません"), state: rt.emptyState(for: entityId),
@@ -39,7 +42,9 @@ struct ListLeaf: View {
                     ListRow(item: c.item, record: row, entity: entity, showsChevron: c.onItemTap != nil,
                             toggleOn: toggleField.map { ListToggle.isOn(row, field: $0.id, daily: ListToggle.isDaily(c.item), overrides: toggleOverrides, today: today) },
                             onToggle: toggleField.map { f in { editable ? toggle(row, field: f.id, entity: entityId) : rt.notifyReadOnly(entity: entityId) } },
-                            toggleEnabled: editable)
+                            toggleEnabled: editable,
+                            mark: mark, markState: mark.map { markOverrides[row.id] ?? row.markState($0.id) },
+                            onMark: mark.map { m in { toggleMark(row, mark: m.id, entity: entityId) } })
                         .background(highlightedId == row.id ? RenderTheme.Colors.brandSoft : Color.clear)
                         .contentShape(Rectangle())
                         .onTapGesture { open(row) }
@@ -71,6 +76,15 @@ struct ListLeaf: View {
                 print("[Metamon] E2E: toggling \(target)")
                 toggle(row, field: f.id, entity: entityId)
             }
+            // `METAMON_E2E_MARK_TITLE=<title>`: 起動 3 秒後にその title の行の印を 1 回押す(#255 のスクリーンショット用)
+            .task {
+                guard let target = ProcessInfo.processInfo.environment["METAMON_E2E_MARK_TITLE"], let m = mark else { return }
+                try? await Task.sleep(for: .seconds(3))
+                let titleField = c.item?.title ?? entity?.displayTitleField ?? ""
+                guard let row = rows.first(where: { rt.display($0[titleField], field: entity?.field(titleField)) == target }) else { return }
+                print("[Metamon] E2E: marking \(target)")
+                toggleMark(row, mark: m.id, entity: entityId)
+            }
             #endif
         }
     }
@@ -85,6 +99,18 @@ struct ListLeaf: View {
             let saved = await rt.updateRecord(entity: entity, recordId: row.id, data: ListToggle.patch(row, field: field, on: next, daily: daily, today: today))
             if !saved { print("[Metamon] list toggle not saved: \(entity)/\(row.id)") }
             withAnimation(RenderTheme.Motion.select) { ListToggle.settle(&toggleOverrides, recordId: row.id, requested: next) }
+        }
+    }
+
+    /// 印(#255): 押した瞬間に塗りと件数を変え、ホストが確定した状態(失敗なら元の状態)に戻す。
+    private func toggleMark(_ row: Record, mark: String, entity: String) {
+        let next = (markOverrides[row.id] ?? row.markState(mark)).toggled()
+        withAnimation(RenderTheme.Motion.select) { markOverrides[row.id] = next }
+        toggleTaps += 1
+        Task {
+            let settled = await rt.toggleMark(entity: entity, recordId: row.id, mark: mark)
+            if settled == nil { print("[Metamon] mark not saved: \(entity)/\(row.id) \(mark)") }
+            withAnimation(RenderTheme.Motion.select) { if markOverrides[row.id] == next { markOverrides[row.id] = nil } }
         }
     }
 

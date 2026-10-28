@@ -63,6 +63,13 @@ final class AppRuntime: DSLRuntime {
         var perform: @MainActor () async -> Void
     }
     var confirm: Confirm?
+
+    /// 共有アプリへの初めての投稿で表示名を聞く(#250)。答えたら `resume` で保存を続ける。
+    struct AuthorNamePrompt: Identifiable {
+        let id = UUID()
+        var resume: @MainActor () async -> Void
+    }
+    var authorNamePrompt: AuthorNamePrompt?
     /// 軽微な通知(下部カプセル・保存失敗など)。生成の失敗はこちらではなく `errorCard`、生成の summary は `summaryBanner`。
     var toast: String? {
         didSet {
@@ -253,8 +260,14 @@ final class AppRuntime: DSLRuntime {
         // ヘッドレス E2E 用: `METAMON_AUTO_RECORD='{"entity":"expense","data":{"amount":980,...}}'` で起動直後に 1 件保存する
         if let raw = ProcessInfo.processInfo.environment["METAMON_AUTO_RECORD"], let data = raw.data(using: .utf8),
            let spec = try? JSONDecoder().decode(AutoRecord.self, from: data) {
-            records[spec.entity] = await recordSync.save(appId: document.appId, entity: spec.entity, recordId: nil, data: spec.data)
+            records[spec.entity] = await recordSync.save(appId: document.appId, entity: spec.entity, recordId: nil, data: spec.data,
+                                                         author: postAuthor(for: spec.entity))
             print("[Metamon] auto record saved locally: entity=\(spec.entity) count=\(records[spec.entity]?.count ?? 0) sync=\(recordSync.status.label)")
+        }
+        // スクショ用: `METAMON_AUTO_AUTHOR_PROMPT=1` で起動直後に「投稿に表示する名前」を聞くアラートを出す(#250)
+        if ProcessInfo.processInfo.environment["METAMON_AUTO_AUTHOR_PROMPT"] == "1" {
+            try? await Task.sleep(for: .seconds(2))
+            authorNamePrompt = AuthorNamePrompt {}
         }
         #endif
     }
@@ -812,6 +825,13 @@ final class AppRuntime: DSLRuntime {
     /// 共有レコードの作者判定(#249)と、`Field.hidden`(#262)の入力を作者のフォームにだけ出すのに使う uid。
     var currentUserId: String? { services.auth.currentUser?.uid }
 
+    /// shared / public の entity に作るレコードの投稿者(#250): ローカル行の作者(uid)と、送る表示名(設定の名前だけ・未設定は nil)。
+    /// private の entity は nil(表示名を送らない)。
+    func postAuthor(for entity: String) -> (uid: String?, name: String?)? {
+        guard dsl.entity(entity)?.isShared == true else { return nil }
+        return (currentUserId, AuthorProfile.name)
+    }
+
     /// 他人の共有レコードを変えようとした時の一言(#249)。端末で止めた時もサーバーの 403 でも同じ文言。
     func notifyReadOnly(entity: String) {
         toast = L10n.tr("このデータは作った人だけが変更できます")
@@ -834,10 +854,15 @@ final class AppRuntime: DSLRuntime {
         return true
     }
 
+    /// ローカル DB の内容で entity の表示を差し替える(印の付け外し #255: AppRuntime+Marks.swift)。
+    func reloadCached(_ entity: String) async {
+        records[entity] = await recordSync.cached(appId: document.appId, entity: entity)
+    }
+
     /// `locationTracker`(#168)の位置 1 点。フォームを通さず 1 件足す(saveRecord と同じくローカル DB に即反映・送信は同期キュー)。
     func createRecord(entity: String, data: [String: JSONValue]) async -> Bool {
         guard dsl.entity(entity) != nil else { return false }
-        records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: nil, data: data)
+        records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: nil, data: data, author: postAuthor(for: entity))
         WidgetSnapshotWriter.write(dsl: dsl, records: records)
         return true
     }
@@ -857,7 +882,7 @@ final class AppRuntime: DSLRuntime {
         UserDefaults.standard.set(true, forKey: key)
         var seen = Set<String>()
         for name in names where seen.insert(name).inserted {
-            records[entity] = await recordSync.save(appId: appId, entity: entity, recordId: nil, data: [tf: .string(name)])
+            records[entity] = await recordSync.save(appId: appId, entity: entity, recordId: nil, data: [tf: .string(name)], author: postAuthor(for: entity))
         }
     }
 
@@ -1008,10 +1033,16 @@ final class AppRuntime: DSLRuntime {
                 notifyReadOnly(entity: entity) // 送信待ちに積まない(#249)
                 return
             }
+            if form.recordId == nil, postAuthor(for: entity) != nil, !AuthorProfile.asked {
+                // 共有アプリへの初めての投稿: 一覧に出る名前を先に決めてもらう(#250)
+                authorNamePrompt = AuthorNamePrompt { [weak self] in await self?.perform(action, ctx) }
+                return
+            }
             // 楽観的 UI: ローカル DB に即反映して画面を進める。appconfig への送信は recordSync のキューが行う
             let payload = form.payload
             let isNew = form.recordId == nil
-            records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: form.recordId, data: payload)
+            records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: form.recordId, data: payload,
+                                                    author: postAuthor(for: entity))
             WidgetSnapshotWriter.write(dsl: dsl, records: records)
             #if !APP_STORE_REVIEW
             writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)

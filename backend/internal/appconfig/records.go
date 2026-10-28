@@ -22,13 +22,14 @@ const (
 )
 
 type recordOut struct {
-	ID         string         `json:"id"`
-	Entity     string         `json:"entity"`
-	Data       map[string]any `json:"data"`
-	Author     string         `json:"author,omitempty"`
-	AuthorName string         `json:"authorName,omitempty"`
-	CreatedAt  time.Time      `json:"createdAt"`
-	UpdatedAt  time.Time      `json:"updatedAt"`
+	ID         string                     `json:"id"`
+	Entity     string                     `json:"entity"`
+	Data       map[string]any             `json:"data"`
+	Author     string                     `json:"author,omitempty"`
+	AuthorName string                     `json:"authorName,omitempty"`
+	Marks      map[string]store.MarkState `json:"marks,omitempty"` // #255: marks.go
+	CreatedAt  time.Time                  `json:"createdAt"`
+	UpdatedAt  time.Time                  `json:"updatedAt"`
 }
 
 func toRecordOut(r *store.Record) recordOut {
@@ -144,6 +145,10 @@ func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		out = append(out, toRecordOut(&items[i]))
+	}
+	if err := h.withMarks(r, recordSet(r, cur, ent, eid), ent, items, out); err != nil {
+		fail(w, err)
+		return
 	}
 	resp := map[string]any{"items": out}
 	if nt := p.next(len(items)); nt != "" {
@@ -295,12 +300,18 @@ func (h *Handler) getRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	rec, err := h.store.GetRecord(r.Context(), recordSet(r, cur, ent, eid), rid)
+	rs := recordSet(r, cur, ent, eid)
+	rec, err := h.store.GetRecord(r.Context(), rs, rid)
 	if err != nil {
 		fail(w, mapStoreErr(err, "record"))
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, toRecordOut(rec))
+	out := []recordOut{toRecordOut(rec)}
+	if err := h.withMarks(r, rs, ent, []store.Record{*rec}, out); err != nil {
+		fail(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, out[0])
 }
 
 func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
@@ -361,7 +372,12 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, mapStoreErr(err, "record"))
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, toRecordOut(rec))
+	out := []recordOut{toRecordOut(rec)}
+	if err := h.withMarks(r, rs, ent, []store.Record{*rec}, out); err != nil {
+		fail(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, out[0])
 }
 
 func (h *Handler) deleteRecord(w http.ResponseWriter, r *http.Request) {

@@ -135,7 +135,7 @@
             "public"
           ],
           "description": "レコードを誰と共有するか(省略時 private)。みんなで投稿・ランキング・掲示板など、他のユーザーと同じデータを見たい時は public。家族・サークル・チームなど決まった人だけで使う時は shared(作成者とシェアリンクで参加した人だけ)。private は本人だけ。",
-          "x-usage": "public/shared のレコードには backend が author(uid)と authorName を自動付与するので、field id に author / authorName は使えない。「家族で」「家族だけ」「サークルで」「チームで」「招待した人だけ」のように決まった人だけなら shared、「みんなで」「共有」「投稿」「ランキング」「掲示板」と言われたら public、家計簿や日記のような個人記録は省略(private)。",
+          "x-usage": "public/shared のレコードには backend が author(uid)と authorName を自動付与するので、field id に author / authorName は使えない。「家族で」「家族だけ」「サークルで」「チームで」「招待した人だけ」のように決まった人だけなら shared、「みんなで」「共有」「投稿」「ランキング」「掲示板」と言われたら public、家計簿や日記のような個人記録は省略(private)。 投稿者名は名前の入力欄(member_name / person / staff_name / 投稿者 など)を作らず、一覧で予約値 $author を表示する(本人が設定した表示名を backend が付ける・なりすましできない)。「自分の投稿だけ」「マイページ」は filter {\"field\":\"$author\",\"op\":\"eq\",\"value\":{\"me\":true}}。",
           "x-enumDescriptions": {
             "private": "本人だけが読み書きできる個人データ(既定)。家計簿・日記・体重など。",
             "shared": "作成者と、シェアリンクで参加した人だけが読み書きできる。家族の家事分担・サークルの出欠・チームのタスク。",
@@ -155,12 +155,26 @@
             "members": "同じアプリを開いた人なら誰でも更新できる(削除は作った人だけ)。家事の完了・共有リストのチェック・出欠・解決トグル。"
           }
         },
+        "marks": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/Mark"
+          },
+          "description": "1 人 1 回のトグルで付ける「自分だけの印」(いいね・保存・お気に入り・既読・行きたい)。public/shared の entity だけ。印はレコードの項目ではなく、誰が付けたかを backend が記録する(押すたびに増えない・付け外しできる・件数は自動で数える)。list.item.mark に id を書くと、行の右端にアイコンと件数のトグルが出る。",
+          "x-usage": "「いいね」「お気に入り」「保存」「ブックマーク」「既読」「行きたい」と言われたら marks を使う。いいね用・保存用の別 entity、親を指す ref、件数の computed(agg count)は作らない(1 人で何回でも押せてしまう・全項目の打ち直しになる)。件数は $marks.<id>(table の列 / sort で多い順。行のトグルにも件数が出るので list.item.trailing には要らない)。「保存したもの」「お気に入り一覧」「既読にしたもの」は filter {\"field\":\"$marks.<id>\",\"op\":\"eq\",\"value\":{\"me\":true}} の一覧(op neq = まだ付けていない = 未読)。その一覧の item にも同じ mark を書く(そこで外せる)。private の entity には書かない(自分だけの記録の「済み」は boolean field + list.item.toggle)。コメント・出欠のように中身のある記録は今まで通り別 entity。"
+        },
         "fields": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/Field"
           }
         }
+      },
+      "x-recordValues": {
+        "$author": "投稿者の表示名(public/shared の entity だけ)。本人がアプリの設定で決めた名前、未設定なら「匿名」。list.item の title/subtitle/trailing・table.columns の field・timeline の titleField/subtitleField に書ける。filter の field に書くと投稿者で絞り込む(value は {\"me\": true} = 自分。op eq = 自分の投稿 / neq = 他の人の投稿)。",
+        "$createdAt": "レコードを作った日時(datetime・全 entity)。list.item の title/subtitle/trailing・table.columns の field・timeline の titleField/subtitleField/dateField・list/table の sort.field に書ける。",
+        "$marks.<id>": "entity の marks の印の件数(integer・public/shared の entity)。<id> は marks の id(例 $marks.like)。list.item の title/subtitle/trailing・table.columns の field・list/table の sort.field(多い順 = desc)に書ける。filter の field に書くと、value {\"me\": true} と op eq で自分が付けたものだけ、op neq でまだ付けていないものに絞る。"
       }
     },
     "Field": {
@@ -658,10 +672,13 @@
           "$ref": "#/$defs/LocationTracker"
         },
         {
-          "$ref": "#/$defs/Dashcam"
+          "$ref": "#/$defs/ChatThread"
         },
         {
           "$ref": "#/$defs/HealthStat"
+        },
+        {
+          "$ref": "#/$defs/Dashcam"
         }
       ]
     },
@@ -958,22 +975,22 @@
     "ListItem": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル、toggle に boolean field で行頭のチェック丸(resets daily なら date field で毎日リセット)。",
+      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル、toggle に boolean field で行頭のチェック丸(resets daily なら date field で毎日リセット)。 mark に entity の marks の id を書くと、行の右端にいいね・保存などのトグルと件数(1 人 1 回)。",
       "required": [
         "title"
       ],
       "properties": {
         "title": {
           "type": "string",
-          "description": "Field id."
+          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at), or \"$marks.<id>\" (mark count)."
         },
         "subtitle": {
           "type": "string",
-          "description": "Field id."
+          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at), or \"$marks.<id>\" (mark count)."
         },
         "trailing": {
           "type": "string",
-          "description": "Field id (e.g. amount, date)."
+          "description": "Field id (e.g. amount, date), or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at), or \"$marks.<id>\" (mark count)."
         },
         "icon": {
           "type": "string"
@@ -981,6 +998,10 @@
         "image": {
           "type": "string",
           "description": "Field id of a photo field shown as thumbnail (a video field shows its first-frame thumbnail)."
+        },
+        "mark": {
+          "type": "string",
+          "description": "Mark id from the list entity's marks (public/shared entity). iOS draws the mark's icon and count at the row end; tapping it adds or removes the signed-in user's mark immediately (once per person, no form, other people's posts too)."
         },
         "toggle": {
           "type": "string",
@@ -1005,7 +1026,8 @@
       ],
       "properties": {
         "field": {
-          "type": "string"
+          "type": "string",
+          "description": "Field id, or \"$createdAt\" (posted at) / \"$marks.<id>\" (mark count, e.g. most liked first with desc)."
         },
         "direction": {
           "type": "string",
@@ -1019,7 +1041,7 @@
     "Filter": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list / stat / chart / agg のレコード絞り込み。op が today / thisWeek / thisMonth / thisYear(期間・端末ローカル。今週は月曜始まり)のときは value を null にし、field は date / datetime。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。",
+      "description": "list / stat / chart / agg のレコード絞り込み。op が today / thisWeek / thisMonth / thisYear(期間・端末ローカル。今週は月曜始まり)のときは value を null にし、field は date / datetime。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。 「自分の投稿だけ」は field \"$author\"・value {\"me\": true}・op eq(public/shared の entity のみ)。 「自分が保存した / いいねしたもの」は field \"$marks.<id>\"・value {\"me\": true}・op eq(neq = まだ付けていない)。",
       "required": [
         "field",
         "op",
@@ -1027,7 +1049,8 @@
       ],
       "properties": {
         "field": {
-          "type": "string"
+          "type": "string",
+          "description": "Field id, or \"$author\" (public/shared entity: the poster; value {\"me\": true}, op eq = my posts / neq = others' posts), or \"$marks.<id>\" (public/shared entity with that mark: value {\"me\": true}, op eq = marked by me / neq = not marked by me)."
         },
         "op": {
           "type": "string",
@@ -1083,9 +1106,12 @@
             },
             {
               "$ref": "#/$defs/ExprIf"
+            },
+            {
+              "$ref": "#/$defs/FilterMe"
             }
           ],
-          "description": "Literal or Expr. null for today/thisWeek/thisMonth/thisYear. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id)."
+          "description": "Literal or Expr. null for today/thisWeek/thisMonth/thisYear. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id). {\"me\": true} = the signed-in user (only with field \"$author\" or \"$marks.<id>\")."
         }
       }
     },
@@ -2294,7 +2320,7 @@
       "properties": {
         "field": {
           "type": "string",
-          "description": "Field id of the table entity."
+          "description": "Field id of the table entity, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at) / \"$marks.<id>\" (mark count)."
         },
         "title": {
           "type": "string",
@@ -2383,13 +2409,15 @@
         },
         "dateField": {
           "type": "string",
-          "description": "date/datetime field; newest first."
+          "description": "date/datetime field, or \"$createdAt\" (posted at); newest first."
         },
         "titleField": {
-          "type": "string"
+          "type": "string",
+          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at)."
         },
         "subtitleField": {
-          "type": "string"
+          "type": "string",
+          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at)."
         },
         "filter": {
           "$ref": "#/$defs/Filter"
@@ -3338,6 +3366,149 @@
       "description": "「記録を開始 / 記録を停止」ボタンと記録中の状態(経過時間・距離)。開始を押した間だけ現在地を entity に 1 点ずつ保存し、アプリを閉じても停止まで続く(既定 1 時間・最長 4 時間で自動停止)。散歩・ランニング・サイクリングのルート、移動ログ、軌跡を残したいアプリで選ぶ。1 回だけ現在地を入れたいなら locationButton。",
       "x-usage": "ホーム画面(screen.entity なし)に A9:F10 で 1 つ(最下 2 行の左 A-B はマイクの席なので空ける)。同じ画面に mapView{kind:\"route\",entity,locationField,dateField}(A3:F8)と stat{aggregate:\"distance\"} / stat{aggregate:\"duration\"}(field = location field、by = datetime field、今日なら filter today)を A1:F2 に並べる。entity は point{loc: location, at: datetime(required, defaultValue now)} のように点だけを持たせ、フォーム画面は作らない。"
     },
+    "ChatThread": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "textField"
+      ],
+      "properties": {
+        "type": {
+          "const": "chatThread"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string",
+          "description": "メッセージを保存する entity。1 メッセージ = 1 レコード。みんなで話すなら scope public。送信者名・送信時刻は予約値 $author / $createdAt を使うので、名前や日時の field は作らない。"
+        },
+        "textField": {
+          "type": "string",
+          "description": "`entity` の string / text field。メッセージ本文が入る。"
+        },
+        "photoField": {
+          "type": "string",
+          "description": "`entity` の photo field(任意)。書くと入力欄に写真ボタンが出て、写真付きで送れる。"
+        },
+        "placeholder": {
+          "type": "string",
+          "description": "入力欄の薄い文字(既定「メッセージ」)。"
+        },
+        "emptyText": {
+          "type": "string",
+          "description": "まだメッセージが無い時の文言(既定「まだメッセージはありません」)。"
+        }
+      },
+      "description": "LINE のようなチャット画面。メッセージを吹き出しで古い順に上から下へ積み(最新が一番下)、自分の分は右・相手の分は左に送信者名付きで出し、画面下に固定の入力欄から送る(送信 = その entity に 1 件保存・フォーム画面は不要)。ほかの人のメッセージはリアルタイムで届く。グループチャット・1 対 1 のメッセージ・連絡のやり取りで選ぶ。投稿を一覧で眺めるだけなら list。",
+      "x-usage": "チャット用のタブかホーム画面に A1:F12 で 1 つだけ置き、同じ画面に他の部品を置かない(左下のマイクは入力欄の左に避けて表示される)。entity は message{text: text(required), photo?: photo} + scope:\"public\" だけ。名前・日時の field、フォーム画面、追加ボタン、list は作らない。entity の他の required field には defaultValue を付ける。"
+    },
+    "HealthStat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "metric",
+        "label"
+      ],
+      "properties": {
+        "type": {
+          "const": "healthStat"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "metric": {
+          "type": "string",
+          "enum": [
+            "steps",
+            "weight"
+          ],
+          "description": "steps=歩数(iPhone の歩数計が自動で数えている値。記録不要)/ weight=体重(ヘルスケアの最新値 kg)。"
+        },
+        "period": {
+          "type": "string",
+          "enum": [
+            "today",
+            "week"
+          ],
+          "description": "today=今日の値(体重は最新値・既定)/ week=直近 7 日の棒グラフと 1 日平均(体重は 7 日の推移)。"
+        },
+        "label": {
+          "type": "string",
+          "description": "カードの見出し(例: 今日の歩数)。"
+        },
+        "target": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "steps の 1 日の目標(例 8000)。today は達成率のバー、week は目標線。"
+        }
+      },
+      "description": "端末のヘルスデータを表示するカード。歩数は iPhone が自動で数えている値(entity も記録も不要)、体重はヘルスケアの最新値。「毎日の歩数を見たい」「今日何歩歩いた」「1 週間の歩数」「ヘルスケアの体重を見たい」など、自分で入力しない健康データを見たい時に選ぶ。権限が無い時・シミュレータでは理由を表示する。",
+      "x-usage": "entity 不要でどの画面にも置ける。today は stat と同じ大きさ(半幅 2〜3 行・例 A1:C3)、week はグラフなので全幅 4〜5 行(例 A4:F8)。目標の話があれば target。手入力の体重記録アプリで「ヘルスケアにも保存」と言われたら、体重 field に health: \"weight\" を付ける(このカードとは別)。"
+    },
+    "FilterMe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "me"
+      ],
+      "properties": {
+        "me": {
+          "const": true
+        }
+      },
+      "description": "filter の value に書く「自分」。field \"$author\"(自分の投稿)か \"$marks.<id>\"(自分が印を付けたもの)と、op eq / neq でだけ使う(public/shared の entity)。"
+    },
+    "Mark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "icon",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "icon": {
+          "type": "string",
+          "enum": [
+            "heart",
+            "star",
+            "bookmark",
+            "thumbsup",
+            "check",
+            "eye",
+            "flag"
+          ],
+          "description": "行に出すアイコン(付けると塗りつぶし)。",
+          "x-enumDescriptions": {
+            "heart": "いいね・好き",
+            "star": "お気に入り",
+            "bookmark": "保存・あとで見る",
+            "thumbsup": "役に立った・賛成",
+            "check": "既読・やった",
+            "eye": "見た",
+            "flag": "行きたい・気になる"
+          }
+        },
+        "label": {
+          "type": "string",
+          "description": "ボタンと読み上げの名前(いいね・保存・既読)。ユーザーの言語で。"
+        }
+      },
+      "description": "entity の印 1 つ(marks の要素)。id は like / save / read など entity 内で一意。1 人 1 回のトグルで、件数と「自分が付けたか」を backend が持つ。"
+    },
     "Dashcam": {
       "type": "object",
       "additionalProperties": false,
@@ -3397,53 +3568,6 @@
       },
       "description": "ドライブレコーダー(ドラレコ)。背面カメラの映像を表示しながら録画し、直近 keepMinutes 分だけを 1 分ごとの区間で端末に残す(ループ録画・容量の上限つき)。加速度が impactG を超えたら前後の区間を「保存済み」にして消さない。autoStart の条件(横向き・ほぼ静止・充電中)が続いたら自動で録画を始める。保存済みの映像は部品の中の一覧から再生・写真に保存・共有できる。録画中は画面のスリープを止める。iOS の制約で画面を出している間だけ録画する(裏に回ると止まる)。「ドラレコ」「車載カメラ」「運転中に録画」「スマホスタンドに置いたら録画」「事故の時の映像を残す」の時に必ずこれを選ぶ(videoField で代替しない)。entity は不要(映像は記録に入れない)。",
       "x-usage": "ホーム画面(screen.entity なし)にこれ 1 つを大きく置く: A1:F10(最下 2 行の左 A-B はマイクの席なので空ける)。1 画面に 1 つだけ。「置いたら自動で」は autoStart [landscape, still]、「充電したら」は charging を足す。容量・残す時間・感度の話があれば maxStorageMB / keepMinutes / impactG。entity・フォーム画面・list は作らない(保存済みの一覧は部品の中にある)。"
-    },
-    "HealthStat": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "type",
-        "metric",
-        "label"
-      ],
-      "properties": {
-        "type": {
-          "const": "healthStat"
-        },
-        "id": {
-          "$ref": "#/$defs/Id"
-        },
-        "area": {
-          "$ref": "#/$defs/Area"
-        },
-        "metric": {
-          "type": "string",
-          "enum": [
-            "steps",
-            "weight"
-          ],
-          "description": "steps=歩数(iPhone の歩数計が自動で数えている値。記録不要)/ weight=体重(ヘルスケアの最新値 kg)。"
-        },
-        "period": {
-          "type": "string",
-          "enum": [
-            "today",
-            "week"
-          ],
-          "description": "today=今日の値(体重は最新値・既定)/ week=直近 7 日の棒グラフと 1 日平均(体重は 7 日の推移)。"
-        },
-        "label": {
-          "type": "string",
-          "description": "カードの見出し(例: 今日の歩数)。"
-        },
-        "target": {
-          "type": "number",
-          "exclusiveMinimum": 0,
-          "description": "steps の 1 日の目標(例 8000)。today は達成率のバー、week は目標線。"
-        }
-      },
-      "description": "端末のヘルスデータを表示するカード。歩数は iPhone が自動で数えている値(entity も記録も不要)、体重はヘルスケアの最新値。「毎日の歩数を見たい」「今日何歩歩いた」「1 週間の歩数」「ヘルスケアの体重を見たい」など、自分で入力しない健康データを見たい時に選ぶ。権限が無い時・シミュレータでは理由を表示する。",
-      "x-usage": "entity 不要でどの画面にも置ける。today は stat と同じ大きさ(半幅 2〜3 行・例 A1:C3)、week はグラフなので全幅 4〜5 行(例 A4:F8)。目標の話があれば target。手入力の体重記録アプリで「ヘルスケアにも保存」と言われたら、体重 field に health: \"weight\" を付ける(このカードとは別)。"
     }
   }
 }

@@ -25,9 +25,12 @@ public enum DSLExamples {
             "water",
             "walk_route",
             "health",
+            "chat",
             "shops",
             "timetable",
             "dinner",
+            "board",
+            "recipes",
             "dashcam",
         ]
         #if APP_STORE_REVIEW
