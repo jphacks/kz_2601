@@ -34,6 +34,7 @@ public enum DSLExamples {
             "drive",
             "dashcam",
             "sensors",
+            "ramen_timer",
         ]
         #if APP_STORE_REVIEW
         return all.filter { !reviewExcluded.contains($0) }

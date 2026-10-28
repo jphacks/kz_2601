@@ -1,0 +1,7 @@
+[
+  {"id": "la_ramen", "kind": "create", "group": "liveActivity", "transcript": "ラーメンタイマーをロック画面に出したい", "note": "#423 timerDisplay(countdown)+liveActivity。新しい entity・通知は作らない", "expect": {"has": ["timerDisplay"], "liveTimer": true, "substitution": false}},
+  {"id": "la_plank", "kind": "create", "group": "liveActivity", "transcript": "プランクを計るストップウォッチ", "note": "#423 頼まれていない時は liveActivity を付けない", "expect": {"has": ["timerDisplay"], "liveTimer": false}},
+  {"id": "la_plank_lock", "kind": "edit", "base": "la_plank", "group": "liveActivity", "transcript": "画面を消しても時間が見えるようにロック画面にも出して", "note": "#423 既存の timerDisplay に liveActivity を add / replace", "expect": {"patch": true, "liveTimer": true}},
+  {"id": "la_driving", "kind": "create", "group": "liveActivity", "transcript": "運転中ってロック画面と Dynamic Island に出して、着いたら消せるアプリ", "note": "#423 startActivity と endActivity のボタン", "expect": {"activityButtons": true}},
+  {"id": "la_queue", "kind": "create", "group": "liveActivity", "transcript": "ラーメン屋の行列に並んでる間、待ち時間の目安30分と今月食べた杯数をロック画面に出したい。食べた記録もつけたい", "note": "#423 startActivity{minutes:30, stat} + 杯数の stat に id", "expect": {"activityButtons": true, "has": ["stat"]}}
+]

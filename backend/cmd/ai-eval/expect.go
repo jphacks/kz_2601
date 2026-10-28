@@ -71,6 +71,9 @@ var expectKeys = map[string]expectKind{
 	"sensorSave":      expectBool,
 	"sensorThreshold": expectBool,
 	"sensorDecline":   expectBool,
+	// checkLiveActivity (#423)
+	"liveTimer":       expectBool,
+	"activityButtons": expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

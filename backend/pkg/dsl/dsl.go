@@ -194,6 +194,8 @@ const (
 	ActionScheduleNotif ActionType = "scheduleNotification"
 	ActionCancelNotif   ActionType = "cancelNotification"
 	ActionExport        ActionType = "export"
+	ActionStartActivity ActionType = "startActivity" // #423 Live Activity
+	ActionEndActivity   ActionType = "endActivity"
 )
 
 // Action is a non-nesting side effect triggered by buttons/list taps.
@@ -211,6 +213,7 @@ type Action struct {
 	Filter         *Filter       `json:"filter,omitempty"`         // export
 	Fields         []string      `json:"fields,omitempty"`         // export: columns (default all but photo/video)
 	Title          string        `json:"title,omitempty"`          // export: file name / PDF heading
+	Activity       *Activity     `json:"activity,omitempty"`       // startActivity (#423)
 }
 
 // ComponentType discriminates Component.
@@ -372,6 +375,7 @@ type Component struct {
 	Mode          string  `json:"mode,omitempty"`          // timerDisplay: stopwatch|countdown / routeGuide: automobile|walking
 	Address       string  `json:"address,omitempty"`       // routeGuide: fixed destination (address / place name)
 	Seconds       int     `json:"seconds,omitempty"`       // timerDisplay countdown start / locationTracker auto stop
+	LiveActivity  bool    `json:"liveActivity,omitempty"`  // timerDisplay: mirror to the lock screen / Dynamic Island (#423)
 	ShareTo       string  `json:"shareTo,omitempty"`       // shareButton: any|line|slack|discord (`target` is progressBar's number)
 	// input batch (slider / stepper / rating / textEditor). Pointers so that
 	// an explicit 0 round-trips through omitempty. Min/Max are shared with gauge.

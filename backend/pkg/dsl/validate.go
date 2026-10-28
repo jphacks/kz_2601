@@ -342,7 +342,9 @@ func (a *App) Validate() error {
 			}
 		case ActionExport:
 			checkExportAction(where, act, entities, add)
-		case ActionBack, ActionOpenVoice, ActionResetForm:
+		case ActionStartActivity:
+			checkActivity(where, act.Activity, a, add) // #423: live_activity.go
+		case ActionBack, ActionOpenVoice, ActionResetForm, ActionEndActivity:
 		default:
 			add("%s: unknown action type %q", where, act.Type)
 		}

@@ -89,6 +89,10 @@ struct TimerDisplayLeaf: View {
     private func persist() {
         TimerRunStore.shared.save(run, for: storeKey)
         notify(isForeground: scenePhase == .active)
+        if c.liveActivity == true {
+            rt.timerActivity(TimerActivityUpdate(key: storeKey, label: c.label.flatMap { $0.isEmpty ? nil : $0 } ?? L("タイマー"),
+                                                 total: isCountdown ? total : nil, run: run))
+        }
     }
 
     private func notify(isForeground: Bool) {

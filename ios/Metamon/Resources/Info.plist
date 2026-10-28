@@ -85,6 +85,10 @@
 	<key>MetamonWhisperModel</key>
 	<string></string>
 
+	<!-- ライブアクティビティ(#423・ActivityKit)。端末内の更新だけなので push の設定・バックグラウンドモードは要らない -->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+
 	<!-- バックグラウンド(#38): 裏の定期同期(BGAppRefreshTask)。識別子は AppRuntime+Background.swift の BackgroundRefresh.identifier と一致させる。
 	     fetch は Info.plist だけで有効になり、App ID 側の capability 操作は不要 -->
 	<key>UIBackgroundModes</key>
