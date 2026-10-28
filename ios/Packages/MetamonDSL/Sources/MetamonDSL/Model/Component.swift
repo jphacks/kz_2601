@@ -159,6 +159,8 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var columnValues: [String]? // 列見出しの明示(nil = enum の options)
     public var rowValues: [String]?    // enum / string の行見出しの明示
     public var rowRange: GridRange?    // integer の行範囲(nil = 1…6)
+    // photoField(#418): 写真から読み取って他の field に入れる。壊れた項目だけ落とす
+    public var analyze: [PhotoAnalyze] = []
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
@@ -174,6 +176,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case tone
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
+        case analyze
     }
 
     public init(from decoder: Decoder) throws {
@@ -256,6 +259,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         columnValues = try? c.decodeIfPresent([String].self, forKey: .columnValues)
         rowValues = try? c.decodeIfPresent([String].self, forKey: .rowValues)
         rowRange = try? c.decodeIfPresent(GridRange.self, forKey: .rowRange)
+        analyze = ((try? c.decodeIfPresent(Lossy<PhotoAnalyze>.self, forKey: .analyze))?.wrappedValue ?? []).filter { $0.kind != .unknown }
     }
 }
 
