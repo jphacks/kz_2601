@@ -24,9 +24,10 @@ done
 "$PB" -c "Set :NSCameraUsageDescription 生成したアプリで QR コードを読み取るために、カメラを使用します。" "$PLIST"
 "$PB" -c "Set :NSMicrophoneUsageDescription 話しかけた内容からアプリを生成するために、マイクを使用します。" "$PLIST"
 "$PB" -c "Set :NSLocationWhenInUseUsageDescription 生成したアプリで、ボタンを押した時の現在地を記録・地図に表示したり、案内を開始した時に目的地まで道案内したりするために使います。" "$PLIST"
+"$PB" -c "Set :NSPhotoLibraryAddUsageDescription 生成したアプリの共有ボタンから画像を写真に保存するために、写真ライブラリへの追加を使用します。" "$PLIST"
 
 # 外した部品を使う同梱の例(docs/dsl/examples)もバンドルから外す(DSLExamples.reviewExcluded と一致させる)
-for name in attendance_nearby walk_route health; do
+for name in attendance_nearby walk_route health dashcam; do
   rm -f "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/${name}.json"
 done
 echo "strip-review-plist: removed review-excluded keys from ${PLIST}"

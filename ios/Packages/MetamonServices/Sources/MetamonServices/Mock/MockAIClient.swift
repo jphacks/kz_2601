@@ -15,6 +15,7 @@ public struct MockAIClient: AIClient {
         if transcript.contains("時間割") || transcript.contains("時限") { return "timetable" }
         if transcript.contains("ナビ") || transcript.contains("道案内") || transcript.contains("ドライブ") { return "drive" }
         if transcript.contains("ランダム") || transcript.contains("くじ") || transcript.contains("晩ごはん") { return "dinner" }
+        if transcript.contains("ドラレコ") || transcript.contains("車載"), DSLExamples.names.contains("dashcam") { return "dashcam" } // #410(審査用の版には無い)
         if transcript.contains("最初") || transcript.contains("戻") { return "initial" }
         return "kakeibo"
     }

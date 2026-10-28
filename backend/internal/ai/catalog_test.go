@@ -75,6 +75,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompLocationTracker,
 		// chat (#260)
 		dsl.CompChatThread,
+		// dashcam (#410)
+		dsl.CompDashcam,
 		// device health
 		dsl.CompHealthStat,
 		// timetable

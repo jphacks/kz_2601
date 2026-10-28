@@ -115,6 +115,8 @@ public struct ComponentRegistry: Sendable {
         // leaf(チャット・#260)
         r.register(.chatThread) { c, ctx in ChatThreadLeaf(c: c, ctx: ctx) }
         r.register(.healthStat) { c, _ in HealthStatLeaf(c: c) }
+        // leaf(ドラレコ・#410)
+        r.register(.dashcam) { c, ctx in DashcamLeaf(c: c, ctx: ctx) }
         #endif
         return r
     }()

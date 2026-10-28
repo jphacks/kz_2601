@@ -679,6 +679,9 @@
         },
         {
           "$ref": "#/$defs/HealthStat"
+        },
+        {
+          "$ref": "#/$defs/Dashcam"
         }
       ]
     },
@@ -3560,6 +3563,66 @@
         }
       },
       "description": "entity の印 1 つ(marks の要素)。id は like / save / read など entity 内で一意。1 人 1 回のトグルで、件数と「自分が付けたか」を backend が持つ。"
+    },
+    "Dashcam": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "dashcam"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "カードの見出し(任意・例: ドラレコ)。"
+        },
+        "keepMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "description": "ループ録画で端末に残す直近の分数(既定 10・1〜60)。これより古い区間(1 区間 = 1 分)は自動で消す。衝撃で保存した区間は消さない。"
+        },
+        "maxStorageMB": {
+          "type": "integer",
+          "minimum": 200,
+          "maximum": 20000,
+          "description": "録画が使う容量の上限 MB(既定 2000 = 約 2GB・200〜20000)。超えたら古いループ区間から消す。保存済みだけで上限に達したら録画を止めて知らせる。"
+        },
+        "impactG": {
+          "type": "number",
+          "minimum": 1.2,
+          "maximum": 8,
+          "description": "衝撃とみなす加速度(重力を除いた G・既定 2.5・1.2〜8)。小さいほど敏感。超えたら前後の区間(直前 1 分〜直後 30 秒)を保存済みにする。"
+        },
+        "autoStart": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "landscape",
+              "still",
+              "charging"
+            ]
+          },
+          "description": "自動で録画を始める条件(全部が 5 秒続いたら開始)。landscape = 横向き / still = ほぼ静止(スタンドに置いた)/ charging = 充電中。「スタンドに置いたら自動で」なら [landscape, still]、「充電したら」なら charging も足す。省略 = 録画ボタンを押した時だけ。"
+        },
+        "audio": {
+          "type": "boolean",
+          "description": "マイクで車内の音声も録る(既定 false = 映像だけ)。「音も録りたい」と言われた時だけ true。"
+        }
+      },
+      "description": "ドライブレコーダー(ドラレコ)。背面カメラの映像を表示しながら録画し、直近 keepMinutes 分だけを 1 分ごとの区間で端末に残す(ループ録画・容量の上限つき)。加速度が impactG を超えたら前後の区間を「保存済み」にして消さない。autoStart の条件(横向き・ほぼ静止・充電中)が続いたら自動で録画を始める。保存済みの映像は部品の中の一覧から再生・写真に保存・共有できる。録画中は画面のスリープを止める。iOS の制約で画面を出している間だけ録画する(裏に回ると止まる)。「ドラレコ」「車載カメラ」「運転中に録画」「スマホスタンドに置いたら録画」「事故の時の映像を残す」の時に必ずこれを選ぶ(videoField で代替しない)。entity は不要(映像は記録に入れない)。",
+      "x-usage": "ホーム画面(screen.entity なし)にこれ 1 つを大きく置く: A1:F10(最下 2 行の左 A-B はマイクの席なので空ける)。1 画面に 1 つだけ。「置いたら自動で」は autoStart [landscape, still]、「充電したら」は charging を足す。容量・残す時間・感度の話があれば maxStorageMB / keepMinutes / impactG。entity・フォーム画面・list は作らない(保存済みの一覧は部品の中にある)。"
     }
   }
 }

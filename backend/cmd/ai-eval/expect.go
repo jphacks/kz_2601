@@ -62,6 +62,8 @@ var expectKeys = map[string]expectKind{
 	// checkRoute (#411)
 	"routeDest": expectString,
 	"routeMode": expectString,
+	// checkDashcam (#410)
+	"dashcamAuto": expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

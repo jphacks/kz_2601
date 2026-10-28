@@ -56,6 +56,7 @@ var dslTerms = []dslTerm{
 	{"locationPicker", "場所の検索", "place search"},
 	{"locationTracker", "道のりの記録", "route tracker"},
 	{"routeGuide", "道案内", "turn-by-turn guide"},
+	{"dashcam", "ドラレコ", ""},
 	{"healthStat", "ヘルスケアの数字", "Health data card"},
 	{"hstack", "横並び", "row"},
 	{"vstack", "縦並び", "column"},
