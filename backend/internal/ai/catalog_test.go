@@ -81,6 +81,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompGridTable,
 		// video (#206)
 		dsl.CompVideoField, dsl.CompVideoPlayer,
+		// audio (#420)
+		dsl.CompAudioRecorder,
 	} {
 		goTypes[string(ct)] = true
 	}

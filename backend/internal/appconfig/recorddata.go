@@ -343,6 +343,15 @@ func normalizeValue(f *dsl.Field, v any) (any, error) {
 			return nil, err
 		}
 		return s, nil
+	case dsl.FieldAudio:
+		s, ok := asString(v)
+		if !ok {
+			return nil, fmt.Errorf("must be an audio value string")
+		}
+		if err := checkAudioValue(s); err != nil {
+			return nil, err
+		}
+		return s, nil
 	case dsl.FieldLocation:
 		s, ok := asString(v)
 		if !ok {

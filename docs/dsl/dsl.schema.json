@@ -206,11 +206,12 @@
             "currency",
             "photo",
             "video",
+            "audio",
             "location",
             "ref",
             "refs"
           ],
-          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField. refs = array of record ids of `refEntity` (multi-select, e.g. expense.split_with -> members: who shares this expense); [] or missing = everyone; filter it with op contains, count it with op len."
+          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). audio = voice recording kept on the recording device: \"audio:<id>|<seconds>\" (AAC m4a written by audioRecorder; other devices show only the length). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField. refs = array of record ids of `refEntity` (multi-select, e.g. expense.split_with -> members: who shares this expense); [] or missing = everyone; filter it with op contains, count it with op len."
         },
         "required": {
           "type": "boolean"
@@ -550,6 +551,9 @@
         },
         {
           "$ref": "#/$defs/VideoPlayer"
+        },
+        {
+          "$ref": "#/$defs/AudioRecorder"
         },
         {
           "$ref": "#/$defs/List"
@@ -1531,6 +1535,40 @@
             "medium",
             "large"
           ]
+        }
+      }
+    },
+    "AudioRecorder": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "マイクで音声を録音して audio field に保存する入力(ボイスメモ・会議や授業の録音)。録音・停止・再生・録り直し・削除ができ、録音中は経過時間と音量のメーターを出す。イヤホン(AirPods など)のボタンでも録音の開始・停止ができる。音声は端末内に保存し、レコードにはファイル名と長さ(秒)だけを入れる。",
+      "x-usage": "「録音する・声で残す・ボイスメモ・会議を録音」に。フォーム画面(screen.entity)に置き、field は type audio。メモ(textEditor)やタイトル・日付と同じフォームに並べる。一覧の行で再生するなら list.item.trailing にその audio field(行に再生ボタンと長さが出る)。文字起こしはしない(声でアプリを作り変える voiceInput とは別物)。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "audioRecorder"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Must be an audio field of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "maxDuration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7200,
+          "description": "Recording limit in seconds (default 600 = 10 minutes, up to 7200)."
         }
       }
     },
