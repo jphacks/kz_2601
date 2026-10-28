@@ -2398,6 +2398,142 @@
         }
       }
     },
+    "AI で読み取っています…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading with AI…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI で読み取っています…"
+          }
+        }
+      }
+    },
+    "もう一度読み取る": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read again"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "もう一度読み取る"
+          }
+        }
+      }
+    },
+    "端末内の AI で写真を読み取り、入力欄に入れます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reads the photo with on-device AI and fills in the fields"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "端末内の AI で写真を読み取り、入力欄に入れます"
+          }
+        }
+      }
+    },
+    "端末内の AI が読み取りました。確認して保存してください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read by on-device AI. Check the values and save."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "端末内の AI が読み取りました。確認して保存してください"
+          }
+        }
+      }
+    },
+    "読み取れなかった項目: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't read: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "読み取れなかった項目: %@"
+          }
+        }
+      }
+    },
+    "この写真は読み取れません": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This photo can't be read"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この写真は読み取れません"
+          }
+        }
+      }
+    },
+    "写っているもの: ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the photo: "
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "写っているもの: "
+          }
+        }
+      }
+    },
+    "関節の位置を重ねた写真": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo with the detected joints"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "関節の位置を重ねた写真"
+          }
+        }
+      }
+    },
     "しきい値を超えました": {
       "extractionState": "manual",
       "localizations": {
@@ -2547,23 +2683,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 件を記録して止めました(上限)"
-          }
-        }
-      }
-    },
-    "保存できませんでした": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn't save"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "保存できませんでした"
           }
         }
       }
@@ -3108,57 +3227,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "保存した映像"
-          }
-        }
-      }
-    },
-    "写真に保存": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Save to Photos"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "写真に保存"
-          }
-        }
-      }
-    },
-    "共有": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Share"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "共有"
-          }
-        }
-      }
-    },
-    "写真に保存しました": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Saved to Photos"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "写真に保存しました"
           }
         }
       }

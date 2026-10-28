@@ -76,6 +76,8 @@ var expectKeys = map[string]expectKind{
 	"activityButtons": expectBool,
 	// checkQR (#422)
 	"qrSource": expectString,
+	// checkPhotoAI (#418)
+	"photoAnalyze": expectStrings,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

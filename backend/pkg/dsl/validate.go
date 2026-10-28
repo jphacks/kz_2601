@@ -425,6 +425,9 @@ func (a *App) Validate() error {
 				} else if (c.Type == CompVideoField || c.Type == CompVideoPlayer) && f.Type != FieldVideo {
 					add("%s: %s field %q must be type video", where, c.Type, c.Field)
 				}
+				if c.Type == CompPhotoField {
+					checkPhotoAnalyze(where, c, formEntity, add)
+				}
 				if c.Type == CompVideoField && (c.MaxDuration < 0 || c.MaxDuration > 600) {
 					add("%s: videoField maxDuration must be 1..600 seconds", where)
 				}

@@ -174,6 +174,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 権限 | `AVCaptureDevice.authorizationStatus(.video)`。未決定なら要求、拒否/制限なら alert「カメラを使えません」→「設定を開く」(`UIApplication.openSettingsURLString`)/「写真から選ぶ」 |
 | エンコード | `PhotoCodec.dataURL(from: UIImage)`:**ピクセル基準で長辺 ≤800px**・renderer scale=1 固定(既定の画面倍率だと 800pt=2400px になる)・JPEG q0.5 → `data:image/jpeg;base64,...` を `FormDraft.values[field]` へ(保存経路は他の入力と同じ `entity.create/update`) |
 | 表示 | 値があれば `PhotoView` サムネイル(160pt)+「撮り直す」「削除」、無ければ `label` のボタン 1 つ |
+| 読み取り(`analyze`・#418) | 撮った・選んだ直後に `PhotoReader`(`Support/PhotoVision.swift`)が Vision で必要な分だけ実行: 文字 `VNRecognizeTextRequest`(ja-JP / en-US・同じ高さの断片を 1 行にまとめる `OCRPiece.lines`)、分類ラベル `VNClassifyImageRequest`、骨格 `VNDetectHumanBodyPoseRequest`。金額・日付・関節の角度・分類のフォールバックは MetamonDSL の純関数(`ReceiptParser` / `PoseAngle` / `PhotoClassifier`)。classify / describe は Apple Intelligence が使える端末なら `OnDeviceAI`(Foundation Models)にラベル + 文字を渡す。読めた項目だけ `FormDraft.values[into]` に入れ、写真の下に「もう一度読み取る」と結果(読めなかった項目名)を出す。jointAngle があればプレビューを `PosePhotoView`(縦横比を保って収め、関節の点と線を Canvas で重ねる)に替え、編集で開いた既存の写真にも骨格だけ重ねる。外部ライブラリ・ネットワークは使わない |
 
 画像は **base64 JPEG 文字列として photo フィールドに置き、entity.create の data に含めて送る**(縮小後 ≈ 数十〜100KB で Firestore ドキュメント 1MB 制限内)。Cloud Storage 経由(URL 化)は P1 以降。
 全 usage description は `ios/Metamon/Resources/Info.plist` に記入済み。

@@ -209,6 +209,7 @@ var chatLimits = []chatLimit{
 	{"車線の案内・渋滞の回避・電車やバスの乗り換え", "車・徒歩の道案内"}, // #411: turn-by-turn itself is routeGuide
 	{"1 つの項目で選択肢を複数選ぶ入力", "選択肢ごとのオンオフ"},
 	{"フォントのポイント数・好きなフォント・アニメーション・部品の重ね合わせ", "文字の 4 段の大きさと枠の大きさ"},
+	{"カメラの映像を見ながらのリアルタイムの回数カウント・フォーム判定", "写真 1 枚ごとに関節の角度を測る"}, // #418
 }
 
 // chatLimitsText renders chatLimits as one prompt bullet.

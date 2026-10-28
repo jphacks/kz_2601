@@ -434,6 +434,17 @@ type Component struct {
 	// Seconds (log interval) / Limit (log count) are shared.
 	Sensor    string           `json:"sensor,omitempty"`
 	Threshold *SensorThreshold `json:"threshold,omitempty"`
+	// photoField (#418): on-device reading of the picked photo into other fields.
+	Analyze []PhotoAnalyze `json:"analyze,omitempty"`
+}
+
+// PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the
+// form field it goes into (Into).
+type PhotoAnalyze struct {
+	Kind    string   `json:"kind"` // text|amount|date|classify|describe|jointAngle
+	Into    string   `json:"into"`
+	Options []string `json:"options,omitempty"` // classify candidates (else the enum into's options)
+	Joint   string   `json:"joint,omitempty"`   // jointAngle: knee|elbow|hip|shoulder (+ left/right)
 }
 
 // GridRange is an inclusive integer range of gridTable rows.

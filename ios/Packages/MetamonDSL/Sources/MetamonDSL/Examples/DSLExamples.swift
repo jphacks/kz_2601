@@ -35,6 +35,8 @@ public enum DSLExamples {
             "dashcam",
             "sensors",
             "ramen_timer",
+            "receipt_ai",
+            "form_check",
         ]
         #if APP_STORE_REVIEW
         return all.filter { !reviewExcluded.contains($0) }

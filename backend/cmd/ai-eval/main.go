@@ -28,6 +28,7 @@
 // Parent -> child (#256): prefillRef (bool: some navigate opens a child form with prefillRef).
 // Add button (#416): oneAdd (bool: no toolbar ＋ opens the same form as a button on its screen).
 // Share (#254): scopeNot (no entity has that scope), summaryHas ([text, ...]: each is in the summary).
+// Photo reading (#418): photoAnalyze ([kind, ...]: some photoField.analyze has each kind; photo_ai.go).
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
 // otherwise the locale is detected from the transcript. tips_cases.json (#415)
 // runs the iOS 頼み方のコツ examples in ja and en; a base outside
@@ -390,6 +391,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkDashcam(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkExport(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkSensor(c.Expect, app, rec.Summary)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkPhotoAI(c.Expect, app)...)
 		if v, ok := c.Expect["noOmission"].(bool); ok && v && len(rec.Omissions) > 0 {
 			rec.ExpectMisses = append(rec.ExpectMisses, fmt.Sprintf("omissions=%v", rec.Omissions))
 		}

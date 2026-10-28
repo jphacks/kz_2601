@@ -183,6 +183,8 @@ public struct Component: Decodable, Identifiable, Sendable {
     // sensorValue(#419)
     public var sensor: String?         // tilt|pitch|roll|acceleration|rotation|pressure|altitude
     public var threshold: SensorThreshold?
+    // photoField(#418): 写真から読み取って他の field に入れる。壊れた項目だけ落とす
+    public var analyze: [PhotoAnalyze] = []
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
@@ -200,7 +202,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
         case textField, photoField
-        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold
+        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze
     }
 
     public init(from decoder: Decoder) throws {
@@ -294,6 +296,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         audio = try? c.decodeIfPresent(Bool.self, forKey: .audio)
         sensor = try? c.decodeIfPresent(String.self, forKey: .sensor)
         threshold = try? c.decodeIfPresent(SensorThreshold.self, forKey: .threshold)
+        analyze = ((try? c.decodeIfPresent(Lossy<PhotoAnalyze>.self, forKey: .analyze))?.wrappedValue ?? []).filter { $0.kind != .unknown }
     }
 }
 
