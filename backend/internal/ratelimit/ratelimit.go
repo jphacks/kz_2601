@@ -51,12 +51,13 @@ type Weights struct {
 	Create int // POST /v1/generate, new app (mode create/auto)
 	Edit   int // POST /v1/generate, mode edit
 	Chat   int // POST /v1/chat, one turn
+	Text   int // POST /v1/text, one aiButton generate (#417)
 }
 
 // DefaultLimits / DefaultWeights: see docs/backend/rate-limit.md for the reasoning.
 var (
 	DefaultLimits  = Limits{Anonymous: 30, SignedIn: 60, Pro: 300, PerIP: 300, Global: 2000}
-	DefaultWeights = Weights{Create: 3, Edit: 2, Chat: 1}
+	DefaultWeights = Weights{Create: 3, Edit: 2, Chat: 1, Text: 1}
 )
 
 // JST is the day boundary (00:00 Asia/Tokyo). A fixed zone avoids needing

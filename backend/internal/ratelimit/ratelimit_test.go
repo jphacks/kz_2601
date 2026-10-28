@@ -173,12 +173,12 @@ func TestStoreFailureFallsBackToMemory(t *testing.T) {
 }
 
 func TestConfigFromEnv(t *testing.T) {
-	env := map[string]string{"RATE_LIMIT_ANON_DAILY": "7", "RATE_LIMIT_GLOBAL_DAILY": "0", "APP_ENV": "stg"}
+	env := map[string]string{"RATE_LIMIT_ANON_DAILY": "7", "RATE_LIMIT_GLOBAL_DAILY": "0", "RATE_LIMIT_WEIGHT_TEXT": "2", "APP_ENV": "stg"}
 	cfg, err := ConfigFromEnv(func(k string) string { return env[k] })
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Limits.Anonymous != 7 || cfg.Limits.Global != 0 || cfg.Limits.SignedIn != DefaultLimits.SignedIn || cfg.Env != "stg" {
+	if cfg.Limits.Anonymous != 7 || cfg.Limits.Global != 0 || cfg.Limits.SignedIn != DefaultLimits.SignedIn || cfg.Weights.Text != 2 || cfg.Env != "stg" {
 		t.Fatalf("cfg: %+v", cfg)
 	}
 	env["RATE_LIMIT_USER_DAILY"] = "lots"
@@ -281,6 +281,7 @@ func TestWeights(t *testing.T) {
 		{"POST", "/v1/generate", `{"mode":"edit"}`, 2},
 		{"POST", "/v1/generate", `{"mode":"undo"}`, 0},
 		{"POST", "/v1/chat", `{}`, 1},
+		{"POST", "/v1/text", `{"shape":"list"}`, 1},
 		{"DELETE", "/v1/chat/x", ``, -1},
 		{"GET", "/health", ``, -1},
 	}
@@ -302,5 +303,22 @@ func TestClientIPUsesLastForwardedHop(t *testing.T) {
 	r.RemoteAddr = "198.51.100.2:5555"
 	if got := ClientIP(r); got != "198.51.100.2" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+// #417: /v1/text needs a token and is charged like a chat turn.
+func TestMiddlewareText(t *testing.T) {
+	l, _ := newTestLimiter(Limits{SignedIn: 2})
+	h := l.Middleware(auth.DevVerifier{})(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	if w := serve(t, h, "POST", "/v1/text", "", `{}`); w.Code != http.StatusUnauthorized {
+		t.Fatalf("no token: %d", w.Code)
+	}
+	for i := 0; i < 2; i++ {
+		if w := serve(t, h, "POST", "/v1/text", "u1", `{}`); w.Code != 200 {
+			t.Fatalf("call %d: %d", i, w.Code)
+		}
+	}
+	if w := serve(t, h, "POST", "/v1/text", "u1", `{}`); w.Code != http.StatusTooManyRequests {
+		t.Fatalf("third: %d", w.Code)
 	}
 }
