@@ -82,6 +82,7 @@ type Entity struct {
 	TitleField string      `json:"titleField,omitempty"`
 	Scope      EntityScope `json:"scope,omitempty"` // "" = private
 	Edit       EntityEdit  `json:"edit,omitempty"`  // "" = author (shared/public only)
+	Marks      []Mark      `json:"marks,omitempty"` // per-user toggles: like / save (#255, shared/public only)
 	Fields     []Field     `json:"fields"`
 }
 
@@ -285,6 +286,8 @@ const (
 	CompNearbyShare ComponentType = "nearbyShare" // MultipeerConnectivity: send records to a nearby device
 	// location tracking (#168): start/stop recording points while the user opts in
 	CompLocationTracker ComponentType = "locationTracker"
+	// chat (#260): bubbles oldest-first + a pinned input bar that saves a record
+	CompChatThread ComponentType = "chatThread"
 	// device health (#167)
 	CompHealthStat ComponentType = "healthStat" // CoreMotion steps / HealthKit weight (no entity)
 )
@@ -406,6 +409,10 @@ type Component struct {
 	ColumnValues []string   `json:"columnValues,omitempty"` // explicit column headers (else enum options)
 	RowValues    []string   `json:"rowValues,omitempty"`    // explicit row headers for enum/string rowField
 	RowRange     *GridRange `json:"rowRange,omitempty"`     // integer rowField range (default 1..6)
+
+	// chatThread (#260). Entity / Placeholder / EmptyText are shared.
+	TextField  string `json:"textField,omitempty"`  // message body (string/text field)
+	PhotoField string `json:"photoField,omitempty"` // optional photo field
 }
 
 // GridRange is an inclusive integer range of gridTable rows.
@@ -439,6 +446,7 @@ type ListItem struct {
 	Trailing string `json:"trailing,omitempty"`
 	Icon     string `json:"icon,omitempty"`
 	Image    string `json:"image,omitempty"`  // photo field id -> thumbnail
+	Mark     string `json:"mark,omitempty"`   // entity mark id -> like/save toggle with count (#255)
 	Toggle   string `json:"toggle,omitempty"` // boolean field id -> one-tap check circle (#108)
 	Resets   string `json:"resets,omitempty"` // "daily": toggle is a date field, checked = today (#132)
 }

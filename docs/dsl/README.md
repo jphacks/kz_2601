@@ -51,6 +51,8 @@
 AppDSL { schemaVersion:1, app:AppMeta, initialScreen, entities[], screens[] }
 AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: fullscreen|floating|none, notifications[]?, tabs[]?: {screen,title,icon?} }
 Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|members, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit?, refEntity?, computed?: Expr, health?: "weight" } }
+  予約値(field id の代わり): $author(共有 entity の投稿者)・$createdAt(作成日時)— §3.5
+  Entity.marks?: [{ id, icon, label }](共有 entity の 1 人 1 回の印・いいね / 保存)・ListItem.mark? / 予約値 $marks.<id>(件数・自分が付けたか)— §3.5
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
 Leaf (44 種・全て id? と area? を持つ) / Action (10 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
@@ -129,6 +131,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `nearbyShare` | `label`, `entity` | | | P2 |
 | `locationTracker` | `entity`, `locationField`(location) | `dateField`(datetime), `label`, `seconds`(自動停止・既定 3600) | | P3 |
 | `healthStat` | `metric`(steps\|weight), `label` | `period`(today\|week・既定 today), `target`(steps の 1 日の目標) | | P2 |
+| `chatThread` | `entity`, `textField`(string/text) | `photoField`(photo), `placeholder`, `emptyText` | | #260 |
 
 `color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
@@ -171,6 +174,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 - **`healthStat` / `Field.health`(#167)**: 端末のヘルスデータ。`healthStat` は **entity を持たない表示カード**で、歩数は iPhone の歩数計(CoreMotion・直近 7 日・capability 不要)、歩数計の無い端末(シミュレータ)はヘルスケアの歩数、体重はヘルスケアの最新値を読む。today は数値(steps は `target` で達成率バー)、week は 7 日のグラフ(steps は棒 + 目標線・weight は折れ線)。許可が無い・使えない端末は「ヘルスケアへのアクセスが許可されていません」等を表示。書き込みは部品ではなく **`Field.health: "weight"`**(number・unit kg): フォームで**新規**保存した時にヘルスケアの体重にも 1 件書く(編集保存では書かない・失敗してもレコードは保存済みでトーストだけ)。入力部品や `saveRecord` を増やさず「どの値をヘルスケアに出すか」をデータ側に 1 キーで持つため。実例: `examples/health.json`。設計は `docs/ios/architecture.md` §15.1。
 - `aiButton`(#78)は **オンデバイス完結の AI 部品**(Apple Intelligence / Foundation Models・iOS 26+)。データは端末外に出ず、クラウド API も課金も無い。結果は output field のドラフトに入るだけで保存はユーザー。非対応端末・Apple Intelligence OFF・モデル準備中は「この端末では AI を使えません」と理由付きで無効化。`Action` の `runAI` 案ではなく Leaf にしたのは、(1) 生成 AI が 1 部品で書き切れる(button + action の 2 段より短く、入力・出力 field を同じ場所で検証できる)、(2) 実行中スピナー・不可時の無効表示が部品の見た目に属する、(3) `ActionType` を増やすとホストの網羅 switch 改修が要る、の 3 点。実例: `examples/diary_ai.json`(本文 → 要約・気分の分類)。
 - **`table.groupBy`(#261)**: 同じ値のレコードを 1 行にまとめる集計表(「店ごとの平均点・件数でランキング」)。列は groupBy の field の列(グループ名・aggregate なし)+ `aggregate`(count / sum / avg / min / max)付きの列だけ。groupBy にできるのは string / enum / ref / boolean / integer / date。`sort.field` は集計列の field(同じ field の集計列が複数なら先頭)、集計列に無ければ groupBy の field = グループ名順。sort 省略 = 最初の集計列の降順、`limit` は上位 N グループ。値が空のレコードはどの行にも入れない。avg / min / max は数値が無ければ「—」、avg は小数 1 桁。iOS は `TableGrouping`(MetamonDSL)でクライアント集計(chart.groupBy と同じ)。新しい部品・Expr ではなく table の拡張にしたのは、(1) 表の見出し・行の描画をそのまま使える、(2) chart / stat と同じ aggregate 語彙で AI が書ける、(3) 古い iOS は `groupBy` と列の `aggregate` を無視して従来のレコード表として描く(落ちない・未知 type のプレースホルダにもならない)ため。マスタ entity の computed `agg` + table(人ごとの合計)も引き続き使える。実例: `examples/ranking.json`。
+- **`chatThread`(#260)**: LINE のようなチャット。`entity` のレコードを 1 通 = 1 件の吹き出しで**古い順に上から下へ**積み(最新が一番下・開いた時も新着が来た時も一番下へスクロール)、**自分の分は右**(ブランド色)・**相手の分は左**(上に送信者名 = `$author`。同じ人が続けて送った 2 通目以降は省く)、下に送った時刻(`$createdAt`)。自分の判定は `Record.author` とサインイン中の uid の比較(#249 / #251 と同じ。author の無い未送信の自分の分と private の entity は全部自分)。**入力欄は部品の下端に固定**(複数行は 4 行まで伸びる・`photoField` があれば写真ボタン)で、送信 = `entity` に 1 件保存(ローカル DB に即反映して同期キューが送る・フォーム画面は作らない)。共有アプリへの初めての送信はフォームの保存と同じく表示名を聞く(#250)。他の人のメッセージは既存の records の購読(SSE `GET /events` → 再取得)で数秒以内に届く。器の中で自前でスクロールするので `GridScreenLayout.scrollsInside` には入れず、マイク FAB が入力欄の左に重なる時だけその分を空ける(`ChatInputInset`)。backend: `textField` は保存する string/text、`photoField` は photo、他の required field は defaultValue 必須(`Validate`)/ フォームが無くても「add form が無い」と言わない・`list` 扱い(`Lint`)/ private の entity は「誰にも見えない」警告。`list` の表示形式(例 `list.style:"chat"`)にしなかったのは、(1) 入力欄を持つ = 一覧 + フォームの 2 役で list の意味(表示だけ・追加はフォーム)を変えてしまう、(2) 下から積む・左右に振る・送信者名をまとめるは list の行テンプレ(title/subtitle/trailing)と共有できる部分が無い、(3) 部品が 1 つなら AI が「チャット = chatThread」と 1 語で選べ、iOS も 1 部品 = 1 ファイルで閉じる、の 3 点。iOS が知らない古いビルドでは未知の部品としてプレースホルダ(RELEASE は何も描かない)になり落ちない。実例: `examples/chat.json`。
 
 ### 3.3 フィールド型と値(appconfig `RecordData` と一致)
 
@@ -227,7 +231,37 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 - public entity を 1 つでも含むアプリは、作成者の `PUT/PATCH /dsl`(と `POST /apps`・restore)で **`apps_public/{appId}` に DSL が複製**される。他ユーザーが同じ appId で `GET /v1/apps/{appId}/dsl` を開くと、自分の `users/{uid}/apps/{appId}` が無ければその DSL が**インストール**(自分の下に複製・version 1)される。以後の編集は各自のコピーに対して行われ、公開 DSL を上書きできるのは最初に公開したユーザーだけ。
 - **`entity.edit`(#252)**: public/shared のレコードを誰が更新できるか。`author`(省略時)は投稿者本人だけ、`members` は同じ appId を開いた全員が PATCH できる。削除はどちらでも投稿者本人だけ。private では意味を持たない(書いても無視)。家事分担の完了・共有の買い物リスト・出欠・落とし物の解決・シフトの確定のように「みんなで 1 つのレコードを更新する」用途で使う。参加者を招待制で絞るのは D-06 で別途。
 - iOS(#249): `Record.author` と自分の uid を比べ、変更できないレコードでは一覧のチェックを薄く表示して押すと理由を出し、長押し削除を出さず、フォームの保存ボタンを「このデータは作った人だけが変更できます」に置き換える。サーバーが 403 を返した時も同じ文言を出し、送信待ちに残さずサーバーの内容に戻す。
-- 作り方: AI が「みんなで」「共有」「投稿」「ランキング」「掲示板」を聞いたら `scope:"public"`、個人の記録なら省略。iOS 側の投稿者名の表示・authorName の送信は別 Issue。iOS のデコーダは未知キーを無視するので、未対応ビルドでも落ちない。
+- 作り方: AI が「みんなで」「共有」「投稿」「ランキング」「掲示板」を聞いたら `scope:"public"`、個人の記録なら省略。iOS のデコーダは未知キーを無視するので、未対応ビルドでも落ちない。
+
+#### レコードの予約値 `$author` / `$createdAt`(#250 #251)
+
+field id の代わりに書ける、どのレコードにもある値。`$` 始まりなので field id(`^[a-z]…`)とぶつからない。正典は `dsl.schema.json` の `$defs/Entity` `x-recordValues`(AI カタログはそこから生成・Go の `dsl.RecordValues` とテストで突き合わせる)。実例: `examples/board.json`(落とし物掲示板)。
+
+| 値 | 中身 | 書ける場所 | 使える entity |
+|---|---|---|---|
+| `$author` | 投稿者の表示名(`authorName`)。絞り込みでは投稿者の uid(`author`)と比べる | `list.item` の title / subtitle / trailing・`table.columns[].field`・`timeline` の titleField / subtitleField・部品の `filter.field` | public / shared だけ(private は全部自分の記録なので `Validate()` がエラー) |
+| `$createdAt` | レコードを作った日時(datetime) | 上の表示箇所 + `timeline.dateField`・`list` / `table` の `sort.field` | 全部 |
+
+- **自分の投稿だけ**: 部品の filter に `{"field":"$author","op":"eq","value":{"me":true}}`(他の人の分は `op:"neq"`)。`{"me":true}` は `$author` 専用で、`$author` の filter はこの形だけ。list / table / timeline / stat(件数)/ chart など部品の filter で使え、agg 式の中では使えない(iOS の評価器に uid を渡さないため。自分の件数は stat `aggregate:"count"` + 同じ filter)。iOS はサインイン中の uid に置き換えて `Record.author` と比べる。appconfig の `filterField=author`(eq / neq・値 = uid)と同じ意味。
+- **投稿者名に何を出すか**: iOS の設定「投稿に表示する名前」に本人が入れた名前だけ。共有 entity に初めて投稿する時に聞き(「匿名のまま」も選べる)、未設定・空なら送らず backend が「匿名」を付ける。Apple の氏名・メールアドレス・端末名は送らない(本人が公開すると決めていない個人情報を他人に見せない)。名前を後で変えても、過去の投稿の表示名は投稿時のまま(backend は create 時だけ受け取る)。
+- iOS は共有 entity のレコードを作る時、ローカル行にも自分の uid と表示名を入れる(未送信のうちから「自分の投稿」に出る・作者判定も同じ)。
+- AI: 共有 entity に名前の手入力欄(member_name / person / staff_name 等)を作らず `$author` を表示する。ai-eval の `authorShown` / `nameInput` / `meFilter`(`m0disc_cases.json`)。
+
+#### 自分だけの印 `marks`(#255)
+
+いいね・保存・お気に入り・既読のように、**1 人 1 回のトグル**で共有レコードに付ける印。印はレコードの `data` ではなく appconfig が「誰が付けたか」を記録するので、押すたびに件数が増えたり、他人の印を付けたりできない。public / shared の entity だけ(private は自分の記録なので boolean field + `list.item.toggle` を使う)。実例: `examples/recipes.json`(みんなのレシピ)。
+
+| 書く場所 | 形 | 意味 |
+|---|---|---|
+| `entity.marks` | `[{ "id": "like", "icon": "heart", "label": "いいね" }]`(3 個まで。icon は heart / star / bookmark / thumbsup / check / eye / flag) | その entity に付けられる印 |
+| `list.item.mark` | `"like"` | 行の右端にアイコンと件数のトグル。他人の投稿にも付けられる(楽観的に反映・失敗したら戻す) |
+| `$marks.<id>` | `list.item` の title / subtitle / trailing・`table.columns[].field`・`list` / `table` の `sort.field` | 件数(integer)。`sort` を desc で「いいねの多い順」 |
+| 部品の `filter` | `{"field":"$marks.save","op":"eq","value":{"me":true}}` | 自分が付けたものだけ(`op:"neq"` = まだ付けていない = 未読)。stat の件数にも使える |
+
+- **いいね数の集計(agg)との関係**: 印はレコードではないので、computed の `agg` からは数えられない(`agg` の filter に `$marks.<id>` を書くと `Validate()` がエラー)。件数は `$marks.<id>` で出す。いいね用の子 entity + ref + `agg count` は作らない(1 人で何回でも押せる・別の画面で親を選び直すフォームになる)。コメント・出欠のように中身のある記録は今まで通り子 entity。
+- appconfig: `PUT` / `DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}` で自分の印を付ける / 外す(どちらも冪等・`{count, mine}` を返す)。`GET /records` と `GET /records/{id}` はレコード最上位に `marks: {"<markId>": {"count": n, "mine": bool}}` を付ける。Firestore は `…/records/{id}/marks/{markId}`(`count`)と `…/marks/{markId}/by/{uid}`。レコードを消すと印も消える。
+- iOS: 一覧の行のトグルは押した瞬間に件数と塗りを変え、サーバーの `{count, mine}` で確定する(失敗したら戻して理由を出す)。オフラインの間は付けられない(送信待ちの列には積まない)。自分の未送信の投稿にもまだ付けられない。
+- AI: 「いいね」「お気に入り」「保存」「既読」は marks を使い、子 entity を作らない。ai-eval の `mark` / `markedByMe` / `markEntity`(`m0disc_cases.json`)。
 
 ### 3.6 ナビゲーション = 画面グラフの規則(#112 #114 #115)
 
