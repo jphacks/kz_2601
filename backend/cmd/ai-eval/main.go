@@ -25,7 +25,9 @@
 // Parent -> child (#256): prefillRef (bool: some navigate opens a child form with prefillRef).
 // Share (#254): scopeNot (no entity has that scope), summaryHas ([text, ...]: each is in the summary).
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
-// otherwise the locale is detected from the transcript. English edits whose
+// otherwise the locale is detected from the transcript. tips_cases.json (#415)
+// runs the iOS 頼み方のコツ examples in ja and en; a base outside
+// internal/ai/examples is reached by a relative name (../../../../docs/dsl/examples/<name>). English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
 // M0 (#281): shared (bool: some entity is shared or public, whichever the model
 // picks). Keys and types are listed in expect.go; -check validates a cases
