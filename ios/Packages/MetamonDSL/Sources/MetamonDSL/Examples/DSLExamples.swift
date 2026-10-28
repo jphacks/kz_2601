@@ -28,6 +28,7 @@ public enum DSLExamples {
             "shops",
             "timetable",
             "dinner",
+            "sensors",
         ]
         #if APP_STORE_REVIEW
         return all.filter { !reviewExcluded.contains($0) }
@@ -36,8 +37,8 @@ public enum DSLExamples {
         #endif
     }()
 
-    /// 審査用ビルド(APP_STORE_REVIEW・#245)で外した部品(nearbyShare / locationTracker / healthStat)を使う例。
-    public static let reviewExcluded: Set<String> = ["attendance_nearby", "walk_route", "health"]
+    /// 審査用ビルド(APP_STORE_REVIEW・#245)で外した部品(nearbyShare / locationTracker / healthStat / sensorValue)を使う例。
+    public static let reviewExcluded: Set<String> = ["attendance_nearby", "walk_route", "health", "sensors"]
 
     /// 初期状態(音声画面のみ)の DSL 名。
     /// 開発用: 環境変数 `METAMON_INITIAL_EXAMPLE`(simctl は `SIMCTL_CHILD_` 接頭辞)で同梱例を直接起動できる(ギャラリー確認用)。

@@ -2091,6 +2091,176 @@
           }
         }
       }
+    },
+    "しきい値を超えました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Threshold exceeded"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "しきい値を超えました"
+          }
+        }
+      }
+    },
+    "このセンサーはこの端末では使えません": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This sensor isn't available on this device"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このセンサーはこの端末では使えません"
+          }
+        }
+      }
+    },
+    "モーションとフィットネスへのアクセスが許可されていません": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motion & Fitness access isn't allowed"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モーションとフィットネスへのアクセスが許可されていません"
+          }
+        }
+      }
+    },
+    "水平です": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Level"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "水平です"
+          }
+        }
+      }
+    },
+    "傾いています": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilted"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "傾いています"
+          }
+        }
+      }
+    },
+    "今の値を記録": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save current value"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今の値を記録"
+          }
+        }
+      }
+    },
+    "記録中 %lld/%lld 件・%lld 秒ごと(画面を開いている間だけ)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording %lld/%lld · every %lld s (while this screen is open)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録中 %lld/%lld 件・%lld 秒ごと(画面を開いている間だけ)"
+          }
+        }
+      }
+    },
+    "%lld 件を記録しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved %lld"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 件を記録しました"
+          }
+        }
+      }
+    },
+    "%lld 件を記録して止めました(上限)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped after saving %lld (limit reached)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 件を記録して止めました(上限)"
+          }
+        }
+      }
+    },
+    "保存できませんでした": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存できませんでした"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
