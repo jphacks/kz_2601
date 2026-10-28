@@ -32,17 +32,19 @@ public extension DSLRuntime {
     /// `{"me": true}`(#251)はサインイン中の uid に置き換えて投稿者と比べる。
     func filteredRecords(_ c: Component) -> [Record] {
         let entityId = c.entity ?? ""
+        return HiddenFields.redact(unredactedRecords(entity: entityId, filters: c.filters), in: dsl.entity(entityId))
+    }
+
+    /// computed 合成済み + filter 適用済みで、hidden はまだ落としていないレコード(書き出しが作者の行だけ hidden を出すため・#421)。
+    func unredactedRecords(entity entityId: String, filters: [Filter]) -> [Record] {
         let entity = dsl.entity(entityId)
         let rows = unredactedViewRecords(for: entityId)
-        guard !c.filters.isEmpty else { return HiddenFields.redact(rows, in: entity) }
-        let filters = c.filters.map { $0.resolvingMe(uid: currentUserId) }
-        let filtered: [Record]
-        if filters.allSatisfy({ $0.valueExpr == nil }) {
-            filtered = rows.filter { r in filters.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field)) } }
-        } else {
-            filtered = evaluator().apply(filters, entity: entity, to: rows)
+        guard !filters.isEmpty else { return rows }
+        let resolved = filters.map { $0.resolvingMe(uid: currentUserId) } // {"me": true}(#251)
+        if resolved.allSatisfy({ $0.valueExpr == nil }) {
+            return rows.filter { r in resolved.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field)) } }
         }
-        return HiddenFields.redact(filtered, in: entity)
+        return evaluator().apply(resolved, entity: entity, to: rows)
     }
 
     private func unredactedViewRecords(for entity: String) -> [Record] {

@@ -64,6 +64,8 @@ var expectKeys = map[string]expectKind{
 	"routeMode": expectString,
 	// checkDashcam (#410)
 	"dashcamAuto": expectBool,
+	// checkExport (#421)
+	"export": expectString,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,
@@ -138,6 +140,10 @@ func validateExpect(exp map[string]any) []string {
 		case "routeMode":
 			if s := v.(string); !slices.Contains(routeModes, s) {
 				bad = append(bad, "routeMode must be automobile|walking: "+s)
+			}
+		case "export":
+			if s := v.(string); s != "csv" && s != "pdf" && s != "both" {
+				bad = append(bad, "export must be csv|pdf|both: "+s)
 			}
 		}
 	}

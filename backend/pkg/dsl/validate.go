@@ -340,6 +340,8 @@ func (a *App) Validate() error {
 			if act.NotificationID == "" {
 				add("%s: cancelNotification needs notificationId", where)
 			}
+		case ActionExport:
+			checkExportAction(where, act, entities, add)
 		case ActionBack, ActionOpenVoice, ActionResetForm:
 		default:
 			add("%s: unknown action type %q", where, act.Type)

@@ -336,7 +336,8 @@
             "openUrl",
             "resetForm",
             "scheduleNotification",
-            "cancelNotification"
+            "cancelNotification",
+            "export"
           ],
           "x-enumDescriptions": {
             "navigate": "画面遷移。list.onItemTap からは recordId が暗黙に渡り、遷移先フォームが編集モードになる(だから onItemTap の遷移先は同じ entity のフォーム)。prefillRef を付けると今のレコード(タップした行・ボタンのあるフォームのレコード)を子フォームの ref に入れて新規で開く。",
@@ -347,7 +348,8 @@
             "openUrl": "URL を Safari で開く。",
             "resetForm": "フォームのドラフトを既定値に戻す。",
             "scheduleNotification": "ローカル通知をその場で予約(dsl.<id> で置換)。任意で押すリマインドはこれ。毎日の定期通知は app.notifications に宣言する。",
-            "cancelNotification": "予約した通知を取り消す。"
+            "cancelNotification": "予約した通知を取り消す。",
+            "export": "記録を CSV(Excel で開ける)か PDF の報告にして共有シートで送る(ファイル・メール・AirDrop)。「CSV で出したい」「PDF にしたい」「Excel で開きたい」「月の報告書」はこれ。button か toolbar に置く。CSV は表示と同じ書式(日付・円・選択肢・参照先の名前・計算項目を含む)、PDF は見出し・絞り込み・表と、同じ画面にある同じ entity のグラフを 1 つにまとめる。"
           }
         },
         "screen": {
@@ -371,10 +373,11 @@
         },
         "entity": {
           "type": "string",
-          "description": "saveRecord / deleteRecord: entity id.",
+          "description": "saveRecord / deleteRecord / export: entity id.",
           "x-for": {
             "saveRecord": "required",
-            "deleteRecord": "required"
+            "deleteRecord": "required",
+            "export": "required"
           }
         },
         "url": {
@@ -407,6 +410,41 @@
           "description": "親から子を作る(#256)。遷移先フォーム(screen.entity)の ref field id。今のレコード(list / mapView の onItemTap ならタップした行、button / toolbar ならその画面のフォームのレコード)を入れて新規で開く。ref の refEntity は今のレコードの entity。遷移先フォームにはその field の picker を残す。calendar / gridTable では使えない。",
           "x-for": {
             "navigate": "optional"
+          }
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "csv",
+            "pdf"
+          ],
+          "description": "export: csv = 表計算向け(UTF-8 BOM 付き・1 行目は項目名)、pdf = 印刷・メール向けの報告。",
+          "x-for": {
+            "export": "required"
+          }
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter",
+          "description": "export: 書き出すレコードの絞り込み(list.filter と同じ)。「今月分」なら {field: 日付, op: thisMonth, value: null}。省略で全件。",
+          "x-for": {
+            "export": "optional"
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "export: 書き出す列(field id の並び)。省略で entity の全項目(計算項目を含む・写真と動画は除く)。",
+          "x-for": {
+            "export": "optional"
+          }
+        },
+        "title": {
+          "type": "string",
+          "description": "export: ファイル名と PDF の見出し(例「6 月の家計簿」)。省略で entity 名。",
+          "x-for": {
+            "export": "optional"
           }
         }
       }

@@ -1,0 +1,6 @@
+[
+  {"id": "x_kakeibo_csv", "kind": "create", "group": "export", "transcript": "家計簿を CSV で出したい", "note": "#421 CSV 書き出しボタン(shareButton で代替しない)", "expect": {"export": "csv", "substitution": false}},
+  {"id": "x_kakeibo_pdf", "kind": "edit", "base": "x_kakeibo_csv", "group": "export", "transcript": "月の報告を PDF に", "note": "#421 今月分の PDF(filter thisMonth)を追加・既存の CSV は残す", "expect": {"patch": true, "export": "both"}},
+  {"id": "x_training_excel", "kind": "create", "group": "export", "transcript": "筋トレの記録をつけて、Excel で開けるファイルにしてメールで送りたい", "note": "#421 Excel = CSV", "expect": {"export": "csv"}},
+  {"id": "x_walk_report_pdf", "kind": "create", "group": "export", "transcript": "散歩の記録と月ごとの距離のグラフ、グラフ付きの報告を PDF にして送れるようにして", "note": "#421 chart と同じ画面に export pdf", "expect": {"export": "pdf", "chart": true}}
+]
