@@ -69,6 +69,16 @@ public actor InMemoryAppConfigClient: AppConfigClient {
         return record
     }
 
+    /// 表示名付きの作成(#250)。appconfig と同じく作者を付ける(scope は知らないので、表示名が来た時だけ。作者はモックの uid)。
+    public func create(appId: String, entity: String, data: [String: JSONValue], clientId: String, authorName: String?) async throws -> Record {
+        var record = try await create(appId: appId, entity: entity, data: data)
+        guard let authorName, let i = tables[entity]?.lastIndex(where: { $0.id == record.id }) else { return record }
+        record.author = MockAuthService.fixedUID
+        record.authorName = authorName
+        tables[entity]![i] = record
+        return record
+    }
+
     public func update(appId: String, entity: String, id: String, data: [String: JSONValue]) async throws -> Record {
         guard let i = tables[entity]?.firstIndex(where: { $0.id == id }) else {
             throw APIError.http(status: 404, body: "\(entity)/\(id) not found")
@@ -82,6 +92,19 @@ public actor InMemoryAppConfigClient: AppConfigClient {
 
     public func delete(appId: String, entity: String, id: String) async throws {
         tables[entity]?.removeAll { $0.id == id }
+    }
+
+    /// 印(#255)。モックは利用者が 1 人なので、レコードの marks をそのまま 1 人分だけ増減する。
+    public func setMark(appId: String, entity: String, id: String, mark: String, on: Bool) async throws -> MarkState {
+        guard let i = tables[entity]?.firstIndex(where: { $0.id == id }) else {
+            throw APIError.server(status: 404, code: "not_found", message: "record not found")
+        }
+        var r = tables[entity]![i]
+        var st = r.markState(mark)
+        if st.mine != on { st = st.toggled() }
+        r.marks = (r.marks ?? [:]).merging([mark: st]) { _, new in new }
+        tables[entity]![i] = r
+        return st
     }
 }
 
@@ -101,6 +124,8 @@ public enum MockSeed {
             "memo": [
                 Record(id: "1", data: ["note": "きれいな紅葉", "date": .string(iso)], createdAt: iso),
             ],
+            // chat(#260): 相手 2 人 + 自分(モックの uid)の会話。古い順に下へ積む
+            "messages": chatSeed(now: now),
             // shopping(#108): 未購入 3 件 + 購入済み 1 件(一覧の丸でチェック)
             "groceries": [
                 Record(id: "g1", data: ["name": "牛乳", "category": "食品", "qty": 1, "done": false, "added": .string(today)], createdAt: iso),
@@ -144,6 +169,15 @@ public enum MockSeed {
             "posts": [
                 Record(id: "post1", data: ["body": "金沢でハッカソンに参加中", "posted": .string(iso)], createdAt: iso),
                 Record(id: "post2", data: ["body": "新しいカフェを見つけた", "posted": .string(iso)], createdAt: iso),
+            ],
+            // recipes(#255): ほかの人のレシピ 3 件。保存の件数はほかの人の分、カレーだけ自分も保存済み
+            "recipes": [
+                Record(id: "r1", data: ["title": "肉じゃが", "minutes": 30], createdAt: iso, author: "u-hanako", authorName: "はなこ",
+                       marks: ["save": MarkState(count: 3, mine: false)]),
+                Record(id: "r2", data: ["title": "チキンカレー", "minutes": 45], createdAt: iso, author: "u-jiro", authorName: "じろう",
+                       marks: ["save": MarkState(count: 2, mine: true)]),
+                Record(id: "r3", data: ["title": "だし巻き卵", "minutes": 10], createdAt: iso, author: "u-hanako", authorName: "はなこ",
+                       marks: ["save": MarkState(count: 0, mine: false)]),
             ],
             // bmi(#101): 65kg/170cm → 22.5、70kg/175cm → 22.9
             "body": [

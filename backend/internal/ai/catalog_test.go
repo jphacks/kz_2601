@@ -73,6 +73,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompNearbyShare,
 		// location tracking
 		dsl.CompLocationTracker,
+		// chat (#260)
+		dsl.CompChatThread,
 		// device health
 		dsl.CompHealthStat,
 		// device sensors (#419)
@@ -150,6 +152,9 @@ func TestCatalogRendering(t *testing.T) {
 		"### Entity の edit",
 		"- edit: author —",
 		"- edit: members —",
+		"### レコードの予約値",
+		"- $author —",
+		"- $createdAt —",
 	} {
 		if !strings.Contains(catalog, want) {
 			t.Errorf("catalog lacks %q\n%s", want, catalog)

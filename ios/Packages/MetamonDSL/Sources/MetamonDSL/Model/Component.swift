@@ -37,6 +37,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case nearbyShare
     // leaf(位置の記録・#168)
     case locationTracker
+    // leaf(チャット・#260)
+    case chatThread
     // leaf(ヘルスデータ・#167)
     case healthStat
     // leaf(時間割のマス目・#234)
@@ -161,6 +163,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var columnValues: [String]? // 列見出しの明示(nil = enum の options)
     public var rowValues: [String]?    // enum / string の行見出しの明示
     public var rowRange: GridRange?    // integer の行範囲(nil = 1…6)
+    // chatThread(#260)。entity / placeholder / emptyText は共用
+    public var textField: String?      // 本文の string / text field
+    public var photoField: String?     // 任意の photo field
     // sensorValue(#419)
     public var sensor: String?         // tilt|pitch|roll|acceleration|rotation|pressure|altitude
     public var threshold: SensorThreshold?
@@ -179,6 +184,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case tone
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
+        case textField, photoField
         case sensor, threshold
     }
 
@@ -262,6 +268,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         columnValues = try? c.decodeIfPresent([String].self, forKey: .columnValues)
         rowValues = try? c.decodeIfPresent([String].self, forKey: .rowValues)
         rowRange = try? c.decodeIfPresent(GridRange.self, forKey: .rowRange)
+        textField = try? c.decodeIfPresent(String.self, forKey: .textField)
+        photoField = try? c.decodeIfPresent(String.self, forKey: .photoField)
         sensor = try? c.decodeIfPresent(String.self, forKey: .sensor)
         threshold = try? c.decodeIfPresent(SensorThreshold.self, forKey: .threshold)
     }
@@ -321,8 +329,10 @@ public struct ListItem: Decodable, Sendable {
     public var toggle: String?
     /// "daily" = toggle は date field。押すと今日の日付を保存し、値が今日の間だけ済み(#132)
     public var resets: String?
+    /// entity.marks の id → 行の右端にいいね・保存のトグルと件数(#255・1 人 1 回)
+    public var mark: String?
 
-    public init(title: String, subtitle: String? = nil, trailing: String? = nil, icon: String? = nil, image: String? = nil, toggle: String? = nil, resets: String? = nil) {
+    public init(title: String, subtitle: String? = nil, trailing: String? = nil, icon: String? = nil, image: String? = nil, toggle: String? = nil, resets: String? = nil, mark: String? = nil) {
         self.title = title
         self.subtitle = subtitle
         self.trailing = trailing
@@ -330,6 +340,7 @@ public struct ListItem: Decodable, Sendable {
         self.image = image
         self.toggle = toggle
         self.resets = resets
+        self.mark = mark
     }
 }
 
@@ -369,7 +380,9 @@ public struct Filter: Codable, Hashable, Sendable {
         let c = try decoder.container(keyedBy: Keys.self)
         field = try c.decode(String.self, forKey: .field)
         op = try c.decode(String.self, forKey: .op)
-        if let e = try c.decodeIfPresent(Expr.self, forKey: .value) {
+        if (try? c.decodeIfPresent([String: Bool].self, forKey: .value)) == ["me": true] {
+            value = Self.meValue // 自分(#251)。Expr ではない
+        } else if let e = try c.decodeIfPresent(Expr.self, forKey: .value) {
             if let lit = e.literalValue { value = lit } else { valueExpr = e }
         }
     }
