@@ -12,9 +12,11 @@ public struct SyncOperation: Codable, Sendable, Identifiable, Equatable {
     public var data: [String: JSONValue]
     public var attempts: Int
     public var enqueuedAt: Date
+    /// create で送る投稿者の表示名(shared / public・#250)。nil なら送らない(backend が「匿名」を付ける)。
+    public var authorName: String?
 
     public init(id: String = UUID().uuidString.lowercased(), appId: String, entity: String, recordId: String,
-                kind: PendingOp, data: [String: JSONValue] = [:], attempts: Int = 0, enqueuedAt: Date = .now) {
+                kind: PendingOp, data: [String: JSONValue] = [:], attempts: Int = 0, enqueuedAt: Date = .now, authorName: String? = nil) {
         self.id = id
         self.appId = appId
         self.entity = entity
@@ -23,6 +25,7 @@ public struct SyncOperation: Codable, Sendable, Identifiable, Equatable {
         self.data = data
         self.attempts = attempts
         self.enqueuedAt = enqueuedAt
+        self.authorName = authorName
     }
 }
 
@@ -229,7 +232,7 @@ public actor SyncQueue {
         let data = resolvingAliases(op.data)
         switch op.kind {
         case .create:
-            let rec = try await client.create(appId: op.appId, entity: op.entity, data: data, clientId: op.id)
+            let rec = try await client.create(appId: op.appId, entity: op.entity, data: data, clientId: op.id, authorName: op.authorName)
             aliases[op.recordId] = rec.id
             await store.markSynced(appId: op.appId, entity: op.entity, localId: op.recordId, server: rec)
         case .update:

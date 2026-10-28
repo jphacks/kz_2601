@@ -44,13 +44,22 @@ public final class OfflineSimulatingAppConfigClient: AppConfigClient, @unchecked
     }
 
     public func create(appId: String, entity: String, data: [String: JSONValue], clientId: String) async throws -> Record {
+        try await create(appId: appId, entity: entity, data: data, clientId: clientId, authorName: nil)
+    }
+
+    public func create(appId: String, entity: String, data: [String: JSONValue], clientId: String, authorName: String?) async throws -> Record {
         try gate("create \(entity) \(clientId)")
-        return try await inner.create(appId: appId, entity: entity, data: data, clientId: clientId)
+        return try await inner.create(appId: appId, entity: entity, data: data, clientId: clientId, authorName: authorName)
     }
 
     public func update(appId: String, entity: String, id: String, data: [String: JSONValue]) async throws -> Record {
         try gate("update \(entity)/\(id)")
         return try await inner.update(appId: appId, entity: entity, id: id, data: data)
+    }
+
+    public func setMark(appId: String, entity: String, id: String, mark: String, on: Bool) async throws -> MarkState {
+        try gate("mark \(entity)/\(id) \(mark) \(on)")
+        return try await inner.setMark(appId: appId, entity: entity, id: id, mark: mark, on: on)
     }
 
     public func delete(appId: String, entity: String, id: String) async throws {

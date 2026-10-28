@@ -143,6 +143,7 @@ apps_public/{appId}                                   # 公開 DSL: {ownerUid, n
 |---|---|---|
 | レコードの置き場 | `users/{uid}/apps/{appId}/entities/{e}/records` | `apps_public/{appId}/entities/{e}/records`(uid 非依存。appId は iOS の UUID なので単独で一意) |
 | 読み取り | 本人のみ | 認証ユーザー全員 |
+| 印(いいね・保存 #255) | 無し(DSL がエラー) | `entity.marks` に宣言した印を 1 人 1 回。件数はレコードの `markCounts.{markId}`、誰が付けたかは `.../records/{id}/marks/{markId}/by/{uid}`(トランザクションで両方を更新)。`PUT` / `DELETE .../records/{id}/marks/{markId}`。レコード削除で一緒に消える |
 | create | 本人 | 認証ユーザー全員。`author`=uid・`authorName`=リクエストの `authorName`(無ければ "匿名")を自動付与。`clientId` の冪等 id は `uid/clientId` から導出(他人と衝突しない) |
 | update / delete | 本人 | `author == uid` のみ(他人のレコードは **403 forbidden**) |
 | delete all(`?confirm=true`) | 全件 | **自分の投稿だけ**削除 |

@@ -51,6 +51,7 @@ var systemPrompt = strings.TrimSpace(`
 - entity/field 束縛: 入力部品(textField/numberField/datePicker/picker/toggle/photoField/image/videoField/videoPlayer)は screen.entity が設定された画面にのみ置き、field はその entity の field id。picker は enum field、photoField/image は photo field、videoField/videoPlayer は video field。
   list/stat/chart の entity は entities の id、item.title/subtitle/trailing/image・sort.field・filter.field・stat.field・chart.groupBy はその entity の field id。stat は aggregate=count 以外 field 必須。
 - entity.scope: 「みんなで」「共有」「投稿」「ランキング」「掲示板」「友達と」のように**他のユーザーと同じデータを見る**用途は scope:"public"(投稿者の author/authorName は backend が付けるので field に入れない)。家計簿・日記・体重のような個人の記録は scope を省略(private)。
+- 投稿者と「自分の」(#250 #251): public/shared の entity には**名前の手入力欄を作らない**(member_name / person / staff_name / 投稿者 / 名前 のような「誰が」の field・プロフィールのピッカーは作らない。本人が設定した表示名を backend が付けるので、なりすましもできない)。誰が投稿・回答したかは list.item の subtitle や table の列・timeline に予約値 "$author" を書いて表示する(投稿日時は "$createdAt"、新しい順は sort {"field":"$createdAt","direction":"desc"})。「自分の投稿だけ」「自分の出欠」「マイページ」は部品の filter {"field":"$author","op":"eq","value":{"me":true}}(他の人の分は op neq)。自分の件数は stat aggregate count に同じ filter。agg 式の中と private の entity では使えない。
 - entity.edit(#252): public/shared のレコードは既定で作った人だけが更新できる。家事分担の「終わった」チェック・共有の買い物リスト・出欠の〇×・落とし物の「解決」・シフトの「確定」のように**作った人以外が同じレコードのトグルや値を変える**設計なら、その entity に edit:"members" を付ける(削除は作った人だけのまま)。投稿・口コミ・ランキングの点数は付けない(本人以外に書き換えさせない)。編集ターンで edit を変えた時は summary に「家事は参加者の誰でも更新できるようにしました。削除は作った人だけです。」のように一言添える(新規作成の読み上げには自動で入る)。「店長だけが確定できる」のような役割ごとの権限は無いので、頼まれたら edit:"members" で代替し、その旨を書く。
 - アクション: navigate.screen は存在する画面 id。saveRecord/deleteRecord は entity 必須。フォーム画面には toolbar に saveRecord ボタンを置く。list.onItemTap で navigate するとフォームが編集モードになる。
 - id は ^[a-z][a-z0-9_-]{0,39}$(英小文字始まり・snake_case)。画面 id・entity id・field id・component id はそれぞれのスコープで一意。
@@ -109,16 +110,16 @@ var systemPrompt = strings.TrimSpace(`
 ` + catalog + `
 
 ## 無い部品・表せない要求を求められたら(黙って落とさない)
-- 使える部品は上のカタログが全部。カレンダー・地図・タイマー・チャット・グラフ以外の可視化など、カタログに無い部品を求められても**存在しない type を出力しない**。
+- 使える部品は上のカタログが全部。カレンダー・地図・タイマー・グラフ以外の可視化など、カタログに無い部品を求められても**存在しない type を出力しない**。
 - 最も近い既存部品で代替する(カレンダー/予定表/タイムライン → 日付 field で sort した list + datePicker、地図 → location field + textField、タイマー/ストップウォッチ → numberField で分や秒を記録、チェックリスト → boolean field + list.item.toggle)。
 - 部品だけでなく**計算・状態・期間・操作**も同じ: 順位番号・一括削除などの一括操作・タイマーの自動切り替え(集中→休憩)のように DSL で表せない要求は、最も近いもので代替する(順位 → 合計の降順の表、一括削除 → スワイプ削除)。
 - 代替したら一言添える: 編集ターンは summary に、新規作成は app.description の末尾に「カレンダー表示は日付順の一覧で代替しました。」「順位は合計の降順の表で代替しました。」のように「○○は△△で代替しました。」と書く(iOS が読み上げる)。代替が複数なら 1 文ずつ。en なら "Calendar view was replaced with a date-sorted list." のように必ず "replaced with" を使う。
 - **依頼の点検(#257・書き終える前に必ず)**: 依頼の動詞・要望(記録する・見る・知らせる・確定する・チェックする・採点する・競う・保存する・共有する…)を頭の中で全部挙げ、各々を DSL のどこで満たすかを決める。満たせないものは代替して上の形で申告し、近い代わりも無ければ「○○は今はできません。」と書く(新規作成は app.description の末尾、編集は summary)。**依頼の一部を黙って落とさない**。
 - **できないことの前提**(代替・申告の対象):
-  - **みんなで使う記録(scope public / shared)は作った人だけが変更・削除できる**(他の人は読める・自分の記録を足せる)。「店長が確定」「家族の誰でも完了を押せる」のように他の人のレコードをチェック・確定する依頼は、その toggle / boolean を他の人は押せない。確定を別の記録にする(店長が「確定」の記録を追加する)か、「みんなで使う記録は作った人だけが変更できるため、○○は作った人しか押せません。」と申告する。
+  - **みんなで使う記録(scope public / shared)は既定で作った人だけが変更・削除できる**(他の人は読める・自分の記録を足せる)。「家族の誰でも完了を押せる」のように他の人のレコードをチェックする依頼は上の entity.edit:"members"(#252)で満たす。「店長だけが確定」のような役割・権限はできないので、members で全員が押せる形にするか確定を別の記録にして、「役割ごとの権限は今はできないため、○○は参加者の誰でも押せる形にしました。」と申告する。
   - **条件で知らせる通知**(在庫が N 個を下回ったら・残りが減ったら)はできない(通知は決まった時刻かレコードの時刻だけ)。不足の一覧などで代替し「○○の通知は今はできないため、△△で代替しました。」と申告する。
-  - **自動の採点**: 正解と回答を比べる計算が作れない時は、点数を手入力にして「自動の採点は今はできないため、点数は自分で入力する形で代替しました。」と申告する。
-  - **ほかの人の投稿を自分用に保存**: 自分用の entity(scope 省略)に type ref + refEntity(投稿の entity)で選ぶ「お気に入り」を作る。全項目を打ち直すフォームで黙って代用しない。
+  - **自動の採点**: クイズ・テストは「クイズ・テストの自動採点」(#262)の形で正誤と点数を計算する。それでも正解と回答を比べる計算が作れない時だけ、点数を手入力にして「自動の採点を組めなかったため、点数は自分で入力する形で代替しました。」と申告する。
+  - **ほかの人の投稿を自分用に保存**: 投稿の entity に marks の save を置く(「いいね・保存・既読は entity.marks」#255)。全項目を打ち直すフォームや写しの entity で黙って代用しない。
 
 ## locale en のとき(#142: 英語の発話でも上の規則はすべて同じ)
 - 上の規則の日本語のキーワードは英語の同じ意味の語でも適用する: "this month" → thisMonth、"today" → today、"this week" → thisWeek、"this year" → thisYear、"last 7 days" / "past week" → 直近7日の filter(gte addDays −6)、"left" / "remaining" / "to go" → 目標 − 合計の stat.value(max …,0)、"per person" → div、"average" → avg、"best" / "record" → max、"in a row" / "streak" → 代替して申告、"split" / "settle up" / "who owes whom" → settlement、"remind me" / "notify" → notifications。**ラベルにこれらの語を書くなら、その filter / 計算を必ず付ける**(ラベルに "(last 7 days)" と書いて filter を付けないのは嘘ラベル)。"Monthly budget" のような設定値の名前は今月の filter と関係ない。

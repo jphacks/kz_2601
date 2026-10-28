@@ -91,12 +91,12 @@ var omissionRules = []omissionRule{
 		omitted:    func(_ string, a *dsl.App) bool { return !hasComputed(a) },
 		needsLogic: true,
 		topic:      regexp.MustCompile(`採点|点数|正解|正誤|スコア|(?i:score|grade|correct)`),
-		problem:    `依頼に採点・点数があるのに、正解と比べる計算が無い(点数を手で入力する形)。正誤を計算で出せないなら、app.description の末尾に「自動の採点は今はできないため、点数は自分で入力する形で代替しました。」と書く`,
+		problem:    `依頼に採点・点数があるのに、正解と比べる計算が無い(点数を手で入力する形)。クイズの自動採点(#262)の形で正誤を計算する。それでも出せないなら、app.description の末尾に「自動の採点を組めなかったため、点数は自分で入力する形で代替しました。」と書く`,
 		noteJA: func(string) string {
-			return "自動の採点は今はできないため、点数は自分で入力する形です。"
+			return "自動の採点を組めなかったため、点数は自分で入力する形です。"
 		},
 		noteEN: func(string) string {
-			return "Automatic scoring isn't possible yet, so scores are entered by hand."
+			return "Automatic scoring couldn't be built, so scores are entered by hand."
 		},
 	},
 	{

@@ -13,7 +13,7 @@ import (
 const casesDir = "../../internal/ai/eval"
 
 func TestCaseFilesValid(t *testing.T) {
-	for _, f := range []string{"cases.json", "demo_cases.json", "m0disc_cases.json", "audit_cases.json", "audit_en_cases.json", "groupby_cases.json", "tips_cases.json"} {
+	for _, f := range []string{"cases.json", "demo_cases.json", "m0disc_cases.json", "audit_cases.json", "audit_en_cases.json", "groupby_cases.json", "parent_child_cases.json", "tips_cases.json"} {
 		if err := checkCasesFile(filepath.Join(casesDir, f), false); err != nil {
 			t.Error(err)
 		}
@@ -70,24 +70,9 @@ func TestTipsCasesPaired(t *testing.T) {
 	}
 }
 
-// m0discPending: cases left without expect because PR #378 / #379 change the
-// same or the next line of m0disc_cases.json (git would conflict). The planned
-// values are in docs/backend/ai-eval/m0disc-regression.md; drop an entry once
-// its case has an expect.
-var m0discPending = map[string]string{
-	"d_family_todo":  "same line: #378 editMembers / #379 substitution",
-	"d_inventory":    "same line: #379 substitution",
-	"d_shift":        "same line: #378 editMembers / #379 substitution",
-	"d_quiz_game":    "same line: #379 substitution",
-	"d_recipe_share": "same line: #379 noOmission",
-	"d_dm":           "next to d_ranking (#378)",
-	"d_event_rsvp":   "next to d_inventory (#379)",
-	"d_task_team":    "next to d_shift (#378 / #379)",
-	"d_study_time":   "next to d_quiz_game (#379)",
-	"d_dice":         "next to d_quiz_game (#379)",
-	"d_subscription": "next to d_recipe_share (#379)",
-	"d_edit_like":    "next to d_lost_found (#378)",
-}
+// m0discPending: cases left without expect (none since the M0 integration of
+// #378 / #379 / #384 / #398 / #405). Add an id here only with a reason.
+var m0discPending = map[string]string{}
 
 // m0disc is the M0 regression set (#281): every case carries an expect.
 func TestM0discEveryCaseHasExpect(t *testing.T) {

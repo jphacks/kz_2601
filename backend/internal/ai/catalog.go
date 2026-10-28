@@ -147,6 +147,16 @@ func BuildCatalog(schema []byte) (string, error) {
 			}
 		}
 	}
+	// #250 #251: values every record carries besides its fields
+	values, _ := entity["x-recordValues"].(map[string]any)
+	if len(values) == 0 {
+		return "", fmt.Errorf("schema has no $defs/Entity x-recordValues")
+	}
+	b.WriteString("### レコードの予約値(field id の代わりに書ける)\n")
+	for _, k := range sortedKeys(values) {
+		desc, _ := values[k].(string)
+		fmt.Fprintf(&b, "- %s — %s\n", k, desc)
+	}
 	if err := writeExprCatalog(&b, defs); err != nil {
 		return "", err
 	}
