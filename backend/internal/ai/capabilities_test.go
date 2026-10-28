@@ -125,9 +125,9 @@ func TestChatLimits_NoConflictWithSchema(t *testing.T) {
 
 func TestShortDesc(t *testing.T) {
 	for in, want := range map[string]string{
-		"区切り線。":                 "区切り線",
+		"区切り線。":                    "区切り線",
 		"A single symbol. Use it.": "A single symbol。Use it",
-		"場所を選ぶ入力欄。タップで開く。":      "場所を選ぶ入力欄。タップで開く",
+		"場所を選ぶ入力欄。タップで開く。":         "場所を選ぶ入力欄。タップで開く",
 	} {
 		if got := shortDesc(in); got != want {
 			t.Errorf("shortDesc(%q) = %q, want %q", in, got, want)
