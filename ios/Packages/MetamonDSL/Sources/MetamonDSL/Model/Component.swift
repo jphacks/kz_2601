@@ -15,6 +15,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     // leaf(ナビ・ネイティブ系)
     case searchBar, calendar, shareButton, openUrlButton, mapView, locationButton, locationPicker, qrScanner, timerDisplay
     case webView
+    // leaf(QR を作って表示・#422)。text / field / value / label / title は共用
+    case qrCode
     // leaf: 入力系バッチ
     case slider, stepper, textEditor, secureField, timePicker, colorPicker, rating
     // leaf(表示系)

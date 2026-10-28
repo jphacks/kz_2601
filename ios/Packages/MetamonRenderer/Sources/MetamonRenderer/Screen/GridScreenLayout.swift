@@ -170,7 +170,7 @@ struct FormFlowLayout: View {
     @ViewBuilder
     private func cell(_ c: Component, area: GridArea) -> some View {
         switch c.type {
-        case .image, .mapView, .webView, .chart, .gauge, .calendar, .qrScanner, .list, .table, .timeline:
+        case .image, .mapView, .webView, .chart, .gauge, .calendar, .qrScanner, .qrCode, .list, .table, .timeline:
             DSLView(component: c, ctx: ctx).frame(height: max(cellH * 2, CGFloat(area.rowSpan) * cellH - gap))
         default:
             DSLView(component: c, ctx: ctx).fixedSize(horizontal: false, vertical: true)
@@ -244,7 +244,7 @@ struct GridCell: View {
         return switch component.type {
         // hstack は通常サイズでは器に収める(stat を横に並べる定番。スクロールにすると高さが無制限になり、stat の数値がセル高さで縮まず下が切れる・#89)
         case .list, .section, .vstack, .text, .table, .timeline, .markdown, .card, .disclosure, .grid, .calendar, .gridTable, .settlement: true
-        case .image, .mapView, .webView, .chart, .gauge, .spacer, .divider, .qrScanner, .voiceInput, .chatThread: false
+        case .image, .mapView, .webView, .chart, .gauge, .spacer, .divider, .qrScanner, .qrCode, .voiceInput, .chatThread: false
         default: typeSize.isAccessibilitySize
         }
     }
