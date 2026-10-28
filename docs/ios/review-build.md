@@ -29,6 +29,7 @@
 | HealthKit(`healthStat` / `Field.health`) | 部品と登録 / `HealthData` / `AppRuntime+Health`、`NSHealth*` / `NSMotionUsageDescription`、entitlement `com.apple.developer.healthkit*` | 4.7.2・5.1.3 |
 | バックグラウンドでの位置の記録(`locationTracker`) | 部品と登録 / `LocationTracking`、`UIBackgroundModes` の `location` | 4.7.2・5.1.5・2.5.4 |
 | 近くの端末との共有(`nearbyShare`・MultipeerConnectivity) | 部品と登録 / `Features/Nearby` 全部、`NSLocalNetworkUsageDescription` / `NSBonjourServices` | 4.7.2 |
+| 音楽プレーヤーの友だちからの曲リクエスト(`musicPlayer.allowRequests`・#412) | 部品の中のリクエストの UI(`MusicPlayerLeaf` の `requests`)。送受信は上の `Features/Nearby` と一緒に外れる | 4.7.2(近くの端末との通信) |
 | DSL から使うカメラの撮影(`photoField` / `videoField`) | `CameraPicker` / `VideoCameraPicker`、撮影の選択肢 | 4.7.2・2.5.14 |
 | 外した部品を使う同梱の例 | `health` / `walk_route` / `attendance_nearby`(`DSLExamples.reviewExcluded`) | 上と同じ |
 
@@ -37,6 +38,7 @@
 - 現在地を 1 回だけ取る `locationButton` と、地図の `mapView`(使用中の位置だけ)は残す。
 - QR を読む `qrScanner` は残す(カメラの説明文はこれに合わせて差し替える)。
 - 裏で定期的に同期する `fetch` は残す。
+- `musicPlayer`(Apple Music の再生・検索)は残す。`NSAppleMusicUsageDescription` も残す(#412)。
 - 最初の版のスコープは、調査メモ(リポジトリ外の `調査_ライセンスとApp Store審査.md`)の「最初の版で削る機能」の表に合わせている。
 
 ## 仕組み
