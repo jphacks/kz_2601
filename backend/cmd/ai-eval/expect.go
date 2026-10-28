@@ -50,6 +50,8 @@ var expectKeys = map[string]expectKind{
 	"summaryHas":   expectStrings,
 	// checkGroupBy (#261, PR #404)
 	"groupedTable": expectBool,
+	// checkExport (#421)
+	"export": expectString,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,
@@ -114,6 +116,10 @@ func validateExpect(exp map[string]any) []string {
 		case "scope":
 			if s := v.(string); s != "public" && s != "shared" && s != "private" {
 				bad = append(bad, "scope must be public|shared|private: "+s)
+			}
+		case "export":
+			if s := v.(string); s != "csv" && s != "pdf" && s != "both" {
+				bad = append(bad, "export must be csv|pdf|both: "+s)
 			}
 		}
 	}
