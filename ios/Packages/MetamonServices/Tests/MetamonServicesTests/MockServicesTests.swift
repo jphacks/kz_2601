@@ -32,6 +32,8 @@ final class MockServicesTests: XCTestCase {
         XCTAssertEqual(MockAIClient.sampleName(for: "散歩の写真を残したい"), "walk")
         XCTAssertEqual(MockAIClient.sampleName(for: "最初に戻して"), "initial")
         XCTAssertEqual(MockAIClient.sampleName(for: "家計簿"), "kakeibo")
+        XCTAssertEqual(MockAIClient.sampleName(for: "レシートを撮ったら金額を読み取って家計簿に"), "receipt_ai")
+        XCTAssertEqual(MockAIClient.sampleName(for: "筋トレのフォームをチェック"), "form_check")
     }
 
     func testMockAIClientKeepsAppIdAndSummary() async throws {

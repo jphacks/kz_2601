@@ -8,6 +8,9 @@ public struct MockAIClient: AIClient {
     public init(delay: Duration = .seconds(1.2)) { self.delay = delay }
 
     public static func sampleName(for transcript: String) -> String {
+        // #418 写真の読み取り・骨格(「筋トレ」「写真」より先に見る)
+        if transcript.contains("レシート") { return "receipt_ai" }
+        if transcript.contains("フォーム") && (transcript.contains("チェック") || transcript.contains("角度")) { return "form_check" }
         if transcript.contains("トレ") || transcript.contains("筋") || transcript.contains("運動") { return "training" }
         if transcript.contains("散歩") || transcript.contains("写真") || transcript.contains("場所") { return "walk" }
         if transcript.contains("買い物") || transcript.contains("チェックリスト") { return "shopping" }
