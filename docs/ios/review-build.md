@@ -28,7 +28,7 @@
 | 誰でも開ける共有リンク(アプリ側の入口) | `ShareAppSheet` / `SharingHooks`(URL を受けて取り込む処理)/ `HTTPSharingClient`、Info.plist の `CFBundleURLTypes`(`tailorit://`) | 1.2(通報・ブロックが無い) |
 | HealthKit(`healthStat` / `Field.health`) | 部品と登録 / `HealthData` / `AppRuntime+Health`、`NSHealth*` / `NSMotionUsageDescription`、entitlement `com.apple.developer.healthkit*` | 4.7.2・5.1.3 |
 | バックグラウンドでの位置の記録(`locationTracker`) | 部品と登録 / `LocationTracking`、`UIBackgroundModes` の `location` | 4.7.2・5.1.5・2.5.4 |
-| 近くの端末との共有(`nearbyShare`・MultipeerConnectivity) | 部品と登録 / `Features/Nearby` 全部、`NSLocalNetworkUsageDescription` / `NSBonjourServices` | 4.7.2 |
+| 近くの端末との共有(`nearbyShare`・MultipeerConnectivity。すれ違い通信と UWB の距離 #425 を含む) | 部品と登録 / `Features/Nearby` 全部 / `NearbyPassbyLeaf`・`NearbyPassbyHost`、`NSLocalNetworkUsageDescription` / `NSBonjourServices` / `NSNearbyInteractionUsageDescription` | 4.7.2 |
 | DSL から使うカメラの撮影(`photoField` / `videoField`) | `CameraPicker` / `VideoCameraPicker`、撮影の選択肢 | 4.7.2・2.5.14 |
 | 外した部品を使う同梱の例 | `health` / `walk_route` / `attendance_nearby`(`DSLExamples.reviewExcluded`) | 上と同じ |
 
@@ -88,13 +88,13 @@ cd ios
 
 ```sh
 APP=<DerivedData>/Build/Products/Review-iphoneos/Metamon.app
-plutil -p "$APP/Info.plist" | grep -E 'NSHealth|NSMotion|NSLocalNetwork|Bonjour|CFBundleURLTypes|UIBackgroundModes' -A2
+plutil -p "$APP/Info.plist" | grep -E 'NSHealth|NSMotion|NSLocalNetwork|Bonjour|NSNearbyInteraction|CFBundleURLTypes|UIBackgroundModes' -A2
 #   → UIBackgroundModes が [fetch] だけで、他は出ないこと
 codesign -d --entitlements :- "$APP"
 #   → com.apple.developer.healthkit が無いこと
-otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|CoreMotion'
+otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|NearbyInteraction|CoreMotion'
 #   → 何も出ないこと
-strings "$APP/Metamon" | grep -E 'HKHealthStore|MCSession|CMPedometer|UIImagePickerController|release-requests|public-apps'
+strings "$APP/Metamon" | grep -E 'HKHealthStore|MCSession|NISession|CMPedometer|UIImagePickerController|release-requests|public-apps'
 #   → 何も出ないこと
 ls "$APP" | grep -E '^(health|walk_route|attendance_nearby)\.json$'
 #   → 何も出ないこと

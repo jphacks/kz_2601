@@ -90,10 +90,11 @@ extension AppRuntime {
 }
 
 extension AppDSL {
-    /// どこかの画面に `nearbyShare` があるか(container の子も見る)。
+    /// どこかの画面に送る方の `nearbyShare` があるか(container の子も見る)。passby(#425)は部品が表示中だけ自分で探す。
     var usesNearbyShare: Bool {
-        screens.contains { s in
-            s.components.contains { $0.type == .nearbyShare || $0.children.contains { $0.type == .nearbyShare } }
+        let isSend: (Component) -> Bool = { $0.type == .nearbyShare && $0.mode != "passby" }
+        return screens.contains { s in
+            s.components.contains { isSend($0) || $0.children.contains(where: isSend) }
         }
     }
 }

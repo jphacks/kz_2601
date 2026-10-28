@@ -7,10 +7,10 @@ set -eu
 PLIST="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
 PB=/usr/libexec/PlistBuddy
 
-# HealthKit / 位置の常時・背面 / 近くの端末(ローカルネットワーク・Bonjour)/ 歩数計(healthStat のみが使う)/ 共有リンクの URL スキーム
+# HealthKit / 位置の常時・背面 / 近くの端末(ローカルネットワーク・Bonjour・UWB の距離 #425)/ 歩数計(healthStat のみが使う)/ 共有リンクの URL スキーム
 for key in NSHealthShareUsageDescription NSHealthUpdateUsageDescription NSHealthClinicalHealthRecordsShareUsageDescription \
            NSLocationAlwaysUsageDescription NSLocationAlwaysAndWhenInUseUsageDescription \
-           NSLocalNetworkUsageDescription NSBonjourServices NSMotionUsageDescription CFBundleURLTypes; do
+           NSLocalNetworkUsageDescription NSBonjourServices NSNearbyInteractionUsageDescription NSMotionUsageDescription CFBundleURLTypes; do
   "$PB" -c "Delete :$key" "$PLIST" 2>/dev/null || true
 done
 
