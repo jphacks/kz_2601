@@ -120,6 +120,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.dashcam) { c, ctx in DashcamLeaf(c: c, ctx: ctx) }
         // leaf(端末のセンサー・#419。CoreMotion)
         r.register(.sensorValue) { c, ctx in SensorValueLeaf(c: c, ctx: ctx) }
+        // leaf(録音・#420)
+        r.register(.audioRecorder) { c, ctx in AudioRecorderLeaf(c: c, ctx: ctx) }
         #endif
         return r
     }()

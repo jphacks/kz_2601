@@ -32,6 +32,7 @@
 | 近くの端末との共有(`nearbyShare`・MultipeerConnectivity) | 部品と登録 / `Features/Nearby` 全部、`NSLocalNetworkUsageDescription` / `NSBonjourServices` | 4.7.2 |
 | DSL から使うカメラの撮影(`photoField` / `videoField`) | `CameraPicker` / `VideoCameraPicker`、撮影の選択肢 | 4.7.2・2.5.14 |
 | ドラレコ(`dashcam`・#410。カメラの常時録画・CoreMotion) | 部品と登録 / `DashcamRecorder`、写真への追加の説明文から「ドラレコ」を外す | 4.7.2・2.5.14 |
+| DSL から使うマイクの録音(`audioRecorder`・#420) | 部品と登録 / `AudioRecorderController` / `RemoteRecorderCommands`(イヤホンのボタン)。マイクの説明文は音声入力だけの文に差し替え済み | 4.7.2・2.5.14 |
 | 外した部品を使う同梱の例 | `health` / `walk_route` / `attendance_nearby` / `dashcam` / `sensors`(`DSLExamples.reviewExcluded`) | 上と同じ |
 
 **残すもの**
@@ -41,6 +42,7 @@
 - 目的地までの道案内 `routeGuide`(#411)も残す。使うのは使用中の位置だけで、背面で案内を続けない(`CLBackgroundActivitySession` も `UIBackgroundModes: location` も使わない)。読み上げ(AVSpeechSynthesizer)に権限は要らない。
 - QR を読む `qrScanner` は残す(カメラの説明文はこれに合わせて差し替える)。
 - QR を作って表示する `qrCode`(#422)も残す。CoreImage で端末内で作るだけで、写真への保存は追加のみの権限(`NSPhotoLibraryAddUsageDescription`)。
+- 声でアプリを作り変える音声入力(マイク FAB)は残す。`audio` field の再生(一覧の行の再生ボタン)も残す(マイクを使わない。この版では録音できないので鳴る録音は無い)。
 - 裏で定期的に同期する `fetch` は残す。
 - 最初の版のスコープは、調査メモ(リポジトリ外の `調査_ライセンスとApp Store審査.md`)の「最初の版で削る機能」の表に合わせている。
 
@@ -99,7 +101,7 @@ codesign -d --entitlements :- "$APP"
 #   → com.apple.developer.healthkit が無いこと
 otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|CoreMotion'
 #   → 何も出ないこと
-strings "$APP/Metamon" | grep -E 'HKHealthStore|MCSession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|release-requests|public-apps'
+strings "$APP/Metamon" | grep -E 'HKHealthStore|MCSession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps'
 #   → 何も出ないこと
 ls "$APP" | grep -E '^(health|walk_route|attendance_nearby|dashcam|sensors)\.json$'
 #   → 何も出ないこと

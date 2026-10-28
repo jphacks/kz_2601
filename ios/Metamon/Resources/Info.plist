@@ -103,7 +103,7 @@
 
 	<!-- ネイティブ機能の権限説明(P0: マイク/カメラ/通知、P1: 位置/モーション) -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>話しかけた内容からアプリを生成するため、また生成したアプリで動画やドラレコの音声を録音するために、マイクを使用します。</string>
+	<string>話しかけた内容からアプリを生成するため、また生成したアプリで動画やドラレコの音声、ボイスメモ・会議などを録音するために、マイクを使用します。</string>
 	<key>NSCameraUsageDescription</key>
 	<string>生成したアプリで写真や動画を撮影・記録するため、またドラレコとして画面を出している間に録画するために、カメラを使用します。</string>
 	<key>NSPhotoLibraryUsageDescription</key>

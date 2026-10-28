@@ -72,12 +72,15 @@ public actor RecordStore {
 
     /// video field の動画ファイル置き場(#206)。行を消す時に一緒に消す。
     public nonisolated let videos: LocalVideoStore
+    /// audio field の録音ファイル置き場(#420)。動画と同じく行と一緒に消す。
+    public nonisolated let audios: LocalAudioStore
 
-    public init(directory: URL? = nil, videos: LocalVideoStore = .shared) {
+    public init(directory: URL? = nil, videos: LocalVideoStore = .shared, audios: LocalAudioStore = .shared) {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         self.directory = directory ?? base.appendingPathComponent("metamon-records", isDirectory: true)
         self.videos = videos
+        self.audios = audios
     }
 
     // MARK: - Read
@@ -171,17 +174,19 @@ public actor RecordStore {
     public func removeAll(appId: String) {
         let dir = directory.appendingPathComponent(Self.safe(appId), isDirectory: true)
         var ids = Set<String>()
+        var audioIDs = Set<String>()
         for key in tables.keys where key.hasPrefix(appId + "/") {
-            tables[key]?.forEach { ids.formUnion(VideoValue.localIDs(in: $0.data)) }
+            tables[key]?.forEach { ids.formUnion(VideoValue.localIDs(in: $0.data)); audioIDs.formUnion(AudioValue.localIDs(in: $0.data)) }
             tables[key] = nil
         }
         // まだ読み込んでいない entity のファイルも見る
         let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
         for file in files where file.pathExtension == "json" {
             let rows = (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode([LocalRecord].self, from: $0) } ?? []
-            rows.forEach { ids.formUnion(VideoValue.localIDs(in: $0.data)) }
+            rows.forEach { ids.formUnion(VideoValue.localIDs(in: $0.data)); audioIDs.formUnion(AudioValue.localIDs(in: $0.data)) }
         }
         videos.remove(ids)
+        audios.remove(audioIDs)
         try? FileManager.default.removeItem(at: dir)
     }
 
@@ -190,6 +195,7 @@ public actor RecordStore {
         tables = [:]
         try? FileManager.default.removeItem(at: directory)
         videos.removeAll()
+        audios.removeAll()
     }
 
     // MARK: - Files

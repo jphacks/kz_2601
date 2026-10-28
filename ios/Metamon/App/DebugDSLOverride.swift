@@ -113,6 +113,8 @@ enum DummyRecords {
         case .video:
             // 別の端末で撮った動画(この端末にファイルが無い)の見え方を確かめる(#206)
             return .string("video:dummy-\(i)")
+        case .audio:
+            return .string("audio:dummy-\(i)|\(30 + i * 7)")
         case .photo, .location:
             return nil
         }

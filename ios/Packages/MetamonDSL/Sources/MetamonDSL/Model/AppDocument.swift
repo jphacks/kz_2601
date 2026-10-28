@@ -240,6 +240,8 @@ public enum FieldType: String, Decodable, Sendable {
     case string, text, integer, number, boolean, date, datetime, `enum`, currency, photo, location
     /// 端末内の動画("video:<id>|<サムネイル data URL>"・#206)。`VideoValue` で読む。
     case video
+    /// 端末内の録音("audio:<id>|<秒>"・#420)。`AudioValue` で読む。
+    case audio
     /// 別 entity のレコード参照(保存値はレコード id 文字列・#101)。`Field.refEntity` が参照先。
     case ref
     /// 別 entity のレコードの複数選択(保存値はレコード id の配列・#231)。空 / 無し = 全員(割り勘する人)。

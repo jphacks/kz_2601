@@ -163,6 +163,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | モーション/歩数 | P1 | `native: motion.read` | CoreMotion / CMPedometer(stub) | `NSMotionUsageDescription` |
 | 共有 | P1 | `native: share {text}` | `UIActivityViewController`(stub) | 不要 |
 | オンデバイス AI | P1 | `aiButton { task, input?, entity?, output, prompt?, options? }` コンポーネント | **実装済み**(`AiButtonLeaf` + `Support/OnDeviceAI.swift`・Foundation Models・§18) | 不要(Apple Intelligence の ON は OS 設定) |
+| 録音(#420) | P3 | `audioRecorder { field, label?, maxDuration? }` + Field `audio` | **実装済み**(`AudioRecorderLeaf` + `Support/AudioRecording.swift` / `AudioPlayback.swift` / `AudioSessionLease.swift`、下記) | `NSMicrophoneUsageDescription`(音声入力と共用) |
 
 ### photoField(カメラ)の実装要点(`MetamonRenderer/Components/Leaves/PhotoFieldLeaf.swift`)
 
@@ -178,6 +179,24 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 
 画像は **base64 JPEG 文字列として photo フィールドに置き、entity.create の data に含めて送る**(縮小後 ≈ 数十〜100KB で Firestore ドキュメント 1MB 制限内)。Cloud Storage 経由(URL 化)は P1 以降。
 全 usage description は `ios/Metamon/Resources/Info.plist` に記入済み。
+
+### audioRecorder(録音・#420)の実装要点
+
+| 項目 | 内容 |
+|---|---|
+| 録音 | `AudioRecorderController`: `AVAudioRecorder`(AAC・44.1kHz モノラル・64kbps)で一時ファイル → 停止で `LocalAudioStore`(`Application Support/metamon-audio/<id>.m4a`)へ移し、field に `"audio:<id>|<秒>"`。上限は `record(forDuration:)`(`AudioRecorderPolicy.maxDuration`: 既定 600 秒・1〜7200)。経過時間と音量(`averagePower` → 0〜1)は 0.1 秒ごと。電話などの中断で止まり、録れた分は残す |
+| 状態 | `AudioRecorderMachine`(MetamonDSL・純粋): idle / recording / recorded。録り直しに失敗したら元の録音に戻る |
+| 再生 | `AudioPlayback.shared`(アプリ全体で 1 本)。フォームの再生行と一覧の行(`list.item.trailing` が audio)の `AudioPlayButton` が使う |
+| イヤホン | `RemoteRecorderCommands`: 部品が画面にある間だけ `MPRemoteCommandCenter` の togglePlayPause / play / pause を受ける(`remoteAction`)。離れたら外す。iOS がボタンを届けるのは最後に音を扱ったアプリだけ(他のアプリで音楽再生中は届かない) |
+| セッション | `AudioSessionLease`: 録音は `.playAndRecord`(`.defaultToSpeaker` / Bluetooth HFP・A2DP)、再生は `.playback`。終わったら借りる前の category / mode / options に戻し、`.notifyOthersOnDeactivation` で非アクティブ。途中で他(音声入力)が設定を変えていたら触らない(単体テスト `AudioRecorderRenderTests`) |
+| 審査用ビルド | 部品・録音・イヤホンのコードごと外す(`docs/ios/review-build.md`) |
+
+**実機での確認(シミュレータでは録音・イヤホンを確かめられない)**
+1. 録音の部品があるフォームで 録音 → 5 秒話す → 停止 → 再生で聞こえる。保存して一覧の行の再生ボタンでも聞こえる。
+2. 録音の直後に、マイク(FAB)で「タイトルを大きくして」と話す → 文字起こしされて変更が進む(音声入力が壊れていない)。再生の直後も同じ。
+3. 録音中にマイク(FAB)を押す → 音声入力が動く。録音は続く・止まるどちらでも、その後の音声入力が普通に使える。
+4. AirPods を付けてフォームを開き、本体で一度録音・停止 → AirPods を 1 回押すと録音が始まり、もう 1 回で止まる。フォームを閉じた後は AirPods のボタンが録音を始めない。
+5. 上限(maxDuration を 10 秒にした DSL)で自動で止まり、録れた分が残る。録音中に電話が来ても録れた分が残る。
 
 ## 6. 音声入力画面とホットリロード
 
