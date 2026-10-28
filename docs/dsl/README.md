@@ -140,7 +140,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 `color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
-### 3.2 アクション(10 種)
+### 3.2 アクション(12 種)
 
 | type | フィールド | iOS の挙動 |
 |---|---|---|
@@ -154,6 +154,8 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `scheduleNotification` | `notification` | ローカル通知を予約(`dsl.<id>`) |
 | `cancelNotification` | `notificationId` | 予約を取消 |
 | `export` | `entity`, `format`(csv/pdf), `filter?`, `fields?`, `title?` | 記録を CSV / PDF に書き出して共有シート(ファイル・メール・AirDrop)を開く(#421・下の「書き出し」) |
+| `startActivity` | `activity`{`title`, `subtitle?`, `icon?`, `minutes?`(1〜480), `stat?`} | ライブアクティビティ(ロック画面 / Dynamic Island)を出す(#423・下の「ライブアクティビティ」) |
+| `endActivity` | | 出しているライブアクティビティを消す(#423) |
 
 `confirmMessage` はどのアクションにも付けられ、先に確認ダイアログを出す。
 
