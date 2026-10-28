@@ -46,8 +46,6 @@ public struct AppDSL: Decodable, Sendable {
     public var initialScreen: String
     @Lossy public var entities: [Entity]
     @Lossy public var screens: [Screen]
-    /// entity id → `scope`(#253 の公開表示用。読むのは `scope(of:)`・EntityScope.swift)
-    public var entityScopes: [String: String] = [:]
 
     public func screen(_ id: String) -> Screen? { screens.first { $0.id == id } }
     public func entity(_ id: String) -> Entity? { entities.first { $0.id == id } }
@@ -108,7 +106,6 @@ extension AppDSL {
         initialScreen = try c.decode(String.self, forKey: .initialScreen)
         _entities = try c.decode(Lossy<Entity>.self, forKey: .entities)
         _screens = try c.decode(Lossy<Screen>.self, forKey: .screens)
-        entityScopes = EntityScopeProbe.scopes((try? c.decode(Lossy<EntityScopeProbe>.self, forKey: .entities))?.wrappedValue ?? [])
         clearDailyToggleDefaults()
     }
 }
@@ -212,9 +209,12 @@ public struct Entity: Decodable, Identifiable, Sendable {
     public var scope: String?
     /// 共有レコードを誰が更新できるか(#252): "author"(省略時)/ "members"。削除はどちらでも作った人だけ。
     public var edit: String?
+    /// 1 人 1 回の印(いいね・保存・#255)。shared / public の entity だけ。
+    @Lossy public var marks: [Mark] = []
     @Lossy public var fields: [Field]
 
-    public func field(_ id: String) -> Field? { fields.first { $0.id == id } }
+    /// field id、または予約値(`$author` / `$createdAt`・#250)の仮 Field。
+    public func field(_ id: String) -> Field? { fields.first { $0.id == id } ?? RecordValue.field(id, in: self) }
 
     /// レコードが appId 共通の置き場にあり、他の人のレコードも混ざる(shared / public)。
     public var isShared: Bool { scope == "shared" || scope == "public" }
@@ -273,6 +273,14 @@ public struct Field: Decodable, Identifiable, Sendable {
     public var isComputed: Bool { computed != nil }
 
     private enum Keys: String, CodingKey { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health, hidden }
+
+    /// 予約値の仮 Field 用(`RecordValue`)。
+    init(id: String, name: String, type: FieldType) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.hidden = false
+    }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)

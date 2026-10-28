@@ -35,6 +35,7 @@ type Memory struct {
 	members  map[string]map[string]*Member // apps_public/{appId}/members/{uid} (memory_member.go)
 	hub      hub                           // change notifications for Watcher (watch.go)
 	deleted  map[string]bool               // uids that called DELETE /v1/me (memory_account.go)
+	marks    map[string]bool               // record/mark/uid keys (memory_marks.go)
 }
 
 // NewMemory returns an empty store.
@@ -99,6 +100,12 @@ func cloneVersion(v *Version) *Version {
 func cloneRecord(r *Record) *Record {
 	cp := *r
 	cp.Data = cloneData(r.Data)
+	if r.MarkCounts != nil {
+		cp.MarkCounts = make(map[string]int, len(r.MarkCounts))
+		for k, v := range r.MarkCounts {
+			cp.MarkCounts[k] = v
+		}
+	}
 	return &cp
 }
 
@@ -372,6 +379,7 @@ func (m *Memory) DeleteRecord(_ context.Context, rs RecordSet, id string) error 
 		return ErrNotFound
 	}
 	delete(recs[rs.Entity], id)
+	m.dropMarks(recordsKey(rs) + "/" + id + "/")
 	m.hub.publish(recordsKey(rs), 0)
 	return nil
 }
@@ -385,6 +393,7 @@ func (m *Memory) DeleteAllRecords(_ context.Context, rs RecordSet) error {
 		return err
 	}
 	delete(recs, rs.Entity)
+	m.dropMarks(recordsKey(rs) + "/")
 	m.hub.publish(recordsKey(rs), 0)
 	return nil
 }

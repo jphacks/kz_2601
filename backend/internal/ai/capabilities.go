@@ -118,6 +118,16 @@ func BuildCapabilityIndex(schema []byte) (string, error) {
 	if len(ss) > 0 {
 		b.WriteString("- 記録の共有(scope): " + strings.Join(ss, " / ") + "\n")
 	}
+	// #250 #251: the poster and "only mine" on shared entities
+	values, _ := entity["x-recordValues"].(map[string]any)
+	var vs []string
+	for _, k := range sortedKeys(values) {
+		d, _ := values[k].(string)
+		vs = append(vs, k+"("+shortDesc(d)+")")
+	}
+	if len(vs) > 0 {
+		b.WriteString("- 記録の予約値: " + strings.Join(vs, " / ") + "\n")
+	}
 	return strings.TrimRight(b.String(), "\n"), nil
 }
 
@@ -198,7 +208,6 @@ var chatLimits = []chatLimit{
 	{"タイマーの自動切り替え", ""},
 	{"ファイル書き出し", "共有ボタン"},
 	{"経路案内・ナビ", "地図アプリで開くボタン"},
-	{"投稿者名の表示", "入力フォームに「使った人」の選択項目"},
 	{"1 つの項目で選択肢を複数選ぶ入力", "選択肢ごとのオンオフ"},
 	{"フォントのポイント数・好きなフォント・アニメーション・部品の重ね合わせ", "文字の 4 段の大きさと枠の大きさ"},
 	{"カメラの映像を見ながらのリアルタイムの回数カウント・フォーム判定", "写真 1 枚ごとに関節の角度を測る"}, // #418

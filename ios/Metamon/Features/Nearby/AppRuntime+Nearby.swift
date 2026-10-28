@@ -80,7 +80,7 @@ extension AppRuntime {
             }
             let appId = document.appId
             for row in rows {
-                _ = await recordSync.save(appId: appId, entity: entityId, recordId: nil, data: row)
+                _ = await recordSync.save(appId: appId, entity: entityId, recordId: nil, data: row, author: postAuthor(for: entityId))
             }
             await reloadLocal(entityId, appId: appId)
             toast = "\(h.sender)さんから「\(entity.name)」を \(rows.count) 件追加しました"
