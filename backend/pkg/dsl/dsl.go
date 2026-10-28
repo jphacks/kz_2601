@@ -408,6 +408,10 @@ type Component struct {
 	// chatThread (#260). Entity / Placeholder / EmptyText are shared.
 	TextField  string `json:"textField,omitempty"`  // message body (string/text field)
 	PhotoField string `json:"photoField,omitempty"` // optional photo field
+
+	// nearbyShare passby (#425). Entity / Mode / Limit are shared.
+	Fields   []string `json:"fields,omitempty"`   // passby: field ids exchanged (explicit allowlist)
+	Distance bool     `json:"distance,omitempty"` // passby: UWB distance / direction to a connected peer
 }
 
 // GridRange is an inclusive integer range of gridTable rows.
