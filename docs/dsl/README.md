@@ -55,7 +55,7 @@ Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|me
   Entity.marks?: [{ id, icon, label }](共有 entity の 1 人 1 回の印・いいね / 保存)・ListItem.mark? / 予約値 $marks.<id>(件数・自分が付けたか)— §3.5
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (44 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
+Leaf (44 種・全て id? と area? を持つ) / Action (11 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
@@ -97,7 +97,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `locationButton` | `field`(location) | `label` | ○ | P1 |
 | `locationPicker` | `field`(location) | `label`, `nameField`(string・場所の名前) | ○ | P1 |
 | `qrScanner` | `field`(string/text) | `label` | ○ | P1 |
-| `timerDisplay` | `mode`(stopwatch/countdown) | `seconds`(countdown 必須 >0), `field`(integer/number), `label` | `field` 使用時のみ | P1 |
+| `timerDisplay` | `mode`(stopwatch/countdown) | `seconds`(countdown 必須 >0), `field`(integer/number), `label`, `liveActivity`(bool・ロック画面 / Dynamic Island にも出す #423) | `field` 使用時のみ | P1 |
 | `webView` | `url`(https のみ) | `title` | | P1 |
 
 `list` は任意キー `searchField` を持ち、同じ画面の `searchBar.field` を指すと title/subtitle の部分一致で絞り込む(backend は対応する `searchBar` の存在を検証)。
@@ -154,6 +154,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 構造・ナビ・ネイティブ系の設計メモ(新規アクションは追加しない):
 
 - `shareButton` / `openUrlButton` / `locationButton` / `qrScanner` / `timerDisplay` は **Leaf 内で完結**し(ShareLink / `openURL` / CoreLocation / AVFoundation / Timer)、新しい `Action` 種別(`share` / `requestLocation` 等)は足さない。`ActionType` に case を足すとホスト(`AppRuntime.run` の網羅 switch)の改修が必須になるため。URL は既存の `openUrl` アクションで足りる。
+- **ライブアクティビティ(#423)** は例外的に Action を 2 つ足した: `startActivity{activity:{title, subtitle?, icon?, minutes?(1〜480), stat?}}` / `endActivity`。自分の見た目を持たず、どのボタン(toolbar・list.onItemTap も)からでも「◯◯中を出す / 消す」をしたいので Leaf にしない。タイマーは `timerDisplay.liveActivity: true` で Leaf 内に閉じる。`activity.stat` は同じアプリの `stat` / `progressBar` の id(Go が型まで検証)。更新は端末内だけ(push 無し)。iOS 側の仕組みは `docs/ios/architecture.md` §12.1、裏で続くもの・止まるものは §17.4。実例 `examples/ramen_timer.json`。
 - **他アプリ連携(#37 最小版)**: `shareButton.shareTo` で送り先を選ぶ。`line` → `https://line.me/R/share?text=<urlencoded>` を `openURL`(LINE 未インストールなら Web 版に遷移・写真は送れないので文面のみ)。`slack` / `discord` → 公式に汎用の共有 URL スキームが無いので **OS 共有シート(ShareLink)を開き、文面をチャンネル投稿向けに整形**(`**` `#` 等の Markdown 記号を落としたプレーンテキスト + 先頭に 💬)。`any`(既定)は従来どおり。キー名が `target` でないのは `progressBar.target`(number)と JSON キーが衝突するため(`columnCount` と同じ理由)。**Slack/Discord への Incoming Webhook 直接投稿は後段(#37 中版: appconfig 側にユーザー設定として保存し `postWebhook` アクションから投稿)**で、この版には含めない。
 - **`locationTracker`(#168)**: 「記録を開始 / 記録を停止」と記録中の状態(経過時間・距離・点の数)。**開始を押した間だけ**現在地を `entity` に 1 点 = 1 レコード(`locationField` に "lat,lng"、`dateField` に時刻)で足す。アプリを閉じても停止まで続き、`seconds`(既定 1 時間・300〜14400 に丸める)で自動停止。権限は When In Use だけ。点の entity はフォーム不要(lint の「add form が無い」から除外)で、他の required field には defaultValue が要る(validate)。見せ方は既存部品の拡張だけ: `mapView.kind: "route"` で点を `dateField` の時刻順に線で結び、`stat.aggregate: "distance"`(m / km)/ `"duration"`(m:ss / h:mm:ss)を `field` = location field、`by` = 日時 field で集計する。**10 分以上空いた点は別の記録**として線を切り、距離・時間にも足さない(朝と夕方の散歩を 1 本にしない)。Expr の `agg` には足していない(必要になったら)。例: `examples/walk_route.json`。
 - **`nearbyShare`(#36)**: 近くの Tailor It 端末へ MultipeerConnectivity(Wi-Fi / Bluetooth 自動・インターネット不要)でレコードを送る。**送る範囲**: `screen.entity == entity` のフォーム画面なら入力中の 1 件(未保存でも今の値)、それ以外の画面ではその entity の新しい順 最大 50 件。**受け取り**: 受信側は前面にいて今のアプリが nearbyShare を使っている間だけ待ち受け(ローカルネットワーク許可ダイアログを無関係なアプリで出さないため)、招待を受けると「◯◯さんから「出席」3 件」の確認を出し、承認した時だけ接続する(暗号化必須)。取り込みは **同じ appId**、または **同じ entity id で保存フィールドの id+型が一致**する時だけ。未知のフィールドは捨てる。設計・実機手順は `docs/ios/architecture.md` §近距離共有。Leaf 内で完結し新しい Action は足さない(上と同じ理由)。

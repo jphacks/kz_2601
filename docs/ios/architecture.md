@@ -579,6 +579,7 @@ AppRuntime.apply() / refresh()  ──▶ WidgetSnapshotWriter.write(dsl:records
        UserDefaults(suiteName: "group.jp.kz2601.metamon") に保存
    ──▶ WidgetCenter.shared.reloadAllTimelines()
 MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 個 / systemMedium=最大 3 個横並び)
+                         ロック画面(#423): accessoryRectangular=アプリ名+最大 2 個 / accessoryCircular=先頭 1 個 / accessoryInline=「ラベル 値」1 行
 ```
 
 | 項目 | 内容 |
@@ -592,6 +593,29 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 | 更新頻度(制約) | 本体がフォアグラウンドで DSL 適用/レコード更新した時に即時 + 30 分毎のタイムライン再読込(値は前回のまま)。**本体を開かずにレコードが増えても(別端末・ホットリロード未受信)ウィジェットは古い**。値が変わらない時は reload しない(WidgetKit の 1 日の更新予算を節約) |
 | 実機署名 | App Group capability を **本体と拡張の 2 つの App ID** に付ける必要がある。`xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で付与される(有料 Program 必須)。通らない時は Apple Developer > Identifiers > App Groups で `group.jp.kz2601.metamon` を作成 → 両 App ID の Capabilities で App Groups にチェック |
 | シミュレータ | 署名なし(`CODE_SIGNING_ALLOWED=NO`)でも App Group の UserDefaults は動く。ウィジェットの配置はホーム画面長押し → + → 「Tailor It」 |
+| ロック画面(#423) | 同じウィジェット(`MetamonStatWidget`)の `supportedFamilies` に accessory 3 種を足しただけ。データ・更新経路はホーム画面と共通。ロック画面は単色(vibrant)で描かれるので色に頼らず太さで区別(`MetamonWidget/AccessoryViews.swift`)。配置はロック画面長押し → カスタマイズ → ロック画面 → ウィジェット |
+
+### 12.1 ライブアクティビティ(ActivityKit・Issue #423)
+ロック画面のバナーと Dynamic Island(compact / expanded / minimal)に「タイマー」「いま◯◯中」を出す。**更新は端末内だけ(push しない)**。時間は日付で渡し OS が描くので、アプリが止まっていても数字は進む。
+
+| DSL | 動き |
+|---|---|
+| `timerDisplay.liveActivity: true` | 開始で出す / 一時停止で止まった時間+「一時停止中」/ リセットで消す / countdown が 0 で「終わりました」を 15 分残して消す。`staleDate` = 終了時刻(背面で 0 になった時もウィジェットが 00:00 を出す) |
+| action `startActivity{activity:{title, subtitle?, icon?, minutes?, stat?}}` | このアプリの表示を出し直す(キー `app:<appId>`・前のものは置き換え)。minutes あり=残り時間、無し=押した時からの経過。stat = stat / progressBar の部品 id(値と進み具合のバー) |
+| action `endActivity` | startActivity で出したこのアプリの表示を消す(タイマーの表示は残す) |
+
+構成:
+- `MetamonWidget/Shared/TailorActivityAttributes.swift`(本体・拡張の両方にコンパイル): static な `appId / appName / icon / key / statId` と `ContentState{title, subtitle, clock(countdown/elapsed/paused), value, valueLabel, progress, finished}`。
+- 組み立て(純粋関数・`MetamonTests/LiveActivityContentTests`): `Metamon/App/LiveActivityContent.swift`。タイマーの段階は Renderer の `TimerActivityUpdate.phase`(`TimerActivityUpdateTests`)。
+- ActivityKit への出し入れ: `Metamon/App/AppRuntime+LiveActivity.swift`(`LiveActivities`。操作は 1 本の列で順番に流す)。Renderer からは `DSLRuntime.timerActivity(_:)` 越し(Renderer は ActivityKit を知らない)。
+- 数字の更新: `AppRuntime.records` の didSet → `refreshLiveActivityStats()`(値が変わった時だけ `update`)。**アプリが止まっている間に別端末で増えた記録は反映されない**(push 無しのため。次に開いた時に更新)。
+- 見た目: `MetamonWidget/LiveActivityWidget.swift`。
+- Info.plist `NSSupportsLiveActivities = YES`。バックグラウンドモードや push の entitlement は**足していない**。審査用の版(Review)にも残す(権限ダイアログ無し・ユーザーが押した時だけ出る)。
+- 設定でライブアクティビティを切られていると startActivity は「ロック画面への表示が設定でオフになっています」を出す(タイマーは黙って出さない)。
+
+確認(ユニットテストでは ActivityKit は動かない):
+- **実機**(iPhone 14 Pro 以降で Dynamic Island。13 はロック画面のバナーのみ): `METAMON_INITIAL_EXAMPLE=ramen_timer` で起動 → タイマー開始 → ロックして残り時間が進む・0 で 00:00 → アプリに戻ると「終わりました」→ 15 分で消える。「行列に並ぶ」→ ロック画面に「行列に並び中」と今月の杯数 → 記録を足すと数字が変わる → 「席に着いた」で消える。
+- シミュレータでもロック画面(⌘L)と Dynamic Island(iPhone 17)の表示は確認できる。
 
 ## 13. アクセシビリティ最低限(Renderer・Issue #68)
 生成アプリ側(Renderer の全部品)で Dynamic Type・VoiceOver・コントラスト・Reduce Motion の最低線を守る。本体(`ios/Metamon/`)は対象外。
@@ -730,7 +754,18 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 
 注意(残課題): 記録中に別の画面へ移ると停止ボタンはその部品の画面にしか無い(背面では青いインジケータ・自動停止で担保)。アプリ全体の「記録中」バーは未実装。
 
-### 17.4 シミュレータでの確認手順(ヘッドレス)
+### 17.4 裏に回った時に続くもの・止まるもの(#423)
+| 機能 | 裏(画面ロック・別アプリ)で | 仕組み |
+|---|---|---|
+| 位置の記録 `locationTracker` | **続く**(自動停止まで) | `CLBackgroundActivitySession` + `UIBackgroundModes: location`(§17.3)。審査用の版では部品ごと外す |
+| タイマー `timerDisplay` | アプリの計算は止まるが、**時間は正しく進む** | 開始時刻から戻った時に計算し直す(§17.1)+ 終了通知 + `liveActivity` ならロック画面 / Dynamic Island の表示を OS が日付から描く |
+| 「いま◯◯中」`startActivity` | **表示は続く**(経過 / 残り時間は OS が描く) | 数字(stat)はアプリが動いている時に更新。最長 8 時間(iOS の制限) |
+| 裏の同期 | ときどき(OS 任せ・最短 15 分) | `BGAppRefreshTask`(§17.2) |
+| カメラ・録画(`photoField` / `videoField` / `qrScanner`) | **止まる**(iOS が背面のカメラを許さない) | 画面を出したまま使う。AI は頼まれたら「画面を出したまま(自動ロックを切って)」と案内する(`internal/ai/live_activity_rules.go`) |
+| 音声入力(マイク・WhisperKit) | **止まる** | 録音は前面のみ。`audio` モードは足していない |
+| 音の再生・読み上げ | 生成アプリの部品には今は無い | 部品で読み上げ(音声案内)を足す時に `UIBackgroundModes: audio` + `AVAudioSession(.playback, .duckOthers)` を一緒に入れる。**審査用の版で残すかはその時に決める**(`strip-review-plist.sh` は今 location だけ外す) |
+
+### 17.5 シミュレータでの確認手順(ヘッドレス)
 - `METAMON_E2E_TIMER_START=<部品 id>`(DEBUG)で、表示時に timerDisplay を開始する。例: `METAMON_INITIAL_EXAMPLE=gallery-structure METAMON_AUTO_OPEN=memo_form:sheet METAMON_E2E_TIMER_START=timer` → `xcrun simctl launch <UDID> com.apple.Preferences` で背面化 → 60 秒後に通知 → アプリを起動し直すと 00:00。
 - 同期は `METAMON_E2E_OFFLINE_SECONDS` + `METAMON_AUTO_RECORD` でオフライン記録 → 背面 → 前面で `[Metamon] background(foreground): ...` を確認。
 
