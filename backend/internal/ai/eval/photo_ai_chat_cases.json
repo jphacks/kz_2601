@@ -1,0 +1,6 @@
+[
+  {"id": "pc_receipt_can", "group": "photo-ai", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#418 写真の読み取りはできる(photoField.analyze)",
+   "steps": [{"say": "レシートを撮ったら金額を自動で入れてくれる家計簿ってできる?", "textNot": ["できません", "できない", "public", "private", "shared", "entity", "scope", "analyze", "computed"]}]},
+  {"id": "pc_live_count_cant", "group": "photo-ai", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#418 カメラ映像でのリアルタイムの回数カウントはできない(写真ごとの角度なら)",
+   "steps": [{"say": "カメラで撮りながらスクワットの回数を自動で数えてくれる機能はできる?", "textAny": ["できません", "できない"], "textNot": ["public", "private", "shared", "entity", "scope", "analyze", "computed"]}]}
+]
