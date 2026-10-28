@@ -35,6 +35,8 @@ public protocol DSLRuntime: AnyObject, Observable {
     func notifyReadOnly(entity: String)
     /// 自分の印(いいね・保存 #255)を付け外しする。確定した状態を返し、付けられなければ nil(ホストが理由を出す)。
     func toggleMark(entity: String, recordId: String, mark: String) async -> MarkState?
+    /// `timerDisplay.liveActivity`(#423): タイマーの開始・一時停止・リセット・終了をロック画面 / Dynamic Island に映す。
+    func timerActivity(_ update: TimerActivityUpdate)
 }
 
 public extension DSLRuntime {
@@ -49,6 +51,8 @@ public extension DSLRuntime {
     func notifyReadOnly(entity: String) {}
     /// 既定は付けない(プレビュー・テスト用ランタイム)。
     func toggleMark(entity: String, recordId: String, mark: String) async -> MarkState? { nil }
+    /// 既定は何もしない(プレビュー・テスト用ランタイム)。
+    func timerActivity(_ update: TimerActivityUpdate) {}
 
     /// 自分が更新できるレコードか(#249 / #252)。他人の共有レコードは entity.edit が members の時だけ。
     func canEdit(entity: String, record: Record) -> Bool {

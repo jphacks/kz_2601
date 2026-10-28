@@ -3,6 +3,7 @@ import Foundation
 public enum ActionType: String, Decodable, Sendable {
     case navigate, back, saveRecord, deleteRecord, openVoice, openUrl, resetForm
     case scheduleNotification, cancelNotification
+    case startActivity, endActivity // #423 ライブアクティビティ
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -31,9 +32,12 @@ public struct Action: Decodable, Sendable {
     public var notification: NotificationSpec?
     /// cancelNotification
     public var notificationId: String?
+    /// startActivity(#423)
+    public var activity: ActivitySpec?
 
     private enum Keys: String, CodingKey {
         case type, screen, presentation, prefillRef, entity, url, confirmMessage, notification, notificationId
+        case activity
     }
 
     public init(from decoder: Decoder) throws {
@@ -48,6 +52,7 @@ public struct Action: Decodable, Sendable {
         confirmMessage = try? c.decodeIfPresent(String.self, forKey: .confirmMessage)
         notification = try? c.decodeIfPresent(NotificationSpec.self, forKey: .notification)
         notificationId = try? c.decodeIfPresent(String.self, forKey: .notificationId)
+        activity = try? c.decodeIfPresent(ActivitySpec.self, forKey: .activity)
     }
 
     /// DSL 外でクライアントが合成するアクション(例: list の長押し削除)。
@@ -59,5 +64,25 @@ public struct Action: Decodable, Sendable {
         self.screen = screen
         self.presentation = presentation
         self.prefillRef = prefillRef
+    }
+}
+
+/// `startActivity` の中身(#423)。ロック画面と Dynamic Island に出す「いま◯◯中」。
+public struct ActivitySpec: Decodable, Equatable, Sendable {
+    public var title: String
+    public var subtitle: String?
+    /// SF Symbols 名(省略時 timer)
+    public var icon: String?
+    /// 今から N 分後を終わりに残り時間を数える。nil は経過時間
+    public var minutes: Int?
+    /// 一緒に出す stat / progressBar の部品 id
+    public var stat: String?
+
+    public init(title: String, subtitle: String? = nil, icon: String? = nil, minutes: Int? = nil, stat: String? = nil) {
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.minutes = minutes
+        self.stat = stat
     }
 }

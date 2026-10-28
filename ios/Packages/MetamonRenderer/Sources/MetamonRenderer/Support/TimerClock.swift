@@ -98,3 +98,43 @@ enum TimerNotifier {
         }
     }
 }
+
+/// `timerDisplay.liveActivity` でホストに渡す 1 回分の状態(#423)。ホストは ActivityKit に映すだけで、時間の計算はここで済ませる。
+public struct TimerActivityUpdate: Equatable, Sendable {
+    /// 部品ごとに一意(`TimerRunStore` のキーと同じ)
+    public var key: String
+    public var label: String
+    /// countdown の合計秒。stopwatch は nil
+    public var total: Int?
+    public var run: TimerRun
+
+    public init(key: String, label: String, total: Int?, run: TimerRun) {
+        self.key = key
+        self.label = label
+        self.total = total
+        self.run = run
+    }
+
+    public enum Phase: Equatable, Sendable {
+        /// 走行中。`start` は一時停止分を差し引いた見かけの開始時刻、`end` は countdown の終了時刻
+        case running(start: Date, end: Date?)
+        /// 一時停止中(表示する秒)
+        case paused(shown: Int)
+        /// countdown が 0 になった: 「終わりました」を少し残して消す
+        case finished
+        /// リセット: すぐ消す
+        case ended
+    }
+
+    public var phase: Phase {
+        if let startedAt = run.startedAt {
+            let start = startedAt.addingTimeInterval(-TimeInterval(run.base))
+            return .running(start: start, end: total.map { start.addingTimeInterval(TimeInterval($0)) })
+        }
+        if run.base == 0 { return .ended }
+        if let total {
+            return run.base >= total ? .finished : .paused(shown: total - run.base)
+        }
+        return .paused(shown: run.base)
+    }
+}

@@ -146,6 +146,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var zoom: String?           // mapView: near|city|wide(mapView の kind: pins|route・#168)
     public var mode: String?           // timerDisplay: stopwatch|countdown
     public var seconds: Int?           // timerDisplay countdown 初期秒
+    public var liveActivity: Bool?     // timerDisplay: ロック画面 / Dynamic Island にも出す(#423)
     public var shareTo: String?        // shareButton: any|line|slack|discord(`target` は progressBar の数値)
     // 入力系バッチ(slider / stepper / rating / textEditor)
     public var min: Double?            // slider / stepper / gauge
@@ -171,6 +172,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case kind, groupBy, bucket, prompt, size
         case expanded, itemWidth, columnCount
         case searchField, onDateTap, locationField, zoom, mode, seconds, shareTo
+        case liveActivity
         case name, color, value, target, url, image, message, columns, limit, dateField, titleField, subtitleField
         case min, max, step, minLines
         case by
@@ -230,6 +232,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         zoom = try? c.decodeIfPresent(String.self, forKey: .zoom)
         mode = try? c.decodeIfPresent(String.self, forKey: .mode)
         seconds = try? c.decodeIfPresent(Int.self, forKey: .seconds)
+        liveActivity = try? c.decodeIfPresent(Bool.self, forKey: .liveActivity)
         shareTo = try? c.decodeIfPresent(String.self, forKey: .shareTo)
         min = try? c.decodeIfPresent(Double.self, forKey: .min)
         max = try? c.decodeIfPresent(Double.self, forKey: .max)
