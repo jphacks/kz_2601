@@ -8,7 +8,7 @@ import (
 // #423: the rules reach the generation prompt and the schema-built catalog /
 // chat index list the new keys and actions.
 func TestLiveActivityRulesReachPrompts(t *testing.T) {
-	for _, want := range []string{"## ロック画面・Dynamic Island(ライブアクティビティ・#423)", `"liveActivity": true`, "type: endActivity"} {
+	for _, want := range []string{"## ロック画面・Dynamic Island(ライブアクティビティ・#423)", `"liveActivity": true`, "type: endActivity", "画面を出したまま"} {
 		if !strings.Contains(systemPrompt, want) {
 			t.Errorf("systemPrompt lacks %q", want)
 		}
