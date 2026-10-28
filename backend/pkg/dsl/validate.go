@@ -630,6 +630,8 @@ func (a *App) Validate() error {
 				checkChatThread(where, c, entities, add)
 			case CompHealthStat:
 				checkHealthStat(where, c, add)
+			case CompMusicPlayer:
+				checkMusicPlayer(where, c, add)
 			case CompNearbyShare:
 				if c.Label == "" {
 					add("%s: nearbyShare needs label", where)
@@ -646,6 +648,7 @@ func (a *App) Validate() error {
 		}
 	}
 	checkRecordNav(a, entities, add) // #256
+	checkMusicPlayerCount(a, add)
 
 	if len(p) > 0 {
 		return &ValidationError{Problems: p}

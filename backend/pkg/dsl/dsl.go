@@ -285,6 +285,8 @@ const (
 	CompChatThread ComponentType = "chatThread"
 	// device health (#167)
 	CompHealthStat ComponentType = "healthStat" // CoreMotion steps / HealthKit weight (no entity)
+	// music (#412): Apple Music player + song requests from nearby friends
+	CompMusicPlayer ComponentType = "musicPlayer"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -408,6 +410,10 @@ type Component struct {
 	// chatThread (#260). Entity / Placeholder / EmptyText are shared.
 	TextField  string `json:"textField,omitempty"`  // message body (string/text field)
 	PhotoField string `json:"photoField,omitempty"` // optional photo field
+
+	// musicPlayer (#412). Title is shared.
+	AllowRequests bool `json:"allowRequests,omitempty"` // accept song requests from nearby devices
+	AutoAccept    bool `json:"autoAccept,omitempty"`    // queue requests without asking
 }
 
 // GridRange is an inclusive integer range of gridTable rows.

@@ -77,6 +77,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompChatThread,
 		// device health
 		dsl.CompHealthStat,
+		// music (#412)
+		dsl.CompMusicPlayer,
 		// timetable
 		dsl.CompGridTable,
 		// video (#206)

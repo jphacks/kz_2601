@@ -676,6 +676,9 @@
         },
         {
           "$ref": "#/$defs/HealthStat"
+        },
+        {
+          "$ref": "#/$defs/MusicPlayer"
         }
       ]
     },
@@ -3451,6 +3454,38 @@
       },
       "description": "端末のヘルスデータを表示するカード。歩数は iPhone が自動で数えている値(entity も記録も不要)、体重はヘルスケアの最新値。「毎日の歩数を見たい」「今日何歩歩いた」「1 週間の歩数」「ヘルスケアの体重を見たい」など、自分で入力しない健康データを見たい時に選ぶ。権限が無い時・シミュレータでは理由を表示する。",
       "x-usage": "entity 不要でどの画面にも置ける。today は stat と同じ大きさ(半幅 2〜3 行・例 A1:C3)、week はグラフなので全幅 4〜5 行(例 A4:F8)。目標の話があれば target。手入力の体重記録アプリで「ヘルスケアにも保存」と言われたら、体重 field に health: \"weight\" を付ける(このカードとは別)。"
+    },
+    "MusicPlayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "musicPlayer"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "カードの見出し(任意・例: ドライブ BGM)。"
+        },
+        "allowRequests": {
+          "type": "boolean",
+          "description": "true = 近くにいる友だちの端末(同じアプリを開いた Tailor It・Wi-Fi / Bluetooth・インターネット不要)から曲のリクエストを受け付ける。届いたリクエストは承認するとこの端末の再生待ちに入る。既定 false。"
+        },
+        "autoAccept": {
+          "type": "boolean",
+          "description": "allowRequests のとき、届いたリクエストを確認せずに再生待ちへ入れる(運転中で画面を触れない時)。既定 false = 1 曲ずつ承認。"
+        }
+      },
+      "description": "Apple Music の音楽プレーヤー。曲を検索して再生待ちに入れ、再生・一時停止・次へ・前へと、今の曲(曲名・アーティスト・ジャケット)と再生待ちを表示する。イヤホンのボタン・ロック画面でも操作できる。allowRequests で近くの友だちの端末から曲のリクエストを受けられる。「音楽を流す」「ドライブの BGM」「プレイリスト」「友だちが曲を入れられる」の時に選ぶ。再生には Apple Music の契約が要る。Spotify は曲名で Spotify アプリを開くことだけでき、再生・操作はできない。entity は要らない。",
+      "x-usage": "entity 不要。1 アプリに 1 つだけ。ホーム(またはタブ)に全幅で大きく置く(例 A1:F12。他の部品と並べるなら A1:F8)。友だちから曲を入れたい話があれば allowRequests: true、運転中で確認できない・勝手に入れていいなら autoAccept: true も。"
     },
     "FilterMe": {
       "type": "object",
