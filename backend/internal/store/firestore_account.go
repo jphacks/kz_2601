@@ -10,7 +10,8 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-// users/{uid} {status: "deleted", deletedAt}. The document is otherwise never
+// users/{uid} {status: "deleted", deletedAt}, later {status: "purged",
+// purgedAt} (firestore_account_purge.go). The document is otherwise never
 // written (apps live in its subcollection), so absence means active.
 func (f *Firestore) userRef(uid string) *firestore.DocumentRef {
 	return f.c.Collection("users").Doc(uid)
@@ -61,8 +62,8 @@ func (f *Firestore) markDeleted(ctx context.Context, uid string) error {
 	return f.c.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
 		snap, err := tx.Get(ref)
 		if err == nil {
-			if st, _ := snap.DataAt("status"); st == AccountDeleted {
-				return nil
+			if st, _ := snap.DataAt("status"); st == AccountDeleted || st == AccountPurged {
+				return nil // keep the first deletedAt; never re-arm a purged tombstone
 			}
 		} else if !isNotFound(err) {
 			return err
@@ -81,7 +82,7 @@ func (f *Firestore) UserDeleted(ctx context.Context, uid string) (bool, error) {
 		return false, err
 	}
 	st, _ := snap.DataAt("status")
-	return st == AccountDeleted, nil
+	return st == AccountDeleted || st == AccountPurged, nil
 }
 
 // each calls fn for every document q returns.
