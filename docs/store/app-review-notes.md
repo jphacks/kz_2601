@@ -26,6 +26,10 @@
 | 審査用アカウント | App Store Connect の「サインイン情報」欄に入れる(このファイルやリポジトリには書かない) | `<demo account>` のまま貼らない |
 | バックエンド | 審査の期間中、ai / appconfig が動いていて、Claude の利用上限に余裕があること | — |
 | 連絡先 | 名前・メール・電話 | 公開リポジトリには書かない。貼る時に埋める |
+| **共有・公開のデータ(`scope: shared / public`・`chatThread`)を審査用の版で作らせないか** | `ClientCapabilities.reviewDisabledFeatures` に `sharedData`、`reviewExcludedComponents` に `.chatThread` があるか(`ad5ccb4` の時点では無い。[m0-early-release-readiness.md](../release/m0-early-release-readiness.md) の G2) | 無いままだと「no store of other users' content」は言えても、画面に「誰でも見られます(公開)」が出て 1.2 の質問を招く。外してから貼る |
+| **aiButton のオンライン版(`POST /v1/text`)を審査用の版で止めたか** | `supportsOnlineAIText` が審査用の版で false か(同 G4) | 止めないと PRIVACY の「記録の中身は送らない」と食い違う(オンライン版は最近の記録を最大 4KB 送る) |
+| **課金(Pro)を入れて出すか** | 同 G1。サーバーは Pro を判定しない(`ratelimit.New(..., nil)`) | 入れないなら IN-APP PURCHASE の段落と試し方の 5 の「Tailor It Pro」を消す |
+| MusicKit | App ID の App Services で MusicKit が有効か | 無いと musicPlayer の検索・再生が失敗する(2.1) |
 
 注: `webView` は AI が決めた https の URL を WKWebView で開く部品(`WebViewLeaf.swift`)。アプリとの橋渡し(JavaScript の注入・メッセージの受け取り)は無いが、ページ側の JavaScript は動く。「コード・JavaScript・WebView を実行しない」と書けなくなり、4.7(HTML5 のミニアプリ)の論点も増える。外しても困る用途は少ない(リンクは `openUrlButton` / `link` で Safari に渡せる)。
 
@@ -56,8 +60,9 @@ HOW IT WORKS - NO DOWNLOADED CODE (Guideline 2.5.2)
   binary does not know is shown as an empty placeholder and does nothing, so new
   component types can only arrive through an App Store update.
 - A user's trackers are personal content inside Tailor It (Guideline 1.2.1).
-  They are not separate apps: they cannot be installed, exported or run outside
-  Tailor It, and nothing is submitted to the App Store.
+  They are not separate apps: a tracker cannot be installed, exported or run outside
+  Tailor It, and nothing is submitted to the App Store. (Users can export their own
+  records as a CSV or PDF file through the system share sheet.)
 - This version has no public catalog, no store of other users' content and no
   share links.
 
@@ -66,8 +71,17 @@ Tailor It itself requests every permission, at the moment the user uses the feat
 - Microphone: voice input. Speech is transcribed on the device (WhisperKit).
 - Photos: attaching a picture from the photo library (system photo picker).
 - Camera: scanning a QR code into a field.
-- Location (while using the app only): saving the current place once, shown on a map.
+- Location (while using the app only): saving the current place once, shown on a map,
+  and walking/driving directions to a destination while the screen is open
+  (no background location).
+- Apple Music: searching and playing songs in a music player the user added
+  (MusicKit; playback needs the user's own Apple Music subscription).
 - Notifications: local reminders the user asks for (for example every morning at 8:00).
+- Live Activities: a timer or one number from the tracker on the Lock Screen,
+  only after the user starts it. Updated on the device, no push.
+- On-device processing: reading text or amounts from a photo the user picked
+  (Vision), and an optional "write with AI" button that uses Apple's on-device
+  model (Foundation Models). Neither sends the photo or the records anywhere.
 
 PRIVACY
 - Before the first AI request we show a consent screen. It explains that what the
@@ -136,8 +150,9 @@ Tailor It の審査をありがとうございます。
 - コード・スクリプト・JavaScript・WebView・プラグインをダウンロードも実行もしません。
   サーバーはすべての JSON をスキーマで確かめます。アプリは、バイナリが知らない部品を空の枠として
   出すだけで何もしないので、新しい部品はアプリの更新でしか増えません。
-- 記録帳は Tailor It の中の個人のコンテンツです(1.2.1)。別のアプリではなく、Tailor It の外で
-  インストール・書き出し・実行はできず、App Store に何かを出すこともありません。
+- 記録帳は Tailor It の中の個人のコンテンツです(1.2.1)。別のアプリではなく、記録帳を
+  Tailor It の外でインストール・書き出し・実行はできず、App Store に何かを出すこともありません
+  (自分の記録は、共有シートから CSV / PDF のファイルにできます)。
 - この版には、公開の一覧・他人の作ったものの店・共有リンクはありません。
 
 端末の機能
@@ -145,8 +160,15 @@ Tailor It の審査をありがとうございます。
 - マイク: 声の入力。書き起こしは端末の中(WhisperKit)。
 - 写真: 写真ライブラリから選んで添える(システムの写真ピッカー)。
 - カメラ: QR コードを読んで項目に入れる。
-- 位置(使用中のみ): 今いる場所を 1 回だけ保存し、地図で見る。
+- 位置(使用中のみ): 今いる場所を 1 回だけ保存し、地図で見る。画面を出している間だけ、
+  目的地までの道案内(背面の位置は使わない)。
+- Apple Music: ユーザーが置いた音楽プレーヤーで曲を探して再生する(MusicKit。再生には
+  本人の Apple Music の契約が要る)。
 - 通知: ユーザーが頼んだリマインダー(例: 毎朝 8 時)を端末で出す。
+- ライブアクティビティ: ユーザーが始めた時だけ、タイマーか記録帳の数字 1 つをロック画面に出す。
+  更新は端末の中だけ(push なし)。
+- 端末の中での処理: 選んだ写真から文字や金額を読む(Vision)、任意の「AI で書く」ボタン
+  (Apple の端末内モデル Foundation Models)。どちらも写真や記録を外に送らない。
 
 プライバシー
 - 最初に AI を使う前に同意画面を出します。話した・入力した内容、会話、記録帳の設計を、
@@ -183,7 +205,7 @@ App 内課金(Tailor It Pro・月額の自動更新)
 | 「Free users can create N new tools per day」 | `3 new trackers per day` | `ProProducts.dailyFreeCreations = 3` |
 | 「Settings > Account > Delete Account」「Settings > About」 | 設定(歯車)> アカウントを削除、設定 > プライバシー | 今の設定画面の並び(`SettingsSheet.swift`) |
 | 「tap "Try without account"」 | 「Use without signing in (anonymous)」 | 実際のボタンの文言 |
-| 権限の説明なし | DEVICE FEATURES を足した | 審査用の版に残るカメラ(QR)・位置(1 回)・写真・通知を、本体の機能として説明する(4.7.2・4.7.3 の論点) |
+| 権限の説明なし | DEVICE FEATURES を足した(10/30: 道案内・Apple Music・ライブアクティビティ・端末内の処理を追加。#411 #412 #418 #423 #417) | 審査用の版に残るカメラ(QR)・位置(1 回)・写真・通知を、本体の機能として説明する(4.7.2・4.7.3 の論点) |
 | 計算の説明なし | 決まった計算の仕組み(閉じた演算の一覧)を書いた | DSL に式(`computed` / `stat.value`)がある。「データだけ」と書いて式を伏せると、後で 2.3.1 の「誤解させる説明」になりうる |
 | 「never ... WebViews」 | `webView` を外した前提にし、外さない場合の差し替えを用意 | 今の審査用の版(#284)には `webView` 部品が残っている |
 | 「Demo account: reviewer@<domain> / <password>」 | サインイン情報の欄に入れる | 公開リポジトリに書かない |
