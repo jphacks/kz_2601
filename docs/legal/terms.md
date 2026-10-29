@@ -1,10 +1,9 @@
 # Tailor It 利用規約
 
-<!-- 未定の値: {{OPERATOR_NAME}}(運営者名・個人)、{{CONTACT_EMAIL}}(問い合わせ・通報のメール)。決まったら docs/legal/*.md の全箇所を一括で置き換える -->
 
 施行日: 2026年10月30日
-運営者: {{OPERATOR_NAME}}
-連絡先: {{CONTACT_EMAIL}}
+運営者: 高岡己太朗
+連絡先: support@tailor-it.app
 
 この利用規約(以下「本規約」)は、Tailor It(以下「本アプリ」)の利用条件を定めます。本アプリを使う方(以下「ユーザー」)は、本規約と [プライバシーポリシー](privacy-policy.md) に同意したものとみなします。
 
@@ -33,7 +32,7 @@
 
 ## 6. 共有したコンテンツ
 - 共有したアプリの内容の責任はユーザーにあります。運営者は、本規約に反すると判断した共有を、予告なく取り下げることがあります。
-- 不適切な共有を見つけた場合は、{{CONTACT_EMAIL}} へ知らせてください。
+- 不適切な共有を見つけた場合は、support@tailor-it.app へ知らせてください。
 
 ## 7. 免責
 - 本アプリは現状のまま提供します。データの消失、サービスの停止・変更によって生じた損害について、運営者は、故意または重大な過失がある場合を除き、責任を負いません。大切な記録は、ユーザー自身でも控えを取ってください。
@@ -46,8 +45,8 @@
 - 本規約は日本法に従います。紛争は 運営者の住所地を管轄する地方裁判所を第一審の専属的合意管轄裁判所とします。
 
 ## 10. お問い合わせ
-- {{OPERATOR_NAME}}
-- メール: {{CONTACT_EMAIL}}
+- 高岡己太朗
+- メール: support@tailor-it.app
 
 ---
 
@@ -55,11 +54,11 @@
 
 > This summary is for convenience. The Japanese text above prevails.
 
-- **Operator:** {{OPERATOR_NAME}} (individual). **Effective:** October 30, 2026.
+- **Operator:** Kotaro Takaoka (高岡己太朗) (individual). **Effective:** October 30, 2026.
 
 - Tailor It lets you build and edit personal apps (records, lists, charts) by speaking or typing. Apps run inside Tailor It using built-in components only; no code is executed.
 - Generation and chat use a third-party AI (Anthropic's Claude) and require your prior consent. AI output is not guaranteed to be accurate; verify anything important yourself.
 - Sign in with Apple or anonymously. You can delete your account in Settings at any time.
 - Basic use is free. AI features have a daily usage limit, which may change; the app tells you when you reach it. Some builds have no in-app purchase. If **Tailor It Pro** (auto-renewable subscription) is offered, its details and price are shown before purchase, and billing, renewal, cancellation and refunds follow Apple's terms. Cancel at least 24 hours before renewal in iOS Settings.
-- Do not create or share illegal, infringing, harmful, sexual or discriminatory content, abuse the service, or impersonate others. We may remove shared content that violates these terms. Report inappropriate content to {{CONTACT_EMAIL}}.
-- The service is provided as is. Governing law: Japan. Exclusive jurisdiction of first instance: the district court having jurisdiction over the operator's address. Contact: {{CONTACT_EMAIL}}
+- Do not create or share illegal, infringing, harmful, sexual or discriminatory content, abuse the service, or impersonate others. We may remove shared content that violates these terms. Report inappropriate content to support@tailor-it.app.
+- The service is provided as is. Governing law: Japan. Exclusive jurisdiction of first instance: the district court having jurisdiction over the operator's address. Contact: support@tailor-it.app

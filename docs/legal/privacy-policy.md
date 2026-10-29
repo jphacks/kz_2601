@@ -1,10 +1,9 @@
 # Tailor It プライバシーポリシー
 
-<!-- 未定の値: {{OPERATOR_NAME}}(運営者名・個人)、{{CONTACT_EMAIL}}(問い合わせ・通報のメール)。決まったら docs/legal/*.md の全箇所を一括で置き換える。公開 URL が決まったら ios/Metamon/Features/Consent/LegalDocuments.swift の publicURL と App Store Connect に登録する -->
 
 施行日: 2026年10月30日
-運営者: {{OPERATOR_NAME}}
-連絡先: {{CONTACT_EMAIL}}
+運営者: 高岡己太朗
+連絡先: support@tailor-it.app
 
 Tailor It(以下「本アプリ」)は、話した内容や入力した文から、自分専用のアプリ(記録・一覧・集計などの画面)を作って直せる iOS アプリです。本ポリシーは、本アプリが集める情報、使い道、送り先、保存と削除について説明します。
 
@@ -82,8 +81,8 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 - 本ポリシーを変える場合はアプリ内でお知らせします。AI に送る情報や送り先を変える場合は、改めて同意をいただきます。
 
 ## 7. お問い合わせ
-- {{OPERATOR_NAME}}
-- メール: {{CONTACT_EMAIL}}
+- 高岡己太朗
+- メール: support@tailor-it.app
 
 ---
 
@@ -91,7 +90,7 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 
 > This summary is for convenience. The Japanese text above prevails.
 
-- **Operator:** {{OPERATOR_NAME}} (individual). **Effective:** October 30, 2026.
+- **Operator:** Kotaro Takaoka (高岡己太朗) (individual). **Effective:** October 30, 2026.
 - **Sign-in:** Sign in with Apple or anonymous, via Google Firebase Authentication. Firebase stores your user ID and, if Apple provides them, your name and email (or Apple's private relay address). Our own server (Firestore) uses only the user ID.
 - **Voice:** Speech is transcribed **on the device** (WhisperKit). **Audio is never uploaded.**
 - **Third-party AI:** Only **after your explicit consent**, the transcribed/typed request, the current conversation and the current app design (screen/field names) are sent through our server (Google Cloud Run, Tokyo) to **Anthropic, PBC (USA, "Claude")** solely to build or edit your app. The contents of your records are not sent when building, editing or chatting. If your app has an "AI write" button (where available) and you tap it, the recent records or form values configured for that button (up to 4KB of text) are sent. Under Anthropic's commercial terms, API inputs and outputs are not used to train their models. Without consent you can still view and use your apps. You can withdraw consent in Settings at any time.
@@ -102,4 +101,4 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 - **No ads, tracking or analytics SDKs.** We do not sell data.
 - **Deletion:** Delete your account in Settings. Server data becomes unavailable immediately and is erased within 30 days. Posts in apps shared with others remain.
 - **Children:** Not intended for children under 13.
-- **Contact:** {{CONTACT_EMAIL}}
+- **Contact:** support@tailor-it.app
