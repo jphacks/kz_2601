@@ -29,7 +29,7 @@ struct AIConsentView: View {
                     Text("送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作るためだけに使います。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                    Text("記録したデータ(数値・メモ・写真など)の中身は送りません。同意しなくても、作ったアプリの閲覧・記録はできます。生成と対話だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。")
+                    Text("アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、アプリの「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {

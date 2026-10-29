@@ -8858,19 +8858,19 @@
         }
       }
     },
-    "記録したデータ(数値・メモ・写真など)の中身は送りません。同意しなくても、作ったアプリの閲覧・記録はできます。生成と対話だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。": {
+    "アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、アプリの「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The contents of your records (numbers, notes, photos, etc.) are not sent. Without consent you can still view and record in your apps; only generation and chat are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled)."
+            "value": "When you build or edit an app, the contents of your records (numbers, notes, photos, etc.) are not sent. However, if an app's \"Write with AI\" button uses the server AI, pressing it sends that app's recent records and the text being entered, only to write that text (photos, audio and video are not sent). Without consent you can still view and record in your apps; only AI features are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled)."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "記録したデータ(数値・メモ・写真など)の中身は送りません。同意しなくても、作ったアプリの閲覧・記録はできます。生成と対話だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"
+            "value": "アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、アプリの「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"
           }
         }
       }
@@ -9147,19 +9147,19 @@
         }
       }
     },
-    "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります。同意を取り消すと、生成と対話が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。": {
+    "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録も送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "When you build or edit an app, what you said, the conversation and the app design are sent to Anthropic's AI. If you withdraw consent, generation and chat are disabled (viewing and recording still work). Data already sent cannot be recalled."
+            "value": "When you build or edit an app, what you said, the conversation and the app design are sent to Anthropic's AI (the contents of your records are not). If a \"Write with AI\" button uses the server AI, pressing it also sends that app's recent records. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります。同意を取り消すと、生成と対話が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
+            "value": "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録も送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
           }
         }
       }
