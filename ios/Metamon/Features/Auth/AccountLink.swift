@@ -129,13 +129,13 @@ struct AccountLinkPromptSheet: View {
     }
 }
 
-/// RootView に付ける: 案内シートは他のシート(発話・同意・フォーム)が閉じてから出す。
+/// RootView に付ける: 案内シートは他のシート(発話・同意・フォーム)と「個人の情報も公開されます」の確認が閉じてから出す。
 struct AccountLinkPromptHost: ViewModifier {
     @Environment(AppRuntime.self) private var rt
 
     func body(content: Content) -> some View {
         content.sheet(isPresented: Binding(
-            get: { rt.showLinkPrompt && !rt.showVoiceSheet && !rt.showAIConsent && !rt.showAppSwitcher && rt.sheet == nil && rt.fullScreen == nil },
+            get: { rt.showLinkPrompt && !rt.showVoiceSheet && !rt.showAIConsent && !rt.showAppSwitcher && rt.sheet == nil && rt.fullScreen == nil && rt.publicDataPrompt == nil },
             set: { if !$0 { rt.showLinkPrompt = false } }
         )) {
             AccountLinkPromptSheet()
