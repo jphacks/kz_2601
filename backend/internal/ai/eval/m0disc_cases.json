@@ -24,6 +24,7 @@
   {"id": "d_baby", "kind": "create", "group": "m0-family", "transcript": "赤ちゃんの授乳とおむつ替えの時間を記録して、前回から何時間たったか見たい", "note": "経過時間", "expect": {"computed": true}},
   {"id": "d_collection", "kind": "create", "group": "m0-hobby", "transcript": "推しのグッズのコレクション管理。写真と値段と買った日、合計いくら使ったか", "expect": {"photo": true, "has": ["stat"]}},
   {"id": "d_travel", "kind": "create", "group": "m0-location", "transcript": "旅行で行った場所を地図にピンで残して、写真とメモもつけたい", "expect": {"photo": true, "has": ["locationPicker", "mapView"]}},
+  {"id": "d_drive_nav", "kind": "create", "group": "m0-location", "transcript": "ドライブ用に目的地までナビしてくれるアプリ", "expect": {"has": ["routeGuide"], "routeMode": "automobile", "unreachable": 0}, "note": "#411 ナビ = routeGuide(地図アプリへ飛ばすだけにしない)"},
   {"id": "d_video_diary", "kind": "create", "group": "m0-media", "transcript": "1日1秒の動画日記。毎日短い動画を撮ってためていきたい", "expect": {"has": ["videoField"]}},
   {"id": "d_split_trip", "kind": "create", "group": "m0-money", "transcript": "旅行の割り勘。友達それぞれが払った分を入力して、最後に誰が誰にいくら払えばいいか出して、友達のスマホからも入力したい", "expect": {"settlement": true, "shared": true}},
   {"id": "d_lot_duty", "kind": "create", "group": "m0-game", "transcript": "掃除当番をくじ引きで決めたい。メンバーを登録しておいて、押したら1人選ばれるやつ", "expect": {"has": ["randomPicker", "list"], "unreachable": 0}, "note": "#263 くじ・当番決め"},

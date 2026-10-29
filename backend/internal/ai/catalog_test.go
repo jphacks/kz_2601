@@ -58,7 +58,7 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompImage, dsl.CompList, dsl.CompStat, dsl.CompChart, dsl.CompVoiceInput, dsl.CompSpacer, dsl.CompDivider,
 		dsl.CompCard, dsl.CompDisclosure, dsl.CompCarousel, dsl.CompGrid,
 		dsl.CompSearchBar, dsl.CompCalendar, dsl.CompShareButton, dsl.CompOpenURLButton,
-		dsl.CompMapView, dsl.CompLocationButton, dsl.CompLocationPicker, dsl.CompQrScanner, dsl.CompTimerDisplay, dsl.CompWebView,
+		dsl.CompMapView, dsl.CompLocationButton, dsl.CompLocationPicker, dsl.CompRouteGuide, dsl.CompQrScanner, dsl.CompTimerDisplay, dsl.CompWebView,
 		dsl.CompSlider, dsl.CompStepper, dsl.CompTextEditor, dsl.CompSecureField, dsl.CompTimePicker, dsl.CompColorPicker, dsl.CompRating,
 		// display
 		dsl.CompLabel, dsl.CompIcon, dsl.CompProgressBar, dsl.CompGauge, dsl.CompBadge, dsl.CompLink, dsl.CompMarkdown,

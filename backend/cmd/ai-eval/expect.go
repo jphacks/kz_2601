@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -58,6 +59,9 @@ var expectKeys = map[string]expectKind{
 	"markEntity": expectBool,
 	// checkGroupBy (#261, PR #404)
 	"groupedTable": expectBool,
+	// checkRoute (#411)
+	"routeDest": expectString,
+	"routeMode": expectString,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,
@@ -122,6 +126,14 @@ func validateExpect(exp map[string]any) []string {
 		case "scope":
 			if s := v.(string); s != "public" && s != "shared" && s != "private" {
 				bad = append(bad, "scope must be public|shared|private: "+s)
+			}
+		case "routeDest":
+			if s := v.(string); !slices.Contains(routeDests, s) {
+				bad = append(bad, "routeDest must be entity|record|address|any: "+s)
+			}
+		case "routeMode":
+			if s := v.(string); !slices.Contains(routeModes, s) {
+				bad = append(bad, "routeMode must be automobile|walking: "+s)
 			}
 		}
 	}

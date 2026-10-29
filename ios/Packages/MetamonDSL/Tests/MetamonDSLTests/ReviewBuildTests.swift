@@ -8,7 +8,7 @@ final class ReviewBuildTests: XCTestCase {
         let allowed = Set(ClientCapabilities.reviewAllowedComponents)
         for t in ClientCapabilities.reviewExcludedComponents { XCTAssertFalse(allowed.contains(t.rawValue), t.rawValue) }
         XCTAssertFalse(allowed.contains(ComponentType.unknown.rawValue))
-        for t in ["vstack", "list", "photoField", "videoField", "chart", "stat", "settlement", "calendar", "gridTable", "locationButton"] {
+        for t in ["vstack", "list", "photoField", "videoField", "chart", "stat", "settlement", "calendar", "gridTable", "locationButton", "routeGuide"] {
             XCTAssertTrue(allowed.contains(t), t)
         }
         XCTAssertEqual(ClientCapabilities.reviewDisabledFeatures, ["fieldHealth", "cameraCapture"])
@@ -33,7 +33,7 @@ final class ReviewBuildTests: XCTestCase {
     /// 主要な発話(家計簿・習慣・日記・TODO・割り勘)のモックが返す / 代表する同梱例は、外した部品を使わない。
     func testMainExamplesWorkWithoutExcludedComponents() throws {
         let excluded = Set(ClientCapabilities.reviewExcludedComponents.map(\.rawValue))
-        for name in ["kakeibo", "medicine", "diary_ai", "shopping", "warikan", "training", "walk", "timetable", "water"] {
+        for name in ["kakeibo", "medicine", "diary_ai", "shopping", "warikan", "training", "walk", "timetable", "water", "drive"] {
             let dsl = try ExamplesFixture.load(name)
             XCTAssertTrue(types(dsl).isDisjoint(with: excluded), "\(name) uses \(types(dsl).intersection(excluded))")
             XCTAssertTrue(dsl.entities.allSatisfy { $0.fields.allSatisfy { $0.health == nil } }, "\(name) uses Field.health")

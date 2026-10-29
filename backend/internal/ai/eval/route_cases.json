@@ -1,0 +1,7 @@
+[
+  {"id": "r_drive", "kind": "create", "group": "route", "transcript": "ドライブ用に目的地までナビしてくれるアプリ", "note": "#411 行き先を登録して選ぶ(entity)・車", "expect": {"has": ["routeGuide"], "routeDest": "any", "routeMode": "automobile", "unreachable": 0, "substitution": false}},
+  {"id": "r_shops_guide", "kind": "create", "group": "route", "transcript": "行きたいお店を検索して登録して、行くときはそこまで道案内してほしい", "note": "#411 locationPicker で選んだ場所へ案内", "expect": {"has": ["routeGuide", "locationPicker"], "routeDest": "any", "unreachable": 0}},
+  {"id": "r_walk_station", "kind": "create", "group": "route", "transcript": "毎朝、家から金沢駅まで歩いて行く道を音声で案内してくれるアプリ", "note": "#411 固定の行き先(address)・徒歩", "expect": {"has": ["routeGuide"], "routeDest": "address", "routeMode": "walking"}},
+  {"id": "r_edit_add_guide", "kind": "edit", "base": "r_shops_guide", "group": "route", "transcript": "お店の画面に、そこまでの行き方を案内するボタンを足して", "note": "#411 既存の location field へ案内を add", "expect": {"patch": true, "has": ["routeGuide"], "routeDest": "any", "unreachable": 0}},
+  {"id": "r_bicycle", "kind": "create", "group": "route", "transcript": "自転車で目的地まで渋滞を避けて案内してくれるナビ", "note": "#411 自転車・渋滞回避はできない → 正直に伝えて車/徒歩の routeGuide", "expect": {"has": ["routeGuide"], "substitution": true}}
+]
