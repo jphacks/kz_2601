@@ -18,6 +18,23 @@
         }
       }
     },
+    "Tailor It で記録帳を用意するとここに数字が出ます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up a tracker in Tailor It to see numbers here"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailor It で記録帳を用意するとここに数字が出ます"
+          }
+        }
+      }
+    },
     "Tailor It の数字": {
       "extractionState": "manual",
       "localizations": {
@@ -82,6 +99,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "作ったアプリの集計(今月の支出など)をホーム画面とロック画面に表示します。"
+          }
+        }
+      }
+    },
+    "用意した記録帳の集計(今月の支出など)をホーム画面とロック画面に表示します。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows totals from your trackers (such as this month’s spending) on the Home Screen and Lock Screen."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用意した記録帳の集計(今月の支出など)をホーム画面とロック画面に表示します。"
+          }
+        }
+      }
+    },
+    "記録帳を用意すると数字が出ます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up a tracker to see numbers"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳を用意すると数字が出ます"
           }
         }
       }
