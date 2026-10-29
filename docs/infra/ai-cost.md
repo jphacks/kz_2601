@@ -66,9 +66,9 @@ export PROJECT_ID="jphacks-kz2601"
 export REGION="asia-northeast1"
 export AI_SERVICE="ai-stg"   # 本番は本番の ai サービス名に替える
 
-# 1) データセット(ログは 400 日で消す)
+# 1) データセット(生のログは 90 日で消す。プライバシーポリシーの保存期間を先に 90 日に直してから作る・#297)
 bq --location="$REGION" mk --dataset \
-  --default_partition_expiration=34560000 \
+  --default_partition_expiration=7776000 \
   "${PROJECT_ID}:ai_usage"
 
 # 2) ai.usage だけを流すシンク(日付パーティション)
