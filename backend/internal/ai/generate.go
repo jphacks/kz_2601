@@ -369,6 +369,8 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			//   3. addMissingAddButtons (#173): runs after 2 so it sees the final
 			//      openers (a button moved to the toolbar still counts) and never
 			//      adds a toolbar button that 2 would then dedupe or move.
+			//   3b. dropDuplicateAddToolbar (#416): a toolbar ＋ opening the same
+			//      form as a button on the screen goes (the button stays).
 			//   4. summarizeFor below (summary hints, #173) last, so the spoken
 			//      button positions describe the final layout.
 			if fixed := addMissingLists(raw, app); len(fixed) != len(raw) {
@@ -387,6 +389,11 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 				}
 			}
 			if fixed := addMissingAddButtons(raw, app, loc); len(fixed) != len(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
+			if fixed := dropDuplicateAddToolbar(raw, app); len(fixed) != len(raw) {
 				if fixedApp, err := dsl.Parse(fixed); err == nil {
 					raw, app = fixed, fixedApp
 				}

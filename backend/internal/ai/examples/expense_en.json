@@ -28,9 +28,6 @@
     {
       "id": "home",
       "title": "Expenses",
-      "toolbar": [
-        { "label": "Add", "icon": "plus", "action": { "type": "navigate", "screen": "expense_form", "presentation": "sheet" } }
-      ],
       "components": [
         { "type": "stat", "id": "total", "area": "A1:F2", "label": "Spent this month", "entity": "expense", "aggregate": "sum", "field": "amount", "format": "currency",
           "filter": { "field": "date", "op": "thisMonth", "value": null } },

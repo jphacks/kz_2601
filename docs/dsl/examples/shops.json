@@ -85,18 +85,7 @@
         }
       ],
       "id": "home",
-      "title": "行きたいお店",
-      "toolbar": [
-        {
-          "action": {
-            "presentation": "sheet",
-            "screen": "shop_form",
-            "type": "navigate"
-          },
-          "icon": "plus",
-          "label": "追加"
-        }
-      ]
+      "title": "行きたいお店"
     },
     {
       "components": [

@@ -26,7 +26,8 @@ public struct ScreenView: View {
                         ToolbarItem(placement: .topBarTrailing) { accessory }
                     }
                     ToolbarItemGroup(placement: .topBarTrailing) {
-                        ForEach(screen.toolbar.filter { tb in !FormSaveBar.pinned(in: screen).contains { $0.id == tb.id } && ButtonLeaf.isVisible(action: tb.action, form: form) }) { tb in
+                        // 同じフォームを開く button がある画面では右上の＋を出さない(#416)
+                        ForEach(DuplicateAddControl.toolbar(of: screen, in: rt.dsl).filter { tb in !FormSaveBar.pinned(in: screen).contains { $0.id == tb.id } && ButtonLeaf.isVisible(action: tb.action, form: form) }) { tb in
                             Button {
                                 Task { await rt.run(tb.action, ctx.actionContext()) }
                             } label: {

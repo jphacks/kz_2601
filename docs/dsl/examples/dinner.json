@@ -24,9 +24,6 @@
     {
       "id": "home",
       "title": "今日の晩ごはん",
-      "toolbar": [
-        { "label": "追加", "icon": "plus", "action": { "type": "navigate", "screen": "dish_form", "presentation": "sheet" } }
-      ],
       "components": [
         {
           "type": "randomPicker", "id": "pick", "area": "A1:F5", "title": "今日の晩ごはん",

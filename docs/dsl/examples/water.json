@@ -24,9 +24,6 @@
     {
       "id": "home",
       "title": "水分記録",
-      "toolbar": [
-        { "label": "追加", "icon": "plus", "action": { "type": "navigate", "screen": "drink_form", "presentation": "sheet" } }
-      ],
       "components": [
         {
           "type": "card", "id": "today", "area": "A1:F3", "title": "今日",

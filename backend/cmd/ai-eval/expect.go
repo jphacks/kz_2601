@@ -84,6 +84,8 @@ var expectKeys = map[string]expectKind{
 	"keepEntity": expectString,
 	"keep":       expectStrings,
 	"growTo":     expectNumber,
+	// checkExpect (#416)
+	"oneAdd": expectBool,
 }
 
 var hhmm = regexp.MustCompile(`^([01]\d|2[0-3]):[0-5]\d$`)

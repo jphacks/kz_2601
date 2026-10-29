@@ -273,6 +273,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 | どの根からも辿れない画面 | 警告(`Lint`)。フォームは追加ボタンや `list.onItemTap` から辿れれば可(entity のフォームが 1 つも辿れない時は従来の「form screen is not reachable」1 件だけ) | 表示はできるので保存済み DSL を壊さない。声で直せばよい |
 | タブがあるのに `initialScreen` がタブの根でない | 警告 | 起動画面が意図と違う |
 | `fullScreen` で開く画面に戻る手段(`back` か、遷移先指定の無い `saveRecord`)が無い | 警告 | iOS は fullScreenCover に閉じるボタンを自動で付けないので閉じ込められる。push は OS の戻る、sheet は下スワイプで戻れるので対象外 |
+| 同じ画面の toolbar(右上の＋)と `button` が、同じフォーム画面(`screen.entity`)を同じ `prefillRef` で開く(#416) | 警告(`Lint`)。生成時は toolbar 側を消す(`dropDuplicateAddToolbar`)。iOS は保存済み DSL でも toolbar 側を出さない(`DuplicateAddControl`) | 同じ「追加」が 2 つ並ぶ。押しやすい右下の button を残し、button が無い画面だけ toolbar の＋にする |
 
 - 警告は `Meta.lint` に載るだけで再生成は起こさない(`AI_LINT_RETRY=1` の時だけ 1 回再生成)。
 - AI 側の基準(`internal/ai/prompt.go`): 役割の違う一覧・集計・設定はタブ(2〜4 個)、入力はフォーム画面を sheet、詳細は `list.onItemTap` で push、1 画面の直下は 8 部品まで、孤立画面を作らない。navigate はどこからどこへ飛んでもよい前提(タブの根へ飛んだらタブ切替は iOS 側 #113)。

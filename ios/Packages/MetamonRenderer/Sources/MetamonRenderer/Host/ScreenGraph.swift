@@ -143,7 +143,7 @@ public struct ScreenGraph: Equatable, Sendable {
                     break
                 }
             }
-            for t in s.toolbar { add(t.action, .toolbar(t.label)) }
+            for t in DuplicateAddControl.toolbar(of: s, in: dsl) { add(t.action, .toolbar(t.label)) } // 画面に出ない重複の＋は数えない(#416)
             for c in s.allComponents {
                 add(c.action, c.type == .button ? .button(c.label ?? c.text ?? "") : .other)
                 add(c.onItemTap, .itemTap)

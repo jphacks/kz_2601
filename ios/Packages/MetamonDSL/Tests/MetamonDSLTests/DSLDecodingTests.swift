@@ -48,7 +48,8 @@ final class DSLDecodingTests: XCTestCase {
         XCTAssertTrue(form.allComponents.contains { $0.type == .datePicker })
         XCTAssertEqual(form.referencedEntities, ["expense"])
         let home = try XCTUnwrap(dsl.screen("home"))
-        XCTAssertEqual(home.toolbar.first?.action.presentation, .sheet)
+        XCTAssertTrue(home.toolbar.isEmpty, "追加は右下の button だけ(#416)")
+        XCTAssertEqual(home.allComponents.first { $0.type == .button }?.action?.presentation, .sheet)
         XCTAssertTrue(home.allComponents.contains { $0.type == .list && $0.onItemTap?.type == .navigate })
     }
 
