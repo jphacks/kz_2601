@@ -17,7 +17,8 @@ final class AddButtonDedupUITests: XCTestCase {
     func testOnlyOneAddControl() {
         app = XCUIApplication()
         app.launchEnvironment = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto", "METAMON_AI_CONSENT": "granted", "METAMON_CLARIFY": "0"]
-        app.launchArguments = ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP", "-metamon.appLanguage", "ja"]
+        app.launchArguments = ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP", "-metamon.appLanguage", "ja",
+                               "-metamon.accountLinkPrompted", "YES"] // 初回だけの引き継ぎの案内を出さない
         app.launch()
 
         let field = app.descendants(matching: .any)["composer.field"].firstMatch

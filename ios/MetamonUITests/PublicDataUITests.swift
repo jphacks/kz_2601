@@ -14,11 +14,12 @@ final class PublicDataUITests: XCTestCase {
         app = nil
     }
 
-    private func launch(clarify: Bool) {
+    private func launch(clarify: Bool, linkPrompted: Bool = true) {
         app = XCUIApplication()
         app.launchEnvironment = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto", "METAMON_AI_CONSENT": "granted",
                                  "METAMON_CLARIFY": clarify ? "1" : "0"]
-        app.launchArguments = ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP", "-metamon.appLanguage", "ja"]
+        app.launchArguments = ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP", "-metamon.appLanguage", "ja",
+                               "-metamon.accountLinkPrompted", linkPrompted ? "YES" : "NO"]
         app.launch()
     }
 
@@ -55,6 +56,23 @@ final class PublicDataUITests: XCTestCase {
         XCTAssertTrue(app.textFields["お名前"].firstMatch.waitForExistence(timeout: 10) || app.staticTexts["お名前"].firstMatch.waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["publicDataNotice"].firstMatch.exists, "公開のフォームに「誰でも見られます」が無い")
         attach("pii-form-notice")
+    }
+
+    /// 初めて作った後の「引き継ぎのためにサインイン」の案内は、このダイアログに答えてから出る(先に出るとダイアログが出ない)
+    func testLinkPromptWaitsForDialog() {
+        launch(clarify: false, linkPrompted: false)
+        say("美容室の予約アプリを作って")
+
+        let alert = app.alerts["個人の情報も公開されます"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 30), "引き継ぎの案内が先に出てダイアログが出ない")
+        let link = app.staticTexts["作ったアプリを残しておきませんか"].firstMatch
+        XCTAssertFalse(link.waitForExistence(timeout: 5), "ダイアログに答える前に引き継ぎの案内が出た")
+        XCTAssertTrue(alert.exists, "引き継ぎの案内でダイアログが消えた")
+
+        alert.buttons["公開のままにする"].tap()
+        XCTAssertTrue(link.waitForExistence(timeout: 10), "ダイアログに答えた後に引き継ぎの案内が出ない")
+        app.buttons["あとで"].firstMatch.tap()
+        XCTAssertTrue(waitGone(link))
     }
 
     /// 「自分だけにする」で修正が走り、公開の表示が消える
