@@ -5,9 +5,10 @@ import Foundation
 /// 通常のビルドは nil(送らない)= backend は今まで通り全部使う。契約: docs/backend/openapi-ai.yaml
 public enum ClientCapabilities {
     /// 審査用ビルドでバイナリから外す部品(Renderer の登録もしない)。
-    public static let reviewExcludedComponents: Set<ComponentType> = [.healthStat, .locationTracker, .nearbyShare, .dashcam, .sensorValue, .audioRecorder, .webView]
-    /// 審査用ビルドで無効にする機能。fieldHealth = Field.health(HealthKit への書き込み)、cameraCapture = photoField / videoField の撮影。
-    public static let reviewDisabledFeatures = ["fieldHealth", "cameraCapture"]
+    public static let reviewExcludedComponents: Set<ComponentType> = [.healthStat, .locationTracker, .nearbyShare, .dashcam, .sensorValue, .audioRecorder, .webView, .chatThread]
+    /// 審査用ビルドで無効にする機能。fieldHealth = Field.health(HealthKit への書き込み)、cameraCapture = photoField / videoField の撮影、
+    /// sharedData = entity の scope shared / public(他の人と同じ記録を見る作り・#451 G2。backend が private に直す)。
+    public static let reviewDisabledFeatures = ["fieldHealth", "cameraCapture", "sharedData"]
 
     /// 審査用ビルドのときの部品の allowlist(`unknown` を除く全 type − 外した部品)。
     public static var reviewAllowedComponents: [String] {

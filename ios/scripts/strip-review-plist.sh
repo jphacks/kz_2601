@@ -26,8 +26,8 @@ done
 "$PB" -c "Set :NSLocationWhenInUseUsageDescription 生成したアプリで、ボタンを押した時の現在地を記録・地図に表示したり、案内を開始した時に目的地まで道案内したりするために使います。" "$PLIST"
 "$PB" -c "Set :NSPhotoLibraryAddUsageDescription 生成したアプリの共有ボタンや QR コードの画像を写真に保存するために、写真ライブラリへの追加を使用します。" "$PLIST"
 
-# 外した部品を使う同梱の例(docs/dsl/examples)もバンドルから外す(DSLExamples.reviewExcluded と一致させる)
-for name in attendance_nearby walk_route health dashcam sensors gallery-web; do
+# 外した部品・共有 / 公開の記録(#451 G2)を使う同梱の例(docs/dsl/examples)もバンドルから外す(DSLExamples.reviewExcluded と一致させる)
+for name in attendance_nearby walk_route health dashcam sensors gallery-web chat board ranking post_comments recipes; do
   rm -f "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/${name}.json"
 done
 echo "strip-review-plist: removed review-excluded keys from ${PLIST}"

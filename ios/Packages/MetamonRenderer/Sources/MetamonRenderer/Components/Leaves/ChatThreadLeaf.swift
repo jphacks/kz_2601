@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#451 G2)ではバイナリから外す(他の人と記録を見る作り。1.2 の通報・ブロックが無い)。
+#if !APP_STORE_REVIEW
 import SwiftUI
 import PhotosUI
 import MetamonDSL
@@ -261,3 +263,4 @@ enum ChatInputInset {
         return min((fab.maxX - bar.minX + gap).rounded(.up), bar.width / 2)
     }
 }
+#endif

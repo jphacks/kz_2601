@@ -347,7 +347,9 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 	}
 	// #77: ready は transcript から有料機能を判定する(旧 clarify は create のみ)
 	defer func() {
-		if err == nil {
+		// #451 G2 / #450 G1: a build without shared data (App Store review)
+		// has no purchase UI, so nothing is marked paid.
+		if err == nil && !restrictionFrom(ctx).NoSharedData() {
 			defaultPaidCatalog.annotate(out, nil)
 		}
 	}()

@@ -22,6 +22,10 @@ import (
 const (
 	FeatureFieldHealth   = "fieldHealth"   // Field.health (HealthKit write)
 	FeatureCameraCapture = "cameraCapture" // photoField / videoField source camera|both
+	// FeatureSharedData: entity scope shared / public (records other users
+	// see), edit and marks. The App Store review build has no report / block
+	// for user content (guideline 1.2), so it keeps every record private (#451 G2).
+	FeatureSharedData = "sharedData"
 )
 
 // Restriction is the per-request set of unusable parts. The zero value means
@@ -30,6 +34,7 @@ type Restriction struct {
 	disallowed map[string]bool // component types the client cannot render
 	noHealth   bool
 	noCamera   bool
+	noShared   bool
 	key        string // "" = no restriction; memo key otherwise
 }
 
@@ -82,16 +87,21 @@ func NewRestriction(allowed, disabled []string) Restriction {
 			r.noHealth = true
 		case FeatureCameraCapture:
 			r.noCamera = true
+		case FeatureSharedData:
+			r.noShared = true
 		}
 	}
-	if len(r.disallowed) > 0 || r.noHealth || r.noCamera {
-		r.key = strings.Join(r.Disallowed(), ",") + fmt.Sprintf("|h=%t|c=%t", r.noHealth, r.noCamera)
+	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared {
+		r.key = strings.Join(r.Disallowed(), ",") + fmt.Sprintf("|h=%t|c=%t|s=%t", r.noHealth, r.noCamera, r.noShared)
 	}
 	return r
 }
 
 // Active reports whether anything is restricted.
 func (r Restriction) Active() bool { return r.key != "" }
+
+// NoSharedData reports whether entities must stay private (#451 G2).
+func (r Restriction) NoSharedData() bool { return r.noShared }
 
 // Disallowed lists the unusable component types, sorted.
 func (r Restriction) Disallowed() []string {
@@ -211,6 +221,9 @@ func restrictSchemaJSON(raw []byte, r Restriction) []byte {
 			}
 		}
 	}
+	if r.noShared {
+		restrictEntitySharing(defs)
+	}
 	if r.disallowed[string(dsl.CompWebView)] {
 		// openUrlButton's description points to webView for embedding (#452 G3)
 		for _, v := range defs {
@@ -226,6 +239,31 @@ func restrictSchemaJSON(raw []byte, r Restriction) []byte {
 		panic("ai: restrict schema: " + err.Error())
 	}
 	return out
+}
+
+// restrictEntitySharing (#451 G2) leaves only scope private and drops marks
+// (shared/public only). edit stays in the schema because the catalog needs
+// its enum; its text says it is unused and enforceRestriction removes it.
+func restrictEntitySharing(defs map[string]any) {
+	entity, _ := defs["Entity"].(map[string]any)
+	props, _ := entity["properties"].(map[string]any)
+	if props == nil {
+		return
+	}
+	if sp, _ := props["scope"].(map[string]any); sp != nil {
+		sp["enum"] = []any{string(dsl.ScopePrivate)}
+		sp["description"] = "この版では private だけ(レコードは本人だけが読み書きする)。他のユーザーと記録を共有できないので、scope は省略する。"
+		sp[keyUsage] = "この版では scope を書かない(すべて private)。「みんなで」「共有」「投稿」「ランキング」「掲示板」と言われても、自分だけの記録として作る。"
+		if m, ok := sp[keyEnumDescs].(map[string]any); ok {
+			delete(m, string(dsl.ScopeShared))
+			delete(m, string(dsl.ScopePublic))
+		}
+	}
+	if ep, _ := props["edit"].(map[string]any); ep != nil {
+		ep["description"] = "この版では使わない(private の entity では意味を持たない)。"
+		delete(ep, keyUsage)
+	}
+	delete(props, "marks")
 }
 
 // restrictSchema swaps the generation schema for the restricted one (the
@@ -265,6 +303,48 @@ var noWebViewReplacer = strings.NewReplacer(
 	"openUrlButton でそのサイトを Safari で開く",
 )
 
+// sharingLineRewrites (#451 G2): rule lines (by prefix) about records other
+// users see; an empty with drops the line. Drift is caught by
+// TestRestriction_NoSharedDataKeepsRecordsPrivate.
+var sharingLineRewrites = []struct{ prefix, with string }{
+	{"- entity.scope:", "- entity.scope: この版では書かない(記録はすべて自分だけ = private)。「みんなで」「共有」「投稿」「ランキング」「掲示板」「友達と」と言われても、他のユーザーと同じデータを見る作りにはせず、自分だけの記録として作る。"},
+	{"- 投稿者と「自分の」", ""},
+	{"- entity.edit(#252)", ""},
+	{"  - **みんなで使う記録(scope public / shared)", ""},
+	{"  - **ほかの人の投稿を自分用に保存**", ""},
+	{"- みんなで使う:", "- みんなで使う: このアプリの版では、他の人と同じ記録を見る・投稿する作り(みんなに公開・参加した人だけ・チャット)はできない。記録はすべて自分だけ(private)。頼まれたら「このアプリの版では、記録を他の人と共有できません」と答え、自分だけの記録で近い形を提案する。"},
+}
+
+// noShareChatRule replaces shareChatRule in builds without shared data.
+const noShareChatRule = "- 共有の範囲: このアプリの版では、記録を他の人と共有できない(家族だけ・みんなに公開のどちらも)。頼まれたら「このアプリの版では、記録を他の人と共有できません」と答える。"
+
+// dropSharingRules removes the shared-data rules (#451 G2): the marks and
+// share-scope blocks, the chat share rule and the scope / poster / edit lines.
+func dropSharingRules(s string) string {
+	s = strings.Replace(s, "\n\n"+marksRules+"\n"+marksCatalog, "", 1)
+	s = strings.Replace(s, shareRules, "", 1)
+	s = strings.Replace(s, shareChatRule, noShareChatRule, 1)
+	lines := strings.Split(s, "\n")
+	kept := lines[:0]
+	for _, ln := range lines {
+		keep := true
+		for _, rw := range sharingLineRewrites {
+			if strings.HasPrefix(ln, rw.prefix) {
+				if rw.with == "" {
+					keep = false
+				} else {
+					ln = rw.with
+				}
+				break
+			}
+		}
+		if keep {
+			kept = append(kept, ln)
+		}
+	}
+	return strings.Join(kept, "\n")
+}
+
 // exampleRe matches "、歩数 = healthStat" style examples in chatCapabilities.
 var exampleRe = regexp.MustCompile(`、[^、()（）=]{1,24} = ([A-Za-z]+)`)
 
@@ -275,6 +355,12 @@ func buildRestrictedPrompt(system string, r Restriction) string {
 	s = strings.ReplaceAll(s, string(generationSchema), string(a.genSch))
 	if r.disallowed[string(dsl.CompWebView)] {
 		s = noWebViewReplacer.Replace(s)
+	}
+	if r.disallowed[string(dsl.CompChatThread)] {
+		s = strings.Replace(s, "\n\n"+chatThreadRules, "", 1) // #451 G2
+	}
+	if r.noShared {
+		s = dropSharingRules(s)
 	}
 
 	// Rule lines that route an utterance to a disallowed part
@@ -322,6 +408,9 @@ func restrictionNote(r Restriction) string {
 	if r.disallowed[string(dsl.CompNearbyShare)] {
 		b.WriteString(musicNoRequestsNote) // #412
 	}
+	if r.noShared {
+		b.WriteString("- 記録はすべて自分だけ(private)。entity の scope / edit / marks、$author・$marks は使わない。「みんなで」「共有」「投稿」「ランキング」「掲示板」「チャット」のように他の人とデータを見る依頼は、このアプリの版ではできないと伝え、自分だけの記録で近い形を作る。\n")
+	}
 	if r.noCamera {
 		b.WriteString("- photoField / videoField の source は library だけ(カメラで撮影はできない。写真・動画はライブラリから選ぶ)。camera / both は使わない。\n")
 	}
@@ -367,6 +456,36 @@ func restrictionViolations(raw, base []byte, r Restriction) []string {
 			out = append(out, fmt.Sprintf("component type %q is not available in this app build: do not use it (use only the parts in the catalog)", t))
 		}
 	}
+	if r.noShared {
+		prev := map[string]bool{}
+		for _, id := range sharedEntities(base) {
+			prev[id] = true
+		}
+		for _, id := range sharedEntities(raw) {
+			if !prev[id] {
+				out = append(out, fmt.Sprintf("entity %q: shared / public records are not available in this app build: omit scope (keep it private) and do not use marks, edit, $author or $marks", id))
+			}
+		}
+	}
+	return out
+}
+
+// sharedEntities lists the ids of entities other users see (scope shared /
+// public) in a DSL document (#451 G2).
+func sharedEntities(raw []byte) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var app dsl.App
+	if err := json.Unmarshal(raw, &app); err != nil {
+		return nil
+	}
+	var out []string
+	for i := range app.Entities {
+		if app.Entities[i].IsShared() {
+			out = append(out, app.Entities[i].ID)
+		}
+	}
 	return out
 }
 
@@ -380,7 +499,8 @@ func sortedIntKeys(m map[string]int) []string {
 }
 
 // enforceRestriction removes disallowed components (with their children),
-// drops Field.health and turns camera sources into library. It returns raw
+// drops Field.health, turns camera sources into library and (sharedData,
+// #451 G2) makes every entity private (scope / edit / marks / item.mark). It returns raw
 // unchanged (changed=false) when nothing applied; notes say what was done.
 func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, changed bool) {
 	if !r.Active() || len(raw) == 0 {
@@ -393,7 +513,7 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 		return raw, nil, false
 	}
 	removed := map[string]int{}
-	var health, camera int
+	var health, camera, private int
 	var fixComps func([]any) []any
 	fixComps = func(cs []any) []any {
 		kept := make([]any, 0, len(cs))
@@ -412,6 +532,11 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 				if src, _ := c["source"].(string); src == "camera" || src == "both" {
 					c["source"] = "library"
 					camera++
+				}
+			}
+			if r.noShared {
+				if item, _ := c["item"].(map[string]any); item != nil {
+					delete(item, "mark") // marks go with the scope below
 				}
 			}
 			if ch, ok := c["children"].([]any); ok {
@@ -445,7 +570,26 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 			}
 		}
 	}
-	if len(removed) == 0 && health == 0 && camera == 0 {
+	if r.noShared {
+		if ents, ok := root["entities"].([]any); ok {
+			for _, e := range ents {
+				em, _ := e.(map[string]any)
+				if em == nil {
+					continue
+				}
+				_, hasEdit := em["edit"]
+				_, hasMarks := em["marks"]
+				scope, _ := em["scope"].(string)
+				if (scope != "" && scope != string(dsl.ScopePrivate)) || hasEdit || hasMarks {
+					delete(em, "scope")
+					delete(em, "edit")
+					delete(em, "marks")
+					private++
+				}
+			}
+		}
+	}
+	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 {
 		return raw, nil, false
 	}
 	for _, t := range sortedIntKeys(removed) {
@@ -456,6 +600,9 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 	}
 	if camera > 0 {
 		notes = append(notes, fmt.Sprintf("camera source -> library on %d component(s)", camera))
+	}
+	if private > 0 {
+		notes = append(notes, fmt.Sprintf("made %d entities private", private))
 	}
 	b, err := json.Marshal(root)
 	if err != nil {
