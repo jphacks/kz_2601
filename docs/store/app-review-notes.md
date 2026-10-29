@@ -201,7 +201,7 @@ App 内課金(Tailor It Pro・月額の自動更新)
 
 | 下書き(調査メモ) | 直した後 | 理由 |
 |---|---|---|
-| 「request text and the tool's content are sent」 | 話した・入力した内容、会話、記録帳の設計。**記録の中身は送らない** | 同意画面(`AIConsentView.swift`)の説明に合わせた。食い違うと 5.1.2(i) で問われる |
+| 「request text and the tool's content are sent」 | 話した・入力した内容、会話、記録帳の設計。**記録の中身は送らない** | 同意画面(`AIConsentView.swift`)の説明に合わせた。食い違うと 5.1.2(i) で問われる。審査用の版は「AI で書く」のオンライン版を外す(#455)ので言い切れる。同意画面は両方の版で同じ文言で、「『AI で書く』がサーバーの AI を使う場合は、押した時だけ最近の記録を送る」と条件つきで書く(通常の版向け・#459) |
 | 「Free users can create N new tools per day」 | `3 new trackers per day` | `ProProducts.dailyFreeCreations = 3` |
 | 「Settings > Account > Delete Account」「Settings > About」 | 設定(歯車)> アカウントを削除、設定 > プライバシー | 今の設定画面の並び(`SettingsSheet.swift`) |
 | 「tap "Try without account"」 | 「Use without signing in (anonymous)」 | 実際のボタンの文言 |
