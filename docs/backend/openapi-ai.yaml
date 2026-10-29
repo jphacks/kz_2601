@@ -427,6 +427,7 @@ components:
         制限がある時、AI に渡す部品カタログ・できることの索引から許可外の部品を外し、生成結果に許可外の部品があれば検証エラーとして再生成させ、最後の試行でも残れば取り除く。
         edit では許可外の部品を新しく足す patch は再生成させ、今の DSL に既にある許可外の部品は取り除いて full で保存する。未知の type は無視(既知の type が 1 つも無ければ制限なし扱い)。
         generate と chat で同じ値を送る。chat の `capabilities`(返答の種類)とは別物。
+        #302: App Store の v1.0 以降の iOS は通常の版でも**描画できる全 type を毎回送る**(ここに無い type = その版が知らない新しい部品なので出さない)。全既知 type を送った時は制限なしと同じ(プロンプトは byte 同一)。版の規則は docs/dsl/README.md §5。
       example: [vstack, hstack, section, text, button, list, stat, chart, textField, numberField, photoField]
     DisabledFeatures:
       type: array
