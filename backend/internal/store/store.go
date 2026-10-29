@@ -159,6 +159,7 @@ type Store interface {
 	Ownership       // appId creators + catalog installs (owner.go)
 	Membership      // shared-app participants (member.go)
 	Purger          // physical app deletion (purge.go)
+	AccountPurger   // physical erasure of deleted accounts (account_purge.go)
 	Marks           // per-user like / save toggles on shared records (marks.go)
 }
 

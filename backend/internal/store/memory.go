@@ -34,7 +34,8 @@ type Memory struct {
 	installs map[string]string             // public_apps/{id}/installs/{uid} -> appId
 	members  map[string]map[string]*Member // apps_public/{appId}/members/{uid} (memory_member.go)
 	hub      hub                           // change notifications for Watcher (watch.go)
-	deleted  map[string]bool               // uids that called DELETE /v1/me (memory_account.go)
+	deleted  map[string]time.Time          // uid -> deletedAt of DELETE /v1/me (memory_account.go)
+	purged   map[string]bool               // uids erased by PurgeAccount + MarkAccountPurged
 	marks    map[string]bool               // record/mark/uid keys (memory_marks.go)
 }
 
