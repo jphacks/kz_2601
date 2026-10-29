@@ -228,7 +228,7 @@ func ownerStores(t *testing.T, f func(t *testing.T, e *env, sfx string)) {
 		if os.Getenv("FIRESTORE_EMULATOR_HOST") == "" {
 			t.Skip("FIRESTORE_EMULATOR_HOST not set")
 		}
-		st, err := store.NewFirestore(t.Context(), "demo-kz2601")
+		st, err := store.NewFirestore(t.Context(), "demo-kz2601", "(default)")
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -76,7 +76,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          # AUTH_MODE 未設定 = firebase(Admin SDK で ID トークン検証)。Firestore は GOOGLE_CLOUD_PROJECT + run-backend SA の ADC。
+          # AUTH_MODE 未設定 = firebase(Admin SDK で ID トークン検証)。Firestore は GOOGLE_CLOUD_PROJECT + FIRESTORE_DATABASE + run-backend SA の ADC。
           if [ -n "$INPUT_ENV" ]; then
             environment="$INPUT_ENV"
           elif [ "$REF_NAME" = "main" ]; then
@@ -108,6 +108,11 @@ jobs:
       REGION: ${{ vars.GCP_REGION }}
       RUN_SA: run-backend@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
       ENV_SUFFIX: ${{ needs.deploy-changes.outputs.suffix }}
+      # Firestore の接続先(#290・backend/internal/fsenv)。今は stg / prod とも同じプロジェクトの (default)。
+      # APP_ENV=stg が本番の DB を使うと起動を止めるので、分離(#291・#293)までは stg だけ ALLOW_SHARED_PROD_DB=1。
+      # 分離したら stg 側を新しい接続先にして ALLOW_SHARED_PROD_DB を外す。
+      FIRESTORE_DATABASE: '(default)'
+      ALLOW_SHARED_PROD_DB: ${{ needs.deploy-changes.outputs.suffix == 'stg' && '1' || '0' }}
       IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/backend/backend:${{ github.sha }}
     steps:
       - uses: actions/checkout@v7
@@ -144,7 +149,7 @@ jobs:
             --cpu=1 --memory=512Mi \
             --min-instances=0 --max-instances=3 \
             --concurrency=80 --timeout=60 \
-            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=${ENV_SUFFIX},GIT_SHA=${GITHUB_SHA}" \
+            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB},GIT_SHA=${GITHUB_SHA}" \
             --quiet
           url="$(gcloud run services describe "appconfig-${ENV_SUFFIX}" \
             --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)')"
@@ -171,7 +176,7 @@ jobs:
             --cpu=1 --memory=512Mi \
             --min-instances=0 --max-instances=3 \
             --concurrency=20 --timeout=300 \
-            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=${ENV_SUFFIX},APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL},GIT_SHA=${GITHUB_SHA}" \
+            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB},APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL},GIT_SHA=${GITHUB_SHA}" \
             --set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest" \
             --quiet
           url="$(gcloud run services describe "ai-${ENV_SUFFIX}" \
