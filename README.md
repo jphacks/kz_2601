@@ -28,6 +28,8 @@
 
 ## 製品概要
 
+<p align="center">(LP: <a href="https://tailor-it.app/">tailor-it.app</a>)</p>
+
 <table align="center">
 <tr>
 <td align="center"><img src="docs/images/readme/demo.gif" width="260" alt="話すと、ドライブの記録アプリが地図付きでできあがる"></td>
@@ -145,11 +147,7 @@ flowchart LR
 2. **CI を徹底した**<br>
    iOS のビルドとテスト、Go のテストと静的解析、秘密情報の検出を、すべての PR で自動で回しています。<br>
    変更のあったモジュールだけを選んでテストし、develop に入る時は UI テストまで通します。
-3. **テストをたくさん書いた**<br>
-   iOS で 400 件以上、Go で 450 件以上のテストがあり、壊れたらすぐ分かるようにしています。
-4. **1 つのスキーマを正典にした**<br>
-   Go の検査・iOS の型・AI への部品一覧を同じ [スキーマ](docs/dsl/dsl.schema.json) から作り、ズレるとテストが落ちます。
-5. **速さにこだわった**<br>
+3. **速さにこだわった**<br>
    中央値で、新規作成 6.6 秒・修正 1.7 秒です。画面の枠は約 2.4 秒で出ます。<br>
    [生成の品質と速さの計測](docs/backend/ai-eval/2026-10-24.md)
 
