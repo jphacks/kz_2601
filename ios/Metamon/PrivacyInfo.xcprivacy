@@ -8,6 +8,8 @@
   集めるデータ(すべて本人に紐づく・トラッキングなし・用途はアプリの機能):
     ユーザー ID(Firebase の uid)/ 名前(Sign in with Apple が渡した時の表示名)/
     その他のユーザーコンテンツ(作ったアプリの設計・記録・AI に送る依頼の文)/ 写真(記録に入れた縮小画像)/ 正確な位置(記録に入れた場所)
+    クラッシュのデータ / パフォーマンスのデータ(Firebase Crashlytics・#296。落ちた場所・端末・OS・アプリの版・空きメモリ等。uid を付けるので本人に紐づく。
+    設定の「クラッシュ報告を送る」でオフにできる。話した内容・記録・DSL は送らない)
   集めないもの: 音声(端末内で文字にする)・ヘルスケア・広告 ID・分析・課金情報(Apple が処理)。
 -->
 <plist version="1.0">
@@ -69,6 +71,30 @@
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypePreciseLocation</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeCrashData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePerformanceData</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>
 			<true/>
 			<key>NSPrivacyCollectedDataTypeTracking</key>

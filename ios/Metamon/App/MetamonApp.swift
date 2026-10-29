@@ -19,6 +19,8 @@ struct MetamonApp: App {
     init() {
         // Firebase は Services 組み立てより前に初期化(plist が無ければ警告してモック認証に落ちる)
         FirebaseBootstrap.configureIfAvailable()
+        // クラッシュ報告(#296): 設定の「クラッシュ報告を送る」を反映(Firebase が無ければ何もしない)
+        CrashReportingPreference.shared.activate(reporter: FirebaseCrashReporter() ?? NoopCrashReporter())
         UNUserNotificationCenter.current().delegate = ForegroundNotificationPresenter.shared // 前面でも通知を出す(#228)
         var services = BuildConfig.make()
         // #246(5.1.2(i)): 同意が無ければ ai へ一切送らない。どの入口(Siri 等)から呼ばれても効くよう Services の ai を包む
@@ -87,6 +89,8 @@ struct MetamonApp: App {
             // 表示言語(#44): 設定の「言語」で即時切替。`Text("…")` の解決と日付・数値の書式がこの Locale に従う
             .environment(\.locale, LanguagePreference.shared.locale)
             .task { await session.observe() }
+            // クラッシュ報告に付ける本人の区別は uid だけ(名前・内容は付けない・#296)
+            .onChange(of: session.user?.uid, initial: true) { _, uid in CrashReportingPreference.shared.updateUser(uid: uid) }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background { BackgroundRefresh.schedule() } // #38: 裏の定期同期を予約
             }

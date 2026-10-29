@@ -53,12 +53,21 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 ### 1.7 課金(提供する場合)
 - 本アプリの版によっては、アプリ内課金がありません。Tailor It Pro(自動更新サブスクリプション)を提供する場合、支払いは **Apple(App Store)** が処理します。運営者はカード情報などの支払い情報を受け取りません。購入の状態は端末で StoreKit から確かめます。
 
-### 1.8 集めないもの
+### 1.8 クラッシュ報告
+- 本アプリが異常終了(クラッシュ)した時に、原因を調べて直すため、Google の **Firebase Crashlytics** に次の情報を送ります。
+  - 落ちた場所(プログラムの位置・スタックトレース)、異常終了の種類、発生日時
+  - 端末の機種・OS の版・本アプリの版、発生時の空きメモリ・空き容量・画面の向きなどの端末の状態
+  - Crashlytics がインストールごとに作る識別子と、ユーザー ID(uid。1.1 のもの)
+- **話した内容・入力した文・記録・作ったアプリの設計(DSL)は送りません。**名前・メールアドレスも送りません。
+- 既定はオンです。設定の「プライバシー」の「クラッシュ報告を送る」からいつでもオフにできます。オフにすると、以後は送らず、まだ送っていない報告も端末から消します。
+- 使い道: 不具合の原因を調べて直すためだけです。広告・トラッキングには使いません。
+
+### 1.9 集めないもの
 - 広告 ID・トラッキング・行動の分析ツール(Firebase Analytics 等)は使いません。第三者への販売はしません。
 
 ## 2. 第三者への提供
 次の委託先に、上記の目的の範囲で情報を預けます。法令に基づく場合を除き、これ以外の第三者には提供しません。
-- Google LLC(Firebase Authentication・Cloud Run・Firestore・Cloud Logging)
+- Google LLC(Firebase Authentication・Firebase Crashlytics・Cloud Run・Firestore・Cloud Logging)
 - Anthropic, PBC(AI による生成・相談。米国への移転を含みます)
 - Apple Inc.(Sign in with Apple・App Store の課金)
 
@@ -66,6 +75,7 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 - 作ったアプリ・記録・アカウントの情報は、アカウントを削除するまで保存します(削除後の扱いは 4 章)。
 - 相談の会話は、サーバーで最大 30 分です。
 - 1 日の利用回数は、日付ごとの回数(数値)だけで、話した内容などは含みません。
+- クラッシュ報告(1.8)は、Firebase Crashlytics の標準の保存期間(受け取ってから 90 日)が過ぎると Google が消去します。[要確認: Firebase の現在のデータ保持の説明と一致するか]
 - サーバーの動作記録(ログ。リクエストの日時・経路・結果・IP アドレスなど)は、Google Cloud Logging に最大 30 日保存します。ログには、話した内容・記録の中身を書かないようにしています。
 - Firestore の別保存(バックアップ)は取っていません。障害対応のため、Firestore が自動で持つ直前の版(最大 1 時間)が残ることがあります。
 
@@ -98,6 +108,7 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 - **Device features** (microphone, camera/photos, location, motion, Health, local network, Apple Music, notifications) are used only where available in your build, only when your app uses them, and with your permission. Health data stays on the device and is never used for advertising.
 - **Sharing / public data** (where available): shared links, the "Discover" catalog and data marked "public" can be seen by others. You can withdraw sharing at any time.
 - **Payments** (if offered) are processed by Apple; we never receive payment details.
+- **Crash reports:** When the app crashes, Google's Firebase Crashlytics receives the crash location (stack trace), crash time, device model, OS and app version, device state (free memory/disk, orientation), a per-installation identifier and your user ID (uid). **What you say, your records and your app designs are never included.** On by default; turn it off in Settings > Privacy ("Send crash reports"). Crash reports are deleted after Crashlytics' standard retention period (90 days) [to be confirmed].
 - **No ads, tracking or analytics SDKs.** We do not sell data.
 - **Deletion:** Delete your account in Settings. Server data becomes unavailable immediately and is erased within 30 days. Posts in apps shared with others remain.
 - **Children:** Not intended for children under 13.
