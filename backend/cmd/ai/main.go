@@ -12,6 +12,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/ai"
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 
 	"cloud.google.com/go/firestore"
@@ -53,6 +54,7 @@ func main() {
 
 	claude := ai.NewClient(apiKey, model, effort)
 	claude.StructuredOutput = os.Getenv("CLAUDE_STRUCTURED_OUTPUT") == "1"
+	claude.Logger = httpx.NewLogger() // ai.usage JSON lines for the cost sink (#298)
 	svc := &ai.Service{
 		Claude:      claude,
 		Store:       store,
