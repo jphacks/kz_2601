@@ -37,6 +37,7 @@ final class PaidGateDecisionTests: XCTestCase {
     }
 }
 
+#if !APP_STORE_REVIEW // 審査用ビルドにはストアが無い(#450 G1)
 /// モックのストア(UI テスト・`simctl launch` のシミュレータ)。App Store に触れずに購入 → Pro。
 @MainActor
 final class MockProStoreTests: XCTestCase {
@@ -74,3 +75,4 @@ final class MockProStoreTests: XCTestCase {
         XCTAssertFalse(ProEntitlementStore(mode: .storeKitOrMock).isMock, "商品が取れないと分かるまでは StoreKit")
     }
 }
+#endif

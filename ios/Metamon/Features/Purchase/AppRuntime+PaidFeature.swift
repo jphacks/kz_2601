@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#450 G1)は App 内課金を持たない(有料機能の確認カードを出さない)。
+#if !APP_STORE_REVIEW
 import SwiftUI
 import MetamonServices
 
@@ -53,3 +55,9 @@ extension AppRuntime {
     /// カードの見出しに出す月額(取れなければ ¥500)。
     var proMonthlyPrice: String { proGate.store.offer?.displayPrice ?? ProOffer.mockMonthly.displayPrice }
 }
+#else
+extension AppRuntime {
+    /// 確認カードは無い(審査用ビルド・#450 G1)。チャットのリセット時の呼び出しを残すための空の実装。
+    func clearPaidConfirm() {}
+}
+#endif

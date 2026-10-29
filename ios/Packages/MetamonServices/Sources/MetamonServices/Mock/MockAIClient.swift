@@ -97,6 +97,10 @@ public struct MockAIClient: AIClient {
         transcript.contains("掲示板") && !transcript.contains("無料版") && !transcript.contains("自分だけ")
     }
 
+    #if APP_STORE_REVIEW
+    /// 審査用ビルドは App 内課金を持たない(#450 G1)。有料機能の印は付けない。
+    static func markingPaid(_ turn: ChatTurn) -> ChatTurn { turn }
+    #else
     /// 有料機能(#77)のモック。backend `paid_features.json` の sharedData の代表的な語だけ見る。
     static let paidKeywords = ["みんなで", "共有", "掲示板", "投稿"]
     static let freeSuffix = "(無料版で作る: 他のユーザーとデータを共有する機能は入れない)"
@@ -111,6 +115,7 @@ public struct MockAIClient: AIClient {
         out.freeTranscript = t + "\n" + freeSuffix
         return out
     }
+    #endif
 
     public func resetChat(appId: String) async {}
 

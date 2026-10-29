@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#450 G1)は App 内課金を持たない。StoreKit と商品 ID をバイナリから外す。
+#if !APP_STORE_REVIEW
 import Foundation
 import Observation
 import StoreKit
@@ -187,3 +189,4 @@ public final class ProEntitlementStore {
         print("[Metamon] IAP entitlement (mock): isPro=\(isPro)")
     }
 }
+#endif

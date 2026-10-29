@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#450 G1)は App 内課金を持たない(設定の「Tailor It Pro」を出さない)。
+#if !APP_STORE_REVIEW
 import SwiftUI
 import MetamonServices
 
@@ -61,3 +63,4 @@ struct ProSettingsSection: View {
         }
     }
 }
+#endif

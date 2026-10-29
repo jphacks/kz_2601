@@ -3,6 +3,7 @@ import MetamonDSL
 import MetamonRenderer
 import MetamonServices
 
+#if !APP_STORE_REVIEW
 /// チャットの確認カードを通らない経路の有料機能(#414)。判定は `PaidGate`(純粋関数)。
 /// - 生成の後: 即生成(チャット OFF・「別のアプリ」)・予備文の「このまま作る / このまま反映」・圏外の保留・状態カードの再送・
 ///   「この機能なしで作る」でも AI が共有にした時。共有の記録が新しく入り Pro でなければ課金画面。
@@ -77,3 +78,11 @@ extension AppRuntime {
         return await proGate.requestPro(.paidFeature([]), closeNote: closeNote, after: .milliseconds(wasOpen ? 550 : 350))
     }
 }
+#else
+/// 審査用ビルド(APP_STORE_REVIEW・#450 G1)は App 内課金を持たない。共有の記録も作れない(#451 G2・backend が private に直す)ので、
+/// 生成・元に戻す / やり直すの後に課金画面は出さない。
+extension AppRuntime {
+    func gatePaidGeneration(before: AppDocument) async {}
+    func gatePaidRestore(before: AppDocument) async {}
+}
+#endif
