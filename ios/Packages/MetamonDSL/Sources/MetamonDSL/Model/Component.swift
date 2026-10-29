@@ -10,11 +10,15 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case photoField, image, list, stat, chart, voiceInput, spacer, divider
     // leaf(動画・#206)
     case videoField, videoPlayer
+    // leaf(録音・#420)
+    case audioRecorder
     // container(構造系: card/disclosure/carousel/grid)
     case card, disclosure, carousel, grid
     // leaf(ナビ・ネイティブ系)
     case searchBar, calendar, shareButton, openUrlButton, mapView, locationButton, locationPicker, qrScanner, timerDisplay
     case webView
+    // leaf(QR を作って表示・#422)。text / field / value / label / title は共用
+    case qrCode
     // leaf: 入力系バッチ
     case slider, stepper, textEditor, secureField, timePicker, colorPicker, rating
     // leaf(表示系)
@@ -47,6 +51,12 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case randomPicker
     // leaf(目的地までの道案内・#411)。title / label / entity / locationField / titleField / mode は共用
     case routeGuide
+    // leaf(ドラレコ・#410)。title は共用
+    case dashcam
+    // leaf(端末のセンサー・#419)。label / style / min / max / entity / field / dateField / seconds / limit は共用
+    case sensorValue
+    // leaf(Apple Music の再生と友だちからの曲リクエスト・#412)。title は共用
+    case musicPlayer
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -121,10 +131,13 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var nameField: String?      // settlement / locationPicker(場所の名前の string field・#212)
     public var balanceField: String?
     // aiButton(#78)。label / prompt / entity / limit は共用
-    public var task: String?           // summarize|classify|rewrite|extract|suggest
+    public var task: String?           // summarize|classify|rewrite|extract|suggest|generate
     public var input: String?          // AI に渡す field(nil = フォーム全体)
     public var output: String?         // 結果を入れる field
     public var options: [String]?      // classify の候補(nil = enum field の options)
+    public var shape: String?          // generate(#417): line|list|fields
+    public var count: Int?             // generate list の個数
+    public var items: [String]?        // generate fields の項目名
     public var target: Double?         // progressBar entity モードの分母
     public var tone: String?           // progressBar: positive(目標)| negative(予算)・#140
     public var url: String?            // link
@@ -149,6 +162,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var mode: String?           // timerDisplay: stopwatch|countdown / routeGuide: automobile|walking
     public var address: String?        // routeGuide: 固定の目的地(住所・施設名)
     public var seconds: Int?           // timerDisplay countdown 初期秒
+    public var liveActivity: Bool?     // timerDisplay: ロック画面 / Dynamic Island にも出す(#423)
     public var shareTo: String?        // shareButton: any|line|slack|discord(`target` は progressBar の数値)
     // 入力系バッチ(slider / stepper / rating / textEditor)
     public var min: Double?            // slider / stepper / gauge
@@ -167,6 +181,23 @@ public struct Component: Decodable, Identifiable, Sendable {
     // chatThread(#260)。entity / placeholder / emptyText は共用
     public var textField: String?      // 本文の string / text field
     public var photoField: String?     // 任意の photo field
+    // dashcam(#410)。title は共用。nil = 既定値(DashcamConfig)
+    public var keepMinutes: Int?       // ループで残す分数
+    public var maxStorageMB: Int?      // 録画の容量上限
+    public var impactG: Double?        // 衝撃の閾値(重力を除いた G)
+    public var autoStart: [String]?    // landscape|still|charging(全部が続いたら開始)
+    public var audio: Bool?            // マイクも録る
+    // sensorValue(#419)
+    public var sensor: String?         // tilt|pitch|roll|acceleration|rotation|pressure|altitude
+    public var threshold: SensorThreshold?
+    // photoField(#418): 写真から読み取って他の field に入れる。壊れた項目だけ落とす
+    public var analyze: [PhotoAnalyze] = []
+    // nearbyShare passby(#425)。entity / mode / limit は共用
+    public var fields: [String]?       // 交換する field id(明示したものだけ送る)
+    public var distance: Bool?         // UWB で距離・方向を出す
+    // musicPlayer(#412)
+    public var allowRequests: Bool?    // 近くの端末から曲のリクエストを受ける
+    public var autoAccept: Bool?       // リクエストを確認せずに再生待ちへ
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
@@ -174,15 +205,17 @@ public struct Component: Decodable, Identifiable, Sendable {
         case kind, groupBy, bucket, prompt, size
         case expanded, itemWidth, columnCount
         case searchField, onDateTap, locationField, zoom, mode, address, seconds, shareTo
+        case liveActivity
         case name, color, value, target, url, image, message, columns, limit, dateField, titleField, subtitleField
         case min, max, step, minLines
         case by
         case nameField, balanceField
-        case task, input, output, options
+        case task, input, output, options, shape, count, items
         case tone
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
         case textField, photoField
+        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance, allowRequests, autoAccept
     }
 
     public init(from decoder: Decoder) throws {
@@ -234,6 +267,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         mode = try? c.decodeIfPresent(String.self, forKey: .mode)
         address = try? c.decodeIfPresent(String.self, forKey: .address)
         seconds = try? c.decodeIfPresent(Int.self, forKey: .seconds)
+        liveActivity = try? c.decodeIfPresent(Bool.self, forKey: .liveActivity)
         shareTo = try? c.decodeIfPresent(String.self, forKey: .shareTo)
         min = try? c.decodeIfPresent(Double.self, forKey: .min)
         max = try? c.decodeIfPresent(Double.self, forKey: .max)
@@ -249,6 +283,9 @@ public struct Component: Decodable, Identifiable, Sendable {
         input = try? c.decodeIfPresent(String.self, forKey: .input)
         output = try? c.decodeIfPresent(String.self, forKey: .output)
         options = try? c.decodeIfPresent([String].self, forKey: .options)
+        shape = try? c.decodeIfPresent(String.self, forKey: .shape)
+        count = try? c.decodeIfPresent(Int.self, forKey: .count)
+        items = try? c.decodeIfPresent([String].self, forKey: .items)
         target = try? c.decodeIfPresent(Double.self, forKey: .target)
         tone = try? c.decodeIfPresent(String.self, forKey: .tone)
         url = try? c.decodeIfPresent(String.self, forKey: .url)
@@ -268,6 +305,35 @@ public struct Component: Decodable, Identifiable, Sendable {
         rowRange = try? c.decodeIfPresent(GridRange.self, forKey: .rowRange)
         textField = try? c.decodeIfPresent(String.self, forKey: .textField)
         photoField = try? c.decodeIfPresent(String.self, forKey: .photoField)
+        keepMinutes = try? c.decodeIfPresent(Int.self, forKey: .keepMinutes)
+        maxStorageMB = try? c.decodeIfPresent(Int.self, forKey: .maxStorageMB)
+        impactG = try? c.decodeIfPresent(Double.self, forKey: .impactG)
+        autoStart = try? c.decodeIfPresent([String].self, forKey: .autoStart)
+        audio = try? c.decodeIfPresent(Bool.self, forKey: .audio)
+        sensor = try? c.decodeIfPresent(String.self, forKey: .sensor)
+        threshold = try? c.decodeIfPresent(SensorThreshold.self, forKey: .threshold)
+        analyze = ((try? c.decodeIfPresent(Lossy<PhotoAnalyze>.self, forKey: .analyze))?.wrappedValue ?? []).filter { $0.kind != .unknown }
+        fields = try? c.decodeIfPresent([String].self, forKey: .fields)
+        distance = try? c.decodeIfPresent(Bool.self, forKey: .distance)
+        allowRequests = try? c.decodeIfPresent(Bool.self, forKey: .allowRequests)
+        autoAccept = try? c.decodeIfPresent(Bool.self, forKey: .autoAccept)
+    }
+}
+
+/// `sensorValue.threshold`(#419): above / below を超えた瞬間に 1 回だけ発火。
+public struct SensorThreshold: Decodable, Sendable {
+    public var above: Double?
+    public var below: Double?
+    public var message: String?
+    public var save: Bool?
+    public var action: Action?
+
+    public init(above: Double? = nil, below: Double? = nil, message: String? = nil, save: Bool? = nil, action: Action? = nil) {
+        self.above = above
+        self.below = below
+        self.message = message
+        self.save = save
+        self.action = action
     }
 }
 

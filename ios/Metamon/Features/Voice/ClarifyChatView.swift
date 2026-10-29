@@ -52,6 +52,16 @@ struct ClarifyChatView: View {
             }
             // #414: 確認カードと一緒に開く課金画面(edit は音声シートの中なので、ここから重ねる)
             .modifier(PaywallPresenter(placement: .chat))
+        // 設定の「頼み方のコツ」で選んだ例を返答欄に入れる(送らない・#415)
+        .onChange(of: rt.composerDraft, initial: true) { _, draft in
+            guard let draft else { return }
+            rt.composerDraft = nil
+            typed = draft
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(500))
+                typing = true
+            }
+        }
         #if DEBUG
         .task {
             // ヘッドレス E2E 用: `METAMON_AUTO_FOCUS=chat` で 3 秒後に返答欄へフォーカス(キーボードの確認・#143)

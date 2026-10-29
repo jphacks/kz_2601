@@ -12,8 +12,8 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
 
-// NewHandler exposes POST /v1/generate, POST /v1/chat, DELETE /v1/chat/{appId}
-// and GET /health.
+// NewHandler exposes POST /v1/generate, POST /v1/chat, DELETE /v1/chat/{appId},
+// POST /v1/text and GET /health.
 // Cloud Run's front end swallows /healthz, so /health is the one to probe.
 //
 // POST /v1/generate?stream=1 answers with Server-Sent Events instead of one
@@ -86,6 +86,7 @@ func NewHandler(svc *Service) http.Handler {
 		}
 		writeJSON(w, http.StatusOK, res)
 	})))
+	mux.Handle("POST /v1/text", caller(textHandler(svc))) // #417 aiButton generate (text.go)
 	// Only the caller's own conversation can be cleared: no token 401,
 	// another user's conversation 403, otherwise 204 (#286).
 	mux.Handle("DELETE /v1/chat/{appId}", caller(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

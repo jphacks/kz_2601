@@ -163,6 +163,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | モーション/歩数 | P1 | `native: motion.read` | CoreMotion / CMPedometer(stub) | `NSMotionUsageDescription` |
 | 共有 | P1 | `native: share {text}` | `UIActivityViewController`(stub) | 不要 |
 | オンデバイス AI | P1 | `aiButton { task, input?, entity?, output, prompt?, options? }` コンポーネント | **実装済み**(`AiButtonLeaf` + `Support/OnDeviceAI.swift`・Foundation Models・§18) | 不要(Apple Intelligence の ON は OS 設定) |
+| 録音(#420) | P3 | `audioRecorder { field, label?, maxDuration? }` + Field `audio` | **実装済み**(`AudioRecorderLeaf` + `Support/AudioRecording.swift` / `AudioPlayback.swift` / `AudioSessionLease.swift`、下記) | `NSMicrophoneUsageDescription`(音声入力と共用) |
 
 ### photoField(カメラ)の実装要点(`MetamonRenderer/Components/Leaves/PhotoFieldLeaf.swift`)
 
@@ -174,9 +175,28 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 権限 | `AVCaptureDevice.authorizationStatus(.video)`。未決定なら要求、拒否/制限なら alert「カメラを使えません」→「設定を開く」(`UIApplication.openSettingsURLString`)/「写真から選ぶ」 |
 | エンコード | `PhotoCodec.dataURL(from: UIImage)`:**ピクセル基準で長辺 ≤800px**・renderer scale=1 固定(既定の画面倍率だと 800pt=2400px になる)・JPEG q0.5 → `data:image/jpeg;base64,...` を `FormDraft.values[field]` へ(保存経路は他の入力と同じ `entity.create/update`) |
 | 表示 | 値があれば `PhotoView` サムネイル(160pt)+「撮り直す」「削除」、無ければ `label` のボタン 1 つ |
+| 読み取り(`analyze`・#418) | 撮った・選んだ直後に `PhotoReader`(`Support/PhotoVision.swift`)が Vision で必要な分だけ実行: 文字 `VNRecognizeTextRequest`(ja-JP / en-US・同じ高さの断片を 1 行にまとめる `OCRPiece.lines`)、分類ラベル `VNClassifyImageRequest`、骨格 `VNDetectHumanBodyPoseRequest`。金額・日付・関節の角度・分類のフォールバックは MetamonDSL の純関数(`ReceiptParser` / `PoseAngle` / `PhotoClassifier`)。classify / describe は Apple Intelligence が使える端末なら `OnDeviceAI`(Foundation Models)にラベル + 文字を渡す。読めた項目だけ `FormDraft.values[into]` に入れ、写真の下に「もう一度読み取る」と結果(読めなかった項目名)を出す。jointAngle があればプレビューを `PosePhotoView`(縦横比を保って収め、関節の点と線を Canvas で重ねる)に替え、編集で開いた既存の写真にも骨格だけ重ねる。外部ライブラリ・ネットワークは使わない |
 
 画像は **base64 JPEG 文字列として photo フィールドに置き、entity.create の data に含めて送る**(縮小後 ≈ 数十〜100KB で Firestore ドキュメント 1MB 制限内)。Cloud Storage 経由(URL 化)は P1 以降。
 全 usage description は `ios/Metamon/Resources/Info.plist` に記入済み。
+
+### audioRecorder(録音・#420)の実装要点
+
+| 項目 | 内容 |
+|---|---|
+| 録音 | `AudioRecorderController`: `AVAudioRecorder`(AAC・44.1kHz モノラル・64kbps)で一時ファイル → 停止で `LocalAudioStore`(`Application Support/metamon-audio/<id>.m4a`)へ移し、field に `"audio:<id>|<秒>"`。上限は `record(forDuration:)`(`AudioRecorderPolicy.maxDuration`: 既定 600 秒・1〜7200)。経過時間と音量(`averagePower` → 0〜1)は 0.1 秒ごと。電話などの中断で止まり、録れた分は残す |
+| 状態 | `AudioRecorderMachine`(MetamonDSL・純粋): idle / recording / recorded。録り直しに失敗したら元の録音に戻る |
+| 再生 | `AudioPlayback.shared`(アプリ全体で 1 本)。フォームの再生行と一覧の行(`list.item.trailing` が audio)の `AudioPlayButton` が使う |
+| イヤホン | `RemoteRecorderCommands`: 部品が画面にある間だけ `MPRemoteCommandCenter` の togglePlayPause / play / pause を受ける(`remoteAction`)。離れたら外す。iOS がボタンを届けるのは最後に音を扱ったアプリだけ(他のアプリで音楽再生中は届かない) |
+| セッション | `AudioSessionLease`: 録音は `.playAndRecord`(`.defaultToSpeaker` / Bluetooth HFP・A2DP)、再生は `.playback`。終わったら借りる前の category / mode / options に戻し、`.notifyOthersOnDeactivation` で非アクティブ。途中で他(音声入力)が設定を変えていたら触らない(単体テスト `AudioRecorderRenderTests`) |
+| 審査用ビルド | 部品・録音・イヤホンのコードごと外す(`docs/ios/review-build.md`) |
+
+**実機での確認(シミュレータでは録音・イヤホンを確かめられない)**
+1. 録音の部品があるフォームで 録音 → 5 秒話す → 停止 → 再生で聞こえる。保存して一覧の行の再生ボタンでも聞こえる。
+2. 録音の直後に、マイク(FAB)で「タイトルを大きくして」と話す → 文字起こしされて変更が進む(音声入力が壊れていない)。再生の直後も同じ。
+3. 録音中にマイク(FAB)を押す → 音声入力が動く。録音は続く・止まるどちらでも、その後の音声入力が普通に使える。
+4. AirPods を付けてフォームを開き、本体で一度録音・停止 → AirPods を 1 回押すと録音が始まり、もう 1 回で止まる。フォームを閉じた後は AirPods のボタンが録音を始めない。
+5. 上限(maxDuration を 10 秒にした DSL)で自動で止まり、録れた分が残る。録音中に電話が来ても録れた分が残る。
 
 ## 6. 音声入力画面とホットリロード
 
@@ -579,6 +599,7 @@ AppRuntime.apply() / refresh()  ──▶ WidgetSnapshotWriter.write(dsl:records
        UserDefaults(suiteName: "group.jp.kz2601.metamon") に保存
    ──▶ WidgetCenter.shared.reloadAllTimelines()
 MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 個 / systemMedium=最大 3 個横並び)
+                         ロック画面(#423): accessoryRectangular=アプリ名+最大 2 個 / accessoryCircular=先頭 1 個 / accessoryInline=「ラベル 値」1 行
 ```
 
 | 項目 | 内容 |
@@ -592,6 +613,29 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 | 更新頻度(制約) | 本体がフォアグラウンドで DSL 適用/レコード更新した時に即時 + 30 分毎のタイムライン再読込(値は前回のまま)。**本体を開かずにレコードが増えても(別端末・ホットリロード未受信)ウィジェットは古い**。値が変わらない時は reload しない(WidgetKit の 1 日の更新予算を節約) |
 | 実機署名 | App Group capability を **本体と拡張の 2 つの App ID** に付ける必要がある。`xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で付与される(有料 Program 必須)。通らない時は Apple Developer > Identifiers > App Groups で `group.jp.kz2601.metamon` を作成 → 両 App ID の Capabilities で App Groups にチェック |
 | シミュレータ | 署名なし(`CODE_SIGNING_ALLOWED=NO`)でも App Group の UserDefaults は動く。ウィジェットの配置はホーム画面長押し → + → 「Tailor It」 |
+| ロック画面(#423) | 同じウィジェット(`MetamonStatWidget`)の `supportedFamilies` に accessory 3 種を足しただけ。データ・更新経路はホーム画面と共通。ロック画面は単色(vibrant)で描かれるので色に頼らず太さで区別(`MetamonWidget/AccessoryViews.swift`)。配置はロック画面長押し → カスタマイズ → ロック画面 → ウィジェット |
+
+### 12.1 ライブアクティビティ(ActivityKit・Issue #423)
+ロック画面のバナーと Dynamic Island(compact / expanded / minimal)に「タイマー」「いま◯◯中」を出す。**更新は端末内だけ(push しない)**。時間は日付で渡し OS が描くので、アプリが止まっていても数字は進む。
+
+| DSL | 動き |
+|---|---|
+| `timerDisplay.liveActivity: true` | 開始で出す / 一時停止で止まった時間+「一時停止中」/ リセットで消す / countdown が 0 で「終わりました」を 15 分残して消す。`staleDate` = 終了時刻(背面で 0 になった時もウィジェットが 00:00 を出す) |
+| action `startActivity{activity:{title, subtitle?, icon?, minutes?, stat?}}` | このアプリの表示を出し直す(キー `app:<appId>`・前のものは置き換え)。minutes あり=残り時間、無し=押した時からの経過。stat = stat / progressBar の部品 id(値と進み具合のバー) |
+| action `endActivity` | startActivity で出したこのアプリの表示を消す(タイマーの表示は残す) |
+
+構成:
+- `MetamonWidget/Shared/TailorActivityAttributes.swift`(本体・拡張の両方にコンパイル): static な `appId / appName / icon / key / statId` と `ContentState{title, subtitle, clock(countdown/elapsed/paused), value, valueLabel, progress, finished}`。
+- 組み立て(純粋関数・`MetamonTests/LiveActivityContentTests`): `Metamon/App/LiveActivityContent.swift`。タイマーの段階は Renderer の `TimerActivityUpdate.phase`(`TimerActivityUpdateTests`)。
+- ActivityKit への出し入れ: `Metamon/App/AppRuntime+LiveActivity.swift`(`LiveActivities`。操作は 1 本の列で順番に流す)。Renderer からは `DSLRuntime.timerActivity(_:)` 越し(Renderer は ActivityKit を知らない)。
+- 数字の更新: `AppRuntime.records` の didSet → `refreshLiveActivityStats()`(値が変わった時だけ `update`)。**アプリが止まっている間に別端末で増えた記録は反映されない**(push 無しのため。次に開いた時に更新)。
+- 見た目: `MetamonWidget/LiveActivityWidget.swift`。
+- Info.plist `NSSupportsLiveActivities = YES`。バックグラウンドモードや push の entitlement は**足していない**。審査用の版(Review)にも残す(権限ダイアログ無し・ユーザーが押した時だけ出る)。
+- 設定でライブアクティビティを切られていると startActivity は「ロック画面への表示が設定でオフになっています」を出す(タイマーは黙って出さない)。
+
+確認(ユニットテストでは ActivityKit は動かない):
+- **実機**(iPhone 14 Pro 以降で Dynamic Island。13 はロック画面のバナーのみ): `METAMON_INITIAL_EXAMPLE=ramen_timer` で起動 → タイマー開始 → ロックして残り時間が進む・0 で 00:00 → アプリに戻ると「終わりました」→ 15 分で消える。「行列に並ぶ」→ ロック画面に「行列に並び中」と今月の杯数 → 記録を足すと数字が変わる → 「席に着いた」で消える。
+- シミュレータでもロック画面(⌘L)と Dynamic Island(iPhone 17)の表示は確認できる。
 
 ## 13. アクセシビリティ最低限(Renderer・Issue #68)
 生成アプリ側(Renderer の全部品)で Dynamic Type・VoiceOver・コントラスト・Reduce Motion の最低線を守る。本体(`ios/Metamon/`)は対象外。
@@ -730,7 +774,18 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 
 注意(残課題): 記録中に別の画面へ移ると停止ボタンはその部品の画面にしか無い(背面では青いインジケータ・自動停止で担保)。アプリ全体の「記録中」バーは未実装。
 
-### 17.4 シミュレータでの確認手順(ヘッドレス)
+### 17.4 裏に回った時に続くもの・止まるもの(#423)
+| 機能 | 裏(画面ロック・別アプリ)で | 仕組み |
+|---|---|---|
+| 位置の記録 `locationTracker` | **続く**(自動停止まで) | `CLBackgroundActivitySession` + `UIBackgroundModes: location`(§17.3)。審査用の版では部品ごと外す |
+| タイマー `timerDisplay` | アプリの計算は止まるが、**時間は正しく進む** | 開始時刻から戻った時に計算し直す(§17.1)+ 終了通知 + `liveActivity` ならロック画面 / Dynamic Island の表示を OS が日付から描く |
+| 「いま◯◯中」`startActivity` | **表示は続く**(経過 / 残り時間は OS が描く) | 数字(stat)はアプリが動いている時に更新。最長 8 時間(iOS の制限) |
+| 裏の同期 | ときどき(OS 任せ・最短 15 分) | `BGAppRefreshTask`(§17.2) |
+| カメラ・録画(`photoField` / `videoField` / `qrScanner`) | **止まる**(iOS が背面のカメラを許さない) | 画面を出したまま使う。AI は頼まれたら「画面を出したまま(自動ロックを切って)」と案内する(`internal/ai/live_activity_rules.go`) |
+| 音声入力(マイク・WhisperKit) | **止まる** | 録音は前面のみ。`audio` モードは足していない |
+| 音の再生・読み上げ | 生成アプリの部品には今は無い | 部品で読み上げ(音声案内)を足す時に `UIBackgroundModes: audio` + `AVAudioSession(.playback, .duckOthers)` を一緒に入れる。**審査用の版で残すかはその時に決める**(`strip-review-plist.sh` は今 location だけ外す) |
+
+### 17.5 シミュレータでの確認手順(ヘッドレス)
 - `METAMON_E2E_TIMER_START=<部品 id>`(DEBUG)で、表示時に timerDisplay を開始する。例: `METAMON_INITIAL_EXAMPLE=gallery-structure METAMON_AUTO_OPEN=memo_form:sheet METAMON_E2E_TIMER_START=timer` → `xcrun simctl launch <UDID> com.apple.Preferences` で背面化 → 60 秒後に通知 → アプリを起動し直すと 00:00。
 - 同期は `METAMON_E2E_OFFLINE_SECONDS` + `METAMON_AUTO_RECORD` でオフライン記録 → 背面 → 前面で `[Metamon] background(foreground): ...` を確認。
 
@@ -744,10 +799,25 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 | 入力 | `input` field の値 / 省略時はフォーム全体(output 以外・写真/位置は除く)/ `entity` 指定時はそのレコードの新しい順 `limit` 件(既定 20)。上限 3000 文字(モデルのコンテキスト約 4k トークン) |
 | 出力 | `output` field の**ドラフト**に入れるだけ。保存はユーザーが保存ボタンで行う。classify は候補に正規化(候補外なら入れずにエラー表示) |
 | 可用性 | `SystemLanguageModel.default.availability` を表示時・前面復帰時に再評価。`deviceNotEligible` / `appleIntelligenceNotEnabled` / `modelNotReady` / iOS 26 未満 → ボタン無効 +「この端末では AI を使えません: 理由」 |
-| ビルド | FoundationModels を触るのは `Support/OnDeviceAI.swift` だけ。`#if canImport(FoundationModels)` + `if #available(iOS 26, *)`、フレームワークは weak link(`LC_LOAD_WEAK_DYLIB` を確認済み)なので deployment target は iOS 17 のまま |
+| ビルド | FoundationModels を触るのは `Support/OnDeviceAI.swift` と `Support/AIGenerate.swift`(#417)だけ。`#if canImport(FoundationModels)` + `if #available(iOS 26, *)`、フレームワークは weak link(`LC_LOAD_WEAK_DYLIB` を確認済み)なので deployment target は iOS 17 のまま |
 | テスト | `AiButtonTests`(可用性→文言の分岐・SDK の Availability からの写像・リクエスト組み立て・classify 正規化)。モデル実行そのものは実機で確認 |
 
 実機での確認: Apple Intelligence 対応機(iPhone 15 Pro 以降・iOS 26+)で 設定 > Apple Intelligence と Siri を ON → モデルのダウンロード完了を待つ → `METAMON_INITIAL_EXAMPLE=diary_ai` か「AI 日記を作って」で生成 → 「書く」→ 本文を入力 →「AI で要約」「気分を判定」。機内モードでも動くこと(=端末外に出ていない)を確認する。
+
+### 18.1 決まった形で書かせる `task: "generate"`(Issue #417)
+
+罰ゲームの案・今日の献立・励ましの一言のように、DSL に固定した指示(`prompt`)で AI に**新しく**書かせる。上の 4 つ(要約など)と違い、端末内 AI が無い端末ではオンライン(ai の `POST /v1/text`・Tailor It Pro)で代わりに書く。
+
+| 項目 | 内容 |
+|---|---|
+| 部品 | `AiButtonLeaf` が task generate を `AiGenerateLeaf` に渡す。フォーム不要。結果は `AITextResultView`(line = 1 文 / list = 箇条書き / fields = 項目名と値・セルに収まらなければ中でスクロール)。`output` があればフォームのドラフトにも入れる(保存は利用者) |
+| どこで書くか | `AIGenerateRoute.choose`: 端末内 AI が使える → 端末内(無料・端末外に出ない)/ 使えない → ホストのオンライン版 / オンラインの無いホスト(プレビュー)→ 理由を出して無効。`METAMON_MOCK=1` は常にホストのモック(`MockAIClient.text` が決まった文を返す) |
+| オンライン版 | `DSLRuntime.generateAIText`(`AppRuntime+AIText.swift`)→ `AITextGate`: 同意が無い → 同意画面 / Pro でない(課金の制限が有効な時)→ 課金画面(`requestProForAIText` の 1 か所。#429 の `ProGate.requestPro` が入ったら差し替える)/ どちらも OK → `services.ai.text`。サーバーの理由は `HTTPAIClient.textError` で画面の文言に(上限はサーバーの日本語のまま) |
+| 依頼 | `AIGenerateBuilder`: 指示は `{{field}}` をフォームの値に置き換えて 500 字まで、`{{input}}` は「下の材料」に置き換え、材料(`entity` の新しい順 20 件まで / `input` field)は別に 4 KB(UTF-8)まで |
+| 形の検証 | `AITextResult.normalize`(MetamonDSL・backend の `parseTextOutput` と同じ規則)。端末内 AI は形ごとの `DynamicGenerationSchema`(fields の名前は f0, f1…)で構造化出力 |
+| テスト | `AITextTests`(形の解釈・切り詰め・例の読み込み)・`AiGenerateTests`(経路・依頼・描画)・`AITextGateTests`(同意 → Pro・モック・エラーの文言)。端末内 AI の実行は実機で確認 |
+
+確認: `METAMON_MOCK=1 METAMON_INITIAL_EXAMPLE=ai_ideas`(罰ゲーム 5 個・励まし・冷蔵庫タブの献立)。
 
 ## 19. 近距離共有(nearbyShare・MultipeerConnectivity / Issue #36)
 
@@ -776,6 +846,46 @@ Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-
 - 単体: `NearbyShareTests`(MetamonDSL・`swift test` で macOS 上で回る)。エンコード/デコード・未知キー・取り込み判定・sanitize・件数上限。
 - シミュレータ 2 台(同じ Mac)で送受信できた。DEBUG 用の環境変数: 送信側 `METAMON_AUTO_NEARBY_SEND=<entity>`(起動 3 秒後にシートを開き最初の相手へ送る)/ 受信側 `METAMON_AUTO_NEARBY_ACCEPT=1`(確認を 2 秒見せて受け取る)。例は `METAMON_INITIAL_EXAMPLE=attendance_nearby METAMON_MOCK=1`。
 - 実機 2 台: 両方に同じビルドを入れ、両方で同じアプリ(例: 出席カード)を開く → 初回はローカルネットワークの許可を「許可」→ 送る側で「近くの先生に送る」→ 相手の名前をタップ → 受け取る側で「受け取る」→ 一覧に増え、送る側に「◯◯さんに N 件届きました」。Wi-Fi と Bluetooth はオンにしておく(同じ Wi-Fi でなくてよい)。
+
+### 19.1 すれ違い通信(nearbyShare mode:passby・#425)
+
+新しい部品ではなく `nearbyShare` のモード(MultipeerConnectivity と審査用ビルドでの除外を共有し、型・Registry を増やさない)。
+
+| 役割 | 実装 | 中身 |
+|---|---|---|
+| leaf | `NearbyPassbyLeaf`(Renderer・`NearbyShareLeaf` が mode で振り分け) | スイッチ・初回の同意(送る項目名を並べる)・「近くの人を探しています」の表示・裏に回ると止まる案内・距離と方向・会った人の一覧。表示中かつ前面(`scenePhase != .background`)の間だけ `attach`、離れたら `detach` |
+| 境界 | `NearbyPassbyController` / `NearbyPassbyHost.controller`(Renderer) | HealthData.source と同じ差し込み口。既定は通信しない `StaticNearbyPassbyController` |
+| データ・判定 | `NearbyPassby`(MetamonDSL・純粋ロジック) | 送る field(明示 ∩ 保存 − hidden − photo/video/ref/refs)、自分の記録だけ新しい順 `limit` 件・16 KB、受信の sanitize、台帳(`senderId|recordId` → 保存した内容・会った人)、同意、cooldown(同じ相手とは 10 分に 1 回) |
+| 本体 | `PassbyController`(`Features/Nearby/`) | 同意・オン/オフ・senderId(端末ごとのランダム ID)・アプリごとの台帳を UserDefaults に保存。受け取りは `createRecord` / 内容で探して `updateRecord`(仮 id は同期で変わるので `reloadCached` してから) |
+| 通信 | `MCPassbyTransport` / `MockPassbyTransport`(`METAMON_MOCK=1`) | serviceType `tailorit-pb`。discoveryInfo に appId のハッシュと senderId、senderId の小さい側だけが招待、相手ごとに暗号化必須の MCSession。交換したら切る。`distance` の時はつないだまま `NIDiscoveryToken` を送り合い `NINearbyPeerConfiguration` で測る |
+
+- 非対応端末(`NISession.deviceCapabilities.supportsPreciseDistanceMeasurement == false`)は距離の欄を一言だけにする。シミュレータは MultipeerConnectivity は動く(同じ Mac の 2 台で交換できる)が UWB は無い。`METAMON_MOCK=1` は 1.5 秒後に「テスト花子」と会ったことにし、距離・方向を 1 秒ごとに動かす(保存・重複除けは本物と同じ経路)。
+- Info.plist: `NSBonjourServices` に `_tailorit-pb._tcp` / `_udp`、`NSNearbyInteractionUsageDescription`。審査用ビルドでは全部外す(`strip-review-plist.sh`)。
+- 確認: `NearbyPassbyTests`(MetamonDSL)/ `NearbyPassbyRenderTests`(Renderer)/ `PassbyControllerTests`(MetamonTests・通信路を差し替え)。
+- 実機 2 台(UWB は iPhone 11 以降・SE を除く): 両方で同じアプリを開き、プロフィールを 1 件書く → すれ違いの画面でスイッチをオン → 同意 → ローカルネットワークと Nearby Interaction の許可 → 数秒で相手が一覧に出て、プロフィールの一覧に相手が増える。distance なら距離と矢印が動く。片方をホームに戻すと止まり、戻ると再開する。
+
+### 19.2 音楽プレーヤーと友だちからの曲リクエスト(`musicPlayer`・Issue #412)
+
+運転中に音楽を流し、同乗の友だちのスマホから曲を足す。**音はこの端末だけが鳴らす**(iOS は端末どうしで音声を中継できない。Bluetooth で友だちの端末をつないで流す形は不可)。
+
+| leaf | `MusicPlayerLeaf`(Renderer) | 今の曲(ジャケット・曲名・アーティスト)・前へ / 再生・一時停止 / 次へ・承認待ちのリクエスト(追加 / 見送る / Spotify で探す)・再生待ち。「曲を探す」シートで検索して追加、または近くの人にリクエスト。前面の間は 1 秒ごとに状態を読み直す |
+| 状態 | `MusicSession.shared`(Renderer・`@Observable`) | 再生元・今の状態・承認待ち(`MusicRequestInbox`)。部品とアプリ本体(近距離の受信)が同じものを使う |
+| 再生元 | `MusicPlayback` protocol → `AppleMusicPlayback`(MusicKit `ApplicationMusicPlayer` + `MusicCatalogSearchRequest`)/ `FakeMusicPlayback`(テスト・`METAMON_MOCK=1`) | id があればカタログから、無ければ「曲名 アーティスト」の検索の 1 曲目を再生待ちの最後へ。空なら再生を始める |
+| データ・判定 | `MusicSong` / `MusicRequestRules` / `MusicRequestInbox` / `MusicLinks`(MetamonDSL・純粋ロジック) | 曲名・アーティスト各 100 文字・id 40 文字(英数字とドット)・ジャケットは https だけ。承認待ちは 20 件まで(古い順に捨てる)。同じ曲(id か 曲名 + アーティスト)は重ねない |
+| 通信 | 既存の `NearbyService`(`NearbyShare.Header.song`) | 曲は招待の context(Header)に載せ、レコードは送らない。受ける側は確認ダイアログを出さずに接続し、Ack を返す(承認は部品の一覧で・`autoAccept` ならそのまま再生待ちへ)。受けないアプリ(allowRequests の musicPlayer が無い)なら黙って断る。古い端末は `song` を無視し「このアプリには「曲のリクエスト」がない」で断る |
+
+- 待ち受けは `nearbyShare` と同じく前面 & 今のアプリが受ける部品を持つ間だけ(`AppDSL.usesNearbyReceive` = nearbyShare か allowRequests の musicPlayer)。
+- **イヤホンのボタン・ロック画面・コントロールセンター**: `ApplicationMusicPlayer` はシステムの再生 UI(Now Playing)に出るので、OS がそのまま操作する(アプリ側に `MPRemoteCommandCenter` の実装は要らない)。再生はシステム側なので Background Modes の audio は付けていない(アプリを閉じても続くかは実機で確認する)。
+- 使えない時の表示(`MusicAvailability`): 未確認 →「Apple Music を使う」ボタン / 拒否 → 設定の場所 / 制限 / 契約なし(検索とリクエストはできる・再生はできない)/ 使えない端末。
+- **Spotify は開くだけ**: Spotify iOS SDK(App Remote)は入れない。Spotify の開発者登録(クライアント ID・リダイレクト URI)・Premium・開発モードは登録した少人数だけ・一般公開には Spotify の審査が要り、端末の Spotify アプリが前面にいる間しか操作できないため。リクエストの行と検索シートに `https://open.spotify.com/search/<曲名 アーティスト>` のリンクだけ出す(Spotify アプリがあれば OS がアプリで開く・`LSApplicationQueriesSchemes` 不要)。
+- Info.plist: `NSAppleMusicUsageDescription`(審査用ビルドでも残す)。`NSLocalNetworkUsageDescription` は文言に「曲のリクエスト」を足した。
+- **人の作業(Apple Developer)**: App ID `jp.kz2601.metamon` の **App Services → MusicKit** を有効にする(Certificates, Identifiers & Profiles → Identifiers → App ID → App Services タブ)。MusicKit は entitlement ファイルではなく App ID 側の設定で、無いとカタログの検索・再生が失敗する(開発者トークンは OS が自動で作る)。自動署名の `-allowProvisioningUpdates` では付かない。
+- 審査用ビルド(`APP_STORE_REVIEW`): 再生は残し、リクエストの UI(送る・承認待ち)を部品の中で外す(`Features/Nearby` ごと外れるので受信もしない)。AI 側は allowedComponents に nearbyShare が無い時、allowRequests を使わないよう制限の注記を足す(`backend/internal/ai/music_rules.go`)。
+
+確認:
+- 単体: `MusicRequestTests`(MetamonDSL・検証・承認待ち・近距離の判定・Spotify のリンク)、`MusicPlayerTests`(Renderer・偽のプレーヤーで再生待ち・リクエストの受け取り・契約なし・描画)。
+- シミュレータ: `METAMON_INITIAL_EXAMPLE=drive_music METAMON_MOCK=1` で偽のカタログ(音は出ない)。MusicKit の実際の再生はシミュレータ不可。
+- 実機 2 台(要 MusicKit の App Service と Apple Music の契約): 両方で「ドライブ BGM」を開く → 受ける側で「Apple Music を使う」→ 許可 → 曲を探して再生 → 送る側で「曲を探す」→ 曲名でリクエスト → 相手の名前をタップ → 受ける側の「リクエスト」に出る → 「追加」で再生待ちへ。イヤホンのボタン・ロック画面での一時停止 / 次へも確認する。
 
 ## 20. 画面マップ(Issue #116)
 

@@ -340,7 +340,11 @@ func (a *App) Validate() error {
 			if act.NotificationID == "" {
 				add("%s: cancelNotification needs notificationId", where)
 			}
-		case ActionBack, ActionOpenVoice, ActionResetForm:
+		case ActionExport:
+			checkExportAction(where, act, entities, add)
+		case ActionStartActivity:
+			checkActivity(where, act.Activity, a, add) // #423: live_activity.go
+		case ActionBack, ActionOpenVoice, ActionResetForm, ActionEndActivity:
 		default:
 			add("%s: unknown action type %q", where, act.Type)
 		}
@@ -420,6 +424,9 @@ func (a *App) Validate() error {
 					add("%s: %s field %q must be type photo", where, c.Type, c.Field)
 				} else if (c.Type == CompVideoField || c.Type == CompVideoPlayer) && f.Type != FieldVideo {
 					add("%s: %s field %q must be type video", where, c.Type, c.Field)
+				}
+				if c.Type == CompPhotoField {
+					checkPhotoAnalyze(where, c, formEntity, add)
 				}
 				if c.Type == CompVideoField && (c.MaxDuration < 0 || c.MaxDuration > 600) {
 					add("%s: videoField maxDuration must be 1..600 seconds", where)
@@ -546,6 +553,8 @@ func (a *App) Validate() error {
 				} else if c.Type == CompQrScanner && f.Type != FieldString && f.Type != FieldText {
 					add("%s: qrScanner field %q must be string or text", where, c.Field)
 				}
+			case CompQrCode: // #422
+				checkQRCode(where, c, formEntity, entities, add)
 			case CompLocationPicker: // #212
 				checkLocationPicker(where, c, formEntity, add)
 			case CompRouteGuide: // #411
@@ -620,6 +629,8 @@ func (a *App) Validate() error {
 			case CompRandomPicker:
 				checkRandomPicker(where, c, entities, add)
 				checkAction(where+".onItemTap", c.OnItemTap)
+			case CompAudioRecorder:
+				checkAudioRecorder(where, c, formEntity, add)
 			case CompEmptyState:
 				if c.Title == "" {
 					add("%s: emptyState needs title", where)
@@ -632,13 +643,17 @@ func (a *App) Validate() error {
 				checkChatThread(where, c, entities, add)
 			case CompHealthStat:
 				checkHealthStat(where, c, add)
+			case CompDashcam:
+				checkDashcam(where, c, add)
+			case CompSensorValue:
+				checkSensorValue(where, c, entities, add)
+				if c.Threshold != nil {
+					checkAction(where+".threshold.action", c.Threshold.Action)
+				}
+			case CompMusicPlayer:
+				checkMusicPlayer(where, c, add)
 			case CompNearbyShare:
-				if c.Label == "" {
-					add("%s: nearbyShare needs label", where)
-				}
-				if entities[c.Entity] == nil {
-					add("%s: nearbyShare entity %q does not exist", where, c.Entity)
-				}
+				checkNearbyShare(where, c, entities, add) // nearby.go
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}
@@ -648,6 +663,8 @@ func (a *App) Validate() error {
 		}
 	}
 	checkRecordNav(a, entities, add) // #256
+	checkDashcamCount(a, add)        // #410
+	checkMusicPlayerCount(a, add)
 
 	if len(p) > 0 {
 		return &ValidationError{Problems: p}

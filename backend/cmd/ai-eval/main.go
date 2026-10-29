@@ -28,8 +28,11 @@
 // Parent -> child (#256): prefillRef (bool: some navigate opens a child form with prefillRef).
 // Add button (#416): oneAdd (bool: no toolbar ＋ opens the same form as a button on its screen).
 // Share (#254): scopeNot (no entity has that scope), summaryHas ([text, ...]: each is in the summary).
+// Photo reading (#418): photoAnalyze ([kind, ...]: some photoField.analyze has each kind; photo_ai.go).
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
-// otherwise the locale is detected from the transcript. English edits whose
+// otherwise the locale is detected from the transcript. tips_cases.json (#415)
+// runs the iOS 頼み方のコツ examples in ja and en; a base outside
+// internal/ai/examples is reached by a relative name (../../../../docs/dsl/examples/<name>). English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
 // M0 (#281): shared (bool: some entity is shared or public, whichever the model
 // picks). Keys and types are listed in expect.go; -check validates a cases
@@ -385,11 +388,22 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkEnum(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkKeep(c.Expect, app, rec.Summary)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRoute(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkDashcam(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkExport(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkSensor(c.Expect, app, rec.Summary)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkPhotoAI(c.Expect, app)...)
 		if v, ok := c.Expect["noOmission"].(bool); ok && v && len(rec.Omissions) > 0 {
 			rec.ExpectMisses = append(rec.ExpectMisses, fmt.Sprintf("omissions=%v", rec.Omissions))
 		}
 		rec.ExpectMisses = append(rec.ExpectMisses, checkGroupBy(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMarks(c.Expect, app)...) // #255: marks.go
+		// #423: live_activity.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkLiveActivity(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkQR(c.Expect, app)...)         // #422: qr.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAudio(c.Expect, app)...)      // #420: audio.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAIGenerate(c.Expect, app)...) // #417: aigen.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkNearby(c.Expect, app)...)     // #425: nearby.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkMusic(c.Expect, app)...)      // #412: music.go
 	}
 	created[c.ID] = res.DSL // edits too, so an edit can build on an earlier edit (#229)
 	log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms first=%dms out=%d chars=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",

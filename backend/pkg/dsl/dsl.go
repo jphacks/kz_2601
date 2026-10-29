@@ -193,6 +193,9 @@ const (
 	ActionResetForm     ActionType = "resetForm"
 	ActionScheduleNotif ActionType = "scheduleNotification"
 	ActionCancelNotif   ActionType = "cancelNotification"
+	ActionExport        ActionType = "export"
+	ActionStartActivity ActionType = "startActivity" // #423 Live Activity
+	ActionEndActivity   ActionType = "endActivity"
 )
 
 // Action is a non-nesting side effect triggered by buttons/list taps.
@@ -206,6 +209,11 @@ type Action struct {
 	Notification   *Notification `json:"notification,omitempty"`   // scheduleNotification
 	NotificationID string        `json:"notificationId,omitempty"` // cancelNotification
 	PrefillRef     string        `json:"prefillRef,omitempty"`     // navigate: ref field of the target form set to the current record (#256)
+	Format         string        `json:"format,omitempty"`         // export: csv|pdf (#421)
+	Filter         *Filter       `json:"filter,omitempty"`         // export
+	Fields         []string      `json:"fields,omitempty"`         // export: columns (default all but photo/video)
+	Title          string        `json:"title,omitempty"`          // export: file name / PDF heading
+	Activity       *Activity     `json:"activity,omitempty"`       // startActivity (#423)
 }
 
 // ComponentType discriminates Component.
@@ -250,6 +258,7 @@ const (
 	CompLocationPicker ComponentType = "locationPicker" // search / map pin -> location field (+ nameField) (#212)
 	CompRouteGuide     ComponentType = "routeGuide"     // MapKit turn-by-turn guidance to a destination (#411)
 	CompQrScanner      ComponentType = "qrScanner"      // AVFoundation -> string field
+	CompQrCode         ComponentType = "qrCode"         // CoreImage QR from text / field / value (#422)
 	CompTimerDisplay   ComponentType = "timerDisplay"   // stopwatch / countdown
 	CompWebView        ComponentType = "webView"        // in-app WKWebView (https only)
 	// leaves: input batch
@@ -277,15 +286,21 @@ const (
 	// random pick (#263): one record per button press, not saved
 	CompRandomPicker ComponentType = "randomPicker"
 	// on-device AI (#78)
-	CompAiButton ComponentType = "aiButton" // Foundation Models -> form field (never leaves the device)
+	CompAiButton ComponentType = "aiButton" // Foundation Models -> form field; task generate may fall back to /v1/text (#417)
 	// peer-to-peer
 	CompNearbyShare ComponentType = "nearbyShare" // MultipeerConnectivity: send records to a nearby device
 	// location tracking (#168): start/stop recording points while the user opts in
 	CompLocationTracker ComponentType = "locationTracker"
 	// chat (#260): bubbles oldest-first + a pinned input bar that saves a record
 	CompChatThread ComponentType = "chatThread"
+	// dashcam (#410): rear camera loop recording, impact save, auto start
+	CompDashcam ComponentType = "dashcam"
 	// device health (#167)
 	CompHealthStat ComponentType = "healthStat" // CoreMotion steps / HealthKit weight (no entity)
+	// device sensors (#419): CoreMotion / CMAltimeter live value, optional save
+	CompSensorValue ComponentType = "sensorValue"
+	// music (#412): Apple Music player + song requests from nearby friends
+	CompMusicPlayer ComponentType = "musicPlayer"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -363,6 +378,7 @@ type Component struct {
 	Mode          string  `json:"mode,omitempty"`          // timerDisplay: stopwatch|countdown / routeGuide: automobile|walking
 	Address       string  `json:"address,omitempty"`       // routeGuide: fixed destination (address / place name)
 	Seconds       int     `json:"seconds,omitempty"`       // timerDisplay countdown start / locationTracker auto stop
+	LiveActivity  bool    `json:"liveActivity,omitempty"`  // timerDisplay: mirror to the lock screen / Dynamic Island (#423)
 	ShareTo       string  `json:"shareTo,omitempty"`       // shareButton: any|line|slack|discord (`target` is progressBar's number)
 	// input batch (slider / stepper / rating / textEditor). Pointers so that
 	// an explicit 0 round-trips through omitempty. Min/Max are shared with gauge.
@@ -395,6 +411,9 @@ type Component struct {
 	Input   string   `json:"input,omitempty"`   // form field fed to the model ("" = whole draft)
 	Output  string   `json:"output,omitempty"`  // form field the result is written to
 	Options []string `json:"options,omitempty"` // classify candidates (else the enum output field's options)
+	Shape   string   `json:"shape,omitempty"`   // generate (#417): line|list|fields
+	Count   int      `json:"count,omitempty"`   // generate list: number of items
+	Items   []string `json:"items,omitempty"`   // generate fields: item names
 
 	// healthStat (#167). Label / Target are shared.
 	Metric string `json:"metric,omitempty"` // steps|weight
@@ -410,6 +429,35 @@ type Component struct {
 	// chatThread (#260). Entity / Placeholder / EmptyText are shared.
 	TextField  string `json:"textField,omitempty"`  // message body (string/text field)
 	PhotoField string `json:"photoField,omitempty"` // optional photo field
+	// dashcam (#410). Title is shared. Zero = iOS default.
+	KeepMinutes  int      `json:"keepMinutes,omitempty"`  // loop length (default 10)
+	MaxStorageMB int      `json:"maxStorageMB,omitempty"` // storage cap (default 2000)
+	ImpactG      float64  `json:"impactG,omitempty"`      // impact threshold in G (default 2.5)
+	AutoStart    []string `json:"autoStart,omitempty"`    // landscape|still|charging, all must hold
+	Audio        bool     `json:"audio,omitempty"`        // also record the microphone
+	// sensorValue (#419). Label / Style / Min / Max / Entity / Field / DateField /
+	// Seconds (log interval) / Limit (log count) are shared.
+	Sensor    string           `json:"sensor,omitempty"`
+	Threshold *SensorThreshold `json:"threshold,omitempty"`
+	// photoField (#418): on-device reading of the picked photo into other fields.
+	Analyze []PhotoAnalyze `json:"analyze,omitempty"`
+
+	// nearbyShare passby (#425). Entity / Mode / Limit are shared.
+	Fields   []string `json:"fields,omitempty"`   // passby: field ids exchanged (explicit allowlist)
+	Distance bool     `json:"distance,omitempty"` // passby: UWB distance / direction to a connected peer
+
+	// musicPlayer (#412). Title is shared.
+	AllowRequests bool `json:"allowRequests,omitempty"` // accept song requests from nearby devices
+	AutoAccept    bool `json:"autoAccept,omitempty"`    // queue requests without asking
+}
+
+// PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the
+// form field it goes into (Into).
+type PhotoAnalyze struct {
+	Kind    string   `json:"kind"` // text|amount|date|classify|describe|jointAngle
+	Into    string   `json:"into"`
+	Options []string `json:"options,omitempty"` // classify candidates (else the enum into's options)
+	Joint   string   `json:"joint,omitempty"`   // jointAngle: knee|elbow|hip|shoulder (+ left/right)
 }
 
 // GridRange is an inclusive integer range of gridTable rows.
@@ -427,7 +475,7 @@ var (
 )
 
 // AITasks is the closed set of aiButton.task values.
-var AITasks = map[string]bool{"summarize": true, "classify": true, "rewrite": true, "extract": true, "suggest": true}
+var AITasks = map[string]bool{"summarize": true, "classify": true, "rewrite": true, "extract": true, "suggest": true, "generate": true}
 
 // TableColumn is one column of a table component.
 type TableColumn struct {

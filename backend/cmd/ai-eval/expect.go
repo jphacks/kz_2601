@@ -9,6 +9,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
 // Expect format check and the per-group pass rate (#281). Both run without
@@ -62,6 +64,34 @@ var expectKeys = map[string]expectKind{
 	// checkRoute (#411)
 	"routeDest": expectString,
 	"routeMode": expectString,
+	// checkDashcam (#410)
+	"dashcamAuto": expectBool,
+	// checkExport (#421)
+	"export": expectString,
+	// checkSensor (#419)
+	"sensor":          expectStrings,
+	"sensorSave":      expectBool,
+	"sensorThreshold": expectBool,
+	"sensorDecline":   expectBool,
+	// checkLiveActivity (#423)
+	"liveTimer":       expectBool,
+	"activityButtons": expectBool,
+	// checkQR (#422)
+	"qrSource": expectString,
+	// checkPhotoAI (#418)
+	"photoAnalyze": expectStrings,
+	// checkAudio (#420)
+	"audio":       expectBool,
+	"audioInList": expectBool,
+	// checkAIGenerate (#417): aigen.go
+	"aiGenerate":       expectString, // line|list|fields|any
+	"aiGenerateEntity": expectBool,
+	// checkNearby (#425)
+	"passby":         expectBool,
+	"passbyDistance": expectBool,
+	// checkMusic (#412)
+	"musicRequests":   expectBool,
+	"musicAutoAccept": expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,
@@ -136,6 +166,18 @@ func validateExpect(exp map[string]any) []string {
 		case "routeMode":
 			if s := v.(string); !slices.Contains(routeModes, s) {
 				bad = append(bad, "routeMode must be automobile|walking: "+s)
+			}
+		case "export":
+			if s := v.(string); s != "csv" && s != "pdf" && s != "both" {
+				bad = append(bad, "export must be csv|pdf|both: "+s)
+			}
+		case "qrSource":
+			if s := v.(string); !qrSources[s] {
+				bad = append(bad, "qrSource must be text|field|value|record|any: "+s)
+			}
+		case "aiGenerate":
+			if s := v.(string); s != "any" && !dsl.AIShapes[s] {
+				bad = append(bad, "aiGenerate must be line|list|fields|any: "+s)
 			}
 		}
 	}

@@ -8,6 +8,9 @@ public struct MockAIClient: AIClient {
     public init(delay: Duration = .seconds(1.2)) { self.delay = delay }
 
     public static func sampleName(for transcript: String) -> String {
+        // #418 写真の読み取り・骨格(「筋トレ」「写真」より先に見る)
+        if transcript.contains("レシート") { return "receipt_ai" }
+        if transcript.contains("フォーム") && (transcript.contains("チェック") || transcript.contains("角度")) { return "form_check" }
         if transcript.contains("トレ") || transcript.contains("筋") || transcript.contains("運動") { return "training" }
         if transcript.contains("散歩") || transcript.contains("写真") || transcript.contains("場所") { return "walk" }
         if transcript.contains("買い物") || transcript.contains("チェックリスト") { return "shopping" }
@@ -15,6 +18,11 @@ public struct MockAIClient: AIClient {
         if transcript.contains("時間割") || transcript.contains("時限") { return "timetable" }
         if transcript.contains("ナビ") || transcript.contains("道案内") || transcript.contains("ドライブ") { return "drive" }
         if transcript.contains("ランダム") || transcript.contains("くじ") || transcript.contains("晩ごはん") { return "dinner" }
+        if transcript.contains("ドラレコ") || transcript.contains("車載"), DSLExamples.names.contains("dashcam") { return "dashcam" } // #410(審査用の版には無い)
+        #if !APP_STORE_REVIEW
+        if transcript.contains("傾き") || transcript.contains("水平器") || transcript.contains("気圧") { return "sensors" } // #419
+        #endif
+        if transcript.contains("音楽") || transcript.contains("BGM") { return "drive_music" }
         if transcript.contains("最初") || transcript.contains("戻") { return "initial" }
         return "kakeibo"
     }

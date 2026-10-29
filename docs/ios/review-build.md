@@ -28,16 +28,24 @@
 | 誰でも開ける共有リンク(アプリ側の入口) | `ShareAppSheet` / `SharingHooks`(URL を受けて取り込む処理)/ `HTTPSharingClient`、Info.plist の `CFBundleURLTypes`(`tailorit://`) | 1.2(通報・ブロックが無い) |
 | HealthKit(`healthStat` / `Field.health`) | 部品と登録 / `HealthData` / `AppRuntime+Health`、`NSHealth*` / `NSMotionUsageDescription`、entitlement `com.apple.developer.healthkit*` | 4.7.2・5.1.3 |
 | バックグラウンドでの位置の記録(`locationTracker`) | 部品と登録 / `LocationTracking`、`UIBackgroundModes` の `location` | 4.7.2・5.1.5・2.5.4 |
-| 近くの端末との共有(`nearbyShare`・MultipeerConnectivity) | 部品と登録 / `Features/Nearby` 全部、`NSLocalNetworkUsageDescription` / `NSBonjourServices` | 4.7.2 |
+| 端末のセンサー(`sensorValue`・CoreMotion の device motion / CMAltimeter・#419) | 部品と登録 / `SensorData`、`NSMotionUsageDescription`(healthStat と共通) | 4.7.2 |
+| 近くの端末との共有(`nearbyShare`・MultipeerConnectivity。すれ違い通信と UWB の距離 #425 を含む) | 部品と登録 / `Features/Nearby` 全部 / `NearbyPassbyLeaf`・`NearbyPassbyHost`、`NSLocalNetworkUsageDescription` / `NSBonjourServices` / `NSNearbyInteractionUsageDescription` | 4.7.2 |
+| 音楽プレーヤーの友だちからの曲リクエスト(`musicPlayer.allowRequests`・#412) | 部品の中のリクエストの UI(`MusicPlayerLeaf` の `requests`)。送受信は上の `Features/Nearby` と一緒に外れる | 4.7.2(近くの端末との通信) |
 | DSL から使うカメラの撮影(`photoField` / `videoField`) | `CameraPicker` / `VideoCameraPicker`、撮影の選択肢 | 4.7.2・2.5.14 |
-| 外した部品を使う同梱の例 | `health` / `walk_route` / `attendance_nearby`(`DSLExamples.reviewExcluded`) | 上と同じ |
+| ドラレコ(`dashcam`・#410。カメラの常時録画・CoreMotion) | 部品と登録 / `DashcamRecorder`、写真への追加の説明文から「ドラレコ」を外す | 4.7.2・2.5.14 |
+| DSL から使うマイクの録音(`audioRecorder`・#420) | 部品と登録 / `AudioRecorderController` / `RemoteRecorderCommands`(イヤホンのボタン)。マイクの説明文は音声入力だけの文に差し替え済み | 4.7.2・2.5.14 |
+| 外した部品を使う同梱の例 | `health` / `walk_route` / `attendance_nearby` / `dashcam` / `sensors`(`DSLExamples.reviewExcluded`) | 上と同じ |
 
 **残すもの**
 - `photoField` / `videoField` は、**写真ライブラリから選ぶ**機能だけ残す。PhotosPicker は別プロセスで動き、権限の確認も要らない。
+  - `photoField.analyze`(#418・写真の文字・金額・分類・骨格の読み取り)は残す。選んだ写真を端末内の Vision / Foundation Models で読むだけで、カメラも権限も使わない。カメラの映像を見ながらの読み取り(回数カウントなど)を足す時は、撮影と同じく審査用の版から外す。
 - 現在地を 1 回だけ取る `locationButton` と、地図の `mapView`(使用中の位置だけ)は残す。
 - 目的地までの道案内 `routeGuide`(#411)も残す。使うのは使用中の位置だけで、背面で案内を続けない(`CLBackgroundActivitySession` も `UIBackgroundModes: location` も使わない)。読み上げ(AVSpeechSynthesizer)に権限は要らない。
 - QR を読む `qrScanner` は残す(カメラの説明文はこれに合わせて差し替える)。
+- QR を作って表示する `qrCode`(#422)も残す。CoreImage で端末内で作るだけで、写真への保存は追加のみの権限(`NSPhotoLibraryAddUsageDescription`)。
+- 声でアプリを作り変える音声入力(マイク FAB)は残す。`audio` field の再生(一覧の行の再生ボタン)も残す(マイクを使わない。この版では録音できないので鳴る録音は無い)。
 - 裏で定期的に同期する `fetch` は残す。
+- `musicPlayer`(Apple Music の再生・検索)は残す。`NSAppleMusicUsageDescription` も残す(#412)。
 - 最初の版のスコープは、調査メモ(リポジトリ外の `調査_ライセンスとApp Store審査.md`)の「最初の版で削る機能」の表に合わせている。
 
 ## 仕組み
@@ -89,15 +97,15 @@ cd ios
 
 ```sh
 APP=<DerivedData>/Build/Products/Review-iphoneos/Metamon.app
-plutil -p "$APP/Info.plist" | grep -E 'NSHealth|NSMotion|NSLocalNetwork|Bonjour|CFBundleURLTypes|UIBackgroundModes' -A2
+plutil -p "$APP/Info.plist" | grep -E 'NSHealth|NSMotion|NSLocalNetwork|Bonjour|NSNearbyInteraction|CFBundleURLTypes|UIBackgroundModes' -A2
 #   → UIBackgroundModes が [fetch] だけで、他は出ないこと
 codesign -d --entitlements :- "$APP"
 #   → com.apple.developer.healthkit が無いこと
-otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|CoreMotion'
+otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|NearbyInteraction|CoreMotion'
 #   → 何も出ないこと
-strings "$APP/Metamon" | grep -E 'HKHealthStore|MCSession|CMPedometer|UIImagePickerController|release-requests|public-apps'
+strings "$APP/Metamon" | grep -E 'HKHealthStore|MCSession|NISession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps'
 #   → 何も出ないこと
-ls "$APP" | grep -E '^(health|walk_route|attendance_nearby)\.json$'
+ls "$APP" | grep -E '^(health|walk_route|attendance_nearby|dashcam|sensors)\.json$'
 #   → 何も出ないこと
 ```
 

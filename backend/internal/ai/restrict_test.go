@@ -16,7 +16,7 @@ func reviewBuild() ([]string, []string) {
 	var allowed []string
 	for t := range knownComponentTypes {
 		switch t {
-		case "healthStat", "locationTracker", "nearbyShare":
+		case "healthStat", "locationTracker", "nearbyShare", "sensorValue":
 		default:
 			allowed = append(allowed, t)
 		}
@@ -29,7 +29,7 @@ func reviewCtx() context.Context {
 	return withRestriction(context.Background(), NewRestriction(a, d))
 }
 
-var removedParts = []string{"healthStat", "locationTracker", "nearbyShare"}
+var removedParts = []string{"healthStat", "locationTracker", "nearbyShare", "sensorValue"}
 
 // withoutNote cuts the appended restriction note (it names the removed parts).
 func withoutNote(s string) string {

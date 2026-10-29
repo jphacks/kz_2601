@@ -28,6 +28,8 @@ public enum NearbyShare {
         public var entityName: String
         public var fields: [FieldSignature]
         public var count: Int
+        /// 曲のリクエスト(`musicPlayer.allowRequests`・#412)。nil = レコードの共有。古い端末はこのキーを無視する
+        public var song: MusicSong?
 
         public init(sender: String, appId: String, appName: String, entity: Entity, count: Int) {
             v = NearbyShare.version
@@ -38,6 +40,19 @@ public enum NearbyShare {
             entityName = entity.name
             fields = NearbyShare.signature(of: entity)
             self.count = count
+        }
+
+        /// 曲のリクエスト 1 件(レコードは送らない・曲は招待の context だけで判定できる)。
+        public init(sender: String, appId: String, appName: String, song: MusicSong) {
+            v = NearbyShare.version
+            self.sender = sender
+            self.appId = appId
+            self.appName = appName
+            entityId = NearbyShare.songEntityId
+            entityName = "曲のリクエスト"
+            fields = []
+            count = 1
+            self.song = song
         }
     }
 
@@ -93,6 +108,7 @@ public enum NearbyShare {
     /// 受け取れるか。同じ appId なら entity id が在れば OK。別アプリなら entity id と保存フィールド(id+型)の集合が一致する時だけ。
     public static func decide(_ header: Header, dsl: AppDSL, appId: String) -> Decision {
         guard header.v <= version else { return .reject(reason: "相手のアプリが新しすぎるため受け取れません") }
+        if let song = header.song { return decideSong(song, dsl: dsl, sameApp: header.appId == appId) }
         guard let entity = dsl.entity(header.entityId) else {
             return .reject(reason: "このアプリには「\(header.entityName)」がないため受け取れません")
         }
@@ -122,9 +138,27 @@ public enum NearbyShare {
         case (.integer, .number), (.number, .number), (.currency, .number): true
         case (.boolean, .bool): true
         case (.string, .string), (.text, .string), (.date, .string), (.datetime, .string),
-             (.enum, .string), (.photo, .string), (.video, .string), (.location, .string), (.ref, .string), (.refs, .array): true
+             (.enum, .string), (.photo, .string), (.video, .string), (.audio, .string), (.location, .string), (.ref, .string), (.refs, .array): true
         default: false
         }
+    }
+
+    // MARK: - 曲のリクエスト(#412)
+
+    /// 曲のリクエストの Decision.accept に入れる印(entity ではない)。
+    public static let songEntityId = "$musicRequest"
+
+    /// 送る曲のリクエストを作る。曲名が無ければ nil。
+    public static func makeSongRequest(_ song: MusicSong, sender: String, appId: String, appName: String) -> Payload? {
+        guard let s = MusicRequestRules.sanitize(song) else { return nil }
+        return Payload(header: Header(sender: sender, appId: appId, appName: appName, song: s), records: [])
+    }
+
+    /// 今のアプリが allowRequests の musicPlayer を使っている時だけ受け取る(同じアプリの別コピーでもよい)。
+    static func decideSong(_ song: MusicSong, dsl: AppDSL, sameApp: Bool) -> Decision {
+        guard dsl.usesMusicRequests else { return .reject(reason: "このアプリは曲のリクエストを受け付けていません") }
+        guard MusicRequestRules.sanitize(song) != nil else { return .reject(reason: "曲名のないリクエストは受け取れません") }
+        return .accept(entityId: songEntityId, sameApp: sameApp)
     }
 
     // MARK: - 符号化

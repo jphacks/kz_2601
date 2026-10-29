@@ -206,11 +206,12 @@
             "currency",
             "photo",
             "video",
+            "audio",
             "location",
             "ref",
             "refs"
           ],
-          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField. refs = array of record ids of `refEntity` (multi-select, e.g. expense.split_with -> members: who shares this expense); [] or missing = everyone; filter it with op contains, count it with op len."
+          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). audio = voice recording kept on the recording device: \"audio:<id>|<seconds>\" (AAC m4a written by audioRecorder; other devices show only the length). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField. refs = array of record ids of `refEntity` (multi-select, e.g. expense.split_with -> members: who shares this expense); [] or missing = everyone; filter it with op contains, count it with op len."
         },
         "required": {
           "type": "boolean"
@@ -336,7 +337,10 @@
             "openUrl",
             "resetForm",
             "scheduleNotification",
-            "cancelNotification"
+            "cancelNotification",
+            "export",
+            "startActivity",
+            "endActivity"
           ],
           "x-enumDescriptions": {
             "navigate": "画面遷移。list.onItemTap からは recordId が暗黙に渡り、遷移先フォームが編集モードになる(だから onItemTap の遷移先は同じ entity のフォーム)。prefillRef を付けると今のレコード(タップした行・ボタンのあるフォームのレコード)を子フォームの ref に入れて新規で開く。",
@@ -347,7 +351,10 @@
             "openUrl": "URL を Safari で開く。",
             "resetForm": "フォームのドラフトを既定値に戻す。",
             "scheduleNotification": "ローカル通知をその場で予約(dsl.<id> で置換)。任意で押すリマインドはこれ。毎日の定期通知は app.notifications に宣言する。",
-            "cancelNotification": "予約した通知を取り消す。"
+            "cancelNotification": "予約した通知を取り消す。",
+            "export": "記録を CSV(Excel で開ける)か PDF の報告にして共有シートで送る(ファイル・メール・AirDrop)。「CSV で出したい」「PDF にしたい」「Excel で開きたい」「月の報告書」はこれ。button か toolbar に置く。CSV は表示と同じ書式(日付・円・選択肢・参照先の名前・計算項目を含む)、PDF は見出し・絞り込み・表と、同じ画面にある同じ entity のグラフを 1 つにまとめる。",
+            "startActivity": "ロック画面と Dynamic Island に「いま◯◯中」を出す(ライブアクティビティ・#423)。activity の title と、任意で残り時間(minutes)・数字(stat)。アプリを閉じても時間は進み、stat は記録を足すたびに更新される。同じアプリで出し直すと前のものを置き換える。タイマー部品の時間を出すだけなら timerDisplay.liveActivity の方が短い。",
+            "endActivity": "startActivity で出したロック画面の表示を消す(「終わった」「到着」ボタンに)。"
           }
         },
         "screen": {
@@ -371,10 +378,11 @@
         },
         "entity": {
           "type": "string",
-          "description": "saveRecord / deleteRecord: entity id.",
+          "description": "saveRecord / deleteRecord / export: entity id.",
           "x-for": {
             "saveRecord": "required",
-            "deleteRecord": "required"
+            "deleteRecord": "required",
+            "export": "required"
           }
         },
         "url": {
@@ -407,6 +415,48 @@
           "description": "親から子を作る(#256)。遷移先フォーム(screen.entity)の ref field id。今のレコード(list / mapView の onItemTap ならタップした行、button / toolbar ならその画面のフォームのレコード)を入れて新規で開く。ref の refEntity は今のレコードの entity。遷移先フォームにはその field の picker を残す。calendar / gridTable では使えない。",
           "x-for": {
             "navigate": "optional"
+          }
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "csv",
+            "pdf"
+          ],
+          "description": "export: csv = 表計算向け(UTF-8 BOM 付き・1 行目は項目名)、pdf = 印刷・メール向けの報告。",
+          "x-for": {
+            "export": "required"
+          }
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter",
+          "description": "export: 書き出すレコードの絞り込み(list.filter と同じ)。「今月分」なら {field: 日付, op: thisMonth, value: null}。省略で全件。",
+          "x-for": {
+            "export": "optional"
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "export: 書き出す列(field id の並び)。省略で entity の全項目(計算項目を含む・写真と動画は除く)。",
+          "x-for": {
+            "export": "optional"
+          }
+        },
+        "title": {
+          "type": "string",
+          "description": "export: ファイル名と PDF の見出し(例「6 月の家計簿」)。省略で entity 名。",
+          "x-for": {
+            "export": "optional"
+          }
+        },
+        "activity": {
+          "$ref": "#/$defs/Activity",
+          "description": "startActivity only.",
+          "x-for": {
+            "startActivity": "required"
           }
         }
       }
@@ -552,6 +602,9 @@
           "$ref": "#/$defs/VideoPlayer"
         },
         {
+          "$ref": "#/$defs/AudioRecorder"
+        },
+        {
           "$ref": "#/$defs/List"
         },
         {
@@ -654,6 +707,9 @@
           "$ref": "#/$defs/QrScanner"
         },
         {
+          "$ref": "#/$defs/QrCode"
+        },
+        {
           "$ref": "#/$defs/TimerDisplay"
         },
         {
@@ -679,6 +735,15 @@
         },
         {
           "$ref": "#/$defs/HealthStat"
+        },
+        {
+          "$ref": "#/$defs/Dashcam"
+        },
+        {
+          "$ref": "#/$defs/SensorValue"
+        },
+        {
+          "$ref": "#/$defs/MusicPlayer"
         }
       ]
     },
@@ -1396,8 +1461,8 @@
     "PhotoField": {
       "type": "object",
       "additionalProperties": false,
-      "description": "カメラ / ライブラリから写真を取り込んで photo field に保存する入力。",
-      "x-usage": "「写真を撮る・残す」は source camera、既存の写真を選ぶなら library、迷えば both。",
+      "description": "カメラ / ライブラリから写真を取り込んで photo field に保存する入力。写真の文字・金額・日付・分類・説明・体の関節の角度を端末内の AI で読み取り、同じレコードの他の項目に入れられる(analyze)。",
+      "x-usage": "「写真を撮る・残す」は source camera、既存の写真を選ぶなら library、迷えば both。「撮ったら読み取って」「レシートを撮ったら金額を入れて」「写真から分類」「フォームをチェック」なら analyze:[{kind, into}] を付け、読み取った値を入れる field(into)を同じ entity に足して、その入力欄も同じフォームに置く(読み取り結果は確認・修正できる)。analyze 付きの photoField は全幅 5〜6 行(例 A1:F5)。レシート → {kind:amount, into:金額(currency)} + {kind:date, into:日付} (+ {kind:text, into:メモ})。写っている物の種類 → {kind:classify, into:enum field}。筋トレ・ストレッチのフォーム → {kind:jointAngle, joint:knee 等, into:角度(number)}(写真に関節の点と線を重ねて出す)。",
       "required": [
         "type",
         "field"
@@ -1426,6 +1491,15 @@
             "library",
             "both"
           ]
+        },
+        "analyze": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/PhotoAnalyze"
+          },
+          "description": "写真を撮った・選んだ直後に端末内で読み取り、into の field に入れる(読み取れなかった項目は今の値のまま。「もう一度読み取る」で読み直せる)。保存はユーザー。"
         }
       }
     },
@@ -1534,6 +1608,40 @@
             "medium",
             "large"
           ]
+        }
+      }
+    },
+    "AudioRecorder": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "マイクで音声を録音して audio field に保存する入力(ボイスメモ・会議や授業の録音)。録音・停止・再生・録り直し・削除ができ、録音中は経過時間と音量のメーターを出す。イヤホン(AirPods など)のボタンでも録音の開始・停止ができる。音声は端末内に保存し、レコードにはファイル名と長さ(秒)だけを入れる。",
+      "x-usage": "「録音する・声で残す・ボイスメモ・会議を録音」に。フォーム画面(screen.entity)に置き、field は type audio。メモ(textEditor)やタイトル・日付と同じフォームに並べる。一覧の行で再生するなら list.item.trailing にその audio field(行に再生ボタンと長さが出る)。文字起こしはしない(声でアプリを作り変える voiceInput とは別物)。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "audioRecorder"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Must be an audio field of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "maxDuration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7200,
+          "description": "Recording limit in seconds (default 600 = 10 minutes, up to 7200)."
         }
       }
     },
@@ -2893,6 +3001,47 @@
       "description": "カメラで QR / バーコードを読み取り、文字列をフォームの文字 field に入れる(実機専用・シミュレータはプレースホルダ+手入力)。在庫管理・チケット受付・本の ISBN・URL 取り込みで選ぶ。",
       "x-usage": "フォーム画面のみ(screen.entity 必須)。結果を表示する textField の上に 1 行(A3:F4)。"
     },
+    "QrCode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "qrCode"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "QR の上の見出し(任意・例: 会員証)。"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "QR にする固定の文字・URL(例: https://example.com)。screen.entity がある画面では `{{fieldId}}` をそのレコードの値で置換する(例: https://x.com/{{account}})。text / field / value のどれか 1 つだけ。"
+        },
+        "field": {
+          "type": "string",
+          "description": "QR にする screen.entity の field(会員番号・URL・チケット番号など。photo / video / refs 不可)。表示中のレコード(フォーム・詳細)の値で作る。"
+        },
+        "value": {
+          "$ref": "#/$defs/Expr",
+          "description": "QR にする値を計算式で(例: concat で文字をつなぐ)。screen.entity がある画面では ref でそのレコードの field を読める。"
+        },
+        "label": {
+          "type": "string",
+          "description": "QR の下の小さな説明(任意・例: 受付でこの QR を見せてください)。"
+        }
+      },
+      "description": "文字・URL・レコードの値から QR コードを作って表示する(読み取りは qrScanner)。長押しまたはボタンで写真に保存・共有できる。値が空なら案内を出す。会員証・チケット・自分の SNS や Web の URL・連絡先・Wi-Fi・受付番号を「QR で見せたい / QR にしたい」に選ぶ。",
+      "x-usage": "値は text(固定)/ field(画面のレコード)/ value(計算式)のどれか 1 つ。ユーザー本人の URL・番号など生成時に分からない値は text に例を書かず、entity の string field に入力させて field で出す(フォーム画面の textField の下に qrCode)。固定の 1 つ(お店の URL 等)ならホームに text で。正方形に近い area(例 B3:E8)、下に label。"
+    },
     "TimerDisplay": {
       "type": "object",
       "additionalProperties": false,
@@ -2927,10 +3076,14 @@
         },
         "label": {
           "type": "string"
+        },
+        "liveActivity": {
+          "type": "boolean",
+          "description": "true で、動いている間ロック画面と Dynamic Island に残り時間 / 経過時間を出す(アプリを閉じても数え続ける・#423)。「ロック画面に出したい」「画面を消しても見たい」「Dynamic Island に」と言われたら付ける。"
         }
       },
       "description": "大きな mm:ss 表示と 開始/一時停止/リセット。stopwatch はカウントアップ、countdown は seconds から 0 へ。筋トレのセット・プランク・ポモドーロ・料理・瞑想など時間を計るアプリで選ぶ。",
-      "x-usage": "画面の主役として A2:F6、下にフォームの入力欄。フォーム画面で `field` を指定すると計測秒をレコードと一緒に保存できる。"
+      "x-usage": "画面の主役として A2:F6、下にフォームの入力欄。フォーム画面で `field` を指定すると計測秒をレコードと一緒に保存できる。 ロック画面にも出すなら liveActivity: true。"
     },
     "WebView": {
       "type": "object",
@@ -3281,11 +3434,37 @@
         },
         "entity": {
           "type": "string",
-          "description": "送る entity。screen.entity と同じならフォームの今のレコード(1 件)、それ以外の画面ではその entity の新しい順 最大 50 件を送る。"
+          "description": "送る entity。send: screen.entity と同じならフォームの今のレコード(1 件)、それ以外の画面ではその entity の新しい順 最大 50 件を送る。passby: 自分の記録(受け取った記録は除く)の新しい順 limit 件を送り、受け取った記録もこの entity に追加する(scope は private のみ)。"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "send",
+            "passby"
+          ],
+          "description": "send(既定)= ボタンを押して相手を選んで送る。passby = すれ違い通信: この画面を開いていてオンにしている間、近くで同じアプリを開いている人と自動で記録を交換し、会った人と日時の一覧を出す(アプリを裏に回すと止まる)。"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "passby で送る field id(必須)。ここに書いた entity の保存 field だけを送る。hidden・photo・video・ref・refs・computed は指定できない。"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "description": "passby で 1 回に送る件数(既定 1 = 最新のプロフィール 1 件)。最大 20 件・16 KB。"
+        },
+        "distance": {
+          "type": "boolean",
+          "description": "passby で、つながった相手との距離と方向(Nearby Interaction・UWB)を出す。対応端末(iPhone 11 以降・SE を除く)だけ。"
         }
       },
-      "description": "近くにいる Tailor It 端末(Wi-Fi / Bluetooth・インターネット不要)を探し、選んだ相手にこの画面のレコードをその場で送るボタン。相手が承認した時だけ届き、同じ entity(id とフィールド構成)を持つアプリならレコードとして追加される。「近くの人と共有」「その場で送る」「出席を取る」「名刺交換」「対戦結果を渡す」など、対面で記録を渡したいアプリで選ぶ。",
-      "x-usage": "フォーム画面なら保存ボタンの近く(A10:F11)に 1 つ。一覧画面なら下部の半幅(D11:F12)に。受け取る側も同じアプリ(同じ entity)を開いている必要がある。"
+      "description": "近くにいる Tailor It 端末(Wi-Fi / Bluetooth・インターネット不要)と記録をその場でやり取りする。send(既定)は相手を選んで送るボタンで、相手が承認した時だけ届き、同じ entity(id とフィールド構成)を持つアプリならレコードとして追加される。「近くの人と共有」「その場で送る」「出席を取る」「名刺交換」「対戦結果を渡す」など、対面で記録を渡したいアプリで選ぶ。mode:passby は「すれ違い通信」: 画面を開いている間、近くで同じアプリを開いている人と fields に書いた項目だけを自動で交換し、会った人の一覧を出す(「すれ違った人とプロフィールを交換」)。distance:true で近くの人との距離・方向も出す(「近くの友だちとの距離を表示」)。",
+      "x-usage": "send: フォーム画面なら保存ボタンの近く(A10:F11)に 1 つ。一覧画面なら下部の半幅(D11:F12)に。受け取る側も同じアプリ(同じ entity)を開いている必要がある。passby: 専用の画面(タブ)に全幅・縦長(A1:F8 など)で 1 つ。entity は自分のプロフィール(名前・ひとことなど)を入れる private の entity で、プロフィールを書くフォーム画面への導線も置く。"
     },
     "ExprIf": {
       "type": "object",
@@ -3313,8 +3492,7 @@
       "additionalProperties": false,
       "required": [
         "type",
-        "task",
-        "output"
+        "task"
       ],
       "properties": {
         "type": {
@@ -3328,7 +3506,7 @@
         },
         "label": {
           "type": "string",
-          "description": "ボタン文言(省略時は task から自動: AI で要約 など)。"
+          "description": "ボタン文言(省略時は task から自動: AI で要約 など)。generate は「罰ゲームを考えて」のように動詞で。"
         },
         "task": {
           "type": "string",
@@ -3337,9 +3515,10 @@
             "classify",
             "rewrite",
             "extract",
-            "suggest"
+            "suggest",
+            "generate"
           ],
-          "description": "summarize=要約 / classify=候補から 1 つ選ぶ / rewrite=言い換え・清書 / extract=要点や値の抜き出し / suggest=一言・アイデアの提案。"
+          "description": "summarize=要約 / classify=候補から 1 つ選ぶ / rewrite=言い換え・清書 / extract=要点や値の抜き出し / suggest=フォームの入力から一言・アイデア / generate=決まった指示(prompt)で新しく書かせる(罰ゲームの案・今日の献立・励ましの一言。結果はボタンの下に出る・shape で形を決める)。"
         },
         "input": {
           "type": "string",
@@ -3347,21 +3526,21 @@
         },
         "entity": {
           "type": "string",
-          "description": "集計入力: この entity の最近のレコード(limit 件)をまとめて AI に渡す(例: 過去の日記から傾向を一言)。input と同時に指定しない。"
+          "description": "集計入力: この entity の最近のレコード(limit 件)をまとめて AI に渡す(例: 過去の日記から傾向を一言 / 冷蔵庫の中身から献立)。input と同時に指定しない。"
         },
         "limit": {
           "type": "integer",
           "minimum": 1,
           "maximum": 50,
-          "description": "entity 入力の件数(新しい順・既定 20)。"
+          "description": "entity 入力の件数(新しい順・既定 20。generate は 20 まで)。"
         },
         "output": {
           "type": "string",
-          "description": "結果を入れる screen.entity の field id(string/text、classify は enum も可)。フォームのドラフトに入るだけで保存はユーザーが行う。"
+          "description": "結果を入れる screen.entity の field id(string/text、classify は enum も可)。フォームのドラフトに入るだけで保存はユーザーが行う。generate 以外は必須。generate は任意(省略 = ボタンの下に出すだけ・保存しない)。"
         },
         "prompt": {
           "type": "string",
-          "description": "追加の指示テンプレ。{{fieldId}} はフォームの値、{{input}} は入力全体に置換。例: 「{{body}} を 30 字で」。"
+          "description": "指示テンプレ。{{fieldId}} はフォームの値、{{input}} は入力全体に置換。例: 「{{body}} を 30 字で」。generate では必須で、これが AI への固定の指示(500 字まで。例: 「飲み会で盛り上がる、誰でもできる軽い罰ゲームの案」)。"
         },
         "options": {
           "type": "array",
@@ -3371,10 +3550,34 @@
             "type": "string"
           },
           "description": "classify の候補。output が enum field なら省略可(field の options を使う)。"
+        },
+        "shape": {
+          "type": "string",
+          "enum": [
+            "line",
+            "list",
+            "fields"
+          ],
+          "description": "generate の出力の形(既定 line)。line=1 行 / list=箇条書き count 個 / fields=items の名前ごとに 1 つ(例: 主菜・副菜・汁物)。"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "generate の shape list の個数(既定 3)。「5 つ」と言われたら 5。"
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "type": "string"
+          },
+          "description": "generate の shape fields の項目名(1〜10 個・各 20 字まで)。例: [\"主菜\",\"副菜\",\"汁物\"]。"
         }
       },
-      "description": "押すとオンデバイス AI(Apple Intelligence / Foundation Models)が走り、フォームの入力を要約・分類・言い換え・抜き出し・提案して output field に入れるボタン。無料・データは端末外に出ない。非対応端末では「この端末では AI を使えません」と無効表示。",
-      "x-usage": "フォーム画面のみ(screen.entity 必須)。発話に「要約して」「分類して」「気分を判定」「タグ付け」「一言で」「言い換えて」「丁寧に」「抜き出して」「提案して」「AI で」がある時に使う。entity に結果用の field(string/text、分類は enum)を足し、その入力欄の直上に 1 行(例 A7:F8)。1 画面 3 個まで。"
+      "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はオンデバイス AI(Apple Intelligence / Foundation Models)だけでフォームの入力を処理して output field に入れる(無料・データは端末外に出ない・非対応端末では「この端末では AI を使えません」)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",
+      "x-usage": "summarize〜suggest はフォーム画面のみ(screen.entity 必須)。発話に「要約して」「分類して」「気分を判定」「タグ付け」「一言で」「言い換えて」「丁寧に」「抜き出して」「AI で」がある時に使う。entity に結果用の field(string/text、分類は enum)を足し、その入力欄の直上に 1 行(例 A7:F8)。generate は「〜の案を出してくれるボタン」「今日の献立を提案」「励ましの一言」「お題を考えて」の時: どの画面でもよく、結果を表示する高さを取る(line は 3 行・list/fields は 5〜6 行 例 A1:F6)。記録を材料にするなら entity(+limit)、結果を記録に残したい時だけフォーム画面で output。1 画面 3 個まで。"
     },
     "LocationTracker": {
       "type": "object",
@@ -3560,6 +3763,308 @@
         }
       },
       "description": "entity の印 1 つ(marks の要素)。id は like / save / read など entity 内で一意。1 人 1 回のトグルで、件数と「自分が付けたか」を backend が持つ。"
+    },
+    "Dashcam": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "dashcam"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "カードの見出し(任意・例: ドラレコ)。"
+        },
+        "keepMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "description": "ループ録画で端末に残す直近の分数(既定 10・1〜60)。これより古い区間(1 区間 = 1 分)は自動で消す。衝撃で保存した区間は消さない。"
+        },
+        "maxStorageMB": {
+          "type": "integer",
+          "minimum": 200,
+          "maximum": 20000,
+          "description": "録画が使う容量の上限 MB(既定 2000 = 約 2GB・200〜20000)。超えたら古いループ区間から消す。保存済みだけで上限に達したら録画を止めて知らせる。"
+        },
+        "impactG": {
+          "type": "number",
+          "minimum": 1.2,
+          "maximum": 8,
+          "description": "衝撃とみなす加速度(重力を除いた G・既定 2.5・1.2〜8)。小さいほど敏感。超えたら前後の区間(直前 1 分〜直後 30 秒)を保存済みにする。"
+        },
+        "autoStart": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "landscape",
+              "still",
+              "charging"
+            ]
+          },
+          "description": "自動で録画を始める条件(全部が 5 秒続いたら開始)。landscape = 横向き / still = ほぼ静止(スタンドに置いた)/ charging = 充電中。「スタンドに置いたら自動で」なら [landscape, still]、「充電したら」なら charging も足す。省略 = 録画ボタンを押した時だけ。"
+        },
+        "audio": {
+          "type": "boolean",
+          "description": "マイクで車内の音声も録る(既定 false = 映像だけ)。「音も録りたい」と言われた時だけ true。"
+        }
+      },
+      "description": "ドライブレコーダー(ドラレコ)。背面カメラの映像を表示しながら録画し、直近 keepMinutes 分だけを 1 分ごとの区間で端末に残す(ループ録画・容量の上限つき)。加速度が impactG を超えたら前後の区間を「保存済み」にして消さない。autoStart の条件(横向き・ほぼ静止・充電中)が続いたら自動で録画を始める。保存済みの映像は部品の中の一覧から再生・写真に保存・共有できる。録画中は画面のスリープを止める。iOS の制約で画面を出している間だけ録画する(裏に回ると止まる)。「ドラレコ」「車載カメラ」「運転中に録画」「スマホスタンドに置いたら録画」「事故の時の映像を残す」の時に必ずこれを選ぶ(videoField で代替しない)。entity は不要(映像は記録に入れない)。",
+      "x-usage": "ホーム画面(screen.entity なし)にこれ 1 つを大きく置く: A1:F10(最下 2 行の左 A-B はマイクの席なので空ける)。1 画面に 1 つだけ。「置いたら自動で」は autoStart [landscape, still]、「充電したら」は charging を足す。容量・残す時間・感度の話があれば maxStorageMB / keepMinutes / impactG。entity・フォーム画面・list は作らない(保存済みの一覧は部品の中にある)。"
+    },
+    "SensorValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "sensor",
+        "label"
+      ],
+      "properties": {
+        "type": {
+          "const": "sensorValue"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "sensor": {
+          "type": "string",
+          "enum": [
+            "tilt",
+            "pitch",
+            "roll",
+            "acceleration",
+            "rotation",
+            "pressure",
+            "altitude"
+          ],
+          "x-enumDescriptions": {
+            "tilt": "傾き(水平からの角度・0〜90°)。水平器・スマホの角度。",
+            "pitch": "前後の傾き(-90〜90°)。",
+            "roll": "左右の傾き(-180〜180°)。",
+            "acceleration": "揺れ・加速度の大きさ(G・重力は除く)。急ブレーキ・衝撃・振動。",
+            "rotation": "回転の速さ(°/s・ジャイロ)。",
+            "pressure": "気圧(hPa・気圧計)。",
+            "altitude": "高度の変化(m・画面を開いた時を 0 とした相対値。標高ではない)。"
+          },
+          "description": "表示する iPhone のセンサー値。温度・湿度は iPhone にセンサーが無いので無い。"
+        },
+        "label": {
+          "type": "string",
+          "description": "カードの見出し(例: 傾き・今の気圧)。"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "number",
+            "gauge",
+            "level"
+          ],
+          "description": "number=大きな数字(既定)/ gauge=範囲のメーター(min〜max)/ level=水平器の泡(sensor tilt のみ)。"
+        },
+        "min": {
+          "type": "number",
+          "description": "gauge の下限(省略時はセンサーごとの既定)。"
+        },
+        "max": {
+          "type": "number",
+          "description": "gauge の上限(省略時はセンサーごとの既定・min より大きい)。"
+        },
+        "entity": {
+          "type": "string",
+          "description": "値を保存する entity(任意)。指定すると「今の値を記録」ボタンが出て、1 回 = 1 レコード。"
+        },
+        "field": {
+          "type": "string",
+          "description": "entity の number field。記録した時の値(単位はセンサーの単位)が入る。entity と一緒に必須。"
+        },
+        "dateField": {
+          "type": "string",
+          "description": "entity の datetime field。記録した時刻が入る(任意)。"
+        },
+        "seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "description": "一定間隔の記録(秒・1〜3600)。指定すると「記録を開始/停止」が出て、画面を開いている間だけ間隔ごとに 1 件保存する。entity が要る。"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "一定間隔の記録の上限件数(既定 60・1〜1000)。達したら自動で止まる。seconds が要る。"
+        },
+        "threshold": {
+          "$ref": "#/$defs/SensorThreshold"
+        }
+      },
+      "description": "iPhone のセンサー(傾き・加速度・回転・気圧・高度)の今の値を表示するカード。画面を開いている間だけ測る(最大 10 回/秒)。entity を付けると今の値を記録でき、seconds で一定間隔の記録、threshold で「30° を超えたら知らせる」ができる。「水平器」「スマホの傾き」「揺れ・振動・衝撃を測る」「気圧」「高度・何階分登った」の時に選ぶ。温度・湿度は測れない(iPhone にセンサーが無い)。センサーの無い端末では「このセンサーはこの端末では使えません」と出る。",
+      "x-usage": "数字だけなら半幅 3 行(A1:C3)、gauge / level は全幅 4〜5 行(A1:F5)。記録するなら entity は例 reading{value: number(unit は °/G/hPa/m), at: datetime(required, defaultValue now)} にしてフォーム画面は作らず、同じ画面に list か chart(A6:F10)を置く。threshold は「傾きすぎ」「揺れが大きい」を知らせたい時だけ。"
+    },
+    "SensorThreshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "above": {
+          "type": "number",
+          "description": "値がこれを超えたら発火(例 tilt 30)。"
+        },
+        "below": {
+          "type": "number",
+          "description": "値がこれを下回ったら発火。"
+        },
+        "message": {
+          "type": "string",
+          "description": "発火した時にカードに出す警告(例: 傾きすぎです)。省略時は既定文。"
+        },
+        "save": {
+          "type": "boolean",
+          "description": "true = 発火した時の値を entity に 1 件保存(entity が要る)。"
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "発火した時に実行する動作(任意)。navigate / scheduleNotification / cancelNotification のみ。"
+        }
+      },
+      "description": "sensorValue のしきい値。above / below のどちらかは必須。条件に入った瞬間だけ 1 回発火し(警告表示 + 振動)、条件から出るまで再発火しない(最短 3 秒おき)。"
+    },
+    "Activity": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "startActivity でロック画面と Dynamic Island に出す内容。minutes を省くと押した時からの経過時間を数える。",
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "大きく出す一言(例「ラーメン待ち」「ランニング中」「運転中」)。"
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "任意: 小さく添える一行(例「かため・3 分」)。"
+        },
+        "icon": {
+          "type": "string",
+          "description": "任意: SF Symbols 名(例 flame / figure.run / car)。省略時 timer。"
+        },
+        "minutes": {
+          "type": "integer",
+          "description": "任意: 今から N 分後を終わりとして残り時間を数える(1〜480)。省略すると経過時間。"
+        },
+        "stat": {
+          "type": "string",
+          "description": "任意: 同じアプリの stat か progressBar 部品の id。その数字(progressBar は進み具合)を添え、記録が増えるたびに更新する。"
+        }
+      }
+    },
+    "PhotoAnalyze": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "into"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "text",
+            "amount",
+            "date",
+            "classify",
+            "describe",
+            "jointAngle"
+          ],
+          "x-enumDescriptions": {
+            "text": "写真の文字(日本語・英語)をそのまま読む(OCR)。into は string / text。",
+            "amount": "レシート・値札の金額(合計の行・無ければ ¥/円 の付いた一番大きい額)。into は currency / integer / number。",
+            "date": "レシート・書類の日付(2026/10/28・2026年10月28日 など)。into は date / datetime。",
+            "classify": "写っている物と文字から候補を 1 つ選ぶ。into は enum(候補はその options)か、options 付きの string / text。",
+            "describe": "写っているものを短い文で説明する。into は string / text。",
+            "jointAngle": "人の体の関節(joint)の角度(度・0〜180)。写真に関節の点と線を重ねて出す。into は number / integer。"
+          }
+        },
+        "into": {
+          "type": "string",
+          "description": "結果を入れる screen.entity の field id(保存される field・photo field 自身は不可)。"
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": {
+            "type": "string"
+          },
+          "description": "classify のみ: 候補。into が enum なら省略可(その options を使う)。"
+        },
+        "joint": {
+          "type": "string",
+          "enum": [
+            "knee",
+            "elbow",
+            "hip",
+            "shoulder",
+            "leftKnee",
+            "rightKnee",
+            "leftElbow",
+            "rightElbow",
+            "leftHip",
+            "rightHip",
+            "leftShoulder",
+            "rightShoulder"
+          ],
+          "description": "jointAngle のみ(必須): 角度を測る関節。knee / elbow / hip / shoulder は左右のうちよく写っている方。"
+        }
+      },
+      "description": "写真から読み取る 1 項目(kind)と、結果を入れる field(into)。"
+    },
+    "MusicPlayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "musicPlayer"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "カードの見出し(任意・例: ドライブ BGM)。"
+        },
+        "allowRequests": {
+          "type": "boolean",
+          "description": "true = 近くにいる友だちの端末(同じアプリを開いた Tailor It・Wi-Fi / Bluetooth・インターネット不要)から曲のリクエストを受け付ける。届いたリクエストは承認するとこの端末の再生待ちに入る。既定 false。"
+        },
+        "autoAccept": {
+          "type": "boolean",
+          "description": "allowRequests のとき、届いたリクエストを確認せずに再生待ちへ入れる(運転中で画面を触れない時)。既定 false = 1 曲ずつ承認。"
+        }
+      },
+      "description": "Apple Music の音楽プレーヤー。曲を検索して再生待ちに入れ、再生・一時停止・次へ・前へと、今の曲(曲名・アーティスト・ジャケット)と再生待ちを表示する。イヤホンのボタン・ロック画面でも操作できる。allowRequests で近くの友だちの端末から曲のリクエストを受けられる。「音楽を流す」「ドライブの BGM」「プレイリスト」「友だちが曲を入れられる」の時に選ぶ。再生には Apple Music の契約が要る。Spotify は曲名で Spotify アプリを開くことだけでき、再生・操作はできない。entity は要らない。",
+      "x-usage": "entity 不要。1 アプリに 1 つだけ。ホーム(またはタブ)に全幅で大きく置く(例 A1:F12。他の部品と並べるなら A1:F8)。友だちから曲を入れたい話があれば allowRequests: true、運転中で確認できない・勝手に入れていいなら autoAccept: true も。"
     }
   }
 }

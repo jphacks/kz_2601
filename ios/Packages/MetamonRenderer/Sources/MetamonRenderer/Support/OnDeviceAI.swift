@@ -172,9 +172,9 @@ enum AIRequestBuilder {
     }
 
     /// 「名前: 値」を並べる(写真・位置・空は落とす)。
-    private static func describe(_ fields: [Field], value: (String) -> JSONValue, separator: String) -> String {
+    static func describe(_ fields: [Field], value: (String) -> JSONValue, separator: String) -> String {
         fields.compactMap { f -> String? in
-            guard f.type != .photo, f.type != .video, f.type != .location else { return nil }
+            guard f.type != .photo, f.type != .video, f.type != .audio, f.type != .location else { return nil }
             let s = FieldCoding.display(value(f.id), field: f)
             return s.isEmpty ? nil : "\(f.name): \(s)"
         }.joined(separator: separator)

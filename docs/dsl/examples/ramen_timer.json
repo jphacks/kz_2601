@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "ラーメンタイマー",
+    "description": "カップ麺の 3 分をロック画面と Dynamic Island でも数える。お店の行列に並ぶ間は「並び中」と今月の杯数をロック画面に出す(ライブアクティビティの見本・#423)",
+    "icon": "flame",
+    "theme": { "primaryColor": "#E65100" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "bowl",
+      "name": "食べた記録",
+      "titleField": "name",
+      "fields": [
+        { "id": "name", "name": "商品・お店", "type": "string", "required": true },
+        { "id": "date", "name": "日時", "type": "datetime", "defaultValue": "now" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "ラーメンタイマー",
+      "toolbar": [
+        { "label": "記録", "icon": "plus", "action": { "type": "navigate", "screen": "bowl_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        { "type": "timerDisplay", "id": "timer", "area": "A1:F5", "mode": "countdown", "seconds": 180, "label": "カップ麺", "liveActivity": true },
+        { "type": "stat", "id": "month", "area": "A6:C7", "label": "今月の杯数", "entity": "bowl", "aggregate": "count",
+          "filter": { "field": "date", "op": "thisMonth", "value": null } },
+        { "type": "button", "id": "queue", "area": "D6:F6", "label": "行列に並ぶ", "icon": "person.3", "style": "primary",
+          "action": { "type": "startActivity", "activity": { "title": "行列に並び中", "icon": "person.3", "minutes": 30, "stat": "month" } } },
+        { "type": "button", "id": "seated", "area": "D7:F7", "label": "席に着いた", "icon": "checkmark", "style": "secondary",
+          "action": { "type": "endActivity" } },
+        {
+          "type": "section", "id": "recent", "area": "A8:F12", "title": "最近食べた",
+          "children": [
+            { "type": "list", "entity": "bowl", "item": { "title": "name", "subtitle": "date" },
+              "sort": { "field": "date", "direction": "desc" }, "emptyText": "食べたら右上の「記録」から",
+              "onItemTap": { "type": "navigate", "screen": "bowl_form", "presentation": "push" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bowl_form",
+      "title": "食べた記録",
+      "entity": "bowl",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "bowl" } }],
+      "components": [
+        {
+          "type": "section", "id": "fields", "area": "A1:F4", "title": "内容",
+          "children": [
+            { "type": "textField", "field": "name", "label": "商品・お店", "placeholder": "とんこつ醤油" },
+            { "type": "datePicker", "field": "date", "label": "日時" }
+          ]
+        }
+      ]
+    }
+  ]
+}

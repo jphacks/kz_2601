@@ -1,0 +1,6 @@
+[
+  {"id": "dc_dashcam_can", "group": "drive", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#410 ドラレコはできるか(dashcam があるので「できます」・部品名を出さない)",
+   "steps": [{"say": "スマホをスタンドに置いたら自動で録画するドラレコって作れる?", "textNot": ["できません", "作れません", "dashcam", "videoField", "entity", "public", "private", "shared"]}]},
+  {"id": "dc_dashcam_background", "group": "drive", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#410 アプリを閉じても録画はできない(画面を出している間だけ)",
+   "steps": [{"say": "ドラレコで、アプリを閉じて地図アプリを見てる間もずっと録画できる?", "textAny": ["できません", "できない", "画面を出している", "画面を表示", "前面"], "textNot": ["dashcam", "entity"]}]}
+]

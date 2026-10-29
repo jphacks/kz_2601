@@ -78,6 +78,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.locationButton) { c, ctx in LocationButtonLeaf(c: c, ctx: ctx) }
         r.register(.locationPicker) { c, ctx in LocationPickerLeaf(c: c, ctx: ctx) }
         r.register(.qrScanner) { c, ctx in QrScannerLeaf(c: c, ctx: ctx) }
+        r.register(.qrCode) { c, ctx in QrCodeLeaf(c: c, ctx: ctx) }
         r.register(.timerDisplay) { c, ctx in TimerDisplayLeaf(c: c, ctx: ctx) }
         // leaf: 入力系バッチ
         r.register(.slider) { c, ctx in SliderLeaf(c: c, ctx: ctx) }
@@ -105,6 +106,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.webView) { c, _ in WebViewLeaf(c: c) }
         // leaf(オンデバイス AI・#78)
         r.register(.aiButton) { c, ctx in AiButtonLeaf(c: c, ctx: ctx) }
+        // leaf(Apple Music・#412)。友だちからのリクエストの UI は部品の中で審査用ビルドから外す
+        r.register(.musicPlayer) { c, _ in MusicPlayerLeaf(c: c) }
         #if !APP_STORE_REVIEW
         // 審査用ビルド(APP_STORE_REVIEW・#245)では登録しない(4.7.2: ネイティブ API を DSL に出さない)。
         // 届いた DSL に含まれていても未知 type のプレースホルダになる。
@@ -115,6 +118,12 @@ public struct ComponentRegistry: Sendable {
         // leaf(チャット・#260)
         r.register(.chatThread) { c, ctx in ChatThreadLeaf(c: c, ctx: ctx) }
         r.register(.healthStat) { c, _ in HealthStatLeaf(c: c) }
+        // leaf(ドラレコ・#410)
+        r.register(.dashcam) { c, ctx in DashcamLeaf(c: c, ctx: ctx) }
+        // leaf(端末のセンサー・#419。CoreMotion)
+        r.register(.sensorValue) { c, ctx in SensorValueLeaf(c: c, ctx: ctx) }
+        // leaf(録音・#420)
+        r.register(.audioRecorder) { c, ctx in AudioRecorderLeaf(c: c, ctx: ctx) }
         #endif
         return r
     }()

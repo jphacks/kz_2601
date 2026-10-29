@@ -26,8 +26,10 @@ struct MetamonApp: App {
         FirstRunTutorialStore.shared.applyLaunchOverride() // #274(DEBUG のみ)
         _ = ExpensiveNetworkProbe.shared // 音声モデルの確認(#275)より前に回線の種類の監視を始める
         services.ai = ConsentGatedAIClient(base: services.ai) { AIConsentStore.isGranted(in: .standard) }
+        if BuildConfig.forceMock { MusicSession.shared.player = FakeMusicPlayback() } // musicPlayer(#412)は音を出さない偽物
         #if !APP_STORE_REVIEW
         if BuildConfig.forceMock { HealthData.source = MockHealthData() } // healthStat(#167)は固定値
+        if BuildConfig.forceMock { SensorData.source = MockSensorData() } // sensorValue(#419)は決まった波形
         #else
         _ = ReviewBuildPackageMarker.self // パッケージにも APP_STORE_REVIEW が渡っていることをコンパイル時に保証(#245)
         #endif
@@ -51,6 +53,9 @@ struct MetamonApp: App {
         runtime.onSessionExpired = { session.expire() } // 401 が続いたらサインイン画面へ(#60)
         runtime.isAnonymousUser = { session.user?.isAnonymous == true } // 引き継ぎの案内(#276)
         IntentHost.shared.register(runtime) // Siri / ショートカット(#80)は本体プロセス内でこの runtime を使う
+        #if !APP_STORE_REVIEW
+        PassbyController.install(runtime: runtime, mock: BuildConfig.forceMock) // すれ違い通信(#425)
+        #endif
         _runtime = State(initialValue: runtime)
         _session = State(initialValue: session)
     }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -12,15 +13,60 @@ import (
 const casesDir = "../../internal/ai/eval"
 
 func TestCaseFilesValid(t *testing.T) {
-	for _, f := range []string{"cases.json", "demo_cases.json", "m0disc_cases.json", "audit_cases.json", "audit_en_cases.json", "groupby_cases.json", "parent_child_cases.json", "route_cases.json"} {
+	for _, f := range []string{"cases.json", "demo_cases.json", "m0disc_cases.json", "audit_cases.json", "audit_en_cases.json", "groupby_cases.json", "parent_child_cases.json", "route_cases.json", "dashcam_cases.json", "export_cases.json", "tips_cases.json", "sensor_cases.json", "live_activity_cases.json", "qr_cases.json", "photo_ai_cases.json", "audio_cases.json", "ai_generate_cases.json", "nearby_cases.json", "music_cases.json"} {
 		if err := checkCasesFile(filepath.Join(casesDir, f), false); err != nil {
 			t.Error(err)
 		}
 	}
-	for _, f := range []string{"chat_cases.json", "m0disc_chat_cases.json"} {
+	for _, f := range []string{"chat_cases.json", "m0disc_chat_cases.json", "dashcam_chat_cases.json", "sensor_chat_cases.json", "photo_ai_chat_cases.json", "music_chat_cases.json"} {
 		if err := checkCasesFile(filepath.Join(casesDir, f), true); err != nil {
 			t.Error(err)
 		}
+	}
+}
+
+// TestTipsCasesPaired (#415): every 頼み方のコツ example runs in ja and en on
+// the same base with the same expect, and every example: base file exists.
+// The ja / en text itself is checked against the iOS list by PromptTipsTests.
+func TestTipsCasesPaired(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(casesDir, "tips_cases.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []Case
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]Case{}
+	for _, c := range cases {
+		byID[c.ID] = c
+	}
+	pairs := 0
+	for _, c := range cases {
+		if !strings.HasPrefix(c.ID, "tip_") || c.Group != "tips" || len(c.Expect) == 0 {
+			t.Errorf("%s: want id tip_*, group tips and an expect", c.ID)
+		}
+		if name, ok := strings.CutPrefix(c.Base, "example:"); ok {
+			// ai-eval runs in backend/ and reads internal/ai/examples/<name>.json
+			if _, err := os.Stat(filepath.Join(casesDir, "../examples", name+".json")); err != nil {
+				t.Errorf("%s: base %s: %v", c.ID, c.Base, err)
+			}
+		}
+		if strings.HasSuffix(c.ID, "_en") {
+			continue
+		}
+		pairs++
+		en, ok := byID[c.ID+"_en"]
+		if !ok {
+			t.Errorf("%s: no %s_en", c.ID, c.ID)
+			continue
+		}
+		if c.Locale != "ja" || en.Locale != "en" || en.Base != c.Base || !reflect.DeepEqual(en.Expect, c.Expect) {
+			t.Errorf("%s: ja / en differ (locale %s/%s base %s/%s)", c.ID, c.Locale, en.Locale, c.Base, en.Base)
+		}
+	}
+	if pairs*2 != len(cases) {
+		t.Errorf("%d ja cases for %d cases", pairs, len(cases))
 	}
 }
 

@@ -443,6 +443,23 @@
         }
       }
     },
+    "1日ごとの変化を折れ線グラフで見せて": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show a line chart of how it changes day by day"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1日ごとの変化を折れ線グラフで見せて"
+          }
+        }
+      }
+    },
     "Apple でサインイン済み": {
       "extractionState": "manual",
       "localizations": {
@@ -575,6 +592,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pro をご利用中です"
+          }
+        }
+      }
+    },
+    "QRコードを読み取って記録できるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let me scan a QR code to log it"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "QRコードを読み取って記録できるようにして"
           }
         }
       }
@@ -1021,6 +1055,23 @@
         }
       }
     },
+    "「メモ」という言葉を「ひとこと」に変えて": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change the word \"Memo\" to \"Comment\""
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「メモ」という言葉を「ひとこと」に変えて"
+          }
+        }
+      }
+    },
     "「元に戻して」と話しても同じ。「別のアプリ。…」と話すと新しいアプリとして作ります。": {
       "extractionState": "manual",
       "localizations": {
@@ -1102,6 +1153,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "「探す」はサーバー接続時のみ使えます"
+          }
+        }
+      }
+    },
+    "「集計」のタブの名前を「グラフ」に変えて": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename the \"Summary\" tab to \"Charts\""
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「集計」のタブの名前を「グラフ」に変えて"
           }
         }
       }
@@ -1395,6 +1463,23 @@
         }
       }
     },
+    "この記録を家族だけで共有して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share these records with my family only"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この記録を家族だけで共有して"
+          }
+        }
+      }
+    },
     "そのままにする": {
       "extractionState": "manual",
       "localizations": {
@@ -1408,6 +1493,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "そのままにする"
+          }
+        }
+      }
+    },
+    "その場でカメラで撮って残せるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let me take a photo with the camera right there and save it"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "その場でカメラで撮って残せるようにして"
+          }
+        }
+      }
+    },
+    "できた画面に向かって、こう話すと思いどおりに直せます。例をタップすると入力欄に入るので、言葉を足してから送ってください。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Say it like this to get the screen you want. Tap an example to put it in the text box, then adjust the words before sending."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "できた画面に向かって、こう話すと思いどおりに直せます。例をタップすると入力欄に入るので、言葉を足してから送ってください。"
           }
         }
       }
@@ -2330,6 +2449,23 @@
         }
       }
     },
+    "みんなに公開して、友達のスマホからも書き込めるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open it to everyone so friends can add entries from their phones"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "みんなに公開して、友達のスマホからも書き込めるようにして"
+          }
+        }
+      }
+    },
     "みんなの掲示板": {
       "extractionState": "manual",
       "localizations": {
@@ -2857,6 +2993,23 @@
         }
       }
     },
+    "カテゴリごとの割合を円グラフで見せて": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show a pie chart of the share by category"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カテゴリごとの割合を円グラフで見せて"
+          }
+        }
+      }
+    },
     "カメラで読み取ると Tailor It で開きます": {
       "extractionState": "manual",
       "localizations": {
@@ -2870,6 +3023,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "カメラで読み取ると Tailor It で開きます"
+          }
+        }
+      }
+    },
+    "カメラ・写真": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera and photos"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カメラ・写真"
           }
         }
       }
@@ -2904,6 +3074,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "グラフを追加して"
+          }
+        }
+      }
+    },
+    "グラフ・合計": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Charts and totals"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "グラフ・合計"
           }
         }
       }
@@ -3350,6 +3537,23 @@
         }
       }
     },
+    "タブの順番を入れ替えて、「集計」をいちばん左にして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reorder the tabs so \"Summary\" is on the far left"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タブの順番を入れ替えて、「集計」をいちばん左にして"
+          }
+        }
+      }
+    },
     "ダウンロード中 %lld%%": {
       "extractionState": "manual",
       "localizations": {
@@ -3503,6 +3707,23 @@
         }
       }
     },
+    "ホームに「使い方」ボタンを置いて、押したら説明を書いた画面に移るようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Put a \"How to use\" button on the home screen that goes to a page with instructions"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ホームに「使い方」ボタンを置いて、押したら説明を書いた画面に移るようにして"
+          }
+        }
+      }
+    },
     "ボウリングのスコア表": {
       "extractionState": "manual",
       "localizations": {
@@ -3537,6 +3758,40 @@
         }
       }
     },
+    "ボタンで別の画面へ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buttons to other screens"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボタンで別の画面へ"
+          }
+        }
+      }
+    },
+    "ボタンの色をもっと目立つ色にして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make the button color stand out more"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボタンの色をもっと目立つ色にして"
+          }
+        }
+      }
+    },
     "ボタンを大きくして": {
       "extractionState": "manual",
       "localizations": {
@@ -3550,6 +3805,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "ボタンを大きくして"
+          }
+        }
+      }
+    },
+    "ボタンを押したら、今いる場所を記録できるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a button that saves where I am right now"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボタンを押したら、今いる場所を記録できるようにして"
           }
         }
       }
@@ -3945,6 +4217,23 @@
         }
       }
     },
+    "一覧 → タップで詳しく・直す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lists → tap for details and edits"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一覧 → タップで詳しく・直す"
+          }
+        }
+      }
+    },
     "一覧の行": {
       "extractionState": "manual",
       "localizations": {
@@ -3962,6 +4251,40 @@
         }
       }
     },
+    "一覧の項目をタップしたら、詳しい内容の画面が開くようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When I tap an item in the list, open a screen with its details"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一覧の項目をタップしたら、詳しい内容の画面が開くようにして"
+          }
+        }
+      }
+    },
+    "一覧を左にスワイプして消せるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let me swipe left on the list to delete an item"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一覧を左にスワイプして消せるようにして"
+          }
+        }
+      }
+    },
     "上部の「%@」": {
       "extractionState": "manual",
       "localizations": {
@@ -3975,6 +4298,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "上部の「%@」"
+          }
+        }
+      }
+    },
+    "下に「履歴」のタブを足して、記録を新しい順に全部見られるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a \"History\" tab at the bottom that shows every entry, newest first"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下に「履歴」のタブを足して、記録を新しい順に全部見られるようにして"
+          }
+        }
+      }
+    },
+    "下のタブ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tabs at the bottom"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下のタブ"
           }
         }
       }
@@ -4183,6 +4540,23 @@
         }
       }
     },
+    "今月の合計を、画面のいちばん上に大きく出して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show this month's total in large text at the very top"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今月の合計を、画面のいちばん上に大きく出して"
+          }
+        }
+      }
+    },
     "他の端末で変更されていたため、サーバーの内容に合わせました": {
       "extractionState": "manual",
       "localizations": {
@@ -4387,6 +4761,23 @@
         }
       }
     },
+    "保存したら、一覧の画面に自動で戻るようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "After I save, go back to the list automatically"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存したら、一覧の画面に自動で戻るようにして"
+          }
+        }
+      }
+    },
     "保存するフォームがありません": {
       "extractionState": "manual",
       "localizations": {
@@ -4574,6 +4965,40 @@
         }
       }
     },
+    "入力の画面に「メモ」の欄を足して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a \"Note\" field to the entry form"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "入力の画面に「メモ」の欄を足して"
+          }
+        }
+      }
+    },
+    "入力欄に入れる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puts it in the text box"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "入力欄に入れる"
+          }
+        }
+      }
+    },
     "公開する": {
       "extractionState": "manual",
       "localizations": {
@@ -4672,6 +5097,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "公開をやめる"
+          }
+        }
+      }
+    },
+    "共有(家族だけ / みんなに公開)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sharing (family only / everyone)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有(家族だけ / みんなに公開)"
           }
         }
       }
@@ -5203,6 +5645,40 @@
         }
       }
     },
+    "右下に「+ 追加」ボタンを置いて、押したら入力の画面が開くようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Put a \"+ Add\" button at the bottom right that opens the entry form"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "右下に「+ 追加」ボタンを置いて、押したら入力の画面が開くようにして"
+          }
+        }
+      }
+    },
+    "合計をもっと大きく表示して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make the total bigger"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "合計をもっと大きく表示して"
+          }
+        }
+      }
+    },
     "同期": {
       "extractionState": "manual",
       "localizations": {
@@ -5301,6 +5777,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "回数制限を無効にする(デモ用)"
+          }
+        }
+      }
+    },
+    "地図・場所": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maps and places"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "地図・場所"
           }
         }
       }
@@ -5794,6 +6287,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "接続先"
+          }
+        }
+      }
+    },
+    "散歩した道のりを地図に記録して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record the route of my walk on a map"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "散歩した道のりを地図に記録して"
           }
         }
       }
@@ -6359,6 +6869,23 @@
         }
       }
     },
+    "毎日の歩数をグラフで見せて": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show my daily steps in a chart"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎日の歩数をグラフで見せて"
+          }
+        }
+      }
+    },
     "毎日の水の量": {
       "extractionState": "manual",
       "localizations": {
@@ -6372,6 +6899,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "毎日の水の量"
+          }
+        }
+      }
+    },
+    "毎晩9時に、記録を忘れないよう通知して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remind me every night at 9 p.m. so I don't forget to log"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎晩9時に、記録を忘れないよう通知して"
+          }
+        }
+      }
+    },
+    "毎週月曜の朝8時にお知らせして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notify me every Monday at 8 a.m."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎週月曜の朝8時にお知らせして"
           }
         }
       }
@@ -6818,6 +7379,23 @@
         }
       }
     },
+    "直し方": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fixing things"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直し方"
+          }
+        }
+      }
+    },
     "空き容量が足りません(あと約%lldMB 必要です)。写真やアプリを整理してから試してください。": {
       "extractionState": "manual",
       "localizations": {
@@ -7158,6 +7736,23 @@
         }
       }
     },
+    "記録した場所を地図にピンで出して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the places I saved as pins on a map"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録した場所を地図にピンで出して"
+          }
+        }
+      }
+    },
     "記録する": {
       "extractionState": "manual",
       "localizations": {
@@ -7171,6 +7766,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "記録する"
+          }
+        }
+      }
+    },
+    "記録に写真を付けられるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let me attach a photo to each entry"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録に写真を付けられるようにして"
           }
         }
       }
@@ -7273,6 +7885,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "話しかけると、このアプリが育ちます"
+          }
+        }
+      }
+    },
+    "詳しい画面で、内容を直したり消したりできるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let me edit or delete the entry on the details screen"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "詳しい画面で、内容を直したり消したりできるようにして"
           }
         }
       }
@@ -7447,6 +8076,57 @@
         }
       }
     },
+    "近くにいる人の端末に、まとめて送れるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let me send entries to people nearby all at once"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近くにいる人の端末に、まとめて送れるようにして"
+          }
+        }
+      }
+    },
+    "追加ボタンを左上に移して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move the add button to the top left"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追加ボタンを左上に移して"
+          }
+        }
+      }
+    },
+    "追加ボタン・入力欄": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add buttons and fields"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追加ボタン・入力欄"
+          }
+        }
+      }
+    },
     "送信": {
       "extractionState": "manual",
       "localizations": {
@@ -7528,6 +8208,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "通信が切れました"
+          }
+        }
+      }
+    },
+    "通知": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知"
+          }
+        }
+      }
+    },
+    "通知の時間を朝7時に変えて": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change the reminder time to 7 a.m."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知の時間を朝7時に変えて"
           }
         }
       }
@@ -7698,6 +8412,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "閉じる"
+          }
+        }
+      }
+    },
+    "集計の画面に「記録する」ボタンを置いて、押したら入力の画面が開くようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Put a \"Record\" button on the Summary screen that opens the entry form"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "集計の画面に「記録する」ボタンを置いて、押したら入力の画面が開くようにして"
           }
         }
       }
@@ -7902,6 +8633,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "音量%llddB"
+          }
+        }
+      }
+    },
+    "一時停止中": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一時停止中"
+          }
+        }
+      }
+    },
+    "終わりました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終わりました"
+          }
+        }
+      }
+    },
+    "ロック画面への表示が設定でオフになっています(設定 > Tailor It > ライブアクティビティ)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live Activities are turned off in Settings (Settings > Tailor It > Live Activities)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ロック画面への表示が設定でオフになっています(設定 > Tailor It > ライブアクティビティ)"
           }
         }
       }
@@ -8433,6 +9215,57 @@
         }
       }
     },
+    "頼み方のコツ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How to ask"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "頼み方のコツ"
+          }
+        }
+      }
+    },
+    "書き出す記録が見つかりません": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No records to export"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "書き出す記録が見つかりません"
+          }
+        }
+      }
+    },
+    "書き出せませんでした": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not export"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "書き出せませんでした"
+          }
+        }
+      }
+    },
     "共有・オンラインの機能と、新しいアプリを、いくつでも": {
       "extractionState": "manual",
       "localizations": {
@@ -8820,6 +9653,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "課金の制限を無効にする(デモ用・回数と有料機能)"
+          }
+        }
+      }
+    },
+    "オンラインの AI で書く": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Writing with online AI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オンラインの AI で書く"
+          }
+        }
+      }
+    },
+    "この端末では AI を端末内で動かせないため、サーバーの AI を使います。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device can't run AI on-device, so the server's AI is used instead."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この端末では AI を端末内で動かせないため、サーバーの AI を使います。"
+          }
+        }
+      }
+    },
+    "閉じると、この端末では AI で書くボタンは使えません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you close this, the AI writing button stays unavailable on this device."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閉じると、この端末では AI で書くボタンは使えません。"
           }
         }
       }

@@ -5,6 +5,7 @@ import MetamonDSL
 
 /// `nearbyShare`(#36): 近くの Tailor It 端末へレコードを送るボタン。通信と相手選びはホスト(`DSLRuntime.shareNearby`)。
 /// 送る範囲: フォーム画面(screen.entity == entity)なら入力中の 1 件、それ以外はその entity の新しい順 最大 50 件。
+/// mode:passby(すれ違い通信・#425)は `NearbyPassbyLeaf`。
 struct NearbyShareLeaf: View {
     @Environment(\.dslRuntime) private var runtime
     let c: Component
@@ -21,6 +22,14 @@ struct NearbyShareLeaf: View {
     }
 
     var body: some View {
+        if let config = NearbyPassby.Config(c) {
+            NearbyPassbyLeaf(c: c, config: config)
+        } else {
+            sendButton
+        }
+    }
+
+    @ViewBuilder private var sendButton: some View {
         let rows = records
         Button {
             runtime.shareNearby(entity: entity, records: rows)

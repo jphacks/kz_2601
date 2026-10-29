@@ -24,18 +24,8 @@ enum WidgetSnapshotWriter {
         let stats = statComponents(in: dsl).prefix(maxStats).map { c -> WidgetSnapshot.Stat in
             let entityId = c.entity ?? ""
             let key = [entityId, c.aggregate ?? "count", c.field ?? "", c.label ?? ""].joined(separator: "|")
-            let value: String?
-            if c.aggregate == nil, let expr = c.valueExpr {
-                value = evaluator.evaluate(expr).map { v in
-                    if case .number(let n) = v { return Aggregator.format(n, as: c.format, unit: c.unit) }
-                    return v.text
-                } ?? "—"
-            } else if records[entityId] != nil {
-                value = formatted(c, entity: dsl.entity(entityId), records: evaluator.viewRecords(for: entityId))
-            } else {
-                // レコード未取得(apply 直後など)は前回値を引き継ぎ、ウィジェットが一瞬 0 にならないようにする
-                value = previous?.stats.first { $0.key == key }?.value
-            }
+            // レコード未取得(apply 直後など)は前回値を引き継ぎ、ウィジェットが一瞬 0 にならないようにする
+            let value = statText(c, dsl: dsl, records: records, evaluator: evaluator) ?? previous?.stats.first { $0.key == key }?.value
             return WidgetSnapshot.Stat(key: key, label: c.label ?? "", value: value)
         }
         let snapshot = WidgetSnapshot(appName: dsl.app.name, stats: Array(stats), updatedAt: .now)
@@ -43,6 +33,19 @@ enum WidgetSnapshotWriter {
         guard snapshot.stats != previous?.stats || snapshot.appName != previous?.appName else { return }
         snapshot.save()
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// stat 1 個の表示文字列。レコード未取得なら nil(ライブアクティビティの数字 #423 と共用)。
+    static func statText(_ c: Component, dsl: AppDSL, records: [String: [Record]], evaluator: ExprEvaluator) -> String? {
+        if c.aggregate == nil, let expr = c.valueExpr {
+            return evaluator.evaluate(expr).map { v in
+                if case .number(let n) = v { return Aggregator.format(n, as: c.format, unit: c.unit) }
+                return v.text
+            } ?? "—"
+        }
+        let entityId = c.entity ?? ""
+        guard records[entityId] != nil else { return nil }
+        return formatted(c, entity: dsl.entity(entityId), records: evaluator.viewRecords(for: entityId))
     }
 
     /// 画面順(initialScreen → タブ順 → 残り)で `stat` を列挙する。

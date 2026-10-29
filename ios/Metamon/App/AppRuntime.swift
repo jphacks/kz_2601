@@ -16,7 +16,10 @@ final class AppRuntime: DSLRuntime {
 
     /// entity id → レコード(サーバーが正。ここはキャッシュ)
     private(set) var records: [String: [Record]] = [:] {
-        didSet { if dsl.app.notifications.contains(where: \.isRecordBased) { scheduleNotificationSync() } } // #228 レコードの時刻から通知
+        didSet {
+            if dsl.app.notifications.contains(where: \.isRecordBased) { scheduleNotificationSync() } // #228 レコードの時刻から通知
+            refreshLiveActivityStats() // #423 ロック画面の数字
+        }
     }
     /// このアプリの次に届く通知(設定画面に出す・#228)。
     var upcomingNotifications: [UpcomingNotification] = []
@@ -46,6 +49,8 @@ final class AppRuntime: DSLRuntime {
     var showTutorial = false
     /// 最初のアプリができた直後の「こう言うと直せます」(#274・1 回だけ)。
     var showFirstEditHint = false
+    /// 「頼み方のコツ」(#415)で選んだ例。音声画面か対話の入力欄が受け取って空に戻す(送信はしない)。
+    var composerDraft: String?
     /// 変身一覧シート(#51: FAB 長押し / 「アプリ一覧」)。
     var showAppSwitcher = false
     /// 自分のアプリ一覧(`appsList()` が更新)。
@@ -63,6 +68,8 @@ final class AppRuntime: DSLRuntime {
         var perform: @MainActor () async -> Void
     }
     var confirm: Confirm?
+    /// 書き出したファイル(#421)。立つと共有シートを開く(`RootView` の HostSheets)。
+    var exportFile: ExportFile?
 
     /// 共有アプリへの初めての投稿で表示名を聞く(#250)。答えたら `resume` で保存を続ける。
     struct AuthorNamePrompt: Identifiable {
@@ -1096,6 +1103,15 @@ final class AppRuntime: DSLRuntime {
             guard let id = action.notificationId else { return }
             await services.notifications.cancel(id: id, appId: document.appId)
             await refreshNotifications()
+
+        case .export:
+            await export(action, ctx)
+        case .startActivity:
+            guard let spec = action.activity else { return }
+            await startActivity(spec)
+
+        case .endActivity:
+            await endActivity()
 
         case .unknown:
             toast = L10n.tr("未対応のアクション: \(action.rawType)")

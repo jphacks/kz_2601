@@ -1,0 +1,7 @@
+[
+  {"id": "dash_stand", "kind": "create", "group": "drive", "transcript": "スマホスタンドに置いたら自動でドラレコになるアプリ", "expect": {"has": ["dashcam"], "lacks": ["videoField"], "dashcamAuto": true, "unreachable": 0}, "note": "#410 置いたら自動開始(横向き+静止)"},
+  {"id": "dash_accident", "kind": "create", "group": "drive", "transcript": "運転中に使うドラレコ。事故とか急ブレーキの時の映像だけは消えないように残したい", "expect": {"has": ["dashcam"], "lacks": ["videoField"], "unreachable": 0}, "note": "#410 衝撃で保存(既定の impactG)"},
+  {"id": "dash_charging", "kind": "create", "group": "drive", "transcript": "車で充電ケーブルを挿したら録画が始まる車載カメラ。音も録って、残すのは直近5分でいい", "expect": {"has": ["dashcam"], "dashcamAuto": true, "unreachable": 0}, "note": "#410 charging・audio・keepMinutes"},
+  {"id": "dash_fuel", "kind": "create", "group": "drive", "transcript": "車の給油記録アプリ。日付と金額と給油量を記録して、月の合計を見たい", "expect": {"has": ["list"], "lacks": ["dashcam"]}, "note": "#410 運転の話でもドラレコを勝手に足さない(次の edit の土台)"},
+  {"id": "dash_edit_add", "kind": "edit", "base": "dash_fuel", "group": "drive", "transcript": "スタンドに置いたら勝手に録画するドラレコの画面も付けて", "expect": {"patch": true, "has": ["dashcam", "list"], "dashcamAuto": true, "unreachable": 0}, "note": "#410 既存アプリに dashcam の画面を足す(給油の一覧は残す)"}
+]

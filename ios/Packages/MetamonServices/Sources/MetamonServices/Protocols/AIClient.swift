@@ -34,6 +34,8 @@ public protocol AIClient: Sendable {
     func chat(appId: String, messages: [ChatMessage], locale: String?, mode: ChatMode?) async throws -> ChatTurn
     /// `DELETE /v1/chat/{appId}`。失敗しても UI は止めない(サーバー側は 30 分で自然に消える)。
     func resetChat(appId: String) async
+    /// `POST /v1/text`(#417): aiButton generate のオンライン版。端末内 AI が使えない時だけ。
+    func text(_ request: AITextRequest) async throws -> AITextResult
 }
 
 public extension AIClient {
@@ -41,6 +43,9 @@ public extension AIClient {
     func morph(transcript: String, appId: String, currentVersion: Int, locale: String?) async throws -> MorphResult {
         try await morph(transcript: transcript, appId: appId, currentVersion: currentVersion)
     }
+
+    /// text を持たない実装(テストの偽物等)は使えない扱い。
+    func text(_ request: AITextRequest) async throws -> AITextResult { throw AITextError.unsupported }
 
     /// mode を指定しない対話(backend が appId の DSL 有無で create / edit を判定)。
     func chat(appId: String, messages: [ChatMessage], locale: String?) async throws -> ChatTurn {

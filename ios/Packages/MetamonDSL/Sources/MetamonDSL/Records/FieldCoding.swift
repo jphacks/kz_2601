@@ -68,13 +68,15 @@ public enum FieldCoding {
         public var no: String
         public var photo: String
         public var video: String
-        public init(yes: String, no: String, photo: String, video: String = "動画") {
+        public var audio: String
+        public init(yes: String, no: String, photo: String, video: String = "動画", audio: String = "録音") {
             self.yes = yes
             self.no = no
             self.photo = photo
             self.video = video
+            self.audio = audio
         }
-        public static let ja = Words(yes: "はい", no: "いいえ", photo: "写真", video: "動画")
+        public static let ja = Words(yes: "はい", no: "いいえ", photo: "写真", video: "動画", audio: "録音")
     }
 
     /// 数値の表示(小数は 2 桁まで・末尾の 0 は落とす)。7.25 時間 = 「7.25」(1 桁だと「7.3」になり、
@@ -109,6 +111,7 @@ public enum FieldCoding {
         case .boolean: return v.truthy ? words.yes : words.no
         case .photo: return v.isNull ? "" : words.photo
         case .video: return v.isNull ? "" : words.video
+        case .audio: return AudioValue(v).map { $0.seconds > 0 ? words.audio + " " + AudioRecorderPolicy.elapsedText(Double($0.seconds)) : words.audio } ?? ""
         default: return v.displayString
         }
     }

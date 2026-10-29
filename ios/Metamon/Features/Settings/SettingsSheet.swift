@@ -245,6 +245,16 @@ struct SettingsSheet: View {
                 Label("使い方を見る", systemImage: "questionmark.circle")
             }
             .accessibilityIdentifier("settings.tutorial")
+            NavigationLink {
+                // #415: 選んだ例は音声画面(か対話)の入力欄に入る。送らない
+                PromptTipsView { text in
+                    rt.composerDraft = text
+                    dismiss()
+                }
+            } label: {
+                Label("頼み方のコツ", systemImage: "lightbulb")
+            }
+            .accessibilityIdentifier("settings.tips")
             Button(role: .destructive) { confirmReset = true } label: {
                 Label("アプリをリセット(初期状態に戻す)", systemImage: "arrow.counterclockwise")
             }
