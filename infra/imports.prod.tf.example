@@ -1,0 +1,156 @@
+# 既存の prod(jphacks-kz2601)を Terraform の管理下に取り込むための import ブロック。
+# prod の初回だけ `cp imports.prod.tf.example imports.tf` してから plan / apply し、
+# apply が終わったら imports.tf を消す(stg ではこのファイルを使わない)。
+# 手順と「差分 0」の確認方法は README.md の「既存の prod を取り込む」。
+
+locals {
+  import_sa_domain = "${var.project_id}.iam.gserviceaccount.com"
+}
+
+# ---- API ----
+
+import {
+  for_each = toset(var.apis)
+  to       = google_project_service.this[each.key]
+  id       = "${var.project_id}/${each.key}"
+}
+
+# ---- サービスアカウント ----
+
+import {
+  to = google_service_account.run_backend
+  id = "projects/${var.project_id}/serviceAccounts/run-backend@${local.import_sa_domain}"
+}
+
+import {
+  to = google_service_account.deployer
+  id = "projects/${var.project_id}/serviceAccounts/github-deployer@${local.import_sa_domain}"
+}
+
+import {
+  to = google_service_account.purge_job[0]
+  id = "projects/${var.project_id}/serviceAccounts/purge-job@${local.import_sa_domain}"
+}
+
+import {
+  to = google_service_account.purge_scheduler[0]
+  id = "projects/${var.project_id}/serviceAccounts/purge-scheduler@${local.import_sa_domain}"
+}
+
+# ---- プロジェクトの IAM(id = "<project> <role> <member>") ----
+
+import {
+  to = google_project_iam_member.run_backend_datastore
+  id = "${var.project_id} roles/datastore.user serviceAccount:run-backend@${local.import_sa_domain}"
+}
+
+import {
+  to = google_project_iam_member.deployer_run_admin
+  id = "${var.project_id} roles/run.admin serviceAccount:github-deployer@${local.import_sa_domain}"
+}
+
+import {
+  to = google_project_iam_member.deployer_ar_writer
+  id = "${var.project_id} roles/artifactregistry.writer serviceAccount:github-deployer@${local.import_sa_domain}"
+}
+
+import {
+  to = google_project_iam_member.purge_job_datastore[0]
+  id = "${var.project_id} roles/datastore.user serviceAccount:purge-job@${local.import_sa_domain}"
+}
+
+import {
+  to = google_project_iam_member.purge_job_firebaseauth[0]
+  id = "${var.project_id} roles/firebaseauth.admin serviceAccount:purge-job@${local.import_sa_domain}"
+}
+
+# ---- SA に対する IAM(id = "<SA の name> <role> <member>") ----
+
+import {
+  to = google_service_account_iam_member.deployer_actas_run_backend
+  id = "projects/${var.project_id}/serviceAccounts/run-backend@${local.import_sa_domain} roles/iam.serviceAccountUser serviceAccount:github-deployer@${local.import_sa_domain}"
+}
+
+import {
+  to = google_service_account_iam_member.deployer_actas_purge_job[0]
+  id = "projects/${var.project_id}/serviceAccounts/purge-job@${local.import_sa_domain} roles/iam.serviceAccountUser serviceAccount:github-deployer@${local.import_sa_domain}"
+}
+
+import {
+  to = google_service_account_iam_member.deployer_wif
+  id = "projects/${var.project_id}/serviceAccounts/github-deployer@${local.import_sa_domain} roles/iam.workloadIdentityUser principalSet://iam.googleapis.com/projects/${var.import_project_number}/locations/global/workloadIdentityPools/github/attribute.repository/${var.github_repository}"
+}
+
+# ---- WIF ----
+
+import {
+  to = google_iam_workload_identity_pool.github
+  id = "projects/${var.project_id}/locations/global/workloadIdentityPools/github"
+}
+
+import {
+  to = google_iam_workload_identity_pool_provider.github
+  id = "projects/${var.project_id}/locations/global/workloadIdentityPools/github/providers/github"
+}
+
+# ---- Artifact Registry ----
+
+import {
+  to = google_artifact_registry_repository.backend
+  id = "projects/${var.project_id}/locations/${var.region}/repositories/backend"
+}
+
+# ---- Secret Manager(入れ物と accessor。値は触らない) ----
+
+import {
+  for_each = toset(var.secret_ids)
+  to       = google_secret_manager_secret.this[each.key]
+  id       = "projects/${var.project_id}/secrets/${each.key}"
+}
+
+import {
+  for_each = toset(var.secret_ids)
+  to       = google_secret_manager_secret_iam_member.run_backend_accessor[each.key]
+  id       = "projects/${var.project_id}/secrets/${each.key} roles/secretmanager.secretAccessor serviceAccount:run-backend@${local.import_sa_domain}"
+}
+
+# ---- Firestore ----
+
+import {
+  to = google_firestore_database.default
+  id = "projects/${var.project_id}/databases/(default)"
+}
+
+# ---- 消去ジョブ(purge_job_image を入れたときだけ) ----
+
+import {
+  to = google_cloud_run_v2_job.purge[0]
+  id = "projects/${var.project_id}/locations/${var.region}/jobs/account-purge"
+}
+
+import {
+  to = google_cloud_run_v2_job_iam_member.purge_scheduler_invoker[0]
+  id = "projects/${var.project_id}/locations/${var.region}/jobs/account-purge roles/run.invoker serviceAccount:purge-scheduler@${local.import_sa_domain}"
+}
+
+import {
+  to = google_cloud_scheduler_job.purge_daily[0]
+  id = "projects/${var.project_id}/locations/${var.region}/jobs/account-purge-daily"
+}
+
+# ---- 予算(budget の ID は `gcloud billing budgets list --billing-account=...` の name の末尾) ----
+
+import {
+  to = google_billing_budget.monthly
+  id = "billingAccounts/${var.billing_account}/budgets/${var.import_budget_id}"
+}
+
+variable "import_project_number" {
+  description = "prod のプロジェクト番号(principalSet の id に使う)"
+  type        = string
+}
+
+variable "import_budget_id" {
+  description = "取り込む既存の予算の ID(imports.tf を使う間だけ)"
+  type        = string
+}

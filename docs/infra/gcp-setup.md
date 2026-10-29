@@ -33,6 +33,8 @@
 > **zsh で `#` 行を貼ると `command not found: #` が出る**のは無害だが、気になるなら先に `setopt interactivecomments` を実行しておく。
 >
 > **注意**: プロジェクトの表示名(`--name`)に `_` は使えない(ID だけでなく表示名にも文字種制限がある)。
+>
+> **2026-10-30 以降(#307)**: API・SA と IAM・Artifact Registry・Secret の入れ物・WIF・Firestore・消去ジョブ・予算は [`infra/`](../../infra/README.md) の Terraform で作る方針。本書は prod を最初に手で作った記録として残す。
 
 ## 目次
 1. [全体像](#1-全体像)
