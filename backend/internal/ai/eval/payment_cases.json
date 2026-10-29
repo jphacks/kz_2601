@@ -1,0 +1,7 @@
+[
+  {"id": "pay_paywall", "kind": "create", "group": "payment", "transcript": "PayPayで払ったら有料の記事が読めるアプリ", "expect": {"substitution": true, "noOmission": true, "unreachable": 0}, "note": "#413 払ったら有料の中身が開く仕組みは作らず、支払いリンクのボタンと記録を代わりに案内する(3.1.1)"},
+  {"id": "pay_paywall_en", "kind": "create", "group": "payment", "locale": "en", "transcript": "An app where people unlock premium articles after paying", "expect": {"substitution": true, "noOmission": true, "unreachable": 0}, "note": "#413 en でも断って代わりを案内する"},
+  {"id": "pay_link_ok", "kind": "create", "group": "payment", "transcript": "ガソリン代の割り勘アプリ。金額と払ったかを記録して、PayPayの請求リンク https://pay.paypay.ne.jp/example を開くボタンも付けて", "expect": {"has": ["openUrlButton"], "substitution": false, "unreachable": 0}, "note": "#413 実物・割り勘の https の支払いリンクは openUrlButton で置いてよい(断らない)"},
+  {"id": "call_video", "kind": "create", "group": "payment", "transcript": "家族とビデオ通話できるアプリ", "expect": {"substitution": true, "noOmission": true, "unreachable": 0}, "note": "#424 通話は作らず、電話をかけるボタン・共有の記録を案内する"},
+  {"id": "call_tel_ok", "kind": "create", "group": "payment", "transcript": "運転中に使うアプリ。自宅 0761-00-0000 に電話をかけるボタンと、今いる場所を家族に共有したい", "expect": {"has": ["openUrlButton"], "substitution": false, "unreachable": 0}, "note": "#424 電話をかけるは tel: でできる(断らない)"}
+]
