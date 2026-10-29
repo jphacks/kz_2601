@@ -103,7 +103,6 @@ struct RootView: View {
         .sheet(item: $rt.sheet) { route in
             ScreenStack(root: route)
                 .modifier(HostSheets(onModal: true))
-                .modifier(ToastHost(onModal: true))
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
                 #endif
@@ -112,7 +111,6 @@ struct RootView: View {
         .fullScreenCover(item: $rt.fullScreen) { route in
             ScreenStack(root: route)
                 .modifier(HostSheets(onModal: true))
-                .modifier(ToastHost(onModal: true))
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
                 #endif
