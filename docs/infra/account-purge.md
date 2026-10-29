@@ -50,14 +50,17 @@
 
 ## 設定の手順(人の作業)
 
-前提: [gcp-setup.md](gcp-setup.md) の環境(`PROJECT_ID=jphacks-kz2601`、`REGION=asia-northeast1`、Artifact Registry `backend`)。イメージは `deploy-cloudrun.yml` が作るもの(`/app/purge` を同梱)をそのまま使います。
+前提: [gcp-setup.md](gcp-setup.md) の環境(`PROJECT_ID=jphacks-kz2601`、`REGION=asia-northeast1`、Artifact Registry `backend`)。イメージは `deploy-cloudrun.yml` が作るもの(`/app/purge` を同梱・stg と prod で同じ Artifact Registry)をそのまま使います。タグより digest(`backend@sha256:...`)で指定する方が確実です(push 時の digest はワークフローのログにあります)。
 
 ```bash
 export PROJECT_ID=jphacks-kz2601
 export REGION=asia-northeast1
 export JOB_SA="purge-job@${PROJECT_ID}.iam.gserviceaccount.com"
 export SCHED_SA="purge-scheduler@${PROJECT_ID}.iam.gserviceaccount.com"
-export IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/backend/backend:<main の SHA>"
+export IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/backend/backend@sha256:<digest>"
+
+# Cloud Scheduler の API(初回だけ)
+gcloud services enable cloudscheduler.googleapis.com --project="$PROJECT_ID"
 ```
 
 ### 1. ジョブ用のサービスアカウント
@@ -66,12 +69,14 @@ appconfig / ai の `run-backend` に Auth の管理権限を足さないよう�
 
 ```bash
 gcloud iam service-accounts create purge-job --display-name="Account purge job" --project="$PROJECT_ID"
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:${JOB_SA}" --role="roles/datastore.user"
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:${JOB_SA}" --role="roles/firebaseauth.admin"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:${JOB_SA}" --role="roles/datastore.user" --condition=None
+gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:${JOB_SA}" --role="roles/firebaseauth.admin" --condition=None
 # deployer が「purge-job として」ジョブを作るための actAs(人が作るなら不要)
-gcloud iam service-accounts add-iam-policy-binding "$JOB_SA" \
+gcloud iam service-accounts add-iam-policy-binding "$JOB_SA" --project="$PROJECT_ID" \
   --member="serviceAccount:github-deployer@${PROJECT_ID}.iam.gserviceaccount.com" --role="roles/iam.serviceAccountUser"
 ```
+
+SA を作った直後は IAM の反映に数分かかります。`add-iam-policy-binding` が "does not exist" で失敗したり、最初の実行が Firestore の PermissionDenied で落ちたりしたら、数分待ってやり直してください。
 
 ### 2. Cloud Run Job を作り、まず dry-run で動かす
 
