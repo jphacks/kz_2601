@@ -78,7 +78,7 @@ gcloud iam service-accounts add-iam-policy-binding "$JOB_SA" \
 ```bash
 gcloud run jobs create account-purge \
   --project="$PROJECT_ID" --region="$REGION" \
-  --image="$IMAGE" --command=/app/purge --args="-dry-run" \
+  --image="$IMAGE" --command=/app/purge --args="-dry-run,-older-than=696h" \
   --service-account="$JOB_SA" \
   --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID}" \
   --tasks=1 --max-retries=1 --task-timeout=30m
@@ -89,7 +89,7 @@ gcloud run jobs execute account-purge --project="$PROJECT_ID" --region="$REGION"
 ログに `purge: start`(`candidates` = 対象の数)と `purge: would purge` が出ることを確かめます。問題が無ければ dry-run を外します。
 
 ```bash
-gcloud run jobs update account-purge --project="$PROJECT_ID" --region="$REGION" --args="-limit=50"
+gcloud run jobs update account-purge --project="$PROJECT_ID" --region="$REGION" --args="-limit=50,-older-than=696h"
 ```
 
 ### 3. Cloud Scheduler で毎日動かす
@@ -107,7 +107,7 @@ gcloud scheduler jobs create http account-purge-daily \
   --oauth-service-account-email="$SCHED_SA"
 ```
 
-毎日 4:30(JST)に動きます。消去は論理削除から最長で 31 日後になるので、ポリシーの「30 日以内」に合わせるなら `-older-than=696h`(29 日)にします。
+毎日 4:30(JST)に動きます。消去は論理削除から最長で 31 日後になるので、ポリシーの「30 日以内」に収めるため、上の手順ではジョブに `-older-than=696h`(29 日)を渡しています。
 
 ### 4. イメージの更新
 
