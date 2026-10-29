@@ -1,0 +1,6 @@
+[
+  {"id": "pc_paywall", "group": "payment", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#413 払ったら有料の中身が開く仕組みはできない(支払いリンクのボタンと記録を案内)",
+   "steps": [{"say": "PayPayで払ったら有料の記事が読めるアプリって作れる?", "textAny": ["できません", "できない"], "textNot": ["openUrlButton", "entity", "paypay://"]}]},
+  {"id": "pc_video_call", "group": "payment", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#424 ビデオ通話はできない(電話をかけるボタン・共有の記録を案内)",
+   "steps": [{"say": "家族とビデオ通話できるアプリは作れる?", "textAny": ["できません", "できない"], "textNot": ["openUrlButton", "WebSocket", "entity"]}]}
+]
