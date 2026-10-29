@@ -71,6 +71,7 @@ final class PrefillRefUITests: XCTestCase {
         write.tap()
         let toast = app.staticTexts["先に「投稿」を保存してください"].firstMatch
         XCTAssertTrue(toast.waitForExistence(timeout: 5), "未保存の親で toast が出ない")
+        XCTAssertEqual(app.staticTexts.matching(identifier: "先に「投稿」を保存してください").count, 1, "toast が二重に出ている(ToastHost の重複)")
         XCTAssertTrue(toast.isHittable, "toast がシートの下に隠れている")
         shot("5-unsaved-parent-toast")
         XCTAssertFalse(app.textFields.matching(NSPredicate(format: "placeholderValue == 'いいですね'")).firstMatch.exists, "コメントのフォームを開かない")
