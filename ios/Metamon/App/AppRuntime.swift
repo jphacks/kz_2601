@@ -195,6 +195,7 @@ final class AppRuntime: DSLRuntime {
     /// リセットのたびに進める。古い応答(待っている間に「最初から」された等)を捨てるため
     @ObservationIgnored var chatEpoch = 0
 
+    #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
     // MARK: 有料機能の確認カード(#77)。ロジックは `Features/Purchase/AppRuntime+PaidFeature.swift`
 
     /// 「これでいく」で有料機能を含むと分かった時のカード(nil = 出していない)。チャットの「これでいく」の位置に出す
@@ -205,6 +206,7 @@ final class AppRuntime: DSLRuntime {
     var paidConfirmMessage: String?
     /// 課金の司令塔(既定は共有の 1 つ。テストで差し替える)
     @ObservationIgnored var proGate: ProGate = .shared
+    #endif
 
     /// 生成直後の「個人の情報も公開されます」の確認(#253・nil = 出していない)。`Features/Privacy/AppRuntime+PublicData.swift`
     var publicDataPrompt: PublicDataPrompt?
@@ -492,11 +494,16 @@ final class AppRuntime: DSLRuntime {
 
     /// 課金(#77): 新規作成(初期画面から)は 1 日の無料枠を消費する。枠切れなら上限シートを出して送らない。成功した時だけ数える。
     /// 圏外の保留の自動送信・状態カードの「もう一度」もここを通す(#414: 枠を素通りしない)。
+    /// 審査用ビルド(#450 G1)は端末で数えない。上限はサーバーの ratelimit だけ(429 は状態カードの「今日はここまでです」)。
     private func sendMetered(_ text: String) async {
+        #if APP_STORE_REVIEW
+        await send(text)
+        #else
         let metered = dsl.isVoiceOnly
         if metered, !proGate.admitNewApp() { showVoiceSheet = false; return }
         await send(text)
         if metered, !dsl.isVoiceOnly { proGate.recordNewApp() }
+        #endif
     }
 
     /// 復帰時の自動送信(`DeferredSend` から)。保留が生きていれば生成に進む。

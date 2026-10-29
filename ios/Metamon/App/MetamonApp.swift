@@ -71,7 +71,9 @@ struct MetamonApp: App {
                         .environment(runtime)                       // アプリ本体の View(RootView / VoiceInputView)向け
                         .environment(\.dslRuntime, runtime)         // Renderer 向け(DSLRuntime protocol)
                         .environment(\.componentRegistry, Self.componentRegistry)
+                        #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
                         .modifier(PaywallHost())                    // 課金(#77): 上限シート + StoreKit の監視開始
+                        #endif
                         .transition(.opacity)
                         .task {
                             await runtime.bootstrap()

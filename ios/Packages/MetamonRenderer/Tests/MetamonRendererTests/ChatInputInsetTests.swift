@@ -1,3 +1,5 @@
+// chatThread は審査用ビルド(APP_STORE_REVIEW・#451 G2)に無い。
+#if !APP_STORE_REVIEW
 import XCTest
 @testable import MetamonRenderer
 
@@ -24,3 +26,4 @@ final class ChatInputInsetTests: XCTestCase {
         XCTAssertEqual(ChatInputInset.leading(bar: bar, fab: wide), bar.width / 2)
     }
 }
+#endif

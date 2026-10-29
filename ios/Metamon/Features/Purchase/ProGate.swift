@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#450 G1)は App 内課金を持たない(課金画面・端末の無料枠・StoreKit の監視をしない)。
+#if !APP_STORE_REVIEW
 import Foundation
 import Observation
 import MetamonServices
@@ -162,3 +164,4 @@ final class ProGate {
         ProcessInfo.processInfo.environment["METAMON_IAP_FREE_LIMIT"].flatMap(Int.init) ?? ProProducts.dailyFreeCreations
     }
 }
+#endif

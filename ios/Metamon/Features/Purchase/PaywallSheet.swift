@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#450 G1)は App 内課金を持たない。
+#if !APP_STORE_REVIEW
 import SwiftUI
 import StoreKit
 import MetamonServices
@@ -296,3 +298,4 @@ struct PaywallHost: ViewModifier {
 #Preview {
     PaywallSheet(reason: .paidFeature([]), closeNote: "閉じると、共有の機能を外して自分だけの記録にします。")
 }
+#endif

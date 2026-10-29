@@ -2,7 +2,7 @@
 
 #247。App Store Connect の「App Review に関する情報 > メモ」に貼る文。審査には英語の版を出し、日本語の版は中身の確認用。
 
-- 前提の版: 審査用の版(`Metamon-Review` / `APP_STORE_REVIEW`、#245 / PR #284、`docs/ios/review-build.md`)。外した機能をこのメモで説明しない・書いた機能は必ずバイナリにある、の両方を守る(2.5.19・2.3.1)。
+- 前提の版: 審査用の版(`Metamon-Review` / `APP_STORE_REVIEW`、#245 / PR #284、`docs/ios/review-build.md`)。最初の版は **App 内課金なし**(#450)・**共有 / 公開のデータなし**(#451)で出す(2026-10-30 決定)。外した機能をこのメモで説明しない・書いた機能は必ずバイナリにある、の両方を守る(2.5.19・2.3.1)。
 - 下書きの元: リポジトリ外の調査メモ `調査_ライセンスとApp Store審査.md` の「審査メモの下書き」。そこから、今のコードと合わない所を直した(下の「下書きから直した所」)。
 - ストアの掲載文は [listing.md](listing.md)、避ける言い回しは [wording.md](wording.md)。
 
@@ -19,19 +19,19 @@
 
 | 項目 | 確かめ方 | メモでの扱い |
 |---|---|---|
-| **`webView` 部品を審査用の版から外したか** | `ClientCapabilities.reviewExcludedComponents` に `.webView` があるか(PR #284 の時点では無い) | 外した場合: 英語の版のまま(「WebView を使わない」と書ける)。外さない場合: 2 章の [WEB PAGES] の段落を差し替える。**外す方を勧める**(下の注) |
+| `webView` 部品を審査用の版から外したか | `ClientCapabilities.reviewExcludedComponents` に `.webView` がある(#452 G3 で外した) | 英語の版のまま(「WebView を使わない」と書ける)。2 章の [WEB PAGES] の段落は使わない |
 | 外した機能がバイナリに無い | `docs/ios/review-build.md` の「外れたことの確かめ方」 | 書かない(リリース申請・探す・共有リンク・HealthKit・道のりの記録・近くの端末・撮影) |
-| 無料の上限の数 | `ProProducts.dailyFreeCreations`(今は 3)。#285(サーバーの上限)が入ったらその値とも合わせる | `3 new trackers per day` |
+| 1 日の上限 | 審査用の版は端末で数えない(`ProGate` ごと外した・#450)。上限はサーバーの `ratelimit` だけで、当たると「今日はここまでです / 今日の上限に達しました。〜からまた使えます」の状態カード(課金画面は出ない) | 数は書かない(`daily limit on AI requests`)。数を変えてもメモを直さずに済む |
 | 削除の後の消去 | `docs/legal/privacy-policy.md` の 4 章の「[要確認: 物理削除までの期間]」が埋まっていること | 「Privacy Policy のとおり消去」と書くので、ポリシー側が先 |
 | 審査用アカウント | App Store Connect の「サインイン情報」欄に入れる(このファイルやリポジトリには書かない) | `<demo account>` のまま貼らない |
 | バックエンド | 審査の期間中、ai / appconfig が動いていて、Claude の利用上限に余裕があること | — |
 | 連絡先 | 名前・メール・電話 | 公開リポジトリには書かない。貼る時に埋める |
-| **共有・公開のデータ(`scope: shared / public`・`chatThread`)を審査用の版で作らせないか** | `ClientCapabilities.reviewDisabledFeatures` に `sharedData`、`reviewExcludedComponents` に `.chatThread` があるか(`ad5ccb4` の時点では無い。[m0-early-release-readiness.md](../release/m0-early-release-readiness.md) の G2) | 無いままだと「no store of other users' content」は言えても、画面に「誰でも見られます(公開)」が出て 1.2 の質問を招く。外してから貼る |
-| **aiButton のオンライン版(`POST /v1/text`)を審査用の版で止めたか** | `supportsOnlineAIText` が審査用の版で false か(同 G4) | 止めないと PRIVACY の「記録の中身は送らない」と食い違う(オンライン版は最近の記録を最大 4KB 送る) |
-| **課金(Pro)を入れて出すか** | 同 G1。サーバーは Pro を判定しない(`ratelimit.New(..., nil)`) | 入れないなら IN-APP PURCHASE の段落と試し方の 5 の「Tailor It Pro」を消す |
+| 共有・公開のデータ(`scope: shared / public`・`chatThread`)を審査用の版で作らせないか | `ClientCapabilities.reviewDisabledFeatures` に `sharedData`、`reviewExcludedComponents` に `.chatThread` がある(#451 G2)。backend の `restrict.go` が scope を private に直す。同梱の例 `chat` / `board` / `ranking` / `post_comments` / `recipes` も外した | 「記録はすべて本人だけ」「他の人とのデータの共有・チャットは無い」と書ける(2 章 HOW IT WORKS の最後の箇条) |
+| aiButton のオンライン版(`POST /v1/text`)を審査用の版で止めたか | `supportsOnlineAIText` が審査用の版で false(#452 G4) | PRIVACY の「記録の中身は送らない」と合う |
+| 課金(Pro) | **入れない**(#450・2026-10-30 決定)。審査用の版から課金画面・設定の「Tailor It Pro」・有料機能の確認カード・StoreKit(商品 ID)を外した。App Store Connect にもサブスクリプションを登録しない | IN-APP PURCHASE の段落は無い。「No in-app purchases」と書く |
 | MusicKit | App ID の App Services で MusicKit が有効か | 無いと musicPlayer の検索・再生が失敗する(2.1) |
 
-注: `webView` は AI が決めた https の URL を WKWebView で開く部品(`WebViewLeaf.swift`)。アプリとの橋渡し(JavaScript の注入・メッセージの受け取り)は無いが、ページ側の JavaScript は動く。「コード・JavaScript・WebView を実行しない」と書けなくなり、4.7(HTML5 のミニアプリ)の論点も増える。外しても困る用途は少ない(リンクは `openUrlButton` / `link` で Safari に渡せる)。
+注: `webView` は AI が決めた https の URL を WKWebView で開く部品(`WebViewLeaf.swift`)。審査用の版からは外した(#452 G3。サイトは `openUrlButton` で Safari に開く)。通常の版に残す理由と、戻す時の差し替えは 2 章の [WEB PAGES]。
 
 ## 2. 英語の版(App Store Connect に貼る)
 
@@ -63,8 +63,9 @@ HOW IT WORKS - NO DOWNLOADED CODE (Guideline 2.5.2)
   They are not separate apps: a tracker cannot be installed, exported or run outside
   Tailor It, and nothing is submitted to the App Store. (Users can export their own
   records as a CSV or PDF file through the system share sheet.)
-- This version has no public catalog, no store of other users' content and no
-  share links.
+- Every tracker and every record is private to the user who made it. This version
+  has no public catalog, no store of other users' content, no share links, no data
+  shared between users and no chat between users.
 
 DEVICE FEATURES
 Tailor It itself requests every permission, at the moment the user uses the feature:
@@ -98,10 +99,12 @@ PRIVACY
   Sign in with Apple token.
 - Privacy Policy and Terms of Use: Settings > Privacy, and in the App Store metadata.
 
-IN-APP PURCHASE (Tailor It Pro, auto-renewable, monthly)
-- Free users can set up 3 new trackers per day. Pro removes this daily limit, which
-  covers the cost of AI generation on our server. Changing existing trackers is free.
-- To see the paywall: Settings > Tailor It Pro, or set up a 4th new tracker in a day.
+NO IN-APP PURCHASES
+- This version is free and has no in-app purchases or subscriptions.
+- To keep the AI cost on our server under control, each account has a daily limit
+  on AI requests. When it is reached, the app says that the limit for today has been
+  reached and when it can be used again (the next day). Existing trackers and records
+  can still be viewed and used.
 
 HOW TO TEST (about 2 minutes)
 1. Sign in with the demo account in the sign-in information, or tap
@@ -109,7 +112,7 @@ HOW TO TEST (about 2 minutes)
 2. Accept the AI consent screen.
 3. Tap the mic or type: "Make a water intake log with a daily goal of 2 liters."
 4. Add a few entries, then say or type: "Show a weekly chart."
-5. Settings shows Privacy, Tailor It Pro and Delete Account.
+5. Settings shows Privacy and Delete Account.
 
 Our backend runs for the whole review period.
 Contact: <name>, <email>, <phone>
@@ -153,7 +156,8 @@ Tailor It の審査をありがとうございます。
 - 記録帳は Tailor It の中の個人のコンテンツです(1.2.1)。別のアプリではなく、記録帳を
   Tailor It の外でインストール・書き出し・実行はできず、App Store に何かを出すこともありません
   (自分の記録は、共有シートから CSV / PDF のファイルにできます)。
-- この版には、公開の一覧・他人の作ったものの店・共有リンクはありません。
+- 記録帳と記録は、すべて作った本人だけのものです。この版には、公開の一覧・他人の作ったものの店・
+  共有リンク・他のユーザーとのデータの共有・ユーザー同士のチャットはありません。
 
 端末の機能
 権限はすべて Tailor It 本体が、その機能を使う時に求めます。
@@ -181,17 +185,18 @@ Tailor It の審査をありがとうございます。
   Sign in with Apple のトークンを失効させます。
 - プライバシーポリシーと利用規約: 設定 > プライバシー と、App Store のメタデータ。
 
-App 内課金(Tailor It Pro・月額の自動更新)
-- 無料では新しい記録帳を 1 日 3 つまで。Pro ではこの上限がなくなります(サーバーでの AI の
-  費用に見合うもの)。すでにある記録帳の変更は無料です。
-- 課金画面の出し方: 設定 > Tailor It Pro、または 1 日に 4 つ目を用意する。
+App 内課金なし
+- この版は無料で、App 内課金・サブスクリプションはありません。
+- サーバーでの AI の費用を抑えるため、アカウントごとに AI への依頼の 1 日の上限があります。
+  上限に達すると「今日の上限に達しました」と、また使える時刻(翌日)を表示します。
+  すでにある記録帳と記録は、そのまま見て使えます。
 
 試し方(約 2 分)
 1. サインイン情報のデモアカウントでサインインするか、「ログインせずに使う(匿名)」を押す。
 2. AI の同意画面で同意する。
 3. マイクを押すか入力する:「1 日 2 リットルを目標に水分を記録したい」
 4. 何件か記録してから、話すか入力する:「週のグラフも見たい」
-5. 設定に、プライバシー・Tailor It Pro・アカウントを削除 がある。
+5. 設定に、プライバシー・アカウントを削除 がある。
 
 審査の期間中、バックエンドは動かしておきます。
 連絡先: <名前>・<メール>・<電話>
@@ -202,12 +207,13 @@ App 内課金(Tailor It Pro・月額の自動更新)
 | 下書き(調査メモ) | 直した後 | 理由 |
 |---|---|---|
 | 「request text and the tool's content are sent」 | 話した・入力した内容、会話、記録帳の設計。**記録の中身は送らない** | 同意画面(`AIConsentView.swift`)の説明に合わせた。食い違うと 5.1.2(i) で問われる。審査用の版は「AI で書く」のオンライン版を外す(#455)ので言い切れる。同意画面は両方の版で同じ文言で、「『AI で書く』がサーバーの AI を使う場合は、押した時だけ最近の記録を送る」と条件つきで書く(通常の版向け・#459) |
-| 「Free users can create N new tools per day」 | `3 new trackers per day` | `ProProducts.dailyFreeCreations = 3` |
+| 「Free users can create N new tools per day」 | NO IN-APP PURCHASES の段落(数は書かない) | 最初の版は課金なし(#450)。上限はサーバーの `ratelimit` だけで、審査用の版に端末の無料枠は無い |
 | 「Settings > Account > Delete Account」「Settings > About」 | 設定(歯車)> アカウントを削除、設定 > プライバシー | 今の設定画面の並び(`SettingsSheet.swift`) |
 | 「tap "Try without account"」 | 「Use without signing in (anonymous)」 | 実際のボタンの文言 |
 | 権限の説明なし | DEVICE FEATURES を足した(10/30: 道案内・Apple Music・ライブアクティビティ・端末内の処理を追加。#411 #412 #418 #423 #417) | 審査用の版に残るカメラ(QR)・位置(1 回)・写真・通知を、本体の機能として説明する(4.7.2・4.7.3 の論点) |
 | 計算の説明なし | 決まった計算の仕組み(閉じた演算の一覧)を書いた | DSL に式(`computed` / `stat.value`)がある。「データだけ」と書いて式を伏せると、後で 2.3.1 の「誤解させる説明」になりうる |
-| 「never ... WebViews」 | `webView` を外した前提にし、外さない場合の差し替えを用意 | 今の審査用の版(#284)には `webView` 部品が残っている |
+| 「never ... WebViews」 | そのまま(審査用の版から `webView` を外した・#452 G3)。通常の版で戻す時の差し替えを用意 | #284 の時点では `webView` 部品が残っていた |
+| 「no store of other users' content」だけ | 記録はすべて本人だけ・共有 / チャットが無いことまで書く | 審査用の版で共有・公開のデータと `chatThread` を外した(#451 G2)。1.2(通報・ブロック)の論点を避ける |
 | 「Demo account: reviewer@<domain> / <password>」 | サインイン情報の欄に入れる | 公開リポジトリに書かない |
 | 「personal tracker or tool」「create tools」 | 「set up a tracker」 | 「create」は「アプリを作る」と読まれやすい([wording.md](wording.md)) |
 
@@ -231,5 +237,6 @@ App 内課金(Tailor It Pro・月額の自動更新)
 | 「ダウンロードしたコードで機能が変わっている」(2.5.2) | JSON は部品の選択と設定だけ。部品・計算の種類はバイナリに固定で、増えるのは更新(審査)の時だけ。サーバーはスキーマで確かめ、アプリは知らない部品を空の枠で出すだけ。JSON の例を添付できる |
 | 「アプリを作るアプリではないか」(4.2.6・4.7) | 作ったものは Tailor It の外では動かず、書き出しも提出もできない。ユーザー自身の記録帳(1.2.1 のコンテンツ) |
 | 「端末の機能を作ったものに渡している」(4.7.2) | 権限は Tailor It 本体が、本体の UI で求める。部品はネイティブで、JSON は「どこに置くか」を決めるだけ。HealthKit・バックグラウンドの位置・近くの端末・撮影は、この版から外した |
+| 「課金は無いのか / 上限は何か」(3.1) | この版は App 内課金なし(バイナリに StoreKit の商品も課金画面も無い)。上限はサーバーの費用を抑えるためのもので、当たると翌日まで待つ旨を表示する |
 | 「隠した機能がある」(2.5.19) | 審査用の版はバイナリから外していて、サーバーのフラグで後からオンにする機能は無い。戻すときは新しい版として審査に出す |
 | 「AI にどんなデータを送るか」(5.1.2(i)) | 同意画面の文言どおり。記録の中身は送らない。同意の取り消しは 設定 > プライバシー |

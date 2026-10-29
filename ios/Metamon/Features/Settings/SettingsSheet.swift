@@ -19,7 +19,9 @@ struct SettingsSheet: View {
                 if Self.e2eDeleteAccount { deleteAccountSection } // E2E: 削除ボタンを画面内に出す(シミュレータはスクロール操作できない)
                 accountSection
                 AuthorNameSettingsSection() // 共有アプリの投稿に出す名前(#250)
+                #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
                 ProSettingsSection() // 課金(#77)
+                #endif
                 languageSection
                 voiceModelSection
                 clarifySection

@@ -1,3 +1,6 @@
+// 審査用ビルド(APP_STORE_REVIEW・#452 G4)ではバイナリから外す(aiButton のオンライン版を持たない)。
+// 外れると AIClient の既定の text(unsupported)になる。
+#if !APP_STORE_REVIEW
 import Foundation
 import MetamonDSL
 
@@ -25,3 +28,4 @@ extension HTTPAIClient {
         }
     }
 }
+#endif

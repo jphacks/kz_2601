@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#450 G1)は App 内課金を持たない。商品 ID をバイナリから外す。
+#if !APP_STORE_REVIEW
 import Foundation
 
 /// 「Tailor It Pro」の商品定義(#77)。本番の商品 ID に差し替える時はここだけ直す。
@@ -11,3 +13,4 @@ public enum ProProducts {
     /// 無料で 1 日に新規作成できるアプリの数。
     public static let dailyFreeCreations = 3
 }
+#endif

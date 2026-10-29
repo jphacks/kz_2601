@@ -24,7 +24,13 @@ struct ClarifyChatView: View {
     private var offer: ClarifyFlow.Offer { rt.chatTurn.map(ClarifyFlow.offer(for:)) ?? .none }
     private var ready: ChatTurn? { if case .confirm = offer { return rt.chatTurn } else { return nil } }
     private var proposals: [ChatOption] { if case .proposals(let options) = offer { return options } else { return [] } }
-    private var busy: Bool { rt.chatPending || rt.isMorphing || rt.paidConfirm != nil }
+    private var busy: Bool {
+        #if APP_STORE_REVIEW
+        rt.chatPending || rt.isMorphing
+        #else
+        rt.chatPending || rt.isMorphing || rt.paidConfirm != nil
+        #endif
+    }
     private var lastAssistantId: UUID? { rt.chatBubbles.last(where: { $0.role == .assistant })?.id }
     private var multiSelect: Bool { rt.chatTurn?.isMultiSelect == true }
     private var current: MultiPick { pick.key == rt.chatBubbles.count ? pick : MultiPick(key: rt.chatBubbles.count) }
@@ -39,6 +45,11 @@ struct ClarifyChatView: View {
                         ErrorCard(presentation: card)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
+                    #if APP_STORE_REVIEW
+                    // 審査用ビルドは App 内課金を持たない(#450 G1)
+                    suggestionChips
+                    actionButton
+                    #else
                     if let paid = rt.paidConfirm {
                         PaidFeatureCard(confirmation: paid)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -46,12 +57,15 @@ struct ClarifyChatView: View {
                         suggestionChips
                         actionButton
                     }
+                    #endif
                     inputRow
                 }
                 .padding(.bottom, Theme.Spacing.sm)
             }
+            #if !APP_STORE_REVIEW
             // #414: 確認カードと一緒に開く課金画面(edit は音声シートの中なので、ここから重ねる)
             .modifier(PaywallPresenter(placement: .chat))
+            #endif
         // 設定の「頼み方のコツ」で選んだ例を返答欄に入れる(送らない・#415)
         .onChange(of: rt.composerDraft, initial: true) { _, draft in
             guard let draft else { return }
@@ -316,6 +330,7 @@ struct ClarifyChatView: View {
 
 // MARK: - Parts
 
+#if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
 /// 有料機能の確認カード(#77)。「〇〇には Tailor It Pro(¥500 / 月)が必要です」→ 購入して作る(= 課金画面・#414)/ この機能なしで作る。
 private struct PaidFeatureCard: View {
     @Environment(AppRuntime.self) private var rt
@@ -381,6 +396,7 @@ private struct PaidFeatureCard: View {
         .metamonCard()
     }
 }
+#endif
 
 private struct BubbleRow: View {
     let bubble: AppRuntime.ChatBubble

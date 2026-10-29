@@ -11,7 +11,8 @@ final class ReviewBuildTests: XCTestCase {
         for t in ["vstack", "list", "photoField", "videoField", "chart", "stat", "settlement", "calendar", "gridTable", "locationButton", "routeGuide"] {
             XCTAssertTrue(allowed.contains(t), t)
         }
-        XCTAssertEqual(ClientCapabilities.reviewDisabledFeatures, ["fieldHealth", "cameraCapture"])
+        XCTAssertEqual(ClientCapabilities.reviewDisabledFeatures, ["fieldHealth", "cameraCapture", "sharedData"])
+        XCTAssertFalse(allowed.contains(ComponentType.chatThread.rawValue), "他の人と記録を見る chatThread は外す(#451 G2)")
     }
 
     func testBuildFlagControlsWhatIsSent() {
@@ -38,9 +39,26 @@ final class ReviewBuildTests: XCTestCase {
             XCTAssertTrue(types(dsl).isDisjoint(with: excluded), "\(name) uses \(types(dsl).intersection(excluded))")
             XCTAssertTrue(dsl.entities.allSatisfy { $0.fields.allSatisfy { $0.health == nil } }, "\(name) uses Field.health")
         }
-        // 外した例は本当に外した部品を使っている(リストの根拠)
+        // 外した例は本当に外した部品か、共有・公開の記録を使っている(リストの根拠)
         for name in DSLExamples.reviewExcluded {
-            XCTAssertFalse(types(try ExamplesFixture.load(name)).isDisjoint(with: excluded), name)
+            let dsl = try ExamplesFixture.load(name)
+            XCTAssertTrue(!types(dsl).isDisjoint(with: excluded) || usesSharedData(dsl), name)
+        }
+    }
+
+    private func usesSharedData(_ dsl: AppDSL) -> Bool {
+        dsl.entities.contains { dsl.scope(of: $0.id).isVisibleToOthers }
+    }
+
+    /// #451 G2: 審査用ビルドに残す同梱の例は、外した部品も共有・公開の記録も使わない。
+    func testRemainingExamplesHaveNoExcludedPartsOrSharedData() throws {
+        let excluded = Set(ClientCapabilities.reviewExcludedComponents.map(\.rawValue))
+        let remaining = DSLExamples.names.filter { !DSLExamples.reviewExcluded.contains($0) }
+        XCTAssertFalse(remaining.isEmpty)
+        for name in remaining {
+            let dsl = try ExamplesFixture.load(name)
+            XCTAssertTrue(types(dsl).isDisjoint(with: excluded), "\(name) uses \(types(dsl).intersection(excluded))")
+            XCTAssertFalse(usesSharedData(dsl), "\(name) uses shared / public data")
         }
     }
 }

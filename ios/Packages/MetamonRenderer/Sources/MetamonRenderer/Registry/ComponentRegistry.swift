@@ -102,8 +102,10 @@ public struct ComponentRegistry: Sendable {
         r.register(.emptyState) { c, _ in EmptyStateLeaf(c: c) }
         // leaf(計算・#101)
         r.register(.settlement) { c, _ in SettlementLeaf(c: c) }
-        // leaf(Web)
+        #if !APP_STORE_REVIEW
+        // leaf(Web)。審査用ビルドでは登録しない(#452 G3)
         r.register(.webView) { c, _ in WebViewLeaf(c: c) }
+        #endif
         // leaf(オンデバイス AI・#78)
         r.register(.aiButton) { c, ctx in AiButtonLeaf(c: c, ctx: ctx) }
         // leaf(Apple Music・#412)。友だちからのリクエストの UI は部品の中で審査用ビルドから外す
@@ -115,7 +117,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.nearbyShare) { c, ctx in NearbyShareLeaf(c: c, ctx: ctx) }
         // leaf(位置の記録・#168)
         r.register(.locationTracker) { c, ctx in LocationTrackerLeaf(c: c, ctx: ctx) }
-        // leaf(チャット・#260)
+        // leaf(チャット・#260)。他の人と記録を見る作りなので審査用ビルドでは登録しない(#451 G2)
         r.register(.chatThread) { c, ctx in ChatThreadLeaf(c: c, ctx: ctx) }
         r.register(.healthStat) { c, _ in HealthStatLeaf(c: c) }
         // leaf(ドラレコ・#410)
