@@ -1,7 +1,7 @@
 name: 機能追加
 description: 新しい機能・画面・API の提案
 title: "feat: "
-labels: [feature]
+labels: [enhancement]
 body:
   - type: dropdown
     id: area
