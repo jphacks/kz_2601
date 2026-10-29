@@ -70,6 +70,23 @@ func TestPaymentCallOmissions(t *testing.T) {
 		{"ガソリン代の記録と、PayPayの請求リンクを開くボタン", ""},
 		{"お店に電話をかけるボタンが欲しい", ""},
 		{"通話料金を毎月記録する", ""},
+		// allowed: records about paid plans / members / unlock codes / calls
+		{"サブスクの有料プランを記録するアプリ", ""},
+		{"有料版のアプリの比較メモ", ""},
+		{"有料会員の更新日を管理したい", ""},
+		{"牛乳を買ったら開封日を記録したい", ""},
+		{"unlock code の管理", ""},
+		{"Keep a list of premium features I use", ""},
+		{"Track paid members of my club and their renewal dates", ""},
+		{"Track who paid and see the total", ""},
+		{"通話できる時間を記録", ""},
+		{"ビデオ通話した時間を記録したい", ""},
+		{"Log how long my video calls were", ""},
+		// declined: the paid / call shapes
+		{"課金した人だけ見られる動画", "paywall"},
+		{"Only paid members can read the articles", "paywall"},
+		{"An app where people unlock premium articles after paying", "paywall"},
+		{"Let us video call each other", "call"},
 	} {
 		if got := ids(c.tr, ""); got != c.want {
 			t.Errorf("%q: omissions = %q, want %q", c.tr, got, c.want)

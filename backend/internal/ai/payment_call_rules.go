@@ -31,10 +31,12 @@ const (
 )
 
 var (
-	// paywallAskRe: paying unlocks content or features (not plain bills, 割り勘, 有料駐車場).
-	paywallAskRe = regexp.MustCompile(`(払ったら|払うと|払えば|支払ったら|購入したら|買ったら|課金したら|課金すると|課金で).{0,20}(読め|見られ|見れ|開|使え|解放|解除)|有料(の|な)?(記事|機能|コンテンツ|会員|プラン|版|部分|ページ|動画)|(?i:paywall|unlock|premium (content|feature)|paid (content|article|feature|member))`)
-	// callAskRe: an in-app voice / video call (「電話をかける」 is tel: and allowed).
-	callAskRe = regexp.MustCompile(`ビデオ通話|音声通話|テレビ電話|通話(機能|したい|でき|する)|(?i:video ?call|voice call|facetime|call (each other|in the app))`)
+	// paywallAskRe: paying unlocks content / features (a pay verb + 読める・使える・解放,
+	// or 「有料会員だけ」). Records about plans, bills, 割り勘 or unlock codes do not match.
+	paywallAskRe = regexp.MustCompile(`(払ったら|払うと|払えば|支払ったら|支払うと|購入したら|購入すると|課金したら|課金すると|課金で|課金すれば).{0,20}(読め|見られ|見れ|使え|解放|解除|アクセスでき)|(有料会員|有料プランの人|課金した人|課金ユーザー|購入した人)(だけ|のみ|限定)|(?i:behind a paywall|\b(pay|pays|paid|paying|payment|purchas\w*|subscrib\w*)\b.{0,30}\b(unlock|access to|to (read|view|see|watch|access))\b|\bunlock\w*\b.{0,30}\b(after|by|when|once|with|for) (pay|purchas|subscrib)|\b(paid|paying|premium) (members?|users?|subscribers?) only\b|\bonly (for )?(paid|paying|premium) (members?|users?|subscribers?))`)
+	// callAskRe: making an in-app voice / video call (「電話をかける」 is tel: and
+	// allowed; 「通話できる時間を記録」「ビデオ通話した時間」 are records).
+	callAskRe = regexp.MustCompile(`(ビデオ通話|音声通話|テレビ電話|通話)(機能|したい|しよう|ができる|できる(アプリ|ように|機能))|(?i:\b(want to|let me|lets? (us|people|me)|able to|can) (video|voice)[ -]?call|\b(video|voice)[ -]?call(s|ing)? (each other|in the app|feature|with)|\bin-app (video |voice )?calls?|\b(make|start|have) (a )?(video|voice) calls?)`)
 )
 
 // paymentCallOmissions back the rules up: a paywall or an in-app call is never
