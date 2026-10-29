@@ -152,7 +152,11 @@ public enum AITextError: LocalizedError, Equatable, Sendable {
         switch self {
         case .unsupported: "この端末では AI を使えません"
         case .needsConsent: "AI へのデータ送信に同意すると使えます"
+        #if APP_STORE_REVIEW
+        case .needsPro: "この端末では AI を使えません" // 審査用ビルドは App 内課金を持たない(#450 G1)。この版では来ない
+        #else
         case .needsPro: "この端末ではオンラインの AI を使います。Tailor It Pro で使えます"
+        #endif
         case .refused: "この内容は AI が書けませんでした"
         case .badOutput: "AI の答えを読み取れませんでした。もう一度お試しください"
         case .failed(let message): message

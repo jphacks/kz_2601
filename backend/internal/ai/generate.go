@@ -411,6 +411,9 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			lintRetry := s.LintRetry && len(ar.meta.Lint)+len(om) > 0
 			// #254: "家族だけ" without a shared entity gets one retry even with LintRetry off
 			shareProblem := shareCreateProblem(transcript, ar.raw)
+			if restrictionFrom(ctx).NoSharedData() {
+				shareProblem = "" // #451 G2: this build keeps every record private
+			}
 			if (lintRetry || shareProblem != "") && linted == nil && i < s.maxRegen() {
 				// one retry for content problems; keep this output in case it fails
 				kept := *ar
@@ -501,6 +504,9 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 			lintRetry := s.LintRetry && len(ar.meta.Lint) > 0
 			// #259: a share request answered with "できない" gets one retry even with LintRetry off
 			shareProblem := shareEditProblem(transcript, env.DSL, next)
+			if restrictionFrom(ctx).NoSharedData() {
+				shareProblem = "" // #451 G2
+			}
 			if (lintRetry || shareProblem != "") && linted == nil && i < s.maxRegen() {
 				kept := *ar
 				linted = &kept

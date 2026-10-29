@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#450 G1)は端末の無料枠を数えない(上限はサーバーの ratelimit だけ)。
+#if !APP_STORE_REVIEW
 import Foundation
 
 /// 新規作成(初期画面からの生成)の無料枠の判定(#77)。純粋関数のみ。
@@ -78,3 +80,4 @@ public final class CreationUsageStore: @unchecked Sendable {
 
     public func reset() { defaults.removeObject(forKey: key) }
 }
+#endif

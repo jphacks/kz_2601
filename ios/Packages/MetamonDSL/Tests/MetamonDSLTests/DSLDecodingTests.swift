@@ -10,7 +10,11 @@ final class DSLDecodingTests: XCTestCase {
             .filter { $0.hasSuffix(".json") }
             .map { String($0.dropLast(5)) }
             .sorted()
+        #if APP_STORE_REVIEW // 審査用ビルドは外した例を names に入れない(#245)
+        XCTAssertEqual(onDisk.filter { !DSLExamples.reviewExcluded.contains($0) }, DSLExamples.names.sorted(), "DSLExamples.names と docs/dsl/examples がずれている")
+        #else
         XCTAssertEqual(onDisk, DSLExamples.names.sorted(), "DSLExamples.names と docs/dsl/examples がずれている")
+        #endif
     }
 
     func testAllExamplesDecode() throws {

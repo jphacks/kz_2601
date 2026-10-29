@@ -433,8 +433,10 @@ components:
       items: { type: string }
       description: |
         #245。部品単位より細かく無効にする機能。既知の値: `fieldHealth`(Field.health を使わない。生成結果の health 属性は落とす)、
-        `cameraCapture`(photoField / videoField の source に camera / both を使わない = library のみ。生成結果は library に直す)。未知の値は無視。省略 = 何も無効にしない。
-      example: [fieldHealth, cameraCapture]
+        `cameraCapture`(photoField / videoField の source に camera / both を使わない = library のみ。生成結果は library に直す)、
+        `sharedData`(#451 G2。entity の scope shared / public・edit・marks を使わない = 記録はすべて private。生成結果は scope / edit / marks /
+        list.item.mark を落とす。chat の ready / 案に requiresPro・paidFeatures を付けない)。未知の値は無視。省略 = 何も無効にしない。
+      example: [fieldHealth, cameraCapture, sharedData]
     ChatMessage:
       type: object
       required: [role, text]

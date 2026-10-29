@@ -97,6 +97,10 @@ targets:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE_REVIEW"
           CODE_SIGN_ENTITLEMENTS: Metamon/Metamon-Review.entitlements
           METAMON_APP_STORE_REVIEW: "YES"
+          # 審査用の版の接続先は prod(#452 G7)。Debug / Release の既定(上の base の stg)は変えない。
+          # URL の出典: docs/release/2026-10-25-runbook.md「prod の URL」・backend/Makefile
+          METAMON_AI_BASE_URL: "https://ai-prod-378953239426.asia-northeast1.run.app"
+          METAMON_APPCONFIG_BASE_URL: "https://appconfig-prod-378953239426.asia-northeast1.run.app"
           # 下の strip-review-plist.sh が出来上がった Info.plist を書き換えるため(Review だけ)
           ENABLE_USER_SCRIPT_SANDBOXING: NO
     postBuildScripts:

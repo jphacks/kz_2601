@@ -168,7 +168,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 	}
 	// #77: ready / proposal に有料機能の判定を付ける(edit で今のアプリが既に持つ機能は除く)
 	defer func() {
-		if err == nil {
+		if err == nil && !restrictionFrom(ctx).NoSharedData() { // #451 G2 / #450 G1
 			defaultPaidCatalog.annotate(out, app)
 		}
 	}()

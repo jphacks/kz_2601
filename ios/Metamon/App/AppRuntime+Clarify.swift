@@ -101,7 +101,9 @@ extension AppRuntime {
         let transcript = chatTurn?.transcript?.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = (transcript?.isEmpty == false ? transcript : nil) ?? fallbackTranscript
         guard !text.isEmpty else { return }
+        #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
         if holdForPaidConfirm(PaidFeatureCheck.confirmation(for: chatTurn, text: text, isPro: proGate.isPro, enforced: proGate.isEnforced)) { return }
+        #endif
         print("[Metamon] chat: build mode=\(chatMode.rawValue) transcript=\(text)")
         await runFromChat(text)
     }
@@ -111,7 +113,9 @@ extension AppRuntime {
         guard morphJob == nil, !chatPending else { return }
         let text = option.instruction.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        #if !APP_STORE_REVIEW
         if holdForPaidConfirm(PaidFeatureCheck.confirmation(for: option, isPro: proGate.isPro, enforced: proGate.isEnforced)) { return }
+        #endif
         print("[Metamon] chat: choose option=\(option.id) mode=\(chatMode.rawValue) instruction=\(text)")
         await runFromChat(text)
     }
