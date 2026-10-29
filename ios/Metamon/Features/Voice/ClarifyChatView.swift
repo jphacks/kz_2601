@@ -48,6 +48,8 @@ struct ClarifyChatView: View {
                 }
                 .padding(.bottom, Theme.Spacing.sm)
             }
+            // #414: 確認カードと一緒に開く課金画面(edit は音声シートの中なので、ここから重ねる)
+            .modifier(PaywallPresenter(placement: .chat))
         #if DEBUG
         .task {
             // ヘッドレス E2E 用: `METAMON_AUTO_FOCUS=chat` で 3 秒後に返答欄へフォーカス(キーボードの確認・#143)
@@ -301,7 +303,7 @@ struct ClarifyChatView: View {
 
 // MARK: - Parts
 
-/// 有料機能の確認カード(#77)。「〇〇には Tailor It Pro(¥500 / 月)が必要です」→ 購入して作る / この機能なしで作る。
+/// 有料機能の確認カード(#77)。「〇〇には Tailor It Pro(¥500 / 月)が必要です」→ 購入して作る(= 課金画面・#414)/ この機能なしで作る。
 private struct PaidFeatureCard: View {
     @Environment(AppRuntime.self) private var rt
     let confirmation: PaidConfirmation

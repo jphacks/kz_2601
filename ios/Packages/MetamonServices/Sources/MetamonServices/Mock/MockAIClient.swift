@@ -24,7 +24,7 @@ public struct MockAIClient: AIClient {
         if MockPublicData.matches(transcript) { // #253 公開の記録に個人の情報
             return try MockPublicData.morph(transcript: transcript, appId: appId, version: currentVersion + 1)
         }
-        let name = Self.sampleName(for: transcript)
+        let name = Self.wantsSharedBoard(transcript) ? "post_comments" : Self.sampleName(for: transcript)
         var doc = try DSLExamples.document(name, version: currentVersion + 1)
         doc.appId = appId
         // 改変らしい指示(作った後 / 「アプリ」も句点も無い短い指示)は指示をそのまま要約に返す(「これでいく」で何が反映されたか見えるように・#186)。
@@ -81,6 +81,12 @@ public struct MockAIClient: AIClient {
         return Self.markingPaid(ChatTurn(kind: .ready, text: "では作りますね。", turn: turn,
                                          brief: ChatBrief(name: title, purpose: requests.first ?? title, entities: [], features: requests.dropFirst().map { $0 }),
                                          transcript: transcript, locale: "ja", source: goAhead ? "shortcut" : "mock"))
+    }
+
+    /// #414: 「掲示板」は誰でも見られる(scope public)ひとこと投稿を返す(有料機能込みで作れたかを画面で確かめる)。
+    /// 無料版の指示・共有を外す修正の指示が付いていれば、従来どおり自分だけの記録のサンプル。
+    static func wantsSharedBoard(_ transcript: String) -> Bool {
+        transcript.contains("掲示板") && !transcript.contains("無料版") && !transcript.contains("自分だけ")
     }
 
     /// 有料機能(#77)のモック。backend `paid_features.json` の sharedData の代表的な語だけ見る。

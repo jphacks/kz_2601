@@ -38,7 +38,7 @@ struct ProSettingsSection: View {
             }
             .disabled(restoring)
             #if DEBUG
-            Toggle("回数制限を無効にする(デモ用)", isOn: $gate.limitDisabled)
+            Toggle("課金の制限を無効にする(デモ用・回数と有料機能)", isOn: $gate.limitDisabled)
                 .tint(Theme.Colors.brandA)
                 .accessibilityIdentifier("settings.pro.limitDisabled")
             #endif
