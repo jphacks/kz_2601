@@ -18,6 +18,8 @@ struct ClarifyChatView: View {
     /// #220: 複数選択中の案・チップ。返事(吹き出しの数)が変わったら空に戻す
     @State private var pick = MultiPick()
     @FocusState private var typing: Bool
+    /// 返事が届いてからこの時刻までは、中身の高さが変わるたびに最新までスクロールし直す
+    @State private var followLatestUntil = Date.distantPast
 
     private var offer: ClarifyFlow.Offer { rt.chatTurn.map(ClarifyFlow.offer(for:)) ?? .none }
     private var ready: ChatTurn? { if case .confirm = offer { return rt.chatTurn } else { return nil } }
@@ -111,6 +113,10 @@ struct ClarifyChatView: View {
                     }
                 }
                 .padding(.vertical, Theme.Spacing.sm)
+                // 案のカード等は差し込み後も高さが伸びる(遅い端末ほど遅れる)。伸びたら最新を見せ直す
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { _ in
+                    if Date.now < followLatestUntil { scrollToEnd(proxy) }
+                }
             }
             .scrollDismissesKeyboard(.interactively)
             // 中身が伸びても下端(最新)に寄せたまま。入力欄は safeAreaInset 側なので動かない(#208)
@@ -128,14 +134,11 @@ struct ClarifyChatView: View {
         }
     }
 
-    /// 返事と一緒に差し込まれる案のカード・要約カードは、同じ更新では id がまだ配置されておらず scrollTo が空振りする(#208)。
-    /// 配置を 1 回待ってから最新までスクロールする
+    /// 返事と一緒に差し込まれる案のカード・要約カードは、同じ更新では配置も高さも決まっていない(#208)。
+    /// 固定の待ちでは CI のような遅い環境で途中で止まるので、しばらくは中身の高さの変化を追ってスクロールし直す
     private func scrollToEndAfterLayout(_ proxy: ScrollViewProxy) {
+        followLatestUntil = .now.addingTimeInterval(2)
         scrollToEnd(proxy)
-        Task {
-            try? await Task.sleep(for: .milliseconds(120))
-            scrollToEnd(proxy)
-        }
     }
 
     private func scrollToEnd(_ proxy: ScrollViewProxy) {
