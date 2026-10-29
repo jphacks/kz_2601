@@ -211,6 +211,16 @@ func restrictSchemaJSON(raw []byte, r Restriction) []byte {
 			}
 		}
 	}
+	if r.disallowed[string(dsl.CompWebView)] {
+		// openUrlButton's description points to webView for embedding (#452 G3)
+		for _, v := range defs {
+			if def, _ := v.(map[string]any); def != nil {
+				if d, ok := def["description"].(string); ok {
+					def["description"] = strings.ReplaceAll(d, "サイトをアプリ内に埋め込むなら webView。", "")
+				}
+			}
+		}
+	}
 	out, err := json.Marshal(root)
 	if err != nil {
 		panic("ai: restrict schema: " + err.Error())
@@ -243,6 +253,18 @@ func restrictPrompt(ctx context.Context, system string) string {
 	return v.(string)
 }
 
+// noWebViewReplacer rewrites the rules that route to webView for builds
+// without it (App Store review build, #452 G3): sites open in Safari via
+// openUrlButton instead. Drift is caught by TestRestriction_PromptsDropPartsAndAddNote.
+var noWebViewReplacer = strings.NewReplacer(
+	"「○○のサイト/ニュースを見たい」は webView(実在する https URL。分からなければ公式トップ)。",
+	"「○○のサイト/ニュースを見たい」は openUrlButton(実在する https URL を Safari で開く。分からなければ公式トップ)。",
+	"webView 部品がある画面のその枠だけ WKWebView で https のページを表示する。",
+	"アプリの中でウェブページは表示しない(サイトは openUrlButton で Safari に開く)。",
+	"webView でそのサイトを表示",
+	"openUrlButton でそのサイトを Safari で開く",
+)
+
 // exampleRe matches "、歩数 = healthStat" style examples in chatCapabilities.
 var exampleRe = regexp.MustCompile(`、[^、()（）=]{1,24} = ([A-Za-z]+)`)
 
@@ -251,6 +273,9 @@ func buildRestrictedPrompt(system string, r Restriction) string {
 	s := strings.ReplaceAll(system, catalog, a.catalog)
 	s = strings.ReplaceAll(s, chatCapabilityIndex, a.index)
 	s = strings.ReplaceAll(s, string(generationSchema), string(a.genSch))
+	if r.disallowed[string(dsl.CompWebView)] {
+		s = noWebViewReplacer.Replace(s)
+	}
 
 	// Rule lines that route an utterance to a disallowed part
 	// (「歩数を見たい」は healthStat ...) are dropped.

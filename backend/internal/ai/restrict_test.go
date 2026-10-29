@@ -11,12 +11,13 @@ import (
 )
 
 // reviewBuild mirrors the App Store review build (#245): everything except
-// healthStat / locationTracker / nearbyShare, no Field.health, no camera.
+// healthStat / locationTracker / nearbyShare / sensorValue / webView (#452 G3),
+// no Field.health, no camera.
 func reviewBuild() ([]string, []string) {
 	var allowed []string
 	for t := range knownComponentTypes {
 		switch t {
-		case "healthStat", "locationTracker", "nearbyShare", "sensorValue":
+		case "healthStat", "locationTracker", "nearbyShare", "sensorValue", "webView":
 		default:
 			allowed = append(allowed, t)
 		}
@@ -29,7 +30,7 @@ func reviewCtx() context.Context {
 	return withRestriction(context.Background(), NewRestriction(a, d))
 }
 
-var removedParts = []string{"healthStat", "locationTracker", "nearbyShare", "sensorValue"}
+var removedParts = []string{"healthStat", "locationTracker", "nearbyShare", "sensorValue", "webView"}
 
 // withoutNote cuts the appended restriction note (it names the removed parts).
 func withoutNote(s string) string {
@@ -261,5 +262,19 @@ func TestRestriction_ChatUsesRestrictedPrompt(t *testing.T) {
 	}
 	if !strings.Contains(f.calls[1].System, "使えない部品: healthStat") {
 		t.Fatal("restricted chat prompt not sent")
+	}
+}
+
+// #452 G3: without webView, sites go to openUrlButton and the share / maps
+// guidance on the same rule line survives.
+func TestRestriction_NoWebViewRoutesSitesToOpenURL(t *testing.T) {
+	got := restrictPrompt(reviewCtx(), systemPrompt)
+	for _, want := range []string{"「○○のサイト/ニュースを見たい」は openUrlButton", "「LINE/Slack/Discord で送りたい」は shareButton"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("restricted prompt lost %q", want)
+		}
+	}
+	if chat := withoutNote(restrictPrompt(reviewCtx(), chatEditSystemPrompt)); !strings.Contains(chat, "openUrlButton でそのサイトを Safari で開く") {
+		t.Fatal("chat limits still suggest webView")
 	}
 }

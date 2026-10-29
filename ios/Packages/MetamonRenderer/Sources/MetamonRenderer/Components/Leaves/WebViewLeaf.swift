@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#452 G3)ではバイナリから外す(審査メモの「WebView を使わない」)。
+#if !APP_STORE_REVIEW
 import SwiftUI
 import WebKit
 import MetamonDSL
@@ -140,3 +142,4 @@ private struct WebViewRepresentable: UIViewRepresentable {
         }
     }
 }
+#endif
