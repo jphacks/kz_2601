@@ -35,8 +35,10 @@
 | ドラレコ(`dashcam`・#410。カメラの常時録画・CoreMotion) | 部品と登録 / `DashcamRecorder`、写真への追加の説明文から「ドラレコ」を外す | 4.7.2・2.5.14 |
 | DSL から使うマイクの録音(`audioRecorder`・#420) | 部品と登録 / `AudioRecorderController` / `RemoteRecorderCommands`(イヤホンのボタン)。マイクの説明文は音声入力だけの文に差し替え済み | 4.7.2・2.5.14 |
 | アプリ内の Web 表示(`webView`・WKWebView) | 部品と登録 / `WebViewLeaf`。サイトは `openUrlButton` で Safari に開く | 審査メモ「WebView を使わない」(#452 G3) |
+| App 内課金(Tailor It Pro・#77 #414) | `ProGate` / `PaywallSheet` / `ProSettingsSection`(設定の「Tailor It Pro」)/ `AppRuntime+PaidFeature`(有料機能の確認カード)/ `AppRuntime+PaidGate` の課金画面、MetamonServices の `ProEntitlementStore`(StoreKit)/ `ProProducts`(商品 ID)/ `CreationQuota`(端末の 1 日 3 回)。1 日の上限はサーバーの `ratelimit` だけで、当たると状態カード「今日はここまでです / 今日の上限に達しました。〜からまた使えます」(課金画面は出ない)。backend も chat の `requiresPro` / `paidFeatures` を付けない | 最初の版は課金なしで出す(#450 G1・2026-10-30 決定)。3.1.1・3.1.2・2.3.1(サーバーが Pro を判定しない) |
+| 共有・公開のデータ(entity の `scope: shared / public`・`edit`・`marks`)と `chatThread` | `chatThread` の部品と登録 / `ChatThreadLeaf`。`ClientCapabilities.reviewDisabledFeatures` の `sharedData` で、backend が scope を private に直す(下の「AI 側の制限」) | 1.2(通報・ブロック・フィルタが無い)(#451 G2) |
 | aiButton のオンライン版(`POST /v1/text`・#417) | `AppRuntime+AIText` のオンライン経路と Pro の入口 / `HTTPAIClient+Text`(`v1/text`)。端末内 AI(Foundation Models)は残る。端末内 AI が無い端末では理由つきで無効 | 5.1.2(i)。同意文の「記録の中身は送らない」(#452 G4) |
-| 外した部品を使う同梱の例 | `health` / `walk_route` / `attendance_nearby` / `dashcam` / `sensors` / `gallery-web`(`DSLExamples.reviewExcluded`) | 上と同じ |
+| 外した部品・共有 / 公開の記録を使う同梱の例 | `health` / `walk_route` / `attendance_nearby` / `dashcam` / `sensors` / `gallery-web` / `chat` / `board` / `ranking` / `post_comments` / `recipes`(`DSLExamples.reviewExcluded`。`strip-review-plist.sh` もバンドルから消す) | 上と同じ |
 
 **残すもの**
 - `photoField` / `videoField` は、**写真ライブラリから選ぶ**機能だけ残す。PhotosPicker は別プロセスで動き、権限の確認も要らない。
@@ -49,6 +51,7 @@
 - 裏で定期的に同期する `fetch` は残す。
 - `musicPlayer`(Apple Music の再生・検索)は残す。`NSAppleMusicUsageDescription` も残す(#412)。
 - 最初の版のスコープは、調査メモ(リポジトリ外の `調査_ライセンスとApp Store審査.md`)の「最初の版で削る機能」の表に合わせている。
+- 最初の版は App 内課金なし・共有 / 公開のデータなしで出す(2026-10-30 決定・#450 #451)。通常の版(Debug / Release)の課金と共有は今まで通り。
 
 ## 仕組み
 
@@ -123,12 +126,18 @@ codesign -d --entitlements :- "$APP"
 #   → com.apple.developer.healthkit が無いこと
 otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|NearbyInteraction|CoreMotion'
 #   → 何も出ないこと
-strings "$APP/Metamon" | grep -E 'HKHealthStore|MCSession|NISession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps|WebViewLeaf|v1/text'
+strings "$APP/Metamon" | grep -E 'HKHealthStore|MCSession|NISession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps|WebViewLeaf|v1/text|ChatThreadLeaf|jp\.kz2601\.metamon\.pro|PaywallSheet|ProSettingsSection|ProEntitlementStore|購入して作る|Pro にする'
 #   → 何も出ないこと
 #   注: WKWebView / WebKit の参照は FirebaseAuth(AuthWebViewController。OAuth・reCAPTCHA 用)から残る。
 #       この版のサインイン(Sign in with Apple・匿名)では使わない。アプリのコードからは WebKit を使わない
-ls "$APP" | grep -E '^(health|walk_route|attendance_nearby|dashcam|sensors|gallery-web)\.json$'
+grep -a -c -F -e 'Tailor It Pro' -e '購入して作る' -e 'オンラインの AI で書く' "$APP/Metamon"
+#   → 0(日本語の文字列は strings では出ないので grep -a で見る)
+otool -L "$APP/Metamon" | grep StoreKit
+#   → 何も出ないこと(App 内課金なし・#450 G1)
+ls "$APP" | grep -E '^(health|walk_route|attendance_nearby|dashcam|sensors|gallery-web|chat|board|ranking|post_comments|recipes)\.json$'
 #   → 何も出ないこと
+grep -l '"scope" *: *"\(public\|shared\)"' "$APP"/*.json
+#   → 何も出ないこと(共有・公開の例が残っていない・#451 G2)
 ```
 
 テスト:
@@ -142,11 +151,18 @@ ls "$APP" | grep -E '^(health|walk_route|attendance_nearby|dashcam|sensors|galle
 
 - **リクエスト**: `POST /v1/generate` と `POST /v1/chat` に、省略可能な 2 つを足す。
   - `allowedComponents`: 使ってよい部品の type の一覧。
-  - `disabledFeatures`: `fieldHealth` / `cameraCapture`。
+  - `disabledFeatures`: `fieldHealth` / `cameraCapture` / `sharedData`(#451 G2)。
 - **省略したとき**(通常の版・旧 iOS): 今まで通り全部使える。プロンプトもスキーマも、#245 の前とバイト単位で同じ。
 - **指定したとき**
   - 部品カタログ・チャットの「できること」の索引・生成スキーマから、許可外の部品を外す。
   - fieldHealth が無効なら `health` 属性を、cameraCapture が無効なら source の camera / both も外す。
+  - `sharedData` が無効なら(審査用の版・#451 G2)、記録はすべて private にする。
+    - 生成スキーマの `Entity.scope` を `private` だけにし、`marks` を外す。カタログの scope / edit の説明も「この版では使わない」に替える。
+    - プロンプトから、共有の範囲(`shareRules`)・いいね / 保存(`marksRules`)・投稿者 / edit / 「みんなで使う」の行を外し、制限の注記に「記録はすべて自分だけ」を足す。チャットの「共有の範囲」は「この版ではできない」に替える。
+    - 「家族だけ」などの依頼で shared を求める再生成(#254 / #259 の `shareCreateProblem` / `shareEditProblem`)はしない。
+    - 生成後の検証で、新しく shared / public の entity があれば再生成に回す。最後の試行でも残っていれば、scope / edit / marks と list の `item.mark` を落とす。
+    - chat の ready / 案に `requiresPro` / `paidFeatures` を付けない(この版に課金は無い・#450 G1)。
+  - `chatThread` が許可外なら、チャットの規則(`chatThreadRules`)も外す。
   - `webView` が許可外なら(審査用の版・#452 G3)、「サイトを見たい」の規則・チャットの「できないこと」の代わり・`openUrlButton` の説明を、`openUrlButton` で Safari に開く形に書き換える。
   - 生成後の検証で、許可外の部品は再生成に回す。最後の試行でも残っていれば、その部品を取り除く。`health` 属性は消し、source は library に直す。
   - edit で、今の DSL に既に許可外の部品がある場合は取り除く(DSL 全体で保存)。何をしたかは `meta.restricted` に入る。

@@ -4,6 +4,7 @@
 - 元の調査: リポジトリ外の `調査_ライセンスとApp Store審査.md`(10/25・`a207e75` 時点)。その後に入った部品(ドラレコ・すれ違い・センサー・録音・musicPlayer・ライブアクティビティ・写真の読み取り・書き出し・aiButton など)を、今のコードで照合し直した。
 - 関連: [審査用の版](../ios/review-build.md)・[審査メモ](../store/app-review-notes.md)・[掲載文](../store/listing.md)・[言い回し](../store/wording.md)
 - 注意: 法律・審査の結果の保証ではない。推測には **(推測)** と書く。
+- 追記(2026-10-30): 1 章の 1・2 の方針で出すと決めた(#450 / #451)。G1〜G4・G6〜G9 は PR #455 に入れた(4 章の「状態」)。2 章は調べた日の結果のまま。
 
 ## 目次
 
@@ -88,10 +89,12 @@
 
 ## 4. コードの穴(Issue にする単位)
 
+状態(2026-10-30・PR #455): G1(#450)・G2(#451)・G3・G4・G6・G7・G8・G9(#452)は対応済み。G5 は値が決まるのを待つ。
+
 | ID | 内容 | 大きさ | 関連 |
 |---|---|---|---|
-| G1 | **課金なしの審査用の版**。`APP_STORE_REVIEW` では次をする。<br>・`ProGate` の課金画面と設定の「Tailor It Pro」を外す(`ProSettingsSection` / `PaywallSheet` の入口)<br>・StoreKit の取引の監視をしない<br>・端末の 1 日 3 回の上限の代わりに、サーバーの上限(`ratelimit`)に当たった時の文言だけを出す<br>・掲載文と審査メモから IAP の段落を外す版を用意する | 中 | #326・#314・#316 |
-| G2 | **共有・公開のデータを審査用の版で作らせない**。<br>・`ClientCapabilities.reviewDisabledFeatures` に `sharedData` を足す<br>・backend の `restrict.go` で、その指定があれば `scope` を外して private にし、プロンプトの scope / chatThread の規則も外す<br>・`chatThread` を `reviewExcludedComponents` に足す<br>・同梱の例 `chat` / `board` / `ranking` / `post_comments` を `DSLExamples.reviewExcluded` と `strip-review-plist.sh` に足す | 中 | #321(戻す時の前提)・#329 |
+| G1 | **課金なしの審査用の版**(対応済み・#450。端末の無料枠も StoreKit の商品 ID もバイナリに無い。上限に当たった時は既存の状態カード「今日の上限に達しました。〜からまた使えます」)。`APP_STORE_REVIEW` では次をする。<br>・`ProGate` の課金画面と設定の「Tailor It Pro」を外す(`ProSettingsSection` / `PaywallSheet` の入口)<br>・StoreKit の取引の監視をしない<br>・端末の 1 日 3 回の上限の代わりに、サーバーの上限(`ratelimit`)に当たった時の文言だけを出す<br>・掲載文と審査メモから IAP の段落を外す版を用意する | 中 | #326・#314・#316 |
+| G2 | **共有・公開のデータを審査用の版で作らせない**(対応済み・#451。`recipes` も scope public なので外した)。<br>・`ClientCapabilities.reviewDisabledFeatures` に `sharedData` を足す<br>・backend の `restrict.go` で、その指定があれば `scope` を外して private にし、プロンプトの scope / chatThread の規則も外す<br>・`chatThread` を `reviewExcludedComponents` に足す<br>・同梱の例 `chat` / `board` / `ranking` / `post_comments` を `DSLExamples.reviewExcluded` と `strip-review-plist.sh` に足す | 中 | #321(戻す時の前提)・#329 |
 | G3 | **`webView` を審査用の版から外す**。<br>・`reviewExcludedComponents` に足し、`ComponentRegistry` の登録を `#if !APP_STORE_REVIEW` で囲む<br>・`gallery-web` の例も外す<br>・外したら、審査メモ 1 章の確認の行が満たされる | 小 | `docs/store/app-review-notes.md` 1 章 |
 | G4 | **aiButton のオンライン版(`POST /v1/text`)を審査用の版で無効にする**。<br>・`supportsOnlineAIText` を `APP_STORE_REVIEW` では false にする<br>・端末内の AI が無い端末では、今までどおり理由つきで無効にする<br>・通常の版で残すなら、同意文とポリシーに「AI で書くボタンでは、そのボタンの材料(最近の記録)を送る」を足す | 小 | #417 |
 | G5 | **法務の文書を本番用にする**。<br>・`docs/legal/privacy-policy.md` / `terms.md` の [要確認] を、人の決めた値で埋める<br>・審査用の版から外した機能の記述(HealthKit・共有)を、版に合わせて直す<br>・`LegalDocuments.publicURL` に公開 URL を入れる<br>・同梱の文から「下書き」の注記を外す | 小(値が決まれば) | #246・#331 |
@@ -105,7 +108,7 @@ G1〜G7 を入れたら、`swift test ... --filter ReviewBuildTests -Xswiftc -DA
 ## 5. 人の作業のチェックリスト
 
 **決めること**
-- [ ] 早く出すか(この文書の結論)と、課金なしで出すか(G1)を決める
+- [x] 早く出すか(この文書の結論)と、課金なしで出すか(G1)を決める(2026-10-30: 課金なし・共有なしで出す。#450 / #451)
 - [ ] Apple Developer Program の名義(個人 / 法人)を決める(#309)。法人なら D-U-N-S の取得を待つか決める
 - [ ] 運営者名・連絡先メール・施行日・物理削除までの期間・年齢区分・管轄を決める(ポリシーと規約の [要確認])
 
@@ -123,12 +126,12 @@ G1〜G7 を入れたら、`swift test ... --filter ReviewBuildTests -Xswiftc -DA
   - バンドル ID: `jp.kz2601.metamon`
   - SKU を決める
   - 主言語: 日本語
-- [ ] 掲載文・キーワード・カテゴリ(仕事効率化)を入れる([listing.md](../store/listing.md))。課金なしで出すなら Pro の段落を外す
+- [ ] 掲載文・キーワード・カテゴリ(仕事効率化)を入れる([listing.md](../store/listing.md))。課金なしで出すので Pro の段落を外す(審査メモの IAP の段落は外した)
 - [ ] プライバシーポリシーの URL・サポートの URL を入れる(#331・#320)。サポートのページに問い合わせ先を書く
 - [ ] App のプライバシー(栄養ラベル)を入れる(#328)
   - 外した機能(健康・常時の位置・ローカルネットワーク)は書かない
   - 書くもの: ユーザーのコンテンツ・音声(端末内で書き起こし、文字だけを送る)・識別子(uid)
-- [ ] 年齢区分の質問票に答える(#329。G2 の後なら、他人とのやり取りは無い)
+- [ ] 年齢区分の質問票に答える(#329。G2 を入れたので、他人とのやり取りは無い)
 - [ ] 輸出のコンプライアンス: `ITSAppUsesNonExemptEncryption = false` が入っていることを確かめる
 - [ ] 審査用のサインイン情報(デモアカウント)を「サインイン情報」欄に入れる。リポジトリには書かない
 - [ ] 審査メモ([app-review-notes.md](../store/app-review-notes.md) 2 章)を貼る
