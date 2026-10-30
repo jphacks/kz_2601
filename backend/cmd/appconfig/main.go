@@ -129,6 +129,8 @@ func newHandler(authMiddleware func(http.Handler) http.Handler, logger *slog.Log
 	if sharePage != nil {
 		mux.Handle("GET /s/{token}", sharePage) // web fallback of a share link (no DSL exposed)
 	}
+	// minimum / latest iOS build (#302): public, read once from env
+	mux.Handle("GET /v1/client-config", appconfig.ClientConfig(appconfig.ClientConfigFromEnv(os.Getenv)))
 	authed := authMiddleware(api)
 	mux.Handle("/v1/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, pattern := api.Handler(r); pattern == "" {

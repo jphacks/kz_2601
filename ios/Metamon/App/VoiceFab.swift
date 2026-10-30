@@ -153,7 +153,7 @@ struct VoiceFab: View {
                 }
         )
         .accessibilityLabel("話しかけて変える")
-        .accessibilityHint("長押しで変身一覧")
+        .accessibilityHint(L10n.key("長押しで変身一覧", review: "長押しで記録帳の一覧"))
         .accessibilityIdentifier("voice.fab")
         .accessibilityAction(named: "変身一覧") { onLongPress() }
         .accessibilityAction(named: "反対側へ移動") {

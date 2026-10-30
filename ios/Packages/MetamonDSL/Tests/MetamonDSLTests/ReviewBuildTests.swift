@@ -21,7 +21,7 @@ final class ReviewBuildTests: XCTestCase {
         XCTAssertEqual(ClientCapabilities.disabledFeatures, ClientCapabilities.reviewDisabledFeatures)
         XCTAssertTrue(Set(DSLExamples.names).isDisjoint(with: DSLExamples.reviewExcluded))
         #else
-        XCTAssertNil(ClientCapabilities.allowedComponents) // 通常ビルドは送らない = 今まで通り全部
+        XCTAssertEqual(ClientCapabilities.allowedComponents, ClientCapabilities.allComponents) // 通常ビルドも全部品を送る(#302)
         XCTAssertNil(ClientCapabilities.disabledFeatures)
         XCTAssertTrue(DSLExamples.reviewExcluded.isSubset(of: Set(DSLExamples.names)))
         #endif

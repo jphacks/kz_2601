@@ -10,6 +10,8 @@ struct MetamonApp: App {
     private let services: Services
     @State private var runtime: AppRuntime
     @State private var session: AuthSession
+    /// 最低対応版・強制アップデート(#302)。サインイン前にも効く
+    @State private var updateGate = UpdateGate()
     @Environment(\.scenePhase) private var scenePhase
 
     /// Renderer 同梱のコンポーネント + アプリ本体が提供する `voiceInput`(WhisperKit 依存なので Renderer には置かない)。
@@ -82,6 +84,7 @@ struct MetamonApp: App {
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: session.user == nil)
+            .modifier(UpdateGateModifier(gate: updateGate))
             .environment(session)
             .environment(\.services, services)              // protocol 越しのサービス
             // 表示言語(#44): 設定の「言語」で即時切替。`Text("…")` の解決と日付・数値の書式がこの Locale に従う

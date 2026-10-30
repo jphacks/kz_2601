@@ -33,6 +33,7 @@ func TestRoutes(t *testing.T) {
 		{name: "apps requires auth", path: "/v1/apps", wantStatus: http.StatusUnauthorized},
 		{name: "apps with debug uid", path: "/v1/apps", debugUID: "u1", wantStatus: http.StatusOK},
 		{name: "unknown path is 404", path: "/v1/nope", wantStatus: http.StatusNotFound},
+		{name: "client-config is public", path: "/v1/client-config", wantStatus: http.StatusOK},
 	}
 
 	for _, tt := range tests {

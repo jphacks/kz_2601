@@ -72,6 +72,7 @@ enum HTTP {
         var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: timeout)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        ClientInfo.current.apply(to: &req) // #302
         for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
         if let body {
             req.httpBody = try JSONEncoder().encode(body)

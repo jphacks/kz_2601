@@ -20,11 +20,13 @@ while v=$("$PB" -c "Print :UIBackgroundModes:$i" "$PLIST" 2>/dev/null); do
   if [ "$v" = "location" ]; then "$PB" -c "Delete :UIBackgroundModes:$i" "$PLIST"; else i=$((i + 1)); fi
 done
 
-# 残す権限の説明は、外した機能に触れない文に差し替える
-"$PB" -c "Set :NSCameraUsageDescription 生成したアプリで QR コードを読み取るために、カメラを使用します。" "$PLIST"
-"$PB" -c "Set :NSMicrophoneUsageDescription 話しかけた内容からアプリを生成するために、マイクを使用します。" "$PLIST"
-"$PB" -c "Set :NSLocationWhenInUseUsageDescription 生成したアプリで、ボタンを押した時の現在地を記録・地図に表示したり、案内を開始した時に目的地まで道案内したりするために使います。" "$PLIST"
-"$PB" -c "Set :NSPhotoLibraryAddUsageDescription 生成したアプリの共有ボタンや QR コードの画像を写真に保存するために、写真ライブラリへの追加を使用します。" "$PLIST"
+# 残す権限の説明は、外した機能に触れず、「アプリを生成」と言わない文に差し替える(#468・docs/store/wording.md「記録帳」)
+"$PB" -c "Set :NSCameraUsageDescription 記録帳で QR コードを読み取るために、カメラを使用します。" "$PLIST"
+"$PB" -c "Set :NSMicrophoneUsageDescription 話した内容から記録帳を用意・変更するために、マイクを使用します。" "$PLIST"
+"$PB" -c "Set :NSLocationWhenInUseUsageDescription 記録帳で、ボタンを押した時の現在地を記録・地図に表示したり、案内を開始した時に目的地まで道案内したりするために使います。" "$PLIST"
+"$PB" -c "Set :NSPhotoLibraryUsageDescription 記録帳に写真や動画を添えるために、写真ライブラリを使用します。" "$PLIST"
+"$PB" -c "Set :NSPhotoLibraryAddUsageDescription 記録帳の画像(QR コードなど)を写真に保存するために、写真ライブラリへの追加を使用します。" "$PLIST"
+"$PB" -c "Set :NSAppleMusicUsageDescription 記録帳の音楽プレーヤーで、Apple Music の曲を検索して再生するために使用します。" "$PLIST"
 
 # 外した部品・共有 / 公開の記録(#451 G2)を使う同梱の例(docs/dsl/examples)もバンドルから外す(DSLExamples.reviewExcluded と一致させる)
 for name in attendance_nearby walk_route health dashcam sensors gallery-web chat board ranking post_comments recipes; do

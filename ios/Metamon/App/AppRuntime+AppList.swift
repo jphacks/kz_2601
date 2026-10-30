@@ -32,7 +32,7 @@ extension AppRuntime {
         do {
             let copy = try await services.appConfig.duplicateApp(appId: app.id, name: name)
             apps.append(copy)
-            toast = L10n.tr("「\(copy.name)」を作りました")
+            toast = L10n.pick(L10n.tr("「\(copy.name)」を作りました"), review: L10n.tr("「\(copy.name)」を用意しました"))
             if visibleApps.contains(where: { $0.sortIndex != nil }), let at = order.firstIndex(of: app.id) {
                 var next = order
                 next.insert(copy.id, at: at + 1)

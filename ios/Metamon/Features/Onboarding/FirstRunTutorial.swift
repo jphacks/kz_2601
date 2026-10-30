@@ -26,19 +26,19 @@ enum FirstRunTutorial {
     static func cards(sharingAvailable: Bool = sharingAvailable, voiceModelMegabytes: Int) -> [Card] {
         [
             Card(id: "create", symbol: "mic.fill", pose: .happy,
-                 title: L10n.tr("話すと、アプリができる"),
-                 body: L10n.tr("マイクをタップして「家計簿が欲しい」のように話すだけ。文字で入力しても作れます。"),
+                 title: L10n.pick(L10n.tr("話すと、アプリができる"), review: L10n.tr("話すと、記録帳が用意できる")),
+                 body: L10n.pick(L10n.tr("マイクをタップして「家計簿が欲しい」のように話すだけ。文字で入力しても作れます。"), review: L10n.tr("マイクをタップして「家計簿をつけたい」のように話すだけ。文字で入力しても用意できます。")),
                  note: L10n.tr("声を文字にする準備(初回だけ約\(voiceModelMegabytes)MB)が終わる前でも、文字ならすぐに作れます。")),
             Card(id: "edit", symbol: "wand.and.stars", pose: .idea,
                  title: L10n.tr("話すと、直せる・戻せる"),
-                 body: L10n.tr("できたアプリの画面にあるマイクから「ボタンを大きくして」「メモ欄を足して」と話すと直せます。気に入らなければ「元に戻して」で戻せます。")),
+                 body: L10n.pick(L10n.tr("できたアプリの画面にあるマイクから「ボタンを大きくして」「メモ欄を足して」と話すと直せます。気に入らなければ「元に戻して」で戻せます。"), review: L10n.tr("記録帳の画面にあるマイクから「ボタンを大きくして」「メモ欄を足して」と話すと直せます。気に入らなければ「元に戻して」で戻せます。"))),
             sharingAvailable
                 ? Card(id: "share", symbol: "person.2.fill", pose: .joy,
                        title: L10n.tr("友達と使える・一覧で切り替え"),
                        body: L10n.tr("割り勘や出欠のアプリは、シェアすると友達や家族と一緒に使えます。マイクを長押しすると、作ったアプリの一覧が開きます。"))
                 : Card(id: "list", symbol: "square.grid.2x2.fill", pose: .joy,
-                       title: L10n.tr("作ったアプリは一覧で切り替え"),
-                       body: L10n.tr("マイクを長押しすると、作ったアプリの一覧が開きます。「アプリ一覧」と話しても開けます。")),
+                       title: L10n.pick(L10n.tr("作ったアプリは一覧で切り替え"), review: L10n.tr("用意した記録帳は一覧で切り替え")),
+                       body: L10n.pick(L10n.tr("マイクを長押しすると、作ったアプリの一覧が開きます。「アプリ一覧」と話しても開けます。"), review: L10n.tr("マイクを長押しすると、用意した記録帳の一覧が開きます。"))),
         ]
     }
 
