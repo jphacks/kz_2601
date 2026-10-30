@@ -1,6 +1,108 @@
 {
   "sourceLanguage": "ja",
   "strings": {
+    "アップデートしてください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Please update"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アップデートしてください"
+          }
+        }
+      }
+    },
+    "この版の Tailor It は使えなくなりました。App Store から最新の版にアップデートしてください。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This version of Tailor It is no longer supported. Please update to the latest version from the App Store."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この版の Tailor It は使えなくなりました。App Store から最新の版にアップデートしてください。"
+          }
+        }
+      }
+    },
+    "App Store を開く": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open App Store"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Store を開く"
+          }
+        }
+      }
+    },
+    "新しい版があります": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A new version is available"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しい版があります"
+          }
+        }
+      }
+    },
+    "アップデート": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アップデート"
+          }
+        }
+      }
+    },
+    "App Store で最新の版にアップデートできます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can update to the latest version from the App Store."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Store で最新の版にアップデートできます。"
+          }
+        }
+      }
+    },
     " ・ あなたの公開": {
       "extractionState": "manual",
       "localizations": {

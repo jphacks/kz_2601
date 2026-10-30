@@ -123,6 +123,7 @@ public struct RealtimeDocumentSync: DocumentSync {
         // 心拍は 15 秒ごとなので、それより長く無音なら切れたとみなす
         var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 40)
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        ClientInfo.current.apply(to: &req) // #302
         if let bearer = try await client.token.idToken(forceRefresh: forceRefresh) {
             req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
         }
