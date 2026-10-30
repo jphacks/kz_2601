@@ -1,0 +1,7 @@
+[
+  {"id": "p_receipt", "kind": "create", "group": "photo-ai", "transcript": "レシートを撮ったら金額を読み取って家計簿に", "note": "#418 photoField.analyze amount(+ date)", "expect": {"photo": true, "photoAnalyze": ["amount"], "unreachable": 0}},
+  {"id": "p_receipt_edit", "kind": "edit", "base": "example:kakeibo", "group": "photo-ai", "transcript": "レシートの写真から金額と日付を自動で入れられるようにして", "note": "#418 既存の家計簿の photoField に analyze を足す", "expect": {"patch": true, "photoAnalyze": ["amount", "date"]}},
+  {"id": "p_form_check", "kind": "create", "group": "photo-ai", "transcript": "筋トレのフォームをチェック", "note": "#418 jointAngle(膝・腰など)", "expect": {"photo": true, "photoAnalyze": ["jointAngle"], "unreachable": 0}},
+  {"id": "p_plant", "kind": "create", "group": "photo-ai", "transcript": "植物の写真を撮ったら、花・観葉植物・多肉植物のどれか自動で分けて記録したい", "note": "#418 classify into enum", "expect": {"photo": true, "photoAnalyze": ["classify"]}},
+  {"id": "p_business_card", "kind": "create", "group": "photo-ai", "transcript": "名刺を撮ったら書いてある文字をメモに入れて保存したい", "note": "#418 OCR text", "expect": {"photo": true, "photoAnalyze": ["text"]}}
+]

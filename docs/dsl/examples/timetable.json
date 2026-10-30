@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "時間割",
+    "description": "大学の時間割。横に曜日・縦に時限のマスで 1 週間を見渡せる。空いているマスをタップするとその曜日・時限で授業を追加、授業のマスをタップすると編集",
+    "icon": "tablecells",
+    "theme": { "primaryColor": "#1E88E5" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "lecture",
+      "name": "授業",
+      "titleField": "subject",
+      "fields": [
+        { "id": "subject", "name": "科目", "type": "string", "required": true },
+        { "id": "weekday", "name": "曜日", "type": "enum", "options": ["月", "火", "水", "木", "金"], "defaultValue": "月" },
+        { "id": "period", "name": "時限", "type": "integer", "defaultValue": 1, "unit": "限" },
+        { "id": "room", "name": "教室", "type": "string" },
+        { "id": "teacher", "name": "先生", "type": "string" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "時間割",
+      "components": [
+        {
+          "type": "gridTable", "id": "week", "area": "A1:F10", "title": "今週の時間割",
+          "entity": "lecture", "columnField": "weekday", "rowField": "period",
+          "titleField": "subject", "subtitleField": "room",
+          "rowRange": { "from": 1, "to": 5 },
+          "onItemTap": { "type": "navigate", "screen": "lecture_form", "presentation": "sheet" }
+        },
+        { "type": "button", "id": "add", "area": "D11:F12", "label": "授業を追加", "icon": "plus",
+          "action": { "type": "navigate", "screen": "lecture_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "lecture_form",
+      "title": "授業",
+      "entity": "lecture",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "lecture" } }],
+      "components": [
+        {
+          "type": "section", "id": "when", "area": "A1:F4", "title": "いつ",
+          "children": [
+            { "type": "picker", "field": "weekday", "label": "曜日", "style": "segmented" },
+            { "type": "stepper", "field": "period", "label": "時限", "min": 1, "max": 5 }
+          ]
+        },
+        {
+          "type": "section", "id": "what", "area": "A5:F9", "title": "授業",
+          "children": [
+            { "type": "textField", "field": "subject", "label": "科目", "placeholder": "線形代数" },
+            { "type": "textField", "field": "room", "label": "教室", "placeholder": "A101" },
+            { "type": "textField", "field": "teacher", "label": "先生", "placeholder": "山田先生" }
+          ]
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "lecture", "confirmMessage": "この授業を削除しますか？" } }
+      ]
+    }
+  ]
+}

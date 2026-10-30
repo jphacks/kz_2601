@@ -208,7 +208,7 @@ func TestSummarizeApp_Kakeibo(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := summarizeApp(app)
-	for _, want := range []string{"expense「支出」(scope private)", `"id":"memo"`, "画面 expense_form「支出を記録」・expense の入力フォーム",
+	for _, want := range []string{"expense「支出」(scope private・項目 ", `"id":"memo"`, "画面 expense_form「支出を記録」・expense の入力フォーム",
 		`"type":"chart"`, `"label":"今月の支出"`, "通知: なし", "ツールバー"} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("summary lacks %q:\n%s", want, s)
@@ -220,17 +220,20 @@ func TestSummarizeApp_Kakeibo(t *testing.T) {
 	}
 }
 
-// iOS's Record drops authorName (MetamonDSL Record.swift decodes only id /
-// data / dates), so the chat must not offer showing the poster; and English
-// answers quote the app's labels verbatim instead of translating them.
+// #250: shared entities show the poster ($author) and "only mine", so the
+// chat must not call them impossible; and English answers quote the app's
+// labels verbatim instead of translating them.
 func TestChatFirst_PromptFacts(t *testing.T) {
-	if strings.Contains(chatCapabilities, "投稿者名つき") || !strings.Contains(chatCapabilities, "投稿者名の表示") {
-		t.Error("capabilities must say the poster name cannot be shown")
+	if !strings.Contains(chatCapabilities, "投稿者名)は一覧・表・タイムラインに出せる") || !strings.Contains(chatCapabilities, "自分の投稿だけ") {
+		t.Error("capabilities must say the poster name and my posts can be shown")
 	}
 	for name, p := range map[string]string{"edit": chatEditSystemPrompt, "create": chatCreateSystemPrompt} {
-		if !strings.Contains(p, "投稿者名の表示") {
-			t.Errorf("%s prompt lacks the poster-name limit", name)
+		if strings.Contains(p, "投稿者名の表示") || strings.Contains(p, "投稿者名)は画面に出せない") {
+			t.Errorf("%s prompt still says the poster name cannot be shown", name)
 		}
+	}
+	if !strings.Contains(chatCapabilityIndex, "記録の予約値: $author(") {
+		t.Error("capability index lacks the record values")
 	}
 	if !strings.Contains(chatEditSystemPrompt, "locale が en でもラベルは訳さない") {
 		t.Error("edit prompt must keep labels untranslated in en")

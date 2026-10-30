@@ -57,7 +57,8 @@ public final class RecordSyncEngine {
         let dir = directory ?? base.appendingPathComponent("metamon-records", isDirectory: true)
         // 動画(#206)は既定なら Application Support/metamon-videos、テストで directory を渡したらその下
         let videos = directory.map { LocalVideoStore(directory: $0.appendingPathComponent("videos", isDirectory: true)) } ?? .shared
-        let store = RecordStore(directory: dir, videos: videos)
+        let audios = directory.map { LocalAudioStore(directory: $0.appendingPathComponent("audio", isDirectory: true)) } ?? .shared
+        let store = RecordStore(directory: dir, videos: videos, audios: audios)
         self.init(store: store, queue: SyncQueue(directory: dir, store: store, client: client), client: client, connectivity: connectivity)
     }
 
@@ -144,13 +145,21 @@ public final class RecordSyncEngine {
 
     // MARK: - Write(楽観的)
 
+    /// 表示名を送らなかった投稿に backend が付ける名前(appconfig `defaultAuthorName`)。送信前のローカル行にも同じものを出す。
+    nonisolated public static let anonymousName = "匿名"
+
     /// 作成(`recordId == nil`)または更新。ローカルに即反映し、更新後の一覧を返す。送信はキューが行う。
-    public func save(appId: String, entity: String, recordId: String?, data: [String: JSONValue]) async -> [Record] {
+    /// - Parameter author: shared / public の entity に作る時の投稿者(#250)。uid はローカル行の作者判定と「自分の投稿」用、
+    ///   name は POST で送る表示名(nil なら送らない)。更新では使わない。
+    public func save(appId: String, entity: String, recordId: String?, data: [String: JSONValue],
+                     author: (uid: String?, name: String?)? = nil) async -> [Record] {
         let now = ISO8601DateFormatter().string(from: .now)
         if let recordId, var row = await store.row(appId: appId, entity: entity, recordId: recordId) {
             let oldVideos = VideoValue.localIDs(in: row.data)
+            let oldAudios = AudioValue.localIDs(in: row.data)
             row.data.merge(data) { _, new in new } // PATCH と同じくキー単位でマージ(DSL から消えた項目も保持)
             store.videos.remove(oldVideos.subtracting(VideoValue.localIDs(in: row.data))) // 撮り直し・削除した動画(#206)
+            store.audios.remove(oldAudios.subtracting(AudioValue.localIDs(in: row.data))) // 録り直し・削除した録音(#420)
             row.updatedAt = now
             if row.pendingOp != .create { row.pendingOp = .update }
             await store.upsert(row)
@@ -158,12 +167,36 @@ public final class RecordSyncEngine {
         } else {
             let clientId = UUID().uuidString.lowercased()
             let row = LocalRecord(appId: appId, entity: entity, recordId: LocalRecord.temporaryId(clientId: clientId), data: data,
-                                  createdAt: now, updatedAt: now, pendingOp: .create, clientId: clientId)
+                                  createdAt: now, updatedAt: now, pendingOp: .create, clientId: clientId,
+                                  author: author?.uid, authorName: author.map { $0.name ?? Self.anonymousName })
             await store.upsert(row)
-            await queue.enqueue(SyncOperation(id: clientId, appId: appId, entity: entity, recordId: row.recordId, kind: .create, data: data))
+            await queue.enqueue(SyncOperation(id: clientId, appId: appId, entity: entity, recordId: row.recordId, kind: .create, data: data,
+                                              authorName: author?.name))
         }
         kick()
         return await store.records(appId: appId, entity: entity)
+    }
+
+    /// 印を付ける / 外す(#255)。押した瞬間にローカルの件数と状態を変え、サーバーの `{count, mine}` で確定する。
+    /// 失敗したら元に戻して投げる。印は送信待ちの列に積まない(オフライン・未送信の自分の投稿では `MarkError`)。
+    @discardableResult
+    public func toggleMark(appId: String, entity: String, recordId: String, mark: String) async throws -> MarkState {
+        guard let row = await store.row(appId: appId, entity: entity, recordId: recordId), row.pendingOp != .delete else {
+            throw MarkError.notFound
+        }
+        guard !row.isTemporary else { throw MarkError.notSynced }
+        guard isOnline else { throw MarkError.offline }
+        let before = row.record.markState(mark)
+        let next = before.toggled()
+        await store.setMark(appId: appId, entity: entity, recordId: recordId, mark: mark, state: next)
+        do {
+            let server = try await client.setMark(appId: appId, entity: entity, id: recordId, mark: mark, on: next.mine)
+            await store.setMark(appId: appId, entity: entity, recordId: recordId, mark: mark, state: server)
+            return server
+        } catch {
+            await store.setMark(appId: appId, entity: entity, recordId: recordId, mark: mark, state: before)
+            throw error
+        }
     }
 
     /// アプリ削除(#180): その appId の未送信キューとローカル DB を消す。サーバー削除が成功してから呼ぶ。
@@ -177,6 +210,7 @@ public final class RecordSyncEngine {
     public func delete(appId: String, entity: String, recordId: String) async -> [Record] {
         if let row = await store.row(appId: appId, entity: entity, recordId: recordId) {
             store.videos.remove(VideoValue.localIDs(in: row.data)) // 端末内の動画ファイル(#206)
+            store.audios.remove(AudioValue.localIDs(in: row.data)) // 端末内の録音(#420)
         }
         let result = await queue.enqueue(SyncOperation(appId: appId, entity: entity, recordId: recordId, kind: .delete))
         if result == .cancelledCreate {
@@ -188,4 +222,14 @@ public final class RecordSyncEngine {
         kick()
         return await store.records(appId: appId, entity: entity)
     }
+}
+
+/// 印を付けられない理由(#255)。
+public enum MarkError: Error, Equatable, Sendable {
+    /// オフライン(印は送信待ちに積まない)
+    case offline
+    /// 自分の投稿がまだ送信されていない(サーバーにレコードが無い)
+    case notSynced
+    /// ローカルにレコードが無い(削除済み)
+    case notFound
 }

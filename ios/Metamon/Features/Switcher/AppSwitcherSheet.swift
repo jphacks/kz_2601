@@ -10,8 +10,10 @@ struct AppSwitcherSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var thumbs = AppThumbnailStore.shared
     @State private var selected: String?
+    #if !APP_STORE_REVIEW
     @State private var sharingUI = SharingUI.shared
     @State private var releaseUI = ReleaseUI.shared
+    #endif
 
     private var apps: [AppSummary] { rt.visibleApps }
     private var showSkeleton: Bool { rt.appsLoading && apps.isEmpty }
@@ -29,14 +31,17 @@ struct AppSwitcherSheet: View {
             Spacer(minLength: Theme.Spacing.md)
         }
         .background(Theme.Colors.canvas.ignoresSafeArea())
+        .modifier(AppRenameAlert()) // #277
         .presentationDetents([.height(500)])
         .presentationDragIndicator(.visible)
         .sensoryFeedback(.selection, trigger: selected)
         .task { await rt.appsList() }
+        #if !APP_STORE_REVIEW // 審査用ビルドはシェア / リリース申請を外す(#245)
         .task { await releaseUI.refresh(rt.services.releaseRequests) }
         .sheet(item: $sharingUI.shareTarget) { ShareAppSheet(app: $0) }
-        .screenMapSheet { ScreenMapUI.shared.closeSwitcherThenTalk(rt) } // #116
         .sheet(item: $releaseUI.target) { ReleaseRequestSheet(app: $0) }
+        #endif
+        .screenMapSheet { ScreenMapUI.shared.closeSwitcherThenTalk(rt) } // #116
     }
 
     // MARK: - Sections
@@ -78,9 +83,7 @@ struct AppSwitcherSheet: View {
             .scrollDisabled(true)
         } else if apps.isEmpty {
             VStack(spacing: Theme.Spacing.sm) {
-                Image(systemName: "square.stack.3d.up.slash")
-                    .font(.title)
-                    .foregroundStyle(Theme.brandGradient)
+                CraneMascot(pose: .point, size: 72) // #102
                 Text(Greeting.switcherEmpty)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -99,6 +102,7 @@ struct AppSwitcherSheet: View {
                         }
                         .overlay(alignment: .topTrailing) { AppCardActions(app: app) }
                         .overlay(alignment: .bottomTrailing) { if app.id == rt.document.appId { ScreenMapCardButton() } } // #116
+                        .modifier(AppCardReorder(app: app)) // #277 長押しでドラッグして並べ替え
                     }
                 }
                 .padding(.horizontal, Theme.Spacing.lg)

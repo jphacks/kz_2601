@@ -26,6 +26,17 @@ extension FormDraft {
             set: { self.values[field] = .string(Self.timeFormatter.string(from: $0)) })
     }
 
+    /// timePicker は未入力でも今の時刻を表示する。見えている時刻をそのまま保存値にする(#229:
+    /// 触らずに保存すると出勤時刻が空のまま = 勤務時間・給料が「—」になっていた)。入力済みなら何もしない。
+    func seedTimeIfEmpty(_ field: String, now: Date = Date()) {
+        guard let f = entity.field(field), FieldCoding.normalize(values[field] ?? .null, for: f) == nil else { return }
+        if f.type == .datetime {
+            values[field] = .string(FieldCoding.encode(now, for: f))
+        } else {
+            values[field] = .string(Self.timeFormatter.string(from: now))
+        }
+    }
+
     /// string/text field に "#RRGGBB" で保存する色束縛。
     func color(_ field: String) -> Binding<Color> {
         Binding(

@@ -4,7 +4,7 @@ import Foundation
 /// 期間 filter(`today` / `thisWeek` / `thisMonth` / `thisYear`)は端末ローカル時刻基準。
 public enum Aggregator {
     /// iOS が解釈する `Filter.op`(schema の enum と一致させる。テストで突き合わせる)。
-    public static let filterOps: Set<String> = ["eq", "neq", "gt", "gte", "lt", "lte", "today", "thisWeek", "thisMonth", "thisYear"]
+    public static let filterOps: Set<String> = ["eq", "neq", "gt", "gte", "lt", "lte", "today", "thisWeek", "thisMonth", "thisYear", "contains"]
 
     /// `thisWeek` 用の暦: 週の始まりを**月曜に固定**する。
     /// 日本の暦・学校・職場の「今週」は月〜日で数えるのが一般的で、ロケール既定(ja_JP は日曜始まり)のままだと
@@ -22,6 +22,18 @@ public enum Aggregator {
     }
 
     public static func matches(_ f: Filter, record: Record, field: Field?, now: Date = DSLClock.now(), calendar: Calendar = .current) -> Bool {
+        if let mid = RecordValue.markId(f.field) {
+            // 自分が付けたか(#255)。value は me(`resolvingMe` 後は uid 文字列)。サーバーの mine をそのまま使う
+            guard f.value != nil, f.value != .null else { return false }
+            let mine = record.markState(mid).mine
+            return f.op == "neq" ? !mine : mine
+        }
+        if f.field == RecordValue.author {
+            // 投稿者の uid と比べる(value は `resolvingMe` で uid にしたもの・#251)。作者の無い行は作者 ""。uid に置き換わっていない me はどれにも一致しない
+            guard let uid = f.value?.stringValue else { return false }
+            let same = (record.author ?? "") == uid
+            return f.op == "neq" ? !same : same
+        }
         let v = record[f.field]
         switch f.op {
         case "thisMonth":
@@ -37,6 +49,10 @@ public enum Aggregator {
         case "thisYear":
             guard let d = FieldCoding.date(from: v) else { return false }
             return calendar.isDate(d, equalTo: now, toGranularity: .year)
+        case "contains":
+            // type refs(#231): 選んだ id に value を含む。未選択(空・無し)= 全員なので常に一致
+            let ids = refIds(v)
+            return ids.isEmpty || ids.contains(f.value?.stringValue ?? "")
         case "eq": return v == f.value || v.displayString == (f.value ?? .null).displayString
         case "neq": return !(v == f.value || v.displayString == (f.value ?? .null).displayString)
         case "gt", "gte", "lt", "lte":
@@ -48,6 +64,15 @@ public enum Aggregator {
             default: return a <= b
             }
         default: return true
+        }
+    }
+
+    /// type refs の保存値 → id の配列(文字列 1 つは 1 件として読む)。
+    public static func refIds(_ v: JSONValue) -> [String] {
+        switch v {
+        case .array(let a): return a.compactMap { $0.stringValue }.filter { !$0.isEmpty }
+        case .string(let s): return s.isEmpty ? [] : [s]
+        default: return []
         }
     }
 
@@ -86,7 +111,7 @@ public enum Aggregator {
         case "currency": return FieldCoding.currency(value)
         case "percent": return String(format: "%.0f%%", value)
         default:
-            let s = value == value.rounded() ? String(Int(value)) : String(format: "%.1f", value)
+            let s = FieldCoding.plainNumber(value)
             return unit.map { s + " " + $0 } ?? s
         }
     }
@@ -99,7 +124,8 @@ public enum Aggregator {
     }
 
     /// chart: groupBy(enum or 日付 field)でグループ化して集計。日付は `bucket`(day|week|month)で丸める。
-    public static func buckets(_ c: Component, entity: Entity?, records: [Record]) -> [Bucket] {
+    /// `label` は日付以外の値 → 表示名(ref の groupBy はレコード id で束ねるので、参照先の見出しを渡す・#235)。
+    public static func buckets(_ c: Component, entity: Entity?, records: [Record], label relabel: ((String) -> String)? = nil) -> [Bucket] {
         guard let groupBy = c.groupBy else { return [] }
         let field = entity?.field(groupBy)
         var groups: [String: (label: String, rows: [Record])] = [:]
@@ -112,7 +138,7 @@ public enum Aggregator {
                 (key, label) = dateBucket(d, c.bucket ?? "day")
             } else {
                 key = v.displayString
-                label = key
+                label = relabel?(key) ?? key
             }
             if groups[key] == nil { order.append(key) }
             groups[key, default: (label, [])].rows.append(r)

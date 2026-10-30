@@ -68,7 +68,7 @@ jobs:
       # false なら build-for-testing だけ(コンパイル確認)
       run_tests: ${{ steps.plan.outputs.run_tests }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # push では github.event.before との差分、PR では base との差分
       - uses: dorny/paths-filter@v4
@@ -194,7 +194,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Xcode 26 を選択
         run: |
@@ -206,7 +206,7 @@ jobs:
           xcodebuild -version
 
       - name: SwiftPM ビルドキャッシュ
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ios/Packages/MetamonDSL/.build
           key: dsl-build-${{ runner.os }}-${{ hashFiles('ios/Packages/MetamonDSL/**/*.swift') }}
@@ -222,11 +222,11 @@ jobs:
     needs: ios-changes
     if: needs.ios-changes.outputs.mode == 'xcode'
     # macos-26: Xcode 26 系。firebase-ios-sdk 13.x が swift-tools 6.2(= Xcode 26)を要求するため macos-15(Xcode 16)では解決不可。
-    # 分単価が高いので無駄に再実行しないこと。push 時は UI テストを含むので上限を少し広めに取る。
+    # 分単価が高いので無駄に再実行しないこと。push 時は UI テストを含むので上限を広めに取る(UI テスト全部で約 31 分かかり 30 分で時間切れになったため 50 分)。
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Xcode 26 を選択
         run: |
@@ -240,7 +240,7 @@ jobs:
       # Homebrew より GitHub Release のバイナリ取得の方が速い(数秒)。バージョン固定でキャッシュ。
       - name: xcodegen キャッシュ
         id: xcodegen-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/xcodegen
           key: xcodegen-${{ env.XCODEGEN_VERSION }}
@@ -274,7 +274,7 @@ jobs:
           "$RUNNER_TEMP/xcodegen/bin/xcodegen" generate --quiet
 
       - name: SwiftPM キャッシュ
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ios/SourcePackages
           key: spm-${{ runner.os }}-${{ hashFiles('ios/project.yml', 'ios/**/Package.resolved') }}
@@ -283,7 +283,7 @@ jobs:
 
       # DerivedData は数百MB〜になる。リポジトリのキャッシュ上限(10GB)を圧迫したら外す。
       - name: DerivedData キャッシュ
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ios/DerivedData
           key: dd-${{ runner.os }}-${{ hashFiles('ios/project.yml') }}-${{ github.sha }}

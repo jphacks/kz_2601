@@ -22,7 +22,7 @@ public enum FieldCoding {
         switch f.type {
         case .boolean: return .bool(false)
         case .enum: return f.options?.first.map { .string($0) } ?? .null
-        case .ref: return .null
+        case .ref, .refs: return .null
         case .date, .datetime: return .string(encode(Date(), for: f))
         default: return .null
         }
@@ -50,6 +50,10 @@ public enum FieldCoding {
             return nil
         case .boolean:
             return .bool(v.truthy)
+        case .refs:
+            // id の配列(#231)。未選択はキーごと落とす(= 全員)
+            let ids = Aggregator.refIds(v)
+            return ids.isEmpty ? Optional<JSONValue>.none : .array(ids.map { .string($0) })
         default:
             if let s = v.stringValue { return s.isEmpty ? nil : .string(s) }
             // JSONValue は ExpressibleByNilLiteral のため三項の `nil` は `.null` になる(#121)。Optional.none を明示する。
@@ -64,13 +68,26 @@ public enum FieldCoding {
         public var no: String
         public var photo: String
         public var video: String
-        public init(yes: String, no: String, photo: String, video: String = "動画") {
+        public var audio: String
+        public init(yes: String, no: String, photo: String, video: String = "動画", audio: String = "録音") {
             self.yes = yes
             self.no = no
             self.photo = photo
             self.video = video
+            self.audio = audio
         }
-        public static let ja = Words(yes: "はい", no: "いいえ", photo: "写真", video: "動画")
+        public static let ja = Words(yes: "はい", no: "いいえ", photo: "写真", video: "動画", audio: "録音")
+    }
+
+    /// 数値の表示(小数は 2 桁まで・末尾の 0 は落とす)。7.25 時間 = 「7.25」(1 桁だと「7.3」になり、
+    /// 時給 × 7.25 の給料と表示が合わなかった・#229)。整数はそのまま。
+    public static func plainNumber(_ n: Double) -> String {
+        guard n.isFinite else { return String(n) }
+        let r = (n * 100).rounded() / 100
+        if r == r.rounded(), abs(r) < 1e15 { return String(Int(r)) }
+        var s = String(format: "%.2f", r)
+        while s.hasSuffix("0") { s.removeLast() }
+        return s
     }
 
     /// 一覧・集計の表示用整形。`locale` / `now` は日付の書式(言語・今年なら年を省く)にだけ使う。`words` は boolean / photo の語。
@@ -86,7 +103,7 @@ public enum FieldCoding {
             return body + (suffix.hasPrefix("/") ? "" : " ") + suffix
         case .number, .integer:
             guard let n = v.doubleValue else { return "" }
-            let s = n == n.rounded() ? String(Int(n)) : String(format: "%.1f", n)
+            let s = plainNumber(n)
             return field.unit.map { s + " " + $0 } ?? s
         case .date, .datetime:
             guard let d = date(from: v) else { return v.displayString }
@@ -94,6 +111,7 @@ public enum FieldCoding {
         case .boolean: return v.truthy ? words.yes : words.no
         case .photo: return v.isNull ? "" : words.photo
         case .video: return v.isNull ? "" : words.video
+        case .audio: return AudioValue(v).map { $0.seconds > 0 ? words.audio + " " + AudioRecorderPolicy.elapsedText(Double($0.seconds)) : words.audio } ?? ""
         default: return v.displayString
         }
     }

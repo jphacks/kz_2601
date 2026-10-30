@@ -10,11 +10,15 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case photoField, image, list, stat, chart, voiceInput, spacer, divider
     // leaf(動画・#206)
     case videoField, videoPlayer
+    // leaf(録音・#420)
+    case audioRecorder
     // container(構造系: card/disclosure/carousel/grid)
     case card, disclosure, carousel, grid
     // leaf(ナビ・ネイティブ系)
-    case searchBar, calendar, shareButton, openUrlButton, mapView, locationButton, qrScanner, timerDisplay
+    case searchBar, calendar, shareButton, openUrlButton, mapView, locationButton, locationPicker, qrScanner, timerDisplay
     case webView
+    // leaf(QR を作って表示・#422)。text / field / value / label / title は共用
+    case qrCode
     // leaf: 入力系バッチ
     case slider, stepper, textEditor, secureField, timePicker, colorPicker, rating
     // leaf(表示系)
@@ -37,8 +41,22 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case nearbyShare
     // leaf(位置の記録・#168)
     case locationTracker
+    // leaf(チャット・#260)
+    case chatThread
     // leaf(ヘルスデータ・#167)
     case healthStat
+    // leaf(時間割のマス目・#234)
+    case gridTable
+    // leaf(ランダムに 1 件選ぶ・#263)。entity / title / titleField / subtitleField / filter / label / onItemTap は共用
+    case randomPicker
+    // leaf(目的地までの道案内・#411)。title / label / entity / locationField / titleField / mode は共用
+    case routeGuide
+    // leaf(ドラレコ・#410)。title は共用
+    case dashcam
+    // leaf(端末のセンサー・#419)。label / style / min / max / entity / field / dateField / seconds / limit は共用
+    case sensorValue
+    // leaf(Apple Music の再生と友だちからの曲リクエスト・#412)。title は共用
+    case musicPlayer
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -110,13 +128,16 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var value: Double?          // progressBar(0..1)/ gauge のリテラル値
     public var valueExpr: Expr?        // stat: `value` に Expr(aggregate の代替・#101)。数値リテラルも入る
     // settlement(#101)
-    public var nameField: String?
+    public var nameField: String?      // settlement / locationPicker(場所の名前の string field・#212)
     public var balanceField: String?
     // aiButton(#78)。label / prompt / entity / limit は共用
-    public var task: String?           // summarize|classify|rewrite|extract|suggest
+    public var task: String?           // summarize|classify|rewrite|extract|suggest|generate
     public var input: String?          // AI に渡す field(nil = フォーム全体)
     public var output: String?         // 結果を入れる field
     public var options: [String]?      // classify の候補(nil = enum field の options)
+    public var shape: String?          // generate(#417): line|list|fields
+    public var count: Int?             // generate list の個数
+    public var items: [String]?        // generate fields の項目名
     public var target: Double?         // progressBar entity モードの分母
     public var tone: String?           // progressBar: positive(目標)| negative(予算)・#140
     public var url: String?            // link
@@ -138,8 +159,10 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var onDateTap: Action?      // calendar
     public var locationField: String?  // mapView / locationTracker
     public var zoom: String?           // mapView: near|city|wide(mapView の kind: pins|route・#168)
-    public var mode: String?           // timerDisplay: stopwatch|countdown
+    public var mode: String?           // timerDisplay: stopwatch|countdown / routeGuide: automobile|walking
+    public var address: String?        // routeGuide: 固定の目的地(住所・施設名)
     public var seconds: Int?           // timerDisplay countdown 初期秒
+    public var liveActivity: Bool?     // timerDisplay: ロック画面 / Dynamic Island にも出す(#423)
     public var shareTo: String?        // shareButton: any|line|slack|discord(`target` は progressBar の数値)
     // 入力系バッチ(slider / stepper / rating / textEditor)
     public var min: Double?            // slider / stepper / gauge
@@ -149,20 +172,50 @@ public struct Component: Decodable, Identifiable, Sendable {
     // healthStat(#167)。label / target は共用
     public var metric: String?         // steps|weight
     public var period: String?         // today(既定)|week
+    // gridTable(#234)。entity / titleField / subtitleField / onItemTap は共用
+    public var columnField: String?    // 横軸(例: 曜日 enum)
+    public var rowField: String?       // 縦軸(例: 時限 integer)
+    public var columnValues: [String]? // 列見出しの明示(nil = enum の options)
+    public var rowValues: [String]?    // enum / string の行見出しの明示
+    public var rowRange: GridRange?    // integer の行範囲(nil = 1…6)
+    // chatThread(#260)。entity / placeholder / emptyText は共用
+    public var textField: String?      // 本文の string / text field
+    public var photoField: String?     // 任意の photo field
+    // dashcam(#410)。title は共用。nil = 既定値(DashcamConfig)
+    public var keepMinutes: Int?       // ループで残す分数
+    public var maxStorageMB: Int?      // 録画の容量上限
+    public var impactG: Double?        // 衝撃の閾値(重力を除いた G)
+    public var autoStart: [String]?    // landscape|still|charging(全部が続いたら開始)
+    public var audio: Bool?            // マイクも録る
+    // sensorValue(#419)
+    public var sensor: String?         // tilt|pitch|roll|acceleration|rotation|pressure|altitude
+    public var threshold: SensorThreshold?
+    // photoField(#418): 写真から読み取って他の field に入れる。壊れた項目だけ落とす
+    public var analyze: [PhotoAnalyze] = []
+    // nearbyShare passby(#425)。entity / mode / limit は共用
+    public var fields: [String]?       // 交換する field id(明示したものだけ送る)
+    public var distance: Bool?         // UWB で距離・方向を出す
+    // musicPlayer(#412)
+    public var allowRequests: Bool?    // 近くの端末から曲のリクエストを受ける
+    public var autoAccept: Bool?       // リクエストを確認せずに再生待ちへ
 
     private enum Keys: String, CodingKey {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
         case includeTime, source, maxDuration, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
         case kind, groupBy, bucket, prompt, size
         case expanded, itemWidth, columnCount
-        case searchField, onDateTap, locationField, zoom, mode, seconds, shareTo
+        case searchField, onDateTap, locationField, zoom, mode, address, seconds, shareTo
+        case liveActivity
         case name, color, value, target, url, image, message, columns, limit, dateField, titleField, subtitleField
         case min, max, step, minLines
         case by
         case nameField, balanceField
-        case task, input, output, options
+        case task, input, output, options, shape, count, items
         case tone
         case metric, period
+        case columnField, rowField, columnValues, rowValues, rowRange
+        case textField, photoField
+        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance, allowRequests, autoAccept
     }
 
     public init(from decoder: Decoder) throws {
@@ -212,7 +265,9 @@ public struct Component: Decodable, Identifiable, Sendable {
         locationField = try? c.decodeIfPresent(String.self, forKey: .locationField)
         zoom = try? c.decodeIfPresent(String.self, forKey: .zoom)
         mode = try? c.decodeIfPresent(String.self, forKey: .mode)
+        address = try? c.decodeIfPresent(String.self, forKey: .address)
         seconds = try? c.decodeIfPresent(Int.self, forKey: .seconds)
+        liveActivity = try? c.decodeIfPresent(Bool.self, forKey: .liveActivity)
         shareTo = try? c.decodeIfPresent(String.self, forKey: .shareTo)
         min = try? c.decodeIfPresent(Double.self, forKey: .min)
         max = try? c.decodeIfPresent(Double.self, forKey: .max)
@@ -228,6 +283,9 @@ public struct Component: Decodable, Identifiable, Sendable {
         input = try? c.decodeIfPresent(String.self, forKey: .input)
         output = try? c.decodeIfPresent(String.self, forKey: .output)
         options = try? c.decodeIfPresent([String].self, forKey: .options)
+        shape = try? c.decodeIfPresent(String.self, forKey: .shape)
+        count = try? c.decodeIfPresent(Int.self, forKey: .count)
+        items = try? c.decodeIfPresent([String].self, forKey: .items)
         target = try? c.decodeIfPresent(Double.self, forKey: .target)
         tone = try? c.decodeIfPresent(String.self, forKey: .tone)
         url = try? c.decodeIfPresent(String.self, forKey: .url)
@@ -240,6 +298,53 @@ public struct Component: Decodable, Identifiable, Sendable {
         subtitleField = try? c.decodeIfPresent(String.self, forKey: .subtitleField)
         metric = try? c.decodeIfPresent(String.self, forKey: .metric)
         period = try? c.decodeIfPresent(String.self, forKey: .period)
+        columnField = try? c.decodeIfPresent(String.self, forKey: .columnField)
+        rowField = try? c.decodeIfPresent(String.self, forKey: .rowField)
+        columnValues = try? c.decodeIfPresent([String].self, forKey: .columnValues)
+        rowValues = try? c.decodeIfPresent([String].self, forKey: .rowValues)
+        rowRange = try? c.decodeIfPresent(GridRange.self, forKey: .rowRange)
+        textField = try? c.decodeIfPresent(String.self, forKey: .textField)
+        photoField = try? c.decodeIfPresent(String.self, forKey: .photoField)
+        keepMinutes = try? c.decodeIfPresent(Int.self, forKey: .keepMinutes)
+        maxStorageMB = try? c.decodeIfPresent(Int.self, forKey: .maxStorageMB)
+        impactG = try? c.decodeIfPresent(Double.self, forKey: .impactG)
+        autoStart = try? c.decodeIfPresent([String].self, forKey: .autoStart)
+        audio = try? c.decodeIfPresent(Bool.self, forKey: .audio)
+        sensor = try? c.decodeIfPresent(String.self, forKey: .sensor)
+        threshold = try? c.decodeIfPresent(SensorThreshold.self, forKey: .threshold)
+        analyze = ((try? c.decodeIfPresent(Lossy<PhotoAnalyze>.self, forKey: .analyze))?.wrappedValue ?? []).filter { $0.kind != .unknown }
+        fields = try? c.decodeIfPresent([String].self, forKey: .fields)
+        distance = try? c.decodeIfPresent(Bool.self, forKey: .distance)
+        allowRequests = try? c.decodeIfPresent(Bool.self, forKey: .allowRequests)
+        autoAccept = try? c.decodeIfPresent(Bool.self, forKey: .autoAccept)
+    }
+}
+
+/// `sensorValue.threshold`(#419): above / below を超えた瞬間に 1 回だけ発火。
+public struct SensorThreshold: Decodable, Sendable {
+    public var above: Double?
+    public var below: Double?
+    public var message: String?
+    public var save: Bool?
+    public var action: Action?
+
+    public init(above: Double? = nil, below: Double? = nil, message: String? = nil, save: Bool? = nil, action: Action? = nil) {
+        self.above = above
+        self.below = below
+        self.message = message
+        self.save = save
+        self.action = action
+    }
+}
+
+/// `gridTable.rowRange`: integer の行範囲(両端を含む)。
+public struct GridRange: Decodable, Sendable, Hashable {
+    public var from: Int
+    public var to: Int
+
+    public init(from: Int, to: Int) {
+        self.from = from
+        self.to = to
     }
 }
 
@@ -247,10 +352,13 @@ public struct Component: Decodable, Identifiable, Sendable {
 public struct TableColumnSpec: Decodable, Sendable {
     public var field: String
     public var title: String?
+    /// `table.groupBy` 時の集計(count|sum|avg|min|max・#261)。nil = グループ名の列
+    public var aggregate: String?
 
-    public init(field: String, title: String? = nil) {
+    public init(field: String, title: String? = nil, aggregate: String? = nil) {
         self.field = field
         self.title = title
+        self.aggregate = aggregate
     }
 }
 
@@ -266,8 +374,10 @@ public struct ListItem: Decodable, Sendable {
     public var toggle: String?
     /// "daily" = toggle は date field。押すと今日の日付を保存し、値が今日の間だけ済み(#132)
     public var resets: String?
+    /// entity.marks の id → 行の右端にいいね・保存のトグルと件数(#255・1 人 1 回)
+    public var mark: String?
 
-    public init(title: String, subtitle: String? = nil, trailing: String? = nil, icon: String? = nil, image: String? = nil, toggle: String? = nil, resets: String? = nil) {
+    public init(title: String, subtitle: String? = nil, trailing: String? = nil, icon: String? = nil, image: String? = nil, toggle: String? = nil, resets: String? = nil, mark: String? = nil) {
         self.title = title
         self.subtitle = subtitle
         self.trailing = trailing
@@ -275,6 +385,7 @@ public struct ListItem: Decodable, Sendable {
         self.image = image
         self.toggle = toggle
         self.resets = resets
+        self.mark = mark
     }
 }
 
@@ -314,7 +425,9 @@ public struct Filter: Codable, Hashable, Sendable {
         let c = try decoder.container(keyedBy: Keys.self)
         field = try c.decode(String.self, forKey: .field)
         op = try c.decode(String.self, forKey: .op)
-        if let e = try c.decodeIfPresent(Expr.self, forKey: .value) {
+        if (try? c.decodeIfPresent([String: Bool].self, forKey: .value)) == ["me": true] {
+            value = Self.meValue // 自分(#251)。Expr ではない
+        } else if let e = try c.decodeIfPresent(Expr.self, forKey: .value) {
             if let lit = e.literalValue { value = lit } else { valueExpr = e }
         }
     }

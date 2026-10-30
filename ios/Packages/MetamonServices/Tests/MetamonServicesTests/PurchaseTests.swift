@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#450 G1)には課金が無い。
+#if !APP_STORE_REVIEW
 import XCTest
 @testable import MetamonServices
 
@@ -71,3 +73,4 @@ final class CreationQuotaTests: XCTestCase {
 
 // StoreKitTest(SKTestSession)の購入テストはここに置かない: パッケージのテストはホストアプリ(Bundle ID)が無く、
 // SKTestSession を開いても Product.products が空で返る(実測)。購入 → 権利の確認はアプリをホストにした `ios/MetamonTests/PurchaseFlowTests.swift` で行う。
+#endif

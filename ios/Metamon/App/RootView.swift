@@ -103,18 +103,27 @@ struct RootView: View {
         .sheet(item: $rt.sheet) { route in
             ScreenStack(root: route)
                 .modifier(HostSheets(onModal: true))
+                #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
+                #endif
+                .modifier(ToastHost(onModal: true))
         }
         .fullScreenCover(item: $rt.fullScreen) { route in
             ScreenStack(root: route)
                 .modifier(HostSheets(onModal: true))
+                #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
+                #endif
+                .modifier(ToastHost(onModal: true))
         }
         .modifier(HostSheets(onModal: false))
+        #if !APP_STORE_REVIEW // 審査用ビルドはシェアリンク・探す・近くの端末との共有を外す(#245)
         .modifier(SharingHooks()) // シェアリンク受信・「探す」シート(#49 #50)
         .modifier(NearbySheets(onModal: false)) // 近くの端末と送り合う(#36)
+        #endif
         .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
+        .modifier(PublicDataPromptHost()) // #253 生成直後の「個人の情報も公開されます」
         .onChange(of: rt.document.version) {
             // 変身(apply)が落ち着いてから今の画面をサムネに撮る(変身一覧カード用)
             Task {
@@ -154,6 +163,9 @@ struct RootView: View {
             }
         }
         #endif
+        .modifier(ConsentHost()) // #246: AI への送信の同意・音声モデルのダウンロード確認
+        .modifier(AccountLinkPromptHost()) // #276: 匿名で初めて作った後の「引き継ぎのためにサインイン」
+        .modifier(TutorialHost()) // #274: 同意のあとに初回のチュートリアル・最初のアプリの直後に直し方の例
         .alert(item: $rt.confirm) { confirm in
             Alert(title: Text(confirm.message),
                   primaryButton: .destructive(Text("実行")) { Task { await confirm.perform() } },
@@ -161,7 +173,8 @@ struct RootView: View {
         }
         .overlay(alignment: .top) { summaryCard }
         .overlay(alignment: .top) { errorCardOverlay }
-        .overlay(alignment: .bottom) { toast }
+        .modifier(ToastHost(onModal: false))
+        .modifier(NewItemsHost()) // #268: 開いた直後に他の人の新着の数
         .onChange(of: scenePhase) { _, phase in
             rt.setForeground(phase == .active) // ホットリロードのポーリングは前面時のみ
         }
@@ -188,14 +201,12 @@ struct RootView: View {
     private var summaryCard: some View {
         if let banner = rt.summaryBanner {
             HStack(alignment: .top, spacing: Theme.Spacing.sm + 2) {
-                Image(systemName: "sparkles")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Theme.brandGradient)
-                    .padding(.top, 1)
+                CraneMascot(pose: .joy, size: 52, sway: 6) // #102
                 Text(banner.text)
                     .font(.subheadline.weight(.medium))
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
+                if let action = banner.action { SummaryBannerActionButton(action: action) } // #209 元に戻す / やり直す
             }
             .metamonCard(padding: Theme.Spacing.md)
             .padding(.horizontal, Theme.Spacing.md)
@@ -204,8 +215,11 @@ struct RootView: View {
             .onTapGesture { withAnimation { rt.summaryBanner = nil } }
             .task(id: banner.id) {
                 // 文字数に応じて 3〜5 秒(読み上げを読み切れる長さ)
-                let seconds = min(5.0, max(3.0, Double(banner.text.count) / 12))
+                // ボタン付き(#209)は押す余裕を持たせて 6 秒以上
+                let seconds = max(banner.action == nil ? 3.0 : 6.0, min(5.0, Double(banner.text.count) / 12))
                 try? await Task.sleep(for: .seconds(seconds))
+                // 次のバナーに差し替わって取り消された時は消さない(新しい方まで消えていた・#209)
+                guard !Task.isCancelled else { return }
                 withAnimation(.easeInOut(duration: 0.35)) { rt.summaryBanner = nil }
             }
         }
@@ -223,24 +237,32 @@ struct RootView: View {
                 .zIndex(4)
         }
     }
+}
 
-    @ViewBuilder
-    private var toast: some View {
-        if let message = rt.toast {
-            Text(message)
-                .font(.footnote.weight(.medium))
-                .padding(.horizontal, Theme.Spacing.md).padding(.vertical, Theme.Spacing.sm + 2)
-                .background(.regularMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Theme.Spacing.md)
-                // マイク FAB と DSL の最下段(行 11〜12 のボタン)の上に出す(被せない)。タブ無しでも同じ高さ
-                .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .task(id: message) {
-                    try? await Task.sleep(for: .seconds(3))
-                    withAnimation { rt.toast = nil }
-                }
+/// 下部の toast。モーダル(sheet / fullScreen)が開いている間はその中に出す(根の overlay はモーダルに隠れる)。
+private struct ToastHost: ViewModifier {
+    let onModal: Bool
+    @Environment(AppRuntime.self) private var rt
+
+    func body(content: Content) -> some View {
+        let active = onModal == (rt.sheet != nil || rt.fullScreen != nil)
+        content.overlay(alignment: .bottom) {
+            if active, let message = rt.toast {
+                Text(message)
+                    .font(.footnote.weight(.medium))
+                    .padding(.horizontal, Theme.Spacing.md).padding(.vertical, Theme.Spacing.sm + 2)
+                    .background(.regularMaterial, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    // マイク FAB と DSL の最下段(行 11〜12 のボタン)の上に出す(被せない)。タブ無しでも同じ高さ
+                    .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .task(id: message) {
+                        try? await Task.sleep(for: .seconds(3))
+                        withAnimation { rt.toast = nil }
+                    }
+            }
         }
     }
 }
@@ -306,6 +328,12 @@ private struct HostSheets: ViewModifier {
             .sheet(isPresented: Binding(get: { active && rt.showAppSwitcher }, set: { rt.showAppSwitcher = $0 })) {
                 AppSwitcherSheet()
             }
+            .sheet(item: Binding(get: { active ? rt.exportFile : nil }, set: { rt.exportFile = $0 })) { file in
+                ActivityView(items: [file.url])
+                    .presentationDetents([.medium, .large])
+                    .ignoresSafeArea()
+            }
+            .modifier(AuthorNamePromptModifier(active: active)) // 共有アプリへの初投稿で表示名を聞く(#250)
     }
 }
 

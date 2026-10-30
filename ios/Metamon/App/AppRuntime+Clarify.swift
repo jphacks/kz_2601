@@ -78,6 +78,7 @@ extension AppRuntime {
     /// ユーザー発話を 1 つ足して ai に聞く。応答(question / ready)を返す。失敗時は状態カード(origin = chat)を出して nil。
     @discardableResult
     func say(_ text: String, source: ClarifyFlow.InputSource = .text) async -> ChatTurn? {
+        guard requireAIConsent() else { return nil } // #246: 同意前は吹き出しも足さない
         cancelAutoBuild()
         clearPaidConfirm() // 話し直したら確認カードは閉じる(新しい応答で判定し直す)
         chatLastInput = source
@@ -100,7 +101,9 @@ extension AppRuntime {
         let transcript = chatTurn?.transcript?.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = (transcript?.isEmpty == false ? transcript : nil) ?? fallbackTranscript
         guard !text.isEmpty else { return }
+        #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
         if holdForPaidConfirm(PaidFeatureCheck.confirmation(for: chatTurn, text: text, isPro: proGate.isPro, enforced: proGate.isEnforced)) { return }
+        #endif
         print("[Metamon] chat: build mode=\(chatMode.rawValue) transcript=\(text)")
         await runFromChat(text)
     }
@@ -110,7 +113,9 @@ extension AppRuntime {
         guard morphJob == nil, !chatPending else { return }
         let text = option.instruction.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        #if !APP_STORE_REVIEW
         if holdForPaidConfirm(PaidFeatureCheck.confirmation(for: option, isPro: proGate.isPro, enforced: proGate.isEnforced)) { return }
+        #endif
         print("[Metamon] chat: choose option=\(option.id) mode=\(chatMode.rawValue) instruction=\(text)")
         await runFromChat(text)
     }
@@ -128,10 +133,14 @@ extension AppRuntime {
     func runFromChat(_ text: String) async {
         let mode = chatMode
         if mode == .edit {
+            // 何も変わらなかった時(#211)はこの会話に理由を足して開き直す(`presentUnchanged`)
+            let bubbles = chatBubbles
             resetChat()
             showVoiceSheet = false
             let prefix = ScreenMapUI.shared.takeContext().map(ScreenMapCopy.contextPrefix) ?? ""
+            chatReturnOnUnchanged = bubbles
             await generate(prefix + text)
+            chatReturnOnUnchanged = nil
         } else {
             // create は全画面の生成中表示を先に出し、対話は完成(apply が消す)か生成しなかった時に消す。
             // 先に対話を消すと、対話画面の撤去と生成中表示の挿入が重なって GeneratingView が描画されず、
@@ -157,6 +166,7 @@ extension AppRuntime {
 
     /// 会話を捨てる(「最初から」・別アプリへの切替・生成開始)。サーバー側も `DELETE /v1/chat/{appId}`。
     func resetChat() {
+        archiveLiveChat() // #210 閉じた会話として残す(「最初から」は `restartChat` で消す)
         cancelAutoBuild()
         chatTask?.cancel()
         chatTask = nil
@@ -190,10 +200,11 @@ extension AppRuntime {
     }
 
     private func chatRound() async -> ChatTurn? {
+        guard requireAIConsent() else { return nil }
         let epoch = chatEpoch
         let appId = document.appId
         let mode = chatMode
-        let history = chatBubbles.map { ChatMessage(role: $0.role == .user ? .user : .assistant, text: $0.text) }
+        let history = chatContextMessages // #210 過去の変更の要約 + 最後の反映以降 + 今の会話
         var timing = chatTiming
         chatTiming = ChatTiming()
         withAnimation(.easeInOut(duration: 0.25)) {
@@ -216,7 +227,7 @@ extension AppRuntime {
             withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
                 chatPending = false
                 chatTurn = turn
-                chatBubbles.append(ChatBubble(role: .assistant, text: turn.text, kind: turn.kind))
+                chatBubbles.append(ChatBubble(role: .assistant, text: turn.text, kind: turn.kind, confirmsPublic: turn.isPublicConfirm))
             }
             await Task.yield() // 吹き出しの描画が始まるまで
             timing.shown = .now

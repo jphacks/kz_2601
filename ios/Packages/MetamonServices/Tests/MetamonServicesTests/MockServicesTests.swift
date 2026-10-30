@@ -32,6 +32,8 @@ final class MockServicesTests: XCTestCase {
         XCTAssertEqual(MockAIClient.sampleName(for: "散歩の写真を残したい"), "walk")
         XCTAssertEqual(MockAIClient.sampleName(for: "最初に戻して"), "initial")
         XCTAssertEqual(MockAIClient.sampleName(for: "家計簿"), "kakeibo")
+        XCTAssertEqual(MockAIClient.sampleName(for: "レシートを撮ったら金額を読み取って家計簿に"), "receipt_ai")
+        XCTAssertEqual(MockAIClient.sampleName(for: "筋トレのフォームをチェック"), "form_check")
     }
 
     func testMockAIClientKeepsAppIdAndSummary() async throws {
@@ -134,6 +136,32 @@ final class MockServicesTests: XCTestCase {
         XCTAssertEqual(second??.uid, MockAuthService.fixedUID)
     }
 
+    /// #276: link は uid を保ったまま匿名でなくする。使用中の Apple ID は credentialAlreadyInUse → 切り替えで既存 uid。
+    func testMockAuthLinkWithApple() async throws {
+        let auth = MockAuthService(signedIn: true)
+        let linked = try await auth.linkWithApple(idToken: "t", nonce: "n", fullName: nil)
+        XCTAssertEqual(linked.uid, MockAuthService.fixedUID)
+        XCTAssertFalse(linked.isAnonymous)
+        do {
+            _ = try await auth.linkWithApple(idToken: "t", nonce: "n", fullName: nil)
+            XCTFail("2 回目は alreadyLinked")
+        } catch AuthError.alreadyLinked {}
+
+        let inUse = MockAuthService(signedIn: true)
+        inUse.appleIDInUse = true
+        do {
+            _ = try await inUse.linkWithApple(idToken: "t", nonce: "n", fullName: nil)
+            XCTFail("使用中の Apple ID は credentialAlreadyInUse")
+        } catch AuthError.credentialAlreadyInUse {}
+        XCTAssertEqual(inUse.currentUser?.isAnonymous, true)
+        let switched = try await inUse.switchToPendingAppleAccount()
+        XCTAssertEqual(switched.uid, MockAuthService.existingAppleUID)
+        do {
+            _ = try await inUse.switchToPendingAppleAccount()
+            XCTFail("資格情報は 1 回だけ")
+        } catch AuthError.noPendingAppleAccount {}
+    }
+
     // MARK: - ai 契約
 
     func testHTTPAIClientParsesGenerateResponse() throws {
@@ -150,6 +178,20 @@ final class MockServicesTests: XCTestCase {
         XCTAssertEqual(r.document.dsl.app.name, "家計簿")
         XCTAssertEqual(r.summary, "家計簿アプリを作成しました")
         XCTAssertEqual(r.mode, "full")
+        XCTAssertFalse(r.unchanged) // 省略 = 変化あり(旧サーバー)
+    }
+
+    /// #211: 変化なしの生成は unchanged=true と理由入りの summary
+    func testHTTPAIClientParsesUnchanged() throws {
+        let json = """
+        {"appId":"dev-1","version":2,"previousVersion":2,"mode":"patch",
+         "dsl":{"schemaVersion":1,"app":{"name":"家計簿","voiceEntry":"floating"},"initialScreen":"home","entities":[],
+                "screens":[{"id":"home","title":"ホーム","components":[{"type":"text","text":"hi"}]}]},
+         "summary":"項目は変更できませんでした。理由: 何の項目か決まっていないため。","locale":"ja","source":"claude","unchanged":true}
+        """
+        let r = try HTTPAIClient.parse(Data(json.utf8), appId: "fallback")
+        XCTAssertTrue(r.unchanged)
+        XCTAssertEqual(r.document.version, 2)
     }
 
     func testGenerateBodyShape() throws {

@@ -279,10 +279,11 @@ const (
 	tStr
 	tBool
 	tDate
+	tList // type refs field: a list of record ids (only len reads it, #231)
 )
 
 func (t exprType) String() string {
-	return [...]string{"any", "number", "string", "boolean", "date"}[t]
+	return [...]string{"any", "number", "string", "boolean", "date", "list of ids (type refs)"}[t]
 }
 
 func fieldExprType(ft FieldType) exprType {
@@ -293,6 +294,8 @@ func fieldExprType(ft FieldType) exprType {
 		return tBool
 	case FieldDate, FieldDatetime:
 		return tDate
+	case FieldRefs:
+		return tList
 	default:
 		return tStr
 	}
@@ -309,7 +312,8 @@ var AggregateFuncs = []string{"count", "sum", "avg", "min", "max", "latest", "ea
 func IsPickAgg(agg string) bool { return agg == "latest" || agg == "earliest" }
 
 // FilterOps is the closed set of Filter.op values.
-var FilterOps = []string{"eq", "neq", "gt", "gte", "lt", "lte", "thisMonth", "today", "thisWeek", "thisYear"}
+// contains: a refs field holds the value (an empty refs = everyone, #231).
+var FilterOps = []string{"eq", "neq", "gt", "gte", "lt", "lte", "thisMonth", "today", "thisWeek", "thisYear", "contains"}
 
 // opSpec is arity + argument/result types of one op. maxArgs -1 = variadic.
 type opSpec struct {
@@ -442,8 +446,14 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 					want = tNum
 				}
 			}
+			if types[i] == tList {
+				if e.Op != "len" {
+					c.add("%s: a type refs field is a list of ids; only op len (the number of chosen records) reads it. Filter another entity with op contains instead", aw)
+				}
+				continue
+			}
 			if !accepts(want, types[i]) {
-				c.add("%s: %s expects a %s but got a %s%s", aw, e.Op, want, types[i], convertHint(want))
+				c.add("%s: %s expects a %s but got a %s%s", aw, e.Op, want, types[i], argHint(e.Op, want, types[i]))
 			}
 			if e.Op == "hoursBetween" {
 				c.checkHoursBetweenArg(aw, types[i])
@@ -538,10 +548,24 @@ func (c *exprChecker) checkAgg(where string, a *AggExpr, row *Entity, depth int)
 // checkFilter validates field/op/value of a filter over entity e. The value
 // may be an Expr evaluated in the outer row context (row).
 func (c *exprChecker) checkFilter(where string, f *Filter, e *Entity, row *Entity, depth int) {
+	if strings.HasPrefix(f.Field, RecordMarkPrefix) {
+		c.add(`%s: %q (marks, #255) works only as the filter of a list/table/timeline/stat/chart component, not inside agg; marks are not records, so show the count with %q (table column / sort) instead of an agg`, where, f.Field, f.Field)
+		return
+	}
+	if f.Field == RecordAuthor || isMeValue(f.Value) {
+		c.add(`%s: %q / {"me":true} (only my posts) works only as the filter of a list/table/timeline/stat/chart component, not inside agg; put it on the component (e.g. stat aggregate count with filter {"field":"$author","op":"eq","value":{"me":true}})`, where, RecordAuthor)
+		return
+	}
 	if fld := e.FieldByID(f.Field); fld == nil {
 		c.add("%s: field %q not in entity %q (fields: %s)", where, f.Field, e.ID, fieldIDs(e))
 	} else {
 		c.dep(e, fld.ID)
+		switch {
+		case f.Op == "contains" && fld.Type != FieldRefs:
+			c.add("%s: filter op contains is only for a type refs field (%q is %s); use eq", where, fld.ID, fld.Type)
+		case f.Op != "contains" && fld.Type == FieldRefs:
+			c.add("%s: %q is type refs (a list of ids); use op contains", where, fld.ID)
+		}
 	}
 	known := false
 	for _, op := range FilterOps {
@@ -564,6 +588,16 @@ func (c *exprChecker) checkFilter(where string, f *Filter, e *Entity, row *Entit
 	if ve != nil && ve.Kind != ExprLiteral {
 		c.check(where+".value", ve, row, depth+1)
 	}
+}
+
+// argHint: subtracting times / dates is hoursBetween / daysBetween, never
+// toNumber ("09:30" is not 9.5 and a date is not a number). #229: the generic
+// toNumber hint led retries to {"op":"sub","args":[toNumber(end),toNumber(start)]}.
+func argHint(op string, want, got exprType) string {
+	if want == tNum && (got == tStr || got == tDate) && (op == "sub" || op == "add") {
+		return ` (to get the hours between two "HH:mm" times or datetimes use {"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]}; days between dates use daysBetween; do not toNumber a time)`
+	}
+	return convertHint(want)
 }
 
 func convertHint(want exprType) string {
@@ -611,15 +645,15 @@ func checkComputedFields(entities []Entity, byID map[string]*Entity, daily map[s
 		for j := range e.Fields {
 			f := &e.Fields[j]
 			where := fmt.Sprintf("entity %q field %q", e.ID, f.ID)
-			if f.Type == FieldRef {
+			if f.Type == FieldRef || f.Type == FieldRefs {
 				switch {
 				case f.RefEntity == "":
-					add("%s: type ref needs refEntity (the entity id it points to)", where)
+					add("%s: type %s needs refEntity (the entity id it points to)", where, f.Type)
 				case byID[f.RefEntity] == nil:
 					add("%s: refEntity %q does not exist (entities: %s)", where, f.RefEntity, entityIDs(byID))
 				}
 			} else if f.RefEntity != "" {
-				add("%s: refEntity is only allowed on type ref", where)
+				add("%s: refEntity is only allowed on type ref or refs", where)
 			}
 			checkHealthField(where, f, add)
 			if f.Computed == nil {
@@ -645,6 +679,7 @@ func checkComputedFields(entities []Entity, byID map[string]*Entity, daily map[s
 			if okType && !accepts(fieldExprType(f.Type), got) {
 				add("%s: computed expression yields a %s but the field type is %s; change the type or convert%s", where, got, f.Type, convertHint(fieldExprType(f.Type)))
 			}
+			checkPayFromHours(where, f, add)
 			key := fieldKey{e.ID, f.ID}
 			for d := range c.deps {
 				graph[key] = append(graph[key], d)

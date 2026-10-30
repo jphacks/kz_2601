@@ -1,7 +1,7 @@
 import WidgetKit
 import SwiftUI
 
-// ホーム画面ウィジェット。本体が App Group に置いた `WidgetSnapshot`(集計済み文字列)を描画するだけ。
+// ホーム画面・ロック画面のウィジェット(ロック画面の accessory は #423)。本体が App Group に置いた `WidgetSnapshot`(集計済み文字列)を描画するだけ。
 // Renderer/DSL には依存しない(WidgetKit は静的タイムライン + メモリ上限 30MB のため軽量に保つ)。
 // 更新タイミング: 本体の `WidgetCenter.reloadAllTimelines()`(DSL 適用・レコード更新時)+ 30 分毎の自動リロード。
 
@@ -9,6 +9,7 @@ import SwiftUI
 struct MetamonWidgetBundle: WidgetBundle {
     var body: some Widget {
         MetamonStatWidget()
+        TailorLiveActivity() // #423
     }
 }
 
@@ -44,8 +45,8 @@ struct MetamonStatWidget: Widget {
                 .widgetURL(URL(string: "metamon://widget"))
         }
         .configurationDisplayName("Tailor It の数字")
-        .description("作ったアプリの集計(今月の支出など)をホーム画面に表示します。")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .description("作ったアプリの集計(今月の支出など)をホーム画面とロック画面に表示します。")
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryCircular, .accessoryInline])
     }
 }
 
@@ -93,8 +94,13 @@ struct MetamonWidgetView: View {
         if let snapshot = entry.snapshot, !snapshot.stats.isEmpty {
             switch family {
             case .systemMedium: MediumStatsView(snapshot: snapshot)
+            case .accessoryRectangular: AccessoryRectangularView(snapshot: snapshot)
+            case .accessoryCircular: AccessoryCircularView(stat: snapshot.stats[0])
+            case .accessoryInline: AccessoryInlineView(stat: snapshot.stats[0])
             default: SmallStatView(snapshot: snapshot)
             }
+        } else if family == .accessoryRectangular || family == .accessoryCircular || family == .accessoryInline {
+            AccessoryEmptyView(family: family)
         } else {
             EmptyStateView(appName: entry.snapshot?.appName)
         }

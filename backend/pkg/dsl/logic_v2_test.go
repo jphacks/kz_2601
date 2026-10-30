@@ -115,6 +115,9 @@ func shiftApp(t *testing.T, hours string) App {
 			{ID: "start", Name: "開始", Type: FieldString},
 			{ID: "end", Name: "終了", Type: FieldString},
 			{ID: "wage", Name: "時給", Type: FieldCurrency},
+			{ID: "break_min", Name: "休憩", Type: FieldInteger, Unit: "分"},
+			{ID: "break_start", Name: "休憩開始", Type: FieldString},
+			{ID: "break_end", Name: "休憩終了", Type: FieldString},
 			{ID: "hours", Name: "時間", Type: FieldNumber, Computed: mustExpr(t, hours)},
 			{ID: "pay", Name: "給料", Type: FieldCurrency, Computed: mustExpr(t, `{"op":"round","args":[{"op":"mul","args":[{"ref":"hours"},{"ref":"wage"}]}]}`)},
 		},
@@ -127,11 +130,44 @@ func TestHoursBetweenValid(t *testing.T) {
 		`{"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]}`,
 		`{"op":"hoursBetween","args":["22:00","05:00"]}`,
 		`{"op":"hoursBetween","args":[{"ref":"start"},{"op":"coalesce","args":[{"ref":"end"},"18:00"]}]}`,
+		// #229: 休憩(分)を引く・後から足した休憩欄が空でも計算できる形
+		`{"op":"max","args":[{"op":"sub","args":[{"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]},{"op":"div","args":[{"op":"coalesce","args":[{"ref":"break_min"},0]},60]}]},0]}`,
+		// 休憩を開始・終了の時刻で持つ形
+		`{"op":"sub","args":[{"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]},{"op":"coalesce","args":[{"op":"hoursBetween","args":[{"ref":"break_start"},{"ref":"break_end"}]},0]}]}`,
 	} {
 		app := shiftApp(t, hours)
 		if err := app.Validate(); err != nil {
 			t.Errorf("%s: %v", hours, err)
 		}
+	}
+}
+
+// #229: 時刻・日付を sub で引くと、toNumber ではなく hoursBetween / daysBetween を勧める。
+func TestTimeSubtractionHintsHoursBetween(t *testing.T) {
+	for _, hours := range []string{
+		`{"op":"sub","args":[{"ref":"end"},{"ref":"start"}]}`,
+		`{"op":"sub","args":[{"ref":"date"},{"ref":"date"}]}`,
+	} {
+		app := shiftApp(t, hours)
+		err := app.Validate()
+		if err == nil || !strings.Contains(err.Error(), `use {"op":"hoursBetween"`) {
+			t.Errorf("%s: want a hoursBetween hint, got %v", hours, err)
+		}
+		if strings.Contains(err.Error(), "wrap it in {\"op\":\"toNumber\"") {
+			t.Errorf("%s: must not suggest toNumber for a time: %v", hours, err)
+		}
+	}
+}
+
+// #229: 休憩の式を pay(currency)に入れてしまった = 時間を金額として出す → 時給を掛けるよう返す。
+func TestPayFromHoursMustMultiplyWage(t *testing.T) {
+	app := shiftApp(t, `{"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]}`)
+	app.Entities[1].Fields[8].Computed = mustExpr(t, `{"op":"max","args":[{"op":"sub","args":[{"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]},{"op":"div","args":[{"op":"coalesce","args":[{"ref":"break_min"},0]},60]}]},0]}`)
+	wantProblem(t, app, `entity "shift" field "pay": a currency field computed from hoursBetween is hours, not money; multiply by the wage`)
+	// 時給を掛けていれば通る(pay の中で hoursBetween を直接使ってもよい)
+	app.Entities[1].Fields[8].Computed = mustExpr(t, `{"op":"round","args":[{"op":"mul","args":[{"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]},{"ref":"wage"}]}]}`)
+	if err := app.Validate(); err != nil {
+		t.Errorf("pay = round(hoursBetween × wage) should be valid: %v", err)
 	}
 }
 
@@ -146,6 +182,6 @@ func TestHoursBetweenRejects(t *testing.T) {
 	}
 	// result is a number: a string-typed computed field is rejected
 	app := shiftApp(t, `{"op":"hoursBetween","args":["09:00","18:00"]}`)
-	app.Entities[1].Fields[4].Type = FieldDate
+	app.Entities[1].Fields[7].Type = FieldDate
 	wantProblem(t, app, "computed expression yields a number but the field type is date")
 }

@@ -82,7 +82,7 @@ Expr := number | string | boolean
 
 `streak` / `doneInDays` の第 1 引数は**値ではなく field の指定**: `list.item.resets: "daily"` の toggle に使われている同 entity の date field を `{"ref": ...}` で渡す(iOS はその行の「押した日の履歴」を読む・§7.5)。computed(integer)で使い、全体の値は stat.value の `agg sum / max` でその computed を集計する。stat.value 直下では行が無いので使えない。
 
-時刻引数(`hoursBetween`)は `"HH:mm"`(`"H:mm"`・`"HH:mm:ss"` も可)の文字列 = `timePicker` が string field に保存する形。datetime を渡したときは**その時刻部分だけ**を使う(日付は無視)。数値・真偽は backend が拒否する(`toNumber("09:30")` は 9.5 にならないので、時刻を数値化して引き算しない)。日付をまたいで 24 時間以上働く・2 日以上空く計算は対象外(§8)。
+時刻引数(`hoursBetween`)は `"HH:mm"`(`"H:mm"`・`"HH:mm:ss"` も可)の文字列 = `timePicker` が string field に保存する形。datetime を渡したときは**その時刻部分だけ**を使う(日付は無視)。数値・真偽は backend が拒否する(`toNumber("09:30")` は 9.5 にならないので、時刻を数値化して引き算しない)。日付をまたいで 24 時間以上働く・2 日以上空く計算は対象外(§8)。iOS の `timePicker` は未入力の時も今の時刻を表示するので、表示中の時刻をそのまま保存値にする(触らずに保存して時刻が空 = 勤務時間「—」にならない・#229)。
 
 ## 4. 置き場所
 
@@ -95,6 +95,7 @@ Expr := number | string | boolean
 
 - **computed フィールド**: `type` は `number|integer|currency|string|boolean|date`。保存されない読み取り専用列。list の item / table の columns / stat・chart の field / sort / filter から通常フィールドと同じに参照できる。入力部品(textField 等)は束縛できない。`required` / `defaultValue` は不可。
 - 部品レベルの `filter`(list / stat / chart …)はスキーマ上 1 つだけ(iOS は配列も読めるが、backend は出さない・AND が要るなら stat.value の agg で)。
+- **グループごとの集計の一覧**(店ごとの平均点・人ごとの合計)は Expr ではなく `table.groupBy` + 列の `aggregate`(README §3.2 の設計メモ・#261)。グループの値ごとに `agg` を書く必要は無い。
 - **`Stat.value`**: `aggregate` の代わり。`aggregate` と `value` は**排他でどちらか必須**。`value` のときは `entity/field/filter` を書かない(agg の中に書く)。`format` はそのまま効く(percent は 0..1 → %)。
 - **`Field.type = "ref"` + `refEntity`**: 他エンティティのレコード参照。保存値はレコード id の文字列。入力は **`picker`**(選択肢 = refEntity のレコード、表示は titleField)。list/table では参照先の titleField を表示する。
 - **`settlement`(Leaf)**: `{"type":"settlement","entity":"members","nameField":"name","balanceField":"balance"}` + `id?` `area?` `title?`。balance(正=受け取る・負=払う)から貪欲法(最大の債務者 → 最大の債権者に min(|負|, 正) を送る、を繰り返す)で「A → B ¥1,200」を列挙。割り勘専用の割り切り部品。合計 0 にならない端数(1 円未満の丸め差)は無視してよい。全員 0 なら「精算は不要です」。
@@ -133,6 +134,7 @@ Expr := number | string | boolean
 | `list.item.resets` | `... with resets daily must be a date field (got boolean)` / `... is a date field; add "resets":"daily"` / `... must not have defaultValue` |
 | `streak` / `doneInDays` | `streak needs {"ref": <daily check field>} of this entity` / `"started" is not a daily check; streak only works on a field used as list item.toggle with "resets":"daily"` / `number of days must be an integer literal 1..366` |
 | Stat 排他 | `stat takes either aggregate or value, not both` / `stat needs aggregate (with entity) or value` |
+| `Field.hidden`(§7.6) | `list item.trailing "correct" of entity "questions" is hidden ...` / `computed shows hidden field questions.correct; a hidden value may only be compared ...` / `a computed field cannot be hidden` |
 
 ## 7. レシピ
 
@@ -148,12 +150,23 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
 3.5. **今の値**: 今の体重 = stat `aggregate: latest, field: weight, by: date`。今の BMI = latest の field に computed bmi。増減 = `sub(latest, earliest)`。
 3.6. **マスタの値**: 家事の点数 = log の computed `{"ref":"chore.points"}`、売上 = `mul({"ref":"item.price"}, {"ref":"qty"})`。
 4. **達成率**: stat{format:percent, value: `div(agg sum, 目標)`} + progressBar{entity, field, target}。
-5. **シフト・バイト代**: shift{date, start/end: string `"HH:mm"`(timePicker), wage: currency}。computed `hours` = `hoursBetween(ref start, ref end)`、`pay` = `round(hours * wage)`。今月の給料 = stat sum pay filter date thisMonth。
+5. **シフト・バイト代**: shift{date, start/end: string `"HH:mm"`(timePicker), wage: currency}。computed `hours` = `hoursBetween(ref start, ref end)`、`pay` = `round(hours * wage)`。今月の勤務時間 / 給料 = stat sum hours / pay filter date thisMonth。
+   - **休憩を引く**(#229): `break_min: integer`(unit「分」)を足し、`hours` = `max(sub(hoursBetween(start, end), div(coalesce(ref break_min, 0), 60)), 0)`。coalesce が無いと、休憩欄を足す前の記録が「—」になる。休憩は `hours` の式に入れ、`pay` は `round(hours * wage)` のまま(currency の computed が `hoursBetween` を使って `mul` しないと backend が拒否する)。休憩を開始・終了の時刻で持つなら `sub(hoursBetween(start, end), coalesce(hoursBetween(break_start, break_end), 0))`。
+   - **夜勤**: `hoursBetween` が日付またぎ(22:00→06:00 = 8)を扱うので式は変えない。今月の判定は `date`(出勤日)で行う。
+   - 時給は記録の field(`wage` の defaultValue に時給)・式の定数(`mul(ref hours, 1100)`)・マスタ(`ref job.wage`)のどれでもよい。
+   - 表示: hours は小数 2 桁まで(7.25 時間)・pay は ¥ と桁区切り(currency の unit「円」は付け足さない・#150)。
+   - 時刻を `sub` で引くと backend は `hoursBetween` を使うよう返す(`toNumber("09:30")` は 9.5 にならない)。
 6. **カウントダウン**: computed `days_left` = `daysUntil(ref date)`、最も近い予定 = `agg min days_left filter days_left gte 0`。
 7. **毎日チェックの連続日数・直近 7 日**(`examples/medicine.json`): medicine{name, taken_on: date} + list `item: {"toggle":"taken_on","resets":"daily","trailing":"streak"}`。
    - `streak`(integer・unit 日) = `{"op":"streak","args":[{"ref":"taken_on"}]}`
    - `last7`(integer・unit 回) = `{"op":"doneInDays","args":[{"ref":"taken_on"},7]}`
    - 全体: 最長の連続 = stat.value `{"agg":"max","entity":"medicine","field":"streak"}`、直近 7 日の合計回数 = `{"agg":"sum","entity":"medicine","field":"last7"}`。実施記録 entity は作らない(丸を押しても増えず二重入力になる)。
+
+8. **クイズの自動採点**(#262・`backend/internal/ai/examples/quiz.json`): questions{text, choices, correct: enum A〜D **hidden**, points} + players{name} + answers{question: ref→questions, player: ref→players, choice: enum A〜D}。友達と遊ぶなら 3 つとも `scope: "public"`。
+   - `is_correct`(boolean) = `{"op":"eq","args":[{"ref":"choice"},{"ref":"question.correct"}]}`
+   - `score`(integer) = `{"if":{"ref":"is_correct"},"then":{"ref":"question.points"},"else":0}`
+   - ランキング: players の `total` = `{"agg":"sum","entity":"answers","field":"score","filter":{"field":"player","op":"eq","value":{"ref":"id"}}}` を table で `sort desc`。
+   - 回答フォームは picker で問題・回答者・選択肢を選ぶ(点数の入力欄は作らない)。正解は §7.6 の hidden で一覧に出さない。
 
 ## 7.5 一覧のワンタップ チェック(`list.item.toggle`, #108)
 
@@ -182,6 +195,14 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
 - iOS の「今日」は DEBUG ビルドだけ環境変数 `METAMON_DEBUG_TODAY=YYYY-MM-DD` で差し替えられる(日付境界の確認用)。
 - 実例: `examples/medicine.json`。
 
+## 7.6 回答者に見せない項目(`Field.hidden`, #262)
+
+- `hidden: true` の field は作者がフォームで入れるだけで、一覧(list.item)・表(table.columns)・グラフ(stat / chart / progressBar / gauge の field・groupBy)・timeline / gridTable・searchField・entity の titleField に出さない。
+- 式では**比較(`eq` `neq` `gt` `gte` `lt` `lte`)の中でだけ**読める。正誤(`eq(choice, question.correct)`)は出せるが、正解を写す computed(`{"ref":"question.correct"}` だけ・`if` の分岐で返す)や、hidden field の `agg`(count 以外)は backend が拒否する。
+- computed には付けない(隠すのは読む元の保存される field)。
+- **厳密な秘匿ではない**: 値はレコードとして全員の端末に届く(画面に出さないだけ)。サーバー側で回答者に返さない形は M4。
+- iOS: フォームの hidden の入力はそのレコードの作者(`Record.author` == 自分の uid。新規・author 無しの行は自分扱い)にだけ出す。一覧・表・グラフ・カレンダー等の表示用レコードからは値を落とし、ref の表示名にも使わない。式(computed)は元の値で評価するので採点は動く。hidden 未対応の古いビルドは未知キーを無視するので落ちない(値は通常の field として出る)。
+
 ## 8. 割り切り(やらないこと)
 
 「0 と 1 を管理して PC 上に PC を作る」状態にしないため、以下は**やらない**:
@@ -194,5 +215,6 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
 - サーバー側評価・集計 API(評価は iOS。件数が増えたら README 決定表 #10 の集計 API と合わせて検討)。
 - progressBar/gauge の `value`/`target` を Expr にすること(stat.value で代替可能・iOS 契約の拡大を避けた。必要なら後段で)。
 - タイムゾーン指定・通貨換算。
+- 乱数(`random` op)。式は描画・レコード再取得のたびに評価されるので、乱数を入れると表示のたびに値が変わる。「ランダムに 1 件選ぶ」は専用 Leaf `randomPicker`(#263・ボタンを押した時だけ選び、部品の表示状態に持つ)で書く。
 
 op を増やすときは `dsl.schema.json`(`ExprOp.op` の enum と x-enumDescriptions)、`backend/pkg/dsl/expr.go`(`Ops`)、本書 §3、iOS の評価器を同時に更新する。

@@ -32,9 +32,6 @@
     {
       "id": "home",
       "title": "入力部品ギャラリー",
-      "toolbar": [
-        { "label": "追加", "icon": "plus", "action": { "type": "navigate", "screen": "checkin_form", "presentation": "sheet" } }
-      ],
       "components": [
         { "type": "stat", "id": "avg_stars", "area": "A1:F2", "label": "平均満足度", "entity": "checkin", "aggregate": "avg", "field": "stars" },
         { "type": "list", "id": "recent", "area": "A3:F10", "entity": "checkin",

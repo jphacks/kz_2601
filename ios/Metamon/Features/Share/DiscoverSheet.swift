@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
+#if !APP_STORE_REVIEW
 import SwiftUI
 import MetamonServices
 
@@ -172,10 +174,11 @@ enum ComponentIcon {
         case "photoField", "camera": "camera.fill"
         case "image": "photo"
         case "videoField", "videoPlayer": "video.fill"
-        case "map", "mapView", "locationButton": "map.fill"
+        case "map", "mapView", "locationButton", "locationPicker": "map.fill"
         case "timer", "timerDisplay": "timer"
         case "webView": "safari"
         case "qrScanner": "qrcode.viewfinder"
+        case "qrCode": "qrcode"
         case "progress", "gauge": "gauge.with.dots.needle.50percent"
         case "text": "text.alignleft"
         default: "square.grid.2x2"
@@ -201,3 +204,4 @@ struct DiscoverEntry: View {
         }
     }
 }
+#endif

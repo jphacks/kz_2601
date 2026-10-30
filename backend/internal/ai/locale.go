@@ -60,6 +60,7 @@ var localeNames = map[Locale]string{
 // summaryText is the locale-dependent wording of the spoken summary.
 type summaryText struct {
 	nothingToUndo string
+	unchanged     string // #211: generate made no change and gave no reason
 	restored      string // fmt with version
 	readyText     string // clarify phase: spoken when the brief is complete
 	editReadyText string // chat edit mode: spoken before the change is generated
@@ -67,8 +68,8 @@ type summaryText struct {
 }
 
 var summaryTexts = map[Locale]summaryText{
-	LocaleJA: {nothingToUndo: "戻せる変更がありません。", restored: "ひとつ前の状態(version %d)に戻しました。", readyText: "では作りますね。", editReadyText: "では変えますね。", proposalText: "こんな案はどうでしょう。"},
-	LocaleEN: {nothingToUndo: "There is nothing to undo.", restored: "I went back to the previous state (version %d).", readyText: "Got it, I'll build it now.", editReadyText: "Got it, I'll change it now.", proposalText: "Here are a few ideas."},
+	LocaleJA: {nothingToUndo: "戻せる変更がありません。", unchanged: "変更できませんでした。何をどう変えるか、もう少し詳しく教えてください。", restored: "ひとつ前の状態(version %d)に戻しました。", readyText: "では作りますね。", editReadyText: "では変えますね。", proposalText: "こんな案はどうでしょう。"},
+	LocaleEN: {nothingToUndo: "There is nothing to undo.", unchanged: "Nothing was changed. Tell me a bit more about what to change and how.", restored: "I went back to the previous state (version %d).", readyText: "Got it, I'll build it now.", editReadyText: "Got it, I'll change it now.", proposalText: "Here are a few ideas."},
 }
 
 func (l Locale) text() summaryText {
@@ -121,6 +122,7 @@ func summarizeEN(a *dsl.App) string {
 			fmt.Fprintf(&b, " You'll get a reminder %s.", when)
 		}
 	}
+	b.WriteString(editNoteEN(a))
 	if note := substitutionNoteEN(a.App.Description); note != "" {
 		b.WriteString(" " + note)
 	}
@@ -131,13 +133,7 @@ func summarizeEN(a *dsl.App) string {
 // write "X was replaced with Y." in app.description when a requested part
 // is not in the catalog.
 func substitutionNoteEN(description string) string {
-	var out []string
-	for _, sentence := range strings.SplitAfter(description, ".") {
-		if strings.Contains(strings.ToLower(sentence), "replaced") {
-			out = append(out, strings.TrimSpace(sentence))
-		}
-	}
-	return strings.Join(out, " ")
+	return strings.Join(honestNote(description, "."), " ")
 }
 
 // withArticle prefixes "a"/"an" by the first letter.

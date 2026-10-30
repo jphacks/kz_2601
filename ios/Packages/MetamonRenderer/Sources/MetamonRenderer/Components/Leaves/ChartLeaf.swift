@@ -11,7 +11,10 @@ struct ChartLeaf: View {
         let entityId = c.entity ?? ""
         let entity = rt.dsl.entity(entityId)
         let rows = rt.filteredRecords(c)
-        let buckets = Aggregator.buckets(c, entity: entity, records: rows)
+        let groupField = c.groupBy.flatMap { entity?.field($0) }
+        // ref の groupBy は id で束ねるので、軸・凡例は参照先の見出しにする(#235)
+        let buckets = Aggregator.buckets(c, entity: entity, records: rows,
+                                         label: groupField?.type == .ref ? { rt.display(.string($0), field: groupField) } : nil)
         VStack(alignment: .leading, spacing: 8) {
             if let title = c.title { Text(title).font(RenderTheme.Fonts.cardTitle) }
             if buckets.isEmpty {

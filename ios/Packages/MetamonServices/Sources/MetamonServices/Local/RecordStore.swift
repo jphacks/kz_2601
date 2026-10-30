@@ -18,11 +18,18 @@ public struct LocalRecord: Codable, Sendable, Equatable, Identifiable {
     public var pendingOp: PendingOp
     /// 作成の冪等キー(= 未送信 create の仮 id の元)。サーバー採番後は参照用に残す。
     public var clientId: String?
+    /// 作った人の uid(shared / public の entity だけ・#249)。未送信 create と旧データは nil。`Field.hidden` の表示判定にも使う(#262)。
+    public var author: String?
+    /// 投稿者の表示名(shared / public・#250)。自分の未送信 create は送る予定の名前。
+    public var authorName: String?
+    /// 印の状態(#255)。サーバーの値か、押した直後の楽観的な値。
+    public var marks: [String: MarkState]?
 
     public var id: String { recordId }
 
     public init(appId: String, entity: String, recordId: String, data: [String: JSONValue],
-                createdAt: String? = nil, updatedAt: String? = nil, pendingOp: PendingOp = .none, clientId: String? = nil) {
+                createdAt: String? = nil, updatedAt: String? = nil, pendingOp: PendingOp = .none, clientId: String? = nil,
+                author: String? = nil, authorName: String? = nil) {
         self.appId = appId
         self.entity = entity
         self.recordId = recordId
@@ -31,15 +38,20 @@ public struct LocalRecord: Codable, Sendable, Equatable, Identifiable {
         self.updatedAt = updatedAt
         self.pendingOp = pendingOp
         self.clientId = clientId
+        self.author = author
+        self.authorName = authorName
     }
 
     public init(appId: String, entity: String, server record: Record) {
         self.init(appId: appId, entity: entity, recordId: record.id, data: record.data,
-                  createdAt: record.createdAt, updatedAt: record.updatedAt)
+                  createdAt: record.createdAt, updatedAt: record.updatedAt, author: record.author, authorName: record.authorName)
+        marks = record.marks
     }
 
     /// Renderer に渡す形。
-    public var record: Record { Record(id: recordId, data: data, createdAt: createdAt, updatedAt: updatedAt) }
+    public var record: Record {
+        Record(id: recordId, data: data, createdAt: createdAt, updatedAt: updatedAt, author: author, authorName: authorName, marks: marks)
+    }
 
     /// 未送信 create の仮 id(`local-<clientId>`)。サーバー採番後に差し替わる。
     public static func temporaryId(clientId: String) -> String { "local-\(clientId)" }
@@ -60,12 +72,15 @@ public actor RecordStore {
 
     /// video field の動画ファイル置き場(#206)。行を消す時に一緒に消す。
     public nonisolated let videos: LocalVideoStore
+    /// audio field の録音ファイル置き場(#420)。動画と同じく行と一緒に消す。
+    public nonisolated let audios: LocalAudioStore
 
-    public init(directory: URL? = nil, videos: LocalVideoStore = .shared) {
+    public init(directory: URL? = nil, videos: LocalVideoStore = .shared, audios: LocalAudioStore = .shared) {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         self.directory = directory ?? base.appendingPathComponent("metamon-records", isDirectory: true)
         self.videos = videos
+        self.audios = audios
     }
 
     // MARK: - Read
@@ -126,12 +141,24 @@ public actor RecordStore {
     /// 同期完了: 仮 id の行をサーバーのレコードに差し替える(create)/ pendingOp を落とす(update)。
     public func markSynced(appId: String, entity: String, localId: String, server: Record) {
         var t = table(appId, entity)
+        let kept = t.first { $0.recordId == localId }?.marks // サーバーが marks を返さない応答(作成)でも印を消さない
         t.removeAll { $0.recordId == localId }
         t.removeAll { $0.recordId == server.id }
         var row = LocalRecord(appId: appId, entity: entity, server: server)
         row.clientId = localId.hasPrefix("local-") ? String(localId.dropFirst("local-".count)) : nil
+        if row.marks == nil { row.marks = kept }
         t.append(row)
         save(appId, entity, t)
+    }
+
+    /// 印の状態だけを書き換える(#255・押した直後の楽観的な値 / サーバーの確定値 / 失敗時の戻し)。行が無ければ false。
+    @discardableResult
+    public func setMark(appId: String, entity: String, recordId: String, mark: String, state: MarkState) -> Bool {
+        var t = table(appId, entity)
+        guard let i = t.firstIndex(where: { $0.recordId == recordId }) else { return false }
+        t[i].marks = (t[i].marks ?? [:]).merging([mark: state]) { _, new in new }
+        save(appId, entity, t)
+        return true
     }
 
     /// 送信を諦めた(サーバーに拒否された)時: create は行ごと消し、update/delete は pendingOp を戻す。
@@ -147,17 +174,19 @@ public actor RecordStore {
     public func removeAll(appId: String) {
         let dir = directory.appendingPathComponent(Self.safe(appId), isDirectory: true)
         var ids = Set<String>()
+        var audioIDs = Set<String>()
         for key in tables.keys where key.hasPrefix(appId + "/") {
-            tables[key]?.forEach { ids.formUnion(VideoValue.localIDs(in: $0.data)) }
+            tables[key]?.forEach { ids.formUnion(VideoValue.localIDs(in: $0.data)); audioIDs.formUnion(AudioValue.localIDs(in: $0.data)) }
             tables[key] = nil
         }
         // まだ読み込んでいない entity のファイルも見る
         let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
         for file in files where file.pathExtension == "json" {
             let rows = (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode([LocalRecord].self, from: $0) } ?? []
-            rows.forEach { ids.formUnion(VideoValue.localIDs(in: $0.data)) }
+            rows.forEach { ids.formUnion(VideoValue.localIDs(in: $0.data)); audioIDs.formUnion(AudioValue.localIDs(in: $0.data)) }
         }
         videos.remove(ids)
+        audios.remove(audioIDs)
         try? FileManager.default.removeItem(at: dir)
     }
 
@@ -166,6 +195,7 @@ public actor RecordStore {
         tables = [:]
         try? FileManager.default.removeItem(at: directory)
         videos.removeAll()
+        audios.removeAll()
     }
 
     // MARK: - Files

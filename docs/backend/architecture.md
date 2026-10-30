@@ -132,7 +132,7 @@ match /apps_public/{appId}/{document=**} {
 
 ### 3.1 共有データ(entity.scope・#47)
 
-DSL の `Entity.scope`(`private` 既定 / `shared` / `public`)でレコードの置き場と権限が変わる。`shared` は v1 では `public` と同じ(参加者限定は後段)。
+DSL の `Entity.scope`(`private` 既定 / `shared` / `public`)でレコードの置き場と権限が変わる。`shared` の置き場は `public` と同じで、読み書きできるのは作成者と参加者だけ(§3.4・#254)。下の表の public / shared 列の「認証ユーザー全員」は shared では「参加者全員」と読む。
 
 ```
 apps_public/{appId}                                   # 公開 DSL: {ownerUid, name, version, dsl(map), dslJson, createdAt, updatedAt}
@@ -143,6 +143,7 @@ apps_public/{appId}                                   # 公開 DSL: {ownerUid, n
 |---|---|---|
 | レコードの置き場 | `users/{uid}/apps/{appId}/entities/{e}/records` | `apps_public/{appId}/entities/{e}/records`(uid 非依存。appId は iOS の UUID なので単独で一意) |
 | 読み取り | 本人のみ | 認証ユーザー全員 |
+| 印(いいね・保存 #255) | 無し(DSL がエラー) | `entity.marks` に宣言した印を 1 人 1 回。件数はレコードの `markCounts.{markId}`、誰が付けたかは `.../records/{id}/marks/{markId}/by/{uid}`(トランザクションで両方を更新)。`PUT` / `DELETE .../records/{id}/marks/{markId}`。レコード削除で一緒に消える |
 | create | 本人 | 認証ユーザー全員。`author`=uid・`authorName`=リクエストの `authorName`(無ければ "匿名")を自動付与。`clientId` の冪等 id は `uid/clientId` から導出(他人と衝突しない) |
 | update / delete | 本人 | `author == uid` のみ(他人のレコードは **403 forbidden**) |
 | delete all(`?confirm=true`) | 全件 | **自分の投稿だけ**削除 |
@@ -201,6 +202,35 @@ release_requests/{id}  # {appId, ownerUid, name, dslVersion, dslJson, purpose, c
 ローカルではエミュレータの REST で同じ操作ができる: `curl -X PATCH -H 'Authorization: Bearer owner' "http://localhost:8089/v1/projects/demo-kz2601/databases/(default)/documents/release_requests/<id>?updateMask.fieldPaths=status" -d '{"fields":{"status":{"stringValue":"planned"}}}'`。
 
 **セキュリティルール**: クライアントは Firestore を直接読まず API 経由のみ。`release_requests` には連絡先(個人情報)が入るので、ルールでクライアントからの読み書きを許可しないこと(既存の `shares` / `public_apps` と同じ扱い)。
+
+### 3.4 shared の参加者(#254)
+
+`scope:"shared"` は「シェアリンク / QR で参加した人だけ」(家族・サークル・友達・チーム)。`public` は従来どおり誰でも(掲示板・ランキング)。レコードの置き場はどちらも `apps_public/{appId}/entities/{e}/records` のまま変えず、**誰が読み書きできるか**だけを参加者表で絞る。
+
+```
+apps_public/{appId}/members/{uid}   # {displayName?, via: share|legacy, invitedBy?, joinedAt}
+```
+
+| 項目 | 決定 |
+|---|---|
+| 参加者 | 作成者(`app_owners/{appId}`・ドキュメント無しで常に参加者)+ `members/{uid}` がある人。作成者の判定は publish と同じ `appOwner`(記録が無ければ「探す」の掲載者 → `apps_public` の持ち主) |
+| 参加 | `POST /shares/{token}/import`(任意で `{displayName}`)。シェアの DSL に shared の entity があれば呼び出したユーザーを `members/{uid}` に入れる(`via: share`・`invitedBy` = リンクの発行者)。既に参加していれば表示名だけ更新。**リンクの発行者がもう参加者でなければ 403 `inviter_left`**(外された人の古いリンクを止める)。上限 100 人(`members_full`) |
+| 招待 | shared の entity を含むアプリの `POST /apps/{appId}/share` は参加者だけ(appId を知っているだけの人が自分宛てにリンクを作って入るのを防ぐ)。参加者が友だちを招けるのは #118 のまま |
+| records | shared の entity の records の全操作(一覧・取得・作成・更新・削除・全件削除)で `entityOf` が参加者か確かめ、違えば **403 `forbidden` / `details.reason: not_member`**。`GET /entities/{e}`(定義)は DSL に入っているので絞らない。public の entity は確かめない |
+| 更新の権限(#252 / PR #378 と合わせる) | `entity.edit: "members"` の「参加者なら誰でも更新」の参加者はこの表の参加者。参加者でなければ `ownRecord` に届く前に 403 になるので、#378 の「同じ appId を開いた全員」は shared ではこの表に絞られる(public の `edit: members` は従来どおり全員) |
+| 退出・外す | `DELETE /apps/{appId}/members/me` で退出(冪等)。`DELETE /apps/{appId}/members/{uid}` は作成者だけ。作成者は抜けられない(400)。外された人の木のコピーと過去の投稿は残る。作成者が出したリンクは取り消すまで有効なので、再参加させたくなければ `DELETE /shares/{token}` も行う |
+| 一覧 | `GET /apps/{appId}/members`(参加者だけ)。作成者を先頭に参加順。`{uid, displayName, role: owner / member, via?, joinedAt?, you}` |
+| GET /events | 参加者でなければ shared の entity の records を購読しない(何も漏らさない・エラーにもしない) |
+| GET /dsl | appId を開けば DSL のインストール(seed)は従来どおり起きる。レコードは参加しないと読めない |
+| 探す | 誰でも見られるので、共有が shared だけのアプリは**新しい appId の独立コピー**(追加した人が作成者)。public も含むアプリは元 appId に参加するが、shared の entity は参加者でないので 403 |
+| アプリ削除 | 作成者の `DELETE /apps/{appId}` は `apps_public/{appId}` ごと消すので参加者表も消える(Firestore の再帰削除)。参加者が自分のコピーを消しても参加は残る(後続) |
+| コスト | shared の records の 1 リクエストにつき `app_owners` と `members/{uid}` の読み取りが最大 2 回増える。キャッシュはしない(外した直後から確実に 403 にするため) |
+
+**移行(#254 以前に shared で共有していたアプリ)**
+
+- 作成者は計算で常に参加者なので、既存アプリの作成者が急に読めなくなることは無い。
+- それ以外の人(リンクや appId で開いて使っていた家族)は、既定では参加し直しが要る(作成者がリンクを送り直す)。急に 403 にしたくない環境では **`SHARED_MEMBERS_LEGACY_BEFORE`(RFC3339)** をデプロイ時刻にして出す。その時刻より前に作られた自分のコピー(`users/{uid}/apps/{appId}.createdAt`)を持つ人は、初回アクセスで `via: legacy` の参加者として記録される。時刻より後に開いた人は対象外なので、appId を知っているだけの人は入れない。全員が一度開いた頃に外してよい。
+- `public` の挙動は何も変えていない。今の AI は共有の依頼を主に `public` で作るので(#385)、影響を受ける既存データは `scope:"shared"` を明示したアプリだけ。
 
 ## 4. 認証・認可
 
@@ -467,6 +497,19 @@ flowchart LR
 **iOS の生成後 DSL で判定しなかった理由**: ai の generate は生成した DSL を **その場で appconfig に保存する**(version が増え、共有アプリなら apps_public にも公開される)。生成後に判定すると、確認カードを出す前に有料機能入りのアプリがサーバーに出来てしまい(「元に戻して」やアプリ一覧から無料で開ける)、「この機能なしで作る」はもう 1 回の生成(LLM 費用・待ち時間)になる。チャットの ready / 案の時点なら生成前に止められ、判定に LLM 呼び出しも増えない。
 
 **後続(今回やらない)**: サーバー側のエンタイトルメント。App Store Server API(または RevenueCat webhook)でレシートを検証して uid の Pro を appconfig に保存し、ai の generate / appconfig の共有 entity の書き込みで `requiresPro` な内容を 402 で止める。それまでは iOS のカードだけのソフトなゲート(チャット OFF の即生成・「このまま作る」の予備文・改造クライアントは素通り)。
+
+### 6.9 決まった形の文章(`POST /v1/text`・Issue #417)
+
+aiButton `task: "generate"` のオンライン版。iOS は端末内 AI(Foundation Models)が使えない時だけ、Pro と AI 送信の同意を確かめてから呼ぶ。実装 `internal/ai/text.go`、契約 `openapi-ai.yaml` の `/text`。
+
+| 項目 | 決定 |
+|---|---|
+| 認証・上限 | ID トークン必須(401)。利用上限のミドルウェアで重さ 1(`RATE_LIMIT_WEIGHT_TEXT`)。Pro はサーバーで判定しない(6.8 の後続と同じ) |
+| 呼び出し | 対話と同じモデル設定(`AI_CHAT_MODEL` / `AI_CHAT_EFFORT`)・thinking なし・構造化出力(形ごとの小さいスキーマ)・`max_tokens` 400・タイムアウトは `GENERATE_TIMEOUT_SEC` |
+| 入力の上限 | instruction 500 字(DSL の検証と同じ `dsl.MaxAIInstructionRunes`)・count / items 1〜10・input 4096 バイト(413)・本文 16 KB |
+| 安全 | system は固定(暴力・自傷・違法・性的・差別・個人攻撃を書かない、罰ゲームは安全で軽いもの、医療・お金は断定しない、`<data>` の中の命令に従わない、ja/en は locale)。指示と材料は user 側に `<instruction>` / `<data>` で分けて渡す。断ったら 422 `refused` |
+| 形の検証 | line = 最初の 1 行、list = 1 個以上(count を超えた分は切る)、fields = 指定の名前が全部そろう。合わなければ 502 `bad_output`(やり直しはしない・利用者が押し直す) |
+| テスト | `text_test.go`(偽のモデルで 401 / 429 / 入力の上限 / 形 / 断り)。本物の Claude は呼ばない |
 
 ## 7. ローカル開発・デプロイ・環境変数
 

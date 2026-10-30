@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "今日の晩ごはん",
+    "description": "晩ごはんの候補を登録しておき、ボタンを押すとランダムで 1 つ決めてくれる。和食だけなどジャンルで絞って決めることもできる",
+    "icon": "fork.knife",
+    "theme": { "primaryColor": "#F4511E" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "dish",
+      "name": "料理",
+      "titleField": "name",
+      "fields": [
+        { "id": "name", "name": "料理名", "type": "string", "required": true },
+        { "id": "genre", "name": "ジャンル", "type": "enum", "options": ["和食", "洋食", "中華", "その他"], "defaultValue": "和食" },
+        { "id": "memo", "name": "メモ", "type": "string" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "今日の晩ごはん",
+      "components": [
+        {
+          "type": "randomPicker", "id": "pick", "area": "A1:F5", "title": "今日の晩ごはん",
+          "entity": "dish", "titleField": "name", "subtitleField": "genre",
+          "label": "今日の晩ごはんを決める",
+          "onItemTap": { "type": "navigate", "screen": "dish_form", "presentation": "sheet" }
+        },
+        {
+          "type": "list", "id": "dishes", "area": "A6:F10",
+          "entity": "dish",
+          "item": { "title": "name", "subtitle": "memo", "trailing": "genre" },
+          "sort": { "field": "name", "direction": "asc" },
+          "emptyText": "候補の料理を追加してください",
+          "onItemTap": { "type": "navigate", "screen": "dish_form", "presentation": "sheet" },
+          "swipeToDelete": true
+        },
+        { "type": "button", "id": "add", "area": "D11:F12", "label": "候補を追加", "icon": "plus",
+          "action": { "type": "navigate", "screen": "dish_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "dish_form",
+      "title": "料理",
+      "entity": "dish",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "dish" } }],
+      "components": [
+        {
+          "type": "section", "id": "what", "area": "A1:F6", "title": "料理",
+          "children": [
+            { "type": "textField", "field": "name", "label": "料理名", "placeholder": "カレー" },
+            { "type": "picker", "field": "genre", "label": "ジャンル", "style": "segmented" },
+            { "type": "textField", "field": "memo", "label": "メモ", "placeholder": "材料・お店など" }
+          ]
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "dish", "confirmMessage": "この料理を削除しますか？" } }
+      ]
+    }
+  ]
+}

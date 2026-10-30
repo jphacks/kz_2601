@@ -137,6 +137,23 @@
         }
       }
     },
+    "%@のコピー": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ Copy"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@のコピー"
+          }
+        }
+      }
+    },
     "%@のメニュー": {
       "extractionState": "manual",
       "localizations": {
@@ -150,6 +167,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@のメニュー"
+          }
+        }
+      }
+    },
+    "%@は、アプリを開いた人なら誰でも見られます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anyone who opens the app can see %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@は、アプリを開いた人なら誰でも見られます。"
           }
         }
       }
@@ -188,6 +222,23 @@
         }
       }
     },
+    "%lld / %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld / %2$lld"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld / %lld"
+          }
+        }
+      }
+    },
     "%lld / %lld 回": {
       "extractionState": "manual",
       "localizations": {
@@ -201,6 +252,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld / %lld 回"
+          }
+        }
+      }
+    },
+    "%lld 人": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld people"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 人"
           }
         }
       }
@@ -252,6 +320,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 秒ほど待ってから、もう一度お試しください"
+          }
+        }
+      }
+    },
+    "(これまでに反映した変更)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(Changes applied so far)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(これまでに反映した変更)"
           }
         }
       }
@@ -320,6 +405,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "(全画面)"
+          }
+        }
+      }
+    },
+    "1つ前に戻しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Went back one step"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1つ前に戻しました"
+          }
+        }
+      }
+    },
+    "1つ前に戻す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo last change"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1つ前に戻す"
+          }
+        }
+      }
+    },
+    "1日ごとの変化を折れ線グラフで見せて": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show a line chart of how it changes day by day"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1日ごとの変化を折れ線グラフで見せて"
           }
         }
       }
@@ -460,6 +596,23 @@
         }
       }
     },
+    "QRコードを読み取って記録できるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let me scan a QR code to log it"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "QRコードを読み取って記録できるようにして"
+          }
+        }
+      }
+    },
     "Tailor It で「%@」を使ってみて\n%@": {
       "extractionState": "manual",
       "localizations": {
@@ -545,6 +698,40 @@
         }
       }
     },
+    "。サインインすると上限が増えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ". Sign in to get a higher limit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "。サインインすると上限が増えます"
+          }
+        }
+      }
+    },
+    "。参加している人の記録も見られます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ". You can also see records from everyone in it"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "。参加している人の記録も見られます"
+          }
+        }
+      }
+    },
     "「%@」": {
       "extractionState": "manual",
       "localizations": {
@@ -575,6 +762,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "「%@」というアプリは見つかりませんでした"
+          }
+        }
+      }
+    },
+    "「%@」に参加しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Joined “%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」に参加しました"
+          }
+        }
+      }
+    },
+    "「%@」に参加しますか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Join “%@”?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」に参加しますか?"
           }
         }
       }
@@ -698,6 +919,23 @@
         }
       }
     },
+    "「%@」を作りました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Created “%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」を作りました"
+          }
+        }
+      }
+    },
     "「%@」を削除しました": {
       "extractionState": "manual",
       "localizations": {
@@ -762,6 +1000,74 @@
           "stringUnit": {
             "state": "translated",
             "value": "「%@」を単体アプリに"
+          }
+        }
+      }
+    },
+    "「%@」を複製できませんでした: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't duplicate “%@”: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」を複製できませんでした: %@"
+          }
+        }
+      }
+    },
+    "「%@」を外しました。あなたのシェアリンクはまだ使えるので、そのリンクからまた参加できます。リンクも止めますか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed “%@”. Your share link still works, so they could join again with it. Turn off the link too?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」を外しました。あなたのシェアリンクはまだ使えるので、そのリンクからまた参加できます。リンクも止めますか?"
+          }
+        }
+      }
+    },
+    "「%@」を外しますか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove “%@”?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」を外しますか?"
+          }
+        }
+      }
+    },
+    "「メモ」という言葉を「ひとこと」に変えて": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change the word \"Memo\" to \"Comment\""
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「メモ」という言葉を「ひとこと」に変えて"
           }
         }
       }
@@ -851,6 +1157,40 @@
         }
       }
     },
+    "「集計」のタブの名前を「グラフ」に変えて": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename the \"Summary\" tab to \"Charts\""
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「集計」のタブの名前を「グラフ」に変えて"
+          }
+        }
+      }
+    },
+    "あなた": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あなた"
+          }
+        }
+      }
+    },
     "あなた: ": {
       "extractionState": "manual",
       "localizations": {
@@ -864,6 +1204,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "あなた: "
+          }
+        }
+      }
+    },
+    "あなたが付けた記録も、参加している人に見えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Records you add are visible to them too"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あなたが付けた記録も、参加している人に見えます"
+          }
+        }
+      }
+    },
+    "いくつでも選べます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick as many as you like"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "いくつでも選べます"
           }
         }
       }
@@ -902,6 +1276,23 @@
         }
       }
     },
+    "いまはモバイル回線です。通信量が多いので、Wi-Fi につないでからがおすすめです。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You’re on a cellular connection. This uses a lot of data, so connecting to Wi-Fi first is recommended."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "いまはモバイル回線です。通信量が多いので、Wi-Fi につないでからがおすすめです。"
+          }
+        }
+      }
+    },
     "いま使っているのが「%@」です": {
       "extractionState": "manual",
       "localizations": {
@@ -919,6 +1310,23 @@
         }
       }
     },
+    "うまく付けられませんでした。もう一度お試しください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save that. Please try again"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "うまく付けられませんでした。もう一度お試しください"
+          }
+        }
+      }
+    },
     "うまく伝わりませんでした": {
       "extractionState": "manual",
       "localizations": {
@@ -932,6 +1340,210 @@
           "stringUnit": {
             "state": "translated",
             "value": "うまく伝わりませんでした"
+          }
+        }
+      }
+    },
+    "この欄を消す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove these fields"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この欄を消す"
+          }
+        }
+      }
+    },
+    "このリンクを送った人はもう参加していないため、参加できません。参加している人に新しいリンクをもらってください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The person who sent this link has left this share, so you can't join with it. Ask someone who's still in it for a new link."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このリンクを送った人はもう参加していないため、参加できません。参加している人に新しいリンクをもらってください"
+          }
+        }
+      }
+    },
+    "この共有から抜けました。もう一度参加するには、参加している人に招待リンクをもらってください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You left this share. To join again, ask someone in it for an invite link."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この共有から抜けました。もう一度参加するには、参加している人に招待リンクをもらってください"
+          }
+        }
+      }
+    },
+    "この共有から抜けますか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leave this share?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この共有から抜けますか?"
+          }
+        }
+      }
+    },
+    "この共有から抜ける": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leave this share"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この共有から抜ける"
+          }
+        }
+      }
+    },
+    "この共有に参加していません。招待リンクから参加してください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You haven't joined this share. Join from an invite link."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この共有に参加していません。招待リンクから参加してください"
+          }
+        }
+      }
+    },
+    "この共有の記録を見られるのは、ここにいる人だけです": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only the people listed here can see this share's records"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この共有の記録を見られるのは、ここにいる人だけです"
+          }
+        }
+      }
+    },
+    "この記録を家族だけで共有して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share these records with my family only"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この記録を家族だけで共有して"
+          }
+        }
+      }
+    },
+    "そのままにする": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep it"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "そのままにする"
+          }
+        }
+      }
+    },
+    "その場でカメラで撮って残せるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let me take a photo with the camera right there and save it"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "その場でカメラで撮って残せるようにして"
+          }
+        }
+      }
+    },
+    "できた画面に向かって、こう話すと思いどおりに直せます。例をタップすると入力欄に入るので、言葉を足してから送ってください。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Say it like this to get the screen you want. Tap an example to put it in the text box, then adjust the words before sending."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "できた画面に向かって、こう話すと思いどおりに直せます。例をタップすると入力欄に入るので、言葉を足してから送ってください。"
+          }
+        }
+      }
+    },
+    "またね。いつでも戻ってきてください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See you! Come back anytime."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "またね。いつでも戻ってきてください"
           }
         }
       }
@@ -970,6 +1582,23 @@
         }
       }
     },
+    "おこづかい帳": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allowance book"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "おこづかい帳"
+          }
+        }
+      }
+    },
     "おはようございます": {
       "extractionState": "manual",
       "localizations": {
@@ -987,6 +1616,40 @@
         }
       }
     },
+    "お金": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Money"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "お金"
+          }
+        }
+      }
+    },
+    "こう話すと直せます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try saying this to change it"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "こう話すと直せます"
+          }
+        }
+      }
+    },
     "ここから行ける": {
       "extractionState": "manual",
       "localizations": {
@@ -1000,6 +1663,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "ここから行ける"
+          }
+        }
+      }
+    },
+    "ここで反映しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applied here"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ここで反映しました"
+          }
+        }
+      }
+    },
+    "ここで反映しました(v%lld)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applied here (v%lld)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ここで反映しました(v%lld)"
           }
         }
       }
@@ -1106,6 +1803,142 @@
         }
       }
     },
+    "このデータは作った人だけが変更できます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only the person who created this can change it"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデータは作った人だけが変更できます"
+          }
+        }
+      }
+    },
+    "投稿に表示する名前": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name shown on your posts"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "投稿に表示する名前"
+          }
+        }
+      }
+    },
+    "みんなで使うアプリに投稿すると、この名前がほかの人にも表示されます。空なら「匿名」です。Apple ID の名前やメールアドレスは表示しません。変えても、これまでの投稿の名前は変わりません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you post to an app you use with others, they see this name. Leave it empty to post as \"Anonymous\". Your Apple ID name and email address are never shown. Changing it does not rename your earlier posts."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "みんなで使うアプリに投稿すると、この名前がほかの人にも表示されます。空なら「匿名」です。Apple ID の名前やメールアドレスは表示しません。変えても、これまでの投稿の名前は変わりません。"
+          }
+        }
+      }
+    },
+    "ニックネーム": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nickname"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ニックネーム"
+          }
+        }
+      }
+    },
+    "この名前で投稿": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Post with this name"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この名前で投稿"
+          }
+        }
+      }
+    },
+    "匿名で投稿": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Post anonymously"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匿名で投稿"
+          }
+        }
+      }
+    },
+    "ほかの人の一覧にこの名前が表示されます。Apple ID の名前やメールアドレスは表示しません。あとから設定で変えられます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Others will see this name in the list. Your Apple ID name and email address are never shown. You can change it later in Settings."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ほかの人の一覧にこの名前が表示されます。Apple ID の名前やメールアドレスは表示しません。あとから設定で変えられます。"
+          }
+        }
+      }
+    },
+    "このネットワークからの今日の上限に達しました。サインインすると続けて使えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This network has reached today's limit. Sign in to keep going"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このネットワークからの今日の上限に達しました。サインインすると続けて使えます"
+          }
+        }
+      }
+    },
     "この内容で作ります": {
       "extractionState": "manual",
       "localizations": {
@@ -1187,6 +2020,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "これでいく"
+          }
+        }
+      }
+    },
+    "これでいく(%lld 件)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go with these (%lld)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "これでいく(%lld 件)"
           }
         }
       }
@@ -1293,6 +2143,40 @@
         }
       }
     },
+    "できたアプリの画面にあるマイクから「ボタンを大きくして」「メモ欄を足して」と話すと直せます。気に入らなければ「元に戻して」で戻せます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the mic on your app’s screen and say “Make the buttons bigger” or “Add a notes field.” Don’t like it? Say “Undo.”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "できたアプリの画面にあるマイクから「ボタンを大きくして」「メモ欄を足して」と話すと直せます。気に入らなければ「元に戻して」で戻せます。"
+          }
+        }
+      }
+    },
+    "とじる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "とじる"
+          }
+        }
+      }
+    },
     "どこからも行けない画面": {
       "extractionState": "manual",
       "localizations": {
@@ -1395,6 +2279,23 @@
         }
       }
     },
+    "はじめる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get started"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "はじめる"
+          }
+        }
+      }
+    },
     "ひとこと説明(任意)": {
       "extractionState": "manual",
       "localizations": {
@@ -1412,23 +2313,6 @@
         }
       }
     },
-    "ひとつ前の状態(version %lld)に戻しました": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restored the previous version (version %lld)"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ひとつ前の状態(version %lld)に戻しました"
-          }
-        }
-      }
-    },
     "ひとつ前の状態に戻す": {
       "extractionState": "manual",
       "localizations": {
@@ -1442,6 +2326,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "ひとつ前の状態に戻す"
+          }
+        }
+      }
+    },
+    "ほかの人が追加・更新しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added or updated by others"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ほかの人が追加・更新しました"
           }
         }
       }
@@ -1548,6 +2449,40 @@
         }
       }
     },
+    "みんなに公開して、友達のスマホからも書き込めるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open it to everyone so friends can add entries from their phones"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "みんなに公開して、友達のスマホからも書き込めるようにして"
+          }
+        }
+      }
+    },
+    "みんなの掲示板": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group message board"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "みんなの掲示板"
+          }
+        }
+      }
+    },
     "もう一度": {
       "extractionState": "manual",
       "localizations": {
@@ -1612,6 +2547,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "やめる"
+          }
+        }
+      }
+    },
+    "やり直しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Redid the change"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "やり直しました"
+          }
+        }
+      }
+    },
+    "やり直す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Redo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "やり直す"
+          }
+        }
+      }
+    },
+    "やり直せませんでした": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't redo the change"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "やり直せませんでした"
           }
         }
       }
@@ -1731,6 +2717,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "アプリが更新されました(version %lld)"
+          }
+        }
+      }
+    },
+    "アプリの名前": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App name"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリの名前"
           }
         }
       }
@@ -1956,6 +2959,23 @@
         }
       }
     },
+    "オフラインのあいだは付けられません": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can't add this while offline"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフラインのあいだは付けられません"
+          }
+        }
+      }
+    },
     "オフライン・未送信 %lld 件": {
       "extractionState": "manual",
       "localizations": {
@@ -1973,6 +2993,23 @@
         }
       }
     },
+    "カテゴリごとの割合を円グラフで見せて": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show a pie chart of the share by category"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カテゴリごとの割合を円グラフで見せて"
+          }
+        }
+      }
+    },
     "カメラで読み取ると Tailor It で開きます": {
       "extractionState": "manual",
       "localizations": {
@@ -1986,6 +3023,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "カメラで読み取ると Tailor It で開きます"
+          }
+        }
+      }
+    },
+    "カメラ・写真": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera and photos"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カメラ・写真"
           }
         }
       }
@@ -2020,6 +3074,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "グラフを追加して"
+          }
+        }
+      }
+    },
+    "グラフ・合計": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Charts and totals"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "グラフ・合計"
+          }
+        }
+      }
+    },
+    "ゲーム": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Games"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ゲーム"
           }
         }
       }
@@ -2122,6 +3210,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "サインインの有効期限が切れました。もう一度サインインしてください"
+          }
+        }
+      }
+    },
+    "サブスクの管理": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subscription tracker"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サブスクの管理"
+          }
+        }
+      }
+    },
+    "サークルの出欠": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Club attendance"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サークルの出欠"
           }
         }
       }
@@ -2296,6 +3418,23 @@
         }
       }
     },
+    "スキップ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skip"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "スキップ"
+          }
+        }
+      }
+    },
     "タグ(スペース区切り・任意) 例: 健康 習慣": {
       "extractionState": "manual",
       "localizations": {
@@ -2394,6 +3533,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "タブ"
+          }
+        }
+      }
+    },
+    "タブの順番を入れ替えて、「集計」をいちばん左にして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reorder the tabs so \"Summary\" is on the far left"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タブの順番を入れ替えて、「集計」をいちばん左にして"
           }
         }
       }
@@ -2551,6 +3707,40 @@
         }
       }
     },
+    "ホームに「使い方」ボタンを置いて、押したら説明を書いた画面に移るようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Put a \"How to use\" button on the home screen that goes to a page with instructions"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ホームに「使い方」ボタンを置いて、押したら説明を書いた画面に移るようにして"
+          }
+        }
+      }
+    },
+    "ボウリングのスコア表": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bowling scorecard"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボウリングのスコア表"
+          }
+        }
+      }
+    },
     "ボタン「%@」": {
       "extractionState": "manual",
       "localizations": {
@@ -2564,6 +3754,91 @@
           "stringUnit": {
             "state": "translated",
             "value": "ボタン「%@」"
+          }
+        }
+      }
+    },
+    "ボタンで別の画面へ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buttons to other screens"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボタンで別の画面へ"
+          }
+        }
+      }
+    },
+    "ボタンの色をもっと目立つ色にして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make the button color stand out more"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボタンの色をもっと目立つ色にして"
+          }
+        }
+      }
+    },
+    "ボタンを大きくして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make the buttons bigger"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボタンを大きくして"
+          }
+        }
+      }
+    },
+    "ボタンを押したら、今いる場所を記録できるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a button that saves where I am right now"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボタンを押したら、今いる場所を記録できるようにして"
+          }
+        }
+      }
+    },
+    "ボードゲームの勝ち負け記録": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Board game win/loss log"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボードゲームの勝ち負け記録"
           }
         }
       }
@@ -2619,6 +3894,40 @@
         }
       }
     },
+    "マイクをタップして「家計簿が欲しい」のように話すだけ。文字で入力しても作れます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap the mic and say something like “I want a budget app.” You can also type it."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "マイクをタップして「家計簿が欲しい」のように話すだけ。文字で入力しても作れます。"
+          }
+        }
+      }
+    },
+    "マイクを長押しすると、作ったアプリの一覧が開きます。「アプリ一覧」と話しても開けます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Long-press the mic to open the list of your apps. You can also say “App list.”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "マイクを長押しすると、作ったアプリの一覧が開きます。「アプリ一覧」と話しても開けます。"
+          }
+        }
+      }
+    },
     "メモ欄を増やして": {
       "extractionState": "manual",
       "localizations": {
@@ -2632,6 +3941,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "メモ欄を増やして"
+          }
+        }
+      }
+    },
+    "メモ欄を足して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a notes field"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "メモ欄を足して"
           }
         }
       }
@@ -2891,6 +4217,23 @@
         }
       }
     },
+    "一覧 → タップで詳しく・直す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lists → tap for details and edits"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一覧 → タップで詳しく・直す"
+          }
+        }
+      }
+    },
     "一覧の行": {
       "extractionState": "manual",
       "localizations": {
@@ -2904,6 +4247,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "一覧の行"
+          }
+        }
+      }
+    },
+    "一覧の項目をタップしたら、詳しい内容の画面が開くようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When I tap an item in the list, open a screen with its details"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一覧の項目をタップしたら、詳しい内容の画面が開くようにして"
+          }
+        }
+      }
+    },
+    "一覧を左にスワイプして消せるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let me swipe left on the list to delete an item"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一覧を左にスワイプして消せるようにして"
           }
         }
       }
@@ -2925,6 +4302,40 @@
         }
       }
     },
+    "下に「履歴」のタブを足して、記録を新しい順に全部見られるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a \"History\" tab at the bottom that shows every entry, newest first"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下に「履歴」のタブを足して、記録を新しい順に全部見られるようにして"
+          }
+        }
+      }
+    },
+    "下のタブ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tabs at the bottom"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下のタブ"
+          }
+        }
+      }
+    },
     "並び順": {
       "extractionState": "manual",
       "localizations": {
@@ -2938,6 +4349,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "並び順"
+          }
+        }
+      }
+    },
+    "並び順を保存できませんでした: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save the order: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "並び順を保存できませんでした: %@"
           }
         }
       }
@@ -3027,6 +4455,40 @@
         }
       }
     },
+    "今日の上限(%lld回分)に達しました。%@からまた使えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You've reached today's limit (%lld). You can continue from %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日の上限(%lld回分)に達しました。%@からまた使えます"
+          }
+        }
+      }
+    },
+    "今日の上限に達しました。%@からまた使えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You've reached today's limit. You can continue from %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日の上限に達しました。%@からまた使えます"
+          }
+        }
+      }
+    },
     "今日の新規作成": {
       "extractionState": "manual",
       "localizations": {
@@ -3057,6 +4519,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "今日の無料作成(%lld 回)を使い切りました"
+          }
+        }
+      }
+    },
+    "今日はここまでです": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That's all for today"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日はここまでです"
+          }
+        }
+      }
+    },
+    "今月の合計を、画面のいちばん上に大きく出して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show this month's total in large text at the very top"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今月の合計を、画面のいちばん上に大きく出して"
           }
         }
       }
@@ -3112,6 +4608,23 @@
         }
       }
     },
+    "作ったアプリは一覧で切り替え": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch apps from the list"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作ったアプリは一覧で切り替え"
+          }
+        }
+      }
+    },
     "作ったアプリへの「ここを変えて」はこれまでどおり無料": {
       "extractionState": "manual",
       "localizations": {
@@ -3125,6 +4638,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "作ったアプリへの「ここを変えて」はこれまでどおり無料"
+          }
+        }
+      }
+    },
+    "使い方を見る": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How to use"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使い方を見る"
+          }
+        }
+      }
+    },
+    "作成者": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Creator"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作成者"
           }
         }
       }
@@ -3163,6 +4710,23 @@
         }
       }
     },
+    "例: 父、たろう": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "e.g. Dad, Taro"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "例: 父、たろう"
+          }
+        }
+      }
+    },
     "価格を取得できませんでした。通信状態を確認してください。": {
       "extractionState": "manual",
       "localizations": {
@@ -3197,6 +4761,23 @@
         }
       }
     },
+    "保存したら、一覧の画面に自動で戻るようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "After I save, go back to the list automatically"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存したら、一覧の画面に自動で戻るようにして"
+          }
+        }
+      }
+    },
     "保存するフォームがありません": {
       "extractionState": "manual",
       "localizations": {
@@ -3210,6 +4791,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "保存するフォームがありません"
+          }
+        }
+      }
+    },
+    "先に保存してください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save this first"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先に保存してください"
+          }
+        }
+      }
+    },
+    "先に「%@」を保存してください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save the %@ first"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先に「%@」を保存してください"
           }
         }
       }
@@ -3231,6 +4846,23 @@
         }
       }
     },
+    "個人の情報も公開されます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personal info will be public too"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "個人の情報も公開されます"
+          }
+        }
+      }
+    },
     "元に戻して": {
       "extractionState": "manual",
       "localizations": {
@@ -3244,6 +4876,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "元に戻して"
+          }
+        }
+      }
+    },
+    "元に戻す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "元に戻す"
           }
         }
       }
@@ -3316,6 +4965,40 @@
         }
       }
     },
+    "入力の画面に「メモ」の欄を足して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a \"Note\" field to the entry form"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "入力の画面に「メモ」の欄を足して"
+          }
+        }
+      }
+    },
+    "入力欄に入れる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puts it in the text box"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "入力欄に入れる"
+          }
+        }
+      }
+    },
     "公開する": {
       "extractionState": "manual",
       "localizations": {
@@ -3350,6 +5033,40 @@
         }
       }
     },
+    "公開のままにする": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep it public"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "公開のままにする"
+          }
+        }
+      }
+    },
+    "公開の記録の確認": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check before making it public"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "公開の記録の確認"
+          }
+        }
+      }
+    },
     "公開をやめました": {
       "extractionState": "manual",
       "localizations": {
@@ -3380,6 +5097,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "公開をやめる"
+          }
+        }
+      }
+    },
+    "共有(家族だけ / みんなに公開)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sharing (family only / everyone)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有(家族だけ / みんなに公開)"
+          }
+        }
+      }
+    },
+    "共有シートから、いつでも抜けられます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can leave anytime from the share sheet"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有シートから、いつでも抜けられます"
           }
         }
       }
@@ -3452,6 +5203,23 @@
         }
       }
     },
+    "利用が集中したため、新しい生成を止めています。%@に再開します": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demand is high, so new requests are paused. We'll reopen at %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用が集中したため、新しい生成を止めています。%@に再開します"
+          }
+        }
+      }
+    },
     "削除": {
       "extractionState": "manual",
       "localizations": {
@@ -3520,6 +5288,23 @@
         }
       }
     },
+    "割り勘や出欠のアプリは、シェアすると友達や家族と一緒に使えます。マイクを長押しすると、作ったアプリの一覧が開きます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share apps like bill splitting or attendance to use them with friends and family. Long-press the mic to open the list of your apps."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "割り勘や出欠のアプリは、シェアすると友達や家族と一緒に使えます。マイクを長押しすると、作ったアプリの一覧が開きます。"
+          }
+        }
+      }
+    },
     "匿名": {
       "extractionState": "manual",
       "localizations": {
@@ -3567,6 +5352,176 @@
           "stringUnit": {
             "state": "translated",
             "value": "単体アプリとしてリリースを申請"
+          }
+        }
+      }
+    },
+    "友達と使える・一覧で切り替え": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use with friends, switch from the list"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "友達と使える・一覧で切り替え"
+          }
+        }
+      }
+    },
+    "友達と割り勘": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Split the bill with friends"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "友達と割り勘"
+          }
+        }
+      }
+    },
+    "参加している人": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "People in this share"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加している人"
+          }
+        }
+      }
+    },
+    "参加している人が上限(100 人)に達しているため、参加できません": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This share is full (100 people), so you can't join."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加している人が上限(100 人)に達しているため、参加できません"
+          }
+        }
+      }
+    },
+    "参加している人が付けた記録が見られます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can see the records added by people in this share"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加している人が付けた記録が見られます"
+          }
+        }
+      }
+    },
+    "参加している人の一覧に、下の名前で出ます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You appear in the member list with the name below"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加している人の一覧に、下の名前で出ます"
+          }
+        }
+      }
+    },
+    "参加している人を読み込めませんでした: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the people in this share: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加している人を読み込めませんでした: %@"
+          }
+        }
+      }
+    },
+    "参加しない": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加しない"
+          }
+        }
+      }
+    },
+    "参加する": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Join"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加する"
+          }
+        }
+      }
+    },
+    "参加すると": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you join"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参加すると"
           }
         }
       }
@@ -3622,6 +5577,23 @@
         }
       }
     },
+    "受け取った人はリンクから参加して、記録を一緒に使えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recipients join with the link and share the records with you"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "受け取った人はリンクから参加して、記録を一緒に使えます"
+          }
+        }
+      }
+    },
     "受け取った人は自分のアプリとして使えます(記録は共有されません)": {
       "extractionState": "manual",
       "localizations": {
@@ -3656,6 +5628,57 @@
         }
       }
     },
+    "右へ移動": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Right"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "右へ移動"
+          }
+        }
+      }
+    },
+    "右下に「+ 追加」ボタンを置いて、押したら入力の画面が開くようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Put a \"+ Add\" button at the bottom right that opens the entry form"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "右下に「+ 追加」ボタンを置いて、押したら入力の画面が開くようにして"
+          }
+        }
+      }
+    },
+    "合計をもっと大きく表示して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make the total bigger"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "合計をもっと大きく表示して"
+          }
+        }
+      }
+    },
     "同期": {
       "extractionState": "manual",
       "localizations": {
@@ -3673,6 +5696,74 @@
         }
       }
     },
+    "名前は1〜%lld文字で入力してください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a name of 1–%lld characters"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名前は1〜%lld文字で入力してください"
+          }
+        }
+      }
+    },
+    "名前を変えられませんでした: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't rename: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名前を変えられませんでした: %@"
+          }
+        }
+      }
+    },
+    "名前を変える": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名前を変える"
+          }
+        }
+      }
+    },
+    "名前なし": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No name"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名前なし"
+          }
+        }
+      }
+    },
     "回数制限を無効にする(デモ用)": {
       "extractionState": "manual",
       "localizations": {
@@ -3686,6 +5777,74 @@
           "stringUnit": {
             "state": "translated",
             "value": "回数制限を無効にする(デモ用)"
+          }
+        }
+      }
+    },
+    "地図・場所": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maps and places"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "地図・場所"
+          }
+        }
+      }
+    },
+    "変更": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "変更"
+          }
+        }
+      }
+    },
+    "声で話すには、声を文字にするモデル(約%lldMB)が必要です。\n下の欄に文字で入力すれば、今すぐ作れます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talking needs a voice-to-text model (about %lld MB).\nType in the box below to start right now."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "声で話すには、声を文字にするモデル(約%lldMB)が必要です。\n下の欄に文字で入力すれば、今すぐ作れます。"
+          }
+        }
+      }
+    },
+    "声を文字にする準備(初回だけ約%lldMB)が終わる前でも、文字ならすぐに作れます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Even before voice setup finishes (about %lld MB, first time only), you can start right away by typing."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "声を文字にする準備(初回だけ約%lldMB)が終わる前でも、文字ならすぐに作れます。"
           }
         }
       }
@@ -3724,6 +5883,23 @@
         }
       }
     },
+    "変身一覧とアプリの上に出る名前です(%lld文字まで)。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shown in your app list and at the top of the app (up to %lld characters)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "変身一覧とアプリの上に出る名前です(%lld文字まで)。"
+          }
+        }
+      }
+    },
     "変身中": {
       "extractionState": "manual",
       "localizations": {
@@ -3737,6 +5913,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "変身中"
+          }
+        }
+      }
+    },
+    "外した人は、この共有の記録を見られなくなります。その人の端末のアプリと、これまでの記録は残ります。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "They will no longer see this share's records. The app on their device and the records they added stay."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外した人は、この共有の記録を見られなくなります。その人の端末のアプリと、これまでの記録は残ります。"
+          }
+        }
+      }
+    },
+    "外す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外す"
+          }
+        }
+      }
+    },
+    "外せませんでした。元に戻しました: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't remove them, so the list was restored: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外せませんでした。元に戻しました: %@"
           }
         }
       }
@@ -3771,6 +5998,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "実行"
+          }
+        }
+      }
+    },
+    "家族・友達と": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With family & friends"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "家族・友達と"
           }
         }
       }
@@ -3843,6 +6087,23 @@
         }
       }
     },
+    "左へ移動": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Left"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "左へ移動"
+          }
+        }
+      }
+    },
     "復元できませんでした。時間をおいて試してください。": {
       "extractionState": "manual",
       "localizations": {
@@ -3907,6 +6168,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "承認待ちです。承認されると自動で Pro になります。"
+          }
+        }
+      }
+    },
+    "抜けられませんでした。元に戻しました: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't leave, so nothing changed: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "抜けられませんでした。元に戻しました: %@"
+          }
+        }
+      }
+    },
+    "抜ける": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leave"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "抜ける"
+          }
+        }
+      }
+    },
+    "抜けると、参加している人の記録は見られなくなります。もう一度参加するには招待リンクが要ります。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "After leaving, you can no longer see their records. You'll need an invite link to join again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "抜けると、参加している人の記録は見られなくなります。もう一度参加するには招待リンクが要ります。"
           }
         }
       }
@@ -3979,6 +6291,23 @@
         }
       }
     },
+    "散歩した道のりを地図に記録して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record the route of my walk on a map"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "散歩した道のりを地図に記録して"
+          }
+        }
+      }
+    },
     "散歩の写真メモ": {
       "extractionState": "manual",
       "localizations": {
@@ -3992,6 +6321,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "散歩の写真メモ"
+          }
+        }
+      }
+    },
+    "文字で入力(今すぐ作れます)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type here (works right away)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字で入力(今すぐ作れます)"
+          }
+        }
+      }
+    },
+    "文字入力なら、このまま作れます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can still make apps by typing"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字入力なら、このまま作れます"
           }
         }
       }
@@ -4166,6 +6529,23 @@
         }
       }
     },
+    "新着 %lld 件": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld new"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新着 %lld 件"
+          }
+        }
+      }
+    },
     "日付のタップ": {
       "extractionState": "manual",
       "localizations": {
@@ -4179,6 +6559,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "日付のタップ"
+          }
+        }
+      }
+    },
+    "早起きチェック": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Early-rising check"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "早起きチェック"
+          }
+        }
+      }
+    },
+    "明日": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tomorrow"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "明日"
           }
         }
       }
@@ -4336,6 +6750,40 @@
         }
       }
     },
+    "未選択": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not selected"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未選択"
+          }
+        }
+      }
+    },
+    "本日の受付を終了しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We've paused new requests for today"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本日の受付を終了しました"
+          }
+        }
+      }
+    },
     "案%lld": {
       "extractionState": "manual",
       "localizations": {
@@ -4370,6 +6818,23 @@
         }
       }
     },
+    "次へ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次へ"
+          }
+        }
+      }
+    },
     "次回更新": {
       "extractionState": "manual",
       "localizations": {
@@ -4400,6 +6865,91 @@
           "stringUnit": {
             "state": "translated",
             "value": "毎日、新しいアプリを無制限に作れます"
+          }
+        }
+      }
+    },
+    "毎日の歩数をグラフで見せて": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show my daily steps in a chart"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎日の歩数をグラフで見せて"
+          }
+        }
+      }
+    },
+    "毎日の水の量": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daily water intake"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎日の水の量"
+          }
+        }
+      }
+    },
+    "毎晩9時に、記録を忘れないよう通知して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remind me every night at 9 p.m. so I don't forget to log"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎晩9時に、記録を忘れないよう通知して"
+          }
+        }
+      }
+    },
+    "毎週月曜の朝8時にお知らせして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notify me every Monday at 8 a.m."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎週月曜の朝8時にお知らせして"
+          }
+        }
+      }
+    },
+    "決定": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "決定"
           }
         }
       }
@@ -4727,6 +7277,23 @@
         }
       }
     },
+    "画面のマイクをタップして、話しかけてください。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap the mic on the screen and talk."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面のマイクをタップして、話しかけてください。"
+          }
+        }
+      }
+    },
     "画面の指定を外す": {
       "extractionState": "manual",
       "localizations": {
@@ -4808,6 +7375,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "画面マップ"
+          }
+        }
+      }
+    },
+    "直し方": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fixing things"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直し方"
+          }
+        }
+      }
+    },
+    "空き容量が足りません(あと約%lldMB 必要です)。写真やアプリを整理してから試してください。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not enough storage (about %lld MB more needed). Free up some photos or apps and try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "空き容量が足りません(あと約%lldMB 必要です)。写真やアプリを整理してから試してください。"
+          }
+        }
+      }
+    },
+    "空欄のままなら、名前なしで一覧に出ます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If left blank, you appear without a name"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "空欄のままなら、名前なしで一覧に出ます"
           }
         }
       }
@@ -4897,6 +7515,23 @@
         }
       }
     },
+    "習慣": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Habits"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "習慣"
+          }
+        }
+      }
+    },
     "考えています…": {
       "extractionState": "manual",
       "localizations": {
@@ -4931,6 +7566,23 @@
         }
       }
     },
+    "自分だけにする": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make it private"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自分だけにする"
+          }
+        }
+      }
+    },
     "自動": {
       "extractionState": "manual",
       "localizations": {
@@ -4944,6 +7596,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "自動"
+          }
+        }
+      }
+    },
+    "複製": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicate"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "複製"
+          }
+        }
+      }
+    },
+    "薬の飲み忘れ防止": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Medicine reminders"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "薬の飲み忘れ防止"
+          }
+        }
+      }
+    },
+    "表示名(任意)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Display name (optional)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "表示名(任意)"
           }
         }
       }
@@ -5016,6 +7719,40 @@
         }
       }
     },
+    "記録": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logs"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録"
+          }
+        }
+      }
+    },
+    "記録した場所を地図にピンで出して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the places I saved as pins on a map"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録した場所を地図にピンで出して"
+          }
+        }
+      }
+    },
     "記録する": {
       "extractionState": "manual",
       "localizations": {
@@ -5029,6 +7766,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "記録する"
+          }
+        }
+      }
+    },
+    "記録に写真を付けられるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let me attach a photo to each entry"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録に写真を付けられるようにして"
           }
         }
       }
@@ -5135,6 +7889,23 @@
         }
       }
     },
+    "詳しい画面で、内容を直したり消したりできるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let me edit or delete the entry on the details screen"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "詳しい画面で、内容を直したり消したりできるようにして"
+          }
+        }
+      }
+    },
     "認識中": {
       "extractionState": "manual",
       "localizations": {
@@ -5199,6 +7970,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "読み込めませんでした: %@"
+          }
+        }
+      }
+    },
+    "読んだ本のメモ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading notes"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "読んだ本のメモ"
           }
         }
       }
@@ -5288,6 +8076,57 @@
         }
       }
     },
+    "近くにいる人の端末に、まとめて送れるようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let me send entries to people nearby all at once"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近くにいる人の端末に、まとめて送れるようにして"
+          }
+        }
+      }
+    },
+    "追加ボタンを左上に移して": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move the add button to the top left"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追加ボタンを左上に移して"
+          }
+        }
+      }
+    },
+    "追加ボタン・入力欄": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add buttons and fields"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追加ボタン・入力欄"
+          }
+        }
+      }
+    },
     "送信": {
       "extractionState": "manual",
       "localizations": {
@@ -5301,6 +8140,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "送信"
+          }
+        }
+      }
+    },
+    "送信が終わってから付けられます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can add this once your post has been sent"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送信が終わってから付けられます"
           }
         }
       }
@@ -5356,6 +8212,40 @@
         }
       }
     },
+    "通知": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知"
+          }
+        }
+      }
+    },
+    "通知の時間を朝7時に変えて": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change the reminder time to 7 a.m."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知の時間を朝7時に変えて"
+          }
+        }
+      }
+    },
     "通知を予約しました(%@)": {
       "extractionState": "manual",
       "localizations": {
@@ -5386,6 +8276,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "連絡先(任意) メールや SNS など"
+          }
+        }
+      }
+    },
+    "選択中": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択中"
           }
         }
       }
@@ -5509,6 +8416,23 @@
         }
       }
     },
+    "集計の画面に「記録する」ボタンを置いて、押したら入力の画面が開くようにして": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Put a \"Record\" button on the Summary screen that opens the entry form"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "集計の画面に「記録する」ボタンを置いて、押したら入力の画面が開くようにして"
+          }
+        }
+      }
+    },
     "非公開にできませんでした: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -5539,6 +8463,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "音声が小さすぎました(録音%@秒・音量%llddB)。マイクに向かって話してください"
+          }
+        }
+      }
+    },
+    "音声の準備中です(文字ならすぐ作れます)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing voice (you can type right away)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声の準備中です(文字ならすぐ作れます)"
           }
         }
       }
@@ -5594,19 +8535,19 @@
         }
       }
     },
-    "音声モデルをダウンロード中 %lld%%\n初回のみ約500MB(Wi-Fi 推奨)": {
+    "音声モデルをダウンロード": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Downloading the voice model %lld%%\nAbout 500 MB, first time only (Wi-Fi recommended)"
+            "value": "Download voice model"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "音声モデルをダウンロード中 %lld%%\n初回のみ約500MB(Wi-Fi 推奨)"
+            "value": "音声モデルをダウンロード"
           }
         }
       }
@@ -5692,6 +8633,1077 @@
           "stringUnit": {
             "state": "translated",
             "value": "音量%llddB"
+          }
+        }
+      }
+    },
+    "一時停止中": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一時停止中"
+          }
+        }
+      }
+    },
+    "終わりました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終わりました"
+          }
+        }
+      }
+    },
+    "ロック画面への表示が設定でオフになっています(設定 > Tailor It > ライブアクティビティ)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live Activities are turned off in Settings (Settings > Tailor It > Live Activities)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ロック画面への表示が設定でオフになっています(設定 > Tailor It > ライブアクティビティ)"
+          }
+        }
+      }
+    },
+    "AI へのデータ送信について": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About sending data to AI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI へのデータ送信について"
+          }
+        }
+      }
+    },
+    "アプリを作る・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you build or edit an app, the following is sent to Anthropic's AI (Claude)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリを作る・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。"
+          }
+        }
+      }
+    },
+    "話した内容・入力した文(端末内で文字にしたもの。音声そのものは送りません)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What you said or typed (transcribed on this device; audio itself is never sent)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話した内容・入力した文(端末内で文字にしたもの。音声そのものは送りません)"
+          }
+        }
+      }
+    },
+    "話した声を端末の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字入力ならすぐにアプリを作れます。設定からいつでもダウンロードできます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This model turns your voice into text on this device (about %lld MB, first time only). While it downloads, or even without it, you can make apps right away by typing. You can download it anytime in Settings."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話した声を端末の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字入力ならすぐにアプリを作れます。設定からいつでもダウンロードできます。"
+          }
+        }
+      }
+    },
+    "話してみる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try talking"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話してみる"
+          }
+        }
+      }
+    },
+    "話すと、アプリができる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk, and an app appears"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話すと、アプリができる"
+          }
+        }
+      }
+    },
+    "話すと、直せる・戻せる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk to change it, or undo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話すと、直せる・戻せる"
+          }
+        }
+      }
+    },
+    "AI との会話の履歴": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your conversation with the AI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI との会話の履歴"
+          }
+        }
+      }
+    },
+    "今のアプリの設計(画面・項目・アプリ名など)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The current app design (screens, fields, app name, etc.)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今のアプリの設計(画面・項目・アプリ名など)"
+          }
+        }
+      }
+    },
+    "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作るためだけに使います。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Destination: Anthropic, PBC (USA), via Tailor It's server (Google Cloud). It is used only to build your app."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作るためだけに使います。"
+          }
+        }
+      }
+    },
+    "アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、アプリの「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you build or edit an app, the contents of your records (numbers, notes, photos, etc.) are not sent. However, if an app's \"Write with AI\" button uses the server AI, pressing it sends that app's recent records and the text being entered, only to write that text (photos, audio and video are not sent). Without consent you can still view and record in your apps; only AI features are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、アプリの「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"
+          }
+        }
+      }
+    },
+    "同意して使う": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agree and continue"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意して使う"
+          }
+        }
+      }
+    },
+    "あとで": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あとで"
+          }
+        }
+      }
+    },
+    "プライバシーポリシー": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy Policy"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プライバシーポリシー"
+          }
+        }
+      }
+    },
+    "利用規約": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terms of Use"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用規約"
+          }
+        }
+      }
+    },
+    "文書を読み込めませんでした": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the document"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文書を読み込めませんでした"
+          }
+        }
+      }
+    },
+    "音声モデルをダウンロードしますか？": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download the voice model?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声モデルをダウンロードしますか？"
+          }
+        }
+      }
+    },
+    "音声モデルをダウンロード中 %lld%%(初回のみ約%lldMB)\n待たなくても、下の欄に文字で入力すれば作れます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading the voice model %1$lld%% (about %2$lld MB, first time only)\nNo need to wait — type in the box below to start"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声モデルをダウンロード中 %lld%%(初回のみ約%lldMB)\n待たなくても、下の欄に文字で入力すれば作れます"
+          }
+        }
+      }
+    },
+    "ダウンロード": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ダウンロード"
+          }
+        }
+      }
+    },
+    "ダウンロード(約%lldMB)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download (about %lld MB)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ダウンロード(約%lldMB)"
+          }
+        }
+      }
+    },
+    "AI へのデータ送信": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending data to AI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI へのデータ送信"
+          }
+        }
+      }
+    },
+    "同意済み": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agreed"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意済み"
+          }
+        }
+      }
+    },
+    "未同意": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not agreed"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未同意"
+          }
+        }
+      }
+    },
+    "同意した日時": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agreed on"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意した日時"
+          }
+        }
+      }
+    },
+    "同意を取り消す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Withdraw consent"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意を取り消す"
+          }
+        }
+      }
+    },
+    "説明を読んで同意する": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read and agree"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "説明を読んで同意する"
+          }
+        }
+      }
+    },
+    "プライバシー": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プライバシー"
+          }
+        }
+      }
+    },
+    "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録も送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you build or edit an app, what you said, the conversation and the app design are sent to Anthropic's AI (the contents of your records are not). If a \"Write with AI\" button uses the server AI, pressing it also sends that app's recent records. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録も送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
+          }
+        }
+      }
+    },
+    "AI への送信の同意を取り消しますか？": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Withdraw consent to send data to AI?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI への送信の同意を取り消しますか？"
+          }
+        }
+      }
+    },
+    "取り消す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Withdraw"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取り消す"
+          }
+        }
+      }
+    },
+    "アプリの生成と対話が使えなくなります。もう一度同意すると使えます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App generation and chat will be disabled until you agree again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリの生成と対話が使えなくなります。もう一度同意すると使えます。"
+          }
+        }
+      }
+    },
+    "頼み方のコツ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How to ask"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "頼み方のコツ"
+          }
+        }
+      }
+    },
+    "書き出す記録が見つかりません": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No records to export"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "書き出す記録が見つかりません"
+          }
+        }
+      }
+    },
+    "書き出せませんでした": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not export"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "書き出せませんでした"
+          }
+        }
+      }
+    },
+    "共有・オンラインの機能と、新しいアプリを、いくつでも": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shared, online features and unlimited new apps"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有・オンラインの機能と、新しいアプリを、いくつでも"
+          }
+        }
+      }
+    },
+    "「%@」には Tailor It Pro が必要です": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” requires Tailor It Pro"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」には Tailor It Pro が必要です"
+          }
+        }
+      }
+    },
+    "「%@」に参加するには Tailor It Pro が必要です": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Joining “%@” requires Tailor It Pro"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」に参加するには Tailor It Pro が必要です"
+          }
+        }
+      }
+    },
+    "みんなで共有するデータ": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shared data"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "みんなで共有するデータ"
+          }
+        }
+      }
+    },
+    "みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data that everyone writes is stored in the cloud and synced to every device, which costs server resources."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。"
+          }
+        }
+      }
+    },
+    "Pro でできること": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What you get with Pro"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro でできること"
+          }
+        }
+      }
+    },
+    "みんなで書き込める共有のデータ(掲示板・ランキング・割り勘など)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shared data everyone can write to (boards, rankings, split bills and more)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "みんなで書き込める共有のデータ(掲示板・ランキング・割り勘など)"
+          }
+        }
+      }
+    },
+    "シェアされたアプリに参加して、同じデータを使えます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Join shared apps and use the same data"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "シェアされたアプリに参加して、同じデータを使えます"
+          }
+        }
+      }
+    },
+    "1 か月ごとの自動更新": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-renews every month"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 か月ごとの自動更新"
+          }
+        }
+      }
+    },
+    "%@ / 月": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ / month"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ / 月"
+          }
+        }
+      }
+    },
+    "月額の自動更新サブスクリプションです。お支払いは購入の確定時に Apple ID に請求されます。期間終了の 24 時間前までに解約しない限り自動で更新され、更新分は終了前の 24 時間以内に請求されます。解約は App Store のアカウント設定からいつでもできます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is a monthly auto-renewing subscription. Payment is charged to your Apple ID at confirmation of purchase. It renews automatically unless canceled at least 24 hours before the end of the current period, and the renewal is charged within 24 hours before the period ends. You can cancel anytime in your App Store account settings."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "月額の自動更新サブスクリプションです。お支払いは購入の確定時に Apple ID に請求されます。期間終了の 24 時間前までに解約しない限り自動で更新され、更新分は終了前の 24 時間以内に請求されます。解約は App Store のアカウント設定からいつでもできます。"
+          }
+        }
+      }
+    },
+    "閉じると、共有の機能を外して自分だけの記録にします。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you close this, sharing is removed and your records stay private to you."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閉じると、共有の機能を外して自分だけの記録にします。"
+          }
+        }
+      }
+    },
+    "閉じても、まだ作りません。「この機能なしで作る」か「やめる」を選べます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Closing won't build anything yet. You can then choose \"Build without this feature\" or \"Cancel\"."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閉じても、まだ作りません。「この機能なしで作る」か「やめる」を選べます。"
+          }
+        }
+      }
+    },
+    "購入して作る": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buy and build"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "購入して作る"
+          }
+        }
+      }
+    },
+    "この機能なしで作る": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Build without this feature"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この機能なしで作る"
+          }
+        }
+      }
+    },
+    "%@には Tailor It Pro(%@ / 月)が必要です": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ requires Tailor It Pro (%2$@ / month)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@には Tailor It Pro(%@ / 月)が必要です"
+          }
+        }
+      }
+    },
+    "閉じると、元の版に戻します。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you close this, the app goes back to the previous version."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閉じると、元の版に戻します。"
+          }
+        }
+      }
+    },
+    "共有の機能は Tailor It Pro が必要なため、元の版に戻しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sharing requires Tailor It Pro, so the app went back to the previous version"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有の機能は Tailor It Pro が必要なため、元の版に戻しました"
+          }
+        }
+      }
+    },
+    "共有の機能を外して、自分だけの記録にしました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed sharing. Your records are now private to you"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有の機能を外して、自分だけの記録にしました"
+          }
+        }
+      }
+    },
+    "共有の機能は Tailor It Pro が必要なため、元に戻しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sharing requires Tailor It Pro, so the change was undone"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共有の機能は Tailor It Pro が必要なため、元に戻しました"
+          }
+        }
+      }
+    },
+    "閉じると参加しません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you close this, you won't join."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閉じると参加しません。"
+          }
+        }
+      }
+    },
+    "「%@」には参加しませんでした。参加には Tailor It Pro が必要です": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You didn't join “%@”. Joining requires Tailor It Pro"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」には参加しませんでした。参加には Tailor It Pro が必要です"
+          }
+        }
+      }
+    },
+    "課金の制限を無効にする(デモ用・回数と有料機能)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disable purchase limits (demo: daily limit and paid features)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "課金の制限を無効にする(デモ用・回数と有料機能)"
+          }
+        }
+      }
+    },
+    "オンラインの AI で書く": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Writing with online AI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オンラインの AI で書く"
+          }
+        }
+      }
+    },
+    "この端末では AI を端末内で動かせないため、サーバーの AI を使います。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device can't run AI on-device, so the server's AI is used instead."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この端末では AI を端末内で動かせないため、サーバーの AI を使います。"
+          }
+        }
+      }
+    },
+    "閉じると、この端末では AI で書くボタンは使えません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you close this, the AI writing button stays unavailable on this device."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閉じると、この端末では AI で書くボタンは使えません。"
           }
         }
       }

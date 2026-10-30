@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -49,6 +50,7 @@ type chatFirstReply struct {
 	Kind        string         `json:"kind"`
 	Text        string         `json:"text"`
 	Suggestions []string       `json:"suggestions"`
+	MultiSelect bool           `json:"multiSelect"` // #220
 	Options     []chatOptionIn `json:"options"`
 	Brief       Brief          `json:"brief"`
 	Transcript  string         `json:"transcript"`
@@ -72,11 +74,12 @@ func ChatEditSchema() json.RawMessage {
 	return json.RawMessage(`{
   "type": "object",
   "additionalProperties": false,
-  "required": ["kind", "text", "suggestions", "options", "transcript"],
+  "required": ["kind", "text", "suggestions", "multiSelect", "options", "transcript"],
   "properties": {
     "kind": {"type": "string", "enum": ["answer", "question", "proposal", "ready"]},
     "text": {"type": "string"},
     "suggestions": {"type": "array", "items": {"type": "string"}},
+    "multiSelect": {"type": "boolean"},
     ` + chatOptionsSchema + `,
     "transcript": {"type": "string"}
   }
@@ -88,11 +91,12 @@ func ChatCreateSchema() json.RawMessage {
 	return json.RawMessage(`{
   "type": "object",
   "additionalProperties": false,
-  "required": ["kind", "text", "suggestions", "options", "brief", "transcript"],
+  "required": ["kind", "text", "suggestions", "multiSelect", "options", "brief", "transcript"],
   "properties": {
     "kind": {"type": "string", "enum": ["answer", "question", "proposal", "ready"]},
     "text": {"type": "string"},
     "suggestions": {"type": "array", "items": {"type": "string"}},
+    "multiSelect": {"type": "boolean"},
     ` + chatOptionsSchema + `,
     "brief": {
       "type": "object",
@@ -164,13 +168,13 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 	}
 	// #77: ready / proposal に有料機能の判定を付ける(edit で今のアプリが既に持つ機能は除く)
 	defer func() {
-		if err == nil {
+		if err == nil && !restrictionFrom(ctx).NoSharedData() { // #451 G2 / #450 G1
 			defaultPaidCatalog.annotate(out, app)
 		}
 	}()
-	store := s.conversations()
-	store.wait(ctx, req.AppID, s.chatTimeout())
-	cv := store.get(req.AppID)
+	store, key := s.conversations(), convKey(auth.UID(ctx), req.AppID)
+	store.wait(ctx, key, s.chatTimeout())
+	cv := store.get(key)
 	if cv == nil || cv.mode != mode {
 		// a create conversation does not carry over into editing (and back)
 		cv = &conversation{mode: mode}
@@ -206,8 +210,9 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 			res.Text = loc.text().readyText
 			res.Brief = cv.brief
 			res.Transcript = cv.transcript
+			plainChatResult(res) // #258
 			cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: res.Text})
-			store.put(req.AppID, cv)
+			store.put(key, cv)
 			res.LatencyMs = Latency{Total: time.Since(started).Milliseconds()}
 			return res, nil
 		}
@@ -255,11 +260,11 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 		}
 		cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: historyText(res)})
 		if mode == chatModeCreate {
-			pending := store.begin(req.AppID)
-			store.put(req.AppID, cv)
+			pending := store.begin(key)
+			store.put(key, cv)
 			go func() {
 				a := <-done
-				store.finish(req.AppID, pending, cv, func(c *conversation) {
+				store.finish(key, pending, cv, func(c *conversation) {
 					if a.reply != nil {
 						b := cleanBrief(a.reply.Brief)
 						c.brief, c.transcript = &b, transcriptOr(a.reply.Transcript, userTexts)
@@ -267,7 +272,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 				})
 			}()
 		} else {
-			store.put(req.AppID, cv)
+			store.put(key, cv)
 			go func() { <-done }()
 		}
 		res.LatencyMs = Latency{Claude: time.Since(callStart).Milliseconds(), Total: time.Since(started).Milliseconds()}
@@ -295,6 +300,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 	res.Meta = ar.meta
 	res.Source = "claude"
 	s.applyFirstReply(res, att.reply, mode, loc, userTexts, force, noMoreQuestions)
+	guardPublicPII(res, cv.messages, app != nil && anyShared(app), loc) // #253
 	if mode == chatModeCreate {
 		b := cleanBrief(att.reply.Brief)
 		cv.brief, cv.transcript = &b, transcriptOr(att.reply.Transcript, userTexts)
@@ -303,7 +309,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 		cv.questions++
 	}
 	cv.messages = append(cv.messages, ChatMessage{Role: "assistant", Text: historyText(res)})
-	store.put(req.AppID, cv)
+	store.put(key, cv)
 	res.LatencyMs = Latency{Claude: ar.latency.Milliseconds(), Total: time.Since(started).Milliseconds()}
 	return res, nil
 }
@@ -345,13 +351,16 @@ func (s *Service) applyFirstReply(res *ChatResult, r *chatFirstReply, mode strin
 			text = loc.text().proposalText
 		}
 		res.Options = opts
+		res.MultiSelect = r.MultiSelect && len(opts) > 1 // #220
 	default: // question | answer
 		res.Suggestions = cleanSuggestions(r.Suggestions)
+		res.MultiSelect = r.MultiSelect && kind == "question" && len(res.Suggestions) > 1 // #220
 	}
 	res.Text = text
 	if res.Source == "" {
 		res.Source = "claude"
 	}
+	plainChatResult(res) // #258
 }
 
 // cleanOptions trims, drops ideas without a title or instruction, caps at 3
@@ -453,6 +462,9 @@ func partialFirstReply(prefix string) (chatFirstReply, bool) {
 	if json.Unmarshal(f["suggestions"], &r.Suggestions) != nil || json.Unmarshal(f["options"], &r.Options) != nil {
 		return r, false
 	}
+	if f["multiSelect"] != nil {
+		_ = json.Unmarshal(f["multiSelect"], &r.MultiSelect) // #220
+	}
 	if r.Kind == "proposal" && len(cleanOptions(r.Options)) == 0 {
 		return r, false
 	}
@@ -495,7 +507,7 @@ func summarizeApp(a *dsl.App) string {
 	}
 	for _, e := range a.Entities {
 		scope := string(e.EffectiveScope())
-		fmt.Fprintf(&b, "- %s「%s」(scope %s)\n", e.ID, e.Name, scope)
+		fmt.Fprintf(&b, "- %s「%s」(scope %s・項目 %d/%d)\n", e.ID, e.Name, scope, len(e.Fields), dsl.MaxFieldsPerEntity)
 		for _, f := range e.Fields {
 			raw, _ := json.Marshal(f)
 			fmt.Fprintf(&b, "  - %s\n", raw)
@@ -532,25 +544,35 @@ func writeComponents(b *strings.Builder, cs []dsl.Component, indent string) {
 	}
 }
 
-// chatCapabilities is what the DSL can and cannot do, for answers. Hand
-// written: the catalog lists the parts, this lists the facts users ask about.
+// chatCapabilities is the hand-written part of what the DSL can and cannot
+// do: how the app works and its limits (#230: the list of parts, ops and
+// actions is not written here; it comes from the schema, see
+// chatCapabilityIndex / catalog, so it never falls behind the generator).
 var chatCapabilities = strings.TrimSpace(`
 ## このアプリの仕組み(質問への答えの根拠)
 - アプリは iOS の SwiftUI でネイティブに描画している(Server-Driven UI: 画面の設計図 JSON を AI が作り、iOS がそれを部品に組み立てる)。**WebView ではない**。webView 部品がある画面のその枠だけ WKWebView で https のページを表示する。
-- 変えられる単位: 画面(最大 12)・下のタブ(2〜5)・記録の種類 entity(最大 6、項目は 20 まで)・部品・計算・通知・テーマ色・アイコン・アプリ名。声やチャットで頼むと AI が設計図を書き換える。
-- 部品の大きさ・位置: 各画面は横 A〜F の 6 列 × 縦 12 行のグリッドで、部品の枠(area)を広げる・狭める・動かすことができる。文字の大きさは text の style(title / headline / body / caption の 4 段)。画像の高さは small / medium / large。**フォントのポイント数・好きなフォント・アニメーション・自由なレイアウト(重ね合わせ)は指定できない**。色はテーマ色と決まった色名(semantic color)だけ。
-- 記録と表示: 入力(文字・数字・金額・日付・時刻・選択肢・オンオフ・写真・スライダー・星・色など)、一覧(並べ替え・絞り込み・検索・スワイプ削除・タップで編集・ワンタップのチェック)、表・タイムライン・月のカレンダー表示。
-- 集計と計算: 合計・件数・平均・最大・最小・最新・最初、今日 / 今週 / 今月 / 今年 / 直近 7 日の絞り込み、グラフ(棒・折れ線・円。カテゴリ別・日 / 週 / 月ごと)、進捗バー・ゲージ、計算式(四則演算・日付の差・時刻の差・条件分岐・マスタの値の参照)、割り勘の精算(誰が誰にいくら)。
-- 端末の機能: カメラ / 写真、ローカル通知(1 回・毎日・毎週)、地図(記録の場所にピン。**経路案内・ナビはできない**。地図アプリで開くボタンは置ける)、現在地、散歩などの道のりの記録(開始を押した間だけ・地図に線と距離 / 時間)、QR 読み取り、ストップウォッチ / カウントダウン、共有(LINE / Slack / Discord / その他)、URL・電話・メールを開くボタン、端末内 AI ボタン(要約・分類・書き換え・抽出・提案。データは端末から出ない)、近くの iPhone へ記録を送る。
-- みんなで使う: entity を public にすると、アプリを使う他の人と同じ記録を見て投稿できる。**家族だけ・招待した人だけに限る設定はまだ無い**(誰でも読める)。**誰が投稿したか(投稿者名)は画面に出せない**(一覧・表・詳細のどこにも表示できない。代わり → 入力フォームに「名前」や「使った人」の選択項目を足す)。各自の記録は private(既定)。
-- できないこと(聞かれたら正直に「できません」と言い、近い代わりを添える): 外部サービスの自動取得(天気・株価・ニュースの API。代わり → webView でそのサイトを表示)、ログイン・課金・決済、サーバーからのプッシュ通知(代わり → 時刻指定のローカル通知)、ウィジェット・Apple Watch、連続日数(代わり → 直近 7 日の記録数)、順位番号(代わり → 合計の降順の表)、一括削除などの一括操作(代わり → スワイプ削除)、タイマーの自動切り替え、ファイル書き出し(代わり → 共有ボタン)、経路案内、投稿者名の表示(代わり → 「使った人」の項目)。
+- 変えられる単位: 画面(最大 12)・下のタブ(2〜5)・記録の種類 entity(最大 6、項目は 40 まで)・部品・計算・通知・テーマ色・アイコン・アプリ名。声やチャットで頼むと AI が設計図を書き換える。
+- 項目数の上限(#221): 今のアプリの entity 行の「項目 n/40」に足すと 40 を超える追加は ready にしない(生成 AI が既存の項目を消して収めてしまう)。proposal で 2 案: どれかの項目を消して足す案(消す項目名を入れる)と、足す項目を別の記録の種類(画面)に分ける案。
+- 部品の大きさ・位置: 各画面は横 A〜F の 6 列 × 縦 12 行のグリッドで、部品の枠(area)を広げる・狭める・動かすことができる。文字の大きさは text の style(title / headline / body / caption の 4 段)。画像の高さは small / medium / large。色はテーマ色と決まった色名(semantic color)だけ。
+- できる・できないの決め方: 部品・計算式の op・ボタンの動作・項目の型は「できることの索引」と「部品カタログ」(どちらもスキーマから自動生成)が正典。そこにある部品や op で組み立てられることは「できます」と答える(例: 連続日数 = streak、直近 n 日にやった日数 = doneInDays、動画 = videoField、歩数 = healthStat、場所の検索 = locationPicker、道のりの記録 = locationTracker)。毎日の通知はアプリの通知設定(1 回・毎日・毎週のローカル通知)。
+- みんなで使う: entity を public(ユーザーには「みんなに公開」と言う)にすると、アプリを使う他の人と同じ記録を見て投稿できる(誰でも読める)。誰が投稿したか(投稿者名)は一覧・表・タイムラインに出せる($author: 各自がアプリの設定で決めた表示名・未設定は「匿名」。名前の入力欄は要らない)。「自分の投稿だけ」のタブや件数も作れる。家族・サークル・チームなど決まった人だけで使うなら shared(ユーザーには「参加した人だけ」と言う。作った人とシェアリンクで参加した人だけが見て投稿できる。「家族だけ」「招待した人だけ」はこれでできる)。各自の記録は private(「自分だけ」・既定)。**みんなに公開・参加した人だけの記録は、既定では作った人だけが変更・削除できる**。家事の完了・出欠の〇×・買い物リストのチェックのように他の人も同じ記録を変えたい時は「参加者みんなが変更できる」にできる(削除は作った人だけ)。「店長だけが確定」のような役割・権限は今はできない。
+` + chatLimitsText())
+
+// chatPlainWords (#258): the user is not an engineer; the catalog names below
+// are for reasoning only (plainTerms in chat_terms.go is the safety net).
+var chatPlainWords = strings.TrimSpace(`
+## 言葉づかい(#258・text / suggestions / 案の title・detail・instruction / transcript に必ず適用)
+- 使う人はエンジニアではない。**設計図の英語の名前(scope 名・型名・部品の type 名・計算式の op 名・entity / field / computed など)を一切書かない**。括弧で添える(「折りたたみ(disclosure)」)のも不可。画面に見える言葉と普通の日本語で言う。
+- 言い換え: public → みんなに公開 / private → 自分だけ / shared → 参加した人だけ / entity → 記録の種類 / field → 項目 / computed・op → 計算 / disclosure → 折りたたみ / stat → 数字のカード / list → 一覧 / ref → ほかの記録から選ぶ項目 / notifications → 通知。
+- 例: ×「public の記録で投稿が流れる掲示板」→ ○「みんなに公開の記録で、投稿が流れる掲示板」。×「支出を public にして」→ ○「支出をみんなに公開して」。×「乱数の計算式(op)は無いので」→ ○「ランダムに選ぶ計算は無いので」。
+- locale en も同じ(record type / item / calculation / everyone can see / only me。"entity" "field" "op" "scope" と書かない)。案の instruction と transcript も生成中の画面に表示されるので同じ(「支出をみんなに公開して」のように画面の言葉で書けば生成 AI に伝わる)。
 `)
 
 var chatEditSystemPrompt = strings.TrimSpace(`
 あなたは「声で変わる自分専用アプリ」の相談相手です。ユーザーはすでに iOS アプリを持っていて、そのアプリについて質問したり、変えたいことを相談したりします。user ターンの「## 今のアプリ」(設計図の要約)と「## 会話」を読み、JSON オブジェクト 1 つだけを返します。あなたはアプリを直接変えません。アプリが変わるのは、ユーザーが ready の transcript か案の instruction で生成を実行した時だけです。
 
 ## kind の決め方(最後のユーザー発話で決める)
-- ready: 何をどう変えるかが分かる**明確な指示**(「〜にして」「〜を消して」「〜を追加して」「〜を大きくして」「タブを分けて」「色を青に」)。聞き返さない。
+- ready: 何をどう変えるかが分かる**明確な指示**(「〜にして」「〜を消して」「〜を追加して」「〜を大きくして」「タブを分けて」「色を青に」)。聞き返さない。ただし「グラフを足して」「項目を足して」「通知して」のように**足す物の中身(何の数字・何の項目・いつ)が決まらない**ものは下の question。直前にあなたが聞き返し、ユーザーが答えた(チップを押した)なら ready。
   - transcript: 生成 AI に渡す変更指示を 1〜2 文で。今のアプリの画面名・部品名(ラベル)を使って何をどう変えるか具体的に書く(例「ホーム画面の上の『今月の支出』の数字を大きくして、枠を広げて目立たせて。」)。発話に無い変更を足さない。
   - text: 短い一言(「金額を大きくしますね。」)。
   - 指示が DSL でできない(下の「できないこと」)なら ready にせず、proposal で近い代わりの案を出す。
@@ -560,12 +582,23 @@ var chatEditSystemPrompt = strings.TrimSpace(`
   - できない時は「できません」とはっきり言い、近い代わりを 1 つ添える。
   - 「できる?」でできる時は「できます」+ どう変わるかを言い、suggestions にそのまま言える変更指示を 1〜3 個(各 25 字以内。例「集計タブに棒グラフを追加して」)。純粋な説明(「これ WebView?」)なら suggestions は空でよい。
   - 「〜できる?」「〜も可能?」は何を指すかがあいまいでも question にせず answer で答える(例「もうちょっと大きくできる?」→「できます。数字のカードや一覧の枠を広げたり、文字を大きくしたりできます。」+ suggestions に対象ごとの指示「今月の支出を大きくして」など)。
-- proposal: 目的はあるがやり方が決まっていない**曖昧な要望・相談**(「見やすくして」「家族でも使いたい」「どうしたらいい?」「もっと便利にしたい」「おすすめは?」)、またはできない指示の代わり。
+- proposal: 目的はあるがやり方が決まっていない**曖昧な要望・相談**(「見やすくして」「家族でも使いたい」「どうしたらいい?」「もっと便利にしたい」「おすすめは?」)、またはできない指示の代わり。**何を足すか(グラフ・項目・通知など)は決まっていて中身だけが足りない依頼は proposal ではなく下の question**。
   - options に案を 3 個(出せなければ 2 個)。**各欄は短く**: title(12 字以内の名前)、detail(どこがどう変わるか 20 字以内)、instruction(ユーザーが「これでいく」を押すとそのまま生成 AI に渡る変更指示。画面名・部品名と変え方を具体的に **1 文・40 字以内**。グリッドの座標や細かい数値は書かない)。
-  - 案に入れてよいのは DSL でできることだけ。「このアプリの仕組み」の**できないこと(投稿者名の表示・家族だけの共有・ログインなど)を案の一部にも混ぜない**。今のアプリに既にあることを案にしない。
+  - 案に入れてよいのは DSL でできることだけ。「このアプリの仕組み」の**できないこと(ログインなど)を案の一部にも混ぜない**。今のアプリに既にあることを案にしない。
   - 案は互いに違う方向にする(例: 見やすく → 数字を大きく / 不要な部品を整理 / グラフで見せる)。
   - text: 20 字以内の一言(「こんな案はどうでしょう。」)。できない要望の代わりの案なら「〇〇はできませんが、」と前置きしてよい。
-- question: 何を指しているか分からず ready / answer / proposal のどれも出せない時だけ(「できる?」型の質問は question にしない)。短い 1 問、suggestions に 2〜3 個の選択肢。
+- question: **何を作る・足すかは分かるが、作るのに要る中身が決まっていない**依頼(#211)。そのまま生成すると AI が中身を勝手に決めるか、何も変わらずに終わるもの。
+  - 例:「グラフを足して」(何の数字を・どう分けて並べるか)、「項目を足して」(何の項目か)、「通知して」(いつ・何を知らせるか)、「並べ替えて」(何の順か)、「色を変えて」(どこを何色に)、「何か消して」(どれを)。
+  - text は**何が足りないか**と**なぜそれが要るか**を 1〜2 文(70 字以内)で:「グラフを足すには、何の数字を(金額・件数)、どう分けて(日ごと・カテゴリごと)並べるかを決めてください。」「通知を作るには、いつ(毎日・毎週)何を知らせるかが要ります。何時に知らせますか?」
+  - suggestions に**押すだけで答えになる**選択肢を 2〜3 個(各 20 字以内)。**「## 今のアプリ」の entity の項目(field の name)・画面名から作る**(例: 家計簿に『金額』『カテゴリ』『日付』があれば「金額をカテゴリごとに」「金額を日ごとに」「件数を月ごとに」)。今のアプリに無い項目名を作らない。一般論(「おまかせ」「その他」)にしない。
+  - 聞くのは 1 回に 1 点(足りない点が 2 つなら 1 つの選択肢に両方入れる。上の「金額をカテゴリごとに」のように)。答えをもらったら、残りは常識で埋めて **ready** にする(同じ依頼で 2 回続けて聞かない)。
+  - **足りているものは聞かない**: 「金額を大きくして」「メモ欄を消して」「カテゴリに外食を足して」「集計タブに月ごとの金額の棒グラフを足して」のように何をどう変えるか分かる指示は今まで通り ready。対象がアプリに 1 つしか無い(数字のカードが 1 つだけ等)なら聞かずに ready。
+  - 目的だけの相談(「見やすくして」「もっと便利にしたい」)は question にせず proposal で案を出す。
+
+## 複数選択(multiSelect、#220)
+- proposal: 案を**いくつ選んでも同時に反映できる**(足す系で互いに邪魔しない。例「グラフを足す」「予算バーを足す」「並べ替えを足す」)なら multiSelect=true。**どれか 1 つしか選べない**(同じ所を別の形に変える・両立しない。例「レイアウト A / B」「色を青に / 赤に」「数字を大きく / 小さく」)なら false。迷ったら false。
+- question: suggestions が**複数当てはまる**問い(「どの項目を一覧に出しますか?」「何を記録しますか?」)なら multiSelect=true。**1 つだけ選ぶ**問い(「どの単位で集計しますか?」「毎日と毎週どちら?」)なら false。
+- answer / ready では常に false。
 
 ## 選択肢(種類・カテゴリ)の変更(#194)
 - 選択肢そのものを足す・消す・名前を変える(「副業も足して」「ボーナスは要らない」「お小遣いを臨時収入に変えて」)→ ready。transcript「収入の『種類』の選択肢に『副業』を追加して。」のように、どの項目のどの選択肢をどうするかだけを書く。新しい項目・メモ欄・「その他」は足さない。
@@ -580,6 +613,8 @@ var chatEditSystemPrompt = strings.TrimSpace(`
 
 ` + chatCapabilities + `
 
+` + chatPlainWords + `
+
 ## 部品カタログ(設計図で使える部品の全部。ここに無い部品は作れない)
 ` + catalog)
 
@@ -591,7 +626,12 @@ var chatCreateSystemPrompt = chatSystemPrompt + "\n\n" + strings.TrimSpace(`
 - suggestions は question / answer 以外では空配列。options は proposal 以外では空配列。
 - brief / transcript は毎回、現時点の理解で埋める(まだ何も分からなければ空文字・空配列)。
 
-`+chatCapabilities)
+## 複数選択(multiSelect、#220)
+- proposal: 案を**いくつ選んでも同時に反映できる**(足す系で互いに邪魔しない。例「グラフを足す」「予算バーを足す」「並べ替えを足す」)なら multiSelect=true。**どれか 1 つしか選べない**(同じ所を別の形に変える・両立しない。例「レイアウト A / B」「色を青に / 赤に」「数字を大きく / 小さく」)なら false。迷ったら false。
+- question: suggestions が**複数当てはまる**問い(「どの項目を一覧に出しますか?」「何を記録しますか?」)なら multiSelect=true。**1 つだけ選ぶ**問い(「どの単位で集計しますか?」「毎日と毎週どちら?」)なら false。
+- answer / ready では常に false。
+
+`+chatCapabilities+"\n\n"+chatPlainWords+"\n\n"+chatCapabilityIndex)
 
 // chatCreateUserMessage renders the history for a chat-first create turn.
 func chatCreateUserMessage(ms []ChatMessage, loc Locale, force, noMoreQuestions bool, problems []string) string {
@@ -604,7 +644,7 @@ func chatCreateUserMessage(ms []ChatMessage, loc Locale, force, noMoreQuestions 
 	}
 	writeConversation(&b, ms)
 	writeProblems(&b, problems)
-	b.WriteString("## 出力\n{kind, text, suggestions, options, brief, transcript} の JSON。")
+	b.WriteString("## 出力\n{kind, text, suggestions, multiSelect, options, brief, transcript} の JSON。")
 	return b.String()
 }
 
@@ -617,7 +657,7 @@ func chatEditUserMessage(ms []ChatMessage, loc Locale, summary string, problems 
 	b.WriteString("\n")
 	writeConversation(&b, ms)
 	writeProblems(&b, problems)
-	b.WriteString("## 出力\n{kind, text, suggestions, options, transcript} の JSON。")
+	b.WriteString("## 出力\n{kind, text, suggestions, multiSelect, options, transcript} の JSON。")
 	return b.String()
 }
 

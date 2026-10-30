@@ -22,7 +22,7 @@ final class MetamonUITests: XCTestCase {
     private func launch(example: String?, _ extra: [String: String] = [:]) -> XCUIApplication {
         let app = XCUIApplication()
         // METAMON_UI_PROBE: 生成中の表示が出ない時の切り分け用に、morphJob の状態を読める観測点を置く(#200)
-        var env = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto", "METAMON_UI_PROBE": "1"]
+        var env = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto", "METAMON_UI_PROBE": "1", "METAMON_AI_CONSENT": "granted"]
         if let example { env["METAMON_INITIAL_EXAMPLE"] = example }
         env.merge(extra) { _, new in new }
         app.launchEnvironment = env
@@ -191,6 +191,81 @@ final class MetamonUITests: XCTestCase {
         attachScreenshot("chat-proposal-applied")
     }
 
+    // MARK: - 複数選択(#220)
+
+    func testMultiSelectProposalAppliesTwoIdeas() {
+        // 「機能を足したい」→ モック AI が組み合わせられる案を 3 つ(multiSelect)。2 つ選んで「これでいく(2 件)」
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "機能を足したい", "METAMON_AUTO_PAUSE": "600"])
+        let toggles = app.buttons.matching(identifier: "chat.option.toggle")
+        XCTAssertTrue(toggles.firstMatch.waitForExistence(timeout: 15), "複数選択の案のカードが出ない")
+        XCTAssertTrue(waitUntil(timeout: 15) { toggles.count == 3 }, "案のカードが 3 枚でない(\(toggles.count) 枚)")
+        XCTAssertFalse(app.buttons["chat.option.choose"].exists, "複数選択なのにカードごとの「これでいく」が出ている")
+        let submit = app.buttons["chat.option.chooseSelected"]
+        XCTAssertTrue(submit.exists, "「これでいく(N 件)」が無い")
+        XCTAssertFalse(submit.isEnabled, "0 件で「これでいく」が押せる")
+        attachScreenshot("multi220-proposal-none")
+
+        toggles.element(boundBy: 0).tap()
+        toggles.element(boundBy: 1).tap()
+        XCTAssertTrue(waitUntil(timeout: 5) { submit.isEnabled && submit.label.contains("2 件") }, "2 件選んでも「これでいく(2 件)」にならない(\(submit.label))")
+        XCTAssertEqual(toggles.element(boundBy: 0).value as? String, "選択中")
+        XCTAssertEqual(toggles.element(boundBy: 2).value as? String, "未選択")
+        XCTAssertTrue(voiceSheet.exists, "選んだだけで音声シートが閉じた")
+        attachScreenshot("multi220-proposal-two")
+
+        submit.tap()
+        XCTAssertTrue(waitFor(voiceSheet, "exists == false", timeout: 15), "「これでいく(2 件)」で生成が始まらない")
+        // モックは指示をそのまま要約に返す: 2 案の指示が 1 回の反映に入っている
+        let applied = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "円グラフ", "予算の進捗バー")).firstMatch
+        XCTAssertTrue(applied.waitForExistence(timeout: 15), "2 案が 1 回で反映されない")
+        attachScreenshot("multi220-proposal-applied")
+    }
+
+    func testMultiSelectChipsSendJoinedAnswer() {
+        launch(example: nil, ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "項目を選びたい", "METAMON_AUTO_PAUSE": "600"])
+        let chips = app.buttons.matching(identifier: "chat.chip")
+        XCTAssertTrue(chips.firstMatch.waitForExistence(timeout: 15), "質問のチップが出ない")
+        let submit = app.buttons["chat.chip.submit"]
+        XCTAssertTrue(submit.exists && !submit.isEnabled, "0 件で「決定」が押せる")
+        chips.element(boundBy: 0).tap()
+        XCTAssertTrue(element(labelBeginsWith: "AI: どの項目").exists, "1 つ押しただけで送られた")
+        chips.element(boundBy: 2).tap()
+        attachScreenshot("multi220-chips-two")
+        submit.tap()
+        XCTAssertTrue(element(labelBeginsWith: "あなた: 金額、メモ").waitForExistence(timeout: 15), "選んだ項目が「、」でつないで送られない")
+        XCTAssertTrue(app.buttons["chat.build"].waitForExistence(timeout: 15), "決定で次(この内容で作る)に進まない")
+    }
+
+    // MARK: - チャット履歴(#210)
+
+    func testChatHistoryRemainsAfterApply() {
+        // 案の「これでいく」で反映 → シートを開き直すと、前の会話と「ここで反映しました(vN)・要約」の区切りが見える
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "見やすくして", "METAMON_AUTO_PAUSE": "600"])
+        let choose = app.buttons.matching(identifier: "chat.option.choose")
+        XCTAssertTrue(choose.firstMatch.waitForExistence(timeout: 15), "案のカードの「これでいく」が出ない")
+        XCTAssertTrue(waitUntil(timeout: 15) { choose.count == 2 }, "案のカードが 2 枚でない")
+        attachScreenshot("history-1-before-apply")
+        choose.firstMatch.tap()
+        XCTAssertTrue(waitFor(voiceSheet, "exists == false", timeout: 15), "「これでいく」で音声シートが閉じない")
+        let applied = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "反映しました")).firstMatch
+        XCTAssertTrue(applied.waitForExistence(timeout: 15), "改変されない")
+        attachScreenshot("history-2-applied")
+
+        waitForFab()
+        fab.tap()
+        XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開き直せない")
+        let divider = app.descendants(matching: .any)["chat.history.applied"]
+        XCTAssertTrue(divider.waitForExistence(timeout: 15), "反映の区切りが見えない")
+        XCTAssertTrue(divider.label.contains("ここで反映しました(v"), "区切りの文言: \(divider.label)")
+        XCTAssertTrue(element(labelBeginsWith: "あなた: 見やすくして").exists, "前の会話が見えない")
+        XCTAssertTrue(app.buttons["chat.restart"].exists, "「最初から」が無い")
+        attachScreenshot("history-3-reopened")
+
+        app.buttons["chat.restart"].tap()
+        XCTAssertTrue(waitFor(divider, "exists == false", timeout: 15), "「最初から」で履歴が消えない")
+        attachScreenshot("history-4-restarted")
+    }
+
     // MARK: - 一覧のチェック丸(#127)
 
     func testListCheckCircleMarksDone() {
@@ -313,18 +388,22 @@ final class MetamonUITests: XCTestCase {
         XCTAssertFalse((field.value as? String ?? "").contains("three"), "送信後に入力欄が空にならない")
     }
 
+    /// 返事待ちの間にキーボードを出して測るための、モックの対話の待ち(秒)。CI(macos-26)は XCUI の問い合わせが 1 回 0.3〜1 秒と遅く、
+    /// 16 秒では送信 → キーボード表示 → 計測の前に返事が届いた(run 40158670179)。余裕を見て 40 秒
+    private let kbReplyDelay = "40"
+
     /// 返事待ちの間にキーボードを出しても、返事が届いた後も、入力欄はキーボードのすぐ上にあってタップできる(#208)。
     /// edit = 作ったアプリの音声シート、create = 初期画面の対話。モックの対話の待ちを延ばして返事待ちの間に操作する。
     func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_edit() {
         launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "見やすくして", "METAMON_AUTO_PAUSE": "600",
-                                    "METAMON_MOCK_AI_DELAY": "16"])
+                                    "METAMON_MOCK_AI_DELAY": kbReplyDelay])
         assertComposerAboveKeyboardAcrossReply("edit", replied: app.buttons.matching(identifier: "chat.option.choose").firstMatch,
                                                 userBubble: "あなた: 見やすくして")
     }
 
     /// 実機の手順どおり: FAB → シートの文字入力で 1 つ目を打って送る(キーボードが閉じる)→ 返事待ちの間に対話の入力欄をタップ
     func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_editTyped() {
-        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": "16"])
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": kbReplyDelay])
         waitForFab()
         fab.tap()
         XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開かない")
@@ -339,7 +418,7 @@ final class MetamonUITests: XCTestCase {
 
     /// 1 つ目を声で(シミュレータのマイクはダミーの定型文)
     func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_editVoice() {
-        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": "16"])
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": kbReplyDelay])
         waitForFab()
         fab.tap()
         XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開かない")
@@ -356,7 +435,7 @@ final class MetamonUITests: XCTestCase {
     }
 
     func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_createTyped() {
-        launch(example: nil, ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": "16"])
+        launch(example: nil, ["METAMON_CLARIFY": "1", "METAMON_MOCK_AI_DELAY": kbReplyDelay])
         let field = composerField
         XCTAssertTrue(field.waitForExistence(timeout: 15), "初期画面の文字入力が無い")
         field.tap()
@@ -368,7 +447,7 @@ final class MetamonUITests: XCTestCase {
 
     func testChatComposerStaysAboveKeyboardWhileWaitingAndAfterReply_create() {
         launch(example: nil, ["METAMON_CLARIFY": "1", "METAMON_AUTO_TRANSCRIPT": "日記", "METAMON_AUTO_PAUSE": "600",
-                              "METAMON_MOCK_AI_DELAY": "16"])
+                              "METAMON_MOCK_AI_DELAY": kbReplyDelay])
         assertComposerAboveKeyboardAcrossReply("create", replied: app.buttons.matching(identifier: "chat.chip").firstMatch,
                                                 userBubble: "あなた: 日記")
     }
@@ -404,7 +483,7 @@ final class MetamonUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(gapWaiting, -1, "返事待ち: 入力欄がキーボードに隠れている", file: file, line: line)
         XCTAssertLessThanOrEqual(gapWaiting, 80, "返事待ち: 入力欄がキーボードから離れすぎ(二重に持ち上がっている)", file: file, line: line)
 
-        XCTAssertTrue(replied.waitForExistence(timeout: 20), "返事が届かない", file: file, line: line)
+        XCTAssertTrue(replied.waitForExistence(timeout: 60), "返事が届かない", file: file, line: line)
         Thread.sleep(forTimeInterval: 0.8) // 返事の吹き出し・スクロールのアニメーション
         settle()
         XCTAssertTrue(kb.exists, "返事が届いたらキーボードが閉じた", file: file, line: line)
@@ -520,25 +599,156 @@ final class MetamonUITests: XCTestCase {
     }
 }
 
-// MARK: - 有料機能の確認カード(#77)
+// MARK: - 有料機能の確認カード(#77)・課金画面(#414)
 
 extension MetamonUITests {
-    /// 課金を有効(`METAMON_IAP_ENFORCE=1`)にして「みんなで書き込む掲示板」を相談 →「これでいく」で確認カード →
-    /// 「この機能なしで作る」で生成が始まり、アプリができる。無料枠に当たらないよう `METAMON_IAP_FREE_LIMIT` を大きくする。
-    func testPaidFeatureCardBuildWithoutFeature() {
-        launch(example: nil, slowAI.merging(["METAMON_CLARIFY": "1", "METAMON_IAP_ENFORCE": "1", "METAMON_IAP_FREE_LIMIT": "1000",
-                                             "METAMON_AUTO_TRANSCRIPT": "サークルのみんなで予定を書き込める掲示板アプリを作って",
-                                             "METAMON_AUTO_PAUSE": "600"]) { $1 })
+    /// 課金の制限を有効にし、購入は端末内のモック(`METAMON_MOCK_STORE=1`・¥500)で即成功させる。無料枠に当たらないよう回数は大きく。
+    private var paidEnv: [String: String] {
+        slowAI.merging(["METAMON_IAP_ENFORCE": "1", "METAMON_IAP_FREE_LIMIT": "1000", "METAMON_MOCK_STORE": "1"]) { $1 }
+    }
+
+    private var paywallHeadline: XCUIElement { app.descendants(matching: .any).matching(identifier: "paywall.headline").firstMatch }
+    private var publicNotice: XCUIElement { app.descendants(matching: .any)["publicDataNotice"].firstMatch }
+
+    /// 「みんなで書き込む掲示板」を相談 →「これでいく」まで(確認カードと課金画面が出る直前)。
+    private func launchSharedBoardChat() {
+        launch(example: nil, paidEnv.merging(["METAMON_CLARIFY": "1",
+                                              "METAMON_AUTO_TRANSCRIPT": "サークルのみんなで予定を書き込める掲示板アプリを作って",
+                                              "METAMON_AUTO_PAUSE": "600"]) { $1 })
         let build = app.buttons["chat.build"]
         XCTAssertTrue(build.waitForExistence(timeout: 15), "「これでいく」が出ない")
         build.tap()
+    }
+
+    /// 課金画面の中身(何ができるか・価格・購入・復元・規約とプライバシー)
+    private func assertPaywallContent(_ name: String, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(paywallHeadline.waitForExistence(timeout: 10), "課金画面が出ない(\(name))", file: file, line: line)
+        XCTAssertTrue(paywallHeadline.label.contains("Tailor It Pro"), "見出し: \(paywallHeadline.label)", file: file, line: line)
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.benefits"].exists, "Pro でできることが無い", file: file, line: line)
+        let price = app.descendants(matching: .any)["paywall.price"].firstMatch
+        XCTAssertTrue(price.waitForExistence(timeout: 10), "価格が無い", file: file, line: line)
+        XCTAssertTrue(price.label.contains("¥500"), "価格: \(price.label)", file: file, line: line)
+        XCTAssertTrue(app.buttons["paywall.purchase"].isEnabled, "購入ボタンが押せない", file: file, line: line)
+        XCTAssertTrue(app.buttons["paywall.restore"].exists, "復元が無い", file: file, line: line)
+        XCTAssertTrue(app.descendants(matching: .any)["legal.terms"].exists, "利用規約へのリンクが無い", file: file, line: line)
+        XCTAssertTrue(app.descendants(matching: .any)["legal.privacy-policy"].exists, "プライバシーポリシーへのリンクが無い", file: file, line: line)
+        attachScreenshot("paywall-\(name)")
+    }
+
+    /// 下までスクロールして、自動更新の説明・規約のリンクを残す(購入ボタンは画面外になるので、この後は閉じるだけ)
+    private func scrollPaywallToBottom(_ name: String, file: StaticString = #filePath, line: UInt = #line) {
+        app.swipeUp()
+        XCTAssertTrue(app.descendants(matching: .any)["legal.terms"].isHittable, "利用規約へのリンクが押せない", file: file, line: line)
+        attachScreenshot("paywall-\(name)-bottom")
+    }
+
+    /// 購入 →「Pro になりました」→ 課金画面が自動で閉じる
+    private func purchaseOnPaywall(file: StaticString = #filePath, line: UInt = #line) {
+        app.buttons["paywall.purchase"].tap()
+        let pro = app.descendants(matching: .any)["paywall.pro"].firstMatch
+        XCTAssertTrue(pro.waitForExistence(timeout: 10), "購入しても Pro にならない", file: file, line: line)
+        attachScreenshot("paywall-purchased")
+        XCTAssertTrue(waitFor(paywallHeadline, "exists == false", timeout: 10), "購入後に課金画面が閉じない", file: file, line: line)
+    }
+
+    /// Pro でない → 有料機能(共有)のアプリを相談 →「これでいく」で課金画面 → モック購入 → 共有の掲示板ができる(誰でも見られる表示)
+    func testPaidFeaturePaywallPurchaseThenBuildsSharedApp() {
+        launchSharedBoardChat()
+        assertPaywallContent("chat")
+        XCTAssertTrue(paywallHeadline.label.contains("みんなで共有するデータ"), "見出しに機能名が無い: \(paywallHeadline.label)")
+        XCTAssertFalse(generating.exists, "課金画面の間は生成しない")
+        purchaseOnPaywall()
+        assertGeneratingThenDone("paid-purchased")
+        XCTAssertTrue(publicNotice.waitForExistence(timeout: 15), "購入後に共有(誰でも見られる)の掲示板ができていない")
+        attachScreenshot("paid-shared-app")
+    }
+
+    /// 課金画面を閉じる → 確認カードに戻る(まだ作らない)→「この機能なしで作る」で自分だけの記録のアプリができる
+    func testPaidFeatureCardBuildWithoutFeature() {
+        launchSharedBoardChat()
+        assertPaywallContent("chat-before-close")
+        app.buttons["paywall.close"].tap()
         let headline = app.descendants(matching: .any).matching(identifier: "paid.headline").firstMatch
-        XCTAssertTrue(headline.waitForExistence(timeout: 5), "有料機能の確認カードが出ない")
+        XCTAssertTrue(headline.waitForExistence(timeout: 5), "課金画面を閉じたら確認カードに戻らない")
         XCTAssertTrue(headline.label.contains("Tailor It Pro"), "見出し: \(headline.label)")
         XCTAssertTrue(app.buttons["paid.purchase"].exists, "「購入して作る」が無い")
-        XCTAssertFalse(generating.exists, "カードの間は生成しない")
+        XCTAssertFalse(generating.exists, "閉じただけで生成した")
         attachScreenshot("paid-feature-card")
         app.buttons["paid.withoutFeature"].tap()
         assertGeneratingThenDone("paid-without")
+        XCTAssertFalse(publicNotice.exists, "この機能なしで作ったのに共有の記録がある")
+    }
+
+    /// チャットを通らない即生成(設定 OFF)でも、共有の記録ができたら課金画面。閉じると共有を外す修正が走る
+    func testDirectGenerationWithSharedDataGoesThroughPaywall() {
+        launch(example: nil, paidEnv.merging(["METAMON_CLARIFY": "0", "METAMON_MOCK_AI_DELAY": "2"]) { $1 })
+        let field = composerField
+        XCTAssertTrue(field.waitForExistence(timeout: 15), "初期画面の文字入力が無い")
+        field.tap()
+        field.typeText("みんなの掲示板アプリを作って")
+        app.buttons["送信"].firstMatch.tap()
+        assertPaywallContent("direct")
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.closeNote"].exists, "閉じた時の説明が無い")
+        scrollPaywallToBottom("direct")
+        app.buttons["paywall.close"].tap()
+        let dropped = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "自分だけの記録にしました")).firstMatch
+        XCTAssertTrue(dropped.waitForExistence(timeout: 20), "閉じても共有を外さない")
+        XCTAssertFalse(publicNotice.exists, "買っていないのに共有の記録が残っている")
+        attachScreenshot("direct-dropped-shared")
+    }
+}
+
+// MARK: - 1 つ前に戻す / やり直す(#209)
+
+extension MetamonUITests {
+    private func text(_ label: String) -> XCUIElement {
+        app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", label)).firstMatch
+    }
+
+    /// 家計簿で修正(モックは「筋トレの記録」でトレーニング記録に変わる)→ 要約の「元に戻す」で家計簿に戻る →「やり直す」で再び修正後に。
+    /// 修正チャット(音声シート)の上部の「1つ前に戻す」も、戻せる版が無い時は押せない。
+    func testUndoFromSummaryBannerAndRedo() {
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "0", "METAMON_MOCK_AI_DELAY": "0.5"])
+        waitForFab()
+        XCTAssertTrue(text("最近の支出").waitForExistence(timeout: 15), "家計簿で起動していない")
+        fab.tap()
+        XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開かない")
+        let headerUndo = app.buttons["voice.undo"]
+        XCTAssertTrue(headerUndo.exists, "修正チャットの上部に「1つ前に戻す」が無い")
+        XCTAssertFalse(headerUndo.isEnabled, "戻せる版が無いのに押せる")
+        attachScreenshot("undo-header-disabled")
+
+        let field = composerField
+        XCTAssertTrue(field.waitForExistence(timeout: 15), "シートの文字入力が無い")
+        field.tap()
+        field.typeText("筋トレの記録")
+        app.buttons["送信"].firstMatch.tap()
+
+        let undo = app.buttons["banner.undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 20), "修正直後の要約に「元に戻す」が出ない")
+        XCTAssertTrue(text("反映しました").exists, "要約が出ていない")
+        XCTAssertFalse(text("最近の支出").exists, "修正が反映されていない")
+        attachScreenshot("undo-banner-after-edit")
+        undo.tap()
+
+        XCTAssertTrue(text("1つ前に戻しました").waitForExistence(timeout: 15), "「1つ前に戻しました」が出ない")
+        XCTAssertTrue(text("最近の支出").waitForExistence(timeout: 15), "前の画面(家計簿)に戻らない")
+        let redo = app.buttons["banner.redo"]
+        XCTAssertTrue(redo.exists, "戻した後に「やり直す」が無い")
+        attachScreenshot("undo-banner-restored")
+        redo.tap()
+
+        XCTAssertTrue(text("やり直しました").waitForExistence(timeout: 15), "「やり直しました」が出ない")
+        XCTAssertTrue(waitFor(text("最近の支出"), "exists == false", timeout: 15), "やり直すで修正後に戻らない")
+        attachScreenshot("undo-redo-done")
+
+        // 修正チャットの上部からも戻せる
+        fab.tap()
+        XCTAssertTrue(headerUndo.waitForExistence(timeout: 15), "音声シートが開かない")
+        XCTAssertTrue(headerUndo.isEnabled, "戻せる版があるのに押せない")
+        attachScreenshot("undo-header-enabled")
+        headerUndo.tap()
+        XCTAssertTrue(text("最近の支出").waitForExistence(timeout: 15), "上部の「1つ前に戻す」で前の画面に戻らない")
+        attachScreenshot("undo-header-restored")
     }
 }

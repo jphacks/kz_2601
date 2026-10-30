@@ -58,23 +58,38 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompImage, dsl.CompList, dsl.CompStat, dsl.CompChart, dsl.CompVoiceInput, dsl.CompSpacer, dsl.CompDivider,
 		dsl.CompCard, dsl.CompDisclosure, dsl.CompCarousel, dsl.CompGrid,
 		dsl.CompSearchBar, dsl.CompCalendar, dsl.CompShareButton, dsl.CompOpenURLButton,
-		dsl.CompMapView, dsl.CompLocationButton, dsl.CompQrScanner, dsl.CompTimerDisplay, dsl.CompWebView,
+		dsl.CompMapView, dsl.CompLocationButton, dsl.CompLocationPicker, dsl.CompRouteGuide, dsl.CompQrScanner, dsl.CompTimerDisplay, dsl.CompWebView,
+		dsl.CompQrCode, // #422
 		dsl.CompSlider, dsl.CompStepper, dsl.CompTextEditor, dsl.CompSecureField, dsl.CompTimePicker, dsl.CompColorPicker, dsl.CompRating,
 		// display
 		dsl.CompLabel, dsl.CompIcon, dsl.CompProgressBar, dsl.CompGauge, dsl.CompBadge, dsl.CompLink, dsl.CompMarkdown,
 		dsl.CompAvatar, dsl.CompTable, dsl.CompTimeline, dsl.CompEmptyState,
 		// logic
 		dsl.CompSettlement,
+		// random pick (#263)
+		dsl.CompRandomPicker,
 		// on-device AI
 		dsl.CompAiButton,
 		// peer-to-peer
 		dsl.CompNearbyShare,
 		// location tracking
 		dsl.CompLocationTracker,
+		// chat (#260)
+		dsl.CompChatThread,
+		// dashcam (#410)
+		dsl.CompDashcam,
 		// device health
 		dsl.CompHealthStat,
+		// device sensors (#419)
+		dsl.CompSensorValue,
+		// music (#412)
+		dsl.CompMusicPlayer,
+		// timetable
+		dsl.CompGridTable,
 		// video (#206)
 		dsl.CompVideoField, dsl.CompVideoPlayer,
+		// audio (#420)
+		dsl.CompAudioRecorder,
 	} {
 		goTypes[string(ct)] = true
 	}
@@ -129,18 +144,24 @@ func TestCatalogRendering(t *testing.T) {
 		"- {\"op\":\"daysUntil\"",
 		"- {\"agg\":",
 		"レシピ",
-		"- filter{field, op(eq|neq|gt|gte|lt|lte|thisMonth|today|thisWeek|thisYear), value}",
-		"- navigate{screen / presentation(push|sheet|fullScreen)}",
+		"- filter{field, op(eq|neq|gt|gte|lt|lte|thisMonth|today|thisWeek|thisYear|contains), value}",
+		"- navigate{screen / prefillRef, presentation(push|sheet|fullScreen)}",
 		"- saveRecord{entity / screen}",
 		"- back{(追加キー無し)}",
 		"- scheduleNotification{notification{id,title,body,repeat}}",
 		"- voiceInput: / prompt, size(compact|large)",
 		"- divider: (追加キー無し) —",
-		"- notification{id, title, body, repeat(once|daily|weekly) / time, weekday(mon|tue|wed|thu|fri|sat|sun)}",
+		"- notification{id, title, body, repeat(once|daily|weekly) / enabledField, entity, field, offsetMinutes, time, titleField, weekday(mon|tue|wed|thu|fri|sat|sun)}",
 		"どの action にも付けられる任意キー: confirmMessage",
 		"### Entity の scope",
 		"- scope: private —",
 		"- scope: public —",
+		"### Entity の edit",
+		"- edit: author —",
+		"- edit: members —",
+		"### レコードの予約値",
+		"- $author —",
+		"- $createdAt —",
 	} {
 		if !strings.Contains(catalog, want) {
 			t.Errorf("catalog lacks %q\n%s", want, catalog)

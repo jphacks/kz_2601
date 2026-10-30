@@ -17,8 +17,9 @@ const CodeAccountDeleted = "account_deleted"
 
 // deleteMe is DELETE /v1/me (#119, App Store 5.1.1(v)). Logical deletion:
 // store.Accounts.DeactivateUser marks the uid deleted, archives its apps,
-// revokes its share links and takes down its catalog listings. The Firebase
-// Auth user is not deleted. Idempotent: always 204.
+// revokes its share links and takes down its catalog listings. The app deletes
+// the Firebase Auth user itself; cmd/purge erases the data (and the Auth user,
+// as a backstop) store.PurgeAfter later (#458). Idempotent: always 204.
 func (h *Handler) deleteMe(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.DeactivateUser(r.Context(), uidOf(r)); err != nil {
 		fail(w, fmt.Errorf("deactivate user: %w", err))

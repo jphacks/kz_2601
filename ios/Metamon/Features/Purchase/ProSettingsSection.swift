@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#450 G1)は App 内課金を持たない(設定の「Tailor It Pro」を出さない)。
+#if !APP_STORE_REVIEW
 import SwiftUI
 import MetamonServices
 
@@ -38,7 +40,7 @@ struct ProSettingsSection: View {
             }
             .disabled(restoring)
             #if DEBUG
-            Toggle("回数制限を無効にする(デモ用)", isOn: $gate.limitDisabled)
+            Toggle("課金の制限を無効にする(デモ用・回数と有料機能)", isOn: $gate.limitDisabled)
                 .tint(Theme.Colors.brandA)
                 .accessibilityIdentifier("settings.pro.limitDisabled")
             #endif
@@ -61,3 +63,4 @@ struct ProSettingsSection: View {
         }
     }
 }
+#endif

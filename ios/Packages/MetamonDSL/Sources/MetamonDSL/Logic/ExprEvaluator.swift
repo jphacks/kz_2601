@@ -167,7 +167,24 @@ public final class ExprEvaluator {
     public func apply(_ filters: [Filter], entity: Entity?, to records: [Record], row: Row? = nil) -> [Record] {
         let resolved = resolve(filters, row: row)
         guard !resolved.isEmpty else { return records }
-        return records.filter { r in resolved.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field), now: now, calendar: calendar) } }
+        return records.filter { r in resolved.allSatisfy { matches($0, record: r, field: entity?.field($0.field)) } }
+    }
+
+    /// `Aggregator.matches` + type refs の `contains` は削除済みの id を除いて判定(残りが 0 件なら全員に一致・#231)。
+    private func matches(_ f: Filter, record: Record, field: Field?) -> Bool {
+        guard f.op == "contains", let field, field.type == .refs else {
+            return Aggregator.matches(f, record: record, field: field, now: now, calendar: calendar)
+        }
+        let ids = liveRefIds(record[f.field], field: field)
+        return ids.isEmpty || ids.contains(f.value?.stringValue ?? "")
+    }
+
+    /// type refs の保存値のうち、参照先にまだあるレコードの id。
+    func liveRefIds(_ v: JSONValue, field: Field) -> [String] {
+        let ids = Aggregator.refIds(v)
+        guard !ids.isEmpty, let target = field.refEntity else { return ids }
+        let live = Set(source(target).map(\.id))
+        return ids.filter { live.contains($0) }
     }
 
     // MARK: - agg
@@ -180,7 +197,7 @@ public final class ExprEvaluator {
         let usesComputed = ([a.field, a.by].compactMap { $0 } + a.filters.map(\.field)).contains { entity?.field($0)?.isComputed == true }
         let base = usesComputed ? viewRecords(for: a.entity) : source(a.entity)
         let rows = resolved.filters.isEmpty ? base : base.filter { r in
-            resolved.filters.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field), now: now, calendar: calendar) }
+            resolved.filters.allSatisfy { matches($0, record: r, field: entity?.field($0.field)) }
         }
         let nums = a.field.map { f in rows.compactMap { $0[f].doubleValue ?? $0[f].stringValue.flatMap { Double($0) } } } ?? []
         let v: ExprValue?
@@ -209,6 +226,12 @@ public final class ExprEvaluator {
         case "coalesce":
             for a in args { if let v = evaluate(a, row: row), v != .string("") { return v } }
             return nil
+        case "len":
+            // type refs(#231): 選んだ件数。削除済みの id は数えず、残りが 0 件(未選択含む)なら参照先の全件数(= 全員で割る)
+            if case .ref(let f)? = args.first, !f.contains("."), let row, let field = row.entity?.field(f), field.type == .refs {
+                let ids = liveRefIds(row.record[f], field: field)
+                return .number(Double(ids.isEmpty ? source(field.refEntity ?? "").count : ids.count))
+            }
         case "streak", "doneInDays":
             // 毎日チェック(#172): 第 1 引数は resets daily の toggle field の ref。値ではなく行の履歴を読む
             guard case .ref(let f)? = args.first, !f.contains("."), let row else { return nil }

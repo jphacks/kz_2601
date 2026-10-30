@@ -48,6 +48,14 @@ type Notification struct {
 	Repeat  string `json:"repeat"`            // once|daily|weekly
 	Time    string `json:"time,omitempty"`    // HH:MM local
 	Weekday string `json:"weekday,omitempty"` // mon..sun (weekly)
+	// Record-based (#228, app.notifications only): one notification per record
+	// of Entity at the time in Field (datetime / date / "HH:MM" string),
+	// shifted by OffsetMinutes (negative = before).
+	Entity        string `json:"entity,omitempty"`
+	Field         string `json:"field,omitempty"`
+	OffsetMinutes int    `json:"offsetMinutes,omitempty"`
+	TitleField    string `json:"titleField,omitempty"`   // record field shown as the body
+	EnabledField  string `json:"enabledField,omitempty"` // boolean field; false = skip the record
 }
 
 // VoiceEntry is how the user re-enters voice mode.
@@ -73,7 +81,24 @@ type Entity struct {
 	Name       string      `json:"name"`
 	TitleField string      `json:"titleField,omitempty"`
 	Scope      EntityScope `json:"scope,omitempty"` // "" = private
+	Edit       EntityEdit  `json:"edit,omitempty"`  // "" = author (shared/public only)
+	Marks      []Mark      `json:"marks,omitempty"` // per-user toggles: like / save (#255, shared/public only)
 	Fields     []Field     `json:"fields"`
+}
+
+// EntityEdit says who may update a shared/public record. Deleting is always
+// the author's alone.
+type EntityEdit string
+
+const (
+	EditAuthor  EntityEdit = "author"  // only the record's author (default)
+	EditMembers EntityEdit = "members" // anyone who opened the app (#252)
+)
+
+// MembersCanEdit reports whether non-authors may PATCH this entity's records.
+// Private entities ignore edit.
+func (e *Entity) MembersCanEdit() bool {
+	return e.IsShared() && e.Edit == EditMembers
 }
 
 // EntityScope says who shares an entity's records.
@@ -81,7 +106,7 @@ type EntityScope string
 
 const (
 	ScopePrivate EntityScope = "private" // owner only (default)
-	ScopeShared  EntityScope = "shared"  // v1: same as public; participant-only later
+	ScopeShared  EntityScope = "shared"  // creator + people who joined by share link (#388)
 	ScopePublic  EntityScope = "public"  // anyone can read; signed-in users can post
 )
 
@@ -121,6 +146,7 @@ const (
 	FieldVideo    FieldType = "video"    // "video:<id>|data:image/jpeg;base64,<thumb>" (movie stays on the device)
 	FieldLocation FieldType = "location" // "lat,lng"
 	FieldRef      FieldType = "ref"      // id of a record of Field.RefEntity
+	FieldRefs     FieldType = "refs"     // ids of records of Field.RefEntity (multi-select, #231); [] = everyone
 )
 
 // Field is one column of an Entity.
@@ -132,9 +158,10 @@ type Field struct {
 	Options      []string  `json:"options,omitempty"`
 	DefaultValue any       `json:"defaultValue,omitempty"` // string|number|bool|nil; "now" for date types
 	Unit         string    `json:"unit,omitempty"`
-	RefEntity    string    `json:"refEntity,omitempty"` // type=ref: target entity id
+	RefEntity    string    `json:"refEntity,omitempty"` // type=ref/refs: target entity id
 	Computed     *Expr     `json:"computed,omitempty"`  // read-only calculated field (row context = this record)
 	Health       string    `json:"health,omitempty"`    // "weight": also write the saved value to HealthKit (#167)
+	Hidden       bool      `json:"hidden,omitempty"`    // not shown to answerers (quiz answer key); computed may compare it (#262)
 }
 
 // Screen is one navigable page.
@@ -166,6 +193,9 @@ const (
 	ActionResetForm     ActionType = "resetForm"
 	ActionScheduleNotif ActionType = "scheduleNotification"
 	ActionCancelNotif   ActionType = "cancelNotification"
+	ActionExport        ActionType = "export"
+	ActionStartActivity ActionType = "startActivity" // #423 Live Activity
+	ActionEndActivity   ActionType = "endActivity"
 )
 
 // Action is a non-nesting side effect triggered by buttons/list taps.
@@ -178,6 +208,12 @@ type Action struct {
 	ConfirmMessage string        `json:"confirmMessage,omitempty"`
 	Notification   *Notification `json:"notification,omitempty"`   // scheduleNotification
 	NotificationID string        `json:"notificationId,omitempty"` // cancelNotification
+	PrefillRef     string        `json:"prefillRef,omitempty"`     // navigate: ref field of the target form set to the current record (#256)
+	Format         string        `json:"format,omitempty"`         // export: csv|pdf (#421)
+	Filter         *Filter       `json:"filter,omitempty"`         // export
+	Fields         []string      `json:"fields,omitempty"`         // export: columns (default all but photo/video)
+	Title          string        `json:"title,omitempty"`          // export: file name / PDF heading
+	Activity       *Activity     `json:"activity,omitempty"`       // startActivity (#423)
 }
 
 // ComponentType discriminates Component.
@@ -214,11 +250,15 @@ const (
 	// nav / native leaves
 	CompSearchBar      ComponentType = "searchBar"      // screen-local search text -> list.searchField
 	CompCalendar       ComponentType = "calendar"       // month view over entity.dateField
+	CompGridTable      ComponentType = "gridTable"      // timetable: columnField x rowField cells (#234)
 	CompShareButton    ComponentType = "shareButton"    // ShareLink
 	CompOpenURLButton  ComponentType = "openUrlButton"  // fixed URL link
 	CompMapView        ComponentType = "mapView"        // MapKit pins from a location field
 	CompLocationButton ComponentType = "locationButton" // CoreLocation -> location field
+	CompLocationPicker ComponentType = "locationPicker" // search / map pin -> location field (+ nameField) (#212)
+	CompRouteGuide     ComponentType = "routeGuide"     // MapKit turn-by-turn guidance to a destination (#411)
 	CompQrScanner      ComponentType = "qrScanner"      // AVFoundation -> string field
+	CompQrCode         ComponentType = "qrCode"         // CoreImage QR from text / field / value (#422)
 	CompTimerDisplay   ComponentType = "timerDisplay"   // stopwatch / countdown
 	CompWebView        ComponentType = "webView"        // in-app WKWebView (https only)
 	// leaves: input batch
@@ -243,14 +283,24 @@ const (
 	CompEmptyState  ComponentType = "emptyState"
 	// logic
 	CompSettlement ComponentType = "settlement" // greedy "A pays B" list from a balance field
+	// random pick (#263): one record per button press, not saved
+	CompRandomPicker ComponentType = "randomPicker"
 	// on-device AI (#78)
-	CompAiButton ComponentType = "aiButton" // Foundation Models -> form field (never leaves the device)
+	CompAiButton ComponentType = "aiButton" // Foundation Models -> form field; task generate may fall back to /v1/text (#417)
 	// peer-to-peer
 	CompNearbyShare ComponentType = "nearbyShare" // MultipeerConnectivity: send records to a nearby device
 	// location tracking (#168): start/stop recording points while the user opts in
 	CompLocationTracker ComponentType = "locationTracker"
+	// chat (#260): bubbles oldest-first + a pinned input bar that saves a record
+	CompChatThread ComponentType = "chatThread"
+	// dashcam (#410): rear camera loop recording, impact save, auto start
+	CompDashcam ComponentType = "dashcam"
 	// device health (#167)
 	CompHealthStat ComponentType = "healthStat" // CoreMotion steps / HealthKit weight (no entity)
+	// device sensors (#419): CoreMotion / CMAltimeter live value, optional save
+	CompSensorValue ComponentType = "sensorValue"
+	// music (#412): Apple Music player + song requests from nearby friends
+	CompMusicPlayer ComponentType = "musicPlayer"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -325,8 +375,10 @@ type Component struct {
 	OnDateTap     *Action `json:"onDateTap,omitempty"`     // calendar
 	LocationField string  `json:"locationField,omitempty"` // mapView
 	Zoom          string  `json:"zoom,omitempty"`          // mapView: near|city|wide
-	Mode          string  `json:"mode,omitempty"`          // timerDisplay: stopwatch|countdown
+	Mode          string  `json:"mode,omitempty"`          // timerDisplay: stopwatch|countdown / routeGuide: automobile|walking
+	Address       string  `json:"address,omitempty"`       // routeGuide: fixed destination (address / place name)
 	Seconds       int     `json:"seconds,omitempty"`       // timerDisplay countdown start / locationTracker auto stop
+	LiveActivity  bool    `json:"liveActivity,omitempty"`  // timerDisplay: mirror to the lock screen / Dynamic Island (#423)
 	ShareTo       string  `json:"shareTo,omitempty"`       // shareButton: any|line|slack|discord (`target` is progressBar's number)
 	// input batch (slider / stepper / rating / textEditor). Pointers so that
 	// an explicit 0 round-trips through omitempty. Min/Max are shared with gauge.
@@ -350,7 +402,7 @@ type Component struct {
 	TitleField    string        `json:"titleField,omitempty"`    // timeline
 	SubtitleField string        `json:"subtitleField,omitempty"` // timeline
 
-	// settlement
+	// settlement / locationPicker (#212: place name string field)
 	NameField    string `json:"nameField,omitempty"`
 	BalanceField string `json:"balanceField,omitempty"`
 
@@ -359,10 +411,59 @@ type Component struct {
 	Input   string   `json:"input,omitempty"`   // form field fed to the model ("" = whole draft)
 	Output  string   `json:"output,omitempty"`  // form field the result is written to
 	Options []string `json:"options,omitempty"` // classify candidates (else the enum output field's options)
+	Shape   string   `json:"shape,omitempty"`   // generate (#417): line|list|fields
+	Count   int      `json:"count,omitempty"`   // generate list: number of items
+	Items   []string `json:"items,omitempty"`   // generate fields: item names
 
 	// healthStat (#167). Label / Target are shared.
 	Metric string `json:"metric,omitempty"` // steps|weight
 	Period string `json:"period,omitempty"` // today|week (default today)
+
+	// gridTable (#234). Entity / TitleField / SubtitleField / OnItemTap are shared.
+	ColumnField  string     `json:"columnField,omitempty"`  // x axis (e.g. weekday enum)
+	RowField     string     `json:"rowField,omitempty"`     // y axis (e.g. period integer)
+	ColumnValues []string   `json:"columnValues,omitempty"` // explicit column headers (else enum options)
+	RowValues    []string   `json:"rowValues,omitempty"`    // explicit row headers for enum/string rowField
+	RowRange     *GridRange `json:"rowRange,omitempty"`     // integer rowField range (default 1..6)
+
+	// chatThread (#260). Entity / Placeholder / EmptyText are shared.
+	TextField  string `json:"textField,omitempty"`  // message body (string/text field)
+	PhotoField string `json:"photoField,omitempty"` // optional photo field
+	// dashcam (#410). Title is shared. Zero = iOS default.
+	KeepMinutes  int      `json:"keepMinutes,omitempty"`  // loop length (default 10)
+	MaxStorageMB int      `json:"maxStorageMB,omitempty"` // storage cap (default 2000)
+	ImpactG      float64  `json:"impactG,omitempty"`      // impact threshold in G (default 2.5)
+	AutoStart    []string `json:"autoStart,omitempty"`    // landscape|still|charging, all must hold
+	Audio        bool     `json:"audio,omitempty"`        // also record the microphone
+	// sensorValue (#419). Label / Style / Min / Max / Entity / Field / DateField /
+	// Seconds (log interval) / Limit (log count) are shared.
+	Sensor    string           `json:"sensor,omitempty"`
+	Threshold *SensorThreshold `json:"threshold,omitempty"`
+	// photoField (#418): on-device reading of the picked photo into other fields.
+	Analyze []PhotoAnalyze `json:"analyze,omitempty"`
+
+	// nearbyShare passby (#425). Entity / Mode / Limit are shared.
+	Fields   []string `json:"fields,omitempty"`   // passby: field ids exchanged (explicit allowlist)
+	Distance bool     `json:"distance,omitempty"` // passby: UWB distance / direction to a connected peer
+
+	// musicPlayer (#412). Title is shared.
+	AllowRequests bool `json:"allowRequests,omitempty"` // accept song requests from nearby devices
+	AutoAccept    bool `json:"autoAccept,omitempty"`    // queue requests without asking
+}
+
+// PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the
+// form field it goes into (Into).
+type PhotoAnalyze struct {
+	Kind    string   `json:"kind"` // text|amount|date|classify|describe|jointAngle
+	Into    string   `json:"into"`
+	Options []string `json:"options,omitempty"` // classify candidates (else the enum into's options)
+	Joint   string   `json:"joint,omitempty"`   // jointAngle: knee|elbow|hip|shoulder (+ left/right)
+}
+
+// GridRange is an inclusive integer range of gridTable rows.
+type GridRange struct {
+	From int `json:"from"`
+	To   int `json:"to"`
 }
 
 // HealthMetrics / HealthPeriods are the closed sets of healthStat values;
@@ -374,12 +475,13 @@ var (
 )
 
 // AITasks is the closed set of aiButton.task values.
-var AITasks = map[string]bool{"summarize": true, "classify": true, "rewrite": true, "extract": true, "suggest": true}
+var AITasks = map[string]bool{"summarize": true, "classify": true, "rewrite": true, "extract": true, "suggest": true, "generate": true}
 
 // TableColumn is one column of a table component.
 type TableColumn struct {
-	Field string `json:"field"`
-	Title string `json:"title,omitempty"`
+	Field     string `json:"field"`
+	Title     string `json:"title,omitempty"`
+	Aggregate string `json:"aggregate,omitempty"` // with table.groupBy: count|sum|avg|min|max (#261)
 }
 
 // ListItem maps record fields onto a list row.
@@ -389,6 +491,7 @@ type ListItem struct {
 	Trailing string `json:"trailing,omitempty"`
 	Icon     string `json:"icon,omitempty"`
 	Image    string `json:"image,omitempty"`  // photo field id -> thumbnail
+	Mark     string `json:"mark,omitempty"`   // entity mark id -> like/save toggle with count (#255)
 	Toggle   string `json:"toggle,omitempty"` // boolean field id -> one-tap check circle (#108)
 	Resets   string `json:"resets,omitempty"` // "daily": toggle is a date field, checked = today (#132)
 }

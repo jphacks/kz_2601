@@ -3,6 +3,9 @@ import Foundation
 public enum ActionType: String, Decodable, Sendable {
     case navigate, back, saveRecord, deleteRecord, openVoice, openUrl, resetForm
     case scheduleNotification, cancelNotification
+    /// 記録を CSV / PDF にして共有シートへ(#421)
+    case export
+    case startActivity, endActivity // #423 ライブアクティビティ
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -20,6 +23,8 @@ public struct Action: Decodable, Sendable {
     /// navigate: 遷移先 / saveRecord: 保存後の遷移先(省略時は back)
     public var screen: String?
     public var presentation: Presentation?
+    /// navigate: 親から子を作る(#256)。遷移先フォームの ref field id。今のレコードの id を入れて新規で開く
+    public var prefillRef: String?
     /// saveRecord / deleteRecord の対象 entity
     public var entity: String?
     public var url: String?
@@ -29,9 +34,21 @@ public struct Action: Decodable, Sendable {
     public var notification: NotificationSpec?
     /// cancelNotification
     public var notificationId: String?
+    /// export: "csv" | "pdf"
+    public var format: String?
+    /// export: 書き出すレコードの絞り込み(単体 / 配列どちらも読む・AND)
+    public var filters: [Filter] = []
+    /// export: 書き出す列(省略で全項目)
+    public var fields: [String]?
+    /// export: ファイル名・PDF の見出し
+    public var title: String?
+    /// startActivity(#423)
+    public var activity: ActivitySpec?
 
     private enum Keys: String, CodingKey {
-        case type, screen, presentation, entity, url, confirmMessage, notification, notificationId
+        case type, screen, presentation, prefillRef, entity, url, confirmMessage, notification, notificationId
+        case format, filter, fields, title
+        case activity
     }
 
     public init(from decoder: Decoder) throws {
@@ -40,18 +57,47 @@ public struct Action: Decodable, Sendable {
         type = ActionType(rawValue: rawType) ?? .unknown
         screen = try? c.decodeIfPresent(String.self, forKey: .screen)
         presentation = try? c.decodeIfPresent(Presentation.self, forKey: .presentation)
+        prefillRef = try? c.decodeIfPresent(String.self, forKey: .prefillRef)
         entity = try? c.decodeIfPresent(String.self, forKey: .entity)
         url = try? c.decodeIfPresent(String.self, forKey: .url)
         confirmMessage = try? c.decodeIfPresent(String.self, forKey: .confirmMessage)
         notification = try? c.decodeIfPresent(NotificationSpec.self, forKey: .notification)
         notificationId = try? c.decodeIfPresent(String.self, forKey: .notificationId)
+        format = try? c.decodeIfPresent(String.self, forKey: .format)
+        filters = Filter.decodeOneOrMany(c, forKey: .filter)
+        fields = try? c.decodeIfPresent([String].self, forKey: .fields)
+        title = try? c.decodeIfPresent(String.self, forKey: .title)
+        activity = try? c.decodeIfPresent(ActivitySpec.self, forKey: .activity)
     }
 
     /// DSL 外でクライアントが合成するアクション(例: list の長押し削除)。
-    public init(type: ActionType, entity: String? = nil, screen: String? = nil) {
+    public init(type: ActionType, entity: String? = nil, screen: String? = nil,
+                presentation: Presentation? = nil, prefillRef: String? = nil) {
         self.type = type
         self.rawType = type.rawValue
         self.entity = entity
         self.screen = screen
+        self.presentation = presentation
+        self.prefillRef = prefillRef
+    }
+}
+
+/// `startActivity` の中身(#423)。ロック画面と Dynamic Island に出す「いま◯◯中」。
+public struct ActivitySpec: Decodable, Equatable, Sendable {
+    public var title: String
+    public var subtitle: String?
+    /// SF Symbols 名(省略時 timer)
+    public var icon: String?
+    /// 今から N 分後を終わりに残り時間を数える。nil は経過時間
+    public var minutes: Int?
+    /// 一緒に出す stat / progressBar の部品 id
+    public var stat: String?
+
+    public init(title: String, subtitle: String? = nil, icon: String? = nil, minutes: Int? = nil, stat: String? = nil) {
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.minutes = minutes
+        self.stat = stat
     }
 }

@@ -30,7 +30,7 @@ func SchemaJSON() []byte { return schemaJSON }
 const (
 	MaxScreens            = 12
 	MaxEntities           = 6
-	MaxFieldsPerEntity    = 20
+	MaxFieldsPerEntity    = 40 // computed fields count too (#221: 20 made edits drop existing fields)
 	MaxComponentsPerLevel = 30
 	MaxDSLBytes           = 64 << 10
 	MaxTabs               = 5
@@ -224,13 +224,19 @@ func (a *App) Validate() error {
 			add("entity %q has no fields", e.ID)
 		}
 		if len(e.Fields) > MaxFieldsPerEntity {
-			add("entity %q has too many fields", e.ID)
+			add("entity %q has too many fields (%d > %d)", e.ID, len(e.Fields), MaxFieldsPerEntity)
 		}
 		switch e.Scope {
 		case "", ScopePrivate, ScopeShared, ScopePublic:
 		default:
 			add("entity %q scope %q must be private, shared or public", e.ID, e.Scope)
 		}
+		switch e.Edit {
+		case "", EditAuthor, EditMembers:
+		default:
+			add("entity %q edit %q must be author or members", e.ID, e.Edit)
+		}
+		checkEntityMarks(e, add)
 		seen := map[string]bool{}
 		for j, f := range e.Fields {
 			if !idRe.MatchString(f.ID) {
@@ -246,9 +252,9 @@ func (a *App) Validate() error {
 			if f.Type == FieldEnum && len(f.Options) == 0 {
 				add("entity %q field %q: enum needs options", e.ID, f.ID)
 			}
-			// ref: options = initial records of refEntity (their title values, #194)
-			if f.Type != FieldEnum && f.Type != FieldRef && len(f.Options) > 0 {
-				add("entity %q field %q: options only allowed for enum and ref", e.ID, f.ID)
+			// ref / refs: options = initial records of refEntity (their title values, #194)
+			if f.Type != FieldEnum && f.Type != FieldRef && f.Type != FieldRefs && len(f.Options) > 0 {
+				add("entity %q field %q: options only allowed for enum, ref and refs", e.ID, f.ID)
 			}
 		}
 		if e.TitleField != "" && !seen[e.TitleField] {
@@ -256,6 +262,7 @@ func (a *App) Validate() error {
 		}
 	}
 	checkComputedFields(a.Entities, entities, DailyToggleFields(a), add)
+	checkHiddenFields(a, entities, add)
 
 	notifIDs := map[string]bool{}
 	for i := range a.App.Notifications {
@@ -265,6 +272,7 @@ func (a *App) Validate() error {
 		}
 		notifIDs[n.ID] = true
 		checkNotification(fmt.Sprintf("app.notifications[%d]", i), n, add)
+		checkRecordNotification(fmt.Sprintf("app.notifications[%d]", i), n, entities, add)
 	}
 
 	screens := map[string]bool{}
@@ -324,12 +332,19 @@ func (a *App) Validate() error {
 				add("%s: scheduleNotification needs notification", where)
 			} else {
 				checkNotification(where, act.Notification, add)
+				if act.Notification.Entity != "" {
+					add("%s: record-based notification (entity/field) belongs in app.notifications, not scheduleNotification", where)
+				}
 			}
 		case ActionCancelNotif:
 			if act.NotificationID == "" {
 				add("%s: cancelNotification needs notificationId", where)
 			}
-		case ActionBack, ActionOpenVoice, ActionResetForm:
+		case ActionExport:
+			checkExportAction(where, act, entities, add)
+		case ActionStartActivity:
+			checkActivity(where, act.Activity, a, add) // #423: live_activity.go
+		case ActionBack, ActionOpenVoice, ActionResetForm, ActionEndActivity:
 		default:
 			add("%s: unknown action type %q", where, act.Type)
 		}
@@ -380,7 +395,7 @@ func (a *App) Validate() error {
 			if len(c.Children) > 0 {
 				add("%s: %s cannot have children", where, c.Type)
 			}
-			if c.Filter != nil {
+			if c.Filter != nil && !checkMeFilter(where, c.Filter, entities[c.Entity], add) {
 				checkComponentFilterValue(where, c.Filter, entities, add)
 				checkComponentPeriodFilter(where, c, entities, add)
 			}
@@ -401,14 +416,17 @@ func (a *App) Validate() error {
 					add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
 				} else if f.Computed != nil && c.Type != CompImage && c.Type != CompVideoPlayer {
 					add("%s: field %q is computed (read-only); inputs cannot bind to it. Bind a stored field or show it with list/table/stat", where, c.Field)
-				} else if c.Type == CompPicker && f.Type != FieldEnum && f.Type != FieldRef {
-					add("%s: picker field %q must be enum or ref", where, c.Field)
-				} else if c.Type != CompPicker && f.Type == FieldRef {
-					add("%s: field %q is type ref; use a picker to choose the %s record", where, c.Field, f.RefEntity)
+				} else if c.Type == CompPicker && f.Type != FieldEnum && f.Type != FieldRef && f.Type != FieldRefs {
+					add("%s: picker field %q must be enum, ref or refs", where, c.Field)
+				} else if c.Type != CompPicker && (f.Type == FieldRef || f.Type == FieldRefs) {
+					add("%s: field %q is type %s; use a picker to choose the %s record", where, c.Field, f.Type, f.RefEntity)
 				} else if (c.Type == CompPhotoField || c.Type == CompImage) && f.Type != FieldPhoto {
 					add("%s: %s field %q must be type photo", where, c.Type, c.Field)
 				} else if (c.Type == CompVideoField || c.Type == CompVideoPlayer) && f.Type != FieldVideo {
 					add("%s: %s field %q must be type video", where, c.Type, c.Field)
+				}
+				if c.Type == CompPhotoField {
+					checkPhotoAnalyze(where, c, formEntity, add)
 				}
 				if c.Type == CompVideoField && (c.MaxDuration < 0 || c.MaxDuration > 600) {
 					add("%s: videoField maxDuration must be 1..600 seconds", where)
@@ -425,16 +443,22 @@ func (a *App) Validate() error {
 					add("%s: list needs item", where)
 					break
 				}
-				for _, fid := range []string{c.Item.Title, c.Item.Subtitle, c.Item.Trailing, c.Item.Image} {
-					if fid != "" && e.FieldByID(fid) == nil {
-						add("%s: list item field %q not in entity %q", where, fid, e.ID)
+				for _, fid := range []string{c.Item.Title, c.Item.Subtitle, c.Item.Trailing} {
+					if msg := valueErr(e, "field", fid); fid != "" && msg != "" {
+						add("%s: list item %s", where, msg)
 					}
 				}
-				checkListToggle(where, c.Item, e, add)
-				if c.Sort != nil && e.FieldByID(c.Sort.Field) == nil {
-					add("%s: sort field %q not in entity %q", where, c.Sort.Field, e.ID)
+				if c.Item.Image != "" && e.FieldByID(c.Item.Image) == nil {
+					add("%s: list item field %q not in entity %q", where, c.Item.Image, e.ID)
 				}
-				if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
+				checkListToggle(where, c.Item, e, add)
+				checkListMark(where, c.Item, e, add)
+				if c.Sort != nil {
+					if msg := valueErr(e, "sort field", c.Sort.Field); msg != "" {
+						add("%s: %s", where, msg)
+					}
+				}
+				if c.Filter != nil && !hasFilterField(e, c.Filter.Field) {
 					add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
 				}
 				checkAction(where+".onItemTap", c.OnItemTap)
@@ -457,7 +481,7 @@ func (a *App) Validate() error {
 				if e.FieldByID(c.GroupBy) == nil {
 					add("%s: chart groupBy %q not in entity %q", where, c.GroupBy, e.ID)
 				}
-				if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
+				if c.Filter != nil && !hasFilterField(e, c.Filter.Field) {
 					add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
 				}
 			case CompVoiceInput, CompSpacer, CompDivider:
@@ -529,6 +553,12 @@ func (a *App) Validate() error {
 				} else if c.Type == CompQrScanner && f.Type != FieldString && f.Type != FieldText {
 					add("%s: qrScanner field %q must be string or text", where, c.Field)
 				}
+			case CompQrCode: // #422
+				checkQRCode(where, c, formEntity, entities, add)
+			case CompLocationPicker: // #212
+				checkLocationPicker(where, c, formEntity, add)
+			case CompRouteGuide: // #411
+				checkRouteGuide(where, c, formEntity, entities, add)
 			case CompTimerDisplay:
 				switch c.Mode {
 				case "stopwatch":
@@ -590,8 +620,17 @@ func (a *App) Validate() error {
 				}
 			case CompTable:
 				checkTable(where, c, entities, add)
+				checkTableGroup(where, c, entities, add)
 			case CompTimeline:
 				checkTimeline(where, c, entities, add)
+			case CompGridTable:
+				checkGridTable(where, c, entities, add)
+				checkAction(where+".onItemTap", c.OnItemTap)
+			case CompRandomPicker:
+				checkRandomPicker(where, c, entities, add)
+				checkAction(where+".onItemTap", c.OnItemTap)
+			case CompAudioRecorder:
+				checkAudioRecorder(where, c, formEntity, add)
 			case CompEmptyState:
 				if c.Title == "" {
 					add("%s: emptyState needs title", where)
@@ -600,15 +639,21 @@ func (a *App) Validate() error {
 				checkAIButton(where, c, formEntity, entities, add)
 			case CompLocationTracker:
 				checkLocationTracker(where, c, entities, add)
+			case CompChatThread:
+				checkChatThread(where, c, entities, add)
 			case CompHealthStat:
 				checkHealthStat(where, c, add)
+			case CompDashcam:
+				checkDashcam(where, c, add)
+			case CompSensorValue:
+				checkSensorValue(where, c, entities, add)
+				if c.Threshold != nil {
+					checkAction(where+".threshold.action", c.Threshold.Action)
+				}
+			case CompMusicPlayer:
+				checkMusicPlayer(where, c, add)
 			case CompNearbyShare:
-				if c.Label == "" {
-					add("%s: nearbyShare needs label", where)
-				}
-				if entities[c.Entity] == nil {
-					add("%s: nearbyShare entity %q does not exist", where, c.Entity)
-				}
+				checkNearbyShare(where, c, entities, add) // nearby.go
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}
@@ -617,6 +662,9 @@ func (a *App) Validate() error {
 			walk(fmt.Sprintf("screen %q components[%d]", s.ID, i), &s.Components[i], 0)
 		}
 	}
+	checkRecordNav(a, entities, add) // #256
+	checkDashcamCount(a, add)        // #410
+	checkMusicPlayerCount(a, add)
 
 	if len(p) > 0 {
 		return &ValidationError{Problems: p}
@@ -636,6 +684,41 @@ func checkNotification(where string, n *Notification, add func(string, ...any)) 
 	}
 	if n.Time != "" && !timeRe.MatchString(n.Time) {
 		add("%s: notification time %q must be HH:MM", where, n.Time)
+	}
+}
+
+// checkRecordNotification validates the record-based fields (#228).
+func checkRecordNotification(where string, n *Notification, entities map[string]*Entity, add func(string, ...any)) {
+	if n.Entity == "" {
+		if n.Field != "" || n.TitleField != "" || n.EnabledField != "" || n.OffsetMinutes != 0 {
+			add("%s: field/titleField/enabledField/offsetMinutes need entity", where)
+		}
+		return
+	}
+	e := entities[n.Entity]
+	if e == nil {
+		add("%s: notification entity %q does not exist", where, n.Entity)
+		return
+	}
+	f := e.FieldByID(n.Field)
+	switch {
+	case n.Field == "":
+		add("%s: record notification needs field (a datetime / date / HH:MM string field of %q)", where, n.Entity)
+	case f == nil:
+		add("%s: notification field %q does not exist in entity %q", where, n.Field, n.Entity)
+	case f.Type != FieldDatetime && f.Type != FieldDate && f.Type != FieldString:
+		add("%s: notification field %q must be datetime, date or string (HH:MM)", where, n.Field)
+	}
+	if n.TitleField != "" && e.FieldByID(n.TitleField) == nil {
+		add("%s: notification titleField %q does not exist in entity %q", where, n.TitleField, n.Entity)
+	}
+	if n.EnabledField != "" {
+		if ef := e.FieldByID(n.EnabledField); ef == nil || ef.Type != FieldBoolean {
+			add("%s: notification enabledField %q must be a boolean field of %q", where, n.EnabledField, n.Entity)
+		}
+	}
+	if n.OffsetMinutes < -10080 || n.OffsetMinutes > 10080 {
+		add("%s: offsetMinutes %d out of range (±10080)", where, n.OffsetMinutes)
 	}
 }
 
@@ -726,7 +809,7 @@ func checkAggregateRef(where string, c *Component, entities map[string]*Entity, 
 	if c.Aggregate != "count" && e.FieldByID(c.Field) == nil {
 		add("%s: %s field %q not in entity %q (required unless aggregate=count)", where, c.Type, c.Field, e.ID)
 	}
-	if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
+	if c.Filter != nil && !hasFilterField(e, c.Filter.Field) {
 		add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
 	}
 	return e, true
@@ -796,14 +879,16 @@ func checkTable(where string, c *Component, entities map[string]*Entity, add fun
 		add("%s: table needs at least one column", where)
 	}
 	for i, col := range c.Columns {
-		if e.FieldByID(col.Field) == nil {
-			add("%s: columns[%d] field %q not in entity %q", where, i, col.Field, e.ID)
+		if msg := valueErr(e, "field", col.Field); msg != "" {
+			add("%s: columns[%d] %s", where, i, msg)
 		}
 	}
-	if c.Sort != nil && e.FieldByID(c.Sort.Field) == nil {
-		add("%s: sort field %q not in entity %q", where, c.Sort.Field, e.ID)
+	if c.Sort != nil {
+		if msg := valueErr(e, "sort field", c.Sort.Field); msg != "" {
+			add("%s: %s", where, msg)
+		}
 	}
-	if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
+	if c.Filter != nil && !hasFilterField(e, c.Filter.Field) {
 		add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
 	}
 	if c.Limit < 0 {
@@ -817,18 +902,20 @@ func checkTimeline(where string, c *Component, entities map[string]*Entity, add 
 		add("%s: timeline entity %q does not exist", where, c.Entity)
 		return
 	}
-	if f := e.FieldByID(c.DateField); f == nil {
+	if c.DateField == RecordCreatedAt {
+		// posted time (a datetime)
+	} else if f := e.FieldByID(c.DateField); f == nil {
 		add("%s: dateField %q not in entity %q", where, c.DateField, e.ID)
 	} else if f.Type != FieldDate && f.Type != FieldDatetime {
 		add("%s: dateField %q must be date or datetime", where, c.DateField)
 	}
-	if e.FieldByID(c.TitleField) == nil {
-		add("%s: titleField %q not in entity %q", where, c.TitleField, e.ID)
+	if msg := valueErr(e, "titleField", c.TitleField); msg != "" {
+		add("%s: %s", where, msg)
 	}
-	if c.SubtitleField != "" && e.FieldByID(c.SubtitleField) == nil {
-		add("%s: subtitleField %q not in entity %q", where, c.SubtitleField, e.ID)
+	if msg := valueErr(e, "subtitleField", c.SubtitleField); c.SubtitleField != "" && msg != "" {
+		add("%s: %s", where, msg)
 	}
-	if c.Filter != nil && e.FieldByID(c.Filter.Field) == nil {
+	if c.Filter != nil && !hasFilterField(e, c.Filter.Field) {
 		add("%s: filter field %q not in entity %q", where, c.Filter.Field, e.ID)
 	}
 	if c.Limit < 0 {

@@ -85,6 +85,10 @@
 	<key>MetamonWhisperModel</key>
 	<string></string>
 
+	<!-- ライブアクティビティ(#423・ActivityKit)。端末内の更新だけなので push の設定・バックグラウンドモードは要らない -->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+
 	<!-- バックグラウンド(#38): 裏の定期同期(BGAppRefreshTask)。識別子は AppRuntime+Background.swift の BackgroundRefresh.identifier と一致させる。
 	     fetch は Info.plist だけで有効になり、App ID 側の capability 操作は不要 -->
 	<key>UIBackgroundModes</key>
@@ -99,29 +103,38 @@
 
 	<!-- ネイティブ機能の権限説明(P0: マイク/カメラ/通知、P1: 位置/モーション) -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>話しかけた内容からアプリを生成するため、また生成したアプリで動画の音声を録音するために、マイクを使用します。</string>
+	<string>話しかけた内容からアプリを生成するため、また生成したアプリで動画やドラレコの音声、ボイスメモ・会議などを録音するために、マイクを使用します。</string>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>生成したアプリの音楽プレーヤーで、Apple Music の曲を検索して再生するために使用します。</string>
 	<key>NSCameraUsageDescription</key>
-	<string>生成したアプリで写真や動画を撮影・記録するために、カメラを使用します。</string>
+	<string>生成したアプリで写真や動画を撮影・記録するため、またドラレコとして画面を出している間に録画するために、カメラを使用します。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>生成したアプリで写真や動画を選択・保存するために、写真ライブラリを使用します。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>生成したアプリの共有ボタンから画像を写真に保存するために、写真ライブラリへの追加を使用します。</string>
+	<string>生成したアプリの共有ボタンや QR コードの画像、ドラレコで保存した映像を写真に保存するために、写真ライブラリへの追加を使用します。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>生成したアプリで現在地を記録・地図に表示するために使います。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
+	<string>生成したアプリで現在地を記録・地図に表示したり、目的地まで道案内したりするために使います。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
 	<!-- healthStat(#167): 歩数は CoreMotion の歩数計(capability 不要)。体重の読み書き・ヘルスケアの歩数は HealthKit -->
+	<!-- sensorValue(#419): 気圧・高度(CMAltimeter)。傾き・加速度(device motion)は許可不要 -->
 	<key>NSMotionUsageDescription</key>
-	<string>生成したアプリで今日や最近の歩数を表示するために、モーションとフィットネスのデータを使用します。</string>
+	<string>生成したアプリで今日や最近の歩数、気圧や高度の変化を表示・記録するために、モーションとフィットネスのデータを使用します。</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>生成したアプリで歩数や体重を表示するために、ヘルスケアのデータを読み取ります。</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>生成したアプリで記録した体重をヘルスケアにも保存するために、ヘルスケアへ書き込みます。</string>
 	<!-- nearbyShare(#36): MultipeerConnectivity で近くの Tailor It 端末と記録を送り合う。サービス名は NearbyService.serviceType と一致させる -->
+	<!-- すれ違い通信(#425): _tailorit-pb は MCPassbyTransport.serviceType と一致させる -->
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>近くにいる Tailor It の端末を見つけて、記録をその場で送ったり受け取ったりするために、ローカルネットワークを使用します。</string>
+	<string>近くにいる Tailor It の端末を見つけて、記録や曲のリクエストをその場で送ったり受け取ったり、すれ違い通信で交換したりするために、ローカルネットワークを使用します。</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_tailorit-mc._tcp</string>
 		<string>_tailorit-mc._udp</string>
+		<string>_tailorit-pb._tcp</string>
+		<string>_tailorit-pb._udp</string>
 	</array>
+	<!-- すれ違い通信の distance(#425): Nearby Interaction(UWB)で近くの人との距離・方向を測る -->
+	<key>NSNearbyInteractionUsageDescription</key>
+	<string>生成したアプリで、すれ違い通信でつながった近くの人との距離と方向を表示するために使います。</string>
 </dict>
 </plist>

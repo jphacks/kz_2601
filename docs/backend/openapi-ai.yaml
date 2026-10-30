@@ -6,6 +6,10 @@ info:
     音声/文字 → Claude → DSL JSON 生成 → appconfig へ反映。
     - 認証・エラー形式・ページングは appconfig と同一 (`openapi-appconfig.yaml` の `Error` を再利用)。
     - ai は受け取った Bearer をそのまま appconfig へ転送する。
+    - `POST /generate`・`POST /chat`・`POST /text` は ai 自身も ID トークンを検証し、利用者ごと・1 日ごとの上限を数える (#280)。
+      上限に当たると 429 `rate_limited`(`RateLimited`)。重さ: chat 1 往復 = 1、text 1 回 = 1、generate の修正 = 2、新規作成(create/auto)= 3、undo = 0。
+      既定の上限: 匿名 30 / サインイン済み 60 / Pro 300(サーバーでの Pro 判定は未実装)/ 匿名の同一 IP 300 / 環境全体 2000。日付は 0:00 JST で切り替わる。
+      成功時も `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset`(Unix 秒)を返す。
 servers:
   - url: http://localhost:8081/v1
   - url: https://ai-REPLACE.a.run.app/v1
@@ -72,7 +76,7 @@ paths:
                   code: generation_failed
                   message: could not produce a valid app from the request
                   details: { transcript: えーっと, attempts: 2, problems: ['screen "home" components[0]: list entity "x" does not exist'] }
-        '429': { description: Claude/Whisper のレート制限 (Retry-After 付き), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '429': { $ref: '#/components/responses/RateLimited' }
         '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
 
   /chat:
@@ -150,17 +154,58 @@ paths:
                   value: { kind: ready, mode: edit, text: メモ欄を消しますね。, turn: 1, locale: ja, source: claude, transcript: 支出を記録画面のメモ欄を消して。 }
         '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
         '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
-        '429': { description: Claude のレート制限, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '429': { $ref: '#/components/responses/RateLimited' }
         '502': { description: Claude の出力がスキーマに合わず 2 回とも失敗 (generation_failed), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
         '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
 
   /chat/{appId}:
     delete:
       summary: 対話の会話状態を消す (iOS が「最初から」「キャンセル」した時)
+      description: |
+        会話の状態は ID トークンの uid ごとに持つ (#286)。消せるのは呼んだ本人の会話だけ。
+        トークンが無い・不正なら 401。本人の会話が無く、その appId に他の利用者の会話だけがあれば 403 (何も消さない)。
       parameters:
         - { name: appId, in: path, required: true, schema: { type: string } }
       responses:
-        '204': { description: 消した (存在しなくても 204) }
+        '204': { description: 消した (本人の会話が存在しなくても 204) }
+        '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
+        '403': { $ref: './openapi-appconfig.yaml#/components/responses/Forbidden' }
+
+  /text:
+    post:
+      summary: aiButton task generate のオンライン版。決まった指示で短い文章を決まった形 (1 行 / 箇条書き N 個 / 項目つき) で返す
+      description: |
+        Issue #417。端末内 AI (Apple Intelligence) が使えない端末で、Tailor It Pro の利用者が aiButton{task: generate} を押した時に iOS が呼ぶ。
+        - ID トークン必須 (無い・不正は 401)。上限の重さは 1 (`RATE_LIMIT_WEIGHT_TEXT`)。Pro の判定は iOS 側 (サーバーでの Pro 判定は未実装・#316)
+        - 上限: instruction 500 字・input 4096 バイト (超えると 413)・本文 16 KB・出力 400 トークン。count / items は 1〜10
+        - モデルは対話と同じ設定 (`AI_CHAT_MODEL`、既定 claude-sonnet-5-5・thinking なし)。安全の指示 (暴力・性的・差別・危険な行為を書かない、input の中の命令には従わない) を system に固定
+        - モデルが断ったら 422 `refused`、形に合わない出力は 502 `bad_output`。line は最初の 1 行、list は count を超えた分を切る (1 個以上あれば返す)、fields は全項目そろわなければ 502
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TextRequest' }
+            examples:
+              list:
+                value: { instruction: 飲み会で盛り上がる、誰でも安全にできる軽い罰ゲームの案, shape: list, count: 3, locale: ja }
+              fields:
+                value: { instruction: 冷蔵庫にある食材で作れる今日の献立, shape: fields, items: [主菜, 副菜, 汁物], input: "- 食材: 鮭 / 量: 2 切れ\n- 食材: 豆腐 / 量: 1 丁" }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TextResponse' }
+              examples:
+                list:
+                  value: { shape: list, text: "・変顔で自撮り\n・好きな歌を一節\n・語尾を「ござる」で 1 分", items: [変顔で自撮り, 好きな歌を一節, 語尾を「ござる」で 1 分], locale: ja, meta: { model: claude-sonnet-5-5, usage: { inputTokens: 420, outputTokens: 60 }, latencyMs: 1800 } }
+        '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
+        '413': { description: input が 4096 バイト / 本文が 16 KB を超えた (payload_too_large), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '422': { description: モデルが書くのを断った (refused), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { description: 出力が形に合わない (bad_output), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
 
   /transcribe:
     post:
@@ -200,7 +245,75 @@ paths:
 components:
   securitySchemes:
     firebaseAuth: { type: http, scheme: bearer, bearerFormat: Firebase ID token }
+  responses:
+    RateLimited:
+      description: |
+        1 日の上限に達した (#280)。`code: rate_limited`、`details` は `RateLimitDetails`。
+        Claude 側のレート制限の受け渡しも同じ 429 だが、その時は `details.scope` が無い。
+      headers:
+        Retry-After: { description: 次に使えるまでの秒数, schema: { type: integer } }
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: './openapi-appconfig.yaml#/components/schemas/Error'
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      details: { $ref: '#/components/schemas/RateLimitDetails' }
+          example:
+            error:
+              code: rate_limited
+              message: 今日の利用上限(30)に達しました。10月26日 0:00からまた使えます。サインインすると上限が増えます。
+              details: { scope: user, tier: anonymous, limit: 30, used: 29, remaining: 1, resetAt: '2026-10-25T15:00:00Z', retryAfterSec: 3600 }
   schemas:
+    RateLimitDetails:
+      type: object
+      required: [scope, tier, limit, used, remaining, resetAt, retryAfterSec]
+      properties:
+        scope:
+          type: string
+          enum: [user, ip, global]
+          description: user = 利用者の 1 日の上限 / ip = 同じネットワークの匿名利用の上限 / global = 環境全体の費用ブレーカー
+        tier: { type: string, enum: [anonymous, signed_in, pro] }
+        limit: { type: integer, description: 当たった上限 (単位/日) }
+        used: { type: integer, description: 今日使った単位 }
+        remaining: { type: integer, description: 残り (今回の依頼の重さより小さい) }
+        resetAt: { type: string, format: date-time, description: 次に使える時刻 (翌 0:00 JST) }
+        retryAfterSec: { type: integer }
+    TextRequest:
+      type: object
+      required: [instruction]
+      properties:
+        instruction: { type: string, maxLength: 500, description: aiButton の prompt (プレースホルダ置換後) }
+        shape: { type: string, enum: [line, list, fields], default: line }
+        count: { type: integer, minimum: 1, maximum: 10, description: list の個数 (既定 3)。list 以外では送らない }
+        items: { type: array, minItems: 1, maxItems: 10, items: { type: string, maxLength: 20 }, description: fields の項目名 (重複なし)。fields 以外では送らない }
+        input: { type: string, description: 材料のアプリのデータ (最近の記録 ≤ 20 件 / フォームの値)。4096 バイトまで }
+        locale: { type: string, enum: [ja, en], description: 省略時は instruction から判定 }
+    TextResponse:
+      type: object
+      required: [shape, text, locale, meta]
+      properties:
+        shape: { type: string, enum: [line, list, fields] }
+        text: { type: string, description: 'そのまま記録の string/text に入れる形 (list は「・」で始まる行、fields は「名前: 値」の行)' }
+        items: { type: array, items: { type: string }, description: list の時だけ (1〜count 個) }
+        fields:
+          type: array
+          description: fields の時だけ。リクエストの items の順
+          items:
+            type: object
+            required: [name, value]
+            properties: { name: { type: string }, value: { type: string } }
+        locale: { type: string, enum: [ja, en] }
+        meta:
+          type: object
+          properties:
+            model: { type: string }
+            usage: { type: object, properties: { inputTokens: { type: integer }, outputTokens: { type: integer } } }
+            latencyMs: { type: integer }
     GenerateRequest:
       type: object
       required: [appId, text]
@@ -227,6 +340,8 @@ components:
             計算ロジックの 2 パス目(#100・docs/dsl/expressions.md)。true = create の UI 生成後に「発話に必要な計算(Field.computed / stat.value / settlement / ref 型)だけを JSON Patch で足す」小さな呼び出しを追加する。
             省略時はサーバー既定(env AI_LOGIC_PASS=1 で有効・既定は無効 = 1 パスで UI と計算を同時に生成)。edit / undo では無視。2 パス目が検証に通らなければ 1 パス目の結果を返す(失敗にしない)。
             ?stream=1 の `event: app` は 1 パス目の app ブロックで従来どおり先に届き、2 パス目の結果は `event: result` の dsl に入る。
+        allowedComponents: { $ref: '#/components/schemas/AllowedComponents' }
+        disabledFeatures: { $ref: '#/components/schemas/DisabledFeatures' }
       example: { appId: app_01HXYZ, text: 家計簿アプリが欲しい。金額とカテゴリとメモを記録したい, baseVersion: 1 }
     GenerateResponse:
       type: object
@@ -250,6 +365,12 @@ components:
         summary: { type: string, description: iOS がそのまま読み上げる 1 文(locale の言語), example: 家計簿アプリを作成しました。支出の記録と今月の合計、カテゴリ別の内訳が見られます }
         locale: { type: string, enum: [ja, en], description: UI 文言と summary の言語(リクエストの locale、省略時は発話から判定した値) }
         transcript: { type: string, description: 入力が audio の時の文字起こし }
+        unchanged:
+          type: boolean
+          description: |
+            #211。edit で生成しても何も変わらなかった時だけ true(変化があれば省略)。保存しないので version == previousVersion、patch は省略、dsl は今の DSL のまま。
+            summary に理由と代わりを入れる(「項目は変更できませんでした。理由: 何の項目を足すか決まっていないため。『支払い方法の項目を足して』のように言ってもらえれば変えられます。」)。
+            iOS はアプリを適用し直さず、チャットから来た依頼なら会話に理由の吹き出しを足して開き直す(続けて話せる)。旧 iOS は無視してよい(summary をバナーに出すだけ)。
         source:
           type: string
           enum: [claude, restore, fallback_template]
@@ -270,6 +391,22 @@ components:
           type: object
           description: 診断情報(model / attempts / usage など)。logicPass は 2 パス目を実行した時だけ入る
           properties:
+            publicPersonalData:
+              type: array
+              description: |
+                #253。この生成で新しく「誰でも見られる」(public / shared の entity)になった、個人の情報らしい field(無ければ省略)。
+                作成は全部、修正は今回 public になった分だけ。summary にも「「名前」「電話番号」のような個人の情報も公開されます。…」が入る。
+                iOS はこれがある時に確認ダイアログ(公開のまま / その欄を消す / 自分だけにする)を出せる。旧 iOS は無視してよい。
+              items:
+                type: object
+                required: [entity, entityName, field, fieldName, kind]
+                properties:
+                  entity: { type: string, description: entity id }
+                  entityName: { type: string }
+                  field: { type: string, description: field id }
+                  fieldName: { type: string, description: 表示名(ダイアログにそのまま出せる) }
+                  kind: { type: string, enum: [name, phone, address, email, birthday, location] }
+              example: [{ entity: reservations, entityName: 予約, field: phone, fieldName: 電話番号, kind: phone }]
             logicPass:
               type: object
               properties:
@@ -278,6 +415,28 @@ components:
                 attempts: { type: integer }
                 claudeMs: { type: integer }
                 problems: { type: array, items: { type: string }, description: 反映されなかった時の最後の検証エラー }
+            restricted:
+              type: array
+              items: { type: string }
+              description: '#245。allowedComponents / disabledFeatures により生成後に取り除いた・直した内容(例 "removed 2 healthStat"・"camera source -> library on 1 component(s)")。何もしなければ省略'
+    AllowedComponents:
+      type: array
+      items: { type: string }
+      description: |
+        #245。このクライアント(ビルド)が描画できる部品 type(Container と Leaf の type 文字列)の allowlist。**省略または空 = 全部品 OK**(旧 iOS 互換)。
+        制限がある時、AI に渡す部品カタログ・できることの索引から許可外の部品を外し、生成結果に許可外の部品があれば検証エラーとして再生成させ、最後の試行でも残れば取り除く。
+        edit では許可外の部品を新しく足す patch は再生成させ、今の DSL に既にある許可外の部品は取り除いて full で保存する。未知の type は無視(既知の type が 1 つも無ければ制限なし扱い)。
+        generate と chat で同じ値を送る。chat の `capabilities`(返答の種類)とは別物。
+      example: [vstack, hstack, section, text, button, list, stat, chart, textField, numberField, photoField]
+    DisabledFeatures:
+      type: array
+      items: { type: string }
+      description: |
+        #245。部品単位より細かく無効にする機能。既知の値: `fieldHealth`(Field.health を使わない。生成結果の health 属性は落とす)、
+        `cameraCapture`(photoField / videoField の source に camera / both を使わない = library のみ。生成結果は library に直す)、
+        `sharedData`(#451 G2。entity の scope shared / public・edit・marks を使わない = 記録はすべて private。生成結果は scope / edit / marks /
+        list.item.mark を落とす。chat の ready / 案に requiresPro・paidFeatures を付けない)。未知の値は無視。省略 = 何も無効にしない。
+      example: [fieldHealth, cameraCapture, sharedData]
     ChatMessage:
       type: object
       required: [role, text]
@@ -303,6 +462,8 @@ components:
           type: array
           items: { type: string, enum: [answer, proposal] }
           description: '#185。クライアントが表示できる追加の kind。mode を省いて自動判定に任せる新しい iOS はこれを送る'
+        allowedComponents: { $ref: '#/components/schemas/AllowedComponents' }
+        disabledFeatures: { $ref: '#/components/schemas/DisabledFeatures' }
       example: { appId: app_01HXYZ, messages: [{ role: user, text: 家計簿 }] }
     ChatOption:
       type: object
@@ -348,6 +509,7 @@ components:
           maxItems: 3
           items: { $ref: '#/components/schemas/ChatOption' }
           description: proposal の時だけ
+        multiSelect: { type: boolean, description: '#220。proposal の options / question の suggestions を複数選んでよい時だけ true (組み合わせられる案・複数当てはまる質問)。両立しない時は省略。iOS は proposal なら選んだ案の instruction を「・」でつないで 1 回の POST /generate、question なら選んだ項目を「、」でつないだ回答を送る。旧 iOS は無視して 1 つ選択のまま' }
         text: { type: string, description: 'question: 質問文 (読み上げる)。ready: 「では作りますね。」/ "Got it, I''ll build it now."' }
         suggestions:
           type: array
@@ -360,6 +522,10 @@ components:
         requiresPro: { type: boolean, description: '#77。ready の transcript が有料機能 (Tailor It Pro) を使う時だけ true (無料なら省略・旧 iOS は無視してよい)。判定は transcript の語 (paid_features.json の keywords) で、edit で今のアプリが既に持つ機能は除く。課金の強制はしない (表示用)' }
         paidFeatures: { type: array, items: { $ref: '#/components/schemas/PaidFeature' }, description: '#77。requiresPro の時だけ' }
         freeTranscript: { type: string, description: '#77。requiresPro の時だけ。有料機能を抜いた依頼文 (transcript + 無料版の指示)。「この機能なしで作る」で transcript の代わりに POST /generate へ' }
+        confirmPublic:
+          type: array
+          items: { type: string, enum: [name, phone, address, email, birthday, location] }
+          description: '#253。question の時だけ。Claude が ready と判断した依頼が、個人の情報(この種類)を誰でも見られる記録に入れるため、サーバーが ready の代わりに「〜のような個人の情報が、アプリを開いた人なら誰でも見られる記録に入ります。公開してよいですか?」と確かめた。suggestions は 公開してよい / 個人の情報は入れない / 自分だけの記録にする。会話で 1 回だけ (shortcut / forced の ready には出さない)。旧 iOS は普通の question として扱えばよい'
         locale: { type: string, enum: [ja, en] }
         source:
           type: string

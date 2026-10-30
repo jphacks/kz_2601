@@ -18,13 +18,18 @@ struct SettingsSheet: View {
             List {
                 if Self.e2eDeleteAccount { deleteAccountSection } // E2E: 削除ボタンを画面内に出す(シミュレータはスクロール操作できない)
                 accountSection
+                AuthorNameSettingsSection() // 共有アプリの投稿に出す名前(#250)
+                #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
                 ProSettingsSection() // 課金(#77)
+                #endif
                 languageSection
                 voiceModelSection
                 clarifySection
                 speechSection
                 appSection
+                if !rt.dsl.app.notifications.isEmpty { notificationSection }
                 syncSection
+                PrivacySettingsSection() // #246: AI への送信の同意・プライバシーポリシー・利用規約
                 connectionSection
                 if !Self.e2eDeleteAccount { deleteAccountSection }
             }
@@ -117,7 +122,7 @@ struct SettingsSheet: View {
     }
 
     private var accountSection: some View {
-        Section("アカウント") {
+        Section {
             if let user = session.user {
                 HStack(spacing: Theme.Spacing.md) {
                     Image(systemName: user.isAnonymous ? "person.crop.circle.dashed" : "apple.logo")
@@ -135,12 +140,26 @@ struct SettingsSheet: View {
                             .textSelection(.enabled)
                     }
                 }
+                if user.isAnonymous {
+                    // #276: uid を保ったまま Apple に昇格(作ったアプリとデータはそのまま)
+                    AppleLinkButton()
+                        .listRowInsets(EdgeInsets(top: Theme.Spacing.sm, leading: Theme.Spacing.md, bottom: Theme.Spacing.sm, trailing: Theme.Spacing.md))
+                    if let message = session.linkError {
+                        Text(message).font(.footnote).foregroundStyle(.red)
+                    }
+                }
                 Button("ログアウト", role: .destructive) {
                     session.signOut()
                     dismiss()
                 }
             } else {
                 Text("サインインしていません").foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("アカウント")
+        } footer: {
+            if session.user?.isAnonymous == true {
+                Text("Apple でサインインすると、作ったアプリとデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、作ったアプリに戻れません。")
             }
         }
     }
@@ -172,6 +191,9 @@ struct SettingsSheet: View {
             }
             if case .failed = services.transcriber.status {
                 Button("再試行") { Task { try? await services.transcriber.prepare() } }
+            }
+            if case .notDownloaded = services.transcriber.status, services.transcriber.needsDownload { // #246: 確認で「あとで」を選んだ人
+                Button("ダウンロード(約\(AppRuntime.voiceModelMegabytes)MB)") { rt.approveModelDownload() }
             }
         }
     }
@@ -218,6 +240,23 @@ struct SettingsSheet: View {
             }
             .disabled(rt.isMorphing)
             ScreenMapSettingsRow() // #116
+            Button {
+                dismiss()
+                rt.replayTutorial() // #274
+            } label: {
+                Label("使い方を見る", systemImage: "questionmark.circle")
+            }
+            .accessibilityIdentifier("settings.tutorial")
+            NavigationLink {
+                // #415: 選んだ例は音声画面(か対話)の入力欄に入る。送らない
+                PromptTipsView { text in
+                    rt.composerDraft = text
+                    dismiss()
+                }
+            } label: {
+                Label("頼み方のコツ", systemImage: "lightbulb")
+            }
+            .accessibilityIdentifier("settings.tips")
             Button(role: .destructive) { confirmReset = true } label: {
                 Label("アプリをリセット(初期状態に戻す)", systemImage: "arrow.counterclockwise")
             }
@@ -227,6 +266,37 @@ struct SettingsSheet: View {
         } footer: {
             Text(L10n.tr("現在: \(rt.dsl.app.name)(v\(rt.document.version))") + (rt.isOffline ? L10n.tr("・オフライン(キャッシュ表示)") : "") + "\n" + L10n.tr("「元に戻して」と話しても同じ。「別のアプリ。…」と話すと新しいアプリとして作ります。"))
         }
+    }
+
+    /// このアプリの次の通知(#228): 予約が本当に入っているかをここで確かめられる。
+    private var notificationSection: some View {
+        Section {
+            if rt.notificationsDenied {
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                } label: {
+                    Label("通知がオフです(タップで設定を開く)", systemImage: "bell.slash")
+                }
+            }
+            if rt.upcomingNotifications.isEmpty {
+                Text("予約中の通知はありません").foregroundStyle(.secondary)
+            }
+            ForEach(Array(rt.upcomingNotifications.prefix(5).enumerated()), id: \.offset) { _, n in
+                LabeledContent {
+                    Text(NotificationCopy.when(n.date)).monospacedDigit()
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(n.title)
+                        if !n.body.isEmpty { Text(n.body).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                    }
+                }
+            }
+        } header: {
+            Text("次の通知")
+        } footer: {
+            Text("アプリを閉じていても、この時刻に届きます。")
+        }
+        .task { await rt.refreshNotifications() }
     }
 
     /// レコードの同期状態(Issue #48): 最新 / 未送信 N 件 / オフライン。「今すぐ同期」でキューを流し直す。

@@ -14,6 +14,12 @@ struct ListRow: View {
     var showsChevron = false
     var toggleOn: Bool? = nil
     var onToggle: (() -> Void)? = nil
+    /// false なら丸を薄く描く(他人の共有レコード・#249)。押すと onToggle が理由を出す
+    var toggleEnabled = true
+    /// 行の右端の印(いいね・保存 #255)。mark と markState の両方があれば描く
+    var mark: Mark? = nil
+    var markState: MarkState? = nil
+    var onMark: (() -> Void)? = nil
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.dslRuntime) private var rt
 
@@ -29,6 +35,11 @@ struct ListRow: View {
 
     private var titleText: String { text(item?.title ?? entity?.displayTitleField) ?? "" }
     private var subtitleText: String? { text(item?.subtitle).flatMap { $0.isEmpty ? nil : $0 } }
+    /// trailing が audio field なら行に再生ボタン(#420)。
+    private var trailingAudio: JSONValue? {
+        guard let f = item?.trailing, entity?.field(f)?.type == .audio, AudioValue(record[f]) != nil else { return nil }
+        return record[f]
+    }
     private var trailingText: String? { text(item?.trailing).flatMap { $0.isEmpty ? nil : $0 } }
 
     /// subtitle / title のどちらかが enum(カテゴリ)なら、その値から色を決める。
@@ -45,6 +56,50 @@ struct ListRow: View {
         [titleText, subtitleText, trailingText].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
     }
 
+    /// 「チェック済み」「いいね 2 件・付けています」など、行の状態の読み上げ。
+    private var accessibilityValueText: String {
+        var parts: [String] = []
+        if let on = toggleOn { parts.append(on ? L("チェック済み") : L("未チェック")) }
+        if let mark, let st = markState {
+            parts.append(st.mine ? L("\(mark.label) \(st.count) 件・付けています") : L("\(mark.label) \(st.count) 件"))
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    /// 印のトグル(#255)。行タップ(フォームを開く)とは別のボタン。付けると塗りつぶし + 色、件数は 1 以上で出す。
+    private func markButton(_ mark: Mark, _ st: MarkState) -> some View {
+        Button {
+            onMark?()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: mark.systemImage(on: st.mine))
+                    .font(.title3)
+                    .contentTransition(.symbolEffect(.replace))
+                if st.count > 0 {
+                    Text("\(st.count)")
+                        .font(.subheadline.monospacedDigit())
+                        .contentTransition(.numericText())
+                }
+            }
+            .foregroundStyle(st.mine ? Self.markColor(mark) : Color.secondary)
+            .frame(minWidth: 28, minHeight: 28)
+            .padding(8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(-8)
+        .accessibilityHidden(true) // 行 1 要素の accessibilityAction で操作する
+    }
+
+    /// いいねは赤系、お気に入りは橙、それ以外はブランド色。
+    static func markColor(_ mark: Mark) -> Color {
+        switch mark.icon {
+        case "heart": .pink
+        case "star": .orange
+        default: RenderTheme.Colors.brandA
+        }
+    }
+
     private var checked: Bool { toggleOn == true }
 
     /// 行頭のチェック丸。行タップ(フォームを開く)とは別のボタン。44pt の当たり判定。
@@ -55,6 +110,7 @@ struct ListRow: View {
             Image(systemName: on ? "checkmark.circle.fill" : "circle")
                 .font(.title2)
                 .foregroundStyle(on ? RenderTheme.Colors.brandA : Color.secondary)
+                .opacity(toggleEnabled ? 1 : 0.4)
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: 28, height: 28)
                 .padding(8)
@@ -101,7 +157,9 @@ struct ListRow: View {
                     }
                 }
                 if !stacked { Spacer(minLength: RenderTheme.Spacing.sm) }
-                if let trailing = trailingText {
+                if let audio = trailingAudio {
+                    AudioPlayButton(value: audio) // #420
+                } else if let trailing = trailingText {
                     Text(trailing)
                         .font(trailingIsNumeric ? RenderTheme.Fonts.rowTrailing : .subheadline.monospacedDigit())
                         .foregroundStyle(trailingIsNumeric ? .primary : .secondary)
@@ -111,6 +169,9 @@ struct ListRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .opacity(checked ? 0.6 : 1)
+            if let mark, let st = markState {
+                markButton(mark, st)
+            }
             if showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
@@ -123,10 +184,16 @@ struct ListRow: View {
         .padding(.vertical, RenderTheme.Spacing.row)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
-        .accessibilityValue(toggleOn.map { $0 ? "チェック済み" : "未チェック" } ?? "")
+        .accessibilityValue(accessibilityValueText)
         .accessibilityActions {
             if let onToggle {
                 Button(checked ? "チェックを外す" : "チェックする", action: onToggle)
+            }
+            if let audio = trailingAudio.flatMap(AudioValue.init) {
+                Button(L("録音を再生")) { AudioPlayback.shared.toggle(audio) }
+            }
+            if let mark, let st = markState, let onMark {
+                Button(st.mine ? L("\(mark.label)を外す") : L("\(mark.label)を付ける"), action: onMark)
             }
         }
     }

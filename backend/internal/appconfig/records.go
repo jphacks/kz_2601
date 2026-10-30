@@ -22,13 +22,14 @@ const (
 )
 
 type recordOut struct {
-	ID         string         `json:"id"`
-	Entity     string         `json:"entity"`
-	Data       map[string]any `json:"data"`
-	Author     string         `json:"author,omitempty"`
-	AuthorName string         `json:"authorName,omitempty"`
-	CreatedAt  time.Time      `json:"createdAt"`
-	UpdatedAt  time.Time      `json:"updatedAt"`
+	ID         string                     `json:"id"`
+	Entity     string                     `json:"entity"`
+	Data       map[string]any             `json:"data"`
+	Author     string                     `json:"author,omitempty"`
+	AuthorName string                     `json:"authorName,omitempty"`
+	Marks      map[string]store.MarkState `json:"marks,omitempty"` // #255: marks.go
+	CreatedAt  time.Time                  `json:"createdAt"`
+	UpdatedAt  time.Time                  `json:"updatedAt"`
 }
 
 func toRecordOut(r *store.Record) recordOut {
@@ -56,10 +57,15 @@ func recordSet(r *http.Request, cur *store.App, ent *dsl.Entity, eid string) sto
 
 // ownRecord loads a record and, on shared entities, requires the caller to be
 // its author (403 otherwise). Private records are the caller's by construction.
-func (h *Handler) ownRecord(r *http.Request, rs store.RecordSet, ent *dsl.Entity, id string) (*store.Record, error) {
+// forUpdate lets anyone through on edit:members entities (#252); deleting
+// stays the author's alone.
+func (h *Handler) ownRecord(r *http.Request, rs store.RecordSet, ent *dsl.Entity, id string, forUpdate bool) (*store.Record, error) {
 	rec, err := h.store.GetRecord(r.Context(), rs, id)
 	if err != nil {
 		return nil, mapStoreErr(err, "record")
+	}
+	if forUpdate && ent.MembersCanEdit() {
+		return rec, nil
 	}
 	if ent.IsShared() && rec.Author != uidOf(r) {
 		return nil, apiErr(http.StatusForbidden, httpx.CodeForbidden, "only the author can modify this record").With("author", rec.Author)
@@ -139,6 +145,10 @@ func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		out = append(out, toRecordOut(&items[i]))
+	}
+	if err := h.withMarks(r, recordSet(r, cur, ent, eid), ent, items, out); err != nil {
+		fail(w, err)
+		return
 	}
 	resp := map[string]any{"items": out}
 	if nt := p.next(len(items)); nt != "" {
@@ -290,12 +300,18 @@ func (h *Handler) getRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	rec, err := h.store.GetRecord(r.Context(), recordSet(r, cur, ent, eid), rid)
+	rs := recordSet(r, cur, ent, eid)
+	rec, err := h.store.GetRecord(r.Context(), rs, rid)
 	if err != nil {
 		fail(w, mapStoreErr(err, "record"))
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, toRecordOut(rec))
+	out := []recordOut{toRecordOut(rec)}
+	if err := h.withMarks(r, rs, ent, []store.Record{*rec}, out); err != nil {
+		fail(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, out[0])
 }
 
 func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
@@ -325,7 +341,7 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rs := recordSet(r, cur, ent, eid)
-	existing, err := h.ownRecord(r, rs, ent, rid)
+	existing, err := h.ownRecord(r, rs, ent, rid, true)
 	if err != nil {
 		fail(w, err)
 		return
@@ -356,7 +372,12 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, mapStoreErr(err, "record"))
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, toRecordOut(rec))
+	out := []recordOut{toRecordOut(rec)}
+	if err := h.withMarks(r, rs, ent, []store.Record{*rec}, out); err != nil {
+		fail(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, out[0])
 }
 
 func (h *Handler) deleteRecord(w http.ResponseWriter, r *http.Request) {
@@ -372,7 +393,7 @@ func (h *Handler) deleteRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	rs := recordSet(r, cur, ent, eid)
 	if ent.IsShared() {
-		if _, err := h.ownRecord(r, rs, ent, rid); err != nil {
+		if _, err := h.ownRecord(r, rs, ent, rid, false); err != nil {
 			fail(w, err)
 			return
 		}

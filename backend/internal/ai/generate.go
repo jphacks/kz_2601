@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch/v5"
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
+	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -40,6 +42,11 @@ type Request struct {
 	// LogicPass overrides Service.LogicPass for this request: true = UI pass
 	// then a second call that adds calculations (logic.go). Create turns only.
 	LogicPass *bool `json:"logicPass,omitempty"`
+	// AllowedComponents (#245): component types (container + leaf) the client
+	// can render; omitted/empty = all. DisabledFeatures: fieldHealth |
+	// cameraCapture (unknown values ignored). See restrict.go.
+	AllowedComponents []string `json:"allowedComponents,omitempty"`
+	DisabledFeatures  []string `json:"disabledFeatures,omitempty"`
 }
 
 // Latency is per-stage wall time in ms.
@@ -50,6 +57,10 @@ type Latency struct {
 
 // Meta is diagnostic detail about how the result was produced.
 type Meta struct {
+	// PublicPersonalData (#253): personal-data-like fields that became readable
+	// by anyone in this generation (iOS can ask before keeping them public).
+	PublicPersonalData []PublicPersonalData `json:"publicPersonalData,omitempty"`
+	// Diagnostics below.
 	Model            string     `json:"model"`
 	Attempts         int        `json:"attempts"`      // Claude calls made
 	Regenerations    int        `json:"regenerations"` // attempts - 1 (validation retries)
@@ -64,6 +75,12 @@ type Meta struct {
 	// returned document (create) or added by the patch (edit).
 	LintRetried bool     `json:"lintRetried,omitempty"`
 	Lint        []string `json:"lint,omitempty"`
+	// Omissions (#257): requested parts the app does not do and the model did
+	// not mention; the summary got a fixed sentence for each.
+	Omissions []string `json:"omissions,omitempty"`
+	// Restricted (#245): what the build restriction removed from the output
+	// after generation (disallowed parts, Field.health, camera sources).
+	Restricted []string `json:"restricted,omitempty"`
 }
 
 // Event is a progress message emitted by GenerateStream before the Result,
@@ -97,8 +114,12 @@ type Result struct {
 	Locale          Locale          `json:"locale"` // language of the UI strings and summary
 	Transcript      string          `json:"transcript"`
 	Source          string          `json:"source"` // claude|restore
-	LatencyMs       Latency         `json:"latencyMs"`
-	Meta            Meta            `json:"meta"`
+	// Unchanged (#211): the generation produced no change (only `test` ops, or
+	// the same DSL). Nothing is saved: version == previousVersion and summary
+	// says why (「〜は変更できませんでした。理由: …。代わりに…」). Omitted when false.
+	Unchanged bool    `json:"unchanged,omitempty"`
+	LatencyMs Latency `json:"latencyMs"`
+	Meta      Meta    `json:"meta"`
 }
 
 // Error is a failure mapped to an HTTP status and error code.
@@ -128,6 +149,11 @@ type Service struct {
 	LintRetry bool
 	// Chat is the model setup of the clarify turn (chat.go); zero = defaults.
 	ChatConfig ChatConfig
+	// Verifier checks the caller's ID token on /v1/chat (#286): the
+	// conversation is kept per uid, and DELETE /v1/chat/{appId} needs one.
+	// nil = no caller is ever verified (DELETE answers 401).
+	Verifier auth.TokenVerifier
+	AuthMode string // auth.ModeDev also accepts X-Debug-Uid with the emulator
 
 	conv     *convStore // clarify conversations (chat.go); lazily created
 	convOnce sync.Once
@@ -149,6 +175,9 @@ type attemptResult struct {
 	summary string
 	meta    Meta
 	latency time.Duration
+	// forceFull: the DSL was changed after the patch (build restriction), so
+	// it is saved as a full document instead of the model's ops.
+	forceFull bool
 }
 
 // Generate runs the pipeline: fetch current -> decide mode -> Claude ->
@@ -162,6 +191,8 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 // is still validated and saved before it is returned.
 func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*Result, error) {
 	started := time.Now()
+	restrict := NewRestriction(req.AllowedComponents, req.DisabledFeatures)
+	ctx = withRestriction(ctx, restrict)
 	transcript := strings.TrimSpace(req.Transcript)
 	if transcript == "" {
 		transcript = strings.TrimSpace(req.Text)
@@ -208,18 +239,44 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 		if err == nil && logic {
 			s.applyLogicPass(ctx, transcript, ar, loc)
 		}
+		if err == nil {
+			ar.summary = withShareNote(ar.summary, transcript, nil, ar.raw, loc) // #259 #215
+			notePublicPII(ar, nil, loc)                                          // #253
+		}
 	case ModeEdit:
 		ar, err = s.generateEdit(ctx, transcript, env, loc, sink)
+		if err == nil {
+			ar.summary = withShareNote(ar.summary, transcript, env.DSL, ar.raw, loc) // #259 #215
+			notePublicPII(ar, env.DSL, loc)                                          // #253
+		}
 	default:
 		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "mode must be auto|create|edit|undo"}
 	}
 	if err != nil {
 		return nil, err
 	}
+	if err := applyRestriction(ar, restrict, mode == ModeCreate, loc); err != nil {
+		return nil, err
+	}
 
+	s.noteOmissions(transcript, ar, loc)
+
+	if mode == ModeEdit && len(ar.ops) > 0 && sameDSL(env.DSL, ar.raw) {
+		// #211: a no-op is not saved as a new version; the summary tells the user why.
+		summary := ar.summary
+		if summary == "" {
+			summary = loc.text().unchanged
+		}
+		return &Result{
+			AppID: req.AppID, Version: env.Version, PreviousVersion: env.Version, Mode: "patch",
+			DSL: env.DSL, Summary: summary, Locale: loc, Transcript: transcript, Source: "claude",
+			Meta: ar.meta, Unchanged: true,
+			LatencyMs: Latency{Claude: ar.latency.Milliseconds(), Total: time.Since(started).Milliseconds()},
+		}, nil
+	}
 	src := appconfigclient.Source{Kind: "ai", Transcript: transcript, Summary: ar.summary, Model: s.Model}
 	var saved *appconfigclient.Envelope
-	if len(ar.ops) > 0 && !ar.meta.AreaFallback {
+	if len(ar.ops) > 0 && !ar.meta.AreaFallback && !ar.forceFull {
 		src.Mode = "patch"
 		saved, err = s.Store.Patch(ctx, req.AppID, env.Version, ar.ops, src)
 	} else {
@@ -251,6 +308,29 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 	return res, nil
 }
 
+// noteOmissions appends a fixed sentence to the summary for each part of the
+// request the final app leaves out without saying so (#257).
+func (s *Service) noteOmissions(transcript string, ar *attemptResult, loc Locale) {
+	app, err := dsl.Parse(ar.raw)
+	if err != nil {
+		return
+	}
+	om := omissions(transcript, app, ar.summary+"\n"+app.App.Description, true)
+	if len(om) == 0 {
+		return
+	}
+	ar.meta.Omissions = omissionIDs(om)
+	note := omissionNote(om, transcript, loc)
+	switch {
+	case ar.summary == "":
+		ar.summary = note
+	case loc == LocaleEN:
+		ar.summary = strings.TrimSpace(ar.summary) + " " + note
+	default:
+		ar.summary = strings.TrimSpace(ar.summary) + note
+	}
+}
+
 // generateFull asks for a whole AppDSL; on validation problems it re-prompts
 // up to maxRegen times, then strips areas, then fails with the problems.
 func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, meta *Meta, loc Locale, sink Sink, uiOnly bool) (*attemptResult, error) {
@@ -271,6 +351,16 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 		raw := dropFormPhotoPreviews(fillDefaults(extractJSON(resp.Text)))
 		raw = fixButtonOverlap(raw) // before validation: saves a regeneration (#169)
 		app, perr := dsl.Parse(raw)
+		if perr == nil && linted == nil && i < s.maxRegen() {
+			// #245: a part this build cannot render is a validation problem;
+			// on the last attempt it is accepted and removed by applyRestriction.
+			if v := restrictionViolations(raw, nil, restrictionFrom(ctx)); len(v) > 0 {
+				lastCandidate = raw
+				problems = v
+				ar.meta.LastProblems = problems
+				continue
+			}
+		}
 		if perr == nil {
 			// Post-processing order (integration of #173 and #174; each step re-parses):
 			//   1. addMissingLists / fixEnglishUnits: existing content fixes.
@@ -279,6 +369,8 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			//   3. addMissingAddButtons (#173): runs after 2 so it sees the final
 			//      openers (a button moved to the toolbar still counts) and never
 			//      adds a toolbar button that 2 would then dedupe or move.
+			//   3b. dropDuplicateAddToolbar (#416): a toolbar ＋ opening the same
+			//      form as a button on the screen goes (the button stays).
 			//   4. summarizeFor below (summary hints, #173) last, so the spoken
 			//      button positions describe the final layout.
 			if fixed := addMissingLists(raw, app); len(fixed) != len(raw) {
@@ -301,6 +393,11 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 					raw, app = fixed, fixedApp
 				}
 			}
+			if fixed := dropDuplicateAddToolbar(raw, app); len(fixed) != len(raw) {
+				if fixedApp, err := dsl.Parse(fixed); err == nil {
+					raw, app = fixed, fixedApp
+				}
+			}
 			if fixed := fixStatUnitLabels(raw); len(fixed) != len(raw) {
 				if fixedApp, err := dsl.Parse(fixed); err == nil {
 					raw, app = fixed, fixedApp
@@ -309,12 +406,26 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			ar.raw = canon(raw)
 			ar.summary = summarizeFor(app, loc)
 			ar.meta.Lint = app.Lint()
-			if s.LintRetry && len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
+			// #257: parts of the request dropped without a word count as content problems too
+			om := omissions(transcript, app, app.App.Description, !uiOnly)
+			lintRetry := s.LintRetry && len(ar.meta.Lint)+len(om) > 0
+			// #254: "家族だけ" without a shared entity gets one retry even with LintRetry off
+			shareProblem := shareCreateProblem(transcript, ar.raw)
+			if restrictionFrom(ctx).NoSharedData() {
+				shareProblem = "" // #451 G2: this build keeps every record private
+			}
+			if (lintRetry || shareProblem != "") && linted == nil && i < s.maxRegen() {
 				// one retry for content problems; keep this output in case it fails
-				ar.meta.LintRetried = true
 				kept := *ar
 				linted = &kept
-				problems = lintProblems(ar.meta.Lint)
+				problems = nil
+				if lintRetry {
+					ar.meta.LintRetried = true
+					problems = lintProblems(append(append([]string(nil), ar.meta.Lint...), omissionProblems(om)...))
+				}
+				if shareProblem != "" {
+					problems = append(problems, shareProblem)
+				}
 				ar.meta.LastProblems = problems
 				continue
 			}
@@ -375,16 +486,38 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 		}
 		doc.Patch = fillPatchDefaults(doc.Patch, env.DSL)
 		next, _, perr := dsl.ApplyPatch(env.DSL, doc.Patch)
+		if perr == nil && linted == nil && i < s.maxRegen() {
+			// #245: the patch may not add parts this build cannot render
+			// (ones already in the app are removed by applyRestriction).
+			if v := restrictionViolations(next, env.DSL, restrictionFrom(ctx)); len(v) > 0 {
+				lastOps, lastSummary = doc.Patch, doc.Summary
+				problems = v
+				ar.meta.LastProblems = problems
+				continue
+			}
+		}
 		if perr == nil {
 			ar.raw = next
 			ar.ops = doc.Patch
 			ar.summary = normalizeDigits(strings.TrimSpace(doc.Summary))
 			ar.meta.Lint = newLint(baseLint, lintOf(next))
-			if s.LintRetry && len(ar.meta.Lint) > 0 && linted == nil && i < s.maxRegen() {
-				ar.meta.LintRetried = true
+			lintRetry := s.LintRetry && len(ar.meta.Lint) > 0
+			// #259: a share request answered with "できない" gets one retry even with LintRetry off
+			shareProblem := shareEditProblem(transcript, env.DSL, next)
+			if restrictionFrom(ctx).NoSharedData() {
+				shareProblem = "" // #451 G2
+			}
+			if (lintRetry || shareProblem != "") && linted == nil && i < s.maxRegen() {
 				kept := *ar
 				linted = &kept
-				problems = lintProblems(ar.meta.Lint)
+				problems = nil
+				if lintRetry {
+					ar.meta.LintRetried = true
+					problems = lintProblems(ar.meta.Lint)
+				}
+				if shareProblem != "" {
+					problems = append(problems, shareProblem)
+				}
 				ar.meta.LastProblems = problems
 				continue
 			}
@@ -431,6 +564,29 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	return fr, nil
 }
 
+// applyRestriction (#245) removes what the build cannot render from the final
+// DSL (after retries, logic pass and fallbacks). A changed patch result is
+// saved as a full document; create turns get a fresh summary.
+func applyRestriction(ar *attemptResult, r Restriction, create bool, loc Locale) error {
+	out, notes, changed := enforceRestriction(ar.raw, r)
+	if !changed {
+		return nil
+	}
+	app, err := dsl.Parse(out)
+	if err != nil {
+		return &Error{Status: http.StatusBadRequest, Code: "generation_failed",
+			Message:  "could not produce a valid app without the parts this app version cannot use",
+			Problems: append(notes, err.Error()), Attempts: ar.meta.Attempts}
+	}
+	ar.raw = canon(out)
+	ar.forceFull = true
+	ar.meta.Restricted = notes
+	if create || ar.summary == "" {
+		ar.summary = summarizeFor(app, loc)
+	}
+	return nil
+}
+
 // call performs one Claude request and folds usage/attempts/latency into ar.
 // onText (nil = non-streaming) receives the text deltas.
 func (s *Service) call(ctx context.Context, system, user string, schema json.RawMessage, ar *attemptResult, onText func(string)) (*Response, error) {
@@ -441,6 +597,7 @@ func (s *Service) call(ctx context.Context, system, user string, schema json.Raw
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	t := time.Now()
+	system, schema = restrictPrompt(ctx, system), restrictSchema(ctx, schema)
 	resp, err := s.Claude.Complete(cctx, Completion{System: system, Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
 	ar.latency += time.Since(t)
 	ar.meta.Attempts++
@@ -759,6 +916,7 @@ func summarize(a *dsl.App) string {
 			fmt.Fprintf(&b, "%sに通知が届きます。", when)
 		}
 	}
+	b.WriteString(editNoteJa(a))
 	b.WriteString(substitutionNote(a.App.Description))
 	return b.String()
 }
@@ -767,14 +925,9 @@ func summarize(a *dsl.App) string {
 // asks Claude to leave in app.description when a requested part is not in the
 // catalog (create turns have no model-written summary; edit turns put it in
 // PatchDocument.summary directly).
+// #257: "○○は今はできません。" sentences are read out the same way.
 func substitutionNote(description string) string {
-	var out strings.Builder
-	for _, sentence := range strings.SplitAfter(description, "。") {
-		if strings.Contains(sentence, "代替") {
-			out.WriteString(strings.TrimSpace(sentence))
-		}
-	}
-	return out.String()
+	return strings.Join(honestNote(description, "。"), "")
 }
 
 // joinJa joins 2 items with と, more with ・.
@@ -884,4 +1037,14 @@ func mapClaudeErr(err error) error {
 		return &Error{Status: http.StatusGatewayTimeout, Code: "upstream_timeout", Message: "Claude call timed out"}
 	}
 	return &Error{Status: http.StatusServiceUnavailable, Code: "upstream_unavailable", Message: err.Error()}
+}
+
+// sameDSL reports whether two DSL documents are equal as JSON values (key
+// order and whitespace ignored).
+func sameDSL(a, b []byte) bool {
+	var x, y any
+	if json.Unmarshal(a, &x) != nil || json.Unmarshal(b, &y) != nil {
+		return false
+	}
+	return reflect.DeepEqual(x, y)
 }

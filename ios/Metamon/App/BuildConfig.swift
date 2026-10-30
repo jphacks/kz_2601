@@ -90,7 +90,9 @@ enum BuildConfig {
             )
             #if DEBUG
             if DebugMockSharing.isEnabled { // UI テスト用(#165): 変身一覧に 2 件 + 端末内で完結するシェア
+                #if !APP_STORE_REVIEW
                 services.sharing = DebugSharingClient()
+                #endif
                 Task { await appConfig.setApps(DebugMockSharing.apps) }
             }
             #endif
@@ -111,9 +113,11 @@ enum BuildConfig {
                 notifications: UserNotificationScheduler(),
                 isLive: appConfigURL != nil
             )
-            services.sharing = appConfigURL.map { HTTPSharingClient(baseURL: $0, token: token) }
             if let appConfigURL { services.account = HTTPAccountClient(baseURL: appConfigURL, token: token) } // #119
+            #if !APP_STORE_REVIEW // 審査用ビルドはシェア / 探す / リリース申請を外す(#245)
+            services.sharing = appConfigURL.map { HTTPSharingClient(baseURL: $0, token: token) }
             services.releaseRequests = appConfigURL.map { HTTPReleaseRequestClient(baseURL: $0, token: token) }
+            #endif
             return services
         }
     }
@@ -167,10 +171,14 @@ enum BuildConfig {
 enum DeviceAppID {
     private static let key = "metamon.appId"
 
+    /// この起動で初めて appId を発行したか(インストール直後・#276)。サインイン後にサーバーの最近のアプリを開く判定に使う。
+    private(set) static var issuedThisLaunch = false
+
     static var current: String {
         if let saved = UserDefaults.standard.string(forKey: key), !saved.isEmpty { return saved }
         let fresh = UUID().uuidString.lowercased()
         UserDefaults.standard.set(fresh, forKey: key)
+        issuedThisLaunch = true
         return fresh
     }
 

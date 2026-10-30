@@ -8,17 +8,31 @@ public struct MockAIClient: AIClient {
     public init(delay: Duration = .seconds(1.2)) { self.delay = delay }
 
     public static func sampleName(for transcript: String) -> String {
+        // #418 写真の読み取り・骨格(「筋トレ」「写真」より先に見る)
+        if transcript.contains("レシート") { return "receipt_ai" }
+        if transcript.contains("フォーム") && (transcript.contains("チェック") || transcript.contains("角度")) { return "form_check" }
         if transcript.contains("トレ") || transcript.contains("筋") || transcript.contains("運動") { return "training" }
         if transcript.contains("散歩") || transcript.contains("写真") || transcript.contains("場所") { return "walk" }
         if transcript.contains("買い物") || transcript.contains("チェックリスト") { return "shopping" }
         if transcript.contains("薬") || transcript.contains("服薬") { return "medicine" }
+        if transcript.contains("時間割") || transcript.contains("時限") { return "timetable" }
+        if transcript.contains("ナビ") || transcript.contains("道案内") || transcript.contains("ドライブ") { return "drive" }
+        if transcript.contains("ランダム") || transcript.contains("くじ") || transcript.contains("晩ごはん") { return "dinner" }
+        if transcript.contains("ドラレコ") || transcript.contains("車載"), DSLExamples.names.contains("dashcam") { return "dashcam" } // #410(審査用の版には無い)
+        #if !APP_STORE_REVIEW
+        if transcript.contains("傾き") || transcript.contains("水平器") || transcript.contains("気圧") { return "sensors" } // #419
+        #endif
+        if transcript.contains("音楽") || transcript.contains("BGM") { return "drive_music" }
         if transcript.contains("最初") || transcript.contains("戻") { return "initial" }
         return "kakeibo"
     }
 
     public func morph(transcript: String, appId: String, currentVersion: Int) async throws -> MorphResult {
         try await Task.sleep(for: delay)
-        let name = Self.sampleName(for: transcript)
+        if MockPublicData.matches(transcript) { // #253 公開の記録に個人の情報
+            return try MockPublicData.morph(transcript: transcript, appId: appId, version: currentVersion + 1)
+        }
+        let name = Self.wantsSharedBoard(transcript) ? "post_comments" : Self.sampleName(for: transcript)
         var doc = try DSLExamples.document(name, version: currentVersion + 1)
         doc.appId = appId
         // 改変らしい指示(作った後 / 「アプリ」も句点も無い短い指示)は指示をそのまま要約に返す(「これでいく」で何が反映されたか見えるように・#186)。
@@ -31,6 +45,8 @@ public struct MockAIClient: AIClient {
     /// 対話のモック(状態は持たず、iOS が毎回送る全履歴だけで決める)。
     /// - 問いかけ(「?」「できる?」「可能?」「WebView」等)→ answer(アプリは変えない・#186)
     /// - 「見やすく」「おすすめ」→ proposal 2 案
+    /// - 「足したい」→ 組み合わせられる proposal 3 案(multiSelect・#220)
+    /// - create の 1 発目に「項目」→ 複数当てはまる question(multiSelect・#220)
     /// - edit: それ以外の指示(「金額を大きくして」)→ ready(transcript = その指示)
     /// - create: 1 発目が短い(≤10 字)なら 1 問だけ聞く。2 発目以降・go-ahead 語・長い 1 発目は ready。
     public func chat(appId: String, messages: [ChatMessage], locale: String?, mode: ChatMode?) async throws -> ChatTurn {
@@ -41,6 +57,15 @@ public struct MockAIClient: AIClient {
         let goAhead = Self.isGoAhead(last)
         let requests = users.filter { !Self.isGoAhead($0) && !Self.isQuestion($0) }
         let mode = mode ?? .create
+        if Self.wantsMultiProposal(last) {
+            return ChatTurn(kind: .proposal, text: "組み合わせて選べます。", turn: turn, options: Self.multiProposals,
+                            locale: "ja", source: "mock", mode: mode.rawValue, multiSelect: true)
+        }
+        if mode == .create, turn == 1, last.contains("項目") {
+            return ChatTurn(kind: .question, text: "どの項目を一覧に出しますか?", suggestions: ["金額", "日付", "メモ"],
+                            turn: turn, locale: "ja", source: "mock", mode: mode.rawValue, multiSelect: true)
+        }
+        if let confirm = MockPublicData.confirmTurn(messages: messages, turn: turn, mode: mode) { return confirm } // #253
         if Self.isQuestion(last) {
             return ChatTurn(kind: .answer, text: Self.answer(for: last), suggestions: mode == .edit ? ["金額を大きくして", "見やすくして"] : nil,
                             turn: turn, locale: "ja", source: "mock", mode: mode.rawValue)
@@ -66,6 +91,16 @@ public struct MockAIClient: AIClient {
                                          transcript: transcript, locale: "ja", source: goAhead ? "shortcut" : "mock"))
     }
 
+    /// #414: 「掲示板」は誰でも見られる(scope public)ひとこと投稿を返す(有料機能込みで作れたかを画面で確かめる)。
+    /// 無料版の指示・共有を外す修正の指示が付いていれば、従来どおり自分だけの記録のサンプル。
+    static func wantsSharedBoard(_ transcript: String) -> Bool {
+        transcript.contains("掲示板") && !transcript.contains("無料版") && !transcript.contains("自分だけ")
+    }
+
+    #if APP_STORE_REVIEW
+    /// 審査用ビルドは App 内課金を持たない(#450 G1)。有料機能の印は付けない。
+    static func markingPaid(_ turn: ChatTurn) -> ChatTurn { turn }
+    #else
     /// 有料機能(#77)のモック。backend `paid_features.json` の sharedData の代表的な語だけ見る。
     static let paidKeywords = ["みんなで", "共有", "掲示板", "投稿"]
     static let freeSuffix = "(無料版で作る: 他のユーザーとデータを共有する機能は入れない)"
@@ -80,6 +115,7 @@ public struct MockAIClient: AIClient {
         out.freeTranscript = t + "\n" + freeSuffix
         return out
     }
+    #endif
 
     public func resetChat(appId: String) async {}
 
@@ -88,6 +124,15 @@ public struct MockAIClient: AIClient {
         if t.hasSuffix("?") || t.hasSuffix("？") { return true }
         return ["できる", "可能", "ですか", "WebView", "どうなって"].contains { t.contains($0) }
     }
+
+    static func wantsMultiProposal(_ text: String) -> Bool { text.contains("足したい") }
+
+    /// #220: 足す系で互いに邪魔しない案(複数選んで 1 回で反映できる)
+    public static let multiProposals = [
+        ChatOption(id: "opt1", title: "グラフを足す", detail: "ホームにカテゴリ別の円グラフを置きます。", instruction: "ホームにカテゴリ別の円グラフを追加して"),
+        ChatOption(id: "opt2", title: "予算バーを足す", detail: "今月の予算の進み具合をバーで見せます。", instruction: "ホームに今月の予算の進捗バーを追加して"),
+        ChatOption(id: "opt3", title: "並べ替えを足す", detail: "一覧を金額の大きい順に並べ替えられます。", instruction: "一覧を金額で並べ替えられるようにして"),
+    ]
 
     static func wantsProposal(_ text: String) -> Bool {
         ["見やすく", "おすすめ", "オススメ", "案を"].contains { text.contains($0) }

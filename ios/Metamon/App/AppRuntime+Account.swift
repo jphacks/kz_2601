@@ -19,9 +19,12 @@ extension AppRuntime {
             keys.forEach(defaults.removeObject(forKey:))
         }
         let center = UNUserNotificationCenter.current()
+        await services.notifications.removeAll()        // アプリごとの予約(#228)
         center.removeAllPendingNotificationRequests()
         center.removeAllDeliveredNotifications()
         resetToInitial()                                // 新しい appId を発行して初期 DSL に(UserDefaults を消した後に)
+        chatHistoryStore.removeAll()                    // チャット履歴(#210)。resetToInitial が閉じた会話を書くので後で消す
+        chatHistory = []
         DeviceAppID.set(document.appId)                 // 念のため保存し直す(次回起動で別 appId にならないように)
         toast = nil
     }

@@ -7,11 +7,18 @@ public struct MorphResult: Sendable {
     public var summary: String?
     /// full | patch(サーバーがどう変えたか。診断用)
     public var mode: String?
+    /// 生成しても何も変わらなかった(#211)。サーバーは保存せず、`summary` に「〜は変更できませんでした。理由: …」を入れる。旧サーバーは送らない(false)
+    public var unchanged: Bool
+    /// #253: 新しく誰でも見られる記録に入った個人の情報の欄(`meta.publicPersonalData`)。旧サーバーは送らない(空)
+    public var publicPersonalData: [PublicPersonalField]
 
-    public init(document: AppDocument, summary: String? = nil, mode: String? = nil) {
+    public init(document: AppDocument, summary: String? = nil, mode: String? = nil, unchanged: Bool = false,
+                publicPersonalData: [PublicPersonalField] = []) {
         self.document = document
         self.summary = summary
         self.mode = mode
+        self.unchanged = unchanged
+        self.publicPersonalData = publicPersonalData
     }
 }
 
@@ -27,6 +34,8 @@ public protocol AIClient: Sendable {
     func chat(appId: String, messages: [ChatMessage], locale: String?, mode: ChatMode?) async throws -> ChatTurn
     /// `DELETE /v1/chat/{appId}`。失敗しても UI は止めない(サーバー側は 30 分で自然に消える)。
     func resetChat(appId: String) async
+    /// `POST /v1/text`(#417): aiButton generate のオンライン版。端末内 AI が使えない時だけ。
+    func text(_ request: AITextRequest) async throws -> AITextResult
 }
 
 public extension AIClient {
@@ -34,6 +43,9 @@ public extension AIClient {
     func morph(transcript: String, appId: String, currentVersion: Int, locale: String?) async throws -> MorphResult {
         try await morph(transcript: transcript, appId: appId, currentVersion: currentVersion)
     }
+
+    /// text を持たない実装(テストの偽物等)は使えない扱い。
+    func text(_ request: AITextRequest) async throws -> AITextResult { throw AITextError.unsupported }
 
     /// mode を指定しない対話(backend が appId の DSL 有無で create / edit を判定)。
     func chat(appId: String, messages: [ChatMessage], locale: String?) async throws -> ChatTurn {
@@ -173,6 +185,9 @@ public struct ChatTurn: Codable, Equatable, Sendable {
     public var transcript: String?
     /// proposal の時だけ。案 1〜3
     public var options: [ChatOption]?
+    /// #220: proposal の案 / question のチップを複数選べる(組み合わせられる時だけ true)。旧 backend は送らない(nil = 1 つ選択)
+    public var multiSelect: Bool?
+    public var isMultiSelect: Bool { multiSelect == true }
     public var locale: String?
     /// claude | shortcut | forced
     public var source: String?
@@ -184,10 +199,17 @@ public struct ChatTurn: Codable, Equatable, Sendable {
     public var paidFeatures: [PaidFeature]?
     /// #77: 有料機能を抜いた依頼文(「この機能なしで作る」で transcript の代わりに generate へ)
     public var freeTranscript: String?
+    /// #253: question の時だけ。個人の情報(name / phone など)を誰でも見られる記録に入れてよいかの確認。旧 backend は送らない
+    public var confirmPublic: [String]?
+    /// 公開してよいかの確認の質問か(吹き出しに公開の印を付ける)
+    public var isPublicConfirm: Bool { kind == .question && !(confirmPublic ?? []).isEmpty }
 
     public init(kind: Kind, text: String, suggestions: [String]? = nil, turn: Int, brief: ChatBrief? = nil,
                 transcript: String? = nil, options: [ChatOption]? = nil, locale: String? = nil, source: String? = nil, mode: String? = nil,
-                requiresPro: Bool? = nil, paidFeatures: [PaidFeature]? = nil, freeTranscript: String? = nil) {
+                requiresPro: Bool? = nil, paidFeatures: [PaidFeature]? = nil, freeTranscript: String? = nil, multiSelect: Bool? = nil,
+                confirmPublic: [String]? = nil) {
+        self.confirmPublic = confirmPublic
+        self.multiSelect = multiSelect
         self.requiresPro = requiresPro
         self.paidFeatures = paidFeatures
         self.freeTranscript = freeTranscript

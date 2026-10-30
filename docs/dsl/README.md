@@ -50,10 +50,12 @@
 ```
 AppDSL { schemaVersion:1, app:AppMeta, initialScreen, entities[], screens[] }
 AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: fullscreen|floating|none, notifications[]?, tabs[]?: {screen,title,icon?} }
-Entity  { id, name, titleField?, scope?: private|shared|public, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit?, refEntity?, computed?: Expr, health?: "weight" } }
+Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|members, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit?, refEntity?, computed?: Expr, health?: "weight" } }
+  予約値(field id の代わり): $author(共有 entity の投稿者)・$createdAt(作成日時)— §3.5
+  Entity.marks?: [{ id, icon, label }](共有 entity の 1 人 1 回の印・いいね / 保存)・ListItem.mark? / 予約値 $marks.<id>(件数・自分が付けたか)— §3.5
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (44 種・全て id? と area? を持つ) / Action (9 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
+Leaf (44 種・全て id? と area? を持つ) / Action (12 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
@@ -72,10 +74,11 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `datePicker` | `field` | `label`, `includeTime` | ○ | P0 |
 | `picker` | `field`(enum または ref) | `label`, `style`(menu/segmented/wheel) | ○ | P0 |
 | `toggle` | `field`, `label` | | ○ | P0 |
-| `photoField` | `field`(photo) | `label`, `source`(camera/library/both) | ○ | P0 |
+| `photoField` | `field`(photo) | `label`, `source`(camera/library/both), `analyze`([{kind, into, options?, joint?}]・#418) | ○ | P0 |
 | `image` | `field`(photo) | `height`(small/medium/large) | ○ | P0 |
 | `videoField` | `field`(video) | `label`, `source`(camera/library/both), `maxDuration`(秒・既定 60) | ○ | #206 |
 | `videoPlayer` | `field`(video) | `height`(small/medium/large) | ○ | #206 |
+| `audioRecorder` | `field`(audio) | `label`, `maxDuration`(秒・既定 600・最大 7200) | ○ | #420 |
 | `list` | `entity`, `item{title}` | `item.subtitle/trailing/icon/image`, `sort`, `filter`, `emptyText`, `onItemTap`, `swipeToDelete` | | P0 |
 | `stat` | `label` + (`entity`+`aggregate` **または** `value`(Expr)) | `field`(count 以外必須), `by`(latest/earliest/distance/duration), `filter`, `format`(plain/currency/percent) | | P0 |
 | `chart` | `entity`, `kind`(bar/line/pie), `groupBy`, `aggregate` | `title`, `field`, `bucket`(day/week/month), `filter` | | P1 |
@@ -88,12 +91,16 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `grid`(Container) | `children`(1 つ以上) | `columnCount`(2/3/4・`columns` は table の列定義なので別名), `spacing` | | P1 |
 | `searchBar` | `field`(画面ローカルの検索キー) | `placeholder` | | P1 |
 | `calendar` | `entity`, `dateField`(date/datetime) | `onDateTap`, `title` | | P1 |
+| `gridTable` | `entity`, `columnField`(enum/string), `rowField`(integer/enum/string), `titleField` | `subtitleField`, `columnValues`, `rowValues`, `rowRange`{from,to}(integer・既定 1〜6・最大 24 行), `onItemTap`, `title` | string の軸は `columnValues`/`rowValues` 必須 | P1 |
 | `shareButton` | `text`(`{{fieldId}}` 可) | `field`, `label`, `icon`, `shareTo`(any/line/slack/discord・既定 any) | `field`/`{{}}` 使用時のみ | P1 |
 | `openUrlButton` | `label`, `url`(https か `line` `slack` `discord` `tel` `mailto` `maps` `comgooglemaps` スキーム) | `icon`, `style`(primary/secondary/plain) | | P1 |
 | `mapView` | `entity`, `locationField`(location) | `titleField`, `zoom`(near/city/wide), `onItemTap`, `kind`(pins/route・#168), `dateField`(route のみ) | | P1 |
 | `locationButton` | `field`(location) | `label` | ○ | P1 |
+| `locationPicker` | `field`(location) | `label`, `nameField`(string・場所の名前) | ○ | P1 |
+| `routeGuide` | 目的地: `locationField`(location)か `address` のどちらか | `entity`(候補から選ぶ)・`titleField`・`mode`(automobile\|walking)・`title`・`label` | | #411 |
 | `qrScanner` | `field`(string/text) | `label` | ○ | P1 |
-| `timerDisplay` | `mode`(stopwatch/countdown) | `seconds`(countdown 必須 >0), `field`(integer/number), `label` | `field` 使用時のみ | P1 |
+| `qrCode` | `text` / `field` / `value`(Expr) のどれか 1 つ | `label`(QR の下の説明), `title` | | #422 |
+| `timerDisplay` | `mode`(stopwatch/countdown) | `seconds`(countdown 必須 >0), `field`(integer/number), `label`, `liveActivity`(bool・ロック画面 / Dynamic Island にも出す #423) | `field` 使用時のみ | P1 |
 | `webView` | `url`(https のみ) | `title` | | P1 |
 
 `list` は任意キー `searchField` を持ち、同じ画面の `searchBar.field` を指すと title/subtitle の部分一致で絞り込む(backend は対応する `searchBar` の存在を検証)。
@@ -118,22 +125,27 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `link` | `text`, `url`(http(s)) | | | P1 |
 | `markdown` | `text`(インライン markdown) | | | P1 |
 | `avatar` | | `image`(https/data URL), `field`(photo・要 screen.entity), `name`(イニシャル), `size` | △(`field` 時) | P1 |
-| `table` | `entity`, `columns[{field,title?}]` | `sort`, `filter`, `limit` | | P1 |
+| `table` | `entity`, `columns[{field,title?,aggregate?}]` | `sort`, `filter`, `limit`, `groupBy`(#261) | | P1 |
 | `timeline` | `entity`, `dateField`(date/datetime), `titleField` | `subtitleField`, `filter`, `limit` | | P1 |
 | `emptyState` | `title` | `icon`, `message` | | P1 |
 | `settlement` | `entity`, `nameField`, `balanceField`(数値・通常は computed) | | | P1 |
-| `aiButton` | `task`(summarize\|classify\|rewrite\|extract\|suggest), `output`(string/text・classify は enum も可) | `label`, `input`(field)または `entity`+`limit`, `prompt`(`{{field}}` `{{input}}` 置換), `options`(classify 候補) | ✓ | P1 |
-| `nearbyShare` | `label`, `entity` | | | P2 |
+| `randomPicker` | `entity`, `titleField` | `subtitleField`, `filter`, `label`(既定「ランダムに決める」), `title`, `onItemTap` | | #263 |
+| `aiButton` | `task`(summarize\|classify\|rewrite\|extract\|suggest\|generate), `output`(string/text・classify は enum も可。generate だけ任意) | `label`, `input`(field)または `entity`+`limit`, `prompt`(`{{field}}` `{{input}}` 置換。generate は必須・500 字まで), `options`(classify 候補), `shape`(line\|list\|fields・generate)+ `count`(list 1〜10)/ `items`(fields の名前 1〜10) | ✓ | P1 / #417 |
+| `nearbyShare` | `label`, `entity`(passby は `fields` も) | `mode`(send\|passby・既定 send)、passby のみ `fields` `limit`(1〜20・既定 1) `distance` | | P2 / #425 |
 | `locationTracker` | `entity`, `locationField`(location) | `dateField`(datetime), `label`, `seconds`(自動停止・既定 3600) | | P3 |
+| `dashcam` | | `title`, `keepMinutes`(既定 10), `maxStorageMB`(既定 2000), `impactG`(既定 2.5), `autoStart`(landscape\|still\|charging の配列), `audio` | | #410 |
 | `healthStat` | `metric`(steps\|weight), `label` | `period`(today\|week・既定 today), `target`(steps の 1 日の目標) | | P2 |
+| `chatThread` | `entity`, `textField`(string/text) | `photoField`(photo), `placeholder`, `emptyText` | | #260 |
+| `sensorValue` | `sensor`(tilt\|pitch\|roll\|acceleration\|rotation\|pressure\|altitude), `label` | `style`(number\|gauge\|level), `min`/`max`(gauge), `entity`+`field`(number)+`dateField`(datetime), `seconds`(一定間隔 1〜3600), `limit`(既定 60・〜1000), `threshold`{`above`\|`below`, `message`, `save`, `action`} | | #419 |
+| `musicPlayer` | | `title`, `allowRequests`(既定 false), `autoAccept`(`allowRequests` 時のみ・既定 false) | | #412 |
 
 `color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
-### 3.2 アクション(9 種)
+### 3.2 アクション(12 種)
 
 | type | フィールド | iOS の挙動 |
 |---|---|---|
-| `navigate` | `screen`, `presentation?`(push/sheet/fullScreen) | 遷移。`list.onItemTap` からは **recordId を暗黙に渡し**遷移先フォームが編集モードになる |
+| `navigate` | `screen`, `presentation?`(push/sheet/fullScreen), `prefillRef?` | 遷移。`list.onItemTap` からは **recordId を暗黙に渡し**遷移先フォームが編集モードになる(だから遷移先は同じ entity のフォーム)。`prefillRef` 付きは**親から子を作る**: 今のレコードを子フォームの ref に入れて新規で開く(下の「親から子を作る」) |
 | `back` | | スタックがあれば pop、モーダル最下層なら dismiss |
 | `saveRecord` | `entity`, `screen?` | ドラフトを POST(新規)/PATCH(編集)→ レコード再取得 → `screen` へ、無ければ `back` |
 | `deleteRecord` | `entity`, `confirmMessage?` | 現在の recordId を DELETE → back。list の長押し削除も同じ |
@@ -142,22 +154,47 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `resetForm` | | ドラフトを既定値に戻す |
 | `scheduleNotification` | `notification` | ローカル通知を予約(`dsl.<id>`) |
 | `cancelNotification` | `notificationId` | 予約を取消 |
+| `export` | `entity`, `format`(csv/pdf), `filter?`, `fields?`, `title?` | 記録を CSV / PDF に書き出して共有シート(ファイル・メール・AirDrop)を開く(#421・下の「書き出し」) |
+| `startActivity` | `activity`{`title`, `subtitle?`, `icon?`, `minutes?`(1〜480), `stat?`} | ライブアクティビティ(ロック画面 / Dynamic Island)を出す(#423・下の「ライブアクティビティ」) |
+| `endActivity` | | 出しているライブアクティビティを消す(#423) |
 
 `confirmMessage` はどのアクションにも付けられ、先に確認ダイアログを出す。
+
+- **書き出し `export`(#421)**: 記録を CSV(UTF-8 BOM 付き・CRLF・1 行目は項目名)か A4 の PDF(見出し・書き出し日・絞り込み・件数・グラフ・表)にして `UIActivityViewController` で共有する。値は一覧・表と同じ書式(日付・¥・選択肢・参照先の名前・計算項目)で、写真・動画は入れない。`fields` 省略で全項目。`filter` は `list.filter` と同じ(単体 / 配列)。hidden(#262)は自分が書いた行だけ値を出し、他人の行しか無ければ列ごと出さない。`=` `+` `@` 等で始まるセルは `'` を前に付ける(CSV インジェクション対策)。PDF には押した画面にある同じ entity の `chart` を `ImageRenderer` で画像にして表の上に入れる。Leaf(`exportButton`)ではなく Action にしたのは、(1) toolbar からも同じ動作を置ける、(2) `confirmMessage` 等の既存の仕組みと button の見た目をそのまま使える、(3) 古い iOS は「未対応のアクション」の toast で済み画面が崩れない、の 3 点(上の「新規アクションは追加しない」の例外)。整形は `RecordExport` / `CSVWriter`(MetamonDSL・純関数)、PDF とファイルは `RecordExporter.swift`(Renderer)。審査用ビルドにも残す(ネイティブ権限が不要)。
 
 構造・ナビ・ネイティブ系の設計メモ(新規アクションは追加しない):
 
 - `shareButton` / `openUrlButton` / `locationButton` / `qrScanner` / `timerDisplay` は **Leaf 内で完結**し(ShareLink / `openURL` / CoreLocation / AVFoundation / Timer)、新しい `Action` 種別(`share` / `requestLocation` 等)は足さない。`ActionType` に case を足すとホスト(`AppRuntime.run` の網羅 switch)の改修が必須になるため。URL は既存の `openUrl` アクションで足りる。
+- **ライブアクティビティ(#423)** は例外的に Action を 2 つ足した: `startActivity{activity:{title, subtitle?, icon?, minutes?(1〜480), stat?}}` / `endActivity`。自分の見た目を持たず、どのボタン(toolbar・list.onItemTap も)からでも「◯◯中を出す / 消す」をしたいので Leaf にしない。タイマーは `timerDisplay.liveActivity: true` で Leaf 内に閉じる。`activity.stat` は同じアプリの `stat` / `progressBar` の id(Go が型まで検証)。更新は端末内だけ(push 無し)。iOS 側の仕組みは `docs/ios/architecture.md` §12.1、裏で続くもの・止まるものは §17.4。実例 `examples/ramen_timer.json`。
 - **他アプリ連携(#37 最小版)**: `shareButton.shareTo` で送り先を選ぶ。`line` → `https://line.me/R/share?text=<urlencoded>` を `openURL`(LINE 未インストールなら Web 版に遷移・写真は送れないので文面のみ)。`slack` / `discord` → 公式に汎用の共有 URL スキームが無いので **OS 共有シート(ShareLink)を開き、文面をチャンネル投稿向けに整形**(`**` `#` 等の Markdown 記号を落としたプレーンテキスト + 先頭に 💬)。`any`(既定)は従来どおり。キー名が `target` でないのは `progressBar.target`(number)と JSON キーが衝突するため(`columnCount` と同じ理由)。**Slack/Discord への Incoming Webhook 直接投稿は後段(#37 中版: appconfig 側にユーザー設定として保存し `postWebhook` アクションから投稿)**で、この版には含めない。
 - **`locationTracker`(#168)**: 「記録を開始 / 記録を停止」と記録中の状態(経過時間・距離・点の数)。**開始を押した間だけ**現在地を `entity` に 1 点 = 1 レコード(`locationField` に "lat,lng"、`dateField` に時刻)で足す。アプリを閉じても停止まで続き、`seconds`(既定 1 時間・300〜14400 に丸める)で自動停止。権限は When In Use だけ。点の entity はフォーム不要(lint の「add form が無い」から除外)で、他の required field には defaultValue が要る(validate)。見せ方は既存部品の拡張だけ: `mapView.kind: "route"` で点を `dateField` の時刻順に線で結び、`stat.aggregate: "distance"`(m / km)/ `"duration"`(m:ss / h:mm:ss)を `field` = location field、`by` = 日時 field で集計する。**10 分以上空いた点は別の記録**として線を切り、距離・時間にも足さない(朝と夕方の散歩を 1 本にしない)。Expr の `agg` には足していない(必要になったら)。例: `examples/walk_route.json`。
+- **`dashcam`(#410)**: ドラレコ。背面カメラのプレビューを出しながら 1 分ごとの区間(mp4)で録画し、直近 `keepMinutes` 分だけ端末(Application Support/metamon-dashcam/)に残す(ループ録画)。`maxStorageMB` を超えたら古いループ区間から消し、保存済みだけで上限に達したら録画を止める。重力を除いた加速度が `impactG` を超えたら、直前 1 分〜直後 30 秒にかかる区間を「保存済み」に移して消さない。`autoStart` の条件(横向き = 重力が端末の横方向・ほぼ静止・充電中)が全部 5 秒続いたら自動で開始(手で止めた後は、条件が一度外れるまで再開しない)。保存済みは部品の「保存した映像」から再生・写真に保存・共有・削除。録画中は画面のスリープを止める。**iOS は裏に回るとカメラを止める**ので、画面を出している間だけ録画する(部品に常に表示・裏に回ったら区間を閉じて停止)。映像はレコードに入れない(entity 不要・同期しない)。1 アプリに 1 つ(validate)。残す区間・衝撃・自動開始の判定は iOS `DashcamLoop` / `DashcamImpact` / `DashcamAutoStart`(MetamonDSL・時刻とセンサー値を差し替えてテスト)。審査用ビルド(#245)では外す。シミュレータはカメラが無いので「実機のみ」の表示。例: `examples/dashcam.json`。
 - **`nearbyShare`(#36)**: 近くの Tailor It 端末へ MultipeerConnectivity(Wi-Fi / Bluetooth 自動・インターネット不要)でレコードを送る。**送る範囲**: `screen.entity == entity` のフォーム画面なら入力中の 1 件(未保存でも今の値)、それ以外の画面ではその entity の新しい順 最大 50 件。**受け取り**: 受信側は前面にいて今のアプリが nearbyShare を使っている間だけ待ち受け(ローカルネットワーク許可ダイアログを無関係なアプリで出さないため)、招待を受けると「◯◯さんから「出席」3 件」の確認を出し、承認した時だけ接続する(暗号化必須)。取り込みは **同じ appId**、または **同じ entity id で保存フィールドの id+型が一致**する時だけ。未知のフィールドは捨てる。設計・実機手順は `docs/ios/architecture.md` §近距離共有。Leaf 内で完結し新しい Action は足さない(上と同じ理由)。
+- **`nearbyShare` mode:`passby`(すれ違い通信・#425)**: 新しい部品ではなく nearbyShare のモード(同じ MultipeerConnectivity・同じ審査用ビルドでの除外・Registry/型の追加なし)。この画面を開いて部品のスイッチをオンにしている間だけ、近くで**同じアプリ(appId)**を開いている人と自動でつながり、`entity` の自分の記録(受け取った記録・他人の記録は除く)の新しい順 `limit` 件(既定 1・最大 20 件・16 KB)を交換する。**送るのは `fields` に書いた保存 field だけ**(hidden #262・photo・video・ref・refs・computed は指定不可=backend 検証でエラー)。受け取った記録は同じ entity に追加(`entity` は private 必須。共有 entity だと他人のプロフィールを全員に公開してしまうため)、同じ相手・同じ記録は 2 度追加せず内容が変わったら更新する。部品内に会った人と日時の一覧を出す。初回オンの前に何を誰に送るかの同意を出し、オンの間は「探しています」の表示、画面を閉じる/アプリを裏に回すと止まる(iOS の制約)ことを常に表示する。`distance:true` は Nearby Interaction(UWB)でつながった相手との距離と方向を出す(iPhone 11 以降・SE を除く。非対応は一言だけ出して隠す)。
 - `openUrlButton.url` は https のほか allowlist のカスタムスキーム(`line` `slack` `discord` `tel` `mailto` `maps` `comgooglemaps`)を許可する(backend `dsl.OpenURLSchemes` と iOS `ExternalURLPolicy` が同じ表・`line`/`slack`/`discord` は Info.plist `LSApplicationQueriesSchemes` にも登録)。`http://` や未知スキームは backend がエラー・iOS はプレースホルダ。
 - `webView` は `WKWebView` の `UIViewRepresentable`(戻る/進む/再読込の小ツールバー + 読み込みバー)。https 以外は不可。WKWebView 自身がスクロールするので `GridScreenLayout.scrollsInside` には**入れない**(セル内で二重スクロールしない)。ページ内リンクが allowlist のスキーム(tel: 等)なら OS に渡し、それ以外の非 http(s) は無視。実例: `examples/gallery-web.json`(webView + LINE/Slack/Discord/共有シートの 4 ボタン + maps/tel/mailto/line リンク)。
 - `calendar.onDateTap` は既存の `navigate` を使う。行タップは recordId を渡して編集、「追加」はタップした日を `dateField` の初期値として Renderer 内の `FormPrefill` に積み、次に開いた新規フォームが 1 回だけ消費する(`Action` に params を増やさない)。
+- **親から子を作る(#256)**: コメント・回答・出欠・いいねのような「親のレコードに付く子のレコード」は、子の entity に親を指す `ref` field(例 `post_comments.post` → `posts`)を置き、`navigate` に `prefillRef: "<その ref field id>"` を付けて子のフォームを開く。**今のレコード** = `list` / `mapView` の `onItemTap` ならタップした行、`button` / `toolbar` ならその画面(`screen.entity`)のフォームのレコード。iOS は今のレコードの id を `FormPrefill` に積み、子のフォームを**新規**で開いて ref に 1 回だけ入れる(recordId は渡さない)。親が未保存(新規フォームの button / toolbar)の時は子を開かず「先に「<親の entity 名>」を保存してください」を出す(`AppRuntime.perform(.navigate)`)。実例: `examples/post_comments.json`(投稿のフォームの「コメントを書く」)。
+  - 検証(`backend/pkg/dsl/prefill_ref.go`・エラー): `list` / `mapView` / `gridTable` の `onItemTap` と `calendar.onDateTap` が**別 entity のフォーム**へ `prefillRef` 無しで行く(タップした行の id で別 entity のフォームが編集モードで開き、該当レコードが無い。旧 d_quiz_game の問題一覧 → 回答フォーム)。メッセージに「同じ entity のフォームへ向ける / `prefillRef` に使える ref field」を入れ、AI の再生成にそのまま渡す。
+  - `prefillRef` の条件: 遷移先は `screen.entity` のあるフォーム・field はその entity の保存される `ref`(`refs` / computed 不可)・`refEntity` が今のレコードの entity・遷移先フォームにその field の `picker` を残す(親が見えて選び直せる。prefillRef を知らない古い iOS でも保存できる)・`screen.entity` の無い画面の button / toolbar と、`calendar` / `gridTable` のタップ(自前で日付・マスを `FormPrefill` に積む)では使えない。
+- **`audioRecorder` / Field `audio`(#420)**: マイクで録音して audio field に保存する入力(ボイスメモ・会議の録音)。録音 → 停止 → 再生・録り直し・削除。録音中は経過時間 / 上限と音量メーター。値は動画(#206)と同じ考え方で **端末内のファイル + レコードには `"audio:<id>|<秒>"` だけ**(AAC m4a・モノラル 64kbps を `Application Support/metamon-audio/<id>.m4a`・iCloud バックアップ対象外。Firebase Storage へのアップロードは動画と同じく未実装なので、他の端末では長さだけ出て再生できない)。レコード削除・録り直し・アプリ削除・アカウント削除でファイルも消す。`videoField` と同じ「field の型 + 入力部品」の形にしたのは、録音はレコードの 1 項目(メモと同じ 1 件に入る)で、一覧・ニアバイ共有・AI ボタンが型で扱いを決められるため(再生は録音部品と一覧の行が持つので `audioPlayer` は作らない)。一覧で再生するには `list.item.trailing` にその audio field(行の右端に再生ボタン + 長さ。同時に鳴るのは 1 本)。上限は `maxDuration`(秒・既定 600・1〜7200。`record(forDuration:)` が止める)。**イヤホンのボタン**: 部品が画面にある間 `MPRemoteCommandCenter` の 再生 / 一時停止 / 切り替え を受け、録音中なら停止・それ以外は開始(録音済みなら録り直し・再生中は再生を止めるだけ)。画面を離れたら外す。iOS がボタンを届けるのは最後に音を扱ったアプリだけなので、他のアプリで音楽を流している間は届かない(実機確認)。**音声入力を壊さない**: 録音・再生の間だけ AVAudioSession を借り(`AudioSessionLease`)、終わったら借りる前の category / mode / options に戻して非アクティブにする(途中で音声入力が設定を変えたら触らない)。音声入力側(`WhisperKitRecognizer`)は開始のたびに `.playAndRecord` を自分で設定する。審査用ビルド(#245)では部品ごと外す(`docs/ios/review-build.md`)。古い iOS では audio field は文字列扱い・部品はプレースホルダ(落ちない)。
+- `gridTable`(#234)は時間割のマス目。列 = columnField の値(enum の options か columnValues)、行 = rowField の値(integer は rowRange、enum は options か rowValues)。マスのタップは `onItemTap`: 記録 1 件 = recordId 付きで編集、空き = 列・行の値を `FormPrefill` に積んで新規、複数 = メニュー(各記録の編集 + 追加)。1 マスに複数ある時は先頭 + 「+n」。列見出しが曜日なら今日の列を強調。列が画面幅に収まらなければ横スクロール、縦は `GridCell` の内側スクロール。配置計算は iOS `GridTableLayout`(MetamonDSL)。実例: `examples/timetable.json`。
+- **`randomPicker`(#263)**: ボタンを押すたびに entity のレコード(`filter` で絞れる)から 1 件をランダムに選び、`titleField`(+ `subtitleField`)を大きく出す(約 0.7 秒のシャッフル演出・「視差効果を減らす」では演出なし)。候補が 2 件以上なら直前と同じ 1 件は続けて出さない。**乱数は Expr に入れない**: 計算式は描画のたびに評価されるので、乱数を入れると再描画・レコード再取得のたびに値が変わる。選んだ 1 件は部品の表示状態(SwiftUI `@State`)だけに持ち、保存しない(画面を離れると消える・再描画では変わらない)。選んだ 1 件のタップは `onItemTap` を recordId 付きで実行(list の行タップと同じ)。選び方は iOS `RandomPick`(MetamonDSL・乱数源を差し替えてテスト)。古い iOS では未知 type としてプレースホルダになる(落ちない)。実例: `examples/dinner.json`。
 - `searchBar.field` は entity の field ではなく**画面ローカルのキー**(`ScreenLocals`)。`list.searchField` で参照し、レコードには保存しない。
 - `mapView` は `latField`/`lngField` の 2 列ではなく既存の **`location` 型 field 1 つ**(`"lat,lng"`)を使う(`locationButton` の保存先と同じ表現・entity の field 数を増やさない)。既存 `map` Leaf は無かったので新設。
+- **`routeGuide`(#411)**: 目的地までの道案内。MapKit `MKDirections` の経路を地図に線で出し、次に曲がる所(矢印・距離・案内文)・残りの距離・あと何分・到着の予想時刻を現在地(`CLLocationUpdate.liveUpdates`)に合わせて進める。音声案内(`AVSpeechSynthesizer`・700 / 300 / 80 m 手前、徒歩は 100 / 25 m 手前・到着)はスピーカーのボタンでオン・オフ(端末に保存)。車 / 徒歩は画面で切り替えられ(`mode` は最初の値)、案内中に切り替えると今の位置から引き直す。道を外れた位置(車 50 m・徒歩 30 m + 位置の精度)が 3 回続いたら引き直す(最短 15 秒おき)。目的地は 1 つだけ: `address`(住所・施設名を `MKLocalSearch` で検索した 1 件目)/ `entity` + `locationField`(画面の entity と別 = ホームに置き、場所を持つレコードから部品の中で選ぶ)/ `locationField` だけ(`screen.entity` の今のレコード・同じフォームの `locationPicker` で選んだ値もそのまま使う)。**使用中の位置だけ**(背面で案内を続けない・`CLBackgroundActivitySession` を使わない)ので審査用ビルドにも残す。案内中は画面を消さない(`isIdleTimerDisabled`)。画面を離れると止まる。車線・渋滞の回避・経由地・自転車 / 電車は無い(MapKit の範囲)。進み方・読み上げる時は iOS `RouteGuidance`(MetamonDSL・位置を渡してテスト)。モック(`METAMON_MOCK=1`)は権限・通信を使わず金沢駅からの L 字の経路を 0.5 秒ごとに進む。実例: `examples/drive.json`。
+- **`qrCode`(#422)**: 文字・URL・レコードの値から QR コードを作って表示する(読み取りの `qrScanner` と対)。値は次のどれか 1 つ(検証 `backend/pkg/dsl/qrcode.go`): `text` = 固定の文字(最大 1000 文字かつ 2331 バイト = バージョン 40・誤り訂正 M の容量。screen.entity の画面では `{{fieldId}}` をそのレコードの値で置換)/ `field` = screen.entity の field(表示中のフォーム・詳細のレコード。photo / video / refs と hidden は不可)/ `value` = Expr(screen.entity の画面なら `ref` でそのレコード)。iOS は CoreImage `CIQRCodeGenerator`(誤り訂正 M)で作り、1 モジュール = 整数ピクセルに拡大して補間なしで描く(ぼけない)。周りに 4 モジュールの白い余白を付け、ダークモードでも白地に黒。長押しのメニューとボタンで写真に保存(`NSPhotoLibraryAddUsageDescription`・追加のみ)と共有シート。値が空・長すぎる時は案内を出す(落ちない)。審査用の版にも残す。
+- **`locationPicker`(#212)**: 現在地以外の場所を選ぶ入力欄。シートで店名・地名・住所を検索(MapKit `MKLocalSearch`・API キー不要)/ 地図を動かして中央のピン / 現在地 から選ぶ。保存は `locationButton` と同じ `"lat,lng"`(値の形を増やさない=mapView・appconfig の検証はそのまま)。場所の名前は任意の `nameField`(string field)に入れる(ピン・現在地で名前が無い時は打った名前を消さない)。「今いる場所」だけなら `locationButton`。モック(`METAMON_MOCK=1`)の検索は固定 3 件。
 - **`healthStat` / `Field.health`(#167)**: 端末のヘルスデータ。`healthStat` は **entity を持たない表示カード**で、歩数は iPhone の歩数計(CoreMotion・直近 7 日・capability 不要)、歩数計の無い端末(シミュレータ)はヘルスケアの歩数、体重はヘルスケアの最新値を読む。today は数値(steps は `target` で達成率バー)、week は 7 日のグラフ(steps は棒 + 目標線・weight は折れ線)。許可が無い・使えない端末は「ヘルスケアへのアクセスが許可されていません」等を表示。書き込みは部品ではなく **`Field.health: "weight"`**(number・unit kg): フォームで**新規**保存した時にヘルスケアの体重にも 1 件書く(編集保存では書かない・失敗してもレコードは保存済みでトーストだけ)。入力部品や `saveRecord` を増やさず「どの値をヘルスケアに出すか」をデータ側に 1 キーで持つため。実例: `examples/health.json`。設計は `docs/ios/architecture.md` §15.1。
+- **`sensorValue`(#419)**: iPhone のセンサーの今の値。tilt / pitch / roll(°)・acceleration(G・重力を除いた揺れ)・rotation(°/s)は CoreMotion の device motion、pressure(hPa)・altitude(m・**画面を開いた時を 0 とする相対値**)は CMAltimeter。**画面に出ている間だけ**測り(`.task` の開始・取り消し)、表示の更新は最大 10 回/秒。`entity`+`field` で「今の値を記録」(1 回 1 レコード・`dateField` に時刻・他の field は `defaultValue`)、`seconds` で「記録を開始/停止」(画面を開いている間だけ・`limit` 件で自動停止)、`threshold` は条件に入った瞬間に 1 回だけ発火(警告表示 + 振動・`save` で 1 件保存・`action` は navigate / scheduleNotification / cancelNotification のみ)、条件から出るまで再発火せず最短 3 秒おき。form の無い entity でも lint は通る(locationTracker と同じ)。**温度・湿度は iPhone にセンサーが無いので無い**(AI は「測れません」と答え、手入力の記録を代わりに出す・外付けセンサーは別 Issue)。センサーの無い端末(シミュレータ)は「このセンサーはこの端末では使えません」、`METAMON_MOCK=1` は決まった波形。計算は iOS `SensorReading`(MetamonDSL)。審査用ビルドでは外す(docs/ios/review-build.md)。実例: `examples/sensors.json`。
 - `aiButton`(#78)は **オンデバイス完結の AI 部品**(Apple Intelligence / Foundation Models・iOS 26+)。データは端末外に出ず、クラウド API も課金も無い。結果は output field のドラフトに入るだけで保存はユーザー。非対応端末・Apple Intelligence OFF・モデル準備中は「この端末では AI を使えません」と理由付きで無効化。`Action` の `runAI` 案ではなく Leaf にしたのは、(1) 生成 AI が 1 部品で書き切れる(button + action の 2 段より短く、入力・出力 field を同じ場所で検証できる)、(2) 実行中スピナー・不可時の無効表示が部品の見た目に属する、(3) `ActionType` を増やすとホストの網羅 switch 改修が要る、の 3 点。実例: `examples/diary_ai.json`(本文 → 要約・気分の分類)。
+- **`photoField.analyze`(#418・写真を AI で読み取る / 骨格)**: 写真を撮った・選んだ直後に**端末内で**読み取り、同じレコードの `into` field のドラフトに入れる(保存はユーザー・読み取れなかった項目は今の値のまま・プレビューの下の「もう一度読み取る」で読み直す)。`kind` は閉じた 6 種: `text`(Vision の文字認識 ja+en → string/text)・`amount`(OCR の「合計」の行、無ければ ¥/円 付きの最大額 → currency/integer/number)・`date`(OCR の `2026/10/28`・`2026年10月28日` など → date/datetime)・`classify`(Vision の画像分類のラベル + OCR を Foundation Models で候補 1 つに寄せる。Apple Intelligence が無い端末は候補名とラベル・文字の一致だけ → enum か options 付き string/text)・`describe`(ラベル + OCR から Foundation Models で 1 文。無い端末はラベルの列挙)・`jointAngle`(Vision の `VNDetectHumanBodyPoseRequest` で `joint` の角度 0〜180 度 → number/integer。プレビューに関節の点と線を重ねる。`knee` など左右無しは信頼度の高い側)。検証(`backend/pkg/dsl/photo_analyze.go`): into は screen.entity の保存される field で photo 自身・computed 不可、kind ごとの型、into の重複、jointAngle の joint 必須、classify の候補(2 つ以上・enum なら options の部分集合)。**新しい部品ではなく photoField の拡張**にしたのは、(1) 撮る操作と読み取りが 1 部品で書け AI が迷わない、(2) 古い iOS は `analyze` を無視して従来の写真入力として動く(落ちない)、(3) 写真ライブラリから選ぶだけでも動くので審査用の版(#245)でも外さなくてよい、の 3 点。backend(Claude の画像入力)へのフォールバックと、カメラ映像でのリアルタイムの回数カウントは後続(課金・認証・レート制限の重み付けが要るため)。実例: `examples/receipt_ai.json`(レシート → 金額・日付・分類・文字)、`examples/form_check.json`(スクワット → 膝・腰の角度)。
+- **`aiButton` の `task: "generate"`(#417)**: 決まった指示(`prompt`)で AI に新しく書かせるボタン(罰ゲームの案・今日の献立・励ましの一言)。結果は `shape` の形でボタンの下に出す: `line`(1 行・既定)/ `list`(箇条書き `count` 個・既定 3)/ `fields`(`items` の名前ごとに 1 つ)。材料は任意で `entity`(新しい順 `limit` ≤ 20 件)か form の `input` / `{{field}}`、iOS が 4 KB に切って渡す。`output` を付けるとフォームのドラフトにも入る(保存は利用者)。付けなければ表示だけで、どの画面にも置ける(screen.entity 不要)。実行は **端末内 AI(Foundation Models)を優先**し、使えない端末だけ ai サービスの `POST /v1/text`(Claude・出力 400 トークン・利用上限の重さ 1)に回す。オンライン版は **Tailor It Pro の機能**(Pro でなければ課金画面・AI 送信の同意が無ければ同意画面)。モック(`METAMON_MOCK=1`)は決まった文を返す。新しい部品 `aiText` にせず aiButton の task にしたのは、(1) 指示テンプレ・`entity`+`limit` の材料・`output` への書き込み・端末内 AI の実行と可用性表示が aiButton と同じで、別部品だと全部が二重になる、(2) AI が「AI で何かするボタン = aiButton」と 1 語で選べる、(3) 部品の enum・レンダラ登録など他の部品と取り合う共有行を増やさない、の 3 点。違いは「入力を変換する(要約など・端末内だけ・無料)」か「指示で新しく書く(generate・オンラインの代わりあり)」で、task で分かれる。
+- **`table.groupBy`(#261)**: 同じ値のレコードを 1 行にまとめる集計表(「店ごとの平均点・件数でランキング」)。列は groupBy の field の列(グループ名・aggregate なし)+ `aggregate`(count / sum / avg / min / max)付きの列だけ。groupBy にできるのは string / enum / ref / boolean / integer / date。`sort.field` は集計列の field(同じ field の集計列が複数なら先頭)、集計列に無ければ groupBy の field = グループ名順。sort 省略 = 最初の集計列の降順、`limit` は上位 N グループ。値が空のレコードはどの行にも入れない。avg / min / max は数値が無ければ「—」、avg は小数 1 桁。iOS は `TableGrouping`(MetamonDSL)でクライアント集計(chart.groupBy と同じ)。新しい部品・Expr ではなく table の拡張にしたのは、(1) 表の見出し・行の描画をそのまま使える、(2) chart / stat と同じ aggregate 語彙で AI が書ける、(3) 古い iOS は `groupBy` と列の `aggregate` を無視して従来のレコード表として描く(落ちない・未知 type のプレースホルダにもならない)ため。マスタ entity の computed `agg` + table(人ごとの合計)も引き続き使える。実例: `examples/ranking.json`。
+- **`chatThread`(#260)**: LINE のようなチャット。`entity` のレコードを 1 通 = 1 件の吹き出しで**古い順に上から下へ**積み(最新が一番下・開いた時も新着が来た時も一番下へスクロール)、**自分の分は右**(ブランド色)・**相手の分は左**(上に送信者名 = `$author`。同じ人が続けて送った 2 通目以降は省く)、下に送った時刻(`$createdAt`)。自分の判定は `Record.author` とサインイン中の uid の比較(#249 / #251 と同じ。author の無い未送信の自分の分と private の entity は全部自分)。**入力欄は部品の下端に固定**(複数行は 4 行まで伸びる・`photoField` があれば写真ボタン)で、送信 = `entity` に 1 件保存(ローカル DB に即反映して同期キューが送る・フォーム画面は作らない)。共有アプリへの初めての送信はフォームの保存と同じく表示名を聞く(#250)。他の人のメッセージは既存の records の購読(SSE `GET /events` → 再取得)で数秒以内に届く。器の中で自前でスクロールするので `GridScreenLayout.scrollsInside` には入れず、マイク FAB が入力欄の左に重なる時だけその分を空ける(`ChatInputInset`)。backend: `textField` は保存する string/text、`photoField` は photo、他の required field は defaultValue 必須(`Validate`)/ フォームが無くても「add form が無い」と言わない・`list` 扱い(`Lint`)/ private の entity は「誰にも見えない」警告。`list` の表示形式(例 `list.style:"chat"`)にしなかったのは、(1) 入力欄を持つ = 一覧 + フォームの 2 役で list の意味(表示だけ・追加はフォーム)を変えてしまう、(2) 下から積む・左右に振る・送信者名をまとめるは list の行テンプレ(title/subtitle/trailing)と共有できる部分が無い、(3) 部品が 1 つなら AI が「チャット = chatThread」と 1 語で選べ、iOS も 1 部品 = 1 ファイルで閉じる、の 3 点。iOS が知らない古いビルドでは未知の部品としてプレースホルダ(RELEASE は何も描かない)になり落ちない。実例: `examples/chat.json`。
+- **`musicPlayer`(#412)**: Apple Music(MusicKit の `ApplicationMusicPlayer`)で**この端末が**再生する。カタログ検索(`MusicCatalogSearchRequest`)で曲を再生待ちに入れ、再生・一時停止・次へ・前へ・今の曲(曲名・アーティスト・ジャケット)・再生待ちを表示する。システムのプレーヤーなので**イヤホンのボタン・ロック画面・コントロールセンター**でもそのまま操作できる(アプリ側の実装は不要)。カタログの再生には Apple Music の契約が要り、未許可・未契約・この端末で使えない時は理由を出す。entity を持たない(再生待ちはシステムのプレーヤーに持つ・端末は 1 つのプレーヤーしか持たないので 1 アプリ 1 つ=backend がエラー)。
+  - **友だちからのリクエスト(`allowRequests`)**: 同じアプリを開いた近くの端末が、曲名・アーティスト(+ 見つかれば Apple Music の曲 id)を `nearbyShare` と同じ MultipeerConnectivity(暗号化必須)で送る。音声は送らない(**iOS は端末間で音声を中継できない**ので「Bluetooth で友だちの端末をつないで流す」は不可。リクエストを受けてこの端末で再生する形で代える)。受けた側は前面で今のアプリが `allowRequests` の musicPlayer を使っている間だけ待ち受け、届いたリクエストを一覧に出して「追加 / 見送る」を選ぶ(`autoAccept` なら確認せず再生待ちへ・運転中向け)。リクエストは 1 件ずつ・曲名 / アーティストは各 100 文字・id は 40 文字までに切り、未承認は 20 件まで(超えたら古い順に捨てる)。審査用ビルド(`APP_STORE_REVIEW`)では `nearbyShare` と同じくリクエスト部分をバイナリから外し、再生だけ残す(`docs/ios/review-build.md`)。
+  - **Spotify は開くだけ**: Spotify の iOS SDK(App Remote)は使わない(Spotify の開発者登録・クライアント ID・Premium・利用者数の制限と審査が要る)。リクエストの行に「Spotify で探す」(`https://open.spotify.com/search/<曲名 アーティスト>`・Spotify アプリがあればアプリで開く)を出すだけで、再生・操作はできない。AI にもそう答えさせる(`backend/internal/ai/music_rules.go`)。実例: `examples/drive_music.json`。
 
 ### 3.3 フィールド型と値(appconfig `RecordData` と一致)
 
@@ -195,15 +232,56 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 ### 3.5 entity.scope = レコードを誰と共有するか(#47)
 
+**共有の依頼の扱い(#259 #215 #254)**: 語の表は `backend/internal/ai/share_intent.go` の 1 か所で、生成(作成・編集)のプロンプト、チャットのプロンプト、有料機能の判定(`paid.go`)、サーバーの点検が同じ表を読む。
+
+- 「友達のスマホからも」「みんなで」「〜と共有」= 他の人と同じ記録を使う → **作成でも編集でも** その entity を `public`。編集は `{"op":"add","path":"/entities/<i>/scope","value":"public"}`(既にあれば replace)。編集が「できない」と返して全 entity が private のままなら、サーバーがレシピを添えて 1 回だけ作り直させる。
+- 「家族だけ」「家族で共有」「家族みんなで」「サークルで」「チームで」「招待した人だけ」= 決まった人だけの共有 → **作成でも編集でも** その entity を `shared`(#388 で作成者とシェアリンクで参加した人だけになった・D-06)。public にはしない: 作成で shared が 1 つも無い / 編集で shared にならなかった時は、サーバーが `"value":"shared"` のレシピを添えて 1 回だけ作り直させる。新しく shared になった entity があれば summary に「○○は、作った人とリンクで招待した人だけが見られます(共有シートからリンクを送って招待)。」が入る(下の「誰でも見られます」は public になった entity だけ)。private のままなら「共有の設定は変えていないため、記録は自分だけのままです。」が入る。チャットは「できる」と答え、公開の確認はしない。
+- 新しく public / shared になった entity があれば、サーバーが summary に「○○は、このアプリを開いた人なら誰でも見られます(みんなに公開)。」を足す(D-05 の文言・すでに言っていれば足さない)。
+- **個人の情報(#253)**: public / shared の entity に名前・電話番号・住所・メールアドレス・誕生日・居場所らしい field(`backend/internal/ai/public_pii.go` が field の id・name・型で判定。ペットの名前・商品名は対象外)が新しく入ったら、サーバーが上の一文の後に「「名前」「電話番号」のような個人の情報も公開されます。ほかの人に見られてよいか確かめてください。」を足し、応答の `meta.publicPersonalData` に field ごとの警告を入れる(iOS が確認ダイアログを出せる)。チャットは依頼文と brief からこれを読み取り、ready の前に 1 回だけ question で確かめる(`confirmPublic`)。
+- 「自分だけ」「非公開」「共有をやめて」は scope を remove。「LINE で送る」「共有ボタン」は scope ではなく shareButton。
+
 | scope | 意味 | レコードの置き場(appconfig) | 書き込み権限 |
 |---|---|---|---|
 | `private`(省略時) | 本人だけ。家計簿・日記・体重など | `users/{uid}/apps/{appId}/entities/{e}/records` | 本人のみ(従来どおり) |
-| `public` | 誰でも読める・ログイン済みなら誰でも投稿できる。掲示板・みんなのランキング・共有リスト | `apps_public/{appId}/entities/{e}/records`(**appId だけで一意**。同じ appId を開いた全員が同じデータを見る) | create は全員、update/delete は投稿者本人のみ(他人のは 403) |
+| `public` | 誰でも読める・ログイン済みなら誰でも投稿できる。掲示板・みんなのランキング・共有リスト | `apps_public/{appId}/entities/{e}/records`(**appId だけで一意**。同じ appId を開いた全員が同じデータを見る) | create は全員、update は投稿者本人のみ(`edit:"members"` なら参加者全員)、delete は投稿者本人のみ(他人のは 403) |
 | `shared` | 同じアプリを開いた人と共有 | **v1 では `public` と同じ扱い**(参加者限定=招待制は後段) | public と同じ |
 
 - public/shared のレコードには backend が **`author`(uid)と `authorName`(iOS が POST 時に任意送信・無ければ "匿名")を自動付与**し、`GET /records` のレコード最上位(`data` の外)で返す。ゆえに public/shared entity の field id に `author` / `authorName` は使えない(`Validate()` がエラー)。
+- **`shared` の参加者(#254)**: 上の表の「v1 では public と同じ扱い」は #254 で変わった。`shared` の records は**作成者とシェアリンク / QR で参加した人だけ**が読み書きでき、それ以外は 403(`details.reason: not_member`)。置き場は public と同じ `apps_public/{appId}`。参加は `POST /shares/{token}/import`、退出・一覧は `/apps/{appId}/members`。家族・サークル・友達・チームは `shared`、不特定多数(掲示板・ランキング)は `public`。詳細と移行は [architecture.md §3.4](../backend/architecture.md)。
 - public entity を 1 つでも含むアプリは、作成者の `PUT/PATCH /dsl`(と `POST /apps`・restore)で **`apps_public/{appId}` に DSL が複製**される。他ユーザーが同じ appId で `GET /v1/apps/{appId}/dsl` を開くと、自分の `users/{uid}/apps/{appId}` が無ければその DSL が**インストール**(自分の下に複製・version 1)される。以後の編集は各自のコピーに対して行われ、公開 DSL を上書きできるのは最初に公開したユーザーだけ。
-- 作り方: AI が「みんなで」「共有」「投稿」「ランキング」「掲示板」を聞いたら `scope:"public"`、個人の記録なら省略。iOS 側(投稿者名の表示・他人のレコードは編集不可・authorName の送信)は別 Issue。iOS のデコーダは未知キーを無視するので、未対応ビルドでも落ちない。
+- **`entity.edit`(#252)**: public/shared のレコードを誰が更新できるか。`author`(省略時)は投稿者本人だけ、`members` は同じ appId を開いた全員が PATCH できる。削除はどちらでも投稿者本人だけ。private では意味を持たない(書いても無視)。家事分担の完了・共有の買い物リスト・出欠・落とし物の解決・シフトの確定のように「みんなで 1 つのレコードを更新する」用途で使う。参加者を招待制で絞るのは D-06 で別途。
+- iOS(#249): `Record.author` と自分の uid を比べ、変更できないレコードでは一覧のチェックを薄く表示して押すと理由を出し、長押し削除を出さず、フォームの保存ボタンを「このデータは作った人だけが変更できます」に置き換える。サーバーが 403 を返した時も同じ文言を出し、送信待ちに残さずサーバーの内容に戻す。
+- 作り方: AI が「みんなで」「共有」「投稿」「ランキング」「掲示板」を聞いたら `scope:"public"`、個人の記録なら省略。iOS のデコーダは未知キーを無視するので、未対応ビルドでも落ちない。
+
+#### レコードの予約値 `$author` / `$createdAt`(#250 #251)
+
+field id の代わりに書ける、どのレコードにもある値。`$` 始まりなので field id(`^[a-z]…`)とぶつからない。正典は `dsl.schema.json` の `$defs/Entity` `x-recordValues`(AI カタログはそこから生成・Go の `dsl.RecordValues` とテストで突き合わせる)。実例: `examples/board.json`(落とし物掲示板)。
+
+| 値 | 中身 | 書ける場所 | 使える entity |
+|---|---|---|---|
+| `$author` | 投稿者の表示名(`authorName`)。絞り込みでは投稿者の uid(`author`)と比べる | `list.item` の title / subtitle / trailing・`table.columns[].field`・`timeline` の titleField / subtitleField・部品の `filter.field` | public / shared だけ(private は全部自分の記録なので `Validate()` がエラー) |
+| `$createdAt` | レコードを作った日時(datetime) | 上の表示箇所 + `timeline.dateField`・`list` / `table` の `sort.field` | 全部 |
+
+- **自分の投稿だけ**: 部品の filter に `{"field":"$author","op":"eq","value":{"me":true}}`(他の人の分は `op:"neq"`)。`{"me":true}` は `$author` 専用で、`$author` の filter はこの形だけ。list / table / timeline / stat(件数)/ chart など部品の filter で使え、agg 式の中では使えない(iOS の評価器に uid を渡さないため。自分の件数は stat `aggregate:"count"` + 同じ filter)。iOS はサインイン中の uid に置き換えて `Record.author` と比べる。appconfig の `filterField=author`(eq / neq・値 = uid)と同じ意味。
+- **投稿者名に何を出すか**: iOS の設定「投稿に表示する名前」に本人が入れた名前だけ。共有 entity に初めて投稿する時に聞き(「匿名のまま」も選べる)、未設定・空なら送らず backend が「匿名」を付ける。Apple の氏名・メールアドレス・端末名は送らない(本人が公開すると決めていない個人情報を他人に見せない)。名前を後で変えても、過去の投稿の表示名は投稿時のまま(backend は create 時だけ受け取る)。
+- iOS は共有 entity のレコードを作る時、ローカル行にも自分の uid と表示名を入れる(未送信のうちから「自分の投稿」に出る・作者判定も同じ)。
+- AI: 共有 entity に名前の手入力欄(member_name / person / staff_name 等)を作らず `$author` を表示する。ai-eval の `authorShown` / `nameInput` / `meFilter`(`m0disc_cases.json`)。
+
+#### 自分だけの印 `marks`(#255)
+
+いいね・保存・お気に入り・既読のように、**1 人 1 回のトグル**で共有レコードに付ける印。印はレコードの `data` ではなく appconfig が「誰が付けたか」を記録するので、押すたびに件数が増えたり、他人の印を付けたりできない。public / shared の entity だけ(private は自分の記録なので boolean field + `list.item.toggle` を使う)。実例: `examples/recipes.json`(みんなのレシピ)。
+
+| 書く場所 | 形 | 意味 |
+|---|---|---|
+| `entity.marks` | `[{ "id": "like", "icon": "heart", "label": "いいね" }]`(3 個まで。icon は heart / star / bookmark / thumbsup / check / eye / flag) | その entity に付けられる印 |
+| `list.item.mark` | `"like"` | 行の右端にアイコンと件数のトグル。他人の投稿にも付けられる(楽観的に反映・失敗したら戻す) |
+| `$marks.<id>` | `list.item` の title / subtitle / trailing・`table.columns[].field`・`list` / `table` の `sort.field` | 件数(integer)。`sort` を desc で「いいねの多い順」 |
+| 部品の `filter` | `{"field":"$marks.save","op":"eq","value":{"me":true}}` | 自分が付けたものだけ(`op:"neq"` = まだ付けていない = 未読)。stat の件数にも使える |
+
+- **いいね数の集計(agg)との関係**: 印はレコードではないので、computed の `agg` からは数えられない(`agg` の filter に `$marks.<id>` を書くと `Validate()` がエラー)。件数は `$marks.<id>` で出す。いいね用の子 entity + ref + `agg count` は作らない(1 人で何回でも押せる・別の画面で親を選び直すフォームになる)。コメント・出欠のように中身のある記録は今まで通り子 entity。
+- appconfig: `PUT` / `DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}` で自分の印を付ける / 外す(どちらも冪等・`{count, mine}` を返す)。`GET /records` と `GET /records/{id}` はレコード最上位に `marks: {"<markId>": {"count": n, "mine": bool}}` を付ける。Firestore は `…/records/{id}/marks/{markId}`(`count`)と `…/marks/{markId}/by/{uid}`。レコードを消すと印も消える。
+- iOS: 一覧の行のトグルは押した瞬間に件数と塗りを変え、サーバーの `{count, mine}` で確定する(失敗したら戻して理由を出す)。オフラインの間は付けられない(送信待ちの列には積まない)。自分の未送信の投稿にもまだ付けられない。
+- AI: 「いいね」「お気に入り」「保存」「既読」は marks を使い、子 entity を作らない。ai-eval の `mark` / `markedByMe` / `markEntity`(`m0disc_cases.json`)。
 
 ### 3.6 ナビゲーション = 画面グラフの規則(#112 #114 #115)
 
@@ -216,6 +294,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | どの根からも辿れない画面 | 警告(`Lint`)。フォームは追加ボタンや `list.onItemTap` から辿れれば可(entity のフォームが 1 つも辿れない時は従来の「form screen is not reachable」1 件だけ) | 表示はできるので保存済み DSL を壊さない。声で直せばよい |
 | タブがあるのに `initialScreen` がタブの根でない | 警告 | 起動画面が意図と違う |
 | `fullScreen` で開く画面に戻る手段(`back` か、遷移先指定の無い `saveRecord`)が無い | 警告 | iOS は fullScreenCover に閉じるボタンを自動で付けないので閉じ込められる。push は OS の戻る、sheet は下スワイプで戻れるので対象外 |
+| 同じ画面の toolbar(右上の＋)と `button` が、同じフォーム画面(`screen.entity`)を同じ `prefillRef` で開く(#416) | 警告(`Lint`)。生成時は toolbar 側を消す(`dropDuplicateAddToolbar`)。iOS は保存済み DSL でも toolbar 側を出さない(`DuplicateAddControl`) | 同じ「追加」が 2 つ並ぶ。押しやすい右下の button を残し、button が無い画面だけ toolbar の＋にする |
 
 - 警告は `Meta.lint` に載るだけで再生成は起こさない(`AI_LINT_RETRY=1` の時だけ 1 回再生成)。
 - AI 側の基準(`internal/ai/prompt.go`): 役割の違う一覧・集計・設定はタブ(2〜4 個)、入力はフォーム画面を sheet、詳細は `list.onItemTap` で push、1 画面の直下は 8 部品まで、孤立画面を作らない。navigate はどこからどこへ飛んでもよい前提(タブの根へ飛んだらタブ切替は iOS 側 #113)。

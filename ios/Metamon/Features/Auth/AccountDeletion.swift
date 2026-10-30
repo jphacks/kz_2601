@@ -12,17 +12,8 @@ extension AuthSession {
         let isApple = user.map { !$0.isAnonymous } == true && service is FirebaseAuthService
         if isApple {
             guard let apple = try await AppleReauth.credential() else { return false }
-            do {
-                try await service.reauthenticateWithApple(idToken: apple.idToken, nonce: apple.nonce)
-            } catch {
-                print("[Metamon] Firebase reauthenticate failed (continuing): \(error)")
-            }
-            do {
-                try await service.revokeAppleToken(authorizationCode: apple.code)
-            } catch {
-                // Firebase の Apple プロバイダ設定(OAuth コードフロー)が無いと失敗する。削除自体は続ける
-                print("[Metamon] Apple token revoke failed (continuing): \(error)")
-            }
+            // 失効の仕組みと人の作業(鍵の登録)は docs/legal/apple-token-revocation.md(#246)
+            _ = await AppleTokenRevocation.run(auth: service, authorizationCode: apple.code, idToken: apple.idToken, nonce: apple.nonce)
         }
         try await AccountDeletionFlow.run(
             account: account,
@@ -35,6 +26,7 @@ extension AuthSession {
             wipeLocal: { await runtime.wipeLocalData() }
         )
         signOut() // セッションの表示を即反映(サインアウト済みでも安全)
+        farewell = true // #102
         return true
     }
 }

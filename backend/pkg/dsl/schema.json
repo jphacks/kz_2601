@@ -134,13 +134,35 @@
             "shared",
             "public"
           ],
-          "description": "レコードを誰と共有するか(省略時 private)。みんなで投稿・ランキング・掲示板など、他のユーザーと同じデータを見たい時は public。private は本人だけ。shared は v1 では public と同じ扱い(参加者限定は後段)。",
-          "x-usage": "public/shared のレコードには backend が author(uid)と authorName を自動付与するので、field id に author / authorName は使えない。「みんなで」「共有」「投稿」「ランキング」「掲示板」と言われたら public、家計簿や日記のような個人記録は省略(private)。",
+          "description": "レコードを誰と共有するか(省略時 private)。みんなで投稿・ランキング・掲示板など、他のユーザーと同じデータを見たい時は public。家族・サークル・チームなど決まった人だけで使う時は shared(作成者とシェアリンクで参加した人だけ)。private は本人だけ。",
+          "x-usage": "public/shared のレコードには backend が author(uid)と authorName を自動付与するので、field id に author / authorName は使えない。「家族で」「家族だけ」「サークルで」「チームで」「招待した人だけ」のように決まった人だけなら shared、「みんなで」「共有」「投稿」「ランキング」「掲示板」と言われたら public、家計簿や日記のような個人記録は省略(private)。 投稿者名は名前の入力欄(member_name / person / staff_name / 投稿者 など)を作らず、一覧で予約値 $author を表示する(本人が設定した表示名を backend が付ける・なりすましできない)。「自分の投稿だけ」「マイページ」は filter {\"field\":\"$author\",\"op\":\"eq\",\"value\":{\"me\":true}}。",
           "x-enumDescriptions": {
             "private": "本人だけが読み書きできる個人データ(既定)。家計簿・日記・体重など。",
-            "shared": "同じアプリを開いた人と共有(v1 は public と同じ)。",
-            "public": "誰でも読めて、ログインしていれば誰でも投稿できる。編集・削除は投稿者本人のみ。掲示板・みんなのランキング・共有リスト。"
+            "shared": "作成者と、シェアリンクで参加した人だけが読み書きできる。家族の家事分担・サークルの出欠・チームのタスク。",
+            "public": "誰でも読めて、ログインしていれば誰でも投稿できる。編集・削除は投稿者本人のみ(edit で参加者全員の編集を許せる)。掲示板・みんなのランキング・共有リスト。"
           }
+        },
+        "edit": {
+          "type": "string",
+          "enum": [
+            "author",
+            "members"
+          ],
+          "description": "public/shared のレコードを誰が更新できるか(省略時 author)。削除はどちらでも作った人だけ。private の entity では意味を持たない。",
+          "x-usage": "家事分担の「終わった」チェック・共有の買い物リストのチェック・出欠の〇×・落とし物の「解決」・シフトの「確定」のように、作った人以外が同じレコードのトグルや値を変える用途は members。掲示板の投稿・ランキングの点数・口コミのように本人の投稿を他人に書き換えられたくないものは省略(author)。private の entity には書かない。",
+          "x-enumDescriptions": {
+            "author": "作った人だけが更新できる(既定)。投稿・口コミ・ランキングの点数。",
+            "members": "同じアプリを開いた人なら誰でも更新できる(削除は作った人だけ)。家事の完了・共有リストのチェック・出欠・解決トグル。"
+          }
+        },
+        "marks": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/Mark"
+          },
+          "description": "1 人 1 回のトグルで付ける「自分だけの印」(いいね・保存・お気に入り・既読・行きたい)。public/shared の entity だけ。印はレコードの項目ではなく、誰が付けたかを backend が記録する(押すたびに増えない・付け外しできる・件数は自動で数える)。list.item.mark に id を書くと、行の右端にアイコンと件数のトグルが出る。",
+          "x-usage": "「いいね」「お気に入り」「保存」「ブックマーク」「既読」「行きたい」と言われたら marks を使う。いいね用・保存用の別 entity、親を指す ref、件数の computed(agg count)は作らない(1 人で何回でも押せてしまう・全項目の打ち直しになる)。件数は $marks.<id>(table の列 / sort で多い順。行のトグルにも件数が出るので list.item.trailing には要らない)。「保存したもの」「お気に入り一覧」「既読にしたもの」は filter {\"field\":\"$marks.<id>\",\"op\":\"eq\",\"value\":{\"me\":true}} の一覧(op neq = まだ付けていない = 未読)。その一覧の item にも同じ mark を書く(そこで外せる)。private の entity には書かない(自分だけの記録の「済み」は boolean field + list.item.toggle)。コメント・出欠のように中身のある記録は今まで通り別 entity。"
         },
         "fields": {
           "type": "array",
@@ -148,6 +170,11 @@
             "$ref": "#/$defs/Field"
           }
         }
+      },
+      "x-recordValues": {
+        "$author": "投稿者の表示名(public/shared の entity だけ)。本人がアプリの設定で決めた名前、未設定なら「匿名」。list.item の title/subtitle/trailing・table.columns の field・timeline の titleField/subtitleField に書ける。filter の field に書くと投稿者で絞り込む(value は {\"me\": true} = 自分。op eq = 自分の投稿 / neq = 他の人の投稿)。",
+        "$createdAt": "レコードを作った日時(datetime・全 entity)。list.item の title/subtitle/trailing・table.columns の field・timeline の titleField/subtitleField/dateField・list/table の sort.field に書ける。",
+        "$marks.<id>": "entity の marks の印の件数(integer・public/shared の entity)。<id> は marks の id(例 $marks.like)。list.item の title/subtitle/trailing・table.columns の field・list/table の sort.field(多い順 = desc)に書ける。filter の field に書くと、value {\"me\": true} と op eq で自分が付けたものだけ、op neq でまだ付けていないものに絞る。"
       }
     },
     "Field": {
@@ -179,10 +206,12 @@
             "currency",
             "photo",
             "video",
+            "audio",
             "location",
-            "ref"
+            "ref",
+            "refs"
           ],
-          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField."
+          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). audio = voice recording kept on the recording device: \"audio:<id>|<seconds>\" (AAC m4a written by audioRecorder; other devices show only the length). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField. refs = array of record ids of `refEntity` (multi-select, e.g. expense.split_with -> members: who shares this expense); [] or missing = everyone; filter it with op contains, count it with op len."
         },
         "required": {
           "type": "boolean"
@@ -217,7 +246,7 @@
         },
         "refEntity": {
           "type": "string",
-          "description": "type=ref only: the entity id whose record this field points to."
+          "description": "type=ref / refs only: the entity id whose record(s) this field points to."
         },
         "computed": {
           "$ref": "#/$defs/Expr",
@@ -229,6 +258,10 @@
             "weight"
           ],
           "description": "保存した値をヘルスケアにも書き込む(weight=体重。field は number で unit kg)。「ヘルスケアにも保存」「ヘルスケアと連携」と言われた時だけ付ける。保存のたびに 1 件書き込み、失敗してもレコードの保存は成功する。"
+        },
+        "hidden": {
+          "type": "boolean",
+          "description": "回答者に見せない項目(クイズの正解など・#262)。作者がフォームで入れ、一覧・表・グラフ・titleField には出さない。computed では比較(eq / neq / gt / gte / lt / lte)の中でだけ読める(正誤 = eq(回答, 問題.正解))。computed には付けない。画面に出さないだけで値は端末に届く(厳密な秘匿ではない)。"
         }
       }
     },
@@ -304,10 +337,13 @@
             "openUrl",
             "resetForm",
             "scheduleNotification",
-            "cancelNotification"
+            "cancelNotification",
+            "export",
+            "startActivity",
+            "endActivity"
           ],
           "x-enumDescriptions": {
-            "navigate": "画面遷移。list.onItemTap からは recordId が暗黙に渡り、遷移先フォームが編集モードになる。",
+            "navigate": "画面遷移。list.onItemTap からは recordId が暗黙に渡り、遷移先フォームが編集モードになる(だから onItemTap の遷移先は同じ entity のフォーム)。prefillRef を付けると今のレコード(タップした行・ボタンのあるフォームのレコード)を子フォームの ref に入れて新規で開く。",
             "back": "前の画面へ戻る(push なら pop、モーダルなら dismiss)。",
             "saveRecord": "フォームのドラフトを保存(新規 POST / 編集 PATCH)して screen へ、無ければ back。フォーム画面の toolbar に置く。",
             "deleteRecord": "現在のレコードを削除して back。confirmMessage を付けるのが定石。",
@@ -315,7 +351,10 @@
             "openUrl": "URL を Safari で開く。",
             "resetForm": "フォームのドラフトを既定値に戻す。",
             "scheduleNotification": "ローカル通知をその場で予約(dsl.<id> で置換)。任意で押すリマインドはこれ。毎日の定期通知は app.notifications に宣言する。",
-            "cancelNotification": "予約した通知を取り消す。"
+            "cancelNotification": "予約した通知を取り消す。",
+            "export": "記録を CSV(Excel で開ける)か PDF の報告にして共有シートで送る(ファイル・メール・AirDrop)。「CSV で出したい」「PDF にしたい」「Excel で開きたい」「月の報告書」はこれ。button か toolbar に置く。CSV は表示と同じ書式(日付・円・選択肢・参照先の名前・計算項目を含む)、PDF は見出し・絞り込み・表と、同じ画面にある同じ entity のグラフを 1 つにまとめる。",
+            "startActivity": "ロック画面と Dynamic Island に「いま◯◯中」を出す(ライブアクティビティ・#423)。activity の title と、任意で残り時間(minutes)・数字(stat)。アプリを閉じても時間は進み、stat は記録を足すたびに更新される。同じアプリで出し直すと前のものを置き換える。タイマー部品の時間を出すだけなら timerDisplay.liveActivity の方が短い。",
+            "endActivity": "startActivity で出したロック画面の表示を消す(「終わった」「到着」ボタンに)。"
           }
         },
         "screen": {
@@ -339,10 +378,11 @@
         },
         "entity": {
           "type": "string",
-          "description": "saveRecord / deleteRecord: entity id.",
+          "description": "saveRecord / deleteRecord / export: entity id.",
           "x-for": {
             "saveRecord": "required",
-            "deleteRecord": "required"
+            "deleteRecord": "required",
+            "export": "required"
           }
         },
         "url": {
@@ -368,6 +408,55 @@
           "description": "cancelNotification only.",
           "x-for": {
             "cancelNotification": "required"
+          }
+        },
+        "prefillRef": {
+          "type": "string",
+          "description": "親から子を作る(#256)。遷移先フォーム(screen.entity)の ref field id。今のレコード(list / mapView の onItemTap ならタップした行、button / toolbar ならその画面のフォームのレコード)を入れて新規で開く。ref の refEntity は今のレコードの entity。遷移先フォームにはその field の picker を残す。calendar / gridTable では使えない。",
+          "x-for": {
+            "navigate": "optional"
+          }
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "csv",
+            "pdf"
+          ],
+          "description": "export: csv = 表計算向け(UTF-8 BOM 付き・1 行目は項目名)、pdf = 印刷・メール向けの報告。",
+          "x-for": {
+            "export": "required"
+          }
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter",
+          "description": "export: 書き出すレコードの絞り込み(list.filter と同じ)。「今月分」なら {field: 日付, op: thisMonth, value: null}。省略で全件。",
+          "x-for": {
+            "export": "optional"
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "export: 書き出す列(field id の並び)。省略で entity の全項目(計算項目を含む・写真と動画は除く)。",
+          "x-for": {
+            "export": "optional"
+          }
+        },
+        "title": {
+          "type": "string",
+          "description": "export: ファイル名と PDF の見出し(例「6 月の家計簿」)。省略で entity 名。",
+          "x-for": {
+            "export": "optional"
+          }
+        },
+        "activity": {
+          "$ref": "#/$defs/Activity",
+          "description": "startActivity only.",
+          "x-for": {
+            "startActivity": "required"
           }
         }
       }
@@ -513,6 +602,9 @@
           "$ref": "#/$defs/VideoPlayer"
         },
         {
+          "$ref": "#/$defs/AudioRecorder"
+        },
+        {
           "$ref": "#/$defs/List"
         },
         {
@@ -591,6 +683,9 @@
           "$ref": "#/$defs/Calendar"
         },
         {
+          "$ref": "#/$defs/GridTable"
+        },
+        {
           "$ref": "#/$defs/ShareButton"
         },
         {
@@ -603,7 +698,16 @@
           "$ref": "#/$defs/LocationButton"
         },
         {
+          "$ref": "#/$defs/LocationPicker"
+        },
+        {
+          "$ref": "#/$defs/RouteGuide"
+        },
+        {
           "$ref": "#/$defs/QrScanner"
+        },
+        {
+          "$ref": "#/$defs/QrCode"
         },
         {
           "$ref": "#/$defs/TimerDisplay"
@@ -615,6 +719,9 @@
           "$ref": "#/$defs/Settlement"
         },
         {
+          "$ref": "#/$defs/RandomPicker"
+        },
+        {
           "$ref": "#/$defs/AiButton"
         },
         {
@@ -624,7 +731,19 @@
           "$ref": "#/$defs/LocationTracker"
         },
         {
+          "$ref": "#/$defs/ChatThread"
+        },
+        {
           "$ref": "#/$defs/HealthStat"
+        },
+        {
+          "$ref": "#/$defs/Dashcam"
+        },
+        {
+          "$ref": "#/$defs/SensorValue"
+        },
+        {
+          "$ref": "#/$defs/MusicPlayer"
         }
       ]
     },
@@ -921,22 +1040,22 @@
     "ListItem": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル、toggle に boolean field で行頭のチェック丸(resets daily なら date field で毎日リセット)。",
+      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル、toggle に boolean field で行頭のチェック丸(resets daily なら date field で毎日リセット)。 mark に entity の marks の id を書くと、行の右端にいいね・保存などのトグルと件数(1 人 1 回)。",
       "required": [
         "title"
       ],
       "properties": {
         "title": {
           "type": "string",
-          "description": "Field id."
+          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at), or \"$marks.<id>\" (mark count)."
         },
         "subtitle": {
           "type": "string",
-          "description": "Field id."
+          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at), or \"$marks.<id>\" (mark count)."
         },
         "trailing": {
           "type": "string",
-          "description": "Field id (e.g. amount, date)."
+          "description": "Field id (e.g. amount, date), or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at), or \"$marks.<id>\" (mark count)."
         },
         "icon": {
           "type": "string"
@@ -944,6 +1063,10 @@
         "image": {
           "type": "string",
           "description": "Field id of a photo field shown as thumbnail (a video field shows its first-frame thumbnail)."
+        },
+        "mark": {
+          "type": "string",
+          "description": "Mark id from the list entity's marks (public/shared entity). iOS draws the mark's icon and count at the row end; tapping it adds or removes the signed-in user's mark immediately (once per person, no form, other people's posts too)."
         },
         "toggle": {
           "type": "string",
@@ -968,7 +1091,8 @@
       ],
       "properties": {
         "field": {
-          "type": "string"
+          "type": "string",
+          "description": "Field id, or \"$createdAt\" (posted at) / \"$marks.<id>\" (mark count, e.g. most liked first with desc)."
         },
         "direction": {
           "type": "string",
@@ -982,7 +1106,7 @@
     "Filter": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list / stat / chart / agg のレコード絞り込み。op が today / thisWeek / thisMonth / thisYear(期間・端末ローカル。今週は月曜始まり)のときは value を null にし、field は date / datetime。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。",
+      "description": "list / stat / chart / agg のレコード絞り込み。op が today / thisWeek / thisMonth / thisYear(期間・端末ローカル。今週は月曜始まり)のときは value を null にし、field は date / datetime。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。 「自分の投稿だけ」は field \"$author\"・value {\"me\": true}・op eq(public/shared の entity のみ)。 「自分が保存した / いいねしたもの」は field \"$marks.<id>\"・value {\"me\": true}・op eq(neq = まだ付けていない)。",
       "required": [
         "field",
         "op",
@@ -990,7 +1114,8 @@
       ],
       "properties": {
         "field": {
-          "type": "string"
+          "type": "string",
+          "description": "Field id, or \"$author\" (public/shared entity: the poster; value {\"me\": true}, op eq = my posts / neq = others' posts), or \"$marks.<id>\" (public/shared entity with that mark: value {\"me\": true}, op eq = marked by me / neq = not marked by me)."
         },
         "op": {
           "type": "string",
@@ -1004,7 +1129,8 @@
             "thisMonth",
             "today",
             "thisWeek",
-            "thisYear"
+            "thisYear",
+            "contains"
           ],
           "x-enumDescriptions": {
             "eq": "field == value",
@@ -1016,7 +1142,8 @@
             "today": "今日(端末ローカル)。value は null",
             "thisWeek": "今週 = 月曜 0:00 〜 日曜 24:00(端末ローカル)。value は null",
             "thisMonth": "今月(端末ローカル)。value は null",
-            "thisYear": "今年 = 1/1 〜 12/31(端末ローカル)。value は null"
+            "thisYear": "今年 = 1/1 〜 12/31(端末ローカル)。value は null",
+            "contains": "type refs の field が value(レコード id)を含む。空の refs = 全員なので常に一致"
           }
         },
         "value": {
@@ -1044,9 +1171,12 @@
             },
             {
               "$ref": "#/$defs/ExprIf"
+            },
+            {
+              "$ref": "#/$defs/FilterMe"
             }
           ],
-          "description": "Literal or Expr. null for today/thisWeek/thisMonth/thisYear. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id)."
+          "description": "Literal or Expr. null for today/thisWeek/thisMonth/thisYear. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id). {\"me\": true} = the signed-in user (only with field \"$author\" or \"$marks.<id>\")."
         }
       }
     },
@@ -1264,7 +1394,7 @@
     "Notification": {
       "type": "object",
       "additionalProperties": false,
-      "description": "ローカル通知 1 件。app.notifications(定期)と scheduleNotification(その場で予約)で共通。time は HH:MM。",
+      "description": "ローカル通知 1 件。app.notifications(定期 / entity+field でレコードの時刻から)と scheduleNotification(その場で予約)で共通。time は HH:MM。",
       "required": [
         "id",
         "title",
@@ -1305,14 +1435,34 @@
             "sun"
           ],
           "description": "weekly only."
+        },
+        "entity": {
+          "$ref": "#/$defs/Id",
+          "description": "app.notifications only. Record-based: one notification per record of this entity, at the time in `field` (alarms / reminders whose time the user sets, 'N minutes before the event')."
+        },
+        "field": {
+          "$ref": "#/$defs/Id",
+          "description": "With entity: the record's time field. datetime (event start / reminder at), date (fires at `time` or 09:00 that day) or string HH:mm from timePicker (alarm time)."
+        },
+        "offsetMinutes": {
+          "type": "integer",
+          "description": "With entity: shift from the record's time in minutes. -10 = 10 minutes before."
+        },
+        "titleField": {
+          "$ref": "#/$defs/Id",
+          "description": "With entity: record field shown in the notification body (e.g. the event title / alarm label)."
+        },
+        "enabledField": {
+          "$ref": "#/$defs/Id",
+          "description": "With entity: boolean field; records where it is false are not notified (alarm on/off)."
         }
       }
     },
     "PhotoField": {
       "type": "object",
       "additionalProperties": false,
-      "description": "カメラ / ライブラリから写真を取り込んで photo field に保存する入力。",
-      "x-usage": "「写真を撮る・残す」は source camera、既存の写真を選ぶなら library、迷えば both。",
+      "description": "カメラ / ライブラリから写真を取り込んで photo field に保存する入力。写真の文字・金額・日付・分類・説明・体の関節の角度を端末内の AI で読み取り、同じレコードの他の項目に入れられる(analyze)。",
+      "x-usage": "「写真を撮る・残す」は source camera、既存の写真を選ぶなら library、迷えば both。「撮ったら読み取って」「レシートを撮ったら金額を入れて」「写真から分類」「フォームをチェック」なら analyze:[{kind, into}] を付け、読み取った値を入れる field(into)を同じ entity に足して、その入力欄も同じフォームに置く(読み取り結果は確認・修正できる)。analyze 付きの photoField は全幅 5〜6 行(例 A1:F5)。レシート → {kind:amount, into:金額(currency)} + {kind:date, into:日付} (+ {kind:text, into:メモ})。写っている物の種類 → {kind:classify, into:enum field}。筋トレ・ストレッチのフォーム → {kind:jointAngle, joint:knee 等, into:角度(number)}(写真に関節の点と線を重ねて出す)。",
       "required": [
         "type",
         "field"
@@ -1341,6 +1491,15 @@
             "library",
             "both"
           ]
+        },
+        "analyze": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/PhotoAnalyze"
+          },
+          "description": "写真を撮った・選んだ直後に端末内で読み取り、into の field に入れる(読み取れなかった項目は今の値のまま。「もう一度読み取る」で読み直せる)。保存はユーザー。"
         }
       }
     },
@@ -1449,6 +1608,40 @@
             "medium",
             "large"
           ]
+        }
+      }
+    },
+    "AudioRecorder": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "マイクで音声を録音して audio field に保存する入力(ボイスメモ・会議や授業の録音)。録音・停止・再生・録り直し・削除ができ、録音中は経過時間と音量のメーターを出す。イヤホン(AirPods など)のボタンでも録音の開始・停止ができる。音声は端末内に保存し、レコードにはファイル名と長さ(秒)だけを入れる。",
+      "x-usage": "「録音する・声で残す・ボイスメモ・会議を録音」に。フォーム画面(screen.entity)に置き、field は type audio。メモ(textEditor)やタイトル・日付と同じフォームに並べる。一覧の行で再生するなら list.item.trailing にその audio field(行に再生ボタンと長さが出る)。文字起こしはしない(声でアプリを作り変える voiceInput とは別物)。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "audioRecorder"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Must be an audio field of the screen entity."
+        },
+        "label": {
+          "type": "string"
+        },
+        "maxDuration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7200,
+          "description": "Recording limit in seconds (default 600 = 10 minutes, up to 7200)."
         }
       }
     },
@@ -2235,11 +2428,22 @@
       "properties": {
         "field": {
           "type": "string",
-          "description": "Field id of the table entity."
+          "description": "Field id of the table entity, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at) / \"$marks.<id>\" (mark count)."
         },
         "title": {
           "type": "string",
           "description": "Header text; defaults to the field name."
+        },
+        "aggregate": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum",
+            "avg",
+            "min",
+            "max"
+          ],
+          "description": "Only with table.groupBy: this column shows the per-group count / sum / avg / min / max of `field` (count ignores the value, so use the groupBy field). Omit on the group-name column (field = groupBy)."
         }
       }
     },
@@ -2279,11 +2483,15 @@
         },
         "limit": {
           "type": "integer",
-          "description": "Max rows shown (default all)."
+          "description": "Max rows shown (default all). With groupBy: max groups (top N of the ranking)."
+        },
+        "groupBy": {
+          "type": "string",
+          "description": "Field id (string / enum / ref / boolean / integer / date) to group records by: one row per distinct value. Columns are then the group name ({field: groupBy}) plus aggregate columns ({field, aggregate}). sort.field = an aggregate column's field (or the groupBy field to sort by count if a count column exists, else by name); default = first aggregate column, descending."
         }
       },
-      "description": "Compact rows x columns grid of records (SwiftUI Grid) with a header row; columns = [{field, title?}] (2-4 columns fit a phone). Choose over `list` when several numeric columns must be compared at a glance (date / item / amount).",
-      "x-usage": "Full width, 4-6 rows (e.g. A1:F5). Scrolls inside its cell when longer."
+      "description": "Compact rows x columns grid of records (SwiftUI Grid) with a header row; columns = [{field, title?}] (2-4 columns fit a phone). Choose over `list` when several numeric columns must be compared at a glance (date / item / amount). With `groupBy` it becomes a per-group summary (one row per shop / person / category with avg / sum / count columns), e.g. a ranking of the average score per shop or the total per person.",
+      "x-usage": "Full width, 4-6 rows (e.g. A1:F5). Scrolls inside its cell when longer. 「店ごと」「人ごと」「〜別のランキング・合計・平均」で同じ値の記録を 1 行にまとめたい時は groupBy + 集計列: {\"type\":\"table\",\"entity\":\"review\",\"groupBy\":\"shop\",\"columns\":[{\"field\":\"shop\",\"title\":\"店\"},{\"field\":\"score\",\"aggregate\":\"avg\",\"title\":\"平均点\"},{\"field\":\"shop\",\"aggregate\":\"count\",\"title\":\"件数\"}],\"sort\":{\"field\":\"score\",\"direction\":\"desc\"}}。sort.field は集計列の field(件数順なら groupBy の field)。投稿 1 件ずつの list は別に置いてよい(フォームへの onItemTap はそちら)。"
     },
     "Timeline": {
       "type": "object",
@@ -2309,13 +2517,15 @@
         },
         "dateField": {
           "type": "string",
-          "description": "date/datetime field; newest first."
+          "description": "date/datetime field, or \"$createdAt\" (posted at); newest first."
         },
         "titleField": {
-          "type": "string"
+          "type": "string",
+          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at)."
         },
         "subtitleField": {
-          "type": "string"
+          "type": "string",
+          "description": "Field id, or \"$author\" (poster's name, public/shared entity) / \"$createdAt\" (posted at)."
         },
         "filter": {
           "$ref": "#/$defs/Filter"
@@ -2421,6 +2631,91 @@
       },
       "description": "月カレンダー(カレンダービュー)。entity のレコードを dateField の日に載せ、レコードのある日に点を打つ。日をタップするとその日のレコード一覧が下に出る。一覧の行タップ = onDateTap を recordId 付きで実行(編集)、「追加」= onDateTap をタップした日を dateField の初期値にして実行(新規)。予定・スケジュール・日記・習慣/トレーニング記録・シフト・締切など「日付のある記録を月表示で見たい」時に必ずこれを選ぶ(list+datePicker で代替しない)。",
       "x-usage": "画面の主役として A1:F9 に置き、下に stat や追加ボタン(A10:F12)。onDateTap は通常 entity のフォーム画面への navigate(presentation: sheet)。"
+    },
+    "GridTable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "columnField",
+        "rowField",
+        "titleField"
+      ],
+      "properties": {
+        "type": {
+          "const": "gridTable"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "columnField": {
+          "type": "string",
+          "description": "横軸(列)に使う `entity` の field。enum(例: 曜日 [月,火,水,木,金])なら options の順に列が並ぶ。string なら columnValues 必須。"
+        },
+        "rowField": {
+          "type": "string",
+          "description": "縦軸(行)に使う `entity` の field。integer(例: 時限 1〜6)なら rowRange で範囲、enum(例: シフト帯 [朝,昼,夜])なら options の順に行が並ぶ。string なら rowValues 必須。"
+        },
+        "titleField": {
+          "type": "string",
+          "description": "マスに大きく出す field(例: 科目名・担当者・メニュー)。"
+        },
+        "subtitleField": {
+          "type": "string",
+          "description": "マスに小さく出す field(例: 教室・時間・メモ)。任意。"
+        },
+        "columnValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "maxItems": 14,
+          "description": "列見出し(=columnField の値)を明示する。省略時は enum の options。enum では options の一部だけ・順番の入れ替えに使う(例: 土日を出さない)。"
+        },
+        "rowValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "maxItems": 24,
+          "description": "行見出し(=rowField の値)を明示する。enum / string の rowField 用。省略時は enum の options。"
+        },
+        "rowRange": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "from",
+            "to"
+          ],
+          "properties": {
+            "from": {
+              "type": "integer"
+            },
+            "to": {
+              "type": "integer"
+            }
+          },
+          "description": "integer の rowField の行範囲(両端を含む・最大 24 行)。例: 1〜6 限は {\"from\":1,\"to\":6}。省略時は 1〜6(記録がそれより大きければそこまで)。"
+        },
+        "onItemTap": {
+          "$ref": "#/$defs/Action",
+          "description": "マスのタップで実行(通常は entity のフォーム画面への navigate)。記録のあるマス = recordId 付き(編集)、空のマス = その列・行の値を columnField / rowField の初期値にして新規。"
+        }
+      },
+      "description": "時間割・週のシフト表のような 2 軸のマス目(グリッド表)。entity のレコードを columnField(横=列・例: 曜日)と rowField(縦=行・例: 時限)の値でマスに置き、マスに titleField(+ subtitleField)を出す。今日の曜日の列を強調。空のマスをタップ = その曜日・時限が入った追加フォーム、記録のマス = 編集。1 マスに複数あれば先頭 + 「+n」。大学・学校の時間割、週のシフト表、曜日ごとの部活の練習メニュー・献立・ゴミ出し・習い事など「曜日 × 時限/時間帯」で決まった予定を一覧したい時に必ずこれを選ぶ(曜日ごとの画面・list で代替しない)。日付の決まった予定は calendar。",
+      "x-usage": "画面の主役として A1:F10 前後の大きなセルに置く(行が多ければ中で縦スクロール、列が多ければ横スクロール)。columnField は曜日の enum([月,火,水,木,金] や [月,火,水,木,金,土,日])、rowField は時限の integer + rowRange か時間帯の enum。onItemTap は entity のフォーム画面への navigate(presentation: sheet)。フォームには columnField / rowField の picker / stepper も置く。"
     },
     "ShareButton": {
       "type": "object",
@@ -2594,6 +2889,90 @@
       "description": "現在地(GPS)を 1 回取得してフォームの location field に保存するボタン。散歩メモ・駐車位置・釣果など「どこで起きたか」を記録するアプリのフォーム画面で選ぶ。",
       "x-usage": "フォーム画面のみ(screen.entity 必須)。他の入力欄の近くに 1 行(A8:F9)。ホーム側の mapView と対で使う。"
     },
+    "LocationPicker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "locationPicker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "screen.entity の location field。選んだ場所が \"lat,lng\" で入る(locationButton と同じ形)。"
+        },
+        "label": {
+          "type": "string"
+        },
+        "nameField": {
+          "type": "string",
+          "description": "任意: screen.entity の string field。選んだ場所の名前(店名・地名)が入る。一覧の title にすると見やすい。"
+        }
+      },
+      "description": "場所を選ぶ入力欄。タップでシートが開き、店名・地名・住所で検索するか、地図を動かして中央のピンで決める(現在地ボタンもある)。行きたいお店リスト・旅行の行き先・訪問先の記録など「現在地以外の場所を登録したい」アプリのフォーム画面で選ぶ。今いる場所だけでよいなら locationButton。",
+      "x-usage": "フォーム画面のみ(screen.entity 必須)。名前の入力欄の近くに A3:F6 程度(選んだ場所の小さな地図が出る)。nameField に場所の名前用の string field を指定し、ホームは mapView(titleField に同じ field)と list で使う。"
+    },
+    "RouteGuide": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "routeGuide"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "カードの見出し(任意・例: 目的地まで案内)。"
+        },
+        "locationField": {
+          "type": "string",
+          "description": "目的地の location field(\"lat,lng\")。entity 省略時は screen.entity のレコード(詳細・フォーム画面で開いている 1 件。同じフォームの locationPicker で選んだ場所もそのまま使える)。address とどちらか一方。"
+        },
+        "entity": {
+          "type": "string",
+          "description": "目的地の候補にするレコードの entity。指定すると部品の中で候補(titleField の名前)から目的地を選ぶ(ホームに置く時)。省略 = screen.entity の今のレコード。"
+        },
+        "titleField": {
+          "type": "string",
+          "description": "目的地の名前にする field(例: 場所の名前)。任意。"
+        },
+        "address": {
+          "type": "string",
+          "description": "固定の目的地(住所・施設名。MapKit で検索)。locationField とどちらか一方。例: 「金沢駅」「石川県金沢市広坂1-1-1」。"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "automobile",
+            "walking"
+          ],
+          "description": "最初の移動手段: automobile 車(既定)/ walking 徒歩。案内中も画面で切り替えられる。"
+        },
+        "label": {
+          "type": "string",
+          "description": "開始ボタンの文言(既定「案内を開始」)。"
+        }
+      },
+      "description": "目的地までの道案内(ナビ)。MapKit で経路を出して地図に線を引き、次に曲がる所・そこまでの距離・残りの距離・到着の予想時刻を現在地に合わせて進める。音声案内(オン・オフ)・車/徒歩の切り替え・道を外れたら経路を引き直す。使用中の位置だけ使う(背面では案内しない)。車線・渋滞の回避など Google マップと同じ精度は無い(MapKit の範囲)。「ナビ」「道案内」「目的地まで案内」「ドライブ」「行き方を教えて」の時に必ずこれを選ぶ(mapView や openUrlButton で地図アプリへ飛ばすだけで代替しない)。",
+      "x-usage": "目的地は 3 通り: (1) 行き先リストのホームに routeGuide{entity: spot, locationField: place, titleField: name}(A1:F7・候補から選ぶ)+ spot の list(A8:F10)+ 追加ボタン(D11:F12)、(2) spot の詳細/フォーム画面(screen.entity)に routeGuide{locationField: place, titleField: name}(locationPicker で選んだ場所へそのまま案内)、(3) 行き先が決まっているなら routeGuide{address: \"金沢駅\"}。entity は例 spot{name: string(required), place: location(required)}、フォームは locationPicker{field: place, nameField: name}。徒歩の道案内なら mode walking。"
+    },
     "QrScanner": {
       "type": "object",
       "additionalProperties": false,
@@ -2621,6 +3000,47 @@
       },
       "description": "カメラで QR / バーコードを読み取り、文字列をフォームの文字 field に入れる(実機専用・シミュレータはプレースホルダ+手入力)。在庫管理・チケット受付・本の ISBN・URL 取り込みで選ぶ。",
       "x-usage": "フォーム画面のみ(screen.entity 必須)。結果を表示する textField の上に 1 行(A3:F4)。"
+    },
+    "QrCode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "qrCode"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "QR の上の見出し(任意・例: 会員証)。"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "QR にする固定の文字・URL(例: https://example.com)。screen.entity がある画面では `{{fieldId}}` をそのレコードの値で置換する(例: https://x.com/{{account}})。text / field / value のどれか 1 つだけ。"
+        },
+        "field": {
+          "type": "string",
+          "description": "QR にする screen.entity の field(会員番号・URL・チケット番号など。photo / video / refs 不可)。表示中のレコード(フォーム・詳細)の値で作る。"
+        },
+        "value": {
+          "$ref": "#/$defs/Expr",
+          "description": "QR にする値を計算式で(例: concat で文字をつなぐ)。screen.entity がある画面では ref でそのレコードの field を読める。"
+        },
+        "label": {
+          "type": "string",
+          "description": "QR の下の小さな説明(任意・例: 受付でこの QR を見せてください)。"
+        }
+      },
+      "description": "文字・URL・レコードの値から QR コードを作って表示する(読み取りは qrScanner)。長押しまたはボタンで写真に保存・共有できる。値が空なら案内を出す。会員証・チケット・自分の SNS や Web の URL・連絡先・Wi-Fi・受付番号を「QR で見せたい / QR にしたい」に選ぶ。",
+      "x-usage": "値は text(固定)/ field(画面のレコード)/ value(計算式)のどれか 1 つ。ユーザー本人の URL・番号など生成時に分からない値は text に例を書かず、entity の string field に入力させて field で出す(フォーム画面の textField の下に qrCode)。固定の 1 つ(お店の URL 等)ならホームに text で。正方形に近い area(例 B3:E8)、下に label。"
     },
     "TimerDisplay": {
       "type": "object",
@@ -2656,10 +3076,14 @@
         },
         "label": {
           "type": "string"
+        },
+        "liveActivity": {
+          "type": "boolean",
+          "description": "true で、動いている間ロック画面と Dynamic Island に残り時間 / 経過時間を出す(アプリを閉じても数え続ける・#423)。「ロック画面に出したい」「画面を消しても見たい」「Dynamic Island に」と言われたら付ける。"
         }
       },
       "description": "大きな mm:ss 表示と 開始/一時停止/リセット。stopwatch はカウントアップ、countdown は seconds から 0 へ。筋トレのセット・プランク・ポモドーロ・料理・瞑想など時間を計るアプリで選ぶ。",
-      "x-usage": "画面の主役として A2:F6、下にフォームの入力欄。フォーム画面で `field` を指定すると計測秒をレコードと一緒に保存できる。"
+      "x-usage": "画面の主役として A2:F6、下にフォームの入力欄。フォーム画面で `field` を指定すると計測秒をレコードと一緒に保存できる。 ロック画面にも出すなら liveActivity: true。"
     },
     "WebView": {
       "type": "object",
@@ -2730,6 +3154,56 @@
       "description": "割り勘の精算リスト。balance(正=受け取る・負=払う)から少ない送金回数になるよう貪欲法で列挙し「A → B ¥1,200」と表示する。割り勘・立替精算専用。",
       "x-usage": "members entity に computed の paid / share / balance を作り、balanceField に balance を指定。全幅 3〜4 行(例 A7:F10)、members の table の下に置く。"
     },
+    "RandomPicker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "titleField"
+      ],
+      "properties": {
+        "type": {
+          "const": "randomPicker"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "カードの見出し(任意・例: 今日の晩ごはん)。"
+        },
+        "entity": {
+          "type": "string",
+          "description": "候補のレコードが入った entity(例: 料理 dish・メンバー member)。"
+        },
+        "titleField": {
+          "type": "string",
+          "description": "選ばれた 1 件として大きく出す field(例: 料理名・名前)。"
+        },
+        "subtitleField": {
+          "type": "string",
+          "description": "選ばれた 1 件の下に小さく出す field(例: ジャンル・メモ)。任意。"
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter",
+          "description": "候補の絞り込み(例: 和食だけ・まだ食べていないものだけ)。省略 = 全件。"
+        },
+        "label": {
+          "type": "string",
+          "description": "ボタンの文言(既定「ランダムに決める」)。例: 今日の晩ごはんを決める・くじを引く。"
+        },
+        "onItemTap": {
+          "$ref": "#/$defs/Action",
+          "description": "選ばれた 1 件のタップで実行(通常は entity のフォーム画面への navigate・recordId 付きで詳細/編集)。任意。"
+        }
+      },
+      "description": "ランダムに 1 件を選ぶ部品(くじ・抽選・ルーレット・今日の晩ごはん決め)。ボタンを押すたびに entity のレコード(filter で絞れる)から 1 件を短いシャッフル演出付きで選び、titleField(+ subtitleField)を大きく出す。前回と同じ 1 件は続けて出さない(候補が 2 件以上のとき)。結果は保存しない(画面を離れると消える・再描画では変わらない)。「ランダムで決めて」「今日の晩ごはん・ランチを決める」「くじ引き」「当番・順番・席を決める」「ガチャ」の時に必ずこれを選ぶ(list だけで代替しない・計算式 Expr に乱数は無い)。",
+      "x-usage": "候補を登録する list と同じ画面に置く: randomPicker を上に A1:F5、候補の list を A6:F10、追加ボタンは右下(D11:F12)。entity は例 dish{name: string(required), genre: enum(任意)}、titleField に name。label は「今日の晩ごはんを決める」のように動詞で。onItemTap は通常 list と同じフォームへの navigate(sheet)。"
+    },
     "Expr": {
       "description": "計算式(式ツリー)。リテラル(number/string/boolean)・{ref}(行のフィールド値)・{agg}(エンティティの集計)・{op,args}(関数)・{if,then,else}。評価エラー(ゼロ除算・型不一致・参照先なし)は iOS で「—」表示。深さ 8 まで。",
       "x-usage": "置き場所は Field.computed(行ごとの算出列・ref 可)と stat.value(画面のスカラー・ref 不可)。発話に計算(割る・差・率・残り・日数・BMI など)がある時だけ足す。",
@@ -2757,15 +3231,16 @@
         }
       ],
       "x-recipes": [
-        "割り勘(members{name} + expenses{title,amount:currency,payer:ref→members,date}): members.computed paid = {\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"amount\",\"filter\":{\"field\":\"payer\",\"op\":\"eq\",\"value\":{\"ref\":\"id\"}}} / share = {\"op\":\"round\",\"args\":[{\"op\":\"div\",\"args\":[{\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"amount\"},{\"agg\":\"count\",\"entity\":\"members\"}]}]} / balance = {\"op\":\"sub\",\"args\":[{\"ref\":\"paid\"},{\"ref\":\"share\"}]}。ホームに stat(合計 aggregate sum・1人あたり value)+ members の table(name/paid/balance)+ settlement{entity:members,nameField:name,balanceField:balance}。支出フォームの payer は picker。",
+        "割り勘(members{name} + expenses{title,amount:currency,payer:ref→members,split_with:refs→members 割り勘する人・未選択 = 全員,date}): expenses.computed per_person = {\"op\":\"div\",\"args\":[{\"ref\":\"amount\"},{\"op\":\"len\",\"args\":[{\"ref\":\"split_with\"}]}]}(len = 選んだ人数・未選択なら全員の人数) / members.computed paid = {\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"amount\",\"filter\":{\"field\":\"payer\",\"op\":\"eq\",\"value\":{\"ref\":\"id\"}}} / share = {\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"per_person\",\"filter\":{\"field\":\"split_with\",\"op\":\"contains\",\"value\":{\"ref\":\"id\"}}} / balance = {\"op\":\"round\",\"args\":[{\"op\":\"sub\",\"args\":[{\"ref\":\"paid\"},{\"ref\":\"share\"}]}]}。ホームに stat(合計 aggregate sum)+ members の list(title name・trailing balance・swipeToDelete・onItemTap で member_form)+ settlement{entity:members,nameField:name,balanceField:balance}。支出フォームの payer と split_with は picker、member_form に deleteRecord ボタン(メンバーを消せる)。中間 entity(splits)は作らない。",
         "BMI(body{date,weight:number kg,height:number cm}): body.computed bmi(number) = {\"op\":\"div\",\"args\":[{\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"op\":\"div\",\"args\":[{\"ref\":\"weight\"},{\"op\":\"pow\",\"args\":[{\"op\":\"div\",\"args\":[{\"ref\":\"height\"},100]},2]}]},10]}]},10]}(小数 1 桁)。list の trailing / table の列に bmi。",
         "今の値・最新の記録(今の体重・最後に水をやった日): stat{aggregate:latest,entity:body,field:weight,by:date}、式の中なら {\"agg\":\"latest\",\"entity\":\"body\",\"field\":\"weight\",\"by\":\"date\"}(by = 並べる日付 field、field = 返す値・computed 可)。今の BMI = latest の field に computed bmi。最初の記録は earliest(体重の増減 = sub(latest, earliest))。",
         "残り予算: stat.value = {\"op\":\"sub\",\"args\":[<予算>,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]}。予算額が発話に無い/後で変えたいなら budget{amount:currency,date:date} entity を作り <予算> = {\"agg\":\"latest\",\"entity\":\"budget\",\"field\":\"amount\",\"by\":\"date\"}(最後に設定した額。max だと下げた予算が反映されない)。",
         "達成率: stat{format:percent,value:{\"op\":\"div\",\"args\":[{\"agg\":\"sum\",\"entity\":\"saving\",\"field\":\"amount\"},<目標>]}}(percent は 0..1 を % 表示)+ progressBar{entity,field,target:<目標>}。",
         "カウントダウン: exam{title,date:date} の computed days_left(integer) = {\"op\":\"daysUntil\",\"args\":[{\"ref\":\"date\"}]}。list の trailing に days_left、最も近い試験は stat.value = {\"agg\":\"min\",\"entity\":\"exam\",\"field\":\"days_left\",\"filter\":{\"field\":\"days_left\",\"op\":\"gte\",\"value\":0}}。",
-        "シフト・バイト代(shift{date,start:string \"HH:mm\"(timePicker),end:string \"HH:mm\",wage:currency 時給}): computed hours(number) = {\"op\":\"hoursBetween\",\"args\":[{\"ref\":\"start\"},{\"ref\":\"end\"}]}(22:00→翌 5:00 は 7)/ pay(currency) = {\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"ref\":\"hours\"},{\"ref\":\"wage\"}]}]}。今月の給料 = stat aggregate sum pay filter date thisMonth。時刻を toNumber しない。",
+        "シフト・バイト代(shift{date,start:string \"HH:mm\"(timePicker),end:string \"HH:mm\",wage:currency 時給}): computed hours(number) = {\"op\":\"hoursBetween\",\"args\":[{\"ref\":\"start\"},{\"ref\":\"end\"}]}(22:00→翌 5:00 は 7)/ pay(currency) = {\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"ref\":\"hours\"},{\"ref\":\"wage\"}]}]}。今月の給料 = stat aggregate sum pay filter date thisMonth。休憩(分)を引く = hours = max(hoursBetween(start,end) − coalesce(break_min,0) / 60, 0)(break_min:integer unit 分)。夜勤は式を変えない。時刻を toNumber / sub しない。",
         "マスタの値を記録で使う(家事の点数・商品の単価・科目の単位数): 記録 log{chore:ref→chores,...} の computed points(number) = {\"ref\":\"chore.points\"}(ref field 名 + . + 参照先の field・1 段だけ)。単価 × 個数 = {\"op\":\"mul\",\"args\":[{\"ref\":\"item.price\"},{\"ref\":\"qty\"}]}。記録側に同じ値の入力欄(stepper 等)を作らない。人ごとの合計は人 entity の computed agg sum に log.points を使う。",
-        "毎日チェックの連続日数・直近 7 日(服薬・習慣 medicine{name,taken_on:date} + list item {toggle:taken_on,resets:daily}): medicine.computed streak(integer) = {\"op\":\"streak\",\"args\":[{\"ref\":\"taken_on\"}]} / last7(integer) = {\"op\":\"doneInDays\",\"args\":[{\"ref\":\"taken_on\"},7]}(丸を押した日は iOS が履歴に残す・実施記録 entity は作らない)。list の trailing に streak、全体は stat.value {\"agg\":\"max\",\"entity\":\"medicine\",\"field\":\"streak\"}(最長の連続)/ {\"agg\":\"sum\",\"entity\":\"medicine\",\"field\":\"last7\"}(直近 7 日の合計回数)。"
+        "毎日チェックの連続日数・直近 7 日(服薬・習慣 medicine{name,taken_on:date} + list item {toggle:taken_on,resets:daily}): medicine.computed streak(integer) = {\"op\":\"streak\",\"args\":[{\"ref\":\"taken_on\"}]} / last7(integer) = {\"op\":\"doneInDays\",\"args\":[{\"ref\":\"taken_on\"},7]}(丸を押した日は iOS が履歴に残す・実施記録 entity は作らない)。list の trailing に streak、全体は stat.value {\"agg\":\"max\",\"entity\":\"medicine\",\"field\":\"streak\"}(最長の連続)/ {\"agg\":\"sum\",\"entity\":\"medicine\",\"field\":\"last7\"}(直近 7 日の合計回数)。",
+        "クイズの自動採点(#262・questions{text:string 問題文,choices:text 選択肢「A 東京 / B 大阪 …」,correct:enum A/B/C/D hidden:true 正解,points:integer} + players{name} + answers{question:ref→questions,player:ref→players,choice:enum A/B/C/D}・3 つとも scope public): answers.computed is_correct(boolean) = {\"op\":\"eq\",\"args\":[{\"ref\":\"choice\"},{\"ref\":\"question.correct\"}]} / score(integer) = {\"if\":{\"ref\":\"is_correct\"},\"then\":{\"ref\":\"question.points\"},\"else\":0} / players.computed total(integer) = {\"agg\":\"sum\",\"entity\":\"answers\",\"field\":\"score\",\"filter\":{\"field\":\"player\",\"op\":\"eq\",\"value\":{\"ref\":\"id\"}}}。正解は hidden の field にして一覧・表に出さない(回答の一覧は is_correct / score を出す・正解を写すだけの computed は作らない)。回答フォームは picker で問題・回答者・選択肢を選ぶ(点数の入力欄は作らない)。ランキング = players の table を total で sort desc。"
       ]
     },
     "ExprRef": {
@@ -2909,7 +3384,7 @@
             "or": "a または b(2 個)",
             "not": "否定",
             "concat": "文字列連結(2 個)",
-            "len": "文字数",
+            "len": "文字数(type refs の field なら選んだ件数・空 = 参照先の全件数)",
             "now": "現在日時(引数なし)",
             "today": "今日の日付(引数なし)",
             "daysBetween": "daysBetween(a,b) = b - a の日数",
@@ -2959,11 +3434,37 @@
         },
         "entity": {
           "type": "string",
-          "description": "送る entity。screen.entity と同じならフォームの今のレコード(1 件)、それ以外の画面ではその entity の新しい順 最大 50 件を送る。"
+          "description": "送る entity。send: screen.entity と同じならフォームの今のレコード(1 件)、それ以外の画面ではその entity の新しい順 最大 50 件を送る。passby: 自分の記録(受け取った記録は除く)の新しい順 limit 件を送り、受け取った記録もこの entity に追加する(scope は private のみ)。"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "send",
+            "passby"
+          ],
+          "description": "send(既定)= ボタンを押して相手を選んで送る。passby = すれ違い通信: この画面を開いていてオンにしている間、近くで同じアプリを開いている人と自動で記録を交換し、会った人と日時の一覧を出す(アプリを裏に回すと止まる)。"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "passby で送る field id(必須)。ここに書いた entity の保存 field だけを送る。hidden・photo・video・ref・refs・computed は指定できない。"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "description": "passby で 1 回に送る件数(既定 1 = 最新のプロフィール 1 件)。最大 20 件・16 KB。"
+        },
+        "distance": {
+          "type": "boolean",
+          "description": "passby で、つながった相手との距離と方向(Nearby Interaction・UWB)を出す。対応端末(iPhone 11 以降・SE を除く)だけ。"
         }
       },
-      "description": "近くにいる Tailor It 端末(Wi-Fi / Bluetooth・インターネット不要)を探し、選んだ相手にこの画面のレコードをその場で送るボタン。相手が承認した時だけ届き、同じ entity(id とフィールド構成)を持つアプリならレコードとして追加される。「近くの人と共有」「その場で送る」「出席を取る」「名刺交換」「対戦結果を渡す」など、対面で記録を渡したいアプリで選ぶ。",
-      "x-usage": "フォーム画面なら保存ボタンの近く(A10:F11)に 1 つ。一覧画面なら下部の半幅(D11:F12)に。受け取る側も同じアプリ(同じ entity)を開いている必要がある。"
+      "description": "近くにいる Tailor It 端末(Wi-Fi / Bluetooth・インターネット不要)と記録をその場でやり取りする。send(既定)は相手を選んで送るボタンで、相手が承認した時だけ届き、同じ entity(id とフィールド構成)を持つアプリならレコードとして追加される。「近くの人と共有」「その場で送る」「出席を取る」「名刺交換」「対戦結果を渡す」など、対面で記録を渡したいアプリで選ぶ。mode:passby は「すれ違い通信」: 画面を開いている間、近くで同じアプリを開いている人と fields に書いた項目だけを自動で交換し、会った人の一覧を出す(「すれ違った人とプロフィールを交換」)。distance:true で近くの人との距離・方向も出す(「近くの友だちとの距離を表示」)。",
+      "x-usage": "send: フォーム画面なら保存ボタンの近く(A10:F11)に 1 つ。一覧画面なら下部の半幅(D11:F12)に。受け取る側も同じアプリ(同じ entity)を開いている必要がある。passby: 専用の画面(タブ)に全幅・縦長(A1:F8 など)で 1 つ。entity は自分のプロフィール(名前・ひとことなど)を入れる private の entity で、プロフィールを書くフォーム画面への導線も置く。"
     },
     "ExprIf": {
       "type": "object",
@@ -2991,8 +3492,7 @@
       "additionalProperties": false,
       "required": [
         "type",
-        "task",
-        "output"
+        "task"
       ],
       "properties": {
         "type": {
@@ -3006,7 +3506,7 @@
         },
         "label": {
           "type": "string",
-          "description": "ボタン文言(省略時は task から自動: AI で要約 など)。"
+          "description": "ボタン文言(省略時は task から自動: AI で要約 など)。generate は「罰ゲームを考えて」のように動詞で。"
         },
         "task": {
           "type": "string",
@@ -3015,9 +3515,10 @@
             "classify",
             "rewrite",
             "extract",
-            "suggest"
+            "suggest",
+            "generate"
           ],
-          "description": "summarize=要約 / classify=候補から 1 つ選ぶ / rewrite=言い換え・清書 / extract=要点や値の抜き出し / suggest=一言・アイデアの提案。"
+          "description": "summarize=要約 / classify=候補から 1 つ選ぶ / rewrite=言い換え・清書 / extract=要点や値の抜き出し / suggest=フォームの入力から一言・アイデア / generate=決まった指示(prompt)で新しく書かせる(罰ゲームの案・今日の献立・励ましの一言。結果はボタンの下に出る・shape で形を決める)。"
         },
         "input": {
           "type": "string",
@@ -3025,21 +3526,21 @@
         },
         "entity": {
           "type": "string",
-          "description": "集計入力: この entity の最近のレコード(limit 件)をまとめて AI に渡す(例: 過去の日記から傾向を一言)。input と同時に指定しない。"
+          "description": "集計入力: この entity の最近のレコード(limit 件)をまとめて AI に渡す(例: 過去の日記から傾向を一言 / 冷蔵庫の中身から献立)。input と同時に指定しない。"
         },
         "limit": {
           "type": "integer",
           "minimum": 1,
           "maximum": 50,
-          "description": "entity 入力の件数(新しい順・既定 20)。"
+          "description": "entity 入力の件数(新しい順・既定 20。generate は 20 まで)。"
         },
         "output": {
           "type": "string",
-          "description": "結果を入れる screen.entity の field id(string/text、classify は enum も可)。フォームのドラフトに入るだけで保存はユーザーが行う。"
+          "description": "結果を入れる screen.entity の field id(string/text、classify は enum も可)。フォームのドラフトに入るだけで保存はユーザーが行う。generate 以外は必須。generate は任意(省略 = ボタンの下に出すだけ・保存しない)。"
         },
         "prompt": {
           "type": "string",
-          "description": "追加の指示テンプレ。{{fieldId}} はフォームの値、{{input}} は入力全体に置換。例: 「{{body}} を 30 字で」。"
+          "description": "指示テンプレ。{{fieldId}} はフォームの値、{{input}} は入力全体に置換。例: 「{{body}} を 30 字で」。generate では必須で、これが AI への固定の指示(500 字まで。例: 「飲み会で盛り上がる、誰でもできる軽い罰ゲームの案」)。"
         },
         "options": {
           "type": "array",
@@ -3049,10 +3550,34 @@
             "type": "string"
           },
           "description": "classify の候補。output が enum field なら省略可(field の options を使う)。"
+        },
+        "shape": {
+          "type": "string",
+          "enum": [
+            "line",
+            "list",
+            "fields"
+          ],
+          "description": "generate の出力の形(既定 line)。line=1 行 / list=箇条書き count 個 / fields=items の名前ごとに 1 つ(例: 主菜・副菜・汁物)。"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "generate の shape list の個数(既定 3)。「5 つ」と言われたら 5。"
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "type": "string"
+          },
+          "description": "generate の shape fields の項目名(1〜10 個・各 20 字まで)。例: [\"主菜\",\"副菜\",\"汁物\"]。"
         }
       },
-      "description": "押すとオンデバイス AI(Apple Intelligence / Foundation Models)が走り、フォームの入力を要約・分類・言い換え・抜き出し・提案して output field に入れるボタン。無料・データは端末外に出ない。非対応端末では「この端末では AI を使えません」と無効表示。",
-      "x-usage": "フォーム画面のみ(screen.entity 必須)。発話に「要約して」「分類して」「気分を判定」「タグ付け」「一言で」「言い換えて」「丁寧に」「抜き出して」「提案して」「AI で」がある時に使う。entity に結果用の field(string/text、分類は enum)を足し、その入力欄の直上に 1 行(例 A7:F8)。1 画面 3 個まで。"
+      "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はオンデバイス AI(Apple Intelligence / Foundation Models)だけでフォームの入力を処理して output field に入れる(無料・データは端末外に出ない・非対応端末では「この端末では AI を使えません」)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",
+      "x-usage": "summarize〜suggest はフォーム画面のみ(screen.entity 必須)。発話に「要約して」「分類して」「気分を判定」「タグ付け」「一言で」「言い換えて」「丁寧に」「抜き出して」「AI で」がある時に使う。entity に結果用の field(string/text、分類は enum)を足し、その入力欄の直上に 1 行(例 A7:F8)。generate は「〜の案を出してくれるボタン」「今日の献立を提案」「励ましの一言」「お題を考えて」の時: どの画面でもよく、結果を表示する高さを取る(line は 3 行・list/fields は 5〜6 行 例 A1:F6)。記録を材料にするなら entity(+limit)、結果を記録に残したい時だけフォーム画面で output。1 画面 3 個まで。"
     },
     "LocationTracker": {
       "type": "object",
@@ -3095,6 +3620,48 @@
       },
       "description": "「記録を開始 / 記録を停止」ボタンと記録中の状態(経過時間・距離)。開始を押した間だけ現在地を entity に 1 点ずつ保存し、アプリを閉じても停止まで続く(既定 1 時間・最長 4 時間で自動停止)。散歩・ランニング・サイクリングのルート、移動ログ、軌跡を残したいアプリで選ぶ。1 回だけ現在地を入れたいなら locationButton。",
       "x-usage": "ホーム画面(screen.entity なし)に A9:F10 で 1 つ(最下 2 行の左 A-B はマイクの席なので空ける)。同じ画面に mapView{kind:\"route\",entity,locationField,dateField}(A3:F8)と stat{aggregate:\"distance\"} / stat{aggregate:\"duration\"}(field = location field、by = datetime field、今日なら filter today)を A1:F2 に並べる。entity は point{loc: location, at: datetime(required, defaultValue now)} のように点だけを持たせ、フォーム画面は作らない。"
+    },
+    "ChatThread": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "textField"
+      ],
+      "properties": {
+        "type": {
+          "const": "chatThread"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string",
+          "description": "メッセージを保存する entity。1 メッセージ = 1 レコード。みんなで話すなら scope public。送信者名・送信時刻は予約値 $author / $createdAt を使うので、名前や日時の field は作らない。"
+        },
+        "textField": {
+          "type": "string",
+          "description": "`entity` の string / text field。メッセージ本文が入る。"
+        },
+        "photoField": {
+          "type": "string",
+          "description": "`entity` の photo field(任意)。書くと入力欄に写真ボタンが出て、写真付きで送れる。"
+        },
+        "placeholder": {
+          "type": "string",
+          "description": "入力欄の薄い文字(既定「メッセージ」)。"
+        },
+        "emptyText": {
+          "type": "string",
+          "description": "まだメッセージが無い時の文言(既定「まだメッセージはありません」)。"
+        }
+      },
+      "description": "LINE のようなチャット画面。メッセージを吹き出しで古い順に上から下へ積み(最新が一番下)、自分の分は右・相手の分は左に送信者名付きで出し、画面下に固定の入力欄から送る(送信 = その entity に 1 件保存・フォーム画面は不要)。ほかの人のメッセージはリアルタイムで届く。グループチャット・1 対 1 のメッセージ・連絡のやり取りで選ぶ。投稿を一覧で眺めるだけなら list。",
+      "x-usage": "チャット用のタブかホーム画面に A1:F12 で 1 つだけ置き、同じ画面に他の部品を置かない(左下のマイクは入力欄の左に避けて表示される)。entity は message{text: text(required), photo?: photo} + scope:\"public\" だけ。名前・日時の field、フォーム画面、追加ボタン、list は作らない。entity の他の required field には defaultValue を付ける。"
     },
     "HealthStat": {
       "type": "object",
@@ -3142,6 +3709,362 @@
       },
       "description": "端末のヘルスデータを表示するカード。歩数は iPhone が自動で数えている値(entity も記録も不要)、体重はヘルスケアの最新値。「毎日の歩数を見たい」「今日何歩歩いた」「1 週間の歩数」「ヘルスケアの体重を見たい」など、自分で入力しない健康データを見たい時に選ぶ。権限が無い時・シミュレータでは理由を表示する。",
       "x-usage": "entity 不要でどの画面にも置ける。today は stat と同じ大きさ(半幅 2〜3 行・例 A1:C3)、week はグラフなので全幅 4〜5 行(例 A4:F8)。目標の話があれば target。手入力の体重記録アプリで「ヘルスケアにも保存」と言われたら、体重 field に health: \"weight\" を付ける(このカードとは別)。"
+    },
+    "FilterMe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "me"
+      ],
+      "properties": {
+        "me": {
+          "const": true
+        }
+      },
+      "description": "filter の value に書く「自分」。field \"$author\"(自分の投稿)か \"$marks.<id>\"(自分が印を付けたもの)と、op eq / neq でだけ使う(public/shared の entity)。"
+    },
+    "Mark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "icon",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "icon": {
+          "type": "string",
+          "enum": [
+            "heart",
+            "star",
+            "bookmark",
+            "thumbsup",
+            "check",
+            "eye",
+            "flag"
+          ],
+          "description": "行に出すアイコン(付けると塗りつぶし)。",
+          "x-enumDescriptions": {
+            "heart": "いいね・好き",
+            "star": "お気に入り",
+            "bookmark": "保存・あとで見る",
+            "thumbsup": "役に立った・賛成",
+            "check": "既読・やった",
+            "eye": "見た",
+            "flag": "行きたい・気になる"
+          }
+        },
+        "label": {
+          "type": "string",
+          "description": "ボタンと読み上げの名前(いいね・保存・既読)。ユーザーの言語で。"
+        }
+      },
+      "description": "entity の印 1 つ(marks の要素)。id は like / save / read など entity 内で一意。1 人 1 回のトグルで、件数と「自分が付けたか」を backend が持つ。"
+    },
+    "Dashcam": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "dashcam"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "カードの見出し(任意・例: ドラレコ)。"
+        },
+        "keepMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "description": "ループ録画で端末に残す直近の分数(既定 10・1〜60)。これより古い区間(1 区間 = 1 分)は自動で消す。衝撃で保存した区間は消さない。"
+        },
+        "maxStorageMB": {
+          "type": "integer",
+          "minimum": 200,
+          "maximum": 20000,
+          "description": "録画が使う容量の上限 MB(既定 2000 = 約 2GB・200〜20000)。超えたら古いループ区間から消す。保存済みだけで上限に達したら録画を止めて知らせる。"
+        },
+        "impactG": {
+          "type": "number",
+          "minimum": 1.2,
+          "maximum": 8,
+          "description": "衝撃とみなす加速度(重力を除いた G・既定 2.5・1.2〜8)。小さいほど敏感。超えたら前後の区間(直前 1 分〜直後 30 秒)を保存済みにする。"
+        },
+        "autoStart": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "landscape",
+              "still",
+              "charging"
+            ]
+          },
+          "description": "自動で録画を始める条件(全部が 5 秒続いたら開始)。landscape = 横向き / still = ほぼ静止(スタンドに置いた)/ charging = 充電中。「スタンドに置いたら自動で」なら [landscape, still]、「充電したら」なら charging も足す。省略 = 録画ボタンを押した時だけ。"
+        },
+        "audio": {
+          "type": "boolean",
+          "description": "マイクで車内の音声も録る(既定 false = 映像だけ)。「音も録りたい」と言われた時だけ true。"
+        }
+      },
+      "description": "ドライブレコーダー(ドラレコ)。背面カメラの映像を表示しながら録画し、直近 keepMinutes 分だけを 1 分ごとの区間で端末に残す(ループ録画・容量の上限つき)。加速度が impactG を超えたら前後の区間を「保存済み」にして消さない。autoStart の条件(横向き・ほぼ静止・充電中)が続いたら自動で録画を始める。保存済みの映像は部品の中の一覧から再生・写真に保存・共有できる。録画中は画面のスリープを止める。iOS の制約で画面を出している間だけ録画する(裏に回ると止まる)。「ドラレコ」「車載カメラ」「運転中に録画」「スマホスタンドに置いたら録画」「事故の時の映像を残す」の時に必ずこれを選ぶ(videoField で代替しない)。entity は不要(映像は記録に入れない)。",
+      "x-usage": "ホーム画面(screen.entity なし)にこれ 1 つを大きく置く: A1:F10(最下 2 行の左 A-B はマイクの席なので空ける)。1 画面に 1 つだけ。「置いたら自動で」は autoStart [landscape, still]、「充電したら」は charging を足す。容量・残す時間・感度の話があれば maxStorageMB / keepMinutes / impactG。entity・フォーム画面・list は作らない(保存済みの一覧は部品の中にある)。"
+    },
+    "SensorValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "sensor",
+        "label"
+      ],
+      "properties": {
+        "type": {
+          "const": "sensorValue"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "sensor": {
+          "type": "string",
+          "enum": [
+            "tilt",
+            "pitch",
+            "roll",
+            "acceleration",
+            "rotation",
+            "pressure",
+            "altitude"
+          ],
+          "x-enumDescriptions": {
+            "tilt": "傾き(水平からの角度・0〜90°)。水平器・スマホの角度。",
+            "pitch": "前後の傾き(-90〜90°)。",
+            "roll": "左右の傾き(-180〜180°)。",
+            "acceleration": "揺れ・加速度の大きさ(G・重力は除く)。急ブレーキ・衝撃・振動。",
+            "rotation": "回転の速さ(°/s・ジャイロ)。",
+            "pressure": "気圧(hPa・気圧計)。",
+            "altitude": "高度の変化(m・画面を開いた時を 0 とした相対値。標高ではない)。"
+          },
+          "description": "表示する iPhone のセンサー値。温度・湿度は iPhone にセンサーが無いので無い。"
+        },
+        "label": {
+          "type": "string",
+          "description": "カードの見出し(例: 傾き・今の気圧)。"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "number",
+            "gauge",
+            "level"
+          ],
+          "description": "number=大きな数字(既定)/ gauge=範囲のメーター(min〜max)/ level=水平器の泡(sensor tilt のみ)。"
+        },
+        "min": {
+          "type": "number",
+          "description": "gauge の下限(省略時はセンサーごとの既定)。"
+        },
+        "max": {
+          "type": "number",
+          "description": "gauge の上限(省略時はセンサーごとの既定・min より大きい)。"
+        },
+        "entity": {
+          "type": "string",
+          "description": "値を保存する entity(任意)。指定すると「今の値を記録」ボタンが出て、1 回 = 1 レコード。"
+        },
+        "field": {
+          "type": "string",
+          "description": "entity の number field。記録した時の値(単位はセンサーの単位)が入る。entity と一緒に必須。"
+        },
+        "dateField": {
+          "type": "string",
+          "description": "entity の datetime field。記録した時刻が入る(任意)。"
+        },
+        "seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "description": "一定間隔の記録(秒・1〜3600)。指定すると「記録を開始/停止」が出て、画面を開いている間だけ間隔ごとに 1 件保存する。entity が要る。"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "一定間隔の記録の上限件数(既定 60・1〜1000)。達したら自動で止まる。seconds が要る。"
+        },
+        "threshold": {
+          "$ref": "#/$defs/SensorThreshold"
+        }
+      },
+      "description": "iPhone のセンサー(傾き・加速度・回転・気圧・高度)の今の値を表示するカード。画面を開いている間だけ測る(最大 10 回/秒)。entity を付けると今の値を記録でき、seconds で一定間隔の記録、threshold で「30° を超えたら知らせる」ができる。「水平器」「スマホの傾き」「揺れ・振動・衝撃を測る」「気圧」「高度・何階分登った」の時に選ぶ。温度・湿度は測れない(iPhone にセンサーが無い)。センサーの無い端末では「このセンサーはこの端末では使えません」と出る。",
+      "x-usage": "数字だけなら半幅 3 行(A1:C3)、gauge / level は全幅 4〜5 行(A1:F5)。記録するなら entity は例 reading{value: number(unit は °/G/hPa/m), at: datetime(required, defaultValue now)} にしてフォーム画面は作らず、同じ画面に list か chart(A6:F10)を置く。threshold は「傾きすぎ」「揺れが大きい」を知らせたい時だけ。"
+    },
+    "SensorThreshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "above": {
+          "type": "number",
+          "description": "値がこれを超えたら発火(例 tilt 30)。"
+        },
+        "below": {
+          "type": "number",
+          "description": "値がこれを下回ったら発火。"
+        },
+        "message": {
+          "type": "string",
+          "description": "発火した時にカードに出す警告(例: 傾きすぎです)。省略時は既定文。"
+        },
+        "save": {
+          "type": "boolean",
+          "description": "true = 発火した時の値を entity に 1 件保存(entity が要る)。"
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "発火した時に実行する動作(任意)。navigate / scheduleNotification / cancelNotification のみ。"
+        }
+      },
+      "description": "sensorValue のしきい値。above / below のどちらかは必須。条件に入った瞬間だけ 1 回発火し(警告表示 + 振動)、条件から出るまで再発火しない(最短 3 秒おき)。"
+    },
+    "Activity": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "startActivity でロック画面と Dynamic Island に出す内容。minutes を省くと押した時からの経過時間を数える。",
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "大きく出す一言(例「ラーメン待ち」「ランニング中」「運転中」)。"
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "任意: 小さく添える一行(例「かため・3 分」)。"
+        },
+        "icon": {
+          "type": "string",
+          "description": "任意: SF Symbols 名(例 flame / figure.run / car)。省略時 timer。"
+        },
+        "minutes": {
+          "type": "integer",
+          "description": "任意: 今から N 分後を終わりとして残り時間を数える(1〜480)。省略すると経過時間。"
+        },
+        "stat": {
+          "type": "string",
+          "description": "任意: 同じアプリの stat か progressBar 部品の id。その数字(progressBar は進み具合)を添え、記録が増えるたびに更新する。"
+        }
+      }
+    },
+    "PhotoAnalyze": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "into"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "text",
+            "amount",
+            "date",
+            "classify",
+            "describe",
+            "jointAngle"
+          ],
+          "x-enumDescriptions": {
+            "text": "写真の文字(日本語・英語)をそのまま読む(OCR)。into は string / text。",
+            "amount": "レシート・値札の金額(合計の行・無ければ ¥/円 の付いた一番大きい額)。into は currency / integer / number。",
+            "date": "レシート・書類の日付(2026/10/28・2026年10月28日 など)。into は date / datetime。",
+            "classify": "写っている物と文字から候補を 1 つ選ぶ。into は enum(候補はその options)か、options 付きの string / text。",
+            "describe": "写っているものを短い文で説明する。into は string / text。",
+            "jointAngle": "人の体の関節(joint)の角度(度・0〜180)。写真に関節の点と線を重ねて出す。into は number / integer。"
+          }
+        },
+        "into": {
+          "type": "string",
+          "description": "結果を入れる screen.entity の field id(保存される field・photo field 自身は不可)。"
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": {
+            "type": "string"
+          },
+          "description": "classify のみ: 候補。into が enum なら省略可(その options を使う)。"
+        },
+        "joint": {
+          "type": "string",
+          "enum": [
+            "knee",
+            "elbow",
+            "hip",
+            "shoulder",
+            "leftKnee",
+            "rightKnee",
+            "leftElbow",
+            "rightElbow",
+            "leftHip",
+            "rightHip",
+            "leftShoulder",
+            "rightShoulder"
+          ],
+          "description": "jointAngle のみ(必須): 角度を測る関節。knee / elbow / hip / shoulder は左右のうちよく写っている方。"
+        }
+      },
+      "description": "写真から読み取る 1 項目(kind)と、結果を入れる field(into)。"
+    },
+    "MusicPlayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "musicPlayer"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "カードの見出し(任意・例: ドライブ BGM)。"
+        },
+        "allowRequests": {
+          "type": "boolean",
+          "description": "true = 近くにいる友だちの端末(同じアプリを開いた Tailor It・Wi-Fi / Bluetooth・インターネット不要)から曲のリクエストを受け付ける。届いたリクエストは承認するとこの端末の再生待ちに入る。既定 false。"
+        },
+        "autoAccept": {
+          "type": "boolean",
+          "description": "allowRequests のとき、届いたリクエストを確認せずに再生待ちへ入れる(運転中で画面を触れない時)。既定 false = 1 曲ずつ承認。"
+        }
+      },
+      "description": "Apple Music の音楽プレーヤー。曲を検索して再生待ちに入れ、再生・一時停止・次へ・前へと、今の曲(曲名・アーティスト・ジャケット)と再生待ちを表示する。イヤホンのボタン・ロック画面でも操作できる。allowRequests で近くの友だちの端末から曲のリクエストを受けられる。「音楽を流す」「ドライブの BGM」「プレイリスト」「友だちが曲を入れられる」の時に選ぶ。再生には Apple Music の契約が要る。Spotify は曲名で Spotify アプリを開くことだけでき、再生・操作はできない。entity は要らない。",
+      "x-usage": "entity 不要。1 アプリに 1 つだけ。ホーム(またはタブ)に全幅で大きく置く(例 A1:F12。他の部品と並べるなら A1:F8)。友だちから曲を入れたい話があれば allowRequests: true、運転中で確認できない・勝手に入れていいなら autoAccept: true も。"
     }
   }
 }

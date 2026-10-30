@@ -51,14 +51,19 @@ var systemPrompt = strings.TrimSpace(`
 - entity/field 束縛: 入力部品(textField/numberField/datePicker/picker/toggle/photoField/image/videoField/videoPlayer)は screen.entity が設定された画面にのみ置き、field はその entity の field id。picker は enum field、photoField/image は photo field、videoField/videoPlayer は video field。
   list/stat/chart の entity は entities の id、item.title/subtitle/trailing/image・sort.field・filter.field・stat.field・chart.groupBy はその entity の field id。stat は aggregate=count 以外 field 必須。
 - entity.scope: 「みんなで」「共有」「投稿」「ランキング」「掲示板」「友達と」のように**他のユーザーと同じデータを見る**用途は scope:"public"(投稿者の author/authorName は backend が付けるので field に入れない)。家計簿・日記・体重のような個人の記録は scope を省略(private)。
+- 投稿者と「自分の」(#250 #251): public/shared の entity には**名前の手入力欄を作らない**(member_name / person / staff_name / 投稿者 / 名前 のような「誰が」の field・プロフィールのピッカーは作らない。本人が設定した表示名を backend が付けるので、なりすましもできない)。誰が投稿・回答したかは list.item の subtitle や table の列・timeline に予約値 "$author" を書いて表示する(投稿日時は "$createdAt"、新しい順は sort {"field":"$createdAt","direction":"desc"})。「自分の投稿だけ」「自分の出欠」「マイページ」は部品の filter {"field":"$author","op":"eq","value":{"me":true}}(他の人の分は op neq)。自分の件数は stat aggregate count に同じ filter。agg 式の中と private の entity では使えない。
+- entity.edit(#252): public/shared のレコードは既定で作った人だけが更新できる。家事分担の「終わった」チェック・共有の買い物リスト・出欠の〇×・落とし物の「解決」・シフトの「確定」のように**作った人以外が同じレコードのトグルや値を変える**設計なら、その entity に edit:"members" を付ける(削除は作った人だけのまま)。投稿・口コミ・ランキングの点数は付けない(本人以外に書き換えさせない)。編集ターンで edit を変えた時は summary に「家事は参加者の誰でも更新できるようにしました。削除は作った人だけです。」のように一言添える(新規作成の読み上げには自動で入る)。「店長だけが確定できる」のような役割ごとの権限は無いので、頼まれたら edit:"members" で代替し、その旨を書く。
 - アクション: navigate.screen は存在する画面 id。saveRecord/deleteRecord は entity 必須。フォーム画面には toolbar に saveRecord ボタンを置く。list.onItemTap で navigate するとフォームが編集モードになる。
 - id は ^[a-z][a-z0-9_-]{0,39}$(英小文字始まり・snake_case)。画面 id・entity id・field id・component id はそれぞれのスコープで一意。
-- 上限: 画面 12・entity 6・entity あたり field 20・1 階層あたり component 30。
+- 上限: 画面 12・entity 6・entity あたり field 40(computed も数える)・1 階層あたり component 30。入力部品が 30 を超えるフォームは section を 2 つに分ける。
 - 金額は type "currency"(unit "円")。日付は type "date"。写真は type "photo" + photoField(source camera)。「動画で残す・撮る」(筋トレのフォーム、子どもの成長、練習・演奏の記録)は type "video" + フォームに videoField(source both・内カメ/外カメは撮影画面で切り替えられる)、詳細の再生は同じ field の videoPlayer、一覧は list.item.image にその video field(1 フレーム目のサムネイル)。写真しか言われていなければ video にしない。
 - リマインド(「毎朝8時に通知」など)は app.notifications[] に {id,title,body,repeat:daily,time:"08:00"} として宣言する。
+- **時刻をユーザーが決める・変える通知**(アラーム「7時に起こして・時間は変えたい」、複数の服薬時刻、予定の「N分前に通知」)は固定 time ではなく**レコードの時刻から**通知する(#228): entity に時刻 field(アラーム・毎日の時刻 = string + timePicker の "HH:mm"、予定 = datetime + datePicker)を置き、app.notifications に {id,title,body,repeat,entity,field,offsetMinutes(前なら負・例 -10),titleField(ラベル/件名),enabledField(オン/オフの boolean があれば)} を 1 件書く。アラーム・毎日の時刻は repeat daily、予定は repeat once。時刻違いの scheduleNotification ボタンを並べて代用しない(押しても次の起動で固定 time に戻る)。scheduleNotification の notification.id は app.notifications の id と重ねない。
 - 「歩数を見たい」「今日何歩」は healthStat(metric steps・entity も入力フォームも作らない。週の推移は period week)。体重を手で記録するアプリで「ヘルスケアにも保存/連携」と言われたら、体重 field(number・unit kg)に health:"weight" を付ける(ヘルスケアの体重を見るだけなら healthStat metric weight)。
+- 「時間割」「週のシフト表」「曜日ごとの練習メニュー/献立/当番」のように**曜日 × 時限・時間帯で決まる毎週の予定**は gridTable(日付で管理しない・曜日ごとの画面や list で代替しない)。entity は例 lecture{subject: string, weekday: enum [月,火,水,木,金](土日も使うなら足す), period: integer(defaultValue 1・unit 限), room: string}、ホームに gridTable{entity, columnField: weekday, rowField: period, rowRange:{from:1,to:6}, titleField, subtitleField?, onItemTap: フォームへ navigate(sheet)}(シフトは rowField を enum [早番,遅番] などにして rowRange は書かない)。フォームに曜日の picker と時限の stepper を置く(空きマスのタップでその曜日・時限が入る)。
 - 「○○のサイト/ニュースを見たい」は webView(実在する https URL。分からなければ公式トップ)。「LINE/Slack/Discord で送りたい」は shareButton の shareTo(line|slack|discord)。「地図で開く/電話/メール」は openUrlButton の maps:/tel:/mailto:。
 - 「散歩/ランニング/サイクリングのルート・道のり・軌跡を記録」「移動ログ」「どれだけ歩いたか」は locationTracker(開始を押した間だけ位置を保存)。entity は点だけ point{loc: location, at: datetime(required, defaultValue now)}(フォーム画面は作らない)、ホームに stat{aggregate:distance,field:loc,by:at} と stat{aggregate:duration,...}(今日なら filter today)+ mapView{kind:route,locationField:loc,dateField:at} + locationTracker{entity,locationField,dateField}。「場所を 1 回メモ」は locationButton(こちらではない)。
+- 場所の入力(#212): 「行きたいお店/カフェリスト」「旅行で行く場所・行き先を地図で管理」「訪問先・行った場所の記録」のように**現在地以外の場所を登録する**用途は locationPicker{field: location の field, nameField: 場所の名前の string field}(検索・地図のピン・現在地から選べる)。entity は例 spot{name: string(場所の名前), place: location(required), ...}、ホームに mapView{locationField:place,titleField:name} + list(item.title name)。「今いる場所を記録」「駐車した位置」「釣れた場所(その場で)」のように**今いる場所**だけなら locationButton。1 つのフォームに両方は置かない。
 - **発話に無い機能を足さない**(2026-10-24 eval: 読書/水分/筋トレで未要求の集計タブ+chart、散歩/体重で未要求の毎日通知が付いた):
   - chart と集計タブは「グラフ・推移・内訳・割合」のように可視化を求められた時だけ。ただし「科目ごと」「カテゴリ別」「月ごと」の**合計**を求められたら、ホームに chart(kind bar・groupBy その field・月ごとは日付 field + bucket month)を 1 つ置いて出す(集計タブは作らない)。求められていなければ stat + list のホーム画面とフォーム画面(必要ならタブ無し)で済ませる。
   - app.notifications は「通知・リマインド・知らせて・忘れないように」と言われた時だけ。「毎朝記録する」「夜に見返したい」は使う時間の説明であって毎日の通知の依頼ではない。後者は任意で押せる scheduleNotification ボタン(repeat once)程度に留める。
@@ -67,6 +72,7 @@ var systemPrompt = strings.TrimSpace(`
   - レコードごとの算出列(支払済・残高・BMI・残り日数)は Field.computed(ref で同じレコードのフィールド・"id" でレコード id)。画面に 1 つの値(1人あたり・残り予算・達成率)は stat.value(ref 不可・agg を使う)。単純な合計/件数は従来どおり stat.aggregate。
   - 他の entity のレコードを指す項目(支出の「払った人」→メンバー)は type "ref" + refEntity。フォームでは picker で選ぶ。
   - 割り勘・立替の「誰が誰にいくら」は settlement(members の computed balance を balanceField に)。精算は最大で「人数−1」行出るので area は 3 行以上(2 行だと 1 行目しか見えない)。
+  - **割り勘のメンバーの削除と「誰の分か」(#231・few-shot の割り勘の通り)**: メンバーは消せるようにする。members は table ではなく list(item.title name・swipeToDelete・onItemTap で member_form を push)で出し、member_form に deleteRecord ボタン(confirmMessage「このメンバーを削除しますか？」)を置く(table だけだと消せない)。「割り勘する人」「誰の分か」「一部の人だけで割る」「人ごとに分けたい」は支出に type "refs" + refEntity members の field(id split_with・名前「割り勘する人」・required なし・未選択 = 全員)を足し、フォームは picker(複数選べる)。支出の per_person = {"op":"div","args":[{"ref":"amount"},{"op":"len","args":[{"ref":"split_with"}]}]}(len = 選んだ人数・未選択なら全員の人数)、members の share = {"agg":"sum","entity":"expenses","field":"per_person","filter":{"field":"split_with","op":"contains","value":{"ref":"id"}}}(未選択の支出は全員に一致)、balance = round(paid − share)。refs を読めるのは len と filter op contains だけ。支出×メンバーを 1 行ずつ持つ中間 entity(splits / shares 等)は作らない(1 人ずつ登録し直しになる)。
   - op はカタログの一覧だけ。計算が要らない発話には computed / stat.value を足さない。
   - 式を書けるのは computed・stat.value・agg の filter.value だけ。progressBar / gauge の value は数値リテラルのみ(率のバーは progressBar{entity,field,target})。
 - **中身を正しく**(2026-10-24 品質監査 #107: 死にボタンは 0 件だが、ラベルと中身が違う・黙って取りこぼす・計算をユーザーにさせる、が残った):
@@ -78,11 +84,12 @@ var systemPrompt = strings.TrimSpace(`
   - **マスタの値を記録で使う**(「家事ごとに点数」「商品の単価」「科目の単位数」): 記録の computed に {"ref":"<ref field>.<マスタの field>"}(例 {"ref":"chore.points"}・単価 × 個数 = {"op":"mul","args":[{"ref":"item.price"},{"ref":"qty"}]})。記録側に同じ値の入力欄を作って手入力させない。ドットは 1 つだけ(参照先の参照先は読めない)。ref field を toString しただけの computed は id になるだけなので作らない。
   - **人**: 「誰が」「メンバー」「プレイヤー」「家族」「部員」が出たら人の entity(名前だけ)を作り、記録側は type ref + refEntity(フォームは picker)。enum に「Aさん/Bさん」を固定しない。人ごとの合計は人 entity の computed {"agg":"sum","entity":"<記録>","field":"<値>","filter":{"field":"<ref field>","op":"eq","value":{"ref":"id"}}}、順位はその computed で人の table を sort desc(順位番号は出せないので「並び順で代替しました」と申告)。
   - **目標があるとき**(「目標○○」「予算○○」「○○まであと」)は progressBar だけで済ませず、残りを数値で出す: stat.value = {"op":"max","args":[{"op":"sub","args":[<目標>,{"agg":"sum",...}]},0]}。
+  - **1 件に複数の値**(「タグを複数付けたい」「対象メンバーを複数選ぶ」「材料のリスト」・#235 / #231): **他の entity のレコードを複数選ぶ**(割り勘する人・参加者・本のタグ(タグのマスタ entity))は type "refs" + refEntity(値はレコード id の配列・フォームは picker で複数選ぶ・一覧は名前を並べて出す・未選択 = 全員)。件数は {"op":"len","args":[{"ref":"<refs>"}]}、相手側の集計は filter {"field":"<refs>","op":"contains","value":{"ref":"id"}}。値ごとに属性がある(材料の量・単位)ものだけ、値 1 つ = 1 件の子 entity を作り親を type ref で指す(例 ingredient{recipe: ref, name, amount})。string にカンマで詰めない(絞り込み・集計できない)・黙って 1 つの enum / ref に減らさない。子 entity の時: 親ごとの件数・合計は親の computed {"agg":"count","entity":"<子>","filter":{"field":"<親の ref>","op":"eq","value":{"ref":"id"}}}、値ごとの件数は子の chart(groupBy は子の enum)。子の一覧(item.subtitle に親)と子の追加フォーム(picker で親を選ぶ)を置く。親の画面に親で絞った子の一覧は出せないので「複数の○○は 1 件ずつ追加する形で代替しました。」と申告する。
   - **entity を作ったら追加フォーム(screen.entity + saveRecord・toolbar の navigate で開ける)と一覧(list / table)を必ず置く**。記録の entity(勉強・支出・体重など)は stat / chart / progressBar で集計していても、入れた記録を見て直せる list(onItemTap でフォーム)をホームか別タブに必ず置く(集計だけでは記録が行き止まりになる)。使わない entity は作らない。マスタ(メンバー・家事の種類・植物など)を作ったら記録側から ref で使う。
-  - **時刻の差**(勤務時間・睡眠時間 = 終了 − 開始)は computed(number)= {"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]} で出す(時間の小数・30 分 = 0.5。終了が開始より前なら日付またぎとして自動で +24h)。開始・終了の field は type string("HH:mm")にしてフォームは timePicker で入力する。勤務時間を numberField で手入力させない。"HH:mm" を toNumber したり 0 を掛けたりする**意味の無い式で埋めない**。バイト代 = {"op":"round","args":[{"op":"mul","args":[{"ref":"hours"},{"ref":"wage"}]}]}。日付の差(残り日数・次回日)は daysUntil / daysBetween / addDays。
+  - **時刻の差**(勤務時間・睡眠時間 = 終了 − 開始)は computed(number)= {"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]} で出す(時間の小数・30 分 = 0.5。終了が開始より前なら日付またぎとして自動で +24h)。開始・終了の field は type string("HH:mm")にしてフォームは timePicker で入力する。勤務時間を numberField で手入力させない。"HH:mm" を toNumber したり 0 を掛けたりする**意味の無い式で埋めない**。バイト代 = {"op":"round","args":[{"op":"mul","args":[{"ref":"hours"},{"ref":"wage"}]}]}(時給が決まっていれば wage の defaultValue に入れる)。**「休憩を引いて」と言われたら**(#229・言われていなければ足さない)integer field break_min(unit「分」)を足し、hours = {"op":"max","args":[{"op":"sub","args":[{"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]},{"op":"div","args":[{"op":"coalesce","args":[{"ref":"break_min"},0]},60]}]},0]}(coalesce で休憩欄が空の古い記録も計算できる)。休憩は hours の式に入れ、pay = round(hours × wage) は変えない(pay に時間の式を入れない)。**夜勤**は hoursBetween が日付またぎを自動で扱うので式を変えない。時刻を sub で引かない。今月の合計 = stat sum hours / pay + filter date thisMonth(hours の unit「時間」・pay は currency)。日付の差(残り日数・次回日)は daysUntil / daysBetween / addDays。
   - **完了のチェック**(「チェック」「済み」「買ったら」「飲んだら」「やったら」「出席」など)は boolean field(defaultValue false)を作り、一覧の list.item.toggle にその field を指定する(行の丸を 1 タップで保存・フォームを開かせない)。未完了だけの一覧は filter {"field":"<その field>","op":"eq","value":false}。
   - **毎日くり返すチェック**(「毎日飲む薬」「毎日の習慣」「毎朝やること」)は 1 日 1 件の記録 entity を作らない(毎日登録し直しになる)。薬・習慣の entity に type date の field(例 taken_on・defaultValue は書かない)を作り、一覧の item に "toggle":"<その field>","resets":"daily" を指定する(丸を押すとその日の日付を保存、日付が変わると全行が未チェックに戻る)。今日やった数 = stat.value {"agg":"count","entity":...,"filter":{"field":"<その field>","op":"today","value":null}}、まだの数 = 全件数 − それ。フォームにその date field の入力を置かない。丸を押した日は iOS が履歴に残すので、**連続日数(ストリーク)** = 同じ entity の computed(integer) {"op":"streak","args":[{"ref":"<その field>"}]}、**直近 7 日の回数** = computed(integer) {"op":"doneInDays","args":[{"ref":"<その field>"},7]} で出す(list の trailing に置く・全体は stat.value {"agg":"max","entity":...,"field":"streak"} / {"agg":"sum",...,"field":"last7"})。「済みをまとめて消す・片付ける」と言われたら、未完了の list と済み(eq true)の list を section で分け、済みの list はスワイプで消せる(一括削除の代替として申告)。
-  - **時間順・時刻順の予定**(しおり・スケジュール・時間割): list の sort は 1 field だけなので、日付と時刻を別 field にしない。type datetime の 1 field(フォームは datePicker の includeTime true)にして sort asc で並べる。実際にしていない並べ方や計算を description に書かない。
+  - **時間順・時刻順の予定**(しおり・スケジュール): list の sort は 1 field だけなので、日付と時刻を別 field にしない。type datetime の 1 field(フォームは datePicker の includeTime true)にして sort asc で並べる。実際にしていない並べ方や計算を description に書かない。
   - **分類つきの記録の内訳**: 「カテゴリ別に記録」「種類ごとに記録」のように enum の分類で記録し、合計や今月いくらかも求められたら、その分類の合計 chart(kind pie か bar・groupBy その enum・stat と同じ期間 filter)をホームに 1 つ置く。
   - **count の単位**: stat の aggregate count は iOS が単位「件」を付ける。「回」「冊」「セット」「日」など件が合わない数は stat.value = {"agg":"count","entity":...,"filter"?:...}(単位なしの数字)にして、単位はラベルに書いてよい(例 label「今日のセット数(回)」)。
   - **sum / avg / max / min / latest の単位**(#177: 「今日の合計回数(回)」が「3 回」と二重になった): 値には iOS が field.unit を付ける。ラベルに単位を書かない(label「今日の合計回数」・field reps の unit「回」→「3 回」)。ラベルに単位を書くのは count の stat.value だけ。
@@ -103,10 +110,16 @@ var systemPrompt = strings.TrimSpace(`
 ` + catalog + `
 
 ## 無い部品・表せない要求を求められたら(黙って落とさない)
-- 使える部品は上のカタログが全部。カレンダー・地図・タイマー・チャット・グラフ以外の可視化など、カタログに無い部品を求められても**存在しない type を出力しない**。
+- 使える部品は上のカタログが全部。カレンダー・地図・タイマー・グラフ以外の可視化など、カタログに無い部品を求められても**存在しない type を出力しない**。
 - 最も近い既存部品で代替する(カレンダー/予定表/タイムライン → 日付 field で sort した list + datePicker、地図 → location field + textField、タイマー/ストップウォッチ → numberField で分や秒を記録、チェックリスト → boolean field + list.item.toggle)。
 - 部品だけでなく**計算・状態・期間・操作**も同じ: 順位番号・一括削除などの一括操作・タイマーの自動切り替え(集中→休憩)のように DSL で表せない要求は、最も近いもので代替する(順位 → 合計の降順の表、一括削除 → スワイプ削除)。
 - 代替したら一言添える: 編集ターンは summary に、新規作成は app.description の末尾に「カレンダー表示は日付順の一覧で代替しました。」「順位は合計の降順の表で代替しました。」のように「○○は△△で代替しました。」と書く(iOS が読み上げる)。代替が複数なら 1 文ずつ。en なら "Calendar view was replaced with a date-sorted list." のように必ず "replaced with" を使う。
+- **依頼の点検(#257・書き終える前に必ず)**: 依頼の動詞・要望(記録する・見る・知らせる・確定する・チェックする・採点する・競う・保存する・共有する…)を頭の中で全部挙げ、各々を DSL のどこで満たすかを決める。満たせないものは代替して上の形で申告し、近い代わりも無ければ「○○は今はできません。」と書く(新規作成は app.description の末尾、編集は summary)。**依頼の一部を黙って落とさない**。
+- **できないことの前提**(代替・申告の対象):
+  - **みんなで使う記録(scope public / shared)は既定で作った人だけが変更・削除できる**(他の人は読める・自分の記録を足せる)。「家族の誰でも完了を押せる」のように他の人のレコードをチェックする依頼は上の entity.edit:"members"(#252)で満たす。「店長だけが確定」のような役割・権限はできないので、members で全員が押せる形にするか確定を別の記録にして、「役割ごとの権限は今はできないため、○○は参加者の誰でも押せる形にしました。」と申告する。
+  - **条件で知らせる通知**(在庫が N 個を下回ったら・残りが減ったら)はできない(通知は決まった時刻かレコードの時刻だけ)。不足の一覧などで代替し「○○の通知は今はできないため、△△で代替しました。」と申告する。
+  - **自動の採点**: クイズ・テストは「クイズ・テストの自動採点」(#262)の形で正誤と点数を計算する。それでも正解と回答を比べる計算が作れない時だけ、点数を手入力にして「自動の採点を組めなかったため、点数は自分で入力する形で代替しました。」と申告する。
+  - **ほかの人の投稿を自分用に保存**: 投稿の entity に marks の save を置く(「いいね・保存・既読は entity.marks」#255)。全項目を打ち直すフォームや写しの entity で黙って代用しない。
 
 ## locale en のとき(#142: 英語の発話でも上の規則はすべて同じ)
 - 上の規則の日本語のキーワードは英語の同じ意味の語でも適用する: "this month" → thisMonth、"today" → today、"this week" → thisWeek、"this year" → thisYear、"last 7 days" / "past week" → 直近7日の filter(gte addDays −6)、"left" / "remaining" / "to go" → 目標 − 合計の stat.value(max …,0)、"per person" → div、"average" → avg、"best" / "record" → max、"in a row" / "streak" → 代替して申告、"split" / "settle up" / "who owes whom" → settlement、"remind me" / "notify" → notifications。**ラベルにこれらの語を書くなら、その filter / 計算を必ず付ける**(ラベルに "(last 7 days)" と書いて filter を付けないのは嘘ラベル)。"Monthly budget" のような設定値の名前は今月の filter と関係ない。
@@ -121,6 +134,8 @@ var systemPrompt = strings.TrimSpace(`
 - 使えるのは card / section / vstack の子だけ。子の area は Container の左上を A1 とするローカル座標(列 A〜F・行は Container 自身の area の行数まで)。
 - 付けるなら**その Container の子の全部**に付ける(一部だけはエラー)。子同士も重ねない。
 - 例: {"type":"card","title":"今月","area":"A1:F3","children":[{"type":"stat",...,"area":"A1:C2"},{"type":"stat",...,"area":"D1:F2"}]}
+
+` + shareRules + `
 
 ## 例 1(locale ja): 発話「家計簿アプリを作って。今月の合計と支出一覧、追加ボタンが欲しい。カテゴリ別の内訳も見たい」→ 出力(この書式・既定値省略で)
 ` + abbreviateExample(fewShotKakeibo) + `
@@ -142,10 +157,13 @@ var editRules = strings.TrimSpace(`
 - value の部分文書でも上の既定値(presentation / filter.value / sort.direction / swipeToDelete / aggregate / defaultValue)は省略してよい(サーバーが補完)。
 - summary は iOS がそのまま読み上げる自然な 1 文。locale ja なら日本語(40 字程度まで・「。」で終える)「カテゴリにカフェを追加しました。」「追加ボタンを左上に移しました。」、locale en なら英語(80 字程度まで・ピリオドで終える)"Added Cafe to the categories." "Moved the add button to the top left." のように何がどう変わったかだけを言う。経緯や補足説明は書かない。
 - すでに満たされている場合は、その値を確認する test 操作 1 つだけの patch にし(空の patch は不可)、summary は「すでに〜になっています。」/ "It's already ..." と短く答える。
+- **指示の中身が足りず何を足すか決められない時**(「項目を足して」で何の項目か無い等)は、勝手に決めた変更も既存の確認だけで済ませることもせず、test 操作 1 つだけの patch にし、summary を「〜は変更できませんでした。理由: 〇〇が決まっていないため。『△△』のように言ってもらえれば変えられます。」(80 字以内)にする(#211)。ただし今のアプリの項目から自然に 1 つに決まるもの(「グラフを足して」→ 既存のグラフと違う分け方の金額のグラフ等)は作ってよい。
+- **指示が DSL でできない時**は、できる部分だけ変える。全部できなければ test 操作 1 つだけの patch にし、summary を「〜は変更できませんでした。理由: 〇〇はできないため。代わりに△△ならできます。」(80 字以内)にする。一部を省いた時も summary に「〜はできないため省きました。」と書く(#211)。
 - 部品を消した結果その画面が空になるなら、その画面と対応する tab も remove する(空のタブを残さない)。
 - value はプリミティブか、上の Schema の部分文書(Entity / Field / Screen / Component / Action / Tab / Notification など)かその配列。
 - 配列 index は「現在の DSL」のものをそのまま使う。末尾追加は "/-"。既存要素の置換は replace、削除は remove。
 - ユーザーが言及していない画面・entity・field・部品は触らない。entity の既存 field id はリネームしない。
+- **依頼に無い既存の field・画面・部品を消して上限に収めない**(#221: 「MCV と MCH を追加」で eGFR と尿酸が黙って消えた)。上限(field 40・画面 12・entity 6)を超える時は削除せず、入らない分は足さずに test 操作 1 つだけの patch にし、summary を「項目数の上限のため○○は追加できませんでした。どれかを消すか、別の記録に分ければ足せます。」(en: "Couldn't add ... because of the field limit. Remove one or split into another record.")にする。
 - 部品を追加・拡大するときは兄弟の area と重ならないようにする。必要なら隣接部品の area も replace で詰める。
 - 「もっと大きく」= area の行数/列数を増やす(例 A1:F2 → A1:F4)、周囲の部品を下にずらす。
 - フォームに入力部品を足す場合は、entity に field を add してから、フォーム画面の section.children に部品を add する。

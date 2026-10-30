@@ -10,7 +10,11 @@ final class DSLDecodingTests: XCTestCase {
             .filter { $0.hasSuffix(".json") }
             .map { String($0.dropLast(5)) }
             .sorted()
+        #if APP_STORE_REVIEW // 審査用ビルドは外した例を names に入れない(#245)
+        XCTAssertEqual(onDisk.filter { !DSLExamples.reviewExcluded.contains($0) }, DSLExamples.names.sorted(), "DSLExamples.names と docs/dsl/examples がずれている")
+        #else
         XCTAssertEqual(onDisk, DSLExamples.names.sorted(), "DSLExamples.names と docs/dsl/examples がずれている")
+        #endif
     }
 
     func testAllExamplesDecode() throws {
@@ -48,7 +52,8 @@ final class DSLDecodingTests: XCTestCase {
         XCTAssertTrue(form.allComponents.contains { $0.type == .datePicker })
         XCTAssertEqual(form.referencedEntities, ["expense"])
         let home = try XCTUnwrap(dsl.screen("home"))
-        XCTAssertEqual(home.toolbar.first?.action.presentation, .sheet)
+        XCTAssertTrue(home.toolbar.isEmpty, "追加は右下の button だけ(#416)")
+        XCTAssertEqual(home.allComponents.first { $0.type == .button }?.action?.presentation, .sheet)
         XCTAssertTrue(home.allComponents.contains { $0.type == .list && $0.onItemTap?.type == .navigate })
     }
 
@@ -130,5 +135,16 @@ final class DSLDecodingTests: XCTestCase {
         XCTAssertEqual(feed.subtitleField, "category")
         XCTAssertEqual(history.components.first { $0.id == "empty" }?.message, "レシートを撮ると、ここに並びます")
         XCTAssertEqual(overview.referencedEntities, ["expense"])
+    }
+
+    /// 親から子を作る(#256): navigate.prefillRef を読み、無い navigate は nil のまま。
+    func testPrefillRefDecodes() throws {
+        let dsl = try load("post_comments")
+        let form = try XCTUnwrap(dsl.screen("post_form"))
+        let button = try XCTUnwrap(form.allComponents.first { $0.id == "write_comment" })
+        XCTAssertEqual(button.action?.type, .navigate)
+        XCTAssertEqual(button.action?.prefillRef, "post")
+        XCTAssertEqual(button.action?.screen, "comment_form")
+        XCTAssertNil(dsl.screen("home")?.toolbar.first?.action.prefillRef)
     }
 }

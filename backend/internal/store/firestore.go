@@ -21,7 +21,8 @@ import (
 //	users/{uid}/apps/{appId}/versions/{n:08d}      {version,parentVersion,dslJson,patchJson,source,createdAt}
 //	users/{uid}/apps/{appId}/entities/{e}/records/{id} {entity,data,clientId,createdAt,updatedAt}
 //	apps_public/{appId}                            {ownerUid,name,version,dsl(map),dslJson,createdAt,updatedAt}
-//	apps_public/{appId}/entities/{e}/records/{id}  {entity,data,clientId,author,authorName,createdAt,updatedAt}
+//	apps_public/{appId}/entities/{e}/records/{id}  {entity,data,clientId,author,authorName,markCounts,createdAt,updatedAt}
+//	  .../records/{id}/marks/{markId}/by/{uid}     {at}  (#255: firestore_marks.go)
 //
 // `dsl` is stored twice: as a native map (so an iOS realtime listener can
 // read it) and as the canonical JSON string (what the API serves back).
@@ -80,11 +81,12 @@ type appDoc struct {
 	UpdatedAt      time.Time      `firestore:"updatedAt"`
 	DSL            map[string]any `firestore:"dsl"`
 	DSLJSON        string         `firestore:"dslJson"`
+	SortIndex      int64          `firestore:"sortIndex,omitempty"`
 }
 
 func (d *appDoc) toApp(id string) *App {
 	return &App{ID: id, Name: d.Name, CurrentVersion: int(d.CurrentVersion), Status: d.Status,
-		CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, DSL: json.RawMessage(d.DSLJSON)}
+		CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, SortIndex: int(d.SortIndex), DSL: json.RawMessage(d.DSLJSON)}
 }
 
 type versionDoc struct {
@@ -117,20 +119,28 @@ func (d *versionDoc) toVersion(appID string) (*Version, error) {
 }
 
 type recordDoc struct {
-	Entity     string         `firestore:"entity"`
-	Data       map[string]any `firestore:"data"`
-	ClientID   string         `firestore:"clientId,omitempty"`
-	Author     string         `firestore:"author,omitempty"`
-	AuthorName string         `firestore:"authorName,omitempty"`
-	CreatedAt  time.Time      `firestore:"createdAt"`
-	UpdatedAt  time.Time      `firestore:"updatedAt"`
+	Entity     string           `firestore:"entity"`
+	Data       map[string]any   `firestore:"data"`
+	ClientID   string           `firestore:"clientId,omitempty"`
+	Author     string           `firestore:"author,omitempty"`
+	AuthorName string           `firestore:"authorName,omitempty"`
+	MarkCounts map[string]int64 `firestore:"markCounts,omitempty"` // #255
+	CreatedAt  time.Time        `firestore:"createdAt"`
+	UpdatedAt  time.Time        `firestore:"updatedAt"`
 }
 
 func (d *recordDoc) toRecord(id string) *Record {
 	if d.Data == nil {
 		d.Data = map[string]any{}
 	}
-	return &Record{ID: id, Entity: d.Entity, Data: d.Data, ClientID: d.ClientID, Author: d.Author, AuthorName: d.AuthorName, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+	rec := &Record{ID: id, Entity: d.Entity, Data: d.Data, ClientID: d.ClientID, Author: d.Author, AuthorName: d.AuthorName, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+	for k, v := range d.MarkCounts {
+		if rec.MarkCounts == nil {
+			rec.MarkCounts = map[string]int{}
+		}
+		rec.MarkCounts[k] = int(v)
+	}
+	return rec
 }
 
 type publicAppDoc struct {
@@ -278,6 +288,33 @@ func (f *Firestore) UpdateAppMeta(ctx context.Context, uid, appID string, name, 
 		return nil, err
 	}
 	return f.GetApp(ctx, uid, appID)
+}
+
+// ReorderApps implements Store. One transaction, so a list is never left
+// half-reordered (the handler caps ids well below the 500-write limit).
+func (f *Firestore) ReorderApps(ctx context.Context, uid string, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	refs := make([]*firestore.DocumentRef, len(ids))
+	for i, id := range ids {
+		refs[i] = f.appRef(uid, id)
+	}
+	return f.c.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
+		snaps, err := tx.GetAll(refs)
+		if err != nil {
+			return err
+		}
+		for i, snap := range snaps {
+			if !snap.Exists() {
+				continue
+			}
+			if err := tx.Update(refs[i], []firestore.Update{{Path: "sortIndex", Value: i + 1}}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // CommitVersion implements Store.
@@ -544,6 +581,9 @@ func (f *Firestore) UpdateRecord(ctx context.Context, rs RecordSet, id string, d
 // DeleteRecord implements Store.
 func (f *Firestore) DeleteRecord(ctx context.Context, rs RecordSet, id string) error {
 	ref := f.recRef(rs, id)
+	if err := f.deleteMarks(ctx, ref); err != nil {
+		return err
+	}
 	_, err := ref.Delete(ctx, firestore.Exists)
 	if isNotFound(err) {
 		return ErrNotFound

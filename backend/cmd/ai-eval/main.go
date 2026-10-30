@@ -1,11 +1,14 @@
 // ai-eval runs internal/ai/eval/cases.json against the real Claude API through
 // the same Service the ai server uses (in-memory store, no HTTP), and writes
 // per-case metrics + the resulting DSL as JSON. Edit cases are seeded with the
-// DSL produced by their `base` create case in the same run. `expect` keys:
+// DSL produced by their `base` case (create or an earlier edit) in the same run. `expect` keys:
 // photo / chart / calendar (bool), notification ("HH:MM" or "any"), substitution (bool:
-// the summary mentions 代替 / "replaced" because a requested part is not in
-// the catalog), scope ("public"|"shared"|"private": at least one entity has
-// that scope), noShared (bool, #77: no shared/public entity), calc / computed / statValue / settlement / ref (bool, #100:
+// the summary mentions 代替 / できません / "replaced" because a requested part is not in
+// the catalog or not possible, #257), scope ("public"|"shared"|"private": at least one entity has
+// that scope), editMembers (bool, #252: some shared entity has edit members),
+// authorShown (bool, #250: a list/table/timeline shows $author), nameInput (bool, #250:
+// a shared entity has a typed-in person-name field), meFilter (bool, #251: a component filters by $author),
+// noShared (bool, #77: no shared/public entity), calc / computed / statValue / settlement / ref (bool, #100:
 // any calculation / Field.computed / stat.value / settlement leaf / ref field;
 // -logic-pass runs the 2nd calculations-only call). Navigation (#114):
 // patch (bool: stored as a JSON Patch, not a full rewrite), unreachable
@@ -13,13 +16,29 @@
 // nav (["from>to", ...]: a button / toolbar / item tap on `from` opens `to`),
 // tabs / tabsMin (number), tabOrder ("a,b": the first tab screens in order),
 // tabHas (component type on a tab root other than the first tab), has ([type, ...]:
-// each component type appears on some screen).
+// each component type appears on some screen), lacks ([type, ...]: none of them appears, #212).
 // Health (#167): health ("steps"|"weight": a healthStat with that metric),
 // healthField (bool: some field has health "weight").
+// Warikan (#231): refs (bool: some field is type refs), deletable ([entity id, ...]: swipeToDelete list or deleteRecord).
+// Grid (#234): grid (bool: some gridTable is present).
+// Route guide (#411): routeDest / routeMode (see route.go).
+// Omission (#257): noOmission (bool: the model met or honestly declined every
+// requested part itself; Meta.Omissions = parts the server had to note).
+// Field cap (#221): keepEntity / keep ([field id, ...]) / growTo (see checkKeep).
+// Parent -> child (#256): prefillRef (bool: some navigate opens a child form with prefillRef).
+// Add button (#416): oneAdd (bool: no toolbar ＋ opens the same form as a button on its screen).
+// Share (#254): scopeNot (no entity has that scope), summaryHas ([text, ...]: each is in the summary).
+// Photo reading (#418): photoAnalyze ([kind, ...]: some photoField.analyze has each kind; photo_ai.go).
 // `base` may be "example:<name>" to seed internal/ai/examples/<name>.json. A case may pin `locale` (ja|en); -locale overrides every case;
-// otherwise the locale is detected from the transcript. English edits whose
+// otherwise the locale is detected from the transcript. tips_cases.json (#415)
+// runs the iOS 頼み方のコツ examples in ja and en; a base outside
+// internal/ai/examples is reached by a relative name (../../../../docs/dsl/examples/<name>). English edits whose
 // base was not produced in the run are seeded with examples/expense_en.json.
+// M0 (#281): shared (bool: some entity is shared or public, whichever the model
+// picks). Keys and types are listed in expect.go; -check validates a cases
+// file without the API, and every run ends with the pass rate per group.
 //
+//	go run ./cmd/ai-eval -check -cases internal/ai/eval/m0disc_cases.json  # no API calls
 //	set -a; source ../.env; set +a
 //	go run ./cmd/ai-eval -effort low -out ../docs/backend/ai-eval/raw
 //	go run ./cmd/ai-eval -stream -repeat 2 -only kakeibo_a,walk_a   # SSE path, time to first event
@@ -54,6 +73,7 @@ type Case struct {
 	Transcript string         `json:"transcript"`
 	Note       string         `json:"note,omitempty"`
 	Expect     map[string]any `json:"expect,omitempty"`
+	Needs      []string       `json:"needs,omitempty"` // audit_cases: human checklist only, not checked
 }
 
 type Metrics struct {
@@ -70,6 +90,10 @@ type Metrics struct {
 	HasChart      bool     `json:"hasChart"`
 	Notifications []string `json:"notifications,omitempty"` // repeat@time
 	Scopes        []string `json:"scopes,omitempty"`        // entityId:scope (effective)
+	EditMembers   []string `json:"editMembers,omitempty"`   // shared entity ids with edit:members (#252)
+	AuthorShown   []string `json:"authorShown,omitempty"`   // screen:type showing $author (#250)
+	NameInputs    []string `json:"nameInputs,omitempty"`    // shared entity.field that looks like a typed name (#250)
+	MeFilter      []string `json:"meFilter,omitempty"`      // screen:type filtering by $author (#251)
 	Areas         []string `json:"areas"`                   // screenId: area list
 	// logic (#100)
 	Computed   []string `json:"computed,omitempty"` // entity.field of computed fields
@@ -78,11 +102,17 @@ type Metrics struct {
 	RefFields  int      `json:"refFields,omitempty"`
 	ProgressTo bool     `json:"progressTarget,omitempty"` // progressBar entity+target (aggregate-based rate)
 	// #177
-	HasCalendar bool     `json:"hasCalendar,omitempty"`
+	HasCalendar bool `json:"hasCalendar,omitempty"`
+	// #234: gridTable columnField:rowField
+	Grid        []string `json:"grid,omitempty"`
 	StatUnitDup []string `json:"statUnitDup,omitempty"` // non-count stat labels ending in "(field.unit)"
 	// #167
 	Health      []string `json:"health,omitempty"`      // healthStat metric:period
 	HealthField bool     `json:"healthField,omitempty"` // a field with health "weight"
+	// #256: screen>childForm.refField of navigate.prefillRef
+	PrefillRefs []string `json:"prefillRefs,omitempty"`
+	// #416: screen>toolbar label of a toolbar ＋ duplicating a button on its screen
+	DupAdd []string `json:"dupAdd,omitempty"`
 }
 
 // HasCalc reports whether the app computes anything beyond plain aggregate stats.
@@ -112,6 +142,8 @@ type Record struct {
 	Usage         ai.Usage        `json:"usage"`
 	Summary       string          `json:"summary,omitempty"`
 	LastProblems  []string        `json:"lastProblems,omitempty"`
+	LintRetried   bool            `json:"lintRetried,omitempty"`
+	Omissions     []string        `json:"omissions,omitempty"` // #257: the server appended a note for these
 	Metrics       *Metrics        `json:"metrics,omitempty"`
 	ExpectMisses  []string        `json:"expectMisses,omitempty"`
 	LogicPass     *ai.LogicMeta   `json:"logicPass,omitempty"`
@@ -170,6 +202,7 @@ func main() {
 	chatEffort := flag.String("chat-effort", "", "-chat: clarify effort (empty = ai.DefaultChatEffort)")
 	chatThinking := flag.String("chat-thinking", "", "-chat: thinking.type adaptive|disabled|between_tools (empty = ai.DefaultChatThinking)")
 	chatCaps := flag.String("capabilities", "", "-chat: comma-separated capabilities (answer,proposal) sent by cases without their own mode/capabilities (#185)")
+	check := flag.Bool("check", false, "validate the cases file (ids, bases, expect keys and types) and exit (no API calls, #281)")
 	flag.Parse()
 	if *chat && *casesPath == "internal/ai/eval/cases.json" {
 		*casesPath = "internal/ai/eval/chat_cases.json"
@@ -179,6 +212,13 @@ func main() {
 		if err := compare(*cmpBefore, *cmpAfter); err != nil {
 			log.Fatal(err)
 		}
+		return
+	}
+	if err := checkCasesFile(*casesPath, *chat); err != nil {
+		log.Fatal(err)
+	}
+	if *check {
+		fmt.Printf("ok %s\n", *casesPath)
 		return
 	}
 
@@ -226,7 +266,7 @@ func main() {
 		log.Fatal(err)
 	}
 	run := Run{Date: time.Now().Format("2006-01-02"), Model: *model, Effort: *effort, Tag: *tag, Stream: *stream}
-	created := map[string]json.RawMessage{} // create case id -> resulting DSL
+	created := map[string]json.RawMessage{} // case id -> resulting DSL (create or edit)
 
 	for rep := 1; rep <= max(*repeat, 1); rep++ {
 		for _, c := range cases {
@@ -255,6 +295,11 @@ func main() {
 		log.Fatal(err)
 	}
 	printTable(run)
+	hasExpect := map[string]bool{}
+	for _, c := range cases {
+		hasExpect[c.ID] = len(c.Expect) > 0
+	}
+	printPassByGroup(passByGroup(run.Cases, hasExpect))
 	fmt.Printf("\nwrote %s\n", path)
 }
 
@@ -332,6 +377,8 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 	rec.Usage = res.Meta.Usage
 	rec.Summary = res.Summary
 	rec.LastProblems = res.Meta.LastProblems
+	rec.LintRetried = res.Meta.LintRetried
+	rec.Omissions = res.Meta.Omissions
 	rec.LogicPass = res.Meta.LogicPass
 	rec.Patch = res.Patch
 	rec.DSL = res.DSL
@@ -339,10 +386,26 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.Metrics = measure(app)
 		rec.ExpectMisses = append(checkExpect(c.Expect, rec.Metrics, rec.Summary), checkNav(c.Expect, app, rec.Mode)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkEnum(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkKeep(c.Expect, app, rec.Summary)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkRoute(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkDashcam(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkExport(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkSensor(c.Expect, app, rec.Summary)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkPhotoAI(c.Expect, app)...)
+		if v, ok := c.Expect["noOmission"].(bool); ok && v && len(rec.Omissions) > 0 {
+			rec.ExpectMisses = append(rec.ExpectMisses, fmt.Sprintf("omissions=%v", rec.Omissions))
+		}
+		rec.ExpectMisses = append(rec.ExpectMisses, checkGroupBy(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkMarks(c.Expect, app)...) // #255: marks.go
+		// #423: live_activity.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkLiveActivity(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkQR(c.Expect, app)...)         // #422: qr.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAudio(c.Expect, app)...)      // #420: audio.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAIGenerate(c.Expect, app)...) // #417: aigen.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkNearby(c.Expect, app)...)     // #425: nearby.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkMusic(c.Expect, app)...)      // #412: music.go
 	}
-	if c.Kind == "create" {
-		created[c.ID] = res.DSL
-	}
+	created[c.ID] = res.DSL // edits too, so an edit can build on an earlier edit (#229)
 	log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms first=%dms out=%d chars=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",
 		c.ID, rec.Attempts, rec.AreaFallback, rec.ClaudeMs, rec.FirstEventMs, rec.Usage.OutputTokens, rec.OutputChars,
 		rec.Metrics.Tabs, rec.Metrics.Screens, rec.Metrics.AreaRatio, rec.ExpectMisses, rec.Summary)
@@ -351,15 +414,20 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 
 func measure(a *dsl.App) *Metrics {
 	m := &Metrics{Tabs: len(a.App.Tabs), Screens: len(a.Screens), Entities: len(a.Entities)}
+	m.PrefillRefs = prefillRefs(a)
+	m.DupAdd = dupAddToolbars(a)
 	for i := range a.Entities {
 		e := &a.Entities[i]
 		m.Fields += len(e.Fields)
 		m.Scopes = append(m.Scopes, e.ID+":"+string(e.EffectiveScope()))
+		if e.MembersCanEdit() {
+			m.EditMembers = append(m.EditMembers, e.ID)
+		}
 		for _, f := range e.Fields {
 			if f.Computed != nil {
 				m.Computed = append(m.Computed, e.ID+"."+f.ID)
 			}
-			if f.Type == dsl.FieldRef {
+			if f.Type == dsl.FieldRef || f.Type == dsl.FieldRefs {
 				m.RefFields++
 			}
 			if f.Health != "" {
@@ -396,6 +464,8 @@ func measure(a *dsl.App) *Metrics {
 					m.Settlement = true
 				case dsl.CompCalendar:
 					m.HasCalendar = true
+				case dsl.CompGridTable:
+					m.Grid = append(m.Grid, x.ColumnField+":"+x.RowField)
 				case dsl.CompHealthStat:
 					m.Health = append(m.Health, x.Metric+":"+x.Period)
 				case dsl.CompStat:
@@ -418,6 +488,8 @@ func measure(a *dsl.App) *Metrics {
 		}
 		m.Areas = append(m.Areas, s.ID+": "+strings.Join(areas, " "))
 	}
+	m.AuthorShown, m.MeFilter = authorUses(a)
+	m.NameInputs = nameInputs(a)
 	if m.TopLevel > 0 {
 		m.AreaRatio = float64(m.WithArea) / float64(m.TopLevel)
 	}
@@ -437,6 +509,13 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 	var miss []string
 	for k, v := range exp {
 		switch k {
+		case "shared": // #281: shared with others, public or shared alike
+			found := slices.ContainsFunc(m.Scopes, func(s string) bool {
+				return strings.HasSuffix(s, ":public") || strings.HasSuffix(s, ":shared")
+			})
+			if found != v.(bool) {
+				miss = append(miss, fmt.Sprintf("shared=%v", m.Scopes))
+			}
 		case "substitution": // a part missing from the catalog was requested: summary must say so
 			if mentionsSubstitution(summary) != v.(bool) {
 				miss = append(miss, fmt.Sprintf("substitution=%v", !v.(bool)))
@@ -449,6 +528,18 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 		case "healthField":
 			if m.HealthField != v.(bool) {
 				miss = append(miss, fmt.Sprintf("healthField=%v", m.HealthField))
+			}
+		case "grid":
+			if (len(m.Grid) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("grid=%v", m.Grid))
+			}
+		case "oneAdd": // #416: no screen has two add controls for one form
+			if (len(m.DupAdd) == 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("oneAdd=%v", m.DupAdd))
+			}
+		case "prefillRef": // #256
+			if (len(m.PrefillRefs) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("prefillRef=%v", m.PrefillRefs))
 			}
 		case "calendar":
 			if m.HasCalendar != v.(bool) {
@@ -500,6 +591,22 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 					break
 				}
 			}
+		case "editMembers": // #252: true = some shared entity is edit:members, false = none
+			if (len(m.EditMembers) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("editMembers=%v", m.EditMembers))
+			}
+		case "authorShown": // #250
+			if (len(m.AuthorShown) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("authorShown=%v", m.AuthorShown))
+			}
+		case "nameInput": // #250: false = no typed-in name field on shared entities
+			if (len(m.NameInputs) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("nameInput=%v", m.NameInputs))
+			}
+		case "meFilter": // #251
+			if (len(m.MeFilter) > 0) != v.(bool) {
+				miss = append(miss, fmt.Sprintf("meFilter=%v", m.MeFilter))
+			}
 		case "scope":
 			want := fmt.Sprint(v)
 			found := false
@@ -510,6 +617,20 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 			}
 			if !found {
 				miss = append(miss, fmt.Sprintf("scope=%v (want %s)", m.Scopes, want))
+			}
+		case "scopeNot": // #254: 「家族だけ」は public にしない
+			for _, s := range m.Scopes {
+				if strings.HasSuffix(s, ":"+fmt.Sprint(v)) {
+					miss = append(miss, fmt.Sprintf("scopeNot=%v (got %s)", v, s))
+					break
+				}
+			}
+		case "summaryHas":
+			ws, _ := v.([]any)
+			for _, w := range ws {
+				if !strings.Contains(summary, fmt.Sprint(w)) {
+					miss = append(miss, fmt.Sprintf("summaryHas: %q", w))
+				}
 			}
 		}
 	}
@@ -522,6 +643,34 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 // optNot check its options (enum choices or ref initial records), fields =
 // the entity's field count (no memo / extra field added), refPick = it became
 // a ref to a master entity with a form screen and initial options.
+// checkKeep (#221): keepEntity / keep list the fields that must survive the
+// edit; growTo is the field count when every requested field was added. The
+// edit passes when nothing in keep was removed and either the entity reached
+// growTo or the summary says the cap blocked it (上限 / "limit").
+func checkKeep(exp map[string]any, a *dsl.App, summary string) []string {
+	eid, _ := exp["keepEntity"].(string)
+	if eid == "" {
+		return nil
+	}
+	e := a.EntityByID(eid)
+	if e == nil {
+		return []string{"keepEntity missing " + eid}
+	}
+	var miss []string
+	if keep, ok := exp["keep"].([]any); ok {
+		for _, k := range keep {
+			if e.FieldByID(fmt.Sprint(k)) == nil {
+				miss = append(miss, "removed "+fmt.Sprint(k))
+			}
+		}
+	}
+	if g, ok := exp["growTo"].(float64); ok && len(e.Fields) < int(g) &&
+		!strings.Contains(summary, "上限") && !strings.Contains(strings.ToLower(summary), "limit") {
+		miss = append(miss, fmt.Sprintf("fields=%d < %d and summary does not mention the cap", len(e.Fields), int(g)))
+	}
+	return miss
+}
+
 func checkEnum(exp map[string]any, a *dsl.App) []string {
 	target, _ := exp["enumField"].(string)
 	if target == "" {
@@ -619,7 +768,23 @@ func checkNav(exp map[string]any, a *dsl.App, mode string) []string {
 			if !found {
 				miss = append(miss, fmt.Sprintf("tabHas!%v", v))
 			}
-		case "has": // component types that must appear on some screen (#168)
+		case "refs": // #231: some field is type refs (multi-select, e.g. expense.split_with)
+			found := false
+			for _, e := range a.Entities {
+				for _, f := range e.Fields {
+					found = found || f.Type == dsl.FieldRefs
+				}
+			}
+			if found != v.(bool) {
+				miss = append(miss, fmt.Sprintf("refs=%v", found))
+			}
+		case "deletable": // #231: each entity has a list with swipeToDelete or a deleteRecord button / toolbar
+			for _, w := range v.([]any) {
+				if !deletable(a, fmt.Sprint(w)) {
+					miss = append(miss, fmt.Sprintf("deletable!%v", w))
+				}
+			}
+		case "has", "lacks": // component types that must (#168) / must not (#212) appear on some screen
 			for _, w := range v.([]any) {
 				found := false
 				for _, s := range a.Screens {
@@ -629,8 +794,8 @@ func checkNav(exp map[string]any, a *dsl.App, mode string) []string {
 						}
 					}
 				}
-				if !found {
-					miss = append(miss, fmt.Sprintf("has!%v", w))
+				if found != (k == "has") {
+					miss = append(miss, fmt.Sprintf("%s!%v", k, w))
 				}
 			}
 		}
@@ -639,9 +804,35 @@ func checkNav(exp map[string]any, a *dsl.App, mode string) []string {
 	return miss
 }
 
+// deletable: a list of entity swipes to delete, or a deleteRecord button / toolbar targets it (#231).
+func deletable(a *dsl.App, entity string) bool {
+	del := func(act *dsl.Action) bool {
+		return act != nil && act.Type == dsl.ActionDeleteRecord && act.Entity == entity
+	}
+	for _, s := range a.Screens {
+		for i := range s.Toolbar {
+			if del(&s.Toolbar[i].Action) {
+				return true
+			}
+		}
+		for _, c := range s.Components {
+			for _, x := range append([]dsl.Component{c}, c.Children...) {
+				if del(x.Action) || (x.Type == dsl.CompList && x.Entity == entity && x.SwipeToDelete) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // mentionsSubstitution: the ja template says 代替, the en one says "replaced".
 func mentionsSubstitution(summary string) bool {
-	return strings.Contains(summary, "代替") || strings.Contains(strings.ToLower(summary), "replaced")
+	if strings.Contains(summary, "代替") || strings.Contains(summary, "できません") || strings.Contains(summary, "できない") {
+		return true
+	}
+	l := strings.ToLower(summary)
+	return strings.Contains(l, "replaced") || strings.Contains(l, "isn't possible") || strings.Contains(l, "can't")
 }
 
 func percentile(v []int64, p float64) int64 {

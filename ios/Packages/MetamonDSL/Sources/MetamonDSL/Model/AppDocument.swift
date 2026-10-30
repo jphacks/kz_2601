@@ -60,7 +60,7 @@ public struct AppDSL: Decodable, Sendable {
             var next = Set<String>()
             for f in e.fields {
                 next.formUnion(f.computed?.referencedEntities ?? [])
-                if let r = f.refEntity { next.insert(r) }
+                if let r = f.refEntity { next.insert(r) } // ref / refs
             }
             for n in next.subtracting(out) { out.insert(n); queue.append(n) }
         }
@@ -171,32 +171,82 @@ public struct NotificationSpec: Decodable, Identifiable, Sendable {
     public var time: String?
     /// mon..sun(weekly のみ)
     public var weekday: String?
+    /// レコードの時刻から通知(#228・app.notifications のみ): `entity` の各レコードの `field`
+    /// (datetime / date / "HH:mm" 文字列)に `offsetMinutes` を足した時刻。
+    public var entity: String?
+    public var field: String?
+    public var offsetMinutes: Int?
+    /// 本文に出すレコードの field(件名・アラーム名)
+    public var titleField: String?
+    /// boolean field。false のレコードは通知しない(アラームのオン/オフ)
+    public var enabledField: String?
+
+    public var isRecordBased: Bool { entity?.isEmpty == false && field?.isEmpty == false }
+
+    public init(
+        id: String, title: String, body: String = "", repeat: Repeat = .once, time: String? = nil, weekday: String? = nil,
+        entity: String? = nil, field: String? = nil, offsetMinutes: Int? = nil, titleField: String? = nil, enabledField: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.body = body
+        self.repeat = `repeat`
+        self.time = time
+        self.weekday = weekday
+        self.entity = entity
+        self.field = field
+        self.offsetMinutes = offsetMinutes
+        self.titleField = titleField
+        self.enabledField = enabledField
+    }
 }
 
 public struct Entity: Decodable, Identifiable, Sendable {
     public var id: String
     public var name: String
     public var titleField: String?
+    /// "private"(省略時)/ "shared" / "public"。未知の値は private 扱い。
+    public var scope: String?
+    /// 共有レコードを誰が更新できるか(#252): "author"(省略時)/ "members"。削除はどちらでも作った人だけ。
+    public var edit: String?
+    /// 1 人 1 回の印(いいね・保存・#255)。shared / public の entity だけ。
+    @Lossy public var marks: [Mark] = []
     @Lossy public var fields: [Field]
 
-    public func field(_ id: String) -> Field? { fields.first { $0.id == id } }
+    /// field id、または予約値(`$author` / `$createdAt`・#250)の仮 Field。
+    public func field(_ id: String) -> Field? { fields.first { $0.id == id } ?? RecordValue.field(id, in: self) }
+
+    /// レコードが appId 共通の置き場にあり、他の人のレコードも混ざる(shared / public)。
+    public var isShared: Bool { scope == "shared" || scope == "public" }
+    /// 作った人以外も更新できる(shared / public かつ edit:"members")。
+    public var membersCanEdit: Bool { isShared && edit == "members" }
 
     /// 保存対象(computed 以外)のフィールド。フォームのドラフト・送信はこちらだけ。
     public var storedFields: [Field] { fields.filter { !$0.isComputed } }
     public var computedFields: [Field] { fields.filter(\.isComputed) }
 
-    /// 一覧の見出しに使う field(titleField → 最初の string field → 最初の field)。
+    /// 一覧の見出しに使う field(titleField → 最初の string field → 最初の field)。hidden の field は見出しにしない(#262)。
     public var displayTitleField: String? {
-        titleField ?? storedFields.first { $0.type == .string }?.id ?? storedFields.first?.id
+        let visible = storedFields.filter { !$0.hidden }
+        if let titleField, field(titleField)?.hidden != true { return titleField }
+        return visible.first { $0.type == .string }?.id ?? visible.first?.id
     }
+
+    /// hidden(#262)の field id。
+    public var hiddenFieldIds: Set<String> { Set(fields.filter(\.hidden).map(\.id)) }
 }
 
 public enum FieldType: String, Decodable, Sendable {
     case string, text, integer, number, boolean, date, datetime, `enum`, currency, photo, location
     /// 端末内の動画("video:<id>|<サムネイル data URL>"・#206)。`VideoValue` で読む。
     case video
+    /// 端末内の録音("audio:<id>|<秒>"・#420)。`AudioValue` で読む。
+    case audio
     /// 別 entity のレコード参照(保存値はレコード id 文字列・#101)。`Field.refEntity` が参照先。
     case ref
+    /// 別 entity のレコードの複数選択(保存値はレコード id の配列・#231)。空 / 無し = 全員(割り勘する人)。
+    /// 式では `len`(選んだ件数)と filter op `contains` だけが読む。
+    case refs
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .string) }
 
     public var isNumeric: Bool { self == .integer || self == .number || self == .currency }
@@ -212,16 +262,27 @@ public struct Field: Decodable, Identifiable, Sendable {
     /// リテラル既定値。date/datetime は "now" 可。
     public var defaultValue: JSONValue?
     public var unit: String?
-    /// type=ref の参照先 entity id。
+    /// type=ref / refs の参照先 entity id。
     public var refEntity: String?
     /// 読み取り専用の算出フィールド(#101)。行コンテキスト = そのレコード。**Record には保存しない**。
     public var computed: Expr?
     /// "weight": 保存した値をヘルスケアの体重にも書き込む(#167)。
     public var health: String?
+    /// 回答者に見せない項目(クイズの正解・#262)。レコードの作者のフォームにだけ出し、一覧・表・グラフ・見出しには出さない。
+    /// 式(比較)からは読める。値は端末に届いているので厳密な秘匿ではない(docs/dsl/expressions.md §7.6)。
+    public var hidden: Bool
 
     public var isComputed: Bool { computed != nil }
 
-    private enum Keys: String, CodingKey { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health }
+    private enum Keys: String, CodingKey { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health, hidden }
+
+    /// 予約値の仮 Field 用(`RecordValue`)。
+    init(id: String, name: String, type: FieldType) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.hidden = false
+    }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
@@ -235,6 +296,7 @@ public struct Field: Decodable, Identifiable, Sendable {
         refEntity = try? c.decodeIfPresent(String.self, forKey: .refEntity)
         computed = try? c.decodeIfPresent(Expr.self, forKey: .computed)
         health = try? c.decodeIfPresent(String.self, forKey: .health)
+        hidden = (try? c.decodeIfPresent(Bool.self, forKey: .hidden)) ?? false
     }
 }
 

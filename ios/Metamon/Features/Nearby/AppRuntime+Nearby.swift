@@ -1,6 +1,9 @@
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
+#if !APP_STORE_REVIEW
 import SwiftUI
 import MetamonDSL
 import MetamonServices
+import MetamonRenderer
 
 /// 近距離共有(#36)の UI 状態。AppRuntime(@Observable)には拡張で保存プロパティを足せないので別に持つ(SharingUI と同じ形)。
 @MainActor
@@ -35,6 +38,16 @@ extension AppRuntime {
         ui.request = .init(payload: payload)
     }
 
+    /// `musicPlayer` から(#412): 曲のリクエストを作って相手選びのシートを開く。
+    func requestSong(_ song: MusicSong) {
+        let sender = NearbyUI.shared.service?.myName ?? nearbyDisplayName
+        guard let payload = NearbyShare.makeSongRequest(song, sender: sender, appId: document.appId, appName: dsl.app.name) else {
+            toast = "曲名を入れてください"
+            return
+        }
+        NearbyUI.shared.request = .init(payload: payload)
+    }
+
     /// 自分の表示名(相手の一覧と「◯◯さんから」に出る)。サインイン名 → 端末名。
     var nearbyDisplayName: String {
         if let name = services.auth.currentUser?.displayName, !name.isEmpty { return name }
@@ -59,12 +72,13 @@ extension AppRuntime {
     /// 前面にいて、今のアプリが `nearbyShare` を使っている間だけ待ち受ける。
     /// (使わないアプリでは advertise しない = 初回起動時にローカルネットワーク許可ダイアログを出さない)
     func updateNearbyAdvertising(foreground: Bool) {
-        NearbyUI.shared.service?.setAdvertising(foreground && dsl.usesNearbyShare)
+        NearbyUI.shared.service?.setAdvertising(foreground && dsl.usesNearbyReceive)
     }
 
     /// 受け取ったレコードを今のアプリに追加する。招待後にアプリが切り替わっていることもあるので、ここでも判定し直す。
     func importNearby(_ payload: NearbyShare.Payload) async -> NearbyShare.Ack {
         let h = payload.header
+        if let song = h.song { return await importSongRequest(song, from: h.sender) }
         switch NearbyShare.decide(h, dsl: dsl, appId: document.appId) {
         case .reject(let reason):
             toast = reason
@@ -78,7 +92,7 @@ extension AppRuntime {
             }
             let appId = document.appId
             for row in rows {
-                _ = await recordSync.save(appId: appId, entity: entityId, recordId: nil, data: row)
+                _ = await recordSync.save(appId: appId, entity: entityId, recordId: nil, data: row, author: postAuthor(for: entityId))
             }
             await reloadLocal(entityId, appId: appId)
             toast = "\(h.sender)さんから「\(entity.name)」を \(rows.count) 件追加しました"
@@ -87,11 +101,26 @@ extension AppRuntime {
     }
 }
 
+extension AppRuntime {
+    /// 曲のリクエスト(#412)を musicPlayer の承認待ちへ(autoAccept なら再生待ちへ)。招待後に切り替わったアプリでは断る。
+    func importSongRequest(_ song: MusicSong, from sender: String) async -> NearbyShare.Ack {
+        guard let player = dsl.musicPlayer, player.allowRequests == true else {
+            return .init(ok: false, added: 0, message: "相手のアプリは今、曲のリクエストを受け付けていません")
+        }
+        return await MusicSession.shared.receive(song, from: sender, autoAccept: player.autoAccept == true)
+    }
+}
+
 extension AppDSL {
-    /// どこかの画面に `nearbyShare` があるか(container の子も見る)。
+    /// 近くの端末から受け取る部品があるか(送る方の `nearbyShare` か、リクエストを受ける `musicPlayer`)。
+    var usesNearbyReceive: Bool { usesNearbyShare || usesMusicRequests }
+
+    /// どこかの画面に送る方の `nearbyShare` があるか(container の子も見る)。passby(#425)は部品が表示中だけ自分で探す。
     var usesNearbyShare: Bool {
-        screens.contains { s in
-            s.components.contains { $0.type == .nearbyShare || $0.children.contains { $0.type == .nearbyShare } }
+        let isSend: (Component) -> Bool = { $0.type == .nearbyShare && $0.mode != "passby" }
+        return screens.contains { s in
+            s.components.contains { isSend($0) || $0.children.contains(where: isSend) }
         }
     }
 }
+#endif

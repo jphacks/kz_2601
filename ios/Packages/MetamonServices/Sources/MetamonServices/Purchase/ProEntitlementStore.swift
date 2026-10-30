@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#450 G1)は App 内課金を持たない。StoreKit と商品 ID をバイナリから外す。
+#if !APP_STORE_REVIEW
 import Foundation
 import Observation
 import StoreKit
@@ -12,8 +14,26 @@ public enum ProEntitlement {
     }
 }
 
+/// 課金画面に出す商品(#414)。StoreKit の `Product` からも、モックからも作れる。
+public struct ProOffer: Equatable, Sendable {
+    public var id: String
+    public var displayName: String
+    /// 地域の通貨で整形済みの価格(例: ¥500)
+    public var displayPrice: String
+
+    public init(id: String, displayName: String, displayPrice: String) {
+        self.id = id
+        self.displayName = displayName
+        self.displayPrice = displayPrice
+    }
+
+    /// StoreKit が使えない時(UI テスト・`simctl launch`)の月額。`ios/StoreKit/TailorItPro.storekit` と同じ値
+    public static let mockMonthly = ProOffer(id: ProProducts.monthly, displayName: "Tailor It Pro", displayPrice: "¥500")
+}
+
 /// StoreKit 2 の薄いラッパー(#77)。商品の取得・購入・復元・権利(`Transaction.currentEntitlements`)の監視。
 /// 外部サービス(RevenueCat 等)は使わない。ローカル検証は Scheme の StoreKit Configuration(`ios/StoreKit/TailorItPro.storekit`)。
+/// `mode` が mock の時は App Store に触れず、購入は端末内で即成功する(DEBUG の UI テスト・シミュレータ用・#414)。
 @MainActor
 @Observable
 public final class ProEntitlementStore {
@@ -22,6 +42,14 @@ public final class ProEntitlementStore {
         /// 保護者の承認待ち(Ask to Buy)など。確定すると `Transaction.updates` で届く
         case pending
         case cancelled
+    }
+
+    public enum Mode: Equatable, Sendable {
+        case storeKit
+        /// 常にモック(UI テスト)
+        case mock
+        /// StoreKit で商品が取れなければモックに切り替える(シミュレータを `simctl launch` で起動した時)
+        case storeKitOrMock
     }
 
     public enum StoreError: Error, Equatable {
@@ -38,12 +66,25 @@ public final class ProEntitlementStore {
     /// 商品が取れなかった(StoreKit Configuration 未設定・圏外など)
     public private(set) var productsError: String?
 
+    /// モックで動いているか(購入・復元が App Store に行かない)
+    public private(set) var isMock = false
+
     public let productIDs: [String]
+    public let mode: Mode
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
     @ObservationIgnored private var started = false
+    @ObservationIgnored private var mockPurchased = false
 
-    public init(productIDs: [String] = ProProducts.all) {
+    public init(productIDs: [String] = ProProducts.all, mode: Mode = .storeKit) {
         self.productIDs = productIDs
+        self.mode = mode
+        isMock = mode == .mock
+    }
+
+    /// 課金画面の商品(月額)。モックなら固定値
+    public var offer: ProOffer? {
+        if isMock { return .mockMonthly }
+        return monthly.map { ProOffer(id: $0.id, displayName: $0.displayName, displayPrice: $0.displayPrice) }
     }
 
     /// 起動時に 1 回。`Transaction.updates`(他端末での購入・更新・返金・Ask to Buy の確定)を監視し、現在の権利と商品を読む。
@@ -66,6 +107,7 @@ public final class ProEntitlementStore {
     public var monthly: Product? { products.first { $0.id == ProProducts.monthly } ?? products.first }
 
     public func loadProducts() async {
+        if isMock { return }
         isLoadingProducts = true
         defer { isLoadingProducts = false }
         do {
@@ -75,11 +117,19 @@ public final class ProEntitlementStore {
         } catch {
             productsError = String(describing: error)
         }
-        print("[Metamon] IAP products: \(products.map(\.id)) error=\(productsError ?? "-")")
+        if products.isEmpty, mode == .storeKitOrMock {
+            isMock = true
+            print("[Metamon] IAP: no StoreKit products → mock store")
+        }
+        print("[Metamon] IAP products: \(products.map(\.id)) error=\(productsError ?? "-") mock=\(isMock)")
     }
 
     /// 検証済みの現在の権利から Pro かどうかを決め直す。
     public func refreshEntitlements() async {
+        if isMock {
+            setMockEntitlement()
+            return
+        }
         var active: (id: String, expires: Date?)?
         for await result in Transaction.currentEntitlements {
             guard case .verified(let t) = result,
@@ -111,13 +161,32 @@ public final class ProEntitlementStore {
 
     public func purchase(productID: String) async throws -> PurchaseOutcome {
         if products.isEmpty { await loadProducts() }
+        if isMock {
+            guard productIDs.contains(productID) else { throw StoreError.productNotFound }
+            mockPurchased = true
+            setMockEntitlement()
+            return .purchased
+        }
         guard let product = products.first(where: { $0.id == productID }) else { throw StoreError.productNotFound }
         return try await purchase(product)
     }
 
     /// 購入の復元。App Store と同期してから権利を読み直す(Apple ID のサインインを求められることがある)。
     public func restore() async throws {
-        try await AppStore.sync()
+        if !isMock { try await AppStore.sync() }
         await refreshEntitlements()
     }
+
+    /// 課金画面の「Pro にする」(月額)。
+    public func purchaseOffer() async throws -> PurchaseOutcome {
+        try await purchase(productID: offer?.id ?? ProProducts.monthly)
+    }
+
+    private func setMockEntitlement() {
+        isPro = mockPurchased
+        activeProductID = mockPurchased ? ProProducts.monthly : nil
+        expiresAt = mockPurchased ? Calendar.current.date(byAdding: .month, value: 1, to: .now) : nil
+        print("[Metamon] IAP entitlement (mock): isPro=\(isPro)")
+    }
 }
+#endif

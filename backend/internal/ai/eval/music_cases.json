@@ -1,0 +1,7 @@
+[
+  {"id": "mu_drive_requests", "kind": "create", "group": "music", "transcript": "ドライブで音楽を流して、友だちのスマホから曲をリクエストできるアプリ", "note": "#412 musicPlayer + allowRequests(再生はこの端末)", "expect": {"has": ["musicPlayer"], "lacks": ["list"], "musicRequests": true, "unreachable": 0}},
+  {"id": "mu_drive_auto", "kind": "create", "group": "music", "transcript": "運転中に使う BGM アプリ。同乗者がスマホから曲を入れたら確認なしで再生待ちに入るようにして", "note": "#412 autoAccept", "expect": {"has": ["musicPlayer"], "musicRequests": true, "musicAutoAccept": true}},
+  {"id": "mu_spotify", "kind": "create", "group": "music", "transcript": "Spotify で流したい。ドライブ用の音楽アプリを作って", "note": "#412 Spotify は開くだけ → Apple Music で作り、正直に申告", "expect": {"has": ["musicPlayer"], "summaryHas": ["Spotify"]}},
+  {"id": "mu_bluetooth", "kind": "create", "group": "music", "transcript": "友だちのスマホを Bluetooth でつないで、みんなのスマホの曲を車で流したい", "note": "#412 音声の中継は不可 → リクエストで代替", "expect": {"has": ["musicPlayer"], "musicRequests": true}},
+  {"id": "mu_edit_requests", "kind": "edit", "base": "mu_drive_requests", "group": "music", "transcript": "友だちからのリクエストは確認しないで自動で入れて", "note": "#412 既存の musicPlayer に autoAccept", "expect": {"patch": true, "musicAutoAccept": true}}
+]

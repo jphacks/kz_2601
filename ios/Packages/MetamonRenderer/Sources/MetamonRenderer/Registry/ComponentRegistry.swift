@@ -55,7 +55,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.image) { c, ctx in ImageLeaf(c: c, ctx: ctx) }
         r.register(.videoField) { c, ctx in VideoFieldLeaf(c: c, ctx: ctx) }
         r.register(.videoPlayer) { c, ctx in VideoPlayerLeaf(c: c, ctx: ctx) }
-        r.register(.list) { c, ctx in ListLeaf(c: c, ctx: ctx) }
+        r.register(.list) { c, ctx in ListLeaf(c: c, ctx: ctx).publicDataNotice(entity: c.entity) } // #253 公開の表示
         r.register(.stat) { c, _ in StatLeaf(c: c) }
         r.register(.chart) { c, _ in ChartLeaf(c: c) }
         r.register(.voiceInput) { c, _ in VoiceInputLeaf(c: c) }
@@ -69,11 +69,16 @@ public struct ComponentRegistry: Sendable {
         // leaf(ナビ・ネイティブ系)
         r.register(.searchBar) { c, ctx in SearchBarLeaf(c: c, ctx: ctx) }
         r.register(.calendar) { c, ctx in CalendarLeaf(c: c, ctx: ctx) }
+        r.register(.gridTable) { c, ctx in GridTableLeaf(c: c, ctx: ctx) }
+        r.register(.randomPicker) { c, ctx in RandomPickerLeaf(c: c, ctx: ctx) }
+        r.register(.routeGuide) { c, ctx in RouteGuideLeaf(c: c, ctx: ctx) }
         r.register(.shareButton) { c, ctx in ShareButtonLeaf(c: c, ctx: ctx) }
         r.register(.openUrlButton) { c, _ in OpenUrlButtonLeaf(c: c) }
         r.register(.mapView) { c, ctx in MapViewLeaf(c: c, ctx: ctx) }
         r.register(.locationButton) { c, ctx in LocationButtonLeaf(c: c, ctx: ctx) }
+        r.register(.locationPicker) { c, ctx in LocationPickerLeaf(c: c, ctx: ctx) }
         r.register(.qrScanner) { c, ctx in QrScannerLeaf(c: c, ctx: ctx) }
+        r.register(.qrCode) { c, ctx in QrCodeLeaf(c: c, ctx: ctx) }
         r.register(.timerDisplay) { c, ctx in TimerDisplayLeaf(c: c, ctx: ctx) }
         // leaf: 入力系バッチ
         r.register(.slider) { c, ctx in SliderLeaf(c: c, ctx: ctx) }
@@ -97,18 +102,39 @@ public struct ComponentRegistry: Sendable {
         r.register(.emptyState) { c, _ in EmptyStateLeaf(c: c) }
         // leaf(計算・#101)
         r.register(.settlement) { c, _ in SettlementLeaf(c: c) }
-        // leaf(Web)
+        #if !APP_STORE_REVIEW
+        // leaf(Web)。審査用ビルドでは登録しない(#452 G3)
         r.register(.webView) { c, _ in WebViewLeaf(c: c) }
+        #endif
         // leaf(オンデバイス AI・#78)
         r.register(.aiButton) { c, ctx in AiButtonLeaf(c: c, ctx: ctx) }
+        // leaf(Apple Music・#412)。友だちからのリクエストの UI は部品の中で審査用ビルドから外す
+        r.register(.musicPlayer) { c, _ in MusicPlayerLeaf(c: c) }
+        #if !APP_STORE_REVIEW
+        // 審査用ビルド(APP_STORE_REVIEW・#245)では登録しない(4.7.2: ネイティブ API を DSL に出さない)。
+        // 届いた DSL に含まれていても未知 type のプレースホルダになる。
         // leaf(近距離共有・#36)
         r.register(.nearbyShare) { c, ctx in NearbyShareLeaf(c: c, ctx: ctx) }
         // leaf(位置の記録・#168)
         r.register(.locationTracker) { c, ctx in LocationTrackerLeaf(c: c, ctx: ctx) }
+        // leaf(チャット・#260)。他の人と記録を見る作りなので審査用ビルドでは登録しない(#451 G2)
+        r.register(.chatThread) { c, ctx in ChatThreadLeaf(c: c, ctx: ctx) }
         r.register(.healthStat) { c, _ in HealthStatLeaf(c: c) }
+        // leaf(ドラレコ・#410)
+        r.register(.dashcam) { c, ctx in DashcamLeaf(c: c, ctx: ctx) }
+        // leaf(端末のセンサー・#419。CoreMotion)
+        r.register(.sensorValue) { c, ctx in SensorValueLeaf(c: c, ctx: ctx) }
+        // leaf(録音・#420)
+        r.register(.audioRecorder) { c, ctx in AudioRecorderLeaf(c: c, ctx: ctx) }
+        #endif
         return r
     }()
 }
+
+#if APP_STORE_REVIEW
+/// アプリ本体(APP_STORE_REVIEW)がこれを参照する。パッケージに条件が渡っていないとコンパイルが落ちる(取りこぼし検知)。
+public enum ReviewBuildPackageMarker {}
+#endif
 
 private struct ComponentRegistryKey: EnvironmentKey {
     static let defaultValue: ComponentRegistry = .standard

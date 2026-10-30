@@ -1,3 +1,5 @@
+// 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
+#if !APP_STORE_REVIEW
 import SwiftUI
 import MetamonDSL
 import MetamonRenderer
@@ -60,7 +62,7 @@ private struct NearbyLifecycle: ViewModifier {
                     #endif
                 }
                 .onChange(of: scenePhase) { _, phase in rt.updateNearbyAdvertising(foreground: phase == .active) }
-                .onChange(of: rt.dsl.usesNearbyShare) { _, _ in rt.updateNearbyAdvertising(foreground: scenePhase == .active) }
+                .onChange(of: rt.dsl.usesNearbyReceive) { _, _ in rt.updateNearbyAdvertising(foreground: scenePhase == .active) }
         } else {
             content
         }
@@ -110,7 +112,8 @@ struct NearbySendSheet: View {
         NavigationStack {
             List {
                 Section {
-                    LabeledContent("送るもの", value: "「\(payload.header.entityName)」\(payload.header.count) 件")
+                    LabeledContent("送るもの", value: payload.header.song.map { "「\($0.title)」のリクエスト" }
+                        ?? "「\(payload.header.entityName)」\(payload.header.count) 件")
                     LabeledContent("あなたの名前", value: service.myName)
                 }
                 Section {
@@ -177,3 +180,4 @@ struct NearbySendSheet: View {
         })
     }
 }
+#endif

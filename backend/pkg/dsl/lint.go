@@ -18,6 +18,7 @@ import (
 //   - stat label says 今日/今週/今月/今年 (today/this week/this month/this
 //     year) but the filter is missing or another period
 //   - screen graph (nav.go): unreachable screens, fullScreen without a way back
+//   - a toolbar item opening the same form as a button on the screen (#416)
 func (a *App) Lint() []string {
 	l := &linter{app: a, entities: map[string]*Entity{}}
 	for i := range a.Entities {
@@ -28,6 +29,8 @@ func (a *App) Lint() []string {
 	l.entityReach()
 	l.navGraph()
 	l.micSeat()
+	l.dupAddControls()
+	l.privateChat()
 	return l.out
 }
 
@@ -343,7 +346,8 @@ func isTargetLabel(label string) bool {
 
 // listTypes show an entity's records one by one.
 var listTypes = map[ComponentType]bool{
-	CompList: true, CompTable: true, CompTimeline: true, CompCalendar: true, CompMapView: true, CompSettlement: true,
+	CompList: true, CompTable: true, CompTimeline: true, CompCalendar: true, CompMapView: true, CompSettlement: true, CompGridTable: true,
+	CompChatThread: true,
 }
 
 func (l *linter) entityReach() {
@@ -354,10 +358,13 @@ func (l *linter) entityReach() {
 		unlisted[id] = true
 	}
 	tracked := trackedEntities(l.app, targets)
+	for id := range chatEntities(l.app, targets) {
+		tracked[id] = true // chatThread sends the messages (#260): no form needed
+	}
 	for _, e := range l.app.Entities {
 		switch fs := forms[e.ID]; {
 		case len(fs) == 0 && tracked[e.ID]:
-			// locationTracker adds the points (#168): no form needed
+			// locationTracker (#168) / sensorValue (#419) add the records: no form needed
 		case len(fs) == 0:
 			l.add(`entity %q has no add form: add a form screen (screen.entity %q with inputs and a saveRecord toolbar button) and a navigate button to it, or remove the entity (a master list such as members must be addable, then referenced with type ref)`, e.ID, e.ID)
 		case !anyOf(fs, targets):
@@ -382,7 +389,7 @@ func formScreens(a *App) map[string][]string {
 
 // UnlistedEntities returns, in entity order, the entities whose records no
 // reachable screen lists (list / table / timeline / calendar / mapView /
-// settlement), excluding single-value setting entities (budget, goal).
+// settlement / gridTable / chatThread), excluding single-value setting entities (budget, goal).
 func (a *App) UnlistedEntities() []string {
 	targets := a.Reachable()
 	listed := map[string]bool{}
@@ -435,7 +442,7 @@ func (l *linter) settingEntities() map[string]bool {
 	}
 	for i := range l.app.Entities {
 		for _, f := range l.app.Entities[i].Fields {
-			if f.Type == FieldRef {
+			if f.Type == FieldRef || f.Type == FieldRefs {
 				other[f.RefEntity] = true
 			}
 			aggs(f.Computed)

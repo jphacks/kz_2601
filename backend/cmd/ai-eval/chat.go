@@ -31,7 +31,8 @@ import (
 // whether it went through. `optionsNot` (no option's title / detail /
 // instruction contains any of them) and `genNot` (the generate summary
 // contains none of them, e.g. 「省き」 = a part was dropped) catch ideas that
-// mix in something the DSL cannot do.
+// mix in something the DSL cannot do. Every step also fails when a
+// Japanese reply / chip / idea still shows a DSL name (#258, ai.LeakedTerms).
 
 type ChatStep struct {
 	Say      string   `json:"say"`
@@ -44,6 +45,21 @@ type ChatStep struct {
 	// OptionsNot / GenNot: see the comment above.
 	OptionsNot []string `json:"optionsNot,omitempty"`
 	GenNot     []string `json:"genNot,omitempty"`
+	// Multi (#220): expected multiSelect (nil = not checked).
+	Multi *bool `json:"multi,omitempty"`
+	// GenerateAll (#220): with generate, a multiSelect proposal sends every
+	// option joined as iOS does for 「これでいく(N 件)」.
+	GenerateAll bool `json:"generateAll,omitempty"`
+	// SuggAny (#211): every suggestion chip contains at least one of these
+	// (the current app's field names), so a chip answers the question.
+	SuggAny []string `json:"suggAny,omitempty"`
+	// GenSay / GenHas (#230): for a "できる?" answer, send GenSay (the
+	// direct request) to Service.Generate on a copy of the base and require
+	// every GenHas string in the resulting DSL, so the answer and what
+	// generate really builds can be compared. Without GenHas the outcome is
+	// only recorded (for "できません" answers).
+	GenSay string   `json:"genSay,omitempty"`
+	GenHas []string `json:"genHas,omitempty"`
 }
 
 type ChatCase struct {
@@ -65,8 +81,10 @@ type ChatGenRecord struct {
 	Mode        string   `json:"mode,omitempty"`
 	Summary     string   `json:"summary,omitempty"`
 	Ops         int      `json:"ops"`
+	Unchanged   bool     `json:"unchanged,omitempty"` // #211: generate made no change
 	TotalMs     int64    `json:"totalMs"`
 	Lint        []string `json:"lint,omitempty"`
+	dsl         string   // resulting DSL, checked by GenHas (not written to raw output)
 }
 
 type ChatStepRecord struct {
@@ -79,6 +97,7 @@ type ChatStepRecord struct {
 	Text        string          `json:"text,omitempty"`
 	Suggestions []string        `json:"suggestions,omitempty"`
 	Options     []ai.ChatOption `json:"options,omitempty"`
+	MultiSelect bool            `json:"multiSelect,omitempty"`
 	Mode        string          `json:"mode,omitempty"`
 	Gen         *ChatGenRecord  `json:"generate,omitempty"`
 	Brief       *ai.Brief       `json:"brief,omitempty"`
@@ -182,17 +201,28 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string
 			}
 			sr.Kind, sr.Source, sr.Turn, sr.Text = res.Kind, res.Source, res.Turn, res.Text
 			sr.Suggestions, sr.Brief, sr.Transcript = res.Suggestions, res.Brief, res.Transcript
-			sr.Options, sr.Mode = res.Options, res.Mode
+			sr.Options, sr.Mode, sr.MultiSelect = res.Options, res.Mode, res.MultiSelect
 			sr.ClaudeMs, sr.Attempts, sr.Usage = res.LatencyMs.Claude, res.Meta.Attempts, res.Meta.Usage
 			sr.FirstTokMs = res.FirstTokenMs
 			if rec.Locale == "" {
 				rec.Locale = string(res.Locale)
 			}
 			sr.Misses = checkChatStep(st, res)
+			if st.GenSay != "" && base != nil {
+				sr.Gen = generateWith(ctx, svc, c.ID, base, st.GenSay, res.Locale)
+				for _, w := range st.GenHas {
+					if !sr.Gen.OK || sr.Gen.Unchanged || !strings.Contains(sr.Gen.dsl, w) {
+						sr.Misses = append(sr.Misses, "generate lacks "+w)
+					}
+				}
+			}
 			if st.Generate && base != nil {
-				sr.Gen = generateFromChat(ctx, svc, c.ID, base, res)
+				sr.Gen = generateFromChat(ctx, svc, c.ID, base, res, st.GenerateAll)
 				if !sr.Gen.OK {
 					sr.Misses = append(sr.Misses, "generate failed: "+sr.Gen.Error)
+				}
+				if sr.Gen.Unchanged {
+					sr.Misses = append(sr.Misses, "generate unchanged: "+sr.Gen.Summary)
 				}
 				for _, w := range st.GenNot {
 					if strings.Contains(sr.Gen.Summary, w) {
@@ -204,8 +234,8 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string
 			if !sr.OK {
 				rec.OK = false
 			}
-			log.Printf("[%s] %s/%s mode=%s turn=%d claude=%dms total=%dms misses=%v text=%q sugg=%v options=%v transcript=%q",
-				c.ID, res.Kind, res.Source, res.Mode, res.Turn, sr.ClaudeMs, sr.TotalMs, sr.Misses, res.Text, res.Suggestions, res.Options, res.Transcript)
+			log.Printf("[%s] %s/%s mode=%s turn=%d claude=%dms total=%dms misses=%v text=%q sugg=%v options=%v multi=%v transcript=%q",
+				c.ID, res.Kind, res.Source, res.Mode, res.Turn, sr.ClaudeMs, sr.TotalMs, sr.Misses, res.Text, res.Suggestions, res.Options, res.MultiSelect, res.Transcript)
 			rec.Steps = append(rec.Steps, sr)
 		}
 		run.Cases = append(run.Cases, rec)
@@ -230,9 +260,11 @@ func runChat(ctx context.Context, svc *ai.Service, casesPath, outDir, tag string
 
 // generateFromChat runs /generate (edit) with what 「これでいく」 / ready
 // would send, on a fresh copy of the base DSL.
-func generateFromChat(ctx context.Context, svc *ai.Service, caseID string, base []byte, res *ai.ChatResult) *ChatGenRecord {
+func generateFromChat(ctx context.Context, svc *ai.Service, caseID string, base []byte, res *ai.ChatResult, all bool) *ChatGenRecord {
 	g := &ChatGenRecord{}
 	switch {
+	case res.Kind == "proposal" && all && res.MultiSelect:
+		g.Instruction = joinInstructions(res.Options)
 	case res.Kind == "proposal" && len(res.Options) > 0:
 		g.Instruction = res.Options[0].Instruction
 	case res.Kind == "ready":
@@ -241,19 +273,29 @@ func generateFromChat(ctx context.Context, svc *ai.Service, caseID string, base 
 		g.Error = "nothing to generate (kind " + res.Kind + ")"
 		return g
 	}
+	return runGenerate(ctx, svc, caseID, base, g, res.Locale)
+}
+
+// generateWith runs /generate (edit) with a fixed instruction (#230 GenSay).
+func generateWith(ctx context.Context, svc *ai.Service, caseID string, base []byte, instruction string, loc ai.Locale) *ChatGenRecord {
+	return runGenerate(ctx, svc, caseID, base, &ChatGenRecord{Instruction: instruction}, loc)
+}
+
+func runGenerate(ctx context.Context, svc *ai.Service, caseID string, base []byte, g *ChatGenRecord, loc ai.Locale) *ChatGenRecord {
 	appID := fmt.Sprintf("gen-%s-%d", caseID, time.Now().UnixNano())
 	if _, err := svc.Store.Put(ctx, appID, 0, base, appconfigclient.Source{Kind: "seed"}); err != nil {
 		g.Error = err.Error()
 		return g
 	}
 	started := time.Now()
-	out, err := svc.Generate(ctx, ai.Request{AppID: appID, Transcript: g.Instruction, Mode: ai.ModeEdit, Locale: res.Locale})
+	out, err := svc.Generate(ctx, ai.Request{AppID: appID, Transcript: g.Instruction, Mode: ai.ModeEdit, Locale: loc})
 	g.TotalMs = time.Since(started).Milliseconds()
 	if err != nil {
 		g.Error = err.Error()
 		return g
 	}
 	g.OK, g.Mode, g.Summary, g.Ops, g.Lint = true, out.Mode, out.Summary, len(out.Patch), out.Meta.Lint
+	g.Unchanged, g.dsl = out.Unchanged, string(out.DSL)
 	log.Printf("[%s] generate %s ops=%d %dms summary=%q", caseID, out.Mode, g.Ops, g.TotalMs, out.Summary)
 	return g
 }
@@ -277,6 +319,18 @@ func checkChatStep(st ChatStep, res *ai.ChatResult) []string {
 			miss = append(miss, "text has "+w)
 		}
 	}
+	// #258: the user never reads DSL names (text, chips, idea titles / details)
+	if res.Locale != ai.LocaleEN {
+		shown := append([]string{res.Text}, res.Suggestions...)
+		for _, o := range res.Options {
+			shown = append(shown, o.Title, o.Detail)
+		}
+		for _, s := range shown {
+			if left := ai.LeakedTerms(s); len(left) > 0 {
+				miss = append(miss, fmt.Sprintf("dsl terms %v in %q", left, s))
+			}
+		}
+	}
 	for _, o := range res.Options {
 		all := strings.ToLower(o.Title + " " + o.Detail + " " + o.Instruction)
 		for _, w := range st.OptionsNot {
@@ -295,11 +349,25 @@ func checkChatStep(st ChatStep, res *ai.ChatResult) []string {
 			}
 		}
 	}
+	if st.Multi != nil && res.MultiSelect != *st.Multi {
+		miss = append(miss, fmt.Sprintf("multiSelect=%v (want %v)", res.MultiSelect, *st.Multi))
+	}
 	if st.Expect != "" && res.Kind != st.Expect {
 		miss = append(miss, "kind="+res.Kind+" (want "+st.Expect+")")
 	}
 	if st.Source != "" && res.Source != st.Source {
 		miss = append(miss, "source="+res.Source+" (want "+st.Source+")")
+	}
+	if res.Kind == "question" && len(st.SuggAny) > 0 {
+		for _, sg := range res.Suggestions {
+			hit := false
+			for _, w := range st.SuggAny {
+				hit = hit || strings.Contains(sg, w)
+			}
+			if !hit {
+				miss = append(miss, "suggestion not from the app: "+sg)
+			}
+		}
 	}
 	if res.Kind == "question" {
 		if strings.TrimSpace(res.Text) == "" {
@@ -393,7 +461,7 @@ func printChatTable(run ChatRun) {
 				sugg += " transcript=" + st.Transcript
 			}
 			if st.Gen != nil {
-				sugg += fmt.Sprintf(" → generate ok=%v %s %dms %s", st.Gen.OK, st.Gen.Mode, st.Gen.TotalMs, st.Gen.Summary+st.Gen.Error)
+				sugg += fmt.Sprintf(" → generate ok=%v unchanged=%v %s %dms %s", st.Gen.OK, st.Gen.Unchanged, st.Gen.Mode, st.Gen.TotalMs, st.Gen.Summary+st.Gen.Error)
 			}
 			fmt.Printf("| %s | %s | %d | %s | %s | %s | %d | %d | %d | %d/%d | %s | %s | %s | %s |\n",
 				r.ID, r.Locale, i+1, cell(st.Say), kind, st.Source, st.Turn, st.ClaudeMs, st.FirstTokMs,
@@ -417,3 +485,15 @@ func printChatTable(run ChatRun) {
 }
 
 func cell(s string) string { return strings.ReplaceAll(strings.ReplaceAll(s, "|", "/"), "\n", " ") }
+
+// joinInstructions mirrors iOS ChatOption.joinedInstruction (#220).
+func joinInstructions(opts []ai.ChatOption) string {
+	if len(opts) == 1 {
+		return opts[0].Instruction
+	}
+	lines := make([]string, len(opts))
+	for i, o := range opts {
+		lines[i] = "・" + o.Instruction
+	}
+	return strings.Join(lines, "\n")
+}

@@ -126,6 +126,37 @@ func BuildCatalog(schema []byte) (string, error) {
 			}
 		}
 	}
+
+	// #252: who may update shared records
+	edits := enumValues(entity, "edit")
+	if len(edits) == 0 {
+		return "", fmt.Errorf("schema has no $defs/Entity.properties.edit enum")
+	}
+	b.WriteString("### Entity の edit(public/shared のレコードを誰が更新できるか・省略時 author)\n")
+	for _, v := range edits {
+		fmt.Fprintf(&b, "- edit: %s", v)
+		if d := enumDescOf(entity, "edit", v); d != "" {
+			b.WriteString(" — " + d)
+		}
+		b.WriteString("\n")
+	}
+	if props, _ := entity["properties"].(map[string]any); props != nil {
+		if ep, _ := props["edit"].(map[string]any); ep != nil {
+			if usage, _ := ep[keyUsage].(string); usage != "" {
+				fmt.Fprintf(&b, "  使い方: %s\n", usage)
+			}
+		}
+	}
+	// #250 #251: values every record carries besides its fields
+	values, _ := entity["x-recordValues"].(map[string]any)
+	if len(values) == 0 {
+		return "", fmt.Errorf("schema has no $defs/Entity x-recordValues")
+	}
+	b.WriteString("### レコードの予約値(field id の代わりに書ける)\n")
+	for _, k := range sortedKeys(values) {
+		desc, _ := values[k].(string)
+		fmt.Fprintf(&b, "- %s — %s\n", k, desc)
+	}
 	if err := writeExprCatalog(&b, defs); err != nil {
 		return "", err
 	}

@@ -10,12 +10,27 @@ struct ButtonLeaf: View {
     let ctx: RenderContext
 
     /// 新規フォーム(recordId 無し)では `deleteRecord` を隠す。削除対象が無いので押しても何も起きないため。
-    static func isVisible(action: Action?, isEditing: Bool) -> Bool {
-        action?.type != .deleteRecord || isEditing
+    /// 他人の共有レコード(#249)では、更新できなければ `saveRecord`、作った人でなければ `deleteRecord` を隠す。
+    static func isVisible(action: Action?, isEditing: Bool, readOnly: Bool = false, canDelete: Bool = true) -> Bool {
+        switch action?.type {
+        case .deleteRecord: isEditing && canDelete
+        case .saveRecord: !readOnly
+        default: true
+        }
+    }
+
+    @MainActor
+    static func isVisible(action: Action?, form: FormDraft?) -> Bool {
+        isVisible(action: action, isEditing: form?.isEditing ?? false, readOnly: form?.isReadOnly ?? false, canDelete: form?.canDelete ?? true)
+    }
+
+    /// icon 省略時の既定。書き出し(#421)は共有の矢印にして「押すと共有シートが開く」と分かるように。
+    static func defaultIcon(_ action: Action?) -> String? {
+        action?.type == .export ? "square.and.arrow.up" : nil
     }
 
     var body: some View {
-        if Self.isVisible(action: c.action, isEditing: ctx.form?.isEditing ?? false) {
+        if Self.isVisible(action: c.action, form: ctx.form) {
             styled
         }
     }
@@ -26,7 +41,7 @@ struct ButtonLeaf: View {
             guard let action = c.action else { return }
             Task { await rt.run(action, ctx.actionContext()) }
         } label: {
-            if let icon = c.icon { Label(c.label ?? "", systemImage: icon) } else { Text(c.label ?? "") }
+            if let icon = c.icon ?? Self.defaultIcon(c.action) { Label(c.label ?? "", systemImage: icon) } else { Text(c.label ?? "") }
         }
         switch c.style {
         case "secondary": button.buttonStyle(RenderButtonStyle(kind: .secondary))

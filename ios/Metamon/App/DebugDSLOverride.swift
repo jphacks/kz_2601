@@ -1,11 +1,13 @@
 #if DEBUG
 import Foundation
 import MetamonDSL
+import MetamonServices
 
 /// 見た目監査(#131)用の DEBUG フック。実際に AI が生成した DSL をファイルから描画する。
 /// - `METAMON_INITIAL_DSL_PATH=<path>`: DSL JSON(AppDSL 本文)を起動時の document にする。appId はファイル名ごとに分ける(ローカルキャッシュ混在防止)
 /// - `METAMON_INITIAL_SCREEN=<screen>`: initialScreen を上書き(タブの 2 枚目を初期表示する等)
 /// - `METAMON_SEED_DUMMY=<n>`: モック時、各 entity に field 型から n 件(1〜10、既定 4)のダミーレコードを作る
+/// - `METAMON_SEED_AUTHORS=mixed`: ダミーレコードの投稿者を「自分(モックの固定 uid)/ 別の人」交互にする(`Field.hidden` #262 の確認用)
 enum DebugDSLOverride {
     private static var env: [String: String] { ProcessInfo.processInfo.environment }
 
@@ -26,14 +28,18 @@ enum DebugDSLOverride {
     /// ダミーレコード(override 未指定 or `METAMON_SEED_DUMMY` 無しなら nil)。
     static var seed: [String: [Record]]? {
         guard let dsl = document?.dsl, let raw = env["METAMON_SEED_DUMMY"] else { return nil }
-        return DummyRecords.make(for: dsl, count: min(max(Int(raw) ?? 4, 1), 10))
+        let seed = DummyRecords.make(for: dsl, count: min(max(Int(raw) ?? 4, 1), 10))
+        return env["METAMON_SEED_AUTHORS"] == "mixed" ? DummyRecords.alternatingAuthors(seed) : seed
     }
+
+    /// モックの 2 人目(自分 = `MockAuthService.fixedUID` 以外の投稿者)。
+    static let otherUID = "mock00-other-uid"
 }
 
 /// entity の field 型からそれらしいダミー値を作る。長い文字列・大きい金額を混ぜて崩れを炙り出す。
 enum DummyRecords {
     static func make(for dsl: AppDSL, count: Int, now: Date = .now) -> [String: [Record]] {
-        let iso = ISO8601DateFormatter().string(from: now)
+        let iso = ISO8601DateFormatter()
         var out: [String: [Record]] = [:]
         for entity in dsl.entities {
             out[entity.id] = (0..<count).map { i in
@@ -41,10 +47,32 @@ enum DummyRecords {
                 for f in entity.storedFields {
                     if let v = value(for: f, entity: entity, index: i, dsl: dsl, now: now) { data[f.id] = v }
                 }
-                return Record(id: "\(entity.id)-\(i + 1)", data: data, createdAt: iso)
+                // 新しい順に 1 時間ずつ前(`$createdAt` の並びと表示を確かめる・#250)
+                let created = iso.string(from: now.addingTimeInterval(Double(-i) * 3600))
+                var record = Record(id: "\(entity.id)-\(i + 1)", data: data, createdAt: created)
+                if entity.isShared {
+                    // 共有 entity: 偶数番は自分(モックの uid)、奇数番はほかの人の投稿
+                    let mine = i % 2 == 0
+                    record.author = mine ? MockAuthService.fixedUID : "dummy-member-\(i)"
+                    record.authorName = mine ? (AuthorProfile.name ?? RecordSyncEngine.anonymousName) : otherNames[i % otherNames.count]
+                }
+                return record
             }
         }
         return out
+    }
+
+    private static let otherNames = ["さくら", "たけし", "匿名"]
+
+    /// 1 件目・3 件目… は自分、2 件目・4 件目… は別の人の投稿にする。
+    static func alternatingAuthors(_ seed: [String: [Record]]) -> [String: [Record]] {
+        seed.mapValues { rows in
+            rows.enumerated().map { i, r in
+                var r = r
+                r.author = i % 2 == 0 ? MockAuthService.fixedUID : DebugDSLOverride.otherUID
+                return r
+            }
+        }
     }
 
     private static let shortWords = ["ランチ", "電車", "カフェ", "本", "日用品", "サークル費"]
@@ -79,9 +107,14 @@ enum DummyRecords {
         case .ref:
             guard let target = f.refEntity, dsl.entity(target) != nil else { return nil }
             return .string("\(target)-\(i % 3 + 1)")
+        case .refs:
+            guard let target = f.refEntity, dsl.entity(target) != nil else { return nil }
+            return i % 3 == 0 ? .array([]) : .array([.string("\(target)-1"), .string("\(target)-\(i % 3 + 1)")])
         case .video:
             // 別の端末で撮った動画(この端末にファイルが無い)の見え方を確かめる(#206)
             return .string("video:dummy-\(i)")
+        case .audio:
+            return .string("audio:dummy-\(i)|\(30 + i * 7)")
         case .photo, .location:
             return nil
         }
