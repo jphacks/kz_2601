@@ -23,7 +23,7 @@ enum ErrorCopy {
         let when = info.resetAt.map { resetTime($0, timeZone: timeZone) } ?? L10n.tr("明日")
         switch info.scope {
         case .global:
-            return L10n.tr("利用が集中したため、新しい生成を止めています。\(when)に再開します")
+            return L10n.pick(L10n.tr("利用が集中したため、新しい生成を止めています。\(when)に再開します"), review: L10n.tr("利用が集中したため、新しい記録帳の用意を止めています。\(when)に再開します"))
         case .ip:
             return L10n.tr("このネットワークからの今日の上限に達しました。サインインすると続けて使えます")
         case .user:
@@ -53,12 +53,15 @@ enum ErrorCopy {
     static var conflictBanner: String { L10n.tr("別の端末で更新されていたため、最新の状態に合わせました。もう一度お話しください") }
     // 入力不備・その他
     static var rejectedTitle: String { L10n.tr("うまく伝わりませんでした") }
-    static var failedTitle: String { L10n.tr("生成に失敗しました") }
-    static var cancelledToast: String { L10n.tr("生成をキャンセルしました") }
+    static var failedTitle: String { L10n.pick(L10n.tr("生成に失敗しました"), review: L10n.tr("記録帳を用意できませんでした")) }
+    static var cancelledToast: String { L10n.pick(L10n.tr("生成をキャンセルしました"), review: L10n.tr("用意を取りやめました")) }
     // 生成前の対話(#75)
     static var chatFailedTitle: String { L10n.tr("質問をうまく用意できませんでした") }
     // サーバー到達不能(起動時)
-    static func offlineRestored(version: Int) -> String { L10n.tr("オフライン: 最後に取得したアプリ(v\(version))を表示しています") }
+    static func offlineRestored(version: Int) -> String {
+        L10n.pick(L10n.tr("オフライン: 最後に取得したアプリ(v\(version))を表示しています"),
+                  review: L10n.tr("オフライン: 最後に取得した記録帳(v\(version))を表示しています"))
+    }
     static func unreachable(_ detail: String) -> String { L10n.tr("サーバーに接続できません: \(detail)") }
     // レコード取得失敗(#85)。Renderer の placeholder 文言は Renderer 側(`EmptyPlaceholder`)に持つ
 

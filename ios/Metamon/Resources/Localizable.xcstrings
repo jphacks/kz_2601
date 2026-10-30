@@ -9707,6 +9707,958 @@
           }
         }
       }
+    },
+    "何を記録したいですか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What do you want to keep track of?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "何を記録したいですか?"
+          }
+        }
+      }
+    },
+    "%@。話すだけで、記録帳の形が変わります": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@. Just talk, and your tracker changes right away"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@。話すだけで、記録帳の形が変わります"
+          }
+        }
+      }
+    },
+    "おかえりなさい。\n今日は何を記録しますか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Welcome back.\nWhat shall we track today?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "おかえりなさい。\n今日は何を記録しますか?"
+          }
+        }
+      }
+    },
+    "%@。マイクを長押しすると、前に用意した記録帳を呼び出せます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@. Long-press the mic to bring back a tracker you set up"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@。マイクを長押しすると、前に用意した記録帳を呼び出せます"
+          }
+        }
+      }
+    },
+    "新しい記録帳ですね。\n何を記録しますか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A new tracker.\nWhat will you keep track of?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しい記録帳ですね。\n何を記録しますか?"
+          }
+        }
+      }
+    },
+    "前の記録帳は、マイクの長押しからいつでも戻せます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Long-press the mic anytime to go back to your previous tracker"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前の記録帳は、マイクの長押しからいつでも戻せます"
+          }
+        }
+      }
+    },
+    "おかえりなさい。\n次は何を記録しますか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Welcome back.\nWhat shall we track next?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "おかえりなさい。\n次は何を記録しますか?"
+          }
+        }
+      }
+    },
+    "%@。前の記録帳は、マイクの長押しからいつでも戻せます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@. Long-press the mic anytime to go back to your previous tracker"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@。前の記録帳は、マイクの長押しからいつでも戻せます"
+          }
+        }
+      }
+    },
+    "この記録帳をどう直しますか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How should this tracker change?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この記録帳をどう直しますか?"
+          }
+        }
+      }
+    },
+    "話すと、この記録帳を直せます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk to adjust this tracker"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話すと、この記録帳を直せます"
+          }
+        }
+      }
+    },
+    "記録帳の一覧": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your trackers"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳の一覧"
+          }
+        }
+      }
+    },
+    "まだ他の記録帳はありません。\n「+ 新しい記録帳」から 2 つ目を用意できます": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No other trackers yet.\nTap “+ New Tracker” to set up a second one"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "まだ他の記録帳はありません。\n「+ 新しい記録帳」から 2 つ目を用意できます"
+          }
+        }
+      }
+    },
+    "新しい記録帳": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Tracker"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しい記録帳"
+          }
+        }
+      }
+    },
+    "家計簿をつけたい": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I want to keep a budget"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "家計簿をつけたい"
+          }
+        }
+      }
+    },
+    "話すと、記録帳が用意できる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk, and your tracker is ready"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話すと、記録帳が用意できる"
+          }
+        }
+      }
+    },
+    "マイクをタップして「家計簿をつけたい」のように話すだけ。文字で入力しても用意できます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap the mic and say something like “I want to keep a budget.” You can also type it."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "マイクをタップして「家計簿をつけたい」のように話すだけ。文字で入力しても用意できます。"
+          }
+        }
+      }
+    },
+    "記録帳の画面にあるマイクから「ボタンを大きくして」「メモ欄を足して」と話すと直せます。気に入らなければ「元に戻して」で戻せます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the mic on your tracker’s screen and say “Make the buttons bigger” or “Add a notes field.” Don’t like it? Say “Undo.”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳の画面にあるマイクから「ボタンを大きくして」「メモ欄を足して」と話すと直せます。気に入らなければ「元に戻して」で戻せます。"
+          }
+        }
+      }
+    },
+    "用意した記録帳は一覧で切り替え": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch trackers from the list"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用意した記録帳は一覧で切り替え"
+          }
+        }
+      }
+    },
+    "マイクを長押しすると、用意した記録帳の一覧が開きます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Long-press the mic to open the list of your trackers."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "マイクを長押しすると、用意した記録帳の一覧が開きます。"
+          }
+        }
+      }
+    },
+    "話した声を端末の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字入力ならすぐに記録帳を用意できます。設定からいつでもダウンロードできます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This model turns your voice into text on this device (about %lld MB, first time only). While it downloads, or even without it, you can set up a tracker right away by typing. You can download it anytime in Settings."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話した声を端末の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字入力ならすぐに記録帳を用意できます。設定からいつでもダウンロードできます。"
+          }
+        }
+      }
+    },
+    "新しい記録帳を声だけで相談している時は、内容がそろうと少し待ってから自動で用意し始めます。用意した記録帳の変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you plan a new tracker by voice only, setup starts automatically shortly after everything is clear. Changes to a tracker you already set up are applied only after you tap \"Go with this\", so nothing changes by accident."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しい記録帳を声だけで相談している時は、内容がそろうと少し待ってから自動で用意し始めます。用意した記録帳の変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。"
+          }
+        }
+      }
+    },
+    "ON にすると、新しく用意する時も記録帳を直す時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When on, you can first chat with the AI both when setting up a new tracker and when adjusting one. It answers questions and suggests ideas; tap \"Go with this\" to apply. When off, what you say is applied right away."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ON にすると、新しく用意する時も記録帳を直す時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。"
+          }
+        }
+      }
+    },
+    "ON にすると、最初の挨拶・AI の質問・記録帳を用意できた時の説明を声で読み上げます。マイクを押すとすぐ止まります。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When on, the first greeting, the AI's questions and the note when your tracker is ready are read aloud. Tap the mic to stop right away."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ON にすると、最初の挨拶・AI の質問・記録帳を用意できた時の説明を声で読み上げます。マイクを押すとすぐ止まります。"
+          }
+        }
+      }
+    },
+    "どんな記録帳にするか考えています…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking about what kind of tracker to set up…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "どんな記録帳にするか考えています…"
+          }
+        }
+      }
+    },
+    "準備中": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setting up"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "準備中"
+          }
+        }
+      }
+    },
+    "記録帳の形を考えています…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setting up your tracker…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳の形を考えています…"
+          }
+        }
+      }
+    },
+    "長押しで記録帳の一覧": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Long-press for your trackers"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "長押しで記録帳の一覧"
+          }
+        }
+      }
+    },
+    "利用が集中したため、新しい記録帳の用意を止めています。%@に再開します": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demand is high, so new requests are paused. We'll reopen at %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用が集中したため、新しい記録帳の用意を止めています。%@に再開します"
+          }
+        }
+      }
+    },
+    "記録帳を用意できませんでした": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't set up the tracker"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳を用意できませんでした"
+          }
+        }
+      }
+    },
+    "用意を取りやめました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setup cancelled"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用意を取りやめました"
+          }
+        }
+      }
+    },
+    "オフライン: 最後に取得した記録帳(v%lld)を表示しています": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offline: showing the last downloaded tracker (v%lld)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフライン: 最後に取得した記録帳(v%lld)を表示しています"
+          }
+        }
+      }
+    },
+    "話すだけで、自分専用の記録帳に": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Just talk to get a tracker made for you"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話すだけで、自分専用の記録帳に"
+          }
+        }
+      }
+    },
+    "オフライン: 保存済みの記録帳の一覧を表示しています": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offline: showing your saved trackers"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフライン: 保存済みの記録帳の一覧を表示しています"
+          }
+        }
+      }
+    },
+    "記録帳の一覧を取得できませんでした: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load your trackers: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳の一覧を取得できませんでした: %@"
+          }
+        }
+      }
+    },
+    "記録帳を切り替えています…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switching trackers…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳を切り替えています…"
+          }
+        }
+      }
+    },
+    "記録帳を読み込めませんでした。接続を確認してください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the tracker. Check your connection"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳を読み込めませんでした。接続を確認してください"
+          }
+        }
+      }
+    },
+    "「%@」に切り替えました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switched to “%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」に切り替えました"
+          }
+        }
+      }
+    },
+    "「%@」に近い記録帳が複数あります。一覧から選んでください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Several trackers match “%@”. Pick one from the list"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」に近い記録帳が複数あります。一覧から選んでください"
+          }
+        }
+      }
+    },
+    "「%@」という記録帳は見つかりませんでした": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't find a tracker called “%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」という記録帳は見つかりませんでした"
+          }
+        }
+      }
+    },
+    "「%@」を用意しました": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up “%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」を用意しました"
+          }
+        }
+      }
+    },
+    "記録帳の名前": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracker name"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳の名前"
+          }
+        }
+      }
+    },
+    "記録帳の一覧と画面の上に出る名前です(%lld文字まで)。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shown in your tracker list and at the top of the screen (up to %lld characters)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳の一覧と画面の上に出る名前です(%lld文字まで)。"
+          }
+        }
+      }
+    },
+    "今の記録帳を初期状態に戻しますか？": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset this tracker to its initial state?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今の記録帳を初期状態に戻しますか？"
+          }
+        }
+      }
+    },
+    "今の記録帳は音声画面だけの状態に戻ります。サーバー上のデータは削除されません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This tracker goes back to the voice screen only. Data on the server is not deleted."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今の記録帳は音声画面だけの状態に戻ります。サーバー上のデータは削除されません。"
+          }
+        }
+      }
+    },
+    "アカウントとすべての記録帳が使えなくなります。元に戻せません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your account and all your trackers will no longer be usable. This can’t be undone."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウントとすべての記録帳が使えなくなります。元に戻せません。"
+          }
+        }
+      }
+    },
+    "用意した記録帳が使えなくなります。この端末のデータも消えます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your trackers will no longer be usable. Data on this device is also erased."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用意した記録帳が使えなくなります。この端末のデータも消えます。"
+          }
+        }
+      }
+    },
+    "新しく用意する記録帳と質問もこの言語になります。用意済みの記録帳の文言は変わりません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New trackers and questions will also use this language. Text in trackers you already set up stays the same."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しく用意する記録帳と質問もこの言語になります。用意済みの記録帳の文言は変わりません。"
+          }
+        }
+      }
+    },
+    "記録帳をリセット(初期状態に戻す)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset tracker (back to initial state)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳をリセット(初期状態に戻す)"
+          }
+        }
+      }
+    },
+    "今の記録帳": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current tracker"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今の記録帳"
+          }
+        }
+      }
+    },
+    "「元に戻して」と話しても同じです。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can also say “Undo”."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「元に戻して」と話しても同じです。"
+          }
+        }
+      }
+    },
+    "記録帳を用意する・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you set up or adjust a tracker, the following is sent to Anthropic's AI (Claude)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳を用意する・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。"
+          }
+        }
+      }
+    },
+    "今の記録帳の画面の形(画面・項目・名前など)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The current tracker's layout (screens, fields, name, etc.)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今の記録帳の画面の形(画面・項目・名前など)"
+          }
+        }
+      }
+    },
+    "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、記録帳の画面を用意するためだけに使います。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Destination: Anthropic, PBC (USA), via Tailor It's server (Google Cloud). It is used only to set up your tracker's screens."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、記録帳の画面を用意するためだけに使います。"
+          }
+        }
+      }
+    },
+    "記録帳を用意する・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、記録帳の「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、その記録帳の最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、記録帳の閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you set up or adjust a tracker, the contents of your records (numbers, notes, photos, etc.) are not sent. However, if a tracker's \"Write with AI\" button uses the server AI, pressing it sends that tracker's recent records and the text being entered, only to write that text (photos, audio and video are not sent). Without consent you can still view and record in your trackers; only AI features are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳を用意する・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、記録帳の「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、その記録帳の最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、記録帳の閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"
+          }
+        }
+      }
+    },
+    "記録帳を用意する・直すときは、話した内容・会話・記録帳の画面の形を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、その記録帳の最近の記録も送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you set up or adjust a tracker, what you said, the conversation and the tracker's layout are sent to Anthropic's AI (the contents of your records are not). If a \"Write with AI\" button uses the server AI, pressing it also sends that tracker's recent records. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳を用意する・直すときは、話した内容・会話・記録帳の画面の形を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、その記録帳の最近の記録も送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
+          }
+        }
+      }
+    },
+    "記録帳を用意する・直す機能と対話が使えなくなります。もう一度同意すると使えます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setting up and adjusting trackers, and chat, will be disabled until you agree again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳を用意する・直す機能と対話が使えなくなります。もう一度同意すると使えます。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

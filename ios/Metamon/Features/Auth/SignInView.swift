@@ -28,7 +28,7 @@ struct SignInView: View {
                     Text("Tailor It")
                         .font(.system(size: 40, weight: .bold, design: .rounded))
                         .brandText()
-                    Text("話しかけるだけで、アプリが生まれ変わる")
+                    Text(L10n.key("話しかけるだけで、アプリが生まれ変わる", review: "話すだけで、自分専用の記録帳に"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

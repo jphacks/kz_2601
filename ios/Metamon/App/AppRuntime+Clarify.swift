@@ -360,7 +360,7 @@ enum ClarifyCopy {
     static var replyPlaceholder: String { L10n.tr("答えを文字で入力") }
     static var settingTitle: String { L10n.tr("チャットで相談してから作る") }
     static var autoBuildSettingTitle: String { L10n.tr("答えがそろったら自動で作る") }
-    static var autoBuildSettingFooter: String { L10n.tr("新しいアプリを声だけで相談している時は、内容がそろうと少し待ってから自動で作り始めます。作ったアプリの変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。") }
+    static var autoBuildSettingFooter: String { L10n.pick(L10n.tr("新しいアプリを声だけで相談している時は、内容がそろうと少し待ってから自動で作り始めます。作ったアプリの変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。"), review: L10n.tr("新しい記録帳を声だけで相談している時は、内容がそろうと少し待ってから自動で用意し始めます。用意した記録帳の変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。")) }
     static var autoBuilding: String { L10n.tr("まもなく作ります…") }
-    static var settingFooter: String { L10n.tr("ON にすると、新しく作る時も作ったアプリを変える時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。") }
+    static var settingFooter: String { L10n.pick(L10n.tr("ON にすると、新しく作る時も作ったアプリを変える時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。"), review: L10n.tr("ON にすると、新しく用意する時も記録帳を直す時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。")) }
 }

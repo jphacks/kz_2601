@@ -20,7 +20,7 @@ enum GeneratingStage: Equatable {
 
     /// 文言表(docs/ios/architecture.md §6 と同期)
     static var normalMessages: [String] { [
-        L10n.tr("どんなアプリにするか考えています…"),
+        L10n.pick(L10n.tr("どんなアプリにするか考えています…"), review: L10n.tr("どんな記録帳にするか考えています…")),
         L10n.tr("必要な画面とデータを決めています…"),
         L10n.tr("画面を組み立てています…"),
         L10n.tr("細部を整えています…"),
@@ -84,7 +84,7 @@ struct GeneratingView: View {
         VStack(spacing: Theme.Spacing.sm) {
             // #102: 作業中のツル(PC とスマホを数秒ごとに持ち替える)
             CraneMascot(pose: Int(elapsed / 4) % 2 == 0 ? .pc : .phone, size: 96, sway: 3)
-            Label("変身中", systemImage: "sparkles")
+            Label(L10n.key("変身中", review: "準備中"), systemImage: "sparkles")
                 .font(.caption.weight(.semibold))
                 .textCase(.uppercase)
                 .tracking(1.2)
