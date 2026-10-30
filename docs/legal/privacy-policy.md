@@ -67,11 +67,12 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 - 相談の会話は、サーバーで最大 30 分です。
 - 1 日の利用回数は、日付ごとの回数(数値)だけで、話した内容などは含みません。
 - サーバーの動作記録(ログ。リクエストの日時・経路・結果・IP アドレスなど)は、Google Cloud Logging に最大 30 日保存します。ログには、話した内容・記録の中身を書かないようにしています。
-- Firestore の別保存(バックアップ)は取っていません。障害対応のため、Firestore が自動で持つ直前の版(最大 1 時間)が残ることがあります。
+- 障害やデータの破損に備えて、Firestore のバックアップを取っています。直前 7 日間の任意の時点に戻すための記録と、1 日 1 回の複製(14 日間保持)があり、どちらも期限が来ると自動的に消えます。
 
 ## 4. アカウントと情報の削除
 - 設定の「アカウントを削除」から、アプリ内で削除できます。削除すると、作ったアプリと共有リンクが使えなくなり、端末のデータを消し、Firebase のアカウントを削除し、Sign in with Apple の連携を解除(トークンの失効)します。
 - サーバー上のデータは、削除の操作の時点で使えなくし(論理削除)、30 日以内に消去します。ほかの人と共有しているアプリへの投稿は残ります。
+- 消去したデータも、バックアップには最大 14 日間残り、その後自動的に消えます。バックアップは障害からの復旧にだけ使い、復旧したときは消去済みのデータを改めて消去します。
 - 作ったアプリを 1 つずつ削除した場合は、そのアプリのサーバー上のデータをその時点で消去します。
 
 ## 5. お子さまの利用
@@ -94,11 +95,11 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 - **Sign-in:** Sign in with Apple or anonymous, via Google Firebase Authentication. Firebase stores your user ID and, if Apple provides them, your name and email (or Apple's private relay address). Our own server (Firestore) uses only the user ID.
 - **Voice:** Speech is transcribed **on the device** (WhisperKit). **Audio is never uploaded.**
 - **Third-party AI:** Only **after your explicit consent**, the transcribed/typed request, the current conversation and the current app design (screen/field names) are sent through our server (Google Cloud Run, Tokyo) to **Anthropic, PBC (USA, "Claude")** solely to build or edit your app. The contents of your records are not sent when building, editing or chatting. If your app has an "AI write" button (where available) and you tap it, the recent records or form values configured for that button (up to 4KB of text) are sent. Under Anthropic's commercial terms, API inputs and outputs are not used to train their models. Without consent you can still view and use your apps. You can withdraw consent in Settings at any time.
-- **Storage:** App designs, version history and records (including downscaled photos you add) are stored on the device and in Google Cloud Firestore (Tokyo). Chat state is kept on the server for up to 30 minutes. Server logs are kept for up to 30 days. No separate Firestore backups are taken.
+- **Storage:** App designs, version history and records (including downscaled photos you add) are stored on the device and in Google Cloud Firestore (Tokyo). Chat state is kept on the server for up to 30 minutes. Server logs are kept for up to 30 days. We keep Firestore backups to recover from failures: point-in-time recovery data for the last 7 days and daily backups kept for 14 days. Both expire automatically.
 - **Device features** (microphone, camera/photos, location, motion, Health, local network, Apple Music, notifications) are used only where available in your build, only when your app uses them, and with your permission. Health data stays on the device and is never used for advertising.
 - **Sharing / public data** (where available): shared links, the "Discover" catalog and data marked "public" can be seen by others. You can withdraw sharing at any time.
 - **Payments** (if offered) are processed by Apple; we never receive payment details.
 - **No ads, tracking or analytics SDKs.** We do not sell data.
-- **Deletion:** Delete your account in Settings. Server data becomes unavailable immediately and is erased within 30 days. Posts in apps shared with others remain.
+- **Deletion:** Delete your account in Settings. Server data becomes unavailable immediately and is erased within 30 days. Posts in apps shared with others remain. Erased data may remain in backups for up to 14 more days until they expire. Backups are used only for disaster recovery; if we restore one, we erase previously deleted data again.
 - **Children:** Not intended for children under 13.
 - **Contact:** support@tailor-it.app
