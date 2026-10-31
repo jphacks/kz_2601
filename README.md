@@ -185,6 +185,6 @@ flowchart LR
 - [決定事項の正典](docs/00_decisions.md)
 - [目標と要件](docs/01_goals_and_requirements.md)
 - [DSL の仕様・部品一覧](docs/dsl/README.md)
-- 設計: [iOS](docs/ios/architecture.md) / [backend](docs/backend/architecture.md) / [GCP の構成](docs/infra/gcp-setup.md)
+- 設計: [iOS](docs/ios/architecture.md) / [backend](docs/backend/architecture.md) / [GCP の構成](docs/infra/gcp-setup.md) / [認証情報の棚卸し](docs/infra/credentials-inventory.md)
 - [生成の品質と速さの計測](docs/backend/ai-eval)
 - [審査デモの台本](docs/03_demo_script.md)
