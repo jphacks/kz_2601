@@ -12,6 +12,7 @@ final class ReviewBuildTests: XCTestCase {
             XCTAssertTrue(allowed.contains(t), t)
         }
         XCTAssertEqual(ClientCapabilities.reviewDisabledFeatures, ["fieldHealth", "cameraCapture", "sharedData"])
+        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention"]) // #482: 審査用の版も記録の自動削除を持つ
         XCTAssertFalse(allowed.contains(ComponentType.chatThread.rawValue), "他の人と記録を見る chatThread は外す(#451 G2)")
     }
 

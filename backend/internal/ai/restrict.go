@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -28,6 +29,12 @@ const (
 	FeatureSharedData = "sharedData"
 )
 
+// FeatureRecordRetention (#482) is a supportedFeatures value: the iOS build
+// purges records past Entity.retentionDays. A client that sends
+// allowedComponents (v1.0 and later) without it ignores retentionDays, so the
+// AI must not promise auto-delete there.
+const FeatureRecordRetention = "recordRetention"
+
 // Restriction is the per-request set of unusable parts. The zero value means
 // no restriction.
 type Restriction struct {
@@ -35,7 +42,9 @@ type Restriction struct {
 	noHealth   bool
 	noCamera   bool
 	noShared   bool
-	key        string // "" = no restriction; memo key otherwise
+	// noRetention (#482): the client cannot purge (Entity.retentionDays)
+	noRetention bool
+	key         string // "" = no restriction; memo key otherwise
 }
 
 // knownComponentTypes are the container and leaf types of the canonical schema.
@@ -91,11 +100,31 @@ func NewRestriction(allowed, disabled []string) Restriction {
 			r.noShared = true
 		}
 	}
-	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared {
-		r.key = strings.Join(r.Disallowed(), ",") + fmt.Sprintf("|h=%t|c=%t|s=%t", r.noHealth, r.noCamera, r.noShared)
+	r.setKey()
+	return r
+}
+
+// NewClientRestriction is NewRestriction plus the client's supportedFeatures
+// (#482). Only a client that sends allowedComponents is judged by them: one
+// that sends neither (dev builds, ai-eval, smoke) stays unrestricted.
+func NewClientRestriction(allowed, disabled, supported []string) Restriction {
+	r := NewRestriction(allowed, disabled)
+	if len(allowed) > 0 && !slices.Contains(supported, FeatureRecordRetention) {
+		r.noRetention = true
+		r.setKey()
 	}
 	return r
 }
+
+func (r *Restriction) setKey() {
+	r.key = ""
+	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared || r.noRetention {
+		r.key = strings.Join(r.Disallowed(), ",") + fmt.Sprintf("|h=%t|c=%t|s=%t|r=%t", r.noHealth, r.noCamera, r.noShared, r.noRetention)
+	}
+}
+
+// NoRetention reports whether Entity.retentionDays is unavailable (#482).
+func (r Restriction) NoRetention() bool { return r.noRetention }
 
 // Active reports whether anything is restricted.
 func (r Restriction) Active() bool { return r.key != "" }
@@ -223,6 +252,12 @@ func restrictSchemaJSON(raw []byte, r Restriction) []byte {
 	}
 	if r.noShared {
 		restrictEntitySharing(defs)
+	}
+	if r.noRetention {
+		if entity, _ := defs["Entity"].(map[string]any); entity != nil {
+			props, _ := entity["properties"].(map[string]any)
+			delete(props, "retentionDays")
+		}
 	}
 	if r.disallowed[string(dsl.CompWebView)] {
 		// openUrlButton's description points to webView for embedding (#452 G3)
@@ -362,6 +397,10 @@ func buildRestrictedPrompt(system string, r Restriction) string {
 	if r.noShared {
 		s = dropSharingRules(s)
 	}
+	if r.noRetention {
+		s = strings.Replace(s, "\n\n"+retentionRules, "", 1)
+		s = strings.Replace(s, retentionChatRule, noRetentionChatRule, 1)
+	}
 
 	// Rule lines that route an utterance to a disallowed part
 	// (「歩数を見たい」は healthStat ...) are dropped.
@@ -410,6 +449,9 @@ func restrictionNote(r Restriction) string {
 	}
 	if r.noShared {
 		b.WriteString("- 記録はすべて自分だけ(private)。entity の scope / edit / marks、$author・$marks は使わない。「みんなで」「共有」「投稿」「ランキング」「掲示板」「チャット」のように他の人とデータを見る依頼は、このアプリの版ではできないと伝え、自分だけの記録で近い形を作る。\n")
+	}
+	if r.noRetention {
+		b.WriteString("- 記録の自動削除(entity の retentionDays)は使わない(この版では期間を過ぎた記録を消せない)。頼まれたら「この版では記録の自動削除はできません。最新版に更新すると使えます」と伝え、ほかの変更だけ行う。\n")
 	}
 	if r.noCamera {
 		b.WriteString("- photoField / videoField の source は library だけ(カメラで撮影はできない。写真・動画はライブラリから選ぶ)。camera / both は使わない。\n")
@@ -467,7 +509,30 @@ func restrictionViolations(raw, base []byte, r Restriction) []string {
 			}
 		}
 	}
+	if r.noRetention {
+		prev := map[string]bool{}
+		for _, id := range retentionEntities(base) {
+			prev[id] = true
+		}
+		for _, id := range retentionEntities(raw) {
+			if !prev[id] {
+				out = append(out, fmt.Sprintf("entity %q: retentionDays (auto-delete) is not available in this app build: omit it", id))
+			}
+		}
+	}
 	return out
+}
+
+// retentionEntities lists entities with retentionDays in a DSL document (#482).
+func retentionEntities(raw []byte) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var app dsl.App
+	if err := json.Unmarshal(raw, &app); err != nil {
+		return nil
+	}
+	return app.RetentionEntities()
 }
 
 // sharedEntities lists the ids of entities other users see (scope shared /
@@ -513,7 +578,7 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 		return raw, nil, false
 	}
 	removed := map[string]int{}
-	var health, camera, private int
+	var health, camera, private, retention int
 	var fixComps func([]any) []any
 	fixComps = func(cs []any) []any {
 		kept := make([]any, 0, len(cs))
@@ -589,7 +654,19 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 			}
 		}
 	}
-	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 {
+	if r.noRetention {
+		if ents, ok := root["entities"].([]any); ok {
+			for _, e := range ents {
+				if em, _ := e.(map[string]any); em != nil {
+					if _, has := em["retentionDays"]; has {
+						delete(em, "retentionDays")
+						retention++
+					}
+				}
+			}
+		}
+	}
+	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 {
 		return raw, nil, false
 	}
 	for _, t := range sortedIntKeys(removed) {
@@ -603,6 +680,9 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 	}
 	if private > 0 {
 		notes = append(notes, fmt.Sprintf("made %d entities private", private))
+	}
+	if retention > 0 {
+		notes = append(notes, fmt.Sprintf("dropped retentionDays on %d entity(ies)", retention))
 	}
 	b, err := json.Marshal(root)
 	if err != nil {
