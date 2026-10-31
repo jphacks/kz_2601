@@ -237,6 +237,7 @@ func (a *App) Validate() error {
 			add("entity %q edit %q must be author or members", e.ID, e.Edit)
 		}
 		checkEntityMarks(e, add)
+		checkEntityRetention(e, add)
 		seen := map[string]bool{}
 		for j, f := range e.Fields {
 			if !idRe.MatchString(f.ID) {

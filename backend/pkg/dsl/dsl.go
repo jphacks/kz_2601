@@ -83,7 +83,10 @@ type Entity struct {
 	Scope      EntityScope `json:"scope,omitempty"` // "" = private
 	Edit       EntityEdit  `json:"edit,omitempty"`  // "" = author (shared/public only)
 	Marks      []Mark      `json:"marks,omitempty"` // per-user toggles: like / save (#255, shared/public only)
-	Fields     []Field     `json:"fields"`
+	// RetentionDays (#482): iOS deletes records older than this many days
+	// (from createdAt); 0 = keep forever. Shared/public: each user's own only.
+	RetentionDays int     `json:"retentionDays,omitempty"`
+	Fields        []Field `json:"fields"`
 }
 
 // EntityEdit says who may update a shared/public record. Deleting is always
