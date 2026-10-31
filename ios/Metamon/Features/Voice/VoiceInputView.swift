@@ -210,7 +210,7 @@ struct VoiceInputView: View {
                     LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
                         .onEnded { _ in if phase == .idle { rt.openSwitcher() } }
                 )
-                .accessibilityHint("長押しで変身一覧")
+                .accessibilityHint(L10n.key("長押しで変身一覧", review: "長押しで記録帳の一覧"))
             Text(statusText)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(phase == .listening ? Theme.Colors.recordA : .secondary)
@@ -406,7 +406,7 @@ struct VoiceInputView: View {
         case .idle: return transcriber.isReady ? L10n.tr("タップして話す") : VoiceModelCopy.notReadyStatus
         case .listening: return L10n.tr("聞いています… もう一度タップで終了")
         case .transcribing: return L10n.tr("文字起こし中…")
-        case .thinking: return rt.isChatting ? ClarifyCopy.thinking : L10n.tr("アプリを考えています…")
+        case .thinking: return rt.isChatting ? ClarifyCopy.thinking : L10n.pick(L10n.tr("アプリを考えています…"), review: L10n.tr("記録帳の形を考えています…"))
         }
     }
 

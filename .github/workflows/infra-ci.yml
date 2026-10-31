@@ -1,0 +1,35 @@
+# infra(Terraform)の CI。fmt と validate だけ(GCP には触らない・backend なしで init)。
+# required check にはしていないので、workflow レベルの paths フィルタで infra/ を触った時だけ動かす。
+name: infra-ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths: ["infra/**", ".github/workflows/infra-ci.yml"]
+  push:
+    branches: [develop, main]
+    paths: ["infra/**", ".github/workflows/infra-ci.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+      - name: import ブロックも含めて validate
+        run: |
+          cp imports.prod.tf.example imports.tf
+          terraform validate
+          rm imports.tf

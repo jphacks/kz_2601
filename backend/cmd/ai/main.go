@@ -12,10 +12,9 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/ai"
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
-
-	"cloud.google.com/go/firestore"
 )
 
 func env(key, def string) string {
@@ -26,6 +25,12 @@ func env(key, def string) string {
 }
 
 func main() {
+	// stg must not use the production Firestore unless ALLOW_SHARED_PROD_DB=1 (#290)
+	if shared, err := fsenv.Check(fsenv.FromEnv(os.Getenv), os.Getenv); err != nil {
+		log.Fatalf("ai: refusing to start: %v", err)
+	} else if shared {
+		log.Printf("ai: warning: stg shares the production Firestore (ALLOW_SHARED_PROD_DB=1)")
+	}
 	port := env("PORT", "8081")
 	model := env("CLAUDE_MODEL", "claude-sonnet-5-5")
 	effort := env("CLAUDE_EFFORT", "low")
@@ -89,6 +94,7 @@ func main() {
 //	                    or AUTH_MODE=dev, off for a bare local run
 //	RATE_LIMIT_STORE    firestore (default with GOOGLE_CLOUD_PROJECT) | memory
 //	RATE_LIMIT_COLLECTION  Firestore collection (default rateLimits)
+//	FIRESTORE_DATABASE  database ID (default "(default)"; internal/fsenv)
 //
 // Limits/weights: ratelimit.ConfigFromEnv.
 func withRateLimit(h http.Handler, verifier auth.IdentityVerifier) http.Handler {
@@ -113,7 +119,7 @@ func withRateLimit(h http.Handler, verifier auth.IdentityVerifier) http.Handler 
 	var store ratelimit.Store = ratelimit.NewMemory()
 	storeName := "memory"
 	if project != "" && os.Getenv("RATE_LIMIT_STORE") != "memory" {
-		client, err := firestore.NewClient(ctx, project)
+		client, err := fsenv.NewClient(ctx, fsenv.FromEnv(os.Getenv))
 		if err != nil {
 			log.Printf("ai: firestore init failed: %v (rate limit counts in memory)", err)
 		} else {

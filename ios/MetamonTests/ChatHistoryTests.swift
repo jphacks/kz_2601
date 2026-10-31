@@ -3,7 +3,7 @@ import MetamonDSL
 import MetamonServices
 @testable import Metamon
 
-/// アプリごとのチャット履歴(#210)。保存と復元・30 件で切り捨て・反映の区切り・AI に送る文脈・削除で消えること。
+/// アプリごとのチャット履歴(#210)。保存と復元・上限件数で切り捨て・反映の区切り・AI に送る文脈・削除で消えること。
 @MainActor
 final class ChatHistoryTests: XCTestCase {
     private var suiteName = ""
@@ -18,8 +18,30 @@ final class ChatHistoryTests: XCTestCase {
         UserDefaults().removePersistentDomain(forName: suiteName)
     }
 
-    private func makeEditRuntime() throws -> AppRuntime {
-        let services = BuildConfig.make(environment: .mock)
+    /// generate を「何も変わらなかった」(#211)にできるモック
+    final class UnchangedAI: AIClient, @unchecked Sendable {
+        let base = MockAIClient(delay: .milliseconds(10))
+        private let lock = NSLock()
+        private var _unchanged = false
+        var unchanged: Bool {
+            get { lock.withLock { _unchanged } }
+            set { lock.withLock { _unchanged = newValue } }
+        }
+
+        func morph(transcript: String, appId: String, currentVersion: Int) async throws -> MorphResult {
+            var result = try await base.morph(transcript: transcript, appId: appId, currentVersion: currentVersion)
+            if unchanged { result.unchanged = true; result.summary = "変更できませんでした" }
+            return result
+        }
+        func chat(appId: String, messages: [ChatMessage], locale: String?, mode: ChatMode?) async throws -> ChatTurn {
+            try await base.chat(appId: appId, messages: messages, locale: locale, mode: mode)
+        }
+        func resetChat(appId: String) async {}
+    }
+
+    private func makeEditRuntime(ai: AIClient? = nil) throws -> AppRuntime {
+        var services = BuildConfig.make(environment: .mock)
+        if let ai { services.ai = ai }
         let doc = try DSLExamples.document("kakeibo", version: 1)
         let rt = AppRuntime(document: doc, services: services)
         rt.clarifyEnabled = true
@@ -38,13 +60,52 @@ final class ChatHistoryTests: XCTestCase {
         XCTAssertEqual(store.load(appId: "c"), [])
     }
 
-    func testStoreKeepsLatest30() {
-        let entries = (1...45).map { ChatHistoryEntry(kind: .user, text: "m\($0)") }
+    func testStoreKeepsLatestLimit() {
+        let total = ChatHistoryStore.limit + 15
+        let entries = (1...total).map { ChatHistoryEntry(kind: .user, text: "m\($0)") }
         store.save(entries, appId: "a")
         let loaded = store.load(appId: "a")
         XCTAssertEqual(loaded.count, ChatHistoryStore.limit)
         XCTAssertEqual(loaded.first?.text, "m16")
-        XCTAssertEqual(loaded.last?.text, "m45")
+        XCTAssertEqual(loaded.last?.text, "m\(total)")
+    }
+
+    // MARK: - 回帰: 指示を重ねても履歴が消えない
+
+    func testManyAppliesKeepFirstConversation() async throws {
+        let rt = try makeEditRuntime()
+        for i in 1...12 {
+            await rt.submitUtterance("修正\(i)をして")
+            await rt.buildFromChat()
+            XCTAssertEqual(rt.document.version, i + 1)
+        }
+        XCTAssertEqual(rt.chatHistory.first?.text, "修正1をして", "修正を 12 回重ねても最初の会話が残る(30 件上限で押し出されていた)")
+        XCTAssertEqual(rt.chatHistory.filter { $0.kind == .applied }.count, 12)
+        XCTAssertEqual(store.load(appId: rt.document.appId), rt.chatHistory)
+    }
+
+    func testUnchangedReopenDoesNotDuplicateConversation() async throws {
+        let ai = UnchangedAI()
+        let rt = try makeEditRuntime(ai: ai)
+        await rt.submitUtterance("金額を大きくして")
+        await rt.buildFromChat()
+        let before = rt.chatHistory
+        XCTAssertEqual(before.map(\.kind), [.user, .assistant, .applied])
+
+        ai.unchanged = true
+        await rt.submitUtterance("見やすくして")
+        for _ in 1...3 { // 何も変わらない → 開き直し、を繰り返す
+            await rt.buildFromChat()
+            XCTAssertTrue(rt.showVoiceSheet)
+            XCTAssertEqual(rt.chatHistory, before, "開き直した会話を閉じた履歴に二重に残さない")
+        }
+        XCTAssertEqual(rt.chatBubbles.map(\.role), [.user, .assistant, .assistant, .assistant, .assistant])
+        XCTAssertEqual(store.load(appId: rt.document.appId).count, before.count + rt.chatBubbles.count)
+
+        ai.unchanged = false
+        await rt.buildFromChat()
+        XCTAssertEqual(rt.chatHistory.count, before.count + 5 + 1, "反映で今の会話が 1 回だけ移る + 区切り")
+        XCTAssertEqual(rt.chatHistory.filter { $0.text == "見やすくして" }.count, 1)
     }
 
     // MARK: - 反映の区切りと復元

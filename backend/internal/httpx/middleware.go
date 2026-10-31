@@ -86,13 +86,14 @@ func Log(logger *slog.Logger) func(http.Handler) http.Handler {
 			started := time.Now()
 			recorder := asRecorder(w)
 			defer func() {
-				logger.InfoContext(r.Context(), "request",
+				attrs := []any{
 					slog.String("method", r.Method),
 					slog.String("path", r.URL.Path),
 					slog.Int("status", recorder.status),
 					slog.Duration("duration", time.Since(started)),
 					slog.String("requestId", RequestID(r.Context())),
-				)
+				}
+				logger.InfoContext(r.Context(), "request", append(attrs, clientAttrs(r)...)...)
 			}()
 			next.ServeHTTP(recorder, r)
 		})

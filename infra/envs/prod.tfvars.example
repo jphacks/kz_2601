@@ -1,0 +1,24 @@
+# cp envs/prod.tfvars.example envs/prod.tfvars して値を埋める(prod.tfvars はコミットしない)
+env        = "prod"
+project_id = "jphacks-kz2601"
+region     = "asia-northeast1"
+
+# WIF: 既定は main だけ。import 直後に差分 0 を確かめるときは [](今と同じ「リポジトリだけ」)にする
+# wif_allowed_refs = []
+
+# Firestore: #288 の判断ではリリース前に有効化する。import 直後に差分 0 を確かめるときは false にする
+firestore_pitr_enabled      = true
+firestore_delete_protection = true
+
+# 消去ジョブ: 今のジョブのイメージ(digest)。作成後のイメージ更新は Terraform は追わない
+purge_enabled   = true
+purge_job_image = "asia-northeast1-docker.pkg.dev/jphacks-kz2601/backend/backend@sha256:<digest>"
+
+billing_account     = "XXXXXX-XXXXXX-XXXXXX"
+budget_display_name = "kz2601 monthly"
+budget_amount       = 4500
+budget_currency     = "JPY"
+
+# imports.tf(imports.prod.tf.example のコピー)を使う間だけ
+# import_project_number = "378953239426"
+# import_budget_id      = "<gcloud billing budgets list の name の末尾>"

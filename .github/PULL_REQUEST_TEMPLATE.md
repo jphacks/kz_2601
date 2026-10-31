@@ -1,5 +1,7 @@
 ## 背景
 <!-- なぜこの変更が必要か。関連 Issue / docs/01 の要件ID(F01 など) -->
+<!-- base が develop だと Closes でも Issue は自動で閉じない。マージした人が手で閉じる -->
+Closes #
 
 ## スコープ
 <!-- このPRでやること / やらないこと を箇条書きで明確に -->
@@ -34,4 +36,6 @@
 ## チェック
 - [ ] 秘密情報(APIキー・GoogleService-Info.plist 等)を含まない
 - [ ] CI 緑
-- [ ] Conventional Commits
+- [ ] Conventional Commits(件名は日本語)
+- [ ] Assignee と Milestone を付けた(`/jphacks-task` の PR は Milestone なし)
+- [ ] Issue の「完了の条件」を満たした

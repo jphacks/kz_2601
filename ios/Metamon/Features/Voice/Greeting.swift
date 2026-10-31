@@ -27,29 +27,29 @@ enum Greeting {
         let hello = timeOfDay(date, calendar: calendar)
         switch context {
         case .firstVisit:
-            return Copy(title: L10n.tr("どんなアプリが欲しいですか?"),
-                        subtitle: L10n.tr("\(hello)。話しかけるだけで、アプリが生まれ変わります"))
+            return Copy(title: L10n.pick(L10n.tr("どんなアプリが欲しいですか?"), review: L10n.tr("何を記録したいですか?")),
+                        subtitle: L10n.pick(L10n.tr("\(hello)。話しかけるだけで、アプリが生まれ変わります"), review: L10n.tr("\(hello)。話すだけで、記録帳の形が変わります")))
         case .returning:
-            return Copy(title: L10n.tr("おかえりなさい。\n今日は何を作りますか?"),
-                        subtitle: L10n.tr("\(hello)。「アプリ一覧」と話すか、マイクを長押しすると前に作ったアプリを呼び出せます"))
+            return Copy(title: L10n.pick(L10n.tr("おかえりなさい。\n今日は何を作りますか?"), review: L10n.tr("おかえりなさい。\n今日は何を記録しますか?")),
+                        subtitle: L10n.pick(L10n.tr("\(hello)。「アプリ一覧」と話すか、マイクを長押しすると前に作ったアプリを呼び出せます"), review: L10n.tr("\(hello)。マイクを長押しすると、前に用意した記録帳を呼び出せます")))
         case .newApp:
-            return Copy(title: L10n.tr("新しいアプリですね。\nどんなアプリにしますか?"),
-                        subtitle: L10n.tr("前のアプリは、マイクの長押しからいつでも戻せます"))
+            return Copy(title: L10n.pick(L10n.tr("新しいアプリですね。\nどんなアプリにしますか?"), review: L10n.tr("新しい記録帳ですね。\n何を記録しますか?")),
+                        subtitle: L10n.pick(L10n.tr("前のアプリは、マイクの長押しからいつでも戻せます"), review: L10n.tr("前の記録帳は、マイクの長押しからいつでも戻せます")))
         case .home:
-            return Copy(title: L10n.tr("おかえりなさい。\n次は何を作りますか?"),
-                        subtitle: L10n.tr("\(hello)。前のアプリは、マイクの長押しからいつでも戻せます"))
+            return Copy(title: L10n.pick(L10n.tr("おかえりなさい。\n次は何を作りますか?"), review: L10n.tr("おかえりなさい。\n次は何を記録しますか?")),
+                        subtitle: L10n.pick(L10n.tr("\(hello)。前のアプリは、マイクの長押しからいつでも戻せます"), review: L10n.tr("\(hello)。前の記録帳は、マイクの長押しからいつでも戻せます")))
         case .editing:
-            return Copy(title: L10n.tr("このアプリをどう変えますか?"),
-                        subtitle: L10n.tr("話しかけると、このアプリが育ちます"))
+            return Copy(title: L10n.pick(L10n.tr("このアプリをどう変えますか?"), review: L10n.tr("この記録帳をどう直しますか?")),
+                        subtitle: L10n.pick(L10n.tr("話しかけると、このアプリが育ちます"), review: L10n.tr("話すと、この記録帳を直せます")))
         }
     }
 
     /// 変身一覧シートの見出し。
-    static var switcherTitle: String { L10n.tr("変身一覧") }
+    static var switcherTitle: String { L10n.pick(L10n.tr("変身一覧"), review: L10n.tr("記録帳の一覧")) }
     static var switcherSubtitle: String { L10n.tr("タップで切り替え。マイクを長押しすると、いつでもここに戻れます") }
-    static var switcherEmpty: String { L10n.tr("まだ他のアプリはありません。\n「+ 新しいアプリ」から 2 つ目を作れます") }
+    static var switcherEmpty: String { L10n.pick(L10n.tr("まだ他のアプリはありません。\n「+ 新しいアプリ」から 2 つ目を作れます"), review: L10n.tr("まだ他の記録帳はありません。\n「+ 新しい記録帳」から 2 つ目を用意できます")) }
     static var currentBadge: String { L10n.tr("使用中") }
-    static var newAppAction: String { L10n.tr("新しいアプリ") }
+    static var newAppAction: String { L10n.pick(L10n.tr("新しいアプリ"), review: L10n.tr("新しい記録帳")) }
     static var homeAction: String { L10n.tr("Tailor It に戻る(初期画面)") }
 
     /// 例文チップのカテゴリ(#274)。初期画面で上の行がカテゴリ、下の行がそのカテゴリの例。
@@ -70,7 +70,7 @@ enum Greeting {
             ExampleCategory(id: "habit", title: L10n.tr("習慣"),
                             examples: [L10n.tr("毎日の水の量"), L10n.tr("薬の飲み忘れ防止"), L10n.tr("早起きチェック")]),
             ExampleCategory(id: "money", title: L10n.tr("お金"),
-                            examples: [L10n.tr("家計簿アプリが欲しい"), L10n.tr("おこづかい帳"), L10n.tr("サブスクの管理")]),
+                            examples: [L10n.pick(L10n.tr("家計簿アプリが欲しい"), review: L10n.tr("家計簿をつけたい")), L10n.tr("おこづかい帳"), L10n.tr("サブスクの管理")]),
             ExampleCategory(id: "together", title: L10n.tr("家族・友達と"), examples: together),
             ExampleCategory(id: "game", title: L10n.tr("ゲーム"),
                             examples: [L10n.tr("ボードゲームの勝ち負け記録"), L10n.tr("ボウリングのスコア表")]),

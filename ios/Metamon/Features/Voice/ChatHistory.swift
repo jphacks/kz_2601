@@ -17,7 +17,8 @@ struct ChatHistoryEntry: Codable, Equatable, Identifiable, Sendable {
 /// モック起動(`METAMON_MOCK=1`・UI テスト)とユニットテストは、前の起動・別のテストの履歴を持ち込まないようメモリだけに置く
 /// (`AppRuntime` ごとに新しい保存先。`METAMON_KEEP_CHAT_HISTORY=1` なら実機と同じ UserDefaults)。
 final class ChatHistoryStore: @unchecked Sendable {
-    static let limit = 30
+    /// 30 件では修正を 6〜10 回重ねるだけで最初の会話から消え、「履歴がリセットされた」ように見えた
+    static let limit = 200
     static let keyPrefix = "metamon.chatHistory."
     static let shared = ChatHistoryStore(defaults: .standard)
 

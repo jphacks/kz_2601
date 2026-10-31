@@ -39,14 +39,14 @@ struct SettingsSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) { Button("閉じる") { dismiss() } }
             }
-            .confirmationDialog("アプリを初期状態に戻しますか？", isPresented: $confirmReset, titleVisibility: .visible) {
+            .confirmationDialog(L10n.key("アプリを初期状態に戻しますか？", review: "今の記録帳を初期状態に戻しますか？"), isPresented: $confirmReset, titleVisibility: .visible) {
                 Button("初期状態に戻す", role: .destructive) {
                     rt.resetToInitial()
                     dismiss()
                 }
                 Button("キャンセル", role: .cancel) {}
             } message: {
-                Text("生成したアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。")
+                Text(L10n.key("生成したアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。", review: "今の記録帳は音声画面だけの状態に戻ります。サーバー上のデータは削除されません。"))
             }
         }
         .presentationDetents([.medium, .large])
@@ -55,7 +55,7 @@ struct SettingsSheet: View {
             Button("削除する", role: .destructive) { deleteAccount() }
             Button("キャンセル", role: .cancel) {}
         } message: {
-            Text("アカウントとすべてのアプリが使えなくなります。元に戻せません。")
+            Text(L10n.key("アカウントとすべてのアプリが使えなくなります。元に戻せません。", review: "アカウントとすべての記録帳が使えなくなります。元に戻せません。"))
         }
         .alert("アカウントを削除できませんでした", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
             Button("OK", role: .cancel) {}
@@ -96,7 +96,7 @@ struct SettingsSheet: View {
                 .disabled(isDeleting)
                 .accessibilityIdentifier("settings.deleteAccount")
             } footer: {
-                Text("作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。")
+                Text(L10n.key("作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。", review: "用意した記録帳が使えなくなります。この端末のデータも消えます。"))
             }
         }
     }
@@ -176,7 +176,7 @@ struct SettingsSheet: View {
             }
             .accessibilityIdentifier("settings.language")
         } footer: {
-            Text("新しく作るアプリと質問もこの言語になります。作成済みのアプリの文言は変わりません。")
+            Text(L10n.key("新しく作るアプリと質問もこの言語になります。作成済みのアプリの文言は変わりません。", review: "新しく用意する記録帳と質問もこの言語になります。用意済みの記録帳の文言は変わりません。"))
         }
     }
 
@@ -258,13 +258,13 @@ struct SettingsSheet: View {
             }
             .accessibilityIdentifier("settings.tips")
             Button(role: .destructive) { confirmReset = true } label: {
-                Label("アプリをリセット(初期状態に戻す)", systemImage: "arrow.counterclockwise")
+                Label(L10n.key("アプリをリセット(初期状態に戻す)", review: "記録帳をリセット(初期状態に戻す)"), systemImage: "arrow.counterclockwise")
             }
             .disabled(rt.isMorphing)
         } header: {
-            Text("アプリ")
+            Text(L10n.key("アプリ", review: "今の記録帳"))
         } footer: {
-            Text(L10n.tr("現在: \(rt.dsl.app.name)(v\(rt.document.version))") + (rt.isOffline ? L10n.tr("・オフライン(キャッシュ表示)") : "") + "\n" + L10n.tr("「元に戻して」と話しても同じ。「別のアプリ。…」と話すと新しいアプリとして作ります。"))
+            Text(L10n.tr("現在: \(rt.dsl.app.name)(v\(rt.document.version))") + (rt.isOffline ? L10n.tr("・オフライン(キャッシュ表示)") : "") + "\n" + L10n.pick(L10n.tr("「元に戻して」と話しても同じ。「別のアプリ。…」と話すと新しいアプリとして作ります。"), review: L10n.tr("「元に戻して」と話しても同じです。")))
         }
     }
 

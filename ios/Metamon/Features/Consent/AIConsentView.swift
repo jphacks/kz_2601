@@ -19,17 +19,17 @@ struct AIConsentView: View {
                         .font(.title2.bold())
                         .frame(maxWidth: .infinity)
                         .multilineTextAlignment(.center)
-                    Text("アプリを作る・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。")
+                    Text(L10n.key("アプリを作る・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。", review: "記録帳を用意する・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。"))
                         .font(.callout)
                     VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                         row("text.bubble", "話した内容・入力した文(端末内で文字にしたもの。音声そのものは送りません)")
                         row("bubble.left.and.bubble.right", "AI との会話の履歴")
-                        row("square.grid.2x2", "今のアプリの設計(画面・項目・アプリ名など)")
+                        row("square.grid.2x2", L10n.key("今のアプリの設計(画面・項目・アプリ名など)", review: "今の記録帳の画面の形(画面・項目・名前など)"))
                     }
-                    Text("送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作るためだけに使います。")
+                    Text(L10n.key("送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作るためだけに使います。", review: "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、記録帳の画面を用意するためだけに使います。"))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                    Text("アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、アプリの「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。")
+                    Text(L10n.key("アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、アプリの「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。", review: "記録帳を用意する・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、記録帳の「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、その記録帳の最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、記録帳の閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {

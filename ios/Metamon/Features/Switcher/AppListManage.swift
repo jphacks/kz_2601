@@ -81,7 +81,7 @@ struct AppRenameAlert: ViewModifier {
             get: { ui.renameTarget != nil },
             set: { if !$0 { ui.renameTarget = nil } }
         )) {
-            TextField(L10n.tr("アプリの名前"), text: $ui.renameText)
+            TextField(L10n.pick(L10n.tr("アプリの名前"), review: L10n.tr("記録帳の名前")), text: $ui.renameText)
                 .accessibilityIdentifier("switcher.rename.field")
             Button(L10n.tr("変更")) {
                 guard let app = ui.renameTarget else { return }
@@ -92,7 +92,7 @@ struct AppRenameAlert: ViewModifier {
             .accessibilityIdentifier("switcher.rename.confirm")
             Button("キャンセル", role: .cancel) {}
         } message: {
-            Text(L10n.tr("変身一覧とアプリの上に出る名前です(\(AppListEdit.maxNameLength)文字まで)。"))
+            Text(L10n.pick(L10n.tr("変身一覧とアプリの上に出る名前です(\(AppListEdit.maxNameLength)文字まで)。"), review: L10n.tr("記録帳の一覧と画面の上に出る名前です(\(AppListEdit.maxNameLength)文字まで)。")))
         }
     }
 }

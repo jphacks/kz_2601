@@ -19,7 +19,7 @@ func TestFirestoreDeactivateUser(t *testing.T) {
 	if os.Getenv("FIRESTORE_EMULATOR_HOST") == "" {
 		t.Skip("FIRESTORE_EMULATOR_HOST not set")
 	}
-	f, err := NewFirestore(context.Background(), "demo-kz2601")
+	f, err := NewFirestore(context.Background(), "demo-kz2601", "(default)")
 	if err != nil {
 		t.Fatal(err)
 	}
