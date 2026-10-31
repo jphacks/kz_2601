@@ -47,6 +47,9 @@ type Request struct {
 	// cameraCapture (unknown values ignored). See restrict.go.
 	AllowedComponents []string `json:"allowedComponents,omitempty"`
 	DisabledFeatures  []string `json:"disabledFeatures,omitempty"`
+	// SupportedFeatures (#482): optional DSL behaviors the client implements
+	// (recordRetention). See NewClientRestriction.
+	SupportedFeatures []string `json:"supportedFeatures,omitempty"`
 }
 
 // Latency is per-stage wall time in ms.
@@ -191,7 +194,7 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 // is still validated and saved before it is returned.
 func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*Result, error) {
 	started := time.Now()
-	restrict := NewRestriction(req.AllowedComponents, req.DisabledFeatures)
+	restrict := NewClientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures)
 	ctx = withRestriction(ctx, restrict)
 	transcript := strings.TrimSpace(req.Transcript)
 	if transcript == "" {

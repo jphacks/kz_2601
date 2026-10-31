@@ -118,6 +118,13 @@ func BuildCapabilityIndex(schema []byte) (string, error) {
 	if len(ss) > 0 {
 		b.WriteString("- 記録の共有(scope): " + strings.Join(ss, " / ") + "\n")
 	}
+	// #482: dropped from the schema for builds that cannot purge (restrict.go)
+	if props, _ := entity["properties"].(map[string]any); props != nil {
+		if rd, _ := props["retentionDays"].(map[string]any); rd != nil {
+			d, _ := rd["description"].(string)
+			b.WriteString("- 記録の自動削除(retentionDays): " + shortDesc(d) + "\n")
+		}
+	}
 	// #250 #251: the poster and "only mine" on shared entities
 	values, _ := entity["x-recordValues"].(map[string]any)
 	var vs []string
