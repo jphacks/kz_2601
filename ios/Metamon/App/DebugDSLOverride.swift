@@ -7,6 +7,7 @@ import MetamonServices
 /// - `METAMON_INITIAL_DSL_PATH=<path>`: DSL JSON(AppDSL 本文)を起動時の document にする。appId はファイル名ごとに分ける(ローカルキャッシュ混在防止)
 /// - `METAMON_INITIAL_SCREEN=<screen>`: initialScreen を上書き(タブの 2 枚目を初期表示する等)
 /// - `METAMON_SEED_DUMMY=<n>`: モック時、各 entity に field 型から n 件(1〜10、既定 4)のダミーレコードを作る
+/// - `METAMON_SEED_STEP_HOURS=<h>`: ダミーレコードの作成日時の間隔(既定 1 時間。記録の保存期間 #482 の確認では 24 = 1 日ずつ古く)
 /// - `METAMON_SEED_AUTHORS=mixed`: ダミーレコードの投稿者を「自分(モックの固定 uid)/ 別の人」交互にする(`Field.hidden` #262 の確認用)
 enum DebugDSLOverride {
     private static var env: [String: String] { ProcessInfo.processInfo.environment }
@@ -28,7 +29,8 @@ enum DebugDSLOverride {
     /// ダミーレコード(override 未指定 or `METAMON_SEED_DUMMY` 無しなら nil)。
     static var seed: [String: [Record]]? {
         guard let dsl = document?.dsl, let raw = env["METAMON_SEED_DUMMY"] else { return nil }
-        let seed = DummyRecords.make(for: dsl, count: min(max(Int(raw) ?? 4, 1), 10))
+        let step = env["METAMON_SEED_STEP_HOURS"].flatMap(Double.init).map { min(max($0, 0), 24 * 365) } ?? 1
+        let seed = DummyRecords.make(for: dsl, count: min(max(Int(raw) ?? 4, 1), 10), stepHours: step)
         return env["METAMON_SEED_AUTHORS"] == "mixed" ? DummyRecords.alternatingAuthors(seed) : seed
     }
 
@@ -38,7 +40,7 @@ enum DebugDSLOverride {
 
 /// entity の field 型からそれらしいダミー値を作る。長い文字列・大きい金額を混ぜて崩れを炙り出す。
 enum DummyRecords {
-    static func make(for dsl: AppDSL, count: Int, now: Date = .now) -> [String: [Record]] {
+    static func make(for dsl: AppDSL, count: Int, now: Date = .now, stepHours: Double = 1) -> [String: [Record]] {
         let iso = ISO8601DateFormatter()
         var out: [String: [Record]] = [:]
         for entity in dsl.entities {
@@ -47,8 +49,8 @@ enum DummyRecords {
                 for f in entity.storedFields {
                     if let v = value(for: f, entity: entity, index: i, dsl: dsl, now: now) { data[f.id] = v }
                 }
-                // 新しい順に 1 時間ずつ前(`$createdAt` の並びと表示を確かめる・#250)
-                let created = iso.string(from: now.addingTimeInterval(Double(-i) * 3600))
+                // 新しい順に 1 時間(stepHours)ずつ前(`$createdAt` の並びと表示を確かめる・#250)
+                let created = iso.string(from: now.addingTimeInterval(Double(-i) * 3600 * stepHours))
                 var record = Record(id: "\(entity.id)-\(i + 1)", data: data, createdAt: created)
                 if entity.isShared {
                     // 共有 entity: 偶数番は自分(モックの uid)、奇数番はほかの人の投稿
