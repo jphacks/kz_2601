@@ -411,7 +411,7 @@ func (s *Service) chatFirstAttempt(ctx context.Context, cfg ChatConfig, system s
 	sent := false
 	start := time.Now()
 	var first time.Duration
-	resp, ttft, err := s.callChatWith(ctx, cfg, system, schema, chatFirstMaxTokens, user, ar, func(delta string) {
+	resp, ttft, err := s.callChatWith(WithOperation(ctx, OpChatFirst), cfg, system, schema, chatFirstMaxTokens, user, ar, func(delta string) {
 		if first == 0 {
 			first = time.Since(start)
 		}

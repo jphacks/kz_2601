@@ -343,7 +343,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 	var lastCandidate []byte
 	var linted *attemptResult // valid output kept while regenerating for its lint warnings
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(ctx, systemPrompt, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
+		resp, err := s.call(WithOperation(ctx, OpGenerate), systemPrompt, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
 			appEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
 			return nil, err
@@ -465,7 +465,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	var linted *attemptResult
 	baseLint := lintOf(env.DSL)
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(ctx, systemPrompt+"\n"+editRules,
+		resp, err := s.call(WithOperation(ctx, OpPatch), systemPrompt+"\n"+editRules,
 			editUserMessage(transcript, env.Version, string(env.DSL), problems, loc), PatchGenerationSchema(), ar,
 			summaryEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
