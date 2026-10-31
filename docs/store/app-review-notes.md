@@ -35,87 +35,49 @@
 
 ## 2. 英語の版(App Store Connect に貼る)
 
-```text
-Thank you for reviewing Tailor It.
+**ASC の上限は 4,000 字。超えたら入らない。** 下のブロックが実際に App Store Connect に入れた文(2026-10-31 時点・3,994 字。Python の `len()`・改行も 1 字)。直したら字数を数え直し、4,000 字を超えないこと。元の長い版(4,808 字)から、挨拶と連絡先の行・行の折り返し・補足の文(サーバーのスキーマ確認、音声モデルのダウンロード、同意しない場合、AI の費用の理由、デモアカウント、例の時刻など)を削った。連絡先は ASC の連絡先欄に入れる。
 
+```text
 WHAT THE APP DOES
 Tailor It gives each user a personal tracker or tool, set up by voice or text.
-The user says what they want to keep track of (for example "a water intake log
-with a daily goal of 2 liters" or "a shopping list grouped by store"), and Tailor It
-shows a matching screen with input fields, lists, totals, charts and reminders.
-The user can then adjust it by talking ("make the button bigger", "add a weekly total")
-and go back to any earlier version.
+The user says what they want to keep track of (for example "a water intake log with a daily goal of 2 liters" or "a shopping list grouped by store"), and Tailor It shows a matching screen with input fields, lists, totals, charts and reminders.
+The user can then adjust it by talking ("make the button bigger", "add a weekly total") and go back to any earlier version.
 
 HOW IT WORKS - NO DOWNLOADED CODE (Guideline 2.5.2)
-- Every screen element is a native SwiftUI component compiled into this binary
-  (lists, forms, charts, buttons, calendars, maps and so on).
-- Our server asks an AI model (Anthropic Claude) to return a JSON configuration.
-  The JSON only selects which built-in components to show, their labels and layout,
-  and which fields the user's records have.
-- Totals and similar values (sums, averages, days between dates, streaks) are
-  computed by a fixed, built-in evaluator with a closed list of arithmetic and date
-  operations. There are no loops, user-defined functions, network or file access.
-- The app never downloads or runs code, scripts, JavaScript, WebViews or plug-ins.
-  The server checks every JSON against our schema. In the app, a component type the
-  binary does not know is shown as an empty placeholder and does nothing, so new
-  component types can only arrive through an App Store update.
-- A user's trackers are personal content inside Tailor It (Guideline 1.2.1).
-  They are not separate apps: a tracker cannot be installed, exported or run outside
-  Tailor It, and nothing is submitted to the App Store. (Users can export their own
-  records as a CSV or PDF file through the system share sheet.)
-- Every tracker and every record is private to the user who made it. This version
-  has no public catalog, no store of other users' content, no share links, no data
-  shared between users and no chat between users.
+- Every screen element is a native SwiftUI component compiled into this binary.
+- Our server asks an AI model (Anthropic Claude) to return a JSON configuration. The JSON only selects which built-in components to show, their labels and layout, and which fields the user's records have.
+- Totals and similar values (sums, averages, days between dates, streaks) are computed by a fixed, built-in evaluator with a closed list of arithmetic and date operations. There are no loops, user-defined functions, network or file access.
+- The app never downloads or runs code, scripts, JavaScript, WebViews or plug-ins. In the app, a component type the binary does not know is shown as an empty placeholder and does nothing, so new component types can only arrive through an App Store update.
+- A user's trackers are personal content inside Tailor It (Guideline 1.2.1). They are not separate apps: a tracker cannot be installed, exported or run outside Tailor It. (Users can export their own records as a CSV or PDF file through the system share sheet.)
+- Every tracker and every record is private to the user who made it. This version has no public catalog, no store of other users' content, no share links, no data shared between users and no chat between users.
 
 DEVICE FEATURES
 Tailor It itself requests every permission, at the moment the user uses the feature:
 - Microphone: voice input. Speech is transcribed on the device (WhisperKit).
-- Photos: attaching a picture from the photo library (system photo picker).
+- Photos: attaching a picture from the photo library.
 - Camera: scanning a QR code into a field.
-- Location (while using the app only): saving the current place once, shown on a map,
-  and walking/driving directions to a destination while the screen is open
-  (no background location).
-- Apple Music: searching and playing songs in a music player the user added
-  (MusicKit; playback needs the user's own Apple Music subscription).
-- Notifications: local reminders the user asks for (for example every morning at 8:00).
-- Live Activities: a timer or one number from the tracker on the Lock Screen,
-  only after the user starts it. Updated on the device, no push.
-- On-device processing: reading text or amounts from a photo the user picked
-  (Vision), and an optional "write with AI" button that uses Apple's on-device
-  model (Foundation Models). Neither sends the photo or the records anywhere.
+- Location (while using the app only): saving the current place once, shown on a map, and walking/driving directions to a destination while the screen is open (no background location).
+- Apple Music: searching and playing songs in a music player the user added (MusicKit; playback needs the user's own Apple Music subscription).
+- Notifications: local reminders the user asks for.
+- Live Activities: a timer or one number from the tracker on the Lock Screen, only after the user starts it. Updated on the device, no push.
+- On-device processing: reading text or amounts from a photo the user picked (Vision), and an optional "write with AI" button that uses Apple's on-device model (Foundation Models). Neither sends the photo or the records anywhere.
 
 PRIVACY
-- Before the first AI request we show a consent screen. It explains that what the
-  user says or types, the chat, and the tracker's layout are sent to Anthropic's AI
-  through our server to set up the screen (Guideline 5.1.2(i)). The contents of the
-  user's records are not sent. Without consent the user can still view and use
-  existing trackers; only setting up and changing them by AI is unavailable.
-  Consent can be withdrawn in Settings > Privacy.
-- The speech model (about 500 MB) is downloaded only after the user confirms.
-  Text input works without it.
-- Account deletion: Settings (gear icon) > Delete Account. It deletes the account,
-  makes all of the user's trackers and records unavailable at once (then erases them
-  as described in the Privacy Policy), clears the data on the device, and revokes the
-  Sign in with Apple token.
-- Privacy Policy and Terms of Use: Settings > Privacy, and in the App Store metadata.
+- Before the first AI request we show a consent screen. It explains that what the user says or types, the chat, and the tracker's layout are sent to Anthropic's AI through our server to set up the screen (Guideline 5.1.2(i)). The contents of the user's records are not sent. Consent can be withdrawn in Settings > Privacy.
+- Account deletion: Settings (gear icon) > Delete Account. It deletes the account, makes all of the user's trackers and records unavailable at once (then erases them as described in the Privacy Policy), clears the data on the device, and revokes the Sign in with Apple token.
 
 NO IN-APP PURCHASES
 - This version is free and has no in-app purchases or subscriptions.
-- To keep the AI cost on our server under control, each account has a daily limit
-  on AI requests. When it is reached, the app says that the limit for today has been
-  reached and when it can be used again (the next day). Existing trackers and records
-  can still be viewed and used.
+- Each account has a daily limit on AI requests. When it is reached, the app says that the limit for today has been reached and when it can be used again (the next day).
 
-HOW TO TEST (about 2 minutes)
-1. Sign in with the demo account in the sign-in information, or tap
-   "Use without signing in (anonymous)".
+HOW TO TEST
+1. Tap "Use without signing in (anonymous)".
 2. Accept the AI consent screen.
 3. Tap the mic or type: "Make a water intake log with a daily goal of 2 liters."
 4. Add a few entries, then say or type: "Show a weekly chart."
 5. Settings shows Privacy and Delete Account.
 
 Our backend runs for the whole review period.
-Contact: <name>, <email>, <phone>
 ```
 
 ### [WEB PAGES] `webView` を外さない場合の差し替え
@@ -123,20 +85,15 @@ Contact: <name>, <email>, <phone>
 `HOW IT WORKS` の 4 つ目の箇条を次に替える(「WebView を使わない」とは書かない)。
 
 ```text
-- The app never downloads or runs code, scripts or plug-ins. The server checks every
-  JSON against our schema. In the app, a component type the binary does not know is
-  shown as an empty placeholder and does nothing, so new component types can only
-  arrive through an App Store update.
-- One component can show a single https web page inside the tracker, the same way a
-  browser would. The page has no bridge to the app: no injected scripts, no message
-  handlers, and no access to the user's records or device features.
+- The app never downloads or runs code, scripts or plug-ins. In the app, a component type the binary does not know is shown as an empty placeholder and does nothing, so new component types can only arrive through an App Store update.
+- One component can show a single https web page inside the tracker, the same way a browser would. The page has no bridge to the app: no injected scripts, no message handlers, and no access to the user's records or device features.
 ```
 
 ## 3. 日本語の版(確認用)
 
-```text
-Tailor It の審査をありがとうございます。
+2 章の英語の版(実際に入れた文)と同じ中身に揃えている。
 
+```text
 このアプリでできること
 声か文字で、自分専用の記録帳・ツールを用意できます。記録したいこと(例:「1 日 2 リットルを
 目標に水分を記録したい」「お店ごとに分けた買い物リスト」)を話すと、入力欄・一覧・合計・
@@ -151,10 +108,10 @@ Tailor It の審査をありがとうございます。
   決まった四則演算と日付の操作だけで計算します。繰り返し・独自の関数・通信・ファイルの読み書きは
   ありません。
 - コード・スクリプト・JavaScript・WebView・プラグインをダウンロードも実行もしません。
-  サーバーはすべての JSON をスキーマで確かめます。アプリは、バイナリが知らない部品を空の枠として
-  出すだけで何もしないので、新しい部品はアプリの更新でしか増えません。
+  アプリは、バイナリが知らない部品を空の枠として出すだけで何もしないので、新しい部品は
+  アプリの更新でしか増えません。
 - 記録帳は Tailor It の中の個人のコンテンツです(1.2.1)。別のアプリではなく、記録帳を
-  Tailor It の外でインストール・書き出し・実行はできず、App Store に何かを出すこともありません
+  Tailor It の外でインストール・書き出し・実行はできません
   (自分の記録は、共有シートから CSV / PDF のファイルにできます)。
 - 記録帳と記録は、すべて作った本人だけのものです。この版には、公開の一覧・他人の作ったものの店・
   共有リンク・他のユーザーとのデータの共有・ユーザー同士のチャットはありません。
@@ -162,13 +119,13 @@ Tailor It の審査をありがとうございます。
 端末の機能
 権限はすべて Tailor It 本体が、その機能を使う時に求めます。
 - マイク: 声の入力。書き起こしは端末の中(WhisperKit)。
-- 写真: 写真ライブラリから選んで添える(システムの写真ピッカー)。
+- 写真: 写真ライブラリから選んで添える。
 - カメラ: QR コードを読んで項目に入れる。
 - 位置(使用中のみ): 今いる場所を 1 回だけ保存し、地図で見る。画面を出している間だけ、
   目的地までの道案内(背面の位置は使わない)。
 - Apple Music: ユーザーが置いた音楽プレーヤーで曲を探して再生する(MusicKit。再生には
   本人の Apple Music の契約が要る)。
-- 通知: ユーザーが頼んだリマインダー(例: 毎朝 8 時)を端末で出す。
+- 通知: ユーザーが頼んだリマインダーを端末で出す。
 - ライブアクティビティ: ユーザーが始めた時だけ、タイマーか記録帳の数字 1 つをロック画面に出す。
   更新は端末の中だけ(push なし)。
 - 端末の中での処理: 選んだ写真から文字や金額を読む(Vision)、任意の「AI で書く」ボタン
@@ -177,29 +134,24 @@ Tailor It の審査をありがとうございます。
 プライバシー
 - 最初に AI を使う前に同意画面を出します。話した・入力した内容、会話、記録帳の設計を、
   画面を用意するためにサーバー経由で Anthropic の AI に送ると説明します(5.1.2(i))。
-  記録の中身は送りません。同意しなくても、記録帳の閲覧と記録はできます(AI での用意と変更だけ
-  使えません)。同意は 設定 > プライバシー で取り消せます。
-- 音声モデル(約 500MB)は確認してからダウンロードします。文字の入力ならダウンロード不要です。
+  記録の中身は送りません。同意は 設定 > プライバシー で取り消せます。
 - アカウントの削除: 設定(歯車)> アカウントを削除。アカウントを削除し、すべての記録帳と記録を
   すぐに使えなくして(その後プライバシーポリシーのとおり消去)、端末のデータを消し、
   Sign in with Apple のトークンを失効させます。
-- プライバシーポリシーと利用規約: 設定 > プライバシー と、App Store のメタデータ。
 
 App 内課金なし
 - この版は無料で、App 内課金・サブスクリプションはありません。
-- サーバーでの AI の費用を抑えるため、アカウントごとに AI への依頼の 1 日の上限があります。
-  上限に達すると「今日の上限に達しました」と、また使える時刻(翌日)を表示します。
-  すでにある記録帳と記録は、そのまま見て使えます。
+- アカウントごとに AI への依頼の 1 日の上限があります。上限に達すると「今日の上限に達しました」と、
+  また使える時刻(翌日)を表示します。
 
-試し方(約 2 分)
-1. サインイン情報のデモアカウントでサインインするか、「ログインせずに使う(匿名)」を押す。
+試し方
+1. 「ログインせずに使う(匿名)」を押す。
 2. AI の同意画面で同意する。
 3. マイクを押すか入力する:「1 日 2 リットルを目標に水分を記録したい」
 4. 何件か記録してから、話すか入力する:「週のグラフも見たい」
 5. 設定に、プライバシー・アカウントを削除 がある。
 
 審査の期間中、バックエンドは動かしておきます。
-連絡先: <名前>・<メール>・<電話>
 ```
 
 ## 4. 下書きから直した所
