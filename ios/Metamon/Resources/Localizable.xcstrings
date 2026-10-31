@@ -10863,6 +10863,57 @@
           }
         }
       }
+    },
+    "クラッシュ報告を送る": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send crash reports"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "クラッシュ報告を送る"
+          }
+        }
+      }
+    },
+    "テスト用にクラッシュさせる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crash the app (test)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テスト用にクラッシュさせる"
+          }
+        }
+      }
+    },
+    "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・作ったアプリの中身は送りません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When the app crashes, where it crashed (the location in the code), your device model, OS, app version and user ID are sent to Google's Firebase Crashlytics and used to fix bugs. What you say, your records and the contents of your apps are never sent."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・作ったアプリの中身は送りません。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
