@@ -5,6 +5,25 @@ import SwiftUI
 // Renderer/DSL には依存しない(WidgetKit は静的タイムライン + メモリ上限 30MB のため軽量に保つ)。
 // 更新タイミング: 本体の `WidgetCenter.reloadAllTimelines()`(DSL 適用・レコード更新時)+ 30 分毎の自動リロード。
 
+/// 審査用の版(APP_STORE_REVIEW・#468)だけ「アプリを作る」を避けた文言にする(docs/store/wording.md)。通常の版は今のまま。
+enum WidgetCopy {
+    static var noApp: String {
+        #if APP_STORE_REVIEW
+        String(localized: "Tailor It で記録帳を用意するとここに数字が出ます")
+        #else
+        String(localized: "Tailor It でアプリを作るとここに数字が出ます")
+        #endif
+    }
+
+    static var noAppShort: LocalizedStringKey {
+        #if APP_STORE_REVIEW
+        "記録帳を用意すると数字が出ます"
+        #else
+        "アプリを作ると数字が出ます"
+        #endif
+    }
+}
+
 @main
 struct MetamonWidgetBundle: WidgetBundle {
     var body: some Widget {
@@ -45,7 +64,11 @@ struct MetamonStatWidget: Widget {
                 .widgetURL(URL(string: "metamon://widget"))
         }
         .configurationDisplayName("Tailor It の数字")
+        #if APP_STORE_REVIEW // 審査用の版は「アプリを作る」を避ける(#468・docs/store/wording.md)
+        .description("用意した記録帳の集計(今月の支出など)をホーム画面とロック画面に表示します。")
+        #else
         .description("作ったアプリの集計(今月の支出など)をホーム画面とロック画面に表示します。")
+        #endif
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryCircular, .accessoryInline])
     }
 }
@@ -215,7 +238,7 @@ struct EmptyStateView: View {
             Spacer(minLength: 0)
             // ウィジェットは端末の言語に従う(アプリ内の言語設定は共有しない・#44)
             Text(appName == nil
-                 ? String(localized: "Tailor It でアプリを作るとここに数字が出ます")
+                 ? WidgetCopy.noApp
                  : String(localized: "「\(appName ?? "")」に集計(stat)の部品がありません"))
                 .font(.caption)
                 .foregroundStyle(.secondary)

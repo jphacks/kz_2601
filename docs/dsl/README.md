@@ -319,3 +319,52 @@ AI に渡す部品カタログは手書きではなく **`dsl.schema.json` か�
 `description` / `x-*` キーは JSON Schema の検証では無視され、iOS のデコーダ(`MetamonDSL` は examples JSON をデコードするだけでスキーマ本文は読まない)にも影響しない。生成用スキーマ(`ai.GenerationSchema()`)では `description` と `x-*` を落としてトークンを節約し、意味はカタログ側だけに載せる。
 
 要求された部品がカタログに無い時(カレンダー・地図など)は、プロンプトの規則で**最も近い既存部品で代替し、存在しない type は出力しない**。代替したことは編集ターンなら `summary`、新規作成なら `app.description` 末尾の「○○は△△で代替しました。」として残り、backend の `summarize()` が読み上げ文に含める。
+
+## 5. 版と互換性(#302)
+
+App Store に出した後は古い iOS が残り続ける。backend は「今いちばん古い、まだ使われている iOS」でも壊れないアプリだけを返す。
+
+### 5.1 DSL の版(`schemaVersion`)
+
+| 変更 | 扱い | 例 |
+|---|---|---|
+| 部品(Container / Leaf)・Action・Field 型・op を**足す** | 互換。`schemaVersion` は上げない | `routeGuide` を足す |
+| 省略できるキー・enum の値を**足す** | 互換。古い iOS は未知キーを無視し、未知 enum は既定に落とす(§1「iOS は寛容」) | `photoField.source` に新しい値 |
+| 既存のキー・値の**意味を変える**・必須にする・消す・名前を変える | 非互換。`schemaVersion` を上げる(`backend/pkg/dsl.SchemaVersion` と iOS の `AppDSL.supportedSchemaVersion` を揃えて更新) | `stat.value` の書き方を変える |
+
+- 意味を変えたくなったら、まず「新しい名前で足して古い方を残す」(互換)で済まないかを考える。版を上げるのは最後の手段。
+- 版を上げた時は、古い版の iOS には古い版の DSL を返し続けるか、§5.4 の最低対応版を上げて古い iOS を止めるかを同じ PR で決める。
+
+### 5.2 iOS が毎回送るもの
+
+| どこに | 中身 | 使い道 |
+|---|---|---|
+| generate / chat の body `allowedComponents` | その版が描画できる部品 type の全部(`ComponentType` から自動) | backend はここに**無い** type を生成結果に入れない(下) |
+| 全リクエストのヘッダ `X-Client-Platform` / `X-Client-Version` / `X-Client-Build` / `X-Client-DSL-Version` | `ios` / `CFBundleShortVersionString` / `CFBundleVersion` / 描画できる最大の `schemaVersion` | ログ(どの版がまだ使われているか = 最低対応版を上げる判断) |
+
+### 5.3 backend が古い iOS に新しい部品を出さない仕組み
+
+`backend/internal/ai/restrict.go`(#245 の審査用ビルドと同じ仕組み)。`allowedComponents` に無い既知の type は、AI に渡す部品カタログ・索引・生成スキーマから外し、生成結果に残れば再生成させ、最後の試行でも残れば取り除く。取り除くと成り立たない時はエラー(`generation_failed`)にして、その部品は送らない。
+
+- `allowedComponents` に backend の知らない type(iOS の方が新しい)があっても無視する。全既知 type を送った時は制限なし(プロンプトは byte 同一)。
+- `allowedComponents` を送らない(v1.0 より前の開発版)クライアントは制限なし。
+- 試験: `backend/internal/ai/compat_test.go`。v1.0 の部品一覧は `testdata/ios_v1_components.json` に凍結してあり、**部品を足しても書き換えない**(足した部品が v1.0 に出ないことを試験が確かめる)。例の DSL ごとに「その部品を知らない 1 つ前の版」を作り、生成結果にその部品が出ないこと・DSL として開けることを確かめる。
+- 保存済みの DSL(別の端末で作った・シェアで取り込んだ)は `GET /dsl` でそのまま返る。古い iOS は未知の type をプレースホルダで描くので、画面は壊れない(§1)。
+
+### 5.4 最低対応版と強制アップデート
+
+appconfig `GET /v1/client-config`(認証不要・`docs/backend/openapi-appconfig.yaml`)が環境変数から返す。
+
+| 環境変数(appconfig) | 意味 | 未設定 |
+|---|---|---|
+| `MIN_IOS_BUILD` | これ未満の `CFBundleVersion` は閉じられない「アップデートしてください」画面 | 強制しない |
+| `LATEST_IOS_BUILD` | これ未満は閉じられるお知らせ | 出さない |
+| `IOS_APP_STORE_URL` | 更新ボタンの行き先(`https://apps.apple.com/app/id…`) | iOS の Info.plist `MetamonAppStoreURL`、それも無ければ App Store で「Tailor It」を検索 |
+
+iOS は起動時と前面に戻った時に読む。**通信失敗・不正な応答では何もしない**(fail open: backend が落ちていてもアプリは使える)。
+
+### 5.5 API の破壊的な変更
+
+- パスの `/v1` は互換な変更(エンドポイント・省略できるフィールド・enum の値を足す)の間は変えない。クライアントは未知のフィールドを無視する。
+- フィールドを消す・意味を変える・必須にする変更は `/v2` を新しく作る。`/v1` と `/v2` は**並走**させ、`/v1` を使う版が `MIN_IOS_BUILD` で止められるまで(目安: `/v2` を使う版の公開から 90 日以上、かつログの `clientBuild` で旧版の利用が十分に減るまで)消さない。
+- 並走中の `/v1` は直すだけで機能を足さない。消す前に `MIN_IOS_BUILD` を `/v2` を使う最初の版に上げる。

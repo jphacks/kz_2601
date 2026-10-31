@@ -176,6 +176,8 @@ final class AppRuntime: DSLRuntime {
     var chatTurn: ChatTurn?
     /// edit のチャットから生成に回した時の会話(#211)。生成しても何も変わらなかったら、この会話に理由の吹き出しを足して音声シートを開き直す
     var chatReturnOnUnchanged: [ChatBubble]?
+    /// 上の会話を閉じる前の履歴。開き直す時はこれに戻す(閉じた時に履歴へ移した同じ会話が二重に残り、件数の上限で古い履歴を押し出していた)
+    @ObservationIgnored var chatHistoryOnUnchanged: [ChatHistoryEntry]?
     /// 生成・改変の前にチャットで相談するか(設定で切替・既定 ON・#186)。OFF は create も edit も従来どおり即反映。
     var clarifyEnabled: Bool = ClarifySettings.enabled {
         didSet { ClarifySettings.enabled = clarifyEnabled }
@@ -569,6 +571,8 @@ final class AppRuntime: DSLRuntime {
         withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
         if let bubbles = chatReturnOnUnchanged {
             chatReturnOnUnchanged = nil
+            if let saved = chatHistoryOnUnchanged { chatHistory = saved } // 吹き出しの didSet が保存するので先に戻す
+            chatHistoryOnUnchanged = nil
             withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
                 chatTurn = nil
                 chatBubbles = bubbles + [ChatBubble(role: .assistant, text: reason, kind: .answer)]
@@ -747,9 +751,9 @@ final class AppRuntime: DSLRuntime {
             let cached = AppListCache.shared.load()
             if !cached.isEmpty {
                 apps = cached
-                toast = L10n.tr("オフライン: 保存済みのアプリ一覧を表示しています")
+                toast = L10n.pick(L10n.tr("オフライン: 保存済みのアプリ一覧を表示しています"), review: L10n.tr("オフライン: 保存済みの記録帳の一覧を表示しています"))
             } else if apps.isEmpty {
-                toast = L10n.tr("アプリ一覧を取得できませんでした: \(error.localizedDescription)")
+                toast = L10n.pick(L10n.tr("アプリ一覧を取得できませんでした: \(error.localizedDescription)"), review: L10n.tr("記録帳の一覧を取得できませんでした: \(error.localizedDescription)"))
             }
         }
         return apps
@@ -770,7 +774,7 @@ final class AppRuntime: DSLRuntime {
         }
         let previousId = document.appId
         withAnimation(.easeInOut(duration: 0.35)) {
-            morphJob = MorphJob(kind: .edit, transcript: L10n.tr("アプリを切り替えています…"), startedAt: .now)
+            morphJob = MorphJob(kind: .edit, transcript: L10n.pick(L10n.tr("アプリを切り替えています…"), review: L10n.tr("記録帳を切り替えています…")), startedAt: .now)
         }
         syncTask?.cancel()
         var next: AppDocument?
@@ -784,7 +788,7 @@ final class AppRuntime: DSLRuntime {
         }
         guard var doc = next else {
             withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
-            toast = L10n.tr("アプリを読み込めませんでした。接続を確認してください")
+            toast = L10n.pick(L10n.tr("アプリを読み込めませんでした。接続を確認してください"), review: L10n.tr("記録帳を読み込めませんでした。接続を確認してください"))
             startSync()
             return
         }
@@ -795,7 +799,7 @@ final class AppRuntime: DSLRuntime {
         startSync()
         // recordSync(オフライン DB)は呼び出しごとに appId を受けるので再起動不要。旧 appId の未送信はキューが引き続き送り、
         // 新 appId のレコードは refresh() がローカル先出し → サーバー pull で読み直す(イベントは document.appId で絞られる)
-        summaryBanner = SummaryBanner(text: L10n.tr("「\(doc.dsl.app.name)」に変身しました") + (isOffline ? L10n.tr("(オフライン・キャッシュ)") : ""), highlight: nil)
+        summaryBanner = SummaryBanner(text: L10n.pick(L10n.tr("「\(doc.dsl.app.name)」に変身しました"), review: L10n.tr("「\(doc.dsl.app.name)」に切り替えました")) + (isOffline ? L10n.tr("(オフライン・キャッシュ)") : ""), highlight: nil)
         print("[Metamon] switched app: \(previousId) → \(appId) version=\(doc.version)")
     }
 
@@ -813,10 +817,10 @@ final class AppRuntime: DSLRuntime {
             }
             await switchApp(to: target.id, afterSheetDismiss: fromVoiceSheet)
         case .ambiguous:
-            toast = L10n.tr("「\(name)」に近いアプリが複数あります。一覧から選んでください")
+            toast = L10n.pick(L10n.tr("「\(name)」に近いアプリが複数あります。一覧から選んでください"), review: L10n.tr("「\(name)」に近い記録帳が複数あります。一覧から選んでください"))
             openSwitcher(afterSheetDismiss: fromVoiceSheet)
         case .none:
-            toast = L10n.tr("「\(name)」というアプリは見つかりませんでした")
+            toast = L10n.pick(L10n.tr("「\(name)」というアプリは見つかりませんでした"), review: L10n.tr("「\(name)」という記録帳は見つかりませんでした"))
             openSwitcher(afterSheetDismiss: fromVoiceSheet)
         }
     }

@@ -21,7 +21,7 @@ func TestFirestorePurgeAccount(t *testing.T) {
 		t.Skip("FIRESTORE_EMULATOR_HOST not set")
 	}
 	ctx := context.Background()
-	f, err := NewFirestore(ctx, "demo-kz2601")
+	f, err := NewFirestore(ctx, "demo-kz2601", "(default)")
 	if err != nil {
 		t.Fatal(err)
 	}

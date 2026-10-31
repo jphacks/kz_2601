@@ -2,7 +2,7 @@
 
 プライバシーポリシー §4「論理削除し、30 日以内に消去します」を実行する仕組みです。`DELETE /v1/me` は論理削除だけをします。`backend/cmd/purge` が、論理削除から 30 日を過ぎたアカウントのデータを毎日消します。
 
-> **本書の手順はまだ実行していません。** GCP の設定は承認を得てから、人が行います。stg と prod は Firestore を共有しているので、ジョブは **1 つの環境(prod)にだけ** 作ります。
+> **prod では設定済み(2026-10-30・ジョブ `account-purge` と毎日 4:30 の Scheduler)。** GCP の設定は承認を得てから行います。stg と prod は Firestore を共有しているので、ジョブは **1 つの環境(prod)にだけ** 作ります。
 
 ## 目次
 - [消すもの・残すもの](#消すもの残すもの)
@@ -91,7 +91,9 @@ gcloud run jobs create account-purge \
 gcloud run jobs execute account-purge --project="$PROJECT_ID" --region="$REGION" --wait
 ```
 
-ログに `purge: start`(`candidates` = 対象の数)と `purge: would purge` が出ることを確かめます。問題が無ければ dry-run を外します。
+Job は `APP_ENV` を付けないので stg 用の起動停止(#290)は掛かりません。DB は `FIRESTORE_DATABASE`(既定 `(default)`)で選びます。stg のプロジェクト/DB で動かす場合は `APP_ENV=stg` を付け、本番の DB を指していれば起動を拒否します。
+
+ログに `purge: firestore`(接続先)・`purge: start`(`candidates` = 対象の数)と `purge: would purge` が出ることを確かめます。問題が無ければ dry-run を外します。
 
 ```bash
 gcloud run jobs update account-purge --project="$PROJECT_ID" --region="$REGION" --args="-limit=50,-older-than=696h"

@@ -13,6 +13,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfig"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
@@ -26,12 +27,14 @@ func main() {
 	port := envOr("PORT", "8080")
 	mode := envOr("AUTH_MODE", auth.ModeFirebase)
 	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
+	target := fsenv.FromEnv(os.Getenv)
+	guardTarget(target, logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	verifier := newVerifier(ctx, mode, project, logger)
-	st, closeStore := newStore(ctx, project, logger)
+	st, closeStore := newStore(ctx, target, logger)
 	defer closeStore()
 
 	// deleted accounts (DELETE /v1/me) get 410 on everything else: appconfig.RejectDeleted
@@ -102,20 +105,34 @@ func newVerifier(ctx context.Context, mode, project string, logger *slog.Logger)
 	return v
 }
 
-// newStore returns Firestore when GOOGLE_CLOUD_PROJECT is set (the emulator
-// is used automatically when FIRESTORE_EMULATOR_HOST is set), otherwise an
-// in-memory store (STORE=memory forces it). The second value closes the store.
-func newStore(ctx context.Context, project string, logger *slog.Logger) (store.Store, func()) {
-	if os.Getenv("STORE") == "memory" || project == "" {
+// guardTarget exits when a stg process would use the production Firestore
+// without ALLOW_SHARED_PROD_DB=1 (fsenv.Check, #290).
+func guardTarget(t fsenv.Target, logger *slog.Logger) {
+	shared, err := fsenv.Check(t, os.Getenv)
+	if err != nil {
+		logger.Error("refusing to start", slog.Any("error", err))
+		os.Exit(1)
+	}
+	if shared {
+		logger.Warn("stg shares the production Firestore (ALLOW_SHARED_PROD_DB=1)", slog.String("firestore", t.String()))
+	}
+}
+
+// newStore returns Firestore when GOOGLE_CLOUD_PROJECT is set (database from
+// FIRESTORE_DATABASE; the emulator is used automatically when
+// FIRESTORE_EMULATOR_HOST is set), otherwise an in-memory store (STORE=memory
+// forces it). The second value closes the store.
+func newStore(ctx context.Context, t fsenv.Target, logger *slog.Logger) (store.Store, func()) {
+	if os.Getenv("STORE") == "memory" || t.Project == "" {
 		logger.Warn("using in-memory store (data is lost on restart)")
 		return store.NewMemory(), func() {}
 	}
-	fs, err := store.NewFirestore(ctx, project)
+	fs, err := store.NewFirestore(ctx, t.Project, t.Database)
 	if err != nil {
 		logger.Error("firestore init failed", slog.Any("error", err))
 		os.Exit(1)
 	}
-	logger.Info("using Firestore", slog.String("project", project), slog.String("emulator", os.Getenv("FIRESTORE_EMULATOR_HOST")))
+	logger.Info("using Firestore", slog.String("project", t.Project), slog.String("database", t.Database), slog.String("emulator", os.Getenv("FIRESTORE_EMULATOR_HOST")))
 	return fs, func() { _ = fs.Close() }
 }
 
@@ -129,6 +146,8 @@ func newHandler(authMiddleware func(http.Handler) http.Handler, logger *slog.Log
 	if sharePage != nil {
 		mux.Handle("GET /s/{token}", sharePage) // web fallback of a share link (no DSL exposed)
 	}
+	// minimum / latest iOS build (#302): public, read once from env
+	mux.Handle("GET /v1/client-config", appconfig.ClientConfig(appconfig.ClientConfigFromEnv(os.Getenv)))
 	authed := authMiddleware(api)
 	mux.Handle("/v1/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, pattern := api.Handler(r); pattern == "" {

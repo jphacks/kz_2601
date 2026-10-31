@@ -723,6 +723,29 @@ paths:
           description: OK
           content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/ReleaseRequest' } } } } } }
 
+  /client-config:
+    get:
+      security: []
+      summary: iOS の最低対応版と最新版(#302・認証不要)
+      description: |
+        サインイン前にも iOS が起動時・前面に戻った時に読む。値は appconfig の環境変数(起動時に 1 回読む)。**未設定・不正な値のフィールドは省略 = 強制しない**。
+        - `MIN_IOS_BUILD`: これ未満の CFBundleVersion は閉じられない「アップデートしてください」画面
+        - `LATEST_IOS_BUILD`: これ未満は閉じられるお知らせ(MIN より小さければ MIN に揃える)
+        - `IOS_APP_STORE_URL`: App Store のページ(https / itms-apps のみ)。省略時は iOS 側の既定
+        iOS は通信失敗・不正な応答では何もしない(fail open)。`Cache-Control: public, max-age=300`。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  minIOSBuild: { type: integer, minimum: 1 }
+                  latestIOSBuild: { type: integer, minimum: 1 }
+                  iosAppStoreUrl: { type: string, format: uri }
+              example: { minIOSBuild: 12, latestIOSBuild: 15, iosAppStoreUrl: 'https://apps.apple.com/app/id0000000000' }
+
   /health:
     get:
       security: []

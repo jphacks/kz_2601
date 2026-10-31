@@ -17,7 +17,7 @@ func TestFirestoreConsume(t *testing.T) {
 		t.Skip("FIRESTORE_EMULATOR_HOST not set")
 	}
 	ctx := context.Background()
-	c, err := firestore.NewClient(ctx, "demo-kz2601")
+	c, err := firestore.NewClientWithDatabase(ctx, "demo-kz2601", firestore.DefaultDatabaseID)
 	if err != nil {
 		t.Fatal(err)
 	}

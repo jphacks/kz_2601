@@ -9,6 +9,8 @@
 // Environment:
 //
 //	GOOGLE_CLOUD_PROJECT          required (Firestore and Firebase Auth project)
+//	FIRESTORE_DATABASE            database ID (default "(default)"; internal/fsenv)
+//	APP_ENV / ALLOW_SHARED_PROD_DB  stg guard (internal/fsenv)
 //	FIRESTORE_EMULATOR_HOST       local emulator (make run-purge)
 //	FIREBASE_AUTH_EMULATOR_HOST   local Auth emulator
 //
@@ -31,6 +33,7 @@ import (
 	firebase "firebase.google.com/go/v4"
 	fbauth "firebase.google.com/go/v4/auth"
 
+	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
@@ -50,10 +53,20 @@ func main() {
 		logger.Error("purge: GOOGLE_CLOUD_PROJECT is required")
 		os.Exit(2)
 	}
+	target := fsenv.FromEnv(os.Getenv)
+	shared, err := fsenv.Check(target, os.Getenv)
+	if err != nil {
+		logger.Error("purge: refusing to start", slog.Any("error", err))
+		os.Exit(2)
+	}
+	if shared {
+		logger.Warn("purge: stg shares the production Firestore (ALLOW_SHARED_PROD_DB=1)")
+	}
+	logger.Info("purge: firestore", slog.String("target", target.String()))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	st, err := store.NewFirestore(ctx, project)
+	st, err := store.NewFirestore(ctx, target.Project, target.Database)
 	if err != nil {
 		logger.Error("purge: firestore init failed", slog.Any("error", err))
 		os.Exit(1)
