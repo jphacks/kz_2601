@@ -89,6 +89,11 @@ func New(s store.Store) *http.ServeMux {
 	mux.HandleFunc("POST /v1/public-apps/{id}/install", h.installPublicApp)
 
 	mux.HandleFunc("DELETE /v1/me", h.deleteMe) // account deletion (#119): account.go
+	// reports / blocks (#321): moderation.go
+	mux.HandleFunc("POST /v1/reports", h.createReport)
+	mux.HandleFunc("GET /v1/me/blocks", h.listBlocks)
+	mux.HandleFunc("POST /v1/me/blocks", h.createBlock)
+	mux.HandleFunc("DELETE /v1/me/blocks/{uid}", h.deleteBlock)
 	// release requests (#76): release.go
 	mux.HandleFunc("POST /v1/apps/{appId}/release-requests", h.createReleaseRequest)
 	mux.HandleFunc("GET /v1/apps/{appId}/release-requests", h.listAppReleaseRequests)
@@ -245,7 +250,9 @@ func (h *Handler) ensureApp(r *http.Request, appID string) (*store.App, error) {
 	}
 	name := init.App.Name
 	if pub, err := h.store.GetPublicApp(ctx, appID); err == nil {
-		raw, name = pub.DSL, pub.Name
+		if !pub.Hidden { // #321: not from an app the operator unpublished
+			raw, name = pub.DSL, pub.Name
+		}
 	} else if !errors.Is(err, store.ErrNotFound) {
 		return nil, err
 	}

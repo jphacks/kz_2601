@@ -177,6 +177,9 @@ func (h *Handler) liveShare(r *http.Request) (*store.Share, error) {
 	if s.Revoked {
 		return nil, apiErr(http.StatusNotFound, httpx.CodeNotFound, "share has been revoked")
 	}
+	if err := h.checkSharedApp(r, s.AppID); err != nil { // #321
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -287,6 +290,9 @@ func (h *Handler) installCopy(r *http.Request, srcAppID string, srcDSL json.RawM
 	}
 	id := newAppID()
 	if joined {
+		if err := h.checkSharedApp(r, srcAppID); err != nil { // #321
+			return nil, err
+		}
 		id = srcAppID
 		if cur, err := h.store.GetApp(ctx, uid, id); err == nil {
 			if cur, err = h.reactivate(r, cur); err != nil {
@@ -335,6 +341,9 @@ type listingOut struct {
 	Mine        bool      `json:"mine"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
+	// Hidden / HiddenReason: unpublished by the operator (#321). Only on the publisher's own listing.
+	Hidden       bool   `json:"hidden,omitempty"`
+	HiddenReason string `json:"hiddenReason,omitempty"`
 }
 
 func toListingOut(r *http.Request, c *store.CatalogApp) listingOut {
@@ -345,9 +354,13 @@ func toListingOut(r *http.Request, c *store.CatalogApp) listingOut {
 	if comps == nil {
 		comps = []string{}
 	}
-	return listingOut{ID: c.ID, Name: c.Name, Description: c.Description, Tags: tags, AuthorName: c.AuthorName,
+	out := listingOut{ID: c.ID, Name: c.Name, Description: c.Description, Tags: tags, AuthorName: c.AuthorName,
 		Components: comps, DSLVersion: c.Version, Installs: c.Installs, Mine: c.OwnerUID == uidOf(r),
 		CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt}
+	if out.Mine {
+		out.Hidden, out.HiddenReason = c.Hidden, c.HiddenReason
+	}
+	return out
 }
 
 func tooLong(s string, n int) bool { return utf8.RuneCountInString(s) > n }
@@ -478,10 +491,20 @@ func (h *Handler) listPublicApps(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	blocked, err := h.blockedBy(r)
+	if err != nil {
+		fail(w, err)
+		return
+	}
 	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
 	hits := make([]store.CatalogApp, 0, len(all))
 	for i := range all {
-		if matches(&all[i], q) {
+		c := &all[i]
+		mine := c.OwnerUID == uidOf(r)
+		if (c.Hidden && !mine) || blocked[c.OwnerUID] { // #321: unpublished / blocked publisher
+			continue
+		}
+		if matches(c, q) {
 			hits = append(hits, all[i])
 		}
 	}
@@ -518,6 +541,10 @@ func (h *Handler) installPublicApp(w http.ResponseWriter, r *http.Request) {
 	c, err := h.store.GetCatalogApp(ctx, id)
 	if err != nil {
 		fail(w, mapStoreErr(err, "public app"))
+		return
+	}
+	if c.Hidden { // #321
+		fail(w, unpublishedErr("this listing", c.ModerationState))
 		return
 	}
 	if prev, err := h.store.GetInstall(ctx, id, uid); err == nil {

@@ -376,6 +376,7 @@ paths:
         public/shared entity は全ユーザーの投稿が返り、各レコードに `author`/`authorName` が付く。
         `filterField=author&filterOp=eq&filterValue=<uid>` で特定ユーザー (自分) の投稿だけに絞れる。
         **scope:shared の entity は作成者と参加者だけ**が読み書きできる (この entity の records の全操作で同じ・それ以外は 403 `not_member`・#254)。public は従来どおり誰でも。
+        呼び出した人がブロックしたユーザー(`/me/blocks`)の投稿は一覧から除く(#321)。運営が非公開にした共有アプリ(`apps_public/{appId}.hidden`)は、public/shared の entity の records の全操作が 403 `unpublished`(details.reason = 運営の理由)。
       parameters:
         - { $ref: '#/components/parameters/PageSize' }
         - { $ref: '#/components/parameters/PageToken' }
@@ -522,6 +523,7 @@ paths:
                   components: { type: array, items: { type: string } }
                   sharedData: { type: boolean, description: 'shared/public entity を含む(import すると元アプリの共有データに参加する)' }
                   mine: { type: boolean }
+        '403': { $ref: '#/components/responses/Unpublished' }
         '404': { description: 取り消し済み or 存在しない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     delete:
       tags: [sharing]
@@ -552,6 +554,7 @@ paths:
       responses:
         '201': { description: Imported, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
         '403': { description: 'リンクの発行者が参加者でない(inviter_left) / 参加者が上限(members_full)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { $ref: '#/components/responses/Unpublished' }
         '404': { description: 取り消し済み or 存在しない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /apps/{appId}/publish:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -583,7 +586,7 @@ paths:
     delete:
       tags: [sharing]
       summary: 非公開にする(掲載者のみ)
-      description: 通報/モデレーションは未実装。不適切な掲載はこの API で掲載者が取り下げる(運営側の強制削除は後続)。
+      description: 掲載者が取り下げる。運営による非公開化は `cmd/moderate hide-listing`(`public_apps/{id}.hidden`・#321・docs/infra/moderation.md)で、掲載者が再公開しても非公開のまま。
       responses:
         '204': { description: Unpublished }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -592,7 +595,9 @@ paths:
     get:
       tags: [sharing]
       summary: 公開アプリを検索
-      description: 名前・説明・タグ・作者名の部分一致(大文字小文字無視)。件数が少ない前提で最大 500 件をメモリ内で絞り込む(全文検索はしない)。
+      description: |
+        名前・説明・タグ・作者名の部分一致(大文字小文字無視)。件数が少ない前提で最大 500 件をメモリ内で絞り込む(全文検索はしない)。
+        運営が非公開にした掲載は掲載者本人にだけ返る(`hidden`・`hiddenReason` 付き)。ブロックしたユーザーの掲載は返らない(#321)。
       parameters:
         - { in: query, name: q, schema: { type: string } }
         - { in: query, name: sort, schema: { type: string, enum: [popular, new], default: popular }, description: 'popular = installs 降順 → 更新日時降順 / new = 更新日時降順' }
@@ -622,7 +627,80 @@ paths:
         installs は uid ごとに 1 回だけ +1(掲載者本人は数えない・`public_apps/{id}/installs/{uid}` に記録・#154)。
       responses:
         '201': { description: Installed, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
+        '403': { $ref: '#/components/responses/Unpublished' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /reports:
+    post:
+      tags: [moderation]
+      summary: 通報する(#321・審査 1.2)
+      description: |
+        「探す」の掲載・シェアリンク・共有アプリ・共有アプリの投稿を運営に通報する。`reports/{id}` に保存し、
+        ログ `moderation: report`(uid と内容は出さない)を運営のアラートが拾う(docs/infra/moderation.md)。
+        保存するのは通報者の uid・対象の種類と ID・対象の持ち主 / 投稿者の uid(サーバーが引く)・理由・日時だけ(内容の写しも自由記述も持たない)。
+        同じ人が同じ対象を通報し直しても 1 件(200 `created: false`)。新しい通報は 1 人 1 日(JST)30 件まで(超えると 429 `rate_limited`)。
+        自分のものは 400。対象が無ければ 404。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, reason]
+              properties:
+                kind: { type: string, enum: [listing, share, app, record] }
+                id: { type: string, description: 'listing = 掲載の id / share = トークン' }
+                appId: { type: string, description: 'app / record' }
+                entityId: { type: string, description: record }
+                recordId: { type: string, description: record }
+                reason: { type: string, enum: [spam, sexual, violence, harassment, illegal, privacy, other] }
+      responses:
+        '201': { description: 通報した, content: { application/json: { schema: { $ref: '#/components/schemas/ReportResult' } } } }
+        '200': { description: 通報済み(created false), content: { application/json: { schema: { $ref: '#/components/schemas/ReportResult' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { description: 今日の通報の上限, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /me/blocks:
+    get:
+      tags: [moderation]
+      summary: ブロックしているユーザー(#321)
+      description: 古い順に最大 500 人。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Block' } }
+    post:
+      tags: [moderation]
+      summary: ユーザーをブロックする(#321)
+      description: |
+        以後、そのユーザーの共有アプリの投稿(GET records)と「探す」の掲載が自分に返らない(相手には知らせない)。
+        `uid`(投稿の `author`)か `listingId`(掲載者をサーバーが引く)のどちらか。`users/{uid}/blocks/{blockedUid}` に保存。冪等。自分は 400。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                uid: { type: string }
+                name: { type: string, maxLength: 64, description: '一覧に出す名前(投稿の authorName)。listingId の時の省略は掲載の authorName' }
+                listingId: { type: string }
+      responses:
+        '201': { description: Blocked, content: { application/json: { schema: { $ref: '#/components/schemas/Block' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /me/blocks/{uid}:
+    parameters: [{ in: path, name: uid, required: true, schema: { type: string } }]
+    delete:
+      tags: [moderation]
+      summary: ブロックを解除する(冪等)
+      responses:
+        '204': { description: Unblocked }
 
   /apps/{appId}/members:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -805,6 +883,12 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: invalid_record, message: 'field "amount" is required', details: { field: amount } } }
+    Unpublished:
+      description: 運営が非公開にした(#321)。details.reason は作者に見せる理由
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: unpublished, message: 'this listing was unpublished by the operator', details: { reason: '不適切な内容のため' } } }
     NotMember:
       description: scope:shared のデータに参加していない(作成者でも参加者でもない・#254)。シェアリンクから参加すれば読める
       content:
@@ -823,7 +907,7 @@ components:
             code:
               type: string
               description: 機械可読コード
-              enum: [bad_request, unauthenticated, not_found, version_conflict, invalid_dsl, invalid_record, payload_too_large, rate_limited, internal]
+              enum: [bad_request, unauthenticated, not_found, version_conflict, invalid_dsl, invalid_record, payload_too_large, rate_limited, unpublished, internal]
             message: { type: string }
             details: { type: object, additionalProperties: true }
             requestId: { type: string }
@@ -935,6 +1019,21 @@ components:
         mine: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        hidden: { type: boolean, description: '運営が非公開にした(#321)。掲載者本人の掲載にだけ付く' }
+        hiddenReason: { type: string, description: 運営の理由(掲載者に見せる) }
+    ReportResult:
+      type: object
+      required: [id, created]
+      properties:
+        id: { type: string }
+        created: { type: boolean }
+    Block:
+      type: object
+      required: [uid, name, createdAt]
+      properties:
+        uid: { type: string }
+        name: { type: string, description: '未設定は "匿名"' }
+        createdAt: { type: string, format: date-time }
     ReleaseRequest:
       type: object
       required: [id, appId, name, dslVersion, purpose, status]
