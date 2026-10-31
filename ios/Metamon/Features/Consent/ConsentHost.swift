@@ -36,7 +36,7 @@ struct ConsentHost: ViewModifier {
         if let shortage = advice.shortageMegabytes {
             lines.append(L10n.tr("空き容量が足りません(あと約\(shortage)MB 必要です)。写真やアプリを整理してから試してください。"))
         }
-        lines.append(L10n.tr("話した声を端末の中で文字にするためのモデルです(約\(AppRuntime.voiceModelMegabytes)MB・初回のみ)。ダウンロード中も、終わらなくても、文字入力ならすぐにアプリを作れます。設定からいつでもダウンロードできます。"))
+        lines.append(L10n.pick(L10n.tr("話した声を端末の中で文字にするためのモデルです(約\(AppRuntime.voiceModelMegabytes)MB・初回のみ)。ダウンロード中も、終わらなくても、文字入力ならすぐにアプリを作れます。設定からいつでもダウンロードできます。"), review: L10n.tr("話した声を端末の中で文字にするためのモデルです(約\(AppRuntime.voiceModelMegabytes)MB・初回のみ)。ダウンロード中も、終わらなくても、文字入力ならすぐに記録帳を用意できます。設定からいつでもダウンロードできます。")))
         return lines.joined(separator: "\n\n")
     }
 }

@@ -116,5 +116,5 @@ final class SpeechReader: NSObject, AVSpeechSynthesizerDelegate {
 enum SpeechCopy {
     static var sectionTitle: String { L10n.tr("読み上げ") }
     static var settingTitle: String { L10n.tr("挨拶と質問を読み上げる") }
-    static var settingFooter: String { L10n.tr("ON にすると、最初の挨拶・AI の質問・アプリができた時の説明を声で読み上げます。マイクを押すとすぐ止まります。") }
+    static var settingFooter: String { L10n.pick(L10n.tr("ON にすると、最初の挨拶・AI の質問・アプリができた時の説明を声で読み上げます。マイクを押すとすぐ止まります。"), review: L10n.tr("ON にすると、最初の挨拶・AI の質問・記録帳を用意できた時の説明を声で読み上げます。マイクを押すとすぐ止まります。")) }
 }

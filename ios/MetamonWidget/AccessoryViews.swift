@@ -80,7 +80,7 @@ struct AccessoryEmptyView: View {
         default:
             VStack(alignment: .leading, spacing: 2) {
                 Text("Tailor It").font(.caption2.weight(.semibold))
-                Text("アプリを作ると数字が出ます")
+                Text(WidgetCopy.noAppShort)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)

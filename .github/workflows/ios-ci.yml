@@ -344,6 +344,38 @@ jobs:
           path: ios/TestResults.xcresult
           retention-days: 3
 
+  # Swift の書式チェック(swift-format・設定は ios/.swift-format)。**今は非ブロッキング**:
+  # 既存コードに指摘が多いため、失敗しても ios-ci(required check)には影響させない(ios-ci の needs に入れない)。
+  # macOS は分単価が高いので、ubuntu + 公式 swift コンテナ(swift 6 系は `swift format` 同梱)で回す。
+  # ブロッキングにする時: 既存の指摘を `swift format --in-place` で一括整形する PR を先に入れてから、
+  #   1) lint に `--strict` を付ける 2) `continue-on-error` を外す 3) ios-ci の needs に ios-format を足す。
+  ios-format:
+    name: ios-format
+    needs: ios-changes
+    if: needs.ios-changes.outputs.mode != 'none'
+    runs-on: ubuntu-latest
+    container: swift:6.2
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: swift format lint(非ブロッキング)
+        working-directory: ios
+        run: |
+          set -u
+          swift format --version
+          swift format lint --recursive --parallel --configuration .swift-format \
+            Metamon MetamonWidget MetamonTests MetamonUITests Packages 2> lint.txt || true
+          n="$(grep -c 'warning:' lint.txt || true)"
+          echo "::notice::swift-format の指摘 ${n} 件(非ブロッキング)"
+          {
+            echo "### swift-format: ${n} 件(非ブロッキング)"
+            echo '```'
+            head -n 200 lint.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # required check。macOS ジョブがスキップでも成功、失敗/キャンセルなら失敗。
   ios-ci:
     name: ios-ci

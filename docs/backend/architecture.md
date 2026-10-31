@@ -572,6 +572,9 @@ jobs:
 | `PORT` | o | o | Cloud Run が注入。ローカル 8080/8081 |
 | `GOOGLE_CLOUD_PROJECT` | o | o | Firebase Admin 初期化 |
 | `AUTH_MODE` | o | o | `firebase`(本番) / `dev` |
+| `FIRESTORE_DATABASE` | o | o | Firestore の DB ID。既定 `(default)`。全バイナリ(appconfig / ai の回数制限 / cmd/purge)が `internal/fsenv` から読む(#290) |
+| `APP_ENV` | o | o | `stg` / `prod`。`stg` が本番の接続先(`PROD_FIRESTORE_PROJECT`/`PROD_FIRESTORE_DATABASE`、既定 `jphacks-kz2601`/`(default)`)を使うと**起動を止める**(エミュレータ時は対象外) |
+| `ALLOW_SHARED_PROD_DB` | o | o | `1` のときだけ上の停止を外す(警告ログは出る)。stg が本番と DB を共有している間(#291・#293 の分離まで)は stg に必須。deploy-cloudrun.yml が stg=`1` / prod=`0` を入れる |
 | `FIRESTORE_EMULATOR_HOST` | o | - | ローカルのみ |
 | `FIREBASE_AUTH_EMULATOR_HOST` | o | o | ローカルのみ(dev ヘッダの有効条件) |
 | `LOG_LEVEL` | o | o | `info` |

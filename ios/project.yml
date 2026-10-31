@@ -32,8 +32,8 @@ settings:
     SWIFT_VERSION: "5.0"
     SWIFT_STRICT_CONCURRENCY: targeted
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "2026103001"
     CODE_SIGN_STYLE: Automatic
     # 実機ビルド時: `METAMON_TEAM_ID=XXXXXXXXXX xcodegen generate` で Team を注入(空なら未設定)
     DEVELOPMENT_TEAM: ${METAMON_TEAM_ID}
@@ -55,6 +55,9 @@ settings:
     # stg 版を prod 版と並べて入れたい時だけ `METAMON_STG_BUNDLE_ID_SUFFIX=.stg xcodegen generate` で Debug / Staging に付ける。
     # 事前に人の作業(App ID・Firebase の iOS アプリ登録)が要る: docs/ios/architecture.md「ビルド構成と接続先」
     METAMON_BUNDLE_ID_SUFFIX: ""
+    # 「アップデートしてください」の App Store ボタン(#302・Info.plist MetamonAppStoreURL)。
+    # TODO(#302): App Store の app id が決まったら "https://apps.apple.com/app/id<ID>" を入れる。空の間は「Tailor It」の検索を開く
+    METAMON_APP_STORE_URL: ""
   configs:
     Debug:
       METAMON_BUNDLE_ID_SUFFIX: "${METAMON_STG_BUNDLE_ID_SUFFIX}"

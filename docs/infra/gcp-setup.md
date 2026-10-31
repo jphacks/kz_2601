@@ -33,6 +33,8 @@
 > **zsh で `#` 行を貼ると `command not found: #` が出る**のは無害だが、気になるなら先に `setopt interactivecomments` を実行しておく。
 >
 > **注意**: プロジェクトの表示名(`--name`)に `_` は使えない(ID だけでなく表示名にも文字種制限がある)。
+>
+> **2026-10-30 以降(#307)**: API・SA と IAM・Artifact Registry・Secret の入れ物・WIF・Firestore・消去ジョブ・予算は [`infra/`](../../infra/README.md) の Terraform で作る方針。本書は prod を最初に手で作った記録として残す。
 
 ## 目次
 1. [全体像](#1-全体像)
@@ -387,9 +389,11 @@ gcloud run deploy appconfig-stg \
   --cpu=1 --memory=512Mi \
   --min-instances=0 --max-instances=3 \
   --concurrency=80 --timeout=60 \
-  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=stg"
+  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=stg,ALLOW_SHARED_PROD_DB=1"
 cd ..
 ```
+
+> `ALLOW_SHARED_PROD_DB=1`: stg は今 本番と同じ `jphacks-kz2601` の `(default)` を使う。backend は `APP_ENV=stg` で本番の接続先なら起動を止める(#290・`backend/internal/fsenv`)ので、分離(#291・#293)までは stg にこれが要る。分離後は stg の接続先を変えてこの変数を外す。
 
 ### 3-2. ai(同じイメージを `--command` で ai として起動)
 
@@ -412,7 +416,7 @@ gcloud run deploy ai-stg \
   --cpu=1 --memory=512Mi \
   --min-instances=0 --max-instances=3 \
   --concurrency=20 --timeout=300 \
-  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=stg,APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL}" \
+  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=stg,ALLOW_SHARED_PROD_DB=1,APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL}" \
   --set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest"
 ```
 
@@ -447,7 +451,7 @@ gcloud run services logs read ai-stg --region="$REGION" --limit=50
 | プロジェクト ID | `GOOGLE_CLOUD_PROJECT` 環境変数(Firebase Admin SDK / Firestore クライアントがこれを読む) |
 | 認証情報 | ADC。Cloud Run 上では `run-backend` SA が自動で使われる(鍵ファイル不要) |
 | Firebase ID トークン検証 | `firebase.google.com/go/v4` の `auth.Client.VerifyIDToken`。公開鍵取得のみで IAM 権限は不要 |
-| Firestore | `cloud.google.com/go/firestore`、`(default)` DB。権限は `roles/datastore.user`(付与済み) |
+| Firestore | `cloud.google.com/go/firestore`。DB は `FIRESTORE_DATABASE`(既定 `(default)`、`internal/fsenv` に集約)。権限は `roles/datastore.user`(付与済み) |
 | Claude API キー | `ANTHROPIC_API_KEY` 環境変数(Secret Manager から注入) |
 | ai → appconfig | `APPCONFIG_BASE_URL`。当面はクライアントから受けた Firebase ID トークンをそのまま転送する想定(**要設計確認**: 後で Cloud Run の service-to-service ID トークンに切替可) |
 
@@ -562,7 +566,7 @@ jobs:
             --service-account="$RUN_SA" --allow-unauthenticated \
             --port=8080 --cpu=1 --memory=512Mi \
             --min-instances=0 --max-instances=3 --concurrency=80 --timeout=60 \
-            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=${ENV_SUFFIX}" \
+            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB}" \
             --quiet
 
       - name: Deploy ai
@@ -573,7 +577,7 @@ jobs:
             --service-account="$RUN_SA" --allow-unauthenticated \
             --port=8080 --cpu=1 --memory=512Mi \
             --min-instances=0 --max-instances=3 --concurrency=20 --timeout=300 \
-            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=${ENV_SUFFIX},APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL}" \
+            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB},APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL}" \
             --set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest" \
             --quiet
 
@@ -797,6 +801,6 @@ gcloud run services update ai-prod --region="$REGION" --min-instances=0   # デ�
 | Firebase iOS アプリ Bundle ID | `jp.kz2601.metamon` |
 | Apple | App ID = Bundle ID、Key(Sign in with Apple)、Services ID `jp.kz2601.metamon.signin`(Web 用・任意) |
 | エミュレータ用プロジェクト | `demo-kz2601` |
-| Cloud Run 環境変数 | `GOOGLE_CLOUD_PROJECT`, `APP_ENV`(`stg`/`prod`), `APPCONFIG_BASE_URL`(ai のみ), `ANTHROPIC_API_KEY`(Secret) |
+| Cloud Run 環境変数 | `GOOGLE_CLOUD_PROJECT`, `FIRESTORE_DATABASE`(既定 `(default)`), `APP_ENV`(`stg`/`prod`), `ALLOW_SHARED_PROD_DB`(stg=`1`・本番と DB を共有している間だけ), `APPCONFIG_BASE_URL`(ai のみ), `ANTHROPIC_API_KEY`(Secret) |
 
 関連ファイル: `backend/Dockerfile`(両バイナリ同梱)、`backend/.gcloudignore`、`.gitignore`(plist / .p8 / .env を除外)。

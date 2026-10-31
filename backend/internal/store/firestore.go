@@ -32,9 +32,10 @@ type Firestore struct {
 
 const publicCollection = "apps_public"
 
-// NewFirestore connects to projectID (honours FIRESTORE_EMULATOR_HOST).
-func NewFirestore(ctx context.Context, projectID string) (*Firestore, error) {
-	c, err := firestore.NewClient(ctx, projectID)
+// NewFirestore connects to database in projectID (honours
+// FIRESTORE_EMULATOR_HOST). Binaries take both from fsenv.FromEnv.
+func NewFirestore(ctx context.Context, projectID, database string) (*Firestore, error) {
+	c, err := firestore.NewClientWithDatabase(ctx, projectID, database)
 	if err != nil {
 		return nil, err
 	}

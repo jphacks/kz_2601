@@ -1,0 +1,19 @@
+# cp envs/stg.tfvars.example envs/stg.tfvars して値を埋める(stg.tfvars はコミットしない)
+env        = "stg"
+project_id = "tailorit-stg" # #288 の仮名。空いているかは作成時に確認
+region     = "asia-northeast1"
+
+# WIF: 既定は develop だけ
+# wif_allowed_refs = ["refs/heads/develop"]
+
+firestore_pitr_enabled      = false
+firestore_delete_protection = true
+
+# 初回は空(Artifact Registry にイメージが無い)。CI が 1 回デプロイした後に digest を入れて再 apply
+purge_enabled   = true
+purge_job_image = ""
+
+billing_account     = "XXXXXX-XXXXXX-XXXXXX"
+budget_display_name = "kz2601 stg monthly"
+budget_amount       = 1500
+budget_currency     = "JPY"

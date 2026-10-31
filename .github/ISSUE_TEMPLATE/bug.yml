@@ -38,3 +38,20 @@ body:
       label: 実際の動作 / ログ
       description: ログ・スクショ・DSL JSON を貼る(APIキー等は伏せる)。
       render: text
+  - type: textarea
+    id: done
+    attributes:
+      label: 完了の条件
+      description: 何ができたら閉じてよいか。確かめ方(実機 / curl / テスト)まで書く。
+      placeholder: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: deps
+    attributes:
+      label: 依存
+      description: 先に終わっている必要がある Issue / PR(#番号)。無ければ「なし」。
+      placeholder: なし
+    validations:
+      required: true
