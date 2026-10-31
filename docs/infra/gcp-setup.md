@@ -34,6 +34,8 @@
 >
 > **注意**: プロジェクトの表示名(`--name`)に `_` は使えない(ID だけでなく表示名にも文字種制限がある)。
 >
+> 認証情報の一覧と差し替え手順は [credentials-inventory.md](credentials-inventory.md)。
+>
 > **2026-10-30 以降(#307)**: API・SA と IAM・Artifact Registry・Secret の入れ物・WIF・Firestore・消去ジョブ・予算は [`infra/`](../../infra/README.md) の Terraform で作る方針。本書は prod を最初に手で作った記録として残す。
 
 ## 目次
