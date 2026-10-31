@@ -29,6 +29,8 @@ public struct HTTPAIClient: AIClient {
         /// 使ってよい部品の allowlist と無効な機能(#245)。通常ビルドは nil = 送らない(全部使える)
         var allowedComponents: [String]? = ClientCapabilities.allowedComponents
         var disabledFeatures: [String]? = ClientCapabilities.disabledFeatures
+        /// この版が実装している DSL の動作(#482 recordRetention)
+        var supportedFeatures: [String] = ClientCapabilities.supportedFeatures
     }
 
     struct GenerateResponse: Decodable {
@@ -90,6 +92,8 @@ public struct HTTPAIClient: AIClient {
         /// 使ってよい部品の allowlist と無効な機能(#245)。通常ビルドは nil = 送らない
         var allowedComponents: [String]? = ClientCapabilities.allowedComponents
         var disabledFeatures: [String]? = ClientCapabilities.disabledFeatures
+        /// この版が実装している DSL の動作(#482 recordRetention)
+        var supportedFeatures: [String] = ClientCapabilities.supportedFeatures
     }
 
     /// `POST {base}/v1/chat`(契約: backend/internal/ai/chat.go の `ChatRequest` / `ChatResult`・#184 会話の取り決め)。

@@ -33,6 +33,10 @@ public enum ClientCapabilities {
         #endif
     }
 
+    /// 部品以外で、この版が実装している DSL の動作(#482)。審査用の版も同じ(記録の自動削除は端末内の処理だけ)。
+    /// backend は allowedComponents を送るのにここに無い動作(= v1.0)を AI に使わせない。
+    public static let supportedFeatures = ["recordRetention"]
+
     public static var disabledFeatures: [String]? {
         #if APP_STORE_REVIEW
         reviewDisabledFeatures
