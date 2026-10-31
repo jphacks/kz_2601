@@ -2,7 +2,7 @@ SHELL := /bin/bash
 PROJECT ?= $(shell gcloud config get-value project 2>/dev/null)
 REGION  ?= asia-northeast1
 
-.PHONY: build vet test lint schema-sync dev emulator run-appconfig run-ai run-purge smoke-local smoke-stg smoke-prod demo-check
+.PHONY: build vet test lint schema-sync dev emulator run-appconfig run-ai run-purge run-moderate smoke-local smoke-stg smoke-prod demo-check
 
 build:
 	go build ./...
@@ -49,6 +49,11 @@ PURGE_FLAGS ?= -dry-run
 run-purge:
 	FIRESTORE_EMULATOR_HOST=localhost:8089 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 \
 	GOOGLE_CLOUD_PROJECT=demo-kz2601 go run ./cmd/purge $(PURGE_FLAGS)
+
+# 運営の通報確認・非公開化(#321)をエミュレータに対して試す: make run-moderate ARGS="reports"
+# 本番の手順は docs/infra/moderation.md。書き込みは -yes を付けた時だけ。
+run-moderate:
+	FIRESTORE_EMULATOR_HOST=localhost:8089 GOOGLE_CLOUD_PROJECT=demo-kz2601 go run ./cmd/moderate $(ARGS)
 
 # ---- smoke (docs/03_demo_script.md の 3 本 + undo。Claude を 3 回呼ぶ) -------------
 AI_STG_URL        ?= https://ai-stg-378953239426.asia-northeast1.run.app
