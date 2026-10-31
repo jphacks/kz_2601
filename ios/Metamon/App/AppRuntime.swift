@@ -176,6 +176,8 @@ final class AppRuntime: DSLRuntime {
     var chatTurn: ChatTurn?
     /// edit のチャットから生成に回した時の会話(#211)。生成しても何も変わらなかったら、この会話に理由の吹き出しを足して音声シートを開き直す
     var chatReturnOnUnchanged: [ChatBubble]?
+    /// 上の会話を閉じる前の履歴。開き直す時はこれに戻す(閉じた時に履歴へ移した同じ会話が二重に残り、件数の上限で古い履歴を押し出していた)
+    @ObservationIgnored var chatHistoryOnUnchanged: [ChatHistoryEntry]?
     /// 生成・改変の前にチャットで相談するか(設定で切替・既定 ON・#186)。OFF は create も edit も従来どおり即反映。
     var clarifyEnabled: Bool = ClarifySettings.enabled {
         didSet { ClarifySettings.enabled = clarifyEnabled }
@@ -569,6 +571,8 @@ final class AppRuntime: DSLRuntime {
         withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
         if let bubbles = chatReturnOnUnchanged {
             chatReturnOnUnchanged = nil
+            if let saved = chatHistoryOnUnchanged { chatHistory = saved } // 吹き出しの didSet が保存するので先に戻す
+            chatHistoryOnUnchanged = nil
             withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
                 chatTurn = nil
                 chatBubbles = bubbles + [ChatBubble(role: .assistant, text: reason, kind: .answer)]
