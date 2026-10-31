@@ -69,6 +69,23 @@
         }
       }
     },
+    "まだ記録がありません": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No records yet"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "まだ記録がありません"
+          }
+        }
+      }
+    },
     "アプリを作ると数字が出ます": {
       "extractionState": "manual",
       "localizations": {
@@ -82,6 +99,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "アプリを作ると数字が出ます"
+          }
+        }
+      }
+    },
+    "件数": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Count"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "件数"
           }
         }
       }
@@ -103,6 +137,23 @@
         }
       }
     },
+    "最近の記録": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recent"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近の記録"
+          }
+        }
+      }
+    },
     "用意した記録帳の集計(今月の支出など)をホーム画面とロック画面に表示します。": {
       "extractionState": "manual",
       "localizations": {
@@ -116,6 +167,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "用意した記録帳の集計(今月の支出など)をホーム画面とロック画面に表示します。"
+          }
+        }
+      }
+    },
+    "直近 7 日": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last 7 days"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直近 7 日"
           }
         }
       }

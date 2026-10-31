@@ -45,7 +45,7 @@ struct MetamonStatWidget: Widget {
         #else
         .description("作ったアプリの集計(今月の支出など)をホーム画面とロック画面に表示します。")
         #endif
-        .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryCircular, .accessoryInline])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryRectangular, .accessoryCircular, .accessoryInline])
     }
 }
 
@@ -65,6 +65,19 @@ struct MetamonStatWidget: Widget {
     StatEntry(date: .now, snapshot: WidgetSnapshot(appName: "筋トレ記録", stats: [
         .init(key: "a", label: "今週の回数", value: "4 件"),
     ], updatedAt: .now))
+}
+
+#Preview("Large", as: .systemLarge) {
+    MetamonStatWidget()
+} timeline: {
+    StatEntry(date: .now, snapshot: .sample)
+    StatEntry(date: .now, snapshot: WidgetSnapshot(appName: "家計簿", stats: WidgetSnapshot.sample.stats, updatedAt: .now,
+                                                   recentTitle: "支出", recent: [], trend: nil))
+    StatEntry(date: .now, snapshot: WidgetSnapshot(appName: "BMI", stats: [
+        .init(key: "a", label: "最新の BMI", value: "21.4"),
+        .init(key: "b", label: "目標まで", value: "-1.2 kg"),
+    ], updatedAt: .now))
+    StatEntry(date: .now, snapshot: nil)
 }
 
 #Preview("Rectangular", as: .accessoryRectangular) {

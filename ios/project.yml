@@ -165,6 +165,8 @@ targets:
         - package: MetamonServices/MetamonServicesTests
         # アプリをホストにしたテスト(StoreKitTest の購入など、Bundle ID が要るもの・#77)
         - MetamonTests
+        # ウィジェットの見た目の描画テスト(#486)
+        - MetamonWidgetTests
         # 指の操作(タップ・ドラッグ・長押し)の UI テスト(#165)。手元で回す: docs/ios/architecture.md「UI テスト」
         - name: MetamonUITests
           parallelizable: false
@@ -209,6 +211,21 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: YES
         ENABLE_PREVIEWS: YES
+
+  # ウィジェットの描画テスト(#486)。ウィジェットの View(MetamonWidget/Views)と受け渡しモデルを直接コンパイルし、ImageRenderer で描く。
+  # 環境変数 WIDGET_SHOTS_DIR(xcodebuild では TEST_RUNNER_WIDGET_SHOTS_DIR)があれば PNG を書き出す(PR のスクショ用)。
+  MetamonWidgetTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: MetamonWidgetTests
+      - path: MetamonWidget/Views
+      - path: MetamonWidget/Shared
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.widgettests
+        TARGETED_DEVICE_FAMILY: "1"
 
   # UI テスト(XCUITest・#165)。モック(METAMON_MOCK=1)+ DEBUG フックで起動し、FAB のドラッグ / 長押し・チップ・チェック丸・フォームを実際に指で操作する。
   MetamonUITests:

@@ -72,6 +72,7 @@ struct MetamonWidgetView: View {
         if let snapshot = entry.snapshot, !snapshot.stats.isEmpty {
             switch family {
             case .systemMedium: MediumStatsView(snapshot: snapshot)
+            case .systemLarge: LargeStatsView(snapshot: snapshot)
             case .accessoryRectangular: AccessoryRectangularView(snapshot: snapshot)
             case .accessoryCircular: AccessoryCircularView(stat: snapshot.stats[0])
             case .accessoryInline: AccessoryInlineView(stat: snapshot.stats[0])
@@ -110,24 +111,7 @@ struct MediumStatsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 0) {
-                ForEach(Array(snapshot.stats.prefix(3).enumerated()), id: \.element.id) { index, stat in
-                    if index > 0 {
-                        Rectangle()
-                            .fill(Color.primary.opacity(0.08))
-                            .frame(width: 1)
-                            .padding(.horizontal, 10)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(stat.label)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                        StatValueText(value: stat.value, size: 24)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
+            StatsRow(stats: Array(snapshot.stats.prefix(3)), valueSize: 24)
             Spacer(minLength: 0)
             AppFooter(appName: snapshot.appName, updatedAt: snapshot.updatedAt)
         }
