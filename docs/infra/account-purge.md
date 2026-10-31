@@ -91,7 +91,9 @@ gcloud run jobs create account-purge \
 gcloud run jobs execute account-purge --project="$PROJECT_ID" --region="$REGION" --wait
 ```
 
-ログに `purge: start`(`candidates` = 対象の数)と `purge: would purge` が出ることを確かめます。問題が無ければ dry-run を外します。
+Job は `APP_ENV` を付けないので stg 用の起動停止(#290)は掛かりません。DB は `FIRESTORE_DATABASE`(既定 `(default)`)で選びます。stg のプロジェクト/DB で動かす場合は `APP_ENV=stg` を付け、本番の DB を指していれば起動を拒否します。
+
+ログに `purge: firestore`(接続先)・`purge: start`(`candidates` = 対象の数)と `purge: would purge` が出ることを確かめます。問題が無ければ dry-run を外します。
 
 ```bash
 gcloud run jobs update account-purge --project="$PROJECT_ID" --region="$REGION" --args="-limit=50,-older-than=696h"
