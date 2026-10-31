@@ -105,6 +105,7 @@ struct RootView: View {
                 .modifier(HostSheets(onModal: true))
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
+                .modifier(ModerationDialogs(onModal: true))
                 #endif
                 .modifier(ToastHost(onModal: true))
         }
@@ -113,6 +114,7 @@ struct RootView: View {
                 .modifier(HostSheets(onModal: true))
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
+                .modifier(ModerationDialogs(onModal: true))
                 #endif
                 .modifier(ToastHost(onModal: true))
         }
@@ -120,6 +122,7 @@ struct RootView: View {
         #if !APP_STORE_REVIEW // 審査用ビルドはシェアリンク・探す・近くの端末との共有を外す(#245)
         .modifier(SharingHooks()) // シェアリンク受信・「探す」シート(#49 #50)
         .modifier(NearbySheets(onModal: false)) // 近くの端末と送り合う(#36)
+        .modifier(ModerationDialogs()) // 通報・ブロック(#321)
         #endif
         .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
