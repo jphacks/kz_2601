@@ -115,8 +115,18 @@ func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusRequestEntityTooLarge, httpx.CodePayloadTooLarge, "too many records to sort in memory"))
 		return
 	}
+	var blocked map[string]bool // #321: posts of users the caller blocked
+	if ent.IsShared() {
+		if blocked, err = h.blockedBy(r); err != nil {
+			fail(w, err)
+			return
+		}
+	}
 	items := make([]store.Record, 0, len(all))
 	for i := range all {
+		if blocked[all[i].Author] {
+			continue
+		}
 		if pred == nil || pred(&all[i]) {
 			items = append(items, all[i])
 		}

@@ -59,6 +59,7 @@ struct ChatThreadLeaf: View {
                                 sender: ChatThread.showsSender(row, after: i > 0 ? rows[i - 1] : nil, in: entity, uid: uid)
                                     ? (row.authorName ?? L("匿名")) : nil
                             )
+                            .contextMenu { ModerationMenuItems(entity: entity.id, record: row) }
                             .id(row.id)
                         }
                     }

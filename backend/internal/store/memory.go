@@ -37,6 +37,9 @@ type Memory struct {
 	deleted  map[string]time.Time          // uid -> deletedAt of DELETE /v1/me (memory_account.go)
 	purged   map[string]bool               // uids erased by PurgeAccount + MarkAccountPurged
 	marks    map[string]bool               // record/mark/uid keys (memory_marks.go)
+	reports  map[string]*Report            // reports/{id} (memory_moderation.go)
+	quota    map[string]int                // uid/day -> reports filed
+	blocks   map[string]map[string]*Block  // users/{uid}/blocks/{blockedUid}
 }
 
 // NewMemory returns an empty store.

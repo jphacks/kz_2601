@@ -32,23 +32,26 @@ type shareDoc struct {
 }
 
 type catalogDoc struct {
-	OwnerUID    string    `firestore:"ownerUid"`
-	Name        string    `firestore:"name"`
-	Description string    `firestore:"description"`
-	Tags        []string  `firestore:"tags"`
-	AuthorName  string    `firestore:"authorName"`
-	Components  []string  `firestore:"components"`
-	Version     int64     `firestore:"dslVersion"`
-	DSLJSON     string    `firestore:"dslJson"`
-	Installs    int64     `firestore:"installs"`
-	CreatedAt   time.Time `firestore:"createdAt"`
-	UpdatedAt   time.Time `firestore:"updatedAt"`
+	OwnerUID     string    `firestore:"ownerUid"`
+	Name         string    `firestore:"name"`
+	Description  string    `firestore:"description"`
+	Tags         []string  `firestore:"tags"`
+	AuthorName   string    `firestore:"authorName"`
+	Components   []string  `firestore:"components"`
+	Version      int64     `firestore:"dslVersion"`
+	DSLJSON      string    `firestore:"dslJson"`
+	Installs     int64     `firestore:"installs"`
+	CreatedAt    time.Time `firestore:"createdAt"`
+	UpdatedAt    time.Time `firestore:"updatedAt"`
+	Hidden       bool      `firestore:"hidden,omitempty"`
+	HiddenReason string    `firestore:"hiddenReason,omitempty"`
+	HiddenAt     time.Time `firestore:"hiddenAt,omitempty"`
 }
 
 func (d *catalogDoc) toCatalog(id string, withDSL bool) *CatalogApp {
 	c := &CatalogApp{ID: id, OwnerUID: d.OwnerUID, Name: d.Name, Description: d.Description, Tags: d.Tags,
 		AuthorName: d.AuthorName, Components: d.Components, Version: int(d.Version), Installs: int(d.Installs),
-		CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+		CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, ModerationState: ModerationState{Hidden: d.Hidden, HiddenReason: d.HiddenReason, HiddenAt: d.HiddenAt}}
 	if withDSL {
 		c.DSL = json.RawMessage(d.DSLJSON)
 	}
@@ -121,6 +124,7 @@ func (f *Firestore) PutCatalogApp(ctx context.Context, uid string, c CatalogApp)
 				return ErrForbidden
 			}
 			d.CreatedAt, d.Installs = old.CreatedAt, old.Installs
+			d.Hidden, d.HiddenReason, d.HiddenAt = old.Hidden, old.HiddenReason, old.HiddenAt
 		case !isNotFound(err):
 			return err
 		}

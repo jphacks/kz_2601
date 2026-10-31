@@ -43,6 +43,12 @@ public protocol DSLRuntime: AnyObject, Observable {
     func generateAIText(_ request: AITextRequest) async throws -> AITextResult
     /// オンライン版を持つホストか(プレビュー・テストは false = 端末内 AI だけ)。
     var supportsOnlineAIText: Bool { get }
+    /// 他人の共有レコードを通報・ブロックできるか(#321・審査 1.2)。シェアの無い版・プレビューは false。
+    func canReport(entity: String, record: Record) -> Bool
+    /// 通報の理由を選ぶ画面をホストが出す。
+    func reportRecord(entity: String, record: Record)
+    /// 作者のブロックの確認をホストが出す(ブロックすると、その人の投稿はすぐ見えなくなる)。
+    func blockAuthor(entity: String, record: Record)
 }
 
 public extension DSLRuntime {
@@ -62,6 +68,9 @@ public extension DSLRuntime {
     func timerActivity(_ update: TimerActivityUpdate) {}
     func generateAIText(_ request: AITextRequest) async throws -> AITextResult { throw AITextError.unsupported }
     var supportsOnlineAIText: Bool { false }
+    func canReport(entity: String, record: Record) -> Bool { false }
+    func reportRecord(entity: String, record: Record) {}
+    func blockAuthor(entity: String, record: Record) {}
 
     /// 自分が更新できるレコードか(#249 / #252)。他人の共有レコードは entity.edit が members の時だけ。
     func canEdit(entity: String, record: Record) -> Bool {
