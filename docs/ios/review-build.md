@@ -68,12 +68,12 @@
   - Review 構成だけ、最後のビルドフェーズ `scripts/strip-review-plist.sh` が、出来上がった Info.plist からキーを消し、説明文を差し替える。署名の前に走る。
   - Debug / Release では何もしない。判定は `METAMON_APP_STORE_REVIEW=YES` で行う。
 - **接続先(#452 G7)**
-  - Review 構成だけ、`project.yml` の `Metamon` ターゲットの `configs.Review` で `METAMON_AI_BASE_URL` / `METAMON_APPCONFIG_BASE_URL` を prod にする。
+  - Review 構成は `project.yml` の `settings.configs.Review` で `METAMON_AI_BASE_URL` / `METAMON_APPCONFIG_BASE_URL` を prod にする(Release も同じ・#292)。
     - ai: `https://ai-prod-378953239426.asia-northeast1.run.app`
     - appconfig: `https://appconfig-prod-378953239426.asia-northeast1.run.app`
     - 出典は `docs/release/2026-10-25-runbook.md` の「prod の URL」と `backend/Makefile`。
-  - Debug / Release の既定(`settings.base` の stg)は変えない。
-  - GoogleService-Info.plist(Firebase)の prod への切り替えは別(#292)。
+  - Debug / Staging は stg(`settings.base`)。
+  - GoogleService-Info.plist(Firebase)も Review / Release は prod の plist を入れる(#292・`docs/ios/architecture.md`「ビルド構成と接続先」)。
 - **プライバシーマニフェスト(#452 G6)**
   - `Metamon/PrivacyInfo.xcprivacy`(アプリ)と `MetamonWidget/PrivacyInfo.xcprivacy`(ウィジェット)。どの版にも入る(xcodegen が各ターゲットの Resources に入れる)。
   - 理由が要る API: UserDefaults(`CA92.1` アプリだけ / `1C8F.1` App Group でウィジェットと共有)、空き容量(`E174.1` / `85F4.1`。音声モデルのダウンロード前の確認と不足分の表示)。ファイルの日時・起動からの時間・キーボードは使っていない。

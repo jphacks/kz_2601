@@ -506,8 +506,8 @@ SignInView ──Sign in with Apple──▶ ASAuthorizationAppleIDCredential(id
 ### 環境変数(ai と appconfig は別々に live にできる)
 | 用途 | 実行時 env | Info.plist キー(build setting から展開) | 既定(project.yml) | 未設定時 |
 |---|---|---|---|---|
-| ai | `METAMON_AI_BASE_URL` | `MetamonAIBaseURL` = `$(METAMON_AI_BASE_URL)` | `https://ai-stg-378953239426.asia-northeast1.run.app` | `MockAIClient` |
-| appconfig | `METAMON_APPCONFIG_BASE_URL`(旧 `METAMON_API_BASE_URL` も可) | `MetamonAppConfigBaseURL` = `$(METAMON_APPCONFIG_BASE_URL)` | `https://appconfig-stg-378953239426.asia-northeast1.run.app` | `InMemoryAppConfigClient` + `NoopDocumentSync`(`isLive=false`) |
+| ai | `METAMON_AI_BASE_URL` | `MetamonAIBaseURL` = `$(METAMON_AI_BASE_URL)` | 構成ごと(下の「ビルド構成と接続先」)。Debug は `https://ai-stg-378953239426.asia-northeast1.run.app` | `MockAIClient` |
+| appconfig | `METAMON_APPCONFIG_BASE_URL`(旧 `METAMON_API_BASE_URL` も可) | `MetamonAppConfigBaseURL` = `$(METAMON_APPCONFIG_BASE_URL)` | 構成ごと。Debug は `https://appconfig-stg-378953239426.asia-northeast1.run.app` | `InMemoryAppConfigClient` + `NoopDocumentSync`(`isLive=false`) |
 | 全モック | `METAMON_MOCK=1` | — | — | URL 設定を無視して `AppEnvironment.mock` |
 | 開発用 uid | `METAMON_DEV_UID=<uid>`(DEBUG のみ) | — | — | `AUTH_MODE=dev` のローカル backend 向けに Bearer へ固定 uid を送る(`StaticTokenProvider`)。staging/本番(Firebase 検証)には通らない |
 
@@ -517,6 +517,41 @@ SignInView ──Sign in with Apple──▶ ASAuthorizationAppleIDCredential(id
 - appconfig 契約(PR #32・`HTTPAppConfigClient`): `GET /v1/apps/{appId}/dsl`(`ETag: "<version>"`・`If-None-Match` で 304)/ `GET /versions`(新しい順・`VersionSummary`)/ `POST /versions/{n}/restore`(201 `VersionSummary` → 続けて `GET /dsl`)/ records `GET`(`pageSize=200`・`nextPageToken` を最大 5 ページ追う)・`POST`(`{data, clientId}`・通信断時は同じ clientId で 1 回再送)・`PATCH`(`{data}`・null で項目削除)・`DELETE`(204)。エラー封筒 `{error:{code,message,details?,requestId?}}` は `APIError.server(status:code:message:details:)`。`details.field` は `APIError.field`。
 - HTTP キャッシュは使わない(`HTTP.session` = ephemeral・`urlCache = nil`・`reloadIgnoringLocalAndRemoteCacheData`)。`GET /dsl` は `Cache-Control: no-cache` + ETag だが `URLSession.shared` が再検証せず古い 200 を返し、起動時復元が 1 つ前の version になる事象が staging E2E で出た。鮮度は自前の `If-None-Match` と `DocumentCache` で管理する。
 - ATS: `NSAllowsLocalNetworking` のみ(LAN の `http://<IP>:8081` 用)。`NSAllowsArbitraryLoads` は入れない。
+
+### ビルド構成と接続先(#292)
+今の GCP プロジェクト `jphacks-kz2601` は prod のまま。stg 用のプロジェクトは後で作る(決定: `docs/decisions/288-prod-staging-db-split.md`)。それまで stg 系の構成は今の stg Cloud Run に向ける。
+
+| 構成 | scheme | ai / appconfig | Firebase plist(バンドル内の名前は常に `GoogleService-Info.plist`) | 表示名 | 主な用途 |
+|---|---|---|---|---|---|
+| Debug | `Metamon` | `ai-stg-…` / `appconfig-stg-…` | `ios/Firebase/GoogleService-Info-Staging.plist`。無ければ prod の plist + ビルド警告 | Tailor It β | 開発・CI(ios-ci)・UI テスト(モック) |
+| Staging | `Metamon-Staging` | 同上 | 同上 | Tailor It β | 端末に入れる検証版(最適化あり・`DEBUG` なし) |
+| Release | `Metamon`(Archive) | `ai-prod-…` / `appconfig-prod-…` | `ios/Firebase/GoogleService-Info.plist` | Tailor It | TestFlight / App Store |
+| Review | `Metamon-Review` | 同上 | 同上 | Tailor It | 審査用(`scripts/build-review.sh`・`docs/ios/review-build.md`) |
+
+- 値は `project.yml` の `settings.base` / `settings.configs`(build setting `METAMON_AI_BASE_URL` / `METAMON_APPCONFIG_BASE_URL` / `METAMON_FIREBASE_ENV` / `METAMON_DISPLAY_NAME`)。xcodebuild の引数で上書きできる(ローカル backend に向ける時など)。
+- plist の流れ: `scripts/sync-firebase-plist.sh` が secrets の `GoogleService-Info.plist`(prod・必須)と `GoogleService-Info-Staging.plist`(stg・あれば)を `ios/Firebase/`(git-ignored)へコピー → Metamon ターゲットのビルドフェーズ「Select Firebase plist」(`scripts/select-firebase-plist.sh`)が構成に合う方をバンドルへ入れる。
+  - stg の plist が無い間は Debug / Staging も prod の Firebase で認証する(今まで通り)。ビルドログに `warning: ios/Firebase/GoogleService-Info-Staging.plist が無いため…` が出る。
+  - どちらも無ければ何も入れない(認証はモック)。CI はこの状態。
+  - 「あれば使う」ファイルを読むため Metamon ターゲットは `ENABLE_USER_SCRIPT_SANDBOXING: NO`(サンドボックスは宣言した入力しか読めず、無いかもしれないファイルは入力に書けない)。
+  - #292 より前の置き場 `Metamon/Resources/GoogleService-Info.plist` は使わない(project.yml で除外。sync スクリプトが消す)。
+- CI(ios-ci)と UI テストは scheme `Metamon` の Debug。plist 無しのモック認証で動くので、構成の追加で変わらない。
+- ウィジェットの App Group(`group.jp.kz2601.metamon`)は全構成で同じ。
+
+#### stg 版と prod 版を同じ端末に入れる(Bundle ID の末尾・既定 OFF)
+既定では全構成とも Bundle ID は `jp.kz2601.metamon`(ウィジェット `jp.kz2601.metamon.widget`)。別の Bundle ID には Apple 側の App ID と Firebase 側の iOS アプリ登録が要るため、末尾は手で ON にする:
+```sh
+METAMON_STG_BUNDLE_ID_SUFFIX=.stg METAMON_TEAM_ID=CHP337D75C xcodegen generate
+```
+→ Debug / Staging は `jp.kz2601.metamon.stg`(ウィジェット `jp.kz2601.metamon.stg.widget`)。Release / Review は変わらない。
+
+ON にする前の人の作業(一度だけ):
+1. Apple Developer: App ID `jp.kz2601.metamon.stg` と `jp.kz2601.metamon.stg.widget` を用意し、Sign in with Apple・App Groups(`group.jp.kz2601.metamon`)・HealthKit を付ける(自動署名 `-allowProvisioningUpdates` でも作られる。Sign in with Apple の設定を確認する)。
+2. Firebase(stg 用プロジェクト): Bundle ID `jp.kz2601.metamon.stg` の iOS アプリを登録し、その `GoogleService-Info.plist` を secrets に `GoogleService-Info-Staging.plist` として置いて `./scripts/sync-firebase-plist.sh`。Authentication の Apple プロバイダの設定も確認する。
+3. TestFlight で配る時は App Store Connect に別アプリ(`jp.kz2601.metamon.stg`)の登録が要る。
+
+注意:
+- App Group は prod 版と共有になる(ウィジェットのスナップショットは後から書いた方になる)。分けたくなったら `WidgetSnapshot.appGroupID` と entitlements を構成ごとにする。
+- 課金の商品 ID(`jp.kz2601.metamon.pro.*`)は Bundle ID ごとに App Store Connect の登録が要る。stg 版はローカルの StoreKit 構成ファイルで試す。
 
 ### ローカル DB と同期(Issue #48・実装済み)
 
@@ -577,10 +612,11 @@ Renderer ──load(entities)──▶ AppRuntime.refresh(entity)
 ## 11. ビルド/実行
 ```sh
 cd ios
-./scripts/sync-firebase-plist.sh               # GoogleService-Info.plist をリポ外からコピー(git-ignored。無ければ認証モック)
+./scripts/sync-firebase-plist.sh               # Firebase の plist をリポ外から ios/Firebase/ へコピー(git-ignored。無ければ認証モック)
 METAMON_TEAM_ID=CHP337D75C xcodegen generate   # .xcodeproj 生成(コミットしない)。Team を注入
 xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' build CODE_SIGNING_ALLOWED=NO
 xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' test CODE_SIGNING_ALLOWED=NO   # 3 パッケージのテストを一括
+xcodebuild -scheme Metamon-Staging -configuration Staging -destination 'platform=iOS Simulator,name=iPhone 17' build   # stg 版(§7「ビルド構成と接続先」)
 (cd Packages/MetamonDSL && swift test)         # DSL だけなら macOS で数秒
 # 実機(ai をローカル LAN で live にする例。appconfig 未指定ならインメモリのまま)
 xcodebuild -scheme Metamon -destination 'id=<DEVICE_ID>' -allowProvisioningUpdates DEVELOPMENT_TEAM=CHP337D75C build METAMON_AI_BASE_URL=http://$(ipconfig getifaddr en0):8081

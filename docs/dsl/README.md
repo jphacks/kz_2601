@@ -53,6 +53,7 @@ AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: full
 Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|members, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit?, refEntity?, computed?: Expr, health?: "weight" } }
   予約値(field id の代わり): $author(共有 entity の投稿者)・$createdAt(作成日時)— §3.5
   Entity.marks?: [{ id, icon, label }](共有 entity の 1 人 1 回の印・いいね / 保存)・ListItem.mark? / 予約値 $marks.<id>(件数・自分が付けたか)— §3.5
+  Entity.retentionDays?: 1〜3650(記録の保存期間。期限を過ぎた記録を端末が自動で消す)— §3.7
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
 Leaf (44 種・全て id? と area? を持つ) / Action (12 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
@@ -300,6 +301,23 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - AI 側の基準(`internal/ai/prompt.go`): 役割の違う一覧・集計・設定はタブ(2〜4 個)、入力はフォーム画面を sheet、詳細は `list.onItemTap` で push、1 画面の直下は 8 部品まで、孤立画面を作らない。navigate はどこからどこへ飛んでもよい前提(タブの根へ飛んだらタブ切替は iOS 側 #113)。
 - 遷移を変える編集は JSON Patch のレシピで出す: 「B から C にも」= B の components に navigate C の button を add、「タブを足す」= `/screens/-` + `/app/tabs/-`(タブが無ければ `/app/tabs` を 2 個で add)、「タブを消す」= `/app/tabs/i` を remove(残り 1 個なら `/app/tabs` ごと remove し、辿れなくなる画面も remove)、「順番」= `/app/tabs` の move。eval は `cases.json` の `group: nav`(`expect` の `patch` / `unreachable` / `nav` / `tabs` / `tabOrder` / `tabHas`)。
 
+### 3.7 entity.retentionDays = 記録の保存期間(#482)
+
+「1週間たった記録は消して」「30日で消えるようにして」で、その entity に `"retentionDays": 7` のように日数を付ける。省略 = 消さない。
+
+| 項目 | 決めたこと |
+|---|---|
+| 数え方 | レコードの `createdAt`(作った日時)から。日付の項目の値ではない。`createdAt` が無い・読めないレコードは消さない |
+| 消す時機(iOS) | DSL を当てた時(起動・切替・生成・ホットリロード)・前面に戻った時・サーバーから読み直した後・保存の後。サーバー側の定期削除は無い(誰も開かなければ残る) |
+| 消し方 | 手で消すのと同じ削除(ローカル DB から即消し、同期キューが appconfig へ `DELETE`)。消えた記録は戻せない |
+| 確認 | 期間が付いた・短くなった時に端末が確認ダイアログ(「自動で消す」「自動で消すのをやめる」「あとで」)を出し、**確認するまで消さない**。確認した期間は端末・appId・entity ごとに保存。延ばしただけなら確認し直さない |
+| 共有(shared / public) | **各自が自分で作った記録だけ**を自分の端末で消す(`author` が自分の uid と一致するもの。author の無い旧データ・uid 不明は消さない)。他の人の記録は、その人が開いた時にその人の端末で消える。他人の記録を消す権限は誰にも足さない |
+| 表示・解除 | 設定シートの「記録の自動削除」に entity ごとの期間。「自動で消すのをやめる」は声の「自動で消すのをやめて」と同じ修正(remove `/entities/<i>/retentionDays`)を送る |
+| 付ける entity | 日々たまる記録だけ。ref で選ばれる一覧(カテゴリ・メンバー)と設定には付けない(AI のルール) |
+
+- AI: `backend/internal/ai/retention_rules.go`。一括削除の制限(chatLimits)と混同して断らない。ai-eval の `retention`(日数・0 = 無し)/ `retentionOnRef`(`retention_cases.json` / `retention_chat_cases.json`)。
+- 古い iOS(#302): v1.0 は `retentionDays` を知らない(無視して消さない)。iOS は generate / chat の body `supportedFeatures: ["recordRetention"]` で実装済みを伝え、`allowedComponents` を送るのに `recordRetention` を含めない版には AI が使わない(§5.2・§5.3)。審査用の版も記録の自動削除を持つ(端末内の処理だけで、共有もネイティブ API も使わない)。
+
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 
 AI に渡す部品カタログは手書きではなく **`dsl.schema.json` から自動生成**される(`backend/internal/ai/catalog.go` の `BuildCatalog`)。検証(Go)・描画(iOS)・AI(プロンプト)の 3 者はすべてスキーマから導出され、抜けはテストで赤になる。
@@ -340,6 +358,7 @@ App Store に出した後は古い iOS が残り続ける。backend は「今い
 | どこに | 中身 | 使い道 |
 |---|---|---|
 | generate / chat の body `allowedComponents` | その版が描画できる部品 type の全部(`ComponentType` から自動) | backend はここに**無い** type を生成結果に入れない(下) |
+| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(今は `recordRetention`・#482) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
 | 全リクエストのヘッダ `X-Client-Platform` / `X-Client-Version` / `X-Client-Build` / `X-Client-DSL-Version` | `ios` / `CFBundleShortVersionString` / `CFBundleVersion` / 描画できる最大の `schemaVersion` | ログ(どの版がまだ使われているか = 最低対応版を上げる判断) |
 
 ### 5.3 backend が古い iOS に新しい部品を出さない仕組み
@@ -348,6 +367,7 @@ App Store に出した後は古い iOS が残り続ける。backend は「今い
 
 - `allowedComponents` に backend の知らない type(iOS の方が新しい)があっても無視する。全既知 type を送った時は制限なし(プロンプトは byte 同一)。
 - `allowedComponents` を送らない(v1.0 より前の開発版)クライアントは制限なし。
+- 部品でない DSL のキー(`Entity.retentionDays`・#482)は `supportedFeatures` で同じことをする: 無い版にはスキーマ・索引・ルールから外し、新しく付けた分は再生成させ、残れば取り除く。
 - 試験: `backend/internal/ai/compat_test.go`。v1.0 の部品一覧は `testdata/ios_v1_components.json` に凍結してあり、**部品を足しても書き換えない**(足した部品が v1.0 に出ないことを試験が確かめる)。例の DSL ごとに「その部品を知らない 1 つ前の版」を作り、生成結果にその部品が出ないこと・DSL として開けることを確かめる。
 - 保存済みの DSL(別の端末で作った・シェアで取り込んだ)は `GET /dsl` でそのまま返る。古い iOS は未知の type をプレースホルダで描くので、画面は壊れない(§1)。
 

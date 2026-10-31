@@ -84,6 +84,7 @@ type ChatRequest struct {
 	// (build restriction; omitted = no restriction). Not related to Capabilities.
 	AllowedComponents []string `json:"allowedComponents,omitempty"`
 	DisabledFeatures  []string `json:"disabledFeatures,omitempty"`
+	SupportedFeatures []string `json:"supportedFeatures,omitempty"` // #482: same as Request
 }
 
 // Brief is the structured understanding of the requested app.
@@ -337,7 +338,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 	if req.AppID == "" {
 		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "appId is required"}
 	}
-	ctx = withRestriction(ctx, NewRestriction(req.AllowedComponents, req.DisabledFeatures))
+	ctx = withRestriction(ctx, NewClientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures))
 	incoming, err := normalizeMessages(req.Messages)
 	if err != nil {
 		return nil, err
@@ -521,7 +522,7 @@ func (s *Service) chatAttempt(ctx context.Context, cfg ChatConfig, user string, 
 	sent := false
 	start := time.Now()
 	var first time.Duration
-	resp, ttft, err := s.callChat(ctx, cfg, user, ar, func(delta string) {
+	resp, ttft, err := s.callChat(WithOperation(ctx, OpChat), cfg, user, ar, func(delta string) {
 		if first == 0 {
 			first = time.Since(start)
 		}

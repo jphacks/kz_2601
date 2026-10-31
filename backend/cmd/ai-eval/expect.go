@@ -92,6 +92,9 @@ var expectKeys = map[string]expectKind{
 	// checkMusic (#412)
 	"musicRequests":   expectBool,
 	"musicAutoAccept": expectBool,
+	// checkRetention (#482): retention.go
+	"retention":      expectNumber,
+	"retentionOnRef": expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

@@ -10762,6 +10762,108 @@
         }
       }
     },
+    "古い記録を自動で消しますか?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete old entries automatically?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "古い記録を自動で消しますか?"
+          }
+        }
+      }
+    },
+    "自動で消す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete automatically"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動で消す"
+          }
+        }
+      }
+    },
+    "自動で消すのをやめる": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop auto-deleting"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動で消すのをやめる"
+          }
+        }
+      }
+    },
+    "確認して自動で消す": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm and delete automatically"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認して自動で消す"
+          }
+        }
+      }
+    },
+    "記録の自動削除": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-delete entries"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録の自動削除"
+          }
+        }
+      }
+    },
+    "期間を過ぎた記録は、開いた時などに自動で消えます。消えた記録は元に戻せません。共有の記録は自分が追加したものだけが消えます。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entries older than the period are deleted automatically, for example when you open it. Deleted entries cannot be restored. For shared entries, only the ones you added are deleted."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "期間を過ぎた記録は、開いた時などに自動で消えます。消えた記録は元に戻せません。共有の記録は自分が追加したものだけが消えます。"
+          }
+        }
+      }
+    },
     "クラッシュ報告を送る": {
       "extractionState": "manual",
       "localizations": {

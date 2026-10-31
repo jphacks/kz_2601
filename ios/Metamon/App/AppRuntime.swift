@@ -212,6 +212,12 @@ final class AppRuntime: DSLRuntime {
 
     /// 生成直後の「個人の情報も公開されます」の確認(#253・nil = 出していない)。`Features/Privacy/AppRuntime+PublicData.swift`
     var publicDataPrompt: PublicDataPrompt?
+    /// 記録の保存期間の確認(#482・nil = 出していない)。`Features/Retention/AppRuntime+Retention.swift`
+    var retentionPrompt: RetentionPrompt?
+    /// 「あとで」にした確認("appId/entity=日数")。このセッションでは聞き直さない
+    @ObservationIgnored var retentionDeferred: Set<String> = []
+    /// 期限切れを消している最中の "appId/entity"(同じ行を 2 回消さない)
+    @ObservationIgnored var retentionPurging: Set<String> = []
 
     let services: Services
     /// レコードのローカル DB + 未送信キュー(Issue #48)。`records` はここから読み、書きはここに即反映してから裏で送る。
@@ -247,6 +253,7 @@ final class AppRuntime: DSLRuntime {
             if DeviceAppID.issuedThisLaunch { await resumeLatestAppIfEmpty() } // #276: 再インストール後のサインイン
             startSync()
         }
+        noteRetention() // #482 起動時の DSL(モック・オフラインでは apply を通らない)
         Task { await syncNotificationsNow() }
         #if DEBUG
         autoNavigateIfRequested() // `METAMON_AUTO_NAV`(#113)
@@ -419,6 +426,7 @@ final class AppRuntime: DSLRuntime {
             startSync()
             Task { await refreshNotifications() } // #228 届いた分の空き枠を埋める
             Task { await catchUpAfterBackground() } // #38: 背面中の取りこぼしを即取り直す(AppRuntime+Background)
+            Task { await purgeAllExpired() } // #482 背面の間に期限を過ぎた記録
         } else {
             syncTask?.cancel()
             // 背面の間の変化は通知されないので、復帰で購読が戻った時に表示中の records を読み直す
@@ -450,6 +458,7 @@ final class AppRuntime: DSLRuntime {
             swap()
         }
         scheduleNotificationSync()
+        noteRetention() // #482 保存期間の確認と期限切れの削除
         WidgetSnapshotWriter.write(dsl: doc.dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         IntentHost.shared.appsMayHaveChanged() // Siri のフレーズ候補(アプリ名)を引き直す(#80)
     }
@@ -892,6 +901,7 @@ final class AppRuntime: DSLRuntime {
         guard dsl.entity(entity) != nil else { return false }
         records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: nil, data: data, author: postAuthor(for: entity))
         WidgetSnapshotWriter.write(dsl: dsl, records: records)
+        await purgeExpired(entity) // #482
         return true
     }
 
@@ -932,6 +942,7 @@ final class AppRuntime: DSLRuntime {
             records[entity] = fresh
             failed.remove(entity)
             if fresh.isEmpty { await seedRefOptions(entity, appId: appId) }
+            await purgeExpired(entity) // #482 サーバーから届いた期限切れ(別の端末で作った自分の記録など)
             print("[Metamon] records loaded: entity=\(entity) count=\(fresh.count)")
             WidgetSnapshotWriter.write(dsl: dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         } catch {
@@ -1075,6 +1086,7 @@ final class AppRuntime: DSLRuntime {
             #if !APP_STORE_REVIEW
             writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)
             #endif
+            Task { await purgeExpired(entity) } // #482 保存の後(画面遷移を待たせない)
             if let screen = action.screen {
                 navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
             } else {

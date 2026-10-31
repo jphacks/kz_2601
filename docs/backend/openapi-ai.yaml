@@ -342,6 +342,7 @@ components:
             ?stream=1 の `event: app` は 1 パス目の app ブロックで従来どおり先に届き、2 パス目の結果は `event: result` の dsl に入る。
         allowedComponents: { $ref: '#/components/schemas/AllowedComponents' }
         disabledFeatures: { $ref: '#/components/schemas/DisabledFeatures' }
+        supportedFeatures: { $ref: '#/components/schemas/SupportedFeatures' }
       example: { appId: app_01HXYZ, text: 家計簿アプリが欲しい。金額とカテゴリとメモを記録したい, baseVersion: 1 }
     GenerateResponse:
       type: object
@@ -438,6 +439,14 @@ components:
         `sharedData`(#451 G2。entity の scope shared / public・edit・marks を使わない = 記録はすべて private。生成結果は scope / edit / marks /
         list.item.mark を落とす。chat の ready / 案に requiresPro・paidFeatures を付けない)。未知の値は無視。省略 = 何も無効にしない。
       example: [fieldHealth, cameraCapture, sharedData]
+    SupportedFeatures:
+      type: array
+      items: { type: string }
+      description: |
+        #482。部品以外で、このクライアントが実装している DSL の動作。既知の値: `recordRetention`(Entity.retentionDays の期限切れレコードを端末が消す)。
+        `allowedComponents` を送るクライアント(v1.0 以降)がここに `recordRetention` を含めない時、AI は retentionDays を使わず「この版ではできない」と答え、生成結果からは落とす。
+        `allowedComponents` も送らないクライアントは制限なし。未知の値は無視。
+      example: [recordRetention]
     ChatMessage:
       type: object
       required: [role, text]
@@ -465,6 +474,7 @@ components:
           description: '#185。クライアントが表示できる追加の kind。mode を省いて自動判定に任せる新しい iOS はこれを送る'
         allowedComponents: { $ref: '#/components/schemas/AllowedComponents' }
         disabledFeatures: { $ref: '#/components/schemas/DisabledFeatures' }
+        supportedFeatures: { $ref: '#/components/schemas/SupportedFeatures' }
       example: { appId: app_01HXYZ, messages: [{ role: user, text: 家計簿 }] }
     ChatOption:
       type: object

@@ -133,7 +133,7 @@ func (s *Service) Text(ctx context.Context, req TextRequest) (*TextResult, error
 	cfg := s.ChatConfig.resolved()
 	ctx, cancel := context.WithTimeout(ctx, s.chatTimeout())
 	defer cancel()
-	resp, err := s.Claude.Complete(ctx, Completion{
+	resp, err := s.Claude.Complete(WithOperation(ctx, OpText), Completion{
 		System:     textSystemPrompt(loc),
 		Messages:   []Message{{Role: "user", Content: textUserMessage(req)}},
 		Schema:     textSchema(req),

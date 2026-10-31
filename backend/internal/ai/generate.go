@@ -47,6 +47,9 @@ type Request struct {
 	// cameraCapture (unknown values ignored). See restrict.go.
 	AllowedComponents []string `json:"allowedComponents,omitempty"`
 	DisabledFeatures  []string `json:"disabledFeatures,omitempty"`
+	// SupportedFeatures (#482): optional DSL behaviors the client implements
+	// (recordRetention). See NewClientRestriction.
+	SupportedFeatures []string `json:"supportedFeatures,omitempty"`
 }
 
 // Latency is per-stage wall time in ms.
@@ -191,7 +194,7 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 // is still validated and saved before it is returned.
 func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*Result, error) {
 	started := time.Now()
-	restrict := NewRestriction(req.AllowedComponents, req.DisabledFeatures)
+	restrict := NewClientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures)
 	ctx = withRestriction(ctx, restrict)
 	transcript := strings.TrimSpace(req.Transcript)
 	if transcript == "" {
@@ -343,7 +346,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 	var lastCandidate []byte
 	var linted *attemptResult // valid output kept while regenerating for its lint warnings
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(ctx, systemPrompt, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
+		resp, err := s.call(WithOperation(ctx, OpGenerate), systemPrompt, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
 			appEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
 			return nil, err
@@ -465,7 +468,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	var linted *attemptResult
 	baseLint := lintOf(env.DSL)
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(ctx, systemPrompt+"\n"+editRules,
+		resp, err := s.call(WithOperation(ctx, OpPatch), systemPrompt+"\n"+editRules,
 			editUserMessage(transcript, env.Version, string(env.DSL), problems, loc), PatchGenerationSchema(), ar,
 			summaryEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {

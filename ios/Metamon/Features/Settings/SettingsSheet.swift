@@ -28,6 +28,7 @@ struct SettingsSheet: View {
                 speechSection
                 appSection
                 if !rt.dsl.app.notifications.isEmpty { notificationSection }
+                RetentionSettingsSection() // #482 記録の自動削除
                 syncSection
                 PrivacySettingsSection() // #246: AI への送信の同意・プライバシーポリシー・利用規約
                 connectionSection

@@ -30,6 +30,26 @@ public extension KeyedDecodingContainer {
     }
 }
 
+/// 正の整数だけを受け、型違い・0 以下・欠落は nil にする(#482 `Entity.retentionDays`)。壊れた値で entity ごと落とさない。
+@propertyWrapper
+public struct LossyPositiveInt: Decodable, Sendable {
+    public var wrappedValue: Int?
+
+    public init(wrappedValue: Int? = nil) { self.wrappedValue = wrappedValue }
+
+    public init(from decoder: Decoder) throws {
+        let c = try? decoder.singleValueContainer()
+        let n = (try? c?.decode(Int.self)) ?? (try? c?.decode(Double.self)).flatMap { $0.isFinite && $0 == $0.rounded() ? Int(exactly: $0) : nil }
+        wrappedValue = n.flatMap { $0 > 0 ? $0 : nil }
+    }
+}
+
+public extension KeyedDecodingContainer {
+    func decode(_ type: LossyPositiveInt.Type, forKey key: Key) throws -> LossyPositiveInt {
+        (try? decodeIfPresent(type, forKey: key)) ?? LossyPositiveInt()
+    }
+}
+
 /// 未知の enum 文字列を fallback に丸める(バックエンドが新しい値を追加しても落ちない)。
 public enum Lenient {
     public static func decode<E: RawRepresentable>(_: E.Type, from decoder: Decoder, fallback: E) -> E where E.RawValue == String {

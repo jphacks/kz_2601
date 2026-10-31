@@ -1,0 +1,9 @@
+[
+  {"id": "rt_create_diary_week", "kind": "create", "group": "retention", "transcript": "1週間たったら自動で消える日記アプリ", "note": "#482 新規作成で retentionDays 7", "expect": {"retention": 7, "retentionOnRef": false}},
+  {"id": "rt_edit_week", "kind": "edit", "base": "example:kakeibo", "group": "retention", "transcript": "1週間たった記録は消して", "note": "#482 断らない・一括削除扱いしない → expense に retentionDays 7", "expect": {"patch": true, "retention": 7}},
+  {"id": "rt_edit_30days", "kind": "edit", "base": "example:kakeibo", "group": "retention", "transcript": "30日で消えるようにして", "note": "#482 retentionDays 30", "expect": {"patch": true, "retention": 30}},
+  {"id": "rt_edit_change", "kind": "edit", "base": "rt_edit_30days", "group": "retention", "transcript": "やっぱり2週間で消えるようにして", "note": "#482 期間の変更は replace", "expect": {"patch": true, "retention": 14}},
+  {"id": "rt_edit_remove", "kind": "edit", "base": "rt_edit_30days", "group": "retention", "transcript": "自動で消すのをやめて", "note": "#482 remove retentionDays", "expect": {"patch": true, "retention": 0}},
+  {"id": "rt_edit_warikan_master", "kind": "edit", "base": "example:warikan", "group": "retention", "transcript": "1か月たった記録は自動で消して", "note": "#482 メンバー(ref で選ぶ一覧)には付けず支出だけ", "expect": {"patch": true, "retention": 30, "retentionOnRef": false}},
+  {"id": "rt_edit_en", "kind": "edit", "base": "example:expense_en", "group": "retention", "locale": "en", "transcript": "Delete entries older than a week automatically", "note": "#482 en", "expect": {"patch": true, "retention": 7}}
+]

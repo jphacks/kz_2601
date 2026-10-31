@@ -1,5 +1,5 @@
 # xcodegen 定義。`cd ios && xcodegen generate` で Metamon.xcodeproj を生成する(.xcodeproj はコミットしない)。
-# ホーム画面の表示名(正式名「Tailor It」・#62)は Metamon/Resources/Info.plist の CFBundleDisplayName だけで変えられる。
+# ホーム画面の表示名(正式名「Tailor It」・#62)は build setting METAMON_DISPLAY_NAME(Info.plist の CFBundleDisplayName に展開)で変える。
 # 内部識別子 `Metamon` / Bundle ID `jp.kz2601.metamon` は Firebase に登録済みなので変更しない。
 name: Metamon
 
@@ -11,11 +11,18 @@ options:
   createIntermediateGroups: true
   generateEmptyDirectories: true
 
-# 構成: Debug / Release は今まで通り(全機能)。Review = App Store 審査用(#245・APP_STORE_REVIEW)。
+# 構成と接続先(#292・docs/ios/architecture.md「ビルド構成と接続先」):
+#   | 構成    | 用途                         | URL  | Firebase plist                     | 表示名        |
+#   | Debug   | 開発・CI・UI テスト          | stg  | Staging(無ければ prod に戻す・警告) | Tailor It β   |
+#   | Staging | 端末に入れる検証版           | stg  | Staging(無ければ prod に戻す・警告) | Tailor It β   |
+#   | Release | 配布(TestFlight / App Store) | prod | prod                               | Tailor It     |
+#   | Review  | App Store 審査用(#245)      | prod | prod                               | Tailor It     |
+# Review = App Store 審査用(#245・APP_STORE_REVIEW)。
 # Review は審査で危ない機能をバイナリから外す。ビルドは必ず scripts/build-review.sh で(ローカル Swift Package にも
 # コンパイル条件を渡すため。Xcode の GUI だけで Review をビルドするとコンパイルエラーで止まる=取りこぼし防止)。docs/ios/review-build.md
 configs:
   Debug: debug
+  Staging: release
   Release: release
   Review: release
 
@@ -34,14 +41,39 @@ settings:
     ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     # バックエンド URL(Info.plist の MetamonAIBaseURL / MetamonAppConfigBaseURL に展開)。空=その側はモック/インメモリ。
-    # 既定は ai / appconfig とも staging(Cloud Run)。ローカルに向けるなら
+    # 既定は stg(Debug / Staging)。Release / Review は下の configs で prod に上書きする。ローカルに向けるなら
     #   xcodebuild ... METAMON_AI_BASE_URL=http://127.0.0.1:8081 METAMON_APPCONFIG_BASE_URL=http://127.0.0.1:8080(シミュレータ)。
     # 全モックで起動したい時は実行時の環境変数 METAMON_MOCK=1。
+    # stg の URL は今の jphacks-kz2601 の stg Cloud Run。stg 用のプロジェクトを作ったらここを差し替える(#288)。
     METAMON_AI_BASE_URL: "https://ai-stg-378953239426.asia-northeast1.run.app"
     METAMON_APPCONFIG_BASE_URL: "https://appconfig-stg-378953239426.asia-northeast1.run.app"
+    # Firebase の plist の選び方(stg / prod)。scripts/select-firebase-plist.sh が読む
+    METAMON_FIREBASE_ENV: stg
+    # ホーム画面の表示名(Info.plist の CFBundleDisplayName)。stg 系は β を付けて見分ける
+    METAMON_DISPLAY_NAME: "Tailor It β"
+    # Bundle ID の末尾(本体とウィジェット)。既定は空 = 全構成で jp.kz2601.metamon(署名・App Group・Sign in with Apple を今のまま)。
+    # stg 版を prod 版と並べて入れたい時だけ `METAMON_STG_BUNDLE_ID_SUFFIX=.stg xcodegen generate` で Debug / Staging に付ける。
+    # 事前に人の作業(App ID・Firebase の iOS アプリ登録)が要る: docs/ios/architecture.md「ビルド構成と接続先」
+    METAMON_BUNDLE_ID_SUFFIX: ""
     # 「アップデートしてください」の App Store ボタン(#302・Info.plist MetamonAppStoreURL)。
     # TODO(#302): App Store の app id が決まったら "https://apps.apple.com/app/id<ID>" を入れる。空の間は「Tailor It」の検索を開く
     METAMON_APP_STORE_URL: ""
+  configs:
+    Debug:
+      METAMON_BUNDLE_ID_SUFFIX: "${METAMON_STG_BUNDLE_ID_SUFFIX}"
+    Staging:
+      METAMON_BUNDLE_ID_SUFFIX: "${METAMON_STG_BUNDLE_ID_SUFFIX}"
+    # 配布用は prod。URL の出典: docs/release/2026-10-25-runbook.md「prod の URL」・backend/Makefile
+    Release:
+      METAMON_AI_BASE_URL: "https://ai-prod-378953239426.asia-northeast1.run.app"
+      METAMON_APPCONFIG_BASE_URL: "https://appconfig-prod-378953239426.asia-northeast1.run.app"
+      METAMON_FIREBASE_ENV: prod
+      METAMON_DISPLAY_NAME: "Tailor It"
+    Review:
+      METAMON_AI_BASE_URL: "https://ai-prod-378953239426.asia-northeast1.run.app"
+      METAMON_APPCONFIG_BASE_URL: "https://appconfig-prod-378953239426.asia-northeast1.run.app"
+      METAMON_FIREBASE_ENV: prod
+      METAMON_DISPLAY_NAME: "Tailor It"
 
 # ---- ローカル Swift Package(マルチモジュール。依存の向きは各 Package.swift で固定) ----
 #   MetamonDSL      : DSL モデル・グリッド計算・集計(Foundation のみ。macOS で `swift test` 可)
@@ -55,8 +87,9 @@ packages:
     path: Packages/MetamonRenderer
   MetamonServices:
     path: Packages/MetamonServices
-# Firebase: `ios/scripts/sync-firebase-plist.sh` で GoogleService-Info.plist を Metamon/Resources/ にコピーしてから generate する
-# (.gitignore 済み・コミット禁止)。無くてもビルド/起動はでき、認証はモック(固定 uid)になる。
+# Firebase: `ios/scripts/sync-firebase-plist.sh` で GoogleService-Info.plist(prod)と、あれば GoogleService-Info-Staging.plist(stg)を
+# ios/Firebase/ にコピーする(.gitignore 済み・コミット禁止)。バンドルへは Metamon ターゲットのビルドフェーズ
+# 「Select Firebase plist」が構成に合う方を GoogleService-Info.plist として入れる。無くてもビルド/起動はでき、認証はモック(固定 uid)になる。
 
 targets:
   Metamon:
@@ -64,6 +97,9 @@ targets:
     platform: iOS
     sources:
       - path: Metamon
+        # 古い置き場(Metamon/Resources)に残った plist をリソースとして二重に入れない。バンドルへはビルドフェーズが入れる(#292)
+        excludes:
+          - "**/GoogleService-Info*.plist"
       # ウィジェットと共有する受け渡しモデル(WidgetSnapshot)。両ターゲットにコンパイルする
       - path: MetamonWidget/Shared
       # DSL v1 の正典サンプル(docs/dsl/examples/*.json)をそのままバンドル。iOS 側にコピーを持たない(ドリフト防止)。
@@ -87,13 +123,16 @@ targets:
     # Review(審査用)は HealthKit を外した Metamon/Metamon-Review.entitlements。
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon$(METAMON_BUNDLE_ID_SUFFIX)
         PRODUCT_NAME: Metamon
         INFOPLIST_FILE: Metamon/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Metamon/Metamon.entitlements
         TARGETED_DEVICE_FAMILY: "1"
         ENABLE_PREVIEWS: YES
         SWIFT_EMIT_LOC_STRINGS: YES
+        # 下の select-firebase-plist.sh が「あれば使う」plist(ios/Firebase/ の stg 版)を読むため。
+        # サンドボックスは宣言した入力ファイルしか読めず、無いかもしれないファイルは入力に書けない(書くと無い時にビルドが落ちる・#292)
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
       configs:
         # dSYM を Crashlytics へ送るスクリプト(#296)がサンドボックスの外(SourcePackages・ネット)を使うため
         Release:
@@ -103,13 +142,17 @@ targets:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE_REVIEW"
           CODE_SIGN_ENTITLEMENTS: Metamon/Metamon-Review.entitlements
           METAMON_APP_STORE_REVIEW: "YES"
-          # 審査用の版の接続先は prod(#452 G7)。Debug / Release の既定(上の base の stg)は変えない。
-          # URL の出典: docs/release/2026-10-25-runbook.md「prod の URL」・backend/Makefile
-          METAMON_AI_BASE_URL: "https://ai-prod-378953239426.asia-northeast1.run.app"
-          METAMON_APPCONFIG_BASE_URL: "https://appconfig-prod-378953239426.asia-northeast1.run.app"
-          # 下の strip-review-plist.sh が出来上がった Info.plist を書き換えるため(Review だけ)
-          ENABLE_USER_SCRIPT_SANDBOXING: NO
+          # 審査用の版の接続先は prod(#452 G7)。URL と plist は上の project の configs(Review)で prod にしている
     postBuildScripts:
+      # 構成に合う Firebase plist をバンドルに GoogleService-Info.plist として入れる(#292)。
+      # Debug / Staging は Staging の plist、無ければ prod の plist に戻して警告。Release / Review は prod。
+      - name: Select Firebase plist
+        script: '"${SRCROOT}/scripts/select-firebase-plist.sh"'
+        inputFiles:
+          - $(SRCROOT)/scripts/select-firebase-plist.sh
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist
+        basedOnDependencyAnalysis: false
       # Review 構成だけ Info.plist から外した機能の権限の説明を消す(Debug / Release では何もしない・#245)
       - name: Strip review-only Info.plist keys
         script: '"${SRCROOT}/scripts/strip-review-plist.sh"'
@@ -171,7 +214,7 @@ targets:
         com.apple.security.application-groups: [group.jp.kz2601.metamon]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.widget
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon$(METAMON_BUNDLE_ID_SUFFIX).widget
         PRODUCT_NAME: MetamonWidget
         INFOPLIST_FILE: MetamonWidget/Info.plist
         TARGETED_DEVICE_FAMILY: "1"
@@ -207,3 +250,16 @@ schemes:
       config: Review
     archive:
       config: Review
+  # 検証版(stg)を端末に入れる scheme(#292)。Run / Archive とも Staging 構成。テストは通常の scheme `Metamon`(Debug)で回す。
+  Metamon-Staging:
+    build:
+      targets:
+        Metamon: all
+    run:
+      config: Staging
+    profile:
+      config: Staging
+    analyze:
+      config: Staging
+    archive:
+      config: Staging

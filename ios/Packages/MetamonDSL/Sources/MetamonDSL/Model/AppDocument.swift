@@ -211,6 +211,8 @@ public struct Entity: Decodable, Identifiable, Sendable {
     public var edit: String?
     /// 1 人 1 回の印(いいね・保存・#255)。shared / public の entity だけ。
     @Lossy public var marks: [Mark] = []
+    /// 記録の保存期間(日数・#482)。作ってからこの日数を過ぎたレコードを端末が消す(`RecordRetention`)。nil = 消さない。
+    @LossyPositiveInt public var retentionDays: Int?
     @Lossy public var fields: [Field]
 
     /// field id、または予約値(`$author` / `$createdAt`・#250)の仮 Field。

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -118,6 +119,8 @@ type Client struct {
 	// ("compiled grammar is too large" / "too many optional parameters"), so
 	// the schema goes into the prompt instead and dsl.Parse stays the gate.
 	StructuredOutput bool
+	// Logger receives the per-attempt ai.usage line (#298); nil = slog.Default().
+	Logger *slog.Logger
 }
 
 // NewClient builds a client; apiKey is never logged.
@@ -195,6 +198,7 @@ type wireEvent struct {
 
 // Complete performs one structured-output call with retry on 429/5xx/network.
 // A streaming call is retried only while nothing has been delivered to OnText.
+// Every HTTP attempt writes one ai.usage log line (usage_log.go).
 func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error) {
 	if c.APIKey == "" {
 		return nil, errors.New("anthropic: ANTHROPIC_API_KEY is not set")
@@ -264,7 +268,9 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 			case <-time.After(delay):
 			}
 		}
+		started := time.Now()
 		resp, err := c.once(ctx, body, onText)
+		c.logUsage(ctx, usageRecord{model: model, stream: req.OnText != nil, attempt: attempt + 1, resp: resp, err: err, latency: time.Since(started)})
 		if err == nil {
 			return resp, nil
 		}
@@ -281,6 +287,8 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 	return nil, lastErr
 }
 
+// once performs one HTTP attempt. On a stream error the partial Response
+// (usage billed so far) is returned with the error, for the usage log only.
 func (c *Client) once(ctx context.Context, body []byte, onText func(string)) (*Response, error) {
 	base := c.BaseURL
 	if base == "" {
@@ -297,7 +305,6 @@ func (c *Client) once(ctx context.Context, body []byte, onText func(string)) (*R
 	if onText != nil {
 		hreq.Header.Set("Accept", "text/event-stream")
 	}
-	started := time.Now()
 	hresp, err := c.HTTP.Do(hreq)
 	if err != nil {
 		return nil, &APIError{Status: 599, Type: "connection_error", Message: err.Error()}
@@ -325,10 +332,8 @@ func (c *Client) once(ctx context.Context, body []byte, onText func(string)) (*R
 		out, err = readJSON(hresp.Body)
 	}
 	if err != nil {
-		return nil, err
+		return out, err
 	}
-	log.Printf("anthropic: model=%s stop=%s in=%d out=%d cache_read=%d stream=%v %dms",
-		out.Model, out.StopReason, out.Usage.InputTokens, out.Usage.OutputTokens, out.Usage.CacheReadInputTokens, onText != nil, time.Since(started).Milliseconds())
 	return out, nil
 }
 
@@ -353,6 +358,7 @@ func readJSON(r io.Reader) (*Response, error) {
 // readStream consumes the SSE stream of one message: text deltas go to
 // onText, usage comes from message_start (input) and message_delta (output),
 // an `error` event aborts with its type (overloaded_error etc. are retryable).
+// On error the partial Response (model/usage so far, no text) comes back too.
 func readStream(r io.Reader, onText func(string)) (*Response, error) {
 	out := &Response{}
 	var text strings.Builder
@@ -413,20 +419,20 @@ func readStream(r io.Reader, onText func(string)) (*Response, error) {
 		switch {
 		case line == "":
 			if err := flush(); err != nil {
-				return nil, err
+				return out, err
 			}
 		case strings.HasPrefix(line, "data:"):
 			dataLines = append(dataLines, strings.TrimPrefix(strings.TrimPrefix(line, "data:"), " "))
 		}
 	}
 	if err := sc.Err(); err != nil {
-		return nil, &APIError{Status: 599, Type: "read_error", Message: err.Error()}
+		return out, &APIError{Status: 599, Type: "read_error", Message: err.Error()}
 	}
 	if err := flush(); err != nil {
-		return nil, err
+		return out, err
 	}
 	if out.StopReason == "" {
-		return nil, &APIError{Status: 599, Type: "stream_incomplete", Message: "stream ended without message_delta"}
+		return out, &APIError{Status: 599, Type: "stream_incomplete", Message: "stream ended without message_delta"}
 	}
 	out.Text = text.String()
 	return out, nil

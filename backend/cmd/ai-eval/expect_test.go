@@ -13,12 +13,12 @@ import (
 const casesDir = "../../internal/ai/eval"
 
 func TestCaseFilesValid(t *testing.T) {
-	for _, f := range []string{"cases.json", "demo_cases.json", "m0disc_cases.json", "audit_cases.json", "audit_en_cases.json", "groupby_cases.json", "parent_child_cases.json", "route_cases.json", "dashcam_cases.json", "export_cases.json", "tips_cases.json", "sensor_cases.json", "live_activity_cases.json", "qr_cases.json", "photo_ai_cases.json", "audio_cases.json", "ai_generate_cases.json", "nearby_cases.json", "music_cases.json", "payment_cases.json"} {
+	for _, f := range []string{"cases.json", "demo_cases.json", "m0disc_cases.json", "audit_cases.json", "audit_en_cases.json", "groupby_cases.json", "parent_child_cases.json", "route_cases.json", "dashcam_cases.json", "export_cases.json", "tips_cases.json", "sensor_cases.json", "live_activity_cases.json", "qr_cases.json", "photo_ai_cases.json", "audio_cases.json", "ai_generate_cases.json", "nearby_cases.json", "music_cases.json", "payment_cases.json", "retention_cases.json"} {
 		if err := checkCasesFile(filepath.Join(casesDir, f), false); err != nil {
 			t.Error(err)
 		}
 	}
-	for _, f := range []string{"chat_cases.json", "m0disc_chat_cases.json", "dashcam_chat_cases.json", "sensor_chat_cases.json", "photo_ai_chat_cases.json", "music_chat_cases.json", "payment_chat_cases.json"} {
+	for _, f := range []string{"chat_cases.json", "m0disc_chat_cases.json", "dashcam_chat_cases.json", "sensor_chat_cases.json", "photo_ai_chat_cases.json", "music_chat_cases.json", "payment_chat_cases.json", "retention_chat_cases.json"} {
 		if err := checkCasesFile(filepath.Join(casesDir, f), true); err != nil {
 			t.Error(err)
 		}
