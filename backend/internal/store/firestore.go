@@ -145,17 +145,20 @@ func (d *recordDoc) toRecord(id string) *Record {
 }
 
 type publicAppDoc struct {
-	OwnerUID  string         `firestore:"ownerUid"`
-	Name      string         `firestore:"name"`
-	Version   int64          `firestore:"version"`
-	DSL       map[string]any `firestore:"dsl"`
-	DSLJSON   string         `firestore:"dslJson"`
-	CreatedAt time.Time      `firestore:"createdAt"`
-	UpdatedAt time.Time      `firestore:"updatedAt"`
+	OwnerUID     string         `firestore:"ownerUid"`
+	Name         string         `firestore:"name"`
+	Version      int64          `firestore:"version"`
+	DSL          map[string]any `firestore:"dsl"`
+	DSLJSON      string         `firestore:"dslJson"`
+	CreatedAt    time.Time      `firestore:"createdAt"`
+	UpdatedAt    time.Time      `firestore:"updatedAt"`
+	Hidden       bool           `firestore:"hidden,omitempty"`
+	HiddenReason string         `firestore:"hiddenReason,omitempty"`
+	HiddenAt     time.Time      `firestore:"hiddenAt,omitempty"`
 }
 
 func (d *publicAppDoc) toPublicApp(id string) *PublicApp {
-	return &PublicApp{ID: id, OwnerUID: d.OwnerUID, Name: d.Name, Version: int(d.Version), DSL: json.RawMessage(d.DSLJSON), CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+	return &PublicApp{ID: id, OwnerUID: d.OwnerUID, Name: d.Name, Version: int(d.Version), DSL: json.RawMessage(d.DSLJSON), CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, ModerationState: ModerationState{Hidden: d.Hidden, HiddenReason: d.HiddenReason, HiddenAt: d.HiddenAt}}
 }
 
 func rawToMap(raw json.RawMessage) (map[string]any, error) {
