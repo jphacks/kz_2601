@@ -156,7 +156,9 @@ func newHandler(authMiddleware func(http.Handler) http.Handler, logger *slog.Log
 		}
 		authed.ServeHTTP(w, r)
 	}))
-	return httpx.Chain(mux, httpx.WithRequestID, httpx.Log(logger), httpx.Recover(logger), httpx.ErrorEnvelope)
+	// /debug/error answers 5xx/panic on purpose on stg only (alert check, #295)
+	debug := httpx.DebugErrors(os.Getenv("APP_ENV") == "stg")
+	return httpx.Chain(mux, httpx.WithRequestID, httpx.Log(logger), httpx.Recover(logger), debug, httpx.ErrorEnvelope)
 }
 
 func health(w http.ResponseWriter, _ *http.Request) {
