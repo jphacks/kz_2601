@@ -43,6 +43,8 @@ public protocol DSLRuntime: AnyObject, Observable {
     func generateAIText(_ request: AITextRequest) async throws -> AITextResult
     /// オンライン版を持つホストか(プレビュー・テストは false = 端末内 AI だけ)。
     var supportsOnlineAIText: Bool { get }
+    /// aiButton の端末内 AI の集計(#446)。決まったラベルだけ渡す。送るか・いつ送るかはホストが決める。
+    func recordAIButton(_ event: AIButtonMetric.Event)
 }
 
 public extension DSLRuntime {
@@ -62,6 +64,8 @@ public extension DSLRuntime {
     func timerActivity(_ update: TimerActivityUpdate) {}
     func generateAIText(_ request: AITextRequest) async throws -> AITextResult { throw AITextError.unsupported }
     var supportsOnlineAIText: Bool { false }
+    /// 既定は数えない(プレビュー・テスト用ランタイム)。
+    func recordAIButton(_ event: AIButtonMetric.Event) {}
 
     /// 自分が更新できるレコードか(#249 / #252)。他人の共有レコードは entity.edit が members の時だけ。
     func canEdit(entity: String, record: Record) -> Bool {
