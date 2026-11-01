@@ -2,7 +2,7 @@ SHELL := /bin/bash
 PROJECT ?= $(shell gcloud config get-value project 2>/dev/null)
 REGION  ?= asia-northeast1
 
-.PHONY: build vet test lint schema-sync dev emulator run-appconfig run-ai run-purge smoke-local smoke-stg smoke-prod demo-check
+.PHONY: build vet test lint schema-sync dev emulator run-appconfig run-ai run-purge run-feedback smoke-local smoke-stg smoke-prod demo-check
 
 build:
 	go build ./...
@@ -49,6 +49,11 @@ PURGE_FLAGS ?= -dry-run
 run-purge:
 	FIRESTORE_EMULATOR_HOST=localhost:8089 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 \
 	GOOGLE_CLOUD_PROJECT=demo-kz2601 go run ./cmd/purge $(PURGE_FLAGS)
+
+# フィードバック(#319)をエミュレータから読む(読み取りだけ)。FEEDBACK_ARGS="show -out /tmp/fb <id>" など。
+FEEDBACK_ARGS ?= list
+run-feedback:
+	FIRESTORE_EMULATOR_HOST=localhost:8089 GOOGLE_CLOUD_PROJECT=demo-kz2601 go run ./cmd/feedback $(FEEDBACK_ARGS)
 
 # ---- smoke (docs/03_demo_script.md の 3 本 + undo。Claude を 3 回呼ぶ) -------------
 AI_STG_URL        ?= https://ai-stg-378953239426.asia-northeast1.run.app
