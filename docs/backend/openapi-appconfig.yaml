@@ -24,6 +24,7 @@ tags:
   - { name: account, description: 'アカウント削除(#119)。architecture.md §4.1' }
   - { name: release, description: 'リリース申請(#76)。architecture.md §3.3' }
   - { name: members, description: 'scope:shared の参加者(#254)。architecture.md §3.4' }
+  - { name: metrics, description: 'aiButton の端末内 AI の集計(#446)。docs/analytics/ai-button-metrics.md' }
 
 paths:
   /apps:
@@ -722,6 +723,67 @@ paths:
         '200':
           description: OK
           content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/ReleaseRequest' } } } } } }
+
+  /metrics/ai-button:
+    post:
+      tags: [metrics]
+      summary: aiButton の端末内 AI の 1 日ごとの集計を送る(#446)
+      description: |
+        iOS(通常の版だけ・設定でオフにできる)が、端末のローカル日ごとに数えた回数を 1 日 1 回まとめて送る。
+        サーバーは**ログに数を書くだけ**(`ai.button.availability` / `ai.button.task` / `ai.button.failure`)。Firestore には書かず、uid もログに出さない。
+        値は決まったラベルと回数だけ。利用者の文・記録・DSL の中身は受けない(未知のキー・未知のラベルは 400)。
+        `reportId` は日ごとに端末で作る乱数(再送の重複を SQL で消すため。端末・人とは結ばない)。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [days]
+              properties:
+                days:
+                  type: array
+                  minItems: 1
+                  maxItems: 7
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [reportId, day, availability]
+                    properties:
+                      reportId: { type: string, pattern: '^[A-Za-z0-9-]{8,64}$' }
+                      day: { type: string, format: date, description: 端末のローカル日。今日(UTC)の 9 日前〜翌日だけ受ける }
+                      availability:
+                        type: string
+                        enum: [available, device_not_eligible, apple_intelligence_off, model_not_ready, os_too_old, other]
+                        description: その日に aiButton を表示した時の、最後に見た Foundation Models の状態
+                      tasks:
+                        type: array
+                        maxItems: 8
+                        items:
+                          type: object
+                          additionalProperties: false
+                          required: [task]
+                          properties:
+                            task: { type: string, enum: [summarize, classify, rewrite, extract, suggest, generate, other], description: DSL の aiButton.task(重複不可) }
+                            attempts: { type: integer, minimum: 0, maximum: 10000, description: 端末内 AI で実行した回数 }
+                            failures:
+                              type: object
+                              description: 答えを出せなかった回数(理由ごと)
+                              propertyNames:
+                                enum: [unavailable, invalid_response, context_too_long, guardrail, unsupported_language, refusal, rate_limited, assets_unavailable, model_error, bad_config]
+                              additionalProperties: { type: integer, minimum: 0, maximum: 10000 }
+            example:
+              days:
+                - reportId: 0F8E2C1A-1111-4222-8333-944455556666
+                  day: '2026-11-01'
+                  availability: available
+                  tasks:
+                    - { task: summarize, attempts: 5, failures: { context_too_long: 1 } }
+      responses:
+        '204': { description: 受け取った(ログに書いた) }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
 
   /client-config:
     get:
