@@ -122,3 +122,60 @@ variable "budget_currency" {
   type        = string
   default     = "JPY"
 }
+
+# ---- 監視(docs/infra/observability.md・#295) ----
+
+variable "monitoring_enabled" {
+  description = "Uptime check・ログベースの指標・アラート・ダッシュボードを作るか。prod の import で差分 0 を確かめる間は false"
+  type        = bool
+  default     = true
+}
+
+variable "monitored_services" {
+  description = "監視する Cloud Run サービス(キーはサービス名)。host は run.app のホスト名、p95_latency_ms は p95 のアラートの閾値。空なら監視のリソースを作らない"
+  type = map(object({
+    host           = string
+    p95_latency_ms = number
+  }))
+  default = {}
+}
+
+variable "alert_emails" {
+  description = "アラートを送るメールアドレス(通知チャンネルを作る)。値は envs/<env>.tfvars にだけ書き、コミットしない"
+  type        = list(string)
+  default     = []
+}
+
+variable "alert_notification_channels" {
+  description = "既にある通知チャンネル(projects/<id>/notificationChannels/<n>)。Slack はコンソールで連携してからここに足す"
+  type        = list(string)
+  default     = []
+}
+
+variable "uptime_check_period" {
+  description = "Uptime check の間隔"
+  type        = string
+  default     = "300s"
+  validation {
+    condition     = contains(["60s", "300s", "600s", "900s"], var.uptime_check_period)
+    error_message = "uptime_check_period は 60s / 300s / 600s / 900s のどれか。"
+  }
+}
+
+variable "error_rate_threshold" {
+  description = "5xx 率のアラートの閾値(5 分の窓での 5xx / 全リクエスト)"
+  type        = number
+  default     = 0.05
+}
+
+variable "claude_failure_rate_threshold" {
+  description = "Claude の失敗率のアラートの閾値(10 分の窓での outcome=error / 全試行)"
+  type        = number
+  default     = 0.2
+}
+
+variable "claude_failure_min_count" {
+  description = "Claude の失敗率のアラートを出す最小の失敗数(10 分の窓)。少ない呼び出しでの誤報を防ぐ"
+  type        = number
+  default     = 3
+}
