@@ -79,7 +79,7 @@ settings:
 #   MetamonDSL      : DSL モデル・グリッド計算・集計(Foundation のみ。macOS で `swift test` 可)
 #   MetamonRenderer : SwiftUI View(コンポーネント1種=1ファイル + ComponentRegistry)。Services を知らない
 #   MetamonServices : Services protocol 群 + 実装(HTTP/Mock/WhisperKit/Firebase Auth/通知)。
-#                     WhisperKit(argmax-oss-swift 1.1.1)と firebase-ios-sdk(FirebaseAuth のみ・13.1.1 固定)はこのパッケージの依存
+#                     WhisperKit(argmax-oss-swift 1.1.1)と firebase-ios-sdk(FirebaseAuth + FirebaseCrashlytics・13.1.1 固定)はこのパッケージの依存
 packages:
   MetamonDSL:
     path: Packages/MetamonDSL
@@ -134,6 +134,9 @@ targets:
         # サンドボックスは宣言した入力ファイルしか読めず、無いかもしれないファイルは入力に書けない(書くと無い時にビルドが落ちる・#292)
         ENABLE_USER_SCRIPT_SANDBOXING: NO
       configs:
+        # dSYM を Crashlytics へ送るスクリプト(#296)がサンドボックスの外(SourcePackages・ネット)を使うため
+        Release:
+          ENABLE_USER_SCRIPT_SANDBOXING: NO
         # App Store 審査用(#245): コード・部品の登録・権限の説明・entitlement(HealthKit)を外す
         Review:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE_REVIEW"
@@ -157,6 +160,14 @@ targets:
           - $(SRCROOT)/scripts/strip-review-plist.sh
           - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)
         basedOnDependencyAnalysis: false
+      # クラッシュ報告(#296): dSYM を Crashlytics へ。実機向けの Release / Review だけ送る(Debug・シミュレータは即終了)。
+      # docs/ios/crash-reporting.md。Crashlytics の run は SourcePackages・dSYM を読みネットに出るので、Release / Review はサンドボックスを外している(上の configs)。
+      # 入力に dSYM・plist を並べないのは、Debug(dSYM を作らない)や plist 無しの CI で「入力が無い」と止まらないようにするため
+      - name: Upload dSYM to Crashlytics
+        script: '"${SRCROOT}/scripts/crashlytics-dsym.sh"'
+        inputFiles:
+          - $(SRCROOT)/scripts/crashlytics-dsym.sh
+        basedOnDependencyAnalysis: false
     scheme:
       # 各モジュールのユニットテストを `xcodebuild -scheme Metamon test` で一括実行する。
       testTargets:
@@ -165,6 +176,8 @@ targets:
         - package: MetamonServices/MetamonServicesTests
         # アプリをホストにしたテスト(StoreKitTest の購入など、Bundle ID が要るもの・#77)
         - MetamonTests
+        # ウィジェットの見た目の描画テスト(#486)
+        - MetamonWidgetTests
         # 指の操作(タップ・ドラッグ・長押し)の UI テスト(#165)。手元で回す: docs/ios/architecture.md「UI テスト」
         - name: MetamonUITests
           parallelizable: false
@@ -209,6 +222,21 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: YES
         ENABLE_PREVIEWS: YES
+
+  # ウィジェットの描画テスト(#486)。ウィジェットの View(MetamonWidget/Views)と受け渡しモデルを直接コンパイルし、ImageRenderer で描く。
+  # 環境変数 WIDGET_SHOTS_DIR(xcodebuild では TEST_RUNNER_WIDGET_SHOTS_DIR)があれば PNG を書き出す(PR のスクショ用)。
+  MetamonWidgetTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: MetamonWidgetTests
+      - path: MetamonWidget/Views
+      - path: MetamonWidget/Shared
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.widgettests
+        TARGETED_DEVICE_FAMILY: "1"
 
   # UI テスト(XCUITest・#165)。モック(METAMON_MOCK=1)+ DEBUG フックで起動し、FAB のドラッグ / 長押し・チップ・チェック丸・フォームを実際に指で操作する。
   MetamonUITests:

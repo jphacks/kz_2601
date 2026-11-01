@@ -89,24 +89,3 @@ struct AccessoryEmptyView: View {
         }
     }
 }
-
-// MARK: - Previews
-
-#Preview("Rectangular", as: .accessoryRectangular) {
-    MetamonStatWidget()
-} timeline: {
-    StatEntry(date: .now, snapshot: .sample)
-    StatEntry(date: .now, snapshot: nil)
-}
-
-#Preview("Circular", as: .accessoryCircular) {
-    MetamonStatWidget()
-} timeline: {
-    StatEntry(date: .now, snapshot: .sample)
-}
-
-#Preview("Inline", as: .accessoryInline) {
-    MetamonStatWidget()
-} timeline: {
-    StatEntry(date: .now, snapshot: .sample)
-}
