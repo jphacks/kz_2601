@@ -22,6 +22,8 @@ public struct Services {
     #if !APP_STORE_REVIEW
     /// リリース申請(#76)。sharing と同じく live の時だけ。
     public var releaseRequests: (any ReleaseRequestClient)?
+    /// アプリ内のフィードバック(#319)。live では `HTTPFeedbackClient`、モックでは `MockFeedbackClient`。
+    public var feedback: any FeedbackClient = MockFeedbackClient()
     #endif
 
     public init(
