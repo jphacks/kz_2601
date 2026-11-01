@@ -45,6 +45,10 @@ func NewFirestore(ctx context.Context, projectID, database string) (*Firestore, 
 // Close releases the client.
 func (f *Firestore) Close() error { return f.c.Close() }
 
+// Client is the underlying client (shared with packages that own their own
+// collections, e.g. internal/entitlement).
+func (f *Firestore) Client() *firestore.Client { return f.c }
+
 var _ Store = (*Firestore)(nil)
 
 func (f *Firestore) appRef(uid, appID string) *firestore.DocumentRef {
