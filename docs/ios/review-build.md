@@ -77,7 +77,7 @@
 - **プライバシーマニフェスト(#452 G6)**
   - `Metamon/PrivacyInfo.xcprivacy`(アプリ)と `MetamonWidget/PrivacyInfo.xcprivacy`(ウィジェット)。どの版にも入る(xcodegen が各ターゲットの Resources に入れる)。
   - 理由が要る API: UserDefaults(`CA92.1` アプリだけ / `1C8F.1` App Group でウィジェットと共有)、空き容量(`E174.1` / `85F4.1`。音声モデルのダウンロード前の確認と不足分の表示)。ファイルの日時・起動からの時間・キーボードは使っていない。
-  - 集めるデータ: ユーザー ID・名前(Sign in with Apple の表示名)・その他のユーザーコンテンツ・写真・正確な位置。すべて本人に紐づき、トラッキングなし、用途はアプリの機能。`docs/legal/privacy-policy.md` と App Store Connect の栄養ラベルに合わせる。
+  - 集めるデータ: ユーザー ID・名前(Sign in with Apple の表示名)・その他のユーザーコンテンツ・写真・正確な位置・クラッシュのデータ・パフォーマンスのデータ(Crashlytics・#296。審査用の版でも入れる)。すべて本人に紐づき、トラッキングなし、用途はアプリの機能。`docs/legal/privacy-policy.md` と App Store Connect の栄養ラベルに合わせる。
   - API やデータの扱いを変えたら、このファイルも直す。
 - **entitlement**
   - Review 構成は `Metamon/Metamon-Review.entitlements` を使う。HealthKit を除いたもの。
