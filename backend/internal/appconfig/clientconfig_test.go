@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -24,7 +26,7 @@ func TestClientConfigFromEnv(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ClientConfigFromEnv(envOf(tt.env)); got != tt.want {
+			if got := ClientConfigFromEnv(envOf(tt.env)); !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("got %+v, want %+v", got, tt.want)
 			}
 		})
@@ -50,5 +52,58 @@ func TestClientConfigHandler(t *testing.T) {
 	body := get(ClientConfigValues{MinIOSBuild: 3, LatestIOSBuild: 5, IOSAppStoreURL: "https://apps.apple.com/app/id1"})
 	if body["minIOSBuild"] != float64(3) || body["latestIOSBuild"] != float64(5) || body["iosAppStoreUrl"] != "https://apps.apple.com/app/id1" {
 		t.Fatalf("body: %v", body)
+	}
+}
+
+func TestNoticeFromEnv(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want *Notice
+	}{
+		{"unset", "", nil},
+		{"minimal defaults to info", `{"id":"n1","message":{"ja":"お知らせ"}}`,
+			&Notice{ID: "n1", Severity: NoticeInfo, Message: NoticeText{Ja: "お知らせ"}}},
+		{"full", `{"id":"2026-11-02-ai","severity":"warning","message":{"ja":" 生成を\n止めています ","en":"Paused"},"linkUrl":"https://example.com/s","minIOSBuild":3,"maxIOSBuild":9}`,
+			&Notice{ID: "2026-11-02-ai", Severity: NoticeWarning, Message: NoticeText{Ja: "生成を 止めています", En: "Paused"}, LinkURL: "https://example.com/s", MinIOSBuild: 3, MaxIOSBuild: 9}},
+		{"not json", `{"id":`, nil},
+		{"unknown field", `{"id":"n1","message":{"ja":"x"},"link":"https://e.com"}`, nil},
+		{"missing id", `{"message":{"ja":"x"}}`, nil},
+		{"bad id", `{"id":"a b","message":{"ja":"x"}}`, nil},
+		{"bad severity", `{"id":"n1","severity":"critical","message":{"ja":"x"}}`, nil},
+		{"missing ja", `{"id":"n1","message":{"en":"x"}}`, nil},
+		{"blank ja", `{"id":"n1","message":{"ja":"  \n "}}`, nil},
+		{"too long", `{"id":"n1","message":{"ja":"` + strings.Repeat("あ", 201) + `"}}`, nil},
+		{"http link", `{"id":"n1","message":{"ja":"x"},"linkUrl":"http://e.com"}`, nil},
+		{"script link", `{"id":"n1","message":{"ja":"x"},"linkUrl":"javascript:alert(1)"}`, nil},
+		{"max below min", `{"id":"n1","message":{"ja":"x"},"minIOSBuild":5,"maxIOSBuild":4}`, nil},
+		{"negative build", `{"id":"n1","message":{"ja":"x"},"minIOSBuild":-1}`, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NoticeFromEnv(envOf(map[string]string{EnvNotice: tt.raw}))
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("got %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClientConfigServesNotice(t *testing.T) {
+	v := ClientConfigFromEnv(envOf(map[string]string{
+		EnvMinIOSBuild: "4",
+		EnvNotice:      `{"id":"n1","severity":"warning","message":{"ja":"止めています","en":"Paused"},"maxIOSBuild":20}`,
+	}))
+	rec := httptest.NewRecorder()
+	ClientConfig(v).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/client-config", nil))
+	want := `{"minIOSBuild":4,"notice":{"id":"n1","severity":"warning","message":{"ja":"止めています","en":"Paused"},"maxIOSBuild":20}}`
+	if got := strings.TrimSpace(rec.Body.String()); got != want {
+		t.Fatalf("body:\n got %s\nwant %s", got, want)
+	}
+
+	// an invalid notice must not take the update fields down with it
+	v = ClientConfigFromEnv(envOf(map[string]string{EnvMinIOSBuild: "4", EnvNotice: "{broken"}))
+	if v.MinIOSBuild != 4 || v.Notice != nil {
+		t.Fatalf("got %+v", v)
 	}
 }
