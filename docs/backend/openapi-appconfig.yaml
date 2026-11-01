@@ -5,6 +5,7 @@ info:
   description: |
     アプリ DSL JSON の CRUD・バージョン管理・汎用レコード API。
     - 認証: `Authorization: Bearer <Firebase ID token>`。uid はトークンから取得し URL には含めない。
+    - App Check(#318): iOS は `X-Firebase-AppCheck` も付ける。`APP_CHECK_MODE=enforce` の時、無い・無効なら 401 `app_check_failed`(`details.reason`: missing / invalid / wrong_app / unconfigured)。off / log では無くても通る。`/health`・`/s/{token}`・`/v1/client-config` は対象外。`docs/infra/app-check.md`
     - すべてのパスは呼び出しユーザー自身の `users/{uid}/...` に束縛される。
     - エラーは全て `Error` 形式。ページングは `pageSize` + `pageToken` / `nextPageToken`。
     - DSL の本体スキーマは `../dsl/dsl.schema.json` を参照 (OpenAPI 内では `$ref`)。
@@ -823,7 +824,7 @@ components:
             code:
               type: string
               description: 機械可読コード
-              enum: [bad_request, unauthenticated, not_found, version_conflict, invalid_dsl, invalid_record, payload_too_large, rate_limited, internal]
+              enum: [bad_request, unauthenticated, not_found, version_conflict, invalid_dsl, invalid_record, payload_too_large, rate_limited, app_check_failed, internal]
             message: { type: string }
             details: { type: object, additionalProperties: true }
             requestId: { type: string }

@@ -58,6 +58,25 @@ func TestHTTPForwardsBearerAndIfMatch(t *testing.T) {
 	}
 }
 
+func TestHTTPForwardsAppCheck(t *testing.T) {
+	var got []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = append(got, r.Header.Get("X-Firebase-AppCheck"))
+		_, _ = w.Write([]byte(`{"appId":"a","version":1,"dsl":{}}`))
+	}))
+	defer srv.Close()
+	c := NewHTTP(srv.URL)
+	if _, err := c.Get(WithAppCheck(context.Background(), "ac-tok"), "a"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Get(context.Background(), "a"); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0] != "ac-tok" || got[1] != "" {
+		t.Fatalf("forwarded %q", got)
+	}
+}
+
 func TestHTTPErrorMapping(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(409)
