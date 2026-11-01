@@ -259,7 +259,7 @@ xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' 
 | `GoogleService-Info.plist` | リポ外 | `ios/scripts/sync-firebase-plist.sh` がコピーし `git check-ignore` で無視を確認 |
 | GCP 認証 | 鍵ファイル無し | GitHub Actions は Workload Identity Federation(`jphacks/kz_2601` に限定) |
 
-`.gitignore` + `secrets-scan.yml`(gitleaks)で二重防御。GCP の構築手順は [`docs/infra/gcp-setup.md`](infra/gcp-setup.md)。
+`.gitignore` + `secrets-scan.yml`(gitleaks)で二重防御。GCP の構築手順は [`docs/infra/gcp-setup.md`](infra/gcp-setup.md)。認証情報の置き場所と差し替え手順は [`docs/infra/credentials-inventory.md`](infra/credentials-inventory.md)。
 
 ## リポジトリ構成とドキュメント
 
