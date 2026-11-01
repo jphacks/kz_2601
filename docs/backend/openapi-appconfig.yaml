@@ -917,7 +917,7 @@ components:
         name: { type: string }
         dslVersion: { type: integer, description: スナップショットした version }
         url: { type: string, example: 'tailorit://import/H6-GGDdrAGTqrpqpbKhx4GG1ZT1VJ0Rb', description: iOS アプリで開く URL(QR もこれ) }
-        webUrl: { type: string, description: 'ブラウザ用フォールバック(認証不要の `GET /s/{token}`。アプリ名と「Tailor It で開く」ボタンだけで DSL は出さない)。`SHARE_WEB_BASE_URL` で上書き可' }
+        webUrl: { type: string, description: 'ブラウザ用の共有ページ(認証不要の `GET /s/{token}`・HTML。アプリの画面を読むだけで描き、レコードは出さない。「アプリで開く」と App Store への導線つき・#362。JSON の API ではないのでこの仕様には載せない)。`SHARE_WEB_BASE_URL` で上書き可' }
         revoked: { type: boolean }
         createdAt: { type: string, format: date-time }
     PublicApp:
