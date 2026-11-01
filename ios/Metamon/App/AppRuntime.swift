@@ -1168,6 +1168,7 @@ final class AppRuntime: DSLRuntime {
             let name = entity.flatMap { dsl.entity($0)?.field(fieldId)?.name } ?? fieldId
             return L10n.tr("「\(name)」の入力を確認してください(\(api.errorDescription ?? ""))")
         }
+        if api.isAppCheckFailure { return ErrorCopy.appCheckFailedBody } // #318: サインインでは直らない
         if api.status == 401 { return ErrorCopy.sessionExpiredSignIn }
         return api.errorDescription ?? "\(api)"
     }

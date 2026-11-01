@@ -71,6 +71,9 @@ public enum APIError: LocalizedError {
         return nil
     }
 
+    /// App Check で弾かれた 401(#318)。ID トークンの失効(`sessionExpired`)と区別する
+    public var isAppCheckFailure: Bool { status == 401 && code == AppCheckHeader.failedCode }
+
     /// `details.field`(422 `invalid_record` / 400 unknown field)。toast で「どの項目か」を出すために使う。
     public var field: String? {
         if case .server(_, _, _, let d) = self, case .string(let f)? = d["field"] { return f }
@@ -145,6 +148,9 @@ public enum FailureKind: Equatable, Sendable {
     case timeout
     /// 401(トークン再取得後も 401)。サインインし直すしかない
     case sessionExpired
+    /// 401 `app_check_failed`(#318・App Check のトークンを取り直しても弾かれた)。サインインでは直らないので
+    /// サインイン画面へ戻さない。正規の版を入れ直す / 少し待って再試行を案内する
+    case appCheckFailed
     /// 混雑・一時障害(429 / 500 / 502 / 503)。`retryAfter` はサーバー指示の待ち秒
     case busy(retryAfter: TimeInterval?)
     /// 今日の上限に達した(#280・429 `rate_limited`)。「もう一度」では解けないので再試行させない
@@ -172,6 +178,7 @@ public enum FailureKind: Equatable, Sendable {
         }
         if let api = error as? APIError {
             if let info = api.rateLimit { return .rateLimited(info) }
+            if api.isAppCheckFailure { return .appCheckFailed }
             switch api.status {
             case 401: return .sessionExpired
             case 409: return .conflict

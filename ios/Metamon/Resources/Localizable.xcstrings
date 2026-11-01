@@ -1,6 +1,23 @@
 {
   "sourceLanguage": "ja",
   "strings": {
+    "このアプリからの接続を確認できませんでした。少し待ってもう一度お試しください。続く時は App Store から最新版を入れてください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We couldn't verify this app's connection. Wait a moment and try again. If it keeps happening, install the latest version from the App Store."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアプリからの接続を確認できませんでした。少し待ってもう一度お試しください。続く時は App Store から最新版を入れてください"
+          }
+        }
+      }
+    },
     "アップデートしてください": {
       "extractionState": "manual",
       "localizations": {
