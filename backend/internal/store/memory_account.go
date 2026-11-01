@@ -110,6 +110,7 @@ func (m *Memory) PurgeAccount(_ context.Context, uid string) (AccountPurgeResult
 		}
 	}
 	res.Installs += m.dropInstalls(func(_, u string) bool { return u == uid })
+	res.Feedback += m.dropFeedback(uid)
 	for appID, o := range m.owners {
 		if p := m.public[appID]; o == uid && (p == nil || p.app == nil || p.app.OwnerUID != uid) { // a kept mirror keeps its owner
 			delete(m.owners, appID)

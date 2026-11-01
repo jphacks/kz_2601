@@ -38,6 +38,7 @@ type AccountPurgeResult struct {
 	Memberships   int // apps_public/*/members/{uid}
 	Marks         int // apps_public/.../marks/*/by/{uid} (counts are decremented)
 	PostsScrubbed int // uid's posts in shared apps whose authorName was cleared
+	Feedback      int // feedback/* sent by uid (#319)
 }
 
 // AccountPurger physically erases accounts that DELETE /v1/me soft-deleted (#458).

@@ -161,6 +161,7 @@ type Store interface {
 	Purger          // physical app deletion (purge.go)
 	AccountPurger   // physical erasure of deleted accounts (account_purge.go)
 	Marks           // per-user like / save toggles on shared records (marks.go)
+	Feedbacks       // in-app feedback (feedback.go)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).
