@@ -26,6 +26,7 @@
 | 本人だけが使っていた共有アプリ(`apps_public/{appId}` と記録) | 消す |
 | 他の人が参加・投稿している、本人の共有アプリ(`apps_public/{appId}`・記録・参加者・`app_owners`) | **残す**(その人たちの共有の場のため) |
 | 他の人と共有しているアプリへの本人の投稿 | **残す**(ポリシー §4)。ただし表示名(`authorName`)は消す。`author` の uid は残るが、Firebase のアカウントは消えるので、誰かにはたどれない |
+| `users/{uid}/entitlements/*`(Pro の権利)と uid の `appstore_transactions/*`(購読と uid の結びつき・#314) | 消す。同じ Apple ID で新しいアカウントに復元できるようにする |
 | Firebase Auth のユーザー | 消す(アプリが退会時に消しているので、ここは取りこぼしの保険) |
 | `users/{uid}` | `{status: "purged", purgedAt}` だけの墓標にする(`deletedAt` は消す)。同じ uid が来ても 410 を返し続け、二度と対象にならない |
 | `rateLimits/*_uid_{uid}` | ジョブでは消さない。日付ごとの回数だけで、TTL で消す(下の提案) |

@@ -64,5 +64,7 @@ ai → appconfig の結合をローカルで確認する時は、appconfig を�
 | `LOG_LEVEL` | o | o | `info` |
 | `APPCONFIG_BASE_URL` | - | o | ai → appconfig。未設定なら ai 内のインメモリ stub(永続なし)。staging は `https://appconfig-stg-378953239426.asia-northeast1.run.app` |
 | `ANTHROPIC_API_KEY` | - | o | Secret Manager。ローカルは `~/Desktop/JPHACKS2026/.env`(リポ外) |
+| `APPSTORE_BUNDLE_IDS` / `APPSTORE_PRODUCT_IDS` | o | - | StoreKit 取引の許可リスト(#314)。既定 `jp.kz2601.metamon` / `jp.kz2601.metamon.pro.monthly` |
+| `APPSTORE_ENVIRONMENTS` | o | o | 受け入れる App Store の環境。既定 `Sandbox,Production`(審査・TestFlight は Sandbox)。ai は Pro の判定(#449)に使う |
 
 Cloud Run 上の appconfig は `AUTH_MODE` 未設定(= `firebase`)で、`run-backend` SA の ADC で Firestore と Firebase Admin を使う。
