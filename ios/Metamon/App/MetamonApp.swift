@@ -59,6 +59,9 @@ struct MetamonApp: App {
         IntentHost.shared.register(runtime) // Siri / ショートカット(#80)は本体プロセス内でこの runtime を使う
         #if !APP_STORE_REVIEW
         PassbyController.install(runtime: runtime, mock: BuildConfig.forceMock) // すれ違い通信(#425)
+        // 課金(#314): 検証済みの取引をサーバーに送り、購入の appAccountToken に uid を入れる
+        ProGate.shared.store.server = services.entitlements
+        ProGate.shared.store.accountUID = { [auth = services.auth] in auth.currentUser?.uid }
         #endif
         _runtime = State(initialValue: runtime)
         _session = State(initialValue: session)

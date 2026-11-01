@@ -117,6 +117,7 @@ enum BuildConfig {
             #if !APP_STORE_REVIEW // 審査用ビルドはシェア / 探す / リリース申請を外す(#245)
             services.sharing = appConfigURL.map { HTTPSharingClient(baseURL: $0, token: token) }
             services.releaseRequests = appConfigURL.map { HTTPReleaseRequestClient(baseURL: $0, token: token) }
+            services.entitlements = appConfigURL.map { HTTPEntitlementClient(baseURL: $0, token: token) } // #314
             #endif
             return services
         }

@@ -979,6 +979,7 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 ### 22.3 回数は端末で数える(サーバー強制は後続)
 - いまは UserDefaults に保存するだけなので、**アプリの削除・端末の時計の変更で回避できる**。ハッカソンの段階では「課金導線の体験」を作ることを優先した。
 - 本番化する時は ai サービス(`POST /v1/generate` の新規作成)側で uid ごとの日次カウンタを持ち、超過は 402 を返す → iOS は 402 を上限シートに繋ぐ。権利はサーバーが App Store Server API(または RevenueCat の webhook)で確認する。
+- **サーバーの権利(#314)**: `ProEntitlementStore.refreshEntitlements`(起動・購入・復元・`Transaction.updates`・サインインし直した時)が、検証済みの取引の `jwsRepresentation` を `HTTPEntitlementClient`(`POST /v1/me/entitlements/apple`)で送る。待たずに裏で送り、同じ uid + 取引は 1 回だけ。失敗は次の機会に送り直す。Xcode の StoreKit 構成の取引(`environment == .xcode`)は Apple の署名ではないので送らない。購入時は `appAccountToken` に `ProAccountToken.uuid(for: uid)` を入れる。サーバーは検証して `users/{uid}/entitlements/pro` に保存し、ai の回数制限が Pro の上限になる(#449・backend architecture.md §6.8)。端末の表示(`isPro`)はまだ StoreKit の値(サーバーを正にするのは後続)。審査用ビルドにはこの部品ごと無い。
 
 ### 22.4 デモ端末で上限に当たらないようにする
 - **DEBUG ビルドは既定で制限なし**(設定の「Tailor It Pro」に DEBUG のみ「回数制限を無効にする(デモ用)」トグル・既定 ON)。Release は既定で制限あり・トグルは出ない。
@@ -996,7 +997,7 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 2. App(`jp.kz2601.metamon`)の「サブスクリプション」でグループ「Tailor It Pro」を作り、商品 ID `jp.kz2601.metamon.pro.monthly`・期間 1 か月・価格(¥500 相当)・表示名と説明(日英)・審査用スクリーンショットを登録。
 3. Sandbox テスターを作り、実機の 設定 > App Store > サンドボックスアカウント でサインインしてテスト購入。
 4. 審査提出時はサブスクを App のバージョンに添付。アプリ内に利用規約・プライバシーポリシーへのリンク、上限シートに価格・期間・自動更新の説明(実装済み)が要る。
-5. サーバー強制(18.3)を入れる場合は App Store Server API のキー(.p8)を発行し、ai / appconfig で権利を検証。App Store Server Notifications V2 の URL を設定。
+5. 取引の検証は鍵なしでローカルにできる(#314 実装済み)。更新・解約・返金を端末が開かれなくても反映するには App Store Server Notifications V2 の URL を設定し、必要なら App Store Server API のキー(.p8)を発行する(#315)。
 
 **RevenueCat に移す場合**
 1. RevenueCat でプロジェクトを作り、App Store Connect の App 内課金キー(In-App Purchase Key)と共有シークレットを登録。

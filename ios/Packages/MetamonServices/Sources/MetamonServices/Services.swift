@@ -22,6 +22,8 @@ public struct Services {
     #if !APP_STORE_REVIEW
     /// リリース申請(#76)。sharing と同じく live の時だけ。
     public var releaseRequests: (any ReleaseRequestClient)?
+    /// Pro の取引をサーバーで検証・保存する(#314)。appconfig が live の時だけ(審査用ビルドは課金が無い)。
+    public var entitlements: (any EntitlementClient)?
     #endif
 
     public init(
