@@ -88,7 +88,8 @@ struct AppleLinkButton: View {
             }
             Button("キャンセル", role: .cancel) {}
         } message: {
-            Text("切り替えると、その Apple ID で作ったアプリが開きます。いま匿名で作ったアプリは引き継がれず、この端末から見えなくなります。")
+            Text(L10n.key("切り替えると、その Apple ID で作ったアプリが開きます。いま匿名で作ったアプリは引き継がれず、この端末から見えなくなります。",
+                          review: "切り替えると、その Apple ID で用意した記録帳が開きます。いま匿名で用意した記録帳は引き継がれず、この端末から見えなくなります。"))
         }
     }
 }
@@ -104,10 +105,11 @@ struct AccountLinkPromptSheet: View {
                 .font(.system(size: 48))
                 .foregroundStyle(Theme.brandGradient)
             VStack(spacing: Theme.Spacing.sm) {
-                Text("作ったアプリを残しておきませんか")
+                Text(L10n.key("作ったアプリを残しておきませんか", review: "用意した記録帳を残しておきませんか"))
                     .font(.title3.weight(.bold))
                     .multilineTextAlignment(.center)
-                Text("いまは匿名で使っています。Apple でサインインしておくと、機種変更やアプリの入れ直しのあとも、作ったアプリとデータに戻れます。")
+                Text(L10n.key("いまは匿名で使っています。Apple でサインインしておくと、機種変更やアプリの入れ直しのあとも、作ったアプリとデータに戻れます。",
+                               review: "いまは匿名で使っています。Apple でサインインしておくと、機種変更やアプリの入れ直しのあとも、用意した記録帳とデータに戻れます。"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

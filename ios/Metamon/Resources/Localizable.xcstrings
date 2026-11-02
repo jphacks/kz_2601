@@ -817,6 +817,40 @@
         }
       }
     },
+    "Apple でサインインすると、作ったアプリとデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、作ったアプリに戻れません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in with Apple to keep your apps and data. If you stay anonymous and delete Tailor It or change phones, you can't get back to your apps."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple でサインインすると、作ったアプリとデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、作ったアプリに戻れません。"
+          }
+        }
+      }
+    },
+    "Apple でサインインすると、用意した記録帳とデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、用意した記録帳に戻れません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in with Apple to keep your trackers and data. If you stay anonymous and delete Tailor It or change phones, you can't get back to your trackers."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple でサインインすると、用意した記録帳とデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、用意した記録帳に戻れません。"
+          }
+        }
+      }
+    },
     "Apple でサインイン中" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2003,6 +2037,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "いまはモバイル回線です。通信量が多いので、Wi-Fi につないでからがおすすめです。"
+          }
+        }
+      }
+    },
+    "いまは匿名で使っています。Apple でサインインしておくと、機種変更やアプリの入れ直しのあとも、作ったアプリとデータに戻れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You're using Tailor It anonymously. Sign in with Apple to get back to your apps and data after changing phones or reinstalling."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いまは匿名で使っています。Apple でサインインしておくと、機種変更やアプリの入れ直しのあとも、作ったアプリとデータに戻れます。"
+          }
+        }
+      }
+    },
+    "いまは匿名で使っています。Apple でサインインしておくと、機種変更やアプリの入れ直しのあとも、用意した記録帳とデータに戻れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You're using Tailor It anonymously. Sign in with Apple to get back to your trackers and data after changing phones or reinstalling."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いまは匿名で使っています。Apple でサインインしておくと、機種変更やアプリの入れ直しのあとも、用意した記録帳とデータに戻れます。"
           }
         }
       }
@@ -3856,6 +3924,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・作ったアプリの中身は送りません。"
+          }
+        }
+      }
+    },
+    "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・記録帳の中身は送りません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When the app crashes, where it crashed (the location in the code), your device model, OS, app version and user ID are sent to Google's Firebase Crashlytics and used to fix bugs. What you say, your records and the contents of your trackers are never sent."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・記録帳の中身は送りません。"
           }
         }
       }
@@ -6818,6 +6903,23 @@
         }
       }
     },
+    "作ったアプリを残しておきませんか" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep the apps you made?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作ったアプリを残しておきませんか"
+          }
+        }
+      }
+    },
     "作成者" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7460,6 +7562,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "再試行"
+          }
+        }
+      }
+    },
+    "切り替えると、その Apple ID で作ったアプリが開きます。いま匿名で作ったアプリは引き継がれず、この端末から見えなくなります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switching opens the apps made with that Apple ID. Apps you made anonymously won't carry over and will no longer be visible on this device."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切り替えると、その Apple ID で作ったアプリが開きます。いま匿名で作ったアプリは引き継がれず、この端末から見えなくなります。"
+          }
+        }
+      }
+    },
+    "切り替えると、その Apple ID で用意した記録帳が開きます。いま匿名で用意した記録帳は引き継がれず、この端末から見えなくなります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switching opens the trackers set up with that Apple ID. Trackers you set up anonymously won't carry over and will no longer be visible on this device."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切り替えると、その Apple ID で用意した記録帳が開きます。いま匿名で用意した記録帳は引き継がれず、この端末から見えなくなります。"
           }
         }
       }
@@ -10099,6 +10235,23 @@
         }
       }
     },
+    "用意した記録帳を残しておきませんか" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep the trackers you set up?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用意した記録帳を残しておきませんか"
+          }
+        }
+      }
+    },
     "用意を取りやめました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11047,6 +11200,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録中"
+          }
+        }
+      }
+    },
+    "記録帳が更新されました(version %lld)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The tracker was updated (version %lld)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録帳が更新されました(version %lld)"
           }
         }
       }

@@ -325,7 +325,7 @@ private struct VoiceToolbarButton: View {
         )
         .accessibilityLabel("話しかけて変える")
         .accessibilityHint(L10n.key("長押しで変身一覧", review: "長押しで記録帳の一覧"))
-        .accessibilityAction(named: "変身一覧") { rt.openSwitcher() }
+        .accessibilityAction(named: L10n.key("変身一覧", review: "記録帳の一覧")) { rt.openSwitcher() }
     }
 }
 
