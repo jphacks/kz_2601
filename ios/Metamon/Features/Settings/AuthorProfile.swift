@@ -27,6 +27,7 @@ enum AuthorProfile {
     }
 }
 
+#if !APP_STORE_REVIEW // 審査用ビルドは共有を外しているので、この欄も出さない(#247)
 /// 設定シートの「投稿に表示する名前」。
 struct AuthorNameSettingsSection: View {
     @AppStorage(AuthorProfile.nameKey) private var stored = ""
@@ -52,6 +53,8 @@ struct AuthorNameSettingsSection: View {
         }
     }
 }
+
+#endif
 
 /// 共有アプリへの初めての投稿で表示名を聞くアラート(#250)。`AppRuntime.authorNamePrompt` が立っている間だけ出る。
 struct AuthorNamePromptModifier: ViewModifier {

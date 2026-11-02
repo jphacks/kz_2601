@@ -6,12 +6,22 @@ import MetamonServices
 
 /// 「Tailor It で家計簿を開く」: 選んだアプリに変身した状態で起動する(変身一覧で選んだのと同じ `switchApp`)。
 struct OpenTailorAppIntent: OpenIntent {
+    #if APP_STORE_REVIEW // 審査用の版は「作ったアプリ・変身」を避け、記録帳と言う(#247・docs/store/wording.md)。App Intents の文言はビルド時に決まるので #if で替える
+    static var title: LocalizedStringResource = "記録帳を開く"
+    static var description = IntentDescription("Tailor It で、選んだ記録帳を開きます。")
+    #else
     static var title: LocalizedStringResource = "アプリを開く"
     static var description = IntentDescription("Tailor It で作ったアプリに変身した状態で開きます。")
+    #endif
     static var openAppWhenRun = true
 
+    #if APP_STORE_REVIEW
+    @Parameter(title: "記録帳", requestValueDialog: "どの記録帳を開きますか?")
+    var target: TailorAppEntity
+    #else
     @Parameter(title: "アプリ", requestValueDialog: "どのアプリを開きますか?")
     var target: TailorAppEntity
+    #endif
 
     @MainActor
     func perform() async throws -> some IntentResult {
@@ -26,11 +36,20 @@ struct OpenTailorAppIntent: OpenIntent {
 /// 本体プロセスが背面で起動され、画面と同じローカル DB に書いて SyncQueue に積む(送信は接続があれば即、無ければ次回)。
 struct AddRecordIntent: AppIntent {
     static var title: LocalizedStringResource = "記録を追加"
+    #if APP_STORE_REVIEW // 審査用の版は記録帳と言う(#247)
+    static var description = IntentDescription("Tailor It を開かずに、記録帳に記録を 1 件追加します。例: 家計簿に「ランチ 800円」。")
+    #else
     static var description = IntentDescription("Tailor It で作ったアプリに、アプリを開かずに記録を 1 件追加します。例: 家計簿に「ランチ 800円」。")
+    #endif
     static var openAppWhenRun = false
 
+    #if APP_STORE_REVIEW
+    @Parameter(title: "記録先", requestValueDialog: "どの記録帳に記録しますか?")
+    var target: RecordTargetEntity
+    #else
     @Parameter(title: "記録先", requestValueDialog: "どのアプリに記録しますか?")
     var target: RecordTargetEntity
+    #endif
 
     @Parameter(title: "内容", description: "例: ランチ 800円", requestValueDialog: "何を記録しますか?")
     var content: String
@@ -93,7 +112,11 @@ enum TailorIntentError: Error, CustomLocalizedStringResourceConvertible {
     var localizedStringResource: LocalizedStringResource {
         switch self {
         case .notReady: "Tailor It を一度開いてから、もう一度お試しください"
+        #if APP_STORE_REVIEW // 審査用の版は記録帳と言う(#247)
+        case .targetNotFound(let name): "「\(name)」が見つかりませんでした。Tailor It で記録帳を確認してください"
+        #else
         case .targetNotFound(let name): "「\(name)」が見つかりませんでした。Tailor It でアプリを確認してください"
+        #endif
         case .missingFields(let names): "「\(names.joined(separator: "・"))」が必要です。Tailor It を開いて追加してください"
         }
     }
@@ -118,6 +141,18 @@ struct TailorItShortcuts: AppShortcutsProvider {
             shortTitle: "記録を追加",
             systemImageName: "plus.circle"
         )
+        #if APP_STORE_REVIEW // 審査用の版は記録帳と言う(#247)。どのフレーズも applicationName を含む
+        AppShortcut(
+            intent: OpenTailorAppIntent(),
+            phrases: [
+                "\(.applicationName)で\(\.$target)を開く",
+                "\(.applicationName)で\(\.$target)を開いて",
+                "\(.applicationName)で記録帳を開く",
+            ],
+            shortTitle: "記録帳を開く",
+            systemImageName: "square.grid.2x2"
+        )
+        #else
         AppShortcut(
             intent: OpenTailorAppIntent(),
             phrases: [
@@ -128,6 +163,7 @@ struct TailorItShortcuts: AppShortcutsProvider {
             shortTitle: "アプリを開く",
             systemImageName: "square.grid.2x2"
         )
+        #endif
         AppShortcut(
             intent: TalkToTailorItIntent(),
             phrases: [
