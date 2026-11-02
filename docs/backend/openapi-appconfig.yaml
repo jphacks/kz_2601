@@ -1128,8 +1128,8 @@ components:
           properties:
             code:
               type: string
-              description: 機械可読コード
-              enum: [bad_request, unauthenticated, not_found, version_conflict, invalid_dsl, invalid_record, payload_too_large, rate_limited, app_check_failed, unpublished, internal, invalid_transaction, transaction_owned_by_other]
+              description: 機械可読コード(`ai_paused` は ai だけ・#511)
+              enum: [bad_request, unauthenticated, not_found, version_conflict, invalid_dsl, invalid_record, payload_too_large, rate_limited, app_check_failed, ai_paused, unpublished, internal, invalid_transaction, transaction_owned_by_other]
             message: { type: string }
             details: { type: object, additionalProperties: true }
             requestId: { type: string }

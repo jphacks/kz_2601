@@ -12121,6 +12121,40 @@
           }
         }
       }
+    },
+    "AI を一時停止しています": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI is paused"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI を一時停止しています"
+          }
+        }
+      }
+    },
+    "AI を一時的に止めています。しばらくしてからもう一度お試しください": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI is temporarily paused. Please try again later"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI を一時的に止めています。しばらくしてからもう一度お試しください"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
