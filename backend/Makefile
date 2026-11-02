@@ -2,32 +2,38 @@ SHELL := /bin/bash
 PROJECT ?= $(shell gcloud config get-value project 2>/dev/null)
 REGION  ?= asia-northeast1
 
-.PHONY: build vet test lint schema-sync dev emulator run-appconfig run-ai run-purge run-feedback run-moderate smoke-local smoke-stg smoke-prod demo-check
-
+.PHONY: build
 build:
 	go build ./...
 
+.PHONY: vet
 vet:
 	go vet ./...
 
+.PHONY: test
 test: schema-check
 	go test ./...
 
+.PHONY: lint
 lint: vet
 	@command -v staticcheck >/dev/null && staticcheck ./... || echo "staticcheck not installed (go install honnef.co/go/tools/cmd/staticcheck@latest)"
 
 # docs/dsl/dsl.schema.json is canonical; the Go package embeds a copy.
+.PHONY: schema-sync
 schema-sync:
 	cp ../docs/dsl/dsl.schema.json pkg/dsl/schema.json
 
+.PHONY: schema-check
 schema-check:
 	@cmp -s ../docs/dsl/dsl.schema.json pkg/dsl/schema.json || (echo "schema out of sync: run make schema-sync" && exit 1)
 
 # ---- local dev -------------------------------------------------------------
 # Terminal 1: make emulator   Terminal 2: make dev
+.PHONY: emulator
 emulator:
 	firebase emulators:start --only firestore,auth --project demo-kz2601
 
+.PHONY: dev
 dev:
 	@echo "appconfig :8080 / ai :8081 (Ctrl-C stops both)"
 	@trap 'kill 0' INT; \
@@ -35,30 +41,15 @@ dev:
 	  $(MAKE) run-ai & \
 	  wait
 
+.PHONY: run-appconfig
 run-appconfig:
 	FIRESTORE_EMULATOR_HOST=localhost:8089 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 \
 	GOOGLE_CLOUD_PROJECT=demo-kz2601 AUTH_MODE=dev PORT=8080 go run ./cmd/appconfig
 
+.PHONY: run-ai
 run-ai:
 	FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 GOOGLE_CLOUD_PROJECT=demo-kz2601 AUTH_MODE=dev \
 	APPCONFIG_BASE_URL=http://localhost:8080 PORT=8081 go run ./cmd/ai
-
-# 退会から 30 日を過ぎたアカウントの消去(#458)をエミュレータに対して試す。既定は -dry-run。
-# 本番は Cloud Run Job(docs/infra/account-purge.md)。ローカルから stg/prod に向けない。
-PURGE_FLAGS ?= -dry-run
-run-purge:
-	FIRESTORE_EMULATOR_HOST=localhost:8089 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 \
-	GOOGLE_CLOUD_PROJECT=demo-kz2601 go run ./cmd/purge $(PURGE_FLAGS)
-
-# フィードバック(#319)をエミュレータから読む(読み取りだけ)。FEEDBACK_ARGS="show -out /tmp/fb <id>" など。
-FEEDBACK_ARGS ?= list
-run-feedback:
-	FIRESTORE_EMULATOR_HOST=localhost:8089 GOOGLE_CLOUD_PROJECT=demo-kz2601 go run ./cmd/feedback $(FEEDBACK_ARGS)
-
-# 運営の通報確認・非公開化(#321)をエミュレータに対して試す: make run-moderate ARGS="reports"
-# 本番の手順は docs/infra/moderation.md。書き込みは -yes を付けた時だけ。
-run-moderate:
-	FIRESTORE_EMULATOR_HOST=localhost:8089 GOOGLE_CLOUD_PROJECT=demo-kz2601 go run ./cmd/moderate $(ARGS)
 
 # ---- smoke (docs/03_demo_script.md の 3 本 + undo。Claude を 3 回呼ぶ) -------------
 AI_STG_URL        ?= https://ai-stg-378953239426.asia-northeast1.run.app
@@ -68,6 +59,7 @@ SMOKE_FLAGS        = $(if $(SMOKE_ONLY),-only $(SMOKE_ONLY),)
 
 # ローカル 2 プロセス(appconfig: memory store + AUTH_MODE=dev / ai: ../.env の ANTHROPIC_API_KEY)を
 # :18080/:18081 で起動 → smoke → 終了。SMOKE_ONLY=kakeibo で 1 本だけ。
+.PHONY: smoke-local
 smoke-local:
 	@set -e; set -a; . ../.env; set +a; \
 	  STORE=memory AUTH_MODE=dev PORT=18080 go run ./cmd/appconfig >/tmp/smoke-appconfig.log 2>&1 & A=$$!; \
@@ -80,6 +72,7 @@ smoke-local:
 
 # staging(appconfig は AUTH_MODE=firebase)。FIREBASE_WEB_API_KEY(Firebase Web API key・公開情報)で
 # 匿名ユーザーの ID トークンを取る。無ければ health と 401 確認だけにフォールバック。
+.PHONY: smoke-stg
 smoke-stg:
 	go run ./cmd/smoke -ai $(AI_STG_URL) -appconfig $(APPCONFIG_STG_URL) -firebase-api-key "$(FIREBASE_WEB_API_KEY)" $(SMOKE_FLAGS)
 
@@ -89,10 +82,15 @@ AI_PROD_URL        ?= https://ai-prod-zgciuf3iha-an.a.run.app
 APPCONFIG_PROD_URL ?= https://appconfig-prod-zgciuf3iha-an.a.run.app
 SMOKE_PROD_ONLY    ?= kakeibo
 
+.PHONY: smoke-prod
 smoke-prod:
 	go run ./cmd/smoke -ai $(AI_PROD_URL) -appconfig $(APPCONFIG_PROD_URL) -firebase-api-key "$(FIREBASE_WEB_API_KEY)" -only $(SMOKE_PROD_ONLY) -cleanup
 
 # デモ前チェック兼ウォームアップ(#171)。curl だけで動く(Go 不要)。ENV=stg|prod、審査の 30 分前に ENV=prod で 1 回。
 ENV ?= stg
+.PHONY: demo-check
 demo-check:
 	../scripts/demo-check.sh $(ENV)
+
+# 運用コマンド(機能ごと)は mk/<feature>.mk に置く。末尾で読むので既定ターゲットは build のまま。
+-include $(wildcard mk/*.mk)
