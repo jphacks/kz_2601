@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
 
 // Optional puts the caller's uid in the context when the request carries a
@@ -40,7 +42,9 @@ func Optional(verifier TokenVerifier, mode string) func(http.Handler) http.Handl
 
 // ContextWithUID returns ctx carrying uid as the verified caller, for a
 // middleware that verified the token itself (e.g. the ai rate limiter).
+// It also notes the uid hash for the request's log lines (httpx.NoteUID).
 func ContextWithUID(ctx context.Context, uid string) context.Context {
+	httpx.NoteUID(ctx, uid)
 	return context.WithValue(ctx, ctxKey{}, uid)
 }
 

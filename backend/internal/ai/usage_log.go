@@ -2,14 +2,13 @@ package ai
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"log/slog"
 	"strconv"
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
 
 // UsageEvent is the message (and `event` attr) of the per-call usage log (#298).
@@ -42,15 +41,9 @@ func operationOf(ctx context.Context) string {
 }
 
 // UIDHash is the pseudonymous user key of the usage log, never the raw uid.
-// The prefix keeps it unlinkable to hashes other tools log (cmd/purge).
-// Empty uid (anonymous caller) gives "".
-func UIDHash(uid string) string {
-	if uid == "" {
-		return ""
-	}
-	sum := sha256.Sum256([]byte("ai-usage:" + uid))
-	return hex.EncodeToString(sum[:8])
-}
+// Same as httpx.UIDHash (request logs, #295); its prefix keeps it unlinkable
+// to hashes other tools log (cmd/purge). Empty uid (anonymous caller) gives "".
+func UIDHash(uid string) string { return httpx.UIDHash(uid) }
 
 // PricingAsOf is the date modelPrices was last checked against the pricing page.
 const PricingAsOf = "2026-10-30"

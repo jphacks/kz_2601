@@ -43,3 +43,16 @@ budget_currency     = "JPY"
 # import_project_number = "378953239426"
 # import_budget_id      = "<gcloud billing budgets list の name の末尾>"
 # import_firestore_backup_schedule_id = "<gcloud firestore backups schedules list の name の末尾>"
+
+# 監視(docs/infra/observability.md・#295)。import で差分 0 を確かめる間は monitoring_enabled = false
+monitoring_enabled = true
+monitored_services = {
+  "ai-prod"        = { host = "ai-prod-378953239426.asia-northeast1.run.app", p95_latency_ms = 60000 }
+  "appconfig-prod" = { host = "appconfig-prod-378953239426.asia-northeast1.run.app", p95_latency_ms = 1500 }
+  # stg が別のプロジェクトに移るまで(#288)は、同じプロジェクトにある stg もここで見る
+  "ai-stg"        = { host = "ai-stg-378953239426.asia-northeast1.run.app", p95_latency_ms = 60000 }
+  "appconfig-stg" = { host = "appconfig-stg-378953239426.asia-northeast1.run.app", p95_latency_ms = 1500 }
+}
+# 通知先のメール(コミットしない)。Slack はコンソールで連携したチャンネルの name を alert_notification_channels に
+alert_emails = ["you@example.com"]
+# alert_notification_channels = ["projects/jphacks-kz2601/notificationChannels/<n>"]
