@@ -12,6 +12,7 @@ type Memory struct {
 	pro      map[string]Pro    // uid -> Pro
 	bindings map[string]string // originalTransactionId -> uid
 	now      func() time.Time
+	notes    memoryNotifications // appstore_notify (#315)
 }
 
 // NewMemory returns an empty store.

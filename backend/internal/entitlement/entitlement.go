@@ -35,16 +35,37 @@ type Pro struct {
 	Environment           string    `json:"environment" firestore:"environment"`
 	ExpiresAt             time.Time `json:"expiresAt" firestore:"expiresAt"`
 	RevokedAt             time.Time `json:"revokedAt,omitzero" firestore:"revokedAt,omitempty"`
-	UpdatedAt             time.Time `json:"updatedAt" firestore:"updatedAt"`
+	// GraceExpiresAt extends Pro past ExpiresAt while Apple retries a failed
+	// renewal (billing grace period; renewal info, #315).
+	GraceExpiresAt time.Time `json:"graceExpiresAt,omitzero" firestore:"graceExpiresAt,omitempty"`
+	// WillRenew is the auto-renew status (nil until a notification / the
+	// Server API reported it, #315).
+	WillRenew *bool     `json:"willRenew,omitempty" firestore:"willRenew,omitempty"`
+	UpdatedAt time.Time `json:"updatedAt" firestore:"updatedAt"`
+	// SignedAt is Apple's signedDate of the stored transaction: an older
+	// signing of the same transaction never replaces it (#315).
+	SignedAt time.Time `json:"-" firestore:"signedAt,omitempty"`
+
+	// renewalKnown: GraceExpiresAt / WillRenew come from a renewal info
+	// (otherwise merge keeps the stored ones). Not stored.
+	renewalKnown bool
 }
 
 // Revoked reports a refunded / revoked transaction.
 func (p *Pro) Revoked() bool { return !p.RevokedAt.IsZero() }
 
+// Until is when Pro ends: ExpiresAt, or the end of the billing grace period.
+func (p *Pro) Until() time.Time {
+	if p.GraceExpiresAt.After(p.ExpiresAt) {
+		return p.GraceExpiresAt
+	}
+	return p.ExpiresAt
+}
+
 // Active reports whether p grants Pro at now. envs restricts the accepted
 // App Store environments (empty = any).
 func (p *Pro) Active(now time.Time, envs []string) bool {
-	if p == nil || p.Revoked() || !p.ExpiresAt.After(now) {
+	if p == nil || p.Revoked() || !p.Until().After(now) {
 		return false
 	}
 	return len(envs) == 0 || slices.Contains(envs, p.Environment)
@@ -60,21 +81,50 @@ func FromTransaction(t *appstore.Transaction, now time.Time) Pro {
 		ExpiresAt:             t.ExpiresDate,
 		RevokedAt:             t.RevocationDate,
 		UpdatedAt:             now.UTC(),
+		SignedAt:              t.SignedDate,
 	}
+}
+
+// WithRenewal sets the renewal state from a verified renewal info of the
+// same subscription (notifications and the Server API, #315).
+func (p Pro) WithRenewal(r *appstore.RenewalInfo) Pro {
+	if r == nil || r.OriginalTransactionID != p.OriginalTransactionID {
+		return p
+	}
+	willRenew := r.AutoRenew
+	p.GraceExpiresAt, p.WillRenew, p.renewalKnown = r.GracePeriodExpiresDate, &willRenew, true
+	return p
 }
 
 // merge decides what to store when in arrives while cur is stored (cur may be
 // nil). Transactions can arrive out of order (an old one from another device,
-// a cached launch-time one), so an older transaction never replaces a newer one:
+// a cached launch-time one, a late notification), so an older transaction
+// never replaces a newer one:
 //
-//   - nothing stored, or the same transaction again (revocation may have changed)
+//   - nothing stored, or the same transaction signed again at the same time or
+//     later (revocation, refund reversal or grace period may have changed); an
+//     earlier signing of the stored transaction is never applied
 //   - a later expiry (renewal, upgrade, new subscription)
 //   - cur no longer grants Pro but in does
 //   - same expiry and subscription, now revoked
+//
+// Without renewal info, in keeps the stored renewal state of the same
+// subscription (grace period only for the same transaction).
 func merge(cur *Pro, in Pro, now time.Time) (Pro, bool) {
+	if cur != nil && !in.renewalKnown && in.OriginalTransactionID == cur.OriginalTransactionID {
+		in.WillRenew = cur.WillRenew
+		if in.TransactionID == cur.TransactionID {
+			in.GraceExpiresAt = cur.GraceExpiresAt
+		}
+	}
+	if cur != nil && in.TransactionID == cur.TransactionID {
+		if in.SignedAt.Before(cur.SignedAt) {
+			return *cur, false
+		}
+		return in, true
+	}
 	switch {
 	case cur == nil,
-		in.TransactionID == cur.TransactionID,
 		in.ExpiresAt.After(cur.ExpiresAt),
 		!cur.Active(now, nil) && in.Active(now, nil),
 		in.ExpiresAt.Equal(cur.ExpiresAt) && in.OriginalTransactionID == cur.OriginalTransactionID && in.Revoked():

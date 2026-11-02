@@ -118,31 +118,9 @@ type payload struct {
 // stays verifiable. Expiry and revocation are not errors: they are reported in
 // the Transaction for the caller to store.
 func (v *Verifier) Verify(signedJWS string) (*Transaction, error) {
-	parts := strings.Split(strings.TrimSpace(signedJWS), ".")
-	if len(parts) != 3 {
-		return nil, reject(ReasonMalformed, "want 3 segments, got %d", len(parts))
-	}
-	var h header
-	if err := decodeSegment(parts[0], &h); err != nil {
-		return nil, reject(ReasonMalformed, "header: %v", err)
-	}
-	if h.Alg != "ES256" {
-		return nil, reject(ReasonSignature, "alg %q", h.Alg)
-	}
 	var p payload
-	if err := decodeSegment(parts[1], &p); err != nil {
-		return nil, reject(ReasonMalformed, "payload: %v", err)
-	}
-	if p.SignedDate <= 0 {
-		return nil, reject(ReasonMalformed, "no signedDate")
-	}
-	signedAt := time.UnixMilli(p.SignedDate)
-
-	leaf, err := v.verifyChain(h.X5c, signedAt)
+	signedAt, err := v.verifyJWS(signedJWS, &p)
 	if err != nil {
-		return nil, err
-	}
-	if err := verifyES256(leaf, parts[0]+"."+parts[1], parts[2]); err != nil {
 		return nil, err
 	}
 
@@ -176,6 +154,45 @@ func (v *Verifier) Verify(signedJWS string) (*Transaction, error) {
 		return nil, reject(ReasonNotSubscription, "no expiresDate (type %q)", t.Type)
 	}
 	return t, nil
+}
+
+// verifyJWS checks the compact JWS (ES256, x5c chain up to the trusted roots
+// at the payload's signedDate, signature) and decodes its payload into out.
+// Shared by transactions, renewal infos and notifications (#315).
+func (v *Verifier) verifyJWS(signedJWS string, out any) (time.Time, error) {
+	parts := strings.Split(strings.TrimSpace(signedJWS), ".")
+	if len(parts) != 3 {
+		return time.Time{}, reject(ReasonMalformed, "want 3 segments, got %d", len(parts))
+	}
+	var h header
+	if err := decodeSegment(parts[0], &h); err != nil {
+		return time.Time{}, reject(ReasonMalformed, "header: %v", err)
+	}
+	if h.Alg != "ES256" {
+		return time.Time{}, reject(ReasonSignature, "alg %q", h.Alg)
+	}
+	var sd struct {
+		SignedDate int64 `json:"signedDate"`
+	}
+	if err := decodeSegment(parts[1], &sd); err != nil {
+		return time.Time{}, reject(ReasonMalformed, "payload: %v", err)
+	}
+	if err := decodeSegment(parts[1], out); err != nil {
+		return time.Time{}, reject(ReasonMalformed, "payload: %v", err)
+	}
+	if sd.SignedDate <= 0 {
+		return time.Time{}, reject(ReasonMalformed, "no signedDate")
+	}
+	signedAt := time.UnixMilli(sd.SignedDate)
+
+	leaf, err := v.verifyChain(h.X5c, signedAt)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if err := verifyES256(leaf, parts[0]+"."+parts[1], parts[2]); err != nil {
+		return time.Time{}, err
+	}
+	return signedAt, nil
 }
 
 // verifyChain checks x5c = [leaf, intermediate, root] up to the trusted roots
