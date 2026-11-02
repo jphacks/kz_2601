@@ -231,26 +231,7 @@ App Store Connect の上限と、上の文の文字数(Python の `len` で数�
 
 ## 5. App のプライバシー(栄養ラベル)の答え
 
-`ios/Metamon/PrivacyInfo.xcprivacy` と [privacy-policy.md](../legal/privacy-policy.md) から。審査用の版が対象(ヘルスケア・背面の位置・近くの端末・課金は入っていない)。
-
-- データを集めるか: **はい**。
-- トラッキング: **いいえ**(`NSPrivacyTracking` false・トラッキングのドメインなし・広告 ID なし)。
-
-| データの種類(ASC の表記) | 集める物 | ユーザーに紐づく | トラッキング | 用途 |
-|---|---|---|---|---|
-| 連絡先情報 > 名前 | Sign in with Apple が渡した時の表示名(Firebase Authentication) | はい | いいえ | App の機能 |
-| 連絡先情報 > メールアドレス | Sign in with Apple が渡した時のメール(中継アドレスを含む・Firebase Authentication) | はい | いいえ | App の機能 |
-| ID > ユーザー ID | Firebase の uid | はい | いいえ | App の機能 |
-| ユーザーコンテンツ > 写真またはビデオ | 記録に添えた写真の縮小画像(Firestore) | はい | いいえ | App の機能 |
-| ユーザーコンテンツ > その他のユーザーコンテンツ | 記録帳の設計と版の履歴・記録・AI に送る依頼の文と会話(Anthropic に渡す) | はい | いいえ | App の機能 |
-| 位置情報 > 正確な位置情報 | ユーザーが記録に入れた場所(Firestore) | はい | いいえ | App の機能 |
-
-選ばないもの: 音声(端末内で文字にする)・健康とフィットネス・財務情報・検索履歴・閲覧履歴・使用状況データ(分析ツールなし)・診断(クラッシュの収集なし)・購入(課金なし)。
-
-要判断 **(推測)**:
-- **メールアドレス**: ポリシー 1.1 のとおり、Apple が渡した時は Firebase Authentication にメール(または中継アドレス)が保存されるので、上の表で選ぶ。xcprivacy には #471 で足した。
-- サーバーのログの IP アドレス(Cloud Logging・30 日)は、栄養ラベルの対象外と考えて選ばない。
-- 「その他のユーザーコンテンツ」は、通常の版の共有・公開を含まない(審査用の版は `sharedData` 無効)。
+[privacy-label.md](privacy-label.md) に移した(#328)。`ios/Metamon/PrivacyInfo.xcprivacy` と 1 対 1 で、審査用の版が対象。
 
 ## 6. 出す前の確認
 
@@ -262,6 +243,6 @@ App Store Connect の上限と、上の文の文字数(Python の `len` で数�
 - [ ] 著作権「2026 高岡己太朗」を入れた
 - [ ] App ID で MusicKit を有効にした(しないなら説明文の Apple Music の行を消す)
 - [ ] 年齢区分の質問票に 4 章のとおり答え、13+ に上げるかを決めた(#329)
-- [ ] 栄養ラベルを 5 章のとおり入れた(メールアドレスを含む)。xcprivacy・ポリシーと一致している
+- [ ] 栄養ラベルを [privacy-label.md](privacy-label.md) のとおり入れた(診断・メールアドレスを含む)。xcprivacy・ポリシーと一致している
 - [ ] スクショの 1 枚目に「アプリ」と言う UI の文言が映っていない(3 章の注。UI の文言の修正は別の Issue)
 - [ ] 審査メモ([app-review-notes.md](app-review-notes.md))と説明文の中身が一致している

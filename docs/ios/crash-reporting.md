@@ -12,7 +12,7 @@
 - Firebase は認証で入っているので、同じ `firebase-ios-sdk`(13.1.1 固定)の `FirebaseCrashlytics` を足した。MetricKit の集計は使わない(端末から自前で送る仕組みとダッシュボードが別に要るため)。
 - 依存は `MetamonServices` パッケージ(`Package.swift`)。アプリ側は Firebase を直接 import しない。
 - 既定はオン。設定の「プライバシー」→「クラッシュ報告を送る」でオフにできる(プライバシーポリシー 1.8 に記載)。AI ではないので、AI への送信の同意とは別。
-- 審査用の版(Review・`APP_STORE_REVIEW`)にも入れる。プライバシーマニフェスト(`ios/Metamon/PrivacyInfo.xcprivacy`)に「クラッシュのデータ」「パフォーマンスのデータ」(本人に紐づく・トラッキングなし・アプリの機能)を書いた。
+- 審査用の版(Review・`APP_STORE_REVIEW`)にも入れる。プライバシーマニフェスト(`ios/Metamon/PrivacyInfo.xcprivacy`)に「クラッシュのデータ」「パフォーマンスのデータ」「その他の診断データ」(本人に紐づく・トラッキングなし・アプリの機能)を書いた。栄養ラベルの答えは `docs/store/privacy-label.md`(#328)。
 - `GoogleService-Info.plist` が無い環境(CI・plist 未同期)では何もしない。
 
 ## コードの場所
