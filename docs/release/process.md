@@ -132,6 +132,7 @@ gitGraph
 5. [ ] **【人】** 実機でアーカイブ: `./scripts/build-review.sh archive -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM_ID> CODE_SIGN_STYLE=Automatic`。
 6. [ ] **【人】** Organizer か `xcodebuild -exportArchive` で App Store Connect にアップロード → TestFlight で実機確認。直すなら修正 PR → `bump-build.sh`(ビルド番号 +1)→ 5 から。
 7. [ ] **【人】** App Store Connect: 栄養ラベル・審査メモ([`../store/app-review-notes.md`](../store/app-review-notes.md))・掲載文がこのバイナリと一致 → 審査に提出。
+   - 提出前の点検表・却下された時の返信・公開のしかたは [`app-review-playbook.md`](app-review-playbook.md)(#332)。
 8. [ ] 通ったら: `release/*` → main(**【人】マージ**)と → develop の PR。backend に変更が無ければ prod デプロイは走らない。
 9. [ ] **【人】** `ios-vX.Y.Z` のタグと Release(本文にビルド番号)。ストアでの公開(手動 / 自動)を選ぶ。
 10. [ ] 審査の期間中・公開後は prod の backend を止めない。

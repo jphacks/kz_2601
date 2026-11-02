@@ -5,6 +5,7 @@
 - 前提の版: 審査用の版(`Metamon-Review` / `APP_STORE_REVIEW`、#245 / PR #284、`docs/ios/review-build.md`)。最初の版は **App 内課金なし**(#450)・**共有 / 公開のデータなし**(#451)で出す(2026-10-30 決定)。外した機能をこのメモで説明しない・書いた機能は必ずバイナリにある、の両方を守る(2.5.19・2.3.1)。
 - 下書きの元: リポジトリ外の調査メモ `調査_ライセンスとApp Store審査.md` の「審査メモの下書き」。そこから、今のコードと合わない所を直した(下の「下書きから直した所」)。
 - ストアの掲載文は [listing.md](listing.md)、避ける言い回しは [wording.md](wording.md)。
+- 提出前の点検と、却下された時の返信の下書きは [../release/app-review-playbook.md](../release/app-review-playbook.md)(#332)。
 
 ## 目次
 
