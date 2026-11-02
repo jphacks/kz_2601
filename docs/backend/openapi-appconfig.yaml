@@ -25,6 +25,7 @@ tags:
   - { name: entities }
   - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引をサーバーで検証して保存する。architecture.md §6.8' }
   - { name: feedback, description: 'アプリ内のフィードバック(#319)。architecture.md §3.5' }
+  - { name: matching, description: '仲間探しのアプリの相互承認(#507)。docs/backend/features/matching.md' }
   - { name: members, description: 'scope:shared の参加者(#254)。architecture.md §3.4' }
   - { name: metrics, description: 'aiButton の端末内 AI の集計(#446)。docs/analytics/ai-button-metrics.md' }
   - { name: records }
@@ -746,6 +747,121 @@ paths:
         '403': { description: 作成者以外が他人を外そうとした, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '404': { description: その uid は参加者ではない(他人を外す時), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
+  /apps/{appId}/interests:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [matching]
+      summary: 届いた / 送った「つながりたい」(#507)
+      description: |
+        `box=incoming`(既定)は自分に届いて未回答のもの、`outgoing` は自分が送って未回答のもの。新しい順に最大 500 件。
+        相手が見送った・ブロックした送信も `outgoing` に `pending` のまま出る(断られたことは相手に伝えない)。お互いにブロックしている人(どちら向きでも)は出さない。
+        アプリ(公開 DSL)に `match:"profile"` の entity が無ければ 404(`details.reason: no_matching`)。プロフィールが scope:shared なら作成者・参加者以外は 403 `not_member`。運営が非公開にしたアプリは 403 `unpublished`。
+      parameters:
+        - { in: query, name: box, schema: { type: string, enum: [incoming, outgoing], default: incoming } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Interest' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [matching]
+      summary: 「つながりたい」を送る(#507)
+      description: |
+        相手のプロフィールのレコード(`recordId`)に送る。自分のプロフィール(`fromRecordId`・自分が書いたもの)が要る。
+        `ageConfirmed: true`(本人による 18 歳以上の確認)が無ければ 400(`details.reason: age_unconfirmed`)。
+        相手がもう自分に送っていれば、これが承認になり `matched` を返す。それ以外は `pending`(送り直しても 1 件)。
+        自分がブロックした人には 400(`details.reason: blocked`)。相手が自分をブロックしている時は `pending` を返すが相手には届かない。
+        1 人 1 日(JST)30 回まで(超えると 429 `rate_limited`・送り直しも数える)。自分のプロフィールへは 400。プロフィールが無ければ 404。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recordId, fromRecordId, ageConfirmed]
+              properties:
+                recordId: { type: string, description: 相手のプロフィール(match:profile の entity)のレコード id }
+                fromRecordId: { type: string, description: 自分のプロフィールのレコード id }
+                ageConfirmed: { type: boolean, description: '本人が 18 歳以上と確認した(iOS が初回に確認を出す)' }
+      responses:
+        '200': { description: 送った / つながった, content: { application/json: { schema: { $ref: '#/components/schemas/Interest' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { description: 今日の上限, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /apps/{appId}/interests/{uid}:
+    parameters:
+      - { $ref: '#/components/parameters/AppId' }
+      - { in: path, name: uid, required: true, schema: { type: string }, description: 相手の uid }
+    delete:
+      tags: [matching]
+      summary: 届いたものを見送る / 送ったものを取り下げる(冪等)
+      description: 相手には伝えない(相手の送信は `pending` のまま見える)。見送った人からの送り直しは届かない。つながった後は `DELETE /matches/{uid}`。
+      responses:
+        '204': { description: Done }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /apps/{appId}/interests/{uid}/accept:
+    parameters:
+      - { $ref: '#/components/parameters/AppId' }
+      - { in: path, name: uid, required: true, schema: { type: string }, description: 送ってきた人の uid }
+    post:
+      tags: [matching]
+      summary: 届いた「つながりたい」を承認する(#507)
+      description: '`ageConfirmed: true` が要る(無ければ 400 `age_unconfirmed`)。その人からの未回答の送信が無い・お互いにブロックしている時は 404。'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ageConfirmed]
+              properties:
+                ageConfirmed: { type: boolean }
+      responses:
+        '200': { description: つながった, content: { application/json: { schema: { $ref: '#/components/schemas/Interest' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /apps/{appId}/matches:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [matching]
+      summary: つながった人(#507)
+      description: |
+        お互いに承認した人。新しい順に最大 500 人。お互いにブロックしている人は出さない。
+        この人たちと自分だけが、`match:"matched"` の entity のレコード(連絡先など)を GET records で読める(それ以外の人の分は一覧に出ず、id を指定しても 404)。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Interest' } }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /apps/{appId}/matches/{uid}:
+    parameters:
+      - { $ref: '#/components/parameters/AppId' }
+      - { in: path, name: uid, required: true, schema: { type: string } }
+    delete:
+      tags: [matching]
+      summary: つながりを解除する(#507)
+      description: どちら側からでも解除できる。以後お互いの matched のレコードは見えない。解除された側からの送り直しは届かない。つながっていなければ 404。
+      responses:
+        '204': { description: Unmatched }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /me:
     delete:
       tags: [account]
@@ -1324,3 +1440,13 @@ components:
         via: { type: string, enum: [share, legacy], description: 'share = リンクで参加 / legacy = #254 以前からアプリを持っていた(移行)。作成者には無い' }
         joinedAt: { type: string, format: date-time, description: 作成者には無い }
         you: { type: boolean, description: 呼び出したユーザー本人 }
+    Interest:
+      type: object
+      description: 「つながりたい」1 件 / つながった 1 人(#507)
+      required: [uid, status, updatedAt]
+      properties:
+        uid: { type: string, description: 相手の uid }
+        profileRecordId: { type: string, description: 相手のプロフィールのレコード id(送った時のもの。消されていることがある) }
+        status: { type: string, enum: [matched, pending] }
+        updatedAt: { type: string, format: date-time }
+        matchedAt: { type: string, format: date-time, description: matched の時だけ }

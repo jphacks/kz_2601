@@ -59,6 +59,10 @@ type AccountPurgeResult struct {
 	Reports int
 	// users/{uid}/blocks/*
 	Blocks int
+	// apps_public/*/match_pairs/* that include uid (#507), with match_quota/{uid}
+	MatchPairs int
+	// uid's records in match profile / matched entities (#507: erased, not kept as posts)
+	MatchRecords int
 }
 
 // LogAttrs returns the counts as slog attrs, one per line, for the
@@ -79,6 +83,8 @@ func (r AccountPurgeResult) LogAttrs() []any {
 		slog.Int("reports", r.Reports),
 		slog.Int("blocks", r.Blocks),
 		slog.Int("feedback", r.Feedback),
+		slog.Int("matchPairs", r.MatchPairs),
+		slog.Int("matchRecords", r.MatchRecords),
 	}
 }
 
@@ -91,6 +97,9 @@ func (r AccountPurgeResult) LogAttrs() []any {
 //   - an apps_public mirror owned by uid stays when someone else is a member
 //     or has posted there (it is those people's shared space), and so does its
 //     app_owners entry. Without others it is erased with the app.
+//
+// Not kept: uid's records in matching apps' profile / matched entities and
+// uid's match pairs (#507). They describe the person, not a shared post.
 type AccountPurger interface {
 	// DeletedAccounts returns accounts soft-deleted before cutoff, oldest
 	// first, up to limit (purged tombstones are not returned).
