@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -123,5 +124,60 @@ func TestDatingOmission(t *testing.T) {
 	}
 	if got := ids("ボドゲ仲間を探すアプリ", ""); strings.Contains(got, "dating") {
 		t.Fatalf("peer finding is not dating: %q", got)
+	}
+}
+
+// #507 phase 2: the recipe names the components, and a build that sends
+// matching (the current iOS, not the review build) gets them.
+func TestMatchingComponentsInRecipe(t *testing.T) {
+	for _, want := range []string{"item.interest: true", "matchList", `show: "incoming"`, `show: "matches"`} {
+		if !strings.Contains(matchingRules, want) {
+			t.Errorf("matchingRules lacks %q", want)
+		}
+	}
+	if !strings.Contains(catalog, "matchList") {
+		t.Fatal("the catalog must list matchList (from the schema)")
+	}
+	all := make([]string, 0, len(knownComponentTypes))
+	for k := range knownComponentTypes {
+		all = append(all, k)
+	}
+	current := NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureMatching})
+	if current.Active() {
+		t.Fatalf("a build with every part and matching is unrestricted: %v", current.Disallowed())
+	}
+
+	// Sends matchList but not matching (or no shared data): matchList and
+	// item.interest are withheld along with match.
+	for name, r := range map[string]Restriction{
+		"no matching": NewClientRestriction(all, nil, []string{FeatureRecordRetention}),
+		"no shared":   NewClientRestriction(all, []string{FeatureSharedData}, []string{FeatureRecordRetention, FeatureMatching}),
+	} {
+		if !slices.Contains(r.Disallowed(), string(dsl.CompMatchList)) {
+			t.Errorf("%s: matchList allowed: %v", name, r.Disallowed())
+		}
+		sch := string(r.assets().genSch)
+		if strings.Contains(sch, `"interest":`) || strings.Contains(sch, `"matchList"`) {
+			t.Errorf("%s: generation schema still offers interest / matchList", name)
+		}
+		if strings.Contains(r.assets().catalog, "matchList") {
+			t.Errorf("%s: catalog still lists matchList", name)
+		}
+	}
+	if !strings.Contains(string(generationSchema), `"interest":`) {
+		t.Fatal("the full generation schema must offer item.interest")
+	}
+
+	old := NewClientRestriction(all, nil, []string{FeatureRecordRetention})
+	raw := []byte(`{"entities":[{"id":"profile","name":"プロフィール","scope":"public","match":"profile","fields":[{"id":"hobby","name":"趣味","type":"string"}]}],` +
+		`"screens":[{"id":"home","components":[{"type":"list","entity":"profile","item":{"title":"hobby","interest":true}},` +
+		`{"type":"matchList","entity":"profile","show":"matches"}]}]}`)
+	out, notes, changed := enforceRestriction(raw, old)
+	s := string(out)
+	if !changed || strings.Contains(s, "interest") || strings.Contains(s, "matchList") || strings.Contains(s, `"match"`) {
+		t.Fatalf("enforce: changed=%v notes=%v out=%s", changed, notes, s)
+	}
+	if got := plainTerms("matchList で届いた人を出します", LocaleJA); strings.Contains(got, "matchList") {
+		t.Fatalf("chat leaks the component name: %q", got)
 	}
 }

@@ -62,3 +62,58 @@ func TestMatchingRejects(t *testing.T) {
 		})
 	}
 }
+
+// #507 phase 2: list.item.interest and matchList only make sense on the
+// match:"profile" entity.
+func TestMatchingComponents(t *testing.T) {
+	if err := matchingApp(t).Validate(); err != nil {
+		t.Fatalf("testdata: %v", err)
+	}
+	if l := matchingApp(t).Lint(); len(l) > 0 {
+		for _, w := range l {
+			if strings.Contains(w, "matchList") || strings.Contains(w, "interest") {
+				t.Errorf("lint: %s", w)
+			}
+		}
+	}
+	matchList := func(a *App) *Component { return &a.Screens[1].Components[0] }
+	cases := []struct {
+		name string
+		edit func(a *App)
+		want string
+	}{
+		{"interest on contact", func(a *App) {
+			a.Screens[0].Components[1].Item.Interest = true
+		}, `item.interest needs the list entity to have match "profile"`},
+		{"matchList on contact", func(a *App) { matchList(a).Entity = "contact" }, `must be the match "profile" entity`},
+		{"matchList no entity", func(a *App) { matchList(a).Entity = "" }, "matchList needs entity"},
+		{"matchList missing entity", func(a *App) { matchList(a).Entity = "nope" }, `matchList entity "nope" does not exist`},
+		{"bad show", func(a *App) { matchList(a).Show = "likes" }, "must be incoming, outgoing or matches"},
+		{"no show", func(a *App) { matchList(a).Show = "" }, "must be incoming, outgoing or matches"},
+		{"unknown field", func(a *App) { matchList(a).Item.Title = "age" }, `matchList item field "age" not in entity`},
+		{"interest in matchList", func(a *App) { matchList(a).Item.Interest = true }, "matchList item uses only"},
+		{"mark in matchList", func(a *App) { matchList(a).Item.Mark = "like" }, "matchList item uses only"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			a := matchingApp(t)
+			c.edit(a)
+			err := a.Validate()
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("want %q, got %v", c.want, err)
+			}
+		})
+	}
+}
+
+// matchList lists the profile records one by one, so the profile entity
+// counts as listed even without a list.
+func TestMatchListCountsAsListed(t *testing.T) {
+	a := matchingApp(t)
+	a.Screens[0].Components = a.Screens[0].Components[1:] // drop the profile list
+	for _, id := range a.UnlistedEntities() {
+		if id == "profile" {
+			t.Fatal("profile shown by matchList is reported unlisted")
+		}
+	}
+}

@@ -9,7 +9,7 @@ import (
 
 // Matching apps (#507). Two parts:
 //   - matchingRules / matchingChatRule: how to build a peer-finding app with
-//     Entity.match. Only for builds that send supportedFeatures "matching"
+//     Entity.match, list.item.interest and matchList. Only for builds that send supportedFeatures "matching"
 //     (restrict.go drops them otherwise, like retentionRules).
 //   - datingRules / datingChatRule: romance and dating are never built, for
 //     every build. Introducing strangers for romance falls under Japan's
@@ -25,15 +25,18 @@ var matchingRules = strings.TrimSpace(`
 - 「同じ趣味の人を探して、お互いに OK したら連絡できるアプリ」「勉強仲間を探したい」「イベントの参加者同士でつながりたい」: 次の 2 つの entity を作る。
   - プロフィール: "match":"profile"、scope は public(「同じ大学の人だけ」「サークルの中で」のように決まった人だけなら shared)。field は趣味・やりたいこと(string か enum)・地域(enum。都道府県や「オンライン」までの大まかな地域)・ひとこと(text)。名前の入力欄は作らず一覧に $author を出す。**写真・位置(location)・住所・市区町村・学校名・年齢・生年月日・性別・連絡先は入れない**(知らない人が見るため)。
   - 連絡先: "match":"matched"、scope はプロフィールと同じ。field は連絡方法(string。SNS の ID など)とひとこと。書いた本人と、お互いに承認してつながった相手だけが読める。
-- 画面: プロフィールの list(title に趣味、subtitle に地域、trailing に $author)と自分のプロフィールのフォーム、連絡先の list(つながった人の分だけ出る)とフォーム。
-- 「つながりたい」を送る・届いたものを承認する・見送る・つながりを解除する・通報・ブロックはアプリ本体(サーバー)が持つ。**いいね用の entity・承認の boolean・相手を選ぶ ref は作らない**。edit は書かない。
+- 画面(タブ 3 つが定石):
+  - 「さがす」: プロフィールの list に **item.interest: true**(title に趣味、subtitle に地域、trailing に $author)。他の人の行に「つながりたい」ボタンが出る(自分の行には出ない・送ると「送りました」)。自分のプロフィールを書くフォームへの追加ボタンも置く。
+  - 「つながり」: **matchList**{entity: プロフィールの entity, show: "incoming"}(届いた人。行で承認・見送る)と matchList{show: "matches"}(つながった人。行のメニューで解除・通報・ブロック)を縦に並べる。送った人の matchList{show: "outgoing"}(取り下げ)は任意。item はプロフィールの list と同じ。
+  - 「連絡先」: 連絡先の list(つながった人の分と自分の分だけ出る)とフォーム。
+- 「つながりたい」を送る・承認する・見送る・取り下げる・解除する・通報・ブロック・18 歳以上の確認はアプリ本体が持つ(item.interest と matchList の中で完結)。**いいね用の entity・承認の boolean・相手を選ぶ ref・承認用のボタンや画面は作らない**。edit は書かない。
 - summary に「お互いに「つながりたい」を送った人とだけ、連絡先が見られます。」を入れる。
 `)
 
 // matchingChatRule: the capability for chat answers (できる?).
 var matchingChatRule = strings.TrimSpace(`
 ## 仲間探し(#507)
-- 趣味・勉強・イベントの仲間をプロフィールから探し、**お互いに承認した人とだけ連絡先が見られる**アプリは**できる**(つながりたいを送る・承認・解除・通報・ブロックはアプリ本体が持つ)。地域は都道府県まで・写真や位置は載せない。
+- 趣味・勉強・イベントの仲間をプロフィールから探し、**お互いに承認した人とだけ連絡先が見られる**アプリは**できる**(プロフィールの一覧の「つながりたい」ボタン・届いた人とつながった人の一覧で承認・見送る・解除・通報・ブロックはアプリ本体が持つ。初めて送る時に 18 歳以上かを確かめる)。地域は都道府県まで・写真や位置は載せない。
 `)
 
 // noMatchingChatRule replaces matchingChatRule for builds without the UI.
@@ -86,7 +89,11 @@ func init() {
 	chatEditSystemPrompt = strings.Replace(chatEditSystemPrompt, chatCapabilities, withMatching, 1)
 	chatCreateSystemPrompt = strings.Replace(chatCreateSystemPrompt, chatCapabilities, withMatching, 1)
 	omissionRules = append(omissionRules, datingOmission)
-	t := dslTerm{"match", "仲間探し", ""} // an ordinary English word: ja text only
-	dslTerms = append(dslTerms, t)
-	termIndex[strings.ToLower(t.term)] = t
+	for _, t := range []dslTerm{
+		{"match", "仲間探し", ""}, // an ordinary English word: ja text only
+		{"matchList", "つながりの一覧", "connections list"},
+	} {
+		dslTerms = append(dslTerms, t)
+		termIndex[strings.ToLower(t.term)] = t
+	}
 }

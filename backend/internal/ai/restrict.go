@@ -103,6 +103,7 @@ func NewRestriction(allowed, disabled []string) Restriction {
 			r.noMatching = true // match needs a shared entity
 		}
 	}
+	r.withholdMatchingUI()
 	r.setKey()
 	return r
 }
@@ -118,8 +119,21 @@ func NewClientRestriction(allowed, disabled, supported []string) Restriction {
 	if len(allowed) > 0 && !slices.Contains(supported, FeatureMatching) {
 		r.noMatching = true
 	}
+	r.withholdMatchingUI()
 	r.setKey()
 	return r
+}
+
+// withholdMatchingUI: without matching there is nothing for matchList to
+// show (#507 phase 2), even when the client lists the type.
+func (r *Restriction) withholdMatchingUI() {
+	if !r.noMatching {
+		return
+	}
+	if r.disallowed == nil {
+		r.disallowed = map[string]bool{}
+	}
+	r.disallowed[string(dsl.CompMatchList)] = true
 }
 
 func (r *Restriction) setKey() {
@@ -273,6 +287,10 @@ func restrictSchemaJSON(raw []byte, r Restriction) []byte {
 		if entity, _ := defs["Entity"].(map[string]any); entity != nil {
 			props, _ := entity["properties"].(map[string]any)
 			delete(props, "match")
+		}
+		if item, _ := defs["ListItem"].(map[string]any); item != nil {
+			props, _ := item["properties"].(map[string]any)
+			delete(props, "interest")
 		}
 	}
 	if r.disallowed[string(dsl.CompWebView)] {
@@ -650,6 +668,14 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 					delete(item, "mark") // marks go with the scope below
 				}
 			}
+			if r.noMatching {
+				if item, _ := c["item"].(map[string]any); item != nil {
+					if _, has := item["interest"]; has {
+						delete(item, "interest") // goes with match below (#507)
+						matching++
+					}
+				}
+			}
 			if ch, ok := c["children"].([]any); ok {
 				c["children"] = fixComps(ch)
 			}
@@ -743,7 +769,7 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 		notes = append(notes, fmt.Sprintf("dropped retentionDays on %d entity(ies)", retention))
 	}
 	if matching > 0 {
-		notes = append(notes, fmt.Sprintf("dropped match on %d entity(ies)", matching))
+		notes = append(notes, fmt.Sprintf("dropped match / item.interest on %d place(s)", matching))
 	}
 	b, err := json.Marshal(root)
 	if err != nil {

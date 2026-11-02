@@ -306,6 +306,8 @@ const (
 	CompSensorValue ComponentType = "sensorValue"
 	// music (#412): Apple Music player + song requests from nearby friends
 	CompMusicPlayer ComponentType = "musicPlayer"
+	// matching (#507): incoming / outgoing / matched people of a match:"profile" entity
+	CompMatchList ComponentType = "matchList"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -454,6 +456,9 @@ type Component struct {
 	// musicPlayer (#412). Title is shared.
 	AllowRequests bool `json:"allowRequests,omitempty"` // accept song requests from nearby devices
 	AutoAccept    bool `json:"autoAccept,omitempty"`    // queue requests without asking
+
+	// matchList (#507). Entity (the match:"profile" entity) / Title / EmptyText / Item / OnItemTap are shared.
+	Show string `json:"show,omitempty"` // incoming|outgoing|matches
 }
 
 // PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the
@@ -495,10 +500,11 @@ type ListItem struct {
 	Subtitle string `json:"subtitle,omitempty"`
 	Trailing string `json:"trailing,omitempty"`
 	Icon     string `json:"icon,omitempty"`
-	Image    string `json:"image,omitempty"`  // photo field id -> thumbnail
-	Mark     string `json:"mark,omitempty"`   // entity mark id -> like/save toggle with count (#255)
-	Toggle   string `json:"toggle,omitempty"` // boolean field id -> one-tap check circle (#108)
-	Resets   string `json:"resets,omitempty"` // "daily": toggle is a date field, checked = today (#132)
+	Image    string `json:"image,omitempty"`    // photo field id -> thumbnail
+	Mark     string `json:"mark,omitempty"`     // entity mark id -> like/save toggle with count (#255)
+	Toggle   string `json:"toggle,omitempty"`   // boolean field id -> one-tap check circle (#108)
+	Resets   string `json:"resets,omitempty"`   // "daily": toggle is a date field, checked = today (#132)
+	Interest bool   `json:"interest,omitempty"` // match:"profile" list: a つながりたい button on others' rows (#507)
 }
 
 // Sort orders a list.

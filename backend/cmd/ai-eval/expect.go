@@ -99,6 +99,7 @@ var expectKeys = map[string]expectKind{
 	"matchProfile": expectBool,
 	"matchMatched": expectBool,
 	"matchSafe":    expectBool,
+	"matchUI":      expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

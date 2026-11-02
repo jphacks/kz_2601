@@ -764,6 +764,9 @@
         },
         {
           "$ref": "#/$defs/MusicPlayer"
+        },
+        {
+          "$ref": "#/$defs/MatchList"
         }
       ]
     },
@@ -1060,7 +1063,7 @@
     "ListItem": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル、toggle に boolean field で行頭のチェック丸(resets daily なら date field で毎日リセット)。 mark に entity の marks の id を書くと、行の右端にいいね・保存などのトグルと件数(1 人 1 回)。",
+      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル、toggle に boolean field で行頭のチェック丸(resets daily なら date field で毎日リセット)。 mark に entity の marks の id を書くと、行の右端にいいね・保存などのトグルと件数(1 人 1 回)。 interest: true は match \"profile\" の一覧の行に「つながりたい」ボタン(#507)。",
       "required": [
         "title"
       ],
@@ -1098,6 +1101,10 @@
             "daily"
           ],
           "description": "daily = a check that comes back unchecked every day (服薬・毎日の習慣). toggle must be a stored date field without defaultValue: tapping saves today's date, the row shows checked only while that date is today (device local), tapping again clears it. Today's done count = stat count filter {toggle field, op today}. iOS also keeps the checked days (history), so a computed integer on the same entity can show the streak {\"op\":\"streak\",\"args\":[{\"ref\":<toggle>}]} and the days done in the last n days {\"op\":\"doneInDays\",\"args\":[{\"ref\":<toggle>},7]}; totals = agg sum/max of those computed fields. Do not add a separate log entity for checks."
+        },
+        "interest": {
+          "type": "boolean",
+          "description": "true = the list entity has match \"profile\" (#507): iOS puts a つながりたい button on other people's rows (not on the user's own). Tapping sends an interest to that person (the first time it asks the user to confirm they are 18 or older); after sending the row reads 送りました, and when both sides sent it reads つながりました. No form, no extra entity, no boolean field."
         }
       }
     },
@@ -4085,6 +4092,62 @@
       },
       "description": "Apple Music の音楽プレーヤー。曲を検索して再生待ちに入れ、再生・一時停止・次へ・前へと、今の曲(曲名・アーティスト・ジャケット)と再生待ちを表示する。イヤホンのボタン・ロック画面でも操作できる。allowRequests で近くの友だちの端末から曲のリクエストを受けられる。「音楽を流す」「ドライブの BGM」「プレイリスト」「友だちが曲を入れられる」の時に選ぶ。再生には Apple Music の契約が要る。Spotify は曲名で Spotify アプリを開くことだけでき、再生・操作はできない。entity は要らない。",
       "x-usage": "entity 不要。1 アプリに 1 つだけ。ホーム(またはタブ)に全幅で大きく置く(例 A1:F12。他の部品と並べるなら A1:F8)。友だちから曲を入れたい話があれば allowRequests: true、運転中で確認できない・勝手に入れていいなら autoAccept: true も。"
+    },
+    "MatchList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "show"
+      ],
+      "properties": {
+        "type": {
+          "const": "matchList"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string",
+          "description": "match \"profile\" の entity の id。行はその人のプロフィールのレコードで描く。"
+        },
+        "show": {
+          "type": "string",
+          "enum": [
+            "incoming",
+            "matches",
+            "outgoing"
+          ],
+          "description": "incoming = 自分に「つながりたい」を送ってきた人(行に「承認」「見送る」)/ outgoing = 自分が送って返事を待っている人(「取り下げる」)/ matches = お互いに送ってつながった人(「つながりを解除」「通報する」「ブロック」)。",
+          "x-enumDescriptions": {
+            "incoming": "届いた「つながりたい」。承認するとつながる・見送っても相手には知らされない。",
+            "matches": "つながった人。連絡先(match \"matched\" の entity)はこの人たちにだけ見える。",
+            "outgoing": "送った「つながりたい」。相手が承認するまでここに残る。"
+          }
+        },
+        "title": {
+          "type": "string",
+          "description": "一覧の上の見出し(任意)。"
+        },
+        "emptyText": {
+          "type": "string",
+          "description": "誰もいない時の文言(既定は show ごとの文)。"
+        },
+        "item": {
+          "$ref": "#/$defs/ListItem",
+          "description": "行の表示。title / subtitle / trailing / icon だけを使う(プロフィールの field か $author)。省略時はプロフィールの titleField。"
+        },
+        "onItemTap": {
+          "$ref": "#/$defs/Action",
+          "description": "行をタップした時(任意)。recordId はその人のプロフィールのレコード。"
+        }
+      },
+      "description": "仲間探しのアプリ(#507)で、届いた「つながりたい」・送った「つながりたい」・つながった人の一覧。行はその人のプロフィールで描き、行の中のボタンとメニューで承認・見送る・取り下げる・つながりを解除・通報・ブロックができる(Action は不要)。match \"profile\" の entity があるアプリだけで使う。",
+      "x-usage": "仲間探しのアプリでは「つながり」のタブ(またはホーム)に、届いた人(show incoming・A1:F4)とつながった人(show matches・A5:F10)を縦に並べる。送った人(show outgoing)は任意。entity はプロフィールの entity。item は title に趣味などプロフィールの field、subtitle に地域、trailing に $author。承認の boolean・いいね用の entity・相手を選ぶ ref・ボタンは作らない。"
     }
   }
 }
