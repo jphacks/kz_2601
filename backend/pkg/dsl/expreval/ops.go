@@ -176,7 +176,7 @@ func (ev *Evaluator) apply(name string, args []dsl.Expr, row *Row) Value {
 		}
 	case "pow":
 		if a, b, ok := two(); ok {
-			return finite(math.Pow(a, b))
+			return finite(pow(a, b))
 		}
 	case "round", "floor", "ceil":
 		a, ok := num(0)

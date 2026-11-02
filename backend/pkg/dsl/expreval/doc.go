@@ -36,6 +36,8 @@ package expreval
 //     this package does not.
 //   - Rounding is .toNearestOrAwayFromZero (math.Round); round/floor/ceil scale
 //     by 10^n with math.Pow10 for integral n (exact like Foundation.pow here).
+//   - pow is rounded to the nearest float64 like Foundation.pow (math.Pow is
+//     not, and its last bit differs by GOARCH; see pow.go).
 //   - The evaluation limit is depth 48 (nesting plus computed chains), as on
 //     iOS; computed cycles evaluate to nil.
 //
