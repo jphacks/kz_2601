@@ -110,6 +110,7 @@ func (m *Memory) PurgeAccount(_ context.Context, uid string) (AccountPurgeResult
 		}
 	}
 	res.Installs += m.dropInstalls(func(_, u string) bool { return u == uid })
+	res.Feedback += m.dropFeedback(uid)
 	for id, r := range m.reports {
 		if r.ReporterUID == uid || r.TargetUID == uid {
 			delete(m.reports, id)
