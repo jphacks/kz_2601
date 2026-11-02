@@ -23,7 +23,8 @@ public struct DSLView: View {
         } else if let build = registry.builder(for: component.rawType) {
             build(component, ctx)
         } else {
-            UnsupportedComponent(label: L("未対応: \(component.rawType)"))
+            // 新しい版の部品・この版で外した部品(#536)。リリースでも枠と理由を出す
+            UnavailableComponent(component: component)
         }
     }
 }
