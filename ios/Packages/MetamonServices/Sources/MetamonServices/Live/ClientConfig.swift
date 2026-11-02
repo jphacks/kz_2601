@@ -5,11 +5,24 @@ public struct ClientConfig: Decodable, Equatable, Sendable {
     public var minIOSBuild: Int?
     public var latestIOSBuild: Int?
     public var iosAppStoreUrl: String?
+    /// アプリ内のお知らせ(#333)。壊れていても nil にするだけで、版の判定は続ける
+    public var notice: ServiceNotice?
 
-    public init(minIOSBuild: Int? = nil, latestIOSBuild: Int? = nil, iosAppStoreUrl: String? = nil) {
+    public init(minIOSBuild: Int? = nil, latestIOSBuild: Int? = nil, iosAppStoreUrl: String? = nil, notice: ServiceNotice? = nil) {
         self.minIOSBuild = minIOSBuild
         self.latestIOSBuild = latestIOSBuild
         self.iosAppStoreUrl = iosAppStoreUrl
+        self.notice = notice
+    }
+
+    private enum CodingKeys: String, CodingKey { case minIOSBuild, latestIOSBuild, iosAppStoreUrl, notice }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        minIOSBuild = try c.decodeIfPresent(Int.self, forKey: .minIOSBuild)
+        latestIOSBuild = try c.decodeIfPresent(Int.self, forKey: .latestIOSBuild)
+        iosAppStoreUrl = try c.decodeIfPresent(String.self, forKey: .iosAppStoreUrl)
+        notice = try? c.decodeIfPresent(ServiceNotice.self, forKey: .notice)
     }
 }
 
@@ -88,11 +101,20 @@ public struct UpdateChecker: Sendable {
         public var requirement: UpdateRequirement
         /// サーバーが指定した App Store の URL(無ければ nil = アプリ側の既定)
         public var appStoreURL: URL?
+        /// この build に出すお知らせ(#333)。閉じたかどうかは見ない(`NoticeDismissals`)
+        public var notice: ServiceNotice?
+
+        public init(requirement: UpdateRequirement, appStoreURL: URL? = nil, notice: ServiceNotice? = nil) {
+            self.requirement = requirement
+            self.appStoreURL = appStoreURL
+            self.notice = notice
+        }
     }
 
     public func check() async -> Result {
-        guard let client, let config = try? await client.fetch() else { return Result(requirement: .none, appStoreURL: nil) }
+        guard let client, let config = try? await client.fetch() else { return Result(requirement: .none) }
         let url = config.iosAppStoreUrl.flatMap(URL.init(string:)).flatMap { ["https", "itms-apps"].contains($0.scheme ?? "") ? $0 : nil }
-        return Result(requirement: UpdateRequirement.evaluate(config: config, build: build), appStoreURL: url)
+        let notice = config.notice.flatMap { $0.isDisplayable && $0.applies(toBuild: build) ? $0 : nil }
+        return Result(requirement: UpdateRequirement.evaluate(config: config, build: build), appStoreURL: url, notice: notice)
     }
 }
