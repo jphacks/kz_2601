@@ -317,7 +317,7 @@ func (h *Handler) getEntity(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) entityOf(r *http.Request) (*store.App, *dsl.Entity, string, error) {
 	cur, ent, eid, err := h.resolveEntity(r)
 	if err == nil {
-		ent, err = h.withSharing(r, cur.ID, ent)
+		ent, err = h.withSharing(r, cur, ent)
 	}
 	if err == nil && ent.EffectiveScope() == dsl.ScopeShared {
 		err = h.requireMember(r, cur)

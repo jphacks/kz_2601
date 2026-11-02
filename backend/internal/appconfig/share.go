@@ -159,7 +159,12 @@ func (h *Handler) createShare(w http.ResponseWriter, r *http.Request) {
 		fail(w, blankErr("sharing"))
 		return
 	}
-	if hasSharedScope(parsed) {
+	rules, err := h.sharingRulesFor(r, app)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if rules.hasSharedScope(parsed) {
 		if err := h.requireMember(r, app); err != nil {
 			fail(w, err)
 			return

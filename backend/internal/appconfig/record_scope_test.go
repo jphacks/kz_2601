@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/store"
-	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
 // editCopy rewrites uid's own copy of appPath to dsl (opening the app first).
@@ -122,20 +122,18 @@ func TestSharedScopeFollowsPublishedDSL(t *testing.T) {
 	wantNotMember(t, e.do("stranger2", http.MethodPatch, recs+"/"+id, `{"data":{"amount":1}}`, nil), "patch")
 }
 
-// An entity the creator did not share stays in the caller's own tree.
-func TestUnpublishedEntityStaysPrivate(t *testing.T) {
+// A shared entity the creator did not publish is refused.
+func TestUnpublishedEntityIsRefused(t *testing.T) {
 	e := newEnv(t)
 	const app = "/v1/apps/SCOPE-PRIV-1"
 	e.ownApp("owner", app, sharedKakeibo(t))
-	both := withExtraEntity(t, sharedKakeibo(t), "expense2") // a copy that adds its own public entity
-	e.editCopy("u2", app, both)
+	e.editCopy("u2", app, withExtraEntity(t, sharedKakeibo(t), "expense2"))
 	recs := app + "/entities/expense2/records"
-	if r := e.do("u2", http.MethodPost, recs, `{"data":{"amount":1}}`, nil); r.code != http.StatusCreated || r.body["author"] != nil {
+	if r := e.do("u2", http.MethodPost, recs, `{"data":{"amount":1}}`, nil); r.code != http.StatusForbidden || r.reason() != notPublishedReason {
 		t.Fatalf("u2 post: %d %s", r.code, r.raw)
 	}
-	e.editCopy("u3", app, both)
-	if r := e.do("u3", http.MethodGet, recs, nil, nil); r.code != http.StatusOK || len(r.body["items"].([]any)) != 0 {
-		t.Fatalf("u3 must not see u2's records: %d %s", r.code, r.raw)
+	if r := e.do("u2", http.MethodPost, app+"/entities/expense/records", `{"data":{"amount":1}}`, nil); r.code != http.StatusCreated {
+		t.Fatalf("published entity: %d %s", r.code, r.raw)
 	}
 }
 
@@ -149,29 +147,171 @@ func TestEventsSharingFollowsPublishedDSL(t *testing.T) {
 	const appID = "SCOPE-EVENTS-1"
 	e.ownApp("owner", "/v1/apps/"+appID, familyKakeibo(t))
 	e.editCopy("stranger", "/v1/apps/"+appID, sharedKakeibo(t))
+	e.ownApp("solo", "/v1/apps/SCOPE-EVENTS-2", kakeibo(t)) // nothing published
+	e.editCopy("other", "/v1/apps/SCOPE-EVENTS-2", sharedKakeibo(t))
 
-	events, stop := openEvents(t, srv, "stranger", appID)
-	hello := next(t, events)
-	stop()
-	if ents, _ := hello.data["entities"].([]any); hello.name != "hello" || len(ents) != 0 {
-		t.Fatalf("stranger hello: %+v", hello)
+	for _, c := range []struct {
+		uid, app string
+		want     int
+	}{{"stranger", appID, 0}, {"owner", appID, 1}, {"other", "SCOPE-EVENTS-2", 0}, {"solo", "SCOPE-EVENTS-2", 1}} {
+		events, stop := openEvents(t, srv, c.uid, c.app)
+		hello := next(t, events)
+		stop()
+		if ents, _ := hello.data["entities"].([]any); hello.name != "hello" || len(ents) != c.want {
+			t.Fatalf("%s hello: %+v", c.uid, hello)
+		}
 	}
 }
 
-func TestSharingOf(t *testing.T) {
-	own := &dsl.Entity{ID: "e", Scope: dsl.ScopePublic, Edit: dsl.EditMembers, Marks: []dsl.Mark{{ID: "x"}}}
-	pub := &dsl.App{Entities: []dsl.Entity{{ID: "e", Scope: dsl.ScopePublic, Marks: []dsl.Mark{{ID: "like"}}}}}
-	if got := sharingOf(own, pub, "u1", "u1"); got != own {
-		t.Fatal("the publisher keeps their own entity")
+
+func withScope(t *testing.T, raw []byte, from, to string) []byte {
+	t.Helper()
+	if !strings.Contains(string(raw), from) {
+		t.Fatalf("dsl has no %s", from)
 	}
-	if got := sharingOf(own, nil, "", "u2"); got != own {
-		t.Fatal("unpublished apps keep the caller's entity")
+	return []byte(strings.Replace(string(raw), from, to, 1))
+}
+
+// Copies that rename the scope of a shared entity, for outsiders and participants.
+func TestSharedScopeCopiesOfParticipants(t *testing.T) {
+	ownerStores(t, func(t *testing.T, e *env, sfx string) {
+		owner, mom, other := "owner"+sfx, "mom"+sfx, "other"+sfx
+		app := "/v1/apps/SCOPE-FAMILY" + sfx
+		recs := app + "/entities/expense/records"
+		e.ownApp(owner, app, familyKakeibo(t))
+		r := e.do(owner, http.MethodPost, recs, `{"data":{"amount":100}}`, nil)
+		if r.code != http.StatusCreated {
+			t.Fatalf("owner post: %d %s", r.code, r.raw)
+		}
+		rid := r.body["id"].(string)
+		tok := e.share(owner, app)
+		if r := e.do(mom, http.MethodPost, "/v1/shares/"+tok+"/import", nil, nil); r.code != http.StatusCreated || r.body["member"] != true {
+			t.Fatalf("mom import: %d %s", r.code, r.raw)
+		}
+
+		for _, scope := range []string{`"scope": "public", "edit": "members"`, `"scope": "private"`} {
+			e.editCopy(other, app, withScope(t, familyKakeibo(t), `"scope": "shared"`, scope))
+			wantNotMember(t, e.do(other, http.MethodGet, recs, nil, nil), scope+": list")
+			wantNotMember(t, e.do(other, http.MethodGet, recs+"/"+rid, nil, nil), scope+": get")
+			wantNotMember(t, e.do(other, http.MethodPost, recs, `{"data":{"amount":1}}`, nil), scope+": create")
+			wantNotMember(t, e.do(other, http.MethodPatch, recs+"/"+rid, `{"data":{"amount":2}}`, nil), scope+": update")
+			wantNotMember(t, e.do(other, http.MethodDelete, recs+"/"+rid, nil, nil), scope+": delete")
+			wantNotMember(t, e.do(other, http.MethodDelete, recs+"?confirm=true", nil, nil), scope+": delete all")
+			wantNotMember(t, e.do(other, http.MethodPost, app+"/share", nil, nil), scope+": share")
+		}
+
+		e.editCopy(mom, app, withScope(t, familyKakeibo(t), `"scope": "shared"`, `"scope": "shared", "edit": "members"`))
+		if r := e.do(mom, http.MethodPatch, recs+"/"+rid, `{"data":{"amount":2}}`, nil); r.code != http.StatusForbidden {
+			t.Fatalf("mom updates owner's record: %d %s", r.code, r.raw)
+		}
+		if r := e.do(mom, http.MethodDelete, recs+"/"+rid, nil, nil); r.code != http.StatusForbidden {
+			t.Fatalf("mom deletes owner's record: %d %s", r.code, r.raw)
+		}
+		// a participant whose copy says private still reads the shared records
+		e.editCopy(mom, app, withScope(t, familyKakeibo(t), `"scope": "shared"`, `"scope": "private"`))
+		if r := e.do(mom, http.MethodGet, recs, nil, nil); r.code != http.StatusOK || len(r.body["items"].([]any)) != 1 {
+			t.Fatalf("mom list: %d %s", r.code, r.raw)
+		}
+
+		r = e.do(owner, http.MethodGet, recs+"/"+rid, nil, nil)
+		if r.code != http.StatusOK || r.body["data"].(map[string]any)["amount"] != float64(100) {
+			t.Fatalf("owner's record changed: %d %s", r.code, r.raw)
+		}
+	})
+}
+
+// The creator's later edit:members applies to participants whose copy predates it.
+func TestSharedEditFollowsCreatorUpdate(t *testing.T) {
+	e := newEnv(t)
+	const app = "/v1/apps/SCOPE-EDIT-3"
+	recs := app + "/entities/expense/records"
+	e.ownApp("owner", app, familyKakeibo(t))
+	rid := e.do("owner", http.MethodPost, recs, `{"data":{"amount":100}}`, nil).body["id"].(string)
+	tok := e.share("owner", app)
+	e.do("mom", http.MethodPost, "/v1/shares/"+tok+"/import", nil, nil)
+	if r := e.do("mom", http.MethodPatch, recs+"/"+rid, `{"data":{"amount":2}}`, nil); r.code != http.StatusForbidden {
+		t.Fatalf("edit:author: %d %s", r.code, r.raw)
 	}
-	got := sharingOf(own, pub, "u1", "u2")
-	if got.Scope != dsl.ScopePublic || got.Edit != "" || len(got.Marks) != 1 || got.Marks[0].ID != "like" || own.Edit != dsl.EditMembers {
-		t.Fatalf("published sharing: %+v", got)
+	e.editCopy("owner", app, withScope(t, familyKakeibo(t), `"scope": "shared"`, `"scope": "shared", "edit": "members"`))
+	if r := e.do("mom", http.MethodPatch, recs+"/"+rid, `{"data":{"amount":2}}`, nil); r.code != http.StatusOK {
+		t.Fatalf("edit:members: %d %s", r.code, r.raw)
 	}
-	if got = sharingOf(&dsl.Entity{ID: "other", Scope: dsl.ScopePublic}, pub, "u1", "u2"); got.IsShared() {
-		t.Fatalf("an entity the publisher did not share stays private: %+v", got)
+}
+
+// Marks are the published entity's: a copy cannot open them to outsiders or
+// add marks the creator did not declare.
+func TestMarksFollowPublishedDSL(t *testing.T) {
+	ownerStores(t, func(t *testing.T, e *env, sfx string) {
+		owner, mom, other := "mo"+sfx, "mm"+sfx, "mx"+sfx
+		app := "/v1/apps/SCOPE-MARKS" + sfx
+		recs := app + "/entities/recipes/records"
+		shared := withScope(t, recipes(t), `"scope": "public"`, `"scope": "shared"`)
+		e.ownApp(owner, app, shared)
+		r := e.do(owner, http.MethodPost, recs, `{"data":{"title":"肉じゃが","minutes":30}}`, nil)
+		if r.code != http.StatusCreated {
+			t.Fatalf("create: %d %s", r.code, r.raw)
+		}
+		mark := recs + "/" + r.body["id"].(string) + "/marks/"
+		tok := e.share(owner, app)
+		e.do(mom, http.MethodPost, "/v1/shares/"+tok+"/import", nil, nil)
+
+		e.editCopy(other, app, recipes(t)) // public in the copy
+		wantNotMember(t, e.do(other, http.MethodPut, mark+"save", nil, nil), "outsider mark")
+
+		extra := withScope(t, shared, `"marks": [{ "id": "save"`, `"marks": [{ "id": "keep", "icon": "bookmark", "label": "あとで" }, { "id": "save"`)
+		e.editCopy(mom, app, extra)
+		if r := e.do(mom, http.MethodPut, mark+"keep", nil, nil); r.code != http.StatusNotFound {
+			t.Fatalf("undeclared mark: %d %s", r.code, r.raw)
+		}
+		if r := e.do(mom, http.MethodPut, mark+"save", nil, nil); r.code != http.StatusOK || r.body["count"] != float64(1) {
+			t.Fatalf("declared mark: %d %s", r.code, r.raw)
+		}
+	})
+}
+
+// Without the creator's published DSL, a copy that declares an entity shared
+// gets no shared data, and does not take over the app by publishing first.
+func TestSharedNeedsCreatorsPublishedDSL(t *testing.T) {
+	ownerStores(t, func(t *testing.T, e *env, sfx string) {
+		owner, other := "po"+sfx, "px"+sfx
+		app := "/v1/apps/SCOPE-NOPUB" + sfx
+		recs := app + "/entities/expense/records"
+		e.ownApp(owner, app, kakeibo(t))
+		if r := e.do(owner, http.MethodPost, recs, `{"data":{"amount":100}}`, nil); r.code != http.StatusCreated {
+			t.Fatalf("owner post: %d %s", r.code, r.raw)
+		}
+		e.editCopy(other, app, sharedKakeibo(t))
+		for _, c := range []struct{ method, path, body string }{
+			{http.MethodGet, recs, ""},
+			{http.MethodPost, recs, `{"data":{"amount":1}}`},
+		} {
+			var body any
+			if c.body != "" {
+				body = c.body
+			}
+			if r := e.do(other, c.method, c.path, body, nil); r.code != http.StatusForbidden || r.reason() != notPublishedReason {
+				t.Fatalf("%s %s: %d %s", c.method, c.path, r.code, r.raw)
+			}
+		}
+		if r := e.do(owner, http.MethodGet, recs, nil, nil); r.code != http.StatusOK || len(r.body["items"].([]any)) != 1 {
+			t.Fatalf("owner list: %d %s", r.code, r.raw)
+		}
+	})
+}
+
+// The creator's own copy decides for the creator, also after the published
+// DSL stops being updated (no shared entity left).
+func TestCreatorCopyDecidesForCreator(t *testing.T) {
+	e := newEnv(t)
+	const app = "/v1/apps/SCOPE-CREATOR"
+	recs := app + "/entities/expense/records"
+	e.ownApp("owner", app, familyKakeibo(t))
+	e.do("owner", http.MethodPost, recs, `{"data":{"amount":100}}`, nil)
+	e.editCopy("owner", app, kakeibo(t)) // private again
+	if r := e.do("owner", http.MethodPost, recs, `{"data":{"amount":7}}`, nil); r.code != http.StatusCreated || r.body["author"] != nil {
+		t.Fatalf("private post: %d %s", r.code, r.raw)
+	}
+	if r := e.do("owner", http.MethodGet, recs, nil, nil); r.code != http.StatusOK || len(r.body["items"].([]any)) != 1 {
+		t.Fatalf("private list: %d %s", r.code, r.raw)
 	}
 }
