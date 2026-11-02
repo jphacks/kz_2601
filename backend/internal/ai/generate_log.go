@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/metrics"
 )
 
@@ -40,9 +41,9 @@ func generateOutcome(res *Result, err error) string {
 			return GenFailed
 		}
 		switch {
-		case ge.Code == "refused":
+		case ge.Code == httpx.CodeRefused:
 			return GenRefused
-		case ge.Code == "generation_failed", ge.Code == "rate_limited": // rate_limited here = Claude's 429
+		case ge.Code == httpx.CodeGenerationFailed, ge.Code == httpx.CodeRateLimited: // rate_limited here = Claude's 429
 			return GenFailed
 		case ge.Status >= 400 && ge.Status < 500:
 			return GenBadRequest
@@ -65,10 +66,7 @@ func generateOutcome(res *Result, err error) string {
 // logGenerate writes one ai.generate line. Labels, counts and the uid hash
 // only: never the transcript, summary, DSL, appId or raw uid.
 func (s *Service) logGenerate(ctx context.Context, tr genTrace, stream bool, res *Result, err error, d time.Duration) {
-	lg := s.Logger
-	if lg == nil {
-		lg = slog.Default()
-	}
+	lg := s.logger()
 	mode := tr.mode
 	if mode == "" {
 		mode = "unknown"

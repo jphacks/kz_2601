@@ -34,11 +34,13 @@ extension AppRuntime {
     }
 
     /// 「この機能なしで作る」: 有料機能を抜いた文で生成する。
+    /// カードはここで消さない(完成時に apply → resetChat が消す)。カードの撤去と生成中表示の挿入が同じ更新に重なると、
+    /// 遅い環境(CI)で GeneratingView が完成まで描かれなかった(#200 と同じ形)。「購入して作る」もカードを残したまま作る
     func buildWithoutPaidFeatures() async {
-        guard let confirmation = paidConfirm else { return }
+        guard let confirmation = paidConfirm, morphJob == nil else { return }
         print("[Metamon] IAP: build without paid features=\(confirmation.features.map(\.id))")
-        clearPaidConfirm()
         await runFromChat(confirmation.freeText)
+        if paidConfirm == confirmation { clearPaidConfirm() } // 作らずに終わった時の保険(通常は resetChat が消している)
     }
 
     /// カードを閉じてチャットに戻る(「やめる」)。

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -282,7 +281,10 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 		if ctx.Err() != nil || delivered {
 			return nil, err
 		}
-		log.Printf("anthropic: attempt %d failed: %v", attempt+1, redact(err))
+		c.logger().LogAttrs(ctx, slog.LevelWarn, "anthropic: attempt failed",
+			slog.Int("attempt", attempt+1),
+			slog.String("error", redact(err)),
+		)
 	}
 	return nil, lastErr
 }

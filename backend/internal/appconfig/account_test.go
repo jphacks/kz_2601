@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -42,7 +43,7 @@ func TestDeleteMe(t *testing.T) {
 
 	// every later request of the deleted uid is 410
 	for _, p := range []string{"/v1/apps", mine + "/dsl", "/v1/public-apps"} {
-		if r := e.do("leaver", http.MethodGet, p, nil, nil); r.code != http.StatusGone || r.errCode() != CodeAccountDeleted {
+		if r := e.do("leaver", http.MethodGet, p, nil, nil); r.code != http.StatusGone || r.errCode() != httpx.CodeAccountDeleted {
 			t.Fatalf("GET %s after delete: %d %s", p, r.code, r.raw)
 		}
 	}

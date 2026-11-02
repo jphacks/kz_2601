@@ -223,7 +223,11 @@ struct RootView: View {
             .task(id: banner.id) {
                 // 文字数に応じて 3〜5 秒(読み上げを読み切れる長さ)
                 // ボタン付き(#209)は押す余裕を持たせて 6 秒以上
-                let seconds = max(banner.action == nil ? 3.0 : 6.0, min(5.0, Double(banner.text.count) / 12))
+                var seconds = max(banner.action == nil ? 3.0 : 6.0, min(5.0, Double(banner.text.count) / 12))
+                #if DEBUG
+                // UI テスト用: 遅い CI では出てから押すまでに 6 秒を超え、押す前に消えた(#209)
+                if let hold = Double(ProcessInfo.processInfo.environment["METAMON_BANNER_SECONDS"] ?? "") { seconds = hold }
+                #endif
                 try? await Task.sleep(for: .seconds(seconds))
                 // 次のバナーに差し替わって取り消された時は消さない(新しい方まで消えていた・#209)
                 guard !Task.isCancelled else { return }

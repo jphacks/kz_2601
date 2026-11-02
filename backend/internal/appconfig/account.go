@@ -19,9 +19,6 @@ func init() {
 	})
 }
 
-// CodeAccountDeleted is the 410 error code for uids that deleted their account.
-const CodeAccountDeleted = "account_deleted"
-
 // deleteMe is DELETE /v1/me (#119, App Store 5.1.1(v)). Logical deletion:
 // store.Accounts.DeactivateUser marks the uid deleted, archives its apps,
 // revokes its share links and takes down its catalog listings. The app deletes
@@ -79,7 +76,7 @@ func RejectDeleted(s store.Accounts, next http.Handler) http.Handler {
 			mu.Unlock()
 		}
 		if gone {
-			httpx.Error(w, http.StatusGone, CodeAccountDeleted, "this account has been deleted")
+			httpx.Error(w, http.StatusGone, httpx.CodeAccountDeleted, "this account has been deleted")
 			return
 		}
 		next.ServeHTTP(w, r)
