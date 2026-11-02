@@ -4,8 +4,9 @@
 
 - 実装: `backend/internal/ratelimit`(ミドルウェア)。`cmd/ai/main.go` で `ai.NewHandler` を包むだけで、handler は触っていない。
 - 対象: `POST /v1/generate`・`POST /v1/chat`・`POST /v1/text`(#417)。ai 自身が Firebase ID トークンを確かめる(今までは appconfig に転送するだけで、chat の create は**トークン無しでも Claude を呼べた**)。
+- 対象外: `DELETE /v1/chat/{appId}`(対話状態を消すだけで Claude を呼ばない)。トークンが要り、無ければ 401、他人の対話なら 403、それ以外は 204(#286・`backend/internal/ai/handler.go`)。
 - 応答: 429 `rate_limited`。`details` は `openapi-ai.yaml` の `RateLimitDetails`、`Retry-After` も付く。
-- AI だけを止めたい時は上限を 1 にせず、一時停止のスイッチ(`AI_PAUSED=1`・503 `ai_paused`)を使う: `docs/infra/ai-pause.md`(#511)
+- AI だけを止めたい時は上限を 1 にせず、一時停止のスイッチ(`AI_PAUSED=1`・503 `ai_paused`)を使う: [ai-pause.md](../infra/ai-pause.md)(#511)。上限を 1 にするのは `AI_PAUSED` の入っていない版が動いている時の予備だけ([incident-runbook.md §5](../ops/incident-runbook.md#5-手順-a-claude-api-の障害上限))
 
 ## 重さ(単位)
 
@@ -96,7 +97,3 @@ rateLimits/{env}_{yyyy-mm-dd}_global
    3. ai: Admin SDK の `appcheck.Client.VerifyToken` で確かめるミドルウェアを足す(まずはログだけ → 様子を見て必須にする)。
    4. Firebase Auth の匿名サインインにも App Check の強制(Identity Platform)をかけると、匿名アカウントを機械的に量産できなくなる。
 3. **デプロイ後の確認**: ai のログに `ai: rate limit on (store=firestore ...)` が出ること、Firestore に `rateLimits` ができること。
-
-## まだやっていないこと
-
-- `DELETE /v1/chat/{appId}` は今もトークン無しで呼べる(他人の対話状態を消せる)。別 Issue にする。
