@@ -53,3 +53,15 @@ resource "google_firestore_database" "default" {
 
   depends_on = [google_project_service.this]
 }
+
+# 日次バックアップ(保持は var.firestore_backup_retention_days)。実行時刻は選べない。
+# 復元の手順は docs/infra/firestore-backup.md
+resource "google_firestore_backup_schedule" "daily" {
+  count = var.firestore_backup_retention_days > 0 ? 1 : 0
+
+  project   = var.project_id
+  database  = google_firestore_database.default.name
+  retention = "${var.firestore_backup_retention_days * 86400}s"
+
+  daily_recurrence {}
+}

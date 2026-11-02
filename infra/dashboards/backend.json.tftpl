@@ -1,0 +1,307 @@
+{
+  "displayName": "backend (${project})",
+  "mosaicLayout": {
+    "columns": 48,
+    "tiles": [
+      {
+        "xPos": 0,
+        "yPos": 0,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "Requests / s by service and status class",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/request_count\" AND ${service_filter}",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_RATE",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "groupByFields": [
+                        "resource.label.service_name",
+                        "metric.label.response_code_class"
+                      ]
+                    }
+                  }
+                },
+                "plotType": "STACKED_AREA",
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "req/s",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 0,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "5xx rate by service (alert > error_rate_threshold)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "timeSeriesFilterRatio": {
+                    "numerator": {
+                      "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/request_count\" AND ${service_filter} AND metric.labels.response_code_class=\"5xx\"",
+                      "aggregation": {
+                        "alignmentPeriod": "300s",
+                        "perSeriesAligner": "ALIGN_DELTA",
+                        "crossSeriesReducer": "REDUCE_SUM",
+                        "groupByFields": [
+                          "resource.label.service_name"
+                        ]
+                      }
+                    },
+                    "denominator": {
+                      "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/request_count\" AND ${service_filter}",
+                      "aggregation": {
+                        "alignmentPeriod": "300s",
+                        "perSeriesAligner": "ALIGN_DELTA",
+                        "crossSeriesReducer": "REDUCE_SUM",
+                        "groupByFields": [
+                          "resource.label.service_name"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "plotType": "LINE",
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "ratio",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 16,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "p95 latency by service (ms)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/request_latencies\" AND ${service_filter}",
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_95",
+                      "groupByFields": [
+                        "resource.label.service_name"
+                      ]
+                    }
+                  }
+                },
+                "plotType": "LINE",
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "ms",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 16,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "Instances by service",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/container/instance_count\" AND ${service_filter}",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_MAX",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "groupByFields": [
+                        "resource.label.service_name"
+                      ]
+                    }
+                  }
+                },
+                "plotType": "LINE",
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "instances",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 32,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "Claude attempts / min by outcome (ai.usage)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"logging.googleapis.com/user/ai_claude_calls\" AND ${service_filter}",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "groupByFields": [
+                        "metric.label.outcome"
+                      ]
+                    }
+                  }
+                },
+                "plotType": "STACKED_BAR",
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "attempts",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 32,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "Claude errors by error_kind",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"logging.googleapis.com/user/ai_claude_calls\" AND ${service_filter} AND metric.labels.outcome=\"error\"",
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "groupByFields": [
+                        "metric.label.error_kind"
+                      ]
+                    }
+                  }
+                },
+                "plotType": "STACKED_BAR",
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "errors",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 48,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "Recovered panics",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"logging.googleapis.com/user/backend_panics\" AND ${service_filter}",
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "groupByFields": [
+                        "resource.label.service_name"
+                      ]
+                    }
+                  }
+                },
+                "plotType": "STACKED_BAR",
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "panics",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 24,
+        "yPos": 48,
+        "width": 24,
+        "height": 16,
+        "widget": {
+          "title": "/health uptime (fraction passed)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "resource.type=\"uptime_url\" AND metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\"",
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "perSeriesAligner": "ALIGN_FRACTION_TRUE",
+                      "crossSeriesReducer": "REDUCE_MEAN",
+                      "groupByFields": [
+                        "resource.label.host"
+                      ]
+                    }
+                  }
+                },
+                "plotType": "LINE",
+                "targetAxis": "Y1"
+              }
+            ],
+            "yAxis": {
+              "label": "fraction",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 64,
+        "width": 48,
+        "height": 6,
+        "widget": {
+          "title": "Runbook",
+          "text": {
+            "format": "MARKDOWN",
+            "content": "Alerts, Error Reporting and how to verify them on stg: ${runbook_url}"
+          }
+        }
+      }
+    ]
+  }
+}

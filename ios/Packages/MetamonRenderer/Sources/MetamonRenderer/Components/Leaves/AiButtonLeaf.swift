@@ -37,10 +37,10 @@ struct AiButtonLeaf: View {
                 .accessibilityHint(availability.isAvailable ? "端末内の AI で処理し、結果を入力欄に入れます" : (availability.message ?? ""))
                 caption
             }
-            .task { availability = AIAvailability.current }
+            .task { refreshAvailability() }
             .onChange(of: scenePhase) { _, phase in
                 // 設定で Apple Intelligence を ON にして戻ってきた時に反映する
-                if phase == .active { availability = AIAvailability.current }
+                if phase == .active { refreshAvailability() }
             }
         } else {
             NeedsForm(c: c)
@@ -69,6 +69,11 @@ struct AiButtonLeaf: View {
         }
     }
 
+    private func refreshAvailability() {
+        availability = AIAvailability.current
+        rt.recordAIButton(.shown(availability.metric)) // #446
+    }
+
     private func run(_ form: FormDraft) async {
         availability = AIAvailability.current
         guard availability.isAvailable, let output = c.output else { return }
@@ -87,9 +92,14 @@ struct AiButtonLeaf: View {
             let values = form.showsHiddenFields(currentUid: rt.currentUserId) ? form.values : HiddenFields.redact(form.values, in: form.entity)
             let request = try AIRequestBuilder.build(c, entity: form.entity, values: values, sourceEntity: source, records: records)
             let result = try await OnDeviceAI.run(request)
+            rt.recordAIButton(.ran(AIButtonMetric.Task(dslTask: c.task), failure: nil))
             withAnimation(RenderTheme.Motion.select) { form.values[output] = .string(result) }
             done = true
         } catch {
+            // #446: 答えを出せなかった理由と task だけ数える(入力の文は渡さない)
+            if let reason = (error as? OnDeviceAIError)?.metricReason ?? AIButtonMetric.FailureReason(buildError: error) {
+                rt.recordAIButton(.ran(AIButtonMetric.Task(dslTask: c.task), failure: reason))
+            }
             self.error = error.localizedDescription
         }
     }

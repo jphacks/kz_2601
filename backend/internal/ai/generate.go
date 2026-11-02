@@ -199,6 +199,7 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*Result, error) {
 	started := time.Now()
 	tr := genTrace{appID: req.AppID}
+	ctx = withCostTally(ctx) // per-generation cost for ai.generate (#298)
 	res, err := s.generateStream(ctx, req, sink, started, &tr)
 	s.logGenerate(ctx, tr, sink != nil, res, err, time.Since(started)) // ai.generate (#322)
 	return res, err

@@ -33,14 +33,17 @@ prod(`jphacks-kz2601`)と stg(新しいプロジェクト・#288 の案 A2)を�
 
 | 対象 | ファイル | 補足 |
 |---|---|---|
-| API の有効化 | `main.tf` | `disable_on_destroy = false`。一覧に無い API は止めない |
+| API の有効化 | `main.tf` | `apis` + `extra_apis`。`disable_on_destroy = false`。一覧に無い API は止めない |
 | SA と IAM | `iam.tf`・`purge.tf` | `run-backend` / `github-deployer` / `purge-job` / `purge-scheduler`。今の prod のバインディングと同じ。**IAM は全部 `*_iam_member`(非権威的)** なので、ここに無いバインディングは消さない |
 | WIF | `wif.tf` | 条件は「このリポジトリ かつ 許可した ref」。既定は prod = `refs/heads/main`、stg = `refs/heads/develop`(`wif_allowed_refs` で変更・`[]` で今と同じリポジトリだけ) |
 | Artifact Registry | `data.tf` | `backend`(Docker) |
 | Secret Manager | `data.tf` | **入れ物だけ**。値(version)は人が入れる。`run-backend` に accessor |
 | Firestore | `data.tf` | `(default)`・Native。PITR と削除保護は変数。`prevent_destroy` と `deletion_policy = "ABANDON"` で Terraform からは消せない |
+| Firestore の日次バックアップ | `data.tf` | `firestore_backup_retention_days`(既定 14 日・0 で作らない)。復元は `docs/infra/firestore-backup.md` |
+| Firebase の API キーの制限 | `apikeys.tf` | キーは Firebase が作る。`firebase_api_keys` に key_id を入れると import して、Bundle ID と使える API の制限だけを持つ。`prevent_destroy` |
 | 消去ジョブ | `purge.tf` | Cloud Run Job `account-purge` と Scheduler `account-purge-daily`(毎日 4:30 JST)。ジョブのイメージは `ignore_changes`(下) |
 | 予算アラート | `budget.tf` | 50 / 90 / 100% と予測 100%。課金アカウントは変数 |
+| 監視 | `monitoring.tf`・`dashboards/` | `/health` の Uptime check・ログベースの指標・アラート(5xx 率・p95・Claude の失敗率・panic)・ダッシュボード 1 枚。通知先は変数。手順は [`docs/infra/observability.md`](../docs/infra/observability.md) |
 
 **管理しないもの**
 
@@ -52,6 +55,9 @@ prod(`jphacks-kz2601`)と stg(新しいプロジェクト・#288 の案 A2)を�
 | Firebase(プロジェクトへの追加・iOS アプリ・Auth のプロバイダ・Sign in with Apple) | Apple の鍵やコンソールでの操作が混ざるので人の作業 |
 | サービスエージェント・`firebase-adminsdk-fbsvc` | Google / Firebase が自動で作り、権限も自動で付ける |
 | GitHub の Environment Variables | `terraform output` の値を人が入れる |
+| Secret の値・state のバケット | 値は人が入れる。バケットは state より先に要る(下) |
+| ログの指標・通知・BigQuery のシンク | 監視は #295(別 PR)。シンクは `docs/infra/ai-cost.md` の承認待ち |
+| Firestore の TTL ポリシー | 消える範囲が変わる判断が要る(`docs/infra/account-purge.md` の提案) |
 
 ## state の置き場とロック
 
@@ -59,7 +65,7 @@ prod(`jphacks-kz2601`)と stg(新しいプロジェクト・#288 の案 A2)を�
 - バケットは **バージョニングを有効**にし、誤って壊した state を前の版に戻せるようにする。公開アクセス防止・均一なバケットレベルのアクセスも付ける。
 - GCS backend はロックを持つ。2 人が同時に apply しても、後の人は「ロック中」で止まる。止まったときに `force-unlock` するのは、相手の apply が本当に終わっているのを確かめてから。
 - 2 人の運用: 変更は PR に `terraform plan` の結果を貼ってレビュー → マージ後に 1 人が apply。apply は手元(各自の `gcloud auth application-default login`)から行い、CI からはまだ行わない。
-- state には Secret の値は入らない(入れ物だけを管理しているため)。ただしリソースの属性は入るので、バケットの閲覧権限は 2 人に絞る。
+- state には Secret の値は入らない(入れ物だけを管理しているため)。ただしリソースの属性と、Firebase の API キーの文字列(アプリに同梱される識別子)は入るので、バケットの閲覧権限は 2 人に絞る。
 
 バケットの作成(最初の 1 回だけ・人の作業):
 
@@ -72,31 +78,34 @@ gcloud storage buckets update gs://jphacks-kz2601-tfstate --versioning
 
 ## stg を空のプロジェクトから作る
 
-### 人の作業(Terraform の前)
-
-| # | やること |
-|---|---|
-| 1 | プロジェクトを作り、課金をつなぐ(`gcloud projects create <id>` → `gcloud billing projects link`)。ID は #288 の判断 4 |
-| 2 | Firebase をプロジェクトに追加し、Authentication を開始(匿名・Apple を有効化)。iOS アプリ(`jp.kz2601.metamon.stg`・#292)を登録して plist を取る |
-| 3 | Apple Developer に stg の App ID を足し、Sign in with Apple を付ける |
-| 4 | `cp envs/stg.tfvars.example envs/stg.tfvars` して課金アカウントなどを埋める |
-
-### コマンド(Terraform)
+コマンドは `infra/bootstrap.sh` の 1 つです。読み取りの事前チェック(ADC・課金・state のバケット)→ `init` → `plan` を行い、`apply` を付けたときだけ、plan に削除・作り直しが無いことを確かめ、`yes` の入力の後にその plan を適用します。
 
 ```sh
-cd infra
-terraform init -backend-config=envs/stg.backend.hcl
-terraform apply -var-file=envs/stg.tfvars
+infra/bootstrap.sh stg          # plan だけ
+infra/bootstrap.sh stg apply    # plan を見て yes で適用
 ```
 
-### 人の作業(Terraform の後)
+### 人の作業のチェックリスト
 
-| # | やること |
-|---|---|
-| 5 | Secret の値を入れる: `printf %s "$KEY" \| gcloud secrets versions add ANTHROPIC_API_KEY --data-file=- --project=<stg>`(stg 用のキー・#289) |
-| 6 | GitHub の Environment `staging` の Variables に `terraform output` の 4 つ(`GCP_PROJECT_ID` ほか)を入れる(#291) |
-| 7 | develop に push して CI のデプロイが通ることを確かめる |
-| 8 | 消去ジョブを使うなら、CI が push したイメージの digest を `purge_job_image` に入れてもう一度 `terraform apply` |
+Terraform の前:
+
+- [ ] 1. プロジェクトを作り、課金をつなぐ(`gcloud projects create <id>` → `gcloud billing projects link`)。ID は #288 の判断 4
+- [ ] 2. state のバケットがあること(無ければ上の「state の置き場とロック」で作る。prod と共有・最初の 1 回だけ)
+- [ ] 3. 自分の ADC: `gcloud auth application-default login`(プロジェクトの Owner か、同等の権限)
+- [ ] 4. Firebase をプロジェクトに追加し、Authentication を開始(匿名・Apple を有効化)。iOS アプリ(`jp.kz2601.metamon.stg`・#292)を登録して plist を取り、リポ外の `secrets/` に置く
+- [ ] 5. Apple Developer に stg の App ID を足し、Sign in with Apple を付ける。Firebase の Apple プロバイダに Services ID・Key ID・鍵を入れる(`docs/infra/credentials-inventory.md` の 4)
+- [ ] 6. App Check に App Attest を登録する(`docs/infra/app-check.md`)
+- [ ] 7. `cp envs/stg.tfvars.example envs/stg.tfvars` して課金アカウントなどを埋める。Firebase が作った API キーの key_id を `firebase_api_keys` に入れる(Cloud Console > APIs & Services > Credentials)
+
+コマンド: `infra/bootstrap.sh stg apply`
+
+Terraform の後:
+
+- [ ] 8. Secret の値を入れる: `pbpaste | gcloud secrets versions add ANTHROPIC_API_KEY --data-file=- --project=<stg>`(stg 用のキー・#289。値を履歴・チャットに残さない)
+- [ ] 9. GitHub の Environment `staging` の Variables に `terraform output` の 4 つ(`GCP_PROJECT_ID` ほか)と `FIREBASE_WEB_API_KEY` を入れる(#291)
+- [ ] 10. develop に push(または `workflow_dispatch`)して CI のデプロイとスモークが通ることを確かめる。Cloud Run のサービスはここで CI が作る
+- [ ] 11. 消去ジョブ: CI が push したイメージの digest を `purge_job_image` に入れて、もう一度 `infra/bootstrap.sh stg apply`
+- [ ] 12. 確かめる: もう一度 `infra/bootstrap.sh stg` を流し、`No changes` になること(#307 の完了の条件)
 
 ## 既存の prod を取り込む
 
@@ -110,10 +119,13 @@ terraform init -backend-config=envs/prod.backend.hcl
 terraform plan -var-file=envs/prod.tfvars -out=prod.tfplan
 ```
 
-1. **まず差分 0 を確かめる**: `prod.tfvars` で一時的に `wif_allowed_refs = []`、`firestore_pitr_enabled = false`、`firestore_delete_protection = false` にする(今の prod と同じ値)。`purge_job_image` は何を入れても差分にならない(`ignore_changes`)。plan が `N to import, 0 to add, 0 to change, 0 to destroy` になれば正しく取り込めている。
+1. **まず差分 0 を確かめる**: `prod.tfvars` で一時的に `monitoring_enabled = false`(監視は取り込みの後に足す)、`wif_allowed_refs = []`、`firestore_pitr_enabled = false`、`firestore_delete_protection = false` にする(今の prod と同じ値)。`purge_job_image` は何を入れても差分にならない(`ignore_changes`)。plan が `N to import, 0 to add, 0 to change, 0 to destroy` になれば正しく取り込めている。
    - provider だけが持つ値(`deletion_protection`・`deletion_policy` など API に無い項目)や、Scheduler の既定ヘッダ(`User-Agent`)が `~ update in-place` に出ることがある。GCP 側の値が変わらないものなので、中身を見て問題無ければ許容する。
 2. 差分が出たら、コードを今の状態に合わせる(prod を変えない)。`destroy` や `must be replaced` が 1 つでも出たら apply しない。
 3. 差分 0 の plan を apply して取り込む。その後 `imports.tf` を消す。
+   - #307 で足したもののうち、prod に既にあるもの: Firestore の日次バックアップ(`import_firestore_backup_schedule_id` で import)、Firebase の API キー(`firebase_api_keys` に key_id を入れると `apikeys.tf` が import。`api_targets` などは今の設定と同じにする)。
+   - `extra_apis` は import せず、apply で有効化する(既に有効なら変化なし)。plan では `+ create` に出るが、作り直しではない。
+   - `infra/bootstrap.sh` を使う場合は `ALLOW_PROD=1 infra/bootstrap.sh prod`(state が空で `imports.tf` が無いと止まる)。
 4. 目標の設定へ寄せるのは別の apply にする。どれも作り直しではなく in-place の変更:
    - Firestore の PITR と削除保護を有効化(#288 の進め方 0・リリースの前・人の承認)
    - WIF を `refs/heads/main` に絞る(#291・審査の期間 〜11/15 の後・人の承認)。絞った後は、develop からも main 以外からも prod へデプロイできなくなる(`workflow_dispatch` で production を選ぶときは main で実行する)

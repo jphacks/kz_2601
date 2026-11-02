@@ -38,6 +38,15 @@ variable "apis" {
   ]
 }
 
+variable "extra_apis" {
+  description = "apis に後から足した API。prod の import(imports.prod.tf.example)は apis だけを取り込み、こちらは有効化(冪等)で揃える"
+  type        = list(string)
+  default = [
+    "apikeys.googleapis.com",
+    "firebaseappcheck.googleapis.com",
+  ]
+}
+
 # ---- GitHub / WIF ----
 
 variable "github_repository" {
@@ -72,6 +81,29 @@ variable "firestore_delete_protection" {
   description = "Firestore の削除保護"
   type        = bool
   default     = true
+}
+
+variable "firestore_backup_retention_days" {
+  description = "Firestore の日次バックアップの保持日数。0 ならスケジュールを作らない。プライバシーポリシーの消去期限と合わせる(docs/infra/firestore-backup.md)"
+  type        = number
+  default     = 14
+  validation {
+    condition     = var.firestore_backup_retention_days >= 0 && var.firestore_backup_retention_days <= 98
+    error_message = "0〜98 日(最大 14 週)。"
+  }
+}
+
+# ---- Firebase の API キー(apikeys.tf) ----
+
+variable "firebase_api_keys" {
+  description = "Firebase が作った API キーの制限。キーは作らず、key_id(Credentials の キー ID)で import して制限だけを持つ。空なら管理しない"
+  type = map(object({
+    key_id         = string
+    display_name   = string
+    ios_bundle_ids = optional(list(string), [])
+    api_targets    = list(string)
+  }))
+  default = {}
 }
 
 # ---- 退会アカウントの消去ジョブ(docs/infra/account-purge.md) ----
@@ -121,4 +153,61 @@ variable "budget_currency" {
   description = "予算の通貨(課金アカウントと同じ)"
   type        = string
   default     = "JPY"
+}
+
+# ---- 監視(docs/infra/observability.md・#295) ----
+
+variable "monitoring_enabled" {
+  description = "Uptime check・ログベースの指標・アラート・ダッシュボードを作るか。prod の import で差分 0 を確かめる間は false"
+  type        = bool
+  default     = true
+}
+
+variable "monitored_services" {
+  description = "監視する Cloud Run サービス(キーはサービス名)。host は run.app のホスト名、p95_latency_ms は p95 のアラートの閾値。空なら監視のリソースを作らない"
+  type = map(object({
+    host           = string
+    p95_latency_ms = number
+  }))
+  default = {}
+}
+
+variable "alert_emails" {
+  description = "アラートを送るメールアドレス(通知チャンネルを作る)。値は envs/<env>.tfvars にだけ書き、コミットしない"
+  type        = list(string)
+  default     = []
+}
+
+variable "alert_notification_channels" {
+  description = "既にある通知チャンネル(projects/<id>/notificationChannels/<n>)。Slack はコンソールで連携してからここに足す"
+  type        = list(string)
+  default     = []
+}
+
+variable "uptime_check_period" {
+  description = "Uptime check の間隔"
+  type        = string
+  default     = "300s"
+  validation {
+    condition     = contains(["60s", "300s", "600s", "900s"], var.uptime_check_period)
+    error_message = "uptime_check_period は 60s / 300s / 600s / 900s のどれか。"
+  }
+}
+
+variable "error_rate_threshold" {
+  description = "5xx 率のアラートの閾値(5 分の窓での 5xx / 全リクエスト)"
+  type        = number
+  default     = 0.05
+}
+
+variable "claude_failure_rate_threshold" {
+  description = "Claude の失敗率のアラートの閾値(10 分の窓での outcome=error / 全試行)"
+  type        = number
+  default     = 0.2
+}
+
+variable "claude_failure_min_count" {
+  description = "Claude の失敗率のアラートを出す最小の失敗数(10 分の窓)。少ない呼び出しでの誤報を防ぐ"
+  type        = number
+  default     = 3
 }

@@ -100,7 +100,8 @@ func New(s store.Store) *http.ServeMux {
 	mux.HandleFunc("POST /v1/apps/{appId}/release-requests", h.createReleaseRequest)
 	mux.HandleFunc("GET /v1/apps/{appId}/release-requests", h.listAppReleaseRequests)
 	mux.HandleFunc("GET /v1/release-requests", h.listMyReleaseRequests)
-	mux.HandleFunc("POST /v1/feedback", h.createFeedback) // #319: feedback.go
+	mux.HandleFunc("POST /v1/metrics/ai-button", h.postAIButtonMetrics) // #446: aibutton_metrics.go
+	mux.HandleFunc("POST /v1/feedback", h.createFeedback)               // #319: feedback.go
 	return mux
 }
 
