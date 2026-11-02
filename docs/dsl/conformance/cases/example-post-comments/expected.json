@@ -1,0 +1,240 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "push",
+                "screen" : "post_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 12
+          },
+          "id" : "posts",
+          "props" : {
+            "emptyText" : "まだ投稿がありません",
+            "entity" : "posts",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "tab:home"
+      },
+      "title" : "投稿",
+      "toolbar" : [
+        {
+          "action" : {
+            "presentation" : "sheet",
+            "screen" : "post_form",
+            "type" : "navigate"
+          },
+          "label" : "投稿"
+        }
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "posts",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "posted" : "2026-11-12T03:00:00Z"
+        }
+      },
+      "id" : "post_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : null,
+          "props" : {
+            "field" : "body",
+            "label" : "ひとこと",
+            "placeholder" : "今日のできごと",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "prefillRef" : "post",
+                "presentation" : "sheet",
+                "screen" : "comment_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 2
+          },
+          "id" : "write_comment",
+          "props" : {
+            "label" : "コメントを書く"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "post_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "posts",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "投稿",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "comments",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "push",
+                "screen" : "comment_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 12
+          },
+          "id" : "comments",
+          "props" : {
+            "emptyText" : "まだコメントがありません",
+            "entity" : "post_comments",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "comments",
+        "stack" : "tab:comments"
+      },
+      "title" : "コメント",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "post_comments",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "commented" : "2026-11-12T03:00:00Z"
+        }
+      },
+      "id" : "comment_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : null,
+          "props" : {
+            "field" : "post",
+            "input" : "ref",
+            "label" : "投稿",
+            "options" : [
+
+            ],
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "picker"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 2
+          },
+          "id" : null,
+          "props" : {
+            "field" : "text",
+            "label" : "コメント",
+            "placeholder" : "いいですね",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "comment_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "post_comments",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "コメント",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

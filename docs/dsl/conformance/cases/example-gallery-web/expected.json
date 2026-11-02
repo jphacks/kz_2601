@@ -1,0 +1,301 @@
+{
+  "screens" : [
+    {
+      "id" : "news",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 12
+          },
+          "id" : "site",
+          "props" : {
+            "title" : "JPHACKS",
+            "url" : "https://jphacks.com"
+          },
+          "state" : "rendered",
+          "type" : "webView"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "news",
+        "stack" : "tab:news"
+      },
+      "title" : "ニュース",
+      "toolbar" : [
+        {
+          "action" : {
+            "presentation" : "sheet",
+            "screen" : "clip_form",
+            "type" : "navigate"
+          },
+          "label" : "クリップ"
+        }
+      ]
+    },
+    {
+      "id" : "share",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 1
+          },
+          "id" : "lead",
+          "props" : {
+            "text" : "送り先を選んで共有"
+          },
+          "state" : "rendered",
+          "type" : "text"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 1,
+            "rowSpan" : 2
+          },
+          "id" : "to_line",
+          "props" : {
+            "label" : "LINE で送る",
+            "text" : "JPHACKS 2026 の公式サイト https://jphacks.com"
+          },
+          "state" : "rendered",
+          "type" : "shareButton"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 3,
+            "row" : 3,
+            "rowSpan" : 2
+          },
+          "id" : "to_slack",
+          "props" : {
+            "label" : "Slack へ",
+            "text" : "**今日の記事** https://jphacks.com"
+          },
+          "state" : "rendered",
+          "type" : "shareButton"
+        },
+        {
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 3,
+            "rowSpan" : 2
+          },
+          "id" : "to_discord",
+          "props" : {
+            "label" : "Discord へ",
+            "text" : "**今日の記事** https://jphacks.com"
+          },
+          "state" : "rendered",
+          "type" : "shareButton"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 5,
+            "rowSpan" : 2
+          },
+          "id" : "to_any",
+          "props" : {
+            "label" : "ほかのアプリで共有",
+            "text" : "JPHACKS 2026 https://jphacks.com"
+          },
+          "state" : "rendered",
+          "type" : "shareButton"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 7,
+            "rowSpan" : 1
+          },
+          "id" : "sep",
+          "state" : "rendered",
+          "type" : "divider"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 3,
+            "row" : 8,
+            "rowSpan" : 2
+          },
+          "id" : "maps",
+          "props" : {
+            "label" : "会場を地図で開く",
+            "url" : "maps:?q=Kanazawa%20Station"
+          },
+          "state" : "rendered",
+          "type" : "openUrlButton"
+        },
+        {
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 8,
+            "rowSpan" : 2
+          },
+          "id" : "call",
+          "props" : {
+            "label" : "電話する",
+            "url" : "tel:0761234567"
+          },
+          "state" : "rendered",
+          "type" : "openUrlButton"
+        },
+        {
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "open_line",
+          "props" : {
+            "label" : "LINE を開く",
+            "url" : "line://nv/chat"
+          },
+          "state" : "rendered",
+          "type" : "openUrlButton"
+        },
+        {
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 12,
+            "rowSpan" : 2
+          },
+          "id" : "mail",
+          "props" : {
+            "label" : "メールで問い合わせ",
+            "url" : "mailto:info@example.com?subject=JPHACKS"
+          },
+          "state" : "rendered",
+          "type" : "openUrlButton"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "share",
+        "stack" : "tab:share"
+      },
+      "title" : "友達に送る",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "clip",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+
+        }
+      },
+      "id" : "clip_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "title",
+          "props" : {
+            "field" : "title",
+            "label" : "見出し",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 2
+          },
+          "id" : "url",
+          "props" : {
+            "field" : "url",
+            "label" : "URL",
+            "placeholder" : "https://",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        },
+        {
+          "band" : 2,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 4
+          },
+          "id" : "comment",
+          "props" : {
+            "field" : "comment",
+            "label" : null,
+            "placeholder" : "ひとこと",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textEditor"
+        },
+        {
+          "band" : 3,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 8,
+            "rowSpan" : 2
+          },
+          "id" : "clip_line",
+          "props" : {
+            "field" : "comment",
+            "label" : "この記事を LINE で送る",
+            "text" : "{{title}}\n{{url}}"
+          },
+          "state" : "rendered",
+          "type" : "shareButton"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "clip_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "clip",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "クリップ",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

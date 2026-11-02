@@ -1,0 +1,490 @@
+{
+  "screens" : [
+    {
+      "id" : "containers",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 4
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "text" : "角丸 + 影の1枚カード。見出しと集計をまとめる"
+              },
+              "state" : "rendered",
+              "type" : "text"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "aggregate" : "count",
+                "entity" : "memo",
+                "label" : "メモ件数",
+                "unavailable" : false,
+                "value" : "0 件"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            }
+          ],
+          "id" : "hero",
+          "props" : {
+            "title" : "card"
+          },
+          "state" : "rendered",
+          "type" : "card"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 2
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "aggregate" : "count",
+                "entity" : "memo",
+                "label" : "今日",
+                "unavailable" : false,
+                "value" : "0 件"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "aggregate" : "count",
+                "entity" : "memo",
+                "label" : "今月",
+                "unavailable" : false,
+                "value" : "0 件"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "aggregate" : "count",
+                "entity" : "memo",
+                "label" : "ぜんぶ",
+                "unavailable" : false,
+                "value" : "0 件"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            }
+          ],
+          "id" : "tiles",
+          "props" : {
+            "columns" : 3
+          },
+          "state" : "rendered",
+          "type" : "grid"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 6,
+            "rowSpan" : 2
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "text" : "1. 横スクロール"
+              },
+              "state" : "rendered",
+              "type" : "text"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "text" : "2. itemWidth で幅を変える"
+              },
+              "state" : "rendered",
+              "type" : "text"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "text" : "3. 子は Leaf だけ"
+              },
+              "state" : "rendered",
+              "type" : "text"
+            },
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "sheet",
+                    "screen" : "memo_form",
+                    "type" : "navigate"
+                  },
+                  "on" : "tap"
+                }
+              ],
+              "id" : null,
+              "props" : {
+                "label" : "メモを追加"
+              },
+              "state" : "rendered",
+              "type" : "button"
+            }
+          ],
+          "id" : "tips",
+          "state" : "rendered",
+          "type" : "carousel"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 8,
+            "rowSpan" : 2
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "text" : "開くと詳細が出る。注意書きや補足に"
+              },
+              "state" : "rendered",
+              "type" : "text"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "label" : "JPHACKS 公式",
+                "url" : "https://jphacks.com"
+              },
+              "state" : "rendered",
+              "type" : "openUrlButton"
+            }
+          ],
+          "id" : "more",
+          "props" : {
+            "expanded" : false,
+            "title" : "disclosure(たたむ)"
+          },
+          "state" : "rendered",
+          "type" : "disclosure"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "containers",
+        "stack" : "tab:containers"
+      },
+      "title" : "構造コンテナ",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "native",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 1
+          },
+          "id" : "search",
+          "props" : {
+            "field" : "search",
+            "placeholder" : "メモを検索",
+            "query" : ""
+          },
+          "state" : "rendered",
+          "type" : "searchBar"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "memo_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 1,
+            "rowSpan" : 3
+          },
+          "id" : "memos",
+          "props" : {
+            "emptyText" : "メモがありません",
+            "entity" : "memo",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "memo_form",
+                "type" : "navigate"
+              },
+              "on" : "dateTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 7
+          },
+          "id" : "cal",
+          "props" : {
+            "entity" : "memo",
+            "title" : "カレンダー"
+          },
+          "state" : "rendered",
+          "type" : "calendar"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "memo_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 11,
+            "rowSpan" : 5
+          },
+          "id" : "map",
+          "props" : {
+            "entity" : "memo"
+          },
+          "state" : "rendered",
+          "type" : "mapView"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 16,
+            "rowSpan" : 3
+          },
+          "id" : "watch",
+          "props" : {
+            "label" : "ストップウォッチ",
+            "mode" : "stopwatch"
+          },
+          "state" : "rendered",
+          "type" : "timerDisplay"
+        },
+        {
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 19,
+            "rowSpan" : 2
+          },
+          "id" : "share",
+          "props" : {
+            "label" : "共有",
+            "text" : "Tailor It で作ったアプリを見て！"
+          },
+          "state" : "rendered",
+          "type" : "shareButton"
+        },
+        {
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 21,
+            "rowSpan" : 2
+          },
+          "id" : "site",
+          "props" : {
+            "label" : "公式サイト",
+            "url" : "https://jphacks.com"
+          },
+          "state" : "rendered",
+          "type" : "openUrlButton"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "native",
+        "stack" : "tab:native"
+      },
+      "title" : "ナビ・ネイティブ",
+      "toolbar" : [
+        {
+          "action" : {
+            "presentation" : "sheet",
+            "screen" : "memo_form",
+            "type" : "navigate"
+          },
+          "label" : "追加"
+        }
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "memo",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "date" : "2026-11-12T03:00:00Z"
+        }
+      },
+      "id" : "memo_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "note",
+          "props" : {
+            "field" : "note",
+            "label" : "ひとこと",
+            "placeholder" : "きれいな紅葉",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 2
+          },
+          "id" : "date",
+          "props" : {
+            "field" : "date",
+            "label" : "日時",
+            "value" : "2026-11-12T03:00:00Z"
+          },
+          "state" : "rendered",
+          "type" : "datePicker"
+        },
+        {
+          "band" : 2,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 2
+          },
+          "id" : "here",
+          "props" : {
+            "field" : "place",
+            "label" : "現在地を記録",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "locationButton"
+        },
+        {
+          "band" : 3,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 6,
+            "rowSpan" : 2
+          },
+          "id" : "qr",
+          "props" : {
+            "field" : "code",
+            "label" : "QRを読み取る",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "qrScanner"
+        },
+        {
+          "band" : 4,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 8,
+            "rowSpan" : 4
+          },
+          "id" : "timer",
+          "props" : {
+            "field" : "elapsed",
+            "label" : "1分タイマー",
+            "mode" : "countdown",
+            "seconds" : 60
+          },
+          "state" : "rendered",
+          "type" : "timerDisplay"
+        },
+        {
+          "band" : 5,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 12,
+            "rowSpan" : 2
+          },
+          "id" : "share_memo",
+          "props" : {
+            "field" : "photo",
+            "label" : "このメモを共有",
+            "text" : "メモ: {{note}}"
+          },
+          "state" : "rendered",
+          "type" : "shareButton"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "memo_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "memo",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "メモ",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

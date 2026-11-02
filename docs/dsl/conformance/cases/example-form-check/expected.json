@@ -1,0 +1,223 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 3,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "avg_knee",
+          "props" : {
+            "aggregate" : "avg",
+            "entity" : "check",
+            "field" : "knee_angle",
+            "label" : "膝の角度(平均)",
+            "unavailable" : false,
+            "value" : "0 度"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "count",
+          "props" : {
+            "aggregate" : "count",
+            "entity" : "check",
+            "label" : "記録",
+            "unavailable" : false,
+            "value" : "0 件"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "check_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 8
+          },
+          "id" : "checks",
+          "props" : {
+            "emptyText" : "写真を撮ってフォームを記録しましょう",
+            "entity" : "check",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "check_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "フォームを撮る"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "フォームチェック",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "check",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "date" : "2026-11-12",
+          "exercise" : "スクワット"
+        }
+      },
+      "id" : "check_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 6
+          },
+          "id" : "shot",
+          "props" : {
+            "field" : "photo",
+            "label" : "横から全身を撮る",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "photoField"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 6,
+            "rowSpan" : 4
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "exercise",
+                "label" : "種目",
+                "options" : [
+                  "スクワット",
+                  "腕立て伏せ",
+                  "ランジ"
+                ],
+                "style" : "segmented",
+                "value" : "スクワット"
+              },
+              "state" : "rendered",
+              "type" : "picker"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "knee_angle",
+                "label" : "膝の角度",
+                "unit" : "度",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "numberField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "hip_angle",
+                "label" : "腰の角度",
+                "unit" : "度",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "numberField"
+            }
+          ],
+          "id" : "values",
+          "props" : {
+            "title" : "測った角度"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 2,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "check_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "check",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "フォーム",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

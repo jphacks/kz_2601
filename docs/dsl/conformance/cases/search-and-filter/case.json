@@ -1,0 +1,160 @@
+{
+  "dsl": {
+    "schemaVersion": 1,
+    "app": {
+      "name": "検索"
+    },
+    "initialScreen": "home",
+    "entities": [
+      {
+        "id": "shop",
+        "name": "店",
+        "titleField": "name",
+        "fields": [
+          {
+            "id": "name",
+            "name": "名前",
+            "type": "string"
+          },
+          {
+            "id": "area",
+            "name": "地域",
+            "type": "enum",
+            "options": [
+              "金沢",
+              "富山"
+            ]
+          },
+          {
+            "id": "visited",
+            "name": "行った日",
+            "type": "date"
+          },
+          {
+            "id": "price",
+            "name": "予算",
+            "type": "currency",
+            "unit": "円"
+          }
+        ]
+      }
+    ],
+    "screens": [
+      {
+        "id": "home",
+        "title": "店",
+        "components": [
+          {
+            "type": "searchBar",
+            "id": "q",
+            "area": "A1:F1",
+            "field": "q",
+            "placeholder": "店の名前"
+          },
+          {
+            "type": "list",
+            "id": "shops",
+            "area": "A2:F6",
+            "entity": "shop",
+            "searchField": "q",
+            "item": {
+              "title": "name",
+              "subtitle": "area",
+              "trailing": "price"
+            },
+            "sort": {
+              "field": "price",
+              "direction": "asc"
+            }
+          },
+          {
+            "type": "stat",
+            "id": "kanazawa",
+            "area": "A7:C8",
+            "label": "金沢の平均予算",
+            "entity": "shop",
+            "aggregate": "avg",
+            "field": "price",
+            "filter": {
+              "field": "area",
+              "op": "eq",
+              "value": "金沢"
+            }
+          },
+          {
+            "type": "stat",
+            "id": "this_week",
+            "area": "D7:F8",
+            "label": "今週行った",
+            "entity": "shop",
+            "aggregate": "count",
+            "filter": {
+              "field": "visited",
+              "op": "thisWeek"
+            }
+          },
+          {
+            "type": "timeline",
+            "id": "tl",
+            "area": "A9:F12",
+            "entity": "shop",
+            "dateField": "visited",
+            "titleField": "name",
+            "subtitleField": "area",
+            "limit": 2
+          }
+        ]
+      }
+    ]
+  },
+  "records": {
+    "shop": [
+      {
+        "id": "s1",
+        "data": {
+          "name": "金沢カレー",
+          "area": "金沢",
+          "visited": "2026-11-11",
+          "price": 900
+        }
+      },
+      {
+        "id": "s2",
+        "data": {
+          "name": "富山ブラック",
+          "area": "富山",
+          "visited": "2026-11-01",
+          "price": 1000
+        }
+      },
+      {
+        "id": "s3",
+        "data": {
+          "name": "金沢おでん",
+          "area": "金沢",
+          "visited": "2026-11-10",
+          "price": 2500
+        }
+      }
+    ]
+  },
+  "device": {
+    "now": "2026-11-12T12:00:00+09:00",
+    "timeZone": "Asia/Tokyo",
+    "locale": "ja_JP"
+  },
+  "operations": [
+    {
+      "search": {
+        "field": "q",
+        "text": "金沢"
+      }
+    },
+    {
+      "search": {
+        "field": "q",
+        "text": "ブラック"
+      }
+    }
+  ]
+}

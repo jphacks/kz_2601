@@ -1,0 +1,134 @@
+{
+  "screens" : [
+    {
+      "form" : {
+        "entity" : "memo",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+
+        }
+      },
+      "id" : "form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 1
+          },
+          "id" : "t",
+          "props" : {
+            "field" : "title",
+            "label" : "題",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 1,
+            "rowSpan" : 3
+          },
+          "id" : "v",
+          "props" : {
+            "field" : "clip",
+            "label" : "動画を撮る",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "videoField"
+        },
+        {
+          "band" : 2,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 2
+          },
+          "id" : "a",
+          "props" : {
+            "field" : "voice",
+            "label" : "録音",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "audioRecorder"
+        },
+        {
+          "band" : 3,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 6,
+            "rowSpan" : 3
+          },
+          "id" : "qr",
+          "props" : {
+            "label" : "QR",
+            "text" : "https://example.com"
+          },
+          "state" : "rendered",
+          "type" : "qrCode"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "form",
+        "stack" : "main"
+      },
+      "title" : "メモ",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "player",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 6
+          },
+          "id" : "vp",
+          "props" : {
+            "url" : "https://example.com/a.mp4"
+          },
+          "state" : "rendered",
+          "type" : "videoPlayer"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 6,
+            "rowSpan" : 1
+          },
+          "id" : "outside",
+          "state" : "needsForm",
+          "type" : "textField"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "player",
+        "stack" : "main"
+      },
+      "title" : "再生",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}
