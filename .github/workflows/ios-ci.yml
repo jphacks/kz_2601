@@ -45,7 +45,8 @@ on:
 
 concurrency:
   group: ios-ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # develop / main への push は取り消さない(最後まで通った実行を残す)。待ちは GitHub が最新の 1 本だけにまとめる
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
