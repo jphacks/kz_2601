@@ -157,7 +157,7 @@ final class LogicV2Tests: XCTestCase {
 
     func testShoppingExampleDecodesToggle() throws {
         let dsl = try ExamplesFixture.load("shopping")
-        let lists = dsl.screen("home")?.components.flatMap { $0.children ?? [] }.filter { $0.type == .list } ?? []
+        let lists = dsl.screen("home")?.components.flatMap { $0.children }.filter { $0.type == .list } ?? []
         XCTAssertEqual(lists.count, 2)
         XCTAssertEqual(lists.map { $0.item?.toggle }, ["done", "done"])
         XCTAssertEqual(dsl.entity("groceries")?.field("done")?.type, .boolean)
