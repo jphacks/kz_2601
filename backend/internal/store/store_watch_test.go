@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -181,5 +182,84 @@ func TestStoreWatchRecords(t *testing.T) {
 
 		cancel()
 		waitClosed(t, ch)
+	})
+}
+
+// WatchRecords only sees the watchRecordsWindow most recently updated records:
+// a mark or a delete on an older record is not signalled, an update brings the
+// record back into the window (#553: an intentional limit, same in both stores).
+func TestStoreWatchRecordsWindow(t *testing.T) {
+	bothStores(t, func(t *testing.T, s Store, sfx string) {
+		w := watcherOf(t, s)
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		rs := PublicRecords("WATCHWIN"+sfx, "post")
+		uid := "ww-user" + sfx
+		// "a-old" sorts below "r..." on an updatedAt tie, so it is the oldest either way
+		ids := []string{"a-old"}
+		for i := range watchRecordsWindow + 1 {
+			ids = append(ids, fmt.Sprintf("r%03d", i))
+		}
+		for _, id := range ids {
+			if _, _, err := s.CreateRecord(ctx, rs, Record{ID: id, Entity: rs.Entity, Data: map[string]any{}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		ch, err := w.WatchRecords(ctx, rs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		quiet := func(what string) {
+			t.Helper()
+			select {
+			case _, ok := <-ch:
+				t.Fatalf("%s: unexpected signal (open=%v)", what, ok)
+			case <-time.After(watchQuiet):
+			}
+		}
+		signal := func(what string) {
+			t.Helper()
+			select {
+			case _, ok := <-ch:
+				if !ok {
+					t.Fatalf("%s: closed", what)
+				}
+			case <-time.After(watchWait):
+				t.Fatalf("%s: no signal within %s", what, watchWait)
+			}
+			select {
+			case <-ch:
+			case <-time.After(watchQuiet):
+			}
+		}
+		step := func(name string, err error) {
+			t.Helper()
+			if err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+		}
+
+		quiet("the initial state is not a change")
+		_, err = s.SetMark(ctx, rs, "a-old", "like", uid, true)
+		step("mark outside the window", err)
+		quiet("mark outside the window")
+		step("delete outside the window", s.DeleteRecord(ctx, rs, "a-old"))
+		quiet("delete outside the window")
+
+		_, err = s.SetMark(ctx, rs, "r100", "like", uid, true)
+		step("mark inside the window", err)
+		signal("mark inside the window")
+
+		// r000 is now the oldest of 101: outside until an update brings it back
+		_, err = s.SetMark(ctx, rs, "r000", "like", uid, true)
+		step("mark on the oldest", err)
+		quiet("mark on the oldest")
+		_, err = s.UpdateRecord(ctx, rs, "r000", map[string]any{"v": 1})
+		step("update the oldest", err)
+		signal("update the oldest")
+		_, err = s.SetMark(ctx, rs, "r000", "like", uid, false)
+		step("mark after the update", err)
+		signal("mark after the update")
 	})
 }

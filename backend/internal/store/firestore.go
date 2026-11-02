@@ -599,24 +599,29 @@ func (f *Firestore) DeleteRecord(ctx context.Context, rs RecordSet, id string) e
 	return err
 }
 
-// DeleteAllRecords implements Store.
+// deleteAllChunk bounds the deletes sent in one BulkWriter run (Firestore
+// allows 500 writes per batch; BulkWriter splits them further).
+const deleteAllChunk = 500
+
+// DeleteAllRecords implements Store. Each record goes with its marks/**
+// subcollections (Firestore keeps them when the record is deleted, #553).
+// DocumentRefs also lists records a failed run already deleted while their
+// marks remain, so a retry finishes the rest.
 func (f *Firestore) DeleteAllRecords(ctx context.Context, rs RecordSet) error {
-	col := f.recordsCol(rs)
-	for {
-		it := col.Limit(200).Documents(ctx)
-		docs, err := it.GetAll()
-		if err != nil {
+	var refs []*firestore.DocumentRef
+	err := eachRef(f.recordsCol(rs).DocumentRefs(ctx), func(rec *firestore.DocumentRef) error {
+		var err error
+		if refs, err = collectTree(ctx, rec, refs, map[string]int{}); err != nil {
 			return err
 		}
-		if len(docs) == 0 {
-			return nil
+		if len(refs) >= deleteAllChunk {
+			err = f.bulkDelete(ctx, refs)
+			refs = refs[:0]
 		}
-		bw := f.c.BulkWriter(ctx)
-		for _, d := range docs {
-			if _, err := bw.Delete(d.Ref); err != nil {
-				return err
-			}
-		}
-		bw.End()
+		return err
+	})
+	if err != nil {
+		return err
 	}
+	return f.bulkDelete(ctx, refs)
 }

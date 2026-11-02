@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"cloud.google.com/go/firestore"
 )
 
 func TestStoreMarks(t *testing.T) {
@@ -119,6 +121,58 @@ func TestStoreMarkedByManyRecords(t *testing.T) {
 		for _, id := range liked {
 			if !got[id]["like"] || got[id]["save"] {
 				t.Errorf("%s: %v", id, got[id])
+			}
+		}
+	})
+}
+
+// DeleteAllRecords takes every record's marks with it: the same id starts over (#553).
+func TestStoreDeleteAllRecordsDropsMarks(t *testing.T) {
+	bothStores(t, func(t *testing.T, s Store, sfx string) {
+		ctx := context.Background()
+		rs := PrivateRecords("mk-all"+sfx, "MARKSALL"+sfx, "post")
+		uid := "mk-all-liker" + sfx
+		if _, _, err := s.EnsureApp(ctx, rs.UID, rs.AppID, []byte(`{}`), "x"); err != nil {
+			t.Fatal(err)
+		}
+		ids := []string{"r1", "r2", "r3"}
+		for _, id := range ids {
+			if _, _, err := s.CreateRecord(ctx, rs, Record{ID: id, Entity: rs.Entity, Data: map[string]any{}}); err != nil {
+				t.Fatal(err)
+			}
+			for _, mark := range []string{"like", "save"} {
+				if _, err := s.SetMark(ctx, rs, id, mark, uid, true); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+
+		if err := s.DeleteAllRecords(ctx, rs); err != nil {
+			t.Fatal(err)
+		}
+		if recs, err := s.ListRecords(ctx, rs, 0); err != nil || len(recs) != 0 {
+			t.Fatalf("records after delete all: %v %v", recs, err)
+		}
+		for _, id := range ids {
+			if _, _, err := s.CreateRecord(ctx, rs, Record{ID: id, Entity: rs.Entity, Data: map[string]any{}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got, err := s.MarkedBy(ctx, rs, ids, []string{"like", "save"}, uid); err != nil || len(got) != 0 {
+			t.Fatalf("marks after re-create: %v %v", got, err)
+		}
+		if got, err := s.SetMark(ctx, rs, "r1", "like", uid, true); err != nil || got != (MarkState{Count: 1, Mine: true}) {
+			t.Fatalf("like after re-create: %+v %v", got, err)
+		}
+		if f, ok := s.(*Firestore); ok { // nothing left under the old records but the new like
+			n := 0
+			err := eachRef(f.recordsCol(rs).DocumentRefs(ctx), func(rec *firestore.DocumentRef) error {
+				return eachRef(rec.Collection("marks").DocumentRefs(ctx), func(m *firestore.DocumentRef) error {
+					return eachRef(m.Collection("by").DocumentRefs(ctx), func(*firestore.DocumentRef) error { n++; return nil })
+				})
+			})
+			if err != nil || n != 1 {
+				t.Fatalf("mark docs left: %d %v", n, err)
 			}
 		}
 	})

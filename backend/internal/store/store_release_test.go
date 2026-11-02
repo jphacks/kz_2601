@@ -4,10 +4,30 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/firestore"
 )
+
+// tickMemoryClock gives Memory a clock that moves on every read: the macOS
+// wall clock has microsecond resolution, so back-to-back creates could share
+// createdAt and "newest first" would fall back to the random id order.
+func tickMemoryClock(s Store) {
+	m, ok := s.(*Memory)
+	if !ok {
+		return
+	}
+	var mu sync.Mutex
+	last := time.Now()
+	m.now = func() time.Time {
+		mu.Lock()
+		defer mu.Unlock()
+		last = last.Add(time.Millisecond)
+		return last
+	}
+}
 
 // setReleaseStatus stands in for the admin editing status in the console.
 func setReleaseStatus(t *testing.T, s Store, id, status string) {
@@ -29,6 +49,7 @@ func setReleaseStatus(t *testing.T, s Store, id, status string) {
 func TestStoreReleaseRequests(t *testing.T) {
 	bothStores(t, func(t *testing.T, s Store, sfx string) {
 		ctx := context.Background()
+		tickMemoryClock(s)
 		owner, other := "rel-owner"+sfx, "rel-other"+sfx
 		a1, a2 := "REL1"+sfx, "REL2"+sfx
 		dsl := json.RawMessage(`{"initialScreen":"home"}`)
@@ -102,6 +123,7 @@ func TestStoreReleaseRequests(t *testing.T) {
 func TestStoreReleaseRequestsNewestWithinBound(t *testing.T) {
 	bothStores(t, func(t *testing.T, s Store, sfx string) {
 		ctx := context.Background()
+		tickMemoryClock(s)
 		owner := "rel-many" + sfx
 		var oldest, newest string
 		for i := range MaxReleaseRequestsPerUser + 1 {
