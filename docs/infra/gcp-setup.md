@@ -598,29 +598,20 @@ jobs:
 
 ## 7. Step 5 ローカル開発
 
-### 5-1. Firestore / Auth エミュレータ
+### 5-1. Firestore エミュレータ
 
-Java 11+ が必要(手元は OpenJDK 26 で OK)。Firestore エミュレータの既定ポート 8080 は appconfig と衝突するので **8089** に変える。
+CI(`backend-emulator`)と同じ gcloud SDK の `cloud-firestore-emulator` を使う。firebase-tools と `firebase.json` は要らない。Java 11+ が必要(手元は OpenJDK 26 で OK)。既定ポート 8080 は appconfig と衝突するので **8089** で起動する。
 
-**☐ あなたがやる**: リポジトリ直下に `firebase.json` を作る(コミットして良い)
+**☐ あなたがやる**: `gcloud components install cloud-firestore-emulator`
 
-```json
-{
-  "emulators": {
-    "firestore": { "port": 8089 },
-    "auth": { "port": 9099 },
-    "ui": { "enabled": true, "port": 4000 },
-    "singleProjectMode": true
-  }
-}
-```
-
-**▶ 実行**(`demo-` で始まるプロジェクト ID はエミュレータ専用。実プロジェクトに絶対触らない)
+**▶ 実行**(プロジェクトは `demo-kz2601` 固定。`demo-` で始まるプロジェクト ID はエミュレータ専用で実プロジェクトに繋がらない)
 
 ```sh
-firebase emulators:start --only firestore,auth --project demo-kz2601
-# UI: http://localhost:4000
+make -C backend emulator         # 127.0.0.1:8089。表示される FIRESTORE_EMULATOR_HOST を export する
+make -C backend test-emulator    # エミュレータ試験(CI と同じ判定)
 ```
+
+Auth エミュレータは起動しない。`FIREBASE_AUTH_EMULATOR_HOST` は `AUTH_MODE=dev` で `X-Debug-Uid` を許す目印として使うだけ(接続はしない)。
 
 ### 5-2. ADC(実 GCP の Firestore / Secret をローカルから叩くとき)
 

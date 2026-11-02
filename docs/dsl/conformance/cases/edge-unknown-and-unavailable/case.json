@@ -1,0 +1,61 @@
+{
+  "dsl": {
+    "schemaVersion": 1,
+    "app": {
+      "name": "未対応"
+    },
+    "initialScreen": "home",
+    "entities": [],
+    "screens": [
+      {
+        "id": "home",
+        "title": "未対応",
+        "components": [
+          {
+            "type": "hologram",
+            "id": "future",
+            "area": "A1:F2",
+            "text": "新しい部品"
+          },
+          {
+            "type": "mapView",
+            "id": "map",
+            "area": "A3:F6",
+            "zoom": "city"
+          },
+          {
+            "type": "text",
+            "id": "after",
+            "area": "A7:F7",
+            "text": "後ろの部品は描く"
+          },
+          {
+            "type": "vstack",
+            "id": "box",
+            "children": [
+              {
+                "type": "hologram",
+                "id": "inner"
+              },
+              {
+                "type": "text",
+                "id": "inner_text",
+                "text": "中"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "device": {
+    "now": "2026-11-12T12:00:00+09:00",
+    "timeZone": "Asia/Tokyo",
+    "locale": "ja_JP",
+    "capabilities": {
+      "missingComponents": [
+        "mapView"
+      ]
+    }
+  }
+}

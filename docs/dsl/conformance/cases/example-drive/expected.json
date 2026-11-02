@@ -1,0 +1,186 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 7
+          },
+          "id" : "guide",
+          "props" : {
+            "entity" : "spot",
+            "mode" : "automobile",
+            "title" : "目的地まで案内"
+          },
+          "state" : "rendered",
+          "type" : "routeGuide"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 7,
+            "rowSpan" : 3
+          },
+          "children" : [
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "push",
+                    "screen" : "spot_form",
+                    "type" : "navigate"
+                  },
+                  "on" : "rowTap"
+                }
+              ],
+              "id" : null,
+              "props" : {
+                "emptyText" : "行き先を追加してください",
+                "entity" : "spot",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "spots",
+          "props" : {
+            "title" : "行き先"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "spot_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "行き先を追加"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "ドライブ",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "spot",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+
+        }
+      },
+      "id" : "spot_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "name_in",
+          "props" : {
+            "field" : "name",
+            "label" : "名前",
+            "placeholder" : "海の見える公園",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 3
+          },
+          "id" : "place_in",
+          "props" : {
+            "field" : "place",
+            "label" : "場所を検索",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "locationPicker"
+        },
+        {
+          "band" : 2,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 5,
+            "rowSpan" : 5
+          },
+          "id" : "guide_here",
+          "state" : "rendered",
+          "type" : "routeGuide"
+        },
+        {
+          "band" : 3,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "spot_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "spot",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "行き先",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

@@ -1,0 +1,342 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "avg_stars",
+          "props" : {
+            "aggregate" : "avg",
+            "entity" : "checkin",
+            "field" : "stars",
+            "label" : "平均満足度",
+            "unavailable" : false,
+            "value" : "0"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "push",
+                "screen" : "checkin_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 8
+          },
+          "id" : "recent",
+          "props" : {
+            "emptyText" : "まだ記録がありません",
+            "entity" : "checkin",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "checkin_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "今日の記録をつける"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "入力部品ギャラリー",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "checkin",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "color" : "#5E35B1",
+          "cups" : 1,
+          "date" : "2026-11-12",
+          "energy" : 5,
+          "mood" : "ふつう",
+          "remind_at" : "2026-11-12T03:00:00Z",
+          "wake_time" : "07:00"
+        }
+      },
+      "id" : "checkin_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "mood",
+          "props" : {
+            "field" : "mood",
+            "label" : "気分",
+            "options" : [
+              "最高",
+              "ふつう",
+              "しんどい"
+            ],
+            "style" : "segmented",
+            "value" : "ふつう"
+          },
+          "state" : "rendered",
+          "type" : "picker"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 2
+          },
+          "id" : "energy",
+          "props" : {
+            "field" : "energy",
+            "label" : "元気度",
+            "max" : 10,
+            "min" : 0,
+            "step" : 1,
+            "value" : 5
+          },
+          "state" : "rendered",
+          "type" : "slider"
+        },
+        {
+          "band" : 2,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 1
+          },
+          "id" : "cups",
+          "props" : {
+            "field" : "cups",
+            "label" : "コーヒー(杯)",
+            "max" : 10,
+            "min" : 0,
+            "value" : 1
+          },
+          "state" : "rendered",
+          "type" : "stepper"
+        },
+        {
+          "band" : 3,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 5,
+            "rowSpan" : 1
+          },
+          "id" : "weight",
+          "props" : {
+            "field" : "weight",
+            "label" : "体重(kg)",
+            "max" : 150,
+            "min" : 30,
+            "step" : 0.1,
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "stepper"
+        },
+        {
+          "band" : 4,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 6,
+            "rowSpan" : 2
+          },
+          "id" : "stars",
+          "props" : {
+            "field" : "stars",
+            "label" : "満足度",
+            "max" : 5,
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "rating"
+        },
+        {
+          "band" : 5,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 3,
+            "row" : 8,
+            "rowSpan" : 2
+          },
+          "id" : "wake_time",
+          "props" : {
+            "field" : "wake_time",
+            "label" : "起床",
+            "value" : "07:00"
+          },
+          "state" : "rendered",
+          "type" : "timePicker"
+        },
+        {
+          "band" : 5,
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 8,
+            "rowSpan" : 2
+          },
+          "id" : "remind_at",
+          "props" : {
+            "field" : "remind_at",
+            "label" : "通知",
+            "value" : "2026-11-12T03:00:00Z"
+          },
+          "state" : "rendered",
+          "type" : "timePicker"
+        },
+        {
+          "band" : 6,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 1
+          },
+          "id" : "color",
+          "props" : {
+            "field" : "color",
+            "label" : "テーマ色",
+            "value" : "#5E35B1"
+          },
+          "state" : "rendered",
+          "type" : "colorPicker"
+        },
+        {
+          "band" : 7,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 11,
+            "rowSpan" : 1
+          },
+          "id" : "pin",
+          "props" : {
+            "field" : "pin",
+            "label" : "ロック番号",
+            "placeholder" : "4桁",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "secureField"
+        },
+        {
+          "band" : 8,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 12,
+            "rowSpan" : 4
+          },
+          "id" : "note",
+          "props" : {
+            "field" : "note",
+            "label" : null,
+            "placeholder" : "今日あったことを自由に",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textEditor"
+        },
+        {
+          "band" : 9,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 16,
+            "rowSpan" : 1
+          },
+          "id" : "date",
+          "props" : {
+            "field" : "date",
+            "label" : "日付",
+            "value" : "2026-11-12"
+          },
+          "state" : "rendered",
+          "type" : "datePicker"
+        },
+        {
+          "band" : 10,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 17,
+            "rowSpan" : 1
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "checkin_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "checkin",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "今日の記録",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

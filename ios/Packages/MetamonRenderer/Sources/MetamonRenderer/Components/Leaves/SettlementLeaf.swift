@@ -9,14 +9,8 @@ struct SettlementLeaf: View {
 
     var body: some View {
         let entityId = c.entity ?? ""
-        let entity = rt.dsl.entity(entityId)
-        let nameField = c.nameField ?? entity?.displayTitleField ?? "name"
         let records = rt.viewRecords(for: entityId)
-        let balances: [(name: String, balance: Double)] = records.compactMap { r in
-            guard let b = r[c.balanceField ?? "balance"].doubleValue else { return nil }
-            return (rt.display(r[nameField], field: entity?.field(nameField)), b)
-        }
-        let transfers = Settlement.transfers(balances)
+        let transfers = Self.transfers(c, rt: rt)
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: RenderTheme.Spacing.sm) {
                 Image(systemName: "arrow.left.arrow.right.circle.fill").foregroundStyle(.tint).accessibilityHidden(true)
@@ -45,6 +39,19 @@ struct SettlementLeaf: View {
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .renderCard(padding: 0)
+    }
+
+    /// 精算の送金(誰が誰にいくら)。適合テストの描画の木(`RenderTree`)も同じ値を使う。
+    @MainActor
+    static func transfers(_ c: Component, rt: any DSLRuntime) -> [Settlement.Transfer] {
+        let entityId = c.entity ?? ""
+        let entity = rt.dsl.entity(entityId)
+        let nameField = c.nameField ?? entity?.displayTitleField ?? "name"
+        let balances: [(name: String, balance: Double)] = rt.viewRecords(for: entityId).compactMap { r in
+            guard let b = r[c.balanceField ?? "balance"].doubleValue else { return nil }
+            return (rt.display(r[nameField], field: entity?.field(nameField)), b)
+        }
+        return Settlement.transfers(balances)
     }
 }
 

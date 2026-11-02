@@ -21,11 +21,20 @@ import (
 type countingStore struct {
 	inner ratelimit.Store
 	n     atomic.Int32
+
+	refunds     atomic.Int32
+	refundUnits atomic.Int32
 }
 
 func (s *countingStore) Consume(ctx context.Context, c []ratelimit.Counter, w int, exp time.Time) (ratelimit.Usage, error) {
 	s.n.Add(1)
 	return s.inner.Consume(ctx, c, w, exp)
+}
+
+func (s *countingStore) Refund(ctx context.Context, c []ratelimit.Counter, w int, exp time.Time) error {
+	s.refunds.Add(1)
+	s.refundUnits.Add(int32(w))
+	return s.inner.Refund(ctx, c, w, exp)
 }
 
 // pausedStack mirrors cmd/ai: Pause in front of the rate limiter (#511).
@@ -71,6 +80,9 @@ func TestPause_ClaudeRoutesAnswer503WithoutClaudeOrQuota(t *testing.T) {
 			}
 			if len(f.calls) != 0 {
 				t.Fatalf("Claude called %d times while paused", len(f.calls))
+			}
+			if n := store.refunds.Load(); n != 0 {
+				t.Fatalf("paused request refunded %d times; it was never charged", n)
 			}
 			if n := store.n.Load(); n != 0 {
 				t.Fatalf("rate limit charged %d times while paused", n)

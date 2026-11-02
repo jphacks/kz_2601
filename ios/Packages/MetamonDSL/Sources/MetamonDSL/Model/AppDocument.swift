@@ -158,8 +158,9 @@ public struct Theme: Decodable, Sendable {
 
 /// ローカル通知(P0)。`app.notifications[]` は DSL ロード時に同期、`scheduleNotification` アクションは押下時に予約。
 public struct NotificationSpec: Decodable, Identifiable, Sendable {
+    /// monthly / yearly(#266)はレコード基準(date / datetime の field)だけ。未知の値は once(古い版は monthly を once として読む)。
     public enum Repeat: String, Decodable, Sendable {
-        case once, daily, weekly
+        case once, daily, weekly, monthly, yearly
         public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .once) }
     }
 
@@ -213,6 +214,8 @@ public struct Entity: Decodable, Identifiable, Sendable {
     @Lossy public var marks: [Mark] = []
     /// 記録の保存期間(日数・#482)。作ってからこの日数を過ぎたレコードを端末が消す(`RecordRetention`)。nil = 消さない。
     @LossyPositiveInt public var retentionDays: Int?
+    /// 仲間探しでの役割(#507): "profile"(みんなが見るプロフィール)/ "matched"(つながった人だけが読む)。未知の値は無視。
+    public var match: String?
     @Lossy public var fields: [Field]
 
     /// field id、または予約値(`$author` / `$createdAt`・#250)の仮 Field。
@@ -222,6 +225,10 @@ public struct Entity: Decodable, Identifiable, Sendable {
     public var isShared: Bool { scope == "shared" || scope == "public" }
     /// 作った人以外も更新できる(shared / public かつ edit:"members")。
     public var membersCanEdit: Bool { isShared && edit == "members" }
+    /// 仲間探しのプロフィール(#507)。「つながりたい」の宛先はそのレコードの author。
+    public var isMatchProfile: Bool { isShared && match == "profile" }
+    /// つながった人だけが読む記録(#507)。つながりが変わったら読み直す。
+    public var isMatchMatched: Bool { isShared && match == "matched" }
 
     /// 保存対象(computed 以外)のフィールド。フォームのドラフト・送信はこちらだけ。
     public var storedFields: [Field] { fields.filter { !$0.isComputed } }

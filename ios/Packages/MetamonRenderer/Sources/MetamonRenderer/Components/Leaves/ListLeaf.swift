@@ -5,6 +5,7 @@ import MetamonDSL
 /// 保存で増えた行(前回描画に無かった id)はブランドの薄い色で 1.2 秒ハイライト(Reduce Motion では省略)。
 /// `item.toggle`(#108): 行頭の丸で boolean を反転して即保存(楽観的 UI。失敗したら戻す)。
 /// 他人の共有レコード(#249): 丸は薄く描いて押すと理由を出し、長押しの削除は出さない(`RecordPermission`)。
+/// `item.interest`(#507): 仲間探しのプロフィールの行に「つながりたい」(`InterestButton`・審査用の版には無い)。
 struct ListLeaf: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -21,8 +22,7 @@ struct ListLeaf: View {
     var body: some View {
         let entityId = c.entity ?? ""
         let entity = rt.dsl.entity(entityId)
-        let filtered = Aggregator.sorted(rt.filteredRecords(c), by: c.sort, entity: entity)
-        let rows = searched(filtered, entity: entity)
+        let rows = Self.rows(c, rt: rt, locals: ctx.locals)
         let ids = rows.map(\.id)
         let toggleField = ListToggle.field(c.item, in: entity)
         let mark = c.item?.mark.flatMap { id in entity?.isShared == true ? entity?.mark(id) : nil }
@@ -44,7 +44,8 @@ struct ListLeaf: View {
                             onToggle: toggleField.map { f in { editable ? toggle(row, field: f.id, entity: entityId) : rt.notifyReadOnly(entity: entityId) } },
                             toggleEnabled: editable,
                             mark: mark, markState: mark.map { markOverrides[row.id] ?? row.markState($0.id) },
-                            onMark: mark.map { m in { toggleMark(row, mark: m.id, entity: entityId) } })
+                            onMark: mark.map { m in { toggleMark(row, mark: m.id, entity: entityId) } },
+                            accessory: interestAccessory(row, entity: entityId))
                         .background(highlightedId == row.id ? RenderTheme.Colors.brandSoft : Color.clear)
                         .contentShape(Rectangle())
                         .onTapGesture { open(row) }
@@ -67,6 +68,7 @@ struct ListLeaf: View {
             .renderCard(padding: 0)
             .onChange(of: ids, initial: true) { _, now in markNewRows(now) }
             .sensoryFeedback(.selection, trigger: toggleTaps)
+            .task(id: c.item?.interest == true ? entityId : "") { await loadInterestStates() }
             #if DEBUG
             // ヘッドレス E2E 用: `METAMON_E2E_TOGGLE_TITLE=<title>` で、起動 3 秒後にその title の行の丸を 1 回タップしたのと同じ処理を行う
             .task {
@@ -115,6 +117,27 @@ struct ListLeaf: View {
         }
     }
 
+    /// `item.interest`(#507): 他の人のプロフィールの行に「つながりたい」。ホストが仲間探しを持たない版では nil。
+    private func interestAccessory(_ row: Record, entity: String) -> RowAccessory? {
+        #if APP_STORE_REVIEW
+        return nil
+        #else
+        guard c.item?.interest == true, let host = rt.matching, let state = host.interestState(entity: entity, record: row) else { return nil }
+        return InterestButton.accessory(state: state, busy: host.interestBusy(record: row)) {
+            toggleTaps += 1
+            Task { await host.sendInterest(entity: entity, record: row) }
+        }
+        #endif
+    }
+
+    /// 行のボタンの出し分けに、届いた / 送った / つながったを読む(#507)。
+    private func loadInterestStates() async {
+        #if !APP_STORE_REVIEW
+        guard c.item?.interest == true else { return }
+        await rt.matching?.refreshMatches(Set(MatchBox.allCases))
+        #endif
+    }
+
     private func open(_ row: Record) {
         guard let action = c.onItemTap else { return }
         Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
@@ -139,9 +162,18 @@ struct ListLeaf: View {
         }
     }
 
+    /// 表示する行(filter → sort → 検索)。適合テストの描画の木(`RenderTree`)も同じ行を使う。
+    @MainActor
+    static func rows(_ c: Component, rt: any DSLRuntime, locals: ScreenLocals?) -> [Record] {
+        let entity = rt.dsl.entity(c.entity ?? "")
+        let filtered = Aggregator.sorted(rt.filteredRecords(c), by: c.sort, entity: entity)
+        return searched(c, filtered, entity: entity, rt: rt, locals: locals)
+    }
+
     /// `searchField`(同画面の searchBar.field)の文字列で title/subtitle を部分一致(大小無視)フィルタ。
-    private func searched(_ rows: [Record], entity: Entity?) -> [Record] {
-        guard let key = c.searchField, let q = ctx.locals?.values[key]?.trimmingCharacters(in: .whitespaces), !q.isEmpty else { return rows }
+    @MainActor
+    private static func searched(_ c: Component, _ rows: [Record], entity: Entity?, rt: any DSLRuntime, locals: ScreenLocals?) -> [Record] {
+        guard let key = c.searchField, let q = locals?.values[key]?.trimmingCharacters(in: .whitespaces), !q.isEmpty else { return rows }
         let fields = [c.item?.title ?? entity?.titleField, c.item?.subtitle].compactMap { $0 }
         return rows.filter { r in
             fields.contains { rt.display(r[$0], field: entity?.field($0)).localizedCaseInsensitiveContains(q) }

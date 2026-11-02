@@ -11,14 +11,11 @@ struct PickerLeaf: View {
         if let form = ctx.form, let field = c.field {
             let fieldDef = form.entity.field(field)
             let selection = form.string(field)
-            // 選択肢から消した値を持つ既存の記録は、その値も並べて表示を保つ(#194)
-            let base = fieldDef?.options ?? []
-            let current = selection.wrappedValue
-            let options = current.isEmpty || base.contains(current) ? base : base + [current]
+            let options = Self.options(base: fieldDef?.options ?? [], current: selection.wrappedValue)
             let picker = Picker(c.label ?? "", selection: selection) {
                 ForEach(options, id: \.self) { Text($0).tag($0) }
             }
-            switch c.style ?? (options.count <= 4 ? "segmented" : "menu") {
+            switch Self.style(c, optionCount: options.count) {
             case "segmented":
                 LabeledInput(label: c.label) {
                     ChipSegments(options: options, selection: selection)
@@ -37,6 +34,16 @@ struct PickerLeaf: View {
         } else {
             NeedsForm(c: c)
         }
+    }
+
+    /// 選択肢から消した値を持つ既存の記録は、その値も並べて表示を保つ(#194)。適合テストの描画の木も同じ並びを使う。
+    static func options(base: [String], current: String) -> [String] {
+        current.isEmpty || base.contains(current) ? base : base + [current]
+    }
+
+    /// 省略時は 4 件以下なら segmented。
+    static func style(_ c: Component, optionCount: Int) -> String {
+        c.style ?? (optionCount <= 4 ? "segmented" : "menu")
     }
 }
 

@@ -28,12 +28,7 @@ func NewMemory() *Memory {
 func (m *Memory) Consume(_ context.Context, counters []Counter, weight int, expireAt time.Time) (Usage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	now := m.now()
-	for id, e := range m.entries {
-		if now.After(e.expireAt) {
-			delete(m.entries, id)
-		}
-	}
+	m.expire()
 	counts := make([]int, len(counters))
 	for i, c := range counters {
 		counts[i] = m.entries[c.ID].count
@@ -45,4 +40,29 @@ func (m *Memory) Consume(_ context.Context, counters []Counter, weight int, expi
 		}
 	}
 	return u, nil
+}
+
+// Refund implements Store.
+func (m *Memory) Refund(_ context.Context, counters []Counter, weight int, expireAt time.Time) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.expire()
+	for _, c := range counters {
+		e, ok := m.entries[c.ID]
+		if !ok {
+			continue
+		}
+		m.entries[c.ID] = memEntry{count: refunded(e.count, weight), expireAt: expireAt}
+	}
+	return nil
+}
+
+// expire drops entries past their expireAt (the Firestore TTL); m.mu is held.
+func (m *Memory) expire() {
+	now := m.now()
+	for id, e := range m.entries {
+		if now.After(e.expireAt) {
+			delete(m.entries, id)
+		}
+	}
 }

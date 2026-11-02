@@ -56,7 +56,7 @@ Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|me
   Entity.retentionDays?: 1〜3650(記録の保存期間。期限を過ぎた記録を端末が自動で消す)— §3.7
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (44 種・全て id? と area? を持つ) / Action (12 種) / Notification { id, title, body, repeat: once|daily|weekly, time?, weekday? }
+Leaf (44 種・全て id? と area? を持つ) / Action (12 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
@@ -80,7 +80,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `videoField` | `field`(video) | `label`, `source`(camera/library/both), `maxDuration`(秒・既定 60) | ○ | #206 |
 | `videoPlayer` | `field`(video) | `height`(small/medium/large) | ○ | #206 |
 | `audioRecorder` | `field`(audio) | `label`, `maxDuration`(秒・既定 600・最大 7200) | ○ | #420 |
-| `list` | `entity`, `item{title}` | `item.subtitle/trailing/icon/image`, `sort`, `filter`, `emptyText`, `onItemTap`, `swipeToDelete` | | P0 |
+| `list` | `entity`, `item{title}` | `item.subtitle/trailing/icon/image`, `item.interest`(match "profile" の一覧・#507), `sort`, `filter`, `emptyText`, `onItemTap`, `swipeToDelete` | | P0 |
 | `stat` | `label` + (`entity`+`aggregate` **または** `value`(Expr)) | `field`(count 以外必須), `by`(latest/earliest/distance/duration), `filter`, `format`(plain/currency/percent) | | P0 |
 | `chart` | `entity`, `kind`(bar/line/pie), `groupBy`, `aggregate` | `title`, `field`, `bucket`(day/week/month), `filter` | | P1 |
 | `voiceInput` | | `prompt`, `size`(compact/large) | | P0 |
@@ -139,6 +139,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `chatThread` | `entity`, `textField`(string/text) | `photoField`(photo), `placeholder`, `emptyText` | | #260 |
 | `sensorValue` | `sensor`(tilt\|pitch\|roll\|acceleration\|rotation\|pressure\|altitude), `label` | `style`(number\|gauge\|level), `min`/`max`(gauge), `entity`+`field`(number)+`dateField`(datetime), `seconds`(一定間隔 1〜3600), `limit`(既定 60・〜1000), `threshold`{`above`\|`below`, `message`, `save`, `action`} | | #419 |
 | `musicPlayer` | | `title`, `allowRequests`(既定 false), `autoAccept`(`allowRequests` 時のみ・既定 false) | | #412 |
+| `matchList` | `entity`(match "profile" の entity), `show`(incoming\|outgoing\|matches) | `title`, `emptyText`, `item`(title / subtitle / trailing / icon), `onItemTap` | | #507 |
 
 `color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
@@ -340,6 +341,23 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - 公開レコードを見せる口: `RecordPeek`(`shareview.go`)。今は常に nil。実装しても渡るのは `scope:"public"` の entity だけ(private / shared は渡さない)。見せるかどうかは #253 の判断待ち。
 - 部品を足した時: この表に行を足す(何もしなければ「アプリで見られます」になるので壊れない)。
 
+### 3.9 entity.match = 仲間探しのアプリ(#507)
+
+趣味・勉強・イベントの仲間をプロフィールから探し、**お互いに承認した人とだけ**つながるアプリ。**恋愛・出会い目的は対象外**(AI が断る)。設計・API・安全の規則は [`docs/backend/features/matching.md`](../backend/features/matching.md)。
+
+| 値 | 意味 | 制約(`Validate()`) |
+|---|---|---|
+| `profile` | みんなが見て「つながりたい」を送る 1 人 1 件のプロフィール。お互いにブロックしている人(どちら向きでも)の分は返らない | scope public / shared・アプリに 1 つまで・location / photo / video の field は不可・edit は書かない |
+| `matched` | 書いた本人と、つながった相手だけが読める(連絡先・次の相談) | scope public / shared・profile の entity が要る・location の field は不可・edit は書かない |
+
+- 誰が誰に送ったか・つながったかはレコードではなく appconfig の `/apps/{appId}/interests`・`/matches` が持つ。見える範囲は**公開 DSL(`apps_public/{appId}`)の match** で決める(各自のコピーではない)。
+- 部品(phase 2):
+  - **`list.item.interest: true`**: match "profile" の一覧の行に「つながりたい」ボタン。自分の行には出さない。送ると「送りました」、お互いに送ると「つながりました」。初めて送る時に「18 歳以上です」の確認を出し(端末に覚える・年齢は保存しない)、`ageConfirmed: true` を送る。オフラインでは送れない。
+  - **`matchList`**{`entity`(プロフィールの entity), `show`}: `incoming` = 届いた人(「承認」「見送る」)/ `outgoing` = 送った人(「取り下げる」)/ `matches` = つながった人(長押しで「つながりを解除」)。どれも長押しで通報・ブロック(#321 の `ModerationHost` をプロフィールのレコードで使う)。行はプロフィールのレコード(`profileRecordId`)で描き、見つからない時は「プロフィールが見つかりません」。
+  - どちらも楽観的に反映し、失敗したら戻して理由を出す。承認・解除の後は match "matched" の entity(連絡先)を読み直す。
+  - Action は足していない(送る・承認は部品の中で完結。`shareButton` と同じ)。`Validate()`: `interest` は match "profile" の list だけ・`matchList.entity` は match "profile"・`show` は 3 値・`item` は title / subtitle / trailing / icon だけ。
+- 版: iOS は `supportedFeatures` に `matching` を送る(審査用の版は送らず、`matchList` も `allowedComponents` から外す)。`matching` を送らない版・共有のデータを外した版には AI が match・`item.interest`・`matchList` を使わない(§5.3 と同じ仕組み・`restrict.go`)。古い iOS は未知のキー(`match`・`item.interest`)を無視し、未知の type(`matchList`)はプレースホルダで描く。
+
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 
 AI に渡す部品カタログは手書きではなく **`dsl.schema.json` から自動生成**される(`backend/internal/ai/catalog.go` の `BuildCatalog`)。検証(Go)・描画(iOS)・AI(プロンプト)の 3 者はすべてスキーマから導出され、抜けはテストで赤になる。
@@ -380,7 +398,7 @@ App Store に出した後は古い iOS が残り続ける。backend は「今い
 | どこに | 中身 | 使い道 |
 |---|---|---|
 | generate / chat の body `allowedComponents` | その版が描画できる部品 type の全部(`ComponentType` から自動) | backend はここに**無い** type を生成結果に入れない(下) |
-| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(今は `recordRetention`・#482) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
+| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(`recordRetention`・#482、`matching`・#507。審査用の版は `matching` を送らない) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
 | 全リクエストのヘッダ `X-Client-Platform` / `X-Client-Version` / `X-Client-Build` / `X-Client-DSL-Version` | `ios` / `CFBundleShortVersionString` / `CFBundleVersion` / 描画できる最大の `schemaVersion` | ログ(どの版がまだ使われているか = 最低対応版を上げる判断) |
 
 ### 5.3 backend が古い iOS に新しい部品を出さない仕組み

@@ -29,9 +29,17 @@ schema-check:
 
 # ---- local dev -------------------------------------------------------------
 # Terminal 1: make emulator   Terminal 2: make dev
+# Firestore エミュレータは CI と同じ gcloud の cloud-firestore-emulator(firebase-tools・firebase.json は不要)。
+# Auth エミュレータは起動しない(FIREBASE_AUTH_EMULATOR_HOST は AUTH_MODE=dev で X-Debug-Uid を許す目印)。
+# 8089 が塞がっている時は FIRESTORE_EMULATOR_HOST=127.0.0.1:18089 make emulator のように変える。
 .PHONY: emulator
 emulator:
-	firebase emulators:start --only firestore,auth --project demo-kz2601
+	../scripts/firestore-emulator.sh start
+
+# エミュレータ試験を CI(backend-emulator)と同じ判定で回す。エミュレータが無ければ一時的に起動して止める。
+.PHONY: test-emulator
+test-emulator:
+	../scripts/firestore-emulator.sh test-all
 
 .PHONY: dev
 dev:

@@ -1,0 +1,178 @@
+{
+  "description": "Logic ops (and or not), if, coalesce. nil counts as false in and/or/not/if.",
+  "defaults": {"now": "2026-10-28T15:30:45+09:00", "timeZone": "Asia/Tokyo"},
+  "cases": [
+    {
+      "name": "and/true-true",
+      "expr": {"op": "and", "args": [true, true]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "and/true-false",
+      "expr": {"op": "and", "args": [true, false]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "and/nil-is-false",
+      "expr": {"op": "and", "args": [true, {"op": "div", "args": [1, 0]}]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "and/no-args",
+      "expr": {"op": "and", "args": []},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "and/truthy-values",
+      "expr": {"op": "and", "args": [1, "x"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "and/false-string",
+      "expr": {"op": "and", "args": ["false", true]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "and/three",
+      "expr": {"op": "and", "args": [true, 1, ""]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "or/false-false",
+      "expr": {"op": "or", "args": [false, false]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "or/false-one",
+      "expr": {"op": "or", "args": [false, 1]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "or/nil-false",
+      "expr": {"op": "or", "args": [{"op": "div", "args": [1, 0]}, false]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "or/no-args",
+      "expr": {"op": "or", "args": []},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "not/true",
+      "expr": {"op": "not", "args": [true]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {"name": "not/zero", "expr": {"op": "not", "args": [0]}, "expected": {"type": "bool", "value": true, "text": "true"}},
+    {
+      "name": "not/nil",
+      "expr": {"op": "not", "args": [{"op": "div", "args": [1, 0]}]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "not/no-args",
+      "expr": {"op": "not", "args": []},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "not/false-string",
+      "expr": {"op": "not", "args": ["false"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "not/empty-string",
+      "expr": {"op": "not", "args": [""]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "not/date",
+      "expr": {"op": "not", "args": [{"op": "today", "args": []}]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "if/true",
+      "expr": {"if": true, "then": "yes", "else": "no"},
+      "expected": {"type": "string", "value": "yes", "text": "yes"}
+    },
+    {
+      "name": "if/false-string",
+      "expr": {"if": "false", "then": "yes", "else": "no"},
+      "expected": {"type": "string", "value": "no", "text": "no"}
+    },
+    {
+      "name": "if/nil-condition",
+      "expr": {"if": {"op": "div", "args": [1, 0]}, "then": "yes", "else": "no"},
+      "expected": {"type": "string", "value": "no", "text": "no"}
+    },
+    {
+      "name": "if/zero",
+      "expr": {"if": 0, "then": "yes", "else": "no"},
+      "expected": {"type": "string", "value": "no", "text": "no"}
+    },
+    {
+      "name": "if/negative-number",
+      "expr": {"if": -1, "then": "yes", "else": "no"},
+      "expected": {"type": "string", "value": "yes", "text": "yes"}
+    },
+    {
+      "name": "if/nested",
+      "expr": {"if": {"op": "gt", "args": [5, 3]}, "then": {"if": {"op": "lt", "args": [5, 4]}, "then": 1, "else": 2}, "else": 3},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "if/nil-branch",
+      "expr": {"if": true, "then": {"op": "div", "args": [1, 0]}, "else": 0},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "if/date-condition",
+      "expr": {"if": {"op": "today", "args": []}, "then": 1, "else": 0},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "if/string-condition",
+      "expr": {"if": "no", "then": 1, "else": 0},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "coalesce/nil-then-value",
+      "expr": {"op": "coalesce", "args": [{"op": "div", "args": [1, 0]}, 5]},
+      "expected": {"type": "number", "value": 5, "text": "5"}
+    },
+    {
+      "name": "coalesce/empty-string",
+      "expr": {"op": "coalesce", "args": ["", "x"]},
+      "expected": {"type": "string", "value": "x", "text": "x"}
+    },
+    {
+      "name": "coalesce/zero-is-a-value",
+      "expr": {"op": "coalesce", "args": [0, 5]},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "coalesce/false-is-a-value",
+      "expr": {"op": "coalesce", "args": [false, 1]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "coalesce/all-nil",
+      "expr": {"op": "coalesce", "args": [{"op": "div", "args": [1, 0]}, {"op": "div", "args": [1, 0]}]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "coalesce/three",
+      "expr": {"op": "coalesce", "args": [{"op": "div", "args": [1, 0]}, "", 3]},
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {"name": "coalesce/no-args", "expr": {"op": "coalesce", "args": []}, "expected": {"type": "nil"}},
+    {
+      "name": "coalesce/one-arg",
+      "expr": {"op": "coalesce", "args": ["a"]},
+      "expected": {"type": "string", "value": "a", "text": "a"}
+    },
+    {
+      "name": "coalesce/whitespace-is-a-value",
+      "expr": {"op": "coalesce", "args": [" ", "x"]},
+      "expected": {"type": "string", "value": " ", "text": " "}
+    }
+  ]
+}

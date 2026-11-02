@@ -1,0 +1,218 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 4
+          },
+          "id" : "by_mood",
+          "props" : {
+            "aggregate" : "count",
+            "buckets" : [
+
+            ],
+            "entity" : "diary",
+            "groupBy" : "mood",
+            "kind" : "pie",
+            "title" : "気分の割合"
+          },
+          "state" : "rendered",
+          "type" : "chart"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "push",
+                "screen" : "diary_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 8
+          },
+          "id" : "entries",
+          "props" : {
+            "emptyText" : "右上の「書く」から今日の日記を書こう",
+            "entity" : "diary",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "AI日記",
+      "toolbar" : [
+        {
+          "action" : {
+            "presentation" : "sheet",
+            "screen" : "diary_form",
+            "type" : "navigate"
+          },
+          "label" : "書く"
+        }
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "diary",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "date" : "2026-11-12",
+          "mood" : "うれしい"
+        }
+      },
+      "id" : "diary_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 5
+          },
+          "id" : "body",
+          "props" : {
+            "field" : "body",
+            "label" : null,
+            "placeholder" : "今日あったことを自由に",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textEditor"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 3,
+            "row" : 5,
+            "rowSpan" : 2
+          },
+          "id" : "ai_summary",
+          "props" : {
+            "label" : "AI で要約",
+            "output" : "summary",
+            "task" : "summarize"
+          },
+          "state" : "rendered",
+          "type" : "aiButton"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 5,
+            "rowSpan" : 2
+          },
+          "id" : "ai_mood",
+          "props" : {
+            "label" : "気分を判定",
+            "output" : "mood",
+            "task" : "classify"
+          },
+          "state" : "rendered",
+          "type" : "aiButton"
+        },
+        {
+          "band" : 2,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 7,
+            "rowSpan" : 2
+          },
+          "id" : "summary",
+          "props" : {
+            "field" : "summary",
+            "label" : "要約",
+            "placeholder" : "AI で要約を押すと入ります",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        },
+        {
+          "band" : 3,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 9,
+            "rowSpan" : 2
+          },
+          "id" : "mood",
+          "props" : {
+            "field" : "mood",
+            "label" : "気分",
+            "options" : [
+              "うれしい",
+              "ふつう",
+              "かなしい",
+              "イライラ",
+              "つかれた"
+            ],
+            "style" : "menu",
+            "value" : "うれしい"
+          },
+          "state" : "rendered",
+          "type" : "picker"
+        },
+        {
+          "band" : 4,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 11,
+            "rowSpan" : 1
+          },
+          "id" : "date",
+          "props" : {
+            "field" : "date",
+            "label" : "日付",
+            "value" : "2026-11-12"
+          },
+          "state" : "rendered",
+          "type" : "datePicker"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "diary_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "diary",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "日記",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

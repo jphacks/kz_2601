@@ -253,7 +253,7 @@ func TestAccountPurgeResultLogAttrsKeys(t *testing.T) {
 	for _, a := range (AccountPurgeResult{}).LogAttrs() {
 		keys = append(keys, a.(slog.Attr).Key)
 	}
-	want := "apps keptMirrors shares listings releases owners installs memberships marks postsScrubbed reports blocks feedback"
+	want := "apps keptMirrors shares listings releases owners installs memberships marks postsScrubbed reports blocks feedback matchPairs matchRecords"
 	if got := strings.Join(keys, " "); got != want {
 		t.Fatalf("LogAttrs keys:\n got %s\nwant %s", got, want)
 	}

@@ -1,0 +1,244 @@
+{
+  "screens" : [
+    {
+      "id" : "overview",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 1
+          },
+          "id" : "heading",
+          "props" : {
+            "text" : "今月のダッシュボード"
+          },
+          "state" : "rendered",
+          "type" : "label"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 1,
+            "rowSpan" : 1
+          },
+          "children" : [
+            {
+              "id" : null,
+              "state" : "rendered",
+              "type" : "icon"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "text" : "今月"
+              },
+              "state" : "rendered",
+              "type" : "badge"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "text" : "予算内"
+              },
+              "state" : "rendered",
+              "type" : "badge"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "text" : "要注意"
+              },
+              "state" : "rendered",
+              "type" : "badge"
+            }
+          ],
+          "id" : "tags",
+          "state" : "rendered",
+          "type" : "hstack"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 2
+          },
+          "id" : "budget",
+          "props" : {
+            "aggregate" : "sum",
+            "entity" : "expense",
+            "field" : "amount",
+            "label" : "予算 ¥30,000 の消化",
+            "percent" : "0%",
+            "ratio" : 0,
+            "target" : 30000
+          },
+          "state" : "rendered",
+          "type" : "progressBar"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 3,
+            "row" : 4,
+            "rowSpan" : 3
+          },
+          "id" : "spent",
+          "props" : {
+            "aggregate" : "sum",
+            "entity" : "expense",
+            "field" : "amount",
+            "label" : "今月の支出",
+            "max" : 30000,
+            "min" : 0,
+            "unit" : "円",
+            "value" : 0
+          },
+          "state" : "rendered",
+          "type" : "gauge"
+        },
+        {
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 4,
+            "rowSpan" : 3
+          },
+          "id" : "me",
+          "state" : "rendered",
+          "type" : "avatar"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 7,
+            "rowSpan" : 2
+          },
+          "id" : "tip",
+          "props" : {
+            "text" : "**太字** と *斜体* と `コード` が使えます。詳しくは [JPHACKS](https://jphacks.com) へ。"
+          },
+          "state" : "rendered",
+          "type" : "markdown"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 9,
+            "rowSpan" : 1
+          },
+          "id" : "official",
+          "props" : {
+            "opens" : true,
+            "text" : "JPHACKS 公式サイトを開く",
+            "url" : "https://jphacks.com"
+          },
+          "state" : "rendered",
+          "type" : "link"
+        },
+        {
+          "cell" : {
+            "col" : 2,
+            "colSpan" : 4,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "fixed",
+          "props" : {
+            "label" : "固定値 60%",
+            "percent" : "60%",
+            "ratio" : 0.6
+          },
+          "state" : "rendered",
+          "type" : "progressBar"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "overview",
+        "stack" : "tab:overview"
+      },
+      "title" : "概要",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "history",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 5
+          },
+          "id" : "recent_table",
+          "props" : {
+            "columns" : [
+              "日付",
+              "内容",
+              "金額"
+            ],
+            "entity" : "expense",
+            "limit" : 10,
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "table"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 5,
+            "rowSpan" : 4
+          },
+          "id" : "feed",
+          "props" : {
+            "entity" : "expense",
+            "limit" : 5,
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "timeline"
+        },
+        {
+          "cell" : {
+            "col" : 2,
+            "colSpan" : 4,
+            "row" : 9,
+            "rowSpan" : 3
+          },
+          "id" : "empty",
+          "props" : {
+            "message" : "レシートを撮ると、ここに並びます",
+            "title" : "まだ写真がありません"
+          },
+          "state" : "rendered",
+          "type" : "emptyState"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "history",
+        "stack" : "tab:history"
+      },
+      "title" : "履歴",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

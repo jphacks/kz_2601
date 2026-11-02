@@ -68,17 +68,22 @@ public struct ScreenView: View {
         }
         let record = route.recordId.flatMap { id in rt.records(for: entityId).first { $0.id == id } }
         if form == nil || form?.entity.id != entityId || form?.recordId != record?.id {
-            let draft = FormDraft(entity: entity, record: record)
-            if let record {
-                draft.isReadOnly = !rt.canEdit(entity: entityId, record: record)
-                draft.canDelete = rt.canDelete(entity: entityId, record: record)
-            }
-            if record == nil {
-                // calendar の日付タップなど、直前に積まれた初期値を新規フォームだけが受け取る
-                for (k, v) in FormPrefill.consume(for: entity) { draft.values[k] = v }
-            }
-            form = draft
+            form = Self.makeDraft(entity: entity, record: record, rt: rt)
         }
+    }
+
+    /// フォームのドラフト(既存レコードなら編集・権限、新規なら直前に積まれた初期値)。適合テストの描画の木(`RenderTree`)も同じ作り方を使う。
+    @MainActor
+    static func makeDraft(entity: Entity, record: Record?, rt: any DSLRuntime) -> FormDraft {
+        let draft = FormDraft(entity: entity, record: record)
+        if let record {
+            draft.isReadOnly = !rt.canEdit(entity: entity.id, record: record)
+            draft.canDelete = rt.canDelete(entity: entity.id, record: record)
+        } else {
+            // calendar の日付タップなど、直前に積まれた初期値を新規フォームだけが受け取る
+            for (k, v) in FormPrefill.consume(for: entity) { draft.values[k] = v }
+        }
+        return draft
     }
 }
 

@@ -90,6 +90,14 @@ type Usage struct {
 // any counter would go over its limit.
 type Store interface {
 	Consume(ctx context.Context, counters []Counter, weight int, expireAt time.Time) (Usage, error)
+	// Refund takes weight back from every counter atomically (#548). A count
+	// never goes below 0 and a missing (or expired) counter is left missing.
+	Refund(ctx context.Context, counters []Counter, weight int, expireAt time.Time) error
+}
+
+// refunded is the count after giving weight back (never below 0).
+func refunded(count, weight int) int {
+	return max(0, count-weight)
 }
 
 // evaluate is the shared check-then-add rule of every Store.
@@ -127,6 +135,16 @@ type Decision struct {
 	Used      int
 	Remaining int
 	ResetAt   time.Time
+
+	// charge is what Allow wrote, so Refund can take it back (zero when nothing was charged).
+	charge charge
+}
+
+type charge struct {
+	store    Store
+	counters []Counter
+	weight   int
+	expireAt time.Time
 }
 
 // Limiter decides whether a request may run.
@@ -220,10 +238,12 @@ func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight
 
 	// TTL: keep a day of slack so the document outlives its own day.
 	expireAt := reset.Add(24 * time.Hour)
-	usage, err := l.store.Consume(ctx, counters, weight, expireAt)
+	store := l.store
+	usage, err := store.Consume(ctx, counters, weight, expireAt)
 	if err != nil {
 		l.log.WarnContext(ctx, "ratelimit: store failed; counting in memory", slog.Any("error", err))
-		usage, err = l.fallback.Consume(ctx, counters, weight, expireAt)
+		store = l.fallback
+		usage, err = store.Consume(ctx, counters, weight, expireAt)
 		if err != nil {
 			return dec, err
 		}
@@ -237,11 +257,24 @@ func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight
 		dec.Remaining = max(0, c.Limit-dec.Used)
 		return dec, nil
 	}
+	dec.charge = charge{store: store, counters: counters, weight: weight, expireAt: expireAt}
 	if counters[0].Scope == ScopeUser {
 		dec.Used = usage.Counts[0]
 		dec.Remaining = max(0, limit-dec.Used)
 	}
 	return dec, nil
+}
+
+// Refund gives back up to units of what Allow charged for dec (#548), to the
+// store that took them (the memory fallback when Firestore failed then).
+// Every counter of the request (user, ip, global) gets the same units back.
+func (l *Limiter) Refund(ctx context.Context, dec Decision, units int) error {
+	c := dec.charge
+	units = min(units, c.weight)
+	if units <= 0 || c.store == nil {
+		return nil
+	}
+	return c.store.Refund(ctx, c.counters, units, c.expireAt)
 }
 
 // docSafe keeps a Firestore document id legal ("/" is the only banned rune).

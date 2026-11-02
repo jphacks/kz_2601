@@ -1,0 +1,109 @@
+{
+  "dsl": {
+    "schemaVersion": 1,
+    "app": {
+      "name": "空"
+    },
+    "initialScreen": "home",
+    "entities": [
+      {
+        "id": "task",
+        "name": "タスク",
+        "titleField": "title",
+        "fields": [
+          {
+            "id": "title",
+            "name": "タイトル",
+            "type": "string",
+            "required": true
+          },
+          {
+            "id": "done",
+            "name": "完了",
+            "type": "boolean"
+          },
+          {
+            "id": "points",
+            "name": "点数",
+            "type": "integer"
+          }
+        ]
+      }
+    ],
+    "screens": [
+      {
+        "id": "home",
+        "title": "空",
+        "components": [
+          {
+            "type": "stat",
+            "id": "count",
+            "area": "A1:C2",
+            "label": "件数",
+            "entity": "task",
+            "aggregate": "count"
+          },
+          {
+            "type": "stat",
+            "id": "sum",
+            "area": "D1:F2",
+            "label": "合計",
+            "entity": "task",
+            "aggregate": "sum",
+            "field": "points"
+          },
+          {
+            "type": "progressBar",
+            "id": "progress",
+            "area": "A3:F3",
+            "label": "進み",
+            "entity": "task",
+            "aggregate": "sum",
+            "field": "points",
+            "target": 10
+          },
+          {
+            "type": "list",
+            "id": "tasks",
+            "area": "A4:F8",
+            "entity": "task",
+            "item": {
+              "title": "title",
+              "toggle": "done"
+            },
+            "emptyText": "タスクはありません"
+          },
+          {
+            "type": "list",
+            "id": "tasks_default",
+            "area": "A9:F10",
+            "entity": "task",
+            "item": {
+              "title": "title"
+            }
+          },
+          {
+            "type": "table",
+            "id": "table",
+            "area": "A11:F12",
+            "entity": "task",
+            "columns": [
+              {
+                "field": "title"
+              },
+              {
+                "field": "points",
+                "title": "点"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "device": {
+    "now": "2026-11-12T12:00:00+09:00",
+    "timeZone": "Asia/Tokyo",
+    "locale": "ja_JP"
+  }
+}

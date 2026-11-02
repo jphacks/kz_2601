@@ -10,9 +10,7 @@ struct TimelineLeaf: View {
         let entityId = c.entity ?? ""
         let entity = rt.dsl.entity(entityId)
         let dateField = c.dateField ?? ""
-        let sort = Sort(field: dateField, direction: "desc")
-        let all = Aggregator.sorted(rt.filteredRecords(c), by: sort, entity: entity)
-        let rows = (c.limit ?? 0) > 0 ? Array(all.prefix(c.limit!)) : all
+        let rows = Self.rows(c, rt: rt)
         if rows.isEmpty {
             EmptyPlaceholder(icon: "clock", emptyText: L("まだありません"), state: rt.emptyState(for: entityId)) {
                 Task { await rt.load(entities: [entityId], force: true) }
@@ -48,5 +46,14 @@ struct TimelineLeaf: View {
             }
         .renderCard()
         }
+    }
+
+    /// 表示する行(日付の新しい順・limit)。適合テストの描画の木(`RenderTree`)も同じ行を使う。
+    @MainActor
+    static func rows(_ c: Component, rt: any DSLRuntime) -> [Record] {
+        let entity = rt.dsl.entity(c.entity ?? "")
+        let sort = Sort(field: c.dateField ?? "", direction: "desc")
+        let all = Aggregator.sorted(rt.filteredRecords(c), by: sort, entity: entity)
+        return (c.limit ?? 0) > 0 ? Array(all.prefix(c.limit!)) : all
     }
 }

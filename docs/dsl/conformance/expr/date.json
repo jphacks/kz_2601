@@ -1,0 +1,567 @@
+{
+  "description": "Date ops: now today daysBetween daysUntil addDays year month day weekday, date parsing and time zones.",
+  "defaults": {"now": "2026-10-28T15:30:45+09:00", "timeZone": "Asia/Tokyo"},
+  "cases": [
+    {
+      "name": "now/value",
+      "expr": {"op": "now", "args": []},
+      "expected": {"type": "date", "value": "2026-10-28T15:30:45+09:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "today/value",
+      "expr": {"op": "today", "args": []},
+      "expected": {"type": "date", "value": "2026-10-28T00:00:00+09:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "today/text",
+      "expr": {"op": "toString", "args": [{"op": "today", "args": []}]},
+      "expected": {"type": "string", "value": "2026-10-28", "text": "2026-10-28"}
+    },
+    {
+      "name": "daysBetween/forward",
+      "expr": {"op": "daysBetween", "args": ["2026-10-01", "2026-10-28"]},
+      "expected": {"type": "number", "value": 27, "text": "27"}
+    },
+    {
+      "name": "daysBetween/backward",
+      "expr": {"op": "daysBetween", "args": ["2026-10-28", "2026-10-01"]},
+      "expected": {"type": "number", "value": -27, "text": "-27"}
+    },
+    {
+      "name": "daysBetween/today-to-christmas",
+      "expr": {"op": "daysBetween", "args": [{"op": "today", "args": []}, "2026-12-25"]},
+      "expected": {"type": "number", "value": 58, "text": "58"}
+    },
+    {
+      "name": "daysBetween/across-midnight",
+      "expr": {"op": "daysBetween", "args": ["2026-10-24T23:30:00+09:00", "2026-10-25T00:30:00+09:00"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "daysBetween/utc-instant-is-local-day",
+      "expr": {"op": "daysBetween", "args": ["2026-10-24T23:30:00Z", "2026-10-25"]},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "daysBetween/offset-without-colon",
+      "expr": {"op": "daysBetween", "args": ["2026-10-24T10:00:00+0900", "2026-10-25"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "daysBetween/fractional-seconds",
+      "expr": {"op": "daysBetween", "args": ["2026-10-24T10:00:00.123Z", {"op": "today", "args": []}]},
+      "expected": {"type": "number", "value": 4, "text": "4"}
+    },
+    {
+      "name": "daysBetween/no-offset-unparsed",
+      "expr": {"op": "daysBetween", "args": ["2026-10-24T10:00:00", {"op": "today", "args": []}]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "daysBetween/single-digit-month",
+      "expr": {"op": "daysBetween", "args": ["2026-1-5", "2026-01-06"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "daysBetween/invalid-day",
+      "expr": {"op": "daysBetween", "args": ["2026-02-30", {"op": "today", "args": []}]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "daysBetween/invalid-month",
+      "expr": {"op": "daysBetween", "args": ["2026-13-01", {"op": "today", "args": []}]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "daysBetween/text",
+      "expr": {"op": "daysBetween", "args": ["bad", {"op": "today", "args": []}]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "daysBetween/number",
+      "expr": {"op": "daysBetween", "args": [1, {"op": "today", "args": []}]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "daysBetween/leap-year",
+      "expr": {"op": "daysBetween", "args": ["2028-02-28", "2028-03-01"]},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "daysBetween/compact-date-unparsed",
+      "expr": {"op": "daysBetween", "args": ["20261024", {"op": "today", "args": []}]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "daysUntil/future",
+      "expr": {"op": "daysUntil", "args": ["2026-10-31"]},
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "daysUntil/past",
+      "expr": {"op": "daysUntil", "args": ["2026-10-27"]},
+      "expected": {"type": "number", "value": -1, "text": "-1"}
+    },
+    {
+      "name": "daysUntil/today",
+      "expr": {"op": "daysUntil", "args": [{"op": "today", "args": []}]},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "daysUntil/now",
+      "expr": {"op": "daysUntil", "args": [{"op": "now", "args": []}]},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "daysUntil/end-of-today",
+      "expr": {"op": "daysUntil", "args": ["2026-10-28T23:59:59+09:00"]},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "daysUntil/next-year",
+      "expr": {"op": "daysUntil", "args": ["2027-10-28"]},
+      "expected": {"type": "number", "value": 365, "text": "365"}
+    },
+    {
+      "name": "daysUntil/nil",
+      "expr": {"op": "daysUntil", "args": [{"op": "div", "args": [1, 0]}]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "addDays/today-plus-3",
+      "expr": {"op": "addDays", "args": [{"op": "today", "args": []}, 3]},
+      "expected": {"type": "date", "value": "2026-10-31T00:00:00+09:00", "text": "2026-10-31"}
+    },
+    {
+      "name": "addDays/minus-7",
+      "expr": {"op": "addDays", "args": ["2026-10-28", -7]},
+      "expected": {"type": "date", "value": "2026-10-21T00:00:00+09:00", "text": "2026-10-21"}
+    },
+    {
+      "name": "addDays/across-year",
+      "expr": {"op": "addDays", "args": ["2026-12-30", 3]},
+      "expected": {"type": "date", "value": "2027-01-02T00:00:00+09:00", "text": "2027-01-02"}
+    },
+    {
+      "name": "addDays/fraction-rounds",
+      "expr": {"op": "addDays", "args": [{"op": "today", "args": []}, 1.5]},
+      "expected": {"type": "date", "value": "2026-10-30T00:00:00+09:00", "text": "2026-10-30"}
+    },
+    {
+      "name": "addDays/negative-fraction-rounds",
+      "expr": {"op": "addDays", "args": [{"op": "today", "args": []}, -1.5]},
+      "expected": {"type": "date", "value": "2026-10-26T00:00:00+09:00", "text": "2026-10-26"}
+    },
+    {
+      "name": "addDays/non-numeric",
+      "expr": {"op": "addDays", "args": [{"op": "today", "args": []}, "x"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "addDays/end-of-month",
+      "expr": {"op": "addDays", "args": ["2026-03-31", 1]},
+      "expected": {"type": "date", "value": "2026-04-01T00:00:00+09:00", "text": "2026-04-01"}
+    },
+    {
+      "name": "addDays/keeps-time",
+      "expr": {"op": "addDays", "args": [{"op": "now", "args": []}, 1]},
+      "expected": {"type": "date", "value": "2026-10-29T15:30:45+09:00", "text": "2026-10-29"}
+    },
+    {
+      "name": "addDays/numeric-string",
+      "expr": {"op": "addDays", "args": ["2026-10-28", "2"]},
+      "expected": {"type": "date", "value": "2026-10-30T00:00:00+09:00", "text": "2026-10-30"}
+    },
+    {
+      "name": "addDays/text",
+      "expr": {"op": "toString", "args": [{"op": "addDays", "args": [{"op": "today", "args": []}, 1]}]},
+      "expected": {"type": "string", "value": "2026-10-29", "text": "2026-10-29"}
+    },
+    {
+      "name": "year/date",
+      "expr": {"op": "year", "args": ["2026-10-28"]},
+      "expected": {"type": "number", "value": 2026, "text": "2026"}
+    },
+    {
+      "name": "month/date",
+      "expr": {"op": "month", "args": ["2026-10-28"]},
+      "expected": {"type": "number", "value": 10, "text": "10"}
+    },
+    {
+      "name": "day/date",
+      "expr": {"op": "day", "args": ["2026-10-28"]},
+      "expected": {"type": "number", "value": 28, "text": "28"}
+    },
+    {
+      "name": "weekday/wednesday",
+      "expr": {"op": "weekday", "args": ["2026-10-28"]},
+      "expected": {"type": "number", "value": 4, "text": "4"}
+    },
+    {
+      "name": "weekday/sunday",
+      "expr": {"op": "weekday", "args": ["2026-11-01"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "weekday/saturday",
+      "expr": {"op": "weekday", "args": ["2026-10-31"]},
+      "expected": {"type": "number", "value": 7, "text": "7"}
+    },
+    {
+      "name": "day/utc-instant-in-local",
+      "expr": {"op": "day", "args": ["2026-10-24T23:30:00Z"]},
+      "expected": {"type": "number", "value": 25, "text": "25"}
+    },
+    {
+      "name": "weekday/utc-instant-in-local",
+      "expr": {"op": "weekday", "args": ["2026-10-24T23:30:00Z"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "month/now",
+      "expr": {"op": "month", "args": [{"op": "now", "args": []}]},
+      "expected": {"type": "number", "value": 10, "text": "10"}
+    },
+    {
+      "name": "year/new-year-local",
+      "expr": {"op": "year", "args": ["2026-12-31T15:30:00Z"]},
+      "expected": {"type": "number", "value": 2027, "text": "2027"}
+    },
+    {"name": "year/text", "expr": {"op": "year", "args": ["x"]}, "expected": {"type": "nil"}},
+    {"name": "year/number", "expr": {"op": "year", "args": [2026]}, "expected": {"type": "nil"}},
+    {
+      "name": "tz/utc/today",
+      "now": "2026-10-28T23:30:00Z",
+      "timeZone": "UTC",
+      "expr": {"op": "today", "args": []},
+      "expected": {"type": "date", "value": "2026-10-28T00:00:00Z", "text": "2026-10-28"}
+    },
+    {
+      "name": "tz/tokyo/today-same-instant",
+      "now": "2026-10-28T23:30:00Z",
+      "expr": {"op": "today", "args": []},
+      "expected": {"type": "date", "value": "2026-10-29T00:00:00+09:00", "text": "2026-10-29"}
+    },
+    {
+      "name": "tz/utc/daysUntil",
+      "now": "2026-10-28T23:30:00Z",
+      "timeZone": "UTC",
+      "expr": {"op": "daysUntil", "args": ["2026-10-29"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "tz/tokyo/daysUntil-same-instant",
+      "now": "2026-10-28T23:30:00Z",
+      "expr": {"op": "daysUntil", "args": ["2026-10-29"]},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "tz/new-york/today-dst-end",
+      "now": "2026-11-01T12:00:00-05:00",
+      "timeZone": "America/New_York",
+      "expr": {"op": "today", "args": []},
+      "expected": {"type": "date", "value": "2026-11-01T00:00:00-04:00", "text": "2026-11-01"}
+    },
+    {
+      "name": "tz/new-york/addDays-across-dst",
+      "now": "2026-11-01T12:00:00-05:00",
+      "timeZone": "America/New_York",
+      "expr": {"op": "addDays", "args": [{"op": "today", "args": []}, 1]},
+      "expected": {"type": "date", "value": "2026-11-02T00:00:00-05:00", "text": "2026-11-02"}
+    },
+    {
+      "name": "tz/new-york/daysBetween-across-dst",
+      "timeZone": "America/New_York",
+      "expr": {"op": "daysBetween", "args": ["2026-10-31", "2026-11-02"]},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "tz/new-york/daysBetween-spring-forward",
+      "timeZone": "America/New_York",
+      "expr": {"op": "daysBetween", "args": ["2026-03-07", "2026-03-09"]},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "tz/new-york/day-of-utc-instant",
+      "timeZone": "America/New_York",
+      "expr": {"op": "day", "args": ["2026-10-24T02:00:00Z"]},
+      "expected": {"type": "number", "value": 23, "text": "23"}
+    },
+    {
+      "name": "tz/new-york/date-string-text",
+      "timeZone": "America/New_York",
+      "expr": {"op": "toString", "args": [{"op": "addDays", "args": ["2026-11-01", 0]}]},
+      "expected": {"type": "string", "value": "2026-11-01", "text": "2026-11-01"}
+    },
+    {
+      "name": "daysBetween/fractional-seconds-offset",
+      "expr": {"op": "daysBetween", "args": ["2026-10-24T23:30:00.5+09:00", {"op": "today", "args": []}]},
+      "expected": {"type": "number", "value": 4, "text": "4"}
+    },
+    {
+      "name": "daysBetween/fractional-seconds-no-digits",
+      "expr": {"op": "daysBetween", "args": ["2026-10-24T10:00:00.Z", {"op": "today", "args": []}]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "gt/fractional-seconds-order",
+      "expr": {
+        "op": "gt",
+        "args": [
+          {"op": "addDays", "args": ["2026-10-24T10:00:00.900Z", 0]},
+          {"op": "addDays", "args": ["2026-10-24T10:00:00.100Z", 0]}
+        ]
+      },
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "strict/datetime-impossible-day",
+      "expr": {"op": "day", "args": ["2026-02-30T10:00:00Z"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "strict/datetime-impossible-day-offset",
+      "expr": {"op": "day", "args": ["2026-04-31T10:00:00+09:00"]},
+      "expected": {"type": "nil"}
+    },
+    {"name": "strict/datetime-24h", "expr": {"op": "day", "args": ["2026-10-24T24:00:00Z"]}, "expected": {"type": "nil"}},
+    {
+      "name": "strict/datetime-minute-60",
+      "expr": {"op": "day", "args": ["2026-10-24T10:60:00+09:00"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "strict/datetime-leap-second",
+      "expr": {"op": "day", "args": ["2026-12-31T23:59:60Z"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "strict/datetime-impossible-day-fraction",
+      "expr": {"op": "day", "args": ["2026-02-30T10:00:00.500Z"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "strict/datetime-feb29-non-leap",
+      "expr": {"op": "day", "args": ["2027-02-29T12:00:00+09:00"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "strict/datetime-feb29-leap",
+      "expr": {"op": "day", "args": ["2028-02-29T12:00:00+09:00"]},
+      "expected": {"type": "number", "value": 29, "text": "29"}
+    },
+    {
+      "name": "strict/datetime-end-of-day",
+      "expr": {"op": "day", "args": ["2026-10-24T23:59:59-05:00"]},
+      "expected": {"type": "number", "value": 25, "text": "25"}
+    },
+    {"name": "strict/date-feb29-non-leap", "expr": {"op": "day", "args": ["2027-02-29"]}, "expected": {"type": "nil"}},
+    {
+      "name": "strict/date-feb29-leap",
+      "expr": {"op": "day", "args": ["2028-02-29"]},
+      "expected": {"type": "number", "value": 29, "text": "29"}
+    },
+    {
+      "name": "strict/date-impossible-day-short",
+      "expr": {"op": "day", "args": ["2026-2-30"]},
+      "expected": {"type": "nil"}
+    },
+    {"name": "strict/date-day-zero", "expr": {"op": "day", "args": ["2026-10-0"]}, "expected": {"type": "nil"}},
+    {"name": "strict/date-year-zero", "expr": {"op": "day", "args": ["0-01-01"]}, "expected": {"type": "nil"}},
+    {
+      "name": "strict/datetime-dst-gap-offset",
+      "timeZone": "America/New_York",
+      "expr": {"op": "day", "args": ["2026-03-08T02:30:00-05:00"]},
+      "expected": {"type": "number", "value": 8, "text": "8"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/date-value",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "addDays", "args": ["2018-11-04", 0]},
+      "expected": {"type": "date", "value": "2018-11-04T01:00:00-02:00", "text": "2018-11-04"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/date-text",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "toString", "args": [{"op": "addDays", "args": ["2018-11-04", 0]}]},
+      "expected": {"type": "string", "value": "2018-11-04", "text": "2018-11-04"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/day",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "day", "args": ["2018-11-04"]},
+      "expected": {"type": "number", "value": 4, "text": "4"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/weekday",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "weekday", "args": ["2018-11-04"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/daysBetween-from-previous",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "daysBetween", "args": ["2018-11-03", "2018-11-04"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/daysBetween-to-next",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "daysBetween", "args": ["2018-11-04", "2018-11-05"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/daysBetween-same",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "daysBetween", "args": ["2018-11-04", {"op": "today", "args": []}]},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/daysUntil",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "daysUntil", "args": ["2018-11-04"]},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/today",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "today", "args": []},
+      "expected": {"type": "date", "value": "2018-11-04T01:00:00-02:00", "text": "2018-11-04"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/today-text",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "toString", "args": [{"op": "today", "args": []}]},
+      "expected": {"type": "string", "value": "2018-11-04", "text": "2018-11-04"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/eq-today",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "eq", "args": [{"op": "today", "args": []}, "2018-11-04"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/eq-previous-day",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "eq", "args": [{"op": "today", "args": []}, "2018-11-03"]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/gt-previous-day-end",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "gt", "args": [{"op": "today", "args": []}, "2018-11-03T23:59:59-03:00"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/lt-first-second",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "lt", "args": [{"op": "today", "args": []}, "2018-11-04T01:00:01-02:00"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/eq-first-instant",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "eq", "args": [{"op": "today", "args": []}, "2018-11-04T01:00:00-02:00"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/addDays-into-gap",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "addDays", "args": ["2018-11-03", 1]},
+      "expected": {"type": "date", "value": "2018-11-04T01:00:00-02:00", "text": "2018-11-04"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/addDays-from-gap",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "addDays", "args": ["2018-11-04", 1]},
+      "expected": {"type": "date", "value": "2018-11-05T01:00:00-02:00", "text": "2018-11-05"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/addDays-time-into-gap",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "addDays", "args": ["2018-11-03T00:30:00-03:00", 1]},
+      "expected": {"type": "date", "value": "2018-11-04T01:30:00-02:00", "text": "2018-11-04"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/normal-day",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "addDays", "args": ["2018-11-10", 0]},
+      "expected": {"type": "date", "value": "2018-11-10T00:00:00-02:00", "text": "2018-11-10"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/normal-day-weekday",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "weekday", "args": ["2018-11-10"]},
+      "expected": {"type": "number", "value": 7, "text": "7"}
+    },
+    {
+      "name": "dst-repeat/sao-paulo/day-after-fall-back",
+      "now": "2019-02-17T10:00:00-03:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "addDays", "args": ["2019-02-17", 0]},
+      "expected": {"type": "date", "value": "2019-02-17T00:00:00-03:00", "text": "2019-02-17"}
+    },
+    {
+      "name": "dst-repeat/sao-paulo/daysBetween",
+      "now": "2019-02-17T10:00:00-03:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "daysBetween", "args": ["2019-02-16", "2019-02-17"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "dst-repeat/new-york/date-value",
+      "now": "2026-11-01T12:00:00-05:00",
+      "timeZone": "America/New_York",
+      "expr": {"op": "addDays", "args": ["2026-11-01", 0]},
+      "expected": {"type": "date", "value": "2026-11-01T00:00:00-04:00", "text": "2026-11-01"}
+    },
+    {
+      "name": "dst-repeat/new-york/day",
+      "now": "2026-11-01T12:00:00-05:00",
+      "timeZone": "America/New_York",
+      "expr": {"op": "day", "args": ["2026-11-01"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "dst-repeat/new-york/daysBetween",
+      "now": "2026-11-01T12:00:00-05:00",
+      "timeZone": "America/New_York",
+      "expr": {"op": "daysBetween", "args": ["2026-11-01", "2026-11-02"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "dst-repeat/new-york/eq-today",
+      "now": "2026-11-01T12:00:00-05:00",
+      "timeZone": "America/New_York",
+      "expr": {"op": "eq", "args": [{"op": "today", "args": []}, "2026-11-01"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "skipped-day/apia/date-only",
+      "now": "2011-12-31T10:00:00+14:00",
+      "timeZone": "Pacific/Apia",
+      "expr": {"op": "day", "args": ["2011-12-30"]},
+      "expected": {"type": "nil"}
+    }
+  ]
+}

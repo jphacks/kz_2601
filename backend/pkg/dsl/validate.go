@@ -238,6 +238,7 @@ func (a *App) Validate() error {
 		}
 		checkEntityMarks(e, add)
 		checkEntityRetention(e, add)
+		checkEntityMatch(e, add)
 		seen := map[string]bool{}
 		for j, f := range e.Fields {
 			if !idRe.MatchString(f.ID) {
@@ -264,6 +265,7 @@ func (a *App) Validate() error {
 	}
 	checkComputedFields(a.Entities, entities, DailyToggleFields(a), add)
 	checkHiddenFields(a, entities, add)
+	checkMatching(a, add)
 
 	notifIDs := map[string]bool{}
 	for i := range a.App.Notifications {
@@ -454,6 +456,7 @@ func (a *App) Validate() error {
 				}
 				checkListToggle(where, c.Item, e, add)
 				checkListMark(where, c.Item, e, add)
+				checkListInterest(where, c.Item, e, add) // match_list.go
 				if c.Sort != nil {
 					if msg := valueErr(e, "sort field", c.Sort.Field); msg != "" {
 						add("%s: %s", where, msg)
@@ -655,6 +658,9 @@ func (a *App) Validate() error {
 				checkMusicPlayer(where, c, add)
 			case CompNearbyShare:
 				checkNearbyShare(where, c, entities, add) // nearby.go
+			case CompMatchList:
+				checkMatchList(where, c, entities, add) // match_list.go
+				checkAction(where+".onItemTap", c.OnItemTap)
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}
@@ -683,6 +689,9 @@ func checkNotification(where string, n *Notification, add func(string, ...any)) 
 	if n.Repeat == "weekly" && n.Weekday == "" {
 		add("%s: weekly notification needs weekday", where)
 	}
+	if slices.Contains(RepeatUnits, n.Repeat) && n.Entity == "" {
+		add("%s: repeat %s needs entity + field (a date / datetime field such as the renewal date or birthday; it repeats on that day)", where, n.Repeat)
+	}
 	if n.Time != "" && !timeRe.MatchString(n.Time) {
 		add("%s: notification time %q must be HH:MM", where, n.Time)
 	}
@@ -709,6 +718,8 @@ func checkRecordNotification(where string, n *Notification, entities map[string]
 		add("%s: notification field %q does not exist in entity %q", where, n.Field, n.Entity)
 	case f.Type != FieldDatetime && f.Type != FieldDate && f.Type != FieldString:
 		add("%s: notification field %q must be datetime, date or string (HH:MM)", where, n.Field)
+	case f.Type == FieldString && slices.Contains(RepeatUnits, n.Repeat):
+		add("%s: repeat %s needs a date or datetime field (%q is a HH:MM string; use daily / weekly for times)", where, n.Repeat, n.Field)
 	}
 	if n.TitleField != "" && e.FieldByID(n.TitleField) == nil {
 		add("%s: notification titleField %q does not exist in entity %q", where, n.TitleField, n.Entity)
