@@ -100,6 +100,10 @@ var expectKeys = map[string]expectKind{
 	"matchMatched": expectBool,
 	"matchSafe":    expectBool,
 	"matchUI":      expectBool,
+	// checkRepeat (#266): repeat.go
+	"repeat":         expectString,
+	"repeatOffset":   expectNumber,
+	"nextOccurrence": expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

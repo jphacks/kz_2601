@@ -32,17 +32,63 @@ public enum FieldCoding {
         f.type == .date ? dateFormatter.string(from: date) : datetimeFormatter.string(from: date)
     }
 
+    /// 日付の値を読む: RFC 3339(秒とオフセット必須・小数秒可)か "YYYY-MM-DD"(端末 TZ のその日の最初の時刻・ふつうは 0:00)。
+    /// 2/30・24:00 のようなあり得ない日時は読まない(Formatter の繰り上げを許さない・Go の expreval と同じ・#555)。
     public static func date(from value: JSONValue) -> Date? {
         guard let s = value.stringValue else { return nil }
-        return datetimeFormatter.date(from: s) ?? fractionalDatetime(s) ?? dateFormatter.date(from: s)
+        return strictDatetime(s) ?? strictDay(s)
     }
 
-    /// 小数秒付きの RFC 3339(`…00.123Z`・サーバーの createdAt など)。小数部を外して通常の形で読み、秒に足す
+    private static let datetimePattern = try! NSRegularExpression(
+        pattern: #"^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]+)?(Z|[+-][0-9]{2}:?[0-9]{2})$"#)
+    private static let dayPattern = try! NSRegularExpression(pattern: #"^([0-9]{1,4})-([0-9]{1,2})-([0-9]{1,2})$"#)
+
+    /// RFC 3339。小数秒(`…00.123Z`・サーバーの createdAt など)は外して通常の形で読み、秒に足す
     /// (Go の expreval と同じ規則にするため `.withFractionalSeconds` は使わない)。
-    static func fractionalDatetime(_ s: String) -> Date? {
-        guard let r = s.range(of: #"\.[0-9]+(?=(Z|[+-][0-9]{2}:?[0-9]{2})$)"#, options: .regularExpression),
-              let frac = Double("0" + s[r]), let d = datetimeFormatter.date(from: s.replacingCharacters(in: r, with: "")) else { return nil }
+    static func strictDatetime(_ s: String) -> Date? {
+        let ns = s as NSString
+        guard let m = datetimePattern.firstMatch(in: s, range: NSRange(location: 0, length: ns.length)) else { return nil }
+        let fracRange = m.range(at: 7)
+        let frac = fracRange.location == NSNotFound ? 0 : Double("0" + ns.substring(with: fracRange)) ?? 0
+        let base = fracRange.location == NSNotFound ? s : ns.replacingCharacters(in: fracRange, with: "")
+        guard let d = datetimeFormatter.date(from: base) else { return nil }
+        // 同じオフセットで書き戻して Y/M/D/h/m/s が入力と同じか(繰り上げていないか)
+        guard let zone = TimeZone(secondsFromGMT: offsetSeconds(ns.substring(with: m.range(at: 8)))),
+              components(d, in: zone, [.year, .month, .day, .hour, .minute, .second]) == (1...6).map({ Int(ns.substring(with: m.range(at: $0))) })
+        else { return nil }
         return d.addingTimeInterval(frac)
+    }
+
+    /// "YYYY-MM-DD"(月・日は 1 桁も可)。端末 TZ でのその日の最初の時刻(`Calendar.startOfDay`)。
+    /// DST で 0:00 が無い日(サンパウロ 2018-11-04 など)はその日の 1:00 になる(nil にしない・前日にしない・#556)。
+    static func strictDay(_ s: String) -> Date? {
+        let ns = s as NSString
+        guard let m = dayPattern.firstMatch(in: s, range: NSRange(location: 0, length: ns.length)) else { return nil }
+        let ymd = (1...3).map { Int(ns.substring(with: m.range(at: $0))) }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = dateFormatter.timeZone
+        // 正午から startOfDay を取る(0:00 を直接作ると DST の隙間で繰り上がる)
+        guard let noon = cal.date(from: DateComponents(year: ymd[0], month: ymd[1], day: ymd[2], hour: 12)) else { return nil }
+        let d = cal.startOfDay(for: noon)
+        // 書き戻して Y/M/D が入力と同じか(2/30 などの繰り上げを許さない)
+        guard components(d, in: cal.timeZone, [.year, .month, .day]) == ymd else { return nil }
+        return d
+    }
+
+    private static func offsetSeconds(_ z: String) -> Int {
+        guard z != "Z" else { return 0 }
+        let digits = z.dropFirst().replacingOccurrences(of: ":", with: "")
+        let secs = (Int(digits.prefix(2)) ?? 0) * 3600 + (Int(digits.suffix(2)) ?? 0) * 60
+        return z.hasPrefix("-") ? -secs : secs
+    }
+
+    private static func components(_ d: Date, in zone: TimeZone, _ units: [Calendar.Component]) -> [Int?] {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = zone
+        let c = cal.dateComponents([.era, .year, .month, .day, .hour, .minute, .second], from: d)
+        // 紀元前(年 0 など)は別の年として扱う
+        guard c.era == 1 else { return units.map { _ in nil } }
+        return units.map { c.value(for: $0) }
     }
 
     /// 送信前の正規化。空文字/未入力は nil(キーごと落とす)。

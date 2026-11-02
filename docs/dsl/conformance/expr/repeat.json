@@ -1,0 +1,238 @@
+{
+  "description": "nextOccurrence (#266): the next monthly / yearly repeat on or after today, the day clamped to the month end, and time zones.",
+  "defaults": {"now": "2026-10-28T15:30:45+09:00", "timeZone": "Asia/Tokyo"},
+  "cases": [
+    {
+      "name": "monthly/later-this-month",
+      "expr": {"op": "nextOccurrence", "args": ["2026-01-30", "monthly"]},
+      "expected": {"type": "date", "value": "2026-10-30T00:00:00+09:00", "text": "2026-10-30"}
+    },
+    {
+      "name": "monthly/passed-this-month",
+      "expr": {"op": "nextOccurrence", "args": ["2026-01-05", "monthly"]},
+      "expected": {"type": "date", "value": "2026-11-05T00:00:00+09:00", "text": "2026-11-05"}
+    },
+    {
+      "name": "monthly/day-is-today",
+      "expr": {"op": "nextOccurrence", "args": ["2026-09-28", "monthly"]},
+      "expected": {"type": "date", "value": "2026-10-28T00:00:00+09:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "monthly/anchor-is-today",
+      "expr": {"op": "nextOccurrence", "args": ["2026-10-28", "monthly"]},
+      "expected": {"type": "date", "value": "2026-10-28T00:00:00+09:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "monthly/anchor-in-future",
+      "expr": {"op": "nextOccurrence", "args": ["2027-03-15", "monthly"]},
+      "expected": {"type": "date", "value": "2027-03-15T00:00:00+09:00", "text": "2027-03-15"}
+    },
+    {
+      "name": "monthly/anchor-yesterday",
+      "expr": {"op": "nextOccurrence", "args": ["2026-10-27", "monthly"]},
+      "expected": {"type": "date", "value": "2026-11-27T00:00:00+09:00", "text": "2026-11-27"}
+    },
+    {
+      "name": "monthly/across-year",
+      "now": "2026-12-20T09:00:00+09:00",
+      "expr": {"op": "nextOccurrence", "args": ["2026-01-10", "monthly"]},
+      "expected": {"type": "date", "value": "2027-01-10T00:00:00+09:00", "text": "2027-01-10"}
+    },
+    {
+      "name": "monthly/subscription-renewal",
+      "now": "2026-10-31T09:00:00+09:00",
+      "expr": {"op": "nextOccurrence", "args": ["2026-09-30", "monthly"]},
+      "expected": {"type": "date", "value": "2026-11-30T00:00:00+09:00", "text": "2026-11-30"}
+    },
+    {
+      "name": "monthly/month-end-31-to-30",
+      "now": "2026-11-02T09:00:00+09:00",
+      "expr": {"op": "nextOccurrence", "args": ["2026-08-31", "monthly"]},
+      "expected": {"type": "date", "value": "2026-11-30T00:00:00+09:00", "text": "2026-11-30"}
+    },
+    {
+      "name": "monthly/month-end-feb",
+      "now": "2027-02-10T09:00:00+09:00",
+      "expr": {"op": "nextOccurrence", "args": ["2026-01-31", "monthly"]},
+      "expected": {"type": "date", "value": "2027-02-28T00:00:00+09:00", "text": "2027-02-28"}
+    },
+    {
+      "name": "monthly/month-end-feb-leap",
+      "now": "2028-02-10T09:00:00+09:00",
+      "expr": {"op": "nextOccurrence", "args": ["2026-01-31", "monthly"]},
+      "expected": {"type": "date", "value": "2028-02-29T00:00:00+09:00", "text": "2028-02-29"}
+    },
+    {
+      "name": "monthly/month-end-feb-clamped-is-today",
+      "now": "2027-02-28T09:00:00+09:00",
+      "expr": {"op": "nextOccurrence", "args": ["2026-01-30", "monthly"]},
+      "expected": {"type": "date", "value": "2027-02-28T00:00:00+09:00", "text": "2027-02-28"}
+    },
+    {
+      "name": "monthly/month-end-back-to-31",
+      "now": "2027-03-01T09:00:00+09:00",
+      "expr": {"op": "nextOccurrence", "args": ["2027-01-31", "monthly"]},
+      "expected": {"type": "date", "value": "2027-03-31T00:00:00+09:00", "text": "2027-03-31"}
+    },
+    {
+      "name": "monthly/datetime-anchor",
+      "expr": {"op": "nextOccurrence", "args": ["2026-01-31T23:00:00+09:00", "monthly"]},
+      "expected": {"type": "date", "value": "2026-10-31T00:00:00+09:00", "text": "2026-10-31"}
+    },
+    {
+      "name": "yearly/birthday-upcoming",
+      "expr": {"op": "nextOccurrence", "args": ["1990-12-01", "yearly"]},
+      "expected": {"type": "date", "value": "2026-12-01T00:00:00+09:00", "text": "2026-12-01"}
+    },
+    {
+      "name": "yearly/birthday-passed",
+      "expr": {"op": "nextOccurrence", "args": ["1990-05-10", "yearly"]},
+      "expected": {"type": "date", "value": "2027-05-10T00:00:00+09:00", "text": "2027-05-10"}
+    },
+    {
+      "name": "yearly/birthday-today",
+      "expr": {"op": "nextOccurrence", "args": ["2000-10-28", "yearly"]},
+      "expected": {"type": "date", "value": "2026-10-28T00:00:00+09:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "yearly/anchor-in-future",
+      "expr": {"op": "nextOccurrence", "args": ["2027-01-01", "yearly"]},
+      "expected": {"type": "date", "value": "2027-01-01T00:00:00+09:00", "text": "2027-01-01"}
+    },
+    {
+      "name": "yearly/feb29-non-leap",
+      "expr": {"op": "nextOccurrence", "args": ["2024-02-29", "yearly"]},
+      "expected": {"type": "date", "value": "2027-02-28T00:00:00+09:00", "text": "2027-02-28"}
+    },
+    {
+      "name": "yearly/feb29-leap",
+      "now": "2027-10-28T09:00:00+09:00",
+      "expr": {"op": "nextOccurrence", "args": ["2024-02-29", "yearly"]},
+      "expected": {"type": "date", "value": "2028-02-29T00:00:00+09:00", "text": "2028-02-29"}
+    },
+    {
+      "name": "yearly/feb29-clamped-is-today",
+      "now": "2027-02-28T09:00:00+09:00",
+      "expr": {"op": "nextOccurrence", "args": ["2024-02-29", "yearly"]},
+      "expected": {"type": "date", "value": "2027-02-28T00:00:00+09:00", "text": "2027-02-28"}
+    },
+    {
+      "name": "yearly/feb29-day-after-clamp",
+      "now": "2027-03-01T09:00:00+09:00",
+      "expr": {"op": "nextOccurrence", "args": ["2024-02-29", "yearly"]},
+      "expected": {"type": "date", "value": "2028-02-29T00:00:00+09:00", "text": "2028-02-29"}
+    },
+    {
+      "name": "tz/utc-instant-is-local-day",
+      "expr": {"op": "nextOccurrence", "args": ["2026-10-27T16:00:00Z", "monthly"]},
+      "expected": {"type": "date", "value": "2026-10-28T00:00:00+09:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "tz/utc-instant-previous-local-day",
+      "expr": {"op": "nextOccurrence", "args": ["2026-10-27T14:00:00Z", "monthly"]},
+      "expected": {"type": "date", "value": "2026-11-27T00:00:00+09:00", "text": "2026-11-27"}
+    },
+    {
+      "name": "tz/new-york-local-day",
+      "timeZone": "America/New_York",
+      "expr": {"op": "nextOccurrence", "args": ["2026-09-28T00:30:00+09:00", "monthly"]},
+      "expected": {"type": "date", "value": "2026-11-27T00:00:00-05:00", "text": "2026-11-27"}
+    },
+    {
+      "name": "tz/new-york-dst-end",
+      "now": "2026-11-01T12:00:00-05:00",
+      "timeZone": "America/New_York",
+      "expr": {"op": "nextOccurrence", "args": ["2026-03-01", "monthly"]},
+      "expected": {"type": "date", "value": "2026-11-01T00:00:00-04:00", "text": "2026-11-01"}
+    },
+    {
+      "name": "tz/new-york-yearly",
+      "timeZone": "America/New_York",
+      "expr": {"op": "nextOccurrence", "args": ["2025-10-28", "yearly"]},
+      "expected": {"type": "date", "value": "2026-10-28T00:00:00-04:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "tz/sao-paulo-monthly-lands-on-dst-gap-day",
+      "now": "2018-11-02T12:00:00-03:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "nextOccurrence", "args": ["2018-10-04", "monthly"]},
+      "expected": {"type": "date", "value": "2018-11-04T01:00:00-02:00", "text": "2018-11-04"}
+    },
+    {
+      "name": "tz/sao-paulo-yearly-lands-on-dst-gap-day",
+      "now": "2018-06-01T12:00:00-03:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "nextOccurrence", "args": ["2017-11-04", "yearly"]},
+      "expected": {"type": "date", "value": "2018-11-04T01:00:00-02:00", "text": "2018-11-04"}
+    },
+    {
+      "name": "tz/sao-paulo-anchor-on-dst-gap-day",
+      "now": "2018-11-20T12:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "nextOccurrence", "args": ["2018-11-04", "monthly"]},
+      "expected": {"type": "date", "value": "2018-12-04T00:00:00-02:00", "text": "2018-12-04"}
+    },
+    {
+      "name": "tz/sao-paulo-gap-day-daysUntil",
+      "now": "2018-11-02T12:00:00-03:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "daysUntil", "args": [{"op": "nextOccurrence", "args": ["2018-10-04", "monthly"]}]},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "combo/daysUntil",
+      "expr": {"op": "daysUntil", "args": [{"op": "nextOccurrence", "args": ["2026-01-30", "monthly"]}]},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "combo/daysUntil-yearly",
+      "expr": {"op": "daysUntil", "args": [{"op": "nextOccurrence", "args": ["1990-05-10", "yearly"]}]},
+      "expected": {"type": "number", "value": 194, "text": "194"}
+    },
+    {
+      "name": "combo/toString",
+      "expr": {"op": "toString", "args": [{"op": "nextOccurrence", "args": ["2026-08-31", "monthly"]}]},
+      "expected": {"type": "string", "value": "2026-10-31", "text": "2026-10-31"}
+    },
+    {
+      "name": "combo/from-today",
+      "expr": {"op": "nextOccurrence", "args": [{"op": "today", "args": []}, "yearly"]},
+      "expected": {"type": "date", "value": "2026-10-28T00:00:00+09:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "combo/from-addDays",
+      "expr": {"op": "nextOccurrence", "args": [{"op": "addDays", "args": [{"op": "today", "args": []}, -1]}, "monthly"]},
+      "expected": {"type": "date", "value": "2026-11-27T00:00:00+09:00", "text": "2026-11-27"}
+    },
+    {
+      "name": "invalid/unit-weekly",
+      "expr": {"op": "nextOccurrence", "args": ["2026-01-30", "weekly"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "invalid/unit-number",
+      "expr": {"op": "nextOccurrence", "args": ["2026-01-30", 1]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "invalid/unit-case",
+      "expr": {"op": "nextOccurrence", "args": ["2026-01-30", "Monthly"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "invalid/date",
+      "expr": {"op": "nextOccurrence", "args": ["2026-02-30", "monthly"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "invalid/not-a-date",
+      "expr": {"op": "nextOccurrence", "args": ["renewal", "monthly"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "invalid/number-date",
+      "expr": {"op": "nextOccurrence", "args": [20260130, "monthly"]},
+      "expected": {"type": "nil"}
+    }
+  ]
+}

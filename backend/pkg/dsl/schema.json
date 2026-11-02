@@ -1443,8 +1443,11 @@
           "enum": [
             "once",
             "daily",
-            "weekly"
-          ]
+            "weekly",
+            "monthly",
+            "yearly"
+          ],
+          "description": "monthly / yearly はレコード基準(entity + date / datetime の field)だけ: field の日付の日(毎年は月日)にくり返す。日が無い月は月末(1/31 → 2/28)。サブスクの更新日・誕生日・記念日。"
         },
         "time": {
           "type": "string",
@@ -3374,6 +3377,7 @@
             "daysBetween",
             "daysUntil",
             "addDays",
+            "nextOccurrence",
             "hoursBetween",
             "year",
             "month",
@@ -3417,6 +3421,7 @@
             "daysBetween": "daysBetween(a,b) = b - a の日数",
             "daysUntil": "daysUntil(d) = d - 今日 の日数(過ぎたら負)",
             "addDays": "addDays(d, n) = d の n 日後",
+            "nextOccurrence": "nextOccurrence(d, \"monthly\"|\"yearly\") = d から毎月 / 毎年くり返す日付のうち、今日以降で最も近い日(d が今日以降なら d)。日が無い月は月末に寄せる(1/31 の毎月 → 2/28・閏年 2/29、2/29 の毎年 → 平年 2/28)。サブスクの次の更新日・次の誕生日。daysUntil と組み合わせて残り日数に",
             "hoursBetween": "hoursBetween(start, end) = \"HH:mm\" 同士の差の時間数(小数。30 分 = 0.5)。end < start は日付またぎとして +24h。勤務時間・睡眠時間に",
             "year": "年",
             "month": "月(1-12)",

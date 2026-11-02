@@ -407,6 +407,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRetention(c.Expect, app)...)  // #482: retention.go
 		// #507: matching.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMatching(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkRepeat(c.Expect, app)...) // #266: repeat.go
 	}
 	created[c.ID] = res.DSL // edits too, so an edit can build on an earlier edit (#229)
 	log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms first=%dms out=%d chars=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",
