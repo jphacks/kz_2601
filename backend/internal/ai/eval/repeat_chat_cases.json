@@ -1,0 +1,6 @@
+[
+  {"id": "nrc_can_monthly", "group": "repeat", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#266 毎月の通知はできる(1 回・毎日・毎週だけと断らない)",
+   "steps": [{"say": "サブスクの更新日の前日に毎月通知することってできる?", "textAny": ["できます", "できる"], "textNot": ["できません", "nextOccurrence", "monthly"]}]},
+  {"id": "nrc_can_birthday", "group": "repeat", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#266 毎年の誕生日の通知はできる",
+   "steps": [{"say": "毎年の誕生日に通知ってできる?", "textAny": ["できます", "できる"], "textNot": ["できません", "yearly"]}]}
+]
