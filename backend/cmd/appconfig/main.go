@@ -40,11 +40,7 @@ func main() {
 	st, closeStore := newStore(ctx, target, logger)
 	defer closeStore()
 
-	appCheck := newAppCheck(ctx, project, logger)
-	// deleted accounts (DELETE /v1/me) get 410 on everything else: appconfig.RejectDeleted
-	authed := func(h http.Handler) http.Handler {
-		return appCheck(auth.Middleware(verifier, mode)(appconfig.RejectDeleted(st, h)))
-	}
+	authed := newAuthed(newAppCheck(ctx, project, logger), auth.Middleware(verifier, mode), st)
 	api := appconfig.New(st)
 	entitlement.Register(api, newEntitlements(st, logger)) // Pro (#314)
 	handler := newHandler(authed, logger, api, appconfig.SharePage(st))
@@ -201,7 +197,38 @@ func newHandler(authMiddleware func(http.Handler) http.Handler, logger *slog.Log
 	}))
 	// /debug/error answers 5xx/panic on purpose on stg only (alert check, #295)
 	debug := httpx.DebugErrors(os.Getenv("APP_ENV") == "stg")
-	return httpx.Chain(mux, httpx.WithRequestID, httpx.Log(logger), httpx.Recover(logger), debug, httpx.ErrorEnvelope)
+	return httpx.Chain(mux,
+		// request id / trace on every response (#295)
+		httpx.WithRequestID,
+		// access log, 5xx as ERROR (#295)
+		httpx.Log(logger),
+		// panics -> 500 + Error Reporting (#295)
+		httpx.Recover(logger),
+		debug,
+		// every error body in the shared envelope
+		httpx.ErrorEnvelope,
+	)
+}
+
+// newAuthed wraps the v1 API outermost first. The order matters
+// (main_test.go): App Check and auth reject before RejectDeleted reads the
+// account, and RejectDeleted needs the uid auth puts in the context.
+func newAuthed(appCheck, authenticate func(http.Handler) http.Handler, accounts store.Accounts) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return httpx.Chain(h,
+			// only our app may call the API (#318)
+			appCheck,
+			// Firebase ID token -> uid, 401 without one
+			authenticate,
+			// 410 account_deleted for a deleted uid (DELETE /v1/me)
+			rejectDeleted(accounts),
+		)
+	}
+}
+
+// rejectDeleted is appconfig.RejectDeleted as a chain item.
+func rejectDeleted(accounts store.Accounts) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler { return appconfig.RejectDeleted(accounts, h) }
 }
 
 func health(w http.ResponseWriter, _ *http.Request) {

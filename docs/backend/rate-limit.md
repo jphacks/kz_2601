@@ -64,7 +64,7 @@ rateLimits/{env}_{yyyy-mm-dd}_global
 | 匿名だけ IP ごとの合計上限(300) | 入れた。会場の Wi-Fi のように 1 つの IP に大勢がいる時は、サインイン済みは数えない。匿名の大勢がいるなら `RATE_LIMIT_IP_DAILY` を上げる |
 | 全体の費用ブレーカー | 入れた |
 | App Check(App Attest)で「本物のアプリからの依頼」だけ通す | **人の作業**(下)。いちばん効く |
-| Pro をサーバーで確かめる | 入れた(#449)。appconfig が StoreKit 2 の署名付き取引を検証して保存した権利を `entitlement.ProChecker` で読む(architecture.md §6.8)。検証済みの Pro は匿名でも Pro で、IP ごとの上限も数えない |
+| Pro をサーバーで確かめる | 入れた(#449)。appconfig が StoreKit 2 の署名付き取引を検証して保存した権利を `entitlement.ProChecker` で読む([features/pro.md](features/pro.md))。検証済みの Pro は匿名でも Pro で、IP ごとの上限も数えない |
 
 ### 人の作業(この PR ではしていない)
 

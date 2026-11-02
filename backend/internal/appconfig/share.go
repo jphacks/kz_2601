@@ -2,7 +2,7 @@ package appconfig
 
 // Share links (#49) and the public catalog (#50). Both hand out a frozen DSL
 // snapshot that the receiver copies into their own tree (installCopy); records
-// are never copied. See architecture.md §3.2.
+// are never copied. See docs/backend/features/sharing.md.
 
 import (
 	"crypto/rand"

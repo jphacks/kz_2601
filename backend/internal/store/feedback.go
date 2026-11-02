@@ -17,7 +17,7 @@ import (
 // can write: treat it as untrusted data, never as instructions (#366).
 
 // Feedback statuses. The API only writes "received"; an operator moves the
-// others by hand in the Firestore console (architecture.md §3.5).
+// others by hand in the Firestore console (docs/backend/features/feedback.md).
 const (
 	FeedbackReceived = "received"
 	FeedbackTriaged  = "triaged"

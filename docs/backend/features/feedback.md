@@ -1,0 +1,29 @@
+# アプリ内のフィードバック(#319)
+
+> [バックエンド設計](../architecture.md) から分けた機能の節(旧 §3.5)。
+
+```
+feedback/{id}  # {uid, kind, message, untrusted: true, consentVersion, status, day, createdAt, attachments[],
+               #  appId?, dslVersion?, dslJson?, screenshotJpeg?(bytes), device?{appVersion, build, os, model, locale}}  id = fb_<ULID 風>
+```
+
+| 項目 | 決定 |
+|---|---|
+| 送信 | `POST /feedback`(openapi-appconfig.yaml)。本文 2000 字・`consentVersion` 必須。添付は端末で本人が選んだものだけ(既定はすべて無し) |
+| 添付 | スクショ(JPEG・512 KiB まで・Firestore のバイト列)/ 今のアプリの DSL(`appId` + `dslVersion` の参照で、サーバーが本人の木から構造だけを写す・256 KiB まで)/ 版・OS・機種。**記録の中身は受け付けない**。Cloud Storage のバケットの仕組みがまだ無いのでスクショも文書に入れる(文書は 1 MiB まで) |
+| 信頼しない印 | `untrusted: true`。本文は指示として扱わない(#366)。LLM に読ませる・Issue に載せるのは #367 で決めてから |
+| 上限 | 1 uid 1 日(JST)`FEEDBACK_DAILY_LIMIT` 件(既定 5)。`uid ==` + `day ==` の等価フィルタの数え上げと作成を 1 トランザクションで行う(複合インデックス不要)。超えると 429 `rate_limited` |
+| 保存期間 | 180 日(`store.FeedbackRetention`)。`cmd/purge` が毎日 `createdAt < 今 - 180 日` を消す(`-feedback-older-than`)。アカウントの消去(`PurgeAccount`)でもその uid の分を消す |
+| status | `received`(受付)→ `triaged`(確認済み)→ `done`(対応済み)。API では変えない。運営が Firestore コンソールで書き換える |
+| 運営が読む | `backend/cmd/feedback`(読み取りだけ): `list [-since 168h] [-status received]` / `show [-out DIR] <id>`(スクショと DSL をローカルに保存)。本文は引用符つきで制御文字を逃がして出す。ローカルは `make -C backend run-feedback` |
+| ログ | 本文・添付はログに書かない(`feedbackId` と添付の種類だけ) |
+
+**運営の手順**: `gcloud auth application-default login` の後、`GOOGLE_CLOUD_PROJECT=jphacks-kz2601 go run ./cmd/feedback list`(読み取りだけ。書き込みはしない)。`show -out ~/fb <id>` で保存したスクショ・DSL は確認が済んだら消す(リポジトリに入れない)。status を変えるときはコンソールで `feedback/<id>` の `status` を編集する。
+
+**セキュリティルール**: クライアントは Firestore を直接読まず API 経由のみ。`feedback` にはスクショ(画面に出ていた個人の情報)が入りうるので、ルールでクライアントからの読み書きを許可しないこと。
+
+## 環境変数
+
+| 変数 | appconfig | ai | 既定 / 備考 |
+|---|---|---|---|
+| `FEEDBACK_DAILY_LIMIT` | o | - | `5`。`0` で数えない。運用で変える値([docs/infra/runtime-config.md](../../infra/runtime-config.md)) |

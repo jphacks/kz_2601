@@ -2,6 +2,22 @@
 
 > 正典は `docs/00_decisions.md`。本書はそれを実装可能な粒度に落としたもの。契約は `openapi-appconfig.yaml` / `openapi-ai.yaml`、DSLは `docs/dsl/README.md`(v1 正典) + `docs/dsl/dsl.schema.json`(旧案: `dsl-proposal.md`)。
 
+> **書き方**: 新しい機能はこの文書に節や表の行を足さず、`features/<slug>.md` を作って下の「機能ごとの設計」に 1 行足す(Issue 番号順)。機能だけが使う環境変数もその文書の「環境変数」に書く。
+
+## 機能ごとの設計
+
+- [共有データ(#47)](features/shared-data.md)
+- [シェアリンクと「探す」(#49 #50)](features/sharing.md)
+- [生成前の対話(#74)](features/chat.md)
+- [リリース申請(#76)](features/release.md)
+- [有料機能の判定と Pro の権利(#77 #314)](features/pro.md)
+- [ホットリロードの変化通知・SSE(#82)](features/events.md)
+- [計算ロジック Expr(#100)](features/expr.md)
+- [アカウント削除(#119)](features/account-deletion.md)
+- [shared の参加者(#254)](features/members.md)
+- [フィードバック(#319)](features/feedback.md)
+- [決まった形の文章(#417)](features/text.md)
+
 ## 1. サービス構成とリクエストフロー
 
 ```mermaid
@@ -130,129 +146,7 @@ match /apps_public/{appId}/{document=**} {
 }
 ```
 
-### 3.1 共有データ(entity.scope・#47)
-
-DSL の `Entity.scope`(`private` 既定 / `shared` / `public`)でレコードの置き場と権限が変わる。`shared` の置き場は `public` と同じで、読み書きできるのは作成者と参加者だけ(§3.4・#254)。下の表の public / shared 列の「認証ユーザー全員」は shared では「参加者全員」と読む。
-
-```
-apps_public/{appId}                                   # 公開 DSL: {ownerUid, name, version, dsl(map), dslJson, createdAt, updatedAt}
-└─ entities/{entityId}/records/{recordId}             # 共有レコード: {entity, data, clientId, author, authorName, createdAt, updatedAt}
-```
-
-| 項目 | private(従来) | public / shared |
-|---|---|---|
-| レコードの置き場 | `users/{uid}/apps/{appId}/entities/{e}/records` | `apps_public/{appId}/entities/{e}/records`(uid 非依存。appId は iOS の UUID なので単独で一意) |
-| 読み取り | 本人のみ | 認証ユーザー全員 |
-| 印(いいね・保存 #255) | 無し(DSL がエラー) | `entity.marks` に宣言した印を 1 人 1 回。件数はレコードの `markCounts.{markId}`、誰が付けたかは `.../records/{id}/marks/{markId}/by/{uid}`(トランザクションで両方を更新)。`PUT` / `DELETE .../records/{id}/marks/{markId}`。レコード削除で一緒に消える |
-| create | 本人 | 認証ユーザー全員。`author`=uid・`authorName`=リクエストの `authorName`(無ければ "匿名")を自動付与。`clientId` の冪等 id は `uid/clientId` から導出(他人と衝突しない) |
-| update / delete | 本人 | `author == uid` のみ(他人のレコードは **403 forbidden**) |
-| delete all(`?confirm=true`) | 全件 | **自分の投稿だけ**削除 |
-| `GET /records` | 従来どおり | 各レコードに `author`/`authorName` を含む。`filterField=author&filterOp=eq&filterValue=<uid>` で「自分の投稿」 |
-| DSL | `users/{uid}/apps/{appId}` | 作成者の `PUT/PATCH /dsl`・`POST /apps`・restore 時に public entity を 1 つでも含めば `apps_public/{appId}` に複製(所有者=最初に公開した uid・他人は上書き不可)。他ユーザーの `GET /dsl` は自分の下に無ければ公開 DSL を複製して version 1 を作る(=インストール) |
-
-実装: `store.RecordSet{UID, AppID, Entity, Public}` でコレクションを選ぶ(`store.PrivateRecords` / `store.PublicRecords`)。`store.PublishApp` / `GetPublicApp` が公開 DSL。handler は `appconfig/records.go` の `recordSet()` と `ownRecord()`(403 判定)。レコード検証は従来どおり呼び出し側ユーザーの現行 DSL で行うので、インストール後に各自が entity を変えても他人のレコードは消えない(スキーマレス)。
-
-### 3.2 シェアリンクと公開カタログ「探す」(#49 #50)
-
-```
-shares/{token}        # {appId, ownerUid, name, dslVersion, dslJson, revoked, createdAt}  token = 192bit base64url
-public_apps/{appId}   # {ownerUid, name, description, tags[], authorName, components[], dslVersion, dslJson, installs, createdAt, updatedAt}
-public_apps/{appId}/installs/{uid}  # {appId(その人の複製先), createdAt}  installs を uid ごとに 1 回だけ数える(#154)
-app_owners/{appId}    # {uid, createdAt}  appId の作成者(publish できる人・#153)
-```
-
-`public_apps`(探すの掲載)は §3.1 の `apps_public`(共有レコードの置き場)とは**別物**。名前が近いので注意。
-
-| 項目 | 決定 |
-|---|---|
-| シェア | `POST /apps/{appId}/share` が現行 DSL を**スナップショット**して token を返す(後から作者が変えてもリンク先は変わらない)。`DELETE /shares/{token}` で取り消し(発行者のみ)。取り消し後の import / プレビュー / Web ページは 404 |
-| 複製(import / install 共通 `installCopy`) | 受け取った人の木に version 1(初期)→ version 2(複製 DSL・`source.kind=import`)で作る(iOS の変身一覧は version 1 を「未生成」として隠すため)。**レコードは複製しない** |
-| 共有データ(scope: shared/public)の扱い | 共有 entity を含むアプリは**新しい appId を振らず元の appId に参加**する。理由: #93 の共有レコードは `apps_public/{appId}` で appId 単位、かつ「他人が同じ appId を開く = インストール」という設計なので、新 appId だと受け取った人は空の掲示板を見るだけになり共有の意味が無い。既に持っていれば何もしない(`created:false`)。private だけのアプリは新しい UUID の appId に独立コピー |
-| 公開 | `POST /apps/{appId}/publish`(name/description/tags/authorName)で作成・更新、`DELETE` で取り下げ。**その appId の作成者だけ**が掲載できる(#153)。作成者 = 最初に実コミット(生成 / PUT・PATCH /dsl / restore / `POST /apps` に dsl 付き / 新規 appId への複製)した uid を `app_owners/{appId}` に Create(既にあれば上書きしない)で記録。GET /dsl の seed(参加)と共有アプリへの参加 install は記録しないので、他人の appId を開いた人・参加者は 403。記録の無い既存アプリは「探す」の掲載者 → `apps_public` の持ち主の順で作成者とみなして記録し、どちらも無ければ最初に publish した人(空のアプリでは不可)を記録する。中身が初期 DSL のまま(components / entities 空)は 400 |
-| 検索 | `GET /public-apps?q=&sort=popular`(または `new`): installs 降順で最大 500 件を読み、名前・説明・タグ・作者名の部分一致をメモリ内で絞る(全文検索なし・複合インデックス不要) |
-| installs | `POST /public-apps/{id}/install` は `installs/{uid}` を見て、2 回目以降は最初の複製を返す(`created:false`・アーカイブ済みなら active に戻す。複製が削除済み(#180)なら新しく複製する)。installs は uid ごとに 1 回だけ、マーカーと同じトランザクションで +1。掲載者本人・参加済みの再インストールは数えない(#154) |
-| 認可 | publish = appId の作成者のみ(`app_owners`)。unpublish = 掲載の ownerUid。revoke = 発行者。share = 自分の木にあるアプリなら誰でも(参加者が友だちを招ける・#118。空のアプリは 400)。import / install / 検索 = 認証済みなら誰でも |
-| Web の共有ページ(#362) | 認証不要の `GET /s/{token}`(appconfig 直下・`/v1` の外)。スナップショット DSL の画面を**読むだけ**で描く(`sharepage.go` + `shareview.go`・`html/template`・JS なし・部品の対応は `docs/dsl/README.md` §3.8)。**レコードは出さない**(#253。公開レコード用の口 `RecordPeek` は nil 固定)。導線は「アプリで開く」(`tailorit://import/<token>`)と App Store(`AppStoreURL`)。og:title / og:description 付き・`noindex`。セキュリティ: CSP `default-src 'none'` + `<style>` の nonce だけ(script・img・frame・form は不可)、DSL の文字は全部エスケープ、リンクは `https://` の `link` だけ、`Referrer-Policy: no-referrer`(token を外へ漏らさない)。描画の上限は 12 画面・400 部品・200ms・512KB。キャッシュ: 有効なら `private, max-age=60`(取り消しは最大 1 分で反映)、無効は 404 + `no-store`。取り消し・存在しない token は従来どおり「リンクが無効です」。運営の非公開化(#321)は `shareHidden` で同じ 404 にする。ベース URL は `SHARE_WEB_BASE_URL`、無ければリクエストのホスト |
-| モデレーション(#321・審査 1.2) | **通報** `POST /reports` → `reports/{id}`(通報者 uid・対象の種類と ID・持ち主 uid・理由・日時のみ。1 人 1 日 30 件・同じ対象は 1 件)+ ログ `moderation: report` を運営のアラートが拾う。**ブロック** `/me/blocks`(`users/{uid}/blocks/{blockedUid}`): ブロックした人の投稿(GET records)と掲載(GET /public-apps)をサーバーで除く。**運営の非公開化** `cmd/moderate`: `public_apps/{id}` / `apps_public/{appId}` に `hidden`・`hiddenReason`(作者に見せる理由)。掲載は本人以外に出さず install は 403 `unpublished`、共有アプリは records・シェアリンク・参加・GET /dsl の seed を止める。投稿は `delete-record` で消す。手順: `docs/infra/moderation.md` |
-
-デモ用シード: `scripts/seed-public-apps.sh <appconfig URL>` が `docs/dsl/examples` の kakeibo / training / walk を `catalog-<name>` として公開する(再実行は上書き)。
-
-### 3.3 リリース申請(#76)
-
-```
-release_requests/{id}  # {appId, ownerUid, name, dslVersion, dslJson, purpose, contact, status, createdAt, updatedAt}  id = rr_<ULID 風>
-```
-
-| 項目 | 決定 |
-|---|---|
-| 申請 | `POST /apps/{appId}/release-requests`(`purpose` 必須 200 字・`contact` 任意 100 字)。所有者のみ(自分の木に無いアプリは 404)。現行 DSL をスナップショットして `status=received` で保存 |
-| 冪等 | 同じ (ownerUid, appId) に `declined` 以外の申請があれば何も書かず既存を 200 で返す(409 にしない)。Firestore はクエリ + 作成を 1 トランザクションで行うので連打でも 1 件 |
-| 取得 | `GET /apps/{appId}/release-requests`(そのアプリ)/ `GET /release-requests`(全アプリ・変身一覧のバッジ用)。DSL 本体は返さない |
-| status | `received`(受付)→ `reviewing`(検討中)→ `planned`(リリース予定)/ `declined`(見送り)。**API では変えない**。管理者が Firestore コンソールで書き換える(下記) |
-| インデックス | `ownerUid ==`(+ `appId ==`)の等価フィルタのみ・並びはメモリ。単一フィールドの自動インデックスで足りるので複合インデックス不要 |
-
-**管理者の運用手順(Firestore コンソール)**
-
-1. GCP コンソール → Firestore → データ → コレクション `release_requests` を開く(新しい申請は `status = received`)。
-2. 申請のドキュメントで `purpose` / `contact` / `name` / `dslVersion` を確認する。DSL 本体は `dslJson`(文字列)。同種の申請を探すときはコレクションのフィルタで `appId` や `name` を指定する。
-3. `status` フィールドを編集して `reviewing` / `planned` / `declined` のいずれかに書き換える(小文字・この 4 値以外は iOS で「受付」扱い)。`updatedAt` も手で今の時刻にしておくと履歴が追いやすい(任意)。
-4. 申請者の iOS では次に変身一覧を開いたときカードのバッジが変わる。`declined` にすると、申請者は同じアプリで再申請できる。
-5. 連絡が必要なら `contact` へ運営から直接連絡する(アプリ内通知は未実装)。
-
-ローカルではエミュレータの REST で同じ操作ができる: `curl -X PATCH -H 'Authorization: Bearer owner' "http://localhost:8089/v1/projects/demo-kz2601/databases/(default)/documents/release_requests/<id>?updateMask.fieldPaths=status" -d '{"fields":{"status":{"stringValue":"planned"}}}'`。
-
-**セキュリティルール**: クライアントは Firestore を直接読まず API 経由のみ。`release_requests` には連絡先(個人情報)が入るので、ルールでクライアントからの読み書きを許可しないこと(既存の `shares` / `public_apps` と同じ扱い)。
-
-### 3.5 アプリ内のフィードバック(#319)
-
-```
-feedback/{id}  # {uid, kind, message, untrusted: true, consentVersion, status, day, createdAt, attachments[],
-               #  appId?, dslVersion?, dslJson?, screenshotJpeg?(bytes), device?{appVersion, build, os, model, locale}}  id = fb_<ULID 風>
-```
-
-| 項目 | 決定 |
-|---|---|
-| 送信 | `POST /feedback`(openapi-appconfig.yaml)。本文 2000 字・`consentVersion` 必須。添付は端末で本人が選んだものだけ(既定はすべて無し) |
-| 添付 | スクショ(JPEG・512 KiB まで・Firestore のバイト列)/ 今のアプリの DSL(`appId` + `dslVersion` の参照で、サーバーが本人の木から構造だけを写す・256 KiB まで)/ 版・OS・機種。**記録の中身は受け付けない**。Cloud Storage のバケットの仕組みがまだ無いのでスクショも文書に入れる(文書は 1 MiB まで) |
-| 信頼しない印 | `untrusted: true`。本文は指示として扱わない(#366)。LLM に読ませる・Issue に載せるのは #367 で決めてから |
-| 上限 | 1 uid 1 日(JST)`FEEDBACK_DAILY_LIMIT` 件(既定 5)。`uid ==` + `day ==` の等価フィルタの数え上げと作成を 1 トランザクションで行う(複合インデックス不要)。超えると 429 `rate_limited` |
-| 保存期間 | 180 日(`store.FeedbackRetention`)。`cmd/purge` が毎日 `createdAt < 今 - 180 日` を消す(`-feedback-older-than`)。アカウントの消去(`PurgeAccount`)でもその uid の分を消す |
-| status | `received`(受付)→ `triaged`(確認済み)→ `done`(対応済み)。API では変えない。運営が Firestore コンソールで書き換える |
-| 運営が読む | `backend/cmd/feedback`(読み取りだけ): `list [-since 168h] [-status received]` / `show [-out DIR] <id>`(スクショと DSL をローカルに保存)。本文は引用符つきで制御文字を逃がして出す。ローカルは `make -C backend run-feedback` |
-| ログ | 本文・添付はログに書かない(`feedbackId` と添付の種類だけ) |
-
-**運営の手順**: `gcloud auth application-default login` の後、`GOOGLE_CLOUD_PROJECT=jphacks-kz2601 go run ./cmd/feedback list`(読み取りだけ。書き込みはしない)。`show -out ~/fb <id>` で保存したスクショ・DSL は確認が済んだら消す(リポジトリに入れない)。status を変えるときはコンソールで `feedback/<id>` の `status` を編集する。
-
-**セキュリティルール**: クライアントは Firestore を直接読まず API 経由のみ。`feedback` にはスクショ(画面に出ていた個人の情報)が入りうるので、ルールでクライアントからの読み書きを許可しないこと。
-
-### 3.4 shared の参加者(#254)
-
-`scope:"shared"` は「シェアリンク / QR で参加した人だけ」(家族・サークル・友達・チーム)。`public` は従来どおり誰でも(掲示板・ランキング)。レコードの置き場はどちらも `apps_public/{appId}/entities/{e}/records` のまま変えず、**誰が読み書きできるか**だけを参加者表で絞る。
-
-```
-apps_public/{appId}/members/{uid}   # {displayName?, via: share|legacy, invitedBy?, joinedAt}
-```
-
-| 項目 | 決定 |
-|---|---|
-| 参加者 | 作成者(`app_owners/{appId}`・ドキュメント無しで常に参加者)+ `members/{uid}` がある人。作成者の判定は publish と同じ `appOwner`(記録が無ければ「探す」の掲載者 → `apps_public` の持ち主) |
-| 参加 | `POST /shares/{token}/import`(任意で `{displayName}`)。シェアの DSL に shared の entity があれば呼び出したユーザーを `members/{uid}` に入れる(`via: share`・`invitedBy` = リンクの発行者)。既に参加していれば表示名だけ更新。**リンクの発行者がもう参加者でなければ 403 `inviter_left`**(外された人の古いリンクを止める)。上限 100 人(`members_full`) |
-| 招待 | shared の entity を含むアプリの `POST /apps/{appId}/share` は参加者だけ(appId を知っているだけの人が自分宛てにリンクを作って入るのを防ぐ)。参加者が友だちを招けるのは #118 のまま |
-| records | shared の entity の records の全操作(一覧・取得・作成・更新・削除・全件削除)で `entityOf` が参加者か確かめ、違えば **403 `forbidden` / `details.reason: not_member`**。`GET /entities/{e}`(定義)は DSL に入っているので絞らない。public の entity は確かめない |
-| 更新の権限(#252 / PR #378 と合わせる) | `entity.edit: "members"` の「参加者なら誰でも更新」の参加者はこの表の参加者。参加者でなければ `ownRecord` に届く前に 403 になるので、#378 の「同じ appId を開いた全員」は shared ではこの表に絞られる(public の `edit: members` は従来どおり全員) |
-| 退出・外す | `DELETE /apps/{appId}/members/me` で退出(冪等)。`DELETE /apps/{appId}/members/{uid}` は作成者だけ。作成者は抜けられない(400)。外された人の木のコピーと過去の投稿は残る。作成者が出したリンクは取り消すまで有効なので、再参加させたくなければ `DELETE /shares/{token}` も行う |
-| 一覧 | `GET /apps/{appId}/members`(参加者だけ)。作成者を先頭に参加順。`{uid, displayName, role: owner / member, via?, joinedAt?, you}` |
-| GET /events | 参加者でなければ shared の entity の records を購読しない(何も漏らさない・エラーにもしない) |
-| GET /dsl | appId を開けば DSL のインストール(seed)は従来どおり起きる。レコードは参加しないと読めない |
-| 探す | 誰でも見られるので、共有が shared だけのアプリは**新しい appId の独立コピー**(追加した人が作成者)。public も含むアプリは元 appId に参加するが、shared の entity は参加者でないので 403 |
-| アプリ削除 | 作成者の `DELETE /apps/{appId}` は `apps_public/{appId}` ごと消すので参加者表も消える(Firestore の再帰削除)。参加者が自分のコピーを消しても参加は残る(後続) |
-| コスト | shared の records の 1 リクエストにつき `app_owners` と `members/{uid}` の読み取りが最大 2 回増える。キャッシュはしない(外した直後から確実に 403 にするため) |
-
-**移行(#254 以前に shared で共有していたアプリ)**
-
-- 作成者は計算で常に参加者なので、既存アプリの作成者が急に読めなくなることは無い。
-- それ以外の人(リンクや appId で開いて使っていた家族)は、既定では参加し直しが要る(作成者がリンクを送り直す)。急に 403 にしたくない環境では **`SHARED_MEMBERS_LEGACY_BEFORE`(RFC3339)** をデプロイ時刻にして出す。その時刻より前に作られた自分のコピー(`users/{uid}/apps/{appId}.createdAt`)を持つ人は、初回アクセスで `via: legacy` の参加者として記録される。時刻より後に開いた人は対象外なので、appId を知っているだけの人は入れない。全員が一度開いた頃に外してよい。
-- `public` の挙動は何も変えていない。今の AI は共有の依頼を主に `public` で作るので(#385)、影響を受ける既存データは `scope:"shared"` を明示したアプリだけ。
+機能ごとのコレクション(共有データ・シェア・リリース申請・フィードバック・参加者)は [機能ごとの設計](#機能ごとの設計) の各文書。
 
 ### 3.6 仲間探しのアプリ(#507)
 
@@ -300,24 +194,7 @@ func Middleware(v *auth.Client, mode string) func(http.Handler) http.Handler {
 func UID(ctx context.Context) string { s, _ := ctx.Value(ctxKey{}).(string); return s }
 ```
 
-### 4.1 アカウント削除(`DELETE /v1/me`・#119)
-
-App Store 審査ガイドライン 5.1.1(v)(アカウントを作れるアプリはアプリ内から削除を開始できること)への対応。iOS の設定シート「アカウントを削除」から呼ぶ。**論理削除**(2026-10-25 ユーザー判断: 物理削除と Firebase Auth のユーザー削除はしない。Cloud Run に `roles/firebaseauth.admin` を足さずに済む)。
-
-| 対象 | 扱い |
-|---|---|
-| `users/{uid}` | `{status: "deleted", deletedAt}` を書く(このドキュメントは他に書かれないので、無ければ有効なユーザー) |
-| `users/{uid}/apps/*` | `status: "archived"`(`DELETE /v1/apps/{appId}` と同じ)。versions・records は残る |
-| `shares/*`(`ownerUid == uid`) | `revoked: true`(受け取り側の取り込み・プレビューは 404) |
-| `public_apps/*`(`ownerUid == uid`) | 取り下げ(「探す」から消える) |
-| `apps_public/*`(共有アプリの DSL と共有レコード) | 残す。他人の投稿も自分の投稿も消えない |
-| Firebase Auth のユーザー | サーバーは削除しない(iOS がクライアント SDK で削除する。下記「再登録」) |
-
-- **以後のリクエスト**: `appconfig.RejectDeleted`(auth.Middleware の内側)が削除済み uid の認証済みリクエストに **410 `account_deleted`** を返す。`DELETE /v1/me` だけは通して何度でも 204。uid ごとに「削除済み」は永続キャッシュ、「有効」は 30 秒キャッシュ(別インスタンスへの反映は最大 30 秒遅れる)
-- **冪等性**: 削除済みの印を最初に書き(トランザクションで最初の `deletedAt` を保持)、アプリ・シェア・掲載の更新は何度やっても同じ結果。途中で失敗しても再実行で終わる
-- **実装**: `store.Accounts`(`DeactivateUser` / `UserDeleted`。`account.go` / `memory_account.go` / `firestore_account.go`)。`ownerUid` の等価クエリだけなのでインデックス追加は不要
-- **再登録**: サーバーは Firebase Auth のユーザーを消さないが、iOS が `DELETE /v1/me` の 204 の後にクライアント SDK で自分のユーザーを削除する(`User.delete()`・管理者権限不要)。そのため同じ Apple ID でサインインし直すと**新しい uid = 新規ユーザー**になる(古い uid のデータは論理削除のまま残る)。クライアント側の削除が失敗した場合だけ、同じ uid に戻って 410 になる(ログに残る)
-- **Sign in with Apple のトークン取り消し**: iOS が削除直前に Apple の再認証で `authorizationCode` を得て `Auth.revokeToken(withAuthorizationCode:)`(Firebase が Apple の `auth/revoke` を呼ぶ)。Firebase コンソールの Apple プロバイダに Services ID・Team ID・Key ID・秘密鍵(OAuth コードフロー構成)が要る。失敗しても削除は続ける
+アカウント削除は [features/account-deletion.md](features/account-deletion.md)。
 
 ## 5. DSL のバージョニングと差分適用
 
@@ -332,24 +209,11 @@ App Store 審査ガイドライン 5.1.1(v)(アカウントを作れるアプリ
 | 保存形式 | 各 version に **フルスナップショット `dsl` + 適用した `patch`**(PUT 時は `patch` 無し) | ロールバックは「コピー」。差分表示・デバッグは `patch` を見る |
 | 楽観ロック | `PUT`/`PATCH` とも `If-Match: "<version>"` 必須。トランザクション内で `currentVersion` と照合し不一致は **409 `version_conflict`**(ボディに現行 version) | Patch は**基底バージョン依存**なので 409 時は再生成が必須(ai は最新を取り直して 1 回だけ再試行) |
 | ロールバック | `POST /v1/apps/{id}/versions/{v}/restore` → version v の `dsl` で **新 version N+1**(`source.kind=restore`)。履歴は消さない | 「元に戻して」と言われた時 ai は Claude を呼ばず **restore を直接叩く**(発話の意図分類は Claude に `{intent: edit|create|undo}` を出させてもよいが v0 はキーワード) |
-| ETag | `ETag: "<currentVersion>"`(例 `"7"`)。`GET /dsl` は `If-None-Match` 一致で **304** | 単調増加 int なので比較が自明。iOS は SSE(§5.1)で変化を知り、フォールバックでポーリング |
+| ETag | `ETag: "<currentVersion>"`(例 `"7"`)。`GET /dsl` は `If-None-Match` 一致で **304** | 単調増加 int なので比較が自明。iOS は SSE([§5.1](features/events.md))で変化を知り、フォールバックでポーリング |
 | 変更の説明 | version.source に `summary`・`transcript`・`mode(full|patch)`・`model` | iOS が「円グラフを追加しました」と読み上げる材料 |
 | 実装 | `pkg/dsl.ApplyPatch(current, ops)`(evanphx/json-patch v5 + `Parse`)、`dsl.PatchSchemaJSON()`、`dsl.ValidatePatchDocument()` は**実装済み・テスト済み** | appconfig/ai が同じ関数を呼ぶので結果が一致する |
 
-### 5.1 ホットリロードの変化通知(`GET /v1/apps/{appId}/events`・SSE・#82)
-
-| 論点 | 決定 | 理由 |
-|---|---|---|
-| 方式 | **backend が Firestore snapshot listener を持ち SSE で通知**(案 B)。iOS が Firestore SDK で直接購読する案 A は不採用 | ルールは全面拒否のまま(クライアント直読みを開けない=認可は API の 1 箇所)。iOS に FirebaseFirestore(gRPC/abseil/leveldb)を足さない=ビルド時間・バイナリ増を避ける。エミュレータ + curl でローカル完結して検証できる |
-| 流すもの | `hello{version,entities}` / `dsl{version}` / `records{entity}` / `bye` のみ。本体は既存 API で再取得 | データの正は API のまま。SSE の認可漏れが即データ漏れにならない |
-| 購読対象 | `users/{uid}/apps/{appId}`(自分の DSL)+ 現行 DSL の各 entity の records(private は自分の下、public/shared は `apps_public/{appId}/entities/{e}/records`) | 共有掲示板(public)で他ユーザーの投稿が数百 ms で出る |
-| records の窓 | `orderBy(updatedAt desc).limit(100)` | 接続ごとに一致件数ぶん読み取り課金されるため。作成/更新は必ず窓の先頭に入る。窓外の古いレコードの削除は通知されない(次の pull で消える) |
-| 寿命 | 1 本 **50 秒**(`EVENTS_MAX_STREAM`)で `bye` → クライアント即再接続。心拍 15 秒 | appconfig の Cloud Run `--timeout=60` 内に収める(デプロイ設定は変更不要)。DSL が変わったら entity 構成が変わり得るので `dsl` の直後にも `bye` |
-| 多インスタンス | 各インスタンスが自分で Firestore を listen するので、別インスタンスへの書き込みも届く | in-process pub/sub だと max-instances=3 で取りこぼす |
-| store | `store.Watcher`(`WatchApp` / `WatchRecords`)。Firestore = snapshot listener、Memory = in-process hub(ローカル・テスト) | ハンドラは interface 依存のまま |
-| 実測 | Firestore エミュレータ: 投稿 → SSE `records` まで **38〜39 ms**。シミュレータ表示まで(250 ms デバウンス + pull 込み)**442 ms** | `scripts/realtime-smoke.sh` |
-
-コスト目安: 1 クライアント 1 entity あたり再接続ごとに最大 100 読み取り(50 秒周期で ≒7,200/時)。無料枠 5 万/日に対し、デモ数台・数時間なら収まるが、常時多数接続は不可。必要なら `EVENTS_MAX_STREAM` と Cloud Run `--timeout` を伸ばす(例 3600s / 55m)と読み取りが約 1/60 になる(Cloud Run は接続中ずっと課金対象になる点とのトレードオフ)。
+変化通知(SSE)は [features/events.md](features/events.md)。
 
 ## 6. ai サービス詳細
 
@@ -467,89 +331,7 @@ Cloud Run: ai は `min-instances=1`(コールドスタート回避・デモ中�
 
 `POST /v1/transcribe` multipart(`audio`: m4a/wav/mp3 ≤ 25MB ≤ 60s, `language=ja`)→ OpenAI `whisper-1` → `{text, language, durationMs}`。`OPENAI_API_KEY` 未設定なら **501 `not_configured`**。`/generate` も `multipart/form-data` で `audio` を受けた時は内部で同じ処理を通す。
 
-### 6.6 生成前の対話フェーズ(`POST /v1/chat`・Issue #74 / G17・2026-10-24 実装)
-
-初回生成の前に数ラリーで要件を固める。`/generate` は無変更で、iOS(#75)は `ready.transcript` を既存の create 経路に渡す。実装は `backend/internal/ai/chat.go`、eval は [ai-eval/2026-10-24-chat.md](ai-eval/2026-10-24-chat.md)。
-
-```mermaid
-flowchart LR
-  U[user: 家計簿] --> S{go-ahead 語?<br/>もう作って / お任せ / just build it}
-  S -- yes & 直前の brief あり --> R0[ready source=shortcut<br/>Claude 不使用 0ms]
-  S -- no --> T{ラリー ≤ 3?}
-  T -- no --> F[Claude: 強制 ready]
-  T -- yes --> C[Claude 構造化出力<br/>{kind,text,suggestions,brief,transcript}]
-  C -- question --> Q[1 問 + 選択肢 ≤3<br/>brief/transcript は保持]
-  C -- ready --> R[ready: brief + transcript]
-  F --> R
-  Q --> U2[user: はい] --> S
-  R --> G[POST /v1/generate text=transcript]
-  R0 --> G
-```
-
-| 項目 | 決定 |
-|---|---|
-| Claude 呼び出し | `Completion.Structured=true` で小さな `ChatSchema`(全 required・closed)を `output_config.format` に送る(DSL 用の大きなスキーマは従来どおりプロンプト埋め込み)。system prompt は固定で約 1.4K tok(キャッシュ)、user ターンに `## 表示言語(locale)` / `## ラリー n/3` / 会話全文。`max_tokens` 1024。JSON が壊れていれば 1 回だけ問題点付きで再要求、2 回失敗で 502 `generation_failed` |
-| 判定基準(プロンプト) | 「目的・記録する項目・見たい一覧/集計・必要なネイティブ機能(camera/notification/calendar/map/location/share)」が推定できれば ready。常識で埋まる点(家計簿なら金額・カテゴリ・日付)は聞かない。曖昧なら**最重要の 1 点だけ**、20 字程度、選択肢 2〜3 個。transcript にユーザーが言っていない機能を足さない |
-| 即 ready | `ai.wantsBuildNow`: 短い発話(ja ≤12 字 / en ≤32 字)に go-ahead 語(もう作って / それでいい / お任せ / よろしく / just build it / go ahead / that's fine …)を含む → 直前ターンで Claude が書いた brief / transcript をそのまま返す。brief がまだ無い 1 発目(「お任せで家計簿」)は Claude を 1 回呼び強制 ready |
-| 上限 | Claude が質問できるのは 3 ラリー。4 ラリー目は `## 強制 ready` を付けて呼び、質問が返っても ready に寄せる(`source=forced`) |
-| 会話状態 | ai プロセス内 `map[appId]`(直近 10 メッセージ・TTL 30 分・アクセス時に lazy sweep)。`messages` は全履歴でも最新 1 件でもよい(2 件以上=置換、1 件=追記)。`DELETE /v1/chat/{appId}` でクリア。**永続化(appconfig `conversations/{appId}`・再起動で続きから)は後段**(Cloud Run `min-instances=1` の単一インスタンスなら 30 分内は同じプロセスに当たる前提) |
-| 既存アプリがある時 | `/chat` は呼ばれない想定(iOS が初期状態の時だけ対話 UI を出す)。`/generate` の `mode: auto` 判定は従来どおり |
-| 速度(#147) | chat は生成と別設定(`AI_CHAT_MODEL` / `AI_CHAT_EFFORT` / `AI_CHAT_THINKING`、既定 Sonnet 5.5 / low / adaptive)。1 回目の呼び出しはストリーミングし、`kind=question` で `text` と `suggestions` が出そろった時点で**質問を先に返す**(スキーマ順が kind→text→suggestions→brief→transcript)。brief / transcript は裏で最後まで生成して会話に保存し、同じ appId の次のターンはそれを待つ。ready は全体が必要なので従来どおり。実測は [ai-eval/2026-10-24-chat-latency.md](ai-eval/2026-10-24-chat-latency.md) |
-| 実測(Sonnet 5.5 / low・6 ケース 8 ステップ全通過) | Claude 1 回 **p50 2.4s**(初回キャッシュ作成 7.5s を除くと 2.05〜2.6s)、即 ready は 0ms。Haiku 5.5 は速くならず(2.2 / 2.8s)英語の具体発話で質問に戻ったので採用せず |
-
-### 6.7 計算ロジック(Expr・Issue #100)
-
-割り勘で「割る」計算が DSL に書けなかった問題への対応。仕様は [../dsl/expressions.md](../dsl/expressions.md)、eval は [ai-eval/2026-10-24-logic.md](ai-eval/2026-10-24-logic.md)。
-
-| 項目 | 決定 |
-|---|---|
-| 表現 | 小さな式ツリー `Expr`(リテラル / ref / agg / op / if・op は閉じた 38 種・深さ 8)を `Field.computed`(行ごとの算出列)と `stat.value`(画面スカラー)に置く。他 entity 参照は `Field.type:"ref"`、精算は Leaf `settlement`。評価は iOS、backend は `pkg/dsl/expr.go` で検証(op/引数/ref 文脈/agg/循環/深さ/粗い型) |
-| AI への教え方 | カタログ末尾に `$defs/Expr` から自動生成した「計算式 Expr」節(形・op 一覧・レシピ 5 本)+ few-shot 例 3(割り勘)+ プロンプト規則「計算が要る発話では UI だけで終わらせない」 |
-| 既定 = **1 パス** | UI と計算を 1 回の生成で出す。新 5 ケースで計算 5/5・一発通過 5/5・p50 6.5s / p95 8.1s。入力は約 +5.8K tok(キャッシュ対象) |
-| 2 パス(opt-in) | `AI_LOGIC_PASS=1` か `Request.logicPass:true`。create の後に計算カタログだけの小さな system prompt(約 2.9K tok)で「計算を足す JSON Patch」を 1 回(+1 回再試行)。検証に通らなければ 1 パス目を返す。計算 5/5 は同じで p50 10.7s(1 パス 6.5s)と遅いので既定にしない。edit ターンでは動かない(後続対応) |
-| ストリーミング | 1 パス目の `event: app` はそのまま先に届く。2 パス目の結果は最終 DSL(`event: result`)に反映 |
-
-### 6.8 有料機能の判定(`requiresPro`・Issue #77・2026-10-25)
-
-チャットの ready / proposal に「作る予定の内容が Tailor It Pro(¥500 / 月)を要するか」を付ける。**課金の強制はしない**(iOS が確認カードを出すための情報だけ)。
-
-| 項目 | 決定 |
-|---|---|
-| 有料リスト(1 か所) | **`backend/internal/ai/paid_features.json`**(`//go:embed`)。初期は **`sharedData`(みんなで共有するデータ = entity.scope shared/public・apps_public の同期)だけ**。他の機能を有料にする時はここに 1 要素足す(`id`・`title`/`reason`/`withoutInstruction` の ja/en・`keywords`・`excludeKeywords`・`dslEntityScopes`)。一時的に外す時は `enabled: false`。id の重複は起動時に panic(テスト `TestPaidCatalog_ParseEditable`) |
-| 判定の材料 | **generate に渡る文そのもの**(ready の `transcript` / 案の `instruction`)に `keywords` が含まれるか(`excludeKeywords` を先に取り除く。「共有ボタン」「共有しない」は有料にしない)。sharedData の語は生成プロンプトの `entity.scope` 規則(「みんなで」「共有」「投稿」「ランキング」「掲示板」「友達と」→ scope:public)と揃えてあるので、生成前に生成結果を予測できる |
-| edit | 今のアプリが既に持つ有料機能(`dslEntityScopes` で現 DSL を判定)は除く(既に共有のアプリを直すたびに聞かない) |
-| 応答(追加フィールド・すべて省略可) | ready: `requiresPro` / `paidFeatures[{id,title,reason}]` / `freeTranscript`。proposal: `options[].requiresPro` / `paidFeatures` / `freeInstruction`。無料なら一切出さない(旧 iOS は今と同じ JSON を受け取る) |
-| 「この機能なしで作る」 | `freeTranscript` / `freeInstruction` = 元の文 + `withoutInstruction`(「無料版で作る: 他のユーザーとデータを共有する機能は入れない…scope は private」)。iOS はこれを generate に渡す |
-| 実装 | `internal/ai/paid.go`(`PaidCatalog.Detect` / `InApp` / `Without` / `annotate`)。`Service.Chat`(旧 clarify)と `chatFirst` の戻り値に defer で付ける。テスト `paid_test.go` |
-
-**iOS の生成後 DSL で判定しなかった理由**: ai の generate は生成した DSL を **その場で appconfig に保存する**(version が増え、共有アプリなら apps_public にも公開される)。生成後に判定すると、確認カードを出す前に有料機能入りのアプリがサーバーに出来てしまい(「元に戻して」やアプリ一覧から無料で開ける)、「この機能なしで作る」はもう 1 回の生成(LLM 費用・待ち時間)になる。チャットの ready / 案の時点なら生成前に止められ、判定に LLM 呼び出しも増えない。
-
-**サーバー側の権利(#314・2026-11-02)**: iOS が購入・復元の後と起動時に StoreKit 2 の署名付き取引(JWS)を appconfig の `POST /v1/me/entitlements/apple` に送る。サーバーは Apple に問い合わせずに検証し(`internal/appstore`)、`users/{uid}/entitlements/pro` に保存する(`internal/entitlement`)。ai の回数制限はこれを読んで Pro の上限にする(#449)。402 で止めるのは #316、更新・解約・返金の通知は #315。
-
-| 項目 | 決定 |
-|---|---|
-| 方式 | App Store の署名付き取引をサーバーで直接検証(RevenueCat 等は使わない。手数料なし・iOS の StoreKit 2 ラッパーと同じ前提) |
-| 検証 | `x5c` を **Apple Root CA - G3**(`internal/appstore/roots.go` に埋め込み・SHA-256 `63343ABF…3E9179`)まで検証。システムの証明書ストアは使わない。中間・leaf の Apple のマーカー拡張・ES256 の署名・`bundleId` / `productId` / `environment` の許可リスト(`APPSTORE_*` 環境変数)・`expiresDate` の有無。検証時刻は取引の `signedDate`(Apple のライブラリでオンライン確認をしない時と同じ) |
-| 環境 | 既定で Sandbox と Production の両方を受ける。審査と TestFlight は本番の版でも Sandbox で買うため(stg と prod は同じ Firestore を使っている)。`APPSTORE_ENVIRONMENTS=Production` で絞れる |
-| 保存 | `users/{uid}/entitlements/pro` {productId, originalTransactionId, transactionId, environment, expiresAt, revokedAt?, updatedAt}。期限切れ・返金も保存(isPro=false)。順番が前後しても古い取引で上書きしない |
-| 1 つの購読 = 1 つの uid | `appstore_transactions/{originalTransactionId}` {uid, productId, environment, boundAt, updatedAt}。別の有効な uid に結びついていれば 409 `transaction_owned_by_other`(1 つの購読を複数のアカウントで使い回せない)。退会済みの uid からは移す。購入時の `appAccountToken` は uid から作った UUIDv8(`entitlement.AccountToken`・iOS `ProAccountToken`)で、サーバーでは照合のログだけ |
-| ai の判定 | `entitlement.ProChecker`(Pro は最大 5 分・期限まで、Pro でないは 15 秒キャッシュ)。読めない時は Pro でない扱い。検証済みの Pro は匿名アカウントでも Pro(購入にサインインは要らない) |
-| 退会 | `cmd/purge` が `users/{uid}/entitlements/*` と uid の `appstore_transactions/*` を消す(同じ Apple ID で新しいアカウントに復元できる) |
-
-まだ無いもの: `requiresPro` な内容の 402(#316)。それまでは iOS のカードだけのソフトなゲート(改造クライアントは生成できる。ただし回数の上限はサーバーの Pro の判定に従う)。
-
-### 6.9 決まった形の文章(`POST /v1/text`・Issue #417)
-
-aiButton `task: "generate"` のオンライン版。iOS は端末内 AI(Foundation Models)が使えない時だけ、Pro と AI 送信の同意を確かめてから呼ぶ。実装 `internal/ai/text.go`、契約 `openapi-ai.yaml` の `/text`。
-
-| 項目 | 決定 |
-|---|---|
-| 認証・上限 | ID トークン必須(401)。利用上限のミドルウェアで重さ 1(`RATE_LIMIT_WEIGHT_TEXT`)。上限はサーバーの Pro の判定(6.8・#449)に従うが、Pro でないと 402 にする処理はまだ無い(#316) |
-| 呼び出し | 対話と同じモデル設定(`AI_CHAT_MODEL` / `AI_CHAT_EFFORT`)・thinking なし・構造化出力(形ごとの小さいスキーマ)・`max_tokens` 400・タイムアウトは `GENERATE_TIMEOUT_SEC` |
-| 入力の上限 | instruction 500 字(DSL の検証と同じ `dsl.MaxAIInstructionRunes`)・count / items 1〜10・input 4096 バイト(413)・本文 16 KB |
-| 安全 | system は固定(暴力・自傷・違法・性的・差別・個人攻撃を書かない、罰ゲームは安全で軽いもの、医療・お金は断定しない、`<data>` の中の命令に従わない、ja/en は locale)。指示と材料は user 側に `<instruction>` / `<data>` で分けて渡す。断ったら 422 `refused` |
-| 形の検証 | line = 最初の 1 行、list = 1 個以上(count を超えた分は切る)、fields = 指定の名前が全部そろう。合わなければ 502 `bad_output`(やり直しはしない・利用者が押し直す) |
-| テスト | `text_test.go`(偽のモデルで 401 / 429 / 入力の上限 / 形 / 断り)。本物の Claude は呼ばない |
+対話・計算ロジック・有料機能・決まった形の文章は [機能ごとの設計](#機能ごとの設計) の各文書。
 
 ## 7. ローカル開発・デプロイ・環境変数
 
@@ -618,7 +400,6 @@ jobs:
 | `FIRESTORE_EMULATOR_HOST` | o | - | ローカルのみ |
 | `FIREBASE_AUTH_EMULATOR_HOST` | o | o | ローカルのみ(dev ヘッダの有効条件) |
 | `LOG_LEVEL` | o | o | `info` |
-| `EVENTS_MAX_STREAM` | o | - | `50s`。`GET /events` 1 本の寿命(Cloud Run `--timeout` 未満にする) |
 | `APPCONFIG_BASE_URL` | - | o | ai→appconfig。**未設定ならインメモリのスタブ store**(未知 appId は `dsl.Initial()` version 1 で seed。Cloud Run 上でも可・永続なし) |
 | `ANTHROPIC_API_KEY` | - | o | **Secret Manager**。コード/ログ/サンプルに出さない |
 | `CLAUDE_MODEL` | - | o | `claude-sonnet-5-5` |
@@ -626,11 +407,9 @@ jobs:
 | `CLAUDE_STRUCTURED_OUTPUT` | - | o | 未設定(=off)。`1` で `output_config.format` を送る(現状は文法サイズ超過で 400) |
 | `OPENAI_API_KEY` | - | o | Secret Manager・任意(無ければ /transcribe 501) |
 | `GENERATE_TIMEOUT_SEC` | - | o | `45` |
-| `AI_LOGIC_PASS` | - | o | 未設定(=off)。`1` で create 後に計算ロジックの 2 パス目を実行(§6.7) |
-| `AI_CHAT_MODEL` | - | o | 未設定 = `claude-sonnet-5-5`。生成前の対話(§6.6)だけのモデル。速さ優先なら `claude-haiku-5-5`(+`AI_CHAT_THINKING=disabled`) |
-| `AI_CHAT_EFFORT` | - | o | 未設定 = `low` |
-| `AI_CHAT_THINKING` | - | o | 未設定 = 送らない(adaptive)。`disabled`(Haiku)/ `between_tools`(Sonnet 5.5)で思考オフ。#147 の eval では速くならなかった |
 | `MAX_AUDIO_BYTES` | - | o | `26214400` |
+
+機能だけが使う変数は [機能ごとの設計](#機能ごとの設計) の各文書の「環境変数」に書く。運用中に人が変える値(`FEEDBACK_DAILY_LIMIT`・`RATE_LIMIT_*`・`NOTICE_JSON` など)とデプロイが決める値(`APP_CHECK_MODE` など)は [docs/infra/runtime-config.md](../infra/runtime-config.md)。
 
 ## 8. ディレクトリ構成
 

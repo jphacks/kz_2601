@@ -90,4 +90,4 @@
 - [PayPay: PayPay 残高を送る](https://paypay.ne.jp/guide/send/)
 - [PayPay: 送られた PayPay 残高を受け取る](https://paypay.ne.jp/guide/receive/)
 - [Apple Pay(Apple Developer)](https://developer.apple.com/apple-pay/)
-- リポジトリ内: `docs/dsl/README.md`(`openUrlButton`・許可リスト)、`docs/backend/architecture.md` §6.8(Pro の判定)、`docs/store/app-review-notes.md`
+- リポジトリ内: `docs/dsl/README.md`(`openUrlButton`・許可リスト)、[`docs/backend/features/pro.md`](../backend/features/pro.md)(Pro の判定)、`docs/store/app-review-notes.md`
