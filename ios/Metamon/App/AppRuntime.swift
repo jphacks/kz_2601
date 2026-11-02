@@ -1175,6 +1175,7 @@ final class AppRuntime: DSLRuntime {
             return L10n.tr("「\(name)」の入力を確認してください(\(api.errorDescription ?? ""))")
         }
         if api.isAppCheckFailure { return ErrorCopy.appCheckFailedBody } // #318: サインインでは直らない
+        if api.isAIPaused { return ErrorCopy.aiPausedBody } // #511
         if api.status == 401 { return ErrorCopy.sessionExpiredSignIn }
         return api.errorDescription ?? "\(api)"
     }
