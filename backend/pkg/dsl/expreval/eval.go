@@ -324,9 +324,9 @@ type filter struct {
 	Value any    `json:"value"`
 }
 
-// resolve evaluates each filter.value Expr in the outer row. A value that
-// cannot be evaluated becomes null (which, like iOS, still matches empty values).
-func (ev *Evaluator) resolve(fs []dsl.Filter, row *Row) []filter {
+// resolve evaluates each filter.value Expr in the outer row. If one evaluates
+// to nil it returns false: the filters match no record.
+func (ev *Evaluator) resolve(fs []dsl.Filter, row *Row) ([]filter, bool) {
 	out := make([]filter, 0, len(fs))
 	for _, f := range fs {
 		v := normalizeJSON(f.Value)
@@ -343,19 +343,24 @@ func (ev *Evaluator) resolve(fs []dsl.Filter, row *Row) []filter {
 			if err != nil {
 				continue // iOS drops a filter it cannot decode
 			}
-			v = ev.Eval(e, row).recordJSON(false, ev.loc)
+			val := ev.Eval(e, row)
+			if val.IsNil() {
+				return nil, false
+			}
+			v = val.recordJSON(false, ev.loc)
 		}
 		out = append(out, filter{f.Field, f.Op, v})
 	}
-	return out
+	return out, true
 }
 
 func (ev *Evaluator) aggregate(a *dsl.AggExpr, row *Row) Value {
-	resolved := ev.resolve(a.Filter, row)
+	resolved, ok := ev.resolve(a.Filter, row)
 	keyBytes, _ := json.Marshal(struct {
 		A, E, F, B string
 		Fs         []filter
-	}{a.Agg, a.Entity, a.Field, a.By, resolved})
+		None       bool
+	}{a.Agg, a.Entity, a.Field, a.By, resolved, !ok})
 	key := string(keyBytes)
 	if hit, ok := ev.aggs[key]; ok {
 		return hit
@@ -379,7 +384,9 @@ func (ev *Evaluator) aggregate(a *dsl.AggExpr, row *Row) Value {
 		base = ev.viewRecords(a.Entity)
 	}
 	rows := base
-	if len(resolved) > 0 {
+	if !ok {
+		rows = nil
+	} else if len(resolved) > 0 {
 		rows = nil
 		for _, r := range base {
 			ok := true
@@ -401,8 +408,7 @@ func (ev *Evaluator) aggregate(a *dsl.AggExpr, row *Row) Value {
 			case float64:
 				nums = append(nums, x)
 			case string:
-				// a plain Double(String): "1,000" is not counted here (unlike ops)
-				if n, ok := swiftDouble(x); ok {
+				if n, ok := parseNumber(x); ok {
 					nums = append(nums, n)
 				}
 			}
@@ -551,23 +557,46 @@ func (ev *Evaluator) matches(f filter, r Record, fd *dsl.Field) bool {
 		same := jsonEqual(v, f.Value) || jsonDisplay(v) == jsonDisplay(f.Value)
 		return same == (f.Op == "eq")
 	case "gt", "gte", "lt", "lte":
-		// numbers only: strings and dates never match (iOS)
-		a, ok1 := jsonDouble(v)
-		b, ok2 := jsonDouble(f.Value)
-		if !ok1 || !ok2 {
+		c, ok := ev.filterOrder(v, f.Value)
+		if !ok {
 			return false
 		}
 		switch f.Op {
 		case "gt":
-			return a > b
+			return c > 0
 		case "gte":
-			return a >= b
+			return c >= 0
 		case "lt":
-			return a < b
+			return c < 0
 		}
-		return a <= b
+		return c <= 0
 	}
 	return true
+}
+
+// filterOrder is Aggregator.filterOrder: numbers (numeric strings, commas
+// allowed) as numbers, then dates (date strings) as dates; nothing else.
+func (ev *Evaluator) filterOrder(a, b any) (int, bool) {
+	num := func(v any) (float64, bool) {
+		if f, ok := jsonDouble(v); ok {
+			return f, true
+		}
+		if s, ok := v.(string); ok {
+			return parseNumber(s)
+		}
+		return 0, false
+	}
+	if x, ok := num(a); ok {
+		if y, ok := num(b); ok {
+			return cmpFloat(x, y), true
+		}
+	}
+	if x, ok := parseDateJSON(a, ev.loc); ok {
+		if y, ok := parseDateJSON(b, ev.loc); ok {
+			return x.Compare(y), true
+		}
+	}
+	return 0, false
 }
 
 // refIDs is Aggregator.refIds: an array of ids, or one string as one id.

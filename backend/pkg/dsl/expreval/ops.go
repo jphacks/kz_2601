@@ -225,7 +225,7 @@ func (ev *Evaluator) apply(name string, args []dsl.Expr, row *Row) Value {
 		if len(vals) < 2 || vals[0].IsNil() || vals[1].IsNil() {
 			return Value{}
 		}
-		c, ok := compare(vals[0], vals[1])
+		c, ok := ev.compare(vals[0], vals[1])
 		if !ok {
 			return Value{}
 		}
@@ -341,6 +341,12 @@ func (ev *Evaluator) equal(a, b Value) bool {
 	case a.Kind == Date && b.Kind == Date:
 		return a.Time.Equal(b.Time)
 	}
+	// a date and a date string compare as dates (other strings as text)
+	if d, s, ok := dateAndString(a, b); ok {
+		if t, ok := parseDate(s, ev.loc); ok {
+			return d.Equal(t)
+		}
+	}
 	if x, ok := a.number(); ok {
 		if y, ok := b.number(); ok {
 			return x == y
@@ -349,21 +355,26 @@ func (ev *Evaluator) equal(a, b Value) bool {
 	return a.Text(ev.loc) == b.Text(ev.loc)
 }
 
-// compare is ExprEvaluator.compare: dates with dates; two strings as text
-// unless both parse as numbers (without removing commas); otherwise numbers.
-func compare(a, b Value) (int, bool) {
+// compare is ExprEvaluator.compare: dates with dates or date strings; two
+// strings as text unless both parse as numbers (commas removed); otherwise
+// numbers.
+func (ev *Evaluator) compare(a, b Value) (int, bool) {
 	if a.Kind == Date && b.Kind == Date {
-		switch {
-		case a.Time.Equal(b.Time):
-			return 0, true
-		case a.Time.Before(b.Time):
-			return -1, true
+		return a.Time.Compare(b.Time), true
+	}
+	if d, s, ok := dateAndString(a, b); ok {
+		t, ok := parseDate(s, ev.loc)
+		if !ok {
+			return 0, false
 		}
-		return 1, true
+		if a.Kind == Date {
+			return d.Compare(t), true
+		}
+		return t.Compare(d), true
 	}
 	if a.Kind == String && b.Kind == String {
-		_, okA := swiftDouble(a.Str)
-		_, okB := swiftDouble(b.Str)
+		_, okA := parseNumber(a.Str)
+		_, okB := parseNumber(b.Str)
 		if !okA || !okB {
 			return compareUTF16(a.Str, b.Str), true
 		}
@@ -373,13 +384,29 @@ func compare(a, b Value) (int, bool) {
 	if !ok1 || !ok2 {
 		return 0, false
 	}
+	return cmpFloat(x, y), true
+}
+
+// dateAndString returns the date and the string when one is a date and the
+// other a string.
+func dateAndString(a, b Value) (time.Time, string, bool) {
+	switch {
+	case a.Kind == Date && b.Kind == String:
+		return a.Time, b.Str, true
+	case a.Kind == String && b.Kind == Date:
+		return b.Time, a.Str, true
+	}
+	return time.Time{}, "", false
+}
+
+func cmpFloat(x, y float64) int {
 	switch {
 	case x == y:
-		return 0, true
+		return 0
 	case x < y:
-		return -1, true
+		return -1
 	}
-	return 1, true
+	return 1
 }
 
 // compareUTF16 orders like NSString.compare without options (UTF-16 code units).
