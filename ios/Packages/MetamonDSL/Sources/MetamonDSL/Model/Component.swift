@@ -59,6 +59,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case musicPlayer
     // leaf(仲間探しの届いた人・送った人・つながった人・#507)。entity / title / emptyText / item / onItemTap は共用
     case matchList
+    // leaf(単語カード・#264)。entity / filter は共用
+    case flashcards
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -202,6 +204,10 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var autoAccept: Bool?       // リクエストを確認せずに再生待ちへ
     // matchList(#507)
     public var show: String?           // incoming|outgoing|matches
+    // flashcards(#264)
+    public var front: String?          // 表の field
+    public var back: String?           // 裏の field
+    public var toggle: String?         // 覚えた / まだ を保存する boolean field
 
     /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
     static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
@@ -224,6 +230,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case textField, photoField
         case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance, allowRequests, autoAccept
         case show
+        case front, back, toggle
     }
 
     public init(from decoder: Decoder) throws {
@@ -326,6 +333,9 @@ public struct Component: Decodable, Identifiable, Sendable {
         allowRequests = try? c.decodeIfPresent(Bool.self, forKey: .allowRequests)
         autoAccept = try? c.decodeIfPresent(Bool.self, forKey: .autoAccept)
         show = try? c.decodeIfPresent(String.self, forKey: .show)
+        front = try? c.decodeIfPresent(String.self, forKey: .front)
+        back = try? c.decodeIfPresent(String.self, forKey: .back)
+        toggle = try? c.decodeIfPresent(String.self, forKey: .toggle)
     }
 }
 

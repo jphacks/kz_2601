@@ -665,6 +665,8 @@ func (a *App) Validate() error {
 			case CompMatchList:
 				checkMatchList(where, c, entities, add) // match_list.go
 				checkAction(where+".onItemTap", c.OnItemTap)
+			case CompFlashcards:
+				checkFlashcards(where, c, entities, add) // flashcards.go
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}

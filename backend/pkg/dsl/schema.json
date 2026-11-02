@@ -767,6 +767,9 @@
         },
         {
           "$ref": "#/$defs/MatchList"
+        },
+        {
+          "$ref": "#/$defs/Flashcards"
         }
       ]
     },
@@ -4158,6 +4161,49 @@
       },
       "description": "仲間探しのアプリ(#507)で、届いた「つながりたい」・送った「つながりたい」・つながった人の一覧。行はその人のプロフィールで描き、行の中のボタンとメニューで承認・見送る・取り下げる・つながりを解除・通報・ブロックができる(Action は不要)。match \"profile\" の entity があるアプリだけで使う。",
       "x-usage": "仲間探しのアプリでは「つながり」のタブ(またはホーム)に、届いた人(show incoming・A1:F4)とつながった人(show matches・A5:F10)を縦に並べる。送った人(show outgoing)は任意。entity はプロフィールの entity。item は title に趣味などプロフィールの field、subtitle に地域、trailing に $author。承認の boolean・いいね用の entity・相手を選ぶ ref・ボタンは作らない。"
+    },
+    "Flashcards": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "front",
+        "back"
+      ],
+      "properties": {
+        "type": {
+          "const": "flashcards"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string",
+          "description": "カードの entity(例: 単語 word・問題 question)。1 レコード = 1 枚。"
+        },
+        "front": {
+          "type": "string",
+          "description": "表に出す field(例: 英単語・問題文)。"
+        },
+        "back": {
+          "type": "string",
+          "description": "めくると出る裏の field(例: 意味・答え)。"
+        },
+        "filter": {
+          "$ref": "#/$defs/Filter",
+          "description": "出題するカードの絞り込み(list と同じ形)。「まだ覚えていないものだけ」は {field: toggle の field, op: eq, value: false}。省略 = 全件。"
+        },
+        "toggle": {
+          "type": "string",
+          "description": "「覚えた / まだ」を保存する boolean field(computed でない)。右スワイプ(または「覚えた」ボタン)で true、左スワイプ(「まだ」)で false を保存する。省略すると記録せずにめくるだけ。"
+        }
+      },
+      "description": "単語カード・暗記カード(フラッシュカード)。entity のレコード(filter で絞れる)を 1 枚ずつ出し、タップで表(front)と裏(back)をめくる。右にスワイプで「覚えた」、左で「まだ」を toggle の boolean field に保存し、次のカードへ進む(スワイプの代わりのボタンもある)。進み具合(n / 全体)と、全部終わった時の完了表示を出す。「単語帳」「暗記カード」「めくると意味・答え」「一問一答」「覚えていないものだけ出題」の時に必ずこれを選ぶ(disclosure や list で代替しない)。",
+      "x-usage": "カードの entity(例 word{term: string(required), meaning: string(required), learned: boolean(defaultValue false)})を作り、ホームに flashcards{entity, front: term, back: meaning, toggle: learned, filter: {field: learned, op: eq, value: false}} を全幅で大きく(例 A1:F7)。下にカードの list(A8:F10・item.toggle に同じ learned で「まだ」に戻せる)と追加ボタン(D11:F12)、カードのフォーム画面(screen.entity + saveRecord)を作る。toggle を省くと記録せずにめくるだけ。"
     }
   }
 }

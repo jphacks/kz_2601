@@ -107,6 +107,8 @@ var expectKeys = map[string]expectKind{
 	// checkNotifyWhen (#265): notify_when.go
 	"notifyWhen":   expectBool,
 	"notifyWhenOp": expectString,
+	// checkFlashcards (#264): flashcards.go
+	"flashcardsUnlearned": expectBool,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,
