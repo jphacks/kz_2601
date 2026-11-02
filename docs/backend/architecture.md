@@ -155,7 +155,7 @@ match /apps_public/{appId}/{document=**} {
 | トークン | `Authorization: Bearer <Firebase ID token>`。Go は `firebase.google.com/go/v4/auth` の `VerifyIDToken` |
 | プロバイダ | **Sign in with Apple** が第一候補、詰まったら **Firebase 匿名認証**で代替。どちらも同じ Firebase ID トークンなので **Go 側は無変更**(`firebase.sign_in_provider` claim が `apple.com` / `anonymous` になるだけ)。匿名→Apple への **アカウントリンク**で uid は維持されるため、後から Apple を足してもデータ移行不要 |
 | uid の扱い | **URL に uid を含めない**。全パスは `/v1/apps/...` で、uid はトークンから取り出して `users/{uid}/...` に束縛。他人のデータに辿り着く URL が存在しない |
-| 失敗 | 401 `unauthenticated`(欠落/期限切れ/署名不正)。403 は現状使わない(自分の木しか触れないため) |
+| 失敗 | 401 `unauthenticated`(欠落/期限切れ/署名不正)。自分の木(`users/{uid}/...`)は uid で縛るので 403 にならない。共有するものは権限が足りないと 403 `forbidden`(`details.reason` 付きのものあり): shared の参加者でない・招待した人が抜けた・参加者が上限(`internal/appconfig/members.go`)、作成者以外が参加者を外す・公開する(`members.go`・`owner.go`)、作者以外がレコードを変える(`records.go`)、持ち主以外がシェアリンク・掲載を変える(`share.go`)、ai で他人の会話を消す(`DELETE /v1/chat/{appId}`・`internal/ai/handler.go`)。運営が非公開にしたものは 403 `unpublished`(`moderation.go`) |
 | ローカル | `AUTH_MODE=dev` かつ `FIREBASE_AUTH_EMULATOR_HOST` 設定時のみ `X-Debug-Uid: <uid>` を受理。加えて dev では verifier が `auth.DevVerifier`(Bearer 値をそのまま uid として受理)になるので、Authorization を転送するだけの ai 経由でも通る。本番では `AUTH_MODE=firebase` 固定(`auth.FirebaseVerifier`)で、dev ヘッダは無視 |
 | ai→appconfig | 受け取った Bearer をそのまま転送(`internal/appconfigclient`)。トークン残寿命が 60s 未満なら iOS 側で refresh してから呼ぶ(Firebase SDK が自動) |
 
@@ -341,12 +341,14 @@ make dev        # appconfig :8080, ai :8081 (AUTH_MODE=dev, X-Debug-Uid で叩�
 curl -H 'X-Debug-Uid: u1' localhost:8080/v1/apps
 ```
 
-### Cloud Run(概要・詳細は infra 担当)
+### Cloud Run(概要・正は `.github/workflows/deploy-cloudrun.yml`)
 
-1. `backend/Dockerfile`(multi-stage, `ARG SERVICE`)を `gcloud builds submit --config cloudbuild.yaml --substitutions=_SERVICE=appconfig` でビルド
-2. `gcloud run deploy appconfig --image ... --region asia-northeast1 --allow-unauthenticated --set-env-vars AUTH_MODE=firebase,GOOGLE_CLOUD_PROJECT=$PROJECT`
-3. ai は `--set-secrets ANTHROPIC_API_KEY=anthropic-api-key:latest,OPENAI_API_KEY=openai-api-key:latest --set-env-vars APPCONFIG_BASE_URL=https://appconfig-xxxx.a.run.app --min-instances 1`
-4. Cloud Run のサービスアカウントに `roles/datastore.user`(Firestore)と `roles/firebaseauth.viewer`(トークン検証に不要だが Admin SDK 初期化のため project 参照権限)
+1. `backend/Dockerfile` を `docker build` して Artifact Registry に push(appconfig と ai は同じイメージ)
+2. `gcloud run deploy appconfig-<stg|prod> --image ... --service-account run-backend@... --allow-unauthenticated --update-env-vars GOOGLE_CLOUD_PROJECT=...,FIRESTORE_DATABASE=...,APP_ENV=...,ALLOW_SHARED_PROD_DB=...,APP_CHECK_MODE=...,GIT_SHA=...`(`AUTH_MODE` は入れない = 既定の `firebase`)
+3. ai は同じイメージを `--command=/app/ai` で起動し、`--update-env-vars` に `APPCONFIG_BASE_URL=<appconfig の URL>` を足す。シークレットは `--set-secrets ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest`(全置換)
+4. 実行用のサービスアカウント `run-backend` に `roles/datastore.user`(Firestore)と、`ANTHROPIC_API_KEY` の `roles/secretmanager.secretAccessor`([docs/infra/gcp-setup.md](../infra/gcp-setup.md))
+
+env は `--set-env-vars`(全置換)でなく `--update-env-vars`(書いたキーだけ上書き)なので、運用中に人が入れた値はデプロイの後も残る(#513)。どの値をどちらが決めるかは [docs/infra/runtime-config.md](../infra/runtime-config.md)。
 
 ### CI(5 分以内必須)
 
@@ -409,45 +411,45 @@ jobs:
 
 ## 8. ディレクトリ構成
 
+`ls backend/cmd backend/internal` の全エントリ(用途は各パッケージの doc コメントから)。
+
 ```
 backend/
-├── go.mod                      # module github.com/jphacks/kz_2601/backend
-├── Makefile                    # build/vet/test/schema-sync/dev
-├── Dockerfile                  # ARG SERVICE=appconfig|ai (infra 担当)
-├── cmd/
-│   ├── appconfig/main.go       # 配線のみ: env → store → handlers → http.Server
-│   └── ai/main.go
-├── internal/                   # サービス実装(外部 import 不可)
-│   ├── httpx/                  # JSON 書き出し・エラー封筒・RequestID・recover・ログ middleware
-│   ├── auth/                   # Firebase IDトークン検証 middleware, UID(ctx)
-│   ├── store/                  # Firestore クライアント + repo (apps / versions / records)
-│   │   ├── firestore.go
-│   │   ├── apps.go             # Get/Create/PutDSL(tx, If-Match)/Restore/List
-│   │   └── records.go          # List(cursor)/Create/Update/Delete + data 正規化
-│   ├── appconfig/              # HTTP handlers (openapi-appconfig.yaml の実装)
-│   │   ├── router.go           # Go 1.22+ の method pattern mux
-│   │   ├── apps.go  dsl.go  entities.go  records.go
-│   ├── appconfigclient/        # ai が使う appconfig の薄い HTTP クライアント(Bearer 転送)
-│   └── ai/
-│       ├── router.go  generate.go  transcribe.go
-│       ├── claude/             # SDK 呼び出し・構造化出力・リトライ・refusal 処理
-│       ├── prompt/             # system.md(embed)・few-shot・差分→summary
-│       ├── fallback/           # キーワード→テンプレ DSL
-│       └── templates/*.json
-└── pkg/dsl/                    # 共有: 型・schema.json(embed)・Parse/Validate・Initial()
-    ├── dsl.go  validate.go  dsl_test.go  schema.json
+  Dockerfile                 # 1 イメージに全サービス。既定は /app/appconfig、ai は --command=/app/ai
+  Makefile                   # build / test / schema-check / dev。運用コマンドは mk/<feature>.mk
+  go.mod                     # module github.com/jphacks/kz_2601/backend
+  mk/                        # feedback.mk / moderate.mk / purge.mk
+  cmd/
+    ai/                      # ai サービス: 文字起こし -> Claude -> DSL(全体 or JSON Patch)-> appconfig
+    ai-audit/                # ai-eval の結果を機能面で採点(押しても動かないボタン・辿れない画面など)。API を呼ばない
+    ai-eval/                 # internal/ai/eval/cases.json を実 Claude で流し、ケースごとの指標と DSL を JSON に出す
+    appconfig/               # appconfig サービス: 配線のみ(env -> store -> handlers -> http.Server)
+    feedback/                # アプリ内フィードバックを運営が読む(#319)。読み取りだけ
+    moderate/                # 通報の確認と運営による非公開化(#321)。手順は docs/infra/moderation.md
+    product-metrics/         # 指標のログ(#297)から週ごとの Markdown 表を出す。ログのエクスポートだけを読む
+    purge/                   # 退会から一定期間たったアカウントと古いフィードバックを消す Cloud Run Job(#458・#319)
+    smoke/                   # デモの発話を実 API で流して表を出す(make smoke-local / smoke-stg)
+  internal/                  # サービス実装(外部 import 不可)
+    ai/                      # 文字起こし -> DSL の変更。pkg/dsl で検証し、問題があれば上限つきで再生成
+    appcheck/                # Firebase App Check のトークン検証(#318・APP_CHECK_MODE)
+    appconfig/               # openapi-appconfig.yaml のルート(store.Store の上)
+    appconfigclient/         # ai が今の DSL を読み書きする薄いクライアント(HTTP で Bearer 転送 / Memory)
+    appstore/                # StoreKit 2 の署名付き取引(JWS)を Apple に問い合わせずに検証(#314)
+    auth/                    # Firebase ID トークン検証 middleware・UID(ctx)・dev 用 verifier
+    entitlement/             # Pro の権利のサーバー側の記録(#314)
+    fsenv/                   # 接続する Firestore の DB を決め、stg が本番の DB を使うと止める(#290)
+    httpx/                   # JSON 書き出し・エラー封筒・RequestID・recover・アクセスログ middleware
+    metrics/                 # プロダクトの指標のイベントを構造化ログに出す(#297)
+    ratelimit/               # 1 人(と全体)が 1 日に起こせる Claude の処理量の上限(#280)
+    store/                   # users/{uid}/apps/{appId} 以下の永続化(Firestore / Memory)
+  pkg/
+    dsl/                     # 全サービス共有の DSL: 型・schema.json(embed)・Parse / Validate
 ```
 
 規約: ハンドラは `store` の interface に依存(テストで fake 差替)。エラーは `httpx.Error(w, status, code, message)` の1経路。すべての書き込みは `dsl.Parse` / `dsl.ApplyPatch` を通過した `*dsl.App` だけを受け取る。
 
-## 9. appconfig 実装状況(2026-10-24)
+## 9. 実装状況
 
-| # | タスク | 状態 | 備考 |
-|---|---|---|---|
-| 1 | `internal/httpx` + `internal/auth` + `cmd/appconfig` の配線 | **実装済み**(PR #26 / #27 / #28、@2410as) | `httpx.WriteJSON/Error/ErrorWithDetails/DecodeBody(DisallowUnknownFields・1MiB)/Chain/WithRequestID/Log/Recover/ErrorEnvelope`、`auth.Middleware(verifier, mode)` / `auth.UID(ctx)`。verifier は `auth.FirebaseVerifier`(firebase・ADC)/ `auth.DevVerifier`(dev・Bearer 値=uid) |
-| 2 | `internal/store` + apps/dsl/versions API | **実装済み**(`feature/appconfig-store-api`) | `store.Store`(Firestore / Memory)。`GET /dsl` は未知 appId を `dsl.Initial()` version 1 で自動作成(iOS は端末固定 UUID を appId に使う)。`PUT`/`PATCH` は `If-Match` 必須(欠落 412 `bad_request`・不一致 409 `version_conflict` + `details.currentVersion`)、422 `invalid_dsl` + `details.problems`。`PATCH` は `application/json-patch+json`(配列)と `application/json`(`{patch, source}`・ai が使う)の両方。`GET /versions`、`GET /versions/{n}`、`POST /versions/{n}/restore`、`GET /entities[/{id}]` |
-| 3 | records API | **実装済み**(同上) | list(`pageSize`/`pageToken`・`sortField`/`sortDir`・`filterField`/`filterOp`/`filterValue`・メモリソート上限 2000 → 413)、POST(`clientId` 冪等=同じ id を返す・`defaultValue` 補完・`required` 422・未知キー 400)、PATCH(キー単位マージ・`null` で削除)、DELETE、DELETE 全件(`?confirm=true`)。`photo` は `data:image/...` か `https://`、1 レコード 300KB 上限 |
-| 4 | ai との実プロセス結合 | **確認済み** | `AUTH_MODE=dev` の appconfig(Firestore エミュレータ)+ ai で `POST /v1/generate`(create → `PUT`、edit → `PATCH`)→ `GET /dsl` の version が 1→2→3 と増え、`GET /versions` に `source.kind=ai`・`patch` が残ることを curl で実測 |
-| - | 残課題 | | `PUT /entities/{id}`(糖衣・未実装)、`PATCH /apps/{id}` の `name` 変更後も version 書き込み時に `dsl.app.name` で上書きされる、`GET /dsl` 封筒に `source`/`createdAt` を含めない(読み 1 回で返すため)、Firestore 複合インデックス未作成(メモリソートで代替)、staging での Firebase 実トークン疎通 |
+今どこまでできているかは GitHub の [Issues](https://github.com/jphacks/kz_2601/issues) と [マイルストーン](https://github.com/jphacks/kz_2601/milestones) を見る(この文書には書かない)。機能ごとの決定は [機能ごとの設計](#機能ごとの設計) の各文書。
 
 **書き込み形式(Firestore)**: `apps/{appId}` は `dsl`(map・iOS リスナー用)と `dslJson`(正規化 JSON 文字列・API が返す本体)の両方を持つ。`versions/{n:08d}` は `dslJson` + `patchJson` + `source`。`records/{id}` の `data` はネイティブ map(将来のクエリ用)。
