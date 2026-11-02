@@ -24,6 +24,20 @@ import (
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
+// routes (share links #49 / public catalog #50)
+func init() {
+	registerRoutes(func(h *Handler, mux *http.ServeMux) {
+		mux.HandleFunc("POST /v1/apps/{appId}/share", h.createShare)
+		mux.HandleFunc("GET /v1/shares/{token}", h.getShare)
+		mux.HandleFunc("DELETE /v1/shares/{token}", h.revokeShare)
+		mux.HandleFunc("POST /v1/shares/{token}/import", h.importShare)
+		mux.HandleFunc("POST /v1/apps/{appId}/publish", h.publishApp)
+		mux.HandleFunc("DELETE /v1/apps/{appId}/publish", h.unpublishApp)
+		mux.HandleFunc("GET /v1/public-apps", h.listPublicApps)
+		mux.HandleFunc("POST /v1/public-apps/{id}/install", h.installPublicApp)
+	})
+}
+
 // Catalog field limits.
 const (
 	maxListingName = 60

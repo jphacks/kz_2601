@@ -8,6 +8,14 @@ import (
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
+// routes (#255)
+func init() {
+	registerRoutes(func(h *Handler, mux *http.ServeMux) {
+		mux.HandleFunc("PUT /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}", h.putMark)
+		mux.HandleFunc("DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}", h.deleteMark)
+	})
+}
+
 // Marks (#255): like / save / read toggles on shared records, once per person.
 //
 //	PUT    /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}  -> {count, mine:true}

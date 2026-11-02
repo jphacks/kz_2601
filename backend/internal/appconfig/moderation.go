@@ -18,6 +18,16 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
+// routes (reports / blocks #321)
+func init() {
+	registerRoutes(func(h *Handler, mux *http.ServeMux) {
+		mux.HandleFunc("POST /v1/reports", h.createReport)
+		mux.HandleFunc("GET /v1/me/blocks", h.listBlocks)
+		mux.HandleFunc("POST /v1/me/blocks", h.createBlock)
+		mux.HandleFunc("DELETE /v1/me/blocks/{uid}", h.deleteBlock)
+	})
+}
+
 // ReportsPerDay caps new reports per reporter per JST day.
 const ReportsPerDay = 30
 
