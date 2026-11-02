@@ -56,8 +56,8 @@ settings:
     # 事前に人の作業(App ID・Firebase の iOS アプリ登録)が要る: docs/ios/architecture.md「ビルド構成と接続先」
     METAMON_BUNDLE_ID_SUFFIX: ""
     # 「アップデートしてください」の App Store ボタン(#302・Info.plist MetamonAppStoreURL)。
-    # TODO(#302): App Store の app id が決まったら "https://apps.apple.com/app/id<ID>" を入れる。空の間は「Tailor It」の検索を開く
-    METAMON_APP_STORE_URL: ""
+    # App Store Connect の Apple ID(backend の sharepage.go の AppStoreURL と同じ)。空にすると「Tailor It」の検索を開く
+    METAMON_APP_STORE_URL: "https://apps.apple.com/app/id6828742045"
     # App Attest の環境(#318・entitlement com.apple.developer.devicecheck.appattest-environment に展開)。
     # 開発署名で端末に入れる Debug / Staging は development、配布の Release / Review は production。docs/infra/app-check.md
     METAMON_APP_ATTEST_ENV: development
