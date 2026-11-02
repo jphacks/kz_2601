@@ -24,7 +24,7 @@
 flowchart LR
   subgraph iOS
     A[SwiftUI Renderer] -- Firebase Auth IDトークン --> B
-    A -- 音声/文字 + IDトークン --> C
+    A -- "文字(端末で文字起こし済み) + IDトークン" --> C
     W[WhisperKit<br/>on-device STT] --> A
   end
   subgraph "Cloud Run"
@@ -33,7 +33,6 @@ flowchart LR
   end
   C -- "PUT /apps/{id}/dsl (同じIDトークンを転送)" --> B
   C -- "messages.create(structured output)" --> K[(Claude API)]
-  C -. "optional POST /transcribe" .-> O[(OpenAI Whisper API)]
   B --> F[(Firestore Native)]
   A -. "SSE GET /events (変化通知のみ・#82)" .-> B
 ```
@@ -279,9 +278,7 @@ func UID(ctx context.Context) string { s, _ := ctx.Value(ctxKey{}).(string); ret
 
 ```mermaid
 flowchart TD
-  I[入力: text or audio] --> T{audio?}
-  T -- yes --> W[Whisper API /transcribe] --> X[text]
-  T -- no --> X
+  X["入力: text(iOS が WhisperKit で文字起こし済み)"]
   X --> U{「元に戻して」?}
   U -- yes --> RS[POST versions/{n-1}/restore] --> O
   U -- no --> M{初回 or create?}
@@ -314,18 +311,17 @@ flowchart TD
 
 | 区間 | 目標 p50 / p95 |
 |---|---|
-| WhisperKit(端末) | iOS 側 |
+| WhisperKit(端末) | iOS 側(音声はサーバーに送らない) |
 | `/generate` 全体(text 入力・初回フル) | **4s / 10s** |
 | `/generate` 全体(編集 Patch) | **2.5s / 6s** |
 | Claude 1回(Sonnet 5.5, effort low, フル出力 ~0.8-1.2K tokens / Patch ~0.1-0.4K tokens) | 目標 3s / 7s ・ 1.5s / 4s。**実測(2026-10-24・16 本)**: create p50 6.6s / p95 8.7s ・ edit p50 1.7s / p95 5.0s → **compact 出力+既定値省略後(create 5 本 × 2)**: create p50 6.0s・平均出力 964 tokens(−26%)。`?stream=1` なら **先頭 `app` ブロックが p50 2.4s** で届く(iOS が名前と仮要約を先出し) |
 | 検証 + appconfig PUT | 150ms / 400ms |
-| `/transcribe`(Whisper API, 10s 音声) | 1.5s / 4s |
 
 Cloud Run: ai は `min-instances=1`(コールドスタート回避・デモ中のみ)、`concurrency=20`、`timeout=60s`、CPU 1 / mem 512Mi。
 
-### 6.5 Whisper エンドポイント(optional)
+### 6.5 音声認識
 
-`POST /v1/transcribe` multipart(`audio`: m4a/wav/mp3 ≤ 25MB ≤ 60s, `language=ja`)→ OpenAI `whisper-1` → `{text, language, durationMs}`。`OPENAI_API_KEY` 未設定なら **501 `not_configured`**。`/generate` も `multipart/form-data` で `audio` を受けた時は内部で同じ処理を通す。
+音声認識は iOS が WhisperKit で端末内で行い、文字だけを `POST /v1/generate`(`/v1/chat`)に送る。ai サービスは音声を受け取らず、文字起こしのエンドポイントも持たない(ルートは `/health`・`/healthz`・`POST /v1/generate`・`POST /v1/chat`・`POST /v1/text`・`DELETE /v1/chat/{appId}` だけ。`backend/internal/ai/handler.go`)。
 
 対話・計算ロジック・有料機能・決まった形の文章は [機能ごとの設計](#機能ごとの設計) の各文書。
 
@@ -403,9 +399,7 @@ jobs:
 | `CLAUDE_MODEL` | - | o | `claude-sonnet-5-5` |
 | `CLAUDE_EFFORT` | - | o | `low`(eval で確定。`high` は品質同等で p50 +1.5s・p95 2 倍) |
 | `CLAUDE_STRUCTURED_OUTPUT` | - | o | 未設定(=off)。`1` で `output_config.format` を送る(現状は文法サイズ超過で 400) |
-| `OPENAI_API_KEY` | - | o | Secret Manager・任意(無ければ /transcribe 501) |
 | `GENERATE_TIMEOUT_SEC` | - | o | `45` |
-| `MAX_AUDIO_BYTES` | - | o | `26214400` |
 
 機能だけが使う変数は [機能ごとの設計](#機能ごとの設計) の各文書の「環境変数」に書く。運用中に人が変える値(`FEEDBACK_DAILY_LIMIT`・`RATE_LIMIT_*`・`NOTICE_JSON` など)とデプロイが決める値(`APP_CHECK_MODE` など)は [docs/infra/runtime-config.md](../infra/runtime-config.md)。
 
@@ -420,7 +414,7 @@ backend/
   go.mod                     # module github.com/jphacks/kz_2601/backend
   mk/                        # feedback.mk / moderate.mk / purge.mk
   cmd/
-    ai/                      # ai サービス: 文字起こし -> Claude -> DSL(全体 or JSON Patch)-> appconfig
+    ai/                      # ai サービス: 文字(iOS が端末内で文字起こし済み)-> Claude -> DSL(全体 or JSON Patch)-> appconfig
     ai-audit/                # ai-eval の結果を機能面で採点(押しても動かないボタン・辿れない画面など)。API を呼ばない
     ai-eval/                 # internal/ai/eval/cases.json を実 Claude で流し、ケースごとの指標と DSL を JSON に出す
     appconfig/               # appconfig サービス: 配線のみ(env -> store -> handlers -> http.Server)
@@ -430,7 +424,7 @@ backend/
     purge/                   # 退会から一定期間たったアカウントと古いフィードバックを消す Cloud Run Job(#458・#319)
     smoke/                   # デモの発話を実 API で流して表を出す(make smoke-local / smoke-stg)
   internal/                  # サービス実装(外部 import 不可)
-    ai/                      # 文字起こし -> DSL の変更。pkg/dsl で検証し、問題があれば上限つきで再生成
+    ai/                      # 文字 -> DSL の変更。pkg/dsl で検証し、問題があれば上限つきで再生成
     appcheck/                # Firebase App Check のトークン検証(#318・APP_CHECK_MODE)
     appconfig/               # openapi-appconfig.yaml のルート(store.Store の上)
     appconfigclient/         # ai が今の DSL を読み書きする薄いクライアント(HTTP で Bearer 転送 / Memory)

@@ -1916,7 +1916,7 @@ iOS は SwiftUI のネイティブ。Android もネイティブ(Kotlin + Jetpack
 
 ## 決めること
 - [ ] UI: Jetpack Compose(推奨)/ 他(Flutter・Compose Multiplatform)と比べた結論
-- [ ] 音声: Android の SpeechRecognizer(端末の中)/ whisper.cpp / サーバーの Whisper。大きさと精度と費用
+- [ ] 音声: Android の SpeechRecognizer(端末の中)/ whisper.cpp / サーバーの Whisper(どれも未実装の候補。今のサーバーに音声認識は無い)。大きさと精度と費用
 - [ ] 最低 API レベル・対象の端末
 - [ ] モジュールの分け方(iOS の Metamon{DSL,Renderer,Services} に対応させる)
 - [ ] DSL の型を正典のスキーマから作る方法(kotlinx.serialization)

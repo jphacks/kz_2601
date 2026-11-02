@@ -73,10 +73,10 @@ flowchart LR
     AR["Artifact Registry<br/>backend/ イメージ"]
     subgraph Run["Cloud Run"]
       AC["appconfig-{stg,prod}<br/>(DSL JSON CRUD)"]
-      AI["ai-{stg,prod}<br/>(音声/文字→Claude→DSL)"]
+      AI["ai-{stg,prod}<br/>(文字→Claude→DSL)"]
     end
     FS[("Firestore<br/>Native mode")]
-    SM["Secret Manager<br/>ANTHROPIC_API_KEY<br/>OPENAI_API_KEY"]
+    SM["Secret Manager<br/>ANTHROPIC_API_KEY"]
     FBA["Firebase Auth<br/>(Apple プロバイダ)"]
     SA_run["SA: run-backend"]
     SA_dep["SA: github-deployer"]
@@ -329,7 +329,6 @@ git check-ignore -v ios/App/GoogleService-Info.plist   # 何か表示されれ�
 
 **☐ あなたがやる**
 - **Claude API キー**: https://console.anthropic.com/ → API Keys → Create Key(Workspace は既定で可)。`sk-ant-...` を控える。
-- (任意)**OpenAI API キー**: WhisperKit(オンデバイス)で足りない場合のみ。https://platform.openai.com/api-keys → Create new secret key。
 
 ### 2-2. 登録(値はファイル経由・履歴に残さない)
 
@@ -341,14 +340,6 @@ read -s -p "ANTHROPIC_API_KEY: " ANTHROPIC_API_KEY; echo
 printf '%s' "$ANTHROPIC_API_KEY" | gcloud secrets create ANTHROPIC_API_KEY \
   --replication-policy=user-managed --locations="$REGION" --data-file=-
 unset ANTHROPIC_API_KEY
-
-# 任意: OpenAI
-read -s -p "OPENAI_API_KEY (空ならスキップ): " OPENAI_API_KEY; echo
-if [ -n "$OPENAI_API_KEY" ]; then
-  printf '%s' "$OPENAI_API_KEY" | gcloud secrets create OPENAI_API_KEY \
-    --replication-policy=user-managed --locations="$REGION" --data-file=-
-fi
-unset OPENAI_API_KEY
 ```
 
 キーを差し替えるとき(新バージョン追加。Cloud Run は `:latest` を参照しているので再デプロイで反映):
@@ -362,7 +353,7 @@ printf '%s' "sk-ant-新しいキー" | gcloud secrets versions add ANTHROPIC_API
 **▶ 実行**
 
 ```sh
-for s in ANTHROPIC_API_KEY OPENAI_API_KEY; do
+for s in ANTHROPIC_API_KEY; do
   gcloud secrets describe "$s" >/dev/null 2>&1 && \
   gcloud secrets add-iam-policy-binding "$s" \
     --member="serviceAccount:${RUN_SA}" --role="roles/secretmanager.secretAccessor"
@@ -424,7 +415,6 @@ gcloud run deploy ai-stg \
   --set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest"
 ```
 
-> OPENAI_API_KEY も使うなら `--set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest"`。
 > `--set-secrets` は既存のシークレット設定を全置換、追加だけなら `--update-secrets`。
 > ソースから直接 ai を上げたい場合は 3-1 のコマンドを `ai-stg` + `--command=/app/ai` にすれば良い(ビルドがもう 1 回走る)。
 
@@ -722,11 +712,10 @@ gcloud run services update ai-prod --region="$REGION" --min-instances=0   # デ�
 
 - Firestore に暴走ループで書かないよう、ai 側は 1 リクエスト 1 パッチ(リトライ上限付き)で実装する。
 
-### 8-4. Claude / OpenAI 側の使用上限
+### 8-4. Claude 側の使用上限
 
 **☐ あなたがやる**
 - **Anthropic Console**: https://console.anthropic.com/ → Settings → **Limits**(組織の月間使用上限 / spend limit を設定できる画面。メニュー名は **要確認**)。ハッカソンなら $20〜30 程度で十分。Usage 画面で日次消費も見える。
-- **OpenAI**(使う場合): https://platform.openai.com/ → Settings → Limits → Monthly budget。
 - キーは Secret Manager にしか置かない。漏れた疑いがあれば Console で Revoke → `gcloud secrets versions add` → Cloud Run 再デプロイ(`gcloud run services update ai-stg --region=$REGION --update-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest` で新リビジョン)。
 
 ---
@@ -745,7 +734,7 @@ gcloud run services update ai-prod --region="$REGION" --min-instances=0   # デ�
 | 6 | Apple プロバイダ | https://console.firebase.google.com/project/`$PROJECT_ID`/authentication/providers | Apple が「有効」 |
 | 7 | iOS アプリ登録 | `firebase apps:list IOS` | Bundle ID が `$BUNDLE_ID` |
 | 8 | plist が ignore | `git check-ignore -v ios/App/GoogleService-Info.plist` | `.gitignore:…` が表示 |
-| 9 | Secret 存在 | `gcloud secrets list --format='value(name)'` | `ANTHROPIC_API_KEY`(+`OPENAI_API_KEY`) |
+| 9 | Secret 存在 | `gcloud secrets list --format='value(name)'` | `ANTHROPIC_API_KEY` |
 | 10 | Secret 権限 | `gcloud secrets get-iam-policy ANTHROPIC_API_KEY --format='value(bindings.members)'` | `serviceAccount:run-backend@…` |
 | 11 | appconfig-stg | `curl -s -o /dev/null -w '%{http_code}' $(gcloud run services describe appconfig-stg --region=$REGION --format='value(status.url)')/healthz` | `200` |
 | 12 | ai-stg | 同上を `ai-stg` で | `200` |
@@ -800,7 +789,7 @@ gcloud run services update ai-prod --region="$REGION" --min-instances=0   # デ�
 | 実行 SA | `run-backend@<PROJECT_ID>.iam.gserviceaccount.com` |
 | デプロイ SA | `github-deployer@<PROJECT_ID>.iam.gserviceaccount.com` |
 | Artifact Registry | `asia-northeast1-docker.pkg.dev/<PROJECT_ID>/backend/backend:<sha>`(CI)、`…/cloud-run-source-deploy/…`(`--source` 自動作成) |
-| Secret | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`(任意) |
+| Secret | `ANTHROPIC_API_KEY` |
 | WIF | pool `github` / provider `github` |
 | Firebase iOS アプリ Bundle ID | `jp.kz2601.metamon` |
 | Apple | App ID = Bundle ID、Key(Sign in with Apple)、Services ID `jp.kz2601.metamon.signin`(Web 用・任意) |
