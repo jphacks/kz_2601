@@ -313,6 +313,66 @@
         ]
       },
       "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "strict/datetime-impossible-day",
+      "expr": {"op": "day", "args": ["2026-02-30T10:00:00Z"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "strict/datetime-impossible-day-offset",
+      "expr": {"op": "day", "args": ["2026-04-31T10:00:00+09:00"]},
+      "expected": {"type": "nil"}
+    },
+    {"name": "strict/datetime-24h", "expr": {"op": "day", "args": ["2026-10-24T24:00:00Z"]}, "expected": {"type": "nil"}},
+    {
+      "name": "strict/datetime-minute-60",
+      "expr": {"op": "day", "args": ["2026-10-24T10:60:00+09:00"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "strict/datetime-leap-second",
+      "expr": {"op": "day", "args": ["2026-12-31T23:59:60Z"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "strict/datetime-impossible-day-fraction",
+      "expr": {"op": "day", "args": ["2026-02-30T10:00:00.500Z"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "strict/datetime-feb29-non-leap",
+      "expr": {"op": "day", "args": ["2027-02-29T12:00:00+09:00"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "strict/datetime-feb29-leap",
+      "expr": {"op": "day", "args": ["2028-02-29T12:00:00+09:00"]},
+      "expected": {"type": "number", "value": 29, "text": "29"}
+    },
+    {
+      "name": "strict/datetime-end-of-day",
+      "expr": {"op": "day", "args": ["2026-10-24T23:59:59-05:00"]},
+      "expected": {"type": "number", "value": 25, "text": "25"}
+    },
+    {"name": "strict/date-feb29-non-leap", "expr": {"op": "day", "args": ["2027-02-29"]}, "expected": {"type": "nil"}},
+    {
+      "name": "strict/date-feb29-leap",
+      "expr": {"op": "day", "args": ["2028-02-29"]},
+      "expected": {"type": "number", "value": 29, "text": "29"}
+    },
+    {
+      "name": "strict/date-impossible-day-short",
+      "expr": {"op": "day", "args": ["2026-2-30"]},
+      "expected": {"type": "nil"}
+    },
+    {"name": "strict/date-day-zero", "expr": {"op": "day", "args": ["2026-10-0"]}, "expected": {"type": "nil"}},
+    {"name": "strict/date-year-zero", "expr": {"op": "day", "args": ["0-01-01"]}, "expected": {"type": "nil"}},
+    {
+      "name": "strict/datetime-dst-gap-offset",
+      "timeZone": "America/New_York",
+      "expr": {"op": "day", "args": ["2026-03-08T02:30:00-05:00"]},
+      "expected": {"type": "number", "value": 8, "text": "8"}
     }
   ]
 }

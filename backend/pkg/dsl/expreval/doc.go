@@ -17,9 +17,8 @@ package expreval
 //   - Date strings are FieldCoding.date(from:): RFC 3339 with seconds and an
 //     offset ("Z", "+09:00" or "+0900"), optionally with fractional seconds
 //     (".123"); or "YYYY-MM-DD" (month/day may be one digit) at 0:00 in the
-//     device time zone. Impossible dates (2026-02-30) are not dates here;
-//     iOS's ISO8601DateFormatter rolls impossible datetimes over (no case
-//     covers that yet).
+//     device time zone. Impossible dates and times (2026-02-30, T24:00,
+//     2027-02-29) are not dates on either side.
 //   - Calendar math uses Env.Location like Calendar.current: today = local
 //     midnight, daysBetween counts local calendar days (a 23/25-hour DST day
 //     counts as one), addDays keeps the wall-clock time, hoursBetween reads the
