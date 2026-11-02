@@ -60,7 +60,9 @@ final class MetamonUITests: XCTestCase {
     }
 
     /// 任意の条件(要素の frame など)が成り立つまで待つ。固定の sleep の代わり。
+    /// 先に 1 回だけ評価する: 述語の初回評価は約 1 秒後で、CI では XCUI の問い合わせ 1 回に 0.3〜2 秒かかり、成り立っていても短い待ちでは評価が間に合わなかった
     private func waitUntil(timeout: TimeInterval, _ condition: @escaping () -> Bool) -> Bool {
+        if condition() { return true }
         let exp = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in condition() }, object: nil)
         return XCTWaiter().wait(for: [exp], timeout: timeout) == .completed
     }
@@ -498,7 +500,8 @@ final class MetamonUITests: XCTestCase {
         let cards = app.buttons.matching(identifier: "chat.option.choose")
         if cards.count == 2 {
             let lastCard = cards.element(boundBy: 1)
-            XCTAssertTrue(waitUntil(timeout: 3) { lastCard.frame.maxY <= send.frame.minY + 1 },
+            // CI では 1 回の評価(frame 2 つの問い合わせ)に数秒かかる。3 秒では成り立っていても評価が終わらず落ちた(run 41043811226)
+            XCTAssertTrue(waitUntil(timeout: 10) { lastCard.frame.maxY <= send.frame.minY + 1 },
                           "返事後: 最新の案がスクロールされず入力欄の裏にある(\(lastCard.frame))", file: file, line: line)
         }
         // タップして打てる
@@ -674,7 +677,10 @@ extension MetamonUITests {
         XCTAssertTrue(app.buttons["paid.purchase"].exists, "「購入して作る」が無い")
         XCTAssertFalse(generating.exists, "閉じただけで生成した")
         attachScreenshot("paid-feature-card")
-        app.buttons["paid.withoutFeature"].tap()
+        // 課金画面が閉じ切るまで(paidConfirmBusy)はカードのボタンが押せない。押せる前に押すと何も起きない
+        let without = app.buttons["paid.withoutFeature"]
+        XCTAssertTrue(waitFor(without, "isEnabled == true", timeout: 10), "「この機能なしで作る」が押せるようにならない")
+        without.tap()
         assertGeneratingThenDone("paid-without")
         XCTAssertFalse(publicNotice.exists, "この機能なしで作ったのに共有の記録がある")
     }
@@ -708,7 +714,8 @@ extension MetamonUITests {
     /// 家計簿で修正(モックは「筋トレの記録」でトレーニング記録に変わる)→ 要約の「元に戻す」で家計簿に戻る →「やり直す」で再び修正後に。
     /// 修正チャット(音声シート)の上部の「1つ前に戻す」も、戻せる版が無い時は押せない。
     func testUndoFromSummaryBannerAndRedo() {
-        launch(example: "kakeibo", ["METAMON_CLARIFY": "0", "METAMON_MOCK_AI_DELAY": "0.5"])
+        // 要約バナーは 6 秒で消える。CI では出てから「元に戻す」を押すまでに 6 秒を超えて消えていた(run 41043811226)ので、テストの間は消さない
+        launch(example: "kakeibo", ["METAMON_CLARIFY": "0", "METAMON_MOCK_AI_DELAY": "0.5", "METAMON_BANNER_SECONDS": "600"])
         waitForFab()
         XCTAssertTrue(text("最近の支出").waitForExistence(timeout: 15), "家計簿で起動していない")
         fab.tap()

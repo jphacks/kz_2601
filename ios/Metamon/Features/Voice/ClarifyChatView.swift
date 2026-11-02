@@ -371,7 +371,7 @@ private struct PaidFeatureCard: View {
                 .background(Theme.brandGradient, in: Capsule())
             }
             .buttonStyle(.plain)
-            .disabled(rt.paidConfirmBusy)
+            .disabled(rt.paidConfirmBusy || rt.morphJob != nil)
             .accessibilityIdentifier("paid.purchase")
             Button { Task { await rt.buildWithoutPaidFeatures() } } label: {
                 Text(L10n.tr("この機能なしで作る"))
@@ -383,7 +383,7 @@ private struct PaidFeatureCard: View {
                     .overlay(Capsule().strokeBorder(Theme.Colors.brandA.opacity(0.4)))
             }
             .buttonStyle(.plain)
-            .disabled(rt.paidConfirmBusy)
+            .disabled(rt.paidConfirmBusy || rt.morphJob != nil)
             .accessibilityIdentifier("paid.withoutFeature")
             if let message = rt.paidConfirmMessage {
                 Text(message)
