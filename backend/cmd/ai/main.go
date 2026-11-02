@@ -79,9 +79,15 @@ func main() {
 		Verifier: verifier,
 		AuthMode: authMode,
 	}
+	// AI_PAUSED=1 stops only the Claude-calling routes with 503 ai_paused,
+	// before the rate limiter (#511). docs/infra/ai-pause.md
+	paused := ai.PausedFromEnv(os.Getenv)
+	if paused {
+		log.Printf("ai: AI_PAUSED is on; generate/chat/text answer 503 ai_paused")
+	}
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           withAppCheck(withRateLimit(ai.NewHandler(svc), verifier)),
+		Handler:           withAppCheck(ai.Pause(paused, httpx.NewLogger())(withRateLimit(ai.NewHandler(svc), verifier))),
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      time.Duration(timeoutSec)*time.Second*3 + 10*time.Second,
 	}
