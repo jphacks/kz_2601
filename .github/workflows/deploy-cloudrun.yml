@@ -13,14 +13,21 @@
 #   deployer SA に必要な IAM: roles/run.admin, roles/artifactregistry.writer,
 #     roles/iam.serviceAccountUser(run-backend に対して), roles/iam.workloadIdentityUser(WIF principalSet から)
 #   ANTHROPIC_API_KEY は GCP Secret Manager(同名)から --set-secrets で ai に注入する。
+#   repo / Environment Variables(任意): APP_CHECK_MODE・FIRESTORE_DATABASE(未設定なら off・(default))
 #
 # 設計メモ:
 # - workflow レベルの `paths:` は使わない(backend-ci.yml と同じ理由: required check 化した時に
 #   "Expected" のまま詰まる)。代わりに `deploy-changes` ジョブ(dorny/paths-filter)で
 #   backend/** とこのファイルの変更有無を判定し、本体ジョブを `if:` で skip する。
 # - ヘルスパスは /health。Cloud Run の Google Front End は /healthz をコンテナに届けない(実測・HTML 404)。
-# - --set-env-vars / --set-secrets は全置換。手動で足した env/secret は次のデプロイで消えるので
-#   必要なものはここに書く。
+# - 環境変数は --update-env-vars(#509)。ここに書いた「ワークフローが毎回決める値」だけを上書きし、
+#   運用で gcloud から入れた値(NOTICE_JSON・MIN_IOS_BUILD・RATE_LIMIT_GLOBAL_DAILY など)は残す。
+#   一覧と変え方: docs/infra/runtime-config.md
+#   - ここから変数を消しても Cloud Run 側には残る。消す時は 1 回 --remove-env-vars を足すか、
+#     gcloud run services update <svc> --remove-env-vars=KEY で消す。
+#   - 新しいサービス(初回デプロイ)でも --update-env-vars で作れる(gcloud run deploy は作成と更新の両方)。
+# - シークレットは --set-secrets のまま(全置換)。ワークフローから外したシークレットが残り続けないように。
+#   手で足したシークレット参照は次のデプロイで消えるので、要るものはここに書く。
 name: deploy-cloudrun
 
 on:
@@ -110,11 +117,13 @@ jobs:
       ENV_SUFFIX: ${{ needs.deploy-changes.outputs.suffix }}
       # Firestore の接続先(#290・backend/internal/fsenv)。今は stg / prod とも同じプロジェクトの (default)。
       # APP_ENV=stg が本番の DB を使うと起動を止めるので、分離(#291・#293)までは stg だけ ALLOW_SHARED_PROD_DB=1。
-      # 分離したら stg 側を新しい接続先にして ALLOW_SHARED_PROD_DB を外す。
-      FIRESTORE_DATABASE: '(default)'
+      # 分離したら stg 側を新しい接続先にして ALLOW_SHARED_PROD_DB=0 にする(消すと --update-env-vars では残る)。
+      # FIRESTORE_DATABASE はワークフローが毎回決める: gcloud で復元先(#294)に向けても次のデプロイで戻る。
+      # 復元先を使い続ける時は GitHub の Environment 変数 FIRESTORE_DATABASE で固定する(docs/infra/runtime-config.md)。
+      FIRESTORE_DATABASE: ${{ vars.FIRESTORE_DATABASE || '(default)' }}
       ALLOW_SHARED_PROD_DB: ${{ needs.deploy-changes.outputs.suffix == 'stg' && '1' || '0' }}
       # App Check(#318・docs/infra/app-check.md)。GitHub の Environment 変数 APP_CHECK_MODE(staging / production 別)で
-      # off / log / enforce を切り替える。未設定は off。--set-env-vars は毎回全部を置き換えるので、gcloud で手で変えた値はここで消える
+      # off / log / enforce を切り替える。未設定は off。ワークフローが毎回決める値なので、gcloud で手で変えた値は次のデプロイで戻る
       APP_CHECK_MODE: ${{ vars.APP_CHECK_MODE || 'off' }}
       IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/backend/backend:${{ github.sha }}
     steps:
@@ -152,7 +161,7 @@ jobs:
             --cpu=1 --memory=512Mi \
             --min-instances=0 --max-instances=3 \
             --concurrency=80 --timeout=60 \
-            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB},APP_CHECK_MODE=${APP_CHECK_MODE},GIT_SHA=${GITHUB_SHA}" \
+            --update-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB},APP_CHECK_MODE=${APP_CHECK_MODE},GIT_SHA=${GITHUB_SHA}" \
             --quiet
           url="$(gcloud run services describe "appconfig-${ENV_SUFFIX}" \
             --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)')"
@@ -168,6 +177,7 @@ jobs:
           # 同じイメージを /app/ai で起動。Claude 呼び出しは数十秒かかるので timeout=300
           # APPCONFIG_BASE_URL は cmd/ai/main.go が読む名前(未設定だと ai はインメモリ stub で動き appconfig を叩かない)。
           # ai → appconfig はクライアントの Firebase ID トークンをそのまま転送するので Cloud Run 間の追加認証は不要。
+          # env は --update-env-vars(手で入れた RATE_LIMIT_* などを残す)、secret は --set-secrets(全置換)。
           gcloud run deploy "ai-${ENV_SUFFIX}" \
             --image="$IMAGE" \
             --command=/app/ai \
@@ -179,7 +189,7 @@ jobs:
             --cpu=1 --memory=512Mi \
             --min-instances=0 --max-instances=3 \
             --concurrency=20 --timeout=300 \
-            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB},APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL},APP_CHECK_MODE=${APP_CHECK_MODE},GIT_SHA=${GITHUB_SHA}" \
+            --update-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB},APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL},APP_CHECK_MODE=${APP_CHECK_MODE},GIT_SHA=${GITHUB_SHA}" \
             --set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest" \
             --quiet
           url="$(gcloud run services describe "ai-${ENV_SUFFIX}" \
