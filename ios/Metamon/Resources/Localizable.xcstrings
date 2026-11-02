@@ -12020,6 +12020,40 @@
         }
       }
     },
+    "AI ボタンの利用状況を送る": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send AI button usage"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI ボタンの利用状況を送る"
+          }
+        }
+      }
+    },
+    "端末内の AI が使えるか(非対応の端末・オフ・準備中)と、AI ボタンが答えを出せなかった回数を、ボタンの種類(要約・分類など)ごとに 1 日 1 回まとめて送ります。ユーザー ID・入力した文・記録は送りません。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Once a day, sends whether on-device AI is available (unsupported device, turned off, or preparing) and how many times AI buttons could not answer, per button type (summarize, classify, etc.). Your user ID, the text you typed, and your records are not sent."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "端末内の AI が使えるか(非対応の端末・オフ・準備中)と、AI ボタンが答えを出せなかった回数を、ボタンの種類(要約・分類など)ごとに 1 日 1 回まとめて送ります。ユーザー ID・入力した文・記録は送りません。"
+          }
+        }
+      }
+    },
     "詳しく見る": {
       "extractionState": "manual",
       "localizations": {

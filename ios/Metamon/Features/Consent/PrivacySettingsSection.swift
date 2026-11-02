@@ -2,10 +2,13 @@ import SwiftUI
 import MetamonServices
 
 /// 設定の「プライバシー」(#246): AI へのデータ送信の同意の確認・取り消しと、プライバシーポリシー・利用規約。
-/// クラッシュ報告(#296)のオン・オフもここ(AI ではないので同意とは別の切り替え)。
+/// クラッシュ報告(#296)・AI ボタンの利用状況(#446・通常の版だけ)のオン・オフもここ(AI への送信ではないので同意とは別の切り替え)。
 struct PrivacySettingsSection: View {
     @Environment(AppRuntime.self) private var rt
     private let crashReporting = CrashReportingPreference.shared
+    #if !APP_STORE_REVIEW
+    private let aiButtonMetrics = AIButtonMetricsRecorder.shared // #446
+    #endif
     @State private var confirmRevoke = false
     @State private var showConsent = false
 
@@ -53,6 +56,14 @@ struct PrivacySettingsSection: View {
         } footer: {
             Text("アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・作ったアプリの中身は送りません。")
         }
+        #if !APP_STORE_REVIEW
+        Section {
+            Toggle("AI ボタンの利用状況を送る", isOn: Binding(get: { aiButtonMetrics.isEnabled }, set: { aiButtonMetrics.setEnabled($0) }))
+                .accessibilityIdentifier("settings.aiButtonMetrics.toggle")
+        } footer: {
+            Text("端末内の AI が使えるか(非対応の端末・オフ・準備中)と、AI ボタンが答えを出せなかった回数を、ボタンの種類(要約・分類など)ごとに 1 日 1 回まとめて送ります。ユーザー ID・入力した文・記録は送りません。")
+        }
+        #endif
     }
 }
 

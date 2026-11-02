@@ -18,7 +18,7 @@ ai サービスが Claude を呼ぶたびに、1 行の構造化ログ `ai.usage
 
 | フィールド | 型 | 中身 |
 | --- | --- | --- |
-| `msg` / `event` | string | いつも `ai.usage` |
+| `message` / `event` | string | いつも `ai.usage`(`severity` は Cloud Logging の重大度になる・#295) |
 | `operation` | string | `generate`(新規作成)/ `patch`(編集)/ `logic`(計算パス)/ `chat`(聞き返し)/ `chat_first`(最初の対話)/ `text`(aiButton の文章生成)/ `unknown`(ラベルなし。eval などのツール) |
 | `model` | string | 頼んだモデル id |
 | `response_model` | string | 実際に答えたモデル(フォールバックで変わることがある)。応答がないときはなし |
@@ -39,7 +39,7 @@ ai サービスが Claude を呼ぶたびに、1 行の構造化ログ `ai.usage
 例:
 
 ```json
-{"time":"2026-10-30T12:00:00+09:00","level":"INFO","msg":"ai.usage","event":"ai.usage","operation":"patch","model":"claude-sonnet-5-5","stream":true,"attempt":1,"outcome":"ok","input_tokens":1000,"output_tokens":500,"cache_creation_input_tokens":2000,"cache_read_input_tokens":4000,"latency_ms":6400,"response_model":"claude-sonnet-5-5","stop_reason":"end_turn","uid_hash":"3f1c0e9a7b2d4c51","est_cost_usd":0.0124,"pricing_as_of":"2026-10-30"}
+{"time":"2026-10-30T12:00:00+09:00","severity":"INFO","message":"ai.usage","event":"ai.usage","operation":"patch","model":"claude-sonnet-5-5","stream":true,"attempt":1,"outcome":"ok","input_tokens":1000,"output_tokens":500,"cache_creation_input_tokens":2000,"cache_read_input_tokens":4000,"latency_ms":6400,"response_model":"claude-sonnet-5-5","stop_reason":"end_turn","uid_hash":"3f1c0e9a7b2d4c51","est_cost_usd":0.0124,"pricing_as_of":"2026-10-30"}
 ```
 
 ## 費用の見積もり
