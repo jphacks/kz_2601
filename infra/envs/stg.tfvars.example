@@ -17,3 +17,12 @@ billing_account     = "XXXXXX-XXXXXX-XXXXXX"
 budget_display_name = "kz2601 stg monthly"
 budget_amount       = 1500
 budget_currency     = "JPY"
+
+# 監視(docs/infra/observability.md・#295)。host は stg のプロジェクトにデプロイした後の URL に替える。
+# stg がまだ prod のプロジェクト(jphacks-kz2601)にある間は、ai-stg / appconfig-stg
+# (https://{ai,appconfig}-stg-378953239426.asia-northeast1.run.app)を prod.tfvars の monitored_services に足す
+monitored_services = {
+  "ai-stg"        = { host = "ai-stg-<project-number>.asia-northeast1.run.app", p95_latency_ms = 60000 }
+  "appconfig-stg" = { host = "appconfig-stg-<project-number>.asia-northeast1.run.app", p95_latency_ms = 1500 }
+}
+alert_emails = ["you@example.com"]
