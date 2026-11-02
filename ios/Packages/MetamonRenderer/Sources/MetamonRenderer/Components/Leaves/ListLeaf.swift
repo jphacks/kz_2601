@@ -22,8 +22,7 @@ struct ListLeaf: View {
     var body: some View {
         let entityId = c.entity ?? ""
         let entity = rt.dsl.entity(entityId)
-        let filtered = Aggregator.sorted(rt.filteredRecords(c), by: c.sort, entity: entity)
-        let rows = searched(filtered, entity: entity)
+        let rows = Self.rows(c, rt: rt, locals: ctx.locals)
         let ids = rows.map(\.id)
         let toggleField = ListToggle.field(c.item, in: entity)
         let mark = c.item?.mark.flatMap { id in entity?.isShared == true ? entity?.mark(id) : nil }
@@ -163,9 +162,18 @@ struct ListLeaf: View {
         }
     }
 
+    /// 表示する行(filter → sort → 検索)。適合テストの描画の木(`RenderTree`)も同じ行を使う。
+    @MainActor
+    static func rows(_ c: Component, rt: any DSLRuntime, locals: ScreenLocals?) -> [Record] {
+        let entity = rt.dsl.entity(c.entity ?? "")
+        let filtered = Aggregator.sorted(rt.filteredRecords(c), by: c.sort, entity: entity)
+        return searched(c, filtered, entity: entity, rt: rt, locals: locals)
+    }
+
     /// `searchField`(同画面の searchBar.field)の文字列で title/subtitle を部分一致(大小無視)フィルタ。
-    private func searched(_ rows: [Record], entity: Entity?) -> [Record] {
-        guard let key = c.searchField, let q = ctx.locals?.values[key]?.trimmingCharacters(in: .whitespaces), !q.isEmpty else { return rows }
+    @MainActor
+    private static func searched(_ c: Component, _ rows: [Record], entity: Entity?, rt: any DSLRuntime, locals: ScreenLocals?) -> [Record] {
+        guard let key = c.searchField, let q = locals?.values[key]?.trimmingCharacters(in: .whitespaces), !q.isEmpty else { return rows }
         let fields = [c.item?.title ?? entity?.titleField, c.item?.subtitle].compactMap { $0 }
         return rows.filter { r in
             fields.contains { rt.display(r[$0], field: entity?.field($0)).localizedCaseInsensitiveContains(q) }

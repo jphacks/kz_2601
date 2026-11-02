@@ -1,0 +1,33 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 10
+          },
+          "id" : "recorder",
+          "props" : {
+            "title" : "ドラレコ"
+          },
+          "state" : "rendered",
+          "type" : "dashcam"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "ドラレコ",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

@@ -39,6 +39,7 @@ jobs:
           filters: |
             backend:
               - 'backend/**'
+              - 'docs/dsl/conformance/expr/**'
               - '.github/workflows/backend-ci.yml'
 
   backend-ci:

@@ -1,0 +1,413 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 1
+          },
+          "id" : "q",
+          "props" : {
+            "field" : "q",
+            "placeholder" : "店の名前",
+            "query" : ""
+          },
+          "state" : "rendered",
+          "type" : "searchBar"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 1,
+            "rowSpan" : 5
+          },
+          "id" : "shops",
+          "props" : {
+            "entity" : "shop",
+            "rows" : [
+              {
+                "recordId" : "s1",
+                "subtitle" : "金沢",
+                "title" : "金沢カレー",
+                "trailing" : "¥900"
+              },
+              {
+                "recordId" : "s2",
+                "subtitle" : "富山",
+                "title" : "富山ブラック",
+                "trailing" : "¥1,000"
+              },
+              {
+                "recordId" : "s3",
+                "subtitle" : "金沢",
+                "title" : "金沢おでん",
+                "trailing" : "¥2,500"
+              }
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 3,
+            "row" : 6,
+            "rowSpan" : 2
+          },
+          "id" : "kanazawa",
+          "props" : {
+            "aggregate" : "avg",
+            "entity" : "shop",
+            "field" : "price",
+            "label" : "金沢の平均予算",
+            "unavailable" : false,
+            "value" : "¥1,700"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 6,
+            "rowSpan" : 2
+          },
+          "id" : "this_week",
+          "props" : {
+            "aggregate" : "count",
+            "entity" : "shop",
+            "label" : "今週行った",
+            "unavailable" : false,
+            "value" : "2 件"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 8,
+            "rowSpan" : 4
+          },
+          "id" : "tl",
+          "props" : {
+            "entity" : "shop",
+            "limit" : 2,
+            "rows" : [
+              {
+                "date" : "11/11(水)",
+                "recordId" : "s1",
+                "subtitle" : "金沢",
+                "title" : "金沢カレー"
+              },
+              {
+                "date" : "11/10(火)",
+                "recordId" : "s3",
+                "subtitle" : "金沢",
+                "title" : "金沢おでん"
+              }
+            ]
+          },
+          "state" : "rendered",
+          "type" : "timeline"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "店",
+      "toolbar" : [
+
+      ]
+    }
+  ],
+  "steps" : [
+    {
+      "effects" : [
+
+      ],
+      "op" : {
+        "search" : {
+          "field" : "q",
+          "text" : "金沢"
+        }
+      },
+      "screen" : {
+        "id" : "home",
+        "layout" : "grid",
+        "nodes" : [
+          {
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 0,
+              "rowSpan" : 1
+            },
+            "id" : "q",
+            "props" : {
+              "field" : "q",
+              "placeholder" : "店の名前",
+              "query" : "金沢"
+            },
+            "state" : "rendered",
+            "type" : "searchBar"
+          },
+          {
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 1,
+              "rowSpan" : 5
+            },
+            "id" : "shops",
+            "props" : {
+              "entity" : "shop",
+              "rows" : [
+                {
+                  "recordId" : "s1",
+                  "subtitle" : "金沢",
+                  "title" : "金沢カレー",
+                  "trailing" : "¥900"
+                },
+                {
+                  "recordId" : "s3",
+                  "subtitle" : "金沢",
+                  "title" : "金沢おでん",
+                  "trailing" : "¥2,500"
+                }
+              ]
+            },
+            "state" : "rendered",
+            "type" : "list"
+          },
+          {
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 3,
+              "row" : 6,
+              "rowSpan" : 2
+            },
+            "id" : "kanazawa",
+            "props" : {
+              "aggregate" : "avg",
+              "entity" : "shop",
+              "field" : "price",
+              "label" : "金沢の平均予算",
+              "unavailable" : false,
+              "value" : "¥1,700"
+            },
+            "state" : "rendered",
+            "type" : "stat"
+          },
+          {
+            "cell" : {
+              "col" : 3,
+              "colSpan" : 3,
+              "row" : 6,
+              "rowSpan" : 2
+            },
+            "id" : "this_week",
+            "props" : {
+              "aggregate" : "count",
+              "entity" : "shop",
+              "label" : "今週行った",
+              "unavailable" : false,
+              "value" : "2 件"
+            },
+            "state" : "rendered",
+            "type" : "stat"
+          },
+          {
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 8,
+              "rowSpan" : 4
+            },
+            "id" : "tl",
+            "props" : {
+              "entity" : "shop",
+              "limit" : 2,
+              "rows" : [
+                {
+                  "date" : "11/11(水)",
+                  "recordId" : "s1",
+                  "subtitle" : "金沢",
+                  "title" : "金沢カレー"
+                },
+                {
+                  "date" : "11/10(火)",
+                  "recordId" : "s3",
+                  "subtitle" : "金沢",
+                  "title" : "金沢おでん"
+                }
+              ]
+            },
+            "state" : "rendered",
+            "type" : "timeline"
+          }
+        ],
+        "route" : {
+          "recordId" : null,
+          "screen" : "home",
+          "stack" : "main"
+        },
+        "title" : "店",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      }
+    },
+    {
+      "effects" : [
+
+      ],
+      "op" : {
+        "search" : {
+          "field" : "q",
+          "text" : "ブラック"
+        }
+      },
+      "screen" : {
+        "id" : "home",
+        "layout" : "grid",
+        "nodes" : [
+          {
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 0,
+              "rowSpan" : 1
+            },
+            "id" : "q",
+            "props" : {
+              "field" : "q",
+              "placeholder" : "店の名前",
+              "query" : "ブラック"
+            },
+            "state" : "rendered",
+            "type" : "searchBar"
+          },
+          {
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 1,
+              "rowSpan" : 5
+            },
+            "id" : "shops",
+            "props" : {
+              "entity" : "shop",
+              "rows" : [
+                {
+                  "recordId" : "s2",
+                  "subtitle" : "富山",
+                  "title" : "富山ブラック",
+                  "trailing" : "¥1,000"
+                }
+              ]
+            },
+            "state" : "rendered",
+            "type" : "list"
+          },
+          {
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 3,
+              "row" : 6,
+              "rowSpan" : 2
+            },
+            "id" : "kanazawa",
+            "props" : {
+              "aggregate" : "avg",
+              "entity" : "shop",
+              "field" : "price",
+              "label" : "金沢の平均予算",
+              "unavailable" : false,
+              "value" : "¥1,700"
+            },
+            "state" : "rendered",
+            "type" : "stat"
+          },
+          {
+            "cell" : {
+              "col" : 3,
+              "colSpan" : 3,
+              "row" : 6,
+              "rowSpan" : 2
+            },
+            "id" : "this_week",
+            "props" : {
+              "aggregate" : "count",
+              "entity" : "shop",
+              "label" : "今週行った",
+              "unavailable" : false,
+              "value" : "2 件"
+            },
+            "state" : "rendered",
+            "type" : "stat"
+          },
+          {
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 8,
+              "rowSpan" : 4
+            },
+            "id" : "tl",
+            "props" : {
+              "entity" : "shop",
+              "limit" : 2,
+              "rows" : [
+                {
+                  "date" : "11/11(水)",
+                  "recordId" : "s1",
+                  "subtitle" : "金沢",
+                  "title" : "金沢カレー"
+                },
+                {
+                  "date" : "11/10(火)",
+                  "recordId" : "s3",
+                  "subtitle" : "金沢",
+                  "title" : "金沢おでん"
+                }
+              ]
+            },
+            "state" : "rendered",
+            "type" : "timeline"
+          }
+        ],
+        "route" : {
+          "recordId" : null,
+          "screen" : "home",
+          "stack" : "main"
+        },
+        "title" : "店",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      }
+    }
+  ]
+}

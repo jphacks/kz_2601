@@ -2,6 +2,7 @@
 
 # 退会から 30 日を過ぎたアカウントの消去(#458)をエミュレータに対して試す。既定は -dry-run。
 # 本番は Cloud Run Job(docs/infra/account-purge.md)。ローカルから stg/prod に向けない。
+# make emulator は Auth エミュレータを起動しないので、-dry-run を外す時は PURGE_FLAGS=-delete-auth=false にする。
 PURGE_FLAGS ?= -dry-run
 .PHONY: run-purge
 run-purge:

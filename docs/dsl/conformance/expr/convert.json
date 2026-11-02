@@ -1,0 +1,97 @@
+{
+  "description": "toNumber: which strings parse as numbers (Swift Double(String) after removing commas).",
+  "defaults": {"now": "2026-10-28T15:30:45+09:00", "timeZone": "Asia/Tokyo"},
+  "cases": [
+    {
+      "name": "toNumber/integer-string",
+      "expr": {"op": "toNumber", "args": ["42"]},
+      "expected": {"type": "number", "value": 42, "text": "42"}
+    },
+    {
+      "name": "toNumber/comma-decimal",
+      "expr": {"op": "toNumber", "args": ["1,234.5"]},
+      "expected": {"type": "number", "value": 1234.5, "text": "1234.5"}
+    },
+    {"name": "toNumber/leading-space", "expr": {"op": "toNumber", "args": [" 5"]}, "expected": {"type": "nil"}},
+    {"name": "toNumber/trailing-space", "expr": {"op": "toNumber", "args": ["5 "]}, "expected": {"type": "nil"}},
+    {
+      "name": "toNumber/plus-sign",
+      "expr": {"op": "toNumber", "args": ["+5"]},
+      "expected": {"type": "number", "value": 5, "text": "5"}
+    },
+    {
+      "name": "toNumber/leading-dot",
+      "expr": {"op": "toNumber", "args": [".5"]},
+      "expected": {"type": "number", "value": 0.5, "text": "0.5"}
+    },
+    {
+      "name": "toNumber/trailing-dot",
+      "expr": {"op": "toNumber", "args": ["5."]},
+      "expected": {"type": "number", "value": 5, "text": "5"}
+    },
+    {
+      "name": "toNumber/hex",
+      "expr": {"op": "toNumber", "args": ["0x10"]},
+      "expected": {"type": "number", "value": 16, "text": "16"}
+    },
+    {
+      "name": "toNumber/hex-float",
+      "expr": {"op": "toNumber", "args": ["0x1p3"]},
+      "expected": {"type": "number", "value": 8, "text": "8"}
+    },
+    {
+      "name": "toNumber/exponent",
+      "expr": {"op": "toNumber", "args": ["1e3"]},
+      "expected": {"type": "number", "value": 1000, "text": "1000"}
+    },
+    {"name": "toNumber/incomplete-exponent", "expr": {"op": "toNumber", "args": ["1e"]}, "expected": {"type": "nil"}},
+    {"name": "toNumber/underscore", "expr": {"op": "toNumber", "args": ["1_000"]}, "expected": {"type": "nil"}},
+    {"name": "toNumber/binary-prefix", "expr": {"op": "toNumber", "args": ["0b1"]}, "expected": {"type": "nil"}},
+    {
+      "name": "toNumber/leading-zeros",
+      "expr": {"op": "toNumber", "args": ["00012"]},
+      "expected": {"type": "number", "value": 12, "text": "12"}
+    },
+    {"name": "toNumber/text", "expr": {"op": "toNumber", "args": ["abc"]}, "expected": {"type": "nil"}},
+    {"name": "toNumber/empty", "expr": {"op": "toNumber", "args": [""]}, "expected": {"type": "nil"}},
+    {
+      "name": "toNumber/true",
+      "expr": {"op": "toNumber", "args": [true]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "toNumber/false",
+      "expr": {"op": "toNumber", "args": [false]},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "toNumber/date",
+      "expr": {"op": "toNumber", "args": [{"op": "today", "args": []}]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "toNumber/infinity-word",
+      "expr": {"op": "toNumber", "args": ["Infinity"]},
+      "expected": {"type": "number", "value": "inf", "text": "inf"}
+    },
+    {
+      "name": "toNumber/overflow",
+      "expr": {"op": "toNumber", "args": ["1e400"]},
+      "expected": {"type": "number", "value": "inf", "text": "inf"}
+    },
+    {"name": "toNumber/time-string", "expr": {"op": "toNumber", "args": ["09:30"]}, "expected": {"type": "nil"}},
+    {"name": "toNumber/arabic-digits", "expr": {"op": "toNumber", "args": ["١٢"]}, "expected": {"type": "nil"}},
+    {"name": "toNumber/fullwidth-digits", "expr": {"op": "toNumber", "args": ["１２"]}, "expected": {"type": "nil"}},
+    {
+      "name": "toNumber/nil",
+      "expr": {"op": "toNumber", "args": [{"op": "div", "args": [1, 0]}]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "toNumber/number",
+      "expr": {"op": "toNumber", "args": [3.5]},
+      "expected": {"type": "number", "value": 3.5, "text": "3.5"}
+    },
+    {"name": "toNumber/no-args", "expr": {"op": "toNumber", "args": []}, "expected": {"type": "nil"}}
+  ]
+}

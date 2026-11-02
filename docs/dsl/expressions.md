@@ -32,7 +32,7 @@ Expr := number | string | boolean
 | 形 | 意味 |
 |---|---|
 | リテラル | 数値・文字列・真偽値。`null` は式ではない(スキーマで拒否) |
-| `ref` | 行コンテキスト(§4)のレコードのフィールド値。`"id"` はレコード id。`"payer.name"` のように **ドット 1 つ**で、type ref の field が指す先のレコードのフィールド値(lookup・#134)。`"<ref>.id"` は ref の値そのもの。2 段以上(`a.b.c`)は不可 |
+| `ref` | 行コンテキスト(§4)のレコードのフィールド値。`"id"` はレコード id。`"payer.name"` のように **ドット 1 つ**で、type ref の field が指す先のレコードのフィールド値(lookup・#134)。`"<ref>.id"` は ref の値そのもの。2 段以上(`a.b.c`)は不可。予約値(`$author` `$createdAt` `$marks.<id>`)は ref に書けない(backend が拒否。印の件数は式でなく table の列・sort で出す) |
 | `agg` | エンティティ全レコード(filter で絞る)の集計。count 以外は `field` 必須。`field` に computed フィールドも可。`latest` / `earliest`(#133)は `by`(date/datetime field)で並べた最新 / 最古の 1 件の `field` の値(型は field のまま・数値以外も可) |
 | `op` | 関数呼び出し。§3 の閉じた一覧のみ |
 | `if` | `if` が true なら `then`、それ以外は `else` |
@@ -61,10 +61,10 @@ Expr := number | string | boolean
 | | `neg` `abs` `sqrt` | 数値 1 個 | 数値(`sqrt` の負数はエラー) |
 | | `round` `floor` `ceil` | (x) または (x, n) | 数値(n = 小数桁・省略で整数。`round(x,1)` = 小数 1 桁) |
 | | `clamp` | (x, lo, hi) | 数値 |
-| 比較 | `eq` `neq` | 任意 2 個 | 真偽(型が違っても nil にせず、数値か文字列に寄せて比べる: レコード id と ref 値の比較用) |
-| | `gt` `gte` `lt` `lte` | 同じ型(数値同士・日付同士)2 個 | 真偽 |
-| 論理 | `and` `or` | 真偽 2 個 | 真偽 |
-| | `not` | 真偽 1 個 | 真偽 |
+| 比較 | `eq` `neq` | 任意 2 個 | 真偽(型が違っても nil にせず、数値か文字列に寄せて比べる: レコード id と ref 値の比較用。日付と日付の文字列は日時として比べる) |
+| | `gt` `gte` `lt` `lte` | 同じ型(数値同士・日付同士)2 個 | 真偽(日付と日付の文字列も日付として比べる。比べられない組は nil) |
+| 論理 | `and` `or` | 真偽 2 個 | 真偽(nil は false として扱い、nil にしない・§5) |
+| | `not` | 真偽 1 個 | 真偽(`not(nil)` = true・§5) |
 | 文字列 | `concat` | 任意 2 個(文字列化して連結) | 文字列 |
 | | `len` | 文字列 1 個 | 数値(文字数) |
 | 日付 | `now` `today` | なし(`args: []`) | 日時 / 今日の日付(端末ローカル) |
@@ -78,7 +78,7 @@ Expr := number | string | boolean
 | 毎日チェック(#172) | `streak` | (`{"ref": <toggle field>}`) | 数値 = 連続日数。今日チェック済みなら今日から、まだなら**昨日から**遡って続いた日数(今日未チェックでも昨日までの連続は切らない)。昨日も無ければ 0 |
 | | `doneInDays` | (`{"ref": <toggle field>}`, n) | 数値 = 直近 n 日(今日を含む)にチェックした日数(直近 7 日 = n 7)。n は整数リテラル 1..366 |
 
-日付引数は date / datetime フィールド、`today`/`now`/`addDays` の結果、`"YYYY-MM-DD"` 文字列を受け付ける。
+日付引数は date / datetime フィールド、`today`/`now`/`addDays` の結果、`"YYYY-MM-DD"` 文字列、RFC 3339 の文字列(オフセット必須・小数秒 `…00.123Z` も可)を受け付ける。
 
 `streak` / `doneInDays` の第 1 引数は**値ではなく field の指定**: `list.item.resets: "daily"` の toggle に使われている同 entity の date field を `{"ref": ...}` で渡す(iOS はその行の「押した日の履歴」を読む・§7.5)。computed(integer)で使い、全体の値は stat.value の `agg sum / max` でその computed を集計する。stat.value 直下では行が無いので使えない。
 
@@ -94,6 +94,8 @@ Expr := number | string | boolean
 | `Filter.value`(list/stat/chart 等の画面部品) | なし | 不可 | `{"op":"addDays","args":[{"op":"today","args":[]},-7]}` = 直近 7 日 |
 
 - **computed フィールド**: `type` は `number|integer|currency|string|boolean|date`。保存されない読み取り専用列。list の item / table の columns / stat・chart の field / sort / filter から通常フィールドと同じに参照できる。入力部品(textField 等)は束縛できない。`required` / `defaultValue` は不可。
+- **filter の比べ方**(agg 内・部品レベル共通): `gt` `gte` `lt` `lte` は、数値同士(数の文字列・カンマ付きも数として)なら数値、日付同士(date / datetime field・日付の文字列・`today` `addDays` などの結果)なら日付で比べる。それ以外の組(文字列同士・日付と数値)はどのレコードにも一致しない。`{"field":"date","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-7]}}` = 直近 7 日。
+- **filter の value の Expr が評価できない(nil)**時は、その filter は**どのレコードにも一致しない**(count / sum は 0、avg / min / max は nil)。値が空のレコードに一致させない(行の無い所で `{"ref":"id"}` を書いた・0 割りなど)。
 - 部品レベルの `filter`(list / stat / chart …)はスキーマ上 1 つだけ(iOS は配列も読めるが、backend は出さない・AND が要るなら stat.value の agg で)。
 - **グループごとの集計の一覧**(店ごとの平均点・人ごとの合計)は Expr ではなく `table.groupBy` + 列の `aggregate`(README §3.2 の設計メモ・#261)。グループの値ごとに `agg` を書く必要は無い。
 - **`Stat.value`**: `aggregate` の代わり。`aggregate` と `value` は**排他でどちらか必須**。`value` のときは `entity/field/filter` を書かない(agg の中に書く)。`format` はそのまま効く(percent は 0..1 → %)。
@@ -104,7 +106,12 @@ Expr := number | string | boolean
 ## 5. 評価ルール(iOS)
 
 - 型は 数値(Double)/ 文字列 / 真偽 / 日付 / 空。currency・integer フィールドは数値。ref フィールドの値は参照先レコード id(文字列)。
-- 空のフィールド・評価エラー(0 割り・型不一致・参照先なし・`sqrt` の負数)は **nil → 表示は「—」**。nil を受けた op は nil を返す(`coalesce` だけは b を返す)。`agg` は 0 件なら count/sum は 0、avg/min/max は nil。
+- 空のフィールド・評価エラー(0 割り・型不一致・参照先なし・`sqrt` の負数)は **nil → 表示は「—」**。nil を受けた op は nil を返す。例外:
+  - `coalesce` は b を返す。
+  - `eq` / `neq` は nil を値として比べる(nil 同士は等しい)。`concat` は nil を空文字にする。
+  - **`and` / `or` / `not` と `if` の条件は nil を false として扱う**(`not(nil)` = true)。まだ押していない boolean field(値が無い)を「false」と読むため。生成アプリの `and(ref workout, ref reading)`(両方達成)や「未完了」の判定が、片方が未入力の行で「—」になったり filter `eq true` / `eq false` から外れたりしないよう、nil にしない(#552)。
+- `agg` は 0 件なら count/sum は 0、avg/min/max は nil。
+- 文字列の数は桁区切りのカンマを除いて数として読む(`"1,200"` = 1200。算術・比較・`agg` の sum / avg / min / max で同じ)。
 - computed 同士の依存は backend が DAG を保証する(循環は来ない)。評価順は依存順でも都度再帰でもよい。
 - `today`/`now` と期間 filter(`today`/`thisWeek`/`thisMonth`/`thisYear`)は端末ローカル時刻(従来の stat filter と同じ)。
 - **`thisWeek` は月曜 0:00 〜 次の月曜 0:00**。端末ロケールの週の始まり(日本の `Calendar` 既定は日曜)に従わず月曜に固定する: 日本の暦・学校・職場の「今週」は月〜日で数えるのが一般的で、日曜始まりだと日曜の記録が「来週」側に入り、週末に振り返る用途(家事当番・週の目標)で直感とずれるため。`thisYear` は 1/1 〜 12/31。

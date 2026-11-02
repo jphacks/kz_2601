@@ -1,0 +1,133 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 3,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "count",
+          "props" : {
+            "aggregate" : "count",
+            "entity" : "task",
+            "label" : "件数",
+            "unavailable" : false,
+            "value" : "0 件"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "sum",
+          "props" : {
+            "aggregate" : "sum",
+            "entity" : "task",
+            "field" : "points",
+            "label" : "合計",
+            "unavailable" : false,
+            "value" : "0"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 1
+          },
+          "id" : "progress",
+          "props" : {
+            "aggregate" : "sum",
+            "entity" : "task",
+            "field" : "points",
+            "label" : "進み",
+            "percent" : "0%",
+            "ratio" : 0,
+            "target" : 10
+          },
+          "state" : "rendered",
+          "type" : "progressBar"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 3,
+            "rowSpan" : 5
+          },
+          "id" : "tasks",
+          "props" : {
+            "emptyText" : "タスクはありません",
+            "entity" : "task",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 8,
+            "rowSpan" : 2
+          },
+          "id" : "tasks_default",
+          "props" : {
+            "emptyText" : "まだありません",
+            "entity" : "task",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "table",
+          "props" : {
+            "columns" : [
+              "タイトル",
+              "点"
+            ],
+            "entity" : "task",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "table"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "空",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

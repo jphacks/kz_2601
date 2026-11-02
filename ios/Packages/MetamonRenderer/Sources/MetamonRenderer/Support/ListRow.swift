@@ -25,24 +25,40 @@ struct ListRow: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.dslRuntime) private var rt
 
-    private func text(_ fieldId: String?) -> String? {
+    private func text(_ fieldId: String?) -> String? { Self.text(fieldId, record: record, entity: entity, rt: rt) }
+
+    @MainActor
+    private static func text(_ fieldId: String?, record: Record, entity: Entity?, rt: any DSLRuntime) -> String? {
         guard let fieldId else { return nil }
         return rt.display(record[fieldId], field: entity?.field(fieldId))
     }
+
+    /// 行に出す文字(title / subtitle / trailing・空は nil)。適合テストの描画の木(`RenderTree`)も同じ文字を使う。
+    @MainActor
+    static func texts(item: ListItem?, record: Record, entity: Entity?, rt: any DSLRuntime) -> (title: String, subtitle: String?, trailing: String?) {
+        let t = { (f: String?) in text(f, record: record, entity: entity, rt: rt) }
+        return (title(t, item: item, entity: entity), nonEmpty(t(item?.subtitle)), nonEmpty(t(item?.trailing)))
+    }
+
+    private static func title(_ t: (String?) -> String?, item: ListItem?, entity: Entity?) -> String {
+        t(item?.title ?? entity?.displayTitleField) ?? ""
+    }
+
+    private static func nonEmpty(_ s: String?) -> String? { s.flatMap { $0.isEmpty ? nil : $0 } }
 
     /// trailing が数値/通貨 field なら等幅・太めで右寄せ(金額が縦に揃う)。
     private var trailingIsNumeric: Bool {
         item?.trailing.flatMap { entity?.field($0)?.type.isNumeric } ?? false
     }
 
-    private var titleText: String { text(item?.title ?? entity?.displayTitleField) ?? "" }
-    private var subtitleText: String? { text(item?.subtitle).flatMap { $0.isEmpty ? nil : $0 } }
+    private var titleText: String { Self.title(text, item: item, entity: entity) }
+    private var subtitleText: String? { Self.nonEmpty(text(item?.subtitle)) }
     /// trailing が audio field なら行に再生ボタン(#420)。
     private var trailingAudio: JSONValue? {
         guard let f = item?.trailing, entity?.field(f)?.type == .audio, AudioValue(record[f]) != nil else { return nil }
         return record[f]
     }
-    private var trailingText: String? { text(item?.trailing).flatMap { $0.isEmpty ? nil : $0 } }
+    private var trailingText: String? { Self.nonEmpty(text(item?.trailing)) }
 
     /// subtitle / title のどちらかが enum(カテゴリ)なら、その値から色を決める。
     private var categoryColor: Color? {

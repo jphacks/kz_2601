@@ -1,0 +1,301 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 10
+          },
+          "children" : [
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "push",
+                    "screen" : "recipe_form",
+                    "type" : "navigate"
+                  },
+                  "on" : "rowTap"
+                }
+              ],
+              "id" : null,
+              "props" : {
+                "emptyText" : "まだレシピがありません",
+                "entity" : "recipes",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "all",
+          "props" : {
+            "title" : "新着"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "recipe_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "投稿"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "tab:home"
+      },
+      "title" : "みんなのレシピ",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "popular",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 12
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "columns" : [
+                  "料理名",
+                  "投稿者",
+                  "保存"
+                ],
+                "entity" : "recipes",
+                "limit" : 20,
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "table"
+            }
+          ],
+          "id" : "ranking",
+          "props" : {
+            "title" : "保存の多い順"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "popular",
+        "stack" : "tab:popular"
+      },
+      "title" : "よく保存されているレシピ",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "saved",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "count",
+          "props" : {
+            "aggregate" : "count",
+            "entity" : "recipes",
+            "label" : "保存したレシピ",
+            "unavailable" : false,
+            "value" : "0 件"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 10
+          },
+          "children" : [
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "push",
+                    "screen" : "recipe_form",
+                    "type" : "navigate"
+                  },
+                  "on" : "rowTap"
+                }
+              ],
+              "id" : null,
+              "props" : {
+                "emptyText" : "みんなのレシピの栞マークで保存できます",
+                "entity" : "recipes",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "list",
+          "props" : {
+            "title" : "保存したもの"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "saved",
+        "stack" : "tab:saved"
+      },
+      "title" : "保存したレシピ",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "recipes",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+
+        }
+      },
+      "id" : "recipe_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 10
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "title",
+                "label" : "料理名",
+                "placeholder" : "肉じゃが",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "minutes",
+                "label" : "調理時間",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "numberField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "steps",
+                "label" : null,
+                "placeholder" : "作り方",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textEditor"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "photo",
+                "label" : "写真",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "photoField"
+            }
+          ],
+          "id" : "fields",
+          "props" : {
+            "title" : "内容"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "recipe_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "recipes",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "レシピ",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

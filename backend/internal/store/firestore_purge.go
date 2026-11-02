@@ -71,41 +71,36 @@ func (f *Firestore) purgeOwned(ctx context.Context, ref *firestore.DocumentRef, 
 // deleteTree deletes ref and every document below it, deepest first, and
 // returns how many documents it deleted per collection id.
 func (f *Firestore) deleteTree(ctx context.Context, ref *firestore.DocumentRef) (map[string]int, error) {
-	var refs []*firestore.DocumentRef
 	counts := map[string]int{}
-	var walk func(*firestore.DocumentRef) error
-	walk = func(d *firestore.DocumentRef) error {
-		cols := d.Collections(ctx)
-		for {
-			col, err := cols.Next()
-			if errors.Is(err, iterator.Done) {
-				break
-			}
-			if err != nil {
-				return err
-			}
-			docs := col.DocumentRefs(ctx) // includes "missing" parents such as entities/{e}
-			for {
-				child, err := docs.Next()
-				if errors.Is(err, iterator.Done) {
-					break
-				}
-				if err != nil {
-					return err
-				}
-				if err := walk(child); err != nil {
-					return err
-				}
-				counts[col.ID]++
-			}
-		}
-		refs = append(refs, d)
-		return nil
-	}
-	if err := walk(ref); err != nil {
+	refs, err := collectTree(ctx, ref, nil, counts)
+	if err != nil {
 		return counts, err
 	}
 	return counts, f.bulkDelete(ctx, refs)
+}
+
+// collectTree appends ref and every document below it to refs, deepest first,
+// counting the documents below ref per collection id.
+func collectTree(ctx context.Context, ref *firestore.DocumentRef, refs []*firestore.DocumentRef, counts map[string]int) ([]*firestore.DocumentRef, error) {
+	cols := ref.Collections(ctx)
+	for {
+		col, err := cols.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return refs, err
+		}
+		err = eachRef(col.DocumentRefs(ctx), func(child *firestore.DocumentRef) error { // includes "missing" parents such as entities/{e}
+			refs, err = collectTree(ctx, child, refs, counts)
+			counts[col.ID]++
+			return err
+		})
+		if err != nil {
+			return refs, err
+		}
+	}
+	return append(refs, ref), nil
 }
 
 func (f *Firestore) bulkDelete(ctx context.Context, refs []*firestore.DocumentRef) error {

@@ -9,12 +9,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// watchRecordsWindow bounds the realtime record listener to the most recently
-// updated documents: a listener is billed one read per matching document on
-// every (re)connect, and creates/updates always land at the top. A delete of a
-// record older than the window is not signalled (the next pull still drops it).
-const watchRecordsWindow = 100
-
 var _ Watcher = (*Firestore)(nil)
 
 // WatchApp implements Watcher with a snapshot listener on users/{uid}/apps/{appId}.

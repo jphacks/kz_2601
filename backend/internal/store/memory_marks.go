@@ -36,7 +36,9 @@ func (m *Memory) SetMark(_ context.Context, rs RecordSet, recordID, markID, uid 
 			delete(m.marks, key)
 			r.MarkCounts[markID] = max(0, r.MarkCounts[markID]-1)
 		}
-		m.hub.publish(recordsKey(rs), 0)
+		if inWatchWindow(recs[rs.Entity], recordID) {
+			m.hub.publish(recordsKey(rs), 0)
+		}
 	}
 	return MarkState{Count: r.MarkCounts[markID], Mine: on}, nil
 }

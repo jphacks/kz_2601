@@ -1,0 +1,337 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 3
+          },
+          "children" : [
+            {
+              "cell" : {
+                "col" : 0,
+                "colSpan" : 3,
+                "row" : 0,
+                "rowSpan" : 2
+              },
+              "id" : "total",
+              "props" : {
+                "aggregate" : "sum",
+                "entity" : "drinks",
+                "field" : "amount",
+                "label" : "今日の合計",
+                "unavailable" : false,
+                "value" : "0 ml"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            },
+            {
+              "cell" : {
+                "col" : 3,
+                "colSpan" : 3,
+                "row" : 0,
+                "rowSpan" : 2
+              },
+              "id" : "times",
+              "props" : {
+                "aggregate" : "count",
+                "entity" : "drinks",
+                "label" : "今日の記録",
+                "unavailable" : false,
+                "value" : "0 件"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            }
+          ],
+          "id" : "today",
+          "localGrid" : true,
+          "props" : {
+            "title" : "今日"
+          },
+          "state" : "rendered",
+          "type" : "card"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 3,
+            "rowSpan" : 2
+          },
+          "children" : [
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "sheet",
+                    "screen" : "drink_form",
+                    "type" : "navigate"
+                  },
+                  "on" : "tap"
+                }
+              ],
+              "cell" : {
+                "col" : 0,
+                "colSpan" : 3,
+                "row" : 0,
+                "rowSpan" : 1
+              },
+              "id" : "add",
+              "props" : {
+                "label" : "飲んだ"
+              },
+              "state" : "rendered",
+              "type" : "button"
+            },
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "push",
+                    "screen" : "history",
+                    "type" : "navigate"
+                  },
+                  "on" : "tap"
+                }
+              ],
+              "cell" : {
+                "col" : 3,
+                "colSpan" : 3,
+                "row" : 0,
+                "rowSpan" : 1
+              },
+              "id" : "history",
+              "props" : {
+                "label" : "履歴"
+              },
+              "state" : "rendered",
+              "type" : "button"
+            }
+          ],
+          "id" : "quick",
+          "localGrid" : true,
+          "props" : {
+            "title" : "記録する"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 5,
+            "rowSpan" : 7
+          },
+          "children" : [
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "push",
+                    "screen" : "drink_form",
+                    "type" : "navigate"
+                  },
+                  "on" : "rowTap"
+                }
+              ],
+              "id" : null,
+              "props" : {
+                "emptyText" : "まだ飲んでいません",
+                "entity" : "drinks",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "recent",
+          "props" : {
+            "title" : "今日の記録"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "水分記録",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "history",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "push",
+                "screen" : "drink_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 12
+          },
+          "id" : "all",
+          "props" : {
+            "emptyText" : "記録がありません",
+            "entity" : "drinks",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "history",
+        "stack" : "main"
+      },
+      "title" : "履歴",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "drinks",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "amount" : 200,
+          "date" : "2026-11-12T03:00:00Z",
+          "kind" : "水"
+        }
+      },
+      "id" : "drink_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 4
+          },
+          "children" : [
+            {
+              "cell" : {
+                "col" : 0,
+                "colSpan" : 3,
+                "row" : 0,
+                "rowSpan" : 1
+              },
+              "id" : "amount_in",
+              "props" : {
+                "field" : "amount",
+                "label" : "量(ml)",
+                "placeholder" : "200",
+                "value" : 200
+              },
+              "state" : "rendered",
+              "type" : "numberField"
+            },
+            {
+              "cell" : {
+                "col" : 3,
+                "colSpan" : 3,
+                "row" : 0,
+                "rowSpan" : 1
+              },
+              "id" : "kind_in",
+              "props" : {
+                "field" : "kind",
+                "label" : "種類",
+                "options" : [
+                  "水",
+                  "お茶",
+                  "コーヒー",
+                  "その他"
+                ],
+                "style" : "menu",
+                "value" : "水"
+              },
+              "state" : "rendered",
+              "type" : "picker"
+            },
+            {
+              "cell" : {
+                "col" : 0,
+                "colSpan" : 6,
+                "row" : 1,
+                "rowSpan" : 1
+              },
+              "id" : "date_in",
+              "props" : {
+                "field" : "date",
+                "label" : "日時",
+                "value" : "2026-11-12T03:00:00Z"
+              },
+              "state" : "rendered",
+              "type" : "datePicker"
+            }
+          ],
+          "id" : "fields",
+          "localGrid" : true,
+          "props" : {
+            "title" : "内容"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "drink_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "drinks",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "飲んだ記録",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

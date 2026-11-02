@@ -1,0 +1,307 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "aggregate" : "sum",
+                "entity" : "expense",
+                "field" : "amount",
+                "format" : "currency",
+                "label" : "今月の支出",
+                "unavailable" : false,
+                "value" : "¥0"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "aggregate" : "count",
+                "entity" : "expense",
+                "label" : "今月の件数",
+                "unavailable" : false,
+                "value" : "0 件"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            }
+          ],
+          "id" : "summary",
+          "state" : "rendered",
+          "type" : "hstack"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 8
+          },
+          "children" : [
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "push",
+                    "screen" : "expense_form",
+                    "type" : "navigate"
+                  },
+                  "on" : "rowTap"
+                }
+              ],
+              "id" : null,
+              "props" : {
+                "emptyText" : "まだ支出がありません",
+                "entity" : "expense",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "recent",
+          "props" : {
+            "title" : "最近の支出"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "expense_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "支出を追加"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "tab:home"
+      },
+      "title" : "家計簿",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "expense",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "category" : "食費",
+          "date" : "2026-11-12"
+        }
+      },
+      "id" : "expense_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 7
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "amount",
+                "label" : "金額",
+                "unit" : "円",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "numberField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "category",
+                "label" : "カテゴリ",
+                "options" : [
+                  "食費",
+                  "交通",
+                  "日用品",
+                  "娯楽",
+                  "その他"
+                ],
+                "style" : "segmented",
+                "value" : "食費"
+              },
+              "state" : "rendered",
+              "type" : "picker"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "memo",
+                "label" : "メモ",
+                "placeholder" : "コンビニ",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "date",
+                "label" : "日付",
+                "value" : "2026-11-12"
+              },
+              "state" : "rendered",
+              "type" : "datePicker"
+            }
+          ],
+          "id" : "fields",
+          "props" : {
+            "title" : "内容"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 7,
+            "rowSpan" : 2
+          },
+          "id" : "receipt",
+          "props" : {
+            "field" : "receipt",
+            "label" : "レシートを撮る",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "photoField"
+        },
+        {
+          "band" : 2,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "expense_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "expense",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "支出を記録",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "stats",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 6
+          },
+          "id" : "by_category",
+          "props" : {
+            "aggregate" : "sum",
+            "buckets" : [
+
+            ],
+            "entity" : "expense",
+            "field" : "amount",
+            "groupBy" : "category",
+            "kind" : "pie",
+            "title" : "カテゴリ別(今月)"
+          },
+          "state" : "rendered",
+          "type" : "chart"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 6,
+            "rowSpan" : 6
+          },
+          "id" : "by_month",
+          "props" : {
+            "aggregate" : "sum",
+            "bucket" : "month",
+            "buckets" : [
+
+            ],
+            "entity" : "expense",
+            "field" : "amount",
+            "groupBy" : "date",
+            "kind" : "bar",
+            "title" : "月ごとの支出"
+          },
+          "state" : "rendered",
+          "type" : "chart"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "stats",
+        "stack" : "tab:stats"
+      },
+      "title" : "集計",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

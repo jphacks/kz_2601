@@ -400,9 +400,12 @@ func (m *Memory) DeleteRecord(_ context.Context, rs RecordSet, id string) error 
 	if _, ok := recs[rs.Entity][id]; !ok {
 		return ErrNotFound
 	}
+	watched := inWatchWindow(recs[rs.Entity], id)
 	delete(recs[rs.Entity], id)
 	m.dropMarks(recordsKey(rs) + "/" + id + "/")
-	m.hub.publish(recordsKey(rs), 0)
+	if watched {
+		m.hub.publish(recordsKey(rs), 0)
+	}
 	return nil
 }
 

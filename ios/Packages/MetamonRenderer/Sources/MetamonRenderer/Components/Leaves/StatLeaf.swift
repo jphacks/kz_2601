@@ -134,8 +134,18 @@ struct StatLeaf: View {
         c.field.flatMap { rt.dsl.entity(c.entity ?? "")?.field($0) }
     }
 
+    private var aggregateValue: (String, Bool, Bool) { Self.aggregateValue(c, rt: rt) }
+    private var exprValue: (String, Bool, Bool) { Self.exprValue(c, rt: rt) }
+
+    /// 表示する値(書式後の文字, 読み込み中, 取得失敗)。適合テストの描画の木(`RenderTree`)も同じ値を使う。
+    @MainActor
+    static func resolve(_ c: Component, rt: any DSLRuntime) -> (text: String, isLoading: Bool, unavailable: Bool) {
+        c.aggregate == nil && c.valueExpr != nil ? exprValue(c, rt: rt) : aggregateValue(c, rt: rt)
+    }
+
     /// aggregate モード(従来): entity の集計。field に computed を指定してもよい(#101)。
-    private var aggregateValue: (String, Bool, Bool) {
+    @MainActor
+    private static func aggregateValue(_ c: Component, rt: any DSLRuntime) -> (String, Bool, Bool) {
         let entityId = c.entity ?? ""
         let entity = rt.dsl.entity(entityId)
         let rows = rt.filteredRecords(c)
@@ -161,7 +171,8 @@ struct StatLeaf: View {
     }
 
     /// value モード(#101): 行コンテキスト無しで Expr を評価。評価できなければ「—」。
-    private var exprValue: (String, Bool, Bool) {
+    @MainActor
+    private static func exprValue(_ c: Component, rt: any DSLRuntime) -> (String, Bool, Bool) {
         guard let expr = c.valueExpr else { return (EmptyPlaceholder.unavailableValue, false, true) }
         let entities = expr.referencedEntities
         let isLoading = entities.contains { rt.loading.contains($0) && rt.records(for: $0).isEmpty }

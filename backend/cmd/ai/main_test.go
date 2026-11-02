@@ -122,3 +122,50 @@ func TestNewAIHandlerRejectsBeforeCharging(t *testing.T) {
 		})
 	}
 }
+
+// A server-side failure from the app (Claude 5xx / timeout) is refunded through
+// the real chain; a client error is not; ai_paused is never charged at all (#548).
+func TestNewAIHandlerRefundsServerFailures(t *testing.T) {
+	logger := quietLogger()
+	tests := []struct {
+		name      string
+		paused    bool
+		appStatus int
+		want      int
+		wantUsed  bool // the 1-unit daily limit is still used up afterwards
+	}{
+		{name: "504 from the app is refunded", appStatus: http.StatusGatewayTimeout, want: http.StatusGatewayTimeout},
+		{name: "502 from the app is refunded", appStatus: http.StatusBadGateway, want: http.StatusBadGateway},
+		{name: "400 from the app is not refunded", appStatus: http.StatusBadRequest, want: http.StatusBadRequest, wantUsed: true},
+		{name: "paused 503 is never charged", paused: true, want: http.StatusServiceUnavailable},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			limiter := ratelimit.New(ratelimit.Config{Limits: ratelimit.Limits{SignedIn: 1}, Weights: ratelimit.DefaultWeights}, ratelimit.NewMemory(), nil)
+			app := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(tt.appStatus) })
+			h := newAIHandler(app, logger,
+				appcheck.Middleware(appcheck.Config{Mode: appcheck.ModeEnforce, Verifier: okVerifier{}, Logger: logger}),
+				ai.Pause(tt.paused, logger),
+				limiter.Middleware(auth.DevVerifier{}),
+			)
+			call := func() int {
+				req := httptest.NewRequest(http.MethodPost, "/v1/chat", strings.NewReader(`{}`))
+				req.Header.Set("Authorization", "Bearer u1")
+				req.Header.Set(appcheck.Header, "ok")
+				rec := httptest.NewRecorder()
+				h.ServeHTTP(rec, req)
+				return rec.Code
+			}
+			if got := call(); got != tt.want {
+				t.Fatalf("status = %d, want %d", got, tt.want)
+			}
+			d, err := limiter.Allow(context.Background(), auth.Identity{UID: "u1"}, "", 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if used := !d.Allowed; used != tt.wantUsed {
+				t.Fatalf("limit used up = %v, want %v (%+v)", used, tt.wantUsed, d)
+			}
+		})
+	}
+}

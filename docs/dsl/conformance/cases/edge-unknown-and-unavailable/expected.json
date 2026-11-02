@@ -1,0 +1,76 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "future",
+          "state" : "unknown",
+          "type" : "hologram"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 4
+          },
+          "id" : "map",
+          "state" : "unavailable",
+          "type" : "mapView"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 6,
+            "rowSpan" : 1
+          },
+          "id" : "after",
+          "props" : {
+            "text" : "後ろの部品は描く"
+          },
+          "state" : "rendered",
+          "type" : "text"
+        },
+        {
+          "children" : [
+            {
+              "id" : "inner",
+              "state" : "unknown",
+              "type" : "hologram"
+            },
+            {
+              "id" : "inner_text",
+              "props" : {
+                "text" : "中"
+              },
+              "state" : "rendered",
+              "type" : "text"
+            }
+          ],
+          "id" : "box",
+          "stacked" : true,
+          "state" : "rendered",
+          "type" : "vstack"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "未対応",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

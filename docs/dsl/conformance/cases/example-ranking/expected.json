@@ -1,0 +1,216 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 5
+          },
+          "children" : [
+            {
+              "id" : "ranking",
+              "props" : {
+                "columns" : [
+                  "お店",
+                  "平均点",
+                  "件数"
+                ],
+                "entity" : "review",
+                "groupBy" : "shop",
+                "limit" : 10,
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "table"
+            }
+          ],
+          "id" : "ranking_card",
+          "props" : {
+            "title" : "お店ランキング"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 5,
+            "rowSpan" : 5
+          },
+          "children" : [
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "push",
+                    "screen" : "review_form",
+                    "type" : "navigate"
+                  },
+                  "on" : "rowTap"
+                }
+              ],
+              "id" : null,
+              "props" : {
+                "emptyText" : "まだ評価がありません",
+                "entity" : "review",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "recent",
+          "props" : {
+            "title" : "新着の評価"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "review_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "評価する"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "ラーメンランキング",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "review",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "date" : "2026-11-12"
+        }
+      },
+      "id" : "review_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "shop_in",
+          "props" : {
+            "field" : "shop",
+            "label" : "お店",
+            "placeholder" : "麺屋〇〇",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 2
+          },
+          "id" : "score_in",
+          "props" : {
+            "field" : "score",
+            "label" : "点数",
+            "max" : 5,
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "rating"
+        },
+        {
+          "band" : 2,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 4
+          },
+          "id" : "comment_in",
+          "props" : {
+            "field" : "comment",
+            "label" : null,
+            "placeholder" : "スープ・麺・接客など",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textEditor"
+        },
+        {
+          "band" : 3,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 8,
+            "rowSpan" : 2
+          },
+          "id" : "date_in",
+          "props" : {
+            "field" : "date",
+            "label" : "日付",
+            "value" : "2026-11-12"
+          },
+          "state" : "rendered",
+          "type" : "datePicker"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "review_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "review",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "評価を投稿",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

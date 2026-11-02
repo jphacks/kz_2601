@@ -16,14 +16,14 @@ public enum FieldCoding {
     public static func defaultValue(for f: Field) -> JSONValue {
         // 選択肢から消えた既定値は使わない(#194)
         if let d = f.defaultValue, !(f.type == .enum && !(f.options ?? []).contains(d.stringValue ?? "")) {
-            if f.type.isDate, d.stringValue == "now" { return .string(encode(Date(), for: f)) }
+            if f.type.isDate, d.stringValue == "now" { return .string(encode(DSLClock.now(), for: f)) }
             return d
         }
         switch f.type {
         case .boolean: return .bool(false)
         case .enum: return f.options?.first.map { .string($0) } ?? .null
         case .ref, .refs: return .null
-        case .date, .datetime: return .string(encode(Date(), for: f))
+        case .date, .datetime: return .string(encode(DSLClock.now(), for: f))
         default: return .null
         }
     }
@@ -34,7 +34,15 @@ public enum FieldCoding {
 
     public static func date(from value: JSONValue) -> Date? {
         guard let s = value.stringValue else { return nil }
-        return datetimeFormatter.date(from: s) ?? dateFormatter.date(from: s)
+        return datetimeFormatter.date(from: s) ?? fractionalDatetime(s) ?? dateFormatter.date(from: s)
+    }
+
+    /// 小数秒付きの RFC 3339(`…00.123Z`・サーバーの createdAt など)。小数部を外して通常の形で読み、秒に足す
+    /// (Go の expreval と同じ規則にするため `.withFractionalSeconds` は使わない)。
+    static func fractionalDatetime(_ s: String) -> Date? {
+        guard let r = s.range(of: #"\.[0-9]+(?=(Z|[+-][0-9]{2}:?[0-9]{2})$)"#, options: .regularExpression),
+              let frac = Double("0" + s[r]), let d = datetimeFormatter.date(from: s.replacingCharacters(in: r, with: "")) else { return nil }
+        return d.addingTimeInterval(frac)
     }
 
     /// 送信前の正規化。空文字/未入力は nil(キーごと落とす)。

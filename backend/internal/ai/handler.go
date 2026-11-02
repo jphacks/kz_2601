@@ -11,6 +11,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 )
 
 // NewHandler exposes POST /v1/generate, POST /v1/chat, DELETE /v1/chat/{appId},
@@ -46,6 +47,8 @@ func NewHandler(svc *Service) http.Handler {
 				res, err := svc.GenerateStream(ctx, req, func(ev Event) { emit(ev.Type, ev) })
 				if err != nil {
 					ge := asError(err)
+					// the stream already answered 200: tell the limiter (#548)
+					ratelimit.ReportStatus(ctx, ge.Status)
 					emit("error", svc.errBody(ctx, ge))
 					return
 				}

@@ -174,7 +174,7 @@ paths:
       description: |
         「何が変わったか」だけを流す。本体は `GET /dsl` / `GET /records` で取り直す(読み取り権限は既存 API と同じ)。
         backend は Firestore の snapshot listener(`users/{uid}/apps/{appId}` と、現行 DSL の各 entity の records
-        コレクション。public/shared entity は `apps_public/{appId}/...`)を持つ。records は `updatedAt` 降順 100 件の窓。
+        コレクション。public/shared entity は `apps_public/{appId}/...`)を持つ。records は `updatedAt` 降順 100 件の窓(窓外の古いレコードへの印の変化・削除は通知しない・#553)。
         未知 appId は `GET /dsl` と同じく seed する。
 
         ```

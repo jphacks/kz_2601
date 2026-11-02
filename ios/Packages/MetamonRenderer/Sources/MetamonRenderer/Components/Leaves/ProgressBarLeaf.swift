@@ -11,9 +11,7 @@ struct ProgressBarLeaf: View {
         let raw = resolvedRatio
         let ratio = max(0, min(1, raw))
         let style = Self.style(raw: raw, tone: c.tone)
-        // tone 指定時は実比率(112%)。桁が暴れないよう 999% で頭打ち
-        let shown = c.tone == nil ? ratio : min(max(0, raw), 9.99)
-        let percent = String(format: "%.0f%%", shown * 100) + (c.tone != nil && raw > 9.99 ? "+" : "")
+        let percent = Self.percentText(raw: raw, tone: c.tone)
         // area が 1 行しか無いとラベル + バーの 2 段がセルに収まらず、下端が隣のセルに隠れていた(#157)。
         // 高さが足りない時はラベル・バー・% を 1 段に並べた低いカードに切り替える(セル内スクロールにはしない)
         ViewThatFits(in: .vertical) {
@@ -100,7 +98,17 @@ struct ProgressBarLeaf: View {
         }
     }
 
-    private var resolvedRatio: Double {
+    private var resolvedRatio: Double { Self.ratio(c, rt: rt) }
+
+    /// 「42%」。tone 指定時は実比率(112%)。桁が暴れないよう 999% で頭打ち
+    static func percentText(raw: Double, tone: String?) -> String {
+        let shown = tone == nil ? max(0, min(1, raw)) : min(max(0, raw), 9.99)
+        return String(format: "%.0f%%", shown * 100) + (tone != nil && raw > 9.99 ? "+" : "")
+    }
+
+    /// 比率(1 を超えてもよい)。適合テストの描画の木(`RenderTree`)も同じ値を使う。
+    @MainActor
+    static func ratio(_ c: Component, rt: any DSLRuntime) -> Double {
         if let v = c.value { return v }
         guard let entityId = c.entity, let target = c.target, target > 0 else { return 0 }
         let rows = rt.filteredRecords(c)

@@ -1,0 +1,596 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "actions" : [
+            {
+              "action" : {
+                "screen" : "q_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 10
+          },
+          "id" : "qs",
+          "props" : {
+            "entity" : "q",
+            "rows" : [
+              {
+                "recordId" : "mine",
+                "title" : "富士山の高さは？"
+              },
+              {
+                "recordId" : "theirs",
+                "title" : "日本一長い川は？"
+              }
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "q_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "問題を作る"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "問題",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "q",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+
+        }
+      },
+      "id" : "q_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "f_text",
+          "props" : {
+            "field" : "text",
+            "label" : "問題文",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 2
+          },
+          "id" : "f_answer",
+          "props" : {
+            "field" : "answer",
+            "label" : "正解",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        },
+        {
+          "band" : 2,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "del",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "q_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "問題",
+      "toolbar" : [
+
+      ]
+    }
+  ],
+  "steps" : [
+    {
+      "effects" : [
+
+      ],
+      "op" : {
+        "tapRow" : {
+          "component" : "qs",
+          "index" : 0
+        }
+      },
+      "screen" : {
+        "form" : {
+          "entity" : "q",
+          "readOnly" : false,
+          "recordId" : "mine",
+          "values" : {
+            "answer" : "3776m",
+            "text" : "富士山の高さは？"
+          }
+        },
+        "id" : "q_form",
+        "layout" : "form",
+        "nodes" : [
+          {
+            "band" : 0,
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 0,
+              "rowSpan" : 2
+            },
+            "id" : "f_text",
+            "props" : {
+              "field" : "text",
+              "label" : "問題文",
+              "value" : "富士山の高さは？"
+            },
+            "state" : "rendered",
+            "type" : "textField"
+          },
+          {
+            "band" : 1,
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 2,
+              "rowSpan" : 2
+            },
+            "id" : "f_answer",
+            "props" : {
+              "field" : "answer",
+              "label" : "正解",
+              "value" : "3776m"
+            },
+            "state" : "rendered",
+            "type" : "textField"
+          },
+          {
+            "actions" : [
+              {
+                "action" : {
+                  "type" : "deleteRecord"
+                },
+                "on" : "tap"
+              }
+            ],
+            "band" : 2,
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 10,
+              "rowSpan" : 2
+            },
+            "id" : "del",
+            "props" : {
+              "label" : "削除"
+            },
+            "state" : "rendered",
+            "type" : "button"
+          }
+        ],
+        "route" : {
+          "recordId" : "mine",
+          "screen" : "q_form",
+          "stack" : "main"
+        },
+        "saveBar" : {
+          "action" : {
+            "type" : "saveRecord"
+          },
+          "label" : "保存"
+        },
+        "title" : "問題",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : "mine",
+        "screen" : "q_form",
+        "stack" : "main"
+      }
+    },
+    {
+      "effects" : [
+
+      ],
+      "op" : {
+        "back" : true
+      },
+      "screen" : {
+        "id" : "home",
+        "layout" : "grid",
+        "nodes" : [
+          {
+            "actions" : [
+              {
+                "action" : {
+                  "screen" : "q_form",
+                  "type" : "navigate"
+                },
+                "on" : "rowTap"
+              }
+            ],
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 0,
+              "rowSpan" : 10
+            },
+            "id" : "qs",
+            "props" : {
+              "entity" : "q",
+              "rows" : [
+                {
+                  "recordId" : "mine",
+                  "title" : "富士山の高さは？"
+                },
+                {
+                  "recordId" : "theirs",
+                  "title" : "日本一長い川は？"
+                }
+              ]
+            },
+            "state" : "rendered",
+            "type" : "list"
+          },
+          {
+            "actions" : [
+              {
+                "action" : {
+                  "presentation" : "sheet",
+                  "screen" : "q_form",
+                  "type" : "navigate"
+                },
+                "on" : "tap"
+              }
+            ],
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 10,
+              "rowSpan" : 2
+            },
+            "id" : "add",
+            "props" : {
+              "label" : "問題を作る"
+            },
+            "state" : "rendered",
+            "type" : "button"
+          }
+        ],
+        "route" : {
+          "recordId" : null,
+          "screen" : "home",
+          "stack" : "main"
+        },
+        "title" : "問題",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      }
+    },
+    {
+      "effects" : [
+
+      ],
+      "op" : {
+        "tapRow" : {
+          "component" : "qs",
+          "index" : 1
+        }
+      },
+      "screen" : {
+        "form" : {
+          "entity" : "q",
+          "readOnly" : true,
+          "recordId" : "theirs",
+          "values" : {
+            "answer" : "信濃川",
+            "text" : "日本一長い川は？"
+          }
+        },
+        "id" : "q_form",
+        "layout" : "form",
+        "nodes" : [
+          {
+            "band" : 0,
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 0,
+              "rowSpan" : 2
+            },
+            "id" : "f_text",
+            "props" : {
+              "field" : "text",
+              "label" : "問題文",
+              "value" : "日本一長い川は？"
+            },
+            "state" : "rendered",
+            "type" : "textField"
+          },
+          {
+            "band" : 1,
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 2,
+              "rowSpan" : 2
+            },
+            "id" : "f_answer",
+            "state" : "hidden",
+            "type" : "textField"
+          },
+          {
+            "band" : 2,
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 10,
+              "rowSpan" : 2
+            },
+            "id" : "del",
+            "state" : "hidden",
+            "type" : "button"
+          }
+        ],
+        "route" : {
+          "recordId" : "theirs",
+          "screen" : "q_form",
+          "stack" : "main"
+        },
+        "saveBar" : "readOnly",
+        "title" : "問題",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : "theirs",
+        "screen" : "q_form",
+        "stack" : "main"
+      }
+    },
+    {
+      "effects" : [
+
+      ],
+      "op" : {
+        "back" : true
+      },
+      "screen" : {
+        "id" : "home",
+        "layout" : "grid",
+        "nodes" : [
+          {
+            "actions" : [
+              {
+                "action" : {
+                  "screen" : "q_form",
+                  "type" : "navigate"
+                },
+                "on" : "rowTap"
+              }
+            ],
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 0,
+              "rowSpan" : 10
+            },
+            "id" : "qs",
+            "props" : {
+              "entity" : "q",
+              "rows" : [
+                {
+                  "recordId" : "mine",
+                  "title" : "富士山の高さは？"
+                },
+                {
+                  "recordId" : "theirs",
+                  "title" : "日本一長い川は？"
+                }
+              ]
+            },
+            "state" : "rendered",
+            "type" : "list"
+          },
+          {
+            "actions" : [
+              {
+                "action" : {
+                  "presentation" : "sheet",
+                  "screen" : "q_form",
+                  "type" : "navigate"
+                },
+                "on" : "tap"
+              }
+            ],
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 10,
+              "rowSpan" : 2
+            },
+            "id" : "add",
+            "props" : {
+              "label" : "問題を作る"
+            },
+            "state" : "rendered",
+            "type" : "button"
+          }
+        ],
+        "route" : {
+          "recordId" : null,
+          "screen" : "home",
+          "stack" : "main"
+        },
+        "title" : "問題",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      }
+    },
+    {
+      "effects" : [
+
+      ],
+      "op" : {
+        "tap" : "add"
+      },
+      "screen" : {
+        "form" : {
+          "entity" : "q",
+          "readOnly" : false,
+          "recordId" : null,
+          "values" : {
+
+          }
+        },
+        "id" : "q_form",
+        "layout" : "form",
+        "nodes" : [
+          {
+            "band" : 0,
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 0,
+              "rowSpan" : 2
+            },
+            "id" : "f_text",
+            "props" : {
+              "field" : "text",
+              "label" : "問題文",
+              "value" : null
+            },
+            "state" : "rendered",
+            "type" : "textField"
+          },
+          {
+            "band" : 1,
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 2,
+              "rowSpan" : 2
+            },
+            "id" : "f_answer",
+            "props" : {
+              "field" : "answer",
+              "label" : "正解",
+              "value" : null
+            },
+            "state" : "rendered",
+            "type" : "textField"
+          },
+          {
+            "band" : 2,
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 10,
+              "rowSpan" : 2
+            },
+            "id" : "del",
+            "state" : "hidden",
+            "type" : "button"
+          }
+        ],
+        "route" : {
+          "recordId" : null,
+          "screen" : "q_form",
+          "stack" : "sheet"
+        },
+        "saveBar" : {
+          "action" : {
+            "type" : "saveRecord"
+          },
+          "label" : "保存"
+        },
+        "title" : "問題",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : null,
+        "screen" : "q_form",
+        "stack" : "sheet"
+      }
+    }
+  ]
+}

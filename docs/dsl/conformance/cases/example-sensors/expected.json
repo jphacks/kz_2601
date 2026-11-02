@@ -1,0 +1,86 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 5
+          },
+          "id" : "level",
+          "props" : {
+            "label" : "傾き",
+            "sensor" : "tilt"
+          },
+          "state" : "rendered",
+          "type" : "sensorValue"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 3,
+            "row" : 5,
+            "rowSpan" : 3
+          },
+          "id" : "pressure",
+          "props" : {
+            "entity" : "reading",
+            "field" : "hpa",
+            "label" : "今の気圧",
+            "limit" : 120,
+            "seconds" : 60,
+            "sensor" : "pressure"
+          },
+          "state" : "rendered",
+          "type" : "sensorValue"
+        },
+        {
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 5,
+            "rowSpan" : 3
+          },
+          "id" : "altitude",
+          "props" : {
+            "label" : "高度の変化",
+            "sensor" : "altitude"
+          },
+          "state" : "rendered",
+          "type" : "sensorValue"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 8,
+            "rowSpan" : 2
+          },
+          "id" : "log",
+          "props" : {
+            "emptyText" : "記録を開始すると気圧がここに並びます",
+            "entity" : "reading",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "水平器と気圧",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}
