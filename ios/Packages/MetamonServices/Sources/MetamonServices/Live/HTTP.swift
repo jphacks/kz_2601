@@ -6,6 +6,8 @@ import MetamonDSL
 ///
 /// 復帰の自動化(#60・ai / appconfig 共通):
 /// - **401**: `TokenProvider.idToken(forceRefresh: true)` で取り直し、値が変わっていれば同じリクエストを **1 回だけ** 再送。それでも 401 なら `APIError`(status 401)を投げ、呼び出し側がサインイン画面へ戻す
+/// - **401 `app_check_failed`**(#318・backend `APP_CHECK_MODE=enforce`): App Check のトークンを取り直して **1 回だけ** 再送。
+///   ID トークンの失効ではないので取り直さない。それでも弾かれたら `FailureKind.appCheckFailed`(サインイン画面へは戻さない)
 /// - **429**: `Retry-After`(秒 or HTTP-date・上限 `maxRetryAfter`)だけ待って **1 回だけ** 再送。ヘッダが無ければ `defaultRetryAfter`
 /// - それ以外(5xx / タイムアウト / 圏外)は自動再送しない(UI の「もう一度」に委ねる。POST の二重実行を避ける)
 enum HTTP {
@@ -20,6 +22,9 @@ enum HTTP {
     /// 鮮度は自前の `If-None-Match` と `DocumentCache` で管理するので HTTP キャッシュは切る。
     /// テストは `URLProtocol` を登録した configuration で差し替える(`makeSession`)。
     nonisolated(unsafe) static var session: URLSession = makeSession()
+
+    /// App Check のトークン(#318)。Firebase があれば `FirebaseBootstrap` が入れる。nil ならヘッダを付けない(モック・plist 無し・テスト)。
+    nonisolated(unsafe) static var appCheck: (any AppCheckTokenProvider)?
 
     /// 429 待ちの sleep。テストでは記録だけして即戻す。
     nonisolated(unsafe) static var sleep: @Sendable (TimeInterval) async -> Void = { seconds in
@@ -78,28 +83,43 @@ enum HTTP {
             req.httpBody = try JSONEncoder().encode(body)
         }
         let bearer = try await token.idToken()
-        var r = try await perform(req, bearer: bearer)
+        var check = await appCheck?.token(forceRefresh: false)
+        var r = try await perform(req, bearer: bearer, appCheck: check)
 
-        if r.status == 401, let bearer {
+        if r.status == 401, isAppCheckRejection(r), let provider = appCheck {
+            // App Check のトークンが弾かれた(期限切れ・取得失敗)。取り直して値が変わった時だけ 1 回再送
+            let fresh = await provider.token(forceRefresh: true)
+            if let fresh, fresh != check {
+                check = fresh
+                r = try await perform(req, bearer: bearer, appCheck: check)
+            }
+        }
+        if r.status == 401, !isAppCheckRejection(r), let bearer {
             // トークン失効(Firebase ID トークンは 1 時間)。取り直して値が変わった時だけ同じリクエストを 1 回再送
             let fresh = try await token.idToken(forceRefresh: true)
             if let fresh, fresh != bearer {
-                r = try await perform(req, bearer: fresh)
+                r = try await perform(req, bearer: fresh, appCheck: check)
             }
         }
         if r.status == 429 {
             let wait = retryAfter(r) ?? defaultRetryAfter
             if wait <= maxRetryAfter {
                 await sleep(wait)
-                r = try await perform(req, bearer: try await token.idToken())
+                r = try await perform(req, bearer: try await token.idToken(), appCheck: check)
             }
         }
         return r
     }
 
-    private static func perform(_ request: URLRequest, bearer: String?) async throws -> Response {
+    /// 401 が App Check で弾かれたものか(本文の `error.code`)。
+    static func isAppCheckRejection(_ r: Response) -> Bool {
+        (try? JSONDecoder().decode(ErrorEnvelope.self, from: r.data))?.error.code == AppCheckHeader.failedCode
+    }
+
+    private static func perform(_ request: URLRequest, bearer: String?, appCheck: String?) async throws -> Response {
         var req = request
         if let bearer { req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
+        if let appCheck { req.setValue(appCheck, forHTTPHeaderField: AppCheckHeader.name) }
         let (data, resp) = try await session.data(for: req)
         let http = resp as? HTTPURLResponse
         return Response(status: http?.statusCode ?? -1, data: data, headers: http?.allHeaderFields ?? [:])

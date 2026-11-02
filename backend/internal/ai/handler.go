@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -39,10 +40,7 @@ func NewHandler(svc *Service) http.Handler {
 			writeErr(w, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "invalid JSON: " + err.Error()})
 			return
 		}
-		ctx := r.Context()
-		if auth := r.Header.Get("Authorization"); auth != "" {
-			ctx = appconfigclient.WithBearer(ctx, auth)
-		}
+		ctx := callerContext(r)
 		if q := r.URL.Query().Get("stream"); q == "1" || q == "true" {
 			serveSSE(w, func(emit func(string, any)) {
 				res, err := svc.GenerateStream(ctx, req, func(ev Event) { emit(ev.Type, ev) })
@@ -75,10 +73,7 @@ func NewHandler(svc *Service) http.Handler {
 			writeErr(w, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "invalid JSON: " + err.Error()})
 			return
 		}
-		ctx := r.Context()
-		if auth := r.Header.Get("Authorization"); auth != "" {
-			ctx = appconfigclient.WithBearer(ctx, auth) // edit mode reads the current DSL
-		}
+		ctx := callerContext(r) // edit mode reads the current DSL
 		res, err := svc.Chat(ctx, req)
 		if err != nil {
 			writeErr(w, err)
@@ -102,6 +97,19 @@ func NewHandler(svc *Service) http.Handler {
 		w.WriteHeader(http.StatusNoContent)
 	})))
 	return mux
+}
+
+// callerContext carries the caller's Authorization and App Check token (#318)
+// to the appconfig calls made on its behalf.
+func callerContext(r *http.Request) context.Context {
+	ctx := r.Context()
+	if auth := r.Header.Get("Authorization"); auth != "" {
+		ctx = appconfigclient.WithBearer(ctx, auth)
+	}
+	if token := r.Header.Get(appconfigclient.AppCheckHeader); token != "" {
+		ctx = appconfigclient.WithAppCheck(ctx, token)
+	}
+	return ctx
 }
 
 // serveSSE runs fn with an emitter that writes `event:`/`data:` frames and

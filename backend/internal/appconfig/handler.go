@@ -41,11 +41,13 @@ type Handler struct {
 	eventsMax time.Duration // lifetime of one GET /events stream
 
 	legacyBefore time.Time // LegacyMembersEnv (members.go)
+
+	feedbackPerDay int // FEEDBACK_DAILY_LIMIT (feedback.go)
 }
 
 // New builds the v1 router (a ServeMux so the caller can probe matches).
 func New(s store.Store) *http.ServeMux {
-	h := &Handler{store: s, cache: map[string]*dsl.App{}, eventsMax: eventsMaxStream(), legacyBefore: legacyMembersBefore()}
+	h := &Handler{store: s, cache: map[string]*dsl.App{}, eventsMax: eventsMaxStream(), legacyBefore: legacyMembersBefore(), feedbackPerDay: feedbackPerDay()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/apps", h.listApps)
 	mux.HandleFunc("POST /v1/apps", h.createApp)
@@ -98,6 +100,7 @@ func New(s store.Store) *http.ServeMux {
 	mux.HandleFunc("POST /v1/apps/{appId}/release-requests", h.createReleaseRequest)
 	mux.HandleFunc("GET /v1/apps/{appId}/release-requests", h.listAppReleaseRequests)
 	mux.HandleFunc("GET /v1/release-requests", h.listMyReleaseRequests)
+	mux.HandleFunc("POST /v1/feedback", h.createFeedback) // #319: feedback.go
 	return mux
 }
 
