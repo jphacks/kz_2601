@@ -111,9 +111,9 @@ final class UpdateCheckTests: XCTestCase {
     func testBodiesSendSupportedFeatures() throws {
         let body = HTTPAIClient.GenerateBody(appId: "a", baseVersion: nil, transcript: "t")
         let chat = HTTPAIClient.ChatBody(appId: "a", messages: [])
-        XCTAssertEqual(body.supportedFeatures, ["recordRetention"])
-        XCTAssertEqual(chat.supportedFeatures, ["recordRetention"])
+        XCTAssertEqual(body.supportedFeatures, ["recordRetention", "notification.when"])
+        XCTAssertEqual(chat.supportedFeatures, ["recordRetention", "notification.when"])
         let json = try XCTUnwrap(String(data: JSONEncoder().encode(body), encoding: .utf8))
-        XCTAssertTrue(json.contains(#""supportedFeatures":["recordRetention"]"#), json)
+        XCTAssertTrue(json.contains(#""supportedFeatures":["recordRetention","notification.when"]"#), json)
     }
 }

@@ -181,12 +181,18 @@ public struct NotificationSpec: Decodable, Identifiable, Sendable {
     public var titleField: String?
     /// boolean field。false のレコードは通知しない(アラームのオン/オフ)
     public var enabledField: String?
+    /// 条件で知らせる(#265・app.notifications のみ): 真偽の式(ref 不可・agg で集計)。偽 → 真に変わった時に 1 回すぐ知らせる。
+    /// 時刻・レコードの日付の通知とは組み合わせない(backend が拒否)。式が読めない通知は `Lossy` が落とす(誤って時刻で鳴らさない)。
+    public var when: Expr?
 
-    public var isRecordBased: Bool { entity?.isEmpty == false && field?.isEmpty == false }
+    public var isRecordBased: Bool { when == nil && entity?.isEmpty == false && field?.isEmpty == false }
+    /// 条件の通知(#265)。予約(時刻・レコードの日付)には入れず、レコードの保存・同期の後に評価する。
+    public var isConditional: Bool { when != nil }
 
     public init(
         id: String, title: String, body: String = "", repeat: Repeat = .once, time: String? = nil, weekday: String? = nil,
-        entity: String? = nil, field: String? = nil, offsetMinutes: Int? = nil, titleField: String? = nil, enabledField: String? = nil
+        entity: String? = nil, field: String? = nil, offsetMinutes: Int? = nil, titleField: String? = nil, enabledField: String? = nil,
+        when: Expr? = nil
     ) {
         self.id = id
         self.title = title
@@ -199,6 +205,7 @@ public struct NotificationSpec: Decodable, Identifiable, Sendable {
         self.offsetMinutes = offsetMinutes
         self.titleField = titleField
         self.enabledField = enabledField
+        self.when = when
     }
 }
 

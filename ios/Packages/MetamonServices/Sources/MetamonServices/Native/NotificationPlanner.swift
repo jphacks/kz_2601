@@ -67,6 +67,7 @@ public enum NotificationPlanner {
         now: Date = Date(), calendar: Calendar = .current
     ) -> [PlannedNotification] {
         specs.flatMap { spec -> [PlannedNotification] in
+            if spec.isConditional { return [] } // #265 条件の通知は予約しない(ConditionNotifications)
             if spec.isRecordBased, let entity = spec.entity {
                 return (records[entity] ?? []).flatMap { planRecord(appId: appId, spec: spec, record: $0, now: now, calendar: calendar) }
             }
@@ -77,7 +78,7 @@ public enum NotificationPlanner {
 
     /// ボタンで押した時の予約(固定時刻のみ)。
     public static func action(appId: String, spec: NotificationSpec, now: Date = Date(), calendar: Calendar = .current) -> PlannedNotification? {
-        guard let trigger = fixedTrigger(spec, now: now, calendar: calendar) else { return nil }
+        guard !spec.isConditional, let trigger = fixedTrigger(spec, now: now, calendar: calendar) else { return nil }
         return PlannedNotification(identifier: actionIdentifier(appId: appId, specId: spec.id), title: spec.title, body: spec.body, trigger: trigger)
     }
 

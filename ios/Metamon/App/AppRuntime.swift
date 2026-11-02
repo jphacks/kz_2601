@@ -18,6 +18,7 @@ final class AppRuntime: DSLRuntime {
     private(set) var records: [String: [Record]] = [:] {
         didSet {
             if dsl.app.notifications.contains(where: \.isRecordBased) { scheduleNotificationSync() } // #228 レコードの時刻から通知
+            if dsl.app.notifications.contains(where: \.isConditional) { scheduleConditionCheck() } // #265 条件で知らせる
             refreshLiveActivityStats() // #423 ロック画面の数字
         }
     }
@@ -27,6 +28,7 @@ final class AppRuntime: DSLRuntime {
     var notificationsDenied = false
     @ObservationIgnored var warnedNotificationsDenied = false
     @ObservationIgnored var notificationSyncTask: Task<Void, Never>?
+    @ObservationIgnored var conditionCheckTask: Task<Void, Never>?
     private(set) var loading: Set<String> = []
     /// サーバーから取れず、ローカルにも無い entity(#85)。Renderer は空状態ではなく「読み込めませんでした(再試行)」を描く。
     private(set) var failed: Set<String> = []
