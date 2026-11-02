@@ -44,6 +44,26 @@ func (h *Handler) publishedDSL(ctx context.Context, appID string) (*dsl.App, *st
 	return a, pub, nil
 }
 
+// creatorMirror returns appID's published mirror when the app's creator
+// (app_owners) wrote it; nil when it is not published or someone else did.
+func (h *Handler) creatorMirror(ctx context.Context, appID string) (*store.PublicApp, error) {
+	pub, err := h.store.GetPublicApp(ctx, appID)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	owner, err := h.appOwner(ctx, appID)
+	if err != nil {
+		return nil, err
+	}
+	if owner == "" || pub.OwnerUID != owner {
+		return nil, nil
+	}
+	return pub, nil
+}
+
 // notPublishedReason is details.reason when a shared entity of the caller's
 // copy is not part of the creator's published DSL.
 const notPublishedReason = "not_published"

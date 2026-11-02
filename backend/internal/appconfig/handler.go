@@ -219,9 +219,9 @@ func (p paging) next(got int) string {
 }
 
 // ensureApp loads the app, seeding version 1 for unknown ids: iOS uses a
-// device-fixed UUID as appId and never calls POST /apps first. If another
-// user has published that appId (apps_public/{appId}, see publish), the seed
-// is their DSL instead of dsl.Initial — this is how a shared app is
+// device-fixed UUID as appId and never calls POST /apps first. If the app's
+// creator has published that appId (apps_public/{appId}, see publish), the
+// seed is their DSL instead of dsl.Initial — this is how a shared app is
 // "installed" under the caller's own uid.
 func (h *Handler) ensureApp(r *http.Request, appID string) (*store.App, error) {
 	ctx, uid := r.Context(), uidOf(r)
@@ -236,12 +236,12 @@ func (h *Handler) ensureApp(r *http.Request, appID string) (*store.App, error) {
 		return nil, err
 	}
 	name := init.App.Name
-	if pub, err := h.store.GetPublicApp(ctx, appID); err == nil {
-		if !pub.Hidden { // #321: not from an app the operator unpublished
-			raw, name = pub.DSL, pub.Name
-		}
-	} else if !errors.Is(err, store.ErrNotFound) {
+	pub, err := h.creatorMirror(ctx, appID)
+	if err != nil {
 		return nil, err
+	}
+	if pub != nil && !pub.Hidden { // #321: not from an app the operator unpublished
+		raw, name = pub.DSL, pub.Name
 	}
 	app, _, err := h.store.EnsureApp(ctx, uid, appID, raw, name)
 	return app, err
@@ -249,10 +249,19 @@ func (h *Handler) ensureApp(r *http.Request, appID string) (*store.App, error) {
 
 // publish mirrors a committed DSL to apps_public/{appId} when it has shared
 // entities, so other users opening the same appId get it from ensureApp.
+// Only the app's creator (app_owners) publishes; other copies stay private.
 // Failures are logged, not returned: the owner's private commit already
 // succeeded, and an appId first published by someone else is left alone.
 func (h *Handler) publish(r *http.Request, appID string, app *dsl.App, raw json.RawMessage, version int) {
 	if !app.HasSharedEntity() {
+		return
+	}
+	owner, err := h.appOwner(r.Context(), appID)
+	if err != nil {
+		slog.Error("appconfig: publish owner lookup failed", slog.String("appId", appID), slog.Any("error", err))
+		return
+	}
+	if owner != uidOf(r) {
 		return
 	}
 	ok, err := h.store.PublishApp(r.Context(), uidOf(r), appID, raw, app.App.Name, version)

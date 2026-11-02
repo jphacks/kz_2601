@@ -163,7 +163,6 @@ func TestEventsSharingFollowsPublishedDSL(t *testing.T) {
 	}
 }
 
-
 func withScope(t *testing.T, raw []byte, from, to string) []byte {
 	t.Helper()
 	if !strings.Contains(string(raw), from) {
