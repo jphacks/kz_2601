@@ -1,3 +1,6 @@
+# 書き方(#516・PR の衝突を減らすため):
+# - enum・tags などのリストは 1 行 1 項目・名前順。components/schemas も名前順に保つ。
+# - 新しい path はファイル末尾でなく、同じ tag の path の隣に足す。
 openapi: 3.1.0
 info:
   title: ai API
@@ -120,7 +123,17 @@ paths:
                     turn: 2
                     locale: ja
                     source: claude
-                    brief: { name: 筋トレ記録, purpose: 腕立てとスクワットの回数を毎日つける, entities: [トレーニング], features: [記録の一覧, 今日の合計回数, 毎朝8時の通知], native: [notification] }
+                    brief:
+                      name: 筋トレ記録
+                      purpose: 腕立てとスクワットの回数を毎日つける
+                      entities:
+                        - トレーニング
+                      features:
+                        - 記録の一覧
+                        - 今日の合計回数
+                        - 毎朝8時の通知
+                      native:
+                        - notification
                     transcript: 筋トレ記録アプリを作って。腕立てとスクワットの回数と日付を記録して、記録の一覧と今日の合計回数を見たい。毎朝8時に通知してほしい。
                 answer:
                   summary: edit の質問への答え (#185)
@@ -149,7 +162,10 @@ paths:
                     brief: { name: サークル掲示板, purpose: サークルのみんなで予定を書き込む, entities: [投稿], features: [投稿の一覧], native: [] }
                     transcript: サークルのみんなで予定を書き込める掲示板アプリを作って。
                     requiresPro: true
-                    paidFeatures: [{ id: sharedData, title: みんなで共有するデータ, reason: みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。 }]
+                    paidFeatures:
+                      - id: sharedData
+                        title: みんなで共有するデータ
+                        reason: みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。
                     freeTranscript: "サークルのみんなで予定を書き込める掲示板アプリを作って。\n(無料版で作る: 他のユーザーとデータを共有する機能は入れない。…)"
                 editReady:
                   summary: edit の明確な指示 (#185)
@@ -191,7 +207,14 @@ paths:
               list:
                 value: { instruction: 飲み会で盛り上がる、誰でも安全にできる軽い罰ゲームの案, shape: list, count: 3, locale: ja }
               fields:
-                value: { instruction: 冷蔵庫にある食材で作れる今日の献立, shape: fields, items: [主菜, 副菜, 汁物], input: "- 食材: 鮭 / 量: 2 切れ\n- 食材: 豆腐 / 量: 1 丁" }
+                value:
+                  instruction: 冷蔵庫にある食材で作れる今日の献立
+                  shape: fields
+                  items:
+                    - 主菜
+                    - 副菜
+                    - 汁物
+                  input: "- 食材: 鮭 / 量: 2 切れ\n- 食材: 豆腐 / 量: 1 丁"
       responses:
         '200':
           description: OK
@@ -200,7 +223,15 @@ paths:
               schema: { $ref: '#/components/schemas/TextResponse' }
               examples:
                 list:
-                  value: { shape: list, text: "・変顔で自撮り\n・好きな歌を一節\n・語尾を「ござる」で 1 分", items: [変顔で自撮り, 好きな歌を一節, 語尾を「ござる」で 1 分], locale: ja, meta: { model: claude-sonnet-5-5, usage: { inputTokens: 420, outputTokens: 60 }, latencyMs: 1800 } }
+                  value:
+                    shape: list
+                    text: "・変顔で自撮り\n・好きな歌を一節\n・語尾を「ござる」で 1 分"
+                    items:
+                      - 変顔で自撮り
+                      - 好きな歌を一節
+                      - 語尾を「ござる」で 1 分
+                    locale: ja
+                    meta: { model: claude-sonnet-5-5, usage: { inputTokens: 420, outputTokens: 60 }, latencyMs: 1800 }
         '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
         '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
         '413': { description: input が 4096 バイト / 本文が 16 KB を超えた (payload_too_large), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
