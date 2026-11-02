@@ -68,6 +68,7 @@ func main() {
 		CallTimeout: time.Duration(timeoutSec) * time.Second,
 		LogicPass:   os.Getenv("AI_LOGIC_PASS") == "1", // UI pass + calculations pass (#100)
 		LintRetry:   os.Getenv("AI_LINT_RETRY") == "1", // off: lint warnings are reported only
+		Logger:      claude.Logger,                     // ai.generate per request (#322)
 		// clarify turn (#147): its own model/effort/thinking; empty = ai.DefaultChat*
 		ChatConfig: ai.ChatConfig{
 			Model:    os.Getenv("AI_CHAT_MODEL"),
