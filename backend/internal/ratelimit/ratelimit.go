@@ -40,7 +40,7 @@ type Limits struct {
 	SignedIn  int
 	Pro       int
 	// PerIP applies to anonymous callers only (re-created anonymous accounts
-	// share a network); signed-in users behind the same Wi-Fi are not affected.
+	// share a network); signed-in and Pro users behind the same Wi-Fi are not affected.
 	PerIP int
 	// Global is the cost breaker across every caller of this environment.
 	Global int
@@ -64,9 +64,9 @@ var (
 // tzdata in the container image.
 var JST = time.FixedZone("JST", 9*60*60)
 
-// ProChecker reports whether uid has Tailor It Pro. There is no server-side
-// receipt check yet, so the default is "never"; plug a verifier in here once
-// App Store Server API / RevenueCat validation exists.
+// ProChecker reports whether uid has Tailor It Pro. Production uses
+// entitlement.ProChecker (the StoreKit transaction verified by appconfig, #314
+// #449); nil means nobody is pro.
 type ProChecker interface {
 	IsPro(ctx context.Context, uid string) bool
 }
@@ -162,12 +162,14 @@ func New(cfg Config, store Store, pro ProChecker) *Limiter {
 // Config returns the effective configuration.
 func (l *Limiter) Config() Config { return l.cfg }
 
+// tier: a verified Pro entitlement wins over the sign-in state (an anonymous
+// account can buy Pro too, #449).
 func (l *Limiter) tier(ctx context.Context, id auth.Identity) Tier {
 	switch {
-	case id.Anonymous:
-		return TierAnonymous
 	case l.pro != nil && l.pro.IsPro(ctx, id.UID):
 		return TierPro
+	case id.Anonymous:
+		return TierAnonymous
 	default:
 		return TierSignedIn
 	}
@@ -206,7 +208,7 @@ func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight
 	if limit > 0 {
 		counters = append(counters, Counter{ID: fmt.Sprintf("%s_%s_uid_%s", prefix, day, docSafe(id.UID)), Scope: ScopeUser, Limit: limit})
 	}
-	if id.Anonymous && l.cfg.Limits.PerIP > 0 && ip != "" {
+	if tier == TierAnonymous && l.cfg.Limits.PerIP > 0 && ip != "" {
 		counters = append(counters, Counter{ID: fmt.Sprintf("%s_%s_ip_%s", prefix, day, ipKey(ip)), Scope: ScopeIP, Limit: l.cfg.Limits.PerIP})
 	}
 	if l.cfg.Limits.Global > 0 {

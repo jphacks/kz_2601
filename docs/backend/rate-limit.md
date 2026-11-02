@@ -24,7 +24,7 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 | --- | --- | --- |
 | `RATE_LIMIT_ANON_DAILY` | 30 | 新規 3 回(9)+ 修正・対話で 21。端末の無料枠(新規 3 回/日)に合わせた |
 | `RATE_LIMIT_USER_DAILY` | 60 | サインイン済みは匿名の 2 倍 |
-| `RATE_LIMIT_PRO_DAILY` | 300 | Pro でも上限はある(緩い)。サーバーでの Pro 判定はまだ無い |
+| `RATE_LIMIT_PRO_DAILY` | 300 | Pro でも上限はある(緩い)。Pro はサーバーで検証した権利(`users/{uid}/entitlements/pro`・#314 #449)で判定 |
 | `RATE_LIMIT_IP_DAILY` | 300 | 匿名だけ。同じ IP からの匿名の合計(作り直し対策) |
 | `RATE_LIMIT_GLOBAL_DAILY` | 2000 | 環境全体の費用ブレーカー。新規作成なら約 660 回 |
 | `RATE_LIMIT_WEIGHT_CREATE` / `_EDIT` / `_CHAT` / `_TEXT` | 3 / 2 / 1 / 1 | |
@@ -63,7 +63,7 @@ rateLimits/{env}_{yyyy-mm-dd}_global
 | 匿名だけ IP ごとの合計上限(300) | 入れた。会場の Wi-Fi のように 1 つの IP に大勢がいる時は、サインイン済みは数えない。匿名の大勢がいるなら `RATE_LIMIT_IP_DAILY` を上げる |
 | 全体の費用ブレーカー | 入れた |
 | App Check(App Attest)で「本物のアプリからの依頼」だけ通す | **人の作業**(下)。いちばん効く |
-| Pro をサーバーで確かめる | 差し込み口(`ratelimit.ProChecker`)だけ。App Store Server API で署名済みトランザクションを確かめる仕組みを足したら繋ぐ |
+| Pro をサーバーで確かめる | 入れた(#449)。appconfig が StoreKit 2 の署名付き取引を検証して保存した権利を `entitlement.ProChecker` で読む(architecture.md §6.8)。検証済みの Pro は匿名でも Pro で、IP ごとの上限も数えない |
 
 ### 人の作業(この PR ではしていない)
 

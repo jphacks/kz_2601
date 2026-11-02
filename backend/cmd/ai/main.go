@@ -10,10 +10,13 @@ import (
 	"strconv"
 	"time"
 
+	"cloud.google.com/go/firestore"
+
 	"github.com/jphacks/kz_2601/backend/internal/ai"
 	"github.com/jphacks/kz_2601/backend/internal/appcheck"
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
@@ -157,18 +160,31 @@ func withRateLimit(h http.Handler, verifier auth.IdentityVerifier) http.Handler 
 	}
 	ctx := context.Background()
 
-	var store ratelimit.Store = ratelimit.NewMemory()
-	storeName := "memory"
-	if project != "" && os.Getenv("RATE_LIMIT_STORE") != "memory" {
-		client, err := fsenv.NewClient(ctx, fsenv.FromEnv(os.Getenv))
+	var client *firestore.Client
+	if project != "" {
+		c, err := fsenv.NewClient(ctx, fsenv.FromEnv(os.Getenv))
 		if err != nil {
-			log.Printf("ai: firestore init failed: %v (rate limit counts in memory)", err)
+			log.Printf("ai: firestore init failed: %v (rate limit counts in memory, nobody is pro)", err)
 		} else {
-			store = ratelimit.NewFirestore(client, os.Getenv("RATE_LIMIT_COLLECTION"))
-			storeName = "firestore"
+			client = c
 		}
 	}
-	log.Printf("ai: rate limit on (store=%s env=%q limits=%+v weights=%+v)", storeName, cfg.Env, cfg.Limits, cfg.Weights)
-	// Pro has no server-side receipt check yet (#280): nil = everyone is anonymous/signed_in.
-	return ratelimit.New(cfg, store, nil).Middleware(verifier)(h)
+	var store ratelimit.Store = ratelimit.NewMemory()
+	storeName := "memory"
+	if client != nil && os.Getenv("RATE_LIMIT_STORE") != "memory" {
+		store = ratelimit.NewFirestore(client, os.Getenv("RATE_LIMIT_COLLECTION"))
+		storeName = "firestore"
+	}
+	// Pro tier (#449): users/{uid}/entitlements/pro written by appconfig after
+	// it verified the StoreKit transaction (#314). Without Firestore nobody is pro.
+	var pro ratelimit.ProChecker
+	if client != nil {
+		policy, err := entitlement.ConfigFromEnv(os.Getenv)
+		if err != nil {
+			log.Fatalf("ai: %v", err)
+		}
+		pro = entitlement.NewProChecker(entitlement.NewFirestore(client), policy.Environments)
+	}
+	log.Printf("ai: rate limit on (store=%s env=%q limits=%+v weights=%+v pro=%v)", storeName, cfg.Env, cfg.Limits, cfg.Weights, pro != nil)
+	return ratelimit.New(cfg, store, pro).Middleware(verifier)(h)
 }

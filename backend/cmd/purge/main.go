@@ -3,8 +3,9 @@
 // -feedback-older-than (#319, 180 days). Meant for a Cloud Run Job run once a
 // day by Cloud Scheduler (docs/infra/account-purge.md).
 //
-// Per account: store.PurgeAccount (data) -> Firebase Auth user deletion ->
-// store.MarkAccountPurged (tombstone). A failure leaves the account a
+// Per account: store.PurgeAccount (data) -> entitlement PurgeUser (Pro
+// documents and App Store transaction bindings, #314) -> Firebase Auth user
+// deletion -> store.MarkAccountPurged (tombstone). A failure leaves the account a
 // candidate, so the next run retries it. Exit status 1 when any account failed.
 //
 // Environment:
@@ -34,6 +35,7 @@ import (
 	firebase "firebase.google.com/go/v4"
 	fbauth "firebase.google.com/go/v4/auth"
 
+	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/store"
@@ -75,6 +77,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() { _ = st.Close() }()
+	opts.entitlements = entitlement.NewFirestore(st.Client())
 
 	var users authDeleter
 	if opts.deleteAuth && !opts.dryRun {
@@ -99,6 +102,14 @@ type options struct {
 	deleteAuth        bool
 	feedbackOlderThan time.Duration
 	feedbackLimit     int
+	// entitlements erases users/{uid}/entitlements and the uid's App Store
+	// bindings (so the Apple ID can be restored on a new account); nil = skip.
+	entitlements entitlementPurger
+}
+
+// entitlementPurger is the part of entitlement.Store purge uses.
+type entitlementPurger interface {
+	PurgeUser(ctx context.Context, uid string) (int, error)
 }
 
 // purgeStore is what run needs from the store.
@@ -139,6 +150,10 @@ func run(ctx context.Context, st purgeStore, users authDeleter, opts options, lo
 			continue
 		}
 		res, err := st.PurgeAccount(ctx, c.UID)
+		entitlements := 0
+		if err == nil && opts.entitlements != nil {
+			entitlements, err = opts.entitlements.PurgeUser(ctx, c.UID)
+		}
 		if err == nil && users != nil {
 			if err = users.DeleteUser(ctx, c.UID); fbauth.IsUserNotFound(err) {
 				err = nil // the app deletes it on DELETE /v1/me; this is the backstop
@@ -157,7 +172,8 @@ func run(ctx context.Context, st purgeStore, users authDeleter, opts options, lo
 			slog.Int("apps", res.Apps), slog.Int("keptMirrors", res.KeptMirrors), slog.Int("shares", res.Shares),
 			slog.Int("listings", res.Listings), slog.Int("releases", res.Releases), slog.Int("owners", res.Owners),
 			slog.Int("installs", res.Installs), slog.Int("memberships", res.Memberships), slog.Int("marks", res.Marks),
-			slog.Int("postsScrubbed", res.PostsScrubbed), slog.Int("reports", res.Reports), slog.Int("blocks", res.Blocks), slog.Int("feedback", res.Feedback), slog.Bool("authDeleted", users != nil))...)
+			slog.Int("postsScrubbed", res.PostsScrubbed), slog.Int("reports", res.Reports), slog.Int("blocks", res.Blocks), slog.Int("feedback", res.Feedback),
+			slog.Int("entitlements", entitlements), slog.Bool("authDeleted", users != nil))...)
 	}
 	if ctx.Err() == nil {
 		failed += purgeFeedback(ctx, st, opts, logger, now)

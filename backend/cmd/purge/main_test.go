@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -145,6 +146,37 @@ func TestRunRefusesShortWindow(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
 	if failed := run(context.Background(), store.NewMemory(), nil, o, logger, time.Now()); failed != 1 {
 		t.Fatalf("failed=%d", failed)
+	}
+}
+
+func TestRunPurgesEntitlements(t *testing.T) {
+	ctx := context.Background()
+	m := setup(t, "gone", "active")
+	if err := m.DeactivateUser(ctx, "gone"); err != nil {
+		t.Fatal(err)
+	}
+	ents := entitlement.NewMemory()
+	exp := time.Now().Add(400 * 24 * time.Hour)
+	for _, uid := range []string{"gone", "active"} {
+		p := entitlement.Pro{ProductID: "p", OriginalTransactionID: "otid-" + uid, TransactionID: "t", Environment: "Sandbox", ExpiresAt: exp}
+		if _, err := ents.Apply(ctx, uid, p, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	o := opts()
+	o.entitlements = ents
+	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
+	if failed := run(ctx, m, &fakeAuth{}, o, logger, time.Now().Add(31*24*time.Hour)); failed != 0 {
+		t.Fatalf("failed=%d", failed)
+	}
+	if p, _ := ents.Get(ctx, "gone"); p != nil {
+		t.Fatalf("entitlement kept: %+v", p)
+	}
+	if owner, _ := ents.Owner(ctx, "otid-gone"); owner != "" {
+		t.Fatalf("binding kept: %q", owner)
+	}
+	if p, _ := ents.Get(ctx, "active"); p == nil {
+		t.Fatal("active account's entitlement must stay")
 	}
 }
 
