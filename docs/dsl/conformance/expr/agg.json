@@ -1,0 +1,623 @@
+{
+  "description": "agg: count sum avg min max latest earliest, filters (period, comparison, refs, reserved values) and row context.",
+  "defaults": {
+    "now": "2026-10-28T15:30:45+09:00",
+    "timeZone": "Asia/Tokyo",
+    "entities": [
+      {
+        "id": "members",
+        "name": "メンバー",
+        "fields": [
+          {"id": "name", "name": "名前", "type": "string"},
+          {
+            "id": "paid",
+            "name": "支払済",
+            "type": "currency",
+            "computed": {
+              "entity": "expenses",
+              "agg": "sum",
+              "field": "amount",
+              "filter": {"value": {"ref": "id"}, "op": "eq", "field": "payer"}
+            }
+          },
+          {
+            "id": "share",
+            "name": "負担額",
+            "type": "currency",
+            "computed": {
+              "op": "round",
+              "args": [
+                {
+                  "op": "div",
+                  "args": [{"entity": "expenses", "agg": "sum", "field": "amount"}, {"entity": "members", "agg": "count"}]
+                }
+              ]
+            }
+          },
+          {
+            "id": "balance",
+            "name": "残高",
+            "type": "currency",
+            "computed": {"op": "sub", "args": [{"ref": "paid"}, {"ref": "share"}]}
+          }
+        ],
+        "titleField": "name"
+      },
+      {
+        "id": "expenses",
+        "name": "支出",
+        "fields": [
+          {"id": "title", "name": "内容", "type": "string"},
+          {"id": "amount", "name": "金額", "type": "currency"},
+          {"id": "payer", "name": "払った人", "type": "ref", "refEntity": "members"},
+          {"id": "date", "name": "日付", "type": "date"},
+          {"id": "tags", "name": "割る人", "type": "refs", "refEntity": "members"},
+          {"id": "big", "name": "高額", "type": "boolean", "computed": {"op": "gte", "args": [{"ref": "amount"}, 1000]}}
+        ],
+        "titleField": "title"
+      },
+      {
+        "id": "body",
+        "name": "体重",
+        "fields": [
+          {"id": "weight", "name": "体重", "type": "number"},
+          {"id": "date", "name": "日付", "type": "date"},
+          {"id": "measured_at", "name": "測定日時", "type": "datetime"},
+          {"id": "memo", "name": "メモ", "type": "string"}
+        ]
+      },
+      {"id": "notes", "name": "メモ", "fields": [{"id": "text", "name": "本文", "type": "string"}]},
+      {
+        "id": "chores",
+        "name": "家事",
+        "fields": [{"id": "name", "name": "名前", "type": "string"}, {"id": "points", "name": "点数", "type": "integer"}]
+      },
+      {
+        "id": "log",
+        "name": "記録",
+        "fields": [
+          {"id": "chore", "name": "家事", "type": "ref", "refEntity": "chores"},
+          {"id": "qty", "name": "回数", "type": "integer"},
+          {
+            "id": "score",
+            "name": "点",
+            "type": "integer",
+            "computed": {"op": "mul", "args": [{"ref": "chore.points"}, {"ref": "qty"}]}
+          }
+        ]
+      },
+      {
+        "id": "posts",
+        "name": "投稿",
+        "fields": [{"id": "text", "name": "本文", "type": "string"}, {"id": "at", "name": "日時", "type": "datetime"}],
+        "marks": [{"id": "like", "icon": "heart", "label": "いいね"}],
+        "scope": "shared"
+      },
+      {
+        "id": "loop",
+        "name": "循環",
+        "fields": [
+          {"id": "a", "name": "A", "type": "number", "computed": {"op": "add", "args": [{"ref": "b"}, 1]}},
+          {"id": "b", "name": "B", "type": "number", "computed": {"op": "add", "args": [{"ref": "a"}, 1]}},
+          {"id": "self", "name": "自分", "type": "number", "computed": {"op": "add", "args": [{"ref": "self"}, 1]}},
+          {"id": "c", "name": "C", "type": "number", "computed": {"op": "coalesce", "args": [{"ref": "a"}, 42]}}
+        ]
+      }
+    ],
+    "records": {
+      "body": [
+        {
+          "id": "b1",
+          "data": {"date": "2026-10-20", "measured_at": "2026-10-20T07:00:00+09:00", "weight": 60.5},
+          "createdAt": "2026-10-20T07:00:00+09:00"
+        },
+        {
+          "id": "b2",
+          "data": {"date": "2026-10-25", "measured_at": "2026-10-25T22:00:00+09:00", "memo": "夜", "weight": 61},
+          "createdAt": "2026-10-25T22:00:00+09:00"
+        },
+        {
+          "id": "b3",
+          "data": {"date": "2026-10-25", "measured_at": "2026-10-25T06:00:00+09:00", "memo": "朝", "weight": 60.8},
+          "createdAt": "2026-10-25T23:00:00+09:00"
+        },
+        {
+          "id": "b4",
+          "data": {"measured_at": "2026-10-27T07:00:00+09:00", "weight": 59},
+          "createdAt": "2026-10-27T07:00:00+09:00"
+        },
+        {"id": "b5", "data": {"date": "bad", "weight": 62}, "createdAt": "2026-10-28T07:00:00+09:00"}
+      ],
+      "chores": [{"id": "c1", "data": {"name": "皿洗い", "points": 3}}, {"id": "c2", "data": {"name": "掃除", "points": 5}}],
+      "expenses": [
+        {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}},
+        {"id": "e2", "data": {"amount": 800, "date": "2026-10-01", "payer": "m2", "tags": ["m1", "gone"], "title": "電車"}},
+        {"id": "e3", "data": {"amount": "350", "date": "2026-09-30", "payer": "m1", "tags": [], "title": "お菓子"}},
+        {"id": "e4", "data": {"amount": null, "title": "未定"}},
+        {"id": "e5", "data": {"amount": 500, "date": "2026-10-28", "payer": "m9", "tags": "m2", "title": "謎"}},
+        {"id": "e6", "data": {"amount": "1,000", "date": "2026-10-26T00:30:00+09:00", "payer": "m2", "title": "夕食"}}
+      ],
+      "log": [
+        {"id": "l1", "data": {"chore": "c1", "qty": 2}},
+        {"id": "l2", "data": {"chore": "c2", "qty": 1}},
+        {"id": "l3", "data": {"chore": "c404", "qty": 4}}
+      ],
+      "loop": [{"id": "x1", "data": {}}],
+      "members": [
+        {"id": "m1", "data": {"name": "Alice"}},
+        {"id": "m2", "data": {"name": "Bob"}},
+        {"id": "m3", "data": {"name": "Carol"}}
+      ],
+      "notes": [
+        {"id": "n2", "data": {"text": "second"}, "createdAt": "2026-10-02T00:00:00Z"},
+        {"id": "n1", "data": {"text": "first"}, "createdAt": "2026-10-01T00:00:00Z"},
+        {"id": "n3", "data": {"text": "no createdAt"}}
+      ],
+      "posts": [
+        {
+          "id": "p1",
+          "data": {"text": "hi", "at": "2026-10-28T09:00:00+09:00"},
+          "author": "u1",
+          "authorName": "けん",
+          "createdAt": "2026-10-28T09:00:00+09:00",
+          "marks": {"like": {"count": 3, "mine": true}}
+        },
+        {
+          "id": "p2",
+          "data": {"text": "yo", "at": "2026-10-27T09:00:00+09:00"},
+          "author": "u2",
+          "authorName": "ゆい",
+          "createdAt": "2026-10-27T09:00:00.123Z",
+          "marks": {"like": {"count": 1, "mine": false}}
+        },
+        {"id": "p3", "data": {"text": "anon"}}
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "count/all",
+      "expr": {"entity": "expenses", "agg": "count"},
+      "expected": {"type": "number", "value": 6, "text": "6"}
+    },
+    {
+      "name": "count/filter-eq",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": "m1", "op": "eq", "field": "payer"}},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "count/unknown-entity",
+      "expr": {"entity": "ghost", "agg": "count"},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "sum/numbers-and-plain-numeric-strings",
+      "expr": {"entity": "expenses", "agg": "sum", "field": "amount"},
+      "expected": {"type": "number", "value": 2850, "text": "2850"}
+    },
+    {
+      "name": "avg/amount",
+      "expr": {"entity": "expenses", "agg": "avg", "field": "amount"},
+      "expected": {"type": "number", "value": 712.5, "text": "712.5"}
+    },
+    {
+      "name": "min/amount",
+      "expr": {"entity": "expenses", "agg": "min", "field": "amount"},
+      "expected": {"type": "number", "value": 350, "text": "350"}
+    },
+    {
+      "name": "max/amount",
+      "expr": {"entity": "expenses", "agg": "max", "field": "amount"},
+      "expected": {"type": "number", "value": 1200, "text": "1200"}
+    },
+    {
+      "name": "sum/unknown-entity-is-zero",
+      "expr": {"entity": "ghost", "agg": "sum", "field": "x"},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "sum/empty-is-zero",
+      "expr": {"entity": "expenses", "agg": "sum", "field": "amount", "filter": {"value": "nobody", "op": "eq", "field": "payer"}},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "avg/empty-is-nil",
+      "expr": {"entity": "expenses", "agg": "avg", "field": "amount", "filter": {"value": "nobody", "op": "eq", "field": "payer"}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "min/empty-is-nil",
+      "expr": {"entity": "expenses", "agg": "min", "field": "amount", "filter": {"value": "nobody", "op": "eq", "field": "payer"}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "max/empty-is-nil",
+      "expr": {"entity": "expenses", "agg": "max", "field": "amount", "filter": {"value": "nobody", "op": "eq", "field": "payer"}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "count/empty-is-zero",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": "nobody", "op": "eq", "field": "payer"}},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "sum/no-field",
+      "expr": {"entity": "expenses", "agg": "sum"},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "unknown-op",
+      "expr": {"entity": "expenses", "agg": "median", "field": "amount"},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "filter/today",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": null, "op": "today", "field": "date"}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/thisMonth",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": null, "op": "thisMonth", "field": "date"}},
+      "expected": {"type": "number", "value": 4, "text": "4"}
+    },
+    {
+      "name": "filter/thisWeek",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": null, "op": "thisWeek", "field": "date"}},
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "filter/thisYear",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": null, "op": "thisYear", "field": "date"}},
+      "expected": {"type": "number", "value": 5, "text": "5"}
+    },
+    {
+      "name": "filter/thisWeek-sunday-night",
+      "now": "2026-11-01T23:00:00+09:00",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": null, "op": "thisWeek", "field": "date"}},
+      "records": {
+        "expenses": [
+          {"id": "w1", "data": {"date": "2026-10-26"}},
+          {"id": "w2", "data": {"date": "2026-11-01"}},
+          {"id": "w3", "data": {"date": "2026-11-02"}},
+          {"id": "w4", "data": {"date": "2026-10-25"}},
+          {"id": "w5", "data": {"date": "2026-10-25T15:30:00Z"}}
+        ]
+      },
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "filter/thisWeek-across-year",
+      "now": "2026-12-31T12:00:00+09:00",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": null, "op": "thisWeek", "field": "date"}},
+      "records": {
+        "expenses": [
+          {"id": "w1", "data": {"date": "2026-12-28"}},
+          {"id": "w2", "data": {"date": "2027-01-03"}},
+          {"id": "w3", "data": {"date": "2027-01-04"}},
+          {"id": "w4", "data": {"date": "2026-12-27"}}
+        ]
+      },
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "filter/today-utc-instant",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": null, "op": "today", "field": "date"}},
+      "records": {
+        "expenses": [{"id": "t1", "data": {"date": "2026-10-27T15:30:00Z"}}, {"id": "t2", "data": {"date": "2026-10-27T14:59:59Z"}}]
+      },
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/thisMonth-new-york",
+      "now": "2026-11-01T00:30:00-04:00",
+      "timeZone": "America/New_York",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": null, "op": "thisMonth", "field": "date"}},
+      "records": {
+        "expenses": [
+          {"id": "t1", "data": {"date": "2026-11-01T03:00:00Z"}},
+          {"id": "t2", "data": {"date": "2026-11-01T05:00:00Z"}},
+          {"id": "t3", "data": {"date": "2026-11-01"}}
+        ]
+      },
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "filter/gt-number-only",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": 500, "op": "gt", "field": "amount"}},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "filter/gte-string-value-never-matches",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": "100", "op": "gte", "field": "amount"}},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "filter/lt",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": 1000, "op": "lt", "field": "amount"}},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "filter/lte",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": 800, "op": "lte", "field": "amount"}},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "filter/date-gte-expr",
+      "expr": {
+        "entity": "expenses",
+        "agg": "count",
+        "filter": {"value": {"op": "addDays", "args": [{"op": "today", "args": []}, -7]}, "op": "gte", "field": "date"}
+      },
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "filter/eq-number-vs-string",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": "1200", "op": "eq", "field": "amount"}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/eq-string-vs-number",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": 350, "op": "eq", "field": "amount"}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/eq-empty-matches-missing",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": "", "op": "eq", "field": "date"}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/eq-null-matches-missing",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": null, "op": "eq", "field": "payer"}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/eq-nil-expr-no-row",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": {"ref": "id"}, "op": "eq", "field": "payer"}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/eq-expr-today",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": {"op": "today", "args": []}, "op": "eq", "field": "date"}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/eq-array-display",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": "m1, m2", "op": "eq", "field": "tags"}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/neq",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": "m1", "op": "neq", "field": "payer"}},
+      "expected": {"type": "number", "value": 4, "text": "4"}
+    },
+    {
+      "name": "filter/and-list",
+      "expr": {
+        "entity": "expenses",
+        "agg": "count",
+        "filter": [{"value": "m1", "op": "eq", "field": "payer"}, {"value": null, "op": "thisMonth", "field": "date"}]
+      },
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/unknown-op-matches-all",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": 1, "op": "between", "field": "amount"}},
+      "expected": {"type": "number", "value": 6, "text": "6"}
+    },
+    {
+      "name": "filter/contains-refs",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": "m2", "op": "contains", "field": "tags"}},
+      "expected": {"type": "number", "value": 5, "text": "5"}
+    },
+    {
+      "name": "filter/contains-refs-deleted-only",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": "gone", "op": "contains", "field": "tags"}},
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "filter/contains-non-refs",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": "ホテル", "op": "contains", "field": "title"}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/computed-field",
+      "expr": {"entity": "members", "agg": "count", "filter": {"value": 0, "op": "gt", "field": "balance"}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/computed-bool",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": true, "op": "eq", "field": "big"}},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "sum/computed-field",
+      "expr": {"entity": "members", "agg": "sum", "field": "paid"},
+      "expected": {"type": "number", "value": 2350, "text": "2350"}
+    },
+    {
+      "name": "sum/computed-field-lookup",
+      "expr": {"entity": "log", "agg": "sum", "field": "score"},
+      "expected": {"type": "number", "value": 11, "text": "11"}
+    },
+    {
+      "name": "row/paid-by-this-member",
+      "expr": {
+        "entity": "expenses",
+        "agg": "sum",
+        "field": "amount",
+        "filter": {"value": {"ref": "id"}, "op": "eq", "field": "payer"}
+      },
+      "row": {"entity": "members", "record": {"id": "m2", "data": {"name": "Bob"}}},
+      "expected": {"type": "number", "value": 800, "text": "800"}
+    },
+    {
+      "name": "row/count-by-lookup-value",
+      "expr": {"entity": "log", "agg": "count", "filter": {"value": {"ref": "chore"}, "op": "eq", "field": "chore"}},
+      "row": {"entity": "log", "record": {"id": "l1", "data": {"chore": "c1", "qty": 2}}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/author",
+      "expr": {"entity": "posts", "agg": "count", "filter": {"value": "u1", "op": "eq", "field": "$author"}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/author-neq",
+      "expr": {"entity": "posts", "agg": "count", "filter": {"value": "u1", "op": "neq", "field": "$author"}},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "filter/marks-mine",
+      "expr": {"entity": "posts", "agg": "count", "filter": {"value": "u1", "op": "eq", "field": "$marks.like"}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "filter/marks-not-mine",
+      "expr": {"entity": "posts", "agg": "count", "filter": {"value": "u1", "op": "neq", "field": "$marks.like"}},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "sum/marks-count",
+      "expr": {"entity": "posts", "agg": "sum", "field": "$marks.like"},
+      "expected": {"type": "number", "value": 4, "text": "4"}
+    },
+    {
+      "name": "latest/by-date",
+      "expr": {"entity": "body", "agg": "latest", "field": "weight", "by": "date"},
+      "expected": {"type": "number", "value": 60.8, "text": "60.8"}
+    },
+    {
+      "name": "latest/same-day-later-created-wins",
+      "expr": {"entity": "body", "agg": "latest", "field": "memo", "by": "date"},
+      "expected": {"type": "string", "value": "朝", "text": "朝"}
+    },
+    {
+      "name": "earliest/by-date",
+      "expr": {"entity": "body", "agg": "earliest", "field": "weight", "by": "date"},
+      "expected": {"type": "number", "value": 60.5, "text": "60.5"}
+    },
+    {
+      "name": "latest/default-by-first-date-field",
+      "expr": {"entity": "body", "agg": "latest", "field": "weight"},
+      "expected": {"type": "number", "value": 60.8, "text": "60.8"}
+    },
+    {
+      "name": "latest/by-datetime",
+      "expr": {"entity": "body", "agg": "latest", "field": "weight", "by": "measured_at"},
+      "expected": {"type": "number", "value": 59, "text": "59"}
+    },
+    {
+      "name": "earliest/by-datetime",
+      "expr": {"entity": "body", "agg": "earliest", "field": "memo", "by": "measured_at"},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "latest/no-date-field-uses-createdAt",
+      "expr": {"entity": "notes", "agg": "latest", "field": "text"},
+      "expected": {"type": "string", "value": "second", "text": "second"}
+    },
+    {
+      "name": "earliest/no-date-field-uses-createdAt",
+      "expr": {"entity": "notes", "agg": "earliest", "field": "text"},
+      "expected": {"type": "string", "value": "no createdAt", "text": "no createdAt"}
+    },
+    {
+      "name": "latest/date-value",
+      "expr": {"entity": "body", "agg": "latest", "field": "date", "by": "date"},
+      "expected": {"type": "date", "value": "2026-10-25T00:00:00+09:00", "text": "2026-10-25"}
+    },
+    {
+      "name": "latest/missing-field-value",
+      "expr": {"entity": "body", "agg": "latest", "field": "memo", "by": "measured_at"},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "latest/with-filter",
+      "expr": {
+        "entity": "body",
+        "agg": "latest",
+        "field": "weight",
+        "by": "date",
+        "filter": {"value": null, "op": "thisMonth", "field": "date"}
+      },
+      "expected": {"type": "number", "value": 60.8, "text": "60.8"}
+    },
+    {
+      "name": "latest/empty",
+      "expr": {"entity": "body", "agg": "latest", "field": "weight", "filter": {"value": 100, "op": "gt", "field": "weight"}},
+      "expected": {"type": "nil"}
+    },
+    {"name": "latest/no-field", "expr": {"entity": "body", "agg": "latest"}, "expected": {"type": "nil"}},
+    {
+      "name": "latest/unknown-entity",
+      "expr": {"entity": "ghost", "agg": "latest", "field": "x"},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "latest/by-string-field",
+      "expr": {"entity": "body", "agg": "latest", "field": "weight", "by": "memo"},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "latest/by-createdAt",
+      "expr": {"entity": "posts", "agg": "latest", "field": "text", "by": "$createdAt"},
+      "expected": {"type": "string", "value": "hi", "text": "hi"}
+    },
+    {
+      "name": "op/budget-left",
+      "expr": {
+        "op": "sub",
+        "args": [
+          5000,
+          {
+            "entity": "expenses",
+            "agg": "sum",
+            "field": "amount",
+            "filter": {"value": null, "op": "thisMonth", "field": "date"}
+          }
+        ]
+      },
+      "expected": {"type": "number", "value": 2500, "text": "2500"}
+    },
+    {
+      "name": "op/weight-change",
+      "expr": {
+        "op": "sub",
+        "args": [
+          {"entity": "body", "agg": "latest", "field": "weight", "by": "date"},
+          {"entity": "body", "agg": "earliest", "field": "weight", "by": "date"}
+        ]
+      },
+      "expected": {"type": "number", "value": 0.29999999999999716, "text": "0.29999999999999716"}
+    },
+    {
+      "name": "op/per-person",
+      "expr": {
+        "op": "round",
+        "args": [
+          {
+            "op": "div",
+            "args": [{"entity": "expenses", "agg": "sum", "field": "amount"}, {"entity": "members", "agg": "count"}]
+          }
+        ]
+      },
+      "expected": {"type": "number", "value": 950, "text": "950"}
+    },
+    {
+      "name": "op/ratio-of-empty",
+      "expr": {
+        "op": "div",
+        "args": [
+          {
+            "entity": "expenses",
+            "agg": "sum",
+            "field": "amount",
+            "filter": {"value": "nobody", "op": "eq", "field": "payer"}
+          },
+          {"entity": "ghost", "agg": "count"}
+        ]
+      },
+      "expected": {"type": "nil"}
+    }
+  ]
+}
