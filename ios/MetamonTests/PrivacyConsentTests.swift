@@ -62,7 +62,7 @@ final class PrivacyConsentTests: XCTestCase {
 
     func testGatedClientNeverCallsAIWithoutConsent() async {
         let base = RecordingAI()
-        let defaults = self.defaults!
+        nonisolated(unsafe) let defaults = self.defaults!
         let gated = ConsentGatedAIClient(base: base) { AIConsentStore.isGranted(in: defaults) }
 
         do {

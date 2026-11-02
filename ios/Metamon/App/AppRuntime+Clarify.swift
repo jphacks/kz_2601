@@ -92,7 +92,7 @@ extension AppRuntime {
     /// 今の履歴を送り直す(状態カードの「もう一度」)。
     func retryChat() {
         guard isChatting, !chatPending else { return }
-        chatTask = Task { await chatRound() }
+        chatTask = Task { _ = await chatRound() }
     }
 
     /// ready の内容で生成する(「これでいく」)。transcript が無ければこれまでの発話をつないで渡す。
