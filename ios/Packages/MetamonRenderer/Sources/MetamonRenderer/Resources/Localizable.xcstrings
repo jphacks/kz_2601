@@ -426,6 +426,23 @@
         }
       }
     },
+    "%lld / %lld 枚" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld / %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld / %2$lld 枚"
+          }
+        }
+      }
+    },
     "%lld 件" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -473,6 +490,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 件を記録しました"
+          }
+        }
+      }
+    },
+    "%lld 枚中 %lld 枚目" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Card %2$lld of %1$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld 枚中 %2$lld 枚目"
           }
         }
       }
@@ -1123,6 +1157,23 @@
         }
       }
     },
+    "まだ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ"
+          }
+        }
+      }
+    },
     "まだありません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1221,6 +1272,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "まもなく目的地です"
+          }
+        }
+      }
+    },
+    "もう一度" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度"
           }
         }
       }
@@ -1357,6 +1425,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "カメラを開きます"
+          }
+        }
+      }
+    },
+    "カードがありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No cards yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カードがありません"
           }
         }
       }
@@ -1510,6 +1595,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "タップで追加"
+          }
+        }
+      }
+    },
+    "ダブルタップでめくる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Double-tap to flip"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダブルタップでめくる"
           }
         }
       }
@@ -2258,6 +2360,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全員"
+          }
+        }
+      }
+    },
+    "全部終わりました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All done"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部終わりました"
           }
         }
       }
@@ -3605,6 +3724,40 @@
         }
       }
     },
+    "表" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Front"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表"
+          }
+        }
+      }
+    },
+    "裏" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "裏"
+          }
+        }
+      }
+    },
     "見送る" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3618,6 +3771,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "見送る"
+          }
+        }
+      }
+    },
+    "覚えた" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Got it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "覚えた"
+          }
+        }
+      }
+    },
+    "覚えていないカードはありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No cards left to learn"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "覚えていないカードはありません"
           }
         }
       }

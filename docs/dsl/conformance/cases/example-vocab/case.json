@@ -1,0 +1,10 @@
+{
+  "dsl": "examples/vocab.json",
+  "records": {
+    "word": [
+      { "id": "w1", "data": { "term": "apple", "meaning": "りんご", "learned": false }, "createdAt": "2026-11-01T09:00:00+09:00" },
+      { "id": "w2", "data": { "term": "borrow", "meaning": "借りる", "learned": true }, "createdAt": "2026-11-02T09:00:00+09:00" },
+      { "id": "w3", "data": { "term": "consider", "meaning": "よく考える" }, "createdAt": "2026-11-03T09:00:00+09:00" }
+    ]
+  }
+}
