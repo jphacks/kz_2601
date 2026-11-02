@@ -317,6 +317,11 @@ func (r *webRenderer) node(s *dsl.Screen, c *dsl.Component, depth int) (webNode,
 		}
 	case dsl.CompLink:
 		n.Kind, n.Text, n.Href = "link", clip(c.Text, 80), safeHref(c.URL)
+	case dsl.CompFlashcards: // #264: the field names only (no cards), the deck is in the app
+		front, back := r.fieldName(c.Entity, c.Front), r.fieldName(c.Entity, c.Back)
+		if front != "" && back != "" {
+			n.Title = clip("カード(表: "+front+" / 裏: "+back+")", 80)
+		}
 	}
 	return n, true
 }
