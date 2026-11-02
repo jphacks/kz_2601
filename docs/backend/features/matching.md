@@ -1,6 +1,6 @@
 # 仲間探しのアプリ(相互承認でつながる・#507)
 
-「同じ趣味の人を探して、お互いに OK したら連絡できるアプリを作って」で、相互承認つきの仲間探しアプリを作れるようにする。この文書は phase 1(backend・AI・DSL の設計)の正典。iOS の描画は phase 2。
+「同じ趣味の人を探して、お互いに OK したら連絡できるアプリを作って」で、相互承認つきの仲間探しアプリを作れるようにする。この文書は仲間探しの設計の正典。phase 1 = backend・AI・`entity.match`、phase 2 = iOS の描画と部品(`list.item.interest`・`matchList`)。
 
 ## 目次
 - [1. 対象範囲と理由](#1-対象範囲と理由)
@@ -11,7 +11,7 @@
 - [6. 安全とプライバシー](#6-安全とプライバシー)
 - [7. App Store と法律のメモ](#7-app-store-と法律のメモ)
 - [8. AI](#8-ai)
-- [9. DSL の部品(phase 2 の設計)](#9-dsl-の部品phase-2-の設計)
+- [9. DSL の部品(phase 2)](#9-dsl-の部品phase-2)
 - [10. phase 2(iOS)の計画](#10-phase-2ios-の計画)
 - [11. 人の判断が要ること](#11-人の判断が要ること)
 - [12. 分かっている制約](#12-分かっている制約)
@@ -143,26 +143,31 @@ match_quota/{uid}   {day, n}  送った回数(JST の 1 日ごと)
 - `allowedComponents` を送るのに `matching` が無い版(今の iOS 全部): `restrict.go` が生成スキーマから `Entity.match` を外し、規則を落とし、生成結果に新しく付いた match は作り直させ、残れば取り除く(#482 の `retentionDays` と同じ)。
 - ai-eval: `internal/ai/eval/matching_cases.json`(作成 7 件)・`matching_chat_cases.json`(チャット 2 件)。expect は `matchProfile` / `matchMatched` / `matchSafe`(`cmd/ai-eval/matching.go`)。
 
-## 9. DSL の部品(phase 2 の設計)
+## 9. DSL の部品(phase 2)
 
-phase 1 では**部品を schema に足さない**。iOS の `ComponentRegistryTests` が「schema にある type が iOS に無い」を赤にするため、部品は iOS の描画と同じ PR で足す(README §4 の手順)。案:
+iOS の描画と同じ PR で schema に足した(iOS の `ComponentRegistryTests` が「schema にある type が iOS に無い」を赤にするため・README §4)。
 
-| 案 | 形 | 役割 |
+| 部品 | 形 | 役割 |
 |---|---|---|
 | `list.item.interest`(省略できるキー) | `true` | `match:"profile"` の一覧の行に「つながりたい」ボタン(自分の行には出さない・送った後は「送りました」)。初回は 18 歳以上の確認を出す |
-| `matchList`(新しい Leaf) | `{entity, show: incoming \| outgoing \| matches, title?, emptyText?, item: {title, subtitle}, onItemTap?}` | `incoming` は承認 / 見送る、`outgoing` は取り下げ、`matches` は解除・通報・ブロック。行はプロフィールのレコード(`profileRecordId`)で描く |
+| `matchList`(新しい Leaf) | `{entity, show: incoming \| outgoing \| matches, title?, emptyText?, item?: {title, subtitle, trailing, icon}, onItemTap?}` | `incoming` は承認 / 見送る、`outgoing` は取り下げ、`matches` は長押しで解除。どの行も長押しで通報・ブロック。行はプロフィールのレコード(`profileRecordId`)で描く |
 
 - Action は足さない(README §3.2: `ActionType` を足すとホストの改修が要る)。送る・承認は部品の中で完結する(`shareButton` などと同じ)。
 - 古い iOS: 未知のキー(`match`・`item.interest`)は無視、未知の type(`matchList`)はプレースホルダ(RELEASE は何も描かない)で落ちない(README §1)。backend は `allowedComponents` に無い部品・`matching` の無い版に match を出さない。
 
-## 10. phase 2(iOS)の計画
+## 10. phase 2(iOS)
+
+実装の場所: 部品 `MetamonRenderer` の `MatchListLeaf`・`InterestButton`・`Host/Capabilities/MatchingHost`、API と楽観的な状態 `MetamonServices` の `HTTPMatchingClient`・`MatchingStore`・`MatchingAgeGate`、ホスト `Metamon/Features/Matching/AppRuntime+Matching.swift`(18 歳以上の確認のシート・失敗の理由)。全部 `#if !APP_STORE_REVIEW`。
+
 
 1. schema に `list.item.interest` と `matchList` を足す(`dsl.go` の定数・`validate.go`・例)。iOS `ComponentType` / `ComponentRegistry` / Leaf の View を同じ PR で。
 2. iOS のサービス層に matching の API クライアント(上の 6 本)。楽観的に反映し、失敗したら戻す。オフラインでは送れない。
 3. 18 歳以上の確認(初回だけ・端末に覚える)。断る・解除・通報・ブロックのメニュー。
 4. iOS が `supportedFeatures` に `matching` を足す(足した版から AI が仲間探しを作る)。AI の規則に部品の使い方を足す。
 5. 審査用の版で外れること(`build-review.sh`)を確かめる。
-6. 実機で、2 台(2 アカウント)で 送る → 承認 → 連絡先が見える → 解除 → 見えない を確かめる。
+6. 実機で、2 台(2 アカウント)で 送る → 承認 → 連絡先が見える → 解除 → 見えない を確かめる(人の作業・未実施)。
+
+1〜5 は済み。18 歳以上の確認は `UserDefaults` の `matching.ageConfirmed.v1`(真偽だけ)。「18 歳未満です」は覚えない(次に押した時もまた聞く)。サーバーが 400 `age_unconfirmed` を返したら覚えた確認を消して聞き直す。
 
 ## 11. 人の判断が要ること
 
