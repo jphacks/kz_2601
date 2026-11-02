@@ -92,6 +92,10 @@ public struct UserNotificationScheduler: NotificationScheduler {
             trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(hour: h, minute: m), repeats: true)
         case .weekly(let w, let h, let m):
             trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(hour: h, minute: m, weekday: w), repeats: true)
+        case .monthly(let d, let h, let m):
+            trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(day: d, hour: h, minute: m), repeats: true)
+        case .yearly(let mo, let d, let h, let m):
+            trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(month: mo, day: d, hour: h, minute: m), repeats: true)
         }
         return UNNotificationRequest(identifier: p.identifier, content: content, trigger: trigger)
     }
