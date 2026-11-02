@@ -273,6 +273,25 @@ final class ShareJoinFlowTests: XCTestCase {
         XCTAssertNil(rt.toast)
     }
 
+    /// #565: プレビューが取れずに自分の共有アプリのリンクを開く → 取り込み結果の mine で課金画面を出さない
+    func testOwnLinkWithoutPreviewSkipsPaywallByInstalledMine() async throws {
+        let fake = FakeShareClient()
+        fake.preview = .failure(URLError(.timedOut))
+        fake.imported = .success(InstalledApp(appId: "family-app", name: "家族の買い物", joined: true, mine: true))
+        let rt = try await makeRuntime(fake)
+        let run = Task { await rt.importShared(token: token) }
+
+        let deadline = ContinuousClock.now + .seconds(2)
+        while rt.proGate.paywall == nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+        XCTAssertNil(rt.proGate.paywall, "プレビューが無くても自分のアプリに課金画面を出さない")
+        rt.proGate.finishPaywall()
+        await run.value
+        XCTAssertEqual(fake.importCalls, [token])
+        XCTAssertNil(SharingUI.shared.pendingJoin)
+        XCTAssertEqual(rt.document.appId, "family-app")
+        XCTAssertNil(rt.toast)
+    }
+
     // MARK: - importShared: 失敗
 
     func testImportFailureShowsRevokedMessage() async throws {

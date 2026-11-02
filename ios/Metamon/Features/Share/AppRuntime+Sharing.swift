@@ -49,8 +49,8 @@ extension AppRuntime {
         }
         do {
             let app = try await sharing.importShare(token: token)
-            // #561: 自分のアプリ(preview.mine)は無料。共有のあるアプリは joined で返るが課金画面を出さない
-            await adopt(app, banner: L10n.tr("シェアされた「\(app.name)」を追加しました"), own: preview?.mine == true)
+            // #561 / #565: 自分のアプリは無料。プレビューが取れなくても取り込み結果の mine で見分ける
+            await adopt(app, banner: L10n.tr("シェアされた「\(app.name)」を追加しました"), own: preview?.mine == true || app.mine)
         } catch {
             toast = Self.importFailureMessage(error)
         }
@@ -91,14 +91,14 @@ extension AppRuntime {
         guard let sharing = services.sharing else { return }
         do {
             let app = try await sharing.install(publicAppId: listing.id)
-            await adopt(app, banner: L10n.tr("「\(app.name)」をインストールしました"), own: listing.mine)
+            await adopt(app, banner: L10n.tr("「\(app.name)」をインストールしました"), own: listing.mine || app.mine)
         } catch {
             toast = L10n.tr("インストールできませんでした: \(error.localizedDescription)")
         }
     }
 
     /// import / install の結果に切り替える(変身アニメは switchApp)。共有データ付きは「みんなと同じデータ」を一言添える。
-    /// `own` = 自分のアプリ(シェアのプレビュー・探すの掲載の mine)。自分のアプリは課金画面を出さない(#561)。
+    /// `own` = 自分のアプリ(シェアのプレビュー・探すの掲載・取り込み結果の mine)。自分のアプリは課金画面を出さない(#561)。
     private func adopt(_ app: InstalledApp, banner: String, own: Bool = false) async {
         print("[Metamon] adopt shared app: appId=\(app.appId) joined=\(app.joined)")
         // #414: プレビューが無かった import・公開アプリのインストールは、結果を見てから課金画面(買わなければ開かない)

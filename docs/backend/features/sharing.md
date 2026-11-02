@@ -14,7 +14,7 @@ app_owners/{appId}    # {uid, createdAt}  appId の作成者(publish できる�
 | 項目 | 決定 |
 |---|---|
 | シェア | `POST /apps/{appId}/share` が現行 DSL を**スナップショット**して token を返す(後から作者が変えてもリンク先は変わらない)。`DELETE /shares/{token}` で取り消し(発行者のみ)。取り消し後の import / プレビュー / Web ページは 404 |
-| 複製(import / install 共通 `installCopy`) | 受け取った人の木に version 1(初期)→ version 2(複製 DSL・`source.kind=import`)で作る(iOS の変身一覧は version 1 を「未生成」として隠すため)。**レコードは複製しない** |
+| 複製(import / install 共通 `installCopy`) | 受け取った人の木に version 1(初期)→ version 2(複製 DSL・`source.kind=import`)で作る(iOS の変身一覧は version 1 を「未生成」として隠すため)。**レコードは複製しない**。応答の `mine` は「呼び出した人が元のアプリの作成者(`app_owners`)か、リンク / 掲載の発行者か」(#565)。プレビュー(`GET /shares/{token}` の `mine`)が取れなくても、iOS はこれで自分のアプリの課金画面を飛ばす |
 | 共有データ(scope: shared/public)の扱い | 共有 entity を含むアプリは**新しい appId を振らず元の appId に参加**する。理由: #93 の共有レコードは `apps_public/{appId}` で appId 単位、かつ「他人が同じ appId を開く = インストール」という設計なので、新 appId だと受け取った人は空の掲示板を見るだけになり共有の意味が無い。既に持っていれば何もしない(`created:false`)。private だけのアプリは新しい UUID の appId に独立コピー |
 | 公開 | `POST /apps/{appId}/publish`(name/description/tags/authorName)で作成・更新、`DELETE` で取り下げ。**その appId の作成者だけ**が掲載できる(#153)。作成者 = 最初に実コミット(生成 / PUT・PATCH /dsl / restore / `POST /apps` に dsl 付き / 新規 appId への複製)した uid を `app_owners/{appId}` に Create(既にあれば上書きしない)で記録。GET /dsl の seed(参加)と共有アプリへの参加 install は記録しないので、他人の appId を開いた人・参加者は 403。記録の無い既存アプリは「探す」の掲載者 → `apps_public` の持ち主の順で作成者とみなして記録し、どちらも無ければ最初に publish した人(空のアプリでは不可)を記録する。中身が初期 DSL のまま(components / entities 空)は 400 |
 | 検索 | `GET /public-apps?q=&sort=popular`(または `new`): installs 降順で最大 500 件を読み、名前・説明・タグ・作者名の部分一致をメモリ内で絞る(全文検索なし・複合インデックス不要) |

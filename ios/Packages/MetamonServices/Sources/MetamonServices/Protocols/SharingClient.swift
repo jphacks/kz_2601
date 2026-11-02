@@ -58,19 +58,22 @@ public struct PublicAppListing: Codable, Sendable, Equatable, Identifiable, Hash
 /// import / install の応答。`appId` に切り替えれば変身できる。
 /// `joined` = 共有データ(scope: shared/public)を持つアプリなので元の appId に参加した(#93 の共有レコードが見える)。
 /// `member` = scope:shared のデータの参加者になった(import だけ・#254)。
+/// `mine` = 自分(作成者・発行者)のアプリ(#565)。古いサーバーは返さないので false。
 public struct InstalledApp: Decodable, Sendable, Equatable {
     public var appId: String
     public var name: String
     public var joined: Bool
     public var member: Bool
+    public var mine: Bool
 
-    enum CodingKeys: String, CodingKey { case id, name, joined, member }
+    enum CodingKeys: String, CodingKey { case id, name, joined, member, mine }
 
-    public init(appId: String, name: String, joined: Bool = false, member: Bool = false) {
+    public init(appId: String, name: String, joined: Bool = false, member: Bool = false, mine: Bool = false) {
         self.appId = appId
         self.name = name
         self.joined = joined
         self.member = member
+        self.mine = mine
     }
 
     public init(from decoder: Decoder) throws {
@@ -79,6 +82,7 @@ public struct InstalledApp: Decodable, Sendable, Equatable {
         name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
         joined = try c.decodeIfPresent(Bool.self, forKey: .joined) ?? false
         member = try c.decodeIfPresent(Bool.self, forKey: .member) ?? false
+        mine = try c.decodeIfPresent(Bool.self, forKey: .mine) ?? false
     }
 }
 
