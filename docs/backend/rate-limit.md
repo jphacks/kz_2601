@@ -32,7 +32,7 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 | `RATE_LIMIT_STORE` | firestore | `memory` でインスタンスごとのメモリ |
 | `RATE_LIMIT_COLLECTION` | rateLimits | |
 
-0 を入れるとその上限は数えない。値は `--set-env-vars` で変える(deploy-cloudrun.yml は全置換なので、変えるならワークフローに書く)。
+0 を入れるとその上限は数えない。値は運用で gcloud の `--update-env-vars` で変える。デプロイ(deploy-cloudrun.yml)はこれらを書かないので、次のデプロイの後も残る(#509・[`docs/infra/runtime-config.md`](../infra/runtime-config.md))。
 
 費用ブレーカーの目安: 1 回の新規作成を $0.03〜0.10 と置くと(入力 1〜2 万トークン + 出力数千トークン。実測で直す)、2000 単位 ≒ 最大 $20〜65/日/環境。stg と prod は別々に数える。
 
