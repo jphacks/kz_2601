@@ -117,7 +117,7 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 - 流れ: `backend/Dockerfile` を 1 回 `docker build`(appconfig / ai 両バイナリ同梱)→ Artifact Registry `asia-northeast1-docker.pkg.dev/jphacks-kz2601/backend/backend:<sha>` → 同じイメージで `appconfig-<env>` と `ai-<env>`(`--command=/app/ai`、`ANTHROPIC_API_KEY` は Secret Manager から注入)を `gcloud run deploy --image`。
 - 最後に両サービスの **`GET /health`** が 200 であることを確認し、URL を job summary に出す。**ヘルスパスは `/health`**(Cloud Run の Google Front End は `/healthz` をコンテナに届けず HTML 404 を返すため。`/healthz` はローカル用に残っている)。
 - その後 **スモーク(`backend/cmd/smoke`・非ブロッキング)** を流して表を job summary に貼る(失敗してもデプロイは成功扱い)。staging はデモ 3 本(Claude 3 回)、**production は家計簿 1 本だけ(`-only kakeibo`・Claude 2 回)+ `-cleanup`** で作った `smoke-*` アプリを `DELETE /v1/apps/{id}`(archive)する。認証は `FIREBASE_WEB_API_KEY`(repo Variable)で Firebase 匿名ユーザーの ID トークンを取る。手元から同じことをするには `cd backend && FIREBASE_WEB_API_KEY=<key> make smoke-stg` / `make smoke-prod`(#66)。
-- `--set-env-vars` / `--set-secrets` は全置換。手で足した env/secret は次のデプロイで消えるので、恒久的に要るものは workflow に書く。
+- env は `--update-env-vars`(#509)。workflow が決める値だけを上書きし、運用で手で入れた値(`NOTICE_JSON`・`MIN_IOS_BUILD`・`RATE_LIMIT_GLOBAL_DAILY` など)は残す。workflow から外した変数は Cloud Run に残るので `--remove-env-vars` で消す。シークレットは `--set-secrets`(全置換)のまま。一覧と変え方は [`docs/infra/runtime-config.md`](infra/runtime-config.md)。
 
 認証は Workload Identity Federation(鍵ファイル無し)。GitHub **Secrets は不要**で、repo Variables に以下を入れる(登録済み)。
 

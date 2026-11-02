@@ -101,7 +101,7 @@ GitHub の Environment 変数 `APP_CHECK_MODE` を `log` にしてデプロイ�
 
 ## モードの切り替え
 
-**ふだんは GitHub の Environment 変数で切り替えます。** デプロイ(`.github/workflows/deploy-cloudrun.yml`)は `--set-env-vars` で環境変数を毎回まとめて置き換えるので、gcloud で手で変えた値は次のデプロイで消えます。
+**ふだんは GitHub の Environment 変数で切り替えます。** `APP_CHECK_MODE` はデプロイ(`.github/workflows/deploy-cloudrun.yml`)が毎回決める値なので、gcloud で手で変えた値は次のデプロイで戻ります([runtime-config.md](runtime-config.md))。
 
 1. GitHub → Settings → Environments → `staging`(または `production`)→ Variables に `APP_CHECK_MODE` = `log` / `enforce` / `off`。
 2. Actions →「deploy-cloudrun」を `workflow_dispatch` で流す(または次のマージを待つ)。

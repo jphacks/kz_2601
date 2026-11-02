@@ -17,6 +17,7 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 
 ### 1.2 話した内容・入力した文(音声)
 - **音声は端末の中で文字にします**(WhisperKit。音声認識のモデルは端末に保存します)。**音声そのもの(録音データ)はサーバーに送りません。**
+- 音声認識のモデルが端末に無い時だけ(初回など)、サイズをお知らせして確認した上で、**Hugging Face, Inc.(米国)** から HTTPS でダウンロードします。このとき Hugging Face に届くのは、通常の通信に伴う情報(IP アドレスと、取得するファイルのリクエスト)だけで、音声・話した内容・記録・アカウントの情報は送りません。モデルが端末にあれば Hugging Face には接続しません。Hugging Face での扱いは [Hugging Face のプライバシーポリシー](https://huggingface.co/privacy) によります。
 - 文字にした内容(または直接入力した文)は、アプリを作る・直すために、次の 1.3 のとおり AI に送ります。
 
 ### 1.3 第三者の AI(Anthropic)へ送る情報
@@ -70,6 +71,7 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 - Google LLC(Firebase Authentication・Firebase Crashlytics・Cloud Run・Firestore・Cloud Logging)
 - Anthropic, PBC(AI による生成・相談。米国への移転を含みます)
 - Apple Inc.(Sign in with Apple・App Store の課金)
+- Hugging Face, Inc.(音声認識のモデルの配信。1.2 のダウンロードの通信だけで、音声・話した内容は送りません。米国)
 
 ## 3. 保存期間
 - 作ったアプリ・記録・アカウントの情報は、アカウントを削除するまで保存します(削除後の扱いは 4 章)。
@@ -103,13 +105,13 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 
 - **Operator:** Kotaro Takaoka (高岡己太朗) (individual). **Effective:** October 30, 2026.
 - **Sign-in:** Sign in with Apple or anonymous, via Google Firebase Authentication. Firebase stores your user ID and, if Apple provides them, your name and email (or Apple's private relay address). Our own server (Firestore) uses only the user ID.
-- **Voice:** Speech is transcribed **on the device** (WhisperKit). **Audio is never uploaded.**
+- **Voice:** Speech is transcribed **on the device** (WhisperKit). **Audio is never uploaded.** Only when the speech model is not on the device (e.g. first use), and after asking you, it is downloaded over HTTPS from **Hugging Face, Inc. (USA)**. Hugging Face receives only standard connection data (your IP address and the file request), never audio, what you say, your records or account details. See [Hugging Face's privacy policy](https://huggingface.co/privacy).
 - **Third-party AI:** Only **after your explicit consent**, the transcribed/typed request, the current conversation and the current app design (screen/field names) are sent through our server (Google Cloud Run, Tokyo) to **Anthropic, PBC (USA, "Claude")** solely to build or edit your app. The contents of your records are not sent when building, editing or chatting. If your app has an "AI write" button (where available) and you tap it, the recent records or form values configured for that button (up to 4KB of text) are sent. Under Anthropic's commercial terms, API inputs and outputs are not used to train their models. Without consent you can still view and use your apps. You can withdraw consent in Settings at any time.
 - **Storage:** App designs, version history and records (including downscaled photos you add) are stored on the device and in Google Cloud Firestore (Tokyo). Chat state is kept on the server for up to 30 minutes. Server logs are kept for up to 30 days. We keep Firestore backups to recover from failures: point-in-time recovery data for the last 7 days and daily backups kept for 14 days. Both expire automatically.
 - **Device features** (microphone, camera/photos, location, motion, Health, local network, Apple Music, notifications) are used only where available in your build, only when your app uses them, and with your permission. Health data stays on the device and is never used for advertising.
 - **Sharing / public data** (where available): shared links, the "Discover" catalog and data marked "public" can be seen by others. You can withdraw sharing at any time.
 - **Payments** (if offered) are processed by Apple; we never receive payment details.
-- **Crash reports:** When the app crashes, Google's Firebase Crashlytics receives the crash location (stack trace), crash time, device model, OS and app version, device state (free memory/disk, orientation), a per-installation identifier and your user ID (uid). **What you say, your records and your app designs are never included.** On by default; turn it off in Settings > Privacy ("Send crash reports"). Crash reports are deleted after Crashlytics' standard retention period (90 days) [to be confirmed].
+- **Crash reports:** When the app crashes, Google's Firebase Crashlytics receives the crash location (stack trace), crash time, device model, OS and app version, device state (free memory/disk, orientation), a per-installation identifier and your user ID (uid). **What you say, your records and your app designs are never included.** On by default; turn it off in Settings > Privacy ("Send crash reports"). Google deletes crash reports 90 days after receipt (Crashlytics' standard retention period).
 - **No ads, tracking or analytics SDKs.** We do not sell data.
 - **Deletion:** Delete your account in Settings. Server data becomes unavailable immediately and is erased within 30 days. Posts in apps shared with others remain. Erased data may remain in backups for up to 14 more days until they expire. Backups are used only for disaster recovery; if we restore one, we erase previously deleted data again.
 - **Children:** Not intended for children under 13.

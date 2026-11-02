@@ -124,7 +124,7 @@ printf '| 生成の成功率(検証を通る) | %s | 98%% 以上 | %s | %s/%s �
   "${GEN_RATE:+$GEN_RATE%}" "$(judge "$GEN_RATE" ">=" 98)" "${GEN_OK:-0}" "${GEN_N:-0}" "${GEN_OUTCOMES:-ai.generate なし}"
 printf '| 初回の生成の p95 | %s 秒 | 30 秒以内 | %s | %s 件・p50 %s 秒(サーバー側の時間) |\n' \
   "${FIRST_P95_S:-—}" "$(judge "$FIRST_P95_S" "<=" 30)" "${FIRST_N:-0}" "${FIRST_P50_S:-—}"
-printf '| 7 日後に開いた率(D7) | 未計測 | 記録のみ | 未計測 | app.opened が未実装(#297) |\n'
+printf '| 7 日後に開いた率(D7) | scripts/product-metrics-weekly.sh で見る | 記録のみ | 手で記入 | #297 のイベント・docs/metrics/product-metrics.md |\n'
 printf '| P1 のフィードバックの残数 | %s | 0 | %s | 件名「[β]」・priority:P1・open |\n' "$P1" "$(judge "$P1" "==" 0)"
 printf '\n参考(基準ではない)\n\n| 項目 | 値 |\n|---|---|\n'
 printf '| POST /v1/generate のリクエスト(Cloud Run) | %s 件・5xx %s 件・p95 %s 秒 |\n' "${HTTP_N:-0}" "${HTTP_5XX:-0}" "${HTTP_P95:-—}"

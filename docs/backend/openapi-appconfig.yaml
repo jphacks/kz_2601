@@ -25,6 +25,7 @@ tags:
   - { name: account, description: 'アカウント削除(#119)。architecture.md §4.1' }
   - { name: release, description: 'リリース申請(#76)。architecture.md §3.3' }
   - { name: members, description: 'scope:shared の参加者(#254)。architecture.md §3.4' }
+  - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引をサーバーで検証して保存する。architecture.md §6.8' }
   - { name: metrics, description: 'aiButton の端末内 AI の集計(#446)。docs/analytics/ai-button-metrics.md' }
   - { name: feedback, description: 'アプリ内のフィードバック(#319)。architecture.md §3.5' }
 
@@ -762,6 +763,66 @@ paths:
         '401': { description: 未認証, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '500': { description: 途中で失敗。再実行で続きが終わる, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
+  /me/entitlements:
+    get:
+      tags: [entitlements]
+      summary: 自分の Pro の権利(#314)
+      description: |
+        `users/{uid}/entitlements/pro` を返す。`isPro` は「取り消されていない・期限内・許可された環境(`APPSTORE_ENVIRONMENTS`)」。
+        ai の回数制限(#449)も同じ判定で Pro の上限にする。iOS は購入・復元・起動時に `POST /me/entitlements/apple` で送った結果をこれで確かめられる。
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Entitlements' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/entitlements/apple:
+    post:
+      tags: [entitlements]
+      summary: StoreKit 2 の署名付き取引(JWS)を送って Pro を保存する(#314)
+      description: |
+        iOS が購入・復元の後と起動時(`Transaction.currentEntitlements`)に `VerificationResult.jwsRepresentation` を送る。
+        サーバーは Apple に問い合わせずにローカルで検証する:
+        - `x5c` の 3 枚(leaf・中間・root)を **Apple Root CA - G3(バックエンドに埋め込み・固定)** まで検証。中間・leaf の Apple のマーカー拡張(OID `1.2.840.113635.100.6.2.1` / `.6.11.1`)も確かめる。検証の時刻は取引の `signedDate`
+        - `alg` は ES256 だけ。leaf の公開鍵で署名を確かめる
+        - `bundleId`(`APPSTORE_BUNDLE_IDS`)・`productId`(`APPSTORE_PRODUCT_IDS`)・`environment`(`APPSTORE_ENVIRONMENTS`、既定 Sandbox と Production)が許可リストにあること
+        - `expiresDate` があること(Pro は自動更新サブスクだけ)
+
+        期限切れ・取り消し(返金)の取引もエラーにせず保存する(`isPro: false` になる)。ただし古い取引が新しい取引を上書きすることはない(期限が後のもの・同じ取引の取り消しだけが上書き)。
+
+        **取引と uid の結びつき**: `appstore_transactions/{originalTransactionId}` に uid を記録し、1 つの購読を 1 つの uid にだけ結びつける。
+        - まだ結びついていない → この uid に結びつける
+        - 退会済み(`DELETE /me` 後・purge 後)の uid に結びついている → この uid に移す(同じ Apple ID で入り直した場合)
+        - 別の有効な uid に結びついている → **409 `transaction_owned_by_other`**(権利は付けない・ログに残す)。サポートが `appstore_transactions/{id}` を消すと外せる
+
+        iOS は購入時に `appAccountToken` に uid から作った UUID を入れる(サーバーでは照合のログだけ)。
+        更新・解約・返金の通知(App Store Server Notifications v2)は #315 で同じ検証と保存を使う。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signedTransaction]
+              properties:
+                signedTransaction: { type: string, description: 'StoreKit 2 の JWS(`header.payload.signature`)', maxLength: 32768 }
+      responses:
+        '200': { description: 保存後の状態, content: { application/json: { schema: { $ref: '#/components/schemas/Entitlements' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '409':
+          description: この購読は別の有効なアカウントに結びついている
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: transaction_owned_by_other, message: 'this subscription is linked to another account' } }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422':
+          description: '検証に失敗(改ざん・Apple 以外の証明書・対象外の bundleId / productId / 環境など)。`details.reason` は malformed / chain / signature / bundle_id / product_id / environment / not_subscription'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: invalid_transaction, message: 'the signed transaction could not be verified', details: { reason: signature } } }
+
   /apps/{appId}/release-requests:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
     post:
@@ -1068,10 +1129,29 @@ components:
             code:
               type: string
               description: 機械可読コード(`ai_paused` は ai だけ・#511)
-              enum: [bad_request, unauthenticated, not_found, version_conflict, invalid_dsl, invalid_record, payload_too_large, rate_limited, app_check_failed, ai_paused, unpublished, internal]
+              enum: [bad_request, unauthenticated, not_found, version_conflict, invalid_dsl, invalid_record, payload_too_large, rate_limited, app_check_failed, ai_paused, unpublished, internal, invalid_transaction, transaction_owned_by_other]
             message: { type: string }
             details: { type: object, additionalProperties: true }
             requestId: { type: string }
+    Entitlements:
+      type: object
+      required: [isPro, pro]
+      properties:
+        isPro: { type: boolean, description: '取り消されていない・期限内・許可された環境の Pro がある' }
+        pro:
+          description: 'users/{uid}/entitlements/pro(無ければ null)'
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [productId, originalTransactionId, transactionId, environment, expiresAt, updatedAt]
+              properties:
+                productId: { type: string, example: jp.kz2601.metamon.pro.monthly }
+                originalTransactionId: { type: string }
+                transactionId: { type: string }
+                environment: { type: string, enum: [Sandbox, Production] }
+                expiresAt: { type: string, format: date-time }
+                revokedAt: { type: string, format: date-time, description: '返金・取り消しの時刻(無ければ省略)' }
+                updatedAt: { type: string, format: date-time }
     AppSummary:
       type: object
       required: [id, name, currentVersion, status, createdAt, updatedAt]

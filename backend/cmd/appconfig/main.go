@@ -13,7 +13,9 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/appcheck"
 	"github.com/jphacks/kz_2601/backend/internal/appconfig"
+	"github.com/jphacks/kz_2601/backend/internal/appstore"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/store"
@@ -43,7 +45,9 @@ func main() {
 	authed := func(h http.Handler) http.Handler {
 		return appCheck(auth.Middleware(verifier, mode)(appconfig.RejectDeleted(st, h)))
 	}
-	handler := newHandler(authed, logger, appconfig.New(st), appconfig.SharePage(st))
+	api := appconfig.New(st)
+	entitlement.Register(api, newEntitlements(st, logger)) // Pro (#314)
+	handler := newHandler(authed, logger, api, appconfig.SharePage(st))
 	server := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
@@ -152,6 +156,27 @@ func newStore(ctx context.Context, t fsenv.Target, logger *slog.Logger) (store.S
 	}
 	logger.Info("using Firestore", slog.String("project", t.Project), slog.String("database", t.Database), slog.String("emulator", os.Getenv("FIRESTORE_EMULATOR_HOST")))
 	return fs, func() { _ = fs.Close() }
+}
+
+// newEntitlements verifies StoreKit transactions against the pinned Apple root
+// (policy: entitlement.ConfigFromEnv) and stores them next to st.
+func newEntitlements(st store.Store, logger *slog.Logger) *entitlement.Service {
+	policy, err := entitlement.ConfigFromEnv(os.Getenv)
+	if err != nil {
+		logger.Error("appstore config", slog.Any("error", err))
+		os.Exit(1)
+	}
+	var es entitlement.Store = entitlement.NewMemory()
+	if fs, ok := st.(*store.Firestore); ok {
+		es = entitlement.NewFirestore(fs.Client())
+	}
+	logger.Info("entitlements", slog.Any("bundleIds", policy.BundleIDs), slog.Any("productIds", policy.ProductIDs), slog.Any("environments", policy.Environments))
+	return &entitlement.Service{
+		Verifier: &appstore.Verifier{Policy: policy},
+		Store:    es,
+		Deleted:  st.UserDeleted,
+		Log:      logger,
+	}
 }
 
 // newHandler mounts health and the share-link page (public) and the v1 API

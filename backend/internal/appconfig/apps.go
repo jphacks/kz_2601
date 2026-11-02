@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/metrics"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -51,6 +52,9 @@ func (h *Handler) listApps(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]any{"items": items}
 	if nt := p.next(len(apps)); nt != "" {
 		resp["nextPageToken"] = nt
+	}
+	if p.offset == 0 {
+		emitMetric(r, metrics.SessionStart)
 	}
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }

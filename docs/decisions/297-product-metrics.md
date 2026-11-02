@@ -1,5 +1,7 @@
 # #297 プロダクトの指標とイベントの設計
 
+> 実装: backend だけで出せる指標は [`docs/metrics/product-metrics.md`](../metrics/product-metrics.md) と `scripts/product-metrics-weekly.sh`(iPhone からの新しい送信なし)。
+>
 > 状態: **提案(オーナーの判断待ち)**。2026-10-30 作成。この PR は設計だけで、コード・GCP・Firebase の変更はしない。
 > 対象 Issue: [#297](https://github.com/jphacks/kz_2601/issues/297)(依存: #295 backend の構造化ログ、#296 iOS のクラッシュ報告。費用ログは #298 / PR #472)
 > 調べた日: 2026-10-30。コードは `origin/develop`(723bb5e)と PR #472 のブランチ `origin/feat/ai-cost-log-298`(efad3b8)を読んだ。料金・ラベルの区分は変わるので、決める前に「参考」をもう一度見ること。

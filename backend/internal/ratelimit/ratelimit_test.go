@@ -108,8 +108,9 @@ func TestProTierHook(t *testing.T) {
 	if !d.Allowed || d.Tier != TierPro || d.Remaining != 5 {
 		t.Fatalf("pro: %+v", d)
 	}
-	// anonymous never gets Pro limits (no receipt can belong to a throwaway account)
-	if d, _ := l.Allow(context.Background(), anon, "", 1); d.Tier != TierAnonymous {
+	// an anonymous account that bought Pro gets it too (purchases need no sign-in,
+	// App Store 5.1.1; the entitlement binds one subscription to one uid, #314)
+	if d, _ := l.Allow(context.Background(), anon, "", 1); d.Tier != TierPro {
 		t.Fatalf("anon pro: %+v", d)
 	}
 }
