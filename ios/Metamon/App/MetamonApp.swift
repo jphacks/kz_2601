@@ -101,15 +101,24 @@ struct MetamonApp: App {
                         .task {
                             await runtime.bootstrap()
                             IntentHost.shared.markReady() // 保留中の「開く/話しかける」を実行(#80)
+                            #if !APP_STORE_REVIEW
+                            SharingUI.shared.isReady = true // 保留中のシェアリンクを開く(#278)
+                            #endif
                             await runtime.flushAIButtonMetrics() // #446: 前の日までの集計を送る
                         }
                         .onChange(of: scenePhase) { _, phase in
                             if phase == .active { Task { await runtime.flushAIButtonMetrics() } }
                         }
+                        #if !APP_STORE_REVIEW
+                        .onDisappear { SharingUI.shared.isReady = false } // サインアウト: 次のサインインの bootstrap まで待つ
+                        #endif
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: session.user == nil)
             .modifier(UpdateGateModifier(gate: updateGate))
+            #if !APP_STORE_REVIEW
+            .modifier(ShareLinkReceiver()) // シェアリンクはサインイン前でも受けて保留(#278)
+            #endif
             .environment(session)
             .environment(\.services, services)              // protocol 越しのサービス
             // 表示言語(#44): 設定の「言語」で即時切替。`Text("…")` の解決と日付・数値の書式がこの Locale に従う
