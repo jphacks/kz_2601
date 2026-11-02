@@ -17,6 +17,7 @@
 
 ## 3. アカウント
 - Sign in with Apple または匿名でサインインします。アカウントはユーザー本人だけが使ってください。
+- 13 歳以上 18 歳未満の方は、保護者の同意を得た上で使ってください。
 - アカウントは、設定からいつでも削除できます。
 
 ## 4. 料金
@@ -59,6 +60,7 @@
 - Tailor It lets you build and edit personal apps (records, lists, charts) by speaking or typing. Apps run inside Tailor It using built-in components only; no code is executed.
 - Generation and chat use a third-party AI (Anthropic's Claude) and require your prior consent. AI output is not guaranteed to be accurate; verify anything important yourself.
 - Sign in with Apple or anonymously. You can delete your account in Settings at any time.
+- Users aged 13 to 17 must have consent from a parent or guardian.
 - Basic use is free. AI features have a daily usage limit, which may change; the app tells you when you reach it. Some builds have no in-app purchase. If **Tailor It Pro** (auto-renewable subscription) is offered, its details and price are shown before purchase, and billing, renewal, cancellation and refunds follow Apple's terms. Cancel at least 24 hours before renewal in iOS Settings.
 - Do not create or share illegal, infringing, harmful, sexual or discriminatory content, abuse the service, or impersonate others. We may remove shared content that violates these terms. Report inappropriate content to support@tailor-it.app.
 - The service is provided as is. Governing law: Japan. Exclusive jurisdiction of first instance: the district court having jurisdiction over the operator's address. Contact: support@tailor-it.app
