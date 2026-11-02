@@ -1,0 +1,6 @@
+[
+  {"id": "nw_create_stock", "kind": "create", "group": "notify-when", "transcript": "備品の在庫管理。入荷と出荷を記録して、在庫が3個を下回ったら知らせて", "note": "#265 在庫の閾値 → when(lt / count of low items > 0)", "expect": {"notifyWhen": true, "computed": true, "substitution": false}},
+  {"id": "nw_create_budget", "kind": "create", "group": "notify-when", "transcript": "家計簿。今月の支出が5万円を超えたら通知して", "note": "#265 予算オーバー → when gt(今月の sum, 50000)", "expect": {"notifyWhen": true, "notifyWhenOp": "gt", "substitution": false}},
+  {"id": "nw_create_goal", "kind": "create", "group": "notify-when", "transcript": "ランニングの記録。今月の合計距離が100kmに届いたら教えて", "note": "#265 目標達成 → when gte(今月の sum, 100)", "expect": {"notifyWhen": true, "notifyWhenOp": "gte", "substitution": false}},
+  {"id": "nw_edit_budget", "kind": "edit", "group": "notify-when", "base": "example:kakeibo", "transcript": "今月の支出が3万円を超えたら知らせて", "note": "#265 既存アプリに when を足す", "expect": {"notifyWhen": true, "notifyWhenOp": "gt", "patch": true}}
+]

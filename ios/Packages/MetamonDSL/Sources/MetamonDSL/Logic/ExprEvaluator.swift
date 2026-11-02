@@ -71,7 +71,7 @@ public final class ExprEvaluator {
     public static let supportedOps: Set<String> = [
         "add", "sub", "mul", "div", "mod", "neg", "abs", "sqrt", "pow", "round", "floor", "ceil", "min", "max", "clamp",
         "eq", "neq", "gt", "gte", "lt", "lte", "and", "or", "not", "concat", "len",
-        "now", "today", "daysBetween", "daysUntil", "addDays", "hoursBetween", "year", "month", "day", "weekday",
+        "now", "today", "daysBetween", "daysUntil", "addDays", "nextOccurrence", "hoursBetween", "year", "month", "day", "weekday",
         "toNumber", "toString", "coalesce", "streak", "doneInDays",
     ]
 
@@ -272,7 +272,8 @@ public final class ExprEvaluator {
         }
         func clockSeconds(_ d: Date) -> Double {
             let c = calendar.dateComponents([.hour, .minute, .second], from: d)
-            return Double((c.hour ?? 0) * 3600 + (c.minute ?? 0) * 60 + (c.second ?? 0))
+            let h: Int = c.hour ?? 0, m: Int = c.minute ?? 0, sec: Int = c.second ?? 0
+            return Double(h * 3600 + m * 60 + sec)
         }
         func allNums() -> [Double]? {
             guard !vals.isEmpty else { return nil }
@@ -335,6 +336,11 @@ public final class ExprEvaluator {
         case "addDays":
             guard let d = date(0), let n = num(1), let r = calendar.date(byAdding: .day, value: Int(n.rounded()), to: d) else { return nil }
             return .date(r)
+        case "nextOccurrence":
+            // #266: 毎月 / 毎年の次の日(今日以降・月末に寄せる)。第 2 引数は "monthly" | "yearly"
+            guard let d = date(0), vals.count >= 2, case .string(let unit)? = vals[1],
+                  let r = RepeatDate.next(d, unit: unit, today: now, calendar: calendar) else { return nil }
+            return .date(r)
         case "hoursBetween":
             // end − start(時間・小数)。end < start は日付またぎとして +24h(22:00→05:00 = 7)
             guard let a = secondsOfDay(0), let b = secondsOfDay(1) else { return nil }
@@ -356,8 +362,14 @@ public final class ExprEvaluator {
         }
     }
 
+    /// 暦日の差。0:00 が無い日の startOfDay は 1:00 なので、時刻の差で数えると翌日までが 0 日になる(#556)。
     private func days(from a: Date, to b: Date) -> ExprValue? {
-        calendar.dateComponents([.day], from: calendar.startOfDay(for: a), to: calendar.startOfDay(for: b)).day.map { .number(Double($0)) }
+        var utc = calendar
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        let cal = calendar
+        let civil = { (d: Date) in utc.date(from: cal.dateComponents([.era, .year, .month, .day], from: d)) }
+        guard let x = civil(a), let y = civil(b) else { return nil }
+        return utc.dateComponents([.day], from: x, to: y).day.map { .number(Double($0)) }
     }
 
     // MARK: - 値の変換・比較

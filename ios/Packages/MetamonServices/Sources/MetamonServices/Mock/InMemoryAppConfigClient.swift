@@ -163,6 +163,13 @@ public enum MockSeed {
                 Record(id: "d3", data: ["name": "麻婆豆腐", "genre": "中華"], createdAt: iso),
                 Record(id: "d4", data: ["name": "焼き魚", "genre": "和食", "memo": "鮭"], createdAt: iso),
             ],
+            // vocab(#264): flashcards のカード 4 件(1 件は覚えた = 山札に出ない)
+            "word": [
+                Record(id: "wd1", data: ["term": "apple", "meaning": "りんご", "learned": false], createdAt: iso),
+                Record(id: "wd2", data: ["term": "borrow", "meaning": "借りる", "learned": false], createdAt: iso),
+                Record(id: "wd3", data: ["term": "consider", "meaning": "よく考える", "learned": false], createdAt: iso),
+                Record(id: "wd4", data: ["term": "decide", "meaning": "決める", "learned": true], createdAt: iso),
+            ],
             // timetable(#234): 月1・水2(同じマスに 2 件 → 「+1」)・金3
             "lecture": [
                 Record(id: "l1", data: ["subject": "線形代数", "weekday": "月", "period": 1, "room": "A101"], createdAt: iso),

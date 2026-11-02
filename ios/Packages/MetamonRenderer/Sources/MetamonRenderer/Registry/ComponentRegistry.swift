@@ -71,6 +71,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.calendar) { c, ctx in CalendarLeaf(c: c, ctx: ctx) }
         r.register(.gridTable) { c, ctx in GridTableLeaf(c: c, ctx: ctx) }
         r.register(.randomPicker) { c, ctx in RandomPickerLeaf(c: c, ctx: ctx) }
+        r.register(.flashcards) { c, ctx in FlashcardsLeaf(c: c, ctx: ctx) } // #264 審査用ビルドにも入れる(OS の機能を使わない)
         r.register(.routeGuide) { c, ctx in RouteGuideLeaf(c: c, ctx: ctx) }
         r.register(.shareButton) { c, ctx in ShareButtonLeaf(c: c, ctx: ctx) }
         r.register(.openUrlButton) { c, _ in OpenUrlButtonLeaf(c: c) }
@@ -126,6 +127,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.sensorValue) { c, ctx in SensorValueLeaf(c: c, ctx: ctx) }
         // leaf(録音・#420)
         r.register(.audioRecorder) { c, ctx in AudioRecorderLeaf(c: c, ctx: ctx) }
+        // leaf(仲間探しの届いた人・つながった人・#507)。共有と一緒に外す
+        r.register(.matchList) { c, ctx in MatchListLeaf(c: c, ctx: ctx) }
         #endif
         return r
     }()

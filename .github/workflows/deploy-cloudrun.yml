@@ -129,6 +129,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # env の組み立てが docs/infra/runtime-config.md の表とずれていたら、ビルド前に止める(#509)
+      - name: 環境変数の組み立てを確かめる
+        run: scripts/check-deploy-env.sh
+
       - name: GCP 認証(Workload Identity Federation)
         uses: google-github-actions/auth@v3
         with:

@@ -70,9 +70,9 @@ public final class LiveSensorData: SensorSource {
         AsyncStream { cont in
             let id = UUID()
             if kind.usesAltimeter {
-                altitudeSubs[id] = { a in kind.value(from: a).map { cont.yield(SensorFrame(value: $0)) } }
+                altitudeSubs[id] = { a in if let v = kind.value(from: a) { cont.yield(SensorFrame(value: v)) } }
             } else {
-                motionSubs[id] = { m in kind.value(from: m).map { cont.yield(SensorFrame(value: $0, motion: m)) } }
+                motionSubs[id] = { m in if let v = kind.value(from: m) { cont.yield(SensorFrame(value: v, motion: m)) } }
             }
             updateRunning()
             cont.onTermination = { _ in

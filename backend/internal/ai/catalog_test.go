@@ -68,6 +68,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompSettlement,
 		// random pick (#263)
 		dsl.CompRandomPicker,
+		// flashcards (#264)
+		dsl.CompFlashcards,
 		// on-device AI
 		dsl.CompAiButton,
 		// peer-to-peer
@@ -84,6 +86,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompSensorValue,
 		// music (#412)
 		dsl.CompMusicPlayer,
+		// matching (#507)
+		dsl.CompMatchList,
 		// timetable
 		dsl.CompGridTable,
 		// video (#206)
@@ -151,7 +155,7 @@ func TestCatalogRendering(t *testing.T) {
 		"- scheduleNotification{notification{id,title,body,repeat}}",
 		"- voiceInput: / prompt, size(compact|large)",
 		"- divider: (追加キー無し) —",
-		"- notification{id, title, body, repeat(once|daily|weekly) / enabledField, entity, field, offsetMinutes, time, titleField, weekday(mon|tue|wed|thu|fri|sat|sun)}",
+		"- notification{id, title, body, repeat(once|daily|weekly|monthly|yearly) / enabledField, entity, field, offsetMinutes, time, titleField, weekday(mon|tue|wed|thu|fri|sat|sun), when}",
 		"どの action にも付けられる任意キー: confirmMessage",
 		"### Entity の scope",
 		"- scope: private —",

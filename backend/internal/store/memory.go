@@ -54,6 +54,10 @@ type Memory struct {
 	reports map[string]*Report           // reports/{id} (memory_moderation.go)
 	quota   map[string]int               // uid/day -> reports filed
 	blocks  map[string]map[string]*Block // users/{uid}/blocks/{blockedUid}
+
+	// matching (#507, memory_matching.go)
+	matchPairs map[string]map[string]*MatchPair // apps_public/{appId}/match_pairs/{pairId}
+	matchQuota map[string]int                   // uid/day -> interests sent
 }
 
 // NewMemory returns an empty store.

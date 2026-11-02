@@ -45,7 +45,7 @@ type Notification struct {
 	ID      string `json:"id"`
 	Title   string `json:"title"`
 	Body    string `json:"body"`
-	Repeat  string `json:"repeat"`            // once|daily|weekly
+	Repeat  string `json:"repeat"`            // once|daily|weekly|monthly|yearly (#266: record-based only)
 	Time    string `json:"time,omitempty"`    // HH:MM local
 	Weekday string `json:"weekday,omitempty"` // mon..sun (weekly)
 	// Record-based (#228, app.notifications only): one notification per record
@@ -56,6 +56,10 @@ type Notification struct {
 	OffsetMinutes int    `json:"offsetMinutes,omitempty"`
 	TitleField    string `json:"titleField,omitempty"`   // record field shown as the body
 	EnabledField  string `json:"enabledField,omitempty"` // boolean field; false = skip the record
+	// When (#265, app.notifications only): a boolean screen-scalar Expr. iOS
+	// posts once when it turns false -> true after a record save / delete /
+	// sync on that device. Exclusive with the time and record triggers.
+	When *Expr `json:"when,omitempty"`
 }
 
 // VoiceEntry is how the user re-enters voice mode.
@@ -85,8 +89,10 @@ type Entity struct {
 	Marks      []Mark      `json:"marks,omitempty"` // per-user toggles: like / save (#255, shared/public only)
 	// RetentionDays (#482): iOS deletes records older than this many days
 	// (from createdAt); 0 = keep forever. Shared/public: each user's own only.
-	RetentionDays int     `json:"retentionDays,omitempty"`
-	Fields        []Field `json:"fields"`
+	RetentionDays int `json:"retentionDays,omitempty"`
+	// Match (#507): the entity's role in a matching app (matching.go).
+	Match  EntityMatch `json:"match,omitempty"`
+	Fields []Field     `json:"fields"`
 }
 
 // EntityEdit says who may update a shared/public record. Deleting is always
@@ -304,6 +310,10 @@ const (
 	CompSensorValue ComponentType = "sensorValue"
 	// music (#412): Apple Music player + song requests from nearby friends
 	CompMusicPlayer ComponentType = "musicPlayer"
+	// matching (#507): incoming / outgoing / matched people of a match:"profile" entity
+	CompMatchList ComponentType = "matchList"
+	// flashcards (#264): one card at a time, tap to flip, swipe to mark learned
+	CompFlashcards ComponentType = "flashcards"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -452,6 +462,14 @@ type Component struct {
 	// musicPlayer (#412). Title is shared.
 	AllowRequests bool `json:"allowRequests,omitempty"` // accept song requests from nearby devices
 	AutoAccept    bool `json:"autoAccept,omitempty"`    // queue requests without asking
+
+	// matchList (#507). Entity (the match:"profile" entity) / Title / EmptyText / Item / OnItemTap are shared.
+	Show string `json:"show,omitempty"` // incoming|outgoing|matches
+
+	// flashcards (#264). Entity / Filter are shared.
+	Front  string `json:"front,omitempty"`  // field on the card's face
+	Back   string `json:"back,omitempty"`   // field shown when flipped
+	Toggle string `json:"toggle,omitempty"` // boolean field: learned (swipe right) / not yet (left)
 }
 
 // PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the
@@ -493,10 +511,11 @@ type ListItem struct {
 	Subtitle string `json:"subtitle,omitempty"`
 	Trailing string `json:"trailing,omitempty"`
 	Icon     string `json:"icon,omitempty"`
-	Image    string `json:"image,omitempty"`  // photo field id -> thumbnail
-	Mark     string `json:"mark,omitempty"`   // entity mark id -> like/save toggle with count (#255)
-	Toggle   string `json:"toggle,omitempty"` // boolean field id -> one-tap check circle (#108)
-	Resets   string `json:"resets,omitempty"` // "daily": toggle is a date field, checked = today (#132)
+	Image    string `json:"image,omitempty"`    // photo field id -> thumbnail
+	Mark     string `json:"mark,omitempty"`     // entity mark id -> like/save toggle with count (#255)
+	Toggle   string `json:"toggle,omitempty"`   // boolean field id -> one-tap check circle (#108)
+	Resets   string `json:"resets,omitempty"`   // "daily": toggle is a date field, checked = today (#132)
+	Interest bool   `json:"interest,omitempty"` // match:"profile" list: a つながりたい button on others' rows (#507)
 }
 
 // Sort orders a list.

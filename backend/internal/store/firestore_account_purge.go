@@ -97,6 +97,10 @@ func (f *Firestore) PurgeAccount(ctx context.Context, uid string) (AccountPurgeR
 			res.Blocks += n
 			return err
 		}},
+		{"match quota", func() error {
+			_, err := f.c.Collection(matchQuotaCollection).Doc(uid).Delete(ctx)
+			return err
+		}},
 		{"owners", func() error {
 			// a mirror of uid that is still there was kept for other people:
 			// its app_owners entry stays with it.
@@ -127,6 +131,9 @@ func (f *Firestore) PurgeAccount(ctx context.Context, uid string) (AccountPurgeR
 // for it. uid's apps_public mirror is erased too unless others take part.
 func (f *Firestore) purgeAccountApp(ctx context.Context, uid string, app *firestore.DocumentRef, res *AccountPurgeResult) error {
 	appID := app.ID
+	if err := f.purgeMatching(ctx, appID, uid, res); err != nil {
+		return fmt.Errorf("matching: %w", err)
+	}
 	n, err := f.purgeShares(ctx, uid, appID)
 	res.Shares += n
 	if err != nil {

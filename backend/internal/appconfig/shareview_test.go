@@ -211,3 +211,27 @@ func TestSharePageHiddenAndRevoked(t *testing.T) {
 		}
 	}
 }
+
+// #264: flashcards stays a placeholder ("アプリで見られます") that names the
+// front / back fields and never the cards.
+func TestSharePageFlashcardsPlaceholder(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "dsl", "examples", "vocab.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := buildWebPage("", raw, nil)
+	var got *webNode
+	for _, s := range p.Screens {
+		for i := range s.Grid {
+			if strings.HasPrefix(s.Grid[i].Title, "カード") {
+				got = &s.Grid[i]
+			}
+		}
+	}
+	if got == nil {
+		t.Fatal("no flashcards node on the share page")
+	}
+	if got.Kind != "placeholder" || got.Title != "カード(表: 単語 / 裏: 意味)" || len(got.Rows) != 0 {
+		t.Errorf("flashcards node = %+v", *got)
+	}
+}

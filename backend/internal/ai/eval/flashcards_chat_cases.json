@@ -1,0 +1,6 @@
+[
+  {"id": "fcc_unlearned_can", "group": "flashcards", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#264 覚えていないカードだけ出題できるか → できる",
+   "steps": [{"say": "暗記カードで、覚えたものは出さずに覚えていないものだけ出題できる?", "textAny": ["できます", "できる"], "textNot": ["できません", "折りたたみ", "flashcards", "toggle", "entity", "filter"]}]},
+  {"id": "fcc_spaced_can", "group": "flashcards", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#264 忘れた頃にもう一度出す(間隔反復)はできない → 正直に",
+   "steps": [{"say": "単語カードで、忘れたころにもう一度出してくれる間隔反復はできる?", "textAny": ["できません", "できない"], "textNot": ["flashcards", "toggle", "entity"]}]}
+]

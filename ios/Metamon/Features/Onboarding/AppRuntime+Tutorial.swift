@@ -49,8 +49,13 @@ extension AppRuntime {
         showVoiceSheet = true
     }
 
-    /// 音声モデルのダウンロード確認は、同意 → チュートリアルが済んでから出す(初回の順序・#274)。
+    /// 音声モデルのダウンロード確認は、同意 → チュートリアル → β の案内(#313)が済んでから出す(初回の順序・#274)。
     var canShowModelDownloadConfirm: Bool {
+        #if APP_STORE_REVIEW
         showModelDownloadConfirm && !showAIConsent && !showTutorial && hasSeenTutorial
+        #else
+        showModelDownloadConfirm && !showAIConsent && !showTutorial && hasSeenTutorial
+            && !showBetaWelcome && !isBetaWelcomePending
+        #endif
     }
 }

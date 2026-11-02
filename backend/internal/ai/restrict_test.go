@@ -17,7 +17,7 @@ func reviewBuild() ([]string, []string) {
 	var allowed []string
 	for t := range knownComponentTypes {
 		switch t {
-		case "healthStat", "locationTracker", "nearbyShare", "sensorValue", "webView", "chatThread":
+		case "healthStat", "locationTracker", "nearbyShare", "sensorValue", "webView", "chatThread", "matchList":
 		default:
 			allowed = append(allowed, t)
 		}
@@ -30,7 +30,7 @@ func reviewCtx() context.Context {
 	return withRestriction(context.Background(), NewRestriction(a, d))
 }
 
-var removedParts = []string{"healthStat", "locationTracker", "nearbyShare", "sensorValue", "webView", "chatThread"}
+var removedParts = []string{"healthStat", "locationTracker", "nearbyShare", "sensorValue", "webView", "chatThread", "matchList"}
 
 // withoutNote cuts the appended restriction note (it names the removed parts).
 func withoutNote(s string) string {
@@ -125,7 +125,7 @@ func TestRestriction_PromptsDropPartsAndAddNote(t *testing.T) {
 		"chat": chatSystemPrompt, "chatCreate": chatCreateSystemPrompt, "chatEdit": chatEditSystemPrompt,
 	} {
 		got := restrictPrompt(ctx, p)
-		if got == p || !strings.Contains(got, "使えない部品: chatThread, healthStat, locationTracker, nearbyShare") {
+		if got == p || !strings.Contains(got, "使えない部品: chatThread, healthStat, locationTracker, matchList, nearbyShare") {
 			t.Fatalf("%s: restriction note missing", name)
 		}
 		body := withoutNote(got)

@@ -154,6 +154,7 @@ public struct RenderTree {
         put("seconds", c.seconds)
         put("limit", c.limit)
         put("expanded", c.expanded)
+        put("show", c.show)
         return p
     }
 
@@ -245,6 +246,20 @@ public struct RenderTree {
         case .searchBar:
             let key = c.field ?? ""
             return ["query": .string(ctx.locals?.values[key] ?? "")]
+        case .flashcards:
+            // 開いた直後の山札(filter → 登録順)。1 枚目が表で出る
+            let entity = rt.dsl.entity(c.entity ?? "")
+            let toggle = FlashcardsLeaf.toggleField(c, in: entity)
+            let text = { (r: Record, f: String?) -> String in rt.display(r[f ?? ""], field: entity?.field(f ?? "")) }
+            let cards = FlashcardsLeaf.cards(c, rt: rt, pending: [:])
+            var p: [String: JSONValue] = ["cards": .array(cards.map { r in
+                var card: [String: JSONValue] = ["recordId": .string(r.id), "front": .string(text(r, c.front)), "back": .string(text(r, c.back))]
+                if let toggle { card["learned"] = .bool(FlashcardDeck.isLearned(r, toggle: toggle)) }
+                return .object(card)
+            })]
+            let progress = FlashcardDeck().progress(in: cards)
+            p["progress"] = .string("\(progress.position) / \(progress.total)")
+            return p
         case .image:
             let value = c.field.flatMap { ctx.form?.values[$0] } ?? .null
             return ["hasImage": .bool(!value.isNull)]

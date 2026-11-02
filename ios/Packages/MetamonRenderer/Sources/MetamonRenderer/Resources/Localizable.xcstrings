@@ -426,6 +426,23 @@
         }
       }
     },
+    "%lld / %lld 枚" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld / %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld / %2$lld 枚"
+          }
+        }
+      }
+    },
     "%lld 件" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -473,6 +490,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 件を記録しました"
+          }
+        }
+      }
+    },
+    "%lld 枚中 %lld 枚目" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Card %2$lld of %1$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld 枚中 %2$lld 枚目"
           }
         }
       }
@@ -834,6 +868,23 @@
         }
       }
     },
+    "お互いに連絡先が見えなくなります。相手に通知は送られません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You will no longer see each other's contact info. They won't be notified."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お互いに連絡先が見えなくなります。相手に通知は送られません。"
+          }
+        }
+      }
+    },
     "このセンサーはこの端末では使えません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1004,6 +1055,74 @@
         }
       }
     },
+    "つながりたい" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つながりたい"
+          }
+        }
+      }
+    },
+    "つながりました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つながりました"
+          }
+        }
+      }
+    },
+    "つながりを解除" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove connection"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つながりを解除"
+          }
+        }
+      }
+    },
+    "つながりを解除しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove this connection?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つながりを解除しますか?"
+          }
+        }
+      }
+    },
     "はい" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1034,6 +1153,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ほぼ静止"
+          }
+        }
+      }
+    },
+    "まだ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ"
           }
         }
       }
@@ -1072,6 +1208,40 @@
         }
       }
     },
+    "まだ届いていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No requests yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ届いていません"
+          }
+        }
+      }
+    },
+    "まだ誰ともつながっていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No connections yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ誰ともつながっていません"
+          }
+        }
+      }
+    },
     "まもなく、%@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1102,6 +1272,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "まもなく目的地です"
+          }
+        }
+      }
+    },
+    "もう一度" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度"
           }
         }
       }
@@ -1238,6 +1425,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "カメラを開きます"
+          }
+        }
+      }
+    },
+    "カードがありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No cards yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カードがありません"
           }
         }
       }
@@ -1395,6 +1599,23 @@
         }
       }
     },
+    "ダブルタップでめくる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Double-tap to flip"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダブルタップでめくる"
+          }
+        }
+      }
+    },
     "ダブルタップで開きます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1459,6 +1680,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ドラレコ"
+          }
+        }
+      }
+    },
+    "プロフィールが見つかりません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profile not found"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロフィールが見つかりません"
           }
         }
       }
@@ -2126,6 +2364,23 @@
         }
       }
     },
+    "全部終わりました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All done"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部終わりました"
+          }
+        }
+      }
+    },
     "共有" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2551,6 +2806,23 @@
         }
       }
     },
+    "取り下げる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Withdraw"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取り下げる"
+          }
+        }
+      }
+    },
     "取得できませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2649,6 +2921,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "徒歩"
+          }
+        }
+      }
+    },
+    "承認" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accept"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認"
+          }
+        }
+      }
+    },
+    "承認する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accept"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認する"
           }
         }
       }
@@ -3418,6 +3724,108 @@
         }
       }
     },
+    "表" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Front"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表"
+          }
+        }
+      }
+    },
+    "裏" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "裏"
+          }
+        }
+      }
+    },
+    "見送る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decline"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "見送る"
+          }
+        }
+      }
+    },
+    "覚えた" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Got it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "覚えた"
+          }
+        }
+      }
+    },
+    "覚えていないカードはありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No cards left to learn"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "覚えていないカードはありません"
+          }
+        }
+      }
+    },
+    "解除する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解除する"
+          }
+        }
+      }
+    },
     "計算した値" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3737,6 +4145,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "追加"
+          }
+        }
+      }
+    },
+    "送った「つながりたい」はありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No pending requests you sent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送った「つながりたい」はありません"
+          }
+        }
+      }
+    },
+    "送りました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送りました"
           }
         }
       }

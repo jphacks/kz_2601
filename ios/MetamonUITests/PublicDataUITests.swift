@@ -14,10 +14,12 @@ final class PublicDataUITests: XCTestCase {
         app = nil
     }
 
-    private func launch(clarify: Bool, linkPrompted: Bool = true) {
+    private func launch(clarify: Bool, linkPrompted: Bool = true, holdBanner: Bool = false) {
         app = XCUIApplication()
         app.launchEnvironment = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto", "METAMON_AI_CONSENT": "granted",
                                  "METAMON_CLARIFY": clarify ? "1" : "0"]
+        // 要約カードは約 5 秒で自動で消える。遅い CI では exists の直後の tap の前に消えて落ちた(#573)ので、テストの間は消さない
+        if holdBanner { app.launchEnvironment["METAMON_BANNER_SECONDS"] = "600" }
         app.launchArguments = ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP", "-metamon.appLanguage", "ja",
                                "-metamon.accountLinkPrompted", linkPrompted ? "YES" : "NO"]
         app.launch()
@@ -33,7 +35,7 @@ final class PublicDataUITests: XCTestCase {
 
     /// 生成直後にダイアログ →「公開のままにする」→ 一覧とフォームに「誰でも見られます」
     func testDialogAfterGeneratingPublicPersonalData() {
-        launch(clarify: false)
+        launch(clarify: false, holdBanner: true)
         say("美容室の予約アプリを作って")
 
         let alert = app.alerts["個人の情報も公開されます"]
@@ -48,8 +50,10 @@ final class PublicDataUITests: XCTestCase {
         let notice = app.descendants(matching: .any)["publicDataNotice"].firstMatch
         XCTAssertTrue(notice.waitForExistence(timeout: 10), "公開の一覧に「誰でも見られます」が無い")
         let banner = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "ほかの人に見られてよいか")).firstMatch
-        if banner.exists { banner.tap() } // 上の要約カード(タップで消える)が一覧の見出しに被らないように
-        _ = waitGone(banner, timeout: 10)
+        // 上の要約カード(タップで消える)が一覧の見出しに被らないように閉じる
+        XCTAssertTrue(banner.waitForExistence(timeout: 10), "生成後の要約カードが無い")
+        banner.tap()
+        XCTAssertTrue(waitGone(banner), "タップしても要約カードが消えない")
         attach("pii-list-notice")
 
         app.buttons["予約を追加"].firstMatch.tap()
