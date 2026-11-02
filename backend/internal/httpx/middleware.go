@@ -93,7 +93,7 @@ func Log(logger *slog.Logger) func(http.Handler) http.Handler {
 					slog.Duration("duration", time.Since(started)),
 					slog.String("requestId", RequestID(r.Context())),
 				}
-				logger.InfoContext(r.Context(), "request", append(attrs, clientAttrs(r)...)...)
+				logger.InfoContext(r.Context(), "request", append(attrs, ClientAttrs(r)...)...)
 			}()
 			next.ServeHTTP(recorder, r)
 		})
@@ -195,8 +195,10 @@ func (ew *envelopeWriter) Write(b []byte) (int, error) {
 // Unwrap lets http.ResponseController reach Flush (SSE) through the wrapper.
 func (ew *envelopeWriter) Unwrap() http.ResponseWriter { return ew.ResponseWriter }
 
+// envelopeCode rewrites only the mux's default text/plain 404/405 bodies;
+// a handler that chose its own Content-Type (JSON, HTML page) is left alone.
 func envelopeCode(status int, contentType string) (string, bool) {
-	if strings.HasPrefix(contentType, "application/json") {
+	if contentType != "" && !strings.HasPrefix(contentType, "text/plain") {
 		return "", false
 	}
 	switch status {

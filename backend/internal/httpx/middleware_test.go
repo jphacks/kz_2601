@@ -287,3 +287,24 @@ func TestErrorEnvelope(t *testing.T) {
 		})
 	}
 }
+
+func TestErrorEnvelopeLeavesHTMLAlone(t *testing.T) {
+	const page = "<!doctype html><p>リンクが無効です</p>"
+	h := ErrorEnvelope(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(page))
+	}))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/s/revoked", nil))
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "text/html; charset=utf-8" {
+		t.Fatalf("content-type = %q, want text/html", ct)
+	}
+	if rec.Body.String() != page {
+		t.Fatalf("body = %q, want the HTML page", rec.Body.String())
+	}
+}

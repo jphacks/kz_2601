@@ -5,6 +5,7 @@ info:
   description: |
     アプリ DSL JSON の CRUD・バージョン管理・汎用レコード API。
     - 認証: `Authorization: Bearer <Firebase ID token>`。uid はトークンから取得し URL には含めない。
+    - App Check(#318): iOS は `X-Firebase-AppCheck` も付ける。`APP_CHECK_MODE=enforce` の時、無い・無効なら 401 `app_check_failed`(`details.reason`: missing / invalid / wrong_app / unconfigured)。off / log では無くても通る。`/health`・`/s/{token}`・`/v1/client-config` は対象外。`docs/infra/app-check.md`
     - すべてのパスは呼び出しユーザー自身の `users/{uid}/...` に束縛される。
     - エラーは全て `Error` 形式。ページングは `pageSize` + `pageToken` / `nextPageToken`。
     - DSL の本体スキーマは `../dsl/dsl.schema.json` を参照 (OpenAPI 内では `$ref`)。
@@ -25,6 +26,7 @@ tags:
   - { name: release, description: 'リリース申請(#76)。architecture.md §3.3' }
   - { name: members, description: 'scope:shared の参加者(#254)。architecture.md §3.4' }
   - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引をサーバーで検証して保存する。architecture.md §6.8' }
+  - { name: feedback, description: 'アプリ内のフィードバック(#319)。architecture.md §3.5' }
 
 paths:
   /apps:
@@ -862,6 +864,74 @@ paths:
           description: OK
           content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/ReleaseRequest' } } } } } }
 
+  /feedback:
+    post:
+      tags: [feedback]
+      summary: フィードバックを送る(添付はどれも任意・既定は無し)
+      description: |
+        `feedback/{id}` に `status=received` で保存する。本文は誰でも書ける**信頼しないデータ**(`untrusted: true` を付けて保存・#366)。
+        - 添付はどれも端末で本人が選んだものだけ(既定はすべて無し)。**記録(records)の中身は受け付けない**(未知のキーは 400)。
+        - `attachments.app` は参照だけ。サーバーが**呼び出したユーザー自身の木**の `versions/{dslVersion}` を読んで DSL の構造を保存する(他人のアプリは見つからない扱い)。
+          見つからない(オフラインで作ったアプリ等)・256 KiB を超える場合は DSL を付けずに保存し、レスポンスの `attachments.dsl` が false になる。
+        - `attachments.screenshot` は base64 の JPEG(デコード後 512 KiB まで)。Cloud Storage のバケットはまだ無いので、Firestore のバイト列のフィールドに置く。
+        - `consentVersion` は送信前に見せた同意文の版(必須)。
+        - 1 ユーザー 1 日(JST)`FEEDBACK_DAILY_LIMIT` 件(既定 5)。超えると 429 `rate_limited`(ai と同じ details・翌 0:00 JST まで)。
+        - 保存期間は 180 日(`cmd/purge` が消す)。アカウントの消去(#458)でも消える。API で読む・消す口は無い(運営は `cmd/feedback` で読むだけ)。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [message, consentVersion]
+              properties:
+                kind: { type: string, enum: [bug, idea, other], default: other, description: 未知の値は other }
+                message: { type: string, minLength: 1, maxLength: 2000, description: 本文(前後の空白は除去) }
+                consentVersion: { type: string, minLength: 1, maxLength: 64, example: feedback-2026-11 }
+                attachments:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    screenshot: { type: string, contentEncoding: base64, contentMediaType: image/jpeg, description: 'デコード後 512 KiB まで(超えると 413)' }
+                    app:
+                      type: object
+                      additionalProperties: false
+                      required: [appId, dslVersion]
+                      properties:
+                        appId: { type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$' }
+                        dslVersion: { type: integer, minimum: 1 }
+                    device:
+                      type: object
+                      additionalProperties: false
+                      description: 各 64 文字まで
+                      properties:
+                        appVersion: { type: string, example: 1.0.0 }
+                        build: { type: string, example: '12' }
+                        os: { type: string, example: iOS 26.1 }
+                        model: { type: string, example: 'iPhone17,1' }
+                        locale: { type: string, example: ja }
+            example: { kind: bug, message: 'グラフが空のまま', consentVersion: feedback-2026-11, attachments: { app: { appId: 3f0c…, dslVersion: 7 } } }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status, createdAt, attachments]
+                properties:
+                  id: { type: string, example: fb_06GPVRYJ58VK8KN57T8W54M124 }
+                  status: { type: string, enum: [received] }
+                  createdAt: { type: string, format: date-time }
+                  attachments:
+                    type: object
+                    description: 実際に保存した添付
+                    properties: { screenshot: { type: boolean }, dsl: { type: boolean }, device: { type: boolean } }
+        '400': { description: message / consentVersion が無い・長すぎる・未知のキー・JPEG でない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '413': { description: スクショが大きすぎる / 本文全体が 1 MiB を超える, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 今日の上限。`Retry-After` と details(scope=user・limit・resetAt・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
   /client-config:
     get:
       security: []
@@ -968,7 +1038,7 @@ components:
             code:
               type: string
               description: 機械可読コード
-              enum: [bad_request, unauthenticated, not_found, version_conflict, invalid_dsl, invalid_record, payload_too_large, rate_limited, unpublished, internal, invalid_transaction, transaction_owned_by_other]
+              enum: [bad_request, unauthenticated, not_found, version_conflict, invalid_dsl, invalid_record, payload_too_large, rate_limited, app_check_failed, unpublished, internal, invalid_transaction, transaction_owned_by_other]
             message: { type: string }
             details: { type: object, additionalProperties: true }
             requestId: { type: string }
@@ -1081,7 +1151,7 @@ components:
         name: { type: string }
         dslVersion: { type: integer, description: スナップショットした version }
         url: { type: string, example: 'tailorit://import/H6-GGDdrAGTqrpqpbKhx4GG1ZT1VJ0Rb', description: iOS アプリで開く URL(QR もこれ) }
-        webUrl: { type: string, description: 'ブラウザ用フォールバック(認証不要の `GET /s/{token}`。アプリ名と「Tailor It で開く」ボタンだけで DSL は出さない)。`SHARE_WEB_BASE_URL` で上書き可' }
+        webUrl: { type: string, description: 'ブラウザ用の共有ページ(認証不要の `GET /s/{token}`・HTML。アプリの画面を読むだけで描き、レコードは出さない。「アプリで開く」と App Store への導線つき・#362。JSON の API ではないのでこの仕様には載せない)。`SHARE_WEB_BASE_URL` で上書き可' }
         revoked: { type: boolean }
         createdAt: { type: string, format: date-time }
     PublicApp:

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"reflect"
 	"strings"
@@ -158,6 +159,9 @@ type Service struct {
 	Verifier auth.TokenVerifier
 	AuthMode string // auth.ModeDev also accepts X-Debug-Uid with the emulator
 
+	// Logger gets the ai.generate line per /v1/generate (#322); nil = slog.Default().
+	Logger *slog.Logger
+
 	conv     *convStore // clarify conversations (chat.go); lazily created
 	convOnce sync.Once
 }
@@ -194,6 +198,13 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 // is still validated and saved before it is returned.
 func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*Result, error) {
 	started := time.Now()
+	var tr genTrace
+	res, err := s.generateStream(ctx, req, sink, started, &tr)
+	s.logGenerate(ctx, tr, sink != nil, res, err, time.Since(started)) // ai.generate (#322)
+	return res, err
+}
+
+func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, started time.Time, tr *genTrace) (*Result, error) {
 	restrict := NewClientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures)
 	ctx = withRestriction(ctx, restrict)
 	transcript := strings.TrimSpace(req.Transcript)
@@ -226,6 +237,7 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 			mode = ModeEdit
 		}
 	}
+	tr.mode, tr.first = string(mode), mode == ModeCreate && isInitial(current)
 	if mode == ModeUndo {
 		return s.undo(ctx, req.AppID, transcript, env, started, loc)
 	}

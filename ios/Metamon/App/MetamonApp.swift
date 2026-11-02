@@ -18,9 +18,19 @@ struct MetamonApp: App {
     static let componentRegistry = ComponentRegistry.standard
         .registering(.voiceInput) { c, _ in VoiceInputView(prompt: c.prompt) }
 
+    /// App Check(#318): シミュレータ・Debug 構成はデバッグ用のトークン、実機の Staging / Release / Review は App Attest。
+    /// docs/infra/app-check.md
+    static var appCheckMode: AppCheckMode {
+        #if DEBUG || targetEnvironment(simulator)
+        .debug
+        #else
+        .deviceAttestation
+        #endif
+    }
+
     init() {
         // Firebase は Services 組み立てより前に初期化(plist が無ければ警告してモック認証に落ちる)
-        FirebaseBootstrap.configureIfAvailable()
+        FirebaseBootstrap.configureIfAvailable(appCheck: Self.appCheckMode)
         // クラッシュ報告(#296): 設定の「クラッシュ報告を送る」を反映(Firebase が無ければ何もしない)
         CrashReportingPreference.shared.activate(reporter: FirebaseCrashReporter() ?? NoopCrashReporter())
         UNUserNotificationCenter.current().delegate = ForegroundNotificationPresenter.shared // 前面でも通知を出す(#228)

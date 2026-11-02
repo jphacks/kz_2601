@@ -58,6 +58,9 @@ settings:
     # 「アップデートしてください」の App Store ボタン(#302・Info.plist MetamonAppStoreURL)。
     # TODO(#302): App Store の app id が決まったら "https://apps.apple.com/app/id<ID>" を入れる。空の間は「Tailor It」の検索を開く
     METAMON_APP_STORE_URL: ""
+    # App Attest の環境(#318・entitlement com.apple.developer.devicecheck.appattest-environment に展開)。
+    # 開発署名で端末に入れる Debug / Staging は development、配布の Release / Review は production。docs/infra/app-check.md
+    METAMON_APP_ATTEST_ENV: development
   configs:
     Debug:
       METAMON_BUNDLE_ID_SUFFIX: "${METAMON_STG_BUNDLE_ID_SUFFIX}"
@@ -69,11 +72,13 @@ settings:
       METAMON_APPCONFIG_BASE_URL: "https://appconfig-prod-378953239426.asia-northeast1.run.app"
       METAMON_FIREBASE_ENV: prod
       METAMON_DISPLAY_NAME: "Tailor It"
+      METAMON_APP_ATTEST_ENV: production
     Review:
       METAMON_AI_BASE_URL: "https://ai-prod-378953239426.asia-northeast1.run.app"
       METAMON_APPCONFIG_BASE_URL: "https://appconfig-prod-378953239426.asia-northeast1.run.app"
       METAMON_FIREBASE_ENV: prod
       METAMON_DISPLAY_NAME: "Tailor It"
+      METAMON_APP_ATTEST_ENV: production
 
 # ---- ローカル Swift Package(マルチモジュール。依存の向きは各 Package.swift で固定) ----
 #   MetamonDSL      : DSL モデル・グリッド計算・集計(Foundation のみ。macOS で `swift test` 可)
@@ -118,7 +123,8 @@ targets:
       # ホーム画面ウィジェット(埋め込み)
       - target: MetamonWidget
     # Sign in with Apple + App Group(ウィジェットとの共有)。自動署名(-allowProvisioningUpdates)が App ID に capability を付与する(有料 Developer Program 必須)。
-    # 中身: Sign in with Apple / App Group / HealthKit(healthStat / Field.health・#167。自動署名で App ID に HealthKit が付く)。
+    # 中身: Sign in with Apple / App Group / HealthKit(healthStat / Field.health・#167。自動署名で App ID に HealthKit が付く)/
+    # App Attest(App Check・#318。環境は METAMON_APP_ATTEST_ENV。自動署名で App ID に App Attest が付く)。
     # 構成ごとに別ファイルにするため xcodegen の `entitlements:` ではなく CODE_SIGN_ENTITLEMENTS で指定する(#245)。
     # Review(審査用)は HealthKit を外した Metamon/Metamon-Review.entitlements。
     settings:
