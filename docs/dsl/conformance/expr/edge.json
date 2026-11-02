@@ -1,0 +1,525 @@
+{
+  "description": "Literals, unknown ops, the evaluator depth limit (48) and nil propagation.",
+  "defaults": {"now": "2026-10-28T15:30:45+09:00", "timeZone": "Asia/Tokyo"},
+  "cases": [
+    {"name": "literal/number", "expr": 42, "expected": {"type": "number", "value": 42, "text": "42"}},
+    {"name": "literal/fraction", "expr": 0.5, "expected": {"type": "number", "value": 0.5, "text": "0.5"}},
+    {"name": "literal/string", "expr": "hello", "expected": {"type": "string", "value": "hello", "text": "hello"}},
+    {
+      "name": "literal/date-string-stays-string",
+      "expr": "2026-10-28",
+      "expected": {"type": "string", "value": "2026-10-28", "text": "2026-10-28"}
+    },
+    {"name": "literal/bool", "expr": true, "expected": {"type": "bool", "value": true, "text": "true"}},
+    {"name": "literal/empty-string", "expr": "", "expected": {"type": "string", "value": "", "text": ""}},
+    {"name": "op/unknown", "expr": {"op": "median", "args": [1, 2]}, "expected": {"type": "nil"}},
+    {
+      "name": "op/missing-args-key",
+      "expr": {"op": "today"},
+      "expected": {"type": "date", "value": "2026-10-28T00:00:00+09:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "depth/47-negs",
+      "expr": {
+        "op": "neg",
+        "args": [
+          {
+            "op": "neg",
+            "args": [
+              {
+                "op": "neg",
+                "args": [
+                  {
+                    "op": "neg",
+                    "args": [
+                      {
+                        "op": "neg",
+                        "args": [
+                          {
+                            "op": "neg",
+                            "args": [
+                              {
+                                "op": "neg",
+                                "args": [
+                                  {
+                                    "op": "neg",
+                                    "args": [
+                                      {
+                                        "op": "neg",
+                                        "args": [
+                                          {
+                                            "op": "neg",
+                                            "args": [
+                                              {
+                                                "op": "neg",
+                                                "args": [
+                                                  {
+                                                    "op": "neg",
+                                                    "args": [
+                                                      {
+                                                        "op": "neg",
+                                                        "args": [
+                                                          {
+                                                            "op": "neg",
+                                                            "args": [
+                                                              {
+                                                                "op": "neg",
+                                                                "args": [
+                                                                  {
+                                                                    "op": "neg",
+                                                                    "args": [
+                                                                      {
+                                                                        "op": "neg",
+                                                                        "args": [
+                                                                          {
+                                                                            "op": "neg",
+                                                                            "args": [
+                                                                              {
+                                                                                "op": "neg",
+                                                                                "args": [
+                                                                                  {
+                                                                                    "op": "neg",
+                                                                                    "args": [
+                                                                                      {
+                                                                                        "op": "neg",
+                                                                                        "args": [
+                                                                                          {
+                                                                                            "op": "neg",
+                                                                                            "args": [
+                                                                                              {
+                                                                                                "op": "neg",
+                                                                                                "args": [
+                                                                                                  {
+                                                                                                    "op": "neg",
+                                                                                                    "args": [
+                                                                                                      {
+                                                                                                        "op": "neg",
+                                                                                                        "args": [
+                                                                                                          {
+                                                                                                            "op": "neg",
+                                                                                                            "args": [
+                                                                                                              {
+                                                                                                                "op": "neg",
+                                                                                                                "args": [
+                                                                                                                  {
+                                                                                                                    "op": "neg",
+                                                                                                                    "args": [
+                                                                                                                      {
+                                                                                                                        "op": "neg",
+                                                                                                                        "args": [
+                                                                                                                          {
+                                                                                                                            "op": "neg",
+                                                                                                                            "args": [
+                                                                                                                              {
+                                                                                                                                "op": "neg",
+                                                                                                                                "args": [
+                                                                                                                                  {
+                                                                                                                                    "op": "neg",
+                                                                                                                                    "args": [
+                                                                                                                                      {
+                                                                                                                                        "op": "neg",
+                                                                                                                                        "args": [
+                                                                                                                                          {
+                                                                                                                                            "op": "neg",
+                                                                                                                                            "args": [
+                                                                                                                                              {
+                                                                                                                                                "op": "neg",
+                                                                                                                                                "args": [
+                                                                                                                                                  {
+                                                                                                                                                    "op": "neg",
+                                                                                                                                                    "args": [
+                                                                                                                                                      {
+                                                                                                                                                        "op": "neg",
+                                                                                                                                                        "args": [
+                                                                                                                                                          {
+                                                                                                                                                            "op": "neg",
+                                                                                                                                                            "args": [
+                                                                                                                                                              {
+                                                                                                                                                                "op": "neg",
+                                                                                                                                                                "args": [
+                                                                                                                                                                  {
+                                                                                                                                                                    "op": "neg",
+                                                                                                                                                                    "args": [
+                                                                                                                                                                      {
+                                                                                                                                                                        "op": "neg",
+                                                                                                                                                                        "args": [
+                                                                                                                                                                          {
+                                                                                                                                                                            "op": "neg",
+                                                                                                                                                                            "args": [
+                                                                                                                                                                              {
+                                                                                                                                                                                "op": "neg",
+                                                                                                                                                                                "args": [
+                                                                                                                                                                                  {
+                                                                                                                                                                                    "op": "neg",
+                                                                                                                                                                                    "args": [
+                                                                                                                                                                                      {
+                                                                                                                                                                                        "op": "neg",
+                                                                                                                                                                                        "args": [
+                                                                                                                                                                                          {
+                                                                                                                                                                                            "op": "neg",
+                                                                                                                                                                                            "args": [
+                                                                                                                                                                                              {
+                                                                                                                                                                                                "op": "neg",
+                                                                                                                                                                                                "args": [1]
+                                                                                                                                                                                              }
+                                                                                                                                                                                            ]
+                                                                                                                                                                                          }
+                                                                                                                                                                                        ]
+                                                                                                                                                                                      }
+                                                                                                                                                                                    ]
+                                                                                                                                                                                  }
+                                                                                                                                                                                ]
+                                                                                                                                                                              }
+                                                                                                                                                                            ]
+                                                                                                                                                                          }
+                                                                                                                                                                        ]
+                                                                                                                                                                      }
+                                                                                                                                                                    ]
+                                                                                                                                                                  }
+                                                                                                                                                                ]
+                                                                                                                                                              }
+                                                                                                                                                            ]
+                                                                                                                                                          }
+                                                                                                                                                        ]
+                                                                                                                                                      }
+                                                                                                                                                    ]
+                                                                                                                                                  }
+                                                                                                                                                ]
+                                                                                                                                              }
+                                                                                                                                            ]
+                                                                                                                                          }
+                                                                                                                                        ]
+                                                                                                                                      }
+                                                                                                                                    ]
+                                                                                                                                  }
+                                                                                                                                ]
+                                                                                                                              }
+                                                                                                                            ]
+                                                                                                                          }
+                                                                                                                        ]
+                                                                                                                      }
+                                                                                                                    ]
+                                                                                                                  }
+                                                                                                                ]
+                                                                                                              }
+                                                                                                            ]
+                                                                                                          }
+                                                                                                        ]
+                                                                                                      }
+                                                                                                    ]
+                                                                                                  }
+                                                                                                ]
+                                                                                              }
+                                                                                            ]
+                                                                                          }
+                                                                                        ]
+                                                                                      }
+                                                                                    ]
+                                                                                  }
+                                                                                ]
+                                                                              }
+                                                                            ]
+                                                                          }
+                                                                        ]
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                ]
+                                                              }
+                                                            ]
+                                                          }
+                                                        ]
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {"type": "number", "value": -1, "text": "-1"}
+    },
+    {
+      "name": "depth/48-negs",
+      "expr": {
+        "op": "neg",
+        "args": [
+          {
+            "op": "neg",
+            "args": [
+              {
+                "op": "neg",
+                "args": [
+                  {
+                    "op": "neg",
+                    "args": [
+                      {
+                        "op": "neg",
+                        "args": [
+                          {
+                            "op": "neg",
+                            "args": [
+                              {
+                                "op": "neg",
+                                "args": [
+                                  {
+                                    "op": "neg",
+                                    "args": [
+                                      {
+                                        "op": "neg",
+                                        "args": [
+                                          {
+                                            "op": "neg",
+                                            "args": [
+                                              {
+                                                "op": "neg",
+                                                "args": [
+                                                  {
+                                                    "op": "neg",
+                                                    "args": [
+                                                      {
+                                                        "op": "neg",
+                                                        "args": [
+                                                          {
+                                                            "op": "neg",
+                                                            "args": [
+                                                              {
+                                                                "op": "neg",
+                                                                "args": [
+                                                                  {
+                                                                    "op": "neg",
+                                                                    "args": [
+                                                                      {
+                                                                        "op": "neg",
+                                                                        "args": [
+                                                                          {
+                                                                            "op": "neg",
+                                                                            "args": [
+                                                                              {
+                                                                                "op": "neg",
+                                                                                "args": [
+                                                                                  {
+                                                                                    "op": "neg",
+                                                                                    "args": [
+                                                                                      {
+                                                                                        "op": "neg",
+                                                                                        "args": [
+                                                                                          {
+                                                                                            "op": "neg",
+                                                                                            "args": [
+                                                                                              {
+                                                                                                "op": "neg",
+                                                                                                "args": [
+                                                                                                  {
+                                                                                                    "op": "neg",
+                                                                                                    "args": [
+                                                                                                      {
+                                                                                                        "op": "neg",
+                                                                                                        "args": [
+                                                                                                          {
+                                                                                                            "op": "neg",
+                                                                                                            "args": [
+                                                                                                              {
+                                                                                                                "op": "neg",
+                                                                                                                "args": [
+                                                                                                                  {
+                                                                                                                    "op": "neg",
+                                                                                                                    "args": [
+                                                                                                                      {
+                                                                                                                        "op": "neg",
+                                                                                                                        "args": [
+                                                                                                                          {
+                                                                                                                            "op": "neg",
+                                                                                                                            "args": [
+                                                                                                                              {
+                                                                                                                                "op": "neg",
+                                                                                                                                "args": [
+                                                                                                                                  {
+                                                                                                                                    "op": "neg",
+                                                                                                                                    "args": [
+                                                                                                                                      {
+                                                                                                                                        "op": "neg",
+                                                                                                                                        "args": [
+                                                                                                                                          {
+                                                                                                                                            "op": "neg",
+                                                                                                                                            "args": [
+                                                                                                                                              {
+                                                                                                                                                "op": "neg",
+                                                                                                                                                "args": [
+                                                                                                                                                  {
+                                                                                                                                                    "op": "neg",
+                                                                                                                                                    "args": [
+                                                                                                                                                      {
+                                                                                                                                                        "op": "neg",
+                                                                                                                                                        "args": [
+                                                                                                                                                          {
+                                                                                                                                                            "op": "neg",
+                                                                                                                                                            "args": [
+                                                                                                                                                              {
+                                                                                                                                                                "op": "neg",
+                                                                                                                                                                "args": [
+                                                                                                                                                                  {
+                                                                                                                                                                    "op": "neg",
+                                                                                                                                                                    "args": [
+                                                                                                                                                                      {
+                                                                                                                                                                        "op": "neg",
+                                                                                                                                                                        "args": [
+                                                                                                                                                                          {
+                                                                                                                                                                            "op": "neg",
+                                                                                                                                                                            "args": [
+                                                                                                                                                                              {
+                                                                                                                                                                                "op": "neg",
+                                                                                                                                                                                "args": [
+                                                                                                                                                                                  {
+                                                                                                                                                                                    "op": "neg",
+                                                                                                                                                                                    "args": [
+                                                                                                                                                                                      {
+                                                                                                                                                                                        "op": "neg",
+                                                                                                                                                                                        "args": [
+                                                                                                                                                                                          {
+                                                                                                                                                                                            "op": "neg",
+                                                                                                                                                                                            "args": [
+                                                                                                                                                                                              {
+                                                                                                                                                                                                "op": "neg",
+                                                                                                                                                                                                "args": [
+                                                                                                                                                                                                  {
+                                                                                                                                                                                                    "op": "neg",
+                                                                                                                                                                                                    "args": [1]
+                                                                                                                                                                                                  }
+                                                                                                                                                                                                ]
+                                                                                                                                                                                              }
+                                                                                                                                                                                            ]
+                                                                                                                                                                                          }
+                                                                                                                                                                                        ]
+                                                                                                                                                                                      }
+                                                                                                                                                                                    ]
+                                                                                                                                                                                  }
+                                                                                                                                                                                ]
+                                                                                                                                                                              }
+                                                                                                                                                                            ]
+                                                                                                                                                                          }
+                                                                                                                                                                        ]
+                                                                                                                                                                      }
+                                                                                                                                                                    ]
+                                                                                                                                                                  }
+                                                                                                                                                                ]
+                                                                                                                                                              }
+                                                                                                                                                            ]
+                                                                                                                                                          }
+                                                                                                                                                        ]
+                                                                                                                                                      }
+                                                                                                                                                    ]
+                                                                                                                                                  }
+                                                                                                                                                ]
+                                                                                                                                              }
+                                                                                                                                            ]
+                                                                                                                                          }
+                                                                                                                                        ]
+                                                                                                                                      }
+                                                                                                                                    ]
+                                                                                                                                  }
+                                                                                                                                ]
+                                                                                                                              }
+                                                                                                                            ]
+                                                                                                                          }
+                                                                                                                        ]
+                                                                                                                      }
+                                                                                                                    ]
+                                                                                                                  }
+                                                                                                                ]
+                                                                                                              }
+                                                                                                            ]
+                                                                                                          }
+                                                                                                        ]
+                                                                                                      }
+                                                                                                    ]
+                                                                                                  }
+                                                                                                ]
+                                                                                              }
+                                                                                            ]
+                                                                                          }
+                                                                                        ]
+                                                                                      }
+                                                                                    ]
+                                                                                  }
+                                                                                ]
+                                                                              }
+                                                                            ]
+                                                                          }
+                                                                        ]
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                ]
+                                                              }
+                                                            ]
+                                                          }
+                                                        ]
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "nil/propagates",
+      "expr": {"op": "add", "args": [1, {"op": "mul", "args": [2, {"op": "div", "args": [1, 0]}]}]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "nil/coalesce-recovers",
+      "expr": {
+        "op": "add",
+        "args": [1, {"op": "coalesce", "args": [{"op": "mul", "args": [2, {"op": "div", "args": [1, 0]}]}, 0]}]
+      },
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "nil/sqrt-negative-in-if",
+      "expr": {
+        "if": {"op": "eq", "args": [{"op": "sqrt", "args": [-4]}, {"op": "div", "args": [1, 0]}]},
+        "then": "both nil",
+        "else": "differ"
+      },
+      "expected": {"type": "string", "value": "both nil", "text": "both nil"}
+    }
+  ]
+}

@@ -1,0 +1,603 @@
+{
+  "description": "ref: row field values, \"id\", one-level lookup (\"payer.name\"), reserved $values, computed fields and cycles.",
+  "defaults": {
+    "now": "2026-10-28T15:30:45+09:00",
+    "timeZone": "Asia/Tokyo",
+    "entities": [
+      {
+        "id": "members",
+        "name": "メンバー",
+        "fields": [
+          {"id": "name", "name": "名前", "type": "string"},
+          {
+            "id": "paid",
+            "name": "支払済",
+            "type": "currency",
+            "computed": {
+              "entity": "expenses",
+              "agg": "sum",
+              "field": "amount",
+              "filter": {"value": {"ref": "id"}, "op": "eq", "field": "payer"}
+            }
+          },
+          {
+            "id": "share",
+            "name": "負担額",
+            "type": "currency",
+            "computed": {
+              "op": "round",
+              "args": [
+                {
+                  "op": "div",
+                  "args": [{"entity": "expenses", "agg": "sum", "field": "amount"}, {"entity": "members", "agg": "count"}]
+                }
+              ]
+            }
+          },
+          {
+            "id": "balance",
+            "name": "残高",
+            "type": "currency",
+            "computed": {"op": "sub", "args": [{"ref": "paid"}, {"ref": "share"}]}
+          }
+        ],
+        "titleField": "name"
+      },
+      {
+        "id": "expenses",
+        "name": "支出",
+        "fields": [
+          {"id": "title", "name": "内容", "type": "string"},
+          {"id": "amount", "name": "金額", "type": "currency"},
+          {"id": "payer", "name": "払った人", "type": "ref", "refEntity": "members"},
+          {"id": "date", "name": "日付", "type": "date"},
+          {"id": "tags", "name": "割る人", "type": "refs", "refEntity": "members"},
+          {"id": "big", "name": "高額", "type": "boolean", "computed": {"op": "gte", "args": [{"ref": "amount"}, 1000]}}
+        ],
+        "titleField": "title"
+      },
+      {
+        "id": "body",
+        "name": "体重",
+        "fields": [
+          {"id": "weight", "name": "体重", "type": "number"},
+          {"id": "date", "name": "日付", "type": "date"},
+          {"id": "measured_at", "name": "測定日時", "type": "datetime"},
+          {"id": "memo", "name": "メモ", "type": "string"}
+        ]
+      },
+      {"id": "notes", "name": "メモ", "fields": [{"id": "text", "name": "本文", "type": "string"}]},
+      {
+        "id": "chores",
+        "name": "家事",
+        "fields": [{"id": "name", "name": "名前", "type": "string"}, {"id": "points", "name": "点数", "type": "integer"}]
+      },
+      {
+        "id": "log",
+        "name": "記録",
+        "fields": [
+          {"id": "chore", "name": "家事", "type": "ref", "refEntity": "chores"},
+          {"id": "qty", "name": "回数", "type": "integer"},
+          {
+            "id": "score",
+            "name": "点",
+            "type": "integer",
+            "computed": {"op": "mul", "args": [{"ref": "chore.points"}, {"ref": "qty"}]}
+          }
+        ]
+      },
+      {
+        "id": "posts",
+        "name": "投稿",
+        "fields": [{"id": "text", "name": "本文", "type": "string"}, {"id": "at", "name": "日時", "type": "datetime"}],
+        "marks": [{"id": "like", "icon": "heart", "label": "いいね"}],
+        "scope": "shared"
+      },
+      {
+        "id": "loop",
+        "name": "循環",
+        "fields": [
+          {"id": "a", "name": "A", "type": "number", "computed": {"op": "add", "args": [{"ref": "b"}, 1]}},
+          {"id": "b", "name": "B", "type": "number", "computed": {"op": "add", "args": [{"ref": "a"}, 1]}},
+          {"id": "self", "name": "自分", "type": "number", "computed": {"op": "add", "args": [{"ref": "self"}, 1]}},
+          {"id": "c", "name": "C", "type": "number", "computed": {"op": "coalesce", "args": [{"ref": "a"}, 42]}}
+        ]
+      }
+    ],
+    "records": {
+      "body": [
+        {
+          "id": "b1",
+          "data": {"date": "2026-10-20", "measured_at": "2026-10-20T07:00:00+09:00", "weight": 60.5},
+          "createdAt": "2026-10-20T07:00:00+09:00"
+        },
+        {
+          "id": "b2",
+          "data": {"date": "2026-10-25", "measured_at": "2026-10-25T22:00:00+09:00", "memo": "夜", "weight": 61},
+          "createdAt": "2026-10-25T22:00:00+09:00"
+        },
+        {
+          "id": "b3",
+          "data": {"date": "2026-10-25", "measured_at": "2026-10-25T06:00:00+09:00", "memo": "朝", "weight": 60.8},
+          "createdAt": "2026-10-25T23:00:00+09:00"
+        },
+        {
+          "id": "b4",
+          "data": {"measured_at": "2026-10-27T07:00:00+09:00", "weight": 59},
+          "createdAt": "2026-10-27T07:00:00+09:00"
+        },
+        {"id": "b5", "data": {"date": "bad", "weight": 62}, "createdAt": "2026-10-28T07:00:00+09:00"}
+      ],
+      "chores": [{"id": "c1", "data": {"name": "皿洗い", "points": 3}}, {"id": "c2", "data": {"name": "掃除", "points": 5}}],
+      "expenses": [
+        {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}},
+        {"id": "e2", "data": {"amount": 800, "date": "2026-10-01", "payer": "m2", "tags": ["m1", "gone"], "title": "電車"}},
+        {"id": "e3", "data": {"amount": "350", "date": "2026-09-30", "payer": "m1", "tags": [], "title": "お菓子"}},
+        {"id": "e4", "data": {"amount": null, "title": "未定"}},
+        {"id": "e5", "data": {"amount": 500, "date": "2026-10-28", "payer": "m9", "tags": "m2", "title": "謎"}},
+        {"id": "e6", "data": {"amount": "1,000", "date": "2026-10-26T00:30:00+09:00", "payer": "m2", "title": "夕食"}}
+      ],
+      "log": [
+        {"id": "l1", "data": {"chore": "c1", "qty": 2}},
+        {"id": "l2", "data": {"chore": "c2", "qty": 1}},
+        {"id": "l3", "data": {"chore": "c404", "qty": 4}}
+      ],
+      "loop": [{"id": "x1", "data": {}}],
+      "members": [
+        {"id": "m1", "data": {"name": "Alice"}},
+        {"id": "m2", "data": {"name": "Bob"}},
+        {"id": "m3", "data": {"name": "Carol"}}
+      ],
+      "notes": [
+        {"id": "n2", "data": {"text": "second"}, "createdAt": "2026-10-02T00:00:00Z"},
+        {"id": "n1", "data": {"text": "first"}, "createdAt": "2026-10-01T00:00:00Z"},
+        {"id": "n3", "data": {"text": "no createdAt"}}
+      ],
+      "posts": [
+        {
+          "id": "p1",
+          "data": {"text": "hi", "at": "2026-10-28T09:00:00+09:00"},
+          "author": "u1",
+          "authorName": "けん",
+          "createdAt": "2026-10-28T09:00:00+09:00",
+          "marks": {"like": {"count": 3, "mine": true}}
+        },
+        {
+          "id": "p2",
+          "data": {"text": "yo", "at": "2026-10-27T09:00:00+09:00"},
+          "author": "u2",
+          "authorName": "ゆい",
+          "createdAt": "2026-10-27T09:00:00.123Z",
+          "marks": {"like": {"count": 1, "mine": false}}
+        },
+        {"id": "p3", "data": {"text": "anon"}}
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "ref/string",
+      "expr": {"ref": "name"},
+      "row": {"entity": "members", "record": {"id": "m1", "data": {"name": "Alice"}}},
+      "expected": {"type": "string", "value": "Alice", "text": "Alice"}
+    },
+    {
+      "name": "ref/id",
+      "expr": {"ref": "id"},
+      "row": {"entity": "members", "record": {"id": "m1", "data": {"name": "Alice"}}},
+      "expected": {"type": "string", "value": "m1", "text": "m1"}
+    },
+    {"name": "ref/no-row", "expr": {"ref": "name"}, "expected": {"type": "nil"}},
+    {
+      "name": "ref/unknown-field",
+      "expr": {"ref": "nope"},
+      "row": {"entity": "members", "record": {"id": "m1", "data": {"name": "Alice"}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "ref/undeclared-key-still-read",
+      "expr": {"ref": "extra"},
+      "row": {"entity": "members", "record": {"id": "m1", "data": {"name": "Alice", "extra": 5}}},
+      "expected": {"type": "number", "value": 5, "text": "5"}
+    },
+    {
+      "name": "ref/no-entity",
+      "expr": {"ref": "x"},
+      "row": {"entity": "ghost", "record": {"id": "g1", "data": {"x": "2026-10-28"}}},
+      "expected": {"type": "string", "value": "2026-10-28", "text": "2026-10-28"}
+    },
+    {
+      "name": "ref/number",
+      "expr": {"ref": "amount"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "number", "value": 1200, "text": "1200"}
+    },
+    {
+      "name": "ref/numeric-string-stays-string",
+      "expr": {"ref": "amount"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e3", "data": {"amount": "350", "date": "2026-09-30", "payer": "m1", "tags": [], "title": "お菓子"}}
+      },
+      "expected": {"type": "string", "value": "350", "text": "350"}
+    },
+    {
+      "name": "ref/null",
+      "expr": {"ref": "amount"},
+      "row": {"entity": "expenses", "record": {"id": "e4", "data": {"amount": null, "title": "未定"}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "ref/missing",
+      "expr": {"ref": "date"},
+      "row": {"entity": "expenses", "record": {"id": "e4", "data": {"amount": null, "title": "未定"}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "ref/date-field",
+      "expr": {"ref": "date"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "date", "value": "2026-10-27T00:00:00+09:00", "text": "2026-10-27"}
+    },
+    {
+      "name": "ref/date-field-with-datetime",
+      "expr": {"ref": "date"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e6", "data": {"amount": "1,000", "date": "2026-10-26T00:30:00+09:00", "payer": "m2", "title": "夕食"}}
+      },
+      "expected": {"type": "date", "value": "2026-10-26T00:30:00+09:00", "text": "2026-10-26"}
+    },
+    {
+      "name": "ref/date-field-invalid",
+      "expr": {"ref": "date"},
+      "row": {
+        "entity": "body",
+        "record": {"id": "b5", "data": {"date": "bad", "weight": 62}, "createdAt": "2026-10-28T07:00:00+09:00"}
+      },
+      "expected": {"type": "string", "value": "bad", "text": "bad"}
+    },
+    {
+      "name": "ref/datetime-field",
+      "expr": {"ref": "measured_at"},
+      "row": {
+        "entity": "body",
+        "record": {
+          "id": "b1",
+          "data": {"date": "2026-10-20", "measured_at": "2026-10-20T07:00:00+09:00", "weight": 60.5},
+          "createdAt": "2026-10-20T07:00:00+09:00"
+        }
+      },
+      "expected": {"type": "date", "value": "2026-10-20T07:00:00+09:00", "text": "2026-10-20"}
+    },
+    {
+      "name": "ref/string-field-not-a-date",
+      "expr": {"ref": "title"},
+      "row": {"entity": "expenses", "record": {"id": "ex", "data": {"title": "2026-10-28"}}},
+      "expected": {"type": "string", "value": "2026-10-28", "text": "2026-10-28"}
+    },
+    {
+      "name": "ref/array-is-nil",
+      "expr": {"ref": "tags"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "ref/object-is-nil",
+      "expr": {"ref": "title"},
+      "row": {"entity": "expenses", "record": {"id": "ex", "data": {"title": {"a": 1}}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "ref/bool",
+      "expr": {"ref": "flag"},
+      "row": {"entity": "notes", "record": {"id": "nx", "data": {"flag": true}}},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "ref/computed-bool",
+      "expr": {"ref": "big"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "ref/computed-bool-string-amount",
+      "expr": {"ref": "big"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e6", "data": {"amount": "1,000", "date": "2026-10-26T00:30:00+09:00", "payer": "m2", "title": "夕食"}}
+      },
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "lookup/name",
+      "expr": {"ref": "payer.name"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "string", "value": "Alice", "text": "Alice"}
+    },
+    {
+      "name": "lookup/id",
+      "expr": {"ref": "payer.id"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "string", "value": "m1", "text": "m1"}
+    },
+    {
+      "name": "lookup/computed-on-target",
+      "expr": {"ref": "payer.paid"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "number", "value": 1550, "text": "1550"}
+    },
+    {
+      "name": "lookup/dangling",
+      "expr": {"ref": "payer.name"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e5", "data": {"amount": 500, "date": "2026-10-28", "payer": "m9", "tags": "m2", "title": "謎"}}
+      },
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "lookup/empty",
+      "expr": {"ref": "payer.name"},
+      "row": {"entity": "expenses", "record": {"id": "e4", "data": {"amount": null, "title": "未定"}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "lookup/not-a-ref-field",
+      "expr": {"ref": "title.name"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "lookup/two-levels",
+      "expr": {"ref": "payer.name.x"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "lookup/unknown-field",
+      "expr": {"ref": "ghost.name"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "lookup/master-points",
+      "expr": {"ref": "chore.points"},
+      "row": {"entity": "log", "record": {"id": "l1", "data": {"chore": "c1", "qty": 2}}},
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "lookup/computed-uses-lookup",
+      "expr": {"ref": "score"},
+      "row": {"entity": "log", "record": {"id": "l1", "data": {"chore": "c1", "qty": 2}}},
+      "expected": {"type": "number", "value": 6, "text": "6"}
+    },
+    {
+      "name": "lookup/computed-dangling",
+      "expr": {"ref": "score"},
+      "row": {"entity": "log", "record": {"id": "l3", "data": {"chore": "c404", "qty": 4}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "reserved/author",
+      "expr": {"ref": "$author"},
+      "row": {
+        "entity": "posts",
+        "record": {
+          "id": "p1",
+          "data": {"text": "hi", "at": "2026-10-28T09:00:00+09:00"},
+          "author": "u1",
+          "authorName": "けん",
+          "createdAt": "2026-10-28T09:00:00+09:00",
+          "marks": {"like": {"count": 3, "mine": true}}
+        }
+      },
+      "expected": {"type": "string", "value": "けん", "text": "けん"}
+    },
+    {
+      "name": "reserved/author-missing",
+      "expr": {"ref": "$author"},
+      "row": {"entity": "posts", "record": {"id": "p3", "data": {"text": "anon"}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "reserved/createdAt",
+      "expr": {"ref": "$createdAt"},
+      "row": {
+        "entity": "posts",
+        "record": {
+          "id": "p1",
+          "data": {"text": "hi", "at": "2026-10-28T09:00:00+09:00"},
+          "author": "u1",
+          "authorName": "けん",
+          "createdAt": "2026-10-28T09:00:00+09:00",
+          "marks": {"like": {"count": 3, "mine": true}}
+        }
+      },
+      "expected": {"type": "date", "value": "2026-10-28T09:00:00+09:00", "text": "2026-10-28"}
+    },
+    {
+      "name": "reserved/createdAt-fractional",
+      "expr": {"ref": "$createdAt"},
+      "row": {
+        "entity": "posts",
+        "record": {
+          "id": "p2",
+          "data": {"text": "yo", "at": "2026-10-27T09:00:00+09:00"},
+          "author": "u2",
+          "authorName": "ゆい",
+          "createdAt": "2026-10-27T09:00:00.123Z",
+          "marks": {"like": {"count": 1, "mine": false}}
+        }
+      },
+      "expected": {"type": "string", "value": "2026-10-27T09:00:00.123Z", "text": "2026-10-27T09:00:00.123Z"}
+    },
+    {
+      "name": "reserved/marks",
+      "expr": {"ref": "$marks.like"},
+      "row": {
+        "entity": "posts",
+        "record": {
+          "id": "p1",
+          "data": {"text": "hi", "at": "2026-10-28T09:00:00+09:00"},
+          "author": "u1",
+          "authorName": "けん",
+          "createdAt": "2026-10-28T09:00:00+09:00",
+          "marks": {"like": {"count": 3, "mine": true}}
+        }
+      },
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "computed/paid",
+      "expr": {"ref": "paid"},
+      "row": {"entity": "members", "record": {"id": "m1", "data": {"name": "Alice"}}},
+      "expected": {"type": "number", "value": 1550, "text": "1550"}
+    },
+    {
+      "name": "computed/share",
+      "expr": {"ref": "share"},
+      "row": {"entity": "members", "record": {"id": "m1", "data": {"name": "Alice"}}},
+      "expected": {"type": "number", "value": 950, "text": "950"}
+    },
+    {
+      "name": "computed/balance",
+      "expr": {"ref": "balance"},
+      "row": {"entity": "members", "record": {"id": "m1", "data": {"name": "Alice"}}},
+      "expected": {"type": "number", "value": 600, "text": "600"}
+    },
+    {
+      "name": "computed/balance-nobody-paid",
+      "expr": {"ref": "balance"},
+      "row": {"entity": "members", "record": {"id": "m3", "data": {"name": "Carol"}}},
+      "expected": {"type": "number", "value": -950, "text": "-950"}
+    },
+    {
+      "name": "computed/cycle",
+      "expr": {"ref": "a"},
+      "row": {"entity": "loop", "record": {"id": "x1", "data": {}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "computed/self-cycle",
+      "expr": {"ref": "self"},
+      "row": {"entity": "loop", "record": {"id": "x1", "data": {}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "computed/coalesce-over-cycle",
+      "expr": {"ref": "c"},
+      "row": {"entity": "loop", "record": {"id": "x1", "data": {}}},
+      "expected": {"type": "number", "value": 42, "text": "42"}
+    },
+    {
+      "name": "len/refs-live",
+      "expr": {"op": "len", "args": [{"ref": "tags"}]},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "len/refs-deleted-id",
+      "expr": {"op": "len", "args": [{"ref": "tags"}]},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e2", "data": {"amount": 800, "date": "2026-10-01", "payer": "m2", "tags": ["m1", "gone"], "title": "電車"}}
+      },
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "len/refs-empty-means-everyone",
+      "expr": {"op": "len", "args": [{"ref": "tags"}]},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e3", "data": {"amount": "350", "date": "2026-09-30", "payer": "m1", "tags": [], "title": "お菓子"}}
+      },
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "len/refs-missing-means-everyone",
+      "expr": {"op": "len", "args": [{"ref": "tags"}]},
+      "row": {"entity": "expenses", "record": {"id": "e4", "data": {"amount": null, "title": "未定"}}},
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "len/refs-single-string",
+      "expr": {"op": "len", "args": [{"ref": "tags"}]},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e5", "data": {"amount": 500, "date": "2026-10-28", "payer": "m9", "tags": "m2", "title": "謎"}}
+      },
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {"name": "len/refs-no-row", "expr": {"op": "len", "args": [{"ref": "tags"}]}, "expected": {"type": "nil"}},
+    {
+      "name": "eq/ref-and-id",
+      "expr": {"op": "eq", "args": [{"ref": "payer"}, "m1"]},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "concat/lookup",
+      "expr": {"op": "concat", "args": [{"ref": "payer.name"}, "さん"]},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "string", "value": "Aliceさん", "text": "Aliceさん"}
+    },
+    {
+      "name": "if/computed",
+      "expr": {"if": {"ref": "big"}, "then": "高い", "else": "ふつう"},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "string", "value": "高い", "text": "高い"}
+    },
+    {
+      "name": "daysUntil/ref",
+      "expr": {"op": "daysUntil", "args": [{"ref": "date"}]},
+      "row": {
+        "entity": "expenses",
+        "record": {"id": "e1", "data": {"amount": 1200, "date": "2026-10-27", "payer": "m1", "tags": ["m1", "m2"], "title": "ホテル"}}
+      },
+      "expected": {"type": "number", "value": -1, "text": "-1"}
+    }
+  ]
+}
