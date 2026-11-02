@@ -1,6 +1,6 @@
 import Foundation
 
-public enum ActionType: String, Decodable, Sendable {
+public enum ActionType: String, Decodable, Sendable, CaseIterable {
     case navigate, back, saveRecord, deleteRecord, openVoice, openUrl, resetForm
     case scheduleNotification, cancelNotification
     /// 記録を CSV / PDF にして共有シートへ(#421)
@@ -45,7 +45,10 @@ public struct Action: Decodable, Sendable {
     /// startActivity(#423)
     public var activity: ActivitySpec?
 
-    private enum Keys: String, CodingKey {
+    /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
+    static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
+
+    private enum Keys: String, CodingKey, CaseIterable {
         case type, screen, presentation, prefillRef, entity, url, confirmMessage, notification, notificationId
         case format, filter, fields, title
         case activity

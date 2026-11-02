@@ -77,6 +77,7 @@ jobs:
           filters: |
             dsl:
               - 'ios/Packages/MetamonDSL/**'
+              - 'docs/dsl/dsl.schema.json'    # スキーマだけの変更でも SchemaSwiftKeysTests を回す(#537)
             renderer:
               - 'ios/Packages/MetamonRenderer/**'
             services:
