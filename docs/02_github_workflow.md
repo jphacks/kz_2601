@@ -101,7 +101,7 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 - gcloud SDK の `cloud-firestore-emulator` を `127.0.0.1:8089`・プロジェクト `demo-kz2601` で起動し、`t.Skip("FIRESTORE_EMULATOR_HOST not set")` を持つパッケージに `go test` をかける。`demo-` プロジェクトで認証情報も渡さないので実 GCP には繋がらない。
 - Firestore 系テスト(`TestFirestore*` / `*/firestore`)が 1 件でもスキップされたら失敗(黙ってスキップさせない)。通った件数は job summary に出る。
 - **required check にはまだしていない**(マージ条件は上の 3 本のまま)。必須にするかはオーナーが判断する。必須にするなら `paths:` をやめて `backend-ci` と同じ paths-filter 方式に変える。
-- 手元で同じことをするには `make -C backend emulator`(別ターミナル)→ `cd backend && FIRESTORE_EMULATOR_HOST=localhost:8089 go test ./internal/...`。
+- 起動・試験の中身は `scripts/firestore-emulator.sh`。手元で同じことをするには `make -C backend test-emulator`(エミュレータが無ければ一時的に起動して止める)。開発用に起動しっぱなしにするなら `make -C backend emulator`(別ターミナル)。
 
 ## CI が落ちた時の見方
 

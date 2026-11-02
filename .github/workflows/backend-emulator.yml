@@ -17,11 +17,13 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/backend-emulator.yml'
+      - 'scripts/firestore-emulator.sh'
   push:
     branches: [develop, main]
     paths:
       - 'backend/**'
       - '.github/workflows/backend-emulator.yml'
+      - 'scripts/firestore-emulator.sh'
 
 concurrency:
   group: backend-emulator-${{ github.event.pull_request.number || github.ref }}
@@ -62,44 +64,14 @@ jobs:
           version: '542.0.0'
           install_components: cloud-firestore-emulator
 
+      # 起動・待ち・試験は scripts/firestore-emulator.sh(make -C backend test-emulator と共用)
       - name: Firestore エミュレータ起動
         run: |
-          nohup gcloud emulators firestore start \
-            --host-port="$FIRESTORE_EMULATOR_HOST" --project="$GOOGLE_CLOUD_PROJECT" \
-            > "$RUNNER_TEMP/emulator.log" 2>&1 &
-          for _ in $(seq 1 90); do
-            if curl -sf "http://$FIRESTORE_EMULATOR_HOST/" > /dev/null; then
-              echo "emulator ready"; exit 0
-            fi
-            sleep 1
-          done
-          echo "::error::Firestore emulator did not become ready in 90s"
-          cat "$RUNNER_TEMP/emulator.log"
-          exit 1
+          nohup ../scripts/firestore-emulator.sh start > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          ../scripts/firestore-emulator.sh wait || { cat "$RUNNER_TEMP/emulator.log"; exit 1; }
 
       - name: go test(エミュレータ試験のあるパッケージ)
-        run: |
-          set -euo pipefail
-          # t.Skip("FIRESTORE_EMULATOR_HOST not set") を持つパッケージ = エミュレータ試験のあるパッケージ
-          pkgs=$(grep -rl --include='*_test.go' 'FIRESTORE_EMULATOR_HOST not set' . | xargs -n1 dirname | sort -u)
-          if [ -z "$pkgs" ]; then echo "::error::no emulator test packages found"; exit 1; fi
-          printf "packages:\n%s\n" "$pkgs"
-          # shellcheck disable=SC2086
-          go test -count=1 -json $pkgs > "$RUNNER_TEMP/test.json" || status=$?
-          jq -rj 'select(.Action=="output") | .Output' "$RUNNER_TEMP/test.json"
-
-          # 黙ってスキップさせない: スキップ理由にエミュレータが出たら、または
-          # Firestore 系テスト(TestFirestore* / */firestore)が 1 件でもスキップされたら失敗
-          if grep -q 'FIRESTORE_EMULATOR_HOST not set' "$RUNNER_TEMP/test.json"; then
-            echo "::error::emulator tests were skipped"; exit 1
-          fi
-          fs='select(.Test != null and (.Test | test("^TestFirestore|/firestore$")))'
-          skipped=$(jq -r "$fs | select(.Action==\"skip\") | .Test" "$RUNNER_TEMP/test.json")
-          if [ -n "$skipped" ]; then echo "::error::skipped Firestore tests:"; echo "$skipped"; exit 1; fi
-          passed=$(jq -r "$fs | select(.Action==\"pass\") | .Test" "$RUNNER_TEMP/test.json" | wc -l | tr -d " ")
-          echo "Firestore emulator tests passed: $passed" | tee -a "$GITHUB_STEP_SUMMARY"
-          if [ "${status:-0}" -ne 0 ]; then exit "$status"; fi
-          if [ "$passed" -eq 0 ]; then echo "::error::no Firestore emulator test ran"; exit 1; fi
+        run: ../scripts/firestore-emulator.sh test
 
       - name: エミュレータログ(失敗時)
         if: failure()

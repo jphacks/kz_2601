@@ -334,9 +334,10 @@ Cloud Run: ai は `min-instances=1`(コールドスタート回避・デモ中�
 ### ローカル
 
 ```sh
-# 前提: firebase-tools, Go 1.24
+# 前提: gcloud(cloud-firestore-emulator コンポーネント), Java 11+, Go 1.24
 cd backend
-make emulator   # Firestore :8089 / Auth :9099 (firebase.json は infra 担当が配置)
+make emulator        # Firestore :8089(CI と同じ gcloud のエミュレータ・demo-kz2601)
+make test-emulator   # エミュレータ試験を CI と同じ判定で回す
 make dev        # appconfig :8080, ai :8081 (AUTH_MODE=dev, X-Debug-Uid で叩ける)
 curl -H 'X-Debug-Uid: u1' localhost:8080/v1/apps
 ```
