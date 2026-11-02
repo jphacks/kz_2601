@@ -16,14 +16,14 @@ public enum FieldCoding {
     public static func defaultValue(for f: Field) -> JSONValue {
         // 選択肢から消えた既定値は使わない(#194)
         if let d = f.defaultValue, !(f.type == .enum && !(f.options ?? []).contains(d.stringValue ?? "")) {
-            if f.type.isDate, d.stringValue == "now" { return .string(encode(Date(), for: f)) }
+            if f.type.isDate, d.stringValue == "now" { return .string(encode(DSLClock.now(), for: f)) }
             return d
         }
         switch f.type {
         case .boolean: return .bool(false)
         case .enum: return f.options?.first.map { .string($0) } ?? .null
         case .ref, .refs: return .null
-        case .date, .datetime: return .string(encode(Date(), for: f))
+        case .date, .datetime: return .string(encode(DSLClock.now(), for: f))
         default: return .null
         }
     }
