@@ -262,13 +262,15 @@ final class ShareJoinFlowTests: XCTestCase {
 
         let deadline = ContinuousClock.now + .seconds(2)
         while rt.proGate.paywall == nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
-        XCTExpectFailure("疑いのある不具合: preview.mine の共有アプリは参加の確認を飛ばして import するが、adopt() が InstalledApp.joined を見て課金画面を出す。自分のアプリは無料(PaidGate.joinNeedsPaywall)のはず") {
-            XCTAssertNil(rt.proGate.paywall, "自分のアプリを開くのに課金画面を出さない")
-        }
+        // #561: adopt() は InstalledApp.joined を見るが、自分のアプリ(preview.mine)は無料
+        XCTAssertNil(rt.proGate.paywall, "自分のアプリを開くのに課金画面を出さない")
         rt.proGate.finishPaywall()
         await run.value
         XCTAssertNil(SharingUI.shared.pendingJoin, "自分のアプリは参加の確認を出さない")
         XCTAssertTrue(fake.joinCalls.isEmpty)
+        XCTAssertEqual(fake.importCalls, [token])
+        XCTAssertEqual(rt.document.appId, "family-app")
+        XCTAssertNil(rt.toast)
     }
 
     // MARK: - importShared: 失敗
@@ -446,6 +448,18 @@ final class ShareJoinFlowTests: XCTestCase {
         await run.value
         XCTAssertEqual(rt.document.appId, "catalog-board")
         XCTAssertEqual(rt.summaryBanner?.text, installed("掲示板") + L10n.tr("。みんなの投稿も見られます"))
+    }
+
+    /// 自分が公開した、みんなの記録を見るアプリ(listing.mine・joined)は課金画面を出さずに開く(#561)
+    func testInstallPublicOwnJoinedAppSkipsPaywall() async throws {
+        let fake = FakeShareClient()
+        fake.installed = .success(InstalledApp(appId: "catalog-board", name: "掲示板", joined: true))
+        let rt = try await makeRuntime(fake)
+        await rt.installPublic(PublicAppListing(id: "catalog-board", name: "掲示板", mine: true))
+        XCTAssertNil(rt.proGate.paywall, "自分のアプリは無料")
+        XCTAssertEqual(rt.document.appId, "catalog-board")
+        XCTAssertEqual(rt.summaryBanner?.text, installed("掲示板") + L10n.tr("。みんなの投稿も見られます"))
+        XCTAssertNil(rt.toast)
     }
 
     /// 既にそのアプリを開いている時は切り替えずにバナーだけ出す
