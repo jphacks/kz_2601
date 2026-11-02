@@ -1,0 +1,47 @@
+{
+  "dsl": {
+    "schemaVersion": 1,
+    "app": {"name": "生理の記録", "voiceEntry": "floating"},
+    "initialScreen": "home",
+    "entities": [
+      {"id": "periods", "name": "生理", "fields": [{"id": "start_on", "name": "開始日", "type": "date"}]},
+      {"id": "settings", "name": "設定", "single": true, "fields": [
+        {"id": "cycle_days", "name": "周期", "type": "integer", "defaultValue": 28, "unit": "日"}
+      ]}
+    ],
+    "screens": [
+      {"id": "home", "title": "記録", "components": [
+        {"type": "stat", "id": "next", "label": "次の予定日", "value": {"op": "addDays", "args": [
+          {"agg": "latest", "entity": "periods", "field": "start_on", "by": "start_on"}, {"setting": "cycle_days"}]}},
+        {"type": "stat", "id": "cycle", "label": "周期", "unit": "日", "value": {"setting": "cycle_days"}},
+        {"type": "list", "id": "log", "entity": "periods", "item": {"title": "start_on"}, "sort": {"field": "start_on", "direction": "desc"}},
+        {"type": "button", "id": "open_settings", "label": "周期の設定", "icon": "gearshape", "style": "secondary",
+         "action": {"type": "navigate", "screen": "settings_form", "presentation": "sheet"}}
+      ]},
+      {"id": "settings_form", "title": "周期の設定", "entity": "settings", "toolbar": [
+        {"label": "保存", "action": {"type": "saveRecord", "entity": "settings"}}
+      ], "components": [
+        {"type": "numberField", "field": "cycle_days", "label": "周期", "unit": "日"}
+      ]}
+    ]
+  },
+  "records": {
+    "periods": [
+      {"id": "p1", "data": {"start_on": "2026-10-03"}},
+      {"id": "p2", "data": {"start_on": "2026-09-05"}}
+    ]
+  },
+  "device": {
+    "now": "2026-11-12T12:00:00+09:00",
+    "timeZone": "Asia/Tokyo",
+    "locale": "ja_JP"
+  },
+  "operations": [
+    {"tap": "open_settings"},
+    {"input": {"field": "cycle_days", "value": 30}},
+    {"tapToolbar": "保存"},
+    {"tap": "open_settings"},
+    {"input": {"field": "cycle_days", "value": 32}},
+    {"tapToolbar": "保存"}
+  ]
+}
