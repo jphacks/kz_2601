@@ -19,6 +19,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -202,6 +203,10 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 	ctx = withCostTally(ctx) // per-generation cost for ai.generate (#298)
 	res, err := s.generateStream(ctx, req, sink, started, &tr)
 	s.logGenerate(ctx, tr, sink != nil, res, err, time.Since(started)) // ai.generate (#322)
+	if err == nil {
+		// mode=auto is charged as create; the limiter refunds the rest (#548)
+		ratelimit.ReportMode(ctx, tr.mode)
+	}
 	return res, err
 }
 
