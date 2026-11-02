@@ -159,6 +159,39 @@ final class MetamonUITests: XCTestCase {
         XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "戻った FAB を押しても音声シートが開かない")
     }
 
+    // MARK: - 設定の識別子(#279)
+
+    /// 設定の 1 画面目に uid は出ない。「詳細(サポート用)」を開くと出る
+    func testSettingsHidesUIDUntilSupportDetailsOpened() {
+        launch(example: "kakeibo")
+        waitForFab()
+        fab.tap()
+        XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開かない")
+        voiceSheet.tap()
+
+        let status = app.staticTexts["settings.accountStatus"]
+        XCTAssertTrue(status.waitForExistence(timeout: 5), "アカウント欄が出ない")
+        XCTAssertEqual(status.label, "匿名で利用中")
+        let uid = element(labelContains: "mock00-fixed-uid")
+        XCTAssertFalse(uid.exists, "1 画面目に uid が出ている")
+        XCTAssertFalse(element(labelBeginsWith: "uid").exists, "1 画面目に uid が出ている")
+        attachScreenshot("settings-first-screen")
+
+        let details = app.buttons["settings.supportDetails"].firstMatch
+        for _ in 0..<10 where !(details.exists && details.isHittable) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(details.isHittable, "「詳細(サポート用)」が無い")
+        XCTAssertFalse(uid.exists, "畳んだままでも uid が出ている")
+        details.tap()
+        XCTAssertTrue(uid.waitForExistence(timeout: 5), "詳細を開いても uid が出ない")
+        attachScreenshot("settings-support-details")
+    }
+
+    private func element(labelContains text: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+    }
+
     // MARK: - 対話のチップ(#105)
 
     func testClarifyChipAdvancesChat() {
