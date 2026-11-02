@@ -19,6 +19,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/metrics"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -161,6 +162,7 @@ func (h *Handler) createShare(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	emitMetric(r, metrics.AppShared, appHashAttr(id))
 	httpx.WriteJSON(w, http.StatusCreated, toShareOut(r, &s))
 }
 
@@ -250,6 +252,8 @@ func (h *Handler) importShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res.Member = member
+	emitMetric(r, metrics.ShareImported, appHashAttr(res.ID), slog.String("source", "share"),
+		slog.Bool("joined", res.Joined), slog.Bool("created", res.Created))
 	httpx.WriteJSON(w, http.StatusCreated, res)
 }
 
@@ -441,6 +445,7 @@ func (h *Handler) publishApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, mapShareErr(err, "listing"))
 		return
 	}
+	emitMetric(r, metrics.AppPublished, appHashAttr(id))
 	httpx.WriteJSON(w, http.StatusOK, toListingOut(r, c))
 }
 
@@ -571,5 +576,7 @@ func (h *Handler) installPublicApp(w http.ResponseWriter, r *http.Request) {
 	if _, err := h.store.RecordInstall(ctx, id, uid, res.ID, res.Created && c.OwnerUID != uid); err != nil {
 		slog.Warn("appconfig: install not recorded", slog.String("id", id), slog.Any("error", err))
 	}
+	emitMetric(r, metrics.ShareImported, appHashAttr(res.ID), slog.String("source", "public"),
+		slog.Bool("joined", res.Joined), slog.Bool("created", res.Created))
 	httpx.WriteJSON(w, http.StatusCreated, res)
 }

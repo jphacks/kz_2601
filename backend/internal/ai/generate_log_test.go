@@ -11,6 +11,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/metrics"
 )
 
 // genLog runs fn with a JSON logger on svc and returns the single ai.generate line.
@@ -48,6 +49,7 @@ func TestGenerateLog_FirstCreateValidated(t *testing.T) {
 		"msg": GenerateEvent, "level": "INFO", "mode": "create", "outcome": GenValidated,
 		"validation_passed": true, "first_generation": true, "stream": false,
 		"attempts": float64(1), "regenerations": float64(0), "uid_hash": UIDHash(rawUID),
+		"app_hash": metrics.AppHash("app-RAW-1"),
 	}
 	for k, v := range want {
 		if m[k] != v {

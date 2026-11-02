@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/metrics"
 )
 
 // GenerateEvent is the message (and `event` attr) of the per-request log of
@@ -28,6 +29,7 @@ const (
 type genTrace struct {
 	mode  string // create|edit|undo; "" before the mode is decided
 	first bool   // create on a blank (voice-only seed) app
+	appID string // logged only as metrics.AppHash
 }
 
 // generateOutcome classifies one /v1/generate result.
@@ -101,6 +103,9 @@ func (s *Service) logGenerate(ctx context.Context, tr genTrace, stream bool, res
 	}
 	if h := UIDHash(auth.UID(ctx)); h != "" {
 		attrs = append(attrs, slog.String("uid_hash", h))
+	}
+	if h := metrics.AppHash(tr.appID); h != "" { // per-app edit counts (#297)
+		attrs = append(attrs, slog.String("app_hash", h))
 	}
 	level := slog.LevelInfo
 	if outcome == GenFailed {
