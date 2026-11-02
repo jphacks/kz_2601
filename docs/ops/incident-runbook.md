@@ -120,7 +120,7 @@ curl -s "$URL/v1/client-config" | jq .notice
 注意:
 
 - 応答は `Cache-Control: max-age=300`。端末に届くまで**最大 5 分**+ 次に前面に戻った時。
-- #513 のマージ後は、デプロイ(`--update-env-vars`)の後も**残る**。終わったら消し忘れない。#513 がマージされるまでは**次のデプロイ(develop / main へのマージ)で消える**(`--set-env-vars` は全置換)ので、障害中にデプロイしたら出し直す。変え方は [runtime-config.md](../infra/runtime-config.md#変え方)。
+- デプロイ(`--update-env-vars`・#513)の後も**残る**。終わったら消し忘れない。変え方は [runtime-config.md](../infra/runtime-config.md#変え方)。
 - appconfig を前のリビジョンに戻している間(§6)は、`services update` で作ったリビジョンにトラフィックが行かない。[§12](#12-知っておくべき落とし穴) の手順で出す。
 - 文面の例:
   - Claude の障害: 「AI の生成を一時的に止めています。作ったアプリと記録はそのまま使えます。」/ "AI generation is paused for now. Your apps and records still work."
@@ -166,7 +166,7 @@ SEV2(全員が生成できない)。料金の暴走は SEV1。
      --remove-env-vars=AI_PAUSED   # 予備を使った時は RATE_LIMIT_GLOBAL_DAILY
    ```
 
-   ※ #513 のマージ後は `AI_PAUSED`・`RATE_LIMIT_GLOBAL_DAILY` もデプロイの後に残る(戻し忘れに注意)。#513 がマージされるまでは次のデプロイで消える(既定に戻る)ので、止めたままにしたい間は `main` にマージしない。
+   ※ `AI_PAUSED`・`RATE_LIMIT_GLOBAL_DAILY` はデプロイの後も残る(#513。戻し忘れに注意)。
 
 ## 6. 手順 B: 悪いデプロイを戻す
 
@@ -247,7 +247,7 @@ SEV1。**原因の調査より先にキーを無効化する。**
    ```
 
    - **修正版がストアで落とせる状態になる前に上げない**(全員が更新画面から出られなくなる)。国によって配信に時間差がある。
-   - `MIN_IOS_BUILD` は #513 のマージ後はデプロイの後も残る。それまでは次のデプロイで消える(§12)。
+   - `MIN_IOS_BUILD` はデプロイの後も残る(#513・§12)。
 6. 段階的リリースを再開(または修正版で新しく始める)。お知らせを外す。
 
 ## 10. 振り返り(障害の記録)
@@ -263,7 +263,7 @@ SEV1。**原因の調査より先にキーを無効化する。**
 
 ### 準備
 
-- [ ] develop の最新が `ai-stg` / `appconfig-stg` にデプロイ済み(このお知らせの機能を含む版)。#513 がマージされるまでは、訓練中に develop にマージしない(env が消えるため)。
+- [ ] develop の最新が `ai-stg` / `appconfig-stg` にデプロイ済み(このお知らせの機能を含む版)。
 - [ ] Staging 構成の iOS アプリ(`project.yml` の既定 = stg)を入れた端末かシミュレータ。
 - [ ] 記録用に [postmortem-template.md](postmortem-template.md) を写す(種類 = 訓練)。
 - [ ] 今のリビジョンを控える: §6 の 1 を `ai-stg` と `appconfig-stg` で。
@@ -298,6 +298,6 @@ SEV1。**原因の調査より先にキーを無効化する。**
    gcloud run services update-traffic appconfig-prod --region=asia-northeast1 --project=jphacks-kz2601 --to-latest
    ```
 
-2. **デプロイと手で入れた env**: #513 のマージ後、`deploy-cloudrun.yml` は `--update-env-vars` でデプロイが決める値だけを上書きし、手で足した `NOTICE_JSON`・`RATE_LIMIT_*`・`MIN_IOS_BUILD`・`LATEST_IOS_BUILD` は**残る**(消し忘れに注意)。どの値を運用で変えてよいか・変え方は [runtime-config.md](../infra/runtime-config.md)。#513 がマージされるまでは `--set-env-vars` の全置換で、次の develop / main のマージで消える。障害中・強制アップデート中はデプロイ後に必ず確かめる。
+2. **デプロイと手で入れた env**: `deploy-cloudrun.yml` は(#513 から) `--update-env-vars` でデプロイが決める値だけを上書きし、手で足した `NOTICE_JSON`・`RATE_LIMIT_*`・`MIN_IOS_BUILD`・`LATEST_IOS_BUILD` は**残る**(消し忘れに注意)。どの値を運用で変えてよいか・変え方は [runtime-config.md](../infra/runtime-config.md)。障害中・強制アップデート中はデプロイ後に必ず確かめる。
 3. **stg と prod は同じ Firestore**(#288 で分けるまで): stg の訓練・調査でもデータを書き換えない。
 4. **キャッシュ**: `client-config` は 5 分キャッシュされる。お知らせ・強制アップデートは即時ではない。
