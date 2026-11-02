@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -242,5 +244,17 @@ func testPurgeAccount(t *testing.T, s Store, sfx string) {
 	}
 	if err := s.MarkAccountPurged(ctx, stayer); !errors.Is(err, ErrNotDeleted) {
 		t.Errorf("active uid: %v", err)
+	}
+}
+
+// docs/infra/account-purge.md queries these keys: append, never rename.
+func TestAccountPurgeResultLogAttrsKeys(t *testing.T) {
+	var keys []string
+	for _, a := range (AccountPurgeResult{}).LogAttrs() {
+		keys = append(keys, a.(slog.Attr).Key)
+	}
+	want := "apps keptMirrors shares listings releases owners installs memberships marks postsScrubbed reports blocks feedback"
+	if got := strings.Join(keys, " "); got != want {
+		t.Fatalf("LogAttrs keys:\n got %s\nwant %s", got, want)
 	}
 }
