@@ -100,8 +100,8 @@ else
     echo "  -- DEMO_CHECK_NO_AI=1: 生成・対話・編集を飛ばします(ai は /health のみ)"
   else
   req GET "$APPCONFIG/v1/apps/$GEN_APP/dsl"
-  [ "$CODE" = 200 ] && row OK "appconfig GET /dsl(新規 seed)" "$CODE" "$MS" "version $(jbody .version)" \
-                    || row NG "appconfig GET /dsl(新規 seed)" "$CODE" "$MS" "$(reason)"
+  if [ "$CODE" = 200 ]; then row OK "appconfig GET /dsl(新規 seed)" "$CODE" "$MS" "version $(jbody .version)"
+  else row NG "appconfig GET /dsl(新規 seed)" "$CODE" "$MS" "$(reason)"; fi
 
   jq -n --arg a "$GEN_APP" '{appId:$a,text:"家計簿アプリが欲しい",mode:"create",locale:"ja"}' >"$TMP/gen.json"
   MAX_TIME=60 req POST "$AI/v1/generate" "$TMP/gen.json"
@@ -199,8 +199,8 @@ else
   jq -n --arg t "$TOKEN" '{idToken:$t}' >"$TMP/del.json"
   req POST "https://identitytoolkit.googleapis.com/v1/accounts:delete?key=$KEY" "$TMP/del.json" 0
   rm -f "$TMP/del.json"
-  [ "$CODE" = 200 ] && row OK "後片付け: 匿名ユーザー削除(accounts:delete)" "$CODE" "$MS" "" \
-                    || row NG "後片付け: 匿名ユーザー削除(accounts:delete)" "$CODE" "$MS" "$(jbody '.error.message // empty')"
+  if [ "$CODE" = 200 ]; then row OK "後片付け: 匿名ユーザー削除(accounts:delete)" "$CODE" "$MS" ""
+  else row NG "後片付け: 匿名ユーザー削除(accounts:delete)" "$CODE" "$MS" "$(jbody '.error.message // empty')"; fi
 fi
 TOKEN=""; KEY=""
 
