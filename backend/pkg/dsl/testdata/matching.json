@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "ボドゲ仲間さがし",
+    "description": "同じ趣味の人を探して、お互いにつながりたいを送ったら連絡先が見られる(#507)",
+    "icon": "person.2",
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "profile",
+      "name": "プロフィール",
+      "titleField": "hobby",
+      "scope": "public",
+      "match": "profile",
+      "fields": [
+        { "id": "hobby", "name": "好きなゲーム", "type": "string", "required": true },
+        { "id": "area", "name": "地域", "type": "enum", "options": ["石川県", "富山県", "福井県", "オンライン"] },
+        { "id": "intro", "name": "ひとこと", "type": "text" }
+      ]
+    },
+    {
+      "id": "contact",
+      "name": "連絡先",
+      "titleField": "how",
+      "scope": "public",
+      "match": "matched",
+      "fields": [
+        { "id": "how", "name": "連絡方法", "type": "string", "required": true }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "仲間さがし",
+      "components": [
+        { "type": "list", "id": "people", "area": "A1:F6", "entity": "profile",
+          "item": { "title": "hobby", "subtitle": "area", "trailing": "$author" }, "emptyText": "まだ誰もいません" },
+        { "type": "list", "id": "contacts", "area": "A7:F12", "entity": "contact",
+          "item": { "title": "how", "subtitle": "$author" }, "emptyText": "つながった人の連絡先がここに出ます" }
+      ]
+    }
+  ]
+}

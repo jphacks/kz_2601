@@ -340,6 +340,18 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - 公開レコードを見せる口: `RecordPeek`(`shareview.go`)。今は常に nil。実装しても渡るのは `scope:"public"` の entity だけ(private / shared は渡さない)。見せるかどうかは #253 の判断待ち。
 - 部品を足した時: この表に行を足す(何もしなければ「アプリで見られます」になるので壊れない)。
 
+### 3.9 entity.match = 仲間探しのアプリ(#507)
+
+趣味・勉強・イベントの仲間をプロフィールから探し、**お互いに承認した人とだけ**つながるアプリ。**恋愛・出会い目的は対象外**(AI が断る)。設計・API・安全の規則は [`docs/backend/features/matching.md`](../backend/features/matching.md)。
+
+| 値 | 意味 | 制約(`Validate()`) |
+|---|---|---|
+| `profile` | みんなが見て「つながりたい」を送る 1 人 1 件のプロフィール。お互いにブロックしている人(どちら向きでも)の分は返らない | scope public / shared・アプリに 1 つまで・location / photo / video の field は不可・edit は書かない |
+| `matched` | 書いた本人と、つながった相手だけが読める(連絡先・次の相談) | scope public / shared・profile の entity が要る・location の field は不可・edit は書かない |
+
+- 誰が誰に送ったか・つながったかはレコードではなく appconfig の `/apps/{appId}/interests`・`/matches` が持つ。見える範囲は**公開 DSL(`apps_public/{appId}`)の match** で決める(各自のコピーではない)。
+- 「つながりたい」を送る・承認する部品(`matchList` など)は **phase 2**(iOS と同じ PR で schema に足す)。今は `supportedFeatures` に `matching` を送る版にだけ AI が match を使う(§5.3 と同じ仕組み・`restrict.go`)。古い iOS は未知のキー `match` を無視する。
+
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 
 AI に渡す部品カタログは手書きではなく **`dsl.schema.json` から自動生成**される(`backend/internal/ai/catalog.go` の `BuildCatalog`)。検証(Go)・描画(iOS)・AI(プロンプト)の 3 者はすべてスキーマから導出され、抜けはテストで赤になる。

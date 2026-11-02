@@ -238,6 +238,7 @@ func (a *App) Validate() error {
 		}
 		checkEntityMarks(e, add)
 		checkEntityRetention(e, add)
+		checkEntityMatch(e, add)
 		seen := map[string]bool{}
 		for j, f := range e.Fields {
 			if !idRe.MatchString(f.ID) {
@@ -264,6 +265,7 @@ func (a *App) Validate() error {
 	}
 	checkComputedFields(a.Entities, entities, DailyToggleFields(a), add)
 	checkHiddenFields(a, entities, add)
+	checkMatching(a, add)
 
 	notifIDs := map[string]bool{}
 	for i := range a.App.Notifications {
