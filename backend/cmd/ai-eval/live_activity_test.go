@@ -29,7 +29,7 @@ func TestCheckLiveActivity(t *testing.T) {
 
 	// start without end is not a usable pair; a timer without the flag does not count
 	half := &dsl.App{Screens: []dsl.Screen{{ID: "home",
-		Toolbar: []dsl.ToolbarButton{{Label: "開始", Action: dsl.Action{Type: dsl.ActionStartActivity, Activity: &dsl.Activity{Title: "運転中"}}}},
+		Toolbar:    []dsl.ToolbarButton{{Label: "開始", Action: dsl.Action{Type: dsl.ActionStartActivity, Activity: &dsl.Activity{Title: "運転中"}}}},
 		Components: []dsl.Component{{Type: dsl.CompTimerDisplay, Mode: "stopwatch"}},
 	}}}
 	if miss := checkLiveActivity(map[string]any{"liveTimer": false, "activityButtons": false}, half); miss != nil {
