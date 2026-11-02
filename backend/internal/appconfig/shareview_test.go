@@ -1,7 +1,6 @@
 package appconfig
 
 import (
-	"context"
 	"flag"
 	"html/template"
 	"net/http"
@@ -199,9 +198,12 @@ func TestSharePageHiddenAndRevoked(t *testing.T) {
 	if err := st.RevokeShare(t.Context(), "tok_r"); err != nil {
 		t.Fatal(err)
 	}
-	prev := shareHidden
-	shareHidden = func(_ context.Context, _ store.Store, sh *store.Share) bool { return sh.AppID == "tok_h" }
-	t.Cleanup(func() { shareHidden = prev })
+	if _, err := st.PublishApp(t.Context(), "o", "tok_h", []byte(`{}`), "n", 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetPublicAppHidden(t.Context(), "tok_h", true, "r"); err != nil {
+		t.Fatal(err)
+	}
 	for _, tok := range []string{"tok_r", "tok_h", "missing", "bad%20tok"} {
 		rr := getSharePage(t, st, tok)
 		if rr.Code != http.StatusNotFound || rr.Header().Get("Cache-Control") != "no-store" || !strings.Contains(rr.Body.String(), "リンクが無効です") {

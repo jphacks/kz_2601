@@ -315,6 +315,9 @@ func (h *Handler) entityOf(r *http.Request) (*store.App, *dsl.Entity, string, er
 	if err == nil && ent.EffectiveScope() == dsl.ScopeShared {
 		err = h.requireMember(r, cur)
 	}
+	if err == nil && ent.IsShared() {
+		err = h.checkSharedApp(r, cur.ID) // #321
+	}
 	if err != nil {
 		return nil, nil, "", err
 	}

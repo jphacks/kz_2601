@@ -26,6 +26,7 @@
 | 単体アプリとしてのリリース申請 | `ReleaseRequestSheet` / `ReleaseUI` / `HTTPReleaseRequestClient` / カードメニューの項目 | 2.5.2・4.2.6 |
 | 「探す」の公開カタログ(公開・インストール) | `DiscoverSheet` / `DiscoverEntry` / `SharingClient` の publish・install | DPLA 3.3.1(B)(c)・1.2 |
 | 誰でも開ける共有リンク(アプリ側の入口) | `ShareAppSheet` / `SharingHooks`(URL を受けて取り込む処理)/ `HTTPSharingClient`、Info.plist の `CFBundleURLTypes`(`tailorit://`) | 1.2(通報・ブロックが無い) |
+| 通報・ブロック(#321) | `ModerationClient` / `HTTPSharingClient+Moderation` / `AppRuntime+Moderation`(`ModerationDialogs`・設定の「ブロック中のユーザー」)。Renderer の長押しメニュー(`ModerationMenuItems`)は残るが、ホストが `canReport` を実装しないので出ない | 共有と一緒に外す(共有が無ければ通報する対象も無い)。共有を戻す時に一緒に戻る |
 | HealthKit(`healthStat` / `Field.health`) | 部品と登録 / `HealthData` / `AppRuntime+Health`、`NSHealth*` / `NSMotionUsageDescription`、entitlement `com.apple.developer.healthkit*` | 4.7.2・5.1.3 |
 | バックグラウンドでの位置の記録(`locationTracker`) | 部品と登録 / `LocationTracking`、`UIBackgroundModes` の `location` | 4.7.2・5.1.5・2.5.4 |
 | 端末のセンサー(`sensorValue`・CoreMotion の device motion / CMAltimeter・#419) | 部品と登録 / `SensorData`、`NSMotionUsageDescription`(healthStat と共通) | 4.7.2 |

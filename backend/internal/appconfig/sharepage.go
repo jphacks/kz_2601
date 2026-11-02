@@ -138,10 +138,10 @@ footer{font-size:13px;color:var(--muted);text-align:center;padding:8px 0 32px}
 
 // shareHidden reports whether the operator unpublished the shared app
 // (#321). Hidden apps get the invalid-link page, like a revoked share.
-// TODO(#490): once merged, this becomes:
-//
-//	p, err := s.GetPublicApp(ctx, sh.AppID); return err == nil && p.Hidden
-var shareHidden = func(_ context.Context, _ store.Store, _ *store.Share) bool { return false }
+var shareHidden = func(ctx context.Context, s store.Store, sh *store.Share) bool {
+	p, err := s.GetPublicApp(ctx, sh.AppID)
+	return err == nil && p.Hidden
+}
 
 func newNonce() string {
 	var b [16]byte
