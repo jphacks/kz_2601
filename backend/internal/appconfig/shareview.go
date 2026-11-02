@@ -45,6 +45,7 @@ type RecordRow struct{ Title, Subtitle, Trailing string }
 // webPage is the template's data.
 type webPage struct {
 	Found       bool
+	Lang        string // "ja" / "en" (sharepage.go)
 	Name        string
 	Description string
 	ImportURL   any // template.URL (the custom scheme is not on html/template's allowlist)
