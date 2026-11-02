@@ -1,0 +1,106 @@
+# backend の Firestore エミュレータ試験(#546)。backend-ci は 5 分上限なので別 workflow にしている。
+#
+# 設計メモ:
+# - required check ではない(必須化はリポジトリ設定=人間の判断)。required でないので workflow の
+#   `paths:` フィルタを使ってよい(backend-ci の "Expected" 待ち問題は起きない)。
+#   必須化するときは backend-ci と同じく paths-filter ジョブ + `if:` に書き換えること。
+# - エミュレータは gcloud SDK の `cloud-firestore-emulator` コンポーネント(バージョン固定)。
+#   docker イメージより取得が軽く、firebase-tools と違って firebase.json が要らない。
+# - プロジェクトは `demo-kz2601` 固定(テスト側もハードコード)。`demo-` プロジェクトは実 GCP に
+#   繋がらない。認証情報も secrets も渡さない。
+# - firestore.rules / indexes はリポジトリに無いので paths に入れていない。追加したら足すこと。
+name: backend-emulator
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-emulator.yml'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-emulator.yml'
+
+concurrency:
+  group: backend-emulator-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend-emulator:
+    name: backend-emulator
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FIRESTORE_EMULATOR_HOST: 127.0.0.1:8089
+      GOOGLE_CLOUD_PROJECT: demo-kz2601
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: |
+            backend/go.sum
+            backend/go.mod
+
+      - uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          version: '542.0.0'
+          install_components: cloud-firestore-emulator
+
+      - name: Firestore エミュレータ起動
+        run: |
+          nohup gcloud emulators firestore start \
+            --host-port="$FIRESTORE_EMULATOR_HOST" --project="$GOOGLE_CLOUD_PROJECT" \
+            > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          for _ in $(seq 1 90); do
+            if curl -sf "http://$FIRESTORE_EMULATOR_HOST/" > /dev/null; then
+              echo "emulator ready"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Firestore emulator did not become ready in 90s"
+          cat "$RUNNER_TEMP/emulator.log"
+          exit 1
+
+      - name: go test(エミュレータ試験のあるパッケージ)
+        run: |
+          set -euo pipefail
+          # t.Skip("FIRESTORE_EMULATOR_HOST not set") を持つパッケージ = エミュレータ試験のあるパッケージ
+          pkgs=$(grep -rl --include='*_test.go' 'FIRESTORE_EMULATOR_HOST not set' . | xargs -n1 dirname | sort -u)
+          if [ -z "$pkgs" ]; then echo "::error::no emulator test packages found"; exit 1; fi
+          printf "packages:\n%s\n" "$pkgs"
+          # shellcheck disable=SC2086
+          go test -count=1 -json $pkgs > "$RUNNER_TEMP/test.json" || status=$?
+          jq -rj 'select(.Action=="output") | .Output' "$RUNNER_TEMP/test.json"
+
+          # 黙ってスキップさせない: スキップ理由にエミュレータが出たら、または
+          # Firestore 系テスト(TestFirestore* / */firestore)が 1 件でもスキップされたら失敗
+          if grep -q 'FIRESTORE_EMULATOR_HOST not set' "$RUNNER_TEMP/test.json"; then
+            echo "::error::emulator tests were skipped"; exit 1
+          fi
+          fs='select(.Test != null and (.Test | test("^TestFirestore|/firestore$")))'
+          skipped=$(jq -r "$fs | select(.Action==\"skip\") | .Test" "$RUNNER_TEMP/test.json")
+          if [ -n "$skipped" ]; then echo "::error::skipped Firestore tests:"; echo "$skipped"; exit 1; fi
+          passed=$(jq -r "$fs | select(.Action==\"pass\") | .Test" "$RUNNER_TEMP/test.json" | wc -l | tr -d " ")
+          echo "Firestore emulator tests passed: $passed" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "${status:-0}" -ne 0 ]; then exit "$status"; fi
+          if [ "$passed" -eq 0 ]; then echo "::error::no Firestore emulator test ran"; exit 1; fi
+
+      - name: エミュレータログ(失敗時)
+        if: failure()
+        run: cat "$RUNNER_TEMP/emulator.log" || true
