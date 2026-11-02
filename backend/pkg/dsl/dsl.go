@@ -56,6 +56,10 @@ type Notification struct {
 	OffsetMinutes int    `json:"offsetMinutes,omitempty"`
 	TitleField    string `json:"titleField,omitempty"`   // record field shown as the body
 	EnabledField  string `json:"enabledField,omitempty"` // boolean field; false = skip the record
+	// When (#265, app.notifications only): a boolean screen-scalar Expr. iOS
+	// posts once when it turns false -> true after a record save / delete /
+	// sync on that device. Exclusive with the time and record triggers.
+	When *Expr `json:"when,omitempty"`
 }
 
 // VoiceEntry is how the user re-enters voice mode.

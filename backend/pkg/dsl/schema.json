@@ -1401,7 +1401,7 @@
     "Notification": {
       "type": "object",
       "additionalProperties": false,
-      "description": "ローカル通知 1 件。app.notifications(定期 / entity+field でレコードの時刻から)と scheduleNotification(その場で予約)で共通。time は HH:MM。",
+      "description": "ローカル通知 1 件。app.notifications(定期 / entity+field でレコードの時刻から / when で条件が真になった時)と scheduleNotification(その場で予約)で共通。time は HH:MM。",
       "required": [
         "id",
         "title",
@@ -1465,6 +1465,11 @@
         "enabledField": {
           "$ref": "#/$defs/Id",
           "description": "With entity: boolean field; records where it is false are not notified (alarm on/off)."
+        },
+        "when": {
+          "$ref": "#/$defs/Expr",
+          "description": "app.notifications only (#265). 条件で知らせる: 真偽の式(ref 不可・agg で集計)。条件が偽 → 真に変わった時に 1 回だけすぐ知らせ、偽に戻ったらまた知らせられる。iOS がこの端末でレコードを保存・削除・同期した直後に評価する(他の人の操作だけで真になった時は、この端末が同期するまで届かない)。when を書いたら repeat は once、time / weekday / entity / field / offsetMinutes / titleField / enabledField は書かない。",
+          "x-usage": "「在庫が少なくなったら教えて」= {\"op\":\"lt\",\"args\":[{\"agg\":\"sum\",\"entity\":\"stock\",\"field\":\"qty\"},5]}。予算オーバー = gt(今月の支出の sum, 予算)。目標達成 = gte(合計, 目標)。"
         }
       }
     },

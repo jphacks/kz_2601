@@ -340,6 +340,29 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - 公開レコードを見せる口: `RecordPeek`(`shareview.go`)。今は常に nil。実装しても渡るのは `scope:"public"` の entity だけ(private / shared は渡さない)。見せるかどうかは #253 の判断待ち。
 - 部品を足した時: この表に行を足す(何もしなければ「アプリで見られます」になるので壊れない)。
 
+### 3.9 通知の when = 条件で知らせる(#265)
+
+「在庫が少なくなったら教えて」「予算を超えたら通知」「目標に届いたら教えて」は、`app.notifications[]` に `when`(真偽の Expr)を書く。
+
+```json
+{"id":"low","title":"在庫が少なくなりました","body":"5 個を下回った商品があります","repeat":"once",
+ "when":{"op":"gt","args":[{"agg":"count","entity":"items","filter":{"field":"stock","op":"lt","value":5}},0]}}
+```
+
+| 項目 | 決めたこと |
+|---|---|
+| 引き金は 1 つ | `when` があればそれだけが引き金。**時刻の通知(`time` / `weekday`・`repeat` daily / weekly)とレコードの日付の通知(`entity` / `field` / `offsetMinutes` / `titleField` / `enabledField`)とは組み合わせない**。`repeat` は `once` だけ(backend が拒否)。`scheduleNotification` には書けない(`app.notifications` だけ) |
+| 式 | `stat.value` と同じ画面の式(行が無い: `ref` 不可・記録は `agg`)。結果は真偽(`lt` / `gt` / `gte` / `eq` / `and` …)。評価できない(nil)は偽 |
+| 鳴る時 | 前回の評価が**偽 → 今回が真**の時に 1 回だけ、すぐ(約 1 秒後)にローカル通知。真のままの保存では鳴らない。偽に戻ってからまた真になれば鳴る。通知を足した直後の最初の評価は状態を覚えるだけ(足した時点で満たしていても鳴らさない) |
+| 評価する時機(iOS) | **この端末で**レコードを保存・削除した直後と、同期(サーバーから読み直し・リアルタイムの変更)の後。DSL を当てた時にも評価して状態を覚える。読み込んでいない entity は端末内 DB の値で評価する |
+| 状態 | 前回の真偽を端末の UserDefaults に appId × 通知 id ごとに保存(アプリを閉じても 1 回きりを守る)。DSL から消えた通知・アプリの削除で消える |
+| 許可 | 通知が許可されていなければ出さない(状態は更新する。後で許可しても過去の分はまとめて出さない) |
+| **他の人の操作(M4)** | 共有(shared / public)の entity で、**他の人の記録だけで条件を満たした時にすぐ届けることはできない**。この端末がアプリを開いて同期した時に評価されて届く。端末を開いていない人にも届けるのはサーバー側の評価(M4)でやる |
+
+- AI: `backend/internal/ai/notify_when_rules.go`(在庫の閾値・予算オーバー・目標達成のレシピ)。ai-eval の `notifyWhen` / `notifyWhenOp`(`notify_when_cases.json` / `notify_when_chat_cases.json`、`m0disc_cases.json` の `d_inventory`)。
+- 古い iOS(#302): `when` を知らない版は `when` を無視し、残りの `{repeat: once}` を**次の 9:00 の 1 回きりの通知として予約してしまう**(開くたびに予約し直すので、ほぼ毎日鳴る誤った通知)。そこで iOS は `supportedFeatures` に `notification.when` を入れ、`allowedComponents` を送るのにこれを含めない版には AI が `when` を使わない(生成されたら通知ごと取り除く・§5.3)。保存済みの DSL を古い版で開いた時の誤った通知は防げないので、`MIN_IOS_BUILD` を上げるまでの既知の制限。
+- 新しい版で `when` が読めない(未知の式の形)時は、その通知ごと落とす(`Lossy`)。時刻の通知として鳴らさない。
+
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 
 AI に渡す部品カタログは手書きではなく **`dsl.schema.json` から自動生成**される(`backend/internal/ai/catalog.go` の `BuildCatalog`)。検証(Go)・描画(iOS)・AI(プロンプト)の 3 者はすべてスキーマから導出され、抜けはテストで赤になる。
@@ -380,7 +403,7 @@ App Store に出した後は古い iOS が残り続ける。backend は「今い
 | どこに | 中身 | 使い道 |
 |---|---|---|
 | generate / chat の body `allowedComponents` | その版が描画できる部品 type の全部(`ComponentType` から自動) | backend はここに**無い** type を生成結果に入れない(下) |
-| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(今は `recordRetention`・#482) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
+| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(今は `recordRetention`・#482、`notification.when`・#265) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
 | 全リクエストのヘッダ `X-Client-Platform` / `X-Client-Version` / `X-Client-Build` / `X-Client-DSL-Version` | `ios` / `CFBundleShortVersionString` / `CFBundleVersion` / 描画できる最大の `schemaVersion` | ログ(どの版がまだ使われているか = 最低対応版を上げる判断) |
 
 ### 5.3 backend が古い iOS に新しい部品を出さない仕組み

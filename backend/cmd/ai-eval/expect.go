@@ -99,6 +99,9 @@ var expectKeys = map[string]expectKind{
 	"repeat":         expectString,
 	"repeatOffset":   expectNumber,
 	"nextOccurrence": expectBool,
+	// checkNotifyWhen (#265): notify_when.go
+	"notifyWhen":   expectBool,
+	"notifyWhenOp": expectString,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

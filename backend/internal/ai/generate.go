@@ -51,7 +51,7 @@ type Request struct {
 	AllowedComponents []string `json:"allowedComponents,omitempty"`
 	DisabledFeatures  []string `json:"disabledFeatures,omitempty"`
 	// SupportedFeatures (#482): optional DSL behaviors the client implements
-	// (recordRetention). See NewClientRestriction.
+	// (recordRetention, notification.when). See NewClientRestriction.
 	SupportedFeatures []string `json:"supportedFeatures,omitempty"`
 }
 

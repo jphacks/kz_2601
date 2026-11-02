@@ -56,7 +56,7 @@ var omissionRules = []omissionRule{
 			return len(a.App.Notifications) == 0 && !hasAction(a, dsl.ActionScheduleNotif)
 		},
 		topic:   regexp.MustCompile(`通知|知らせ|教え|リマインド|アラート|(?i:notif|remind|alert|let you know)`),
-		problem: `依頼に「知らせて / 通知 / 教えて」があるのに app.notifications も scheduleNotification も無い。決まった時刻・レコードの時刻の通知で満たせるなら足す。条件で知らせる通知(在庫が減ったら等)はできないので、近いもの(不足の一覧など)で代替し、app.description の末尾に「○○の通知は今はできないため、△△で代替しました。」と書く`,
+		problem: `依頼に「知らせて / 通知 / 教えて」があるのに app.notifications も scheduleNotification も無い。決まった時刻・レコードの時刻の通知で満たせるなら足す。条件で知らせる通知(在庫が減ったら・予算を超えたら等)は app.notifications の when(#265)で足す。この版で when が使えない時だけ、近いもの(不足の一覧など)で代替し、app.description の末尾に「○○の通知は今はできないため、△△で代替しました。」と書く`,
 		noteJA: func(t string) string {
 			if notifyCondRe.MatchString(t) {
 				return "条件で知らせる通知は今はできないため、通知は入れていません。"

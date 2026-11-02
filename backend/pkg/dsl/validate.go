@@ -274,6 +274,7 @@ func (a *App) Validate() error {
 		notifIDs[n.ID] = true
 		checkNotification(fmt.Sprintf("app.notifications[%d]", i), n, add)
 		checkRecordNotification(fmt.Sprintf("app.notifications[%d]", i), n, entities, add)
+		checkWhenNotification(fmt.Sprintf("app.notifications[%d]", i), n, entities, add)
 	}
 
 	screens := map[string]bool{}
@@ -335,6 +336,9 @@ func (a *App) Validate() error {
 				checkNotification(where, act.Notification, add)
 				if act.Notification.Entity != "" {
 					add("%s: record-based notification (entity/field) belongs in app.notifications, not scheduleNotification", where)
+				}
+				if act.Notification.When != nil {
+					add("%s: notification when (condition) belongs in app.notifications, not scheduleNotification", where)
 				}
 			}
 		case ActionCancelNotif:

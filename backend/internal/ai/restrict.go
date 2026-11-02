@@ -35,6 +35,11 @@ const (
 // AI must not promise auto-delete there.
 const FeatureRecordRetention = "recordRetention"
 
+// FeatureNotificationWhen (#265) is a supportedFeatures value: the iOS build
+// evaluates app.notifications[].when. Older builds read a when notification
+// as a plain repeat once (a 09:00 reminder), so it is never generated for them.
+const FeatureNotificationWhen = "notification.when"
+
 // Restriction is the per-request set of unusable parts. The zero value means
 // no restriction.
 type Restriction struct {
@@ -44,7 +49,9 @@ type Restriction struct {
 	noShared   bool
 	// noRetention (#482): the client cannot purge (Entity.retentionDays)
 	noRetention bool
-	key         string // "" = no restriction; memo key otherwise
+	// noWhen (#265): the client cannot evaluate Notification.when
+	noWhen bool
+	key    string // "" = no restriction; memo key otherwise
 }
 
 // knownComponentTypes are the container and leaf types of the canonical schema.
@@ -113,18 +120,25 @@ func NewClientRestriction(allowed, disabled, supported []string) Restriction {
 		r.noRetention = true
 		r.setKey()
 	}
+	if len(allowed) > 0 && !slices.Contains(supported, FeatureNotificationWhen) {
+		r.noWhen = true
+		r.setKey()
+	}
 	return r
 }
 
 func (r *Restriction) setKey() {
 	r.key = ""
-	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared || r.noRetention {
-		r.key = strings.Join(r.Disallowed(), ",") + fmt.Sprintf("|h=%t|c=%t|s=%t|r=%t", r.noHealth, r.noCamera, r.noShared, r.noRetention)
+	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared || r.noRetention || r.noWhen {
+		r.key = strings.Join(r.Disallowed(), ",") + fmt.Sprintf("|h=%t|c=%t|s=%t|r=%t|w=%t", r.noHealth, r.noCamera, r.noShared, r.noRetention, r.noWhen)
 	}
 }
 
 // NoRetention reports whether Entity.retentionDays is unavailable (#482).
 func (r Restriction) NoRetention() bool { return r.noRetention }
+
+// NoWhen reports whether Notification.when is unavailable (#265).
+func (r Restriction) NoWhen() bool { return r.noWhen }
 
 // Active reports whether anything is restricted.
 func (r Restriction) Active() bool { return r.key != "" }
@@ -257,6 +271,12 @@ func restrictSchemaJSON(raw []byte, r Restriction) []byte {
 		if entity, _ := defs["Entity"].(map[string]any); entity != nil {
 			props, _ := entity["properties"].(map[string]any)
 			delete(props, "retentionDays")
+		}
+	}
+	if r.noWhen {
+		if n, _ := defs["Notification"].(map[string]any); n != nil {
+			props, _ := n["properties"].(map[string]any)
+			delete(props, "when")
 		}
 	}
 	if r.disallowed[string(dsl.CompWebView)] {
@@ -401,6 +421,11 @@ func buildRestrictedPrompt(system string, r Restriction) string {
 		s = strings.Replace(s, "\n\n"+retentionRules, "", 1)
 		s = strings.Replace(s, retentionChatRule, noRetentionChatRule, 1)
 	}
+	if r.noWhen {
+		s = strings.Replace(s, "\n\n"+notifyWhenRules, "", 1)
+		s = strings.Replace(s, condNotifyCanLine, condNotifyCannotLine, 1)
+		s = strings.Replace(s, notifyWhenChatRule, noNotifyWhenChatRule, 1)
+	}
 
 	// Rule lines that route an utterance to a disallowed part
 	// (「歩数を見たい」は healthStat ...) are dropped.
@@ -452,6 +477,9 @@ func restrictionNote(r Restriction) string {
 	}
 	if r.noRetention {
 		b.WriteString("- 記録の自動削除(entity の retentionDays)は使わない(この版では期間を過ぎた記録を消せない)。頼まれたら「この版では記録の自動削除はできません。最新版に更新すると使えます」と伝え、ほかの変更だけ行う。\n")
+	}
+	if r.noWhen {
+		b.WriteString("- 条件で知らせる通知(app.notifications の when)は使わない(この版では条件を確かめられない)。在庫が減ったら・予算を超えたら等と頼まれたら、不足の一覧などで代替し「条件で知らせる通知はこの版ではできないため、○○で代替しました。」と申告する。\n")
 	}
 	if r.noCamera {
 		b.WriteString("- photoField / videoField の source は library だけ(カメラで撮影はできない。写真・動画はライブラリから選ぶ)。camera / both は使わない。\n")
@@ -520,6 +548,35 @@ func restrictionViolations(raw, base []byte, r Restriction) []string {
 			}
 		}
 	}
+	if r.noWhen {
+		prev := map[string]bool{}
+		for _, id := range whenNotifications(base) {
+			prev[id] = true
+		}
+		for _, id := range whenNotifications(raw) {
+			if !prev[id] {
+				out = append(out, fmt.Sprintf("app.notifications %q: when (condition notification) is not available in this app build: remove the notification and substitute (e.g. a shortage list)", id))
+			}
+		}
+	}
+	return out
+}
+
+// whenNotifications lists the ids of app.notifications with when (#265).
+func whenNotifications(raw []byte) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var app dsl.App
+	if err := json.Unmarshal(raw, &app); err != nil {
+		return nil
+	}
+	var out []string
+	for _, n := range app.App.Notifications {
+		if n.When != nil {
+			out = append(out, n.ID)
+		}
+	}
 	return out
 }
 
@@ -578,7 +635,7 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 		return raw, nil, false
 	}
 	removed := map[string]int{}
-	var health, camera, private, retention int
+	var health, camera, private, retention, when int
 	var fixComps func([]any) []any
 	fixComps = func(cs []any) []any {
 		kept := make([]any, 0, len(cs))
@@ -666,7 +723,23 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 			}
 		}
 	}
-	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 {
+	if r.noWhen {
+		// the whole notification goes: without when an old build reads it as a 09:00 reminder
+		if app, _ := root["app"].(map[string]any); app != nil {
+			if ns, ok := app["notifications"].([]any); ok {
+				kept := make([]any, 0, len(ns))
+				for _, v := range ns {
+					if n, _ := v.(map[string]any); n != nil && n["when"] != nil {
+						when++
+						continue
+					}
+					kept = append(kept, v)
+				}
+				app["notifications"] = kept
+			}
+		}
+	}
+	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 && when == 0 {
 		return raw, nil, false
 	}
 	for _, t := range sortedIntKeys(removed) {
@@ -683,6 +756,9 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 	}
 	if retention > 0 {
 		notes = append(notes, fmt.Sprintf("dropped retentionDays on %d entity(ies)", retention))
+	}
+	if when > 0 {
+		notes = append(notes, fmt.Sprintf("dropped %d when notification(s)", when))
 	}
 	b, err := json.Marshal(root)
 	if err != nil {

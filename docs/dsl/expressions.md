@@ -101,6 +101,7 @@ Expr := number | string | boolean
 |---|---|---|---|
 | `Field.computed` | そのレコード | 可(同 entity のフィールド・`"id"`) | 算出列: 支払済・残高・BMI・残り日数 |
 | `Stat.value` | なし(画面スカラー) | **不可**(`agg` を使う) | 1 人あたり・残り予算・達成率 |
+| `Notification.when`(#265) | なし(画面スカラー) | **不可**(`agg` を使う) | 条件で知らせる(結果は真偽・偽 → 真で 1 回。README §3.9) |
 | `Filter.value`(agg 内) | 外側の行(computed なら そのレコード) | 外側に行があれば可 | 「このメンバーが払った」 |
 | `Filter.value`(list/stat/chart 等の画面部品) | なし | 不可 | `{"op":"addDays","args":[{"op":"today","args":[]},-7]}` = 直近 7 日 |
 
