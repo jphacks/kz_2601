@@ -216,3 +216,43 @@ func TestRunErasesExpiredFeedback(t *testing.T) {
 		t.Fatalf("below 24h must be refused: failed=%d", failed)
 	}
 }
+
+// The Cloud Logging queries in docs/infra/account-purge.md read these keys:
+// renaming or dropping one breaks them silently.
+func TestRunAccountPurgedLogKeys(t *testing.T) {
+	ctx := context.Background()
+	m := setup(t, "gone")
+	if err := m.DeactivateUser(ctx, "gone"); err != nil {
+		t.Fatal(err)
+	}
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logs, nil))
+	if failed := run(ctx, m, &fakeAuth{}, opts(), logger, time.Now().Add(31*24*time.Hour)); failed != 0 {
+		t.Fatalf("failed=%d", failed)
+	}
+	var keys []string
+	for _, line := range strings.Split(strings.TrimSpace(logs.String()), "\n") {
+		if !strings.Contains(line, `"msg":"purge: account purged"`) {
+			continue
+		}
+		dec := json.NewDecoder(strings.NewReader(line))
+		if _, err := dec.Token(); err != nil {
+			t.Fatal(err)
+		}
+		for dec.More() {
+			k, err := dec.Token()
+			if err != nil {
+				t.Fatal(err)
+			}
+			keys = append(keys, k.(string))
+			var v json.RawMessage
+			if err := dec.Decode(&v); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	want := "time level msg account deletedDaysAgo apps keptMirrors shares listings releases owners installs memberships marks postsScrubbed reports blocks feedback entitlements authDeleted"
+	if got := strings.Join(keys, " "); got != want {
+		t.Fatalf("account purged log keys:\n got %s\nwant %s", got, want)
+	}
+}
