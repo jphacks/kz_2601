@@ -528,6 +528,74 @@
         }
       }
     },
+    "18 歳以上です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'm 18 or older"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "18 歳以上です"
+          }
+        }
+      }
+    },
+    "18 歳以上ですか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Are you 18 or older?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "18 歳以上ですか?"
+          }
+        }
+      }
+    },
+    "18 歳未満です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'm under 18"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "18 歳未満です"
+          }
+        }
+      }
+    },
+    "18 歳未満の方は「つながりたい」を使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecting is only available to people 18 or older"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "18 歳未満の方は「つながりたい」を使えません"
+          }
+        }
+      }
+    },
     "1つ前に戻しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1871,6 +1939,23 @@
         }
       }
     },
+    "うまくいきませんでした。もう一度お試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Something went wrong. Please try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "うまくいきませんでした。もう一度お試しください"
+          }
+        }
+      }
+    },
     "うまく付けられませんでした。もう一度お試しください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2207,6 +2292,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリからの接続を確認できませんでした。少し待ってもう一度お試しください。続く時は App Store から最新版を入れてください"
+          }
+        }
+      }
+    },
+    "このアプリでは今は仲間探しを使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finding people isn't available in this app right now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリでは今は仲間探しを使えません"
           }
         }
       }
@@ -2785,6 +2887,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "たとえば、こんな変更"
+          }
+        }
+      }
+    },
+    "つながりました。連絡先が見られます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected. You can now see their contact info"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つながりました。連絡先が見られます"
+          }
+        }
+      }
+    },
+    "つながりを解除しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection removed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つながりを解除しました"
           }
         }
       }
@@ -4013,6 +4149,23 @@
         }
       }
     },
+    "オフラインのあいだは送れません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can't send while offline"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフラインのあいだは送れません"
+          }
+        }
+      }
+    },
     "オフライン・未送信 %lld 件" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4999,6 +5152,23 @@
         }
       }
     },
+    "ブロックを解除してから送れます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unblock this person to send a request"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブロックを解除してから送れます"
+          }
+        }
+      }
+    },
     "ブロック中のユーザー" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5063,6 +5233,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "プラン"
+          }
+        }
+      }
+    },
+    "プロフィールの送信が終わってから送れます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can send once your profile has been uploaded"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロフィールの送信が終わってから送れます"
           }
         }
       }
@@ -6206,6 +6393,23 @@
         }
       }
     },
+    "今日はこれ以上送れません。明日またお試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You've reached today's limit. Please try again tomorrow"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日はこれ以上送れません。明日またお試しください"
+          }
+        }
+      }
+    },
     "今日はこれ以上送れません。明日また送ってください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6270,6 +6474,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "他の端末で変更されていたため、サーバーの内容に合わせました"
+          }
+        }
+      }
+    },
+    "仲間探しでは、知らない人と「つながりたい」を送り合い、お互いに承認すると連絡先が見えるようになります。18 歳以上の方だけが使えます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To find people, you send connection requests to people you don't know, and once both of you accept, you can see each other's contact info. Only people 18 or older can use this."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仲間探しでは、知らない人と「つながりたい」を送り合い、お互いに承認すると連絡先が見えるようになります。18 歳以上の方だけが使えます。"
           }
         }
       }
@@ -6661,6 +6882,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "先に保存してください"
+          }
+        }
+      }
+    },
+    "先に自分のプロフィールを書いてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create your own profile first"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先に自分のプロフィールを書いてください"
           }
         }
       }
@@ -8157,6 +8395,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "左へ移動"
+          }
+        }
+      }
+    },
+    "年齢や生年月日は保存しません。この確認は、この端末に 1 回だけ記録します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your age and birthday are not stored. This confirmation is saved once on this device."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "年齢や生年月日は保存しません。この確認は、この端末に 1 回だけ記録します。"
           }
         }
       }
@@ -9806,6 +10061,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "直し方"
+          }
+        }
+      }
+    },
+    "相手が見つかりませんでした。一覧を更新してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't find this person. Please refresh the list"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手が見つかりませんでした。一覧を更新してください"
           }
         }
       }

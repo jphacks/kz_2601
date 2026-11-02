@@ -17,6 +17,7 @@
 - [shared の参加者(#254)](features/members.md)
 - [フィードバック(#319)](features/feedback.md)
 - [決まった形の文章(#417)](features/text.md)
+- [仲間探しのアプリ(#507)](features/matching.md)
 
 ## 1. サービス構成とリクエストフロー
 

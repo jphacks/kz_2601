@@ -165,6 +165,7 @@ type Store interface {
 	Marks           // per-user like / save toggles on shared records (marks.go)
 	Feedbacks       // in-app feedback (feedback.go)
 	Moderation      // reports, blocks, operator unpublish (moderation.go, #321)
+	Matching        // interests and matches of matching apps (matching.go, #507)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).

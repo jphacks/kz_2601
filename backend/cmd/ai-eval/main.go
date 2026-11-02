@@ -405,6 +405,8 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkNearby(c.Expect, app)...)     // #425: nearby.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMusic(c.Expect, app)...)      // #412: music.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRetention(c.Expect, app)...)  // #482: retention.go
+		// #507: matching.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkMatching(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRepeat(c.Expect, app)...)     // #266: repeat.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkNotifyWhen(c.Expect, app)...) // #265: notify_when.go
 	}

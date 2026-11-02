@@ -40,10 +40,10 @@ func TestNotifyWhenRestriction(t *testing.T) {
 	for k := range knownComponentTypes {
 		all = append(all, k)
 	}
-	if r := NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen}); r.Active() {
+	if r := NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching}); r.Active() {
 		t.Fatal("a current build must stay unrestricted")
 	}
-	old := NewClientRestriction(all, nil, []string{FeatureRecordRetention})
+	old := NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureMatching})
 	if !old.Active() || !old.NoWhen() || old.NoRetention() {
 		t.Fatalf("a build without notification.when: active=%v noWhen=%v", old.Active(), old.NoWhen())
 	}

@@ -20,6 +20,8 @@ struct ListRow: View {
     var mark: Mark? = nil
     var markState: MarkState? = nil
     var onMark: (() -> Void)? = nil
+    /// 行の右端に置く小さなボタン(仲間探しの「つながりたい」・承認 #507)。行タップとは別に押せる
+    var accessory: RowAccessory? = nil
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.dslRuntime) private var rt
 
@@ -79,6 +81,7 @@ struct ListRow: View {
         if let mark, let st = markState {
             parts.append(st.mine ? L("\(mark.label) \(st.count) 件・付けています") : L("\(mark.label) \(st.count) 件"))
         }
+        if let v = accessory?.value { parts.append(v) }
         return parts.joined(separator: ", ")
     }
 
@@ -188,6 +191,10 @@ struct ListRow: View {
             if let mark, let st = markState {
                 markButton(mark, st)
             }
+            if let accessory {
+                accessory.view
+                    .accessibilityHidden(true) // 行 1 要素の accessibilityAction で操作する
+            }
             if showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
@@ -211,6 +218,24 @@ struct ListRow: View {
             if let mark, let st = markState, let onMark {
                 Button(st.mine ? L("\(mark.label)を外す") : L("\(mark.label)を付ける"), action: onMark)
             }
+            if let accessory {
+                ForEach(Array(accessory.actions.enumerated()), id: \.offset) { _, a in
+                    Button(a.label, action: a.perform)
+                }
+            }
         }
     }
+}
+
+/// `ListRow` の右端のボタン(#507)。VoiceOver では行の操作(accessibilityActions)として読む。
+struct RowAccessory {
+    struct Action {
+        let label: String
+        let perform: () -> Void
+    }
+
+    let view: AnyView
+    var actions: [Action] = []
+    /// 行の読み上げに足す状態(「送りました」など)
+    var value: String?
 }

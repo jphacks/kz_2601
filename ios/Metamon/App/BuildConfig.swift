@@ -125,6 +125,7 @@ enum BuildConfig {
         .aiButtonMetrics,
         .entitlements,
         .feedback,
+        .matching,
         .releaseRequests,
         .sharing,
     ]

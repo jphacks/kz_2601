@@ -238,6 +238,7 @@ func (a *App) Validate() error {
 		}
 		checkEntityMarks(e, add)
 		checkEntityRetention(e, add)
+		checkEntityMatch(e, add)
 		seen := map[string]bool{}
 		for j, f := range e.Fields {
 			if !idRe.MatchString(f.ID) {
@@ -264,6 +265,7 @@ func (a *App) Validate() error {
 	}
 	checkComputedFields(a.Entities, entities, DailyToggleFields(a), add)
 	checkHiddenFields(a, entities, add)
+	checkMatching(a, add)
 
 	notifIDs := map[string]bool{}
 	for i := range a.App.Notifications {
@@ -458,6 +460,7 @@ func (a *App) Validate() error {
 				}
 				checkListToggle(where, c.Item, e, add)
 				checkListMark(where, c.Item, e, add)
+				checkListInterest(where, c.Item, e, add) // match_list.go
 				if c.Sort != nil {
 					if msg := valueErr(e, "sort field", c.Sort.Field); msg != "" {
 						add("%s: %s", where, msg)
@@ -659,6 +662,9 @@ func (a *App) Validate() error {
 				checkMusicPlayer(where, c, add)
 			case CompNearbyShare:
 				checkNearbyShare(where, c, entities, add) // nearby.go
+			case CompMatchList:
+				checkMatchList(where, c, entities, add) // match_list.go
+				checkAction(where+".onItemTap", c.OnItemTap)
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}

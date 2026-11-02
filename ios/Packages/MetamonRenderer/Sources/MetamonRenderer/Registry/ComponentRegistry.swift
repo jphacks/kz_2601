@@ -126,6 +126,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.sensorValue) { c, ctx in SensorValueLeaf(c: c, ctx: ctx) }
         // leaf(録音・#420)
         r.register(.audioRecorder) { c, ctx in AudioRecorderLeaf(c: c, ctx: ctx) }
+        // leaf(仲間探しの届いた人・つながった人・#507)。共有と一緒に外す
+        r.register(.matchList) { c, ctx in MatchListLeaf(c: c, ctx: ctx) }
         #endif
         return r
     }()

@@ -67,6 +67,7 @@ func (m *Memory) PurgeAccount(_ context.Context, uid string) (AccountPurgeResult
 		return res, ErrNotDeleted
 	}
 	for appID := range m.users[uid] {
+		m.purgeMatching(appID, uid, &res)
 		c, listed := m.catalog[appID]
 		if listed && c.OwnerUID == uid {
 			delete(m.catalog, appID)
@@ -124,6 +125,7 @@ func (m *Memory) PurgeAccount(_ context.Context, uid string) (AccountPurgeResult
 	}
 	res.Blocks += len(m.blocks[uid])
 	delete(m.blocks, uid)
+	m.dropMatchQuota(uid)
 	for appID, o := range m.owners {
 		if p := m.public[appID]; o == uid && (p == nil || p.app == nil || p.app.OwnerUID != uid) { // a kept mirror keeps its owner
 			delete(m.owners, appID)

@@ -95,6 +95,11 @@ var expectKeys = map[string]expectKind{
 	// checkRetention (#482): retention.go
 	"retention":      expectNumber,
 	"retentionOnRef": expectBool,
+	// checkMatching (#507): matching.go
+	"matchProfile": expectBool,
+	"matchMatched": expectBool,
+	"matchSafe":    expectBool,
+	"matchUI":      expectBool,
 	// checkRepeat (#266): repeat.go
 	"repeat":         expectString,
 	"repeatOffset":   expectNumber,

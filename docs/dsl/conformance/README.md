@@ -122,7 +122,7 @@ case の名前: `example-*`(`docs/dsl/examples` をそのまま描く)・`flow-*
 | `searchBar` | `query` |
 | `image` | `hasImage` |
 
-DSL に書いた値で `props` に入れるもの: `title text label message placeholder url field entity aggregate format groupBy bucket kind mode metric period sensor task output address unit min max step target seconds limit expanded`。`style`・`icon`・`color`・`size`・`height` などの見た目のキーは入れない。
+DSL に書いた値で `props` に入れるもの: `title text label message placeholder url field entity aggregate format groupBy bucket kind mode metric period sensor task output address unit min max step target seconds limit expanded show`。`style`・`icon`・`color`・`size`・`height` などの見た目のキーは入れない。
 
 ### effects
 
@@ -167,19 +167,20 @@ DSL に書いた値で `props` に入れるもの: `title text label message pla
 - OS の機能に頼る部品(mapView・healthStat・sensorValue・routeGuide・musicPlayer・dashcam・nearbyShare・locationTracker・chatThread・webView・calendar・gridTable・randomPicker・aiButton・timerDisplay・qrCode など)は、`state` と DSL に書いた値だけで、中で解決する値(地図のピン・歩数・センサーの値・タイマーの残り・カレンダーのマス)はまだ木に入れていない。
 - 書き出し・通知・ライブアクティビティ・URL を開くは `request` として「頼んだこと」だけ。結果(ファイルの中身・通知の時刻)は比べない。
 - 一覧の印(いいね #255)・保存待ちのチェックの表示・新しい行のハイライト・読み込み中(`loading`)の表示は入れていない(端末の一時状態)。
+- 仲間探し(#507)の `matchList` の行と `list.item.interest` の「つながりたい」ボタンは、appconfig の `/interests`・`/matches`(誰が誰に送ったか)で決まり、レコードには無い。木には `matchList` の `state` と DSL の値(`entity`・`show`・`title`)だけを入れ、行・ボタンは入れない(`edge-matching`。`item.interest` の付いた list は普通の list と同じ行を出す)。
 - appconfig が取得時に行う部品の置き換え(`substituted:<type>`)はサーバーの仕事なので、ここでは `unavailable` だけ。
 
 ## 網羅
 
 `ConformanceTests.testCoverageListIsUpToDate` が「全 case に出てくる部品の type + `coverage.json` の `notYetCovered` = スキーマの全 type」を確かめる(足りない・余計なら赤)。
 
-今: **66 / 66 の type が case に出てくる**(`notYetCovered` は空)。そのうち値まで解決して比べるもの:
+今: **67 / 67 の type が case に出てくる**(`notYetCovered` は空)。そのうち値まで解決して比べるもの:
 
 | 区分 | type |
 |---|---|
 | Container(7) | vstack hstack section card disclosure carousel grid(子の順・ローカルグリッドの位置・見出し・列数・開閉) |
 | 値まで解決する Leaf | text label badge markdown link emptyState button stat list table timeline chart progressBar gauge settlement searchBar image、入力 18 種(textField numberField picker toggle datePicker slider stepper textEditor secureField timePicker rating colorPicker photoField videoField audioRecorder locationPicker locationButton qrScanner) |
-| state と DSL の値だけの Leaf | 上の「既知の隙間」に挙げた OS の機能に頼る部品・icon avatar spacer divider voiceInput shareButton openUrlButton videoPlayer |
+| state と DSL の値だけの Leaf | 上の「既知の隙間」に挙げた OS の機能に頼る部品・matchList(仲間探しのつながりの状態に頼る)・icon avatar spacer divider voiceInput shareButton openUrlButton videoPlayer |
 
 アクションは navigate(push / sheet / prefillRef なし)・back・saveRecord(必須の検証・新規・遷移)・deleteRecord(確認・閉じる)を操作で試している。startActivity・endActivity・scheduleNotification は examples の木に `actions` として出る(実行は `request`)。
 
