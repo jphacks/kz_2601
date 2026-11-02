@@ -1,0 +1,8 @@
+[
+  {"id": "sg_create_period", "kind": "create", "group": "single", "transcript": "生理の記録と次の予定日を出したい。周期は自分で決めたい", "note": "#267 周期は single の設定・次の予定日は setting", "expect": {"single": true, "setting": true}},
+  {"id": "sg_create_weight_goal", "kind": "create", "group": "single", "transcript": "体重の記録。目標体重を決めて、あと何キロか見たい", "note": "#267 目標体重は single・残りは setting との差", "expect": {"single": true, "setting": true}},
+  {"id": "sg_create_budget", "kind": "create", "group": "single", "transcript": "家計簿。月の予算を設定して、残りを表示して", "note": "#267 予算は single(予算の記録を追加させない)", "expect": {"single": true, "setting": true}},
+  {"id": "sg_create_steps_goal", "kind": "create", "group": "single", "transcript": "毎日の歩数を記録して、1日の目標を変えられるようにして", "note": "#267 1 日の目標は single", "expect": {"single": true, "setting": true}},
+  {"id": "sg_create_diary", "kind": "create", "group": "single", "transcript": "日記アプリ", "note": "#267 1 つだけの値が無い依頼に single を作らない", "expect": {"single": false, "setting": false}},
+  {"id": "sg_create_budget_en", "kind": "create", "group": "single", "locale": "en", "transcript": "Expense tracker with a monthly budget I can change and the amount left", "note": "#267 en", "expect": {"single": true, "setting": true}}
+]
