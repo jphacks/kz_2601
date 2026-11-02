@@ -45,8 +45,11 @@ flowchart TD
 
 ### 1.1 DI(依存性注入)
 - **入口は `ios/Metamon/App/BuildConfig.swift` の `BuildConfig.make(environment:)` だけ**。`AppEnvironment`(`.mock` / `.live(appConfigURL:aiURL:)`・どちらか片方だけ live も可)を環境変数 `METAMON_AI_BASE_URL` / `METAMON_APPCONFIG_BASE_URL` / Info.plist から判定し、`Services`(protocol のコンテナ struct。`auth` を含む)を**1回だけ**組み立てる。Mock と本番の切替はこのファイルで完結する。
+- **機能ごとのサービスを足すとき**(#516): `Services` の本体(auth … isLive)は触らない。`MetamonServices/<機能>/Services+<機能>.swift` に `ServiceKey`(既定値)と `Services` の computed property を置く(`EnvironmentValues` と同じ形)。
+- live の差し込みは `Metamon/Features/<機能>/<機能>+Wiring.swift` に `LiveWiring` の `static let` を書き、`BuildConfig.liveWirings`(名前順・1 行 1 つ)に 1 行足す。審査用ビルドで外す機能は、ファイルと closure の中身を `#if !APP_STORE_REVIEW` で囲む。
 - `MetamonApp` が `Services` を `AppRuntime(document:services:)` と SwiftUI Environment `\.services`(`App/ServicesEnvironment.swift`)に渡す。View は `@Environment(\.services)` で protocol 越しに使う(例: `VoiceInputView` → `services.transcriber`)。
 - Renderer は Services を知らない。必要な能力(DSL、レコード、`run(action)`、ナビ)は `DSLRuntime` protocol(`MetamonRenderer/Host/DSLRuntime.swift`)で宣言し、`AppRuntime` が準拠して `\.dslRuntime` で注入する。`@Observable` なのでプロパティ変更は SwiftUI が追跡する。
+- 機能ごとの能力(近距離共有・印・ライブアクティビティ・AI・通報など)は `DSLRuntime` に足さない。`MetamonRenderer/Host/Capabilities/<X>Host.swift` に `XHost` protocol と `DSLRuntime` の取り出し口(`var x: (any XHost)? { self as? any XHost }`)を作り、`AppRuntime+X.swift` で準拠する。Renderer は `rt.x?.foo() ?? 既定値` で呼ぶ(準拠しないプレビュー・テストのランタイムは nil = 何もしない・false)。**新しい機能で `DSLRuntime.swift` は触らない。**
 - 外部 DI ライブラリは使わない。
 
 ### 1.2 ComponentRegistry(コンポーネントが増えても崩れない仕組み)
@@ -663,7 +666,7 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 構成:
 - `MetamonWidget/Shared/TailorActivityAttributes.swift`(本体・拡張の両方にコンパイル): static な `appId / appName / icon / key / statId` と `ContentState{title, subtitle, clock(countdown/elapsed/paused), value, valueLabel, progress, finished}`。
 - 組み立て(純粋関数・`MetamonTests/LiveActivityContentTests`): `Metamon/App/LiveActivityContent.swift`。タイマーの段階は Renderer の `TimerActivityUpdate.phase`(`TimerActivityUpdateTests`)。
-- ActivityKit への出し入れ: `Metamon/App/AppRuntime+LiveActivity.swift`(`LiveActivities`。操作は 1 本の列で順番に流す)。Renderer からは `DSLRuntime.timerActivity(_:)` 越し(Renderer は ActivityKit を知らない)。
+- ActivityKit への出し入れ: `Metamon/App/AppRuntime+LiveActivity.swift`(`LiveActivities`。操作は 1 本の列で順番に流す)。Renderer からは `LiveActivityHost.timerActivity(_:)` 越し(Renderer は ActivityKit を知らない)。
 - 数字の更新: `AppRuntime.records` の didSet → `refreshLiveActivityStats()`(値が変わった時だけ `update`)。**アプリが止まっている間に別端末で増えた記録は反映されない**(push 無しのため。次に開いた時に更新)。
 - 見た目: `MetamonWidget/LiveActivityWidget.swift`。
 - Info.plist `NSSupportsLiveActivities = YES`。バックグラウンドモードや push の entitlement は**足していない**。審査用の版(Review)にも残す(権限ダイアログ無し・ユーザーが押した時だけ出る)。
@@ -848,7 +851,7 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 |---|---|
 | 部品 | `AiButtonLeaf` が task generate を `AiGenerateLeaf` に渡す。フォーム不要。結果は `AITextResultView`(line = 1 文 / list = 箇条書き / fields = 項目名と値・セルに収まらなければ中でスクロール)。`output` があればフォームのドラフトにも入れる(保存は利用者) |
 | どこで書くか | `AIGenerateRoute.choose`: 端末内 AI が使える → 端末内(無料・端末外に出ない)/ 使えない → ホストのオンライン版 / オンラインの無いホスト(プレビュー)→ 理由を出して無効。`METAMON_MOCK=1` は常にホストのモック(`MockAIClient.text` が決まった文を返す) |
-| オンライン版 | `DSLRuntime.generateAIText`(`AppRuntime+AIText.swift`)→ `AITextGate`: 同意が無い → 同意画面 / Pro でない(課金の制限が有効な時)→ 課金画面(`requestProForAIText` の 1 か所。#429 の `ProGate.requestPro` が入ったら差し替える)/ どちらも OK → `services.ai.text`。サーバーの理由は `HTTPAIClient.textError` で画面の文言に(上限はサーバーの日本語のまま) |
+| オンライン版 | `AITextHost.generateAIText`(`AppRuntime+AIText.swift`)→ `AITextGate`: 同意が無い → 同意画面 / Pro でない(課金の制限が有効な時)→ 課金画面(`requestProForAIText` の 1 か所。#429 の `ProGate.requestPro` が入ったら差し替える)/ どちらも OK → `services.ai.text`。サーバーの理由は `HTTPAIClient.textError` で画面の文言に(上限はサーバーの日本語のまま) |
 | 依頼 | `AIGenerateBuilder`: 指示は `{{field}}` をフォームの値に置き換えて 500 字まで、`{{input}}` は「下の材料」に置き換え、材料(`entity` の新しい順 20 件まで / `input` field)は別に 4 KB(UTF-8)まで |
 | 形の検証 | `AITextResult.normalize`(MetamonDSL・backend の `parseTextOutput` と同じ規則)。端末内 AI は形ごとの `DynamicGenerationSchema`(fields の名前は f0, f1…)で構造化出力 |
 | テスト | `AITextTests`(形の解釈・切り詰め・例の読み込み)・`AiGenerateTests`(経路・依頼・描画)・`AITextGateTests`(同意 → Pro・モック・エラーの文言)。端末内 AI の実行は実機で確認 |
@@ -861,7 +864,7 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 
 | 役割 | 実装 | 中身 |
 |---|---|---|
-| leaf | `NearbyShareLeaf`(Renderer) | 送る範囲を決めて `DSLRuntime.shareNearby(entity:records:)` を呼ぶだけ。フォーム画面(`screen.entity == entity`)は入力中の 1 件(未保存でも今の値)、それ以外はその entity の新しい順 最大 50 件。0 件なら押せない |
+| leaf | `NearbyShareLeaf`(Renderer) | 送る範囲を決めて `NearbyHost.shareNearby(entity:records:)` を呼ぶだけ。フォーム画面(`screen.entity == entity`)は入力中の 1 件(未保存でも今の値)、それ以外はその entity の新しい順 最大 50 件。0 件なら押せない |
 | データ・判定 | `NearbyShare`(MetamonDSL・純粋ロジック) | `Header`(送信者・appId・entity id/名・保存フィールドの id+型・件数)を招待の context に、`Payload`(Header + レコード)を接続後に 1 回、受信側は `Ack` を返す。JSON。未知キーは無視、レコード内の未知フィールド・型違い・null は `sanitize` で捨てる |
 | 通信 | `NearbyService`(アプリ本体 `Features/Nearby/`) | `MCSession(encryptionPreference: .required)`。送信シートを開いている間だけ browse、相手を選ぶと招待(30 秒)→ 接続で送信 → Ack で完了表示して切断 |
 | 受信 UI | `NearbySheets`(RootView の根とモーダル内に付ける) | 招待が来ると「◯◯さんから「出席」が 3 件届きました」の確認。**承認した時だけ招待を受ける**(勝手に受け取らない)。取り込めない時は理由だけ出して断る |

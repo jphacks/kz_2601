@@ -23,6 +23,7 @@ extension HTTPAIClient {
         case "refused": AITextError.refused
         case "bad_output": AITextError.badOutput
         case "rate_limited": e
+        case APIError.aiPausedCode: AITextError.failed("AI を一時的に止めています。しばらくしてからもう一度お試しください")
         case "payload_too_large": AITextError.failed("材料の記録が多すぎます。記録を減らしてからお試しください")
         default: e
         }

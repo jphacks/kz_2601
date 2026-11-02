@@ -24,7 +24,7 @@ final class NearbyUI {
     func install(_ service: NearbyService) { self.service = service }
 }
 
-extension AppRuntime {
+extension AppRuntime: NearbyHost {
     /// `nearbyShare` leaf から: 送るデータを作って相手選びのシートを開く。
     func shareNearby(entity: String, records: [[String: JSONValue]]) {
         guard let e = dsl.entity(entity) else { return }

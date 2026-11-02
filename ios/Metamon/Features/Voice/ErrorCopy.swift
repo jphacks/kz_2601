@@ -42,6 +42,9 @@ enum ErrorCopy {
         f.dateFormat = english ? "MMM d, H:mm" : "M月d日 H:mm"
         return f.string(from: date)
     }
+    // 運営による AI の一時停止(#511・503 ai_paused)。上限の文言とは分ける
+    static var aiPausedTitle: String { L10n.tr("AI を一時停止しています") }
+    static var aiPausedBody: String { L10n.tr("AI を一時的に止めています。しばらくしてからもう一度お試しください") }
     static var timeoutTitle: String { L10n.tr("時間がかかりすぎました") }
     static var timeoutBody: String { L10n.tr("サーバーの応答がありませんでした。もう一度お試しください") }
     // セッション

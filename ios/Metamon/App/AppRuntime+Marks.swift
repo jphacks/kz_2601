@@ -1,9 +1,10 @@
 import Foundation
 import MetamonDSL
 import MetamonServices
+import MetamonRenderer
 
 /// 共有レコードの印(いいね・保存・既読 #255)。1 人 1 回のトグルで、件数と自分の状態はサーバーが持つ。
-extension AppRuntime {
+extension AppRuntime: MarksHost {
     /// ローカル DB に楽観的な値を入れてから送り、サーバーの `{count, mine}` で確定する。付けられなければ元に戻して理由を出し nil。
     func toggleMark(entity: String, recordId: String, mark: String) async -> MarkState? {
         guard let ent = dsl.entity(entity), ent.isShared, ent.mark(mark) != nil else { return nil }

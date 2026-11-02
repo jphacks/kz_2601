@@ -11,6 +11,7 @@ info:
       上限に当たると 429 `rate_limited`(`RateLimited`)。重さ: chat 1 往復 = 1、text 1 回 = 1、generate の修正 = 2、新規作成(create/auto)= 3、undo = 0。
       既定の上限: 匿名 30 / サインイン済み 60 / Pro 300(サーバーでの Pro 判定は未実装)/ 匿名の同一 IP 300 / 環境全体 2000。日付は 0:00 JST で切り替わる。
       成功時も `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset`(Unix 秒)を返す。
+    - 一時停止(#511): ai に `AI_PAUSED=1` がある間、Claude を呼ぶ `POST /generate`(`mode=undo` を除く)・`POST /chat`・`POST /text` は Claude を呼ばず、上限も数えずに 503 `ai_paused` を返す。`/health`・`DELETE /chat/{appId}` は止めない。`docs/infra/ai-pause.md`
 servers:
   - url: http://localhost:8081/v1
   - url: https://ai-REPLACE.a.run.app/v1
@@ -78,7 +79,7 @@ paths:
                   message: could not produce a valid app from the request
                   details: { transcript: えーっと, attempts: 2, problems: ['screen "home" components[0]: list entity "x" does not exist'] }
         '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '503': { description: '上流 (Claude) 障害 / 運営が AI を一時停止中 (`ai_paused`・#511)', content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
 
   /chat:
     post:
@@ -157,7 +158,7 @@ paths:
         '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
         '429': { $ref: '#/components/responses/RateLimited' }
         '502': { description: Claude の出力がスキーマに合わず 2 回とも失敗 (generation_failed), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
-        '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '503': { description: '上流 (Claude) 障害 / 運営が AI を一時停止中 (`ai_paused`・#511)', content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
 
   /chat/{appId}:
     delete:
@@ -206,7 +207,7 @@ paths:
         '422': { description: モデルが書くのを断った (refused), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
         '429': { $ref: '#/components/responses/RateLimited' }
         '502': { description: 出力が形に合わない (bad_output), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
-        '503': { description: 上流 (Claude) 障害, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '503': { description: '上流 (Claude) 障害 / 運営が AI を一時停止中 (`ai_paused`・#511)', content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
 
   /transcribe:
     post:

@@ -1,11 +1,15 @@
 import Foundation
 import MetamonDSL
 import MetamonServices
+import MetamonRenderer
 
 /// aiButton generate のオンライン版(#417)。Renderer は端末内 AI が使えない時だけここを呼ぶ。
 /// 判定は `AITextGate`(同意 → Pro)。モック(METAMON_MOCK)は `MockAIClient` が決まった文を返す。
 /// 審査用ビルド(APP_STORE_REVIEW・#452 G4)はオンライン版(POST /v1/text)を持たない(同意文の「記録の中身は送らない」に合わせる)。
 /// 端末内 AI(Foundation Models)はそのまま使え、無い端末では理由つきで無効になる。
+/// `AITextHost`: recordAIButton は AppRuntime+AIButtonMetrics.swift。
+extension AppRuntime: AITextHost {}
+
 #if APP_STORE_REVIEW
 extension AppRuntime {
     var supportsOnlineAIText: Bool { false }

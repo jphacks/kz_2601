@@ -168,12 +168,11 @@ func run(ctx context.Context, st purgeStore, users authDeleter, opts options, lo
 			continue
 		}
 		purged++
-		logger.Info("purge: account purged", append(attrs,
-			slog.Int("apps", res.Apps), slog.Int("keptMirrors", res.KeptMirrors), slog.Int("shares", res.Shares),
-			slog.Int("listings", res.Listings), slog.Int("releases", res.Releases), slog.Int("owners", res.Owners),
-			slog.Int("installs", res.Installs), slog.Int("memberships", res.Memberships), slog.Int("marks", res.Marks),
-			slog.Int("postsScrubbed", res.PostsScrubbed), slog.Int("reports", res.Reports), slog.Int("blocks", res.Blocks), slog.Int("feedback", res.Feedback),
-			slog.Int("entitlements", entitlements), slog.Bool("authDeleted", users != nil))...)
+		attrs = append(append(attrs, res.LogAttrs()...),
+			slog.Int("entitlements", entitlements),
+			slog.Bool("authDeleted", users != nil),
+		)
+		logger.Info("purge: account purged", attrs...)
 	}
 	if ctx.Err() == nil {
 		failed += purgeFeedback(ctx, st, opts, logger, now)
