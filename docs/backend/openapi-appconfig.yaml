@@ -997,13 +997,14 @@ paths:
   /client-config:
     get:
       security: []
-      summary: iOS の最低対応版と最新版(#302・認証不要)
+      summary: iOS の最低対応版と最新版(#302)・アプリ内のお知らせ(#333)・認証不要
       description: |
         サインイン前にも iOS が起動時・前面に戻った時に読む。値は appconfig の環境変数(起動時に 1 回読む)。**未設定・不正な値のフィールドは省略 = 強制しない**。
         - `MIN_IOS_BUILD`: これ未満の CFBundleVersion は閉じられない「アップデートしてください」画面
         - `LATEST_IOS_BUILD`: これ未満は閉じられるお知らせ(MIN より小さければ MIN に揃える)
         - `IOS_APP_STORE_URL`: App Store のページ(https / itms-apps のみ)。省略時は iOS 側の既定
-        iOS は通信失敗・不正な応答では何もしない(fail open)。`Cache-Control: public, max-age=300`。
+        - `NOTICE_JSON`: アプリ内のお知らせ(`notice`・#333)。1 行のバナーで、利用者が閉じられる。iOS は閉じた `id` を覚えるので、文面を変えて出し直す時は `id` も変える。JSON が壊れている・必須が無い・未知のフィールドがある時は `notice` を省略する(他のフィールドは出す)。手順は `docs/ops/incident-runbook.md`
+        iOS は通信失敗・不正な応答では何もしない(fail open)。`notice` だけが不正な時も版の判定は続ける。`Cache-Control: public, max-age=300`(変更が届くまで最大 5 分)。
       responses:
         '200':
           description: OK
@@ -1015,7 +1016,16 @@ paths:
                   minIOSBuild: { type: integer, minimum: 1 }
                   latestIOSBuild: { type: integer, minimum: 1 }
                   iosAppStoreUrl: { type: string, format: uri }
-              example: { minIOSBuild: 12, latestIOSBuild: 15, iosAppStoreUrl: 'https://apps.apple.com/app/id0000000000' }
+                  notice: { $ref: '#/components/schemas/Notice' }
+              example:
+                minIOSBuild: 12
+                latestIOSBuild: 15
+                iosAppStoreUrl: 'https://apps.apple.com/app/id0000000000'
+                notice:
+                  id: 2026-11-02-ai
+                  severity: warning
+                  message: { ja: 'AI の生成を一時的に止めています。作ったアプリはそのまま使えます。', en: 'AI generation is paused for now. Your apps still work.' }
+                  linkUrl: 'https://example.com/status'
 
   /health:
     get:
@@ -1089,6 +1099,25 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: forbidden, message: 'join this app with a share link to see its shared data', details: { reason: not_member } } }
   schemas:
+    Notice:
+      type: object
+      description: アプリ内のお知らせ(#333)。appconfig の環境変数 `NOTICE_JSON` と同じ形(未知のフィールドは不可)。iOS は閉じられるバナーで出し、閉じた `id` を端末に覚える。
+      required: [id, severity, message]
+      additionalProperties: false
+      properties:
+        id: { type: string, pattern: '^[A-Za-z0-9._-]{1,64}$', description: 'お知らせの識別子。文面を変えたら変える(例: 2026-11-02-ai)' }
+        severity: { type: string, enum: [info, warning], default: info, description: '`NOTICE_JSON` で省略すると info' }
+        message:
+          type: object
+          required: [ja]
+          additionalProperties: false
+          description: 1 行の文面(改行・連続する空白は 1 つの空白にする)。英語の表示で `en` が無ければ `ja` を出す
+          properties:
+            ja: { type: string, minLength: 1, maxLength: 200 }
+            en: { type: string, maxLength: 200 }
+        linkUrl: { type: string, format: uri, pattern: '^https://', description: '「詳しく」で開くページ(https のみ)' }
+        minIOSBuild: { type: integer, minimum: 1, description: 'この CFBundleVersion 以上だけに出す(省略 = 下限なし)' }
+        maxIOSBuild: { type: integer, minimum: 1, description: 'この CFBundleVersion 以下だけに出す(省略 = 上限なし)。minIOSBuild 以上' }
     Error:
       type: object
       required: [error]

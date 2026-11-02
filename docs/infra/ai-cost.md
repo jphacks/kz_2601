@@ -3,14 +3,47 @@
 ai サービスが Claude を呼ぶたびに、1 行の構造化ログ `ai.usage` を出します。これを BigQuery に流して、日ごと・ユーザーごとの費用と上位のユーザーを出します。1 日の費用が閾値を超えたら知らせます。
 
 > **ログを出すコードは入っています。BigQuery のシンク・アラートの手順はまだ実行していません。** GCP の設定は承認を得てから、人が行います(下の「人の作業」)。
+>
+> **シンクが無くても今すぐ見られます**: `scripts/ai-cost.sh prod`(読み取りだけ。下の「すぐ見る」)。
 
 ## 目次
+- [すぐ見る: scripts/ai-cost.sh](#すぐ見る-scriptsai-costsh)
 - [ログの形(ai.usage)](#ログの形aiusage)
+- [1 生成ごとの費用(ai.generate)](#1-生成ごとの費用aigenerate)
 - [費用の見積もり](#費用の見積もり)
 - [人の作業 1: BigQuery へのシンク](#人の作業-1-bigquery-へのシンク)
 - [集計の SQL](#集計の-sql)
 - [人の作業 2: 1 日の費用のアラート](#人の作業-2-1-日の費用のアラート)
 - [わかっている限界](#わかっている限界)
+
+## すぐ見る: scripts/ai-cost.sh
+
+Cloud Logging を `gcloud logging read` で読んで集計します。GCP の設定は何も変えません(要る権限は `roles/logging.viewer` だけ)。BigQuery のシンクを作る前でも、ログが残っている期間(既定 30 日)なら見られます。
+
+```bash
+scripts/ai-cost.sh prod                    # 昨日(日本時間)と直近 7 日
+scripts/ai-cost.sh prod --days 30          # 1 人あたりの月の費用の分布(Pro の価格 #325・上限 #317 の根拠)
+scripts/ai-cost.sh prod --day 2026-11-01   # 見る日を指定
+scripts/ai-cost.sh prod --threshold 50     # 1 日の閾値(USD)。超えたら終了コード 3
+scripts/ai-cost.sh prod --dry-run          # フィルタだけ出す(Logs Explorer に貼れる)
+```
+
+出るもの(Markdown の表):
+
+| 節 | 中身 |
+| --- | --- |
+| 1 日の合計 | 見る日(既定は昨日・日本時間)の合計・呼び出し数・未ログインの分・料金表にない呼び出し・ユーザー数・**1 人あたりの中央値と上位 1%(p99)**・最大 |
+| 上位のユーザー | `uid_hash` ごとの費用の上位(既定 10 人、`TOP=20` で変更)。上位 1% に入る人に印 |
+| 処理ごと | `operation`(generate / patch / chat …)ごとの呼び出しと費用 |
+| 日ごと | 期間の日ごとの費用・呼び出し・ユーザー数 |
+| 期間の 1 人あたりの費用 | 期間の合計を 1 人ずつ出した p50 / p90 / p99 / 最大 |
+| 1 生成ごとの費用 | `ai.generate` の `est_cost_usd`(mode ごとの平均・p50・p95) |
+| 閾値 | 見る日の合計が閾値(既定 20 USD・`--threshold` か `AI_COST_DAILY_THRESHOLD_USD`)を超えたか。超えたら終了コード 3 |
+
+- 1 回の読み取りは `LIMIT`(既定 50000 行)まで。超えたら警告が出るので `LIMIT` を上げる。利用が増えて重くなったら、下の BigQuery に移る
+- パーセンタイルは最近順位法(人数が少ないと p99 = 最大になる)
+- 集計の確かめ: `scripts/ai-cost-test.sh`(固定の入力 `scripts/testdata/ai-cost/` で期待値と比べる。jq だけで動く)
+- 終了コード 3 を使えば、毎朝の定期実行(手元の cron など)で閾値超えに気づける。Cloud Monitoring のアラートは下の「人の作業 2」
 
 ## ログの形(ai.usage)
 
@@ -41,6 +74,19 @@ ai サービスが Claude を呼ぶたびに、1 行の構造化ログ `ai.usage
 ```json
 {"time":"2026-10-30T12:00:00+09:00","severity":"INFO","message":"ai.usage","event":"ai.usage","operation":"patch","model":"claude-sonnet-5-5","stream":true,"attempt":1,"outcome":"ok","input_tokens":1000,"output_tokens":500,"cache_creation_input_tokens":2000,"cache_read_input_tokens":4000,"latency_ms":6400,"response_model":"claude-sonnet-5-5","stop_reason":"end_turn","uid_hash":"3f1c0e9a7b2d4c51","est_cost_usd":0.0124,"pricing_as_of":"2026-10-30"}
 ```
+
+## 1 生成ごとの費用(ai.generate)
+
+`POST /v1/generate` 1 回ぶんの費用は、`ai.generate`(`backend/internal/ai/generate_log.go`・[../release/beta-quality-gate.md](../release/beta-quality-gate.md))の行に足してあります。その生成で出た `ai.usage` の行をリクエストの中で合計したもの(`backend/internal/ai/cost_tally.go`)で、再試行・失敗した試行・計算パスも入ります。
+
+| フィールド | 中身 |
+| --- | --- |
+| `claude_calls` | Claude への HTTP の試行の数 |
+| `input_tokens` / `output_tokens` / `cache_creation_input_tokens` / `cache_read_input_tokens` | 試行の合計 |
+| `est_cost_usd` / `pricing_as_of` | 見積もり費用の合計。**料金表にないモデルが 1 回でも混ざると出さない**(一部だけの合計を全体と読み違えないため) |
+| `unpriced_calls` | 料金表にないモデルの試行の数(そのときだけ) |
+
+Claude を呼ばなかった生成(戻す・入力の誤り)には、これらのフィールドは付きません。聞き返し(`/v1/chat`)と aiButton の文章生成は `ai.generate` を出さないので、`ai.usage` の `operation` で見ます。
 
 ## 費用の見積もり
 

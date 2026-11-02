@@ -9,6 +9,26 @@ region     = "asia-northeast1"
 firestore_pitr_enabled      = false
 firestore_delete_protection = true
 
+# 日次バックアップの保持(日)。0 で作らない
+firestore_backup_retention_days = 14
+
+# Firebase の API キーの制限(apikeys.tf)。Firebase がアプリ登録時に作ったキーを key_id で取り込む。
+# key_id は Cloud Console > APIs & Services > Credentials のキーの ID。api_targets は今の制限と同じ一覧にし、
+# 初回の plan で差分を見てから apply する(違う制限を入れるとアプリが動かなくなる)
+# firebase_api_keys = {
+#   ios = {
+#     key_id         = "<キー ID>"
+#     display_name   = "iOS key (auto created by Firebase)"
+#     ios_bundle_ids = ["jp.kz2601.metamon.stg"]
+#     api_targets    = ["identitytoolkit.googleapis.com", "securetoken.googleapis.com", "firebaseinstallations.googleapis.com", "firebaseappcheck.googleapis.com", "firebasecrashlytics.googleapis.com"]
+#   }
+#   web = {
+#     key_id       = "<キー ID>"
+#     display_name = "Browser key (auto created by Firebase)"
+#     api_targets  = ["identitytoolkit.googleapis.com", "securetoken.googleapis.com"]
+#   }
+# }
+
 # 初回は空(Artifact Registry にイメージが無い)。CI が 1 回デプロイした後に digest を入れて再 apply
 purge_enabled   = true
 purge_job_image = ""

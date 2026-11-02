@@ -121,6 +121,15 @@ import {
   id = "projects/${var.project_id}/databases/(default)"
 }
 
+# 日次バックアップのスケジュール(ID は `gcloud firestore backups schedules list --database='(default)'` の name の末尾)
+import {
+  to = google_firestore_backup_schedule.daily[0]
+  id = "projects/${var.project_id}/databases/(default)/backupSchedules/${var.import_firestore_backup_schedule_id}"
+}
+
+# extra_apis は import しない(有効化は冪等で、既に有効なら何も変わらない)。
+# Firebase の API キーは apikeys.tf の import ブロックが firebase_api_keys から取り込む。
+
 # ---- 消去ジョブ(purge_job_image を入れたときだけ) ----
 
 import {
@@ -152,5 +161,10 @@ variable "import_project_number" {
 
 variable "import_budget_id" {
   description = "取り込む既存の予算の ID(imports.tf を使う間だけ)"
+  type        = string
+}
+
+variable "import_firestore_backup_schedule_id" {
+  description = "取り込む既存の Firestore バックアップスケジュールの ID(imports.tf を使う間だけ)"
   type        = string
 }

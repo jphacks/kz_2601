@@ -84,6 +84,7 @@ scripts/beta-weekly.sh prod --dry-run  # 実行せずに Logs Explorer のフィ
 | `attempts` / `regenerations` / `area_fallback` / `downgraded_to_full` / `lint_retried` | 成功時は `Meta` の値。失敗時は `attempts` だけ |
 | `error_code` | 失敗時だけ(`generation_failed`・`refused`・`upstream_timeout`・`rate_limited`(Claude の 429)など) |
 | `uid_hash` | `ai.usage` と同じ擬名。uid が無い呼び出しではなし |
+| `claude_calls` / `input_tokens` / `output_tokens` / `cache_creation_input_tokens` / `cache_read_input_tokens` / `est_cost_usd` | その生成で Claude を呼んだ全部(再試行・失敗・計算パスを含む)の合計。`est_cost_usd` は料金表にないモデルが混ざると出さず、`unpriced_calls` を出す(#298・[../infra/ai-cost.md](../infra/ai-cost.md)) |
 
 - 出さないもの: 話した内容・要約・DSL・appId・生の uid(`generate_log_test.go` で確かめている)
 - 失敗(`failed`)は `WARN`、それ以外は `INFO`

@@ -99,6 +99,7 @@ func (s *Service) logGenerate(ctx context.Context, tr genTrace, stream bool, res
 	} else if err != nil {
 		attrs = append(attrs, slog.String("error_code", "internal"))
 	}
+	attrs = append(attrs, tallyOf(ctx).attrs()...) // tokens and cost of every attempt (#298)
 	if h := UIDHash(auth.UID(ctx)); h != "" {
 		attrs = append(attrs, slog.String("uid_hash", h))
 	}

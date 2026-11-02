@@ -3,6 +3,8 @@
 > 正典は `docs/00_decisions.md`。本書はそれを **gcloud / firebase CLI で手を動かして実現する runbook**。
 > 操作者: @ko-tarou。Terraform なし。所要目安: Step 0〜3 で 60〜90 分、Step 4 で 30 分。
 >
+> **新しい環境(stg など)は [`infra/`](../../infra/README.md) の Terraform(`infra/bootstrap.sh`)で作る(#307)。** 本書はハッカソン時の手順の記録と、Terraform で扱わない人の作業(Firebase・Apple・Secret の値)の詳細として残す。
+>
 > 記法
 > - **☐ あなたがやる** … ブラウザ/コンソール/Apple Developer 等、人が操作する箇所
 > - **▶ 実行** … そのままターミナルに貼れるコマンド
