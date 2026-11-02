@@ -106,6 +106,7 @@ struct RootView: View {
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
                 .modifier(ModerationDialogs(onModal: true))
+                .modifier(MatchingSheets(onModal: true))
                 #endif
                 .modifier(ToastHost(onModal: true))
         }
@@ -115,6 +116,7 @@ struct RootView: View {
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
                 .modifier(ModerationDialogs(onModal: true))
+                .modifier(MatchingSheets(onModal: true))
                 #endif
                 .modifier(ToastHost(onModal: true))
         }
@@ -123,6 +125,7 @@ struct RootView: View {
         .modifier(SharingHooks()) // シェアリンク受信・「探す」シート(#49 #50)
         .modifier(NearbySheets(onModal: false)) // 近くの端末と送り合う(#36)
         .modifier(ModerationDialogs()) // 通報・ブロック(#321)
+        .modifier(MatchingSheets()) // 仲間探しの 18 歳以上の確認(#507)
         #endif
         .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }

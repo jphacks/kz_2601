@@ -14,7 +14,7 @@ public enum ClientCapabilities {
     }
 
     /// 審査用ビルドでバイナリから外す部品(Renderer の登録もしない)。
-    public static let reviewExcludedComponents: Set<ComponentType> = [.healthStat, .locationTracker, .nearbyShare, .dashcam, .sensorValue, .audioRecorder, .webView, .chatThread]
+    public static let reviewExcludedComponents: Set<ComponentType> = [.healthStat, .locationTracker, .nearbyShare, .dashcam, .sensorValue, .audioRecorder, .webView, .chatThread, .matchList]
     /// 審査用ビルドで無効にする機能。fieldHealth = Field.health(HealthKit への書き込み)、cameraCapture = photoField / videoField の撮影、
     /// sharedData = entity の scope shared / public(他の人と同じ記録を見る作り・#451 G2。backend が private に直す)。
     public static let reviewDisabledFeatures = ["fieldHealth", "cameraCapture", "sharedData"]
@@ -33,9 +33,15 @@ public enum ClientCapabilities {
         #endif
     }
 
-    /// 部品以外で、この版が実装している DSL の動作(#482)。審査用の版も同じ(記録の自動削除は端末内の処理だけ)。
-    /// backend は allowedComponents を送るのにここに無い動作(= v1.0)を AI に使わせない。
-    public static let supportedFeatures = ["recordRetention"]
+    /// 部品以外で、この版が実装している DSL の動作(#482)。backend は allowedComponents を送るのにここに無い動作(= v1.0)を AI に使わせない。
+    /// recordRetention は審査用の版も同じ(記録の自動削除は端末内の処理だけ)。matching(#507・仲間探し)は審査用の版では送らない(共有と一緒に外す)。
+    public static var supportedFeatures: [String] {
+        #if APP_STORE_REVIEW
+        ["recordRetention"]
+        #else
+        ["recordRetention", "matching"]
+        #endif
+    }
 
     public static var disabledFeatures: [String]? {
         #if APP_STORE_REVIEW
