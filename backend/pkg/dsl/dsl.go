@@ -45,7 +45,7 @@ type Notification struct {
 	ID      string `json:"id"`
 	Title   string `json:"title"`
 	Body    string `json:"body"`
-	Repeat  string `json:"repeat"`            // once|daily|weekly
+	Repeat  string `json:"repeat"`            // once|daily|weekly|monthly|yearly (#266: record-based only)
 	Time    string `json:"time,omitempty"`    // HH:MM local
 	Weekday string `json:"weekday,omitempty"` // mon..sun (weekly)
 	// Record-based (#228, app.notifications only): one notification per record

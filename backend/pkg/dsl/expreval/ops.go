@@ -273,6 +273,13 @@ func (ev *Evaluator) apply(name string, args []dsl.Expr, row *Row) Value {
 		if ok1 && ok2 && !math.IsInf(n, 0) && !math.IsNaN(n) {
 			return DateValue(addDays(d, int(roundAway(n)), ev.loc))
 		}
+	case "nextOccurrence":
+		// #266: next monthly / yearly repeat on or after today (clamped to the month end)
+		if d, ok := date(0); ok && len(vals) >= 2 && vals[1].Kind == String {
+			if r, ok := nextOccurrence(d, vals[1].Str, ev.now, ev.loc); ok {
+				return DateValue(r)
+			}
+		}
 	case "hoursBetween":
 		a, ok1 := secondsOfDay(0)
 		b, ok2 := secondsOfDay(1)
