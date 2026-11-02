@@ -39,6 +39,7 @@ struct SettingsSheet: View {
                 RetentionSettingsSection() // #482 記録の自動削除
                 syncSection
                 #if !APP_STORE_REVIEW // 審査用ビルドはフィードバックを外す(プライバシーの表示に無い種類を集めるため・#319)
+                if rt.canOpenBetaWelcome { betaWelcomeSection } // #313: β の版だけ
                 feedbackSection
                 #endif
                 PrivacySettingsSection() // #246: AI への送信の同意・プライバシーポリシー・利用規約
@@ -278,6 +279,19 @@ struct SettingsSheet: View {
     }
 
     #if !APP_STORE_REVIEW
+    /// β の案内(#313)。β(TestFlight)の版でだけ出す。
+    private var betaWelcomeSection: some View {
+        Section {
+            Button {
+                dismiss()
+                rt.openBetaWelcome()
+            } label: {
+                Label("β 版のご案内", systemImage: "testtube.2")
+            }
+            .accessibilityIdentifier("settings.betaWelcome")
+        }
+    }
+
     /// フィードバック(#319)。スクショはシートの下のアプリの画面を、開いた時点で撮る(送るかは本人が選ぶ)。
     private var feedbackSection: some View {
         Section {
