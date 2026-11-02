@@ -129,7 +129,8 @@ func runCase(t *testing.T, c conformanceCase, f caseFile) {
 	case Date:
 		s, _ := want.Value.(string)
 		w, err := time.Parse(time.RFC3339, s)
-		if err != nil || !got.Time.Equal(w) {
+		// expected dates have whole seconds (fractional seconds are dropped)
+		if err != nil || !got.Time.Truncate(time.Second).Equal(w) {
 			t.Errorf("date: got %s, want %s", got.Time.In(loc).Format(time.RFC3339), s)
 		}
 	}

@@ -56,15 +56,23 @@ public enum Aggregator {
         case "eq": return v == f.value || v.displayString == (f.value ?? .null).displayString
         case "neq": return !(v == f.value || v.displayString == (f.value ?? .null).displayString)
         case "gt", "gte", "lt", "lte":
-            guard let a = v.doubleValue, let b = f.value?.doubleValue else { return false }
+            guard let order = filterOrder(v, f.value ?? .null) else { return false }
             switch f.op {
-            case "gt": return a > b
-            case "gte": return a >= b
-            case "lt": return a < b
-            default: return a <= b
+            case "gt": return order == .orderedDescending
+            case "gte": return order != .orderedAscending
+            case "lt": return order == .orderedAscending
+            default: return order != .orderedDescending
             }
         default: return true
         }
+    }
+
+    /// 大小比較の filter: 数値(数の文字列・カンマ付きも)同士は数値、日付(date / datetime・日付の文字列)同士は日付で比べる。それ以外は比べない。
+    static func filterOrder(_ a: JSONValue, _ b: JSONValue) -> ComparisonResult? {
+        func num(_ v: JSONValue) -> Double? { v.doubleValue ?? v.stringValue.flatMap(ExprValue.parseNumber) }
+        if let x = num(a), let y = num(b) { return ExprEvaluator.order(x, y) }
+        if let x = FieldCoding.date(from: a), let y = FieldCoding.date(from: b) { return ExprEvaluator.order(x, y) }
+        return nil
     }
 
     /// type refs の保存値 → id の配列(文字列 1 つは 1 件として読む)。

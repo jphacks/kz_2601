@@ -191,14 +191,14 @@
       "expected": {"type": "number", "value": 0, "text": "0"}
     },
     {
-      "name": "sum/numbers-and-plain-numeric-strings",
+      "name": "sum/numbers-and-numeric-strings",
       "expr": {"entity": "expenses", "agg": "sum", "field": "amount"},
-      "expected": {"type": "number", "value": 2850, "text": "2850"}
+      "expected": {"type": "number", "value": 3850, "text": "3850"}
     },
     {
       "name": "avg/amount",
       "expr": {"entity": "expenses", "agg": "avg", "field": "amount"},
-      "expected": {"type": "number", "value": 712.5, "text": "712.5"}
+      "expected": {"type": "number", "value": 770, "text": "770"}
     },
     {
       "name": "min/amount",
@@ -322,24 +322,24 @@
       "expected": {"type": "number", "value": 2, "text": "2"}
     },
     {
-      "name": "filter/gt-number-only",
+      "name": "filter/gt-numbers-and-numeric-strings",
       "expr": {"entity": "expenses", "agg": "count", "filter": {"value": 500, "op": "gt", "field": "amount"}},
-      "expected": {"type": "number", "value": 2, "text": "2"}
+      "expected": {"type": "number", "value": 3, "text": "3"}
     },
     {
-      "name": "filter/gte-string-value-never-matches",
+      "name": "filter/gte-numeric-string-value",
       "expr": {"entity": "expenses", "agg": "count", "filter": {"value": "100", "op": "gte", "field": "amount"}},
-      "expected": {"type": "number", "value": 0, "text": "0"}
+      "expected": {"type": "number", "value": 5, "text": "5"}
     },
     {
       "name": "filter/lt",
       "expr": {"entity": "expenses", "agg": "count", "filter": {"value": 1000, "op": "lt", "field": "amount"}},
-      "expected": {"type": "number", "value": 2, "text": "2"}
+      "expected": {"type": "number", "value": 3, "text": "3"}
     },
     {
       "name": "filter/lte",
       "expr": {"entity": "expenses", "agg": "count", "filter": {"value": 800, "op": "lte", "field": "amount"}},
-      "expected": {"type": "number", "value": 2, "text": "2"}
+      "expected": {"type": "number", "value": 3, "text": "3"}
     },
     {
       "name": "filter/date-gte-expr",
@@ -348,7 +348,7 @@
         "agg": "count",
         "filter": {"value": {"op": "addDays", "args": [{"op": "today", "args": []}, -7]}, "op": "gte", "field": "date"}
       },
-      "expected": {"type": "number", "value": 0, "text": "0"}
+      "expected": {"type": "number", "value": 3, "text": "3"}
     },
     {
       "name": "filter/eq-number-vs-string",
@@ -373,7 +373,7 @@
     {
       "name": "filter/eq-nil-expr-no-row",
       "expr": {"entity": "expenses", "agg": "count", "filter": {"value": {"ref": "id"}, "op": "eq", "field": "payer"}},
-      "expected": {"type": "number", "value": 1, "text": "1"}
+      "expected": {"type": "number", "value": 0, "text": "0"}
     },
     {
       "name": "filter/eq-expr-today",
@@ -422,7 +422,7 @@
     {
       "name": "filter/computed-field",
       "expr": {"entity": "members", "agg": "count", "filter": {"value": 0, "op": "gt", "field": "balance"}},
-      "expected": {"type": "number", "value": 1, "text": "1"}
+      "expected": {"type": "number", "value": 2, "text": "2"}
     },
     {
       "name": "filter/computed-bool",
@@ -432,7 +432,7 @@
     {
       "name": "sum/computed-field",
       "expr": {"entity": "members", "agg": "sum", "field": "paid"},
-      "expected": {"type": "number", "value": 2350, "text": "2350"}
+      "expected": {"type": "number", "value": 3350, "text": "3350"}
     },
     {
       "name": "sum/computed-field-lookup",
@@ -448,7 +448,7 @@
         "filter": {"value": {"ref": "id"}, "op": "eq", "field": "payer"}
       },
       "row": {"entity": "members", "record": {"id": "m2", "data": {"name": "Bob"}}},
-      "expected": {"type": "number", "value": 800, "text": "800"}
+      "expected": {"type": "number", "value": 1800, "text": "1800"}
     },
     {
       "name": "row/count-by-lookup-value",
@@ -577,7 +577,7 @@
           }
         ]
       },
-      "expected": {"type": "number", "value": 2500, "text": "2500"}
+      "expected": {"type": "number", "value": 1500, "text": "1500"}
     },
     {
       "name": "op/weight-change",
@@ -601,7 +601,7 @@
           }
         ]
       },
-      "expected": {"type": "number", "value": 950, "text": "950"}
+      "expected": {"type": "number", "value": 1283, "text": "1283"}
     },
     {
       "name": "op/ratio-of-empty",
@@ -618,6 +618,83 @@
         ]
       },
       "expected": {"type": "nil"}
+    },
+    {
+      "name": "filter/date-range-last-7-days-sum",
+      "expr": {
+        "entity": "expenses",
+        "agg": "sum",
+        "field": "amount",
+        "filter": {"value": {"op": "addDays", "args": [{"op": "today", "args": []}, -7]}, "op": "gte", "field": "date"}
+      },
+      "expected": {"type": "number", "value": 2700, "text": "2700"}
+    },
+    {
+      "name": "filter/date-lt-date-string",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": "2026-10-27", "op": "lt", "field": "date"}},
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "filter/datetime-vs-date-expr",
+      "expr": {
+        "entity": "expenses",
+        "agg": "count",
+        "filter": {"value": {"op": "addDays", "args": [{"op": "today", "args": []}, -2]}, "op": "lte", "field": "date"}
+      },
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "filter/date-vs-number-never-matches",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": 0, "op": "gt", "field": "date"}},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "filter/text-vs-text-never-matches",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": "a", "op": "gt", "field": "title"}},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "filter/comma-string-value",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": "1,000", "op": "gte", "field": "amount"}},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "filter/neq-nil-expr-no-row",
+      "expr": {"entity": "expenses", "agg": "count", "filter": {"value": {"ref": "id"}, "op": "neq", "field": "payer"}},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "filter/gte-nil-expr-matches-none",
+      "expr": {
+        "entity": "expenses",
+        "agg": "count",
+        "filter": {"value": {"op": "div", "args": [1, 0]}, "op": "gte", "field": "amount"}
+      },
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "filter/nil-expr-in-and-list",
+      "expr": {
+        "entity": "expenses",
+        "agg": "count",
+        "filter": [{"value": "m1", "op": "eq", "field": "payer"}, {"value": {"ref": "id"}, "op": "eq", "field": "date"}]
+      },
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "sum/nil-expr-filter-is-zero",
+      "expr": {
+        "entity": "expenses",
+        "agg": "sum",
+        "field": "amount",
+        "filter": {"value": {"ref": "id"}, "op": "eq", "field": "payer"}
+      },
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "earliest/by-createdAt-fractional",
+      "expr": {"entity": "posts", "agg": "earliest", "field": "text", "by": "$createdAt"},
+      "expected": {"type": "string", "value": "yo", "text": "yo"}
     }
   ]
 }

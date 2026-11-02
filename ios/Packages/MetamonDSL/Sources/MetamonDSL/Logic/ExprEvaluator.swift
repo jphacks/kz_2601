@@ -10,10 +10,13 @@ public enum ExprValue: Hashable, Sendable {
     public var number: Double? {
         switch self {
         case .number(let n): return n
-        case .string(let s): return Double(s.replacingOccurrences(of: ",", with: ""))
+        case .string(let s): return Self.parseNumber(s)
         default: return nil
         }
     }
+
+    /// 文字列 → 数値。桁区切りのカンマは除く("1,200" = 1200)。
+    static func parseNumber(_ s: String) -> Double? { Double(s.replacingOccurrences(of: ",", with: "")) }
 
     public var truthy: Bool {
         switch self {
@@ -155,17 +158,20 @@ public final class ExprEvaluator {
         return out
     }
 
-    /// filter.value の Expr を外側の行で評価してリテラルにする。評価できなければ null(=どれにも一致しない)。
-    public func resolve(_ filters: [Filter], row: Row?) -> [Filter] {
-        filters.map { f in
-            guard let e = f.valueExpr else { return f }
-            return Filter(field: f.field, op: f.op, value: evaluate(e, row: row)?.json() ?? .null)
+    /// filter.value の Expr を外側の行で評価してリテラルにする。評価できない(nil)ものがあれば nil(= どのレコードにも一致しない)。
+    public func resolve(_ filters: [Filter], row: Row?) -> [Filter]? {
+        var out: [Filter] = []
+        for f in filters {
+            guard let e = f.valueExpr else { out.append(f); continue }
+            guard let v = evaluate(e, row: row) else { return nil }
+            out.append(Filter(field: f.field, op: f.op, value: v.json()))
         }
+        return out
     }
 
     /// 解決済み filter の AND。
     public func apply(_ filters: [Filter], entity: Entity?, to records: [Record], row: Row? = nil) -> [Record] {
-        let resolved = resolve(filters, row: row)
+        guard let resolved = resolve(filters, row: row) else { return [] }
         guard !resolved.isEmpty else { return records }
         return records.filter { r in resolved.allSatisfy { matches($0, record: r, field: entity?.field($0.field)) } }
     }
@@ -190,16 +196,17 @@ public final class ExprEvaluator {
     // MARK: - agg
 
     private func aggregate(_ a: AggExpr, row: Row?) -> ExprValue? {
-        let resolved = AggExpr(op: a.op, entity: a.entity, field: a.field, by: a.by, filters: resolve(a.filters, row: row))
+        let filters = resolve(a.filters, row: row)
+        let resolved = AggExpr(op: a.op, entity: a.entity, field: a.field, by: a.by, filters: filters ?? a.filters)
         if let hit = aggMemo[resolved] { return hit }
         let entity = entities[a.entity]
         // computed field を集計・絞り込みに使う時だけ合成済みレコードを使う(無駄な評価と自己参照を避ける)
         let usesComputed = ([a.field, a.by].compactMap { $0 } + a.filters.map(\.field)).contains { entity?.field($0)?.isComputed == true }
         let base = usesComputed ? viewRecords(for: a.entity) : source(a.entity)
-        let rows = resolved.filters.isEmpty ? base : base.filter { r in
+        let rows = filters == nil ? [] : resolved.filters.isEmpty ? base : base.filter { r in
             resolved.filters.allSatisfy { matches($0, record: r, field: entity?.field($0.field)) }
         }
-        let nums = a.field.map { f in rows.compactMap { $0[f].doubleValue ?? $0[f].stringValue.flatMap { Double($0) } } } ?? []
+        let nums = a.field.map { f in rows.compactMap { $0[f].doubleValue ?? $0[f].stringValue.flatMap(ExprValue.parseNumber) } } ?? []
         let v: ExprValue?
         switch a.op {
         case "count": v = .number(Double(rows.count))
@@ -383,6 +390,10 @@ public final class ExprEvaluator {
         case (nil, _), (_, nil): return false
         case let (.number(x)?, .number(y)?): return x == y
         case let (.date(x)?, .date(y)?): return x == y
+        case let (.date(x)?, .string(s)?), let (.string(s)?, .date(x)?):
+            // 日付と日付の文字列は日付として比べる(読めない文字列は文字列として)
+            if let y = FieldCoding.date(from: .string(s)) { return x == y }
+            return a?.text == b?.text
         default:
             if let x = a?.number, let y = b?.number { return x == y }
             return a?.text == b?.text
@@ -391,11 +402,17 @@ public final class ExprEvaluator {
 
     static func compare(_ a: ExprValue, _ b: ExprValue) -> ComparisonResult? {
         switch (a, b) {
-        case let (.date(x), .date(y)): return x == y ? .orderedSame : (x < y ? .orderedAscending : .orderedDescending)
-        case (.string(let x), .string(let y)) where Double(x) == nil || Double(y) == nil: return x.compare(y)
+        case let (.date(x), .date(y)): return order(x, y)
+        case let (.date(x), .string(s)): return FieldCoding.date(from: .string(s)).map { order(x, $0) }
+        case let (.string(s), .date(y)): return FieldCoding.date(from: .string(s)).map { order($0, y) }
+        case (.string(let x), .string(let y)) where ExprValue.parseNumber(x) == nil || ExprValue.parseNumber(y) == nil: return x.compare(y)
         default:
             guard let x = a.number, let y = b.number else { return nil }
-            return x == y ? .orderedSame : (x < y ? .orderedAscending : .orderedDescending)
+            return order(x, y)
         }
+    }
+
+    static func order<T: Comparable>(_ x: T, _ y: T) -> ComparisonResult {
+        x == y ? .orderedSame : (x < y ? .orderedAscending : .orderedDescending)
     }
 }

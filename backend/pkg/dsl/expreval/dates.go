@@ -10,14 +10,15 @@ import (
 
 var (
 	// ISO8601DateFormatter's default (.withInternetDateTime): seconds and an
-	// offset are required, fractional seconds are not accepted.
-	isoRe = regexp.MustCompile(`^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(Z|[+-]\d{2}:?\d{2})$`)
+	// offset are required. FieldCoding.date also reads fractional seconds by
+	// removing them, parsing the rest and adding them back.
+	isoRe = regexp.MustCompile(`^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d+)?(Z|[+-]\d{2}:?\d{2})$`)
 	// DateFormatter "yyyy-MM-dd" (en_US_POSIX): month and day may have one digit.
 	dayRe = regexp.MustCompile(`^(\d{1,4})-(\d{1,2})-(\d{1,2})$`)
 )
 
-// parseDate is FieldCoding.date(from:): RFC 3339 with an offset, then
-// "YYYY-MM-DD" at 0:00 in loc. Anything else (fractional seconds, no offset,
+// parseDate is FieldCoding.date(from:): RFC 3339 with an offset (fractional
+// seconds allowed), then "YYYY-MM-DD" at 0:00 in loc. Anything else (no offset,
 // impossible dates such as 2026-02-30) is not a date.
 func parseDate(s string, loc *time.Location) (time.Time, bool) {
 	if m := isoRe.FindStringSubmatch(s); m != nil {
@@ -27,16 +28,16 @@ func parseDate(s string, loc *time.Location) (time.Time, bool) {
 			return time.Time{}, false
 		}
 		zone := time.UTC
-		if m[7] != "Z" {
-			off := strings.ReplaceAll(m[7][1:], ":", "")
+		if m[8] != "Z" {
+			off := strings.ReplaceAll(m[8][1:], ":", "")
 			oh, om := atoi(off[:2]), atoi(off[2:])
 			secs := oh*3600 + om*60
-			if m[7][0] == '-' {
+			if m[8][0] == '-' {
 				secs = -secs
 			}
 			zone = time.FixedZone("", secs)
 		}
-		return time.Date(y, time.Month(mo), d, h, mi, sec, 0, zone), true
+		return time.Date(y, time.Month(mo), d, h, mi, sec, fracNanos(m[7]), zone), true
 	}
 	if m := dayRe.FindStringSubmatch(s); m != nil {
 		y, mo, d := atoi(m[1]), atoi(m[2]), atoi(m[3])
@@ -46,6 +47,15 @@ func parseDate(s string, loc *time.Location) (time.Time, bool) {
 		return time.Date(y, time.Month(mo), d, 0, 0, 0, 0, loc), true
 	}
 	return time.Time{}, false
+}
+
+// fracNanos turns ".123" into nanoseconds (digits past the 9th are dropped).
+func fracNanos(s string) int {
+	if s == "" {
+		return 0
+	}
+	digits := (s[1:] + "000000000")[:9]
+	return atoi(digits)
 }
 
 func parseDateJSON(v any, loc *time.Location) (time.Time, bool) {

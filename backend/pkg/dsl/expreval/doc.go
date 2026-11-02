@@ -12,12 +12,14 @@ package expreval
 //   - String → number is Swift's Double(String) (strtod on the whole string):
 //     no surrounding spaces, "0x10" without a "p" exponent is 16, "1e400" is
 //     +inf, "inf" / "infinity" / "nan" in any case; underscores are rejected
-//     (strconv would accept some). Ops remove commas first ("1,200" = 1200);
-//     agg sums and the string-vs-string branch of gt/lt do not.
+//     (strconv would accept some). Commas are removed first ("1,200" = 1200)
+//     in ops, agg sums and comparisons.
 //   - Date strings are FieldCoding.date(from:): RFC 3339 with seconds and an
-//     offset ("Z", "+09:00" or "+0900"), no fractional seconds; or "YYYY-MM-DD"
-//     (month/day may be one digit) at 0:00 in the device time zone. Impossible
-//     dates (2026-02-30) are not dates.
+//     offset ("Z", "+09:00" or "+0900"), optionally with fractional seconds
+//     (".123"); or "YYYY-MM-DD" (month/day may be one digit) at 0:00 in the
+//     device time zone. Impossible dates (2026-02-30) are not dates here;
+//     iOS's ISO8601DateFormatter rolls impossible datetimes over (no case
+//     covers that yet).
 //   - Calendar math uses Env.Location like Calendar.current: today = local
 //     midnight, daysBetween counts local calendar days (a 23/25-hour DST day
 //     counts as one), addDays keeps the wall-clock time, hoursBetween reads the
@@ -38,5 +40,7 @@ package expreval
 //     iOS; computed cycles evaluate to nil.
 //
 // Record.CreatedAt and Record.AuthorName use "" for "absent" (Swift uses nil).
+// A filter value Expr that evaluates to nil makes the filters match no record.
+// Filter gt/gte/lt/lte compare numbers (numeric strings too), else dates.
 // A filter value {"me": true} is left as is (the caller substitutes the uid),
 // so it never matches, as on iOS before resolvingMe.

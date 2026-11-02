@@ -57,9 +57,14 @@ func (v Value) number() (float64, bool) {
 	case Number:
 		return v.Num, true
 	case String:
-		return swiftDouble(strings.ReplaceAll(v.Str, ",", ""))
+		return parseNumber(v.Str)
 	}
 	return 0, false
+}
+
+// parseNumber is ExprValue.parseNumber: Double(String) after removing commas.
+func parseNumber(s string) (float64, bool) {
+	return swiftDouble(strings.ReplaceAll(s, ",", ""))
 }
 
 // truthy is ExprValue.truthy.

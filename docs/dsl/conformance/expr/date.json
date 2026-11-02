@@ -48,9 +48,9 @@
       "expected": {"type": "number", "value": 1, "text": "1"}
     },
     {
-      "name": "daysBetween/fractional-seconds-unparsed",
+      "name": "daysBetween/fractional-seconds",
       "expr": {"op": "daysBetween", "args": ["2026-10-24T10:00:00.123Z", {"op": "today", "args": []}]},
-      "expected": {"type": "nil"}
+      "expected": {"type": "number", "value": 4, "text": "4"}
     },
     {
       "name": "daysBetween/no-offset-unparsed",
@@ -292,6 +292,27 @@
       "timeZone": "America/New_York",
       "expr": {"op": "toString", "args": [{"op": "addDays", "args": ["2026-11-01", 0]}]},
       "expected": {"type": "string", "value": "2026-11-01", "text": "2026-11-01"}
+    },
+    {
+      "name": "daysBetween/fractional-seconds-offset",
+      "expr": {"op": "daysBetween", "args": ["2026-10-24T23:30:00.5+09:00", {"op": "today", "args": []}]},
+      "expected": {"type": "number", "value": 4, "text": "4"}
+    },
+    {
+      "name": "daysBetween/fractional-seconds-no-digits",
+      "expr": {"op": "daysBetween", "args": ["2026-10-24T10:00:00.Z", {"op": "today", "args": []}]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "gt/fractional-seconds-order",
+      "expr": {
+        "op": "gt",
+        "args": [
+          {"op": "addDays", "args": ["2026-10-24T10:00:00.900Z", 0]},
+          {"op": "addDays", "args": ["2026-10-24T10:00:00.100Z", 0]}
+        ]
+      },
+      "expected": {"type": "bool", "value": true, "text": "true"}
     }
   ]
 }

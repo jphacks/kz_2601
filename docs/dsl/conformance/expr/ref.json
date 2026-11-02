@@ -460,7 +460,7 @@
           "marks": {"like": {"count": 1, "mine": false}}
         }
       },
-      "expected": {"type": "string", "value": "2026-10-27T09:00:00.123Z", "text": "2026-10-27T09:00:00.123Z"}
+      "expected": {"type": "date", "value": "2026-10-27T18:00:00+09:00", "text": "2026-10-27"}
     },
     {
       "name": "reserved/marks",
@@ -488,19 +488,19 @@
       "name": "computed/share",
       "expr": {"ref": "share"},
       "row": {"entity": "members", "record": {"id": "m1", "data": {"name": "Alice"}}},
-      "expected": {"type": "number", "value": 950, "text": "950"}
+      "expected": {"type": "number", "value": 1283, "text": "1283"}
     },
     {
       "name": "computed/balance",
       "expr": {"ref": "balance"},
       "row": {"entity": "members", "record": {"id": "m1", "data": {"name": "Alice"}}},
-      "expected": {"type": "number", "value": 600, "text": "600"}
+      "expected": {"type": "number", "value": 267, "text": "267"}
     },
     {
       "name": "computed/balance-nobody-paid",
       "expr": {"ref": "balance"},
       "row": {"entity": "members", "record": {"id": "m3", "data": {"name": "Carol"}}},
-      "expected": {"type": "number", "value": -950, "text": "-950"}
+      "expected": {"type": "number", "value": -1283, "text": "-1283"}
     },
     {
       "name": "computed/cycle",
