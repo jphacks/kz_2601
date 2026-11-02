@@ -1,0 +1,137 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 6
+          },
+          "id" : "people",
+          "props" : {
+            "entity" : "profile",
+            "rows" : [
+              {
+                "recordId" : "p_me",
+                "subtitle" : "石川県",
+                "title" : "カタン",
+                "trailing" : "わたし"
+              },
+              {
+                "recordId" : "p_a",
+                "subtitle" : "富山県",
+                "title" : "ドミニオン",
+                "trailing" : "あおい"
+              },
+              {
+                "recordId" : "p_b",
+                "subtitle" : "オンライン",
+                "title" : "宝石の煌き",
+                "trailing" : "ひかる"
+              }
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 6,
+            "rowSpan" : 6
+          },
+          "id" : "contacts",
+          "props" : {
+            "entity" : "contact",
+            "rows" : [
+              {
+                "recordId" : "c_me",
+                "subtitle" : "わたし",
+                "title" : "Discord: me#0001"
+              }
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "tab:home"
+      },
+      "title" : "仲間さがし",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "connections",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 4
+          },
+          "id" : "incoming",
+          "props" : {
+            "entity" : "profile",
+            "show" : "incoming",
+            "title" : "届いた「つながりたい」"
+          },
+          "state" : "rendered",
+          "type" : "matchList"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 2
+          },
+          "id" : "outgoing",
+          "props" : {
+            "entity" : "profile",
+            "show" : "outgoing",
+            "title" : "送った「つながりたい」"
+          },
+          "state" : "rendered",
+          "type" : "matchList"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 6,
+            "rowSpan" : 6
+          },
+          "id" : "matches",
+          "props" : {
+            "entity" : "profile",
+            "show" : "matches",
+            "title" : "つながった人"
+          },
+          "state" : "rendered",
+          "type" : "matchList"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "connections",
+        "stack" : "tab:connections"
+      },
+      "title" : "つながり",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

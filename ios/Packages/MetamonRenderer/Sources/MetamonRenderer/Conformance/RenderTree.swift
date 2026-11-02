@@ -154,6 +154,7 @@ public struct RenderTree {
         put("seconds", c.seconds)
         put("limit", c.limit)
         put("expanded", c.expanded)
+        put("show", c.show)
         return p
     }
 
