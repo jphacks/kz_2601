@@ -16,6 +16,8 @@ case "$action" in
     set -- -destination 'generic/platform=iOS' -archivePath "${ARCHIVE_PATH:-build/TailorIt-Review.xcarchive}" "$@" archive ;;
   *) echo "usage: $0 build|archive [xcodebuild args...]" >&2; exit 2 ;;
 esac
+# $(inherited) は xcodebuild の書き方で、シェルに展開させない
+# shellcheck disable=SC2016
 set -- -project Metamon.xcodeproj -scheme Metamon-Review -configuration Review \
   'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) APP_STORE_REVIEW' "$@"
 # 並行ビルドで取り合わないよう lockf で直列にする(#452 G9)。全セッションで同じパスを使う(#568)。
