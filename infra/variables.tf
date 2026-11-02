@@ -38,6 +38,15 @@ variable "apis" {
   ]
 }
 
+variable "extra_apis" {
+  description = "apis に後から足した API。prod の import(imports.prod.tf.example)は apis だけを取り込み、こちらは有効化(冪等)で揃える"
+  type        = list(string)
+  default = [
+    "apikeys.googleapis.com",
+    "firebaseappcheck.googleapis.com",
+  ]
+}
+
 # ---- GitHub / WIF ----
 
 variable "github_repository" {
@@ -72,6 +81,29 @@ variable "firestore_delete_protection" {
   description = "Firestore の削除保護"
   type        = bool
   default     = true
+}
+
+variable "firestore_backup_retention_days" {
+  description = "Firestore の日次バックアップの保持日数。0 ならスケジュールを作らない。プライバシーポリシーの消去期限と合わせる(docs/infra/firestore-backup.md)"
+  type        = number
+  default     = 14
+  validation {
+    condition     = var.firestore_backup_retention_days >= 0 && var.firestore_backup_retention_days <= 98
+    error_message = "0〜98 日(最大 14 週)。"
+  }
+}
+
+# ---- Firebase の API キー(apikeys.tf) ----
+
+variable "firebase_api_keys" {
+  description = "Firebase が作った API キーの制限。キーは作らず、key_id(Credentials の キー ID)で import して制限だけを持つ。空なら管理しない"
+  type = map(object({
+    key_id         = string
+    display_name   = string
+    ios_bundle_ids = optional(list(string), [])
+    api_targets    = list(string)
+  }))
+  default = {}
 }
 
 # ---- 退会アカウントの消去ジョブ(docs/infra/account-purge.md) ----
