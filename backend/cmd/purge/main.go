@@ -157,7 +157,7 @@ func run(ctx context.Context, st purgeStore, users authDeleter, opts options, lo
 			slog.Int("apps", res.Apps), slog.Int("keptMirrors", res.KeptMirrors), slog.Int("shares", res.Shares),
 			slog.Int("listings", res.Listings), slog.Int("releases", res.Releases), slog.Int("owners", res.Owners),
 			slog.Int("installs", res.Installs), slog.Int("memberships", res.Memberships), slog.Int("marks", res.Marks),
-			slog.Int("postsScrubbed", res.PostsScrubbed), slog.Int("feedback", res.Feedback), slog.Bool("authDeleted", users != nil))...)
+			slog.Int("postsScrubbed", res.PostsScrubbed), slog.Int("reports", res.Reports), slog.Int("blocks", res.Blocks), slog.Int("feedback", res.Feedback), slog.Bool("authDeleted", users != nil))...)
 	}
 	if ctx.Err() == nil {
 		failed += purgeFeedback(ctx, st, opts, logger, now)

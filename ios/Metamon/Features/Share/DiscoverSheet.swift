@@ -13,6 +13,7 @@ struct DiscoverSheet: View {
     @State private var items: [PublicAppListing] = []
     @State private var loading = true
     @State private var error: String?
+    @State private var moderation = ModerationUI.shared
 
     var body: some View {
         NavigationStack {
@@ -39,7 +40,8 @@ struct DiscoverSheet: View {
             }
         }
         .presentationDetents([.large])
-        .task(id: "\(sort)|\(query)") { await search() }
+        .task(id: "\(sort)|\(query)|\(moderation.blockCount)") { await search() } // ブロックしたら読み直す(#321)
+        .modifier(ModerationDialogs(discover: true))
     }
 
     @ViewBuilder
@@ -68,6 +70,12 @@ struct DiscoverSheet: View {
         } else {
             ForEach(items) { item in
                 PublicAppCard(item: item) { install(item) }
+                    .contextMenu {
+                        if !item.mine, rt.moderation != nil { // #321
+                            Button("通報する", systemImage: "exclamationmark.bubble") { rt.reportListing(item) }
+                            Button("公開した人をブロック", systemImage: "hand.raised", role: .destructive) { rt.blockPublisher(item) }
+                        }
+                    }
             }
         }
     }
@@ -126,6 +134,12 @@ struct PublicAppCard: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(item.name)をインストール")
+            }
+            if item.hidden == true { // #321: 運営が非公開にした自分の掲載
+                Label(item.hiddenReason.map { L10n.tr("運営により非公開: \($0)") } ?? L10n.tr("運営により非公開"),
+                      systemImage: "eye.slash")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
             }
             if !item.description.isEmpty {
                 Text(item.description)
