@@ -1428,9 +1428,10 @@ components:
         - { $ref: '#/components/schemas/AppWithDSL' }
         - type: object
           properties:
-            joined: { type: boolean, description: 'true = 共有データ付きなので元の appId に参加した' }
             created: { type: boolean, description: 'false = 既に持っていた(参加済み)' }
+            joined: { type: boolean, description: 'true = 共有データ付きなので元の appId に参加した' }
             member: { type: boolean, description: 'true = scope:shared のデータの参加者になった(import だけ・#254)' }
+            mine: { type: boolean, description: 'true = 呼び出した本人が元のアプリの作成者(app_owners)か、リンク/掲載の発行者。iOS は課金画面を出さない(#565)' }
     Member:
       type: object
       required: [uid, displayName, role, you]

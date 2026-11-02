@@ -131,6 +131,7 @@ struct RootView: View {
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
         .modifier(PublicDataPromptHost()) // #253 生成直後の「個人の情報も公開されます」
         .modifier(RetentionPromptHost()) // #482 記録の保存期間の確認
+        .modifier(TrackingBarHost()) // #559 位置の記録中はどの画面でも上に「記録中」バー
         #if !APP_STORE_REVIEW
         .modifier(FeedbackShakeHost()) // #319 端末を振ってフィードバック
         #endif
@@ -176,6 +177,9 @@ struct RootView: View {
         .modifier(ConsentHost()) // #246: AI への送信の同意・音声モデルのダウンロード確認
         .modifier(AccountLinkPromptHost()) // #276: 匿名で初めて作った後の「引き継ぎのためにサインイン」
         .modifier(TutorialHost()) // #274: 同意のあとに初回のチュートリアル・最初のアプリの直後に直し方の例
+        #if !APP_STORE_REVIEW
+        .modifier(BetaWelcomeHost()) // #313: β の版だけ、チュートリアルのあとに初回の案内
+        #endif
         .alert(item: $rt.confirm) { confirm in
             Alert(title: Text(confirm.message),
                   primaryButton: .destructive(Text("実行")) { Task { await confirm.perform() } },

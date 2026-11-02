@@ -266,6 +266,7 @@ func (h *Handler) importShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res.Member = member
+	res.Mine = h.createdBy(r, s.AppID, s.OwnerUID)
 	emitMetric(r, metrics.ShareImported, appHashAttr(res.ID), slog.String("source", "share"),
 		slog.Bool("joined", res.Joined), slog.Bool("created", res.Created))
 	httpx.WriteJSON(w, http.StatusCreated, res)
@@ -281,6 +282,24 @@ type installResult struct {
 	Created bool `json:"created"`
 	// Member: the caller now participates in the app's scope:"shared" data (#254).
 	Member bool `json:"member"`
+	// Mine: the caller created the source app (or issued the link / the
+	// listing), so iOS skips the paywall even without a preview (#565).
+	Mine bool `json:"mine"`
+}
+
+// createdBy reports whether the caller issued the link / listing (issuer) or
+// created srcAppID (app_owners). Best effort: a lookup error means false.
+func (h *Handler) createdBy(r *http.Request, srcAppID, issuer string) bool {
+	uid := uidOf(r)
+	if issuer == uid {
+		return true
+	}
+	o, err := h.appOwner(r.Context(), srcAppID)
+	if err != nil {
+		slog.Warn("appconfig: owner lookup failed", slog.String("appId", srcAppID), slog.Any("error", err))
+		return false
+	}
+	return o == uid
 }
 
 // installCopy puts srcDSL into the caller's tree. Private-only apps get a new
@@ -572,7 +591,7 @@ func (h *Handler) installPublicApp(w http.ResponseWriter, r *http.Request) {
 				fail(w, err)
 				return
 			}
-			httpx.WriteJSON(w, http.StatusCreated, installResult{appWithDSL: appWithDSL{appSummary: summary(cur), DSL: cur.DSL}, Joined: prev == c.ID})
+			httpx.WriteJSON(w, http.StatusCreated, installResult{appWithDSL: appWithDSL{appSummary: summary(cur), DSL: cur.DSL}, Joined: prev == c.ID, Mine: c.OwnerUID == uid})
 			return
 		} else if !errors.Is(err, store.ErrNotFound) {
 			fail(w, err)
@@ -587,6 +606,7 @@ func (h *Handler) installPublicApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	res.Mine = c.OwnerUID == uid
 	if _, err := h.store.RecordInstall(ctx, id, uid, res.ID, res.Created && c.OwnerUID != uid); err != nil {
 		slog.Warn("appconfig: install not recorded", slog.String("id", id), slog.Any("error", err))
 	}

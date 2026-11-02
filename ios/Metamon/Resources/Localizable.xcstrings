@@ -647,6 +647,23 @@
         }
       }
     },
+    "AI が作るので、同じ頼み方でも毎回少し違うものができます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Because AI builds the app, the same request can give a slightly different result each time."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI が作るので、同じ頼み方でも毎回少し違うものができます。"
+          }
+        }
+      }
+    },
     "AI との会話の履歴" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1021,6 +1038,23 @@
         }
       }
     },
+    "Tailor It β へようこそ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Welcome to the Tailor It beta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It β へようこそ"
+          }
+        }
+      }
+    },
     "Tailor It で「%@」を使ってみて\n%@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1068,6 +1102,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tailor It の外でも使える 1 つのアプリとして公開してほしい、と運営に申請します。みんなに需要があると判断したら、運営がリリース作業を行います。"
+          }
+        }
+      }
+    },
+    "β の期間中は、作ったアプリや記録が消えることがあります。大事なデータは、ほかの場所にも残してください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "During the beta, the apps you make and your records may be erased. Keep a copy of anything important somewhere else."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "β の期間中は、作ったアプリや記録が消えることがあります。大事なデータは、ほかの場所にも残してください。"
+          }
+        }
+      }
+    },
+    "β 版のご案内" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About the beta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "β 版のご案内"
+          }
+        }
+      }
+    },
+    "β 版を試していただき、ありがとうございます。使ってみて気づいたことを、ぜひ教えてください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thanks for trying the beta. Please tell us anything you notice while using it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "β 版を試していただき、ありがとうございます。使ってみて気づいたことを、ぜひ教えてください。"
           }
         }
       }
@@ -2228,6 +2313,23 @@
         }
       }
     },
+    "ここまでに記録した地点はそのまま残ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points recorded so far will be kept."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここまでに記録した地点はそのまま残ります。"
+          }
+        }
+      }
+    },
     "このまま作って" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3210,6 +3312,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "または文字で入力"
+          }
+        }
+      }
+    },
+    "まだできないこと" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not supported yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだできないこと"
           }
         }
       }
@@ -4251,6 +4370,23 @@
         }
       }
     },
+    "カレンダー・連絡先・銀行など、ほかのアプリやサービスのデータは読み込めません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It can't read data from other apps or services, such as Calendar, Contacts, or your bank."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダー・連絡先・銀行など、ほかのアプリやサービスのデータは読み込めません。"
+          }
+        }
+      }
+    },
     "キャンセル" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4778,6 +4914,23 @@
         }
       }
     },
+    "タップすると入力欄に入ります(まだ送りません)。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap one to put it in the input field (it won't be sent yet)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップすると入力欄に入ります(まだ送りません)。"
+          }
+        }
+      }
+    },
     "タップで切り替え" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4978,6 +5131,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "データ"
+          }
+        }
+      }
+    },
+    "データについて" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About your data"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データについて"
           }
         }
       }
@@ -6512,6 +6682,74 @@
         }
       }
     },
+    "位置の記録を停止" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop location recording"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置の記録を停止"
+          }
+        }
+      }
+    },
+    "位置の記録を停止しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop recording your location?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置の記録を停止しますか?"
+          }
+        }
+      }
+    },
+    "位置を記録中・経過 %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recording location, %@ elapsed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置を記録中・経過 %@"
+          }
+        }
+      }
+    },
+    "位置情報の許可を待っています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for location permission"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報の許可を待っています"
+          }
+        }
+      }
+    },
     "何を記録したいですか?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6780,6 +7018,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "個人情報の公開"
+          }
+        }
+      }
+    },
+    "停止" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止"
           }
         }
       }
@@ -8042,6 +8297,23 @@
         }
       }
     },
+    "困ったこと・欲しい機能を、ここからそのまま送れます。端末を振っても開けます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send problems or ideas straight from here. You can also shake your device to open it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "困ったこと・欲しい機能を、ここからそのまま送れます。端末を振っても開けます。"
+          }
+        }
+      }
+    },
     "地図・場所" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8344,6 +8616,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "家計簿アプリが欲しい"
+          }
+        }
+      }
+    },
+    "家計簿アプリを作って" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make a budget app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "家計簿アプリを作って"
           }
         }
       }
@@ -9436,6 +9725,23 @@
         }
       }
     },
+    "毎日の体重を記録して、グラフで見せて" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log my weight every day and show it as a graph"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "毎日の体重を記録して、グラフで見せて"
+          }
+        }
+      }
+    },
     "毎日の歩数をグラフで見せて" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9946,6 +10252,23 @@
         }
       }
     },
+    "画面がたくさんつながるアプリや、ゲームのように動くアプリは、思った通りにできないことがあります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps with many connected screens, or game-like apps with motion, may not turn out as you expect."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面がたくさんつながるアプリや、ゲームのように動くアプリは、思った通りにできないことがあります。"
+          }
+        }
+      }
+    },
     "画面のマイクをタップして、話しかけてください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10214,6 +10537,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "筋トレの記録"
+          }
+        }
+      }
+    },
+    "筋トレの記録アプリを作って" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make a workout log app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "筋トレの記録アプリを作って"
           }
         }
       }
@@ -10694,6 +11034,23 @@
         }
       }
     },
+    "記録中" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recording"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録中"
+          }
+        }
+      }
+    },
     "記録帳の一覧" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10945,6 +11302,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定"
+          }
+        }
+      }
+    },
+    "試してほしい依頼" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Things to try"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試してほしい依頼"
           }
         }
       }

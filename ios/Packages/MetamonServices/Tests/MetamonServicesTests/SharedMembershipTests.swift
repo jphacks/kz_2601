@@ -111,5 +111,8 @@ final class SharedMembershipTests: XCTestCase {
     func testInstalledAppMemberDefaultsToFalse() throws {
         let app = try JSONDecoder().decode(InstalledApp.self, from: Data(#"{"id":"a","name":"n","joined":true}"#.utf8))
         XCTAssertFalse(app.member, "#254 より前の backend は member を返さない")
+        XCTAssertFalse(app.mine, "#565 より前の backend は mine を返さない")
+        let own = try JSONDecoder().decode(InstalledApp.self, from: Data(#"{"id":"a","name":"n","joined":true,"mine":true}"#.utf8))
+        XCTAssertTrue(own.mine)
     }
 }
