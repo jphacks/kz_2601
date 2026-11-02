@@ -17,6 +17,7 @@
 - [shared の参加者(#254)](features/members.md)
 - [フィードバック(#319)](features/feedback.md)
 - [決まった形の文章(#417)](features/text.md)
+- [仲間探しのアプリ(#507)](features/matching.md)
 
 ## 1. サービス構成とリクエストフロー
 
@@ -147,10 +148,6 @@ match /apps_public/{appId}/{document=**} {
 ```
 
 機能ごとのコレクション(共有データ・シェア・リリース申請・フィードバック・参加者)は [機能ごとの設計](#機能ごとの設計) の各文書。
-
-### 3.6 仲間探しのアプリ(#507)
-
-`entity.match`(profile / matched)と `apps_public/{appId}/match_pairs`。相互承認・見える範囲・安全の規則は [features/matching.md](features/matching.md)。
 
 ## 4. 認証・認可
 
