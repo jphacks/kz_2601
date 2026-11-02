@@ -1361,19 +1361,36 @@
         }
       }
     },
-    "未対応: %@": {
+    "アプリを更新すると表示できます": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Unsupported: %@"
+            "value": "Update the app to show this"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "未対応: %@"
+            "value": "アプリを更新すると表示できます"
+          }
+        }
+      }
+    },
+    "この端末では使えません": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not available on this device"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この端末では使えません"
           }
         }
       }

@@ -69,8 +69,8 @@ flowchart TD
 | ルート | `AppDocument: Decodable` | `screens: [id: Screen]`、`navigation`、初期 `state` |
 | ノード | `struct Node { id, visible, padding, component }` | 共通メタ + 種別 |
 | 種別 | `indirect enum Component` | `type` 文字列で分岐する手書き `init(from:)` |
-| 未知 type | `.unknown(type:)` | 描画は DEBUG で黄色ラベル、RELEASE で `EmptyView` |
-| 既知 type だが props 不正 | `.invalid(type:reason:)` | 同上。画面全体は落とさない |
+| 未知 type | `.unknown(type:)` | 全ビルドで控えめな枠(`UnavailableComponent`・#536)。`ComponentType` に無い type は「アプリを更新すると表示できます」、有るのにレジストリに無い type(審査用の版で外した部品)は「この端末では使えません」。部品名は出さない(DEBUG だけ type を小さく添える) |
+| 既知 type だが props 不正 | `.invalid(type:reason:)` | DEBUG で黄色ラベル、RELEASE で `EmptyView`(`UnsupportedComponent`)。画面全体は落とさない |
 | 配列中の壊れた要素 | `@Lossy var children: [Node]` | 要素単位で skip |
 | 未知 enum 値 | `Lenient.decode(..., fallback:)` | `style: "neon"` → `.primary` |
 | 再帰 | `DSLView(node:ctx:)` → `switch component` → 子に `DSLView` | `ForEach(children)`(`Node: Identifiable`) |
