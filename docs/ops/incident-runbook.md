@@ -140,28 +140,33 @@ SEV2(全員が生成できない)。料金の暴走は SEV1。
    | 400 で credit / billing の文言 | 前払い残高・月の上限に達した | Console で残高・支出上限を確かめる(費用の見方は [ai-cost.md](../infra/ai-cost.md)) |
    | 401 `authentication_error` | キーが無効(ローテーション漏れ・漏えいで無効化) | §8 |
 
-2. **生成を止める(丁寧に断る)**: 専用の停止スイッチはまだ無いので、**全体の 1 日上限**(コストの遮断器)を 1 にする。Claude を呼ぶ前に 429 `rate_limited`(scope `global`)で断り、iOS は「本日の受付を終了しました / 利用が集中したため、新しい生成を止めています。○時に再開します」のカードを出す。作ったアプリ・記録・一覧(appconfig)はそのまま使える。専用のスイッチは #511 で入る予定(ai に `AI_PAUSED=1`。マージ後は [runtime-config.md](../infra/runtime-config.md#運用で変える値) を参照)。それまでは下の手順で止める。
+2. **生成を止める(丁寧に断る)**: ai に `AI_PAUSED=1` を入れる([ai-pause.md](../infra/ai-pause.md))。生成・対話・テキストだけを Claude を呼ばずに 503 `ai_paused` で断り、iOS は「AI を一時的に止めています。しばらくしてからもう一度お試しください」を出す。作ったアプリ・記録・一覧(appconfig)はそのまま使える。
+
+   ```sh
+   gcloud run services update ai-prod --region=asia-northeast1 --project=jphacks-kz2601 \
+     --update-env-vars=AI_PAUSED=1
+   ```
+
+   **予備(AI_PAUSED が効かない版の時)**: **全体の 1 日上限**(コストの遮断器)を 1 にする。Claude を呼ぶ前に 429 `rate_limited`(scope `global`)で断り、iOS は「本日の受付を終了しました / 利用が集中したため、新しい生成を止めています。○時に再開します」のカードを出す。
 
    ```sh
    gcloud run services update ai-prod --region=asia-northeast1 --project=jphacks-kz2601 \
      --update-env-vars=RATE_LIMIT_GLOBAL_DAILY=1
    ```
 
-   - 数え方は日ごと(JST 0 時でリセット)。今日すでに 1 単位以上使っていれば、以後の生成・対話・aiButton は**全部**断られる。
-   - 断る文言が「利用が集中」なので、**必ずお知らせ(§4)で本当の理由を出す**。
+   - (予備のみ)数え方は日ごと(JST 0 時でリセット)。今日すでに 1 単位以上使っていれば、以後の生成・対話・aiButton は**全部**断られる。
+   - (予備のみ)断る文言が「利用が集中」なので、**必ずお知らせ(§4)で本当の理由を出す**。
    - 止めずに待つ判断もある(短い障害なら、iOS のエラー表示と再試行で足りる)。目安: 30 分を超えそうなら止める。
 
 3. **お知らせを出す**(§4・warning)。
-4. **戻す**: 復旧を 15 分確かめてから既定(2000)に戻し、お知らせを「復旧しました」(新しい id・info)に差し替える。
+4. **戻す**: 復旧を 15 分確かめてから入れた env を外し(`AI_PAUSED` / 予備なら `RATE_LIMIT_GLOBAL_DAILY`。既定 2000 に戻る)、お知らせを「復旧しました」(新しい id・info)に差し替える。
 
    ```sh
    gcloud run services update ai-prod --region=asia-northeast1 --project=jphacks-kz2601 \
-     --remove-env-vars=RATE_LIMIT_GLOBAL_DAILY
+     --remove-env-vars=AI_PAUSED   # 予備を使った時は RATE_LIMIT_GLOBAL_DAILY
    ```
 
-   ※ #513 のマージ後は `RATE_LIMIT_GLOBAL_DAILY` もデプロイの後に残る(戻し忘れに注意)。#513 がマージされるまでは次のデプロイで消える(既定に戻る)ので、止めたままにしたい間は `main` にマージしない。
-
-**専用スイッチ(#511・作業中)**: 理由を正しく出せる `AI_PAUSED=1`(503 + 「一時停止中」の文言)を ai に足す。マージされるまでは上の `RATE_LIMIT_GLOBAL_DAILY=1` で止める。
+   ※ #513 のマージ後は `AI_PAUSED`・`RATE_LIMIT_GLOBAL_DAILY` もデプロイの後に残る(戻し忘れに注意)。#513 がマージされるまでは次のデプロイで消える(既定に戻る)ので、止めたままにしたい間は `main` にマージしない。
 
 ## 6. 手順 B: 悪いデプロイを戻す
 
