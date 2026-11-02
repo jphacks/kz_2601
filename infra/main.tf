@@ -26,7 +26,7 @@ locals {
 }
 
 resource "google_project_service" "this" {
-  for_each = toset(var.apis)
+  for_each = toset(concat(var.apis, var.extra_apis))
 
   project = var.project_id
   service = each.key
