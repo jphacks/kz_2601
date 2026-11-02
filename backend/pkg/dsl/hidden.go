@@ -94,6 +94,8 @@ func hiddenDisplayRefs(c *Component) []displayRef {
 	addRef("balanceField", c.BalanceField)
 	addRef("columnField", c.ColumnField)
 	addRef("rowField", c.RowField)
+	addRef("front", c.Front)
+	addRef("back", c.Back)
 	// stat / chart / progressBar / gauge: the aggregated value (count reads no field).
 	if c.Aggregate != "count" {
 		switch c.Type {

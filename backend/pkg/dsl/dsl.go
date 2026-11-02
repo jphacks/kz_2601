@@ -312,6 +312,8 @@ const (
 	CompMusicPlayer ComponentType = "musicPlayer"
 	// matching (#507): incoming / outgoing / matched people of a match:"profile" entity
 	CompMatchList ComponentType = "matchList"
+	// flashcards (#264): one card at a time, tap to flip, swipe to mark learned
+	CompFlashcards ComponentType = "flashcards"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -463,6 +465,11 @@ type Component struct {
 
 	// matchList (#507). Entity (the match:"profile" entity) / Title / EmptyText / Item / OnItemTap are shared.
 	Show string `json:"show,omitempty"` // incoming|outgoing|matches
+
+	// flashcards (#264). Entity / Filter are shared.
+	Front  string `json:"front,omitempty"`  // field on the card's face
+	Back   string `json:"back,omitempty"`   // field shown when flipped
+	Toggle string `json:"toggle,omitempty"` // boolean field: learned (swipe right) / not yet (left)
 }
 
 // PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the
