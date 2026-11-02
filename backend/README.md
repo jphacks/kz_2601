@@ -39,7 +39,8 @@ middleware の組み立ては `httpx.Chain` で 1 行に 1 つ(外側から順�
 ```sh
 cd backend
 make build vet test      # CI と同じ(golangci-lint run ./... も通す)
-make emulator            # 別ターミナル: Firestore :8089 / Auth :9099
+make emulator            # 別ターミナル: Firestore :8089(gcloud・CI と同じ。Auth エミュレータは無し)
+make test-emulator       # エミュレータ試験(CI の backend-emulator と同じ判定。無ければ一時起動して止める)
 make dev                 # appconfig :8080 / ai :8081 (AUTH_MODE=dev, X-Debug-Uid で叩ける)
 make schema-sync         # docs/dsl/dsl.schema.json → pkg/dsl/schema.json (スキーマ変更時)
 
