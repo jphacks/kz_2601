@@ -127,6 +127,9 @@ public struct RealtimeDocumentSync: DocumentSync {
         if let bearer = try await client.token.idToken(forceRefresh: forceRefresh) {
             req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
         }
+        if let check = await HTTP.appCheck?.token(forceRefresh: forceRefresh) {
+            req.setValue(check, forHTTPHeaderField: AppCheckHeader.name) // #318
+        }
         let (bytes, resp) = try await HTTP.session.bytes(for: req)
         let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
         if status == 401 { throw StreamError.unauthorized }

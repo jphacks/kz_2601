@@ -19,6 +19,7 @@
 | `shares/*`(本人が出した共有リンク) | 消す |
 | `public_apps/*`(本人の「探す」掲載)と `installs/*` | 消す |
 | `release_requests/*`(連絡先を含む) | 消す |
+| `feedback/*`(本人が送ったフィードバック・#319) | 消す |
 | `app_owners/*`(本人が作ったアプリの記録) | 消す(下の「残す共有アプリ」の分は残す) |
 | `public_apps/*/installs/{uid}`(本人が他の人の掲載を入れた記録) | 消す |
 | `apps_public/*/members/{uid}`(参加者としての表示名) | 消す |
@@ -26,6 +27,8 @@
 | 本人だけが使っていた共有アプリ(`apps_public/{appId}` と記録) | 消す |
 | 他の人が参加・投稿している、本人の共有アプリ(`apps_public/{appId}`・記録・参加者・`app_owners`) | **残す**(その人たちの共有の場のため) |
 | 他の人と共有しているアプリへの本人の投稿 | **残す**(ポリシー §4)。ただし表示名(`authorName`)は消す。`author` の uid は残るが、Firebase のアカウントは消えるので、誰かにはたどれない |
+| `reports/*`(本人が出した通報・本人が対象の通報)と `report_quota/{uid}`(#321) | 消す |
+| `users/{uid}/blocks/*`(本人のブロック一覧・#321) | 消す。他の人のブロック一覧にある本人の uid は残る(たどれる先が無くなるだけ) |
 | Firebase Auth のユーザー | 消す(アプリが退会時に消しているので、ここは取りこぼしの保険) |
 | `users/{uid}` | `{status: "purged", purgedAt}` だけの墓標にする(`deletedAt` は消す)。同じ uid が来ても 410 を返し続け、二度と対象にならない |
 | `rateLimits/*_uid_{uid}` | ジョブでは消さない。日付ごとの回数だけで、TTL で消す(下の提案) |
@@ -45,6 +48,8 @@
 | `-limit` | 50 | 1 回で扱う最大件数 |
 | `-older-than` | 720h | 論理削除からの経過時間。24h 未満は拒否する |
 | `-delete-auth` | true | Firebase Auth のユーザーも消す |
+| `-feedback-older-than` | 4320h | フィードバック(#319)の保存期間(180 日)。アカウントとは別に、これより古い `feedback/*` を毎回消す。24h 未満は拒否する |
+| `-feedback-limit` | 500 | 1 回で消すフィードバックの最大件数(残りは次の日) |
 
 ローカル(エミュレータ)で試す: `make emulator` の後に `make -C backend run-purge`(既定は `-dry-run`。`PURGE_FLAGS="-older-than=24h"` などで変える)。
 

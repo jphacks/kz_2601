@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -10,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jphacks/kz_2601/backend/internal/appcheck"
 	"github.com/jphacks/kz_2601/backend/internal/appconfig"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
@@ -59,7 +62,55 @@ func TestRoutes(t *testing.T) {
 
 var openAPIErrorCodes = []string{
 	"bad_request", "unauthenticated", "not_found", "version_conflict",
-	"invalid_dsl", "invalid_record", "payload_too_large", "rate_limited", "internal",
+	"invalid_dsl", "invalid_record", "payload_too_large", "rate_limited", "app_check_failed", "internal",
+}
+
+// APP_CHECK_MODE=enforce guards only the authenticated API (#318): health, the
+// share page and client-config (old builds learn they must update) stay open.
+func TestAppCheckEnforceGuardsAPIOnly(t *testing.T) {
+	t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
+	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
+	ac := appcheck.Middleware(appcheck.Config{Mode: appcheck.ModeEnforce, Verifier: okVerifier{}, Logger: logger})
+	authed := func(h http.Handler) http.Handler { return ac(auth.Middleware(nil, auth.ModeDev)(h)) }
+	share := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	h := newHandler(authed, logger, appconfig.New(store.NewMemory()), share)
+
+	tests := []struct {
+		path, token string
+		want        int
+	}{
+		{"/health", "", http.StatusOK},
+		{"/s/abc", "", http.StatusOK},
+		{"/v1/client-config", "", http.StatusOK},
+		{"/v1/nope", "", http.StatusNotFound},
+		{"/v1/apps", "", http.StatusUnauthorized},
+		{"/v1/apps", "bad", http.StatusUnauthorized},
+		{"/v1/apps", "ok", http.StatusOK},
+	}
+	for _, tt := range tests {
+		req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+		req.Header.Set(auth.DebugUIDHeader, "u1")
+		if tt.token != "" {
+			req.Header.Set(appcheck.Header, tt.token)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != tt.want {
+			t.Fatalf("%s token=%q: status %d, want %d (%s)", tt.path, tt.token, rec.Code, tt.want, rec.Body.String())
+		}
+		if tt.want == http.StatusUnauthorized && !strings.Contains(rec.Body.String(), httpx.CodeAppCheckFailed) {
+			t.Fatalf("%s: body %s", tt.path, rec.Body.String())
+		}
+	}
+}
+
+type okVerifier struct{}
+
+func (okVerifier) Verify(_ context.Context, token string) (string, error) {
+	if token != "ok" {
+		return "", errors.New("invalid")
+	}
+	return "ios", nil
 }
 
 func TestUnmatchedRoutesReturnErrorEnvelope(t *testing.T) {

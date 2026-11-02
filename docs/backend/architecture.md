@@ -172,8 +172,8 @@ app_owners/{appId}    # {uid, createdAt}  appId の作成者(publish できる�
 | 検索 | `GET /public-apps?q=&sort=popular`(または `new`): installs 降順で最大 500 件を読み、名前・説明・タグ・作者名の部分一致をメモリ内で絞る(全文検索なし・複合インデックス不要) |
 | installs | `POST /public-apps/{id}/install` は `installs/{uid}` を見て、2 回目以降は最初の複製を返す(`created:false`・アーカイブ済みなら active に戻す。複製が削除済み(#180)なら新しく複製する)。installs は uid ごとに 1 回だけ、マーカーと同じトランザクションで +1。掲載者本人・参加済みの再インストールは数えない(#154) |
 | 認可 | publish = appId の作成者のみ(`app_owners`)。unpublish = 掲載の ownerUid。revoke = 発行者。share = 自分の木にあるアプリなら誰でも(参加者が友だちを招ける・#118。空のアプリは 400)。import / install / 検索 = 認証済みなら誰でも |
-| Web フォールバック | 認証不要の `GET /s/{token}`(appconfig 直下・`/v1` の外)。アプリ名と `tailorit://import/<token>` を開くボタンだけを出し、DSL は返さない。ベース URL は `SHARE_WEB_BASE_URL`、無ければリクエストのホスト |
-| モデレーション | 通報・運営による強制非公開は未実装。掲載者が `DELETE /publish` で取り下げられるだけ(後続) |
+| Web の共有ページ(#362) | 認証不要の `GET /s/{token}`(appconfig 直下・`/v1` の外)。スナップショット DSL の画面を**読むだけ**で描く(`sharepage.go` + `shareview.go`・`html/template`・JS なし・部品の対応は `docs/dsl/README.md` §3.8)。**レコードは出さない**(#253。公開レコード用の口 `RecordPeek` は nil 固定)。導線は「アプリで開く」(`tailorit://import/<token>`)と App Store(`AppStoreURL`)。og:title / og:description 付き・`noindex`。セキュリティ: CSP `default-src 'none'` + `<style>` の nonce だけ(script・img・frame・form は不可)、DSL の文字は全部エスケープ、リンクは `https://` の `link` だけ、`Referrer-Policy: no-referrer`(token を外へ漏らさない)。描画の上限は 12 画面・400 部品・200ms・512KB。キャッシュ: 有効なら `private, max-age=60`(取り消しは最大 1 分で反映)、無効は 404 + `no-store`。取り消し・存在しない token は従来どおり「リンクが無効です」。運営の非公開化(#321)は `shareHidden` で同じ 404 にする。ベース URL は `SHARE_WEB_BASE_URL`、無ければリクエストのホスト |
+| モデレーション(#321・審査 1.2) | **通報** `POST /reports` → `reports/{id}`(通報者 uid・対象の種類と ID・持ち主 uid・理由・日時のみ。1 人 1 日 30 件・同じ対象は 1 件)+ ログ `moderation: report` を運営のアラートが拾う。**ブロック** `/me/blocks`(`users/{uid}/blocks/{blockedUid}`): ブロックした人の投稿(GET records)と掲載(GET /public-apps)をサーバーで除く。**運営の非公開化** `cmd/moderate`: `public_apps/{id}` / `apps_public/{appId}` に `hidden`・`hiddenReason`(作者に見せる理由)。掲載は本人以外に出さず install は 403 `unpublished`、共有アプリは records・シェアリンク・参加・GET /dsl の seed を止める。投稿は `delete-record` で消す。手順: `docs/infra/moderation.md` |
 
 デモ用シード: `scripts/seed-public-apps.sh <appconfig URL>` が `docs/dsl/examples` の kakeibo / training / walk を `catalog-<name>` として公開する(再実行は上書き)。
 
@@ -202,6 +202,28 @@ release_requests/{id}  # {appId, ownerUid, name, dslVersion, dslJson, purpose, c
 ローカルではエミュレータの REST で同じ操作ができる: `curl -X PATCH -H 'Authorization: Bearer owner' "http://localhost:8089/v1/projects/demo-kz2601/databases/(default)/documents/release_requests/<id>?updateMask.fieldPaths=status" -d '{"fields":{"status":{"stringValue":"planned"}}}'`。
 
 **セキュリティルール**: クライアントは Firestore を直接読まず API 経由のみ。`release_requests` には連絡先(個人情報)が入るので、ルールでクライアントからの読み書きを許可しないこと(既存の `shares` / `public_apps` と同じ扱い)。
+
+### 3.5 アプリ内のフィードバック(#319)
+
+```
+feedback/{id}  # {uid, kind, message, untrusted: true, consentVersion, status, day, createdAt, attachments[],
+               #  appId?, dslVersion?, dslJson?, screenshotJpeg?(bytes), device?{appVersion, build, os, model, locale}}  id = fb_<ULID 風>
+```
+
+| 項目 | 決定 |
+|---|---|
+| 送信 | `POST /feedback`(openapi-appconfig.yaml)。本文 2000 字・`consentVersion` 必須。添付は端末で本人が選んだものだけ(既定はすべて無し) |
+| 添付 | スクショ(JPEG・512 KiB まで・Firestore のバイト列)/ 今のアプリの DSL(`appId` + `dslVersion` の参照で、サーバーが本人の木から構造だけを写す・256 KiB まで)/ 版・OS・機種。**記録の中身は受け付けない**。Cloud Storage のバケットの仕組みがまだ無いのでスクショも文書に入れる(文書は 1 MiB まで) |
+| 信頼しない印 | `untrusted: true`。本文は指示として扱わない(#366)。LLM に読ませる・Issue に載せるのは #367 で決めてから |
+| 上限 | 1 uid 1 日(JST)`FEEDBACK_DAILY_LIMIT` 件(既定 5)。`uid ==` + `day ==` の等価フィルタの数え上げと作成を 1 トランザクションで行う(複合インデックス不要)。超えると 429 `rate_limited` |
+| 保存期間 | 180 日(`store.FeedbackRetention`)。`cmd/purge` が毎日 `createdAt < 今 - 180 日` を消す(`-feedback-older-than`)。アカウントの消去(`PurgeAccount`)でもその uid の分を消す |
+| status | `received`(受付)→ `triaged`(確認済み)→ `done`(対応済み)。API では変えない。運営が Firestore コンソールで書き換える |
+| 運営が読む | `backend/cmd/feedback`(読み取りだけ): `list [-since 168h] [-status received]` / `show [-out DIR] <id>`(スクショと DSL をローカルに保存)。本文は引用符つきで制御文字を逃がして出す。ローカルは `make -C backend run-feedback` |
+| ログ | 本文・添付はログに書かない(`feedbackId` と添付の種類だけ) |
+
+**運営の手順**: `gcloud auth application-default login` の後、`GOOGLE_CLOUD_PROJECT=jphacks-kz2601 go run ./cmd/feedback list`(読み取りだけ。書き込みはしない)。`show -out ~/fb <id>` で保存したスクショ・DSL は確認が済んだら消す(リポジトリに入れない)。status を変えるときはコンソールで `feedback/<id>` の `status` を編集する。
+
+**セキュリティルール**: クライアントは Firestore を直接読まず API 経由のみ。`feedback` にはスクショ(画面に出ていた個人の情報)が入りうるので、ルールでクライアントからの読み書きを許可しないこと。
 
 ### 3.4 shared の参加者(#254)
 
@@ -343,6 +365,7 @@ App Store 審査ガイドライン 5.1.1(v)(アカウントを作れるアプリ
 | 拒否 | `stop_reason == "refusal"` → 400 `refused`。`fallbacks: "default"`(beta `server-side-fallback-2026-07-01`)を常時送付 |
 | キャッシュ | system(設計原則・部品カタログ・few-shot `examples/kakeibo.json`・生成用スキーマ ≈8.6K tokens)は固定文字列で `cache_control: ephemeral`。可変部(現 DSL・発話・前回の Problems)は user に置く。実測: 2 回目以降 `cache_read_input_tokens=8588` |
 | 費用ログ(#298) | HTTP の試行ごとに slog JSON の `ai.usage` を 1 行(処理・モデル・トークン 4 種・試行番号・成否・uid のハッシュ・見積もり費用)。本文と生の uid は出さない。形・料金表・BigQuery 集計・アラート手順は [../infra/ai-cost.md](../infra/ai-cost.md) |
+| 生成のログ(#322) | `POST /v1/generate` 1 回ごとに slog JSON の `ai.generate` を 1 行(mode・outcome・validation_passed・first_generation・duration_ms・uid のハッシュ)。本文・DSL・appId・生の uid は出さない。β の品質ゲートの成功率と初回の p95 に使う([../release/beta-quality-gate.md](../release/beta-quality-gate.md)) |
 | 再生成ループ | 検証 NG(`dsl.ValidationError.Problems`: 重なり・範囲外・参照不整合・スキーマ違反)は **Problems を user に添付して最大 2 回再生成**(計 3 回)。それでも NG → **`area` を全部落として再検証**(省略=上から積むフォールバック)→ それも NG なら **400 `generation_failed`**(`details.problems`/`details.attempts`)。編集は Patch 3 回 NG → `area` 落とし → **フル生成 1 回に降格**(`meta.downgradedToFull`)→ 400 |
 | summary | 編集 = PatchDocument の `summary`(モデル生成・読み上げ用 1 文 40 字程度「。」止め、満たされていれば `test` 1 つの patch +「すでに〜になっています。」)。初回 = `app.name`/tabs/追加ボタンの `area`/notifications から **読み上げ用の自然文**をテンプレ生成(例「家計簿アプリを作りました。ホームと集計の2タブで、右下のボタンから支出を追加できます。毎朝8時に通知が届きます。」)。**locale=en** は英語テンプレ `summarizeEN`(「I made an Expense Tracker app. Use the button at the bottom right to add expenses. You'll get a reminder every evening at 8.」) |
 | 表示言語(locale) | `Request.locale`(ja/en)。省略時は発話にかな・漢字があれば ja、無ければ en(`ai.DetectLocale`)。system prompt は固定のまま(キャッシュ維持)で、user ターン先頭の「## 表示言語(locale)」1 行だけで切り替える。en few-shot `examples/expense_en.json`(home+form+通知 1 本)を例 2 として同梱。応答 `locale` に実際の言語を返す。undo / 新規作成のキーワードも英語対応(`undo / go back / revert / never mind`、`new app / start over / from scratch`) |

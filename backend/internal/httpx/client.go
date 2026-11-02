@@ -16,8 +16,8 @@ const (
 	ClientDSLVersionHeader = "X-Client-DSL-Version" // highest DSL schemaVersion the client renders
 )
 
-// clientAttrs returns the client headers present on r as log attributes.
-func clientAttrs(r *http.Request) []any {
+// ClientAttrs returns the client headers present on r as log attributes.
+func ClientAttrs(r *http.Request) []any {
 	var out []any
 	for _, h := range []struct{ key, header string }{
 		{"clientPlatform", ClientPlatformHeader},

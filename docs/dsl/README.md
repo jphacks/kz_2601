@@ -318,6 +318,28 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - AI: `backend/internal/ai/retention_rules.go`。一括削除の制限(chatLimits)と混同して断らない。ai-eval の `retention`(日数・0 = 無し)/ `retentionOnRef`(`retention_cases.json` / `retention_chat_cases.json`)。
 - 古い iOS(#302): v1.0 は `retentionDays` を知らない(無視して消さない)。iOS は generate / chat の body `supportedFeatures: ["recordRetention"]` で実装済みを伝え、`allowedComponents` を送るのに `recordRetention` を含めない版には AI が使わない(§5.2・§5.3)。審査用の版も記録の自動削除を持つ(端末内の処理だけで、共有もネイティブ API も使わない)。
 
+### 3.8 Web の共有ページで描ける部品(#362・#351 の Web 列)
+
+`GET /s/{token}`(appconfig・認証不要)は、シェアのスナップショット DSL を**読むだけ**で描く(Go の `html/template`・JavaScript なし。実装 `backend/internal/appconfig/shareview.go`)。**レコードは出さない**(#253): データを使う部品は空の状態(「—」・`emptyText`・「記録はアプリで見られます」)だけ。グリッド(§3.4 の `area`、card / section / vstack のローカルグリッド)はそのまま 6 列の CSS grid に置き、`area` 無しは下に積む。
+
+| 区分 | 部品 | Web での見え方 |
+|---|---|---|
+| 描く | `vstack` `hstack` `section` `card` `disclosure` `carousel` `grid` | 並び・見出し・枠(disclosure は `<details>`、carousel は横スクロール) |
+| 描く | `text` `label` `markdown` | 文字(`style` title / headline は見出し。markdown は記法を解釈せず文字のまま) |
+| 描く | `badge` `divider` `spacer` `emptyState` `icon` | 文字・線・余白(icon は丸い印だけ。SF Symbols は出さない) |
+| 描く(空) | `stat` `healthStat` `progressBar` `gauge` | ラベル + 「—」/ 空のバー |
+| 描く(構造だけ) | `list` `timeline` `table` | 行に出る項目名(list の title / subtitle / trailing、table の列名)+ 空の表示 |
+| 描く(見本) | `chart` | 固定の見本の棒 / 円(SVG・データではない)+「グラフはアプリで見られます」 |
+| 描く(押せない) | `textField` `numberField` `datePicker` `timePicker` `picker` `toggle` `slider` `stepper` `textEditor` `secureField` `colorPicker` `rating` `searchBar` | `disabled` の入力欄(picker は enum の選択肢、ラベルは無ければ項目名) |
+| 描く(押せない) | `button` `shareButton` `openUrlButton` `photoField` `videoField` | `disabled` のボタン。URL は出さない |
+| 描く(リンク) | `link` | `https://` の時だけリンク(`rel="nofollow noopener noreferrer ugc"`)、それ以外は文字だけ |
+| 代わりの表示 | `image` `avatar` `videoPlayer` | 「写真」の枠 |
+| 代わりの表示 | 上以外すべて(`voiceInput` `calendar` `gridTable` `mapView` `qrScanner` `qrCode` `timerDisplay` `webView` `settlement` `randomPicker` `aiButton` `chatThread` `dashcam` `sensorValue` `musicPlayer` など)と未知の type | 「アプリで見られます」の枠(`title` があれば添える) |
+
+- 画面の順: タブの順 → `initialScreen` → 残り。上限 12 画面・400 部品・200ms・出力 512KB(超えたら「続きはアプリで見られます」/ 名前と導線だけに落とす)。
+- 公開レコードを見せる口: `RecordPeek`(`shareview.go`)。今は常に nil。実装しても渡るのは `scope:"public"` の entity だけ(private / shared は渡さない)。見せるかどうかは #253 の判断待ち。
+- 部品を足した時: この表に行を足す(何もしなければ「アプリで見られます」になるので壊れない)。
+
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 
 AI に渡す部品カタログは手書きではなく **`dsl.schema.json` から自動生成**される(`backend/internal/ai/catalog.go` の `BuildCatalog`)。検証(Go)・描画(iOS)・AI(プロンプト)の 3 者はすべてスキーマから導出され、抜けはテストで赤になる。

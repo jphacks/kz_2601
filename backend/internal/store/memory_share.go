@@ -75,7 +75,7 @@ func (m *Memory) PutCatalogApp(_ context.Context, uid string, c CatalogApp) (*Ca
 		if old.OwnerUID != uid {
 			return nil, ErrForbidden
 		}
-		c.CreatedAt, c.Installs = old.CreatedAt, old.Installs
+		c.CreatedAt, c.Installs, c.ModerationState = old.CreatedAt, old.Installs, old.ModerationState
 	}
 	m.catalog[c.ID] = cloneCatalog(&c, true)
 	return cloneCatalog(&c, false), nil

@@ -5,7 +5,8 @@ info:
   description: |
     音声/文字 → Claude → DSL JSON 生成 → appconfig へ反映。
     - 認証・エラー形式・ページングは appconfig と同一 (`openapi-appconfig.yaml` の `Error` を再利用)。
-    - ai は受け取った Bearer をそのまま appconfig へ転送する。
+    - ai は受け取った Bearer と `X-Firebase-AppCheck` をそのまま appconfig へ転送する。
+    - App Check(#318): `APP_CHECK_MODE=enforce` の時、`X-Firebase-AppCheck` が無い・無効なら(上限を数える前に)401 `app_check_failed`。off / log では無くても通る。`/health` は対象外。`docs/infra/app-check.md`
     - `POST /generate`・`POST /chat`・`POST /text` は ai 自身も ID トークンを検証し、利用者ごと・1 日ごとの上限を数える (#280)。
       上限に当たると 429 `rate_limited`(`RateLimited`)。重さ: chat 1 往復 = 1、text 1 回 = 1、generate の修正 = 2、新規作成(create/auto)= 3、undo = 0。
       既定の上限: 匿名 30 / サインイン済み 60 / Pro 300(サーバーでの Pro 判定は未実装)/ 匿名の同一 IP 300 / 環境全体 2000。日付は 0:00 JST で切り替わる。

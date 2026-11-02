@@ -40,7 +40,9 @@ func setup(t *testing.T, uids ...string) *store.Memory {
 	return m
 }
 
-func opts() options { return options{limit: 50, olderThan: store.PurgeAfter, deleteAuth: true} }
+func opts() options {
+	return options{limit: 50, olderThan: store.PurgeAfter, deleteAuth: true, feedbackOlderThan: store.FeedbackRetention, feedbackLimit: 500}
+}
 
 func TestRunPurgesOnlyOldDeletedAccounts(t *testing.T) {
 	ctx := context.Background()
@@ -143,5 +145,42 @@ func TestRunRefusesShortWindow(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
 	if failed := run(context.Background(), store.NewMemory(), nil, o, logger, time.Now()); failed != 1 {
 		t.Fatalf("failed=%d", failed)
+	}
+}
+
+func TestRunErasesExpiredFeedback(t *testing.T) {
+	ctx := context.Background()
+	m := setup(t)
+	old, err := m.CreateFeedback(ctx, store.Feedback{UID: "a", Message: "old", ConsentVersion: "v1"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.CreateFeedback(ctx, store.Feedback{UID: "a", Message: "new", ConsentVersion: "v1"}, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.SetFeedbackCreatedAt(old.ID, time.Now().Add(-181*24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	logger := slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil))
+
+	dry := opts()
+	dry.dryRun = true
+	if failed := run(ctx, m, nil, dry, logger, time.Now()); failed != 0 {
+		t.Fatalf("dry run failed=%d", failed)
+	}
+	if items, _ := m.ListFeedback(ctx, store.FeedbackQuery{}); len(items) != 2 {
+		t.Fatalf("dry run must keep everything: %d", len(items))
+	}
+	if failed := run(ctx, m, nil, opts(), logger, time.Now()); failed != 0 {
+		t.Fatalf("failed=%d", failed)
+	}
+	items, _ := m.ListFeedback(ctx, store.FeedbackQuery{})
+	if len(items) != 1 || items[0].Message != "new" {
+		t.Fatalf("left: %+v", items)
+	}
+	short := opts()
+	short.feedbackOlderThan = time.Hour
+	if failed := run(ctx, m, nil, short, logger, time.Now()); failed != 1 {
+		t.Fatalf("below 24h must be refused: failed=%d", failed)
 	}
 }

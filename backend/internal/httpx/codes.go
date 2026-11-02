@@ -10,5 +10,6 @@ const (
 	CodeInvalidRecord   = "invalid_record"
 	CodePayloadTooLarge = "payload_too_large"
 	CodeRateLimited     = "rate_limited"
+	CodeAppCheckFailed  = "app_check_failed" // App Check enforce (#318)
 	CodeInternal        = "internal"
 )

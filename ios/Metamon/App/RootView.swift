@@ -105,6 +105,7 @@ struct RootView: View {
                 .modifier(HostSheets(onModal: true))
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
+                .modifier(ModerationDialogs(onModal: true))
                 #endif
                 .modifier(ToastHost(onModal: true))
         }
@@ -113,6 +114,7 @@ struct RootView: View {
                 .modifier(HostSheets(onModal: true))
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
+                .modifier(ModerationDialogs(onModal: true))
                 #endif
                 .modifier(ToastHost(onModal: true))
         }
@@ -120,11 +122,15 @@ struct RootView: View {
         #if !APP_STORE_REVIEW // 審査用ビルドはシェアリンク・探す・近くの端末との共有を外す(#245)
         .modifier(SharingHooks()) // シェアリンク受信・「探す」シート(#49 #50)
         .modifier(NearbySheets(onModal: false)) // 近くの端末と送り合う(#36)
+        .modifier(ModerationDialogs()) // 通報・ブロック(#321)
         #endif
         .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
         .modifier(PublicDataPromptHost()) // #253 生成直後の「個人の情報も公開されます」
         .modifier(RetentionPromptHost()) // #482 記録の保存期間の確認
+        #if !APP_STORE_REVIEW
+        .modifier(FeedbackShakeHost()) // #319 端末を振ってフィードバック
+        #endif
         .onChange(of: rt.document.version) {
             // 変身(apply)が落ち着いてから今の画面をサムネに撮る(変身一覧カード用)
             Task {

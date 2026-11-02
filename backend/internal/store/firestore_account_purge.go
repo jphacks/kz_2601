@@ -72,9 +72,29 @@ func (f *Firestore) PurgeAccount(ctx context.Context, uid string) (AccountPurgeR
 			res.Releases += n
 			return err
 		}},
+		{"feedback", func() error {
+			n, err := f.deleteQuery(ctx, f.c.Collection(feedbackCollection).Where("uid", "==", uid), nil)
+			res.Feedback += n
+			return err
+		}},
 		{"installs", func() error {
 			n, err := f.purgeInstalls(ctx, uid)
 			res.Installs += n
+			return err
+		}},
+		{"moderation", func() error {
+			for _, field := range []string{"reporterUid", "targetUid"} {
+				n, err := f.deleteQuery(ctx, f.c.Collection(reportsCollection).Where(field, "==", uid), nil)
+				res.Reports += n
+				if err != nil {
+					return err
+				}
+			}
+			if _, err := f.c.Collection(reportQuotaCollection).Doc(uid).Delete(ctx); err != nil {
+				return err
+			}
+			n, err := f.deleteQuery(ctx, f.userRef(uid).Collection(blocksCollection).Query, nil)
+			res.Blocks += n
 			return err
 		}},
 		{"owners", func() error {

@@ -857,7 +857,13 @@ final class AppRuntime: DSLRuntime {
 
     // MARK: - Records
 
-    func records(for entity: String) -> [Record] { records[entity] ?? [] }
+    func records(for entity: String) -> [Record] {
+        #if APP_STORE_REVIEW
+        records[entity] ?? []
+        #else
+        hidingBlocked(records[entity] ?? [], entity: entity) // #321: ブロックした人の投稿はすぐ隠す
+        #endif
+    }
 
     /// 共有レコードの作者判定(#249)と、`Field.hidden`(#262)の入力を作者のフォームにだけ出すのに使う uid。
     var currentUserId: String? { services.auth.currentUser?.uid }
@@ -1168,6 +1174,7 @@ final class AppRuntime: DSLRuntime {
             let name = entity.flatMap { dsl.entity($0)?.field(fieldId)?.name } ?? fieldId
             return L10n.tr("「\(name)」の入力を確認してください(\(api.errorDescription ?? ""))")
         }
+        if api.isAppCheckFailure { return ErrorCopy.appCheckFailedBody } // #318: サインインでは直らない
         if api.status == 401 { return ErrorCopy.sessionExpiredSignIn }
         return api.errorDescription ?? "\(api)"
     }
