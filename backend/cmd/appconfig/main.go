@@ -162,7 +162,7 @@ func newHandler(authMiddleware func(http.Handler) http.Handler, logger *slog.Log
 	mux.HandleFunc("GET /health", health)
 	mux.HandleFunc("GET /healthz", health)
 	if sharePage != nil {
-		mux.Handle("GET /s/{token}", sharePage) // web fallback of a share link (no DSL exposed)
+		mux.Handle("GET /s/{token}", sharePage) // read-only web view of a share link (#362, no records)
 	}
 	// minimum / latest iOS build (#302): public, read once from env
 	mux.Handle("GET /v1/client-config", appconfig.ClientConfig(appconfig.ClientConfigFromEnv(os.Getenv)))
