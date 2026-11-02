@@ -75,7 +75,7 @@ go run ./cmd/ai-eval -chat -env-file ../.env -cases internal/ai/eval/m0disc_chat
 | d_sleep | `computed: true` | hoursBetween |
 | d_medicine | `notification: any`(前から) | — |
 | d_period | `calc: true` | 次の予定日の計算 |
-| d_vocab | `substitution: true` | めくるカードは M2(D-16) |
+| d_vocab | `has: [flashcards], lacks: [disclosure], flashcardsUnlearned: true, substitution: false` | めくるカード `flashcards`(#264)。覚えたものは filter で出題から外す |
 | d_pet | `photo: true, shared: true` | 家族で共有・写真 |
 | d_baby | `computed: true` | 前回からの経過時間 |
 | d_collection | `photo: true, has: [stat]` | 写真と合計 |

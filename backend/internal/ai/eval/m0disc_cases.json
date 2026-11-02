@@ -16,7 +16,7 @@
   {"id": "d_sleep", "kind": "create", "group": "m0-health", "transcript": "寝た時間と起きた時間を記録して、睡眠時間の平均を出したい", "expect": {"computed": true}},
   {"id": "d_medicine", "kind": "create", "group": "m0-health", "transcript": "薬の飲み忘れ防止。朝昼晩に通知して、飲んだらチェックできるように", "expect": {"notification": "any"}},
   {"id": "d_period", "kind": "create", "group": "m0-health", "transcript": "生理の記録と次の予定日の予測", "note": "日付の予測計算", "expect": {"calc": true}},
-  {"id": "d_vocab", "kind": "create", "group": "m0-study", "transcript": "英単語の暗記カード。表に単語、めくると意味が出て、覚えたかどうか記録したい", "note": "フラッシュカード・めくる操作", "expect": {"substitution": true}},
+  {"id": "d_vocab", "kind": "create", "group": "m0-study", "transcript": "英単語の暗記カード。表に単語、めくると意味が出て、覚えたかどうか記録したい", "note": "フラッシュカード・めくる操作(#264: flashcards で覚えたものは出題から外す)", "expect": {"has": ["flashcards"], "lacks": ["disclosure"], "flashcardsUnlearned": true, "substitution": false, "unreachable": 0}},
   {"id": "d_study_time", "kind": "create", "group": "m0-study", "transcript": "勉強時間をストップウォッチで計って科目ごとに記録、週の合計をグラフで", "expect": {"has": ["timerDisplay"], "chart": true}},
   {"id": "d_quiz_game", "kind": "create", "group": "m0-game", "transcript": "友達と遊べるクイズゲーム。問題を作って出し合って点数を競いたい", "note": "ゲーム・対戦・#262 自動採点で代替なし", "expect": {"computed": true}},
   {"id": "d_dice", "kind": "create", "group": "m0-game", "transcript": "ボタンを押すとランダムで今日の晩ごはんを決めてくれるアプリ", "note": "ランダム(#263: 候補の list + randomPicker)", "expect": {"has": ["randomPicker", "list"], "unreachable": 0}},
