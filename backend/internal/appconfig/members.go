@@ -21,6 +21,15 @@ import (
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
+// routes (shared-app participants #254)
+func init() {
+	registerRoutes(func(h *Handler, mux *http.ServeMux) {
+		h.legacyBefore = legacyMembersBefore()
+		mux.HandleFunc("GET /v1/apps/{appId}/members", h.listMembers)
+		mux.HandleFunc("DELETE /v1/apps/{appId}/members/{uid}", h.removeMember)
+	})
+}
+
 // LegacyMembersEnv: copies of an app created before this time (RFC3339) join
 // it as members on first access (migration for apps shared before #254).
 // Unset = no grandfathering.

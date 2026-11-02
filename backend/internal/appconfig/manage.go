@@ -16,6 +16,14 @@ import (
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
+// routes (#277)
+func init() {
+	registerRoutes(func(h *Handler, mux *http.ServeMux) {
+		mux.HandleFunc("PUT /v1/apps/order", h.reorderApps)
+		mux.HandleFunc("POST /v1/apps/{appId}/duplicate", h.duplicateApp)
+	})
+}
+
 const (
 	maxAppNameRunes = 40
 	maxReorderIDs   = 400 // one Firestore transaction (500 writes) with room to spare

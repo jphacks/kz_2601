@@ -28,6 +28,8 @@
 | `internal/appconfig` | `openapi-appconfig.yaml` のハンドラ(apps / dsl / versions / entities / records) |
 | `internal/appconfigclient` | ai が appconfig を叩く薄い HTTP クライアント(Bearer 転送) |
 
+機能(共有・メンバー・通報など)のルートは、その機能のファイルの `init()` から `registerRoutes` で足す(AI のプロンプトと同じ形)。`handler.go` の `New()` には core(apps / dsl / versions / entities / records)だけを置く。足したルートは `routes_test.go` の `wantRoutes` にも書く。
+
 ## 起動
 
 ```sh
