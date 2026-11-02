@@ -158,8 +158,9 @@ public struct Theme: Decodable, Sendable {
 
 /// ローカル通知(P0)。`app.notifications[]` は DSL ロード時に同期、`scheduleNotification` アクションは押下時に予約。
 public struct NotificationSpec: Decodable, Identifiable, Sendable {
+    /// monthly / yearly(#266)はレコード基準(date / datetime の field)だけ。未知の値は once(古い版は monthly を once として読む)。
     public enum Repeat: String, Decodable, Sendable {
-        case once, daily, weekly
+        case once, daily, weekly, monthly, yearly
         public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .once) }
     }
 

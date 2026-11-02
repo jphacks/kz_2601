@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -335,10 +336,20 @@ var Ops = map[string]opSpec{
 	"concat": {2, 2, tAny, tStr}, "len": {1, 1, tStr, tNum},
 	"now": {0, 0, tAny, tDate}, "today": {0, 0, tAny, tDate},
 	"daysBetween": {2, 2, tDate, tNum}, "daysUntil": {1, 1, tDate, tNum}, "addDays": {2, 2, tAny, tDate}, "hoursBetween": {2, 2, tAny, tNum},
-	"year": {1, 1, tDate, tNum}, "month": {1, 1, tDate, tNum}, "day": {1, 1, tDate, tNum}, "weekday": {1, 1, tDate, tNum},
+	"nextOccurrence": {2, 2, tAny, tDate}, "year": {1, 1, tDate, tNum}, "month": {1, 1, tDate, tNum}, "day": {1, 1, tDate, tNum}, "weekday": {1, 1, tDate, tNum},
 	"toNumber": {1, 1, tAny, tNum}, "toString": {1, 1, tAny, tStr}, "coalesce": {2, 2, tAny, tAny},
 	// daily check history (#172): arg 0 is {"ref": <resets daily toggle field>}
 	"streak": {1, 1, tDate, tNum}, "doneInDays": {2, 2, tAny, tNum},
+}
+
+// RepeatUnits are nextOccurrence's second argument and the record-based
+// Notification.repeat values that repeat a date (#266).
+var RepeatUnits = []string{"monthly", "yearly"}
+
+// IsRepeatUnit reports whether e is the literal "monthly" or "yearly".
+func IsRepeatUnit(e Expr) bool {
+	s, ok := e.Lit.(string)
+	return e.Kind == ExprLiteral && ok && slices.Contains(RepeatUnits, s)
 }
 
 // fieldKey identifies a field across entities ("members.balance").
@@ -440,10 +451,13 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 			aw := fmt.Sprintf("%s.%s.args[%d]", where, e.Op, i)
 			types[i] = c.check(aw, &e.Args[i], row, depth+1)
 			want := spec.arg
-			if e.Op == "addDays" {
+			if e.Op == "addDays" || e.Op == "nextOccurrence" {
 				want = tDate
 				if i == 1 {
 					want = tNum
+					if e.Op == "nextOccurrence" {
+						want = tAny // the "monthly" | "yearly" literal is checked below
+					}
 				}
 			}
 			if types[i] == tList {
@@ -462,6 +476,10 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 		switch e.Op {
 		case "streak", "doneInDays":
 			c.checkDailyHistory(where, e, row)
+		case "nextOccurrence":
+			if n == 2 && !IsRepeatUnit(e.Args[1]) {
+				c.add(`%s.nextOccurrence.args[1]: must be the string "monthly" or "yearly" (e.g. {"op":"nextOccurrence","args":[{"ref":"renew_on"},"monthly"]})`, where)
+			}
 		case "gt", "gte", "lt", "lte":
 			if n == 2 && types[0] != tAny && types[1] != tAny && !accepts(types[0], types[1]) && !accepts(types[1], types[0]) {
 				c.add("%s: %s compares a %s with a %s; compare values of the same type", where, e.Op, types[0], types[1])

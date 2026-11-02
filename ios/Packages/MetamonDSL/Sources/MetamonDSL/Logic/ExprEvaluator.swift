@@ -71,7 +71,7 @@ public final class ExprEvaluator {
     public static let supportedOps: Set<String> = [
         "add", "sub", "mul", "div", "mod", "neg", "abs", "sqrt", "pow", "round", "floor", "ceil", "min", "max", "clamp",
         "eq", "neq", "gt", "gte", "lt", "lte", "and", "or", "not", "concat", "len",
-        "now", "today", "daysBetween", "daysUntil", "addDays", "hoursBetween", "year", "month", "day", "weekday",
+        "now", "today", "daysBetween", "daysUntil", "addDays", "nextOccurrence", "hoursBetween", "year", "month", "day", "weekday",
         "toNumber", "toString", "coalesce", "streak", "doneInDays",
     ]
 
@@ -334,6 +334,11 @@ public final class ExprEvaluator {
             return days(from: now, to: d)
         case "addDays":
             guard let d = date(0), let n = num(1), let r = calendar.date(byAdding: .day, value: Int(n.rounded()), to: d) else { return nil }
+            return .date(r)
+        case "nextOccurrence":
+            // #266: 毎月 / 毎年の次の日(今日以降・月末に寄せる)。第 2 引数は "monthly" | "yearly"
+            guard let d = date(0), vals.count >= 2, case .string(let unit)? = vals[1],
+                  let r = RepeatDate.next(d, unit: unit, today: now, calendar: calendar) else { return nil }
             return .date(r)
         case "hoursBetween":
             // end − start(時間・小数)。end < start は日付またぎとして +24h(22:00→05:00 = 7)

@@ -91,6 +91,42 @@ func addDays(t time.Time, n int, loc *time.Location) time.Time {
 	return time.Date(l.Year(), l.Month(), l.Day()+n, l.Hour(), l.Minute(), l.Second(), l.Nanosecond(), loc)
 }
 
+// addMonths is Calendar.date(byAdding: .month): same wall-clock time n months
+// later, the day clamped to the last day of that month (Jan 31 + 1 = Feb 28).
+func addMonths(t time.Time, n int, loc *time.Location) time.Time {
+	l := t.In(loc)
+	first := time.Date(l.Year(), l.Month()+time.Month(n), 1, 0, 0, 0, 0, time.UTC)
+	y, m := first.Year(), first.Month()
+	day := min(l.Day(), time.Date(y, m+1, 0, 0, 0, 0, 0, time.UTC).Day())
+	return time.Date(y, m, day, l.Hour(), l.Minute(), l.Second(), l.Nanosecond(), loc)
+}
+
+// nextOccurrence is RepeatDate.next (#266): the first monthly / yearly repeat of
+// anchor's day on or after today (anchor's own day when that is today or later).
+func nextOccurrence(anchor time.Time, unit string, now time.Time, loc *time.Location) (time.Time, bool) {
+	step := 0
+	switch unit {
+	case "monthly":
+		step = 1
+	case "yearly":
+		step = 12
+	default:
+		return time.Time{}, false
+	}
+	a, t := startOfDay(anchor, loc), startOfDay(now, loc)
+	if !a.Before(t) {
+		return a, true
+	}
+	k := max(((t.Year()-a.Year())*12+int(t.Month())-int(a.Month()))/step, 0)
+	for range 4 {
+		if d := startOfDay(addMonths(a, step*k, loc), loc); !d.Before(t) {
+			return d, true
+		}
+		k++
+	}
+	return time.Time{}, false
+}
+
 // daysBetween counts calendar days from a's day to b's day in loc (DST days count as one).
 func daysBetween(a, b time.Time, loc *time.Location) int {
 	civil := func(t time.Time) time.Time {
