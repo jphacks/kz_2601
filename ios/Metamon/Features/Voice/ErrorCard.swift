@@ -44,6 +44,7 @@ struct ErrorPresentation: Equatable, Identifiable {
         case .busy(let after): return ErrorPresentation(kind: .busy(retryAfter: after), transcript: transcript, origin: origin)
         case .sessionExpired: return ErrorPresentation(kind: .sessionExpired, transcript: transcript, origin: origin)
         case .rateLimited(let info): return ErrorPresentation(kind: .rateLimited(info), transcript: transcript, origin: origin)
+        case .appCheckFailed: return ErrorPresentation(kind: .failed(message: ErrorCopy.appCheckFailedBody), transcript: transcript, origin: origin)
         case .rejected(let m), .other(let m): return ErrorPresentation(kind: .failed(message: m), transcript: transcript, origin: origin)
         case .conflict, .cancelled: return nil
         }

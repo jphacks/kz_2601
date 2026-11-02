@@ -93,7 +93,7 @@ func Log(logger *slog.Logger) func(http.Handler) http.Handler {
 					slog.Duration("duration", time.Since(started)),
 					slog.String("requestId", RequestID(r.Context())),
 				}
-				logger.InfoContext(r.Context(), "request", append(attrs, clientAttrs(r)...)...)
+				logger.InfoContext(r.Context(), "request", append(attrs, ClientAttrs(r)...)...)
 			}()
 			next.ServeHTTP(recorder, r)
 		})
