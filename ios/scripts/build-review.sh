@@ -18,8 +18,9 @@ case "$action" in
 esac
 set -- -project Metamon.xcodeproj -scheme Metamon-Review -configuration Review \
   'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) APP_STORE_REVIEW' "$@"
-# 並行ビルドで取り合わないよう、ロックのディレクトリがある機械では lockf で直列にする(#452 G9)。無ければそのまま。
-lock="${XCODEBUILD_LOCK:-/private/tmp/claude-501/-Users-kota/44acee01-4956-468b-91b0-b11b2b64aee3/scratchpad/xcodebuild.lock}"
+# 並行ビルドで取り合わないよう lockf で直列にする(#452 G9)。全セッションで同じパスを使う(#568)。
+lock="${XCODEBUILD_LOCK:-$HOME/.cache/metamon/xcodebuild.lock}"
+mkdir -p "$(dirname "$lock")" 2>/dev/null || true
 if [ -d "$(dirname "$lock")" ] && [ -x /usr/bin/lockf ]; then
   exec nice -n 15 /usr/bin/lockf -k "$lock" xcodebuild "$@"
 fi
