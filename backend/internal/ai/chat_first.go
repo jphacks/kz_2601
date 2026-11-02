@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/metrics"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -147,7 +148,10 @@ func (s *Service) chatMode(ctx context.Context, req ChatRequest) (string, *dsl.A
 			return "", nil, mapStoreErr(err)
 		}
 		// auto: the chat still works without the store; assume a new app.
-		log.Printf("chat: store get %s: %v (falling back to create)", req.AppID, err)
+		s.logger().LogAttrs(ctx, slog.LevelWarn, "chat: store get failed (falling back to create)",
+			slog.String("app_hash", metrics.AppHash(req.AppID)),
+			slog.String("error", err.Error()),
+		)
 		return chatModeCreate, nil, nil
 	}
 	app, err := dsl.Parse(env.DSL)

@@ -66,10 +66,7 @@ func generateOutcome(res *Result, err error) string {
 // logGenerate writes one ai.generate line. Labels, counts and the uid hash
 // only: never the transcript, summary, DSL, appId or raw uid.
 func (s *Service) logGenerate(ctx context.Context, tr genTrace, stream bool, res *Result, err error, d time.Duration) {
-	lg := s.Logger
-	if lg == nil {
-		lg = slog.Default()
-	}
+	lg := s.logger()
 	mode := tr.mode
 	if mode == "" {
 		mode = "unknown"
