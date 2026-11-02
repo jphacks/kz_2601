@@ -272,7 +272,8 @@ public final class ExprEvaluator {
         }
         func clockSeconds(_ d: Date) -> Double {
             let c = calendar.dateComponents([.hour, .minute, .second], from: d)
-            return Double((c.hour ?? 0) * 3600 + (c.minute ?? 0) * 60 + (c.second ?? 0))
+            let h: Int = c.hour ?? 0, m: Int = c.minute ?? 0, sec: Int = c.second ?? 0
+            return Double(h * 3600 + m * 60 + sec)
         }
         func allNums() -> [Double]? {
             guard !vals.isEmpty else { return nil }
