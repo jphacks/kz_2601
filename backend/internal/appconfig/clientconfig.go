@@ -21,9 +21,10 @@ const (
 
 // ClientConfigValues is the body of GET /v1/client-config.
 type ClientConfigValues struct {
-	MinIOSBuild    int    `json:"minIOSBuild,omitempty"`
-	LatestIOSBuild int    `json:"latestIOSBuild,omitempty"`
-	IOSAppStoreURL string `json:"iosAppStoreUrl,omitempty"`
+	MinIOSBuild    int     `json:"minIOSBuild,omitempty"`
+	LatestIOSBuild int     `json:"latestIOSBuild,omitempty"`
+	IOSAppStoreURL string  `json:"iosAppStoreUrl,omitempty"`
+	Notice         *Notice `json:"notice,omitempty"` // #333 (notice.go)
 }
 
 // ClientConfigFromEnv reads the env vars through getenv (os.Getenv).
@@ -40,7 +41,7 @@ func ClientConfigFromEnv(getenv func(string) string) ClientConfigValues {
 		}
 		return n
 	}
-	v := ClientConfigValues{MinIOSBuild: build(EnvMinIOSBuild), LatestIOSBuild: build(EnvLatestIOSBuild)}
+	v := ClientConfigValues{MinIOSBuild: build(EnvMinIOSBuild), LatestIOSBuild: build(EnvLatestIOSBuild), Notice: NoticeFromEnv(getenv)}
 	if raw := strings.TrimSpace(getenv(EnvIOSAppStoreURL)); raw != "" {
 		if u, err := url.Parse(raw); err == nil && (u.Scheme == "https" || u.Scheme == "itms-apps") && u.Host != "" {
 			v.IOSAppStoreURL = raw

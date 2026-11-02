@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -26,6 +27,10 @@ func env(key, def string) string {
 }
 
 func main() {
+	// Cloud Logging JSON for slog and the log package alike (#295)
+	logger := httpx.NewLogger()
+	slog.SetDefault(logger)
+
 	// stg must not use the production Firestore unless ALLOW_SHARED_PROD_DB=1 (#290)
 	if shared, err := fsenv.Check(fsenv.FromEnv(os.Getenv), os.Getenv); err != nil {
 		log.Fatalf("ai: refusing to start: %v", err)
@@ -60,7 +65,7 @@ func main() {
 
 	claude := ai.NewClient(apiKey, model, effort)
 	claude.StructuredOutput = os.Getenv("CLAUDE_STRUCTURED_OUTPUT") == "1"
-	claude.Logger = httpx.NewLogger() // ai.usage JSON lines for the cost sink (#298)
+	claude.Logger = logger // ai.usage JSON lines for the cost sink (#298)
 	svc := &ai.Service{
 		Claude:      claude,
 		Store:       store,
@@ -87,12 +92,20 @@ func main() {
 	}
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           withAppCheck(ai.Pause(paused, httpx.NewLogger())(withRateLimit(ai.NewHandler(svc), verifier))),
+		Handler:           withObservability(withAppCheck(ai.Pause(paused, logger)(withRateLimit(ai.NewHandler(svc), verifier))), logger),
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      time.Duration(timeoutSec)*time.Second*3 + 10*time.Second,
 	}
 	log.Printf("ai listening on :%s (model=%s effort=%s logicPass=%v chat=%+v)", port, model, effort, svc.LogicPass, svc.ChatConfig)
 	log.Fatal(srv.ListenAndServe())
+}
+
+// withObservability adds the request id / trace, the access log (5xx as
+// ERROR) and panic recovery so 5xx and panics reach Error Reporting (#295).
+// /debug/error answers 5xx/panic on purpose on stg only.
+func withObservability(h http.Handler, logger *slog.Logger) http.Handler {
+	debug := httpx.DebugErrors(os.Getenv("APP_ENV") == "stg")
+	return httpx.Chain(h, httpx.WithRequestID, httpx.Log(logger), httpx.Recover(logger), debug)
 }
 
 // withAppCheck verifies X-Firebase-AppCheck (#318) before the rate limiter, so

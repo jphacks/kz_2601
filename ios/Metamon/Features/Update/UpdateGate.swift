@@ -5,6 +5,7 @@ import MetamonServices
 /// - MIN 未満: 閉じられない「アップデートしてください」画面
 /// - LATEST 未満: 閉じられるお知らせ(同じ latest には 1 起動で 1 回)
 /// - 通信失敗・設定なし・モック: 何もしない(fail open)
+/// 同じ応答に載るアプリ内のお知らせ(#333)も持つ。審査用の版でも出す(運用の機能)。
 @MainActor
 @Observable
 final class UpdateGate {
@@ -13,9 +14,14 @@ final class UpdateGate {
     private var dismissedLatest: Int?
     private var checking = false
     private let checker: UpdateChecker
+    /// サーバーのお知らせ(この build 向けに絞ったもの)。閉じたかは `dismissals` で見る
+    private(set) var notice: ServiceNotice?
+    private var dismissedNoticeID: String?
+    private let dismissals: NoticeDismissals
 
-    init(checker: UpdateChecker) {
+    init(checker: UpdateChecker, dismissals: NoticeDismissals = NoticeDismissals()) {
         self.checker = checker
+        self.dismissals = dismissals
     }
 
     convenience init() {
@@ -25,6 +31,7 @@ final class UpdateGate {
     func check() async {
         #if DEBUG
         if let forced = Self.debugOverride { requirement = forced; return }
+        if let forced = Self.debugNotice { notice = forced; return }
         #endif
         guard !checking else { return }
         checking = true
@@ -32,6 +39,20 @@ final class UpdateGate {
         let result = await checker.check()
         requirement = result.requirement
         serverStoreURL = result.appStoreURL
+        notice = result.notice
+    }
+
+    /// バナーに出すお知らせ。閉じられない更新画面の間は出さない。
+    var visibleNotice: ServiceNotice? {
+        guard let notice, !isBlocking, notice.id != dismissedNoticeID, !dismissals.isDismissed(notice.id) else { return nil }
+        return notice
+    }
+
+    /// 閉じた id を端末に覚える(同じ id は二度と出さない)。
+    func dismissServiceNotice() {
+        guard let notice else { return }
+        dismissals.dismiss(notice.id)
+        dismissedNoticeID = notice.id // @Observable に変化を伝える(UserDefaults は追跡されない)
     }
 
     var isBlocking: Bool {
@@ -58,6 +79,15 @@ final class UpdateGate {
         case "recommended": return .recommended(latest: 9999)
         default: return nil
         }
+    }
+
+    /// 見た目の確認用: `METAMON_FORCE_NOTICE=info|warning`(閉じた記録は残らないよう毎回違う id)
+    private static var debugNotice: ServiceNotice? {
+        guard let raw = ProcessInfo.processInfo.environment["METAMON_FORCE_NOTICE"], let severity = ServiceNotice.Severity(rawValue: raw) else { return nil }
+        return ServiceNotice(
+            id: "debug-\(UUID().uuidString)", severity: severity,
+            message: .init(ja: "AI の生成を一時的に止めています。作ったアプリと記録はそのまま使えます。", en: "AI generation is paused for now. Your apps and records still work."),
+            linkUrl: "https://example.com")
     }
     #endif
 }
@@ -123,6 +153,13 @@ struct UpdateGateModifier: ViewModifier {
                         .transition(.opacity)
                 }
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let notice = gate.visibleNotice {
+                    ServiceNoticeBanner(notice: notice) { gate.dismissServiceNotice() }
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.25), value: gate.visibleNotice)
             .alert("新しい版があります", isPresented: Binding(get: { gate.showsNotice && !gate.isBlocking }, set: { if !$0 { gate.dismissNotice() } })) {
                 Button("アップデート") {
                     gate.dismissNotice()

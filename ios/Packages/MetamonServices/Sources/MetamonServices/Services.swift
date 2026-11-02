@@ -22,6 +22,8 @@ public struct Services {
     #if !APP_STORE_REVIEW
     /// リリース申請(#76)。sharing と同じく live の時だけ。
     public var releaseRequests: (any ReleaseRequestClient)?
+    /// aiButton の端末内 AI の集計の送り先(#446)。appconfig が live の時だけ。審査用ビルドには無い
+    public var aiButtonMetrics: (any AIButtonMetricsSender)?
     /// アプリ内のフィードバック(#319)。live では `HTTPFeedbackClient`、モックでは `MockFeedbackClient`。
     public var feedback: any FeedbackClient = MockFeedbackClient()
     #endif
