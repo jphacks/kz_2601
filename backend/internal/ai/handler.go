@@ -32,12 +32,12 @@ func NewHandler(svc *Service) http.Handler {
 	mux.HandleFunc("POST /v1/generate", func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 		if err != nil {
-			writeErr(w, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "cannot read body"})
+			writeErr(w, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "cannot read body"})
 			return
 		}
 		var req Request
 		if err := json.Unmarshal(body, &req); err != nil {
-			writeErr(w, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "invalid JSON: " + err.Error()})
+			writeErr(w, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "invalid JSON: " + err.Error()})
 			return
 		}
 		ctx := callerContext(r)
@@ -65,12 +65,12 @@ func NewHandler(svc *Service) http.Handler {
 	mux.Handle("POST /v1/chat", caller(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 		if err != nil {
-			writeErr(w, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "cannot read body"})
+			writeErr(w, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "cannot read body"})
 			return
 		}
 		var req ChatRequest
 		if err := json.Unmarshal(body, &req); err != nil {
-			writeErr(w, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "invalid JSON: " + err.Error()})
+			writeErr(w, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "invalid JSON: " + err.Error()})
 			return
 		}
 		ctx := callerContext(r) // edit mode reads the current DSL
@@ -138,7 +138,7 @@ func serveSSE(w http.ResponseWriter, fn func(emit func(event string, v any))) {
 func asError(err error) *Error {
 	var ge *Error
 	if !errors.As(err, &ge) {
-		ge = &Error{Status: http.StatusInternalServerError, Code: "internal", Message: err.Error()}
+		ge = &Error{Status: http.StatusInternalServerError, Code: httpx.CodeInternal, Message: err.Error()}
 	}
 	return ge
 }

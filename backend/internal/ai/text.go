@@ -147,7 +147,7 @@ func (s *Service) Text(ctx context.Context, req TextRequest) (*TextResult, error
 		return nil, mapClaudeErr(err)
 	}
 	if resp.StopReason == "refusal" {
-		return nil, &Error{Status: http.StatusUnprocessableEntity, Code: "refused", Message: "the model declined this request"}
+		return nil, &Error{Status: http.StatusUnprocessableEntity, Code: httpx.CodeRefused, Message: "the model declined this request"}
 	}
 	res, err := parseTextOutput(resp.Text, req)
 	if err != nil {
@@ -237,7 +237,7 @@ func cleanItem(s string) string {
 // every requested name present (in the requested order).
 func parseTextOutput(raw string, req TextRequest) (*TextResult, error) {
 	bad := func(msg string) error {
-		return &Error{Status: http.StatusBadGateway, Code: "bad_output", Message: msg}
+		return &Error{Status: http.StatusBadGateway, Code: httpx.CodeBadOutput, Message: msg}
 	}
 	if i, j := strings.Index(raw, "{"), strings.LastIndex(raw, "}"); i >= 0 && j > i {
 		raw = raw[i : j+1]

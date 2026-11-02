@@ -1131,11 +1131,12 @@ components:
           properties:
             code:
               type: string
-              description: 機械可読コード(`ai_paused` は ai だけ・#511)
+              description: 機械可読コード。appconfig が返すものだけ(ai のコードは `openapi-ai.yaml` の `Error`)。`backend/internal/httpx/codes.go` と一致することをテストで確かめる(#523)
               enum:
-                - ai_paused
+                - account_deleted
                 - app_check_failed
                 - bad_request
+                - forbidden
                 - internal
                 - invalid_dsl
                 - invalid_record
