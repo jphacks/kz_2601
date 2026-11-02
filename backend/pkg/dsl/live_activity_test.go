@@ -34,11 +34,11 @@ func TestActivityValid(t *testing.T) {
 
 func TestActivityErrors(t *testing.T) {
 	for want, act := range map[string]Action{
-		"needs activity{title}":      {Type: ActionStartActivity},
-		"activity.title is empty":    {Type: ActionStartActivity, Activity: &Activity{}},
-		"minutes must be 1-480":      {Type: ActionStartActivity, Activity: &Activity{Title: "t", Minutes: 481}},
-		`stat "nope" is not a`:       {Type: ActionStartActivity, Activity: &Activity{Title: "t", Stat: "nope"}},
-		`stat "note" is a text`:      {Type: ActionStartActivity, Activity: &Activity{Title: "t", Stat: "note"}},
+		"needs activity{title}":     {Type: ActionStartActivity},
+		"activity.title is empty":   {Type: ActionStartActivity, Activity: &Activity{}},
+		"minutes must be 1-480":     {Type: ActionStartActivity, Activity: &Activity{Title: "t", Minutes: 481}},
+		`stat "nope" is not a`:      {Type: ActionStartActivity, Activity: &Activity{Title: "t", Stat: "nope"}},
+		`stat "note" is a text`:     {Type: ActionStartActivity, Activity: &Activity{Title: "t", Stat: "note"}},
 		"unknown action type \"liv": {Type: "liveActivity"},
 	} {
 		app := activityApp(act)

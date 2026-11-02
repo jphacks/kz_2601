@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/metrics"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -135,7 +137,7 @@ func (s *Service) chatMode(ctx context.Context, req ChatRequest) (string, *dsl.A
 	switch mode {
 	case "", "auto", chatModeCreate, chatModeEdit:
 	default:
-		return "", nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "mode must be create|edit"}
+		return "", nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "mode must be create|edit"}
 	}
 	if mode == chatModeCreate || s.Store == nil {
 		return chatModeCreate, nil, nil
@@ -146,12 +148,15 @@ func (s *Service) chatMode(ctx context.Context, req ChatRequest) (string, *dsl.A
 			return "", nil, mapStoreErr(err)
 		}
 		// auto: the chat still works without the store; assume a new app.
-		log.Printf("chat: store get %s: %v (falling back to create)", req.AppID, err)
+		s.logger().LogAttrs(ctx, slog.LevelWarn, "chat: store get failed (falling back to create)",
+			slog.String("app_hash", metrics.AppHash(req.AppID)),
+			slog.String("error", err.Error()),
+		)
 		return chatModeCreate, nil, nil
 	}
 	app, err := dsl.Parse(env.DSL)
 	if err != nil {
-		return "", nil, &Error{Status: http.StatusInternalServerError, Code: "internal", Message: "current DSL is invalid: " + err.Error()}
+		return "", nil, &Error{Status: http.StatusInternalServerError, Code: httpx.CodeInternal, Message: "current DSL is invalid: " + err.Error()}
 	}
 	if isInitial(app) {
 		// nothing to edit yet: talk about the app to create.
@@ -181,7 +186,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 	}
 	cv.messages = mergeHistory(cv.messages, incoming)
 	if len(cv.messages) == 0 || cv.messages[len(cv.messages)-1].Role != "user" {
-		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "messages must end with a user message"}
+		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "messages must end with a user message"}
 	}
 	userTexts := make([]string, 0, len(cv.messages))
 	for _, m := range cv.messages {
@@ -280,7 +285,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 	case att = <-done:
 		*ar = *bgAR
 	case <-ctx.Done():
-		return nil, &Error{Status: http.StatusGatewayTimeout, Code: "timeout", Message: "chat turn cancelled"}
+		return nil, &Error{Status: http.StatusGatewayTimeout, Code: httpx.CodeTimeout, Message: "chat turn cancelled"}
 	}
 	if att.err != nil {
 		return nil, att.err
@@ -291,7 +296,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 			return nil, att2.err
 		}
 		if att2.reply == nil {
-			return nil, &Error{Status: http.StatusBadGateway, Code: "generation_failed",
+			return nil, &Error{Status: http.StatusBadGateway, Code: httpx.CodeGenerationFailed,
 				Message: "could not produce a chat turn", Problems: att2.problems, Attempts: ar.meta.Attempts}
 		}
 		att = att2

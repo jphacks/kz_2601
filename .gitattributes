@@ -1,0 +1,2 @@
+# String Catalog はキー単位で 3-way マージする(scripts/setup-git.sh でドライバを登録)
+*.xcstrings merge=xcstrings

@@ -88,13 +88,18 @@ type usageRecord struct {
 	latency time.Duration
 }
 
+// logger is c.Logger, or slog.Default() when unset.
+func (c *Client) logger() *slog.Logger {
+	if c.Logger != nil {
+		return c.Logger
+	}
+	return slog.Default()
+}
+
 // logUsage writes one ai.usage line. Only labels, counts and the uid hash:
 // never prompt/response text or the raw uid.
 func (c *Client) logUsage(ctx context.Context, r usageRecord) {
-	lg := c.Logger
-	if lg == nil {
-		lg = slog.Default()
-	}
+	lg := c.logger()
 	var u Usage
 	stop, respModel := "", ""
 	if r.resp != nil {

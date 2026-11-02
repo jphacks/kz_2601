@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -132,7 +133,7 @@ func (h *HTTP) do(ctx context.Context, method, path string, headers map[string]s
 	}
 	resp, err := h.Client.Do(req)
 	if err != nil {
-		return &Error{Status: http.StatusBadGateway, Code: "appconfig_unreachable", Message: err.Error()}
+		return &Error{Status: http.StatusBadGateway, Code: httpx.CodeAppconfigUnreachable, Message: err.Error()}
 	}
 	defer func() { _ = resp.Body.Close() }()
 	data, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
@@ -218,7 +219,7 @@ func (h *HTTP) Restore(ctx context.Context, appID string, n int) (*Envelope, err
 		return nil, err
 	}
 	if cur.Version != env.Version {
-		return nil, &Error{Status: http.StatusConflict, Code: "version_conflict",
+		return nil, &Error{Status: http.StatusConflict, Code: httpx.CodeVersionConflict,
 			Message: fmt.Sprintf("restored as version %d but current is %d", env.Version, cur.Version), CurrentVersion: cur.Version}
 	}
 	return cur, nil
@@ -281,13 +282,13 @@ func (m *Memory) Get(_ context.Context, appID string) (*Envelope, error) {
 
 func (m *Memory) Put(_ context.Context, appID string, baseVersion int, doc json.RawMessage, src Source) (*Envelope, error) {
 	if _, err := dsl.Parse(doc); err != nil {
-		return nil, &Error{Status: http.StatusUnprocessableEntity, Code: "invalid_dsl", Message: err.Error()}
+		return nil, &Error{Status: http.StatusUnprocessableEntity, Code: httpx.CodeInvalidDSL, Message: err.Error()}
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	e := m.getOrSeed(appID)
 	if baseVersion != 0 && baseVersion != e.Version {
-		return nil, &Error{Status: http.StatusConflict, Code: "version_conflict", Message: "base version is stale", CurrentVersion: e.Version}
+		return nil, &Error{Status: http.StatusConflict, Code: httpx.CodeVersionConflict, Message: "base version is stale", CurrentVersion: e.Version}
 	}
 	m.commit(e, doc, src)
 	cp := *e
@@ -299,11 +300,11 @@ func (m *Memory) Patch(_ context.Context, appID string, baseVersion int, ops []d
 	defer m.mu.Unlock()
 	e := m.getOrSeed(appID)
 	if baseVersion != 0 && baseVersion != e.Version {
-		return nil, &Error{Status: http.StatusConflict, Code: "version_conflict", Message: "base version is stale", CurrentVersion: e.Version}
+		return nil, &Error{Status: http.StatusConflict, Code: httpx.CodeVersionConflict, Message: "base version is stale", CurrentVersion: e.Version}
 	}
 	next, _, err := dsl.ApplyPatch(e.DSL, ops)
 	if err != nil {
-		return nil, &Error{Status: http.StatusUnprocessableEntity, Code: "invalid_dsl", Message: err.Error()}
+		return nil, &Error{Status: http.StatusUnprocessableEntity, Code: httpx.CodeInvalidDSL, Message: err.Error()}
 	}
 	m.commit(e, next, src)
 	cp := *e
@@ -335,5 +336,5 @@ func (m *Memory) Restore(_ context.Context, appID string, n int) (*Envelope, err
 			return &cp, nil
 		}
 	}
-	return nil, &Error{Status: http.StatusNotFound, Code: "not_found", Message: fmt.Sprintf("version %d not found", n)}
+	return nil, &Error{Status: http.StatusNotFound, Code: httpx.CodeNotFound, Message: fmt.Sprintf("version %d not found", n)}
 }

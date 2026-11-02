@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -74,7 +75,7 @@ func TestReportAndUnpublishListing(t *testing.T) {
 		t.Fatalf("hidden listing must not be listed: %v", got)
 	}
 	r = e.do("viewer", http.MethodPost, "/v1/public-apps/"+id+"/install", nil, nil)
-	if r.code != http.StatusForbidden || r.errCode() != CodeUnpublished {
+	if r.code != http.StatusForbidden || r.errCode() != httpx.CodeUnpublished {
 		t.Fatalf("install hidden: %d %s", r.code, r.raw)
 	}
 	// the publisher still sees it, with the reason; republishing keeps it hidden
@@ -188,7 +189,7 @@ func TestUnpublishSharedApp(t *testing.T) {
 	}
 	for _, uid := range []string{"u1", "u2"} {
 		r := e.do(uid, http.MethodGet, recs, nil, nil)
-		if r.code != http.StatusForbidden || r.errCode() != CodeUnpublished {
+		if r.code != http.StatusForbidden || r.errCode() != httpx.CodeUnpublished {
 			t.Fatalf("%s records: %d %s", uid, r.code, r.raw)
 		}
 	}
