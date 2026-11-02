@@ -767,6 +767,8 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 - **単一ソース**: `LanguagePreference.shared`(Renderer・`@Observable`)。`setting`(system / ja / en)は UserDefaults `metamon.appLanguage`。`code` は "ja" | "en"、`locale` は書式用。
 - **切替は即時**: ルートで `.environment(\.locale, LanguagePreference.shared.locale)` を注入 → `Text("…")` リテラルはその Locale で引き直される。`String` を返す文言は本体 `L10n.tr("…")` / Renderer `L("…")`(lproj を直接引く)。body 内で呼ぶので Observation で再描画される。`static let` の文言は `static var` にする(起動時の言語で固定されないように)。
 - **書くときのルール**: SwiftUI に直接渡すリテラル(`Text` / `Button` / `Label` / `Section` / `accessibilityLabel` 等)はそのまま。三項演算子・変数・`String` 返しは `L10n.tr`。Renderer 内は全部 `L()`(リテラルは Bundle.main を引いてしまうため)。新しい文言は xcstrings に en を追加(キーの補間は `%@` / `%lld`、補間ありのキーでは `%` を `%%`)。
+- **xcstrings の書式(#516)**: キーはどこに足してもよい。足したら `python3 ios/scripts/xcstrings-fmt.py <file>` で整える(Xcode と同じ書式: キー順・`" : "`・末尾改行なし。Xcode で保存しても差分が出ない)。CI(`ios-ci` ジョブ)が `--check` で検査する。
+- **マージドライバ**: clone ごとに 1 回 `scripts/setup-git.sh` を実行する。`.xcstrings` をキー単位で 3-way マージし、別々のキーの追加はコンフリクトしなくなる(同じキーを両側で違う内容に変えた時だけ止まる)。
 - **端末の AppleLanguages は書き換えない**。権限ダイアログ・システム UI・ウィジェット(別プロセス)は端末の言語のまま。
 - **生成の locale(#45)**: 設定で言語を明示 → generate / chat に `locale` を送る。「自動」は送らない(backend が発話の文字種で判定)。WhisperKit の `language` は `LanguagePreference.code`(録音ごとに読む)。
 - **翻訳しないもの**: DSL 内の文言(AI が locale に合わせて生成)、Services のログ、FieldIcon のキーワード、音声意図判定の語彙。通貨は DSL の `currency` が円前提なので英語 UI でも `¥`。
