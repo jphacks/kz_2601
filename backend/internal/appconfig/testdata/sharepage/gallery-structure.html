@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="color-scheme" content="light dark">
+<title>部品ギャラリー(構造・ネイティブ) - Tailor It</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Tailor It">
+<meta property="og:title" content="部品ギャラリー(構造・ネイティブ)">
+<meta property="og:description" content="card/disclosure/carousel/grid と searchBar/calendar/mapView/shareButton/openUrlButton/locationButton/qrScanner/timerDisplay の配置見本">
+<meta property="og:url" content="https://example.test/s/tok">
+<meta name="twitter:card" content="summary">
+<style nonce="test-nonce">
+:root{--bg:#f6f5fb;--fg:#17142a;--muted:#5d5875;--card:#fff;--line:#dedbea;--accent:#6a4cff;--row:40px}
+@media (prefers-color-scheme:dark){:root{--bg:#0f0c1d;--fg:#f3f1ff;--muted:#a9a3c6;--card:#1b1730;--line:#332d52;--accent:#9a85ff}}
+*{box-sizing:border-box}
+body{margin:0;overflow-wrap:anywhere;background:var(--bg);color:var(--fg);font:16px/1.6 -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+main{max-width:480px;margin:0 auto;padding:16px}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+header.app{text-align:center;padding:24px 0 8px}
+header.app h1{font-size:24px;margin:4px 0}
+.muted,.lead{color:var(--muted)}
+.cta{display:flex;flex-direction:column;gap:10px;margin:16px 0 24px}
+.btn{display:block;text-align:center;padding:14px 20px;border-radius:999px;font-weight:600;text-decoration:none;border:1px solid var(--line);color:var(--fg);background:var(--card)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+nav.screens ul{display:flex;gap:8px;overflow-x:auto;list-style:none;padding:0;margin:0 0 12px}
+nav.screens a{display:block;white-space:nowrap;padding:6px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);text-decoration:none;color:var(--fg);font-size:14px}
+section.screen{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin:0 0 20px}
+section.screen>h2{font-size:18px;margin:0 0 8px;display:flex;justify-content:space-between;gap:8px}
+.tb{font-size:14px;color:var(--muted);font-weight:500}
+.grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:minmax(var(--row),auto);gap:6px}
+.stack{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.grid>*,.stack>*{min-width:0}
+.row{display:flex;gap:8px;overflow-x:auto}.row>*{flex:1 1 0;min-width:120px}
+.cgrid{display:grid;gap:8px}.cols2{grid-template-columns:repeat(2,1fr)}.cols3{grid-template-columns:repeat(3,1fr)}.cols4{grid-template-columns:repeat(4,1fr)}
+.box{border:1px solid var(--line);border-radius:12px;padding:10px}
+.box>h3,details>summary{font-size:15px;margin:0 0 6px;font-weight:600}
+h3.t{font-size:20px;margin:0}h3.h{font-size:17px;margin:0}
+p{margin:0}.caption{font-size:13px;color:var(--muted)}
+.stat .v{font-size:24px;font-weight:700}
+.meter{height:8px;border-radius:4px;background:var(--line)}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;background:var(--line);font-size:13px}
+.empty,.ph{display:flex;align-items:center;justify-content:center;text-align:center;min-height:var(--row);padding:8px;border:1px dashed var(--line);border-radius:10px;color:var(--muted);font-size:14px;height:100%}
+.skel{font-size:13px;color:var(--muted);border-bottom:1px solid var(--line);padding:4px 0}
+ul.rows{list-style:none;margin:0;padding:0}ul.rows li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding:6px 0}
+label{display:block;font-size:13px;color:var(--muted)}
+input,select,textarea,button{font:inherit;width:100%;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+input[type=checkbox]{width:auto}
+button{border-radius:999px;font-weight:600}button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}button.destructive{color:#d33}
+:disabled{opacity:.75;cursor:not-allowed}
+.unit{display:flex;gap:6px;align-items:center}
+.stars{letter-spacing:2px;color:var(--muted)}
+.img{min-height:96px}
+figure{margin:0}
+svg.chart{width:100%;height:96px;color:var(--accent);opacity:.5}
+table{width:100%;border-collapse:collapse;font-size:14px}th{text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding:4px}
+.icon{display:inline-block;width:20px;height:20px;border-radius:50%;background:var(--line)}
+hr{border:0;border-top:1px solid var(--line);width:100%}
+footer{font-size:13px;color:var(--muted);text-align:center;padding:8px 0 32px}
+:root{--accent:#00897B}
+.gc0-5{grid-column:1/7}
+.gc3-5{grid-column:4/7}
+.gr1-1{grid-row:1/2}
+.gr1-2{grid-row:1/3}
+.gr1-4{grid-row:1/5}
+.gr12-16{grid-row:12/17}
+.gr13-14{grid-row:13/15}
+.gr17-19{grid-row:17/20}
+.gr2-4{grid-row:2/5}
+.gr20-21{grid-row:20/22}
+.gr22-23{grid-row:22/24}
+.gr3-4{grid-row:3/5}
+.gr5-11{grid-row:5/12}
+.gr5-6{grid-row:5/7}
+.gr7-8{grid-row:7/9}
+.gr9-10{grid-row:9/11}
+.gr9-12{grid-row:9/13}
+</style></head>
+<body><main>
+<header class="app"><p class="muted">アプリが共有されました</p>
+<h1>部品ギャラリー(構造・ネイティブ)</h1>
+<p class="lead">card/disclosure/carousel/grid と searchBar/calendar/mapView/shareButton/openUrlButton/locationButton/qrScanner/timerDisplay の配置見本</p></header>
+<div class="cta"><a class="btn primary" href="tailorit://import/tok">アプリで開く</a>
+<a class="btn" href="https://apps.apple.com/app/id6828742045" rel="noopener">App Store で入手</a></div>
+<p class="caption">開かない場合は Tailor It をインストールしてから、もう一度このリンクを開いてください。この画面は見本です。記録されたデータは表示しません。</p>
+<nav class="screens" aria-label="画面"><ul><li><a href="#s0">構造コンテナ</a></li><li><a href="#s1">ナビ・ネイティブ</a></li><li><a href="#s2">メモ</a></li></ul></nav>
+<section class="screen" id="s0" aria-labelledby="s0h">
+<h2 id="s0h">構造コンテナ</h2>
+<div class="grid"><div class="gc0-5 gr1-4"><div class="box"><h3>card</h3><div class="stack"><p>角丸 &#43; 影の1枚カード。見出しと集計をまとめる</p><div class="box stat"><div class="caption">メモ件数</div><div class="v" aria-label="データなし">—</div></div></div></div></div><div class="gc0-5 gr5-6"><div class="cgrid cols3"><div class="box stat"><div class="caption">今日</div><div class="v" aria-label="データなし">—</div></div><div class="box stat"><div class="caption">今月</div><div class="v" aria-label="データなし">—</div></div><div class="box stat"><div class="caption">ぜんぶ</div><div class="v" aria-label="データなし">—</div></div></div></div><div class="gc0-5 gr7-8"><div class="row"><h3 class="h">1. 横スクロール</h3><h3 class="h">2. itemWidth で幅を変える</h3><h3 class="h">3. 子は Leaf だけ</h3><button type="button" class="" disabled>メモを追加</button></div></div><div class="gc0-5 gr9-10"><details class="box"><summary>disclosure(たたむ)</summary><div class="stack"><p class="caption">開くと詳細が出る。注意書きや補足に</p><button type="button" class="plain" disabled>JPHACKS 公式</button></div></details></div></div>
+
+</section>
+<section class="screen" id="s1" aria-labelledby="s1h">
+<h2 id="s1h">ナビ・ネイティブ<span class="tb">追加</span></h2>
+<div class="grid"><div class="gc0-5 gr1-1"><div><div class="unit"><input id="f1" type="search" placeholder="メモを検索" disabled></div></div></div><div class="gc0-5 gr2-4"><div class="box"><div class="skel" aria-hidden="true">ひとこと / 日時</div><div class="empty">メモがありません</div></div></div><div class="gc0-5 gr5-11"><div class="ph">カレンダー<br>アプリで見られます</div></div><div class="gc0-5 gr12-16"><div class="ph">アプリで見られます</div></div><div class="gc0-5 gr17-19"><div class="ph">アプリで見られます</div></div><div class="gc3-5 gr20-21"><button type="button" class="" disabled>共有</button></div><div class="gc3-5 gr22-23"><button type="button" class="secondary" disabled>公式サイト</button></div></div>
+
+</section>
+<section class="screen" id="s2" aria-labelledby="s2h">
+<h2 id="s2h">メモ<span class="tb">保存</span></h2>
+<div class="grid"><div class="gc0-5 gr1-2"><div><label for="f2">ひとこと</label><div class="unit"><input id="f2" type="text" placeholder="きれいな紅葉" disabled></div></div></div><div class="gc0-5 gr3-4"><div><label for="f3">日時</label><div class="unit"><input id="f3" type="date" disabled></div></div></div><div class="gc0-5 gr5-6"><div class="ph">アプリで見られます</div></div><div class="gc0-5 gr7-8"><div class="ph">アプリで見られます</div></div><div class="gc0-5 gr9-12"><div class="ph">アプリで見られます</div></div><div class="gc0-5 gr13-14"><button type="button" class="" disabled>このメモを共有</button></div></div>
+
+</section>
+
+<footer>Tailor It</footer>
+</main></body></html>
+
+

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/ai"
+	"github.com/jphacks/kz_2601/backend/internal/appcheck"
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
@@ -67,6 +68,7 @@ func main() {
 		CallTimeout: time.Duration(timeoutSec) * time.Second,
 		LogicPass:   os.Getenv("AI_LOGIC_PASS") == "1", // UI pass + calculations pass (#100)
 		LintRetry:   os.Getenv("AI_LINT_RETRY") == "1", // off: lint warnings are reported only
+		Logger:      claude.Logger,                     // ai.generate per request (#322)
 		// clarify turn (#147): its own model/effort/thinking; empty = ai.DefaultChat*
 		ChatConfig: ai.ChatConfig{
 			Model:    os.Getenv("AI_CHAT_MODEL"),
@@ -79,12 +81,38 @@ func main() {
 	}
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           withRateLimit(ai.NewHandler(svc), verifier),
+		Handler:           withAppCheck(withRateLimit(ai.NewHandler(svc), verifier)),
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      time.Duration(timeoutSec)*time.Second*3 + 10*time.Second,
 	}
 	log.Printf("ai listening on :%s (model=%s effort=%s logicPass=%v chat=%+v)", port, model, effort, svc.LogicPass, svc.ChatConfig)
 	log.Fatal(srv.ListenAndServe())
+}
+
+// withAppCheck verifies X-Firebase-AppCheck (#318) before the rate limiter, so
+// enforce rejects without spending quota. /health stays open.
+//
+//	APP_CHECK_MODE=off (default) | log | enforce
+//	APP_CHECK_APP_IDS  optional comma-separated Firebase app IDs to accept
+//
+// docs/infra/app-check.md
+func withAppCheck(h http.Handler) http.Handler {
+	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
+	mw, mode, err := appcheck.FromEnv(os.Getenv, httpx.NewLogger(), func() (appcheck.Verifier, error) {
+		return appcheck.NewFirebaseVerifier(context.Background(), project)
+	})
+	if err != nil {
+		log.Fatalf("ai: %v", err)
+	}
+	log.Printf("ai: app check mode=%s", mode)
+	checked := mw(h)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" || r.URL.Path == "/healthz" {
+			h.ServeHTTP(w, r)
+			return
+		}
+		checked.ServeHTTP(w, r)
+	})
 }
 
 // withRateLimit puts the per-user / per-IP / global daily limits (#280) in

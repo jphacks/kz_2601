@@ -72,6 +72,11 @@ func (f *Firestore) PurgeAccount(ctx context.Context, uid string) (AccountPurgeR
 			res.Releases += n
 			return err
 		}},
+		{"feedback", func() error {
+			n, err := f.deleteQuery(ctx, f.c.Collection(feedbackCollection).Where("uid", "==", uid), nil)
+			res.Feedback += n
+			return err
+		}},
 		{"installs", func() error {
 			n, err := f.purgeInstalls(ctx, uid)
 			res.Installs += n

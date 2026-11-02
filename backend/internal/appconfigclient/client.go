@@ -76,6 +76,22 @@ func bearerFrom(ctx context.Context) string {
 	return v
 }
 
+type appCheckKey struct{}
+
+// AppCheckHeader is forwarded so appconfig in APP_CHECK_MODE=enforce accepts
+// ai's calls made for the client (#318; same value as appcheck.Header).
+const AppCheckHeader = "X-Firebase-AppCheck"
+
+// WithAppCheck stores the caller's App Check token so HTTP forwards it.
+func WithAppCheck(ctx context.Context, token string) context.Context {
+	return context.WithValue(ctx, appCheckKey{}, token)
+}
+
+func appCheckFrom(ctx context.Context) string {
+	v, _ := ctx.Value(appCheckKey{}).(string)
+	return v
+}
+
 // ---- HTTP ------------------------------------------------------------------
 
 // HTTP talks to a deployed appconfig at BaseURL (e.g. http://localhost:8080).
@@ -107,6 +123,9 @@ func (h *HTTP) do(ctx context.Context, method, path string, headers map[string]s
 	}
 	if auth := bearerFrom(ctx); auth != "" {
 		req.Header.Set("Authorization", auth)
+	}
+	if token := appCheckFrom(ctx); token != "" {
+		req.Header.Set(AppCheckHeader, token)
 	}
 	for k, v := range headers {
 		req.Header.Set(k, v)

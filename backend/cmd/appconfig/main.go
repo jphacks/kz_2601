@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/appcheck"
 	"github.com/jphacks/kz_2601/backend/internal/appconfig"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
@@ -37,9 +38,10 @@ func main() {
 	st, closeStore := newStore(ctx, target, logger)
 	defer closeStore()
 
+	appCheck := newAppCheck(ctx, project, logger)
 	// deleted accounts (DELETE /v1/me) get 410 on everything else: appconfig.RejectDeleted
 	authed := func(h http.Handler) http.Handler {
-		return auth.Middleware(verifier, mode)(appconfig.RejectDeleted(st, h))
+		return appCheck(auth.Middleware(verifier, mode)(appconfig.RejectDeleted(st, h)))
 	}
 	handler := newHandler(authed, logger, appconfig.New(st), appconfig.SharePage(st))
 	server := &http.Server{
@@ -105,6 +107,22 @@ func newVerifier(ctx context.Context, mode, project string, logger *slog.Logger)
 	return v
 }
 
+// newAppCheck returns the App Check middleware (#318) for the authenticated
+// API only: /health, /s/{token} and /v1/client-config (needed to tell old
+// builds to update) stay open. APP_CHECK_MODE=off (default) | log | enforce,
+// APP_CHECK_APP_IDS optional. docs/infra/app-check.md
+func newAppCheck(ctx context.Context, project string, logger *slog.Logger) func(http.Handler) http.Handler {
+	mw, mode, err := appcheck.FromEnv(os.Getenv, logger, func() (appcheck.Verifier, error) {
+		return appcheck.NewFirebaseVerifier(ctx, project)
+	})
+	if err != nil {
+		logger.Error("refusing to start", slog.Any("error", err))
+		os.Exit(1)
+	}
+	logger.Info("app check", slog.String("mode", mode))
+	return mw
+}
+
 // guardTarget exits when a stg process would use the production Firestore
 // without ALLOW_SHARED_PROD_DB=1 (fsenv.Check, #290).
 func guardTarget(t fsenv.Target, logger *slog.Logger) {
@@ -144,7 +162,7 @@ func newHandler(authMiddleware func(http.Handler) http.Handler, logger *slog.Log
 	mux.HandleFunc("GET /health", health)
 	mux.HandleFunc("GET /healthz", health)
 	if sharePage != nil {
-		mux.Handle("GET /s/{token}", sharePage) // web fallback of a share link (no DSL exposed)
+		mux.Handle("GET /s/{token}", sharePage) // read-only web view of a share link (#362, no records)
 	}
 	// minimum / latest iOS build (#302): public, read once from env
 	mux.Handle("GET /v1/client-config", appconfig.ClientConfig(appconfig.ClientConfigFromEnv(os.Getenv)))
