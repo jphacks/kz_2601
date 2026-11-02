@@ -128,6 +128,7 @@ struct RootView: View {
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
         .modifier(PublicDataPromptHost()) // #253 生成直後の「個人の情報も公開されます」
         .modifier(RetentionPromptHost()) // #482 記録の保存期間の確認
+        .modifier(TrackingBarHost()) // #559 位置の記録中はどの画面でも上に「記録中」バー
         #if !APP_STORE_REVIEW
         .modifier(FeedbackShakeHost()) // #319 端末を振ってフィードバック
         #endif

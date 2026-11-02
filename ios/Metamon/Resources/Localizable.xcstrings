@@ -2143,6 +2143,23 @@
         }
       }
     },
+    "ここまでに記録した地点はそのまま残ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points recorded so far will be kept."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここまでに記録した地点はそのまま残ります。"
+          }
+        }
+      }
+    },
     "このまま作って" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6291,6 +6308,74 @@
         }
       }
     },
+    "位置の記録を停止" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop location recording"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置の記録を停止"
+          }
+        }
+      }
+    },
+    "位置の記録を停止しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop recording your location?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置の記録を停止しますか?"
+          }
+        }
+      }
+    },
+    "位置を記録中・経過 %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recording location, %@ elapsed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置を記録中・経過 %@"
+          }
+        }
+      }
+    },
+    "位置情報の許可を待っています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for location permission"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報の許可を待っています"
+          }
+        }
+      }
+    },
     "何を記録したいですか?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6559,6 +6644,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "個人情報の公開"
+          }
+        }
+      }
+    },
+    "停止" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止"
           }
         }
       }
@@ -10418,6 +10520,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録はまずこの端末に保存され、接続があるときにサーバーへ送られます。"
+          }
+        }
+      }
+    },
+    "記録中" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recording"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録中"
           }
         }
       }
