@@ -54,6 +54,7 @@ Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|me
   予約値(field id の代わり): $author(共有 entity の投稿者)・$createdAt(作成日時)— §3.5
   Entity.marks?: [{ id, icon, label }](共有 entity の 1 人 1 回の印・いいね / 保存)・ListItem.mark? / 予約値 $marks.<id>(件数・自分が付けたか)— §3.5
   Entity.retentionDays?: 1〜3650(記録の保存期間。期限を過ぎた記録を端末が自動で消す)— §3.7
+  Entity.single?: true(設定値の置き場。レコードは常に 1 件・式 {"setting": "<fieldId>"} で読む)— §3.11
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
 Leaf (44 種・全て id? と area? を持つ) / Action (12 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
@@ -384,6 +385,27 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - 古い iOS(#302): `when` を知らない版は `when` を無視し、残りの `{repeat: once}` を**次の 9:00 の 1 回きりの通知として予約してしまう**(開くたびに予約し直すので、ほぼ毎日鳴る誤った通知)。そこで iOS は `supportedFeatures` に `notification.when` を入れ、`allowedComponents` を送るのにこれを含めない版には AI が `when` を使わない(生成されたら通知ごと取り除く・§5.3)。保存済みの DSL を古い版で開いた時の誤った通知は防げないので、`MIN_IOS_BUILD` を上げるまでの既知の制限。
 - 新しい版で `when` が読めない(未知の式の形)時は、その通知ごと落とす(`Lossy`)。時刻の通知として鳴らさない。
 
+### 3.11 entity.single = 設定値の置き場(#267)
+
+周期の日数・目標・月の予算のように**アプリ全体で 1 つだけの値**は、`"single": true` の entity(例 `settings`)に置く。「設定を追加」でレコードを増やし最新の 1 件を `latest` で読む形はやめる。
+
+```json
+{"id":"settings","name":"設定","single":true,"fields":[{"id":"cycle_days","name":"周期","type":"integer","defaultValue":28,"unit":"日"}]}
+```
+次の予定日 = `{"op":"addDays","args":[{"agg":"latest","entity":"periods","field":"start_on","by":"start_on"},{"setting":"cycle_days"}]}`。
+
+| 項目 | 決めたこと |
+|---|---|
+| レコード | 常に 1 件。保存前は「defaultValue が入った空の 1 件」として扱う(式も初期値を読む) |
+| フォーム | `screen.entity` が single の画面は、開くと**既存の 1 件の編集**(無ければ初期値の新規)。保存は追加でなく上書き。削除ボタン・「続けて追加」は出さない。開き方は toolbar / button の `navigate`(recordId は要らない) |
+| 読む | 式 `{"setting":"<fieldId>"}`(expressions.md §2)。行の無い所(`stat.value`・`progressBar.value`・通知の `when`)でも、別の entity の computed からでも読める。1 つの field id は 1 つの single entity にだけ置く |
+| 使えない所(backend が拒否) | single の entity を `list` / `table` / `stat`・`progressBar` などの `entity`、式の `agg`、ref / refs の `refEntity`、`deleteRecord` / `export` に使う。`scope` shared / public・`retentionDays`・`match`・`hidden` の field |
+| 保存の形 | iOS は single の entity のレコードを `clientId: "single"` で作る。appconfig は single の entity の `POST .../records` を **clientId によらず固定の doc id**(`IDFromClientID("single")`)に置き、既にあればその data で上書きする(201 でなく 200)。private の entity だけなので置き場は利用者ごとに 1 つ |
+| 2 件以上ある時 | (古い版が「追加」した等)`createdAt` が最も新しい 1 件(同じなら後の方)を使う。式・フォームとも同じ |
+
+- AI: `backend/internal/ai/single_rules.go`。ai-eval の `single` / `setting`(`single_cases.json`、`m0disc_cases.json` の `d_period`)。
+- 古い iOS(#302): single を知らない版は、設定のフォームを**開くたびに新しい 1 件を追加**し(データが増える)、`{"setting":...}` を含む computed を読めない(その field が入力欄として出る・`stat.value` は「—」)。そこで iOS は `supportedFeatures` に `singleEntity` を入れ、`allowedComponents` を送るのにこれを含めない版には AI が single / setting を使わない(残れば single を外し、setting を `{"agg":"latest","entity":…,"field":…}` に置き換える・§5.3)。保存済みの DSL を古い版で開いた時は防げないので、`MIN_IOS_BUILD` を上げるまでの既知の制限(backend が固定の doc id に上書きするので、サーバー上の件数は増えない)。
+
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 
 AI に渡す部品カタログは手書きではなく **`dsl.schema.json` から自動生成**される(`backend/internal/ai/catalog.go` の `BuildCatalog`)。検証(Go)・描画(iOS)・AI(プロンプト)の 3 者はすべてスキーマから導出され、抜けはテストで赤になる。
@@ -424,7 +446,7 @@ App Store に出した後は古い iOS が残り続ける。backend は「今い
 | どこに | 中身 | 使い道 |
 |---|---|---|
 | generate / chat の body `allowedComponents` | その版が描画できる部品 type の全部(`ComponentType` から自動) | backend はここに**無い** type を生成結果に入れない(下) |
-| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(`recordRetention`・#482、`matching`・#507、`notification.when`・#265。審査用の版は `matching` を送らない) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
+| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(`recordRetention`・#482、`matching`・#507、`notification.when`・#265、`singleEntity`・#267。審査用の版は `matching` を送らない) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
 | 全リクエストのヘッダ `X-Client-Platform` / `X-Client-Version` / `X-Client-Build` / `X-Client-DSL-Version` | `ios` / `CFBundleShortVersionString` / `CFBundleVersion` / 描画できる最大の `schemaVersion` | ログ(どの版がまだ使われているか = 最低対応版を上げる判断) |
 
 ### 5.3 backend が古い iOS に新しい部品を出さない仕組み
