@@ -254,6 +254,10 @@ apps_public/{appId}/members/{uid}   # {displayName?, via: share|legacy, invitedB
 - それ以外の人(リンクや appId で開いて使っていた家族)は、既定では参加し直しが要る(作成者がリンクを送り直す)。急に 403 にしたくない環境では **`SHARED_MEMBERS_LEGACY_BEFORE`(RFC3339)** をデプロイ時刻にして出す。その時刻より前に作られた自分のコピー(`users/{uid}/apps/{appId}.createdAt`)を持つ人は、初回アクセスで `via: legacy` の参加者として記録される。時刻より後に開いた人は対象外なので、appId を知っているだけの人は入れない。全員が一度開いた頃に外してよい。
 - `public` の挙動は何も変えていない。今の AI は共有の依頼を主に `public` で作るので(#385)、影響を受ける既存データは `scope:"shared"` を明示したアプリだけ。
 
+### 3.6 仲間探しのアプリ(#507)
+
+`entity.match`(profile / matched)と `apps_public/{appId}/match_pairs`。相互承認・見える範囲・安全の規則は [features/matching.md](features/matching.md)。
+
 ## 4. 認証・認可
 
 | 項目 | 決定 |
