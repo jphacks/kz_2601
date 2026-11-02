@@ -15,7 +15,7 @@ struct AiGenerateLeaf: View {
     @State private var error: String?
 
     private var route: AIGenerateRoute {
-        AIGenerateRoute.choose(availability: availability, hostOnline: rt.supportsOnlineAIText, mock: AIGenerateRoute.isMock)
+        AIGenerateRoute.choose(availability: availability, hostOnline: rt.aiText?.supportsOnlineAIText ?? false, mock: AIGenerateRoute.isMock)
     }
 
     var body: some View {
@@ -72,7 +72,7 @@ struct AiGenerateLeaf: View {
 
     private func refreshAvailability() {
         availability = AIAvailability.current
-        rt.recordAIButton(.shown(availability.metric)) // #446
+        rt.aiText?.recordAIButton(.shown(availability.metric)) // #446
     }
 
     private func run() async {
@@ -100,10 +100,12 @@ struct AiGenerateLeaf: View {
             let out: AITextResult
             switch route {
             case .onDevice: out = try await OnDeviceAI.generate(request)
-            default: out = try await rt.generateAIText(request)
+            default:
+                guard let host = rt.aiText else { throw AITextError.unsupported }
+                out = try await host.generateAIText(request)
             }
             usedOnline = route == .online
-            if route == .onDevice { rt.recordAIButton(.ran(.generate, failure: nil)) }
+            if route == .onDevice { rt.aiText?.recordAIButton(.ran(.generate, failure: nil)) }
             withAnimation(RenderTheme.Motion.select) {
                 result = out
                 if let output = c.output, let form { form.values[output] = .string(out.text) }
@@ -112,7 +114,7 @@ struct AiGenerateLeaf: View {
             // #446: 端末内 AI の失敗だけ数える(オンライン版は #426 の判断材料ではない)
             if route == .onDevice,
                let reason = (error as? OnDeviceAIError)?.metricReason ?? AIButtonMetric.FailureReason(buildError: error) {
-                rt.recordAIButton(.ran(.generate, failure: reason))
+                rt.aiText?.recordAIButton(.ran(.generate, failure: reason))
             }
             self.error = error.localizedDescription
         }

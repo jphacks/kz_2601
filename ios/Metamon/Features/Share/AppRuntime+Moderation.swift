@@ -57,15 +57,15 @@ extension ReportReason {
     }
 }
 
-extension AppRuntime {
+extension AppRuntime: ModerationHost {
     /// 通報・ブロックの API(live のシェアがある時だけ)。
-    var moderation: (any ModerationClient)? { services.sharing as? any ModerationClient }
+    var moderationClient: (any ModerationClient)? { services.sharing as? any ModerationClient }
 
-    // MARK: DSLRuntime(Renderer の長押しメニュー)
+    // MARK: ModerationHost(Renderer の長押しメニュー)
 
     /// 他人の共有レコードだけ(自分の投稿・private の entity・作者の分からない行は出さない)。
     func canReport(entity: String, record: Record) -> Bool {
-        guard moderation != nil, dsl.entity(entity)?.isShared == true,
+        guard moderationClient != nil, dsl.entity(entity)?.isShared == true,
               let author = record.author, !author.isEmpty, let me = currentUserId else { return false }
         return author != me
     }
@@ -96,10 +96,10 @@ extension AppRuntime {
     // MARK: 実行
 
     func submitReport(_ req: ModerationRequest, reason: ReportReason) async {
-        guard let moderation else { return }
+        guard let moderationClient else { return }
         let ui = ModerationUI.shared
         do {
-            try await moderation.report(req.target, reason: reason)
+            try await moderationClient.report(req.target, reason: reason)
             ui.notice = ModerationNotice(title: L10n.tr("通報しました"),
                                          message: L10n.tr("運営が内容を確認し、利用規約に反するものは非公開にします。この人を表示したくない時はブロックもできます。"),
                                          fromDiscover: req.fromDiscover)
@@ -113,16 +113,16 @@ extension AppRuntime {
 
     /// 投稿の作者は先に端末で隠してから送る(失敗したら戻す)。掲載者は応答の uid で隠し、「探す」は読み直す。
     func confirmBlock(_ req: ModerationRequest) async {
-        guard let moderation else { return }
+        guard let moderationClient else { return }
         let ui = ModerationUI.shared
         if let uid = req.authorUID { ui.blocked[uid] = req.authorName }
         do {
             let user: BlockedUser
             switch req.target {
             case .record:
-                user = try await moderation.block(uid: req.authorUID ?? "", name: req.authorName)
+                user = try await moderationClient.block(uid: req.authorUID ?? "", name: req.authorName)
             case .listing(let id):
-                user = try await moderation.block(listingId: id)
+                user = try await moderationClient.block(listingId: id)
             }
             ui.blocked[user.uid] = user.name
             ui.blockCount += 1
@@ -136,11 +136,11 @@ extension AppRuntime {
     }
 
     func unblock(_ user: BlockedUser) async {
-        guard let moderation else { return }
+        guard let moderationClient else { return }
         let ui = ModerationUI.shared
         ui.blocked[user.uid] = nil
         do {
-            try await moderation.unblock(uid: user.uid)
+            try await moderationClient.unblock(uid: user.uid)
             for e in dsl.entities where e.isShared { await load(entities: [e.id], force: true) } // サーバーが除いていた投稿を取り直す
         } catch {
             ui.blocked[user.uid] = user.name
@@ -150,8 +150,8 @@ extension AppRuntime {
 
     /// サインイン中の uid のブロック一覧を 1 回読む(失敗しても投稿はサーバーが除くので、次の起動で読み直す)。
     func loadBlockedUsers() async {
-        guard let moderation, let me = currentUserId, ModerationUI.shared.loadedFor != me else { return }
-        guard let users = try? await moderation.blockedUsers() else { return }
+        guard let moderationClient, let me = currentUserId, ModerationUI.shared.loadedFor != me else { return }
+        guard let users = try? await moderationClient.blockedUsers() else { return }
         ModerationUI.shared.blocked = Dictionary(users.map { ($0.uid, $0.name) }, uniquingKeysWith: { a, _ in a })
         ModerationUI.shared.loadedFor = me
     }
@@ -217,7 +217,7 @@ struct BlockedUsersSettingsSection: View {
     @State private var ui = ModerationUI.shared
 
     var body: some View {
-        if rt.moderation != nil {
+        if rt.moderationClient != nil {
             Section {
                 if ui.blocked.isEmpty {
                     Text("ブロックしている人はいません").foregroundStyle(.secondary)
