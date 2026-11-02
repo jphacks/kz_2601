@@ -27,7 +27,7 @@ paths:
       summary: 発話から新しい DSL を生成して適用
       description: |
         **2 モード (確定)**: 初回生成 = フル DSL、2 回目以降の改変 = JSON Patch (RFC 6902)。
-        1. text(または audio→Whisper で text) を得る
+        1. text (iOS 端末内で文字起こし済み) を受け取る
         2. appconfig から現行 DSL を取得 (`baseVersion` 省略時は現行)
         3. モード判定: 現行が初期状態(entities 空・音声画面のみ) or `mode=create` → **full**。それ以外 → **patch** (`mode=auto` の既定)。「元に戻して」は restore
         4. full: Claude 構造化出力 (root AppDSL) → `dsl.Parse` → `PUT /apps/{appId}/dsl`
@@ -65,8 +65,8 @@ paths:
         '200':
           description: 生成・適用成功
           content: { application/json: { schema: { $ref: '#/components/schemas/GenerateResponse' } } }
-        '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { description: appId が存在しない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '409':
           description: baseVersion 指定時に再試行後も競合
@@ -170,8 +170,8 @@ paths:
                 editReady:
                   summary: edit の明確な指示 (#185)
                   value: { kind: ready, mode: edit, text: メモ欄を消しますね。, turn: 1, locale: ja, source: claude, transcript: 支出を記録画面のメモ欄を消して。 }
-        '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
         '429': { $ref: '#/components/responses/RateLimited' }
         '502': { description: Claude の出力がスキーマに合わず 2 回とも失敗 (generation_failed), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '503': { description: '上流 (Claude) 障害 / 運営が AI を一時停止中 (`ai_paused`・#511)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
@@ -186,8 +186,8 @@ paths:
         - { name: appId, in: path, required: true, schema: { type: string } }
       responses:
         '204': { description: 消した (本人の会話が存在しなくても 204) }
-        '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
-        '403': { $ref: './openapi-appconfig.yaml#/components/responses/Forbidden' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /text:
     post:
@@ -232,42 +232,13 @@ paths:
                       - 語尾を「ござる」で 1 分
                     locale: ja
                     meta: { model: claude-sonnet-5-5, usage: { inputTokens: 420, outputTokens: 60 }, latencyMs: 1800 }
-        '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
         '413': { description: input が 4096 バイト / 本文が 16 KB を超えた (payload_too_large), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '422': { description: モデルが書くのを断った (refused), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '429': { $ref: '#/components/responses/RateLimited' }
         '502': { description: 出力が形に合わない (bad_output), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '503': { description: '上流 (Claude) 障害 / 運営が AI を一時停止中 (`ai_paused`・#511)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-
-  /transcribe:
-    post:
-      summary: 音声→文字 (optional。WhisperKit が使えない端末向け)
-      description: '`OPENAI_API_KEY` 未設定時は 501 `not_configured`。'
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [audio]
-              properties:
-                audio: { type: string, format: binary }
-                language: { type: string, default: ja }
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [text]
-                properties:
-                  text: { type: string }
-                  language: { type: string }
-                  durationMs: { type: integer }
-        '413': { description: 音声が大きすぎる, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '501': { description: 未設定, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /health:
     get:
@@ -279,6 +250,13 @@ components:
   securitySchemes:
     firebaseAuth: { type: http, scheme: bearer, bearerFormat: Firebase ID token }
   responses:
+    BadRequest: { description: 入力不正, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden:
+      description: その appId の会話が他の利用者のもの (`DELETE /chat/{appId}`・#286)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: forbidden, message: 'the conversation belongs to another user' } }
     RateLimited:
       description: |
         1 日の上限に達した (#280)。`code: rate_limited`、`details` は `RateLimitDetails`。
@@ -301,6 +279,7 @@ components:
               code: rate_limited
               message: 今日の利用上限(30)に達しました。10月26日 0:00からまた使えます。サインインすると上限が増えます。
               details: { scope: user, tier: anonymous, limit: 30, used: 29, remaining: 1, resetAt: '2026-10-25T15:00:00Z', retryAfterSec: 3600 }
+    Unauthenticated: { description: トークン欠落/無効, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   schemas:
     Error:
       type: object
@@ -457,7 +436,7 @@ components:
               target: { type: string }
         latencyMs:
           type: object
-          properties: { transcribe: { type: integer }, claude: { type: integer }, total: { type: integer } }
+          properties: { claude: { type: integer }, total: { type: integer } }
         meta:
           type: object
           description: 診断情報(model / attempts / usage など)。logicPass は 2 パス目を実行した時だけ入る
