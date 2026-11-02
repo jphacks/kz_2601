@@ -34,12 +34,13 @@ public enum ClientCapabilities {
     }
 
     /// 部品以外で、この版が実装している DSL の動作(#482)。backend は allowedComponents を送るのにここに無い動作(= v1.0)を AI に使わせない。
-    /// recordRetention は審査用の版も同じ(記録の自動削除は端末内の処理だけ)。matching(#507・仲間探し)は審査用の版では送らない(共有と一緒に外す)。
+    /// recordRetention・notification.when は審査用の版も同じ(記録の自動削除・条件の通知は端末内の処理だけ)。matching(#507・仲間探し)は審査用の版では送らない(共有と一緒に外す)。
+    /// notification.when(#265): 知らない版は残りを 9:00 の 1 回きりとして予約してしまうので、無い版には生成させない。
     public static var supportedFeatures: [String] {
         #if APP_STORE_REVIEW
-        ["recordRetention"]
+        ["recordRetention", "notification.when"]
         #else
-        ["recordRetention", "matching"]
+        ["recordRetention", "matching", "notification.when"]
         #endif
     }
 

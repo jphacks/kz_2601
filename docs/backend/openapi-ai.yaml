@@ -492,7 +492,7 @@ components:
       type: array
       items: { type: string }
       description: |
-        #482。部品以外で、このクライアントが実装している DSL の動作。既知の値: `recordRetention`(Entity.retentionDays の期限切れレコードを端末が消す)。
+        #482。部品以外で、このクライアントが実装している DSL の動作。既知の値: `recordRetention`(Entity.retentionDays の期限切れレコードを端末が消す)、`notification.when`(#265・app.notifications[].when の条件を端末が評価する。無い版には when を使わず、生成されたら通知ごと落とす)。
         `allowedComponents` を送るクライアント(v1.0 以降)がここに `recordRetention` を含めない時、AI は retentionDays を使わず「この版ではできない」と答え、生成結果からは落とす。
         `allowedComponents` も送らないクライアントは制限なし。未知の値は無視。
       example: [recordRetention]
