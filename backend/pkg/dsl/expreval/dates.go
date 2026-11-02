@@ -114,8 +114,14 @@ func startOfDay(t time.Time, loc *time.Location) time.Time {
 // day = 2018-11-04 1:30), as Foundation does.
 func addDays(t time.Time, n int, loc *time.Location) time.Time {
 	l := t.In(loc)
-	r := time.Date(l.Year(), l.Month(), l.Day()+n, l.Hour(), l.Minute(), l.Second(), l.Nanosecond(), loc)
-	want := time.Date(l.Year(), l.Month(), l.Day()+n, l.Hour(), l.Minute(), l.Second(), l.Nanosecond(), time.UTC)
+	return wallClock(l.Year(), l.Month(), l.Day()+n, l, loc)
+}
+
+// wallClock is y-m-d at clock's wall-clock time in loc. A time in a DST gap
+// moves forward by the gap, as Foundation's calendar math does.
+func wallClock(y int, m time.Month, d int, clock time.Time, loc *time.Location) time.Time {
+	r := time.Date(y, m, d, clock.Hour(), clock.Minute(), clock.Second(), clock.Nanosecond(), loc)
+	want := time.Date(y, m, d, clock.Hour(), clock.Minute(), clock.Second(), clock.Nanosecond(), time.UTC)
 	got := time.Date(r.Year(), r.Month(), r.Day(), r.Hour(), r.Minute(), r.Second(), r.Nanosecond(), time.UTC)
 	if got.Before(want) {
 		// time.Date read the gap time with the offset after the gap: use the one before it
@@ -127,12 +133,14 @@ func addDays(t time.Time, n int, loc *time.Location) time.Time {
 
 // addMonths is Calendar.date(byAdding: .month): same wall-clock time n months
 // later, the day clamped to the last day of that month (Jan 31 + 1 = Feb 28).
+// A time in a DST gap moves forward like addDays (Sao Paulo 2018-10-04 0:00 + 1
+// month = 2018-11-04 1:00, not the previous day).
 func addMonths(t time.Time, n int, loc *time.Location) time.Time {
 	l := t.In(loc)
 	first := time.Date(l.Year(), l.Month()+time.Month(n), 1, 0, 0, 0, 0, time.UTC)
 	y, m := first.Year(), first.Month()
 	day := min(l.Day(), time.Date(y, m+1, 0, 0, 0, 0, 0, time.UTC).Day())
-	return time.Date(y, m, day, l.Hour(), l.Minute(), l.Second(), l.Nanosecond(), loc)
+	return wallClock(y, m, day, l, loc)
 }
 
 // nextOccurrence is RepeatDate.next (#266): the first monthly / yearly repeat of
