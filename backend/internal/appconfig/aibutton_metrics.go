@@ -16,6 +16,13 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
 
+// routes (#446)
+func init() {
+	registerRoutes(func(h *Handler, mux *http.ServeMux) {
+		mux.HandleFunc("POST /v1/metrics/ai-button", h.postAIButtonMetrics)
+	})
+}
+
 // Log events (the message and the `event` attr). One availability line per
 // device-day, one task line per (day, task), one failure line per (day, task, reason).
 const (

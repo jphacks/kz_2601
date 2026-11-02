@@ -12,6 +12,13 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
+// routes (account deletion #119)
+func init() {
+	registerRoutes(func(h *Handler, mux *http.ServeMux) {
+		mux.HandleFunc("DELETE /v1/me", h.deleteMe)
+	})
+}
+
 // CodeAccountDeleted is the 410 error code for uids that deleted their account.
 const CodeAccountDeleted = "account_deleted"
 

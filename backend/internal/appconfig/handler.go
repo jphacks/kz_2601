@@ -32,6 +32,7 @@ const (
 var idRe = regexp.MustCompile(`^[A-Za-z0-9_.:-]{1,128}$`)
 
 // Handler serves /v1/*. Authentication is applied by the caller (auth.Middleware).
+// Fields are grouped per feature (blank lines keep gofmt alignment local).
 type Handler struct {
 	store store.Store
 
@@ -40,22 +41,28 @@ type Handler struct {
 
 	eventsMax time.Duration // lifetime of one GET /events stream
 
-	legacyBefore time.Time // LegacyMembersEnv (members.go)
+	legacyBefore time.Time // LegacyMembersEnv: set by members.go
 
-	feedbackPerDay int // FEEDBACK_DAILY_LIMIT (feedback.go)
+	feedbackPerDay int // FEEDBACK_DAILY_LIMIT: set by feedback.go
 }
 
+// routeGroups holds the feature routes. Each feature file registers its own
+// from init(), so adding a feature does not edit New().
+var routeGroups []func(h *Handler, mux *http.ServeMux)
+
+// registerRoutes adds a feature's routes (and its Handler settings).
+func registerRoutes(f func(h *Handler, mux *http.ServeMux)) { routeGroups = append(routeGroups, f) }
+
 // New builds the v1 router (a ServeMux so the caller can probe matches).
+// Core routes live here; feature routes come from routeGroups.
 func New(s store.Store) *http.ServeMux {
-	h := &Handler{store: s, cache: map[string]*dsl.App{}, eventsMax: eventsMaxStream(), legacyBefore: legacyMembersBefore(), feedbackPerDay: feedbackPerDay()}
+	h := &Handler{store: s, cache: map[string]*dsl.App{}, eventsMax: eventsMaxStream()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/apps", h.listApps)
 	mux.HandleFunc("POST /v1/apps", h.createApp)
 	mux.HandleFunc("GET /v1/apps/{appId}", h.getApp)
 	mux.HandleFunc("PATCH /v1/apps/{appId}", h.patchApp)
 	mux.HandleFunc("DELETE /v1/apps/{appId}", h.deleteApp)
-	mux.HandleFunc("PUT /v1/apps/order", h.reorderApps)               // #277 manage.go
-	mux.HandleFunc("POST /v1/apps/{appId}/duplicate", h.duplicateApp) // #277 manage.go
 
 	mux.HandleFunc("GET /v1/apps/{appId}/dsl", h.getDSL)
 	mux.HandleFunc("GET /v1/apps/{appId}/events", h.events)
@@ -74,34 +81,10 @@ func New(s store.Store) *http.ServeMux {
 	mux.HandleFunc("GET /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.getRecord)
 	mux.HandleFunc("PATCH /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.patchRecord)
 	mux.HandleFunc("DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.deleteRecord)
-	mux.HandleFunc("PUT /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}", h.putMark)       // #255: marks.go
-	mux.HandleFunc("DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}", h.deleteMark) // #255
 
-	// share links (#49) / public catalog (#50): share.go
-	mux.HandleFunc("POST /v1/apps/{appId}/share", h.createShare)
-	mux.HandleFunc("GET /v1/shares/{token}", h.getShare)
-	mux.HandleFunc("DELETE /v1/shares/{token}", h.revokeShare)
-	mux.HandleFunc("POST /v1/shares/{token}/import", h.importShare)
-	mux.HandleFunc("POST /v1/apps/{appId}/publish", h.publishApp)
-	mux.HandleFunc("DELETE /v1/apps/{appId}/publish", h.unpublishApp)
-	// shared-app participants (#254): members.go
-	mux.HandleFunc("GET /v1/apps/{appId}/members", h.listMembers)
-	mux.HandleFunc("DELETE /v1/apps/{appId}/members/{uid}", h.removeMember)
-	mux.HandleFunc("GET /v1/public-apps", h.listPublicApps)
-	mux.HandleFunc("POST /v1/public-apps/{id}/install", h.installPublicApp)
-
-	mux.HandleFunc("DELETE /v1/me", h.deleteMe) // account deletion (#119): account.go
-	// reports / blocks (#321): moderation.go
-	mux.HandleFunc("POST /v1/reports", h.createReport)
-	mux.HandleFunc("GET /v1/me/blocks", h.listBlocks)
-	mux.HandleFunc("POST /v1/me/blocks", h.createBlock)
-	mux.HandleFunc("DELETE /v1/me/blocks/{uid}", h.deleteBlock)
-	// release requests (#76): release.go
-	mux.HandleFunc("POST /v1/apps/{appId}/release-requests", h.createReleaseRequest)
-	mux.HandleFunc("GET /v1/apps/{appId}/release-requests", h.listAppReleaseRequests)
-	mux.HandleFunc("GET /v1/release-requests", h.listMyReleaseRequests)
-	mux.HandleFunc("POST /v1/metrics/ai-button", h.postAIButtonMetrics) // #446: aibutton_metrics.go
-	mux.HandleFunc("POST /v1/feedback", h.createFeedback)               // #319: feedback.go
+	for _, register := range routeGroups {
+		register(h, mux)
+	}
 	return mux
 }
 

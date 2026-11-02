@@ -15,6 +15,15 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
+// routes (release requests #76)
+func init() {
+	registerRoutes(func(h *Handler, mux *http.ServeMux) {
+		mux.HandleFunc("POST /v1/apps/{appId}/release-requests", h.createReleaseRequest)
+		mux.HandleFunc("GET /v1/apps/{appId}/release-requests", h.listAppReleaseRequests)
+		mux.HandleFunc("GET /v1/release-requests", h.listMyReleaseRequests)
+	})
+}
+
 // Release request field limits (runes).
 const (
 	maxReleasePurpose = 200

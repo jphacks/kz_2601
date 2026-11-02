@@ -23,6 +23,14 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
+// routes (#319)
+func init() {
+	registerRoutes(func(h *Handler, mux *http.ServeMux) {
+		h.feedbackPerDay = feedbackPerDay()
+		mux.HandleFunc("POST /v1/feedback", h.createFeedback)
+	})
+}
+
 // Feedback limits.
 const (
 	maxFeedbackMessage    = 2000      // runes

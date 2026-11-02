@@ -234,3 +234,62 @@ func TestEnvOr(t *testing.T) {
 		})
 	}
 }
+
+// countingAccounts counts the account lookups RejectDeleted makes.
+type countingAccounts struct {
+	store.Accounts
+	lookups int
+}
+
+func (a *countingAccounts) UserDeleted(ctx context.Context, uid string) (bool, error) {
+	a.lookups++
+	return a.Accounts.UserDeleted(ctx, uid)
+}
+
+// newAuthed keeps App Check -> auth -> RejectDeleted (#516): rejected requests
+// never reach the account lookup, and a deleted uid gets 410.
+func TestNewAuthedOrder(t *testing.T) {
+	t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
+	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
+	mem := store.NewMemory()
+	if err := mem.DeactivateUser(context.Background(), "gone"); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name, token, uid string
+		want             int
+		wantCode         string
+		wantLookups      int
+	}{
+		{name: "app check first", token: "bad", uid: "u1", want: http.StatusUnauthorized, wantCode: httpx.CodeAppCheckFailed},
+		{name: "auth before RejectDeleted", token: "ok", want: http.StatusUnauthorized, wantCode: httpx.CodeUnauthenticated},
+		{name: "deleted uid is 410", token: "ok", uid: "gone", want: http.StatusGone, wantCode: "account_deleted", wantLookups: 1},
+		{name: "active uid passes", token: "ok", uid: "u1", want: http.StatusOK, wantLookups: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			accounts := &countingAccounts{Accounts: mem}
+			ac := appcheck.Middleware(appcheck.Config{Mode: appcheck.ModeEnforce, Verifier: okVerifier{}, Logger: logger})
+			app := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+			h := newAuthed(ac, auth.Middleware(nil, auth.ModeDev), accounts)(app)
+
+			req := httptest.NewRequest(http.MethodGet, "/v1/apps", nil)
+			req.Header.Set(appcheck.Header, tt.token)
+			if tt.uid != "" {
+				req.Header.Set(auth.DebugUIDHeader, tt.uid)
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+
+			if rec.Code != tt.want {
+				t.Fatalf("status = %d, want %d (%s)", rec.Code, tt.want, rec.Body.String())
+			}
+			if tt.wantCode != "" && !strings.Contains(rec.Body.String(), tt.wantCode) {
+				t.Fatalf("body %s, want code %s", rec.Body.String(), tt.wantCode)
+			}
+			if accounts.lookups != tt.wantLookups {
+				t.Fatalf("account lookups = %d, want %d", accounts.lookups, tt.wantLookups)
+			}
+		})
+	}
+}
