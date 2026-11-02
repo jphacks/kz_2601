@@ -380,6 +380,8 @@ gcloud secrets list
 
 ### 3-1. appconfig(ソースからビルド)
 
+> env は `--update-env-vars` で入れる(サービスが無い初回でも作れる)。自動デプロイ(`.github/workflows/deploy-cloudrun.yml`)と同じ書き方で、運用で手で入れた値を消さない。フラグの違いは [runtime-config.md](runtime-config.md#しくみ)。
+
 **▶ 実行**(リポジトリ直下から。初回は Artifact Registry リポジトリ `cloud-run-source-deploy` を作るか聞かれるので `Y`。ビルド込みで 3〜5 分)
 
 ```sh
@@ -393,7 +395,7 @@ gcloud run deploy appconfig-stg \
   --cpu=1 --memory=512Mi \
   --min-instances=0 --max-instances=3 \
   --concurrency=80 --timeout=60 \
-  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=stg,ALLOW_SHARED_PROD_DB=1"
+  --update-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=stg,ALLOW_SHARED_PROD_DB=1"
 cd ..
 ```
 
@@ -420,7 +422,7 @@ gcloud run deploy ai-stg \
   --cpu=1 --memory=512Mi \
   --min-instances=0 --max-instances=3 \
   --concurrency=20 --timeout=300 \
-  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=stg,ALLOW_SHARED_PROD_DB=1,APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL}" \
+  --update-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=stg,ALLOW_SHARED_PROD_DB=1,APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL}" \
   --set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest"
 ```
 
@@ -518,6 +520,8 @@ Secrets に入れるものは **無し**(API キーは Secret Manager、認証�
 
 ### 4-4. ワークフロー(GitHub 整備担当が `.github/workflows/deploy-backend.yml` として追加)
 
+> 今のワークフローは `.github/workflows/deploy-cloudrun.yml`。下は構築時の雛形で、正しい内容はワークフローの方を見る。env は `--update-env-vars`(#509・#513)で、デプロイが決める値・運用で変える値は [runtime-config.md](runtime-config.md)。
+
 `docs/00_decisions.md` の CI(lint+test、Draft では発火しない)とは別ファイル。push トリガーのみ(fork PR からは動かない)。
 
 ```yaml
@@ -570,7 +574,7 @@ jobs:
             --service-account="$RUN_SA" --allow-unauthenticated \
             --port=8080 --cpu=1 --memory=512Mi \
             --min-instances=0 --max-instances=3 --concurrency=80 --timeout=60 \
-            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB}" \
+            --update-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB}" \
             --quiet
 
       - name: Deploy ai
@@ -581,7 +585,7 @@ jobs:
             --service-account="$RUN_SA" --allow-unauthenticated \
             --port=8080 --cpu=1 --memory=512Mi \
             --min-instances=0 --max-instances=3 --concurrency=20 --timeout=300 \
-            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB},APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL}" \
+            --update-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB},APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL}" \
             --set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest" \
             --quiet
 

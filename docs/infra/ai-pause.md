@@ -8,7 +8,7 @@ Claude の障害・費用の急増・不正利用の時に、AI の生成だけ�
 - アプリ: 「AI を一時的に止めています。しばらくしてからもう一度お試しください」を出す(上限の文言とは別)。
 - ログ: 弾いた依頼ごとに `ai.paused`(INFO・method と path だけ。uid・本文は出さない)。起動時に `ai: AI_PAUSED is on` が出る。
 
-これまでの代用(`RATE_LIMIT_GLOBAL_DAILY=1`)は「上限に達しました」と出て理由が違うので使わない。
+AI を止める時はこのスイッチを使う。`RATE_LIMIT_GLOBAL_DAILY=1` は「上限に達しました」と出て理由が違うので、`AI_PAUSED` の入っていない版が動いている時の予備としてだけ使う([incident-runbook.md §5](../ops/incident-runbook.md#5-手順-a-claude-api-の障害上限))。
 
 ## 入れる・切る
 
@@ -24,4 +24,4 @@ gcloud run services update ai-<env> --region asia-northeast1 --remove-env-vars A
 
 確認: `curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<ai の URL>/v1/text -H 'Content-Type: application/json' -d '{}'` が止めている間は `503`(戻した後は 401 など 503 以外)。`/health` はどちらでも 200。
 
-> 注意: 今の `.github/workflows/deploy-cloudrun.yml` は `--set-env-vars` で env を全部置き換えるので、**止めている間に ai がデプロイされるとスイッチが消えて AI が再開する**。止めている間は develop / main へのマージを控えるか、デプロイ後に入れ直す。運用で変える環境変数の扱いは #509 で決める。
+> 注意: デプロイ(`.github/workflows/deploy-cloudrun.yml`)は `--update-env-vars` でワークフローが決める値だけを上書きする(#513)ので、`AI_PAUSED` は ai のデプロイの後も残る。**戻し忘れない**。運用で変える環境変数の扱いは [runtime-config.md](runtime-config.md)。
