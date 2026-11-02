@@ -110,6 +110,19 @@ func (m *Memory) PurgeAccount(_ context.Context, uid string) (AccountPurgeResult
 		}
 	}
 	res.Installs += m.dropInstalls(func(_, u string) bool { return u == uid })
+	for id, r := range m.reports {
+		if r.ReporterUID == uid || r.TargetUID == uid {
+			delete(m.reports, id)
+			res.Reports++
+		}
+	}
+	for k := range m.quota {
+		if strings.HasPrefix(k, uid+"/") {
+			delete(m.quota, k)
+		}
+	}
+	res.Blocks += len(m.blocks[uid])
+	delete(m.blocks, uid)
 	for appID, o := range m.owners {
 		if p := m.public[appID]; o == uid && (p == nil || p.app == nil || p.app.OwnerUID != uid) { // a kept mirror keeps its owner
 			delete(m.owners, appID)
