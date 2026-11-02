@@ -1,210 +1,210 @@
 {
-  "sourceLanguage": "ja",
-  "strings": {
-    "Tailor It でアプリを作るとここに数字が出ます": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Make an app in Tailor It and its numbers show up here"
+  "sourceLanguage" : "ja",
+  "strings" : {
+    "Tailor It でアプリを作るとここに数字が出ます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make an app in Tailor It and its numbers show up here"
           }
         },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tailor It でアプリを作るとここに数字が出ます"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It でアプリを作るとここに数字が出ます"
           }
         }
       }
     },
-    "Tailor It で記録帳を用意するとここに数字が出ます": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Set up a tracker in Tailor It to see numbers here"
+    "Tailor It で記録帳を用意するとここに数字が出ます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set up a tracker in Tailor It to see numbers here"
           }
         },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tailor It で記録帳を用意するとここに数字が出ます"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It で記録帳を用意するとここに数字が出ます"
           }
         }
       }
     },
-    "Tailor It の数字": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tailor It Numbers"
+    "Tailor It の数字" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It Numbers"
           }
         },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tailor It の数字"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It の数字"
           }
         }
       }
     },
-    "「%@」に集計(stat)の部品がありません": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "“%@” has no stat component"
+    "「%@」に集計(stat)の部品がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” has no stat component"
           }
         },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "「%@」に集計(stat)の部品がありません"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」に集計(stat)の部品がありません"
           }
         }
       }
     },
-    "まだ記録がありません": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No records yet"
+    "まだ記録がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No records yet"
           }
         },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "まだ記録がありません"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ記録がありません"
           }
         }
       }
     },
-    "アプリを作ると数字が出ます": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Make an app to see its numbers"
+    "アプリを作ると数字が出ます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make an app to see its numbers"
           }
         },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "アプリを作ると数字が出ます"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを作ると数字が出ます"
           }
         }
       }
     },
-    "件数": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Count"
+    "件数" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Count"
           }
         },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "件数"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "件数"
           }
         }
       }
     },
-    "作ったアプリの集計(今月の支出など)をホーム画面とロック画面に表示します。": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Shows totals from your app (like this month's spending) on the Home Screen and Lock Screen."
+    "作ったアプリの集計(今月の支出など)をホーム画面とロック画面に表示します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows totals from your app (like this month's spending) on the Home Screen and Lock Screen."
           }
         },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "作ったアプリの集計(今月の支出など)をホーム画面とロック画面に表示します。"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作ったアプリの集計(今月の支出など)をホーム画面とロック画面に表示します。"
           }
         }
       }
     },
-    "最近の記録": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recent"
+    "最近の記録" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent"
           }
         },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最近の記録"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近の記録"
           }
         }
       }
     },
-    "用意した記録帳の集計(今月の支出など)をホーム画面とロック画面に表示します。": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Shows totals from your trackers (such as this month’s spending) on the Home Screen and Lock Screen."
+    "用意した記録帳の集計(今月の支出など)をホーム画面とロック画面に表示します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows totals from your trackers (such as this month’s spending) on the Home Screen and Lock Screen."
           }
         },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "用意した記録帳の集計(今月の支出など)をホーム画面とロック画面に表示します。"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用意した記録帳の集計(今月の支出など)をホーム画面とロック画面に表示します。"
           }
         }
       }
     },
-    "直近 7 日": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Last 7 days"
+    "直近 7 日" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last 7 days"
           }
         },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "直近 7 日"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直近 7 日"
           }
         }
       }
     },
-    "記録帳を用意すると数字が出ます": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Set up a tracker to see numbers"
+    "記録帳を用意すると数字が出ます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set up a tracker to see numbers"
           }
         },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "記録帳を用意すると数字が出ます"
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録帳を用意すると数字が出ます"
           }
         }
       }
     }
   },
-  "version": "1.0"
+  "version" : "1.0"
 }

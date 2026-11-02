@@ -384,7 +384,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
+      - uses: actions/checkout@v7
+
+      # キーの並びと書式を Xcode と揃える(末尾追記どうしのコンフリクト防止・#516)。ブロッキング
+      - name: xcstrings の整形チェック
+        run: git ls-files -z '*.xcstrings' | xargs -0 python3 ios/scripts/xcstrings-fmt.py --check
+
       - name: 結果を集約
+        if: always()
         env:
           CHANGES: ${{ needs.ios-changes.result }}
           DSL: ${{ needs.ios-dsl.result }}
