@@ -59,6 +59,24 @@ final class PaidFeatureConfirmTests: XCTestCase {
         XCTAssertFalse(rt.dsl.isVoiceOnly, "アプリができる")
     }
 
+    /// 「この機能なしで作る」はカードを生成中も残し、完成(apply → resetChat)で消す。
+    /// カードの撤去と生成中表示の挿入を同じ更新にすると、遅い環境で生成中の表示が描かれなかった(#200 と同じ形)
+    func testBuildWithoutKeepsCardWhileGenerating() async throws {
+        let (rt, _) = try makeRuntime(enforced: true)
+        await rt.submitUtterance(sharedRequest)
+        await rt.buildFromChat()
+        XCTAssertNotNil(rt.paidConfirm)
+
+        let task = Task { await rt.buildWithoutPaidFeatures() }
+        let deadline = Date.now.addingTimeInterval(5)
+        while rt.morphJob == nil, Date.now < deadline { await Task.yield() }
+        XCTAssertEqual(rt.morphJob?.kind, .create, "生成が始まる")
+        XCTAssertNotNil(rt.paidConfirm, "生成が始まった時点ではまだカードを消さない")
+        await task.value
+        XCTAssertNil(rt.paidConfirm, "完成したらカードは消える")
+        XCTAssertFalse(rt.dsl.isVoiceOnly, "アプリができる")
+    }
+
     func testFreeReadyBuildsWithoutCard() async throws {
         let (rt, spy) = try makeRuntime(enforced: true)
         await rt.submitUtterance("毎日の支出を記録する家計簿アプリを作って")
