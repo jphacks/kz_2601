@@ -79,6 +79,7 @@ Expr := number | string | boolean
 | | `doneInDays` | (`{"ref": <toggle field>}`, n) | 数値 = 直近 n 日(今日を含む)にチェックした日数(直近 7 日 = n 7)。n は整数リテラル 1..366 |
 
 日付引数は date / datetime フィールド、`today`/`now`/`addDays` の結果、`"YYYY-MM-DD"` 文字列、RFC 3339 の文字列(オフセット必須・小数秒 `…00.123Z` も可)を受け付ける。
+`"YYYY-MM-DD"` と `today` は端末のタイムゾーンでの**その日の最初の時刻**(ふつうは 0:00)。夏時間の切り替えで 0:00 が無い日(サンパウロの 2018-11-04 など)はその日の 1:00 で、前の日にも「—」にもならない。`daysBetween` / `daysUntil` は時刻の差でなく暦の日数で数える(23 時間・25 時間の日も 1 日)。`addDays` は同じ時刻の n 日後で、その時刻が夏時間の切り替えで無い時は無い時間の長さだけ後ろにずらす(0:30 → 1:30・#556)。
 
 `streak` / `doneInDays` の第 1 引数は**値ではなく field の指定**: `list.item.resets: "daily"` の toggle に使われている同 entity の date field を `{"ref": ...}` で渡す(iOS はその行の「押した日の履歴」を読む・§7.5)。computed(integer)で使い、全体の値は stat.value の `agg sum / max` でその computed を集計する。stat.value 直下では行が無いので使えない。
 
