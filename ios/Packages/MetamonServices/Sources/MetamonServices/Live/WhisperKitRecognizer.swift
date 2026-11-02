@@ -153,7 +153,7 @@ public final class WhisperKitRecognizer: SpeechTranscriber {
         let session = AVAudioSession.sharedInstance()
         let before = "\(session.category.rawValue)/\(session.mode.rawValue)"
         do {
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
             try session.setActive(true, options: [])
         } catch {
             diag.failure = "audioSession: \(error.localizedDescription)"

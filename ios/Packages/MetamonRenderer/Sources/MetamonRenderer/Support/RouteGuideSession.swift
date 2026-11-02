@@ -130,10 +130,18 @@ final class RouteGuideSession {
         return true
     }
 
+    /// MKPlacemark は iOS 26 で非推奨。iOS 26 以降は init(location:address:) を使う。
+    private static func mapItem(_ c: RouteGuidance.Coord) -> MKMapItem {
+        if #available(iOS 26.0, *) {
+            return MKMapItem(location: CLLocation(latitude: c.lat, longitude: c.lng), address: nil)
+        }
+        return MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: c.lat, longitude: c.lng)))
+    }
+
     static func directions(from: RouteGuidance.Coord, to: RouteGuidance.Coord, mode: RouteGuidance.Mode) async -> RouteGuidance.Route? {
         let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: from.lat, longitude: from.lng)))
-        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: to.lat, longitude: to.lng)))
+        request.source = mapItem(from)
+        request.destination = mapItem(to)
         request.transportType = mode == .walking ? .walking : .automobile
         request.requestsAlternateRoutes = false
         guard let r = try? await MKDirections(request: request).calculate().routes.first else { return nil }

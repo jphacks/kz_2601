@@ -18,7 +18,7 @@ enum IntentE2E {
                     guard let target = try await RecordTargetQuery().entities(matching: parts[1]).first else {
                         print("[Metamon] E2E intent: no record target for \(parts[1])"); return
                     }
-                    var intent = AddRecordIntent()
+                    let intent = AddRecordIntent()
                     intent.target = target
                     intent.content = parts[2]
                     _ = try await intent.perform()
@@ -26,7 +26,7 @@ enum IntentE2E {
                     guard let target = try await TailorAppQuery().entities(matching: parts[1]).first else {
                         print("[Metamon] E2E intent: no app for \(parts[1])"); return
                     }
-                    var intent = OpenTailorAppIntent()
+                    let intent = OpenTailorAppIntent()
                     intent.target = target
                     _ = try await intent.perform()
                 case "talk":

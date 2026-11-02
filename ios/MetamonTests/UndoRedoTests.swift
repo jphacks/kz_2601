@@ -6,8 +6,54 @@ import MetamonServices
 /// 「1 つ前に戻す」/「やり直す」の入口(#209)。モック(端末内の履歴で戻す経路)で状態遷移を確かめる。
 @MainActor
 final class UndoRedoTests: XCTestCase {
-    private func makeRuntime() throws -> AppRuntime {
-        let services = BuildConfig.make(environment: .mock)
+    /// 生成を 1 回だけ止めておけるモック。止めた生成は `started` で始まりを知らせ、`release()` まで返らない(実時間の sleep に頼らない)。
+    final class GatedAI: AIClient, @unchecked Sendable {
+        let base = MockAIClient(delay: .zero)
+        private let lock = NSLock()
+        private var holdNext = false
+        private var release: CheckedContinuation<Void, Never>?
+        private var released = false
+        let started: AsyncStream<Void>
+        private let startedSink: AsyncStream<Void>.Continuation
+
+        init() { (started, startedSink) = AsyncStream.makeStream() }
+
+        func holdNextMorph() { lock.withLock { holdNext = true } }
+
+        func releaseMorph() {
+            let waiting = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+                released = true
+                defer { release = nil }
+                return release
+            }
+            waiting?.resume()
+        }
+
+        func morph(transcript: String, appId: String, currentVersion: Int) async throws -> MorphResult {
+            let hold = lock.withLock { () -> Bool in defer { holdNext = false }; return holdNext }
+            if hold {
+                startedSink.yield()
+                await withCheckedContinuation { cont in
+                    let resumeNow = lock.withLock { () -> Bool in
+                        if released { return true }
+                        release = cont
+                        return false
+                    }
+                    if resumeNow { cont.resume() }
+                }
+            }
+            return try await base.morph(transcript: transcript, appId: appId, currentVersion: currentVersion)
+        }
+        func chat(appId: String, messages: [ChatMessage], locale: String?, mode: ChatMode?) async throws -> ChatTurn {
+            try await base.chat(appId: appId, messages: messages, locale: locale, mode: mode)
+        }
+        func resetChat(appId: String) async {}
+    }
+
+    /// 既定のモック(1.2 秒の実時間の待ち)は使わない。全体実行で 1 件が長く走るほど、テストのプロセスが落ちた時に巻き込まれやすい(#568)
+    private func makeRuntime(ai: AIClient = MockAIClient(delay: .milliseconds(10))) throws -> AppRuntime {
+        var services = BuildConfig.make(environment: .mock)
+        services.ai = ai
         let doc = try DSLExamples.document("kakeibo", version: 1)
         let rt = AppRuntime(document: doc, services: services)
         rt.clarifyEnabled = false
@@ -77,13 +123,18 @@ final class UndoRedoTests: XCTestCase {
     }
 
     func testUndoIgnoredWhileMorphing() async throws {
-        let rt = try makeRuntime()
+        let ai = GatedAI()
+        let rt = try makeRuntime(ai: ai)
         await rt.generate("金額を大きくして")
+        ai.holdNextMorph()
         let job = Task { await rt.generate("筋トレの記録") }
-        try await Task.sleep(for: .milliseconds(100))
+        // 生成が AI に届くまで待つ(100ms の sleep だと、混んでいる時に生成が始まる前・終わった後に戻してしまう・#568)
+        var started = ai.started.makeAsyncIterator()
+        _ = await started.next()
         XCTAssertTrue(rt.isMorphing)
         await rt.undo()
         XCTAssertEqual(rt.document.version, 2, "生成中は戻さない")
+        ai.releaseMorph()
         await job.value
         XCTAssertEqual(rt.document.version, 3)
     }

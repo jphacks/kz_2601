@@ -39,9 +39,11 @@ final class ChatHistoryTests: XCTestCase {
         func resetChat(appId: String) async {}
     }
 
-    private func makeEditRuntime(ai: AIClient? = nil) throws -> AppRuntime {
+    /// 既定のモック(chat 0.6 秒 + generate 1.2 秒の実時間の待ち)は使わない。12 回重ねるテストが 20 秒を超え、
+    /// 全体実行でテストのプロセスが落ちた時に最も巻き込まれやすかった(#568)
+    private func makeEditRuntime(ai: AIClient = MockAIClient(delay: .milliseconds(10))) throws -> AppRuntime {
         var services = BuildConfig.make(environment: .mock)
-        if let ai { services.ai = ai }
+        services.ai = ai
         let doc = try DSLExamples.document("kakeibo", version: 1)
         let rt = AppRuntime(document: doc, services: services)
         rt.clarifyEnabled = true
