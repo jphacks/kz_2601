@@ -41,6 +41,7 @@
 | aiButton のオンライン版(`POST /v1/text`・#417) | `AppRuntime+AIText` のオンライン経路と Pro の入口 / `HTTPAIClient+Text`(`v1/text`)。端末内 AI(Foundation Models)は残る。端末内 AI が無い端末では理由つきで無効 | 5.1.2(i)。同意文の「記録の中身は送らない」(#452 G4) |
 | aiButton の端末内 AI の集計(`POST /v1/metrics/ai-button`・#446) | `AppRuntime+AIButtonMetrics` は何もしない / MetamonServices の `AIButtonMetrics.swift`(貯める・送る)/ 設定の「AI ボタンの利用状況を送る」。Renderer の数える呼び出しは残るが、ホストが捨てる | 栄養ラベルに「使用状況データ」が増えるため(`docs/analytics/ai-button-metrics.md`) |
 | アプリ内のフィードバック(#319) | `Features/Feedback` 全部(`FeedbackComposerView` / `FeedbackContext` / 振って開く `FeedbackShakeHost`・`UIWindow.motionEnded`)/ 設定の「フィードバックを送る」/ MetamonServices の `FeedbackClient` / `HTTPFeedbackClient`(`v1/feedback`) | プライバシーの表示に無い種類(カスタマーサポート・その他の診断データ・スクショ)を集める。表示を足すまで外す(`docs/legal/feedback-privacy-draft.md`) |
+| β の初回の案内(#313) | `BetaEnvironment` / `BetaWelcomeStore` / `BetaWelcomeView`(`BetaWelcomeHost`)/ `AppRuntime` の `betaWelcome`・`showBetaWelcome` / 設定の「β 版のご案内」 | 2.2(App Store の版に β の文言を入れない)。β かどうかは実行時にレシート(`sandboxReceipt` = TestFlight)で見分ける。TestFlight と App Store は同じバイナリなので、Release の App Store では実行時の判定で出ず、審査用の版はコードごと無い |
 | 外した部品・共有 / 公開の記録を使う同梱の例 | `health` / `walk_route` / `attendance_nearby` / `dashcam` / `sensors` / `gallery-web` / `chat` / `board` / `ranking` / `post_comments` / `recipes`(`DSLExamples.reviewExcluded`。`strip-review-plist.sh` もバンドルから消す) | 上と同じ |
 
 **残すもの**

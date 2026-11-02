@@ -75,7 +75,7 @@ enum CrashTestTrigger {
         #if DEBUG
         return true
         #else
-        return Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        return BetaEnvironment.isTestFlight
         #endif
     }
 

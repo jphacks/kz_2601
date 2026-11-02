@@ -47,6 +47,12 @@ final class AppRuntime: DSLRuntime {
     @ObservationIgnored var tutorial: FirstRunTutorialStore?
     /// チュートリアルを出す(初回の同意のあと / 設定の「使い方を見る」)。
     var showTutorial = false
+    #if !APP_STORE_REVIEW // 審査用ビルドは β の案内を持たない(#313)
+    /// β の初回の案内(#313)。MetamonApp が `.shared` を入れる。nil(ユニットテスト等)は出さない。
+    @ObservationIgnored var betaWelcome: BetaWelcomeStore?
+    /// β の案内を出す(チュートリアルのあと / 設定の「β 版のご案内」)。
+    var showBetaWelcome = false
+    #endif
     /// 最初のアプリができた直後の「こう言うと直せます」(#274・1 回だけ)。
     var showFirstEditHint = false
     /// 「頼み方のコツ」(#415)で選んだ例。音声画面か対話の入力欄が受け取って空に戻す(送信はしない)。
