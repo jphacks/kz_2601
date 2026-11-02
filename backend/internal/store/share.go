@@ -43,7 +43,7 @@ type CatalogApp struct {
 	ModerationState
 }
 
-// MaxCatalogApps bounds the in-memory search (architecture.md §3.2).
+// MaxCatalogApps bounds the in-memory search (docs/backend/features/sharing.md).
 const MaxCatalogApps = 500
 
 // Sharing is the share-link and catalog part of Store.

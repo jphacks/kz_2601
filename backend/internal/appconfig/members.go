@@ -4,7 +4,7 @@ package appconfig
 // read and written only by the app's creator (app_owners) and the members in
 // apps_public/{appId}/members/{uid}; scope:"public" stays open to everyone.
 // One joins by importing a share link issued by a participant. See
-// architecture.md §3.4.
+// docs/backend/features/members.md.
 
 import (
 	"context"

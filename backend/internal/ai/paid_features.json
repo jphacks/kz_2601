@@ -1,5 +1,5 @@
 {
-  "_comment": "有料機能(Tailor It Pro が必要)のリスト(#77)。ここ 1 か所で足し引きする。enabled=false で一時的に外せる。docs/backend/architecture.md「有料機能の判定」参照。",
+  "_comment": "有料機能(Tailor It Pro が必要)のリスト(#77)。ここ 1 か所で足し引きする。enabled=false で一時的に外せる。docs/backend/features/pro.md参照。",
   "features": [
     {
       "id": "sharedData",

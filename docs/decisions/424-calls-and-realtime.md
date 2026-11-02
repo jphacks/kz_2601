@@ -76,11 +76,11 @@
 
 ### 4. 今の仕組みでどこまで足りるか(Firestore + SSE)
 
-- **注意: iOS は Firestore の SDK で直接購読していない。** backend(appconfig)が Firestore の snapshot listener を持ち、iOS へは SSE `GET /v1/apps/{appId}/events` で「何が変わったか」だけ流して、本体は API で取り直す(`docs/backend/architecture.md` §5.1・`docs/ios/architecture.md`)。
+- **注意: iOS は Firestore の SDK で直接購読していない。** backend(appconfig)が Firestore の snapshot listener を持ち、iOS へは SSE `GET /v1/apps/{appId}/events` で「何が変わったか」だけ流して、本体は API で取り直す([`docs/backend/features/events.md`](../backend/features/events.md)・`docs/ios/architecture.md`)。
 - 実測: 共有の掲示板に投稿 → 別の端末の一覧に出るまで **442 ms**(SSE の到達は 38 ms・残りはデバウンス 250 ms と取り直し)。
 - 足りる用途: グループのチャット(新着が数百 ms で出る)、出欠・ランキング、数秒ごとの位置の共有(レコードの更新として流す)。
 - 足りない用途: 音声・映像(そもそも Firestore に流すものではない)、アプリを閉じている人への通知(M4 のプッシュ #269)、毎秒何回も変わる値(1 ドキュメントへの書き込みは毎秒 1 回程度が目安・書き込みの費用も増える)。
-- 費用の注意: SSE は再接続ごとに最大 100 件読む(50 秒周期で 1 クライアント 1 entity あたり ≒7,200 読み取り/時、§5.1)。位置を 5 秒ごとに書くと 1 人 720 書き込み/時。無料枠(読み 5 万・書き 2 万/日)を多数の常時接続で超える。使い方が増えたら `EVENTS_MAX_STREAM` と Cloud Run の timeout を伸ばす(§5.1 に書いてある対策)。
+- 費用の注意: SSE は再接続ごとに最大 100 件読む(50 秒周期で 1 クライアント 1 entity あたり ≒7,200 読み取り/時、[events.md](../backend/features/events.md))。位置を 5 秒ごとに書くと 1 人 720 書き込み/時。無料枠(読み 5 万・書き 2 万/日)を多数の常時接続で超える。使い方が増えたら `EVENTS_MAX_STREAM` と Cloud Run の timeout を伸ばす([events.md](../backend/features/events.md) に書いてある対策)。
 - WebSocket(案 E): Cloud Run は WebSocket を使えるが、接続は request timeout(最大 60 分)で切れ、**接続中はインスタンスが動き続けて課金される**。インスタンス間の同期には Firestore か Redis が要ると Google の文書にある。今の SSE + Firestore の構成とほぼ同じことをするので、今は足す理由が無い。
 
 ### 5. 審査・その他
@@ -97,7 +97,7 @@
 | 2 | 通話をいつ検討するか | **M4 の後**(#269 プッシュ・#271 1 対 1・#272 権限・#321 通報の後)。独立したエピックにする |
 | 3 | 入れる時のサービス | **マネージド**(Cloudflare Realtime か LiveKit Cloud を比較)。自前の TURN はしない |
 | 4 | 着信(CallKit + VoIP プッシュ)まで入れるか | 最初は**入れない**(B: アプリを開いている時だけ)。需要を見てから C |
-| 5 | WebSocket を足すか | **足さない**(今の SSE で足りる。足りなくなったら §5.1 の timeout を伸ばす) |
+| 5 | WebSocket を足すか | **足さない**(今の SSE で足りる。足りなくなったら [events.md](../backend/features/events.md) の timeout を伸ばす) |
 | 6 | 通話を Pro 限定にするか | 入れるなら **Pro 限定 + 1 日の分数の上限** |
 
 ## 参考
@@ -110,4 +110,4 @@
 - [Cloudflare Realtime SFU の価格](https://developers.cloudflare.com/realtime/sfu/pricing/)
 - [LiveKit Cloud の価格](https://livekit.com/pricing)
 - [Cloud Run で WebSocket を使う(Google Cloud)](https://docs.cloud.google.com/run/docs/triggering/websockets)
-- リポジトリ内: `docs/backend/architecture.md` §5.1(SSE)、`docs/ios/architecture.md`(RealtimeDocumentSync)、`docs/roadmap/roadmap-m1-m6.md`(M4: #269〜#273・#336〜#339)、`docs/roadmap/m0-discovery.md`(D-20・D-21)
+- リポジトリ内: [`docs/backend/features/events.md`](../backend/features/events.md)(SSE)、`docs/ios/architecture.md`(RealtimeDocumentSync)、`docs/roadmap/roadmap-m1-m6.md`(M4: #269〜#273・#336〜#339)、`docs/roadmap/m0-discovery.md`(D-20・D-21)

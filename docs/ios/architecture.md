@@ -458,7 +458,7 @@ DEBUG フック: `METAMON_AUTO_SWITCHER=1`(起動 2.5 秒後に変身一覧を�
 | 初期画面下部「みんなが作ったアプリを探す」 | `DiscoverSheet`: 検索(250ms 間引き)・人気/新着・カード(名前・作者・利用数・説明・部品アイコン・タグ)→「入れる」で `POST /public-apps/{id}/install` → 変身 | `Features/Share/DiscoverSheet.swift`。導線は `VoiceInputView` に 1 行(`DiscoverEntry`) |
 
 - サービスは `MetamonServices` の `SharingClient`(`HTTPSharingClient`)。`Services.sharing` は appconfig が live の時だけ非 nil で、モック起動では導線ごと出さない。
-- 共有データ(scope: shared/public)を持つアプリは受け取ると**元の appId に参加**する(backend architecture §3.2)。要約カードに「みんなの投稿も見られます」を添える。
+- 共有データ(scope: shared/public)を持つアプリは受け取ると**元の appId に参加**する([backend features/sharing.md](../backend/features/sharing.md))。要約カードに「みんなの投稿も見られます」を添える。
 - DEBUG フック: `METAMON_AUTO_SHARE=1`(変身一覧 → 今のアプリのシェアシート)/ `METAMON_AUTO_IMPORT=<token>`(リンクを開いたのと同じ経路。`simctl openurl` は OS の確認ダイアログで止まるため)/ `METAMON_AUTO_DISCOVER=1`(+ `METAMON_AUTO_INSTALL=<公開 id>`)。
 - 注意: 端末ローカルの `DocumentCache` / レコードキャッシュは uid を区別しないので、同じ端末で `METAMON_DEV_UID` を切り替えると前ユーザーのキャッシュが一瞬見える(サーバーは正しく分離)。2 ユーザー検証はアプリを入れ直してから行う。
 
@@ -471,7 +471,7 @@ DEBUG フック: `METAMON_AUTO_SWITCHER=1`(起動 2.5 秒後に変身一覧を�
 
 - カード右上はシェア直行ボタンから「…」メニュー(「シェア・公開」/「単体アプリとしてリリースを申請」)に変えた。シェアの中身(`ShareAppSheet`)は変更なし。
 - サービスは `ReleaseRequestClient`(`HTTPReleaseRequestClient`)。`Services.releaseRequests` は sharing と同じく live の時だけ非 nil。
-- status は管理者が Firestore コンソールで書き換える(backend architecture §3.3)。未知の値は「受付」扱い。
+- status は管理者が Firestore コンソールで書き換える([backend features/release.md](../backend/features/release.md))。未知の値は「受付」扱い。
 - DEBUG フック: `METAMON_AUTO_RELEASE=1`(変身一覧 → 申請シート)+ `METAMON_AUTO_RELEASE_APP=<appId>` / `METAMON_AUTO_RELEASE_PURPOSE=<文>`(入力 → 送信 → 3 秒後に閉じてバッジ)/ `METAMON_AUTO_RELEASE_CONTACT`。
 
 ## 7. 認証(実装済み)
@@ -982,7 +982,7 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 ### 22.3 回数は端末で数える(サーバー強制は後続)
 - いまは UserDefaults に保存するだけなので、**アプリの削除・端末の時計の変更で回避できる**。ハッカソンの段階では「課金導線の体験」を作ることを優先した。
 - 本番化する時は ai サービス(`POST /v1/generate` の新規作成)側で uid ごとの日次カウンタを持ち、超過は 402 を返す → iOS は 402 を上限シートに繋ぐ。権利はサーバーが App Store Server API(または RevenueCat の webhook)で確認する。
-- **サーバーの権利(#314)**: `ProEntitlementStore.refreshEntitlements`(起動・購入・復元・`Transaction.updates`・サインインし直した時)が、検証済みの取引の `jwsRepresentation` を `HTTPEntitlementClient`(`POST /v1/me/entitlements/apple`)で送る。待たずに裏で送り、同じ uid + 取引は 1 回だけ。失敗は次の機会に送り直す。Xcode の StoreKit 構成の取引(`environment == .xcode`)は Apple の署名ではないので送らない。購入時は `appAccountToken` に `ProAccountToken.uuid(for: uid)` を入れる。サーバーは検証して `users/{uid}/entitlements/pro` に保存し、ai の回数制限が Pro の上限になる(#449・backend architecture.md §6.8)。端末の表示(`isPro`)はまだ StoreKit の値(サーバーを正にするのは後続)。審査用ビルドにはこの部品ごと無い。
+- **サーバーの権利(#314)**: `ProEntitlementStore.refreshEntitlements`(起動・購入・復元・`Transaction.updates`・サインインし直した時)が、検証済みの取引の `jwsRepresentation` を `HTTPEntitlementClient`(`POST /v1/me/entitlements/apple`)で送る。待たずに裏で送り、同じ uid + 取引は 1 回だけ。失敗は次の機会に送り直す。Xcode の StoreKit 構成の取引(`environment == .xcode`)は Apple の署名ではないので送らない。購入時は `appAccountToken` に `ProAccountToken.uuid(for: uid)` を入れる。サーバーは検証して `users/{uid}/entitlements/pro` に保存し、ai の回数制限が Pro の上限になる(#449・[backend features/pro.md](../backend/features/pro.md))。端末の表示(`isPro`)はまだ StoreKit の値(サーバーを正にするのは後続)。審査用ビルドにはこの部品ごと無い。
 
 ### 22.4 デモ端末で上限に当たらないようにする
 - **DEBUG ビルドは既定で制限なし**(設定の「Tailor It Pro」に DEBUG のみ「回数制限を無効にする(デモ用)」トグル・既定 ON)。Release は既定で制限あり・トグルは出ない。
@@ -1014,7 +1014,7 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 
 | 項目 | 決定 |
 |---|---|
-| 何が有料か | backend の `paid_features.json`(1 か所・docs/backend/architecture.md §6.8)。初期は「みんなで共有するデータ」(共有データ型アプリ)だけ。iOS は判定を持たず、`POST /v1/chat` の ready の `requiresPro` / `paidFeatures` / `freeTranscript`、案の `options[].requiresPro` / `freeInstruction` を見るだけ |
+| 何が有料か | backend の `paid_features.json`(1 か所・[docs/backend/features/pro.md](../backend/features/pro.md))。初期は「みんなで共有するデータ」(共有データ型アプリ)だけ。iOS は判定を持たず、`POST /v1/chat` の ready の `requiresPro` / `paidFeatures` / `freeTranscript`、案の `options[].requiresPro` / `freeInstruction` を見るだけ |
 | 出す時 | ready の「これでいく」(`buildFromChat`・声の自動生成も含む)と案の「これでいく」(`choose`)。判定は `MetamonServices/Purchase/PaidFeatureCheck.swift`(純粋関数) |
 | 出さない時 | **Pro 会員** / **回数制限が無効の時(DEBUG ビルドの既定 = デモ端末)**。`METAMON_IAP_ENFORCE=1` で DEBUG でも出る(`ProGate.isEnforced` と同じ扱い・22.4)/ 旧 backend(`requiresPro` 無し)/ ready の transcript 以外の予備文で作る時 |
 | カード | `ClarifyChatView` の「これでいく」の位置(`PaidFeatureCard`・create は初期画面、edit は音声シートの中)。購入して作る = `ProEntitlementStore.purchase` → 成功したら有料機能込みの文で生成(キャンセル・承認待ちはカードに残る)/ この機能なしで作る = `freeTranscript`(`freeInstruction`)で生成 / × = チャットに戻る。話し直すとカードは閉じて次の応答で判定し直す |

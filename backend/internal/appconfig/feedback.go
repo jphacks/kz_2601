@@ -5,7 +5,7 @@ package appconfig
 // The DSL attachment is a reference (appId + dslVersion): the snapshot is
 // read from the caller's own tree, so it is exactly the stored structure and
 // another user's app cannot be attached. Retention and erasure: store.FeedbackRetention
-// and cmd/purge (architecture.md §3.5).
+// and cmd/purge (docs/backend/features/feedback.md).
 
 import (
 	"bytes"

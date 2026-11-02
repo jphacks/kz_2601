@@ -491,7 +491,7 @@ components:
         freeInstruction: { type: string, description: '#77。requiresPro の時だけ。有料機能を抜いた指示文 (「この機能なしで作る」で instruction の代わりに POST /generate へ)' }
     PaidFeature:
       type: object
-      description: '#77。有料機能 1 つ。一覧はサーバーの backend/internal/ai/paid_features.json (docs/backend/architecture.md「有料機能の判定」)'
+      description: '#77。有料機能 1 つ。一覧はサーバーの backend/internal/ai/paid_features.json (docs/backend/features/pro.md)'
       required: [id, title, reason]
       properties:
         id: { type: string, description: 'sharedData (みんなで共有するデータ) など' }

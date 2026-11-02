@@ -8,7 +8,7 @@ import (
 
 // Release request statuses (#76). Only "received" is written by the API; an
 // admin moves the others by hand in the Firestore console
-// (architecture.md §3.3).
+// (docs/backend/features/release.md).
 const (
 	ReleaseReceived  = "received"
 	ReleaseReviewing = "reviewing"
