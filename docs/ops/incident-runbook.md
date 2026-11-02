@@ -120,7 +120,7 @@ curl -s "$URL/v1/client-config" | jq .notice
 注意:
 
 - 応答は `Cache-Control: max-age=300`。端末に届くまで**最大 5 分**+ 次に前面に戻った時。
-- **次のデプロイ(develop / main へのマージ)で消えます**(`deploy-cloudrun.yml` の `--set-env-vars` は全置換)。障害中にデプロイしたら出し直す。
+- #513 のマージ後は、デプロイ(`--update-env-vars`)の後も**残る**。終わったら消し忘れない。#513 がマージされるまでは**次のデプロイ(develop / main へのマージ)で消える**(`--set-env-vars` は全置換)ので、障害中にデプロイしたら出し直す。変え方は [runtime-config.md](../infra/runtime-config.md#変え方)。
 - appconfig を前のリビジョンに戻している間(§6)は、`services update` で作ったリビジョンにトラフィックが行かない。[§12](#12-知っておくべき落とし穴) の手順で出す。
 - 文面の例:
   - Claude の障害: 「AI の生成を一時的に止めています。作ったアプリと記録はそのまま使えます。」/ "AI generation is paused for now. Your apps and records still work."
@@ -140,7 +140,7 @@ SEV2(全員が生成できない)。料金の暴走は SEV1。
    | 400 で credit / billing の文言 | 前払い残高・月の上限に達した | Console で残高・支出上限を確かめる(費用の見方は [ai-cost.md](../infra/ai-cost.md)) |
    | 401 `authentication_error` | キーが無効(ローテーション漏れ・漏えいで無効化) | §8 |
 
-2. **生成を止める(丁寧に断る)**: 専用の停止スイッチはまだ無いので、**全体の 1 日上限**(コストの遮断器)を 1 にする。Claude を呼ぶ前に 429 `rate_limited`(scope `global`)で断り、iOS は「本日の受付を終了しました / 利用が集中したため、新しい生成を止めています。○時に再開します」のカードを出す。作ったアプリ・記録・一覧(appconfig)はそのまま使える。
+2. **生成を止める(丁寧に断る)**: 専用の停止スイッチはまだ無いので、**全体の 1 日上限**(コストの遮断器)を 1 にする。Claude を呼ぶ前に 429 `rate_limited`(scope `global`)で断り、iOS は「本日の受付を終了しました / 利用が集中したため、新しい生成を止めています。○時に再開します」のカードを出す。作ったアプリ・記録・一覧(appconfig)はそのまま使える。専用のスイッチは #511 で入る予定(ai に `AI_PAUSED=1`。マージ後は [runtime-config.md](../infra/runtime-config.md#運用で変える値) を参照)。それまでは下の手順で止める。
 
    ```sh
    gcloud run services update ai-prod --region=asia-northeast1 --project=jphacks-kz2601 \
@@ -159,9 +159,9 @@ SEV2(全員が生成できない)。料金の暴走は SEV1。
      --remove-env-vars=RATE_LIMIT_GLOBAL_DAILY
    ```
 
-   ※ `RATE_LIMIT_GLOBAL_DAILY` も次のデプロイで消える(既定に戻る)。止めたままにしたい間は `main` にマージしない。
+   ※ #513 のマージ後は `RATE_LIMIT_GLOBAL_DAILY` もデプロイの後に残る(戻し忘れに注意)。#513 がマージされるまでは次のデプロイで消える(既定に戻る)ので、止めたままにしたい間は `main` にマージしない。
 
-**提案(別 Issue)**: 理由を正しく出せる専用のスイッチ(例: `AI_PAUSED=1` で 503 + 「一時停止中」の文言)を ai に足す。
+**専用スイッチ(#511・作業中)**: 理由を正しく出せる `AI_PAUSED=1`(503 + 「一時停止中」の文言)を ai に足す。マージされるまでは上の `RATE_LIMIT_GLOBAL_DAILY=1` で止める。
 
 ## 6. 手順 B: 悪いデプロイを戻す
 
@@ -202,14 +202,14 @@ SEV2(全員が生成できない)。料金の暴走は SEV1。
 
 ## 7. 手順 C: Firestore を復元する
 
-SEV1。詳しい手順・費用・安全ルールは [firestore-backup.md](../infra/firestore-backup.md)(#294・PITR 7 日 + 日次バックアップ 14 日)。ここは障害対応での順番だけ。
+SEV1。詳しい手順・費用・安全ルールは [firestore-backup-restore.md](../infra/firestore-backup-restore.md)(#294・PITR 7 日 + 日次バックアップ 14 日)。ここは障害対応での順番だけ。
 
 1. **壊している原因を止める**: デプロイが原因なら §6 で戻す。ジョブが原因なら止める(例: 消去ジョブ `account-purge-daily` を `gcloud scheduler jobs pause`)。
 2. **お知らせ**(§4・warning)。「一部のデータが表示されない可能性があります。復旧作業中です。」
 3. **壊れる前の時刻 `T`(UTC・分単位)を決める**: ログ・デプロイの時刻・利用者の報告から。
 4. **戻し方を選ぶ**:
-   - 7 日以内 → [ケース 1(PITR から一部を戻す)](../infra/firestore-backup.md#ケース-1-一部の文書を過去の時点から戻す)
-   - 7 日より前 → [ケース 2(バックアップを新しい DB に復元)](../infra/firestore-backup.md#ケース-2-バックアップを新しい-db-に復元して戻す)
+   - 7 日以内 → [ケース 1(PITR から一部を戻す)](../infra/firestore-backup-restore.md#ケース-1-一部の文書を過去の時点から戻す)
+   - 7 日より前 → [ケース 2(バックアップを新しい DB に復元)](../infra/firestore-backup-restore.md#ケース-2-バックアップを新しい-db-に復元して戻す)
 5. **生きている `(default)` を消したり、まるごと上書きしたりしない**。新しい DB で中身を確かめ、`--collection-ids` で絞って戻す。本番への `import` は 2 人で確認してから。
 6. **退会済みの人のデータがよみがえっていないか**: 消去ジョブを `-dry-run` で流す([account-purge.md](../infra/account-purge.md))。
 7. 止めたジョブを戻す(`gcloud scheduler jobs resume`)。
@@ -242,7 +242,7 @@ SEV1。**原因の調査より先にキーを無効化する。**
    ```
 
    - **修正版がストアで落とせる状態になる前に上げない**(全員が更新画面から出られなくなる)。国によって配信に時間差がある。
-   - `MIN_IOS_BUILD` も次のデプロイで消える(§12)。
+   - `MIN_IOS_BUILD` は #513 のマージ後はデプロイの後も残る。それまでは次のデプロイで消える(§12)。
 6. 段階的リリースを再開(または修正版で新しく始める)。お知らせを外す。
 
 ## 10. 振り返り(障害の記録)
@@ -254,11 +254,11 @@ SEV1。**原因の調査より先にキーを無効化する。**
 
 ## 11. stg での障害訓練(#333 の完了条件)
 
-**人が行う**(GCP の変更を含む)。所要 60〜90 分、2 人で。指揮役が本書を読みながら操作し、補助役が時刻とつまずきを記録する。**本番(`*-prod`)には触れない。** **Firestore への書き込み・import は訓練に含めない**(stg と prod が同じ DB のため。DB の復元練習は [firestore-backup.md の runbook](../infra/firestore-backup.md#復元練習の-runbook294-の完了条件)(#294)で別に行う)。
+**人が行う**(GCP の変更を含む)。所要 60〜90 分、2 人で。指揮役が本書を読みながら操作し、補助役が時刻とつまずきを記録する。**本番(`*-prod`)には触れない。** **Firestore への書き込み・import は訓練に含めない**(stg と prod が同じ DB のため。DB の復元練習は [firestore-backup-restore.md の runbook](../infra/firestore-backup-restore.md#復元練習の-runbook294-の完了条件)(#294)で別に行う)。
 
 ### 準備
 
-- [ ] develop の最新が `ai-stg` / `appconfig-stg` にデプロイ済み(このお知らせの機能を含む版)。訓練中は develop にマージしない(env が消えるため)。
+- [ ] develop の最新が `ai-stg` / `appconfig-stg` にデプロイ済み(このお知らせの機能を含む版)。#513 がマージされるまでは、訓練中に develop にマージしない(env が消えるため)。
 - [ ] Staging 構成の iOS アプリ(`project.yml` の既定 = stg)を入れた端末かシミュレータ。
 - [ ] 記録用に [postmortem-template.md](postmortem-template.md) を写す(種類 = 訓練)。
 - [ ] 今のリビジョンを控える: §6 の 1 を `ai-stg` と `appconfig-stg` で。
@@ -293,6 +293,6 @@ SEV1。**原因の調査より先にキーを無効化する。**
    gcloud run services update-traffic appconfig-prod --region=asia-northeast1 --project=jphacks-kz2601 --to-latest
    ```
 
-2. **デプロイで env が消える**: `deploy-cloudrun.yml` は `--set-env-vars` で env を全置換する。手で足した `NOTICE_JSON`・`RATE_LIMIT_GLOBAL_DAILY`・`MIN_IOS_BUILD`・`LATEST_IOS_BUILD` は、次の develop / main のマージで消える。障害中・強制アップデート中はデプロイ後に必ず確かめる。
+2. **デプロイと手で入れた env**: #513 のマージ後、`deploy-cloudrun.yml` は `--update-env-vars` でデプロイが決める値だけを上書きし、手で足した `NOTICE_JSON`・`RATE_LIMIT_*`・`MIN_IOS_BUILD`・`LATEST_IOS_BUILD` は**残る**(消し忘れに注意)。どの値を運用で変えてよいか・変え方は [runtime-config.md](../infra/runtime-config.md)。#513 がマージされるまでは `--set-env-vars` の全置換で、次の develop / main のマージで消える。障害中・強制アップデート中はデプロイ後に必ず確かめる。
 3. **stg と prod は同じ Firestore**(#288 で分けるまで): stg の訓練・調査でもデータを書き換えない。
 4. **キャッシュ**: `client-config` は 5 分キャッシュされる。お知らせ・強制アップデートは即時ではない。
