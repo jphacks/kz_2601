@@ -35,9 +35,13 @@ public struct PublicAppListing: Codable, Sendable, Equatable, Identifiable, Hash
     public var installs: Int
     /// 自分が公開したものか
     public var mine: Bool
+    /// 運営が非公開にした(#321)。自分の掲載にだけ付く
+    public var hidden: Bool?
+    /// 運営の理由(作者に見せる)
+    public var hiddenReason: String?
 
     public init(id: String, name: String, description: String = "", tags: [String] = [], authorName: String = "",
-                components: [String] = [], installs: Int = 0, mine: Bool = false) {
+                components: [String] = [], installs: Int = 0, mine: Bool = false, hidden: Bool? = nil, hiddenReason: String? = nil) {
         self.id = id
         self.name = name
         self.description = description
@@ -46,6 +50,8 @@ public struct PublicAppListing: Codable, Sendable, Equatable, Identifiable, Hash
         self.components = components
         self.installs = installs
         self.mine = mine
+        self.hidden = hidden
+        self.hiddenReason = hiddenReason
     }
 }
 

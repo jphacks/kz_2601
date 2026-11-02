@@ -39,6 +39,8 @@ type CatalogApp struct {
 	Installs    int             `json:"installs"`
 	CreatedAt   time.Time       `json:"createdAt"`
 	UpdatedAt   time.Time       `json:"updatedAt"`
+	// ModerationState: unpublished by the operator (#321). Kept when the owner publishes again.
+	ModerationState
 }
 
 // MaxCatalogApps bounds the in-memory search (architecture.md §3.2).
