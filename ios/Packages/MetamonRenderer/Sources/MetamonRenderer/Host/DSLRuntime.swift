@@ -45,6 +45,12 @@ public protocol DSLRuntime: AnyObject, Observable {
     var supportsOnlineAIText: Bool { get }
     /// aiButton の端末内 AI の集計(#446)。決まったラベルだけ渡す。送るか・いつ送るかはホストが決める。
     func recordAIButton(_ event: AIButtonMetric.Event)
+    /// 他人の共有レコードを通報・ブロックできるか(#321・審査 1.2)。シェアの無い版・プレビューは false。
+    func canReport(entity: String, record: Record) -> Bool
+    /// 通報の理由を選ぶ画面をホストが出す。
+    func reportRecord(entity: String, record: Record)
+    /// 作者のブロックの確認をホストが出す(ブロックすると、その人の投稿はすぐ見えなくなる)。
+    func blockAuthor(entity: String, record: Record)
 }
 
 public extension DSLRuntime {
@@ -66,6 +72,9 @@ public extension DSLRuntime {
     var supportsOnlineAIText: Bool { false }
     /// 既定は数えない(プレビュー・テスト用ランタイム)。
     func recordAIButton(_ event: AIButtonMetric.Event) {}
+    func canReport(entity: String, record: Record) -> Bool { false }
+    func reportRecord(entity: String, record: Record) {}
+    func blockAuthor(entity: String, record: Record) {}
 
     /// 自分が更新できるレコードか(#249 / #252)。他人の共有レコードは entity.edit が members の時だけ。
     func canEdit(entity: String, record: Record) -> Bool {
