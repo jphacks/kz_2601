@@ -25,7 +25,7 @@ Issue をまとめて回す時は `.claude/skills/jphacks-task/SKILL.md`(`/jphac
 - **git worktree で作業する**(他のエージェント・人間の作業ツリーを汚さない)。ブランチは `origin/develop` から切る: `git fetch origin && git checkout -b <feature|fix|docs|test|chore>/<短い英語名> origin/develop`
 - コミットは Conventional Commits、件名は日本語(`CONTRIBUTING.md`)。
 - テストを通してから報告する(Go: `go test ./...`・`golangci-lint run ./...`・`make schema-check`。iOS: `xcodegen generate` → `xcodebuild test`)。
-- **`xcodebuild` は同時に 1 本だけ**。`/usr/bin/lockf -k "$TMPDIR/xcodebuild.lock" xcodebuild ...` で直列にする。
+- **`xcodebuild` は同時に 1 本だけ**。`/usr/bin/lockf -k "$XCODEBUILD_LOCK" xcodebuild ...` で直列にする。ロックは**同じ機械の全セッションで同じパス**にする(セッションごとに変わる `$TMPDIR` は不可)。同じシミュレータで 2 本のテストが重なると、後から起動した方が先のテストのプロセスを落とす(#568)。
 - **シミュレータを作らない・消さない**(`xcrun simctl create/delete/erase` をしない)。既存のものを使う。
 - 報告は**日本語**で、短く: ブランチ・コミット・テストの件数・できなかったこと・人間の判断が要ること。
 
