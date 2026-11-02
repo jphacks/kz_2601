@@ -1,0 +1,5 @@
+[
+  {"timestamp":"2026-11-01T01:00:00Z","jsonPayload":{"mode":"edit","outcome":"validated","est_cost_usd":1.5}},
+  {"timestamp":"2026-10-31T15:30:00Z","jsonPayload":{"mode":"create","outcome":"validated","est_cost_usd":0.5}},
+  {"timestamp":"2026-10-30T15:30:00Z","jsonPayload":{"mode":"create","outcome":"validated"}}
+]
