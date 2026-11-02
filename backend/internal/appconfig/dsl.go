@@ -311,10 +311,14 @@ func (h *Handler) getEntity(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, ent)
 }
 
-// entityOf resolves the entity of a records route: resolveEntity plus, on
-// scope:"shared" entities, the participant check (#254, members.go).
+// entityOf resolves the entity of a records route: resolveEntity with the
+// published sharing settings (record_scope.go) plus, on scope:"shared"
+// entities, the participant check (#254, members.go).
 func (h *Handler) entityOf(r *http.Request) (*store.App, *dsl.Entity, string, error) {
 	cur, ent, eid, err := h.resolveEntity(r)
+	if err == nil {
+		ent, err = h.withSharing(r, cur.ID, ent)
+	}
 	if err == nil && ent.EffectiveScope() == dsl.ScopeShared {
 		err = h.requireMember(r, cur)
 	}

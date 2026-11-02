@@ -63,6 +63,20 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	pubDSL, pub, err := h.publishedDSL(r.Context(), appID)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	ents := make([]*dsl.Entity, len(app.Entities))
+	anyShared := false
+	for i := range app.Entities {
+		ents[i] = &app.Entities[i]
+		if pub != nil {
+			ents[i] = sharingOf(ents[i], pubDSL, pub.OwnerUID, uid)
+		}
+		anyShared = anyShared || ents[i].EffectiveScope() == dsl.ScopeShared
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), h.eventsMax)
 	defer cancel()
@@ -75,7 +89,7 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 	broken := make(chan struct{})
 	entities := make([]string, 0, len(app.Entities))
 	member := true // non-participants get no signals from scope:"shared" entities (#254)
-	if hasSharedScope(app) {
+	if anyShared {
 		if err := h.requireMember(r, cur); err != nil {
 			var ae *apiError
 			if !errors.As(err, &ae) {
@@ -85,8 +99,7 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 			member = false
 		}
 	}
-	for i := range app.Entities {
-		ent := &app.Entities[i]
+	for _, ent := range ents {
 		if !member && ent.EffectiveScope() == dsl.ScopeShared {
 			continue
 		}
