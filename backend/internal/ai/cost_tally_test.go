@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/metrics"
 )
 
 func bodyWithText(model, text string) string {
@@ -89,5 +90,8 @@ func TestGenerateLog_CarriesRequestCost(t *testing.T) {
 	}
 	if got, _ := m["est_cost_usd"].(float64); math.Abs(got-0.0124*calls) > 1e-9 {
 		t.Fatalf("est_cost_usd = %v, want %v", m["est_cost_usd"], 0.0124*calls)
+	}
+	if m["app_hash"] != metrics.AppHash("app-1") { // #297 field coexists with the cost fields
+		t.Fatalf("app_hash missing next to cost fields: %v", m)
 	}
 }

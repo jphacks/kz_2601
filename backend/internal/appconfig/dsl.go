@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/metrics"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -62,6 +63,8 @@ func (h *Handler) getDSL(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+	} else {
+		emitMetric(r, metrics.AppOpened, appHashAttr(app.ID)) // a refresh sends If-None-Match
 	}
 	httpx.WriteJSON(w, http.StatusOK, dslEnvelope{AppID: app.ID, Version: app.CurrentVersion, DSL: app.DSL})
 }

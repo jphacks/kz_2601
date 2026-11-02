@@ -24,7 +24,7 @@ TestFlight β から正式リリース(M3)に進むかを、感覚ではなく�
 | 1 | クラッシュなし率 | 7 日間にアプリを使ったユーザーのうち、クラッシュしなかった人の割合(Crashlytics の「クラッシュフリー ユーザー」) | **99.5% 以上** | Firebase Crashlytics(#296) |
 | 2 | 生成の成功率 | `POST /v1/generate` の create / edit のうち、検証を通った結果を返した割合。分母から呼び出し側の誤り(4xx)を外す | **98% 以上** | `ai.generate` ログ(このドキュメントと同じ PR で追加) |
 | 3 | 初回の生成の p95 | 空のアプリへの最初の create が成功した時の、サーバーでの処理時間(受け付け → 保存して返すまで)の 95 パーセンタイル | **30 秒以内** | `ai.generate` ログ |
-| 4 | 7 日後に開いた率(D7) | 最初に生成に成功した日を 0 日目とし、7 日目に自分のアプリを開いたユーザーの割合(#297 の定義) | **記録だけ**(目標値はオーナーが決める) | `app.opened` イベント(**未実装**・#297) |
+| 4 | 7 日後に開いた率(D7) | 最初に生成に成功した日を 0 日目とし、7 日目にアプリを使ったユーザーの割合(#297 の定義・[`docs/metrics/product-metrics.md`](../metrics/product-metrics.md)) | **記録だけ**(目標値はオーナーが決める) | `session.start`・`app.opened` などのイベント(#297) |
 | 5 | P1 のフィードバックの残数 | 件名が `[β]` で始まり `priority:P1` が付いた open の Issue の数 | **0** | GitHub Issues(下の 5 章で作る) |
 
 ## 2. いま測れるもの・まだ測れないもの
@@ -34,7 +34,7 @@ TestFlight β から正式リリース(M3)に進むかを、感覚ではなく�
 | 1 クラッシュなし率 | **測れる**(Crashlytics の画面) | Firebase Console で Crashlytics を有効にし、prod の plist の版が β に出ていること(#296 の「人がやること」・#292) |
 | 2 生成の成功率 | **このブランチのマージと prod へのデプロイの後に測れる** | `ai.generate` が `main` に入って `ai-prod` にデプロイされること。2026-11-02 時点で prod には `ai.usage`(#472)もまだ出ていない(develop にだけある) |
 | 3 初回の生成の p95 | 同上 | 同上 |
-| 4 D7 | **測れない** | #297 の実装(`app.opened` などのイベント)と BigQuery へのシンク(#297 の作業の順番 3・6)。シンクの作成は人の承認が要る |
+| 4 D7 | **#297 のイベントが本番に出た後に測れる** | `scripts/product-metrics-weekly.sh prod` で出す(Cloud Logging の 30 日の範囲)。長く見るには BigQuery のシンク(人の承認) |
 | 5 P1 の残数 | **測れる**(GitHub) | 5 章の振り分けを毎週回すこと。アプリ内のフィードバック(#319・PR #492)がマージされるまでは、TestFlight のフィードバックと Crashlytics だけが入口 |
 
 参考として、`ai.generate` が出るまでの間は Cloud Run のリクエストログで `POST /v1/generate` の件数・5xx・p95 を見られる(`scripts/beta-weekly.sh` の「参考」)。ストリーミングは 200 を返してからエラーを送るので、**成功率の代わりにはならない**。
@@ -165,7 +165,7 @@ WHERE timestamp >= TIMESTAMP(week_start, 'Asia/Tokyo')
 
 ### 4. 7 日後に開いた率(D7)
 
-**まだ測れない。** `app.opened`(`GET /v1/apps/{appId}/dsl` を `If-None-Match` なしで受けた時)が backend に無い。#297 の実装(作業の順番 3)と BigQuery のシンク(同 6・人の承認)の後に、[`docs/decisions/297-product-metrics.md`](../decisions/297-product-metrics.md) の「D1 / D7」の SQL で出す。それまでは週の記録に「未計測」と書く。
+#297 で `session.start`・`app.opened` などのイベントを backend に足した。本番に出た後は `scripts/product-metrics-weekly.sh prod` の「翌日・7 日後に開いた率」の表で出す(定義は [`docs/metrics/product-metrics.md`](../metrics/product-metrics.md))。本番に出るまでは週の記録に「未計測」と書く。
 
 ### 5. P1 のフィードバックの残数(GitHub)
 
