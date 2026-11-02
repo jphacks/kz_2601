@@ -203,7 +203,10 @@ public struct Component: Decodable, Identifiable, Sendable {
     // matchList(#507)
     public var show: String?           // incoming|outgoing|matches
 
-    private enum Keys: String, CodingKey {
+    /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
+    static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
+
+    private enum Keys: String, CodingKey, CaseIterable {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
         case includeTime, source, maxDuration, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
         case kind, groupBy, bucket, prompt, size

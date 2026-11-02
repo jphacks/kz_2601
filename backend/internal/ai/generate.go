@@ -19,6 +19,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -213,7 +214,7 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 		transcript = strings.TrimSpace(req.Text)
 	}
 	if req.AppID == "" || transcript == "" {
-		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "appId and transcript are required"}
+		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "appId and transcript are required"}
 	}
 	loc, err := resolveLocale(req.Locale, transcript)
 	if err != nil {
@@ -225,7 +226,7 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 	}
 	current, err := dsl.Parse(env.DSL)
 	if err != nil {
-		return nil, &Error{Status: http.StatusInternalServerError, Code: "internal", Message: "current DSL is invalid: " + err.Error()}
+		return nil, &Error{Status: http.StatusInternalServerError, Code: httpx.CodeInternal, Message: "current DSL is invalid: " + err.Error()}
 	}
 	mode := req.Mode
 	if mode == "" || mode == ModeAuto {
@@ -266,7 +267,7 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 			notePublicPII(ar, env.DSL, loc)                                          // #253
 		}
 	default:
-		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "mode must be auto|create|edit|undo"}
+		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "mode must be auto|create|edit|undo"}
 	}
 	if err != nil {
 		return nil, err
@@ -466,7 +467,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			return ar, nil
 		}
 	}
-	return nil, &Error{Status: http.StatusBadRequest, Code: "generation_failed",
+	return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeGenerationFailed,
 		Message: "could not produce a valid app from the request", Problems: problems, Attempts: ar.meta.Attempts}
 }
 
@@ -590,7 +591,7 @@ func applyRestriction(ar *attemptResult, r Restriction, create bool, loc Locale)
 	}
 	app, err := dsl.Parse(out)
 	if err != nil {
-		return &Error{Status: http.StatusBadRequest, Code: "generation_failed",
+		return &Error{Status: http.StatusBadRequest, Code: httpx.CodeGenerationFailed,
 			Message:  "could not produce a valid app without the parts this app version cannot use",
 			Problems: append(notes, err.Error()), Attempts: ar.meta.Attempts}
 	}
@@ -628,7 +629,7 @@ func (s *Service) call(ctx context.Context, system, user string, schema json.Raw
 		if resp.StopDetails != nil && resp.StopDetails.Category != "" {
 			msg += " (" + resp.StopDetails.Category + ")"
 		}
-		return nil, &Error{Status: http.StatusBadRequest, Code: "refused", Message: msg, Attempts: ar.meta.Attempts}
+		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeRefused, Message: msg, Attempts: ar.meta.Attempts}
 	}
 	return resp, nil
 }
@@ -1026,11 +1027,11 @@ func mapStoreErr(err error) error {
 	if errors.As(err, &ae) {
 		code := ae.Code
 		if code == "" {
-			code = "appconfig_error"
+			code = httpx.CodeAppconfigError
 		}
 		return &Error{Status: ae.Status, Code: code, Message: ae.Message}
 	}
-	return &Error{Status: http.StatusBadGateway, Code: "appconfig_error", Message: err.Error()}
+	return &Error{Status: http.StatusBadGateway, Code: httpx.CodeAppconfigError, Message: err.Error()}
 }
 
 func mapClaudeErr(err error) error {
@@ -1042,17 +1043,17 @@ func mapClaudeErr(err error) error {
 	if errors.As(err, &ae) {
 		switch ae.Status {
 		case 429:
-			return &Error{Status: http.StatusTooManyRequests, Code: "rate_limited", Message: "Claude rate limit"}
+			return &Error{Status: http.StatusTooManyRequests, Code: httpx.CodeRateLimited, Message: "Claude rate limit"}
 		case 400, 401, 403:
-			return &Error{Status: http.StatusInternalServerError, Code: "internal", Message: "Claude request rejected: " + ae.Message}
+			return &Error{Status: http.StatusInternalServerError, Code: httpx.CodeInternal, Message: "Claude request rejected: " + ae.Message}
 		default:
-			return &Error{Status: http.StatusServiceUnavailable, Code: "upstream_unavailable", Message: "Claude unavailable: " + ae.Type}
+			return &Error{Status: http.StatusServiceUnavailable, Code: httpx.CodeUpstreamUnavailable, Message: "Claude unavailable: " + ae.Type}
 		}
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		return &Error{Status: http.StatusGatewayTimeout, Code: "upstream_timeout", Message: "Claude call timed out"}
+		return &Error{Status: http.StatusGatewayTimeout, Code: httpx.CodeUpstreamTimeout, Message: "Claude call timed out"}
 	}
-	return &Error{Status: http.StatusServiceUnavailable, Code: "upstream_unavailable", Message: err.Error()}
+	return &Error{Status: http.StatusServiceUnavailable, Code: httpx.CodeUpstreamUnavailable, Message: err.Error()}
 }
 
 // sameDSL reports whether two DSL documents are equal as JSON values (key

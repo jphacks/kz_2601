@@ -31,9 +31,6 @@ func init() {
 // ReportsPerDay caps new reports per reporter per JST day.
 const ReportsPerDay = 30
 
-// CodeUnpublished is the error code for content the operator unpublished.
-const CodeUnpublished = "unpublished"
-
 // reportReasons are the accepted report reasons (iOS shows one per row).
 var reportReasons = map[string]bool{
 	"spam": true, "sexual": true, "violence": true, "harassment": true,
@@ -43,7 +40,7 @@ var reportReasons = map[string]bool{
 // unpublishedErr tells everyone that the operator stopped this; the owner
 // sees why (the reason is written for the author).
 func unpublishedErr(what string, st store.ModerationState) *apiError {
-	return apiErr(http.StatusForbidden, CodeUnpublished, what+" was unpublished by the operator").With("reason", st.HiddenReason)
+	return apiErr(http.StatusForbidden, httpx.CodeUnpublished, what+" was unpublished by the operator").With("reason", st.HiddenReason)
 }
 
 // ---- reports ----------------------------------------------------------------

@@ -31,6 +31,14 @@ backend(ai / appconfig)の 5xx の増加・panic・Claude の失敗・応答の�
 
 リクエストごとのアクセスログ(`httpx.Log`)は `event="http.request"`・`method`・`path`(クエリは出さない)・`status`・`duration`・`client`。**5xx は `ERROR`**、それ以外は `INFO`。
 
+**リクエストの途中のログ**: リクエストの処理中に出すログは、`log.Printf` ではなく `slog` の `LogAttrs(ctx, …)` / `ErrorContext(ctx, …)` などの **ctx を渡す形**で出す。ctx から trace・`requestId`・`uid_hash` がアクセスログと同じように付く。属性は 1 行に 1 つ(#516)。`log.Printf` のままでよいのは、起動時(`cmd/*` の main がリクエストを受ける前)と CLI(`cmd/ai-eval` など)だけ。ai の今のログ:
+
+| `message` | 重大度 | 属性 | いつ |
+| --- | --- | --- | --- |
+| `ai: error response` | `ERROR`(Error Reporting に入る) | `status`・`code`・`error` | ai が 5xx を返す時(JSON と SSE の `event: error`) |
+| `anthropic: attempt failed` | `WARNING` | `attempt`・`error`(`429 rate_limit_error` などの状態と種類だけ) | Claude の呼び出しを再試行する前 |
+| `chat: store get failed (falling back to create)` | `WARNING` | `app_hash`・`error` | `/v1/chat` の auto で今の DSL を読めず、新規として続ける時 |
+
 **出さないもの**: 生の uid、リクエストの本文・クエリ・発話・プロンプト・応答の本文、トークン。テスト(`logging_test.go`・`auth/loguid_test.go`・`ai/usage_log_test.go`)で確かめています。
 
 例(5xx のアクセスログ):
@@ -188,4 +196,3 @@ Issue の完了の条件「stg でわざと 5xx を出すと、5 分以内にア
 - Uptime check は `/health` を 300 秒ごとに複数のリージョンから叩くので、そのぶん Cloud Run のリクエスト(と 5xx 率の分母)が増える
 - ダッシュボードの JSON はコンソールで直すと Terraform との差分になる。直すときは `backend.json.tftpl` を直して apply する
 - trace は `GOOGLE_CLOUD_PROJECT` が無いと付かない(Cloud Run では deploy-cloudrun.yml が入れている)
-- ai の `errBody` の `log.Printf`(5xx のエラーメッセージ)は context を持たないので、trace / requestId が付かない。同じ時刻のアクセスログ(`ERROR`)で突き合わせる

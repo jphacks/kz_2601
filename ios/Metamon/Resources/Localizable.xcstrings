@@ -800,7 +800,7 @@
         }
       }
     },
-    "Apple でサインイン済み" : {
+    "Apple でサインイン中" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -812,7 +812,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple でサインイン済み"
+            "value" : "Apple でサインイン中"
           }
         }
       }
@@ -5611,6 +5611,23 @@
         }
       }
     },
+    "ユーザー ID" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "User ID"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ユーザー ID"
+          }
+        }
+      }
+    },
     "リリース予定" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6121,6 +6138,23 @@
         }
       }
     },
+    "今のアプリの版" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current app revision"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今のアプリの版"
+          }
+        }
+      }
+    },
     "今のアプリの設計(DSL)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6202,6 +6236,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今の記録帳"
+          }
+        }
+      }
+    },
+    "今の記録帳の版" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current logbook revision"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今の記録帳の版"
           }
         }
       }
@@ -7379,6 +7430,23 @@
         }
       }
     },
+    "匿名で利用中" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Using anonymously"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匿名で利用中"
+          }
+        }
+      }
+    },
     "匿名で投稿" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7392,23 +7460,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "匿名で投稿"
-          }
-        }
-      }
-    },
-    "匿名ユーザー" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anonymous user"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "匿名ユーザー"
           }
         }
       }
@@ -7936,6 +7987,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "名前を変える"
+          }
+        }
+      }
+    },
+    "問い合わせの時は、この内容を伝えてください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please include these details when you contact support."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "問い合わせの時は、この内容を伝えてください。"
           }
         }
       }
@@ -8565,23 +8633,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "接続を確認して、もう一度お試しください"
-          }
-        }
-      }
-    },
-    "接続先" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Endpoints"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "接続先"
           }
         }
       }
@@ -9640,19 +9691,19 @@
         }
       }
     },
-    "現在: %@(v%lld)" : {
+    "現在: %@" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Current: %1$@ (v%2$lld)"
+            "value" : "Current: %@"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "現在: %@(v%lld)"
+            "value" : "現在: %@"
           }
         }
       }
@@ -11153,6 +11204,40 @@
         }
       }
     },
+    "詳細(サポート用)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details (for support)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細(サポート用)"
+          }
+        }
+      }
+    },
+    "詳細をコピー" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy details"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細をコピー"
+          }
+        }
+      }
+    },
     "認識中" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12220,6 +12305,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音声を聞き取れませんでした%@。もう一度はっきり話してください"
+          }
+        }
+      }
+    },
+    "音声モデル" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデル"
           }
         }
       }

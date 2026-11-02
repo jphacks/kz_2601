@@ -99,6 +99,8 @@ gcloud run jobs create account-purge \
 gcloud run jobs execute account-purge --project="$PROJECT_ID" --region="$REGION" --wait
 ```
 
+`gcloud run jobs create` は Job を新しく作る時だけのコマンドなので、ここでは `--set-env-vars` を使います(作る時は既存の env がありません)。作った後に env を変える時は、他の値を消さないよう `gcloud run jobs update account-purge --update-env-vars KEY=VALUE` を使います。
+
 Job は `APP_ENV` を付けないので stg 用の起動停止(#290)は掛かりません。DB は `FIRESTORE_DATABASE`(既定 `(default)`)で選びます。stg のプロジェクト/DB で動かす場合は `APP_ENV=stg` を付け、本番の DB を指していれば起動を拒否します。
 
 ログに `purge: firestore`(接続先)・`purge: start`(`candidates` = 対象の数)と `purge: would purge` が出ることを確かめます。問題が無ければ dry-run を外します。

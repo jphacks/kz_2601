@@ -282,7 +282,10 @@ public struct Field: Decodable, Identifiable, Sendable {
 
     public var isComputed: Bool { computed != nil }
 
-    private enum Keys: String, CodingKey { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health, hidden }
+    /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
+    static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
+
+    private enum Keys: String, CodingKey, CaseIterable { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health, hidden }
 
     /// 予約値の仮 Field 用(`RecordValue`)。
     init(id: String, name: String, type: FieldType) {

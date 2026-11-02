@@ -953,6 +953,23 @@
         }
       }
     },
+    "この端末では使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available on this device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末では使えません"
+          }
+        }
+      }
+    },
     "この端末にはありません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1221,6 +1238,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "もう一度読み取る"
+          }
+        }
+      }
+    },
+    "アプリを更新すると表示できます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update the app to show this"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを更新すると表示できます"
           }
         }
       }
@@ -2938,23 +2972,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未チェック"
-          }
-        }
-      }
-    },
-    "未対応: %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unsupported: %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未対応: %@"
           }
         }
       }

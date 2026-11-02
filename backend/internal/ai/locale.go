@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -27,7 +28,7 @@ func resolveLocale(explicit Locale, transcript string) (Locale, error) {
 	case LocaleJA, LocaleEN:
 		return explicit, nil
 	default:
-		return "", &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "locale must be ja or en"}
+		return "", &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "locale must be ja or en"}
 	}
 }
 

@@ -31,7 +31,7 @@
 
 - GitHub Actions **Secrets は使っていない**(上の 5 つはすべて Variables。値が公開されても認証にはならない識別子か、クライアントに配布される前提の Firebase Web API キー)。
 - Secret Manager にあるのは `ANTHROPIC_API_KEY` だけ。入れ物は Terraform(`infra/` の `secret_ids`)で作り、値(version)は人が入れる。
-- `OPENAI_API_KEY`(`/v1/transcribe` 用)は任意で、現在は登録していない。登録する場合は Anthropic と同じ手順で `ai-*` に注入する。
+- 音声認識は iOS の端末内(WhisperKit)で行うので、音声認識用の API キー(OpenAI など)は無い。
 
 ---
 
