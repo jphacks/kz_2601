@@ -113,17 +113,21 @@ enum BuildConfig {
                 notifications: UserNotificationScheduler(),
                 isLive: appConfigURL != nil
             )
-            if let appConfigURL { services.account = HTTPAccountClient(baseURL: appConfigURL, token: token) } // #119
-            #if !APP_STORE_REVIEW // 審査用ビルドはシェア / 探す / リリース申請を外す(#245)
-            services.sharing = appConfigURL.map { HTTPSharingClient(baseURL: $0, token: token) }
-            services.releaseRequests = appConfigURL.map { HTTPReleaseRequestClient(baseURL: $0, token: token) }
-            services.entitlements = appConfigURL.map { HTTPEntitlementClient(baseURL: $0, token: token) } // #314
-            services.aiButtonMetrics = appConfigURL.map { HTTPAIButtonMetricsSender(baseURL: $0, token: token) } // #446
-            if let appConfigURL { services.feedback = HTTPFeedbackClient(baseURL: appConfigURL, token: token) } // #319
-            #endif
+            for wiring in liveWirings { wiring.apply(&services, appConfigURL, token) }
             return services
         }
     }
+
+    /// live 構成で機能ごとのサービスを差し込む(#516)。中身は `Features/<機能>/<機能>+Wiring.swift`。
+    /// 互いに依存しない(それぞれ別のプロパティに代入するだけ)ので順番は自由。名前順に 1 行ずつ並べる。
+    static let liveWirings: [LiveWiring] = [
+        .account,
+        .aiButtonMetrics,
+        .entitlements,
+        .feedback,
+        .releaseRequests,
+        .sharing,
+    ]
 
     /// ホットリロード: SSE(`GET /events`)+ ポーリングのフォールバック(#82)。
     /// DEBUG のみ `METAMON_REALTIME=0` で Day1 のポーリングだけに戻せる(比較・切り分け用)。

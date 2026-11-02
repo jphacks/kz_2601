@@ -45,6 +45,8 @@ flowchart TD
 
 ### 1.1 DI(依存性注入)
 - **入口は `ios/Metamon/App/BuildConfig.swift` の `BuildConfig.make(environment:)` だけ**。`AppEnvironment`(`.mock` / `.live(appConfigURL:aiURL:)`・どちらか片方だけ live も可)を環境変数 `METAMON_AI_BASE_URL` / `METAMON_APPCONFIG_BASE_URL` / Info.plist から判定し、`Services`(protocol のコンテナ struct。`auth` を含む)を**1回だけ**組み立てる。Mock と本番の切替はこのファイルで完結する。
+- **機能ごとのサービスを足すとき**(#516): `Services` の本体(auth … isLive)は触らない。`MetamonServices/<機能>/Services+<機能>.swift` に `ServiceKey`(既定値)と `Services` の computed property を置く(`EnvironmentValues` と同じ形)。
+- live の差し込みは `Metamon/Features/<機能>/<機能>+Wiring.swift` に `LiveWiring` の `static let` を書き、`BuildConfig.liveWirings`(名前順・1 行 1 つ)に 1 行足す。審査用ビルドで外す機能は、ファイルと closure の中身を `#if !APP_STORE_REVIEW` で囲む。
 - `MetamonApp` が `Services` を `AppRuntime(document:services:)` と SwiftUI Environment `\.services`(`App/ServicesEnvironment.swift`)に渡す。View は `@Environment(\.services)` で protocol 越しに使う(例: `VoiceInputView` → `services.transcriber`)。
 - Renderer は Services を知らない。必要な能力(DSL、レコード、`run(action)`、ナビ)は `DSLRuntime` protocol(`MetamonRenderer/Host/DSLRuntime.swift`)で宣言し、`AppRuntime` が準拠して `\.dslRuntime` で注入する。`@Observable` なのでプロパティ変更は SwiftUI が追跡する。
 - 外部 DI ライブラリは使わない。
