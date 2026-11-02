@@ -35,27 +35,14 @@ func NewFirestore(client *firestore.Client, collection string) *Firestore {
 
 // Consume implements Store.
 func (f *Firestore) Consume(ctx context.Context, counters []Counter, weight int, expireAt time.Time) (Usage, error) {
-	refs := make([]*firestore.DocumentRef, len(counters))
-	for i, c := range counters {
-		refs[i] = f.c.Collection(f.col).Doc(c.ID)
-	}
+	refs := f.refs(counters)
 	var usage Usage
 	err := f.c.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
 		snaps, err := tx.GetAll(refs)
 		if err != nil {
 			return err
 		}
-		counts := make([]int, len(counters))
-		for i, s := range snaps {
-			if !s.Exists() {
-				continue
-			}
-			if v, err := s.DataAt("count"); err == nil {
-				if n, ok := v.(int64); ok {
-					counts[i] = int(n)
-				}
-			}
-		}
+		counts := readCounts(snaps)
 		usage = evaluate(counters, counts, weight)
 		if usage.Blocked >= 0 {
 			return nil
@@ -73,4 +60,55 @@ func (f *Firestore) Consume(ctx context.Context, counters []Counter, weight int,
 		return nil
 	}, firestore.MaxAttempts(5))
 	return usage, err
+}
+
+// Refund implements Store: one transaction, like Consume. A counter document
+// that does not exist (TTL already removed it) is not created again.
+func (f *Firestore) Refund(ctx context.Context, counters []Counter, weight int, expireAt time.Time) error {
+	refs := f.refs(counters)
+	return f.c.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
+		snaps, err := tx.GetAll(refs)
+		if err != nil {
+			return err
+		}
+		counts := readCounts(snaps)
+		for i, ref := range refs {
+			if !snaps[i].Exists() {
+				continue
+			}
+			if err := tx.Set(ref, map[string]any{
+				"count":     int64(refunded(counts[i], weight)),
+				"scope":     counters[i].Scope,
+				"expireAt":  expireAt,
+				"updatedAt": firestore.ServerTimestamp,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, firestore.MaxAttempts(5))
+}
+
+func (f *Firestore) refs(counters []Counter) []*firestore.DocumentRef {
+	refs := make([]*firestore.DocumentRef, len(counters))
+	for i, c := range counters {
+		refs[i] = f.c.Collection(f.col).Doc(c.ID)
+	}
+	return refs
+}
+
+// readCounts is the `count` of each snapshot (0 when missing).
+func readCounts(snaps []*firestore.DocumentSnapshot) []int {
+	counts := make([]int, len(snaps))
+	for i, s := range snaps {
+		if !s.Exists() {
+			continue
+		}
+		if v, err := s.DataAt("count"); err == nil {
+			if n, ok := v.(int64); ok {
+				counts[i] = int(n)
+			}
+		}
+	}
+	return counts
 }

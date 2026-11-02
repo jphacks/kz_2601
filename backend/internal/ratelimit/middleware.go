@@ -2,9 +2,11 @@ package ratelimit
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
@@ -33,16 +35,22 @@ func (w Weights) Weight(r *http.Request, body []byte) int {
 			Mode string `json:"mode"`
 		}
 		_ = json.Unmarshal(body, &req)
-		switch req.Mode {
-		case "undo": // restores the previous version, no Claude call
-			return 0
-		case "edit":
-			return w.Edit
-		default: // create / auto (auto may still turn out to be an edit)
-			return w.Create
-		}
+		return w.modeWeight(req.Mode)
 	}
 	return -1
+}
+
+// modeWeight is the units of one generate mode. create / auto / "" weigh as
+// create (auto may still turn out to be an edit: ReportMode refunds that).
+func (w Weights) modeWeight(mode string) int {
+	switch mode {
+	case "undo": // restores the previous version, no Claude call
+		return 0
+	case "edit":
+		return w.Edit
+	default:
+		return w.Create
+	}
 }
 
 // Middleware guards POST /v1/generate, /v1/chat and /v1/text: it verifies the
@@ -73,7 +81,8 @@ func (l *Limiter) Middleware(verifier auth.IdentityVerifier) func(http.Handler) 
 			}
 			r.Body = io.NopCloser(bytes.NewReader(body))
 
-			dec, err := l.Allow(r.Context(), id, ClientIP(r), l.cfg.Weights.Weight(r, body))
+			weight := l.cfg.Weights.Weight(r, body)
+			dec, err := l.Allow(r.Context(), id, ClientIP(r), weight)
 			if err != nil {
 				httpx.Error(w, http.StatusInternalServerError, httpx.CodeInternal, "rate limiter unavailable")
 				return
@@ -84,9 +93,35 @@ func (l *Limiter) Middleware(verifier auth.IdentityVerifier) func(http.Handler) 
 				return
 			}
 			// verified here: auth.Optional in the handler keeps this uid instead of verifying again
-			next.ServeHTTP(w, r.WithContext(auth.ContextWithUID(r.Context(), id.UID)))
+			ctx := auth.ContextWithUID(r.Context(), id.UID)
+			out := &outcome{}
+			sw := &statusWriter{ResponseWriter: w}
+			next.ServeHTTP(sw, r.WithContext(context.WithValue(ctx, outcomeKey{}, out)))
+			l.settle(r, dec, weight, out, sw.status)
 		})
 	}
+}
+
+// settle refunds what the request should not pay after all (refund.go, #548).
+func (l *Limiter) settle(r *http.Request, dec Decision, charged int, out *outcome, httpStatus int) {
+	status, mode := out.final(httpStatus)
+	gone := r.Context().Err() != nil // the client disconnected before the end
+	units := l.cfg.Weights.refundUnits(charged, status, mode, gone)
+	if units <= 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), refundTimeout)
+	defer cancel()
+	if err := l.Refund(ctx, dec, units); err != nil {
+		l.log.WarnContext(ctx, "ratelimit: refund failed", slog.Any("error", err), slog.Int("units", units))
+		return
+	}
+	l.log.InfoContext(ctx, "ratelimit.refund",
+		slog.Int("units", units),
+		slog.Int("status", status),
+		slog.String("mode", mode),
+		slog.String("path", r.URL.Path),
+	)
 }
 
 func setHeaders(w http.ResponseWriter, d Decision, now time.Time) {

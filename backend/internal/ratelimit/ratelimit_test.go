@@ -162,6 +162,10 @@ func (failingStore) Consume(context.Context, []Counter, int, time.Time) (Usage, 
 	return Usage{}, errors.New("firestore down")
 }
 
+func (failingStore) Refund(context.Context, []Counter, int, time.Time) error {
+	return errors.New("firestore down")
+}
+
 func TestStoreFailureFallsBackToMemory(t *testing.T) {
 	l := New(Config{Limits: Limits{SignedIn: 2}}, failingStore{}, nil)
 	ctx := context.Background()
