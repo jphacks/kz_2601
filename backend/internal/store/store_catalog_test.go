@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 // mine keeps the listings of this run (the emulator's public_apps is shared by runs).
@@ -47,7 +48,7 @@ func TestStorePutCatalogApp(t *testing.T) {
 		}
 		in.Name, in.Version = "N2", 3
 		upd, err := s.PutCatalogApp(ctx, owner, in)
-		if err != nil || upd.Name != "N2" || upd.Version != 3 || upd.Installs != 1 || !upd.CreatedAt.Equal(first.CreatedAt) ||
+		if err != nil || upd.Name != "N2" || upd.Version != 3 || upd.Installs != 1 || !upd.CreatedAt.Equal(first.CreatedAt.Truncate(time.Microsecond)) ||
 			!upd.UpdatedAt.After(first.UpdatedAt) || !upd.Hidden || upd.HiddenReason != "spam" {
 			t.Fatalf("update: %+v %v", upd, err)
 		}
