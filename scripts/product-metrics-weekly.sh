@@ -3,7 +3,7 @@
 # 定義と見方は docs/metrics/product-metrics.md。集計は backend/cmd/product-metrics。
 #
 # 使い方:
-#   scripts/product-metrics-weekly.sh prod               # 直近 35 日(D7 を出すため 5 週)
+#   scripts/product-metrics-weekly.sh prod               # 直近 28 日(Cloud Logging の既定の保存は 30 日)
 #   scripts/product-metrics-weekly.sh stg --days 63
 #   scripts/product-metrics-weekly.sh prod --dry-run     # 実行せずにフィルタだけ出す
 #   scripts/product-metrics-weekly.sh --input logs.json  # 手元の書き出し(gcloud の JSON か JSON lines)を集計
@@ -15,7 +15,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_NAME=""
-DAYS=35
+DAYS=28
 DRY=0
 INPUT=""
 while [ $# -gt 0 ]; do
