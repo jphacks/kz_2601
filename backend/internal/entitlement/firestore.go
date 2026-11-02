@@ -57,6 +57,15 @@ func proData(p Pro) map[string]any {
 	if p.Revoked() {
 		m["revokedAt"] = p.RevokedAt
 	}
+	if !p.GraceExpiresAt.IsZero() {
+		m["graceExpiresAt"] = p.GraceExpiresAt
+	}
+	if p.WillRenew != nil {
+		m["willRenew"] = *p.WillRenew
+	}
+	if !p.SignedAt.IsZero() {
+		m["signedAt"] = p.SignedAt
+	}
 	return m
 }
 

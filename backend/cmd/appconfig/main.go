@@ -42,8 +42,9 @@ func main() {
 
 	authed := newAuthed(newAppCheck(ctx, project, logger), auth.Middleware(verifier, mode), st)
 	api := appconfig.New(st)
-	entitlement.Register(api, newEntitlements(st, logger)) // Pro (#314)
-	handler := newHandler(authed, logger, api, appconfig.SharePage(st))
+	ents := newEntitlements(st, logger)
+	entitlement.Register(api, ents) // Pro (#314)
+	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appStoreNotifications(ents, logger))
 	server := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
@@ -175,10 +176,11 @@ func newEntitlements(st store.Store, logger *slog.Logger) *entitlement.Service {
 	}
 }
 
-// newHandler mounts health and the share-link page (public) and the v1 API
+// newHandler mounts health and the share-link page (public), the routes public
+// adds (unauthenticated, e.g. App Store notifications) and the v1 API
 // (authenticated). Unknown /v1 paths and wrong methods are answered by the
 // API mux before auth so they stay 404/405 envelopes rather than 401.
-func newHandler(authMiddleware func(http.Handler) http.Handler, logger *slog.Logger, api *http.ServeMux, sharePage http.Handler) http.Handler {
+func newHandler(authMiddleware func(http.Handler) http.Handler, logger *slog.Logger, api *http.ServeMux, sharePage http.Handler, public ...func(*http.ServeMux)) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", health)
 	mux.HandleFunc("GET /healthz", health)
@@ -187,6 +189,9 @@ func newHandler(authMiddleware func(http.Handler) http.Handler, logger *slog.Log
 	}
 	// minimum / latest iOS build (#302): public, read once from env
 	mux.Handle("GET /v1/client-config", appconfig.ClientConfig(appconfig.ClientConfigFromEnv(os.Getenv)))
+	for _, register := range public {
+		register(mux)
+	}
 	authed := authMiddleware(api)
 	mux.Handle("/v1/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, pattern := api.Handler(r); pattern == "" {

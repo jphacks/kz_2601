@@ -7,7 +7,8 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/appconfig ./cmd/appconfig \
  && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/ai ./cmd/ai \
- && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/purge ./cmd/purge
+ && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/purge ./cmd/purge \
+ && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/appstore-reconcile ./cmd/appstore-reconcile
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/ /app/

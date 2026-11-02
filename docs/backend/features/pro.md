@@ -15,14 +15,14 @@
 
 **iOS の生成後 DSL で判定しなかった理由**: ai の generate は生成した DSL を **その場で appconfig に保存する**(version が増え、共有アプリなら apps_public にも公開される)。生成後に判定すると、確認カードを出す前に有料機能入りのアプリがサーバーに出来てしまい(「元に戻して」やアプリ一覧から無料で開ける)、「この機能なしで作る」はもう 1 回の生成(LLM 費用・待ち時間)になる。チャットの ready / 案の時点なら生成前に止められ、判定に LLM 呼び出しも増えない。
 
-**サーバー側の権利(#314・2026-11-02)**: iOS が購入・復元の後と起動時に StoreKit 2 の署名付き取引(JWS)を appconfig の `POST /v1/me/entitlements/apple` に送る。サーバーは Apple に問い合わせずに検証し(`internal/appstore`)、`users/{uid}/entitlements/pro` に保存する(`internal/entitlement`)。ai の回数制限はこれを読んで Pro の上限にする(#449)。402 で止めるのは #316、更新・解約・返金の通知は #315。
+**サーバー側の権利(#314・2026-11-02)**: iOS が購入・復元の後と起動時に StoreKit 2 の署名付き取引(JWS)を appconfig の `POST /v1/me/entitlements/apple` に送る。サーバーは Apple に問い合わせずに検証し(`internal/appstore`)、`users/{uid}/entitlements/pro` に保存する(`internal/entitlement`)。ai の回数制限はこれを読んで Pro の上限にする(#449)。402 で止めるのは #316。更新・解約・返金は App Store Server Notifications v2 の `POST /v1/appstore/notifications` と照合ジョブ `cmd/appstore-reconcile` で反映する(#315・[app-store-notifications.md](../../infra/app-store-notifications.md))。
 
 | 項目 | 決定 |
 |---|---|
 | 方式 | App Store の署名付き取引をサーバーで直接検証(RevenueCat 等は使わない。手数料なし・iOS の StoreKit 2 ラッパーと同じ前提) |
 | 検証 | `x5c` を **Apple Root CA - G3**(`internal/appstore/roots.go` に埋め込み・SHA-256 `63343ABF…3E9179`)まで検証。システムの証明書ストアは使わない。中間・leaf の Apple のマーカー拡張・ES256 の署名・`bundleId` / `productId` / `environment` の許可リスト(`APPSTORE_*` 環境変数)・`expiresDate` の有無。検証時刻は取引の `signedDate`(Apple のライブラリでオンライン確認をしない時と同じ) |
 | 環境 | 既定で Sandbox と Production の両方を受ける。審査と TestFlight は本番の版でも Sandbox で買うため(stg と prod は同じ Firestore を使っている)。`APPSTORE_ENVIRONMENTS=Production` で絞れる |
-| 保存 | `users/{uid}/entitlements/pro` {productId, originalTransactionId, transactionId, environment, expiresAt, revokedAt?, updatedAt}。期限切れ・返金も保存(isPro=false)。順番が前後しても古い取引で上書きしない |
+| 保存 | `users/{uid}/entitlements/pro` {productId, originalTransactionId, transactionId, environment, expiresAt, revokedAt?, graceExpiresAt?, willRenew?, signedAt, updatedAt}。期限切れ・返金も保存(isPro=false)。順番が前後しても古い取引で上書きしない(同じ取引は `signedAt` が新しい時だけ)。猶予期間中は `graceExpiresAt` まで Pro(#315) |
 | 1 つの購読 = 1 つの uid | `appstore_transactions/{originalTransactionId}` {uid, productId, environment, boundAt, updatedAt}。別の有効な uid に結びついていれば 409 `transaction_owned_by_other`(1 つの購読を複数のアカウントで使い回せない)。退会済みの uid からは移す。購入時の `appAccountToken` は uid から作った UUIDv8(`entitlement.AccountToken`・iOS `ProAccountToken`)で、サーバーでは照合のログだけ |
 | ai の判定 | `entitlement.ProChecker`(Pro は最大 5 分・期限まで、Pro でないは 15 秒キャッシュ)。読めない時は Pro でない扱い。検証済みの Pro は匿名アカウントでも Pro(購入にサインインは要らない) |
 | 退会 | `cmd/purge` が `users/{uid}/entitlements/*` と uid の `appstore_transactions/*` を消す(同じ Apple ID で新しいアカウントに復元できる) |

@@ -887,7 +887,7 @@ paths:
       tags: [entitlements]
       summary: 自分の Pro の権利(#314)
       description: |
-        `users/{uid}/entitlements/pro` を返す。`isPro` は「取り消されていない・期限内・許可された環境(`APPSTORE_ENVIRONMENTS`)」。
+        `users/{uid}/entitlements/pro` を返す。`isPro` は「取り消されていない・期限内(猶予期間 `graceExpiresAt` を含む)・許可された環境(`APPSTORE_ENVIRONMENTS`)」。
         ai の回数制限(#449)も同じ判定で Pro の上限にする。iOS は購入・復元・起動時に `POST /me/entitlements/apple` で送った結果をこれで確かめられる。
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Entitlements' } } } }
@@ -914,7 +914,7 @@ paths:
         - 別の有効な uid に結びついている → **409 `transaction_owned_by_other`**(権利は付けない・ログに残す)。サポートが `appstore_transactions/{id}` を消すと外せる
 
         iOS は購入時に `appAccountToken` に uid から作った UUID を入れる(サーバーでは照合のログだけ)。
-        更新・解約・返金の通知(App Store Server Notifications v2)は #315 で同じ検証と保存を使う。
+        更新・解約・返金の通知(App Store Server Notifications v2)は `POST /appstore/notifications`(#315)で同じ検証と保存を使う。同じ取引は `signedDate` が保存済みより古ければ上書きしない(返金の後に端末に残った古い取引を送っても Pro に戻らない)。
       requestBody:
         required: true
         content:
@@ -941,6 +941,43 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: { code: invalid_transaction, message: 'the signed transaction could not be verified', details: { reason: signature } } }
+
+  /appstore/notifications:
+    post:
+      tags: [entitlements]
+      security: []
+      summary: App Store Server Notifications v2 の受け口(#315)・認証不要
+      description: |
+        Apple が購読の変化(SUBSCRIBED・DID_RENEW・DID_FAIL_TO_RENEW(猶予期間)・GRACE_PERIOD_EXPIRED・EXPIRED・DID_CHANGE_RENEWAL_STATUS・REFUND・REFUND_REVERSED・REVOKE など)を送る。Firebase の認証・App Check は無し。`signedPayload` の署名(`POST /me/entitlements/apple` と同じ Apple Root CA - G3 までの検証)が認証の代わり。
+        - `bundleId`・`environment`(`APPSTORE_*`)を確かめ、中の `signedTransactionInfo` / `signedRenewalInfo` も同じ方法で検証して `users/{uid}/entitlements/pro` に反映する。uid は `appstore_transactions/{originalTransactionId}` の結びつきで引く
+        - 同じ `notificationUUID` は 1 回だけ処理する(`appstore_notifications/{uuid}`・2 回目は `duplicate`)
+        - 順番が前後しても権利を巻き戻さない(同じ取引は `signedDate` が新しい時だけ上書き・期限が前の取引で上書きしない)
+        - 200 で Apple は再送をやめる。500 は再送される(一時的な失敗)
+        手順: `docs/infra/app-store-notifications.md`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signedPayload]
+              properties:
+                signedPayload: { type: string, description: 'responseBodyV2 の JWS' }
+      responses:
+        '200':
+          description: '処理済み。`applied`(反映)・`duplicate`(処理済みの通知)・`unbound`(まだどのアカウントにも結びついていない購読。iOS が送った時に結びつく)・`ignored`(TEST・Pro 以外の商品など)'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome]
+                properties:
+                  outcome: { type: string, enum: [applied, duplicate, ignored, unbound] }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '422':
+          description: '検証に失敗(Apple 以外の証明書・改ざん・対象外の bundleId / 環境など)。`details.reason` は `POST /me/entitlements/apple` と同じ'
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '500': { description: 一時的な失敗(Apple が再送する), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /apps/{appId}/release-requests:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -1284,8 +1321,10 @@ components:
                 transactionId: { type: string }
                 environment: { type: string, enum: [Sandbox, Production] }
                 expiresAt: { type: string, format: date-time }
+                graceExpiresAt: { type: string, format: date-time, description: '請求の猶予期間の終わり(#315)。`expiresAt` を過ぎてもこの時刻まで Pro(無ければ省略)' }
                 revokedAt: { type: string, format: date-time, description: '返金・取り消しの時刻(無ければ省略)' }
                 updatedAt: { type: string, format: date-time }
+                willRenew: { type: boolean, description: '自動更新が有効か(#315・通知か照合で分かるまで省略)' }
     AppSummary:
       type: object
       required: [id, name, currentVersion, status, createdAt, updatedAt]
