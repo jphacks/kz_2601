@@ -137,8 +137,12 @@ func (c *Client) logUsage(ctx context.Context, r usageRecord) {
 	if respModel != "" {
 		priced = respModel
 	}
-	if usd, ok := EstimateCostUSD(priced, u); ok {
+	usd, ok := EstimateCostUSD(priced, u)
+	if ok {
 		attrs = append(attrs, slog.Float64("est_cost_usd", usd), slog.String("pricing_as_of", PricingAsOf))
+	}
+	if t := tallyOf(ctx); t != nil {
+		t.add(u, usd, ok)
 	}
 	lg.LogAttrs(ctx, slog.LevelInfo, UsageEvent, attrs...)
 }
