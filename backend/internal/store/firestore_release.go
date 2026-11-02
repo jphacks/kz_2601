@@ -9,7 +9,7 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-// Layout (architecture.md §3.3):
+// Layout (docs/backend/features/release.md):
 //
 //	release_requests/{id}  {appId,ownerUid,name,dslVersion,dslJson,purpose,contact,status,createdAt,updatedAt}
 //

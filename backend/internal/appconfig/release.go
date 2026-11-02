@@ -3,7 +3,7 @@ package appconfig
 // Release requests (#76): the owner asks for an app to be shipped as its own
 // standalone app. The API only files the request (status "received") with a
 // DSL snapshot; an admin moves status in the Firestore console
-// (architecture.md §3.3).
+// (docs/backend/features/release.md).
 
 import (
 	"fmt"

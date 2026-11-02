@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// Layout (architecture.md §3.2):
+// Layout (docs/backend/features/sharing.md):
 //
 //	shares/{token}        {appId,ownerUid,name,dslVersion,dslJson,revoked,createdAt}
 //	public_apps/{appId}   {ownerUid,name,description,tags,authorName,components,dslVersion,dslJson,installs,createdAt,updatedAt}

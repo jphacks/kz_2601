@@ -1,6 +1,6 @@
 // Command feedback lets an operator read in-app feedback (#319). Read-only:
 // it never writes to Firestore (status changes are done by hand in the
-// console, architecture.md §3.5).
+// console, docs/backend/features/feedback.md).
 //
 //	feedback list [-since 168h] [-status received] [-limit 50]
 //	feedback show [-out DIR] <id>     # -out saves screenshot.jpg / dsl.json there

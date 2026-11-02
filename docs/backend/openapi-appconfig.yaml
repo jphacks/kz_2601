@@ -19,17 +19,17 @@ servers:
 security:
   - firebaseAuth: []
 tags:
-  - { name: account, description: 'アカウント削除(#119)。architecture.md §4.1' }
+  - { name: account, description: 'アカウント削除(#119)。features/account-deletion.md' }
   - { name: apps }
   - { name: dsl }
   - { name: entities }
-  - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引をサーバーで検証して保存する。architecture.md §6.8' }
-  - { name: feedback, description: 'アプリ内のフィードバック(#319)。architecture.md §3.5' }
-  - { name: members, description: 'scope:shared の参加者(#254)。architecture.md §3.4' }
+  - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引をサーバーで検証して保存する。features/pro.md' }
+  - { name: feedback, description: 'アプリ内のフィードバック(#319)。features/feedback.md' }
+  - { name: members, description: 'scope:shared の参加者(#254)。features/members.md' }
   - { name: metrics, description: 'aiButton の端末内 AI の集計(#446)。docs/analytics/ai-button-metrics.md' }
   - { name: records }
-  - { name: release, description: 'リリース申請(#76)。architecture.md §3.3' }
-  - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。architecture.md §3.2' }
+  - { name: release, description: 'リリース申請(#76)。features/release.md' }
+  - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。features/sharing.md' }
   - { name: versions }
 
 paths:

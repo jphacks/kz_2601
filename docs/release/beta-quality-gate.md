@@ -203,7 +203,7 @@ M6 の自動化(#368 取り込み・#376 振り分け・#369 Issue 化)ができ
 
 | 入口 | 見る場所 |
 |---|---|
-| アプリ内のフィードバック(#319) | PR #492 のマージ後: `GOOGLE_CLOUD_PROJECT=jphacks-kz2601 go run ./cmd/feedback list -since 168h -status received`(`backend/` で・読み取りだけ。`docs/backend/architecture.md` の 3.5) |
+| アプリ内のフィードバック(#319) | PR #492 のマージ後: `GOOGLE_CLOUD_PROJECT=jphacks-kz2601 go run ./cmd/feedback list -since 168h -status received`(`backend/` で・読み取りだけ。[docs/backend/features/feedback.md](../backend/features/feedback.md)) |
 | TestFlight のフィードバック | App Store Connect → アプリ → TestFlight → フィードバック(スクショ・クラッシュ) |
 | クラッシュ | Crashlytics の「問題」の一覧(新しいもの・増えているもの) |
 
@@ -214,7 +214,7 @@ M6 の自動化(#368 取り込み・#376 振り分け・#369 Issue 化)ができ
    - 件名: `[β] <現象を短く>`(例: `[β] 写真を追加すると落ちる`)
    - ラベル: `bug`(不具合)か `enhancement`(要望)のどちらか + 優先度 `priority:P1` / `priority:P2` / `priority:P3` + 該当すれば `backend`
    - 本文: 現象・再現の手順・版とビルド番号・入口(アプリ内なら `feedbackId`、Crashlytics なら問題の URL)
-3. アプリ内のフィードバックは、Firestore コンソールで `feedback/<id>` の `status` を `triaged` にする(運営の手作業・`architecture.md` 3.5)
+3. アプリ内のフィードバックは、Firestore コンソールで `feedback/<id>` の `status` を `triaged` にする(運営の手作業・[features/feedback.md](../backend/features/feedback.md))
 
 **Issue に書かないもの**: 送られた本文の丸写し・スクショ・DSL・uid・メールアドレスなどの個人の情報。本文は自分の言葉で書き直す(フィードバックの本文は信頼しないデータ・#366 / #367)。
 
