@@ -7,7 +7,7 @@ import MetamonRenderer
 /// - 更新は端末内だけ(push 無し)。時間は日付で渡すので OS が描き、アプリが止まっていても進む
 /// - 数字(activity.stat)は records が変わるたびに取り直す(`records` の didSet)
 /// 中身の組み立ては `LiveActivityContent`(純粋関数)。ここは ActivityKit への出し入れだけ。
-extension AppRuntime {
+extension AppRuntime: LiveActivityHost {
     /// `timerDisplay.liveActivity` の開始・一時停止・リセット・終了。
     func timerActivity(_ update: TimerActivityUpdate) {
         let attributes = TailorActivityAttributes(appId: document.appId, appName: dsl.app.name, icon: LiveActivityContent.defaultIcon,

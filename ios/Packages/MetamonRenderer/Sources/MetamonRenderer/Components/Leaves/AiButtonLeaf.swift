@@ -71,7 +71,7 @@ struct AiButtonLeaf: View {
 
     private func refreshAvailability() {
         availability = AIAvailability.current
-        rt.recordAIButton(.shown(availability.metric)) // #446
+        rt.aiText?.recordAIButton(.shown(availability.metric)) // #446
     }
 
     private func run(_ form: FormDraft) async {
@@ -92,13 +92,13 @@ struct AiButtonLeaf: View {
             let values = form.showsHiddenFields(currentUid: rt.currentUserId) ? form.values : HiddenFields.redact(form.values, in: form.entity)
             let request = try AIRequestBuilder.build(c, entity: form.entity, values: values, sourceEntity: source, records: records)
             let result = try await OnDeviceAI.run(request)
-            rt.recordAIButton(.ran(AIButtonMetric.Task(dslTask: c.task), failure: nil))
+            rt.aiText?.recordAIButton(.ran(AIButtonMetric.Task(dslTask: c.task), failure: nil))
             withAnimation(RenderTheme.Motion.select) { form.values[output] = .string(result) }
             done = true
         } catch {
             // #446: 答えを出せなかった理由と task だけ数える(入力の文は渡さない)
             if let reason = (error as? OnDeviceAIError)?.metricReason ?? AIButtonMetric.FailureReason(buildError: error) {
-                rt.recordAIButton(.ran(AIButtonMetric.Task(dslTask: c.task), failure: reason))
+                rt.aiText?.recordAIButton(.ran(AIButtonMetric.Task(dslTask: c.task), failure: reason))
             }
             self.error = error.localizedDescription
         }

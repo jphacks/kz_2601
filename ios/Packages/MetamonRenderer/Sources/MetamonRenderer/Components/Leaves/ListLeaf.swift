@@ -109,7 +109,7 @@ struct ListLeaf: View {
         withAnimation(RenderTheme.Motion.select) { markOverrides[row.id] = next }
         toggleTaps += 1
         Task {
-            let settled = await rt.toggleMark(entity: entity, recordId: row.id, mark: mark)
+            let settled = await rt.marks?.toggleMark(entity: entity, recordId: row.id, mark: mark)
             if settled == nil { print("[Metamon] mark not saved: \(entity)/\(row.id) \(mark)") }
             withAnimation(RenderTheme.Motion.select) { if markOverrides[row.id] == next { markOverrides[row.id] = nil } }
         }
