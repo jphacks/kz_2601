@@ -76,7 +76,7 @@ func TestFirestoreRefund(t *testing.T) {
 	if _, err := s.Consume(ctx, counters, 3, exp); err != nil {
 		t.Fatal(err)
 	}
-	later := exp.Add(time.Hour)
+	later := exp.Add(time.Hour).Truncate(time.Microsecond) // Firestore keeps microseconds
 	if err := s.Refund(ctx, counters, 2, later); err != nil {
 		t.Fatal(err)
 	}
