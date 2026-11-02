@@ -361,8 +361,14 @@ public final class ExprEvaluator {
         }
     }
 
+    /// 暦日の差。0:00 が無い日の startOfDay は 1:00 なので、時刻の差で数えると翌日までが 0 日になる(#556)。
     private func days(from a: Date, to b: Date) -> ExprValue? {
-        calendar.dateComponents([.day], from: calendar.startOfDay(for: a), to: calendar.startOfDay(for: b)).day.map { .number(Double($0)) }
+        var utc = calendar
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        let cal = calendar
+        let civil = { (d: Date) in utc.date(from: cal.dateComponents([.era, .year, .month, .day], from: d)) }
+        guard let x = civil(a), let y = civil(b) else { return nil }
+        return utc.dateComponents([.day], from: x, to: y).day.map { .number(Double($0)) }
     }
 
     // MARK: - 値の変換・比較

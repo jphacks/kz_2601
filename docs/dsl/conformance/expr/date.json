@@ -373,6 +373,195 @@
       "timeZone": "America/New_York",
       "expr": {"op": "day", "args": ["2026-03-08T02:30:00-05:00"]},
       "expected": {"type": "number", "value": 8, "text": "8"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/date-value",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "addDays", "args": ["2018-11-04", 0]},
+      "expected": {"type": "date", "value": "2018-11-04T01:00:00-02:00", "text": "2018-11-04"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/date-text",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "toString", "args": [{"op": "addDays", "args": ["2018-11-04", 0]}]},
+      "expected": {"type": "string", "value": "2018-11-04", "text": "2018-11-04"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/day",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "day", "args": ["2018-11-04"]},
+      "expected": {"type": "number", "value": 4, "text": "4"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/weekday",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "weekday", "args": ["2018-11-04"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/daysBetween-from-previous",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "daysBetween", "args": ["2018-11-03", "2018-11-04"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/daysBetween-to-next",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "daysBetween", "args": ["2018-11-04", "2018-11-05"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/daysBetween-same",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "daysBetween", "args": ["2018-11-04", {"op": "today", "args": []}]},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/daysUntil",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "daysUntil", "args": ["2018-11-04"]},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/today",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "today", "args": []},
+      "expected": {"type": "date", "value": "2018-11-04T01:00:00-02:00", "text": "2018-11-04"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/today-text",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "toString", "args": [{"op": "today", "args": []}]},
+      "expected": {"type": "string", "value": "2018-11-04", "text": "2018-11-04"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/eq-today",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "eq", "args": [{"op": "today", "args": []}, "2018-11-04"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/eq-previous-day",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "eq", "args": [{"op": "today", "args": []}, "2018-11-03"]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/gt-previous-day-end",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "gt", "args": [{"op": "today", "args": []}, "2018-11-03T23:59:59-03:00"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/lt-first-second",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "lt", "args": [{"op": "today", "args": []}, "2018-11-04T01:00:01-02:00"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/eq-first-instant",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "eq", "args": [{"op": "today", "args": []}, "2018-11-04T01:00:00-02:00"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/addDays-into-gap",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "addDays", "args": ["2018-11-03", 1]},
+      "expected": {"type": "date", "value": "2018-11-04T01:00:00-02:00", "text": "2018-11-04"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/addDays-from-gap",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "addDays", "args": ["2018-11-04", 1]},
+      "expected": {"type": "date", "value": "2018-11-05T01:00:00-02:00", "text": "2018-11-05"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/addDays-time-into-gap",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "addDays", "args": ["2018-11-03T00:30:00-03:00", 1]},
+      "expected": {"type": "date", "value": "2018-11-04T01:30:00-02:00", "text": "2018-11-04"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/normal-day",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "addDays", "args": ["2018-11-10", 0]},
+      "expected": {"type": "date", "value": "2018-11-10T00:00:00-02:00", "text": "2018-11-10"}
+    },
+    {
+      "name": "dst-gap/sao-paulo/normal-day-weekday",
+      "now": "2018-11-04T10:00:00-02:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "weekday", "args": ["2018-11-10"]},
+      "expected": {"type": "number", "value": 7, "text": "7"}
+    },
+    {
+      "name": "dst-repeat/sao-paulo/day-after-fall-back",
+      "now": "2019-02-17T10:00:00-03:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "addDays", "args": ["2019-02-17", 0]},
+      "expected": {"type": "date", "value": "2019-02-17T00:00:00-03:00", "text": "2019-02-17"}
+    },
+    {
+      "name": "dst-repeat/sao-paulo/daysBetween",
+      "now": "2019-02-17T10:00:00-03:00",
+      "timeZone": "America/Sao_Paulo",
+      "expr": {"op": "daysBetween", "args": ["2019-02-16", "2019-02-17"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "dst-repeat/new-york/date-value",
+      "now": "2026-11-01T12:00:00-05:00",
+      "timeZone": "America/New_York",
+      "expr": {"op": "addDays", "args": ["2026-11-01", 0]},
+      "expected": {"type": "date", "value": "2026-11-01T00:00:00-04:00", "text": "2026-11-01"}
+    },
+    {
+      "name": "dst-repeat/new-york/day",
+      "now": "2026-11-01T12:00:00-05:00",
+      "timeZone": "America/New_York",
+      "expr": {"op": "day", "args": ["2026-11-01"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "dst-repeat/new-york/daysBetween",
+      "now": "2026-11-01T12:00:00-05:00",
+      "timeZone": "America/New_York",
+      "expr": {"op": "daysBetween", "args": ["2026-11-01", "2026-11-02"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "dst-repeat/new-york/eq-today",
+      "now": "2026-11-01T12:00:00-05:00",
+      "timeZone": "America/New_York",
+      "expr": {"op": "eq", "args": [{"op": "today", "args": []}, "2026-11-01"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "skipped-day/apia/date-only",
+      "now": "2011-12-31T10:00:00+14:00",
+      "timeZone": "Pacific/Apia",
+      "expr": {"op": "day", "args": ["2011-12-30"]},
+      "expected": {"type": "nil"}
     }
   ]
 }

@@ -32,7 +32,7 @@ public enum FieldCoding {
         f.type == .date ? dateFormatter.string(from: date) : datetimeFormatter.string(from: date)
     }
 
-    /// 日付の値を読む: RFC 3339(秒とオフセット必須・小数秒可)か "YYYY-MM-DD"(端末 TZ の 0:00)。
+    /// 日付の値を読む: RFC 3339(秒とオフセット必須・小数秒可)か "YYYY-MM-DD"(端末 TZ のその日の最初の時刻・ふつうは 0:00)。
     /// 2/30・24:00 のようなあり得ない日時は読まない(Formatter の繰り上げを許さない・Go の expreval と同じ・#555)。
     public static func date(from value: JSONValue) -> Date? {
         guard let s = value.stringValue else { return nil }
@@ -59,13 +59,19 @@ public enum FieldCoding {
         return d.addingTimeInterval(frac)
     }
 
-    /// "YYYY-MM-DD"(月・日は 1 桁も可)。端末 TZ の 0:00。DST で 0:00 が無い日もあるので Y/M/D だけ比べる。
+    /// "YYYY-MM-DD"(月・日は 1 桁も可)。端末 TZ でのその日の最初の時刻(`Calendar.startOfDay`)。
+    /// DST で 0:00 が無い日(サンパウロ 2018-11-04 など)はその日の 1:00 になる(nil にしない・前日にしない・#556)。
     static func strictDay(_ s: String) -> Date? {
         let ns = s as NSString
-        guard let m = dayPattern.firstMatch(in: s, range: NSRange(location: 0, length: ns.length)),
-              let d = dateFormatter.date(from: s),
-              components(d, in: dateFormatter.timeZone, [.year, .month, .day]) == (1...3).map({ Int(ns.substring(with: m.range(at: $0))) })
-        else { return nil }
+        guard let m = dayPattern.firstMatch(in: s, range: NSRange(location: 0, length: ns.length)) else { return nil }
+        let ymd = (1...3).map { Int(ns.substring(with: m.range(at: $0))) }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = dateFormatter.timeZone
+        // 正午から startOfDay を取る(0:00 を直接作ると DST の隙間で繰り上がる)
+        guard let noon = cal.date(from: DateComponents(year: ymd[0], month: ymd[1], day: ymd[2], hour: 12)) else { return nil }
+        let d = cal.startOfDay(for: noon)
+        // 書き戻して Y/M/D が入力と同じか(2/30 などの繰り上げを許さない)
+        guard components(d, in: cal.timeZone, [.year, .month, .day]) == ymd else { return nil }
         return d
     }
 
