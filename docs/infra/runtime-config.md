@@ -52,7 +52,8 @@
 | `LATEST_IOS_BUILD` | appconfig | これより古いビルドに閉じられるアップデート案内を出す(#302) | 無し |
 | `IOS_APP_STORE_URL` | appconfig | 上の案内から開く App Store の URL(`https://apps.apple.com/app/id<id>`) | 無し |
 | `FEEDBACK_DAILY_LIMIT` | appconfig | 1 人 1 日のフィードバック送信の上限。`0` で数えない | 5 |
-| `RATE_LIMIT_GLOBAL_DAILY` | ai | 環境全体の 1 日の AI 上限(費用ブレーカー)。小さくすると AI を止める代わりにもなる([rate-limit.md](../backend/rate-limit.md)) | 2000 |
+| `AI_PAUSED` | ai | `1`(`true` / `on` も可)で AI の生成だけを止める(#511)。generate(`mode=undo` を除く)・chat・text が Claude を呼ばずに 503 `ai_paused` を返す。AI を止める時はこれを使う([ai-pause.md](ai-pause.md)) | 無し(止めない) |
+| `RATE_LIMIT_GLOBAL_DAILY` | ai | 環境全体の 1 日の AI 上限(費用ブレーカー)([rate-limit.md](../backend/rate-limit.md))。AI を止める用途には `AI_PAUSED` を使う。`1` にして止めるのは、`AI_PAUSED` の入っていない版が動いている時の予備だけ([incident-runbook.md §5](../ops/incident-runbook.md#5-手順-a-claude-api-の障害上限)) | 2000 |
 | `RATE_LIMIT_ANON_DAILY` / `_USER_DAILY` / `_PRO_DAILY` / `_IP_DAILY` | ai | 利用者ごと・IP ごとの 1 日の上限([rate-limit.md](../backend/rate-limit.md)) | 30 / 60 / 300 / 300 |
 | `RATE_LIMIT_WEIGHT_*` | ai | 呼び出し 1 回で数える重み([rate-limit.md](../backend/rate-limit.md)) | 3 / 2 / 1 / 1 |
 | `LOG_LEVEL` | 両方 | ログの詳しさ(調査の間だけ `debug` など) | info |
