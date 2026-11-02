@@ -1,0 +1,210 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 5
+          },
+          "id" : "timer",
+          "props" : {
+            "label" : "カップ麺",
+            "mode" : "countdown",
+            "seconds" : 180
+          },
+          "state" : "rendered",
+          "type" : "timerDisplay"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 3,
+            "row" : 5,
+            "rowSpan" : 2
+          },
+          "id" : "month",
+          "props" : {
+            "aggregate" : "count",
+            "entity" : "bowl",
+            "label" : "今月の杯数",
+            "unavailable" : false,
+            "value" : "0 件"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "type" : "startActivity"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 5,
+            "rowSpan" : 1
+          },
+          "id" : "queue",
+          "props" : {
+            "label" : "行列に並ぶ"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "type" : "endActivity"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 6,
+            "rowSpan" : 1
+          },
+          "id" : "seated",
+          "props" : {
+            "label" : "席に着いた"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 7,
+            "rowSpan" : 5
+          },
+          "children" : [
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "push",
+                    "screen" : "bowl_form",
+                    "type" : "navigate"
+                  },
+                  "on" : "rowTap"
+                }
+              ],
+              "id" : null,
+              "props" : {
+                "emptyText" : "食べたら右上の「記録」から",
+                "entity" : "bowl",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "recent",
+          "props" : {
+            "title" : "最近食べた"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "ラーメンタイマー",
+      "toolbar" : [
+        {
+          "action" : {
+            "presentation" : "sheet",
+            "screen" : "bowl_form",
+            "type" : "navigate"
+          },
+          "label" : "記録"
+        }
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "bowl",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "date" : "2026-11-12T03:00:00Z"
+        }
+      },
+      "id" : "bowl_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 4
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "name",
+                "label" : "商品・お店",
+                "placeholder" : "とんこつ醤油",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "date",
+                "label" : "日時",
+                "value" : "2026-11-12T03:00:00Z"
+              },
+              "state" : "rendered",
+              "type" : "datePicker"
+            }
+          ],
+          "id" : "fields",
+          "props" : {
+            "title" : "内容"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "bowl_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "bowl",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "食べた記録",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

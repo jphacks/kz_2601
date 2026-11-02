@@ -9,12 +9,7 @@ struct ChartLeaf: View {
 
     var body: some View {
         let entityId = c.entity ?? ""
-        let entity = rt.dsl.entity(entityId)
-        let rows = rt.filteredRecords(c)
-        let groupField = c.groupBy.flatMap { entity?.field($0) }
-        // ref の groupBy は id で束ねるので、軸・凡例は参照先の見出しにする(#235)
-        let buckets = Aggregator.buckets(c, entity: entity, records: rows,
-                                         label: groupField?.type == .ref ? { rt.display(.string($0), field: groupField) } : nil)
+        let buckets = Self.buckets(c, rt: rt)
         VStack(alignment: .leading, spacing: 8) {
             if let title = c.title { Text(title).font(RenderTheme.Fonts.cardTitle) }
             if buckets.isEmpty {
@@ -67,6 +62,16 @@ struct ChartLeaf: View {
     }
 
     /// x 軸ラベル: 6 文字を超えたら 5 文字 + …(凡例・VoiceOver は元の文字列のまま)
+    /// 棒・点・扇の元(groupBy の集計)。適合テストの描画の木(`RenderTree`)も同じ値を使う。
+    @MainActor
+    static func buckets(_ c: Component, rt: any DSLRuntime) -> [Aggregator.Bucket] {
+        let entity = rt.dsl.entity(c.entity ?? "")
+        let groupField = c.groupBy.flatMap { entity?.field($0) }
+        // ref の groupBy は id で束ねるので、軸・凡例は参照先の見出しにする(#235)
+        return Aggregator.buckets(c, entity: entity, records: rt.filteredRecords(c),
+                                  label: groupField?.type == .ref ? { rt.display(.string($0), field: groupField) } : nil)
+    }
+
     static func axisLabel(_ s: String) -> String {
         s.count > 6 ? String(s.prefix(5)) + "…" : s
     }

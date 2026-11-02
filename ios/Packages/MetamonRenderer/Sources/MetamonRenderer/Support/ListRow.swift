@@ -20,27 +20,45 @@ struct ListRow: View {
     var mark: Mark? = nil
     var markState: MarkState? = nil
     var onMark: (() -> Void)? = nil
+    /// 行の右端に置く小さなボタン(仲間探しの「つながりたい」・承認 #507)。行タップとは別に押せる
+    var accessory: RowAccessory? = nil
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.dslRuntime) private var rt
 
-    private func text(_ fieldId: String?) -> String? {
+    private func text(_ fieldId: String?) -> String? { Self.text(fieldId, record: record, entity: entity, rt: rt) }
+
+    @MainActor
+    private static func text(_ fieldId: String?, record: Record, entity: Entity?, rt: any DSLRuntime) -> String? {
         guard let fieldId else { return nil }
         return rt.display(record[fieldId], field: entity?.field(fieldId))
     }
+
+    /// 行に出す文字(title / subtitle / trailing・空は nil)。適合テストの描画の木(`RenderTree`)も同じ文字を使う。
+    @MainActor
+    static func texts(item: ListItem?, record: Record, entity: Entity?, rt: any DSLRuntime) -> (title: String, subtitle: String?, trailing: String?) {
+        let t = { (f: String?) in text(f, record: record, entity: entity, rt: rt) }
+        return (title(t, item: item, entity: entity), nonEmpty(t(item?.subtitle)), nonEmpty(t(item?.trailing)))
+    }
+
+    private static func title(_ t: (String?) -> String?, item: ListItem?, entity: Entity?) -> String {
+        t(item?.title ?? entity?.displayTitleField) ?? ""
+    }
+
+    private static func nonEmpty(_ s: String?) -> String? { s.flatMap { $0.isEmpty ? nil : $0 } }
 
     /// trailing が数値/通貨 field なら等幅・太めで右寄せ(金額が縦に揃う)。
     private var trailingIsNumeric: Bool {
         item?.trailing.flatMap { entity?.field($0)?.type.isNumeric } ?? false
     }
 
-    private var titleText: String { text(item?.title ?? entity?.displayTitleField) ?? "" }
-    private var subtitleText: String? { text(item?.subtitle).flatMap { $0.isEmpty ? nil : $0 } }
+    private var titleText: String { Self.title(text, item: item, entity: entity) }
+    private var subtitleText: String? { Self.nonEmpty(text(item?.subtitle)) }
     /// trailing が audio field なら行に再生ボタン(#420)。
     private var trailingAudio: JSONValue? {
         guard let f = item?.trailing, entity?.field(f)?.type == .audio, AudioValue(record[f]) != nil else { return nil }
         return record[f]
     }
-    private var trailingText: String? { text(item?.trailing).flatMap { $0.isEmpty ? nil : $0 } }
+    private var trailingText: String? { Self.nonEmpty(text(item?.trailing)) }
 
     /// subtitle / title のどちらかが enum(カテゴリ)なら、その値から色を決める。
     private var categoryColor: Color? {
@@ -63,6 +81,7 @@ struct ListRow: View {
         if let mark, let st = markState {
             parts.append(st.mine ? L("\(mark.label) \(st.count) 件・付けています") : L("\(mark.label) \(st.count) 件"))
         }
+        if let v = accessory?.value { parts.append(v) }
         return parts.joined(separator: ", ")
     }
 
@@ -172,6 +191,10 @@ struct ListRow: View {
             if let mark, let st = markState {
                 markButton(mark, st)
             }
+            if let accessory {
+                accessory.view
+                    .accessibilityHidden(true) // 行 1 要素の accessibilityAction で操作する
+            }
             if showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
@@ -195,6 +218,24 @@ struct ListRow: View {
             if let mark, let st = markState, let onMark {
                 Button(st.mine ? L("\(mark.label)を外す") : L("\(mark.label)を付ける"), action: onMark)
             }
+            if let accessory {
+                ForEach(Array(accessory.actions.enumerated()), id: \.offset) { _, a in
+                    Button(a.label, action: a.perform)
+                }
+            }
         }
     }
+}
+
+/// `ListRow` の右端のボタン(#507)。VoiceOver では行の操作(accessibilityActions)として読む。
+struct RowAccessory {
+    struct Action {
+        let label: String
+        let perform: () -> Void
+    }
+
+    let view: AnyView
+    var actions: [Action] = []
+    /// 行の読み上げに足す状態(「送りました」など)
+    var value: String?
 }

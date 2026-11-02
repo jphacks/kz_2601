@@ -54,6 +54,10 @@ type Memory struct {
 	reports map[string]*Report           // reports/{id} (memory_moderation.go)
 	quota   map[string]int               // uid/day -> reports filed
 	blocks  map[string]map[string]*Block // users/{uid}/blocks/{blockedUid}
+
+	// matching (#507, memory_matching.go)
+	matchPairs map[string]map[string]*MatchPair // apps_public/{appId}/match_pairs/{pairId}
+	matchQuota map[string]int                   // uid/day -> interests sent
 }
 
 // NewMemory returns an empty store.
@@ -396,9 +400,12 @@ func (m *Memory) DeleteRecord(_ context.Context, rs RecordSet, id string) error 
 	if _, ok := recs[rs.Entity][id]; !ok {
 		return ErrNotFound
 	}
+	watched := inWatchWindow(recs[rs.Entity], id)
 	delete(recs[rs.Entity], id)
 	m.dropMarks(recordsKey(rs) + "/" + id + "/")
-	m.hub.publish(recordsKey(rs), 0)
+	if watched {
+		m.hub.publish(recordsKey(rs), 0)
+	}
 	return nil
 }
 

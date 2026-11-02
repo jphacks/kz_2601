@@ -43,7 +43,11 @@ struct GaugeLeaf: View {
     }
 
     /// (値, 単位)。entity モードは field の unit を単位にする(count は 件)。
-    private var resolvedValue: (Double, String?) {
+    private var resolvedValue: (Double, String?) { Self.value(c, rt: rt) }
+
+    /// (値, 単位)。適合テストの描画の木(`RenderTree`)も同じ値を使う。
+    @MainActor
+    static func value(_ c: Component, rt: any DSLRuntime) -> (Double, String?) {
         if let v = c.value { return (v, nil) }
         guard let entityId = c.entity else { return (0, nil) }
         let entity = rt.dsl.entity(entityId)

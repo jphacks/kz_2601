@@ -1,0 +1,300 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "aggregate" : "sum",
+                "entity" : "workout",
+                "field" : "reps",
+                "label" : "今日の回数",
+                "unavailable" : false,
+                "value" : "0"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "aggregate" : "count",
+                "entity" : "workout",
+                "label" : "今月のセット",
+                "unavailable" : false,
+                "value" : "0 件"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "aggregate" : "max",
+                "entity" : "workout",
+                "field" : "weight",
+                "format" : "plain",
+                "label" : "最大重量",
+                "unavailable" : false,
+                "value" : "0 kg"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            }
+          ],
+          "id" : "summary",
+          "state" : "rendered",
+          "type" : "hstack"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 5
+          },
+          "id" : "weekly",
+          "props" : {
+            "aggregate" : "sum",
+            "bucket" : "week",
+            "buckets" : [
+
+            ],
+            "entity" : "workout",
+            "field" : "reps",
+            "groupBy" : "date",
+            "kind" : "bar",
+            "title" : "週ごとの回数"
+          },
+          "state" : "rendered",
+          "type" : "chart"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 7,
+            "rowSpan" : 3
+          },
+          "id" : "by_exercise",
+          "props" : {
+            "aggregate" : "sum",
+            "buckets" : [
+
+            ],
+            "entity" : "workout",
+            "field" : "reps",
+            "groupBy" : "exercise",
+            "kind" : "pie",
+            "title" : "種目別"
+          },
+          "state" : "rendered",
+          "type" : "chart"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "workout_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "record",
+          "props" : {
+            "label" : "今日の記録を保存"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "tab:home"
+      },
+      "title" : "トレーニング記録",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "workout",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "date" : "2026-11-12T03:00:00Z",
+          "done" : true,
+          "exercise" : "腕立て"
+        }
+      },
+      "id" : "workout_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 8
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "exercise",
+                "label" : "種目",
+                "options" : [
+                  "腕立て",
+                  "スクワット",
+                  "懸垂",
+                  "ベンチプレス",
+                  "ランニング"
+                ],
+                "style" : "menu",
+                "value" : "腕立て"
+              },
+              "state" : "rendered",
+              "type" : "picker"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "reps",
+                "label" : "回数",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "numberField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "weight",
+                "label" : "重量",
+                "unit" : "kg",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "numberField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "done",
+                "label" : "完了",
+                "value" : true
+              },
+              "state" : "rendered",
+              "type" : "toggle"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "date",
+                "label" : "日時",
+                "value" : "2026-11-12T03:00:00Z"
+              },
+              "state" : "rendered",
+              "type" : "datePicker"
+            }
+          ],
+          "id" : "fields",
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "workout_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "workout",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "記録",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "history",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "push",
+                "screen" : "workout_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 12
+          },
+          "id" : "all",
+          "props" : {
+            "emptyText" : "まだ記録がありません",
+            "entity" : "workout",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "history",
+        "stack" : "tab:history"
+      },
+      "title" : "履歴",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

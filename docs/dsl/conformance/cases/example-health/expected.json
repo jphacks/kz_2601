@@ -1,0 +1,219 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 3,
+            "row" : 0,
+            "rowSpan" : 4
+          },
+          "id" : "steps_today",
+          "props" : {
+            "label" : "今日の歩数",
+            "metric" : "steps",
+            "target" : 8000
+          },
+          "state" : "rendered",
+          "type" : "healthStat"
+        },
+        {
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 0,
+            "rowSpan" : 4
+          },
+          "id" : "weight_now",
+          "props" : {
+            "label" : "体重(ヘルスケア)",
+            "metric" : "weight"
+          },
+          "state" : "rendered",
+          "type" : "healthStat"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 6
+          },
+          "id" : "steps_week",
+          "props" : {
+            "label" : "1 週間の歩数",
+            "metric" : "steps",
+            "period" : "week",
+            "target" : 8000
+          },
+          "state" : "rendered",
+          "type" : "healthStat"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "tab:home"
+      },
+      "title" : "今日",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "weights",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "latest",
+          "props" : {
+            "aggregate" : "latest",
+            "entity" : "body",
+            "field" : "weight",
+            "label" : "最新の体重",
+            "unavailable" : false,
+            "value" : "—"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "push",
+                "screen" : "body_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 10
+          },
+          "id" : "history",
+          "props" : {
+            "emptyText" : "右上の + から体重を記録",
+            "entity" : "body",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "weights",
+        "stack" : "tab:weights"
+      },
+      "title" : "体重",
+      "toolbar" : [
+        {
+          "action" : {
+            "presentation" : "sheet",
+            "screen" : "body_form",
+            "type" : "navigate"
+          },
+          "label" : "記録"
+        }
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "body",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "date" : "2026-11-12"
+        }
+      },
+      "id" : "body_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 3
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "date",
+                "label" : "日付",
+                "value" : "2026-11-12"
+              },
+              "state" : "rendered",
+              "type" : "datePicker"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "weight",
+                "label" : "体重",
+                "unit" : "kg",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "numberField"
+            }
+          ],
+          "id" : "fields",
+          "props" : {
+            "title" : "内容"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 3,
+            "rowSpan" : 1
+          },
+          "id" : "note",
+          "props" : {
+            "text" : "保存するとヘルスケアの体重にも記録されます"
+          },
+          "state" : "rendered",
+          "type" : "text"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "body_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "body",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "体重を記録",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

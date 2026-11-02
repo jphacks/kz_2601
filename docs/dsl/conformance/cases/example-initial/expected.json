@@ -1,0 +1,30 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "voice",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 12
+          },
+          "id" : "mic",
+          "state" : "rendered",
+          "type" : "voiceInput"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

@@ -10,9 +10,10 @@
 # 変更の判定(dorny/paths-filter)→ 回すもの:
 #   | 変わった場所                                  | ジョブ          | テスト                                                    |
 #   |-----------------------------------------------|-----------------|-----------------------------------------------------------|
-#   | ios/Packages/MetamonDSL/** だけ               | ios-dsl         | `swift test`(MetamonDSLTests)。アプリのビルド・シミュレータ無し |
+#   | ios/Packages/MetamonDSL/** だけ(*2)           | ios-dsl         | `swift test`(MetamonDSLTests)。アプリのビルド・シミュレータ無し |
 #   | MetamonDSL + 他の iOS 変更                    | ios-xcode       | DSL / Renderer / Services / MetamonTests(DSL は全員の依存) |
 #   | ios/Packages/MetamonRenderer/**               | ios-xcode       | MetamonRendererTests + MetamonTests                       |
+#   | docs/dsl/conformance/**・docs/dsl/examples/** | ios-xcode       | MetamonRendererTests(適合テスト #352)+ MetamonTests      |
 #   | ios/Packages/MetamonServices/**               | ios-xcode       | MetamonServicesTests + MetamonTests                       |
 #   | app(*1)                                       | ios-xcode       | MetamonTests                                              |
 #   | ios/MetamonUITests/** だけ                    | ios-xcode       | なし(build-for-testing でコンパイルだけ確認)              |
@@ -21,6 +22,7 @@
 #   | develop / main への push(上記のどれかが変更) | ios-xcode       | 全部(UI テスト MetamonUITests を含む)                    |
 #   (*1) ios/Metamon/**, ios/MetamonWidget/**, ios/MetamonTests/**, ios/project.yml, ios/StoreKit/**,
 #        docs/dsl/examples/**(アプリにバンドルされる)
+#   (*2) docs/dsl/conformance/expr/**(Expr の共有テストデータ・#545)も DSL の変更として扱う
 #   PR では常に -skip-testing:MetamonUITests(`ui-tests` ラベル時だけ UI テストも足す)。
 #
 # UI テスト(MetamonUITests)を PR で回したい時: PR に `ui-tests` ラベルを付けて、ios-ci の
@@ -77,9 +79,13 @@ jobs:
           filters: |
             dsl:
               - 'ios/Packages/MetamonDSL/**'
+              - 'docs/dsl/conformance/expr/**'
               - 'docs/dsl/dsl.schema.json'    # スキーマだけの変更でも SchemaSwiftKeysTests を回す(#537)
             renderer:
               - 'ios/Packages/MetamonRenderer/**'
+              # 適合テスト(#352)の case と期待値。examples も case の DSL に使う
+              - 'docs/dsl/conformance/**'
+              - 'docs/dsl/examples/**'
             services:
               - 'ios/Packages/MetamonServices/**'
             app:

@@ -1,0 +1,258 @@
+{
+  "description": "String ops (concat len toString) and how numbers/dates turn into text (Swift Double description).",
+  "defaults": {"now": "2026-10-28T15:30:45+09:00", "timeZone": "Asia/Tokyo"},
+  "cases": [
+    {
+      "name": "concat/two",
+      "expr": {"op": "concat", "args": ["a", "b"]},
+      "expected": {"type": "string", "value": "ab", "text": "ab"}
+    },
+    {
+      "name": "concat/label-and-number",
+      "expr": {"op": "concat", "args": ["合計: ", 1200]},
+      "expected": {"type": "string", "value": "合計: 1200", "text": "合計: 1200"}
+    },
+    {
+      "name": "concat/decimal",
+      "expr": {"op": "concat", "args": ["x", 0.1]},
+      "expected": {"type": "string", "value": "x0.1", "text": "x0.1"}
+    },
+    {
+      "name": "concat/nil-is-empty",
+      "expr": {"op": "concat", "args": ["x", {"op": "div", "args": [1, 0]}]},
+      "expected": {"type": "string", "value": "x", "text": "x"}
+    },
+    {
+      "name": "concat/bool",
+      "expr": {"op": "concat", "args": [true, "!"]},
+      "expected": {"type": "string", "value": "true!", "text": "true!"}
+    },
+    {
+      "name": "concat/three",
+      "expr": {"op": "concat", "args": [1, 2, 3]},
+      "expected": {"type": "string", "value": "123", "text": "123"}
+    },
+    {
+      "name": "concat/empty",
+      "expr": {"op": "concat", "args": ["", ""]},
+      "expected": {"type": "string", "value": "", "text": ""}
+    },
+    {
+      "name": "concat/today",
+      "expr": {"op": "concat", "args": [{"op": "today", "args": []}, "/"]},
+      "expected": {"type": "string", "value": "2026-10-28/", "text": "2026-10-28/"}
+    },
+    {
+      "name": "concat/now-is-date-only",
+      "expr": {"op": "concat", "args": [{"op": "now", "args": []}]},
+      "expected": {"type": "string", "value": "2026-10-28", "text": "2026-10-28"}
+    },
+    {
+      "name": "concat/no-args",
+      "expr": {"op": "concat", "args": []},
+      "expected": {"type": "string", "value": "", "text": ""}
+    },
+    {
+      "name": "format/integer",
+      "expr": {"op": "toString", "args": [1234567]},
+      "expected": {"type": "string", "value": "1234567", "text": "1234567"}
+    },
+    {
+      "name": "format/negative-integer",
+      "expr": {"op": "toString", "args": [-3]},
+      "expected": {"type": "string", "value": "-3", "text": "-3"}
+    },
+    {
+      "name": "format/negative-fraction",
+      "expr": {"op": "toString", "args": [-0.5]},
+      "expected": {"type": "string", "value": "-0.5", "text": "-0.5"}
+    },
+    {
+      "name": "format/third",
+      "expr": {"op": "toString", "args": [{"op": "div", "args": [1, 3]}]},
+      "expected": {"type": "string", "value": "0.3333333333333333", "text": "0.3333333333333333"}
+    },
+    {
+      "name": "format/large-integer-below-1e15",
+      "expr": {"op": "toString", "args": [123456789012345]},
+      "expected": {"type": "string", "value": "123456789012345", "text": "123456789012345"}
+    },
+    {
+      "name": "format/1e15",
+      "expr": {"op": "toString", "args": [1000000000000000.0]},
+      "expected": {"type": "string", "value": "1000000000000000.0", "text": "1000000000000000.0"}
+    },
+    {
+      "name": "format/2e15",
+      "expr": {"op": "toString", "args": [2000000000000000.0]},
+      "expected": {"type": "string", "value": "2000000000000000.0", "text": "2000000000000000.0"}
+    },
+    {
+      "name": "format/2pow53",
+      "expr": {"op": "toString", "args": [9007199254740992.0]},
+      "expected": {"type": "string", "value": "9007199254740992.0", "text": "9007199254740992.0"}
+    },
+    {
+      "name": "format/above-2pow53",
+      "expr": {"op": "toString", "args": [9.007199254740994e+15]},
+      "expected": {"type": "string", "value": "9.007199254740994e+15", "text": "9.007199254740994e+15"}
+    },
+    {
+      "name": "format/1e16",
+      "expr": {"op": "toString", "args": [1e+16]},
+      "expected": {"type": "string", "value": "1e+16", "text": "1e+16"}
+    },
+    {
+      "name": "format/1e21",
+      "expr": {"op": "toString", "args": [1e+21]},
+      "expected": {"type": "string", "value": "1e+21", "text": "1e+21"}
+    },
+    {
+      "name": "format/fraction-below-1e15",
+      "expr": {"op": "toString", "args": [999999999999999.9]},
+      "expected": {"type": "string", "value": "999999999999999.9", "text": "999999999999999.9"}
+    },
+    {
+      "name": "format/fraction-above-1e15",
+      "expr": {"op": "toString", "args": [1000000000000000.5]},
+      "expected": {"type": "string", "value": "1000000000000000.5", "text": "1000000000000000.5"}
+    },
+    {
+      "name": "format/small-decimal",
+      "expr": {"op": "toString", "args": [0.00025]},
+      "expected": {"type": "string", "value": "0.00025", "text": "0.00025"}
+    },
+    {
+      "name": "format/1e-4",
+      "expr": {"op": "toString", "args": [0.0001]},
+      "expected": {"type": "string", "value": "0.0001", "text": "0.0001"}
+    },
+    {
+      "name": "format/below-1e-4",
+      "expr": {"op": "toString", "args": [9.999e-05]},
+      "expected": {"type": "string", "value": "9.999e-05", "text": "9.999e-05"}
+    },
+    {
+      "name": "format/1e-5",
+      "expr": {"op": "toString", "args": [1e-05]},
+      "expected": {"type": "string", "value": "1e-05", "text": "1e-05"}
+    },
+    {
+      "name": "format/tiny",
+      "expr": {"op": "toString", "args": [1.5e-07]},
+      "expected": {"type": "string", "value": "1.5e-07", "text": "1.5e-07"}
+    },
+    {
+      "name": "format/denormal",
+      "expr": {"op": "toString", "args": [5e-324]},
+      "expected": {"type": "string", "value": "5e-324", "text": "5e-324"}
+    },
+    {
+      "name": "format/float-error",
+      "expr": {"op": "toString", "args": [{"op": "add", "args": [0.1, 0.2]}]},
+      "expected": {"type": "string", "value": "0.30000000000000004", "text": "0.30000000000000004"}
+    },
+    {
+      "name": "format/inf",
+      "expr": {"op": "toString", "args": [{"op": "toNumber", "args": ["inf"]}]},
+      "expected": {"type": "string", "value": "inf", "text": "inf"}
+    },
+    {
+      "name": "format/negative-inf",
+      "expr": {"op": "toString", "args": [{"op": "toNumber", "args": ["-inf"]}]},
+      "expected": {"type": "string", "value": "-inf", "text": "-inf"}
+    },
+    {
+      "name": "format/nan",
+      "expr": {"op": "toString", "args": [{"op": "toNumber", "args": ["nan"]}]},
+      "expected": {"type": "string", "value": "nan", "text": "nan"}
+    },
+    {
+      "name": "format/negative-zero",
+      "expr": {"op": "toString", "args": [{"op": "toNumber", "args": ["-0"]}]},
+      "expected": {"type": "string", "value": "0", "text": "0"}
+    },
+    {
+      "name": "format/rounded-money",
+      "expr": {"op": "toString", "args": [{"op": "round", "args": [{"op": "div", "args": [10000, 3]}]}]},
+      "expected": {"type": "string", "value": "3333", "text": "3333"}
+    },
+    {
+      "name": "toString/bool",
+      "expr": {"op": "toString", "args": [false]},
+      "expected": {"type": "string", "value": "false", "text": "false"}
+    },
+    {
+      "name": "toString/today",
+      "expr": {"op": "toString", "args": [{"op": "today", "args": []}]},
+      "expected": {"type": "string", "value": "2026-10-28", "text": "2026-10-28"}
+    },
+    {
+      "name": "toString/nil",
+      "expr": {"op": "toString", "args": [{"op": "div", "args": [1, 0]}]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "toString/string",
+      "expr": {"op": "toString", "args": ["x"]},
+      "expected": {"type": "string", "value": "x", "text": "x"}
+    },
+    {
+      "name": "len/ascii",
+      "expr": {"op": "len", "args": ["hello"]},
+      "expected": {"type": "number", "value": 5, "text": "5"}
+    },
+    {
+      "name": "len/japanese",
+      "expr": {"op": "len", "args": ["日本語"]},
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "len/combining-accent",
+      "expr": {"op": "len", "args": ["e\u0301"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "len/combining-dakuten",
+      "expr": {"op": "len", "args": ["か\u3099"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "len/zwj-family",
+      "expr": {"op": "len", "args": ["👨\u200d👩\u200d👧"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {"name": "len/flags", "expr": {"op": "len", "args": ["🇯🇵🇺🇸"]}, "expected": {"type": "number", "value": 2, "text": "2"}},
+    {
+      "name": "len/skin-tone",
+      "expr": {"op": "len", "args": ["👍Ἷd"]},
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "len/variation-selector",
+      "expr": {"op": "len", "args": ["❤\ufe0f"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "len/crlf",
+      "expr": {"op": "len", "args": ["a\r\nb"]},
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {"name": "len/hangul", "expr": {"op": "len", "args": ["한국"]}, "expected": {"type": "number", "value": 2, "text": "2"}},
+    {
+      "name": "len/number",
+      "expr": {"op": "len", "args": [12345]},
+      "expected": {"type": "number", "value": 5, "text": "5"}
+    },
+    {"name": "len/decimal", "expr": {"op": "len", "args": [1.5]}, "expected": {"type": "number", "value": 3, "text": "3"}},
+    {"name": "len/bool", "expr": {"op": "len", "args": [true]}, "expected": {"type": "number", "value": 4, "text": "4"}},
+    {"name": "len/empty", "expr": {"op": "len", "args": [""]}, "expected": {"type": "number", "value": 0, "text": "0"}},
+    {"name": "len/nil", "expr": {"op": "len", "args": [{"op": "div", "args": [1, 0]}]}, "expected": {"type": "nil"}},
+    {
+      "name": "len/today",
+      "expr": {"op": "len", "args": [{"op": "today", "args": []}]},
+      "expected": {"type": "number", "value": 10, "text": "10"}
+    },
+    {"name": "len/no-args", "expr": {"op": "len", "args": []}, "expected": {"type": "nil"}}
+  ]
+}

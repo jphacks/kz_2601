@@ -1,0 +1,208 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "lecture_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 10
+          },
+          "id" : "week",
+          "props" : {
+            "entity" : "lecture",
+            "title" : "今週の時間割"
+          },
+          "state" : "rendered",
+          "type" : "gridTable"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "lecture_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "授業を追加"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "時間割",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "lecture",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "period" : 1,
+          "weekday" : "月"
+        }
+      },
+      "id" : "lecture_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 4
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "weekday",
+                "label" : "曜日",
+                "options" : [
+                  "月",
+                  "火",
+                  "水",
+                  "木",
+                  "金"
+                ],
+                "style" : "segmented",
+                "value" : "月"
+              },
+              "state" : "rendered",
+              "type" : "picker"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "period",
+                "label" : "時限",
+                "max" : 5,
+                "min" : 1,
+                "value" : 1
+              },
+              "state" : "rendered",
+              "type" : "stepper"
+            }
+          ],
+          "id" : "when",
+          "props" : {
+            "title" : "いつ"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 5
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "subject",
+                "label" : "科目",
+                "placeholder" : "線形代数",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "room",
+                "label" : "教室",
+                "placeholder" : "A101",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "teacher",
+                "label" : "先生",
+                "placeholder" : "山田先生",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            }
+          ],
+          "id" : "what",
+          "props" : {
+            "title" : "授業"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 2,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "lecture_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "lecture",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "授業",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

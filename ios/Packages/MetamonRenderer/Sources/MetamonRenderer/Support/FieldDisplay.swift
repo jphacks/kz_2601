@@ -8,5 +8,5 @@ extension FieldCoding.Words {
 
 /// Renderer から値を表示する時の入口。日付の書式と boolean / photo の語を UI 言語に合わせる。
 func displayText(_ value: JSONValue, field: Field?) -> String {
-    FieldCoding.display(value, field: field, locale: LanguagePreference.shared.locale, words: .localized)
+    FieldCoding.display(value, field: field, locale: LanguagePreference.shared.locale, now: DSLClock.now(), words: .localized)
 }

@@ -1,0 +1,88 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 3,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "distance",
+          "props" : {
+            "aggregate" : "distance",
+            "entity" : "point",
+            "field" : "loc",
+            "label" : "今日の距離",
+            "unavailable" : false,
+            "value" : "0 m"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "duration",
+          "props" : {
+            "aggregate" : "duration",
+            "entity" : "point",
+            "field" : "loc",
+            "label" : "今日の時間",
+            "unavailable" : false,
+            "value" : "0:00"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 6
+          },
+          "id" : "route",
+          "props" : {
+            "entity" : "point",
+            "kind" : "route"
+          },
+          "state" : "rendered",
+          "type" : "mapView"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 8,
+            "rowSpan" : 2
+          },
+          "id" : "tracker",
+          "props" : {
+            "entity" : "point",
+            "label" : "散歩を記録する",
+            "seconds" : 3600
+          },
+          "state" : "rendered",
+          "type" : "locationTracker"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "散歩ルート",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

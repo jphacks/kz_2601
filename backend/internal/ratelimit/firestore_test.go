@@ -51,3 +51,64 @@ func TestFirestoreConsume(t *testing.T) {
 		t.Fatalf("over limit: %+v %v", u, err)
 	}
 }
+
+// Runs against the local emulator only (make emulator); never staging/prod.
+func TestFirestoreRefund(t *testing.T) {
+	if os.Getenv("FIRESTORE_EMULATOR_HOST") == "" {
+		t.Skip("FIRESTORE_EMULATOR_HOST not set")
+	}
+	ctx := context.Background()
+	c, err := firestore.NewClientWithDatabase(ctx, "demo-kz2601", firestore.DefaultDatabaseID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	s := NewFirestore(c, "rateLimitsTest")
+	sfx := strconv.FormatInt(time.Now().UnixNano(), 36)
+	counters := []Counter{
+		{ID: "u_" + sfx, Scope: ScopeUser, Limit: 10},
+		{ID: "g_" + sfx, Scope: ScopeGlobal, Limit: 1000},
+	}
+	exp := time.Now().Add(48 * time.Hour)
+	if _, err := s.Consume(ctx, []Counter{counters[1]}, 4, exp); err != nil { // someone else's global
+		t.Fatal(err)
+	}
+	if _, err := s.Consume(ctx, counters, 3, exp); err != nil {
+		t.Fatal(err)
+	}
+	later := exp.Add(time.Hour).Truncate(time.Microsecond) // Firestore keeps microseconds
+	if err := s.Refund(ctx, counters, 2, later); err != nil {
+		t.Fatal(err)
+	}
+	read := func(id string) (int64, time.Time, bool) {
+		snap, err := c.Collection("rateLimitsTest").Doc(id).Get(ctx)
+		if err != nil {
+			return 0, time.Time{}, false
+		}
+		n, _ := snap.DataAt("count")
+		e, _ := snap.DataAt("expireAt")
+		at, _ := e.(time.Time)
+		return n.(int64), at, true
+	}
+	if n, at, _ := read(counters[0].ID); n != 1 || !at.Equal(later) {
+		t.Fatalf("user after refund: %d %v", n, at)
+	}
+	if n, _, _ := read(counters[1].ID); n != 5 { // 4 + 3 - 2
+		t.Fatalf("global after refund: %d", n)
+	}
+	// never below zero
+	if err := s.Refund(ctx, counters, 9, later); err != nil {
+		t.Fatal(err)
+	}
+	if n, _, _ := read(counters[0].ID); n != 0 {
+		t.Fatalf("user below zero: %d", n)
+	}
+	// a missing counter is not created
+	missing := Counter{ID: "m_" + sfx, Scope: ScopeUser, Limit: 10}
+	if err := s.Refund(ctx, []Counter{missing}, 1, later); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, ok := read(missing.ID); ok {
+		t.Fatal("refund created a counter")
+	}
+}

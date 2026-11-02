@@ -6,7 +6,11 @@ import Foundation
 /// DEBUG ビルドだけ環境変数 `METAMON_DEBUG_TODAY=YYYY-MM-DD`(simctl は `SIMCTL_CHILD_` 接頭辞)で日付を差し替えられる
 /// (時刻は実時刻のまま。日付境界の確認用)。
 public enum DSLClock {
+    /// 固定の時刻(適合テスト・#352 の `device.now`)。nil なら実時刻。アプリからは設定しない
+    nonisolated(unsafe) public static var fixed: Date?
+
     public static func now() -> Date {
+        if let fixed { return fixed }
         #if DEBUG
         if let override = debugNow(Date()) { return override }
         #endif

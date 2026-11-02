@@ -1,0 +1,7 @@
+[
+  {"id": "nr_create_subs", "kind": "create", "group": "repeat", "transcript": "サブスクの管理アプリ。次の更新日の前日に通知して", "note": "#266 毎月の更新日の前日 → repeat monthly + offset -1440・残り日数は nextOccurrence", "expect": {"repeat": "monthly", "repeatOffset": -1440, "nextOccurrence": true}},
+  {"id": "nr_create_payday", "kind": "create", "group": "repeat", "transcript": "毎月の引き落とし日を登録して、3日前に知らせて", "note": "#266 毎月・3 日前", "expect": {"repeat": "monthly", "repeatOffset": -4320}},
+  {"id": "nr_create_birthday", "kind": "create", "group": "repeat", "transcript": "友達の誕生日を登録して、誕生日の朝に通知して。あと何日かも見たい", "note": "#266 誕生日 → repeat yearly・次の誕生日までの日数は nextOccurrence yearly", "expect": {"repeat": "yearly", "nextOccurrence": true}},
+  {"id": "nr_create_anniversary", "kind": "create", "group": "repeat", "transcript": "記念日を管理するアプリ。1週間前に知らせて", "note": "#266 記念日の 1 週間前 → yearly offset -10080", "expect": {"repeat": "yearly", "repeatOffset": -10080}},
+  {"id": "nr_create_subs_en", "kind": "create", "group": "repeat", "locale": "en", "transcript": "Track my subscriptions and remind me the day before each renewal", "note": "#266 en", "expect": {"repeat": "monthly", "repeatOffset": -1440}}
+]

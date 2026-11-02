@@ -1,0 +1,238 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 4
+          },
+          "children" : [
+            {
+              "cell" : {
+                "col" : 0,
+                "colSpan" : 3,
+                "row" : 0,
+                "rowSpan" : 1
+              },
+              "id" : "c1",
+              "props" : {
+                "text" : "左"
+              },
+              "state" : "rendered",
+              "type" : "text"
+            },
+            {
+              "cell" : {
+                "col" : 3,
+                "colSpan" : 3,
+                "row" : 0,
+                "rowSpan" : 1
+              },
+              "id" : "c2",
+              "props" : {
+                "text" : "右"
+              },
+              "state" : "rendered",
+              "type" : "text"
+            },
+            {
+              "cell" : {
+                "col" : 0,
+                "colSpan" : 6,
+                "row" : 1,
+                "rowSpan" : 1
+              },
+              "id" : "c3",
+              "state" : "rendered",
+              "type" : "spacer"
+            }
+          ],
+          "id" : "card",
+          "localGrid" : true,
+          "props" : {
+            "title" : "カード"
+          },
+          "state" : "rendered",
+          "type" : "card"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 1
+          },
+          "id" : "later",
+          "props" : {
+            "text" : "後に書いたが上から 5 行目"
+          },
+          "state" : "rendered",
+          "type" : "text"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 5,
+            "rowSpan" : 3
+          },
+          "children" : [
+            {
+              "id" : "p1",
+              "props" : {
+                "text" : "area あり"
+              },
+              "state" : "rendered",
+              "type" : "text"
+            },
+            {
+              "id" : "p2",
+              "props" : {
+                "text" : "area 無し"
+              },
+              "state" : "rendered",
+              "type" : "text"
+            }
+          ],
+          "id" : "partial",
+          "state" : "rendered",
+          "type" : "vstack"
+        },
+        {
+          "id" : "stacked1",
+          "props" : {
+            "text" : "area 無しは下に積む"
+          },
+          "stacked" : true,
+          "state" : "rendered",
+          "type" : "text"
+        },
+        {
+          "id" : "stacked2",
+          "stacked" : true,
+          "state" : "rendered",
+          "type" : "divider"
+        },
+        {
+          "id" : "stacked3",
+          "stacked" : true,
+          "state" : "rendered",
+          "type" : "spacer"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "配置",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "task",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "done" : false
+        }
+      },
+      "id" : "form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 4,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "title",
+          "props" : {
+            "field" : "title",
+            "label" : "タイトル",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        },
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 4,
+            "colSpan" : 2,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "done",
+          "props" : {
+            "field" : "done",
+            "label" : "完了",
+            "value" : false
+          },
+          "state" : "rendered",
+          "type" : "toggle"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 1
+          },
+          "id" : "points",
+          "props" : {
+            "field" : "points",
+            "label" : "点数",
+            "max" : 10,
+            "min" : 0,
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "stepper"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "type" : "saveRecord"
+              },
+              "on" : "tap"
+            }
+          ],
+          "band" : 2,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 9,
+            "rowSpan" : 2
+          },
+          "id" : "save",
+          "props" : {
+            "label" : "保存"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "form",
+        "stack" : "main"
+      },
+      "title" : "フォーム",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

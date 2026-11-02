@@ -115,6 +115,36 @@ func TestShareImportJoinsSharedApp(t *testing.T) {
 	}
 }
 
+// The import result says whether the caller created the app, so iOS can skip
+// the paywall even when the preview failed (#565).
+func TestShareImportMine(t *testing.T) {
+	e := newEnv(t)
+	const app = "/v1/apps/OWNER-KAKEIBO"
+	e.ownApp("owner", app, kakeibo(t))
+	tok, _ := e.do("owner", http.MethodPost, app+"/share", nil, nil).body["token"].(string)
+	if r := e.do("owner", http.MethodPost, "/v1/shares/"+tok+"/import", nil, nil); r.code != http.StatusCreated || r.body["mine"] != true {
+		t.Fatalf("owner import: %d %s", r.code, r.raw)
+	}
+	if r := e.do("friend", http.MethodPost, "/v1/shares/"+tok+"/import", nil, nil); r.code != http.StatusCreated || r.body["mine"] != false {
+		t.Fatalf("friend import: %d %s", r.code, r.raw)
+	}
+
+	// a participant's link: the creator (app_owners) still gets mine, others not
+	const board = "/v1/apps/BOARD-1"
+	e.ownApp("owner", board, sharedKakeibo(t))
+	tok, _ = e.do("owner", http.MethodPost, board+"/share", nil, nil).body["token"].(string)
+	if r := e.do("friend", http.MethodPost, "/v1/shares/"+tok+"/import", nil, nil); r.code != http.StatusCreated || r.body["mine"] != false {
+		t.Fatalf("friend join: %d %s", r.code, r.raw)
+	}
+	tok, _ = e.do("friend", http.MethodPost, board+"/share", nil, nil).body["token"].(string)
+	if r := e.do("owner", http.MethodPost, "/v1/shares/"+tok+"/import", nil, nil); r.code != http.StatusCreated || r.body["mine"] != true {
+		t.Fatalf("creator via participant's link: %d %s", r.code, r.raw)
+	}
+	if r := e.do("guest", http.MethodPost, "/v1/shares/"+tok+"/import", nil, nil); r.code != http.StatusCreated || r.body["mine"] != false {
+		t.Fatalf("guest via participant's link: %d %s", r.code, r.raw)
+	}
+}
+
 func TestPublishSearchInstall(t *testing.T) {
 	e := newEnv(t)
 	const app = "/v1/apps/OWNER-KAKEIBO"
@@ -162,10 +192,13 @@ func TestPublishSearchInstall(t *testing.T) {
 
 	// install: new appId, installs+1, then popular order puts it first
 	r = e.do("finder", http.MethodPost, "/v1/public-apps/OWNER-KAKEIBO/install", nil, nil)
-	if r.code != http.StatusCreated || r.body["id"] == "OWNER-KAKEIBO" || r.body["currentVersion"] != float64(2) {
+	if r.code != http.StatusCreated || r.body["id"] == "OWNER-KAKEIBO" || r.body["currentVersion"] != float64(2) || r.body["mine"] != false {
 		t.Fatalf("install: %d %s", r.code, r.raw)
 	}
-	e.do("owner", http.MethodPost, "/v1/public-apps/OWNER-KAKEIBO/install", nil, nil) // owner's own install is not counted
+	// owner's own install is not counted, and says mine (#565)
+	if r = e.do("owner", http.MethodPost, "/v1/public-apps/OWNER-KAKEIBO/install", nil, nil); r.code != http.StatusCreated || r.body["mine"] != true {
+		t.Fatalf("owner install: %d %s", r.code, r.raw)
+	}
 	r = e.do("finder", http.MethodGet, "/v1/public-apps?sort=popular", nil, nil)
 	first := r.body["items"].([]any)[0].(map[string]any)
 	if first["id"] != "OWNER-KAKEIBO" || first["installs"] != float64(1) || first["mine"] != false {

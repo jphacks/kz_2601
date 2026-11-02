@@ -13,9 +13,19 @@ type Watcher interface {
 	// WatchApp sends the app's currentVersion: once with the current value,
 	// then on every change. Slow consumers only see the latest value.
 	WatchApp(ctx context.Context, uid, appID string) (<-chan int, error)
-	// WatchRecords signals each change to the record set after its initial state.
+	// WatchRecords signals each change to the record set after its initial
+	// state, within the watchRecordsWindow most recently updated records:
+	// creates and updates always land there, but a mark or a delete on an
+	// older record is not signalled (the next pull still shows it, #553).
 	WatchRecords(ctx context.Context, rs RecordSet) (<-chan struct{}, error)
 }
+
+// watchRecordsWindow bounds WatchRecords to the most recently updated records
+// (updatedAt desc, then id desc). A Firestore listener is billed one read per
+// matching document on every (re)connect; Memory keeps the same limit so both
+// stores signal the same changes. SetMark does not touch updatedAt: lists can
+// sort by it, so a like would reorder them.
+const watchRecordsWindow = 100
 
 // offer sends v without blocking, replacing a value the consumer has not read yet.
 func offer[T any](ch chan T, v T) {
@@ -125,4 +135,21 @@ func (m *Memory) WatchRecords(ctx context.Context, rs RecordSet) (<-chan struct{
 		}
 	}()
 	return out, nil
+}
+
+// inWatchWindow reports whether id is among the watchRecordsWindow most
+// recently updated records of recs (Firestore's updatedAt desc order with
+// the implicit document id tie-break). Callers hold m.mu.
+func inWatchWindow(recs map[string]*Record, id string) bool {
+	r, ok := recs[id]
+	if !ok {
+		return false
+	}
+	newer := 0
+	for oid, o := range recs {
+		if o.UpdatedAt.After(r.UpdatedAt) || (o.UpdatedAt.Equal(r.UpdatedAt) && oid > id) {
+			newer++
+		}
+	}
+	return newer < watchRecordsWindow
 }

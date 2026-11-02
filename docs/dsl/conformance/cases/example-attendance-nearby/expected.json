@@ -1,0 +1,318 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "today",
+          "props" : {
+            "aggregate" : "count",
+            "entity" : "attendance",
+            "label" : "今日の出席",
+            "unavailable" : false,
+            "value" : "0 件"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 8
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "emptyText" : "まだ届いていません",
+                "entity" : "attendance",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "log",
+          "props" : {
+            "title" : "届いた出席"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "attend_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "attend",
+          "props" : {
+            "label" : "出席する"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "出席カード",
+      "toolbar" : [
+        {
+          "action" : {
+            "screen" : "members",
+            "type" : "navigate"
+          },
+          "label" : "名簿"
+        }
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "attendance",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "date" : "2026-11-12T03:00:00Z",
+          "status" : "出席"
+        }
+      },
+      "id" : "attend_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 6
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "name",
+                "label" : "名前",
+                "placeholder" : "山田 花子",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "status",
+                "label" : "状態",
+                "options" : [
+                  "出席",
+                  "遅刻",
+                  "早退"
+                ],
+                "style" : "segmented",
+                "value" : "出席"
+              },
+              "state" : "rendered",
+              "type" : "picker"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "date",
+                "label" : "日時",
+                "value" : "2026-11-12T03:00:00Z"
+              },
+              "state" : "rendered",
+              "type" : "datePicker"
+            }
+          ],
+          "id" : "fields",
+          "props" : {
+            "title" : "自分の出席"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 7,
+            "rowSpan" : 2
+          },
+          "id" : "send",
+          "props" : {
+            "entity" : "attendance",
+            "label" : "近くの先生に送る"
+          },
+          "state" : "rendered",
+          "type" : "nearbyShare"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "attend_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "attendance",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "出席する",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "members",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 10
+          },
+          "id" : "list",
+          "props" : {
+            "emptyText" : "名簿は空です",
+            "entity" : "members",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "cell" : {
+            "col" : 2,
+            "colSpan" : 4,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "share_roster",
+          "props" : {
+            "entity" : "members",
+            "label" : "名簿を近くの人に送る"
+          },
+          "state" : "rendered",
+          "type" : "nearbyShare"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "members",
+        "stack" : "main"
+      },
+      "title" : "名簿",
+      "toolbar" : [
+        {
+          "action" : {
+            "presentation" : "sheet",
+            "screen" : "member_form",
+            "type" : "navigate"
+          },
+          "label" : "追加"
+        }
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "members",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+
+        }
+      },
+      "id" : "member_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 4
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "name",
+                "label" : "名前",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "team",
+                "label" : "チーム",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            }
+          ],
+          "id" : "fields",
+          "props" : {
+            "title" : "メンバー"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "member_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "members",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "メンバー",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

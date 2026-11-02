@@ -162,6 +162,19 @@
           "description": "記録の保存期間(日数・#482)。作ってから($createdAt)この日数を過ぎたレコードを、端末が開いた時・前面に戻った時・保存の後に自動で消す(消えたレコードは戻せない)。設定した時は端末が確認を出し、確認するまで消さない。shared / public の entity では各自が自分で作ったレコードだけが消える。省略 = 消さない。",
           "x-usage": "「1週間たった記録は消して」「30日で消えるようにして」「古い記録は自動で消したい」は日々たまる記録の entity に書く(1週間=7・2週間=14・1か月=30・3か月=90・半年=180・1年=365)。ref で選ばれる一覧(カテゴリ・メンバー・お店)や設定には書かない。「自動で消すのをやめて」は remove、期間の変更は replace。消す処理のボタン・filter・computed・別 entity は作らない。"
         },
+        "match": {
+          "type": "string",
+          "enum": [
+            "matched",
+            "profile"
+          ],
+          "description": "マッチングのアプリ(#507・趣味・勉強・イベントの仲間探し)での entity の役割。profile = みんなが見て「つながりたい」を送る 1 人 1 件のプロフィール。matched = 書いた人と、その人とお互いに承認してつながった人だけが読める記録(連絡先など)。scope は public か shared。恋愛・出会い目的のアプリには使わない。",
+          "x-usage": "仲間探しのアプリは profile の entity を 1 つ(趣味・地域(都道府県やオンラインの enum)・ひとこと。写真・位置・連絡先・年齢・性別は入れない)と、連絡先や集合の相談を書く matched の entity を作る。matched は profile が無いアプリでは使えない。位置(location)の field はどちらにも置かない。edit は書かない。",
+          "x-enumDescriptions": {
+            "matched": "書いた人と、つながった相手だけが読める(連絡先・次に会う相談)。",
+            "profile": "みんなが見るプロフィール(1 人 1 件)。ここから「つながりたい」を送る。"
+          }
+        },
         "marks": {
           "type": "array",
           "maxItems": 3,
@@ -751,6 +764,9 @@
         },
         {
           "$ref": "#/$defs/MusicPlayer"
+        },
+        {
+          "$ref": "#/$defs/MatchList"
         }
       ]
     },
@@ -1047,7 +1063,7 @@
     "ListItem": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル、toggle に boolean field で行頭のチェック丸(resets daily なら date field で毎日リセット)。 mark に entity の marks の id を書くと、行の右端にいいね・保存などのトグルと件数(1 人 1 回)。",
+      "description": "list の 1 行。各キーは field id。title は必須、trailing に金額や日付、image に photo field でサムネイル、toggle に boolean field で行頭のチェック丸(resets daily なら date field で毎日リセット)。 mark に entity の marks の id を書くと、行の右端にいいね・保存などのトグルと件数(1 人 1 回)。 interest: true は match \"profile\" の一覧の行に「つながりたい」ボタン(#507)。",
       "required": [
         "title"
       ],
@@ -1085,6 +1101,10 @@
             "daily"
           ],
           "description": "daily = a check that comes back unchecked every day (服薬・毎日の習慣). toggle must be a stored date field without defaultValue: tapping saves today's date, the row shows checked only while that date is today (device local), tapping again clears it. Today's done count = stat count filter {toggle field, op today}. iOS also keeps the checked days (history), so a computed integer on the same entity can show the streak {\"op\":\"streak\",\"args\":[{\"ref\":<toggle>}]} and the days done in the last n days {\"op\":\"doneInDays\",\"args\":[{\"ref\":<toggle>},7]}; totals = agg sum/max of those computed fields. Do not add a separate log entity for checks."
+        },
+        "interest": {
+          "type": "boolean",
+          "description": "true = the list entity has match \"profile\" (#507): iOS puts a つながりたい button on other people's rows (not on the user's own). Tapping sends an interest to that person (the first time it asks the user to confirm they are 18 or older); after sending the row reads 送りました, and when both sides sent it reads つながりました. No form, no extra entity, no boolean field."
         }
       }
     },
@@ -1401,7 +1421,7 @@
     "Notification": {
       "type": "object",
       "additionalProperties": false,
-      "description": "ローカル通知 1 件。app.notifications(定期 / entity+field でレコードの時刻から)と scheduleNotification(その場で予約)で共通。time は HH:MM。",
+      "description": "ローカル通知 1 件。app.notifications(定期 / entity+field でレコードの時刻から / when で条件が真になった時)と scheduleNotification(その場で予約)で共通。time は HH:MM。",
       "required": [
         "id",
         "title",
@@ -1423,8 +1443,11 @@
           "enum": [
             "once",
             "daily",
-            "weekly"
-          ]
+            "weekly",
+            "monthly",
+            "yearly"
+          ],
+          "description": "monthly / yearly はレコード基準(entity + date / datetime の field)だけ: field の日付の日(毎年は月日)にくり返す。日が無い月は月末(1/31 → 2/28)。サブスクの更新日・誕生日・記念日。"
         },
         "time": {
           "type": "string",
@@ -1462,6 +1485,11 @@
         "enabledField": {
           "$ref": "#/$defs/Id",
           "description": "With entity: boolean field; records where it is false are not notified (alarm on/off)."
+        },
+        "when": {
+          "$ref": "#/$defs/Expr",
+          "description": "app.notifications only (#265). 条件で知らせる: 真偽の式(ref 不可・agg で集計)。条件が偽 → 真に変わった時に 1 回だけすぐ知らせ、偽に戻ったらまた知らせられる。iOS がこの端末でレコードを保存・削除・同期した直後に評価する(他の人の操作だけで真になった時は、この端末が同期するまで届かない)。when を書いたら repeat は once、time / weekday / entity / field / offsetMinutes / titleField / enabledField は書かない。",
+          "x-usage": "「在庫が少なくなったら教えて」= {\"op\":\"lt\",\"args\":[{\"agg\":\"sum\",\"entity\":\"stock\",\"field\":\"qty\"},5]}。予算オーバー = gt(今月の支出の sum, 予算)。目標達成 = gte(合計, 目標)。"
         }
       }
     },
@@ -3354,6 +3382,7 @@
             "daysBetween",
             "daysUntil",
             "addDays",
+            "nextOccurrence",
             "hoursBetween",
             "year",
             "month",
@@ -3397,6 +3426,7 @@
             "daysBetween": "daysBetween(a,b) = b - a の日数",
             "daysUntil": "daysUntil(d) = d - 今日 の日数(過ぎたら負)",
             "addDays": "addDays(d, n) = d の n 日後",
+            "nextOccurrence": "nextOccurrence(d, \"monthly\"|\"yearly\") = d から毎月 / 毎年くり返す日付のうち、今日以降で最も近い日(d が今日以降なら d)。日が無い月は月末に寄せる(1/31 の毎月 → 2/28・閏年 2/29、2/29 の毎年 → 平年 2/28)。サブスクの次の更新日・次の誕生日。daysUntil と組み合わせて残り日数に",
             "hoursBetween": "hoursBetween(start, end) = \"HH:mm\" 同士の差の時間数(小数。30 分 = 0.5)。end < start は日付またぎとして +24h。勤務時間・睡眠時間に",
             "year": "年",
             "month": "月(1-12)",
@@ -4072,6 +4102,62 @@
       },
       "description": "Apple Music の音楽プレーヤー。曲を検索して再生待ちに入れ、再生・一時停止・次へ・前へと、今の曲(曲名・アーティスト・ジャケット)と再生待ちを表示する。イヤホンのボタン・ロック画面でも操作できる。allowRequests で近くの友だちの端末から曲のリクエストを受けられる。「音楽を流す」「ドライブの BGM」「プレイリスト」「友だちが曲を入れられる」の時に選ぶ。再生には Apple Music の契約が要る。Spotify は曲名で Spotify アプリを開くことだけでき、再生・操作はできない。entity は要らない。",
       "x-usage": "entity 不要。1 アプリに 1 つだけ。ホーム(またはタブ)に全幅で大きく置く(例 A1:F12。他の部品と並べるなら A1:F8)。友だちから曲を入れたい話があれば allowRequests: true、運転中で確認できない・勝手に入れていいなら autoAccept: true も。"
+    },
+    "MatchList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "show"
+      ],
+      "properties": {
+        "type": {
+          "const": "matchList"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string",
+          "description": "match \"profile\" の entity の id。行はその人のプロフィールのレコードで描く。"
+        },
+        "show": {
+          "type": "string",
+          "enum": [
+            "incoming",
+            "matches",
+            "outgoing"
+          ],
+          "description": "incoming = 自分に「つながりたい」を送ってきた人(行に「承認」「見送る」)/ outgoing = 自分が送って返事を待っている人(「取り下げる」)/ matches = お互いに送ってつながった人(「つながりを解除」「通報する」「ブロック」)。",
+          "x-enumDescriptions": {
+            "incoming": "届いた「つながりたい」。承認するとつながる・見送っても相手には知らされない。",
+            "matches": "つながった人。連絡先(match \"matched\" の entity)はこの人たちにだけ見える。",
+            "outgoing": "送った「つながりたい」。相手が承認するまでここに残る。"
+          }
+        },
+        "title": {
+          "type": "string",
+          "description": "一覧の上の見出し(任意)。"
+        },
+        "emptyText": {
+          "type": "string",
+          "description": "誰もいない時の文言(既定は show ごとの文)。"
+        },
+        "item": {
+          "$ref": "#/$defs/ListItem",
+          "description": "行の表示。title / subtitle / trailing / icon だけを使う(プロフィールの field か $author)。省略時はプロフィールの titleField。"
+        },
+        "onItemTap": {
+          "$ref": "#/$defs/Action",
+          "description": "行をタップした時(任意)。recordId はその人のプロフィールのレコード。"
+        }
+      },
+      "description": "仲間探しのアプリ(#507)で、届いた「つながりたい」・送った「つながりたい」・つながった人の一覧。行はその人のプロフィールで描き、行の中のボタンとメニューで承認・見送る・取り下げる・つながりを解除・通報・ブロックができる(Action は不要)。match \"profile\" の entity があるアプリだけで使う。",
+      "x-usage": "仲間探しのアプリでは「つながり」のタブ(またはホーム)に、届いた人(show incoming・A1:F4)とつながった人(show matches・A5:F10)を縦に並べる。送った人(show outgoing)は任意。entity はプロフィールの entity。item は title に趣味などプロフィールの field、subtitle に地域、trailing に $author。承認の boolean・いいね用の entity・相手を選ぶ ref・ボタンは作らない。"
     }
   }
 }

@@ -1,0 +1,258 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "aggregate" : "count",
+                "entity" : "groceries",
+                "label" : "残り",
+                "unavailable" : false,
+                "value" : "0 件"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "aggregate" : "count",
+                "entity" : "groceries",
+                "label" : "今週追加",
+                "unavailable" : false,
+                "value" : "0 件"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            }
+          ],
+          "id" : "summary",
+          "state" : "rendered",
+          "type" : "hstack"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 5
+          },
+          "children" : [
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "push",
+                    "screen" : "item_form",
+                    "type" : "navigate"
+                  },
+                  "on" : "rowTap"
+                }
+              ],
+              "id" : null,
+              "props" : {
+                "emptyText" : "全部買いました",
+                "entity" : "groceries",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "todo",
+          "props" : {
+            "title" : "買うもの"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 7,
+            "rowSpan" : 3
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "emptyText" : "まだありません",
+                "entity" : "groceries",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "bought",
+          "props" : {
+            "title" : "買ったもの"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "item_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "追加"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "買い物リスト",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "groceries",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "added" : "2026-11-12",
+          "category" : "食品",
+          "done" : false,
+          "qty" : 1
+        }
+      },
+      "id" : "item_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 7
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "name",
+                "label" : "品名",
+                "placeholder" : "牛乳",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "category",
+                "label" : "売り場",
+                "options" : [
+                  "食品",
+                  "日用品",
+                  "その他"
+                ],
+                "style" : "segmented",
+                "value" : "食品"
+              },
+              "state" : "rendered",
+              "type" : "picker"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "qty",
+                "label" : "個数",
+                "max" : 99,
+                "min" : 1,
+                "step" : 1,
+                "value" : 1
+              },
+              "state" : "rendered",
+              "type" : "stepper"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "done",
+                "label" : "買った",
+                "value" : false
+              },
+              "state" : "rendered",
+              "type" : "toggle"
+            }
+          ],
+          "id" : "fields",
+          "props" : {
+            "title" : "内容"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "item_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "groceries",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "買うもの",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

@@ -1,0 +1,259 @@
+{
+  "screens" : [
+    {
+      "id" : "a",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "about",
+          "props" : {
+            "text" : "A はタブの根。B → C → A と進んでも戻るは深くならない"
+          },
+          "state" : "rendered",
+          "type" : "text"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "screen" : "b",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 2
+          },
+          "id" : "to_b",
+          "props" : {
+            "label" : "B へ"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "c",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 2
+          },
+          "id" : "c_sheet",
+          "props" : {
+            "label" : "C をシートで開く"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "a",
+        "stack" : "tab:a"
+      },
+      "title" : "画面 A",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "b",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "about",
+          "props" : {
+            "text" : "B から C へ進む"
+          },
+          "state" : "rendered",
+          "type" : "text"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "screen" : "c",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 2
+          },
+          "id" : "to_c",
+          "props" : {
+            "label" : "C へ"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "b",
+        "stack" : "main"
+      },
+      "title" : "画面 B",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "c",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "about",
+          "props" : {
+            "text" : "C から A(タブの根)へ戻るか、別タブへ飛ぶ"
+          },
+          "state" : "rendered",
+          "type" : "text"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "screen" : "a",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 2
+          },
+          "id" : "to_a",
+          "props" : {
+            "label" : "A へ"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "screen" : "other",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 2
+          },
+          "id" : "to_other",
+          "props" : {
+            "label" : "別タブへ"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "c",
+        "stack" : "main"
+      },
+      "title" : "画面 C",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "other",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "about",
+          "props" : {
+            "text" : "別タブの根。ここからも B へ行ける"
+          },
+          "state" : "rendered",
+          "type" : "text"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "screen" : "b",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 2
+          },
+          "id" : "to_b",
+          "props" : {
+            "label" : "B へ"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "other",
+        "stack" : "tab:other"
+      },
+      "title" : "別タブ",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

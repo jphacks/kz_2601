@@ -38,10 +38,16 @@ struct ComputedFieldRow: View {
     let field: Field
     let form: FormDraft
 
-    var body: some View {
+    /// 計算結果と表示の文字。適合テストの描画の木(`RenderTree`)も同じ値を使う。
+    @MainActor
+    static func resolve(field: Field, form: FormDraft, rt: any DSLRuntime) -> (value: JSONValue?, text: String) {
         let row = ExprEvaluator.Row(entity: form.entity, record: Record(id: form.recordId ?? "draft", data: form.payload), memoizable: false)
         let value = field.computed.flatMap { rt.evaluator().evaluate($0, row: row) }
-        let text = displayText(value?.json(for: field) ?? .null, field: field)
+        return (value?.json(for: field), displayText(value?.json(for: field) ?? .null, field: field))
+    }
+
+    var body: some View {
+        let (value, text) = Self.resolve(field: field, form: form, rt: rt)
         LabeledInput(label: c.label ?? field.name) {
             HStack {
                 Text(text)

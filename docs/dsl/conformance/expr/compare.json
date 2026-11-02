@@ -1,0 +1,231 @@
+{
+  "description": "Comparison ops: eq neq gt gte lt lte (coercion between numbers, strings, bools and dates).",
+  "defaults": {"now": "2026-10-28T15:30:45+09:00", "timeZone": "Asia/Tokyo"},
+  "cases": [
+    {
+      "name": "eq/numbers",
+      "expr": {"op": "eq", "args": [1, 1]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "eq/number-and-string",
+      "expr": {"op": "eq", "args": [1, "1"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "eq/comma-string",
+      "expr": {"op": "eq", "args": ["1,000", 1000]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "eq/strings",
+      "expr": {"op": "eq", "args": ["a", "a"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "eq/different-strings",
+      "expr": {"op": "eq", "args": ["a", "b"]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "eq/case-sensitive",
+      "expr": {"op": "eq", "args": ["abc", "ABC"]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "eq/bool-and-string",
+      "expr": {"op": "eq", "args": [true, "true"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "eq/bool-and-number",
+      "expr": {"op": "eq", "args": [true, 1]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "eq/float-string",
+      "expr": {"op": "eq", "args": [1, "1.0"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "eq/hex-string",
+      "expr": {"op": "eq", "args": ["0x10", 16]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "eq/nil-nil",
+      "expr": {"op": "eq", "args": [{"op": "div", "args": [1, 0]}, {"op": "div", "args": [1, 0]}]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "eq/nil-zero",
+      "expr": {"op": "eq", "args": [{"op": "div", "args": [1, 0]}, 0]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "eq/empty-string-zero",
+      "expr": {"op": "eq", "args": ["", 0]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "eq/today-and-date-string",
+      "expr": {"op": "eq", "args": [{"op": "today", "args": []}, "2026-10-28"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "eq/now-and-date-string",
+      "expr": {"op": "eq", "args": [{"op": "now", "args": []}, "2026-10-28"]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "eq/dates",
+      "expr": {"op": "eq", "args": [{"op": "addDays", "args": ["2026-10-27", 1]}, {"op": "today", "args": []}]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {"name": "eq/one-arg", "expr": {"op": "eq", "args": [1]}, "expected": {"type": "nil"}},
+    {
+      "name": "neq/numbers",
+      "expr": {"op": "neq", "args": [1, 2]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "neq/nil-nil",
+      "expr": {"op": "neq", "args": [{"op": "div", "args": [1, 0]}, {"op": "div", "args": [1, 0]}]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "neq/number-and-string",
+      "expr": {"op": "neq", "args": [2, "2"]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "gt/numbers",
+      "expr": {"op": "gt", "args": [2, 1]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "gt/numeric-strings",
+      "expr": {"op": "gt", "args": ["10", "9"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "gt/mixed-strings-compare-as-text",
+      "expr": {"op": "gt", "args": ["10", "9a"]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "gt/strings",
+      "expr": {"op": "gt", "args": ["b", "a"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "gt/comma-strings-compare-as-numbers",
+      "expr": {"op": "gt", "args": ["1,000", "999"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {"name": "gt/number-vs-text", "expr": {"op": "gt", "args": [1, "x"]}, "expected": {"type": "nil"}},
+    {
+      "name": "gt/date-vs-date-string",
+      "expr": {"op": "gt", "args": [{"op": "today", "args": []}, "2026-10-01"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "gt/dates",
+      "expr": {"op": "gt", "args": [{"op": "addDays", "args": [{"op": "today", "args": []}, 1]}, {"op": "today", "args": []}]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {"name": "gt/bools", "expr": {"op": "gt", "args": [true, false]}, "expected": {"type": "nil"}},
+    {"name": "gt/nil", "expr": {"op": "gt", "args": [{"op": "div", "args": [1, 0]}, 1]}, "expected": {"type": "nil"}},
+    {
+      "name": "gt/number-vs-numeric-string",
+      "expr": {"op": "gt", "args": [10, "9"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "gte/equal",
+      "expr": {"op": "gte", "args": [1, 1]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "gte/dates-equal",
+      "expr": {"op": "gte", "args": [{"op": "today", "args": []}, {"op": "today", "args": []}]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "lt/numbers",
+      "expr": {"op": "lt", "args": [1, 2]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "lt/words",
+      "expr": {"op": "lt", "args": ["apple", "banana"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "lt/uppercase-first",
+      "expr": {"op": "lt", "args": ["Z", "a"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "lt/accented",
+      "expr": {"op": "lt", "args": ["é", "f"]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "lt/japanese",
+      "expr": {"op": "lt", "args": ["あ", "い"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {"name": "lt/one-arg", "expr": {"op": "lt", "args": [1]}, "expected": {"type": "nil"}},
+    {
+      "name": "lte/equal",
+      "expr": {"op": "lte", "args": [2, 2]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "lte/greater",
+      "expr": {"op": "lte", "args": [3, 2]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "lt/date-vs-date-string",
+      "expr": {"op": "lt", "args": [{"op": "today", "args": []}, "2026-10-29"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "gte/date-string-vs-date",
+      "expr": {"op": "gte", "args": ["2026-10-28", {"op": "today", "args": []}]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "gt/date-vs-datetime-string",
+      "expr": {"op": "gt", "args": [{"op": "now", "args": []}, "2026-10-28T06:00:00Z"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "gt/date-vs-text-is-nil",
+      "expr": {"op": "gt", "args": [{"op": "today", "args": []}, "tomorrow"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "eq/today-and-datetime-string",
+      "expr": {"op": "eq", "args": [{"op": "today", "args": []}, "2026-10-28T00:00:00+09:00"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "eq/date-and-text",
+      "expr": {"op": "eq", "args": [{"op": "today", "args": []}, "x"]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "neq/date-and-date-string",
+      "expr": {"op": "neq", "args": [{"op": "addDays", "args": [{"op": "today", "args": []}, 1]}, "2026-10-28"]},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "lt/comma-strings-compare-as-numbers",
+      "expr": {"op": "lt", "args": ["1,000", "200"]},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    }
+  ]
+}

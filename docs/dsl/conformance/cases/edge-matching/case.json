@@ -1,0 +1,199 @@
+{
+  "dsl": {
+    "schemaVersion": 1,
+    "app": {
+      "name": "ボドゲ仲間さがし",
+      "description": "同じ趣味の人を探して、お互いにつながりたいを送ったら連絡先が見られる(#507)",
+      "icon": "person.2",
+      "voiceEntry": "floating",
+      "tabs": [
+        {
+          "screen": "home",
+          "title": "さがす",
+          "icon": "magnifyingglass"
+        },
+        {
+          "screen": "connections",
+          "title": "つながり",
+          "icon": "person.2"
+        }
+      ]
+    },
+    "initialScreen": "home",
+    "entities": [
+      {
+        "id": "profile",
+        "name": "プロフィール",
+        "titleField": "hobby",
+        "scope": "public",
+        "match": "profile",
+        "fields": [
+          {
+            "id": "hobby",
+            "name": "好きなゲーム",
+            "type": "string",
+            "required": true
+          },
+          {
+            "id": "area",
+            "name": "地域",
+            "type": "enum",
+            "options": [
+              "石川県",
+              "富山県",
+              "福井県",
+              "オンライン"
+            ]
+          },
+          {
+            "id": "intro",
+            "name": "ひとこと",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "contact",
+        "name": "連絡先",
+        "titleField": "how",
+        "scope": "public",
+        "match": "matched",
+        "fields": [
+          {
+            "id": "how",
+            "name": "連絡方法",
+            "type": "string",
+            "required": true
+          }
+        ]
+      }
+    ],
+    "screens": [
+      {
+        "id": "home",
+        "title": "仲間さがし",
+        "components": [
+          {
+            "type": "list",
+            "id": "people",
+            "area": "A1:F6",
+            "entity": "profile",
+            "item": {
+              "title": "hobby",
+              "subtitle": "area",
+              "trailing": "$author",
+              "interest": true
+            },
+            "emptyText": "まだ誰もいません"
+          },
+          {
+            "type": "list",
+            "id": "contacts",
+            "area": "A7:F12",
+            "entity": "contact",
+            "item": {
+              "title": "how",
+              "subtitle": "$author"
+            },
+            "emptyText": "つながった人の連絡先がここに出ます"
+          }
+        ]
+      },
+      {
+        "id": "connections",
+        "title": "つながり",
+        "components": [
+          {
+            "type": "matchList",
+            "id": "incoming",
+            "area": "A1:F4",
+            "entity": "profile",
+            "show": "incoming",
+            "title": "届いた「つながりたい」",
+            "item": {
+              "title": "hobby",
+              "subtitle": "area",
+              "trailing": "$author"
+            }
+          },
+          {
+            "type": "matchList",
+            "id": "outgoing",
+            "area": "A5:F6",
+            "entity": "profile",
+            "show": "outgoing",
+            "title": "送った「つながりたい」",
+            "item": {
+              "title": "hobby",
+              "subtitle": "area"
+            },
+            "emptyText": "まだ送っていません"
+          },
+          {
+            "type": "matchList",
+            "id": "matches",
+            "area": "A7:F12",
+            "entity": "profile",
+            "show": "matches",
+            "title": "つながった人",
+            "item": {
+              "title": "hobby",
+              "subtitle": "area",
+              "trailing": "$author"
+            },
+            "emptyText": "まだ誰ともつながっていません"
+          }
+        ]
+      }
+    ]
+  },
+  "records": {
+    "profile": [
+      {
+        "id": "p_me",
+        "data": {
+          "hobby": "カタン",
+          "area": "石川県",
+          "intro": "週末に遊べる人"
+        },
+        "author": "me",
+        "authorName": "わたし"
+      },
+      {
+        "id": "p_a",
+        "data": {
+          "hobby": "ドミニオン",
+          "area": "富山県"
+        },
+        "author": "u_a",
+        "authorName": "あおい"
+      },
+      {
+        "id": "p_b",
+        "data": {
+          "hobby": "宝石の煌き",
+          "area": "オンライン",
+          "intro": "平日の夜"
+        },
+        "author": "u_b",
+        "authorName": "ひかる"
+      }
+    ],
+    "contact": [
+      {
+        "id": "c_me",
+        "data": {
+          "how": "Discord: me#0001"
+        },
+        "author": "me",
+        "authorName": "わたし"
+      }
+    ]
+  },
+  "device": {
+    "now": "2026-11-12T12:00:00+09:00",
+    "timeZone": "Asia/Tokyo",
+    "locale": "ja_JP",
+    "userId": "me"
+  }
+}

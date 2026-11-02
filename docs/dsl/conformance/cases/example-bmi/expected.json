@@ -1,0 +1,169 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "avg",
+          "props" : {
+            "aggregate" : "avg",
+            "entity" : "body",
+            "field" : "bmi",
+            "label" : "平均 BMI",
+            "unavailable" : false,
+            "value" : "0"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 8
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "emptyText" : "まだ記録がありません",
+                "entity" : "body",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "history",
+          "props" : {
+            "title" : "履歴"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "body_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "記録する"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "BMI記録",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "body",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "date" : "2026-11-12"
+        }
+      },
+      "id" : "body_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 6
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "date",
+                "label" : "日付",
+                "value" : "2026-11-12"
+              },
+              "state" : "rendered",
+              "type" : "datePicker"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "weight",
+                "label" : "体重",
+                "unit" : "kg",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "numberField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "height",
+                "label" : "身長",
+                "unit" : "cm",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "numberField"
+            }
+          ],
+          "id" : "fields",
+          "props" : {
+            "title" : "体"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "body_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "body",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "記録",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}
