@@ -41,6 +41,7 @@ prod(`jphacks-kz2601`)と stg(新しいプロジェクト・#288 の案 A2)を�
 | Firestore | `data.tf` | `(default)`・Native。PITR と削除保護は変数。`prevent_destroy` と `deletion_policy = "ABANDON"` で Terraform からは消せない |
 | 消去ジョブ | `purge.tf` | Cloud Run Job `account-purge` と Scheduler `account-purge-daily`(毎日 4:30 JST)。ジョブのイメージは `ignore_changes`(下) |
 | 予算アラート | `budget.tf` | 50 / 90 / 100% と予測 100%。課金アカウントは変数 |
+| 監視 | `monitoring.tf`・`dashboards/` | `/health` の Uptime check・ログベースの指標・アラート(5xx 率・p95・Claude の失敗率・panic)・ダッシュボード 1 枚。通知先は変数。手順は [`docs/infra/observability.md`](../docs/infra/observability.md) |
 
 **管理しないもの**
 
@@ -110,7 +111,7 @@ terraform init -backend-config=envs/prod.backend.hcl
 terraform plan -var-file=envs/prod.tfvars -out=prod.tfplan
 ```
 
-1. **まず差分 0 を確かめる**: `prod.tfvars` で一時的に `wif_allowed_refs = []`、`firestore_pitr_enabled = false`、`firestore_delete_protection = false` にする(今の prod と同じ値)。`purge_job_image` は何を入れても差分にならない(`ignore_changes`)。plan が `N to import, 0 to add, 0 to change, 0 to destroy` になれば正しく取り込めている。
+1. **まず差分 0 を確かめる**: `prod.tfvars` で一時的に `monitoring_enabled = false`(監視は取り込みの後に足す)、`wif_allowed_refs = []`、`firestore_pitr_enabled = false`、`firestore_delete_protection = false` にする(今の prod と同じ値)。`purge_job_image` は何を入れても差分にならない(`ignore_changes`)。plan が `N to import, 0 to add, 0 to change, 0 to destroy` になれば正しく取り込めている。
    - provider だけが持つ値(`deletion_protection`・`deletion_policy` など API に無い項目)や、Scheduler の既定ヘッダ(`User-Agent`)が `~ update in-place` に出ることがある。GCP 側の値が変わらないものなので、中身を見て問題無ければ許容する。
 2. 差分が出たら、コードを今の状態に合わせる(prod を変えない)。`destroy` や `must be replaced` が 1 つでも出たら apply しない。
 3. 差分 0 の plan を apply して取り込む。その後 `imports.tf` を消す。

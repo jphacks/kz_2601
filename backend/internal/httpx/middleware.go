@@ -4,9 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -17,11 +17,11 @@ const RequestIDHeader = "X-Request-Id"
 
 const maxRequestIDLen = 64
 
-type requestIDKey struct{}
-
 func RequestID(ctx context.Context) string {
-	s, _ := ctx.Value(requestIDKey{}).(string)
-	return s
+	if m := metaFrom(ctx); m != nil {
+		return m.id
+	}
+	return ""
 }
 
 func WithRequestID(next http.Handler) http.Handler {
@@ -31,7 +31,9 @@ func WithRequestID(next http.Handler) http.Handler {
 			id = newRequestID()
 		}
 		w.Header().Set(RequestIDHeader, id)
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestIDKey{}, id)))
+		m := &requestMeta{id: id}
+		m.traceID, m.spanID, m.sampled = parseTrace(r.Header.Get("traceparent"), r.Header.Get("X-Cloud-Trace-Context"))
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestMetaKey{}, m)))
 	})
 }
 
@@ -66,10 +68,16 @@ func Recover(logger *slog.Logger) func(http.Handler) http.Handler {
 				if v == nil {
 					return
 				}
+				if v == http.ErrAbortHandler {
+					panic(v)
+				}
+				// Go panic format ("panic: ...\n\ngoroutine N [running]:") so
+				// Error Reporting parses the stack (#295).
 				logger.ErrorContext(r.Context(), "panic recovered",
 					slog.Any("panic", v),
 					slog.String("requestId", RequestID(r.Context())),
-					slog.String("stack", string(debug.Stack())),
+					slog.String("stack_trace", fmt.Sprintf("panic: %v\n\n%s", v, debug.Stack())),
+					errorContext(r, http.StatusInternalServerError),
 				)
 				if !recorder.wrote {
 					Error(recorder, http.StatusInternalServerError, CodeInternal, "internal server error")
@@ -87,13 +95,21 @@ func Log(logger *slog.Logger) func(http.Handler) http.Handler {
 			recorder := asRecorder(w)
 			defer func() {
 				attrs := []any{
+					slog.String("event", RequestEvent),
 					slog.String("method", r.Method),
 					slog.String("path", r.URL.Path),
 					slog.Int("status", recorder.status),
 					slog.Duration("duration", time.Since(started)),
 					slog.String("requestId", RequestID(r.Context())),
 				}
-				logger.InfoContext(r.Context(), "request", append(attrs, ClientAttrs(r)...)...)
+				attrs = append(attrs, ClientAttrs(r)...)
+				// 5xx is ERROR so it reaches Error Reporting (#295)
+				if recorder.status >= http.StatusInternalServerError {
+					attrs = append(attrs, errorContext(r, recorder.status))
+					logger.ErrorContext(r.Context(), "request", attrs...)
+					return
+				}
+				logger.InfoContext(r.Context(), "request", attrs...)
 			}()
 			next.ServeHTTP(recorder, r)
 		})
@@ -132,8 +148,26 @@ func (rec *responseRecorder) Write(b []byte) (int, error) {
 // Unwrap lets http.ResponseController reach Flush (SSE) through the wrapper.
 func (rec *responseRecorder) Unwrap() http.ResponseWriter { return rec.ResponseWriter }
 
-func NewLogger() *slog.Logger {
-	return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: LogLevel(os.Getenv("LOG_LEVEL"))}))
+// Flush keeps `w.(http.Flusher)` working for SSE handlers behind Log/Recover.
+func (rec *responseRecorder) Flush() {
+	if !rec.wrote {
+		rec.WriteHeader(http.StatusOK)
+	}
+	_ = http.NewResponseController(rec.ResponseWriter).Flush()
+}
+
+// RequestEvent is the `event` attr of the access log line.
+// Cloud Logging filter: jsonPayload.event="http.request".
+const RequestEvent = "http.request"
+
+// errorContext is the Error Reporting `context.httpRequest` (path only: the
+// query may carry user input).
+func errorContext(r *http.Request, status int) slog.Attr {
+	return slog.Group("context", slog.Group("httpRequest",
+		slog.String("method", r.Method),
+		slog.String("url", r.URL.Path),
+		slog.Int("responseStatusCode", status),
+	))
 }
 
 func LogLevel(raw string) slog.Level {

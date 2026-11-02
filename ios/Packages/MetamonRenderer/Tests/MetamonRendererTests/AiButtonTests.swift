@@ -110,3 +110,38 @@ final class AiButtonTests: XCTestCase {
         }
     }
 }
+
+/// #446: 集計のラベル(利用者の文・例外の文面を混ぜない)。
+final class AiButtonMetricLabelTests: XCTestCase {
+    func testAvailabilityLabels() {
+        XCTAssertEqual(AIAvailability.available.metric, .available)
+        XCTAssertEqual(AIAvailability.unavailable(.deviceNotEligible).metric, .deviceNotEligible)
+        XCTAssertEqual(AIAvailability.unavailable(.appleIntelligenceNotEnabled).metric, .appleIntelligenceOff)
+        XCTAssertEqual(AIAvailability.unavailable(.modelNotReady).metric, .modelNotReady)
+        XCTAssertEqual(AIAvailability.unavailable(.osTooOld).metric, .osTooOld)
+        XCTAssertEqual(AIAvailability.unavailable(.other).metric, .other)
+    }
+
+    func testFailureReasons() {
+        XCTAssertEqual(OnDeviceAIError.invalidResponse.metricReason, .invalidResponse)
+        XCTAssertEqual(OnDeviceAIError.unavailable(.unavailable(.modelNotReady)).metricReason, .unavailable)
+        XCTAssertEqual(OnDeviceAIError.from(URLError(.unknown)).metricReason, .modelError)
+        // 利用者の入力待ちは失敗に数えない。DSL の設定の不足は bad_config
+        XCTAssertNil(AIButtonMetric.FailureReason(buildError: AIRequestBuilder.BuildError.emptyInput))
+        XCTAssertNil(AIButtonMetric.FailureReason(buildError: AIGenerateBuilder.BuildError.noRecords))
+        XCTAssertEqual(AIButtonMetric.FailureReason(buildError: AIRequestBuilder.BuildError.noOptions), .badConfig)
+        XCTAssertEqual(AIButtonMetric.FailureReason(buildError: AIGenerateBuilder.BuildError.noInstruction), .badConfig)
+        XCTAssertNil(AIButtonMetric.FailureReason(buildError: URLError(.unknown)))
+    }
+
+    #if canImport(FoundationModels)
+    func testGenerationErrorReasons() {
+        guard #available(iOS 26.0, macOS 26.0, *) else { return }
+        let ctx = LanguageModelSession.GenerationError.Context(debugDescription: "x")
+        XCTAssertEqual(OnDeviceAIError.reason(for: LanguageModelSession.GenerationError.exceededContextWindowSize(ctx)), .contextTooLong)
+        XCTAssertEqual(OnDeviceAIError.reason(for: LanguageModelSession.GenerationError.guardrailViolation(ctx)), .guardrail)
+        XCTAssertEqual(OnDeviceAIError.reason(for: LanguageModelSession.GenerationError.unsupportedLanguageOrLocale(ctx)), .unsupportedLanguage)
+        XCTAssertEqual(OnDeviceAIError.reason(for: LanguageModelSession.GenerationError.concurrentRequests(ctx)), .rateLimited)
+    }
+    #endif
+}

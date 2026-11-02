@@ -95,6 +95,10 @@ struct MetamonApp: App {
                         .task {
                             await runtime.bootstrap()
                             IntentHost.shared.markReady() // 保留中の「開く/話しかける」を実行(#80)
+                            await runtime.flushAIButtonMetrics() // #446: 前の日までの集計を送る
+                        }
+                        .onChange(of: scenePhase) { _, phase in
+                            if phase == .active { Task { await runtime.flushAIButtonMetrics() } }
                         }
                 }
             }

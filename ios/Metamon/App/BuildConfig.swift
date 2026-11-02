@@ -118,6 +118,7 @@ enum BuildConfig {
             services.sharing = appConfigURL.map { HTTPSharingClient(baseURL: $0, token: token) }
             services.releaseRequests = appConfigURL.map { HTTPReleaseRequestClient(baseURL: $0, token: token) }
             services.entitlements = appConfigURL.map { HTTPEntitlementClient(baseURL: $0, token: token) } // #314
+            services.aiButtonMetrics = appConfigURL.map { HTTPAIButtonMetricsSender(baseURL: $0, token: token) } // #446
             if let appConfigURL { services.feedback = HTTPFeedbackClient(baseURL: appConfigURL, token: token) } // #319
             #endif
             return services

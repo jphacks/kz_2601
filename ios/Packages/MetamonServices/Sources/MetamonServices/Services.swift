@@ -24,6 +24,8 @@ public struct Services {
     public var releaseRequests: (any ReleaseRequestClient)?
     /// Pro の取引をサーバーで検証・保存する(#314)。appconfig が live の時だけ(審査用ビルドは課金が無い)。
     public var entitlements: (any EntitlementClient)?
+    /// aiButton の端末内 AI の集計の送り先(#446)。appconfig が live の時だけ。審査用ビルドには無い
+    public var aiButtonMetrics: (any AIButtonMetricsSender)?
     /// アプリ内のフィードバック(#319)。live では `HTTPFeedbackClient`、モックでは `MockFeedbackClient`。
     public var feedback: any FeedbackClient = MockFeedbackClient()
     #endif
