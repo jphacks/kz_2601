@@ -93,9 +93,14 @@ func main() {
 	if paused {
 		log.Printf("ai: AI_PAUSED is on; generate/chat/text answer 503 ai_paused")
 	}
+	handler := newAIHandler(ai.NewHandler(svc), logger,
+		newAppCheck(),
+		ai.Pause(paused, logger),
+		newRateLimit(verifier),
+	)
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           withObservability(withAppCheck(ai.Pause(paused, logger)(withRateLimit(ai.NewHandler(svc), verifier))), logger),
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      time.Duration(timeoutSec)*time.Second*3 + 10*time.Second,
 	}
@@ -103,22 +108,35 @@ func main() {
 	log.Fatal(srv.ListenAndServe())
 }
 
-// withObservability adds the request id / trace, the access log (5xx as
-// ERROR) and panic recovery so 5xx and panics reach Error Reporting (#295).
-// /debug/error answers 5xx/panic on purpose on stg only.
-func withObservability(h http.Handler, logger *slog.Logger) http.Handler {
-	debug := httpx.DebugErrors(os.Getenv("APP_ENV") == "stg")
-	return httpx.Chain(h, httpx.WithRequestID, httpx.Log(logger), httpx.Recover(logger), debug)
+// newAIHandler wraps app outermost first. The order is security- and
+// cost-relevant (main_test.go): observability sees every response, App Check
+// and Pause reject before the rate limiter charges anything.
+func newAIHandler(app http.Handler, logger *slog.Logger, appCheck, pause, rateLimit func(http.Handler) http.Handler) http.Handler {
+	return httpx.Chain(app,
+		// request id / trace on every response (#295)
+		httpx.WithRequestID,
+		// access log, 5xx as ERROR (#295)
+		httpx.Log(logger),
+		// panics -> 500 + Error Reporting (#295)
+		httpx.Recover(logger),
+		// /debug/error answers 5xx/panic on stg only (#295)
+		httpx.DebugErrors(os.Getenv("APP_ENV") == "stg"),
+		// enforce rejects before the rate limiter, without spending quota (#318)
+		appCheck,
+		// AI_PAUSED: 503 before the rate limiter, nothing charged (#511)
+		pause,
+		// daily limits; innermost so only admitted requests are counted (#280)
+		rateLimit,
+	)
 }
 
-// withAppCheck verifies X-Firebase-AppCheck (#318) before the rate limiter, so
-// enforce rejects without spending quota. /health stays open.
+// newAppCheck verifies X-Firebase-AppCheck (#318). /health stays open.
 //
 //	APP_CHECK_MODE=off (default) | log | enforce
 //	APP_CHECK_APP_IDS  optional comma-separated Firebase app IDs to accept
 //
 // docs/infra/app-check.md
-func withAppCheck(h http.Handler) http.Handler {
+func newAppCheck() func(http.Handler) http.Handler {
 	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	mw, mode, err := appcheck.FromEnv(os.Getenv, httpx.NewLogger(), func() (appcheck.Verifier, error) {
 		return appcheck.NewFirebaseVerifier(context.Background(), project)
@@ -127,18 +145,20 @@ func withAppCheck(h http.Handler) http.Handler {
 		log.Fatalf("ai: %v", err)
 	}
 	log.Printf("ai: app check mode=%s", mode)
-	checked := mw(h)
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/health" || r.URL.Path == "/healthz" {
-			h.ServeHTTP(w, r)
-			return
-		}
-		checked.ServeHTTP(w, r)
-	})
+	return func(h http.Handler) http.Handler {
+		checked := mw(h)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/health" || r.URL.Path == "/healthz" {
+				h.ServeHTTP(w, r)
+				return
+			}
+			checked.ServeHTTP(w, r)
+		})
+	}
 }
 
-// withRateLimit puts the per-user / per-IP / global daily limits (#280) in
-// front of POST /v1/generate and /v1/chat.
+// newRateLimit returns the per-user / per-IP / global daily limits (#280) for
+// POST /v1/generate and /v1/chat (identity when off).
 //
 //	RATE_LIMIT=off|on   default: on when GOOGLE_CLOUD_PROJECT is set (Cloud Run)
 //	                    or AUTH_MODE=dev, off for a bare local run
@@ -147,17 +167,18 @@ func withAppCheck(h http.Handler) http.Handler {
 //	FIRESTORE_DATABASE  database ID (default "(default)"; internal/fsenv)
 //
 // Limits/weights: ratelimit.ConfigFromEnv.
-func withRateLimit(h http.Handler, verifier auth.IdentityVerifier) http.Handler {
+func newRateLimit(verifier auth.IdentityVerifier) func(http.Handler) http.Handler {
+	off := func(h http.Handler) http.Handler { return h }
 	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	mode := env("AUTH_MODE", auth.ModeFirebase)
 	switch os.Getenv("RATE_LIMIT") {
 	case "off", "0", "false":
 		log.Printf("ai: RATE_LIMIT=off; generate/chat are not limited")
-		return h
+		return off
 	case "":
 		if project == "" && mode != auth.ModeDev {
 			log.Printf("ai: rate limit off (no GOOGLE_CLOUD_PROJECT); set RATE_LIMIT=on to force")
-			return h
+			return off
 		}
 	}
 	cfg, err := ratelimit.ConfigFromEnv(os.Getenv)
@@ -192,5 +213,5 @@ func withRateLimit(h http.Handler, verifier auth.IdentityVerifier) http.Handler 
 		pro = entitlement.NewProChecker(entitlement.NewFirestore(client), policy.Environments)
 	}
 	log.Printf("ai: rate limit on (store=%s env=%q limits=%+v weights=%+v pro=%v)", storeName, cfg.Env, cfg.Limits, cfg.Weights, pro != nil)
-	return ratelimit.New(cfg, store, pro).Middleware(verifier)(h)
+	return ratelimit.New(cfg, store, pro).Middleware(verifier)
 }
