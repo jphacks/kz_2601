@@ -297,12 +297,36 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 	if body.ClientID != "" {
 		rec.ID = store.IDFromClientID(clientKey)
 	}
+	if ent.Single {
+		h.upsertSingle(w, r, recordSet(r, cur, ent, eid), rec)
+		return
+	}
 	out, _, err := h.store.CreateRecord(r.Context(), recordSet(r, cur, ent, eid), rec)
 	if err != nil {
 		fail(w, mapStoreErr(err, "entity"))
 		return
 	}
 	httpx.WriteJSON(w, http.StatusCreated, toRecordOut(out))
+}
+
+// upsertSingle (#267): a single entity keeps one record per user under a fixed
+// id, whatever clientId the client sent. Creating it again (another device, a
+// build that does not know single and adds) overwrites its data: 200, not 201.
+func (h *Handler) upsertSingle(w http.ResponseWriter, r *http.Request, rs store.RecordSet, rec store.Record) {
+	rec.ID = store.IDFromClientID(dsl.SingleRecordKey)
+	out, created, err := h.store.CreateRecord(r.Context(), rs, rec)
+	if err == nil && !created {
+		out, err = h.store.UpdateRecord(r.Context(), rs, rec.ID, rec.Data)
+	}
+	if err != nil {
+		fail(w, mapStoreErr(err, "entity"))
+		return
+	}
+	status := http.StatusCreated
+	if !created {
+		status = http.StatusOK
+	}
+	httpx.WriteJSON(w, status, toRecordOut(out))
 }
 
 func (h *Handler) getRecord(w http.ResponseWriter, r *http.Request) {

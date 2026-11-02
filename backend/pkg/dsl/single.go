@@ -12,12 +12,13 @@ import (
 // field with {"setting": "<fieldId>"}. Before the first save the record is
 // empty and a setting reads the field's defaultValue.
 //
-// Storage: iOS creates the record with the fixed clientId SingleClientID, so
-// appconfig stores it under one document id per user (records.go upserts).
+// Storage: appconfig stores a single entity's record under one fixed
+// document id per user (store.IDFromClientID(SingleRecordKey)) whatever
+// clientId iOS sent, and a create on an existing record overwrites its data
+// (appconfig records.go). Two devices saving first both land on that one doc.
 
-// SingleClientID is the clientId (and the source of the fixed record id) of a
-// single entity's record.
-const SingleClientID = "single"
+// SingleRecordKey derives the fixed record id of a single entity.
+const SingleRecordKey = "single"
 
 // SingleEntities lists the ids of single entities, in order.
 func (a *App) SingleEntities() []string {

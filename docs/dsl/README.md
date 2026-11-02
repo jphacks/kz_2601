@@ -400,7 +400,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 | フォーム | `screen.entity` が single の画面は、開くと**既存の 1 件の編集**(無ければ初期値の新規)。保存は追加でなく上書き。削除ボタン・「続けて追加」は出さない。開き方は toolbar / button の `navigate`(recordId は要らない) |
 | 読む | 式 `{"setting":"<fieldId>"}`(expressions.md §2)。行の無い所(`stat.value`・`progressBar.value`・通知の `when`)でも、別の entity の computed からでも読める。1 つの field id は 1 つの single entity にだけ置く |
 | 使えない所(backend が拒否) | single の entity を `list` / `table` / `stat`・`progressBar` などの `entity`、式の `agg`、ref / refs の `refEntity`、`deleteRecord` / `export` に使う。`scope` shared / public・`retentionDays`・`match`・`hidden` の field |
-| 保存の形 | iOS は single の entity のレコードを `clientId: "single"` で作る。appconfig は single の entity の `POST .../records` を **clientId によらず固定の doc id**(`IDFromClientID("single")`)に置き、既にあればその data で上書きする(201 でなく 200)。private の entity だけなので置き場は利用者ごとに 1 つ |
+| 保存の形 | appconfig は single の entity の `POST .../records` を **clientId によらず固定の doc id**(`IDFromClientID("single")`)に置き、既にあればその data で上書きする(201 でなく 200)。private の entity だけなので置き場は利用者ごとに 1 つ。iOS の作り方・同期は他の entity と同じ(2 台が同時に初回保存しても同じ doc に入り、後の保存が勝つ) |
 | 2 件以上ある時 | (古い版が「追加」した等)`createdAt` が最も新しい 1 件(同じなら後の方)を使う。式・フォームとも同じ |
 
 - AI: `backend/internal/ai/single_rules.go`。ai-eval の `single` / `setting`(`single_cases.json`、`m0disc_cases.json` の `d_period`)。
