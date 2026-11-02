@@ -1,6 +1,12 @@
 import Foundation
 import MetamonDSL
 
+/// `Services` に機能ごとのサービスを足すためのキー(#516)。1 機能 = 1 キー + `Services+<機能>.swift` の computed property。
+public protocol ServiceKey {
+    associatedtype Value
+    static var defaultValue: Value { get }
+}
+
 /// 全サービスの束(DI コンテナ)。アプリ本体の `BuildConfig.make(environment:)` が起動時に1回だけ組み立て、
 /// SwiftUI Environment(`\.services`)と `AppRuntime` に渡す。利用側は protocol にしか依存しない。
 public struct Services {
@@ -13,22 +19,8 @@ public struct Services {
     public var notifications: any NotificationScheduler
     /// true なら起動時にサーバー(appconfig)から DSL を取得し、ホットリロードを開始する。
     public var isLive: Bool
-    #if !APP_STORE_REVIEW // 審査用ビルドはシェア / 探す / リリース申請をバイナリから外す(#245)
-    /// シェア / 「探す」(#49 #50)。appconfig が live の時だけ(モックでは nil = 導線を出さない)。
-    public var sharing: (any SharingClient)?
-    #endif
-    /// アカウント削除(#119)。live では `HTTPAccountClient`、それ以外はモック(成功のみ)。
-    public var account: any AccountClient = MockAccountClient()
-    #if !APP_STORE_REVIEW
-    /// リリース申請(#76)。sharing と同じく live の時だけ。
-    public var releaseRequests: (any ReleaseRequestClient)?
-    /// Pro の取引をサーバーで検証・保存する(#314)。appconfig が live の時だけ(審査用ビルドは課金が無い)。
-    public var entitlements: (any EntitlementClient)?
-    /// aiButton の端末内 AI の集計の送り先(#446)。appconfig が live の時だけ。審査用ビルドには無い
-    public var aiButtonMetrics: (any AIButtonMetricsSender)?
-    /// アプリ内のフィードバック(#319)。live では `HTTPFeedbackClient`、モックでは `MockFeedbackClient`。
-    public var feedback: any FeedbackClient = MockFeedbackClient()
-    #endif
+    /// 機能ごとのサービス(`ServiceKey` で引く)。プロパティは `<機能>/Services+<機能>.swift` の extension に置く(#516)。
+    private var storage: [ObjectIdentifier: Any] = [:]
 
     public init(
         auth: any AuthService,
@@ -48,6 +40,15 @@ public struct Services {
         self.transcriber = transcriber
         self.notifications = notifications
         self.isLive = isLive
+    }
+
+    /// `EnvironmentValues` と同じ形。未設定なら `K.defaultValue`。
+    public subscript<K: ServiceKey>(_ key: K.Type) -> K.Value {
+        get {
+            if let value = storage[ObjectIdentifier(key)], let typed = value as? K.Value { return typed }
+            return K.defaultValue
+        }
+        set { storage[ObjectIdentifier(key)] = newValue }
     }
 }
 
