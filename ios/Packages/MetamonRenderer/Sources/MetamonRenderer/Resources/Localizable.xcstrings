@@ -4012,6 +4012,40 @@
           }
         }
       }
+    },
+    "通報する": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Report"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通報する"
+          }
+        }
+      }
+    },
+    "投稿者をブロック": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Block poster"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "投稿者をブロック"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

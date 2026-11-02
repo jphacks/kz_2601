@@ -58,6 +58,7 @@ struct ListLeaf: View {
                                     Task { await rt.run(Action(type: .deleteRecord, entity: entityId), ctx.actionContext(recordId: row.id)) }
                                 }
                             }
+                            ModerationMenuItems(entity: entityId, record: row)
                         }
                 }
             }

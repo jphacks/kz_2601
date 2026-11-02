@@ -111,6 +111,8 @@ type PublicApp struct {
 	DSL       json.RawMessage `json:"dsl"`
 	CreatedAt time.Time       `json:"createdAt"`
 	UpdatedAt time.Time       `json:"updatedAt"`
+	// ModerationState: unpublished by the operator (#321). Kept across PublishApp.
+	ModerationState
 }
 
 // Commit is one new DSL version to append.
@@ -161,6 +163,7 @@ type Store interface {
 	Purger          // physical app deletion (purge.go)
 	AccountPurger   // physical erasure of deleted accounts (account_purge.go)
 	Marks           // per-user like / save toggles on shared records (marks.go)
+	Moderation      // reports, blocks, operator unpublish (moderation.go, #321)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).
