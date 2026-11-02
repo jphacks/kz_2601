@@ -16,6 +16,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/appstore/appstoretest"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
 
 const (
@@ -221,7 +222,7 @@ func TestHandler(t *testing.T) {
 	}
 	tampered := good[:len(good)-4] + "AAAA"
 	if w := do("u1", "POST", "/v1/me/entitlements/apple", map[string]string{"signedTransaction": tampered}); w.Code != 422 ||
-		!strings.Contains(w.Body.String(), `"reason":"signature"`) || !strings.Contains(w.Body.String(), CodeInvalidTransaction) {
+		!strings.Contains(w.Body.String(), `"reason":"signature"`) || !strings.Contains(w.Body.String(), httpx.CodeInvalidTransaction) {
 		t.Fatalf("tampered: %d %s", w.Code, w.Body)
 	}
 	w := do("u1", "POST", "/v1/me/entitlements/apple", map[string]string{"signedTransaction": good})
@@ -233,7 +234,7 @@ func TestHandler(t *testing.T) {
 		t.Fatalf("body %s", w.Body)
 	}
 	if w := do("u2", "POST", "/v1/me/entitlements/apple", map[string]string{"signedTransaction": good}); w.Code != 409 ||
-		!strings.Contains(w.Body.String(), CodeOwnedByOther) {
+		!strings.Contains(w.Body.String(), httpx.CodeTransactionOwnedByOther) {
 		t.Fatalf("other: %d %s", w.Code, w.Body)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/metrics"
 )
 
@@ -40,9 +41,9 @@ func generateOutcome(res *Result, err error) string {
 			return GenFailed
 		}
 		switch {
-		case ge.Code == "refused":
+		case ge.Code == httpx.CodeRefused:
 			return GenRefused
-		case ge.Code == "generation_failed", ge.Code == "rate_limited": // rate_limited here = Claude's 429
+		case ge.Code == httpx.CodeGenerationFailed, ge.Code == httpx.CodeRateLimited: // rate_limited here = Claude's 429
 			return GenFailed
 		case ge.Status >= 400 && ge.Status < 500:
 			return GenBadRequest

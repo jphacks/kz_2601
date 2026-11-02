@@ -7,7 +7,7 @@ info:
   version: 0.1.0
   description: |
     音声/文字 → Claude → DSL JSON 生成 → appconfig へ反映。
-    - 認証・エラー形式・ページングは appconfig と同一 (`openapi-appconfig.yaml` の `Error` を再利用)。
+    - 認証・エラー形式・ページングは appconfig と同一。エラーの封筒は同じ形で、`code` の一覧だけ ai 用 (`components/schemas/Error`・#523)。
     - ai は受け取った Bearer と `X-Firebase-AppCheck` をそのまま appconfig へ転送する。
     - App Check(#318): `APP_CHECK_MODE=enforce` の時、`X-Firebase-AppCheck` が無い・無効なら(上限を数える前に)401 `app_check_failed`。off / log では無くても通る。`/health` は対象外。`docs/infra/app-check.md`
     - `POST /generate`・`POST /chat`・`POST /text` は ai 自身も ID トークンを検証し、利用者ごと・1 日ごとの上限を数える (#280)。
@@ -67,22 +67,22 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/GenerateResponse' } } }
         '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
         '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
-        '404': { description: appId が存在しない, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '404': { description: appId が存在しない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '409':
           description: baseVersion 指定時に再試行後も競合
-          content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
         '422':
           description: 生成失敗 (再生成・fallback とも不成立)。iOS は「うまく聞き取れませんでした」を再生
           content:
             application/json:
-              schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' }
+              schema: { $ref: '#/components/schemas/Error' }
               example:
                 error:
                   code: generation_failed
                   message: could not produce a valid app from the request
                   details: { transcript: えーっと, attempts: 2, problems: ['screen "home" components[0]: list entity "x" does not exist'] }
         '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { description: '上流 (Claude) 障害 / 運営が AI を一時停止中 (`ai_paused`・#511)', content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '503': { description: '上流 (Claude) 障害 / 運営が AI を一時停止中 (`ai_paused`・#511)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /chat:
     post:
@@ -173,8 +173,8 @@ paths:
         '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
         '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
         '429': { $ref: '#/components/responses/RateLimited' }
-        '502': { description: Claude の出力がスキーマに合わず 2 回とも失敗 (generation_failed), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
-        '503': { description: '上流 (Claude) 障害 / 運営が AI を一時停止中 (`ai_paused`・#511)', content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '502': { description: Claude の出力がスキーマに合わず 2 回とも失敗 (generation_failed), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: '上流 (Claude) 障害 / 運営が AI を一時停止中 (`ai_paused`・#511)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /chat/{appId}:
     delete:
@@ -234,11 +234,11 @@ paths:
                     meta: { model: claude-sonnet-5-5, usage: { inputTokens: 420, outputTokens: 60 }, latencyMs: 1800 }
         '400': { $ref: './openapi-appconfig.yaml#/components/responses/BadRequest' }
         '401': { $ref: './openapi-appconfig.yaml#/components/responses/Unauthenticated' }
-        '413': { description: input が 4096 バイト / 本文が 16 KB を超えた (payload_too_large), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
-        '422': { description: モデルが書くのを断った (refused), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '413': { description: input が 4096 バイト / 本文が 16 KB を超えた (payload_too_large), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { description: モデルが書くのを断った (refused), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '429': { $ref: '#/components/responses/RateLimited' }
-        '502': { description: 出力が形に合わない (bad_output), content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
-        '503': { description: '上流 (Claude) 障害 / 運営が AI を一時停止中 (`ai_paused`・#511)', content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '502': { description: 出力が形に合わない (bad_output), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: '上流 (Claude) 障害 / 運営が AI を一時停止中 (`ai_paused`・#511)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /transcribe:
     post:
@@ -266,8 +266,8 @@ paths:
                   text: { type: string }
                   language: { type: string }
                   durationMs: { type: integer }
-        '413': { description: 音声が大きすぎる, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
-        '501': { description: 未設定, content: { application/json: { schema: { $ref: './openapi-appconfig.yaml#/components/schemas/Error' } } } }
+        '413': { description: 音声が大きすぎる, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '501': { description: 未設定, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /health:
     get:
@@ -289,7 +289,7 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: './openapi-appconfig.yaml#/components/schemas/Error'
+              - $ref: '#/components/schemas/Error'
               - type: object
                 properties:
                   error:
@@ -302,6 +302,43 @@ components:
               message: 今日の利用上限(30)に達しました。10月26日 0:00からまた使えます。サインインすると上限が増えます。
               details: { scope: user, tier: anonymous, limit: 30, used: 29, remaining: 1, resetAt: '2026-10-25T15:00:00Z', retryAfterSec: 3600 }
   schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: |
+                機械可読コード。ai が返すものだけ。`backend/internal/httpx/codes.go` と一致することをテストで確かめる(#523)。
+                appconfig から返ったエラーはコードをそのまま中継する(`account_deleted` など)。
+              enum:
+                - account_deleted
+                - ai_paused
+                - app_check_failed
+                - appconfig_error
+                - appconfig_unreachable
+                - bad_output
+                - bad_request
+                - forbidden
+                - generation_failed
+                - internal
+                - invalid_dsl
+                - not_found
+                - payload_too_large
+                - rate_limited
+                - refused
+                - timeout
+                - unauthenticated
+                - upstream_timeout
+                - upstream_unavailable
+                - version_conflict
+            message: { type: string }
+            details: { type: object, additionalProperties: true }
+            requestId: { type: string }
     RateLimitDetails:
       type: object
       required: [scope, tier, limit, used, remaining, resetAt, retryAfterSec]
