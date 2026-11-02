@@ -38,6 +38,7 @@ gh pr ready            # Draft 解除
 - `feature/*` → `develop`: Squash merge 推奨(履歴が1コミット=1PRになる)。タイトルは Conventional Commits に直す。
 - `develop` → `main`: **実機(iPhone 13)で E2E を通してから**。Merge commit(squash しない。develop と main の履歴を揃える)。マージすると Cloud Run prod に自動デプロイ。
 - 変更を触らない領域の CI(例: iOS だけ触った PR の `backend-ci`)は自動で skip され、required check は満たされる。
+- `scripts-ci`(`.github/workflows/scripts-ci.yml`)は `*.sh`・`scripts/**`・`.github/workflows/**` を触った時だけ走り、shellcheck・`scripts/ai-cost-test.sh`・actionlint を回す。required check ではない(ローカルでは `git ls-files -z '*.sh' | xargs -0 shellcheck` と `actionlint`)。
 
 ## hotfix / release
 
