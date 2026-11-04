@@ -153,7 +153,7 @@ Our first release. Set up a tracker made just for you by talking, and adjust it 
 
 | 欄 | 値 |
 |---|---|
-| サポート URL | https://tailor-it.app/ |
+| サポート URL | https://tailor-it.app/contact |
 | マーケティング URL | https://tailor-it.app/ |
 | 著作権 | 2026 高岡己太朗 |
 | プライバシーポリシー URL | https://tailor-it.app/privacy |
@@ -198,6 +198,7 @@ App Store Connect の上限と、上の文の文字数(Python の `len` で数�
 |---|---|---|
 | プライマリ | 仕事効率化(Productivity) | 記録・チェックリスト・リマインダーが中心。「開発ツール(Developer Tools)」にはしない |
 | セカンダリ | ライフスタイル(Lifestyle) | 習慣・家計簿・買い物 |
+| 年齢区分 | **13+ に上書き(2026-11-03 決定)** | 質問票の答え(下)から出る区分より上の 13+ を、App Store Connect の「より高い年齢区分に変更」で選ぶ。プライバシーポリシー 5 章(13 歳未満は対象外・13〜17 歳は保護者の同意)に合わせる |
 
 ### 年齢区分の質問票の答え(審査用の版)
 
@@ -240,7 +241,7 @@ App Store Connect の上限と、上の文の文字数(Python の `len` で数�
 - [ ] 書いた機能が審査用の版にある(1 章の照合表)。共有・探す・ヘルスケア・道のりの記録・撮影・Web 表示・課金を書いていない
 - [ ] Pro の段落と、1 日の上限の数(「1 日 3 つ」)を書いていない。App Store Connect にサブスクリプションを登録していない
 - [ ] 文字数が上限に収まる(2 章の「文字数」。文を変えたら数え直す)
-- [ ] 利用規約・プライバシーポリシー・サポート・マーケティングの URL が開ける(https://tailor-it.app/ ・ /terms ・ /privacy)。サポートのページに問い合わせ先がある(#331・#320)
+- [ ] 利用規約・プライバシーポリシー・サポート・マーケティングの URL が開ける(https://tailor-it.app/ ・ /contact ・ /terms ・ /privacy)。サポートのページに問い合わせ先がある(#331・#320)
 - [ ] 著作権「2026 高岡己太朗」を入れた
 - [ ] App ID で MusicKit を有効にした(しないなら説明文の Apple Music の行を消す)
 - [ ] 年齢区分の質問票に 4 章のとおり答え、13+ に上げるかを決めた(#329・[age-rating.md](age-rating.md) の 7 章)

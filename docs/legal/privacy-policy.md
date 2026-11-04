@@ -89,6 +89,7 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 
 ## 5. お子さまの利用
 - 本アプリは 13 歳未満の方を対象にしていません。
+- 13 歳以上 18 歳未満の方は、保護者の同意を得た上で使ってください。
 
 ## 6. 改定
 - 本ポリシーを変える場合はアプリ内でお知らせします。AI に送る情報や送り先を変える場合は、改めて同意をいただきます。
@@ -114,5 +115,5 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 - **Crash reports:** When the app crashes, Google's Firebase Crashlytics receives the crash location (stack trace), crash time, device model, OS and app version, device state (free memory/disk, orientation), a per-installation identifier and your user ID (uid). **What you say, your records and your app designs are never included.** On by default; turn it off in Settings > Privacy ("Send crash reports"). Google deletes crash reports 90 days after receipt (Crashlytics' standard retention period).
 - **No ads, tracking or analytics SDKs.** We do not sell data.
 - **Deletion:** Delete your account in Settings. Server data becomes unavailable immediately and is erased within 30 days. Posts in apps shared with others remain. Erased data may remain in backups for up to 14 more days until they expire. Backups are used only for disaster recovery; if we restore one, we erase previously deleted data again.
-- **Children:** Not intended for children under 13.
+- **Children:** Not intended for children under 13. Users aged 13 to 17 must have consent from a parent or guardian.
 - **Contact:** support@tailor-it.app

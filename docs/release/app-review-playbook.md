@@ -196,7 +196,7 @@ Thank you for the review. Regarding Guideline 1.2:
 <Only after #329 has confirmed it: "Requests and outputs are checked so that the app does not create objectionable screens or text.">
 <!-- 確かめていない事実は書かない(2.3.1)。#329 で生成内容のフィルタを確かめるまで、上の行は入れない -->
 
-- Users can contact us through the support page: <support URL>.
+- Users can contact us through the support page: https://tailor-it.app/contact.
 
 If you would still like us to add a way to report AI-generated content, please let us know. We will add it in a new build.
 
