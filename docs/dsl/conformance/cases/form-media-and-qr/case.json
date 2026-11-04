@@ -1,0 +1,94 @@
+{
+  "dsl": {
+    "schemaVersion": 1,
+    "app": {
+      "name": "メディア"
+    },
+    "initialScreen": "form",
+    "entities": [
+      {
+        "id": "memo",
+        "name": "メモ",
+        "titleField": "title",
+        "fields": [
+          {
+            "id": "title",
+            "name": "題",
+            "type": "string"
+          },
+          {
+            "id": "clip",
+            "name": "動画",
+            "type": "video"
+          },
+          {
+            "id": "voice",
+            "name": "録音",
+            "type": "audio"
+          }
+        ]
+      }
+    ],
+    "screens": [
+      {
+        "id": "form",
+        "title": "メモ",
+        "entity": "memo",
+        "components": [
+          {
+            "type": "textField",
+            "id": "t",
+            "area": "A1:F1",
+            "field": "title",
+            "label": "題"
+          },
+          {
+            "type": "videoField",
+            "id": "v",
+            "area": "A2:F4",
+            "field": "clip",
+            "label": "動画を撮る",
+            "maxDuration": 30
+          },
+          {
+            "type": "audioRecorder",
+            "id": "a",
+            "area": "A5:F6",
+            "field": "voice",
+            "label": "録音"
+          },
+          {
+            "type": "qrCode",
+            "id": "qr",
+            "area": "A7:F9",
+            "text": "https://example.com",
+            "label": "QR"
+          }
+        ]
+      },
+      {
+        "id": "player",
+        "title": "再生",
+        "components": [
+          {
+            "type": "videoPlayer",
+            "id": "vp",
+            "area": "A1:F6",
+            "url": "https://example.com/a.mp4"
+          },
+          {
+            "type": "textField",
+            "id": "outside",
+            "area": "A7:F7",
+            "field": "title"
+          }
+        ]
+      }
+    ]
+  },
+  "device": {
+    "now": "2026-11-12T12:00:00+09:00",
+    "timeZone": "Asia/Tokyo",
+    "locale": "ja_JP"
+  }
+}

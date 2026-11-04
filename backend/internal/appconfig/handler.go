@@ -32,6 +32,7 @@ const (
 var idRe = regexp.MustCompile(`^[A-Za-z0-9_.:-]{1,128}$`)
 
 // Handler serves /v1/*. Authentication is applied by the caller (auth.Middleware).
+// Fields are grouped per feature (blank lines keep gofmt alignment local).
 type Handler struct {
 	store store.Store
 
@@ -40,20 +41,28 @@ type Handler struct {
 
 	eventsMax time.Duration // lifetime of one GET /events stream
 
-	legacyBefore time.Time // LegacyMembersEnv (members.go)
+	legacyBefore time.Time // LegacyMembersEnv: set by members.go
+
+	feedbackPerDay int // FEEDBACK_DAILY_LIMIT: set by feedback.go
 }
 
+// routeGroups holds the feature routes. Each feature file registers its own
+// from init(), so adding a feature does not edit New().
+var routeGroups []func(h *Handler, mux *http.ServeMux)
+
+// registerRoutes adds a feature's routes (and its Handler settings).
+func registerRoutes(f func(h *Handler, mux *http.ServeMux)) { routeGroups = append(routeGroups, f) }
+
 // New builds the v1 router (a ServeMux so the caller can probe matches).
+// Core routes live here; feature routes come from routeGroups.
 func New(s store.Store) *http.ServeMux {
-	h := &Handler{store: s, cache: map[string]*dsl.App{}, eventsMax: eventsMaxStream(), legacyBefore: legacyMembersBefore()}
+	h := &Handler{store: s, cache: map[string]*dsl.App{}, eventsMax: eventsMaxStream()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/apps", h.listApps)
 	mux.HandleFunc("POST /v1/apps", h.createApp)
 	mux.HandleFunc("GET /v1/apps/{appId}", h.getApp)
 	mux.HandleFunc("PATCH /v1/apps/{appId}", h.patchApp)
 	mux.HandleFunc("DELETE /v1/apps/{appId}", h.deleteApp)
-	mux.HandleFunc("PUT /v1/apps/order", h.reorderApps)               // #277 manage.go
-	mux.HandleFunc("POST /v1/apps/{appId}/duplicate", h.duplicateApp) // #277 manage.go
 
 	mux.HandleFunc("GET /v1/apps/{appId}/dsl", h.getDSL)
 	mux.HandleFunc("GET /v1/apps/{appId}/events", h.events)
@@ -72,27 +81,10 @@ func New(s store.Store) *http.ServeMux {
 	mux.HandleFunc("GET /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.getRecord)
 	mux.HandleFunc("PATCH /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.patchRecord)
 	mux.HandleFunc("DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.deleteRecord)
-	mux.HandleFunc("PUT /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}", h.putMark)       // #255: marks.go
-	mux.HandleFunc("DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}", h.deleteMark) // #255
 
-	// share links (#49) / public catalog (#50): share.go
-	mux.HandleFunc("POST /v1/apps/{appId}/share", h.createShare)
-	mux.HandleFunc("GET /v1/shares/{token}", h.getShare)
-	mux.HandleFunc("DELETE /v1/shares/{token}", h.revokeShare)
-	mux.HandleFunc("POST /v1/shares/{token}/import", h.importShare)
-	mux.HandleFunc("POST /v1/apps/{appId}/publish", h.publishApp)
-	mux.HandleFunc("DELETE /v1/apps/{appId}/publish", h.unpublishApp)
-	// shared-app participants (#254): members.go
-	mux.HandleFunc("GET /v1/apps/{appId}/members", h.listMembers)
-	mux.HandleFunc("DELETE /v1/apps/{appId}/members/{uid}", h.removeMember)
-	mux.HandleFunc("GET /v1/public-apps", h.listPublicApps)
-	mux.HandleFunc("POST /v1/public-apps/{id}/install", h.installPublicApp)
-
-	mux.HandleFunc("DELETE /v1/me", h.deleteMe) // account deletion (#119): account.go
-	// release requests (#76): release.go
-	mux.HandleFunc("POST /v1/apps/{appId}/release-requests", h.createReleaseRequest)
-	mux.HandleFunc("GET /v1/apps/{appId}/release-requests", h.listAppReleaseRequests)
-	mux.HandleFunc("GET /v1/release-requests", h.listMyReleaseRequests)
+	for _, register := range routeGroups {
+		register(h, mux)
+	}
 	return mux
 }
 
@@ -227,9 +219,9 @@ func (p paging) next(got int) string {
 }
 
 // ensureApp loads the app, seeding version 1 for unknown ids: iOS uses a
-// device-fixed UUID as appId and never calls POST /apps first. If another
-// user has published that appId (apps_public/{appId}, see publish), the seed
-// is their DSL instead of dsl.Initial — this is how a shared app is
+// device-fixed UUID as appId and never calls POST /apps first. If the app's
+// creator has published that appId (apps_public/{appId}, see publish), the
+// seed is their DSL instead of dsl.Initial — this is how a shared app is
 // "installed" under the caller's own uid.
 func (h *Handler) ensureApp(r *http.Request, appID string) (*store.App, error) {
 	ctx, uid := r.Context(), uidOf(r)
@@ -244,10 +236,12 @@ func (h *Handler) ensureApp(r *http.Request, appID string) (*store.App, error) {
 		return nil, err
 	}
 	name := init.App.Name
-	if pub, err := h.store.GetPublicApp(ctx, appID); err == nil {
-		raw, name = pub.DSL, pub.Name
-	} else if !errors.Is(err, store.ErrNotFound) {
+	pub, err := h.creatorMirror(ctx, appID)
+	if err != nil {
 		return nil, err
+	}
+	if pub != nil && !pub.Hidden { // #321: not from an app the operator unpublished
+		raw, name = pub.DSL, pub.Name
 	}
 	app, _, err := h.store.EnsureApp(ctx, uid, appID, raw, name)
 	return app, err
@@ -255,10 +249,19 @@ func (h *Handler) ensureApp(r *http.Request, appID string) (*store.App, error) {
 
 // publish mirrors a committed DSL to apps_public/{appId} when it has shared
 // entities, so other users opening the same appId get it from ensureApp.
+// Only the app's creator (app_owners) publishes; other copies stay private.
 // Failures are logged, not returned: the owner's private commit already
 // succeeded, and an appId first published by someone else is left alone.
 func (h *Handler) publish(r *http.Request, appID string, app *dsl.App, raw json.RawMessage, version int) {
 	if !app.HasSharedEntity() {
+		return
+	}
+	owner, err := h.appOwner(r.Context(), appID)
+	if err != nil {
+		slog.Error("appconfig: publish owner lookup failed", slog.String("appId", appID), slog.Any("error", err))
+		return
+	}
+	if owner != uidOf(r) {
 		return
 	}
 	ok, err := h.store.PublishApp(r.Context(), uidOf(r), appID, raw, app.App.Name, version)

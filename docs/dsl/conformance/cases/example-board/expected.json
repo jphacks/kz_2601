@@ -1,0 +1,247 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 10
+          },
+          "children" : [
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "push",
+                    "screen" : "item_form",
+                    "type" : "navigate"
+                  },
+                  "on" : "rowTap"
+                }
+              ],
+              "id" : null,
+              "props" : {
+                "emptyText" : "まだ投稿がありません",
+                "entity" : "items",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "all",
+          "props" : {
+            "title" : "みんなの投稿"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "item_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "投稿"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "tab:home"
+      },
+      "title" : "落とし物掲示板",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "mine",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "count",
+          "props" : {
+            "aggregate" : "count",
+            "entity" : "items",
+            "label" : "自分の投稿",
+            "unavailable" : false,
+            "value" : "0 件"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 10
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "columns" : [
+                  "落とし物",
+                  "拾った場所",
+                  "投稿日時"
+                ],
+                "entity" : "items",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "table"
+            }
+          ],
+          "id" : "list",
+          "props" : {
+            "title" : "投稿したもの"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "mine",
+        "stack" : "tab:mine"
+      },
+      "title" : "自分の投稿",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "items",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "solved" : false
+        }
+      },
+      "id" : "item_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 9
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "title",
+                "label" : "落とし物",
+                "placeholder" : "青い傘",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "place",
+                "label" : "拾った場所",
+                "placeholder" : "図書館の入口",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "photo",
+                "label" : "写真",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "photoField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "solved",
+                "label" : "持ち主が見つかった",
+                "value" : false
+              },
+              "state" : "rendered",
+              "type" : "toggle"
+            }
+          ],
+          "id" : "fields",
+          "props" : {
+            "title" : "内容"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "item_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "items",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "落とし物",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

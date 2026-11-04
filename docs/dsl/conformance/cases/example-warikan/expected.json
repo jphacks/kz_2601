@@ -1,0 +1,371 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "aggregate" : "sum",
+                "entity" : "expenses",
+                "field" : "amount",
+                "format" : "currency",
+                "label" : "合計",
+                "unavailable" : false,
+                "value" : "¥0"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "format" : "currency",
+                "label" : "1人あたり",
+                "unavailable" : true,
+                "value" : "—"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            }
+          ],
+          "id" : "summary",
+          "state" : "rendered",
+          "type" : "hstack"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 3
+          },
+          "children" : [
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "push",
+                    "screen" : "member_form",
+                    "type" : "navigate"
+                  },
+                  "on" : "rowTap"
+                }
+              ],
+              "id" : null,
+              "props" : {
+                "emptyText" : "メンバーを追加してください",
+                "entity" : "members",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "members",
+          "props" : {
+            "title" : "メンバー"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 5,
+            "rowSpan" : 3
+          },
+          "id" : "settle",
+          "props" : {
+            "entity" : "members",
+            "title" : "精算",
+            "transfers" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "settlement"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 8,
+            "rowSpan" : 2
+          },
+          "children" : [
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "push",
+                    "screen" : "expense_form",
+                    "type" : "navigate"
+                  },
+                  "on" : "rowTap"
+                }
+              ],
+              "id" : null,
+              "props" : {
+                "emptyText" : "まだ支出がありません",
+                "entity" : "expenses",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "recent",
+          "props" : {
+            "title" : "支出"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "expense_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add_expense",
+          "props" : {
+            "label" : "支出を追加"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "旅行の割り勘",
+      "toolbar" : [
+        {
+          "action" : {
+            "presentation" : "sheet",
+            "screen" : "member_form",
+            "type" : "navigate"
+          },
+          "label" : "メンバー追加"
+        }
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "expenses",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "date" : "2026-11-12"
+        }
+      },
+      "id" : "expense_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 8
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "title",
+                "label" : "内容",
+                "placeholder" : "夕食",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "amount",
+                "label" : "金額",
+                "unit" : "円",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "numberField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "payer",
+                "input" : "ref",
+                "label" : "払った人",
+                "options" : [
+
+                ],
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "picker"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "split_with",
+                "input" : "refs",
+                "label" : "割り勘する人(未選択 = 全員)",
+                "options" : [
+
+                ],
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "picker"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "date",
+                "label" : "日付",
+                "value" : "2026-11-12"
+              },
+              "state" : "rendered",
+              "type" : "datePicker"
+            }
+          ],
+          "id" : "fields",
+          "props" : {
+            "title" : "内容"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "expense_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "expenses",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "支出を記録",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "members",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+
+        }
+      },
+      "id" : "member_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 3
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "name",
+                "label" : "名前",
+                "placeholder" : "たろう",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            }
+          ],
+          "id" : "fields",
+          "props" : {
+            "title" : "メンバー"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "member_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "members",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "メンバー",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

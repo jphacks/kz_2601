@@ -42,6 +42,9 @@ enum ErrorCopy {
         f.dateFormat = english ? "MMM d, H:mm" : "M月d日 H:mm"
         return f.string(from: date)
     }
+    // 運営による AI の一時停止(#511・503 ai_paused)。上限の文言とは分ける
+    static var aiPausedTitle: String { L10n.tr("AI を一時停止しています") }
+    static var aiPausedBody: String { L10n.tr("AI を一時的に止めています。しばらくしてからもう一度お試しください") }
     static var timeoutTitle: String { L10n.tr("時間がかかりすぎました") }
     static var timeoutBody: String { L10n.tr("サーバーの応答がありませんでした。もう一度お試しください") }
     // セッション
@@ -49,6 +52,8 @@ enum ErrorCopy {
     static var sessionExpiredBody: String { L10n.tr("もう一度サインインしてください") }
     /// サインイン画面(`SignInView`)に出す 1 文
     static var sessionExpiredSignIn: String { L10n.tr("サインインの有効期限が切れました。もう一度サインインしてください") }
+    // App Check(#318・401 app_check_failed)。サインインでは直らない
+    static var appCheckFailedBody: String { L10n.tr("このアプリからの接続を確認できませんでした。少し待ってもう一度お試しください。続く時は App Store から最新版を入れてください") }
     // 競合
     static var conflictBanner: String { L10n.tr("別の端末で更新されていたため、最新の状態に合わせました。もう一度お話しください") }
     // 入力不備・その他

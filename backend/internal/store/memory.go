@@ -22,21 +22,42 @@ type memPublic struct {
 
 // Memory is an in-process Store for tests and local development.
 type Memory struct {
-	mu     sync.Mutex
+	mu  sync.Mutex
+	now func() time.Time
+	hub hub // change notifications for Watcher (watch.go)
+
+	// apps, versions, records
 	users  map[string]map[string]*memApp
 	public map[string]*memPublic
-	now    func() time.Time
 
-	shares   map[string]*Share             // shares/{token} (memory_share.go)
-	catalog  map[string]*CatalogApp        // public_apps/{appId}
-	releases map[string]*ReleaseRequest    // release_requests/{id} (memory_release.go)
-	owners   map[string]string             // app_owners/{appId} -> uid (memory_owner.go)
-	installs map[string]string             // public_apps/{id}/installs/{uid} -> appId
-	members  map[string]map[string]*Member // apps_public/{appId}/members/{uid} (memory_member.go)
-	hub      hub                           // change notifications for Watcher (watch.go)
-	deleted  map[string]time.Time          // uid -> deletedAt of DELETE /v1/me (memory_account.go)
-	purged   map[string]bool               // uids erased by PurgeAccount + MarkAccountPurged
-	marks    map[string]bool               // record/mark/uid keys (memory_marks.go)
+	// sharing and the public catalog
+	shares   map[string]*Share          // shares/{token} (memory_share.go)
+	catalog  map[string]*CatalogApp     // public_apps/{appId}
+	releases map[string]*ReleaseRequest // release_requests/{id} (memory_release.go)
+	owners   map[string]string          // app_owners/{appId} -> uid (memory_owner.go)
+	installs map[string]string          // public_apps/{id}/installs/{uid} -> appId
+
+	// participants
+	members map[string]map[string]*Member // apps_public/{appId}/members/{uid} (memory_member.go)
+
+	// marks
+	marks map[string]bool // record/mark/uid keys (memory_marks.go)
+
+	// account deletion
+	deleted map[string]time.Time // uid -> deletedAt of DELETE /v1/me (memory_account.go)
+	purged  map[string]bool      // uids erased by PurgeAccount + MarkAccountPurged
+
+	// feedback
+	feedback map[string]*Feedback // feedback/{id} (memory_feedback.go)
+
+	// moderation
+	reports map[string]*Report           // reports/{id} (memory_moderation.go)
+	quota   map[string]int               // uid/day -> reports filed
+	blocks  map[string]map[string]*Block // users/{uid}/blocks/{blockedUid}
+
+	// matching (#507, memory_matching.go)
+	matchPairs map[string]map[string]*MatchPair // apps_public/{appId}/match_pairs/{pairId}
+	matchQuota map[string]int                   // uid/day -> interests sent
 }
 
 // NewMemory returns an empty store.
@@ -379,9 +400,12 @@ func (m *Memory) DeleteRecord(_ context.Context, rs RecordSet, id string) error 
 	if _, ok := recs[rs.Entity][id]; !ok {
 		return ErrNotFound
 	}
+	watched := inWatchWindow(recs[rs.Entity], id)
 	delete(recs[rs.Entity], id)
 	m.dropMarks(recordsKey(rs) + "/" + id + "/")
-	m.hub.publish(recordsKey(rs), 0)
+	if watched {
+		m.hub.publish(recordsKey(rs), 0)
+	}
 	return nil
 }
 

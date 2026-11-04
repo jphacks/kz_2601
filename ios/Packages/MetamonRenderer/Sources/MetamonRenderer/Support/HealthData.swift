@@ -111,7 +111,8 @@ public final class LiveHealthData: HealthDataSource, @unchecked Sendable {
         guard let from = starts.first else { return [] }
         let descriptor = HKSampleQueryDescriptor(
             predicates: [.quantitySample(type: type, predicate: HKQuery.predicateForSamples(withStart: from, end: nil))],
-            sortDescriptors: [SortDescriptor(\.startDate, order: .reverse)],
+            // \.startDate のキーパスは Sendable でない(Swift 6 で error)。同じ並び(startDate の降順)を NSSortDescriptor から作る
+            sortDescriptors: SortDescriptor(NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false), comparing: HKQuantitySample.self).map { [$0] } ?? [],
             limit: 200
         )
         let samples = try await descriptor.result(for: store)

@@ -115,8 +115,24 @@ func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusRequestEntityTooLarge, httpx.CodePayloadTooLarge, "too many records to sort in memory"))
 		return
 	}
+	var blocked map[string]bool // #321: posts of users the caller blocked
+	// #507: profile / matched-only rules of matching apps (matching.go)
+	var matchOK func(author string) bool
+	if ent.IsShared() {
+		if blocked, err = h.blockedBy(r); err != nil {
+			fail(w, err)
+			return
+		}
+		if matchOK, err = h.matchFilter(r, cur.ID, eid, recordAuthors(all)); err != nil {
+			fail(w, err)
+			return
+		}
+	}
 	items := make([]store.Record, 0, len(all))
 	for i := range all {
+		if blocked[all[i].Author] || (matchOK != nil && !matchOK(all[i].Author)) {
+			continue
+		}
 		if pred == nil || pred(&all[i]) {
 			items = append(items, all[i])
 		}
@@ -302,6 +318,12 @@ func (h *Handler) getRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	rs := recordSet(r, cur, ent, eid)
 	rec, err := h.store.GetRecord(r.Context(), rs, rid)
+	if err == nil && ent.IsShared() {
+		var ok func(string) bool
+		if ok, err = h.matchFilter(r, cur.ID, eid, []string{rec.Author}); err == nil && ok != nil && !ok(rec.Author) {
+			err = store.ErrNotFound // #507: not matched with the author
+		}
+	}
 	if err != nil {
 		fail(w, mapStoreErr(err, "record"))
 		return

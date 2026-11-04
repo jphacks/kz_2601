@@ -17,6 +17,27 @@ final class SharingUI {
     var issued: [String: ShareInfo] = [:]
     /// 記録を共有するアプリのリンクを開いた時の参加の確認(#254・`JoinShareSheet`)
     var pendingJoin: PendingJoin?
+
+    /// 受け取ったシェアリンク(#278)。サインイン前・bootstrap 前に届いた分も捨てずに持ち、準備ができてから 1 回だけ開く。
+    /// 未インストールの人が入れてから開き直すと、サインイン画面の上で届くため(RootView の onOpenURL では取りこぼす)。
+    private(set) var pendingLink: URL?
+    /// RootView の bootstrap が終わったか(`MetamonApp`)。サインアウトで false に戻す
+    var isReady = false
+
+    /// シェアリンクなら保留して true。それ以外の URL は false(触らない)。
+    @discardableResult
+    func receive(_ url: URL) -> Bool {
+        guard ShareURL.token(from: url) != nil else { return false }
+        pendingLink = url
+        return true
+    }
+
+    /// 準備済みなら保留中のリンクを渡して空にする。まだなら nil(保留は残す)。
+    func takeLink() -> URL? {
+        guard isReady, let url = pendingLink else { return nil }
+        pendingLink = nil
+        return url
+    }
 }
 
 extension AppRuntime {
@@ -37,9 +58,9 @@ extension AppRuntime {
             return
         }
         // #254: 記録を共有するアプリは、参加すると何が見えるかを先に見せて表示名を聞く(プレビューが取れなければ従来どおり)
-        if let membership = sharing as? any MembershipClient,
-           let preview = try? await membership.previewShare(token: token),
-           preview.sharedData, !preview.mine {
+        let membership = sharing as? any MembershipClient
+        let preview = try? await membership?.previewShare(token: token)
+        if let preview, preview.sharedData, !preview.mine {
             // #414: 記録を共有するアプリへの参加は Tailor It Pro。参加の確認より先に課金画面
             if PaidGate.joinNeedsPaywall(preview, isPro: proGate.isPro, enforced: proGate.isEnforced) {
                 guard await admitSharedApp(name: preview.name) else { return }
@@ -49,7 +70,8 @@ extension AppRuntime {
         }
         do {
             let app = try await sharing.importShare(token: token)
-            await adopt(app, banner: L10n.tr("シェアされた「\(app.name)」を追加しました"))
+            // #561 / #565: 自分のアプリは無料。プレビューが取れなくても取り込み結果の mine で見分ける
+            await adopt(app, banner: L10n.tr("シェアされた「\(app.name)」を追加しました"), own: preview?.mine == true || app.mine)
         } catch {
             toast = Self.importFailureMessage(error)
         }
@@ -90,17 +112,18 @@ extension AppRuntime {
         guard let sharing = services.sharing else { return }
         do {
             let app = try await sharing.install(publicAppId: listing.id)
-            await adopt(app, banner: L10n.tr("「\(app.name)」をインストールしました"))
+            await adopt(app, banner: L10n.tr("「\(app.name)」をインストールしました"), own: listing.mine || app.mine)
         } catch {
             toast = L10n.tr("インストールできませんでした: \(error.localizedDescription)")
         }
     }
 
     /// import / install の結果に切り替える(変身アニメは switchApp)。共有データ付きは「みんなと同じデータ」を一言添える。
-    private func adopt(_ app: InstalledApp, banner: String) async {
+    /// `own` = 自分のアプリ(シェアのプレビュー・探すの掲載・取り込み結果の mine)。自分のアプリは課金画面を出さない(#561)。
+    private func adopt(_ app: InstalledApp, banner: String, own: Bool = false) async {
         print("[Metamon] adopt shared app: appId=\(app.appId) joined=\(app.joined)")
         // #414: プレビューが無かった import・公開アプリのインストールは、結果を見てから課金画面(買わなければ開かない)
-        if PaidGate.installedNeedsPaywall(app, isPro: proGate.isPro, enforced: proGate.isEnforced) {
+        if !own, PaidGate.installedNeedsPaywall(app, isPro: proGate.isPro, enforced: proGate.isEnforced) {
             SharingUI.shared.showDiscover = false
             guard await admitSharedApp(name: app.name, after: .milliseconds(550)) else { return }
         }
@@ -114,6 +137,13 @@ extension AppRuntime {
     }
 }
 
+/// WindowGroup の根に付ける(#278): サインイン画面の時に届いたシェアリンクも `SharingUI` に保留する。
+struct ShareLinkReceiver: ViewModifier {
+    func body(content: Content) -> some View {
+        content.onOpenURL { url in SharingUI.shared.receive(url) }
+    }
+}
+
 /// RootView に 1 行で付ける: URL スキーム受信・「探す」シート・DEBUG の自動操作フック。
 struct SharingHooks: ViewModifier {
     @Environment(AppRuntime.self) private var rt
@@ -121,7 +151,10 @@ struct SharingHooks: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onOpenURL { url in Task { await rt.openShareURL(url) } }
+            // リンクの受信は `ShareLinkReceiver`(サインイン画面の時も届く)。ここでは準備ができたら開く(#278)
+            .task(id: "\(ui.isReady)|\(ui.pendingLink?.absoluteString ?? "")") {
+                if let url = ui.takeLink() { await rt.openShareURL(url) }
+            }
             .sheet(isPresented: $ui.showDiscover) { DiscoverSheet() }
             .sheet(item: $ui.pendingJoin) { JoinShareSheet(join: $0) }
             #if DEBUG

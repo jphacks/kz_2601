@@ -45,8 +45,11 @@ flowchart TD
 
 ### 1.1 DI(依存性注入)
 - **入口は `ios/Metamon/App/BuildConfig.swift` の `BuildConfig.make(environment:)` だけ**。`AppEnvironment`(`.mock` / `.live(appConfigURL:aiURL:)`・どちらか片方だけ live も可)を環境変数 `METAMON_AI_BASE_URL` / `METAMON_APPCONFIG_BASE_URL` / Info.plist から判定し、`Services`(protocol のコンテナ struct。`auth` を含む)を**1回だけ**組み立てる。Mock と本番の切替はこのファイルで完結する。
+- **機能ごとのサービスを足すとき**(#516): `Services` の本体(auth … isLive)は触らない。`MetamonServices/<機能>/Services+<機能>.swift` に `ServiceKey`(既定値)と `Services` の computed property を置く(`EnvironmentValues` と同じ形)。
+- live の差し込みは `Metamon/Features/<機能>/<機能>+Wiring.swift` に `LiveWiring` の `static let` を書き、`BuildConfig.liveWirings`(名前順・1 行 1 つ)に 1 行足す。審査用ビルドで外す機能は、ファイルと closure の中身を `#if !APP_STORE_REVIEW` で囲む。
 - `MetamonApp` が `Services` を `AppRuntime(document:services:)` と SwiftUI Environment `\.services`(`App/ServicesEnvironment.swift`)に渡す。View は `@Environment(\.services)` で protocol 越しに使う(例: `VoiceInputView` → `services.transcriber`)。
 - Renderer は Services を知らない。必要な能力(DSL、レコード、`run(action)`、ナビ)は `DSLRuntime` protocol(`MetamonRenderer/Host/DSLRuntime.swift`)で宣言し、`AppRuntime` が準拠して `\.dslRuntime` で注入する。`@Observable` なのでプロパティ変更は SwiftUI が追跡する。
+- 機能ごとの能力(近距離共有・印・ライブアクティビティ・AI・通報など)は `DSLRuntime` に足さない。`MetamonRenderer/Host/Capabilities/<X>Host.swift` に `XHost` protocol と `DSLRuntime` の取り出し口(`var x: (any XHost)? { self as? any XHost }`)を作り、`AppRuntime+X.swift` で準拠する。Renderer は `rt.x?.foo() ?? 既定値` で呼ぶ(準拠しないプレビュー・テストのランタイムは nil = 何もしない・false)。**新しい機能で `DSLRuntime.swift` は触らない。**
 - 外部 DI ライブラリは使わない。
 
 ### 1.2 ComponentRegistry(コンポーネントが増えても崩れない仕組み)
@@ -66,8 +69,8 @@ flowchart TD
 | ルート | `AppDocument: Decodable` | `screens: [id: Screen]`、`navigation`、初期 `state` |
 | ノード | `struct Node { id, visible, padding, component }` | 共通メタ + 種別 |
 | 種別 | `indirect enum Component` | `type` 文字列で分岐する手書き `init(from:)` |
-| 未知 type | `.unknown(type:)` | 描画は DEBUG で黄色ラベル、RELEASE で `EmptyView` |
-| 既知 type だが props 不正 | `.invalid(type:reason:)` | 同上。画面全体は落とさない |
+| 未知 type | `.unknown(type:)` | 全ビルドで控えめな枠(`UnavailableComponent`・#536)。`ComponentType` に無い type は「アプリを更新すると表示できます」、有るのにレジストリに無い type(審査用の版で外した部品)は「この端末では使えません」。部品名は出さない(DEBUG だけ type を小さく添える) |
+| 既知 type だが props 不正 | `.invalid(type:reason:)` | DEBUG で黄色ラベル、RELEASE で `EmptyView`(`UnsupportedComponent`)。画面全体は落とさない |
 | 配列中の壊れた要素 | `@Lossy var children: [Node]` | 要素単位で skip |
 | 未知 enum 値 | `Lenient.decode(..., fallback:)` | `style: "neon"` → `.primary` |
 | 再帰 | `DSLView(node:ctx:)` → `switch component` → 子に `DSLView` | `ForEach(children)`(`Node: Identifiable`) |
@@ -455,7 +458,7 @@ DEBUG フック: `METAMON_AUTO_SWITCHER=1`(起動 2.5 秒後に変身一覧を�
 | 初期画面下部「みんなが作ったアプリを探す」 | `DiscoverSheet`: 検索(250ms 間引き)・人気/新着・カード(名前・作者・利用数・説明・部品アイコン・タグ)→「入れる」で `POST /public-apps/{id}/install` → 変身 | `Features/Share/DiscoverSheet.swift`。導線は `VoiceInputView` に 1 行(`DiscoverEntry`) |
 
 - サービスは `MetamonServices` の `SharingClient`(`HTTPSharingClient`)。`Services.sharing` は appconfig が live の時だけ非 nil で、モック起動では導線ごと出さない。
-- 共有データ(scope: shared/public)を持つアプリは受け取ると**元の appId に参加**する(backend architecture §3.2)。要約カードに「みんなの投稿も見られます」を添える。
+- 共有データ(scope: shared/public)を持つアプリは受け取ると**元の appId に参加**する([backend features/sharing.md](../backend/features/sharing.md))。要約カードに「みんなの投稿も見られます」を添える。
 - DEBUG フック: `METAMON_AUTO_SHARE=1`(変身一覧 → 今のアプリのシェアシート)/ `METAMON_AUTO_IMPORT=<token>`(リンクを開いたのと同じ経路。`simctl openurl` は OS の確認ダイアログで止まるため)/ `METAMON_AUTO_DISCOVER=1`(+ `METAMON_AUTO_INSTALL=<公開 id>`)。
 - 注意: 端末ローカルの `DocumentCache` / レコードキャッシュは uid を区別しないので、同じ端末で `METAMON_DEV_UID` を切り替えると前ユーザーのキャッシュが一瞬見える(サーバーは正しく分離)。2 ユーザー検証はアプリを入れ直してから行う。
 
@@ -468,7 +471,7 @@ DEBUG フック: `METAMON_AUTO_SWITCHER=1`(起動 2.5 秒後に変身一覧を�
 
 - カード右上はシェア直行ボタンから「…」メニュー(「シェア・公開」/「単体アプリとしてリリースを申請」)に変えた。シェアの中身(`ShareAppSheet`)は変更なし。
 - サービスは `ReleaseRequestClient`(`HTTPReleaseRequestClient`)。`Services.releaseRequests` は sharing と同じく live の時だけ非 nil。
-- status は管理者が Firestore コンソールで書き換える(backend architecture §3.3)。未知の値は「受付」扱い。
+- status は管理者が Firestore コンソールで書き換える([backend features/release.md](../backend/features/release.md))。未知の値は「受付」扱い。
 - DEBUG フック: `METAMON_AUTO_RELEASE=1`(変身一覧 → 申請シート)+ `METAMON_AUTO_RELEASE_APP=<appId>` / `METAMON_AUTO_RELEASE_PURPOSE=<文>`(入力 → 送信 → 3 秒後に閉じてバッジ)/ `METAMON_AUTO_RELEASE_CONTACT`。
 
 ## 7. 認証(実装済み)
@@ -506,8 +509,8 @@ SignInView ──Sign in with Apple──▶ ASAuthorizationAppleIDCredential(id
 ### 環境変数(ai と appconfig は別々に live にできる)
 | 用途 | 実行時 env | Info.plist キー(build setting から展開) | 既定(project.yml) | 未設定時 |
 |---|---|---|---|---|
-| ai | `METAMON_AI_BASE_URL` | `MetamonAIBaseURL` = `$(METAMON_AI_BASE_URL)` | `https://ai-stg-378953239426.asia-northeast1.run.app` | `MockAIClient` |
-| appconfig | `METAMON_APPCONFIG_BASE_URL`(旧 `METAMON_API_BASE_URL` も可) | `MetamonAppConfigBaseURL` = `$(METAMON_APPCONFIG_BASE_URL)` | `https://appconfig-stg-378953239426.asia-northeast1.run.app` | `InMemoryAppConfigClient` + `NoopDocumentSync`(`isLive=false`) |
+| ai | `METAMON_AI_BASE_URL` | `MetamonAIBaseURL` = `$(METAMON_AI_BASE_URL)` | 構成ごと(下の「ビルド構成と接続先」)。Debug は `https://ai-stg-378953239426.asia-northeast1.run.app` | `MockAIClient` |
+| appconfig | `METAMON_APPCONFIG_BASE_URL`(旧 `METAMON_API_BASE_URL` も可) | `MetamonAppConfigBaseURL` = `$(METAMON_APPCONFIG_BASE_URL)` | 構成ごと。Debug は `https://appconfig-stg-378953239426.asia-northeast1.run.app` | `InMemoryAppConfigClient` + `NoopDocumentSync`(`isLive=false`) |
 | 全モック | `METAMON_MOCK=1` | — | — | URL 設定を無視して `AppEnvironment.mock` |
 | 開発用 uid | `METAMON_DEV_UID=<uid>`(DEBUG のみ) | — | — | `AUTH_MODE=dev` のローカル backend 向けに Bearer へ固定 uid を送る(`StaticTokenProvider`)。staging/本番(Firebase 検証)には通らない |
 
@@ -517,6 +520,41 @@ SignInView ──Sign in with Apple──▶ ASAuthorizationAppleIDCredential(id
 - appconfig 契約(PR #32・`HTTPAppConfigClient`): `GET /v1/apps/{appId}/dsl`(`ETag: "<version>"`・`If-None-Match` で 304)/ `GET /versions`(新しい順・`VersionSummary`)/ `POST /versions/{n}/restore`(201 `VersionSummary` → 続けて `GET /dsl`)/ records `GET`(`pageSize=200`・`nextPageToken` を最大 5 ページ追う)・`POST`(`{data, clientId}`・通信断時は同じ clientId で 1 回再送)・`PATCH`(`{data}`・null で項目削除)・`DELETE`(204)。エラー封筒 `{error:{code,message,details?,requestId?}}` は `APIError.server(status:code:message:details:)`。`details.field` は `APIError.field`。
 - HTTP キャッシュは使わない(`HTTP.session` = ephemeral・`urlCache = nil`・`reloadIgnoringLocalAndRemoteCacheData`)。`GET /dsl` は `Cache-Control: no-cache` + ETag だが `URLSession.shared` が再検証せず古い 200 を返し、起動時復元が 1 つ前の version になる事象が staging E2E で出た。鮮度は自前の `If-None-Match` と `DocumentCache` で管理する。
 - ATS: `NSAllowsLocalNetworking` のみ(LAN の `http://<IP>:8081` 用)。`NSAllowsArbitraryLoads` は入れない。
+
+### ビルド構成と接続先(#292)
+今の GCP プロジェクト `jphacks-kz2601` は prod のまま。stg 用のプロジェクトは後で作る(決定: `docs/decisions/288-prod-staging-db-split.md`)。それまで stg 系の構成は今の stg Cloud Run に向ける。
+
+| 構成 | scheme | ai / appconfig | Firebase plist(バンドル内の名前は常に `GoogleService-Info.plist`) | 表示名 | 主な用途 |
+|---|---|---|---|---|---|
+| Debug | `Metamon` | `ai-stg-…` / `appconfig-stg-…` | `ios/Firebase/GoogleService-Info-Staging.plist`。無ければ prod の plist + ビルド警告 | Tailor It β | 開発・CI(ios-ci)・UI テスト(モック) |
+| Staging | `Metamon-Staging` | 同上 | 同上 | Tailor It β | 端末に入れる検証版(最適化あり・`DEBUG` なし) |
+| Release | `Metamon`(Archive) | `ai-prod-…` / `appconfig-prod-…` | `ios/Firebase/GoogleService-Info.plist` | Tailor It | TestFlight / App Store |
+| Review | `Metamon-Review` | 同上 | 同上 | Tailor It | 審査用(`scripts/build-review.sh`・`docs/ios/review-build.md`) |
+
+- 値は `project.yml` の `settings.base` / `settings.configs`(build setting `METAMON_AI_BASE_URL` / `METAMON_APPCONFIG_BASE_URL` / `METAMON_FIREBASE_ENV` / `METAMON_DISPLAY_NAME`)。xcodebuild の引数で上書きできる(ローカル backend に向ける時など)。
+- plist の流れ: `scripts/sync-firebase-plist.sh` が secrets の `GoogleService-Info.plist`(prod・必須)と `GoogleService-Info-Staging.plist`(stg・あれば)を `ios/Firebase/`(git-ignored)へコピー → Metamon ターゲットのビルドフェーズ「Select Firebase plist」(`scripts/select-firebase-plist.sh`)が構成に合う方をバンドルへ入れる。
+  - stg の plist が無い間は Debug / Staging も prod の Firebase で認証する(今まで通り)。ビルドログに `warning: ios/Firebase/GoogleService-Info-Staging.plist が無いため…` が出る。
+  - どちらも無ければ何も入れない(認証はモック)。CI はこの状態。
+  - 「あれば使う」ファイルを読むため Metamon ターゲットは `ENABLE_USER_SCRIPT_SANDBOXING: NO`(サンドボックスは宣言した入力しか読めず、無いかもしれないファイルは入力に書けない)。
+  - #292 より前の置き場 `Metamon/Resources/GoogleService-Info.plist` は使わない(project.yml で除外。sync スクリプトが消す)。
+- CI(ios-ci)と UI テストは scheme `Metamon` の Debug。plist 無しのモック認証で動くので、構成の追加で変わらない。
+- ウィジェットの App Group(`group.jp.kz2601.metamon`)は全構成で同じ。
+
+#### stg 版と prod 版を同じ端末に入れる(Bundle ID の末尾・既定 OFF)
+既定では全構成とも Bundle ID は `jp.kz2601.metamon`(ウィジェット `jp.kz2601.metamon.widget`)。別の Bundle ID には Apple 側の App ID と Firebase 側の iOS アプリ登録が要るため、末尾は手で ON にする:
+```sh
+METAMON_STG_BUNDLE_ID_SUFFIX=.stg METAMON_TEAM_ID=CHP337D75C xcodegen generate
+```
+→ Debug / Staging は `jp.kz2601.metamon.stg`(ウィジェット `jp.kz2601.metamon.stg.widget`)。Release / Review は変わらない。
+
+ON にする前の人の作業(一度だけ):
+1. Apple Developer: App ID `jp.kz2601.metamon.stg` と `jp.kz2601.metamon.stg.widget` を用意し、Sign in with Apple・App Groups(`group.jp.kz2601.metamon`)・HealthKit を付ける(自動署名 `-allowProvisioningUpdates` でも作られる。Sign in with Apple の設定を確認する)。
+2. Firebase(stg 用プロジェクト): Bundle ID `jp.kz2601.metamon.stg` の iOS アプリを登録し、その `GoogleService-Info.plist` を secrets に `GoogleService-Info-Staging.plist` として置いて `./scripts/sync-firebase-plist.sh`。Authentication の Apple プロバイダの設定も確認する。
+3. TestFlight で配る時は App Store Connect に別アプリ(`jp.kz2601.metamon.stg`)の登録が要る。
+
+注意:
+- App Group は prod 版と共有になる(ウィジェットのスナップショットは後から書いた方になる)。分けたくなったら `WidgetSnapshot.appGroupID` と entitlements を構成ごとにする。
+- 課金の商品 ID(`jp.kz2601.metamon.pro.*`)は Bundle ID ごとに App Store Connect の登録が要る。stg 版はローカルの StoreKit 構成ファイルで試す。
 
 ### ローカル DB と同期(Issue #48・実装済み)
 
@@ -577,10 +615,11 @@ Renderer ──load(entities)──▶ AppRuntime.refresh(entity)
 ## 11. ビルド/実行
 ```sh
 cd ios
-./scripts/sync-firebase-plist.sh               # GoogleService-Info.plist をリポ外からコピー(git-ignored。無ければ認証モック)
+./scripts/sync-firebase-plist.sh               # Firebase の plist をリポ外から ios/Firebase/ へコピー(git-ignored。無ければ認証モック)
 METAMON_TEAM_ID=CHP337D75C xcodegen generate   # .xcodeproj 生成(コミットしない)。Team を注入
 xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' build CODE_SIGNING_ALLOWED=NO
 xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' test CODE_SIGNING_ALLOWED=NO   # 3 パッケージのテストを一括
+xcodebuild -scheme Metamon-Staging -configuration Staging -destination 'platform=iOS Simulator,name=iPhone 17' build   # stg 版(§7「ビルド構成と接続先」)
 (cd Packages/MetamonDSL && swift test)         # DSL だけなら macOS で数秒
 # 実機(ai をローカル LAN で live にする例。appconfig 未指定ならインメモリのまま)
 xcodebuild -scheme Metamon -destination 'id=<DEVICE_ID>' -allowProvisioningUpdates DEVELOPMENT_TEAM=CHP337D75C build METAMON_AI_BASE_URL=http://$(ipconfig getifaddr en0):8081
@@ -627,7 +666,7 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 構成:
 - `MetamonWidget/Shared/TailorActivityAttributes.swift`(本体・拡張の両方にコンパイル): static な `appId / appName / icon / key / statId` と `ContentState{title, subtitle, clock(countdown/elapsed/paused), value, valueLabel, progress, finished}`。
 - 組み立て(純粋関数・`MetamonTests/LiveActivityContentTests`): `Metamon/App/LiveActivityContent.swift`。タイマーの段階は Renderer の `TimerActivityUpdate.phase`(`TimerActivityUpdateTests`)。
-- ActivityKit への出し入れ: `Metamon/App/AppRuntime+LiveActivity.swift`(`LiveActivities`。操作は 1 本の列で順番に流す)。Renderer からは `DSLRuntime.timerActivity(_:)` 越し(Renderer は ActivityKit を知らない)。
+- ActivityKit への出し入れ: `Metamon/App/AppRuntime+LiveActivity.swift`(`LiveActivities`。操作は 1 本の列で順番に流す)。Renderer からは `LiveActivityHost.timerActivity(_:)` 越し(Renderer は ActivityKit を知らない)。
 - 数字の更新: `AppRuntime.records` の didSet → `refreshLiveActivityStats()`(値が変わった時だけ `update`)。**アプリが止まっている間に別端末で増えた記録は反映されない**(push 無しのため。次に開いた時に更新)。
 - 見た目: `MetamonWidget/LiveActivityWidget.swift`。
 - Info.plist `NSSupportsLiveActivities = YES`。バックグラウンドモードや push の entitlement は**足していない**。審査用の版(Review)にも残す(権限ダイアログ無し・ユーザーが押した時だけ出る)。
@@ -728,6 +767,8 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 - **単一ソース**: `LanguagePreference.shared`(Renderer・`@Observable`)。`setting`(system / ja / en)は UserDefaults `metamon.appLanguage`。`code` は "ja" | "en"、`locale` は書式用。
 - **切替は即時**: ルートで `.environment(\.locale, LanguagePreference.shared.locale)` を注入 → `Text("…")` リテラルはその Locale で引き直される。`String` を返す文言は本体 `L10n.tr("…")` / Renderer `L("…")`(lproj を直接引く)。body 内で呼ぶので Observation で再描画される。`static let` の文言は `static var` にする(起動時の言語で固定されないように)。
 - **書くときのルール**: SwiftUI に直接渡すリテラル(`Text` / `Button` / `Label` / `Section` / `accessibilityLabel` 等)はそのまま。三項演算子・変数・`String` 返しは `L10n.tr`。Renderer 内は全部 `L()`(リテラルは Bundle.main を引いてしまうため)。新しい文言は xcstrings に en を追加(キーの補間は `%@` / `%lld`、補間ありのキーでは `%` を `%%`)。
+- **xcstrings の書式(#516)**: キーはどこに足してもよい。足したら `python3 ios/scripts/xcstrings-fmt.py <file>` で整える(Xcode と同じ書式: キー順・`" : "`・末尾改行なし。Xcode で保存しても差分が出ない)。CI(`ios-ci` ジョブ)が `--check` で検査する。
+- **マージドライバ**: clone ごとに 1 回 `scripts/setup-git.sh` を実行する。`.xcstrings` をキー単位で 3-way マージし、別々のキーの追加はコンフリクトしなくなる(同じキーを両側で違う内容に変えた時だけ止まる)。
 - **端末の AppleLanguages は書き換えない**。権限ダイアログ・システム UI・ウィジェット(別プロセス)は端末の言語のまま。
 - **生成の locale(#45)**: 設定で言語を明示 → generate / chat に `locale` を送る。「自動」は送らない(backend が発話の文字種で判定)。WhisperKit の `language` は `LanguagePreference.code`(録音ごとに読む)。
 - **翻訳しないもの**: DSL 内の文言(AI が locale に合わせて生成)、Services のログ、FieldIcon のキーワード、音声意図判定の語彙。通貨は DSL の `currency` が円前提なので英語 UI でも `¥`。
@@ -772,7 +813,7 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 >
 > (日本語) 位置情報は、利用者が「記録を開始」を押した時だけ使い、既定はオフです。「使用中のみ許可」だけを求め、「常に許可」は求めません。記録中は背面でも続け、その間 iOS の青い位置インジケータが常に表示されます。「記録を停止」か 1 時間(最長 4 時間)で自動停止します。記録した地点は利用者自身の記録としてのみ保存し、第三者提供・広告には使いません。
 
-注意(残課題): 記録中に別の画面へ移ると停止ボタンはその部品の画面にしか無い(背面では青いインジケータ・自動停止で担保)。アプリ全体の「記録中」バーは未実装。
+記録中は、どの画面でも上に「記録中」バー(経過時間・「停止」)を重ねる(`TrackingBarHost`・#559)。状態は Renderer の `LocationTrackingControl.status` で読む。シート・全画面のモーダルの中には出さない。審査用の版は位置の記録ごと外すのでバーも出ない。
 
 ### 17.4 裏に回った時に続くもの・止まるもの(#423)
 | 機能 | 裏(画面ロック・別アプリ)で | 仕組み |
@@ -812,7 +853,7 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 |---|---|
 | 部品 | `AiButtonLeaf` が task generate を `AiGenerateLeaf` に渡す。フォーム不要。結果は `AITextResultView`(line = 1 文 / list = 箇条書き / fields = 項目名と値・セルに収まらなければ中でスクロール)。`output` があればフォームのドラフトにも入れる(保存は利用者) |
 | どこで書くか | `AIGenerateRoute.choose`: 端末内 AI が使える → 端末内(無料・端末外に出ない)/ 使えない → ホストのオンライン版 / オンラインの無いホスト(プレビュー)→ 理由を出して無効。`METAMON_MOCK=1` は常にホストのモック(`MockAIClient.text` が決まった文を返す) |
-| オンライン版 | `DSLRuntime.generateAIText`(`AppRuntime+AIText.swift`)→ `AITextGate`: 同意が無い → 同意画面 / Pro でない(課金の制限が有効な時)→ 課金画面(`requestProForAIText` の 1 か所。#429 の `ProGate.requestPro` が入ったら差し替える)/ どちらも OK → `services.ai.text`。サーバーの理由は `HTTPAIClient.textError` で画面の文言に(上限はサーバーの日本語のまま) |
+| オンライン版 | `AITextHost.generateAIText`(`AppRuntime+AIText.swift`)→ `AITextGate`: 同意が無い → 同意画面 / Pro でない(課金の制限が有効な時)→ 課金画面(`requestProForAIText` の 1 か所。#429 の `ProGate.requestPro` が入ったら差し替える)/ どちらも OK → `services.ai.text`。サーバーの理由は `HTTPAIClient.textError` で画面の文言に(上限はサーバーの日本語のまま) |
 | 依頼 | `AIGenerateBuilder`: 指示は `{{field}}` をフォームの値に置き換えて 500 字まで、`{{input}}` は「下の材料」に置き換え、材料(`entity` の新しい順 20 件まで / `input` field)は別に 4 KB(UTF-8)まで |
 | 形の検証 | `AITextResult.normalize`(MetamonDSL・backend の `parseTextOutput` と同じ規則)。端末内 AI は形ごとの `DynamicGenerationSchema`(fields の名前は f0, f1…)で構造化出力 |
 | テスト | `AITextTests`(形の解釈・切り詰め・例の読み込み)・`AiGenerateTests`(経路・依頼・描画)・`AITextGateTests`(同意 → Pro・モック・エラーの文言)。端末内 AI の実行は実機で確認 |
@@ -825,7 +866,7 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 
 | 役割 | 実装 | 中身 |
 |---|---|---|
-| leaf | `NearbyShareLeaf`(Renderer) | 送る範囲を決めて `DSLRuntime.shareNearby(entity:records:)` を呼ぶだけ。フォーム画面(`screen.entity == entity`)は入力中の 1 件(未保存でも今の値)、それ以外はその entity の新しい順 最大 50 件。0 件なら押せない |
+| leaf | `NearbyShareLeaf`(Renderer) | 送る範囲を決めて `NearbyHost.shareNearby(entity:records:)` を呼ぶだけ。フォーム画面(`screen.entity == entity`)は入力中の 1 件(未保存でも今の値)、それ以外はその entity の新しい順 最大 50 件。0 件なら押せない |
 | データ・判定 | `NearbyShare`(MetamonDSL・純粋ロジック) | `Header`(送信者・appId・entity id/名・保存フィールドの id+型・件数)を招待の context に、`Payload`(Header + レコード)を接続後に 1 回、受信側は `Ack` を返す。JSON。未知キーは無視、レコード内の未知フィールド・型違い・null は `sanitize` で捨てる |
 | 通信 | `NearbyService`(アプリ本体 `Features/Nearby/`) | `MCSession(encryptionPreference: .required)`。送信シートを開いている間だけ browse、相手を選ぶと招待(30 秒)→ 接続で送信 → Ack で完了表示して切断 |
 | 受信 UI | `NearbySheets`(RootView の根とモーダル内に付ける) | 招待が来ると「◯◯さんから「出席」が 3 件届きました」の確認。**承認した時だけ招待を受ける**(勝手に受け取らない)。取り込めない時は理由だけ出して断る |
@@ -943,6 +984,7 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 ### 22.3 回数は端末で数える(サーバー強制は後続)
 - いまは UserDefaults に保存するだけなので、**アプリの削除・端末の時計の変更で回避できる**。ハッカソンの段階では「課金導線の体験」を作ることを優先した。
 - 本番化する時は ai サービス(`POST /v1/generate` の新規作成)側で uid ごとの日次カウンタを持ち、超過は 402 を返す → iOS は 402 を上限シートに繋ぐ。権利はサーバーが App Store Server API(または RevenueCat の webhook)で確認する。
+- **サーバーの権利(#314)**: `ProEntitlementStore.refreshEntitlements`(起動・購入・復元・`Transaction.updates`・サインインし直した時)が、検証済みの取引の `jwsRepresentation` を `HTTPEntitlementClient`(`POST /v1/me/entitlements/apple`)で送る。待たずに裏で送り、同じ uid + 取引は 1 回だけ。失敗は次の機会に送り直す。Xcode の StoreKit 構成の取引(`environment == .xcode`)は Apple の署名ではないので送らない。購入時は `appAccountToken` に `ProAccountToken.uuid(for: uid)` を入れる。サーバーは検証して `users/{uid}/entitlements/pro` に保存し、ai の回数制限が Pro の上限になる(#449・[backend features/pro.md](../backend/features/pro.md))。端末の表示(`isPro`)はまだ StoreKit の値(サーバーを正にするのは後続)。審査用ビルドにはこの部品ごと無い。
 
 ### 22.4 デモ端末で上限に当たらないようにする
 - **DEBUG ビルドは既定で制限なし**(設定の「Tailor It Pro」に DEBUG のみ「回数制限を無効にする(デモ用)」トグル・既定 ON)。Release は既定で制限あり・トグルは出ない。
@@ -960,7 +1002,7 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 2. App(`jp.kz2601.metamon`)の「サブスクリプション」でグループ「Tailor It Pro」を作り、商品 ID `jp.kz2601.metamon.pro.monthly`・期間 1 か月・価格(¥500 相当)・表示名と説明(日英)・審査用スクリーンショットを登録。
 3. Sandbox テスターを作り、実機の 設定 > App Store > サンドボックスアカウント でサインインしてテスト購入。
 4. 審査提出時はサブスクを App のバージョンに添付。アプリ内に利用規約・プライバシーポリシーへのリンク、上限シートに価格・期間・自動更新の説明(実装済み)が要る。
-5. サーバー強制(18.3)を入れる場合は App Store Server API のキー(.p8)を発行し、ai / appconfig で権利を検証。App Store Server Notifications V2 の URL を設定。
+5. 取引の検証は鍵なしでローカルにできる(#314 実装済み)。更新・解約・返金を端末が開かれなくても反映するには App Store Server Notifications V2 の URL を設定し、必要なら App Store Server API のキー(.p8)を発行する(#315)。
 
 **RevenueCat に移す場合**
 1. RevenueCat でプロジェクトを作り、App Store Connect の App 内課金キー(In-App Purchase Key)と共有シークレットを登録。
@@ -974,7 +1016,7 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 
 | 項目 | 決定 |
 |---|---|
-| 何が有料か | backend の `paid_features.json`(1 か所・docs/backend/architecture.md §6.8)。初期は「みんなで共有するデータ」(共有データ型アプリ)だけ。iOS は判定を持たず、`POST /v1/chat` の ready の `requiresPro` / `paidFeatures` / `freeTranscript`、案の `options[].requiresPro` / `freeInstruction` を見るだけ |
+| 何が有料か | backend の `paid_features.json`(1 か所・[docs/backend/features/pro.md](../backend/features/pro.md))。初期は「みんなで共有するデータ」(共有データ型アプリ)だけ。iOS は判定を持たず、`POST /v1/chat` の ready の `requiresPro` / `paidFeatures` / `freeTranscript`、案の `options[].requiresPro` / `freeInstruction` を見るだけ |
 | 出す時 | ready の「これでいく」(`buildFromChat`・声の自動生成も含む)と案の「これでいく」(`choose`)。判定は `MetamonServices/Purchase/PaidFeatureCheck.swift`(純粋関数) |
 | 出さない時 | **Pro 会員** / **回数制限が無効の時(DEBUG ビルドの既定 = デモ端末)**。`METAMON_IAP_ENFORCE=1` で DEBUG でも出る(`ProGate.isEnforced` と同じ扱い・22.4)/ 旧 backend(`requiresPro` 無し)/ ready の transcript 以外の予備文で作る時 |
 | カード | `ClarifyChatView` の「これでいく」の位置(`PaidFeatureCard`・create は初期画面、edit は音声シートの中)。購入して作る = `ProEntitlementStore.purchase` → 成功したら有料機能込みの文で生成(キャンセル・承認待ちはカードに残る)/ この機能なしで作る = `freeTranscript`(`freeInstruction`)で生成 / × = チャットに戻る。話し直すとカードは閉じて次の応答で判定し直す |
@@ -994,7 +1036,7 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 | プレビューの無い import・「探す」の公開アプリのインストール | import / install の後(`InstalledApp.joined / member`) | そのアプリに切り替えない(一覧には残る) |
 | 新規作成の無料枠 | 生成の前(`admitNewApp`) | 送らない。圏外の保留の自動送信・状態カードの再送も枠を通す(`sendMetered`) |
 
-- 課金画面の中身: 見出し(理由ごと)・なぜ有料か・プラン名 / 期間 / 価格(`ProOffer`)・購入・復元・閉じたらどうなるか・Pro でできること・自動更新の説明・利用規約 / プライバシーポリシー(`LegalDocumentLink`。公開 URL が決まるまでは同梱文書)。
+- 課金画面の中身: 見出し(理由ごと)・なぜ有料か・プラン名 / 期間 / 価格(`ProOffer`)・購入・復元・閉じたらどうなるか・Pro でできること・自動更新の説明・利用規約 / プライバシーポリシー(`LegalDocumentLink`。同梱文書を開き、その画面から公開ページ https://tailor-it.app/terms ・ /privacy も開ける)。
 - 出す場所: 確認カードの課金画面は `ClarifyChatView`(音声シートの中にも重ねられる・placement `.chat`)、それ以外は `PaywallHost`(placement `.root`。音声シートは閉じてから出す)。
 - オンデバイスの `aiButton`(§18)はサーバーを使わないので無料。
 - 課金の制限の無効化(DEBUG の既定・22.4)中は、回数も有料機能も課金画面を出さない。設定のトグル名は「課金の制限を無効にする(デモ用・回数と有料機能)」。

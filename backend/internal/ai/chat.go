@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
 
 // Clarify phase (Issue #74): a few short question/answer turns before the
@@ -84,6 +85,7 @@ type ChatRequest struct {
 	// (build restriction; omitted = no restriction). Not related to Capabilities.
 	AllowedComponents []string `json:"allowedComponents,omitempty"`
 	DisabledFeatures  []string `json:"disabledFeatures,omitempty"`
+	SupportedFeatures []string `json:"supportedFeatures,omitempty"` // #482: same as Request
 }
 
 // Brief is the structured understanding of the requested app.
@@ -335,9 +337,9 @@ func (s *Service) ClearChat(uid, appID string) error {
 func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, err error) {
 	started := time.Now()
 	if req.AppID == "" {
-		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "appId is required"}
+		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "appId is required"}
 	}
-	ctx = withRestriction(ctx, NewRestriction(req.AllowedComponents, req.DisabledFeatures))
+	ctx = withRestriction(ctx, NewClientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures))
 	incoming, err := normalizeMessages(req.Messages)
 	if err != nil {
 		return nil, err
@@ -361,7 +363,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 	}
 	cv.messages = mergeHistory(cv.messages, incoming)
 	if len(cv.messages) == 0 || cv.messages[len(cv.messages)-1].Role != "user" {
-		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "messages must end with a user message"}
+		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "messages must end with a user message"}
 	}
 	userTexts := make([]string, 0, len(cv.messages))
 	for _, m := range cv.messages {
@@ -435,7 +437,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 		case att = <-done:
 			*ar = *bgAR
 		case <-ctx.Done():
-			return nil, &Error{Status: http.StatusGatewayTimeout, Code: "timeout", Message: "clarify turn cancelled"}
+			return nil, &Error{Status: http.StatusGatewayTimeout, Code: httpx.CodeTimeout, Message: "clarify turn cancelled"}
 		}
 	} else {
 		att = s.chatAttempt(ctx, cfg, chatUserMessage(cv.messages, loc, turn, true, nil), ar, nil)
@@ -450,7 +452,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 			return nil, att2.err
 		}
 		if att2.reply == nil {
-			return nil, &Error{Status: http.StatusBadGateway, Code: "generation_failed",
+			return nil, &Error{Status: http.StatusBadGateway, Code: httpx.CodeGenerationFailed,
 				Message: "could not produce a clarify turn", Problems: att2.problems, Attempts: ar.meta.Attempts}
 		}
 		att = att2
@@ -521,7 +523,7 @@ func (s *Service) chatAttempt(ctx context.Context, cfg ChatConfig, user string, 
 	sent := false
 	start := time.Now()
 	var first time.Duration
-	resp, ttft, err := s.callChat(ctx, cfg, user, ar, func(delta string) {
+	resp, ttft, err := s.callChat(WithOperation(ctx, OpChat), cfg, user, ar, func(delta string) {
 		if first == 0 {
 			first = time.Since(start)
 		}
@@ -631,7 +633,7 @@ func (s *Service) callChatWith(ctx context.Context, cfg ChatConfig, system strin
 	}
 	ar.meta.Usage.Add(resp.Usage)
 	if resp.StopReason == "refusal" {
-		return nil, 0, &Error{Status: http.StatusBadRequest, Code: "refused", Message: "the model declined this request", Attempts: ar.meta.Attempts}
+		return nil, 0, &Error{Status: http.StatusBadRequest, Code: httpx.CodeRefused, Message: "the model declined this request", Attempts: ar.meta.Attempts}
 	}
 	return resp, ttft, nil
 }
@@ -643,7 +645,7 @@ func normalizeMessages(in []ChatMessage) ([]ChatMessage, error) {
 		role := strings.ToLower(strings.TrimSpace(m.Role))
 		text := strings.TrimSpace(m.Text)
 		if role != "user" && role != "assistant" {
-			return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "message role must be user or assistant"}
+			return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "message role must be user or assistant"}
 		}
 		if text == "" {
 			continue
@@ -654,7 +656,7 @@ func normalizeMessages(in []ChatMessage) ([]ChatMessage, error) {
 		out = append(out, ChatMessage{Role: role, Text: text})
 	}
 	if len(out) == 0 {
-		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "messages must contain at least one user message"}
+		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "messages must contain at least one user message"}
 	}
 	return out, nil
 }

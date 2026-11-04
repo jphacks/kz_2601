@@ -12,8 +12,12 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
-// CodeAccountDeleted is the 410 error code for uids that deleted their account.
-const CodeAccountDeleted = "account_deleted"
+// routes (account deletion #119)
+func init() {
+	registerRoutes(func(h *Handler, mux *http.ServeMux) {
+		mux.HandleFunc("DELETE /v1/me", h.deleteMe)
+	})
+}
 
 // deleteMe is DELETE /v1/me (#119, App Store 5.1.1(v)). Logical deletion:
 // store.Accounts.DeactivateUser marks the uid deleted, archives its apps,
@@ -72,7 +76,7 @@ func RejectDeleted(s store.Accounts, next http.Handler) http.Handler {
 			mu.Unlock()
 		}
 		if gone {
-			httpx.Error(w, http.StatusGone, CodeAccountDeleted, "this account has been deleted")
+			httpx.Error(w, http.StatusGone, httpx.CodeAccountDeleted, "this account has been deleted")
 			return
 		}
 		next.ServeHTTP(w, r)

@@ -32,7 +32,7 @@ Expr := number | string | boolean
 | 形 | 意味 |
 |---|---|
 | リテラル | 数値・文字列・真偽値。`null` は式ではない(スキーマで拒否) |
-| `ref` | 行コンテキスト(§4)のレコードのフィールド値。`"id"` はレコード id。`"payer.name"` のように **ドット 1 つ**で、type ref の field が指す先のレコードのフィールド値(lookup・#134)。`"<ref>.id"` は ref の値そのもの。2 段以上(`a.b.c`)は不可 |
+| `ref` | 行コンテキスト(§4)のレコードのフィールド値。`"id"` はレコード id。`"payer.name"` のように **ドット 1 つ**で、type ref の field が指す先のレコードのフィールド値(lookup・#134)。`"<ref>.id"` は ref の値そのもの。2 段以上(`a.b.c`)は不可。予約値(`$author` `$createdAt` `$marks.<id>`)は ref に書けない(backend が拒否。印の件数は式でなく table の列・sort で出す) |
 | `agg` | エンティティ全レコード(filter で絞る)の集計。count 以外は `field` 必須。`field` に computed フィールドも可。`latest` / `earliest`(#133)は `by`(date/datetime field)で並べた最新 / 最古の 1 件の `field` の値(型は field のまま・数値以外も可) |
 | `op` | 関数呼び出し。§3 の閉じた一覧のみ |
 | `if` | `if` が true なら `then`、それ以外は `else` |
@@ -61,16 +61,17 @@ Expr := number | string | boolean
 | | `neg` `abs` `sqrt` | 数値 1 個 | 数値(`sqrt` の負数はエラー) |
 | | `round` `floor` `ceil` | (x) または (x, n) | 数値(n = 小数桁・省略で整数。`round(x,1)` = 小数 1 桁) |
 | | `clamp` | (x, lo, hi) | 数値 |
-| 比較 | `eq` `neq` | 任意 2 個 | 真偽(型が違っても nil にせず、数値か文字列に寄せて比べる: レコード id と ref 値の比較用) |
-| | `gt` `gte` `lt` `lte` | 同じ型(数値同士・日付同士)2 個 | 真偽 |
-| 論理 | `and` `or` | 真偽 2 個 | 真偽 |
-| | `not` | 真偽 1 個 | 真偽 |
+| 比較 | `eq` `neq` | 任意 2 個 | 真偽(型が違っても nil にせず、数値か文字列に寄せて比べる: レコード id と ref 値の比較用。日付と日付の文字列は日時として比べる) |
+| | `gt` `gte` `lt` `lte` | 同じ型(数値同士・日付同士)2 個 | 真偽(日付と日付の文字列も日付として比べる。比べられない組は nil) |
+| 論理 | `and` `or` | 真偽 2 個 | 真偽(nil は false として扱い、nil にしない・§5) |
+| | `not` | 真偽 1 個 | 真偽(`not(nil)` = true・§5) |
 | 文字列 | `concat` | 任意 2 個(文字列化して連結) | 文字列 |
 | | `len` | 文字列 1 個 | 数値(文字数) |
 | 日付 | `now` `today` | なし(`args: []`) | 日時 / 今日の日付(端末ローカル) |
 | | `daysBetween` | (a, b) | 数値 = b − a の日数 |
 | | `daysUntil` | (d) | 数値 = d − 今日 の日数(過ぎたら負) |
 | | `addDays` | (d, n) | 日付 = d の n 日後 |
+| | `nextOccurrence` | (d, `"monthly"` \| `"yearly"`) | 日付 = d から毎月 / 毎年くり返す日のうち、**今日以降で最も近い日**(0:00)。d が今日以降なら d。日が無い月は月末に寄せる(§3.1)。第 2 引数は文字列リテラルだけ(#266) |
 | 時刻 | `hoursBetween` | (start, end) | 数値 = end − start の時間数(小数。30 分 = 0.5)。**end < start は日付またぎとして +24h**(22:00→05:00 = 7)。同じ時刻は 0 |
 | | `year` `month` `day` `weekday` | (d) | 数値(month 1-12、weekday 1=日 … 7=土) |
 | 変換 | `toNumber` `toString` | 任意 1 個 | 数値(変換不可はエラー)/ 文字列 |
@@ -78,7 +79,17 @@ Expr := number | string | boolean
 | 毎日チェック(#172) | `streak` | (`{"ref": <toggle field>}`) | 数値 = 連続日数。今日チェック済みなら今日から、まだなら**昨日から**遡って続いた日数(今日未チェックでも昨日までの連続は切らない)。昨日も無ければ 0 |
 | | `doneInDays` | (`{"ref": <toggle field>}`, n) | 数値 = 直近 n 日(今日を含む)にチェックした日数(直近 7 日 = n 7)。n は整数リテラル 1..366 |
 
-日付引数は date / datetime フィールド、`today`/`now`/`addDays` の結果、`"YYYY-MM-DD"` 文字列を受け付ける。
+### 3.1 `nextOccurrence` の決まり(#266)
+
+- 回 k = d + k か月(毎年は 12k か月)。**日が無い月はその月の末日に寄せる**: 1/31 の毎月 → 2/28(閏年は 2/29)・3/31・4/30、2/29 の毎年 → 平年は 2/28。寄せるのはその回だけで、次の回は元の日に戻る(1/31 → 2/28 → 3/31。28 日に固定されない)。iOS の `Calendar.date(byAdding: .month)` と同じ。
+- 比べるのは日(端末ローカル)だけ: 回の日 ≥ 今日 の最初の回(今日が更新日なら今日)。時刻は落として 0:00 を返す。datetime は端末のタイムゾーンでの日付で読む(`day` と同じ)。
+- d がまだ先(今日より後)なら d(始まる前の回は作らない)。
+- `"monthly"` `"yearly"` 以外・日付でない d は nil(backend は文字列リテラル以外を拒否)。
+- 残り日数 = `daysUntil(nextOccurrence(d, "monthly"))`(更新日を過ぎてもマイナスにならない)。
+- レコード基準の通知の `repeat: monthly | yearly` も同じ回を使う(§7 の 9)。
+
+日付引数は date / datetime フィールド、`today`/`now`/`addDays` の結果、`"YYYY-MM-DD"` 文字列、RFC 3339 の文字列(オフセット必須・小数秒 `…00.123Z` も可)を受け付ける。
+`"YYYY-MM-DD"` と `today` は端末のタイムゾーンでの**その日の最初の時刻**(ふつうは 0:00)。夏時間の切り替えで 0:00 が無い日(サンパウロの 2018-11-04 など)はその日の 1:00 で、前の日にも「—」にもならない。`daysBetween` / `daysUntil` は時刻の差でなく暦の日数で数える(23 時間・25 時間の日も 1 日)。`addDays` は同じ時刻の n 日後で、その時刻が夏時間の切り替えで無い時は無い時間の長さだけ後ろにずらす(0:30 → 1:30・#556)。
 
 `streak` / `doneInDays` の第 1 引数は**値ではなく field の指定**: `list.item.resets: "daily"` の toggle に使われている同 entity の date field を `{"ref": ...}` で渡す(iOS はその行の「押した日の履歴」を読む・§7.5)。computed(integer)で使い、全体の値は stat.value の `agg sum / max` でその computed を集計する。stat.value 直下では行が無いので使えない。
 
@@ -90,10 +101,13 @@ Expr := number | string | boolean
 |---|---|---|---|
 | `Field.computed` | そのレコード | 可(同 entity のフィールド・`"id"`) | 算出列: 支払済・残高・BMI・残り日数 |
 | `Stat.value` | なし(画面スカラー) | **不可**(`agg` を使う) | 1 人あたり・残り予算・達成率 |
+| `Notification.when`(#265) | なし(画面スカラー) | **不可**(`agg` を使う) | 条件で知らせる(結果は真偽・偽 → 真で 1 回。README §3.10) |
 | `Filter.value`(agg 内) | 外側の行(computed なら そのレコード) | 外側に行があれば可 | 「このメンバーが払った」 |
 | `Filter.value`(list/stat/chart 等の画面部品) | なし | 不可 | `{"op":"addDays","args":[{"op":"today","args":[]},-7]}` = 直近 7 日 |
 
 - **computed フィールド**: `type` は `number|integer|currency|string|boolean|date`。保存されない読み取り専用列。list の item / table の columns / stat・chart の field / sort / filter から通常フィールドと同じに参照できる。入力部品(textField 等)は束縛できない。`required` / `defaultValue` は不可。
+- **filter の比べ方**(agg 内・部品レベル共通): `gt` `gte` `lt` `lte` は、数値同士(数の文字列・カンマ付きも数として)なら数値、日付同士(date / datetime field・日付の文字列・`today` `addDays` などの結果)なら日付で比べる。それ以外の組(文字列同士・日付と数値)はどのレコードにも一致しない。`{"field":"date","op":"gte","value":{"op":"addDays","args":[{"op":"today","args":[]},-7]}}` = 直近 7 日。
+- **filter の value の Expr が評価できない(nil)**時は、その filter は**どのレコードにも一致しない**(count / sum は 0、avg / min / max は nil)。値が空のレコードに一致させない(行の無い所で `{"ref":"id"}` を書いた・0 割りなど)。
 - 部品レベルの `filter`(list / stat / chart …)はスキーマ上 1 つだけ(iOS は配列も読めるが、backend は出さない・AND が要るなら stat.value の agg で)。
 - **グループごとの集計の一覧**(店ごとの平均点・人ごとの合計)は Expr ではなく `table.groupBy` + 列の `aggregate`(README §3.2 の設計メモ・#261)。グループの値ごとに `agg` を書く必要は無い。
 - **`Stat.value`**: `aggregate` の代わり。`aggregate` と `value` は**排他でどちらか必須**。`value` のときは `entity/field/filter` を書かない(agg の中に書く)。`format` はそのまま効く(percent は 0..1 → %)。
@@ -104,7 +118,12 @@ Expr := number | string | boolean
 ## 5. 評価ルール(iOS)
 
 - 型は 数値(Double)/ 文字列 / 真偽 / 日付 / 空。currency・integer フィールドは数値。ref フィールドの値は参照先レコード id(文字列)。
-- 空のフィールド・評価エラー(0 割り・型不一致・参照先なし・`sqrt` の負数)は **nil → 表示は「—」**。nil を受けた op は nil を返す(`coalesce` だけは b を返す)。`agg` は 0 件なら count/sum は 0、avg/min/max は nil。
+- 空のフィールド・評価エラー(0 割り・型不一致・参照先なし・`sqrt` の負数)は **nil → 表示は「—」**。nil を受けた op は nil を返す。例外:
+  - `coalesce` は b を返す。
+  - `eq` / `neq` は nil を値として比べる(nil 同士は等しい)。`concat` は nil を空文字にする。
+  - **`and` / `or` / `not` と `if` の条件は nil を false として扱う**(`not(nil)` = true)。まだ押していない boolean field(値が無い)を「false」と読むため。生成アプリの `and(ref workout, ref reading)`(両方達成)や「未完了」の判定が、片方が未入力の行で「—」になったり filter `eq true` / `eq false` から外れたりしないよう、nil にしない(#552)。
+- `agg` は 0 件なら count/sum は 0、avg/min/max は nil。
+- 文字列の数は桁区切りのカンマを除いて数として読む(`"1,200"` = 1200。算術・比較・`agg` の sum / avg / min / max で同じ)。
 - computed 同士の依存は backend が DAG を保証する(循環は来ない)。評価順は依存順でも都度再帰でもよい。
 - `today`/`now` と期間 filter(`today`/`thisWeek`/`thisMonth`/`thisYear`)は端末ローカル時刻(従来の stat filter と同じ)。
 - **`thisWeek` は月曜 0:00 〜 次の月曜 0:00**。端末ロケールの週の始まり(日本の `Calendar` 既定は日曜)に従わず月曜に固定する: 日本の暦・学校・職場の「今週」は月〜日で数えるのが一般的で、日曜始まりだと日曜の記録が「来週」側に入り、週末に振り返る用途(家事当番・週の目標)で直感とずれるため。`thisYear` は 1/1 〜 12/31。
@@ -132,6 +151,7 @@ Expr := number | string | boolean
 | `hoursBetween` の引数 | `hoursBetween expects a "HH:mm" time string (or a datetime field) but got a number` |
 | `list.item.toggle` | `list item.toggle "name" must be a boolean field (got string)` / `... is computed (read-only)` |
 | `list.item.resets` | `... with resets daily must be a date field (got boolean)` / `... is a date field; add "resets":"daily"` / `... must not have defaultValue` |
+| `nextOccurrence` | `nextOccurrence.args[1]: must be the string "monthly" or "yearly"` / `repeat monthly needs entity + field` / `repeat yearly needs a date or datetime field` |
 | `streak` / `doneInDays` | `streak needs {"ref": <daily check field>} of this entity` / `"started" is not a daily check; streak only works on a field used as list item.toggle with "resets":"daily"` / `number of days must be an integer literal 1..366` |
 | Stat 排他 | `stat takes either aggregate or value, not both` / `stat needs aggregate (with entity) or value` |
 | `Field.hidden`(§7.6) | `list item.trailing "correct" of entity "questions" is hidden ...` / `computed shows hidden field questions.correct; a hidden value may only be compared ...` / `a computed field cannot be hidden` |
@@ -167,6 +187,13 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
    - `score`(integer) = `{"if":{"ref":"is_correct"},"then":{"ref":"question.points"},"else":0}`
    - ランキング: players の `total` = `{"agg":"sum","entity":"answers","field":"score","filter":{"field":"player","op":"eq","value":{"ref":"id"}}}` を table で `sort desc`。
    - 回答フォームは picker で問題・回答者・選択肢を選ぶ(点数の入力欄は作らない)。正解は §7.6 の hidden で一覧に出さない。
+
+9. **サブスクの更新日・誕生日・記念日**(#266): subs{name, price: currency, renew_on: date(datePicker)}。
+   - `days_left`(integer・unit 日) = `{"op":"daysUntil","args":[{"op":"nextOccurrence","args":[{"ref":"renew_on"},"monthly"]}]}`(`daysUntil(ref renew_on)` だけだと過ぎてマイナス)。一覧は days_left の昇順。
+   - 前日の通知 = `app.notifications` に `{"id":"renew","title":"明日はサブスクの更新日","body":"","repeat":"monthly","entity":"subs","field":"renew_on","offsetMinutes":-1440,"titleField":"name"}`。更新日 10/30 なら 10/29・11/29・12/29…(2 月は 2/28 に寄せて 2/27)の 9:00(`time` で変えられる)。
+   - 誕生日・記念日は `"yearly"`。
+   - **iOS の予約**: 発火の日時(毎月なら日・時・分、毎年なら月・日・時・分)が 4 年分ずっと同じなら `UNCalendarNotificationTrigger` のくり返し 1 件(アプリを開かなくても鳴り続ける)。月末に寄せる回がある(29〜31 日・2/29・ずらすと月をまたぐ「1 日の前日」など)・起点がまだ先なら、近い順に具体的な日時を毎月 3 件 / 毎年 2 件予約し、アプリを開いた時(DSL の読み込み・レコードの変化)に先へ延ばす。全アプリで 60 件の上限と近い順の選び方は従来どおり。
+   - 固定 `time` だけの通知・`scheduleNotification`・`"HH:mm"` の string field には使えない(backend が拒否)。monthly / yearly を知らない古い版は once として読む(落ちない・次の 1 回だけ)。
 
 ## 7.5 一覧のワンタップ チェック(`list.item.toggle`, #108)
 

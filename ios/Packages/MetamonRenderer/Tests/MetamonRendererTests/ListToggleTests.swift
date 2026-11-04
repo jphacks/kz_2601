@@ -15,7 +15,7 @@ final class ListToggleTests: XCTestCase {
     }
 
     private func homeLists(_ dsl: AppDSL) -> [Component] {
-        dsl.screen("home")?.components.flatMap { $0.children ?? [] }.filter { $0.type == .list } ?? []
+        dsl.screen("home")?.components.flatMap { $0.children }.filter { $0.type == .list } ?? []
     }
 
     func testShoppingRowsShowToggle() throws {
@@ -28,7 +28,7 @@ final class ListToggleTests: XCTestCase {
         }
         // 他の正典サンプルの list には丸が出ない(既存の見た目を変えない)
         let kakeibo = try AppDSL.load(contentsOf: Self.repoRoot.appending(path: "docs/dsl/examples/kakeibo.json"))
-        let list = try XCTUnwrap(kakeibo.screen("home")?.components.flatMap { $0.children ?? [] }.first { $0.type == .list })
+        let list = try XCTUnwrap(kakeibo.screen("home")?.components.flatMap { $0.children }.first { $0.type == .list })
         XCTAssertNil(ListToggle.field(list.item, in: kakeibo.entity("expense")))
     }
 

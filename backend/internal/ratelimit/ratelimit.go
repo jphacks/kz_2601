@@ -40,7 +40,7 @@ type Limits struct {
 	SignedIn  int
 	Pro       int
 	// PerIP applies to anonymous callers only (re-created anonymous accounts
-	// share a network); signed-in users behind the same Wi-Fi are not affected.
+	// share a network); signed-in and Pro users behind the same Wi-Fi are not affected.
 	PerIP int
 	// Global is the cost breaker across every caller of this environment.
 	Global int
@@ -64,9 +64,9 @@ var (
 // tzdata in the container image.
 var JST = time.FixedZone("JST", 9*60*60)
 
-// ProChecker reports whether uid has Tailor It Pro. There is no server-side
-// receipt check yet, so the default is "never"; plug a verifier in here once
-// App Store Server API / RevenueCat validation exists.
+// ProChecker reports whether uid has Tailor It Pro. Production uses
+// entitlement.ProChecker (the StoreKit transaction verified by appconfig, #314
+// #449); nil means nobody is pro.
 type ProChecker interface {
 	IsPro(ctx context.Context, uid string) bool
 }
@@ -90,6 +90,14 @@ type Usage struct {
 // any counter would go over its limit.
 type Store interface {
 	Consume(ctx context.Context, counters []Counter, weight int, expireAt time.Time) (Usage, error)
+	// Refund takes weight back from every counter atomically (#548). A count
+	// never goes below 0 and a missing (or expired) counter is left missing.
+	Refund(ctx context.Context, counters []Counter, weight int, expireAt time.Time) error
+}
+
+// refunded is the count after giving weight back (never below 0).
+func refunded(count, weight int) int {
+	return max(0, count-weight)
 }
 
 // evaluate is the shared check-then-add rule of every Store.
@@ -127,6 +135,16 @@ type Decision struct {
 	Used      int
 	Remaining int
 	ResetAt   time.Time
+
+	// charge is what Allow wrote, so Refund can take it back (zero when nothing was charged).
+	charge charge
+}
+
+type charge struct {
+	store    Store
+	counters []Counter
+	weight   int
+	expireAt time.Time
 }
 
 // Limiter decides whether a request may run.
@@ -162,12 +180,14 @@ func New(cfg Config, store Store, pro ProChecker) *Limiter {
 // Config returns the effective configuration.
 func (l *Limiter) Config() Config { return l.cfg }
 
+// tier: a verified Pro entitlement wins over the sign-in state (an anonymous
+// account can buy Pro too, #449).
 func (l *Limiter) tier(ctx context.Context, id auth.Identity) Tier {
 	switch {
-	case id.Anonymous:
-		return TierAnonymous
 	case l.pro != nil && l.pro.IsPro(ctx, id.UID):
 		return TierPro
+	case id.Anonymous:
+		return TierAnonymous
 	default:
 		return TierSignedIn
 	}
@@ -206,7 +226,7 @@ func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight
 	if limit > 0 {
 		counters = append(counters, Counter{ID: fmt.Sprintf("%s_%s_uid_%s", prefix, day, docSafe(id.UID)), Scope: ScopeUser, Limit: limit})
 	}
-	if id.Anonymous && l.cfg.Limits.PerIP > 0 && ip != "" {
+	if tier == TierAnonymous && l.cfg.Limits.PerIP > 0 && ip != "" {
 		counters = append(counters, Counter{ID: fmt.Sprintf("%s_%s_ip_%s", prefix, day, ipKey(ip)), Scope: ScopeIP, Limit: l.cfg.Limits.PerIP})
 	}
 	if l.cfg.Limits.Global > 0 {
@@ -218,10 +238,12 @@ func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight
 
 	// TTL: keep a day of slack so the document outlives its own day.
 	expireAt := reset.Add(24 * time.Hour)
-	usage, err := l.store.Consume(ctx, counters, weight, expireAt)
+	store := l.store
+	usage, err := store.Consume(ctx, counters, weight, expireAt)
 	if err != nil {
 		l.log.WarnContext(ctx, "ratelimit: store failed; counting in memory", slog.Any("error", err))
-		usage, err = l.fallback.Consume(ctx, counters, weight, expireAt)
+		store = l.fallback
+		usage, err = store.Consume(ctx, counters, weight, expireAt)
 		if err != nil {
 			return dec, err
 		}
@@ -235,11 +257,24 @@ func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight
 		dec.Remaining = max(0, c.Limit-dec.Used)
 		return dec, nil
 	}
+	dec.charge = charge{store: store, counters: counters, weight: weight, expireAt: expireAt}
 	if counters[0].Scope == ScopeUser {
 		dec.Used = usage.Counts[0]
 		dec.Remaining = max(0, limit-dec.Used)
 	}
 	return dec, nil
+}
+
+// Refund gives back up to units of what Allow charged for dec (#548), to the
+// store that took them (the memory fallback when Firestore failed then).
+// Every counter of the request (user, ip, global) gets the same units back.
+func (l *Limiter) Refund(ctx context.Context, dec Decision, units int) error {
+	c := dec.charge
+	units = min(units, c.weight)
+	if units <= 0 || c.store == nil {
+		return nil
+	}
+	return c.store.Refund(ctx, c.counters, units, c.expireAt)
 }
 
 // docSafe keeps a Firestore document id legal ("/" is the only banned rune).

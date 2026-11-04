@@ -14,7 +14,8 @@ open Metamon.xcodeproj
 ```
 ios/
 ├── Metamon/                 # アプリ本体(薄い): MetamonApp / AppRuntime / RootView / Features/{Auth,Voice} / BuildConfig(DI の入口)
-├── scripts/sync-firebase-plist.sh   # GoogleService-Info.plist を ~/Desktop/JPHACKS2026/secrets から Metamon/Resources/ へ
+├── Firebase/                # Firebase の plist の置き場(git-ignored。sync-firebase-plist.sh がコピー)
+├── scripts/sync-firebase-plist.sh   # GoogleService-Info*.plist を ~/Desktop/JPHACKS2026/secrets から Firebase/ へ
 └── Packages/
     ├── MetamonDSL/          # DSL モデル・GridArea・Record/Aggregator(Foundation のみ・swift test 可)
     ├── MetamonRenderer/     # SwiftUI View。Components/ は 1 種 = 1 ファイル、ComponentRegistry で登録
@@ -25,9 +26,10 @@ ios/
 
 ## 秘密情報(GoogleService-Info.plist)
 - 置き場はリポ外 `~/Desktop/JPHACKS2026/secrets/GoogleService-Info.plist`(別の場所なら `METAMON_SECRETS_DIR=... ./scripts/sync-firebase-plist.sh`)。
-- `sync-firebase-plist.sh` が `Metamon/Resources/` にコピーし、`git check-ignore` で無視されていることを確認する(public リポ。**絶対にコミットしない**)。
+- `sync-firebase-plist.sh` が `ios/Firebase/` にコピーし、`git check-ignore` で無視されていることを確認する(public リポ。**絶対にコミットしない**)。
+  - `GoogleService-Info.plist` = prod(必須)。`GoogleService-Info-Staging.plist` = stg(secrets にあればコピー)。
+  - バンドルへはビルドフェーズ「Select Firebase plist」が構成に合う方を `GoogleService-Info.plist` として入れる(下の「ビルド構成と接続先」)。
 - plist が無くてもビルド/起動はできる(起動ログに警告、認証はモックの固定 uid・Authorization ヘッダ無し)。
-- xcodegen はファイルの有無で Resources を決めるので、**コピーしてから `xcodegen generate`**。
 
 ## 認証(Firebase Auth)
 - 起動時にサインイン済みでなければ `SignInView`: **Sign in with Apple**(`SignInWithAppleButton` → nonce/SHA-256 → `OAuthProvider.appleCredential` → Firebase)、下に「ログインせずに使う(匿名)」(`signInAnonymously`)。
@@ -57,6 +59,19 @@ xcrun devicectl device install app --device 150ACFA5-8AF6-569A-8EBD-47283A3D1E0B
 xcrun devicectl device process launch --device 150ACFA5-8AF6-569A-8EBD-47283A3D1E0B jp.kz2601.metamon
 ```
 - appId は端末ごとに固定(初回起動で UUID を生成し `UserDefaults` に保存)。ai のインメモリ store は再起動で消えるが、未知の appId は初期状態として扱われるので再生成すれば続きから使える(version ズレは 409 → 現行基準で 1 回リトライ)。
+
+## ビルド構成と接続先(#292)
+
+| 構成 | 使う scheme | 用途 | ai / appconfig | Firebase plist | 表示名 |
+|---|---|---|---|---|---|
+| Debug | `Metamon` | 開発・CI・UI テスト | stg | stg(無ければ prod に戻して警告) | Tailor It β |
+| Staging | `Metamon-Staging` | 端末に入れる検証版 | stg | stg(無ければ prod に戻して警告) | Tailor It β |
+| Release | `Metamon`(Archive) | TestFlight / App Store | prod | prod | Tailor It |
+| Review | `Metamon-Review` | App Store 審査用(#245) | prod | prod | Tailor It |
+
+- 切り替えは scheme か `-configuration` で選ぶだけ(例: `xcodebuild -scheme Metamon-Staging -configuration Staging ...`)。
+- stg の URL は今の `jphacks-kz2601` の stg Cloud Run。stg 用の GCP / Firebase プロジェクトができたら `project.yml` の URL と secrets の `GoogleService-Info-Staging.plist` を差し替える(#288)。
+- Bundle ID は既定で全構成 `jp.kz2601.metamon`(同じ端末では上書きになる)。stg 版と prod 版を並べて入れる手順は [docs/ios/architecture.md「ビルド構成と接続先」](../docs/ios/architecture.md#ビルド構成と接続先292)。
 
 ## App Store 審査用の版(#245)
 

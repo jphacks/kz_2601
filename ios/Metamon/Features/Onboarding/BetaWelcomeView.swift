@@ -1,0 +1,133 @@
+// 審査用ビルドでは外す(β の文言を App Store の版に入れない・#313・docs/ios/review-build.md)。
+#if !APP_STORE_REVIEW
+import SwiftUI
+import MetamonServices
+
+/// β の案内の中身(#313)。キーは日本語(英語は `Localizable.xcstrings`)。
+enum BetaWelcomeContent {
+    /// 試してほしい依頼の例。タップで入力欄に入る(送らない)
+    static let tryKeys: [String] = [
+        "家計簿アプリを作って",
+        "毎日の体重を記録して、グラフで見せて",
+        "筋トレの記録アプリを作って",
+        "入力の画面に「メモ」の欄を足して",
+    ]
+
+    /// まだできないこと
+    static let limitKeys: [String] = [
+        "画面がたくさんつながるアプリや、ゲームのように動くアプリは、思った通りにできないことがあります。",
+        "カレンダー・連絡先・銀行など、ほかのアプリやサービスのデータは読み込めません。",
+        "AI が作るので、同じ頼み方でも毎回少し違うものができます。",
+    ]
+}
+
+/// RootView に付ける: チュートリアル(#274)の後に、β の版でだけ初回に 1 回出す。
+struct BetaWelcomeHost: ViewModifier {
+    @Environment(AppRuntime.self) private var rt
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(isPresented: Binding(get: { rt.showBetaWelcome },
+                                        set: { if !$0 { rt.finishBetaWelcome() } })) {
+                BetaWelcomeView()
+            }
+            .onChange(of: rt.showTutorial) { _, showing in
+                // チュートリアルが閉じたら、閉じるアニメーションを待ってから出す(重なると表示されない)
+                guard !showing else { return }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(700))
+                    rt.presentBetaWelcomeIfNeeded()
+                }
+            }
+            .task {
+                // チュートリアルが済んでいる人(β に入れ直した等)は、起動して少し待ってから出す
+                try? await Task.sleep(for: .milliseconds(1200))
+                rt.presentBetaWelcomeIfNeeded()
+            }
+    }
+}
+
+/// β の案内(#313): 試してほしい依頼・まだできないこと・データが消える可能性・フィードバック(#319)への入口。
+struct BetaWelcomeView: View {
+    @Environment(AppRuntime.self) private var rt
+    @Environment(\.services) private var services
+    @State private var feedback: FeedbackContext?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    HStack(alignment: .top, spacing: Theme.Spacing.md) {
+                        CraneMascot(pose: .happy, size: 64, sway: 4)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                            Text("Tailor It β へようこそ")
+                                .font(.headline)
+                                .accessibilityAddTraits(.isHeader)
+                            Text("β 版を試していただき、ありがとうございます。使ってみて気づいたことを、ぜひ教えてください。")
+                                .font(.subheadline)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+
+                Section {
+                    ForEach(BetaWelcomeContent.tryKeys, id: \.self) { key in
+                        let text = L10n.tr(String.LocalizationValue(key))
+                        Button {
+                            rt.composerDraft = text
+                            rt.finishBetaWelcome()
+                        } label: {
+                            Label(L10n.tr("「\(text)」"), systemImage: "mic")
+                        }
+                    }
+                } header: {
+                    Text("試してほしい依頼")
+                } footer: {
+                    Text("タップすると入力欄に入ります(まだ送りません)。")
+                }
+
+                Section {
+                    ForEach(BetaWelcomeContent.limitKeys, id: \.self) { key in
+                        Label(L10n.tr(String.LocalizationValue(key)), systemImage: "exclamationmark.circle")
+                            .font(.subheadline)
+                    }
+                } header: {
+                    Text("まだできないこと")
+                }
+
+                Section {
+                    Label("β の期間中は、作ったアプリや記録が消えることがあります。大事なデータは、ほかの場所にも残してください。",
+                          systemImage: "externaldrive.badge.exclamationmark")
+                        .font(.subheadline)
+                } header: {
+                    Text("データについて")
+                }
+
+                Section {
+                    Button {
+                        feedback = FeedbackContext.capture(runtime: rt, screenshot: FeedbackScreenshot.captureAppScreen())
+                    } label: {
+                        Label("フィードバックを送る", systemImage: "envelope")
+                    }
+                    .accessibilityIdentifier("betaWelcome.feedback")
+                } footer: {
+                    Text("困ったこと・欲しい機能を、ここからそのまま送れます。端末を振っても開けます。")
+                }
+            }
+            .navigationTitle("β 版のご案内")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("はじめる") { rt.finishBetaWelcome() }
+                        .accessibilityIdentifier("betaWelcome.close")
+                }
+            }
+            .sheet(item: $feedback) { ctx in
+                FeedbackComposerView(context: ctx, client: services.feedback) { feedback = nil }
+            }
+        }
+        .accessibilityIdentifier("betaWelcome.sheet")
+    }
+}
+#endif

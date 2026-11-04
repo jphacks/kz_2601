@@ -106,4 +106,19 @@ final class UpdateCheckTests: XCTestCase {
         let chat = HTTPAIClient.ChatBody(appId: "a", messages: [])
         XCTAssertEqual(chat.allowedComponents, body.allowedComponents, "generate と chat は同じ一覧")
     }
+
+    /// 記録の自動削除(#482)・仲間探し(#507)を実装していることを generate / chat の両方で伝える(無いと backend は使わせない)。
+    func testBodiesSendSupportedFeatures() throws {
+        let body = HTTPAIClient.GenerateBody(appId: "a", baseVersion: nil, transcript: "t")
+        let chat = HTTPAIClient.ChatBody(appId: "a", messages: [])
+        #if APP_STORE_REVIEW
+        let expected = ["recordRetention", "notification.when"]
+        #else
+        let expected = ["recordRetention", "matching", "notification.when"] // #507 仲間探し(審査用の版は送らない)
+        #endif
+        XCTAssertEqual(body.supportedFeatures, expected)
+        XCTAssertEqual(chat.supportedFeatures, expected)
+        let json = try XCTUnwrap(String(data: JSONEncoder().encode(body), encoding: .utf8))
+        XCTAssertTrue(json.contains(#""supportedFeatures":["# + expected.map { "\"\($0)\"" }.joined(separator: ",") + "]"), json)
+    }
 }

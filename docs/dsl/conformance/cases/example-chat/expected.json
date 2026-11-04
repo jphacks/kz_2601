@@ -1,0 +1,34 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 12
+          },
+          "id" : "chat",
+          "props" : {
+            "entity" : "messages",
+            "placeholder" : "メッセージを入力"
+          },
+          "state" : "rendered",
+          "type" : "chatThread"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "サークルのチャット",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

@@ -3,7 +3,7 @@ package appconfig
 // Release requests (#76): the owner asks for an app to be shipped as its own
 // standalone app. The API only files the request (status "received") with a
 // DSL snapshot; an admin moves status in the Firestore console
-// (architecture.md §3.3).
+// (docs/backend/features/release.md).
 
 import (
 	"fmt"
@@ -14,6 +14,15 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
+
+// routes (release requests #76)
+func init() {
+	registerRoutes(func(h *Handler, mux *http.ServeMux) {
+		mux.HandleFunc("POST /v1/apps/{appId}/release-requests", h.createReleaseRequest)
+		mux.HandleFunc("GET /v1/apps/{appId}/release-requests", h.listAppReleaseRequests)
+		mux.HandleFunc("GET /v1/release-requests", h.listMyReleaseRequests)
+	})
+}
 
 // Release request field limits (runes).
 const (

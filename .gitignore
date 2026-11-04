@@ -3,7 +3,7 @@
 .env.*
 *.pem
 *.p8
-GoogleService-Info.plist
+GoogleService-Info*.plist
 serviceAccountKey*.json
 
 # macOS / Xcode

@@ -38,6 +38,7 @@ gh pr ready            # Draft 解除
 - `feature/*` → `develop`: Squash merge 推奨(履歴が1コミット=1PRになる)。タイトルは Conventional Commits に直す。
 - `develop` → `main`: **実機(iPhone 13)で E2E を通してから**。Merge commit(squash しない。develop と main の履歴を揃える)。マージすると Cloud Run prod に自動デプロイ。
 - 変更を触らない領域の CI(例: iOS だけ触った PR の `backend-ci`)は自動で skip され、required check は満たされる。
+- `scripts-ci`(`.github/workflows/scripts-ci.yml`)は `*.sh`・`scripts/**`・`.github/workflows/**` を触った時だけ走り、shellcheck・`scripts/ai-cost-test.sh`・actionlint を回す。required check ではない(ローカルでは `git ls-files -z '*.sh' | xargs -0 shellcheck` と `actionlint`)。
 
 ## hotfix / release
 
@@ -93,6 +94,16 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
   gh run rerun <run-id>
   ```
 
+## backend-emulator(Firestore エミュレータ試験・必須ではない)
+
+`.github/workflows/backend-emulator.yml`(#546)。`backend-ci` は 5 分上限なので別 workflow。
+
+- 発火: `backend/**` かこの workflow を触る PR(非 Draft)と、`develop` / `main` への push。
+- gcloud SDK の `cloud-firestore-emulator` を `127.0.0.1:8089`・プロジェクト `demo-kz2601` で起動し、`t.Skip("FIRESTORE_EMULATOR_HOST not set")` を持つパッケージに `go test` をかける。`demo-` プロジェクトで認証情報も渡さないので実 GCP には繋がらない。
+- Firestore 系テスト(`TestFirestore*` / `*/firestore`)が 1 件でもスキップされたら失敗(黙ってスキップさせない)。通った件数は job summary に出る。
+- **required check にはまだしていない**(マージ条件は上の 3 本のまま)。必須にするかはオーナーが判断する。必須にするなら `paths:` をやめて `backend-ci` と同じ paths-filter 方式に変える。
+- 起動・試験の中身は `scripts/firestore-emulator.sh`。手元で同じことをするには `make -C backend test-emulator`(エミュレータが無ければ一時的に起動して止める)。開発用に起動しっぱなしにするなら `make -C backend emulator`(別ターミナル)。
+
 ## CI が落ちた時の見方
 
 1. PR の Checks タブ → 赤い job をクリック → 失敗した step を開く(`::error` 行が要点)。
@@ -117,7 +128,7 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 - 流れ: `backend/Dockerfile` を 1 回 `docker build`(appconfig / ai 両バイナリ同梱)→ Artifact Registry `asia-northeast1-docker.pkg.dev/jphacks-kz2601/backend/backend:<sha>` → 同じイメージで `appconfig-<env>` と `ai-<env>`(`--command=/app/ai`、`ANTHROPIC_API_KEY` は Secret Manager から注入)を `gcloud run deploy --image`。
 - 最後に両サービスの **`GET /health`** が 200 であることを確認し、URL を job summary に出す。**ヘルスパスは `/health`**(Cloud Run の Google Front End は `/healthz` をコンテナに届けず HTML 404 を返すため。`/healthz` はローカル用に残っている)。
 - その後 **スモーク(`backend/cmd/smoke`・非ブロッキング)** を流して表を job summary に貼る(失敗してもデプロイは成功扱い)。staging はデモ 3 本(Claude 3 回)、**production は家計簿 1 本だけ(`-only kakeibo`・Claude 2 回)+ `-cleanup`** で作った `smoke-*` アプリを `DELETE /v1/apps/{id}`(archive)する。認証は `FIREBASE_WEB_API_KEY`(repo Variable)で Firebase 匿名ユーザーの ID トークンを取る。手元から同じことをするには `cd backend && FIREBASE_WEB_API_KEY=<key> make smoke-stg` / `make smoke-prod`(#66)。
-- `--set-env-vars` / `--set-secrets` は全置換。手で足した env/secret は次のデプロイで消えるので、恒久的に要るものは workflow に書く。
+- env は `--update-env-vars`(#509)。workflow が決める値だけを上書きし、運用で手で入れた値(`NOTICE_JSON`・`MIN_IOS_BUILD`・`RATE_LIMIT_GLOBAL_DAILY` など)は残す。workflow から外した変数は Cloud Run に残るので `--remove-env-vars` で消す。シークレットは `--set-secrets`(全置換)のまま。一覧と変え方は [`docs/infra/runtime-config.md`](infra/runtime-config.md)。
 
 認証は Workload Identity Federation(鍵ファイル無し)。GitHub **Secrets は不要**で、repo Variables に以下を入れる(登録済み)。
 

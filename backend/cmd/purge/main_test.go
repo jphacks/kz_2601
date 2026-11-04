@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -40,7 +41,9 @@ func setup(t *testing.T, uids ...string) *store.Memory {
 	return m
 }
 
-func opts() options { return options{limit: 50, olderThan: store.PurgeAfter, deleteAuth: true} }
+func opts() options {
+	return options{limit: 50, olderThan: store.PurgeAfter, deleteAuth: true, feedbackOlderThan: store.FeedbackRetention, feedbackLimit: 500}
+}
 
 func TestRunPurgesOnlyOldDeletedAccounts(t *testing.T) {
 	ctx := context.Background()
@@ -143,5 +146,113 @@ func TestRunRefusesShortWindow(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
 	if failed := run(context.Background(), store.NewMemory(), nil, o, logger, time.Now()); failed != 1 {
 		t.Fatalf("failed=%d", failed)
+	}
+}
+
+func TestRunPurgesEntitlements(t *testing.T) {
+	ctx := context.Background()
+	m := setup(t, "gone", "active")
+	if err := m.DeactivateUser(ctx, "gone"); err != nil {
+		t.Fatal(err)
+	}
+	ents := entitlement.NewMemory()
+	exp := time.Now().Add(400 * 24 * time.Hour)
+	for _, uid := range []string{"gone", "active"} {
+		p := entitlement.Pro{ProductID: "p", OriginalTransactionID: "otid-" + uid, TransactionID: "t", Environment: "Sandbox", ExpiresAt: exp}
+		if _, err := ents.Apply(ctx, uid, p, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	o := opts()
+	o.entitlements = ents
+	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
+	if failed := run(ctx, m, &fakeAuth{}, o, logger, time.Now().Add(31*24*time.Hour)); failed != 0 {
+		t.Fatalf("failed=%d", failed)
+	}
+	if p, _ := ents.Get(ctx, "gone"); p != nil {
+		t.Fatalf("entitlement kept: %+v", p)
+	}
+	if owner, _ := ents.Owner(ctx, "otid-gone"); owner != "" {
+		t.Fatalf("binding kept: %q", owner)
+	}
+	if p, _ := ents.Get(ctx, "active"); p == nil {
+		t.Fatal("active account's entitlement must stay")
+	}
+}
+
+func TestRunErasesExpiredFeedback(t *testing.T) {
+	ctx := context.Background()
+	m := setup(t)
+	old, err := m.CreateFeedback(ctx, store.Feedback{UID: "a", Message: "old", ConsentVersion: "v1"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.CreateFeedback(ctx, store.Feedback{UID: "a", Message: "new", ConsentVersion: "v1"}, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.SetFeedbackCreatedAt(old.ID, time.Now().Add(-181*24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	logger := slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil))
+
+	dry := opts()
+	dry.dryRun = true
+	if failed := run(ctx, m, nil, dry, logger, time.Now()); failed != 0 {
+		t.Fatalf("dry run failed=%d", failed)
+	}
+	if items, _ := m.ListFeedback(ctx, store.FeedbackQuery{}); len(items) != 2 {
+		t.Fatalf("dry run must keep everything: %d", len(items))
+	}
+	if failed := run(ctx, m, nil, opts(), logger, time.Now()); failed != 0 {
+		t.Fatalf("failed=%d", failed)
+	}
+	items, _ := m.ListFeedback(ctx, store.FeedbackQuery{})
+	if len(items) != 1 || items[0].Message != "new" {
+		t.Fatalf("left: %+v", items)
+	}
+	short := opts()
+	short.feedbackOlderThan = time.Hour
+	if failed := run(ctx, m, nil, short, logger, time.Now()); failed != 1 {
+		t.Fatalf("below 24h must be refused: failed=%d", failed)
+	}
+}
+
+// The Cloud Logging queries in docs/infra/account-purge.md read these keys:
+// renaming or dropping one breaks them silently.
+func TestRunAccountPurgedLogKeys(t *testing.T) {
+	ctx := context.Background()
+	m := setup(t, "gone")
+	if err := m.DeactivateUser(ctx, "gone"); err != nil {
+		t.Fatal(err)
+	}
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logs, nil))
+	if failed := run(ctx, m, &fakeAuth{}, opts(), logger, time.Now().Add(31*24*time.Hour)); failed != 0 {
+		t.Fatalf("failed=%d", failed)
+	}
+	var keys []string
+	for _, line := range strings.Split(strings.TrimSpace(logs.String()), "\n") {
+		if !strings.Contains(line, `"msg":"purge: account purged"`) {
+			continue
+		}
+		dec := json.NewDecoder(strings.NewReader(line))
+		if _, err := dec.Token(); err != nil {
+			t.Fatal(err)
+		}
+		for dec.More() {
+			k, err := dec.Token()
+			if err != nil {
+				t.Fatal(err)
+			}
+			keys = append(keys, k.(string))
+			var v json.RawMessage
+			if err := dec.Decode(&v); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	want := "time level msg account deletedDaysAgo apps keptMirrors shares listings releases owners installs memberships marks postsScrubbed reports blocks feedback matchPairs matchRecords entitlements authDeleted"
+	if got := strings.Join(keys, " "); got != want {
+		t.Fatalf("account purged log keys:\n got %s\nwant %s", got, want)
 	}
 }

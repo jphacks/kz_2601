@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/metrics"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -62,6 +63,8 @@ func (h *Handler) getDSL(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+	} else {
+		emitMetric(r, metrics.AppOpened, appHashAttr(app.ID)) // a refresh sends If-None-Match
 	}
 	httpx.WriteJSON(w, http.StatusOK, dslEnvelope{AppID: app.ID, Version: app.CurrentVersion, DSL: app.DSL})
 }
@@ -308,12 +311,19 @@ func (h *Handler) getEntity(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, ent)
 }
 
-// entityOf resolves the entity of a records route: resolveEntity plus, on
-// scope:"shared" entities, the participant check (#254, members.go).
+// entityOf resolves the entity of a records route: resolveEntity with the
+// published sharing settings (record_scope.go) plus, on scope:"shared"
+// entities, the participant check (#254, members.go).
 func (h *Handler) entityOf(r *http.Request) (*store.App, *dsl.Entity, string, error) {
 	cur, ent, eid, err := h.resolveEntity(r)
+	if err == nil {
+		ent, err = h.withSharing(r, cur, ent)
+	}
 	if err == nil && ent.EffectiveScope() == dsl.ScopeShared {
 		err = h.requireMember(r, cur)
+	}
+	if err == nil && ent.IsShared() {
+		err = h.checkSharedApp(r, cur.ID) // #321
 	}
 	if err != nil {
 		return nil, nil, "", err

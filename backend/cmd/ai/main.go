@@ -4,17 +4,22 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
+	"cloud.google.com/go/firestore"
+
 	"github.com/jphacks/kz_2601/backend/internal/ai"
+	"github.com/jphacks/kz_2601/backend/internal/appcheck"
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/entitlement"
+	"github.com/jphacks/kz_2601/backend/internal/fsenv"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
-
-	"cloud.google.com/go/firestore"
 )
 
 func env(key, def string) string {
@@ -25,6 +30,16 @@ func env(key, def string) string {
 }
 
 func main() {
+	// Cloud Logging JSON for slog and the log package alike (#295)
+	logger := httpx.NewLogger()
+	slog.SetDefault(logger)
+
+	// stg must not use the production Firestore unless ALLOW_SHARED_PROD_DB=1 (#290)
+	if shared, err := fsenv.Check(fsenv.FromEnv(os.Getenv), os.Getenv); err != nil {
+		log.Fatalf("ai: refusing to start: %v", err)
+	} else if shared {
+		log.Printf("ai: warning: stg shares the production Firestore (ALLOW_SHARED_PROD_DB=1)")
+	}
 	port := env("PORT", "8081")
 	model := env("CLAUDE_MODEL", "claude-sonnet-5-5")
 	effort := env("CLAUDE_EFFORT", "low")
@@ -53,6 +68,7 @@ func main() {
 
 	claude := ai.NewClient(apiKey, model, effort)
 	claude.StructuredOutput = os.Getenv("CLAUDE_STRUCTURED_OUTPUT") == "1"
+	claude.Logger = logger // ai.usage JSON lines for the cost sink (#298)
 	svc := &ai.Service{
 		Claude:      claude,
 		Store:       store,
@@ -60,6 +76,7 @@ func main() {
 		CallTimeout: time.Duration(timeoutSec) * time.Second,
 		LogicPass:   os.Getenv("AI_LOGIC_PASS") == "1", // UI pass + calculations pass (#100)
 		LintRetry:   os.Getenv("AI_LINT_RETRY") == "1", // off: lint warnings are reported only
+		Logger:      claude.Logger,                     // ai.generate per request (#322)
 		// clarify turn (#147): its own model/effort/thinking; empty = ai.DefaultChat*
 		ChatConfig: ai.ChatConfig{
 			Model:    os.Getenv("AI_CHAT_MODEL"),
@@ -70,9 +87,20 @@ func main() {
 		Verifier: verifier,
 		AuthMode: authMode,
 	}
+	// AI_PAUSED=1 stops only the Claude-calling routes with 503 ai_paused,
+	// before the rate limiter (#511). docs/infra/ai-pause.md
+	paused := ai.PausedFromEnv(os.Getenv)
+	if paused {
+		log.Printf("ai: AI_PAUSED is on; generate/chat/text answer 503 ai_paused")
+	}
+	handler := newAIHandler(ai.NewHandler(svc), logger,
+		newAppCheck(),
+		ai.Pause(paused, logger),
+		newRateLimit(verifier),
+	)
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           withRateLimit(ai.NewHandler(svc), verifier),
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      time.Duration(timeoutSec)*time.Second*3 + 10*time.Second,
 	}
@@ -80,26 +108,77 @@ func main() {
 	log.Fatal(srv.ListenAndServe())
 }
 
-// withRateLimit puts the per-user / per-IP / global daily limits (#280) in
-// front of POST /v1/generate and /v1/chat.
+// newAIHandler wraps app outermost first. The order is security- and
+// cost-relevant (main_test.go): observability sees every response, App Check
+// and Pause reject before the rate limiter charges anything.
+func newAIHandler(app http.Handler, logger *slog.Logger, appCheck, pause, rateLimit func(http.Handler) http.Handler) http.Handler {
+	return httpx.Chain(app,
+		// request id / trace on every response (#295)
+		httpx.WithRequestID,
+		// access log, 5xx as ERROR (#295)
+		httpx.Log(logger),
+		// panics -> 500 + Error Reporting (#295)
+		httpx.Recover(logger),
+		// /debug/error answers 5xx/panic on stg only (#295)
+		httpx.DebugErrors(os.Getenv("APP_ENV") == "stg"),
+		// enforce rejects before the rate limiter, without spending quota (#318)
+		appCheck,
+		// AI_PAUSED: 503 before the rate limiter, nothing charged (#511)
+		pause,
+		// daily limits; innermost so only admitted requests are counted (#280)
+		rateLimit,
+	)
+}
+
+// newAppCheck verifies X-Firebase-AppCheck (#318). /health stays open.
+//
+//	APP_CHECK_MODE=off (default) | log | enforce
+//	APP_CHECK_APP_IDS  optional comma-separated Firebase app IDs to accept
+//
+// docs/infra/app-check.md
+func newAppCheck() func(http.Handler) http.Handler {
+	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
+	mw, mode, err := appcheck.FromEnv(os.Getenv, httpx.NewLogger(), func() (appcheck.Verifier, error) {
+		return appcheck.NewFirebaseVerifier(context.Background(), project)
+	})
+	if err != nil {
+		log.Fatalf("ai: %v", err)
+	}
+	log.Printf("ai: app check mode=%s", mode)
+	return func(h http.Handler) http.Handler {
+		checked := mw(h)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/health" || r.URL.Path == "/healthz" {
+				h.ServeHTTP(w, r)
+				return
+			}
+			checked.ServeHTTP(w, r)
+		})
+	}
+}
+
+// newRateLimit returns the per-user / per-IP / global daily limits (#280) for
+// POST /v1/generate and /v1/chat (identity when off).
 //
 //	RATE_LIMIT=off|on   default: on when GOOGLE_CLOUD_PROJECT is set (Cloud Run)
 //	                    or AUTH_MODE=dev, off for a bare local run
 //	RATE_LIMIT_STORE    firestore (default with GOOGLE_CLOUD_PROJECT) | memory
 //	RATE_LIMIT_COLLECTION  Firestore collection (default rateLimits)
+//	FIRESTORE_DATABASE  database ID (default "(default)"; internal/fsenv)
 //
 // Limits/weights: ratelimit.ConfigFromEnv.
-func withRateLimit(h http.Handler, verifier auth.IdentityVerifier) http.Handler {
+func newRateLimit(verifier auth.IdentityVerifier) func(http.Handler) http.Handler {
+	off := func(h http.Handler) http.Handler { return h }
 	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	mode := env("AUTH_MODE", auth.ModeFirebase)
 	switch os.Getenv("RATE_LIMIT") {
 	case "off", "0", "false":
 		log.Printf("ai: RATE_LIMIT=off; generate/chat are not limited")
-		return h
+		return off
 	case "":
 		if project == "" && mode != auth.ModeDev {
 			log.Printf("ai: rate limit off (no GOOGLE_CLOUD_PROJECT); set RATE_LIMIT=on to force")
-			return h
+			return off
 		}
 	}
 	cfg, err := ratelimit.ConfigFromEnv(os.Getenv)
@@ -108,18 +187,31 @@ func withRateLimit(h http.Handler, verifier auth.IdentityVerifier) http.Handler 
 	}
 	ctx := context.Background()
 
-	var store ratelimit.Store = ratelimit.NewMemory()
-	storeName := "memory"
-	if project != "" && os.Getenv("RATE_LIMIT_STORE") != "memory" {
-		client, err := firestore.NewClient(ctx, project)
+	var client *firestore.Client
+	if project != "" {
+		c, err := fsenv.NewClient(ctx, fsenv.FromEnv(os.Getenv))
 		if err != nil {
-			log.Printf("ai: firestore init failed: %v (rate limit counts in memory)", err)
+			log.Printf("ai: firestore init failed: %v (rate limit counts in memory, nobody is pro)", err)
 		} else {
-			store = ratelimit.NewFirestore(client, os.Getenv("RATE_LIMIT_COLLECTION"))
-			storeName = "firestore"
+			client = c
 		}
 	}
-	log.Printf("ai: rate limit on (store=%s env=%q limits=%+v weights=%+v)", storeName, cfg.Env, cfg.Limits, cfg.Weights)
-	// Pro has no server-side receipt check yet (#280): nil = everyone is anonymous/signed_in.
-	return ratelimit.New(cfg, store, nil).Middleware(verifier)(h)
+	var store ratelimit.Store = ratelimit.NewMemory()
+	storeName := "memory"
+	if client != nil && os.Getenv("RATE_LIMIT_STORE") != "memory" {
+		store = ratelimit.NewFirestore(client, os.Getenv("RATE_LIMIT_COLLECTION"))
+		storeName = "firestore"
+	}
+	// Pro tier (#449): users/{uid}/entitlements/pro written by appconfig after
+	// it verified the StoreKit transaction (#314). Without Firestore nobody is pro.
+	var pro ratelimit.ProChecker
+	if client != nil {
+		policy, err := entitlement.ConfigFromEnv(os.Getenv)
+		if err != nil {
+			log.Fatalf("ai: %v", err)
+		}
+		pro = entitlement.NewProChecker(entitlement.NewFirestore(client), policy.Environments)
+	}
+	log.Printf("ai: rate limit on (store=%s env=%q limits=%+v weights=%+v pro=%v)", storeName, cfg.Env, cfg.Limits, cfg.Weights, pro != nil)
+	return ratelimit.New(cfg, store, pro).Middleware(verifier)
 }

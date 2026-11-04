@@ -9,7 +9,7 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-// Layout (architecture.md §3.3):
+// Layout (docs/backend/features/release.md):
 //
 //	release_requests/{id}  {appId,ownerUid,name,dslVersion,dslJson,purpose,contact,status,createdAt,updatedAt}
 //
@@ -17,6 +17,15 @@ import (
 // "received". Queries use equality filters only (ownerUid [+ appId]), which
 // the automatic single-field indexes serve without a composite index.
 const releaseCollection = "release_requests"
+
+// releaseScanCap is a hard safety cap on how many of one user's requests a
+// query reads. Ordering by createdAt would need a composite index (equality +
+// orderBy on another field), so queries come back in document-ID order and
+// the newest-first sort and the MaxReleaseRequestsPerUser cut happen in
+// memory over everything read. A user holds at most one open request per app
+// and a new one only appears after an admin declines by hand, so real counts
+// stay far below this; past it the result is no longer guaranteed newest.
+const releaseScanCap = 10 * MaxReleaseRequestsPerUser
 
 type releaseDoc struct {
 	AppID     string    `firestore:"appId"`
@@ -41,7 +50,9 @@ func (f *Firestore) releaseQuery(uid, appID string) firestore.Query {
 	if appID != "" {
 		q = q.Where("appId", "==", appID)
 	}
-	return q.Limit(MaxReleaseRequestsPerUser)
+	// dslJson is never returned by the queries, so it is not read.
+	return q.Select("appId", "ownerUid", "name", "dslVersion", "purpose", "contact", "status", "createdAt", "updatedAt").
+		Limit(releaseScanCap)
 }
 
 func readReleases(it *firestore.DocumentIterator) ([]ReleaseRequest, error) {
@@ -100,5 +111,9 @@ func (f *Firestore) CreateReleaseRequest(ctx context.Context, rr ReleaseRequest)
 
 // ListReleaseRequests implements Store.
 func (f *Firestore) ListReleaseRequests(ctx context.Context, uid, appID string) ([]ReleaseRequest, error) {
-	return readReleases(f.releaseQuery(uid, appID).Documents(ctx))
+	out, err := readReleases(f.releaseQuery(uid, appID).Documents(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return page(out, MaxReleaseRequestsPerUser, 0), nil
 }

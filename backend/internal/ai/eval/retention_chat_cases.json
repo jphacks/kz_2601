@@ -1,0 +1,6 @@
+[
+  {"id": "rc_can_week", "group": "retention", "mode": "edit", "base": "internal/ai/examples/kakeibo.json", "capabilities": ["answer", "proposal"], "note": "#482 できる? → できる(一括削除の制限と混同しない)",
+   "steps": [{"say": "1週間たった記録を自動で消すことってできる?", "textAny": ["できます", "できる"], "textNot": ["できません", "retentionDays", "entity"]}]},
+  {"id": "rc_do_week", "group": "retention", "mode": "edit", "base": "internal/ai/examples/kakeibo.json", "note": "#482 頼まれたら断らずに進める",
+   "steps": [{"say": "1週間たった記録は消して", "textNot": ["できません", "一括削除", "retentionDays"]}]}
+]

@@ -26,15 +26,37 @@ public struct UserNotificationScheduler: NotificationScheduler {
         _ = await apply(appId: appId)
     }
 
+    public func post(_ spec: NotificationSpec, appId: String) async -> Bool {
+        guard await requestPermissionIfNeeded() else { return false }
+        let content = UNMutableNotificationContent()
+        content.title = spec.title
+        content.body = spec.body
+        content.sound = .default
+        // 予約(apply)が消す "dsl." とは別の名前空間。1 秒後に出るので登録簿には残さない
+        let request = UNNotificationRequest(
+            identifier: ConditionNotifications.identifier(appId: appId, specId: spec.id), content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            return true
+        } catch {
+            print("[Metamon] condition notification failed id=\(spec.id): \(error)")
+            return false
+        }
+    }
+
     public func removeApp(_ appId: String) async {
         await NotificationRegistry.shared.removeApp(appId)
+        await ConditionNotificationStore.shared.removeApp(appId)
         _ = await apply(appId: appId)
     }
 
     public func removeAll() async {
         await NotificationRegistry.shared.removeAll()
+        await ConditionNotificationStore.shared.removeAll()
         let center = UNUserNotificationCenter.current()
-        let ids = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(NotificationPlanner.prefix) }
+        let ids = await center.pendingNotificationRequests().map(\.identifier)
+            .filter { $0.hasPrefix(NotificationPlanner.prefix) || $0.hasPrefix(ConditionNotifications.prefix) }
         center.removePendingNotificationRequests(withIdentifiers: ids)
     }
 
@@ -92,6 +114,10 @@ public struct UserNotificationScheduler: NotificationScheduler {
             trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(hour: h, minute: m), repeats: true)
         case .weekly(let w, let h, let m):
             trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(hour: h, minute: m, weekday: w), repeats: true)
+        case .monthly(let d, let h, let m):
+            trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(day: d, hour: h, minute: m), repeats: true)
+        case .yearly(let mo, let d, let h, let m):
+            trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(month: mo, day: d, hour: h, minute: m), repeats: true)
         }
         return UNNotificationRequest(identifier: p.identifier, content: content, trigger: trigger)
     }

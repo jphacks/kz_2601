@@ -105,6 +105,8 @@ struct RootView: View {
                 .modifier(HostSheets(onModal: true))
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
+                .modifier(ModerationDialogs(onModal: true))
+                .modifier(MatchingSheets(onModal: true))
                 #endif
                 .modifier(ToastHost(onModal: true))
         }
@@ -113,6 +115,8 @@ struct RootView: View {
                 .modifier(HostSheets(onModal: true))
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
+                .modifier(ModerationDialogs(onModal: true))
+                .modifier(MatchingSheets(onModal: true))
                 #endif
                 .modifier(ToastHost(onModal: true))
         }
@@ -120,10 +124,17 @@ struct RootView: View {
         #if !APP_STORE_REVIEW // 審査用ビルドはシェアリンク・探す・近くの端末との共有を外す(#245)
         .modifier(SharingHooks()) // シェアリンク受信・「探す」シート(#49 #50)
         .modifier(NearbySheets(onModal: false)) // 近くの端末と送り合う(#36)
+        .modifier(ModerationDialogs()) // 通報・ブロック(#321)
+        .modifier(MatchingSheets()) // 仲間探しの 18 歳以上の確認(#507)
         #endif
         .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
         .modifier(PublicDataPromptHost()) // #253 生成直後の「個人の情報も公開されます」
+        .modifier(RetentionPromptHost()) // #482 記録の保存期間の確認
+        .modifier(TrackingBarHost()) // #559 位置の記録中はどの画面でも上に「記録中」バー
+        #if !APP_STORE_REVIEW
+        .modifier(FeedbackShakeHost()) // #319 端末を振ってフィードバック
+        #endif
         .onChange(of: rt.document.version) {
             // 変身(apply)が落ち着いてから今の画面をサムネに撮る(変身一覧カード用)
             Task {
@@ -166,6 +177,9 @@ struct RootView: View {
         .modifier(ConsentHost()) // #246: AI への送信の同意・音声モデルのダウンロード確認
         .modifier(AccountLinkPromptHost()) // #276: 匿名で初めて作った後の「引き継ぎのためにサインイン」
         .modifier(TutorialHost()) // #274: 同意のあとに初回のチュートリアル・最初のアプリの直後に直し方の例
+        #if !APP_STORE_REVIEW
+        .modifier(BetaWelcomeHost()) // #313: β の版だけ、チュートリアルのあとに初回の案内
+        #endif
         .alert(item: $rt.confirm) { confirm in
             Alert(title: Text(confirm.message),
                   primaryButton: .destructive(Text("実行")) { Task { await confirm.perform() } },
@@ -216,7 +230,11 @@ struct RootView: View {
             .task(id: banner.id) {
                 // 文字数に応じて 3〜5 秒(読み上げを読み切れる長さ)
                 // ボタン付き(#209)は押す余裕を持たせて 6 秒以上
-                let seconds = max(banner.action == nil ? 3.0 : 6.0, min(5.0, Double(banner.text.count) / 12))
+                var seconds = max(banner.action == nil ? 3.0 : 6.0, min(5.0, Double(banner.text.count) / 12))
+                #if DEBUG
+                // UI テスト用: 遅い CI では出てから押すまでに 6 秒を超え、押す前に消えた(#209)
+                if let hold = Double(ProcessInfo.processInfo.environment["METAMON_BANNER_SECONDS"] ?? "") { seconds = hold }
+                #endif
                 try? await Task.sleep(for: .seconds(seconds))
                 // 次のバナーに差し替わって取り消された時は消さない(新しい方まで消えていた・#209)
                 guard !Task.isCancelled else { return }
@@ -307,7 +325,7 @@ private struct VoiceToolbarButton: View {
         )
         .accessibilityLabel("話しかけて変える")
         .accessibilityHint(L10n.key("長押しで変身一覧", review: "長押しで記録帳の一覧"))
-        .accessibilityAction(named: "変身一覧") { rt.openSwitcher() }
+        .accessibilityAction(named: L10n.key("変身一覧", review: "記録帳の一覧")) { rt.openSwitcher() }
     }
 }
 

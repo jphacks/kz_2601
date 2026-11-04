@@ -39,5 +39,8 @@ final class AITextGateTests: XCTestCase {
         XCTAssertEqual(HTTPAIClient.textError(.server(status: 502, code: "bad_output", message: "missing field")) as? AITextError, .badOutput)
         let limited = HTTPAIClient.textError(.server(status: 429, code: "rate_limited", message: "今日の利用上限(60)に達しました。"))
         XCTAssertEqual(limited.localizedDescription, "今日の利用上限(60)に達しました。", "上限はサーバーの日本語のまま")
+        // #511: 一時停止は上限と別の文言
+        XCTAssertEqual(HTTPAIClient.textError(.server(status: 503, code: "ai_paused", message: "paused")) as? AITextError,
+                       .failed("AI を一時的に止めています。しばらくしてからもう一度お試しください"))
     }
 }

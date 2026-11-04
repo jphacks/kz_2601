@@ -1,0 +1,195 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "dish_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 5
+          },
+          "id" : "pick",
+          "props" : {
+            "entity" : "dish",
+            "label" : "今日の晩ごはんを決める",
+            "title" : "今日の晩ごはん"
+          },
+          "state" : "rendered",
+          "type" : "randomPicker"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "dish_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 5,
+            "rowSpan" : 5
+          },
+          "id" : "dishes",
+          "props" : {
+            "emptyText" : "候補の料理を追加してください",
+            "entity" : "dish",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "dish_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "候補を追加"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "今日の晩ごはん",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "dish",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "genre" : "和食"
+        }
+      },
+      "id" : "dish_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 6
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "name",
+                "label" : "料理名",
+                "placeholder" : "カレー",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "genre",
+                "label" : "ジャンル",
+                "options" : [
+                  "和食",
+                  "洋食",
+                  "中華",
+                  "その他"
+                ],
+                "style" : "segmented",
+                "value" : "和食"
+              },
+              "state" : "rendered",
+              "type" : "picker"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "memo",
+                "label" : "メモ",
+                "placeholder" : "材料・お店など",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            }
+          ],
+          "id" : "what",
+          "props" : {
+            "title" : "料理"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "dish_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "dish",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "料理",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

@@ -1,0 +1,234 @@
+{
+  "description": "Daily check ops: streak and doneInDays read the row's \"<field>__dates\" history.",
+  "defaults": {
+    "now": "2026-10-28T15:30:45+09:00",
+    "timeZone": "Asia/Tokyo",
+    "entities": [
+      {
+        "id": "medicine",
+        "name": "薬",
+        "fields": [{"id": "name", "name": "名前", "type": "string"}, {"id": "taken_on", "name": "飲んだ日", "type": "date"}]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "streak/three-days-including-today",
+      "expr": {"op": "streak", "args": [{"ref": "taken_on"}]},
+      "row": {
+        "entity": "medicine",
+        "record": {
+          "id": "r1",
+          "data": {"name": "血圧の薬", "taken_on": "2026-10-28", "taken_on__dates": ["2026-10-26", "2026-10-27", "2026-10-28"]}
+        }
+      },
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "streak/today-not-done-counts-from-yesterday",
+      "expr": {"op": "streak", "args": [{"ref": "taken_on"}]},
+      "row": {
+        "entity": "medicine",
+        "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on": "2026-10-27", "taken_on__dates": ["2026-10-26", "2026-10-27"]}}
+      },
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "streak/yesterday-missing",
+      "expr": {"op": "streak", "args": [{"ref": "taken_on"}]},
+      "row": {
+        "entity": "medicine",
+        "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on": "2026-10-26", "taken_on__dates": ["2026-10-25", "2026-10-26"]}}
+      },
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "streak/legacy-value-only",
+      "expr": {"op": "streak", "args": [{"ref": "taken_on"}]},
+      "row": {"entity": "medicine", "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on": "2026-10-28"}}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "streak/value-merged-into-history",
+      "expr": {"op": "streak", "args": [{"ref": "taken_on"}]},
+      "row": {
+        "entity": "medicine",
+        "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on": "2026-10-28", "taken_on__dates": ["2026-10-26", "2026-10-27"]}}
+      },
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "streak/invalid-history-entries-ignored",
+      "expr": {"op": "streak", "args": [{"ref": "taken_on"}]},
+      "row": {
+        "entity": "medicine",
+        "record": {
+          "id": "r1",
+          "data": {"name": "血圧の薬", "taken_on": "2026-10-28", "taken_on__dates": ["2026-10-27", "bad", "2026-02-30", 5]}
+        }
+      },
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "streak/datetime-entry-uses-local-day",
+      "expr": {"op": "streak", "args": [{"ref": "taken_on"}]},
+      "row": {
+        "entity": "medicine",
+        "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on__dates": ["2026-10-26T20:00:00Z", "2026-10-27T20:00:00Z"]}}
+      },
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "streak/empty",
+      "expr": {"op": "streak", "args": [{"ref": "taken_on"}]},
+      "row": {"entity": "medicine", "record": {"id": "r1", "data": {"name": "血圧の薬"}}},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {"name": "streak/no-row", "expr": {"op": "streak", "args": [{"ref": "taken_on"}]}, "expected": {"type": "nil"}},
+    {
+      "name": "streak/literal-arg",
+      "expr": {"op": "streak", "args": ["taken_on"]},
+      "row": {"entity": "medicine", "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on": "2026-10-28"}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "streak/dotted-ref",
+      "expr": {"op": "streak", "args": [{"ref": "a.taken_on"}]},
+      "row": {"entity": "medicine", "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on": "2026-10-28"}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "streak/gap",
+      "expr": {"op": "streak", "args": [{"ref": "taken_on"}]},
+      "row": {
+        "entity": "medicine",
+        "record": {
+          "id": "r1",
+          "data": {
+            "name": "血圧の薬",
+            "taken_on": "2026-10-28",
+            "taken_on__dates": ["2026-10-24", "2026-10-25", "2026-10-27", "2026-10-28"]
+          }
+        }
+      },
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "streak/across-month",
+      "now": "2026-11-01T08:00:00+09:00",
+      "expr": {"op": "streak", "args": [{"ref": "taken_on"}]},
+      "row": {
+        "entity": "medicine",
+        "record": {
+          "id": "r1",
+          "data": {"name": "血圧の薬", "taken_on": "2026-11-01", "taken_on__dates": ["2026-10-30", "2026-10-31", "2026-11-01"]}
+        }
+      },
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "streak/new-york-across-dst",
+      "now": "2026-11-02T10:00:00-05:00",
+      "timeZone": "America/New_York",
+      "expr": {"op": "streak", "args": [{"ref": "taken_on"}]},
+      "row": {
+        "entity": "medicine",
+        "record": {
+          "id": "r1",
+          "data": {"name": "血圧の薬", "taken_on": "2026-11-02", "taken_on__dates": ["2026-10-31", "2026-11-01", "2026-11-02"]}
+        }
+      },
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "doneInDays/seven",
+      "expr": {"op": "doneInDays", "args": [{"ref": "taken_on"}, 7]},
+      "row": {
+        "entity": "medicine",
+        "record": {
+          "id": "r1",
+          "data": {
+            "name": "血圧の薬",
+            "taken_on": "2026-10-28",
+            "taken_on__dates": ["2026-10-20", "2026-10-21", "2026-10-22", "2026-10-25", "2026-10-28"]
+          }
+        }
+      },
+      "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "doneInDays/one",
+      "expr": {"op": "doneInDays", "args": [{"ref": "taken_on"}, 1]},
+      "row": {
+        "entity": "medicine",
+        "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on": "2026-10-28", "taken_on__dates": ["2026-10-27", "2026-10-28"]}}
+      },
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "doneInDays/zero",
+      "expr": {"op": "doneInDays", "args": [{"ref": "taken_on"}, 0]},
+      "row": {"entity": "medicine", "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on": "2026-10-28"}}},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "doneInDays/negative",
+      "expr": {"op": "doneInDays", "args": [{"ref": "taken_on"}, -3]},
+      "row": {"entity": "medicine", "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on": "2026-10-28"}}},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "doneInDays/fraction-rounds",
+      "expr": {"op": "doneInDays", "args": [{"ref": "taken_on"}, 1.5]},
+      "row": {
+        "entity": "medicine",
+        "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on": "2026-10-28", "taken_on__dates": ["2026-10-27", "2026-10-28"]}}
+      },
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "doneInDays/half-rounds-away",
+      "expr": {"op": "doneInDays", "args": [{"ref": "taken_on"}, 0.5]},
+      "row": {"entity": "medicine", "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on": "2026-10-28"}}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "doneInDays/non-numeric",
+      "expr": {"op": "doneInDays", "args": [{"ref": "taken_on"}, "x"]},
+      "row": {"entity": "medicine", "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on": "2026-10-28"}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "doneInDays/missing-n",
+      "expr": {"op": "doneInDays", "args": [{"ref": "taken_on"}]},
+      "row": {"entity": "medicine", "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on": "2026-10-28"}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "doneInDays/capped-at-400",
+      "expr": {"op": "doneInDays", "args": [{"ref": "taken_on"}, 500]},
+      "row": {
+        "entity": "medicine",
+        "record": {
+          "id": "r1",
+          "data": {"name": "血圧の薬", "taken_on": "2025-09-24", "taken_on__dates": ["2025-09-23", "2025-09-24", "2026-10-28"]}
+        }
+      },
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "doneInDays/future-dates-ignored",
+      "expr": {"op": "doneInDays", "args": [{"ref": "taken_on"}, 7]},
+      "row": {
+        "entity": "medicine",
+        "record": {"id": "r1", "data": {"name": "血圧の薬", "taken_on": "2026-10-30", "taken_on__dates": ["2026-10-29", "2026-10-30"]}}
+      },
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "doneInDays/no-row",
+      "expr": {"op": "doneInDays", "args": [{"ref": "taken_on"}, 7]},
+      "expected": {"type": "nil"}
+    }
+  ]
+}

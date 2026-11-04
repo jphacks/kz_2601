@@ -15,7 +15,7 @@ struct AiGenerateLeaf: View {
     @State private var error: String?
 
     private var route: AIGenerateRoute {
-        AIGenerateRoute.choose(availability: availability, hostOnline: rt.supportsOnlineAIText, mock: AIGenerateRoute.isMock)
+        AIGenerateRoute.choose(availability: availability, hostOnline: rt.aiText?.supportsOnlineAIText ?? false, mock: AIGenerateRoute.isMock)
     }
 
     var body: some View {
@@ -42,9 +42,9 @@ struct AiGenerateLeaf: View {
             }
             caption
         }
-        .task { availability = AIAvailability.current }
+        .task { refreshAvailability() }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { availability = AIAvailability.current }
+            if phase == .active { refreshAvailability() }
         }
     }
 
@@ -68,6 +68,11 @@ struct AiGenerateLeaf: View {
         } else if result != nil, usedOnline {
             Text("オンラインの AI が書きました").font(.caption).foregroundStyle(.secondary)
         }
+    }
+
+    private func refreshAvailability() {
+        availability = AIAvailability.current
+        rt.aiText?.recordAIButton(.shown(availability.metric)) // #446
     }
 
     private func run() async {
@@ -95,14 +100,22 @@ struct AiGenerateLeaf: View {
             let out: AITextResult
             switch route {
             case .onDevice: out = try await OnDeviceAI.generate(request)
-            default: out = try await rt.generateAIText(request)
+            default:
+                guard let host = rt.aiText else { throw AITextError.unsupported }
+                out = try await host.generateAIText(request)
             }
             usedOnline = route == .online
+            if route == .onDevice { rt.aiText?.recordAIButton(.ran(.generate, failure: nil)) }
             withAnimation(RenderTheme.Motion.select) {
                 result = out
                 if let output = c.output, let form { form.values[output] = .string(out.text) }
             }
         } catch {
+            // #446: 端末内 AI の失敗だけ数える(オンライン版は #426 の判断材料ではない)
+            if route == .onDevice,
+               let reason = (error as? OnDeviceAIError)?.metricReason ?? AIButtonMetric.FailureReason(buildError: error) {
+                rt.aiText?.recordAIButton(.ran(.generate, failure: reason))
+            }
             self.error = error.localizedDescription
         }
     }

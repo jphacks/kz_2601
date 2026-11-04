@@ -3,7 +3,7 @@ import MetamonDSL
 
 /// `musicPlayer`(#412): Apple Music の再生(今の曲・前へ / 再生・一時停止 / 次へ・再生待ち)と、友だちから届いたリクエスト。
 /// 状態は `MusicSession.shared`(端末に 1 つのプレーヤー)。前面にいる間は 1 秒ごとに読み直し、ロック画面・イヤホンでの操作も映す。
-/// 友だちへのリクエスト送信は近距離共有(`DSLRuntime.requestSong`)。審査用ビルド(APP_STORE_REVIEW)ではリクエストの UI を外す。
+/// 友だちへのリクエスト送信は近距離共有(`NearbyHost.requestSong`)。審査用ビルド(APP_STORE_REVIEW)ではリクエストの UI を外す。
 struct MusicPlayerLeaf: View {
     let c: Component
     @Environment(\.dslRuntime) private var runtime
@@ -183,7 +183,7 @@ struct MusicPlayerLeaf: View {
     private func sendOutgoing() {
         guard let song = outgoing else { return }
         outgoing = nil
-        runtime.requestSong(song)
+        runtime.nearby?.requestSong(song)
     }
 }
 

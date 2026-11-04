@@ -4,7 +4,7 @@ package appconfig
 // read and written only by the app's creator (app_owners) and the members in
 // apps_public/{appId}/members/{uid}; scope:"public" stays open to everyone.
 // One joins by importing a share link issued by a participant. See
-// architecture.md §3.4.
+// docs/backend/features/members.md.
 
 import (
 	"context"
@@ -20,6 +20,15 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
+
+// routes (shared-app participants #254)
+func init() {
+	registerRoutes(func(h *Handler, mux *http.ServeMux) {
+		h.legacyBefore = legacyMembersBefore()
+		mux.HandleFunc("GET /v1/apps/{appId}/members", h.listMembers)
+		mux.HandleFunc("DELETE /v1/apps/{appId}/members/{uid}", h.removeMember)
+	})
+}
 
 // LegacyMembersEnv: copies of an app created before this time (RFC3339) join
 // it as members on first access (migration for apps shared before #254).

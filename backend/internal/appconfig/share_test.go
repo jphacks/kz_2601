@@ -115,6 +115,36 @@ func TestShareImportJoinsSharedApp(t *testing.T) {
 	}
 }
 
+// The import result says whether the caller created the app, so iOS can skip
+// the paywall even when the preview failed (#565).
+func TestShareImportMine(t *testing.T) {
+	e := newEnv(t)
+	const app = "/v1/apps/OWNER-KAKEIBO"
+	e.ownApp("owner", app, kakeibo(t))
+	tok, _ := e.do("owner", http.MethodPost, app+"/share", nil, nil).body["token"].(string)
+	if r := e.do("owner", http.MethodPost, "/v1/shares/"+tok+"/import", nil, nil); r.code != http.StatusCreated || r.body["mine"] != true {
+		t.Fatalf("owner import: %d %s", r.code, r.raw)
+	}
+	if r := e.do("friend", http.MethodPost, "/v1/shares/"+tok+"/import", nil, nil); r.code != http.StatusCreated || r.body["mine"] != false {
+		t.Fatalf("friend import: %d %s", r.code, r.raw)
+	}
+
+	// a participant's link: the creator (app_owners) still gets mine, others not
+	const board = "/v1/apps/BOARD-1"
+	e.ownApp("owner", board, sharedKakeibo(t))
+	tok, _ = e.do("owner", http.MethodPost, board+"/share", nil, nil).body["token"].(string)
+	if r := e.do("friend", http.MethodPost, "/v1/shares/"+tok+"/import", nil, nil); r.code != http.StatusCreated || r.body["mine"] != false {
+		t.Fatalf("friend join: %d %s", r.code, r.raw)
+	}
+	tok, _ = e.do("friend", http.MethodPost, board+"/share", nil, nil).body["token"].(string)
+	if r := e.do("owner", http.MethodPost, "/v1/shares/"+tok+"/import", nil, nil); r.code != http.StatusCreated || r.body["mine"] != true {
+		t.Fatalf("creator via participant's link: %d %s", r.code, r.raw)
+	}
+	if r := e.do("guest", http.MethodPost, "/v1/shares/"+tok+"/import", nil, nil); r.code != http.StatusCreated || r.body["mine"] != false {
+		t.Fatalf("guest via participant's link: %d %s", r.code, r.raw)
+	}
+}
+
 func TestPublishSearchInstall(t *testing.T) {
 	e := newEnv(t)
 	const app = "/v1/apps/OWNER-KAKEIBO"
@@ -162,10 +192,13 @@ func TestPublishSearchInstall(t *testing.T) {
 
 	// install: new appId, installs+1, then popular order puts it first
 	r = e.do("finder", http.MethodPost, "/v1/public-apps/OWNER-KAKEIBO/install", nil, nil)
-	if r.code != http.StatusCreated || r.body["id"] == "OWNER-KAKEIBO" || r.body["currentVersion"] != float64(2) {
+	if r.code != http.StatusCreated || r.body["id"] == "OWNER-KAKEIBO" || r.body["currentVersion"] != float64(2) || r.body["mine"] != false {
 		t.Fatalf("install: %d %s", r.code, r.raw)
 	}
-	e.do("owner", http.MethodPost, "/v1/public-apps/OWNER-KAKEIBO/install", nil, nil) // owner's own install is not counted
+	// owner's own install is not counted, and says mine (#565)
+	if r = e.do("owner", http.MethodPost, "/v1/public-apps/OWNER-KAKEIBO/install", nil, nil); r.code != http.StatusCreated || r.body["mine"] != true {
+		t.Fatalf("owner install: %d %s", r.code, r.raw)
+	}
 	r = e.do("finder", http.MethodGet, "/v1/public-apps?sort=popular", nil, nil)
 	first := r.body["items"].([]any)[0].(map[string]any)
 	if first["id"] != "OWNER-KAKEIBO" || first["installs"] != float64(1) || first["mine"] != false {
@@ -220,21 +253,27 @@ func TestSharePage(t *testing.T) {
 // ownerStores runs f against Memory and, when FIRESTORE_EMULATOR_HOST is set,
 // against the Firestore emulator (ids get a per-run suffix there).
 func ownerStores(t *testing.T, f func(t *testing.T, e *env, sfx string)) {
+	storeEnvs(t, func(t *testing.T, e *env, _ store.Store, sfx string) { f(t, e, sfx) })
+}
+
+// storeEnvs is ownerStores that also hands f the store behind e.
+func storeEnvs(t *testing.T, f func(t *testing.T, e *env, st store.Store, sfx string)) {
 	t.Run("memory", func(t *testing.T) {
 		t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
-		f(t, &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(store.NewMemory()))}, "")
+		st := store.NewMemory()
+		f(t, &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(st))}, st, "")
 	})
 	t.Run("firestore", func(t *testing.T) {
 		if os.Getenv("FIRESTORE_EMULATOR_HOST") == "" {
 			t.Skip("FIRESTORE_EMULATOR_HOST not set")
 		}
-		st, err := store.NewFirestore(t.Context(), "demo-kz2601")
+		st, err := store.NewFirestore(t.Context(), "demo-kz2601", "(default)")
 		if err != nil {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = st.Close() })
 		t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
-		f(t, &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(st))}, "-"+strconv.FormatInt(time.Now().UnixNano(), 36))
+		f(t, &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(st))}, st, "-"+strconv.FormatInt(time.Now().UnixNano(), 36))
 	})
 }
 

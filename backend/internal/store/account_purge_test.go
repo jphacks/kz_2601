@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,7 +23,7 @@ func TestFirestorePurgeAccount(t *testing.T) {
 		t.Skip("FIRESTORE_EMULATOR_HOST not set")
 	}
 	ctx := context.Background()
-	f, err := NewFirestore(ctx, "demo-kz2601")
+	f, err := NewFirestore(ctx, "demo-kz2601", "(default)")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,6 +107,17 @@ func testPurgeAccount(t *testing.T, s Store, sfx string) {
 	_, _, err = s.CreateReleaseRequest(ctx, ReleaseRequest{AppID: theirs, OwnerUID: stayer, Contact: "y@example.com"})
 	must(err)
 
+	report := func(by, kind, target, about string) {
+		t.Helper()
+		_, err := s.AddReport(ctx, Report{ID: ReportID(by, kind, target), ReporterUID: by, Kind: kind, TargetID: target,
+			TargetUID: about, Reason: "spam", Status: "open"}, "2026-10-31", 0)
+		must(err)
+	}
+	report(leaver, ReportListing, theirs, stayer)
+	report(stayer, ReportRecord, theirs+"/post/p-theirs-l", leaver)
+	must(s.PutBlock(ctx, leaver, Block{UID: stayer, Name: "Stayer"}))
+	must(s.PutBlock(ctx, stayer, Block{UID: "third" + sfx}))
+
 	if _, err := s.PurgeAccount(ctx, leaver); !errors.Is(err, ErrNotDeleted) {
 		t.Fatalf("active account must not be purged: %v", err)
 	}
@@ -129,9 +142,12 @@ func testPurgeAccount(t *testing.T, s Store, sfx string) {
 	res, err := s.PurgeAccount(ctx, leaver)
 	must(err)
 	want := AccountPurgeResult{Apps: 3, KeptMirrors: 1, Shares: 1, Releases: 1, Owners: 1, Installs: 1,
-		Memberships: 1, Marks: 2, PostsScrubbed: 2}
+		Memberships: 1, Marks: 2, PostsScrubbed: 2, Reports: 2, Blocks: 1}
 	if res != want {
 		t.Errorf("result:\n got %+v\nwant %+v", res, want)
+	}
+	if bs, err := s.ListBlocks(ctx, stayer); err != nil || len(bs) != 1 {
+		t.Errorf("stayer's blocks must stay: %+v %v", bs, err)
 	}
 	again, err := s.PurgeAccount(ctx, leaver)
 	must(err)
@@ -228,5 +244,17 @@ func testPurgeAccount(t *testing.T, s Store, sfx string) {
 	}
 	if err := s.MarkAccountPurged(ctx, stayer); !errors.Is(err, ErrNotDeleted) {
 		t.Errorf("active uid: %v", err)
+	}
+}
+
+// docs/infra/account-purge.md queries these keys: append, never rename.
+func TestAccountPurgeResultLogAttrsKeys(t *testing.T) {
+	var keys []string
+	for _, a := range (AccountPurgeResult{}).LogAttrs() {
+		keys = append(keys, a.(slog.Attr).Key)
+	}
+	want := "apps keptMirrors shares listings releases owners installs memberships marks postsScrubbed reports blocks feedback matchPairs matchRecords"
+	if got := strings.Join(keys, " "); got != want {
+		t.Fatalf("LogAttrs keys:\n got %s\nwant %s", got, want)
 	}
 }

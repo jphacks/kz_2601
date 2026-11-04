@@ -1,0 +1,211 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "label" : "今日飲んだ(回)",
+                "unavailable" : false,
+                "value" : "0"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "label" : "まだの薬",
+                "unavailable" : false,
+                "value" : "0"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "label" : "最長の連続(日)",
+                "unavailable" : true,
+                "value" : "—"
+              },
+              "state" : "rendered",
+              "type" : "stat"
+            }
+          ],
+          "id" : "summary",
+          "state" : "rendered",
+          "type" : "hstack"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 8
+          },
+          "children" : [
+            {
+              "actions" : [
+                {
+                  "action" : {
+                    "presentation" : "push",
+                    "screen" : "medicine_form",
+                    "type" : "navigate"
+                  },
+                  "on" : "rowTap"
+                }
+              ],
+              "id" : null,
+              "props" : {
+                "emptyText" : "毎日飲む薬を追加してください",
+                "entity" : "medicine",
+                "rows" : [
+
+                ]
+              },
+              "state" : "rendered",
+              "type" : "list"
+            }
+          ],
+          "id" : "today",
+          "props" : {
+            "title" : "今日の薬"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "medicine_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "薬を追加"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "今日の薬",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "medicine",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "timing" : "朝"
+        }
+      },
+      "id" : "medicine_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 4
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "name",
+                "label" : "薬の名前",
+                "placeholder" : "血圧の薬",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "timing",
+                "label" : "飲むとき",
+                "options" : [
+                  "朝",
+                  "昼",
+                  "夜",
+                  "寝る前"
+                ],
+                "style" : "segmented",
+                "value" : "朝"
+              },
+              "state" : "rendered",
+              "type" : "picker"
+            }
+          ],
+          "id" : "fields",
+          "props" : {
+            "title" : "内容"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "medicine_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "medicine",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "薬",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

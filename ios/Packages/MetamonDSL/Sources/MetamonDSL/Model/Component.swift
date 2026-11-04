@@ -57,6 +57,10 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case sensorValue
     // leaf(Apple Music の再生と友だちからの曲リクエスト・#412)。title は共用
     case musicPlayer
+    // leaf(仲間探しの届いた人・送った人・つながった人・#507)。entity / title / emptyText / item / onItemTap は共用
+    case matchList
+    // leaf(単語カード・#264)。entity / filter は共用
+    case flashcards
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -198,8 +202,17 @@ public struct Component: Decodable, Identifiable, Sendable {
     // musicPlayer(#412)
     public var allowRequests: Bool?    // 近くの端末から曲のリクエストを受ける
     public var autoAccept: Bool?       // リクエストを確認せずに再生待ちへ
+    // matchList(#507)
+    public var show: String?           // incoming|outgoing|matches
+    // flashcards(#264)
+    public var front: String?          // 表の field
+    public var back: String?           // 裏の field
+    public var toggle: String?         // 覚えた / まだ を保存する boolean field
 
-    private enum Keys: String, CodingKey {
+    /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
+    static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
+
+    private enum Keys: String, CodingKey, CaseIterable {
         case id, type, area, title, spacing, children, text, style, align, label, icon, action, field, placeholder, multiline, unit
         case includeTime, source, maxDuration, height, entity, item, sort, filter, emptyText, onItemTap, swipeToDelete, aggregate, format
         case kind, groupBy, bucket, prompt, size
@@ -216,6 +229,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         case columnField, rowField, columnValues, rowValues, rowRange
         case textField, photoField
         case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance, allowRequests, autoAccept
+        case show
+        case front, back, toggle
     }
 
     public init(from decoder: Decoder) throws {
@@ -317,6 +332,10 @@ public struct Component: Decodable, Identifiable, Sendable {
         distance = try? c.decodeIfPresent(Bool.self, forKey: .distance)
         allowRequests = try? c.decodeIfPresent(Bool.self, forKey: .allowRequests)
         autoAccept = try? c.decodeIfPresent(Bool.self, forKey: .autoAccept)
+        show = try? c.decodeIfPresent(String.self, forKey: .show)
+        front = try? c.decodeIfPresent(String.self, forKey: .front)
+        back = try? c.decodeIfPresent(String.self, forKey: .back)
+        toggle = try? c.decodeIfPresent(String.self, forKey: .toggle)
     }
 }
 
@@ -376,8 +395,10 @@ public struct ListItem: Decodable, Sendable {
     public var resets: String?
     /// entity.marks の id → 行の右端にいいね・保存のトグルと件数(#255・1 人 1 回)
     public var mark: String?
+    /// true = match "profile" の一覧の他の人の行に「つながりたい」ボタン(#507)
+    public var interest: Bool?
 
-    public init(title: String, subtitle: String? = nil, trailing: String? = nil, icon: String? = nil, image: String? = nil, toggle: String? = nil, resets: String? = nil, mark: String? = nil) {
+    public init(title: String, subtitle: String? = nil, trailing: String? = nil, icon: String? = nil, image: String? = nil, toggle: String? = nil, resets: String? = nil, mark: String? = nil, interest: Bool? = nil) {
         self.title = title
         self.subtitle = subtitle
         self.trailing = trailing
@@ -386,6 +407,7 @@ public struct ListItem: Decodable, Sendable {
         self.toggle = toggle
         self.resets = resets
         self.mark = mark
+        self.interest = interest
     }
 }
 

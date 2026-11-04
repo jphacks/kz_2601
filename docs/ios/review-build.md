@@ -26,6 +26,7 @@
 | 単体アプリとしてのリリース申請 | `ReleaseRequestSheet` / `ReleaseUI` / `HTTPReleaseRequestClient` / カードメニューの項目 | 2.5.2・4.2.6 |
 | 「探す」の公開カタログ(公開・インストール) | `DiscoverSheet` / `DiscoverEntry` / `SharingClient` の publish・install | DPLA 3.3.1(B)(c)・1.2 |
 | 誰でも開ける共有リンク(アプリ側の入口) | `ShareAppSheet` / `SharingHooks`(URL を受けて取り込む処理)/ `HTTPSharingClient`、Info.plist の `CFBundleURLTypes`(`tailorit://`) | 1.2(通報・ブロックが無い) |
+| 通報・ブロック(#321) | `ModerationClient` / `HTTPSharingClient+Moderation` / `AppRuntime+Moderation`(`ModerationDialogs`・設定の「ブロック中のユーザー」)。Renderer の長押しメニュー(`ModerationMenuItems`)は残るが、ホストが `canReport` を実装しないので出ない | 共有と一緒に外す(共有が無ければ通報する対象も無い)。共有を戻す時に一緒に戻る |
 | HealthKit(`healthStat` / `Field.health`) | 部品と登録 / `HealthData` / `AppRuntime+Health`、`NSHealth*` / `NSMotionUsageDescription`、entitlement `com.apple.developer.healthkit*` | 4.7.2・5.1.3 |
 | バックグラウンドでの位置の記録(`locationTracker`) | 部品と登録 / `LocationTracking`、`UIBackgroundModes` の `location` | 4.7.2・5.1.5・2.5.4 |
 | 端末のセンサー(`sensorValue`・CoreMotion の device motion / CMAltimeter・#419) | 部品と登録 / `SensorData`、`NSMotionUsageDescription`(healthStat と共通) | 4.7.2 |
@@ -38,6 +39,12 @@
 | App 内課金(Tailor It Pro・#77 #414) | `ProGate` / `PaywallSheet` / `ProSettingsSection`(設定の「Tailor It Pro」)/ `AppRuntime+PaidFeature`(有料機能の確認カード)/ `AppRuntime+PaidGate` の課金画面、MetamonServices の `ProEntitlementStore`(StoreKit)/ `ProProducts`(商品 ID)/ `CreationQuota`(端末の 1 日 3 回)。1 日の上限はサーバーの `ratelimit` だけで、当たると状態カード「今日はここまでです / 今日の上限に達しました。〜からまた使えます」(課金画面は出ない)。backend も chat の `requiresPro` / `paidFeatures` を付けない | 最初の版は課金なしで出す(#450 G1・2026-10-30 決定)。3.1.1・3.1.2・2.3.1(サーバーが Pro を判定しない) |
 | 共有・公開のデータ(entity の `scope: shared / public`・`edit`・`marks`)と `chatThread` | `chatThread` の部品と登録 / `ChatThreadLeaf`。`ClientCapabilities.reviewDisabledFeatures` の `sharedData` で、backend が scope を private に直す(下の「AI 側の制限」) | 1.2(通報・ブロック・フィルタが無い)(#451 G2) |
 | aiButton のオンライン版(`POST /v1/text`・#417) | `AppRuntime+AIText` のオンライン経路と Pro の入口 / `HTTPAIClient+Text`(`v1/text`)。端末内 AI(Foundation Models)は残る。端末内 AI が無い端末では理由つきで無効 | 5.1.2(i)。同意文の「記録の中身は送らない」(#452 G4) |
+| aiButton の端末内 AI の集計(`POST /v1/metrics/ai-button`・#446) | `AppRuntime+AIButtonMetrics` は何もしない / MetamonServices の `AIButtonMetrics.swift`(貯める・送る)/ 設定の「AI ボタンの利用状況を送る」。Renderer の数える呼び出しは残るが、ホストが捨てる | 栄養ラベルに「使用状況データ」が増えるため(`docs/analytics/ai-button-metrics.md`) |
+| 仲間探し(#507・`matchList` / `list.item.interest`) | `matchList` の部品と登録 / `MatchListLeaf` / `InterestButton` / `MatchingHost`、MetamonServices の `MatchingClient` / `HTTPMatchingClient`(`v1/apps/{appId}/interests`・`matches`)/ `MatchingStore` / `MatchingAgeGate`、`Features/Matching` 全部(18 歳以上の確認 `AdultConfirmSheet`)。`supportedFeatures` に `matching` を送らず、backend が match・`item.interest`・`matchList` を使わない | 共有と一緒に外す(知らない人と連絡先を交換する機能。年齢区分・1.2) |
+| アプリ内のフィードバック(#319) | `Features/Feedback` 全部(`FeedbackComposerView` / `FeedbackContext` / 振って開く `FeedbackShakeHost`・`UIWindow.motionEnded`)/ 設定の「フィードバックを送る」/ MetamonServices の `FeedbackClient` / `HTTPFeedbackClient`(`v1/feedback`) | プライバシーの表示に無い種類(カスタマーサポート・その他の診断データ・スクショ)を集める。表示を足すまで外す(`docs/legal/feedback-privacy-draft.md`) |
+| β の初回の案内(#313) | `BetaEnvironment` / `BetaWelcomeStore` / `BetaWelcomeView`(`BetaWelcomeHost`)/ `AppRuntime` の `betaWelcome`・`showBetaWelcome` / 設定の「β 版のご案内」 | 2.2(App Store の版に β の文言を入れない)。β かどうかは実行時にレシート(`sandboxReceipt` = TestFlight)で見分ける。TestFlight と App Store は同じバイナリなので、Release の App Store では実行時の判定で出ず、審査用の版はコードごと無い |
+| 設定の「投稿に表示する名前」(#250) | `AuthorNameSettingsSection`(説明が「みんなで使うアプリに投稿すると…」)。初投稿で名前を聞くアラート(`AuthorNamePromptModifier`)は残るが、記録がすべて private なので出ない | 共有と一緒に外す(外した共有機能の説明になる・2.3) |
+| ショートカット / Siri(App Intents)の文言の言い換え | `TailorItIntents.swift` / `IntentEntities.swift` の「作ったアプリに変身した状態で開きます」「どのアプリを開きますか?」などを、`#if APP_STORE_REVIEW` で「記録帳を開く」「どの記録帳を開きますか?」に替える(App Intents の文言はビルド時に決まるので `L10n.pick` は使えない)。フレーズは `\(.applicationName)` を含んだまま | 言い換え(`docs/store/wording.md`・#247) |
 | 外した部品・共有 / 公開の記録を使う同梱の例 | `health` / `walk_route` / `attendance_nearby` / `dashcam` / `sensors` / `gallery-web` / `chat` / `board` / `ranking` / `post_comments` / `recipes`(`DSLExamples.reviewExcluded`。`strip-review-plist.sh` もバンドルから消す) | 上と同じ |
 
 **残すもの**
@@ -68,16 +75,16 @@
   - Review 構成だけ、最後のビルドフェーズ `scripts/strip-review-plist.sh` が、出来上がった Info.plist からキーを消し、説明文を差し替える。署名の前に走る。
   - Debug / Release では何もしない。判定は `METAMON_APP_STORE_REVIEW=YES` で行う。
 - **接続先(#452 G7)**
-  - Review 構成だけ、`project.yml` の `Metamon` ターゲットの `configs.Review` で `METAMON_AI_BASE_URL` / `METAMON_APPCONFIG_BASE_URL` を prod にする。
+  - Review 構成は `project.yml` の `settings.configs.Review` で `METAMON_AI_BASE_URL` / `METAMON_APPCONFIG_BASE_URL` を prod にする(Release も同じ・#292)。
     - ai: `https://ai-prod-378953239426.asia-northeast1.run.app`
     - appconfig: `https://appconfig-prod-378953239426.asia-northeast1.run.app`
     - 出典は `docs/release/2026-10-25-runbook.md` の「prod の URL」と `backend/Makefile`。
-  - Debug / Release の既定(`settings.base` の stg)は変えない。
-  - GoogleService-Info.plist(Firebase)の prod への切り替えは別(#292)。
+  - Debug / Staging は stg(`settings.base`)。
+  - GoogleService-Info.plist(Firebase)も Review / Release は prod の plist を入れる(#292・`docs/ios/architecture.md`「ビルド構成と接続先」)。
 - **プライバシーマニフェスト(#452 G6)**
   - `Metamon/PrivacyInfo.xcprivacy`(アプリ)と `MetamonWidget/PrivacyInfo.xcprivacy`(ウィジェット)。どの版にも入る(xcodegen が各ターゲットの Resources に入れる)。
   - 理由が要る API: UserDefaults(`CA92.1` アプリだけ / `1C8F.1` App Group でウィジェットと共有)、空き容量(`E174.1` / `85F4.1`。音声モデルのダウンロード前の確認と不足分の表示)。ファイルの日時・起動からの時間・キーボードは使っていない。
-  - 集めるデータ: ユーザー ID・名前(Sign in with Apple の表示名)・その他のユーザーコンテンツ・写真・正確な位置。すべて本人に紐づき、トラッキングなし、用途はアプリの機能。`docs/legal/privacy-policy.md` と App Store Connect の栄養ラベルに合わせる。
+  - 集めるデータ: ユーザー ID・名前(Sign in with Apple の表示名)・その他のユーザーコンテンツ・写真・正確な位置・クラッシュのデータ・パフォーマンスのデータ(Crashlytics・#296。審査用の版でも入れる)。すべて本人に紐づき、トラッキングなし、用途はアプリの機能。`docs/legal/privacy-policy.md` と App Store Connect の栄養ラベルに合わせる。
   - API やデータの扱いを変えたら、このファイルも直す。
 - **entitlement**
   - Review 構成は `Metamon/Metamon-Review.entitlements` を使う。HealthKit を除いたもの。
@@ -126,7 +133,7 @@ codesign -d --entitlements :- "$APP"
 #   → com.apple.developer.healthkit が無いこと
 otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|NearbyInteraction|CoreMotion'
 #   → 何も出ないこと
-strings "$APP/Metamon" | grep -E 'HKHealthStore|MCSession|NISession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps|WebViewLeaf|v1/text|ChatThreadLeaf|jp\.kz2601\.metamon\.pro|PaywallSheet|ProSettingsSection|ProEntitlementStore|購入して作る|Pro にする'
+strings "$APP/Metamon" | grep -E 'MatchListLeaf|HTTPMatchingClient|MatchingStore|AdultConfirmSheet|/interests|v1/feedback|FeedbackComposerView|HKHealthStore|MCSession|NISession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps|WebViewLeaf|v1/text|ChatThreadLeaf|jp\.kz2601\.metamon\.pro|PaywallSheet|ProSettingsSection|ProEntitlementStore|購入して作る|Pro にする'
 #   → 何も出ないこと
 #   注: WKWebView / WebKit の参照は FirebaseAuth(AuthWebViewController。OAuth・reCAPTCHA 用)から残る。
 #       この版のサインイン(Sign in with Apple・匿名)では使わない。アプリのコードからは WebKit を使わない
@@ -176,3 +183,4 @@ grep -l '"scope" *: *"\(public\|shared\)"' "$APP"/*.json
 - **審査用の版に戻す場合**(例: v1.1 で「探す」を戻す)
   - `#if` を外す。
   - **通報・ブロック・フィルタなど、審査で求められるものを先に入れてから**、新しい版として審査に出す。審査の後でフラグを切り替えるだけ、はしない(2.5.19)。
+  - 戻す順番と、1 機能ずつ出す・却下で外して出し直す手順は [`../release/feature-resubmission-plan.md`](../release/feature-resubmission-plan.md)(#334)。

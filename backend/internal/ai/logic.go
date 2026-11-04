@@ -95,7 +95,7 @@ func (s *Service) runLogicPass(ctx context.Context, transcript string, current [
 	var problems []string
 	for i := 0; i < logicPassMaxAttempts; i++ {
 		ar := &attemptResult{}
-		resp, err := s.call(ctx, logicSystemPrompt, logicUserMessage(transcript, current, problems, loc), PatchGenerationSchema(), ar, nil)
+		resp, err := s.call(WithOperation(ctx, OpLogic), logicSystemPrompt, logicUserMessage(transcript, current, problems, loc), PatchGenerationSchema(), ar, nil)
 		lm.Attempts++
 		lm.ClaudeMs += ar.latency.Milliseconds()
 		lm.Usage.Add(ar.meta.Usage)

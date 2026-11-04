@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"reflect"
 	"strings"
@@ -18,6 +19,8 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -47,6 +50,9 @@ type Request struct {
 	// cameraCapture (unknown values ignored). See restrict.go.
 	AllowedComponents []string `json:"allowedComponents,omitempty"`
 	DisabledFeatures  []string `json:"disabledFeatures,omitempty"`
+	// SupportedFeatures (#482): optional DSL behaviors the client implements
+	// (recordRetention, notification.when). See NewClientRestriction.
+	SupportedFeatures []string `json:"supportedFeatures,omitempty"`
 }
 
 // Latency is per-stage wall time in ms.
@@ -155,6 +161,9 @@ type Service struct {
 	Verifier auth.TokenVerifier
 	AuthMode string // auth.ModeDev also accepts X-Debug-Uid with the emulator
 
+	// Logger gets the ai.generate line per /v1/generate (#322); nil = slog.Default().
+	Logger *slog.Logger
+
 	conv     *convStore // clarify conversations (chat.go); lazily created
 	convOnce sync.Once
 }
@@ -191,14 +200,26 @@ func (s *Service) Generate(ctx context.Context, req Request) (*Result, error) {
 // is still validated and saved before it is returned.
 func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*Result, error) {
 	started := time.Now()
-	restrict := NewRestriction(req.AllowedComponents, req.DisabledFeatures)
+	tr := genTrace{appID: req.AppID}
+	ctx = withCostTally(ctx) // per-generation cost for ai.generate (#298)
+	res, err := s.generateStream(ctx, req, sink, started, &tr)
+	s.logGenerate(ctx, tr, sink != nil, res, err, time.Since(started)) // ai.generate (#322)
+	if err == nil {
+		// mode=auto is charged as create; the limiter refunds the rest (#548)
+		ratelimit.ReportMode(ctx, tr.mode)
+	}
+	return res, err
+}
+
+func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, started time.Time, tr *genTrace) (*Result, error) {
+	restrict := NewClientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures)
 	ctx = withRestriction(ctx, restrict)
 	transcript := strings.TrimSpace(req.Transcript)
 	if transcript == "" {
 		transcript = strings.TrimSpace(req.Text)
 	}
 	if req.AppID == "" || transcript == "" {
-		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "appId and transcript are required"}
+		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "appId and transcript are required"}
 	}
 	loc, err := resolveLocale(req.Locale, transcript)
 	if err != nil {
@@ -210,7 +231,7 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 	}
 	current, err := dsl.Parse(env.DSL)
 	if err != nil {
-		return nil, &Error{Status: http.StatusInternalServerError, Code: "internal", Message: "current DSL is invalid: " + err.Error()}
+		return nil, &Error{Status: http.StatusInternalServerError, Code: httpx.CodeInternal, Message: "current DSL is invalid: " + err.Error()}
 	}
 	mode := req.Mode
 	if mode == "" || mode == ModeAuto {
@@ -223,6 +244,7 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 			mode = ModeEdit
 		}
 	}
+	tr.mode, tr.first = string(mode), mode == ModeCreate && isInitial(current)
 	if mode == ModeUndo {
 		return s.undo(ctx, req.AppID, transcript, env, started, loc)
 	}
@@ -250,7 +272,7 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 			notePublicPII(ar, env.DSL, loc)                                          // #253
 		}
 	default:
-		return nil, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "mode must be auto|create|edit|undo"}
+		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "mode must be auto|create|edit|undo"}
 	}
 	if err != nil {
 		return nil, err
@@ -343,7 +365,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 	var lastCandidate []byte
 	var linted *attemptResult // valid output kept while regenerating for its lint warnings
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(ctx, systemPrompt, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
+		resp, err := s.call(WithOperation(ctx, OpGenerate), systemPrompt, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
 			appEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
 			return nil, err
@@ -450,7 +472,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			return ar, nil
 		}
 	}
-	return nil, &Error{Status: http.StatusBadRequest, Code: "generation_failed",
+	return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeGenerationFailed,
 		Message: "could not produce a valid app from the request", Problems: problems, Attempts: ar.meta.Attempts}
 }
 
@@ -465,7 +487,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	var linted *attemptResult
 	baseLint := lintOf(env.DSL)
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(ctx, systemPrompt+"\n"+editRules,
+		resp, err := s.call(WithOperation(ctx, OpPatch), systemPrompt+"\n"+editRules,
 			editUserMessage(transcript, env.Version, string(env.DSL), problems, loc), PatchGenerationSchema(), ar,
 			summaryEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
@@ -574,7 +596,7 @@ func applyRestriction(ar *attemptResult, r Restriction, create bool, loc Locale)
 	}
 	app, err := dsl.Parse(out)
 	if err != nil {
-		return &Error{Status: http.StatusBadRequest, Code: "generation_failed",
+		return &Error{Status: http.StatusBadRequest, Code: httpx.CodeGenerationFailed,
 			Message:  "could not produce a valid app without the parts this app version cannot use",
 			Problems: append(notes, err.Error()), Attempts: ar.meta.Attempts}
 	}
@@ -612,7 +634,7 @@ func (s *Service) call(ctx context.Context, system, user string, schema json.Raw
 		if resp.StopDetails != nil && resp.StopDetails.Category != "" {
 			msg += " (" + resp.StopDetails.Category + ")"
 		}
-		return nil, &Error{Status: http.StatusBadRequest, Code: "refused", Message: msg, Attempts: ar.meta.Attempts}
+		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeRefused, Message: msg, Attempts: ar.meta.Attempts}
 	}
 	return resp, nil
 }
@@ -1010,11 +1032,11 @@ func mapStoreErr(err error) error {
 	if errors.As(err, &ae) {
 		code := ae.Code
 		if code == "" {
-			code = "appconfig_error"
+			code = httpx.CodeAppconfigError
 		}
 		return &Error{Status: ae.Status, Code: code, Message: ae.Message}
 	}
-	return &Error{Status: http.StatusBadGateway, Code: "appconfig_error", Message: err.Error()}
+	return &Error{Status: http.StatusBadGateway, Code: httpx.CodeAppconfigError, Message: err.Error()}
 }
 
 func mapClaudeErr(err error) error {
@@ -1026,17 +1048,17 @@ func mapClaudeErr(err error) error {
 	if errors.As(err, &ae) {
 		switch ae.Status {
 		case 429:
-			return &Error{Status: http.StatusTooManyRequests, Code: "rate_limited", Message: "Claude rate limit"}
+			return &Error{Status: http.StatusTooManyRequests, Code: httpx.CodeRateLimited, Message: "Claude rate limit"}
 		case 400, 401, 403:
-			return &Error{Status: http.StatusInternalServerError, Code: "internal", Message: "Claude request rejected: " + ae.Message}
+			return &Error{Status: http.StatusInternalServerError, Code: httpx.CodeInternal, Message: "Claude request rejected: " + ae.Message}
 		default:
-			return &Error{Status: http.StatusServiceUnavailable, Code: "upstream_unavailable", Message: "Claude unavailable: " + ae.Type}
+			return &Error{Status: http.StatusServiceUnavailable, Code: httpx.CodeUpstreamUnavailable, Message: "Claude unavailable: " + ae.Type}
 		}
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		return &Error{Status: http.StatusGatewayTimeout, Code: "upstream_timeout", Message: "Claude call timed out"}
+		return &Error{Status: http.StatusGatewayTimeout, Code: httpx.CodeUpstreamTimeout, Message: "Claude call timed out"}
 	}
-	return &Error{Status: http.StatusServiceUnavailable, Code: "upstream_unavailable", Message: err.Error()}
+	return &Error{Status: http.StatusServiceUnavailable, Code: httpx.CodeUpstreamUnavailable, Message: err.Error()}
 }
 
 // sameDSL reports whether two DSL documents are equal as JSON values (key

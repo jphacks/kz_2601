@@ -4,9 +4,9 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>ja</string>
-	<!-- ホーム画面に出る表示名(正式名 Tailor It・#62)はここ1箇所だけ。内部識別子 Metamon / Bundle ID jp.kz2601.metamon は Firebase 登録値なので変えない -->
+	<!-- ホーム画面に出る表示名(正式名 Tailor It・#62)。値は project.yml の METAMON_DISPLAY_NAME(stg 系は「Tailor It β」・#292)。内部識別子 Metamon / Bundle ID jp.kz2601.metamon は Firebase 登録値なので変えない -->
 	<key>CFBundleDisplayName</key>
-	<string>Tailor It</string>
+	<string>$(METAMON_DISPLAY_NAME)</string>
 	<!-- Siri が「Tailor It」を聞き取れない時の別名(App Shortcuts のフレーズ「Tailor It で記録を追加」にも効く・#80) -->
 	<key>INAlternativeAppNames</key>
 	<array>

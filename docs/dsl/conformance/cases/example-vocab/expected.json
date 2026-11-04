@@ -1,0 +1,207 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 7
+          },
+          "id" : "cards",
+          "props" : {
+            "cards" : [
+              {
+                "back" : "りんご",
+                "front" : "apple",
+                "learned" : false,
+                "recordId" : "w1"
+              },
+              {
+                "back" : "よく考える",
+                "front" : "consider",
+                "learned" : false,
+                "recordId" : "w3"
+              }
+            ],
+            "entity" : "word",
+            "progress" : "1 / 2"
+          },
+          "state" : "rendered",
+          "type" : "flashcards"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "word_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 7,
+            "rowSpan" : 3
+          },
+          "id" : "words",
+          "props" : {
+            "entity" : "word",
+            "rows" : [
+              {
+                "checked" : false,
+                "recordId" : "w1",
+                "subtitle" : "りんご",
+                "title" : "apple"
+              },
+              {
+                "checked" : true,
+                "recordId" : "w2",
+                "subtitle" : "借りる",
+                "title" : "borrow"
+              },
+              {
+                "checked" : false,
+                "recordId" : "w3",
+                "subtitle" : "よく考える",
+                "title" : "consider"
+              }
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "word_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "単語を追加"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "英単語カード",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "word",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "learned" : false
+        }
+      },
+      "id" : "word_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 6
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "term",
+                "label" : "単語",
+                "placeholder" : "apple",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "meaning",
+                "label" : "意味",
+                "placeholder" : "りんご",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "learned",
+                "label" : "覚えた",
+                "value" : false
+              },
+              "state" : "rendered",
+              "type" : "toggle"
+            }
+          ],
+          "id" : "what",
+          "props" : {
+            "title" : "単語"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "word_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "word",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "単語",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

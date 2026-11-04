@@ -27,14 +27,16 @@
 
 ## 2. 今わかっている土台の問題(実測)
 
+> 2026-10-25 の実測。その後に入ったコードは「対応」の列に「11-02:」で足した。今の状況は各 Issue を見る。
+
 | # | 問題 | 根拠 | 対応 |
 |---|---|---|---|
-| 1 | **staging と本番が同じ Firestore(同じ GCP プロジェクトの `(default)`)を使っている。** develop への push で動く stg の書き込み・スモークは、本番のデータに入る | `deploy-cloudrun.yml` は両環境とも `GOOGLE_CLOUD_PROJECT=${PROJECT_ID}` が同じ。`store/firestore.go` は `firestore.NewClient(ctx, projectID)` だけで、`APP_ENV` を読むコードが無い | #288〜#293 |
+| 1 | **staging と本番が同じ Firestore(同じ GCP プロジェクトの `(default)`)を使っている。** develop への push で動く stg の書き込み・スモークは、本番のデータに入る | `deploy-cloudrun.yml` は両環境とも `GOOGLE_CLOUD_PROJECT=${PROJECT_ID}` が同じ。`store/firestore.go` は `firestore.NewClient(ctx, projectID)` だけで、`APP_ENV` を読むコードが無い | #288〜#293。11-02: `internal/fsenv`(#290)で stg が本番の DB を使うと起動を止めるようになった。ただし DB はまだ共有で、stg は `ALLOW_SHARED_PROD_DB=1` で動く(分離は #291・#293) |
 | 2 | **develop / main にブランチ保護が効いていない**(「マージは人だけ」が仕組みで守られていない) | `gh api repos/jphacks/kz_2601/branches/develop/protection` → 404 `Branch not protected`。`scripts/github/setup-branch-protection.sh` はあるが未適用(jphacks の Organization で admin 権限が無い可能性) | #299 |
 | 3 | **リポジトリを移すと自動デプロイが止まる。** WIF のプロバイダが `assertion.repository == 'jphacks/kz_2601'` で縛られている | `docs/infra/gcp-setup.md` 4-1 | #306 |
-| 4 | 計測が無い。クラッシュの報告・プロダクトの指標・AI 費用の記録が無い | iOS に Crashlytics 等なし。backend は slog の出力だけ | #295〜#298 |
-| 5 | Pro の判定が端末だけ(改造したクライアントは素通り)。サーバー側の上限も無い | `ProGate.swift`・`architecture.md` §6.8「後続」・#280 | #314〜#317 |
-| 6 | 共有・公開に、通報・ブロック・運営による非公開化が無い(審査 1.2) | `architecture.md` §3.2「モデレーション: 未実装」・調査 2 | #321 |
+| 4 | 計測が無い。クラッシュの報告・プロダクトの指標・AI 費用の記録が無い | iOS に Crashlytics 等なし。backend は slog の出力だけ | #295〜#298。11-02: iOS の Crashlytics(#296)・指標のイベント(#297・`internal/metrics`)・AI 費用のログ(#298・`ai.usage`)・構造化ログと Error Reporting(#295)のコードは入った。シンク・アラートの GCP 側の設定は人の作業(`docs/infra/observability.md`・`docs/infra/ai-cost.md`) |
+| 5 | Pro の判定が端末だけ(改造したクライアントは素通り)。サーバー側の上限も無い | `ProGate.swift`・`docs/backend/features/pro.md`「後続」・#280 | #314〜#317。11-02: サーバー側の回数の上限(#280・`internal/ratelimit`)と、StoreKit 2 の取引のサーバー検証・Pro の権利の保存(#314・`internal/appstore`・`internal/entitlement`)は実装済み。402 で止める(#316)・通知(#315)・プランごとの上限(#317)は残り |
+| 6 | 共有・公開に、通報・ブロック・運営による非公開化が無い(審査 1.2) | `docs/backend/features/sharing.md`「モデレーション: 未実装」・調査 2 | #321。11-02: 実装済み(通報 `POST /reports`・ブロック `/me/blocks`・運営の非公開化 `cmd/moderate`。`docs/backend/features/sharing.md`・`docs/infra/moderation.md`) |
 | 7 | プロンプトと生成ロジックが MIT で公開済み(取り消せない)。移行後の差分だけが非公開になる | 調査 1-4 | R-20(移行後はサーバー側を非公開で育てる) |
 
 ## 3. 全体の流れとマイルストーンをまたぐ依存
@@ -923,7 +925,7 @@ R-19(2 人の権利の話し合い)
 
 ```markdown
 ## 背景
-Pro の判定は端末の `ProGate.swift` だけ。改造したクライアントは素通りできる(`architecture.md` §6.8「後続」)。本格的な課金は #306 の移行の後だが、仕組みは β(sandbox)で先に作る。
+Pro の判定は端末の `ProGate.swift` だけ。改造したクライアントは素通りできる(`docs/backend/features/pro.md`「後続」)。本格的な課金は #306 の移行の後だが、仕組みは β(sandbox)で先に作る。
 
 ## やること
 - [ ] 方式を決める: App Store Server API を直接使う / RevenueCat 等を使う(手数料・Android(#360)との共通化)
@@ -1086,6 +1088,8 @@ App Store はサポート URL が必須。β の段階から問い合わせの�
 
 ### R-35(#321)
 
+> 11-02: 実装済み。下の本文は起票時のもの。仕組みは `docs/backend/features/sharing.md` のモデレーションの行、運用は `docs/infra/moderation.md`。
+
 - タイトル: 共有アプリの通報・ブロック・運営による非公開化(審査 1.2 の対応)
 - ラベル: enhancement, priority:P1 / マイルストーン: M2
 
@@ -1093,7 +1097,7 @@ App Store はサポート URL が必須。β の段階から問い合わせの�
 
 ```markdown
 ## 背景
-審査 1.2 / 1.2.1(a) は、利用者が作った内容を共有・公開するアプリに、フィルタ・通報・ブロック・連絡先の公開を求める(2026-10-16 の改定で AI の生成アプリも明記)。今のバックエンドには通報・ブロックの API が無い(`architecture.md` §3.2「モデレーション: 未実装」)。M0 の #245 で「探す」を外すとしても、シェアリンクでの共有と共有レコードは残る。
+審査 1.2 / 1.2.1(a) は、利用者が作った内容を共有・公開するアプリに、フィルタ・通報・ブロック・連絡先の公開を求める(2026-10-16 の改定で AI の生成アプリも明記)。今のバックエンドには通報・ブロックの API が無い(`docs/backend/features/sharing.md`「モデレーション: 未実装」)。M0 の #245 で「探す」を外すとしても、シェアリンクでの共有と共有レコードは残る。
 
 ## やること
 - [ ] 通報: 共有アプリ・共有レコード・掲載(探す)に「通報する」。`reports/{id}` に保存し運営に通知
@@ -1197,7 +1201,7 @@ App Store で一般に配信し、Pro の課金を本番で受け取る。
 
 ```markdown
 ## 背景
-今の仮の価格は Tailor It Pro ¥500 / 月(`architecture.md` §6.8)。有料の機能は sharedData だけ。1 人あたりの AI 費用(#298)と β の反応(#322)を見て決める。
+今の仮の価格は Tailor It Pro ¥500 / 月(`docs/backend/features/pro.md`)。有料の機能は sharedData だけ。1 人あたりの AI 費用(#298)と β の反応(#322)を見て決める。
 
 ## やること
 - [ ] 1 人あたりの月の AI 費用・インフラ費用と、Apple の手数料から、損をしない価格の下限を出す
@@ -1912,7 +1916,7 @@ iOS は SwiftUI のネイティブ。Android もネイティブ(Kotlin + Jetpack
 
 ## 決めること
 - [ ] UI: Jetpack Compose(推奨)/ 他(Flutter・Compose Multiplatform)と比べた結論
-- [ ] 音声: Android の SpeechRecognizer(端末の中)/ whisper.cpp / サーバーの Whisper。大きさと精度と費用
+- [ ] 音声: Android の SpeechRecognizer(端末の中)/ whisper.cpp / サーバーの Whisper(どれも未実装の候補。今のサーバーに音声認識は無い)。大きさと精度と費用
 - [ ] 最低 API レベル・対象の端末
 - [ ] モジュールの分け方(iOS の Metamon{DSL,Renderer,Services} に対応させる)
 - [ ] DSL の型を正典のスキーマから作る方法(kotlinx.serialization)

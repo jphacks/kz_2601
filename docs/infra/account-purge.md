@@ -2,7 +2,7 @@
 
 プライバシーポリシー §4「論理削除し、30 日以内に消去します」を実行する仕組みです。`DELETE /v1/me` は論理削除だけをします。`backend/cmd/purge` が、論理削除から 30 日を過ぎたアカウントのデータを毎日消します。
 
-> **本書の手順はまだ実行していません。** GCP の設定は承認を得てから、人が行います。stg と prod は Firestore を共有しているので、ジョブは **1 つの環境(prod)にだけ** 作ります。
+> **prod では設定済み(2026-10-30・ジョブ `account-purge` と毎日 4:30 の Scheduler)。** GCP の設定は承認を得てから行います。stg と prod は Firestore を共有しているので、ジョブは **1 つの環境(prod)にだけ** 作ります。
 
 ## 目次
 - [消すもの・残すもの](#消すもの残すもの)
@@ -19,6 +19,7 @@
 | `shares/*`(本人が出した共有リンク) | 消す |
 | `public_apps/*`(本人の「探す」掲載)と `installs/*` | 消す |
 | `release_requests/*`(連絡先を含む) | 消す |
+| `feedback/*`(本人が送ったフィードバック・#319) | 消す |
 | `app_owners/*`(本人が作ったアプリの記録) | 消す(下の「残す共有アプリ」の分は残す) |
 | `public_apps/*/installs/{uid}`(本人が他の人の掲載を入れた記録) | 消す |
 | `apps_public/*/members/{uid}`(参加者としての表示名) | 消す |
@@ -26,6 +27,11 @@
 | 本人だけが使っていた共有アプリ(`apps_public/{appId}` と記録) | 消す |
 | 他の人が参加・投稿している、本人の共有アプリ(`apps_public/{appId}`・記録・参加者・`app_owners`) | **残す**(その人たちの共有の場のため) |
 | 他の人と共有しているアプリへの本人の投稿 | **残す**(ポリシー §4)。ただし表示名(`authorName`)は消す。`author` の uid は残るが、Firebase のアカウントは消えるので、誰かにはたどれない |
+| `users/{uid}/entitlements/*`(Pro の権利)と uid の `appstore_transactions/*`(購読と uid の結びつき・#314) | 消す。同じ Apple ID で新しいアカウントに復元できるようにする |
+| `reports/*`(本人が出した通報・本人が対象の通報)と `report_quota/{uid}`(#321) | 消す |
+| `users/{uid}/blocks/*`(本人のブロック一覧・#321) | 消す。他の人のブロック一覧にある本人の uid は残る(たどれる先が無くなるだけ) |
+| 仲間探しのアプリ(#507)の `apps_public/*/match_pairs/*`(本人を含むもの)と `match_quota/{uid}` | 消す(ログの `matchPairs`) |
+| 仲間探しのアプリの、本人のプロフィール(`match:"profile"`)と連絡先(`match:"matched"`)のレコード | 消す(ログの `matchRecords`)。上の「投稿は残す」の例外: 本人を表す情報で、共有の場の投稿ではないため |
 | Firebase Auth のユーザー | 消す(アプリが退会時に消しているので、ここは取りこぼしの保険) |
 | `users/{uid}` | `{status: "purged", purgedAt}` だけの墓標にする(`deletedAt` は消す)。同じ uid が来ても 410 を返し続け、二度と対象にならない |
 | `rateLimits/*_uid_{uid}` | ジョブでは消さない。日付ごとの回数だけで、TTL で消す(下の提案) |
@@ -45,6 +51,8 @@
 | `-limit` | 50 | 1 回で扱う最大件数 |
 | `-older-than` | 720h | 論理削除からの経過時間。24h 未満は拒否する |
 | `-delete-auth` | true | Firebase Auth のユーザーも消す |
+| `-feedback-older-than` | 4320h | フィードバック(#319)の保存期間(180 日)。アカウントとは別に、これより古い `feedback/*` を毎回消す。24h 未満は拒否する |
+| `-feedback-limit` | 500 | 1 回で消すフィードバックの最大件数(残りは次の日) |
 
 ローカル(エミュレータ)で試す: `make emulator` の後に `make -C backend run-purge`(既定は `-dry-run`。`PURGE_FLAGS="-older-than=24h"` などで変える)。
 
@@ -91,7 +99,11 @@ gcloud run jobs create account-purge \
 gcloud run jobs execute account-purge --project="$PROJECT_ID" --region="$REGION" --wait
 ```
 
-ログに `purge: start`(`candidates` = 対象の数)と `purge: would purge` が出ることを確かめます。問題が無ければ dry-run を外します。
+`gcloud run jobs create` は Job を新しく作る時だけのコマンドなので、ここでは `--set-env-vars` を使います(作る時は既存の env がありません)。作った後に env を変える時は、他の値を消さないよう `gcloud run jobs update account-purge --update-env-vars KEY=VALUE` を使います。
+
+Job は `APP_ENV` を付けないので stg 用の起動停止(#290)は掛かりません。DB は `FIRESTORE_DATABASE`(既定 `(default)`)で選びます。stg のプロジェクト/DB で動かす場合は `APP_ENV=stg` を付け、本番の DB を指していれば起動を拒否します。
+
+ログに `purge: firestore`(接続先)・`purge: start`(`candidates` = 対象の数)と `purge: would purge` が出ることを確かめます。問題が無ければ dry-run を外します。
 
 ```bash
 gcloud run jobs update account-purge --project="$PROJECT_ID" --region="$REGION" --args="-limit=50,-older-than=696h"

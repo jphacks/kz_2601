@@ -63,6 +63,7 @@ checks_json="$(printf '%s\n' "${REQUIRED_CHECKS[@]}" \
   | jq -R --argjson app "$GITHUB_ACTIONS_APP_ID" '{context: ., app_id: $app}' | jq -s .)"
 
 if [ "$OWNER_TYPE" = "Organization" ]; then
+  # shellcheck disable=SC2086 # HUMAN_USERS は空白区切りの一覧。わざと分割する
   users_json="$(printf '%s\n' $HUMAN_USERS | jq -R . | jq -s .)"
   restrictions_json="$(jq -n --argjson users "$users_json" '{users: $users, teams: [], apps: []}')"
 else

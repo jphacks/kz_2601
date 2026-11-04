@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jphacks/kz_2601/backend/internal/appcheck"
 	"github.com/jphacks/kz_2601/backend/internal/appconfig"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
@@ -59,7 +62,55 @@ func TestRoutes(t *testing.T) {
 
 var openAPIErrorCodes = []string{
 	"bad_request", "unauthenticated", "not_found", "version_conflict",
-	"invalid_dsl", "invalid_record", "payload_too_large", "rate_limited", "internal",
+	"invalid_dsl", "invalid_record", "payload_too_large", "rate_limited", "app_check_failed", "internal",
+}
+
+// APP_CHECK_MODE=enforce guards only the authenticated API (#318): health, the
+// share page and client-config (old builds learn they must update) stay open.
+func TestAppCheckEnforceGuardsAPIOnly(t *testing.T) {
+	t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
+	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
+	ac := appcheck.Middleware(appcheck.Config{Mode: appcheck.ModeEnforce, Verifier: okVerifier{}, Logger: logger})
+	authed := func(h http.Handler) http.Handler { return ac(auth.Middleware(nil, auth.ModeDev)(h)) }
+	share := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	h := newHandler(authed, logger, appconfig.New(store.NewMemory()), share)
+
+	tests := []struct {
+		path, token string
+		want        int
+	}{
+		{"/health", "", http.StatusOK},
+		{"/s/abc", "", http.StatusOK},
+		{"/v1/client-config", "", http.StatusOK},
+		{"/v1/nope", "", http.StatusNotFound},
+		{"/v1/apps", "", http.StatusUnauthorized},
+		{"/v1/apps", "bad", http.StatusUnauthorized},
+		{"/v1/apps", "ok", http.StatusOK},
+	}
+	for _, tt := range tests {
+		req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+		req.Header.Set(auth.DebugUIDHeader, "u1")
+		if tt.token != "" {
+			req.Header.Set(appcheck.Header, tt.token)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != tt.want {
+			t.Fatalf("%s token=%q: status %d, want %d (%s)", tt.path, tt.token, rec.Code, tt.want, rec.Body.String())
+		}
+		if tt.want == http.StatusUnauthorized && !strings.Contains(rec.Body.String(), httpx.CodeAppCheckFailed) {
+			t.Fatalf("%s: body %s", tt.path, rec.Body.String())
+		}
+	}
+}
+
+type okVerifier struct{}
+
+func (okVerifier) Verify(_ context.Context, token string) (string, error) {
+	if token != "ok" {
+		return "", errors.New("invalid")
+	}
+	return "ios", nil
 }
 
 func TestUnmatchedRoutesReturnErrorEnvelope(t *testing.T) {
@@ -179,6 +230,65 @@ func TestEnvOr(t *testing.T) {
 			t.Setenv("PORT", tt.value)
 			if got := envOr("PORT", "8080"); got != tt.want {
 				t.Fatalf("envOr = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// countingAccounts counts the account lookups RejectDeleted makes.
+type countingAccounts struct {
+	store.Accounts
+	lookups int
+}
+
+func (a *countingAccounts) UserDeleted(ctx context.Context, uid string) (bool, error) {
+	a.lookups++
+	return a.Accounts.UserDeleted(ctx, uid)
+}
+
+// newAuthed keeps App Check -> auth -> RejectDeleted (#516): rejected requests
+// never reach the account lookup, and a deleted uid gets 410.
+func TestNewAuthedOrder(t *testing.T) {
+	t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
+	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
+	mem := store.NewMemory()
+	if err := mem.DeactivateUser(context.Background(), "gone"); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name, token, uid string
+		want             int
+		wantCode         string
+		wantLookups      int
+	}{
+		{name: "app check first", token: "bad", uid: "u1", want: http.StatusUnauthorized, wantCode: httpx.CodeAppCheckFailed},
+		{name: "auth before RejectDeleted", token: "ok", want: http.StatusUnauthorized, wantCode: httpx.CodeUnauthenticated},
+		{name: "deleted uid is 410", token: "ok", uid: "gone", want: http.StatusGone, wantCode: "account_deleted", wantLookups: 1},
+		{name: "active uid passes", token: "ok", uid: "u1", want: http.StatusOK, wantLookups: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			accounts := &countingAccounts{Accounts: mem}
+			ac := appcheck.Middleware(appcheck.Config{Mode: appcheck.ModeEnforce, Verifier: okVerifier{}, Logger: logger})
+			app := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+			h := newAuthed(ac, auth.Middleware(nil, auth.ModeDev), accounts)(app)
+
+			req := httptest.NewRequest(http.MethodGet, "/v1/apps", nil)
+			req.Header.Set(appcheck.Header, tt.token)
+			if tt.uid != "" {
+				req.Header.Set(auth.DebugUIDHeader, tt.uid)
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+
+			if rec.Code != tt.want {
+				t.Fatalf("status = %d, want %d (%s)", rec.Code, tt.want, rec.Body.String())
+			}
+			if tt.wantCode != "" && !strings.Contains(rec.Body.String(), tt.wantCode) {
+				t.Fatalf("body %s, want code %s", rec.Body.String(), tt.wantCode)
+			}
+			if accounts.lookups != tt.wantLookups {
+				t.Fatalf("account lookups = %d, want %d", accounts.lookups, tt.wantLookups)
 			}
 		})
 	}

@@ -18,14 +18,29 @@ struct MetamonApp: App {
     static let componentRegistry = ComponentRegistry.standard
         .registering(.voiceInput) { c, _ in VoiceInputView(prompt: c.prompt) }
 
+    /// App Check(#318): シミュレータ・Debug 構成はデバッグ用のトークン、実機の Staging / Release / Review は App Attest。
+    /// docs/infra/app-check.md
+    static var appCheckMode: AppCheckMode {
+        #if DEBUG || targetEnvironment(simulator)
+        .debug
+        #else
+        .deviceAttestation
+        #endif
+    }
+
     init() {
         // Firebase は Services 組み立てより前に初期化(plist が無ければ警告してモック認証に落ちる)
-        FirebaseBootstrap.configureIfAvailable()
+        FirebaseBootstrap.configureIfAvailable(appCheck: Self.appCheckMode)
+        // クラッシュ報告(#296): 設定の「クラッシュ報告を送る」を反映(Firebase が無ければ何もしない)
+        CrashReportingPreference.shared.activate(reporter: FirebaseCrashReporter() ?? NoopCrashReporter())
         UNUserNotificationCenter.current().delegate = ForegroundNotificationPresenter.shared // 前面でも通知を出す(#228)
         var services = BuildConfig.make()
         // #246(5.1.2(i)): 同意が無ければ ai へ一切送らない。どの入口(Siri 等)から呼ばれても効くよう Services の ai を包む
         AIConsentDebug.applyLaunchOverride()
         FirstRunTutorialStore.shared.applyLaunchOverride() // #274(DEBUG のみ)
+        #if !APP_STORE_REVIEW
+        BetaWelcomeStore.shared.applyLaunchOverride() // #313(DEBUG のみ)
+        #endif
         _ = ExpensiveNetworkProbe.shared // 音声モデルの確認(#275)より前に回線の種類の監視を始める
         services.ai = ConsentGatedAIClient(base: services.ai) { AIConsentStore.isGranted(in: .standard) }
         if BuildConfig.forceMock { MusicSession.shared.player = FakeMusicPlayback() } // musicPlayer(#412)は音を出さない偽物
@@ -51,12 +66,18 @@ struct MetamonApp: App {
         let runtime = AppRuntime(document: document, services: services)
         runtime.aiConsent = .shared
         runtime.tutorial = .shared
+        #if !APP_STORE_REVIEW
+        runtime.betaWelcome = .shared // #313
+        #endif
         let session = AuthSession(service: services.auth)
         runtime.onSessionExpired = { session.expire() } // 401 が続いたらサインイン画面へ(#60)
         runtime.isAnonymousUser = { session.user?.isAnonymous == true } // 引き継ぎの案内(#276)
         IntentHost.shared.register(runtime) // Siri / ショートカット(#80)は本体プロセス内でこの runtime を使う
         #if !APP_STORE_REVIEW
         PassbyController.install(runtime: runtime, mock: BuildConfig.forceMock) // すれ違い通信(#425)
+        // 課金(#314): 検証済みの取引をサーバーに送り、購入の appAccountToken に uid を入れる
+        ProGate.shared.store.server = services.entitlements
+        ProGate.shared.store.accountUID = { [auth = services.auth] in auth.currentUser?.uid }
         #endif
         _runtime = State(initialValue: runtime)
         _session = State(initialValue: session)
@@ -80,16 +101,31 @@ struct MetamonApp: App {
                         .task {
                             await runtime.bootstrap()
                             IntentHost.shared.markReady() // 保留中の「開く/話しかける」を実行(#80)
+                            #if !APP_STORE_REVIEW
+                            SharingUI.shared.isReady = true // 保留中のシェアリンクを開く(#278)
+                            #endif
+                            await runtime.flushAIButtonMetrics() // #446: 前の日までの集計を送る
                         }
+                        .onChange(of: scenePhase) { _, phase in
+                            if phase == .active { Task { await runtime.flushAIButtonMetrics() } }
+                        }
+                        #if !APP_STORE_REVIEW
+                        .onDisappear { SharingUI.shared.isReady = false } // サインアウト: 次のサインインの bootstrap まで待つ
+                        #endif
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: session.user == nil)
             .modifier(UpdateGateModifier(gate: updateGate))
+            #if !APP_STORE_REVIEW
+            .modifier(ShareLinkReceiver()) // シェアリンクはサインイン前でも受けて保留(#278)
+            #endif
             .environment(session)
             .environment(\.services, services)              // protocol 越しのサービス
             // 表示言語(#44): 設定の「言語」で即時切替。`Text("…")` の解決と日付・数値の書式がこの Locale に従う
             .environment(\.locale, LanguagePreference.shared.locale)
             .task { await session.observe() }
+            // クラッシュ報告に付ける本人の区別は uid だけ(名前・内容は付けない・#296)
+            .onChange(of: session.user?.uid, initial: true) { _, uid in CrashReportingPreference.shared.updateUser(uid: uid) }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background { BackgroundRefresh.schedule() } // #38: 裏の定期同期を予約
             }

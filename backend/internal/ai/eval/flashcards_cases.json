@@ -1,0 +1,6 @@
+[
+  {"id": "fc_vocab", "kind": "create", "group": "flashcards", "transcript": "英単語を覚えるアプリ。カードの表に単語、タップでめくると意味。覚えたら右にスワイプして、覚えてないのだけ出してほしい", "note": "#264 flashcards + toggle + 覚えていないものだけの filter", "expect": {"has": ["flashcards", "list"], "lacks": ["disclosure"], "flashcardsUnlearned": true, "substitution": false, "unreachable": 0}},
+  {"id": "fc_history", "kind": "create", "group": "flashcards", "transcript": "日本史の一問一答で暗記したい。問題を見て、めくったら答え", "note": "#264 一問一答 = flashcards(採点のクイズではない)", "expect": {"has": ["flashcards"], "lacks": ["disclosure"], "unreachable": 0}},
+  {"id": "fc_only_flip", "kind": "create", "group": "flashcards", "transcript": "中国語の単語帳。めくって意味を見るだけでいい", "note": "#264 記録しないならめくるだけでもよい(toggle は任意)", "expect": {"has": ["flashcards"], "unreachable": 0}},
+  {"id": "fc_edit_unlearned", "kind": "edit", "base": "fc_history", "group": "flashcards", "transcript": "覚えた問題はもう出さないようにして", "note": "#264 既存の flashcards に toggle と filter を足す", "expect": {"patch": true, "has": ["flashcards"], "flashcardsUnlearned": true}}
+]

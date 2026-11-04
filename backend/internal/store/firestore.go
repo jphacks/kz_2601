@@ -32,9 +32,10 @@ type Firestore struct {
 
 const publicCollection = "apps_public"
 
-// NewFirestore connects to projectID (honours FIRESTORE_EMULATOR_HOST).
-func NewFirestore(ctx context.Context, projectID string) (*Firestore, error) {
-	c, err := firestore.NewClient(ctx, projectID)
+// NewFirestore connects to database in projectID (honours
+// FIRESTORE_EMULATOR_HOST). Binaries take both from fsenv.FromEnv.
+func NewFirestore(ctx context.Context, projectID, database string) (*Firestore, error) {
+	c, err := firestore.NewClientWithDatabase(ctx, projectID, database)
 	if err != nil {
 		return nil, err
 	}
@@ -43,6 +44,10 @@ func NewFirestore(ctx context.Context, projectID string) (*Firestore, error) {
 
 // Close releases the client.
 func (f *Firestore) Close() error { return f.c.Close() }
+
+// Client is the underlying client (shared with packages that own their own
+// collections, e.g. internal/entitlement).
+func (f *Firestore) Client() *firestore.Client { return f.c }
 
 var _ Store = (*Firestore)(nil)
 
@@ -144,17 +149,20 @@ func (d *recordDoc) toRecord(id string) *Record {
 }
 
 type publicAppDoc struct {
-	OwnerUID  string         `firestore:"ownerUid"`
-	Name      string         `firestore:"name"`
-	Version   int64          `firestore:"version"`
-	DSL       map[string]any `firestore:"dsl"`
-	DSLJSON   string         `firestore:"dslJson"`
-	CreatedAt time.Time      `firestore:"createdAt"`
-	UpdatedAt time.Time      `firestore:"updatedAt"`
+	OwnerUID     string         `firestore:"ownerUid"`
+	Name         string         `firestore:"name"`
+	Version      int64          `firestore:"version"`
+	DSL          map[string]any `firestore:"dsl"`
+	DSLJSON      string         `firestore:"dslJson"`
+	CreatedAt    time.Time      `firestore:"createdAt"`
+	UpdatedAt    time.Time      `firestore:"updatedAt"`
+	Hidden       bool           `firestore:"hidden,omitempty"`
+	HiddenReason string         `firestore:"hiddenReason,omitempty"`
+	HiddenAt     time.Time      `firestore:"hiddenAt,omitempty"`
 }
 
 func (d *publicAppDoc) toPublicApp(id string) *PublicApp {
-	return &PublicApp{ID: id, OwnerUID: d.OwnerUID, Name: d.Name, Version: int(d.Version), DSL: json.RawMessage(d.DSLJSON), CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+	return &PublicApp{ID: id, OwnerUID: d.OwnerUID, Name: d.Name, Version: int(d.Version), DSL: json.RawMessage(d.DSLJSON), CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, ModerationState: ModerationState{Hidden: d.Hidden, HiddenReason: d.HiddenReason, HiddenAt: d.HiddenAt}}
 }
 
 func rawToMap(raw json.RawMessage) (map[string]any, error) {
@@ -591,24 +599,29 @@ func (f *Firestore) DeleteRecord(ctx context.Context, rs RecordSet, id string) e
 	return err
 }
 
-// DeleteAllRecords implements Store.
+// deleteAllChunk bounds the deletes sent in one BulkWriter run (Firestore
+// allows 500 writes per batch; BulkWriter splits them further).
+const deleteAllChunk = 500
+
+// DeleteAllRecords implements Store. Each record goes with its marks/**
+// subcollections (Firestore keeps them when the record is deleted, #553).
+// DocumentRefs also lists records a failed run already deleted while their
+// marks remain, so a retry finishes the rest.
 func (f *Firestore) DeleteAllRecords(ctx context.Context, rs RecordSet) error {
-	col := f.recordsCol(rs)
-	for {
-		it := col.Limit(200).Documents(ctx)
-		docs, err := it.GetAll()
-		if err != nil {
+	var refs []*firestore.DocumentRef
+	err := eachRef(f.recordsCol(rs).DocumentRefs(ctx), func(rec *firestore.DocumentRef) error {
+		var err error
+		if refs, err = collectTree(ctx, rec, refs, map[string]int{}); err != nil {
 			return err
 		}
-		if len(docs) == 0 {
-			return nil
+		if len(refs) >= deleteAllChunk {
+			err = f.bulkDelete(ctx, refs)
+			refs = refs[:0]
 		}
-		bw := f.c.BulkWriter(ctx)
-		for _, d := range docs {
-			if _, err := bw.Delete(d.Ref); err != nil {
-				return err
-			}
-		}
-		bw.End()
+		return err
+	})
+	if err != nil {
+		return err
 	}
+	return f.bulkDelete(ctx, refs)
 }

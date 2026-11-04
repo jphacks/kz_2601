@@ -8,15 +8,18 @@ public enum FirebaseBootstrap {
     public private(set) static var isConfigured = false
 
     /// plist があれば `FirebaseApp.configure()`。アプリ起動の最初(`BuildConfig.make` より前)に 1 回呼ぶ。
+    /// `appCheck`(#318): App Check のプロバイダ。`.off` 以外なら ai / appconfig へのリクエストに `X-Firebase-AppCheck` が付く。
     @discardableResult
-    public static func configureIfAvailable(bundle: Bundle = .main) -> Bool {
+    public static func configureIfAvailable(bundle: Bundle = .main, appCheck: AppCheckMode = .off) -> Bool {
         if isConfigured { return true }
         guard let path = bundle.path(forResource: "GoogleService-Info", ofType: "plist"),
               let options = FirebaseOptions(contentsOfFile: path) else {
             print("[Metamon] GoogleService-Info.plist がバンドルにありません。`ios/scripts/sync-firebase-plist.sh` を実行して xcodegen し直してください。認証はモック(固定 uid)で動きます")
             return false
         }
+        FirebaseAppCheckSetup.installFactory(appCheck) // configure より前(Firebase の決まり)
         FirebaseApp.configure(options: options)
+        if appCheck != .off { HTTP.appCheck = FirebaseAppCheckTokenProvider() }
         isConfigured = true
         return true
     }

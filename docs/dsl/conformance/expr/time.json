@@ -1,0 +1,135 @@
+{
+  "description": "hoursBetween: \"HH:mm\" strings and the clock part of datetimes (local time zone).",
+  "defaults": {"now": "2026-10-28T15:30:45+09:00", "timeZone": "Asia/Tokyo"},
+  "cases": [
+    {
+      "name": "hoursBetween/day-shift",
+      "expr": {"op": "hoursBetween", "args": ["09:00", "17:30"]},
+      "expected": {"type": "number", "value": 8.5, "text": "8.5"}
+    },
+    {
+      "name": "hoursBetween/overnight",
+      "expr": {"op": "hoursBetween", "args": ["22:00", "05:00"]},
+      "expected": {"type": "number", "value": 7, "text": "7"}
+    },
+    {
+      "name": "hoursBetween/same",
+      "expr": {"op": "hoursBetween", "args": ["9:00", "9:00"]},
+      "expected": {"type": "number", "value": 0, "text": "0"}
+    },
+    {
+      "name": "hoursBetween/seconds",
+      "expr": {"op": "hoursBetween", "args": ["09:00:30", "09:01:00"]},
+      "expected": {"type": "number", "value": 0.008333333333333333, "text": "0.008333333333333333"}
+    },
+    {
+      "name": "hoursBetween/24-00-start",
+      "expr": {"op": "hoursBetween", "args": ["24:00", "01:00"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "hoursBetween/24-00-end",
+      "expr": {"op": "hoursBetween", "args": ["00:00", "24:00"]},
+      "expected": {"type": "number", "value": 24, "text": "24"}
+    },
+    {
+      "name": "hoursBetween/24-30-invalid",
+      "expr": {"op": "hoursBetween", "args": ["24:30", "01:00"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "hoursBetween/single-digit-minute",
+      "expr": {"op": "hoursBetween", "args": ["9:5", "10:00"]},
+      "expected": {"type": "number", "value": 0.9166666666666666, "text": "0.9166666666666666"}
+    },
+    {
+      "name": "hoursBetween/three-digit-hour",
+      "expr": {"op": "hoursBetween", "args": ["123:00", "10:00"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "hoursBetween/padded-with-spaces",
+      "expr": {"op": "hoursBetween", "args": [" 09:00 ", "10:00"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "hoursBetween/minute-60",
+      "expr": {"op": "hoursBetween", "args": ["09:60", "10:00"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "hoursBetween/dash-separator",
+      "expr": {"op": "hoursBetween", "args": ["09-00", "10:00"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "hoursBetween/empty-part",
+      "expr": {"op": "hoursBetween", "args": ["9:00:", "10:00"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "hoursBetween/missing-hour",
+      "expr": {"op": "hoursBetween", "args": [":30", "10:00"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "hoursBetween/fullwidth",
+      "expr": {"op": "hoursBetween", "args": ["０９:００", "10:00"]},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "hoursBetween/datetimes",
+      "expr": {"op": "hoursBetween", "args": ["2026-10-24T09:00:00+09:00", "2026-10-24T18:15:00+09:00"]},
+      "expected": {"type": "number", "value": 9.25, "text": "9.25"}
+    },
+    {
+      "name": "hoursBetween/utc-datetime-local-clock",
+      "expr": {"op": "hoursBetween", "args": ["2026-10-24T00:00:00Z", "10:00"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "hoursBetween/date-only-is-nil",
+      "expr": {"op": "hoursBetween", "args": ["2026-10-24", "10:00"]},
+      "expected": {"type": "nil"}
+    },
+    {"name": "hoursBetween/numbers-are-nil", "expr": {"op": "hoursBetween", "args": [9, 10]}, "expected": {"type": "nil"}},
+    {
+      "name": "hoursBetween/now",
+      "expr": {"op": "hoursBetween", "args": [{"op": "now", "args": []}, "16:30:45"]},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "hoursBetween/today",
+      "expr": {"op": "hoursBetween", "args": [{"op": "today", "args": []}, "06:00"]},
+      "expected": {"type": "number", "value": 6, "text": "6"}
+    },
+    {
+      "name": "hoursBetween/break",
+      "expr": {
+        "op": "max",
+        "args": [
+          {
+            "op": "sub",
+            "args": [
+              {"op": "hoursBetween", "args": ["09:00", "18:00"]},
+              {"op": "div", "args": [{"op": "coalesce", "args": [{"op": "div", "args": [1, 0]}, 0]}, 60]}
+            ]
+          },
+          0
+        ]
+      },
+      "expected": {"type": "number", "value": 9, "text": "9"}
+    },
+    {
+      "name": "hoursBetween/pay",
+      "expr": {"op": "round", "args": [{"op": "mul", "args": [{"op": "hoursBetween", "args": ["09:00", "16:15"]}, 1100]}]},
+      "expected": {"type": "number", "value": 7975, "text": "7975"}
+    },
+    {
+      "name": "hoursBetween/new-york-dst-wall-clock",
+      "timeZone": "America/New_York",
+      "expr": {"op": "hoursBetween", "args": ["2026-11-01T05:00:00Z", "2026-11-01T08:00:00Z"]},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    }
+  ]
+}

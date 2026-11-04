@@ -30,6 +30,40 @@ extension AppRuntime {
         handleNotificationResult(result, appId: appId, hasSpecs: !specs.isEmpty)
     }
 
+    /// 条件の通知(#265): レコードの保存・削除・同期が続いても 1 回にまとめて評価する。
+    func scheduleConditionCheck() {
+        conditionCheckTask?.cancel()
+        conditionCheckTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard let self, !Task.isCancelled else { return }
+            await checkConditionNotificationsNow()
+        }
+    }
+
+    /// 各 `when` を評価し、偽 → 真に変わった通知をすぐ出す。前回の真偽は `ConditionNotificationStore` に残る。
+    /// 未表示の entity は端末内 DB から読む(読み込み前の空で評価して誤って鳴らさない)。
+    func checkConditionNotificationsNow() async {
+        let appId = document.appId
+        let dsl = self.dsl
+        let specs = dsl.app.notifications.filter(\.isConditional)
+        guard !specs.isEmpty else { return }
+        var recs: [String: [Record]] = [:]
+        for entity in dsl.entities.map(\.id) {
+            if let loaded = records[entity] {
+                recs[entity] = loaded
+            } else {
+                recs[entity] = await recordSync.cached(appId: appId, entity: entity)
+            }
+        }
+        guard document.appId == appId else { return }
+        let current = ConditionNotifications.evaluate(specs, dsl: dsl, records: recs)
+        let fire = await ConditionNotificationStore.shared.update(appId: appId, current: current)
+        for spec in specs where fire.contains(spec.id) {
+            let posted = await services.notifications.post(spec, appId: appId)
+            print("[Metamon] condition notification id=\(spec.id) posted=\(posted)")
+        }
+    }
+
     /// 前面復帰: 届いた 1 回きりの分の空き枠を次の通知で埋める。
     func refreshNotifications() async {
         let appId = document.appId

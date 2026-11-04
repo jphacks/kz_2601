@@ -48,6 +48,21 @@ final class FieldCodingTests: XCTestCase {
         XCTAssertTrue(s.contains(":30"), s)
         XCTAssertFalse(s.contains("2026"), s)
     }
+
+    /// #555: あり得ない日時は繰り上げて読まない。正しい形(オフセット・小数秒・1 桁の月日・うるう日)は読む。
+    func testDateRejectsImpossibleDatetimes() {
+        for s in ["2026-02-30T10:00:00Z", "2026-10-24T24:00:00Z", "2026-10-24T10:60:00+09:00", "2026-12-31T23:59:60Z",
+                  "2027-02-29T00:00:00+0900", "2026-02-30T10:00:00.5Z", "2026-02-30", "2027-02-29", "2026-2-30", "0-01-01"] {
+            XCTAssertNil(FieldCoding.date(from: .string(s)), s)
+        }
+        XCTAssertEqual(FieldCoding.date(from: "2026-10-24T10:00:00Z")?.timeIntervalSince1970, 1_792_836_000)
+        XCTAssertEqual(FieldCoding.date(from: "2026-10-24T19:00:00+09:00")?.timeIntervalSince1970, 1_792_836_000)
+        XCTAssertEqual(FieldCoding.date(from: "2026-10-24T05:00:00-0500")?.timeIntervalSince1970, 1_792_836_000)
+        XCTAssertEqual(FieldCoding.date(from: "2026-10-24T10:00:00.250Z")?.timeIntervalSince1970, 1_792_836_000.25)
+        XCTAssertEqual(FieldCoding.date(from: "2028-02-29T23:59:59-05:00")?.timeIntervalSince1970, 1_835_499_599)
+        XCTAssertNotNil(FieldCoding.date(from: "2028-02-29"))
+        XCTAssertNotNil(FieldCoding.date(from: "2026-1-5"))
+    }
     private func currencyField(unit: String?) throws -> Field {
         let u = unit.map { #","unit":"\#($0)""# } ?? ""
         return try JSONDecoder().decode(Field.self, from: Data(#"{"id":"f","name":"F","type":"currency"\#(u)}"#.utf8))

@@ -133,7 +133,7 @@ func (s *Service) Text(ctx context.Context, req TextRequest) (*TextResult, error
 	cfg := s.ChatConfig.resolved()
 	ctx, cancel := context.WithTimeout(ctx, s.chatTimeout())
 	defer cancel()
-	resp, err := s.Claude.Complete(ctx, Completion{
+	resp, err := s.Claude.Complete(WithOperation(ctx, OpText), Completion{
 		System:     textSystemPrompt(loc),
 		Messages:   []Message{{Role: "user", Content: textUserMessage(req)}},
 		Schema:     textSchema(req),
@@ -147,7 +147,7 @@ func (s *Service) Text(ctx context.Context, req TextRequest) (*TextResult, error
 		return nil, mapClaudeErr(err)
 	}
 	if resp.StopReason == "refusal" {
-		return nil, &Error{Status: http.StatusUnprocessableEntity, Code: "refused", Message: "the model declined this request"}
+		return nil, &Error{Status: http.StatusUnprocessableEntity, Code: httpx.CodeRefused, Message: "the model declined this request"}
 	}
 	res, err := parseTextOutput(resp.Text, req)
 	if err != nil {
@@ -237,7 +237,7 @@ func cleanItem(s string) string {
 // every requested name present (in the requested order).
 func parseTextOutput(raw string, req TextRequest) (*TextResult, error) {
 	bad := func(msg string) error {
-		return &Error{Status: http.StatusBadGateway, Code: "bad_output", Message: msg}
+		return &Error{Status: http.StatusBadGateway, Code: httpx.CodeBadOutput, Message: msg}
 	}
 	if i, j := strings.Index(raw, "{"), strings.LastIndex(raw, "}"); i >= 0 && j > i {
 		raw = raw[i : j+1]
@@ -302,26 +302,26 @@ func parseTextOutput(raw string, req TextRequest) (*TextResult, error) {
 func textHandler(svc *Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if auth.UID(r.Context()) == "" {
-			writeErr(w, &Error{Status: http.StatusUnauthorized, Code: httpx.CodeUnauthenticated, Message: "missing or invalid bearer token"})
+			svc.writeErr(w, r, &Error{Status: http.StatusUnauthorized, Code: httpx.CodeUnauthenticated, Message: "missing or invalid bearer token"})
 			return
 		}
 		body, err := io.ReadAll(io.LimitReader(r.Body, textMaxBodyBytes+1))
 		if err != nil {
-			writeErr(w, badText("cannot read body"))
+			svc.writeErr(w, r, badText("cannot read body"))
 			return
 		}
 		if len(body) > textMaxBodyBytes {
-			writeErr(w, &Error{Status: http.StatusRequestEntityTooLarge, Code: httpx.CodePayloadTooLarge, Message: "body too large"})
+			svc.writeErr(w, r, &Error{Status: http.StatusRequestEntityTooLarge, Code: httpx.CodePayloadTooLarge, Message: "body too large"})
 			return
 		}
 		var req TextRequest
 		if err := json.Unmarshal(body, &req); err != nil {
-			writeErr(w, badText("invalid JSON: "+err.Error()))
+			svc.writeErr(w, r, badText("invalid JSON: "+err.Error()))
 			return
 		}
 		res, err := svc.Text(r.Context(), req)
 		if err != nil {
-			writeErr(w, err)
+			svc.writeErr(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, res)

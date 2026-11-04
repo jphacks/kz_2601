@@ -1,3 +1,6 @@
+# 書き方(#516・PR の衝突を減らすため):
+# - enum・tags などのリストは 1 行 1 項目・名前順。components/schemas も名前順に保つ。
+# - 新しい path はファイル末尾でなく、同じ tag の path の隣に足す。
 openapi: 3.1.0
 info:
   title: appconfig API
@@ -5,6 +8,7 @@ info:
   description: |
     アプリ DSL JSON の CRUD・バージョン管理・汎用レコード API。
     - 認証: `Authorization: Bearer <Firebase ID token>`。uid はトークンから取得し URL には含めない。
+    - App Check(#318): iOS は `X-Firebase-AppCheck` も付ける。`APP_CHECK_MODE=enforce` の時、無い・無効なら 401 `app_check_failed`(`details.reason`: missing / invalid / wrong_app / unconfigured)。off / log では無くても通る。`/health`・`/s/{token}`・`/v1/client-config` は対象外。`docs/infra/app-check.md`
     - すべてのパスは呼び出しユーザー自身の `users/{uid}/...` に束縛される。
     - エラーは全て `Error` 形式。ページングは `pageSize` + `pageToken` / `nextPageToken`。
     - DSL の本体スキーマは `../dsl/dsl.schema.json` を参照 (OpenAPI 内では `$ref`)。
@@ -15,15 +19,19 @@ servers:
 security:
   - firebaseAuth: []
 tags:
+  - { name: account, description: 'アカウント削除(#119)。features/account-deletion.md' }
   - { name: apps }
   - { name: dsl }
-  - { name: versions }
   - { name: entities }
+  - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引をサーバーで検証して保存する。features/pro.md' }
+  - { name: feedback, description: 'アプリ内のフィードバック(#319)。features/feedback.md' }
+  - { name: matching, description: '仲間探しのアプリの相互承認(#507)。features/matching.md' }
+  - { name: members, description: 'scope:shared の参加者(#254)。features/members.md' }
+  - { name: metrics, description: 'aiButton の端末内 AI の集計(#446)。docs/analytics/ai-button-metrics.md' }
   - { name: records }
-  - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。architecture.md §3.2' }
-  - { name: account, description: 'アカウント削除(#119)。architecture.md §4.1' }
-  - { name: release, description: 'リリース申請(#76)。architecture.md §3.3' }
-  - { name: members, description: 'scope:shared の参加者(#254)。architecture.md §3.4' }
+  - { name: release, description: 'リリース申請(#76)。features/release.md' }
+  - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。features/sharing.md' }
+  - { name: versions }
 
 paths:
   /apps:
@@ -166,7 +174,7 @@ paths:
       description: |
         「何が変わったか」だけを流す。本体は `GET /dsl` / `GET /records` で取り直す(読み取り権限は既存 API と同じ)。
         backend は Firestore の snapshot listener(`users/{uid}/apps/{appId}` と、現行 DSL の各 entity の records
-        コレクション。public/shared entity は `apps_public/{appId}/...`)を持つ。records は `updatedAt` 降順 100 件の窓。
+        コレクション。public/shared entity は `apps_public/{appId}/...`)を持つ。records は `updatedAt` 降順 100 件の窓(窓外の古いレコードへの印の変化・削除は通知しない・#553)。
         未知 appId は `GET /dsl` と同じく seed する。
 
         ```
@@ -376,6 +384,7 @@ paths:
         public/shared entity は全ユーザーの投稿が返り、各レコードに `author`/`authorName` が付く。
         `filterField=author&filterOp=eq&filterValue=<uid>` で特定ユーザー (自分) の投稿だけに絞れる。
         **scope:shared の entity は作成者と参加者だけ**が読み書きできる (この entity の records の全操作で同じ・それ以外は 403 `not_member`・#254)。public は従来どおり誰でも。
+        呼び出した人がブロックしたユーザー(`/me/blocks`)の投稿は一覧から除く(#321)。運営が非公開にした共有アプリ(`apps_public/{appId}.hidden`)は、public/shared の entity の records の全操作が 403 `unpublished`(details.reason = 運営の理由)。
       parameters:
         - { $ref: '#/components/parameters/PageSize' }
         - { $ref: '#/components/parameters/PageToken' }
@@ -522,6 +531,7 @@ paths:
                   components: { type: array, items: { type: string } }
                   sharedData: { type: boolean, description: 'shared/public entity を含む(import すると元アプリの共有データに参加する)' }
                   mine: { type: boolean }
+        '403': { $ref: '#/components/responses/Unpublished' }
         '404': { description: 取り消し済み or 存在しない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     delete:
       tags: [sharing]
@@ -552,6 +562,7 @@ paths:
       responses:
         '201': { description: Imported, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
         '403': { description: 'リンクの発行者が参加者でない(inviter_left) / 参加者が上限(members_full)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { $ref: '#/components/responses/Unpublished' }
         '404': { description: 取り消し済み or 存在しない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /apps/{appId}/publish:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -583,7 +594,7 @@ paths:
     delete:
       tags: [sharing]
       summary: 非公開にする(掲載者のみ)
-      description: 通報/モデレーションは未実装。不適切な掲載はこの API で掲載者が取り下げる(運営側の強制削除は後続)。
+      description: 掲載者が取り下げる。運営による非公開化は `cmd/moderate hide-listing`(`public_apps/{id}.hidden`・#321・docs/infra/moderation.md)で、掲載者が再公開しても非公開のまま。
       responses:
         '204': { description: Unpublished }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -592,7 +603,9 @@ paths:
     get:
       tags: [sharing]
       summary: 公開アプリを検索
-      description: 名前・説明・タグ・作者名の部分一致(大文字小文字無視)。件数が少ない前提で最大 500 件をメモリ内で絞り込む(全文検索はしない)。
+      description: |
+        名前・説明・タグ・作者名の部分一致(大文字小文字無視)。件数が少ない前提で最大 500 件をメモリ内で絞り込む(全文検索はしない)。
+        運営が非公開にした掲載は掲載者本人にだけ返る(`hidden`・`hiddenReason` 付き)。ブロックしたユーザーの掲載は返らない(#321)。
       parameters:
         - { in: query, name: q, schema: { type: string } }
         - { in: query, name: sort, schema: { type: string, enum: [popular, new], default: popular }, description: 'popular = installs 降順 → 更新日時降順 / new = 更新日時降順' }
@@ -622,7 +635,80 @@ paths:
         installs は uid ごとに 1 回だけ +1(掲載者本人は数えない・`public_apps/{id}/installs/{uid}` に記録・#154)。
       responses:
         '201': { description: Installed, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
+        '403': { $ref: '#/components/responses/Unpublished' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /reports:
+    post:
+      tags: [moderation]
+      summary: 通報する(#321・審査 1.2)
+      description: |
+        「探す」の掲載・シェアリンク・共有アプリ・共有アプリの投稿を運営に通報する。`reports/{id}` に保存し、
+        ログ `moderation: report`(uid と内容は出さない)を運営のアラートが拾う(docs/infra/moderation.md)。
+        保存するのは通報者の uid・対象の種類と ID・対象の持ち主 / 投稿者の uid(サーバーが引く)・理由・日時だけ(内容の写しも自由記述も持たない)。
+        同じ人が同じ対象を通報し直しても 1 件(200 `created: false`)。新しい通報は 1 人 1 日(JST)30 件まで(超えると 429 `rate_limited`)。
+        自分のものは 400。対象が無ければ 404。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, reason]
+              properties:
+                kind: { type: string, enum: [listing, share, app, record] }
+                id: { type: string, description: 'listing = 掲載の id / share = トークン' }
+                appId: { type: string, description: 'app / record' }
+                entityId: { type: string, description: record }
+                recordId: { type: string, description: record }
+                reason: { type: string, enum: [spam, sexual, violence, harassment, illegal, privacy, other] }
+      responses:
+        '201': { description: 通報した, content: { application/json: { schema: { $ref: '#/components/schemas/ReportResult' } } } }
+        '200': { description: 通報済み(created false), content: { application/json: { schema: { $ref: '#/components/schemas/ReportResult' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { description: 今日の通報の上限, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /me/blocks:
+    get:
+      tags: [moderation]
+      summary: ブロックしているユーザー(#321)
+      description: 古い順に最大 500 人。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Block' } }
+    post:
+      tags: [moderation]
+      summary: ユーザーをブロックする(#321)
+      description: |
+        以後、そのユーザーの共有アプリの投稿(GET records)と「探す」の掲載が自分に返らない(相手には知らせない)。
+        `uid`(投稿の `author`)か `listingId`(掲載者をサーバーが引く)のどちらか。`users/{uid}/blocks/{blockedUid}` に保存。冪等。自分は 400。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                uid: { type: string }
+                name: { type: string, maxLength: 64, description: '一覧に出す名前(投稿の authorName)。listingId の時の省略は掲載の authorName' }
+                listingId: { type: string }
+      responses:
+        '201': { description: Blocked, content: { application/json: { schema: { $ref: '#/components/schemas/Block' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /me/blocks/{uid}:
+    parameters: [{ in: path, name: uid, required: true, schema: { type: string } }]
+    delete:
+      tags: [moderation]
+      summary: ブロックを解除する(冪等)
+      responses:
+        '204': { description: Unblocked }
 
   /apps/{appId}/members:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -661,6 +747,121 @@ paths:
         '403': { description: 作成者以外が他人を外そうとした, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '404': { description: その uid は参加者ではない(他人を外す時), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
+  /apps/{appId}/interests:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [matching]
+      summary: 届いた / 送った「つながりたい」(#507)
+      description: |
+        `box=incoming`(既定)は自分に届いて未回答のもの、`outgoing` は自分が送って未回答のもの。新しい順に最大 500 件。
+        相手が見送った・ブロックした送信も `outgoing` に `pending` のまま出る(断られたことは相手に伝えない)。お互いにブロックしている人(どちら向きでも)は出さない。
+        アプリ(公開 DSL)に `match:"profile"` の entity が無ければ 404(`details.reason: no_matching`)。プロフィールが scope:shared なら作成者・参加者以外は 403 `not_member`。運営が非公開にしたアプリは 403 `unpublished`。
+      parameters:
+        - { in: query, name: box, schema: { type: string, enum: [incoming, outgoing], default: incoming } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Interest' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [matching]
+      summary: 「つながりたい」を送る(#507)
+      description: |
+        相手のプロフィールのレコード(`recordId`)に送る。自分のプロフィール(`fromRecordId`・自分が書いたもの)が要る。
+        `ageConfirmed: true`(本人による 18 歳以上の確認)が無ければ 400(`details.reason: age_unconfirmed`)。
+        相手がもう自分に送っていれば、これが承認になり `matched` を返す。それ以外は `pending`(送り直しても 1 件)。
+        自分がブロックした人には 400(`details.reason: blocked`)。相手が自分をブロックしている時は `pending` を返すが相手には届かない。
+        1 人 1 日(JST)30 回まで(超えると 429 `rate_limited`・送り直しも数える)。自分のプロフィールへは 400。プロフィールが無ければ 404。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recordId, fromRecordId, ageConfirmed]
+              properties:
+                recordId: { type: string, description: 相手のプロフィール(match:profile の entity)のレコード id }
+                fromRecordId: { type: string, description: 自分のプロフィールのレコード id }
+                ageConfirmed: { type: boolean, description: '本人が 18 歳以上と確認した(iOS が初回に確認を出す)' }
+      responses:
+        '200': { description: 送った / つながった, content: { application/json: { schema: { $ref: '#/components/schemas/Interest' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { description: 今日の上限, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /apps/{appId}/interests/{uid}:
+    parameters:
+      - { $ref: '#/components/parameters/AppId' }
+      - { in: path, name: uid, required: true, schema: { type: string }, description: 相手の uid }
+    delete:
+      tags: [matching]
+      summary: 届いたものを見送る / 送ったものを取り下げる(冪等)
+      description: 相手には伝えない(相手の送信は `pending` のまま見える)。見送った人からの送り直しは届かない。つながった後は `DELETE /matches/{uid}`。
+      responses:
+        '204': { description: Done }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /apps/{appId}/interests/{uid}/accept:
+    parameters:
+      - { $ref: '#/components/parameters/AppId' }
+      - { in: path, name: uid, required: true, schema: { type: string }, description: 送ってきた人の uid }
+    post:
+      tags: [matching]
+      summary: 届いた「つながりたい」を承認する(#507)
+      description: '`ageConfirmed: true` が要る(無ければ 400 `age_unconfirmed`)。その人からの未回答の送信が無い・お互いにブロックしている時は 404。'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ageConfirmed]
+              properties:
+                ageConfirmed: { type: boolean }
+      responses:
+        '200': { description: つながった, content: { application/json: { schema: { $ref: '#/components/schemas/Interest' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /apps/{appId}/matches:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [matching]
+      summary: つながった人(#507)
+      description: |
+        お互いに承認した人。新しい順に最大 500 人。お互いにブロックしている人は出さない。
+        この人たちと自分だけが、`match:"matched"` の entity のレコード(連絡先など)を GET records で読める(それ以外の人の分は一覧に出ず、id を指定しても 404)。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Interest' } }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /apps/{appId}/matches/{uid}:
+    parameters:
+      - { $ref: '#/components/parameters/AppId' }
+      - { in: path, name: uid, required: true, schema: { type: string } }
+    delete:
+      tags: [matching]
+      summary: つながりを解除する(#507)
+      description: どちら側からでも解除できる。以後お互いの matched のレコードは見えない。解除された側からの送り直しは届かない。つながっていなければ 404。
+      responses:
+        '204': { description: Unmatched }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /me:
     delete:
       tags: [account]
@@ -680,6 +881,103 @@ paths:
         '204': { description: 削除済み(2 回目以降も 204) }
         '401': { description: 未認証, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '500': { description: 途中で失敗。再実行で続きが終わる, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/entitlements:
+    get:
+      tags: [entitlements]
+      summary: 自分の Pro の権利(#314)
+      description: |
+        `users/{uid}/entitlements/pro` を返す。`isPro` は「取り消されていない・期限内(猶予期間 `graceExpiresAt` を含む)・許可された環境(`APPSTORE_ENVIRONMENTS`)」。
+        ai の回数制限(#449)も同じ判定で Pro の上限にする。iOS は購入・復元・起動時に `POST /me/entitlements/apple` で送った結果をこれで確かめられる。
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Entitlements' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/entitlements/apple:
+    post:
+      tags: [entitlements]
+      summary: StoreKit 2 の署名付き取引(JWS)を送って Pro を保存する(#314)
+      description: |
+        iOS が購入・復元の後と起動時(`Transaction.currentEntitlements`)に `VerificationResult.jwsRepresentation` を送る。
+        サーバーは Apple に問い合わせずにローカルで検証する:
+        - `x5c` の 3 枚(leaf・中間・root)を **Apple Root CA - G3(バックエンドに埋め込み・固定)** まで検証。中間・leaf の Apple のマーカー拡張(OID `1.2.840.113635.100.6.2.1` / `.6.11.1`)も確かめる。検証の時刻は取引の `signedDate`
+        - `alg` は ES256 だけ。leaf の公開鍵で署名を確かめる
+        - `bundleId`(`APPSTORE_BUNDLE_IDS`)・`productId`(`APPSTORE_PRODUCT_IDS`)・`environment`(`APPSTORE_ENVIRONMENTS`、既定 Sandbox と Production)が許可リストにあること
+        - `expiresDate` があること(Pro は自動更新サブスクだけ)
+
+        期限切れ・取り消し(返金)の取引もエラーにせず保存する(`isPro: false` になる)。ただし古い取引が新しい取引を上書きすることはない(期限が後のもの・同じ取引の取り消しだけが上書き)。
+
+        **取引と uid の結びつき**: `appstore_transactions/{originalTransactionId}` に uid を記録し、1 つの購読を 1 つの uid にだけ結びつける。
+        - まだ結びついていない → この uid に結びつける
+        - 退会済み(`DELETE /me` 後・purge 後)の uid に結びついている → この uid に移す(同じ Apple ID で入り直した場合)
+        - 別の有効な uid に結びついている → **409 `transaction_owned_by_other`**(権利は付けない・ログに残す)。サポートが `appstore_transactions/{id}` を消すと外せる
+
+        iOS は購入時に `appAccountToken` に uid から作った UUID を入れる(サーバーでは照合のログだけ)。
+        更新・解約・返金の通知(App Store Server Notifications v2)は `POST /appstore/notifications`(#315)で同じ検証と保存を使う。同じ取引は `signedDate` が保存済みより古ければ上書きしない(返金の後に端末に残った古い取引を送っても Pro に戻らない)。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signedTransaction]
+              properties:
+                signedTransaction: { type: string, description: 'StoreKit 2 の JWS(`header.payload.signature`)', maxLength: 32768 }
+      responses:
+        '200': { description: 保存後の状態, content: { application/json: { schema: { $ref: '#/components/schemas/Entitlements' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '409':
+          description: この購読は別の有効なアカウントに結びついている
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: transaction_owned_by_other, message: 'this subscription is linked to another account' } }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422':
+          description: '検証に失敗(改ざん・Apple 以外の証明書・対象外の bundleId / productId / 環境など)。`details.reason` は malformed / chain / signature / bundle_id / product_id / environment / not_subscription'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: invalid_transaction, message: 'the signed transaction could not be verified', details: { reason: signature } } }
+
+  /appstore/notifications:
+    post:
+      tags: [entitlements]
+      security: []
+      summary: App Store Server Notifications v2 の受け口(#315)・認証不要
+      description: |
+        Apple が購読の変化(SUBSCRIBED・DID_RENEW・DID_FAIL_TO_RENEW(猶予期間)・GRACE_PERIOD_EXPIRED・EXPIRED・DID_CHANGE_RENEWAL_STATUS・REFUND・REFUND_REVERSED・REVOKE など)を送る。Firebase の認証・App Check は無し。`signedPayload` の署名(`POST /me/entitlements/apple` と同じ Apple Root CA - G3 までの検証)が認証の代わり。
+        - `bundleId`・`environment`(`APPSTORE_*`)を確かめ、中の `signedTransactionInfo` / `signedRenewalInfo` も同じ方法で検証して `users/{uid}/entitlements/pro` に反映する。uid は `appstore_transactions/{originalTransactionId}` の結びつきで引く
+        - 同じ `notificationUUID` は 1 回だけ処理する(`appstore_notifications/{uuid}`・2 回目は `duplicate`)
+        - 順番が前後しても権利を巻き戻さない(同じ取引は `signedDate` が新しい時だけ上書き・期限が前の取引で上書きしない)
+        - 200 で Apple は再送をやめる。500 は再送される(一時的な失敗)
+        手順: `docs/infra/app-store-notifications.md`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signedPayload]
+              properties:
+                signedPayload: { type: string, description: 'responseBodyV2 の JWS' }
+      responses:
+        '200':
+          description: '処理済み。`applied`(反映)・`duplicate`(処理済みの通知)・`unbound`(まだどのアカウントにも結びついていない購読。iOS が送った時に結びつく)・`ignored`(TEST・Pro 以外の商品など)'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome]
+                properties:
+                  outcome: { type: string, enum: [applied, duplicate, ignored, unbound] }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '422':
+          description: '検証に失敗(Apple 以外の証明書・改ざん・対象外の bundleId / 環境など)。`details.reason` は `POST /me/entitlements/apple` と同じ'
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '500': { description: 一時的な失敗(Apple が再送する), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /apps/{appId}/release-requests:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -723,16 +1021,146 @@ paths:
           description: OK
           content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: '#/components/schemas/ReleaseRequest' } } } } } }
 
+  /metrics/ai-button:
+    post:
+      tags: [metrics]
+      summary: aiButton の端末内 AI の 1 日ごとの集計を送る(#446)
+      description: |
+        iOS(通常の版だけ・設定でオフにできる)が、端末のローカル日ごとに数えた回数を 1 日 1 回まとめて送る。
+        サーバーは**ログに数を書くだけ**(`ai.button.availability` / `ai.button.task` / `ai.button.failure`)。Firestore には書かず、uid もログに出さない。
+        値は決まったラベルと回数だけ。利用者の文・記録・DSL の中身は受けない(未知のキー・未知のラベルは 400)。
+        `reportId` は日ごとに端末で作る乱数(再送の重複を SQL で消すため。端末・人とは結ばない)。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [days]
+              properties:
+                days:
+                  type: array
+                  minItems: 1
+                  maxItems: 7
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [reportId, day, availability]
+                    properties:
+                      reportId: { type: string, pattern: '^[A-Za-z0-9-]{8,64}$' }
+                      day: { type: string, format: date, description: 端末のローカル日。今日(UTC)の 9 日前〜翌日だけ受ける }
+                      availability:
+                        type: string
+                        enum: [available, device_not_eligible, apple_intelligence_off, model_not_ready, os_too_old, other]
+                        description: その日に aiButton を表示した時の、最後に見た Foundation Models の状態
+                      tasks:
+                        type: array
+                        maxItems: 8
+                        items:
+                          type: object
+                          additionalProperties: false
+                          required: [task]
+                          properties:
+                            task: { type: string, enum: [summarize, classify, rewrite, extract, suggest, generate, other], description: DSL の aiButton.task(重複不可) }
+                            attempts: { type: integer, minimum: 0, maximum: 10000, description: 端末内 AI で実行した回数 }
+                            failures:
+                              type: object
+                              description: 答えを出せなかった回数(理由ごと)
+                              propertyNames:
+                                enum: [unavailable, invalid_response, context_too_long, guardrail, unsupported_language, refusal, rate_limited, assets_unavailable, model_error, bad_config]
+                              additionalProperties: { type: integer, minimum: 0, maximum: 10000 }
+            example:
+              days:
+                - reportId: 0F8E2C1A-1111-4222-8333-944455556666
+                  day: '2026-11-01'
+                  availability: available
+                  tasks:
+                    - { task: summarize, attempts: 5, failures: { context_too_long: 1 } }
+      responses:
+        '204': { description: 受け取った(ログに書いた) }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /feedback:
+    post:
+      tags: [feedback]
+      summary: フィードバックを送る(添付はどれも任意・既定は無し)
+      description: |
+        `feedback/{id}` に `status=received` で保存する。本文は誰でも書ける**信頼しないデータ**(`untrusted: true` を付けて保存・#366)。
+        - 添付はどれも端末で本人が選んだものだけ(既定はすべて無し)。**記録(records)の中身は受け付けない**(未知のキーは 400)。
+        - `attachments.app` は参照だけ。サーバーが**呼び出したユーザー自身の木**の `versions/{dslVersion}` を読んで DSL の構造を保存する(他人のアプリは見つからない扱い)。
+          見つからない(オフラインで作ったアプリ等)・256 KiB を超える場合は DSL を付けずに保存し、レスポンスの `attachments.dsl` が false になる。
+        - `attachments.screenshot` は base64 の JPEG(デコード後 512 KiB まで)。Cloud Storage のバケットはまだ無いので、Firestore のバイト列のフィールドに置く。
+        - `consentVersion` は送信前に見せた同意文の版(必須)。
+        - 1 ユーザー 1 日(JST)`FEEDBACK_DAILY_LIMIT` 件(既定 5)。超えると 429 `rate_limited`(ai と同じ details・翌 0:00 JST まで)。
+        - 保存期間は 180 日(`cmd/purge` が消す)。アカウントの消去(#458)でも消える。API で読む・消す口は無い(運営は `cmd/feedback` で読むだけ)。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [message, consentVersion]
+              properties:
+                kind: { type: string, enum: [bug, idea, other], default: other, description: 未知の値は other }
+                message: { type: string, minLength: 1, maxLength: 2000, description: 本文(前後の空白は除去) }
+                consentVersion: { type: string, minLength: 1, maxLength: 64, example: feedback-2026-11 }
+                attachments:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    screenshot: { type: string, contentEncoding: base64, contentMediaType: image/jpeg, description: 'デコード後 512 KiB まで(超えると 413)' }
+                    app:
+                      type: object
+                      additionalProperties: false
+                      required: [appId, dslVersion]
+                      properties:
+                        appId: { type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$' }
+                        dslVersion: { type: integer, minimum: 1 }
+                    device:
+                      type: object
+                      additionalProperties: false
+                      description: 各 64 文字まで
+                      properties:
+                        appVersion: { type: string, example: 1.0.0 }
+                        build: { type: string, example: '12' }
+                        os: { type: string, example: iOS 26.1 }
+                        model: { type: string, example: 'iPhone17,1' }
+                        locale: { type: string, example: ja }
+            example: { kind: bug, message: 'グラフが空のまま', consentVersion: feedback-2026-11, attachments: { app: { appId: 3f0c…, dslVersion: 7 } } }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status, createdAt, attachments]
+                properties:
+                  id: { type: string, example: fb_06GPVRYJ58VK8KN57T8W54M124 }
+                  status: { type: string, enum: [received] }
+                  createdAt: { type: string, format: date-time }
+                  attachments:
+                    type: object
+                    description: 実際に保存した添付
+                    properties: { screenshot: { type: boolean }, dsl: { type: boolean }, device: { type: boolean } }
+        '400': { description: message / consentVersion が無い・長すぎる・未知のキー・JPEG でない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '413': { description: スクショが大きすぎる / 本文全体が 1 MiB を超える, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 今日の上限。`Retry-After` と details(scope=user・limit・resetAt・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
   /client-config:
     get:
       security: []
-      summary: iOS の最低対応版と最新版(#302・認証不要)
+      summary: iOS の最低対応版と最新版(#302)・アプリ内のお知らせ(#333)・認証不要
       description: |
         サインイン前にも iOS が起動時・前面に戻った時に読む。値は appconfig の環境変数(起動時に 1 回読む)。**未設定・不正な値のフィールドは省略 = 強制しない**。
         - `MIN_IOS_BUILD`: これ未満の CFBundleVersion は閉じられない「アップデートしてください」画面
         - `LATEST_IOS_BUILD`: これ未満は閉じられるお知らせ(MIN より小さければ MIN に揃える)
         - `IOS_APP_STORE_URL`: App Store のページ(https / itms-apps のみ)。省略時は iOS 側の既定
-        iOS は通信失敗・不正な応答では何もしない(fail open)。`Cache-Control: public, max-age=300`。
+        - `NOTICE_JSON`: アプリ内のお知らせ(`notice`・#333)。1 行のバナーで、利用者が閉じられる。iOS は閉じた `id` を覚えるので、文面を変えて出し直す時は `id` も変える。JSON が壊れている・必須が無い・未知のフィールドがある時は `notice` を省略する(他のフィールドは出す)。手順は `docs/ops/incident-runbook.md`
+        iOS は通信失敗・不正な応答では何もしない(fail open)。`notice` だけが不正な時も版の判定は続ける。`Cache-Control: public, max-age=300`(変更が届くまで最大 5 分)。
       responses:
         '200':
           description: OK
@@ -744,7 +1172,16 @@ paths:
                   minIOSBuild: { type: integer, minimum: 1 }
                   latestIOSBuild: { type: integer, minimum: 1 }
                   iosAppStoreUrl: { type: string, format: uri }
-              example: { minIOSBuild: 12, latestIOSBuild: 15, iosAppStoreUrl: 'https://apps.apple.com/app/id0000000000' }
+                  notice: { $ref: '#/components/schemas/Notice' }
+              example:
+                minIOSBuild: 12
+                latestIOSBuild: 15
+                iosAppStoreUrl: 'https://apps.apple.com/app/id0000000000'
+                notice:
+                  id: 2026-11-02-ai
+                  severity: warning
+                  message: { ja: 'AI の生成を一時的に止めています。作ったアプリはそのまま使えます。', en: 'AI generation is paused for now. Your apps still work.' }
+                  linkUrl: 'https://example.com/status'
 
   /health:
     get:
@@ -805,6 +1242,12 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: invalid_record, message: 'field "amount" is required', details: { field: amount } } }
+    Unpublished:
+      description: 運営が非公開にした(#321)。details.reason は作者に見せる理由
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: unpublished, message: 'this listing was unpublished by the operator', details: { reason: '不適切な内容のため' } } }
     NotMember:
       description: scope:shared のデータに参加していない(作成者でも参加者でもない・#254)。シェアリンクから参加すれば読める
       content:
@@ -812,6 +1255,25 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: forbidden, message: 'join this app with a share link to see its shared data', details: { reason: not_member } } }
   schemas:
+    Notice:
+      type: object
+      description: アプリ内のお知らせ(#333)。appconfig の環境変数 `NOTICE_JSON` と同じ形(未知のフィールドは不可)。iOS は閉じられるバナーで出し、閉じた `id` を端末に覚える。
+      required: [id, severity, message]
+      additionalProperties: false
+      properties:
+        id: { type: string, pattern: '^[A-Za-z0-9._-]{1,64}$', description: 'お知らせの識別子。文面を変えたら変える(例: 2026-11-02-ai)' }
+        severity: { type: string, enum: [info, warning], default: info, description: '`NOTICE_JSON` で省略すると info' }
+        message:
+          type: object
+          required: [ja]
+          additionalProperties: false
+          description: 1 行の文面(改行・連続する空白は 1 つの空白にする)。英語の表示で `en` が無ければ `ja` を出す
+          properties:
+            ja: { type: string, minLength: 1, maxLength: 200 }
+            en: { type: string, maxLength: 200 }
+        linkUrl: { type: string, format: uri, pattern: '^https://', description: '「詳しく」で開くページ(https のみ)' }
+        minIOSBuild: { type: integer, minimum: 1, description: 'この CFBundleVersion 以上だけに出す(省略 = 下限なし)' }
+        maxIOSBuild: { type: integer, minimum: 1, description: 'この CFBundleVersion 以下だけに出す(省略 = 上限なし)。minIOSBuild 以上' }
     Error:
       type: object
       required: [error]
@@ -822,11 +1284,47 @@ components:
           properties:
             code:
               type: string
-              description: 機械可読コード
-              enum: [bad_request, unauthenticated, not_found, version_conflict, invalid_dsl, invalid_record, payload_too_large, rate_limited, internal]
+              description: 機械可読コード。appconfig が返すものだけ(ai のコードは `openapi-ai.yaml` の `Error`)。`backend/internal/httpx/codes.go` と一致することをテストで確かめる(#523)
+              enum:
+                - account_deleted
+                - app_check_failed
+                - bad_request
+                - forbidden
+                - internal
+                - invalid_dsl
+                - invalid_record
+                - invalid_transaction
+                - not_found
+                - payload_too_large
+                - rate_limited
+                - transaction_owned_by_other
+                - unauthenticated
+                - unpublished
+                - version_conflict
             message: { type: string }
             details: { type: object, additionalProperties: true }
             requestId: { type: string }
+    Entitlements:
+      type: object
+      required: [isPro, pro]
+      properties:
+        isPro: { type: boolean, description: '取り消されていない・期限内・許可された環境の Pro がある' }
+        pro:
+          description: 'users/{uid}/entitlements/pro(無ければ null)'
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [productId, originalTransactionId, transactionId, environment, expiresAt, updatedAt]
+              properties:
+                productId: { type: string, example: jp.kz2601.metamon.pro.monthly }
+                originalTransactionId: { type: string }
+                transactionId: { type: string }
+                environment: { type: string, enum: [Sandbox, Production] }
+                expiresAt: { type: string, format: date-time }
+                graceExpiresAt: { type: string, format: date-time, description: '請求の猶予期間の終わり(#315)。`expiresAt` を過ぎてもこの時刻まで Pro(無ければ省略)' }
+                revokedAt: { type: string, format: date-time, description: '返金・取り消しの時刻(無ければ省略)' }
+                updatedAt: { type: string, format: date-time }
+                willRenew: { type: boolean, description: '自動更新が有効か(#315・通知か照合で分かるまで省略)' }
     AppSummary:
       type: object
       required: [id, name, currentVersion, status, createdAt, updatedAt]
@@ -917,7 +1415,7 @@ components:
         name: { type: string }
         dslVersion: { type: integer, description: スナップショットした version }
         url: { type: string, example: 'tailorit://import/H6-GGDdrAGTqrpqpbKhx4GG1ZT1VJ0Rb', description: iOS アプリで開く URL(QR もこれ) }
-        webUrl: { type: string, description: 'ブラウザ用フォールバック(認証不要の `GET /s/{token}`。アプリ名と「Tailor It で開く」ボタンだけで DSL は出さない)。`SHARE_WEB_BASE_URL` で上書き可' }
+        webUrl: { type: string, description: 'ブラウザ用の共有ページ(認証不要の `GET /s/{token}`・HTML。アプリの画面を読むだけで描き、レコードは出さない。「アプリで開く」と App Store への導線つき・#362。JSON の API ではないのでこの仕様には載せない)。`SHARE_WEB_BASE_URL` で上書き可' }
         revoked: { type: boolean }
         createdAt: { type: string, format: date-time }
     PublicApp:
@@ -935,6 +1433,21 @@ components:
         mine: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        hidden: { type: boolean, description: '運営が非公開にした(#321)。掲載者本人の掲載にだけ付く' }
+        hiddenReason: { type: string, description: 運営の理由(掲載者に見せる) }
+    ReportResult:
+      type: object
+      required: [id, created]
+      properties:
+        id: { type: string }
+        created: { type: boolean }
+    Block:
+      type: object
+      required: [uid, name, createdAt]
+      properties:
+        uid: { type: string }
+        name: { type: string, description: '未設定は "匿名"' }
+        createdAt: { type: string, format: date-time }
     ReleaseRequest:
       type: object
       required: [id, appId, name, dslVersion, purpose, status]
@@ -954,9 +1467,10 @@ components:
         - { $ref: '#/components/schemas/AppWithDSL' }
         - type: object
           properties:
-            joined: { type: boolean, description: 'true = 共有データ付きなので元の appId に参加した' }
             created: { type: boolean, description: 'false = 既に持っていた(参加済み)' }
+            joined: { type: boolean, description: 'true = 共有データ付きなので元の appId に参加した' }
             member: { type: boolean, description: 'true = scope:shared のデータの参加者になった(import だけ・#254)' }
+            mine: { type: boolean, description: 'true = 呼び出した本人が元のアプリの作成者(app_owners)か、リンク/掲載の発行者。iOS は課金画面を出さない(#565)' }
     Member:
       type: object
       required: [uid, displayName, role, you]
@@ -967,3 +1481,13 @@ components:
         via: { type: string, enum: [share, legacy], description: 'share = リンクで参加 / legacy = #254 以前からアプリを持っていた(移行)。作成者には無い' }
         joinedAt: { type: string, format: date-time, description: 作成者には無い }
         you: { type: boolean, description: 呼び出したユーザー本人 }
+    Interest:
+      type: object
+      description: 「つながりたい」1 件 / つながった 1 人(#507)
+      required: [uid, status, updatedAt]
+      properties:
+        uid: { type: string, description: 相手の uid }
+        profileRecordId: { type: string, description: 相手のプロフィールのレコード id(送った時のもの。消されていることがある) }
+        status: { type: string, enum: [matched, pending] }
+        updatedAt: { type: string, format: date-time }
+        matchedAt: { type: string, format: date-time, description: matched の時だけ }

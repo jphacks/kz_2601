@@ -146,15 +146,15 @@ public struct HTTPAppConfigClient: AppConfigClient {
         let body = CreateBody(data: data, clientId: clientId, authorName: authorName)
         let path = "v1/apps/\(appId)/entities/\(entity)/records"
         do {
-            return try await decodeRecord(try await request("POST", path, body: body))
+            return try decodeRecord(try await request("POST", path, body: body))
         } catch let error as URLError where Self.isRetryable(error) {
             // 送ったかどうか分からない通信断。同じ clientId で再送すればサーバー側で同一レコードに畳まれる
-            return try await decodeRecord(try await request("POST", path, body: body))
+            return try decodeRecord(try await request("POST", path, body: body))
         }
     }
 
     public func update(appId: String, entity: String, id: String, data: [String: JSONValue]) async throws -> Record {
-        try await decodeRecord(try await request("PATCH", "v1/apps/\(appId)/entities/\(entity)/records/\(id)", body: RecordBody(data: data)))
+        try decodeRecord(try await request("PATCH", "v1/apps/\(appId)/entities/\(entity)/records/\(id)", body: RecordBody(data: data)))
     }
 
     public func delete(appId: String, entity: String, id: String) async throws {

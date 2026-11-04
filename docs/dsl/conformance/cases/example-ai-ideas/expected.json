@@ -1,0 +1,199 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 7
+          },
+          "id" : "batsu",
+          "props" : {
+            "label" : "罰ゲームを考えて",
+            "task" : "generate"
+          },
+          "state" : "rendered",
+          "type" : "aiButton"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 7,
+            "rowSpan" : 4
+          },
+          "id" : "cheer",
+          "props" : {
+            "label" : "励ましの一言",
+            "task" : "generate"
+          },
+          "state" : "rendered",
+          "type" : "aiButton"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "tab:home"
+      },
+      "title" : "アイデア",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "id" : "fridge",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 6
+          },
+          "id" : "menu",
+          "props" : {
+            "entity" : "food",
+            "label" : "献立を提案して",
+            "limit" : 20,
+            "task" : "generate"
+          },
+          "state" : "rendered",
+          "type" : "aiButton"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "food_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 6,
+            "rowSpan" : 4
+          },
+          "id" : "foods",
+          "props" : {
+            "emptyText" : "冷蔵庫にある食材を追加してください",
+            "entity" : "food",
+            "rows" : [
+
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "food_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "食材を追加"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "fridge",
+        "stack" : "tab:fridge"
+      },
+      "title" : "冷蔵庫",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "food",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+
+        }
+      },
+      "id" : "food_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "name",
+          "props" : {
+            "field" : "name",
+            "label" : "食材",
+            "placeholder" : "鮭",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 2
+          },
+          "id" : "amount",
+          "props" : {
+            "field" : "amount",
+            "label" : "量",
+            "placeholder" : "2 切れ",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "food_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "food",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "食材",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

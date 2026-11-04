@@ -1,0 +1,4 @@
+[
+  {"id": "nwc_can_stock", "group": "notify-when", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#265 在庫が減ったら通知はできる(時刻の通知だけと断らない)",
+   "steps": [{"say": "在庫が5個を下回ったら通知することってできる?", "textAny": ["できます", "できる"], "textNot": ["できません", "when", "notifications"]}]}
+]

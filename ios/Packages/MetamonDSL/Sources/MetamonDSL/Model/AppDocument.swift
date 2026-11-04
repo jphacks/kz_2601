@@ -158,8 +158,9 @@ public struct Theme: Decodable, Sendable {
 
 /// ローカル通知(P0)。`app.notifications[]` は DSL ロード時に同期、`scheduleNotification` アクションは押下時に予約。
 public struct NotificationSpec: Decodable, Identifiable, Sendable {
+    /// monthly / yearly(#266)はレコード基準(date / datetime の field)だけ。未知の値は once(古い版は monthly を once として読む)。
     public enum Repeat: String, Decodable, Sendable {
-        case once, daily, weekly
+        case once, daily, weekly, monthly, yearly
         public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .once) }
     }
 
@@ -180,12 +181,18 @@ public struct NotificationSpec: Decodable, Identifiable, Sendable {
     public var titleField: String?
     /// boolean field。false のレコードは通知しない(アラームのオン/オフ)
     public var enabledField: String?
+    /// 条件で知らせる(#265・app.notifications のみ): 真偽の式(ref 不可・agg で集計)。偽 → 真に変わった時に 1 回すぐ知らせる。
+    /// 時刻・レコードの日付の通知とは組み合わせない(backend が拒否)。式が読めない通知は `Lossy` が落とす(誤って時刻で鳴らさない)。
+    public var when: Expr?
 
-    public var isRecordBased: Bool { entity?.isEmpty == false && field?.isEmpty == false }
+    public var isRecordBased: Bool { when == nil && entity?.isEmpty == false && field?.isEmpty == false }
+    /// 条件の通知(#265)。予約(時刻・レコードの日付)には入れず、レコードの保存・同期の後に評価する。
+    public var isConditional: Bool { when != nil }
 
     public init(
         id: String, title: String, body: String = "", repeat: Repeat = .once, time: String? = nil, weekday: String? = nil,
-        entity: String? = nil, field: String? = nil, offsetMinutes: Int? = nil, titleField: String? = nil, enabledField: String? = nil
+        entity: String? = nil, field: String? = nil, offsetMinutes: Int? = nil, titleField: String? = nil, enabledField: String? = nil,
+        when: Expr? = nil
     ) {
         self.id = id
         self.title = title
@@ -198,6 +205,7 @@ public struct NotificationSpec: Decodable, Identifiable, Sendable {
         self.offsetMinutes = offsetMinutes
         self.titleField = titleField
         self.enabledField = enabledField
+        self.when = when
     }
 }
 
@@ -211,6 +219,10 @@ public struct Entity: Decodable, Identifiable, Sendable {
     public var edit: String?
     /// 1 人 1 回の印(いいね・保存・#255)。shared / public の entity だけ。
     @Lossy public var marks: [Mark] = []
+    /// 記録の保存期間(日数・#482)。作ってからこの日数を過ぎたレコードを端末が消す(`RecordRetention`)。nil = 消さない。
+    @LossyPositiveInt public var retentionDays: Int?
+    /// 仲間探しでの役割(#507): "profile"(みんなが見るプロフィール)/ "matched"(つながった人だけが読む)。未知の値は無視。
+    public var match: String?
     @Lossy public var fields: [Field]
 
     /// field id、または予約値(`$author` / `$createdAt`・#250)の仮 Field。
@@ -220,6 +232,10 @@ public struct Entity: Decodable, Identifiable, Sendable {
     public var isShared: Bool { scope == "shared" || scope == "public" }
     /// 作った人以外も更新できる(shared / public かつ edit:"members")。
     public var membersCanEdit: Bool { isShared && edit == "members" }
+    /// 仲間探しのプロフィール(#507)。「つながりたい」の宛先はそのレコードの author。
+    public var isMatchProfile: Bool { isShared && match == "profile" }
+    /// つながった人だけが読む記録(#507)。つながりが変わったら読み直す。
+    public var isMatchMatched: Bool { isShared && match == "matched" }
 
     /// 保存対象(computed 以外)のフィールド。フォームのドラフト・送信はこちらだけ。
     public var storedFields: [Field] { fields.filter { !$0.isComputed } }
@@ -274,7 +290,10 @@ public struct Field: Decodable, Identifiable, Sendable {
 
     public var isComputed: Bool { computed != nil }
 
-    private enum Keys: String, CodingKey { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health, hidden }
+    /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
+    static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
+
+    private enum Keys: String, CodingKey, CaseIterable { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health, hidden }
 
     /// 予約値の仮 Field 用(`RecordValue`)。
     init(id: String, name: String, type: FieldType) {

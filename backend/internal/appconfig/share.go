@@ -2,7 +2,7 @@ package appconfig
 
 // Share links (#49) and the public catalog (#50). Both hand out a frozen DSL
 // snapshot that the receiver copies into their own tree (installCopy); records
-// are never copied. See architecture.md §3.2.
+// are never copied. See docs/backend/features/sharing.md.
 
 import (
 	"crypto/rand"
@@ -19,9 +19,24 @@ import (
 	"unicode/utf8"
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/metrics"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
+
+// routes (share links #49 / public catalog #50)
+func init() {
+	registerRoutes(func(h *Handler, mux *http.ServeMux) {
+		mux.HandleFunc("POST /v1/apps/{appId}/share", h.createShare)
+		mux.HandleFunc("GET /v1/shares/{token}", h.getShare)
+		mux.HandleFunc("DELETE /v1/shares/{token}", h.revokeShare)
+		mux.HandleFunc("POST /v1/shares/{token}/import", h.importShare)
+		mux.HandleFunc("POST /v1/apps/{appId}/publish", h.publishApp)
+		mux.HandleFunc("DELETE /v1/apps/{appId}/publish", h.unpublishApp)
+		mux.HandleFunc("GET /v1/public-apps", h.listPublicApps)
+		mux.HandleFunc("POST /v1/public-apps/{id}/install", h.installPublicApp)
+	})
+}
 
 // Catalog field limits.
 const (
@@ -144,7 +159,12 @@ func (h *Handler) createShare(w http.ResponseWriter, r *http.Request) {
 		fail(w, blankErr("sharing"))
 		return
 	}
-	if hasSharedScope(parsed) {
+	rules, err := h.sharingRulesFor(r, app)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if rules.hasSharedScope(parsed) {
 		if err := h.requireMember(r, app); err != nil {
 			fail(w, err)
 			return
@@ -161,6 +181,7 @@ func (h *Handler) createShare(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	emitMetric(r, metrics.AppShared, appHashAttr(id))
 	httpx.WriteJSON(w, http.StatusCreated, toShareOut(r, &s))
 }
 
@@ -176,6 +197,9 @@ func (h *Handler) liveShare(r *http.Request) (*store.Share, error) {
 	}
 	if s.Revoked {
 		return nil, apiErr(http.StatusNotFound, httpx.CodeNotFound, "share has been revoked")
+	}
+	if err := h.checkSharedApp(r, s.AppID); err != nil { // #321
+		return nil, err
 	}
 	return s, nil
 }
@@ -247,6 +271,9 @@ func (h *Handler) importShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res.Member = member
+	res.Mine = h.createdBy(r, s.AppID, s.OwnerUID)
+	emitMetric(r, metrics.ShareImported, appHashAttr(res.ID), slog.String("source", "share"),
+		slog.Bool("joined", res.Joined), slog.Bool("created", res.Created))
 	httpx.WriteJSON(w, http.StatusCreated, res)
 }
 
@@ -260,6 +287,24 @@ type installResult struct {
 	Created bool `json:"created"`
 	// Member: the caller now participates in the app's scope:"shared" data (#254).
 	Member bool `json:"member"`
+	// Mine: the caller created the source app (or issued the link / the
+	// listing), so iOS skips the paywall even without a preview (#565).
+	Mine bool `json:"mine"`
+}
+
+// createdBy reports whether the caller issued the link / listing (issuer) or
+// created srcAppID (app_owners). Best effort: a lookup error means false.
+func (h *Handler) createdBy(r *http.Request, srcAppID, issuer string) bool {
+	uid := uidOf(r)
+	if issuer == uid {
+		return true
+	}
+	o, err := h.appOwner(r.Context(), srcAppID)
+	if err != nil {
+		slog.Warn("appconfig: owner lookup failed", slog.String("appId", srcAppID), slog.Any("error", err))
+		return false
+	}
+	return o == uid
 }
 
 // installCopy puts srcDSL into the caller's tree. Private-only apps get a new
@@ -287,6 +332,9 @@ func (h *Handler) installCopy(r *http.Request, srcAppID string, srcDSL json.RawM
 	}
 	id := newAppID()
 	if joined {
+		if err := h.checkSharedApp(r, srcAppID); err != nil { // #321
+			return nil, err
+		}
 		id = srcAppID
 		if cur, err := h.store.GetApp(ctx, uid, id); err == nil {
 			if cur, err = h.reactivate(r, cur); err != nil {
@@ -335,6 +383,9 @@ type listingOut struct {
 	Mine        bool      `json:"mine"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
+	// Hidden / HiddenReason: unpublished by the operator (#321). Only on the publisher's own listing.
+	Hidden       bool   `json:"hidden,omitempty"`
+	HiddenReason string `json:"hiddenReason,omitempty"`
 }
 
 func toListingOut(r *http.Request, c *store.CatalogApp) listingOut {
@@ -345,9 +396,13 @@ func toListingOut(r *http.Request, c *store.CatalogApp) listingOut {
 	if comps == nil {
 		comps = []string{}
 	}
-	return listingOut{ID: c.ID, Name: c.Name, Description: c.Description, Tags: tags, AuthorName: c.AuthorName,
+	out := listingOut{ID: c.ID, Name: c.Name, Description: c.Description, Tags: tags, AuthorName: c.AuthorName,
 		Components: comps, DSLVersion: c.Version, Installs: c.Installs, Mine: c.OwnerUID == uidOf(r),
 		CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt}
+	if out.Mine {
+		out.Hidden, out.HiddenReason = c.Hidden, c.HiddenReason
+	}
+	return out
 }
 
 func tooLong(s string, n int) bool { return utf8.RuneCountInString(s) > n }
@@ -428,6 +483,7 @@ func (h *Handler) publishApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, mapShareErr(err, "listing"))
 		return
 	}
+	emitMetric(r, metrics.AppPublished, appHashAttr(id))
 	httpx.WriteJSON(w, http.StatusOK, toListingOut(r, c))
 }
 
@@ -478,10 +534,20 @@ func (h *Handler) listPublicApps(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	blocked, err := h.blockedBy(r)
+	if err != nil {
+		fail(w, err)
+		return
+	}
 	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
 	hits := make([]store.CatalogApp, 0, len(all))
 	for i := range all {
-		if matches(&all[i], q) {
+		c := &all[i]
+		mine := c.OwnerUID == uidOf(r)
+		if (c.Hidden && !mine) || blocked[c.OwnerUID] { // #321: unpublished / blocked publisher
+			continue
+		}
+		if matches(c, q) {
 			hits = append(hits, all[i])
 		}
 	}
@@ -520,13 +586,17 @@ func (h *Handler) installPublicApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, mapStoreErr(err, "public app"))
 		return
 	}
+	if c.Hidden { // #321
+		fail(w, unpublishedErr("this listing", c.ModerationState))
+		return
+	}
 	if prev, err := h.store.GetInstall(ctx, id, uid); err == nil {
 		if cur, err := h.store.GetApp(ctx, uid, prev); err == nil {
 			if cur, err = h.reactivate(r, cur); err != nil {
 				fail(w, err)
 				return
 			}
-			httpx.WriteJSON(w, http.StatusCreated, installResult{appWithDSL: appWithDSL{appSummary: summary(cur), DSL: cur.DSL}, Joined: prev == c.ID})
+			httpx.WriteJSON(w, http.StatusCreated, installResult{appWithDSL: appWithDSL{appSummary: summary(cur), DSL: cur.DSL}, Joined: prev == c.ID, Mine: c.OwnerUID == uid})
 			return
 		} else if !errors.Is(err, store.ErrNotFound) {
 			fail(w, err)
@@ -541,8 +611,11 @@ func (h *Handler) installPublicApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	res.Mine = c.OwnerUID == uid
 	if _, err := h.store.RecordInstall(ctx, id, uid, res.ID, res.Created && c.OwnerUID != uid); err != nil {
 		slog.Warn("appconfig: install not recorded", slog.String("id", id), slog.Any("error", err))
 	}
+	emitMetric(r, metrics.ShareImported, appHashAttr(res.ID), slog.String("source", "public"),
+		slog.Bool("joined", res.Joined), slog.Bool("created", res.Created))
 	httpx.WriteJSON(w, http.StatusCreated, res)
 }

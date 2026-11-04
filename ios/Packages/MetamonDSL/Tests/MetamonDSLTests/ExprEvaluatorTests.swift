@@ -81,7 +81,8 @@ final class ExprEvaluatorTests: XCTestCase {
         XCTAssertEqual(try d(#"{"op":"month","args":["2026-10-24"]}"#)?.number, 10)
         XCTAssertEqual(try d(#"{"op":"day","args":["2026-10-24"]}"#)?.number, 24)
         XCTAssertEqual(try d(#"{"op":"weekday","args":["2026-10-24"]}"#)?.number, 7, "Calendar 準拠: 日=1 … 土=7")
-        XCTAssertEqual(try d(#"{"op":"gt","args":[{"op":"now"},"2026-01-01"]}"#), nil, "date と文字列の比較は型不一致")
+        XCTAssertEqual(try d(#"{"op":"gt","args":[{"op":"now"},"2026-01-01"]}"#), .bool(true), "date と日付の文字列は日付として比べる(#552)")
+        XCTAssertEqual(try d(#"{"op":"gt","args":[{"op":"now"},"tomorrow"]}"#), nil, "日付として読めない文字列とは比べない")
         XCTAssertEqual(try d(#"{"op":"gt","args":[{"op":"now"},{"op":"addDays","args":["2026-01-01",0]}]}"#), .bool(true))
     }
 

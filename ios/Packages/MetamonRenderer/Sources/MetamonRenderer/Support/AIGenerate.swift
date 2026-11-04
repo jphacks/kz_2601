@@ -116,7 +116,7 @@ extension OnDeviceAI {
             } catch let e as OnDeviceAIError {
                 throw e
             } catch {
-                throw OnDeviceAIError.failed(error.localizedDescription)
+                throw OnDeviceAIError.from(error)
             }
         }
         #endif

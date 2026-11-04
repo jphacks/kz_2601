@@ -18,6 +18,7 @@ final class AppRuntime: DSLRuntime {
     private(set) var records: [String: [Record]] = [:] {
         didSet {
             if dsl.app.notifications.contains(where: \.isRecordBased) { scheduleNotificationSync() } // #228 レコードの時刻から通知
+            if dsl.app.notifications.contains(where: \.isConditional) { scheduleConditionCheck() } // #265 条件で知らせる
             refreshLiveActivityStats() // #423 ロック画面の数字
         }
     }
@@ -27,6 +28,7 @@ final class AppRuntime: DSLRuntime {
     var notificationsDenied = false
     @ObservationIgnored var warnedNotificationsDenied = false
     @ObservationIgnored var notificationSyncTask: Task<Void, Never>?
+    @ObservationIgnored var conditionCheckTask: Task<Void, Never>?
     private(set) var loading: Set<String> = []
     /// サーバーから取れず、ローカルにも無い entity(#85)。Renderer は空状態ではなく「読み込めませんでした(再試行)」を描く。
     private(set) var failed: Set<String> = []
@@ -47,6 +49,12 @@ final class AppRuntime: DSLRuntime {
     @ObservationIgnored var tutorial: FirstRunTutorialStore?
     /// チュートリアルを出す(初回の同意のあと / 設定の「使い方を見る」)。
     var showTutorial = false
+    #if !APP_STORE_REVIEW // 審査用ビルドは β の案内を持たない(#313)
+    /// β の初回の案内(#313)。MetamonApp が `.shared` を入れる。nil(ユニットテスト等)は出さない。
+    @ObservationIgnored var betaWelcome: BetaWelcomeStore?
+    /// β の案内を出す(チュートリアルのあと / 設定の「β 版のご案内」)。
+    var showBetaWelcome = false
+    #endif
     /// 最初のアプリができた直後の「こう言うと直せます」(#274・1 回だけ)。
     var showFirstEditHint = false
     /// 「頼み方のコツ」(#415)で選んだ例。音声画面か対話の入力欄が受け取って空に戻す(送信はしない)。
@@ -176,6 +184,8 @@ final class AppRuntime: DSLRuntime {
     var chatTurn: ChatTurn?
     /// edit のチャットから生成に回した時の会話(#211)。生成しても何も変わらなかったら、この会話に理由の吹き出しを足して音声シートを開き直す
     var chatReturnOnUnchanged: [ChatBubble]?
+    /// 上の会話を閉じる前の履歴。開き直す時はこれに戻す(閉じた時に履歴へ移した同じ会話が二重に残り、件数の上限で古い履歴を押し出していた)
+    @ObservationIgnored var chatHistoryOnUnchanged: [ChatHistoryEntry]?
     /// 生成・改変の前にチャットで相談するか(設定で切替・既定 ON・#186)。OFF は create も edit も従来どおり即反映。
     var clarifyEnabled: Bool = ClarifySettings.enabled {
         didSet { ClarifySettings.enabled = clarifyEnabled }
@@ -210,6 +220,12 @@ final class AppRuntime: DSLRuntime {
 
     /// 生成直後の「個人の情報も公開されます」の確認(#253・nil = 出していない)。`Features/Privacy/AppRuntime+PublicData.swift`
     var publicDataPrompt: PublicDataPrompt?
+    /// 記録の保存期間の確認(#482・nil = 出していない)。`Features/Retention/AppRuntime+Retention.swift`
+    var retentionPrompt: RetentionPrompt?
+    /// 「あとで」にした確認("appId/entity=日数")。このセッションでは聞き直さない
+    @ObservationIgnored var retentionDeferred: Set<String> = []
+    /// 期限切れを消している最中の "appId/entity"(同じ行を 2 回消さない)
+    @ObservationIgnored var retentionPurging: Set<String> = []
 
     let services: Services
     /// レコードのローカル DB + 未送信キュー(Issue #48)。`records` はここから読み、書きはここに即反映してから裏で送る。
@@ -245,6 +261,7 @@ final class AppRuntime: DSLRuntime {
             if DeviceAppID.issuedThisLaunch { await resumeLatestAppIfEmpty() } // #276: 再インストール後のサインイン
             startSync()
         }
+        noteRetention() // #482 起動時の DSL(モック・オフラインでは apply を通らない)
         Task { await syncNotificationsNow() }
         #if DEBUG
         autoNavigateIfRequested() // `METAMON_AUTO_NAV`(#113)
@@ -392,7 +409,8 @@ final class AppRuntime: DSLRuntime {
         }
         print("[Metamon] hot reload: version \(document.version) → \(doc.version)")
         apply(doc)
-        summaryBanner = SummaryBanner(text: L10n.tr("アプリが更新されました(version \(doc.version))"), highlight: nil)
+        summaryBanner = SummaryBanner(text: L10n.pick(L10n.tr("アプリが更新されました(version \(doc.version))"),
+                                                     review: L10n.tr("記録帳が更新されました(version \(doc.version))")), highlight: nil)
     }
 
     /// records の変化通知はまとめて 1 回だけ取り直す(連投で pull を重ねない)。未表示の entity は画面が開いた時に読むので無視。
@@ -417,6 +435,7 @@ final class AppRuntime: DSLRuntime {
             startSync()
             Task { await refreshNotifications() } // #228 届いた分の空き枠を埋める
             Task { await catchUpAfterBackground() } // #38: 背面中の取りこぼしを即取り直す(AppRuntime+Background)
+            Task { await purgeAllExpired() } // #482 背面の間に期限を過ぎた記録
         } else {
             syncTask?.cancel()
             // 背面の間の変化は通知されないので、復帰で購読が戻った時に表示中の records を読み直す
@@ -448,6 +467,7 @@ final class AppRuntime: DSLRuntime {
             swap()
         }
         scheduleNotificationSync()
+        noteRetention() // #482 保存期間の確認と期限切れの削除
         WidgetSnapshotWriter.write(dsl: doc.dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         IntentHost.shared.appsMayHaveChanged() // Siri のフレーズ候補(アプリ名)を引き直す(#80)
     }
@@ -569,6 +589,8 @@ final class AppRuntime: DSLRuntime {
         withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
         if let bubbles = chatReturnOnUnchanged {
             chatReturnOnUnchanged = nil
+            if let saved = chatHistoryOnUnchanged { chatHistory = saved } // 吹き出しの didSet が保存するので先に戻す
+            chatHistoryOnUnchanged = nil
             withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
                 chatTurn = nil
                 chatBubbles = bubbles + [ChatBubble(role: .assistant, text: reason, kind: .answer)]
@@ -844,7 +866,13 @@ final class AppRuntime: DSLRuntime {
 
     // MARK: - Records
 
-    func records(for entity: String) -> [Record] { records[entity] ?? [] }
+    func records(for entity: String) -> [Record] {
+        #if APP_STORE_REVIEW
+        records[entity] ?? []
+        #else
+        hidingBlocked(records[entity] ?? [], entity: entity) // #321: ブロックした人の投稿はすぐ隠す
+        #endif
+    }
 
     /// 共有レコードの作者判定(#249)と、`Field.hidden`(#262)の入力を作者のフォームにだけ出すのに使う uid。
     var currentUserId: String? { services.auth.currentUser?.uid }
@@ -888,6 +916,7 @@ final class AppRuntime: DSLRuntime {
         guard dsl.entity(entity) != nil else { return false }
         records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: nil, data: data, author: postAuthor(for: entity))
         WidgetSnapshotWriter.write(dsl: dsl, records: records)
+        await purgeExpired(entity) // #482
         return true
     }
 
@@ -928,6 +957,7 @@ final class AppRuntime: DSLRuntime {
             records[entity] = fresh
             failed.remove(entity)
             if fresh.isEmpty { await seedRefOptions(entity, appId: appId) }
+            await purgeExpired(entity) // #482 サーバーから届いた期限切れ(別の端末で作った自分の記録など)
             print("[Metamon] records loaded: entity=\(entity) count=\(fresh.count)")
             WidgetSnapshotWriter.write(dsl: dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         } catch {
@@ -1071,6 +1101,7 @@ final class AppRuntime: DSLRuntime {
             #if !APP_STORE_REVIEW
             writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)
             #endif
+            Task { await purgeExpired(entity) } // #482 保存の後(画面遷移を待たせない)
             if let screen = action.screen {
                 navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
             } else {
@@ -1152,6 +1183,8 @@ final class AppRuntime: DSLRuntime {
             let name = entity.flatMap { dsl.entity($0)?.field(fieldId)?.name } ?? fieldId
             return L10n.tr("「\(name)」の入力を確認してください(\(api.errorDescription ?? ""))")
         }
+        if api.isAppCheckFailure { return ErrorCopy.appCheckFailedBody } // #318: サインインでは直らない
+        if api.isAIPaused { return ErrorCopy.aiPausedBody } // #511
         if api.status == 401 { return ErrorCopy.sessionExpiredSignIn }
         return api.errorDescription ?? "\(api)"
     }

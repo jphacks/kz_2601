@@ -1,15 +1,17 @@
 package ai
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 )
 
 // NewHandler exposes POST /v1/generate, POST /v1/chat, DELETE /v1/chat/{appId},
@@ -31,24 +33,23 @@ func NewHandler(svc *Service) http.Handler {
 	mux.HandleFunc("POST /v1/generate", func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 		if err != nil {
-			writeErr(w, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "cannot read body"})
+			svc.writeErr(w, r, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "cannot read body"})
 			return
 		}
 		var req Request
 		if err := json.Unmarshal(body, &req); err != nil {
-			writeErr(w, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "invalid JSON: " + err.Error()})
+			svc.writeErr(w, r, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "invalid JSON: " + err.Error()})
 			return
 		}
-		ctx := r.Context()
-		if auth := r.Header.Get("Authorization"); auth != "" {
-			ctx = appconfigclient.WithBearer(ctx, auth)
-		}
+		ctx := callerContext(r)
 		if q := r.URL.Query().Get("stream"); q == "1" || q == "true" {
 			serveSSE(w, func(emit func(string, any)) {
 				res, err := svc.GenerateStream(ctx, req, func(ev Event) { emit(ev.Type, ev) })
 				if err != nil {
 					ge := asError(err)
-					emit("error", errBody(ge))
+					// the stream already answered 200: tell the limiter (#548)
+					ratelimit.ReportStatus(ctx, ge.Status)
+					emit("error", svc.errBody(ctx, ge))
 					return
 				}
 				emit("result", res)
@@ -57,7 +58,7 @@ func NewHandler(svc *Service) http.Handler {
 		}
 		res, err := svc.Generate(ctx, req)
 		if err != nil {
-			writeErr(w, err)
+			svc.writeErr(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, res)
@@ -67,21 +68,18 @@ func NewHandler(svc *Service) http.Handler {
 	mux.Handle("POST /v1/chat", caller(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 		if err != nil {
-			writeErr(w, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "cannot read body"})
+			svc.writeErr(w, r, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "cannot read body"})
 			return
 		}
 		var req ChatRequest
 		if err := json.Unmarshal(body, &req); err != nil {
-			writeErr(w, &Error{Status: http.StatusBadRequest, Code: "bad_request", Message: "invalid JSON: " + err.Error()})
+			svc.writeErr(w, r, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "invalid JSON: " + err.Error()})
 			return
 		}
-		ctx := r.Context()
-		if auth := r.Header.Get("Authorization"); auth != "" {
-			ctx = appconfigclient.WithBearer(ctx, auth) // edit mode reads the current DSL
-		}
+		ctx := callerContext(r) // edit mode reads the current DSL
 		res, err := svc.Chat(ctx, req)
 		if err != nil {
-			writeErr(w, err)
+			svc.writeErr(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, res)
@@ -92,16 +90,29 @@ func NewHandler(svc *Service) http.Handler {
 	mux.Handle("DELETE /v1/chat/{appId}", caller(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		uid := auth.UID(r.Context())
 		if uid == "" {
-			writeErr(w, &Error{Status: http.StatusUnauthorized, Code: httpx.CodeUnauthenticated, Message: "missing or invalid bearer token"})
+			svc.writeErr(w, r, &Error{Status: http.StatusUnauthorized, Code: httpx.CodeUnauthenticated, Message: "missing or invalid bearer token"})
 			return
 		}
 		if err := svc.ClearChat(uid, r.PathValue("appId")); errors.Is(err, ErrNotOwner) {
-			writeErr(w, &Error{Status: http.StatusForbidden, Code: httpx.CodeForbidden, Message: err.Error()})
+			svc.writeErr(w, r, &Error{Status: http.StatusForbidden, Code: httpx.CodeForbidden, Message: err.Error()})
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})))
 	return mux
+}
+
+// callerContext carries the caller's Authorization and App Check token (#318)
+// to the appconfig calls made on its behalf.
+func callerContext(r *http.Request) context.Context {
+	ctx := r.Context()
+	if auth := r.Header.Get("Authorization"); auth != "" {
+		ctx = appconfigclient.WithBearer(ctx, auth)
+	}
+	if token := r.Header.Get(appconfigclient.AppCheckHeader); token != "" {
+		ctx = appconfigclient.WithAppCheck(ctx, token)
+	}
+	return ctx
 }
 
 // serveSSE runs fn with an emitter that writes `event:`/`data:` frames and
@@ -130,12 +141,22 @@ func serveSSE(w http.ResponseWriter, fn func(emit func(event string, v any))) {
 func asError(err error) *Error {
 	var ge *Error
 	if !errors.As(err, &ge) {
-		ge = &Error{Status: http.StatusInternalServerError, Code: "internal", Message: err.Error()}
+		ge = &Error{Status: http.StatusInternalServerError, Code: httpx.CodeInternal, Message: err.Error()}
 	}
 	return ge
 }
 
-func errBody(ge *Error) map[string]any {
+// logger is s.Logger, or slog.Default() when unset.
+func (s *Service) logger() *slog.Logger {
+	if s.Logger != nil {
+		return s.Logger
+	}
+	return slog.Default()
+}
+
+// errBody builds the error body. A 5xx is logged at ERROR with ctx, so the
+// line carries the request's trace and requestId (#295).
+func (s *Service) errBody(ctx context.Context, ge *Error) map[string]any {
 	details := map[string]any{}
 	if len(ge.Problems) > 0 {
 		details["problems"] = ge.Problems
@@ -148,14 +169,18 @@ func errBody(ge *Error) map[string]any {
 		e["details"] = details
 	}
 	if ge.Status >= 500 {
-		log.Printf("generate: %d %s: %s", ge.Status, ge.Code, ge.Message)
+		s.logger().LogAttrs(ctx, slog.LevelError, "ai: error response",
+			slog.Int("status", ge.Status),
+			slog.String("code", ge.Code),
+			slog.String("error", ge.Message),
+		)
 	}
 	return map[string]any{"error": e}
 }
 
-func writeErr(w http.ResponseWriter, err error) {
+func (s *Service) writeErr(w http.ResponseWriter, r *http.Request, err error) {
 	ge := asError(err)
-	body := errBody(ge)
+	body := s.errBody(r.Context(), ge)
 	delete(body["error"].(map[string]any), "status")
 	writeJSON(w, ge.Status, body)
 }

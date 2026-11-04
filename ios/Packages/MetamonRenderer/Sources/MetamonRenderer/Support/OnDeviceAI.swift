@@ -43,6 +43,18 @@ enum AIAvailability: Equatable, Sendable {
         }
     }
 
+    /// 集計(#446)のラベル。
+    var metric: AIButtonMetric.Availability {
+        switch self {
+        case .available: .available
+        case .unavailable(.deviceNotEligible): .deviceNotEligible
+        case .unavailable(.appleIntelligenceNotEnabled): .appleIntelligenceOff
+        case .unavailable(.modelNotReady): .modelNotReady
+        case .unavailable(.osTooOld): .osTooOld
+        case .unavailable(.other): .other
+        }
+    }
+
     /// 現在の端末の状態。
     static var current: AIAvailability {
         #if canImport(FoundationModels)
@@ -194,13 +206,56 @@ enum AIRequestBuilder {
 enum OnDeviceAIError: LocalizedError {
     case unavailable(AIAvailability)
     case invalidResponse
-    case failed(String)
+    case failed(String, reason: AIButtonMetric.FailureReason)
 
     var errorDescription: String? {
         switch self {
         case .unavailable(let a): a.message ?? AIAvailability.title
         case .invalidResponse: "AI の答えを読み取れませんでした。もう一度お試しください"
-        case .failed(let detail): "AI の処理に失敗しました(\(detail))"
+        case .failed(let detail, _): "AI の処理に失敗しました(\(detail))"
+        }
+    }
+
+    /// 集計(#446)の理由。
+    var metricReason: AIButtonMetric.FailureReason {
+        switch self {
+        case .unavailable: .unavailable
+        case .invalidResponse: .invalidResponse
+        case .failed(_, let reason): reason
+        }
+    }
+
+    /// Foundation Models の例外を決まった理由に寄せる(例外の文面は送らない)。
+    static func from(_ error: any Error) -> OnDeviceAIError {
+        .failed(error.localizedDescription, reason: reason(for: error))
+    }
+
+    static func reason(for error: any Error) -> AIButtonMetric.FailureReason {
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, macOS 26.0, *), let e = error as? LanguageModelSession.GenerationError {
+            switch e {
+            case .exceededContextWindowSize: return .contextTooLong
+            case .assetsUnavailable: return .assetsUnavailable
+            case .guardrailViolation: return .guardrail
+            case .unsupportedLanguageOrLocale: return .unsupportedLanguage
+            case .decodingFailure, .unsupportedGuide: return .invalidResponse
+            case .rateLimited, .concurrentRequests: return .rateLimited
+            case .refusal: return .refusal
+            @unknown default: return .modelError
+            }
+        }
+        #endif
+        return .modelError
+    }
+}
+
+extension AIButtonMetric.FailureReason {
+    /// 組み立ての失敗を理由に寄せる。利用者の入力待ち(空・記録なし)は失敗に数えない(nil)。
+    init?(buildError error: any Error) {
+        switch error {
+        case AIRequestBuilder.BuildError.emptyInput, AIGenerateBuilder.BuildError.noRecords: return nil
+        case is AIRequestBuilder.BuildError, is AIGenerateBuilder.BuildError: self = .badConfig
+        default: return nil
         }
     }
 }
@@ -229,7 +284,7 @@ enum OnDeviceAI {
             } catch let e as OnDeviceAIError {
                 throw e
             } catch {
-                throw OnDeviceAIError.failed(error.localizedDescription)
+                throw OnDeviceAIError.from(error)
             }
         }
         #endif

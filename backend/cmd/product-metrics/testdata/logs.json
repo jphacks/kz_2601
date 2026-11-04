@@ -1,0 +1,397 @@
+[
+ {
+  "timestamp": "2026-10-21T00:00:00Z",
+  "jsonPayload": {
+   "event": "ai.usage",
+   "uid_hash": "aaaaaaaaaaaaaaaa",
+   "outcome": "ok"
+  }
+ },
+ {
+  "timestamp": "2026-10-21T00:00:00Z",
+  "jsonPayload": {
+   "event": "session.start"
+  }
+ },
+ {
+  "timestamp": "2026-11-02T00:00:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "appconfig-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "session.start",
+   "uid_hash": "aaaaaaaaaaaaaaaa",
+   "message": "session.start",
+   "severity": "INFO"
+  }
+ },
+ {
+  "timestamp": "2026-10-30T04:05:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "appconfig-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "app.shared",
+   "uid_hash": "cccccccccccccccc",
+   "message": "app.shared",
+   "severity": "INFO",
+   "app_hash": "3333333333333333"
+  }
+ },
+ {
+  "timestamp": "2026-10-30T04:00:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "appconfig-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "app.published",
+   "uid_hash": "cccccccccccccccc",
+   "message": "app.published",
+   "severity": "INFO",
+   "app_hash": "3333333333333333"
+  }
+ },
+ {
+  "timestamp": "2026-10-29T04:00:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "ai-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "ai.generate",
+   "uid_hash": "cccccccccccccccc",
+   "message": "ai.generate",
+   "severity": "INFO",
+   "app_hash": "3333333333333333",
+   "mode": "create",
+   "outcome": "validated",
+   "validation_passed": true
+  }
+ },
+ {
+  "timestamp": "2026-10-28T03:02:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "appconfig-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "share.imported",
+   "uid_hash": "cccccccccccccccc",
+   "message": "share.imported",
+   "severity": "INFO",
+   "app_hash": "3333333333333333",
+   "source": "share"
+  }
+ },
+ {
+  "timestamp": "2026-10-28T03:01:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "ai-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "ai.generate",
+   "uid_hash": "cccccccccccccccc",
+   "message": "ai.generate",
+   "severity": "INFO",
+   "app_hash": "3333333333333333",
+   "mode": "create",
+   "outcome": "failed",
+   "validation_passed": false
+  }
+ },
+ {
+  "timestamp": "2026-10-28T03:00:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "appconfig-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "session.start",
+   "uid_hash": "cccccccccccccccc",
+   "message": "session.start",
+   "severity": "INFO"
+  }
+ },
+ {
+  "timestamp": "2026-10-28T22:00:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "appconfig-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "session.start",
+   "uid_hash": "bbbbbbbbbbbbbbbb",
+   "message": "session.start",
+   "severity": "INFO"
+  }
+ },
+ {
+  "timestamp": "2026-10-22T11:43:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "ai-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "ai.generate",
+   "uid_hash": "bbbbbbbbbbbbbbbb",
+   "message": "ai.generate",
+   "severity": "INFO",
+   "app_hash": "2222222222222222",
+   "mode": "undo",
+   "outcome": "restored",
+   "validation_passed": false
+  }
+ },
+ {
+  "timestamp": "2026-10-22T11:42:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "ai-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "ai.generate",
+   "uid_hash": "bbbbbbbbbbbbbbbb",
+   "message": "ai.generate",
+   "severity": "INFO",
+   "app_hash": "2222222222222222",
+   "mode": "create",
+   "outcome": "bad_request",
+   "validation_passed": false
+  }
+ },
+ {
+  "timestamp": "2026-10-22T11:41:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "ai-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "ai.generate",
+   "uid_hash": "bbbbbbbbbbbbbbbb",
+   "message": "ai.generate",
+   "severity": "INFO",
+   "app_hash": "2222222222222222",
+   "mode": "edit",
+   "outcome": "validated",
+   "validation_passed": true
+  }
+ },
+ {
+  "timestamp": "2026-10-22T11:40:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "ai-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "ai.generate",
+   "uid_hash": "bbbbbbbbbbbbbbbb",
+   "message": "ai.generate",
+   "severity": "INFO",
+   "app_hash": "2222222222222222",
+   "mode": "edit",
+   "outcome": "validated",
+   "validation_passed": true
+  }
+ },
+ {
+  "timestamp": "2026-10-22T11:31:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "ai-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "ai.generate",
+   "uid_hash": "bbbbbbbbbbbbbbbb",
+   "message": "ai.generate",
+   "severity": "INFO",
+   "app_hash": "2222222222222222",
+   "mode": "create",
+   "outcome": "regenerated",
+   "validation_passed": true
+  }
+ },
+ {
+  "timestamp": "2026-10-22T11:30:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "ai-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "ai.generate",
+   "uid_hash": "bbbbbbbbbbbbbbbb",
+   "message": "ai.generate",
+   "severity": "INFO",
+   "app_hash": "2222222222222222",
+   "mode": "create",
+   "outcome": "refused",
+   "validation_passed": false
+  }
+ },
+ {
+  "timestamp": "2026-10-22T11:00:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "appconfig-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "session.start",
+   "uid_hash": "bbbbbbbbbbbbbbbb",
+   "message": "session.start",
+   "severity": "INFO"
+  }
+ },
+ {
+  "timestamp": "2026-10-26T23:00:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "appconfig-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "app.opened",
+   "uid_hash": "aaaaaaaaaaaaaaaa",
+   "message": "app.opened",
+   "severity": "INFO",
+   "app_hash": "1111111111111111"
+  }
+ },
+ {
+  "timestamp": "2026-10-21T00:01:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "appconfig-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "app.shared",
+   "uid_hash": "aaaaaaaaaaaaaaaa",
+   "message": "app.shared",
+   "severity": "INFO",
+   "app_hash": "1111111111111111"
+  }
+ },
+ {
+  "timestamp": "2026-10-21T00:00:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "appconfig-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "app.opened",
+   "uid_hash": "aaaaaaaaaaaaaaaa",
+   "message": "app.opened",
+   "severity": "INFO",
+   "app_hash": "1111111111111111"
+  }
+ },
+ {
+  "timestamp": "2026-10-20T01:12:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "ai-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "ai.generate",
+   "uid_hash": "aaaaaaaaaaaaaaaa",
+   "message": "ai.generate",
+   "severity": "INFO",
+   "app_hash": "1111111111111111",
+   "mode": "edit",
+   "outcome": "unchanged",
+   "validation_passed": true
+  }
+ },
+ {
+  "timestamp": "2026-10-20T01:10:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "ai-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "ai.generate",
+   "uid_hash": "aaaaaaaaaaaaaaaa",
+   "message": "ai.generate",
+   "severity": "INFO",
+   "app_hash": "1111111111111111",
+   "mode": "edit",
+   "outcome": "regenerated",
+   "validation_passed": true
+  }
+ },
+ {
+  "timestamp": "2026-10-20T01:05:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "ai-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "ai.generate",
+   "uid_hash": "aaaaaaaaaaaaaaaa",
+   "message": "ai.generate",
+   "severity": "INFO",
+   "app_hash": "1111111111111111",
+   "mode": "create",
+   "outcome": "validated",
+   "validation_passed": true
+  }
+ },
+ {
+  "timestamp": "2026-10-20T01:00:00.000000Z",
+  "resource": {
+   "type": "cloud_run_revision",
+   "labels": {
+    "service_name": "appconfig-stg"
+   }
+  },
+  "jsonPayload": {
+   "event": "session.start",
+   "uid_hash": "aaaaaaaaaaaaaaaa",
+   "message": "session.start",
+   "severity": "INFO"
+  }
+ }
+]

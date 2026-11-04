@@ -1,7 +1,9 @@
 # GCP 構築手順書(JPHACKS 2026 / kz_2601)
 
 > 正典は `docs/00_decisions.md`。本書はそれを **gcloud / firebase CLI で手を動かして実現する runbook**。
-> 操作者: @ko-tarou。Terraform なし。所要目安: Step 0〜3 で 60〜90 分、Step 4 で 30 分。
+> 操作者: @ko-tarou。本書の手順は Terraform を使わない(新しい環境は下の `infra/` を使う)。所要目安: Step 0〜3 で 60〜90 分、Step 4 で 30 分。
+>
+> **新しい環境(stg など)は [`infra/`](../../infra/README.md) の Terraform(`infra/bootstrap.sh`)で作る(#307)。** 本書はハッカソン時の手順の記録と、Terraform で扱わない人の作業(Firebase・Apple・Secret の値)の詳細として残す。
 >
 > 記法
 > - **☐ あなたがやる** … ブラウザ/コンソール/Apple Developer 等、人が操作する箇所
@@ -21,18 +23,22 @@
 > | Firebase iOS アプリ | 表示名 `Metamon` / App ID `1:378953239426:ios:6106ede996c98d1f70dd9b` / Bundle ID `jp.kz2601.metamon`。`GoogleService-Info.plist` は repo 外 `~/Desktop/JPHACKS2026/secrets/` に書き出し済み(iOS ターゲット直下へコピーして使う。コミット禁止) |
 > | Cloud Run `appconfig-stg` | https://appconfig-stg-378953239426.asia-northeast1.run.app (旧形式 https://appconfig-stg-zgciuf3iha-an.a.run.app) |
 > | Cloud Run `ai-stg` | https://ai-stg-378953239426.asia-northeast1.run.app (旧形式 https://ai-stg-zgciuf3iha-an.a.run.app)。`--command=/app/ai`、`ANTHROPIC_API_KEY` を Secret 注入済み |
-> | ヘルスチェック実測 | **両サービスとも `/healthz` は Google Front End が HTML 404 を返し、コンテナに届かない**(リクエストログに残らない。`/`・`/foo`・`/healthz/` は Go の `404 page not found` が返るのでコンテナ自体は稼働中・ローカル起動では `/healthz` 200)。`*.run.app` で `/healthz` が予約パス扱いになっている模様。**backend のヘルスパスを `/health`(または `/api/healthz`)に変え、`deploy-cloudrun.yml` の curl も合わせる**こと(要対応・backend 担当) |
+> | ヘルスチェック | **解消済み**: ヘルスパスは `GET /health`(appconfig・ai とも)。`deploy-cloudrun.yml` のヘルスチェックと `infra/monitoring.tf` の Uptime check も `/health`。`/healthz` はローカル用に残っているが、`*.run.app` では Google Front End が HTML 404 を返しコンテナに届かない(2026-10-24 実測) |
 > | Cloud Run コンソール | https://console.cloud.google.com/run?project=jphacks-kz2601 |
 > | WIF プロバイダ | `projects/378953239426/locations/global/workloadIdentityPools/github/providers/github`(条件 `assertion.repository == 'jphacks/kz_2601'`) |
-> | GitHub Variables(repo 単位) | `GCP_PROJECT_ID` / `GCP_REGION` / `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_SERVICE_ACCOUNT`(`.github/workflows/deploy-cloudrun.yml` の変数名に合わせた。本書 4-3 の `GCP_WIF_PROVIDER` / `GCP_DEPLOY_SA` / `GCP_RUNTIME_SA` は旧案) |
+> | GitHub Variables(repo 単位) | `GCP_PROJECT_ID` / `GCP_REGION` / `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_SERVICE_ACCOUNT`(`.github/workflows/deploy-cloudrun.yml` の変数名。実行 SA はワークフローが `run-backend@<GCP_PROJECT_ID>…` と組み立てるので変数は無い) |
 > | GitHub Environments | `staging` / `production` 作成済み |
 > | 予算 | `kz2601 monthly` 4,500 JPY/月(課金アカウントが JPY のため。50/90/100%+予測100%) |
 >
-> **既知の不一致(GitHub 整備担当と要すり合わせ)**: 現行 `deploy-cloudrun.yml` は (a) サービス名が `<SERVICE_PREFIX>-<cmd>`(既定 `morph-appconfig` / `morph-ai`)で stg/prod の区別が無く、本書の `appconfig-stg` 等と別名になる、(b) Secret 名が `anthropic-api-key` だが実体は `ANTHROPIC_API_KEY`、(c) buildpacks 前提(`GOOGLE_BUILDABLE`)だが `backend/Dockerfile` があると Dockerfile が優先され、`--command=/app/ai` が無い ai はappconfig バイナリで起動してしまう。本書 4-4 の YAML に寄せるのを推奨。
+> **既知の不一致 → 解消済み(#563 で確認)**: 以前の `deploy-cloudrun.yml` とのずれ((a) サービス名 `morph-*`、(b) Secret 名 `anthropic-api-key`、(c) buildpacks 前提)は、今のワークフローではすべて直っている。(a) サービス名は `appconfig-<stg|prod>` / `ai-<stg|prod>`、(b) Secret は `ANTHROPIC_API_KEY`(`--set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest`)、(c) `backend/Dockerfile` で 1 回ビルドし、ai は `--command=/app/ai` で起動する。
 >
 > **zsh で `#` 行を貼ると `command not found: #` が出る**のは無害だが、気になるなら先に `setopt interactivecomments` を実行しておく。
 >
 > **注意**: プロジェクトの表示名(`--name`)に `_` は使えない(ID だけでなく表示名にも文字種制限がある)。
+>
+> 認証情報の一覧と差し替え手順は [credentials-inventory.md](credentials-inventory.md)。
+>
+> **2026-10-30 以降(#307)**: API・SA と IAM・Artifact Registry・Secret の入れ物・WIF・Firestore・消去ジョブ・予算は [`infra/`](../../infra/README.md) の Terraform で作る方針。本書は prod を最初に手で作った記録として残す。
 
 ## 目次
 1. [全体像](#1-全体像)
@@ -54,7 +60,7 @@
 ```mermaid
 flowchart LR
   subgraph Dev["開発者 / GitHub"]
-    GH["GitHub Actions<br/>(deploy-backend.yml)"]
+    GH["GitHub Actions<br/>(deploy-cloudrun.yml)"]
     Mac["Mac<br/>gcloud / firebase CLI"]
   end
 
@@ -67,10 +73,10 @@ flowchart LR
     AR["Artifact Registry<br/>backend/ イメージ"]
     subgraph Run["Cloud Run"]
       AC["appconfig-{stg,prod}<br/>(DSL JSON CRUD)"]
-      AI["ai-{stg,prod}<br/>(音声/文字→Claude→DSL)"]
+      AI["ai-{stg,prod}<br/>(文字→Claude→DSL)"]
     end
     FS[("Firestore<br/>Native mode")]
-    SM["Secret Manager<br/>ANTHROPIC_API_KEY<br/>OPENAI_API_KEY"]
+    SM["Secret Manager<br/>ANTHROPIC_API_KEY"]
     FBA["Firebase Auth<br/>(Apple プロバイダ)"]
     SA_run["SA: run-backend"]
     SA_dep["SA: github-deployer"]
@@ -323,7 +329,6 @@ git check-ignore -v ios/App/GoogleService-Info.plist   # 何か表示されれ�
 
 **☐ あなたがやる**
 - **Claude API キー**: https://console.anthropic.com/ → API Keys → Create Key(Workspace は既定で可)。`sk-ant-...` を控える。
-- (任意)**OpenAI API キー**: WhisperKit(オンデバイス)で足りない場合のみ。https://platform.openai.com/api-keys → Create new secret key。
 
 ### 2-2. 登録(値はファイル経由・履歴に残さない)
 
@@ -335,14 +340,6 @@ read -s -p "ANTHROPIC_API_KEY: " ANTHROPIC_API_KEY; echo
 printf '%s' "$ANTHROPIC_API_KEY" | gcloud secrets create ANTHROPIC_API_KEY \
   --replication-policy=user-managed --locations="$REGION" --data-file=-
 unset ANTHROPIC_API_KEY
-
-# 任意: OpenAI
-read -s -p "OPENAI_API_KEY (空ならスキップ): " OPENAI_API_KEY; echo
-if [ -n "$OPENAI_API_KEY" ]; then
-  printf '%s' "$OPENAI_API_KEY" | gcloud secrets create OPENAI_API_KEY \
-    --replication-policy=user-managed --locations="$REGION" --data-file=-
-fi
-unset OPENAI_API_KEY
 ```
 
 キーを差し替えるとき(新バージョン追加。Cloud Run は `:latest` を参照しているので再デプロイで反映):
@@ -356,7 +353,7 @@ printf '%s' "sk-ant-新しいキー" | gcloud secrets versions add ANTHROPIC_API
 **▶ 実行**
 
 ```sh
-for s in ANTHROPIC_API_KEY OPENAI_API_KEY; do
+for s in ANTHROPIC_API_KEY; do
   gcloud secrets describe "$s" >/dev/null 2>&1 && \
   gcloud secrets add-iam-policy-binding "$s" \
     --member="serviceAccount:${RUN_SA}" --role="roles/secretmanager.secretAccessor"
@@ -374,6 +371,8 @@ gcloud secrets list
 
 ### 3-1. appconfig(ソースからビルド)
 
+> env は `--update-env-vars` で入れる(サービスが無い初回でも作れる)。自動デプロイ(`.github/workflows/deploy-cloudrun.yml`)と同じ書き方で、運用で手で入れた値を消さない。フラグの違いは [runtime-config.md](runtime-config.md#しくみ)。
+
 **▶ 実行**(リポジトリ直下から。初回は Artifact Registry リポジトリ `cloud-run-source-deploy` を作るか聞かれるので `Y`。ビルド込みで 3〜5 分)
 
 ```sh
@@ -387,9 +386,11 @@ gcloud run deploy appconfig-stg \
   --cpu=1 --memory=512Mi \
   --min-instances=0 --max-instances=3 \
   --concurrency=80 --timeout=60 \
-  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=stg"
+  --update-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=stg,ALLOW_SHARED_PROD_DB=1"
 cd ..
 ```
+
+> `ALLOW_SHARED_PROD_DB=1`: stg は今 本番と同じ `jphacks-kz2601` の `(default)` を使う。backend は `APP_ENV=stg` で本番の接続先なら起動を止める(#290・`backend/internal/fsenv`)ので、分離(#291・#293)までは stg にこれが要る。分離後は stg の接続先を変えてこの変数を外す。
 
 ### 3-2. ai(同じイメージを `--command` で ai として起動)
 
@@ -412,11 +413,10 @@ gcloud run deploy ai-stg \
   --cpu=1 --memory=512Mi \
   --min-instances=0 --max-instances=3 \
   --concurrency=20 --timeout=300 \
-  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=stg,APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL}" \
+  --update-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=stg,ALLOW_SHARED_PROD_DB=1,APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL}" \
   --set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest"
 ```
 
-> OPENAI_API_KEY も使うなら `--set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest"`。
 > `--set-secrets` は既存のシークレット設定を全置換、追加だけなら `--update-secrets`。
 > ソースから直接 ai を上げたい場合は 3-1 のコマンドを `ai-stg` + `--command=/app/ai` にすれば良い(ビルドがもう 1 回走る)。
 
@@ -428,7 +428,7 @@ gcloud run deploy ai-stg \
 for svc in appconfig-stg ai-stg; do
   url="$(gcloud run services describe "$svc" --region="$REGION" --format='value(status.url)')"
   printf '%-14s %s -> ' "$svc" "$url"
-  curl -s -o /dev/null -w '%{http_code}\n' "$url/healthz"
+  curl -s -o /dev/null -w '%{http_code}\n' "$url/health"
 done
 # 期待: 両方 200
 ```
@@ -447,7 +447,7 @@ gcloud run services logs read ai-stg --region="$REGION" --limit=50
 | プロジェクト ID | `GOOGLE_CLOUD_PROJECT` 環境変数(Firebase Admin SDK / Firestore クライアントがこれを読む) |
 | 認証情報 | ADC。Cloud Run 上では `run-backend` SA が自動で使われる(鍵ファイル不要) |
 | Firebase ID トークン検証 | `firebase.google.com/go/v4` の `auth.Client.VerifyIDToken`。公開鍵取得のみで IAM 権限は不要 |
-| Firestore | `cloud.google.com/go/firestore`、`(default)` DB。権限は `roles/datastore.user`(付与済み) |
+| Firestore | `cloud.google.com/go/firestore`。DB は `FIRESTORE_DATABASE`(既定 `(default)`、`internal/fsenv` に集約)。権限は `roles/datastore.user`(付与済み) |
 | Claude API キー | `ANTHROPIC_API_KEY` 環境変数(Secret Manager から注入) |
 | ai → appconfig | `APPCONFIG_BASE_URL`。当面はクライアントから受けた Firebase ID トークンをそのまま転送する想定(**要設計確認**: 後で Cloud Run の service-to-service ID トークンに切替可) |
 
@@ -502,13 +502,16 @@ gcloud iam service-accounts add-iam-policy-binding "$DEPLOY_SA" \
 |---|---|---|---|
 | Variable | `GCP_PROJECT_ID` | `jphacks-kz2601` | `echo $PROJECT_ID` |
 | Variable | `GCP_REGION` | `asia-northeast1` | - |
-| Variable | `GCP_WIF_PROVIDER` | `projects/<番号>/locations/global/workloadIdentityPools/github/providers/github` | `echo $WIF_PROVIDER` |
-| Variable | `GCP_DEPLOY_SA` | `github-deployer@<PROJECT_ID>.iam.gserviceaccount.com` | `echo $DEPLOY_SA` |
-| Variable | `GCP_RUNTIME_SA` | `run-backend@<PROJECT_ID>.iam.gserviceaccount.com` | `echo $RUN_SA` |
+| Variable | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/<番号>/locations/global/workloadIdentityPools/github/providers/github` | `echo $WIF_PROVIDER` |
+| Variable | `GCP_SERVICE_ACCOUNT` | `github-deployer@<PROJECT_ID>.iam.gserviceaccount.com` | `echo $DEPLOY_SA` |
+
+実行 SA(`run-backend`)はワークフローが組み立てるので変数は要らない。任意で `FIREBASE_WEB_API_KEY`(スモーク用)、Environment ごとに `APP_CHECK_MODE`・`FIRESTORE_DATABASE`(未設定なら `off`・`(default)`。[runtime-config.md](runtime-config.md))。Terraform で作った環境では値を `terraform output` から取る([infra/README.md](../../infra/README.md))。
 
 Secrets に入れるものは **無し**(API キーは Secret Manager、認証は WIF)。
 
-### 4-4. ワークフロー(GitHub 整備担当が `.github/workflows/deploy-backend.yml` として追加)
+### 4-4. ワークフロー(構築時の雛形。今は `.github/workflows/deploy-cloudrun.yml`)
+
+> 今のワークフローは `.github/workflows/deploy-cloudrun.yml`。下は構築時の雛形で、正しい内容はワークフローの方を見る。env は `--update-env-vars`(#509・#513)で、デプロイが決める値・運用で変える値は [runtime-config.md](runtime-config.md)。
 
 `docs/00_decisions.md` の CI(lint+test、Draft では発火しない)とは別ファイル。push トリガーのみ(fork PR からは動かない)。
 
@@ -535,15 +538,15 @@ jobs:
     env:
       PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       REGION: ${{ vars.GCP_REGION }}
-      RUN_SA: ${{ vars.GCP_RUNTIME_SA }}
+      RUN_SA: run-backend@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
       ENV_SUFFIX: ${{ github.ref_name == 'main' && 'prod' || 'stg' }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.GCP_DEPLOY_SA }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
 
       - uses: google-github-actions/setup-gcloud@v2
 
@@ -562,7 +565,7 @@ jobs:
             --service-account="$RUN_SA" --allow-unauthenticated \
             --port=8080 --cpu=1 --memory=512Mi \
             --min-instances=0 --max-instances=3 --concurrency=80 --timeout=60 \
-            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=${ENV_SUFFIX}" \
+            --update-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB}" \
             --quiet
 
       - name: Deploy ai
@@ -573,7 +576,7 @@ jobs:
             --service-account="$RUN_SA" --allow-unauthenticated \
             --port=8080 --cpu=1 --memory=512Mi \
             --min-instances=0 --max-instances=3 --concurrency=20 --timeout=300 \
-            --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},APP_ENV=${ENV_SUFFIX},APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL}" \
+            --update-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB},APPCONFIG_BASE_URL=${APPCONFIG_BASE_URL}" \
             --set-secrets="ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest" \
             --quiet
 
@@ -581,7 +584,7 @@ jobs:
         run: |
           for svc in appconfig ai; do
             url="$(gcloud run services describe "${svc}-${ENV_SUFFIX}" --region="$REGION" --format='value(status.url)')"
-            curl -fsS "$url/healthz" && echo " <- ${svc}-${ENV_SUFFIX} OK"
+            curl -fsS "$url/health" && echo " <- ${svc}-${ENV_SUFFIX} OK"
           done
 ```
 
@@ -596,29 +599,20 @@ jobs:
 
 ## 7. Step 5 ローカル開発
 
-### 5-1. Firestore / Auth エミュレータ
+### 5-1. Firestore エミュレータ
 
-Java 11+ が必要(手元は OpenJDK 26 で OK)。Firestore エミュレータの既定ポート 8080 は appconfig と衝突するので **8089** に変える。
+CI(`backend-emulator`)と同じ gcloud SDK の `cloud-firestore-emulator` を使う。firebase-tools と `firebase.json` は要らない。Java 11+ が必要(手元は OpenJDK 26 で OK)。既定ポート 8080 は appconfig と衝突するので **8089** で起動する。
 
-**☐ あなたがやる**: リポジトリ直下に `firebase.json` を作る(コミットして良い)
+**☐ あなたがやる**: `gcloud components install cloud-firestore-emulator`
 
-```json
-{
-  "emulators": {
-    "firestore": { "port": 8089 },
-    "auth": { "port": 9099 },
-    "ui": { "enabled": true, "port": 4000 },
-    "singleProjectMode": true
-  }
-}
-```
-
-**▶ 実行**(`demo-` で始まるプロジェクト ID はエミュレータ専用。実プロジェクトに絶対触らない)
+**▶ 実行**(プロジェクトは `demo-kz2601` 固定。`demo-` で始まるプロジェクト ID はエミュレータ専用で実プロジェクトに繋がらない)
 
 ```sh
-firebase emulators:start --only firestore,auth --project demo-kz2601
-# UI: http://localhost:4000
+make -C backend emulator         # 127.0.0.1:8089。表示される FIRESTORE_EMULATOR_HOST を export する
+make -C backend test-emulator    # エミュレータ試験(CI と同じ判定)
 ```
+
+Auth エミュレータは起動しない。`FIREBASE_AUTH_EMULATOR_HOST` は `AUTH_MODE=dev` で `X-Debug-Uid` を許す目印として使うだけ(接続はしない)。
 
 ### 5-2. ADC(実 GCP の Firestore / Secret をローカルから叩くとき)
 
@@ -649,7 +643,7 @@ ANTHROPIC_API_KEY=sk-ant-...        # ai を動かす時だけ。Secret Manager 
 ```sh
 cd backend && set -a && . ./.env && set +a && go run ./cmd/appconfig          # :8080
 cd backend && set -a && . ./.env && set +a && PORT=8081 go run ./cmd/ai       # :8081
-curl -s localhost:8080/healthz; echo; curl -s localhost:8081/healthz; echo
+curl -s localhost:8080/health; echo; curl -s localhost:8081/health; echo
 ```
 
 Docker で Cloud Run と同じイメージを試す:
@@ -714,11 +708,10 @@ gcloud run services update ai-prod --region="$REGION" --min-instances=0   # デ�
 
 - Firestore に暴走ループで書かないよう、ai 側は 1 リクエスト 1 パッチ(リトライ上限付き)で実装する。
 
-### 8-4. Claude / OpenAI 側の使用上限
+### 8-4. Claude 側の使用上限
 
 **☐ あなたがやる**
 - **Anthropic Console**: https://console.anthropic.com/ → Settings → **Limits**(組織の月間使用上限 / spend limit を設定できる画面。メニュー名は **要確認**)。ハッカソンなら $20〜30 程度で十分。Usage 画面で日次消費も見える。
-- **OpenAI**(使う場合): https://platform.openai.com/ → Settings → Limits → Monthly budget。
 - キーは Secret Manager にしか置かない。漏れた疑いがあれば Console で Revoke → `gcloud secrets versions add` → Cloud Run 再デプロイ(`gcloud run services update ai-stg --region=$REGION --update-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest` で新リビジョン)。
 
 ---
@@ -737,15 +730,15 @@ gcloud run services update ai-prod --region="$REGION" --min-instances=0   # デ�
 | 6 | Apple プロバイダ | https://console.firebase.google.com/project/`$PROJECT_ID`/authentication/providers | Apple が「有効」 |
 | 7 | iOS アプリ登録 | `firebase apps:list IOS` | Bundle ID が `$BUNDLE_ID` |
 | 8 | plist が ignore | `git check-ignore -v ios/App/GoogleService-Info.plist` | `.gitignore:…` が表示 |
-| 9 | Secret 存在 | `gcloud secrets list --format='value(name)'` | `ANTHROPIC_API_KEY`(+`OPENAI_API_KEY`) |
+| 9 | Secret 存在 | `gcloud secrets list --format='value(name)'` | `ANTHROPIC_API_KEY` |
 | 10 | Secret 権限 | `gcloud secrets get-iam-policy ANTHROPIC_API_KEY --format='value(bindings.members)'` | `serviceAccount:run-backend@…` |
-| 11 | appconfig-stg | `curl -s -o /dev/null -w '%{http_code}' $(gcloud run services describe appconfig-stg --region=$REGION --format='value(status.url)')/healthz` | `200` |
+| 11 | appconfig-stg | `curl -s -o /dev/null -w '%{http_code}' $(gcloud run services describe appconfig-stg --region=$REGION --format='value(status.url)')/health` | `200` |
 | 12 | ai-stg | 同上を `ai-stg` で | `200` |
 | 13 | ai にシークレット注入 | `gcloud run services describe ai-stg --region=$REGION --format='yaml(spec.template.spec.containers[0].env)'` | `ANTHROPIC_API_KEY` が `secretKeyRef` で載る |
 | 14 | 実行 SA | `gcloud run services describe ai-stg --region=$REGION --format='value(spec.template.spec.serviceAccountName)'` | `run-backend@…` |
 | 15 | WIF プロバイダ | `gcloud iam workload-identity-pools providers describe github --location=global --workload-identity-pool=github --format='value(state)'` | `ACTIVE` |
-| 16 | GitHub Variables | リポジトリ Settings → Actions → Variables | 5 つ揃っている |
-| 17 | CI デプロイ | `develop` へ push → Actions | `deploy-backend` 緑、Smoke test OK |
+| 16 | GitHub Variables | リポジトリ Settings → Actions → Variables | 4-3 の 4 つが揃っている |
+| 17 | CI デプロイ | `develop` へ push → Actions | `deploy-cloudrun` 緑、ヘルスチェック(`/health`)OK |
 | 18 | 予算 | `gcloud billing budgets list --billing-account=$BILLING_ACCOUNT --format='value(displayName)'` | `kz2601 monthly` |
 | 19 | エミュレータ | `firebase emulators:start --only firestore,auth --project demo-kz2601` | `All emulators ready` |
 | 20 | 実機サインイン | iPhone 13 で Sign in with Apple → Firebase コンソール Authentication → Users | ユーザーが 1 人増える |
@@ -761,7 +754,7 @@ gcloud run services update ai-prod --region="$REGION" --min-instances=0   # デ�
 | `projects create` が `The project ID you specified is already in use` | ID が他人に取られている | 別 ID。`PROJECT_ID` を更新して以降を続ける |
 | `gcloud run deploy --source` が Cloud Build の権限エラー(`…compute@developer.gserviceaccount.com does not have permission` 等) | 新規プロジェクトの Cloud Build は Compute 既定 SA で動く。既定 SA が無い/権限不足 | `compute.googleapis.com` を有効化(0-4)。それでも駄目なら `gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" --role="roles/cloudbuild.builds.builder"` |
 | `--source` で `cloud-run-source-deploy` の作成確認が出る | 初回のみ | `Y` |
-| `curl <run.app URL>/healthz` が Google の HTML 404(`Error 404 (Not Found)!!1`)。`/` や `/healthz/` は Go の `404 page not found` | `/healthz` が Google Front End に吸われてコンテナに届かない(2026-10-24 実測。リクエストログにも残らない) | ヘルスパスを `/health` 等に変更して再デプロイ。CI の Smoke test / ヘルスチェック step も同じパスに |
+| `curl <run.app URL>/healthz` が Google の HTML 404(`Error 404 (Not Found)!!1`)。`/` や `/healthz/` は Go の `404 page not found` | `/healthz` が Google Front End に吸われてコンテナに届かない(2026-10-24 実測。リクエストログにも残らない) | 解消済み: 今のヘルスパスは `/health`(CI のヘルスチェックも同じ)。`/healthz` を叩いていないか確認 |
 | Cloud Run が `Container failed to start… listen on PORT=8080` | バイナリが 8080 を聞いていない / `--command` のパス違い | `/app/appconfig` or `/app/ai`。ログ `gcloud run services logs read <svc> --region=$REGION` |
 | ai が起動時に `Permission denied on secret` | 2-3 の `secretAccessor` 未付与、または `--service-account` を付け忘れて既定 SA で動いている | チェックリスト 10・14 を確認して再デプロイ |
 | Firestore `databases create` が `already exists` / Datastore モードで作ってしまった | 1 プロジェクト 1 `(default)`。ロケーション・モードは後から変更不可 | 間違えたら `gcloud firestore databases delete --database='(default)'` して作り直す(データが空のうちに)。`--delete-protection` を付けていたら先に `databases update --no-delete-protection` |
@@ -786,17 +779,17 @@ gcloud run services update ai-prod --region="$REGION" --min-instances=0   # デ�
 
 | 種類 | 名前 |
 |---|---|
-| GCP プロジェクト | `jphacks-kz2601`(仮) |
+| GCP プロジェクト | `jphacks-kz2601`(prod。stg を別プロジェクトに分ける案は [infra/README.md](../../infra/README.md)) |
 | リージョン | `asia-northeast1` |
 | Cloud Run サービス | `appconfig-stg` / `ai-stg` / `appconfig-prod` / `ai-prod` |
-| 実行 SA | `run-backend@<PROJECT_ID>.iam.gserviceaccount.com` |
+| 実行 SA | `run-backend@<PROJECT_ID>.iam.gserviceaccount.com`(消去ジョブ用の `purge-job` / `purge-scheduler` は `infra/purge.tf`) |
 | デプロイ SA | `github-deployer@<PROJECT_ID>.iam.gserviceaccount.com` |
 | Artifact Registry | `asia-northeast1-docker.pkg.dev/<PROJECT_ID>/backend/backend:<sha>`(CI)、`…/cloud-run-source-deploy/…`(`--source` 自動作成) |
-| Secret | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`(任意) |
+| Secret | `ANTHROPIC_API_KEY` |
 | WIF | pool `github` / provider `github` |
 | Firebase iOS アプリ Bundle ID | `jp.kz2601.metamon` |
 | Apple | App ID = Bundle ID、Key(Sign in with Apple)、Services ID `jp.kz2601.metamon.signin`(Web 用・任意) |
 | エミュレータ用プロジェクト | `demo-kz2601` |
-| Cloud Run 環境変数 | `GOOGLE_CLOUD_PROJECT`, `APP_ENV`(`stg`/`prod`), `APPCONFIG_BASE_URL`(ai のみ), `ANTHROPIC_API_KEY`(Secret) |
+| Cloud Run 環境変数 | `GOOGLE_CLOUD_PROJECT`, `FIRESTORE_DATABASE`(既定 `(default)`), `APP_ENV`(`stg`/`prod`), `ALLOW_SHARED_PROD_DB`(stg=`1`・本番と DB を共有している間だけ), `APPCONFIG_BASE_URL`(ai のみ), `APP_CHECK_MODE`, `GIT_SHA`, `ANTHROPIC_API_KEY`(Secret)。一覧と運用で変える値は [runtime-config.md](runtime-config.md) |
 
-関連ファイル: `backend/Dockerfile`(両バイナリ同梱)、`backend/.gcloudignore`、`.gitignore`(plist / .p8 / .env を除外)。
+関連ファイル: `backend/Dockerfile`(appconfig / ai / purge を同梱)、`backend/.gcloudignore`、`.gitignore`(plist / .p8 / .env を除外)。

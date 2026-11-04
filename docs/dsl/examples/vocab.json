@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "英単語カード",
+    "description": "英単語の暗記カード。表に単語、タップでめくると意味が出る。右にスワイプで覚えた、左でまだ。覚えた単語は出題から外れる",
+    "icon": "rectangle.on.rectangle.angled",
+    "theme": { "primaryColor": "#3949AB" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "word",
+      "name": "単語",
+      "titleField": "term",
+      "fields": [
+        { "id": "term", "name": "単語", "type": "string", "required": true },
+        { "id": "meaning", "name": "意味", "type": "string", "required": true },
+        { "id": "learned", "name": "覚えた", "type": "boolean", "defaultValue": false }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "英単語カード",
+      "components": [
+        {
+          "type": "flashcards", "id": "cards", "area": "A1:F7",
+          "entity": "word", "front": "term", "back": "meaning", "toggle": "learned",
+          "filter": { "field": "learned", "op": "eq", "value": false }
+        },
+        {
+          "type": "list", "id": "words", "area": "A8:F10",
+          "entity": "word",
+          "item": { "title": "term", "subtitle": "meaning", "toggle": "learned" },
+          "sort": { "field": "term", "direction": "asc" },
+          "emptyText": "単語を追加してください",
+          "onItemTap": { "type": "navigate", "screen": "word_form", "presentation": "sheet" },
+          "swipeToDelete": true
+        },
+        { "type": "button", "id": "add", "area": "D11:F12", "label": "単語を追加", "icon": "plus",
+          "action": { "type": "navigate", "screen": "word_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "word_form",
+      "title": "単語",
+      "entity": "word",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "word" } }],
+      "components": [
+        {
+          "type": "section", "id": "what", "area": "A1:F6", "title": "単語",
+          "children": [
+            { "type": "textField", "field": "term", "label": "単語", "placeholder": "apple" },
+            { "type": "textField", "field": "meaning", "label": "意味", "placeholder": "りんご" },
+            { "type": "toggle", "field": "learned", "label": "覚えた" }
+          ]
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "word", "confirmMessage": "この単語を削除しますか？" } }
+      ]
+    }
+  ]
+}

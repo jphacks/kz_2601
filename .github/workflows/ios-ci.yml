@@ -10,9 +10,10 @@
 # 変更の判定(dorny/paths-filter)→ 回すもの:
 #   | 変わった場所                                  | ジョブ          | テスト                                                    |
 #   |-----------------------------------------------|-----------------|-----------------------------------------------------------|
-#   | ios/Packages/MetamonDSL/** だけ               | ios-dsl         | `swift test`(MetamonDSLTests)。アプリのビルド・シミュレータ無し |
+#   | ios/Packages/MetamonDSL/** だけ(*2)           | ios-dsl         | `swift test`(MetamonDSLTests)。アプリのビルド・シミュレータ無し |
 #   | MetamonDSL + 他の iOS 変更                    | ios-xcode       | DSL / Renderer / Services / MetamonTests(DSL は全員の依存) |
 #   | ios/Packages/MetamonRenderer/**               | ios-xcode       | MetamonRendererTests + MetamonTests                       |
+#   | docs/dsl/conformance/**・docs/dsl/examples/** | ios-xcode       | MetamonRendererTests(適合テスト #352)+ MetamonTests      |
 #   | ios/Packages/MetamonServices/**               | ios-xcode       | MetamonServicesTests + MetamonTests                       |
 #   | app(*1)                                       | ios-xcode       | MetamonTests                                              |
 #   | ios/MetamonUITests/** だけ                    | ios-xcode       | なし(build-for-testing でコンパイルだけ確認)              |
@@ -21,6 +22,7 @@
 #   | develop / main への push(上記のどれかが変更) | ios-xcode       | 全部(UI テスト MetamonUITests を含む)                    |
 #   (*1) ios/Metamon/**, ios/MetamonWidget/**, ios/MetamonTests/**, ios/project.yml, ios/StoreKit/**,
 #        docs/dsl/examples/**(アプリにバンドルされる)
+#   (*2) docs/dsl/conformance/expr/**(Expr の共有テストデータ・#545)も DSL の変更として扱う
 #   PR では常に -skip-testing:MetamonUITests(`ui-tests` ラベル時だけ UI テストも足す)。
 #
 # UI テスト(MetamonUITests)を PR で回したい時: PR に `ui-tests` ラベルを付けて、ios-ci の
@@ -43,7 +45,8 @@ on:
 
 concurrency:
   group: ios-ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # develop / main への push は取り消さない(最後まで通った実行を残す)。待ちは GitHub が最新の 1 本だけにまとめる
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -77,8 +80,13 @@ jobs:
           filters: |
             dsl:
               - 'ios/Packages/MetamonDSL/**'
+              - 'docs/dsl/conformance/expr/**'
+              - 'docs/dsl/dsl.schema.json'    # スキーマだけの変更でも SchemaSwiftKeysTests を回す(#537)
             renderer:
               - 'ios/Packages/MetamonRenderer/**'
+              # 適合テスト(#352)の case と期待値。examples も case の DSL に使う
+              - 'docs/dsl/conformance/**'
+              - 'docs/dsl/examples/**'
             services:
               - 'ios/Packages/MetamonServices/**'
             app:
@@ -344,6 +352,38 @@ jobs:
           path: ios/TestResults.xcresult
           retention-days: 3
 
+  # Swift の書式チェック(swift-format・設定は ios/.swift-format)。**今は非ブロッキング**:
+  # 既存コードに指摘が多いため、失敗しても ios-ci(required check)には影響させない(ios-ci の needs に入れない)。
+  # macOS は分単価が高いので、ubuntu + 公式 swift コンテナ(swift 6 系は `swift format` 同梱)で回す。
+  # ブロッキングにする時: 既存の指摘を `swift format --in-place` で一括整形する PR を先に入れてから、
+  #   1) lint に `--strict` を付ける 2) `continue-on-error` を外す 3) ios-ci の needs に ios-format を足す。
+  ios-format:
+    name: ios-format
+    needs: ios-changes
+    if: needs.ios-changes.outputs.mode != 'none'
+    runs-on: ubuntu-latest
+    container: swift:6.2
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: swift format lint(非ブロッキング)
+        working-directory: ios
+        run: |
+          set -u
+          swift format --version
+          swift format lint --recursive --parallel --configuration .swift-format \
+            Metamon MetamonWidget MetamonTests MetamonUITests Packages 2> lint.txt || true
+          n="$(grep -c 'warning:' lint.txt || true)"
+          echo "::notice::swift-format の指摘 ${n} 件(非ブロッキング)"
+          {
+            echo "### swift-format: ${n} 件(非ブロッキング)"
+            echo '```'
+            head -n 200 lint.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # required check。macOS ジョブがスキップでも成功、失敗/キャンセルなら失敗。
   ios-ci:
     name: ios-ci
@@ -352,7 +392,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
+      - uses: actions/checkout@v7
+
+      # キーの並びと書式を Xcode と揃える(末尾追記どうしのコンフリクト防止・#516)。ブロッキング
+      - name: xcstrings の整形チェック
+        run: git ls-files -z '*.xcstrings' | xargs -0 python3 ios/scripts/xcstrings-fmt.py --check
+
       - name: 結果を集約
+        if: always()
         env:
           CHANGES: ${{ needs.ios-changes.result }}
           DSL: ${{ needs.ios-dsl.result }}

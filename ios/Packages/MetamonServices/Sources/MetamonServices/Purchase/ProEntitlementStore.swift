@@ -69,6 +69,18 @@ public final class ProEntitlementStore {
     /// モックで動いているか(購入・復元が App Store に行かない)
     public private(set) var isMock = false
 
+    /// サーバーが返した Pro(#314)。nil = まだ送っていない / 送れなかった
+    public private(set) var serverEntitlements: ServerEntitlements?
+
+    /// 検証済みの取引を送る先(#314)。nil なら送らない(モック・appconfig が無い構成)
+    @ObservationIgnored public var server: (any EntitlementClient)?
+    /// いまの uid(購入の `appAccountToken`・送信済みの記録の鍵)
+    @ObservationIgnored public var accountUID: (@Sendable () -> String?)?
+    /// 送った取引(uid + JWS)。同じものを何度も送らない。失敗したものは入れない(次の起動・復元で送り直す)
+    @ObservationIgnored private var submitted: Set<String> = []
+    /// 送信中の処理(テストで待つ)
+    @ObservationIgnored public private(set) var serverSyncTask: Task<Void, Never>?
+
     public let productIDs: [String]
     public let mode: Mode
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
@@ -88,8 +100,12 @@ public final class ProEntitlementStore {
     }
 
     /// 起動時に 1 回。`Transaction.updates`(他端末での購入・更新・返金・Ask to Buy の確定)を監視し、現在の権利と商品を読む。
+    /// 2 回目以降(サインインし直して画面が作り直された時)は権利だけ読み直す(新しい uid でサーバーに送る・#314)。
     public func start() {
-        guard !started else { return }
+        guard !started else {
+            Task { await refreshEntitlements() }
+            return
+        }
         started = true
         updatesTask = Task { [weak self] in
             for await update in Transaction.updates {
@@ -131,12 +147,16 @@ public final class ProEntitlementStore {
             return
         }
         var active: (id: String, expires: Date?)?
+        var signed: [String] = []
         for await result in Transaction.currentEntitlements {
-            guard case .verified(let t) = result,
-                  ProEntitlement.isActive(productID: t.productID, revocationDate: t.revocationDate,
+            guard case .verified(let t) = result, productIDs.contains(t.productID) else { continue }
+            // Xcode の StoreKit 構成の取引は Apple の証明書で署名されていないので、サーバーは受け取らない
+            if t.environment != .xcode { signed.append(result.jwsRepresentation) }
+            guard ProEntitlement.isActive(productID: t.productID, revocationDate: t.revocationDate,
                                           expirationDate: t.expirationDate, productIDs: productIDs) else { continue }
             active = (t.productID, t.expirationDate)
         }
+        sendToServer(signed)
         isPro = active != nil
         activeProductID = active?.id
         expiresAt = active?.expires
@@ -144,7 +164,11 @@ public final class ProEntitlementStore {
     }
 
     public func purchase(_ product: Product) async throws -> PurchaseOutcome {
-        switch try await product.purchase() {
+        var options: Set<Product.PurchaseOption> = []
+        if let uid = accountUID?(), !uid.isEmpty {
+            options.insert(.appAccountToken(ProAccountToken.uuid(for: uid))) // #314: どの uid の購入か
+        }
+        switch try await product.purchase(options: options) {
         case .success(let verification):
             guard case .verified(let transaction) = verification else { throw StoreError.unverified }
             await transaction.finish()
@@ -180,6 +204,29 @@ public final class ProEntitlementStore {
     /// 課金画面の「Pro にする」(月額)。
     public func purchaseOffer() async throws -> PurchaseOutcome {
         try await purchase(productID: offer?.id ?? ProProducts.monthly)
+    }
+
+    /// 検証済みの取引(JWS)をサーバーに送る(#314)。購入・復元・起動・`Transaction.updates` のあと `refreshEntitlements` から呼ばれる。
+    /// 待たない(購入の完了をネットワークで遅らせない)。失敗はログだけで、次の機会に送り直す。
+    func sendToServer(_ signedTransactions: [String]) {
+        guard let server, !signedTransactions.isEmpty else { return }
+        let uid = accountUID?() ?? ""
+        let pending = signedTransactions.filter { !submitted.contains(uid + "|" + $0) }
+        guard !pending.isEmpty else { return }
+        let previous = serverSyncTask
+        serverSyncTask = Task { [weak self] in
+            await previous?.value
+            for jws in pending {
+                do {
+                    let result = try await server.submitAppleTransaction(jws)
+                    self?.submitted.insert(uid + "|" + jws)
+                    self?.serverEntitlements = result
+                    print("[Metamon] IAP server entitlement: isPro=\(result.isPro)")
+                } catch {
+                    print("[Metamon] IAP server sync failed: \(error)")
+                }
+            }
+        }
     }
 
     private func setMockEntitlement() {

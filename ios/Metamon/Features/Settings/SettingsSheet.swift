@@ -2,7 +2,7 @@ import SwiftUI
 import MetamonServices
 import MetamonRenderer
 
-/// 歯車から開く設定シート。アカウント・音声モデル・接続先・アプリのリセット。
+/// 歯車から開く設定シート。アカウント・音声モデル・アプリのリセット。uid・接続先などは「詳細(サポート用)」(#279)。
 struct SettingsSheet: View {
     @Environment(AppRuntime.self) private var rt
     @Environment(AuthSession.self) private var session
@@ -12,13 +12,23 @@ struct SettingsSheet: View {
     @State private var confirmDelete = false
     @State private var isDeleting = false
     @State private var deleteError: String?
+    @State private var showSupportDetails = false
+    @State private var copiedSupportInfo = false
+    #if !APP_STORE_REVIEW
+    @State private var feedback: FeedbackContext? // #319
+    #endif
 
     var body: some View {
         NavigationStack {
             List {
                 if Self.e2eDeleteAccount { deleteAccountSection } // E2E: 削除ボタンを画面内に出す(シミュレータはスクロール操作できない)
                 accountSection
+                #if !APP_STORE_REVIEW // 審査用ビルドは共有を外しているので、投稿に出す名前も出さない(#247)
                 AuthorNameSettingsSection() // 共有アプリの投稿に出す名前(#250)
+                #endif
+                #if !APP_STORE_REVIEW // 審査用ビルドはシェアを外す(#245)
+                BlockedUsersSettingsSection() // ブロック中のユーザー(#321)
+                #endif
                 #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
                 ProSettingsSection() // 課金(#77)
                 #endif
@@ -28,9 +38,14 @@ struct SettingsSheet: View {
                 speechSection
                 appSection
                 if !rt.dsl.app.notifications.isEmpty { notificationSection }
+                RetentionSettingsSection() // #482 記録の自動削除
                 syncSection
+                #if !APP_STORE_REVIEW // 審査用ビルドはフィードバックを外す(プライバシーの表示に無い種類を集めるため・#319)
+                if rt.canOpenBetaWelcome { betaWelcomeSection } // #313: β の版だけ
+                feedbackSection
+                #endif
                 PrivacySettingsSection() // #246: AI への送信の同意・プライバシーポリシー・利用規約
-                connectionSection
+                supportSection
                 if !Self.e2eDeleteAccount { deleteAccountSection }
             }
             .navigationTitle("設定")
@@ -70,6 +85,11 @@ struct SettingsSheet: View {
             }
         }
         .interactiveDismissDisabled(isDeleting)
+        #if !APP_STORE_REVIEW
+        .sheet(item: $feedback) { ctx in
+            FeedbackComposerView(context: ctx, client: services.feedback) { feedback = nil }
+        }
+        #endif
         #if DEBUG
         // ヘッドレス E2E 用(#119): `METAMON_E2E_DELETE_ACCOUNT=<秒>` で、その秒数後に確認ダイアログ → さらに 4 秒後に「削除する」
         .task {
@@ -129,16 +149,9 @@ struct SettingsSheet: View {
                         .font(.title2)
                         .foregroundStyle(Theme.brandGradient)
                         .frame(width: 36)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(user.isAnonymous ? L10n.tr("匿名ユーザー") : L10n.tr("Apple でサインイン済み"))
-                            .font(.body.weight(.medium))
-                        Text("uid \(user.uid)")
-                            .font(.caption2.monospaced())
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .textSelection(.enabled)
-                    }
+                    Text(SupportInfo.accountStatus(isAnonymous: user.isAnonymous))
+                        .font(.body.weight(.medium))
+                        .accessibilityIdentifier("settings.accountStatus")
                 }
                 if user.isAnonymous {
                     // #276: uid を保ったまま Apple に昇格(作ったアプリとデータはそのまま)
@@ -159,7 +172,8 @@ struct SettingsSheet: View {
             Text("アカウント")
         } footer: {
             if session.user?.isAnonymous == true {
-                Text("Apple でサインインすると、作ったアプリとデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、作ったアプリに戻れません。")
+                Text(L10n.key("Apple でサインインすると、作ったアプリとデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、作ったアプリに戻れません。",
+                               review: "Apple でサインインすると、用意した記録帳とデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、用意した記録帳に戻れません。"))
             }
         }
     }
@@ -182,7 +196,6 @@ struct SettingsSheet: View {
 
     private var voiceModelSection: some View {
         Section("音声モデル(オンデバイス)") {
-            LabeledContent("モデル", value: BuildConfig.whisperModel)
             LabeledContent("状態") {
                 HStack(spacing: Theme.Spacing.sm) {
                     Circle().fill(statusColor).frame(width: 8, height: 8)
@@ -264,9 +277,38 @@ struct SettingsSheet: View {
         } header: {
             Text(L10n.key("アプリ", review: "今の記録帳"))
         } footer: {
-            Text(L10n.tr("現在: \(rt.dsl.app.name)(v\(rt.document.version))") + (rt.isOffline ? L10n.tr("・オフライン(キャッシュ表示)") : "") + "\n" + L10n.pick(L10n.tr("「元に戻して」と話しても同じ。「別のアプリ。…」と話すと新しいアプリとして作ります。"), review: L10n.tr("「元に戻して」と話しても同じです。")))
+            Text(L10n.tr("現在: \(rt.dsl.app.name)") + (rt.isOffline ? L10n.tr("・オフライン(キャッシュ表示)") : "") + "\n" + L10n.pick(L10n.tr("「元に戻して」と話しても同じ。「別のアプリ。…」と話すと新しいアプリとして作ります。"), review: L10n.tr("「元に戻して」と話しても同じです。")))
         }
     }
+
+    #if !APP_STORE_REVIEW
+    /// β の案内(#313)。β(TestFlight)の版でだけ出す。
+    private var betaWelcomeSection: some View {
+        Section {
+            Button {
+                dismiss()
+                rt.openBetaWelcome()
+            } label: {
+                Label("β 版のご案内", systemImage: "testtube.2")
+            }
+            .accessibilityIdentifier("settings.betaWelcome")
+        }
+    }
+
+    /// フィードバック(#319)。スクショはシートの下のアプリの画面を、開いた時点で撮る(送るかは本人が選ぶ)。
+    private var feedbackSection: some View {
+        Section {
+            Button {
+                feedback = FeedbackContext.capture(runtime: rt, screenshot: FeedbackScreenshot.captureAppScreen())
+            } label: {
+                Label("フィードバックを送る", systemImage: "envelope")
+            }
+            .accessibilityIdentifier("settings.feedback")
+        } footer: {
+            Text("端末を振っても開けます。何を送るかは送る前に選べます。")
+        }
+    }
+    #endif
 
     /// このアプリの次の通知(#228): 予約が本当に入っているかをここで確かめられる。
     private var notificationSection: some View {
@@ -339,13 +381,53 @@ struct SettingsSheet: View {
         }
     }
 
-    private var connectionSection: some View {
-        Section("接続先") {
-            LabeledContent("ai", value: services.ai is MockAIClient ? L10n.tr("モック") : (BuildConfig.aiBaseURL?.host() ?? "live"))
-            LabeledContent("appconfig", value: services.isLive ? (BuildConfig.appConfigBaseURL?.host() ?? "live") : L10n.tr("インメモリ"))
-            LabeledContent("バージョン", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "-")
+    /// 問い合わせ用の識別子(#279)。1 画面目に英数字の識別子を出さないよう、既定で畳む。
+    private var supportSection: some View {
+        let info = supportInfo
+        return Section {
+            Link(destination: LegalDocument.contactURL) { // 審査用の版にも出す(サポートの窓口)
+                Label("お問い合わせ", systemImage: "envelope")
+            }
+            .font(.body)
+            .accessibilityIdentifier("settings.contact")
+            DisclosureGroup(isExpanded: $showSupportDetails) {
+                ForEach(info.rows, id: \.label) { row in
+                    LabeledContent(row.label) {
+                        Text(verbatim: row.value)
+                            .font(.footnote.monospaced())
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
+                    }
+                }
+                Button {
+                    UIPasteboard.general.string = info.clipboardText
+                    copiedSupportInfo = true
+                } label: {
+                    Label(copiedSupportInfo ? L10n.tr("コピーしました") : L10n.tr("詳細をコピー"),
+                          systemImage: copiedSupportInfo ? "checkmark" : "doc.on.doc")
+                }
+                .accessibilityIdentifier("settings.supportDetails.copy")
+            } label: {
+                Text("詳細(サポート用)")
+            }
+            .accessibilityIdentifier("settings.supportDetails")
+        } footer: {
+            if showSupportDetails { Text("問い合わせの時は、この内容を伝えてください。") }
         }
         .font(.footnote)
+    }
+
+    private var supportInfo: SupportInfo {
+        let bundle = Bundle.main
+        return SupportInfo(
+            uid: session.user?.uid,
+            voiceModel: BuildConfig.whisperModel,
+            aiEndpoint: services.ai is MockAIClient ? L10n.tr("モック") : (BuildConfig.aiBaseURL?.host() ?? "live"),
+            appConfigEndpoint: services.isLive ? (BuildConfig.appConfigBaseURL?.host() ?? "live") : L10n.tr("インメモリ"),
+            appVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "-",
+            build: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "-",
+            appRevision: rt.document.version)
     }
 
     private var statusText: String {
