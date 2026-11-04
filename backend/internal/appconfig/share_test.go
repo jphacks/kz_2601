@@ -253,9 +253,15 @@ func TestSharePage(t *testing.T) {
 // ownerStores runs f against Memory and, when FIRESTORE_EMULATOR_HOST is set,
 // against the Firestore emulator (ids get a per-run suffix there).
 func ownerStores(t *testing.T, f func(t *testing.T, e *env, sfx string)) {
+	storeEnvs(t, func(t *testing.T, e *env, _ store.Store, sfx string) { f(t, e, sfx) })
+}
+
+// storeEnvs is ownerStores that also hands f the store behind e.
+func storeEnvs(t *testing.T, f func(t *testing.T, e *env, st store.Store, sfx string)) {
 	t.Run("memory", func(t *testing.T) {
 		t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
-		f(t, &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(store.NewMemory()))}, "")
+		st := store.NewMemory()
+		f(t, &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(st))}, st, "")
 	})
 	t.Run("firestore", func(t *testing.T) {
 		if os.Getenv("FIRESTORE_EMULATOR_HOST") == "" {
@@ -267,7 +273,7 @@ func ownerStores(t *testing.T, f func(t *testing.T, e *env, sfx string)) {
 		}
 		t.Cleanup(func() { _ = st.Close() })
 		t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
-		f(t, &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(st))}, "-"+strconv.FormatInt(time.Now().UnixNano(), 36))
+		f(t, &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(st))}, st, "-"+strconv.FormatInt(time.Now().UnixNano(), 36))
 	})
 }
 
