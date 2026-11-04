@@ -7,7 +7,11 @@ import MetamonServices
 /// 変身一覧のアプリ 1 件。「Tailor It で家計簿を開く」の `家計簿`。
 /// DSL は変えない: アプリを作れば `GET /v1/apps` に出て、そのままここに出る。
 struct TailorAppEntity: AppEntity {
+    #if APP_STORE_REVIEW // 審査用の版は記録帳と言う(#247)
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "記録帳"
+    #else
     static var typeDisplayRepresentation: TypeDisplayRepresentation = "アプリ"
+    #endif
     static var defaultQuery = TailorAppQuery()
 
     var id: String

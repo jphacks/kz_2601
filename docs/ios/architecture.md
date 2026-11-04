@@ -1036,7 +1036,7 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 | プレビューの無い import・「探す」の公開アプリのインストール | import / install の後(`InstalledApp.joined / member`) | そのアプリに切り替えない(一覧には残る) |
 | 新規作成の無料枠 | 生成の前(`admitNewApp`) | 送らない。圏外の保留の自動送信・状態カードの再送も枠を通す(`sendMetered`) |
 
-- 課金画面の中身: 見出し(理由ごと)・なぜ有料か・プラン名 / 期間 / 価格(`ProOffer`)・購入・復元・閉じたらどうなるか・Pro でできること・自動更新の説明・利用規約 / プライバシーポリシー(`LegalDocumentLink`。公開 URL が決まるまでは同梱文書)。
+- 課金画面の中身: 見出し(理由ごと)・なぜ有料か・プラン名 / 期間 / 価格(`ProOffer`)・購入・復元・閉じたらどうなるか・Pro でできること・自動更新の説明・利用規約 / プライバシーポリシー(`LegalDocumentLink`。同梱文書を開き、その画面から公開ページ https://tailor-it.app/terms ・ /privacy も開ける)。
 - 出す場所: 確認カードの課金画面は `ClarifyChatView`(音声シートの中にも重ねられる・placement `.chat`)、それ以外は `PaywallHost`(placement `.root`。音声シートは閉じてから出す)。
 - オンデバイスの `aiButton`(§18)はサーバーを使わないので無料。
 - 課金の制限の無効化(DEBUG の既定・22.4)中は、回数も有料機能も課金画面を出さない。設定のトグル名は「課金の制限を無効にする(デモ用・回数と有料機能)」。
