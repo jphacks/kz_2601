@@ -181,3 +181,4 @@ grep -l '"scope" *: *"\(public\|shared\)"' "$APP"/*.json
 - **審査用の版に戻す場合**(例: v1.1 で「探す」を戻す)
   - `#if` を外す。
   - **通報・ブロック・フィルタなど、審査で求められるものを先に入れてから**、新しい版として審査に出す。審査の後でフラグを切り替えるだけ、はしない(2.5.19)。
+  - 戻す順番と、1 機能ずつ出す・却下で外して出し直す手順は [`../release/feature-resubmission-plan.md`](../release/feature-resubmission-plan.md)(#334)。
