@@ -125,6 +125,27 @@ type Commit struct {
 	Name        string // app name to set (dsl.app.name); "" keeps
 	Patch       []dsl.PatchOp
 	Source      *Source
+	// Events are outbox events stored in the same transaction (#342:
+	// rules_changed). An event with Version 0 gets the new version. nil
+	// stores nothing (the commit costs what it did before).
+	Events []OutboxEvent
+}
+
+// commitEvents gives c's events the new version n and validates them.
+func commitEvents(c Commit, n int, now time.Time) ([]OutboxEvent, error) {
+	if len(c.Events) == 0 {
+		return nil, nil
+	}
+	events := append([]OutboxEvent(nil), c.Events...)
+	for i := range events {
+		if events[i].Version == 0 {
+			events[i].Version = n
+		}
+	}
+	if err := prepareOutbox(events, now); err != nil {
+		return nil, err
+	}
+	return events, nil
 }
 
 // Store is what the handlers depend on. All methods are scoped by uid.
@@ -170,6 +191,7 @@ type Store interface {
 	Moderation      // reports, blocks, operator unpublish (moderation.go, #321)
 	Matching        // interests and matches of matching apps (matching.go, #507)
 	Outbox          // record writes that queue runner triggers (outbox.go, #341)
+	Schedules       // runner schedules and per-app state (schedule.go, #342)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).

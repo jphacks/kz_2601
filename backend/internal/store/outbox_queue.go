@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -44,6 +45,7 @@ type OutboxQueue interface {
 	// still at attempt (else ErrLeaseLost).
 	FinishOutbox(ctx context.Context, env, eventID string, attempt int, res OutboxResult) error
 	// RetryOutbox sets availableAt = at, status retry and lastError, when
-	// the event is still at attempt (else ErrLeaseLost).
-	RetryOutbox(ctx context.Context, env, eventID string, attempt int, at time.Time, lastError string) error
+	// the event is still at attempt (else ErrLeaseLost). A non-nil charge
+	// replaces the stored one (nil keeps it).
+	RetryOutbox(ctx context.Context, env, eventID string, attempt int, at time.Time, lastError string, charge json.RawMessage) error
 }

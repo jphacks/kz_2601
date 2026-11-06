@@ -378,6 +378,15 @@ func (f *Firestore) CommitVersion(ctx context.Context, uid, appID string, c Comm
 		if err := tx.Create(ref.Collection("versions").Doc(VersionDocID(n)), vd); err != nil {
 			return err
 		}
+		events, err := commitEvents(c, n, now)
+		if err != nil {
+			return err
+		}
+		for i := range events {
+			if err := tx.Create(f.outboxCol(events[i].Env).Doc(events[i].EventID), toOutboxDoc(&events[i])); err != nil {
+				return err
+			}
+		}
 		out = &Version{AppID: appID, Version: n, ParentVersion: cur, DSL: c.DSL, Patch: c.Patch, Source: c.Source, CreatedAt: now}
 		return nil
 	})
