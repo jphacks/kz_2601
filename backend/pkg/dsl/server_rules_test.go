@@ -143,9 +143,11 @@ func TestServerRulesRejects(t *testing.T) {
 		{"hourly", func(a *App) { a.ServerRules[3].On.Every = "hourly" }, "daily, weekly or monthly"},
 		{"deleted", func(a *App) { a.ServerRules[0].On.Record = "deleted" }, "created or updated"},
 		// condition
-		{"agg in condition", func(a *App) {
-			a.ServerRules[0].If = expr(t, `{"op":"gt","args":[{"agg":"count","entity":"rsvps"},3]}`)
-		}, "agg is not available in server rules"},
+		{"agg in condition on the other side", func(a *App) {
+			a.Entities[3].Scope = ""
+			a.ServerRules[2].Do = a.ServerRules[2].Do[:1]
+			a.ServerRules[0].If = expr(t, `{"op":"gt","args":[{"agg":"count","entity":"log"},3]}`)
+		}, "agg reads only records on the same side"},
 		{"condition not boolean", func(a *App) { a.ServerRules[0].If = expr(t, `{"ref":"answer"}`) }, "must be true/false"},
 		{"unknown field in condition", func(a *App) { a.ServerRules[0].If = expr(t, `{"ref":"ghost"}`) }, `ref "ghost" is not a field`},
 		{"prev on created", func(a *App) {
