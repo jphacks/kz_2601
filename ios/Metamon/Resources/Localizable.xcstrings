@@ -732,6 +732,23 @@
         }
       }
     },
+    "AI に送る内容の説明を改めました。もう一度ご確認ください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We've updated what is sent to the AI. Please review it again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI に送る内容の説明を改めました。もう一度ご確認ください。"
+          }
+        }
+      }
+    },
     "AI へのデータ送信" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1901,6 +1918,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」を複製できませんでした: %@"
+          }
+        }
+      }
+    },
+    "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI が使える時は送りません。使えない時だけ、押した時に、最近の記録と入力中の文字(最大 4KB)を送ります。写真・音声・動画は送りません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Write with AI\" buttons (write, summarize, classify, rewrite, extract, suggest) send nothing when on-device AI is available. Only when it is not, tapping one sends recent records and the text being entered (up to 4KB). Photos, audio and video are never sent."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI が使える時は送りません。使えない時だけ、押した時に、最近の記録と入力中の文字(最大 4KB)を送ります。写真・音声・動画は送りません。"
+          }
+        }
+      }
+    },
+    "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI だけで動き、何も送りません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Write with AI\" buttons (write, summarize, classify, rewrite, extract, suggest) run only with on-device AI and send nothing."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI だけで動き、何も送りません。"
           }
         }
       }
@@ -4472,19 +4523,19 @@
         }
       }
     },
-    "アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、アプリの「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。" : {
+    "アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "When you build or edit an app, the contents of your records (numbers, notes, photos, etc.) are not sent. However, if an app's \"Write with AI\" button uses the server AI, pressing it sends that app's recent records and the text being entered, only to write that text (photos, audio and video are not sent). Without consent you can still view and record in your apps; only AI features are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled)."
+            "value" : "When you build or edit an app, the contents of your records (numbers, notes, photos, etc.) are not sent."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、アプリの「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"
+            "value" : "アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。"
           }
         }
       }
@@ -4506,19 +4557,19 @@
         }
       }
     },
-    "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録も送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。" : {
+    "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、端末の中の AI が使えない時だけ、押した時に最近の記録と入力中の文字(最大 4KB)を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "When you build or edit an app, what you said, the conversation and the app design are sent to Anthropic's AI (the contents of your records are not). If a \"Write with AI\" button uses the server AI, pressing it also sends that app's recent records. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
+            "value" : "When you build or edit an app, what you said, the conversation and the app design are sent to Anthropic's AI (the contents of your records are not). \"Write with AI\" buttons send recent records and the text being entered (up to 4KB) only when tapped and only if on-device AI is unavailable. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録も送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
+            "value" : "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、端末の中の AI が使えない時だけ、押した時に最近の記録と入力中の文字(最大 4KB)を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
           }
         }
       }
@@ -8433,6 +8484,23 @@
         }
       }
     },
+    "削除しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleted"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除しました"
+          }
+        }
+      }
+    },
     "削除する" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9024,6 +9092,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "同意して使う"
+          }
+        }
+      }
+    },
+    "同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Without consent you can still view and record in your apps; only AI features are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"
+          }
+        }
+      }
+    },
+    "同意しなくても、記録帳の閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Without consent you can still view and record in your trackers; only AI features are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意しなくても、記録帳の閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"
           }
         }
       }
@@ -12377,19 +12479,19 @@
         }
       }
     },
-    "記録帳を用意する・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、記録帳の「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、その記録帳の最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、記録帳の閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。" : {
+    "記録帳を用意する・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "When you set up or adjust a tracker, the contents of your records (numbers, notes, photos, etc.) are not sent. However, if a tracker's \"Write with AI\" button uses the server AI, pressing it sends that tracker's recent records and the text being entered, only to write that text (photos, audio and video are not sent). Without consent you can still view and record in your trackers; only AI features are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled)."
+            "value" : "When you set up or adjust a tracker, the contents of your records (numbers, notes, photos, etc.) are not sent."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "記録帳を用意する・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、記録帳の「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、その記録帳の最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、記録帳の閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"
+            "value" : "記録帳を用意する・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。"
           }
         }
       }
@@ -12411,19 +12513,19 @@
         }
       }
     },
-    "記録帳を用意する・直すときは、話した内容・会話・記録帳の画面の形を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、その記録帳の最近の記録も送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。" : {
+    "記録帳を用意する・直すときは、話した内容・会話・記録帳の画面の形を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは端末の中の AI だけで動き、送りません。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "When you set up or adjust a tracker, what you said, the conversation and the tracker's layout are sent to Anthropic's AI (the contents of your records are not). If a \"Write with AI\" button uses the server AI, pressing it also sends that tracker's recent records. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
+            "value" : "When you set up or adjust a tracker, what you said, the conversation and the tracker's layout are sent to Anthropic's AI (the contents of your records are not). \"Write with AI\" buttons run only with on-device AI and send nothing. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "記録帳を用意する・直すときは、話した内容・会話・記録帳の画面の形を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、その記録帳の最近の記録も送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
+            "value" : "記録帳を用意する・直すときは、話した内容・会話・記録帳の画面の形を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは端末の中の AI だけで動き、送りません。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
           }
         }
       }
@@ -13176,19 +13278,19 @@
         }
       }
     },
-    "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作るためだけに使います。" : {
+    "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作るためだけに使います。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Destination: Anthropic, PBC (USA), via Tailor It's server (Google Cloud). It is used only to build your app."
+            "value" : "Destination: Anthropic, PBC (USA), via Tailor It's server (Google Cloud). It is used only to build your app or to write a button's text."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作るためだけに使います。"
+            "value" : "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作るためだけに使います。"
           }
         }
       }
@@ -14090,6 +14192,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音声を聞き取れませんでした%@。もう一度はっきり話してください"
+          }
+        }
+      }
+    },
+    "音声を聞き取れませんでした。もう一度はっきり話してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not catch what you said. Please speak clearly and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声を聞き取れませんでした。もう一度はっきり話してください"
           }
         }
       }

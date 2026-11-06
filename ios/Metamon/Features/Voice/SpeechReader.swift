@@ -1,5 +1,6 @@
 import AVFoundation
 import Observation
+import MetamonRenderer
 
 /// 挨拶・生成完了の summary・生成前の対話(AI の質問)を読み上げる(#43)。
 ///
@@ -65,6 +66,7 @@ final class SpeechReader: NSObject, AVSpeechSynthesizerDelegate {
     /// マイクタップ時: 即停止し、録音が終わるまで読み上げを抑止する。止まり切るまで最大 0.3 秒待つ(TTS の尾をマイクが拾わないように)。
     func stopForRecording() async {
         micBusy = true
+        LeafSpeech.shared.stopForRecording() // 生成したアプリの speakButton も止める
         guard synthesizer.isSpeaking else { return }
         synthesizer.stopSpeaking(at: .immediate)
         print("[Metamon] speech: stop (mic tapped)")
@@ -76,6 +78,7 @@ final class SpeechReader: NSObject, AVSpeechSynthesizerDelegate {
     /// 録音終了(成功・失敗とも)。読み上げの抑止を解く。
     func recordingFinished() {
         micBusy = false
+        LeafSpeech.shared.recordingFinished()
     }
 
     /// 指定言語の最高品質ボイス(premium > enhanced > default)。無ければ言語指定のみ。

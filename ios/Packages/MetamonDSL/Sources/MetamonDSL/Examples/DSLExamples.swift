@@ -22,6 +22,7 @@ public enum DSLExamples {
             "diary_ai",
             "ai_ideas",
             "medicine",
+            "file_import",
             "attendance_nearby",
             "water",
             "walk_route",
