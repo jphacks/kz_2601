@@ -5,7 +5,9 @@
         "entity" : "sketch",
         "readOnly" : false,
         "recordId" : null,
-        "values" : {}
+        "values" : {
+
+        }
       },
       "id" : "form",
       "layout" : "form",
@@ -51,7 +53,9 @@
         "stack" : "main"
       },
       "title" : "スケッチ",
-      "toolbar" : []
+      "toolbar" : [
+
+      ]
     }
   ]
 }
