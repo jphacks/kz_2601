@@ -13,7 +13,8 @@ var calendarRules = strings.TrimSpace(`
 - 「前日に知らせて」「30 分前に通知」はカレンダー側の通知 alertMinutes(1440 / 30)。アプリのローカル通知(app.notifications)と二重にしない(どちらか片方。端末のカレンダーに入れる依頼なら alertMinutes)。
 - 一覧から入れたい時は、一覧の行を開く(navigate)フォームに上のボタンを置く(onItemTap を addToCalendar にすると編集が開けなくなる)。
 - 既存アプリへの「カレンダーにも入れられるようにして」は、その entity のフォーム画面に上のボタンを add する(entity は作り直さない)。日付の field が無ければ datetime の field を add してから。
-- アラーム(止めるまで鳴り続ける目覚まし)・他のアプリの利用時間の取得・スクリーンタイムの制限は作れない。目覚ましは時刻指定のローカル通知、制限は自分で記録する形にして、summary で正直に伝える。
+- カレンダーは予定の登録だけ。目覚まし・「止めるまで鳴らして」は addToCalendar の alertMinutes ではなく、通知の alarm: true(「止めるまで鳴るアラーム(alarm)」の節)を使う。予定を入れつつ起こしてほしい時は両方。
+- 他のアプリの利用時間の取得・スクリーンタイムの制限は作れない。制限は自分で記録する形にして、summary で正直に伝える。
 `)
 
 func init() { systemPrompt += "\n\n" + calendarRules }
