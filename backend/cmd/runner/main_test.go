@@ -135,3 +135,30 @@ func TestSerialBusy(t *testing.T) {
 		t.Fatalf("calls: %d", ft.calls.Load())
 	}
 }
+
+func TestNotifyPausedAndAutoPauseFromEnv(t *testing.T) {
+	if !flagFromEnv(envMap(map[string]string{"RUNNER_NOTIFY_PAUSED": "on"}), "RUNNER_NOTIFY_PAUSED")() {
+		t.Fatal("RUNNER_NOTIFY_PAUSED=on")
+	}
+	if flagFromEnv(envMap(nil), "RUNNER_NOTIFY_PAUSED")() {
+		t.Fatal("unset is not paused")
+	}
+	if a, err := autoPauseFromEnv(envMap(nil)); err != nil || a.Reporters != 0 || a.For != 0 {
+		t.Fatalf("defaults: %+v %v", a, err)
+	}
+	a, err := autoPauseFromEnv(envMap(map[string]string{"RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS": "5", "RUNNER_AUTO_NOTIFY_PAUSE_FOR": "24h"}))
+	if err != nil || a.Reporters != 5 || a.For != 24*time.Hour {
+		t.Fatalf("set: %+v %v", a, err)
+	}
+	if a, err := autoPauseFromEnv(envMap(map[string]string{"RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS": "0"})); err != nil || a.Reporters >= 0 {
+		t.Fatalf("0 = off: %+v %v", a, err)
+	}
+	for _, bad := range []map[string]string{
+		{"RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS": "-1"}, {"RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS": "x"},
+		{"RUNNER_AUTO_NOTIFY_PAUSE_FOR": "10m"}, {"RUNNER_AUTO_NOTIFY_PAUSE_FOR": "x"},
+	} {
+		if _, err := autoPauseFromEnv(envMap(bad)); err == nil {
+			t.Fatalf("%v accepted", bad)
+		}
+	}
+}

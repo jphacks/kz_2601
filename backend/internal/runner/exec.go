@@ -34,11 +34,12 @@ const RunEvent = "runner.run"
 // counted (refunded if the event gives up).
 func (r *Runner) process(ctx context.Context, ev store.OutboxEvent) (map[string]string, quota.Charge, error) {
 	var none quota.Charge
+	stopLevel := ""
 	all := func(outcome, reason string) map[string]string {
 		out := make(map[string]string, len(ev.RuleIDs))
 		for _, id := range ev.RuleIDs {
 			out[id] = outcome
-			r.logRun(ctx, ev, runLog{ruleID: id, outcome: outcome, reason: reason})
+			r.logRun(ctx, ev, runLog{ruleID: id, outcome: outcome, reason: reason, stopLevel: stopLevel})
 			r.cfg.Quota.LogUsage(ctx, quota.Usage{AppID: ev.AppID, ActorUID: ev.ActorUID, RuleID: id, Trigger: triggerName(ev.Kind), Outcome: outcome})
 		}
 		return out
@@ -46,6 +47,14 @@ func (r *Runner) process(ctx context.Context, ev store.OutboxEvent) (map[string]
 	// stopping takes effect at once, whatever the version (#337)
 	if r.cfg.Paused() {
 		return all(quota.OutcomeSkippedPaused, ""), none, nil
+	}
+	st, err := r.stopsFor(ctx, ev)
+	if err != nil {
+		return nil, none, err
+	}
+	if st.app != nil {
+		stopLevel = StopLevelApp
+		return all(OutcomeSkippedStopped, ReasonOperatorStop), none, nil
 	}
 	if ev.Kind == store.OutboxSchedule && schedule.IsLate(ev.DueAt, r.cfg.Now(), r.cfg.MaxLate) {
 		return all(OutcomeSkippedLate, ""), none, nil
@@ -102,7 +111,11 @@ func (r *Runner) process(ctx context.Context, ev store.OutboxEvent) (map[string]
 			r.logRun(ctx, ev, runLog{ruleID: id, outcome: OutcomeSkippedStopped, reason: ReasonRuleRemoved})
 			continue
 		}
-		o, charge, err := r.runRule(ctx, h, ev, app, rule, trig, creator)
+		if st.rules[id] {
+			out[id] = r.ruleStopped(ctx, ev, rule)
+			continue
+		}
+		o, charge, err := r.runRule(ctx, h, ev, app, rule, trig, creator, st.notify)
 		if err != nil {
 			return nil, charge, fmt.Errorf("rule %s: %w", id, err)
 		}
@@ -233,7 +246,10 @@ func orEmpty(m map[string]any) map[string]any {
 
 // runRule counts, plans, writes and notifies one rule. On error, charge is
 // what this run counted so far (kept with the event for a refund).
-func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEvent, app *dsl.App, rule *dsl.ServerRule, trig engine.Trigger, creator string) (outcome string, charge quota.Charge, err error) {
+// notifyPaused (NotifyPaused*, "" = not paused): the rule runs and writes
+// but sends nothing; each skipped notification is marked done so a retry
+// does not send it after the pause.
+func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEvent, app *dsl.App, rule *dsl.ServerRule, trig engine.Trigger, creator, notifyPaused string) (outcome string, charge quota.Charge, err error) {
 	start := time.Now()
 	run := quota.Run{
 		AppID: ev.AppID, CreatorUID: creator, Shared: h.Shared(), ActorUID: ev.ActorUID, Attempt: ev.Attempts,
@@ -307,6 +323,13 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 			return fail(err)
 		}
 		if done {
+			continue
+		}
+		if notifyPaused != "" {
+			if err := h.Mark(ctx, key); err != nil {
+				return fail(err)
+			}
+			rl.notifyPaused, rl.notifiesSkipped = notifyPaused, rl.notifiesSkipped+1
 			continue
 		}
 		res, err := resolver.Resolve(ctx, trig, n)
@@ -427,12 +450,16 @@ func (l recipientLimiter) Limit(ctx context.Context, uids []string) ([]string, [
 }
 
 type runLog struct {
-	ruleID        string
-	outcome       string
-	reason        string
-	writesSkipped int
-	notifies      []notify.Summary
-	took          time.Duration
+	ruleID       string
+	outcome      string
+	reason       string
+	stopLevel    string // StopLevel* of an operator_stop
+	notifyPaused string // NotifyPaused* when notifications were not sent
+	// notifiesSkipped: notify actions not sent because of notifyPaused
+	notifiesSkipped int
+	writesSkipped   int
+	notifies        []notify.Summary
+	took            time.Duration
 }
 
 // logRun writes one runner.run line.
@@ -451,6 +478,12 @@ func (r *Runner) logRun(ctx context.Context, ev store.OutboxEvent, l runLog) {
 	}
 	if l.reason != "" {
 		attrs = append(attrs, slog.String("reason", l.reason))
+	}
+	if l.stopLevel != "" {
+		attrs = append(attrs, slog.String("stop_level", l.stopLevel))
+	}
+	if l.notifyPaused != "" {
+		attrs = append(attrs, slog.String("notify_paused", l.notifyPaused), slog.Int("notifies_skipped", l.notifiesSkipped))
 	}
 	if l.writesSkipped > 0 {
 		attrs = append(attrs, slog.Int("writes_skipped", l.writesSkipped))
