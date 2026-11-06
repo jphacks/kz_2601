@@ -17,7 +17,7 @@ final class SchemaSwiftKeysTests: XCTestCase {
     func testComponentTypesMatchSchema() throws {
         let schemaTypes = Set(try SchemaFixture.load().componentProps.keys)
         let swiftTypes = Set(ComponentType.allCases.filter { $0 != .unknown }.map(\.rawValue))
-        XCTAssertEqual(schemaTypes.count, 68, "部品の数が 68 でない(7 Container + 61 Leaf・#351・matchList #507・flashcards #264)")
+        XCTAssertEqual(schemaTypes.count, 73, "部品の数が 73 でない(7 Container + 66 Leaf・#351・matchList #507・flashcards #264・transcribeField / speakButton・drawingField・feed #348・fileImport)")
         assertSameSet(schema: schemaTypes, swift: swiftTypes, what: "部品の type",
                       swiftPlace: "ComponentType の case")
     }
@@ -85,6 +85,7 @@ final class SchemaSwiftKeysTests: XCTestCase {
             ("CalendarEvent", "CalendarEventSpec(Model/Action.swift)", CalendarEventSpec(startField: "s")),
             ("Mark", "Mark(Records/RecordMark.swift)", Mark(id: "m", icon: "heart", label: "l")),
             ("PhotoAnalyze", "PhotoAnalyze(Records/PhotoReading.swift)", PhotoAnalyze(kind: .text, into: "f")),
+            ("ImportColumn", "ImportColumn(Records/RecordImport.swift)", ImportColumn(column: "c", field: "f")),
             ("Notification", "NotificationSpec(Model/AppDocument.swift)", NotificationSpec(id: "n", title: "t")),
         ]
         for c in cases {

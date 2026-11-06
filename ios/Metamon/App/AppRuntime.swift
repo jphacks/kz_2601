@@ -96,6 +96,9 @@ final class AppRuntime: DSLRuntime {
         }
     }
 
+    /// 一覧の記録を消した直後の「削除しました・元に戻す」(M11・`AppRuntime+RecordUndo.swift`)。
+    var recordUndo: RecordUndo?
+
     /// 生成(morph)まわりのエラー **状態カード**(#60)。音声画面 / 生成後の画面上部に出し、主ボタンで復帰する。nil なら正常。
     var errorCard: ErrorPresentation? {
         didSet {
@@ -445,6 +448,7 @@ final class AppRuntime: DSLRuntime {
         guard isForeground != active else { return }
         isForeground = active
         recordSync.setForeground(active)
+        if !active { recordUndo = nil } // 背面では削除を送り切るので、戻せない
         if active {
             startSync()
             Task { await refreshNotifications() } // #228 届いた分の空き枠を埋める
@@ -1166,8 +1170,7 @@ final class AppRuntime: DSLRuntime {
                 notifyReadOnly(entity: entity)
                 return
             }
-            records[entity] = await recordSync.delete(appId: document.appId, entity: entity, recordId: id)
-            WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            await deleteUndoably(entity: entity, recordId: id) // M11: 数秒は送らず「元に戻す」を出す
             if ctx.recordId == nil { close(ctx.route) } // フォーム上からの削除は画面を閉じる
 
         case .openVoice:

@@ -302,6 +302,14 @@ private struct ToastHost: ViewModifier {
                     }
             }
         }
+        .overlay(alignment: .bottom) {
+            if active, let undo = rt.recordUndo { // M11 削除しました・元に戻す。普通のトーストと重なったらその上に積む
+                RecordUndoToast(undo: undo)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md
+                             + (rt.toast == nil ? 0 : 56))
+            }
+        }
     }
 }
 

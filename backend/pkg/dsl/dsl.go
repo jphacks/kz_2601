@@ -306,6 +306,8 @@ const (
 	CompSettlement ComponentType = "settlement" // greedy "A pays B" list from a balance field
 	// random pick (#263): one record per button press, not saved
 	CompRandomPicker ComponentType = "randomPicker"
+	// file import (file_import.go): CSV rows / text / PDF body -> records, on the device
+	CompFileImport ComponentType = "fileImport"
 	// on-device AI (#78)
 	CompAiButton ComponentType = "aiButton" // Foundation Models -> form field; task generate may fall back to /v1/text (#417)
 	// peer-to-peer
@@ -326,6 +328,8 @@ const (
 	CompMatchList ComponentType = "matchList"
 	// flashcards (#264): one card at a time, tap to flip, swipe to mark learned
 	CompFlashcards ComponentType = "flashcards"
+	// external feed (#348): read-only list from an allowlisted public source via appconfig
+	CompFeed ComponentType = "feed"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -466,6 +470,9 @@ type Component struct {
 	Threshold *SensorThreshold `json:"threshold,omitempty"`
 	// photoField (#418): on-device reading of the picked photo into other fields.
 	Analyze []PhotoAnalyze `json:"analyze,omitempty"`
+	// fileImport (file_import.go). Entity / Field / Label are shared.
+	Accept []string       `json:"accept,omitempty"` // csv|text|pdf
+	Map    []ImportColumn `json:"map,omitempty"`    // csv: column header -> field id
 
 	// nearbyShare passby (#425). Entity / Mode / Limit are shared.
 	Fields   []string `json:"fields,omitempty"`   // passby: field ids exchanged (explicit allowlist)
@@ -482,15 +489,27 @@ type Component struct {
 	Front  string `json:"front,omitempty"`  // field on the card's face
 	Back   string `json:"back,omitempty"`   // field shown when flipped
 	Toggle string `json:"toggle,omitempty"` // boolean field: learned (swipe right) / not yet (left)
+
+	// feed (#348). Title / Limit / EmptyText are shared. Never a URL (feed.go).
+	Provider string `json:"provider,omitempty"` // weather|holidays|rss
+	Region   string `json:"region,omitempty"`   // weather: JMA forecast office code (WeatherRegions)
+	FeedID   string `json:"feedId,omitempty"`   // rss: allowlisted feed id (RSSFeeds)
 }
 
 // PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the
 // form field it goes into (Into).
 type PhotoAnalyze struct {
-	Kind    string   `json:"kind"` // text|amount|date|classify|describe|jointAngle
+	Kind    string   `json:"kind"` // text|amount|date|classify|describe|jointAngle|label|labels|barcode|peopleCount|color
 	Into    string   `json:"into"`
 	Options []string `json:"options,omitempty"` // classify candidates (else the enum into's options)
 	Joint   string   `json:"joint,omitempty"`   // jointAngle: knee|elbow|hip|shoulder (+ left/right)
+}
+
+// ImportColumn is one fileImport.map entry: the CSV column whose header is
+// Column goes into Field.
+type ImportColumn struct {
+	Column string `json:"column"`
+	Field  string `json:"field"`
 }
 
 // GridRange is an inclusive integer range of gridTable rows.

@@ -44,6 +44,41 @@ enum PhotoVision {
         return pose.isEmpty ? nil : pose
     }
 
+    /// 写真の中のバーコード・QR の中身(見つかった順)。
+    static func barcodes(in image: CGImage, orientation: CGImagePropertyOrientation = .up) -> [String] {
+        let request = VNDetectBarcodesRequest()
+        guard (try? VNImageRequestHandler(cgImage: image, orientation: orientation).perform([request])) != nil else { return [] }
+        return (request.results ?? []).compactMap { $0.payloadStringValue?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    }
+
+    /// 写っている人の数(顔の数と人の体の数の多い方)。顔の特徴は取らない(誰かは見分けない)。両方失敗したら nil。
+    static func peopleCount(in image: CGImage, orientation: CGImagePropertyOrientation = .up) -> Int? {
+        let faces = VNDetectFaceRectanglesRequest()
+        let humans = VNDetectHumanRectanglesRequest()
+        humans.upperBodyOnly = false
+        let handler = VNImageRequestHandler(cgImage: image, orientation: orientation)
+        let faceCount = (try? handler.perform([faces])) != nil ? faces.results?.count ?? 0 : nil
+        let humanCount = (try? handler.perform([humans])) != nil ? humans.results?.count ?? 0 : nil
+        guard faceCount != nil || humanCount != nil else { return nil }
+        return Swift.max(faceCount ?? 0, humanCount ?? 0)
+    }
+
+    /// 写真の中央 60% を 32×32 に縮めた画素(0〜1 の RGB)。主な色を数える元。
+    static func centerPixels(of image: CGImage, side: Int = 32) -> [(r: Double, g: Double, b: Double)] {
+        let w = Double(image.width), h = Double(image.height)
+        let crop = CGRect(x: w * 0.2, y: h * 0.2, width: w * 0.6, height: h * 0.6).integral
+        guard let center = image.cropping(to: crop),
+              let ctx = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
+                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return [] }
+        ctx.interpolationQuality = .medium
+        ctx.draw(center, in: CGRect(x: 0, y: 0, width: side, height: side))
+        guard let data = ctx.data else { return [] }
+        let bytes = data.bindMemory(to: UInt8.self, capacity: side * side * 4)
+        return (0..<(side * side)).map { i in
+            (Double(bytes[i * 4]) / 255, Double(bytes[i * 4 + 1]) / 255, Double(bytes[i * 4 + 2]) / 255)
+        }
+    }
+
     static let jointNames: [(PoseKeypoint, VNHumanBodyPoseObservation.JointName)] = [
         (.nose, .nose), (.neck, .neck), (.root, .root),
         (.leftShoulder, .leftShoulder), (.rightShoulder, .rightShoulder),
@@ -83,21 +118,45 @@ struct PhotoReadOutcome: Sendable {
     var pose: BodyPose?
 }
 
+/// 1 枚の写真から Vision で取り出した手がかり。analyze の kind が要る分だけ埋める(テストでは差し替える)。
+struct PhotoClues: Sendable {
+    var lines: [String] = []
+    var labels: [String] = []
+    var pose: BodyPose?
+    var barcodes: [String] = []
+    var peopleCount: Int?
+    var color: String?
+    /// 画像の縦横比(幅 / 高さ)。関節の角度に使う
+    var aspect: Double = 1
+
+    /// 要る Vision の要求だけ実行する。重いので呼び出し側で detached にする。
+    static func detect(in cg: CGImage, for specs: [PhotoAnalyze]) -> PhotoClues {
+        let kinds = Set(specs.map(\.kind))
+        return PhotoClues(
+            lines: specs.contains(where: \.needsText) ? PhotoVision.textLines(in: cg) : [],
+            labels: specs.contains(where: \.needsLabels) ? PhotoVision.labels(in: cg) : [],
+            pose: kinds.contains(.jointAngle) ? PhotoVision.bodyPose(in: cg) : nil,
+            barcodes: kinds.contains(.barcode) ? PhotoVision.barcodes(in: cg) : [],
+            peopleCount: kinds.contains(.peopleCount) ? PhotoVision.peopleCount(in: cg) : nil,
+            color: kinds.contains(.color) ? PhotoColor.dominant(pixels: PhotoVision.centerPixels(of: cg)) : nil,
+            aspect: Double(cg.width) / Double(Swift.max(cg.height, 1)))
+    }
+}
+
 /// `analyze` の全項目を 1 枚の写真に対して実行する。重い処理は呼び出し側の Task から detached で動かす。
 enum PhotoReader {
     static func read(_ image: UIImage, specs: [PhotoAnalyze], entity: Entity) async -> PhotoReadOutcome {
         guard let cg = image.cgImage else { return PhotoReadOutcome(missed: specs.map(\.into)) }
-        let aspect = Double(cg.width) / Double(Swift.max(cg.height, 1))
-        let (lines, labels, pose) = await Task.detached(priority: .userInitiated) {
-            (specs.contains(where: \.needsText) ? PhotoVision.textLines(in: cg) : [],
-             specs.contains(where: \.needsLabels) ? PhotoVision.labels(in: cg) : [],
-             specs.contains { $0.kind == .jointAngle } ? PhotoVision.bodyPose(in: cg) : nil)
-        }.value
+        let clues = await Task.detached(priority: .userInitiated) { PhotoClues.detect(in: cg, for: specs) }.value
+        return await apply(clues, specs: specs, entity: entity)
+    }
 
-        var out = PhotoReadOutcome(pose: pose)
+    /// 手がかりから各 into の値を作る(読めなかった項目は missed)。
+    static func apply(_ clues: PhotoClues, specs: [PhotoAnalyze], entity: Entity) async -> PhotoReadOutcome {
+        var out = PhotoReadOutcome(pose: clues.pose)
         for spec in specs {
             guard let field = entity.field(spec.into),
-                  let raw = await reading(spec, field: field, lines: lines, labels: labels, pose: pose, aspect: aspect),
+                  let raw = await reading(spec, field: field, clues: clues),
                   let value = raw.jsonValue(for: field.type) else {
                 out.missed.append(spec.into)
                 continue
@@ -107,7 +166,8 @@ enum PhotoReader {
         return out
     }
 
-    static func reading(_ spec: PhotoAnalyze, field: Field, lines: [String], labels: [String], pose: BodyPose?, aspect: Double) async -> PhotoReadingValue? {
+    static func reading(_ spec: PhotoAnalyze, field: Field, clues: PhotoClues) async -> PhotoReadingValue? {
+        let (lines, labels) = (clues.lines, clues.labels)
         let text = lines.joined(separator: "\n")
         switch spec.kind {
         case .text:
@@ -132,8 +192,19 @@ enum PhotoReader {
             let words = labels.prefix(5).map(PhotoClassifier.japanese)
             return words.isEmpty ? .text(String(text.prefix(200))) : .text(L("写っているもの: ") + words.joined(separator: "、"))
         case .jointAngle:
-            guard let pose, let joint = spec.joint else { return nil }
-            return PoseAngle.angle(joint: joint, in: pose, aspect: aspect).map(PhotoReadingValue.number)
+            guard let pose = clues.pose, let joint = spec.joint else { return nil }
+            return PoseAngle.angle(joint: joint, in: pose, aspect: clues.aspect).map(PhotoReadingValue.number)
+        case .label:
+            return PhotoClassifier.names(labels: labels, max: 1).first.map(PhotoReadingValue.text)
+        case .labels:
+            let names = PhotoClassifier.names(labels: labels, max: 5)
+            return names.isEmpty ? nil : .text(names.joined(separator: "、"))
+        case .barcode:
+            return clues.barcodes.first.map(PhotoReadingValue.text)
+        case .peopleCount:
+            return clues.peopleCount.map { .number(Double($0)) }
+        case .color:
+            return clues.color.map(PhotoReadingValue.text)
         case .unknown:
             return nil
         }
