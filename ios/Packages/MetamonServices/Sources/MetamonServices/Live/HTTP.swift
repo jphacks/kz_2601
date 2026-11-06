@@ -73,15 +73,7 @@ enum HTTP {
         timeout: TimeInterval = defaultTimeout,
         headers: [String: String] = [:]
     ) async throws -> Response {
-        guard let url = URL(string: path, relativeTo: baseURL) else { throw APIError.invalidURL }
-        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: timeout)
-        req.httpMethod = method
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        ClientInfo.current.apply(to: &req) // #302
-        for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
-        if let body {
-            req.httpBody = try JSONEncoder().encode(body)
-        }
+        let req = try request(method, baseURL: baseURL, path: path, body: body, timeout: timeout, headers: headers)
         let bearer = try await token.idToken()
         var check = await appCheck?.token(forceRefresh: false)
         var r = try await perform(req, bearer: bearer, appCheck: check)
@@ -109,6 +101,45 @@ enum HTTP {
             }
         }
         return r
+    }
+
+    /// 認証ヘッダ以外を揃えたリクエスト(`exchange` と `openStream` で共用)。
+    static func request(
+        _ method: String,
+        baseURL: URL,
+        path: String,
+        body: (any Encodable)?,
+        timeout: TimeInterval,
+        headers: [String: String]
+    ) throws -> URLRequest {
+        guard let url = URL(string: path, relativeTo: baseURL) else { throw APIError.invalidURL }
+        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: timeout)
+        req.httpMethod = method
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        ClientInfo.current.apply(to: &req) // #302
+        for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
+        if let body {
+            req.httpBody = try JSONEncoder().encode(body)
+        }
+        return req
+    }
+
+    /// 本文を少しずつ読むリクエスト(SSE・#636)。ステータスを問わず返し、401 / 429 の再送はしない(呼び出し側が `exchange` に戻す)。
+    /// `timeout` は次のバイトが届くまでの待ち(全体の上限ではない)。
+    static func openStream(
+        _ method: String,
+        baseURL: URL,
+        path: String,
+        body: (any Encodable)?,
+        token: any TokenProvider,
+        timeout: TimeInterval = defaultTimeout,
+        headers: [String: String] = [:]
+    ) async throws -> (bytes: URLSession.AsyncBytes, response: HTTPURLResponse?) {
+        var req = try request(method, baseURL: baseURL, path: path, body: body, timeout: timeout, headers: headers)
+        if let bearer = try await token.idToken() { req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
+        if let check = await appCheck?.token(forceRefresh: false) { req.setValue(check, forHTTPHeaderField: AppCheckHeader.name) }
+        let (bytes, resp) = try await session.bytes(for: req)
+        return (bytes, resp as? HTTPURLResponse)
     }
 
     /// 401 が App Check で弾かれたものか(本文の `error.code`)。

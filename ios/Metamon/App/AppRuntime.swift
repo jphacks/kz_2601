@@ -122,6 +122,8 @@ final class AppRuntime: DSLRuntime {
         var kind: Kind
         var transcript: String
         var startedAt: Date
+        /// SSE で届いた途中経過(#636・create だけ)。組み立て台に仮置きする
+        var draft = BuildChoreography.LiveDraft()
 
         /// 生成中の見せ方。初期画面からの作成に加え、生成後の画面からの「〇〇アプリを作って」も作り直し(mode=full)になるので
         /// 全画面の「変身中」にする。それ以外の改変は今の画面を薄くして上に小さなインジケータ(#182)。
@@ -564,11 +566,25 @@ final class AppRuntime: DSLRuntime {
         interruptedByOffline = false
         let previous = document
         let createdFromInitial = previous.dsl.isVoiceOnly
-        let task = Task { [services, appId = document.appId, version = document.version, locale = Self.generationLocale] in
-            try await services.ai.morph(transcript: text, appId: appId, currentVersion: version, locale: locale)
+        // create は途中経過(#636)を受けて組み立て台に仮置きする。届いた順に MainActor で当てる
+        let progress = morphJob?.kind == .create ? AsyncStream.makeStream(of: GenerateProgress.self) : nil
+        let progressTask = progress.map { pair in
+            Task { @MainActor [weak self, startedAt = morphJob?.startedAt] in
+                for await p in pair.stream { self?.noteBuildProgress(p, startedAt: startedAt) }
+            }
+        }
+        let task = Task { [services, appId = document.appId, version = document.version, locale = Self.generationLocale, sink = progress?.continuation] in
+            if let sink {
+                return try await services.ai.morph(transcript: text, appId: appId, currentVersion: version, locale: locale) { _ = sink.yield($0) }
+            }
+            return try await services.ai.morph(transcript: text, appId: appId, currentVersion: version, locale: locale)
         }
         morphTask = task
-        defer { if morphTask == task { morphTask = nil } }
+        defer {
+            if morphTask == task { morphTask = nil }
+            progress?.continuation.finish()
+            progressTask?.cancel()
+        }
         do {
             let result = try await task.value
             // 待っている間に別のアプリ・初期状態へ移っていたら、前のアプリの結果を今の画面に当てない
@@ -608,6 +624,12 @@ final class AppRuntime: DSLRuntime {
             withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
             await present(failure, transcript: text)
         }
+    }
+
+    /// 途中経過(#636)を今の create の組み立て台に当てる。別の生成・終わった後に届いた分は捨てる。
+    private func noteBuildProgress(_ p: GenerateProgress, startedAt: Date?) {
+        guard let job = morphJob, job.kind == .create, job.startedAt == startedAt else { return }
+        morphJob?.draft.apply(p)
     }
 
     /// 生成しても何も変わらなかった時(#211)。保存されていないので適用も履歴も触らず、理由を伝える。
