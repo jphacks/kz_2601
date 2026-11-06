@@ -71,4 +71,15 @@ final class QualitySweepTests: XCTestCase {
         XCTAssertNil(rt.morphJob)
         XCTAssertNil(rt.errorCard)
     }
+
+    // MARK: - 自動削除の注記
+
+    func testRetentionFooterMentionsSharedOnlyForSharedEntities() throws {
+        let shared = L10n.tr("共有の記録は自分が追加したものだけが消えます。")
+        let privateRt = try runtime(retention: true)
+        XCTAssertFalse(RetentionSettingsSection.footer(entities: privateRt.dsl.entities).contains(shared),
+                       "自分だけの記録(審査用の版は全部これ)に共有の説明を出さない")
+        let sharedRt = try runtime(retention: true, scope: "shared")
+        XCTAssertTrue(RetentionSettingsSection.footer(entities: sharedRt.dsl.entities).contains(shared))
+    }
 }
