@@ -1,6 +1,6 @@
 import XCTest
 
-/// #274: 初回は 同意 → チュートリアル(3 枚)→ 初期画面(カテゴリ別の例)→ 最初のアプリの直後に「こう話すと直せます」。
+/// #274・H1: 初回は 同意 → チュートリアル(1 枚)→ 初期画面(カテゴリ別の例)→ 最初のアプリの直後に「こう話すと直せます」。
 /// `METAMON_AI_CONSENT=reset` / `METAMON_TUTORIAL=reset` で初回の状態で起動する(DEBUG フック)。
 final class TutorialUITests: XCTestCase {
     private var app: XCUIApplication!
@@ -23,23 +23,18 @@ final class TutorialUITests: XCTestCase {
         // 1. 同意が先
         let agree = app.buttons["consent.agree"]
         XCTAssertTrue(agree.waitForExistence(timeout: 15), "初回起動で同意の画面が出ない")
-        XCTAssertFalse(app.buttons["tutorial.next"].exists, "同意より先にチュートリアルが出た")
+        XCTAssertFalse(app.buttons["tutorial.start"].exists, "同意より先にチュートリアルが出た")
         agree.tap()
 
-        // 2. チュートリアル 3 枚 → はじめる
-        let next = app.buttons["tutorial.next"]
-        XCTAssertTrue(next.waitForExistence(timeout: 10), "同意のあとにチュートリアルが出ない")
-        XCTAssertTrue(app.staticTexts["話すと、アプリができる"].exists)
-        attach("tutorial-1-create")
-        next.tap()
-        XCTAssertTrue(app.staticTexts["話すと、直せる・戻せる"].waitForExistence(timeout: 5))
-        attach("tutorial-2-edit")
-        next.tap()
+        // 2. チュートリアル 1 枚(H1)→ はじめる
         let start = app.buttons["tutorial.start"]
-        XCTAssertTrue(start.waitForExistence(timeout: 5), "3 枚目に「はじめる」が無い")
-        attach("tutorial-3-share")
+        XCTAssertTrue(start.waitForExistence(timeout: 10), "同意のあとにチュートリアルが出ない")
+        XCTAssertTrue(app.staticTexts["話すと、アプリができる"].exists)
+        XCTAssertFalse(app.buttons["tutorial.next"].exists, "チュートリアルは 1 枚")
+        attach("tutorial-1-create")
         start.tap()
         XCTAssertTrue(waitGone(start), "「はじめる」で閉じない")
+        XCTAssertFalse(app.alerts.firstMatch.waitForExistence(timeout: 2), "音声モデルの確認を自動で出さない(M14)")
 
         // 3. 初期画面: カテゴリ別の例(家族・友達と に共有系)
         let together = app.buttons["examples.category.together"]

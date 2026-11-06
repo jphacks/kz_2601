@@ -224,29 +224,28 @@ struct ClarifyChatView: View {
             let multi = multiSelect && rt.chatTurn?.kind == .question
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 if multi { MultiSelectHint() }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Theme.Spacing.sm) {
-                        ForEach(chips, id: \.self) { chip in
-                            let on = multi && current.chips.contains(chip)
-                            Button { if multi { toggle(chip: chip) } else { onSend(chip) } } label: {
-                                HStack(spacing: 4) {
-                                    if multi { Image(systemName: on ? "checkmark.circle.fill" : "circle") }
-                                    Text(chip)
-                                }
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(on ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-                                .padding(.horizontal, Theme.Spacing.md)
-                                .padding(.vertical, Theme.Spacing.sm + 2)
-                                .background(on ? AnyShapeStyle(Theme.brandGradient) : AnyShapeStyle(Theme.Colors.surface), in: Capsule())
-                                .overlay(Capsule().strokeBorder(Theme.Colors.brandA.opacity(0.35)))
+                // M5: 横スクロールだと画面の外のチップに気づかないので、折り返して全部見せる
+                ChipFlowLayout(spacing: Theme.Spacing.sm) {
+                    ForEach(chips, id: \.self) { chip in
+                        let on = multi && current.chips.contains(chip)
+                        Button { if multi { toggle(chip: chip) } else { onSend(chip) } } label: {
+                            HStack(spacing: 4) {
+                                if multi { Image(systemName: on ? "checkmark.circle.fill" : "circle") }
+                                Text(chip)
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("chat.chip")
-                            .accessibilityAddTraits(on ? .isSelected : [])
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(on ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                            .padding(.horizontal, Theme.Spacing.md)
+                            .padding(.vertical, Theme.Spacing.sm + 2)
+                            .background(on ? AnyShapeStyle(Theme.brandGradient) : AnyShapeStyle(Theme.Colors.surface), in: Capsule())
+                            .overlay(Capsule().strokeBorder(Theme.Colors.brandA.opacity(0.35)))
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("chat.chip")
+                        .accessibilityAddTraits(on ? .isSelected : [])
                     }
-                    .padding(.horizontal, 1)
                 }
+                .padding(.horizontal, 1)
                 if multi {
                     let enabled = MultiSelect.canSubmit(selectedCount: current.chips.count)
                     Button { onSend(MultiSelect.joinedAnswer(current.chips)) } label: {
@@ -367,10 +366,11 @@ private struct PaidFeatureCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            // H4: 課金画面は自動では開かず、「Pro にする」を押した時に開く(#414 はこれで満たす)
             Button { Task { await rt.purchaseAndBuild() } } label: {
                 HStack(spacing: Theme.Spacing.sm) {
                     if rt.paidConfirmBusy { ProgressView().tint(.white) }
-                    Text(L10n.tr("購入して作る")).font(.headline)
+                    Text(L10n.tr("Pro にする")).font(.headline)
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
@@ -404,6 +404,59 @@ private struct PaidFeatureCard: View {
     }
 }
 #endif
+
+/// 答えのチップを左から並べ、幅が足りなければ次の行へ折り返す(M5)。
+struct ChipFlowLayout: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        let rows = Self.rows(sizes: measure(subviews, maxWidth: maxWidth), maxWidth: maxWidth, spacing: spacing)
+        return CGSize(width: rows.map(\.width).max() ?? 0, height: rows.last.map { $0.y + $0.height } ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let sizes = measure(subviews, maxWidth: bounds.width)
+        for row in Self.rows(sizes: sizes, maxWidth: bounds.width, spacing: spacing) {
+            var x = bounds.minX
+            for index in row.items {
+                subviews[index].place(at: CGPoint(x: x, y: bounds.minY + row.y), proposal: ProposedViewSize(sizes[index]))
+                x += sizes[index].width + spacing
+            }
+        }
+    }
+
+    /// 長いチップは幅いっぱいで折り返した大きさ。
+    private func measure(_ subviews: Subviews, maxWidth: CGFloat) -> [CGSize] {
+        subviews.map { $0.sizeThatFits(ProposedViewSize(width: maxWidth.isFinite ? maxWidth : nil, height: nil)) }
+    }
+
+    struct Row: Equatable {
+        var items: [Int]
+        var y: CGFloat
+        var width: CGFloat
+        var height: CGFloat
+    }
+
+    /// 行の割り付け(純粋関数・テスト用)。1 つで幅を超えるチップは 1 行に 1 つ。
+    static func rows(sizes: [CGSize], maxWidth: CGFloat, spacing: CGFloat) -> [Row] {
+        var rows: [Row] = []
+        var current = Row(items: [], y: 0, width: 0, height: 0)
+        for (index, size) in sizes.enumerated() {
+            let width = min(size.width, maxWidth)
+            let needed = current.items.isEmpty ? width : current.width + spacing + width
+            if !current.items.isEmpty, needed > maxWidth {
+                rows.append(current)
+                current = Row(items: [], y: current.y + current.height + spacing, width: 0, height: 0)
+            }
+            current.width = current.items.isEmpty ? width : current.width + spacing + width
+            current.height = max(current.height, size.height)
+            current.items.append(index)
+        }
+        if !current.items.isEmpty { rows.append(current) }
+        return rows
+    }
+}
 
 private struct BubbleRow: View {
     let bubble: AppRuntime.ChatBubble

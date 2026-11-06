@@ -17,6 +17,7 @@ extension AppRuntime {
     /// 設定の「使い方を見る」。シートを閉じきってから出す(シートの同時表示は SwiftUI が無視する)。
     func replayTutorial() {
         showVoiceSheet = false
+        showAppSwitcher = false // 変身一覧の歯車から開いた設定(H10)
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(600))
             self?.showTutorial = true
@@ -49,13 +50,16 @@ extension AppRuntime {
         showVoiceSheet = true
     }
 
-    /// 音声モデルのダウンロード確認は、同意 → チュートリアル → β の案内(#313)が済んでから出す(初回の順序・#274)。
+    /// 音声モデルのダウンロード確認は、同意・チュートリアル・β の案内(#313)が出ている間は出さない(#274)。
+    /// 確認は利用者の操作(案内のボタン・マイク)でだけ出す(M14)。β の案内は最初のアプリの後なので待たない。
     var canShowModelDownloadConfirm: Bool {
         #if APP_STORE_REVIEW
         showModelDownloadConfirm && !showAIConsent && !showTutorial && hasSeenTutorial
         #else
-        showModelDownloadConfirm && !showAIConsent && !showTutorial && hasSeenTutorial
-            && !showBetaWelcome && !isBetaWelcomePending
+        showModelDownloadConfirm && !showAIConsent && !showTutorial && hasSeenTutorial && !showBetaWelcome
         #endif
     }
+
+    /// 最初のアプリを作ったか(初期画面からの作成で「直し方の例」を予約した = `hasShownEditHint`)。β の案内はこの後(H1)。
+    var hasMadeFirstApp: Bool { tutorial?.hasShownEditHint ?? true }
 }

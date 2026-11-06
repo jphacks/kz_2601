@@ -21,7 +21,7 @@ enum BetaWelcomeContent {
     ]
 }
 
-/// RootView に付ける: チュートリアル(#274)の後に、β の版でだけ初回に 1 回出す。
+/// RootView に付ける: β の版でだけ、最初のアプリの後に 1 回出す(H1)。
 struct BetaWelcomeHost: ViewModifier {
     @Environment(AppRuntime.self) private var rt
 
@@ -31,16 +31,16 @@ struct BetaWelcomeHost: ViewModifier {
                                         set: { if !$0 { rt.finishBetaWelcome() } })) {
                 BetaWelcomeView()
             }
-            .onChange(of: rt.showTutorial) { _, showing in
-                // チュートリアルが閉じたら、閉じるアニメーションを待ってから出す(重なると表示されない)
-                guard !showing else { return }
+            .onChange(of: rt.showFirstEditHint) { wasShowing, showing in
+                // 最初のアプリの直後の「直し方の例」が閉じたら出す(H1: 初回の関門から外し、最初のアプリの後へ)
+                guard wasShowing, !showing else { return }
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(700))
                     rt.presentBetaWelcomeIfNeeded()
                 }
             }
             .task {
-                // チュートリアルが済んでいる人(β に入れ直した等)は、起動して少し待ってから出す
+                // 前の起動で最初のアプリを作った人(直し方の例を閉じる前に終了した・β に入れ直した等)は、起動して少し待ってから出す
                 try? await Task.sleep(for: .milliseconds(1200))
                 rt.presentBetaWelcomeIfNeeded()
             }
@@ -74,10 +74,7 @@ struct BetaWelcomeView: View {
                 Section {
                     ForEach(BetaWelcomeContent.tryKeys, id: \.self) { key in
                         let text = L10n.tr(String.LocalizationValue(key))
-                        Button {
-                            rt.composerDraft = text
-                            rt.finishBetaWelcome()
-                        } label: {
+                        Button { rt.useBetaWelcomeExample(text) } label: {
                             Label(L10n.tr("「\(text)」"), systemImage: "mic")
                         }
                     }

@@ -29,9 +29,9 @@ struct ListLeaf: View {
         let today = DSLClock.now()
         if rows.isEmpty {
             EmptyPlaceholder(icon: "tray", emptyText: c.emptyText ?? L("まだありません"), state: rt.emptyState(for: entityId),
-                             cta: L("最初の 1 件を追加しましょう")) {
-                Task { await rt.load(entities: [entityId], force: true) }
-            }
+                             cta: L("最初の 1 件を追加しましょう"),
+                             retry: { Task { await rt.load(entities: [entityId], force: true) } },
+                             onCTA: emptyAdd(entity: entityId))
             .onChange(of: ids, initial: true) { _, now in seenIds = Set(now) }
         } else {
             // 1 枚のカードに行を積み、行間は 1pt の hairline(iOS の inset grouped list と同じ読み味)
@@ -141,6 +141,13 @@ struct ListLeaf: View {
     private func open(_ row: Record) {
         guard let action = c.onItemTap else { return }
         Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
+    }
+
+    /// 空の一覧の案内を押した時: 同じ画面の追加ボタンと同じフォームを開く(M12)。無ければ nil(案内は文字だけ)。
+    private func emptyAdd(entity: String) -> (() -> Void)? {
+        guard let screen = rt.dsl.screen(ctx.route.screen),
+              let action = DuplicateAddControl.emptyListAdd(entity: entity, on: screen, in: rt.dsl) else { return nil }
+        return { Task { await rt.run(action, ctx.actionContext()) } }
     }
 
     /// 先頭のアイコン/画像の幅ぶんセパレータを内側に寄せる。

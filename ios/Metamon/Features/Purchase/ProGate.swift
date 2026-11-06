@@ -12,8 +12,6 @@ enum PaywallReason: Equatable {
     case limitReached
     /// 共有・オンラインなどの有料機能を使うアプリを作る / 直す(features が空なら「みんなで共有するデータ」)
     case paidFeature([PaidFeature])
-    /// 記録を共有するアプリ・公開アプリに参加する
-    case join(appName: String)
 }
 
 /// 課金画面の表示要求。`placement` = どこの View が present するか(チャットの確認カードは音声シートの中にもあるので、その場で出す)。

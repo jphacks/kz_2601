@@ -201,6 +201,20 @@ struct VoiceInputView: View {
                 .disabled(rt.isMorphing)
                 .accessibilityIdentifier("chat.restart")
             }
+            // H10: 一覧はマイクの長押しにしか無かった。設定の隣に見える入口を置く(作ったアプリが無い時は出さない)
+            if VoiceTopBar.showsAppList(appCount: rt.visibleApps.count, isVoiceOnly: rt.dsl.isVoiceOnly, madeFirstApp: rt.hasMadeFirstApp) {
+                Button { rt.openSwitcher() } label: {
+                    Image(systemName: "square.grid.2x2")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .padding(Theme.Spacing.sm)
+                        .background(Theme.Colors.surface, in: Circle())
+                        .overlay(Circle().strokeBorder(Theme.Colors.hairline))
+                }
+                .disabled(rt.isMorphing)
+                .accessibilityLabel(Text(L10n.key("アプリ一覧", review: "記録帳の一覧")))
+                .accessibilityIdentifier("voice.appList")
+            }
             Button { showSettings = true } label: {
                 Image(systemName: "gearshape")
                     .font(.body.weight(.medium))
@@ -236,7 +250,10 @@ struct VoiceInputView: View {
     private var micSection: some View {
         VStack(spacing: Theme.Spacing.md) {
             // タップ = 発話、長押し = メタ操作(変身一覧)。FAB と同じ二段構え
-            MicButton(mode: micMode, size: LandscapeLayout.micSize(isInitial: isInitial, compactHeight: compactHeight)) { Task { await toggle() } }
+            MicButton(mode: micMode, size: LandscapeLayout.micSize(isInitial: isInitial, compactHeight: compactHeight)) {
+                if phase == .idle, rt.askModelDownloadBeforeRecording() { return } // M14: 起動では聞かず、初めてマイクを押した時に
+                Task { await toggle() }
+            }
                 .simultaneousGesture(
                     LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
                         .onEnded { _ in if phase == .idle { rt.openSwitcher() } }
@@ -519,6 +536,15 @@ struct VoiceInputView: View {
         }
         phase = .idle
         if rt.isChatting { transcript = "" }
+    }
+}
+
+/// 音声画面の上部(H10)。
+enum VoiceTopBar {
+    /// 一覧のボタンを出すか。今アプリを開いている・前にアプリを作った・一覧に 1 件でもある時。
+    /// 初回(まだ何も作っていない初期画面)は空の一覧しか開けないので出さない。
+    static func showsAppList(appCount: Int, isVoiceOnly: Bool, madeFirstApp: Bool) -> Bool {
+        !isVoiceOnly || madeFirstApp || appCount > 0
     }
 }
 
