@@ -21,7 +21,7 @@ final class ReviewBuildTests: XCTestCase {
         #if APP_STORE_REVIEW
         XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "notification.when", "singleEntity"])
         #else
-        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "matching", "notification.when", "singleEntity"])
+        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles"])
         #endif
     }
 
