@@ -1089,6 +1089,23 @@
         }
       }
     },
+    "Tailor It Pro が必要な機能が入るため、保存しませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This needs a Tailor It Pro feature, so it was not saved"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It Pro が必要な機能が入るため、保存しませんでした"
+          }
+        }
+      }
+    },
     "Tailor It β へようこそ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1578,6 +1595,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」の画面のつながり"
+          }
+        }
+      }
+    },
+    "「%@」は Tailor It Pro が必要なため、保存しませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” needs Tailor It Pro, so it was not saved"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」は Tailor It Pro が必要なため、保存しませんでした"
           }
         }
       }
@@ -2547,6 +2581,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリをどう変えますか?"
+          }
+        }
+      }
+    },
+    "このアプリを作った人が Tailor It Pro ではないため、共有のデータに書き込めません(見ることはできます)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The creator of this app doesn't have Tailor It Pro, so you can't add to its shared data (you can still view it)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリを作った人が Tailor It Pro ではないため、共有のデータに書き込めません(見ることはできます)"
           }
         }
       }
@@ -7685,6 +7736,23 @@
         }
       }
     },
+    "共有のデータに書き込むには Tailor It Pro が必要です(見ることはできます)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adding to shared data needs Tailor It Pro (you can still view it)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有のデータに書き込むには Tailor It Pro が必要です(見ることはできます)"
+          }
+        }
+      }
+    },
     "共有の機能は Tailor It Pro が必要なため、元に戻しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12360,6 +12428,23 @@
         }
       }
     },
+    "購入の確認がまだサーバーに届いていません。少し待ってから、もう一度話しかけてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your purchase hasn't reached our server yet. Wait a moment, then try speaking again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入の確認がまだサーバーに届いていません。少し待ってから、もう一度話しかけてください"
+          }
+        }
+      }
+    },
     "購入を復元" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13176,6 +13261,23 @@
         }
       }
     },
+    "閉じると、この内容では作りません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you close this, it won't be made this way."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じると、この内容では作りません。"
+          }
+        }
+      }
+    },
     "閉じると、この端末では AI で書くボタンは使えません。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13206,6 +13308,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "閉じると、元の版に戻します。"
+          }
+        }
+      }
+    },
+    "閉じると、共有のデータは見るだけになります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you close this, the shared data stays view-only."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じると、共有のデータは見るだけになります。"
           }
         }
       }

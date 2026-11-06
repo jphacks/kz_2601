@@ -46,6 +46,9 @@ public enum SyncEvent: Sendable, Equatable {
     case drained
     /// 共有(scope:shared)のデータに参加していない(403 `not_member`・#254)。操作は破棄し、create はローカル行も消した
     case notMember(appId: String, entity: String)
+    /// 共有の記録の書き込みに Tailor It Pro が要る(402 `pro_required`・#316)。アプリの作成者が Pro でない。
+    /// 操作は破棄し、create はローカル行も消した。`pro.creatorNeedsPro` = 呼び出した人は参加者(払っても直らない)
+    case proRequired(appId: String, entity: String, pro: ProRequired)
 }
 
 /// 指数バックオフ: base × multiplier^(attempt-1)。attempt は 1 始まり。
@@ -188,6 +191,13 @@ public actor SyncQueue {
                     finish(op)
                     print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) not a member")
                     emit(.notMember(appId: op.appId, entity: op.entity))
+                    continue
+                }
+                if let pro = ProRequired(error) { // #316: 4xx の rejected より先に見分ける
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
+                    finish(op)
+                    print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) needs Pro (creator=\(pro.creatorNeedsPro))")
+                    emit(.proRequired(appId: op.appId, entity: op.entity, pro: pro))
                     continue
                 }
                 switch Self.classify(error) {
