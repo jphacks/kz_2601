@@ -454,6 +454,10 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 		}
 		return c.checkAgg(where, e.Agg, row, depth)
 	case ExprSetting:
+		if c.server {
+			c.add("%s: {\"setting\":%q} is not available in server rules (a setting is each user's own value, so the rule cannot tell whose to read)", where, e.Setting)
+			return tAny
+		}
 		return c.checkSetting(where, e.Setting)
 	case ExprOp:
 		spec, ok := Ops[e.Op]

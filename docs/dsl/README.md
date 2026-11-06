@@ -430,6 +430,8 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 | 連鎖 | 処理が書いたレコードは次のきっかけを起こさない | 別のルール(自分も含む)のきっかけになる書き込み(作るなら created、書き換え・increment は同じ field の updated)を断る |
 | 上限 | ルール 20・時刻のルール 5・処理 5(Pro の値) | 無料の値(3・1・3)は `App.ServerRuleQuotaProblems(pro)` で、プランが分かる所(appconfig)が見る |
 | 使えないアプリ | 仲間探し(`entity.match`)のアプリ | `serverRules` ごと断る |
+| single の entity(§3.11) | 「常に 1 件」なので `createRecord` の行き先にできない。きっかけにするのと、きっかけの 1 件の `updateRecord`(上書き)はよい | `createRecord` の entity が single なら断る |
+| `{"setting":…}` | 設定は利用者ごとの値で、どの人の設定かが決まらないので、条件・値の式で使えない(private のルールでも) | 式に `setting` があれば断る |
 
 - 共有データに効くのは作成者の公開 DSL(`apps_public/{appId}`)の宣言だけ。参加者が自分のコピーを書き換えても効かない(#337・runner の側で守る)。
 - 人が読める説明は `App.DescribeServerRule`(例: 「出欠」が作られた時(条件に合えば)、「予定」を作った人に通知・「予定」の「参加の数」を数える)。「このアプリの自動の動き」の一覧(#347)で使う。

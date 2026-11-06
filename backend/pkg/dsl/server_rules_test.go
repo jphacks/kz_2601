@@ -324,3 +324,61 @@ func TestDescribeServerRule(t *testing.T) {
 		}
 	}
 }
+
+// #340 × #267: a single entity always holds one record and a setting is each
+// user's own value, so rules must not add to the one or read the other.
+func TestServerRulesSingle(t *testing.T) {
+	base := func(a *App) {
+		a.Entities = []Entity{
+			{ID: "diary", Name: "日記", Fields: []Field{{ID: "mood", Name: "気分", Type: FieldInteger}}},
+			{ID: "settings", Name: "設定", Single: true, Fields: []Field{{ID: "goal", Name: "目標", Type: FieldInteger, DefaultValue: 3.0}}},
+		}
+		a.Screens[0].Components = []Component{{Type: CompText, Text: "日記"}}
+		a.ServerRules = []ServerRule{{ID: "low", On: RuleTrigger{Record: TriggerCreated, Entity: "diary"},
+			Do: []RuleAction{{Notify: &RuleNotify{To: RuleRecipient{Kind: RecipientOwner}, Title: "ひとこと", Body: "記録しました"}}}}}
+	}
+	cases := []struct {
+		name string
+		edit func(a *App)
+		want string // "" = accepted
+	}{
+		{"plain private rule", func(*App) {}, ""},
+		{"trigger on single", func(a *App) { a.ServerRules[0].On = RuleTrigger{Record: TriggerUpdated, Entity: "settings"} }, ""},
+		{"update the single trigger record", func(a *App) {
+			a.ServerRules[0].On = RuleTrigger{Record: TriggerUpdated, Entity: "settings", Fields: []string{"goal"}}
+			a.ServerRules[0].Do = []RuleAction{{UpdateRecord: &RuleUpdateRecord{Values: map[string]Expr{"goal": *expr(t, `{"op":"max","args":[{"ref":"goal"},1]}`)}}}}
+		}, "no chains"}, // overwriting is allowed by itself; here it would re-fire its own trigger
+		{"update single without chain", func(a *App) {
+			a.ServerRules[0].On = RuleTrigger{Record: TriggerCreated, Entity: "settings"}
+			a.ServerRules[0].Do = []RuleAction{{UpdateRecord: &RuleUpdateRecord{Values: map[string]Expr{"goal": *expr(t, `5`)}}}}
+		}, ""},
+		{"create into single", func(a *App) {
+			a.ServerRules[0].Do = []RuleAction{{CreateRecord: &RuleCreateRecord{Entity: "settings", Values: map[string]Expr{"goal": *expr(t, `5`)}}}}
+		}, "is single (always one record)"},
+		{"setting in condition", func(a *App) {
+			a.ServerRules[0].If = expr(t, `{"op":"lt","args":[{"ref":"mood"},{"setting":"goal"}]}`)
+		}, "not available in server rules"},
+		{"setting on time trigger", func(a *App) {
+			a.ServerRules[0].On = RuleTrigger{Every: "daily", Time: "09:00"}
+			a.ServerRules[0].If = expr(t, `{"op":"gt","args":[{"setting":"goal"},0]}`)
+		}, "not available in server rules"},
+		{"setting in value", func(a *App) {
+			a.Entities = append(a.Entities, Entity{ID: "log", Name: "記録", Fields: []Field{{ID: "n", Name: "数", Type: FieldInteger}}})
+			a.ServerRules[0].Do = []RuleAction{{CreateRecord: &RuleCreateRecord{Entity: "log", Values: map[string]Expr{"n": *expr(t, `{"setting":"goal"}`)}}}}
+		}, "not available in server rules"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			a := serverRulesApp(t)
+			base(a)
+			c.edit(a)
+			err := a.Validate()
+			switch {
+			case c.want == "" && err != nil:
+				t.Fatal(err)
+			case c.want != "" && (err == nil || !strings.Contains(err.Error(), c.want)):
+				t.Fatalf("want %q, got %v", c.want, err)
+			}
+		})
+	}
+}

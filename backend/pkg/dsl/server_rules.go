@@ -332,6 +332,9 @@ func checkRuleAction(where string, r *ServerRule, act *RuleAction, row *Entity, 
 			add("%s: entity %q does not exist (entities: %s)", w, act.CreateRecord.Entity, entityIDs(entities))
 			return
 		}
+		if target.Single {
+			add("%s: entity %q is single (always one record); a rule cannot add records to it", w, target.ID)
+		}
 		checkRuleTargetScope(w, target, scope, add)
 		checkRuleValues(w, r, target, act.CreateRecord.Values, row, entities, add)
 		for _, f := range target.Fields {
@@ -347,7 +350,7 @@ func checkRuleAction(where string, r *ServerRule, act *RuleAction, row *Entity, 
 			add("%s: updateRecord needs a record trigger (a time trigger has no record to update)", w)
 			return
 		}
-		target := row
+		target := row // a single trigger record is overwritten in place (still one record)
 		if act.UpdateRecord.Ref != "" {
 			if target = refTarget(w, row, act.UpdateRecord.Ref, entities, add); target == nil {
 				return
