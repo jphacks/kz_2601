@@ -73,7 +73,22 @@ final class AppRuntime: DSLRuntime {
     struct Confirm: Identifiable {
         let id = UUID()
         var message: String
+        /// 主ボタンの文言(L1: 「実行」でなく何が起きるか)と、取り消せない操作か
+        var primaryLabel: String = L10n.tr("続ける")
+        var isDestructive = false
         var perform: @MainActor () async -> Void
+
+        /// アクションの種類から主ボタンを決める(L1)
+        static func button(for type: ActionType) -> (label: String, destructive: Bool) {
+            switch type {
+            case .deleteRecord: (L10n.tr("削除"), true)
+            case .resetForm: (L10n.tr("入力を消す"), true)
+            case .saveRecord: (L10n.tr("保存"), false)
+            case .export: (L10n.tr("書き出す"), false)
+            case .navigate, .openUrl: (L10n.tr("開く"), false)
+            default: (L10n.tr("続ける"), false)
+            }
+        }
     }
     var confirm: Confirm?
     /// 書き出したファイル(#421)。立つと共有シートを開く(`RootView` の HostSheets)。
@@ -91,6 +106,7 @@ final class AppRuntime: DSLRuntime {
             #if DEBUG
             if let toast { print("[Metamon] toast: \(toast)") } // ヘッドレス E2E でエラー文言を拾うため
             #endif
+            if let toast, toast != oldValue { VoiceOverAnnouncer.announce(toast) } // H8
         }
     }
 
@@ -101,6 +117,7 @@ final class AppRuntime: DSLRuntime {
             if let errorCard { print("[Metamon] errorCard: \(errorCard.kind) transcript=\(errorCard.transcript)") }
             else if oldValue != nil { print("[Metamon] errorCard: cleared") }
             #endif
+            if let errorCard, errorCard.id != oldValue?.id { VoiceOverAnnouncer.announce(errorCard.announcement) } // H8
         }
     }
     /// 401 が再取得後も続いた時(セッション切れ)。`MetamonApp` が `AuthSession.expire()` を結ぶ。
@@ -141,7 +158,9 @@ final class AppRuntime: DSLRuntime {
         var highlight: UnitPoint?
         var action: Action? = nil
     }
-    var summaryBanner: SummaryBanner?
+    var summaryBanner: SummaryBanner? {
+        didSet { if let summaryBanner, summaryBanner.id != oldValue?.id { VoiceOverAnnouncer.announce(summaryBanner.text) } } // H8
+    }
 
     /// 「やり直す」の戻り先(#209)。戻す直前の版。サーバー経由なら `version` を restore、ローカルなら `document` を当て直す。
     struct RedoPoint {
@@ -234,7 +253,7 @@ final class AppRuntime: DSLRuntime {
     @ObservationIgnored private var morphTask: Task<MorphResult, Error>?
     @ObservationIgnored private var isForeground = true
     /// 「元に戻して」のフォールバック(appconfig が versions を持たない mock / 未デプロイ時)。直近 10 件。
-    /// 「1 つ前に戻す」ボタンの出し分けに使うので観測する(#209)。
+    /// 「元に戻す」ボタンの出し分けに使うので観測する(#209)。
     private var localHistory: [AppDocument] = []
     /// `openUrl` で外部に渡す処理(テストで差し替える)。
     @ObservationIgnored var openExternalURL: @MainActor (URL) async -> Bool = { await UIApplication.shared.open($0) }
@@ -312,6 +331,7 @@ final class AppRuntime: DSLRuntime {
         do {
             let remote = try await services.appConfig.fetchDocument(appId: document.appId)
             isOffline = false
+            if errorCard?.title == ErrorCopy.unreachableTitle { errorCard = nil } // つながったら起動時の知らせを下げる
             if remote.version > document.version || (remote.version == document.version && document.version == 0) {
                 apply(remote, animated: false)
             }
@@ -321,10 +341,11 @@ final class AppRuntime: DSLRuntime {
             if let cached = DocumentCache.shared.load(appId: document.appId), cached.version >= document.version {
                 apply(cached, animated: false)
                 isOffline = true
-                toast = ErrorCopy.offlineRestored(version: cached.version)
+                toast = ErrorCopy.offlineRestored
             } else {
                 isOffline = true
-                toast = ErrorCopy.unreachable(error.localizedDescription)
+                // H9: OS のエラー文は出さず、消えない状態カードで次の一手を(中身は上の restore failed のログ)
+                errorCard = .notice(icon: "wifi.exclamationmark", title: ErrorCopy.unreachableTitle, body: ErrorCopy.unreachableBody)
             }
         }
     }
@@ -413,8 +434,7 @@ final class AppRuntime: DSLRuntime {
         }
         print("[Metamon] hot reload: version \(document.version) → \(doc.version)")
         apply(doc)
-        summaryBanner = SummaryBanner(text: L10n.pick(L10n.tr("アプリが更新されました(version \(doc.version))"),
-                                                     review: L10n.tr("記録帳が更新されました(version \(doc.version))")), highlight: nil)
+        summaryBanner = SummaryBanner(text: L10n.tr("最新の内容に更新しました"), highlight: nil)
     }
 
     /// records の変化通知はまとめて 1 回だけ取り直す(連投で pull を重ねない)。未表示の entity は画面が開いた時に読むので無視。
@@ -576,6 +596,9 @@ final class AppRuntime: DSLRuntime {
             if let summary = result.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
                 summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary), action: canUndo ? .undo : nil)
                 SpeechReader.shared.speak(summary) // #43(設定 OFF なら何もしない)
+            } else {
+                // 要約が無くても完成は伝える(H8・バナーの didSet が読み上げる要約の代わり)
+                VoiceOverAnnouncer.announce(ErrorCopy.completedAnnouncement(appName: result.document.dsl.app.name, created: createdFromInitial))
             }
             scheduleFirstEditHint(createdFromInitial: createdFromInitial) // #274 最初のアプリの直後に 1 回だけ
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
@@ -666,7 +689,7 @@ final class AppRuntime: DSLRuntime {
         morphTask?.cancel()
     }
 
-    /// 「1 つ前に戻す」を押せるか(#209)。作ったアプリで、サーバーに前の版がある(version > 1)か端末の履歴がある時。
+    /// 「元に戻す」を押せるか(#209)。作ったアプリで、サーバーに前の版がある(version > 1)か端末の履歴がある時。
     var canUndo: Bool {
         !dsl.isVoiceOnly && ((services.isLive && document.version > 1) || !localHistory.isEmpty)
     }
@@ -695,7 +718,7 @@ final class AppRuntime: DSLRuntime {
                 startSync()
                 // restore は新しい版を作るので、「やり直す」は戻す前の版(current)をもう一度 restore すればよい
                 redoPoint = RedoPoint(version: current.version, document: before, viaServer: true)
-                summaryBanner = SummaryBanner(text: L10n.tr("1つ前に戻しました"), highlight: nil, action: .redo)
+                summaryBanner = SummaryBanner(text: L10n.tr("元に戻しました"), highlight: nil, action: .redo)
                 print("[Metamon] undo ok: restored from version \(target.version) → new version \(doc.version)")
                 await gatePaidRestore(before: before) // #414 共有の版に戻した時も課金画面を通す
                 return
@@ -710,7 +733,7 @@ final class AppRuntime: DSLRuntime {
         }
         apply(previous)
         redoPoint = RedoPoint(version: before.version, document: before, viaServer: false)
-        summaryBanner = SummaryBanner(text: L10n.tr("1つ前に戻しました"), highlight: nil, action: .redo)
+        summaryBanner = SummaryBanner(text: L10n.tr("元に戻しました"), highlight: nil, action: .redo)
         await gatePaidRestore(before: before)
     }
 
@@ -784,9 +807,9 @@ final class AppRuntime: DSLRuntime {
             let cached = AppListCache.shared.load()
             if !cached.isEmpty {
                 apps = cached
-                toast = L10n.pick(L10n.tr("オフライン: 保存済みのアプリ一覧を表示しています"), review: L10n.tr("オフライン: 保存済みの記録帳の一覧を表示しています"))
+                toast = L10n.pick(L10n.tr("オフラインです。保存済みの変身一覧を表示しています"), review: L10n.tr("オフラインです。保存済みの記録帳の一覧を表示しています"))
             } else if apps.isEmpty {
-                toast = L10n.pick(L10n.tr("アプリ一覧を取得できませんでした: \(error.localizedDescription)"), review: L10n.tr("記録帳の一覧を取得できませんでした: \(error.localizedDescription)"))
+                toast = ErrorCopy.failure(L10n.pick(L10n.tr("変身一覧を読み込めませんでした"), review: L10n.tr("記録帳の一覧を読み込めませんでした")), error, context: "apps list")
             }
         }
         return apps
@@ -1076,7 +1099,8 @@ final class AppRuntime: DSLRuntime {
 
     func run(_ action: Action, _ ctx: ActionContext) async {
         if let message = action.confirmMessage {
-            confirm = Confirm(message: message) { [weak self] in await self?.perform(action, ctx) }
+            let button = Confirm.button(for: action.type)
+            confirm = Confirm(message: message, primaryLabel: button.label, isDestructive: button.destructive) { [weak self] in await self?.perform(action, ctx) }
             return
         }
         await perform(action, ctx)
@@ -1207,24 +1231,26 @@ final class AppRuntime: DSLRuntime {
     /// appconfig のエラー封筒を人向けに。422 `invalid_record` は `details.field` を DSL の Field 名に引き直して「どの項目か」を出す。
     /// 同期キューで保存が弾かれた時の toast。項目が分かれば「払った人」のように名前で出す(英語の field id を見せない)。
     func rejectedToast(entity: String, field: String?, message: String) -> String {
-        guard let field else { return L10n.tr("保存できませんでした: \(message)") }
+        // H9: サーバーの文はログにだけ残し、画面には決まった文を出す
+        ErrorLog.record(message, context: "save \(entity)\(field.map { ".\($0)" } ?? "")")
+        guard let field else { return L10n.tr("保存できませんでした。入力を確認して、もう一度お試しください") }
         let name = dsl.entity(entity)?.field(field)?.name ?? field
-        // サーバー文言の `field "payer" ` 前置きは名前と重複するので落とす
-        let reason = message.replacingOccurrences(of: "field \"\(field)\" ", with: "")
-        return L10n.tr("保存できませんでした: \(L10n.tr("「\(name)」の入力を確認してください(\(reason))"))")
+        return L10n.tr("保存できませんでした。「\(name)」の入力を確認してください")
     }
 
+    /// 利用者に出す 1 文(H9)。OS のエラー文・サーバーの文は出さず、ログにだけ残す。
     func message(for error: Error, entity: String?) -> String {
-        guard let api = error as? APIError else { return error.localizedDescription }
+        guard let api = error as? APIError else { return ErrorCopy.failure(L10n.tr("うまくいきませんでした"), error, context: "action") }
         if let denial = SharedAccessDenial(api) { return denial.message } // #254
         if let pro = ProRequired(api) { return pro.writeMessage } // #316(印を付けるなど)
         if api.code == "invalid_record" || (api.status == 400 && api.field != nil), let fieldId = api.field {
             let name = entity.flatMap { dsl.entity($0)?.field(fieldId)?.name } ?? fieldId
-            return L10n.tr("「\(name)」の入力を確認してください(\(api.errorDescription ?? ""))")
+            ErrorLog.record(error, context: "action \(entity ?? "-").\(fieldId)")
+            return L10n.tr("「\(name)」の入力を確認してください")
         }
         if api.isAppCheckFailure { return ErrorCopy.appCheckFailedBody } // #318: サインインでは直らない
         if api.isAIPaused { return ErrorCopy.aiPausedBody } // #511
         if api.status == 401 { return ErrorCopy.sessionExpiredSignIn }
-        return api.errorDescription ?? "\(api)"
+        return ErrorCopy.failure(L10n.tr("うまくいきませんでした"), error, context: "action")
     }
 }

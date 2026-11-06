@@ -182,9 +182,11 @@ struct RootView: View {
         .modifier(BetaWelcomeHost()) // #313: β の版だけ、チュートリアルのあとに初回の案内
         #endif
         .alert(item: $rt.confirm) { confirm in
-            Alert(title: Text(confirm.message),
-                  primaryButton: .destructive(Text("実行")) { Task { await confirm.perform() } },
-                  secondaryButton: .cancel(Text("キャンセル")))
+            let run: () -> Void = { Task { await confirm.perform() } }
+            return Alert(title: Text(confirm.message),
+                         primaryButton: confirm.isDestructive ? .destructive(Text(confirm.primaryLabel), action: run)
+                                                              : .default(Text(confirm.primaryLabel), action: run),
+                         secondaryButton: .cancel(Text("キャンセル")))
         }
         .overlay(alignment: .top) { summaryCard }
         .overlay(alignment: .top) { errorCardOverlay }
@@ -218,7 +220,7 @@ struct RootView: View {
             isTopLayer: rt.sheet == nil && rt.fullScreen == nil && AIButtonLayers.shared.isEmpty)
     }
 
-    /// 変身直後の要約(読み上げ文)。上部カードで 3 秒表示して自動で消える。
+    /// 変身直後の要約(読み上げ文)。上部カードで 3〜6 秒表示して自動で消える(VoiceOver の時は長く・H8)。
     @ViewBuilder
     private var summaryCard: some View {
         if let banner = rt.summaryBanner {
@@ -241,7 +243,8 @@ struct RootView: View {
             .task(id: banner.id) {
                 // 文字数に応じて 3〜5 秒(読み上げを読み切れる長さ)
                 // ボタン付き(#209)は押す余裕を持たせて 6 秒以上
-                var seconds = max(banner.action == nil ? 3.0 : 6.0, min(5.0, Double(banner.text.count) / 12))
+                // VoiceOver の時は読み上げを聞いてから探して押せるよう長く(H8)
+                var seconds = VoiceOverAnnouncer.holdSeconds(max(banner.action == nil ? 3.0 : 6.0, min(5.0, Double(banner.text.count) / 12)))
                 #if DEBUG
                 // UI テスト用: 遅い CI では出てから押すまでに 6 秒を超え、押す前に消えた(#209)
                 if let hold = Double(ProcessInfo.processInfo.environment["METAMON_BANNER_SECONDS"] ?? "") { seconds = hold }
@@ -291,7 +294,8 @@ private struct ToastHost: ViewModifier {
                     .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task(id: message) {
-                        try? await Task.sleep(for: .seconds(3))
+                        try? await Task.sleep(for: .seconds(VoiceOverAnnouncer.holdSeconds(3))) // H8: VoiceOver の時は長く
+                        guard !Task.isCancelled else { return }
                         withAnimation { rt.toast = nil }
                     }
             }

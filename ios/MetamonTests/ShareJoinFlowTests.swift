@@ -426,7 +426,8 @@ final class ShareJoinFlowTests: XCTestCase {
         let rt = try await makeRuntime(fake)
         let appId = rt.document.appId
         await rt.installPublic(PublicAppListing(id: "catalog-walk", name: "散歩"))
-        XCTAssertEqual(rt.toast, L10n.tr("インストールできませんでした: \(failure.localizedDescription)"))
+        XCTAssertEqual(rt.toast, L10n.tr("\(L10n.tr("インストールできませんでした"))。\(ErrorCopy.offlineInterruptedBody)"))
+        XCTAssertFalse(rt.toast?.contains(failure.localizedDescription) ?? true, "OS のエラー文は出さない(H9)")
         XCTAssertEqual(rt.document.appId, appId)
         XCTAssertNil(rt.summaryBanner)
     }

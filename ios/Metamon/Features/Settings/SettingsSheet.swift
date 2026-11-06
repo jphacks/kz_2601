@@ -249,7 +249,7 @@ struct SettingsSheet: View {
                 dismiss()
                 Task { await rt.undo() }
             } label: {
-                Label("ひとつ前の状態に戻す", systemImage: "arrow.uturn.backward")
+                Label("元に戻す", systemImage: "arrow.uturn.backward")
             }
             .disabled(rt.isMorphing)
             ScreenMapSettingsRow() // #116

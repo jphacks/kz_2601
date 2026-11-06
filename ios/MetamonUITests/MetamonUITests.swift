@@ -745,7 +745,7 @@ extension MetamonUITests {
     }
 
     /// 家計簿で修正(モックは「筋トレの記録」でトレーニング記録に変わる)→ 要約の「元に戻す」で家計簿に戻る →「やり直す」で再び修正後に。
-    /// 修正チャット(音声シート)の上部の「1つ前に戻す」も、戻せる版が無い時は押せない。
+    /// 修正チャット(音声シート)の上部の「元に戻す」も、戻せる版が無い時は押せない。
     func testUndoFromSummaryBannerAndRedo() {
         // 要約バナーは 6 秒で消える。CI では出てから「元に戻す」を押すまでに 6 秒を超えて消えていた(run 41043811226)ので、テストの間は消さない
         launch(example: "kakeibo", ["METAMON_CLARIFY": "0", "METAMON_MOCK_AI_DELAY": "0.5", "METAMON_BANNER_SECONDS": "600"])
@@ -754,7 +754,7 @@ extension MetamonUITests {
         fab.tap()
         XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開かない")
         let headerUndo = app.buttons["voice.undo"]
-        XCTAssertTrue(headerUndo.exists, "修正チャットの上部に「1つ前に戻す」が無い")
+        XCTAssertTrue(headerUndo.exists, "修正チャットの上部に「元に戻す」が無い")
         XCTAssertFalse(headerUndo.isEnabled, "戻せる版が無いのに押せる")
         attachScreenshot("undo-header-disabled")
 
@@ -771,7 +771,7 @@ extension MetamonUITests {
         attachScreenshot("undo-banner-after-edit")
         undo.tap()
 
-        XCTAssertTrue(text("1つ前に戻しました").waitForExistence(timeout: 15), "「1つ前に戻しました」が出ない")
+        XCTAssertTrue(text("元に戻しました").waitForExistence(timeout: 15), "「元に戻しました」が出ない")
         XCTAssertTrue(text("最近の支出").waitForExistence(timeout: 15), "前の画面(家計簿)に戻らない")
         let redo = app.buttons["banner.redo"]
         XCTAssertTrue(redo.exists, "戻した後に「やり直す」が無い")
@@ -788,7 +788,7 @@ extension MetamonUITests {
         XCTAssertTrue(headerUndo.isEnabled, "戻せる版があるのに押せない")
         attachScreenshot("undo-header-enabled")
         headerUndo.tap()
-        XCTAssertTrue(text("最近の支出").waitForExistence(timeout: 15), "上部の「1つ前に戻す」で前の画面に戻らない")
+        XCTAssertTrue(text("最近の支出").waitForExistence(timeout: 15), "上部の「元に戻す」で前の画面に戻らない")
         attachScreenshot("undo-header-restored")
     }
 }

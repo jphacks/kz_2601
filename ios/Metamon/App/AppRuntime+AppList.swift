@@ -21,7 +21,7 @@ extension AppRuntime {
         } catch {
             print("[Metamon] renameApp failed: \(error)")
             if let j = apps.firstIndex(where: { $0.id == app.id }) { apps[j].name = before.name }
-            toast = L10n.tr("名前を変えられませんでした: \(error.localizedDescription)")
+            toast = ErrorCopy.failure(L10n.tr("名前を変えられませんでした"), error, context: "rename app")
         }
     }
 
@@ -40,7 +40,7 @@ extension AppRuntime {
             }
         } catch {
             print("[Metamon] duplicateApp failed: \(error)")
-            toast = L10n.tr("「\(app.name)」を複製できませんでした: \(error.localizedDescription)")
+            toast = ErrorCopy.failure(L10n.tr("「\(app.name)」を複製できませんでした"), error, context: "duplicate app")
         }
     }
 
@@ -60,7 +60,7 @@ extension AppRuntime {
         } catch {
             print("[Metamon] reorderApps failed: \(error)")
             apps = previous
-            toast = L10n.tr("並び順を保存できませんでした: \(error.localizedDescription)")
+            toast = ErrorCopy.failure(L10n.tr("並び順を保存できませんでした"), error, context: "reorder apps")
         }
     }
 }

@@ -296,7 +296,7 @@ struct ReleaseRequestSheet: View {
             justSent = true
             print("[Metamon] release request: id=\(r.id) status=\(r.status)")
         } catch {
-            self.error = L10n.tr("申請できませんでした: \(error.localizedDescription)")
+            self.error = ErrorCopy.failure(L10n.tr("申請できませんでした"), error, context: "ReleaseRequestSheet")
         }
     }
 }

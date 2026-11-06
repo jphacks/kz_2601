@@ -317,6 +317,8 @@ stateDiagram-v2
 カードは初期画面 / 音声シートでは `VoiceInputView` の中(マイクの下)、生成後(edit)の失敗は音声シートが閉じているので `RootView` が画面上部にコンパクト版を出す。
 文言は `Features/Voice/ErrorCopy.swift` に集約(Greeting と同じ方針)。失敗の分類は Services の `FailureKind.classify(error)` が 1 箇所で行い、UI は分類だけを見る。
 トーストに残すのは軽微なもの(保存失敗・キャンセル・「これ以上前の状態はありません」等)だけ。
+**文言に内部の値を出さない**(UX 点検 H9): OS の `localizedDescription`・サーバーの message・秒数 / dB / サンプル数などの診断は画面に出さず、`ErrorLog.record`(stdout の `[Metamon] <context> failed:` と os_log subsystem `jp.kz2601.metamon` category `error`)にだけ残す。画面は `ErrorCopy.failure("〇〇できませんでした", error, context:)` で「何が起きたか。次の一手」(圏外なら接続の確認・それ以外は少し待って再試行)。生成以外の消えない知らせ(録音の失敗・起動時に届かない)は `ErrorPresentation.notice`(主ボタンなし・「閉じる」だけ)。
+**VoiceOver**(H8): `toast` / `summaryBanner` / `errorCard` の didSet と、AI の返事(`chatRound`)・要約の無い完成で `VoiceOverAnnouncer.announce` を出す。VoiceOver が有効な時は要約バナーとトーストが自動で消えるまでを長くする(`VoiceOverAnnouncer.holdSeconds`・3 倍・最低 15 秒)。確認アラートの主ボタンはアクションに合わせる(削除 =「削除」・取り消せない操作は destructive・L1)。
 
 | 状況 | 判定(`FailureKind`) | 表示(カード) | 主ボタン | 副ボタン | 自動復帰 |
 |---|---|---|---|---|---|
@@ -328,9 +330,11 @@ stateDiagram-v2
 | 401(Firebase ID トークン失効) | HTTP 層: `idToken(forceRefresh: true)` → 値が変われば同じリクエストを 1 回再送(ai / appconfig 共通) | 成功すれば何も出ない | — | — | **自動(1 回)** |
 | 401 が再取得後も続く | `.sessionExpired` | 「サインインの有効期限が切れました」「もう一度サインインしてください」 | サインイン | 閉じる | `AuthSession.expire()` → サインアウト → `SignInView` に同じ 1 文を表示 |
 | appconfig 409(version 競合) | `.conflict`(ai 側の baseVersion 無しリトライでも解けなかった時) | バナー「別の端末で更新されていたため、最新の状態に合わせました。もう一度お話しください」 | — | — | **`GET /dsl` で最新を取り直して `apply()`** |
-| 4xx(入力不備など)/ 分類不能 | `.rejected(message)` / `.other` | 「生成に失敗しました」+ サーバーの message | もう一度 | 閉じる | なし |
-| ユーザーのキャンセル | `.cancelled` | トースト「生成をキャンセルしました」 | — | — | — |
-| 起動時にサーバー到達不能 | `restoreFromServer` 失敗 | トースト「オフライン: 最後に取得したアプリ(vN)を表示しています」(キャッシュ無しなら「サーバーに接続できません」) | — | — | 到達性 online 復帰で `GET /dsl` を取り直す |
+| 4xx(入力不備など) | `.rejected(message)` | 「うまく伝わりませんでした」「言い方を変えて、もう一度お話しください」(サーバーの message はログだけ) | — | 閉じる | なし |
+| 分類不能 | `.other` | 「うまく作れませんでした」「少し待ってから、もう一度お試しください」 | もう一度 | 閉じる | なし |
+| ユーザーのキャンセル | `.cancelled` | トースト「作るのをやめました」 | — | — | — |
+| 起動時にサーバー到達不能 | `restoreFromServer` 失敗 | トースト「オフラインです。最後に保存したアプリを表示しています」(キャッシュ無しなら状態カード「サーバーに接続できません」「接続を確認してください。つながると自動で読み込み直します」) | — | 閉じる | 到達性 online 復帰で `GET /dsl` を取り直す |
+| 録音・文字起こしの失敗 | `TranscriberFailure` / 空の書き起こし | 音声画面の状態カード(例「うまく聞き取れませんでした」「マイクに近づいて、もう一度話してください」)。秒数・dB は `[Voice]` のログ | — | 閉じる | 次に録音を始めると消える |
 | レコード取得失敗(#85) | `refresh()` 失敗 & ローカルにも無い → `AppRuntime.failed` に entity | list / table / timeline / chart: 「読み込めませんでした」+ **再試行**、stat: `—`、calendar: 文言 + 再試行(空状態「まだありません」「¥0」と区別) | 再試行(`load(force:)`) | — | 到達性 online 復帰で `failed` の entity を読み直す |
 
 自動再送の方針: **POST を二重実行し得る失敗(5xx / タイムアウト / 接続断)は自動再送しない**(ai の生成はべき等でない)。自動で再送するのは 401(トークン差し替え)と 429(サーバーが待てと言った)だけ、それぞれ 1 回。
