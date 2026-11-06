@@ -58,6 +58,8 @@
 | `RATE_LIMIT_GLOBAL_DAILY` | ai | 環境全体の 1 日の AI 上限(費用ブレーカー)([rate-limit.md](../backend/rate-limit.md))。AI を止める用途には `AI_PAUSED` を使う。`1` にして止めるのは、`AI_PAUSED` の入っていない版が動いている時の予備だけ([incident-runbook.md §5](../ops/incident-runbook.md#5-手順-a-claude-api-の障害上限)) | 2000 |
 | `RATE_LIMIT_ANON_DAILY` / `_USER_DAILY` / `_PRO_DAILY` / `_IP_DAILY` | ai | 利用者ごと・IP ごとの 1 日の上限([rate-limit.md](../backend/rate-limit.md)) | 30 / 60 / 300 / 300 |
 | `RATE_LIMIT_WEIGHT_*` | ai | 呼び出し 1 回で数える重み([rate-limit.md](../backend/rate-limit.md)) | 3 / 2 / 1 / 1 |
+| `RUNNER_GLOBAL_DAILY` | runner(**まだ使われていない**) | 環境全体の 1 日の自動の動きの実行の上限(費用の遮断・[#338](../decisions/338-server-feature-cost-model.md#上限案))。`0` で数えない。runner のサービスの追加は人の承認の後 | 10000 |
+| `RUNNER_LIMIT_*` | runner(**まだ使われていない**) | アプリ・作成者・きっかけの人・受け取る人ごとの 1 日の上限と、1 回の実行の形の上限(`backend/internal/runner/quota/config.go` の `ConfigFromEnv`・#345)。`_FREE` / `_PRO` の組は無料 / Pro。`0` で数えない。runner のサービスの追加は人の承認の後 | 実行 100 / 2000(アプリ)・300 / 3000(作成者)、書き込み 100 / 2000、通知の宛先 50 / 1000、受け取る人 20(1 アプリ)・100(合計)、きっかけの人 200、1 回の宛先 1 / 200・書き込み 1 / 10、定期のルール 1 / 5 |
 | `RUNNER_OUTBOX` | appconfig | `1` で、serverRules(自動の動き)の条件に合う記録の書き込みを、同じトランザクションで outbox(`runner/{APP_ENV}/outbox`)に積む(#341)。入れるのは人の承認を得てから(runner が無いまま入れると積まれるだけで動かない) | 無し(積まない) |
 | `LOG_LEVEL` | 両方 | ログの詳しさ(調査の間だけ `debug` など) | info |
 
