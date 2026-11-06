@@ -12,6 +12,12 @@ struct SettingsSheet: View {
     @State private var confirmDelete = false
     @State private var isDeleting = false
     @State private var deleteError: String?
+    /// ログアウトの確認(端末のデータを消す・未送信の扱い)
+    @State private var signOutPrompt: SignOutFlow.Prompt?
+    /// 送ってからログアウトしようとして送り切れなかった件数
+    @State private var signOutUnsent: Int?
+    @State private var isSigningOut = false
+    @State private var signOutError: String?
     @State private var showSupportDetails = false
     @State private var copiedSupportInfo = false
     #if !APP_STORE_REVIEW
@@ -77,14 +83,42 @@ struct SettingsSheet: View {
         } message: {
             Text(deleteError ?? "")
         }
+        .alert("ログアウトしますか？", isPresented: Binding(get: { signOutPrompt != nil }, set: { if !$0 { signOutPrompt = nil } }),
+               presenting: signOutPrompt) { prompt in
+            switch prompt {
+            case .plain:
+                Button("ログアウト", role: .destructive) { signOut(.discardAndWipe) }
+            case .unsent(_, let canSend):
+                if canSend {
+                    Button("送ってからログアウト") { signOut(.sendThenWipe) }
+                        .keyboardShortcut(.defaultAction)
+                }
+                Button("送らずにログアウト", role: .destructive) { signOut(.discardAndWipe) }
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: { prompt in
+            Text(SignOutCopy.message(isAnonymous: session.user?.isAnonymous == true, prompt: prompt))
+        }
+        .alert("送れなかった記録があります", isPresented: Binding(get: { signOutUnsent != nil }, set: { if !$0 { signOutUnsent = nil } }),
+               presenting: signOutUnsent) { _ in
+            Button("送らずにログアウト", role: .destructive) { signOut(.discardAndWipe) }
+            Button("キャンセル", role: .cancel) {}
+        } message: { n in
+            Text(SignOutCopy.unsentAfterFlush(n))
+        }
+        .alert("ログアウトできませんでした", isPresented: Binding(get: { signOutError != nil }, set: { if !$0 { signOutError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(signOutError ?? "")
+        }
         .overlay {
-            if isDeleting {
-                ProgressView("削除しています…")
+            if isDeleting || isSigningOut {
+                ProgressView(LocalizedStringKey(isDeleting ? "削除しています…" : "ログアウトしています…"))
                     .padding(Theme.Spacing.lg)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             }
         }
-        .interactiveDismissDisabled(isDeleting)
+        .interactiveDismissDisabled(isDeleting || isSigningOut)
         #if !APP_STORE_REVIEW
         .sheet(item: $feedback) { ctx in
             FeedbackComposerView(context: ctx, client: services.feedback) { feedback = nil }
@@ -111,12 +145,18 @@ struct SettingsSheet: View {
             Section {
                 Button(role: .destructive) { confirmDelete = true } label: {
                     Label("アカウントを削除", systemImage: "person.crop.circle.badge.xmark")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(rt.canDelete ? Color.red : Color.secondary) // 生成中は押せない見た目に
                 }
-                .disabled(isDeleting)
+                .disabled(isDeleting || isSigningOut || !rt.canDelete)
                 .accessibilityIdentifier("settings.deleteAccount")
             } footer: {
-                Text(L10n.key("作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。", review: "用意した記録帳が使えなくなります。この端末のデータも消えます。"))
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    if !rt.canDelete {
+                        Text(AppRuntime.deleteBlockedReason)
+                            .accessibilityIdentifier("settings.deleteAccount.blocked")
+                    }
+                    Text(L10n.key("作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。", review: "用意した記録帳が使えなくなります。この端末のデータも消えます。"))
+                }
             }
         }
     }
@@ -130,6 +170,7 @@ struct SettingsSheet: View {
     }
 
     private func deleteAccount() {
+        guard rt.canDelete else { return } // 確認を出した後に生成が始まった
         isDeleting = true
         Task {
             defer { isDeleting = false }
@@ -137,6 +178,22 @@ struct SettingsSheet: View {
                 if try await session.deleteAccount(account: services.account, runtime: rt) { dismiss() }
             } catch {
                 deleteError = error.localizedDescription
+            }
+        }
+    }
+
+    /// ログアウト: 端末のデータをアカウント削除と同じに消してからサインアウトする。
+    private func signOut(_ choice: SignOutFlow.Choice) {
+        isSigningOut = true
+        Task {
+            defer { isSigningOut = false }
+            do {
+                switch try await session.signOutAndWipe(runtime: rt, choice: choice) {
+                case .signedOut: dismiss()
+                case .unsent(let n): signOutUnsent = n
+                }
+            } catch {
+                signOutError = error.localizedDescription
             }
         }
     }
@@ -162,9 +219,10 @@ struct SettingsSheet: View {
                     }
                 }
                 Button("ログアウト", role: .destructive) {
-                    session.signOut()
-                    dismiss()
+                    signOutPrompt = SignOutFlow.prompt(pending: rt.recordSync.pendingCount, isOnline: rt.recordSync.isOnline)
                 }
+                .disabled(isDeleting || isSigningOut)
+                .accessibilityIdentifier("settings.signOut")
             } else {
                 Text("サインインしていません").foregroundStyle(.secondary)
             }

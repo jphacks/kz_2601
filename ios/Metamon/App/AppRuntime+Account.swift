@@ -5,7 +5,7 @@ import MetamonRenderer
 import MetamonServices
 
 extension AppRuntime {
-    /// アカウント削除(#119)の後始末: この端末に残る自分のデータをすべて消し、初期状態の新しい appId に戻す。
+    /// アカウント削除(#119)・ログアウトの後始末: この端末に残る自分のデータをすべて消し、初期状態の新しい appId に戻す。
     /// サーバーには何も送らない(削除済みユーザーのトークンで 401 にならないように)。
     func wipeLocalData() async {
         #if !APP_STORE_REVIEW
@@ -37,11 +37,12 @@ extension AppRuntime {
 /// 端末のデータ削除のうち UserDefaults の分。
 enum LocalWipe {
     /// 消さずに残すキー: 個人のデータではない端末の設定(表示の言語)と、本人が選んだ送信のオプトアウト
-    /// (クラッシュ報告 #296・AI ボタンの利用状況 #446)。消すと、画面はオフのまま次の起動で黙ってオンに戻る。
+    /// (クラッシュ報告 #296・AI ボタンの利用状況 #446。消すと、画面はオフのまま次の起動で黙ってオンに戻る)と、端末の移行の印。
     static let preservedKeys: Set<String> = [
         "metamon.appLanguage",
         "metamon.crashReporting.enabled",
         "metamon.aiButtonMetrics.enabled",
+        TimerKeyMigration.doneKey, // タイマーのキーの移行(#623)の印。消すと次の起動で移行がもう一度走る(データではない)
     ]
 
     /// removePersistentDomain は直後の書き込み(新 appId)が永続化されないことがあったので、キーを 1 つずつ消す。
