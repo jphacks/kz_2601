@@ -80,3 +80,42 @@ func TestAddressedRestriction(t *testing.T) {
 		t.Fatal("no shared data: the chat rule must go")
 	}
 }
+
+// An older build gets member / members as string: a picker on them becomes a
+// textField wherever it sits, a picker on an enum stays, and the DSL stays valid.
+func TestRestrictionTurnsParticipantPickersIntoTextFields(t *testing.T) {
+	const doc = `{"schemaVersion":1,"app":{"name":"当番","voiceEntry":"none"},"initialScreen":"form",
+"entities":[{"id":"shifts","name":"当番","scope":"shared","fields":[
+ {"id":"staff","name":"担当","type":"member","required":true},
+ {"id":"others","name":"手伝い","type":"members"},
+ {"id":"kind","name":"種類","type":"enum","options":["朝","夜"]}]}],
+"screens":[{"id":"form","title":"追加","entity":"shifts","toolbar":[{"label":"保存","action":{"type":"saveRecord","entity":"shifts"}}],"components":[
+ {"type":"section","title":"誰が","children":[{"type":"picker","field":"staff","label":"担当"},{"type":"picker","field":"others","label":"手伝い"}]},
+ {"type":"picker","field":"kind","label":"種類"}]}]}`
+	if _, err := dsl.Parse([]byte(doc)); err != nil {
+		t.Fatalf("doc must be valid: %v", err)
+	}
+	all := allComponentTypes()
+	base := []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity}
+	for name, tc := range map[string]struct {
+		features []string
+		pickers  int
+	}{
+		"neither":      {base, 1},
+		"no roles":     {append(base[:4:4], FeatureAddressed), 2},
+		"no addressed": {append(base[:4:4], FeatureDataRoles), 2},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, _, changed := enforceRestriction([]byte(doc), NewClientRestriction(all, nil, tc.features))
+			if !changed {
+				t.Fatal("must change")
+			}
+			if _, err := dsl.Parse(out); err != nil {
+				t.Fatalf("the enforced DSL must stay valid: %v\n%s", err, out)
+			}
+			if got := strings.Count(string(out), `"type":"picker"`); got != tc.pickers {
+				t.Fatalf("pickers = %d, want %d\n%s", got, tc.pickers, out)
+			}
+		})
+	}
+}
