@@ -319,6 +319,8 @@ const (
 	CompMatchList ComponentType = "matchList"
 	// flashcards (#264): one card at a time, tap to flip, swipe to mark learned
 	CompFlashcards ComponentType = "flashcards"
+	// external feed (#348): read-only list from an allowlisted public source via appconfig
+	CompFeed ComponentType = "feed"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -475,6 +477,11 @@ type Component struct {
 	Front  string `json:"front,omitempty"`  // field on the card's face
 	Back   string `json:"back,omitempty"`   // field shown when flipped
 	Toggle string `json:"toggle,omitempty"` // boolean field: learned (swipe right) / not yet (left)
+
+	// feed (#348). Title / Limit / EmptyText are shared. Never a URL (feed.go).
+	Provider string `json:"provider,omitempty"` // weather|holidays|rss
+	Region   string `json:"region,omitempty"`   // weather: JMA forecast office code (WeatherRegions)
+	FeedID   string `json:"feedId,omitempty"`   // rss: allowlisted feed id (RSSFeeds)
 }
 
 // PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the
