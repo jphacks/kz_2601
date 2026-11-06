@@ -100,32 +100,37 @@ struct AccountLinkPromptSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: Theme.Spacing.lg) {
-            Image(systemName: "person.crop.circle.badge.checkmark")
-                .font(.system(size: 48))
-                .foregroundStyle(Theme.brandGradient)
-            VStack(spacing: Theme.Spacing.sm) {
-                Text(L10n.key("作ったアプリを残しておきませんか", review: "用意した記録帳を残しておきませんか"))
-                    .font(.title3.weight(.bold))
-                    .multilineTextAlignment(.center)
-                Text(L10n.key("いまは匿名で使っています。Apple でサインインしておくと、機種変更やアプリの入れ直しのあとも、作ったアプリとデータに戻れます。",
-                               review: "いまは匿名で使っています。Apple でサインインしておくと、機種変更やアプリの入れ直しのあとも、用意した記録帳とデータに戻れます。"))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            VStack(spacing: Theme.Spacing.sm) {
-                AppleLinkButton { dismiss() }
-                if let message = session.linkError {
-                    Text(message).font(.footnote).foregroundStyle(.red).multilineTextAlignment(.center)
+        // 横向き(#625)はシートの高さが足りず「あとで」が見切れるのでスクロールに入れる
+        ScrollView {
+            VStack(spacing: Theme.Spacing.lg) {
+                Image(systemName: "person.crop.circle.badge.checkmark")
+                    .font(.system(size: 48))
+                    .foregroundStyle(Theme.brandGradient)
+                VStack(spacing: Theme.Spacing.sm) {
+                    Text(L10n.key("作ったアプリを残しておきませんか", review: "用意した記録帳を残しておきませんか"))
+                        .font(.title3.weight(.bold))
+                        .multilineTextAlignment(.center)
+                    Text(L10n.key("いまは匿名で使っています。Apple でサインインしておくと、機種変更やアプリの入れ直しのあとも、作ったアプリとデータに戻れます。",
+                                   review: "いまは匿名で使っています。Apple でサインインしておくと、機種変更やアプリの入れ直しのあとも、用意した記録帳とデータに戻れます。"))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
-                Button("あとで") { dismiss() }
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, Theme.Spacing.sm)
+                VStack(spacing: Theme.Spacing.sm) {
+                    AppleLinkButton { dismiss() }
+                    if let message = session.linkError {
+                        Text(message).font(.footnote).foregroundStyle(.red).multilineTextAlignment(.center)
+                    }
+                    Button("あとで") { dismiss() }
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, Theme.Spacing.sm)
+                }
             }
+            .padding(Theme.Spacing.lg)
+            .readableWidth()
         }
-        .padding(Theme.Spacing.lg)
+        .scrollBounceBehavior(.basedOnSize)
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
     }

@@ -125,6 +125,64 @@ type Commit struct {
 	Name        string // app name to set (dsl.app.name); "" keeps
 	Patch       []dsl.PatchOp
 	Source      *Source
+	// Publish, when set, updates apps_public/{appId} in the same transaction
+	// as the commit, so the mirror never lags behind the creator's version.
+	Publish *CommitPublish
+	// Events are outbox events stored in the same transaction (#342:
+	// rules_changed). An event with Version 0 gets the new version. nil
+	// stores nothing (the commit costs what it did before).
+	Events []OutboxEvent
+}
+
+// commitEvents gives c's events the new version n and validates them.
+func commitEvents(c Commit, n int, now time.Time) ([]OutboxEvent, error) {
+	if len(c.Events) == 0 {
+		return nil, nil
+	}
+	events := append([]OutboxEvent(nil), c.Events...)
+	for i := range events {
+		if events[i].Version == 0 {
+			events[i].Version = n
+		}
+	}
+	if err := prepareOutbox(events, now); err != nil {
+		return nil, err
+	}
+	return events, nil
+}
+
+// CommitPublish is how a commit touches apps_public/{appId}. Nothing is
+// published unless app_owners names the committer as the creator (Claim
+// records them first when no creator is known). A mirror the committer owns
+// is updated even when no shared entity is left (sharing was withdrawn); a
+// missing one is created only when Shared. A mirror owned by another uid is
+// left alone, and moderation fields are kept.
+type CommitPublish struct {
+	Shared bool // the DSL has a shared / public entity
+	Claim  bool // record the committer as the creator when none is recorded
+}
+
+// publishAction is what a commit does to apps_public/{appId}.
+type publishAction int
+
+const (
+	publishNone publishAction = iota
+	publishCreate
+	publishUpdate
+)
+
+// decidePublish: owner is the recorded creator after any claim ("" none),
+// mirrorOwner the current mirror's owner ("" when there is no mirror).
+func decidePublish(p *CommitPublish, uid, owner, mirrorOwner string, mirror bool) publishAction {
+	switch {
+	case p == nil || owner != uid:
+		return publishNone
+	case mirror && mirrorOwner == uid:
+		return publishUpdate
+	case !mirror && p.Shared:
+		return publishCreate
+	}
+	return publishNone
 }
 
 // Store is what the handlers depend on. All methods are scoped by uid.
@@ -169,7 +227,11 @@ type Store interface {
 	Feedbacks       // in-app feedback (feedback.go)
 	Moderation      // reports, blocks, operator unpublish (moderation.go, #321)
 	Matching        // interests and matches of matching apps (matching.go, #507)
+	Devices         // push tokens of users' devices (device.go, #269)
+	NotifyConsents  // recipients' consent to others' notifications (device.go, #339)
 	Outbox          // record writes that queue runner triggers (outbox.go, #341)
+	Schedules       // runner schedules and per-app state (schedule.go, #342)
+	RunnerActivity  // read-only rule statuses and stops for the creator (rule_status.go, #347)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).

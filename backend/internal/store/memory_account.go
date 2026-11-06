@@ -33,6 +33,7 @@ func (m *Memory) DeactivateUser(_ context.Context, uid string) error {
 			delete(m.catalog, id)
 		}
 	}
+	m.dropDevices(uid)
 	return nil
 }
 
@@ -125,6 +126,8 @@ func (m *Memory) PurgeAccount(_ context.Context, uid string) (AccountPurgeResult
 	}
 	res.Blocks += len(m.blocks[uid])
 	delete(m.blocks, uid)
+	res.Devices += m.dropDevices(uid)
+	res.NotifyConsents += m.dropConsents(uid)
 	m.dropMatchQuota(uid)
 	for appID, o := range m.owners {
 		if p := m.public[appID]; o == uid && (p == nil || p.app == nil || p.app.OwnerUID != uid) { // a kept mirror keeps its owner

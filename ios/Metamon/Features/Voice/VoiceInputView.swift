@@ -10,6 +10,8 @@ struct VoiceInputView: View {
     @Environment(AuthSession.self) private var session
     @Environment(\.services) private var services
     @Environment(\.colorScheme) private var scheme
+    /// 横向き(#625)はマイク・見出しを左、例文・文字入力を右に並べる
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     var prompt: String?
 
     @State private var phase: Phase = .idle
@@ -47,20 +49,27 @@ struct VoiceInputView: View {
                     // キーボード分の安全領域ごとアニメーションし直して入力欄がずれうる
                     ClarifyChatView(micMode: micMode, statusText: statusText, onMic: { Task { await toggle() } },
                                     onSend: { submit($0) })
+                        .readableWidth() // 横向きで吹き出し・入力欄が横に間延びしないように(#625)
                         .transition(.opacity)
+                } else if compactHeight {
+                    // 横向き(#625): 縦に積むと入力欄の上に見出しとマイクが入らないので 2 列にする。
+                    // 文字・録音の状態はこの View の @State なので、回転して並べ方が変わっても残る
+                    HStack(alignment: .top, spacing: Theme.Spacing.lg) {
+                        ScrollView { idleContent }
+                            .scrollBounceBehavior(.basedOnSize)
+                            .frame(maxWidth: .infinity)
+                        VStack(spacing: 0) {
+                            Spacer(minLength: Theme.Spacing.sm)
+                            bottomPanel
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .animation(.spring(duration: 0.45, bounce: 0.15), value: phase)
+                    .animation(.spring(duration: 0.45, bounce: 0.15), value: rt.errorCard)
                 } else {
                     idleContent
                         // 例文・文字入力・「探す」は下に固定し、キーボードと同じアニメーションで一緒に上げる(#196)
-                        .safeAreaInset(edge: .bottom, spacing: 0) {
-                            VStack(spacing: 0) {
-                                if !typing { examples }
-                                textEntry
-                                #if !APP_STORE_REVIEW
-                                if isInitial, !typing { DiscoverEntry() } // 「探す」(#50)
-                                #endif
-                            }
-                            .padding(.bottom, Theme.Spacing.sm)
-                        }
+                        .safeAreaInset(edge: .bottom, spacing: 0) { bottomPanel }
                         .animation(.spring(duration: 0.45, bounce: 0.15), value: phase)
                         .animation(.spring(duration: 0.45, bounce: 0.15), value: transcript)
                         .animation(.spring(duration: 0.45, bounce: 0.15), value: rt.errorCard)
@@ -136,6 +145,20 @@ struct VoiceInputView: View {
 
     // MARK: - Sections
 
+    private var compactHeight: Bool { LandscapeLayout.isCompactHeight(verticalSizeClass) }
+
+    /// 例文・文字入力・「探す」。縦向きは画面の下に固定、横向きは右の列の下に置く。
+    private var bottomPanel: some View {
+        VStack(spacing: 0) {
+            if !typing { examples }
+            textEntry
+            #if !APP_STORE_REVIEW
+            if isInitial, !typing { DiscoverEntry() } // 「探す」(#50)
+            #endif
+        }
+        .padding(.bottom, Theme.Spacing.sm)
+    }
+
     /// 対話の前(マイク・見出し・書き起こし)。
     private var idleContent: some View {
         VStack(spacing: 0) {
@@ -194,9 +217,10 @@ struct VoiceInputView: View {
 
     private var heading: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            if isInitial, prompt == nil { CraneMascot(pose: .happy, size: 76) } // #102
+            // 横向きは縦の空きが無いのでツルを出さない(#625)
+            if isInitial, prompt == nil, !compactHeight { CraneMascot(pose: .happy, size: 76) } // #102
             Text(prompt ?? greeting.title)
-                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .font(.system(size: LandscapeLayout.headingSize(compactHeight: compactHeight), weight: .bold, design: .rounded))
                 .multilineTextAlignment(.center)
                 .minimumScaleFactor(0.8)
                 .contentTransition(.opacity)
@@ -212,7 +236,7 @@ struct VoiceInputView: View {
     private var micSection: some View {
         VStack(spacing: Theme.Spacing.md) {
             // タップ = 発話、長押し = メタ操作(変身一覧)。FAB と同じ二段構え
-            MicButton(mode: micMode, size: isInitial ? 132 : 104) { Task { await toggle() } }
+            MicButton(mode: micMode, size: LandscapeLayout.micSize(isInitial: isInitial, compactHeight: compactHeight)) { Task { await toggle() } }
                 .simultaneousGesture(
                     LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
                         .onEnded { _ in if phase == .idle { rt.openSwitcher() } }

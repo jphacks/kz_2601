@@ -52,6 +52,9 @@ func (f *Firestore) DeactivateUser(ctx context.Context, uid string) error {
 		return fmt.Errorf("unlist: %w", err)
 	}
 	bw.Flush()
+	if _, err := f.DeleteDevices(ctx, uid); err != nil {
+		return fmt.Errorf("delete devices: %w", err)
+	}
 	return nil
 }
 

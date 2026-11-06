@@ -10,6 +10,7 @@ final class ServerRulesDecodingTests: XCTestCase {
         XCTAssertEqual(dsl.entities.map(\.id), ["events", "rsvps", "messages", "log"])
         XCTAssertEqual(dsl.screens.map(\.id), ["home"])
         XCTAssertEqual(dsl.initialScreen, "home")
+        XCTAssertGreaterThan(dsl.serverRuleCount, 0) // #347: 設定の「自動の動き」を出す
     }
 
     /// 封筒(AppDocument)の中にあっても落ちない・未知の形でも無視する。
@@ -22,5 +23,7 @@ final class ServerRulesDecodingTests: XCTestCase {
         let doc = try JSONDecoder().decode(AppDocument.self, from: Data(json.utf8))
         XCTAssertEqual(doc.version, 3)
         XCTAssertEqual(doc.dsl.screens.count, 1)
+        XCTAssertEqual(doc.dsl.serverRuleCount, 1)
+        XCTAssertEqual(AppDSL.fallback.serverRuleCount, 0)
     }
 }

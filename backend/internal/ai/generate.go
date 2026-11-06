@@ -97,13 +97,16 @@ type Meta struct {
 // line), edit turns send `summary`. iOS can show and read them out while the
 // rest of the DSL is still being generated.
 type Event struct {
-	Type        string   `json:"type"` // app|summary
+	Type        string   `json:"type"` // app|summary|component|restart
 	Attempt     int      `json:"attempt"`
 	Locale      Locale   `json:"locale"`
 	Name        string   `json:"name,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Tabs        []string `json:"tabs,omitempty"`
 	Summary     string   `json:"summary,omitempty"`
+	// component (#636): one part of the first visible screen, provisional
+	Screen    string          `json:"screen,omitempty"`
+	Component *ComponentEvent `json:"component,omitempty"`
 }
 
 // Sink receives Events in order, on the calling goroutine.
@@ -370,9 +373,13 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 	var problems []string
 	var lastCandidate []byte
 	var linted *attemptResult // valid output kept while regenerating for its lint warnings
+	streamed := false // a component event was sent: a regeneration sends restart (#636)
 	for i := 0; i <= s.maxRegen(); i++ {
+		if i > 0 {
+			restartEvent(sink, loc, ar.meta.Attempts+1, streamed)
+		}
 		resp, err := s.call(WithOperation(ctx, OpGenerate), systemPrompt, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
-			appEventWatcher(sink, loc, ar.meta.Attempts+1))
+			createEventWatcher(sink, loc, ar.meta.Attempts+1, &streamed))
 		if err != nil {
 			return nil, err
 		}

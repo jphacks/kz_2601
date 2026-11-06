@@ -59,6 +59,10 @@ type AccountPurgeResult struct {
 	Reports int
 	// users/{uid}/blocks/*
 	Blocks int
+	// users/{uid}/devices/* left after DeactivateUser (#269; normally 0)
+	Devices int
+	// users/{uid}/notifyConsent/* (#339)
+	NotifyConsents int
 	// apps_public/*/match_pairs/* that include uid (#507), with match_quota/{uid}
 	MatchPairs int
 	// uid's records in match profile / matched entities (#507: erased, not kept as posts)
@@ -85,6 +89,8 @@ func (r AccountPurgeResult) LogAttrs() []any {
 		slog.Int("feedback", r.Feedback),
 		slog.Int("matchPairs", r.MatchPairs),
 		slog.Int("matchRecords", r.MatchRecords),
+		slog.Int("devices", r.Devices),
+		slog.Int("notifyConsents", r.NotifyConsents),
 	}
 }
 

@@ -15,7 +15,9 @@
 - [計算ロジック Expr(#100)](features/expr.md)
 - [アカウント削除(#119)](features/account-deletion.md)
 - [shared の参加者(#254)](features/members.md)
+- [プッシュ通知の端末と受け取りの同意(#269)](features/notifications.md)
 - [フィードバック(#319)](features/feedback.md)
+- [自動の動きの見える化(#347)](features/automations.md)
 - [決まった形の文章(#417)](features/text.md)
 - [仲間探しのアプリ(#507)](features/matching.md)
 
@@ -225,7 +227,7 @@ func UID(ctx context.Context) string { s, _ := ctx.Value(ctxKey{}).(string); ret
 | 出力 | **既定は「スキーマをプロンプトに載せて JSON のみを出させ、Go で厳密検証」**。`output_config.format`(構造化出力)は `CLAUDE_STRUCTURED_OUTPUT=1` のときだけ送る(下記「構造化出力の制約」参照)。応答テキストは `extractJSON`(コードフェンス/前置き除去)→ 初回 `dsl.Parse`、編集 `dsl.ApplyPatch` |
 | max_tokens | 16000。DSL 64KB 上限内 |
 | 出力の短縮(#61) | プロンプトで **1 行の compact JSON**(改行・インデント無し)と **既定値の省略** を指示し、Go 側 `internal/ai/defaults.go` `fillDefaults` / `fillPatchDefaults` が `dsl.Parse` の前に補完する(schemaVersion 1・voiceEntry floating・navigate.presentation = フォームへ sheet / 行タップ push・filter.value null・sort.direction desc・list.swipeToDelete true・stat/chart.aggregate sum・date の defaultValue now)。few-shot も同じ省略形で埋め込む(`abbreviateExample`、round-trip テスト付き)。`pkg/dsl` の検証は不変・iOS には明示値が届く。**実測(2026-10-24・create 5 本 × 2): 出力 1,300 → 964 tokens(−26%)、p50 6.5 → 6.0s、品質 10/10 維持**(`docs/backend/ai-eval/2026-10-24-latency.md`) |
-| ストリーミング(#61) | `POST /v1/generate?stream=1` は SSE。`client.go` が `stream: true` を読み(`Completion.OnText`)、`stream.go` `keyWatcher` が出力先頭の `app` ブロック(edit は `summary`)の完了を検出 → `event: app` / `event: summary`(名前・タブ名・仮の読み上げ文「家計簿アプリを作っています。ホームと集計の2タブです。」)→ 検証・保存後に `event: result`(JSON モードと同じ応答)か `event: error`。create のキー順 app → initialScreen → entities → screens、edit は `{"summary":…,"patch":[…]}` をプロンプトで固定。**first event p50 2.4s(完了 6.0s)、edit は 0.9〜1.0s(完了 1.3s)**。JSON モード(`stream` 無し)は従来どおり |
+| ストリーミング(#61) | `POST /v1/generate?stream=1` は SSE。`client.go` が `stream: true` を読み(`Completion.OnText`)、`stream.go` `keyWatcher` が出力先頭の `app` ブロック(edit は `summary`)の完了を検出 → `event: app` / `event: summary`(名前・タブ名・仮の読み上げ文「家計簿アプリを作っています。ホームと集計の2タブです。」)→ create は最初に見える画面(初期タブ・タブ無しなら initialScreen)の部品が 1 つ閉じるたびに `event: component`(`component_stream.go`・#636。仮置き用。作り直す時は `event: restart`)→ 検証・保存後に `event: result`(JSON モードと同じ応答)か `event: error`。create のキー順 app → initialScreen → entities → screens、edit は `{"summary":…,"patch":[…]}` をプロンプトで固定。**first event p50 2.4s(完了 6.0s)、edit は 0.9〜1.0s(完了 1.3s)**。JSON モード(`stream` 無し)は従来どおり |
 | 拒否 | `stop_reason == "refusal"` → 400 `refused`。`fallbacks: "default"`(beta `server-side-fallback-2026-07-01`)を常時送付 |
 | キャッシュ | system(設計原則・部品カタログ・few-shot `examples/kakeibo.json`・生成用スキーマ ≈8.6K tokens)は固定文字列で `cache_control: ephemeral`。可変部(現 DSL・発話・前回の Problems)は user に置く。実測: 2 回目以降 `cache_read_input_tokens=8588` |
 | 費用ログ(#298) | HTTP の試行ごとに slog JSON の `ai.usage` を 1 行(処理・モデル・トークン 4 種・試行番号・成否・uid のハッシュ・見積もり費用)。`ai.generate` にも 1 生成ぶんのトークンと費用の合計(`cost_tally.go`)。本文と生の uid は出さない。形・料金表・`scripts/ai-cost.sh`(すぐ見る集計)・BigQuery 集計・アラート手順は [../infra/ai-cost.md](../infra/ai-cost.md) |

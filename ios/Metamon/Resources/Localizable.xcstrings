@@ -35,6 +35,23 @@
         }
       }
     },
+    "%@ に自動で解除されます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lifts automatically at %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ に自動で解除されます。"
+          }
+        }
+      }
+    },
     "%@ を入力してください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1136,6 +1153,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tailor It の外でも使える 1 つのアプリとして公開してほしい、と運営に申請します。みんなに需要があると判断したら、運営がリリース作業を行います。"
+          }
+        }
+      }
+    },
+    "openUrl: url は https か line/slack/discord/tel/mailto/maps のみ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "openUrl: url must be https or line/slack/discord/tel/mailto/maps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "openUrl: url は https か line/slack/discord/tel/mailto/maps のみ"
           }
         }
       }
@@ -2534,6 +2568,23 @@
         }
       }
     },
+    "このアプリには自動の動きがありません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app has no automations."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリには自動の動きがありません。"
+          }
+        }
+      }
+    },
     "このアプリは上のオープンソースソフトウェアを使っています。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3044,6 +3095,23 @@
         }
       }
     },
+    "しばらく開かれていないため休んでいます(開くと再開します)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resting because the app hasn't been opened for a while (open it to resume)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "しばらく開かれていないため休んでいます(開くと再開します)"
+          }
+        }
+      }
+    },
     "そのままにする" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3520,6 +3588,23 @@
         }
       }
     },
+    "まだ動いていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hasn't run yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ動いていません"
+          }
+        }
+      }
+    },
     "まもなく作ります…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3958,6 +4043,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリ"
+          }
+        }
+      }
+    },
+    "アプリが使えない状態だったため動きませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't run because the app wasn't available"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリが使えない状態だったため動きませんでした"
+          }
+        }
+      }
+    },
+    "アプリが変わったため動きませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't run because the app changed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリが変わったため動きませんでした"
           }
         }
       }
@@ -4859,6 +4978,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "サーバーの応答がありませんでした。もう一度お試しください"
+          }
+        }
+      }
+    },
+    "サービス全体で一時停止しています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paused for the whole service"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サービス全体で一時停止しています"
+          }
+        }
+      }
+    },
+    "サービス全体の上限に達したため止めました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped: the service's daily limit was reached"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サービス全体の上限に達したため止めました"
           }
         }
       }
@@ -6614,6 +6767,23 @@
         }
       }
     },
+    "今のプランでは動きません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available on your current plan"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今のプランでは動きません"
+          }
+        }
+      }
+    },
     "今の画面のスクショ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6733,6 +6903,23 @@
         }
       }
     },
+    "今日の上限に達したため止めました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped: today's limit was reached"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日の上限に達したため止めました"
+          }
+        }
+      }
+    },
     "今日の上限に達しました。%@からまた使えます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6746,6 +6933,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今日の上限に達しました。%@からまた使えます"
+          }
+        }
+      }
+    },
+    "今日の実行" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Runs today"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日の実行"
           }
         }
       }
@@ -7001,6 +7205,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "何を記録したいですか?"
+          }
+        }
+      }
+    },
+    "何度か試しましたがうまくいきませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tried several times but couldn't run"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何度か試しましたがうまくいきませんでした"
           }
         }
       }
@@ -7970,6 +8191,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "割り勘や出欠のアプリは、シェアすると友達や家族と一緒に使えます。マイクを長押しすると、作ったアプリの一覧が開きます。"
+          }
+        }
+      }
+    },
+    "動きました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ran"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "動きました"
+          }
+        }
+      }
+    },
+    "動きました(通知は止めています)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ran (notifications are paused)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "動きました(通知は止めています)"
+          }
+        }
+      }
+    },
+    "動きませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't run"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "動きませんでした"
           }
         }
       }
@@ -9589,6 +9861,23 @@
         }
       }
     },
+    "日本時間の 0 時に 0 に戻ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resets at midnight Japan time."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日本時間の 0 時に 0 に戻ります。"
+          }
+        }
+      }
+    },
     "早起きチェック" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9738,6 +10027,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最初の画面"
+          }
+        }
+      }
+    },
+    "最後に動いた: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last run: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最後に動いた: %@"
           }
         }
       }
@@ -10010,6 +10316,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "次回更新"
+          }
+        }
+      }
+    },
+    "止まっている理由について確かめたい時は、お問い合わせください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you have questions about why it stopped, please contact us."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "止まっている理由について確かめたい時は、お問い合わせください。"
           }
         }
       }
@@ -11115,6 +11438,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自動で消すのをやめる"
+          }
+        }
+      }
+    },
+    "自動の動き" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automations"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動の動き"
+          }
+        }
+      }
+    },
+    "自動の動きはアプリを作った人だけが見られます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only the person who made this app can see its automations."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動の動きはアプリを作った人だけが見られます。"
+          }
+        }
+      }
+    },
+    "自動の動きを読み込めませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load the automations"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動の動きを読み込めませんでした"
           }
         }
       }
@@ -12649,6 +13023,23 @@
         }
       }
     },
+    "通知を一時的に止めています。自動の動きは動いています。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications are paused for now. Automations still run."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知を一時的に止めています。自動の動きは動いています。"
+          }
+        }
+      }
+    },
     "通知を予約しました(%@)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12683,6 +13074,57 @@
         }
       }
     },
+    "遅れたため動かしませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skipped because it was running late"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "遅れたため動かしませんでした"
+          }
+        }
+      }
+    },
+    "運営がこのアプリの自動の動きを止めています。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It has stopped this app's automations."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "運営がこのアプリの自動の動きを止めています。"
+          }
+        }
+      }
+    },
+    "運営がこのルールを止めています。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It has stopped this automation."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "運営がこのルールを止めています。"
+          }
+        }
+      }
+    },
     "運営が内容を確認し、利用規約に反するものは非公開にします。この人を表示したくない時はブロックもできます。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12713,6 +13155,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "運営が内容を確認します。通報したことは相手に知らされません。"
+          }
+        }
+      }
+    },
+    "運営が止めています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped by Tailor It"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "運営が止めています"
           }
         }
       }

@@ -62,6 +62,17 @@ func TestEnvParsing(t *testing.T) {
 			t.Errorf("%q accepted", bad)
 		}
 	}
+	if d, err := maxLateFromEnv(envMap(nil)); d != 30*time.Minute || err != nil {
+		t.Errorf("unset max late: %v %v", d, err)
+	}
+	if d, err := maxLateFromEnv(envMap(map[string]string{"RUNNER_SCHEDULE_MAX_LATE": "45m"})); d != 45*time.Minute || err != nil {
+		t.Errorf("45m: %v %v", d, err)
+	}
+	for _, bad := range []string{"x", "10s", "-5m"} {
+		if _, err := maxLateFromEnv(envMap(map[string]string{"RUNNER_SCHEDULE_MAX_LATE": bad})); err == nil {
+			t.Errorf("max late %q accepted", bad)
+		}
+	}
 	// time/tzdata is linked in: zones load without the OS database
 	if _, err := time.LoadLocation("Asia/Tokyo"); err != nil {
 		t.Fatal(err)
@@ -122,5 +133,32 @@ func TestSerialBusy(t *testing.T) {
 	<-done
 	if ft.calls.Load() != 1 {
 		t.Fatalf("calls: %d", ft.calls.Load())
+	}
+}
+
+func TestNotifyPausedAndAutoPauseFromEnv(t *testing.T) {
+	if !flagFromEnv(envMap(map[string]string{"RUNNER_NOTIFY_PAUSED": "on"}), "RUNNER_NOTIFY_PAUSED")() {
+		t.Fatal("RUNNER_NOTIFY_PAUSED=on")
+	}
+	if flagFromEnv(envMap(nil), "RUNNER_NOTIFY_PAUSED")() {
+		t.Fatal("unset is not paused")
+	}
+	if a, err := autoPauseFromEnv(envMap(nil)); err != nil || a.Reporters != 0 || a.For != 0 {
+		t.Fatalf("defaults: %+v %v", a, err)
+	}
+	a, err := autoPauseFromEnv(envMap(map[string]string{"RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS": "5", "RUNNER_AUTO_NOTIFY_PAUSE_FOR": "24h"}))
+	if err != nil || a.Reporters != 5 || a.For != 24*time.Hour {
+		t.Fatalf("set: %+v %v", a, err)
+	}
+	if a, err := autoPauseFromEnv(envMap(map[string]string{"RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS": "0"})); err != nil || a.Reporters >= 0 {
+		t.Fatalf("0 = off: %+v %v", a, err)
+	}
+	for _, bad := range []map[string]string{
+		{"RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS": "-1"}, {"RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS": "x"},
+		{"RUNNER_AUTO_NOTIFY_PAUSE_FOR": "10m"}, {"RUNNER_AUTO_NOTIFY_PAUSE_FOR": "x"},
+	} {
+		if _, err := autoPauseFromEnv(envMap(bad)); err == nil {
+			t.Fatalf("%v accepted", bad)
+		}
 	}
 }

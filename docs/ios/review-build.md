@@ -41,6 +41,7 @@
 | aiButton のオンライン版(`POST /v1/text`・#417) | `AppRuntime+AIText` のオンライン経路と Pro の入口 / `HTTPAIClient+Text`(`v1/text`)。端末内 AI(Foundation Models)は残る。端末内 AI が無い端末では理由つきで無効 | 5.1.2(i)。同意文の「記録の中身は送らない」(#452 G4) |
 | aiButton の端末内 AI の集計(`POST /v1/metrics/ai-button`・#446) | `AppRuntime+AIButtonMetrics` は何もしない / MetamonServices の `AIButtonMetrics.swift`(貯める・送る)/ 設定の「AI ボタンの利用状況を送る」。Renderer の数える呼び出しは残るが、ホストが捨てる | 栄養ラベルに「使用状況データ」が増えるため(`docs/analytics/ai-button-metrics.md`) |
 | 仲間探し(#507・`matchList` / `list.item.interest`) | `matchList` の部品と登録 / `MatchListLeaf` / `InterestButton` / `MatchingHost`、MetamonServices の `MatchingClient` / `HTTPMatchingClient`(`v1/apps/{appId}/interests`・`matches`)/ `MatchingStore` / `MatchingAgeGate`、`Features/Matching` 全部(18 歳以上の確認 `AdultConfirmSheet`)。`supportedFeatures` に `matching` を送らず、backend が match・`item.interest`・`matchList` を使わない | 共有と一緒に外す(知らない人と連絡先を交換する機能。年齢区分・1.2) |
+| 自動の動きの見える化(#347) | `Features/Automations` 全部(`AutomationsView` / `AutomationsSettingsRow`・設定の「自動の動き」)/ MetamonServices の `AutomationsClient` / `HTTPAutomationsClient`(`v1/apps/{appId}/automations`) | 審査用の版では AI が serverRules を作らない(#614)ので、出す先が無い |
 | アプリ内のフィードバック(#319) | `Features/Feedback` 全部(`FeedbackComposerView` / `FeedbackContext` / 振って開く `FeedbackShakeHost`・`UIWindow.motionEnded`)/ 設定の「フィードバックを送る」/ MetamonServices の `FeedbackClient` / `HTTPFeedbackClient`(`v1/feedback`) | プライバシーの表示に無い種類(カスタマーサポート・その他の診断データ・スクショ)を集める。表示を足すまで外す(`docs/legal/feedback-privacy-draft.md`) |
 | β の初回の案内(#313) | `BetaEnvironment` / `BetaWelcomeStore` / `BetaWelcomeView`(`BetaWelcomeHost`)/ `AppRuntime` の `betaWelcome`・`showBetaWelcome` / 設定の「β 版のご案内」 | 2.2(App Store の版に β の文言を入れない)。β かどうかは実行時にレシート(`sandboxReceipt` = TestFlight)で見分ける。TestFlight と App Store は同じバイナリなので、Release の App Store では実行時の判定で出ず、審査用の版はコードごと無い |
 | 設定の「投稿に表示する名前」(#250) | `AuthorNameSettingsSection`(説明が「みんなで使うアプリに投稿すると…」)。初投稿で名前を聞くアラート(`AuthorNamePromptModifier`)は残るが、記録がすべて private なので出ない | 共有と一緒に外す(外した共有機能の説明になる・2.3) |
@@ -134,11 +135,11 @@ codesign -d --entitlements :- "$APP"
 #   → com.apple.developer.healthkit が無いこと
 otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|NearbyInteraction|CoreMotion'
 #   → 何も出ないこと
-strings "$APP/Metamon" | grep -E 'MatchListLeaf|HTTPMatchingClient|MatchingStore|AdultConfirmSheet|/interests|v1/feedback|FeedbackComposerView|HKHealthStore|MCSession|NISession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps|WebViewLeaf|v1/text|ChatThreadLeaf|jp\.kz2601\.metamon\.pro|PaywallSheet|ProSettingsSection|ProEntitlementStore|購入して作る|Pro にする'
+strings "$APP/Metamon" | grep -E 'AutomationsView|HTTPAutomationsClient|/automations|MatchListLeaf|HTTPMatchingClient|MatchingStore|AdultConfirmSheet|/interests|v1/feedback|FeedbackComposerView|HKHealthStore|MCSession|NISession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps|WebViewLeaf|v1/text|ChatThreadLeaf|jp\.kz2601\.metamon\.pro|PaywallSheet|ProSettingsSection|ProEntitlementStore|購入して作る|Pro にする'
 #   → 何も出ないこと
 #   注: WKWebView / WebKit の参照は FirebaseAuth(AuthWebViewController。OAuth・reCAPTCHA 用)から残る。
 #       この版のサインイン(Sign in with Apple・匿名)では使わない。アプリのコードからは WebKit を使わない
-grep -a -c -F -e 'Tailor It Pro' -e '購入して作る' -e 'オンラインの AI で書く' "$APP/Metamon"
+grep -a -c -F -e 'Tailor It Pro' -e '購入して作る' -e 'オンラインの AI で書く' -e '今日の上限に達したため止めました' "$APP/Metamon"
 #   → 0(日本語の文字列は strings では出ないので grep -a で見る)
 grep -a -c -F -e 'ManageSubscriptionButton' -e 'サブスクリプションを管理' "$APP/Metamon"
 #   → 0(サブスクの管理の導線も無い・#326)

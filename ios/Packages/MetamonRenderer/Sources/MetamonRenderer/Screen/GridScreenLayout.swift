@@ -5,6 +5,7 @@ import MetamonDSL
 /// - 横 6 列(A-F)= 可視幅 ÷ 6、縦 1 行 = 可視高さ ÷ 12。`area` を持つ直下の子は矩形に絶対配置(セル内でスクロール)。
 /// - `area` の無い子は「area で使われた最終行の次の行」から全幅で上から積む(フォールバック)。
 /// - 13 行目以降 or フォールバックがはみ出せば画面全体が縦スクロール。voiceInput 画面(初期状態)はスクロールしない。
+/// - 横向き(#625)は `GridMetrics`: 最大幅で中央寄せ・行の高さ固定・画面ごと縦スクロール(voiceInput 画面も)。
 /// - 見た目: セル間ギャップ / 画面端余白は `RenderTheme.Spacing`、出現は index × stagger の遅延付きフェード(変身の受け側)。
 /// - 最下段(行 11〜12)の左端(A〜B 列)/ 右端(E〜F 列)に部品があれば、その上端(global 座標)を
 ///   `GridBottomObstructionKey` / `GridBottomTrailingObstructionKey` で上げる(ホストがマイク FAB を上に逃がすため・#83 / #52)。
@@ -20,6 +21,8 @@ public struct GridScreenLayout: View {
     /// フォーカスを得た入力欄(`keyboardAnchor` の id)。tick は同じ欄への再フォーカスでもスクロールさせるため
     @State private var focusRequest: (key: String, tick: Int)?
     @Environment(\.fabFrame) private var fabFrame
+    /// 横向き(#625)は `GridMetrics` で幅を絞って中央に寄せ、行の高さを固定して縦スクロール
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     public init(screen: Screen, ctx: RenderContext) {
         self.screen = screen
@@ -28,9 +31,11 @@ public struct GridScreenLayout: View {
 
     public var body: some View {
         GeometryReader { geo in
-            let cellW = (geo.size.width - inset * 2) / CGFloat(GridArea.columns)
             let layoutH = GridLayoutHeight.resolve(current: geo.size.height, stable: stableHeight)
-            let cellH = (layoutH - inset * 2) / CGFloat(GridArea.visibleRows)
+            let metrics = GridMetrics.resolve(width: geo.size.width, height: layoutH, inset: inset,
+                                              compactHeight: verticalSizeClass == .compact)
+            let cellW = metrics.cellW
+            let cellH = metrics.cellH
             let placement = screen.gridPlacement
             let lastRow = placement.placed.map(\.area.row2).max() ?? 0
             let gridHeight = CGFloat(lastRow) * cellH
@@ -42,7 +47,7 @@ public struct GridScreenLayout: View {
                     FormFlowLayout(placed: placement.placed, cellW: cellW, cellH: cellH, ctx: ctx)
                 } else if !placement.placed.isEmpty {
                     ZStack(alignment: .topLeading) {
-                        Color.clear.frame(width: geo.size.width - inset * 2, height: gridHeight)
+                        Color.clear.frame(width: metrics.frameWidth - inset * 2, height: gridHeight)
                         ForEach(Array(placement.placed.enumerated()), id: \.element.component.id) { index, item in
                             let (c, a) = item
                             GridCell(component: c, ctx: ctx)
@@ -58,20 +63,25 @@ public struct GridScreenLayout: View {
                 }
             }
             .padding(inset)
-            .frame(width: geo.size.width, alignment: .topLeading)
+            .frame(width: metrics.frameWidth, alignment: .topLeading)
+            // 横向きは中央に寄せる(縦向きは frameWidth = 画面の幅なのでそのまま)
+            .frame(width: geo.size.width)
             // 入力欄の外(部品の無い所)をタップしたらキーボードを閉じる
             .background(Color.clear.contentShape(Rectangle()).onTapGesture { KeyboardState.dismiss() })
 
             Group {
-                if screen.isVoiceScreen {
+                // 横向きは voiceInput 画面も行が画面に収まらないのでスクロールに入れる
+                if screen.isVoiceScreen, !metrics.scrollsVertically {
                     content
                 } else {
                     ScrollViewReader { proxy in
                         ScrollView {
                             // area 無しで積んだ部品(全幅の list 等)は画面のスクロールの末尾に FAB ぶんの余白(#157)。
                             // area だけの画面は高さぴったりなので足さない(足すと常に少しスクロールしてしまう)
+                            // 横向きで FAB が左右の余白に収まらない時は、area だけの画面も最下段を FAB の上へ出せるよう余白を足す
                             content
-                                .padding(.bottom, placement.stacked.isEmpty ? 0 : FabClearance.contentMargin(viewport: geo.frame(in: .global), fab: fabFrame))
+                                .padding(.bottom, placement.stacked.isEmpty && !(metrics.scrollsVertically && !metrics.fabInGutter)
+                                    ? 0 : FabClearance.contentMargin(viewport: geo.frame(in: .global), fab: fabFrame))
                         }
                         .scrollDismissesKeyboard(.interactively)
                         .scrollBounceBehavior(.basedOnSize)
@@ -91,8 +101,9 @@ public struct GridScreenLayout: View {
                     }
                 }
             }
-            .preference(key: GridBottomObstructionKey.self, value: bottomObstruction(geo: geo, cellH: cellH, placed: placement.placed.map(\.area)))
-            .preference(key: GridBottomTrailingObstructionKey.self, value: bottomObstruction(geo: geo, cellH: cellH, placed: placement.placed.map(\.area), side: .trailing))
+            // 横向きはグリッドがスクロールするので「最下段の上端」で FAB を押し上げない(余白か末尾の余白で避ける)
+            .preference(key: GridBottomObstructionKey.self, value: metrics.scrollsVertically ? [:] : bottomObstruction(geo: geo, cellH: cellH, placed: placement.placed.map(\.area)))
+            .preference(key: GridBottomTrailingObstructionKey.self, value: metrics.scrollsVertically ? [:] : bottomObstruction(geo: geo, cellH: cellH, placed: placement.placed.map(\.area), side: .trailing))
         }
         .background {
             GeometryReader { full in
