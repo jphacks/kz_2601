@@ -253,6 +253,9 @@ struct SettingsSheet: View {
             }
             .disabled(rt.isMorphing)
             ScreenMapSettingsRow() // #116
+            #if !APP_STORE_REVIEW // 審査用ビルドは serverRules を作らない(#614)
+            AutomationsSettingsRow() // #347 自動の動き(serverRules があるアプリだけ)
+            #endif
             Button {
                 dismiss()
                 rt.replayTutorial() // #274

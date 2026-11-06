@@ -123,6 +123,7 @@ enum BuildConfig {
     static let liveWirings: [LiveWiring] = [
         .account,
         .aiButtonMetrics,
+        .automations,
         .entitlements,
         .feedback,
         .matching,
