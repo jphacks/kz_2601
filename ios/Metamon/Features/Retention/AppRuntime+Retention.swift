@@ -188,8 +188,14 @@ struct RetentionSettingsSection: View {
             } header: {
                 Text("記録の自動削除")
             } footer: {
-                Text("期間を過ぎた記録は、開いた時などに自動で消えます。消えた記録は元に戻せません。共有の記録は自分が追加したものだけが消えます。")
+                Text(Self.footer(entities: entities))
             }
         }
+    }
+
+    /// 共有の記録の注記は、期間のある entity に共有のものがある時だけ(審査用の版・自分だけの記録には共有が無い)。
+    static func footer(entities: [Entity]) -> String {
+        let base = L10n.tr("期間を過ぎた記録は、開いた時などに自動で消えます。消えた記録は元に戻せません。")
+        return entities.contains(where: \.isShared) ? base + L10n.tr("共有の記録は自分が追加したものだけが消えます。") : base
     }
 }

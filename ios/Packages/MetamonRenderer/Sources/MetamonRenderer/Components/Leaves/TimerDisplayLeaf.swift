@@ -4,7 +4,8 @@ import MetamonDSL
 /// `timerDisplay`: ストップウォッチ(mode=stopwatch・カウントアップ)/ タイマー(mode=countdown・`seconds` から 0 へ)。
 /// 開始 / 一時停止 / リセット。一時停止・終了時に経過秒を `field`(integer/number)へ保存する(フォーム画面のみ)。
 /// 時間は開始時刻から都度計算し `TimerRunStore` に保存(#38): 背面・再起動を挟んでも正しい残り時間を出し、
-/// countdown 走行中に背面へ回ったら終了時刻にローカル通知を予約、前面に戻ったら取り消す。
+/// countdown を開始した時点で終了時刻にローカル通知を予約し(部品が画面から消えても残る)、一時停止・リセットで取り消す。
+/// 前面でこの部品が見えている間は、アプリの通知 delegate がバナーを出さない(`TimerVisibility`)。
 struct TimerDisplayLeaf: View {
     let c: Component
     let ctx: RenderContext
@@ -47,17 +48,20 @@ struct TimerDisplayLeaf: View {
             guard running else { return }
             catchUp(now)
         }
-        .onAppear(perform: restore)
+        .onAppear {
+            TimerVisibility.appeared(storeKey)
+            restore()
+        }
+        .onDisappear { TimerVisibility.disappeared(storeKey) }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { catchUp(.now) }
-            notify(isForeground: phase == .active)
         }
     }
 
     // MARK: - 時間の扱い(#38)
 
-    /// 画面 / アプリ / 部品で一意。別アプリの同名部品と混ざらないようアプリ名も含める。
-    private var storeKey: String { "\(rt.dsl.app.name)/\(ctx.route.screen)/\(c.id)" }
+    /// 画面 / アプリ / 部品で一意。同じ名前のアプリが 2 つあっても混ざらないよう appId を使う。
+    private var storeKey: String { TimerRunStore.key(appId: rt.appId, screen: ctx.route.screen, component: c.id) }
 
     private func restore() {
         #if DEBUG
@@ -73,6 +77,7 @@ struct TimerDisplayLeaf: View {
         run = saved
         catchUp(.now)
         if !running { elapsed = run.elapsed(at: .now) }
+        if running { persist() } // 予約とロック画面の表示を取り直す(キーの移行で消えた分も戻る)
     }
 
     /// 開始時刻から経過を出し直す。背面中に終わっていれば完了として止める。
@@ -88,22 +93,21 @@ struct TimerDisplayLeaf: View {
 
     private func persist() {
         TimerRunStore.shared.save(run, for: storeKey)
-        notify(isForeground: scenePhase == .active)
+        notify()
         if c.liveActivity == true {
             rt.liveActivity?.timerActivity(TimerActivityUpdate(key: storeKey, label: c.label.flatMap { $0.isEmpty ? nil : $0 } ?? L("タイマー"),
                                                  total: isCountdown ? total : nil, run: run))
         }
     }
 
-    private func notify(isForeground: Bool) {
-        let plan = TimerNotificationPlan.decide(isForeground: isForeground, isCountdown: isCountdown, run: run, total: total, now: .now)
+    private func notify() {
+        let plan = TimerNotificationPlan.decide(isCountdown: isCountdown, run: run, total: total, now: .now)
         TimerNotifier.apply(plan, key: storeKey, title: rt.dsl.app.name, name: c.label.flatMap { $0.isEmpty ? nil : $0 } ?? L("タイマー"))
     }
 
     private func start() {
         run = TimerRun(base: elapsed, startedAt: Date())
-        if isCountdown { TimerNotifier.requestPermissionIfNeeded() }
-        persist()
+        persist() // countdown なら終了通知をここで予約する(初回は許可を求める)
     }
 
     private func pause() {

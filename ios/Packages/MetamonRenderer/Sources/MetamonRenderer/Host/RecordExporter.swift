@@ -9,6 +9,17 @@ public struct ExportFile: Identifiable, Equatable, Sendable {
     public init(url: URL) { self.url = url }
 }
 
+/// 書き出したファイルの置き場(一時フォルダ/export)。中身は記録の写しなので、次の書き出しとアカウント削除で消す。
+public enum ExportFiles {
+    public static var directory: URL {
+        FileManager.default.temporaryDirectory.appending(path: "export", directoryHint: .isDirectory)
+    }
+
+    public static func removeAll() {
+        try? FileManager.default.removeItem(at: directory)
+    }
+}
+
 public enum ExportError: Error, Equatable {
     case unknownEntity
     case unknownFormat
@@ -61,9 +72,8 @@ public extension DSLRuntime {
         default:
             throw ExportError.unknownFormat
         }
-        let dir = FileManager.default.temporaryDirectory
-            .appending(path: "export", directoryHint: .isDirectory)
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        ExportFiles.removeAll() // 前回までの書き出し(記録の写し)を残さない。共有シートは閉じてから次を押す
+        let dir = ExportFiles.directory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = dir.appending(path: RecordExport.fileName(table.title, ext: ext))
         try data.write(to: url, options: .atomic)

@@ -390,6 +390,7 @@ struct SettingsSheet: View {
             }
             .font(.body)
             .accessibilityIdentifier("settings.contact")
+            LicensesLink() // #306: 審査用の版にも出す
             DisclosureGroup(isExpanded: $showSupportDetails) {
                 ForEach(info.rows, id: \.label) { row in
                     LabeledContent(row.label) {

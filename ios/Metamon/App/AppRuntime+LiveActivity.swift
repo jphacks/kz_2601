@@ -104,4 +104,25 @@ enum LiveActivities {
             await activity.end(nil, dismissalPolicy: .immediate)
         }
     }
+
+    /// 消したアプリの表示(startActivity・タイマーの両方)を消す。終了後に残している「終わりました」も含める。
+    static func end(appId: String) async {
+        for activity in Item.activities where activity.attributes.appId == appId {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
+    }
+
+    /// タイマーのキーを appId にする前(アプリ名で始まる)の表示を消す(#38 のキー移行)。
+    static func endLegacyTimers() async {
+        for activity in Item.activities where LiveActivityContent.isLegacyTimerKey(activity.attributes.key, appId: activity.attributes.appId) {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
+    }
+
+    /// アカウント削除: このアプリが出したものをすべて消す。
+    static func endAll() async {
+        for activity in Item.activities {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
+    }
 }

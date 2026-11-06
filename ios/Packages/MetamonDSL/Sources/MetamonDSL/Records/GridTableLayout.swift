@@ -74,7 +74,9 @@ public struct GridTableLayout: Sendable {
     /// rowRange があればそれ、無ければ 1〜6(記録がそれより外ならそこまで広げる)。最大 24 行。
     static func integerRange(_ range: GridRange?, records: [Record], key: String) -> [Int] {
         if let range, range.to >= range.from {
-            return Array(range.from...min(range.to, range.from + maxRows - 1))
+            // from が Int の端でも足し算で落ちない
+            let (end, overflow) = range.from.addingReportingOverflow(maxRows - 1)
+            return Array(range.from...(overflow ? range.to : min(range.to, end)))
         }
         let present = records.compactMap { intValue($0[key]) }
         let lo = min(defaultRows.lowerBound, present.min() ?? defaultRows.lowerBound)
@@ -82,20 +84,26 @@ public struct GridTableLayout: Sendable {
         return Array(lo...min(hi, lo + maxRows - 1))
     }
 
+    /// 整数として扱う値の上限(これより大きい記録は行・マスに置かない)。`Int(Double)` は範囲外で落ち、
+    /// 見出しの範囲計算(`lo + maxRows`)も端の値で桁あふれするため。
+    static let maxMagnitude = 1_000_000_000_000_000
+
     static func intValue(_ v: JSONValue) -> Int? {
+        let i: Int?
         switch v {
-        case .number(let n) where n.isFinite: Int(n.rounded())
-        case .string(let s): Int(s.trimmingCharacters(in: .whitespaces))
-        default: nil
+        case .number(let n) where n.isFinite && abs(n) < Double(maxMagnitude): i = Int(n.rounded())
+        case .string(let s): i = Int(s.trimmingCharacters(in: .whitespaces))
+        default: i = nil
         }
+        return i.flatMap { abs($0) < maxMagnitude ? $0 : nil }
     }
 
     /// 値の照合キー。数値は整数に丸め、"2" と 2 を同じマスに置く。
     static func matchKey(_ v: JSONValue) -> String? {
         switch v {
-        case .number(let n) where n.isFinite: "n:\(Int(n.rounded()))"
+        case .number: intValue(v).map { "n:\($0)" }
         case .string(let s):
-            if let i = Int(s.trimmingCharacters(in: .whitespaces)) { "n:\(i)" } else { s.isEmpty ? nil : "s:\(s)" }
+            if let i = intValue(v) { "n:\(i)" } else { s.isEmpty ? nil : "s:\(s)" }
         case .bool(let b): "s:\(b)"
         default: nil
         }

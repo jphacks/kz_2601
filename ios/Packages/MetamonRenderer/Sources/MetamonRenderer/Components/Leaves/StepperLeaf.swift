@@ -9,10 +9,9 @@ struct StepperLeaf: View {
 
     var body: some View {
         if let form = ctx.form, let field = c.field {
-            let lo = c.min ?? -1_000_000_000
-            let hi = Swift.max(c.max ?? 1_000_000_000, lo + 0.001)
+            let bounds = NumericInput.range(min: c.min, max: c.max, defaultMin: -1_000_000_000, defaultMax: 1_000_000_000)
             let fieldDef = form.entity.field(field)
-            let value = form.double(field, fallback: Swift.max(0, lo))
+            let value = form.double(field, fallback: Swift.max(0, bounds.lowerBound))
             let label = c.label ?? fieldDef?.name ?? field
             InputRow(icon: FieldIcon.infer(component: c, field: fieldDef), label: label) {
                 Text(displayText(.number(value.wrappedValue), field: fieldDef))
@@ -20,7 +19,7 @@ struct StepperLeaf: View {
                     .foregroundStyle(RenderTheme.Colors.brandText)
                     .contentTransition(.numericText())
                     .animation(RenderTheme.Motion.select, value: value.wrappedValue)
-                Stepper("", value: value, in: lo...hi, step: c.step ?? 1)
+                Stepper("", value: value, in: bounds, step: NumericInput.step(c.step) ?? 1)
                     .labelsHidden()
                     .tint(RenderTheme.Colors.brandA)
                     .accessibilityLabel(label)
