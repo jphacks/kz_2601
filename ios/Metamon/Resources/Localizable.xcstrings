@@ -1344,6 +1344,23 @@
         }
       }
     },
+    "「%@」について話しかけます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talk about \"%@\""
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」について話しかけます"
+          }
+        }
+      }
+    },
     "「%@」には Tailor It Pro が必要です" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10558,6 +10575,23 @@
         }
       }
     },
+    "画面「%@」(id: %@)の部品「%@」(id: %@)で: " : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On screen \"%1$@\" (id: %2$@), component \"%3$@\" (id: %4$@): "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面「%@」(id: %@)の部品「%@」(id: %@)で: "
+          }
+        }
+      }
+    },
     "画面「%@」について話す" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10571,6 +10605,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "画面「%@」について話す"
+          }
+        }
+      }
+    },
+    "画面「%@」の「%@」について話す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talking about \"%2$@\" on \"%1$@\""
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面「%@」の「%@」について話す"
           }
         }
       }

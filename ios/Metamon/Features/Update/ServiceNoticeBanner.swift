@@ -24,6 +24,7 @@ struct ServiceNoticeBanner: View {
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel(isWarning ? Text("重要なお知らせ: \(text)") : Text("お知らせ: \(text)"))
+                    .accessibilityDismissAction(onDismiss) // #628
                 if let url = notice.linkURL {
                     Button("詳しく見る") { openURL(url) }
                         .font(.subheadline.weight(.semibold))
@@ -52,6 +53,7 @@ struct ServiceNoticeBanner: View {
                 .overlay(alignment: .bottom) { Rectangle().fill(tint.opacity(0.6)).frame(height: 1) }
                 .ignoresSafeArea(edges: .top)
         }
+        .swipeToDismiss(onDismiss: onDismiss) // #628 上に払って閉じる
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("notice.banner")
     }

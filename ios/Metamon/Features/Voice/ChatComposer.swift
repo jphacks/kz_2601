@@ -4,7 +4,7 @@ import MetamonRenderer
 /// 画面下に固定する文字入力バー(#196・LINE のトーク入力が手本)。音声シートの初期画面と対話で共通。
 /// - 置き場所は呼び出し側の `.safeAreaInset(edge: .bottom)`。キーボードと同じアニメーションで一緒に上がる(手動のオフセット計算はしない)
 /// - 1 行から文字に合わせて伸び、6 行を超えたら欄の中でスクロール。return は改行、送信は送信ボタン
-/// - 送信の前に日本語の変換中の文字を確定させる(未確定の文字が消える・二重に残るのを防ぐ)
+/// - 送信の前に日本語の変換中の文字を確定させ、送った後は入力欄が必ず空になる(#627・`TextSubmission`)
 struct ChatComposer<Leading: View>: View {
     let placeholder: String
     @Binding var text: String
@@ -14,6 +14,7 @@ struct ChatComposer<Leading: View>: View {
     var keepsFocus = true
     let onSend: (String) -> Void
     @ViewBuilder var leading: Leading
+    @State private var echo: SentTextEcho?
 
     static var fieldMinHeight: CGFloat { 44 }
 
@@ -34,6 +35,7 @@ struct ChatComposer<Leading: View>: View {
                 .overlay(RoundedRectangle(cornerRadius: ComposerMetrics.radius, style: .continuous)
                     .strokeBorder(focused.wrappedValue ? Theme.Colors.brandA.opacity(0.6) : Theme.Colors.hairline))
                 .accessibilityIdentifier("composer.field")
+                .onChange(of: text) { _, new in dropEcho(new) }
             Button(action: send) {
                 Image(systemName: "arrow.up")
                     .font(.body.weight(.bold))
@@ -48,14 +50,25 @@ struct ChatComposer<Leading: View>: View {
     }
 
     private func send() {
-        KeyboardState.commitMarkedText()
-        // 確定した文字がバインディングに届くのを 1 ループ待つ
-        DispatchQueue.main.async {
-            let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !value.isEmpty, !disabled else { return }
+        // 入力欄で変換中の文字を確定させ、その場の全文を読む(バインディングは確定より遅れる・#627)
+        let raw = KeyboardState.takeFocusedText() ?? text
+        guard let value = TextSubmission.value(raw), !disabled else { return }
+        // 入力欄そのものを空にしてキーボードの文書も空にする(バインディングだけ空にすると後から書き戻される)
+        KeyboardState.clearFocusedText()
+        text = ""
+        echo = SentTextEcho(sent: value)
+        if !keepsFocus { focused.wrappedValue = false }
+        onSend(value)
+    }
+
+    /// 送った直後にキーボードから書き戻された文字(送った文字の末尾)を消す(#627)。
+    private func dropEcho(_ new: String) {
+        guard let echo else { return }
+        if echo.shouldClear(new) {
+            KeyboardState.clearFocusedText()
             text = ""
-            if !keepsFocus { focused.wrappedValue = false }
-            onSend(value)
+        } else if !new.isEmpty {
+            self.echo = nil // 新しく打ち始めた
         }
     }
 }
