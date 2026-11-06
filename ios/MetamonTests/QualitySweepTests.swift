@@ -46,4 +46,29 @@ final class QualitySweepTests: XCTestCase {
         let after = await rt.recordSync.cached(appId: appId, entity: "memo")
         XCTAssertEqual(after.count, 2)
     }
+
+    // MARK: - 生成中に初期状態へ戻した
+
+    func testMorphResultIsDroppedWhenAppChangedWhileGenerating() async throws {
+        let ai = UndoRedoTests.GatedAI()
+        var services = BuildConfig.make(environment: .mock)
+        services.ai = ai
+        let rt = AppRuntime(document: try DSLExamples.document("kakeibo", version: 1), services: services)
+        rt.clarifyEnabled = false
+        ai.holdNextMorph()
+        let job = Task { await rt.generate("金額を大きくして") }
+        var started = ai.started.makeAsyncIterator()
+        _ = await started.next()
+        XCTAssertTrue(rt.isMorphing)
+
+        rt.resetToInitial() // 生成の途中で初期状態へ(新しい appId)
+        let freshId = rt.document.appId
+        ai.releaseMorph()
+        await job.value
+
+        XCTAssertTrue(rt.dsl.isVoiceOnly, "前のアプリの生成結果で初期画面を上書きしない")
+        XCTAssertEqual(rt.document.appId, freshId)
+        XCTAssertNil(rt.morphJob)
+        XCTAssertNil(rt.errorCard)
+    }
 }

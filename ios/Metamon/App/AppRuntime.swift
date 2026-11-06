@@ -553,9 +553,14 @@ final class AppRuntime: DSLRuntime {
             try await services.ai.morph(transcript: text, appId: appId, currentVersion: version, locale: locale)
         }
         morphTask = task
-        defer { morphTask = nil }
+        defer { if morphTask == task { morphTask = nil } }
         do {
             let result = try await task.value
+            // 待っている間に別のアプリ・初期状態へ移っていたら、前のアプリの結果を今の画面に当てない
+            guard document.appId == previous.appId else {
+                print("[Metamon] morph result dropped: app changed \(previous.appId) → \(document.appId)")
+                return
+            }
             if result.unchanged {
                 presentUnchanged(result.summary)
                 return
@@ -574,6 +579,7 @@ final class AppRuntime: DSLRuntime {
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
             if gatePaid { await gatePaidGeneration(before: previous) } // #414
         } catch {
+            guard document.appId == previous.appId else { return } // 移った先に前のアプリの失敗を出さない
             let failure: FailureKind = interruptedByOffline ? .offline : FailureKind.classify(error)
             interruptedByOffline = false
             print("[Metamon] morph failed: \(failure) (\(error))")
