@@ -4710,6 +4710,23 @@
         }
       }
     },
+    "サブスクリプションを管理" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage Subscription"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サブスクリプションを管理"
+          }
+        }
+      }
+    },
     "サークルの出欠" : {
       "extractionState" : "manual",
       "localizations" : {
