@@ -69,6 +69,15 @@ func proData(p Pro) map[string]any {
 	return m
 }
 
+// storedPrecision truncates p's times to the microseconds Firestore keeps, so
+// what Apply returns equals what Get reads back.
+func storedPrecision(p Pro) Pro {
+	for _, t := range []*time.Time{&p.ExpiresAt, &p.RevokedAt, &p.GraceExpiresAt, &p.UpdatedAt, &p.SignedAt} {
+		*t = t.Truncate(time.Microsecond)
+	}
+	return p
+}
+
 // Get implements Store.
 func (f *Firestore) Get(ctx context.Context, uid string) (*Pro, error) {
 	s, err := f.proRef(uid).Get(ctx)
@@ -98,6 +107,7 @@ func (f *Firestore) Owner(ctx context.Context, otid string) (string, error) {
 // document, then writes both (or fails with ErrOwnedByOther).
 func (f *Firestore) Apply(ctx context.Context, uid string, p Pro, transferFrom string) (*Pro, error) {
 	bref, pref := f.bindingRef(p.OriginalTransactionID), f.proRef(uid)
+	p = storedPrecision(p)
 	var out Pro
 	err := f.c.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
 		snaps, err := tx.GetAll([]*firestore.DocumentRef{bref, pref})
@@ -117,7 +127,7 @@ func (f *Firestore) Apply(ctx context.Context, uid string, p Pro, transferFrom s
 				return err
 			}
 		}
-		now := f.now().UTC()
+		now := f.now().UTC().Truncate(time.Microsecond)
 		binding := map[string]any{"uid": uid, "productId": p.ProductID, "environment": p.Environment, "updatedAt": now}
 		if owner != uid {
 			binding["boundAt"] = now

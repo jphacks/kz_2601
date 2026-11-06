@@ -91,6 +91,28 @@ func TestSubmitBindsAndGrantsPro(t *testing.T) {
 	})
 }
 
+// The Pro returned by a submit equals what a later read returns (Firestore
+// keeps microseconds; the clock here has nanoseconds).
+func TestSubmitResultMatchesReadBack(t *testing.T) {
+	stores(t, func(t *testing.T, st Store) {
+		e := newEnv(t, st)
+		e.now = e.now.Truncate(time.Second).Add(123456789)
+		ctx := context.Background()
+		alice, otid := uid(t, "alice"), uid(t, "otid")
+		got, err := e.svc.SubmitApple(ctx, alice, e.jws(t, appstoretest.Monthly(bundle, product, otid, e.now)))
+		if err != nil || got.Pro == nil {
+			t.Fatalf("submit: %+v %v", got, err)
+		}
+		again, err := e.svc.Get(ctx, alice)
+		if err != nil || again.Pro == nil {
+			t.Fatalf("get: %+v %v", again, err)
+		}
+		if !got.Pro.UpdatedAt.Equal(again.Pro.UpdatedAt) || !got.Pro.ExpiresAt.Equal(again.Pro.ExpiresAt) {
+			t.Fatalf("submit returned %+v, read returned %+v", got.Pro, again.Pro)
+		}
+	})
+}
+
 func TestSubmitRejectsOtherActiveAccount(t *testing.T) {
 	stores(t, func(t *testing.T, st Store) {
 		e := newEnv(t, st)

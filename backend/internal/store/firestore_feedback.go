@@ -49,7 +49,7 @@ func (d *feedbackDoc) toFeedback(id string, withBodies bool) *Feedback {
 // CreateFeedback implements Store. The daily count and the create run in one
 // transaction so parallel sends cannot exceed perDay.
 func (f *Firestore) CreateFeedback(ctx context.Context, fb Feedback, perDay int) (*Feedback, error) {
-	now := time.Now().UTC()
+	now := Now()
 	fb.ID, fb.Status, fb.Day, fb.CreatedAt = NewID("fb_"), FeedbackReceived, FeedbackDay(now), now
 	d := feedbackDoc{UID: fb.UID, Kind: fb.Kind, Message: fb.Message, Untrusted: true, ConsentVersion: fb.ConsentVersion,
 		Status: fb.Status, Attachments: fb.Attachments(), AppID: fb.AppID, DSLVersion: int64(fb.DSLVersion),

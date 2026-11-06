@@ -48,7 +48,7 @@ func (f *Firestore) AddMember(ctx context.Context, appID string, m Member) (bool
 		created = true
 		joined := m.JoinedAt
 		if joined.IsZero() {
-			joined = time.Now().UTC()
+			joined = Now()
 		}
 		return tx.Create(ref, memberDoc{DisplayName: m.DisplayName, Via: m.Via, InvitedBy: m.InvitedBy, JoinedAt: joined})
 	})

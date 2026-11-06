@@ -176,7 +176,7 @@ func (h *Handler) createShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := store.Share{Token: tok, AppID: id, OwnerUID: uidOf(r), Name: app.Name, Version: app.CurrentVersion,
-		DSL: app.DSL, CreatedAt: time.Now().UTC()}
+		DSL: app.DSL, CreatedAt: store.Now()}
 	if err := h.store.CreateShare(r.Context(), s); err != nil {
 		fail(w, err)
 		return
