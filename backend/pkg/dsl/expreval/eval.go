@@ -60,6 +60,10 @@ type Row struct {
 // MaxDepth bounds nesting plus computed chains (iOS ExprEvaluator.maxDepth).
 const MaxDepth = 48
 
+// MaxAddDays bounds addDays' day count (about 273 years; iOS
+// ExprEvaluator.maxAddDays). Beyond it addDays is nil.
+const MaxAddDays = 100_000
+
 // maxHistory is DailyCheck.maxHistory.
 const maxHistory = 400
 

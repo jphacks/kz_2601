@@ -109,12 +109,17 @@ type Decision struct {
 	// NearLimit: an execution counter reached 80% (the creator's warning).
 	NearLimit bool
 	ResetAt   time.Time
+	// Day is the quota's day of the run (yyyy-mm-dd in Config.Location).
+	Day string
 	// Charge is what Begin counted; give it back with Quota.Refund when the
 	// run fails for good.
 	Charge Charge
+	// AppExec is the app's execution counter as Begin saw it (after its own
+	// charge when allowed); nil when Begin did not read it (a plan block, a
+	// retry, or the counter is off). The creator's screen shows it (#347).
+	AppExec *Block
 
 	run      Run
-	day      string
 	expireAt time.Time
 }
 
@@ -191,7 +196,7 @@ func (q *Quota) Begin(ctx context.Context, r Run) (Decision, error) {
 	y, m, d := now.Date()
 	reset := time.Date(y, m, d+1, 0, 0, 0, 0, q.cfg.Location)
 	dec := Decision{
-		run: r, day: now.Format("2006-01-02"), ResetAt: reset,
+		run: r, Day: now.Format("2006-01-02"), ResetAt: reset,
 		// TTL: a day of slack so the document outlives its own day.
 		expireAt: reset.Add(24 * time.Hour),
 	}
@@ -209,7 +214,7 @@ func (q *Quota) Begin(ctx context.Context, r Run) (Decision, error) {
 	var counters []ratelimit.Counter
 	add := func(scope, id string, limit int) {
 		if limit > 0 {
-			counters = append(counters, ratelimit.Counter{ID: q.id(dec.day, id), Scope: scope, Limit: limit})
+			counters = append(counters, ratelimit.Counter{ID: q.id(dec.Day, id), Scope: scope, Limit: limit})
 		}
 	}
 	add(ScopeAppExec, "rx_app_"+docSafe(r.AppID), pick(plan, l.AppExecFree, l.AppExecPro))
@@ -224,6 +229,11 @@ func (q *Quota) Begin(ctx context.Context, r Run) (Decision, error) {
 	u, mem, err := q.consume(ctx, counters, 1, dec.expireAt)
 	if err != nil {
 		return dec, err
+	}
+	for i, c := range counters {
+		if c.Scope == ScopeAppExec {
+			dec.AppExec = &Block{Scope: c.Scope, CounterID: c.ID, Limit: c.Limit, Used: u.Counts[i]}
+		}
 	}
 	if u.Blocked >= 0 {
 		c := counters[u.Blocked]
@@ -269,7 +279,7 @@ func (q *Quota) Writes(ctx context.Context, dec Decision, n int) (Grant, error) 
 		g.Dropped = n - g.Allowed
 		return g, nil
 	}
-	ctr := ratelimit.Counter{ID: q.id(dec.day, "rw_app_"+docSafe(dec.run.AppID)), Scope: ScopeAppWrites, Limit: limit}
+	ctr := ratelimit.Counter{ID: q.id(dec.Day, "rw_app_"+docSafe(dec.run.AppID)), Scope: ScopeAppWrites, Limit: limit}
 	got, part, blk, err := q.fill(ctx, ctr, g.Allowed, dec.expireAt)
 	if err != nil {
 		return Grant{Dropped: n}, err
@@ -340,10 +350,10 @@ func (q *Quota) Recipients(ctx context.Context, dec Decision, uids []string) (Re
 	for _, u := range list {
 		var counters []ratelimit.Counter
 		if l.RecipientPerApp > 0 {
-			counters = append(counters, ratelimit.Counter{ID: q.id(dec.day, "rn_rcpt_app_"+docSafe(dec.run.AppID)+"_"+docSafe(u)), Scope: ScopeRecipientApp, Limit: l.RecipientPerApp})
+			counters = append(counters, ratelimit.Counter{ID: q.id(dec.Day, "rn_rcpt_app_"+docSafe(dec.run.AppID)+"_"+docSafe(u)), Scope: ScopeRecipientApp, Limit: l.RecipientPerApp})
 		}
 		if l.RecipientTotal > 0 {
-			counters = append(counters, ratelimit.Counter{ID: q.id(dec.day, "rn_rcpt_total_"+docSafe(u)), Scope: ScopeRecipientTotal, Limit: l.RecipientTotal})
+			counters = append(counters, ratelimit.Counter{ID: q.id(dec.Day, "rn_rcpt_total_"+docSafe(u)), Scope: ScopeRecipientTotal, Limit: l.RecipientTotal})
 		}
 		if len(counters) == 0 {
 			ok = append(ok, taken{uid: u})
@@ -367,7 +377,7 @@ func (q *Quota) Recipients(ctx context.Context, dec Decision, uids []string) (Re
 	// then the app's daily recipients, as many as fit
 	got := len(ok)
 	if limit := pick(dec.Plan, l.AppNotifyFree, l.AppNotifyPro); limit > 0 && got > 0 {
-		ctr := ratelimit.Counter{ID: q.id(dec.day, "rn_app_"+docSafe(dec.run.AppID)), Scope: ScopeAppNotify, Limit: limit}
+		ctr := ratelimit.Counter{ID: q.id(dec.Day, "rn_app_"+docSafe(dec.run.AppID)), Scope: ScopeAppNotify, Limit: limit}
 		n, part, blk, err := q.fill(ctx, ctr, got, dec.expireAt)
 		if err != nil {
 			for _, t := range ok {

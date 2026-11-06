@@ -78,8 +78,9 @@ type Consent interface {
 	Allows(ctx context.Context, uid string) (bool, error)
 }
 
-// NoConsent is the default Consent: nobody has agreed (there is no storage
-// or screen for consent yet), so notifications to others are not sent.
+// NoConsent is the default Consent of a Resolver: nobody has agreed, so
+// notifications to others are not sent. The runner passes the stored
+// consents (users/{uid}/notifyConsent/{appId}, #339) instead.
 type NoConsent struct{}
 
 // Allows always reports false.

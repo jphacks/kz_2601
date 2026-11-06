@@ -6,6 +6,7 @@ package queue
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -72,9 +73,10 @@ func (q *Queue) GiveUp(ctx context.Context, ev store.OutboxEvent, lastError stri
 }
 
 // Retry puts ev back after Delay(ev.Attempts). code is a short error class
-// (never content).
-func (q *Queue) Retry(ctx context.Context, ev store.OutboxEvent, code string) error {
-	return ignoreLost(q.st.RetryOutbox(ctx, q.env, ev.EventID, ev.Attempts, q.Now().Add(q.Delay(ev.Attempts)), code))
+// (never content); charge (nil = keep the stored one) is what this attempt
+// counted, refunded if the event gives up.
+func (q *Queue) Retry(ctx context.Context, ev store.OutboxEvent, code string, charge json.RawMessage) error {
+	return ignoreLost(q.st.RetryOutbox(ctx, q.env, ev.EventID, ev.Attempts, q.Now().Add(q.Delay(ev.Attempts)), code, charge))
 }
 
 // Delay is the wait after the attempt-th failure.

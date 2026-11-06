@@ -67,7 +67,9 @@ func (ev *Evaluator) apply(name string, args []dsl.Expr, row *Row) Value {
 		if !ok || math.IsInf(n, 0) || math.IsNaN(n) {
 			return Value{}
 		}
-		return NumberValue(float64(ev.doneInDays(days, int(roundAway(n)))))
+		// history stops at maxHistory days, so clamping first gives the same count
+		// and keeps int() in range for huge n
+		return NumberValue(float64(ev.doneInDays(days, int(roundAway(min(max(n, -1), maxHistory))))))
 	}
 
 	vals := make([]Value, len(args))
@@ -270,8 +272,8 @@ func (ev *Evaluator) apply(name string, args []dsl.Expr, row *Row) Value {
 	case "addDays":
 		d, ok1 := date(0)
 		n, ok2 := num(1)
-		if ok1 && ok2 && !math.IsInf(n, 0) && !math.IsNaN(n) {
-			return DateValue(addDays(d, int(roundAway(n)), ev.loc))
+		if n = roundAway(n); ok1 && ok2 && math.Abs(n) <= MaxAddDays { // false for NaN / ±Inf
+			return DateValue(addDays(d, int(n), ev.loc))
 		}
 	case "nextOccurrence":
 		// #266: next monthly / yearly repeat on or after today (clamped to the month end)

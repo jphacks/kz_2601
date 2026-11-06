@@ -93,7 +93,9 @@ final class LogicV2Tests: XCTestCase {
         XCTAssertEqual(try hours(#""9:30""#, #""12:00""#), 2.5, "H:mm も可")
         XCTAssertEqual(try hours(#""10:00:00""#, #""10:30:00""#), 0.5, "HH:mm:ss も可")
         XCTAssertEqual(try hours(#""10:00""#, #""10:00""#), 0, "同じ時刻は 0(24 ではない)")
-        XCTAssertEqual(try hours(#""00:00""#, #""24:00""#), 24, "24:00 は終端として可")
+        XCTAssertEqual(try XCTUnwrap(hours(#""00:00""#, #""23:59""#)), 23 + 59.0 / 60, accuracy: 1e-9, "23:59 まで可")
+        XCTAssertNil(try hours(#""00:00""#, #""24:00""#), "時刻は 00:00〜23:59 だけ(24:00 は不可)")
+        XCTAssertNil(try hours(#""24:30""#, #""01:00""#))
     }
 
     func testHoursBetweenOvernight() throws {

@@ -21,6 +21,7 @@ security:
 tags:
   - { name: account, description: 'アカウント削除(#119)。features/account-deletion.md' }
   - { name: apps }
+  - { name: automations, description: '作成者向けの「自動の動き」の見える化(#347)。features/automations.md' }
   - { name: dsl }
   - { name: entities }
   - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引をサーバーで検証して保存する。features/pro.md' }
@@ -28,6 +29,7 @@ tags:
   - { name: matching, description: '仲間探しのアプリの相互承認(#507)。features/matching.md' }
   - { name: members, description: 'scope:shared の参加者(#254)。features/members.md' }
   - { name: metrics, description: 'aiButton の端末内 AI の集計(#446)。docs/analytics/ai-button-metrics.md' }
+  - { name: notifications, description: 'プッシュ通知の端末と受け取りの同意(#269・#339)。features/notifications.md' }
   - { name: records }
   - { name: release, description: 'リリース申請(#76)。features/release.md' }
   - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。features/sharing.md' }
@@ -164,6 +166,26 @@ paths:
           headers: { ETag: { $ref: '#/components/headers/ETag' } }
           content: { application/json: { schema: { $ref: '#/components/schemas/AppWithDSL' } } }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /apps/{appId}/automations:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [automations]
+      summary: 自動の動き(serverRules)の一覧と直近の結果(作成者だけ)
+      description: |
+        呼び出した人の DSL(最新の版)の `serverRules` を順に返す。各ルールの説明(`DescribeServerRule`)・最後に動いた時刻・直近の結果(利用者向けの決まった語)・運営の停止中かどうか。
+        アプリ全体の運営の停止・通知の停止と、今日の実行の数(アプリの実行の上限・日本時間の 0 時で戻る)も返す。
+        runner がルールごとに上書きする小さな文書(`runner/{env}/rule_status/{hash}`・30 日の TTL)を読む。outbox は読まない。
+        作成者(`app_owners`)以外は 403(参加者も)。レコードの値・通知の本文・他人の uid・停止の理由・通報の数は返さない。
+        共有・公開のデータで動いた結果と、作成者本人の private のデータで動いた結果のうち新しい方を返す(他の人の private のデータで動いた結果は返さない)。
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Automations' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: 作成者ではない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /apps/{appId}/events:
@@ -872,6 +894,7 @@ paths:
         - 自分のアプリ(`users/{uid}/apps/*`)をすべて `status: "archived"` に(`DELETE /apps/{appId}` と同じ扱い)
         - 自分のシェアリンク(`shares/*`)を取り消し(`revoked: true` → 受け取り側は 404)
         - 自分の「探す」の掲載(`public_apps/*`)を取り下げ
+        - 自分の端末の登録(`users/{uid}/devices/*`)を消す(プッシュをすぐ止める・決定 #337)
         - 共有データ(`apps_public/*` 配下)の自分の投稿は**残す**。Firebase Auth のユーザーも**削除しない**
           (iOS が 204 の後にクライアント SDK で Firebase のユーザーを削除するので、同じ Apple ID で再サインインすると新しい uid になる)
         以後この uid の認証済みリクエストは **410 `account_deleted`**(この `DELETE /me` だけは何度でも 204)。
@@ -881,6 +904,67 @@ paths:
         '204': { description: 削除済み(2 回目以降も 204) }
         '401': { description: 未認証, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '500': { description: 途中で失敗。再実行で続きが終わる, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/devices/{installationId}:
+    parameters: [{ in: path, name: installationId, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,64}$' }, description: 'アプリの入れ直しごとに端末で作る識別子(例: UUID)' }]
+    put:
+      tags: [notifications]
+      summary: プッシュ通知の端末トークンを登録・更新する(#269)
+      description: |
+        `users/{uid}/devices/{installationId}` に保存(本人の分だけ。パスに uid は無い)。同じ `installationId` は上書き(`createdAt` は保つ)。
+        1 人 10 台まで。11 台目を登録すると、最後の更新が古いものから消す。同じトークンが別のアカウント(または別の `installationId`)にあれば、そちらを消す(1 台の端末でアカウントを替えた時に前のアカウントの通知が届かないように)。
+        トークンはレスポンスにもログにも出さない。退会(`DELETE /me`)の時点で全部消す(決定 #337)。APNs が 410(Unregistered)を返したトークンは runner が消す。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, environment]
+              additionalProperties: false
+              properties:
+                token: { type: string, pattern: '^([0-9a-fA-F]{2}){32,100}$', description: APNs の端末トークン(16 進。大文字は小文字にして保存) }
+                environment: { type: string, enum: [sandbox, production], description: トークンが有効な APNs の環境 }
+                appVersion: { type: string, maxLength: 32 }
+                os: { type: string, maxLength: 32, example: iOS 18.1 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Device' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    delete:
+      tags: [notifications]
+      summary: 端末の登録を消す(サインアウト・通知を切った時。冪等)
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /me/notify-consent/{appId}:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    put:
+      tags: [notifications]
+      summary: 他の人の行動で届くこのアプリの通知を受け取るか(#339)
+      description: |
+        `users/{uid}/notifyConsent/{appId}` に保存。保存が無い = 受け取らない(runner は作成者以外に送らない)。
+        有効にするには自分のコピー(無ければ 404)と、共有のデータがあるアプリでは参加(無ければ 403 `not_member`)が要る。無効にするのはいつでもできる。
+        決定 #339 の既定(shared は参加の時に確認つきで有効・public は無効)は、iOS が参加の画面でこの API を呼んで実現する。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [allowed]
+              additionalProperties: false
+              properties:
+                allowed: { type: boolean }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/NotifyConsent' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /me/entitlements:
     get:
@@ -1354,6 +1438,71 @@ components:
         - type: object
           required: [dsl]
           properties: { dsl: { $ref: '../dsl/dsl.schema.json' } }
+    AutomationResult:
+      type: string
+      description: |
+        直近の 1 回の結果。iOS はこの語ごとに文言を持つ。知らない語は「その他」として扱う。
+        - none: まだ動いていない(30 日以上動いていない時も)
+        - ok: 動いた
+        - notify_paused: 動いたが通知は止めた(通知の停止中)
+        - limit: 今日の上限に達したので止めた
+        - service_limit: サービス全体の今日の上限に達したので止めた
+        - service_paused: サービス全体で自動の動きを一時停止している
+        - plan: 今のプランでは動かない(匿名のアカウント・共有のデータは Pro)
+        - stopped: 運営がこのアプリ・ルールを止めている(非公開化を含む)
+        - changed: アプリが変わってこのルールが無くなった
+        - unavailable: アプリか作成者のアカウントが使えない状態だった
+        - late: 遅れたので動かさなかった(後でまとめて動かさない)
+        - inactive: しばらく開かれていないので休んでいる(開くと再開)
+        - failed: 何度か試したがうまくいかなかった
+        - other: この版の知らない結果
+      enum:
+        - changed
+        - failed
+        - inactive
+        - late
+        - limit
+        - none
+        - notify_paused
+        - ok
+        - other
+        - plan
+        - service_limit
+        - service_paused
+        - stopped
+        - unavailable
+    AutomationRule:
+      type: object
+      required: [id, description, trigger, result]
+      properties:
+        id: { type: string }
+        description: { type: string, description: 'ルールの説明(日本語・`DescribeServerRule`)。例: 「毎日 07:00、「記録」に記録を足す」' }
+        trigger: { type: string, enum: [record, schedule] }
+        result: { $ref: '#/components/schemas/AutomationResult' }
+        lastRunAt: { type: string, format: date-time, description: 最後に動いた(止めた・失敗したを含む)時刻。まだ無ければ省く }
+        lastOkAt: { type: string, format: date-time, description: 最後にうまく動いた時刻 }
+        stopped: { $ref: '#/components/schemas/AutomationStop' }
+    AutomationStop:
+      type: object
+      description: 運営の停止が効いている印(このキーがある時だけ)。理由・誰が・通報の数は返さない
+      properties:
+        until: { type: string, format: date-time, description: 自動で解ける時刻。無ければ運営が解くまで }
+    Automations:
+      type: object
+      required: [appId, rules]
+      properties:
+        appId: { type: string }
+        stopped: { $ref: '#/components/schemas/AutomationStop' }
+        notifyPaused: { $ref: '#/components/schemas/AutomationStop' }
+        quota:
+          type: object
+          description: アプリの今日の実行の数(runner の上限の数え方。最後に動いた時の数。まだ動いていなければ省く)
+          required: [used, limit, resetAt]
+          properties:
+            used: { type: integer, minimum: 0 }
+            limit: { type: integer, minimum: 1 }
+            resetAt: { type: string, format: date-time, description: 次に 0 に戻る時刻(日本時間の 0 時) }
+        rules: { type: array, items: { $ref: '#/components/schemas/AutomationRule' } }
     DSLEnvelope:
       type: object
       required: [appId, version, dsl]
@@ -1460,6 +1609,24 @@ components:
         uid: { type: string }
         name: { type: string, description: '未設定は "匿名"' }
         createdAt: { type: string, format: date-time }
+    Device:
+      type: object
+      required: [installationId, environment, createdAt, updatedAt]
+      description: 登録した端末(トークンは返さない)
+      properties:
+        installationId: { type: string }
+        environment: { type: string, enum: [sandbox, production] }
+        appVersion: { type: string }
+        os: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    NotifyConsent:
+      type: object
+      required: [appId, allowed, updatedAt]
+      properties:
+        appId: { type: string }
+        allowed: { type: boolean }
+        updatedAt: { type: string, format: date-time }
     ReleaseRequest:
       type: object
       required: [id, appId, name, dslVersion, purpose, status]

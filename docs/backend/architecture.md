@@ -15,7 +15,9 @@
 - [計算ロジック Expr(#100)](features/expr.md)
 - [アカウント削除(#119)](features/account-deletion.md)
 - [shared の参加者(#254)](features/members.md)
+- [プッシュ通知の端末と受け取りの同意(#269)](features/notifications.md)
 - [フィードバック(#319)](features/feedback.md)
+- [自動の動きの見える化(#347)](features/automations.md)
 - [決まった形の文章(#417)](features/text.md)
 - [仲間探しのアプリ(#507)](features/matching.md)
 
