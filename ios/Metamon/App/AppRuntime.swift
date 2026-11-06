@@ -1083,19 +1083,21 @@ final class AppRuntime: DSLRuntime {
                 toast = L10n.tr("\(missing.joined(separator: L10n.tr("・"))) を入力してください")
                 return
             }
-            if let id = form.recordId, let current = record(entity, id), !canEdit(entity: entity, record: current) {
+            // single(#267): 既存の 1 件があれば常にそれを上書き(フォームを開いた後に読み込まれた分も)
+            let recordId = form.recordId ?? (dsl.entity(entity)?.single == true ? SingleRecord.pick(records[entity] ?? [])?.id : nil)
+            if let id = recordId, let current = record(entity, id), !canEdit(entity: entity, record: current) {
                 notifyReadOnly(entity: entity) // 送信待ちに積まない(#249)
                 return
             }
-            if form.recordId == nil, postAuthor(for: entity) != nil, !AuthorProfile.asked {
+            if recordId == nil, postAuthor(for: entity) != nil, !AuthorProfile.asked {
                 // 共有アプリへの初めての投稿: 一覧に出る名前を先に決めてもらう(#250)
                 authorNamePrompt = AuthorNamePrompt { [weak self] in await self?.perform(action, ctx) }
                 return
             }
             // 楽観的 UI: ローカル DB に即反映して画面を進める。appconfig への送信は recordSync のキューが行う
             let payload = form.payload
-            let isNew = form.recordId == nil
-            records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: form.recordId, data: payload,
+            let isNew = recordId == nil
+            records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: recordId, data: payload,
                                                     author: postAuthor(for: entity))
             WidgetSnapshotWriter.write(dsl: dsl, records: records)
             #if !APP_STORE_REVIEW
@@ -1110,7 +1112,8 @@ final class AppRuntime: DSLRuntime {
 
         case .deleteRecord:
             guard let entity = action.entity ?? ctx.form?.entity.id,
-                  let id = ctx.recordId ?? ctx.form?.recordId else { return }
+                  let id = ctx.recordId ?? ctx.form?.recordId,
+                  dsl.entity(entity)?.single != true else { return } // single の 1 件は消さない(#267・backend も拒否)
             if let current = record(entity, id), !canDelete(entity: entity, record: current) {
                 notifyReadOnly(entity: entity)
                 return

@@ -27,6 +27,7 @@ Expr := number | string | boolean
       | {"agg": "count|sum|avg|min|max|latest|earliest", "entity": "<entityId>", "field"?: "<fieldId>", "by"?: "<dateFieldId>", "filter"?: Filter | [Filter]}
       | {"op": "<name>", "args": [Expr, ...]}
       | {"if": Expr, "then": Expr, "else": Expr}
+      | {"setting": "<fieldId>"}
 ```
 
 | 形 | 意味 |
@@ -36,6 +37,7 @@ Expr := number | string | boolean
 | `agg` | エンティティ全レコード(filter で絞る)の集計。count 以外は `field` 必須。`field` に computed フィールドも可。`latest` / `earliest`(#133)は `by`(date/datetime field)で並べた最新 / 最古の 1 件の `field` の値(型は field のまま・数値以外も可) |
 | `op` | 関数呼び出し。§3 の閉じた一覧のみ |
 | `if` | `if` が true なら `then`、それ以外は `else` |
+| `setting` | single の entity(設定値の置き場・README §3.11・#267)の 1 件のレコードのフィールド値。行コンテキストに依らず**どこでも**書ける(`stat.value`・通知の `when` も可)。保存前・空の field は `defaultValue`(date の `"now"` は当てずに nil)。computed の field も読める(保存前は初期値の 1 件で評価)。2 件以上あれば `createdAt` が最も新しい 1 件(同じなら後の方)。single の entity に `agg` は使えない(backend が拒否) |
 
 `agg.filter` は `Filter` 1 つ、または配列(AND)。`Filter.value` には Expr を書ける。computed 内の agg では `value` の `ref` は**外側のレコード**を指す:
 
@@ -152,6 +154,7 @@ Expr := number | string | boolean
 | `list.item.toggle` | `list item.toggle "name" must be a boolean field (got string)` / `... is computed (read-only)` |
 | `list.item.resets` | `... with resets daily must be a date field (got boolean)` / `... is a date field; add "resets":"daily"` / `... must not have defaultValue` |
 | `nextOccurrence` | `nextOccurrence.args[1]: must be the string "monthly" or "yearly"` / `repeat monthly needs entity + field` / `repeat yearly needs a date or datetime field` |
+| `setting`・single(#267) | `{"setting":"cycle"} is not a field of a single entity (settings: cycle_days)` / `is ambiguous: more than one single entity has field ...` / `entity "settings" is single ...; read its value with {"setting":"<fieldId>"} instead of agg` / `list over single entity "settings"` / `deleteRecord on single entity "settings"` |
 | `streak` / `doneInDays` | `streak needs {"ref": <daily check field>} of this entity` / `"started" is not a daily check; streak only works on a field used as list item.toggle with "resets":"daily"` / `number of days must be an integer literal 1..366` |
 | Stat 排他 | `stat takes either aggregate or value, not both` / `stat needs aggregate (with entity) or value` |
 | `Field.hidden`(§7.6) | `list item.trailing "correct" of entity "questions" is hidden ...` / `computed shows hidden field questions.correct; a hidden value may only be compared ...` / `a computed field cannot be hidden` |

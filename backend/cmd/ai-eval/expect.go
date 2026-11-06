@@ -100,6 +100,9 @@ var expectKeys = map[string]expectKind{
 	"matchMatched": expectBool,
 	"matchSafe":    expectBool,
 	"matchUI":      expectBool,
+	// checkSingle (#267): single.go
+	"single":  expectBool,
+	"setting": expectBool,
 	// checkRepeat (#266): repeat.go
 	"repeat":         expectString,
 	"repeatOffset":   expectNumber,

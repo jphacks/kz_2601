@@ -139,8 +139,9 @@ footer{font-size:13px;color:var(--muted);text-align:center;padding:8px 0 32px}
 {{- else if eq .Kind "select"}}<div>{{with .Label}}<label for="{{$.ID}}">{{.}}</label>{{end}}<select id="{{.ID}}" disabled>{{range .Options}}<option>{{.}}</option>{{end}}</select></div>
 {{- else if eq .Kind "toggle"}}<label><input id="{{.ID}}" type="checkbox" disabled> {{.Label}}</label>
 {{- else if eq .Kind "rating"}}<div>{{with .Label}}<span class="caption">{{.}}</span> {{end}}<span class="stars" role="img" aria-label="{{printf (t "rating") .Cols}}">{{.Text}}</span></div>
-{{- else if eq .Kind "button"}}<button type="button" class="{{.Style}}" disabled>{{.Label}}</button>
+{{- else if eq .Kind "button"}}<button type="button" class="{{.Style}}" disabled>{{if .Label}}{{.Label}}{{else}}{{t "share"}}{{end}}</button>
 {{- else if eq .Kind "link"}}{{if .Href}}<a href="{{.Href}}" rel="nofollow noopener noreferrer ugc" target="_blank">{{.Text}}</a>{{else}}<span>{{.Text}}</span>{{end}}
+{{- else if eq .Kind "flashcards"}}<div class="ph">{{with .Items}}{{printf (t "cards") (index . 0) (index . 1)}}<br>{{end}}{{t "inApp"}}</div>
 {{- else}}<div class="ph">{{with .Title}}{{.}}<br>{{end}}{{t "inApp"}}</div>
 {{- end}}{{end}}`
 
@@ -171,6 +172,8 @@ var sharePageText = map[string]map[string]string{
 		"photo":       "写真",
 		"rating":      "評価 %d 段階",
 		"inApp":       "アプリで見られます",
+		"cards":       "カード(表: %s / 裏: %s)",
+		"share":       "共有",
 	},
 	"en": {
 		"ogDefault":   "An app made with Tailor It was shared with you",
@@ -196,6 +199,8 @@ var sharePageText = map[string]map[string]string{
 		"photo":       "Photo",
 		"rating":      "Rating out of %d",
 		"inApp":       "Shown in the app",
+		"cards":       "Cards (front: %s / back: %s)",
+		"share":       "Share",
 	},
 }
 
@@ -227,10 +232,19 @@ func shareLang(accept string) string {
 }
 
 // shareHidden reports whether the operator unpublished the shared app
-// (#321). Hidden apps get the invalid-link page, like a revoked share.
-var shareHidden = func(ctx context.Context, s store.Store, sh *store.Share) bool {
+// (#321). Hidden apps get the invalid-link page, like a revoked share. A
+// failed lookup also hides it: the page must not show an unpublished app
+// because the store was briefly unavailable (checkSharedApp fails too).
+func shareHidden(ctx context.Context, s store.Store, sh *store.Share) bool {
 	p, err := s.GetPublicApp(ctx, sh.AppID)
-	return err == nil && p.Hidden
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return false
+	case err != nil:
+		slog.Warn("appconfig: share page moderation lookup failed", slog.Any("error", err))
+		return true
+	}
+	return p.Hidden
 }
 
 func newNonce() string {

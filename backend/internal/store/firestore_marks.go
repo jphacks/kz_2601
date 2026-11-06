@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"errors"
-	"time"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
@@ -44,7 +43,7 @@ func (f *Firestore) SetMark(ctx context.Context, rs RecordSet, recordID, markID,
 		}
 		if on {
 			count++
-			if err := tx.Set(by, map[string]any{"at": time.Now().UTC()}); err != nil {
+			if err := tx.Set(by, map[string]any{"at": Now()}); err != nil {
 				return err
 			}
 		} else {

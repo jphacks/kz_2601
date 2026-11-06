@@ -50,6 +50,24 @@ public extension KeyedDecodingContainer {
     }
 }
 
+/// 真偽値だけを受け、型違い・欠落は false にする(#267 `Entity.single`)。壊れた値で entity ごと落とさない。
+@propertyWrapper
+public struct LossyBool: Decodable, Sendable {
+    public var wrappedValue: Bool
+
+    public init(wrappedValue: Bool = false) { self.wrappedValue = wrappedValue }
+
+    public init(from decoder: Decoder) throws {
+        wrappedValue = (try? decoder.singleValueContainer().decode(Bool.self)) ?? false
+    }
+}
+
+public extension KeyedDecodingContainer {
+    func decode(_ type: LossyBool.Type, forKey key: Key) throws -> LossyBool {
+        (try? decodeIfPresent(type, forKey: key)) ?? LossyBool()
+    }
+}
+
 /// 未知の enum 文字列を fallback に丸める(バックエンドが新しい値を追加しても落ちない)。
 public enum Lenient {
     public static func decode<E: RawRepresentable>(_: E.Type, from decoder: Decoder, fallback: E) -> E where E.RawValue == String {

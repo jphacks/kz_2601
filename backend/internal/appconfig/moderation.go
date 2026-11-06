@@ -79,7 +79,7 @@ func (h *Handler) createReport(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "cannot report your own content"))
 		return
 	}
-	now := time.Now().UTC()
+	now := store.Now()
 	rep := store.Report{ID: store.ReportID(uid, body.Kind, target), ReporterUID: uid, Kind: body.Kind, TargetID: target,
 		TargetUID: owner, Reason: body.Reason, Status: "open", CreatedAt: now}
 	created, err := h.store.AddReport(r.Context(), rep, now.In(ratelimit.JST).Format(time.DateOnly), ReportsPerDay)
@@ -230,7 +230,7 @@ func (h *Handler) createBlock(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "too many blocked users"))
 		return
 	}
-	b.CreatedAt = time.Now().UTC()
+	b.CreatedAt = store.Now()
 	if err := h.store.PutBlock(r.Context(), uidOf(r), b); err != nil {
 		fail(w, err)
 		return

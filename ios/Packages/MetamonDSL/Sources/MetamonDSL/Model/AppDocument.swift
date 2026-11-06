@@ -54,6 +54,8 @@ public struct AppDSL: Decodable, Sendable {
     public func entitiesNeeded(by screen: Screen) -> Set<String> {
         var out = screen.referencedEntities
         for c in screen.allComponents { out.formUnion(c.valueExpr?.referencedEntities ?? []) }
+        // {"setting": ...}(#267)はどの式からも読めるので、single の entity(1 件ずつ)はいつも読む
+        out.formUnion(entities.filter(\.single).map(\.id))
         var queue = Array(out)
         while let id = queue.popLast() {
             guard let e = entity(id) else { continue }
@@ -223,6 +225,8 @@ public struct Entity: Decodable, Identifiable, Sendable {
     @LossyPositiveInt public var retentionDays: Int?
     /// 仲間探しでの役割(#507): "profile"(みんなが見るプロフィール)/ "matched"(つながった人だけが読む)。未知の値は無視。
     public var match: String?
+    /// 設定値の置き場(#267)。レコードは常に 1 件(`SingleRecord`)。フォームは開くとその 1 件の編集、一覧には出さない。式 `{"setting": ...}` で読む。
+    @LossyBool public var single: Bool = false
     @Lossy public var fields: [Field]
 
     /// field id、または予約値(`$author` / `$createdAt`・#250)の仮 Field。

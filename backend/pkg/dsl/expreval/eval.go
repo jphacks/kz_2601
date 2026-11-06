@@ -77,6 +77,7 @@ type Evaluator struct {
 	views      map[string][]Record
 	inProgress map[string]bool
 	depth      int
+	singles    []*dsl.Entity // single entities in entity order (#267)
 }
 
 // New builds an Evaluator over env.
@@ -97,6 +98,9 @@ func New(env Env) *Evaluator {
 	for i := range env.Entities {
 		if _, dup := ev.entities[env.Entities[i].ID]; !dup {
 			ev.entities[env.Entities[i].ID] = &env.Entities[i]
+			if env.Entities[i].Single {
+				ev.singles = append(ev.singles, &env.Entities[i])
+			}
 		}
 	}
 	return ev
@@ -129,6 +133,8 @@ func (ev *Evaluator) Eval(e dsl.Expr, row *Row) Value {
 			return Value{}
 		}
 		return ev.aggregate(e.Agg, row)
+	case dsl.ExprSetting:
+		return ev.setting(e.Setting)
 	case dsl.ExprOp:
 		return ev.apply(e.Op, e.Args, row)
 	case dsl.ExprIf:

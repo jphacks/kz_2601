@@ -76,6 +76,8 @@ public final class ExprEvaluator {
     ]
 
     private let entities: [String: Entity]
+    /// single の entity(entity の順・#267)
+    private let singles: [Entity]
     private let source: (String) -> [Record]
     private let now: Date
     private let calendar: Calendar
@@ -88,8 +90,13 @@ public final class ExprEvaluator {
 
     public init(entities: [Entity], records: @escaping (String) -> [Record], now: Date = DSLClock.now(), calendar: Calendar = .current) {
         var map: [String: Entity] = [:]
-        for e in entities where map[e.id] == nil { map[e.id] = e }
+        var singles: [Entity] = []
+        for e in entities where map[e.id] == nil {
+            map[e.id] = e
+            if e.single { singles.append(e) }
+        }
         self.entities = map
+        self.singles = singles
         self.source = records
         self.now = now
         self.calendar = calendar
@@ -114,7 +121,22 @@ public final class ExprEvaluator {
         case .op(let name, let args): return apply(name, args, row: row)
         case .cond(let c, let t, let e):
             return (evaluate(c, row: row)?.truthy ?? false) ? evaluate(t, row: row) : evaluate(e, row: row)
+        case .setting(let id): return setting(id)
         }
+    }
+
+    /// `{"setting": id}`(#267): field を持つ最初の single の entity(entity の順)の 1 件(`SingleRecord`)の値。
+    /// 保存前は defaultValue の入った 1 件で読み、保存した 1 件でも空の field は defaultValue。
+    private func setting(_ id: String) -> ExprValue? {
+        guard !id.hasPrefix("$"), id != "id" else { return nil }
+        for entity in singles {
+            guard let field = entity.fields.first(where: { $0.id == id }) else { continue }
+            let record = SingleRecord.pick(source(entity.id)) ?? Record(id: "", data: SingleRecord.defaults(of: entity))
+            let v = fieldValue(id, row: Row(entity: entity, record: record))
+            if v == nil, !field.isComputed, let d = SingleRecord.defaultValue(field) { return Self.value(from: d, field: field) }
+            return v
+        }
+        return nil
     }
 
     /// 行のフィールド値。"id" はレコード id、computed は評価(メモ)、それ以外は保存値。
