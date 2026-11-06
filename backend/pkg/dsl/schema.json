@@ -36,6 +36,14 @@
       "items": {
         "$ref": "#/$defs/Screen"
       }
+    },
+    "serverRules": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "$ref": "#/$defs/ServerRule"
+      },
+      "description": "サーバーの自動の動き(M4・#340): きっかけ(レコードの作成・更新、毎日・毎週・毎月の時刻)→ 条件(Expr)→ 処理(通知・レコードを書く・数の field を増やす)。iOS は描画しない。動くのはサーバー(runner)で、共有データに効くのは作成者の公開 DSL の宣言だけ。処理が書いたレコードは次のきっかけを起こさない(連鎖なし)。外部への送信・任意の宛先は語彙に無い。上限と宛先の規則は Go の Validate(backend/pkg/dsl/server_rules.go)。"
     }
   },
   "$defs": {
@@ -4204,6 +4212,231 @@
       },
       "description": "単語カード・暗記カード(フラッシュカード)。entity のレコード(filter で絞れる)を 1 枚ずつ出し、タップで表(front)と裏(back)をめくる。右にスワイプで「覚えた」、左で「まだ」を toggle の boolean field に保存し、次のカードへ進む(スワイプの代わりのボタンもある)。進み具合(n / 全体)と、全部終わった時の完了表示を出す。「単語帳」「暗記カード」「めくると意味・答え」「一問一答」「覚えていないものだけ出題」の時に必ずこれを選ぶ(disclosure や list で代替しない)。",
       "x-usage": "カードの entity(例 word{term: string(required), meaning: string(required), learned: boolean(defaultValue false)})を作り、ホームに flashcards{entity, front: term, back: meaning, toggle: learned, filter: {field: learned, op: eq, value: false}} を全幅で大きく(例 A1:F7)。下にカードの list(A8:F10・item.toggle に同じ learned で「まだ」に戻せる)と追加ボタン(D11:F12)、カードのフォーム画面(screen.entity + saveRecord)を作る。toggle を省くと記録せずにめくるだけ。"
+    },
+    "ServerRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "on",
+        "do"
+      ],
+      "description": "自動の動き 1 つ。on のきっかけで、if が真(省略 = いつでも)なら do の処理を上から順に行う。",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "on": {
+          "$ref": "#/$defs/RuleTrigger"
+        },
+        "if": {
+          "$ref": "#/$defs/Expr",
+          "description": "条件(真偽の Expr)。行はきっかけのレコード({\"ref\":\"<field>\"}・\"<refField>.<field>\")。更新のきっかけでは {\"ref\":\"$prev.<field>\"} で更新の前の値。agg・streak・doneInDays・computed field は使えない。時刻のきっかけには行が無い(ref 不可)。"
+        },
+        "do": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/RuleAction"
+          }
+        }
+      }
+    },
+    "RuleTrigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "きっかけ。レコード(record + entity、更新なら fields で絞れる)か時刻(every + time、毎週は weekday、毎月は day)のどちらか 1 つ。時刻は作成者のタイムゾーン。",
+      "properties": {
+        "record": {
+          "type": "string",
+          "enum": [
+            "created",
+            "updated"
+          ],
+          "x-enumDescriptions": {
+            "created": "entity のレコードが作られた時。",
+            "updated": "entity のレコードが更新された時(fields があれば、そのどれかの値が変わった時だけ)。"
+          }
+        },
+        "entity": {
+          "type": "string",
+          "description": "record のきっかけの entity id。"
+        },
+        "fields": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "string"
+          },
+          "description": "record updated だけ: この field のどれかが変わった時だけ動く。"
+        },
+        "every": {
+          "type": "string",
+          "enum": [
+            "daily",
+            "weekly",
+            "monthly"
+          ],
+          "description": "時刻のきっかけ。1 日 1 回より細かくはできない。"
+        },
+        "time": {
+          "type": "string",
+          "description": "every の時刻 HH:MM。"
+        },
+        "weekday": {
+          "type": "string",
+          "enum": [
+            "mon",
+            "tue",
+            "wed",
+            "thu",
+            "fri",
+            "sat",
+            "sun"
+          ],
+          "description": "every weekly の曜日。"
+        },
+        "day": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 28,
+          "description": "every monthly の日(1〜28)。"
+        }
+      }
+    },
+    "RuleAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "maxProperties": 1,
+      "description": "処理 1 つ。notify / createRecord / updateRecord / increment のどれか 1 つのキーだけを書く。",
+      "properties": {
+        "notify": {
+          "$ref": "#/$defs/RuleNotify"
+        },
+        "createRecord": {
+          "$ref": "#/$defs/RuleCreateRecord"
+        },
+        "updateRecord": {
+          "$ref": "#/$defs/RuleUpdateRecord"
+        },
+        "increment": {
+          "$ref": "#/$defs/RuleIncrement"
+        }
+      }
+    },
+    "RuleNotify": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "to",
+        "title",
+        "body"
+      ],
+      "description": "プッシュ通知。押すとこのアプリが開く(外のページには行かない)。きっかけを起こした本人には送らない。題 30 字・本文 80 字まで(差し込みの {…} も数える)。{<field>} できっかけのレコードの値(実行の時に 30 字で切る)、{$author} で書いた人の表示名を差し込める。URL・メールアドレス・電話番号・公式や運営を名乗る語は書けない。",
+      "properties": {
+        "to": {
+          "$ref": "#/$defs/RuleRecipient"
+        },
+        "title": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        }
+      }
+    },
+    "RuleRecipient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "description": "通知の宛先(閉じた種類だけ。任意の人・メールアドレス・電話は無い)。private のアプリは owner だけ、public は owner と authorOf だけ、shared は全部。",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "owner",
+            "author",
+            "authorOf",
+            "members"
+          ],
+          "x-enumDescriptions": {
+            "owner": "アプリの作成者(private のアプリでは本人)。",
+            "author": "きっかけのレコードを書いた人(shared のレコードのきっかけだけ)。",
+            "authorOf": "きっかけのレコードの ref field(field)が指すレコードを書いた人(例: 出欠の親の予定を作った人)。",
+            "members": "参加者全員(shared だけ)。"
+          }
+        },
+        "field": {
+          "type": "string",
+          "description": "kind authorOf だけ: きっかけの entity の type ref の field id。"
+        }
+      }
+    },
+    "RuleCreateRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity",
+        "values"
+      ],
+      "description": "同じアプリの entity にレコードを 1 件作る。きっかけと同じ側(private どうし・shared / public どうし)の entity だけ。required の field はすべて書く。",
+      "properties": {
+        "entity": {
+          "type": "string"
+        },
+        "values": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Expr"
+          },
+          "description": "field id → 値(Expr。行はきっかけのレコード)。computed・photo・video・location の field には書けない。"
+        }
+      }
+    },
+    "RuleUpdateRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "values"
+      ],
+      "description": "きっかけのレコード(ref 省略)か、その ref field が指すレコード(ref)の field を書き換える。レコードのきっかけだけ。",
+      "properties": {
+        "ref": {
+          "type": "string",
+          "description": "きっかけの entity の type ref の field id(省略 = きっかけのレコード)。"
+        },
+        "values": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Expr"
+          },
+          "description": "field id → 値(Expr。行はきっかけのレコード)。computed・photo・video・location の field には書けない。"
+        }
+      }
+    },
+    "RuleIncrement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "field"
+      ],
+      "description": "集計: きっかけのレコードの ref field(ref)が指すレコードの数の field(field)に by(省略 = 1・負なら減らす)を足す。件数は by 省略、合計は by に {\"ref\":\"<数の field>\"}。レコードのきっかけだけ。",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "by": {
+          "$ref": "#/$defs/Expr"
+        }
+      }
     }
   }
 }

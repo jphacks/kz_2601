@@ -266,6 +266,7 @@ func (a *App) Validate() error {
 	checkComputedFields(a.Entities, entities, DailyToggleFields(a), add)
 	checkHiddenFields(a, entities, add)
 	checkMatching(a, add)
+	checkServerRules(a, entities, add)
 
 	notifIDs := map[string]bool{}
 	for i := range a.App.Notifications {

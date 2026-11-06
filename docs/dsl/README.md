@@ -384,6 +384,32 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - 古い iOS(#302): `when` を知らない版は `when` を無視し、残りの `{repeat: once}` を**次の 9:00 の 1 回きりの通知として予約してしまう**(開くたびに予約し直すので、ほぼ毎日鳴る誤った通知)。そこで iOS は `supportedFeatures` に `notification.when` を入れ、`allowedComponents` を送るのにこれを含めない版には AI が `when` を使わない(生成されたら通知ごと取り除く・§5.3)。保存済みの DSL を古い版で開いた時の誤った通知は防げないので、`MIN_IOS_BUILD` を上げるまでの既知の制限。
 - 新しい版で `when` が読めない(未知の式の形)時は、その通知ごと落とす(`Lossy`)。時刻の通知として鳴らさない。
 
+### 3.11 serverRules = サーバーの自動の動き(#340・M4)
+
+「誰かが出欠をつけたら、予定を作った人に通知」のような、**端末を開いていない人にも届く動き**をアプリのトップの `serverRules[]` に宣言する(方式 A = 宣言だけ・AI がコードを書かない。設計は `docs/decisions/336`〜`339`)。**iOS は描画しない**(未知のキーとして無視する)。動かすのはサーバーの runner(#341・#342)で、この PR の時点ではスキーマと検証だけ。生成用スキーマ(`ai.GenerationSchema()`)からは外してあり、AI が書くのは #343 から。
+
+```json
+{"id":"notify_rsvp","on":{"record":"created","entity":"rsvps"},
+ "if":{"op":"eq","args":[{"ref":"answer"},"yes"]},
+ "do":[{"notify":{"to":{"kind":"authorOf","field":"event"},"title":"出欠","body":"{$author}さんが参加にしました"}},
+       {"increment":{"ref":"event","field":"yes_count"}}]}
+```
+
+| 部分 | 語彙 | 決まり(`Validate()`・`backend/pkg/dsl/server_rules.go`) |
+|---|---|---|
+| きっかけ `on` | `record`: `created` / `updated`(+ `entity`、更新は `fields` で「この field が変わった時」に絞れる)。`every`: `daily` / `weekly`(`weekday`)/ `monthly`(`day` 1〜28)+ `time` HH:MM(作成者のタイムゾーン) | どちらか 1 つ。削除のきっかけ・1 日 1 回より細かい時刻・外からの呼び出しは無い |
+| 条件 `if` | Expr(行 = きっかけのレコード。`"<refField>.<field>"` で ref 先、更新では `"$prev.<field>"` で前の値) | 真偽であること。`agg`・`streak` / `doneInDays`・computed field は使えない。時刻のきっかけには行が無い |
+| 処理 `do`(1〜5 個) | `notify`{`to`, `title`, `body`} / `createRecord`{`entity`, `values`} / `updateRecord`{`ref`?, `values`} / `increment`{`ref`, `field`, `by`?} | 1 つのオブジェクトに 1 種類だけ。書けるのはきっかけと同じ側の entity(private どうし・shared / public どうし)。computed・photo・video・location の field には書かない。createRecord は required の field を全部書く |
+| 宛先 `to.kind` | `owner`(作成者)/ `author`(きっかけのレコードを書いた人)/ `authorOf` + `field`(ref 先のレコードを書いた人)/ `members`(参加者全員) | private は `owner` だけ、**public は `owner` と `authorOf` だけ**、shared は全部。きっかけを起こした本人には送らない。任意の uid・メール・電話・外部の宛先は無い |
+| 通知の本文 | 決まった枠 + `{<field>}`(きっかけのレコードの値)・`{$author}`(書いた人の表示名・shared / public) | **題 30 字・本文 80 字**(差し込みの `{…}` も数える)。差し込む値は実行の時に 30 字で切る。URL・ドメイン・メールアドレス・電話番号・「公式」「運営」などの名乗り・制御文字・見えない文字は不可。ref・refs・photo・video・location・hidden・computed の field は差し込めない |
+| 連鎖 | 処理が書いたレコードは次のきっかけを起こさない | 別のルール(自分も含む)のきっかけになる書き込み(作るなら created、書き換え・increment は同じ field の updated)を断る |
+| 上限 | ルール 20・時刻のルール 5・処理 5(Pro の値) | 無料の値(3・1・3)は `App.ServerRuleQuotaProblems(pro)` で、プランが分かる所(appconfig)が見る |
+| 使えないアプリ | 仲間探し(`entity.match`)のアプリ | `serverRules` ごと断る |
+
+- 共有データに効くのは作成者の公開 DSL(`apps_public/{appId}`)の宣言だけ。参加者が自分のコピーを書き換えても効かない(#337・runner の側で守る)。
+- 人が読める説明は `App.DescribeServerRule`(例: 「出欠」が作られた時(条件に合えば)、「予定」を作った人に通知・「予定」の「参加の数」を数える)。「このアプリの自動の動き」の一覧(#347)で使う。
+- 古い iOS: `AppDSL` はトップの未知キーを読まないので、`serverRules` があっても今までどおり開ける。
+
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 
 AI に渡す部品カタログは手書きではなく **`dsl.schema.json` から自動生成**される(`backend/internal/ai/catalog.go` の `BuildCatalog`)。検証(Go)・描画(iOS)・AI(プロンプト)の 3 者はすべてスキーマから導出され、抜けはテストで赤になる。
