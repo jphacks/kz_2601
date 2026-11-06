@@ -57,7 +57,7 @@ public enum ShareTarget: String, Sendable, CaseIterable {
     }
 }
 
-/// `openUrlButton` / `link` が開いてよい URL の判定。backend `dsl.OpenURLSchemes` と同じ allowlist。
+/// `openUrlButton` / `link` / `openUrl` アクションが開いてよい URL の判定。backend `dsl.OpenURLSchemes` と同じ allowlist。
 /// `line` `slack` `discord` は Info.plist の `LSApplicationQueriesSchemes` にも載せる。
 public enum ExternalURLPolicy {
     public static let allowedSchemes: Set<String> = ["https", "line", "slack", "discord", "tel", "mailto", "maps", "comgooglemaps"]
