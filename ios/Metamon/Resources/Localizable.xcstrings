@@ -3078,6 +3078,23 @@
         }
       }
     },
+    "この端末では音声モデルの準備ができるまで声で入力できません。文字で入力してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On this device, voice input works once the voice model is ready. Please type for now."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末では音声モデルの準備ができるまで声で入力できません。文字で入力してください"
+          }
+        }
+      }
+    },
     "この端末のデータが消え、匿名のアカウントには戻れません。作ったアプリと記録も開けなくなります。残したい時は、先に「Apple でサインイン」で引き継いでください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3822,6 +3839,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "まだ動いていません"
+          }
+        }
+      }
+    },
+    "まだ声で入力できません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice input isn't available yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ声で入力できません"
           }
         }
       }
@@ -7205,6 +7239,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今の記録帳を初期状態に戻しますか？"
+          }
+        }
+      }
+    },
+    "今は簡易の聞き取りで話せます。音声モデル(約%lldMB)を入れると、より正確に聞き取れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can talk now with quick listening. Add the voice model (about %lld MB) for more accurate results."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今は簡易の聞き取りで話せます。音声モデル(約%lldMB)を入れると、より正確に聞き取れます。"
           }
         }
       }
@@ -11119,6 +11170,23 @@
         }
       }
     },
+    "準備中のため簡易の聞き取りです" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quick listening while the voice model gets ready"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備中のため簡易の聞き取りです"
+          }
+        }
+      }
+    },
     "準備完了" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14196,6 +14264,23 @@
         }
       }
     },
+    "音声モデルの準備ができるまでは、文字で入力してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please type until the voice model is ready."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデルの準備ができるまでは、文字で入力してください"
+          }
+        }
+      }
+    },
     "音声モデルをダウンロード" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14328,6 +14413,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音声モデルを読み込み中…(初回は1分ほど)"
+          }
+        }
+      }
+    },
+    "音声認識の許可がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speech recognition isn't allowed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声認識の許可がありません"
           }
         }
       }

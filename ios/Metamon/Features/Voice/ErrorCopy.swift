@@ -83,6 +83,8 @@ enum ErrorCopy {
         case .microphoneDenied: L10n.tr("マイクを使えません")
         case .audioSession, .noInputAvailable, .noAudioCaptured: L10n.tr("録音できませんでした")
         case .tooShort, .silent: L10n.tr("うまく聞き取れませんでした")
+        case .speechRecognitionDenied: L10n.tr("音声認識の許可がありません")
+        case .onDeviceRecognitionUnavailable: L10n.tr("まだ声で入力できません")
         }
     }
     static func transcriberFailure(_ f: TranscriberFailure) -> String {
@@ -92,6 +94,8 @@ enum ErrorCopy {
         case .audioSession, .noInputAvailable, .noAudioCaptured: L10n.tr("ほかのアプリの通話や録音を終えてから、もう一度お試しください")
         case .tooShort: L10n.tr("タップしてから話し、話し終えたらもう一度タップしてください")
         case .silent: L10n.tr("マイクに近づいて、もう一度話してください")
+        case .speechRecognitionDenied: L10n.tr("音声モデルの準備ができるまでは、文字で入力してください")
+        case .onDeviceRecognitionUnavailable: L10n.tr("この端末では音声モデルの準備ができるまで声で入力できません。文字で入力してください")
         }
     }
     static var notHeardTitle: String { L10n.tr("うまく聞き取れませんでした") }

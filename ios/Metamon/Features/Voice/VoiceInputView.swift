@@ -267,6 +267,13 @@ struct VoiceInputView: View {
                 .contentTransition(.opacity)
                 .id(statusText)
                 .transition(.opacity)
+            if transcriber.isProvisional {
+                // U5: WhisperKit の準備中は Apple の端末内の認識で仮に聞き取る。精度が違うことを小さく伝える
+                Label(VoiceModelCopy.provisional, systemImage: "waveform.badge.exclamationmark")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("voice.provisional")
+            }
             modelStatusView
             #if targetEnvironment(simulator)
             Text("シミュレータ: マイクはダミー(定型文を返します)")
@@ -401,7 +408,7 @@ struct VoiceInputView: View {
         case .notDownloaded where !ModelDownloadConsent.isApproved() || ExpensiveNetworkProbe.shared.isExpensive:
             // 確認で「あとで」を選んだ / モバイル回線で待っている(#275): 文字で始められることを先に伝える
             VStack(spacing: Theme.Spacing.sm) {
-                Text(VoiceModelCopy.textFirst)
+                Text(transcriber.isProvisional ? VoiceModelCopy.provisionalTextFirst : VoiceModelCopy.textFirst)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -566,6 +573,11 @@ enum VoiceModelCopy {
     static var textStillWorks: String { L10n.tr("文字入力なら、このまま作れます") }
     static var notReadyStatus: String { L10n.tr("音声の準備中です(文字ならすぐ作れます)") }
     static var textPlaceholder: String { L10n.tr("文字で入力(今すぐ作れます)") }
+    // U5: 本命のモデルの準備中に、端末内の Apple の音声認識で仮に聞き取っている時
+    static var provisional: String { L10n.tr("準備中のため簡易の聞き取りです") }
+    static var provisionalTextFirst: String {
+        L10n.tr("今は簡易の聞き取りで話せます。音声モデル(約\(AppRuntime.voiceModelMegabytes)MB)を入れると、より正確に聞き取れます。")
+    }
 }
 
 #Preview {

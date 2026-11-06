@@ -11,7 +11,7 @@
 | P0 ネイティブ | **カメラ + ローカル通知** | `camera` コンポーネント / `native: notification.*` を実装済み。位置/センサー/共有は P1(ブリッジに stub) |
 | デモ3本 | 家計簿 / トレーニング記録 / 散歩メモ | サンプル DSL は `docs/dsl/examples/*.json`(4 本)をそのままバンドル |
 | 認証 | Sign in with Apple → 詰まったら匿名認証 | `TokenProvider` 抽象の裏で切替。UI/ランタイムは影響なし |
-| STT | WhisperKit 確定・**導入済み** | `SpeechTranscriber` 抽象。実機 `WhisperKitRecognizer`(model `small`)/ シミュレータ `MockTranscriber`(§6) |
+| STT | WhisperKit 確定・**導入済み** | `SpeechTranscriber` 抽象。実機 `WhisperKitRecognizer`(model `small`。準備中は `AppleOnDeviceTranscriber` で仮に聞き取る `FallbackTranscriber`・U5)/ シミュレータ `MockTranscriber`(§6) |
 | iOS CI | 5分制限なし | WhisperKit/Firebase 解決込みのビルドでも可 |
 
 ## 1. 全体構成(マルチモジュール)
@@ -220,10 +220,25 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | モデル | `BuildConfig.whisperModel`(環境変数 `METAMON_WHISPER_MODEL` / Info.plist `MetamonWhisperModel`、既定 **`small`**)。短縮名は `openai_whisper-small` に解決し、Hugging Face `argmaxinc/whisperkit-coreml` から取得 |
 | 配置 | `Application Support/WhisperKit/models/argmaxinc/whisperkit-coreml/openai_whisper-small/`(約 500MB)。`MelSpectrogram/AudioEncoder/TextDecoder.mlmodelc` + `config.json` が揃っていればオフラインでも Hub に問い合わせずロード |
 | DL と状態 | `prepare()` を `AppRuntime.bootstrap()` が起動直後に呼ぶ。`status`: `notDownloaded → downloading(downloadProgress 0〜1) → loading(CoreML ロード + ANE 特化 prewarm) → ready → recognizing`。失敗は `.failed(message)` で UI に「再試行」ボタン |
-| 権限 | `AudioProcessor.requestRecordPermission()`(`NSMicrophoneUsageDescription`、記入済み)。`NSSpeechRecognitionUsageDescription` は Apple Speech フォールバック用に残置(WhisperKit 自体は不要) |
+| 権限 | `AudioProcessor.requestRecordPermission()`(`NSMicrophoneUsageDescription`、記入済み)。WhisperKit 自体は音声認識の許可が不要。`NSSpeechRecognitionUsageDescription` は下の仮の聞き取り(U5)用 |
 | 録音 | 録音前に **自前で** `AVAudioSession(.playAndRecord, .default, [.defaultToSpeaker, .allowBluetooth])` + `setActive(true)`(WhisperKit 側は `try?` で失敗を握りつぶすため。カメラ/AVCaptureSession の後でも record 系に戻す)→ `startRecordingLive(callback: nil)` → 停止で `audioSamples` を取り出し `purgeAudioSamples`。`precheck`: 0 サンプル=`noAudioCaptured`・0.5 秒未満=`tooShort`・ピーク < 0.001(-60dBFS)=`silent` を **理由付き `TranscriberFailure`** として throw(toast にそのまま日本語で出る) |
 | 診断 | `lastDiagnostics: TranscriberDiagnostics`(録音秒数・サンプル数・ピーク/RMS・セッション category/mode・入力ルート・権限・モデル状態・失敗理由)。`[Voice]` プレフィックスで stdout と os_log(subsystem `jp.kz2601.metamon` category `voice`)に `recording started` / `stopped samples=N duration=S peak=…` / `transcribe result text="…"` を出す。実機ログ: `xcrun devicectl device process launch --console --device <id> jp.kz2601.metamon` |
 | 制約 | シミュレータでは `#if targetEnvironment(simulator)` で `MockTranscriber` + 文字入力のみ(マイク非表示)。ストリーミング(途中結果)は未対応=停止後に一括。`small` のメモリは推論時 ~1GB 弱、初回 prewarm は 30〜90 秒 |
+
+### 準備中の仮の聞き取り(U5・2026-11-06)
+
+WhisperKit の DL・読み込み(初回は数分)の間もマイクで話せるように、Apple の端末内の音声認識で仮に聞き取る(UX 点検 H2)。
+
+| 項目 | 内容 |
+|---|---|
+| 組み立て | 実機の `BuildConfig.makeTranscriber()` が `FallbackTranscriber(primary: WhisperKitRecognizer, provisional: AppleOnDeviceTranscriber)` を返す。シミュレータは従来どおり `MockTranscriber` |
+| 切り替え | 録音を**始める時**に選ぶ。WhisperKit が ready なら WhisperKit、そうでなく仮が使えるなら仮。録音中に WhisperKit の準備が終わっても、その録音は始めた方で止める(切り替えは録音の合間) |
+| 見せる状態 | `status`・`downloadProgress`・`needsDownload`・`prepare()` は WhisperKit のまま(設定・DL の確認・進捗の表示は変わらない)。`isReady` は「WhisperKit が ready か仮が使える」。`isProvisional` が true の間、音声画面に「準備中のため簡易の聞き取りです」 |
+| 端末内だけ | `SFSpeechAudioBufferRecognitionRequest.requiresOnDeviceRecognition = true`。`supportsOnDeviceRecognition == false` の端末・言語では使わない(サーバーへ送る Apple の認識には落とさない)→ 今まで通りマイクは灰色で文字の入力を先に出す |
+| 許可 | 最初の仮の録音で `SFSpeechRecognizer.requestAuthorization`(`NSSpeechRecognitionUsageDescription`。審査用の版は `strip-review-plist.sh` が同じ趣旨の文に差し替える)。拒否・制限なら `TranscriberFailure.speechRecognitionDenied` を出し、以後は仮を使わない(マイクは灰色・文字を先に) |
+| 言語 | `LanguagePreference` の `ja` → `ja-JP`、`en` → `en-US` |
+| プライバシー | 声は端末の外に送らず、録音も残さない。プライバシーの申告(音声データは集めない)は変わらない(`docs/store/privacy-label.md`) |
+| テスト | `MetamonServicesTests/FallbackTranscriberTests`(偽の実装で: 準備中は仮・準備後は WhisperKit・録音の合間だけ切り替え・端末内が使えない時は使わない・許可が無い時) |
 
 ### 音声画面 → 生成中 → 変身 の状態遷移(2026-10-24 刷新)
 
@@ -235,7 +250,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 VoiceInputView.phase                         AppRuntime.morphJob               RootView
  idle ──tap──▶ listening ──tap──▶ transcribing ──text──▶ (送信) ─▶ create / edit ──apply──▶ nil
    │ 例文チップ / 文字入力 ─────────────────────────────▶ (送信) ─┘                      │
-   └ 準備中(モデル DL/ロード)はマイク灰色・タップ不可                               summaryBanner 3〜5s
+   └ 準備中(モデル DL/ロード)は仮の聞き取り(U5)。端末内の認識が使えない時はマイク灰色・タップ不可                               summaryBanner 3〜5s
 ```
 
 | 画面状態 | 判定 | UI |
