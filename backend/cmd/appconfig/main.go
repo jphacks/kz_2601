@@ -54,7 +54,8 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("pro gate", slog.String("mode", string(proMode)))
-	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode))
+	limits := planLimits(logger) // #317
+	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode), appconfig.WithPlanLimits(limits))
 	entitlement.Register(api, ents) // Pro (#314)
 	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appStoreNotifications(ents, logger))
 	server := &http.Server{

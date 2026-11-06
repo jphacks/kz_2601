@@ -283,6 +283,10 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	if err := h.checkRecordLimits(r, cur, ent, data, nil, true); err != nil { // #317
+		fail(w, err)
+		return
+	}
 	if len(body.ClientID) > 256 {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "clientId too long"))
 		return
@@ -426,6 +430,10 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := checkRecordSize(merged); err != nil {
+		fail(w, err)
+		return
+	}
+	if err := h.checkRecordLimits(r, cur, ent, delta, existing.Data, false); err != nil { // #317
 		fail(w, err)
 		return
 	}

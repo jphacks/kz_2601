@@ -68,6 +68,12 @@
 | `RUNNER_SCHEDULE_MAX_LATE` | runner(**まだデプロイしていない**) | 定期のルール(#342)の実行が期限からこれより遅れたら `skipped_late` にして実行しない(後からまとめて実行しない)。`45m` のように書く。1 分未満は起動しない | `30m` |
 | `RUNNER_TICK_INTERVAL` | runner(**まだデプロイしていない**) | ローカル用。`10s` のように書くと、runner が自分でこの間隔で outbox を処理する。本番は Cloud Scheduler が `POST /internal/tick` を呼ぶので入れない | 無し(`/internal/tick` を呼ばれた時だけ) |
 | `RUNNER_OUTBOX` | appconfig | `1` で、serverRules(自動の動き)の条件に合う記録の書き込みを、同じトランザクションで outbox(`runner/{APP_ENV}/outbox`)に積む(#341)。時刻のきっかけを持つ(持っていた)DSL の保存では `rules_changed` を同じトランザクションで積み、`GET /dsl` で `runner/{APP_ENV}/apps/*` の `lastOpenedAt` を 1 アプリ 1 日 1 回まで書く(#342)。入れるのは人の承認を得てから(runner が無いまま入れると積まれるだけで動かない) | 無し(積まない) |
+| `PLAN_FREE_APPS` / `PLAN_PRO_APPS` | appconfig | プランごとの上限(#317)。1 人が作れるアプリの数(共有のアプリを入れるのは数えない)。`0` で数えない([rate-limit.md](../backend/rate-limit.md#プランごとの上限317)) | 100 / 1000 |
+| `PLAN_FREE_RECORDS_PER_APP` / `PLAN_PRO_RECORDS_PER_APP` | appconfig | 1 つのアプリのレコードの件数(その人が見える分: 自分の分 + 共有の分)。共有のアプリは作成者のプランで数える。`0` で数えない | 5000 / 50000 |
+| `PLAN_FREE_PHOTOS_PER_APP` / `PLAN_PRO_PHOTOS_PER_APP` | appconfig | 1 つのアプリの写真の枚数(1 枚 300 KB まで = 容量の上限)。`0` で数えない | 500 / 5000 |
+| `PLAN_LIMITS_MODE` | appconfig | 上の 3 つの強制。`enforce` = 403 `plan_limit_reached` / `log` = 止めずにログ `plan_limit.would_block` だけ / `off` = 数えない(#317 の前と同じ)。それ以外の値は起動しない | `enforce` |
+| `AI_FREE_DAILY_BUDGET_USD` | ai | 全体の遮断(#317)。その日(JST)の AI の費用(`ai.usage` の `est_cost_usd` の合計・USD)がこれを超えたら、Pro でない人の generate・chat を 503 `free_plan_paused` で止める(0:00 JST に自動で戻る)。`0` / 無しで無効([rate-limit.md](../backend/rate-limit.md#全体の遮断317)) | 無し(無効) |
+| `AI_FREE_BUDGET_RESUME_DAY` | ai | 上の遮断を手で戻す。`2026-11-07` のように JST の日付を入れると、その日だけ止めない(翌日からはまた効く) | 無し |
 | `LOG_LEVEL` | 両方 | ログの詳しさ(調査の間だけ `debug` など) | info |
 
 この表に無い変数は、運用で変えないでください。変えたい時は Issue にして、ワークフローか本書に足します。
@@ -87,6 +93,13 @@ gcloud run services update "$SERVICE" --region asia-northeast1 --project jphacks
 ```sh
 gcloud run services update ai-stg --region asia-northeast1 --project jphacks-kz2601 \
   --update-env-vars RATE_LIMIT_GLOBAL_DAILY=200
+```
+
+例: 無料プランの生成の遮断(#317)を今日だけ解く(明日からはまた効く)。
+
+```sh
+gcloud run services update ai-stg --region asia-northeast1 --project jphacks-kz2601 \
+  --update-env-vars AI_FREE_BUDGET_RESUME_DAY=$(TZ=Asia/Tokyo date +%F)
 ```
 
 値にカンマが入る時(`NOTICE_JSON` など)は、区切り文字を `@` に変えます(`^@^`。gcloud の `topic escaping`)。
