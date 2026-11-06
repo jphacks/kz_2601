@@ -26,7 +26,6 @@ final class AppRuntime: DSLRuntime {
     var upcomingNotifications: [UpcomingNotification] = []
     /// 通知が許可されていない(予約しても届かない)。
     var notificationsDenied = false
-    @ObservationIgnored var warnedNotificationsDenied = false
     @ObservationIgnored var notificationSyncTask: Task<Void, Never>?
     @ObservationIgnored var conditionCheckTask: Task<Void, Never>?
     private(set) var loading: Set<String> = []
@@ -43,6 +42,8 @@ final class AppRuntime: DSLRuntime {
     @ObservationIgnored var aiConsent: AIConsentStore?
     /// 同意の画面を出す(初回起動 / 同意前に生成・対話しようとした時)。
     var showAIConsent = false
+    /// 同意の前に話した最後の 1 件(M2)。同意して画面が閉じたら続けて送る(`resumeUtteranceAfterConsent`)
+    @ObservationIgnored var utteranceAwaitingConsent: (text: String, source: ClarifyFlow.InputSource)?
     /// 音声モデルのダウンロード確認(#246・4.2.3(ii))。端末にモデルが無く未承認の時だけ立つ。
     var showModelDownloadConfirm = false
     /// 初回のチュートリアル(#274)。MetamonApp が `.shared` を入れる。nil(ユニットテスト等)は見た扱い。
@@ -73,7 +74,22 @@ final class AppRuntime: DSLRuntime {
     struct Confirm: Identifiable {
         let id = UUID()
         var message: String
+        /// 主ボタンの文言(L1: 「実行」でなく何が起きるか)と、取り消せない操作か
+        var primaryLabel: String = L10n.tr("続ける")
+        var isDestructive = false
         var perform: @MainActor () async -> Void
+
+        /// アクションの種類から主ボタンを決める(L1)
+        static func button(for type: ActionType) -> (label: String, destructive: Bool) {
+            switch type {
+            case .deleteRecord: (L10n.tr("削除"), true)
+            case .resetForm: (L10n.tr("入力を消す"), true)
+            case .saveRecord: (L10n.tr("保存"), false)
+            case .export: (L10n.tr("書き出す"), false)
+            case .navigate, .openUrl: (L10n.tr("開く"), false)
+            default: (L10n.tr("続ける"), false)
+            }
+        }
     }
     var confirm: Confirm?
     /// 書き出したファイル(#421)。立つと共有シートを開く(`RootView` の HostSheets)。
@@ -91,8 +107,12 @@ final class AppRuntime: DSLRuntime {
             #if DEBUG
             if let toast { print("[Metamon] toast: \(toast)") } // ヘッドレス E2E でエラー文言を拾うため
             #endif
+            if let toast, toast != oldValue { VoiceOverAnnouncer.announce(toast) } // H8
         }
     }
+
+    /// 一覧の記録を消した直後の「削除しました・元に戻す」(M11・`AppRuntime+RecordUndo.swift`)。
+    var recordUndo: RecordUndo?
 
     /// 生成(morph)まわりのエラー **状態カード**(#60)。音声画面 / 生成後の画面上部に出し、主ボタンで復帰する。nil なら正常。
     var errorCard: ErrorPresentation? {
@@ -101,15 +121,16 @@ final class AppRuntime: DSLRuntime {
             if let errorCard { print("[Metamon] errorCard: \(errorCard.kind) transcript=\(errorCard.transcript)") }
             else if oldValue != nil { print("[Metamon] errorCard: cleared") }
             #endif
+            if let errorCard, errorCard.id != oldValue?.id { VoiceOverAnnouncer.announce(errorCard.announcement) } // H8
         }
     }
     /// 401 が再取得後も続いた時(セッション切れ)。`MetamonApp` が `AuthSession.expire()` を結ぶ。
     @ObservationIgnored var onSessionExpired: (@MainActor () -> Void)?
     /// 今のユーザーが匿名か(#276: 引き継ぎの案内)。`MetamonApp` が `AuthSession` を結ぶ。nil は匿名でない扱い。
     @ObservationIgnored var isAnonymousUser: (@MainActor () -> Bool)?
-    /// 匿名ユーザーが初めてアプリを作った後に 1 回だけ出す「引き継ぎのためにサインイン」(#276・`AccountLinkPromptHost`)。
+    /// 匿名ユーザーが初めてアプリを作った次の起動で 1 回だけ出す「引き継ぎのためにサインイン」(#276・H7・`AccountLinkPromptHost`)。
     var showLinkPrompt = false
-    @ObservationIgnored var linkPromptDelay: Duration = .seconds(2.5)
+    @ObservationIgnored var linkPromptDelay: Duration = .seconds(1.5)
     /// 圏外で送れなかった発話を 1 件保留し、復帰で 1 回だけ送る。
     @ObservationIgnored private let deferredMorph: DeferredSend<String>
     @ObservationIgnored private var connectivityTask: Task<Void, Never>?
@@ -122,6 +143,8 @@ final class AppRuntime: DSLRuntime {
         var kind: Kind
         var transcript: String
         var startedAt: Date
+        /// SSE で届いた途中経過(#636・create だけ)。組み立て台に仮置きする
+        var draft = BuildChoreography.LiveDraft()
 
         /// 生成中の見せ方。初期画面からの作成に加え、生成後の画面からの「〇〇アプリを作って」も作り直し(mode=full)になるので
         /// 全画面の「変身中」にする。それ以外の改変は今の画面を薄くして上に小さなインジケータ(#182)。
@@ -149,7 +172,9 @@ final class AppRuntime: DSLRuntime {
         var highlight: UnitPoint?
         var action: Action? = nil
     }
-    var summaryBanner: SummaryBanner?
+    var summaryBanner: SummaryBanner? {
+        didSet { if let summaryBanner, summaryBanner.id != oldValue?.id { VoiceOverAnnouncer.announce(summaryBanner.text) } } // H8
+    }
 
     /// 「やり直す」の戻り先(#209)。戻す直前の版。サーバー経由なら `version` を restore、ローカルなら `document` を当て直す。
     struct RedoPoint {
@@ -224,7 +249,15 @@ final class AppRuntime: DSLRuntime {
     var paidConfirmMessage: String?
     /// 課金の司令塔(既定は共有の 1 つ。テストで差し替える)
     @ObservationIgnored var proGate: ProGate = .shared
+    /// 無料枠切れで止めた新規作成(H3)。会話はそのまま残し、チャットに「続きから作る」を出す(`AppRuntime+HeldBuild.swift`)
+    var heldBuild: HeldBuild?
+    /// 共有の記録が入った版の課金画面を出すまでの間(H7: 要約バナーより先に課金の判断をしてもらう)
+    var paidGatePending = false
     #endif
+    /// 上限・402 で作らずに止めた時、create の会話を消さない(H3)。`runFromChat` が読んで戻す
+    @ObservationIgnored var keepChatAfterStop = false
+    /// 「最初から」で、これまでの会話も消すかの確認(M9)
+    var showRestartConfirm = false
 
     /// 生成直後の「個人の情報も公開されます」の確認(#253・nil = 出していない)。`Features/Privacy/AppRuntime+PublicData.swift`
     var publicDataPrompt: PublicDataPrompt?
@@ -242,7 +275,7 @@ final class AppRuntime: DSLRuntime {
     @ObservationIgnored private var morphTask: Task<MorphResult, Error>?
     @ObservationIgnored private var isForeground = true
     /// 「元に戻して」のフォールバック(appconfig が versions を持たない mock / 未デプロイ時)。直近 10 件。
-    /// 「1 つ前に戻す」ボタンの出し分けに使うので観測する(#209)。
+    /// 「元に戻す」ボタンの出し分けに使うので観測する(#209)。
     private var localHistory: [AppDocument] = []
     /// `openUrl` で外部に渡す処理(テストで差し替える)。
     @ObservationIgnored var openExternalURL: @MainActor (URL) async -> Bool = { await UIApplication.shared.open($0) }
@@ -272,6 +305,7 @@ final class AppRuntime: DSLRuntime {
             startSync()
         }
         noteRetention() // #482 起動時の DSL(モック・オフラインでは apply を通らない)
+        presentDeferredAccountLinkIfNeeded() // #276・H7 前の起動で最初のアプリを作っていたら引き継ぎの案内
         Task { await syncNotificationsNow() }
         #if DEBUG
         autoNavigateIfRequested() // `METAMON_AUTO_NAV`(#113)
@@ -320,6 +354,7 @@ final class AppRuntime: DSLRuntime {
         do {
             let remote = try await services.appConfig.fetchDocument(appId: document.appId)
             isOffline = false
+            if errorCard?.title == ErrorCopy.unreachableTitle { errorCard = nil } // つながったら起動時の知らせを下げる
             if remote.version > document.version || (remote.version == document.version && document.version == 0) {
                 apply(remote, animated: false)
             }
@@ -329,10 +364,11 @@ final class AppRuntime: DSLRuntime {
             if let cached = DocumentCache.shared.load(appId: document.appId), cached.version >= document.version {
                 apply(cached, animated: false)
                 isOffline = true
-                toast = ErrorCopy.offlineRestored(version: cached.version)
+                toast = ErrorCopy.offlineRestored
             } else {
                 isOffline = true
-                toast = ErrorCopy.unreachable(error.localizedDescription)
+                // H9: OS のエラー文は出さず、消えない状態カードで次の一手を(中身は上の restore failed のログ)
+                errorCard = .notice(icon: "wifi.exclamationmark", title: ErrorCopy.unreachableTitle, body: ErrorCopy.unreachableBody)
             }
         }
     }
@@ -421,8 +457,7 @@ final class AppRuntime: DSLRuntime {
         }
         print("[Metamon] hot reload: version \(document.version) → \(doc.version)")
         apply(doc)
-        summaryBanner = SummaryBanner(text: L10n.pick(L10n.tr("アプリが更新されました(version \(doc.version))"),
-                                                     review: L10n.tr("記録帳が更新されました(version \(doc.version))")), highlight: nil)
+        summaryBanner = SummaryBanner(text: L10n.tr("最新の内容に更新しました"), highlight: nil)
     }
 
     /// records の変化通知はまとめて 1 回だけ取り直す(連投で pull を重ねない)。未表示の entity は画面が開いた時に読むので無視。
@@ -443,6 +478,7 @@ final class AppRuntime: DSLRuntime {
         guard isForeground != active else { return }
         isForeground = active
         recordSync.setForeground(active)
+        if !active { recordUndo = nil } // 背面では削除を送り切るので、戻せない
         if active {
             startSync()
             Task { await refreshNotifications() } // #228 届いた分の空き枠を埋める
@@ -529,7 +565,8 @@ final class AppRuntime: DSLRuntime {
         await sendMetered(text)
     }
 
-    /// 課金(#77): 新規作成(初期画面から)は 1 日の無料枠を消費する。枠切れなら上限シートを出して送らない。成功した時だけ数える。
+    /// 課金(#77): 新規作成(初期画面から)は 1 日の無料枠を消費する。枠切れなら上限シートを出し、買えば同じ依頼でそのまま作る。
+    /// 閉じたら送らず、会話を残して「続きから作る」を出す(H3・`holdBuild`)。成功した時だけ数える。
     /// 圏外の保留の自動送信・状態カードの「もう一度」もここを通す(#414: 枠を素通りしない)。
     /// 審査用ビルド(#450 G1)は端末で数えない。上限はサーバーの ratelimit だけ(429 は状態カードの「今日はここまでです」)。
     private func sendMetered(_ text: String) async {
@@ -537,7 +574,14 @@ final class AppRuntime: DSLRuntime {
         await send(text)
         #else
         let metered = dsl.isVoiceOnly
-        if metered, !proGate.admitNewApp() { showVoiceSheet = false; return }
+        if metered {
+            let wasOpen = showVoiceSheet
+            showVoiceSheet = false
+            guard await proGate.admitNewApp(after: .milliseconds(wasOpen ? 450 : 250)) else {
+                holdBuild(text)
+                return
+            }
+        }
         await send(text)
         if metered, !dsl.isVoiceOnly { proGate.recordNewApp() }
         #endif
@@ -564,11 +608,25 @@ final class AppRuntime: DSLRuntime {
         interruptedByOffline = false
         let previous = document
         let createdFromInitial = previous.dsl.isVoiceOnly
-        let task = Task { [services, appId = document.appId, version = document.version, locale = Self.generationLocale] in
-            try await services.ai.morph(transcript: text, appId: appId, currentVersion: version, locale: locale)
+        // create は途中経過(#636)を受けて組み立て台に仮置きする。届いた順に MainActor で当てる
+        let progress = morphJob?.kind == .create ? AsyncStream.makeStream(of: GenerateProgress.self) : nil
+        let progressTask = progress.map { pair in
+            Task { @MainActor [weak self, startedAt = morphJob?.startedAt] in
+                for await p in pair.stream { self?.noteBuildProgress(p, startedAt: startedAt) }
+            }
+        }
+        let task = Task { [services, appId = document.appId, version = document.version, locale = Self.generationLocale, sink = progress?.continuation] in
+            if let sink {
+                return try await services.ai.morph(transcript: text, appId: appId, currentVersion: version, locale: locale) { _ = sink.yield($0) }
+            }
+            return try await services.ai.morph(transcript: text, appId: appId, currentVersion: version, locale: locale)
         }
         morphTask = task
-        defer { if morphTask == task { morphTask = nil } }
+        defer {
+            if morphTask == task { morphTask = nil }
+            progress?.continuation.finish()
+            progressTask?.cancel()
+        }
         do {
             let result = try await task.value
             // 待っている間に別のアプリ・初期状態へ移っていたら、前のアプリの結果を今の画面に当てない
@@ -584,13 +642,17 @@ final class AppRuntime: DSLRuntime {
             // withAnimation の中で morphJob = nil も行う。create は本物の部品を置く演出を挟む・edit は変わった部品を光らせる(#626)
             let stage = buildStagePlan(job: morphJob, previous: previous, next: result.document)
             apply(result.document, reveal: stage.reveal, highlight: stage.highlight)
-            if previous.dsl.isVoiceOnly { offerAccountLinkIfNeeded() } // #276
+            if previous.dsl.isVoiceOnly { offerAccountLinkIfNeeded() } // #276 次の起動に予約(H7)
             noteChatApplied(version: result.document.version, summary: result.summary) // #210 反映の区切り
             notePublicPersonalData(result) // #253 公開の記録に個人の情報が入ったら確認
             startSync()
             if let summary = result.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
-                summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary), action: canUndo ? .undo : nil)
+                // 部品が光る時は位置の円を出さない(M7・二重に指さない)
+                summaryBanner = SummaryBanner(text: summary, highlight: stage.highlight.isEmpty ? PositionHint.anchor(in: summary) : nil, action: canUndo ? .undo : nil)
                 SpeechReader.shared.speak(summary) // #43(設定 OFF なら何もしない)
+            } else {
+                // 要約が無くても完成は伝える(H8・バナーの didSet が読み上げる要約の代わり)
+                VoiceOverAnnouncer.announce(ErrorCopy.completedAnnouncement(appName: result.document.dsl.app.name, created: createdFromInitial))
             }
             scheduleFirstEditHint(createdFromInitial: createdFromInitial) // #274 最初のアプリの直後に 1 回だけ
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
@@ -606,8 +668,15 @@ final class AppRuntime: DSLRuntime {
             interruptedByOffline = false
             print("[Metamon] morph failed: \(failure) (\(error))")
             withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
+            if case .rateLimited = failure { keepChatAfterStop = true } // H3・M3: 上限でも会話は消さない(カードから次の一手)
             await present(failure, transcript: text)
         }
+    }
+
+    /// 途中経過(#636)を今の create の組み立て台に当てる。別の生成・終わった後に届いた分は捨てる。
+    private func noteBuildProgress(_ p: GenerateProgress, startedAt: Date?) {
+        guard let job = morphJob, job.kind == .create, job.startedAt == startedAt else { return }
+        morphJob?.draft.apply(p)
     }
 
     /// 生成しても何も変わらなかった時(#211)。保存されていないので適用も履歴も触らず、理由を伝える。
@@ -667,8 +736,34 @@ final class AppRuntime: DSLRuntime {
         case .signIn:
             withAnimation(.easeInOut(duration: 0.3)) { errorCard = nil }
             onSessionExpired?()
+        case .signInApple:
+            showLinkPrompt = true // 匿名の上限(M3): Apple に引き継ぐと上限が増える。カードは残す(サインイン後に「これでいく」)
+        case .upgradePro:
+            #if !APP_STORE_REVIEW
+            Task { await upgradeFromRateLimit(card) }
+            #else
+            break // 審査用の版はこのボタンを出さない(`ErrorPresentation.rateLimitPrimary`)
+            #endif
         }
     }
+
+    #if !APP_STORE_REVIEW
+    /// 上限のカードの「Pro にする」(M3)。買えば(サーバーが Pro を知ってから)同じ依頼で続ける。閉じたらカードのまま。
+    private func upgradeFromRateLimit(_ card: ErrorPresentation) async {
+        // 音声シートの中のカード(edit の対話)はシートの中から出す(根の課金画面はシートに隠れる)
+        guard await proGate.requestPro(.limitReached, placement: showVoiceSheet ? .chat : .root) else { return }
+        await proGate.store.serverSyncTask?.value
+        guard errorCard == card else { return } // 待っている間に閉じた・話し直した
+        withAnimation(.easeInOut(duration: 0.3)) { errorCard = nil }
+        if card.origin == .chat {
+            retryChat()
+        } else if isChatting, dsl.isVoiceOnly {
+            await runFromChat(card.transcript)
+        } else {
+            await sendMetered(card.transcript)
+        }
+    }
+    #endif
 
     /// 状態カードの副ボタン。やめる = 保留を取り消す、閉じる = カードを消す(発話は残らない)。
     func handle(_ secondary: ErrorPresentation.Secondary, of card: ErrorPresentation) {
@@ -681,7 +776,7 @@ final class AppRuntime: DSLRuntime {
         morphTask?.cancel()
     }
 
-    /// 「1 つ前に戻す」を押せるか(#209)。作ったアプリで、サーバーに前の版がある(version > 1)か端末の履歴がある時。
+    /// 「元に戻す」を押せるか(#209)。作ったアプリで、サーバーに前の版がある(version > 1)か端末の履歴がある時。
     var canUndo: Bool {
         !dsl.isVoiceOnly && ((services.isLive && document.version > 1) || !localHistory.isEmpty)
     }
@@ -710,7 +805,7 @@ final class AppRuntime: DSLRuntime {
                 startSync()
                 // restore は新しい版を作るので、「やり直す」は戻す前の版(current)をもう一度 restore すればよい
                 redoPoint = RedoPoint(version: current.version, document: before, viaServer: true)
-                summaryBanner = SummaryBanner(text: L10n.tr("1つ前に戻しました"), highlight: nil, action: .redo)
+                summaryBanner = SummaryBanner(text: L10n.tr("元に戻しました"), highlight: nil, action: .redo)
                 print("[Metamon] undo ok: restored from version \(target.version) → new version \(doc.version)")
                 await gatePaidRestore(before: before) // #414 共有の版に戻した時も課金画面を通す
                 return
@@ -725,7 +820,7 @@ final class AppRuntime: DSLRuntime {
         }
         apply(previous)
         redoPoint = RedoPoint(version: before.version, document: before, viaServer: false)
-        summaryBanner = SummaryBanner(text: L10n.tr("1つ前に戻しました"), highlight: nil, action: .redo)
+        summaryBanner = SummaryBanner(text: L10n.tr("元に戻しました"), highlight: nil, action: .redo)
         await gatePaidRestore(before: before)
     }
 
@@ -799,9 +894,9 @@ final class AppRuntime: DSLRuntime {
             let cached = AppListCache.shared.load()
             if !cached.isEmpty {
                 apps = cached
-                toast = L10n.pick(L10n.tr("オフライン: 保存済みのアプリ一覧を表示しています"), review: L10n.tr("オフライン: 保存済みの記録帳の一覧を表示しています"))
+                toast = L10n.pick(L10n.tr("オフラインです。保存済みの変身一覧を表示しています"), review: L10n.tr("オフラインです。保存済みの記録帳の一覧を表示しています"))
             } else if apps.isEmpty {
-                toast = L10n.pick(L10n.tr("アプリ一覧を取得できませんでした: \(error.localizedDescription)"), review: L10n.tr("記録帳の一覧を取得できませんでした: \(error.localizedDescription)"))
+                toast = ErrorCopy.failure(L10n.pick(L10n.tr("変身一覧を読み込めませんでした"), review: L10n.tr("記録帳の一覧を読み込めませんでした")), error, context: "apps list")
             }
         }
         return apps
@@ -1091,7 +1186,8 @@ final class AppRuntime: DSLRuntime {
 
     func run(_ action: Action, _ ctx: ActionContext) async {
         if let message = action.confirmMessage {
-            confirm = Confirm(message: message) { [weak self] in await self?.perform(action, ctx) }
+            let button = Confirm.button(for: action.type)
+            confirm = Confirm(message: message, primaryLabel: button.label, isDestructive: button.destructive) { [weak self] in await self?.perform(action, ctx) }
             return
         }
         await perform(action, ctx)
@@ -1145,6 +1241,7 @@ final class AppRuntime: DSLRuntime {
             let isNew = recordId == nil
             records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: recordId, data: payload,
                                                     author: postAuthor(for: entity))
+            form.markClean() // 保存した内容は閉じても破棄の確認を出さない(M10)
             WidgetSnapshotWriter.write(dsl: dsl, records: records)
             #if !APP_STORE_REVIEW
             writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)
@@ -1164,8 +1261,7 @@ final class AppRuntime: DSLRuntime {
                 notifyReadOnly(entity: entity)
                 return
             }
-            records[entity] = await recordSync.delete(appId: document.appId, entity: entity, recordId: id)
-            WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            await deleteUndoably(entity: entity, recordId: id) // M11: 数秒は送らず「元に戻す」を出す
             if ctx.recordId == nil { close(ctx.route) } // フォーム上からの削除は画面を閉じる
 
         case .openVoice:
@@ -1222,24 +1318,26 @@ final class AppRuntime: DSLRuntime {
     /// appconfig のエラー封筒を人向けに。422 `invalid_record` は `details.field` を DSL の Field 名に引き直して「どの項目か」を出す。
     /// 同期キューで保存が弾かれた時の toast。項目が分かれば「払った人」のように名前で出す(英語の field id を見せない)。
     func rejectedToast(entity: String, field: String?, message: String) -> String {
-        guard let field else { return L10n.tr("保存できませんでした: \(message)") }
+        // H9: サーバーの文はログにだけ残し、画面には決まった文を出す
+        ErrorLog.record(message, context: "save \(entity)\(field.map { ".\($0)" } ?? "")")
+        guard let field else { return L10n.tr("保存できませんでした。入力を確認して、もう一度お試しください") }
         let name = dsl.entity(entity)?.field(field)?.name ?? field
-        // サーバー文言の `field "payer" ` 前置きは名前と重複するので落とす
-        let reason = message.replacingOccurrences(of: "field \"\(field)\" ", with: "")
-        return L10n.tr("保存できませんでした: \(L10n.tr("「\(name)」の入力を確認してください(\(reason))"))")
+        return L10n.tr("保存できませんでした。「\(name)」の入力を確認してください")
     }
 
+    /// 利用者に出す 1 文(H9)。OS のエラー文・サーバーの文は出さず、ログにだけ残す。
     func message(for error: Error, entity: String?) -> String {
-        guard let api = error as? APIError else { return error.localizedDescription }
+        guard let api = error as? APIError else { return ErrorCopy.failure(L10n.tr("うまくいきませんでした"), error, context: "action") }
         if let denial = SharedAccessDenial(api) { return denial.message } // #254
         if let pro = ProRequired(api) { return pro.writeMessage } // #316(印を付けるなど)
         if api.code == "invalid_record" || (api.status == 400 && api.field != nil), let fieldId = api.field {
             let name = entity.flatMap { dsl.entity($0)?.field(fieldId)?.name } ?? fieldId
-            return L10n.tr("「\(name)」の入力を確認してください(\(api.errorDescription ?? ""))")
+            ErrorLog.record(error, context: "action \(entity ?? "-").\(fieldId)")
+            return L10n.tr("「\(name)」の入力を確認してください")
         }
         if api.isAppCheckFailure { return ErrorCopy.appCheckFailedBody } // #318: サインインでは直らない
         if api.isAIPaused { return ErrorCopy.aiPausedBody } // #511
         if api.status == 401 { return ErrorCopy.sessionExpiredSignIn }
-        return api.errorDescription ?? "\(api)"
+        return ErrorCopy.failure(L10n.tr("うまくいきませんでした"), error, context: "action")
     }
 }

@@ -211,3 +211,39 @@ variable "claude_failure_min_count" {
   type        = number
   default     = 3
 }
+
+# ---- runner(自動の動き・runner.tf・docs/infra/runner.md) ----
+
+variable "runner_enabled" {
+  description = "runner の SA・deployer の actAs・Firestore の TTL を作るか。既定は false(何も作らない)。#288 の分離までは prod でだけ true にする"
+  type        = bool
+  default     = false
+}
+
+variable "runner_service_url" {
+  description = "runner-prod の URL(初回デプロイの後に gcloud run services describe の status.url を入れる)。空なら Scheduler と invoker を作らない"
+  type        = string
+  default     = ""
+  validation {
+    condition     = var.runner_service_url == "" || startswith(var.runner_service_url, "https://")
+    error_message = "runner_service_url は空か https:// で始まる URL。"
+  }
+}
+
+variable "runner_tick_paused" {
+  description = "Scheduler の runner-tick を止めておくか(止めている間は自動の動きが進まない。積まれたきっかけは残る)"
+  type        = bool
+  default     = false
+}
+
+variable "runner_ttl_collection_groups" {
+  description = "expireAt で TTL を掛ける runner のコレクション(collection group)"
+  type        = list(string)
+  default     = ["done", "outbox", "rule_status"]
+}
+
+variable "runner_secret_ids" {
+  description = "runner だけが読む Secret の入れ物(APNs の鍵など)。値は人が入れる。空なら作らない"
+  type        = list(string)
+  default     = []
+}

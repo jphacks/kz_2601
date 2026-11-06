@@ -10,6 +10,12 @@ extension MockAIClient {
     public func text(_ request: AITextRequest) async throws -> AITextResult {
         try await Task.sleep(for: delay / 2)
         let result: AITextResult?
+        if request.isTransform {
+            // 要約など: classify は最初の候補、それ以外は決まった文
+            let text = request.task == "classify" ? request.options?.first : "\(request.task ?? "")の結果です(モック)"
+            guard let out = AITextResult.normalize(text: text, items: nil, fields: nil, for: request) else { throw AITextError.badOutput }
+            return out
+        }
         switch request.shape {
         case .line:
             result = AITextResult.normalize(text: "今日もよくがんばりました。少し休んでいきましょう(モック)", items: nil, fields: nil, for: request)

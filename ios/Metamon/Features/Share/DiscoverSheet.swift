@@ -96,7 +96,7 @@ struct DiscoverSheet: View {
         } catch is CancellationError {
         } catch {
             if (error as? URLError)?.code == .cancelled { return }
-            self.error = L10n.tr("読み込めませんでした: \(error.localizedDescription)")
+            self.error = ErrorCopy.failure(L10n.tr("読み込めませんでした"), error, context: "DiscoverSheet")
         }
     }
 
@@ -187,6 +187,7 @@ enum ComponentIcon {
         case "toggle": "switch.2"
         case "photoField", "camera": "camera.fill"
         case "image": "photo"
+        case "drawingField": "pencil.tip"
         case "videoField", "videoPlayer": "video.fill"
         case "map", "mapView", "locationButton", "locationPicker": "map.fill"
         case "timer", "timerDisplay": "timer"

@@ -2,6 +2,8 @@ import SwiftUI
 import MetamonDSL
 
 /// `list`: entity のレコード一覧(filter/sort はクライアント側)。行タップで `onItemTap`、長押しで削除(swipeToDelete)。
+/// 行は `List` ではなく `LazyVStack` なので `.swipeActions` が効かない。縦スクロールとぶつかる自前のスワイプは作らず、
+/// 長押しのメニューと VoiceOver の操作「削除」で消す(M11)。消した直後の「元に戻す」はホスト(`deleteRecord`)が出す。
 /// 保存で増えた行(前回描画に無かった id)はブランドの薄い色で 1.2 秒ハイライト(Reduce Motion では省略)。
 /// `item.toggle`(#108): 行頭の丸で boolean を反転して即保存(楽観的 UI。失敗したら戻す)。
 /// 他人の共有レコード(#249): 丸は薄く描いて押すと理由を出し、長押しの削除は出さない(`RecordPermission`)。
@@ -29,9 +31,9 @@ struct ListLeaf: View {
         let today = DSLClock.now()
         if rows.isEmpty {
             EmptyPlaceholder(icon: "tray", emptyText: c.emptyText ?? L("まだありません"), state: rt.emptyState(for: entityId),
-                             cta: L("最初の 1 件を追加しましょう")) {
-                Task { await rt.load(entities: [entityId], force: true) }
-            }
+                             cta: L("最初の 1 件を追加しましょう"),
+                             retry: { Task { await rt.load(entities: [entityId], force: true) } },
+                             onCTA: emptyAdd(entity: entityId))
             .onChange(of: ids, initial: true) { _, now in seenIds = Set(now) }
         } else {
             // 1 枚のカードに行を積み、行間は 1pt の hairline(iOS の inset grouped list と同じ読み味)
@@ -54,12 +56,13 @@ struct ListLeaf: View {
                         .accessibilityHint(c.onItemTap != nil ? L("ダブルタップで開きます") : "")
                         .accessibilityAction { open(row) }
                         .contextMenu {
-                            if c.swipeToDelete == true, rt.canDelete(entity: entityId, record: row) {
-                                Button(L("削除"), systemImage: "trash", role: .destructive) {
-                                    Task { await rt.run(Action(type: .deleteRecord, entity: entityId), ctx.actionContext(recordId: row.id)) }
-                                }
+                            if deletable(row, entity: entityId) {
+                                Button(L("削除"), systemImage: "trash", role: .destructive) { delete(row, entity: entityId) }
                             }
                             ModerationMenuItems(entity: entityId, record: row)
+                        }
+                        .accessibilityActions {
+                            if deletable(row, entity: entityId) { Button(L("削除")) { delete(row, entity: entityId) } }
                         }
                 }
             }
@@ -138,9 +141,25 @@ struct ListLeaf: View {
         #endif
     }
 
+    /// 削除を出すか: `swipeToDelete` の一覧で、消せる記録(他人の共有の記録は消せない・#249)だけ。
+    private func deletable(_ row: Record, entity: String) -> Bool {
+        c.swipeToDelete == true && rt.canDelete(entity: entity, record: row)
+    }
+
+    private func delete(_ row: Record, entity: String) {
+        Task { await rt.run(Action(type: .deleteRecord, entity: entity), ctx.actionContext(recordId: row.id)) }
+    }
+
     private func open(_ row: Record) {
         guard let action = c.onItemTap else { return }
         Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
+    }
+
+    /// 空の一覧の案内を押した時: 同じ画面の追加ボタンと同じフォームを開く(M12)。無ければ nil(案内は文字だけ)。
+    private func emptyAdd(entity: String) -> (() -> Void)? {
+        guard let screen = rt.dsl.screen(ctx.route.screen),
+              let action = DuplicateAddControl.emptyListAdd(entity: entity, on: screen, in: rt.dsl) else { return nil }
+        return { Task { await rt.run(action, ctx.actionContext()) } }
     }
 
     /// 先頭のアイコン/画像の幅ぶんセパレータを内側に寄せる。

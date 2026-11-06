@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "app": {"name": "歩数ランキング", "voiceEntry": "floating"},
+  "initialScreen": "home",
+  "entities": [
+    {"id": "players", "name": "参加者", "scope": "shared", "titleField": "name", "fields": [
+      {"id": "name", "name": "名前", "type": "string", "required": true},
+      {"id": "score", "name": "歩数", "type": "integer"},
+      {"id": "rank", "name": "順位", "type": "integer"}
+    ]}
+  ],
+  "screens": [
+    {"id": "home", "title": "ランキング", "components": [
+      {"type": "list", "entity": "players", "item": {"title": "name", "subtitle": "rank"}}
+    ]}
+  ],
+  "serverRules": [
+    {"id": "ranking", "on": {"every": "daily", "time": "21:00", "each": "players"},
+     "do": [{"updateRecord": {"values": {
+       "rank": {"op": "add", "args": [{"agg": "count", "entity": "players", "filter": {"field": "score", "op": "gt", "value": {"ref": "score"}}}, 1]}}}},
+       {"notify": {"to": {"kind": "author"}, "title": "今日の順位", "body": "{name}さんは {place} 位です",
+         "with": {"place": {"op": "add", "args": [{"agg": "count", "entity": "players", "filter": {"field": "score", "op": "gt", "value": {"ref": "score"}}}, 1]}}}}]}
+  ]
+}

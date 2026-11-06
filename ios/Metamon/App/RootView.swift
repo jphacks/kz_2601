@@ -93,7 +93,7 @@ struct RootView: View {
             #if DEBUG
             UITestMorphProbe()
             #endif
-            if let banner = rt.summaryBanner, let anchor = banner.highlight {
+            if let banner = rt.summaryBanner, let anchor = banner.highlight, rt.isNoticeTurn(.summary) {
                 PositionHighlight(anchor: anchor)
                     .transition(.opacity)
                     .zIndex(3)
@@ -136,6 +136,7 @@ struct RootView: View {
         .modifier(PublicDataPromptHost()) // #253 生成直後の「個人の情報も公開されます」
         .modifier(RetentionPromptHost()) // #482 記録の保存期間の確認
         .modifier(TrackingBarHost()) // #559 位置の記録中はどの画面でも上に「記録中」バー
+        .modifier(NotificationsOffBarHost()) // L3 通知がオフなら上に「設定を開く」付きのバー
         #if !APP_STORE_REVIEW
         .modifier(FeedbackShakeHost()) // #319 端末を振ってフィードバック
         #endif
@@ -187,9 +188,11 @@ struct RootView: View {
         .modifier(BetaWelcomeHost()) // #313: β の版だけ、チュートリアルのあとに初回の案内
         #endif
         .alert(item: $rt.confirm) { confirm in
-            Alert(title: Text(confirm.message),
-                  primaryButton: .destructive(Text("実行")) { Task { await confirm.perform() } },
-                  secondaryButton: .cancel(Text("キャンセル")))
+            let run: () -> Void = { Task { await confirm.perform() } }
+            return Alert(title: Text(confirm.message),
+                         primaryButton: confirm.isDestructive ? .destructive(Text(confirm.primaryLabel), action: run)
+                                                              : .default(Text(confirm.primaryLabel), action: run),
+                         secondaryButton: .cancel(Text("キャンセル")))
         }
         .overlay(alignment: .top) { summaryCard }
         .overlay(alignment: .top) { errorCardOverlay }
@@ -227,10 +230,11 @@ struct RootView: View {
             isBuilding: rt.buildStage != nil)
     }
 
-    /// 変身直後の要約(読み上げ文)。上部カードで 3 秒表示して自動で消える。
+    /// 変身直後の要約(読み上げ文)。上部カードで 3〜6 秒表示して自動で消える(VoiceOver の時は長く・H8)。
+    /// 共有の版の課金画面が出ている間は待つ(H7: 出てから時間を数える。課金画面の下で「元に戻す」が時間切れにならない)
     @ViewBuilder
     private var summaryCard: some View {
-        if let banner = rt.summaryBanner {
+        if let banner = rt.summaryBanner, rt.isNoticeTurn(.summary) {
             let dismiss = { withAnimation { rt.summaryBanner = nil } }
             HStack(alignment: .top, spacing: Theme.Spacing.sm + 2) {
                 CraneMascot(pose: .joy, size: 52, sway: 6) // #102
@@ -250,7 +254,8 @@ struct RootView: View {
             .task(id: banner.id) {
                 // 文字数に応じて 3〜5 秒(読み上げを読み切れる長さ)
                 // ボタン付き(#209)は押す余裕を持たせて 6 秒以上
-                var seconds = max(banner.action == nil ? 3.0 : 6.0, min(5.0, Double(banner.text.count) / 12))
+                // VoiceOver の時は読み上げを聞いてから探して押せるよう長く(H8)
+                var seconds = VoiceOverAnnouncer.holdSeconds(max(banner.action == nil ? 3.0 : 6.0, min(5.0, Double(banner.text.count) / 12)))
                 #if DEBUG
                 // UI テスト用: 遅い CI では出てから押すまでに 6 秒を超え、押す前に消えた(#209)
                 if let hold = Double(ProcessInfo.processInfo.environment["METAMON_BANNER_SECONDS"] ?? "") { seconds = hold }
@@ -300,9 +305,18 @@ private struct ToastHost: ViewModifier {
                     .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task(id: message) {
-                        try? await Task.sleep(for: .seconds(3))
+                        try? await Task.sleep(for: .seconds(VoiceOverAnnouncer.holdSeconds(3))) // H8: VoiceOver の時は長く
+                        guard !Task.isCancelled else { return }
                         withAnimation { rt.toast = nil }
                     }
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if active, let undo = rt.recordUndo { // M11 削除しました・元に戻す。普通のトーストと重なったらその上に積む
+                RecordUndoToast(undo: undo)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md
+                             + (rt.toast == nil ? 0 : 56))
             }
         }
     }

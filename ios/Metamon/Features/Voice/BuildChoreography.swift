@@ -1,12 +1,14 @@
 import Foundation
 import MetamonDSL
 import MetamonRenderer
+import MetamonServices
 
 /// 生成中の「パーツを選んで置く」演出の段取り(#626)。View を持たない純粋なロジックだけをここに置き、単体テストする。
 /// - 待っている間(`WaitingScript`): パーツ箱から部品のシルエットを選んで空の画面に置く → 入れ替える → 並べ直す、を繰り返す
 /// - 結果が届いた時(`AssemblyPlan`): 本物の結果の部品を上から 1 つずつ置いて、本物の画面に切り替える(最長 1.5 秒)
 /// - 編集(`EditHighlight`): 変わった部品だけを光らせて置き直す
-/// AI の応答は最後にまとめて届く(ストリーミングしない)ので、待っている間の部品は依頼文から当てた「下書き」。
+/// 待っている間の部品は依頼文から当てた「下書き」。SSE で本物の部品が届いたら(#636・`LiveDraft`)届いた順に下書きと置き換える(仮置き)。
+/// 最後の結果で `AssemblyPlan` が置き直すので、仮置きと結果が違っても破綻しない。
 enum BuildChoreography {
     /// 部品のシルエットの種類。DSL の `ComponentType` を見た目の近いものにまとめる。
     enum PartKind: String, CaseIterable, Equatable, Sendable {
@@ -19,12 +21,12 @@ enum BuildChoreography {
             case .textField, .numberField, .datePicker, .picker, .textEditor, .secureField, .timePicker, .colorPicker,
                  .slider, .stepper, .rating, .searchBar, .locationPicker, .voiceInput: .field
             case .toggle: .toggle
-            case .list, .table, .timeline, .gridTable, .matchList, .chatThread, .settlement: .list
+            case .list, .table, .timeline, .gridTable, .matchList, .chatThread, .settlement, .feed: .list
             case .chart: .chart
             case .stat, .gauge, .progressBar, .healthStat, .sensorValue, .timerDisplay: .stat
             case .calendar: .calendar
             case .mapView, .routeGuide, .locationTracker: .map
-            case .photoField, .image, .videoField, .videoPlayer, .audioRecorder, .qrCode, .qrScanner, .dashcam,
+            case .photoField, .drawingField, .image, .videoField, .videoPlayer, .audioRecorder, .qrCode, .qrScanner, .dashcam,
                  .musicPlayer, .avatar, .icon, .webView: .media
             default: .card
             }
@@ -77,6 +79,8 @@ enum BuildChoreography {
         var placed: [PlacedPart]
         var picking: PartKind?
         var move: Move
+        /// 画面の縦の行数(仮置きが 12 行を超えたら伸ばす)
+        var rows: Int = GridArea.visibleRows
     }
 
     enum Move: Equatable { case place, swap, reorder, relayout }
@@ -100,6 +104,17 @@ enum BuildChoreography {
 
         static func step(elapsed: TimeInterval, reduceMotion: Bool) -> Int {
             max(0, Int(elapsed / stepSeconds(reduceMotion: reduceMotion)))
+        }
+
+        /// 仮置き(#636)を混ぜたコマ。本物の部品を置き、重ならない所だけ下書きを残す(下書きは 5 枠まで)。
+        func frame(at step: Int, live: LiveDraft?) -> WaitingFrame {
+            let guess = frame(at: step)
+            guard let live, !live.components.isEmpty else { return guess }
+            let real = live.parts
+            let rest = guess.placed.filter { g in !real.contains { $0.area.overlaps(g.area) } }
+            let keep = max(0, Self.layouts[0].count - real.count)
+            return WaitingFrame(placed: real + rest.prefix(keep), picking: live.latestKind ?? guess.picking, move: .place,
+                                rows: max(GridArea.visibleRows, real.map(\.area.row2).max() ?? 0))
         }
 
         /// `step` 手目のコマ。0 手目から順に再生して決める(決定的・数十手なので軽い)。
@@ -171,6 +186,8 @@ enum BuildChoreography {
         var rows: Int
         /// パーツ箱に出す種類(結果に出てくる順・最大 6)
         var tray: [PartKind]
+        /// タブの見出し(タブが 2 つ以上の時だけ・画面の下に出す)
+        var tabs: [String] = []
 
         /// 置く部品の上限。超えた分は最後の手でまとめて置く
         static let maxSteps = 10
@@ -182,21 +199,30 @@ enum BuildChoreography {
         /// Reduce Motion: 全部を一度にフェードで出す
         static let reducedTotal = 0.45
 
-        static func make(for dsl: AppDSL, reduceMotion: Bool) -> AssemblyPlan {
+        /// `shown`: 仮置きで既に見せた部品(#636)。結果と同じ部品(id・種類・場所が一致)は最初から置いておき、残りだけ 1 つずつ置く。
+        static func make(for dsl: AppDSL, reduceMotion: Bool, shown: [PlacedPart] = []) -> AssemblyPlan {
             let parts = initialParts(of: dsl)
             var tray: [PartKind] = []
             for p in parts where !tray.contains(p.kind) { tray.append(p.kind) }
             let rows = max(GridArea.visibleRows, parts.map(\.area.row2).max() ?? 0)
+            let tabs = dsl.app.hasTabs ? dsl.app.tabs.map(\.title) : []
             if reduceMotion || parts.isEmpty {
                 return AssemblyPlan(steps: parts.map { Step(part: $0, delay: 0) },
-                                    total: reduceMotion ? reducedTotal : leadIn + hold, rows: rows, tray: Array(tray.prefix(6)))
+                                    total: reduceMotion ? reducedTotal : leadIn + hold, rows: rows, tray: Array(tray.prefix(6)), tabs: tabs)
             }
-            let slots = min(parts.count, maxSteps)
+            let kept = parts.filter { p in shown.contains { $0.id == p.id && $0.kind == p.kind && $0.area == p.area } }
+            let rest = parts.filter { p in !kept.contains(p) }
+            if rest.isEmpty {
+                return AssemblyPlan(steps: kept.map { Step(part: $0, delay: 0) }, total: leadIn + hold, rows: rows,
+                                    tray: Array(tray.prefix(6)), tabs: tabs)
+            }
+            let slots = min(rest.count, maxSteps)
             let per = min(maxPerStep, maxPlacing / Double(slots))
-            let steps = parts.enumerated().map { i, p in
+            let steps = kept.map { Step(part: $0, delay: 0) } + rest.enumerated().map { i, p in
                 Step(part: p, delay: leadIn + Double(min(i, slots - 1)) * per)
             }
-            return AssemblyPlan(steps: steps, total: leadIn + Double(slots) * per + hold, rows: rows, tray: Array(tray.prefix(6)))
+            return AssemblyPlan(steps: steps, total: leadIn + Double(slots) * per + hold, rows: rows,
+                                tray: Array(tray.prefix(6)), tabs: tabs)
         }
 
         /// 最初に見える画面(タブがあれば初期タブ)の直下の部品を、上から(行 → 列)の順に。area の無い部品は下に全幅で積む。
@@ -226,11 +252,99 @@ enum BuildChoreography {
 
         /// シルエットに添える短い文字(本物の結果の部品の名前)。長い文は出さない。
         static func caption(of c: Component) -> String? {
-            let raw = [c.label, c.title, c.type == .text ? c.text : nil].compactMap { $0 }
+            shortCaption([c.label, c.title, c.type == .text ? c.text : nil])
+        }
+
+        static func shortCaption(_ candidates: [String?]) -> String? {
+            let raw = candidates.compactMap { $0 }
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .first { !$0.isEmpty }
             guard let raw else { return nil }
             return raw.count > 12 ? String(raw.prefix(11)) + "…" : raw
+        }
+    }
+
+    // MARK: - 届いた本物の部品(仮置き・#636)
+
+    /// SSE で届いた途中経過。`GenerateProgress` を届いた順に `apply` する。どれも仮置きで、最後の結果が正。
+    struct LiveDraft: Equatable {
+        /// アプリ名(`app`)
+        var appName: String?
+        /// タブの見出し(2 つ以上の時だけ画面の下に出す)
+        var tabs: [String] = []
+        /// 今の作り直しの回。古い回の部品は捨てる
+        private(set) var attempt = 0
+        /// 届いた部品(届いた順・同じ index は 1 回だけ)
+        private(set) var components: [StreamedComponent] = []
+
+        mutating func apply(_ p: GenerateProgress) {
+            switch p {
+            case let .app(name, tabs, attempt):
+                guard attempt >= self.attempt else { return }
+                appName = name
+                self.tabs = tabs
+            case let .component(c):
+                if c.attempt < attempt { return }
+                if c.attempt > attempt { // restart を取りこぼしても、新しい回が来たら前の回を捨てる
+                    attempt = c.attempt
+                    components = []
+                }
+                guard !components.contains(where: { $0.index == c.index }) else { return }
+                components.append(c)
+            case let .restart(attempt):
+                // 0 = iOS 側のやり直し(stream を諦めた・409)。次の stream は 1 回目から数え直す
+                self.attempt = attempt
+                components = []
+            }
+        }
+
+        /// 届いた部品のシルエット。area のある部品はその場所、無い部品はその下に全幅で積む(`initialParts` と同じ)。
+        var parts: [PlacedPart] {
+            var out: [PlacedPart] = []
+            var stacked: [StreamedComponent] = []
+            for c in components.sorted(by: { $0.index < $1.index }) {
+                if let raw = c.area, let area = GridArea(raw) {
+                    out.append(part(c, area: area))
+                } else {
+                    stacked.append(c)
+                }
+            }
+            var row = (out.map(\.area.row2).max() ?? 0) + 1
+            for c in stacked {
+                let type = ComponentType(rawValue: c.type)
+                let height = type == .list || type == .chart ? 4 : 2
+                if let area = GridArea("A\(row):F\(row + height - 1)") { out.append(part(c, area: area)) }
+                row += height
+            }
+            // 同じ id の部品が来ても描画の id は重ねない
+            var seen: Set<String> = []
+            for i in out.indices where !seen.insert(out[i].id).inserted { out[i].id = "stream-dup-\(i)" }
+            return out
+        }
+
+        /// 最後に届いた部品の種類(パーツ箱で持ち上げる)
+        var latestKind: PartKind? { components.last.map { Self.kind(of: $0, area: $0.area.flatMap(GridArea.init)) } }
+
+        /// パーツ箱: 届いた部品の種類を先頭に、残りは下書きの箱で埋める
+        func tray(base: [PartKind]) -> [PartKind] {
+            var out: [PartKind] = []
+            for k in components.map({ Self.kind(of: $0, area: $0.area.flatMap(GridArea.init)) }) + base where !out.contains(k) {
+                out.append(k)
+            }
+            return Array(out.prefix(6))
+        }
+
+        private func part(_ c: StreamedComponent, area: GridArea) -> PlacedPart {
+            let id = c.id.flatMap { $0.isEmpty ? nil : $0 } ?? "stream-\(c.index)"
+            return PlacedPart(id: id, kind: Self.kind(of: c, area: area), area: area,
+                              caption: AssemblyPlan.shortCaption([c.label]))
+        }
+
+        /// 見出しらしい text(1 行の高さ)は heading。style は届かないので高さだけで見る
+        private static func kind(of c: StreamedComponent, area: GridArea?) -> PartKind {
+            guard let type = ComponentType(rawValue: c.type) else { return .card }
+            if type == .text, (area?.rowSpan ?? 3) <= 1 { return .heading }
+            return PartKind.of(type)
         }
     }
 

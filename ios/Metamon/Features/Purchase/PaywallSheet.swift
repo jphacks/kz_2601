@@ -96,8 +96,6 @@ struct PaywallSheet: View {
             return L10n.tr("今日の無料作成(\(gate.quota.dailyFreeLimit) 回)を使い切りました")
         case .paidFeature(let features):
             return L10n.tr("「\(Self.featureNames(features))」には Tailor It Pro が必要です")
-        case .join(let name):
-            return L10n.tr("「\(name)」に参加するには Tailor It Pro が必要です")
         }
     }
 

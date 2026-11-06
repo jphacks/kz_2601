@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import MetamonServices
 import MetamonRenderer
 
@@ -58,41 +59,69 @@ enum ErrorCopy {
     static var conflictBanner: String { L10n.tr("別の端末で更新されていたため、最新の状態に合わせました。もう一度お話しください") }
     // 入力不備・その他
     static var rejectedTitle: String { L10n.tr("うまく伝わりませんでした") }
-    static var failedTitle: String { L10n.pick(L10n.tr("生成に失敗しました"), review: L10n.tr("記録帳を用意できませんでした")) }
-    static var cancelledToast: String { L10n.pick(L10n.tr("生成をキャンセルしました"), review: L10n.tr("用意を取りやめました")) }
+    static var failedTitle: String { L10n.pick(L10n.tr("うまく作れませんでした"), review: L10n.tr("記録帳を用意できませんでした")) }
+    static var cancelledToast: String { L10n.pick(L10n.tr("作るのをやめました"), review: L10n.tr("用意を取りやめました")) }
     // 生成前の対話(#75)
     static var chatFailedTitle: String { L10n.tr("質問をうまく用意できませんでした") }
-    // サーバー到達不能(起動時)
-    static func offlineRestored(version: Int) -> String {
-        L10n.pick(L10n.tr("オフライン: 最後に取得したアプリ(v\(version))を表示しています"),
-                  review: L10n.tr("オフライン: 最後に取得した記録帳(v\(version))を表示しています"))
+    // サーバー到達不能(起動時)。版の番号・OS のエラー文は出さない(M15・H9)
+    static var offlineRestored: String {
+        L10n.pick(L10n.tr("オフラインです。最後に保存したアプリを表示しています"),
+                  review: L10n.tr("オフラインです。最後に保存した記録帳を表示しています"))
     }
-    static func unreachable(_ detail: String) -> String { L10n.tr("サーバーに接続できません: \(detail)") }
+    static var unreachableTitle: String { L10n.tr("サーバーに接続できません") }
+    static var unreachableBody: String { L10n.tr("接続を確認してください。つながると自動で読み込み直します") }
     // レコード取得失敗(#85)。Renderer の placeholder 文言は Renderer 側(`EmptyPlaceholder`)に持つ
 
-    // 録音/認識の失敗(#44)。`TranscriberFailure.errorDescription`(Services・日本語固定)の表示言語対応版
-    static func transcriberFailure(_ f: TranscriberFailure) -> String {
+    // 生成の失敗(H9)。サーバーの文はそのまま出さず、ログにだけ残す
+    static var rejectedBody: String { L10n.tr("言い方を変えて、もう一度お話しください") }
+    static var otherBody: String { L10n.tr("少し待ってから、もう一度お試しください") }
+
+    // 録音/認識の失敗(#44・H9)。秒数・dB・サンプル数・オーディオセッションの理由は出さない(診断は `[Voice]` のログ)
+    static func transcriberTitle(_ f: TranscriberFailure) -> String {
         switch f {
-        case .notReady(let status): L10n.tr("音声モデルを準備中です(\(status))。少し待ってからお試しください")
-        case .microphoneDenied: L10n.tr("マイクの権限がありません。設定アプリ > Tailor It でマイクを許可してください")
-        case .audioSession(let reason): L10n.tr("録音を開始できませんでした(オーディオセッション: \(reason))")
-        case .noInputAvailable: L10n.tr("使えるマイクが見つかりません(他のアプリが使用中か、入力ルートがありません)")
-        case .noAudioCaptured(let s): L10n.tr("マイクから音声が届きませんでした(録音\(seconds(s))秒・0サンプル)。他のアプリの通話/録音を終了して再試行してください")
-        case .tooShort(let s): L10n.tr("録音が短すぎました(\(seconds(s))秒)。タップしてから話し、話し終えてからもう一度タップしてください")
-        case .silent(let s, let db): L10n.tr("音声が小さすぎました(録音\(seconds(s))秒・音量\(Int(db.rounded()))dB)。マイクに向かって話してください")
+        case .notReady: L10n.tr("音声モデルを準備中です")
+        case .microphoneDenied: L10n.tr("マイクを使えません")
+        case .audioSession, .noInputAvailable, .noAudioCaptured: L10n.tr("録音できませんでした")
+        case .tooShort, .silent: L10n.tr("うまく聞き取れませんでした")
+        case .speechRecognitionDenied: L10n.tr("音声認識の許可がありません")
+        case .onDeviceRecognitionUnavailable: L10n.tr("まだ声で入力できません")
         }
     }
-    static func message(for error: Error) -> String {
-        (error as? TranscriberFailure).map(transcriberFailure) ?? error.localizedDescription
+    static func transcriberFailure(_ f: TranscriberFailure) -> String {
+        switch f {
+        case .notReady: L10n.tr("少し待ってから、もう一度お試しください")
+        case .microphoneDenied: L10n.tr("設定アプリ > Tailor It でマイクを許可してください")
+        case .audioSession, .noInputAvailable, .noAudioCaptured: L10n.tr("ほかのアプリの通話や録音を終えてから、もう一度お試しください")
+        case .tooShort: L10n.tr("タップしてから話し、話し終えたらもう一度タップしてください")
+        case .silent: L10n.tr("マイクに近づいて、もう一度話してください")
+        case .speechRecognitionDenied: L10n.tr("音声モデルの準備ができるまでは、文字で入力してください")
+        case .onDeviceRecognitionUnavailable: L10n.tr("この端末では音声モデルの準備ができるまで声で入力できません。文字で入力してください")
+        }
     }
-    /// toast に添える診断の 1 行要約(`TranscriberDiagnostics.summary` の表示言語対応版)
-    static func diagnosticsSummary(_ d: TranscriberDiagnostics) -> String {
-        var parts = [L10n.tr("録音\(seconds(d.recordedSeconds))秒")]
-        parts.append(d.peakAmplitude > 0 ? L10n.tr("音量\(Int(d.peakDecibels.rounded()))dB") : L10n.tr("無音"))
-        if !d.inputRoute.isEmpty { parts.append(L10n.tr("入力:\(d.inputRoute)")) }
-        return parts.joined(separator: L10n.tr("・"))
+    static var notHeardTitle: String { L10n.tr("うまく聞き取れませんでした") }
+    static var notHeardBody: String { L10n.tr("もう一度、はっきり話してください") }
+
+    /// 失敗の「次の一手」。圏外なら接続の確認、それ以外は少し待って再試行。
+    static func nextStep(for error: Error) -> String {
+        switch FailureKind.classify(error) {
+        case .offline: offlineInterruptedBody
+        case .sessionExpired: sessionExpiredBody
+        case .appCheckFailed: appCheckFailedBody
+        case .aiPaused: aiPausedBody
+        default: otherBody
+        }
     }
-    private static func seconds(_ s: Double) -> String { String(format: "%.1f", s) }
+    /// 「〇〇できませんでした。次の一手」。エラーの中身(英語の OS の文・サーバーの文)はログにだけ残す。
+    static func failure(_ what: String, _ error: Error, context: String) -> String {
+        ErrorLog.record(error, context: context)
+        return L10n.tr("\(what)。\(nextStep(for: error))")
+    }
+
+    // 完成の読み上げ(H8)。要約が無い時だけ使う
+    static func completedAnnouncement(appName: String, created: Bool) -> String {
+        guard created, !appName.isEmpty else { return L10n.tr("変更しました") }
+        return L10n.tr("「\(appName)」ができました")
+    }
 
     // ボタン
     static var retry: String { L10n.tr("もう一度") }
@@ -100,5 +129,22 @@ enum ErrorCopy {
     static var discard: String { L10n.tr("やめる") }
     static var dismiss: String { L10n.tr("閉じる") }
     static var signIn: String { L10n.tr("サインイン") }
+    static var signInApple: String { L10n.tr("Apple でサインイン") }
+    static var upgradePro: String { L10n.tr("Pro にする") }
     static var edit: String { L10n.tr("言い直す") }
+}
+
+/// 失敗の詳しい中身(OS のエラー文・サーバーの文・診断の値)の置き場(H9)。画面には出さず、stdout と os_log に残す。
+/// 実機は `xcrun devicectl device process launch --console` か Console.app(subsystem `jp.kz2601.metamon` category `error`)で見る。
+enum ErrorLog {
+    private static let logger = Logger(subsystem: "jp.kz2601.metamon", category: "error")
+
+    static func record(_ error: Error, context: String) {
+        record("\(error)", context: context)
+    }
+
+    static func record(_ detail: String, context: String) {
+        print("[Metamon] \(context) failed: \(detail)")
+        logger.error("\(context, privacy: .public) failed: \(detail)")
+    }
 }

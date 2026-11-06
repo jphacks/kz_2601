@@ -31,7 +31,7 @@ enum Greeting {
                         subtitle: L10n.pick(L10n.tr("\(hello)。話しかけるだけで、アプリが生まれ変わります"), review: L10n.tr("\(hello)。話すだけで、記録帳の形が変わります")))
         case .returning:
             return Copy(title: L10n.pick(L10n.tr("おかえりなさい。\n今日は何を作りますか?"), review: L10n.tr("おかえりなさい。\n今日は何を記録しますか?")),
-                        subtitle: L10n.pick(L10n.tr("\(hello)。「アプリ一覧」と話すか、マイクを長押しすると前に作ったアプリを呼び出せます"), review: L10n.tr("\(hello)。マイクを長押しすると、前に用意した記録帳を呼び出せます")))
+                        subtitle: L10n.pick(L10n.tr("\(hello)。「変身一覧」と話すか、マイクを長押しすると前に作ったアプリを呼び出せます"), review: L10n.tr("\(hello)。マイクを長押しすると、前に用意した記録帳を呼び出せます")))
         case .newApp:
             return Copy(title: L10n.pick(L10n.tr("新しいアプリですね。\nどんなアプリにしますか?"), review: L10n.tr("新しい記録帳ですね。\n何を記録しますか?")),
                         subtitle: L10n.pick(L10n.tr("前のアプリは、マイクの長押しからいつでも戻せます"), review: L10n.tr("前の記録帳は、マイクの長押しからいつでも戻せます")))
@@ -50,7 +50,7 @@ enum Greeting {
     static var switcherEmpty: String { L10n.pick(L10n.tr("まだ他のアプリはありません。\n「+ 新しいアプリ」から 2 つ目を作れます"), review: L10n.tr("まだ他の記録帳はありません。\n「+ 新しい記録帳」から 2 つ目を用意できます")) }
     static var currentBadge: String { L10n.tr("使用中") }
     static var newAppAction: String { L10n.pick(L10n.tr("新しいアプリ"), review: L10n.tr("新しい記録帳")) }
-    static var homeAction: String { L10n.tr("Tailor It に戻る(初期画面)") }
+    static var homeAction: String { L10n.tr("最初の画面に戻る") }
 
     /// 例文チップのカテゴリ(#274)。初期画面で上の行がカテゴリ、下の行がそのカテゴリの例。
     struct ExampleCategory: Identifiable, Equatable {

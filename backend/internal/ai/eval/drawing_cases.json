@@ -1,0 +1,6 @@
+[
+  {"id": "dr_sketch", "kind": "create", "group": "drawing", "transcript": "お絵かき帳。描いた絵を一覧で見たい", "note": "drawingField + photo field・一覧の行に絵", "expect": {"has": ["drawingField", "list"], "unreachable": 0}},
+  {"id": "dr_signature", "kind": "create", "group": "drawing", "transcript": "配達の受け取りサインを手書きでもらって記録したい", "note": "サインは drawingField(photoField・textEditor にしない)", "expect": {"has": ["drawingField"], "lacks": ["photoField"], "unreachable": 0}},
+  {"id": "dr_notes", "kind": "create", "group": "drawing", "transcript": "授業のノート。タイトルと本文だけ", "note": "dr_edit_add の土台(手書きなし)", "expect": {"lacks": ["drawingField"]}},
+  {"id": "dr_edit_add", "kind": "edit", "base": "dr_notes", "group": "drawing", "transcript": "ノートに手書きで図も描けるようにして", "note": "既存のフォームに photo field + drawingField を足す", "expect": {"patch": true, "has": ["drawingField"], "unreachable": 0}}
+]

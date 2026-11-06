@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"math"
 	"regexp"
 	"slices"
 	"strings"
@@ -35,17 +36,42 @@ var (
 
 const minPhoneDigits = 10
 
-// render fills {field} / {$author} from the trigger record, sanitizes each
-// inserted value and cuts the result to maxRunes.
-func (p *planner) render(tmpl string, maxRunes int) string {
+// render fills {name} of with, {field} / {$author} from the trigger record,
+// sanitizes each inserted value and cuts the result to maxRunes.
+func (p *planner) render(tmpl string, maxRunes int, with map[string]dsl.Expr) string {
 	s := placeholderRe.ReplaceAllStringFunc(tmpl, func(m string) string {
-		text, formatted := p.insert(m[1 : len(m)-1])
+		id := m[1 : len(m)-1]
+		if x, ok := with[id]; ok {
+			text, formatted := p.named(x)
+			if formatted {
+				return text
+			}
+			return SanitizeInsert(text)
+		}
+		text, formatted := p.insert(id)
 		if formatted {
 			return text
 		}
 		return SanitizeInsert(text)
 	})
 	return cut(s, maxRunes)
+}
+
+// named is the display text of a with value: a date is formatted here; a
+// number may come from a user's value (max / latest), so it is sanitized
+// like an inserted field. Anything else is unavailable.
+func (p *planner) named(x dsl.Expr) (text string, formatted bool) {
+	v := p.e.Eval(x, p.row)
+	switch v.Kind {
+	case expreval.Date:
+		return v.Text(p.loc), true
+	case expreval.Number:
+		if math.IsNaN(v.Num) || math.IsInf(v.Num, 0) {
+			return "", false
+		}
+		return v.Text(p.loc), false
+	}
+	return "", false
 }
 
 // insert is the display text of one placeholder ("" when unavailable).

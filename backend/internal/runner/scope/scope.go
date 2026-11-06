@@ -2,7 +2,9 @@
 // is made from one trigger and touches that app only: no method takes an
 // appId, every record path is built in one place (recordSet) and checked
 // against the handle's appId, and records can be read only when they are the
-// trigger record or a record its ref fields point to.
+// trigger record or a record its ref fields point to, or listed by List (all
+// records of one entity on the handle's side: on.each / agg, #340 reads) and
+// the records their ref fields point to.
 //
 // It implements engine.RefReader and notify.Directory / notify.Accounts /
 // notify.Consent, and reads device tokens (#269).
@@ -45,6 +47,7 @@ type Backend interface {
 	AppOwner(ctx context.Context, appID string) (string, error)
 	ListMembers(ctx context.Context, appID string, limit int) ([]store.Member, error)
 	GetRecord(ctx context.Context, rs store.RecordSet, id string) (*store.Record, error)
+	ListRecords(ctx context.Context, rs store.RecordSet, limit int) ([]store.Record, error)
 	CreateRecord(ctx context.Context, rs store.RecordSet, rec store.Record) (*store.Record, bool, error)
 	UserDeleted(ctx context.Context, uid string) (bool, error)
 	ListBlocks(ctx context.Context, uid string) ([]store.Block, error)
@@ -237,6 +240,50 @@ func (h *Handle) Record(ctx context.Context, entity, id string) (expreval.Record
 		return expreval.Record{}, false, err
 	}
 	return ToExpr(r), true, nil
+}
+
+// ErrTooMany: List found more records than its limit.
+var ErrTooMany = errors.New("scope: more records than the limit")
+
+// List returns the records of entity on the handle's side (the user's own
+// for private data) for on.each / agg (#340 reads), newest first. More than
+// limit records (limit > 0) is ErrTooMany. Listed records and the records
+// their ref fields point to become readable by Record.
+func (h *Handle) List(ctx context.Context, entity string, limit int) ([]expreval.Record, error) {
+	if h.readable == nil {
+		return nil, ErrNotBound
+	}
+	rs, err := h.recordSet(ctx, entity)
+	if err != nil {
+		return nil, err
+	}
+	n := 0
+	if limit > 0 {
+		n = limit + 1
+	}
+	recs, err := h.b.ListRecords(ctx, rs, n)
+	if err != nil {
+		return nil, err
+	}
+	if limit > 0 && len(recs) > limit {
+		return nil, ErrTooMany
+	}
+	ent := h.app.EntityByID(entity)
+	out := make([]expreval.Record, 0, len(recs))
+	for i := range recs {
+		r := &recs[i]
+		h.readable[entity+"\x00"+r.ID] = true
+		for _, f := range ent.Fields {
+			if f.Type != dsl.FieldRef {
+				continue
+			}
+			if ref, _ := r.Data[f.ID].(string); ref != "" {
+				h.readable[f.RefEntity+"\x00"+ref] = true
+			}
+		}
+		out = append(out, ToExpr(r))
+	}
+	return out, nil
 }
 
 // ToExpr converts a stored record for the evaluator.
