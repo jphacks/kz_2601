@@ -53,6 +53,7 @@
   - `photoField.analyze`(#418・写真の文字・金額・分類・骨格の読み取り)は残す。選んだ写真を端末内の Vision / Foundation Models で読むだけで、カメラも権限も使わない。カメラの映像を見ながらの読み取り(回数カウントなど)を足す時は、撮影と同じく審査用の版から外す。
 - 現在地を 1 回だけ取る `locationButton` と、地図の `mapView`(使用中の位置だけ)は残す。
 - 目的地までの道案内 `routeGuide`(#411)も残す。使うのは使用中の位置だけで、背面で案内を続けない(`CLBackgroundActivitySession` も `UIBackgroundModes: location` も使わない)。読み上げ(AVSpeechSynthesizer)に権限は要らない。
+- ファイルの取り込み `fileImport` は残す。ファイル選択(`.fileImporter`)は別プロセスで動き、権限の確認も Info.plist の説明文も要らない。CSV の行・テキスト / PDF の本文(PDFKit・文字の無いページは Vision の文字認識)を端末内で読んで記録にするだけで、ファイルそのものは送らない・残さない。ファイルの日時の API(理由が要る API)も使わない。
 - QR を読む `qrScanner` は残す(カメラの説明文はこれに合わせて差し替える)。
 - QR を作って表示する `qrCode`(#422)も残す。CoreImage で端末内で作るだけで、写真への保存は追加のみの権限(`NSPhotoLibraryAddUsageDescription`)。審査用の版の説明文にも QR の保存を書く(#452 G8)。
 - 声でアプリを作り変える音声入力(マイク FAB)は残す。`audio` field の再生(一覧の行の再生ボタン)も残す(マイクを使わない。この版では録音できないので鳴る録音は無い)。
