@@ -133,5 +133,28 @@ func unaddress(root map[string]any, noAddressed bool) int {
 			walk(entity, cs)
 		}
 	}
+	if noAddressed {
+		n += unrecipient(root)
+	}
+	return n
+}
+
+// unrecipient: without addressedTo, a rule's notify to the recipients goes
+// to the record's author instead (kind recipients needs an addressed entity).
+func unrecipient(root map[string]any) int {
+	n := 0
+	rules, _ := root["serverRules"].([]any)
+	for _, r := range rules {
+		rm, _ := r.(map[string]any)
+		do, _ := rm["do"].([]any)
+		for _, a := range do {
+			am, _ := a.(map[string]any)
+			nm, _ := am["notify"].(map[string]any)
+			if to, _ := nm["to"].(map[string]any); to != nil && to["kind"] == dsl.RecipientRecipients {
+				nm["to"] = map[string]any{"kind": dsl.RecipientAuthor}
+				n++
+			}
+		}
+	}
 	return n
 }

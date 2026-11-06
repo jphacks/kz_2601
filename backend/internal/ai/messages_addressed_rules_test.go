@@ -119,3 +119,20 @@ func TestRestrictionTurnsParticipantPickersIntoTextFields(t *testing.T) {
 		})
 	}
 }
+
+// A rule to the recipients stays valid for a build without addressed messages.
+func TestUnaddressRecipients(t *testing.T) {
+	root := map[string]any{"serverRules": []any{map[string]any{"do": []any{map[string]any{"notify": map[string]any{
+		"to": map[string]any{"kind": dsl.RecipientRecipients, "field": "to"}}}}}}}
+	if n := unaddress(root, false); n != 0 {
+		t.Fatalf("kept for a build with addressed messages: %d", n)
+	}
+	if n := unaddress(root, true); n != 1 {
+		t.Fatalf("changed %d", n)
+	}
+	rule := root["serverRules"].([]any)[0].(map[string]any)
+	to := rule["do"].([]any)[0].(map[string]any)["notify"].(map[string]any)["to"].(map[string]any)
+	if to["kind"] != dsl.RecipientAuthor || to["field"] != nil {
+		t.Fatalf("to: %v", to)
+	}
+}
