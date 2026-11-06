@@ -641,6 +641,10 @@ func (a *App) Validate() error {
 				checkAction(where+".onItemTap", c.OnItemTap)
 			case CompAudioRecorder:
 				checkAudioRecorder(where, c, formEntity, add)
+			case CompTranscribeField: // speech.go
+				checkTranscribeField(where, c, formEntity, add)
+			case CompSpeakButton: // speech.go
+				checkSpeakButton(where, c, formEntity, entities, add)
 			case CompEmptyState:
 				if c.Title == "" {
 					add("%s: emptyState needs title", where)
