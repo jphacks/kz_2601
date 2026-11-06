@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/feeds"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/store"
@@ -53,6 +54,8 @@ type Handler struct {
 
 	pro     paid.ProChecker // Pro features (pro_gate.go, #316); nil = not enforced
 	proMode paid.Mode       // PRO_GATE_MODE; "" = enforce
+	feeds     *feeds.Service // external feeds (feeds.go, #348); nil = from env
+	feedUsers *feedLimiter
 }
 
 // routeGroups holds the feature routes. Each feature file registers its own
