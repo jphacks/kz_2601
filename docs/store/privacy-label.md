@@ -31,7 +31,7 @@ ASC はデータの種類ごとに「用途 → ユーザーに紐づくか → 
 |---|---|---|---|---|---|---|
 | 連絡先情報 > 名前 | Sign in with Apple が渡した時の名前 | Firebase Authentication | App の機能 | はい | いいえ | `FirebaseAuthService.signInWithApple(fullName:)` |
 | 連絡先情報 > メールアドレス | Sign in with Apple が渡した時のメール(非公開を選ぶと中継用のアドレス) | Firebase Authentication | App の機能 | はい | いいえ | 同上(Firebase が Apple の ID トークンから保存) |
-| ユーザーコンテンツ > 写真またはビデオ | 記録に入れた写真の縮小画像(800px 以下の JPEG)・動画のサムネイル。動画そのものは端末内 | Firestore | App の機能 | はい | いいえ | `PhotoCodec`・`VideoFieldLeaf`(`video:<id>\|<サムネイル>`)・`HTTPAppConfigClient` の records |
+| ユーザーコンテンツ > 写真またはビデオ | 記録に入れた写真の縮小画像(800px 以下の JPEG)・手書きの絵(`drawingField` で描いた絵。写真と同じ 800px 以下の JPEG で photo field に入る)・動画のサムネイル。動画そのものは端末内 | Firestore | App の機能 | はい | いいえ | `PhotoCodec`・`DrawingCodec`・`VideoFieldLeaf`(`video:<id>\|<サムネイル>`)・`HTTPAppConfigClient` の records |
 | ユーザーコンテンツ > その他のユーザーコンテンツ | 記録帳の設計(DSL)と版の履歴・記録・AI に送る依頼の文と会話 | Firestore / Anthropic(サーバー経由) | App の機能 | はい | いいえ | `HTTPAppConfigClient`(`v1/apps/…`)・`HTTPAIClient`(`v1/generate`・`v1/chat`) |
 | 位置情報 > 正確な位置情報 | 本人が記録に入れた場所(`locationButton` の緯度経度・小数 6 桁) | Firestore | App の機能 | はい | いいえ | `LocationButtonLeaf`(`%.6f,%.6f`) |
 | ID > ユーザー ID | Firebase の uid | Firebase Authentication / Firestore / Crashlytics | App の機能 | はい | いいえ | `FirebaseAuthService`・`FirebaseCrashReporter.setUserID` |
@@ -57,6 +57,7 @@ ASC はデータの種類ごとに「用途 → ユーザーに紐づくか → 
 | カスタマーサポート | アプリ内のフィードバック(`v1/feedback`)はこの版に無い |
 
 - Hugging Face(音声モデルの配信)へは IP とファイルのリクエストだけで、運営者は受け取らない。サーバーのログの IP(Cloud Logging・30 日)も選ばない(5 章)。
+- ファイルの取り込み(`fileImport`)は、選んだ CSV・テキスト・PDF を端末内で読んで記録にするだけ。ファイルそのものは送らない・保存しない。取り込んだ記録は 2 章の「その他のユーザーコンテンツ」(記録)と同じ扱いなので、申告は変わらない。
 - Firebase App Check(App Attest / DeviceCheck)は端末とアプリが正規かの確認で、集めるデータに当たらない。
 
 ## 4. 通常の版だけで増えるもの
@@ -87,7 +88,7 @@ ASC はデータの種類ごとに「用途 → ユーザーに紐づくか → 
 | UserDefaults | 設定・同意・タイマー・通知の予約など(`UserDefaults.standard`・`@AppStorage`) | CA92.1 | ○ | |
 | UserDefaults | App Group でウィジェットに渡す `WidgetSnapshot` | 1C8F.1 | ○ | ○ |
 | 空き容量 | `ModelDownloadAdvice`(音声モデルの前の確認と不足分の表示)・`DashcamRecorder`(通常の版だけ) | E174.1・85F4.1 | ○ | |
-| ファイルの日時 | 使わない | - | | |
+| ファイルの日時 | 使わない(`fileImport` もファイルの中身を読むだけで、作成日・更新日は読まない) | - | | |
 | システムの起動時間 | 使わない(`ContinuousClock` は対象外) | - | | |
 | アクティブなキーボード | 使わない | - | | |
 

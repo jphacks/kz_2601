@@ -118,6 +118,9 @@ var expectKeys = map[string]expectKind{
 	"ruleSim":     expectBool,
 	// checkFlashcards (#264): flashcards.go
 	"flashcardsUnlearned": expectBool,
+	// checkFeed (#348): feed.go
+	"feed":       expectString,
+	"feedRegion": expectString,
 	// checkNav
 	"patch":       expectBool,
 	"unreachable": expectNumber,

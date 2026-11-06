@@ -19,12 +19,12 @@ enum BuildChoreography {
             case .textField, .numberField, .datePicker, .picker, .textEditor, .secureField, .timePicker, .colorPicker,
                  .slider, .stepper, .rating, .searchBar, .locationPicker, .voiceInput: .field
             case .toggle: .toggle
-            case .list, .table, .timeline, .gridTable, .matchList, .chatThread, .settlement: .list
+            case .list, .table, .timeline, .gridTable, .matchList, .chatThread, .settlement, .feed: .list
             case .chart: .chart
             case .stat, .gauge, .progressBar, .healthStat, .sensorValue, .timerDisplay: .stat
             case .calendar: .calendar
             case .mapView, .routeGuide, .locationTracker: .map
-            case .photoField, .image, .videoField, .videoPlayer, .audioRecorder, .qrCode, .qrScanner, .dashcam,
+            case .photoField, .drawingField, .image, .videoField, .videoPlayer, .audioRecorder, .qrCode, .qrScanner, .dashcam,
                  .musicPlayer, .avatar, .icon, .webView: .media
             default: .card
             }
