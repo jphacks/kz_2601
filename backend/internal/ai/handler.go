@@ -21,7 +21,9 @@ import (
 //
 // POST /v1/generate?stream=1 answers with Server-Sent Events instead of one
 // JSON body: `event: app` / `event: summary` (an Event, as soon as the first
-// block of the model output is complete), then `event: result` (the same
+// block of the model output is complete), `event: component` per part of the
+// first visible screen and `event: restart` before a regeneration (create
+// turns, #636), then `event: result` (the same
 // GenerateResponse as the JSON mode) or `event: error` (the same error body).
 func NewHandler(svc *Service) http.Handler {
 	mux := http.NewServeMux()

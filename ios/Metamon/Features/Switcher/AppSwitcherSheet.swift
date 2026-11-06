@@ -19,17 +19,21 @@ struct AppSwitcherSheet: View {
     private var showSkeleton: Bool { rt.appsLoading && apps.isEmpty }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-                .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.top, Theme.Spacing.lg)
-            cards
-                .padding(.top, Theme.Spacing.lg)
-            actions
-                .padding(.horizontal, Theme.Spacing.lg)
-                .padding(.top, Theme.Spacing.lg)
-            Spacer(minLength: Theme.Spacing.md)
+        // 横向き(#625)は高さ 500 が取れないので縦にスクロールできるようにする(縦向きは収まるので動かない)
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.top, Theme.Spacing.lg)
+                cards
+                    .padding(.top, Theme.Spacing.lg)
+                actions
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.top, Theme.Spacing.lg)
+                Spacer(minLength: Theme.Spacing.md)
+            }
         }
+        .scrollBounceBehavior(.basedOnSize)
         .background(Theme.Colors.canvas.ignoresSafeArea())
         .modifier(AppRenameAlert()) // #277
         .presentationDetents([.height(500)])

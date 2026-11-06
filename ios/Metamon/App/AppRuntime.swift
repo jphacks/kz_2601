@@ -236,6 +236,8 @@ final class AppRuntime: DSLRuntime {
     /// 「元に戻して」のフォールバック(appconfig が versions を持たない mock / 未デプロイ時)。直近 10 件。
     /// 「1 つ前に戻す」ボタンの出し分けに使うので観測する(#209)。
     private var localHistory: [AppDocument] = []
+    /// `openUrl` で外部に渡す処理(テストで差し替える)。
+    @ObservationIgnored var openExternalURL: @MainActor (URL) async -> Bool = { await UIApplication.shared.open($0) }
 
     init(document: AppDocument, services: Services) {
         self.document = document
@@ -1155,8 +1157,12 @@ final class AppRuntime: DSLRuntime {
             showVoiceSheet = true
 
         case .openUrl:
-            guard let s = action.url, let url = URL(string: s) else { return }
-            _ = await UIApplication.shared.open(url)
+            // openUrlButton / link / webView と同じ判定
+            guard let url = ExternalURLPolicy.openable(action.url) else {
+                toast = L10n.tr("openUrl: url は https か line/slack/discord/tel/mailto/maps のみ")
+                return
+            }
+            _ = await openExternalURL(url)
 
         case .resetForm:
             ctx.form?.reset()
