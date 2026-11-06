@@ -52,7 +52,7 @@ final class SchemaSwiftKeysTests: XCTestCase {
     func testActionTypesMatchSchema() throws {
         let schemaTypes = try SchemaFixture.load().actionTypes
         let swiftTypes = Set(ActionType.allCases.filter { $0 != .unknown }.map(\.rawValue))
-        XCTAssertEqual(schemaTypes.count, 12, "アクションの数が 12 でない(#351)")
+        XCTAssertEqual(schemaTypes.count, 14, "アクションの数が 14 でない(#351・#270 で follow / unfollow)")
         assertSameSet(schema: schemaTypes, swift: swiftTypes, what: "アクションの type",
                       swiftPlace: "ActionType の case")
     }

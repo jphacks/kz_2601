@@ -2704,6 +2704,23 @@
         }
       }
     },
+    "このアプリでは今はフォローを使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Following isn't available in this app right now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリでは今はフォローを使えません"
+          }
+        }
+      }
+    },
     "このアプリでは今は仲間探しを使えません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2870,6 +2887,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この人の投稿と公開したアプリが、あなたに表示されなくなります。相手には知らされません。設定からいつでも解除できます。"
+          }
+        }
+      }
+    },
+    "この人はもうこのアプリに参加していません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This person no longer takes part in this app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この人はもうこのアプリに参加していません"
           }
         }
       }
@@ -3771,6 +3805,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ほかの人の一覧にこの名前が表示されます。Apple ID の名前やメールアドレスは表示しません。あとから設定で変えられます。"
+          }
+        }
+      }
+    },
+    "ほかの人の投稿を開いてからフォローしてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open someone else's post to follow them"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかの人の投稿を開いてからフォローしてください"
           }
         }
       }
@@ -4880,6 +4931,23 @@
         }
       }
     },
+    "オフラインのあいだはフォローできません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can't follow while offline"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフラインのあいだはフォローできません"
+          }
+        }
+      }
+    },
     "オフラインのあいだは付けられません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5947,6 +6015,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "フィードバックを送る"
+          }
+        }
+      }
+    },
+    "フォローしました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Followed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォローしました"
+          }
+        }
+      }
+    },
+    "フォローできる人数(500 人)を超えています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can follow up to 500 people in this app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォローできる人数(500 人)を超えています"
+          }
+        }
+      }
+    },
+    "フォローを変えられませんでした。もう一度お試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't change the follow. Please try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォローを変えられませんでした。もう一度お試しください"
+          }
+        }
+      }
+    },
+    "フォローを外しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unfollowed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォローを外しました"
           }
         }
       }

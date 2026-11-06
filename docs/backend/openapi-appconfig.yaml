@@ -411,6 +411,7 @@ paths:
         複合インデックスが無い組み合わせはサーバー側メモリソート (1 entity 上限 2000 件、超過は 413)。
         public/shared entity は全ユーザーの投稿が返り、各レコードに `author`/`authorName` が付く。
         `filterField=author&filterOp=eq&filterValue=<uid>` で特定ユーザー (自分) の投稿だけに絞れる。
+        `filterField=author&filterOp=in&filterValue=myFollows` で自分がフォローしている人の投稿だけ (`nin` = フォローしていない人の投稿・#270)。フォローは 1 文書なのでメモリで絞る (Firestore の `in` の 30 件の上限は関係しない)。
         **scope:shared の entity は作成者と参加者だけ**が読み書きできる (この entity の records の全操作で同じ・それ以外は 403 `not_member`・#254)。public は従来どおり誰でも。
         呼び出した人がブロックしたユーザー(`/me/blocks`)の投稿は一覧から除く(#321)。運営が非公開にした共有アプリ(`apps_public/{appId}.hidden`)は、public/shared の entity の records の全操作が 403 `unpublished`(details.reason = 運営の理由)。
       parameters:
@@ -419,7 +420,7 @@ paths:
         - { in: query, name: sortField, schema: { type: string } }
         - { in: query, name: sortDir, schema: { type: string, enum: [asc, desc] } }
         - { in: query, name: filterField, schema: { type: string } }
-        - { in: query, name: filterOp, schema: { type: string, enum: [eq, neq, gt, gte, lt, lte, thisMonth, today] } }
+        - { in: query, name: filterOp, schema: { type: string, enum: [eq, neq, gt, gte, lt, lte, thisMonth, today, in, nin] }, description: 'in / nin は filterField=author・filterValue=myFollows だけ (#270)' }
         - { in: query, name: filterValue, schema: { type: string } }
       responses:
         '200':
@@ -524,6 +525,50 @@ paths:
       summary: 自分の印を外す (#255・冪等)
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/MarkState' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /apps/{appId}/follows:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [records]
+      summary: 自分がフォローしている人 (#270)
+      description: |
+        共有アプリ (公開済みの DSL に public / shared の entity がある) の中で、呼び出した人がフォローしている人の uid (古い順)。
+        フォローはアプリごと・本人だけが見られる (フォローされた人には知らせず、フォロワーの一覧も無い)。
+        scope:shared だけのアプリは作成者と参加者だけ (それ以外は 403 `not_member`)。共有のデータが無いアプリは 404 `no_shared_data`。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uids]
+                properties:
+                  uids: { type: array, items: { type: string } }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /apps/{appId}/follows/{uid}:
+    parameters:
+      - { $ref: '#/components/parameters/AppId' }
+      - { in: path, name: uid, required: true, schema: { type: string }, description: フォローする人 (投稿の `author`) }
+    put:
+      tags: [records]
+      summary: フォローする (#270・冪等)
+      description: |
+        自分は 400 `follow_self`。scope:shared だけのアプリでは、相手も作成者か参加者でないと 404 `not_in_app`。
+        1 人がフォローできるのは 1 アプリ 500 人まで (超えると 403 `follows_full`)。
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FollowState' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [records]
+      summary: フォローを外す (#270・冪等)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FollowState' } } } }
+        '403': { $ref: '#/components/responses/NotMember' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /apps/{appId}/share:
@@ -1648,6 +1693,12 @@ components:
       properties:
         count: { type: integer, minimum: 0, description: '印を付けている人数' }
         mine: { type: boolean, description: '呼び出した本人が付けているか' }
+    FollowState:
+      type: object
+      required: [following, count]
+      properties:
+        following: { type: boolean, description: '操作の後にフォローしているか' }
+        count: { type: integer, minimum: 0, description: 'このアプリで自分がフォローしている人数' }
     Share:
       type: object
       required: [token, appId, name, dslVersion, url, webUrl]

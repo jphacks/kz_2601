@@ -32,6 +32,7 @@
 | `users/{uid}/blocks/*`(本人のブロック一覧・#321) | 消す。他の人のブロック一覧にある本人の uid は残る(たどれる先が無くなるだけ) |
 | `users/{uid}/devices/*`(プッシュ通知の端末トークン・#269) | 退会(論理削除)の時点で消している。ここでは残りを消す(ログの `devices`・ふつうは 0) |
 | `users/{uid}/notifyConsent/*`(通知を受け取る同意・#339) | 消す(ログの `notifyConsents`) |
+| `apps_public/*/follows/{uid}`(本人のフォロー一覧・#270)と、他の人のフォロー一覧にある本人の uid | 消す(ログの `follows`) |
 | 仲間探しのアプリ(#507)の `apps_public/*/match_pairs/*`(本人を含むもの)と `match_quota/{uid}` | 消す(ログの `matchPairs`) |
 | 仲間探しのアプリの、本人のプロフィール(`match:"profile"`)と連絡先(`match:"matched"`)のレコード | 消す(ログの `matchRecords`)。上の「投稿は残す」の例外: 本人を表す情報で、共有の場の投稿ではないため |
 | Firebase Auth のユーザー | 消す(アプリが退会時に消しているので、ここは取りこぼしの保険) |

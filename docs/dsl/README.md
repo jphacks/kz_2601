@@ -57,7 +57,7 @@ Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|me
   Entity.single?: true(設定値の置き場。レコードは常に 1 件・式 {"setting": "<fieldId>"} で読む)— §3.11
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section|card|disclosure|carousel|grid, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (66 種・全て id? と area? を持つ) / Action (12 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
+Leaf (66 種・全て id? と area? を持つ) / Action (14 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField?, when? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
@@ -150,7 +150,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 `color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
-### 3.2 アクション(12 種)
+### 3.2 アクション(14 種)
 
 | type | フィールド | iOS の挙動 |
 |---|---|---|
@@ -158,6 +158,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `back` | | スタックがあれば pop、モーダル最下層なら dismiss |
 | `saveRecord` | `entity`, `screen?` | ドラフトを POST(新規)/PATCH(編集)→ レコード再取得 → `screen` へ、無ければ `back` |
 | `deleteRecord` | `entity`, `confirmMessage?` | 現在の recordId を DELETE → back。list の長押し削除も同じ |
+| `follow` / `unfollow` | `entity`(public / shared) | 今開いている投稿を書いた人をフォローする / 外す(#270・下の「フォロー」)。今の状態に合わない方と、自分の投稿では隠れる |
 | `openVoice` | | 音声シートを開く |
 | `openUrl` | `url` | Safari で開く |
 | `resetForm` | | ドラフトを既定値に戻す |
@@ -302,6 +303,24 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - appconfig: `PUT` / `DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}` で自分の印を付ける / 外す(どちらも冪等・`{count, mine}` を返す)。`GET /records` と `GET /records/{id}` はレコード最上位に `marks: {"<markId>": {"count": n, "mine": bool}}` を付ける。Firestore は `…/records/{id}/marks/{markId}`(`count`)と `…/marks/{markId}/by/{uid}`。レコードを消すと印も消える。
 - iOS: 一覧の行のトグルは押した瞬間に件数と塗りを変え、サーバーの `{count, mine}` で確定する(失敗したら戻して理由を出す)。オフラインの間は付けられない(送信待ちの列には積まない)。自分の未送信の投稿にもまだ付けられない。
 - AI: 「いいね」「お気に入り」「保存」「既読」は marks を使い、子 entity を作らない。ai-eval の `mark` / `markedByMe` / `markEntity`(`m0disc_cases.json`)。
+
+#### フォロー `myFollows`(#270)
+
+「フォローした人の投稿だけが流れるタイムライン」。フォローは**アプリごとの人と人の関係**で、appconfig が持つ(DSL の entity ではない)。DSL は読むだけ: 一覧の絞り込みと、投稿の画面のボタン。public / shared の entity だけ。実例: `examples/timeline.json`(ひとことタイムライン)。
+
+| 書く場所 | 形 | 意味 |
+|---|---|---|
+| 部品の `filter` | `{"field":"$author","op":"eq","value":{"myFollows":true}}` | 自分がフォローしている人の投稿だけ(`op:"neq"` = フォローしていない人の投稿。自分の投稿はどちらでも「フォローしていない人」側)。list / table / timeline / stat(件数)/ chart で使え、agg の中では使えない |
+| Action `follow` / `unfollow` | `{"type":"follow","entity":"posts"}` | 今開いている投稿(`list.onItemTap` で開いたその entity の画面)を書いた人をフォローする / 外す。button はフォロー済みなら `follow`、まだなら `unfollow` を隠し、自分の投稿では両方隠す |
+
+- follow / unfollow を Leaf ではなく Action にしたのは `export` と同じ理由(button の見た目と `confirmMessage` を使える・toolbar にも置ける・古い iOS は「未対応のアクション」の toast で済む)。
+- **プロフィール**は投稿者の表示名(`$author`・各自がアプリの設定で決めた名前)。アイコン・自己紹介・人ごとのプロフィール画面は今は無い(参加者の情報に写真が無いため)。
+- **見える範囲**: フォローは本人だけが見られる。フォローされた人には知らせず、フォロワーの一覧・人数も出さない(つきまといに使われにくくする)。scope:shared だけのアプリでは参加者だけがフォローでき、フォローできる相手も参加者だけ。
+- appconfig: `GET /v1/apps/{appId}/follows`(`{uids}`)・`PUT` / `DELETE /v1/apps/{appId}/follows/{uid}`(冪等・`{following, count}`)。一覧の API は `filterField=author&filterOp=in&filterValue=myFollows`(`nin` も)。Firestore は `apps_public/{appId}/follows/{uid}`(`{uids: [...]}`・1 人 1 文書)。1 人が 1 アプリでフォローできるのは 500 人まで。
+- **Firestore の `in`(30 件まで)は使わない**: records は今も 1 entity 2000 件までを読んでメモリで絞っている(§3)。フォローの一覧は 1 文書なので 1 回の読み取りで、何人フォローしても同じ。件数が増えて records をクエリで絞るようになったら、30 人ずつの分割か、投稿時に配る(自動の動き・#341)を選び直す。
+- iOS: 起動時にこのアプリのフォロー一覧を読み、`{"myFollows":true}` を uid の集合に置き換えて端末で絞る(`$author` の `{"me":true}` と同じ所)。ボタンは押した瞬間に一覧へ反映し、失敗したら戻して理由を出す。読み込む前・オフラインで一度も読めていない時は、フォロー中の一覧は空。
+- AI: 「フォロー」「フォロー中」「好きな人の投稿だけ」はこの filter とボタン。フォロー用の entity・相手を選ぶ ref は作らない。ai-eval の `followFilter` / `followButton` / `followEntity`(`follow_cases.json`・`m0disc_cases.json` d_sns_follow)。
+- 古い iOS(この機能の前の版)は `{"myFollows":true}` を読めずに filter ごと捨てるので、その一覧は全員の投稿になり、ボタンは押すと「未対応のアクション」になる(落ちない)。
 
 ### 3.6 ナビゲーション = 画面グラフの規則(#112 #114 #115)
 
