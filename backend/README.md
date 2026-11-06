@@ -7,6 +7,7 @@
 |---|---|---|
 | `cmd/appconfig` | @2410as | アプリ DSL JSON の CRUD・JSON Patch 適用・バージョン・汎用レコード |
 | `cmd/ai` | Claude Code | 音声/文字 → Claude → DSL(初回フル / 以後 JSON Patch) → appconfig |
+| `cmd/runner` | Claude Code | 自動の動き(serverRules)を outbox から実行(#341・**未デプロイ**)。`POST /internal/tick`・ローカルは `make run-runner` |
 
 共有型は `pkg/dsl`:
 

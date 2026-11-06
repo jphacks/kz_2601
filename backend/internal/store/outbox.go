@@ -52,11 +52,19 @@ type OutboxEvent struct {
 	ActorUID       string `json:"actorUid"`
 	ActorAnonymous bool   `json:"actorAnonymous"`
 
+	// AvailableAt: when the event may be claimed; zero once it is finished
+	// (the runner removes the field, outbox_queue.go).
 	AvailableAt time.Time `json:"availableAt"`
 	Attempts    int       `json:"attempts"`
 	Status      string    `json:"status"`
 	CreatedAt   time.Time `json:"createdAt"`
 	ExpireAt    time.Time `json:"expireAt"`
+
+	// Set by the runner (outbox_queue.go).
+	Outcome      string            `json:"outcome,omitempty"`
+	RuleOutcomes map[string]string `json:"ruleOutcomes,omitempty"`
+	LastError    string            `json:"lastError,omitempty"`
+	FinishedAt   time.Time         `json:"finishedAt,omitzero"`
 }
 
 // EmitFunc builds the events of one record write inside its transaction:

@@ -35,6 +35,11 @@ type outboxDoc struct {
 	Status         string         `firestore:"status"`
 	CreatedAt      time.Time      `firestore:"createdAt"`
 	ExpireAt       time.Time      `firestore:"expireAt"`
+	// written by the runner (firestore_runner.go)
+	Outcome      string            `firestore:"outcome,omitempty"`
+	RuleOutcomes map[string]string `firestore:"ruleOutcomes,omitempty"`
+	LastError    string            `firestore:"lastError,omitempty"`
+	FinishedAt   time.Time         `firestore:"finishedAt,omitempty"`
 }
 
 func toOutboxDoc(ev *OutboxEvent) outboxDoc {
@@ -53,6 +58,7 @@ func (d *outboxDoc) toEvent(env, id string) OutboxEvent {
 		Version: int(d.Version), RuleIDs: d.RuleIDs, ChangedFields: d.ChangedFields, Data: d.Data, Prev: d.Prev,
 		ActorUID: d.ActorUID, ActorAnonymous: d.ActorAnonymous,
 		AvailableAt: d.AvailableAt, Attempts: int(d.Attempts), Status: d.Status, CreatedAt: d.CreatedAt, ExpireAt: d.ExpireAt,
+		Outcome: d.Outcome, RuleOutcomes: d.RuleOutcomes, LastError: d.LastError, FinishedAt: d.FinishedAt,
 	}
 }
 
