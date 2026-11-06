@@ -6,6 +6,7 @@ import MetamonDSL
 /// - type=ref field → 参照先レコードの Picker
 /// - type=refs field → 参照先レコードの複数選択(#231)
 /// - type=member field → 参加者の Picker(#272)
+/// - type=members field → 参加者の複数選択(#271)
 /// AI がどの入力部品を置いても同じ見た目・挙動になるよう、`DSLView` が 1 箇所で振り分ける。
 enum FormFieldOverride {
     static let inputTypes: Set<ComponentType> = [
@@ -23,6 +24,8 @@ enum FormFieldOverride {
                 RefsPickerRow(c: c, field: field, form: form)
             } else if field.type == .member {
                 MemberPickerRow(c: c, field: field, form: form)
+            } else if field.type == .members {
+                MembersPickerRow(c: c, field: field, form: form)
             }
         }
     }
@@ -30,7 +33,7 @@ enum FormFieldOverride {
     @MainActor
     static func applies(to c: Component, ctx: RenderContext) -> Bool {
         guard let form = ctx.form, inputTypes.contains(c.type), let fid = c.field, let field = form.entity.field(fid) else { return false }
-        return field.isComputed || field.type == .ref || field.type == .refs || field.type == .member
+        return field.isComputed || field.type == .ref || field.type == .refs || field.type == .member || field.type == .members
     }
 }
 
@@ -122,6 +125,61 @@ struct MemberPickerRow: View {
                            options: [(value: "", title: L("選択してください"))] + listed + kept)
             }
         }
+    }
+}
+
+/// type=members field の複数選択(#271)。参加者を表示名のチップで ON/OFF。保存値は選んだ uid の配列。
+/// 宛先に使うので自分は並べない。今の値に一覧に無い人(抜けた人)がいても値は残す。
+struct MembersPickerRow: View {
+    @Environment(\.dslRuntime) private var rt
+    let c: Component
+    let field: Field
+    let form: FormDraft
+
+    var body: some View {
+        let me = rt.currentUserId
+        let members = (rt.membersHost?.appMembers ?? []).filter { $0.uid != me }
+        let selected = Set(Aggregator.refIds(form.values[field.id] ?? .null))
+        LabeledInput(label: c.label ?? field.name) {
+            if members.isEmpty {
+                Label(L("参加している人を読み込めていません"), systemImage: "person.2")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .renderInputChrome()
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: RenderTheme.Spacing.sm) {
+                        ForEach(members) { m in
+                            let title = rt.memberName(.string(m.uid))
+                            let on = selected.contains(m.uid)
+                            Button { toggle(m.uid, in: members) } label: {
+                                Label(title, systemImage: on ? "checkmark.circle.fill" : "circle")
+                                    .font(.subheadline.weight(on ? .semibold : .regular))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Capsule().fill(on ? RenderTheme.Colors.brandA.opacity(0.18) : Color.secondary.opacity(0.1)))
+                                    .foregroundStyle(on ? RenderTheme.Colors.brandA : .primary)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("members.\(field.id).\(m.uid)")
+                            .accessibilityAddTraits(on ? .isSelected : [])
+                        }
+                    }
+                }
+                .renderInputChrome()
+            }
+        }
+    }
+
+    /// 並びは参加者の順に保つ。一覧に無い uid(抜けた人)は後ろに残す。
+    private func toggle(_ uid: String, in members: [AppMember]) {
+        let current = Aggregator.refIds(form.values[field.id] ?? .null)
+        var ids = Set(current)
+        if ids.contains(uid) { ids.remove(uid) } else { ids.insert(uid) }
+        let listed = members.map(\.uid)
+        let ordered = listed.filter { ids.contains($0) } + current.filter { ids.contains($0) && !listed.contains($0) }
+        form.values[field.id] = .array(ordered.map { .string($0) })
     }
 }
 

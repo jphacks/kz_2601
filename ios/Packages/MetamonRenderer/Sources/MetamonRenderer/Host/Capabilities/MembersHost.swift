@@ -1,3 +1,4 @@
+import Foundation
 import MetamonDSL
 
 /// 共有データの参加者 1 人(#272・type member の選択肢と表示名)。
@@ -37,5 +38,14 @@ public extension DSLRuntime {
         guard let uid = value.stringValue, !uid.isEmpty else { return "" }
         guard let m = membersHost?.appMembers.first(where: { $0.uid == uid }) else { return L("参加者") }
         return m.displayName.isEmpty ? L("参加者") : m.displayName
+    }
+
+    /// type members の値(uid の配列・#271)の表示名を並べる。未選択は空。
+    func memberNames(_ value: JSONValue) -> String {
+        let names = Aggregator.refIds(value).map { memberName(.string($0)) }
+        guard !names.isEmpty else { return "" }
+        let list = ListFormatter()
+        list.locale = LanguagePreference.shared.locale
+        return list.string(from: names) ?? names.joined(separator: ", ")
     }
 }

@@ -235,6 +235,8 @@ public struct Entity: Decodable, Identifiable, Sendable {
     public var unique: [String]?
     /// 共有レコードを誰が消せるか(#272): "author"(省略時)/ "admins" / "authorOrAdmins"。`RecordPermission.canDelete` が読む。
     public var deleteBy: String?
+    /// 宛先の field id(#271)。この entity の記録は作った人と宛先の人だけが読める(サーバーが一覧から外す)。端末は表示に使わない。
+    public var addressedTo: String?
     @Lossy public var fields: [Field]
 
     /// field id、または予約値(`$author` / `$createdAt`・#250)の仮 Field。
@@ -277,6 +279,8 @@ public enum FieldType: String, Decodable, Sendable {
     case refs
     /// 共有データの参加者(保存値は uid・#272)。入力は参加者の一覧から選び、一覧には表示名を出す。
     case member
+    /// 共有データの参加者の複数選択(保存値は uid の配列・#271)。グループ宛てのメッセージの宛先。
+    case members
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .string) }
 
     public var isNumeric: Bool { self == .integer || self == .number || self == .currency }

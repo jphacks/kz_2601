@@ -23,7 +23,7 @@ extension AppRuntime {
     /// 参加者を使う DSL か(type member・editableBy・deleteBy・visibleTo)。使わないアプリでは members API を呼ばない。
     nonisolated static func usesMembers(_ dsl: AppDSL) -> Bool {
         let fields = dsl.entities.contains { e in
-            e.deleteBy != nil || e.fields.contains { $0.type == .member || $0.isAdminOnly }
+            e.deleteBy != nil || e.fields.contains { $0.type == .member || $0.type == .members || $0.isAdminOnly }
         }
         return fields || dsl.screens.contains { s in s.components.contains(where: Self.hasVisibleTo) }
     }
