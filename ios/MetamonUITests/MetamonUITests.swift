@@ -297,6 +297,11 @@ final class MetamonUITests: XCTestCase {
         attachScreenshot("history-3-reopened")
 
         app.buttons["chat.restart"].tap()
+        // これまでの会話があるので確認が出る(M9)。全部消す方を選ぶ
+        let eraseAll = app.buttons["これまでの会話も消す"].firstMatch
+        XCTAssertTrue(eraseAll.waitForExistence(timeout: 10), "「最初から」で確認が出ない")
+        XCTAssertTrue(divider.exists, "確認の前に履歴が消えた")
+        eraseAll.tap()
         XCTAssertTrue(waitFor(divider, "exists == false", timeout: 15), "「最初から」で履歴が消えない")
         attachScreenshot("history-4-restarted")
     }
@@ -646,7 +651,7 @@ extension MetamonUITests {
     private var paywallHeadline: XCUIElement { app.descendants(matching: .any).matching(identifier: "paywall.headline").firstMatch }
     private var publicNotice: XCUIElement { app.descendants(matching: .any)["publicDataNotice"].firstMatch }
 
-    /// 「みんなで書き込む掲示板」を相談 →「これでいく」まで(確認カードと課金画面が出る直前)。
+    /// 「みんなで書き込む掲示板」を相談 →「これでいく」→ 確認カード(課金画面は自動では開かない・H4)。
     private func launchSharedBoardChat() {
         launch(example: nil, paidEnv.merging(["METAMON_CLARIFY": "1",
                                               "METAMON_AUTO_TRANSCRIPT": "サークルのみんなで予定を書き込める掲示板アプリを作って",
@@ -654,6 +659,16 @@ extension MetamonUITests {
         let build = app.buttons["chat.build"]
         XCTAssertTrue(build.waitForExistence(timeout: 15), "「これでいく」が出ない")
         build.tap()
+        let headline = app.descendants(matching: .any).matching(identifier: "paid.headline").firstMatch
+        XCTAssertTrue(headline.waitForExistence(timeout: 10), "確認カードが出ない")
+        XCTAssertFalse(paywallHeadline.exists, "課金画面が自動で開いた")
+    }
+
+    /// 確認カードの「Pro にする」→ 課金画面
+    private func tapProOnCard() {
+        let pro = app.buttons["paid.purchase"]
+        XCTAssertTrue(pro.waitForExistence(timeout: 5), "「Pro にする」が無い")
+        pro.tap()
     }
 
     /// 課金画面の中身(何ができるか・価格・購入・復元・規約とプライバシー)
@@ -687,9 +702,10 @@ extension MetamonUITests {
         XCTAssertTrue(waitFor(paywallHeadline, "exists == false", timeout: 10), "購入後に課金画面が閉じない", file: file, line: line)
     }
 
-    /// Pro でない → 有料機能(共有)のアプリを相談 →「これでいく」で課金画面 → モック購入 → 共有の掲示板ができる(誰でも見られる表示)
+    /// Pro でない → 有料機能(共有)のアプリを相談 →「これでいく」で確認カード →「Pro にする」で課金画面 → モック購入 → 共有の掲示板ができる(誰でも見られる表示)
     func testPaidFeaturePaywallPurchaseThenBuildsSharedApp() {
         launchSharedBoardChat()
+        tapProOnCard()
         assertPaywallContent("chat")
         XCTAssertTrue(paywallHeadline.label.contains("みんなで共有するデータ"), "見出しに機能名が無い: \(paywallHeadline.label)")
         XCTAssertFalse(generating.exists, "課金画面の間は生成しない")
@@ -699,15 +715,16 @@ extension MetamonUITests {
         attachScreenshot("paid-shared-app")
     }
 
-    /// 課金画面を閉じる → 確認カードに戻る(まだ作らない)→「この機能なしで作る」で自分だけの記録のアプリができる
+    /// 「Pro にする」→ 課金画面を閉じる → 確認カードに戻る(まだ作らない)→「この機能なしで作る」で自分だけの記録のアプリができる
     func testPaidFeatureCardBuildWithoutFeature() {
         launchSharedBoardChat()
+        tapProOnCard()
         assertPaywallContent("chat-before-close")
         app.buttons["paywall.close"].tap()
         let headline = app.descendants(matching: .any).matching(identifier: "paid.headline").firstMatch
         XCTAssertTrue(headline.waitForExistence(timeout: 5), "課金画面を閉じたら確認カードに戻らない")
         XCTAssertTrue(headline.label.contains("Tailor It Pro"), "見出し: \(headline.label)")
-        XCTAssertTrue(app.buttons["paid.purchase"].exists, "「購入して作る」が無い")
+        XCTAssertTrue(app.buttons["paid.purchase"].exists, "「Pro にする」が無い")
         XCTAssertFalse(generating.exists, "閉じただけで生成した")
         attachScreenshot("paid-feature-card")
         // 課金画面が閉じ切るまで(paidConfirmBusy)はカードのボタンが押せない。押せる前に押すと何も起きない
@@ -745,7 +762,7 @@ extension MetamonUITests {
     }
 
     /// 家計簿で修正(モックは「筋トレの記録」でトレーニング記録に変わる)→ 要約の「元に戻す」で家計簿に戻る →「やり直す」で再び修正後に。
-    /// 修正チャット(音声シート)の上部の「1つ前に戻す」も、戻せる版が無い時は押せない。
+    /// 修正チャット(音声シート)の上部の「元に戻す」も、戻せる版が無い時は押せない。
     func testUndoFromSummaryBannerAndRedo() {
         // 要約バナーは 6 秒で消える。CI では出てから「元に戻す」を押すまでに 6 秒を超えて消えていた(run 41043811226)ので、テストの間は消さない
         launch(example: "kakeibo", ["METAMON_CLARIFY": "0", "METAMON_MOCK_AI_DELAY": "0.5", "METAMON_BANNER_SECONDS": "600"])
@@ -754,7 +771,7 @@ extension MetamonUITests {
         fab.tap()
         XCTAssertTrue(voiceSheet.waitForExistence(timeout: 15), "音声シートが開かない")
         let headerUndo = app.buttons["voice.undo"]
-        XCTAssertTrue(headerUndo.exists, "修正チャットの上部に「1つ前に戻す」が無い")
+        XCTAssertTrue(headerUndo.exists, "修正チャットの上部に「元に戻す」が無い")
         XCTAssertFalse(headerUndo.isEnabled, "戻せる版が無いのに押せる")
         attachScreenshot("undo-header-disabled")
 
@@ -771,7 +788,7 @@ extension MetamonUITests {
         attachScreenshot("undo-banner-after-edit")
         undo.tap()
 
-        XCTAssertTrue(text("1つ前に戻しました").waitForExistence(timeout: 15), "「1つ前に戻しました」が出ない")
+        XCTAssertTrue(text("元に戻しました").waitForExistence(timeout: 15), "「元に戻しました」が出ない")
         XCTAssertTrue(text("最近の支出").waitForExistence(timeout: 15), "前の画面(家計簿)に戻らない")
         let redo = app.buttons["banner.redo"]
         XCTAssertTrue(redo.exists, "戻した後に「やり直す」が無い")
@@ -788,7 +805,7 @@ extension MetamonUITests {
         XCTAssertTrue(headerUndo.isEnabled, "戻せる版があるのに押せない")
         attachScreenshot("undo-header-enabled")
         headerUndo.tap()
-        XCTAssertTrue(text("最近の支出").waitForExistence(timeout: 15), "上部の「1つ前に戻す」で前の画面に戻らない")
+        XCTAssertTrue(text("最近の支出").waitForExistence(timeout: 15), "上部の「元に戻す」で前の画面に戻らない")
         attachScreenshot("undo-header-restored")
     }
 }

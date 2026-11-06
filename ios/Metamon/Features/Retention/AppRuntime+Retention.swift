@@ -136,9 +136,10 @@ struct RetentionPromptHost: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .task(id: rt.retentionPrompt?.id) {
+            // H7: 要約バナー・公開の確認など前のお知らせが閉じてから(`PostBuildNotice`)
+            .task(id: PromptTurn(id: rt.retentionPrompt?.id, turn: rt.isNoticeTurn(.retention))) {
                 shown = nil
-                guard rt.retentionPrompt != nil else { return }
+                guard rt.retentionPrompt != nil, rt.isNoticeTurn(.retention) else { return }
                 try? await Task.sleep(for: .milliseconds(900))
                 guard !Task.isCancelled else { return }
                 shown = rt.retentionPrompt

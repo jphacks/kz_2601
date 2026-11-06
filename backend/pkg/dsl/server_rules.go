@@ -13,9 +13,11 @@ import (
 
 // Server rules (#340, M4 approach A: declarations only). The vocabulary is
 // closed (decisions #336-#339): triggers record created / updated and
-// daily / weekly / monthly times; conditions are a subset of Expr; actions
-// notify / createRecord / updateRecord / increment. No chains, no external
-// sends, no arbitrary recipients. The runner (#341) enforces the same rules
+// daily / weekly / monthly times (optionally once per record of an entity,
+// on.each); conditions are a subset of Expr (agg over the app's records on
+// the rule's side, server_rules_reads.go); actions notify / createRecord /
+// updateRecord / increment. No chains, no external sends, no arbitrary
+// recipients. The runner (#341) enforces the same rules
 // again at run time; this file is the generation-time gate.
 
 // ServerRule is one automatic server action.
@@ -27,7 +29,7 @@ type ServerRule struct {
 }
 
 // RuleTrigger is a record trigger (Record + Entity [+ Fields]) or a time
-// trigger (Every + Time [+ Weekday | Day]).
+// trigger (Every + Time [+ Weekday | Day] [+ Each]).
 type RuleTrigger struct {
 	Record  string   `json:"record,omitempty"` // created|updated
 	Entity  string   `json:"entity,omitempty"`
@@ -36,6 +38,9 @@ type RuleTrigger struct {
 	Time    string   `json:"time,omitempty"`   // HH:MM in the creator's time zone
 	Weekday string   `json:"weekday,omitempty"`
 	Day     int      `json:"day,omitempty"` // monthly: 1..28
+	// Each (time trigger): run the rule once per record of this entity (the
+	// row of if / values / placeholders), e.g. a reminder per task due soon.
+	Each string `json:"each,omitempty"`
 }
 
 // RuleAction holds exactly one action.
@@ -51,6 +56,9 @@ type RuleNotify struct {
 	To    RuleRecipient `json:"to"`
 	Title string        `json:"title"`
 	Body  string        `json:"body"`
+	// With names number / date values ({name} in title / body), e.g. a
+	// weekly total: {"total": {"agg":"sum",...}}.
+	With map[string]Expr `json:"with,omitempty"`
 }
 
 // RuleRecipient is a closed recipient kind.
@@ -175,9 +183,15 @@ func checkServerRules(a *App, entities map[string]*Entity, add func(string, ...a
 			scheduled++
 		}
 		row := checkRuleTrigger(where, r, entities, add)
-		scope := a.ruleScope(r)
+		rc := &ruleCheck{r: r, row: row, scope: a.ruleScope(r), entities: entities, add: add, reads: map[string]bool{}}
+		if r.On.Each != "" && row != nil {
+			rc.reads[row.ID] = true
+			if row.IsShared() != (rc.scope != ScopePrivate) {
+				add("%s.on.each: entity %q is %s but the app's time-triggered rules work on %s data; each needs an entity on the same side", where, row.ID, row.EffectiveScope(), rc.scope)
+			}
+		}
 		if r.If != nil {
-			ch := ruleExprChecker(r, row, entities, add)
+			ch := rc.expr()
 			if got := ch.check(where+".if", r.If, row, 1); !accepts(tBool, got) {
 				add("%s.if: condition must be true/false (got %s); compare with eq / gt / and ...", where, got)
 			}
@@ -190,7 +204,10 @@ func checkServerRules(a *App, entities map[string]*Entity, add func(string, ...a
 			add("%s: too many actions (%d > %d)", where, len(r.Do), MaxRuleActionsPro)
 		}
 		for j := range r.Do {
-			checkRuleAction(fmt.Sprintf("%s.do[%d]", where, j), r, &r.Do[j], row, scope, entities, add)
+			checkRuleAction(fmt.Sprintf("%s.do[%d]", where, j), rc, &r.Do[j])
+		}
+		if n := len(rc.reads); n > MaxRuleReadEntities {
+			add("%s: reads the records of %d entities (each + agg: %s); at most %d", where, n, strings.Join(sortedKeys(rc.reads), ", "), MaxRuleReadEntities)
 		}
 	}
 	if scheduled > MaxScheduledRulesPro {
@@ -199,10 +216,21 @@ func checkServerRules(a *App, entities map[string]*Entity, add func(string, ...a
 	checkRuleChains(a, add)
 }
 
-func ruleExprChecker(r *ServerRule, row *Entity, entities map[string]*Entity, add func(string, ...any)) *exprChecker {
-	ch := &exprChecker{entities: entities, add: add, deps: map[fieldKey]bool{}, server: true}
-	if r.On.Record == TriggerUpdated {
-		ch.prev = row
+// ruleCheck is what the checks of one rule share.
+type ruleCheck struct {
+	r        *ServerRule
+	row      *Entity // the row of the rule's expressions (nil = time trigger without each)
+	scope    EntityScope
+	entities map[string]*Entity
+	add      func(string, ...any)
+	reads    map[string]bool // entities whose records the rule lists (each + agg)
+}
+
+// expr is a checker for one expression of the rule.
+func (rc *ruleCheck) expr() *exprChecker {
+	ch := &exprChecker{entities: rc.entities, add: rc.add, deps: map[fieldKey]bool{}, server: true, serverScope: rc.scope, serverReads: rc.reads}
+	if rc.r.On.Record == TriggerUpdated {
+		ch.prev = rc.row
 	}
 	return ch
 }
@@ -256,7 +284,7 @@ func checkRuleTrigger(where string, r *ServerRule, entities map[string]*Entity, 
 			add("%s: time %q must be HH:MM", where, t.Time)
 		}
 		if t.Entity != "" || len(t.Fields) > 0 {
-			add("%s: entity / fields are only for record triggers", where)
+			add("%s: entity / fields are only for record triggers (each: run once per record of an entity)", where)
 		}
 		switch t.Every {
 		case "weekly":
@@ -278,13 +306,20 @@ func checkRuleTrigger(where string, r *ServerRule, entities map[string]*Entity, 
 				add("%s: weekday / day are only for every weekly / monthly", where)
 			}
 		}
-		return nil
+		if t.Each == "" {
+			return nil
+		}
+		e := entities[t.Each]
+		if e == nil {
+			add("%s: each %q does not exist (entities: %s)", where, t.Each, entityIDs(entities))
+		}
+		return e
 	}
 	if t.Record != TriggerCreated && t.Record != TriggerUpdated {
 		add("%s: record %q must be created or updated", where, t.Record)
 	}
-	if t.Time != "" || t.Weekday != "" || t.Day != 0 {
-		add("%s: time / weekday / day are only for time triggers (every)", where)
+	if t.Time != "" || t.Weekday != "" || t.Day != 0 || t.Each != "" {
+		add("%s: time / weekday / day / each are only for time triggers (every)", where)
 	}
 	e := entities[t.Entity]
 	if e == nil {
@@ -309,9 +344,9 @@ func checkRuleTrigger(where string, r *ServerRule, entities map[string]*Entity, 
 	return e
 }
 
-// checkRuleAction validates one action of rule r. row is the trigger entity
-// (nil = time trigger); scope the rule's data scope.
-func checkRuleAction(where string, r *ServerRule, act *RuleAction, row *Entity, scope EntityScope, entities map[string]*Entity, add func(string, ...any)) {
+// checkRuleAction validates one action of rule rc.r.
+func checkRuleAction(where string, rc *ruleCheck, act *RuleAction) {
+	row, scope, entities, add := rc.row, rc.scope, rc.entities, rc.add
 	n := 0
 	for _, set := range []bool{act.Notify != nil, act.CreateRecord != nil, act.UpdateRecord != nil, act.Increment != nil} {
 		if set {
@@ -324,7 +359,7 @@ func checkRuleAction(where string, r *ServerRule, act *RuleAction, row *Entity, 
 	}
 	switch {
 	case act.Notify != nil:
-		checkRuleNotify(where+".notify", act.Notify, row, scope, entities, add)
+		checkRuleNotify(where+".notify", rc, act.Notify)
 	case act.CreateRecord != nil:
 		w := where + ".createRecord"
 		target := entities[act.CreateRecord.Entity]
@@ -336,7 +371,7 @@ func checkRuleAction(where string, r *ServerRule, act *RuleAction, row *Entity, 
 			add("%s: entity %q is single (always one record); a rule cannot add records to it", w, target.ID)
 		}
 		checkRuleTargetScope(w, target, scope, add)
-		checkRuleValues(w, r, target, act.CreateRecord.Values, row, entities, add)
+		checkRuleValues(w, rc, target, act.CreateRecord.Values)
 		for _, f := range target.Fields {
 			if f.Required && f.Computed == nil {
 				if _, ok := act.CreateRecord.Values[f.ID]; !ok {
@@ -347,7 +382,7 @@ func checkRuleAction(where string, r *ServerRule, act *RuleAction, row *Entity, 
 	case act.UpdateRecord != nil:
 		w := where + ".updateRecord"
 		if row == nil {
-			add("%s: updateRecord needs a record trigger (a time trigger has no record to update)", w)
+			add("%s: updateRecord needs a record trigger or on.each (a time trigger has no record to update)", w)
 			return
 		}
 		target := row // a single trigger record is overwritten in place (still one record)
@@ -360,11 +395,11 @@ func checkRuleAction(where string, r *ServerRule, act *RuleAction, row *Entity, 
 		if len(act.UpdateRecord.Values) == 0 {
 			add("%s: values is empty", w)
 		}
-		checkRuleValues(w, r, target, act.UpdateRecord.Values, row, entities, add)
+		checkRuleValues(w, rc, target, act.UpdateRecord.Values)
 	case act.Increment != nil:
 		w := where + ".increment"
 		if row == nil {
-			add("%s: increment needs a record trigger (it adds to the record the trigger's ref field points to)", w)
+			add("%s: increment needs a record trigger or on.each (it adds to the record the row's ref field points to)", w)
 			return
 		}
 		target := refTarget(w, row, act.Increment.Ref, entities, add)
@@ -382,7 +417,7 @@ func checkRuleAction(where string, r *ServerRule, act *RuleAction, row *Entity, 
 			add("%s: field %q is %s; increment needs an integer / number / currency field", w, f.ID, f.Type)
 		}
 		if act.Increment.By != nil {
-			ch := ruleExprChecker(r, row, entities, add)
+			ch := rc.expr()
 			if got := ch.check(w+".by", act.Increment.By, row, 1); !accepts(tNum, got) {
 				add("%s.by: must be a number (got %s)", w, got)
 			}
@@ -414,7 +449,8 @@ func checkRuleTargetScope(where string, target *Entity, scope EntityScope, add f
 	}
 }
 
-func checkRuleValues(where string, r *ServerRule, target *Entity, values map[string]Expr, row *Entity, entities map[string]*Entity, add func(string, ...any)) {
+func checkRuleValues(where string, rc *ruleCheck, target *Entity, values map[string]Expr) {
+	row, add := rc.row, rc.add
 	keys := make([]string, 0, len(values))
 	for k := range values {
 		keys = append(keys, k)
@@ -435,7 +471,7 @@ func checkRuleValues(where string, r *ServerRule, target *Entity, values map[str
 			continue
 		}
 		v := values[k]
-		ch := ruleExprChecker(r, row, entities, add)
+		ch := rc.expr()
 		got := ch.check(w, &v, row, 1)
 		checkNoComputed(w, ch, add)
 		want := fieldExprType(f.Type)
@@ -466,7 +502,8 @@ func RecipientAllowed(scope EntityScope, kind string) bool {
 	return slices.Contains(recipientsByScope[scope], kind)
 }
 
-func checkRuleNotify(where string, n *RuleNotify, row *Entity, scope EntityScope, entities map[string]*Entity, add func(string, ...any)) {
+func checkRuleNotify(where string, rc *ruleCheck, n *RuleNotify) {
+	row, scope, entities, add := rc.row, rc.scope, rc.entities, rc.add
 	k := n.To.Kind
 	switch k {
 	case RecipientOwner, RecipientAuthor, RecipientAuthorOf, RecipientMembers:
@@ -477,7 +514,7 @@ func checkRuleNotify(where string, n *RuleNotify, row *Entity, scope EntityScope
 		add("%s.to: kind %q must be owner, author, authorOf or members", where, k)
 	}
 	if (k == RecipientAuthor || k == RecipientAuthorOf) && row == nil {
-		add("%s.to: kind %s needs a record trigger (a time trigger has no record)", where, k)
+		add("%s.to: kind %s needs a record trigger or on.each (a time trigger has no record)", where, k)
 	}
 	if k == RecipientAuthorOf {
 		if row != nil {
@@ -488,14 +525,15 @@ func checkRuleNotify(where string, n *RuleNotify, row *Entity, scope EntityScope
 	} else if n.To.Field != "" {
 		add("%s.to: field is only for kind authorOf", where)
 	}
-	checkNotifyText(where+".title", n.Title, MaxNotifyTitleRunes, row, add)
-	checkNotifyText(where+".body", n.Body, MaxNotifyBodyRunes, row, add)
+	checkNotifyWith(where, rc, n)
+	checkNotifyText(where+".title", n.Title, MaxNotifyTitleRunes, row, n.With, add)
+	checkNotifyText(where+".body", n.Body, MaxNotifyBodyRunes, row, n.With, add)
 }
 
 // checkNotifyText validates a notification template: length, placeholders
-// ({field} of the trigger record / {$author}), and no URL / email / phone /
-// official-sounding words / control or invisible characters.
-func checkNotifyText(where, s string, maxRunes int, row *Entity, add func(string, ...any)) {
+// ({field} of the trigger record / {$author} / {name} of with), and no URL /
+// email / phone / official-sounding words / control or invisible characters.
+func checkNotifyText(where, s string, maxRunes int, row *Entity, with map[string]Expr, add func(string, ...any)) {
 	if strings.TrimSpace(s) == "" {
 		add("%s: is empty", where)
 		return
@@ -504,11 +542,14 @@ func checkNotifyText(where, s string, maxRunes int, row *Entity, add func(string
 		add("%s: too long (%d > %d characters, placeholders included)", where, n, maxRunes)
 	}
 	for _, m := range notifyPlaceholderRe.FindAllStringSubmatch(s, -1) {
+		if _, ok := with[m[1]]; ok {
+			continue
+		}
 		checkPlaceholder(where, m[1], row, add)
 	}
 	literal := norm.NFKC.String(notifyPlaceholderRe.ReplaceAllString(s, " "))
 	if strings.ContainsAny(literal, "{}") {
-		add("%s: unmatched { or }; insert a value as {<field>} or {$author}", where)
+		add("%s: unmatched { or }; insert a value as {<field>}, {$author} or {<with name>}", where)
 	}
 	for _, r := range literal {
 		if unicode.Is(unicode.Cc, r) || unicode.Is(unicode.Cf, r) {
@@ -544,7 +585,7 @@ func checkNotifyText(where, s string, maxRunes int, row *Entity, add func(string
 
 func checkPlaceholder(where, id string, row *Entity, add func(string, ...any)) {
 	if row == nil {
-		add("%s: {%s}: a time trigger has no record to insert values from", where, id)
+		add("%s: {%s}: a time trigger has no record to insert values from (name a total in notify.with, or use on.each)", where, id)
 		return
 	}
 	if id == notifyAuthorPlaceholder {
@@ -578,7 +619,7 @@ func checkRuleChains(a *App, add func(string, ...any)) {
 	writes := map[string][]write{} // entity id -> writes
 	for i := range a.ServerRules {
 		r := &a.ServerRules[i]
-		row := a.EntityByID(r.On.Entity)
+		row := a.EntityByID(r.RowEntity())
 		for _, act := range r.Do {
 			switch {
 			case act.CreateRecord != nil:
@@ -663,7 +704,7 @@ func (a *App) DescribeServerRule(r *ServerRule) string {
 		}
 		return id
 	}
-	row := a.EntityByID(r.On.Entity)
+	row := a.EntityByID(r.RowEntity())
 	fname := func(e *Entity, id string) string {
 		if e != nil {
 			if f := e.FieldByID(id); f != nil {
@@ -700,6 +741,9 @@ func (a *App) DescribeServerRule(r *ServerRule) string {
 	default:
 		when = fmt.Sprintf("「%s」が更新された時", ename(t.Entity))
 	}
+	if t.Each != "" {
+		when += fmt.Sprintf("、「%s」の記録ごとに", ename(t.Each))
+	}
 	if r.If != nil {
 		when += "(条件に合えば)"
 	}
@@ -735,5 +779,5 @@ func (a *App) DescribeServerRule(r *ServerRule) string {
 			acts = append(acts, fmt.Sprintf("「%s」の「%s」を数える", refName(act.Increment.Ref), fname(target, act.Increment.Field)))
 		}
 	}
-	return when + "、" + strings.Join(acts, "・")
+	return when + "、" + a.describeReads(r) + strings.Join(acts, "・")
 }

@@ -17,7 +17,9 @@ extension AppRuntime {
         print("[Metamon] IAP: generated app uses shared data without Pro → paywall (version=\(version))")
         let personalData = publicDataPrompt // #253 の確認は課金画面の後(買った時だけ)に出す
         publicDataPrompt = nil
+        paidGatePending = true // H7: 要約バナー・確認は課金画面が閉じてから
         let pro = await requestProOverSheets(closeNote: L10n.tr("閉じると、共有の機能を外して自分だけの記録にします。"))
+        paidGatePending = false
         guard document.appId == appId, document.version == version else { return } // 待っている間に切り替えた・直した
         if pro {
             publicDataPrompt = personalData
@@ -78,6 +80,7 @@ extension AppRuntime {
         guard !proGate.isPro else {
             // 端末では Pro なのにサーバーが知らない(取引の送信がまだ・失敗)。課金画面は出さず、送り直しもしない(繰り返さない)
             print("[Metamon] IAP: server refused a paid save although this device is Pro")
+            keepChatAfterStop = true // 会話は残す(少し待って「これでいく」でまた送れる・H3)
             summaryBanner = SummaryBanner(text: L10n.tr("購入の確認がまだサーバーに届いていません。少し待ってから、もう一度話しかけてください"), highlight: nil)
             return
         }
@@ -88,6 +91,8 @@ extension AppRuntime {
                                               after: .milliseconds(wasOpen ? 550 : 350))
         guard document.appId == appId else { return }
         guard bought else {
+            // 新規作成の対話中は会話を残し、確認カード(購入して作る / この機能なしで作る)に戻す(H3)
+            if holdForProRequired(pro, transcript: transcript) { return }
             summaryBanner = SummaryBanner(text: pro.notSavedMessage, highlight: nil)
             return
         }

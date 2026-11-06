@@ -5,6 +5,7 @@ import MetamonRenderer
 /// - タップ = 「このアプリを変える」発話シート、長押し(0.45s) = メタ操作(変身一覧)。
 /// - ドラッグで自由移動 → 離すと最寄りの左右の辺に吸着。端から `fabSize * 0.3` 以内で離す(or 端へ弾く)と画面外へ隠れ、取っ手だけ残る。
 ///   取っ手のタップ / 内側へ 20pt 引く で戻る。取っ手の長押しでも変身一覧。
+///   初めて隠した時だけ、取っ手の横に「取っ手を押すと戻ります」を数秒出す(UX 点検 L6・`FabHideHint`)。
 /// - 位置(辺・下端距離・隠れ)は `@AppStorage` でアプリ共通に保存。初期値は左下 + 自動退避(従来どおり)。
 /// - 吸着した側の最下段 2 列に DSL の部品がある画面では、その上端まで退避する(#83・左 `GridBottomObstructionKey` / 右 `GridBottomTrailingObstructionKey`)。
 ///
@@ -25,6 +26,9 @@ struct VoiceFab: View {
     /// 領域の下端から FAB の下端まで。`FabDock.autoBottom`(-1)= 自動(タブバー・部品退避のみ)
     @AppStorage("fab.bottom") private var storedBottom = Double(FabDock.autoBottom)
     @AppStorage("fab.hidden") private var hidden = false
+    /// 隠した時の案内を出したか(L6・アプリ共通で 1 回)
+    @AppStorage("fab.hideHintShown") private var hideHintShown = false
+    @State private var showsHideHint = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var drag: CGSize = .zero
@@ -64,9 +68,17 @@ struct VoiceFab: View {
                             y: rest.y
                         )
                         .transition(.opacity)
+                    if showsHideHint {
+                        hideHint
+                            .frame(maxWidth: .infinity, alignment: side == .leading ? .leading : .trailing)
+                            .padding(.horizontal, Theme.Layout.fabHandleHitWidth + 4)
+                            .position(x: area.width / 2, y: rest.y)
+                            .transition(.opacity)
+                    }
                 }
             }
             .animation(.easeOut(duration: 0.25), value: bottom)
+            .animation(.easeInOut(duration: 0.25), value: showsHideHint)
             // 止まっている位置の矩形(global)。Renderer が背の高い list の末尾に FAB ぶんの余白を足すのに使う(#157)。
             // ドラッグ中の位置は流さない(指に合わせて list の余白が揺れるため)。隠れている時は nil = 余白不要
             .preference(key: VoiceFabFrameKey.self, value: hidden ? nil : CGRect(
@@ -141,6 +153,7 @@ struct VoiceFab: View {
                         centerY: rest.y + v.translation.height, height: area.height, fabSize: size,
                         minBottom: Theme.Layout.fabBottomInset(hasTabs: hasTabs), maxBottom: maxBottom
                     )
+                    let wasHidden = hidden
                     withAnimation(snapAnimation) {
                         isDragging = false
                         sideRaw = snap.side.rawValue
@@ -148,6 +161,7 @@ struct VoiceFab: View {
                         hidden = snap.hidden
                         drag = .zero
                     }
+                    noteHidden(was: wasHidden)
                     // 指を離した瞬間に来る Button のタップを捨ててから解除
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { suppressTap = false }
                 }
@@ -159,7 +173,11 @@ struct VoiceFab: View {
         .accessibilityAction(named: "反対側へ移動") {
             withAnimation(snapAnimation) { sideRaw = (side == .leading ? FabSide.trailing : .leading).rawValue }
         }
-        .accessibilityAction(named: "端に隠す") { withAnimation(snapAnimation) { hidden = true } }
+        .accessibilityAction(named: "端に隠す") {
+            let wasHidden = hidden
+            withAnimation(snapAnimation) { hidden = true }
+            noteHidden(was: wasHidden)
+        }
         .allowsHitTesting(!hidden)
         .accessibilityHidden(hidden)
     }
@@ -210,9 +228,36 @@ struct VoiceFab: View {
     }
 
     private func reveal() {
+        showsHideHint = false
         withAnimation(snapAnimation) {
             hidden = false
             handlePull = 0
+        }
+    }
+
+    // MARK: 隠した時の案内(L6)
+
+    private var hideHint: some View {
+        Text(FabHideHint.message)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.black.opacity(0.78), in: Capsule())
+            .fixedSize()
+            .onTapGesture { showsHideHint = false }
+            .accessibilityHidden(true) // VoiceOver には読み上げで伝える
+    }
+
+    /// 初めて隠した時だけ案内を数秒出す。
+    private func noteHidden(was wasHidden: Bool) {
+        guard FabHideHint.shouldShow(wasHidden: wasHidden, nowHidden: hidden, alreadyShown: hideHintShown) else { return }
+        hideHintShown = true
+        showsHideHint = true
+        AccessibilityNotification.Announcement(FabHideHint.message).post()
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(FabHideHint.seconds))
+            showsHideHint = false
         }
     }
 
@@ -234,6 +279,17 @@ struct VoiceFab: View {
         storedBottom = parts.count > 1 ? Double(parts[1]) ?? Double(FabDock.autoBottom) : Double(FabDock.autoBottom)
     }
     #endif
+}
+
+/// FAB を端に隠した時の案内(L6)。一覧・設定・直すの入口がすべて FAB なので、偶然隠しても戻し方が分かるように 1 回だけ出す。
+enum FabHideHint {
+    static let seconds: Double = 4
+    static var message: String { L10n.tr("取っ手を押すと戻ります") }
+
+    /// 出ていた FAB を隠した時で、まだ案内していない時だけ
+    static func shouldShow(wasHidden: Bool, nowHidden: Bool, alreadyShown: Bool) -> Bool {
+        !wasHidden && nowHidden && !alreadyShown
+    }
 }
 
 /// `VoiceFab` の止まっている位置(global)。隠れている / 出していない時は nil。RootView が Renderer の `fabFrame` に渡す(#157)。

@@ -12,8 +12,9 @@
 5. [足りない部品・機能(多い順)](#足りない部品機能多い順)
 6. [× のもの: 難しい理由と代わりの案](#-のもの-難しい理由と代わりの案)
 7. [受賞・決勝の作品](#受賞決勝の作品)
-8. [相談が要ること](#相談が要ること)
-9. [作品の一覧](#作品の一覧)
+8. [測り方](#測り方)
+9. [相談が要ること](#相談が要ること)
+10. [作品の一覧](#作品の一覧)
 
 ## 要約
 
@@ -141,6 +142,61 @@ Web の作品はモバイルに置き換えて考えた(Web だから × には�
 | ? | 1 |
 
 × の理由の多くは自作の機器(12)・AR(9)・クラウド AI を含む複数の組み合わせ(8)・カメラの連続認識(5)。受賞作は「ハードウェアを作った」「新しい体験を作った」作品が多いため、日常の記録・共有が中心の全体よりも × の割合が高い。一覧の「受賞など」の列に、どの作品かを載せた。
+
+## 測り方
+
+上の ◎○ は README を読んだ見込みで、AI が本当にその作品を作れるかは数えていない。そこで、過去の作品を元にした ai-eval のケースで「作れた割合」を測る。実際に Claude を呼ぶのは人が決めた時だけ(下のコマンド)。
+
+### ケース
+
+| ファイル(`backend/internal/ai/eval/`) | 作品 | group | 中身 |
+|---|---|---|---|
+| `jphacks_coverage_cases.json` | 37 | `cov-full`(◎ 18)・`cov-reduced`(○ 19) | develop にある部品だけで作れる作品(記録を読むルール `ruleAgg`・`ruleEach` は #658、文字起こし・手書き・読み上げ・写真の labels・fileImport・feed は #659 で入った) |
+| `jphacks_coverage_pending_cases.json` | 2 | `cov-pr660`(2) | 開いている PR の部品が要る作品(カレンダーへの追加は #660) |
+
+- **選び方**: 判定 ◎○△ の 241 作品から 39 作品。受賞・決勝の ◎○△ 28 作品のうち 18 作品を入れ、残りは機能の分類(共有・記録・計算・通知・地図・写真・QR・AI・音声・マッチング・音楽)が偏らないように選んだ。× は入れていない(本体が作れないため)。△ は、足りない物が開いている PR で入る作品だけを PR 待ちのファイルに入れた。
+- **依頼の文**: 利用者が話す形で、その作品の本体の体験を 1〜2 文で頼む。作品名・チーム名は入れず、`note` の先頭にリポジトリの名前(`jphacks/<repo>`)・判定・受賞を書いた。
+- **期待の付け方**: 本体の体験に要る物だけを、既存の期待のキーで書く(部品 `has`・共有 `shared` / `scope`・計算 `calc` / `computed`・通知 `notification`・写真の読み取り `photoAnalyze`・AI `aiGenerate` / `aiTask`・曲のリクエスト `musicRequests`・マッチング `matchProfile`・ルール `serverRules` / `ruleTrigger` / `ruleAction` など)。見た目・画面の数・タブは見ない。○ の作品は「欠けるもの」(一覧のメモ)を期待に入れない。
+- **PR 待ちの期待**: develop に無い部品は `has` の名前(`transcribeField` など)で書く。PR が足す期待のキー(`addToCalendar` など)は `pendingExpect` に置き、PR がマージされてキーが入ると自動で確かめる対象になる(それまでは実行のログに「not checked until the PR is merged」と出て、確かめない)。
+- **作れた** = 生成が成功し、期待をすべて満たした作品。試験(`backend/cmd/ai-eval/coverage_test.go`)が、作品の数(30〜40)・依頼の文にチーム名が無いこと・develop のファイルが develop の部品だけを使うこと・PR 待ちのケースが本当に新しい部品を要ることを確かめる。
+
+### コマンド(`backend/` で)
+
+```sh
+# 期待の書き方だけを確かめる(API を呼ばない)
+go run ./cmd/ai-eval -check -cases internal/ai/eval/jphacks_coverage_cases.json
+go run ./cmd/ai-eval -check -cases internal/ai/eval/jphacks_coverage_pending_cases.json
+
+# 実際に回す(人が決めた時だけ。-logic-pass / -server-rules は本番の AI_LOGIC_PASS / AI_SERVER_RULES に合わせる)
+go run ./cmd/ai-eval -env-file ../.env -cases internal/ai/eval/jphacks_coverage_cases.json -logic-pass -server-rules -tag jphacks
+go run ./cmd/ai-eval -env-file ../.env -cases internal/ai/eval/jphacks_coverage_pending_cases.json -logic-pass -server-rules -tag jphacks-pending  # #660 のマージ後
+
+# 件数を絞る(受賞作の 3 件だけ・落ちた作品だけを回し直す)
+go run ./cmd/ai-eval -env-file ../.env -cases internal/ai/eval/jphacks_coverage_cases.json -logic-pass -server-rules -tag jphacks -only cov_poker_chips,cov_trash_dex,cov_car_dj
+
+# 保存した結果から作れた割合を出す(API を呼ばない。同じ id は後のファイルの結果を使う)
+go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks.json'
+go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 待ちも合わせて
+```
+
+実行の最後と `-score` に group ごとの「pass / checked」(= 作れた / 作品)と total が出る。`-score` は作れなかった作品の外れた期待も一覧にする。
+
+### 件数・費用の目安
+
+| 回し方 | 新規作成の回数 | 費用の目安 |
+|---|---|---|
+| develop のファイル | 28 | $0.8〜2.8 |
+| PR 待ちのファイル | 11 | $0.3〜1.1 |
+| 両方 | 39 | $1.2〜3.9(2 回目の呼び出し `-logic-pass` / `-server-rules` を含めると多くて $6 程度) |
+| `-only` で 3 件 | 3 | $0.1〜0.3 |
+
+1 回の新規作成を $0.03〜0.10 と置いた(`docs/backend/rate-limit.md` の目安。モデルは ai-eval の既定 `claude-sonnet-5-5`・effort low)。実測の `usage` は結果のファイルに残るので、1 回目の後に直す。ケースは直列に回るので、1 件 30〜60 秒として 39 件で 20〜40 分。
+
+### 目標との関係
+
+- 目標の指標は「判定できた 341 作品のうち ◎○ の割合」(今 43% → 60% 以上)。この割合は README からの見込みなので、**ケースの作れた割合を掛けて実際の見込みにする**: 実際の ◎○ ≒ ◎ 51 × `cov-full` の割合 + ○ 97 × `cov-reduced` の割合。例えば両方 80% なら 148 × 0.8 ≒ 118 作品(35%)で、見込みの 43% より低い。
+- 60% の見込み(205 作品)は「足すべき上位 5 つ」が入った後の数。PR 待ちのケース(`cov-pr*`)は、部品が入って △ から ◎○ になるはずの作品が本当に作れるかを測る。マージ後に `cov-pr*` の割合が低ければ、部品はあっても AI が使えていない(プロンプト・カタログの直し)ことが分かる。
+- 1 作品で約 3 ポイント動く標本なので、1 回の差は揺れとみる。比べる時は同じモデル・effort で回し、揺れを見るなら `-repeat 2`(実行の最後の表は 2 回分を数える。`-score` は同じ id の最後の 1 件だけを使う)。
 
 ## 相談が要ること
 

@@ -96,7 +96,7 @@ struct DiscoverSheet: View {
         } catch is CancellationError {
         } catch {
             if (error as? URLError)?.code == .cancelled { return }
-            self.error = L10n.tr("読み込めませんでした: \(error.localizedDescription)")
+            self.error = ErrorCopy.failure(L10n.tr("読み込めませんでした"), error, context: "DiscoverSheet")
         }
     }
 
