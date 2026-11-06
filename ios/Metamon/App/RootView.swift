@@ -23,7 +23,7 @@ struct RootView: View {
         @Bindable var rt = rt
         ZStack {
             Group {
-                if let job = rt.morphJob, job.kind == .create {
+                if let stage = rt.buildStage {
                     #if DEBUG
                     let _ = MorphProbe.rootCreateEvals += 1
                     #endif
@@ -31,7 +31,8 @@ struct RootView: View {
                     // 重ねる方式(zIndex 固定の層)では遅い CI で、morphJob が立っているのに完成まで一度も描かれず、
                     // 下の初期画面(「アプリを考えています…」)が見えたままだった。置き換えなら隠れる先が無い。
                     // 完成時は apply が document 差し替えと morphJob = nil を同じアニメーションで行い、.id が変わってクロスフェードになる
-                    GeneratingView(job: job)
+                    // 結果が届いた後も組み上げ(#626)の間はここに留まる(`rootViewID` で作り直さない)
+                    GeneratingView(job: stage.job, reveal: stage.reveal)
                         .transition(.asymmetric(insertion: .identity, removal: .opacity))
                 } else if rt.dsl.isVoiceOnly {
                     // 初期状態(voiceEntry = fullscreen)はグリッドのセル内ではなく全面に描く(背景を画面いっぱいに敷くため)。
@@ -43,7 +44,8 @@ struct RootView: View {
             }
                 // appId か version が変わったら丸ごと作り直して transition を出す。
                 // appId も含める: 別アプリが同じ version・同じ screen id(home)だと作り直されず、記録が読み直されない(#80 で発見)
-                .id("\(rt.document.appId)#\(rt.document.version)")
+                // 組み上げ演出(#626)の間は待っていた時の id に留め、終わった時に新しい id へ(= いつもの変身のクロスフェード)
+                .id(rt.rootViewID)
                 .transition(.asymmetric(
                     insertion: .scale(scale: 0.96).combined(with: .opacity),
                     removal: .opacity
@@ -55,13 +57,14 @@ struct RootView: View {
                 .onPreferenceChange(GridBottomObstructionKey.self) { bottomObstructions = $0 }
                 .onPreferenceChange(GridBottomTrailingObstructionKey.self) { trailingBottomObstructions = $0 }
                 .environment(\.fabFrame, fabFrame)
+                .environment(\.changeHighlight, rt.changeHighlight) // #626 編集で変わった部品だけ光らせる
 
             // フォーム画面(push)では FAB を出さず、ナビバー右上のマイク(`formToolbarAccessory`)が入口になる(#83)
             // キーボード表示中も隠す(入力欄・キーボードのツールバーに被るため・#143)
             // シート・部品のシートが上にある間はそちらの層が出す(#629 `ModalVoiceFabLayer` / `ComponentAIButtonLayer`)
             ZStack {
                 // create の全画面「変身中」の上には出さない(重ねる方式の時は GeneratingView が覆っていた)
-                if rt.morphJob?.kind != .create, mainEntry == .fab {
+                if mainEntry == .fab {
                     VoiceFab(
                         hasTabs: rt.dsl.app.hasTabs,
                         leadingObstructionTop: bottomObstructions[visibleMainRoute.id],
@@ -139,8 +142,10 @@ struct RootView: View {
         .onChange(of: rt.document.version) {
             // 変身(apply)が落ち着いてから今の画面をサムネに撮る(変身一覧カード用)
             Task {
-                try? await Task.sleep(for: .milliseconds(1200))
-                guard rt.morphJob == nil, !rt.showAppSwitcher else { return }
+                // 組み上げ演出(#626)の間は生成中の表示なので、終わって本物の画面に切り替わってから撮る
+                let reveal = rt.buildReveal.map { $0.plan.total + 0.7 } ?? 0
+                try? await Task.sleep(for: .seconds(1.2 + reveal))
+                guard rt.morphJob == nil, rt.buildReveal == nil, !rt.showAppSwitcher else { return }
                 AppThumbnailStore.shared.capture(appId: rt.document.appId, isVoiceOnly: rt.dsl.isVoiceOnly)
             }
         }
@@ -215,7 +220,8 @@ struct RootView: View {
     private var mainEntry: AIButtonPlacement.Entry {
         AIButtonPlacement.entry(
             layer: .main, voiceEntry: rt.dsl.app.voiceEntry, isForm: isFormVisible, keyboardVisible: keyboard.isVisible,
-            isTopLayer: rt.sheet == nil && rt.fullScreen == nil && AIButtonLayers.shared.isEmpty)
+            isTopLayer: rt.sheet == nil && rt.fullScreen == nil && AIButtonLayers.shared.isEmpty,
+            isBuilding: rt.buildStage != nil)
     }
 
     /// 変身直後の要約(読み上げ文)。上部カードで 3 秒表示して自動で消える。

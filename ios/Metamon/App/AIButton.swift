@@ -22,10 +22,11 @@ enum AIButtonPlacement {
         var isStackRoot: Bool
     }
 
-    /// その層に出す入口。上に別の層が重なっている(`isTopLayer == false`)・初期画面(音声だけ)では出さない。
+    /// その層に出す入口。上に別の層が重なっている(`isTopLayer == false`)・初期画面(音声だけ)・組み上げ中(`isBuilding`・#626)では出さない。
     /// FAB は `voiceEntry == .floating` の時だけ・キーボード表示中は隠す(#143)。ナビバーのマイクはキーボードに被らないので出したまま。
-    static func entry(layer: Layer, voiceEntry: VoiceEntry, isForm: Bool, keyboardVisible: Bool, isTopLayer: Bool) -> Entry {
-        guard isTopLayer, voiceEntry != .fullscreen else { return .none }
+    static func entry(layer: Layer, voiceEntry: VoiceEntry, isForm: Bool, keyboardVisible: Bool, isTopLayer: Bool,
+                      isBuilding: Bool = false) -> Entry {
+        guard isTopLayer, !isBuilding, voiceEntry != .fullscreen else { return .none }
         if layer == .component || isForm { return .toolbar }
         return FabVisibility.isShown(floating: voiceEntry == .floating, formVisible: false, keyboardVisible: keyboardVisible) ? .fab : .none
     }
@@ -72,9 +73,9 @@ extension AppRuntime {
                                   initialScreen: dsl.initialScreen, sheet: sheet, fullScreen: fullScreen)
     }
 
-    /// AI ボタンを押した: 今の画面(・部品)を指示の対象にして音声シートを開く(#629)。生成中は何もしない。
+    /// AI ボタンを押した: 今の画面(・部品)を指示の対象にして音声シートを開く(#629)。生成中・組み上げ中(#626)は何もしない。
     func openVoiceForVisibleScreen(component: AIButtonComponent? = nil) {
-        guard morphJob == nil else { return }
+        guard morphJob == nil, buildStage == nil else { return }
         let visible = visibleScreen
         ScreenMapUI.shared.context = AIButtonPlacement.context(
             visible: visible, hasTabs: dsl.app.hasTabs,
@@ -97,7 +98,8 @@ struct ModalVoiceFabLayer: ViewModifier {
         let entry = AIButtonPlacement.entry(
             layer: .modal, voiceEntry: rt.dsl.app.voiceEntry,
             isForm: rt.dsl.screen(visible.route.screen)?.entity != nil,
-            keyboardVisible: keyboard.isVisible, isTopLayer: visible.layer == .modal && layers.isEmpty)
+            keyboardVisible: keyboard.isVisible, isTopLayer: visible.layer == .modal && layers.isEmpty,
+            isBuilding: rt.buildStage != nil)
         ZStack {
             content
                 .onPreferenceChange(GridBottomObstructionKey.self) { bottomObstructions = $0 }
@@ -134,7 +136,9 @@ struct ComponentAIButtonLayer: View {
     var body: some View {
         content
             .toolbar {
-                if !rt.dsl.isVoiceOnly {
+                if AIButtonPlacement.entry(layer: .component, voiceEntry: rt.dsl.app.voiceEntry, isForm: false,
+                                           keyboardVisible: false, isTopLayer: true,
+                                           isBuilding: rt.buildStage != nil) == .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         VoiceToolbarButton(target: component) { rt.openVoiceForVisibleScreen(component: component) }
                     }
@@ -161,6 +165,7 @@ struct VoiceToolbarButton: View {
     var target: AIButtonComponent?
     var onTap: (() -> Void)?
     @Environment(AppRuntime.self) private var rt
+    private var isBusy: Bool { rt.morphJob != nil || rt.buildStage != nil }
 
     var body: some View {
         Button { if let onTap { onTap() } else { rt.openVoiceForVisibleScreen() } } label: {
@@ -174,12 +179,12 @@ struct VoiceToolbarButton: View {
         .buttonStyle(.plain)
         .simultaneousGesture(
             LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
-                .onEnded { _ in if target == nil, rt.morphJob == nil { rt.openSwitcher() } }
+                .onEnded { _ in if target == nil, !isBusy { rt.openSwitcher() } }
         )
-        // 生成中は FAB と同じく押せない(フォームのシートは本体の暗転の外なので、ここから設定の「初期状態に戻す」等に行けていた)
-        .opacity(rt.morphJob != nil ? 0.35 : 1)
-        .allowsHitTesting(rt.morphJob == nil)
-        .disabled(rt.morphJob != nil)
+        // 生成中・組み上げ中(#626)は FAB と同じく押せない(フォームのシートは本体の暗転の外なので、ここから設定の「初期状態に戻す」等に行けていた)
+        .opacity(isBusy ? 0.35 : 1)
+        .allowsHitTesting(!isBusy)
+        .disabled(isBusy)
         .accessibilityLabel("話しかけて変える")
         .modifier(VoiceToolbarAccessibility(target: target))
         .accessibilityIdentifier(target == nil ? "voice.toolbarMic" : "voice.componentMic")

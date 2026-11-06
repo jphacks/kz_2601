@@ -100,6 +100,25 @@ public final class RecordSyncEngine {
         await refreshStatus()
     }
 
+    /// サインアウトの前に未送信を送り切る。オフライン・連続失敗で止まった・`timeout` を過ぎたらそこまで。
+    /// - Returns: 残った未送信の件数
+    public func flush(timeout: Duration = .seconds(10)) async -> Int {
+        let clock = ContinuousClock()
+        let deadline = clock.now + timeout
+        while isOnline, clock.now < deadline {
+            let draining = await queue.isDraining
+            if !draining {
+                await queue.resume()
+                let left = await queue.count
+                let paused = await queue.isPaused
+                if left == 0 || paused { break }
+            }
+            try? await Task.sleep(for: .milliseconds(100)) // 別の送信が流れている間は待つ
+        }
+        await refreshStatus()
+        return await queue.count
+    }
+
     /// 前面復帰でも未送信を流す(背面でネットワークが戻っていた場合の取りこぼし防止)。
     public func setForeground(_ active: Bool) {
         isForeground = active

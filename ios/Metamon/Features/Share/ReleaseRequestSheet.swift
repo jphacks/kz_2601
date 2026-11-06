@@ -74,8 +74,18 @@ struct AppCardActions: View {
                 Divider()
                 #endif
                 Button(role: .destructive) { confirmingDelete = true } label: {
-                    Label("削除", systemImage: "trash")
+                    if rt.canDelete {
+                        Label("削除", systemImage: "trash")
+                    } else {
+                        Label { // 生成中は押せない(理由をメニューの小さな文字で添える)
+                            Text("削除")
+                            Text(AppRuntime.deleteBlockedReason)
+                        } icon: {
+                            Image(systemName: "trash")
+                        }
+                    }
                 }
+                .disabled(!rt.canDelete)
                 .accessibilityIdentifier("switcher.delete")
                 AppManageMenuItems(app: app) // #277 名前を変える・複製・並べ替え
             } label: {
