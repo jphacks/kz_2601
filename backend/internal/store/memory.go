@@ -43,6 +43,9 @@ type Memory struct {
 	// marks
 	marks map[string]bool // record/mark/uid keys (memory_marks.go)
 
+	// follows (#270, memory_follow.go): appId -> follower uid -> followed uids
+	follows map[string]map[string][]string
+
 	// account deletion
 	deleted map[string]time.Time // uid -> deletedAt of DELETE /v1/me (memory_account.go)
 	purged  map[string]bool      // uids erased by PurgeAccount + MarkAccountPurged

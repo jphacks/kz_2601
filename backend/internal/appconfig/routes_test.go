@@ -21,6 +21,7 @@ var wantRoutes = []string{
 	"DELETE /v1/apps/{appId}/entities/{entityId}/records",
 	"DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}",
 	"DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}",
+	"DELETE /v1/apps/{appId}/follows/{uid}",
 	"DELETE /v1/apps/{appId}/interests/{uid}",
 	"DELETE /v1/apps/{appId}/matches/{uid}",
 	"DELETE /v1/apps/{appId}/members/{uid}",
@@ -38,6 +39,7 @@ var wantRoutes = []string{
 	"GET /v1/apps/{appId}/entities/{entityId}/records",
 	"GET /v1/apps/{appId}/entities/{entityId}/records/{recordId}",
 	"GET /v1/apps/{appId}/events",
+	"GET /v1/apps/{appId}/follows",
 	"GET /v1/apps/{appId}/interests",
 	"GET /v1/apps/{appId}/matches",
 	"GET /v1/apps/{appId}/members",
@@ -69,6 +71,7 @@ var wantRoutes = []string{
 	"PUT /v1/apps/order",
 	"PUT /v1/apps/{appId}/dsl",
 	"PUT /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}",
+	"PUT /v1/apps/{appId}/follows/{uid}",
 	"PUT /v1/me/devices/{installationId}",
 	"PUT /v1/me/notify-consent/{appId}",
 }
