@@ -71,6 +71,40 @@ extension AppRuntime {
         apply(doc)
     }
 
+    /// サーバーが生成・直しの保存を 402 `pro_required` で止めた(#316・有料の機能が入る)。何も保存されていない。
+    /// 課金画面を出し、買えば(サーバーへの取引の送信を待って)同じ依頼をもう一度送る。閉じたら理由をバナーで伝える。
+    func presentProRequired(_ pro: ProRequired, transcript: String, gatePaid: Bool) async {
+        let appId = document.appId
+        guard !proGate.isPro else {
+            // 端末では Pro なのにサーバーが知らない(取引の送信がまだ・失敗)。課金画面は出さず、送り直しもしない(繰り返さない)
+            print("[Metamon] IAP: server refused a paid save although this device is Pro")
+            summaryBanner = SummaryBanner(text: L10n.tr("購入の確認がまだサーバーに届いていません。少し待ってから、もう一度話しかけてください"), highlight: nil)
+            return
+        }
+        print("[Metamon] IAP: server refused a paid save (\(pro.features.map(\.id))) → paywall")
+        let wasOpen = showVoiceSheet
+        showVoiceSheet = false
+        let bought = await proGate.requestPro(.paidFeature(pro.features), closeNote: L10n.tr("閉じると、この内容では作りません。"),
+                                              after: .milliseconds(wasOpen ? 550 : 350))
+        guard document.appId == appId else { return }
+        guard bought else {
+            summaryBanner = SummaryBanner(text: pro.notSavedMessage, highlight: nil)
+            return
+        }
+        await proGate.store.serverSyncTask?.value // サーバーが Pro を知ってから送り直す
+        await send(transcript, gatePaid: gatePaid)
+    }
+
+    /// 共有の記録の書き込みが 402(#316)。作成者なら課金画面、参加者は払っても直らないので案内だけ。
+    func presentProRequiredWrite(_ pro: ProRequired) {
+        guard !pro.creatorNeedsPro else {
+            toast = pro.writeMessage
+            return
+        }
+        print("[Metamon] IAP: shared write needs Pro → paywall")
+        Task { _ = await proGate.requestPro(.paidFeature(pro.features), closeNote: L10n.tr("閉じると、共有のデータは見るだけになります。")) }
+    }
+
     /// 音声シートが開いていれば閉じ終わるのを待ってから、root の課金画面を出す。
     private func requestProOverSheets(closeNote: String) async -> Bool {
         let wasOpen = showVoiceSheet
@@ -84,5 +118,16 @@ extension AppRuntime {
 extension AppRuntime {
     func gatePaidGeneration(before: AppDocument) async {}
     func gatePaidRestore(before: AppDocument) async {}
+
+    /// 402 `pro_required`(#316)。この版は有料の機能を作らない(backend が共有を private に直し、serverRules を作らない)ので
+    /// 当たらない想定。当たっても課金画面は無いので、理由を伝えるだけ。
+    func presentProRequired(_ pro: ProRequired, transcript: String, gatePaid: Bool) async {
+        print("[Metamon] review build got pro_required (\(pro.features.map(\.id)))")
+        summaryBanner = SummaryBanner(text: pro.notSavedMessage, highlight: nil)
+    }
+
+    func presentProRequiredWrite(_ pro: ProRequired) {
+        toast = pro.writeMessage
+    }
 }
 #endif

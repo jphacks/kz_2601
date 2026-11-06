@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 )
 
@@ -32,7 +33,8 @@ type Plan string
 const (
 	PlanFree Plan = "free"
 	PlanPro  Plan = "pro"
-	// PlanNone: the creator may not run rules (anonymous, or shared data without Pro).
+	// PlanNone: the creator may not run rules (anonymous, or no Pro: server
+	// rules are a Pro feature, #316).
 	PlanNone Plan = "none"
 )
 
@@ -61,6 +63,8 @@ const (
 	ScopeScheduledRules = "scheduled_rules"
 	ScopeAnonymous      = "anonymous"
 	ScopeSharedNeedsPro = "shared_needs_pro"
+	// ScopeNeedsPro: the creator of a private app's rules has no Pro (#316).
+	ScopeNeedsPro = "needs_pro"
 )
 
 // ProChecker is entitlement.ProChecker (same as ratelimit.ProChecker); nil = nobody is Pro.
@@ -77,6 +81,11 @@ type Config struct {
 	Location *time.Location
 	// Now is the clock; nil = time.Now.
 	Now func() time.Time
+	// ProMode is PRO_GATE_MODE (#316): enforce ("" too) runs rules only for
+	// Pro creators; log and off run private apps on the free plan as before
+	// #316 (log also writes pro_gate.would_block). Shared data needs Pro in
+	// every mode (#338).
+	ProMode paid.Mode
 }
 
 // Run is one execution of one rule (an outbox entry or a scheduled tick).
@@ -177,6 +186,10 @@ func (q *Quota) logger() *slog.Logger {
 }
 
 // Plan decides the creator's plan. A verified Pro wins over anonymity (#314).
+// Server rules are a Pro feature (#316, owner's decision 2026-11-06): without
+// Pro nothing runs, private apps included: the free allowance is 0. PlanFree
+// and the *Free limits stay (a 0 limit means "no counter", not "nothing") for
+// PRO_GATE_MODE=log / off, the only cases Plan returns PlanFree.
 func (q *Quota) Plan(ctx context.Context, r Run) (Plan, *Block) {
 	switch {
 	case q.pro != nil && r.CreatorUID != "" && q.pro.IsPro(ctx, r.CreatorUID):
@@ -185,8 +198,12 @@ func (q *Quota) Plan(ctx context.Context, r Run) (Plan, *Block) {
 		return PlanNone, &Block{Scope: ScopeAnonymous}
 	case r.Shared:
 		return PlanNone, &Block{Scope: ScopeSharedNeedsPro}
+	case !q.cfg.ProMode.Checks():
+		return PlanFree, nil
+	case q.cfg.ProMode.Stop(ctx, q.logger(), "runner", r.CreatorUID, []string{paid.ServerRules}):
+		return PlanNone, &Block{Scope: ScopeNeedsPro}
 	}
-	return PlanFree, nil
+	return PlanFree, nil // PRO_GATE_MODE=log: the pre-#316 free allowance
 }
 
 // Begin checks the plan and counts one execution against the app, creator,
@@ -405,7 +422,7 @@ func (q *Quota) Recipients(ctx context.Context, dec Decision, uids []string) (Re
 // The generation stage rejects more; the runner runs only the first allowed.
 func (q *Quota) ScheduledRules(plan Plan, n int) (allowed int, blk *Block) {
 	if plan == PlanNone {
-		return 0, &Block{Scope: ScopeAnonymous}
+		return 0, &Block{Scope: ScopeNeedsPro}
 	}
 	l := q.cfg.Limits
 	c := pick(plan, l.ScheduledRulesFree, l.ScheduledRulesPro)

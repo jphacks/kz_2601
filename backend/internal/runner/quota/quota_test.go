@@ -15,12 +15,19 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 )
 
 type clock struct{ t time.Time }
 
 func (c *clock) now() time.Time { return c.t }
+
+// everyonePro: server rules run only for Pro creators (#316), so the
+// counter tests run as Pro.
+type everyonePro struct{}
+
+func (everyonePro) IsPro(context.Context, string) bool { return true }
 
 type proSet map[string]bool
 
@@ -67,7 +74,7 @@ var (
 
 func TestBeginStopsAtLimit(t *testing.T) {
 	stores(t, func(t *testing.T, st ratelimit.Store, env string) {
-		q, _ := newQuota(st, env, Limits{AppExecFree: 3}, nil)
+		q, _ := newQuota(st, env, Limits{AppExecPro: 3}, everyonePro{})
 		for i := range 3 {
 			if d := begin(t, q, appA); !d.Allowed || d.Outcome != OutcomeOK {
 				t.Fatalf("run %d: %+v", i, d)
@@ -85,7 +92,7 @@ func TestBeginStopsAtLimit(t *testing.T) {
 
 func TestAppsAreSeparate(t *testing.T) {
 	stores(t, func(t *testing.T, st ratelimit.Store, env string) {
-		q, _ := newQuota(st, env, Limits{AppExecFree: 1}, nil)
+		q, _ := newQuota(st, env, Limits{AppExecPro: 1}, everyonePro{})
 		begin(t, q, appA)
 		if begin(t, q, appA).Allowed {
 			t.Fatal("app-a must be stopped")
@@ -98,7 +105,7 @@ func TestAppsAreSeparate(t *testing.T) {
 
 func TestCreatorActorAndGlobal(t *testing.T) {
 	stores(t, func(t *testing.T, st ratelimit.Store, env string) {
-		q, _ := newQuota(st, env, Limits{CreatorExecFree: 2, ActorPerApp: 5, Global: 4}, nil)
+		q, _ := newQuota(st, env, Limits{CreatorExecPro: 2, ActorPerApp: 5, Global: 4}, everyonePro{})
 		other := appA
 		other.AppID = "app-a2"
 		begin(t, q, appA)
@@ -107,7 +114,7 @@ func TestCreatorActorAndGlobal(t *testing.T) {
 			t.Fatalf("creator over: %+v", d)
 		}
 		// actor per app
-		q2, _ := newQuota(st, env+"x", Limits{ActorPerApp: 1}, nil)
+		q2, _ := newQuota(st, env+"x", Limits{ActorPerApp: 1}, everyonePro{})
 		begin(t, q2, appA)
 		if d := begin(t, q2, appA); d.Allowed || d.Block.Scope != ScopeActorExec {
 			t.Fatalf("actor over: %+v", d)
@@ -118,7 +125,7 @@ func TestCreatorActorAndGlobal(t *testing.T) {
 			t.Fatalf("schedule has no actor: %+v", d.Block)
 		}
 		// global
-		q3, _ := newQuota(st, env+"g", Limits{Global: 2}, nil)
+		q3, _ := newQuota(st, env+"g", Limits{Global: 2}, everyonePro{})
 		begin(t, q3, appA)
 		begin(t, q3, appB)
 		if d := begin(t, q3, appA); d.Allowed || d.Outcome != OutcomeSkippedGlobal || d.Block.Scope != ScopeGlobal {
@@ -129,7 +136,7 @@ func TestCreatorActorAndGlobal(t *testing.T) {
 
 func TestDayRollsOverAtMidnightJST(t *testing.T) {
 	stores(t, func(t *testing.T, st ratelimit.Store, env string) {
-		q, c := newQuota(st, env, Limits{AppExecFree: 1}, nil)
+		q, c := newQuota(st, env, Limits{AppExecPro: 1}, everyonePro{})
 		d := begin(t, q, appA)
 		if want := time.Date(2026, 11, 7, 0, 0, 0, 0, ratelimit.JST); !d.ResetAt.Equal(want) {
 			t.Fatalf("resetAt %v", d.ResetAt)
@@ -147,7 +154,7 @@ func TestDayRollsOverAtMidnightJST(t *testing.T) {
 
 func TestRefundAndRetries(t *testing.T) {
 	stores(t, func(t *testing.T, st ratelimit.Store, env string) {
-		q, _ := newQuota(st, env, Limits{AppExecFree: 1, AppWritesFree: 5, RunWritesFree: 0}, nil)
+		q, _ := newQuota(st, env, Limits{AppExecPro: 1, AppWritesPro: 5, RunWritesPro: 0}, everyonePro{})
 		d := begin(t, q, appA)
 		w, err := q.Writes(context.Background(), d, 3)
 		if err != nil || w.Allowed != 3 {
@@ -179,11 +186,11 @@ func TestRefundAndRetries(t *testing.T) {
 func TestProAndFree(t *testing.T) {
 	stores(t, func(t *testing.T, st ratelimit.Store, env string) {
 		lim := DefaultLimits
-		lim.AppExecFree, lim.AppExecPro = 1, 3
+		lim.AppExecPro = 3
 		q, _ := newQuota(st, env, lim, proSet{"carol": true})
-		begin(t, q, appA)
-		if begin(t, q, appA).Allowed {
-			t.Fatal("free app stops at 1")
+		// #316: without Pro nothing runs, private apps included (no free allowance)
+		if d := begin(t, q, appA); d.Allowed || d.Outcome != OutcomeSkippedPlan || d.Plan != PlanNone || d.Block.Scope != ScopeNeedsPro || !d.Charge.Empty() {
+			t.Fatalf("free private app: %+v", d)
 		}
 		for i := range 3 {
 			if d := begin(t, q, appB); !d.Allowed || d.Plan != PlanPro {
@@ -193,30 +200,30 @@ func TestProAndFree(t *testing.T) {
 		if begin(t, q, appB).Allowed {
 			t.Fatal("pro app stops at 3")
 		}
-		// per-run shape: free 1 write / 1 recipient, Pro 10 / 200
-		free, _ := newQuota(st, env+"s", DefaultLimits, proSet{"carol": true})
-		fd, pd := begin(t, free, appA), begin(t, free, appB)
+		// per-run shape: Pro 10 writes / 200 recipients; a free run gets none
+		pq, _ := newQuota(st, env+"s", DefaultLimits, proSet{"carol": true})
+		fd, pd := begin(t, pq, appA), begin(t, pq, appB)
 		ctx := context.Background()
-		if w, _ := free.Writes(ctx, fd, 4); w.Allowed != 1 || w.Dropped != 3 || w.Block.Scope != ScopeRunWrites {
+		if w, _ := pq.Writes(ctx, fd, 4); w.Allowed != 0 || w.Dropped != 4 {
 			t.Fatalf("free writes: %+v", w)
 		}
-		if w, _ := free.Writes(ctx, pd, 12); w.Allowed != 10 || w.Dropped != 2 {
+		if w, _ := pq.Writes(ctx, pd, 12); w.Allowed != 10 || w.Dropped != 2 {
 			t.Fatalf("pro writes: %+v", w)
 		}
-		if r, _ := free.Recipients(ctx, fd, []string{"alice", "bob"}); len(r.Allowed) != 1 || r.Dropped[0].Block.Scope != ScopeRunRecipients {
+		if r, _ := pq.Recipients(ctx, fd, []string{"alice", "bob"}); len(r.Allowed) != 0 || len(r.Dropped) != 2 {
 			t.Fatalf("free recipients: %+v", r)
 		}
 		many := make([]string, 205)
 		for i := range many {
 			many[i] = "u" + strconv.Itoa(i)
 		}
-		if r, _ := free.Recipients(ctx, pd, many); len(r.Allowed) != 200 || len(r.Dropped) != 5 {
+		if r, _ := pq.Recipients(ctx, pd, many); len(r.Allowed) != 200 || len(r.Dropped) != 5 {
 			t.Fatalf("pro recipients: %d %d", len(r.Allowed), len(r.Dropped))
 		}
-		if n, b := free.ScheduledRules(PlanFree, 2); n != 1 || b.Scope != ScopeScheduledRules {
-			t.Fatalf("scheduled free: %d %+v", n, b)
+		if n, b := pq.ScheduledRules(PlanNone, 2); n != 0 || b.Scope != ScopeNeedsPro {
+			t.Fatalf("scheduled without Pro: %d %+v", n, b)
 		}
-		if n, b := free.ScheduledRules(PlanPro, 5); n != 5 || b != nil {
+		if n, b := pq.ScheduledRules(PlanPro, 6); n != 5 || b.Scope != ScopeScheduledRules {
 			t.Fatalf("scheduled pro: %d %+v", n, b)
 		}
 	})
@@ -249,7 +256,7 @@ func TestAnonymousAndSharedNeedPlan(t *testing.T) {
 
 func TestZeroDisablesCounter(t *testing.T) {
 	stores(t, func(t *testing.T, st ratelimit.Store, env string) {
-		q, _ := newQuota(st, env, Limits{}, nil)
+		q, _ := newQuota(st, env, Limits{}, everyonePro{})
 		for range 5 {
 			d := begin(t, q, appA)
 			if !d.Allowed || !d.Charge.Empty() {
@@ -350,7 +357,7 @@ func (failing) Refund(context.Context, []ratelimit.Counter, int, time.Time) erro
 
 func TestFirestoreDownCountsInMemory(t *testing.T) {
 	var buf bytes.Buffer
-	q, _ := newQuota(failing{}, "test", Limits{AppExecFree: 2}, nil)
+	q, _ := newQuota(failing{}, "test", Limits{AppExecPro: 2}, everyonePro{})
 	q.Logger = slog.New(slog.NewJSONHandler(&buf, nil))
 	d := begin(t, q, appA)
 	if !d.Allowed || len(d.Charge.Parts) != 1 || !d.Charge.Parts[0].Memory {
@@ -372,7 +379,7 @@ func TestFirestoreDownCountsInMemory(t *testing.T) {
 }
 
 func TestNearLimit(t *testing.T) {
-	q, _ := newQuota(nil, "test", Limits{AppExecFree: 5}, nil)
+	q, _ := newQuota(nil, "test", Limits{AppExecPro: 5}, everyonePro{})
 	for i := range 3 {
 		if begin(t, q, appA).NearLimit {
 			t.Fatalf("run %d near", i)
@@ -433,5 +440,44 @@ func TestUsageLog(t *testing.T) {
 	}
 	if EstimateCostUSD(Usage{Outcome: OutcomeSkippedQuota}) != 0 {
 		t.Fatal("skipped run costs nothing")
+	}
+}
+
+// PRO_GATE_MODE: log and off run a free creator's private rules on the free
+// plan as before #316 (log also writes pro_gate.would_block); shared data
+// needs Pro in every mode (#338).
+func TestProGateModes(t *testing.T) {
+	shared := Run{AppID: "x", CreatorUID: "free-1", Shared: true, Attempt: 1}
+	for _, mode := range []paid.Mode{paid.ModeEnforce, paid.ModeLog, paid.ModeOff} {
+		var buf bytes.Buffer
+		c := &clock{t: time.Date(2026, 11, 6, 23, 0, 0, 0, ratelimit.JST)}
+		q := New(Config{Limits: DefaultLimits, Env: "test", Now: c.now, ProMode: mode}, ratelimit.NewMemoryClock(c.now), proSet{})
+		q.Logger = slog.New(slog.NewJSONHandler(&buf, nil))
+		d := begin(t, q, appA)
+		logged := strings.Count(buf.String(), `"msg":"pro_gate.would_block"`)
+		switch mode {
+		case paid.ModeEnforce:
+			if d.Allowed || d.Block.Scope != ScopeNeedsPro || logged != 1 {
+				t.Fatalf("enforce: %+v (logs %d)", d, logged)
+			}
+		case paid.ModeLog:
+			if !d.Allowed || d.Plan != PlanFree || logged != 1 || !strings.Contains(buf.String(), `"where":"runner"`) {
+				t.Fatalf("log: %+v %s", d, buf.String())
+			}
+		case paid.ModeOff:
+			if !d.Allowed || d.Plan != PlanFree || logged != 0 {
+				t.Fatalf("off: %+v (logs %d)", d, logged)
+			}
+		}
+		if d := begin(t, q, shared); d.Allowed || d.Block.Scope != ScopeSharedNeedsPro {
+			t.Fatalf("%s shared: %+v", mode, d)
+		}
+	}
+	cfg, err := ConfigFromEnv(func(k string) string { return map[string]string{"PRO_GATE_MODE": "log"}[k] })
+	if err != nil || cfg.ProMode != paid.ModeLog {
+		t.Fatalf("env: %+v %v", cfg.ProMode, err)
+	}
+	if _, err := ConfigFromEnv(func(k string) string { return map[string]string{"PRO_GATE_MODE": "maybe"}[k] }); err == nil {
+		t.Fatal("bad PRO_GATE_MODE")
 	}
 }

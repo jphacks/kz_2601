@@ -3,6 +3,8 @@ package quota
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 )
 
 // Limits are the daily counters (units per JST day) and the per-run shape
@@ -39,9 +41,15 @@ var DefaultLimits = Limits{
 }
 
 // ConfigFromEnv reads RUNNER_LIMIT_* and RUNNER_GLOBAL_DAILY (unset =
-// DefaultLimits; 0 disables) and APP_ENV, like ratelimit.ConfigFromEnv.
+// DefaultLimits; 0 disables), APP_ENV and PRO_GATE_MODE, like
+// ratelimit.ConfigFromEnv.
 func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	cfg := Config{Limits: DefaultLimits, Env: getenv("APP_ENV")}
+	mode, err := paid.ModeFromEnv(getenv) // PRO_GATE_MODE (#316)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.ProMode = mode
 	l := &cfg.Limits
 	fields := []struct {
 		key string

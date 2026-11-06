@@ -106,7 +106,9 @@ func unshared(t *testing.T, raw []byte) []byte {
 
 type fakePro map[string]bool
 
-func (p fakePro) IsPro(_ context.Context, uid string) bool { return p[uid] }
+// IsPro: the key "*" makes everyone Pro (the default of the harness: server
+// rules run only for Pro creators, #316).
+func (p fakePro) IsPro(_ context.Context, uid string) bool { return p[uid] || p["*"] }
 
 type oldAccounts struct{}
 
@@ -186,7 +188,7 @@ func newHarness(t *testing.T, st runnerStore, sfx string, opts options) *harness
 		opts.limits(&lim)
 	}
 	if opts.pro == nil {
-		opts.pro = fakePro{}
+		opts.pro = fakePro{"*": true}
 	}
 	h.pro = opts.pro
 	q := quota.New(quota.Config{Limits: lim, Env: env}, nil, opts.pro)
@@ -592,6 +594,36 @@ func TestRunnerNotifyConsent(t *testing.T) {
 		}
 		if out := h.logs.String(); !strings.Contains(out, `"no_consent":1`) {
 			t.Fatalf("no_consent not counted: %s", out)
+		}
+	})
+}
+
+// #316: server rules are a Pro feature, private apps included. A creator
+// without Pro (or whose Pro lapsed) keeps the app and its rules, but nothing
+// runs: skipped_plan, nothing written, nothing sent.
+func TestRunnerPrivateNeedsPro(t *testing.T) {
+	stores(t, options{pro: fakePro{}}, func(t *testing.T, h *harness) {
+		id, uid := "RUN-FREE"+h.sfx, "uid-free-owner"+h.sfx
+		h.tokens[uid] = []string{"tok-free"}
+		_, project, _ := h.privateTodo(id, uid)
+		if res := h.tick(); res.Done != 1 {
+			t.Fatalf("tick: %+v", res)
+		}
+		done := h.oneEvent(id)
+		if done.Outcome != quota.OutcomeSkippedPlan || done.RuleOutcomes["on_task"] != quota.OutcomeSkippedPlan {
+			t.Fatalf("event: %+v", done)
+		}
+		if n := len(h.records(store.PrivateRecords(uid, id, "log"))); n != 0 {
+			t.Fatalf("logs written without Pro: %d", n)
+		}
+		if c := num(h.record(store.PrivateRecords(uid, id, "project"), project).Data["count"]); c != 0 {
+			t.Fatalf("count without Pro: %v", c)
+		}
+		if p := h.sender.Pushes(); len(p) != 0 {
+			t.Fatalf("pushes without Pro: %+v", p)
+		}
+		if !strings.Contains(h.logs.String(), `"limit":"`+quota.ScopeNeedsPro+`"`) {
+			t.Fatalf("runner.usage limit: %s", h.logs.String())
 		}
 	})
 }

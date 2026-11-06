@@ -59,6 +59,9 @@ type Error struct {
 	Code           string
 	Message        string
 	CurrentVersion int // set on 409
+	// Details is error.details when it has more than currentVersion
+	// (402 pro_required: features, #316).
+	Details map[string]any
 }
 
 func (e *Error) Error() string {
@@ -152,6 +155,9 @@ func (h *HTTP) do(ctx context.Context, method, path string, headers map[string]s
 		}
 		if v, ok := e.Error.Details["currentVersion"].(float64); ok {
 			ae.CurrentVersion = int(v)
+		}
+		if f, ok := e.Error.Details["features"]; ok {
+			ae.Details = map[string]any{"features": f}
 		}
 		return ae
 	}

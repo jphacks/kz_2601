@@ -23,6 +23,9 @@ type Service struct {
 	Environments []string
 	Now          func() time.Time
 	Log          *slog.Logger
+	// Changed is called after POST /v1/me/entitlements/apple stored a
+	// transaction (ProChecker.Forget: a purchase counts at once, #316).
+	Changed func(uid string)
 }
 
 func (s *Service) now() time.Time {

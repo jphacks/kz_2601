@@ -42,5 +42,7 @@ final class AITextGateTests: XCTestCase {
         // #511: 一時停止は上限と別の文言
         XCTAssertEqual(HTTPAIClient.textError(.server(status: 503, code: "ai_paused", message: "paused")) as? AITextError,
                        .failed("AI を一時的に止めています。しばらくしてからもう一度お試しください"))
+        // #316: サーバーも Pro を確かめる。402 は課金画面へ(needsPro)
+        XCTAssertEqual(HTTPAIClient.textError(.server(status: 402, code: "pro_required", message: "this needs Tailor It Pro: onlineAI")) as? AITextError, .needsPro)
     }
 }
