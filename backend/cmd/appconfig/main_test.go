@@ -293,3 +293,19 @@ func TestNewAuthedOrder(t *testing.T) {
 		})
 	}
 }
+
+// GET /health names the environment and build through the full chain (#290).
+func TestHealthReportsEnv(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	t.Setenv("GIT_SHA", "0123456789abcdef")
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "p")
+	rec := httptest.NewRecorder()
+	testHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusOK {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	if body["status"] != "ok" || body["env"] != "prod" || body["firestoreDatabase"] != "(default)" || body["version"] != "0123456" {
+		t.Fatalf("%v", body)
+	}
+}
