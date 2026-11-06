@@ -15,6 +15,7 @@ public struct ScreenView: View {
         if let screen = rt.dsl.screen(route.screen) {
             let ctx = RenderContext(route: route, form: form, locals: locals)
             GridScreenLayout(screen: screen, ctx: ctx)
+                .environment(\.dslNestingDepth, 0) // 部品から開いたシートの画面も 0 段から数える
                 .background(RenderTheme.Colors.canvas)
                 .modifier(FormSaveBar(screen: screen, ctx: ctx)) // saveRecord は画面下の固定バーへ(#89)
                 .modifier(PublicFormNotice(screen: screen)) // #253 公開の entity のフォームに「誰でも見られます」

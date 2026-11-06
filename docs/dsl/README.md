@@ -231,6 +231,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | フォールバック(`area` 無し) | 従来どおり**上から積む**。同一画面で混在した場合は「`area` で使われた**最終行の次の行**から、全幅で上から順に積む」(決定的・LLM が配置を出し損ねても崩れない)。`area` が 1 つも無ければ 1 行目から積む |
 | Container 内(#81) | 子は既定で積む。**card / section / vstack だけ**は子にも `area` を付けられ、Container の中身の矩形を**ローカルグリッド**(A1 = Container の左上・横 6 列 = 中身の幅 ÷ 6・行は Container 自身の `area` の行数まで)として配置する。ルール: 子の**全部に付けるか全部付けないか**(一部だけはエラー)/ 子同士の重なり禁止 / 行は Container の行数以内(Container が `area` 無しで積まれている時は 48 行まで)/ **入れ子は 1 段まで**(hstack / grid / carousel / disclosure の子と孫には付けない)。用途は「カードの中で 2 列に並べる」(stat 2 枚・ボタン 2 つ)だけ。iOS: 通常画面では中身の高さ ÷ 子が使う最終行 を 1 行とし `GridCell` を再利用して絶対配置。フォーム画面(`FormFlowLayout`)と `area` 無しで積まれた Container の中では横位置と幅だけ効かせ、高さは中身なり(#139 の方針) |
 | タブとの関係 | グリッドは**タブ内の各 Screen の中身**の配置。直交する概念で、タブの有無に関係なく同じ |
+| 上限(極端な値) | `area` の行は 48 まで・入れ子は 2 段(Screen > Container > Leaf)まで。どちらも backend が断る。iOS も二重に守り、48 行を超える行は 48 に丸め、8 段より深い `children` は読まず描かない(空の枠) |
 | iOS 実装 | `GridScreenLayout`: `GeometryReader` で `cellW = (幅-24)/6`、`cellH = (高さ-24)/12` を算出し、`area` 子を `.frame(width: colSpan*cellW-8, height: rowSpan*cellH-8).offset(...)` で絶対配置。`voiceInput` 画面(初期状態)は非スクロール |
 
 例(家計簿 home): 合計カード `A1:F2`・最近の支出(list・セル内スクロール) `A3:F10`・追加ボタン `D11:F12`。散歩メモ home: 今日 `A1:C2` / ぜんぶ `D1:F2` の 2 枚並び + 一覧 `A3:F12`。
@@ -411,7 +412,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 
 ### 3.12 serverRules = サーバーの自動の動き(#340・M4)
 
-「誰かが出欠をつけたら、予定を作った人に通知」のような、**端末を開いていない人にも届く動き**をアプリのトップの `serverRules[]` に宣言する(方式 A = 宣言だけ・AI がコードを書かない。設計は `docs/decisions/336`〜`339`)。**iOS は描画しない**(未知のキーとして無視する)。動かすのはサーバーの runner(#341・#342)で、この PR の時点ではスキーマと検証だけ。生成用スキーマ(`ai.GenerationSchema()`)からは外してあり、AI が書くのは #343 から。
+「誰かが出欠をつけたら、予定を作った人に通知」のような、**端末を開いていない人にも届く動き**をアプリのトップの `serverRules[]` に宣言する(方式 A = 宣言だけ・AI がコードを書かない。設計は `docs/decisions/336`〜`339`)。**iOS は描画しない**(未知のキーとして無視する)。動かすのはサーバーの runner(#341・#342)。
 
 ```json
 {"id":"notify_rsvp","on":{"record":"created","entity":"rsvps"},
@@ -436,6 +437,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - 共有データに効くのは作成者の公開 DSL(`apps_public/{appId}`)の宣言だけ。参加者が自分のコピーを書き換えても効かない(#337・runner の側で守る)。
 - 人が読める説明は `App.DescribeServerRule`(例: 「出欠」が作られた時(条件に合えば)、「予定」を作った人に通知・「予定」の「参加の数」を数える)。「このアプリの自動の動き」の一覧(#347)で使う。
 - 古い iOS: `AppDSL` はトップの未知キーを読まないので、`serverRules` があっても今までどおり開ける。
+- AI の生成(#343): 生成用スキーマ(`ai.GenerationSchema()`)には入れず、依頼が自動の動き(通知・定期・数える など)を含む時だけ、UI の生成の後に別の小さな呼び出し(`backend/internal/ai/server_rules_pass.go`・専用スキーマ `ServerRulesGenerationSchema()`・`createRecord` / `updateRecord` の `values` はそこだけ `[{field, value}]` の配列)で `serverRules` 全体を書く。結果は `Validate()` を通し、通らなければ問題を添えて再生成、最後まで通らなければルール無しで保存して summary で断る。作ったルールは `DescribeServerRule` の文で summary に出る。`AI_SERVER_RULES=1` の時だけ動く(既定は無効)。
 
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 

@@ -71,11 +71,16 @@ type Config struct {
 	Quota *quota.Quota
 	// Sender: nil = notify.LogSender.
 	Sender notify.Sender
-	// Tokens: nil = nobody has a device (the token store is #269).
+	// Tokens: nil = the devices in the store (users/{uid}/devices, #269)
+	// whose environment is PushEnvironment, read through the run's handle.
 	Tokens notify.TokenReader
-	// Consent / Age: nil = notify's defaults (no consent; age unknown).
+	// PushEnvironment: the APNs environment Sender sends to ("" = production).
+	PushEnvironment string
+	// Consent: nil = the consents in the store (users/{uid}/notifyConsent,
+	// #339) through the run's handle; none stored = not agreed.
 	Consent notify.Consent
-	Age     notify.AccountAge
+	// Age: nil = notify's default (age unknown).
+	Age notify.AccountAge
 	// Paused (RUNNER_PAUSED): events are finished as skipped_paused, never kept for later.
 	Paused func() bool
 	// NotifyPaused (RUNNER_NOTIFY_PAUSED): rules run and write, notifications
@@ -110,8 +115,8 @@ func New(cfg Config) (*Runner, error) {
 	if cfg.Sender == nil {
 		cfg.Sender = notify.LogSender{Logger: cfg.Logger}
 	}
-	if cfg.Tokens == nil {
-		cfg.Tokens = notify.MemoryTokens{}
+	if cfg.PushEnvironment == "" {
+		cfg.PushEnvironment = store.DeviceProduction
 	}
 	if cfg.Paused == nil {
 		cfg.Paused = func() bool { return false }

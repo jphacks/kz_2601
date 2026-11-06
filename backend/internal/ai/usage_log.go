@@ -17,13 +17,14 @@ const UsageEvent = "ai.usage"
 
 // Operation names in the ai.usage log, set by the call site via WithOperation.
 const (
-	OpGenerate  = "generate"   // create turn: full DSL
-	OpPatch     = "patch"      // edit turn: JSON Patch
-	OpLogic     = "logic"      // calculations pass (#100)
-	OpChat      = "chat"       // clarify turn
-	OpChatFirst = "chat_first" // first chat turn that may already build
-	OpText      = "text"       // aiButton text generation (#417)
-	OpUnknown   = "unknown"    // unlabeled call (eval/smoke tools)
+	OpGenerate    = "generate"     // create turn: full DSL
+	OpPatch       = "patch"        // edit turn: JSON Patch
+	OpLogic       = "logic"        // calculations pass (#100)
+	OpServerRules = "server_rules" // server-rules pass (#343)
+	OpChat        = "chat"         // clarify turn
+	OpChatFirst   = "chat_first"   // first chat turn that may already build
+	OpText        = "text"         // aiButton text generation (#417)
+	OpUnknown     = "unknown"      // unlabeled call (eval/smoke tools)
 )
 
 type operationKey struct{}

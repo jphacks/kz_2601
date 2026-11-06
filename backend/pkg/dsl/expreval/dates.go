@@ -195,8 +195,8 @@ func week(now time.Time, loc *time.Location) (time.Time, time.Time) {
 	return start, addDays(start, 7, loc)
 }
 
-// timeOfDay is ExprEvaluator.timeOfDay: "HH:mm" / "H:mm" / "HH:mm:ss" (up to
-// "24:00") to seconds after 0:00.
+// timeOfDay is ExprEvaluator.timeOfDay: "HH:mm" / "H:mm" / "HH:mm:ss"
+// (00:00 to 23:59:59) to seconds after 0:00.
 func timeOfDay(s string) (float64, bool) {
 	s = strings.TrimFunc(s, func(r rune) bool { return r == '\t' || unicode.Is(unicode.Zs, r) })
 	parts := strings.Split(s, ":")
@@ -218,7 +218,7 @@ func timeOfDay(s string) (float64, bool) {
 	if len(parts) == 3 {
 		sec = atoi(parts[2])
 	}
-	if h > 24 || m > 59 || sec > 59 || (h == 24 && (m != 0 || sec != 0)) {
+	if h > 23 || m > 59 || sec > 59 {
 		return 0, false
 	}
 	return float64(h*3600 + m*60 + sec), true

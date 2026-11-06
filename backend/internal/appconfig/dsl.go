@@ -116,16 +116,19 @@ func (h *Handler) putDSL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	raw := compact(body.DSL)
+	pub, err := h.commitPublish(r, id, app, true)
+	if err != nil {
+		fail(w, err)
+		return
+	}
 	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
-		BaseVersion: base, DSL: raw, Name: app.App.Name, Source: normalizeSource(body.Source, "full"),
+		BaseVersion: base, DSL: raw, Name: app.App.Name, Source: normalizeSource(body.Source, "full"), Publish: pub,
 		Events: h.rulesChanged(r, id, prev.DSL, app),
 	})
 	if err != nil {
 		fail(w, mapStoreErr(err, "app"))
 		return
 	}
-	h.claim(r, id)
-	h.publish(r, id, app, raw, v.Version)
 	w.Header().Set("ETag", etag(v.Version))
 	httpx.WriteJSON(w, http.StatusCreated, toSummary(v))
 }
@@ -172,16 +175,19 @@ func (h *Handler) patchDSL(w http.ResponseWriter, r *http.Request) {
 		fail(w, invalidDSL(err))
 		return
 	}
+	pub, err := h.commitPublish(r, id, app, true)
+	if err != nil {
+		fail(w, err)
+		return
+	}
 	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
-		BaseVersion: base, DSL: next, Name: app.App.Name, Patch: ops, Source: normalizeSource(src, "patch"),
+		BaseVersion: base, DSL: next, Name: app.App.Name, Patch: ops, Source: normalizeSource(src, "patch"), Publish: pub,
 		Events: h.rulesChanged(r, id, cur.DSL, app),
 	})
 	if err != nil {
 		fail(w, mapStoreErr(err, "app"))
 		return
 	}
-	h.claim(r, id)
-	h.publish(r, id, app, next, v.Version)
 	w.Header().Set("ETag", etag(v.Version))
 	httpx.WriteJSON(w, http.StatusCreated, dslEnvelope{AppID: id, Version: v.Version, DSL: v.DSL, Source: v.Source, CreatedAt: &v.CreatedAt})
 }
@@ -273,17 +279,20 @@ func (h *Handler) restoreVersion(w http.ResponseWriter, r *http.Request) {
 		fail(w, invalidDSL(err))
 		return
 	}
+	pub, err := h.commitPublish(r, id, app, true)
+	if err != nil {
+		fail(w, err)
+		return
+	}
 	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
 		BaseVersion: cur.CurrentVersion, DSL: target.DSL, Name: app.App.Name,
-		Source: &store.Source{Kind: "restore", Mode: "full", RestoredFrom: n},
+		Source: &store.Source{Kind: "restore", Mode: "full", RestoredFrom: n}, Publish: pub,
 		Events: h.rulesChanged(r, id, cur.DSL, app),
 	})
 	if err != nil {
 		fail(w, mapStoreErr(err, "app"))
 		return
 	}
-	h.claim(r, id)
-	h.publish(r, id, app, target.DSL, v.Version)
 	w.Header().Set("ETag", etag(v.Version))
 	httpx.WriteJSON(w, http.StatusCreated, restoreResponse{versionSummary: toSummary(v), DSL: v.DSL})
 }

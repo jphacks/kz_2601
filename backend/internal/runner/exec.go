@@ -169,6 +169,11 @@ func (r *Runner) appState(ctx context.Context, h *scope.Handle, ev store.OutboxE
 	if err != nil {
 		return nil, "", ReasonAppDeleted, nil
 	}
+	// sharing withdrawn (the entity left the published DSL or is no longer
+	// shared): queued shared triggers are dropped, whatever the version (#337)
+	if ent := current.EntityByID(ev.Entity); h.Shared() && (ent == nil || !ent.IsShared()) {
+		return nil, "", ReasonRuleRemoved, nil
+	}
 	return current, creator, "", nil
 }
 
@@ -311,12 +316,20 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		}
 	}
 
-	resolver, err := notify.NewResolver(notify.Config{Directory: h, Accounts: h, Consent: r.cfg.Consent, Age: r.cfg.Age,
+	var consent notify.Consent = h
+	if r.cfg.Consent != nil {
+		consent = r.cfg.Consent
+	}
+	resolver, err := notify.NewResolver(notify.Config{Directory: h, Accounts: h, Consent: consent, Age: r.cfg.Age,
 		Limiter: recipientLimiter{q: r.cfg.Quota, dec: dec, charged: charged}})
 	if err != nil {
 		return fail(err)
 	}
-	disp := notify.Dispatcher{Tokens: r.cfg.Tokens, Sender: r.cfg.Sender}
+	var tokens notify.TokenReader = handleTokens{h: h, env: r.cfg.PushEnvironment}
+	if r.cfg.Tokens != nil {
+		tokens = r.cfg.Tokens
+	}
+	disp := notify.Dispatcher{Tokens: tokens, Sender: r.cfg.Sender}
 	for _, n := range plan.Notifies {
 		key := markKey(ev, rule, n.Action)
 		done, err := h.Marked(ctx, key)
@@ -341,6 +354,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		if err != nil {
 			return fail(err)
 		}
+		r.dropUnregistered(ctx, h, out.Unregistered)
 		if out.Retryable {
 			return fail(errSendRetry)
 		}
@@ -426,6 +440,28 @@ func triggerName(kind string) string {
 		return quota.TriggerSchedule
 	}
 	return quota.TriggerRecordCreated
+}
+
+// handleTokens reads device tokens through the run's handle (#337), keeping
+// those of the APNs environment the runner sends to.
+type handleTokens struct {
+	h   *scope.Handle
+	env string
+}
+
+// Tokens implements notify.TokenReader.
+func (t handleTokens) Tokens(ctx context.Context, uid string) ([]string, error) {
+	return t.h.DeviceTokens(ctx, uid, t.env)
+}
+
+// dropUnregistered deletes the tokens APNs rejected as unregistered (410). A
+// failure is logged only: the next send to that token gets 410 again.
+func (r *Runner) dropUnregistered(ctx context.Context, h *scope.Handle, toks []notify.DeviceToken) {
+	for _, t := range toks {
+		if err := h.DropDeviceToken(ctx, t.UID, t.Token); err != nil {
+			r.cfg.Logger.WarnContext(ctx, "runner: unregistered device token not deleted", slog.Any("error", err))
+		}
+	}
 }
 
 // recipientLimiter adapts quota.Recipients to notify.RecipientLimiter.

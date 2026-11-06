@@ -18,6 +18,6 @@ apps_public/{appId}                                   # 公開 DSL: {ownerUid, n
 | update / delete | 本人 | `author == uid` のみ(他人のレコードは **403 forbidden**) |
 | delete all(`?confirm=true`) | 全件 | **自分の投稿だけ**削除 |
 | `GET /records` | 従来どおり | 各レコードに `author`/`authorName` を含む。`filterField=author&filterOp=eq&filterValue=<uid>` で「自分の投稿」 |
-| DSL | `users/{uid}/apps/{appId}` | 作成者の `PUT/PATCH /dsl`・`POST /apps`・restore 時に public entity を 1 つでも含めば `apps_public/{appId}` に複製(所有者=最初に公開した uid・他人は上書き不可)。他ユーザーの `GET /dsl` は自分の下に無ければ公開 DSL を複製して version 1 を作る(=インストール) |
+| DSL | `users/{uid}/apps/{appId}` | 作成者の `PUT/PATCH /dsl`・`POST /apps`・restore 時に public entity を 1 つでも含めば `apps_public/{appId}` に複製(所有者=最初に公開した uid・他人は上書き不可)。既存のアプリへのコミット(`PUT/PATCH /dsl`・restore・名前の変更)は**コミットと同じトランザクションで**複製を更新し、複製の版はいつも作成者の最新の版と同じ(複製に失敗したらコミットごと失敗する)。複製が既にあれば、共有の entity が無くなったコミットでも更新する(取り下げた共有の決まりと自動の動きが残らない。共有レコードは消さず、参加者からは見えなくなる。共有に戻すとまた見える)。他ユーザーの `GET /dsl` は自分の下に無ければ公開 DSL を複製して version 1 を作る(=インストール) |
 
 実装: `store.RecordSet{UID, AppID, Entity, Public}` でコレクションを選ぶ(`store.PrivateRecords` / `store.PublicRecords`)。`store.PublishApp` / `GetPublicApp` が公開 DSL。handler は `appconfig/records.go` の `recordSet()` と `ownRecord()`(403 判定)。レコード検証は従来どおり呼び出し側ユーザーの現行 DSL で行うので、インストール後に各自が entity を変えても他人のレコードは消えない(スキーマレス)。entity の共有の設定(`scope`・`edit`・`marks`)だけは、作成者(`app_owners`)が公開した DSL(`apps_public/{appId}`)のものを使う。作成者は自分の DSL のまま。自分の DSL では shared / public なのに作成者の公開 DSL に無い entity は **403 `forbidden` / `details.reason: not_published`**。シェアの作成と events の参加者の確かめも同じ判定(`appconfig/record_scope.go`)。

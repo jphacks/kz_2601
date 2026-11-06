@@ -85,6 +85,25 @@ func withoutRules(t *testing.T, raw []byte) []byte {
 	return out
 }
 
+// unshared makes every entity private and keeps only notify_rsvp's
+// increment (the rest is not allowed on private data).
+func unshared(t *testing.T, raw []byte) []byte {
+	t.Helper()
+	var a map[string]any
+	if err := json.Unmarshal(raw, &a); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range a["entities"].([]any) {
+		delete(e.(map[string]any), "scope")
+	}
+	a["serverRules"] = []any{map[string]any{
+		"id": "notify_rsvp", "on": map[string]any{"record": "created", "entity": "rsvps"},
+		"do": []any{map[string]any{"increment": map[string]any{"ref": "event", "field": "yes_count"}}},
+	}}
+	out, _ := json.Marshal(a)
+	return out
+}
+
 type fakePro map[string]bool
 
 func (p fakePro) IsPro(_ context.Context, uid string) bool { return p[uid] }
@@ -134,6 +153,8 @@ type options struct {
 	pro    fakePro
 	age    notify.AccountAge
 	limits func(*quota.Limits)
+	// storeDevices: read devices and consents from the store (#269) instead of h.tokens.
+	storeDevices bool
 }
 
 func stores(t *testing.T, opts options, f func(t *testing.T, h *harness)) {
@@ -171,10 +192,14 @@ func newHarness(t *testing.T, st runnerStore, sfx string, opts options) *harness
 	q := quota.New(quota.Config{Limits: lim, Env: env}, nil, opts.pro)
 	logger := slog.New(slog.NewJSONHandler(h.logs, nil))
 	q.Logger = logger
-	r, err := runner.New(runner.Config{
+	cfg := runner.Config{
 		Env: env, Store: st, Quota: q, Sender: h.sender, Tokens: h.tokens, Age: opts.age,
 		Paused: func() bool { return h.paused }, NotifyPaused: func() bool { return h.notifyPaused }, Now: func() time.Time { return h.clock }, Logger: logger,
-	})
+	}
+	if opts.storeDevices {
+		cfg.Tokens = nil
+	}
+	r, err := runner.New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -474,6 +499,11 @@ func TestRunnerStops(t *testing.T) {
 			}},
 			{name: "rule removed", pro: true, want: runner.OutcomeSkippedStopped, stop: func(_, app, owner string) {
 				h.putDSL(owner, app, withoutRules(h.t, circleRules(h.t)))
+			}},
+			// the creator took every entity off sharing but kept the rule: the
+			// mirror follows the commit and the queued shared trigger is dropped
+			{name: "sharing withdrawn", pro: true, want: runner.OutcomeSkippedStopped, stop: func(_, app, owner string) {
+				h.putDSL(owner, app, unshared(h.t, circleRules(h.t)))
 			}},
 			{name: "creator deleted", pro: true, want: runner.OutcomeSkippedStopped, stop: func(_, _, owner string) {
 				if err := h.st.DeactivateUser(h.t.Context(), owner); err != nil {

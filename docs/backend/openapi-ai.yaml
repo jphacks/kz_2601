@@ -477,6 +477,16 @@ components:
                 attempts: { type: integer }
                 claudeMs: { type: integer }
                 problems: { type: array, items: { type: string }, description: 反映されなかった時の最後の検証エラー }
+            serverRules:
+              type: object
+              description: '#343。サーバーの自動の動き(serverRules)を書く別の呼び出しを実行した時だけ入る(env AI_SERVER_RULES=1 かつ依頼が通知・定期・数えるなどを含む時)'
+              properties:
+                applied: { type: boolean, description: serverRules が検証を通って変わった }
+                rules: { type: integer, description: 返した DSL のルールの数 }
+                attempts: { type: integer }
+                claudeMs: { type: integer }
+                declined: { type: string, description: 作れない依頼(外部への送信など)を断った 1 文。summary にも入る }
+                problems: { type: array, items: { type: string }, description: 反映されなかった時の最後の検証エラー }
             restricted:
               type: array
               items: { type: string }

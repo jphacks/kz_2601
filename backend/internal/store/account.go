@@ -15,6 +15,7 @@ type Accounts interface {
 	//   - every users/{uid}/apps/{appId} gets status "archived"
 	//   - shares/* owned by uid are revoked
 	//   - public_apps/* (the "探す" listings) owned by uid are taken down
+	//   - users/{uid}/devices/* are deleted (#337: pushes stop right away)
 	//
 	// Shared records uid posted (apps_public/...) are kept. Idempotent: the
 	// mark is written first, so a retry after a partial failure finishes the rest.

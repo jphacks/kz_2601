@@ -70,13 +70,14 @@ func main() {
 	claude.StructuredOutput = os.Getenv("CLAUDE_STRUCTURED_OUTPUT") == "1"
 	claude.Logger = logger // ai.usage JSON lines for the cost sink (#298)
 	svc := &ai.Service{
-		Claude:      claude,
-		Store:       store,
-		Model:       model,
-		CallTimeout: time.Duration(timeoutSec) * time.Second,
-		LogicPass:   os.Getenv("AI_LOGIC_PASS") == "1", // UI pass + calculations pass (#100)
-		LintRetry:   os.Getenv("AI_LINT_RETRY") == "1", // off: lint warnings are reported only
-		Logger:      claude.Logger,                     // ai.generate per request (#322)
+		Claude:          claude,
+		Store:           store,
+		Model:           model,
+		CallTimeout:     time.Duration(timeoutSec) * time.Second,
+		LogicPass:       os.Getenv("AI_LOGIC_PASS") == "1",   // UI pass + calculations pass (#100)
+		ServerRulesPass: os.Getenv("AI_SERVER_RULES") == "1", // server rules for automatic actions (#343)
+		LintRetry:       os.Getenv("AI_LINT_RETRY") == "1",   // off: lint warnings are reported only
+		Logger:          claude.Logger,                       // ai.generate per request (#322)
 		// clarify turn (#147): its own model/effort/thinking; empty = ai.DefaultChat*
 		ChatConfig: ai.ChatConfig{
 			Model:    os.Getenv("AI_CHAT_MODEL"),
