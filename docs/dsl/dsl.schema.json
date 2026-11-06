@@ -1884,7 +1884,7 @@
     "Area": {
       "type": "string",
       "pattern": "^[A-F][1-9][0-9]*:[A-F][1-9][0-9]*$",
-      "description": "Grid rectangle on the screen's implicit grid, spreadsheet style 'A1:C3' = top-left cell : bottom-right cell. Columns A-F (screen width / 6), rows 1..N (row height = visible height / 12; rows > 12 make the screen scroll). Siblings with area must not overlap (Go validator). Omit to stack below the grid (fallback). Inside a card / section / vstack (#81) children may also carry area on a local grid: A1 = the container's top-left, columns A-F = container width / 6, rows 1..(the container's own row count). Either every child of that container has area or none does (stack). Only one level: no area on children of hstack / grid / carousel / disclosure."
+      "description": "Grid rectangle on the screen's implicit grid, spreadsheet style 'A1:C3' = top-left cell : bottom-right cell. Columns A-F (screen width / 6), rows 1..48 (row height = visible height / 12; rows > 12 make the screen scroll). Siblings with area must not overlap (Go validator). Omit to stack below the grid (fallback). Inside a card / section / vstack (#81) children may also carry area on a local grid: A1 = the container's top-left, columns A-F = container width / 6, rows 1..(the container's own row count). Either every child of that container has area or none does (stack). Only one level: no area on children of hstack / grid / carousel / disclosure."
     },
     "Tab": {
       "type": "object",
