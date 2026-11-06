@@ -100,5 +100,7 @@ enum ErrorCopy {
     static var discard: String { L10n.tr("やめる") }
     static var dismiss: String { L10n.tr("閉じる") }
     static var signIn: String { L10n.tr("サインイン") }
+    static var signInApple: String { L10n.tr("Apple でサインイン") }
+    static var upgradePro: String { L10n.tr("Pro にする") }
     static var edit: String { L10n.tr("言い直す") }
 }

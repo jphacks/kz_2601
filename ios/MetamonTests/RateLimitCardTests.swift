@@ -25,7 +25,7 @@ final class RateLimitCardTests: XCTestCase {
         let info = RateLimitInfo(scope: .user, tier: "signed_in", limit: 60, remaining: 0, resetAt: reset)
         let c = try card(info)
         XCTAssertEqual(c.title, "今日はここまでです")
-        XCTAssertNil(c.primary, "もう一度では解けないので再試行ボタンは出さない")
+        XCTAssertEqual(c.primary, .upgradePro, "もう一度では解けないので再試行ではなく Pro の案内(M3)")
         XCTAssertEqual(c.secondary, .dismiss)
         let body = ErrorCopy.rateLimitedBody(info, timeZone: jst)
         XCTAssertEqual(body, "今日の上限(60回分)に達しました。10月26日 0:00からまた使えます")
@@ -45,6 +45,15 @@ final class RateLimitCardTests: XCTestCase {
         XCTAssertEqual(ErrorCopy.rateLimitedBody(global, timeZone: jst), "利用が集中したため、新しい生成を止めています。10月26日 0:00に再開します")
         let ip = RateLimitInfo(scope: .ip, tier: "anonymous", limit: 300, resetAt: reset)
         XCTAssertTrue(ErrorCopy.rateLimitedBody(ip, timeZone: jst).contains("サインイン"))
+    }
+
+    /// M3: 上限のカードに次の一手。匿名・同じネットワーク = Apple でサインイン、サインイン済み = Pro、Pro・全体の停止 = なし
+    func testRateLimitPrimaryIsTheNextStep() throws {
+        XCTAssertEqual(try card(RateLimitInfo(scope: .user, tier: "anonymous", limit: 30, resetAt: reset)).primary, .signInApple)
+        XCTAssertEqual(try card(RateLimitInfo(scope: .ip, tier: "anonymous", limit: 300, resetAt: reset)).primary, .signInApple)
+        XCTAssertEqual(try card(RateLimitInfo(scope: .user, tier: "signed_in", limit: 60, resetAt: reset)).primary, .upgradePro)
+        XCTAssertNil(try card(RateLimitInfo(scope: .user, tier: "pro", limit: 300, resetAt: reset)).primary)
+        XCTAssertNil(try card(RateLimitInfo(scope: .global, tier: "signed_in", limit: 3000, resetAt: reset)).primary)
     }
 
     func testChatOriginAlsoUsesTheCard() throws {

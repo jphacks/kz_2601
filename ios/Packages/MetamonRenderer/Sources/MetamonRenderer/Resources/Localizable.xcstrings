@@ -2347,6 +2347,23 @@
         }
       }
     },
+    "入力した内容を破棄しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard your changes?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力した内容を破棄しますか?"
+          }
+        }
+      }
+    },
     "全員" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3520,6 +3537,23 @@
         }
       }
     },
+    "破棄する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "破棄する"
+          }
+        }
+      }
+    },
     "移動手段" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3703,6 +3737,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "絞り込み: %@"
+          }
+        }
+      }
+    },
+    "編集を続ける" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep Editing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集を続ける"
           }
         }
       }
@@ -4485,6 +4536,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "閉じる"
+          }
+        }
+      }
+    },
+    "閉じると、入力した内容は保存されません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you close, what you entered won't be saved."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じると、入力した内容は保存されません。"
           }
         }
       }

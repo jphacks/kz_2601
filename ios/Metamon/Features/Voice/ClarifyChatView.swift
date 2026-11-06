@@ -60,6 +60,9 @@ struct ClarifyChatView: View {
                     if let paid = rt.paidConfirm {
                         PaidFeatureCard(confirmation: paid)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
+                    } else if rt.heldBuild != nil {
+                        HeldBuildCard() // H3: 無料枠切れで止めた。会話は残して「続きから作る」
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                     } else if !collapsesOffer {
                         suggestionChips
                         actionButton
@@ -338,6 +341,47 @@ struct ClarifyChatView: View {
 // MARK: - Parts
 
 #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
+/// 無料枠切れで止めた新規作成(H3)。会話はそのまま。「続きから作る」は同じ依頼で作る(枠が無ければ課金画面)。
+private struct HeldBuildCard: View {
+    @Environment(AppRuntime.self) private var rt
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            HStack(alignment: .top) {
+                Label(L10n.tr("今日の無料作成(\(rt.dailyFreeCreations)回)を使い切りました"), systemImage: "crown.fill")
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("held.headline")
+                Spacer(minLength: Theme.Spacing.sm)
+                Button { rt.dismissHeldBuild() } label: {
+                    Image(systemName: "xmark.circle.fill").font(.title3).foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.tr("閉じる"))
+                .accessibilityIdentifier("held.close")
+            }
+            Text(L10n.tr("会話はこのまま残っています。Tailor It Pro にすると、続きからすぐ作れます。明日になると、また無料で作れます。"))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button { Task { await rt.continueHeldBuild() } } label: {
+                Text(L10n.tr("続きから作る"))
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(Theme.brandGradient, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(rt.morphJob != nil)
+            .accessibilityIdentifier("held.continue")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .metamonCard()
+    }
+}
+
 /// 有料機能の確認カード(#77)。「〇〇には Tailor It Pro(¥500 / 月)が必要です」→ 購入して作る(= 課金画面・#414)/ この機能なしで作る。
 private struct PaidFeatureCard: View {
     @Environment(AppRuntime.self) private var rt

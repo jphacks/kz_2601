@@ -29,7 +29,8 @@ extension AppRuntime {
         showTutorial = false
     }
 
-    /// 初期画面から最初のアプリができた直後に 1 回だけ、要約カードが消えた頃に直し方の例を出す。
+    /// 初期画面から最初のアプリができた直後に 1 回だけ、直し方の例を出す。
+    /// 出す順番は `PostBuildNotice`(H7): 課金画面・要約バナー・確認が閉じてから `TutorialHost` が出す。
     func scheduleFirstEditHint(createdFromInitial: Bool) {
         guard let tutorial, tutorial.shouldShowEditHint(createdFromInitial: createdFromInitial) else { return }
         tutorial.markEditHintShown()
@@ -40,8 +41,8 @@ extension AppRuntime {
         }
     }
 
-    /// 要約カード(3〜6 秒)と重ならない待ち時間。
-    static let editHintDelaySeconds: Double = 6.5
+    /// 完成の切り替えが落ち着くまでの待ち(要約バナーとの重なりは順番で避ける・H7)。
+    static let editHintDelaySeconds: Double = 0.8
 
     /// 直し方の例のボタン: 発話シートを開く。
     func openVoiceFromEditHint() {

@@ -79,14 +79,15 @@ final class ProGate {
         quota.decide(used: usedToday, isPro: store.isPro, limitDisabled: !isEnforced)
     }
 
-    /// 新規作成の前に呼ぶ。枠切れなら上限シートを出して false(呼び出し側は送らない)。
-    /// 音声シートなど別のシートが閉じ終わるのを待ってから出す。
-    func admitNewApp() -> Bool {
+    /// 新規作成の前に呼ぶ。枠切れなら上限シートを出し、閉じるまで待つ。戻り値 = 作ってよいか(枠がある・買った)。
+    /// false なら呼び出し側は送らない(会話は残す・H3)。音声シートなど別のシートが閉じ終わるのを `after` だけ待ってから出す。
+    func admitNewApp(after delay: Duration = .milliseconds(450)) async -> Bool {
         usedToday = usage.used()
         guard decision == .blocked else { return true }
         print("[Metamon] IAP: daily free limit reached (\(usedToday)/\(quota.dailyFreeLimit)) → paywall")
-        Task { _ = await requestPro(.limitReached, after: .milliseconds(450)) }
-        return false
+        let bought = await requestPro(.limitReached, after: delay)
+        usedToday = usage.used()
+        return bought || decision != .blocked
     }
 
     /// 課金画面を出し、閉じるまで待つ。戻り値 = 閉じた時に Pro か(買った / 復元した)。Pro ならすぐ true。

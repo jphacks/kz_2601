@@ -30,6 +30,7 @@ extension AppRuntime {
         paidConfirmBusy = false
         guard pro, paidConfirm == confirmation else { return } // 買わなかった / 待っている間に閉じた・話し直した
         print("[Metamon] IAP: pro → build with paid features")
+        await proGate.store.serverSyncTask?.value // サーバーが Pro を知ってから作る(402 の後に買った時・H3)
         await runFromChat(confirmation.paidText)
     }
 

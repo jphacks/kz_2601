@@ -107,9 +107,9 @@ final class AppRuntime: DSLRuntime {
     @ObservationIgnored var onSessionExpired: (@MainActor () -> Void)?
     /// 今のユーザーが匿名か(#276: 引き継ぎの案内)。`MetamonApp` が `AuthSession` を結ぶ。nil は匿名でない扱い。
     @ObservationIgnored var isAnonymousUser: (@MainActor () -> Bool)?
-    /// 匿名ユーザーが初めてアプリを作った後に 1 回だけ出す「引き継ぎのためにサインイン」(#276・`AccountLinkPromptHost`)。
+    /// 匿名ユーザーが初めてアプリを作った次の起動で 1 回だけ出す「引き継ぎのためにサインイン」(#276・H7・`AccountLinkPromptHost`)。
     var showLinkPrompt = false
-    @ObservationIgnored var linkPromptDelay: Duration = .seconds(2.5)
+    @ObservationIgnored var linkPromptDelay: Duration = .seconds(1.5)
     /// 圏外で送れなかった発話を 1 件保留し、復帰で 1 回だけ送る。
     @ObservationIgnored private let deferredMorph: DeferredSend<String>
     @ObservationIgnored private var connectivityTask: Task<Void, Never>?
@@ -216,7 +216,15 @@ final class AppRuntime: DSLRuntime {
     var paidConfirmMessage: String?
     /// 課金の司令塔(既定は共有の 1 つ。テストで差し替える)
     @ObservationIgnored var proGate: ProGate = .shared
+    /// 無料枠切れで止めた新規作成(H3)。会話はそのまま残し、チャットに「続きから作る」を出す(`AppRuntime+HeldBuild.swift`)
+    var heldBuild: HeldBuild?
+    /// 共有の記録が入った版の課金画面を出すまでの間(H7: 要約バナーより先に課金の判断をしてもらう)
+    var paidGatePending = false
     #endif
+    /// 上限・402 で作らずに止めた時、create の会話を消さない(H3)。`runFromChat` が読んで戻す
+    @ObservationIgnored var keepChatAfterStop = false
+    /// 「最初から」で、これまでの会話も消すかの確認(M9)
+    var showRestartConfirm = false
 
     /// 生成直後の「個人の情報も公開されます」の確認(#253・nil = 出していない)。`Features/Privacy/AppRuntime+PublicData.swift`
     var publicDataPrompt: PublicDataPrompt?
@@ -264,6 +272,7 @@ final class AppRuntime: DSLRuntime {
             startSync()
         }
         noteRetention() // #482 起動時の DSL(モック・オフラインでは apply を通らない)
+        presentDeferredAccountLinkIfNeeded() // #276・H7 前の起動で最初のアプリを作っていたら引き継ぎの案内
         Task { await syncNotificationsNow() }
         #if DEBUG
         autoNavigateIfRequested() // `METAMON_AUTO_NAV`(#113)
@@ -516,7 +525,8 @@ final class AppRuntime: DSLRuntime {
         await sendMetered(text)
     }
 
-    /// 課金(#77): 新規作成(初期画面から)は 1 日の無料枠を消費する。枠切れなら上限シートを出して送らない。成功した時だけ数える。
+    /// 課金(#77): 新規作成(初期画面から)は 1 日の無料枠を消費する。枠切れなら上限シートを出し、買えば同じ依頼でそのまま作る。
+    /// 閉じたら送らず、会話を残して「続きから作る」を出す(H3・`holdBuild`)。成功した時だけ数える。
     /// 圏外の保留の自動送信・状態カードの「もう一度」もここを通す(#414: 枠を素通りしない)。
     /// 審査用ビルド(#450 G1)は端末で数えない。上限はサーバーの ratelimit だけ(429 は状態カードの「今日はここまでです」)。
     private func sendMetered(_ text: String) async {
@@ -524,7 +534,14 @@ final class AppRuntime: DSLRuntime {
         await send(text)
         #else
         let metered = dsl.isVoiceOnly
-        if metered, !proGate.admitNewApp() { showVoiceSheet = false; return }
+        if metered {
+            let wasOpen = showVoiceSheet
+            showVoiceSheet = false
+            guard await proGate.admitNewApp(after: .milliseconds(wasOpen ? 450 : 250)) else {
+                holdBuild(text)
+                return
+            }
+        }
         await send(text)
         if metered, !dsl.isVoiceOnly { proGate.recordNewApp() }
         #endif
@@ -569,7 +586,7 @@ final class AppRuntime: DSLRuntime {
             }
             remember(previous)
             apply(result.document) // withAnimation の中で morphJob = nil も行う
-            if previous.dsl.isVoiceOnly { offerAccountLinkIfNeeded() } // #276
+            if previous.dsl.isVoiceOnly { offerAccountLinkIfNeeded() } // #276 次の起動に予約(H7)
             noteChatApplied(version: result.document.version, summary: result.summary) // #210 反映の区切り
             notePublicPersonalData(result) // #253 公開の記録に個人の情報が入ったら確認
             startSync()
@@ -591,6 +608,7 @@ final class AppRuntime: DSLRuntime {
             interruptedByOffline = false
             print("[Metamon] morph failed: \(failure) (\(error))")
             withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
+            if case .rateLimited = failure { keepChatAfterStop = true } // H3・M3: 上限でも会話は消さない(カードから次の一手)
             await present(failure, transcript: text)
         }
     }
@@ -652,8 +670,34 @@ final class AppRuntime: DSLRuntime {
         case .signIn:
             withAnimation(.easeInOut(duration: 0.3)) { errorCard = nil }
             onSessionExpired?()
+        case .signInApple:
+            showLinkPrompt = true // 匿名の上限(M3): Apple に引き継ぐと上限が増える。カードは残す(サインイン後に「これでいく」)
+        case .upgradePro:
+            #if !APP_STORE_REVIEW
+            Task { await upgradeFromRateLimit(card) }
+            #else
+            break // 審査用の版はこのボタンを出さない(`ErrorPresentation.rateLimitPrimary`)
+            #endif
         }
     }
+
+    #if !APP_STORE_REVIEW
+    /// 上限のカードの「Pro にする」(M3)。買えば(サーバーが Pro を知ってから)同じ依頼で続ける。閉じたらカードのまま。
+    private func upgradeFromRateLimit(_ card: ErrorPresentation) async {
+        // 音声シートの中のカード(edit の対話)はシートの中から出す(根の課金画面はシートに隠れる)
+        guard await proGate.requestPro(.limitReached, placement: showVoiceSheet ? .chat : .root) else { return }
+        await proGate.store.serverSyncTask?.value
+        guard errorCard == card else { return } // 待っている間に閉じた・話し直した
+        withAnimation(.easeInOut(duration: 0.3)) { errorCard = nil }
+        if card.origin == .chat {
+            retryChat()
+        } else if isChatting, dsl.isVoiceOnly {
+            await runFromChat(card.transcript)
+        } else {
+            await sendMetered(card.transcript)
+        }
+    }
+    #endif
 
     /// 状態カードの副ボタン。やめる = 保留を取り消す、閉じる = カードを消す(発話は残らない)。
     func handle(_ secondary: ErrorPresentation.Secondary, of card: ErrorPresentation) {
@@ -1130,6 +1174,7 @@ final class AppRuntime: DSLRuntime {
             let isNew = recordId == nil
             records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: recordId, data: payload,
                                                     author: postAuthor(for: entity))
+            form.markClean() // 保存した内容は閉じても破棄の確認を出さない(M10)
             WidgetSnapshotWriter.write(dsl: dsl, records: records)
             #if !APP_STORE_REVIEW
             writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)

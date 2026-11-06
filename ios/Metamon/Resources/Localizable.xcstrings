@@ -834,6 +834,23 @@
         }
       }
     },
+    "Apple でサインイン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in with Apple"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple でサインイン"
+          }
+        }
+      }
+    },
     "Apple でサインインすると、作ったアプリとデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、作ったアプリに戻れません。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3091,6 +3108,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "これでいく: %@"
+          }
+        }
+      }
+    },
+    "これまでの会話と反映の記録を消すと、元に戻せません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Earlier conversations and change records can't be restored once cleared."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これまでの会話と反映の記録を消すと、元に戻せません。"
+          }
+        }
+      }
+    },
+    "これまでの会話も消す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Also clear earlier conversations"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これまでの会話も消す"
           }
         }
       }
@@ -6835,6 +6886,23 @@
         }
       }
     },
+    "今の会話だけ消す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear this conversation only"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今の会話だけ消す"
+          }
+        }
+      }
+    },
     "今の画面のスクショ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7039,6 +7107,23 @@
         }
       }
     },
+    "今日の無料作成(%lld回)を使い切りました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You've used today's free creations (%lld)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日の無料作成(%lld回)を使い切りました"
+          }
+        }
+      }
+    },
     "今日はここまでです" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7171,6 +7256,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "件"
+          }
+        }
+      }
+    },
+    "会話はこのまま残っています。Tailor It Pro にすると、続きからすぐ作れます。明日になると、また無料で作れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your conversation is still here. With Tailor It Pro you can continue right away. You can also create for free again tomorrow."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会話はこのまま残っています。Tailor It Pro にすると、続きからすぐ作れます。明日になると、また無料で作れます。"
           }
         }
       }
@@ -10082,6 +10184,23 @@
         }
       }
     },
+    "最初からにしますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start over?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最初からにしますか?"
+          }
+        }
+      }
+    },
     "最初の画面" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11387,6 +11506,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "終わりました"
+          }
+        }
+      }
+    },
+    "続きから作る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue building"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "続きから作る"
           }
         }
       }
