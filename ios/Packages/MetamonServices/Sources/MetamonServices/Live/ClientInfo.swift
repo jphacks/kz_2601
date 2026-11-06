@@ -33,5 +33,6 @@ public struct ClientInfo: Equatable, Sendable {
 
     func apply(to request: inout URLRequest) {
         for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
+        request.setValue(TimeZone.current.identifier, forHTTPHeaderField: "X-Time-Zone") // 定期のルールの時刻・「今日」の基準(#342)
     }
 }

@@ -35,6 +35,7 @@ App Store Review Guidelines 1.2 / 1.2.1(a)(利用者が作った内容を共有�
    - `record` → `apps_public/{appId}/entities/{entityId}/records/{recordId}`(`targetId` = `appId/entityId/recordId`)
 3. 規約(`docs/legal/terms.md`)の禁止事項に当たれば止める(`hide-listing` / `hide-app` / `delete-record` / `revoke-share`)。理由は作者が読む文で書く(例「性的な内容が含まれるため非公開にしました」)。
 4. `resolve <reportId>`(当たらなければ `-status dismissed`)。
+   - 自動の動き(通知)が絡む時は、先に通知・アプリを止める([incident-runbook.md 手順 F](../ops/incident-runbook.md#13-手順-f-悪用自動の動き)・`stop-app` / `pause-notify`)。24 時間で 3 人の通報があったアプリは、runner が通知を自動で一時停止している(`moderate stops -env prod` で見える)。
 5. 悪質な利用者は、Firebase Auth のコンソールでアカウントを無効にする(この仕組みには無い)。
 
 ## cmd/moderate の使い方

@@ -88,6 +88,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var title: String?          // section / chart
     public var spacing: String?        // none|small|medium|large
     public var children: [Component]
+    /// 読む・描く入れ子の段数の上限(スキーマは 2 段)。これより深い `children` は読まない(空の枠)。
+    /// 1 段のデコードが大きなスタックを使い、非同期処理のスレッド(512KB)では約 20 段(Debug は約 10 段)で落ちるため。
+    public static let maxNestingDepth = 8
 
     // text / button / inputs
     public var text: String?
@@ -241,7 +244,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         area = try? c.decodeIfPresent(String.self, forKey: .area)
         title = try? c.decodeIfPresent(String.self, forKey: .title)
         spacing = try? c.decodeIfPresent(String.self, forKey: .spacing)
-        children = (try? c.decode(Lossy<Component>.self, forKey: .children).wrappedValue) ?? []
+        let depth = decoder.codingPath.lazy.filter { $0.stringValue == Keys.children.stringValue }.count
+        children = depth + 1 < Self.maxNestingDepth ? (try? c.decode(Lossy<Component>.self, forKey: .children).wrappedValue) ?? [] : []
         text = try? c.decodeIfPresent(String.self, forKey: .text)
         style = try? c.decodeIfPresent(String.self, forKey: .style)
         align = try? c.decodeIfPresent(String.self, forKey: .align)

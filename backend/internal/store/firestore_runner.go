@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -138,13 +139,17 @@ func (f *Firestore) FinishOutbox(ctx context.Context, env, eventID string, attem
 }
 
 // RetryOutbox implements OutboxQueue.
-func (f *Firestore) RetryOutbox(ctx context.Context, env, eventID string, attempt int, at time.Time, lastError string) error {
+func (f *Firestore) RetryOutbox(ctx context.Context, env, eventID string, attempt int, at time.Time, lastError string, charge json.RawMessage) error {
 	return f.leased(ctx, env, eventID, attempt, func() []firestore.Update {
-		return []firestore.Update{
+		u := []firestore.Update{
 			{Path: "availableAt", Value: at},
 			{Path: "status", Value: OutboxRetry},
 			{Path: "lastError", Value: lastError},
 		}
+		if charge != nil {
+			u = append(u, firestore.Update{Path: "chargeJson", Value: string(charge)})
+		}
+		return u
 	})
 }
 
