@@ -8,7 +8,19 @@ import MetamonServices
 /// 使用中のアプリを消す時は、残りのうち最新のアプリ(無ければ初期画面)に **先に** 切り替えてからサーバーを呼ぶ
 /// (消した後に同期のポーリング `GET /dsl` が走ると、サーバーが同じ appId を空のアプリとして作り直すため)。
 extension AppRuntime {
+    /// アプリ・アカウントを削除できるか。生成中(作る・直す)は削除しない(生成の結果が消したアプリ・アカウントに書かれるのを防ぐ)。
+    var canDelete: Bool { !isMorphing }
+
+    /// 生成中に削除できない理由(削除ボタンに添える)
+    static var deleteBlockedReason: String {
+        L10n.pick(L10n.tr("アプリを作っている間は削除できません。"), review: L10n.tr("記録帳を用意している間は削除できません。"))
+    }
+
     func deleteApp(_ app: AppSummary) async {
+        guard canDelete else { // 確認を出した後に生成が始まった
+            toast = Self.deleteBlockedReason
+            return
+        }
         guard !appDeletion.hidden.contains(app.id) else { return } // 二度押し
         let fallback = AppDeletion.fallback(deleting: app.id, current: document.appId, apps: apps)
         do {
