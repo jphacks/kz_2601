@@ -2466,6 +2466,23 @@
         }
       }
     },
+    "このアプリ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This App"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリ"
+          }
+        }
+      }
+    },
     "このアプリからの接続を確認できませんでした。少し待ってもう一度お試しください。続く時は App Store から最新版を入れてください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2496,6 +2513,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリでは今は仲間探しを使えません"
+          }
+        }
+      }
+    },
+    "このアプリは上のオープンソースソフトウェアを使っています。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app uses the open source software listed above."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリは上のオープンソースソフトウェアを使っています。"
           }
         }
       }
@@ -4421,6 +4455,23 @@
         }
       }
     },
+    "オープンソースソフトウェア" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Source Software"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オープンソースソフトウェア"
+          }
+        }
+      }
+    },
     "カテゴリごとの割合を円グラフで見せて" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4995,6 +5046,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "スパム・宣伝"
+          }
+        }
+      }
+    },
+    "ソースコード" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source Code"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソースコード"
           }
         }
       }
@@ -5913,6 +5981,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ユーザー ID"
+          }
+        }
+      }
+    },
+    "ライセンス" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licenses"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライセンス"
+          }
+        }
+      }
+    },
+    "ライセンスを読み込めませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not load the licenses"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライセンスを読み込めませんでした"
           }
         }
       }
@@ -10146,6 +10248,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無音"
+          }
+        }
+      }
+    },
+    "版" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版"
           }
         }
       }
