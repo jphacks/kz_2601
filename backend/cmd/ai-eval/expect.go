@@ -86,6 +86,7 @@ var expectKeys = map[string]expectKind{
 	// checkAIGenerate (#417): aigen.go
 	"aiGenerate":       expectString, // line|list|fields|any
 	"aiGenerateEntity": expectBool,
+	"aiTask":           expectString, // some aiButton has this task (summarize|classify|...|generate)
 	// checkNearby (#425)
 	"passby":         expectBool,
 	"passbyDistance": expectBool,
@@ -204,6 +205,10 @@ func validateExpect(exp map[string]any) []string {
 		case "aiGenerate":
 			if s := v.(string); s != "any" && !dsl.AIShapes[s] {
 				bad = append(bad, "aiGenerate must be line|list|fields|any: "+s)
+			}
+		case "aiTask":
+			if s := v.(string); !dsl.AITasks[s] {
+				bad = append(bad, "aiTask must be an aiButton task: "+s)
 			}
 		}
 	}
