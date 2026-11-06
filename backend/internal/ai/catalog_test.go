@@ -94,6 +94,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompVideoField, dsl.CompVideoPlayer,
 		// audio (#420)
 		dsl.CompAudioRecorder,
+		// speech: transcription / read aloud
+		dsl.CompTranscribeField, dsl.CompSpeakButton,
 	} {
 		goTypes[string(ct)] = true
 	}
