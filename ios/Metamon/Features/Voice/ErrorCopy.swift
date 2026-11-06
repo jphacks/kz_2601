@@ -23,7 +23,7 @@ enum ErrorCopy {
         let when = info.resetAt.map { resetTime($0, timeZone: timeZone) } ?? L10n.tr("明日")
         switch info.scope {
         case .global:
-            return L10n.pick(L10n.tr("利用が集中したため、新しい生成を止めています。\(when)に再開します"), review: L10n.tr("利用が集中したため、新しい記録帳の用意を止めています。\(when)に再開します"))
+            return L10n.pick(L10n.tr("利用が集中したため、新しくアプリを作るのを止めています。\(when)に再開します"), review: L10n.tr("利用が集中したため、新しい記録帳の用意を止めています。\(when)に再開します"))
         case .ip:
             return L10n.tr("このネットワークからの今日の上限に達しました。サインインすると続けて使えます")
         case .user:

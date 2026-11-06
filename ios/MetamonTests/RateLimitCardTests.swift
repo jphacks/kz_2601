@@ -42,7 +42,7 @@ final class RateLimitCardTests: XCTestCase {
     func testGlobalBreakerAndIPCopy() throws {
         let global = RateLimitInfo(scope: .global, tier: "signed_in", limit: 3000, resetAt: reset)
         XCTAssertEqual(try card(global).title, "本日の受付を終了しました")
-        XCTAssertEqual(ErrorCopy.rateLimitedBody(global, timeZone: jst), "利用が集中したため、新しい生成を止めています。10月26日 0:00に再開します")
+        XCTAssertEqual(ErrorCopy.rateLimitedBody(global, timeZone: jst), "利用が集中したため、新しくアプリを作るのを止めています。10月26日 0:00に再開します")
         let ip = RateLimitInfo(scope: .ip, tier: "anonymous", limit: 300, resetAt: reset)
         XCTAssertTrue(ErrorCopy.rateLimitedBody(ip, timeZone: jst).contains("サインイン"))
     }

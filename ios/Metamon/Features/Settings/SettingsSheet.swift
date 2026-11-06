@@ -67,7 +67,7 @@ struct SettingsSheet: View {
                 }
                 Button("キャンセル", role: .cancel) {}
             } message: {
-                Text(L10n.key("生成したアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。", review: "今の記録帳は音声画面だけの状態に戻ります。サーバー上のデータは削除されません。"))
+                Text(L10n.key("作ったアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。", review: "今の記録帳は音声画面だけの状態に戻ります。サーバー上のデータは削除されません。"))
             }
         }
         .presentationDetents([.medium, .large])
