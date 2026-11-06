@@ -164,6 +164,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | URL 起動 | P0 | `openURL` / `native: openURL` | `UIApplication.open`(実装済み) | 不要 |
 | 位置 | P1 | `native: location.current → into` / `map` コンポーネント | `CLLocationManager` 1回取得(stub) / MapKit(実装済み) | `NSLocationWhenInUseUsageDescription` |
 | モーション/歩数 | P1 | `native: motion.read` | CoreMotion / CMPedometer(stub) | `NSMotionUsageDescription` |
+| カレンダーへの追加 | P1 | action `addToCalendar{entity, calendarEvent}` | `EKEventEditViewController`(実装済み・§12.2) | 不要(別プロセスの OS の画面) |
 | 共有 | P1 | `native: share {text}` | `UIActivityViewController`(stub) | 不要 |
 | オンデバイス AI | P1 | `aiButton { task, input?, entity?, output, prompt?, options? }` コンポーネント | **実装済み**(`AiButtonLeaf` + `Support/OnDeviceAI.swift`・Foundation Models・§18) | 不要(Apple Intelligence の ON は OS 設定) |
 | 録音(#420) | P3 | `audioRecorder { field, label?, maxDuration? }` + Field `audio` | **実装済み**(`AudioRecorderLeaf` + `Support/AudioRecording.swift` / `AudioPlayback.swift` / `AudioSessionLease.swift`、下記) | `NSMicrophoneUsageDescription`(音声入力と共用) |
@@ -729,6 +730,18 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 確認(ユニットテストでは ActivityKit は動かない):
 - **実機**(iPhone 14 Pro 以降で Dynamic Island。13 はロック画面のバナーのみ): `METAMON_INITIAL_EXAMPLE=ramen_timer` で起動 → タイマー開始 → ロックして残り時間が進む・0 で 00:00 → アプリに戻ると「終わりました」→ 15 分で消える。「行列に並ぶ」→ ロック画面に「行列に並び中」と今月の杯数 → 記録を足すと数字が変わる → 「席に着いた」で消える。
 - シミュレータでもロック画面(⌘L)と Dynamic Island(iPhone 17)の表示は確認できる。
+
+### 12.2 端末のカレンダーへの追加(EventKitUI・`addToCalendar`)
+生成アプリのレコードを iPhone のカレンダーに予定として入れる。**アプリは端末の予定を読まない・書き込みもしない**: OS の「新規イベント」画面(`EKEventEditViewController`)を中身を埋めて開き、ユーザーが「追加」を押した時だけ OS が入れる。
+
+| 項目 | 内容 |
+|---|---|
+| DSL | action `addToCalendar{entity, calendarEvent:{startField, endField?, durationMinutes?, titleField?, locationField?, notesField?, alertMinutes?}}`(`docs/dsl/README.md` §3.2) |
+| 権限 | 不要。iOS 17 以降 `EKEventEditViewController` は別プロセスで描かれ、`requestAccess` も `NSCalendars*UsageDescription` も entitlement も要らない(最低 iOS は 17.0)。`EKEventStore()` は event を作るためだけに使う |
+| 値 | フォーム画面なら `FormDraft.payload`(未保存でも今の値)、`list.onItemTap` なら `records` のその行。組み立ては純関数 `CalendarEventPlan.build`(MetamonDSL・`CalendarEventPlanTests`) |
+| 構成 | `Metamon/App/AppRuntime+Calendar.swift`(`addToCalendar` と `CalendarEventEditor`)・`AppRuntime.calendarDraft` が立つと `RootView` の `HostSheets` がシートで出す。「追加」で toast「カレンダーに追加しました」 |
+| 審査用の版 | 残す(権限ダイアログが無い・ユーザーの操作でだけ入る) |
+| 確認 | シミュレータでも OS の画面は開く。保存先はシミュレータのカレンダー |
 
 ## 13. アクセシビリティ最低限(Renderer・Issue #68)
 生成アプリ側(Renderer の全部品)で Dynamic Type・VoiceOver・コントラスト・Reduce Motion の最低線を守る。本体(`ios/Metamon/`)は対象外。

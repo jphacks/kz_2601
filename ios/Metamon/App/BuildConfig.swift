@@ -85,7 +85,7 @@ enum BuildConfig {
                 sync: NoopDocumentSync(),
                 token: NoAuthTokenProvider(),
                 transcriber: makeTranscriber(),
-                notifications: UserNotificationScheduler(),
+                notifications: UserNotificationScheduler(alarms: AlarmBackend.make()),
                 isLive: false
             )
             #if DEBUG
@@ -110,7 +110,7 @@ enum BuildConfig {
                 sync: sync,
                 token: token,
                 transcriber: makeTranscriber(),
-                notifications: UserNotificationScheduler(),
+                notifications: UserNotificationScheduler(alarms: AlarmBackend.make()),
                 isLive: appConfigURL != nil
             )
             for wiring in liveWirings { wiring.apply(&services, appConfigURL, token) }
