@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "部活の名簿と資料",
+    "description": "部員の名簿を CSV から一括で取り込み、配られた PDF・テキストの本文を資料として残す。ファイルは端末の中で読むだけで送らない",
+    "icon": "doc.text",
+    "theme": { "primaryColor": "#00897B" },
+    "voiceEntry": "floating",
+    "tabs": [
+      { "screen": "members", "title": "名簿", "icon": "person.3" },
+      { "screen": "docs", "title": "資料", "icon": "doc.text" }
+    ]
+  },
+  "initialScreen": "members",
+  "entities": [
+    {
+      "id": "member",
+      "name": "部員",
+      "titleField": "name",
+      "fields": [
+        { "id": "name", "name": "名前", "type": "string", "required": true },
+        { "id": "grade", "name": "学年", "type": "integer" },
+        { "id": "part", "name": "パート", "type": "enum", "options": ["未定", "前衛", "後衛"] },
+        { "id": "joined", "name": "入部日", "type": "date" }
+      ]
+    },
+    {
+      "id": "doc",
+      "name": "資料",
+      "titleField": "title",
+      "fields": [
+        { "id": "title", "name": "題名", "type": "string" },
+        { "id": "body", "name": "本文", "type": "text" },
+        { "id": "added", "name": "追加日", "type": "date", "defaultValue": "now" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "members",
+      "title": "名簿",
+      "components": [
+        {
+          "type": "list", "id": "member_list", "area": "A1:F8",
+          "entity": "member",
+          "item": { "title": "name", "subtitle": "part", "trailing": "grade" },
+          "sort": { "field": "grade", "direction": "asc" },
+          "emptyText": "名簿の CSV を取り込むか、部員を追加してください",
+          "onItemTap": { "type": "navigate", "screen": "member_form", "presentation": "sheet" },
+          "swipeToDelete": true
+        },
+        {
+          "type": "fileImport", "id": "import_members", "area": "A9:F10",
+          "entity": "member", "accept": ["csv"], "label": "名簿の CSV を取り込む",
+          "map": [{ "column": "氏名", "field": "name" }]
+        },
+        { "type": "button", "id": "add_member", "area": "D11:F12", "label": "部員を追加", "icon": "plus",
+          "action": { "type": "navigate", "screen": "member_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "member_form",
+      "title": "部員",
+      "entity": "member",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "member" } }],
+      "components": [
+        {
+          "type": "section", "id": "who", "area": "A1:F8", "title": "部員",
+          "children": [
+            { "type": "textField", "field": "name", "label": "名前" },
+            { "type": "numberField", "field": "grade", "label": "学年" },
+            { "type": "picker", "field": "part", "label": "パート", "style": "segmented" },
+            { "type": "datePicker", "field": "joined", "label": "入部日" }
+          ]
+        },
+        { "type": "button", "id": "delete_member", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "member", "confirmMessage": "この部員を削除しますか？" } }
+      ]
+    },
+    {
+      "id": "docs",
+      "title": "資料",
+      "components": [
+        {
+          "type": "list", "id": "doc_list", "area": "A1:F10",
+          "entity": "doc",
+          "item": { "title": "title", "subtitle": "added" },
+          "sort": { "field": "added", "direction": "desc" },
+          "emptyText": "PDF やテキストを取り込んでください",
+          "onItemTap": { "type": "navigate", "screen": "doc_form", "presentation": "sheet" },
+          "swipeToDelete": true
+        },
+        {
+          "type": "fileImport", "id": "import_docs", "area": "D11:F12",
+          "entity": "doc", "accept": ["pdf", "text"], "field": "body", "label": "PDF・テキストを取り込む"
+        }
+      ]
+    },
+    {
+      "id": "doc_form",
+      "title": "資料",
+      "entity": "doc",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "doc" } }],
+      "components": [
+        {
+          "type": "section", "id": "what", "area": "A1:F10", "title": "資料",
+          "children": [
+            { "type": "textField", "field": "title", "label": "題名" },
+            { "type": "textEditor", "field": "body", "placeholder": "本文", "minLines": 8 }
+          ]
+        },
+        { "type": "button", "id": "delete_doc", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "doc", "confirmMessage": "この資料を削除しますか？" } }
+      ]
+    }
+  ]
+}

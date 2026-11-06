@@ -26,6 +26,7 @@ tags:
   - { name: entities }
   - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引をサーバーで検証して保存する。features/pro.md' }
   - { name: feedback, description: 'アプリ内のフィードバック(#319)。features/feedback.md' }
+  - { name: feeds, description: '外部の公開データの読み取り(#348)。許可リストの出どころだけ。features/external-feeds.md' }
   - { name: matching, description: '仲間探しのアプリの相互承認(#507)。features/matching.md' }
   - { name: members, description: 'scope:shared の参加者(#254)。features/members.md' }
   - { name: metrics, description: 'aiButton の端末内 AI の集計(#446)。docs/analytics/ai-button-metrics.md' }
@@ -1287,6 +1288,67 @@ paths:
         '413': { description: スクショが大きすぎる / 本文全体が 1 MiB を超える, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '429': { description: 今日の上限。`Retry-After` と details(scope=user・limit・resetAt・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
+  /feeds/{provider}:
+    get:
+      tags: [feeds]
+      summary: 外部の公開データを読む(DSL の feed・#348)。運営の許可リストだけ・読むだけ
+      description: |
+        DSL の `feed` 部品が表示するデータを、サーバーが**決まった出どころ**から取って返す。端末は外部へ直接つながらない。
+        - provider は閉じた一覧(weather / holidays / rss)。取りに行く URL はサーバーのコードで固定で、リクエストから URL・ホスト・パスは受け取らない。
+        - weather: `region`(気象庁の府県予報区のコード・`dsl.WeatherRegions` のどれか)が必須。位置(緯度経度)は受け取らない。
+        - holidays: パラメータなし(今日以降の祝日)。
+        - rss: `feedId`(許可したフィードの id)が必須。任意のフィードの URL は指定できない。
+        - 上の表に無いパラメータ・同じパラメータの重複は 400。
+        - サーバーはプロバイダごとにキャッシュする(天気 30 分・祝日 12 時間・rss 15 分)。出どころが落ちている時は 24 時間以内の最後の取得結果を `stale: true` で返す。
+        - 1 ユーザー 1 時間 `FEEDS_USER_PER_HOUR` 回(既定 120)。超えると 429 `rate_limited`。出どころへの取得はインスタンスあたり 1 分 `FEEDS_UPSTREAM_PER_MINUTE` 回(既定 30)まで。
+        - `FEEDS_DISABLED`(カンマ区切りの provider・`all`)で止められる。止めている provider は 503 `upstream_unavailable`(details.reason = disabled)。
+        - 出典(`source`)を一覧の下に必ず出す(公共データ利用規約 第1.0版の出典の記載)。
+      parameters:
+        - { name: provider, in: path, required: true, schema: { type: string, enum: [weather, holidays, rss] } }
+        - { name: region, in: query, schema: { type: string, pattern: '^[0-9]{6}$' }, description: 'weather だけ・必須。例 130000(東京都)' }
+        - { name: feedId, in: query, schema: { type: string, enum: [digital-news, fdma-news, fdma-disaster] }, description: 'rss だけ・必須' }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 20, default: 5 } }
+      responses:
+        '200':
+          description: 'OK(Cache-Control は private, max-age=300)'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [provider, title, items, source, fetchedAt]
+                properties:
+                  provider: { type: string, enum: [weather, holidays, rss] }
+                  title: { type: string, example: 石川県の天気 }
+                  items:
+                    type: array
+                    maxItems: 20
+                    items:
+                      type: object
+                      required: [title]
+                      properties:
+                        date: { type: string, description: 'weather / holidays は YYYY-MM-DD、rss は RFC 3339' }
+                        title: { type: string, maxLength: 200 }
+                        subtitle: { type: string, maxLength: 120 }
+                        icon: { type: string, description: SF Symbols の名前(weather) }
+                        url: { type: string, pattern: '^https://', description: 'rss の記事(https のみ。それ以外は省略)' }
+                        max: { type: number, description: 最高気温(°C) }
+                        min: { type: number, description: 最低気温(°C) }
+                        pop: { type: integer, minimum: 0, maximum: 100, description: 降水確率(%) }
+                  source:
+                    type: object
+                    required: [name, url, license]
+                    properties:
+                      name: { type: string, example: 気象庁ホームページ }
+                      url: { type: string, format: uri }
+                      license: { type: string, example: 公共データ利用規約(第1.0版) }
+                  fetchedAt: { type: string, format: date-time }
+                  stale: { type: boolean, description: 出どころが落ちていて、最後に取れた結果を返した }
+        '400': { description: 許可リストに無い region / feedId・未知のパラメータ・limit の範囲外, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { description: 未知の provider, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 1 時間の上限。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: 止めている(details.reason = disabled)・出どころに今つながらない(`Retry-After`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
   /client-config:
     get:
       security: []
@@ -1459,6 +1521,7 @@ components:
                 - transaction_owned_by_other
                 - unauthenticated
                 - unpublished
+                - upstream_unavailable
                 - version_conflict
             message: { type: string }
             details: { type: object, additionalProperties: true }

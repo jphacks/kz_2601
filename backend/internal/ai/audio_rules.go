@@ -12,7 +12,7 @@ var audioRules = strings.TrimSpace(`
 - maxDuration は秒(既定 600 = 10 分・最大 7200)。「1 時間の会議」など長さが言われたら合わせる(3600)。言われなければ省略。
 - 既存アプリへの「録音もできるようにして」は、その entity に audio field を add し、そのフォームに audioRecorder を add する(entity・画面は作り直さない)。
 - イヤホン(AirPods など)のボタンで録音の開始・停止ができる(録音の部品がある画面を開いている間)。
-- できないこと: 文字起こし(録音を文字にする)・他の端末での再生(音声は録音した端末にだけ保存し、他の端末では長さだけ出る)。求められたら summary で正直に伝える。
+- できないこと: 録音した音声を後から文字にする(文字で残したいなら transcribeField で話す)・他の端末での再生(音声は録音した端末にだけ保存し、他の端末では長さだけ出る)。求められたら summary で正直に伝える。
 `)
 
 var audioRecorderTerm = dslTerm{"audioRecorder", "録音の欄", "voice recorder"}
