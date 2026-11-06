@@ -28,6 +28,7 @@ type runnerStore interface {
 	store.OutboxQueue
 	store.RunnerWrites
 	store.RunnerStops
+	store.RuleStatuses
 }
 
 type outboxLister interface {

@@ -30,6 +30,7 @@ var wantRoutes = []string{
 	"DELETE /v1/shares/{token}",
 	"GET /v1/apps",
 	"GET /v1/apps/{appId}",
+	"GET /v1/apps/{appId}/automations",
 	"GET /v1/apps/{appId}/dsl",
 	"GET /v1/apps/{appId}/entities",
 	"GET /v1/apps/{appId}/entities/{entityId}",

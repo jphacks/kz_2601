@@ -71,6 +71,9 @@ type Memory struct {
 
 	// runner stops (#346, memory_stop.go)
 	stops map[string]map[string]*Stop // env -> id
+
+	// runner rule statuses (#347, memory_rule_status.go)
+	ruleStatus map[string]map[string]*RuleStatus // env -> id
 }
 
 // NewMemory returns an empty store.

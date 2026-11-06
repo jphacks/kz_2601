@@ -47,18 +47,25 @@ func outboxFromEnv(getenv func(string) string) outboxConfig {
 	default:
 		return outboxConfig{}
 	}
-	env := strings.ToLower(strings.TrimSpace(getenv("APP_ENV")))
+	env, ok := runnerEnv(getenv)
+	if !ok {
+		log.Printf("appconfig: %s=1 but APP_ENV %q cannot name an outbox; the outbox stays off", runnerOutboxEnv, env)
+		return outboxConfig{}
+	}
+	return outboxConfig{on: true, env: env}
+}
+
+// runnerEnv is the {env} of runner/{env}/… for APP_ENV; ok=false when
+// APP_ENV cannot name one.
+func runnerEnv(getenv func(string) string) (env string, ok bool) {
+	env = strings.ToLower(strings.TrimSpace(getenv("APP_ENV")))
 	switch env {
 	case "":
 		env = outboxLocalEnv
 	case "staging":
 		env = "stg" // fsenv counts it as stg too
 	}
-	if !outboxEnvRe.MatchString(env) {
-		log.Printf("appconfig: %s=1 but APP_ENV %q cannot name an outbox; the outbox stays off", runnerOutboxEnv, env)
-		return outboxConfig{}
-	}
-	return outboxConfig{on: true, env: env}
+	return env, outboxEnvRe.MatchString(env)
 }
 
 // outboxPlan is what a write to one entity needs to build its events.

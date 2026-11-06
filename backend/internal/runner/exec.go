@@ -275,6 +275,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		return fail(err)
 	}
 	charged.Parts = append(charged.Parts, dec.Charge.Parts...)
+	rl.quota, rl.quotaDay = dec.AppExec, dec.Day
 	if !dec.Allowed {
 		if dec.Block != nil {
 			usage.Limit = dec.Block.Scope
@@ -460,6 +461,9 @@ type runLog struct {
 	writesSkipped   int
 	notifies        []notify.Summary
 	took            time.Duration
+	// quota: the app's execution counter of quotaDay (rule status, #347)
+	quota    *quota.Block
+	quotaDay string
 }
 
 // logRun writes one runner.run line.
@@ -492,4 +496,30 @@ func (r *Runner) logRun(ctx context.Context, ev store.OutboxEvent, l runLog) {
 		attrs = append(attrs, slog.Any("notifies", l.notifies))
 	}
 	r.cfg.Logger.LogAttrs(ctx, slog.LevelInfo, RunEvent, attrs...)
+	r.putStatus(ctx, ev, l)
+}
+
+// putStatus overwrites the rule's status for its creator's screen (#347).
+// Best effort: a failed write is logged; the run's result stands.
+func (r *Runner) putStatus(ctx context.Context, ev store.OutboxEvent, l runLog) {
+	if l.ruleID == "" || l.outcome == "" {
+		return
+	}
+	uid := "" // shared / public: one status per rule
+	if ev.Scope == "" || ev.Scope == string(dsl.ScopePrivate) {
+		uid = ev.UID
+	}
+	now := r.cfg.Now().UTC()
+	s := store.RuleStatus{ID: store.RuleStatusID(ev.AppID, uid, l.ruleID), AppID: ev.AppID, RuleID: l.ruleID,
+		At: now, Outcome: l.outcome, Reason: l.reason, NotifyPaused: l.notifyPaused != "", ExpireAt: now.Add(store.RuleStatusTTL)}
+	if l.outcome == quota.OutcomeOK {
+		s.LastOKAt = now
+	}
+	if l.quota != nil && l.quotaDay != "" {
+		s.QuotaDay, s.QuotaUsed, s.QuotaLimit = l.quotaDay, l.quota.Used, l.quota.Limit
+	}
+	if err := r.cfg.Store.PutRuleStatus(ctx, r.cfg.Env, s); err != nil {
+		r.cfg.Logger.WarnContext(ctx, "runner: writing a rule status failed",
+			slog.String("app_id", ev.AppID), slog.String("rule_id", l.ruleID), slog.Any("error", err))
+	}
 }

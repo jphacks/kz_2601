@@ -60,6 +60,7 @@ type Store interface {
 	store.OutboxQueue
 	store.Schedules
 	store.RunnerStops
+	store.RuleStatuses
 }
 
 // Config configures a Runner. Env, Store and Quota are required.

@@ -21,6 +21,7 @@ security:
 tags:
   - { name: account, description: 'アカウント削除(#119)。features/account-deletion.md' }
   - { name: apps }
+  - { name: automations, description: '作成者向けの「自動の動き」の見える化(#347)。features/automations.md' }
   - { name: dsl }
   - { name: entities }
   - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引をサーバーで検証して保存する。features/pro.md' }
@@ -164,6 +165,26 @@ paths:
           headers: { ETag: { $ref: '#/components/headers/ETag' } }
           content: { application/json: { schema: { $ref: '#/components/schemas/AppWithDSL' } } }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /apps/{appId}/automations:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [automations]
+      summary: 自動の動き(serverRules)の一覧と直近の結果(作成者だけ)
+      description: |
+        呼び出した人の DSL(最新の版)の `serverRules` を順に返す。各ルールの説明(`DescribeServerRule`)・最後に動いた時刻・直近の結果(利用者向けの決まった語)・運営の停止中かどうか。
+        アプリ全体の運営の停止・通知の停止と、今日の実行の数(アプリの実行の上限・日本時間の 0 時で戻る)も返す。
+        runner がルールごとに上書きする小さな文書(`runner/{env}/rule_status/{hash}`・30 日の TTL)を読む。outbox は読まない。
+        作成者(`app_owners`)以外は 403(参加者も)。レコードの値・通知の本文・他人の uid・停止の理由・通報の数は返さない。
+        共有・公開のデータで動いた結果と、作成者本人の private のデータで動いた結果のうち新しい方を返す(他の人の private のデータで動いた結果は返さない)。
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Automations' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: 作成者ではない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /apps/{appId}/events:
@@ -1354,6 +1375,71 @@ components:
         - type: object
           required: [dsl]
           properties: { dsl: { $ref: '../dsl/dsl.schema.json' } }
+    AutomationResult:
+      type: string
+      description: |
+        直近の 1 回の結果。iOS はこの語ごとに文言を持つ。知らない語は「その他」として扱う。
+        - none: まだ動いていない(30 日以上動いていない時も)
+        - ok: 動いた
+        - notify_paused: 動いたが通知は止めた(通知の停止中)
+        - limit: 今日の上限に達したので止めた
+        - service_limit: サービス全体の今日の上限に達したので止めた
+        - service_paused: サービス全体で自動の動きを一時停止している
+        - plan: 今のプランでは動かない(匿名のアカウント・共有のデータは Pro)
+        - stopped: 運営がこのアプリ・ルールを止めている(非公開化を含む)
+        - changed: アプリが変わってこのルールが無くなった
+        - unavailable: アプリか作成者のアカウントが使えない状態だった
+        - late: 遅れたので動かさなかった(後でまとめて動かさない)
+        - inactive: しばらく開かれていないので休んでいる(開くと再開)
+        - failed: 何度か試したがうまくいかなかった
+        - other: この版の知らない結果
+      enum:
+        - changed
+        - failed
+        - inactive
+        - late
+        - limit
+        - none
+        - notify_paused
+        - ok
+        - other
+        - plan
+        - service_limit
+        - service_paused
+        - stopped
+        - unavailable
+    AutomationRule:
+      type: object
+      required: [id, description, trigger, result]
+      properties:
+        id: { type: string }
+        description: { type: string, description: 'ルールの説明(日本語・`DescribeServerRule`)。例: 「毎日 07:00、「記録」に記録を足す」' }
+        trigger: { type: string, enum: [record, schedule] }
+        result: { $ref: '#/components/schemas/AutomationResult' }
+        lastRunAt: { type: string, format: date-time, description: 最後に動いた(止めた・失敗したを含む)時刻。まだ無ければ省く }
+        lastOkAt: { type: string, format: date-time, description: 最後にうまく動いた時刻 }
+        stopped: { $ref: '#/components/schemas/AutomationStop' }
+    AutomationStop:
+      type: object
+      description: 運営の停止が効いている印(このキーがある時だけ)。理由・誰が・通報の数は返さない
+      properties:
+        until: { type: string, format: date-time, description: 自動で解ける時刻。無ければ運営が解くまで }
+    Automations:
+      type: object
+      required: [appId, rules]
+      properties:
+        appId: { type: string }
+        stopped: { $ref: '#/components/schemas/AutomationStop' }
+        notifyPaused: { $ref: '#/components/schemas/AutomationStop' }
+        quota:
+          type: object
+          description: アプリの今日の実行の数(runner の上限の数え方。最後に動いた時の数。まだ動いていなければ省く)
+          required: [used, limit, resetAt]
+          properties:
+            used: { type: integer, minimum: 0 }
+            limit: { type: integer, minimum: 1 }
+            resetAt: { type: string, format: date-time, description: 次に 0 に戻る時刻(日本時間の 0 時) }
+        rules: { type: array, items: { $ref: '#/components/schemas/AutomationRule' } }
     DSLEnvelope:
       type: object
       required: [appId, version, dsl]

@@ -192,6 +192,7 @@ type Store interface {
 	Matching        // interests and matches of matching apps (matching.go, #507)
 	Outbox          // record writes that queue runner triggers (outbox.go, #341)
 	Schedules       // runner schedules and per-app state (schedule.go, #342)
+	RunnerActivity  // read-only rule statuses and stops for the creator (rule_status.go, #347)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).
