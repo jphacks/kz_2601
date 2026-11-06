@@ -39,7 +39,11 @@ struct ButtonLeaf: View {
     private var styled: some View {
         let button = Button {
             guard let action = c.action else { return }
-            Task { await rt.run(action, ctx.actionContext()) }
+            Task {
+                // 保存・リセットはフォームを読む / 空にするので、変換中の文字を確定させてから(#627)
+                if TextSubmission.commitsInput(before: action.type) { await KeyboardState.finishEditing() }
+                await rt.run(action, ctx.actionContext())
+            }
         } label: {
             if let icon = c.icon ?? Self.defaultIcon(c.action) { Label(c.label ?? "", systemImage: icon) } else { Text(c.label ?? "") }
         }
