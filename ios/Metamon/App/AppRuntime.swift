@@ -131,6 +131,14 @@ final class AppRuntime: DSLRuntime {
     }
     private(set) var morphJob: MorphJob?
     var isMorphing: Bool { morphJob != nil }
+    /// create の結果が届いた後、本物の部品を 1 つずつ置く演出の間だけ立つ(#626・`AppRuntime+BuildStage.swift`)。
+    /// 結果はもう適用済み(`morphJob` は nil)で、RootView は生成中の表示を続けて組み上げを見せる。
+    var buildReveal: BuildReveal?
+    /// 編集の直後に光らせる部品(#626)。Renderer の出現時に読む
+    var changeHighlight: ChangeHighlight = .none
+    @ObservationIgnored var buildRevealTask: Task<Void, Never>?
+    /// Reduce Motion(テストで差し替える)
+    @ObservationIgnored var reduceMotion: () -> Bool = { UIAccessibility.isReduceMotionEnabled }
 
     /// 変身直後に画面上部へ数秒出す要約(読み上げ文)。位置ヒントがあれば該当領域をハイライトする。
     struct SummaryBanner: Identifiable, Equatable {
@@ -449,10 +457,14 @@ final class AppRuntime: DSLRuntime {
     }
 
     /// 新しい DSL に差し替える。ナビ・キャッシュは初期化(画面構成が変わるため)。通知は DSL に同期。
-    func apply(_ doc: AppDocument, animated: Bool = true) {
+    /// `reveal`: create の結果の組み上げ演出(#626)。`highlight`: 編集で変わった部品(#626)。どちらも無い apply では消す。
+    func apply(_ doc: AppDocument, animated: Bool = true, reveal: BuildReveal? = nil, highlight: ChangeHighlight = .none) {
         // 別アプリへの切替・新規 appId・生成完了では、進行中の対話を捨てる(サーバー側も DELETE)
         if !chatBubbles.isEmpty || chatPending { resetChat() }
+        buildRevealTask?.cancel()
         let swap = {
+            self.buildReveal = reveal
+            self.changeHighlight = highlight
             self.document = doc
             self.records = [:]
             self.failed = []
@@ -470,6 +482,7 @@ final class AppRuntime: DSLRuntime {
         } else {
             swap()
         }
+        scheduleBuildRevealEnd(reveal, highlight: highlight)
         scheduleNotificationSync()
         noteRetention() // #482 保存期間の確認と期限切れの削除
         WidgetSnapshotWriter.write(dsl: doc.dsl, records: records) // ホーム画面ウィジェットへ stat を反映
@@ -568,7 +581,9 @@ final class AppRuntime: DSLRuntime {
                 return
             }
             remember(previous)
-            apply(result.document) // withAnimation の中で morphJob = nil も行う
+            // withAnimation の中で morphJob = nil も行う。create は本物の部品を置く演出を挟む・edit は変わった部品を光らせる(#626)
+            let stage = buildStagePlan(job: morphJob, previous: previous, next: result.document)
+            apply(result.document, reveal: stage.reveal, highlight: stage.highlight)
             if previous.dsl.isVoiceOnly { offerAccountLinkIfNeeded() } // #276
             noteChatApplied(version: result.document.version, summary: result.summary) // #210 反映の区切り
             notePublicPersonalData(result) // #253 公開の記録に個人の情報が入ったら確認
