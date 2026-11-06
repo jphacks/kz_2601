@@ -112,6 +112,13 @@ enum LiveActivities {
         }
     }
 
+    /// タイマーのキーを appId にする前(アプリ名で始まる)の表示を消す(#38 のキー移行)。
+    static func endLegacyTimers() async {
+        for activity in Item.activities where LiveActivityContent.isLegacyTimerKey(activity.attributes.key, appId: activity.attributes.appId) {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
+    }
+
     /// アカウント削除: このアプリが出したものをすべて消す。
     static func endAll() async {
         for activity in Item.activities {

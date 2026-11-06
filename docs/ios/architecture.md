@@ -781,8 +781,10 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 
 ### 17.1 タイマー(`timerDisplay`)
 - 状態は `TimerRun { base(一時停止までの累計秒), startedAt(走行中の開始時刻) }` だけ持ち、表示秒は毎回 `now` から計算(`MetamonRenderer/Support/TimerClock.swift`)。
-- `TimerRunStore`(UserDefaults・キー `metamon.timer.<アプリ名>/<画面>/<部品 id>`)に保存。アプリを殺しても、次に開いた時に残り時間 / 完了(00:00)を正しく出す。
-- 終了通知は純粋関数 `TimerNotificationPlan.decide` で判定: **countdown が走行中で scenePhase が active 以外になった時だけ** 終了時刻に予約(識別子 `timer.<キー>`)、active に戻ったら取り消し。inactive(コントロールセンター・許可ダイアログ・App スイッチャー)でも予約するのは、スイッチャーからの強制終了でも通知を残すため(active で取り消すので重複しない)。
+- `TimerRunStore`(UserDefaults・キー `metamon.timer.<appId>/<画面>/<部品 id>`)に保存。アプリを殺しても、次に開いた時に残り時間 / 完了(00:00)を正しく出す。キーは appId で始めるので、同じ名前のアプリが 2 つあっても混ざらない(ライブアクティビティのキー・通知の識別子も同じキーから作る)。
+- 以前のキー(`<アプリ名>/...`)は起動時に 1 回だけ `TimerKeyMigration` で移す(印 `metamon.timerKeys.migratedToAppId`)。持ち主はアプリ一覧のキャッシュと開いているアプリから決め、同じ名前のアプリが複数ある時は開いているアプリがその名前ならそちらへ、それ以外は決められないので捨てる。予約済みの終了通知も新しい識別子で取り直し、古いキーのライブアクティビティは消す(部品を開くと出し直す)。
+- アプリの削除では `TimerCleanup.removeApp(appId:)` でそのアプリの走行状態と終了通知を消す。
+- 終了通知は純粋関数 `TimerNotificationPlan.decide` で判定: **countdown を開始した時点で** 終了時刻に予約(識別子 `timer.<キー>`)し、一時停止・リセット・終了で取り消す。部品の表示や scenePhase には頼らない(生成アプリを切り替えて部品が画面から消えても予約が残る)。予約・取り消しは 1 本の列で順番に流す。前面でその部品が見えている間は通知の delegate がバナーを出さない(`TimerVisibility`)。
 - 通知許可は countdown を初めて開始した時に求める。拒否されていても画面上のタイマーは正しく動く。
 - 見た目(`TimerDisplayLeaf` の body)は変更していない。
 
