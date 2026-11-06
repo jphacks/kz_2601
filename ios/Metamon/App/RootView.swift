@@ -58,24 +58,22 @@ struct RootView: View {
 
             // フォーム画面(push)では FAB を出さず、ナビバー右上のマイク(`formToolbarAccessory`)が入口になる(#83)
             // キーボード表示中も隠す(入力欄・キーボードのツールバーに被るため・#143)
+            // シート・部品のシートが上にある間はそちらの層が出す(#629 `ModalVoiceFabLayer` / `ComponentAIButtonLayer`)
             ZStack {
                 // create の全画面「変身中」の上には出さない(重ねる方式の時は GeneratingView が覆っていた)
-                if rt.morphJob?.kind != .create,
-                   FabVisibility.isShown(floating: rt.dsl.app.voiceEntry == .floating, formVisible: isFormVisible,
-                                         keyboardVisible: keyboard.isVisible) {
+                if rt.morphJob?.kind != .create, mainEntry == .fab {
                     VoiceFab(
                         hasTabs: rt.dsl.app.hasTabs,
                         leadingObstructionTop: bottomObstructions[visibleMainRoute.id],
                         trailingObstructionTop: trailingBottomObstructions[visibleMainRoute.id],
                         isBusy: rt.morphJob != nil,
-                        onTap: { rt.showVoiceSheet = true },
+                        onTap: { rt.openVoiceForVisibleScreen() },
                         onLongPress: { rt.openSwitcher() }
                     )
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
                 }
             }
-            .animation(.easeOut(duration: 0.22), value: isFormVisible)
-            .animation(.easeOut(duration: 0.22), value: keyboard.isVisible)
+            .animation(.easeOut(duration: 0.22), value: mainEntry)
             .onPreferenceChange(VoiceFabFrameKey.self) { fabFrame = $0 }
             // edit(改変)の小さなインジケータだけを上に重ねる(create の全画面は上の Group で置き換え)
             ZStack {
@@ -102,6 +100,7 @@ struct RootView: View {
         .preferredColorScheme(colorScheme)
         .sheet(item: $rt.sheet) { route in
             ScreenStack(root: route)
+                .modifier(ModalVoiceFabLayer()) // #629 シートの中にも AI ボタン
                 .modifier(HostSheets(onModal: true))
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
@@ -112,6 +111,7 @@ struct RootView: View {
         }
         .fullScreenCover(item: $rt.fullScreen) { route in
             ScreenStack(root: route)
+                .modifier(ModalVoiceFabLayer())
                 .modifier(HostSheets(onModal: true))
                 #if !APP_STORE_REVIEW
                 .modifier(NearbySheets(onModal: true))
@@ -128,6 +128,7 @@ struct RootView: View {
         .modifier(MatchingSheets()) // 仲間探しの 18 歳以上の確認(#507)
         #endif
         .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
+        .environment(\.aiButtonLayer, ComponentAIButtonLayer.wrapper) // #629 部品から開くシートにも AI ボタン
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
         .modifier(PublicDataPromptHost()) // #253 生成直後の「個人の情報も公開されます」
         .modifier(RetentionPromptHost()) // #482 記録の保存期間の確認
@@ -210,23 +211,33 @@ struct RootView: View {
         rt.dsl.screen(visibleMainRoute.screen)?.entity != nil
     }
 
+    /// 根(main 層)の入口。シート・部品のシートが上にある間は出さない(#629)
+    private var mainEntry: AIButtonPlacement.Entry {
+        AIButtonPlacement.entry(
+            layer: .main, voiceEntry: rt.dsl.app.voiceEntry, isForm: isFormVisible, keyboardVisible: keyboard.isVisible,
+            isTopLayer: rt.sheet == nil && rt.fullScreen == nil && AIButtonLayers.shared.isEmpty)
+    }
+
     /// 変身直後の要約(読み上げ文)。上部カードで 3 秒表示して自動で消える。
     @ViewBuilder
     private var summaryCard: some View {
         if let banner = rt.summaryBanner {
+            let dismiss = { withAnimation { rt.summaryBanner = nil } }
             HStack(alignment: .top, spacing: Theme.Spacing.sm + 2) {
                 CraneMascot(pose: .joy, size: 52, sway: 6) // #102
                 Text(banner.text)
                     .font(.subheadline.weight(.medium))
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityDismissAction(dismiss) // #628
                 Spacer(minLength: 0)
                 if let action = banner.action { SummaryBannerActionButton(action: action) } // #209 元に戻す / やり直す
             }
             .metamonCard(padding: Theme.Spacing.md)
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.top, Theme.Spacing.sm)
+            .swipeToDismiss(onDismiss: dismiss) // #628 上に払って閉じる(元に戻す付きでも)
             .transition(.move(edge: .top).combined(with: .opacity))
-            .onTapGesture { withAnimation { rt.summaryBanner = nil } }
+            .onTapGesture(perform: dismiss)
             .task(id: banner.id) {
                 // 文字数に応じて 3〜5 秒(読み上げを読み切れる長さ)
                 // ボタン付き(#209)は押す余裕を持たせて 6 秒以上
@@ -266,6 +277,7 @@ private struct ToastHost: ViewModifier {
         let active = onModal == (rt.sheet != nil || rt.fullScreen != nil)
         content.overlay(alignment: .bottom) {
             if active, let message = rt.toast {
+                let dismiss = { withAnimation { rt.toast = nil } }
                 Text(message)
                     .font(.footnote.weight(.medium))
                     .padding(.horizontal, Theme.Spacing.md).padding(.vertical, Theme.Spacing.sm + 2)
@@ -274,6 +286,8 @@ private struct ToastHost: ViewModifier {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Theme.Spacing.md)
                     // マイク FAB と DSL の最下段(行 11〜12 のボタン)の上に出す(被せない)。タブ無しでも同じ高さ
+                    .accessibilityDismissAction(dismiss) // #628
+                    .swipeToDismiss(edge: .bottom, onDismiss: dismiss) // 下に出るので下に払って閉じる
                     .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task(id: message) {
@@ -305,30 +319,6 @@ private struct UITestMorphProbe: View {
 }
 #endif
 
-/// フォーム画面のナビバー右上に置く小さなマイク(FAB の代わり・#83)。タップ = 発話シート、長押し = 変身一覧(FAB と同じ 2 入口)。
-private struct VoiceToolbarButton: View {
-    @Environment(AppRuntime.self) private var rt
-
-    var body: some View {
-        Button { rt.showVoiceSheet = true } label: {
-            Image(systemName: "mic.fill")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(width: Theme.Layout.toolbarMicSize, height: Theme.Layout.toolbarMicSize)
-                .background(Theme.brandGradient, in: Circle())
-                .overlay(Circle().strokeBorder(.white.opacity(0.25)))
-        }
-        .buttonStyle(.plain)
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
-                .onEnded { _ in rt.openSwitcher() }
-        )
-        .accessibilityLabel("話しかけて変える")
-        .accessibilityHint(L10n.key("長押しで変身一覧", review: "長押しで記録帳の一覧"))
-        .accessibilityAction(named: L10n.key("変身一覧", review: "記録帳の一覧")) { rt.openSwitcher() }
-    }
-}
-
 /// 発話シート・変身一覧の present 元。フォームが sheet/fullScreen で出ている間は根からは present できない(二重 present になる)ので、
 /// モーダルの中身にも同じ 2 枚を付け、「モーダルが出ているか」で片方だけが実際に開く。
 private struct HostSheets: ViewModifier {
@@ -338,7 +328,9 @@ private struct HostSheets: ViewModifier {
     func body(content: Content) -> some View {
         let active = onModal == (rt.sheet != nil || rt.fullScreen != nil)
         content
-            .sheet(isPresented: Binding(get: { active && rt.showVoiceSheet }, set: { rt.showVoiceSheet = $0 })) {
+            // 部品から開いたシートが上にある間は、そちらが出す(#629 `ComponentAIButtonLayer`)
+            .sheet(isPresented: Binding(get: { active && rt.showVoiceSheet && AIButtonLayers.shared.isEmpty },
+                                        set: { rt.showVoiceSheet = $0 })) {
                 VoiceInputView()
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)

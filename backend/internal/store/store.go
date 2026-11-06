@@ -73,8 +73,11 @@ type Record struct {
 	Author     string         `json:"author,omitempty"`     // uid of the poster (shared/public)
 	AuthorName string         `json:"authorName,omitempty"` // display name chosen by the poster
 	MarkCounts map[string]int `json:"markCounts,omitempty"` // mark id -> how many people set it (#255, marks.go)
-	CreatedAt  time.Time      `json:"createdAt"`
-	UpdatedAt  time.Time      `json:"updatedAt"`
+	// Origin is set on records a server rule created (#341, runner_write.go).
+	// Not part of the API.
+	Origin    *RecordOrigin `json:"-"`
+	CreatedAt time.Time     `json:"createdAt"`
+	UpdatedAt time.Time     `json:"updatedAt"`
 }
 
 // RecordSet locates one record collection (architecture.md §3):
@@ -166,6 +169,7 @@ type Store interface {
 	Feedbacks       // in-app feedback (feedback.go)
 	Moderation      // reports, blocks, operator unpublish (moderation.go, #321)
 	Matching        // interests and matches of matching apps (matching.go, #507)
+	Outbox          // record writes that queue runner triggers (outbox.go, #341)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).

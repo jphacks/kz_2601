@@ -4,7 +4,7 @@ import SwiftUI
 import StoreKit
 import MetamonServices
 
-/// 「Tailor It Pro」の課金画面(#77 / #414)。何ができるようになるか・価格・購入・復元・規約とプライバシー(3.1.2)。
+/// 「Tailor It Pro」の課金画面(#77 / #414)。何ができるようになるか・価格・購入・復元・サブスクの管理(#326)・規約とプライバシー(3.1.2)。
 /// 開く入口: 設定の「Pro にする」/ 無料作成の上限 / 有料機能(共有など)を使うアプリの生成・修正 / 共有アプリへの参加。
 struct PaywallSheet: View {
     var reason: PaywallReason = .settings
@@ -178,6 +178,12 @@ struct PaywallSheet: View {
                 .disabled(busy)
                 .accessibilityIdentifier("paywall.restore")
 
+            if ManageSubscriptionPlacement.placement(isPro: false) == .nearRestore {
+                ManageSubscriptionButton(accessibilityID: "paywall.manage")
+                    .font(.footnote)
+                    .tint(.secondary)
+            }
+
             if store.offer == nil, !store.isLoadingProducts {
                 Text("価格を取得できませんでした。通信状態を確認してください。")
                     .font(.footnote)
@@ -210,13 +216,20 @@ struct PaywallSheet: View {
     }
 
     private var proBadge: some View {
-        Label(justPurchased ? "Pro になりました" : "Pro をご利用中です", systemImage: "checkmark.seal.fill")
-            .font(.headline)
-            .foregroundStyle(Theme.Colors.brandText)
-            .padding(.vertical, Theme.Spacing.md)
-            .frame(maxWidth: .infinity)
-            .metamonCard()
-            .accessibilityIdentifier("paywall.pro")
+        VStack(spacing: Theme.Spacing.md) {
+            Label(justPurchased ? "Pro になりました" : "Pro をご利用中です", systemImage: "checkmark.seal.fill")
+                .font(.headline)
+                .foregroundStyle(Theme.Colors.brandText)
+                .accessibilityIdentifier("paywall.pro")
+            if ManageSubscriptionPlacement.placement(isPro: true) == .prominent {
+                ManageSubscriptionButton(accessibilityID: "paywall.manage")
+                    .font(.subheadline.weight(.medium))
+                    .tint(Theme.Colors.brandText)
+            }
+        }
+        .padding(.vertical, Theme.Spacing.md)
+        .frame(maxWidth: .infinity)
+        .metamonCard()
     }
 
     /// 3.1.2: 自動更新の説明 + 利用規約・プライバシーポリシーへのリンク

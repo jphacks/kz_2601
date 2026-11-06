@@ -121,34 +121,35 @@ func (m *Metrics) HasCalc() bool {
 }
 
 type Record struct {
-	ID            string          `json:"id"`
-	Kind          string          `json:"kind"`
-	Group         string          `json:"group"`
-	Transcript    string          `json:"transcript"`
-	Locale        string          `json:"locale,omitempty"`
-	Repeat        int             `json:"repeat,omitempty"`
-	OK            bool            `json:"ok"`
-	Error         string          `json:"error,omitempty"`
-	Mode          string          `json:"mode,omitempty"`
-	Attempts      int             `json:"attempts"`
-	Regenerations int             `json:"regenerations"`
-	AreaFallback  bool            `json:"areaFallback"`
-	Downgraded    bool            `json:"downgradedToFull,omitempty"`
-	ClaudeMs      int64           `json:"claudeMs"`
-	TotalMs       int64           `json:"totalMs"`
-	FirstEventMs  int64           `json:"firstEventMs,omitempty"` // -stream: time to the app/summary event
-	FirstEvent    string          `json:"firstEvent,omitempty"`   // -stream: its provisional summary
-	OutputChars   int             `json:"outputChars,omitempty"`
-	Usage         ai.Usage        `json:"usage"`
-	Summary       string          `json:"summary,omitempty"`
-	LastProblems  []string        `json:"lastProblems,omitempty"`
-	LintRetried   bool            `json:"lintRetried,omitempty"`
-	Omissions     []string        `json:"omissions,omitempty"` // #257: the server appended a note for these
-	Metrics       *Metrics        `json:"metrics,omitempty"`
-	ExpectMisses  []string        `json:"expectMisses,omitempty"`
-	LogicPass     *ai.LogicMeta   `json:"logicPass,omitempty"`
-	Patch         []dsl.PatchOp   `json:"patch,omitempty"`
-	DSL           json.RawMessage `json:"dsl,omitempty"`
+	ID            string              `json:"id"`
+	Kind          string              `json:"kind"`
+	Group         string              `json:"group"`
+	Transcript    string              `json:"transcript"`
+	Locale        string              `json:"locale,omitempty"`
+	Repeat        int                 `json:"repeat,omitempty"`
+	OK            bool                `json:"ok"`
+	Error         string              `json:"error,omitempty"`
+	Mode          string              `json:"mode,omitempty"`
+	Attempts      int                 `json:"attempts"`
+	Regenerations int                 `json:"regenerations"`
+	AreaFallback  bool                `json:"areaFallback"`
+	Downgraded    bool                `json:"downgradedToFull,omitempty"`
+	ClaudeMs      int64               `json:"claudeMs"`
+	TotalMs       int64               `json:"totalMs"`
+	FirstEventMs  int64               `json:"firstEventMs,omitempty"` // -stream: time to the app/summary event
+	FirstEvent    string              `json:"firstEvent,omitempty"`   // -stream: its provisional summary
+	OutputChars   int                 `json:"outputChars,omitempty"`
+	Usage         ai.Usage            `json:"usage"`
+	Summary       string              `json:"summary,omitempty"`
+	LastProblems  []string            `json:"lastProblems,omitempty"`
+	LintRetried   bool                `json:"lintRetried,omitempty"`
+	Omissions     []string            `json:"omissions,omitempty"` // #257: the server appended a note for these
+	Metrics       *Metrics            `json:"metrics,omitempty"`
+	ExpectMisses  []string            `json:"expectMisses,omitempty"`
+	LogicPass     *ai.LogicMeta       `json:"logicPass,omitempty"`
+	ServerRules   *ai.ServerRulesMeta `json:"serverRules,omitempty"` // #343
+	Patch         []dsl.PatchOp       `json:"patch,omitempty"`
+	DSL           json.RawMessage     `json:"dsl,omitempty"`
 }
 
 type Run struct {
@@ -197,6 +198,7 @@ func main() {
 	cmpAfter := flag.String("compare-after", "", "glob of raw run files = after")
 	envFile := flag.String("env-file", "", "KEY=VALUE file to load into the environment first (e.g. ../.env); values are never printed")
 	logicPass := flag.Bool("logic-pass", false, "enable the 2nd calculations-only call after each create (same as AI_LOGIC_PASS=1)")
+	serverRules := flag.Bool("server-rules", false, "enable the server-rules call when the request asks for an automatic action (same as AI_SERVER_RULES=1, #343)")
 	chat := flag.Bool("chat", false, "run the clarify-phase cases (internal/ai/eval/chat_cases.json unless -cases is set) through Service.Chat instead of /generate")
 	chatModel := flag.String("chat-model", "", "-chat: clarify model (empty = ai.DefaultChatModel, same as AI_CHAT_MODEL)")
 	chatEffort := flag.String("chat-effort", "", "-chat: clarify effort (empty = ai.DefaultChatEffort)")
@@ -239,11 +241,12 @@ func main() {
 	}
 	store := appconfigclient.NewMemory()
 	svc := &ai.Service{
-		Claude:      ai.NewClient(apiKey, *model, *effort),
-		Store:       store,
-		Model:       *model,
-		CallTimeout: *timeout,
-		LogicPass:   *logicPass,
+		Claude:          ai.NewClient(apiKey, *model, *effort),
+		Store:           store,
+		Model:           *model,
+		CallTimeout:     *timeout,
+		LogicPass:       *logicPass,
+		ServerRulesPass: *serverRules,
 	}
 	ctx := context.Background()
 	if *chat {
@@ -380,6 +383,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 	rec.LintRetried = res.Meta.LintRetried
 	rec.Omissions = res.Meta.Omissions
 	rec.LogicPass = res.Meta.LogicPass
+	rec.ServerRules = res.Meta.ServerRules
 	rec.Patch = res.Patch
 	rec.DSL = res.DSL
 	if app, perr := dsl.Parse(res.DSL); perr == nil {
@@ -407,10 +411,11 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRetention(c.Expect, app)...)  // #482: retention.go
 		// #507: matching.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMatching(c.Expect, app)...)
-		rec.ExpectMisses = append(rec.ExpectMisses, checkRepeat(c.Expect, app)...)     // #266: repeat.go
-		rec.ExpectMisses = append(rec.ExpectMisses, checkSingle(c.Expect, app)...)     // #267: single.go
-		rec.ExpectMisses = append(rec.ExpectMisses, checkNotifyWhen(c.Expect, app)...) // #265: notify_when.go
-		rec.ExpectMisses = append(rec.ExpectMisses, checkFlashcards(c.Expect, app)...) // #264: flashcards.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkRepeat(c.Expect, app)...)      // #266: repeat.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkSingle(c.Expect, app)...)      // #267: single.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkNotifyWhen(c.Expect, app)...)  // #265: notify_when.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkFlashcards(c.Expect, app)...)  // #264: flashcards.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkServerRules(c.Expect, app)...) // #343: server_rules.go
 	}
 	created[c.ID] = res.DSL // edits too, so an edit can build on an earlier edit (#229)
 	log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms first=%dms out=%d chars=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",

@@ -21,9 +21,11 @@ public enum TextInputRules {
     /// textField の複数行の行数(最小〜最大)。最大を超えたら欄の中でスクロール。
     static let multilineLines: ClosedRange<Int> = 3 ... 8
 
-    /// textEditor の行数。`minLines`(既定 4)から伸び、最低でも 10 行まで。
+    /// textEditor の行数。`minLines`(既定 4・最大 30)から伸び、最低でも 10 行まで。
+    /// 巨大な minLines(Int.max だと +6 で落ちる・数万行ぶんの高さを確保して固まる)は 30 行に丸める。
+    static let maxEditorMinLines = 30
     static func editorLines(minLines: Int?) -> ClosedRange<Int> {
-        let low = Swift.max(minLines ?? 4, 1)
+        let low = Swift.min(Swift.max(minLines ?? 4, 1), maxEditorMinLines)
         return low ... Swift.max(low + 6, 10)
     }
 }

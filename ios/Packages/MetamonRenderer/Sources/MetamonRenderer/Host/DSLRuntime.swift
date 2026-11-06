@@ -8,6 +8,8 @@ import MetamonDSL
 @MainActor
 public protocol DSLRuntime: AnyObject, Observable {
     var dsl: AppDSL { get }
+    /// 表示中のアプリの appId(端末内に残す状態のキー・タイマー #38)。名前は重なり得るので使わない
+    var appId: String { get }
     /// スタック名(main / tab:xxx / sheet / full)→ push 済み Route
     var paths: [String: [Route]] { get }
     /// タブ表示時に選択中のタブ(= tab.screen)
@@ -36,6 +38,8 @@ public protocol DSLRuntime: AnyObject, Observable {
 
 public extension DSLRuntime {
     func load(entities: Set<String>) async { await load(entities: entities, force: false) }
+    /// テスト・プレビューのホスト用(アプリ本体の `AppRuntime` は document.appId を返す)
+    var appId: String { "" }
     var failed: Set<String> { [] }
     /// 既定は保存しない(プレビュー・テスト用のランタイム)。
     func updateRecord(entity: String, recordId: String, data: [String: JSONValue]) async -> Bool { false }

@@ -77,6 +77,17 @@ xcrun devicectl device process launch --device 150ACFA5-8AF6-569A-8EBD-47283A3D1
 
 審査で危ない機能(HealthKit・背面の位置の記録・近くの端末との共有・カメラの撮影・探す・共有リンク・リリース申請)をバイナリから外した版は `./scripts/build-review.sh build|archive` で作る(scheme `Metamon-Review` / 構成 Review)。詳細は [docs/ios/review-build.md](../docs/ios/review-build.md)。
 
+## サードパーティのライセンス(#306)
+
+設定の「ライセンス」に出す一覧は `Metamon/Resources/ThirdPartyLicenses.json`。手で書かず、依存(`Packages/MetamonServices/Package.resolved`)や `LICENSE` を変えたら作り直す:
+
+```sh
+python3 scripts/third-party-licenses.py --source-packages <DerivedData>/SourcePackages   # 生成(Xcode で一度ビルドしてチェックアウトを作ってから)
+python3 scripts/third-party-licenses.py --check                                           # 検査(scripts-ci の licenses-check と同じ)
+```
+
+ライセンスの種類が判定できない・本文が無い依存があると止まる(推測で埋めない)。
+
 ## テスト
 
 ```sh

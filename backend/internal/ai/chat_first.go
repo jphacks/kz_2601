@@ -506,6 +506,9 @@ func summarizeApp(a *dsl.App) string {
 	} else {
 		b.WriteString("通知: なし\n")
 	}
+	for i := range a.ServerRules { // #343: the server's automatic actions in plain words
+		fmt.Fprintf(&b, "自動の動き: %s\n", a.DescribeServerRule(&a.ServerRules[i]))
+	}
 	b.WriteString("\n### 記録の種類(entity)\n")
 	if len(a.Entities) == 0 {
 		b.WriteString("なし\n")

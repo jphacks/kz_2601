@@ -9,19 +9,19 @@ struct SliderLeaf: View {
 
     var body: some View {
         if let form = ctx.form, let field = c.field {
-            let lo = c.min ?? 0
-            let hi = Swift.max(c.max ?? 100, lo + 0.001)
+            // min > max・step ≤ 0 も来うる(step 0 の Slider は刻みの数が無限になる)
+            let bounds = NumericInput.range(min: c.min, max: c.max, defaultMin: 0, defaultMax: 100)
             let fieldDef = form.entity.field(field)
-            let step = c.step ?? (fieldDef?.type == .number ? nil : 1)
-            let value = form.double(field, fallback: lo)
+            let step = NumericInput.step(c.step) ?? (fieldDef?.type == .number ? nil : 1)
+            let value = form.double(field, fallback: bounds.lowerBound)
             LabeledInput(label: c.label) {
                 HStack(spacing: RenderTheme.Spacing.sm + 4) {
                     InputIcon(name: FieldIcon.infer(component: c, field: fieldDef))
                     Group {
                         if let step {
-                            Slider(value: value, in: lo...hi, step: step)
+                            Slider(value: value, in: bounds, step: step)
                         } else {
-                            Slider(value: value, in: lo...hi)
+                            Slider(value: value, in: bounds)
                         }
                     }
                     .tint(RenderTheme.Colors.brandA)

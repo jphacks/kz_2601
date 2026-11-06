@@ -41,7 +41,9 @@ struct QrScannerLeaf: View {
                         .navigationTitle(c.label ?? L("QRを読み取る"))
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar { ToolbarItem(placement: .cancellationAction) { Button(L("閉じる")) { showScanner = false } } }
+                        .aiButtonLayer()
                     }
+                    .aiButtonTarget(c) // #629
                 }
                 #endif
                 if let s = (form.values[field] ?? .null).stringValue, !s.isEmpty {

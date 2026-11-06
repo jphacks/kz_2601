@@ -14,6 +14,11 @@ extension AppRuntime {
 
     /// `BGAppRefreshTask` の本体。OS の持ち時間(約 30 秒)内で終わる量だけやる。
     func backgroundRefresh() async {
+        // サインアウト後も予約は残って起こされる。トークン無しで送らない(未送信は次のサインインまで端末に残す)
+        guard services.auth.currentUser != nil else {
+            print("[Metamon] background(bg-refresh): signed out, skipped")
+            return
+        }
         await syncAll(reason: "bg-refresh")
     }
 

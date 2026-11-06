@@ -29,6 +29,8 @@ public protocol SpeechTranscriber: AnyObject {
     /// 録音を止めて文字起こし。短すぎ/無音/マイク未入力は `TranscriberFailure`(理由付き)を throw し、
     /// 認識はできたが文字が出なかった時だけ "" を返す(理由は `lastDiagnostics` に残る)。
     func stopAndTranscribe() async throws -> String
+    /// 録音を捨てて止める(文字起こしはしない)。録音中に画面が閉じられた時など。録音していなければ何もしない。
+    func cancelRecording()
     /// 直近の録音/認識の診断(録音秒数・サンプル数・音量・AVAudioSession・権限・モデル状態)。未実装なら nil。
     var lastDiagnostics: TranscriberDiagnostics? { get }
     /// 端末にモデルが無く、prepare するとダウンロードが始まるか(#246: その前にサイズを示して確認する)。
@@ -40,6 +42,7 @@ public extension SpeechTranscriber {
     var downloadProgress: Double { 0 }
     var lastDiagnostics: TranscriberDiagnostics? { nil }
     var needsDownload: Bool { false }
+    func cancelRecording() {}
 }
 
 /// 「音声を聞き取れませんでした」の理由を画面とログに出すための診断情報。

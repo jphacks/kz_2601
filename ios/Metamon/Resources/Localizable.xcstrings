@@ -1361,6 +1361,23 @@
         }
       }
     },
+    "「%@」について話しかけます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talk about \"%@\""
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」について話しかけます"
+          }
+        }
+      }
+    },
     "「%@」には Tailor It Pro が必要です" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2483,6 +2500,23 @@
         }
       }
     },
+    "このアプリ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This App"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリ"
+          }
+        }
+      }
+    },
     "このアプリからの接続を確認できませんでした。少し待ってもう一度お試しください。続く時は App Store から最新版を入れてください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2513,6 +2547,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリでは今は仲間探しを使えません"
+          }
+        }
+      }
+    },
+    "このアプリは上のオープンソースソフトウェアを使っています。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app uses the open source software listed above."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリは上のオープンソースソフトウェアを使っています。"
           }
         }
       }
@@ -4438,6 +4489,23 @@
         }
       }
     },
+    "オープンソースソフトウェア" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Source Software"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オープンソースソフトウェア"
+          }
+        }
+      }
+    },
     "カテゴリごとの割合を円グラフで見せて" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4727,6 +4795,23 @@
         }
       }
     },
+    "サブスクリプションを管理" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage Subscription"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サブスクリプションを管理"
+          }
+        }
+      }
+    },
     "サークルの出欠" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4995,6 +5080,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "スパム・宣伝"
+          }
+        }
+      }
+    },
+    "ソースコード" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source Code"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソースコード"
           }
         }
       }
@@ -5913,6 +6015,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ユーザー ID"
+          }
+        }
+      }
+    },
+    "ライセンス" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licenses"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライセンス"
+          }
+        }
+      }
+    },
+    "ライセンスを読み込めませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not load the licenses"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライセンスを読み込めませんでした"
           }
         }
       }
@@ -7545,6 +7681,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "共有の機能を外して、自分だけの記録にしました"
+          }
+        }
+      }
+    },
+    "共有の記録は自分が追加したものだけが消えます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " For shared entries, only the ones you added are deleted."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有の記録は自分が追加したものだけが消えます。"
           }
         }
       }
@@ -9232,23 +9385,6 @@
         }
       }
     },
-    "新しい appId で音声画面から作り始めます" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Starts from the voice screen with a new appId"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "新しい appId で音声画面から作り始めます"
-          }
-        }
-      }
-    },
     "新しいアプリ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9691,19 +9827,19 @@
         }
       }
     },
-    "期間を過ぎた記録は、開いた時などに自動で消えます。消えた記録は元に戻せません。共有の記録は自分が追加したものだけが消えます。" : {
+    "期間を過ぎた記録は、開いた時などに自動で消えます。消えた記録は元に戻せません。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Entries older than the period are deleted automatically, for example when you open it. Deleted entries cannot be restored. For shared entries, only the ones you added are deleted."
+            "value" : "Entries older than the period are deleted automatically, for example when you open it. Deleted entries cannot be restored."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "期間を過ぎた記録は、開いた時などに自動で消えます。消えた記録は元に戻せません。共有の記録は自分が追加したものだけが消えます。"
+            "value" : "期間を過ぎた記録は、開いた時などに自動で消えます。消えた記録は元に戻せません。"
           }
         }
       }
@@ -10150,6 +10286,23 @@
         }
       }
     },
+    "版" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版"
+          }
+        }
+      }
+    },
     "状態" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10439,6 +10592,23 @@
         }
       }
     },
+    "画面「%@」(id: %@)の部品「%@」(id: %@)で: " : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On screen \"%1$@\" (id: %2$@), component \"%3$@\" (id: %4$@): "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面「%@」(id: %@)の部品「%@」(id: %@)で: "
+          }
+        }
+      }
+    },
     "画面「%@」について話す" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10452,6 +10622,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "画面「%@」について話す"
+          }
+        }
+      }
+    },
+    "画面「%@」の「%@」について話す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talking about \"%2$@\" on \"%1$@\""
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面「%@」の「%@」について話す"
           }
         }
       }
@@ -11676,6 +11863,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "話してみる"
+          }
+        }
+      }
+    },
+    "話して新しいアプリを作り始めます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start a new app by talking"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話して新しいアプリを作り始めます"
+          }
+        }
+      }
+    },
+    "話して新しい記録帳を用意し始めます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start a new tracker by talking"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話して新しい記録帳を用意し始めます"
           }
         }
       }

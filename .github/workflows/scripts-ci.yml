@@ -1,4 +1,4 @@
-# シェルスクリプトと workflows の CI(#574)。shellcheck・scripts/ai-cost-test.sh・actionlint。
+# シェルスクリプトと workflows の CI(#574)。shellcheck・scripts/ai-cost-test.sh・actionlint・ライセンスの一覧の鮮度(#306)。
 # required check にはしていないので、workflow レベルの paths フィルタで対象を触った時だけ動かす。
 # shellcheck / actionlint は公式 Release からバージョン固定で取得する(runner 同梱版の更新で結果が変わらないように)。
 name: scripts-ci
@@ -6,10 +6,10 @@ name: scripts-ci
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths: ["**/*.sh", "scripts/**", ".github/workflows/**"]
+    paths: ["**/*.sh", "scripts/**", ".github/workflows/**", "ios/scripts/**", "**/Package.resolved", "ios/Metamon/Resources/ThirdPartyLicenses.json", "LICENSE"]
   push:
     branches: [develop, main]
-    paths: ["**/*.sh", "scripts/**", ".github/workflows/**"]
+    paths: ["**/*.sh", "scripts/**", ".github/workflows/**", "ios/scripts/**", "**/Package.resolved", "ios/Metamon/Resources/ThirdPartyLicenses.json", "LICENSE"]
 
 concurrency:
   group: scripts-ci-${{ github.event.pull_request.number || github.ref }}
@@ -49,6 +49,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: scripts/ai-cost-test.sh # jq は runner に同梱
+
+  # アプリに同梱するライセンスの一覧(#306)。Package.resolved・LICENSE が変わったのに一覧が古いと落ちる。
+  # ubuntu にはパッケージのチェックアウトが無いので、依存(identity・版・revision)と LICENSE の照合だけ
+  licenses-check:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 ios/scripts/third-party-licenses.py --check
 
   actionlint:
     if: github.event_name == 'push' || github.event.pull_request.draft == false

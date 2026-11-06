@@ -30,3 +30,7 @@ node_modules/
 # SwiftPM local packages
 ios/Packages/*/.build/
 ios/Packages/*/.swiftpm/
+
+# Python のキャッシュ
+__pycache__/
+*.pyc

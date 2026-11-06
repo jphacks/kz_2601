@@ -52,6 +52,9 @@ type Row struct {
 	Record Record
 	// Draft marks a form draft (not saved): its computed values are not memoized.
 	Draft bool
+	// Prev is the record before an update (server rules, #340/#341):
+	// "$prev.<field>" reads its stored value. nil = no previous record.
+	Prev *Record
 }
 
 // MaxDepth bounds nesting plus computed chains (iOS ExprEvaluator.maxDepth).
@@ -231,6 +234,9 @@ func (ev *Evaluator) FieldValue(id string, row *Row) Value {
 	if id == "id" {
 		return StringValue(row.Record.ID)
 	}
+	if fid, ok := strings.CutPrefix(id, dsl.PrevPrefix); ok && row.Prev != nil {
+		return ev.prevValue(fid, row)
+	}
 	if i := strings.IndexByte(id, '.'); i >= 0 {
 		return ev.lookup(id[:i], id[i+1:], row)
 	}
@@ -258,6 +264,16 @@ func (ev *Evaluator) FieldValue(id string, row *Row) Value {
 		ev.computed[key] = v
 	}
 	return v
+}
+
+// prevValue is "$prev.<field>": the stored value before the update. Only
+// stored fields of the row's entity (computed values are not stored).
+func (ev *Evaluator) prevValue(fid string, row *Row) Value {
+	f := field(row.Entity, fid)
+	if f == nil || f.Computed != nil || strings.HasPrefix(fid, "$") {
+		return Value{}
+	}
+	return ev.stored(get(*row.Prev, fid), f)
 }
 
 func (ev *Evaluator) lookup(refField, target string, row *Row) Value {

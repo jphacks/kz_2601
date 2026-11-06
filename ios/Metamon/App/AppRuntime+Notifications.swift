@@ -1,6 +1,7 @@
 import Foundation
 import UserNotifications
 import MetamonDSL
+import MetamonRenderer
 import MetamonServices
 
 /// 生成アプリのローカル通知(#228)。DSL の読み込み・レコードの変化・前面復帰で予約し直す。
@@ -99,6 +100,9 @@ final class ForegroundNotificationPresenter: NSObject, UNUserNotificationCenterD
     func userNotificationCenter(
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        // 終わったタイマーが画面に見えている時は出さない(00:00 が見えている)。見えていなければ出す(#38)
+        let id = notification.request.identifier
+        if await MainActor.run(body: { TimerVisibility.isShowing(notificationId: id) }) { return [] }
+        return [.banner, .list, .sound]
     }
 }

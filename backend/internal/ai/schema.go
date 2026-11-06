@@ -68,6 +68,7 @@ func Relax(raw []byte) (json.RawMessage, error) {
 			root = inlined
 		}
 	}
+	dropServerRules(root)
 	relaxSchema(root)
 	compact(root)
 	return json.Marshal(root)
@@ -320,4 +321,21 @@ func stripAreas(raw []byte) ([]byte, bool) {
 		return nil, false
 	}
 	return out, changed
+}
+
+// serverRuleDefs are the server-rule $defs (#340). They stay out of the
+// generation schema (size limit; RuleCreateRecord.values is an open map that
+// structured outputs reject): the AI writes rules in a separate pass with its
+// own schema (server_rules_pass.go, #343). dsl.Parse still accepts serverRules.
+var serverRuleDefs = []string{"ServerRule", "RuleTrigger", "RuleAction", "RuleNotify", "RuleRecipient", "RuleCreateRecord", "RuleUpdateRecord", "RuleIncrement"}
+
+func dropServerRules(root map[string]any) {
+	if props, _ := root["properties"].(map[string]any); props != nil {
+		delete(props, "serverRules")
+	}
+	if defs, _ := root["$defs"].(map[string]any); defs != nil {
+		for _, name := range serverRuleDefs {
+			delete(defs, name)
+		}
+	}
 }

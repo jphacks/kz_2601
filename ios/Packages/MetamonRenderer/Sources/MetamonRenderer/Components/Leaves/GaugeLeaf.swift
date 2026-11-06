@@ -11,11 +11,14 @@ struct GaugeLeaf: View {
         let hi = (c.max ?? 1) > lo ? (c.max ?? 1) : lo + 1
         let (value, unit) = resolvedValue
         let clamped = max(lo, min(hi, value))
+        // 取得失敗(#85)は 0 ではなく「—」(記録が無いのと区別・stat と同じ)
+        let unavailable = ProgressBarLeaf.isUnavailable(c, rt: rt)
+        let valueText = unavailable ? EmptyPlaceholder.unavailableValue : Aggregator.format(value, as: nil, unit: nil)
         VStack(spacing: 8) {
             Gauge(value: clamped, in: lo...hi) {
                 Text(c.label ?? "")
             } currentValueLabel: {
-                Text(Aggregator.format(value, as: nil, unit: nil)).font(.caption.monospacedDigit())
+                Text(valueText).font(.caption.monospacedDigit())
             } minimumValueLabel: {
                 Text(compact(lo)).font(.caption2)
             } maximumValueLabel: {
@@ -34,7 +37,7 @@ struct GaugeLeaf: View {
         // VoiceOver: 「体重 (kg), 62.5(範囲 40〜120)」と 1 要素で読む
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(unit.flatMap { u in c.label.map { "\($0) (\(u))" } } ?? c.label ?? L("ゲージ"))
-        .accessibilityValue(L("\(Aggregator.format(value, as: nil, unit: nil))(範囲 \(compact(lo))〜\(compact(hi)))"))
+        .accessibilityValue(unavailable ? L("取得できませんでした") : L("\(valueText)(範囲 \(compact(lo))〜\(compact(hi)))"))
     }
 
     /// 端の目盛り: 大きい値は 30K のように短く(円形ゲージの幅に収める)。

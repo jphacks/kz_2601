@@ -1,4 +1,5 @@
 import Foundation
+import MetamonRenderer
 import MetamonServices
 
 /// 変身一覧のカード「…」→「削除」(#180)。
@@ -24,6 +25,8 @@ extension AppRuntime {
         }
         await recordSync.purge(appId: app.id)
         await services.notifications.removeApp(app.id)  // そのアプリの通知(#228)
+        LiveActivities.enqueue { await LiveActivities.end(appId: app.id) } // ロック画面・Dynamic Island(#423)
+        await TimerCleanup.removeApp(appId: app.id)     // タイマーの終了通知と走行状態(キーが appId で始まる)
         DocumentCache.shared.remove(appId: app.id)
         AppThumbnailStore.shared.remove(appId: app.id)
         chatHistoryStore.remove(appId: app.id)          // チャット履歴(#210)
