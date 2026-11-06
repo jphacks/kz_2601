@@ -101,7 +101,10 @@ type Entity struct {
 	Unique []string `json:"unique,omitempty"`
 	// DeleteBy (#272): who may delete a shared/public record (data_rules.go).
 	DeleteBy EntityDeleteBy `json:"deleteBy,omitempty"`
-	Fields   []Field        `json:"fields"`
+	// AddressedTo (#271): the member / members field naming who may read a
+	// record besides its author (addressed.go).
+	AddressedTo string  `json:"addressedTo,omitempty"`
+	Fields      []Field `json:"fields"`
 }
 
 // EntityEdit says who may update a shared/public record. Deleting is always

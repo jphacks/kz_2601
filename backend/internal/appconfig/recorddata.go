@@ -374,6 +374,8 @@ func normalizeValue(f *dsl.Field, v any) (any, error) {
 			return nil, fmt.Errorf("must be the uid of a participant")
 		}
 		return s, nil
+	case dsl.FieldMembers:
+		return normalizeMembers(v) // #271: addressed.go
 	}
 	return nil, fmt.Errorf("has unsupported type %q", f.Type)
 }

@@ -64,6 +64,9 @@ func (h *Handler) ownRecord(r *http.Request, rs store.RecordSet, ent *dsl.Entity
 	if err != nil {
 		return nil, mapStoreErr(err, "record")
 	}
+	if !canRead(ent, rec, uidOf(r)) { // #271: an addressed record of others
+		return nil, recordNotFound()
+	}
 	if forUpdate && ent.MembersCanEdit() {
 		return rec, nil
 	}
@@ -129,7 +132,11 @@ func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	items := make([]store.Record, 0, len(all))
+	uid := uidOf(r)
 	for i := range all {
+		if !canRead(ent, &all[i], uid) { // #271: only the author and recipients
+			continue
+		}
 		if blocked[all[i].Author] || (matchOK != nil && !matchOK(all[i].Author)) {
 			continue
 		}
@@ -279,6 +286,10 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	if err := h.checkAddressed(r, cur, ent, nil, data); err != nil { // #271
+		fail(w, err)
+		return
+	}
 	if err := checkRecordSize(data); err != nil {
 		fail(w, err)
 		return
@@ -299,6 +310,7 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 			fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "authorName too long"))
 			return
 		}
+		rec.Readers = recordReaders(ent, rec.Author, data) // #271
 		// the collection is shared, so two users' idempotency keys must not collide
 		clientKey = rec.Author + "/" + body.ClientID
 	}
@@ -350,6 +362,9 @@ func (h *Handler) getRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	rs := recordSet(r, cur, ent, eid)
 	rec, err := h.store.GetRecord(r.Context(), rs, rid)
+	if err == nil && !canRead(ent, rec, uidOf(r)) {
+		err = store.ErrNotFound // #271: an addressed record of others
+	}
 	if err == nil && ent.IsShared() {
 		var ok func(string) bool
 		if ok, err = h.matchFilter(r, cur.ID, eid, []string{rec.Author}); err == nil && ok != nil && !ok(rec.Author) {
@@ -405,6 +420,10 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.checkRecordRules(r, cur, ent, existing, delta); err != nil {
+		fail(w, err)
+		return
+	}
+	if err := h.checkAddressed(r, cur, ent, existing, delta); err != nil { // #271
 		fail(w, err)
 		return
 	}

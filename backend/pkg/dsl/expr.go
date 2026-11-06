@@ -307,7 +307,7 @@ func fieldExprType(ft FieldType) exprType {
 		return tBool
 	case FieldDate, FieldDatetime:
 		return tDate
-	case FieldRefs:
+	case FieldRefs, FieldMembers:
 		return tList
 	default:
 		return tStr

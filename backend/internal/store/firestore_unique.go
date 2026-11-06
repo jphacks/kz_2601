@@ -105,7 +105,7 @@ func (f *Firestore) CreateRecordUnique(ctx context.Context, rs RecordSet, rec Re
 			}
 		}
 		now := Now()
-		d := recordDoc{Entity: rs.Entity, Data: rec.Data, ClientID: rec.ClientID, Author: rec.Author, AuthorName: rec.AuthorName, Origin: toOriginDoc(rec.Origin), UniqueKey: claim.Key, CreatedAt: now, UpdatedAt: now}
+		d := recordDoc{Entity: rs.Entity, Data: rec.Data, ClientID: rec.ClientID, Author: rec.Author, AuthorName: rec.AuthorName, Readers: rec.Readers, Origin: toOriginDoc(rec.Origin), UniqueKey: claim.Key, CreatedAt: now, UpdatedAt: now}
 		if err := tx.Create(ref, d); err != nil {
 			return err
 		}
