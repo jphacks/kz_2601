@@ -138,6 +138,11 @@ func (r *Runner) appState(ctx context.Context, h *scope.Handle, ev store.OutboxE
 	if err != nil {
 		return nil, "", ReasonAppDeleted, nil
 	}
+	// sharing withdrawn (the entity left the published DSL or is no longer
+	// shared): queued shared triggers are dropped, whatever the version (#337)
+	if ent := current.EntityByID(ev.Entity); h.Shared() && (ent == nil || !ent.IsShared()) {
+		return nil, "", ReasonRuleRemoved, nil
+	}
 	return current, creator, "", nil
 }
 

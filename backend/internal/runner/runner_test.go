@@ -83,6 +83,25 @@ func withoutRules(t *testing.T, raw []byte) []byte {
 	return out
 }
 
+// unshared makes every entity private and keeps only notify_rsvp's
+// increment (the rest is not allowed on private data).
+func unshared(t *testing.T, raw []byte) []byte {
+	t.Helper()
+	var a map[string]any
+	if err := json.Unmarshal(raw, &a); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range a["entities"].([]any) {
+		delete(e.(map[string]any), "scope")
+	}
+	a["serverRules"] = []any{map[string]any{
+		"id": "notify_rsvp", "on": map[string]any{"record": "created", "entity": "rsvps"},
+		"do": []any{map[string]any{"increment": map[string]any{"ref": "event", "field": "yes_count"}}},
+	}}
+	out, _ := json.Marshal(a)
+	return out
+}
+
 type fakePro map[string]bool
 
 func (p fakePro) IsPro(_ context.Context, uid string) bool { return p[uid] }
@@ -456,6 +475,11 @@ func TestRunnerStops(t *testing.T) {
 			}},
 			{name: "rule removed", pro: true, want: runner.OutcomeSkippedStopped, stop: func(_, app, owner string) {
 				h.putDSL(owner, app, withoutRules(h.t, circleRules(h.t)))
+			}},
+			// the creator took every entity off sharing but kept the rule: the
+			// mirror follows the commit and the queued shared trigger is dropped
+			{name: "sharing withdrawn", pro: true, want: runner.OutcomeSkippedStopped, stop: func(_, app, owner string) {
+				h.putDSL(owner, app, unshared(h.t, circleRules(h.t)))
 			}},
 			{name: "creator deleted", pro: true, want: runner.OutcomeSkippedStopped, stop: func(_, _, owner string) {
 				if err := h.st.DeactivateUser(h.t.Context(), owner); err != nil {
