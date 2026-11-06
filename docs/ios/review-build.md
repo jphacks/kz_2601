@@ -36,6 +36,7 @@
 | ドラレコ(`dashcam`・#410。カメラの常時録画・CoreMotion) | 部品と登録 / `DashcamRecorder`、写真への追加の説明文から「ドラレコ」を外す | 4.7.2・2.5.14 |
 | DSL から使うマイクの録音(`audioRecorder`・#420) | 部品と登録 / `AudioRecorderController` / `RemoteRecorderCommands`(イヤホンのボタン)。マイクの説明文は音声入力だけの文に差し替え済み | 4.7.2・2.5.14 |
 | アプリ内の Web 表示(`webView`・WKWebView) | 部品と登録 / `WebViewLeaf`。サイトは `openUrlButton` で Safari に開く | 審査メモ「WebView を使わない」(#452 G3) |
+| 外部の公開データ(`feed`・#348。天気予報・祝日・許可した公的機関の RSS) | 部品と登録 / `FeedLeaf` / `FeedHost` / `AppRuntime+Feeds`、MetamonServices の `FeedClient` / `HTTPFeedClient`(`v1/feeds`)/ `FeedCache`、MetamonDSL の `FeedQuery` / `FeedResult`。`allowedComponents` から外すので AI も作らない | 外部の Web の内容を出す(2.5.2・4.7・1.2 の説明が要る。`docs/backend/features/external-feeds.md`「審査用の版」) |
 | App 内課金(Tailor It Pro・#77 #414) | `ProGate` / `PaywallSheet` / `ProSettingsSection`(設定の「Tailor It Pro」)/ `ManageSubscriptionButton`(「サブスクリプションを管理」・#326)/ `AppRuntime+PaidFeature`(有料機能の確認カード)/ `AppRuntime+PaidGate` の課金画面、MetamonServices の `ProEntitlementStore`(StoreKit)/ `ProProducts`(商品 ID)/ `CreationQuota`(端末の 1 日 3 回)。1 日の上限はサーバーの `ratelimit` だけで、当たると状態カード「今日はここまでです / 今日の上限に達しました。〜からまた使えます」(課金画面は出ない)。backend も chat の `requiresPro` / `paidFeatures` を付けない | 最初の版は課金なしで出す(#450 G1・2026-10-30 決定)。3.1.1・3.1.2・2.3.1(サーバーが Pro を判定しない) |
 | 共有・公開のデータ(entity の `scope: shared / public`・`edit`・`marks`)と `chatThread` | `chatThread` の部品と登録 / `ChatThreadLeaf`。`ClientCapabilities.reviewDisabledFeatures` の `sharedData` で、backend が scope を private に直す(下の「AI 側の制限」) | 1.2(通報・ブロック・フィルタが無い)(#451 G2) |
 | aiButton のオンライン版(`POST /v1/text`・#417) | `AppRuntime+AIText` のオンライン経路と Pro の入口 / `HTTPAIClient+Text`(`v1/text`)。端末内 AI(Foundation Models)は残る。端末内 AI が無い端末では理由つきで無効 | 5.1.2(i)。同意文の「記録の中身は送らない」(#452 G4) |
@@ -137,7 +138,7 @@ codesign -d --entitlements :- "$APP"
 #   → com.apple.developer.healthkit が無いこと
 otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|NearbyInteraction|CoreMotion'
 #   → 何も出ないこと
-strings "$APP/Metamon" | grep -E 'AutomationsView|HTTPAutomationsClient|/automations|MatchListLeaf|HTTPMatchingClient|MatchingStore|AdultConfirmSheet|/interests|v1/feedback|FeedbackComposerView|HKHealthStore|MCSession|NISession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps|WebViewLeaf|v1/text|ChatThreadLeaf|jp\.kz2601\.metamon\.pro|PaywallSheet|ProSettingsSection|ProEntitlementStore|購入して作る|Pro にする'
+strings "$APP/Metamon" | grep -E 'AutomationsView|HTTPAutomationsClient|/automations|MatchListLeaf|HTTPMatchingClient|MatchingStore|AdultConfirmSheet|/interests|v1/feedback|FeedbackComposerView|HKHealthStore|MCSession|NISession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps|WebViewLeaf|FeedLeaf|HTTPFeedClient|v1/feeds|v1/text|ChatThreadLeaf|jp\.kz2601\.metamon\.pro|PaywallSheet|ProSettingsSection|ProEntitlementStore|購入して作る|Pro にする'
 #   → 何も出ないこと
 #   注: WKWebView / WebKit の参照は FirebaseAuth(AuthWebViewController。OAuth・reCAPTCHA 用)から残る。
 #       この版のサインイン(Sign in with Apple・匿名)では使わない。アプリのコードからは WebKit を使わない

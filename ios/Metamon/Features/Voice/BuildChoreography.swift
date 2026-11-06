@@ -19,7 +19,7 @@ enum BuildChoreography {
             case .textField, .numberField, .datePicker, .picker, .textEditor, .secureField, .timePicker, .colorPicker,
                  .slider, .stepper, .rating, .searchBar, .locationPicker, .voiceInput: .field
             case .toggle: .toggle
-            case .list, .table, .timeline, .gridTable, .matchList, .chatThread, .settlement: .list
+            case .list, .table, .timeline, .gridTable, .matchList, .chatThread, .settlement, .feed: .list
             case .chart: .chart
             case .stat, .gauge, .progressBar, .healthStat, .sensorValue, .timerDisplay: .stat
             case .calendar: .calendar

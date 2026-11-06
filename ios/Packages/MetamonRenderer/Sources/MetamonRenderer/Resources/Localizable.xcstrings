@@ -2126,6 +2126,23 @@
         }
       }
     },
+    "今は表示するものがありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing to show right now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今は表示するものがありません"
+          }
+        }
+      }
+    },
     "件" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2840,6 +2857,40 @@
         }
       }
     },
+    "出典: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出典: %@"
+          }
+        }
+      }
+    },
+    "出典: %@(%@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source: %@ (%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出典: %@(%@)"
+          }
+        }
+      }
+    },
     "別の記録が進行中です" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3465,6 +3516,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最新 %@ kg(7 日で %@ kg)"
+          }
+        }
+      }
+    },
+    "最新の情報を取れなかったため、前に取った内容です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't get the latest data; showing what was fetched earlier"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新の情報を取れなかったため、前に取った内容です"
           }
         }
       }
@@ -5012,6 +5080,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "関節の位置を重ねた写真"
+          }
+        }
+      }
+    },
+    "降水確率 %lld パーセント" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld percent chance of rain"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "降水確率 %lld パーセント"
           }
         }
       }

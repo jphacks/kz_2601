@@ -72,6 +72,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompDrawingField,
 		// flashcards (#264)
 		dsl.CompFlashcards,
+		// external feed (#348)
+		dsl.CompFeed,
 		// on-device AI
 		dsl.CompAiButton,
 		// peer-to-peer
