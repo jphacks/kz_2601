@@ -16,7 +16,7 @@
 話すだけで、自分専用のアプリができる iPhone アプリ。<br>
 できたアプリは、使いながら「ここをこうして」と話して直せます。
 
-[公式サイト tailor-it.app](https://tailor-it.app/) ・ App Store: 配信に向けて準備中
+[公式サイト tailor-it.app](https://tailor-it.app/) ・ App Store: 審査中
 
 </div>
 
