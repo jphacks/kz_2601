@@ -151,13 +151,13 @@ Web の作品はモバイルに置き換えて考えた(Web だから × には�
 
 | ファイル(`backend/internal/ai/eval/`) | 作品 | group | 中身 |
 |---|---|---|---|
-| `jphacks_coverage_cases.json` | 30 | `cov-full`(◎ 14)・`cov-reduced`(○ 16) | develop にある部品だけで作れる作品(記録を読むルール `ruleAgg`・`ruleEach` は #658 で入った) |
-| `jphacks_coverage_pending_cases.json` | 9 | `cov-pr659`(7)・`cov-pr660`(2) | 開いている PR の部品が要る作品(文字起こし・手書き・読み上げ・写真の labels・fileImport・feed は #659、カレンダーへの追加は #660) |
+| `jphacks_coverage_cases.json` | 37 | `cov-full`(◎ 18)・`cov-reduced`(○ 19) | develop にある部品だけで作れる作品(記録を読むルール `ruleAgg`・`ruleEach` は #658、文字起こし・手書き・読み上げ・写真の labels・fileImport・feed は #659 で入った) |
+| `jphacks_coverage_pending_cases.json` | 2 | `cov-pr660`(2) | 開いている PR の部品が要る作品(カレンダーへの追加は #660) |
 
 - **選び方**: 判定 ◎○△ の 241 作品から 39 作品。受賞・決勝の ◎○△ 28 作品のうち 18 作品を入れ、残りは機能の分類(共有・記録・計算・通知・地図・写真・QR・AI・音声・マッチング・音楽)が偏らないように選んだ。× は入れていない(本体が作れないため)。△ は、足りない物が開いている PR で入る作品だけを PR 待ちのファイルに入れた。
 - **依頼の文**: 利用者が話す形で、その作品の本体の体験を 1〜2 文で頼む。作品名・チーム名は入れず、`note` の先頭にリポジトリの名前(`jphacks/<repo>`)・判定・受賞を書いた。
 - **期待の付け方**: 本体の体験に要る物だけを、既存の期待のキーで書く(部品 `has`・共有 `shared` / `scope`・計算 `calc` / `computed`・通知 `notification`・写真の読み取り `photoAnalyze`・AI `aiGenerate` / `aiTask`・曲のリクエスト `musicRequests`・マッチング `matchProfile`・ルール `serverRules` / `ruleTrigger` / `ruleAction` など)。見た目・画面の数・タブは見ない。○ の作品は「欠けるもの」(一覧のメモ)を期待に入れない。
-- **PR 待ちの期待**: develop に無い部品は `has` の名前(`transcribeField` など)で書く。PR が足す期待のキー(`addToCalendar`・`feed`)は `pendingExpect` に置き、PR がマージされてキーが入ると自動で確かめる対象になる(それまでは実行のログに「not checked until the PR is merged」と出て、確かめない)。
+- **PR 待ちの期待**: develop に無い部品は `has` の名前(`transcribeField` など)で書く。PR が足す期待のキー(`addToCalendar` など)は `pendingExpect` に置き、PR がマージされてキーが入ると自動で確かめる対象になる(それまでは実行のログに「not checked until the PR is merged」と出て、確かめない)。
 - **作れた** = 生成が成功し、期待をすべて満たした作品。試験(`backend/cmd/ai-eval/coverage_test.go`)が、作品の数(30〜40)・依頼の文にチーム名が無いこと・develop のファイルが develop の部品だけを使うこと・PR 待ちのケースが本当に新しい部品を要ることを確かめる。
 
 ### コマンド(`backend/` で)
@@ -169,7 +169,7 @@ go run ./cmd/ai-eval -check -cases internal/ai/eval/jphacks_coverage_pending_cas
 
 # 実際に回す(人が決めた時だけ。-logic-pass / -server-rules は本番の AI_LOGIC_PASS / AI_SERVER_RULES に合わせる)
 go run ./cmd/ai-eval -env-file ../.env -cases internal/ai/eval/jphacks_coverage_cases.json -logic-pass -server-rules -tag jphacks
-go run ./cmd/ai-eval -env-file ../.env -cases internal/ai/eval/jphacks_coverage_pending_cases.json -logic-pass -server-rules -tag jphacks-pending  # #659・#660 のマージ後
+go run ./cmd/ai-eval -env-file ../.env -cases internal/ai/eval/jphacks_coverage_pending_cases.json -logic-pass -server-rules -tag jphacks-pending  # #660 のマージ後
 
 # 件数を絞る(受賞作の 3 件だけ・落ちた作品だけを回し直す)
 go run ./cmd/ai-eval -env-file ../.env -cases internal/ai/eval/jphacks_coverage_cases.json -logic-pass -server-rules -tag jphacks -only cov_poker_chips,cov_trash_dex,cov_car_dj

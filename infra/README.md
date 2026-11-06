@@ -42,6 +42,7 @@ prod(`jphacks-kz2601`)と stg(新しいプロジェクト・#288 の案 A2)を�
 | Firestore の日次バックアップ | `data.tf` | `firestore_backup_retention_days`(既定 14 日・0 で作らない)。復元は `docs/infra/firestore-backup.md` |
 | Firebase の API キーの制限 | `apikeys.tf` | キーは Firebase が作る。`firebase_api_keys` に key_id を入れると import して、Bundle ID と使える API の制限だけを持つ。`prevent_destroy` |
 | 消去ジョブ | `purge.tf` | Cloud Run Job `account-purge` と Scheduler `account-purge-daily`(毎日 4:30 JST)。ジョブのイメージは `ignore_changes`(下) |
+| runner(自動の動き) | `runner.tf` | **既定 `runner_enabled = false` で何も作らない**。true で SA `runner` / `runner-scheduler`・deployer の actAs・runner のコレクションの TTL(`expireAt`)。`runner_service_url` を入れると Scheduler `runner-tick`(毎分)と invoker。prod だけ。サービス本体は workflow が作る。手順は [`docs/infra/runner.md`](../docs/infra/runner.md) |
 | 予算アラート | `budget.tf` | 50 / 90 / 100% と予測 100%。課金アカウントは変数 |
 | 監視 | `monitoring.tf`・`dashboards/` | `/health` の Uptime check・ログベースの指標・アラート(5xx 率・p95・Claude の失敗率・panic)・ダッシュボード 1 枚。通知先は変数。手順は [`docs/infra/observability.md`](../docs/infra/observability.md) |
 
@@ -57,7 +58,7 @@ prod(`jphacks-kz2601`)と stg(新しいプロジェクト・#288 の案 A2)を�
 | GitHub の Environment Variables | `terraform output` の値を人が入れる |
 | Secret の値・state のバケット | 値は人が入れる。バケットは state より先に要る(下) |
 | ログの指標・通知・BigQuery のシンク | 監視は #295(別 PR)。シンクは `docs/infra/ai-cost.md` の承認待ち |
-| Firestore の TTL ポリシー | 消える範囲が変わる判断が要る(`docs/infra/account-purge.md` の提案) |
+| Firestore の TTL ポリシー(runner の分以外) | 消える範囲が変わる判断が要る(`docs/infra/account-purge.md` の提案)。runner の `done` / `outbox` / `rule_status` は `runner.tf`(#341 で期間が決まっている) |
 
 ## state の置き場とロック
 

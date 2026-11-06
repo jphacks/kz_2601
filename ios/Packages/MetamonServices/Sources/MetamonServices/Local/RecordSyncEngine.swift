@@ -41,6 +41,8 @@ public final class RecordSyncEngine {
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     @ObservationIgnored private var isForeground = true
     @ObservationIgnored private var started = false
+    /// 取り消せる削除の待ち(M11)。ticket.id → 送る時刻を待つ Task。`RecordSyncEngine+Undo.swift`
+    @ObservationIgnored var undoable: [UUID: (ticket: DeletionTicket, timer: Task<Void, Never>)] = [:]
 
     public init(store: RecordStore, queue: SyncQueue, client: any AppConfigClient, connectivity: any ConnectivityMonitor) {
         self.store = store
@@ -95,6 +97,7 @@ public final class RecordSyncEngine {
     /// アカウント削除用(#119): 購読を止め、未送信キューとローカル DB を空にする。次の `start()` で再開できる。
     public func wipe() async {
         stop()
+        dropPendingDeletions { _ in true }
         await queue.discardAll()
         await store.removeEverything()
         await refreshStatus()
@@ -103,6 +106,7 @@ public final class RecordSyncEngine {
     /// サインアウトの前に未送信を送り切る。オフライン・連続失敗で止まった・`timeout` を過ぎたらそこまで。
     /// - Returns: 残った未送信の件数
     public func flush(timeout: Duration = .seconds(10)) async -> Int {
+        await commitPendingDeletions() // 取り消し待ちの削除も送る
         let clock = ContinuousClock()
         let deadline = clock.now + timeout
         while isOnline, clock.now < deadline {
@@ -122,7 +126,7 @@ public final class RecordSyncEngine {
     /// 前面復帰でも未送信を流す(背面でネットワークが戻っていた場合の取りこぼし防止)。
     public func setForeground(_ active: Bool) {
         isForeground = active
-        if active { kick() }
+        if active { kick() } else { Task { await commitPendingDeletions() } } // 背面で落とされても削除は失わない
     }
 
     /// 設定シートの「今すぐ同期」。
@@ -153,13 +157,14 @@ public final class RecordSyncEngine {
 
     /// ローカル DB の内容(即時)。削除待ちは除く。
     public func cached(appId: String, entity: String) async -> [Record] {
-        await store.records(appId: appId, entity: entity)
+        await shown(appId: appId, entity: entity)
     }
 
     /// サーバー全件を取り、ローカルを置換(未送信行は残す)して返す。失敗はそのまま投げる(呼び出し側がローカル表示を続ける)。
     public func pull(appId: String, entity: String) async throws -> [Record] {
         let server = try await client.list(appId: appId, entity: entity)
-        return await store.replace(appId: appId, entity: entity, with: server)
+        await store.replace(appId: appId, entity: entity, with: server)
+        return await shown(appId: appId, entity: entity)
     }
 
     // MARK: - Write(楽観的)
@@ -193,7 +198,7 @@ public final class RecordSyncEngine {
                                               authorName: author?.name))
         }
         kick()
-        return await store.records(appId: appId, entity: entity)
+        return await shown(appId: appId, entity: entity)
     }
 
     /// 印を付ける / 外す(#255)。押した瞬間にローカルの件数と状態を変え、サーバーの `{count, mine}` で確定する。
@@ -220,6 +225,7 @@ public final class RecordSyncEngine {
 
     /// アプリ削除(#180): その appId の未送信キューとローカル DB を消す。サーバー削除が成功してから呼ぶ。
     public func purge(appId: String) async {
+        dropPendingDeletions { $0.appId == appId }
         await queue.discard(appId: appId)
         await store.removeAll(appId: appId)
         await refreshStatus()
@@ -239,7 +245,7 @@ public final class RecordSyncEngine {
             await store.upsert(row)
         }
         kick()
-        return await store.records(appId: appId, entity: entity)
+        return await shown(appId: appId, entity: entity)
     }
 }
 

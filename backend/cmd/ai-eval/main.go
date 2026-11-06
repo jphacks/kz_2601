@@ -435,6 +435,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkSingle(c.Expect, app)...)      // #267: single.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkNotifyWhen(c.Expect, app)...)  // #265: notify_when.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkFlashcards(c.Expect, app)...)  // #264: flashcards.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkFeed(c.Expect, app)...)        // #348: feed.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkServerRules(c.Expect, app)...) // #343: server_rules.go
 	}
 	created[c.ID] = res.DSL // edits too, so an edit can build on an earlier edit (#229)

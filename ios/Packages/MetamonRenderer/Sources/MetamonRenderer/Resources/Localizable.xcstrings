@@ -120,6 +120,23 @@
         }
       }
     },
+    "%@(描いた絵あり)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (drawn)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@(描いた絵あり)"
+          }
+        }
+      }
+    },
     "%@(添付済み)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -494,6 +511,40 @@
         }
       }
     },
+    "%lld 件を追加しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added %lld records"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 件を追加しました"
+          }
+        }
+      }
+    },
+    "%lld 件を追加しました(%lld 件は追加できませんでした)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added %1$lld records (%2$lld couldn't be added)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 件を追加しました(%lld 件は追加できませんでした)"
+          }
+        }
+      }
+    },
     "%lld 枚中 %lld 枚目" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -507,6 +558,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld 枚中 %2$lld 枚目"
+          }
+        }
+      }
+    },
+    "%lld 行目: %@「%@」を読めません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Row %1$lld: can't read %2$@ \"%3$@\""
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 行目: %@「%@」を読めません"
+          }
+        }
+      }
+    },
+    "%lld 行目: %@が空です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Row %1$lld: %2$@ is empty"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 行目: %@が空です"
+          }
+        }
+      }
+    },
+    "%lld 行目: %@が長すぎます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Row %1$lld: %2$@ is too long"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 行目: %@が長すぎます"
           }
         }
       }
@@ -596,6 +698,23 @@
         }
       }
     },
+    "1 行目の項目名が「%@」の項目(%@)に合いません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The first row doesn't match the fields of \"%1$@\" (%2$@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 行目の項目名が「%@」の項目(%@)に合いません"
+          }
+        }
+      }
+    },
     "AI で読み取っています…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -609,6 +728,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI で読み取っています…"
+          }
+        }
+      }
+    },
+    "OK" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
+    "PDF から文字を取り出せませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't get any text from the PDF"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF から文字を取り出せませんでした"
           }
         }
       }
@@ -766,6 +919,23 @@
         }
       }
     },
+    "「%@」から %lld 文字を「%@」に 1 件追加します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add 1 record to \"%3$@\" with %2$lld characters from \"%1$@\"."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」から %lld 文字を「%@」に 1 件追加します。"
+          }
+        }
+      }
+    },
     "「%@」が見つかりませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -779,6 +949,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」が見つかりませんでした"
+          }
+        }
+      }
+    },
+    "「%@」に %lld 件を追加します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add %2$lld records to \"%1$@\"."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」に %lld 件を追加します。"
           }
         }
       }
@@ -970,6 +1157,40 @@
         }
       }
     },
+    "この画面では話して入力を使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speak to type is not available here"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画面では話して入力を使えません"
+          }
+        }
+      }
+    },
+    "この種類のファイルは取り込めません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This type of file can't be imported"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この種類のファイルは取り込めません"
+          }
+        }
+      }
+    },
     "この端末ではヘルスデータを使えません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1017,6 +1238,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この端末にはありません"
+          }
+        }
+      }
+    },
+    "これ以上記録を足せません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No more records can be added"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これ以上記録を足せません"
           }
         }
       }
@@ -1310,6 +1548,23 @@
         }
       }
     },
+    "やり直す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "やり直す"
+          }
+        }
+      }
+    },
     "アプリを更新すると表示できます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1548,6 +1803,23 @@
         }
       }
     },
+    "タップして描く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to draw"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップして描く"
+          }
+        }
+      }
+    },
     "タップで編集" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1684,6 +1956,57 @@
         }
       }
     },
+    "ファイルから取り込む" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import from a file"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルから取り込む"
+          }
+        }
+      }
+    },
+    "ファイルが大きすぎます(%lldMB まで)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file is too large (up to %lld MB)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルが大きすぎます(%lldMB まで)"
+          }
+        }
+      }
+    },
+    "ファイルを開けませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't open the file"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルを開けませんでした"
+          }
+        }
+      }
+    },
     "プロフィールが見つかりません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1752,6 +2075,23 @@
         }
       }
     },
+    "ペン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pen"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペン"
+          }
+        }
+      }
+    },
     "ボタンを押すと 1 つ選びます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1782,6 +2122,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "マイクを使えません"
+          }
+        }
+      }
+    },
+    "マイクを押して話すと、ここに文字で入ります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the mic and speak. Your words appear here."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイクを押して話すと、ここに文字で入ります"
           }
         }
       }
@@ -1973,6 +2330,23 @@
         }
       }
     },
+    "上限(1 回 %lld 件・合計 %lld 件)を超える %lld 行は入れません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%3$lld rows over the limit (%1$lld per import, %2$lld in total) are skipped"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上限(1 回 %lld 件・合計 %lld 件)を超える %lld 行は入れません"
+          }
+        }
+      }
+    },
     "予定はありません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2020,6 +2394,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今の映像を保存"
+          }
+        }
+      }
+    },
+    "今は表示するものがありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing to show right now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今は表示するものがありません"
           }
         }
       }
@@ -2160,6 +2551,57 @@
         }
       }
     },
+    "何も描いていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing drawn"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何も描いていません"
+          }
+        }
+      }
+    },
+    "使う列: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Columns used: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使う列: %@"
+          }
+        }
+      }
+    },
+    "使わない列: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Columns not used: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使わない列: %@"
+          }
+        }
+      }
+    },
     "保存した映像" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2245,6 +2687,23 @@
         }
       }
     },
+    "保存せずに閉じる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close without saving"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存せずに閉じる"
+          }
+        }
+      }
+    },
     "保存できませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2313,6 +2772,23 @@
         }
       }
     },
+    "元に戻す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元に戻す"
+          }
+        }
+      }
+    },
     "充電中" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2360,6 +2836,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全員"
+          }
+        }
+      }
+    },
+    "全部消しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cleared"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部消しました"
+          }
+        }
+      }
+    },
+    "全部消しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear everything?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部消しますか?"
+          }
+        }
+      }
+    },
+    "全部消す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear all"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部消す"
           }
         }
       }
@@ -2636,6 +3163,40 @@
         }
       }
     },
+    "出典: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出典: %@"
+          }
+        }
+      }
+    },
+    "出典: %@(%@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source: %@ (%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出典: %@(%@)"
+          }
+        }
+      }
+    },
     "別の記録が進行中です" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2857,6 +3418,40 @@
         }
       }
     },
+    "取り込みますか？" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import this file?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取り込みますか？"
+          }
+        }
+      }
+    },
+    "取り込めませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't import"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取り込めませんでした"
+          }
+        }
+      }
+    },
     "取得できませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2959,6 +3554,57 @@
         }
       }
     },
+    "手書き" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drawing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手書き"
+          }
+        }
+      }
+    },
+    "手書きのキャンバス" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drawing canvas"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手書きのキャンバス"
+          }
+        }
+      }
+    },
+    "手書きの画面を開きます。指や Apple Pencil で描けます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the drawing screen. Draw with your finger or Apple Pencil."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手書きの画面を開きます。指や Apple Pencil で描けます"
+          }
+        }
+      }
+    },
     "承認" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3027,6 +3673,91 @@
         }
       }
     },
+    "指や Apple Pencil で描きます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Draw with your finger or Apple Pencil"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指や Apple Pencil で描きます"
+          }
+        }
+      }
+    },
+    "描いた線と前に描いた絵を全部消します" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erases all strokes and the earlier drawing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描いた線と前に描いた絵を全部消します"
+          }
+        }
+      }
+    },
+    "描いた線を保存せずに閉じますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close without saving your drawing?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描いた線を保存せずに閉じますか?"
+          }
+        }
+      }
+    },
+    "描き続ける" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep drawing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描き続ける"
+          }
+        }
+      }
+    },
+    "描き足す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Draw more"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描き足す"
+          }
+        }
+      }
+    },
     "撮り直す" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3057,6 +3788,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "撮影"
+          }
+        }
+      }
+    },
+    "文字にしています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribing…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字にしています…"
+          }
+        }
+      }
+    },
+    "文字を読めませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read any text"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字を読めませんでした"
+          }
+        }
+      }
+    },
+    "文字コードを読めませんでした(UTF-8 か Shift_JIS の CSV にしてください)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read the text encoding (save the CSV as UTF-8 or Shift_JIS)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字コードを読めませんでした(UTF-8 か Shift_JIS の CSV にしてください)"
           }
         }
       }
@@ -3108,6 +3890,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最新 %@ kg(7 日で %@ kg)"
+          }
+        }
+      }
+    },
+    "最新の情報を取れなかったため、前に取った内容です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't get the latest data; showing what was fetched earlier"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新の情報を取れなかったため、前に取った内容です"
           }
         }
       }
@@ -3265,6 +4064,23 @@
         }
       }
     },
+    "止める" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "止める"
+          }
+        }
+      }
+    },
     "歩" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3312,6 +4128,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "水平です"
+          }
+        }
+      }
+    },
+    "消しゴム" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eraser"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "消しゴム"
           }
         }
       }
@@ -3707,6 +4540,40 @@
         }
       }
     },
+    "線 %lld 本" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld strokes"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "線 %lld 本"
+          }
+        }
+      }
+    },
+    "聞いています… タップで終わる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listening… Tap to finish"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "聞いています… タップで終わる"
+          }
+        }
+      }
+    },
     "自分" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4098,6 +4965,23 @@
         }
       }
     },
+    "話して入力" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speak to type"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話して入力"
+          }
+        }
+      }
+    },
     "詳細" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4111,6 +4995,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "詳細"
+          }
+        }
+      }
+    },
+    "読み上げる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read aloud"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み上げる"
+          }
+        }
+      }
+    },
+    "読み上げる内容がまだありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing to read aloud yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み上げる内容がまだありません"
           }
         }
       }
@@ -4183,6 +5101,23 @@
         }
       }
     },
+    "読めない行: %lld 行(入れません)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unreadable rows: %lld (skipped)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読めない行: %lld 行(入れません)"
+          }
+        }
+      }
+    },
     "車" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4213,6 +5148,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "追加"
+          }
+        }
+      }
+    },
+    "追加する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加する"
+          }
+        }
+      }
+    },
+    "追加中 %lld / %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adding %1$lld / %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加中 %lld / %lld"
           }
         }
       }
@@ -4298,6 +5267,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "進捗"
+          }
+        }
+      }
+    },
+    "道具" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tool"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "道具"
           }
         }
       }
@@ -4455,6 +5441,23 @@
         }
       }
     },
+    "長いので先頭の %lld 文字だけ入れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It's long, so only the first %lld characters are kept."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長いので先頭の %lld 文字だけ入れます。"
+          }
+        }
+      }
+    },
     "長すぎて QR コードにできません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4519,6 +5522,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "関節の位置を重ねた写真"
+          }
+        }
+      }
+    },
+    "降水確率 %lld パーセント" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld percent chance of rain"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "降水確率 %lld パーセント"
+          }
+        }
+      }
+    },
+    "音声モデルを準備しています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing the speech model…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデルを準備しています…"
+          }
+        }
+      }
+    },
+    "音声モデルを用意する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get the speech model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデルを用意する"
           }
         }
       }

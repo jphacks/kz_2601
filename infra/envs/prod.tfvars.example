@@ -56,3 +56,11 @@ monitored_services = {
 # 通知先のメール(コミットしない)。Slack はコンソールで連携したチャンネルの name を alert_notification_channels に
 alert_emails = ["you@example.com"]
 # alert_notification_channels = ["projects/jphacks-kz2601/notificationChannels/<n>"]
+
+# runner(自動の動き・docs/infra/runner.md)。人の承認の後に true。stg では入れない(#288 の分離まで prod だけ)
+# runner_enabled = true
+# 初回デプロイ(RUNNER_DEPLOY=1)の後に status.url を入れると Scheduler の runner-tick ができる
+# runner_service_url = "https://runner-prod-378953239426.asia-northeast1.run.app"
+# runner_tick_paused = false
+# APNs の鍵を runner に渡す時だけ(入れ物は runner だけが読める)
+# runner_secret_ids = ["APNS_AUTH_KEY"]

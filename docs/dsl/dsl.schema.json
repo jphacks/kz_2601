@@ -244,7 +244,7 @@
             "ref",
             "refs"
           ],
-          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). audio = voice recording kept on the recording device: \"audio:<id>|<seconds>\" (AAC m4a written by audioRecorder; other devices show only the length). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField. refs = array of record ids of `refEntity` (multi-select, e.g. expense.split_with -> members: who shares this expense); [] or missing = everyone; filter it with op contains, count it with op len."
+          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL; a drawingField saves its drawing here as the same kind of picture. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). audio = voice recording kept on the recording device: \"audio:<id>|<seconds>\" (AAC m4a written by audioRecorder; other devices show only the length). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField. refs = array of record ids of `refEntity` (multi-select, e.g. expense.split_with -> members: who shares this expense); [] or missing = everyone; filter it with op contains, count it with op len."
         },
         "required": {
           "type": "boolean"
@@ -638,6 +638,12 @@
           "$ref": "#/$defs/AudioRecorder"
         },
         {
+          "$ref": "#/$defs/TranscribeField"
+        },
+        {
+          "$ref": "#/$defs/SpeakButton"
+        },
+        {
           "$ref": "#/$defs/List"
         },
         {
@@ -654,6 +660,9 @@
         },
         {
           "$ref": "#/$defs/Divider"
+        },
+        {
+          "$ref": "#/$defs/DrawingField"
         },
         {
           "$ref": "#/$defs/Slider"
@@ -773,6 +782,9 @@
           "$ref": "#/$defs/Dashcam"
         },
         {
+          "$ref": "#/$defs/FileImport"
+        },
+        {
           "$ref": "#/$defs/SensorValue"
         },
         {
@@ -783,6 +795,9 @@
         },
         {
           "$ref": "#/$defs/Flashcards"
+        },
+        {
+          "$ref": "#/$defs/Feed"
         }
       ]
     },
@@ -1434,6 +1449,34 @@
         }
       }
     },
+    "DrawingField": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "指・Apple Pencil で手書き・お絵かきして photo field に保存する入力(PencilKit)。ペン・消しゴム・元に戻す・やり直し・全部消すができる。描いた絵は写真と同じ画像(白地の JPEG・800px 以下)としてレコードに入り、一覧・image・詳細では写真と同じに見える。保存済みの絵を開くと、その上に描き足せる。",
+      "x-usage": "「手書きで書く・お絵かき・サイン(署名)・スケッチ・図を描く・手書きのメモ・ぬり絵・間違い探しの印」に。フォーム画面(screen.entity)に置き、field は type photo(写真用と同じ型。新しい型は無い)。全幅 4〜6 行(例 A2:F6)。一覧で見せるなら list.item.image にその photo field、詳細で大きく見せるなら image。写真も撮るなら photoField と別の photo field にする。文字の認識(手書きを文字にする)はしない。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "drawingField"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Must be a photo field of the screen entity (the drawing is saved as a picture)."
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
     "Notification": {
       "type": "object",
       "additionalProperties": false,
@@ -1512,8 +1555,8 @@
     "PhotoField": {
       "type": "object",
       "additionalProperties": false,
-      "description": "カメラ / ライブラリから写真を取り込んで photo field に保存する入力。写真の文字・金額・日付・分類・説明・体の関節の角度を端末内の AI で読み取り、同じレコードの他の項目に入れられる(analyze)。",
-      "x-usage": "「写真を撮る・残す」は source camera、既存の写真を選ぶなら library、迷えば both。「撮ったら読み取って」「レシートを撮ったら金額を入れて」「写真から分類」「フォームをチェック」なら analyze:[{kind, into}] を付け、読み取った値を入れる field(into)を同じ entity に足して、その入力欄も同じフォームに置く(読み取り結果は確認・修正できる)。analyze 付きの photoField は全幅 5〜6 行(例 A1:F5)。レシート → {kind:amount, into:金額(currency)} + {kind:date, into:日付} (+ {kind:text, into:メモ})。写っている物の種類 → {kind:classify, into:enum field}。筋トレ・ストレッチのフォーム → {kind:jointAngle, joint:knee 等, into:角度(number)}(写真に関節の点と線を重ねて出す)。",
+      "description": "カメラ / ライブラリから写真を取り込んで photo field に保存する入力。写真の文字・金額・日付・分類・説明・体の関節の角度・物の名前・バーコード・人数・主な色を端末内の AI で読み取り、同じレコードの他の項目に入れられる(analyze)。",
+      "x-usage": "「写真を撮る・残す」は source camera、既存の写真を選ぶなら library、迷えば both。「撮ったら読み取って」「レシートを撮ったら金額を入れて」「写真から分類」「フォームをチェック」なら analyze:[{kind, into}] を付け、読み取った値を入れる field(into)を同じ entity に足して、その入力欄も同じフォームに置く(読み取り結果は確認・修正できる)。analyze 付きの photoField は全幅 5〜6 行(例 A1:F5)。レシート → {kind:amount, into:金額(currency)} + {kind:date, into:日付} (+ {kind:text, into:メモ})。写っている物の種類 → {kind:classify, into:enum field}。筋トレ・ストレッチのフォーム → {kind:jointAngle, joint:knee 等, into:角度(number)}(写真に関節の点と線を重ねて出す)。花・植物・料理の名前 → {kind:label, into:名前(string)}。冷蔵庫の中の物 → {kind:labels, into:メモ(text)}。本・商品のバーコード → {kind:barcode, into:コード(string)}。集合写真の人数 → {kind:peopleCount, into:人数(integer)}。服・物の色 → {kind:color, into:色(string)}。",
       "required": [
         "type",
         "field"
@@ -1666,7 +1709,7 @@
       "type": "object",
       "additionalProperties": false,
       "description": "マイクで音声を録音して audio field に保存する入力(ボイスメモ・会議や授業の録音)。録音・停止・再生・録り直し・削除ができ、録音中は経過時間と音量のメーターを出す。イヤホン(AirPods など)のボタンでも録音の開始・停止ができる。音声は端末内に保存し、レコードにはファイル名と長さ(秒)だけを入れる。",
-      "x-usage": "「録音する・声で残す・ボイスメモ・会議を録音」に。フォーム画面(screen.entity)に置き、field は type audio。メモ(textEditor)やタイトル・日付と同じフォームに並べる。一覧の行で再生するなら list.item.trailing にその audio field(行に再生ボタンと長さが出る)。文字起こしはしない(声でアプリを作り変える voiceInput とは別物)。",
+      "x-usage": "「録音する・声で残す・ボイスメモ・会議を録音」に。フォーム画面(screen.entity)に置き、field は type audio。メモ(textEditor)やタイトル・日付と同じフォームに並べる。一覧の行で再生するなら list.item.trailing にその audio field(行に再生ボタンと長さが出る)。録音を文字にはしない(話して文字で残すのは transcribeField。声でアプリを作り変える voiceInput とは別物)。",
       "required": [
         "type",
         "field"
@@ -1693,6 +1736,76 @@
           "minimum": 1,
           "maximum": 7200,
           "description": "Recording limit in seconds (default 600 = 10 minutes, up to 7200)."
+        }
+      }
+    },
+    "TranscribeField": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "押して話すと、端末の中で声を文字にして string / text の field に入れる入力(文字起こし・音声メモを文字で残す・議事録・日記を声で書く)。文字は複数行の欄に入り、そのまま手で直せる。話すたびに後ろに足す(改行で区切る)。声は端末の外に出さず、録音も残さない(音声入力と同じ端末内の音声モデル)。",
+      "x-usage": "「文字起こし」「声で書きたい・話してメモ」「議事録」「声で日記」「しゃべった内容を文字で残す」に。フォーム画面(screen.entity)に置き、field は string / text。同じ field に textEditor を重ねて置かない(この部品が複数行の欄も持つ)。全幅 4〜6 行(例 A5:F10)。音声そのものも残したい時は別の audio field に audioRecorder を並べる(録音を後から文字にはできない)。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "transcribeField"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Stored string / text field of the screen entity. The transcript is appended to it."
+        },
+        "label": {
+          "type": "string",
+          "description": "欄の見出し(任意・例: 議事録)。"
+        },
+        "placeholder": {
+          "type": "string",
+          "description": "空の時の薄い案内(任意・例: マイクを押して話してください)。"
+        }
+      }
+    },
+    "SpeakButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "押すと文字・レコードの値を端末の声で読み上げるボタン(もう一度押すと止まる)。声は UI の言語(日本語 / 英語)。端末の中だけで動き、権限は要らない。読み上げ・音声で聞く・単語や例文の発音・手順やレシピを声で聞く・目の不自由な人向けに。",
+      "x-usage": "値は text(固定・`{{fieldId}}` で画面のレコードの値を差し込める)/ field(画面のレコード)/ value(計算式)のどれか 1 つ。フォーム・詳細画面(screen.entity)で入力した文や記録を読むなら field(例: textEditor の下に speakButton{field: body})。ホームの決まった案内を読むなら text。label はボタンの文字(既定「読み上げる」)。横幅は半分〜全幅・高さ 2 行(例 A9:C10)。",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "speakButton"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "読み上げる固定の文。screen.entity がある画面では `{{fieldId}}` をそのレコードの値で置換する(例: {{word}} の意味は {{meaning}})。text / field / value のどれか 1 つだけ。"
+        },
+        "field": {
+          "type": "string",
+          "description": "読み上げる screen.entity の field(本文・単語・手順など。photo / video / audio / refs 不可)。表示中のレコード(フォーム・詳細)の値を読む。"
+        },
+        "value": {
+          "$ref": "#/$defs/Expr",
+          "description": "読み上げる値を計算式で(例: concat で文をつなぐ)。screen.entity がある画面では ref でそのレコードの field を読める。"
+        },
+        "label": {
+          "type": "string",
+          "description": "ボタンの文字(任意・既定「読み上げる」)。"
         }
       }
     },
@@ -3895,6 +4008,81 @@
       "description": "ドライブレコーダー(ドラレコ)。背面カメラの映像を表示しながら録画し、直近 keepMinutes 分だけを 1 分ごとの区間で端末に残す(ループ録画・容量の上限つき)。加速度が impactG を超えたら前後の区間を「保存済み」にして消さない。autoStart の条件(横向き・ほぼ静止・充電中)が続いたら自動で録画を始める。保存済みの映像は部品の中の一覧から再生・写真に保存・共有できる。録画中は画面のスリープを止める。iOS の制約で画面を出している間だけ録画する(裏に回ると止まる)。「ドラレコ」「車載カメラ」「運転中に録画」「スマホスタンドに置いたら録画」「事故の時の映像を残す」の時に必ずこれを選ぶ(videoField で代替しない)。entity は不要(映像は記録に入れない)。",
       "x-usage": "ホーム画面(screen.entity なし)にこれ 1 つを大きく置く: A1:F10(最下 2 行の左 A-B はマイクの席なので空ける)。1 画面に 1 つだけ。「置いたら自動で」は autoStart [landscape, still]、「充電したら」は charging を足す。容量・残す時間・感度の話があれば maxStorageMB / keepMinutes / impactG。entity・フォーム画面・list は作らない(保存済みの一覧は部品の中にある)。"
     },
+    "FileImport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "accept"
+      ],
+      "properties": {
+        "type": {
+          "const": "fileImport"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string",
+          "description": "記録を足す entity(private か shared。public・single・match には足せない)。"
+        },
+        "accept": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "text",
+              "pdf"
+            ]
+          },
+          "description": "選べるファイル。csv = 表(1 行 = 1 件・1 行目は項目名・Excel の CSV / Shift_JIS も読む)、text = テキストファイル、pdf = PDF(本文を取り出す。画像だけの PDF は端末内の文字認識)。"
+        },
+        "label": {
+          "type": "string",
+          "description": "ボタンの文言(既定「ファイルから取り込む」)。例: 名簿の CSV を取り込む・PDF を取り込む。"
+        },
+        "field": {
+          "type": "string",
+          "description": "text / pdf の本文を入れる field(type text なら 20000 字・string なら 4000 字まで。超えた分は切る)。accept に text / pdf がある時は必須、csv だけなら書かない。entity の titleField(string)にはファイル名が入る。"
+        },
+        "map": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/$defs/ImportColumn"
+          },
+          "description": "csv の列の当て方(省略可)。書いた列が先に当たり、残りは 1 行目の項目名が field の name か id と同じ列に当たる(export の CSV はそのまま読み戻せる)。どの field にも当たらない列は使わない。"
+        }
+      },
+      "description": "ファイルを選んで記録を足すボタン(ファイルの取り込み)。押すと iOS のファイル選択が開き、csv は 1 行ずつ記録にして(型を変換・最大 500 行)、text / pdf は本文を取り出して field に入れた記録を 1 件足す。足す前に「n 件を追加・m 行は読めない」を確かめる。処理はすべて端末内で、ファイルそのものは送らない・残さない(足した記録だけが今まで通り保存・同期される)。「CSV を取り込みたい」「Excel の名簿を入れたい」「PDF・テキストを読み込んで本文を記録したい」「書き出した CSV を戻したい」の時に必ずこれを選ぶ(手入力のフォームで代替しない)。音声・画像・Word のファイルは読めない。",
+      "x-usage": "記録の一覧がある画面で、一覧の下の全幅(例 A9:F10・追加ボタン D11:F12 の上)に置く。追加ボタンが無ければ右下(D11:F12)。左下 A11:B12 はマイクの席なので空ける。CSV の名簿なら entity 例 member{name: string(required), grade: integer, club: string} + fileImport{entity: member, accept: [csv], label: 名簿の CSV を取り込む}。列名が field の name と違う時だけ map: [{column: 氏名, field: name}]。PDF・テキストなら entity 例 doc{title: string, body: text}(titleField: title)+ fileImport{entity: doc, accept: [pdf, text], field: body, label: PDF を取り込む}。取り込んだ本文の要約は同じ entity のフォームに aiButton{task: summarize, input: body}。"
+    },
+    "ImportColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "column",
+        "field"
+      ],
+      "description": "fileImport.map の 1 つ: CSV の 1 行目が column の列を field に入れる。",
+      "properties": {
+        "column": {
+          "type": "string",
+          "description": "CSV の 1 行目(項目名)の文字(例: 氏名)。"
+        },
+        "field": {
+          "type": "string",
+          "description": "入れる先の field id(computed・写真・動画・録音は不可)。"
+        }
+      }
+    },
     "SensorValue": {
       "type": "object",
       "additionalProperties": false,
@@ -4060,7 +4248,12 @@
             "date",
             "classify",
             "describe",
-            "jointAngle"
+            "jointAngle",
+            "label",
+            "labels",
+            "barcode",
+            "peopleCount",
+            "color"
           ],
           "x-enumDescriptions": {
             "text": "写真の文字(日本語・英語)をそのまま読む(OCR)。into は string / text。",
@@ -4068,7 +4261,12 @@
             "date": "レシート・書類の日付(2026/10/28・2026年10月28日 など)。into は date / datetime。",
             "classify": "写っている物と文字から候補を 1 つ選ぶ。into は enum(候補はその options)か、options 付きの string / text。",
             "describe": "写っているものを短い文で説明する。into は string / text。",
-            "jointAngle": "人の体の関節(joint)の角度(度・0〜180)。写真に関節の点と線を重ねて出す。into は number / integer。"
+            "jointAngle": "人の体の関節(joint)の角度(度・0〜180)。写真に関節の点と線を重ねて出す。into は number / integer。",
+            "label": "写っている物・動植物・料理の名前を 1 つ(画像分類のいちばん具体的なラベル。主なものは日本語)。候補が決まっているなら classify。into は string / text。",
+            "labels": "写っている物の名前を最大 5 つ、「、」区切りで(冷蔵庫の中・机の上など)。into は string / text。",
+            "barcode": "写真の中のバーコード・QR コードの中身(JAN・ISBN・URL など。最初の 1 つ)。into は string / text。",
+            "peopleCount": "写っている人の数(顔か体を数える・誰かは見分けない)。into は integer / number。",
+            "color": "写真の中央の主な色の名前(赤・青・緑・白・黒 など 12 色)。into は string / text。"
           }
         },
         "into": {
@@ -4472,6 +4670,56 @@
           "$ref": "#/$defs/Expr"
         }
       }
+    },
+    "Feed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "provider"
+      ],
+      "properties": {
+        "type": {
+          "const": "feed"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "weather",
+            "holidays",
+            "rss"
+          ],
+          "description": "データの出どころ(閉じた一覧)。weather = 気象庁の天気予報(region が要る)、holidays = 内閣府の国民の祝日(これから来る祝日)、rss = 運営が許可したお知らせのフィード(feedId が要る)。任意の URL・Web サイトは指定できない。"
+        },
+        "region": {
+          "type": "string",
+          "description": "weather だけ: 気象庁の府県予報区のコード(6 桁)。例 130000 東京都・170000 石川県・270000 大阪府・016000 石狩・空知・後志地方(札幌)・471000 沖縄本島地方。"
+        },
+        "feedId": {
+          "type": "string",
+          "description": "rss だけ: 許可されたフィードの id(digital-news = デジタル庁 新着・更新 / fdma-news = 消防庁 新着情報 / fdma-disaster = 消防庁 災害情報)。"
+        },
+        "title": {
+          "type": "string",
+          "description": "上に出す見出し(例: 金沢の天気・次の祝日)。省略するとデータの出どころの名前。"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "出す行数(1〜20・省略 = 5)。weather は日数(最大 7 日)。"
+        },
+        "emptyText": {
+          "type": "string",
+          "description": "行が無い時の文。"
+        }
+      },
+      "description": "外部の公開データの読み取り専用の一覧(#348)。サーバーが運営の許可した出どころ(気象庁の天気予報・内閣府の祝日・許可したお知らせのフィード)だけから取り、端末は直接外へ出ない。日付・見出し・天気のアイコン・最高 / 最低気温・降水確率・出典を行で出す。記録は作らず保存もしない(読むだけ)。「天気予報」「明日の天気」「次の祝日」「祝日の一覧」「お知らせ・新着ニュース」の時に使う。任意の URL・任意のサイトの読み込み・外部への送信はできない。",
+      "x-usage": "天気: feed{provider: weather, region: 地域のコード, title: 〇〇の天気, limit: 3〜7}(例 A1:F5)。祝日: feed{provider: holidays, title: 次の祝日, limit: 5}。お知らせ: feed{provider: rss, feedId: 許可された id, limit: 10}。地域が分からない天気の依頼は東京都(130000)にして summary で地域を変えられると伝える。entity・保存ボタン・フォームは作らない。"
     }
   }
 }

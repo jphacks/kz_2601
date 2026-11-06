@@ -167,6 +167,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 共有 | P1 | `native: share {text}` | `UIActivityViewController`(stub) | 不要 |
 | オンデバイス AI | P1 | `aiButton { task, input?, entity?, output, prompt?, options? }` コンポーネント | **実装済み**(`AiButtonLeaf` + `Support/OnDeviceAI.swift`・Foundation Models・§18) | 不要(Apple Intelligence の ON は OS 設定) |
 | 録音(#420) | P3 | `audioRecorder { field, label?, maxDuration? }` + Field `audio` | **実装済み**(`AudioRecorderLeaf` + `Support/AudioRecording.swift` / `AudioPlayback.swift` / `AudioSessionLease.swift`、下記) | `NSMicrophoneUsageDescription`(音声入力と共用) |
+| 文字起こし・読み上げ | P3 | `transcribeField { field, label?, placeholder? }` / `speakButton { text / field / value, label? }` | **実装済み**(`TranscribeFieldLeaf` + `Host/Capabilities/DictationHost.swift` → 本体 `Features/Voice/AppRuntime+Dictation.swift`(音声入力と同じ `services.transcriber`)、`SpeakButtonLeaf` + `Support/LeafSpeech.swift`、下記) | `NSMicrophoneUsageDescription`(音声入力と共用・文字起こしを追記)。読み上げは不要 |
 
 ### photoField(カメラ)の実装要点(`MetamonRenderer/Components/Leaves/PhotoFieldLeaf.swift`)
 
@@ -178,10 +179,21 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 権限 | `AVCaptureDevice.authorizationStatus(.video)`。未決定なら要求、拒否/制限なら alert「カメラを使えません」→「設定を開く」(`UIApplication.openSettingsURLString`)/「写真から選ぶ」 |
 | エンコード | `PhotoCodec.dataURL(from: UIImage)`:**ピクセル基準で長辺 ≤800px**・renderer scale=1 固定(既定の画面倍率だと 800pt=2400px になる)・JPEG q0.5 → `data:image/jpeg;base64,...` を `FormDraft.values[field]` へ(保存経路は他の入力と同じ `entity.create/update`) |
 | 表示 | 値があれば `PhotoView` サムネイル(160pt)+「撮り直す」「削除」、無ければ `label` のボタン 1 つ |
-| 読み取り(`analyze`・#418) | 撮った・選んだ直後に `PhotoReader`(`Support/PhotoVision.swift`)が Vision で必要な分だけ実行: 文字 `VNRecognizeTextRequest`(ja-JP / en-US・同じ高さの断片を 1 行にまとめる `OCRPiece.lines`)、分類ラベル `VNClassifyImageRequest`、骨格 `VNDetectHumanBodyPoseRequest`。金額・日付・関節の角度・分類のフォールバックは MetamonDSL の純関数(`ReceiptParser` / `PoseAngle` / `PhotoClassifier`)。classify / describe は Apple Intelligence が使える端末なら `OnDeviceAI`(Foundation Models)にラベル + 文字を渡す。読めた項目だけ `FormDraft.values[into]` に入れ、写真の下に「もう一度読み取る」と結果(読めなかった項目名)を出す。jointAngle があればプレビューを `PosePhotoView`(縦横比を保って収め、関節の点と線を Canvas で重ねる)に替え、編集で開いた既存の写真にも骨格だけ重ねる。外部ライブラリ・ネットワークは使わない |
+| 読み取り(`analyze`・#418) | 撮った・選んだ直後に `PhotoReader`(`Support/PhotoVision.swift`)が Vision で必要な分だけ実行: 文字 `VNRecognizeTextRequest`(ja-JP / en-US・同じ高さの断片を 1 行にまとめる `OCRPiece.lines`)、分類ラベル `VNClassifyImageRequest`、骨格 `VNDetectHumanBodyPoseRequest`、バーコード `VNDetectBarcodesRequest`、人数 `VNDetectFaceRectanglesRequest` + `VNDetectHumanRectanglesRequest`、主な色は中央を 32×32 に縮めた画素(結果は `PhotoClues` にまとめ、テストで差し替える)。金額・日付・関節の角度・分類のフォールバック・ラベルの名前・色の名前は MetamonDSL の純関数(`ReceiptParser` / `PoseAngle` / `PhotoClassifier` / `PhotoColor`)。classify / describe は Apple Intelligence が使える端末なら `OnDeviceAI`(Foundation Models)にラベル + 文字を渡す。読めた項目だけ `FormDraft.values[into]` に入れ、写真の下に「もう一度読み取る」と結果(読めなかった項目名)を出す。jointAngle があればプレビューを `PosePhotoView`(縦横比を保って収め、関節の点と線を Canvas で重ねる)に替え、編集で開いた既存の写真にも骨格だけ重ねる。外部ライブラリ・ネットワークは使わない |
 
 画像は **base64 JPEG 文字列として photo フィールドに置き、entity.create の data に含めて送る**(縮小後 ≈ 数十〜100KB で Firestore ドキュメント 1MB 制限内)。Cloud Storage 経由(URL 化)は P1 以降。
 全 usage description は `ios/Metamon/Resources/Info.plist` に記入済み。
+
+### transcribeField / speakButton(文字起こし・読み上げ)の実装要点
+
+| 項目 | 内容 |
+|---|---|
+| 文字起こし | `TranscribeFieldLeaf` → `DictationHost`(Renderer は Services を知らないので能力の protocol 越し)→ 本体の `AppRuntime+Dictation` が `services.transcriber`(WhisperKit・端末内)の `startRecording` / `stopAndTranscribe` を呼ぶ。結果は `DictationText.appending` で field の後ろに足す。声はサーバーに送らず、録音も残さない |
+| 音声モデル | 音声入力と同じモデル。無ければ部品のボタンが「音声モデルを用意する」になり、起動時と同じ確認(#246 `prepareTranscriberIfAllowed`)を出す |
+| マイクの取り合い | 音声入力と同じ `transcriber` を使うので同時には録れない。マイク FAB の音声入力のシート(`showVoiceSheet`)が出たら部品は録音を捨てる。画面を離れた時も捨てる |
+| 読み上げ | `LeafSpeech.shared`(アプリ全体で 1 本)。`usesApplicationAudioSession = false` で共有セッションに触らない(#43 の `SpeechReader` と同じ)。声は UI の言語(`LanguagePreference`: ja-JP / en-US)。設定の「挨拶と質問を読み上げる」(#43)とは別で、ユーザーが押した時だけ喋る |
+| 録音中は喋らない | `SpeechReader.stopForRecording()` / `recordingFinished()` が `LeafSpeech` も止める・抑止を解く。音声入力と `transcribeField` の録音の両方がこれを通る |
+| 審査用ビルド | 両方残す(端末の中だけ・マイクは音声入力と同じ説明文に文字起こしを追記) |
 
 ### audioRecorder(録音・#420)の実装要点
 
@@ -598,6 +610,7 @@ Renderer ──load(entities)──▶ AppRuntime.refresh(entity)
 | DB | `MetamonServices/Local/RecordStore.swift`(actor)。**FileManager + JSON**: `Application Support/metamon-records/<appId>/<entity>.json` に `LocalRecord{appId, entity, recordId, data, createdAt, updatedAt, pendingOp, clientId}` の配列。SwiftData/SQLite にしなかった理由: 1 entity ≤ 1000 件・読みは entity 単位全件なのでファイル=索引(appId, entity)で足りる / `DocumentCache` と同じ流儀でスキーマ移行・ModelContainer を抱えない / macOS `swift test` でそのまま動く。万単位になったら同 I/F で SQLite 化 |
 | 差分取得 | appconfig の `GET /records` は `filterField` に entity の Field しか受けない(`buildFilter`)ため `updatedAfter` 相当が無い → **全件取得で置換**(`store.replace`)。未送信行(`pendingOp != none`)だけ残す。`lastUpdatedAt` は将来の差分 API 用に用意済み |
 | 書き込み | `RecordSyncEngine.save/delete`(`Local/RecordSyncEngine.swift`・`@MainActor @Observable`)。create は仮 id `local-<clientId>`、update はキー単位マージ(PATCH と同義・DSL から消えた項目もローカルで保持)、delete は行を `pendingOp=delete` にして一覧から隠す |
+| 削除の取り消し(M11) | `deleteRecord`(一覧の長押し・VoiceOver の操作「削除」・フォームの削除ボタン)は `RecordSyncEngine.deleteUndoably`(`Local/RecordSyncEngine+Undo.swift`)。5 秒(VoiceOver では 10 秒)はメモリ上で一覧から隠すだけで、ローカル DB にも送信の列にも触れない。下部の「削除しました・元に戻す」(`RecordUndoToast`)で戻せばサーバーには何も送らない(記録の id・作成日時・作者が変わらない)。時間が過ぎる・背面に回る・サインアウトの送り切りで `delete` と同じく列に積む。待ちの間にアプリが落ちたら記録は残る(消えすぎない側) |
 | キュー | `Local/SyncQueue.swift`(actor)。積む時に畳む: create+update → create に併合 / create+delete → 両方消す(サーバーに行かない)/ update+update → 1 つ。送信後は仮 id → サーバー id の別名表を持ち、後続の update/delete を引き直す。`BackoffPolicy(base 0.5s, ×2, maxAttempts 5)`。`sleep` を差し替えられるのでテストは待たない |
 | 冪等 | `AppConfigClient.create(appId:entity:data:clientId:)` を追加(既定実装は clientId 無視)。`HTTPAppConfigClient` は `{data, clientId}` を送り、再送でも同じ clientId |
 | 到達性 | `Local/Connectivity.swift`: `NetworkPathConnectivity`(`NWPathMonitor`)/ `ManualConnectivity`(テスト・E2E)。オンライン復帰で `queue.resume()` |
@@ -844,7 +857,7 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 | 裏の同期 | ときどき(OS 任せ・最短 15 分) | `BGAppRefreshTask`(§17.2) |
 | カメラ・録画(`photoField` / `videoField` / `qrScanner`) | **止まる**(iOS が背面のカメラを許さない) | 画面を出したまま使う。AI は頼まれたら「画面を出したまま(自動ロックを切って)」と案内する(`internal/ai/live_activity_rules.go`) |
 | 音声入力(マイク・WhisperKit) | **止まる** | 録音は前面のみ。`audio` モードは足していない |
-| 音の再生・読み上げ | 生成アプリの部品には今は無い | 部品で読み上げ(音声案内)を足す時に `UIBackgroundModes: audio` + `AVAudioSession(.playback, .duckOthers)` を一緒に入れる。**審査用の版で残すかはその時に決める**(`strip-review-plist.sh` は今 location だけ外す) |
+| 音の再生・読み上げ(`speakButton`・`transcribeField`) | **止まる** | 前面だけで使う部品として足した(`UIBackgroundModes: audio` は入れていない)。背面で読み上げを続けたくなった時に `UIBackgroundModes: audio` + `AVAudioSession(.playback, .duckOthers)` を一緒に入れ、審査用の版で残すかをその時に決める |
 
 ### 17.5 シミュレータでの確認手順(ヘッドレス)
 - `METAMON_E2E_TIMER_START=<部品 id>`(DEBUG)で、表示時に timerDisplay を開始する。例: `METAMON_INITIAL_EXAMPLE=gallery-structure METAMON_AUTO_OPEN=memo_form:sheet METAMON_E2E_TIMER_START=timer` → `xcrun simctl launch <UDID> com.apple.Preferences` で背面化 → 60 秒後に通知 → アプリを起動し直すと 00:00。
