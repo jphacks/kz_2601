@@ -208,6 +208,8 @@ public enum FieldCoding {
         let f = DateFormatter()
         f.locale = locale
         if locale.language.languageCode?.identifier == "ja" {
+            // 固定の書式は西暦前提。端末の暦が和暦・仏暦だと yyyy が「0007」「2568」になる
+            f.calendar = cal
             f.dateFormat = (sameYear ? "M/d(EEE)" : "yyyy/M/d(EEE)") + (withTime ? " H:mm" : "")
         } else {
             f.setLocalizedDateFormatFromTemplate((sameYear ? "EEEMMMd" : "EEEMMMdy") + (withTime ? "jmm" : ""))
