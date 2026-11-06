@@ -57,7 +57,7 @@ Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|me
   Entity.single?: true(設定値の置き場。レコードは常に 1 件・式 {"setting": "<fieldId>"} で読む)— §3.11
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (44 種・全て id? と area? を持つ) / Action (12 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
+Leaf (44 種・全て id? と area? を持つ) / Action (13 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
@@ -145,7 +145,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 `color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
-### 3.2 アクション(12 種)
+### 3.2 アクション(13 種)
 
 | type | フィールド | iOS の挙動 |
 |---|---|---|
@@ -161,10 +161,13 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `export` | `entity`, `format`(csv/pdf), `filter?`, `fields?`, `title?` | 記録を CSV / PDF に書き出して共有シート(ファイル・メール・AirDrop)を開く(#421・下の「書き出し」) |
 | `startActivity` | `activity`{`title`, `subtitle?`, `icon?`, `minutes?`(1〜480), `stat?`} | ライブアクティビティ(ロック画面 / Dynamic Island)を出す(#423・下の「ライブアクティビティ」) |
 | `endActivity` | | 出しているライブアクティビティを消す(#423) |
+| `addToCalendar` | `entity`, `calendarEvent`{`startField`, `endField?`, `durationMinutes?`(1〜10080・既定 60), `titleField?`, `locationField?`, `notesField?`, `alertMinutes?`(0〜10080)} | 今のレコードを端末のカレンダーに入れる。OS の「新規イベント」画面を埋めて開く(下の「カレンダーへの追加」) |
 
 `confirmMessage` はどのアクションにも付けられ、先に確認ダイアログを出す。
 
 - **書き出し `export`(#421)**: 記録を CSV(UTF-8 BOM 付き・CRLF・1 行目は項目名)か A4 の PDF(見出し・書き出し日・絞り込み・件数・グラフ・表)にして `UIActivityViewController` で共有する。値は一覧・表と同じ書式(日付・¥・選択肢・参照先の名前・計算項目)で、写真・動画は入れない。`fields` 省略で全項目。`filter` は `list.filter` と同じ(単体 / 配列)。hidden(#262)は自分が書いた行だけ値を出し、他人の行しか無ければ列ごと出さない。`=` `+` `@` 等で始まるセルは `'` を前に付ける(CSV インジェクション対策)。PDF には押した画面にある同じ entity の `chart` を `ImageRenderer` で画像にして表の上に入れる。Leaf(`exportButton`)ではなく Action にしたのは、(1) toolbar からも同じ動作を置ける、(2) `confirmMessage` 等の既存の仕組みと button の見た目をそのまま使える、(3) 古い iOS は「未対応のアクション」の toast で済み画面が崩れない、の 3 点(上の「新規アクションは追加しない」の例外)。整形は `RecordExport` / `CSVWriter`(MetamonDSL・純関数)、PDF とファイルは `RecordExporter.swift`(Renderer)。審査用ビルドにも残す(ネイティブ権限が不要)。
+
+- **カレンダーへの追加 `addToCalendar`**: 今のレコード(`screen.entity == entity` のフォーム画面の button / toolbar なら入力中の値・未保存でも、`list.onItemTap` ならタップした行)を EventKitUI の `EKEventEditViewController` に埋めて開き、ユーザーが「追加」を押すと端末のカレンダー(iCloud・Google など端末に設定したもの)に入る。iOS 17 以降この画面は別プロセスで動くので、**カレンダーの許可・`NSCalendars*UsageDescription`・entitlement は要らない**(アプリは端末の予定を読まない)。`startField` が `date` なら終日、`datetime` ならその時刻から。終わりは `endField` の値(空・始まりより前なら無視)→ `durationMinutes`(既定 60)。名前は `titleField` → `entity.titleField` → 最初の string → entity 名。`alertMinutes` はカレンダー側の通知(N 分前・0 は始まり)。始まりが空なら「「開始」を入力してください」。Go は field の存在と型(start / end = date・datetime、title / location = string・text・enum、notes = string・text)と範囲を検証(`backend/pkg/dsl/calendar_event.go`)。組み立ては `CalendarEventPlan`(MetamonDSL・純関数)、画面は `AppRuntime+Calendar.swift`。Action にしたのは `export` と同じ 3 点(toolbar にも置ける・button の見た目と `confirmMessage` を使える・古い iOS は「未対応のアクション」の toast で済む)。審査用ビルドにも残す(権限が要らない)。アラーム(AlarmKit)・スクリーンタイム(FamilyControls)は権限と entitlement が要るので入れていない。
 
 構造・ナビ・ネイティブ系の設計メモ(新規アクションは追加しない):
 
