@@ -59,8 +59,10 @@ struct NewItemsHost: ViewModifier {
         .metamonCard(padding: Theme.Spacing.md)
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.top, Theme.Spacing.sm)
+        .swipeToDismiss { self.notice = nil } // #628
         .transition(.move(edge: .top).combined(with: .opacity))
         .accessibilityElement(children: .combine)
+        .accessibilityDismissAction { self.notice = nil }
         .accessibilityIdentifier("newItems.banner")
         .onTapGesture { self.notice = nil }
         .task(id: notice.id) {

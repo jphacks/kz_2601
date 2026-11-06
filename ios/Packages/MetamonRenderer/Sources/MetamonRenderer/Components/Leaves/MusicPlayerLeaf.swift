@@ -49,6 +49,7 @@ struct MusicPlayerLeaf: View {
         }
         .sheet(isPresented: $searching, onDismiss: sendOutgoing) {
             MusicSearchSheet(session: session, requests: requests) { outgoing = $0 }
+                .aiButtonTarget(c) // #629
         }
     }
 
@@ -350,6 +351,7 @@ struct MusicSearchSheet: View {
                     Button(L("閉じる")) { dismiss() }
                 }
             }
+            .aiButtonLayer()
             .task {
                 if session.availability == .notDetermined { await session.prepare(requesting: true) }
                 if let m = session.availability.message, !session.availability.canSearch { message = m }

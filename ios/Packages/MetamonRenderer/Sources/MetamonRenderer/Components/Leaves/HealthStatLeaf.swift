@@ -95,7 +95,7 @@ struct HealthStatLeaf: View {
             let rate = latest / target
             ProgressView(value: min(rate, 1))
                 .tint(rate >= 1 ? RenderTheme.Colors.positive : RenderTheme.Colors.brandA)
-            Text(L("目標 \(Self.stepsText(target)) 歩の \(Int((rate * 100).rounded()))%"))
+            Text(L("目標 \(Self.stepsText(target)) 歩の \(NumericInput.clampedInt(rate * 100))%"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -163,7 +163,7 @@ struct HealthStatLeaf: View {
     }
 
     static func stepsText(_ v: Double) -> String {
-        Int(v.rounded()).formatted(.number.grouping(.automatic))
+        NumericInput.clampedInt(v).formatted(.number.grouping(.automatic))
     }
 
     // MARK: load

@@ -133,7 +133,8 @@ public enum Aggregator {
 
     /// chart: groupBy(enum or 日付 field)でグループ化して集計。日付は `bucket`(day|week|month)で丸める。
     /// `label` は日付以外の値 → 表示名(ref の groupBy はレコード id で束ねるので、参照先の見出しを渡す・#235)。
-    public static func buckets(_ c: Component, entity: Entity?, records: [Record], label relabel: ((String) -> String)? = nil) -> [Bucket] {
+    /// `locale` は日付の見出しの言語。nil・日本語は「3月」「3/4週」「3/4」、それ以外は Locale の書式(「Mar」「3/4」)。
+    public static func buckets(_ c: Component, entity: Entity?, records: [Record], label relabel: ((String) -> String)? = nil, locale: Locale? = nil) -> [Bucket] {
         guard let groupBy = c.groupBy else { return [] }
         let field = entity?.field(groupBy)
         var groups: [String: (label: String, rows: [Record])] = [:]
@@ -143,7 +144,7 @@ public enum Aggregator {
             let key: String
             let label: String
             if let f = field, f.type.isDate, let d = FieldCoding.date(from: v) {
-                (key, label) = dateBucket(d, c.bucket ?? "day")
+                (key, label) = dateBucket(d, c.bucket ?? "day", locale: locale)
             } else {
                 key = v.displayString
                 label = relabel?(key) ?? key
@@ -161,21 +162,34 @@ public enum Aggregator {
         }
     }
 
-    private static func dateBucket(_ d: Date, _ bucket: String) -> (String, String) {
-        let cal = Calendar.current
+    static func dateBucket(_ d: Date, _ bucket: String, locale: Locale? = nil) -> (String, String) {
+        // 西暦で束ねる(端末の暦が和暦だと年が 7 などになり、キーの並びがずれる)。週の始まりは端末の設定に従う
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = FieldCoding.dateFormatter.timeZone
+        cal.firstWeekday = Calendar.current.firstWeekday
+        let ja = locale.map { $0.language.languageCode?.identifier == "ja" } ?? true
+        func formatted(_ date: Date, _ template: String) -> String {
+            let f = DateFormatter()
+            f.locale = locale
+            f.calendar = cal
+            f.timeZone = cal.timeZone
+            f.setLocalizedDateFormatFromTemplate(template)
+            return f.string(from: date)
+        }
         switch bucket {
         case "month":
             let comps = cal.dateComponents([.year, .month], from: d)
-            return (String(format: "%04d-%02d", comps.year ?? 0, comps.month ?? 0), "\(comps.month ?? 0)月")
+            let key = String(format: "%04d-%02d", comps.year ?? 0, comps.month ?? 0)
+            return (key, ja ? "\(comps.month ?? 0)月" : formatted(d, "MMM"))
         case "week":
             let start = cal.dateInterval(of: .weekOfYear, for: d)?.start ?? d
             let key = FieldCoding.dateFormatter.string(from: start)
             let comps = cal.dateComponents([.month, .day], from: start)
-            return (key, "\(comps.month ?? 0)/\(comps.day ?? 0)週")
+            return (key, ja ? "\(comps.month ?? 0)/\(comps.day ?? 0)週" : formatted(start, "Md"))
         default:
             let key = FieldCoding.dateFormatter.string(from: d)
             let comps = cal.dateComponents([.month, .day], from: d)
-            return (key, "\(comps.month ?? 0)/\(comps.day ?? 0)")
+            return (key, ja ? "\(comps.month ?? 0)/\(comps.day ?? 0)" : formatted(d, "Md"))
         }
     }
 }

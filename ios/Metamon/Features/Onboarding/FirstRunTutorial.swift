@@ -87,6 +87,12 @@ final class FirstRunTutorialStore {
         createdFromInitial && !hasShownEditHint
     }
 
+    /// 保存先を直接消した後(アカウント削除)に、画面の状態を保存先に合わせ直す。
+    func reload() {
+        hasSeenTutorial = defaults.bool(forKey: Self.seenKey)
+        hasShownEditHint = defaults.bool(forKey: Self.editHintKey)
+    }
+
     func resetForTesting() {
         defaults.removeObject(forKey: Self.seenKey)
         defaults.removeObject(forKey: Self.editHintKey)

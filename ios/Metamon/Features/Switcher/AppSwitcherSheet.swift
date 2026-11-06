@@ -126,7 +126,7 @@ struct AppSwitcherSheet: View {
                     .background(Theme.brandGradient, in: Capsule())
             }
             .buttonStyle(.plain)
-            .accessibilityHint("新しい appId で音声画面から作り始めます")
+            .accessibilityHint(L10n.key("話して新しいアプリを作り始めます", review: "話して新しい記録帳を用意し始めます"))
 
             Button {
                 selected = "home"
