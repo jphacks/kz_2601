@@ -43,6 +43,7 @@
 | aiButton の端末内 AI の集計(`POST /v1/metrics/ai-button`・#446) | `AppRuntime+AIButtonMetrics` は何もしない / MetamonServices の `AIButtonMetrics.swift`(貯める・送る)/ 設定の「AI ボタンの利用状況を送る」。Renderer の数える呼び出しは残るが、ホストが捨てる | 栄養ラベルに「使用状況データ」が増えるため(`docs/analytics/ai-button-metrics.md`) |
 | 仲間探し(#507・`matchList` / `list.item.interest`) | `matchList` の部品と登録 / `MatchListLeaf` / `InterestButton` / `MatchingHost`、MetamonServices の `MatchingClient` / `HTTPMatchingClient`(`v1/apps/{appId}/interests`・`matches`)/ `MatchingStore` / `MatchingAgeGate`、`Features/Matching` 全部(18 歳以上の確認 `AdultConfirmSheet`)。`supportedFeatures` に `matching` を送らず、backend が match・`item.interest`・`matchList` を使わない | 共有と一緒に外す(知らない人と連絡先を交換する機能。年齢区分・1.2) |
 | 自動の動きの見える化(#347) | `Features/Automations` 全部(`AutomationsView` / `AutomationsSettingsRow`・設定の「自動の動き」)/ MetamonServices の `AutomationsClient` / `HTTPAutomationsClient`(`v1/apps/{appId}/automations`) | 審査用の版では AI が serverRules を作らない(`sharedData` を無効にした依頼では server-rules pass を飛ばす・#316)ので、出す先が無い |
+| プッシュ通知の登録(#269) | `Features/Push` 全部(`PushHost` / `PushAppDelegate` / `PushConsentSection`。`AppRuntime+Push` はサインアウトの呼び出しの空の関数だけ残る)/ MetamonServices の `Push/` と `HTTPPushDeviceClient`(`v1/me/devices`・`v1/me/notify-consent`)/ 参加の画面の同意。`registerForRemoteNotifications` を呼ばず、`Metamon-Review.entitlements` に `aps-environment` を足さない | 審査用の版では AI が serverRules を作らず共有も無いので、他の人の行動で届く通知が無い |
 | アプリ内のフィードバック(#319) | `Features/Feedback` 全部(`FeedbackComposerView` / `FeedbackContext` / 振って開く `FeedbackShakeHost`・`UIWindow.motionEnded`)/ 設定の「フィードバックを送る」/ MetamonServices の `FeedbackClient` / `HTTPFeedbackClient`(`v1/feedback`) | プライバシーの表示に無い種類(カスタマーサポート・その他の診断データ・スクショ)を集める。表示を足すまで外す(`docs/legal/feedback-privacy-draft.md`) |
 | β の初回の案内(#313) | `BetaEnvironment` / `BetaWelcomeStore` / `BetaWelcomeView`(`BetaWelcomeHost`)/ `AppRuntime` の `betaWelcome`・`showBetaWelcome` / 設定の「β 版のご案内」 | 2.2(App Store の版に β の文言を入れない)。β かどうかは実行時にレシート(`sandboxReceipt` = TestFlight)で見分ける。TestFlight と App Store は同じバイナリなので、Release の App Store では実行時の判定で出ず、審査用の版はコードごと無い |
 | 設定の「投稿に表示する名前」(#250) | `AuthorNameSettingsSection`(説明が「みんなで使うアプリに投稿すると…」)。初投稿で名前を聞くアラート(`AuthorNamePromptModifier`)は残るが、記録がすべて private なので出ない | 共有と一緒に外す(外した共有機能の説明になる・2.3) |
@@ -89,7 +90,7 @@
   - GoogleService-Info.plist(Firebase)も Review / Release は prod の plist を入れる(#292・`docs/ios/architecture.md`「ビルド構成と接続先」)。
 - **プライバシーマニフェスト(#452 G6)**
   - `Metamon/PrivacyInfo.xcprivacy`(アプリ)と `MetamonWidget/PrivacyInfo.xcprivacy`(ウィジェット)。どの版にも入る(xcodegen が各ターゲットの Resources に入れる)。
-  - 元のファイルは審査用の版の申告。通常の版(Debug / Staging / Release)だけ、ビルドの最後に `scripts/extend-privacy-manifest.sh` がバンドルの写しに通常の版で集める種類(購入履歴・製品の操作・カスタマーサポート)を足す(`docs/store/privacy-label.md` の 4 章)。
+  - 元のファイルは審査用の版の申告。通常の版(Debug / Staging / Release)だけ、ビルドの最後に `scripts/extend-privacy-manifest.sh` がバンドルの写しに通常の版で集める種類(購入履歴・製品の操作・カスタマーサポート・デバイス ID)を足す(`docs/store/privacy-label.md` の 4 章)。
   - 理由が要る API: UserDefaults(`CA92.1` アプリだけ / `1C8F.1` App Group でウィジェットと共有)、空き容量(`E174.1` / `85F4.1`。音声モデルのダウンロード前の確認と不足分の表示)。ファイルの日時・起動からの時間・キーボードは使っていない。
   - 集めるデータ: ユーザー ID・名前(Sign in with Apple の表示名)・その他のユーザーコンテンツ・写真・正確な位置・クラッシュのデータ・パフォーマンスのデータ(Crashlytics・#296。審査用の版でも入れる)。すべて本人に紐づき、トラッキングなし、用途はアプリの機能。`docs/legal/privacy-policy.md` と App Store Connect の栄養ラベルに合わせる。
   - API やデータの扱いを変えたら、このファイルも直す。
@@ -142,6 +143,9 @@ otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|NearbyInterac
 #   → 何も出ないこと
 strings "$APP/Metamon" | grep -E 'AutomationsView|HTTPAutomationsClient|/automations|MatchListLeaf|HTTPMatchingClient|MatchingStore|AdultConfirmSheet|/interests|v1/feedback|FeedbackComposerView|HKHealthStore|MCSession|NISession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps|WebViewLeaf|FeedLeaf|HTTPFeedClient|v1/feeds|v1/text|ChatThreadLeaf|jp\.kz2601\.metamon\.pro|PaywallSheet|ProSettingsSection|ProEntitlementStore|購入して作る|Pro にする'
 #   → 何も出ないこと
+strings "$APP/Metamon" | grep -E 'v1/me/devices|notify-consent|HTTPPushDeviceClient|PushDeviceRegistrar'
+#   → 何も出ないこと(プッシュの登録・#269)
+#   注: registerForRemoteNotifications の文字列は FirebaseAuth(電話番号の認証の AuthAPNSTokenManager)から残る。この版では呼ばない
 #   注: WKWebView / WebKit の参照は FirebaseAuth(AuthWebViewController。OAuth・reCAPTCHA 用)から残る。
 #       この版のサインイン(Sign in with Apple・匿名)では使わない。アプリのコードからは WebKit を使わない
 grep -a -c -F -e 'Tailor It Pro' -e '購入して作る' -e 'オンラインの AI で書く' -e '今日の上限に達したため止めました' "$APP/Metamon"
