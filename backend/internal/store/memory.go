@@ -68,6 +68,9 @@ type Memory struct {
 	// runner schedules and per-app state (#342, memory_schedule.go)
 	schedules  map[string]map[string]*Schedule // env -> id
 	runnerApps map[string]*RunnerApp           // env/key
+
+	// runner stops (#346, memory_stop.go)
+	stops map[string]map[string]*Stop // env -> id
 }
 
 // NewMemory returns an empty store.
