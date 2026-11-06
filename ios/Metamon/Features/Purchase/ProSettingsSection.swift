@@ -3,7 +3,7 @@
 import SwiftUI
 import MetamonServices
 
-/// 設定シートの「Tailor It Pro」セクション(#77): プランの状態・今日の回数・購入 / 復元。
+/// 設定シートの「Tailor It Pro」セクション(#77): プランの状態・今日の回数・購入 / 復元・サブスクの管理(#326)。
 struct ProSettingsSection: View {
     @State private var showPaywall = false
     @State private var restoring = false
@@ -22,6 +22,9 @@ struct ProSettingsSection: View {
                 if let expires = gate.store.expiresAt {
                     LabeledContent("次回更新", value: expires.formatted(date: .abbreviated, time: .omitted))
                 }
+                if ManageSubscriptionPlacement.placement(isPro: true) == .prominent {
+                    ManageSubscriptionButton(accessibilityID: "settings.pro.manage")
+                }
             } else {
                 LabeledContent("今日の新規作成") {
                     Text(gate.isEnforced ? L10n.tr("\(min(gate.usedToday, gate.quota.dailyFreeLimit)) / \(gate.quota.dailyFreeLimit) 回") : L10n.tr("\(gate.usedToday) 回(制限なし)"))
@@ -39,6 +42,9 @@ struct ProSettingsSection: View {
                 Label("購入を復元", systemImage: "arrow.clockwise")
             }
             .disabled(restoring)
+            if !gate.isPro, ManageSubscriptionPlacement.placement(isPro: false) == .nearRestore {
+                ManageSubscriptionButton(accessibilityID: "settings.pro.manage")
+            }
             #if DEBUG
             Toggle("課金の制限を無効にする(デモ用・回数と有料機能)", isOn: $gate.limitDisabled)
                 .tint(Theme.Colors.brandA)
