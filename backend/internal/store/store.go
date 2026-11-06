@@ -73,8 +73,11 @@ type Record struct {
 	Author     string         `json:"author,omitempty"`     // uid of the poster (shared/public)
 	AuthorName string         `json:"authorName,omitempty"` // display name chosen by the poster
 	MarkCounts map[string]int `json:"markCounts,omitempty"` // mark id -> how many people set it (#255, marks.go)
-	CreatedAt  time.Time      `json:"createdAt"`
-	UpdatedAt  time.Time      `json:"updatedAt"`
+	// Origin is set on records a server rule created (#341, runner_write.go).
+	// Not part of the API.
+	Origin    *RecordOrigin `json:"-"`
+	CreatedAt time.Time     `json:"createdAt"`
+	UpdatedAt time.Time     `json:"updatedAt"`
 }
 
 // RecordSet locates one record collection (architecture.md §3):
