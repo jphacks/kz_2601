@@ -459,6 +459,13 @@ var recipientsByScope = map[EntityScope][]string{
 	ScopePublic:  {RecipientOwner, RecipientAuthorOf},
 }
 
+// RecipientAllowed reports whether a rule on scope data may notify kind (the
+// same table Validate uses; the runner enforces it again at run time). scope
+// must be an effective scope ("" and unknown scopes allow nothing).
+func RecipientAllowed(scope EntityScope, kind string) bool {
+	return slices.Contains(recipientsByScope[scope], kind)
+}
+
 func checkRuleNotify(where string, n *RuleNotify, row *Entity, scope EntityScope, entities map[string]*Entity, add func(string, ...any)) {
 	k := n.To.Kind
 	switch k {

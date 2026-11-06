@@ -120,9 +120,11 @@ func TestResolveTable(t *testing.T) {
 		refused Reason
 		skipped []Skip
 	}{
-		{"private owner→owner (actor is owner)", dsl.ScopePrivate, "o", "", dsl.RecipientOwner, nil, "", []Skip{{UID: "o", Reason: ReasonActor}}},
+		{"private owner→owner (own reminder)", dsl.ScopePrivate, "o", "", dsl.RecipientOwner, []string{"o"}, "", nil},
 		{"private scheduled→owner", dsl.ScopePrivate, "", "", dsl.RecipientOwner, []string{"o"}, "", nil},
 		{"\"\" scope is private", "", "", "", dsl.RecipientOwner, []string{"o"}, "", nil},
+		{"\"\" scope owner→owner (own reminder)", "", "o", "", dsl.RecipientOwner, []string{"o"}, "", nil},
+		{"private someone else's write→owner", dsl.ScopePrivate, "x", "", dsl.RecipientOwner, []string{"o"}, "", nil},
 		{"private author refused", dsl.ScopePrivate, "o", "", dsl.RecipientAuthor, nil, ReasonScope, nil},
 		{"private authorOf refused", dsl.ScopePrivate, "o", "", dsl.RecipientAuthorOf, nil, ReasonScope, nil},
 		{"private members refused", dsl.ScopePrivate, "o", "", dsl.RecipientMembers, nil, ReasonScope, nil},
@@ -136,6 +138,7 @@ func TestResolveTable(t *testing.T) {
 		{"shared scheduled→members", dsl.ScopeShared, "", "", dsl.RecipientMembers, []string{"o", "m1", "m2"}, "", nil},
 		{"shared scheduled→author who left", dsl.ScopeShared, "", "x", dsl.RecipientAuthor, nil, "", []Skip{{UID: "x", Reason: ReasonNotMember}}},
 
+		{"public owner→owner", dsl.ScopePublic, "o", "", dsl.RecipientOwner, nil, "", []Skip{{UID: "o", Reason: ReasonActor}}},
 		{"public outsider→owner", dsl.ScopePublic, "x", "", dsl.RecipientOwner, []string{"o"}, "", nil},
 		{"public outsider→authorOf", dsl.ScopePublic, "x", "", dsl.RecipientAuthorOf, []string{"m2"}, "", nil},
 		{"public owner→authorOf", dsl.ScopePublic, "o", "", dsl.RecipientAuthorOf, []string{"m2"}, "", nil},
@@ -292,6 +295,11 @@ func TestResolveNewAccount(t *testing.T) {
 	got, _ := r.Resolve(ctx, trig(dsl.ScopeShared, "m1", "m1"), plan(dsl.RecipientOwner))
 	if len(got.To) != 0 || !reflect.DeepEqual(got.Skipped, []Skip{{UID: "o", Reason: ReasonNewAccount}}) {
 		t.Errorf("unknown age: got %+v", got)
+	}
+	// private, the owner's own reminder: not someone else, no age check
+	got, _ = r.Resolve(ctx, trig(dsl.ScopePrivate, "o", "o"), plan(dsl.RecipientOwner))
+	if !slices.Equal(got.To, []string{"o"}) {
+		t.Errorf("private own reminder: got %+v", got)
 	}
 	// scheduled: no actor, no age check
 	got, _ = r.Resolve(ctx, trig(dsl.ScopeShared, "", ""), plan(dsl.RecipientOwner))

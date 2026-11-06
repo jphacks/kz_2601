@@ -32,7 +32,7 @@ const (
 	// ReasonNoRecipient: the kind resolved to nobody (no owner, empty ref,
 	// record gone, record without an author).
 	ReasonNoRecipient Reason = "no_recipient"
-	ReasonActor       Reason = "actor"      // the person who caused the trigger
+	ReasonActor       Reason = "actor"      // the person who caused the trigger (shared / public)
 	ReasonDeleted     Reason = "deleted"    // the account is deleted
 	ReasonNotMember   Reason = "not_member" // not a participant at run time
 	ReasonBlocked     Reason = "blocked"    // a block between the recipient and the actor (either way)
@@ -120,20 +120,14 @@ func (Unlimited) Limit(_ context.Context, uids []string) ([]string, []LimitDrop,
 	return uids, nil, nil
 }
 
-// allowedKinds mirrors pkg/dsl's recipientsByScope (#339). Validate rejects
-// the rest when generating; this is the run-time enforcement.
-var allowedKinds = map[dsl.EntityScope][]string{
-	dsl.ScopePrivate: {dsl.RecipientOwner},
-	dsl.ScopeShared:  {dsl.RecipientOwner, dsl.RecipientAuthor, dsl.RecipientAuthorOf, dsl.RecipientMembers},
-	dsl.ScopePublic:  {dsl.RecipientOwner, dsl.RecipientAuthorOf},
-}
-
-// KindAllowed reports whether a rule on scope data may notify kind ("" scope = private).
+// KindAllowed reports whether a rule on scope data may notify kind ("" scope
+// = private). The table is pkg/dsl's (Validate rejects the rest when
+// generating; this is the run-time enforcement).
 func KindAllowed(scope dsl.EntityScope, kind string) bool {
 	if scope == "" {
 		scope = dsl.ScopePrivate
 	}
-	return slices.Contains(allowedKinds[scope], kind)
+	return dsl.RecipientAllowed(scope, kind)
 }
 
 // Resolver decides who receives a planned notification.
@@ -304,7 +298,9 @@ func (r *Resolver) candidates(ctx context.Context, ev engine.Trigger, n engine.P
 // check returns why uid must not receive it ("" = may).
 func (r *Resolver) check(ctx context.Context, ev engine.Trigger, scope dsl.EntityScope, owner, uid string,
 	members map[string]bool, actorBlocks []string, newActor bool) (Reason, error) {
-	if uid == ev.Actor {
+	// the actor is not notified of their own write, except the owner of a
+	// private app (a reminder to oneself is the only notification there)
+	if uid == ev.Actor && scope != dsl.ScopePrivate {
 		return ReasonActor, nil
 	}
 	deleted, err := r.accounts.Deleted(ctx, uid)
@@ -324,7 +320,7 @@ func (r *Resolver) check(ctx context.Context, ev engine.Trigger, scope dsl.Entit
 			return ReasonNotMember, nil
 		}
 	}
-	if ev.Actor != "" {
+	if ev.Actor != "" && uid != ev.Actor {
 		if slices.Contains(actorBlocks, uid) {
 			return ReasonBlocked, nil
 		}
@@ -335,7 +331,7 @@ func (r *Resolver) check(ctx context.Context, ev engine.Trigger, scope dsl.Entit
 		if slices.Contains(theirs, ev.Actor) {
 			return ReasonBlocked, nil
 		}
-		// every recipient here is someone other than the actor
+		// a notification to someone other than the actor
 		if newActor {
 			return ReasonNewAccount, nil
 		}
