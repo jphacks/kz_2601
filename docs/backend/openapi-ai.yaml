@@ -244,7 +244,19 @@ paths:
     get:
       security: []
       summary: liveness
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: 'ok。stg / prod の取り違えと版を見分ける最小限だけ返す(#290・docs/infra/runtime-config.md)'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ok] }
+                  env: { type: string, description: 'APP_ENV(stg / prod)。未設定なら省略' }
+                  firestoreDatabase: { type: string, description: 'FIRESTORE_DATABASE(既定 (default))。Firestore を使わない時は省略' }
+                  version: { type: string, description: 'GIT_SHA の先頭 7 文字。未設定なら省略' }
 
 components:
   securitySchemes:

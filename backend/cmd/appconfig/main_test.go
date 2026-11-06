@@ -294,6 +294,22 @@ func TestNewAuthedOrder(t *testing.T) {
 	}
 }
 
+// GET /health names the environment and build through the full chain (#290).
+func TestHealthReportsEnv(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	t.Setenv("GIT_SHA", "0123456789abcdef")
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "p")
+	rec := httptest.NewRecorder()
+	testHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusOK {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	if body["status"] != "ok" || body["env"] != "prod" || body["firestoreDatabase"] != "(default)" || body["version"] != "0123456" {
+		t.Fatalf("%v", body)
+	}
+}
+
 // #362 / #497: a share link opened in a browser through the whole chain
 // (envelope included) gets the HTML invalid-link page in the viewer's
 // language for every way it can be dead; the API keeps its JSON 404.
