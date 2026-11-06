@@ -107,6 +107,8 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var source: String?         // photoField / videoField: camera|library|both
     public var maxDuration: Int?       // videoField: 録画の上限秒(既定 60)
     public var height: String?         // image: small|medium|large
+    /// button: "admins" = 管理者にだけ出す(#272)。表示だけで、守るのはサーバー(editableBy / deleteBy)。
+    public var visibleTo: String?
 
     // data-bound(list / stat / chart)
     public var entity: String?
@@ -234,6 +236,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance, allowRequests, autoAccept
         case show
         case front, back, toggle
+        case visibleTo
     }
 
     public init(from decoder: Decoder) throws {
@@ -260,6 +263,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         source = try? c.decodeIfPresent(String.self, forKey: .source)
         maxDuration = try? c.decodeIfPresent(Int.self, forKey: .maxDuration)
         height = try? c.decodeIfPresent(String.self, forKey: .height)
+        visibleTo = try? c.decodeIfPresent(String.self, forKey: .visibleTo)
         entity = try? c.decodeIfPresent(String.self, forKey: .entity)
         item = try? c.decodeIfPresent(ListItem.self, forKey: .item)
         sort = try? c.decodeIfPresent(Sort.self, forKey: .sort)

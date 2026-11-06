@@ -5,6 +5,7 @@ import MetamonDSL
 /// - computed field → 読み取り専用の行(ドラフトでライブ更新)
 /// - type=ref field → 参照先レコードの Picker
 /// - type=refs field → 参照先レコードの複数選択(#231)
+/// - type=member field → 参加者の Picker(#272)
 /// AI がどの入力部品を置いても同じ見た目・挙動になるよう、`DSLView` が 1 箇所で振り分ける。
 enum FormFieldOverride {
     static let inputTypes: Set<ComponentType> = [
@@ -20,6 +21,8 @@ enum FormFieldOverride {
                 RefPickerRow(c: c, field: field, form: form)
             } else if field.type == .refs {
                 RefsPickerRow(c: c, field: field, form: form)
+            } else if field.type == .member {
+                MemberPickerRow(c: c, field: field, form: form)
             }
         }
     }
@@ -27,7 +30,7 @@ enum FormFieldOverride {
     @MainActor
     static func applies(to c: Component, ctx: RenderContext) -> Bool {
         guard let form = ctx.form, inputTypes.contains(c.type), let fid = c.field, let field = form.entity.field(fid) else { return false }
-        return field.isComputed || field.type == .ref || field.type == .refs
+        return field.isComputed || field.type == .ref || field.type == .refs || field.type == .member
     }
 }
 
@@ -87,6 +90,36 @@ struct RefPickerRow: View {
                 // #131: 素の menu だと青文字だけが浮いて他の入力と揃わないので、picker(menu)と同じ器にする
                 MenuSelect(icon: "link", label: c.label ?? field.name, selection: form.string(field.id),
                            options: [("", L("選択してください"))] + options.map { ($0.id, rt.refTitle($0.id, entity: field.refEntity) ?? $0.id) })
+            }
+        }
+    }
+}
+
+/// type=member field の Picker(#272)。共有データの参加者を表示名で選ぶ。保存値は uid。
+/// 参加者を読めない時(読む前・参加していない・審査用の版)は選べない旨を出す。今の値は一覧に無くても残す(抜けた人)。
+struct MemberPickerRow: View {
+    @Environment(\.dslRuntime) private var rt
+    let c: Component
+    let field: Field
+    let form: FormDraft
+
+    var body: some View {
+        let members = rt.membersHost?.appMembers ?? []
+        let selection = form.string(field.id)
+        LabeledInput(label: c.label ?? field.name) {
+            if members.isEmpty {
+                Label(L("参加している人を読み込めていません"), systemImage: "person.2")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .renderInputChrome()
+            } else {
+                let current = selection.wrappedValue
+                let listed: [(value: String, title: String)] = members.map { (value: $0.uid, title: rt.memberName(.string($0.uid))) }
+                let known = current.isEmpty || members.contains(where: { $0.uid == current })
+                let kept: [(value: String, title: String)] = known ? [] : [(value: current, title: rt.memberName(.string(current)))]
+                MenuSelect(icon: "person", label: c.label ?? field.name, selection: selection,
+                           options: [(value: "", title: L("選択してください"))] + listed + kept)
             }
         }
     }

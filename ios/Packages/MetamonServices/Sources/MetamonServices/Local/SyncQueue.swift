@@ -49,6 +49,9 @@ public enum SyncEvent: Sendable, Equatable {
     /// 共有の記録の書き込みに Tailor It Pro が要る(402 `pro_required`・#316)。アプリの作成者が Pro でない。
     /// 操作は破棄し、create はローカル行も消した。`pro.creatorNeedsPro` = 呼び出した人は参加者(払っても直らない)
     case proRequired(appId: String, entity: String, pro: ProRequired)
+    /// アプリの決まりで断られた(#272 管理者だけ・#273 同じ内容の記録)。操作は破棄し、create はローカル行も消した。
+    /// 楽観的に書いた値が残るので、entity をサーバーから引き直すこと
+    case denied(appId: String, entity: String, denial: RecordWriteDenial)
 }
 
 /// 指数バックオフ: base × multiplier^(attempt-1)。attempt は 1 始まり。
@@ -191,6 +194,13 @@ public actor SyncQueue {
                     finish(op)
                     print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) not a member")
                     emit(.notMember(appId: op.appId, entity: op.entity))
+                    continue
+                }
+                if let denial = RecordWriteDenial(error) { // #272 #273: 「作った人だけ」の 403・競合の 409 より先に見分ける
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
+                    finish(op)
+                    print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) denied: \(denial)")
+                    emit(.denied(appId: op.appId, entity: op.entity, denial: denial))
                     continue
                 }
                 if let pro = ProRequired(error) { // #316: 4xx の rejected より先に見分ける

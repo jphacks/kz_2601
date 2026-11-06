@@ -75,9 +75,12 @@ type Record struct {
 	MarkCounts map[string]int `json:"markCounts,omitempty"` // mark id -> how many people set it (#255, marks.go)
 	// Origin is set on records a server rule created (#341, runner_write.go).
 	// Not part of the API.
-	Origin    *RecordOrigin `json:"-"`
-	CreatedAt time.Time     `json:"createdAt"`
-	UpdatedAt time.Time     `json:"updatedAt"`
+	Origin *RecordOrigin `json:"-"`
+	// UniqueKey is the entity.unique claim the record holds (#273, unique.go).
+	// Not part of the API.
+	UniqueKey string    `json:"-"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 // RecordSet locates one record collection (architecture.md §3):
@@ -232,6 +235,7 @@ type Store interface {
 	Outbox          // record writes that queue runner triggers (outbox.go, #341)
 	Schedules       // runner schedules and per-app state (schedule.go, #342)
 	RunnerActivity  // read-only rule statuses and stops for the creator (rule_status.go, #347)
+	UniqueRecords   // writes that keep entity.unique (unique.go, #273)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).

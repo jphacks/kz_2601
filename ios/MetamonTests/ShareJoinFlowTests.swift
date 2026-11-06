@@ -43,6 +43,7 @@ private final class FakeShareClient: SharingClient, MembershipClient, @unchecked
     func members(appId: String) async throws -> SharedMemberList { SharedMemberList(items: [], role: .member) }
     func removeMember(appId: String, uid: String) async throws {}
     func leave(appId: String) async throws {}
+    func setAdmin(appId: String, uid: String, admin: Bool) async throws {}
 }
 
 /// 参加者 API を持たない古いシェアの実装(プレビュー無しで import する経路)。

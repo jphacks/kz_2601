@@ -111,7 +111,7 @@ func TestSingleRestriction(t *testing.T) {
 		t.Fatalf("the enforced DSL must stay valid: %v", err)
 	}
 	// a current build keeps it
-	cur := NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity})
+	cur := NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles})
 	if cur.Active() {
 		t.Fatal("a current build must stay unrestricted")
 	}

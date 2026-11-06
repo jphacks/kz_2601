@@ -51,6 +51,7 @@ var wantRoutes = []string{
 	"PATCH /v1/apps/{appId}",
 	"PATCH /v1/apps/{appId}/dsl",
 	"PATCH /v1/apps/{appId}/entities/{entityId}/records/{recordId}",
+	"PATCH /v1/apps/{appId}/members/{uid}",
 	"POST /v1/apps",
 	"POST /v1/apps/{appId}/duplicate",
 	"POST /v1/apps/{appId}/entities/{entityId}/records",

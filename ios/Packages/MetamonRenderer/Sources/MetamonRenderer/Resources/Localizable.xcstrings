@@ -2823,6 +2823,40 @@
         }
       }
     },
+    "参加している人を読み込めていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The member list isn't loaded yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加している人を読み込めていません"
+          }
+        }
+      }
+    },
+    "参加者" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Member"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加者"
+          }
+        }
+      }
+    },
     "参照先" : {
       "extractionState" : "manual",
       "localizations" : {

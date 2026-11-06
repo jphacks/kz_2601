@@ -52,9 +52,9 @@ public extension DSLRuntime {
         RecordPermission.canEdit(record, in: dsl.entity(entity), uid: currentUserId)
     }
 
-    /// 自分が削除できるレコードか。共有レコードは作った人だけ。
+    /// 自分が削除できるレコードか。共有レコードは作った人だけ(entity.deleteBy で管理者も・#272)。
     func canDelete(entity: String, record: Record) -> Bool {
-        RecordPermission.canDelete(record, in: dsl.entity(entity), uid: currentUserId)
+        RecordPermission.canDelete(record, in: dsl.entity(entity), uid: currentUserId, isAdmin: viewerIsAdmin)
     }
 
     /// 部品が共通で使う空状態の判定: 読み込み中 / 取得失敗 / 本当に空。
