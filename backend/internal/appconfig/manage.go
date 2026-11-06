@@ -68,14 +68,18 @@ func (h *Handler) rename(r *http.Request, id, name string) error {
 	if cur.Name == name && string(compact(next)) == string(compact(cur.DSL)) {
 		return nil
 	}
-	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
+	pub, err := h.commitPublish(r, id, app, false)
+	if err != nil {
+		return err
+	}
+	_, err = h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
 		BaseVersion: cur.CurrentVersion, DSL: next, Name: name, Patch: ops,
-		Source: &store.Source{Kind: "manual", Mode: "patch", Summary: "名前を「" + name + "」に変更"},
+		Source: &store.Source{Kind: "manual", Mode: "patch", Summary: "名前を「" + name + "」に変更"}, Publish: pub,
+		Events: h.rulesChanged(r, id, cur.DSL, app),
 	})
 	if err != nil {
 		return mapStoreErr(err, "app")
 	}
-	h.publish(r, id, app, next, v.Version)
 	return nil
 }
 
@@ -116,6 +120,10 @@ func (h *Handler) duplicateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	newID := newAppID()
+	if err := h.checkPaidSave(r, newID, app, nil); err != nil { // #316: the copy is a new app of the caller
+		fail(w, err)
+		return
+	}
 	v, err := h.seedCopy(r, newID, raw, name, &store.Source{Kind: "import", Mode: "full", Summary: "「" + src.Name + "」を複製"})
 	if err != nil {
 		fail(w, err)
@@ -144,7 +152,10 @@ func (h *Handler) seedCopy(r *http.Request, id string, raw json.RawMessage, name
 	if _, _, err := h.store.EnsureApp(r.Context(), uidOf(r), id, initRaw, init.App.Name); err != nil {
 		return nil, err
 	}
-	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{BaseVersion: 1, DSL: raw, Name: name, Source: src})
+	var next dsl.App
+	_ = json.Unmarshal(raw, &next) // only read for its time-triggered rules
+	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{BaseVersion: 1, DSL: raw, Name: name, Source: src,
+		Events: h.rulesChanged(r, id, nil, &next)})
 	if err != nil {
 		return nil, mapStoreErr(err, "app")
 	}

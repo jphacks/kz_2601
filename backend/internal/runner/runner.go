@@ -8,6 +8,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/runner/notify"
 	"github.com/jphacks/kz_2601/backend/internal/runner/queue"
 	"github.com/jphacks/kz_2601/backend/internal/runner/quota"
+	"github.com/jphacks/kz_2601/backend/internal/runner/schedule"
 	"github.com/jphacks/kz_2601/backend/internal/runner/scope"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
@@ -28,6 +30,12 @@ const (
 	OutcomeSkippedStale = "skipped_stale"
 	// OutcomeMixed: the rules of one event ended differently (event level only).
 	OutcomeMixed = "mixed"
+	// OutcomeSkippedLate: a schedule run started more than Config.MaxLate
+	// after it was due (#342). It is not run later.
+	OutcomeSkippedLate = "skipped_late"
+	// OutcomeSkippedInactive: nobody opened the app for Config.InactiveDays
+	// before the run was due (#342). The schedule keeps going; opening resumes it.
+	OutcomeSkippedInactive = "skipped_inactive"
 )
 
 // Reasons of OutcomeSkippedStopped.
@@ -39,6 +47,7 @@ const (
 	ReasonVersionMissing = "version_missing" // the trigger's DSL version is gone
 	ReasonRuleRemoved    = "rule_removed"    // not in the trigger's version or not in the current DSL
 	ReasonBadEvent       = "bad_event"
+	ReasonOperatorStop   = "operator_stop" // the operator's app / rule stop (#346); stop_level says which
 )
 
 // DefaultMaxAge: triggers older than this are not run (#337: after a
@@ -49,6 +58,9 @@ const DefaultMaxAge = time.Hour
 type Store interface {
 	scope.Backend
 	store.OutboxQueue
+	store.Schedules
+	store.RunnerStops
+	store.RuleStatuses
 }
 
 // Config configures a Runner. Env, Store and Quota are required.
@@ -59,15 +71,30 @@ type Config struct {
 	Quota *quota.Quota
 	// Sender: nil = notify.LogSender.
 	Sender notify.Sender
-	// Tokens: nil = nobody has a device (the token store is #269).
+	// Tokens: nil = the devices in the store (users/{uid}/devices, #269)
+	// whose environment is PushEnvironment, read through the run's handle.
 	Tokens notify.TokenReader
-	// Consent / Age: nil = notify's defaults (no consent; age unknown).
+	// PushEnvironment: the APNs environment Sender sends to ("" = production).
+	PushEnvironment string
+	// Consent: nil = the consents in the store (users/{uid}/notifyConsent,
+	// #339) through the run's handle; none stored = not agreed.
 	Consent notify.Consent
-	Age     notify.AccountAge
+	// Age: nil = notify's default (age unknown).
+	Age notify.AccountAge
 	// Paused (RUNNER_PAUSED): events are finished as skipped_paused, never kept for later.
 	Paused func() bool
+	// NotifyPaused (RUNNER_NOTIFY_PAUSED): rules run and write, notifications
+	// are not sent (and not sent later).
+	NotifyPaused func() bool
+	// AutoPause: the automatic notify pause on reports (#339).
+	AutoPause AutoPause
 	// MaxAge: 0 = DefaultMaxAge.
 	MaxAge time.Duration
+	// MaxLate (RUNNER_SCHEDULE_MAX_LATE): a schedule run started later than
+	// this after it was due is skipped_late; 0 = schedule.DefaultMaxLate.
+	MaxLate time.Duration
+	// InactiveDays: 0 = schedule.DefaultInactiveDays.
+	InactiveDays int
 	// Batch: events claimed at a time; 0 = queue.DefaultBatch.
 	Batch  int
 	Now    func() time.Time
@@ -88,14 +115,24 @@ func New(cfg Config) (*Runner, error) {
 	if cfg.Sender == nil {
 		cfg.Sender = notify.LogSender{Logger: cfg.Logger}
 	}
-	if cfg.Tokens == nil {
-		cfg.Tokens = notify.MemoryTokens{}
+	if cfg.PushEnvironment == "" {
+		cfg.PushEnvironment = store.DeviceProduction
 	}
 	if cfg.Paused == nil {
 		cfg.Paused = func() bool { return false }
 	}
+	if cfg.NotifyPaused == nil {
+		cfg.NotifyPaused = func() bool { return false }
+	}
+	cfg.AutoPause = cfg.AutoPause.withDefaults()
 	if cfg.MaxAge <= 0 {
 		cfg.MaxAge = DefaultMaxAge
+	}
+	if cfg.MaxLate <= 0 {
+		cfg.MaxLate = schedule.DefaultMaxLate
+	}
+	if cfg.InactiveDays <= 0 {
+		cfg.InactiveDays = schedule.DefaultInactiveDays
 	}
 	if cfg.Batch <= 0 {
 		cfg.Batch = queue.DefaultBatch
@@ -116,21 +153,30 @@ func (r *Runner) Queue() *queue.Queue { return r.queue }
 
 // TickResult counts what one Tick did.
 type TickResult struct {
-	Claimed int            `json:"claimed"`
-	Done    int            `json:"done"`
-	Retried int            `json:"retried"`
-	GaveUp  int            `json:"gaveUp"`
-	Events  map[string]int `json:"outcomes,omitempty"` // event outcome -> count
+	// Scheduled: schedule runs queued by this tick (#342).
+	Scheduled int `json:"scheduled"`
+	// AutoPaused: apps whose notifications this tick paused on reports (#346).
+	AutoPaused int            `json:"autoPaused,omitempty"`
+	Claimed    int            `json:"claimed"`
+	Done       int            `json:"done"`
+	Retried    int            `json:"retried"`
+	GaveUp     int            `json:"gaveUp"`
+	Events     map[string]int `json:"outcomes,omitempty"` // event outcome -> count
 	// More: the budget ran out with events possibly left.
 	More bool `json:"more"`
 }
 
-// Tick drains due events until the queue is empty or budget has passed
-// (the batch in hand is always finished). Errors of single events are
-// retried by the queue; err is a failure to claim or to store a result.
+// Tick queues the due schedule runs, then drains due events until the
+// queue is empty or budget has passed (the batch in hand is always
+// finished). Errors of single events are retried by the queue; err is a
+// failure to claim or to store a result.
 func (r *Runner) Tick(ctx context.Context, budget time.Duration) (TickResult, error) {
 	deadline := time.Now().Add(budget)
 	var res TickResult
+	res.AutoPaused = r.autoPause(ctx)
+	if err := r.claimSchedules(ctx, deadline, &res); err != nil {
+		return res, err
+	}
 	for {
 		if ctx.Err() != nil {
 			return res, ctx.Err()
@@ -174,18 +220,54 @@ func (r *Runner) handle(ctx context.Context, ev store.OutboxEvent) (status, outc
 		for _, id := range ev.RuleIDs {
 			r.logRun(ctx, ev, runLog{ruleID: id, outcome: queue.OutcomeGaveUp})
 		}
+		r.refund(ctx, ev)
 		return store.OutboxGaveUp, queue.OutcomeGaveUp, r.queue.GiveUp(ctx, ev, "")
 	}
-	rules, perr := r.process(ctx, ev)
+	if ev.Kind == store.OutboxRulesChanged {
+		outcome, err := r.rebuild(ctx, ev)
+		if err != nil {
+			return r.retry(ctx, ev, err, quota.Charge{})
+		}
+		return store.OutboxDone, outcome, r.queue.Done(ctx, ev, outcome, nil)
+	}
+	rules, charge, perr := r.process(ctx, ev)
 	if perr != nil {
-		code := errorCode(perr)
-		r.cfg.Logger.WarnContext(ctx, "runner: event failed; will retry",
-			slog.String("event_id", ev.EventID), slog.String("app_id", ev.AppID),
-			slog.Int("attempt", ev.Attempts), slog.String("error_code", code), slog.Any("error", perr))
-		return store.OutboxRetry, quota.OutcomeError, r.queue.Retry(ctx, ev, code)
+		return r.retry(ctx, ev, perr, charge)
 	}
 	outcome = summarize(rules)
 	return store.OutboxDone, outcome, r.queue.Done(ctx, ev, outcome, rules)
+}
+
+// retry puts ev back, keeping what this attempt counted with it.
+func (r *Runner) retry(ctx context.Context, ev store.OutboxEvent, perr error, charge quota.Charge) (status, outcome string, err error) {
+	code := errorCode(perr)
+	r.cfg.Logger.WarnContext(ctx, "runner: event failed; will retry",
+		slog.String("event_id", ev.EventID), slog.String("app_id", ev.AppID),
+		slog.Int("attempt", ev.Attempts), slog.String("error_code", code), slog.Any("error", perr))
+	var raw json.RawMessage
+	if !charge.Empty() {
+		if b, err := json.Marshal(charge); err == nil {
+			raw = b
+		}
+	}
+	return store.OutboxRetry, quota.OutcomeError, r.queue.Retry(ctx, ev, code, raw)
+}
+
+// refund gives back what the attempts of a given-up event counted (#338:
+// failures are not billed). A failed refund is logged, not retried.
+func (r *Runner) refund(ctx context.Context, ev store.OutboxEvent) {
+	if len(ev.Charge) == 0 {
+		return
+	}
+	var c quota.Charge
+	err := json.Unmarshal(ev.Charge, &c)
+	if err == nil {
+		err = r.cfg.Quota.Refund(ctx, c)
+	}
+	if err != nil {
+		r.cfg.Logger.WarnContext(ctx, "runner: refund of a given-up event failed",
+			slog.String("event_id", ev.EventID), slog.String("app_id", ev.AppID), slog.Any("error", err))
+	}
 }
 
 func summarize(rules map[string]string) string {

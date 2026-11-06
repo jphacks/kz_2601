@@ -300,6 +300,41 @@ final class RecordSyncTests: XCTestCase {
         XCTAssertEqual(row?.author, "other")
     }
 
+    /// #316: 作成者が Pro でない共有アプリへの書き込みは 402 `pro_required`。再送せず、ローカル行を戻し、誰の Pro が要るかを UI に渡す。
+    func testSyncQueueProRequiredDropsCreateAndEmits() async throws {
+        let client = RecordingClient()
+        await client.setRejectCreate("posts", APIError.server(status: 402, code: "pro_required", message: "this needs Tailor It Pro: sharedData",
+                                                             details: ["features": .array([.object(["id": .string("sharedData"), "title": .string("みんなで共有するデータ"), "reason": .string("r")])]),
+                                                                       "reason": .string("creator_needs_pro")]))
+        let store = RecordStore(directory: dir)
+        let queue = SyncQueue(directory: dir, store: store, client: client, policy: .immediate)
+        await store.upsert(LocalRecord(appId: "a", entity: "posts", recordId: "local-p1", data: ["text": "こんにちは"], pendingOp: .create, clientId: "p1"))
+        let events = await queue.events()
+        await queue.enqueue(SyncOperation(id: "p1", appId: "a", entity: "posts", recordId: "local-p1", kind: .create, data: ["text": "こんにちは"]))
+        await queue.drain()
+        var it = events.makeAsyncIterator()
+        let first = await it.next()
+        guard case .proRequired(let appId, let entity, let pro)? = first else {
+            return XCTFail("expected proRequired, got \(String(describing: first))")
+        }
+        XCTAssertEqual([appId, entity], ["a", "posts"])
+        XCTAssertEqual(pro, ProRequired(features: [PaidFeature(id: "sharedData", title: "みんなで共有するデータ", reason: "r")], creatorNeedsPro: true))
+        let count = await queue.count
+        XCTAssertEqual(count, 0, "402 は再送しない")
+        let rows = await store.records(appId: "a", entity: "posts")
+        XCTAssertTrue(rows.isEmpty, "書けなかった create のローカル行は消える")
+    }
+
+    func testProRequiredParsing() {
+        XCTAssertNil(ProRequired(APIError.server(status: 403, code: "forbidden", message: "")))
+        XCTAssertNil(ProRequired(APIError.server(status: 402, code: "other", message: "")))
+        let own = ProRequired(APIError.server(status: 402, code: "pro_required", message: "",
+                                              details: ["features": .array([.object(["id": .string("serverRules")])])]))
+        XCTAssertEqual(own?.features.map(\.id), ["serverRules"])
+        XCTAssertEqual(own?.features.first?.title, "serverRules", "title が無ければ id")
+        XCTAssertEqual(own?.creatorNeedsPro, false)
+    }
+
     func testClassify() {
         XCTAssertEqual(SyncQueue.classify(APIError.server(status: 403, code: "forbidden", message: "only the author can modify this record")), .forbidden)
         XCTAssertEqual(SyncQueue.classify(URLError(.notConnectedToInternet)), .transient)

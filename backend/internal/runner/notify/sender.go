@@ -40,8 +40,9 @@ type Sender interface {
 	Send(ctx context.Context, p Push) (Result, error)
 }
 
-// TokenReader reads uid's device tokens. The implementation lives with the
-// registration API (#269); tests use MemoryTokens.
+// TokenReader reads uid's device tokens. The runner reads users/{uid}/devices
+// (registered by PUT /v1/me/devices, #269) through its appId-bound handle;
+// tests may use MemoryTokens.
 type TokenReader interface {
 	Tokens(ctx context.Context, uid string) ([]string, error)
 }

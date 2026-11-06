@@ -352,6 +352,13 @@ func (f *Firestore) CommitVersion(ctx context.Context, uid, appID string, c Comm
 			return err
 		}
 		now := Now()
+		// reads first (a transaction cannot read after writing)
+		var pubWrite func() error
+		if c.Publish != nil {
+			if pubWrite, err = f.publishOnCommit(tx, uid, appID, c, m, n, now); err != nil {
+				return err
+			}
+		}
 		upd := []firestore.Update{
 			{Path: "currentVersion", Value: n},
 			{Path: "dsl", Value: m},
@@ -377,6 +384,20 @@ func (f *Firestore) CommitVersion(ctx context.Context, uid, appID string, c Comm
 		}
 		if err := tx.Create(ref.Collection("versions").Doc(VersionDocID(n)), vd); err != nil {
 			return err
+		}
+		events, err := commitEvents(c, n, now)
+		if err != nil {
+			return err
+		}
+		for i := range events {
+			if err := tx.Create(f.outboxCol(events[i].Env).Doc(events[i].EventID), toOutboxDoc(&events[i])); err != nil {
+				return err
+			}
+		}
+		if pubWrite != nil {
+			if err := pubWrite(); err != nil {
+				return err
+			}
 		}
 		out = &Version{AppID: appID, Version: n, ParentVersion: cur, DSL: c.DSL, Patch: c.Patch, Source: c.Source, CreatedAt: now}
 		return nil
@@ -476,6 +497,62 @@ func (f *Firestore) PublishApp(ctx context.Context, uid, appID string, raw json.
 		return false, err
 	}
 	return published, nil
+}
+
+// publishOnCommit reads app_owners and apps_public inside CommitVersion's
+// transaction and returns the writes to make (nil: none). See CommitPublish.
+func (f *Firestore) publishOnCommit(tx *firestore.Transaction, uid, appID string, c Commit, m map[string]any, version int, now time.Time) (func() error, error) {
+	ownerRef, pubRef := f.ownerRef(appID), f.publicRef(appID)
+	owner, claim := "", false
+	snap, err := tx.Get(ownerRef)
+	switch {
+	case err == nil:
+		var d ownerDoc
+		if err := snap.DataTo(&d); err != nil {
+			return nil, err
+		}
+		owner = d.UID
+	case !isNotFound(err):
+		return nil, err
+	case c.Publish.Claim:
+		owner, claim = uid, true
+	}
+	mirror, mirrorOwner := false, ""
+	snap, err = tx.Get(pubRef)
+	switch {
+	case err == nil:
+		var d publicAppDoc
+		if err := snap.DataTo(&d); err != nil {
+			return nil, err
+		}
+		mirror, mirrorOwner = true, d.OwnerUID
+	case !isNotFound(err):
+		return nil, err
+	}
+	action := decidePublish(c.Publish, uid, owner, mirrorOwner, mirror)
+	if !claim && action == publishNone {
+		return nil, nil
+	}
+	return func() error {
+		if claim {
+			if err := tx.Create(ownerRef, ownerDoc{UID: uid, CreatedAt: now}); err != nil {
+				return err
+			}
+		}
+		switch action {
+		case publishCreate:
+			return tx.Create(pubRef, publicAppDoc{OwnerUID: uid, Name: c.Name, Version: int64(version), DSL: m, DSLJSON: string(c.DSL), CreatedAt: now, UpdatedAt: now})
+		case publishUpdate:
+			upd := []firestore.Update{
+				{Path: "version", Value: version}, {Path: "dsl", Value: m}, {Path: "dslJson", Value: string(c.DSL)}, {Path: "updatedAt", Value: now},
+			}
+			if c.Name != "" {
+				upd = append(upd, firestore.Update{Path: "name", Value: c.Name})
+			}
+			return tx.Update(pubRef, upd)
+		}
+		return nil
+	}, nil
 }
 
 // GetPublicApp implements Store.

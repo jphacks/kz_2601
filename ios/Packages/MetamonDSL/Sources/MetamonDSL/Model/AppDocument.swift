@@ -46,6 +46,8 @@ public struct AppDSL: Decodable, Sendable {
     public var initialScreen: String
     @Lossy public var entities: [Entity]
     @Lossy public var screens: [Screen]
+    /// サーバーの自動の動き(トップの `serverRules`)の数。中身は iOS では使わない(#340)。設定の「自動の動き」を出すかだけに使う(#347)。
+    public var serverRuleCount: Int = 0
 
     public func screen(_ id: String) -> Screen? { screens.first { $0.id == id } }
     public func entity(_ id: String) -> Entity? { entities.first { $0.id == id } }
@@ -98,7 +100,7 @@ public struct AppDSL: Decodable, Sendable {
 }
 
 extension AppDSL {
-    private enum Keys: String, CodingKey { case schemaVersion, app, initialScreen, entities, screens }
+    private enum Keys: String, CodingKey { case schemaVersion, app, initialScreen, entities, screens, serverRules }
 
     /// 毎日リセットのチェック(#132)の toggle field は、デコード時に新規作成の既定値(今日)を外す。
     public init(from decoder: Decoder) throws {
@@ -108,6 +110,8 @@ extension AppDSL {
         initialScreen = try c.decode(String.self, forKey: .initialScreen)
         _entities = try c.decode(Lossy<Entity>.self, forKey: .entities)
         _screens = try c.decode(Lossy<Screen>.self, forKey: .screens)
+        // 形を問わず数だけ(未知の形でも落とさない)
+        serverRuleCount = (try? c.decodeIfPresent([JSONValue].self, forKey: .serverRules))?.count ?? 0
         clearDailyToggleDefaults()
     }
 }

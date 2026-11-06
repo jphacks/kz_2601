@@ -18,6 +18,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -45,7 +46,13 @@ type Handler struct {
 
 	feedbackPerDay int // FEEDBACK_DAILY_LIMIT: set by feedback.go
 
-	outbox outboxConfig // RUNNER_OUTBOX / APP_ENV: set by outbox.go (#341)
+	outbox   outboxConfig // RUNNER_OUTBOX / APP_ENV: set by outbox.go (#341)
+	activity activity     // lastOpenedAt written today (activity.go, #342)
+
+	runnerEnv string // runner/{env} the automations view reads (automations.go, #347)
+
+	pro     paid.ProChecker // Pro features (pro_gate.go, #316); nil = not enforced
+	proMode paid.Mode       // PRO_GATE_MODE; "" = enforce
 }
 
 // routeGroups holds the feature routes. Each feature file registers its own
@@ -57,8 +64,11 @@ func registerRoutes(f func(h *Handler, mux *http.ServeMux)) { routeGroups = appe
 
 // New builds the v1 router (a ServeMux so the caller can probe matches).
 // Core routes live here; feature routes come from routeGroups.
-func New(s store.Store) *http.ServeMux {
+func New(s store.Store, opts ...Option) *http.ServeMux {
 	h := &Handler{store: s, cache: map[string]*dsl.App{}, eventsMax: eventsMaxStream()}
+	for _, o := range opts {
+		o(h)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/apps", h.listApps)
 	mux.HandleFunc("POST /v1/apps", h.createApp)
@@ -249,11 +259,27 @@ func (h *Handler) ensureApp(r *http.Request, appID string) (*store.App, error) {
 	return app, err
 }
 
-// publish mirrors a committed DSL to apps_public/{appId} when it has shared
-// entities, so other users opening the same appId get it from ensureApp.
-// Only the app's creator (app_owners) publishes; other copies stay private.
-// Failures are logged, not returned: the owner's private commit already
-// succeeded, and an appId first published by someone else is left alone.
+// commitPublish makes a commit to an existing app also update its mirror
+// (apps_public/{appId}) in the same transaction, so the creator's version and
+// the published one never drift apart: a commit that cannot publish fails as
+// a whole. Only the creator's commits publish (decided in the store from
+// app_owners); claim records the committer as the creator when none is known.
+// Legacy owners (catalog / mirror) are resolved into app_owners first.
+func (h *Handler) commitPublish(r *http.Request, appID string, app *dsl.App, claim bool) (*store.CommitPublish, error) {
+	if _, err := h.appOwner(r.Context(), appID); err != nil {
+		return nil, err
+	}
+	return &store.CommitPublish{Shared: app.HasSharedEntity(), Claim: claim}, nil
+}
+
+// publish mirrors the first DSL of a newly created appId (POST /apps,
+// duplicate) to apps_public/{appId} when it has shared entities, so other
+// users opening the same appId get it from ensureApp. Commits to an existing
+// app publish through commitPublish instead. Only the app's creator
+// (app_owners) publishes; other copies stay private. Failures are logged, not
+// returned: the app was already created, and without a mirror nothing of it
+// is shared yet (the next commit publishes). An appId first published by
+// someone else is left alone.
 func (h *Handler) publish(r *http.Request, appID string, app *dsl.App, raw json.RawMessage, version int) {
 	if !app.HasSharedEntity() {
 		return

@@ -13,6 +13,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/runner/engine"
 	"github.com/jphacks/kz_2601/backend/internal/runner/notify"
 	"github.com/jphacks/kz_2601/backend/internal/runner/quota"
+	"github.com/jphacks/kz_2601/backend/internal/runner/schedule"
 	"github.com/jphacks/kz_2601/backend/internal/runner/scope"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
@@ -29,52 +30,78 @@ const RunEvent = "runner.run"
 
 // process runs every rule of ev. It returns the outcome of each rule; an
 // error means the event should be retried (marks keep the retry from
-// repeating what already happened).
-func (r *Runner) process(ctx context.Context, ev store.OutboxEvent) (map[string]string, error) {
+// repeating what already happened) and charge is what the failed rule
+// counted (refunded if the event gives up).
+func (r *Runner) process(ctx context.Context, ev store.OutboxEvent) (map[string]string, quota.Charge, error) {
+	var none quota.Charge
+	stopLevel := ""
 	all := func(outcome, reason string) map[string]string {
 		out := make(map[string]string, len(ev.RuleIDs))
 		for _, id := range ev.RuleIDs {
 			out[id] = outcome
-			r.logRun(ctx, ev, runLog{ruleID: id, outcome: outcome, reason: reason})
+			r.logRun(ctx, ev, runLog{ruleID: id, outcome: outcome, reason: reason, stopLevel: stopLevel})
 			r.cfg.Quota.LogUsage(ctx, quota.Usage{AppID: ev.AppID, ActorUID: ev.ActorUID, RuleID: id, Trigger: triggerName(ev.Kind), Outcome: outcome})
 		}
 		return out
 	}
 	// stopping takes effect at once, whatever the version (#337)
 	if r.cfg.Paused() {
-		return all(quota.OutcomeSkippedPaused, ""), nil
+		return all(quota.OutcomeSkippedPaused, ""), none, nil
+	}
+	st, err := r.stopsFor(ctx, ev)
+	if err != nil {
+		return nil, none, err
+	}
+	if st.app != nil {
+		stopLevel = StopLevelApp
+		return all(OutcomeSkippedStopped, ReasonOperatorStop), none, nil
+	}
+	if ev.Kind == store.OutboxSchedule && schedule.IsLate(ev.DueAt, r.cfg.Now(), r.cfg.MaxLate) {
+		return all(OutcomeSkippedLate, ""), none, nil
 	}
 	if r.cfg.Now().Sub(ev.CreatedAt) > r.cfg.MaxAge {
-		return all(OutcomeSkippedStale, ""), nil
+		return all(OutcomeSkippedStale, ""), none, nil
 	}
 	h, err := scope.New(r.cfg.Store, r.cfg.Env, ev, r.cfg.Logger)
 	if err != nil {
-		return all(OutcomeSkippedStopped, ReasonBadEvent), nil
+		return all(OutcomeSkippedStopped, ReasonBadEvent), none, nil
 	}
 
 	current, creator, reason, err := r.appState(ctx, h, ev)
 	if err != nil {
-		return nil, err
+		return nil, none, err
 	}
 	if reason != "" {
-		return all(OutcomeSkippedStopped, reason), nil
+		if ev.Kind == store.OutboxSchedule && (reason == ReasonAppDeleted || reason == ReasonCreatorDeleted) {
+			r.dropSchedule(ctx, ev)
+		}
+		return all(OutcomeSkippedStopped, reason), none, nil
+	}
+	if ev.Kind == store.OutboxSchedule {
+		idle, err := r.inactive(ctx, h, ev)
+		if err != nil {
+			return nil, none, err
+		}
+		if idle {
+			return all(OutcomeSkippedInactive, ""), none, nil
+		}
 	}
 	v, err := h.Version(ctx, ev.Version)
 	if errors.Is(err, store.ErrNotFound) {
-		return all(OutcomeSkippedStopped, ReasonVersionMissing), nil
+		return all(OutcomeSkippedStopped, ReasonVersionMissing), none, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, none, err
 	}
 	app, err := decodeDSL(v.DSL)
 	if err != nil {
-		return all(OutcomeSkippedStopped, ReasonVersionMissing), nil
+		return all(OutcomeSkippedStopped, ReasonVersionMissing), none, nil
 	}
 	h.Bind(app, ev.Entity, ev.RecordID, ev.Data)
 
 	trig, err := r.trigger(ctx, h, ev, app)
 	if err != nil {
-		return nil, err
+		return nil, none, err
 	}
 	out := make(map[string]string, len(ev.RuleIDs))
 	for _, id := range ev.RuleIDs {
@@ -84,13 +111,17 @@ func (r *Runner) process(ctx context.Context, ev store.OutboxEvent) (map[string]
 			r.logRun(ctx, ev, runLog{ruleID: id, outcome: OutcomeSkippedStopped, reason: ReasonRuleRemoved})
 			continue
 		}
-		o, err := r.runRule(ctx, h, ev, app, rule, trig, creator)
+		if st.rules[id] {
+			out[id] = r.ruleStopped(ctx, ev, rule)
+			continue
+		}
+		o, charge, err := r.runRule(ctx, h, ev, app, rule, trig, creator, st.notify)
 		if err != nil {
-			return nil, fmt.Errorf("rule %s: %w", id, err)
+			return nil, charge, fmt.Errorf("rule %s: %w", id, err)
 		}
 		out[id] = o
 	}
-	return out, nil
+	return out, none, nil
 }
 
 // appState checks right before running that the app may still run and
@@ -138,6 +169,11 @@ func (r *Runner) appState(ctx context.Context, h *scope.Handle, ev store.OutboxE
 	if err != nil {
 		return nil, "", ReasonAppDeleted, nil
 	}
+	// sharing withdrawn (the entity left the published DSL or is no longer
+	// shared): queued shared triggers are dropped, whatever the version (#337)
+	if ent := current.EntityByID(ev.Entity); h.Shared() && (ent == nil || !ent.IsShared()) {
+		return nil, "", ReasonRuleRemoved, nil
+	}
 	return current, creator, "", nil
 }
 
@@ -164,18 +200,27 @@ func ruleByID(a *dsl.App, id string) *dsl.ServerRule {
 }
 
 // trigger builds the engine trigger from the event's snapshot (the values
-// at the time of the write). The poster's display name of a shared record
-// is read from the record itself (the event does not carry it).
+// at the time of the write), read in the creator's time zone. The poster's
+// display name of a shared record is read from the record itself (the event
+// does not carry it).
 func (r *Runner) trigger(ctx context.Context, h *scope.Handle, ev store.OutboxEvent, app *dsl.App) (engine.Trigger, error) {
 	scopeOf := dsl.EntityScope(ev.Scope)
 	if scopeOf == "" {
 		scopeOf = dsl.ScopePrivate
 	}
+	loc, err := r.location(ctx, h, ev)
+	if err != nil {
+		return engine.Trigger{}, err
+	}
 	t := engine.Trigger{
 		AppID: ev.AppID, Scope: scopeOf, Entity: ev.Entity, Actor: ev.ActorUID, Version: ev.Version, At: ev.CreatedAt,
-		Record: expreval.Record{ID: ev.RecordID, Data: orEmpty(ev.Data), Author: ev.Author},
+		Record: expreval.Record{ID: ev.RecordID, Data: orEmpty(ev.Data), Author: ev.Author}, Location: loc,
 	}
 	switch ev.Kind {
+	case store.OutboxSchedule:
+		// the run is "at" its due time: today / now read the scheduled day
+		t.Kind, t.At, t.Record = engine.KindScheduled, ev.DueAt, expreval.Record{}
+		return t, nil
 	case store.OutboxRecordCreated:
 		t.Kind = engine.KindCreated
 	case store.OutboxRecordUpdated:
@@ -204,14 +249,23 @@ func orEmpty(m map[string]any) map[string]any {
 	return m
 }
 
-// runRule counts, plans, writes and notifies one rule.
-func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEvent, app *dsl.App, rule *dsl.ServerRule, trig engine.Trigger, creator string) (string, error) {
+// runRule counts, plans, writes and notifies one rule. On error, charge is
+// what this run counted so far (kept with the event for a refund).
+// notifyPaused (NotifyPaused*, "" = not paused): the rule runs and writes
+// but sends nothing; each skipped notification is marked done so a retry
+// does not send it after the pause.
+func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEvent, app *dsl.App, rule *dsl.ServerRule, trig engine.Trigger, creator, notifyPaused string) (outcome string, charge quota.Charge, err error) {
 	start := time.Now()
 	run := quota.Run{
 		AppID: ev.AppID, CreatorUID: creator, Shared: h.Shared(), ActorUID: ev.ActorUID, Attempt: ev.Attempts,
 		// private data: the creator is the person who wrote
 		CreatorAnonymous: !h.Shared() && ev.ActorAnonymous,
 	}
+	if ev.Kind == store.OutboxSchedule {
+		run.CreatorAnonymous = ev.ActorAnonymous // the schedule keeps the creator's
+	}
+	charged := &quota.Charge{}
+	fail := func(err error) (string, quota.Charge, error) { return "", *charged, err }
 	usage := quota.Usage{AppID: ev.AppID, CreatorUID: creator, ActorUID: ev.ActorUID, RuleID: rule.ID, Trigger: triggerName(ev.Kind)}
 	rl := runLog{ruleID: rule.ID}
 	finish := func(outcome string) string {
@@ -223,23 +277,26 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 	}
 	dec, err := r.cfg.Quota.Begin(ctx, run)
 	if err != nil {
-		return "", err
+		return fail(err)
 	}
+	charged.Parts = append(charged.Parts, dec.Charge.Parts...)
+	rl.quota, rl.quotaDay = dec.AppExec, dec.Day
 	if !dec.Allowed {
 		if dec.Block != nil {
 			usage.Limit = dec.Block.Scope
 		}
-		return finish(dec.Outcome), nil
+		return finish(dec.Outcome), quota.Charge{}, nil
 	}
 	plan, err := engine.PlanRule(ctx, app, rule, trig, h)
 	if err != nil {
-		return "", err
+		return fail(err)
 	}
 
 	grant, err := r.cfg.Quota.Writes(ctx, dec, len(plan.Writes))
 	if err != nil {
-		return "", err
+		return fail(err)
 	}
+	charged.Parts = append(charged.Parts, grant.Charge.Parts...)
 	if grant.Block != nil {
 		usage.Limit = grant.Block.Scope
 	}
@@ -250,7 +307,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		}
 		wrote, err := r.write(ctx, h, ev, rule, w)
 		if err != nil {
-			return "", err
+			return fail(err)
 		}
 		if wrote {
 			usage.Writes++
@@ -259,34 +316,50 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		}
 	}
 
-	resolver, err := notify.NewResolver(notify.Config{Directory: h, Accounts: h, Consent: r.cfg.Consent, Age: r.cfg.Age,
-		Limiter: recipientLimiter{q: r.cfg.Quota, dec: dec}})
-	if err != nil {
-		return "", err
+	var consent notify.Consent = h
+	if r.cfg.Consent != nil {
+		consent = r.cfg.Consent
 	}
-	disp := notify.Dispatcher{Tokens: r.cfg.Tokens, Sender: r.cfg.Sender}
+	resolver, err := notify.NewResolver(notify.Config{Directory: h, Accounts: h, Consent: consent, Age: r.cfg.Age,
+		Limiter: recipientLimiter{q: r.cfg.Quota, dec: dec, charged: charged}})
+	if err != nil {
+		return fail(err)
+	}
+	var tokens notify.TokenReader = handleTokens{h: h, env: r.cfg.PushEnvironment}
+	if r.cfg.Tokens != nil {
+		tokens = r.cfg.Tokens
+	}
+	disp := notify.Dispatcher{Tokens: tokens, Sender: r.cfg.Sender}
 	for _, n := range plan.Notifies {
 		key := markKey(ev, rule, n.Action)
 		done, err := h.Marked(ctx, key)
 		if err != nil {
-			return "", err
+			return fail(err)
 		}
 		if done {
 			continue
 		}
+		if notifyPaused != "" {
+			if err := h.Mark(ctx, key); err != nil {
+				return fail(err)
+			}
+			rl.notifyPaused, rl.notifiesSkipped = notifyPaused, rl.notifiesSkipped+1
+			continue
+		}
 		res, err := resolver.Resolve(ctx, trig, n)
 		if err != nil {
-			return "", err
+			return fail(err)
 		}
 		out, err := disp.Dispatch(ctx, res, notify.Content{Key: ev.EventID + "/" + rule.ID, AppID: ev.AppID, AppName: app.App.Name, Title: n.Title, Body: n.Body})
 		if err != nil {
-			return "", err
+			return fail(err)
 		}
+		r.dropUnregistered(ctx, h, out.Unregistered)
 		if out.Retryable {
-			return "", errSendRetry
+			return fail(errSendRetry)
 		}
 		if err := h.Mark(ctx, key); err != nil {
-			return "", err
+			return fail(err)
 		}
 		usage.NotifyRecipients += len(out.Sent)
 		for _, s := range out.Skipped {
@@ -296,7 +369,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		}
 		rl.notifies = append(rl.notifies, out.Summary())
 	}
-	return finish(quota.OutcomeOK), nil
+	return finish(quota.OutcomeOK), quota.Charge{}, nil
 }
 
 // markKey names the done mark of one action of one rule run.
@@ -360,22 +433,51 @@ func addNumber(v any, by float64) any {
 }
 
 func triggerName(kind string) string {
-	if kind == store.OutboxRecordUpdated {
+	switch kind {
+	case store.OutboxRecordUpdated:
 		return quota.TriggerRecordUpdated
+	case store.OutboxSchedule:
+		return quota.TriggerSchedule
 	}
 	return quota.TriggerRecordCreated
 }
 
+// handleTokens reads device tokens through the run's handle (#337), keeping
+// those of the APNs environment the runner sends to.
+type handleTokens struct {
+	h   *scope.Handle
+	env string
+}
+
+// Tokens implements notify.TokenReader.
+func (t handleTokens) Tokens(ctx context.Context, uid string) ([]string, error) {
+	return t.h.DeviceTokens(ctx, uid, t.env)
+}
+
+// dropUnregistered deletes the tokens APNs rejected as unregistered (410). A
+// failure is logged only: the next send to that token gets 410 again.
+func (r *Runner) dropUnregistered(ctx context.Context, h *scope.Handle, toks []notify.DeviceToken) {
+	for _, t := range toks {
+		if err := h.DropDeviceToken(ctx, t.UID, t.Token); err != nil {
+			r.cfg.Logger.WarnContext(ctx, "runner: unregistered device token not deleted", slog.Any("error", err))
+		}
+	}
+}
+
 // recipientLimiter adapts quota.Recipients to notify.RecipientLimiter.
 type recipientLimiter struct {
-	q   *quota.Quota
-	dec quota.Decision
+	q       *quota.Quota
+	dec     quota.Decision
+	charged *quota.Charge // what the grants counted (refund on give-up)
 }
 
 func (l recipientLimiter) Limit(ctx context.Context, uids []string) ([]string, []notify.LimitDrop, error) {
 	g, err := l.q.Recipients(ctx, l.dec, uids)
 	if err != nil {
 		return nil, nil, err
+	}
+	if l.charged != nil {
+		l.charged.Parts = append(l.charged.Parts, g.Charge.Parts...)
 	}
 	drops := make([]notify.LimitDrop, 0, len(g.Dropped))
 	for _, d := range g.Dropped {
@@ -385,12 +487,19 @@ func (l recipientLimiter) Limit(ctx context.Context, uids []string) ([]string, [
 }
 
 type runLog struct {
-	ruleID        string
-	outcome       string
-	reason        string
-	writesSkipped int
-	notifies      []notify.Summary
-	took          time.Duration
+	ruleID       string
+	outcome      string
+	reason       string
+	stopLevel    string // StopLevel* of an operator_stop
+	notifyPaused string // NotifyPaused* when notifications were not sent
+	// notifiesSkipped: notify actions not sent because of notifyPaused
+	notifiesSkipped int
+	writesSkipped   int
+	notifies        []notify.Summary
+	took            time.Duration
+	// quota: the app's execution counter of quotaDay (rule status, #347)
+	quota    *quota.Block
+	quotaDay string
 }
 
 // logRun writes one runner.run line.
@@ -410,6 +519,12 @@ func (r *Runner) logRun(ctx context.Context, ev store.OutboxEvent, l runLog) {
 	if l.reason != "" {
 		attrs = append(attrs, slog.String("reason", l.reason))
 	}
+	if l.stopLevel != "" {
+		attrs = append(attrs, slog.String("stop_level", l.stopLevel))
+	}
+	if l.notifyPaused != "" {
+		attrs = append(attrs, slog.String("notify_paused", l.notifyPaused), slog.Int("notifies_skipped", l.notifiesSkipped))
+	}
 	if l.writesSkipped > 0 {
 		attrs = append(attrs, slog.Int("writes_skipped", l.writesSkipped))
 	}
@@ -417,4 +532,30 @@ func (r *Runner) logRun(ctx context.Context, ev store.OutboxEvent, l runLog) {
 		attrs = append(attrs, slog.Any("notifies", l.notifies))
 	}
 	r.cfg.Logger.LogAttrs(ctx, slog.LevelInfo, RunEvent, attrs...)
+	r.putStatus(ctx, ev, l)
+}
+
+// putStatus overwrites the rule's status for its creator's screen (#347).
+// Best effort: a failed write is logged; the run's result stands.
+func (r *Runner) putStatus(ctx context.Context, ev store.OutboxEvent, l runLog) {
+	if l.ruleID == "" || l.outcome == "" {
+		return
+	}
+	uid := "" // shared / public: one status per rule
+	if ev.Scope == "" || ev.Scope == string(dsl.ScopePrivate) {
+		uid = ev.UID
+	}
+	now := r.cfg.Now().UTC()
+	s := store.RuleStatus{ID: store.RuleStatusID(ev.AppID, uid, l.ruleID), AppID: ev.AppID, RuleID: l.ruleID,
+		At: now, Outcome: l.outcome, Reason: l.reason, NotifyPaused: l.notifyPaused != "", ExpireAt: now.Add(store.RuleStatusTTL)}
+	if l.outcome == quota.OutcomeOK {
+		s.LastOKAt = now
+	}
+	if l.quota != nil && l.quotaDay != "" {
+		s.QuotaDay, s.QuotaUsed, s.QuotaLimit = l.quotaDay, l.quota.Used, l.quota.Limit
+	}
+	if err := r.cfg.Store.PutRuleStatus(ctx, r.cfg.Env, s); err != nil {
+		r.cfg.Logger.WarnContext(ctx, "runner: writing a rule status failed",
+			slog.String("app_id", ev.AppID), slog.String("rule_id", l.ruleID), slog.Any("error", err))
+	}
 }

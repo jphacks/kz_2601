@@ -12,6 +12,9 @@
 //	FIRESTORE_EMULATOR_HOST                    local emulator (make run-runner)
 //	APP_ENV                                    names the outbox ("" = local, staging = stg)
 //	RUNNER_PAUSED=1                            finish every event as skipped_paused (not run later)
+//	RUNNER_NOTIFY_PAUSED=1                     run rules and write, send no notification (not sent later)
+//	RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS         people reporting an app in 24h that pause its notifications (default 3; 0 = off)
+//	RUNNER_AUTO_NOTIFY_PAUSE_FOR               how long that pause lasts (default 72h)
 //	RUNNER_TICK_INTERVAL                       e.g. 10s: tick by itself (local); "" = only on /internal/tick
 //	RUNNER_LIMIT_* / RUNNER_GLOBAL_DAILY       quota (internal/runner/quota)
 //	RATE_LIMIT_COLLECTION                      where quota counters live (ratelimit)
@@ -31,6 +34,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -43,6 +47,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 	"github.com/jphacks/kz_2601/backend/internal/runner"
 	"github.com/jphacks/kz_2601/backend/internal/runner/quota"
+	"github.com/jphacks/kz_2601/backend/internal/runner/schedule"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -66,11 +71,22 @@ func main() {
 		logger.Error("runner: bad configuration", slog.Any("error", err))
 		os.Exit(2)
 	}
+	maxLate, err := maxLateFromEnv(os.Getenv)
+	if err != nil {
+		logger.Error("runner: bad configuration", slog.Any("error", err))
+		os.Exit(2)
+	}
+	autoPause, err := autoPauseFromEnv(os.Getenv)
+	if err != nil {
+		logger.Error("runner: bad configuration", slog.Any("error", err))
+		os.Exit(2)
+	}
 	qcfg, err := quota.ConfigFromEnv(os.Getenv)
 	if err != nil {
 		logger.Error("runner: bad configuration", slog.Any("error", err))
 		os.Exit(2)
 	}
+	logger.Info("runner: pro gate", slog.String("mode", string(qcfg.ProMode))) // PRO_GATE_MODE (#316)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -89,15 +105,17 @@ func main() {
 		entitlement.NewProChecker(entitlement.NewFirestore(st.Client()), policy.Environments))
 	q.Logger = logger
 	env := outboxEnv(os.Getenv("APP_ENV"))
-	// No device-token store yet (#269) and no APNs key here: notifications
-	// are resolved and counted, and LogSender logs their shape only.
-	r, err := runner.New(runner.Config{Env: env, Store: st, Quota: q, Paused: pausedFromEnv(os.Getenv), Logger: logger})
+	// No APNs key here yet: notifications are resolved against the stored
+	// devices and consents (#269) and counted, and LogSender logs their shape only.
+	r, err := runner.New(runner.Config{Env: env, Store: st, Quota: q, Paused: pausedFromEnv(os.Getenv),
+		NotifyPaused: flagFromEnv(os.Getenv, "RUNNER_NOTIFY_PAUSED"), AutoPause: autoPause, MaxLate: maxLate, Logger: logger})
 	if err != nil {
 		logger.Error("runner: init failed", slog.Any("error", err))
 		os.Exit(1)
 	}
 	logger.Info("runner: starting", slog.String("firestore", target.String()), slog.String("outbox_env", env),
-		slog.Duration("tick_interval", interval), slog.Bool("paused", pausedFromEnv(os.Getenv)()))
+		slog.Duration("tick_interval", interval), slog.Bool("paused", pausedFromEnv(os.Getenv)()),
+		slog.Bool("notify_paused", flagFromEnv(os.Getenv, "RUNNER_NOTIFY_PAUSED")()))
 	t := &serial{t: r}
 	if err := serve(ctx, envOr("PORT", "8080"), newMux(t, logger), t, interval, logger); err != nil {
 		logger.Error("runner: serve failed", slog.Any("error", err))
@@ -131,13 +149,42 @@ func outboxEnv(appEnv string) string {
 
 // pausedFromEnv reads RUNNER_PAUSED on every call (1 / true / on).
 func pausedFromEnv(getenv func(string) string) func() bool {
+	return flagFromEnv(getenv, "RUNNER_PAUSED")
+}
+
+// flagFromEnv reads a switch on every call (1 / true / on).
+func flagFromEnv(getenv func(string) string, name string) func() bool {
 	return func() bool {
-		switch strings.ToLower(strings.TrimSpace(getenv("RUNNER_PAUSED"))) {
+		switch strings.ToLower(strings.TrimSpace(getenv(name))) {
 		case "1", "true", "on":
 			return true
 		}
 		return false
 	}
+}
+
+// autoPauseFromEnv reads RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS ("" = 3, 0 =
+// off) and RUNNER_AUTO_NOTIFY_PAUSE_FOR ("" = 72h, at least 1h).
+func autoPauseFromEnv(getenv func(string) string) (runner.AutoPause, error) {
+	var a runner.AutoPause
+	if raw := strings.TrimSpace(getenv("RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 || n > 1000 {
+			return a, fmt.Errorf("RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS must be 0-1000, got %q", raw)
+		}
+		a.Reporters = n
+		if n == 0 {
+			a.Reporters = -1 // off
+		}
+	}
+	if raw := strings.TrimSpace(getenv("RUNNER_AUTO_NOTIFY_PAUSE_FOR")); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil || d < time.Hour {
+			return a, fmt.Errorf("RUNNER_AUTO_NOTIFY_PAUSE_FOR must be a duration of at least 1h, got %q", raw)
+		}
+		a.For = d
+	}
+	return a, nil
 }
 
 // tickInterval reads RUNNER_TICK_INTERVAL ("" = off).
@@ -149,6 +196,19 @@ func tickInterval(getenv func(string) string) (time.Duration, error) {
 	d, err := time.ParseDuration(raw)
 	if err != nil || d < time.Second {
 		return 0, fmt.Errorf("RUNNER_TICK_INTERVAL must be a duration of at least 1s, got %q", raw)
+	}
+	return d, nil
+}
+
+// maxLateFromEnv reads RUNNER_SCHEDULE_MAX_LATE ("" = schedule.DefaultMaxLate).
+func maxLateFromEnv(getenv func(string) string) (time.Duration, error) {
+	raw := strings.TrimSpace(getenv("RUNNER_SCHEDULE_MAX_LATE"))
+	if raw == "" {
+		return schedule.DefaultMaxLate, nil
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d < time.Minute {
+		return 0, fmt.Errorf("RUNNER_SCHEDULE_MAX_LATE must be a duration of at least 1m, got %q", raw)
 	}
 	return d, nil
 }

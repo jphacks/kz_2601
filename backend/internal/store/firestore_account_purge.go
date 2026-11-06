@@ -97,6 +97,16 @@ func (f *Firestore) PurgeAccount(ctx context.Context, uid string) (AccountPurgeR
 			res.Blocks += n
 			return err
 		}},
+		{"devices", func() error {
+			n, err := f.DeleteDevices(ctx, uid)
+			res.Devices += n
+			if err != nil {
+				return err
+			}
+			n, err = f.DeleteNotifyConsents(ctx, uid)
+			res.NotifyConsents += n
+			return err
+		}},
 		{"match quota", func() error {
 			_, err := f.c.Collection(matchQuotaCollection).Doc(uid).Delete(ctx)
 			return err

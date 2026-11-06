@@ -162,7 +162,8 @@ func TestGenerateStream_EmitsAppEventBeforeResult(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(events) != 1 || events[0].Type != "app" || events[0].Name != "家計簿" || events[0].Attempt != 1 ||
+	// app first, then the home screen's 3 components (#636)
+	if len(events) != 4 || events[0].Type != "app" || events[1].Type != "component" || events[3].Component.ID != "recent" || events[0].Name != "家計簿" || events[0].Attempt != 1 ||
 		strings.Join(events[0].Tabs, ",") != "ホーム,集計" || events[0].Summary != "家計簿アプリを作っています。ホームと集計の2タブです。" || events[0].Locale != LocaleJA {
 		t.Fatalf("events: %+v", events)
 	}
@@ -227,7 +228,7 @@ func TestHandler_SSE(t *testing.T) {
 			last = strings.TrimPrefix(line, "data: ")
 		}
 	}
-	if strings.Join(names, ",") != "app,result" {
+	if strings.Join(names, ",") != "app,component,component,component,result" {
 		t.Fatalf("events %v", names)
 	}
 	var out Result

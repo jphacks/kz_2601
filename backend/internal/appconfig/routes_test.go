@@ -27,9 +27,11 @@ var wantRoutes = []string{
 	"DELETE /v1/apps/{appId}/publish",
 	"DELETE /v1/me",
 	"DELETE /v1/me/blocks/{uid}",
+	"DELETE /v1/me/devices/{installationId}",
 	"DELETE /v1/shares/{token}",
 	"GET /v1/apps",
 	"GET /v1/apps/{appId}",
+	"GET /v1/apps/{appId}/automations",
 	"GET /v1/apps/{appId}/dsl",
 	"GET /v1/apps/{appId}/entities",
 	"GET /v1/apps/{appId}/entities/{entityId}",
@@ -67,6 +69,8 @@ var wantRoutes = []string{
 	"PUT /v1/apps/order",
 	"PUT /v1/apps/{appId}/dsl",
 	"PUT /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}",
+	"PUT /v1/me/devices/{installationId}",
+	"PUT /v1/me/notify-consent/{appId}",
 }
 
 // handleFuncPatterns collects every mux.HandleFunc pattern in the package sources.

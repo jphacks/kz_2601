@@ -27,6 +27,8 @@ type runnerStore interface {
 	store.Store
 	store.OutboxQueue
 	store.RunnerWrites
+	store.RunnerStops
+	store.RuleStatuses
 }
 
 type outboxLister interface {
@@ -83,9 +85,30 @@ func withoutRules(t *testing.T, raw []byte) []byte {
 	return out
 }
 
+// unshared makes every entity private and keeps only notify_rsvp's
+// increment (the rest is not allowed on private data).
+func unshared(t *testing.T, raw []byte) []byte {
+	t.Helper()
+	var a map[string]any
+	if err := json.Unmarshal(raw, &a); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range a["entities"].([]any) {
+		delete(e.(map[string]any), "scope")
+	}
+	a["serverRules"] = []any{map[string]any{
+		"id": "notify_rsvp", "on": map[string]any{"record": "created", "entity": "rsvps"},
+		"do": []any{map[string]any{"increment": map[string]any{"ref": "event", "field": "yes_count"}}},
+	}}
+	out, _ := json.Marshal(a)
+	return out
+}
+
 type fakePro map[string]bool
 
-func (p fakePro) IsPro(_ context.Context, uid string) bool { return p[uid] }
+// IsPro: the key "*" makes everyone Pro (the default of the harness: server
+// rules run only for Pro creators, #316).
+func (p fakePro) IsPro(_ context.Context, uid string) bool { return p[uid] || p["*"] }
 
 type oldAccounts struct{}
 
@@ -119,16 +142,21 @@ type harness struct {
 	sfx    string
 	clock  time.Time
 	paused bool
-	sender *notify.FakeSender
-	tokens notify.MemoryTokens
-	r      *runner.Runner
-	logs   *syncBuffer
-	pro    fakePro
+	// notifyPaused: RUNNER_NOTIFY_PAUSED
+	notifyPaused bool
+	sender       *notify.FakeSender
+	tokens       notify.MemoryTokens
+	r            *runner.Runner
+	logs         *syncBuffer
+	pro          fakePro
 }
 
 type options struct {
-	pro fakePro
-	age notify.AccountAge
+	pro    fakePro
+	age    notify.AccountAge
+	limits func(*quota.Limits)
+	// storeDevices: read devices and consents from the store (#269) instead of h.tokens.
+	storeDevices bool
 }
 
 func stores(t *testing.T, opts options, f func(t *testing.T, h *harness)) {
@@ -156,17 +184,24 @@ func newHarness(t *testing.T, st runnerStore, sfx string, opts options) *harness
 	h.h = auth.Middleware(nil, auth.ModeDev)(appconfig.New(st))
 	lim := quota.DefaultLimits
 	lim.RunWritesFree = 10
+	if opts.limits != nil {
+		opts.limits(&lim)
+	}
 	if opts.pro == nil {
-		opts.pro = fakePro{}
+		opts.pro = fakePro{"*": true}
 	}
 	h.pro = opts.pro
 	q := quota.New(quota.Config{Limits: lim, Env: env}, nil, opts.pro)
 	logger := slog.New(slog.NewJSONHandler(h.logs, nil))
 	q.Logger = logger
-	r, err := runner.New(runner.Config{
+	cfg := runner.Config{
 		Env: env, Store: st, Quota: q, Sender: h.sender, Tokens: h.tokens, Age: opts.age,
-		Paused: func() bool { return h.paused }, Now: func() time.Time { return h.clock }, Logger: logger,
-	})
+		Paused: func() bool { return h.paused }, NotifyPaused: func() bool { return h.notifyPaused }, Now: func() time.Time { return h.clock }, Logger: logger,
+	}
+	if opts.storeDevices {
+		cfg.Tokens = nil
+	}
+	r, err := runner.New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,10 +228,20 @@ func (h *harness) do(uid, method, path, body string, hdr map[string]string) (int
 
 func (h *harness) putDSL(uid, app string, dsl []byte) {
 	h.t.Helper()
+	h.putDSLTZ(uid, app, dsl, "")
+}
+
+// putDSLTZ saves dsl as a device in time zone tz would ("" = no header).
+func (h *harness) putDSLTZ(uid, app string, dsl []byte, tz string) {
+	h.t.Helper()
 	_, cur := h.do(uid, http.MethodGet, app+"/dsl", "", nil)
 	v, _ := cur["version"].(float64)
 	body := `{"dsl":` + string(dsl) + `,"source":{"kind":"ai","mode":"full","transcript":"x","summary":"x","model":"test"}}`
-	if code, out := h.do(uid, http.MethodPut, app+"/dsl", body, map[string]string{"If-Match": `"` + strconv.Itoa(int(v)) + `"`}); code != http.StatusCreated {
+	hdr := map[string]string{"If-Match": `"` + strconv.Itoa(int(v)) + `"`}
+	if tz != "" {
+		hdr[appconfig.TimeZoneHeader] = tz
+	}
+	if code, out := h.do(uid, http.MethodPut, app+"/dsl", body, hdr); code != http.StatusCreated {
 		h.t.Fatalf("put dsl %s: %d %v", app, code, out)
 	}
 }
@@ -249,7 +294,7 @@ func (h *harness) events(appID string) []store.OutboxEvent {
 	}
 	var out []store.OutboxEvent
 	for _, ev := range all {
-		if ev.AppID == appID {
+		if ev.AppID == appID && (ev.Kind == store.OutboxRecordCreated || ev.Kind == store.OutboxRecordUpdated) {
 			out = append(out, ev)
 		}
 	}
@@ -457,6 +502,11 @@ func TestRunnerStops(t *testing.T) {
 			{name: "rule removed", pro: true, want: runner.OutcomeSkippedStopped, stop: func(_, app, owner string) {
 				h.putDSL(owner, app, withoutRules(h.t, circleRules(h.t)))
 			}},
+			// the creator took every entity off sharing but kept the rule: the
+			// mirror follows the commit and the queued shared trigger is dropped
+			{name: "sharing withdrawn", pro: true, want: runner.OutcomeSkippedStopped, stop: func(_, app, owner string) {
+				h.putDSL(owner, app, unshared(h.t, circleRules(h.t)))
+			}},
 			{name: "creator deleted", pro: true, want: runner.OutcomeSkippedStopped, stop: func(_, _, owner string) {
 				if err := h.st.DeactivateUser(h.t.Context(), owner); err != nil {
 					h.t.Fatal(err)
@@ -544,6 +594,36 @@ func TestRunnerNotifyConsent(t *testing.T) {
 		}
 		if out := h.logs.String(); !strings.Contains(out, `"no_consent":1`) {
 			t.Fatalf("no_consent not counted: %s", out)
+		}
+	})
+}
+
+// #316: server rules are a Pro feature, private apps included. A creator
+// without Pro (or whose Pro lapsed) keeps the app and its rules, but nothing
+// runs: skipped_plan, nothing written, nothing sent.
+func TestRunnerPrivateNeedsPro(t *testing.T) {
+	stores(t, options{pro: fakePro{}}, func(t *testing.T, h *harness) {
+		id, uid := "RUN-FREE"+h.sfx, "uid-free-owner"+h.sfx
+		h.tokens[uid] = []string{"tok-free"}
+		_, project, _ := h.privateTodo(id, uid)
+		if res := h.tick(); res.Done != 1 {
+			t.Fatalf("tick: %+v", res)
+		}
+		done := h.oneEvent(id)
+		if done.Outcome != quota.OutcomeSkippedPlan || done.RuleOutcomes["on_task"] != quota.OutcomeSkippedPlan {
+			t.Fatalf("event: %+v", done)
+		}
+		if n := len(h.records(store.PrivateRecords(uid, id, "log"))); n != 0 {
+			t.Fatalf("logs written without Pro: %d", n)
+		}
+		if c := num(h.record(store.PrivateRecords(uid, id, "project"), project).Data["count"]); c != 0 {
+			t.Fatalf("count without Pro: %v", c)
+		}
+		if p := h.sender.Pushes(); len(p) != 0 {
+			t.Fatalf("pushes without Pro: %+v", p)
+		}
+		if !strings.Contains(h.logs.String(), `"limit":"`+quota.ScopeNeedsPro+`"`) {
+			t.Fatalf("runner.usage limit: %s", h.logs.String())
 		}
 	})
 }

@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "time/tzdata" // X-Time-Zone names resolve on a distroless image (#342)
 
 	"github.com/jphacks/kz_2601/backend/internal/appcheck"
 	"github.com/jphacks/kz_2601/backend/internal/appconfig"
@@ -18,6 +19,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -41,8 +43,18 @@ func main() {
 	defer closeStore()
 
 	authed := newAuthed(newAppCheck(ctx, project, logger), auth.Middleware(verifier, mode), st)
-	api := appconfig.New(st)
 	ents := newEntitlements(st, logger)
+	// Pro features (#316): paid saves and shared writes need Pro; a purchase
+	// counts at once on this instance (Changed drops the cached "not Pro")
+	pro := entitlement.NewProChecker(ents.Store, ents.Verifier.Environments)
+	ents.Changed = pro.Forget
+	proMode, err := paid.ModeFromEnv(os.Getenv) // enforce (default) | log | off
+	if err != nil {
+		logger.Error("pro gate", slog.Any("error", err))
+		os.Exit(1)
+	}
+	logger.Info("pro gate", slog.String("mode", string(proMode)))
+	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode))
 	entitlement.Register(api, ents) // Pro (#314)
 	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appStoreNotifications(ents, logger))
 	server := &http.Server{

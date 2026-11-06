@@ -10,6 +10,7 @@ App Store 審査ガイドライン 5.1.1(v)(アカウントを作れるアプリ
 | `users/{uid}/apps/*` | `status: "archived"`(`DELETE /v1/apps/{appId}` と同じ)。versions・records は残る |
 | `shares/*`(`ownerUid == uid`) | `revoked: true`(受け取り側の取り込み・プレビューは 404) |
 | `public_apps/*`(`ownerUid == uid`) | 取り下げ(「探す」から消える) |
+| `users/{uid}/devices/*`(プッシュ通知の端末・#269) | 消す(決定 #337: プッシュをすぐ止める。[notifications.md](notifications.md)) |
 | `apps_public/*`(共有アプリの DSL と共有レコード) | 残す。他人の投稿も自分の投稿も消えない |
 | Firebase Auth のユーザー | サーバーは削除しない(iOS がクライアント SDK で削除する。下記「再登録」) |
 

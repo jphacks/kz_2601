@@ -47,18 +47,25 @@ func outboxFromEnv(getenv func(string) string) outboxConfig {
 	default:
 		return outboxConfig{}
 	}
-	env := strings.ToLower(strings.TrimSpace(getenv("APP_ENV")))
+	env, ok := runnerEnv(getenv)
+	if !ok {
+		log.Printf("appconfig: %s=1 but APP_ENV %q cannot name an outbox; the outbox stays off", runnerOutboxEnv, env)
+		return outboxConfig{}
+	}
+	return outboxConfig{on: true, env: env}
+}
+
+// runnerEnv is the {env} of runner/{env}/… for APP_ENV; ok=false when
+// APP_ENV cannot name one.
+func runnerEnv(getenv func(string) string) (env string, ok bool) {
+	env = strings.ToLower(strings.TrimSpace(getenv("APP_ENV")))
 	switch env {
 	case "":
 		env = outboxLocalEnv
 	case "staging":
 		env = "stg" // fsenv counts it as stg too
 	}
-	if !outboxEnvRe.MatchString(env) {
-		log.Printf("appconfig: %s=1 but APP_ENV %q cannot name an outbox; the outbox stays off", runnerOutboxEnv, env)
-		return outboxConfig{}
-	}
-	return outboxConfig{on: true, env: env}
+	return env, outboxEnvRe.MatchString(env)
 }
 
 // outboxPlan is what a write to one entity needs to build its events.
@@ -74,6 +81,7 @@ type outboxPlan struct {
 	heavy   map[string]bool
 	actor   string
 	anon    bool
+	tz      string // the creator's zone when the writer is the creator ("" = the runner looks it up)
 }
 
 // outboxPlanFor returns the plan for a kind (dsl.TriggerCreated / Updated)
@@ -94,12 +102,15 @@ func (h *Handler) outboxPlanFor(r *http.Request, cur *store.App, ent *dsl.Entity
 			return nil, err // only the creator's mirror counts
 		}
 		p.rules, p.version = a, pub.Version
+		if owner == p.actor {
+			p.tz = headerTimeZone(r)
+		}
 	} else {
 		a, err := h.parsedDSL(uidOf(r), cur)
 		if err != nil {
 			return nil, err
 		}
-		p.rules, p.version, p.uid = a, cur.CurrentVersion, uidOf(r)
+		p.rules, p.version, p.uid, p.tz = a, cur.CurrentVersion, uidOf(r), headerTimeZone(r)
 	}
 	src := p.rules.EntityByID(ent.ID)
 	// the declaring DSL must put the records on the same side as the write
@@ -149,7 +160,7 @@ func (p *outboxPlan) emit() store.EmitFunc {
 			Env: p.env, Kind: kind, AppID: p.appID, Scope: string(p.scope), UID: p.uid,
 			Entity: p.entity, RecordID: next.ID, Author: next.Author, Version: p.version,
 			RuleIDs: ids, ChangedFields: changed, Data: pickFields(next.Data, fields),
-			ActorUID: p.actor, ActorAnonymous: p.anon,
+			ActorUID: p.actor, ActorAnonymous: p.anon, TimeZone: p.tz,
 		}
 		if prev != nil {
 			ev.Prev = pickFields(prev.Data, fields)

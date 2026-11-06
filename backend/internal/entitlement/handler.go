@@ -44,6 +44,9 @@ func Register(mux *http.ServeMux, s *Service) {
 		var verr *appstore.Error
 		switch {
 		case err == nil:
+			if s.Changed != nil {
+				s.Changed(auth.UID(r.Context()))
+			}
 			httpx.WriteJSON(w, http.StatusOK, st)
 		case errors.As(err, &verr):
 			slog.WarnContext(r.Context(), "entitlement: rejected transaction", slog.String("reason", verr.Reason), slog.Any("error", verr.Err))

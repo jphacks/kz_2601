@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 )
 
@@ -32,7 +33,8 @@ type Plan string
 const (
 	PlanFree Plan = "free"
 	PlanPro  Plan = "pro"
-	// PlanNone: the creator may not run rules (anonymous, or shared data without Pro).
+	// PlanNone: the creator may not run rules (anonymous, or no Pro: server
+	// rules are a Pro feature, #316).
 	PlanNone Plan = "none"
 )
 
@@ -61,6 +63,8 @@ const (
 	ScopeScheduledRules = "scheduled_rules"
 	ScopeAnonymous      = "anonymous"
 	ScopeSharedNeedsPro = "shared_needs_pro"
+	// ScopeNeedsPro: the creator of a private app's rules has no Pro (#316).
+	ScopeNeedsPro = "needs_pro"
 )
 
 // ProChecker is entitlement.ProChecker (same as ratelimit.ProChecker); nil = nobody is Pro.
@@ -77,6 +81,11 @@ type Config struct {
 	Location *time.Location
 	// Now is the clock; nil = time.Now.
 	Now func() time.Time
+	// ProMode is PRO_GATE_MODE (#316): enforce ("" too) runs rules only for
+	// Pro creators; log and off run private apps on the free plan as before
+	// #316 (log also writes pro_gate.would_block). Shared data needs Pro in
+	// every mode (#338).
+	ProMode paid.Mode
 }
 
 // Run is one execution of one rule (an outbox entry or a scheduled tick).
@@ -109,12 +118,17 @@ type Decision struct {
 	// NearLimit: an execution counter reached 80% (the creator's warning).
 	NearLimit bool
 	ResetAt   time.Time
+	// Day is the quota's day of the run (yyyy-mm-dd in Config.Location).
+	Day string
 	// Charge is what Begin counted; give it back with Quota.Refund when the
 	// run fails for good.
 	Charge Charge
+	// AppExec is the app's execution counter as Begin saw it (after its own
+	// charge when allowed); nil when Begin did not read it (a plan block, a
+	// retry, or the counter is off). The creator's screen shows it (#347).
+	AppExec *Block
 
 	run      Run
-	day      string
 	expireAt time.Time
 }
 
@@ -172,6 +186,10 @@ func (q *Quota) logger() *slog.Logger {
 }
 
 // Plan decides the creator's plan. A verified Pro wins over anonymity (#314).
+// Server rules are a Pro feature (#316, owner's decision 2026-11-06): without
+// Pro nothing runs, private apps included: the free allowance is 0. PlanFree
+// and the *Free limits stay (a 0 limit means "no counter", not "nothing") for
+// PRO_GATE_MODE=log / off, the only cases Plan returns PlanFree.
 func (q *Quota) Plan(ctx context.Context, r Run) (Plan, *Block) {
 	switch {
 	case q.pro != nil && r.CreatorUID != "" && q.pro.IsPro(ctx, r.CreatorUID):
@@ -180,8 +198,12 @@ func (q *Quota) Plan(ctx context.Context, r Run) (Plan, *Block) {
 		return PlanNone, &Block{Scope: ScopeAnonymous}
 	case r.Shared:
 		return PlanNone, &Block{Scope: ScopeSharedNeedsPro}
+	case !q.cfg.ProMode.Checks():
+		return PlanFree, nil
+	case q.cfg.ProMode.Stop(ctx, q.logger(), "runner", r.CreatorUID, []string{paid.ServerRules}):
+		return PlanNone, &Block{Scope: ScopeNeedsPro}
 	}
-	return PlanFree, nil
+	return PlanFree, nil // PRO_GATE_MODE=log: the pre-#316 free allowance
 }
 
 // Begin checks the plan and counts one execution against the app, creator,
@@ -191,7 +213,7 @@ func (q *Quota) Begin(ctx context.Context, r Run) (Decision, error) {
 	y, m, d := now.Date()
 	reset := time.Date(y, m, d+1, 0, 0, 0, 0, q.cfg.Location)
 	dec := Decision{
-		run: r, day: now.Format("2006-01-02"), ResetAt: reset,
+		run: r, Day: now.Format("2006-01-02"), ResetAt: reset,
 		// TTL: a day of slack so the document outlives its own day.
 		expireAt: reset.Add(24 * time.Hour),
 	}
@@ -209,7 +231,7 @@ func (q *Quota) Begin(ctx context.Context, r Run) (Decision, error) {
 	var counters []ratelimit.Counter
 	add := func(scope, id string, limit int) {
 		if limit > 0 {
-			counters = append(counters, ratelimit.Counter{ID: q.id(dec.day, id), Scope: scope, Limit: limit})
+			counters = append(counters, ratelimit.Counter{ID: q.id(dec.Day, id), Scope: scope, Limit: limit})
 		}
 	}
 	add(ScopeAppExec, "rx_app_"+docSafe(r.AppID), pick(plan, l.AppExecFree, l.AppExecPro))
@@ -224,6 +246,11 @@ func (q *Quota) Begin(ctx context.Context, r Run) (Decision, error) {
 	u, mem, err := q.consume(ctx, counters, 1, dec.expireAt)
 	if err != nil {
 		return dec, err
+	}
+	for i, c := range counters {
+		if c.Scope == ScopeAppExec {
+			dec.AppExec = &Block{Scope: c.Scope, CounterID: c.ID, Limit: c.Limit, Used: u.Counts[i]}
+		}
 	}
 	if u.Blocked >= 0 {
 		c := counters[u.Blocked]
@@ -269,7 +296,7 @@ func (q *Quota) Writes(ctx context.Context, dec Decision, n int) (Grant, error) 
 		g.Dropped = n - g.Allowed
 		return g, nil
 	}
-	ctr := ratelimit.Counter{ID: q.id(dec.day, "rw_app_"+docSafe(dec.run.AppID)), Scope: ScopeAppWrites, Limit: limit}
+	ctr := ratelimit.Counter{ID: q.id(dec.Day, "rw_app_"+docSafe(dec.run.AppID)), Scope: ScopeAppWrites, Limit: limit}
 	got, part, blk, err := q.fill(ctx, ctr, g.Allowed, dec.expireAt)
 	if err != nil {
 		return Grant{Dropped: n}, err
@@ -340,10 +367,10 @@ func (q *Quota) Recipients(ctx context.Context, dec Decision, uids []string) (Re
 	for _, u := range list {
 		var counters []ratelimit.Counter
 		if l.RecipientPerApp > 0 {
-			counters = append(counters, ratelimit.Counter{ID: q.id(dec.day, "rn_rcpt_app_"+docSafe(dec.run.AppID)+"_"+docSafe(u)), Scope: ScopeRecipientApp, Limit: l.RecipientPerApp})
+			counters = append(counters, ratelimit.Counter{ID: q.id(dec.Day, "rn_rcpt_app_"+docSafe(dec.run.AppID)+"_"+docSafe(u)), Scope: ScopeRecipientApp, Limit: l.RecipientPerApp})
 		}
 		if l.RecipientTotal > 0 {
-			counters = append(counters, ratelimit.Counter{ID: q.id(dec.day, "rn_rcpt_total_"+docSafe(u)), Scope: ScopeRecipientTotal, Limit: l.RecipientTotal})
+			counters = append(counters, ratelimit.Counter{ID: q.id(dec.Day, "rn_rcpt_total_"+docSafe(u)), Scope: ScopeRecipientTotal, Limit: l.RecipientTotal})
 		}
 		if len(counters) == 0 {
 			ok = append(ok, taken{uid: u})
@@ -367,7 +394,7 @@ func (q *Quota) Recipients(ctx context.Context, dec Decision, uids []string) (Re
 	// then the app's daily recipients, as many as fit
 	got := len(ok)
 	if limit := pick(dec.Plan, l.AppNotifyFree, l.AppNotifyPro); limit > 0 && got > 0 {
-		ctr := ratelimit.Counter{ID: q.id(dec.day, "rn_app_"+docSafe(dec.run.AppID)), Scope: ScopeAppNotify, Limit: limit}
+		ctr := ratelimit.Counter{ID: q.id(dec.Day, "rn_app_"+docSafe(dec.run.AppID)), Scope: ScopeAppNotify, Limit: limit}
 		n, part, blk, err := q.fill(ctx, ctr, got, dec.expireAt)
 		if err != nil {
 			for _, t := range ok {
@@ -395,7 +422,7 @@ func (q *Quota) Recipients(ctx context.Context, dec Decision, uids []string) (Re
 // The generation stage rejects more; the runner runs only the first allowed.
 func (q *Quota) ScheduledRules(plan Plan, n int) (allowed int, blk *Block) {
 	if plan == PlanNone {
-		return 0, &Block{Scope: ScopeAnonymous}
+		return 0, &Block{Scope: ScopeNeedsPro}
 	}
 	l := q.cfg.Limits
 	c := pick(plan, l.ScheduledRulesFree, l.ScheduledRulesPro)

@@ -55,14 +55,19 @@
 | `IOS_APP_STORE_URL` | appconfig | 上の案内から開く App Store の URL(`https://apps.apple.com/app/id<id>`) | 無し |
 | `FEEDBACK_DAILY_LIMIT` | appconfig | 1 人 1 日のフィードバック送信の上限。`0` で数えない | 5 |
 | `AI_PAUSED` | ai | `1`(`true` / `on` も可)で AI の生成だけを止める(#511)。generate(`mode=undo` を除く)・chat・text が Claude を呼ばずに 503 `ai_paused` を返す。AI を止める時はこれを使う([ai-pause.md](ai-pause.md)) | 無し(止めない) |
+| `PRO_GATE_MODE` | ai・appconfig・runner(3 つとも同じ値にする) | 有料の機能(共有データ・自動の動き・アプリの中のオンラインの AI)の強制(#316・[pro.md](../backend/features/pro.md))。`enforce` = Pro でなければ 402 `pro_required` / runner は `skipped_plan`。`log` = 止めずに、止めるはずだった事実を構造化ログ `pro_gate.would_block`(`where`・`uid_hash`・`features`・`blocked:false`)に出すだけ(runner は private のアプリを #316 の前の無料の枠で動かす)。`off` = 見ない(#316 の前と同じ)。共有データの自動の動きは #338 のとおりどの値でも Pro だけ。それ以外の値は起動しない(打ち間違いで外れないように)。段階的に出す時は `log` で `would_block` の量を見てから `enforce` | `enforce` |
 | `RATE_LIMIT_GLOBAL_DAILY` | ai | 環境全体の 1 日の AI 上限(費用ブレーカー)([rate-limit.md](../backend/rate-limit.md))。AI を止める用途には `AI_PAUSED` を使う。`1` にして止めるのは、`AI_PAUSED` の入っていない版が動いている時の予備だけ([incident-runbook.md §5](../ops/incident-runbook.md#5-手順-a-claude-api-の障害上限)) | 2000 |
 | `RATE_LIMIT_ANON_DAILY` / `_USER_DAILY` / `_PRO_DAILY` / `_IP_DAILY` | ai | 利用者ごと・IP ごとの 1 日の上限([rate-limit.md](../backend/rate-limit.md)) | 30 / 60 / 300 / 300 |
 | `RATE_LIMIT_WEIGHT_*` | ai | 呼び出し 1 回で数える重み([rate-limit.md](../backend/rate-limit.md)) | 3 / 2 / 1 / 1 |
 | `RUNNER_GLOBAL_DAILY` | runner(**まだ使われていない**) | 環境全体の 1 日の自動の動きの実行の上限(費用の遮断・[#338](../decisions/338-server-feature-cost-model.md#上限案))。`0` で数えない。runner のサービスの追加は人の承認の後 | 10000 |
-| `RUNNER_LIMIT_*` | runner(**まだ使われていない**) | アプリ・作成者・きっかけの人・受け取る人ごとの 1 日の上限と、1 回の実行の形の上限(`backend/internal/runner/quota/config.go` の `ConfigFromEnv`・#345)。`_FREE` / `_PRO` の組は無料 / Pro。`0` で数えない。runner のサービスの追加は人の承認の後 | 実行 100 / 2000(アプリ)・300 / 3000(作成者)、書き込み 100 / 2000、通知の宛先 50 / 1000、受け取る人 20(1 アプリ)・100(合計)、きっかけの人 200、1 回の宛先 1 / 200・書き込み 1 / 10、定期のルール 1 / 5 |
+| `RUNNER_LIMIT_*` | runner(**まだ使われていない**) | アプリ・作成者・きっかけの人・受け取る人ごとの 1 日の上限と、1 回の実行の形の上限(`backend/internal/runner/quota/config.go` の `ConfigFromEnv`・#345)。`_FREE` / `_PRO` の組は無料 / Pro。**自動の動きは Pro だけ(#316)なので `_FREE` は今は使われない**(Pro でない作成者のルールは数える前に `skipped_plan`)。`0` で数えない。runner のサービスの追加は人の承認の後 | 実行 100 / 2000(アプリ)・300 / 3000(作成者)、書き込み 100 / 2000、通知の宛先 50 / 1000、受け取る人 20(1 アプリ)・100(合計)、きっかけの人 200、1 回の宛先 1 / 200・書き込み 1 / 10、定期のルール 1 / 5 |
+| `RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS` | runner(**まだデプロイしていない**) | 1 つのアプリ(アプリそのもの・その中の投稿)を 24 時間でこの人数(別々の人)が通報したら、そのアプリの通知を自動で一時停止する(#339・#346)。止めるのは通知だけ(非公開化などは人)。`0` で自動では止めない | 3 |
+| `RUNNER_AUTO_NOTIFY_PAUSE_FOR` | runner(**まだデプロイしていない**) | 上の自動の一時停止の長さ。`48h` のように書く。1 時間未満は起動しない。運営が `moderate resume-notify` で先に解ける([incident-runbook.md 手順 F](../ops/incident-runbook.md#13-手順-f-悪用自動の動き)) | `72h` |
+| `RUNNER_NOTIFY_PAUSED` | runner(**まだデプロイしていない**) | `1`(`true` / `on` も可)で通知だけを全体で止める(#339・#346)。ルールは動き、書き込みはする。止めている間の通知は後から送らない | 無し(止めない) |
 | `RUNNER_PAUSED` | runner(**まだデプロイしていない**) | `1`(`true` / `on` も可)で自動の動きを全体で止める(#337 の停止スイッチの「全体」)。止めている間に取り出したきっかけは `skipped_paused` で終わらせ、再開しても後からまとめて実行しない | 無し(止めない) |
+| `RUNNER_SCHEDULE_MAX_LATE` | runner(**まだデプロイしていない**) | 定期のルール(#342)の実行が期限からこれより遅れたら `skipped_late` にして実行しない(後からまとめて実行しない)。`45m` のように書く。1 分未満は起動しない | `30m` |
 | `RUNNER_TICK_INTERVAL` | runner(**まだデプロイしていない**) | ローカル用。`10s` のように書くと、runner が自分でこの間隔で outbox を処理する。本番は Cloud Scheduler が `POST /internal/tick` を呼ぶので入れない | 無し(`/internal/tick` を呼ばれた時だけ) |
-| `RUNNER_OUTBOX` | appconfig | `1` で、serverRules(自動の動き)の条件に合う記録の書き込みを、同じトランザクションで outbox(`runner/{APP_ENV}/outbox`)に積む(#341)。入れるのは人の承認を得てから(runner が無いまま入れると積まれるだけで動かない) | 無し(積まない) |
+| `RUNNER_OUTBOX` | appconfig | `1` で、serverRules(自動の動き)の条件に合う記録の書き込みを、同じトランザクションで outbox(`runner/{APP_ENV}/outbox`)に積む(#341)。時刻のきっかけを持つ(持っていた)DSL の保存では `rules_changed` を同じトランザクションで積み、`GET /dsl` で `runner/{APP_ENV}/apps/*` の `lastOpenedAt` を 1 アプリ 1 日 1 回まで書く(#342)。入れるのは人の承認を得てから(runner が無いまま入れると積まれるだけで動かない) | 無し(積まない) |
 | `LOG_LEVEL` | 両方 | ログの詳しさ(調査の間だけ `debug` など) | info |
 
 この表に無い変数は、運用で変えないでください。変えたい時は Issue にして、ワークフローか本書に足します。

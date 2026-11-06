@@ -975,6 +975,20 @@ Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-
 
 DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か field>` で表示 3 秒後にその入力欄へフォーカス、`METAMON_AUTO_BLUR=<秒>` でさらに n 秒後に閉じる。`voice`(音声画面)/ `voice-sheet`(生成後に発話シートを開いて入力)/ `chat`(対話の返答欄)も可。例: `METAMON_MOCK=1 METAMON_INITIAL_EXAMPLE=gallery-input METAMON_AUTO_OPEN=checkin_form METAMON_AUTO_FOCUS=pin`。ヘッドレス起動のシミュレータはハードウェアキーボード未接続なのでソフトキーボードが出る。
 
+### 21.1 横向き(#625)
+
+iPhone は縦と横(左右)を使える(上下逆さま・iPad は対象外。`Info.plist` の `UISupportedInterfaceOrientations`・`TARGETED_DEVICE_FAMILY = 1`)。横向き = 高さが compact(`verticalSizeClass == .compact`)。方針は「同じ部品のまま、幅を絞って中央に寄せる・飾りを小さくする・縦に収まらない所はスクロール」。並べ替え(2 カラム化)は音声画面だけ。
+
+| 場所 | 横向きの扱い | 実装 |
+|---|---|---|
+| 生成したアプリの画面(`GridScreenLayout`) | 高さ ÷ 12 では行が潰れるので、行の高さを固定(52pt)して画面ごと縦スクロール。幅は最大 640pt で中央寄せし、左右の余白(各 96pt 以上)にマイク FAB が収まるようにする。A〜F の列の割り付けは縦と同じ。voiceInput 画面も横ではスクロール | `GridMetrics.resolve`(純粋関数・`GridMetricsTests`)。横では最下段の FAB 退避(`GridBottomObstructionKey`)を上げず、余白が取れない幅だけ末尾に FAB ぶんの余白 |
+| 音声画面 / 発話シート(`VoiceInputView`) | 左 = 見出しとマイク(スクロール)、右 = 例文・文字入力・「探す」。ツルを出さず、マイクと見出しを小さく | `LandscapeLayout`(`LandscapeLayoutTests`)。文字・録音の状態は `VoiceInputView` の `@State` なので回転しても残る |
+| 対話(`ClarifyChatView`) | 幅 560pt まで中央寄せ。キーボード表示中は選択肢チップと「これでいく」を畳み、吹き出しと入力欄の場所を残す | `.readableWidth()`・`collapsesOffer` |
+| チュートリアル・引き継ぎの案内・変身一覧 | ツルを小さく・幅を絞る・高さが足りないシートは縦スクロール | `TutorialView`・`AccountLinkPromptSheet`・`AppSwitcherSheet` |
+| QR の読み取り | プレビューを端末の向きに合わせて回す(ドラレコと同じ `RotationCoordinator`) | `QrCameraController` |
+
+セーフエリア(横に来るノッチ・ダイナミックアイランド)は SwiftUI の既定に任せ、背景以外で `.ignoresSafeArea` を足さない。
+
 ## 22. アプリ内課金「Tailor It Pro」(StoreKit 2・Issue #77 の最小形)
 
 外部アカウント(RevenueCat・App Store Connect)を使わず、**StoreKit 2 + ローカルの StoreKit Configuration** だけで動く形。本番の商品登録は後続。
@@ -1033,13 +1047,13 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 
 | 項目 | 決定 |
 |---|---|
-| 何が有料か | backend の `paid_features.json`(1 か所・[docs/backend/features/pro.md](../backend/features/pro.md))。初期は「みんなで共有するデータ」(共有データ型アプリ)だけ。iOS は判定を持たず、`POST /v1/chat` の ready の `requiresPro` / `paidFeatures` / `freeTranscript`、案の `options[].requiresPro` / `freeInstruction` を見るだけ |
+| 何が有料か | backend の `internal/paid/paid_features.json`(1 か所・[docs/backend/features/pro.md](../backend/features/pro.md))。初期は「みんなで共有するデータ」(共有データ型アプリ)だけ。iOS は判定を持たず、`POST /v1/chat` の ready の `requiresPro` / `paidFeatures` / `freeTranscript`、案の `options[].requiresPro` / `freeInstruction` を見るだけ |
 | 出す時 | ready の「これでいく」(`buildFromChat`・声の自動生成も含む)と案の「これでいく」(`choose`)。判定は `MetamonServices/Purchase/PaidFeatureCheck.swift`(純粋関数) |
 | 出さない時 | **Pro 会員** / **回数制限が無効の時(DEBUG ビルドの既定 = デモ端末)**。`METAMON_IAP_ENFORCE=1` で DEBUG でも出る(`ProGate.isEnforced` と同じ扱い・22.4)/ 旧 backend(`requiresPro` 無し)/ ready の transcript 以外の予備文で作る時 |
 | カード | `ClarifyChatView` の「これでいく」の位置(`PaidFeatureCard`・create は初期画面、edit は音声シートの中)。購入して作る = `ProEntitlementStore.purchase` → 成功したら有料機能込みの文で生成(キャンセル・承認待ちはカードに残る)/ この機能なしで作る = `freeTranscript`(`freeInstruction`)で生成 / × = チャットに戻る。話し直すとカードは閉じて次の応答で判定し直す |
 | 実装 | `Features/Purchase/AppRuntime+PaidFeature.swift`(`holdForPaidConfirm` / `purchaseAndBuild` / `buildWithoutPaidFeatures` / `dismissPaidConfirm`)。モック ai は「みんなで / 共有 / 掲示板 / 投稿」を含む ready に `requiresPro` を付ける |
 | テスト | `MetamonServicesTests/PaidFeatureCheckTests.swift`(出し分け・JSON の新旧)・`MetamonTests/PaidFeatureConfirmTests.swift`(カード → なしで作る・無効化中は出ない・やめる / 話し直し・案)・UI `testPaidFeatureCardBuildWithoutFeature` |
-| 限界(後続) | サーバー強制なし(22.3 と同じ)。チャットを通らない経路は 22.8 の「生成の後の判定」で課金画面を通す |
+| 限界(後続) | チャットを通らない経路は 22.8 の「生成の後の判定」で課金画面を通す。サーバーの強制(402)は 22.9 |
 
 ### 22.8 有料機能は必ず課金画面を通す(Issue #414)
 共有・オンラインなど、サーバーに負荷のかかる有料機能を使う全経路で、Pro でなければ課金画面(`PaywallSheet`)に進む。判定は `MetamonServices/Purchase/PaidGate.swift`(純粋関数)、表示は `ProGate.requestPro(_:placement:closeNote:)`(課金画面を出し、閉じるまで待って「Pro になったか」を返す)。
@@ -1052,6 +1066,17 @@ DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か fi
 | シェアリンクを開く(記録を共有するアプリ・自分のでない) | 参加の確認(#254)の前(`ShareLinkPreview.sharedData`) | 参加しない |
 | プレビューの無い import・「探す」の公開アプリのインストール | import / install の後(`InstalledApp.joined / member`) | そのアプリに切り替えない(一覧には残る) |
 | 新規作成の無料枠 | 生成の前(`admitNewApp`) | 送らない。圏外の保留の自動送信・状態カードの再送も枠を通す(`sendMetered`) |
+
+### 22.9 サーバーの 402 `pro_required`(Issue #316)
+サーバーも有料の機能を止める(backend の [pro.md](../backend/features/pro.md) の「サーバーでの強制」)。端末の課金の制限が無効(DEBUG の既定・22.4)でも、サーバーは Pro でない uid の有料の機能を止めるので、**デモ端末でも共有・自動の動きを作るには Pro(Sandbox の購入)が要る**。判定は `MetamonServices/Protocols/ProRequired.swift`(`details.features` / `details.reason`)。
+
+| 経路 | 受けた時 |
+|---|---|
+| 生成・直し(`send`) | 何も保存されていない。課金画面(`.paidFeature(features)`)→ 買えばサーバーへの取引の送信(`serverSyncTask`)を待って同じ依頼を送り直す / 閉じたら「〇〇は Tailor It Pro が必要なため、保存しませんでした」。端末では Pro なのに 402 の時は課金画面を出さず案内だけ(送り直しを繰り返さない)。`AppRuntime+PaidGate.swift` の `presentProRequired` |
+| 共有の記録の書き込み(同期キュー) | `SyncEvent.proRequired`。書いた分は戻す。作成者なら課金画面、参加者(`creator_needs_pro`)は「作った人が Pro ではないため書き込めません(見ることはできます)」。印を付ける等の即時の書き込みは `message(for:)` の同じ文言 |
+| オンラインの AI(`POST /v1/text`) | `AITextError.needsPro` → 課金画面(`requestProForAIText`) |
+| 審査用の版 | 有料の機能を作らない(backend が共有を private に直し、serverRules を作らない)ので当たらない想定。当たっても課金画面は無いので文言だけ |
+| テスト | `MetamonTests/ProRequiredFlowTests.swift`・`MetamonServicesTests/RecordSyncTests.swift`(`testSyncQueueProRequired…`・`testProRequiredParsing`)・`AITextGateTests` |
 
 - 課金画面の中身: 見出し(理由ごと)・なぜ有料か・プラン名 / 期間 / 価格(`ProOffer`)・購入・復元・閉じたらどうなるか・Pro でできること・自動更新の説明・利用規約 / プライバシーポリシー(`LegalDocumentLink`。同梱文書を開き、その画面から公開ページ https://tailor-it.app/terms ・ /privacy も開ける)。
 - 出す場所: 確認カードの課金画面は `ClarifyChatView`(音声シートの中にも重ねられる・placement `.chat`)、それ以外は `PaywallHost`(placement `.root`。音声シートは閉じてから出す)。
