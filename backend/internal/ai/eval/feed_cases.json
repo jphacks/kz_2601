@@ -1,0 +1,7 @@
+[
+  {"id": "feed_weather_kanazawa", "kind": "create", "group": "feed", "transcript": "金沢の今週の天気が見られるアプリ", "note": "#348 feed weather + 石川県の府県予報区", "expect": {"has": ["feed"], "feed": "weather", "feedRegion": "170000", "unreachable": 0}},
+  {"id": "feed_weather_default", "kind": "create", "group": "feed", "transcript": "明日の天気と、持ち物のチェックリスト", "note": "#348 地域が無い → 東京都にして summary で変えられると伝える", "expect": {"has": ["feed", "list"], "feed": "weather", "feedRegion": "130000", "unreachable": 0}},
+  {"id": "feed_holidays", "kind": "create", "group": "feed", "transcript": "次の祝日まで何日か分かる、連休の予定を書くアプリ", "note": "#348 feed holidays + 予定の記録", "expect": {"has": ["feed"], "feed": "holidays", "unreachable": 0}},
+  {"id": "feed_rss_disaster", "kind": "create", "group": "feed", "transcript": "消防庁の災害情報を見られるようにして、防災グッズの在庫も管理したい", "note": "#348 feed rss の許可された feedId", "expect": {"has": ["feed"], "feed": "rss", "unreachable": 0}},
+  {"id": "feed_edit_add_weather", "kind": "edit", "base": "feed_holidays", "group": "feed", "transcript": "大阪の天気も上に出して", "note": "#348 既存アプリに weather を足す", "expect": {"patch": true, "feed": "weather", "feedRegion": "270000"}}
+]

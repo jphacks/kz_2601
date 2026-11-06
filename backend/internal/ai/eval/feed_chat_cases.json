@@ -1,0 +1,6 @@
+[
+  {"id": "feedc_weather_can", "group": "feed", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#348 天気予報を出せるか → できる(県の単位)",
+   "steps": [{"say": "アプリに天気予報を出せる?", "textAny": ["できます", "できる"], "textNot": ["できません", "feed", "provider", "region"]}]},
+  {"id": "feedc_stock_cannot", "group": "feed", "mode": "create", "capabilities": ["answer", "proposal"], "note": "#348 株価の自動取得は許可リストに無い → 正直に",
+   "steps": [{"say": "株価を自動で取ってきて表示できる?", "textAny": ["できません", "できない"], "textNot": ["feed", "provider"]}]}
+]
