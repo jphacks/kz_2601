@@ -25,6 +25,9 @@ const CodeBadRequest = "bad_request"
 
 const CodeForbidden = "forbidden"
 
+// the free plan's AI work is paused: the day's AI cost passed its threshold (#317)
+const CodeFreePlanPaused = "free_plan_paused"
+
 const CodeGenerationFailed = "generation_failed"
 
 const CodeInternal = "internal"
@@ -38,6 +41,9 @@ const CodeInvalidTransaction = "invalid_transaction"
 const CodeNotFound = "not_found"
 
 const CodePayloadTooLarge = "payload_too_large"
+
+// the payer's plan limit (apps, records, photos) is reached (#317)
+const CodePlanLimitReached = "plan_limit_reached"
 
 // a paid feature (Tailor It Pro) the caller or the app's creator does not have (#316)
 const CodeProRequired = "pro_required"

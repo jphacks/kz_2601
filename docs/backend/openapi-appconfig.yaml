@@ -1322,6 +1322,18 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: pro_required, message: 'this needs Tailor It Pro: sharedData', details: { features: [{ id: sharedData, title: みんなで共有するデータ, reason: みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。 }], reason: creator_needs_pro } } }
+    PlanLimitReached:
+      description: |
+        プランの上限 (#317・docs/backend/rate-limit.md の「プランごとの上限」)。403 `plan_limit_reached`。払う人のプランで数える: 自分のアプリは呼び出した人、他の人が作ったアプリは作成者。
+        - アプリの数: 自分の新しいアプリ (POST /apps・新しい appId の最初の読み込み・duplicate)。共有のアプリを入れるのは数えない
+        - レコードの件数 / アプリ: レコードの作成 (single の entity は数えない)。その人が見えるレコード (自分の分 + 共有の分) の全 entity の合計
+        - 写真の枚数 / アプリ: 写真の項目が空から入る作成・更新 (差し替えは数えない)
+        - details: `resource` (apps / recordsPerApp / photosPerApp)・`plan` (free / pro)・`limit`・`used`・`upgrade` (Pro にすると上限が上がる)。`reason: creator_plan_limit` は作成者のプランの上限 (参加者には課金画面ではなく案内を出す)
+        - `PLAN_LIMITS_MODE=log` / `off` の時は返さない。数えるのに失敗した時は通す
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: plan_limit_reached, message: 'このアプリを作った人のプランの上限に達しました: このアプリに保存できるデータの件数(5000 件)。作った人が Tailor It Pro にすると上限が上がります。', details: { resource: recordsPerApp, plan: free, limit: 5000, used: 5000, upgrade: true, reason: creator_plan_limit } } }
     Unauthenticated: { description: トークン欠落/無効, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     NotFound: { description: 存在しない (他人のリソースも 404), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Forbidden:
@@ -1409,6 +1421,7 @@ components:
                 - invalid_transaction
                 - not_found
                 - payload_too_large
+                - plan_limit_reached
                 - pro_required
                 - rate_limited
                 - transaction_owned_by_other
