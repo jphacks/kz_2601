@@ -120,6 +120,10 @@ func (h *Handler) duplicateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	newID := newAppID()
+	if err := h.checkPaidSave(r, newID, app, nil); err != nil { // #316: the copy is a new app of the caller
+		fail(w, err)
+		return
+	}
 	v, err := h.seedCopy(r, newID, raw, name, &store.Source{Kind: "import", Mode: "full", Summary: "「" + src.Name + "」を複製"})
 	if err != nil {
 		fail(w, err)

@@ -53,7 +53,7 @@ func TestRunnerStatusForCreator(t *testing.T) {
 			t.Fatalf("after a run: %v", out)
 		}
 		q, _ := out["quota"].(map[string]any)
-		if q == nil || q["used"] != float64(1) || q["limit"] != float64(quota.DefaultLimits.AppExecFree) {
+		if q == nil || q["used"] != float64(1) || q["limit"] != float64(quota.DefaultLimits.AppExecPro) {
 			t.Fatalf("quota: %v", out)
 		}
 		if code, _ := h.do("uid-someone"+h.sfx, http.MethodGet, app+"/automations", "", nil); code != http.StatusForbidden {

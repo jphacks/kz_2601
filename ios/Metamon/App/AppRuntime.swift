@@ -582,6 +582,11 @@ final class AppRuntime: DSLRuntime {
             if gatePaid { await gatePaidGeneration(before: previous) } // #414
         } catch {
             guard document.appId == previous.appId else { return } // 移った先に前のアプリの失敗を出さない
+            if !interruptedByOffline, let pro = ProRequired(error) { // #316: 有料の機能が入るので保存されなかった
+                withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
+                await presentProRequired(pro, transcript: text, gatePaid: gatePaid)
+                return
+            }
             let failure: FailureKind = interruptedByOffline ? .offline : FailureKind.classify(error)
             interruptedByOffline = false
             print("[Metamon] morph failed: \(failure) (\(error))")
@@ -1028,6 +1033,11 @@ final class AppRuntime: DSLRuntime {
                 guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
                 records[entity] = cached
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            case .proRequired(let appId, let entity, let pro):
+                guard appId == document.appId else { return }
+                presentProRequiredWrite(pro) // #316: 書いた分は戻した。作成者なら課金画面、参加者なら案内
+                records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records)
             }
         }
     }
@@ -1207,6 +1217,7 @@ final class AppRuntime: DSLRuntime {
     func message(for error: Error, entity: String?) -> String {
         guard let api = error as? APIError else { return error.localizedDescription }
         if let denial = SharedAccessDenial(api) { return denial.message } // #254
+        if let pro = ProRequired(api) { return pro.writeMessage } // #316(印を付けるなど)
         if api.code == "invalid_record" || (api.status == 400 && api.field != nil), let fieldId = api.field {
             let name = entity.flatMap { dsl.entity($0)?.field(fieldId)?.name } ?? fieldId
             return L10n.tr("「\(name)」の入力を確認してください(\(api.errorDescription ?? ""))")

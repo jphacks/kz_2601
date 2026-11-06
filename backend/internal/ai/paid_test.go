@@ -10,9 +10,13 @@ import (
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
-func TestPaidCatalog_DefaultHasSharedDataOnly(t *testing.T) {
-	if len(defaultPaidCatalog.features) != 1 || defaultPaidCatalog.features[0].ID != "sharedData" {
-		t.Fatalf("初期の有料リストは sharedData だけ: %+v", defaultPaidCatalog.features)
+func TestPaidCatalog_DefaultList(t *testing.T) {
+	var ids []string
+	for _, d := range defaultPaidCatalog.c.Defs() {
+		ids = append(ids, d.ID+":"+d.Gate)
+	}
+	if strings.Join(ids, ",") != "sharedData:save,serverRules:save,onlineAI:use" {
+		t.Fatalf("有料リスト(#316): %v", ids)
 	}
 }
 

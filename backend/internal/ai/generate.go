@@ -20,6 +20,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -140,6 +141,8 @@ type Error struct {
 	Message  string
 	Problems []string
 	Attempts int
+	// Details are extra error.details keys (402 pro_required: features).
+	Details map[string]any
 }
 
 func (e *Error) Error() string { return fmt.Sprintf("%s: %s", e.Code, e.Message) }
@@ -168,6 +171,13 @@ type Service struct {
 	// nil = no caller is ever verified (DELETE answers 401).
 	Verifier auth.TokenVerifier
 	AuthMode string // auth.ModeDev also accepts X-Debug-Uid with the emulator
+
+	// Pro checks Tailor It Pro (#316): saving a DSL that adds a paid feature
+	// and POST /v1/text answer 402 pro_required for others. nil = no check
+	// here (local runs; appconfig still checks the save).
+	Pro paid.ProChecker
+	// ProMode is PRO_GATE_MODE: enforce ("" too) / log / off.
+	ProMode paid.Mode
 
 	// Logger gets the ai.generate line per /v1/generate (#322); nil = slog.Default().
 	Logger *slog.Logger
@@ -304,6 +314,11 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 			Meta: ar.meta, Unchanged: true,
 			LatencyMs: Latency{Claude: ar.latency.Milliseconds(), Total: time.Since(started).Milliseconds()},
 		}, nil
+	}
+	// #316: an app with a paid feature it did not have needs Pro (after
+	// generating: the DSL decides, not the request's words)
+	if err := s.gatePaid(ctx, ar.raw, current, loc); err != nil {
+		return nil, err
 	}
 	src := appconfigclient.Source{Kind: "ai", Transcript: transcript, Summary: ar.summary, Model: s.Model}
 	var saved *appconfigclient.Envelope
@@ -1047,7 +1062,7 @@ func mapStoreErr(err error) error {
 		if code == "" {
 			code = httpx.CodeAppconfigError
 		}
-		return &Error{Status: ae.Status, Code: code, Message: ae.Message}
+		return &Error{Status: ae.Status, Code: code, Message: ae.Message, Details: ae.Details}
 	}
 	return &Error{Status: http.StatusBadGateway, Code: httpx.CodeAppconfigError, Message: err.Error()}
 }

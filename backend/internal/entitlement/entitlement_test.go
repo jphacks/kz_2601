@@ -215,6 +215,8 @@ func TestPurgeUser(t *testing.T) {
 
 func TestHandler(t *testing.T) {
 	e := newEnv(t, NewMemory())
+	var changed []string
+	e.svc.Changed = func(uid string) { changed = append(changed, uid) }
 	mux := http.NewServeMux()
 	Register(mux, e.svc)
 	h := auth.Middleware(auth.DevVerifier{}, auth.ModeDev)(mux)
@@ -247,9 +249,15 @@ func TestHandler(t *testing.T) {
 		!strings.Contains(w.Body.String(), `"reason":"signature"`) || !strings.Contains(w.Body.String(), httpx.CodeInvalidTransaction) {
 		t.Fatalf("tampered: %d %s", w.Code, w.Body)
 	}
+	if len(changed) != 0 {
+		t.Fatalf("Changed after a rejected transaction: %v", changed)
+	}
 	w := do("u1", "POST", "/v1/me/entitlements/apple", map[string]string{"signedTransaction": good})
 	if w.Code != 200 {
 		t.Fatalf("ok: %d %s", w.Code, w.Body)
+	}
+	if len(changed) != 1 || changed[0] != "u1" { // #316: the cached "not Pro" is dropped
+		t.Fatalf("Changed: %v", changed)
 	}
 	var st Status
 	if err := json.Unmarshal(w.Body.Bytes(), &st); err != nil || !st.IsPro || st.Pro.ProductID != product {
@@ -276,6 +284,11 @@ func TestProChecker(t *testing.T) {
 	if c.IsPro(ctx, "u") {
 		t.Fatal("negative result is cached for NegTTL")
 	}
+	c.Forget("u") // a purchase was just stored (#316)
+	if !c.IsPro(ctx, "u") {
+		t.Fatal("pro right after Forget")
+	}
+	c.Forget("u")
 	now = now.Add(16 * time.Second)
 	if !c.IsPro(ctx, "u") {
 		t.Fatal("pro after NegTTL")
