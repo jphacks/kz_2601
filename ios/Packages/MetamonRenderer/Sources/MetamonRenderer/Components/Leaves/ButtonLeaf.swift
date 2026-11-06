@@ -30,7 +30,8 @@ struct ButtonLeaf: View {
     }
 
     var body: some View {
-        if Self.isVisible(action: c.action, form: ctx.form) {
+        // follow / unfollow(#270)は今の投稿の作者の状態に合う方だけ
+        if Self.isVisible(action: c.action, form: ctx.form), rt.showsFollowButton(c.action, recordId: ctx.actionContext().currentRecordId) {
             styled
         }
     }

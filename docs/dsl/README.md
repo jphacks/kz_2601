@@ -57,7 +57,7 @@ Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|me
   Entity.single?: true(設定値の置き場。レコードは常に 1 件・式 {"setting": "<fieldId>"} で読む)— §3.11
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (44 種・全て id? と area? を持つ) / Action (12 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
+Leaf (44 種・全て id? と area? を持つ) / Action (14 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
@@ -145,7 +145,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 `color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
-### 3.2 アクション(12 種)
+### 3.2 アクション(14 種)
 
 | type | フィールド | iOS の挙動 |
 |---|---|---|
@@ -305,7 +305,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - **Firestore の `in`(30 件まで)は使わない**: records は今も 1 entity 2000 件までを読んでメモリで絞っている(§3)。フォローの一覧は 1 文書なので 1 回の読み取りで、何人フォローしても同じ。件数が増えて records をクエリで絞るようになったら、30 人ずつの分割か、投稿時に配る(自動の動き・#341)を選び直す。
 - iOS: 起動時にこのアプリのフォロー一覧を読み、`{"myFollows":true}` を uid の集合に置き換えて端末で絞る(`$author` の `{"me":true}` と同じ所)。ボタンは押した瞬間に一覧へ反映し、失敗したら戻して理由を出す。読み込む前・オフラインで一度も読めていない時は、フォロー中の一覧は空。
 - AI: 「フォロー」「フォロー中」「好きな人の投稿だけ」はこの filter とボタン。フォロー用の entity・相手を選ぶ ref は作らない。ai-eval の `followFilter` / `followButton` / `followEntity`(`follow_cases.json`・`m0disc_cases.json` d_sns_follow)。
-- 古い iOS(この機能の前の版)は `{"myFollows":true}` を知らないので、その一覧は空になり、ボタンは「未対応のアクション」になる。
+- 古い iOS(この機能の前の版)は `{"myFollows":true}` を読めずに filter ごと捨てるので、その一覧は全員の投稿になり、ボタンは押すと「未対応のアクション」になる(落ちない)。
 
 ### 3.6 ナビゲーション = 画面グラフの規則(#112 #114 #115)
 

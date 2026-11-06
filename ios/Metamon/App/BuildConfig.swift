@@ -126,6 +126,7 @@ enum BuildConfig {
         .automations,
         .entitlements,
         .feedback,
+        .follows,
         .matching,
         .releaseRequests,
         .sharing,

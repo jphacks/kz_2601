@@ -1182,6 +1182,9 @@ final class AppRuntime: DSLRuntime {
         case .resetForm:
             ctx.form?.reset()
 
+        case .follow, .unfollow:
+            await runFollow(action, ctx) // #270: Features/Follows
+
         case .scheduleNotification:
             guard let spec = action.notification else { return }
             await attempt {

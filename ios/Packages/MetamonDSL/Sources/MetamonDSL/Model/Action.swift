@@ -6,6 +6,8 @@ public enum ActionType: String, Decodable, Sendable, CaseIterable {
     /// 記録を CSV / PDF にして共有シートへ(#421)
     case export
     case startActivity, endActivity // #423 ライブアクティビティ
+    /// 今開いている投稿を書いた人をフォローする / 外す(#270)
+    case follow, unfollow
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }

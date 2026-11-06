@@ -453,6 +453,8 @@ public struct Filter: Codable, Hashable, Sendable {
         op = try c.decode(String.self, forKey: .op)
         if (try? c.decodeIfPresent([String: Bool].self, forKey: .value)) == ["me": true] {
             value = Self.meValue // 自分(#251)。Expr ではない
+        } else if (try? c.decodeIfPresent([String: Bool].self, forKey: .value)) == ["myFollows": true] {
+            value = Self.myFollowsValue // フォローしている人(#270)。Expr ではない
         } else if let e = try c.decodeIfPresent(Expr.self, forKey: .value) {
             if let lit = e.literalValue { value = lit } else { valueExpr = e }
         }
