@@ -51,29 +51,34 @@ final class PurchaseFlowTests: XCTestCase {
         let defaults = UserDefaults(suiteName: "PurchaseFlowTests.\(UUID().uuidString)")!
         let gate = ProGate(store: ProEntitlementStore(), usage: CreationUsageStore(defaults: defaults),
                            quota: CreationQuota(dailyFreeLimit: 1), limitDisabled: false)
-        XCTAssertTrue(gate.admitNewApp())
+        let first = await gate.admitNewApp()
+        XCTAssertTrue(first)
         gate.recordNewApp()
         XCTAssertEqual(gate.decision, .blocked)
-        XCTAssertFalse(gate.admitNewApp())
+        let blocked = Task { await gate.admitNewApp() }
         try await Task.sleep(for: .milliseconds(700))
         XCTAssertTrue(gate.paywallPresented)
         XCTAssertEqual(gate.paywall?.reason, .limitReached)
         gate.finishPaywall()
+        let admitted = await blocked.value
+        XCTAssertFalse(admitted, "買わずに閉じたら作らない")
 
         await gate.store.loadProducts()
         try XCTSkipIf(gate.store.products.isEmpty, Self.headlessNote)
         _ = try await gate.store.purchase(productID: ProProducts.monthly)
         XCTAssertTrue(gate.isPro)
         XCTAssertEqual(gate.decision, .unlimited)
-        XCTAssertTrue(gate.admitNewApp())
+        let unlocked = await gate.admitNewApp()
+        XCTAssertTrue(unlocked)
     }
 
     /// デモ端末(制限の無効化)は回数に関係なく通す。
-    func testLimitDisabledNeverBlocks() {
+    func testLimitDisabledNeverBlocks() async {
         let defaults = UserDefaults(suiteName: "PurchaseFlowTests.\(UUID().uuidString)")!
         let gate = ProGate(store: ProEntitlementStore(), usage: CreationUsageStore(defaults: defaults),
                            quota: CreationQuota(dailyFreeLimit: 0), limitDisabled: true)
-        XCTAssertTrue(gate.admitNewApp())
+        let admitted = await gate.admitNewApp()
+        XCTAssertTrue(admitted)
         XCTAssertFalse(gate.paywallPresented)
     }
 }

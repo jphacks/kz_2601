@@ -3,7 +3,7 @@ import MetamonDSL
 import MetamonServices
 @testable import Metamon
 
-/// #274 初回のチュートリアル・カテゴリ別の例・直し方の例 / #275 音声モデルの準備中も文字で始められる案内。
+/// #274 初回のチュートリアル・カテゴリ別の例・直し方の例 / #275 音声モデルの準備中も文字で始められる案内 / H1 初回の関門。
 @MainActor
 final class FirstRunTutorialTests: XCTestCase {
     private var defaults: UserDefaults!
@@ -60,11 +60,11 @@ final class FirstRunTutorialTests: XCTestCase {
         XCTAssertTrue(store.hasShownEditHint)
     }
 
-    // MARK: - 順序: 同意 → チュートリアル → 音声モデルの確認
+    // MARK: - 順序: 同意 → チュートリアル(音声モデルの確認は利用者が求めた時だけ・M14)
 
     func testTutorialWaitsForConsentThenGatesModelDownloadConfirm() throws {
         let rt = try makeRuntime()
-        rt.showModelDownloadConfirm = true
+        rt.showModelDownloadConfirm = true // 案内のボタン・マイクから求めた
 
         rt.presentTutorialIfNeeded()
         XCTAssertFalse(rt.showTutorial, "同意の説明を出す前はチュートリアルを出さない")
@@ -83,7 +83,7 @@ final class FirstRunTutorialTests: XCTestCase {
         rt.finishTutorial()
         XCTAssertFalse(rt.showTutorial)
         XCTAssertTrue(rt.tutorial?.hasSeenTutorial == true)
-        XCTAssertTrue(rt.canShowModelDownloadConfirm, "チュートリアルのあとにダウンロード確認")
+        XCTAssertTrue(rt.canShowModelDownloadConfirm, "チュートリアルのあとなら出せる")
 
         rt.presentTutorialIfNeeded()
         XCTAssertFalse(rt.showTutorial, "見たら次からは自動で出さない")
@@ -115,14 +115,12 @@ final class FirstRunTutorialTests: XCTestCase {
 
     // MARK: - カードと例(審査用の版ではシェアを案内しない)
 
-    func testCardsDropSharingWhenUnavailable() {
-        let full = FirstRunTutorial.cards(sharingAvailable: true, voiceModelMegabytes: 500)
-        XCTAssertEqual(full.map(\.id), ["create", "edit", "share"])
-        XCTAssertNotNil(full[0].note, "1 枚目に文字ですぐ作れる案内(#275)")
-        XCTAssertTrue(full[0].note?.contains("500") == true)
-
-        let review = FirstRunTutorial.cards(sharingAvailable: false, voiceModelMegabytes: 500)
-        XCTAssertEqual(review.map(\.id), ["create", "edit", "list"])
+    /// 初回の関門を減らす(H1・U6): チュートリアルは 1 枚(作り方だけ)。直し方は最初のアプリの直後、一覧は上部のボタン
+    func testTutorialIsOneCard() {
+        let cards = FirstRunTutorial.cards(voiceModelMegabytes: 500)
+        XCTAssertEqual(cards.map(\.id), ["create"])
+        XCTAssertNotNil(cards[0].note, "文字ですぐ作れる案内(#275)")
+        XCTAssertTrue(cards[0].note?.contains("500") == true)
     }
 
     func testExampleCategoriesIncludeSharedExamples() {

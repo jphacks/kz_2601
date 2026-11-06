@@ -14,6 +14,7 @@
 //	rn_app_{appId}                notification recipients of one app
 //	rn_rcpt_app_{appId}_{uid}     notifications one person got from one app
 //	rn_rcpt_total_{uid}           notifications one person got in total
+//	rr_app_{appId}                records read by one app's rules (each / agg)
 package quota
 
 import (
@@ -61,6 +62,8 @@ const (
 	ScopeRunRecipients  = "run_recipients"
 	ScopeRunWrites      = "run_writes"
 	ScopeScheduledRules = "scheduled_rules"
+	ScopeAppReads       = "app_reads"
+	ScopeRunReads       = "run_reads"
 	ScopeAnonymous      = "anonymous"
 	ScopeSharedNeedsPro = "shared_needs_pro"
 	// ScopeNeedsPro: the creator of a private app's rules has no Pro (#316).
@@ -310,6 +313,34 @@ func (q *Quota) Writes(ctx context.Context, dec Decision, n int) (Grant, error) 
 		g.Charge.Parts = append(g.Charge.Parts, *part)
 	}
 	return g, nil
+}
+
+// RunReadCap is how many records one run may read (each / agg); 0 = no cap.
+func (q *Quota) RunReadCap(plan Plan) int {
+	l := q.cfg.Limits
+	return pick(plan, l.RunReadsFree, l.RunReadsPro)
+}
+
+// Reads counts n records read by an allowed run against the app's daily
+// reads, all or nothing: blk != nil means the run must stop (a total over part
+// of the records would be wrong). Retries count nothing.
+func (q *Quota) Reads(ctx context.Context, dec Decision, n int) (Charge, *Block, error) {
+	if !dec.Allowed {
+		return Charge{}, &Block{Scope: ScopeAppReads}, nil
+	}
+	limit := pick(dec.Plan, q.cfg.Limits.AppReadsFree, q.cfg.Limits.AppReadsPro)
+	if n <= 0 || dec.run.Attempt > 1 || limit <= 0 {
+		return Charge{}, nil, nil
+	}
+	c := ratelimit.Counter{ID: q.id(dec.Day, "rr_app_"+docSafe(dec.run.AppID)), Scope: ScopeAppReads, Limit: limit}
+	u, mem, err := q.consume(ctx, []ratelimit.Counter{c}, n, dec.expireAt)
+	if err != nil {
+		return Charge{}, nil, err
+	}
+	if u.Blocked >= 0 {
+		return Charge{}, &Block{Scope: c.Scope, CounterID: c.ID, Limit: c.Limit, Used: u.Counts[0]}, nil
+	}
+	return Charge{Parts: []ChargePart{{Counters: []ratelimit.Counter{c}, Weight: n, ExpireAt: dec.expireAt, Memory: mem}}}, nil, nil
 }
 
 // Drop is one recipient left out and why.

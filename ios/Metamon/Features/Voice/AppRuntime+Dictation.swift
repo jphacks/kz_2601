@@ -27,13 +27,18 @@ extension AppRuntime: DictationHost {
         }
     }
 
+    private static func dictationMessage(_ error: Error) -> String {
+        if let f = error as? TranscriberFailure { return ErrorCopy.transcriberFailure(f) }
+        return ErrorCopy.failure(L10n.tr("録音できませんでした"), error, context: "dictation")
+    }
+
     func startDictation() async throws {
         await SpeechReader.shared.stopForRecording() // #43 と speakButton の読み上げを止めてから録音
         do {
             try await services.transcriber.startRecording()
         } catch {
             SpeechReader.shared.recordingFinished()
-            throw DictationFailure(ErrorCopy.message(for: error))
+            throw DictationFailure(Self.dictationMessage(error))
         }
     }
 
@@ -43,7 +48,7 @@ extension AppRuntime: DictationHost {
         do {
             text = try await services.transcriber.stopAndTranscribe()
         } catch {
-            throw DictationFailure(ErrorCopy.message(for: error))
+            throw DictationFailure(Self.dictationMessage(error))
         }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw DictationFailure(L10n.tr("音声を聞き取れませんでした。もう一度はっきり話してください"))

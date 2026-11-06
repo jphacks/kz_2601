@@ -5,7 +5,8 @@ import MetamonDSL
 /// - 0〜10s  normal   : create p50 6.6s / p95 8.7s。数秒ごとに文言を回す
 /// - 10〜20s slow     : 「もう少しかかっています」(area 再生成 1 回 ≒ +7s)
 /// - 20〜30s warning  : 警告色。backend は 20s で警告ライン
-/// - 30s〜   fallback : backend がテンプレ DSL にフォールバック中。キャンセルを出す(HTTP は 45s で timeout)
+/// - 30s〜   fallback : backend がテンプレ DSL にフォールバック中。キャンセルを枠付きで目立たせる(HTTP は 45s で timeout)
+/// キャンセルは最初から小さく出す(言い間違いに気づいたらすぐ止められる・UX 点検 M6)。
 enum GeneratingStage: Equatable {
     case normal, slow, warning, fallback
 
@@ -37,6 +38,14 @@ enum GeneratingStage: Equatable {
         case .fallback: return L10n.tr("混み合っています。安全なテンプレートに切り替えています…")
         }
     }
+
+    /// キャンセルを枠付きで目立たせるか(M6)。それまでは小さい文字のボタン
+    var cancelIsProminent: Bool { self == .fallback }
+
+    /// 待ち時間の目安(M6)。create の最初の段だけ(create p50 6.6s / p95 8.7s)。過ぎたら段階文言に任せる
+    func estimate(edit: Bool) -> String? {
+        self == .normal && !edit ? L10n.tr("ふつう 10 秒ほど") : nil
+    }
 }
 
 /// create(初期状態からの生成)の全画面「変身中」演出。
@@ -65,7 +74,7 @@ struct GeneratingView: View {
 
             VStack(spacing: Theme.Spacing.lg) {
                 header
-                BuildStageView(script: script, elapsed: elapsed, plan: reveal?.plan)
+                BuildStageView(script: script, elapsed: elapsed, plan: reveal?.plan, live: job.draft)
                     .padding(.horizontal, Theme.Spacing.lg)
                 footer
             }
@@ -98,12 +107,21 @@ struct GeneratingView: View {
                 .textCase(.uppercase)
                 .tracking(1.2)
                 .foregroundStyle(Theme.brandGradient)
+            // SSE で届いたアプリ名(#636・仮置き)
+            if let name = job.draft.appName {
+                Text(name)
+                    .font(.headline)
+                    .foregroundStyle(Theme.brandGradient)
+                    .lineLimit(1)
+                    .transition(.opacity)
+            }
             Text("「\(displayTranscript)」")
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .minimumScaleFactor(0.8)
         }
+        .animation(.easeInOut(duration: 0.3), value: job.draft.appName)
     }
 
     /// 見出しには「別のアプリ。」などの切替キーワードを出さない(VoiceIntent.newAppPrefixes と同じ語)。
@@ -129,19 +147,32 @@ struct GeneratingView: View {
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.tertiary)
 
-            if stage == .fallback, reveal == nil {
-                Button(role: .cancel) { rt.cancelMorph() } label: {
-                    Text("キャンセル").font(.subheadline.weight(.semibold))
+            // M6: 最初から小さく出し、30 秒を過ぎたら枠付きにする
+            if reveal == nil {
+                if stage.cancelIsProminent {
+                    Button(role: .cancel) { rt.cancelMorph() } label: {
+                        Text("キャンセル").font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.bordered)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                } else {
+                    Button(role: .cancel) { rt.cancelMorph() } label: {
+                        Text("キャンセル").font(.footnote)
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .frame(minHeight: 44) // タップ領域 44pt
                 }
-                .buttonStyle(.bordered)
-                .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
         }
         .animation(.easeInOut(duration: 0.3), value: stage)
     }
 
+    /// 「3 秒・ふつう 10 秒ほど」(目安は最初の段だけ・M6)
     private var elapsedLabel: String {
-        L10n.tr("\(Int(elapsed.rounded(.down))) 秒")
+        let seconds = L10n.tr("\(Int(elapsed.rounded(.down))) 秒")
+        guard reveal == nil, let estimate = stage.estimate(edit: false) else { return seconds }
+        return seconds + " · " + estimate
     }
 }
 
@@ -184,12 +215,11 @@ struct EditingIndicator: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                if stage == .fallback {
-                    Button("中止") { rt.cancelMorph() }
-                        .font(.caption.weight(.semibold))
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                }
+                // M6: 最初から出す(言い間違いに気づいたらすぐ止められる)
+                Button("中止") { rt.cancelMorph() }
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
             }
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm + 2)

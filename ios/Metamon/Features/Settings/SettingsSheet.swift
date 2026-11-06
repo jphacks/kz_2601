@@ -38,6 +38,7 @@ struct SettingsSheet: View {
                 #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
                 ProSettingsSection() // 課金(#77)
                 #endif
+                RemainingTodaySettingsSection() // #630 今日の残り(審査用の版も出す)
                 languageSection
                 voiceModelSection
                 clarifySection
@@ -310,7 +311,7 @@ struct SettingsSheet: View {
                 dismiss()
                 Task { await rt.undo() }
             } label: {
-                Label("ひとつ前の状態に戻す", systemImage: "arrow.uturn.backward")
+                Label("元に戻す", systemImage: "arrow.uturn.backward")
             }
             .disabled(rt.isMorphing)
             ScreenMapSettingsRow() // #116

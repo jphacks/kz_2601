@@ -88,7 +88,7 @@ final class UndoRedoTests: XCTestCase {
         await rt.undo(expectedVersion: rt.document.version)
         XCTAssertEqual(rt.document.version, 1)
         XCTAssertEqual(rt.dsl.app.name, original, "1 つ前の画面に戻る")
-        XCTAssertEqual(rt.summaryBanner?.text, L10n.tr("1つ前に戻しました"))
+        XCTAssertEqual(rt.summaryBanner?.text, L10n.tr("元に戻しました"))
         XCTAssertEqual(rt.summaryBanner?.action, .redo, "戻した直後は「やり直す」")
         XCTAssertNotNil(rt.redoPoint)
         XCTAssertFalse(rt.canUndo, "これ以上前は無い")

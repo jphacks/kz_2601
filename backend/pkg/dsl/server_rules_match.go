@@ -37,7 +37,8 @@ func (a *App) HasRecordRules(entity, kind string) bool {
 }
 
 // ReferencedFields returns the trigger record's field ids the rule reads
-// (condition, values, notification placeholders, ref fields it follows),
+// (condition, values, agg filter values, notification placeholders, ref
+// fields it follows),
 // sorted and unique. "id" and {$author} are not fields and are left out.
 func (r *ServerRule) ReferencedFields() []string {
 	seen := map[string]bool{}
@@ -46,30 +47,13 @@ func (r *ServerRule) ReferencedFields() []string {
 			seen[id] = true
 		}
 	}
-	var walk func(e *Expr)
-	walk = func(e *Expr) {
-		if e == nil {
-			return
-		}
+	r.walkExprs(func(e *Expr) {
 		if e.Kind == ExprRef && e.Ref != "id" {
 			ref := strings.TrimPrefix(e.Ref, PrevPrefix)
 			ref, _, _ = strings.Cut(ref, ".") // lookup "<ref field>.<field>" reads the ref field
 			addField(ref)
 		}
-		for i := range e.Args {
-			walk(&e.Args[i])
-		}
-		walk(e.If)
-		walk(e.Then)
-		walk(e.Else)
-	}
-	walkValues := func(values map[string]Expr) {
-		for k := range values {
-			v := values[k]
-			walk(&v)
-		}
-	}
-	walk(r.If)
+	})
 	for _, act := range r.Do {
 		switch {
 		case act.Notify != nil:
@@ -78,19 +62,15 @@ func (r *ServerRule) ReferencedFields() []string {
 			}
 			for _, s := range []string{act.Notify.Title, act.Notify.Body} {
 				for _, m := range notifyPlaceholderRe.FindAllStringSubmatch(s, -1) {
-					if m[1] != notifyAuthorPlaceholder {
+					if _, named := act.Notify.With[m[1]]; m[1] != notifyAuthorPlaceholder && !named {
 						addField(m[1])
 					}
 				}
 			}
-		case act.CreateRecord != nil:
-			walkValues(act.CreateRecord.Values)
 		case act.UpdateRecord != nil:
 			addField(act.UpdateRecord.Ref)
-			walkValues(act.UpdateRecord.Values)
 		case act.Increment != nil:
 			addField(act.Increment.Ref)
-			walk(act.Increment.By)
 		}
 	}
 	out := make([]string, 0, len(seen))

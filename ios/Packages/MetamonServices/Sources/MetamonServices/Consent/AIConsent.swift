@@ -114,6 +114,12 @@ public struct ConsentGatedAIClient: AIClient {
         return try await base.morph(transcript: transcript, appId: appId, currentVersion: currentVersion, locale: locale)
     }
 
+    public func morph(transcript: String, appId: String, currentVersion: Int, locale: String?,
+                      progress: @escaping @Sendable (GenerateProgress) -> Void) async throws -> MorphResult {
+        guard isGranted() else { throw AIConsentError.notGranted }
+        return try await base.morph(transcript: transcript, appId: appId, currentVersion: currentVersion, locale: locale, progress: progress)
+    }
+
     public func chat(appId: String, messages: [ChatMessage], locale: String?, mode: ChatMode?) async throws -> ChatTurn {
         guard isGranted() else { throw AIConsentError.notGranted }
         return try await base.chat(appId: appId, messages: messages, locale: locale, mode: mode)

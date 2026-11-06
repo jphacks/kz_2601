@@ -61,17 +61,13 @@ extension AppRuntime {
         let membership = sharing as? any MembershipClient
         let preview = try? await membership?.previewShare(token: token)
         if let preview, preview.sharedData, !preview.mine {
-            // #414: 記録を共有するアプリへの参加は Tailor It Pro。参加の確認より先に課金画面
-            if PaidGate.joinNeedsPaywall(preview, isPro: proGate.isPro, enforced: proGate.isEnforced) {
-                guard await admitSharedApp(name: preview.name) else { return }
-            }
+            // 参加者は無料(正典「課金・Pro」2026-11-06: 共有アプリの費用は作成者の Pro)。課金画面は出さない(H5)
             SharingUI.shared.pendingJoin = PendingJoin(token: token, preview: preview)
             return
         }
         do {
             let app = try await sharing.importShare(token: token)
-            // #561 / #565: 自分のアプリは無料。プレビューが取れなくても取り込み結果の mine で見分ける
-            await adopt(app, banner: L10n.tr("シェアされた「\(app.name)」を追加しました"), own: preview?.mine == true || app.mine)
+            await adopt(app, banner: L10n.tr("シェアされた「\(app.name)」を追加しました"))
         } catch {
             toast = Self.importFailureMessage(error)
         }
@@ -94,40 +90,28 @@ extension AppRuntime {
         }
     }
 
-    /// 共有アプリへの参加の課金画面(#414)。買わずに閉じたら参加しない。
-    private func admitSharedApp(name: String, after delay: Duration = .zero) async -> Bool {
-        let pro = await proGate.requestPro(.join(appName: name), closeNote: L10n.tr("閉じると参加しません。"), after: delay)
-        if !pro { toast = L10n.tr("「\(name)」には参加しませんでした。参加には Tailor It Pro が必要です") }
-        return pro
-    }
-
     /// import の失敗。403 の参加の理由(#254)・取り消し済み(404)・その他。
     static func importFailureMessage(_ error: Error) -> String {
         if let denial = SharedAccessDenial(error) { return denial.message }
         return (error as? APIError)?.status == 404
             ? L10n.tr("このシェアリンクは取り消されたか、存在しません")
-            : L10n.tr("シェアされたアプリを開けませんでした: \(error.localizedDescription)")
+            : ErrorCopy.failure(L10n.tr("シェアされたアプリを開けませんでした"), error, context: "share import")
     }
 
     func installPublic(_ listing: PublicAppListing) async {
         guard let sharing = services.sharing else { return }
         do {
             let app = try await sharing.install(publicAppId: listing.id)
-            await adopt(app, banner: L10n.tr("「\(app.name)」をインストールしました"), own: listing.mine || app.mine)
+            await adopt(app, banner: L10n.tr("「\(app.name)」をインストールしました"))
         } catch {
-            toast = L10n.tr("インストールできませんでした: \(error.localizedDescription)")
+            toast = ErrorCopy.failure(L10n.tr("インストールできませんでした"), error, context: "install public")
         }
     }
 
     /// import / install の結果に切り替える(変身アニメは switchApp)。共有データ付きは「みんなと同じデータ」を一言添える。
-    /// `own` = 自分のアプリ(シェアのプレビュー・探すの掲載・取り込み結果の mine)。自分のアプリは課金画面を出さない(#561)。
-    private func adopt(_ app: InstalledApp, banner: String, own: Bool = false) async {
+    /// 参加者・インストールした人は無料(H5)。作成者が Pro でない時の書き込みは 402 `creator_needs_pro` の案内(`ProRequired.writeMessage`)だけ。
+    private func adopt(_ app: InstalledApp, banner: String) async {
         print("[Metamon] adopt shared app: appId=\(app.appId) joined=\(app.joined)")
-        // #414: プレビューが無かった import・公開アプリのインストールは、結果を見てから課金画面(買わなければ開かない)
-        if !own, PaidGate.installedNeedsPaywall(app, isPro: proGate.isPro, enforced: proGate.isEnforced) {
-            SharingUI.shared.showDiscover = false
-            guard await admitSharedApp(name: app.name, after: .milliseconds(550)) else { return }
-        }
         if app.appId != document.appId {
             await switchApp(to: app.appId, afterSheetDismiss: true)
         }

@@ -151,6 +151,7 @@ struct VoiceInputView: View {
     private var bottomPanel: some View {
         VStack(spacing: 0) {
             if !typing { examples }
+            RemainingTodayBadge() // #630 今日の残り
             textEntry
             #if !APP_STORE_REVIEW
             if isInitial, !typing { DiscoverEntry() } // 「探す」(#50)
@@ -185,11 +186,11 @@ struct VoiceInputView: View {
                     Text("Tailor It").font(.headline.weight(.bold))
                 }
             } else {
-                UndoHeaderButtons() // #209 修正チャットの上部に「1つ前に戻す」
+                UndoHeaderButtons() // #209 修正チャットの上部に「元に戻す」
             }
             Spacer()
             if inChat {
-                Button { rt.restartChat() } label: {
+                Button { rt.requestRestartChat() } label: {
                     Label(ClarifyCopy.restart, systemImage: "arrow.counterclockwise")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
@@ -200,6 +201,21 @@ struct VoiceInputView: View {
                 }
                 .disabled(rt.isMorphing)
                 .accessibilityIdentifier("chat.restart")
+                .modifier(RestartChatConfirm())
+            }
+            // H10: 一覧はマイクの長押しにしか無かった。設定の隣に見える入口を置く(作ったアプリが無い時は出さない)
+            if VoiceTopBar.showsAppList(appCount: rt.visibleApps.count, isVoiceOnly: rt.dsl.isVoiceOnly, madeFirstApp: rt.hasMadeFirstApp) {
+                Button { rt.openSwitcher() } label: {
+                    Image(systemName: "square.grid.2x2")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .padding(Theme.Spacing.sm)
+                        .background(Theme.Colors.surface, in: Circle())
+                        .overlay(Circle().strokeBorder(Theme.Colors.hairline))
+                }
+                .disabled(rt.isMorphing)
+                .accessibilityLabel(Text(L10n.key("アプリ一覧", review: "記録帳の一覧")))
+                .accessibilityIdentifier("voice.appList")
             }
             Button { showSettings = true } label: {
                 Image(systemName: "gearshape")
@@ -236,7 +252,10 @@ struct VoiceInputView: View {
     private var micSection: some View {
         VStack(spacing: Theme.Spacing.md) {
             // タップ = 発話、長押し = メタ操作(変身一覧)。FAB と同じ二段構え
-            MicButton(mode: micMode, size: LandscapeLayout.micSize(isInitial: isInitial, compactHeight: compactHeight)) { Task { await toggle() } }
+            MicButton(mode: micMode, size: LandscapeLayout.micSize(isInitial: isInitial, compactHeight: compactHeight)) {
+                if phase == .idle, rt.askModelDownloadBeforeRecording() { return } // M14: 起動では聞かず、初めてマイクを押した時に
+                Task { await toggle() }
+            }
                 .simultaneousGesture(
                     LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
                         .onEnded { _ in if phase == .idle { rt.openSwitcher() } }
@@ -248,6 +267,13 @@ struct VoiceInputView: View {
                 .contentTransition(.opacity)
                 .id(statusText)
                 .transition(.opacity)
+            if transcriber.isProvisional {
+                // U5: WhisperKit の準備中は Apple の端末内の認識で仮に聞き取る。精度が違うことを小さく伝える
+                Label(VoiceModelCopy.provisional, systemImage: "waveform.badge.exclamationmark")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("voice.provisional")
+            }
             modelStatusView
             #if targetEnvironment(simulator)
             Text("シミュレータ: マイクはダミー(定型文を返します)")
@@ -382,7 +408,7 @@ struct VoiceInputView: View {
         case .notDownloaded where !ModelDownloadConsent.isApproved() || ExpensiveNetworkProbe.shared.isExpensive:
             // 確認で「あとで」を選んだ / モバイル回線で待っている(#275): 文字で始められることを先に伝える
             VStack(spacing: Theme.Spacing.sm) {
-                Text(VoiceModelCopy.textFirst)
+                Text(transcriber.isProvisional ? VoiceModelCopy.provisionalTextFirst : VoiceModelCopy.textFirst)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -412,9 +438,9 @@ struct VoiceInputView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-        case .failed(let message):
+        case .failed: // 中身はログ(`[Voice]`)と設定の詳細にだけ出す(H9)
             VStack(spacing: Theme.Spacing.sm) {
-                Text("音声モデルの準備に失敗しました\n\(message)")
+                Text("音声モデルを用意できませんでした。接続を確認して「再試行」を押してください")
                     .font(.caption)
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
@@ -448,12 +474,13 @@ struct VoiceInputView: View {
         case .idle:
             typing = false
             await SpeechReader.shared.stopForRecording() // #43 読み上げ中なら即停止してから録音
+            if case .notice = rt.errorCard?.kind { withAnimation { rt.errorCard = nil } } // 前の録音の失敗は話し直したら消す
             do {
                 try await transcriber.startRecording()
                 phase = .listening
             } catch {
                 SpeechReader.shared.recordingFinished()
-                rt.toast = ErrorCopy.message(for: error)
+                showVoiceFailure(error)
             }
         case .listening:
             phase = .transcribing
@@ -462,19 +489,14 @@ struct VoiceInputView: View {
             let text: String
             do {
                 text = try await transcriber.stopAndTranscribe()
-            } catch let failure as TranscriberFailure {
-                // 短すぎ / 無音 / マイク未入力 / セッション失敗。理由はそのまま日本語で出る
-                rt.toast = ErrorCopy.transcriberFailure(failure)
-                phase = .idle
-                return
             } catch {
-                rt.toast = L10n.tr("文字起こしに失敗しました: \(error.localizedDescription)")
+                // 短すぎ / 無音 / マイク未入力 / セッション失敗など。消えない状態カードに次の一手を出す(H9)
+                showVoiceFailure(error)
                 phase = .idle
                 return
             }
             guard !text.isEmpty else {
-                let detail = transcriber.lastDiagnostics.map { "(\(ErrorCopy.diagnosticsSummary($0)))" } ?? ""
-                rt.toast = L10n.tr("音声を聞き取れませんでした\(detail)。もう一度はっきり話してください")
+                showVoiceFailure(nil)
                 phase = .idle
                 return
             }
@@ -489,6 +511,13 @@ struct VoiceInputView: View {
             await morph(text)
         default:
             break
+        }
+    }
+
+    /// 録音・文字起こしの失敗を状態カードに(H9・トーストだと 3 秒で消える)。診断の値はログにだけ残す。
+    private func showVoiceFailure(_ error: Error?) {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            rt.errorCard = .voiceFailure(error, diagnostics: transcriber.lastDiagnostics)
         }
     }
 
@@ -522,6 +551,15 @@ struct VoiceInputView: View {
     }
 }
 
+/// 音声画面の上部(H10)。
+enum VoiceTopBar {
+    /// 一覧のボタンを出すか。今アプリを開いている・前にアプリを作った・一覧に 1 件でもある時。
+    /// 初回(まだ何も作っていない初期画面)は空の一覧しか開けないので出さない。
+    static func showsAppList(appCount: Int, isVoiceOnly: Bool, madeFirstApp: Bool) -> Bool {
+        !isVoiceOnly || madeFirstApp || appCount > 0
+    }
+}
+
 /// 音声モデルの準備中・未ダウンロードの文言(#275)。文字入力ならすぐ作れることを前に出す。
 @MainActor
 enum VoiceModelCopy {
@@ -535,6 +573,11 @@ enum VoiceModelCopy {
     static var textStillWorks: String { L10n.tr("文字入力なら、このまま作れます") }
     static var notReadyStatus: String { L10n.tr("音声の準備中です(文字ならすぐ作れます)") }
     static var textPlaceholder: String { L10n.tr("文字で入力(今すぐ作れます)") }
+    // U5: 本命のモデルの準備中に、端末内の Apple の音声認識で仮に聞き取っている時
+    static var provisional: String { L10n.tr("準備中のため簡易の聞き取りです") }
+    static var provisionalTextFirst: String {
+        L10n.tr("今は簡易の聞き取りで話せます。音声モデル(約\(AppRuntime.voiceModelMegabytes)MB)を入れると、より正確に聞き取れます。")
+    }
 }
 
 #Preview {
@@ -543,4 +586,24 @@ enum VoiceModelCopy {
         .environment(AppRuntime(document: (try? DSLExamples.document("initial")) ?? .fallback, services: services))
         .environment(AuthSession(service: services.auth))
         .environment(\.services, services)
+}
+
+/// 「最初から」の確認(M9)。これまでの会話(反映の区切り)も消すと戻せないので、今の会話だけ消すのと選べるようにする。
+private struct RestartChatConfirm: ViewModifier {
+    @Environment(AppRuntime.self) private var rt
+
+    func body(content: Content) -> some View {
+        @Bindable var rt = rt
+        content.confirmationDialog(L10n.tr("最初からにしますか?"), isPresented: $rt.showRestartConfirm, titleVisibility: .visible) {
+            if rt.isChatting {
+                Button(L10n.tr("今の会話だけ消す")) { rt.restartLiveChat() }
+                    .accessibilityIdentifier("chat.restart.live")
+            }
+            Button(L10n.tr("これまでの会話も消す"), role: .destructive) { rt.restartChat() }
+                .accessibilityIdentifier("chat.restart.all")
+            Button(L10n.tr("キャンセル"), role: .cancel) {}
+        } message: {
+            Text(L10n.tr("これまでの会話と反映の記録を消すと、元に戻せません。"))
+        }
+    }
 }

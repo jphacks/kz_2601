@@ -27,6 +27,7 @@ const (
 	costExecUSD      = 0.000016
 	costRecipientUSD = 0.0000006
 	costWriteUSD     = 0.000002
+	costReadUSD      = 0.0000004 // one record read by each / agg (1,000 ≈ 0.0004)
 )
 
 // Usage is one runner.usage line: labels and counts only. Never record
@@ -57,7 +58,7 @@ func EstimateCostUSD(u Usage) float64 {
 	default:
 		return 0
 	}
-	return costExecUSD + float64(u.NotifyRecipients)*costRecipientUSD + float64(u.Writes)*costWriteUSD
+	return costExecUSD + float64(u.NotifyRecipients)*costRecipientUSD + float64(u.Writes)*costWriteUSD + float64(u.Reads)*costReadUSD
 }
 
 // LogUsage writes one runner.usage line.

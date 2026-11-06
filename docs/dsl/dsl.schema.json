@@ -3760,7 +3760,7 @@
           "description": "generate の shape fields の項目名(1〜10 個・各 20 字まで)。例: [\"主菜\",\"副菜\",\"汁物\"]。"
         }
       },
-      "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はオンデバイス AI(Apple Intelligence / Foundation Models)だけでフォームの入力を処理して output field に入れる(無料・データは端末外に出ない・非対応端末では「この端末では AI を使えません」)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",
+      "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はフォームの入力を処理して output field に入れる(端末内 AI(Apple Intelligence / Foundation Models)が使えれば無料で端末の中だけ、無い端末では Tailor It Pro のオンライン AI。写真は送らない)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",
       "x-usage": "summarize〜suggest はフォーム画面のみ(screen.entity 必須)。発話に「要約して」「分類して」「気分を判定」「タグ付け」「一言で」「言い換えて」「丁寧に」「抜き出して」「AI で」がある時に使う。entity に結果用の field(string/text、分類は enum)を足し、その入力欄の直上に 1 行(例 A7:F8)。generate は「〜の案を出してくれるボタン」「今日の献立を提案」「励ましの一言」「お題を考えて」の時: どの画面でもよく、結果を表示する高さを取る(line は 3 行・list/fields は 5〜6 行 例 A1:F6)。記録を材料にするなら entity(+limit)、結果を記録に残したい時だけフォーム画面で output。1 画面 3 個まで。"
     },
     "LocationTracker": {
@@ -4452,7 +4452,7 @@
         },
         "if": {
           "$ref": "#/$defs/Expr",
-          "description": "条件(真偽の Expr)。行はきっかけのレコード({\"ref\":\"<field>\"}・\"<refField>.<field>\")。更新のきっかけでは {\"ref\":\"$prev.<field>\"} で更新の前の値。agg・streak・doneInDays・computed field は使えない。時刻のきっかけには行が無い(ref 不可)。"
+          "description": "条件(真偽の Expr)。行はきっかけのレコード({\"ref\":\"<field>\"}・\"<refField>.<field>\")か on.each のレコード。更新のきっかけでは {\"ref\":\"$prev.<field>\"} で更新の前の値。agg で同じアプリ・同じ側(private どうし・shared / public どうし)の entity を集計できる(期間の filter も可。読む件数は実行ごと・アプリの 1 日ごとに上限があり、超えたらその回は実行しない)。streak・doneInDays・computed field・setting は使えない。each の無い時刻のきっかけには行が無い(ref 不可・agg は可)。"
         },
         "do": {
           "type": "array",
@@ -4467,7 +4467,7 @@
     "RuleTrigger": {
       "type": "object",
       "additionalProperties": false,
-      "description": "きっかけ。レコード(record + entity、更新なら fields で絞れる)か時刻(every + time、毎週は weekday、毎月は day)のどちらか 1 つ。時刻は作成者のタイムゾーン。",
+      "description": "きっかけ。レコード(record + entity、更新なら fields で絞れる)か時刻(every + time、毎週は weekday、毎月は day、each で entity のレコードごとに)のどちらか 1 つ。時刻は作成者のタイムゾーン。",
       "properties": {
         "record": {
           "type": "string",
@@ -4523,6 +4523,10 @@
           "minimum": 1,
           "maximum": 28,
           "description": "every monthly の日(1〜28)。"
+        },
+        "each": {
+          "type": "string",
+          "description": "時刻のきっかけだけ: この entity のレコード 1 件ずつにルールを動かす(行 = そのレコード。if で絞る・{<field>}・author・updateRecord・increment が使える)。例: 締め切りが 3 日後の記録ごとに書いた人へ通知・順位を各レコードに書く。ルールと同じ側の entity だけ。読む件数に上限がある。"
         }
       }
     },
@@ -4555,7 +4559,7 @@
         "title",
         "body"
       ],
-      "description": "プッシュ通知。押すとこのアプリが開く(外のページには行かない)。きっかけを起こした本人には送らない。題 30 字・本文 80 字まで(差し込みの {…} も数える)。{<field>} できっかけのレコードの値(実行の時に 30 字で切る)、{$author} で書いた人の表示名を差し込める。URL・メールアドレス・電話番号・公式や運営を名乗る語は書けない。",
+      "description": "プッシュ通知。押すとこのアプリが開く(外のページには行かない)。きっかけを起こした本人には送らない。題 30 字・本文 80 字まで(差し込みの {…} も数える)。{<field>} できっかけ(または on.each)のレコードの値(実行の時に 30 字で切る)、{$author} で書いた人の表示名、{<with の名前>} で with の数・日付を差し込める。URL・メールアドレス・電話番号・公式や運営を名乗る語は書けない。",
       "properties": {
         "to": {
           "$ref": "#/$defs/RuleRecipient"
@@ -4565,6 +4569,14 @@
         },
         "body": {
           "type": "string"
+        },
+        "with": {
+          "type": "object",
+          "maxProperties": 3,
+          "additionalProperties": {
+            "$ref": "#/$defs/Expr"
+          },
+          "description": "名前 → 数か日付の Expr(例: {\"total\":{\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisWeek\",\"value\":null}}})。title / body に {名前} で差し込む(時刻のきっかけの「今週の合計」など)。名前は小文字の id で、行の field と同じ名前は不可。文字の値は差し込めない。"
         }
       }
     },
@@ -4624,7 +4636,7 @@
       "required": [
         "values"
       ],
-      "description": "きっかけのレコード(ref 省略)か、その ref field が指すレコード(ref)の field を書き換える。レコードのきっかけだけ。",
+      "description": "きっかけのレコード(ref 省略)か、その ref field が指すレコード(ref)の field を書き換える。レコードのきっかけか on.each だけ(each では行のレコード)。",
       "properties": {
         "ref": {
           "type": "string",
@@ -4646,7 +4658,7 @@
         "ref",
         "field"
       ],
-      "description": "集計: きっかけのレコードの ref field(ref)が指すレコードの数の field(field)に by(省略 = 1・負なら減らす)を足す。件数は by 省略、合計は by に {\"ref\":\"<数の field>\"}。レコードのきっかけだけ。",
+      "description": "集計: きっかけのレコードの ref field(ref)が指すレコードの数の field(field)に by(省略 = 1・負なら減らす)を足す。件数は by 省略、合計は by に {\"ref\":\"<数の field>\"}。レコードのきっかけか on.each だけ。",
       "properties": {
         "ref": {
           "type": "string"

@@ -86,6 +86,7 @@ var expectKeys = map[string]expectKind{
 	// checkAIGenerate (#417): aigen.go
 	"aiGenerate":       expectString, // line|list|fields|any
 	"aiGenerateEntity": expectBool,
+	"aiTask":           expectString, // some aiButton has this task (summarize|classify|...|generate)
 	// checkNearby (#425)
 	"passby":         expectBool,
 	"passbyDistance": expectBool,
@@ -116,6 +117,9 @@ var expectKeys = map[string]expectKind{
 	"ruleAction":  expectString,
 	"ruleTo":      expectString,
 	"ruleSim":     expectBool,
+	"ruleEach":    expectBool,
+	"ruleAgg":     expectBool,
+	"ruleWith":    expectBool,
 	// checkFlashcards (#264): flashcards.go
 	"flashcardsUnlearned": expectBool,
 	// checkFeed (#348): feed.go
@@ -208,6 +212,10 @@ func validateExpect(exp map[string]any) []string {
 			if s := v.(string); s != "any" && !dsl.AIShapes[s] {
 				bad = append(bad, "aiGenerate must be line|list|fields|any: "+s)
 			}
+		case "aiTask":
+			if s := v.(string); !dsl.AITasks[s] {
+				bad = append(bad, "aiTask must be an aiButton task: "+s)
+			}
 		}
 	}
 	if _, ok := exp["keepEntity"]; !ok && (exp["keep"] != nil || exp["growTo"] != nil) {
@@ -246,6 +254,9 @@ func validateCases(cases []Case) []string {
 			bad = append(bad, where+"empty transcript")
 		}
 		for _, b := range validateExpect(c.Expect) {
+			bad = append(bad, where+b)
+		}
+		for _, b := range validatePendingExpect(c.Expect, c.PendingExpect) {
 			bad = append(bad, where+b)
 		}
 		seen[c.ID] = true

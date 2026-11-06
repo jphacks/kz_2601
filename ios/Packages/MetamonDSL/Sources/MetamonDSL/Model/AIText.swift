@@ -13,6 +13,8 @@ public enum AITextLimits {
     public static let maxRecords = 20
     public static let defaultCount = 3
     public static let maxItemCharacters = 200
+    /// 要約・書き直しなど(task が generate 以外)のオンライン版の答えの上限(backend `TextMaxTaskRunes`)。
+    public static let maxTaskCharacters = 1200
 
     /// UTF-8 で `maxBytes` 以下に切る(文字の途中では切らない)。
     public static func clip(_ s: String, maxBytes: Int = maxInputBytes) -> String {
@@ -41,16 +43,25 @@ public struct AITextRequest: Codable, Equatable, Sendable {
     public var input: String?
     /// ja | en
     public var locale: String?
+    /// summarize | classify | rewrite | extract | suggest のオンライン版(nil = generate)。shape は line 固定・input 必須
+    public var task: String?
+    /// classify の候補(classify 以外は nil)
+    public var options: [String]?
 
     public init(instruction: String, shape: AITextShape, count: Int? = nil, items: [String]? = nil,
-                input: String? = nil, locale: String? = nil) {
+                input: String? = nil, locale: String? = nil, task: String? = nil, options: [String]? = nil) {
         self.instruction = instruction
         self.shape = shape
         self.count = count
         self.items = items
         self.input = input
         self.locale = locale
+        self.task = task
+        self.options = options
     }
+
+    /// 入力を変える task(要約など)か。答えは 1 つの文で、output の field に入れる。
+    public var isTransform: Bool { task != nil && task != "generate" }
 
     /// list の実際の個数(既定 3・1〜10)。
     public var resolvedCount: Int { Swift.min(Swift.max(count ?? AITextLimits.defaultCount, 1), AITextLimits.maxItems) }
@@ -83,6 +94,7 @@ public struct AITextResult: Codable, Equatable, Sendable {
     /// 生の出力を依頼の形に合わせる(backend の `parseTextOutput` と同じ規則)。合わなければ nil。
     /// line = 最初の空でない行 / list = 1 個以上(count を超えた分は切る)/ fields = 依頼の名前が全部そろう(依頼の順)。
     public static func normalize(text: String?, items: [String]?, fields: [AITextField]?, for request: AITextRequest) -> AITextResult? {
+        if request.isTransform { return normalizeTransform(text, for: request) }
         switch request.shape {
         case .line:
             guard let line = (text ?? "").split(whereSeparator: \.isNewline).map({ clean(String($0)) }).first(where: { !$0.isEmpty })
@@ -107,6 +119,20 @@ public struct AITextResult: Codable, Equatable, Sendable {
             guard !out.isEmpty else { return nil }
             return AITextResult(shape: .fields, text: out.map { "\($0.name): \($0.value)" }.joined(separator: "\n"), fields: out)
         }
+    }
+
+    /// 要約などの答え(backend `parseTaskOutput` と同じ規則): 全体を残して前後を整え、長ければ切る。
+    /// classify は候補そのものか、候補をちょうど 1 つ含む答えだけ受け取る。
+    static func normalizeTransform(_ text: String?, for request: AITextRequest) -> AITextResult? {
+        let t = (text ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "\"「」").union(.whitespacesAndNewlines))
+        guard !t.isEmpty else { return nil }
+        if request.task == "classify" {
+            let options = request.options ?? []
+            if options.contains(t) { return AITextResult(shape: .line, text: t) }
+            let hits = options.filter { t.contains($0) }
+            return hits.count == 1 ? AITextResult(shape: .line, text: hits[0]) : nil
+        }
+        return AITextResult(shape: .line, text: String(t.prefix(AITextLimits.maxTaskCharacters)))
     }
 
     /// `POST /v1/text` の 200 本文(openapi `TextResponse`)。サーバーが整えた後でも同じ規則で確かめる。

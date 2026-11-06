@@ -48,6 +48,35 @@ type Trigger struct {
 	Location *time.Location
 }
 
+// Lister lists the records of one entity of the trigger's app (the side the
+// rule works on): on.each and agg read it. The runner's reader caps how many
+// records a run may read and returns an error wrapping ErrReadLimit beyond
+// that (the run is stopped, never computed on part of the records).
+type Lister interface {
+	List(ctx context.Context, entity string) ([]expreval.Record, error)
+}
+
+// ErrReadLimit: a read cap stopped the run (errors.As a *ReadLimitError for
+// which one).
+var ErrReadLimit = errors.New("engine: read limit")
+
+// ReadLimitError names the cap (a quota scope) that stopped the reads.
+type ReadLimitError struct {
+	Scope string
+	Limit int
+	Used  int
+}
+
+func (e *ReadLimitError) Error() string {
+	return fmt.Sprintf("engine: read limit %s (%d > %d)", e.Scope, e.Used, e.Limit)
+}
+
+// Unwrap makes errors.Is(err, ErrReadLimit) true.
+func (e *ReadLimitError) Unwrap() error { return ErrReadLimit }
+
+// errNoLister: a rule reads records (each / agg) but the reader cannot list.
+var errNoLister = errors.New("engine: the rule lists records but the reader has no List")
+
 // RefReader reads one record a ref field of the trigger record points to.
 // The runner gives a reader bound to the trigger's appId; found=false when the record does not exist.
 type RefReader interface {
@@ -115,8 +144,62 @@ func (p Plan) Empty() bool { return len(p.Writes) == 0 && len(p.Notifies) == 0 }
 // PlanRule evaluates rule for ev (named PlanRule because the result type is
 // Plan): the trigger must match the rule, `if` must be
 // true, then each action's values / by / text are computed. An action whose
-// target ref is empty (or whose by is not a number) is skipped.
+// target ref is empty (or whose by is not a number) is skipped. A rule with
+// agg needs refs to implement Lister. A rule with on.each runs on one
+// record here (ev.Record); PlanEach runs it on every record.
 func PlanRule(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger, refs RefReader) (Plan, error) {
+	return planOne(ctx, app, rule, ev, refs, map[string][]expreval.Record{})
+}
+
+// RowPlan is the plan of an on.each rule for one record.
+type RowPlan struct {
+	// Trigger is ev with Entity / Record set to the record (the row the
+	// notifications resolve author / authorOf from).
+	Trigger Trigger
+	Plan    Plan
+}
+
+// PlanEach evaluates an on.each rule for every record of its entity (listed
+// through refs, which must implement Lister) and returns the non-empty plans
+// in the order the records were listed.
+func PlanEach(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger, refs RefReader) ([]RowPlan, error) {
+	if app == nil || rule == nil {
+		return nil, errors.New("engine: app and rule are required")
+	}
+	if rule.On.Each == "" || ev.Kind != KindScheduled {
+		return nil, fmt.Errorf("engine: rule %q is not a time-triggered each rule (trigger %q)", rule.ID, ev.Kind)
+	}
+	l, ok := refs.(Lister)
+	if !ok {
+		return nil, errNoLister
+	}
+	lists := map[string][]expreval.Record{}
+	recs, err := l.List(ctx, rule.On.Each)
+	if err != nil {
+		return nil, err
+	}
+	lists[rule.On.Each] = recs
+	var out []RowPlan
+	for _, rec := range recs {
+		if rec.ID == "" {
+			continue
+		}
+		rt := ev
+		rt.Entity, rt.Record = rule.On.Each, rec
+		p, err := planOne(ctx, app, rule, rt, refs, lists)
+		if err != nil {
+			return nil, err
+		}
+		if !p.Empty() {
+			out = append(out, RowPlan{Trigger: rt, Plan: p})
+		}
+	}
+	return out, nil
+}
+
+// planOne is PlanRule with the lists already read in this run (shared by
+// the rows of PlanEach).
+func planOne(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger, refs RefReader, lists map[string][]expreval.Record) (Plan, error) {
 	if app == nil || rule == nil {
 		return Plan{}, errors.New("engine: app and rule are required")
 	}
@@ -128,9 +211,12 @@ func PlanRule(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigge
 	if loc == nil {
 		loc = time.UTC
 	}
-	src := &refSource{ctx: ctx, row: row, refs: refs, cache: map[string][]expreval.Record{}}
+	src := &refSource{ctx: ctx, row: row, refs: refs, cache: map[string][]expreval.Record{}, lists: lists, listed: map[string]bool{}}
+	for _, id := range rule.AggEntities() {
+		src.listed[id] = true
+	}
 	e := expreval.New(expreval.Env{Entities: app.Entities, Source: src, Now: ev.At, Location: loc})
-	p := planner{app: app, ev: ev, row: row, e: e, loc: loc}
+	p := planner{app: app, ev: ev, row: row, e: e, loc: loc, each: rule.On.Each != ""}
 	if rule.If != nil {
 		v := e.Eval(*rule.If, row)
 		if src.err != nil {
@@ -160,7 +246,14 @@ func matchTrigger(app *dsl.App, rule *dsl.ServerRule, ev Trigger) (*expreval.Row
 		if ev.Kind != KindScheduled {
 			return nil, false, fmt.Errorf("engine: rule %q is time-triggered but the trigger is %q", rule.ID, ev.Kind)
 		}
-		return nil, true, nil
+		if rule.On.Each == "" {
+			return nil, true, nil
+		}
+		ent := app.EntityByID(rule.On.Each)
+		if ent == nil || ev.Record.ID == "" || ev.Entity != ent.ID {
+			return nil, false, fmt.Errorf("engine: rule %q runs on each %q record; use PlanEach", rule.ID, rule.On.Each)
+		}
+		return &expreval.Row{Entity: ent, Record: ev.Record}, true, nil
 	}
 	if ev.Kind != rule.On.Record || ev.Entity != rule.On.Entity {
 		return nil, false, fmt.Errorf("engine: rule %q is %s on %q but the trigger is %s on %q", rule.ID, rule.On.Record, rule.On.Entity, ev.Kind, ev.Entity)
@@ -196,14 +289,17 @@ type planner struct {
 	row *expreval.Row
 	e   *expreval.Evaluator
 	loc *time.Location
+	// each: the row was just listed (on.each), so an update of the row that
+	// changes nothing is not written (a daily recount writes only changes).
+	each bool
 }
 
 func (p *planner) action(i int, act *dsl.RuleAction, out *Plan) error {
 	switch {
 	case act.Notify != nil:
 		n := PlannedNotify{Action: i, To: act.Notify.To,
-			Title: p.render(act.Notify.Title, dsl.MaxNotifyTitleRunes),
-			Body:  p.render(act.Notify.Body, dsl.MaxNotifyBodyRunes)}
+			Title: p.render(act.Notify.Title, dsl.MaxNotifyTitleRunes, act.Notify.With),
+			Body:  p.render(act.Notify.Body, dsl.MaxNotifyBodyRunes, act.Notify.With)}
 		if n.To.Kind == dsl.RecipientAuthorOf && p.row != nil {
 			if f := p.row.Entity.FieldByID(n.To.Field); f != nil {
 				n.RefEntity, n.RefID = f.RefEntity, refID(p.row.Record, f.ID)
@@ -227,8 +323,11 @@ func (p *planner) action(i int, act *dsl.RuleAction, out *Plan) error {
 		if !ok {
 			return nil
 		}
-		out.Writes = append(out.Writes, PlannedWrite{Action: i, Kind: WriteUpdate, Entity: target.ID, RecordID: id,
-			Values: p.values(target, act.UpdateRecord.Values)})
+		vals := p.values(target, act.UpdateRecord.Values)
+		if p.each && act.UpdateRecord.Ref == "" && p.unchanged(vals) {
+			return nil
+		}
+		out.Writes = append(out.Writes, PlannedWrite{Action: i, Kind: WriteUpdate, Entity: target.ID, RecordID: id, Values: vals})
 	case act.Increment != nil:
 		if act.Increment.Ref == "" {
 			return nil
@@ -249,6 +348,30 @@ func (p *planner) action(i int, act *dsl.RuleAction, out *Plan) error {
 			Field: act.Increment.Field, By: by})
 	}
 	return nil
+}
+
+// unchanged reports whether writing vals to the row changes nothing.
+func (p *planner) unchanged(vals map[string]any) bool {
+	for k, v := range vals {
+		if !sameJSON(normalize(v), normalize(p.row.Record.Data[k])) {
+			return false
+		}
+	}
+	return true
+}
+
+// normalize makes stored numbers (int64 from Firestore) compare equal to
+// computed ones (float64).
+func normalize(v any) any {
+	switch n := v.(type) {
+	case int:
+		return float64(n)
+	case int64:
+		return float64(n)
+	case float32:
+		return float64(n)
+	}
+	return v
 }
 
 // target is the trigger record (ref "") or the record its ref field points
@@ -308,6 +431,28 @@ func (p *planner) refsValue(x dsl.Expr) any {
 	return ids
 }
 
+// list reads all records of entity once per run.
+func (s *refSource) list(entity string) []expreval.Record {
+	if hit, ok := s.lists[entity]; ok {
+		return hit
+	}
+	if s.err != nil {
+		return nil
+	}
+	l, ok := s.refs.(Lister)
+	if !ok {
+		s.err = errNoLister
+		return nil
+	}
+	recs, err := l.List(s.ctx, entity)
+	if err != nil {
+		s.err = err
+		return nil
+	}
+	s.lists[entity] = recs
+	return recs
+}
+
 func refID(r expreval.Record, field string) string {
 	s, _ := r.Data[field].(string)
 	return s
@@ -321,9 +466,16 @@ type refSource struct {
 	refs  RefReader
 	cache map[string][]expreval.Record
 	err   error
+	// listed: entities the rule's aggs read (all their records, through
+	// Lister); lists: what was listed in this run (shared by PlanEach rows).
+	listed map[string]bool
+	lists  map[string][]expreval.Record
 }
 
 func (s *refSource) Records(entity string) []expreval.Record {
+	if s.listed[entity] {
+		return s.list(entity)
+	}
 	if hit, ok := s.cache[entity]; ok {
 		return hit
 	}
