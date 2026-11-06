@@ -144,3 +144,40 @@ func TestStoreCommitEvents(t *testing.T) {
 		}
 	})
 }
+
+// #342: keys of different (appId, uid, ruleId) never collide, even when the
+// parts joined with "_" read the same.
+func TestStoreScheduleKeysDoNotCollide(t *testing.T) {
+	if ScheduleKey("a_b", "", "c") == ScheduleKey("a", "", "b_c") ||
+		ScheduleKey("a", "b_c", "d") == ScheduleKey("a_b", "c", "d") ||
+		ScheduleKey("a", "", "b") == ScheduleKey("a", "b", "") ||
+		TenantKey("a_b", "") == TenantKey("a", "b") {
+		t.Fatal("keys collide")
+	}
+	bothStores(t, func(t *testing.T, s Store, sfx string) {
+		ctx := context.Background()
+		env := "sk" + sfx
+		next := time.Date(2026, 11, 8, 0, 0, 0, 0, time.UTC)
+		x := Schedule{ID: ScheduleKey("a_b"+sfx, "", "c"), AppID: "a_b" + sfx, Scope: "shared", RuleID: "c",
+			Every: "daily", Time: "07:00", TimeZone: "Asia/Tokyo", Version: 1, NextRunAt: next}
+		y := Schedule{ID: ScheduleKey("a"+sfx, "", "b_c"), AppID: "a" + sfx, Scope: "shared", RuleID: "b_c",
+			Every: "daily", Time: "08:00", TimeZone: "Asia/Tokyo", Version: 1, NextRunAt: next}
+		for _, row := range []Schedule{x, y} {
+			if put, err := s.PutSchedule(ctx, env, row); !put || err != nil {
+				t.Fatalf("put %s: %v %v", row.RuleID, put, err)
+			}
+		}
+		for _, want := range []Schedule{x, y} {
+			rows, err := s.ListSchedules(ctx, env, want.AppID)
+			if err != nil || len(rows) != 1 || rows[0].ID != want.ID || rows[0].RuleID != want.RuleID || rows[0].Time != want.Time {
+				t.Fatalf("rows of %s: %+v %v", want.AppID, rows, err)
+			}
+		}
+		if del, err := s.DeleteSchedule(ctx, env, x.ID, 1); !del || err != nil {
+			t.Fatalf("delete: %v %v", del, err)
+		}
+		if rows, _ := s.ListSchedules(ctx, env, y.AppID); len(rows) != 1 {
+			t.Fatalf("deleting one removed the other: %+v", rows)
+		}
+	})
+}

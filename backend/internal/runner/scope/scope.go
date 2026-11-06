@@ -194,8 +194,8 @@ func (h *Handle) Version(ctx context.Context, n int) (*store.Version, error) {
 }
 
 // RunnerApp is the app's runner state (last opened, the creator's time
-// zone): runner/{env}/apps/{appId} for shared / public data, keyed by the
-// user too for private data.
+// zone): runner/{env}/apps/{store.TenantKey(appId, uid)}, uid "" for
+// shared / public data.
 func (h *Handle) RunnerApp(ctx context.Context) (store.RunnerApp, error) {
 	return h.b.RunnerApp(ctx, h.env, store.TenantKey(h.appID, h.uid))
 }

@@ -2,6 +2,9 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"strings"
 	"time"
 )
 
@@ -9,9 +12,11 @@ import (
 // each: the runner keeps one document per rule and, on every tick, takes
 // the ones that are due (a range on the single field nextRunAt).
 //
-//	runner/{env}/schedules/{appId}_{ruleId}         shared / public apps
-//	runner/{env}/schedules/{appId}_{uid}_{ruleId}   private apps (one per user)
-//	runner/{env}/apps/{appId}[_{uid}]               lastOpenedAt, timeZone
+//	runner/{env}/schedules/{ScheduleKey(appId, uid, ruleId)}   uid "" for shared / public apps
+//	runner/{env}/apps/{TenantKey(appId, uid)}                  lastOpenedAt, timeZone
+//
+// The ids are hashes of the parts (no two apps / rules can collide); appId,
+// uid and ruleId are fields of the schedule document.
 //
 // appconfig writes apps/*.lastOpenedAt when the app is opened (at most once
 // a day); the runner writes the rest.
@@ -57,17 +62,18 @@ func (s Schedule) SameTiming(o Schedule) bool {
 }
 
 // TenantKey names an app's runner state: the appId, plus the uid for a
-// private app (each user has their own copy and their own schedules).
-func TenantKey(appID, uid string) string {
-	if uid == "" {
-		return runnerMarkID(appID)
-	}
-	return runnerMarkID(appID + "_" + uid)
-}
+// private app (each user has their own copy and their own schedules). It
+// is a hash of the parts with a separator ids cannot hold, so no two
+// (appId, uid) pairs share a key; the parts are kept as fields.
+func TenantKey(appID, uid string) string { return "t_" + keyHash(appID, uid) }
 
-// ScheduleKey is the document id of a schedule.
-func ScheduleKey(appID, uid, ruleID string) string {
-	return TenantKey(appID, uid) + "_" + runnerMarkID(ruleID)
+// ScheduleKey is the document id of a schedule (same hashing as TenantKey,
+// so "a_b"+"c" and "a"+"b_c" are different documents).
+func ScheduleKey(appID, uid, ruleID string) string { return "s_" + keyHash(appID, uid, ruleID) }
+
+func keyHash(parts ...string) string {
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+	return hex.EncodeToString(sum[:16])
 }
 
 // RunnerApp is runner/{env}/apps/{TenantKey}.
