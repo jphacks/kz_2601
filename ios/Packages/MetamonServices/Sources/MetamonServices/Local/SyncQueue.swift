@@ -187,14 +187,14 @@ public actor SyncQueue {
                 emit(.sent(appId: op.appId, entity: op.entity))
             } catch {
                 if SharedAccessDenial(error) == .notMember { // #378 の「作った人だけ」の 403 より先に見分ける
-                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: rowId(op))
                     finish(op)
                     print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) not a member")
                     emit(.notMember(appId: op.appId, entity: op.entity))
                     continue
                 }
                 if let pro = ProRequired(error) { // #316: 4xx の rejected より先に見分ける
-                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: rowId(op))
                     finish(op)
                     print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) needs Pro (creator=\(pro.creatorNeedsPro))")
                     emit(.proRequired(appId: op.appId, entity: op.entity, pro: pro))
@@ -202,16 +202,16 @@ public actor SyncQueue {
                 }
                 switch Self.classify(error) {
                 case .conflict:
-                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: rowId(op))
                     finish(op)
                     emit(.conflict(appId: op.appId, entity: op.entity, message: (error as? APIError)?.errorDescription ?? "\(error)"))
                 case .forbidden:
-                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: rowId(op))
                     finish(op)
                     print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) forbidden (not the author)")
                     emit(.forbidden(appId: op.appId, entity: op.entity))
                 case .rejected(let message):
-                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: rowId(op))
                     finish(op)
                     print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) rejected: \(message)")
                     emit(.rejected(appId: op.appId, entity: op.entity, message: message, field: (error as? APIError)?.field))
@@ -254,12 +254,15 @@ public actor SyncQueue {
             } catch let e as APIError where e.status == 404 {
                 // もう無い = 目的は達成
             }
-            await store.remove(appId: op.appId, entity: op.entity, recordId: op.recordId)
+            await store.remove(appId: op.appId, entity: op.entity, recordId: serverId)
             aliases[op.recordId] = nil
         case .none:
             break
         }
     }
+
+    /// 操作が指すローカル行の id。積んだ後に作成が届くと、行は仮 id からサーバー id に替わっている。
+    private func rowId(_ op: SyncOperation) -> String { aliases[op.recordId] ?? op.recordId }
 
     /// 値に残った仮 id(`local-<clientId>`)を送信済みのサーバー id に差し替える。
     /// 未送信のメンバーを選んだ支出の type=ref(払った人)などは、積んだ時点では仮 id のまま入っている。
