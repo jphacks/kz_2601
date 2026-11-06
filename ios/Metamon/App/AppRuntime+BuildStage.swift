@@ -29,7 +29,8 @@ extension AppRuntime {
         guard let job else { return (nil, .none) }
         switch job.kind {
         case .create:
-            let plan = BuildChoreography.AssemblyPlan.make(for: next.dsl, reduceMotion: reduceMotion())
+            // 仮置き(#636)で見せた部品のうち結果と同じものは置いたまま、残りを置く
+            let plan = BuildChoreography.AssemblyPlan.make(for: next.dsl, reduceMotion: reduceMotion(), shown: job.draft.parts)
             return (BuildReveal(job: job, plan: plan, heldViewID: rootViewID), .none)
         case .edit:
             guard previous.appId == next.appId, !previous.dsl.isVoiceOnly else { return (nil, .none) }

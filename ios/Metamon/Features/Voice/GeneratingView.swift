@@ -74,7 +74,7 @@ struct GeneratingView: View {
 
             VStack(spacing: Theme.Spacing.lg) {
                 header
-                BuildStageView(script: script, elapsed: elapsed, plan: reveal?.plan)
+                BuildStageView(script: script, elapsed: elapsed, plan: reveal?.plan, live: job.draft)
                     .padding(.horizontal, Theme.Spacing.lg)
                 footer
             }
@@ -107,12 +107,21 @@ struct GeneratingView: View {
                 .textCase(.uppercase)
                 .tracking(1.2)
                 .foregroundStyle(Theme.brandGradient)
+            // SSE で届いたアプリ名(#636・仮置き)
+            if let name = job.draft.appName {
+                Text(name)
+                    .font(.headline)
+                    .foregroundStyle(Theme.brandGradient)
+                    .lineLimit(1)
+                    .transition(.opacity)
+            }
             Text("「\(displayTranscript)」")
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .minimumScaleFactor(0.8)
         }
+        .animation(.easeInOut(duration: 0.3), value: job.draft.appName)
     }
 
     /// 見出しには「別のアプリ。」などの切替キーワードを出さない(VoiceIntent.newAppPrefixes と同じ語)。

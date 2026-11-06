@@ -244,10 +244,10 @@ VoiceInputView.phase                         AppRuntime.morphJob               R
 | idle(準備中) | `status` が notDownloaded/downloading/loading | マイク灰色・無効、下に DL 進捗 / 読み込み中 |
 | listening | 録音中 | 赤〜珊瑚のマイク + 外へ広がる波紋 ×3(擬似音量で振幅が揺れる ※ `SpeechTranscriber` に音量 API が無いため実音量連動は未対応)、"聞いています…" |
 | transcribing | `stopAndTranscribe` 待ち | 波形バー、"文字起こし中…"。結果はカードに 1 文字ずつ(`TypewriterText`)表示してから送信 |
-| 生成中 create | `morphJob.kind == .create`(現在 DSL が voice-only) | 全画面 `GeneratingView`: 見出し=「認識テキスト」、組み立て台 `BuildStageView`(#626: パーツ箱から部品のシルエットを選んで空の画面に置く → 入れ替える → 並べ直す。依頼文の語「グラフ」「記録」「チェック」等から出そうな部品を先に出す・`BuildChoreography.WaitingScript`)、段階文言、経過秒 |
+| 生成中 create | `morphJob.kind == .create`(現在 DSL が voice-only) | 全画面 `GeneratingView`: 見出し=「認識テキスト」、組み立て台 `BuildStageView`(#626: パーツ箱から部品のシルエットを選んで空の画面に置く → 入れ替える → 並べ直す。依頼文の語「グラフ」「記録」「チェック」等から出そうな部品を先に出す・`BuildChoreography.WaitingScript`)、段階文言、経過秒。#636: create は `POST /v1/generate?stream=1`(SSE)で読み、`app` でアプリ名(見出しの上)とタブの帯、`component` で本物の部品を届いた順に下書きと置き換えて**仮置き**(同じ index は 1 回・`LiveDraft`)、`restart` で仮置きを捨てて当て推量に戻る。SSE が使えない(401 / 429・接続断・`result` の前に終わった)時は仮置きを捨てて stream なしの呼び方に戻る(`event: error` はそのまま失敗として出す)。edit は stream しない |
 | 生成中 edit | `morphJob.kind == .edit` | シートを閉じ、現在画面を 45% + blur 1.5 で薄くし、上部に `EditingIndicator` カプセル(小さな部品の並べ直し + 「変更を反映しています…」+ 発話) |
 | 変身 | `apply(doc)` | **同じ `withAnimation(.spring 0.65)` の中で** `document` 差し替えと `morphJob = nil` → 生成中オーバーレイ fade out と新ツリー scale(0.96→1)+fade in がクロスフェード |
-| 組み上げ(create の結果・#626) | `apply(doc, reveal:)` で `buildReveal` が立つ | 結果は適用済みのまま、RootView は `.id` を待っていた時の値(`rootViewID`)に留めて `GeneratingView` を続け、本物の結果の部品(初期タブの直下・上から行 → 列)を 1 つずつ置く(`AssemblyPlan`・全体 1.5 秒以内・タップで飛ばせる)。終わると `buildReveal = nil` で本物の画面へクロスフェード。別の apply が来たら捨てる |
+| 組み上げ(create の結果・#626) | `apply(doc, reveal:)` で `buildReveal` が立つ | 結果は適用済みのまま、RootView は `.id` を待っていた時の値(`rootViewID`)に留めて `GeneratingView` を続け、本物の結果の部品(初期タブの直下・上から行 → 列)を 1 つずつ置く(`AssemblyPlan`。仮置きと id・種類・場所が同じ部品は最初から置いたまま、違う部品は結果で置き直す・#636・全体 1.5 秒以内・タップで飛ばせる)。終わると `buildReveal = nil` で本物の画面へクロスフェード。別の apply が来たら捨てる |
 | 変身(edit の結果・#626) | `apply(doc, highlight:)` | 変わった部品(中身の印で比較・`editHighlight`)だけを Renderer の出現で置き直して光らせ、変わっていない部品は待たせず出す。新しい画面・7 割超が変わった画面はいつもの出現 |
 | Reduce Motion | — | 待っている間は 2.4 秒ごとにフェードだけで切り替え、組み上げは全部を一度にフェード(0.45 秒)、編集は光の淡いフェードだけ |
 | 要約 | `summaryBanner` | 画面上部のカード(sparkles + summary)を 3〜5 秒(文字数÷12 でクランプ)表示して自動で消える。タップで即閉じ |

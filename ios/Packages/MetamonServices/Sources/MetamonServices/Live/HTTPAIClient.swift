@@ -5,6 +5,7 @@ import MetamonDSL
 /// - body: `{appId, baseVersion?, transcript, mode:"auto"}`、`Authorization: Bearer <Firebase ID token>`
 /// - 200: `{appId, version, previousVersion, mode, dsl, patch?, summary, ...}` → `dsl` と `summary` を使う
 /// - 4xx/5xx: `{error:{code,message}}` → `APIError.server`
+/// create は `?stream=1`(SSE)で途中経過も読む(#636・`GenerateStream.swift`)。edit は stream しない。
 /// 成功した DSL は `DocumentCache` にも入れる(appconfig から取り直さなくてもオフライン復元できるように)。
 public struct HTTPAIClient: AIClient {
     public let baseURL: URL
@@ -69,14 +70,22 @@ public struct HTTPAIClient: AIClient {
         }
     }
 
-    private func generate(transcript: String, appId: String, baseVersion: Int?, locale: String?) async throws -> MorphResult {
+    /// 途中経過付き(#636)。create の時だけ AppRuntime が呼ぶ。409 のやり直しは仮置きを捨ててから。
+    public func morph(transcript: String, appId: String, currentVersion: Int, locale: String?,
+                      progress: @escaping @Sendable (GenerateProgress) -> Void) async throws -> MorphResult {
+        let base = currentVersion > 0 ? currentVersion : nil
+        do {
+            return try await generateStreaming(transcript: transcript, appId: appId, baseVersion: base, locale: locale, progress: progress)
+        } catch APIError.server(409, _, _, _) {
+            progress(.restart(attempt: 0))
+            return try await generateStreaming(transcript: transcript, appId: appId, baseVersion: nil, locale: locale, progress: progress)
+        }
+    }
+
+    func generate(transcript: String, appId: String, baseVersion: Int?, locale: String?) async throws -> MorphResult {
         let body = GenerateBody(appId: appId, baseVersion: baseVersion, transcript: transcript, locale: locale)
         let data = try await HTTP.send("POST", baseURL: baseURL, path: "v1/generate", body: body, token: token, timeout: timeout)
-        let result = try Self.parse(data, appId: appId)
-        if let cache, let envelope = Self.envelope(from: data, appId: result.document.appId, version: result.document.version) {
-            cache.store(appId: result.document.appId, envelope: envelope)
-        }
-        return result
+        return try finish(data, appId: appId)
     }
 
     // MARK: - 対話(clarify)
