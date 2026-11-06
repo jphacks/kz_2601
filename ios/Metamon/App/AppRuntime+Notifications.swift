@@ -75,11 +75,8 @@ extension AppRuntime {
     private func handleNotificationResult(_ result: NotificationSyncResult, appId: String, hasSpecs: Bool) {
         guard document.appId == appId else { return }
         upcomingNotifications = result.upcoming
+        // 許可が無い時は上のバー(`NotificationsOffBarHost`・設定を開くボタン付き)で伝える。トーストは 3 秒で消えるのでやめた(L3)
         notificationsDenied = result.denied && hasSpecs
-        if notificationsDenied, !warnedNotificationsDenied {
-            warnedNotificationsDenied = true
-            toast = L10n.tr("通知がオフのため届きません。設定アプリの「通知」で Tailor It を許可してください")
-        }
     }
 }
 

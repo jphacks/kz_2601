@@ -10,14 +10,15 @@ struct TutorialHost: ViewModifier {
         content
             .fullScreenCover(isPresented: $rt.showTutorial) { TutorialView() }
             .overlay(alignment: .bottom) {
-                if rt.showFirstEditHint, !rt.dsl.isVoiceOnly, rt.morphJob == nil, !rt.showVoiceSheet {
+                // H7: 要約バナー・確認が閉じてから(`PostBuildNotice`)
+                if rt.showFirstEditHint, rt.isNoticeTurn(.editHint), !rt.dsl.isVoiceOnly, rt.morphJob == nil, !rt.showVoiceSheet {
                     FirstEditHintCard()
                         .padding(.horizontal, Theme.Spacing.md)
                         .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: rt.dsl.app.hasTabs) + Theme.Layout.fabSize + Theme.Spacing.md)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .animation(.spring(duration: 0.45, bounce: 0.15), value: rt.showFirstEditHint)
+            .animation(.spring(duration: 0.45, bounce: 0.15), value: rt.showFirstEditHint && rt.isNoticeTurn(.editHint))
             .onChange(of: rt.showAIConsent) { _, showing in
                 // 同意の画面が閉じたら、閉じるアニメーションを待ってから出す(重なると表示されない)
                 guard !showing else { return }

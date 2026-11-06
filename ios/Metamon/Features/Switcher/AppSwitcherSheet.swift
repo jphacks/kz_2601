@@ -4,12 +4,13 @@ import MetamonRenderer
 
 /// 変身一覧(#51)。マイク FAB の長押し / 「アプリ一覧」で開く。
 /// 自分のアプリを横スクロールのカード(サムネ・名前・最終更新・「使用中」)で並べ、タップで切替。
-/// 下に「+ 新しいアプリ」「Tailor It に戻る(初期画面)」。
+/// 下に「+ 新しいアプリ」「Tailor It に戻る(初期画面)」。右上に設定(歯車・H10: 音声シートの奥にしか無かった)。
 struct AppSwitcherSheet: View {
     @Environment(AppRuntime.self) private var rt
     @Environment(\.dismiss) private var dismiss
     @State private var thumbs = AppThumbnailStore.shared
     @State private var selected: String?
+    @State private var showSettings = false
     #if !APP_STORE_REVIEW
     @State private var sharingUI = SharingUI.shared
     @State private var releaseUI = ReleaseUI.shared
@@ -46,6 +47,7 @@ struct AppSwitcherSheet: View {
         .sheet(item: $releaseUI.target) { ReleaseRequestSheet(app: $0) }
         #endif
         .screenMapSheet { ScreenMapUI.shared.closeSwitcherThenTalk(rt) } // #116
+        .sheet(isPresented: $showSettings) { SettingsSheet() } // H10
     }
 
     // MARK: - Sections
@@ -62,6 +64,16 @@ struct AppSwitcherSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
+            Button { showSettings = true } label: {
+                Image(systemName: "gearshape")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .padding(Theme.Spacing.sm + 2)
+                    .background(Theme.Colors.surface, in: Circle())
+                    .overlay(Circle().strokeBorder(Theme.Colors.hairline))
+            }
+            .accessibilityLabel("設定")
+            .accessibilityIdentifier("switcher.settings")
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(.footnote.weight(.bold))

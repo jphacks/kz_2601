@@ -101,8 +101,9 @@ var serverRulesGenerationSchema = buildServerRulesSchema()
 
 // ServerRulesGenerationSchema is the structured-output schema of the
 // server-rules pass: {unchanged, declined, serverRules}. The values maps of
-// createRecord / updateRecord are arrays of {field, value} here (structured
-// outputs reject open maps); serverRulesFromWire turns them back.
+// createRecord / updateRecord are arrays of {field, value} and notify.with an
+// array of {name, value} here (structured outputs reject open maps);
+// serverRulesFromWire turns them back.
 func ServerRulesGenerationSchema() json.RawMessage { return serverRulesGenerationSchema }
 
 func buildServerRulesSchema() json.RawMessage {
@@ -122,6 +123,16 @@ func buildServerRulesSchema() json.RawMessage {
 			panic("ai: server rules schema: $defs/" + name + " has no properties")
 		}
 		props["values"] = pairs
+	}
+	if d, _ := defs["RuleNotify"].(map[string]any); d != nil {
+		props, _ := d["properties"].(map[string]any)
+		if props == nil {
+			panic("ai: server rules schema: $defs/RuleNotify has no properties")
+		}
+		props["with"] = map[string]any{"type": "array", "items": map[string]any{
+			"type": "object", "additionalProperties": false, "required": []any{"name", "value"},
+			"properties": map[string]any{"name": map[string]any{"type": "string"}, "value": map[string]any{"$ref": "#/$defs/Expr"}},
+		}}
 	}
 	root := map[string]any{
 		"type": "object", "additionalProperties": false,
@@ -149,8 +160,8 @@ type serverRulesReply struct {
 	ServerRules []map[string]any `json:"serverRules"`
 }
 
-// serverRulesFromWire turns values [{field, value}] back into the DSL's
-// {field: value} map (already-map values are kept).
+// serverRulesFromWire turns values [{field, value}] and with [{name, value}]
+// back into the DSL's maps (already-map values are kept).
 func serverRulesFromWire(rules []map[string]any) ([]map[string]any, error) {
 	for i, r := range rules {
 		do, _ := r["do"].([]any)
@@ -176,9 +187,40 @@ func serverRulesFromWire(rules []map[string]any) ([]map[string]any, error) {
 				}
 				body["values"] = m
 			}
+			if err := withFromWire(act, i, j); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return rules, nil
+}
+
+// withFromWire turns notify.with [{name, value}] into {name: value}; an
+// empty list is dropped.
+func withFromWire(act map[string]any, i, j int) error {
+	body, _ := act["notify"].(map[string]any)
+	arr, ok := body["with"].([]any)
+	if !ok {
+		return nil
+	}
+	if len(arr) == 0 {
+		delete(body, "with")
+		return nil
+	}
+	m := make(map[string]any, len(arr))
+	for _, p := range arr {
+		pair, _ := p.(map[string]any)
+		n, _ := pair["name"].(string)
+		if n == "" {
+			return fmt.Errorf("serverRules[%d].do[%d].notify.with: each item needs name and value", i, j)
+		}
+		if _, dup := m[n]; dup {
+			return fmt.Errorf("serverRules[%d].do[%d].notify.with: name %q is written twice", i, j, n)
+		}
+		m[n] = pair["value"]
+	}
+	body["with"] = m
+	return nil
 }
 
 // withServerRules returns current with app.serverRules replaced (removed when empty).

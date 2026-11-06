@@ -1,0 +1,4 @@
+[
+  {"id": "cov_poster_event", "kind": "create", "group": "cov-pr660", "transcript": "イベントのポスターを撮ると日時とタイトルを読み取って予定に登録し、iPhoneのカレンダーにも入れられるアプリ", "note": "jphacks/os_2407 ○ Innovator。PR #660 の addToCalendar", "expect": {"photoAnalyze": ["date"]}, "pendingExpect": {"addToCalendar": true}},
+  {"id": "cov_mail_calendar", "kind": "create", "group": "cov-pr660", "transcript": "届いたメールの文を貼ると日時と用件を取り出して予定にし、iPhoneのカレンダーに追加できるアプリ", "note": "jphacks/OL_2303 △。PR #660 の addToCalendar。メールの自動取得は欠ける", "expect": {"has": ["aiButton"]}, "pendingExpect": {"addToCalendar": true}}
+]

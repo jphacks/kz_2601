@@ -19,10 +19,15 @@ struct ErrorPresentation: Equatable, Identifiable {
         case timeout
         /// 401(再取得しても失効)
         case sessionExpired
-        /// 4xx(入力不備など)・その他
+        /// 4xx(入力不備)。言い直してもらう(同じ発話の再送はしない)
+        case rejected
+        /// その他。message は `ErrorCopy` の決まった文(サーバーの文は入れない・H9)
         case failed(message: String)
+        /// 生成以外の消えない知らせ(H9: 録音の失敗・起動時に届かない等)。主ボタンなし・「閉じる」だけ
+        case notice(icon: String, title: String, body: String)
     }
-    enum Primary: Equatable { case retry, sendNow, signIn }
+    /// signInApple = 匿名の上限(M3・「Apple でサインイン」で上限が増える)/ upgradePro = Pro で上限が増える(M3)
+    enum Primary: Equatable { case retry, sendNow, signIn, signInApple, upgradePro }
     enum Secondary: Equatable { case discard, dismiss }
 
     /// 何の失敗か。generate = 生成(「もう一度」で同じ発話を再生成)、chat = 生成前の対話(#75・「もう一度」で同じ履歴を再送)
@@ -33,6 +38,23 @@ struct ErrorPresentation: Equatable, Identifiable {
     /// 再送に使う発話
     var transcript: String
     var origin: Origin = .generate
+
+    /// 消えない知らせ(H9)。生成の発話は持たない
+    static func notice(icon: String = "exclamationmark.triangle", title: String, body: String) -> ErrorPresentation {
+        ErrorPresentation(kind: .notice(icon: icon, title: title, body: body), transcript: "")
+    }
+
+    /// 録音・文字起こしの失敗(H9)。音声画面の状態カードに出す。秒数・dB などの診断はログにだけ残す。
+    /// `error` が nil なら「録音はできたが文字にならなかった」。
+    static func voiceFailure(_ error: Error?, diagnostics: TranscriberDiagnostics? = nil) -> ErrorPresentation {
+        if let diagnostics { ErrorLog.record(diagnostics.summary, context: "voice diagnostics") }
+        guard let error else { return .notice(icon: "mic.slash", title: ErrorCopy.notHeardTitle, body: ErrorCopy.notHeardBody) }
+        ErrorLog.record(error, context: "voice")
+        if let f = error as? TranscriberFailure {
+            return .notice(icon: "mic.slash", title: ErrorCopy.transcriberTitle(f), body: ErrorCopy.transcriberFailure(f))
+        }
+        return .notice(icon: "mic.slash", title: L10n.tr("文字起こしできませんでした"), body: ErrorCopy.nextStep(for: error))
+    }
 
     static func == (a: ErrorPresentation, b: ErrorPresentation) -> Bool {
         a.kind == b.kind && a.transcript == b.transcript && a.origin == b.origin
@@ -48,7 +70,12 @@ struct ErrorPresentation: Equatable, Identifiable {
         case .rateLimited(let info): return ErrorPresentation(kind: .rateLimited(info), transcript: transcript, origin: origin)
         case .aiPaused: return ErrorPresentation(kind: .aiPaused, transcript: transcript, origin: origin)
         case .appCheckFailed: return ErrorPresentation(kind: .failed(message: ErrorCopy.appCheckFailedBody), transcript: transcript, origin: origin)
-        case .rejected(let m), .other(let m): return ErrorPresentation(kind: .failed(message: m), transcript: transcript, origin: origin)
+        case .rejected(let m):
+            ErrorLog.record(m, context: "\(origin == .chat ? "chat" : "morph") rejected") // サーバーの文はログにだけ
+            return ErrorPresentation(kind: .rejected, transcript: transcript, origin: origin)
+        case .other(let m):
+            ErrorLog.record(m, context: origin == .chat ? "chat" : "morph")
+            return ErrorPresentation(kind: .failed(message: ErrorCopy.otherBody), transcript: transcript, origin: origin)
         case .conflict, .cancelled: return nil
         }
     }
@@ -62,7 +89,8 @@ struct ErrorPresentation: Equatable, Identifiable {
         case .aiPaused: "pause.circle"
         case .timeout: "clock.badge.exclamationmark"
         case .sessionExpired: "person.crop.circle.badge.exclamationmark"
-        case .failed: "exclamationmark.triangle"
+        case .failed, .rejected: "exclamationmark.triangle"
+        case .notice(let icon, _, _): icon
         }
     }
 
@@ -76,6 +104,8 @@ struct ErrorPresentation: Equatable, Identifiable {
         case .timeout: ErrorCopy.timeoutTitle
         case .sessionExpired: ErrorCopy.sessionExpiredTitle
         case .failed: origin == .chat ? ErrorCopy.chatFailedTitle : ErrorCopy.failedTitle
+        case .rejected: ErrorCopy.rejectedTitle
+        case .notice(_, let title, _): title
         }
     }
 
@@ -89,6 +119,8 @@ struct ErrorPresentation: Equatable, Identifiable {
         case .timeout: ErrorCopy.timeoutBody
         case .sessionExpired: ErrorCopy.sessionExpiredBody
         case .failed(let message): message
+        case .rejected: ErrorCopy.rejectedBody
+        case .notice(_, _, let body): body
         }
     }
 
@@ -97,7 +129,23 @@ struct ErrorPresentation: Equatable, Identifiable {
         case .offlineQueued: .sendNow
         case .offlineInterrupted, .busy, .timeout, .failed, .aiPaused: .retry
         case .sessionExpired: .signIn
-        case .rateLimited: nil
+        case .rejected, .notice: nil
+        case .rateLimited(let info): Self.rateLimitPrimary(info)
+        }
+    }
+
+    /// 上限のカードの次の一手(M3)。もう一度では解けないので再試行は出さない。全体の停止は待つしかない
+    static func rateLimitPrimary(_ info: RateLimitInfo) -> Primary? {
+        switch info.scope {
+        case .global: return nil
+        case .ip: return .signInApple
+        case .user:
+            if info.isAnonymous { return .signInApple }
+            #if APP_STORE_REVIEW
+            return nil // 審査用の版は App 内課金を持たない(#450 G1)
+            #else
+            return info.tier == "pro" ? nil : .upgradePro
+            #endif
         }
     }
 
@@ -108,8 +156,13 @@ struct ErrorPresentation: Equatable, Identifiable {
         }
     }
 
+    /// VoiceOver で読み上げる文(H8)。カードの見出しと本文
+    var announcement: String { "\(title)。\(body)" }
+
     var isWarning: Bool {
         if case .failed = kind { return true }
+        if case .rejected = kind { return true }
+        if case .notice = kind { return true }
         if case .sessionExpired = kind { return true }
         return false
     }
@@ -171,7 +224,7 @@ struct ErrorCard: View {
         }
         .metamonCard(padding: compact ? Theme.Spacing.md : Theme.Spacing.md + Theme.Spacing.xs)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(presentation.title)。\(presentation.body)")
+        .accessibilityLabel(presentation.announcement)
     }
 
     private func label(_ p: ErrorPresentation.Primary) -> String {
@@ -179,6 +232,8 @@ struct ErrorCard: View {
         case .retry: ErrorCopy.retry
         case .sendNow: ErrorCopy.sendNow
         case .signIn: ErrorCopy.signIn
+        case .signInApple: ErrorCopy.signInApple
+        case .upgradePro: ErrorCopy.upgradePro
         }
     }
 
