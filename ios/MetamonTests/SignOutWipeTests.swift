@@ -61,11 +61,12 @@ final class SignOutWipeTests: XCTestCase {
         XCTAssertEqual(keep.map { d.object(forKey: $0) as? NSObject }, keptValues, "言語・送信のオプトアウト・移行の印は残す")
     }
 
-    func testPreservedKeysAreTheThreeSettingsPlusTimerMigrationMark() {
+    func testPreservedKeysAreTheThreeSettingsPlusDeviceMarks() {
         XCTAssertEqual(LocalWipe.preservedKeys, [
             "metamon.appLanguage",
             "metamon.crashReporting.enabled",
             "metamon.aiButtonMetrics.enabled",
+            PushDeviceRegistrar.installationIdKey,
             TimerKeyMigration.doneKey,
         ])
     }

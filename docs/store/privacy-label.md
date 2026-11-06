@@ -72,11 +72,11 @@ ASC はデータの種類ごとに「用途 → ユーザーに紐づくか → 
 | フィードバック(`v1/feedback`) | カスタマーサポート・その他の診断データ・写真(スクショ) | 自前のサーバー([../legal/feedback-privacy-draft.md](../legal/feedback-privacy-draft.md)) | App の機能 | はい | — | カスタマーサポートを足す(ほかは宣言済み) |
 | 共有・公開・仲間探し・通報 | その他のユーザーコンテンツ(他の人に見える)・名前(表示名) | 自前のサーバー | App の機能 | はい | 1.6 | 宣言済み |
 | 背面の位置の記録(`locationTracker`) | 正確な位置情報(連続した点) | Firestore | App の機能 | はい | 1.5 | 宣言済み |
-| プッシュ通知の端末の登録(**iOS は未実装**。サーバー側だけ develop にある) | ID > デバイス ID(APNs の端末のトークン・インストールごとの識別子) | 自前のサーバー(Firestore)・APNs | App の機能(通知を届ける) | はい | 1.10・3・4 章 | iOS の登録が入る PR で足す |
+| プッシュ通知の端末の登録(`v1/me/devices`・#269) | ID > デバイス ID(APNs の端末のトークン・インストールごとの識別子) | 自前のサーバー(Firestore)・APNs | App の機能(通知を届ける) | はい | 1.10・3・4 章 | 足す |
 | サーバーの自動の動き(`v1/apps/{id}/automations`・runner は未デプロイ) | 増えない(読むのは記録 = その他のユーザーコンテンツ。通知の本文に記録の値 30 字まで) | 自前のサーバー・APNs | App の機能 | はい | 1.10 | 宣言済み |
 
 - **端末のトークンを「デバイス ID」にする理由**: Apple の定義は「Such as the device's advertising identifier, or other device-level ID」([App privacy details](https://developer.apple.com/app-store/app-privacy-details/))。APNs のトークンとインストールごとの識別子は、端末(のこのアプリ)を指す値で、サーバーにサインアウト・退会まで残す(「collect」= リクエストに応えるのに要る時間より長く残す、に当たる)。広告 ID ではないが「other device-level ID」に入るので、申告する側に倒す。審査用の版の Firebase のインストール識別子(診断の付属)は 2 章のとおり「その他の診断データ」のまま。
-- **マニフェスト**: `ios/Metamon/PrivacyInfo.xcprivacy` の元のファイルは審査用の版の申告(2 章と 1 対 1)のまま。通常の版は、ビルドの最後に `ios/scripts/extend-privacy-manifest.sh` がバンドルの写しに上の表の「足す」の種類(`PurchaseHistory`・`ProductInteraction`・`CustomerSupport`)を足す(Review 構成では何もしない)。この表とスクリプトの一覧を 1 対 1 に保つ。
+- **マニフェスト**: `ios/Metamon/PrivacyInfo.xcprivacy` の元のファイルは審査用の版の申告(2 章と 1 対 1)のまま。通常の版は、ビルドの最後に `ios/scripts/extend-privacy-manifest.sh` がバンドルの写しに上の表の「足す」の種類(`PurchaseHistory`・`ProductInteraction`・`CustomerSupport`・`DeviceID`)を足す(Review 構成では何もしない)。この表とスクリプトの一覧を 1 対 1 に保つ。
 - 通常の版を App Store に出すことにした時は、ASC の入力にこの章の「増える種類」を足す(人の作業・7 章)。
 
 ## 5. 要判断

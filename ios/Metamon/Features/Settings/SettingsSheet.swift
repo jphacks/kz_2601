@@ -44,6 +44,9 @@ struct SettingsSheet: View {
                 speechSection
                 appSection
                 if !rt.dsl.app.notifications.isEmpty { notificationSection }
+                #if !APP_STORE_REVIEW
+                PushConsentSection() // #269
+                #endif
                 RetentionSettingsSection() // #482 記録の自動削除
                 syncSection
                 #if !APP_STORE_REVIEW // 審査用ビルドはフィードバックを外す(プライバシーの表示に無い種類を集めるため・#319)

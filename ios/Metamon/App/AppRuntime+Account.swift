@@ -42,6 +42,7 @@ enum LocalWipe {
         "metamon.appLanguage",
         "metamon.crashReporting.enabled",
         "metamon.aiButtonMetrics.enabled",
+        "metamon.push.installationId", // 端末ごとに安定させる(#269)。個人のデータではない
         TimerKeyMigration.doneKey, // タイマーのキーの移行(#623)の印。消すと次の起動で移行がもう一度走る(データではない)
     ]
 
