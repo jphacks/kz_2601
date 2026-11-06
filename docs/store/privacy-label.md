@@ -3,7 +3,7 @@
 #328。App Store Connect の「App のプライバシー」に入れる答えと、その根拠のコード。`ios/Metamon/PrivacyInfo.xcprivacy` の `NSPrivacyCollectedDataTypes` と 1 対 1 で揃える(片方を変えたらもう片方も変える)。
 
 - 対象: App Store に出す**審査用の版**(Review 構成・`APP_STORE_REVIEW`)。外した機能は [../ios/review-build.md](../ios/review-build.md)。
-- ポリシー: [../legal/privacy-policy.md](../legal/privacy-policy.md)(ここでは変えない。ずれは 5 章)。
+- ポリシー: [../legal/privacy-policy.md](../legal/privacy-policy.md)(ここでは変えない。ずれは 5 章)。2026-11 の改定(PR #663)で増えた購入・通知・自動の動きは、通常の版だけにある(4 章)。
 - ASC への入力は人の作業(6 章)。
 
 ## 目次
@@ -62,22 +62,29 @@ ASC はデータの種類ごとに「用途 → ユーザーに紐づくか → 
 
 ## 4. 通常の版だけで増えるもの
 
-通常の版(Debug / Release・TestFlight)には次がある。審査用の版に戻す時は、このファイル・マニフェスト・ポリシーを先に足す。
+通常の版(Debug / Staging / Release・TestFlight)には次がある。**どれも審査用の版のバイナリに無いので、App Store に出す審査用の版の申告(1・2 章・ASC の入力)は変わらない。**審査用の版に戻す時は、このファイル・マニフェスト・ポリシーを先に足す。ポリシーの節は 2026-11 の改定(PR #663)の番号。
 
-| 機能 | 増える種類(案) | 送り先 |
-|---|---|---|
-| App 内課金(`v1/me/entitlements/apple`) | 購入 > 購入履歴 | 自前のサーバー(署名付きの取引) |
-| aiButton の集計(`v1/metrics/ai-button`) | 使用状況データ > 製品の操作 | 自前のサーバー |
-| aiButton のオンライン版(`v1/text`) | その他のユーザーコンテンツ(記録の文・最大 4KB を Anthropic へ) | サーバー経由で Anthropic |
-| フィードバック(`v1/feedback`) | カスタマーサポート・その他の診断データ・写真(スクショ) | 自前のサーバー([../legal/feedback-privacy-draft.md](../legal/feedback-privacy-draft.md)) |
-| 共有・公開・仲間探し・通報 | その他のユーザーコンテンツ(他の人に見える)・名前(表示名) | 自前のサーバー |
-| 背面の位置の記録(`locationTracker`) | 正確な位置情報(連続した点) | Firestore |
+| 機能 | 増える種類 | 送り先 | 用途 | 紐づく | ポリシー | 通常の版のマニフェスト |
+|---|---|---|---|---|---|---|
+| App 内課金(`v1/me/entitlements/apple`・App Store Server Notifications) | 購入 > 購入履歴(商品 ID・取引 ID・有効期限・返金・自動更新・環境・購読とユーザー ID の対応) | 自前のサーバー(Apple の署名を確かめて保存) | App の機能(Pro の判定) | はい | 1.7・3・4 章 | 足す |
+| aiButton の集計(`v1/metrics/ai-button`) | 使用状況データ > 製品の操作 | 自前のサーバー | App の機能(改善) | はい | — | 足す |
+| aiButton のオンライン版(`v1/text`) | その他のユーザーコンテンツ(最近の記録・入力中の文字・最大 4KB を Anthropic へ。写真は送らない) | サーバー経由で Anthropic | App の機能 | はい | 1.3 | 2 章で宣言済み |
+| フィードバック(`v1/feedback`) | カスタマーサポート・その他の診断データ・写真(スクショ) | 自前のサーバー([../legal/feedback-privacy-draft.md](../legal/feedback-privacy-draft.md)) | App の機能 | はい | — | カスタマーサポートを足す(ほかは宣言済み) |
+| 共有・公開・仲間探し・通報 | その他のユーザーコンテンツ(他の人に見える)・名前(表示名) | 自前のサーバー | App の機能 | はい | 1.6 | 宣言済み |
+| 背面の位置の記録(`locationTracker`) | 正確な位置情報(連続した点) | Firestore | App の機能 | はい | 1.5 | 宣言済み |
+| プッシュ通知の端末の登録(**iOS は未実装**。サーバー側だけ develop にある) | ID > デバイス ID(APNs の端末のトークン・インストールごとの識別子) | 自前のサーバー(Firestore)・APNs | App の機能(通知を届ける) | はい | 1.10・3・4 章 | iOS の登録が入る PR で足す |
+| サーバーの自動の動き(`v1/apps/{id}/automations`・runner は未デプロイ) | 増えない(読むのは記録 = その他のユーザーコンテンツ。通知の本文に記録の値 30 字まで) | 自前のサーバー・APNs | App の機能 | はい | 1.10 | 宣言済み |
+
+- **端末のトークンを「デバイス ID」にする理由**: Apple の定義は「Such as the device's advertising identifier, or other device-level ID」([App privacy details](https://developer.apple.com/app-store/app-privacy-details/))。APNs のトークンとインストールごとの識別子は、端末(のこのアプリ)を指す値で、サーバーにサインアウト・退会まで残す(「collect」= リクエストに応えるのに要る時間より長く残す、に当たる)。広告 ID ではないが「other device-level ID」に入るので、申告する側に倒す。審査用の版の Firebase のインストール識別子(診断の付属)は 2 章のとおり「その他の診断データ」のまま。
+- **マニフェスト**: `ios/Metamon/PrivacyInfo.xcprivacy` の元のファイルは審査用の版の申告(2 章と 1 対 1)のまま。通常の版は、ビルドの最後に `ios/scripts/extend-privacy-manifest.sh` がバンドルの写しに上の表の「足す」の種類(`PurchaseHistory`・`ProductInteraction`・`CustomerSupport`)を足す(Review 構成では何もしない)。この表とスクリプトの一覧を 1 対 1 に保つ。
+- 通常の版を App Store に出すことにした時は、ASC の入力にこの章の「増える種類」を足す(人の作業・7 章)。
 
 ## 5. 要判断
 
 - **パフォーマンスデータ**: Crashlytics 自身のマニフェストは「クラッシュデータ」「その他の診断データ」だけで、パフォーマンスデータを宣言していない。Apple の定義(起動時間・ハング率・電力)に当たる物は送っていないので、外してよい見込み **(推測)**。外すならマニフェストからも消す。
 - **AI の 1 日の回数**: ポリシー 1.4 のとおり、uid ごとの回数(匿名は IP を変換した値ごと)を日ごとに保存する。制限のためだけで分析に使わないので「使用状況データ」には入れない見込み **(推測)**。
 - **サーバーのログの IP アドレス**(Cloud Logging・30 日): 障害の調査のためで、栄養ラベルの対象外と考えて選ばない **(推測)**。
+- **通知の受け取りの同意(アプリごと)・自動の動きの回数**(ポリシー 1.10): 同意の有無は設定、回数は使いすぎを防ぐためだけで分析に使わないので、AI の 1 日の回数と同じく申告しない見込み **(推測)**。iOS の通知の登録が入る時に見直す。
 
 ## 6. 理由が要る API(プライバシーマニフェスト)
 

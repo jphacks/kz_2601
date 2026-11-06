@@ -19,6 +19,11 @@ struct AIConsentView: View {
                         .font(.title2.bold())
                         .frame(maxWidth: .infinity)
                         .multilineTextAlignment(.center)
+                    if rt.aiConsent?.needsReconsent == true { // 版が上がった(ポリシー 6 章)
+                        Text("AI に送る内容の説明を改めました。もう一度ご確認ください。")
+                            .font(.callout.bold())
+                            .accessibilityIdentifier("consent.reconsent")
+                    }
                     Text(L10n.key("アプリを作る・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。", review: "記録帳を用意する・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。"))
                         .font(.callout)
                     VStack(alignment: .leading, spacing: Theme.Spacing.md) {
@@ -26,10 +31,17 @@ struct AIConsentView: View {
                         row("bubble.left.and.bubble.right", "AI との会話の履歴")
                         row("square.grid.2x2", L10n.key("今のアプリの設計(画面・項目・アプリ名など)", review: "今の記録帳の画面の形(画面・項目・名前など)"))
                     }
-                    Text(L10n.key("送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作るためだけに使います。", review: "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、記録帳の画面を用意するためだけに使います。"))
+                    Text(L10n.key("送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作るためだけに使います。", review: "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、記録帳の画面を用意するためだけに使います。"))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                    Text(L10n.key("アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、アプリの「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、そのアプリの最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。", review: "記録帳を用意する・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、記録帳の「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、その記録帳の最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、記録帳の閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"))
+                    Text(L10n.key("アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。", review: "記録帳を用意する・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。"))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    // 「AI で書く」の範囲(ポリシー 1.3)。審査用の版はオンラインの AI を持たない(#452 G4)ので送らない
+                    Text(L10n.key("「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI が使える時は送りません。使えない時だけ、押した時に、最近の記録と入力中の文字(最大 4KB)を送ります。写真・音声・動画は送りません。", review: "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI だけで動き、何も送りません。"))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Text(L10n.key("同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。", review: "同意しなくても、記録帳の閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {

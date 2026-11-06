@@ -89,6 +89,7 @@
   - GoogleService-Info.plist(Firebase)も Review / Release は prod の plist を入れる(#292・`docs/ios/architecture.md`「ビルド構成と接続先」)。
 - **プライバシーマニフェスト(#452 G6)**
   - `Metamon/PrivacyInfo.xcprivacy`(アプリ)と `MetamonWidget/PrivacyInfo.xcprivacy`(ウィジェット)。どの版にも入る(xcodegen が各ターゲットの Resources に入れる)。
+  - 元のファイルは審査用の版の申告。通常の版(Debug / Staging / Release)だけ、ビルドの最後に `scripts/extend-privacy-manifest.sh` がバンドルの写しに通常の版で集める種類(購入履歴・製品の操作・カスタマーサポート)を足す(`docs/store/privacy-label.md` の 4 章)。
   - 理由が要る API: UserDefaults(`CA92.1` アプリだけ / `1C8F.1` App Group でウィジェットと共有)、空き容量(`E174.1` / `85F4.1`。音声モデルのダウンロード前の確認と不足分の表示)。ファイルの日時・起動からの時間・キーボードは使っていない。
   - 集めるデータ: ユーザー ID・名前(Sign in with Apple の表示名)・その他のユーザーコンテンツ・写真・正確な位置・クラッシュのデータ・パフォーマンスのデータ(Crashlytics・#296。審査用の版でも入れる)。すべて本人に紐づき、トラッキングなし、用途はアプリの機能。`docs/legal/privacy-policy.md` と App Store Connect の栄養ラベルに合わせる。
   - API やデータの扱いを変えたら、このファイルも直す。
