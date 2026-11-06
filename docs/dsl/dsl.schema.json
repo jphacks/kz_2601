@@ -1502,6 +1502,10 @@
           "$ref": "#/$defs/Id",
           "description": "With entity: boolean field; records where it is false are not notified (alarm on/off)."
         },
+        "alarm": {
+          "type": "boolean",
+          "description": "true = 止めるまで鳴り続けるアラーム(iOS 26.1 以降の AlarmKit・ロック中も全画面で鳴る)。目覚まし・起床・「止めるまで鳴らして」の時だけ。時刻の通知(time / weekday)とレコードの時刻の通知(entity + field)に付けられ、when とは組み合わせない。アラームが使えない端末(古い iOS・許可が無い・審査用の版)では同じ時刻の普通の通知になる。"
+        },
         "when": {
           "$ref": "#/$defs/Expr",
           "description": "app.notifications only (#265). 条件で知らせる: 真偽の式(ref 不可・agg で集計)。条件が偽 → 真に変わった時に 1 回だけすぐ知らせ、偽に戻ったらまた知らせられる。iOS がこの端末でレコードを保存・削除・同期した直後に評価する(他の人の操作だけで真になった時は、この端末が同期するまで届かない)。when を書いたら repeat は once、time / weekday / entity / field / offsetMinutes / titleField / enabledField は書かない。",

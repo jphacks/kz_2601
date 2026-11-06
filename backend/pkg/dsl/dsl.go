@@ -59,6 +59,9 @@ type Notification struct {
 	OffsetMinutes int    `json:"offsetMinutes,omitempty"`
 	TitleField    string `json:"titleField,omitempty"`   // record field shown as the body
 	EnabledField  string `json:"enabledField,omitempty"` // boolean field; false = skip the record
+	// Alarm: ring until stopped (iOS 26.1+ AlarmKit). Older iOS / no
+	// permission / the review build post a normal notification at the same time.
+	Alarm bool `json:"alarm,omitempty"`
 	// When (#265, app.notifications only): a boolean screen-scalar Expr. iOS
 	// posts once when it turns false -> true after a record save / delete /
 	// sync on that device. Exclusive with the time and record triggers.
