@@ -556,7 +556,7 @@ func (f *Firestore) CreateRecord(ctx context.Context, rs RecordSet, rec Record) 
 			return err
 		}
 		// Firestore keeps microseconds: return what a later read returns
-		now := time.Now().UTC().Truncate(time.Microsecond)
+		now := Now()
 		d := recordDoc{Entity: rs.Entity, Data: rec.Data, ClientID: rec.ClientID, Author: rec.Author, AuthorName: rec.AuthorName, CreatedAt: now, UpdatedAt: now}
 		if err := tx.Create(ref, d); err != nil {
 			return err
