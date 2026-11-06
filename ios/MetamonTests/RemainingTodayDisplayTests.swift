@@ -1,4 +1,5 @@
 import XCTest
+import MetamonRenderer
 import MetamonServices
 @testable import Metamon
 
