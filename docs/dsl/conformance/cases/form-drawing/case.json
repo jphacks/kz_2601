@@ -1,0 +1,56 @@
+{
+  "dsl": {
+    "schemaVersion": 1,
+    "app": {
+      "name": "お絵かき"
+    },
+    "initialScreen": "form",
+    "entities": [
+      {
+        "id": "sketch",
+        "name": "スケッチ",
+        "titleField": "title",
+        "fields": [
+          {
+            "id": "title",
+            "name": "題",
+            "type": "string"
+          },
+          {
+            "id": "art",
+            "name": "絵",
+            "type": "photo"
+          }
+        ]
+      }
+    ],
+    "screens": [
+      {
+        "id": "form",
+        "title": "スケッチ",
+        "entity": "sketch",
+        "components": [
+          {
+            "type": "textField",
+            "id": "t",
+            "area": "A1:F1",
+            "field": "title",
+            "label": "題"
+          },
+          {
+            "type": "drawingField",
+            "id": "d",
+            "area": "A2:F6",
+            "field": "art",
+            "label": "手書き"
+          }
+        ]
+      }
+    ]
+  },
+  "device": {
+    "now": "2026-11-12T12:00:00+09:00",
+    "timeZone": "Asia/Tokyo",
+    "locale": "ja_JP"
+  }
+}

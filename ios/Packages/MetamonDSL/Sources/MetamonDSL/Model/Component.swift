@@ -12,6 +12,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case videoField, videoPlayer
     // leaf(録音・#420)
     case audioRecorder
+    // leaf(手書き・お絵かき。PencilKit → photo field)
+    case drawingField
     // container(構造系: card/disclosure/carousel/grid)
     case card, disclosure, carousel, grid
     // leaf(ナビ・ネイティブ系)

@@ -175,12 +175,12 @@ DSL に書いた値で `props` に入れるもの: `title text label message pla
 
 `ConformanceTests.testCoverageListIsUpToDate` が「全 case に出てくる部品の type + `coverage.json` の `notYetCovered` = スキーマの全 type」を確かめる(足りない・余計なら赤)。
 
-今: **68 / 68 の type が case に出てくる**(`notYetCovered` は空)。そのうち値まで解決して比べるもの:
+今: **69 / 69 の type が case に出てくる**(`notYetCovered` は空)。そのうち値まで解決して比べるもの:
 
 | 区分 | type |
 |---|---|
 | Container(7) | vstack hstack section card disclosure carousel grid(子の順・ローカルグリッドの位置・見出し・列数・開閉) |
-| 値まで解決する Leaf | text label badge markdown link emptyState button stat list table timeline chart progressBar gauge settlement flashcards searchBar image、入力 18 種(textField numberField picker toggle datePicker slider stepper textEditor secureField timePicker rating colorPicker photoField videoField audioRecorder locationPicker locationButton qrScanner) |
+| 値まで解決する Leaf | text label badge markdown link emptyState button stat list table timeline chart progressBar gauge settlement flashcards searchBar image、入力 19 種(textField numberField picker toggle datePicker slider stepper textEditor secureField timePicker rating colorPicker photoField drawingField videoField audioRecorder locationPicker locationButton qrScanner) |
 | state と DSL の値だけの Leaf | 上の「既知の隙間」に挙げた OS の機能に頼る部品・matchList(仲間探しのつながりの状態に頼る)・icon avatar spacer divider voiceInput shareButton openUrlButton videoPlayer |
 
 アクションは navigate(push / sheet / prefillRef なし)・back・saveRecord(必須の検証・新規・遷移)・deleteRecord(確認・閉じる)を操作で試している。startActivity・endActivity・scheduleNotification は examples の木に `actions` として出る(実行は `request`)。
