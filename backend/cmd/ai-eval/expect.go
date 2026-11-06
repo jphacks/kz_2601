@@ -245,6 +245,9 @@ func validateCases(cases []Case) []string {
 		for _, b := range validateExpect(c.Expect) {
 			bad = append(bad, where+b)
 		}
+		for _, b := range validatePendingExpect(c.Expect, c.PendingExpect) {
+			bad = append(bad, where+b)
+		}
 		seen[c.ID] = true
 	}
 	return bad
