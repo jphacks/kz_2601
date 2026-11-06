@@ -8,6 +8,7 @@ import Foundation
 ///       | {"agg": "count|sum|avg|min|max|latest|earliest", "entity": "...", "field"?: "...", "by"?: "...", "filter"?: Filter | [Filter]}
 ///       | {"op": "<name>", "args": [Expr, ...]}
 ///       | {"if": Expr, "then": Expr, "else": Expr}
+///       | {"setting": "<fieldId>"}                    single の entity の 1 件のレコードのフィールド値(#267)
 /// ```
 /// 正典は `docs/dsl/expressions.md` / `dsl.schema.json` の `Expr`(ExprRef / ExprAgg / ExprOp / ExprIf)。
 /// 契約上リテラルに null は無いが、デコードは寛容に受けて `.literal(.null)` にする(then/else 省略時の既定値にも使う)。
@@ -18,6 +19,8 @@ public indirect enum Expr: Hashable, Sendable {
     case agg(AggExpr)
     case op(String, [Expr])
     case cond(Expr, then: Expr, else: Expr)
+    /// single の entity(設定値の置き場・#267)の field。どの single の entity の field かは評価時に引く。
+    case setting(String)
 
     /// リテラル(number/string/bool/null)ならその値。Filter.value の後方互換に使う。
     public var literalValue: JSONValue? { if case .literal(let v) = self { return v }; return nil }
@@ -42,7 +45,7 @@ public struct AggExpr: Hashable, Sendable {
 }
 
 extension Expr: Codable {
-    private enum Keys: String, CodingKey { case ref, agg, entity, field, by, filter, op, args, `if`, then, `else` }
+    private enum Keys: String, CodingKey { case ref, agg, entity, field, by, filter, op, args, `if`, then, `else`, setting }
 
     public init(from decoder: Decoder) throws {
         if let single = try? decoder.singleValueContainer() {
@@ -61,12 +64,14 @@ extension Expr: Codable {
                                 filters: Filter.decodeOneOrMany(c, forKey: .filter)))
         } else if let o = try c.decodeIfPresent(String.self, forKey: .op) {
             self = .op(o, try c.decodeIfPresent([Expr].self, forKey: .args) ?? [])
+        } else if let f = try c.decodeIfPresent(String.self, forKey: .setting) {
+            self = .setting(f)
         } else if c.contains(.if) {
             self = .cond(try c.decode(Expr.self, forKey: .if),
                          then: try c.decodeIfPresent(Expr.self, forKey: .then) ?? .literal(.null),
                          else: try c.decodeIfPresent(Expr.self, forKey: .else) ?? .literal(.null))
         } else {
-            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Expr: ref/agg/op/if のいずれも無い"))
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Expr: ref/agg/op/if/setting のいずれも無い"))
         }
     }
 
@@ -94,6 +99,9 @@ extension Expr: Codable {
             try c.encode(i, forKey: .if)
             try c.encode(t, forKey: .then)
             try c.encode(e, forKey: .else)
+        case .setting(let f):
+            var c = encoder.container(keyedBy: Keys.self)
+            try c.encode(f, forKey: .setting)
         }
     }
 }
@@ -103,6 +111,8 @@ public extension Expr {
     var referencedEntities: Set<String> {
         switch self {
         case .literal, .ref: return []
+        // single の entity は AppDSL.entitiesNeeded がいつも足す(式からは field しか分からない)
+        case .setting: return []
         case .agg(let a):
             return a.filters.reduce(into: [a.entity]) { $0.formUnion($1.valueExpr?.referencedEntities ?? []) }
         case .op(_, let args): return args.reduce(into: []) { $0.formUnion($1.referencedEntities) }

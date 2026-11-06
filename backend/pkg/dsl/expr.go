@@ -18,6 +18,7 @@ import (
 //	{"agg": "...", "entity": "...", "field"?, "by"?, "filter"?: Filter | [Filter]}
 //	{"op": "<name>", "args": [Expr, ...]}
 //	{"if": Expr, "then": Expr, "else": Expr}
+//	{"setting": "<fieldId>"}                     field of the single entity's one record (#267)
 //
 // iOS evaluates it; the backend only validates (names, arity, references,
 // row context, cycles, depth, coarse types).
@@ -31,6 +32,8 @@ type Expr struct {
 	If   *Expr
 	Then *Expr
 	Else *Expr
+	// Setting (Kind == ExprSetting, #267): a field id of a single entity.
+	Setting string
 }
 
 // ExprKind discriminates Expr.
@@ -42,6 +45,7 @@ const (
 	ExprAgg
 	ExprOp
 	ExprIf
+	ExprSetting
 )
 
 // AggExpr aggregates an entity's records. Filter is ANDed.
@@ -71,7 +75,7 @@ func (e *Expr) Number() (float64, bool) {
 	return f, ok
 }
 
-// UnmarshalJSON accepts the five shapes above and rejects anything else
+// UnmarshalJSON accepts the six shapes above and rejects anything else
 // (null, arrays, objects with unknown or mixed keys).
 func (e *Expr) UnmarshalJSON(b []byte) error {
 	b = bytes.TrimSpace(b)
@@ -174,6 +178,12 @@ func (e *Expr) UnmarshalJSON(b []byte) error {
 			e.Args = []Expr{}
 		}
 		return nil
+	case m["setting"] != nil:
+		if err := allow("setting"); err != nil {
+			return err
+		}
+		*e = Expr{Kind: ExprSetting}
+		return json.Unmarshal(m["setting"], &e.Setting)
 	case m["if"] != nil:
 		if err := allow("if", "then", "else"); err != nil {
 			return err
@@ -195,7 +205,7 @@ func (e *Expr) UnmarshalJSON(b []byte) error {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
-		return fmt.Errorf("expr: object with keys %v is not an expression (one of ref | agg | op | if)", keys)
+		return fmt.Errorf("expr: object with keys %v is not an expression (one of ref | agg | op | if | setting)", keys)
 	}
 }
 
@@ -212,6 +222,8 @@ func (e Expr) MarshalJSON() ([]byte, error) {
 		return json.Marshal(e.Lit)
 	case ExprRef:
 		return json.Marshal(map[string]string{"ref": e.Ref})
+	case ExprSetting:
+		return json.Marshal(map[string]string{"setting": e.Setting})
 	case ExprAgg:
 		if e.Agg == nil {
 			return nil, errors.New("expr: agg is nil")
@@ -441,6 +453,8 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 			return tAny
 		}
 		return c.checkAgg(where, e.Agg, row, depth)
+	case ExprSetting:
+		return c.checkSetting(where, e.Setting)
 	case ExprOp:
 		spec, ok := Ops[e.Op]
 		if !ok {
@@ -541,6 +555,9 @@ func (c *exprChecker) checkAgg(where string, a *AggExpr, row *Entity, depth int)
 	if e == nil {
 		c.add("%s: entity %q does not exist (entities: %s)", where, a.Entity, entityIDs(c.entities))
 		return tNum
+	}
+	if e.Single {
+		c.add(`%s: entity %q is single (one record of settings); read its value with {"setting":"<fieldId>"} instead of agg`, where, e.ID)
 	}
 	result := tNum
 	if IsPickAgg(a.Agg) {

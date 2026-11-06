@@ -327,7 +327,7 @@ func (f *Firestore) MarkAccountPurged(ctx context.Context, uid string) error {
 		case AccountPurged:
 			return nil
 		case AccountDeleted:
-			return tx.Set(ref, map[string]any{"status": AccountPurged, "purgedAt": time.Now().UTC()})
+			return tx.Set(ref, map[string]any{"status": AccountPurged, "purgedAt": Now()})
 		default:
 			return ErrNotDeleted
 		}

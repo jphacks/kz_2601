@@ -270,7 +270,7 @@ final class ConformanceRuntime: DSLRuntime {
         if let s = sessions[route.id] { return s }
         var form: FormDraft?
         if let screen = dsl.screen(route.screen), let eid = screen.entity, let entity = dsl.entity(eid) {
-            let record = route.recordId.flatMap { id in records(for: eid).first { $0.id == id } }
+            let record = ScreenView.formRecord(entity: entity, recordId: route.recordId, records: records(for: eid))
             form = ScreenView.makeDraft(entity: entity, record: record, rt: self)
         }
         let s = (form, ScreenLocals())

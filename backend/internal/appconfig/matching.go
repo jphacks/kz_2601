@@ -327,7 +327,7 @@ func (h *Handler) sendInterest(w http.ResponseWriter, r *http.Request) {
 		case cur == nil:
 			return fresh(), nil
 		case cur.Status == store.MatchPending && cur.From == target && !theyBlocked:
-			cur.Status, cur.MatchedAt = store.MatchMatched, time.Now().UTC()
+			cur.Status, cur.MatchedAt = store.MatchMatched, store.Now()
 			cur.Profiles[me] = body.FromRecordID
 			return cur, nil
 		case cur.Status == store.MatchDeclined && cur.DeclinedBy == me:
@@ -413,7 +413,7 @@ func (h *Handler) acceptInterest(w http.ResponseWriter, r *http.Request) {
 		if cur == nil || cur.Status != store.MatchPending || cur.From != other {
 			return nil, errNoInterest
 		}
-		cur.Status, cur.MatchedAt = store.MatchMatched, time.Now().UTC()
+		cur.Status, cur.MatchedAt = store.MatchMatched, store.Now()
 		return cur, nil
 	})
 	if err != nil {

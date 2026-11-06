@@ -94,8 +94,10 @@ type Entity struct {
 	// (from createdAt); 0 = keep forever. Shared/public: each user's own only.
 	RetentionDays int `json:"retentionDays,omitempty"`
 	// Match (#507): the entity's role in a matching app (matching.go).
-	Match  EntityMatch `json:"match,omitempty"`
-	Fields []Field     `json:"fields"`
+	Match EntityMatch `json:"match,omitempty"`
+	// Single (#267): the entity holds one record of settings (single.go).
+	Single bool    `json:"single,omitempty"`
+	Fields []Field `json:"fields"`
 }
 
 // EntityEdit says who may update a shared/public record. Deleting is always

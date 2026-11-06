@@ -293,3 +293,85 @@ func TestNewAuthedOrder(t *testing.T) {
 		})
 	}
 }
+
+// GET /health names the environment and build through the full chain (#290).
+func TestHealthReportsEnv(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	t.Setenv("GIT_SHA", "0123456789abcdef")
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "p")
+	rec := httptest.NewRecorder()
+	testHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusOK {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	if body["status"] != "ok" || body["env"] != "prod" || body["firestoreDatabase"] != "(default)" || body["version"] != "0123456" {
+		t.Fatalf("%v", body)
+	}
+}
+
+// #362 / #497: a share link opened in a browser through the whole chain
+// (envelope included) gets the HTML invalid-link page in the viewer's
+// language for every way it can be dead; the API keeps its JSON 404.
+func TestSharePageNotFoundIsHTML(t *testing.T) {
+	t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
+	ctx := t.Context()
+	st := store.NewMemory()
+	for _, tok := range []string{"tok_ok", "tok_rev", "tok_hid"} {
+		if err := st.CreateShare(ctx, store.Share{Token: tok, Name: "n", AppID: tok, OwnerUID: "o"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.RevokeShare(ctx, "tok_rev"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.PublishApp(ctx, "o", "tok_hid", []byte(`{}`), "n", 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetPublicAppHidden(ctx, "tok_hid", true, "r"); err != nil {
+		t.Fatal(err)
+	}
+	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
+	h := newHandler(auth.Middleware(nil, auth.ModeDev), logger, appconfig.New(st), appconfig.SharePage(st))
+
+	get := func(path, lang string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		if lang != "" {
+			req.Header.Set("Accept-Language", lang)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	if rec := get("/s/tok_ok", ""); rec.Code != http.StatusOK {
+		t.Fatalf("live share: %d", rec.Code)
+	}
+	for _, path := range []string{"/s/missing", "/s/tok_rev", "/s/tok_hid", "/s/bad%20tok", "/s/", "/s/tok_ok/extra"} {
+		for lang, want := range map[string]string{"ja": "リンクが無効です", "en-US": "This link is not valid"} {
+			rec := get(path, lang)
+			if rec.Code != http.StatusNotFound {
+				t.Errorf("%s %s: status %d", path, lang, rec.Code)
+			}
+			if ct := rec.Header().Get("Content-Type"); ct != "text/html; charset=utf-8" {
+				t.Errorf("%s %s: content-type %q (body %.80s)", path, lang, ct, rec.Body.String())
+			}
+			if csp := rec.Header().Get("Content-Security-Policy"); !strings.HasPrefix(csp, "default-src 'none'; style-src 'nonce-") {
+				t.Errorf("%s %s: CSP %q", path, lang, csp)
+			}
+			if body := rec.Body.String(); !strings.Contains(body, want) || strings.Contains(body, `"code"`) {
+				t.Errorf("%s %s: body lacks %q or is an envelope", path, lang, want)
+			}
+		}
+	}
+	// the API's share lookup is still a JSON envelope
+	req := httptest.NewRequest(http.MethodGet, "/v1/shares/tok_rev", nil)
+	req.Header.Set(auth.DebugUIDHeader, "u1")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	var env struct {
+		Error struct{ Code string } `json:"error"`
+	}
+	if rec.Code != http.StatusNotFound || json.Unmarshal(rec.Body.Bytes(), &env) != nil || env.Error.Code != httpx.CodeNotFound {
+		t.Errorf("api: %d %s", rec.Code, rec.Body.String())
+	}
+}

@@ -74,7 +74,7 @@ go run ./cmd/ai-eval -chat -env-file ../.env -cases internal/ai/eval/m0disc_chat
 | d_habit | `calc: true` | 連続日数(streak) |
 | d_sleep | `computed: true` | hoursBetween |
 | d_medicine | `notification: any`(前から) | — |
-| d_period | `calc: true` | 次の予定日の計算 |
+| d_period | `calc: true`・`single: true`・`setting: true` | 次の予定日の計算。周期は single の設定(#267) |
 | d_vocab | `has: [flashcards], lacks: [disclosure], flashcardsUnlearned: true, substitution: false` | めくるカード `flashcards`(#264)。覚えたものは filter で出題から外す |
 | d_pet | `photo: true, shared: true` | 家族で共有・写真 |
 | d_baby | `computed: true` | 前回からの経過時間 |

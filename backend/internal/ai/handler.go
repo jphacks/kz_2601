@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
@@ -24,10 +25,7 @@ import (
 // GenerateResponse as the JSON mode) or `event: error` (the same error body).
 func NewHandler(svc *Service) http.Handler {
 	mux := http.NewServeMux()
-	health := func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	}
+	health := httpx.Health(httpx.HealthInfoFromEnv(os.Getenv)) // env / database / version (#290)
 	mux.HandleFunc("GET /health", health)
 	mux.HandleFunc("GET /healthz", health)
 	mux.HandleFunc("POST /v1/generate", func(w http.ResponseWriter, r *http.Request) {

@@ -182,10 +182,12 @@ func newEntitlements(st store.Store, logger *slog.Logger) *entitlement.Service {
 // API mux before auth so they stay 404/405 envelopes rather than 401.
 func newHandler(authMiddleware func(http.Handler) http.Handler, logger *slog.Logger, api *http.ServeMux, sharePage http.Handler, public ...func(*http.ServeMux)) http.Handler {
 	mux := http.NewServeMux()
+	health := httpx.Health(httpx.HealthInfoFromEnv(os.Getenv)) // env / database / version (#290)
 	mux.HandleFunc("GET /health", health)
 	mux.HandleFunc("GET /healthz", health)
 	if sharePage != nil {
 		mux.Handle("GET /s/{token}", sharePage) // read-only web view of a share link (#362, no records)
+		mux.Handle("GET /s/", sharePage)        // /s/, /s/a/b: the HTML invalid-link page, not a JSON 404
 	}
 	// minimum / latest iOS build (#302): public, read once from env
 	mux.Handle("GET /v1/client-config", appconfig.ClientConfig(appconfig.ClientConfigFromEnv(os.Getenv)))
@@ -234,9 +236,4 @@ func newAuthed(appCheck, authenticate func(http.Handler) http.Handler, accounts 
 // rejectDeleted is appconfig.RejectDeleted as a chain item.
 func rejectDeleted(accounts store.Accounts) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler { return appconfig.RejectDeleted(accounts, h) }
-}
-
-func health(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("ok"))
 }

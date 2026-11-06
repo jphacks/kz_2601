@@ -244,7 +244,19 @@ paths:
     get:
       security: []
       summary: liveness
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: 'ok。stg / prod の取り違えと版を見分ける最小限だけ返す(#290・docs/infra/runtime-config.md)'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ok] }
+                  env: { type: string, description: 'APP_ENV(stg / prod)。未設定なら省略' }
+                  firestoreDatabase: { type: string, description: 'FIRESTORE_DATABASE(既定 (default))。Firestore を使わない時は省略' }
+                  version: { type: string, description: 'GIT_SHA の先頭 7 文字。未設定なら省略' }
 
 components:
   securitySchemes:
@@ -492,7 +504,7 @@ components:
       type: array
       items: { type: string }
       description: |
-        #482。部品以外で、このクライアントが実装している DSL の動作。既知の値: `recordRetention`(Entity.retentionDays の期限切れレコードを端末が消す)、`notification.when`(#265・app.notifications[].when の条件を端末が評価する。無い版には when を使わず、生成されたら通知ごと落とす)。
+        #482。部品以外で、このクライアントが実装している DSL の動作。既知の値: `recordRetention`(Entity.retentionDays の期限切れレコードを端末が消す)、`notification.when`(#265・app.notifications[].when の条件を端末が評価する。無い版には when を使わず、生成されたら通知ごと落とす)、`singleEntity`(#267・Entity.single の 1 件を編集し、式 {"setting": …} を評価する。無い版には single / setting を使わず、生成されたら single を外して setting を agg latest に置き換える)。
         `allowedComponents` を送るクライアント(v1.0 以降)がここに `recordRetention` を含めない時、AI は retentionDays を使わず「この版ではできない」と答え、生成結果からは落とす。
         `allowedComponents` も送らないクライアントは制限なし。未知の値は無視。
       example: [recordRetention]

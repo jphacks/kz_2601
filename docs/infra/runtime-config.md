@@ -41,6 +41,8 @@
 | `GIT_SHA` | 両方 | デプロイしたコミット |
 | `APPCONFIG_BASE_URL` | ai | 同じ環境の appconfig の URL |
 
+`GET /health`(appconfig・ai)はこのうち `APP_ENV`・`FIRESTORE_DATABASE`・`GIT_SHA`(先頭 7 文字)だけを返す(#290)。例: `{"status":"ok","env":"stg","firestoreDatabase":"(default)","version":"89061ea"}`。デプロイ後に stg / prod の取り違えと版をここで確かめる。誰でも叩ける口なので、ほかの値は足さない。
+
 ## 運用で変える値
 
 デプロイでは触りません。未設定なら backend の既定値で動きます。

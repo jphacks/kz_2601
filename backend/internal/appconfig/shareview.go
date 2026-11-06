@@ -312,16 +312,14 @@ func (r *webRenderer) node(s *dsl.Screen, c *dsl.Component, depth int) (webNode,
 		n.Kind, n.Label = "button", r.inputLabel(s, c)
 		n.Style = "secondary"
 	case dsl.CompButton, dsl.CompShareButton, dsl.CompOpenURLButton:
-		n.Kind, n.Label, n.Style = "button", clip(c.Label, 40), c.Style
-		if n.Label == "" {
-			n.Label = "共有"
-		}
+		n.Kind, n.Label, n.Style = "button", clip(c.Label, 40), c.Style // no label: "share" (shareButton)
 	case dsl.CompLink:
 		n.Kind, n.Text, n.Href = "link", clip(c.Text, 80), safeHref(c.URL)
 	case dsl.CompFlashcards: // #264: the field names only (no cards), the deck is in the app
+		n.Kind = "flashcards"
 		front, back := r.fieldName(c.Entity, c.Front), r.fieldName(c.Entity, c.Back)
 		if front != "" && back != "" {
-			n.Title = clip("カード(表: "+front+" / 裏: "+back+")", 80)
+			n.Items = []string{clip(front, 30), clip(back, 30)}
 		}
 	}
 	return n, true
