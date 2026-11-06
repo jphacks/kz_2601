@@ -57,4 +57,21 @@ final class TimerClockTests: XCTestCase {
         store.save(TimerRun(), for: key)
         XCTAssertNil(store.load(key), "リセット(初期状態)は保存を消す")
     }
+
+    func testClearAppRemovesOnlyThatAppsTimers() {
+        let store = TimerRunStore.shared
+        let app = "消すアプリ-\(UUID().uuidString)"
+        let other = app + "2" // 名前の前方一致で別アプリを巻き込まない
+        let run = TimerRun(base: 5, startedAt: t0)
+        store.save(run, for: "\(app)/home/timer")
+        store.save(run, for: "\(app)/form/t2")
+        store.save(run, for: "\(other)/home/timer")
+        defer { store.clear("\(other)/home/timer") }
+
+        store.clearApp(named: app)
+
+        XCTAssertNil(store.load("\(app)/home/timer"))
+        XCTAssertNil(store.load("\(app)/form/t2"))
+        XCTAssertEqual(store.load("\(other)/home/timer"), run)
+    }
 }

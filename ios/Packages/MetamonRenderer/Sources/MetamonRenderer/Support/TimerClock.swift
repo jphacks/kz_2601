@@ -64,6 +64,29 @@ public struct TimerRunStore: Sendable {
     public func clear(_ key: String) {
         UserDefaults.standard.removeObject(forKey: Self.prefix + key)
     }
+
+    /// アプリを消した時: そのアプリ(キーの先頭がアプリ名)のタイマーの状態をすべて消す。
+    public func clearApp(named appName: String) {
+        let prefix = Self.prefix + Self.appPrefix(appName)
+        for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix(prefix) {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+
+    /// `TimerDisplayLeaf.storeKey`(`<アプリ名>/<画面>/<部品 id>`)のアプリの部分。
+    static func appPrefix(_ appName: String) -> String { appName + "/" }
+}
+
+/// アプリを消した時のタイマーの後片付け(#38 の終了通知と保存した走行状態)。
+/// キーはアプリ名で始まるので、同じ名前のアプリが残っている時は呼ばない(残っている方のタイマーも消えるため)。
+public enum TimerCleanup {
+    public static func removeApp(named appName: String) async {
+        TimerRunStore.shared.clearApp(named: appName)
+        let center = UNUserNotificationCenter.current()
+        let prefix = TimerNotifier.prefix + TimerRunStore.appPrefix(appName)
+        let ids = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(prefix) }
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+    }
 }
 
 /// 終了時のローカル通知(識別子 prefix `timer.`。DSL 通知の `dsl.` とは別なので `sync` に消されない)。

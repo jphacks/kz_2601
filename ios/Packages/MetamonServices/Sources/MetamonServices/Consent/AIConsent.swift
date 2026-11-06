@@ -41,6 +41,13 @@ public final class AIConsentStore {
         grantedAt = nil
     }
 
+    /// 保存先を直接消した後(アカウント削除の端末データ削除)に、画面の状態を保存先に合わせ直す。
+    /// 合わせないと画面は「同意済み」のまま送信の砦(`ConsentGatedAIClient`)だけが止め、同意の画面も出なくなる。
+    public func reload() {
+        isGranted = Self.isGranted(in: defaults)
+        grantedAt = isGranted ? defaults.object(forKey: Self.dateKey) as? Date : nil
+    }
+
     /// 初回起動の説明を一度出したか(「あとで」を選んだ人に毎回は出さない。生成しようとした時はまた出る)。
     public var hasBeenPrompted: Bool { defaults.bool(forKey: Self.promptedKey) }
     public func markPrompted() { defaults.set(true, forKey: Self.promptedKey) }
