@@ -8382,6 +8382,23 @@
         }
       }
     },
+    "削除しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleted"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除しました"
+          }
+        }
+      }
+    },
     "削除する" : {
       "extractionState" : "manual",
       "localizations" : {
