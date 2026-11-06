@@ -166,6 +166,13 @@ targets:
           - $(SRCROOT)/scripts/strip-review-plist.sh
           - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)
         basedOnDependencyAnalysis: false
+      # 通常の版(Debug / Staging / Release)だけ、マニフェストに通常の版で集める種類を足す(Review は元のまま)。
+      # 足す種類は docs/store/privacy-label.md の 4 章と 1 対 1
+      - name: Extend privacy manifest for normal builds
+        script: '"${SRCROOT}/scripts/extend-privacy-manifest.sh"'
+        inputFiles:
+          - $(SRCROOT)/scripts/extend-privacy-manifest.sh
+        basedOnDependencyAnalysis: false
       # クラッシュ報告(#296): dSYM を Crashlytics へ。実機向けの Release / Review だけ送る(Debug・シミュレータは即終了)。
       # docs/ios/crash-reporting.md。Crashlytics の run は SourcePackages・dSYM を読みネットに出るので、Release / Review はサンドボックスを外している(上の configs)。
       # 入力に dSYM・plist を並べないのは、Debug(dSYM を作らない)や plist 無しの CI で「入力が無い」と止まらないようにするため

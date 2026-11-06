@@ -1,0 +1,8 @@
+[
+  {"id": "sp_minutes", "kind": "create", "group": "speech", "transcript": "会議の議事録を文字起こしで残したい", "note": "話して文字で残す = transcribeField(audioRecorder・voiceInput にしない)", "expect": {"has": ["transcribeField", "list"], "unreachable": 0}},
+  {"id": "sp_diary", "kind": "create", "group": "speech", "transcript": "しゃべるだけで書ける日記", "note": "声で日記 = transcribeField", "expect": {"has": ["transcribeField"], "unreachable": 0}},
+  {"id": "sp_words", "kind": "create", "group": "speech", "transcript": "英単語を登録して発音を読み上げで聞ける単語帳", "note": "記録の値の読み上げ = speakButton{field}", "expect": {"has": ["speakButton", "list"], "unreachable": 0}},
+  {"id": "sp_recipe", "kind": "create", "group": "speech", "transcript": "料理中に手順を読み上げてくれるレシピ帳", "note": "手順の読み上げ = speakButton", "expect": {"has": ["speakButton"], "unreachable": 0}},
+  {"id": "sp_notes", "kind": "create", "group": "speech", "transcript": "思いついたことを書き留めるメモ帳。タイトルと本文だけ", "note": "sp_edit_add の土台", "expect": {"unreachable": 0}},
+  {"id": "sp_edit_add", "kind": "edit", "base": "sp_notes", "group": "speech", "transcript": "本文を声で入力できるようにして、読み上げもできるようにして", "note": "既存のフォームの本文を transcribeField に替え、speakButton を足す", "expect": {"patch": true, "has": ["transcribeField", "speakButton"], "unreachable": 0}}
+]
