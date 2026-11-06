@@ -94,7 +94,12 @@ struct FormSaveBar: ViewModifier {
     private func run(_ action: Action) async {
         phase = .saving
         await KeyboardState.finishEditing() // 変換中の文字を確定させてから保存する(#627)
+        let rejections = ctx.form?.flagCount
         await rt.run(action, ctx.actionContext())
+        guard ctx.form?.flagCount == rejections else { // 必須が空で弾かれた: 「保存しました」を出さない(M10)
+            phase = .idle
+            return
+        }
         phase = .done
         try? await Task.sleep(for: .seconds(RenderTheme.Motion.checkSeconds))
         phase = .idle
