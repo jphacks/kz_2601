@@ -58,6 +58,12 @@ type Memory struct {
 	// matching (#507, memory_matching.go)
 	matchPairs map[string]map[string]*MatchPair // apps_public/{appId}/match_pairs/{pairId}
 	matchQuota map[string]int                   // uid/day -> interests sent
+
+	// runner outbox (#341, memory_outbox.go)
+	outbox map[string]map[string]*OutboxEvent // env -> eventId
+
+	// runner done marks (#341, memory_runner.go): env/key
+	runnerDone map[string]bool
 }
 
 // NewMemory returns an empty store.
@@ -122,6 +128,10 @@ func cloneVersion(v *Version) *Version {
 func cloneRecord(r *Record) *Record {
 	cp := *r
 	cp.Data = cloneData(r.Data)
+	if r.Origin != nil {
+		o := *r.Origin
+		cp.Origin = &o
+	}
 	if r.MarkCounts != nil {
 		cp.MarkCounts = make(map[string]int, len(r.MarkCounts))
 		for k, v := range r.MarkCounts {

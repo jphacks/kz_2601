@@ -20,6 +20,9 @@ type App struct {
 	InitialScreen string   `json:"initialScreen"`
 	Entities      []Entity `json:"entities"`
 	Screens       []Screen `json:"screens"`
+	// ServerRules (#340): automatic server actions (trigger -> condition ->
+	// actions). iOS does not render them; server_rules.go validates them.
+	ServerRules []ServerRule `json:"serverRules,omitempty"`
 }
 
 // AppMeta describes the whole app.

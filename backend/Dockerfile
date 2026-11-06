@@ -1,4 +1,5 @@
-# 1イメージに appconfig / ai と、退会済みアカウントを消す purge(Cloud Run Job 用・docs/infra/account-purge.md)を同梱する。
+# 1イメージに appconfig / ai と、退会済みアカウントを消す purge(Cloud Run Job 用・docs/infra/account-purge.md)、
+# 自動の動きを実行する runner(#341・まだデプロイしていない)を同梱する。
 # Cloud Run 側は `--command=/app/ai` でサービスごとに起動バイナリを切り替える(ビルドは1回で済む)。
 FROM golang:1.26-bookworm AS build
 WORKDIR /src
@@ -8,7 +9,8 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/appconfig ./cmd/appconfig \
  && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/ai ./cmd/ai \
  && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/purge ./cmd/purge \
- && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/appstore-reconcile ./cmd/appstore-reconcile
+ && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/appstore-reconcile ./cmd/appstore-reconcile \
+ && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/runner ./cmd/runner
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/ /app/

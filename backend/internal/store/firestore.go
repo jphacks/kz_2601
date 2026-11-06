@@ -130,6 +130,7 @@ type recordDoc struct {
 	Author     string           `firestore:"author,omitempty"`
 	AuthorName string           `firestore:"authorName,omitempty"`
 	MarkCounts map[string]int64 `firestore:"markCounts,omitempty"` // #255
+	Origin     *originDoc       `firestore:"origin,omitempty"`     // #341
 	CreatedAt  time.Time        `firestore:"createdAt"`
 	UpdatedAt  time.Time        `firestore:"updatedAt"`
 }
@@ -138,7 +139,7 @@ func (d *recordDoc) toRecord(id string) *Record {
 	if d.Data == nil {
 		d.Data = map[string]any{}
 	}
-	rec := &Record{ID: id, Entity: d.Entity, Data: d.Data, ClientID: d.ClientID, Author: d.Author, AuthorName: d.AuthorName, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+	rec := &Record{ID: id, Entity: d.Entity, Data: d.Data, ClientID: d.ClientID, Author: d.Author, AuthorName: d.AuthorName, Origin: d.Origin.toOrigin(), CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
 	for k, v := range d.MarkCounts {
 		if rec.MarkCounts == nil {
 			rec.MarkCounts = map[string]int{}
@@ -557,7 +558,7 @@ func (f *Firestore) CreateRecord(ctx context.Context, rs RecordSet, rec Record) 
 		}
 		// Firestore keeps microseconds: return what a later read returns
 		now := Now()
-		d := recordDoc{Entity: rs.Entity, Data: rec.Data, ClientID: rec.ClientID, Author: rec.Author, AuthorName: rec.AuthorName, CreatedAt: now, UpdatedAt: now}
+		d := recordDoc{Entity: rs.Entity, Data: rec.Data, ClientID: rec.ClientID, Author: rec.Author, AuthorName: rec.AuthorName, Origin: toOriginDoc(rec.Origin), CreatedAt: now, UpdatedAt: now}
 		if err := tx.Create(ref, d); err != nil {
 			return err
 		}

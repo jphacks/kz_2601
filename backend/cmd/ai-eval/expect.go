@@ -110,6 +110,12 @@ var expectKeys = map[string]expectKind{
 	// checkNotifyWhen (#265): notify_when.go
 	"notifyWhen":   expectBool,
 	"notifyWhenOp": expectString,
+	// checkServerRules (#343): server_rules.go
+	"serverRules": expectBool,
+	"ruleTrigger": expectString,
+	"ruleAction":  expectString,
+	"ruleTo":      expectString,
+	"ruleSim":     expectBool,
 	// checkFlashcards (#264): flashcards.go
 	"flashcardsUnlearned": expectBool,
 	// checkNav

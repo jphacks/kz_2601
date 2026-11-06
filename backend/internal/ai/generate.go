@@ -76,6 +76,8 @@ type Meta struct {
 	OutputChars      int        `json:"outputChars,omitempty"` // model text length (whitespace share diagnostics)
 	LastProblems     []string   `json:"lastProblems,omitempty"`
 	LogicPass        *LogicMeta `json:"logicPass,omitempty"` // set when the logic pass ran
+	// ServerRules is set when the server-rules pass ran (#343).
+	ServerRules *ServerRulesMeta `json:"serverRules,omitempty"`
 	// LintRetried: the first valid output had content warnings (dsl.Lint) and
 	// was regenerated once with them; Lint lists the warnings left in the
 	// returned document (create) or added by the patch (edit).
@@ -149,6 +151,9 @@ type Service struct {
 	// LogicPass enables the second "calculations only" call after a create
 	// (env AI_LOGIC_PASS=1; Request.LogicPass overrides per request).
 	LogicPass bool
+	// ServerRulesPass enables the server-rules call (#343) after a create or
+	// edit whose request asks for an automatic action (env AI_SERVER_RULES=1).
+	ServerRulesPass bool
 	// LintRetry regenerates once when the first valid output has content
 	// warnings (dsl.Lint). Off by default: warnings are only reported in
 	// Meta.Lint, and the user fixes the app by voice instead (env AI_LINT_RETRY=1).
@@ -280,6 +285,7 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 	if err := applyRestriction(ar, restrict, mode == ModeCreate, loc); err != nil {
 		return nil, err
 	}
+	s.applyServerRulesPass(ctx, transcript, ar, loc) // #343: after the final UI, before the omission notes
 
 	s.noteOmissions(transcript, ar, loc)
 

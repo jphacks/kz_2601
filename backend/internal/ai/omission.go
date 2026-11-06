@@ -53,7 +53,7 @@ var omissionRules = []omissionRule{
 		id:    "notify",
 		asked: func(t string) bool { return notifyAskRe.MatchString(t) && !notifyOffRe.MatchString(t) },
 		omitted: func(_ string, a *dsl.App) bool {
-			return len(a.App.Notifications) == 0 && !hasAction(a, dsl.ActionScheduleNotif)
+			return len(a.App.Notifications) == 0 && !hasAction(a, dsl.ActionScheduleNotif) && !hasRuleNotify(a)
 		},
 		topic:   regexp.MustCompile(`通知|知らせ|教え|リマインド|アラート|(?i:notif|remind|alert|let you know)`),
 		problem: `依頼に「知らせて / 通知 / 教えて」があるのに app.notifications も scheduleNotification も無い。決まった時刻・レコードの時刻の通知で満たせるなら足す。条件で知らせる通知(在庫が減ったら・予算を超えたら等)は app.notifications の when(#265)で足す。この版で when が使えない時だけ、近いもの(不足の一覧など)で代替し、app.description の末尾に「○○の通知は今はできないため、△△で代替しました。」と書く`,
@@ -282,4 +282,16 @@ func visitComponents(a *dsl.App, fn func(*dsl.Component)) {
 	for i := range a.Screens {
 		walk(a.Screens[i].Components)
 	}
+}
+
+// hasRuleNotify: a server rule notifies (#343), which answers "知らせて" too.
+func hasRuleNotify(a *dsl.App) bool {
+	for i := range a.ServerRules {
+		for _, act := range a.ServerRules[i].Do {
+			if act.Notify != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
