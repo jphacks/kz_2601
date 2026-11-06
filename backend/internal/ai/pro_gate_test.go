@@ -1,9 +1,11 @@
 package ai
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
@@ -166,5 +168,38 @@ func TestPaidCatalog_DetectServerRules(t *testing.T) {
 	}
 	if got := defaultPaidCatalog.Detect(strings.Replace(free, "参加者に通知する", "", 1), LocaleJA); len(got) != 0 {
 		t.Fatalf("withoutInstruction detected as paid: %+v", got)
+	}
+}
+
+// PRO_GATE_MODE on the ai: log answers and logs pro_gate.would_block, off
+// does not look, enforce (default) answers 402.
+func TestProGateModes(t *testing.T) {
+	for _, mode := range []paid.Mode{paid.ModeEnforce, paid.ModeLog, paid.ModeOff} {
+		var buf bytes.Buffer
+		svc, _ := textSvc(`{"text":"がんばったね"}`)
+		svc.Pro, svc.ProMode = proSet{}, mode
+		svc.Logger = slog.New(slog.NewJSONHandler(&buf, nil))
+		rec := postText(t, NewHandler(svc), "free-user", `{"instruction":"励ましの一言"}`)
+
+		gen, _ := newSvc(&fakeCaller{replies: []string{waterApp, waterRules}})
+		gen.ServerRulesPass, gen.Pro, gen.ProMode, gen.Logger = true, proSet{}, mode, svc.Logger
+		_, err := gen.Generate(auth.ContextWithUID(context.Background(), "free"), Request{AppID: "pg-mode-" + string(mode), Transcript: "水分の記録。毎朝7時に水分の記録を促して"})
+
+		logged := strings.Count(buf.String(), `"msg":"pro_gate.would_block"`)
+		switch mode {
+		case paid.ModeEnforce:
+			if rec.Code != http.StatusPaymentRequired || logged != 2 {
+				t.Fatalf("enforce text: %d (logs %d)", rec.Code, logged)
+			}
+			asProRequired(t, err, paid.ServerRules)
+		case paid.ModeLog:
+			if rec.Code != http.StatusOK || err != nil || logged != 2 || !strings.Contains(buf.String(), `"blocked":false`) {
+				t.Fatalf("log: text %d / generate %v / %s", rec.Code, err, buf.String())
+			}
+		case paid.ModeOff:
+			if rec.Code != http.StatusOK || err != nil || logged != 0 {
+				t.Fatalf("off: text %d / generate %v / logs %d", rec.Code, err, logged)
+			}
+		}
 	}
 }

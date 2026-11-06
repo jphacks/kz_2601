@@ -321,7 +321,9 @@ func textHandler(svc *Service) http.Handler {
 			return
 		}
 		// #316: the online AI of an app is a Pro feature (the on-device AI is free)
-		if svc.Pro != nil && !svc.Pro.IsPro(r.Context(), auth.UID(r.Context())) {
+		uid := auth.UID(r.Context())
+		if svc.Pro != nil && svc.ProMode.Checks() && !svc.Pro.IsPro(r.Context(), uid) &&
+			svc.ProMode.Stop(r.Context(), svc.logger(), "ai.text", uid, []string{paid.OnlineAI}) {
 			svc.writeErr(w, r, onlineAIRequired(req.Locale))
 			return
 		}

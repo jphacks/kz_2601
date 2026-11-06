@@ -173,6 +173,8 @@ type Service struct {
 	// and POST /v1/text answer 402 pro_required for others. nil = no check
 	// here (local runs; appconfig still checks the save).
 	Pro paid.ProChecker
+	// ProMode is PRO_GATE_MODE: enforce ("" too) / log / off.
+	ProMode paid.Mode
 
 	// Logger gets the ai.generate line per /v1/generate (#322); nil = slog.Default().
 	Logger *slog.Logger

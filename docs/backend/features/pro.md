@@ -54,6 +54,7 @@
 | Pro が切れた人のアプリ | 開く・読む(DSL・記録・共有の記録)・有料機能を足さない直し・自分の記録を消す・印を外すはできる。有料機能を足す保存・有料機能の版への restore・複製・共有の書き込み・自動の動きの実行・オンラインの AI は止まる。更新すれば元に戻る(データは消さない) |
 | 判定の単位 | 機能ごと。既に共有のアプリにルールを足すのは serverRules が「新しい」ので 402、既にルールがあるアプリのルールを直すのは通る(実行は runner が止める) |
 | 取り込み | シェアの取り込み・「探す」からのインストール(`installCopy`)は止めない(参加は無料。独立した写しになった共有アプリは、書き込みの時に作成者 = 取り込んだ人の Pro を見る) |
+| 段階的に出すスイッチ | 環境変数 `PRO_GATE_MODE`(ai・appconfig・runner が同じ値を読む・`paid.ModeFromEnv`)。`enforce`(既定)/ `log`(止めずに `pro_gate.would_block` をログに出す。runner は private のアプリを #316 の前の無料の枠で動かす)/ `off`(見ない)。enforce でも止めるたびに同じログを出す(`blocked:true`)。不明な値は起動しない。[runtime-config.md](../../infra/runtime-config.md) |
 | キャッシュ | `entitlement.ProChecker`(Pro は最大 5 分、Pro でないは 15 秒)。appconfig は購入・復元の `POST /v1/me/entitlements/apple` の後にその uid のキャッシュを捨てる(`Service.Changed` → `ProChecker.Forget`)ので、買った直後の保存は通る。ai のキャッシュは別のプロセスなので最大 15 秒は古い(その間の generate は appconfig ではなく ai が 402 を返しうる。iOS は購入の後に 1 回やり直す) |
 | checker が無い時 | appconfig は `appconfig.WithPro` を渡さなければ見ない(テスト・ツール)。cmd/appconfig は常に渡す(エミュレータ・メモリの権利の保存でも。ローカルで共有を試すには `users/{uid}/entitlements/pro` を書く)。ai は `GOOGLE_CLOUD_PROJECT` が無いローカルでは見ない、Firestore に繋がらない時は誰も Pro でない扱い |
 | 審査用の版 | App 内課金が無く、共有・serverRules・オンラインの AI をバイナリから外している。backend は `disabledFeatures: sharedData` の依頼で共有を private に直し(既存)、**serverRules を作らない**(#316 で server-rules pass を飛ばすようにした)ので、審査用の版の生成は 402 に当たらない。`/v1/text` は呼ばない。共有のアプリに参加する入口(シェアのリンク・探す)も無い |

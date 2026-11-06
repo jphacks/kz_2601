@@ -86,6 +86,7 @@ func main() {
 		logger.Error("runner: bad configuration", slog.Any("error", err))
 		os.Exit(2)
 	}
+	logger.Info("runner: pro gate", slog.String("mode", string(qcfg.ProMode))) // PRO_GATE_MODE (#316)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

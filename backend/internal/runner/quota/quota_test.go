@@ -15,6 +15,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 )
 
@@ -439,5 +440,44 @@ func TestUsageLog(t *testing.T) {
 	}
 	if EstimateCostUSD(Usage{Outcome: OutcomeSkippedQuota}) != 0 {
 		t.Fatal("skipped run costs nothing")
+	}
+}
+
+// PRO_GATE_MODE: log and off run a free creator's private rules on the free
+// plan as before #316 (log also writes pro_gate.would_block); shared data
+// needs Pro in every mode (#338).
+func TestProGateModes(t *testing.T) {
+	shared := Run{AppID: "x", CreatorUID: "free-1", Shared: true, Attempt: 1}
+	for _, mode := range []paid.Mode{paid.ModeEnforce, paid.ModeLog, paid.ModeOff} {
+		var buf bytes.Buffer
+		c := &clock{t: time.Date(2026, 11, 6, 23, 0, 0, 0, ratelimit.JST)}
+		q := New(Config{Limits: DefaultLimits, Env: "test", Now: c.now, ProMode: mode}, ratelimit.NewMemoryClock(c.now), proSet{})
+		q.Logger = slog.New(slog.NewJSONHandler(&buf, nil))
+		d := begin(t, q, appA)
+		logged := strings.Count(buf.String(), `"msg":"pro_gate.would_block"`)
+		switch mode {
+		case paid.ModeEnforce:
+			if d.Allowed || d.Block.Scope != ScopeNeedsPro || logged != 1 {
+				t.Fatalf("enforce: %+v (logs %d)", d, logged)
+			}
+		case paid.ModeLog:
+			if !d.Allowed || d.Plan != PlanFree || logged != 1 || !strings.Contains(buf.String(), `"where":"runner"`) {
+				t.Fatalf("log: %+v %s", d, buf.String())
+			}
+		case paid.ModeOff:
+			if !d.Allowed || d.Plan != PlanFree || logged != 0 {
+				t.Fatalf("off: %+v (logs %d)", d, logged)
+			}
+		}
+		if d := begin(t, q, shared); d.Allowed || d.Block.Scope != ScopeSharedNeedsPro {
+			t.Fatalf("%s shared: %+v", mode, d)
+		}
+	}
+	cfg, err := ConfigFromEnv(func(k string) string { return map[string]string{"PRO_GATE_MODE": "log"}[k] })
+	if err != nil || cfg.ProMode != paid.ModeLog {
+		t.Fatalf("env: %+v %v", cfg.ProMode, err)
+	}
+	if _, err := ConfigFromEnv(func(k string) string { return map[string]string{"PRO_GATE_MODE": "maybe"}[k] }); err == nil {
+		t.Fatal("bad PRO_GATE_MODE")
 	}
 }

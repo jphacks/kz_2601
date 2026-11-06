@@ -51,7 +51,8 @@ type Handler struct {
 
 	runnerEnv string // runner/{env} the automations view reads (automations.go, #347)
 
-	pro paid.ProChecker // Pro features (pro_gate.go, #316); nil = not enforced
+	pro     paid.ProChecker // Pro features (pro_gate.go, #316); nil = not enforced
+	proMode paid.Mode       // PRO_GATE_MODE; "" = enforce
 }
 
 // routeGroups holds the feature routes. Each feature file registers its own

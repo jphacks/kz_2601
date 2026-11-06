@@ -25,6 +25,8 @@ import (
 //     creator to have Pro. Reading, and deleting one's own records, stay open.
 //
 // Without a checker (WithPro not given: tests, tools) nothing is checked.
+// PRO_GATE_MODE (WithProMode): enforce (default) / log (only
+// pro_gate.would_block is logged) / off.
 
 // reasonCreatorNeedsPro is details.reason when the caller is not the one
 // who has to buy (a participant of a shared app whose creator has no Pro).
@@ -37,6 +39,14 @@ type Option func(h *Handler)
 func WithPro(p paid.ProChecker) Option {
 	return func(h *Handler) { h.pro = p }
 }
+
+// WithProMode sets PRO_GATE_MODE (paid.ModeFromEnv).
+func WithProMode(m paid.Mode) Option {
+	return func(h *Handler) { h.proMode = m }
+}
+
+// gateOn reports whether the paid features are looked at.
+func (h *Handler) gateOn() bool { return h.pro != nil && h.proMode.Checks() }
 
 // lang picks the language of details.features from Accept-Language.
 func lang(r *http.Request) string {
@@ -54,7 +64,7 @@ func proRequired(features []paid.Feature) *apiError {
 // checkPaidSave refuses next when it adds paid features to prev (nil = a new
 // app) and the caller, the app's creator, has no Pro.
 func (h *Handler) checkPaidSave(r *http.Request, appID string, next, prev *dsl.App) error {
-	if h.pro == nil {
+	if !h.gateOn() {
 		return nil
 	}
 	added := paid.Default.Added(next, prev, lang(r))
@@ -69,7 +79,7 @@ func (h *Handler) checkPaidSave(r *http.Request, appID string, next, prev *dsl.A
 	if owner != "" && owner != uid {
 		return nil // a participant's copy: never published, its rules run as the participant
 	}
-	if h.pro.IsPro(r.Context(), uid) {
+	if h.pro.IsPro(r.Context(), uid) || !h.proMode.Stop(r.Context(), nil, "appconfig.dsl_save", uid, paid.IDs(added)) {
 		return nil
 	}
 	return proRequired(added)
@@ -77,7 +87,7 @@ func (h *Handler) checkPaidSave(r *http.Request, appID string, next, prev *dsl.A
 
 // checkPaidSaveRaw is checkPaidSave with the stored DSL of prev (nil = none).
 func (h *Handler) checkPaidSaveRaw(r *http.Request, appID string, next *dsl.App, prev *store.App) error {
-	if h.pro == nil {
+	if !h.gateOn() {
 		return nil
 	}
 	var old *dsl.App
@@ -94,14 +104,14 @@ func (h *Handler) checkPaidSaveRaw(r *http.Request, appID string, next *dsl.App,
 // checkSharedWrite refuses a write to a shared record when the app's creator
 // has no Pro (the creator pays for the app's shared data).
 func (h *Handler) checkSharedWrite(r *http.Request, cur *store.App, ent *dsl.Entity) error {
-	if h.pro == nil || !ent.IsShared() {
+	if !h.gateOn() || !ent.IsShared() {
 		return nil
 	}
 	owner, err := h.appOwner(r.Context(), cur.ID)
 	if err != nil {
 		return err
 	}
-	if owner == "" || h.pro.IsPro(r.Context(), owner) {
+	if owner == "" || h.pro.IsPro(r.Context(), owner) || !h.proMode.Stop(r.Context(), nil, "appconfig.shared_write", owner, []string{paid.SharedData}) {
 		return nil
 	}
 	f := paid.Feature{ID: paid.SharedData}

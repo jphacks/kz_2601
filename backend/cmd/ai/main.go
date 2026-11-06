@@ -19,6 +19,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 )
 
@@ -66,6 +67,11 @@ func main() {
 	authMode := env("AUTH_MODE", auth.ModeFirebase)
 	verifier := auth.VerifierFromEnv(context.Background(), authMode, os.Getenv("GOOGLE_CLOUD_PROJECT"))
 
+	proMode, err := paid.ModeFromEnv(os.Getenv) // PRO_GATE_MODE: enforce (default) | log | off
+	if err != nil {
+		log.Fatalf("ai: %v", err)
+	}
+	log.Printf("ai: pro gate mode=%s", proMode)
 	fsClient := newFirestore()
 	pro := newProChecker(fsClient)
 
@@ -91,7 +97,8 @@ func main() {
 		Verifier: verifier,
 		AuthMode: authMode,
 		// Pro features (#316): 402 pro_required on a paid save / POST /v1/text
-		Pro: pro,
+		Pro:     pro,
+		ProMode: proMode,
 	}
 	// AI_PAUSED=1 stops only the Claude-calling routes with 503 ai_paused,
 	// before the rate limiter (#511). docs/infra/ai-pause.md

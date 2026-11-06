@@ -178,7 +178,7 @@ func ProRequired(features []PaidFeature) *Error {
 // again on PUT / PATCH /dsl.
 func (s *Service) gatePaid(ctx context.Context, next []byte, prev *dsl.App, loc Locale) error {
 	uid := auth.UID(ctx)
-	if s.Pro == nil || uid == "" {
+	if s.Pro == nil || uid == "" || !s.ProMode.Checks() {
 		return nil
 	}
 	a, err := dsl.Parse(next)
@@ -186,7 +186,7 @@ func (s *Service) gatePaid(ctx context.Context, next []byte, prev *dsl.App, loc 
 		return nil // validated before; appconfig answers the save
 	}
 	added := defaultPaidCatalog.c.Added(a, prev, string(loc))
-	if len(added) == 0 || s.Pro.IsPro(ctx, uid) {
+	if len(added) == 0 || s.Pro.IsPro(ctx, uid) || !s.ProMode.Stop(ctx, s.logger(), "ai.generate", uid, paid.IDs(added)) {
 		return nil
 	}
 	return ProRequired(added)

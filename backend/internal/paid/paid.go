@@ -12,8 +12,11 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"slices"
+	"strings"
 
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -199,4 +202,72 @@ func IDs(fs []Feature) []string {
 		out[i] = f.ID
 	}
 	return out
+}
+
+// Mode is PRO_GATE_MODE: how hard the paid features are enforced (#316), so
+// the gate can be rolled out in steps. ai, appconfig and runner read the same
+// variable.
+type Mode string
+
+// Modes.
+const (
+	// ModeEnforce (default): 402 pro_required / the runner skips (skipped_plan).
+	ModeEnforce Mode = "enforce"
+	// ModeLog: nothing is stopped; what would have been is logged as
+	// pro_gate.would_block.
+	ModeLog Mode = "log"
+	// ModeOff: no check at all (the behavior before #316).
+	ModeOff Mode = "off"
+)
+
+// ModeEnv is the environment variable of Mode.
+const ModeEnv = "PRO_GATE_MODE"
+
+// WouldBlockEvent is the log event of ModeLog (and of every stop in enforce).
+const WouldBlockEvent = "pro_gate.would_block"
+
+// ModeFromEnv reads PRO_GATE_MODE (unset = enforce). Another value is an
+// error: a typo must not switch the gate off silently.
+func ModeFromEnv(getenv func(string) string) (Mode, error) {
+	switch m := Mode(strings.ToLower(strings.TrimSpace(getenv(ModeEnv)))); m {
+	case "":
+		return ModeEnforce, nil
+	case ModeEnforce, ModeLog, ModeOff:
+		return m, nil
+	default:
+		return ModeEnforce, fmt.Errorf("%s must be enforce|log|off, got %q", ModeEnv, getenv(ModeEnv))
+	}
+}
+
+// Checks reports whether the gate looks at all (enforce or log).
+func (m Mode) Checks() bool { return m != ModeOff }
+
+// Stop is called where the gate would stop something (where = the API or
+// runner step, uid = whose Pro was missing). It logs pro_gate.would_block
+// and reports whether to really stop (enforce; the zero Mode counts as
+// enforce).
+func (m Mode) Stop(ctx context.Context, log *slog.Logger, where, uid string, features []string) bool {
+	if m == ModeOff {
+		return false
+	}
+	enforce := m != ModeLog
+	if log == nil {
+		log = slog.Default()
+	}
+	log.InfoContext(ctx, WouldBlockEvent,
+		slog.String("event", WouldBlockEvent),
+		slog.String("mode", string(m.orEnforce())),
+		slog.Bool("blocked", enforce),
+		slog.String("where", where),
+		slog.String("uid_hash", httpx.UIDHash(uid)),
+		slog.Any("features", features),
+	)
+	return enforce
+}
+
+func (m Mode) orEnforce() Mode {
+	if m == "" {
+		return ModeEnforce
+	}
+	return m
 }

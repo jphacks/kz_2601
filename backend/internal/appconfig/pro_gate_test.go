@@ -1,12 +1,16 @@
 package appconfig
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -184,5 +188,43 @@ func TestProGateParticipantCopy(t *testing.T) {
 	r := e.do("friend", http.MethodGet, app+"/dsl", nil, nil)
 	if r = e.do("friend", http.MethodPut, app+"/dsl", putBody(withRules(t, sharedKakeibo(t))), ifMatch(r.version())); r.code != http.StatusCreated {
 		t.Fatalf("participant copy: %d %s", r.code, r.raw)
+	}
+}
+
+// PRO_GATE_MODE: log saves and writes but logs pro_gate.would_block; off
+// does not look at all; enforce (default) answers 402.
+func TestProGateModes(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	for _, mode := range []paid.Mode{paid.ModeEnforce, paid.ModeLog, paid.ModeOff} {
+		buf.Reset()
+		t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
+		e := &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(store.NewMemory(), WithPro(proSet{}), WithProMode(mode)))}
+		app := "/v1/apps/PG-MODE-" + string(mode)
+		e.do("free", http.MethodGet, app+"/dsl", nil, nil)
+		r := e.do("free", http.MethodPut, app+"/dsl", putBody(sharedKakeibo(t)), ifMatch(1))
+		w := e.do("friend", http.MethodPost, app+"/entities/expense/records", `{"data":{"amount":1}}`, nil)
+		logged := strings.Count(buf.String(), `"msg":"pro_gate.would_block"`)
+		switch mode {
+		case paid.ModeEnforce:
+			wantPro(t, "enforce save", r, "sharedData")
+			if logged != 1 {
+				t.Fatalf("enforce logs the stop: %s", buf.String())
+			}
+		case paid.ModeLog:
+			if r.code != http.StatusCreated || w.code != http.StatusCreated {
+				t.Fatalf("log: save %d / write %d %s", r.code, w.code, w.raw)
+			}
+			if logged != 2 || !strings.Contains(buf.String(), `"where":"appconfig.dsl_save"`) || !strings.Contains(buf.String(), `"where":"appconfig.shared_write"`) {
+				t.Fatalf("log: %s", buf.String())
+			}
+		case paid.ModeOff:
+			if r.code != http.StatusCreated || w.code != http.StatusCreated || logged != 0 {
+				t.Fatalf("off: save %d / write %d / logs %d", r.code, w.code, logged)
+			}
+		}
 	}
 }
