@@ -53,6 +53,14 @@ final class AIButtonPlacementTests: XCTestCase {
         XCTAssertEqual(entry(.main, voiceEntry: VoiceEntry.none, isForm: true), .toolbar)
     }
 
+    func testNothingWhileBuilding() {
+        // 組み上げ中(#626 `rt.buildStage != nil`)は根の FAB・シートの FAB・部品のシートのマイク・フォームのマイクのどれも出さない
+        XCTAssertEqual(entry(.main, isBuilding: true), Entry.none)
+        XCTAssertEqual(entry(.modal, isBuilding: true), Entry.none)
+        XCTAssertEqual(entry(.component, isBuilding: true), Entry.none)
+        XCTAssertEqual(entry(.main, isForm: true, isBuilding: true), Entry.none)
+    }
+
     // MARK: - 今見えている画面
 
     func testVisiblePrefersModalOverMainStack() {
@@ -162,8 +170,9 @@ final class AIButtonPlacementTests: XCTestCase {
     private typealias Entry = AIButtonPlacement.Entry
 
     private func entry(_ layer: AIButtonPlacement.Layer, voiceEntry: VoiceEntry = .floating, isForm: Bool = false,
-                       keyboardVisible: Bool = false, isTopLayer: Bool = true) -> Entry {
-        AIButtonPlacement.entry(layer: layer, voiceEntry: voiceEntry, isForm: isForm, keyboardVisible: keyboardVisible, isTopLayer: isTopLayer)
+                       keyboardVisible: Bool = false, isTopLayer: Bool = true, isBuilding: Bool = false) -> Entry {
+        AIButtonPlacement.entry(layer: layer, voiceEntry: voiceEntry, isForm: isForm, keyboardVisible: keyboardVisible,
+                                isTopLayer: isTopLayer, isBuilding: isBuilding)
     }
 
     private func visible(paths: [String: [Route]], sheet: Route? = nil, fullScreen: Route? = nil) -> AIButtonPlacement.Visible {

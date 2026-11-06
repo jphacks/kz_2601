@@ -375,6 +375,23 @@
         }
       }
     },
+    "%lld 件の記録を送れませんでした。送らずにログアウトすると、この記録は消えます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld records couldn’t be sent. If you sign out without sending, they’ll be lost."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 件の記録を送れませんでした。送らずにログアウトすると、この記録は消えます。"
+          }
+        }
+      }
+    },
     "%lld 回(制限なし)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3027,6 +3044,74 @@
         }
       }
     },
+    "この端末のデータが消え、匿名のアカウントには戻れません。作ったアプリと記録も開けなくなります。残したい時は、先に「Apple でサインイン」で引き継いでください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data on this device will be erased, and you can’t return to this anonymous account. You won’t be able to open the apps and records you made. To keep them, use “Sign in with Apple” first."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末のデータが消え、匿名のアカウントには戻れません。作ったアプリと記録も開けなくなります。残したい時は、先に「Apple でサインイン」で引き継いでください。"
+          }
+        }
+      }
+    },
+    "この端末のデータが消え、匿名のアカウントには戻れません。用意した記録帳と記録も開けなくなります。残したい時は、先に「Apple でサインイン」で引き継いでください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data on this device will be erased, and you can’t return to this anonymous account. You won’t be able to open your record books and records. To keep them, use “Sign in with Apple” first."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末のデータが消え、匿名のアカウントには戻れません。用意した記録帳と記録も開けなくなります。残したい時は、先に「Apple でサインイン」で引き継いでください。"
+          }
+        }
+      }
+    },
+    "この端末のデータは消えます。もう一度サインインすると、作ったアプリと送り済みの記録は戻ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data on this device will be erased. Sign in again to get back the apps you made and the records already sent."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末のデータは消えます。もう一度サインインすると、作ったアプリと送り済みの記録は戻ります。"
+          }
+        }
+      }
+    },
+    "この端末のデータは消えます。もう一度サインインすると、用意した記録帳と送り済みの記録は戻ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data on this device will be erased. Sign in again to get back your record books and the records already sent."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末のデータは消えます。もう一度サインインすると、用意した記録帳と送り済みの記録は戻ります。"
+          }
+        }
+      }
+    },
     "この記録を家族だけで共有して" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3707,6 +3792,40 @@
         }
       }
     },
+    "まだ送っていない記録が %lld 件あります。今はオフラインのため送れません。送らずにログアウトすると、この記録は消えます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have %lld unsent records. You’re offline, so they can’t be sent now. If you sign out without sending, they’ll be lost."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ送っていない記録が %lld 件あります。今はオフラインのため送れません。送らずにログアウトすると、この記録は消えます。"
+          }
+        }
+      }
+    },
+    "まだ送っていない記録が %lld 件あります。送ってからログアウトします。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have %lld unsent records. They’ll be sent before you sign out."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ送っていない記録が %lld 件あります。送ってからログアウトします。"
+          }
+        }
+      }
+    },
     "まもなく作ります…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4332,6 +4451,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリをリセット(初期状態に戻す)"
+          }
+        }
+      }
+    },
+    "アプリを作っている間は削除できません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can’t delete while an app is being made."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを作っている間は削除できません。"
           }
         }
       }
@@ -6457,6 +6593,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ログアウト"
+          }
+        }
+      }
+    },
+    "ログアウトしています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signing out…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログアウトしています…"
+          }
+        }
+      }
+    },
+    "ログアウトしますか？" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign out?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログアウトしますか？"
+          }
+        }
+      }
+    },
+    "ログアウトできませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t sign out"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログアウトできませんでした"
           }
         }
       }
@@ -12156,6 +12343,23 @@
         }
       }
     },
+    "記録帳を用意している間は削除できません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can’t delete while a record book is being set up."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録帳を用意している間は削除できません。"
+          }
+        }
+      }
+    },
     "記録帳を用意する・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。ただし、記録帳の「AI で書く」ボタンがサーバーの AI を使う場合は、押した時だけ、その記録帳の最近の記録と入力中の文字を、文を作るためだけに送ります(写真・音声・動画は送りません)。同意しなくても、記録帳の閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12921,6 +13125,40 @@
         }
       }
     },
+    "送ってからログアウト" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send, Then Sign Out"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送ってからログアウト"
+          }
+        }
+      }
+    },
+    "送らずにログアウト" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign Out Without Sending"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送らずにログアウト"
+          }
+        }
+      }
+    },
     "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作るためだけに使います。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13002,6 +13240,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "送る前に"
+          }
+        }
+      }
+    },
+    "送れなかった記録があります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some records weren’t sent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送れなかった記録があります"
           }
         }
       }

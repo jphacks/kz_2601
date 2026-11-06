@@ -52,14 +52,14 @@ public struct GridScreenLayout: View {
                             let (c, a) = item
                             GridCell(component: c, ctx: ctx)
                                 .frame(width: CGFloat(a.colSpan) * cellW - gap, height: CGFloat(a.rowSpan) * cellH - gap)
-                                .staggeredAppear(index: index)
+                                .staggeredAppear(index: index, highlightKey: ChangeHighlight.key(screen: screen.id, component: c.id))
                                 .offset(x: CGFloat(a.col1) * cellW + gap / 2, y: CGFloat(a.row1 - 1) * cellH + gap / 2)
                         }
                     }
                 }
                 ForEach(Array(placement.stacked.enumerated()), id: \.element.id) { index, c in
                     DSLView(component: c, ctx: ctx)
-                        .staggeredAppear(index: placement.placed.count + index)
+                        .staggeredAppear(index: placement.placed.count + index, highlightKey: ChangeHighlight.key(screen: screen.id, component: c.id))
                 }
             }
             .padding(inset)
@@ -365,17 +365,53 @@ private struct ContentFrameKey: PreferenceKey {
 
 /// 画面が差し替わった直後、各セルが index × stagger の遅延で薄く小さい状態から出現する。
 /// RootView 側が `.id(document.version)` でツリーを作り直すので、変身のたびに onAppear が走る。Reduce Motion ではスキップ。
+/// 編集の直後(`changeHighlight` にこの画面がある・#626)は、変わった部品だけを少し遅れて置き直して光らせ、
+/// 変わっていない部品は待たせずに出す。Reduce Motion では動かさず光の淡いフェードだけ。
 private struct StaggeredAppear: ViewModifier {
     let index: Int
+    var highlightKey: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.changeHighlight) private var highlight
     @State private var shown = false
+    @State private var glow: Double = 0
+
+    private var screenHighlighted: Bool {
+        guard let key = highlightKey, let screen = key.split(separator: "/").first else { return false }
+        return highlight.screens.contains(String(screen))
+    }
+    private var isChanged: Bool { highlightKey.map(highlight.components.contains) ?? false }
 
     func body(content: Content) -> some View {
         content
             .opacity(shown || reduceMotion ? 1 : 0)
-            .scaleEffect(shown || reduceMotion ? 1 : RenderTheme.Motion.appearScale)
+            .scaleEffect(shown || reduceMotion ? 1 : (isChanged ? 0.9 : RenderTheme.Motion.appearScale))
+            .overlay {
+                if glow > 0 {
+                    RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous)
+                        .strokeBorder(RenderTheme.Colors.brandB, lineWidth: 2)
+                        .shadow(color: RenderTheme.Colors.brandB.opacity(0.6), radius: 8)
+                        .opacity(glow)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
             .onAppear {
-                guard !shown, !reduceMotion else { return }
+                guard !shown else { return }
+                if screenHighlighted {
+                    if isChanged {
+                        glow = 1
+                        if reduceMotion {
+                            shown = true
+                        } else {
+                            withAnimation(.spring(duration: 0.5, bounce: 0.3).delay(0.15)) { shown = true }
+                        }
+                        withAnimation(.easeOut(duration: 1.1).delay(0.5)) { glow = 0 }
+                    } else {
+                        shown = true
+                    }
+                    return
+                }
+                guard !reduceMotion else { return }
                 withAnimation(RenderTheme.Motion.appear.delay(Double(min(index, 12)) * RenderTheme.Motion.stagger)) {
                     shown = true
                 }
@@ -384,5 +420,7 @@ private struct StaggeredAppear: ViewModifier {
 }
 
 private extension View {
-    func staggeredAppear(index: Int) -> some View { modifier(StaggeredAppear(index: index)) }
+    func staggeredAppear(index: Int, highlightKey: String? = nil) -> some View {
+        modifier(StaggeredAppear(index: index, highlightKey: highlightKey))
+    }
 }
