@@ -4,7 +4,27 @@ import Observation
 import MetamonDSL
 @testable import MetamonRenderer
 
-/// AI が作る DSL の極端な値(min > max・step ≤ 0・巨大な数)。
+/// 取得失敗(`failed`)を持てるランタイム。
+@MainActor
+@Observable
+private final class OfflineRuntime: DSLRuntime {
+    var dsl: AppDSL
+    var paths: [String: [Route]] = [:]
+    var selectedTab = ""
+    var loading: Set<String> = []
+    var failed: Set<String> = []
+    var store: [String: [Record]] = [:]
+
+    init(dsl: AppDSL) { self.dsl = dsl }
+
+    func records(for entity: String) -> [Record] { store[entity] ?? [] }
+    func load(entities: Set<String>, force: Bool) async {}
+    func run(_ action: Action, _ ctx: ActionContext) async {}
+    func close(_ route: Route) {}
+    func pathBinding(_ stack: String) -> Binding<[Route]> { .constant([]) }
+}
+
+/// AI が作る DSL の極端な値(min > max・step ≤ 0・巨大な数)と、取得失敗の表示。
 final class ExtremeDSLValueTests: XCTestCase {
     func testRangeFixesInvertedAndEmptyBounds() {
         XCTAssertEqual(NumericInput.range(min: nil, max: nil, defaultMin: 0, defaultMax: 100), 0...100)
@@ -44,5 +64,22 @@ final class ExtremeDSLValueTests: XCTestCase {
         XCTAssertEqual(TextInputRules.editorLines(minLines: nil), 4...10)
         XCTAssertEqual(TextInputRules.editorLines(minLines: Int.max).lowerBound, TextInputRules.maxEditorMinLines)
         XCTAssertEqual(TextInputRules.editorLines(minLines: -5).lowerBound, 1)
+    }
+
+    /// 取得に失敗して記録が無い時、progressBar / gauge は「0%」「0」ではなく「—」(#85・stat と同じ)。
+    @MainActor func testProgressBarUnavailableWhenFetchFailed() throws {
+        var url = URL(fileURLWithPath: #filePath)
+        for _ in 0..<6 { url.deleteLastPathComponent() }
+        let dsl = try AppDSL.load(contentsOf: url.appending(path: "docs/dsl/examples/vocab.json"))
+        let rt = OfflineRuntime(dsl: dsl)
+        let c = try JSONDecoder().decode(Component.self, from: Data(#"{"type":"progressBar","entity":"word","aggregate":"count","target":10}"#.utf8))
+        XCTAssertFalse(ProgressBarLeaf.isUnavailable(c, rt: rt), "取得に失敗していなければ 0% のまま")
+        rt.failed = ["word"]
+        XCTAssertTrue(ProgressBarLeaf.isUnavailable(c, rt: rt))
+        rt.store["word"] = [Record(id: "w1", data: ["term": "apple"])]
+        XCTAssertFalse(ProgressBarLeaf.isUnavailable(c, rt: rt), "手元に記録があれば集計する")
+        let literal = try JSONDecoder().decode(Component.self, from: Data(#"{"type":"progressBar","value":0.4}"#.utf8))
+        rt.store = [:]
+        XCTAssertFalse(ProgressBarLeaf.isUnavailable(literal, rt: rt), "value リテラルは取得に関係しない")
     }
 }
