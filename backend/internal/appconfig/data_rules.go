@@ -232,6 +232,9 @@ func (h *Handler) checkDelete(r *http.Request, rs store.RecordSet, cur *store.Ap
 	if err != nil {
 		return mapStoreErr(err, "record")
 	}
+	if !canRead(ent, rec, uidOf(r)) { // #271
+		return recordNotFound()
+	}
 	if by == dsl.DeleteByAuthorOrAdmins && rec.Author == uidOf(r) {
 		return nil
 	}

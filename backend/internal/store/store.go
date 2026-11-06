@@ -78,7 +78,11 @@ type Record struct {
 	Origin *RecordOrigin `json:"-"`
 	// UniqueKey is the entity.unique claim the record holds (#273, unique.go).
 	// Not part of the API.
-	UniqueKey string    `json:"-"`
+	UniqueKey string `json:"-"`
+	// Readers are the uids that may read an addressed record (#271: author
+	// and recipients, set when it is created). Empty = everyone who may read
+	// the entity. Not part of the API.
+	Readers   []string  `json:"-"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }

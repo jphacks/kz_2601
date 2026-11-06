@@ -228,6 +228,11 @@
             "admins": "アプリの管理者だけ。シフト表・お知らせ。",
             "authorOrAdmins": "作った人か管理者。予約・掲示板の投稿。"
           }
+        },
+        "addressedTo": {
+          "type": "string",
+          "description": "宛先付きの記録(1 対 1・グループ宛てのメッセージ・#271)。宛先の field id(type member = 1 人・members = 複数人)。この entity のレコードは、作った人と宛先の参加者だけが読める(一覧・取得・リアルタイム更新・印。それ以外の人には無いのと同じ)。宛先は送った後で変えられない。scope shared の entity だけ。edit members・single・match とは書けない。unique を書くなら \"$author\" を含める。",
+          "x-usage": "「1 対 1 のメッセージ」「DM」「個別に連絡」「先生にだけ送る」は宛先の field(type member・picker で選ぶ)、「グループに送る」「何人かを選んで送る」は type members。受信箱は filter {\"field\":\"$author\",\"op\":\"neq\",\"value\":{\"me\":true}}(読めるのは自分宛てだけ)、送信済みは op eq。未読は marks の read(icon eye)と list.item.mark、未読だけは filter {\"field\":\"$marks.read\",\"op\":\"neq\",\"value\":{\"me\":true}}。"
         }
       },
       "x-recordValues": {
@@ -269,9 +274,10 @@
             "location",
             "ref",
             "refs",
-            "member"
+            "member",
+            "members"
           ],
-          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL; a drawingField saves its drawing here as the same kind of picture. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). audio = voice recording kept on the recording device: \"audio:<id>|<seconds>\" (AAC m4a written by audioRecorder; other devices show only the length). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField. refs = array of record ids of `refEntity` (multi-select, e.g. expense.split_with -> members: who shares this expense); [] or missing = everyone; filter it with op contains, count it with op len. member = uid (string) of a participant of the shared data (the creator or someone who joined with the share link; scope \"shared\" only): pick it with a picker, which lists the participants by their display names (e.g. shift.staff = 担当者). The server refuses a uid that does not participate."
+          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL; a drawingField saves its drawing here as the same kind of picture. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). audio = voice recording kept on the recording device: \"audio:<id>|<seconds>\" (AAC m4a written by audioRecorder; other devices show only the length). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField. refs = array of record ids of `refEntity` (multi-select, e.g. expense.split_with -> members: who shares this expense); [] or missing = everyone; filter it with op contains, count it with op len. member = uid (string) of a participant of the shared data (the creator or someone who joined with the share link; scope \"shared\" only): pick it with a picker, which lists the participants by their display names (e.g. shift.staff = 担当者). The server refuses a uid that does not participate. members = array of participant uids (scope \"shared\" only, e.g. message.to = 宛先 of a group message): pick them with a picker (multi-select of the participants). Use it as entity.addressedTo for messages only the author and the chosen people read."
         },
         "required": {
           "type": "boolean"

@@ -38,11 +38,12 @@ public enum ClientCapabilities {
     /// notification.when(#265): 知らない版は残りを 9:00 の 1 回きりとして予約してしまうので、無い版には生成させない。
     /// singleEntity(#267・設定値の置き場): 知らない版は設定のフォームで保存するたびに記録を足してしまうので、無い版には生成させない。審査用の版も同じ。
     /// dataRoles(#272・参加者を選ぶ member と管理者だけのボタン visibleTo): 参加者の一覧を読むので、共有を外す審査用の版は送らない。
+    /// addressedMessages(#271・宛先を選ぶ members と宛先付きの記録): 同じく参加者を選ぶので審査用の版は送らない。
     public static var supportedFeatures: [String] {
         #if APP_STORE_REVIEW
         ["recordRetention", "notification.when", "singleEntity"]
         #else
-        ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles"]
+        ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages"]
         #endif
     }
 

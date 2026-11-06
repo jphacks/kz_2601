@@ -56,6 +56,7 @@ Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|me
   Entity.retentionDays?: 1〜3650(記録の保存期間。期限を過ぎた記録を端末が自動で消す)— §3.7
   Entity.single?: true(設定値の置き場。レコードは常に 1 件・式 {"setting": "<fieldId>"} で読む)— §3.11
   Entity.unique?: [fieldId|$author](1〜3・一意)/ deleteBy?: author|admins|authorOrAdmins・Field.editableBy?: "admins"・Field.type "member"・button.visibleTo?: "admins" — §3.13
+  Entity.addressedTo?: fieldId(宛先の member / members field。作った人と宛先の人だけが読む)・Field.type "members" — §3.14
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
 Leaf (66 種・全て id? と area? を持つ) / Action (12 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
@@ -472,6 +473,23 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - iOS: `supportedFeatures` に `dataRoles` を送る。送らない古い版には AI が member と visibleTo を使わない(member は string に・visibleTo は外す・§5.3)。古い版でも editableBy / deleteBy / unique はサーバーが守る(断られた時の文言が汎用になるだけ)。iOS は 409 `duplicate` を「同じ内容の記録がもうあります」、403 `admins_only` を「管理者だけが変更できます」と出す。
 - AI: `backend/internal/ai/data_roles_rules.go`。
 
+### 3.14 宛先を選んで送るメッセージ(1 対 1・グループ宛て・#271・M4)
+
+「1 対 1 のメッセージ」「先生にだけ質問」「選んだ何人かに連絡」を、宛先の人と送った人だけが読める記録で作る。守るのはサーバー(appconfig)で、iOS は宛先を選ぶ入力と表示を持つだけ。実装: `backend/pkg/dsl/addressed.go`(検証)・`backend/internal/appconfig/addressed.go`(読める人の判定)・`backend/internal/store/watch_visible.go`(リアルタイム更新)。
+
+| 書く場所 | 形 | 意味 | 制約(`Validate()`) |
+|---|---|---|---|
+| `entity.addressedTo` | 宛先の field id | この entity のレコードは**作った人と宛先の人だけ**が読める。ほかの参加者(アプリの作成者・管理者を含む)には、無いのと同じ | scope `shared` だけ。宛先の field は type `member`(1 人)か `members`(複数)・computed / editableBy 不可。`edit:"members"`・`single`・`match` とは書けない。`unique` を書くなら `$author` を含める |
+| `field.type: "members"` | 参加者の uid の配列 | グループ宛ての宛先。入力は picker(参加者を複数選ぶ)、一覧は表示名を並べる。参加者でない uid は 422 | scope `shared` の entity だけ・defaultValue 不可・入力は picker |
+
+- **読める人の決め方**: レコードを作る時に appconfig が「作った人 + 宛先」を `readers` としてレコードに持たせる(API には出さない)。宛先は送った後で変えられない(PATCH で変えると 422)。宛先が空の作成も 422。`readers` を持つレコードは、後から DSL の `addressedTo` を外しても `readers` の人にしか見えない(古いメッセージが開かない)。
+- **見えない人に対して**(すべて 404・中身も有無も返さない): 一覧(`GET .../records` から除く)・取得・PATCH・DELETE・印(`PUT/DELETE .../marks`)・通報(`POST /reports` の record)。全件削除(`DELETE .../records`)は今までどおり自分の分だけ(`deleteBy` で管理者が消せる entity なら管理者は全員の分を消せる。中身は読めない)。リアルタイム更新(`GET /events`)は、宛先付きの entity では自分が読める記録が変わった時だけ `records` を送る。
+- **集計**: 一覧が読める分だけなので、端末の集計(stat・agg・未読の数)も自分が読める記録だけになる。
+- **自動の動き(§3.12)**: 宛先付きの entity をきっかけにするルールは、通知の宛先が `author` だけ・書き換えはその記録だけ(`createRecord` / `increment` / ref の `updateRecord` は不可)。どのルールも宛先付きの entity に `createRecord` できず、宛先の field を書き換えられない。宛先の人への通知(`to.kind` で field を指す)は、#658 の語彙が入った後に足す。
+- **未読**: 既存の印(§3.5 `marks`)の `read` を使う。受信箱の `list.item.mark: "read"` で既読の印、`{"field":"$marks.read","op":"neq","value":{"me":true}}` で未読だけ。受信箱は `$author` neq me(読めるのは自分宛てだけなので、これで自分宛て)、送信済みは eq。
+- iOS: `supportedFeatures` に `addressedMessages` を送る(審査用の版は共有を外しているので送らない)。送らない版には AI が addressedTo と members を使わない(addressedTo は外し、members は string に・§5.3)。
+- AI: `backend/internal/ai/messages_addressed_rules.go`。ai-eval の `addressed` / `addressedGroup` / `addressedUnread`(`addressed_cases.json`)。
+
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 
 AI に渡す部品カタログは手書きではなく **`dsl.schema.json` から自動生成**される(`backend/internal/ai/catalog.go` の `BuildCatalog`)。検証(Go)・描画(iOS)・AI(プロンプト)の 3 者はすべてスキーマから導出され、抜けはテストで赤になる。
@@ -512,7 +530,7 @@ App Store に出した後は古い iOS が残り続ける。backend は「今い
 | どこに | 中身 | 使い道 |
 |---|---|---|
 | generate / chat の body `allowedComponents` | その版が描画できる部品 type の全部(`ComponentType` から自動) | backend はここに**無い** type を生成結果に入れない(下) |
-| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(`recordRetention`・#482、`matching`・#507、`notification.when`・#265、`singleEntity`・#267、`dataRoles`・#272。審査用の版は `matching` と `dataRoles` を送らない) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
+| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(`recordRetention`・#482、`matching`・#507、`notification.when`・#265、`singleEntity`・#267、`dataRoles`・#272、`addressedMessages`・#271。審査用の版は `matching`・`dataRoles`・`addressedMessages` を送らない) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
 | 全リクエストのヘッダ `X-Client-Platform` / `X-Client-Version` / `X-Client-Build` / `X-Client-DSL-Version` | `ios` / `CFBundleShortVersionString` / `CFBundleVersion` / 描画できる最大の `schemaVersion` | ログ(どの版がまだ使われているか = 最低対応版を上げる判断) |
 
 ### 5.3 backend が古い iOS に新しい部品を出さない仕組み
