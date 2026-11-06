@@ -3647,7 +3647,7 @@
           "description": "generate の shape fields の項目名(1〜10 個・各 20 字まで)。例: [\"主菜\",\"副菜\",\"汁物\"]。"
         }
       },
-      "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はオンデバイス AI(Apple Intelligence / Foundation Models)だけでフォームの入力を処理して output field に入れる(無料・データは端末外に出ない・非対応端末では「この端末では AI を使えません」)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",
+      "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はフォームの入力を処理して output field に入れる(端末内 AI(Apple Intelligence / Foundation Models)が使えれば無料で端末の中だけ、無い端末では Tailor It Pro のオンライン AI。写真は送らない)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",
       "x-usage": "summarize〜suggest はフォーム画面のみ(screen.entity 必須)。発話に「要約して」「分類して」「気分を判定」「タグ付け」「一言で」「言い換えて」「丁寧に」「抜き出して」「AI で」がある時に使う。entity に結果用の field(string/text、分類は enum)を足し、その入力欄の直上に 1 行(例 A7:F8)。generate は「〜の案を出してくれるボタン」「今日の献立を提案」「励ましの一言」「お題を考えて」の時: どの画面でもよく、結果を表示する高さを取る(line は 3 行・list/fields は 5〜6 行 例 A1:F6)。記録を材料にするなら entity(+limit)、結果を記録に残したい時だけフォーム画面で output。1 画面 3 個まで。"
     },
     "LocationTracker": {
