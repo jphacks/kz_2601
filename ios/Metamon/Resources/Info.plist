@@ -37,9 +37,12 @@
 	<false/>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<!-- 横向き(左右)も使える(#625)。上下逆さまは無し。iPad は対象外(TARGETED_DEVICE_FAMILY = 1) -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
