@@ -43,6 +43,8 @@
 | 仲間探し(#507・`matchList` / `list.item.interest`) | `matchList` の部品と登録 / `MatchListLeaf` / `InterestButton` / `MatchingHost`、MetamonServices の `MatchingClient` / `HTTPMatchingClient`(`v1/apps/{appId}/interests`・`matches`)/ `MatchingStore` / `MatchingAgeGate`、`Features/Matching` 全部(18 歳以上の確認 `AdultConfirmSheet`)。`supportedFeatures` に `matching` を送らず、backend が match・`item.interest`・`matchList` を使わない | 共有と一緒に外す(知らない人と連絡先を交換する機能。年齢区分・1.2) |
 | アプリ内のフィードバック(#319) | `Features/Feedback` 全部(`FeedbackComposerView` / `FeedbackContext` / 振って開く `FeedbackShakeHost`・`UIWindow.motionEnded`)/ 設定の「フィードバックを送る」/ MetamonServices の `FeedbackClient` / `HTTPFeedbackClient`(`v1/feedback`) | プライバシーの表示に無い種類(カスタマーサポート・その他の診断データ・スクショ)を集める。表示を足すまで外す(`docs/legal/feedback-privacy-draft.md`) |
 | β の初回の案内(#313) | `BetaEnvironment` / `BetaWelcomeStore` / `BetaWelcomeView`(`BetaWelcomeHost`)/ `AppRuntime` の `betaWelcome`・`showBetaWelcome` / 設定の「β 版のご案内」 | 2.2(App Store の版に β の文言を入れない)。β かどうかは実行時にレシート(`sandboxReceipt` = TestFlight)で見分ける。TestFlight と App Store は同じバイナリなので、Release の App Store では実行時の判定で出ず、審査用の版はコードごと無い |
+| 設定の「投稿に表示する名前」(#250) | `AuthorNameSettingsSection`(説明が「みんなで使うアプリに投稿すると…」)。初投稿で名前を聞くアラート(`AuthorNamePromptModifier`)は残るが、記録がすべて private なので出ない | 共有と一緒に外す(外した共有機能の説明になる・2.3) |
+| ショートカット / Siri(App Intents)の文言の言い換え | `TailorItIntents.swift` / `IntentEntities.swift` の「作ったアプリに変身した状態で開きます」「どのアプリを開きますか?」などを、`#if APP_STORE_REVIEW` で「記録帳を開く」「どの記録帳を開きますか?」に替える(App Intents の文言はビルド時に決まるので `L10n.pick` は使えない)。フレーズは `\(.applicationName)` を含んだまま | 言い換え(`docs/store/wording.md`・#247) |
 | 外した部品・共有 / 公開の記録を使う同梱の例 | `health` / `walk_route` / `attendance_nearby` / `dashcam` / `sensors` / `gallery-web` / `chat` / `board` / `ranking` / `post_comments` / `recipes`(`DSLExamples.reviewExcluded`。`strip-review-plist.sh` もバンドルから消す) | 上と同じ |
 
 **残すもの**
@@ -181,3 +183,4 @@ grep -l '"scope" *: *"\(public\|shared\)"' "$APP"/*.json
 - **審査用の版に戻す場合**(例: v1.1 で「探す」を戻す)
   - `#if` を外す。
   - **通報・ブロック・フィルタなど、審査で求められるものを先に入れてから**、新しい版として審査に出す。審査の後でフラグを切り替えるだけ、はしない(2.5.19)。
+  - 戻す順番と、1 機能ずつ出す・却下で外して出し直す手順は [`../release/feature-resubmission-plan.md`](../release/feature-resubmission-plan.md)(#334)。

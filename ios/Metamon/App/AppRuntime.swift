@@ -409,7 +409,8 @@ final class AppRuntime: DSLRuntime {
         }
         print("[Metamon] hot reload: version \(document.version) → \(doc.version)")
         apply(doc)
-        summaryBanner = SummaryBanner(text: L10n.tr("アプリが更新されました(version \(doc.version))"), highlight: nil)
+        summaryBanner = SummaryBanner(text: L10n.pick(L10n.tr("アプリが更新されました(version \(doc.version))"),
+                                                     review: L10n.tr("記録帳が更新されました(version \(doc.version))")), highlight: nil)
     }
 
     /// records の変化通知はまとめて 1 回だけ取り直す(連投で pull を重ねない)。未表示の entity は画面が開いた時に読むので無視。

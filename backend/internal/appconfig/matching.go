@@ -14,10 +14,8 @@ package appconfig
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
@@ -57,30 +55,9 @@ type matchSpec struct {
 // publishedMatch reads the matching roles of appID's published DSL (nil, nil
 // when the app is not published or has no matching).
 func (h *Handler) publishedMatch(ctx context.Context, appID string) (*matchSpec, *store.PublicApp, error) {
-	pub, err := h.store.GetPublicApp(ctx, appID)
-	if errors.Is(err, store.ErrNotFound) {
-		return nil, nil, nil
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-	key := "pub/" + appID + "/" + strconv.Itoa(pub.Version) + "/" + pub.UpdatedAt.Format(time.RFC3339Nano)
-	h.mu.Lock()
-	a, ok := h.cache[key]
-	h.mu.Unlock()
-	if !ok {
-		// decode only: an older mirror that today's rules would reject must
-		// not break every shared record list
-		a = &dsl.App{}
-		if err := json.Unmarshal(pub.DSL, a); err != nil {
-			return nil, pub, err
-		}
-		h.mu.Lock()
-		if len(h.cache) > 256 {
-			h.cache = map[string]*dsl.App{}
-		}
-		h.cache[key] = a
-		h.mu.Unlock()
+	a, pub, err := h.publishedDSL(ctx, appID)
+	if a == nil || err != nil {
+		return nil, pub, err
 	}
 	if !a.HasMatching() {
 		return nil, pub, nil

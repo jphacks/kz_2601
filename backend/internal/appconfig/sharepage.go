@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
@@ -20,12 +21,13 @@ const AppStoreURL = "https://apps.apple.com/app/id6828742045"
 // name and the call to action only.
 const maxSharePageBytes = 512 << 10
 
-// sharePage is the unauthenticated web view of a share link (GET /s/{token}):
+// sharePageSrc is the unauthenticated web view of a share link (GET /s/{token}):
 // the app's screens read-only (shareview.go, #362) plus "open in app" /
-// App Store. Records are never shown (#253). No script runs: the CSP allows
-// only the nonce'd <style>.
-var sharePage = template.Must(template.New("share").Parse(`<!doctype html>
-<html lang="ja"><head><meta charset="utf-8">
+// App Store and the steps for someone without the app (#278). Records are
+// never shown (#253). No script runs: the CSP allows only the nonce'd <style>.
+// Fixed wording comes from sharePageText via {{t "key"}}.
+const sharePageSrc = `<!doctype html>
+<html lang="{{.Lang}}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <meta name="color-scheme" content="light dark">
@@ -33,10 +35,10 @@ var sharePage = template.Must(template.New("share").Parse(`<!doctype html>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Tailor It">
 <meta property="og:title" content="{{.Name}}">
-<meta property="og:description" content="{{if .Description}}{{.Description}}{{else}}Tailor It で作られたアプリが共有されました{{end}}">
+<meta property="og:description" content="{{if .Description}}{{.Description}}{{else}}{{t "ogDefault"}}{{end}}">
 {{if .PageURL}}<meta property="og:url" content="{{.PageURL}}">
 {{end}}<meta name="twitter:card" content="summary">
-{{else}}<title>リンクが無効です - Tailor It</title>
+{{else}}<title>{{t "invalid"}} - Tailor It</title>
 {{end}}<style nonce="{{.Nonce}}">
 :root{--bg:#f6f5fb;--fg:#17142a;--muted:#5d5875;--card:#fff;--line:#dedbea;--accent:#6a4cff;--row:40px}
 @media (prefers-color-scheme:dark){:root{--bg:#0f0c1d;--fg:#f3f1ff;--muted:#a9a3c6;--card:#1b1730;--line:#332d52;--accent:#9a85ff}}
@@ -84,26 +86,32 @@ svg.chart{width:100%;height:96px;color:var(--accent);opacity:.5}
 table{width:100%;border-collapse:collapse;font-size:14px}th{text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding:4px}
 .icon{display:inline-block;width:20px;height:20px;border-radius:50%;background:var(--line)}
 hr{border:0;border-top:1px solid var(--line);width:100%}
+section.install{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 16px;margin:0 0 20px}
+section.install>h2{font-size:16px;margin:0 0 6px}
+section.install ol{margin:0;padding-left:1.4em}
 footer{font-size:13px;color:var(--muted);text-align:center;padding:8px 0 32px}
 {{if .Accent}}:root{--accent:{{.Accent}}}
 {{end}}{{range .CSS}}.{{.Class}}{grid-{{.Prop}}:{{.From}}/{{.To}}}
 {{end}}</style></head>
 <body><main>
-{{if .Found}}<header class="app"><p class="muted">アプリが共有されました</p>
+{{if .Found}}<header class="app"><p class="muted">{{t "shared"}}</p>
 <h1>{{.Name}}</h1>
 {{with .Description}}<p class="lead">{{.}}</p>{{end}}</header>
-<div class="cta"><a class="btn primary" href="{{.ImportURL}}">アプリで開く</a>
-<a class="btn" href="{{.StoreURL}}" rel="noopener">App Store で入手</a></div>
-<p class="caption">開かない場合は Tailor It をインストールしてから、もう一度このリンクを開いてください。この画面は見本です。記録されたデータは表示しません。</p>
-{{if .Screens}}<nav class="screens" aria-label="画面"><ul>{{range .Screens}}<li><a href="#{{.Anchor}}">{{if .Title}}{{.Title}}{{else}}画面{{end}}</a></li>{{end}}</ul></nav>
+<div class="cta"><a class="btn primary" href="{{.ImportURL}}">{{t "open"}}</a>
+<a class="btn" href="{{.StoreURL}}" rel="noopener">{{t "get"}}</a></div>
+<section class="install" aria-labelledby="install-h"><h2 id="install-h">{{t "installH"}}</h2>
+<p class="caption">{{t "installLead"}}</p>
+<ol><li>{{t "install1"}}</li><li>{{t "install2"}}</li><li>{{t "install3"}}</li></ol></section>
+<p class="caption">{{t "sample"}}</p>
+{{if .Screens}}<nav class="screens" aria-label="{{t "screens"}}"><ul>{{range .Screens}}<li><a href="#{{.Anchor}}">{{if .Title}}{{.Title}}{{else}}{{t "screen"}}{{end}}</a></li>{{end}}</ul></nav>
 {{range .Screens}}<section class="screen" id="{{.Anchor}}" aria-labelledby="{{.Anchor}}h">
-<h2 id="{{.Anchor}}h">{{if .Title}}{{.Title}}{{else}}画面{{end}}{{if .Toolbar}}<span class="tb">{{range $i, $b := .Toolbar}}{{if $i}} · {{end}}{{$b}}{{end}}</span>{{end}}</h2>
+<h2 id="{{.Anchor}}h">{{if .Title}}{{.Title}}{{else}}{{t "screen"}}{{end}}{{if .Toolbar}}<span class="tb">{{range $i, $b := .Toolbar}}{{if $i}} · {{end}}{{$b}}{{end}}</span>{{end}}</h2>
 {{if .Grid}}<div class="grid">{{range .Grid}}{{template "node" .}}{{end}}</div>{{end}}
 {{if .Stack}}<div class="stack">{{range .Stack}}{{template "node" .}}{{end}}</div>{{end}}
 </section>
-{{end}}{{if .Truncated}}<p class="caption">続きはアプリで見られます。</p>{{end}}{{end}}
-{{else}}<header class="app"><h1>リンクが無効です</h1><p class="muted">このシェアリンクは取り消されたか、存在しません。</p></header>
-<div class="cta"><a class="btn" href="{{.StoreURL}}" rel="noopener">App Store で Tailor It を見る</a></div>
+{{end}}{{if .Truncated}}<p class="caption">{{t "more"}}</p>{{end}}{{end}}
+{{else}}<header class="app"><h1>{{t "invalid"}}</h1><p class="muted">{{t "invalidLead"}}</p></header>
+<div class="cta"><a class="btn" href="{{.StoreURL}}" rel="noopener">{{t "see"}}</a></div>
 {{end}}<footer>Tailor It</footer>
 </main></body></html>
 {{define "node"}}<div class="{{.Class}}">{{template "leaf" .}}</div>{{end}}
@@ -112,7 +120,7 @@ footer{font-size:13px;color:var(--muted);text-align:center;padding:8px 0 32px}
 {{- else if eq .Kind "stack"}}<div class="stack">{{template "children" .}}</div>
 {{- else if eq .Kind "row"}}<div class="row">{{template "children" .}}</div>
 {{- else if eq .Kind "grid"}}<div class="cgrid cols{{.Cols}}">{{template "children" .}}</div>
-{{- else if eq .Kind "disclosure"}}<details class="box"{{if .Open}} open{{end}}><summary>{{if .Title}}{{.Title}}{{else}}詳細{{end}}</summary><div class="stack">{{template "children" .}}</div></details>
+{{- else if eq .Kind "disclosure"}}<details class="box"{{if .Open}} open{{end}}><summary>{{if .Title}}{{.Title}}{{else}}{{t "details"}}{{end}}</summary><div class="stack">{{template "children" .}}</div></details>
 {{- else if eq .Kind "heading"}}<h3 class="{{if eq .Style "title"}}t{{else}}h{{end}}">{{.Text}}</h3>
 {{- else if eq .Kind "text"}}<p{{if eq .Style "caption"}} class="caption"{{end}}>{{.Text}}</p>
 {{- else if eq .Kind "badge"}}<span class="badge">{{.Text}}</span>
@@ -120,21 +128,103 @@ footer{font-size:13px;color:var(--muted);text-align:center;padding:8px 0 32px}
 {{- else if eq .Kind "spacer"}}<div aria-hidden="true"></div>
 {{- else if eq .Kind "icon"}}<span class="icon" aria-hidden="true"></span>
 {{- else if eq .Kind "empty"}}<div class="empty"><div>{{with .Title}}<strong>{{.}}</strong><br>{{end}}{{.Text}}</div></div>
-{{- else if eq .Kind "stat"}}<div class="box stat"><div class="caption">{{.Label}}</div><div class="v" aria-label="データなし">—</div></div>
-{{- else if eq .Kind "meter"}}<div class="box"><div class="caption">{{.Label}}</div><div class="meter" role="img" aria-label="データなし"></div></div>
-{{- else if eq .Kind "list"}}<div class="box">{{with .Items}}<div class="skel" aria-hidden="true">{{range $i, $f := .}}{{if $i}} / {{end}}{{$f}}{{end}}</div>{{end}}{{if .Rows}}<ul class="rows">{{range .Rows}}<li><span>{{.Title}}{{with .Subtitle}}<br><span class="caption">{{.}}</span>{{end}}</span><span>{{.Trailing}}</span></li>{{end}}</ul>{{else}}<div class="empty">{{if .Text}}{{.Text}}{{else}}記録はアプリで見られます{{end}}</div>{{end}}</div>
-{{- else if eq .Kind "table"}}<div class="box"><table><thead><tr>{{range .Items}}<th scope="col">{{.}}</th>{{end}}</tr></thead></table><div class="empty">記録はアプリで見られます</div></div>
-{{- else if eq .Kind "chart"}}<figure class="box">{{with .Title}}<figcaption class="caption">{{.}}</figcaption>{{end}}{{if eq .Style "pie"}}<svg class="chart" viewBox="0 0 120 96" aria-hidden="true"><circle cx="60" cy="48" r="40" fill="none" stroke="currentColor" stroke-width="16" stroke-dasharray="120 131"/></svg>{{else}}<svg class="chart" viewBox="0 0 120 96" aria-hidden="true"><rect x="6" y="56" width="16" height="36" fill="currentColor"/><rect x="30" y="36" width="16" height="56" fill="currentColor"/><rect x="54" y="64" width="16" height="28" fill="currentColor"/><rect x="78" y="24" width="16" height="68" fill="currentColor"/><rect x="102" y="46" width="16" height="46" fill="currentColor"/></svg>{{end}}<p class="caption">グラフはアプリで見られます</p></figure>
-{{- else if eq .Kind "image"}}<div class="ph img" role="img" aria-label="写真">写真</div>
+{{- else if eq .Kind "stat"}}<div class="box stat"><div class="caption">{{.Label}}</div><div class="v" aria-label="{{t "noData"}}">—</div></div>
+{{- else if eq .Kind "meter"}}<div class="box"><div class="caption">{{.Label}}</div><div class="meter" role="img" aria-label="{{t "noData"}}"></div></div>
+{{- else if eq .Kind "list"}}<div class="box">{{with .Items}}<div class="skel" aria-hidden="true">{{range $i, $f := .}}{{if $i}} / {{end}}{{$f}}{{end}}</div>{{end}}{{if .Rows}}<ul class="rows">{{range .Rows}}<li><span>{{.Title}}{{with .Subtitle}}<br><span class="caption">{{.}}</span>{{end}}</span><span>{{.Trailing}}</span></li>{{end}}</ul>{{else}}<div class="empty">{{if .Text}}{{.Text}}{{else}}{{t "records"}}{{end}}</div>{{end}}</div>
+{{- else if eq .Kind "table"}}<div class="box"><table><thead><tr>{{range .Items}}<th scope="col">{{.}}</th>{{end}}</tr></thead></table><div class="empty">{{t "records"}}</div></div>
+{{- else if eq .Kind "chart"}}<figure class="box">{{with .Title}}<figcaption class="caption">{{.}}</figcaption>{{end}}{{if eq .Style "pie"}}<svg class="chart" viewBox="0 0 120 96" aria-hidden="true"><circle cx="60" cy="48" r="40" fill="none" stroke="currentColor" stroke-width="16" stroke-dasharray="120 131"/></svg>{{else}}<svg class="chart" viewBox="0 0 120 96" aria-hidden="true"><rect x="6" y="56" width="16" height="36" fill="currentColor"/><rect x="30" y="36" width="16" height="56" fill="currentColor"/><rect x="54" y="64" width="16" height="28" fill="currentColor"/><rect x="78" y="24" width="16" height="68" fill="currentColor"/><rect x="102" y="46" width="16" height="46" fill="currentColor"/></svg>{{end}}<p class="caption">{{t "chart"}}</p></figure>
+{{- else if eq .Kind "image"}}<div class="ph img" role="img" aria-label="{{t "photo"}}">{{t "photo"}}</div>
 {{- else if eq .Kind "input"}}<div>{{with .Label}}<label for="{{$.ID}}">{{.}}</label>{{end}}<div class="unit"><input id="{{.ID}}" type="{{.Style}}"{{with .Placeholder}} placeholder="{{.}}"{{end}} disabled>{{with .Unit}}<span>{{.}}</span>{{end}}</div></div>
 {{- else if eq .Kind "textarea"}}<div>{{with .Label}}<label for="{{$.ID}}">{{.}}</label>{{end}}<textarea id="{{.ID}}" rows="3"{{with .Placeholder}} placeholder="{{.}}"{{end}} disabled></textarea></div>
 {{- else if eq .Kind "select"}}<div>{{with .Label}}<label for="{{$.ID}}">{{.}}</label>{{end}}<select id="{{.ID}}" disabled>{{range .Options}}<option>{{.}}</option>{{end}}</select></div>
 {{- else if eq .Kind "toggle"}}<label><input id="{{.ID}}" type="checkbox" disabled> {{.Label}}</label>
-{{- else if eq .Kind "rating"}}<div>{{with .Label}}<span class="caption">{{.}}</span> {{end}}<span class="stars" role="img" aria-label="評価 {{.Cols}} 段階">{{.Text}}</span></div>
+{{- else if eq .Kind "rating"}}<div>{{with .Label}}<span class="caption">{{.}}</span> {{end}}<span class="stars" role="img" aria-label="{{printf (t "rating") .Cols}}">{{.Text}}</span></div>
 {{- else if eq .Kind "button"}}<button type="button" class="{{.Style}}" disabled>{{.Label}}</button>
 {{- else if eq .Kind "link"}}{{if .Href}}<a href="{{.Href}}" rel="nofollow noopener noreferrer ugc" target="_blank">{{.Text}}</a>{{else}}<span>{{.Text}}</span>{{end}}
-{{- else}}<div class="ph">{{with .Title}}{{.}}<br>{{end}}アプリで見られます</div>
-{{- end}}{{end}}`))
+{{- else}}<div class="ph">{{with .Title}}{{.}}<br>{{end}}{{t "inApp"}}</div>
+{{- end}}{{end}}`
+
+// sharePageText is the page's fixed wording (#278). The keys must match in
+// every language (TestSharePageTextKeys).
+var sharePageText = map[string]map[string]string{
+	"ja": {
+		"ogDefault":   "Tailor It で作られたアプリが共有されました",
+		"invalid":     "リンクが無効です",
+		"invalidLead": "このシェアリンクは取り消されたか、存在しません。",
+		"see":         "App Store で Tailor It を見る",
+		"shared":      "アプリが共有されました",
+		"open":        "アプリで開く",
+		"get":         "App Store で入手",
+		"installH":    "Tailor It をまだ入れていない場合",
+		"installLead": "「アプリで開く」で開けない時は、Tailor It が入っていません。次の順で参加できます。",
+		"install1":    "「App Store で入手」から Tailor It をインストールします。",
+		"install2":    "Tailor It を開いて、サインインします。",
+		"install3":    "このページに戻って、もう一度「アプリで開く」を押すと参加できます(届いたリンクを開き直しても同じです)。",
+		"sample":      "この画面は見本です。記録されたデータは表示しません。",
+		"screens":     "画面",
+		"screen":      "画面",
+		"more":        "続きはアプリで見られます。",
+		"details":     "詳細",
+		"noData":      "データなし",
+		"records":     "記録はアプリで見られます",
+		"chart":       "グラフはアプリで見られます",
+		"photo":       "写真",
+		"rating":      "評価 %d 段階",
+		"inApp":       "アプリで見られます",
+	},
+	"en": {
+		"ogDefault":   "An app made with Tailor It was shared with you",
+		"invalid":     "This link is not valid",
+		"invalidLead": "This share link was revoked or does not exist.",
+		"see":         "See Tailor It on the App Store",
+		"shared":      "An app was shared with you",
+		"open":        "Open in the app",
+		"get":         "Get it on the App Store",
+		"installH":    "Don't have Tailor It yet?",
+		"installLead": "If \"Open in the app\" does nothing, Tailor It is not installed. Join in three steps:",
+		"install1":    "Install Tailor It from \"Get it on the App Store\".",
+		"install2":    "Open Tailor It and sign in.",
+		"install3":    "Come back to this page and tap \"Open in the app\" again to join (opening the link you received again works too).",
+		"sample":      "This is a preview. Recorded data is not shown.",
+		"screens":     "Screens",
+		"screen":      "Screen",
+		"more":        "See the rest in the app.",
+		"details":     "Details",
+		"noData":      "No data",
+		"records":     "Records are shown in the app",
+		"chart":       "Charts are shown in the app",
+		"photo":       "Photo",
+		"rating":      "Rating out of %d",
+		"inApp":       "Shown in the app",
+	},
+}
+
+// sharePages holds the page template per language.
+var sharePages = func() map[string]*template.Template {
+	out := map[string]*template.Template{}
+	for lang, text := range sharePageText {
+		t := func(key string) string { return text[key] }
+		out[lang] = template.Must(template.New("share").Funcs(template.FuncMap{"t": t}).Parse(sharePageSrc))
+	}
+	return out
+}()
+
+// shareLang picks ja or en from Accept-Language: the first ja / en tag in the
+// sender's order (q-values are not ranked; browsers list by preference).
+// No header keeps the original Japanese page; any other language gets en.
+func shareLang(accept string) string {
+	if strings.TrimSpace(accept) == "" {
+		return "ja"
+	}
+	for _, part := range strings.Split(accept, ",") {
+		tag, _, _ := strings.Cut(strings.TrimSpace(part), ";")
+		primary, _, _ := strings.Cut(strings.ToLower(strings.TrimSpace(tag)), "-")
+		if primary == "ja" || primary == "en" {
+			return primary
+		}
+	}
+	return "en"
+}
 
 // shareHidden reports whether the operator unpublished the shared app
 // (#321). Hidden apps get the invalid-link page, like a revoked share.
@@ -158,6 +248,7 @@ func shareCSP(nonce string) string {
 func SharePage(s store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page := webPage{StoreURL: AppStoreURL}
+		lang := shareLang(r.Header.Get("Accept-Language"))
 		tok := r.PathValue("token")
 		if idRe.MatchString(tok) {
 			if sh, err := s.GetShare(r.Context(), tok); err == nil && !sh.Revoked && !shareHidden(r.Context(), s, sh) {
@@ -166,7 +257,7 @@ func SharePage(s store.Store) http.HandlerFunc {
 				page.PageURL = webBase(r) + "/s/" + tok
 			}
 		}
-		page.Nonce = newNonce()
+		page.Lang, page.Nonce = lang, newNonce()
 		body, err := renderSharePage(page)
 		if err != nil {
 			slog.Warn("appconfig: share page render failed", slog.Any("error", err))
@@ -182,6 +273,7 @@ func SharePage(s store.Store) http.HandlerFunc {
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer") // the token is a capability
 		h.Set("X-Robots-Tag", "noindex, nofollow")
+		h.Set("Vary", "Accept-Language")
 		if !page.Found {
 			h.Set("Cache-Control", "no-store")
 			w.WriteHeader(http.StatusNotFound)
@@ -196,8 +288,13 @@ func SharePage(s store.Store) http.HandlerFunc {
 var errPageTooBig = errors.New("share page exceeds size limit")
 
 func renderSharePage(p webPage) ([]byte, error) {
+	tmpl, ok := sharePages[p.Lang]
+	if !ok {
+		tmpl = sharePages["ja"]
+		p.Lang = "ja"
+	}
 	var buf bytes.Buffer
-	if err := sharePage.Execute(&buf, p); err != nil {
+	if err := tmpl.Execute(&buf, p); err != nil {
 		return nil, err
 	}
 	if buf.Len() > maxSharePageBytes {

@@ -17,6 +17,27 @@ final class SharingUI {
     var issued: [String: ShareInfo] = [:]
     /// 記録を共有するアプリのリンクを開いた時の参加の確認(#254・`JoinShareSheet`)
     var pendingJoin: PendingJoin?
+
+    /// 受け取ったシェアリンク(#278)。サインイン前・bootstrap 前に届いた分も捨てずに持ち、準備ができてから 1 回だけ開く。
+    /// 未インストールの人が入れてから開き直すと、サインイン画面の上で届くため(RootView の onOpenURL では取りこぼす)。
+    private(set) var pendingLink: URL?
+    /// RootView の bootstrap が終わったか(`MetamonApp`)。サインアウトで false に戻す
+    var isReady = false
+
+    /// シェアリンクなら保留して true。それ以外の URL は false(触らない)。
+    @discardableResult
+    func receive(_ url: URL) -> Bool {
+        guard ShareURL.token(from: url) != nil else { return false }
+        pendingLink = url
+        return true
+    }
+
+    /// 準備済みなら保留中のリンクを渡して空にする。まだなら nil(保留は残す)。
+    func takeLink() -> URL? {
+        guard isReady, let url = pendingLink else { return nil }
+        pendingLink = nil
+        return url
+    }
 }
 
 extension AppRuntime {
@@ -116,6 +137,13 @@ extension AppRuntime {
     }
 }
 
+/// WindowGroup の根に付ける(#278): サインイン画面の時に届いたシェアリンクも `SharingUI` に保留する。
+struct ShareLinkReceiver: ViewModifier {
+    func body(content: Content) -> some View {
+        content.onOpenURL { url in SharingUI.shared.receive(url) }
+    }
+}
+
 /// RootView に 1 行で付ける: URL スキーム受信・「探す」シート・DEBUG の自動操作フック。
 struct SharingHooks: ViewModifier {
     @Environment(AppRuntime.self) private var rt
@@ -123,7 +151,10 @@ struct SharingHooks: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onOpenURL { url in Task { await rt.openShareURL(url) } }
+            // リンクの受信は `ShareLinkReceiver`(サインイン画面の時も届く)。ここでは準備ができたら開く(#278)
+            .task(id: "\(ui.isReady)|\(ui.pendingLink?.absoluteString ?? "")") {
+                if let url = ui.takeLink() { await rt.openShareURL(url) }
+            }
             .sheet(isPresented: $ui.showDiscover) { DiscoverSheet() }
             .sheet(item: $ui.pendingJoin) { JoinShareSheet(join: $0) }
             #if DEBUG

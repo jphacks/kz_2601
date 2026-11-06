@@ -155,7 +155,7 @@ struct VoiceFab: View {
         .accessibilityLabel("話しかけて変える")
         .accessibilityHint(L10n.key("長押しで変身一覧", review: "長押しで記録帳の一覧"))
         .accessibilityIdentifier("voice.fab")
-        .accessibilityAction(named: "変身一覧") { onLongPress() }
+        .accessibilityAction(named: L10n.key("変身一覧", review: "記録帳の一覧")) { onLongPress() }
         .accessibilityAction(named: "反対側へ移動") {
             withAnimation(snapAnimation) { sideRaw = (side == .leading ? FabSide.trailing : .leading).rawValue }
         }
@@ -206,7 +206,7 @@ struct VoiceFab: View {
             .accessibilityIdentifier("voice.fabHandle")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { reveal() }
-            .accessibilityAction(named: "変身一覧") { onLongPress() }
+            .accessibilityAction(named: L10n.key("変身一覧", review: "記録帳の一覧")) { onLongPress() }
     }
 
     private func reveal() {

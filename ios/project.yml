@@ -111,7 +111,7 @@ targets:
       - path: ../docs/dsl/examples
         buildPhase: resources
         type: group
-      # プライバシーポリシー・利用規約(#246)。公開 URL が決まるまでアプリ内で同梱版を表示する
+      # プライバシーポリシー・利用規約(#246)。アプリ内で同梱版を表示し、その画面から公開ページ(tailor-it.app)も開ける
       - path: ../docs/legal
         buildPhase: resources
         type: group

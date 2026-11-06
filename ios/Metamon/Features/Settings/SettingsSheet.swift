@@ -23,7 +23,9 @@ struct SettingsSheet: View {
             List {
                 if Self.e2eDeleteAccount { deleteAccountSection } // E2E: 削除ボタンを画面内に出す(シミュレータはスクロール操作できない)
                 accountSection
+                #if !APP_STORE_REVIEW // 審査用ビルドは共有を外しているので、投稿に出す名前も出さない(#247)
                 AuthorNameSettingsSection() // 共有アプリの投稿に出す名前(#250)
+                #endif
                 #if !APP_STORE_REVIEW // 審査用ビルドはシェアを外す(#245)
                 BlockedUsersSettingsSection() // ブロック中のユーザー(#321)
                 #endif
@@ -170,7 +172,8 @@ struct SettingsSheet: View {
             Text("アカウント")
         } footer: {
             if session.user?.isAnonymous == true {
-                Text("Apple でサインインすると、作ったアプリとデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、作ったアプリに戻れません。")
+                Text(L10n.key("Apple でサインインすると、作ったアプリとデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、作ったアプリに戻れません。",
+                               review: "Apple でサインインすると、用意した記録帳とデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、用意した記録帳に戻れません。"))
             }
         }
     }
@@ -382,6 +385,11 @@ struct SettingsSheet: View {
     private var supportSection: some View {
         let info = supportInfo
         return Section {
+            Link(destination: LegalDocument.contactURL) { // 審査用の版にも出す(サポートの窓口)
+                Label("お問い合わせ", systemImage: "envelope")
+            }
+            .font(.body)
+            .accessibilityIdentifier("settings.contact")
             DisclosureGroup(isExpanded: $showSupportDetails) {
                 ForEach(info.rows, id: \.label) { row in
                     LabeledContent(row.label) {

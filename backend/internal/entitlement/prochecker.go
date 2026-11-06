@@ -55,8 +55,8 @@ func (c *ProChecker) IsPro(ctx context.Context, uid string) bool {
 	e := proEntry{pro: p.Active(now, c.Environments), until: now.Add(c.NegTTL)}
 	if e.pro {
 		e.until = now.Add(c.PosTTL)
-		if p.ExpiresAt.Before(e.until) {
-			e.until = p.ExpiresAt
+		if p.Until().Before(e.until) {
+			e.until = p.Until()
 		}
 	}
 	c.mu.Lock()
