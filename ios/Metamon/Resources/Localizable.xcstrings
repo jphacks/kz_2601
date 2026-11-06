@@ -12802,6 +12802,23 @@
         }
       }
     },
+    "質問 %lld / %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Question %lld of %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "質問 %lld / %lld"
+          }
+        }
+      }
+    },
     "質問や変えたいことを入力" : {
       "extractionState" : "manual",
       "localizations" : {

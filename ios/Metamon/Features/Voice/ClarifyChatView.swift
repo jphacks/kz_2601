@@ -109,6 +109,9 @@ struct ClarifyChatView: View {
                             .id(bubble.id)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
+                    if !rt.chatPending, let n = QuestionProgress.number(bubbles: rt.chatBubbles, mode: rt.chatMode, latest: rt.chatTurn?.kind) {
+                        QuestionProgressLabel(number: n) // M5 あと何問か
+                    }
                     if rt.chatPending {
                         TypingIndicator()
                             .frame(maxWidth: .infinity, alignment: .leading)
