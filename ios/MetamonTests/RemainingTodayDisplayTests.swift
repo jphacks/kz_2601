@@ -45,7 +45,7 @@ final class RemainingTodayDisplayTests: XCTestCase {
         XCTAssertEqual(info, RateLimitInfo(scope: .user, tier: "anonymous", limit: 30, remaining: 0, resetAt: reset))
         let card = try XCTUnwrap(ErrorPresentation.from(.rateLimited(info), transcript: ""))
         XCTAssertEqual(card.title, "今日はここまでです", "0 の時は既存の上限のカードの文言")
-        XCTAssertNil(card.primary)
+        XCTAssertEqual(card.primary, .signInApple, "匿名の上限は Apple でサインインで増える(#648 M3)")
         if case .exhausted(let pro) = RemainingTodayDisplay.of(value(0, limit: 300), now: now, isPro: true, isAnonymous: true) {
             XCTAssertEqual(pro.tier, "pro")
         } else { XCTFail() }
