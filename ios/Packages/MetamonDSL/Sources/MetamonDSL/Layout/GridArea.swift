@@ -5,6 +5,8 @@ import Foundation
 public struct GridArea: Equatable, Sendable {
     public static let columns = 6
     public static let visibleRows = 12
+    /// 行の上限(backend `dsl.MaxGridRows` と同じ)。超える行はここに丸める(巨大な行で画面の高さが膨らんで固まらない)。
+    public static let maxRows = 48
 
     public var col1: Int, row1: Int, col2: Int, row2: Int
 
@@ -18,7 +20,7 @@ public struct GridArea: Equatable, Sendable {
     private static func cell(_ s: Substring) -> (col: Int, row: Int)? {
         guard let first = s.first, let ascii = first.asciiValue, (65...70).contains(ascii),
               let row = Int(s.dropFirst()), row >= 1 else { return nil }
-        return (Int(ascii) - 65, row)
+        return (Int(ascii) - 65, min(row, maxRows))
     }
 
     public var colSpan: Int { col2 - col1 + 1 }

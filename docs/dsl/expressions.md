@@ -72,7 +72,7 @@ Expr := number | string | boolean
 | 日付 | `now` `today` | なし(`args: []`) | 日時 / 今日の日付(端末ローカル) |
 | | `daysBetween` | (a, b) | 数値 = b − a の日数 |
 | | `daysUntil` | (d) | 数値 = d − 今日 の日数(過ぎたら負) |
-| | `addDays` | (d, n) | 日付 = d の n 日後 |
+| | `addDays` | (d, n) | 日付 = d の n 日後(n は四捨五入。絶対値が 100000 日 = 約 273 年を超えると「—」) |
 | | `nextOccurrence` | (d, `"monthly"` \| `"yearly"`) | 日付 = d から毎月 / 毎年くり返す日のうち、**今日以降で最も近い日**(0:00)。d が今日以降なら d。日が無い月は月末に寄せる(§3.1)。第 2 引数は文字列リテラルだけ(#266) |
 | 時刻 | `hoursBetween` | (start, end) | 数値 = end − start の時間数(小数。30 分 = 0.5)。**end < start は日付またぎとして +24h**(22:00→05:00 = 7)。同じ時刻は 0 |
 | | `year` `month` `day` `weekday` | (d) | 数値(month 1-12、weekday 1=日 … 7=土) |
@@ -95,7 +95,7 @@ Expr := number | string | boolean
 
 `streak` / `doneInDays` の第 1 引数は**値ではなく field の指定**: `list.item.resets: "daily"` の toggle に使われている同 entity の date field を `{"ref": ...}` で渡す(iOS はその行の「押した日の履歴」を読む・§7.5)。computed(integer)で使い、全体の値は stat.value の `agg sum / max` でその computed を集計する。stat.value 直下では行が無いので使えない。
 
-時刻引数(`hoursBetween`)は `"HH:mm"`(`"H:mm"`・`"HH:mm:ss"` も可)の文字列 = `timePicker` が string field に保存する形。datetime を渡したときは**その時刻部分だけ**を使う(日付は無視)。数値・真偽は backend が拒否する(`toNumber("09:30")` は 9.5 にならないので、時刻を数値化して引き算しない)。日付をまたいで 24 時間以上働く・2 日以上空く計算は対象外(§8)。iOS の `timePicker` は未入力の時も今の時刻を表示するので、表示中の時刻をそのまま保存値にする(触らずに保存して時刻が空 = 勤務時間「—」にならない・#229)。
+時刻引数(`hoursBetween`)は `"HH:mm"`(`"H:mm"`・`"HH:mm:ss"` も可)の文字列で、`00:00`〜`23:59` だけ(`24:00` 以降は「—」) = `timePicker` が string field に保存する形。datetime を渡したときは**その時刻部分だけ**を使う(日付は無視)。数値・真偽は backend が拒否する(`toNumber("09:30")` は 9.5 にならないので、時刻を数値化して引き算しない)。日付をまたいで 24 時間以上働く・2 日以上空く計算は対象外(§8)。iOS の `timePicker` は未入力の時も今の時刻を表示するので、表示中の時刻をそのまま保存値にする(触らずに保存して時刻が空 = 勤務時間「—」にならない・#229)。
 
 ## 4. 置き場所
 
