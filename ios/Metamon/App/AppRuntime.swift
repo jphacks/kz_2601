@@ -381,6 +381,8 @@ final class AppRuntime: DSLRuntime {
     @ObservationIgnored private var pendingHotReload: AppDocument?
     @ObservationIgnored private var pendingHotReloadTask: Task<Void, Never>?
     @ObservationIgnored private var recordsRefreshTasks: [String: Task<Void, Never>] = [:]
+    /// 保存中のフォーム(saveRecord の連打で同じ記録を 2 件作らない)
+    @ObservationIgnored private var savingForms: Set<ObjectIdentifier> = []
 
     /// シート / 全画面 / push 先 / 音声シートが開いている = 入力や操作の途中。DSL を差し替えるとフォームの下書きが消えるので待つ。
     private var isInteracting: Bool {
@@ -1092,6 +1094,9 @@ final class AppRuntime: DSLRuntime {
                 authorNamePrompt = AuthorNamePrompt { [weak self] in await self?.perform(action, ctx) }
                 return
             }
+            // 保存ボタンの連打: 1 回目のローカル保存を待つ間に 2 回目が来ると、新規なら同じ内容が 2 件できる
+            guard savingForms.insert(ObjectIdentifier(form)).inserted else { return }
+            defer { savingForms.remove(ObjectIdentifier(form)) }
             // 楽観的 UI: ローカル DB に即反映して画面を進める。appconfig への送信は recordSync のキューが行う
             let payload = form.payload
             let isNew = form.recordId == nil
