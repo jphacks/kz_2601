@@ -89,8 +89,8 @@ func main() {
 		entitlement.NewProChecker(entitlement.NewFirestore(st.Client()), policy.Environments))
 	q.Logger = logger
 	env := outboxEnv(os.Getenv("APP_ENV"))
-	// No device-token store yet (#269) and no APNs key here: notifications
-	// are resolved and counted, and LogSender logs their shape only.
+	// No APNs key here yet: notifications are resolved against the stored
+	// devices and consents (#269) and counted, and LogSender logs their shape only.
 	r, err := runner.New(runner.Config{Env: env, Store: st, Quota: q, Paused: pausedFromEnv(os.Getenv), Logger: logger})
 	if err != nil {
 		logger.Error("runner: init failed", slog.Any("error", err))

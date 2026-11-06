@@ -4,7 +4,8 @@
 // against the handle's appId, and records can be read only when they are the
 // trigger record or a record its ref fields point to.
 //
-// It implements engine.RefReader and notify.Directory / notify.Accounts.
+// It implements engine.RefReader and notify.Directory / notify.Accounts /
+// notify.Consent, and reads device tokens (#269).
 package scope
 
 import (
@@ -47,6 +48,9 @@ type Backend interface {
 	CreateRecord(ctx context.Context, rs store.RecordSet, rec store.Record) (*store.Record, bool, error)
 	UserDeleted(ctx context.Context, uid string) (bool, error)
 	ListBlocks(ctx context.Context, uid string) ([]store.Block, error)
+	ListDevices(ctx context.Context, uid string) ([]store.Device, error)
+	DeleteDeviceToken(ctx context.Context, uid, token string) (int, error)
+	NotifyAllowed(ctx context.Context, uid, appID string) (bool, error)
 	store.RunnerWrites
 }
 
@@ -71,6 +75,7 @@ var (
 	_ engine.RefReader = (*Handle)(nil)
 	_ notify.Directory = (*Handle)(nil)
 	_ notify.Accounts  = (*Handle)(nil)
+	_ notify.Consent   = (*Handle)(nil)
 )
 
 // New binds a handle to the app of ev (an outbox event of env).
@@ -284,6 +289,36 @@ func (h *Handle) Blocks(ctx context.Context, uid string) ([]string, error) {
 		out = append(out, b.UID)
 	}
 	return out, nil
+}
+
+// ---- notify.Consent and devices (#269, #339) ---------------------------------------
+
+// Allows implements notify.Consent: uid's stored consent for this app.
+func (h *Handle) Allows(ctx context.Context, uid string) (bool, error) {
+	return h.b.NotifyAllowed(ctx, uid, h.appID)
+}
+
+// DeviceTokens are uid's tokens valid on the APNs environment env (all when
+// env is ""). The notifier asks only for recipients that passed the checks
+// (#337: tokens are personal data across apps).
+func (h *Handle) DeviceTokens(ctx context.Context, uid, env string) ([]string, error) {
+	ds, err := h.b.ListDevices(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, d := range ds {
+		if env == "" || d.Environment == env {
+			out = append(out, d.Token)
+		}
+	}
+	return out, nil
+}
+
+// DropDeviceToken deletes uid's devices holding token (APNs 410).
+func (h *Handle) DropDeviceToken(ctx context.Context, uid, token string) error {
+	_, err := h.b.DeleteDeviceToken(ctx, uid, token)
+	return err
 }
 
 // ---- writes -----------------------------------------------------------------------

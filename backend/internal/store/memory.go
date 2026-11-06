@@ -47,6 +47,11 @@ type Memory struct {
 	deleted map[string]time.Time // uid -> deletedAt of DELETE /v1/me (memory_account.go)
 	purged  map[string]bool      // uids erased by PurgeAccount + MarkAccountPurged
 
+	// devices and consent (#269, memory_device.go)
+	devices      map[string]map[string]*Device        // users/{uid}/devices/{installationId}
+	deviceTokens map[string]deviceRef                 // device_tokens/{tokenKey}
+	consents     map[string]map[string]*NotifyConsent // users/{uid}/notifyConsent/{appId}
+
 	// feedback
 	feedback map[string]*Feedback // feedback/{id} (memory_feedback.go)
 

@@ -169,6 +169,8 @@ type Store interface {
 	Feedbacks       // in-app feedback (feedback.go)
 	Moderation      // reports, blocks, operator unpublish (moderation.go, #321)
 	Matching        // interests and matches of matching apps (matching.go, #507)
+	Devices         // push tokens of users' devices (device.go, #269)
+	NotifyConsents  // recipients' consent to others' notifications (device.go, #339)
 	Outbox          // record writes that queue runner triggers (outbox.go, #341)
 }
 

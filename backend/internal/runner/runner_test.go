@@ -129,6 +129,8 @@ type harness struct {
 type options struct {
 	pro fakePro
 	age notify.AccountAge
+	// storeDevices: read devices and consents from the store (#269) instead of h.tokens.
+	storeDevices bool
 }
 
 func stores(t *testing.T, opts options, f func(t *testing.T, h *harness)) {
@@ -163,10 +165,14 @@ func newHarness(t *testing.T, st runnerStore, sfx string, opts options) *harness
 	q := quota.New(quota.Config{Limits: lim, Env: env}, nil, opts.pro)
 	logger := slog.New(slog.NewJSONHandler(h.logs, nil))
 	q.Logger = logger
-	r, err := runner.New(runner.Config{
+	cfg := runner.Config{
 		Env: env, Store: st, Quota: q, Sender: h.sender, Tokens: h.tokens, Age: opts.age,
 		Paused: func() bool { return h.paused }, Now: func() time.Time { return h.clock }, Logger: logger,
-	})
+	}
+	if opts.storeDevices {
+		cfg.Tokens = nil
+	}
+	r, err := runner.New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
