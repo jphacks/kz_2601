@@ -74,6 +74,7 @@ type outboxPlan struct {
 	heavy   map[string]bool
 	actor   string
 	anon    bool
+	tz      string // the creator's zone when the writer is the creator ("" = the runner looks it up)
 }
 
 // outboxPlanFor returns the plan for a kind (dsl.TriggerCreated / Updated)
@@ -94,12 +95,15 @@ func (h *Handler) outboxPlanFor(r *http.Request, cur *store.App, ent *dsl.Entity
 			return nil, err // only the creator's mirror counts
 		}
 		p.rules, p.version = a, pub.Version
+		if owner == p.actor {
+			p.tz = headerTimeZone(r)
+		}
 	} else {
 		a, err := h.parsedDSL(uidOf(r), cur)
 		if err != nil {
 			return nil, err
 		}
-		p.rules, p.version, p.uid = a, cur.CurrentVersion, uidOf(r)
+		p.rules, p.version, p.uid, p.tz = a, cur.CurrentVersion, uidOf(r), headerTimeZone(r)
 	}
 	src := p.rules.EntityByID(ent.ID)
 	// the declaring DSL must put the records on the same side as the write
@@ -149,7 +153,7 @@ func (p *outboxPlan) emit() store.EmitFunc {
 			Env: p.env, Kind: kind, AppID: p.appID, Scope: string(p.scope), UID: p.uid,
 			Entity: p.entity, RecordID: next.ID, Author: next.Author, Version: p.version,
 			RuleIDs: ids, ChangedFields: changed, Data: pickFields(next.Data, fields),
-			ActorUID: p.actor, ActorAnonymous: p.anon,
+			ActorUID: p.actor, ActorAnonymous: p.anon, TimeZone: p.tz,
 		}
 		if prev != nil {
 			ev.Prev = pickFields(prev.Data, fields)

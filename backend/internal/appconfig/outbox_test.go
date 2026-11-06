@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/jphacks/kz_2601/backend/internal/store"
@@ -70,8 +71,14 @@ type outboxReader interface {
 	OutboxEvents(ctx context.Context, env string, limit int) ([]store.OutboxEvent, error)
 }
 
-// outboxFor returns env's events of appID.
+// outboxFor returns env's record-trigger events of appID.
 func outboxFor(t *testing.T, st store.Store, env, appID string) []store.OutboxEvent {
+	t.Helper()
+	return outboxKinds(t, st, env, appID, store.OutboxRecordCreated, store.OutboxRecordUpdated)
+}
+
+// outboxKinds returns env's events of appID of the given kinds.
+func outboxKinds(t *testing.T, st store.Store, env, appID string, kinds ...string) []store.OutboxEvent {
 	t.Helper()
 	all, err := st.(outboxReader).OutboxEvents(t.Context(), env, 0)
 	if err != nil {
@@ -79,7 +86,7 @@ func outboxFor(t *testing.T, st store.Store, env, appID string) []store.OutboxEv
 	}
 	var out []store.OutboxEvent
 	for _, ev := range all {
-		if ev.AppID == appID {
+		if ev.AppID == appID && slices.Contains(kinds, ev.Kind) {
 			out = append(out, ev)
 		}
 	}
