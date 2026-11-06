@@ -35,6 +35,8 @@ public protocol SpeechTranscriber: AnyObject {
     var lastDiagnostics: TranscriberDiagnostics? { get }
     /// 端末にモデルが無く、prepare するとダウンロードが始まるか(#246: その前にサイズを示して確認する)。
     var needsDownload: Bool { get }
+    /// 本命のモデルの準備中で、仮の聞き取り(端末内の Apple の音声認識・U5)を使っているか。画面に「簡易の聞き取り」と出す。
+    var isProvisional: Bool { get }
 }
 
 public extension SpeechTranscriber {
@@ -42,6 +44,7 @@ public extension SpeechTranscriber {
     var downloadProgress: Double { 0 }
     var lastDiagnostics: TranscriberDiagnostics? { nil }
     var needsDownload: Bool { false }
+    var isProvisional: Bool { false }
     func cancelRecording() {}
 }
 
@@ -88,6 +91,10 @@ public enum TranscriberFailure: LocalizedError, Equatable, Sendable {
     case tooShort(seconds: Double)
     /// サンプルは届いたが全て 0 付近(ミュート/マイク故障/入力ルート不正)
     case silent(seconds: Double, peakDecibels: Float)
+    /// 仮の聞き取り(Apple の端末内の音声認識)の許可が無い(U5)。文字の入力を案内する
+    case speechRecognitionDenied
+    /// この端末・言語では端末内の音声認識が使えない(サーバーへ送る認識は使わない・U5)
+    case onDeviceRecognitionUnavailable
 
     public var errorDescription: String? {
         switch self {
@@ -98,6 +105,8 @@ public enum TranscriberFailure: LocalizedError, Equatable, Sendable {
         case .noAudioCaptured(let s): return String(format: "マイクから音声が届きませんでした(録音%.1f秒・0サンプル)。他のアプリの通話/録音を終了して再試行してください", s)
         case .tooShort(let s): return String(format: "録音が短すぎました(%.1f秒)。タップしてから話し、話し終えてからもう一度タップしてください", s)
         case .silent(let s, let db): return String(format: "音声が小さすぎました(録音%.1f秒・音量%.0fdB)。マイクに向かって話してください", s, db)
+        case .speechRecognitionDenied: return "音声認識の許可がありません。音声モデルの準備ができるまでは、文字で入力してください"
+        case .onDeviceRecognitionUnavailable: return "この端末では音声モデルの準備ができるまで声で入力できません。文字で入力してください"
         }
     }
 }

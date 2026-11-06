@@ -80,6 +80,8 @@ enum ErrorCopy {
         case .noAudioCaptured(let s): L10n.tr("マイクから音声が届きませんでした(録音\(seconds(s))秒・0サンプル)。他のアプリの通話/録音を終了して再試行してください")
         case .tooShort(let s): L10n.tr("録音が短すぎました(\(seconds(s))秒)。タップしてから話し、話し終えてからもう一度タップしてください")
         case .silent(let s, let db): L10n.tr("音声が小さすぎました(録音\(seconds(s))秒・音量\(Int(db.rounded()))dB)。マイクに向かって話してください")
+        case .speechRecognitionDenied: L10n.tr("音声認識の許可がありません。音声モデルの準備ができるまでは、文字で入力してください")
+        case .onDeviceRecognitionUnavailable: L10n.tr("この端末では音声モデルの準備ができるまで声で入力できません。文字で入力してください")
         }
     }
     static func message(for error: Error) -> String {

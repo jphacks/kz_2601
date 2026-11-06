@@ -163,6 +163,7 @@ enum BuildConfig {
     }
 
     /// 実機 = WhisperKit(モック API でも音声認識は本物)。シミュレータは CoreML/ANE が使えず実用不可なのでモック(文字入力フォールバック)。
+    /// WhisperKit の準備ができるまでは、Apple の端末内の音声認識で仮に聞き取る(U5・端末内で使えない時は使わない)。
     @MainActor
     static func makeTranscriber() -> any SpeechTranscriber {
         #if targetEnvironment(simulator)
@@ -170,7 +171,8 @@ enum BuildConfig {
         #else
         let recognizer = WhisperKitRecognizer(model: whisperModel)
         recognizer.language = { LanguagePreference.shared.code } // 認識言語は UI 言語に合わせる(#45)
-        return recognizer
+        let provisional = AppleOnDeviceTranscriber(language: { LanguagePreference.shared.code })
+        return FallbackTranscriber(primary: recognizer, provisional: provisional)
         #endif
     }
 }

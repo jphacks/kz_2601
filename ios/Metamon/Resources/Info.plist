@@ -111,6 +111,9 @@
 	<!-- ネイティブ機能の権限説明(P0: マイク/カメラ/通知、P1: 位置/モーション) -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>話しかけた内容からアプリを生成するため、また生成したアプリで動画やドラレコの音声、ボイスメモ・会議などを録音するために、マイクを使用します。</string>
+	<!-- U5: 音声モデル(WhisperKit)の準備中だけ、Apple の端末内の音声認識(requiresOnDeviceRecognition)で仮に聞き取る。声は端末の外に送らない -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>音声モデルの準備ができるまでの間、話した内容をこの端末の中で文字にするために、音声認識を使用します。声は端末の外に送りません。</string>
 	<key>NSAppleMusicUsageDescription</key>
 	<string>生成したアプリの音楽プレーヤーで、Apple Music の曲を検索して再生するために使用します。</string>
 	<key>NSCameraUsageDescription</key>
