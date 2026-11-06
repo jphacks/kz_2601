@@ -55,6 +55,7 @@ struct LocationPickerLeaf: View {
                 PlacePicking.apply(place, to: &form.values, field: field, nameField: c.nameField)
                 pickedName = place.name
             }
+            .aiButtonTarget(c) // #629 シートの中にも AI ボタン
         }
     }
 
@@ -105,6 +106,7 @@ struct LocationPickerSheet: View {
                     Button(L("キャンセル")) { dismiss() }
                 }
             }
+            .aiButtonLayer()
             .task(id: query) {
                 let q = query
                 guard !q.trimmingCharacters(in: .whitespaces).isEmpty else { results = []; return }
