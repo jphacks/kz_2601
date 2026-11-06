@@ -379,6 +379,11 @@ type exprChecker struct {
 	// daily (streak / doneInDays read their history). nil = not checked.
 	daily   map[string]map[string]bool
 	tooDeep bool
+	// server (#340): a server rule's expression (no agg / device history).
+	// prev is the entity whose "$prev.<field>" (value before an update) may
+	// be read; nil = not allowed.
+	server bool
+	prev   *Entity
 }
 
 func (c *exprChecker) dep(e *Entity, fid string) {
@@ -429,6 +434,9 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 		if e.Ref == "id" {
 			return tStr
 		}
+		if c.server && strings.HasPrefix(e.Ref, PrevPrefix) {
+			return c.checkPrev(where, e.Ref)
+		}
 		if strings.Contains(e.Ref, ".") {
 			return c.checkLookup(where, e.Ref, row)
 		}
@@ -440,14 +448,25 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 		c.dep(row, f.ID)
 		return fieldExprType(f.Type)
 	case ExprAgg:
+		if c.server {
+			c.add("%s: agg is not available in server rules yet (read only the trigger record's fields)", where)
+			return tAny
+		}
 		return c.checkAgg(where, e.Agg, row, depth)
 	case ExprSetting:
+		if c.server {
+			c.add("%s: {\"setting\":%q} is not available in server rules (a setting is each user's own value, so the rule cannot tell whose to read)", where, e.Setting)
+			return tAny
+		}
 		return c.checkSetting(where, e.Setting)
 	case ExprOp:
 		spec, ok := Ops[e.Op]
 		if !ok {
 			c.add("%s: unknown op %q (allowed: %s)", where, e.Op, strings.Join(sortedOps(), " "))
 			return tAny
+		}
+		if c.server && (e.Op == "streak" || e.Op == "doneInDays") {
+			c.add("%s: op %s reads the device's check history and is not available in server rules", where, e.Op)
 		}
 		n := len(e.Args)
 		switch {

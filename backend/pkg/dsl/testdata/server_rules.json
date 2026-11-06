@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "app": {"name": "サークルの予定", "voiceEntry": "floating"},
+  "initialScreen": "home",
+  "entities": [
+    {"id": "events", "name": "予定", "scope": "shared", "titleField": "title", "fields": [
+      {"id": "title", "name": "タイトル", "type": "string", "required": true},
+      {"id": "date", "name": "日付", "type": "date"},
+      {"id": "status", "name": "状態", "type": "enum", "options": ["予定", "確定", "中止"]},
+      {"id": "yes_count", "name": "参加の数", "type": "integer"}
+    ]},
+    {"id": "rsvps", "name": "出欠", "scope": "shared", "fields": [
+      {"id": "event", "name": "予定", "type": "ref", "refEntity": "events", "required": true},
+      {"id": "answer", "name": "回答", "type": "enum", "options": ["yes", "no"], "required": true}
+    ]},
+    {"id": "messages", "name": "メッセージ", "scope": "shared", "fields": [
+      {"id": "body", "name": "本文", "type": "text", "required": true}
+    ]},
+    {"id": "log", "name": "変更の記録", "scope": "shared", "fields": [
+      {"id": "note", "name": "メモ", "type": "string", "required": true}
+    ]}
+  ],
+  "screens": [
+    {"id": "home", "title": "予定", "components": [
+      {"type": "list", "entity": "events", "item": {"title": "title", "subtitle": "date"}}
+    ]}
+  ],
+  "serverRules": [
+    {"id": "notify_rsvp", "on": {"record": "created", "entity": "rsvps"},
+     "if": {"op": "eq", "args": [{"ref": "answer"}, "yes"]},
+     "do": [
+       {"notify": {"to": {"kind": "authorOf", "field": "event"}, "title": "出欠", "body": "{$author}さんが参加にしました"}},
+       {"increment": {"ref": "event", "field": "yes_count"}}
+     ]},
+    {"id": "new_message", "on": {"record": "created", "entity": "messages"},
+     "do": [{"notify": {"to": {"kind": "members"}, "title": "新着メッセージ", "body": "{$author}: {body}"}}]},
+    {"id": "status_changed", "on": {"record": "updated", "entity": "events", "fields": ["status"]},
+     "if": {"op": "neq", "args": [{"ref": "$prev.status"}, {"ref": "status"}]},
+     "do": [
+       {"notify": {"to": {"kind": "members"}, "title": "予定が変わりました", "body": "{title} は {status} になりました"}},
+       {"createRecord": {"entity": "log", "values": {"note": {"op": "concat", "args": ["状態の変更: ", {"ref": "title"}]}}}}
+     ]},
+    {"id": "morning", "on": {"every": "weekly", "weekday": "mon", "time": "09:00"},
+     "do": [{"notify": {"to": {"kind": "owner"}, "title": "今週の予定", "body": "今週の予定を見直しましょう"}}]}
+  ]
+}

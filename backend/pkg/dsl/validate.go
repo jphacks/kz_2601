@@ -267,6 +267,7 @@ func (a *App) Validate() error {
 	checkHiddenFields(a, entities, add)
 	checkMatching(a, add)
 	checkSingleEntities(a, entities, add)
+	checkServerRules(a, entities, add)
 
 	notifIDs := map[string]bool{}
 	for i := range a.App.Notifications {
