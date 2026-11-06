@@ -105,19 +105,21 @@ func TestFileImportSemanticErrors(t *testing.T) {
 	}
 }
 
-// member (#272) holds a participant uid, which a CSV cell cannot name.
+// member (#272) and members (#271) hold participant uids, which a CSV cell cannot name.
 func TestFileImportRejectsMemberField(t *testing.T) {
-	app := importApp()
-	shift := Entity{ID: "shift", Name: "シフト", TitleField: "day", Scope: ScopeShared, Fields: []Field{
-		{ID: "day", Name: "日", Type: FieldString, Required: true},
-		{ID: "staff", Name: "担当", Type: FieldMember},
-	}}
-	app.Entities = append(app.Entities, shift)
-	app.Screens[0].Components = []Component{{Type: CompFileImport, Entity: "shift", Accept: []string{"csv"},
-		Map: []ImportColumn{{Column: "担当", Field: "staff"}}}}
-	err := app.Validate()
-	if err == nil || !strings.Contains(err.Error(), `field "staff" is member`) {
-		t.Fatalf("want the member problem, got %v", err)
+	for _, tp := range []FieldType{FieldMember, FieldMembers} {
+		app := importApp()
+		shift := Entity{ID: "shift", Name: "シフト", TitleField: "day", Scope: ScopeShared, Fields: []Field{
+			{ID: "day", Name: "日", Type: FieldString, Required: true},
+			{ID: "staff", Name: "担当", Type: tp},
+		}}
+		app.Entities = append(app.Entities, shift)
+		app.Screens[0].Components = []Component{{Type: CompFileImport, Entity: "shift", Accept: []string{"csv"},
+			Map: []ImportColumn{{Column: "担当", Field: "staff"}}}}
+		err := app.Validate()
+		if err == nil || !strings.Contains(err.Error(), `field "staff" is `+string(tp)) {
+			t.Fatalf("%s: want the participant problem, got %v", tp, err)
+		}
 	}
 }
 

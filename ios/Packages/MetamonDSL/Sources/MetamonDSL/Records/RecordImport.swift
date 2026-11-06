@@ -132,7 +132,7 @@ public enum RecordImport {
     /// 見出し → 使える field。`map` が先、残りは見出しが field の name か id と同じ列(前後の空白・大文字小文字は無視)。
     /// 計算項目・写真・動画・録音・参加者(member・uid は CSV に書けない)には当てない。1 つの field に当てるのは最初の列だけ。
     public static func columns(headers: [String], entity: Entity, map: [ImportColumn]) -> [Int: Field] {
-        let usable = entity.storedFields.filter { ![.photo, .video, .audio, .member].contains($0.type) }
+        let usable = entity.storedFields.filter { ![.photo, .video, .audio, .member, .members].contains($0.type) }
         let key = { (s: String) in s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
         var out: [Int: Field] = [:]
         var used = Set<String>()
@@ -249,7 +249,7 @@ public enum RecordImport {
             let parts = s.split(separator: ",").map { Double($0.trimmingCharacters(in: .whitespaces)) }
             guard parts.count == 2, let lat = parts[0], let lng = parts[1], abs(lat) <= 90, abs(lng) <= 180 else { return .invalid(.invalid) }
             return .value(.string(s.replacingOccurrences(of: " ", with: "")))
-        case .photo, .video, .audio, .member:
+        case .photo, .video, .audio, .member, .members:
             return .empty
         }
     }

@@ -123,8 +123,8 @@ func checkImportMap(where string, m []ImportColumn, e *Entity, add func(string, 
 			add("%s: field %q is computed (read-only)", at, f.ID)
 		case f.Type == FieldPhoto || f.Type == FieldVideo || f.Type == FieldAudio:
 			add("%s: field %q is %s; a CSV cell cannot hold it", at, f.ID, f.Type)
-		case f.Type == FieldMember:
-			add("%s: field %q is member (a participant uid); a CSV cell cannot hold it", at, f.ID)
+		case f.Type == FieldMember || f.Type == FieldMembers:
+			add("%s: field %q is %s (participant uids); a CSV cell cannot hold it", at, f.ID, f.Type)
 		case fields[f.ID]:
 			add("%s: field %q is mapped twice", at, f.ID)
 		}
