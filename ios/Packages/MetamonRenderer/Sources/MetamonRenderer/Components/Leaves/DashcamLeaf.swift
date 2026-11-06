@@ -48,7 +48,7 @@ struct DashcamLeaf: View {
             }
         }
         .sheet(isPresented: $showClips) {
-            if let recorder { DashcamClipsSheet(recorder: recorder) }
+            if let recorder { DashcamClipsSheet(recorder: recorder).aiButtonTarget(c) } // #629
         }
     }
 
@@ -266,6 +266,7 @@ private struct DashcamClipsSheet: View {
             .navigationTitle(L("保存した映像"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button(L("閉じる")) { dismiss() } } }
+            .aiButtonLayer()
         }
     }
 }

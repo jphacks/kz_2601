@@ -1,6 +1,7 @@
 import SwiftUI
 import Observation
 import MetamonServices
+import MetamonRenderer
 
 /// 画面マップ(#116)の表示状態と「この画面について話す」の文脈。変身一覧・設定・音声シートの間で共有する。
 @MainActor
@@ -34,6 +35,8 @@ final class ScreenMapUI {
 struct ScreenContext: Equatable {
     var id: String
     var title: String
+    /// 部品から開いたシートの AI ボタンで押した時の部品(#629)
+    var component: AIButtonComponent?
 }
 
 extension AppRuntime {
@@ -50,7 +53,16 @@ extension AppRuntime {
 }
 
 enum ScreenMapCopy {
-    static func contextPrefix(_ s: ScreenContext) -> String { L10n.tr("画面「\(s.title)」(id: \(s.id))で: ") }
+    static func contextPrefix(_ s: ScreenContext) -> String {
+        if let c = s.component { return L10n.tr("画面「\(s.title)」(id: \(s.id))の部品「\(c.label)」(id: \(c.id))で: ") }
+        return L10n.tr("画面「\(s.title)」(id: \(s.id))で: ")
+    }
+
+    /// 音声シートの上のチップの文言。
+    static func chipText(_ s: ScreenContext) -> String {
+        if let c = s.component { return L10n.tr("画面「\(s.title)」の「\(c.label)」について話す") }
+        return L10n.tr("画面「\(s.title)」について話す")
+    }
     static var title: String { L10n.tr("画面マップ") }
 }
 
@@ -123,7 +135,7 @@ struct ScreenContextChip: View {
             HStack(spacing: Theme.Spacing.sm) {
                 Image(systemName: "point.3.connected.trianglepath.dotted")
                     .foregroundStyle(Theme.brandGradient)
-                Text(L10n.tr("画面「\(screen.title)」について話す"))
+                Text(ScreenMapCopy.chipText(screen))
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                 Button { ui.context = nil } label: {
