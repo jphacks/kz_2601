@@ -23,6 +23,9 @@ const CodeBadOutput = "bad_output"
 
 const CodeBadRequest = "bad_request"
 
+// another record of the entity has the same entity.unique values (#273)
+const CodeDuplicateRecord = "duplicate_record"
+
 const CodeForbidden = "forbidden"
 
 const CodeGenerationFailed = "generation_failed"

@@ -55,6 +55,7 @@ Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|me
   Entity.marks?: [{ id, icon, label }](共有 entity の 1 人 1 回の印・いいね / 保存)・ListItem.mark? / 予約値 $marks.<id>(件数・自分が付けたか)— §3.5
   Entity.retentionDays?: 1〜3650(記録の保存期間。期限を過ぎた記録を端末が自動で消す)— §3.7
   Entity.single?: true(設定値の置き場。レコードは常に 1 件・式 {"setting": "<fieldId>"} で読む)— §3.11
+  Entity.unique?: [fieldId|$author](1〜3・一意)/ deleteBy?: author|admins|authorOrAdmins・Field.editableBy?: "admins"・Field.type "member"・button.visibleTo?: "admins" — §3.13
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
 Leaf (44 種・全て id? と area? を持つ) / Action (12 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
@@ -438,6 +439,24 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - 人が読める説明は `App.DescribeServerRule`(例: 「出欠」が作られた時(条件に合えば)、「予定」を作った人に通知・「予定」の「参加の数」を数える)。「このアプリの自動の動き」の一覧(#347)で使う。
 - 古い iOS: `AppDSL` はトップの未知キーを読まないので、`serverRules` があっても今までどおり開ける。
 - AI の生成(#343): 生成用スキーマ(`ai.GenerationSchema()`)には入れず、依頼が自動の動き(通知・定期・数える など)を含む時だけ、UI の生成の後に別の小さな呼び出し(`backend/internal/ai/server_rules_pass.go`・専用スキーマ `ServerRulesGenerationSchema()`・`createRecord` / `updateRecord` の `values` はそこだけ `[{field, value}]` の配列)で `serverRules` 全体を書く。結果は `Validate()` を通し、通らなければ問題を添えて再生成、最後まで通らなければルール無しで保存して summary で断る。作ったルールは `DescribeServerRule` の文で summary に出る。`AI_SERVER_RULES=1` の時だけ動く(既定は無効)。
+
+### 3.13 管理者の権限と重複の防止(#272 #273・M4)
+
+「店長だけが確定できる」「削除は管理者だけ」「同じ時間に 2 人予約できないように」「1 人 1 回答」を宣言で書く。守るのはサーバー(appconfig)で、iOS は表示を合わせるだけ。実装: `backend/pkg/dsl/data_rules.go`(検証)・`backend/internal/appconfig/data_rules.go`(権限と 409)・`backend/internal/store/unique.go`(一意の予約)。
+
+| 書く場所 | 形 | 意味 | 制約(`Validate()`) |
+|---|---|---|---|
+| 管理者(DSL 外) | `PATCH /apps/{appId}/members/{uid}` `{"admin": true}` | 作った人が最初の管理者(外せない)。管理者は参加者を管理者にでき、自分でやめられる(`me`)。`GET /members` の各行と最上位に `admin` | — |
+| `field.editableBy` | `"admins"` | その項目を入れる・変えるのは管理者だけ(作成で既定値・空以外を入れる / 更新で値を変える → 403 `details.reason: admins_only`)。管理者は**他人のレコードでもその項目だけ**変えられる(entity の `edit` によらない) | shared / public の保存する field |
+| `entity.deleteBy` | `author`(省略時)/ `admins` / `authorOrAdmins` | 誰が消せるか。全件削除(`DELETE .../records`)は、管理者なら全員の分・`admins` で管理者でなければ 403 | shared / public・match / single 以外 |
+| `button.visibleTo` | `"admins"` | 管理者にだけボタンを出す(表示だけ。守る値には editableBy / deleteBy も付ける) | button だけ・shared / public の entity があるアプリ |
+| `field.type: "member"` | 参加者の uid(文字列) | 担当者・当番。入力は picker(参加者の表示名が並ぶ)、一覧は表示名。参加者でない uid は 422 | scope `shared` の entity だけ・defaultValue 不可・入力は picker |
+| `entity.unique` | `["slot"]`・`["day","slot"]`・`["$author"]`・`["event","$author"]`(1〜3 個) | 全部が同じレコードは 1 件だけ。違反は **409 `duplicate_record`**(`details.reason: duplicate`・`details.fields`) | field は string / integer / number / currency / boolean / date / datetime / enum / ref / member。`$author` は shared / public。single / match には書かない |
+
+- **一意の守り方**: 値の組を hash した鍵を `entities/{e}/unique/{key}`(`{recordId}`)にレコードと同じトランザクションで置く(2 人が同時に押しても片方だけ通る)。レコードは自分の鍵を `uniqueKey` に持ち、更新で値が変われば鍵を移し、削除・全件削除で外す。`unique` を足す前からあるレコード(鍵が無い)とも比べるため、鍵を取る時に同じ値のレコードをクエリでも探す(読み取り +1)。鍵の持ち主のレコードが無い・別の鍵を持つ時は古い鍵として取り直す。空の項目があるレコードは比べない。値の変わらない更新は比べ直さない(前からある重複を編集で 409 にしない)。
+- **サーバーの自動の動き(§3.12)の書き込み**は権限と一意を見ない(作成者の宣言で動くため)。一意の比較の相手にはなる。
+- iOS: `supportedFeatures` に `dataRoles` を送る。送らない古い版には AI が member と visibleTo を使わない(member は string に・visibleTo は外す・§5.3)。古い版でも editableBy / deleteBy / unique はサーバーが守る(断られた時の文言が汎用になるだけ)。iOS は 409 `duplicate` を「同じ内容の記録がもうあります」、403 `admins_only` を「管理者だけが変更できます」と出す。
+- AI: `backend/internal/ai/data_roles_rules.go`。
 
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 

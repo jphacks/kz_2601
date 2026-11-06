@@ -275,6 +275,10 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	if err := h.checkRecordRules(r, cur, ent, nil, data); err != nil { // #272
+		fail(w, err)
+		return
+	}
 	if err := checkRecordSize(data); err != nil {
 		fail(w, err)
 		return
@@ -305,7 +309,7 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		h.upsertSingle(w, r, cur, ent, recordSet(r, cur, ent, eid), rec)
 		return
 	}
-	out, _, err := h.createRecordOutbox(r, cur, ent, recordSet(r, cur, ent, eid), rec)
+	out, _, err := h.createRecordKept(r, cur, ent, recordSet(r, cur, ent, eid), rec) // #273
 	if err != nil {
 		fail(w, mapStoreErr(err, "entity"))
 		return
@@ -395,8 +399,12 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rs := recordSet(r, cur, ent, eid)
-	existing, err := h.ownRecord(r, rs, ent, rid, true)
+	existing, err := h.recordForPatch(r, rs, cur, ent, rid, delta) // #272: admins may change admin-only fields
 	if err != nil {
+		fail(w, err)
+		return
+	}
+	if err := h.checkRecordRules(r, cur, ent, existing, delta); err != nil {
 		fail(w, err)
 		return
 	}
@@ -421,7 +429,7 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	rec, err := h.updateRecordOutbox(r, cur, ent, rs, rid, merged)
+	rec, err := h.updateRecordKept(r, cur, ent, rs, existing, merged) // #273
 	if err != nil {
 		fail(w, mapStoreErr(err, "record"))
 		return
@@ -447,7 +455,7 @@ func (h *Handler) deleteRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	rs := recordSet(r, cur, ent, eid)
 	if ent.IsShared() {
-		if _, err := h.ownRecord(r, rs, ent, rid, false); err != nil {
+		if err := h.checkDelete(r, rs, cur, ent, rid); err != nil { // #272: entity.deleteBy
 			fail(w, err)
 			return
 		}
@@ -480,6 +488,11 @@ func (h *Handler) deleteAllRecords(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	everyone, err := h.deleteAllScope(r, cur, ent) // #272: an admin clears everyone's
+	if err != nil {
+		fail(w, err)
+		return
+	}
 	all, err := h.store.ListRecords(r.Context(), rs, 0)
 	if err != nil {
 		fail(w, mapStoreErr(err, "entity"))
@@ -487,7 +500,7 @@ func (h *Handler) deleteAllRecords(w http.ResponseWriter, r *http.Request) {
 	}
 	uid := uidOf(r)
 	for i := range all {
-		if all[i].Author != uid {
+		if !everyone && all[i].Author != uid {
 			continue
 		}
 		if err := h.store.DeleteRecord(r.Context(), rs, all[i].ID); err != nil && !errors.Is(err, store.ErrNotFound) {

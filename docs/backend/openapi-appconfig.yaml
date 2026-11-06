@@ -440,6 +440,8 @@ paths:
         `data` は現行 DSL のフィールド定義で型検証・正規化。未知キーは 400。`required` 欠落は 422。
         entity.scope が public/shared なら誰でも作成でき、レスポンスの `author`(uid) と `authorName` はサーバーが付ける
         (`data` に author/authorName は入れられない。冪等 id は uid+clientId から導出するので他人の clientId と衝突しない)。
+        `editableBy: admins` の field に管理者でない人が既定値・空以外を入れると 403(`details.reason: admins_only`・`details.field`)。type member の値が参加者の uid でなければ 422。
+        entity の `unique` の値が他のレコードと同じなら 409 `duplicate_record`(`details.reason: duplicate`・`details.fields`)(#272 #273)。
       requestBody:
         required: true
         content:
@@ -457,11 +459,12 @@ paths:
         '403': { $ref: '#/components/responses/NotMember' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/InvalidRecord' }
+        '409': { $ref: '#/components/responses/DuplicateRecord' }
         '402': { $ref: '#/components/responses/ProRequired' }
     delete:
       tags: [records]
       summary: エンティティの全レコード削除 (デモリセット用・`?confirm=true` 必須)
-      description: public/shared entity では**自分が投稿したレコードだけ**削除する (他人の投稿は残る)。
+      description: public/shared entity では**自分が投稿したレコードだけ**削除する (他人の投稿は残る)。`deleteBy` が admins / authorOrAdmins の entity では管理者は全員の分を消す。`deleteBy: admins` で管理者でなければ 403 `admins_only`(#272)。
       parameters: [{ in: query, name: confirm, required: true, schema: { type: boolean } }]
       responses:
         '204': { description: Deleted }
@@ -480,7 +483,7 @@ paths:
     patch:
       tags: [records]
       summary: レコード部分更新 (data のキー単位でマージ)
-      description: public/shared entity では `author == 自分` のレコードだけ更新できる (他人のは 403)。
+      description: public/shared entity では `author == 自分` のレコードだけ更新できる (他人のは 403)。管理者は他人のレコードでも `editableBy: admins` の field だけは変えられ、管理者でない人がその field を変えると 403 `admins_only`。`unique` の値が他のレコードと同じになる変更は 409 `duplicate_record`(#272 #273)。
       requestBody:
         required: true
         content:
@@ -494,11 +497,12 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/InvalidRecord' }
+        '409': { $ref: '#/components/responses/DuplicateRecord' }
         '402': { $ref: '#/components/responses/ProRequired' }
     delete:
       tags: [records]
       summary: レコード削除
-      description: public/shared entity では `author == 自分` のレコードだけ削除できる (他人のは 403)。
+      description: public/shared entity では `author == 自分` のレコードだけ削除できる (他人のは 403)。entity の `deleteBy` が admins なら管理者だけ、authorOrAdmins なら作った人か管理者(それ以外は 403 `admins_only`・#272)。
       responses:
         '204': { description: Deleted }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -759,6 +763,7 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/Member' } }
                   role: { type: string, enum: [owner, member], description: 呼び出したユーザーの立場 }
+                  admin: { type: boolean, description: '呼び出したユーザーが管理者か(#272・作成者は常に true)' }
         '403': { $ref: '#/components/responses/NotMember' }
   /apps/{appId}/members/{uid}:
     parameters:
@@ -776,6 +781,32 @@ paths:
         '400': { description: 作成者は抜けられない / uid が不正, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '403': { description: 作成者以外が他人を外そうとした, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '404': { description: その uid は参加者ではない(他人を外す時), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    patch:
+      tags: [members]
+      summary: 参加者を管理者にする / 管理者から外す(#272)
+      description: |
+        呼び出せるのは**管理者だけ**(作成者は常に管理者)。管理者でない参加者は 403(`details.reason: admins_only`)、参加者でなければ 403 `not_member`。
+        作成者は管理者から外せない(400)。`me` で自分が管理者をやめられる。管理者は field の `editableBy: admins` を変えられ、entity の `deleteBy` が admins / authorOrAdmins なら他人のレコードを消せる(docs/dsl/README.md §3.13)。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [admin]
+              properties: { admin: { type: boolean } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uid, admin]
+                properties: { uid: { type: string }, admin: { type: boolean } }
+        '400': { description: 作成者を外そうとした / uid が不正 / admin が無い, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { description: 管理者ではない(admins_only)/ 参加者ではない(not_member), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { description: その uid は参加者ではない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /apps/{appId}/interests:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -1330,6 +1361,12 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: forbidden, message: 'only the author can modify this record', details: { author: 'uid_of_poster' } } }
+    DuplicateRecord:
+      description: entity の unique の値が同じレコードが既にある(#273)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: duplicate_record, message: 'another record already has the same values', details: { reason: duplicate, fields: [slot] } } }
     VersionConflict:
       description: If-Match が現行と不一致
       content:
@@ -1402,6 +1439,7 @@ components:
                 - account_deleted
                 - app_check_failed
                 - bad_request
+                - duplicate_record
                 - forbidden
                 - internal
                 - invalid_dsl
@@ -1675,6 +1713,7 @@ components:
         uid: { type: string }
         displayName: { type: string, description: 'import 時の displayName(無ければ空。作成者は常に空)' }
         role: { type: string, enum: [owner, member] }
+        admin: { type: boolean, description: '管理者(#272)。作成者は常に true' }
         via: { type: string, enum: [share, legacy], description: 'share = リンクで参加 / legacy = #254 以前からアプリを持っていた(移行)。作成者には無い' }
         joinedAt: { type: string, format: date-time, description: 作成者には無い }
         you: { type: boolean, description: 呼び出したユーザー本人 }

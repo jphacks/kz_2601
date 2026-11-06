@@ -62,7 +62,7 @@ func TestMatchingRestriction(t *testing.T) {
 	if strings.Contains(string(old.assets().genSch), `"match":`) {
 		t.Fatal("restricted schema still offers match")
 	}
-	if !strings.Contains(string(NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity}).assets().genSch), `"match":`) &&
+	if !strings.Contains(string(NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles}).assets().genSch), `"match":`) &&
 		!strings.Contains(string(generationSchema), `"match":`) {
 		t.Fatal("the full schema must offer match")
 	}
@@ -142,7 +142,7 @@ func TestMatchingComponentsInRecipe(t *testing.T) {
 	for k := range knownComponentTypes {
 		all = append(all, k)
 	}
-	current := NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity})
+	current := NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles})
 	if current.Active() {
 		t.Fatalf("a build with every part and matching is unrestricted: %v", current.Disallowed())
 	}
@@ -151,7 +151,7 @@ func TestMatchingComponentsInRecipe(t *testing.T) {
 	// item.interest are withheld along with match.
 	for name, r := range map[string]Restriction{
 		"no matching": NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen}),
-		"no shared":   NewClientRestriction(all, []string{FeatureSharedData}, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity}),
+		"no shared":   NewClientRestriction(all, []string{FeatureSharedData}, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles}),
 	} {
 		if !slices.Contains(r.Disallowed(), string(dsl.CompMatchList)) {
 			t.Errorf("%s: matchList allowed: %v", name, r.Disallowed())
