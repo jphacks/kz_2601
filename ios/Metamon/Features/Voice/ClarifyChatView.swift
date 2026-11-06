@@ -9,6 +9,8 @@ import MetamonServices
 /// - 入力はマイク(WhisperKit・録音は親の `VoiceInputView` が持つ)+ 文字入力
 struct ClarifyChatView: View {
     @Environment(AppRuntime.self) private var rt
+    /// 横向き(#625)でキーボードが出ている間は、選択肢・ボタンを畳んで入力欄と吹き出しの場所を残す
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     let micMode: MicButton.Mode
     let statusText: String
     let onMic: () -> Void
@@ -35,6 +37,9 @@ struct ClarifyChatView: View {
     private var multiSelect: Bool { rt.chatTurn?.isMultiSelect == true }
     private var current: MultiPick { pick.key == rt.chatBubbles.count ? pick : MultiPick(key: rt.chatBubbles.count) }
 
+    /// 横向き + 文字入力中(#625): 画面の大半がキーボードに隠れ、選択肢とボタンを出すと吹き出しが 0 行になる
+    private var collapsesOffer: Bool { LandscapeLayout.isCompactHeight(verticalSizeClass) && typing }
+
     var body: some View {
         transcriptScroll
             .padding(.top, Theme.Spacing.sm)
@@ -47,13 +52,15 @@ struct ClarifyChatView: View {
                     }
                     #if APP_STORE_REVIEW
                     // 審査用ビルドは App 内課金を持たない(#450 G1)
-                    suggestionChips
-                    actionButton
+                    if !collapsesOffer {
+                        suggestionChips
+                        actionButton
+                    }
                     #else
                     if let paid = rt.paidConfirm {
                         PaidFeatureCard(confirmation: paid)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
-                    } else {
+                    } else if !collapsesOffer {
                         suggestionChips
                         actionButton
                     }

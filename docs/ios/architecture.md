@@ -960,6 +960,20 @@ Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-
 
 DEBUG フック(ヘッドレス確認用): `METAMON_AUTO_FOCUS=<部品 id か field>` で表示 3 秒後にその入力欄へフォーカス、`METAMON_AUTO_BLUR=<秒>` でさらに n 秒後に閉じる。`voice`(音声画面)/ `voice-sheet`(生成後に発話シートを開いて入力)/ `chat`(対話の返答欄)も可。例: `METAMON_MOCK=1 METAMON_INITIAL_EXAMPLE=gallery-input METAMON_AUTO_OPEN=checkin_form METAMON_AUTO_FOCUS=pin`。ヘッドレス起動のシミュレータはハードウェアキーボード未接続なのでソフトキーボードが出る。
 
+### 21.1 横向き(#625)
+
+iPhone は縦と横(左右)を使える(上下逆さま・iPad は対象外。`Info.plist` の `UISupportedInterfaceOrientations`・`TARGETED_DEVICE_FAMILY = 1`)。横向き = 高さが compact(`verticalSizeClass == .compact`)。方針は「同じ部品のまま、幅を絞って中央に寄せる・飾りを小さくする・縦に収まらない所はスクロール」。並べ替え(2 カラム化)は音声画面だけ。
+
+| 場所 | 横向きの扱い | 実装 |
+|---|---|---|
+| 生成したアプリの画面(`GridScreenLayout`) | 高さ ÷ 12 では行が潰れるので、行の高さを固定(52pt)して画面ごと縦スクロール。幅は最大 640pt で中央寄せし、左右の余白(各 96pt 以上)にマイク FAB が収まるようにする。A〜F の列の割り付けは縦と同じ。voiceInput 画面も横ではスクロール | `GridMetrics.resolve`(純粋関数・`GridMetricsTests`)。横では最下段の FAB 退避(`GridBottomObstructionKey`)を上げず、余白が取れない幅だけ末尾に FAB ぶんの余白 |
+| 音声画面 / 発話シート(`VoiceInputView`) | 左 = 見出しとマイク(スクロール)、右 = 例文・文字入力・「探す」。ツルを出さず、マイクと見出しを小さく | `LandscapeLayout`(`LandscapeLayoutTests`)。文字・録音の状態は `VoiceInputView` の `@State` なので回転しても残る |
+| 対話(`ClarifyChatView`) | 幅 560pt まで中央寄せ。キーボード表示中は選択肢チップと「これでいく」を畳み、吹き出しと入力欄の場所を残す | `.readableWidth()`・`collapsesOffer` |
+| チュートリアル・引き継ぎの案内・変身一覧 | ツルを小さく・幅を絞る・高さが足りないシートは縦スクロール | `TutorialView`・`AccountLinkPromptSheet`・`AppSwitcherSheet` |
+| QR の読み取り | プレビューを端末の向きに合わせて回す(ドラレコと同じ `RotationCoordinator`) | `QrCameraController` |
+
+セーフエリア(横に来るノッチ・ダイナミックアイランド)は SwiftUI の既定に任せ、背景以外で `.ignoresSafeArea` を足さない。
+
 ## 22. アプリ内課金「Tailor It Pro」(StoreKit 2・Issue #77 の最小形)
 
 外部アカウント(RevenueCat・App Store Connect)を使わず、**StoreKit 2 + ローカルの StoreKit Configuration** だけで動く形。本番の商品登録は後続。

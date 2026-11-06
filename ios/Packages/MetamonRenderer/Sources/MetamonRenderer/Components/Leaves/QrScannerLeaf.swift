@@ -72,6 +72,9 @@ final class QrCameraController: UIViewController, AVCaptureMetadataOutputObjects
     var onFound: ((String) -> Void)?
     private let session = AVCaptureSession()
     private var found = false
+    /// 端末の向きに合わせてプレビューを回す(#625: 横向きで映像が 90° 倒れて見えた)。DashcamLeaf と同じ
+    private var rotation: AVCaptureDevice.RotationCoordinator?
+    private var rotationObservation: NSKeyValueObservation?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -89,6 +92,14 @@ final class QrCameraController: UIViewController, AVCaptureMetadataOutputObjects
         layer.videoGravity = .resizeAspectFill
         layer.frame = view.bounds
         view.layer.addSublayer(layer)
+        let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: layer)
+        rotation = coordinator
+        rotationObservation = coordinator.observe(\.videoRotationAngleForHorizonLevelPreview, options: [.initial, .new]) { [weak layer] c, _ in
+            let angle = c.videoRotationAngleForHorizonLevelPreview
+            DispatchQueue.main.async {
+                if let conn = layer?.connection, conn.isVideoRotationAngleSupported(angle) { conn.videoRotationAngle = angle }
+            }
+        }
     }
 
     override func viewWillLayoutSubviews() {
