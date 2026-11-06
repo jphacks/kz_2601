@@ -303,7 +303,7 @@ func TestRenderPlaceholders(t *testing.T) {
 		{strings.Repeat("あ", 78) + "{title}{title}", strings.Repeat("あ", 78) + "合宿"}, // body cut to 80
 	}
 	for _, c := range cases {
-		if got := p.render(c.tmpl, dsl.MaxNotifyBodyRunes); got != c.want {
+		if got := p.render(c.tmpl, dsl.MaxNotifyBodyRunes, nil); got != c.want {
 			t.Errorf("render(%q) = %q, want %q", c.tmpl, got, c.want)
 		}
 	}

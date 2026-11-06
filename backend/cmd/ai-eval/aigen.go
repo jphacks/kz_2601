@@ -2,13 +2,15 @@ package main
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
 // aiButton generate (#417) expect keys: aiGenerate (string: the shape of some
 // generate button, or any) and aiGenerateEntity (bool: one of them reads
-// records). Cases: internal/ai/eval/ai_generate_cases.json (-cases).
+// records), aiTask (string: some aiButton has this task). Cases:
+// internal/ai/eval/ai_generate_cases.json and cloud_ai_cases.json (-cases).
 
 // generateButtons lists the generate aiButtons of the app.
 func generateButtons(a *dsl.App) []dsl.Component {
@@ -52,6 +54,21 @@ func checkAIGenerate(exp map[string]any, a *dsl.App) []string {
 		}
 		if got != want {
 			miss = append(miss, fmt.Sprintf("aiGenerateEntity=%v", got))
+		}
+	}
+	if want, ok := exp["aiTask"].(string); ok {
+		var got []string
+		for _, s := range a.Screens {
+			for _, c := range s.Components {
+				for _, x := range append([]dsl.Component{c}, c.Children...) {
+					if x.Type == dsl.CompAiButton {
+						got = append(got, x.Task)
+					}
+				}
+			}
+		}
+		if !slices.Contains(got, want) {
+			miss = append(miss, fmt.Sprintf("aiTask=%s got %v", want, got))
 		}
 	}
 	return miss
