@@ -1,0 +1,62 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 4
+          },
+          "id" : "weather",
+          "props" : {
+            "limit" : 3,
+            "title" : "石川県の天気"
+          },
+          "state" : "rendered",
+          "type" : "feed"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 4,
+            "rowSpan" : 4
+          },
+          "id" : "holidays",
+          "props" : {
+            "title" : "祝日"
+          },
+          "state" : "rendered",
+          "type" : "feed"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 8,
+            "rowSpan" : 4
+          },
+          "id" : "news",
+          "props" : {
+            "title" : "デジタル庁のお知らせ"
+          },
+          "state" : "rendered",
+          "type" : "feed"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "今日",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

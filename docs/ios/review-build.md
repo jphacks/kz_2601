@@ -36,6 +36,7 @@
 | ドラレコ(`dashcam`・#410。カメラの常時録画・CoreMotion) | 部品と登録 / `DashcamRecorder`、写真への追加の説明文から「ドラレコ」を外す | 4.7.2・2.5.14 |
 | DSL から使うマイクの録音(`audioRecorder`・#420) | 部品と登録 / `AudioRecorderController` / `RemoteRecorderCommands`(イヤホンのボタン)。マイクの説明文は音声入力だけの文に差し替え済み | 4.7.2・2.5.14 |
 | アプリ内の Web 表示(`webView`・WKWebView) | 部品と登録 / `WebViewLeaf`。サイトは `openUrlButton` で Safari に開く | 審査メモ「WebView を使わない」(#452 G3) |
+| 外部の公開データ(`feed`・#348。天気予報・祝日・許可した公的機関の RSS) | 部品と登録 / `FeedLeaf` / `FeedHost` / `AppRuntime+Feeds`、MetamonServices の `FeedClient` / `HTTPFeedClient`(`v1/feeds`)/ `FeedCache`、MetamonDSL の `FeedQuery` / `FeedResult`。`allowedComponents` から外すので AI も作らない | 外部の Web の内容を出す(2.5.2・4.7・1.2 の説明が要る。`docs/backend/features/external-feeds.md`「審査用の版」) |
 | App 内課金(Tailor It Pro・#77 #414) | `ProGate` / `PaywallSheet` / `ProSettingsSection`(設定の「Tailor It Pro」)/ `ManageSubscriptionButton`(「サブスクリプションを管理」・#326)/ `AppRuntime+PaidFeature`(有料機能の確認カード)/ `AppRuntime+PaidGate` の課金画面、MetamonServices の `ProEntitlementStore`(StoreKit)/ `ProProducts`(商品 ID)/ `CreationQuota`(端末の 1 日 3 回)。1 日の上限はサーバーの `ratelimit` だけで、当たると状態カード「今日はここまでです / 今日の上限に達しました。〜からまた使えます」(課金画面は出ない)。backend も chat の `requiresPro` / `paidFeatures` を付けない | 最初の版は課金なしで出す(#450 G1・2026-10-30 決定)。3.1.1・3.1.2・2.3.1(サーバーが Pro を判定しない) |
 | 共有・公開のデータ(entity の `scope: shared / public`・`edit`・`marks`)と `chatThread` | `chatThread` の部品と登録 / `ChatThreadLeaf`。`ClientCapabilities.reviewDisabledFeatures` の `sharedData` で、backend が scope を private に直す(下の「AI 側の制限」) | 1.2(通報・ブロック・フィルタが無い)(#451 G2) |
 | aiButton のオンライン版(`POST /v1/text`・#417) | `AppRuntime+AIText` のオンライン経路と Pro の入口 / `HTTPAIClient+Text`(`v1/text`)。端末内 AI(Foundation Models)は残る。端末内 AI が無い端末では理由つきで無効 | 5.1.2(i)。同意文の「記録の中身は送らない」(#452 G4) |
@@ -50,12 +51,14 @@
 
 **残すもの**
 - `photoField` / `videoField` は、**写真ライブラリから選ぶ**機能だけ残す。PhotosPicker は別プロセスで動き、権限の確認も要らない。
-  - `photoField.analyze`(#418・写真の文字・金額・分類・骨格の読み取り)は残す。選んだ写真を端末内の Vision / Foundation Models で読むだけで、カメラも権限も使わない。カメラの映像を見ながらの読み取り(回数カウントなど)を足す時は、撮影と同じく審査用の版から外す。
+  - `photoField.analyze`(#418・写真の文字・金額・分類・骨格・物の名前・バーコード・人数・主な色の読み取り)は残す。選んだ写真を端末内の Vision / Foundation Models で読むだけで、カメラも権限も使わない(写真は端末の外に出ないので、プライバシーの申告も変わらない)。カメラの映像を見ながらの読み取り(回数カウントなど)を足す時は、撮影と同じく審査用の版から外す。
+- 手書き・お絵かきの `drawingField` は残す。PencilKit で端末内に描くだけで権限は要らず、描いた絵は写真と同じ形(800px 以下の JPEG)で photo field に入る(プライバシーの表示は「写真またはビデオ」の範囲)。
 - 現在地を 1 回だけ取る `locationButton` と、地図の `mapView`(使用中の位置だけ)は残す。
 - 目的地までの道案内 `routeGuide`(#411)も残す。使うのは使用中の位置だけで、背面で案内を続けない(`CLBackgroundActivitySession` も `UIBackgroundModes: location` も使わない)。読み上げ(AVSpeechSynthesizer)に権限は要らない。
 - ファイルの取り込み `fileImport` は残す。ファイル選択(`.fileImporter`)は別プロセスで動き、権限の確認も Info.plist の説明文も要らない。CSV の行・テキスト / PDF の本文(PDFKit・文字の無いページは Vision の文字認識)を端末内で読んで記録にするだけで、ファイルそのものは送らない・残さない。ファイルの日時の API(理由が要る API)も使わない。
 - QR を読む `qrScanner` は残す(カメラの説明文はこれに合わせて差し替える)。
 - QR を作って表示する `qrCode`(#422)も残す。CoreImage で端末内で作るだけで、写真への保存は追加のみの権限(`NSPhotoLibraryAddUsageDescription`)。審査用の版の説明文にも QR の保存を書く(#452 G8)。
+- 生成したアプリの文字起こし `transcribeField` と読み上げ `speakButton` は残す。どちらも端末の中だけで動く(声を送らない・録音を残さない)。文字起こしは音声入力と同じ端末内の音声モデル、読み上げは AVSpeechSynthesizer で権限は要らない。マイクの説明文に「記録帳の欄に話した内容を端末の中で文字にして入れる」を足した。
 - 声でアプリを作り変える音声入力(マイク FAB)は残す。`audio` field の再生(一覧の行の再生ボタン)も残す(マイクを使わない。この版では録音できないので鳴る録音は無い)。
 - 裏で定期的に同期する `fetch` は残す。
 - 設定の「ライセンス」(このアプリの MIT の表示とサードパーティのライセンスの一覧・#306)は残す。
@@ -136,7 +139,7 @@ codesign -d --entitlements :- "$APP"
 #   → com.apple.developer.healthkit が無いこと
 otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|NearbyInteraction|CoreMotion'
 #   → 何も出ないこと
-strings "$APP/Metamon" | grep -E 'AutomationsView|HTTPAutomationsClient|/automations|MatchListLeaf|HTTPMatchingClient|MatchingStore|AdultConfirmSheet|/interests|v1/feedback|FeedbackComposerView|HKHealthStore|MCSession|NISession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps|WebViewLeaf|v1/text|ChatThreadLeaf|jp\.kz2601\.metamon\.pro|PaywallSheet|ProSettingsSection|ProEntitlementStore|購入して作る|Pro にする'
+strings "$APP/Metamon" | grep -E 'AutomationsView|HTTPAutomationsClient|/automations|MatchListLeaf|HTTPMatchingClient|MatchingStore|AdultConfirmSheet|/interests|v1/feedback|FeedbackComposerView|HKHealthStore|MCSession|NISession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps|WebViewLeaf|FeedLeaf|HTTPFeedClient|v1/feeds|v1/text|ChatThreadLeaf|jp\.kz2601\.metamon\.pro|PaywallSheet|ProSettingsSection|ProEntitlementStore|購入して作る|Pro にする'
 #   → 何も出ないこと
 #   注: WKWebView / WebKit の参照は FirebaseAuth(AuthWebViewController。OAuth・reCAPTCHA 用)から残る。
 #       この版のサインイン(Sign in with Apple・匿名)では使わない。アプリのコードからは WebKit を使わない

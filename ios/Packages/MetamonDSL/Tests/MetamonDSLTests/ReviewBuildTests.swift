@@ -8,12 +8,13 @@ final class ReviewBuildTests: XCTestCase {
         let allowed = Set(ClientCapabilities.reviewAllowedComponents)
         for t in ClientCapabilities.reviewExcludedComponents { XCTAssertFalse(allowed.contains(t.rawValue), t.rawValue) }
         XCTAssertFalse(allowed.contains(ComponentType.unknown.rawValue))
-        for t in ["vstack", "list", "photoField", "videoField", "chart", "stat", "settlement", "calendar", "gridTable", "locationButton", "routeGuide", "flashcards", "fileImport"] {
+        for t in ["vstack", "list", "photoField", "videoField", "chart", "stat", "settlement", "calendar", "gridTable", "locationButton", "routeGuide", "flashcards", "drawingField", "transcribeField", "speakButton", "fileImport"] {
             XCTAssertTrue(allowed.contains(t), t)
         }
         XCTAssertEqual(ClientCapabilities.reviewDisabledFeatures, ["fieldHealth", "cameraCapture", "sharedData"])
         XCTAssertFalse(allowed.contains(ComponentType.chatThread.rawValue), "他の人と記録を見る chatThread は外す(#451 G2)")
         XCTAssertFalse(allowed.contains(ComponentType.matchList.rawValue), "仲間探し(#507)は共有と一緒に外す")
+        XCTAssertFalse(allowed.contains(ComponentType.feed.rawValue), "外部の公開データ(#348)は外す(外部の Web の内容を出す)")
     }
 
     /// #482・#265: 記録の自動削除・条件の通知はどの版も持つ。#507: 仲間探しは審査用の版では送らない(backend が match・item.interest・matchList を使わない)。

@@ -1,5 +1,6 @@
 import XCTest
 import UIKit
+import CoreImage
 import MetamonDSL
 @testable import MetamonRenderer
 
@@ -91,10 +92,83 @@ final class PhotoAnalyzeTests: XCTestCase {
             .leftAnkle: PosePoint(x: 0.5, y: 0.2, confidence: 0.9),
         ]
         let spec = PhotoAnalyze(kind: .jointAngle, into: "knee_angle", joint: "knee")
-        let v = await PhotoReader.reading(spec, field: knee, lines: [], labels: [], pose: squat, aspect: 1)
+        let v = await PhotoReader.reading(spec, field: knee, clues: PhotoClues(pose: squat))
         XCTAssertEqual(v?.jsonValue(for: knee.type), .number(90))
-        let none = await PhotoReader.reading(spec, field: knee, lines: [], labels: [], pose: nil, aspect: 1)
+        let none = await PhotoReader.reading(spec, field: knee, clues: PhotoClues())
         XCTAssertNil(none)
+    }
+
+    // MARK: 拡張の kind(Vision の結果を差し替えて field に入る値を確かめる)
+
+    private func moreEntity() throws -> Entity {
+        let json = #"""
+        {"id":"item","name":"記録","fields":[{"id":"photo","name":"写真","type":"photo"},{"id":"name","name":"名前","type":"string"},
+         {"id":"things","name":"写っている物","type":"text"},{"id":"code","name":"コード","type":"string"},
+         {"id":"people","name":"人数","type":"integer"},{"id":"color","name":"色","type":"string"}]}
+        """#
+        return try JSONDecoder().decode(Entity.self, from: Data(json.utf8))
+    }
+
+    private let moreSpecs = [
+        PhotoAnalyze(kind: .label, into: "name"), PhotoAnalyze(kind: .labels, into: "things"),
+        PhotoAnalyze(kind: .barcode, into: "code"), PhotoAnalyze(kind: .peopleCount, into: "people"),
+        PhotoAnalyze(kind: .color, into: "color"),
+    ]
+
+    func testMoreKindsFromInjectedClues() async throws {
+        let clues = PhotoClues(labels: ["food", "sushi", "dish", "rice", "sashimi_platter", "plate", "table"],
+                               barcodes: ["9784000000000", "https://example.com"], peopleCount: 3, color: "赤")
+        let out = await PhotoReader.apply(clues, specs: moreSpecs, entity: try moreEntity())
+        XCTAssertEqual(out.values["name"], .string("寿司"), "大まかな food を飛ばして具体的なラベル")
+        XCTAssertEqual(out.values["things"], .string("寿司、ご飯、sashimi platter、plate、テーブル"), "訳のあるラベルは日本語・無いラベル(plate)は英語のまま")
+        XCTAssertEqual(out.values["code"], .string("9784000000000"), "最初のバーコード")
+        XCTAssertEqual(out.values["people"], .number(3))
+        XCTAssertEqual(out.values["color"], .string("赤"))
+        XCTAssertEqual(out.missed, [])
+    }
+
+    /// 何も見つからない写真: 人数 0 は値として入れ、他は読めなかった項目(今の値のまま)。
+    func testMoreKindsWithNothingFound() async throws {
+        let out = await PhotoReader.apply(PhotoClues(peopleCount: 0), specs: moreSpecs, entity: try moreEntity())
+        XCTAssertEqual(out.values, ["people": .number(0)])
+        XCTAssertEqual(out.missed, ["name", "things", "code", "color"])
+    }
+
+    /// 大まかなラベルしか無い時はそれを使う。
+    func testLabelFallsBackToGenericLabel() async throws {
+        let v = await PhotoReader.reading(PhotoAnalyze(kind: .label, into: "name"), field: try XCTUnwrap(try moreEntity().field("name")),
+                                          clues: PhotoClues(labels: ["food", "plant"]))
+        XCTAssertEqual(v, .text("食べ物"))
+    }
+
+    /// 描いた画像から: QR コードを読み、中央の色を数え、人のいない画像は 0 人。
+    func testVisionOnRenderedImages() throws {
+        let qr = try XCTUnwrap(CIFilter(name: "CIQRCodeGenerator", parameters: ["inputMessage": Data("TAILOR-418".utf8)])?.outputImage)
+            .transformed(by: CGAffineTransform(scaleX: 12, y: 12))
+        let qrCG = try XCTUnwrap(CIContext().createCGImage(qr.padded(), from: qr.padded().extent))
+        let codes = PhotoVision.barcodes(in: qrCG)
+        #if targetEnvironment(simulator)
+        // シミュレータの Vision はバーコードを返さないことがある(実機では検出する)
+        if codes.isEmpty { try checkColorAndPeople(); throw XCTSkip("シミュレータで Vision のバーコード検出が結果を返さない") }
+        #endif
+        XCTAssertEqual(codes, ["TAILOR-418"])
+        try checkColorAndPeople()
+    }
+
+    /// 中央の色を数え、人のいない画像は 0 人・バーコード無し。
+    private func checkColorAndPeople() throws {
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let red = UIGraphicsImageRenderer(size: CGSize(width: 200, height: 200), format: format).image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 200, height: 200))
+            UIColor.systemRed.setFill()
+            ctx.fill(CGRect(x: 30, y: 30, width: 140, height: 140))
+        }
+        let cg = try XCTUnwrap(red.cgImage)
+        XCTAssertEqual(PhotoColor.dominant(pixels: PhotoVision.centerPixels(of: cg)), "赤", "周りの白ではなく中央の色")
+        XCTAssertEqual(PhotoVision.peopleCount(in: cg) ?? 0, 0)
+        XCTAssertTrue(PhotoVision.barcodes(in: cg).isEmpty)
     }
 
     func testOverlayGeometry() {
@@ -115,5 +189,13 @@ final class PhotoAnalyzeTests: XCTestCase {
         XCTAssertEqual(r.options, ["食費", "交通"])
         XCTAssertTrue(r.prompt.contains("food") && r.prompt.contains("合計 ¥493") && r.prompt.contains("食費 / 交通"))
         XCTAssertEqual(AIRequestBuilder.normalize("「交通」", for: r), "交通")
+    }
+}
+
+private extension CIImage {
+    /// QR の周りに白い余白(読み取りに要る quiet zone)を付ける。
+    func padded(by margin: CGFloat = 48) -> CIImage {
+        let bg = CIImage(color: .white).cropped(to: extent.insetBy(dx: -margin, dy: -margin))
+        return composited(over: bg)
     }
 }

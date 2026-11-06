@@ -308,7 +308,7 @@ func (r *webRenderer) node(s *dsl.Screen, c *dsl.Component, depth int) (webNode,
 			n.Cols = int(*c.Max)
 		}
 		n.Text = strings.Repeat("☆", n.Cols)
-	case dsl.CompPhotoField, dsl.CompVideoField:
+	case dsl.CompPhotoField, dsl.CompVideoField, dsl.CompDrawingField:
 		n.Kind, n.Label = "button", r.inputLabel(s, c)
 		n.Style = "secondary"
 	case dsl.CompButton, dsl.CompShareButton, dsl.CompOpenURLButton:

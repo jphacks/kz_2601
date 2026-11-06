@@ -643,6 +643,12 @@ func (a *App) Validate() error {
 				checkFileImport(where, c, entities, add) // file_import.go
 			case CompAudioRecorder:
 				checkAudioRecorder(where, c, formEntity, add)
+			case CompTranscribeField: // speech.go
+				checkTranscribeField(where, c, formEntity, add)
+			case CompSpeakButton: // speech.go
+				checkSpeakButton(where, c, formEntity, entities, add)
+			case CompDrawingField:
+				checkDrawingField(where, c, formEntity, add)
 			case CompEmptyState:
 				if c.Title == "" {
 					add("%s: emptyState needs title", where)
@@ -671,6 +677,8 @@ func (a *App) Validate() error {
 				checkAction(where+".onItemTap", c.OnItemTap)
 			case CompFlashcards:
 				checkFlashcards(where, c, entities, add) // flashcards.go
+			case CompFeed:
+				checkFeed(where, c, add) // feed.go
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}

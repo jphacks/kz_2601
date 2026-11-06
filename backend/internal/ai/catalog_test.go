@@ -68,10 +68,14 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompSettlement,
 		// random pick (#263)
 		dsl.CompRandomPicker,
+		// handwriting / drawing (PencilKit -> photo field)
+		dsl.CompDrawingField,
 		// file import: csv / text / pdf -> records on the device
 		dsl.CompFileImport,
 		// flashcards (#264)
 		dsl.CompFlashcards,
+		// external feed (#348)
+		dsl.CompFeed,
 		// on-device AI
 		dsl.CompAiButton,
 		// peer-to-peer
@@ -96,6 +100,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompVideoField, dsl.CompVideoPlayer,
 		// audio (#420)
 		dsl.CompAudioRecorder,
+		// speech: transcription / read aloud
+		dsl.CompTranscribeField, dsl.CompSpeakButton,
 	} {
 		goTypes[string(ct)] = true
 	}

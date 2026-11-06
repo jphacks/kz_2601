@@ -52,6 +52,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.picker) { c, ctx in PickerLeaf(c: c, ctx: ctx) }
         r.register(.toggle) { c, ctx in ToggleLeaf(c: c, ctx: ctx) }
         r.register(.photoField) { c, ctx in PhotoFieldLeaf(c: c, ctx: ctx) }
+        r.register(.drawingField) { c, ctx in DrawingFieldLeaf(c: c, ctx: ctx) } // 審査用ビルドにも入れる(写真と同じ扱い・権限を使わない)
         r.register(.image) { c, ctx in ImageLeaf(c: c, ctx: ctx) }
         r.register(.videoField) { c, ctx in VideoFieldLeaf(c: c, ctx: ctx) }
         r.register(.videoPlayer) { c, ctx in VideoPlayerLeaf(c: c, ctx: ctx) }
@@ -81,6 +82,9 @@ public struct ComponentRegistry: Sendable {
         r.register(.locationPicker) { c, ctx in LocationPickerLeaf(c: c, ctx: ctx) }
         r.register(.qrScanner) { c, ctx in QrScannerLeaf(c: c, ctx: ctx) }
         r.register(.qrCode) { c, ctx in QrCodeLeaf(c: c, ctx: ctx) }
+        // leaf(文字起こし・読み上げ)。端末の中だけで動くので審査用ビルドにも入れる
+        r.register(.transcribeField) { c, ctx in TranscribeFieldLeaf(c: c, ctx: ctx) }
+        r.register(.speakButton) { c, ctx in SpeakButtonLeaf(c: c, ctx: ctx) }
         r.register(.timerDisplay) { c, ctx in TimerDisplayLeaf(c: c, ctx: ctx) }
         // leaf: 入力系バッチ
         r.register(.slider) { c, ctx in SliderLeaf(c: c, ctx: ctx) }
@@ -130,6 +134,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.audioRecorder) { c, ctx in AudioRecorderLeaf(c: c, ctx: ctx) }
         // leaf(仲間探しの届いた人・つながった人・#507)。共有と一緒に外す
         r.register(.matchList) { c, ctx in MatchListLeaf(c: c, ctx: ctx) }
+        // leaf(外部の公開データ・#348)。外部の Web の内容を出すので外す
+        r.register(.feed) { c, _ in FeedLeaf(c: c) }
         #endif
         return r
     }()

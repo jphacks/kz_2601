@@ -1,0 +1,230 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "hello",
+          "props" : {
+            "label" : "あいさつを聞く",
+            "text" : "おはようございます"
+          },
+          "state" : "rendered",
+          "type" : "speakButton"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "screen" : "form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 8
+          },
+          "id" : "notes",
+          "props" : {
+            "entity" : "note",
+            "rows" : [
+              {
+                "recordId" : "n1",
+                "title" : "会議"
+              }
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "メモ",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "note",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+
+        }
+      },
+      "id" : "form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 1
+          },
+          "id" : "t",
+          "props" : {
+            "field" : "title",
+            "label" : "題",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 1,
+            "rowSpan" : 5
+          },
+          "id" : "dictate",
+          "props" : {
+            "field" : "body",
+            "label" : "本文(話して入力)",
+            "placeholder" : "マイクを押して話してください",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "transcribeField"
+        },
+        {
+          "band" : 2,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 6,
+            "rowSpan" : 2
+          },
+          "id" : "read",
+          "props" : {
+            "field" : "body",
+            "label" : "読み上げる"
+          },
+          "state" : "rendered",
+          "type" : "speakButton"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "form",
+        "stack" : "main"
+      },
+      "title" : "メモ",
+      "toolbar" : [
+
+      ]
+    }
+  ],
+  "steps" : [
+    {
+      "effects" : [
+
+      ],
+      "op" : {
+        "tapRow" : {
+          "component" : "notes",
+          "index" : 0
+        }
+      },
+      "screen" : {
+        "form" : {
+          "entity" : "note",
+          "readOnly" : false,
+          "recordId" : "n1",
+          "values" : {
+            "body" : "来週までに見積もりを出す",
+            "title" : "会議"
+          }
+        },
+        "id" : "form",
+        "layout" : "form",
+        "nodes" : [
+          {
+            "band" : 0,
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 0,
+              "rowSpan" : 1
+            },
+            "id" : "t",
+            "props" : {
+              "field" : "title",
+              "label" : "題",
+              "value" : "会議"
+            },
+            "state" : "rendered",
+            "type" : "textField"
+          },
+          {
+            "band" : 1,
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 1,
+              "rowSpan" : 5
+            },
+            "id" : "dictate",
+            "props" : {
+              "field" : "body",
+              "label" : "本文(話して入力)",
+              "placeholder" : "マイクを押して話してください",
+              "value" : "来週までに見積もりを出す"
+            },
+            "state" : "rendered",
+            "type" : "transcribeField"
+          },
+          {
+            "band" : 2,
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 6,
+              "rowSpan" : 2
+            },
+            "id" : "read",
+            "props" : {
+              "field" : "body",
+              "label" : "読み上げる"
+            },
+            "state" : "rendered",
+            "type" : "speakButton"
+          }
+        ],
+        "route" : {
+          "recordId" : "n1",
+          "screen" : "form",
+          "stack" : "main"
+        },
+        "title" : "メモ",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : "n1",
+        "screen" : "form",
+        "stack" : "main"
+      }
+    }
+  ]
+}
