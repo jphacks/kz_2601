@@ -79,24 +79,45 @@ final class AccountLinkTests: XCTestCase {
         return rt
     }
 
-    func testPromptOffersOnceForAnonymous() async throws {
+    /// H7: 最初のアプリの直後には出さず、次の起動で 1 回だけ出す
+    func testPromptWaitsForNextLaunchThenOffersOnce() async throws {
         let rt = try makeRuntime(anonymous: true)
-        rt.offerAccountLinkIfNeeded(defaults: defaults)
-        try await waitUntil { rt.showLinkPrompt }
+        rt.offerAccountLinkIfNeeded(defaults: defaults, launch: "launch-1")
+        rt.presentDeferredAccountLinkIfNeeded(defaults: defaults, launch: "launch-1")
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertFalse(rt.showLinkPrompt, "最初のアプリを作った起動では出さない")
+        XCTAssertTrue(AccountLinkPrompt.shouldOffer(defaults))
+
+        let next = try makeRuntime(anonymous: true)
+        next.presentDeferredAccountLinkIfNeeded(defaults: defaults, launch: "launch-2")
+        try await waitUntil { next.showLinkPrompt }
         XCTAssertFalse(AccountLinkPrompt.shouldOffer(defaults))
 
-        rt.showLinkPrompt = false
-        rt.offerAccountLinkIfNeeded(defaults: defaults)
+        let third = try makeRuntime(anonymous: true)
+        third.offerAccountLinkIfNeeded(defaults: defaults, launch: "launch-3")
+        third.presentDeferredAccountLinkIfNeeded(defaults: defaults, launch: "launch-4")
         try await Task.sleep(for: .milliseconds(100))
-        XCTAssertFalse(rt.showLinkPrompt, "2 回目は出さない")
+        XCTAssertFalse(third.showLinkPrompt, "2 回目は出さない")
     }
 
     func testPromptNotOfferedToAppleUser() async throws {
         let rt = try makeRuntime(anonymous: false)
-        rt.offerAccountLinkIfNeeded(defaults: defaults)
+        rt.offerAccountLinkIfNeeded(defaults: defaults, launch: "launch-1")
+        rt.presentDeferredAccountLinkIfNeeded(defaults: defaults, launch: "launch-2")
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertFalse(rt.showLinkPrompt)
         XCTAssertTrue(AccountLinkPrompt.shouldOffer(defaults), "Apple のユーザーには数えない")
+    }
+
+    /// 予約の後、次の起動までに Apple に引き継いだら出さない
+    func testPendingDroppedAfterLinking() async throws {
+        let anon = try makeRuntime(anonymous: true)
+        anon.offerAccountLinkIfNeeded(defaults: defaults, launch: "launch-1")
+        let linked = try makeRuntime(anonymous: false)
+        linked.presentDeferredAccountLinkIfNeeded(defaults: defaults, launch: "launch-2")
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertFalse(linked.showLinkPrompt)
+        XCTAssertFalse(AccountLinkPrompt.isDue(defaults, launch: "launch-3"), "予約は消える")
     }
 
     // MARK: - 再インストール後に開くアプリ

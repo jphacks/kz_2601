@@ -8,6 +8,8 @@ public struct ScreenView: View {
     let route: Route
     @State private var form: FormDraft?
     @State private var locals = ScreenLocals()
+    /// 入力のあるフォームを閉じる前の確認(M10)
+    @State private var confirmDiscard = false
 
     public init(route: Route) { self.route = route }
 
@@ -43,9 +45,19 @@ public struct ScreenView: View {
                     }
                     if route.stack == "sheet" || route.stack == "full", (rt.paths[route.stack] ?? []).isEmpty {
                         ToolbarItem(placement: .topBarLeading) {
-                            Button(L("閉じる")) { rt.close(route) }
+                            Button(L("閉じる")) {
+                                if hasUnsavedInput { confirmDiscard = true } else { rt.close(route) }
+                            }
                         }
                     }
+                }
+                // M10: シートのフォームに入力があれば、下に払って閉じない(「閉じる」で破棄を確認する)
+                .interactiveDismissDisabled(hasUnsavedInput)
+                .confirmationDialog(L("入力した内容を破棄しますか?"), isPresented: $confirmDiscard, titleVisibility: .visible) {
+                    Button(L("破棄する"), role: .destructive) { rt.close(route) }
+                    Button(L("編集を続ける"), role: .cancel) {}
+                } message: {
+                    Text(L("閉じると、入力した内容は保存されません。"))
                 }
                 .task(id: route) {
                     // 新規フォームは読み込みを待たずに用意する(FormPrefill は数秒で失効するため、通信待ちで落とさない)
@@ -59,6 +71,11 @@ public struct ScreenView: View {
         } else {
             ContentUnavailableView(L("画面がありません: \(route.screen)"), systemImage: "questionmark.square.dashed")
         }
+    }
+
+    /// シート・全画面のフォームに保存していない入力があるか(M10)。
+    private var hasUnsavedInput: Bool {
+        (route.stack == "sheet" || route.stack == "full") && form?.hasUnsavedChanges == true
     }
 
     /// `screen.entity` があればドラフトを用意。recordId 付きなら既存レコードをロード(編集モード)。
@@ -89,6 +106,7 @@ public struct ScreenView: View {
         } else {
             // calendar の日付タップなど、直前に積まれた初期値を新規フォームだけが受け取る
             for (k, v) in FormPrefill.consume(for: entity) { draft.values[k] = v }
+            draft.markClean() // 直前に積まれた初期値は入力ではない(閉じても確認しない・M10)
         }
         return draft
     }
