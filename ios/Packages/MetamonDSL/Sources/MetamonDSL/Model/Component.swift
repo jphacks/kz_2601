@@ -61,6 +61,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case matchList
     // leaf(単語カード・#264)。entity / filter は共用
     case flashcards
+    // leaf(外部の公開データ・#348)。title / limit / emptyText は共用。appconfig が許可リストの出どころだけから取る
+    case feed
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -211,6 +213,10 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var front: String?          // 表の field
     public var back: String?           // 裏の field
     public var toggle: String?         // 覚えた / まだ を保存する boolean field
+    // feed(#348)。URL は持たない
+    public var provider: String?       // weather|holidays|rss
+    public var region: String?         // weather: 気象庁の府県予報区のコード
+    public var feedId: String?         // rss: 許可したフィードの id
 
     /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
     static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
@@ -234,6 +240,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance, allowRequests, autoAccept
         case show
         case front, back, toggle
+        case provider, region, feedId
     }
 
     public init(from decoder: Decoder) throws {
@@ -340,6 +347,9 @@ public struct Component: Decodable, Identifiable, Sendable {
         front = try? c.decodeIfPresent(String.self, forKey: .front)
         back = try? c.decodeIfPresent(String.self, forKey: .back)
         toggle = try? c.decodeIfPresent(String.self, forKey: .toggle)
+        provider = try? c.decodeIfPresent(String.self, forKey: .provider)
+        region = try? c.decodeIfPresent(String.self, forKey: .region)
+        feedId = try? c.decodeIfPresent(String.self, forKey: .feedId)
     }
 }
 
