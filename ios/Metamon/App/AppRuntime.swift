@@ -643,7 +643,8 @@ final class AppRuntime: DSLRuntime {
             notePublicPersonalData(result) // #253 公開の記録に個人の情報が入ったら確認
             startSync()
             if let summary = result.summary?.trimmingCharacters(in: .whitespacesAndNewlines), !summary.isEmpty {
-                summaryBanner = SummaryBanner(text: summary, highlight: PositionHint.anchor(in: summary), action: canUndo ? .undo : nil)
+                // 部品が光る時は位置の円を出さない(M7・二重に指さない)
+                summaryBanner = SummaryBanner(text: summary, highlight: stage.highlight.isEmpty ? PositionHint.anchor(in: summary) : nil, action: canUndo ? .undo : nil)
                 SpeechReader.shared.speak(summary) // #43(設定 OFF なら何もしない)
             } else {
                 // 要約が無くても完成は伝える(H8・バナーの didSet が読み上げる要約の代わり)

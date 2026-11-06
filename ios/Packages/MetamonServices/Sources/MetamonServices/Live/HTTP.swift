@@ -139,6 +139,7 @@ enum HTTP {
         if let bearer = try await token.idToken() { req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
         if let check = await appCheck?.token(forceRefresh: false) { req.setValue(check, forHTTPHeaderField: AppCheckHeader.name) }
         let (bytes, resp) = try await session.bytes(for: req)
+        noteRemaining(resp as? HTTPURLResponse) // #630: 生成のストリームの応答でも「今日の残り」を更新
         return (bytes, resp as? HTTPURLResponse)
     }
 
