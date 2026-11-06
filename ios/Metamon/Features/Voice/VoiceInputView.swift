@@ -97,6 +97,13 @@ struct VoiceInputView: View {
             insertDraft(draft)
         }
         .onTapGesture { typing = false }
+        // 録音中にシートを下に払って閉じたら録音を捨てる(マイクが点いたまま残り、次に話した時に前の音が混ざっていた)
+        .onDisappear {
+            guard phase == .listening else { return }
+            transcriber.cancelRecording()
+            SpeechReader.shared.recordingFinished()
+            phase = .idle
+        }
         // #43 初期画面の挨拶を読み上げ(対話中・生成中・生成後のシートでは読まない)
         .task(id: "\(isInitial)|\(inChat)|\(greeting.title)") {
             // 対話 →「この内容で作る」直後は inChat=false でも生成開始が数フレーム遅れるので、少し待ってから判定する
