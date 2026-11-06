@@ -210,6 +210,7 @@ const (
 	ActionExport        ActionType = "export"
 	ActionStartActivity ActionType = "startActivity" // #423 Live Activity
 	ActionEndActivity   ActionType = "endActivity"
+	ActionAddCalendar   ActionType = "addToCalendar" // system "new event" sheet (calendar_event.go)
 )
 
 // Action is a non-nesting side effect triggered by buttons/list taps.
@@ -228,6 +229,9 @@ type Action struct {
 	Fields         []string      `json:"fields,omitempty"`         // export: columns (default all but photo/video)
 	Title          string        `json:"title,omitempty"`          // export: file name / PDF heading
 	Activity       *Activity     `json:"activity,omitempty"`       // startActivity (#423)
+
+	// addToCalendar: the record fields that become the event (calendar_event.go)
+	CalendarEvent *CalendarEvent `json:"calendarEvent,omitempty"`
 }
 
 // ComponentType discriminates Component.
