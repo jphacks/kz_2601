@@ -645,6 +645,8 @@ func (a *App) Validate() error {
 				checkTranscribeField(where, c, formEntity, add)
 			case CompSpeakButton: // speech.go
 				checkSpeakButton(where, c, formEntity, entities, add)
+			case CompDrawingField:
+				checkDrawingField(where, c, formEntity, add)
 			case CompEmptyState:
 				if c.Title == "" {
 					add("%s: emptyState needs title", where)

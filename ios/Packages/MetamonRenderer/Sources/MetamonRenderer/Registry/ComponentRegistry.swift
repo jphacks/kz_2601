@@ -52,6 +52,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.picker) { c, ctx in PickerLeaf(c: c, ctx: ctx) }
         r.register(.toggle) { c, ctx in ToggleLeaf(c: c, ctx: ctx) }
         r.register(.photoField) { c, ctx in PhotoFieldLeaf(c: c, ctx: ctx) }
+        r.register(.drawingField) { c, ctx in DrawingFieldLeaf(c: c, ctx: ctx) } // 審査用ビルドにも入れる(写真と同じ扱い・権限を使わない)
         r.register(.image) { c, ctx in ImageLeaf(c: c, ctx: ctx) }
         r.register(.videoField) { c, ctx in VideoFieldLeaf(c: c, ctx: ctx) }
         r.register(.videoPlayer) { c, ctx in VideoPlayerLeaf(c: c, ctx: ctx) }

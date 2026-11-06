@@ -1,0 +1,57 @@
+{
+  "screens" : [
+    {
+      "form" : {
+        "entity" : "sketch",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {}
+      },
+      "id" : "form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 1
+          },
+          "id" : "t",
+          "props" : {
+            "field" : "title",
+            "label" : "題",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "textField"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 1,
+            "rowSpan" : 5
+          },
+          "id" : "d",
+          "props" : {
+            "field" : "art",
+            "label" : "手書き",
+            "value" : null
+          },
+          "state" : "rendered",
+          "type" : "drawingField"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "form",
+        "stack" : "main"
+      },
+      "title" : "スケッチ",
+      "toolbar" : []
+    }
+  ]
+}

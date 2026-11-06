@@ -120,6 +120,23 @@
         }
       }
     },
+    "%@(描いた絵あり)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (drawn)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@(描いた絵あり)"
+          }
+        }
+      }
+    },
     "%@(添付済み)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1327,6 +1344,23 @@
         }
       }
     },
+    "やり直す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "やり直す"
+          }
+        }
+      }
+    },
     "アプリを更新すると表示できます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1565,6 +1599,23 @@
         }
       }
     },
+    "タップして描く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to draw"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップして描く"
+          }
+        }
+      }
+    },
     "タップで編集" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1765,6 +1816,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ヘルスデータを取得できませんでした"
+          }
+        }
+      }
+    },
+    "ペン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pen"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペン"
           }
         }
       }
@@ -2194,6 +2262,23 @@
         }
       }
     },
+    "何も描いていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing drawn"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何も描いていません"
+          }
+        }
+      }
+    },
     "保存した映像" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2279,6 +2364,23 @@
         }
       }
     },
+    "保存せずに閉じる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close without saving"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存せずに閉じる"
+          }
+        }
+      }
+    },
     "保存できませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2347,6 +2449,23 @@
         }
       }
     },
+    "元に戻す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元に戻す"
+          }
+        }
+      }
+    },
     "充電中" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2394,6 +2513,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全員"
+          }
+        }
+      }
+    },
+    "全部消しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cleared"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部消しました"
+          }
+        }
+      }
+    },
+    "全部消しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear everything?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部消しますか?"
+          }
+        }
+      }
+    },
+    "全部消す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear all"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部消す"
           }
         }
       }
@@ -2993,6 +3163,57 @@
         }
       }
     },
+    "手書き" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drawing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手書き"
+          }
+        }
+      }
+    },
+    "手書きのキャンバス" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drawing canvas"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手書きのキャンバス"
+          }
+        }
+      }
+    },
+    "手書きの画面を開きます。指や Apple Pencil で描けます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the drawing screen. Draw with your finger or Apple Pencil."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手書きの画面を開きます。指や Apple Pencil で描けます"
+          }
+        }
+      }
+    },
     "承認" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3057,6 +3278,91 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "押した時だけ位置を記録します(最長%lld分で自動停止)"
+          }
+        }
+      }
+    },
+    "指や Apple Pencil で描きます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Draw with your finger or Apple Pencil"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指や Apple Pencil で描きます"
+          }
+        }
+      }
+    },
+    "描いた線と前に描いた絵を全部消します" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erases all strokes and the earlier drawing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描いた線と前に描いた絵を全部消します"
+          }
+        }
+      }
+    },
+    "描いた線を保存せずに閉じますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close without saving your drawing?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描いた線を保存せずに閉じますか?"
+          }
+        }
+      }
+    },
+    "描き続ける" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep drawing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描き続ける"
+          }
+        }
+      }
+    },
+    "描き足す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Draw more"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描き足す"
           }
         }
       }
@@ -3380,6 +3686,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "水平です"
+          }
+        }
+      }
+    },
+    "消しゴム" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eraser"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "消しゴム"
           }
         }
       }
@@ -3771,6 +4094,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "絞り込み: %@"
+          }
+        }
+      }
+    },
+    "線 %lld 本" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld strokes"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "線 %lld 本"
           }
         }
       }
@@ -4434,6 +4774,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "進捗"
+          }
+        }
+      }
+    },
+    "道具" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tool"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "道具"
           }
         }
       }
