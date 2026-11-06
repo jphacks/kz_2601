@@ -184,6 +184,11 @@
           "description": "1 人 1 回のトグルで付ける「自分だけの印」(いいね・保存・お気に入り・既読・行きたい)。public/shared の entity だけ。印はレコードの項目ではなく、誰が付けたかを backend が記録する(押すたびに増えない・付け外しできる・件数は自動で数える)。list.item.mark に id を書くと、行の右端にアイコンと件数のトグルが出る。",
           "x-usage": "「いいね」「お気に入り」「保存」「ブックマーク」「既読」「行きたい」と言われたら marks を使う。いいね用・保存用の別 entity、親を指す ref、件数の computed(agg count)は作らない(1 人で何回でも押せてしまう・全項目の打ち直しになる)。件数は $marks.<id>(table の列 / sort で多い順。行のトグルにも件数が出るので list.item.trailing には要らない)。「保存したもの」「お気に入り一覧」「既読にしたもの」は filter {\"field\":\"$marks.<id>\",\"op\":\"eq\",\"value\":{\"me\":true}} の一覧(op neq = まだ付けていない = 未読)。その一覧の item にも同じ mark を書く(そこで外せる)。private の entity には書かない(自分だけの記録の「済み」は boolean field + list.item.toggle)。コメント・出欠のように中身のある記録は今まで通り別 entity。"
         },
+        "single": {
+          "type": "boolean",
+          "description": "設定値の置き場(#267)。true の entity はレコードが常に 1 件だけ: フォーム画面(screen.entity)は開くと既存の 1 件の「編集」になり(追加・削除なし・初回は defaultValue が入った空の 1 件)、一覧には並べない。値は式 {\"setting\":\"<fieldId>\"} でどこからでも読む。private の entity だけ。",
+          "x-usage": "周期の日数・目標(体重・貯金・歩数)・月の予算・1 日の上限など、アプリ全体で 1 つだけの値は single の entity(例 settings{cycle_days:integer defaultValue 28})にまとめ、値の field に defaultValue を付ける。日々たまる記録・一覧で選ぶマスタ(カテゴリ・メンバー)には付けない。single の entity は list / table / stat の aggregate / chart などの entity・agg・ref field の refEntity・deleteRecord に使わない(backend が拒否する)。設定画面へは toolbar / button の navigate で開く(onItemTap にしない)。"
+        },
         "fields": {
           "type": "array",
           "items": {
@@ -3243,7 +3248,7 @@
       "x-usage": "候補を登録する list と同じ画面に置く: randomPicker を上に A1:F5、候補の list を A6:F10、追加ボタンは右下(D11:F12)。entity は例 dish{name: string(required), genre: enum(任意)}、titleField に name。label は「今日の晩ごはんを決める」のように動詞で。onItemTap は通常 list と同じフォームへの navigate(sheet)。"
     },
     "Expr": {
-      "description": "計算式(式ツリー)。リテラル(number/string/boolean)・{ref}(行のフィールド値)・{agg}(エンティティの集計)・{op,args}(関数)・{if,then,else}。評価エラー(ゼロ除算・型不一致・参照先なし)は iOS で「—」表示。深さ 8 まで。",
+      "description": "計算式(式ツリー)。リテラル(number/string/boolean)・{ref}(行のフィールド値)・{agg}(エンティティの集計)・{op,args}(関数)・{if,then,else}・{setting}(single の entity の設定値)。評価エラー(ゼロ除算・型不一致・参照先なし)は iOS で「—」表示。深さ 8 まで。",
       "x-usage": "置き場所は Field.computed(行ごとの算出列・ref 可)と stat.value(画面のスカラー・ref 不可)。発話に計算(割る・差・率・残り・日数・BMI など)がある時だけ足す。",
       "anyOf": [
         {
@@ -3266,19 +3271,23 @@
         },
         {
           "$ref": "#/$defs/ExprIf"
+        },
+        {
+          "$ref": "#/$defs/ExprSetting"
         }
       ],
       "x-recipes": [
         "割り勘(members{name} + expenses{title,amount:currency,payer:ref→members,split_with:refs→members 割り勘する人・未選択 = 全員,date}): expenses.computed per_person = {\"op\":\"div\",\"args\":[{\"ref\":\"amount\"},{\"op\":\"len\",\"args\":[{\"ref\":\"split_with\"}]}]}(len = 選んだ人数・未選択なら全員の人数) / members.computed paid = {\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"amount\",\"filter\":{\"field\":\"payer\",\"op\":\"eq\",\"value\":{\"ref\":\"id\"}}} / share = {\"agg\":\"sum\",\"entity\":\"expenses\",\"field\":\"per_person\",\"filter\":{\"field\":\"split_with\",\"op\":\"contains\",\"value\":{\"ref\":\"id\"}}} / balance = {\"op\":\"round\",\"args\":[{\"op\":\"sub\",\"args\":[{\"ref\":\"paid\"},{\"ref\":\"share\"}]}]}。ホームに stat(合計 aggregate sum)+ members の list(title name・trailing balance・swipeToDelete・onItemTap で member_form)+ settlement{entity:members,nameField:name,balanceField:balance}。支出フォームの payer と split_with は picker、member_form に deleteRecord ボタン(メンバーを消せる)。中間 entity(splits)は作らない。",
         "BMI(body{date,weight:number kg,height:number cm}): body.computed bmi(number) = {\"op\":\"div\",\"args\":[{\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"op\":\"div\",\"args\":[{\"ref\":\"weight\"},{\"op\":\"pow\",\"args\":[{\"op\":\"div\",\"args\":[{\"ref\":\"height\"},100]},2]}]},10]}]},10]}(小数 1 桁)。list の trailing / table の列に bmi。",
         "今の値・最新の記録(今の体重・最後に水をやった日): stat{aggregate:latest,entity:body,field:weight,by:date}、式の中なら {\"agg\":\"latest\",\"entity\":\"body\",\"field\":\"weight\",\"by\":\"date\"}(by = 並べる日付 field、field = 返す値・computed 可)。今の BMI = latest の field に computed bmi。最初の記録は earliest(体重の増減 = sub(latest, earliest))。",
-        "残り予算: stat.value = {\"op\":\"sub\",\"args\":[<予算>,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]}。予算額が発話に無い/後で変えたいなら budget{amount:currency,date:date} entity を作り <予算> = {\"agg\":\"latest\",\"entity\":\"budget\",\"field\":\"amount\",\"by\":\"date\"}(最後に設定した額。max だと下げた予算が反映されない)。",
+        "残り予算: stat.value = {\"op\":\"sub\",\"args\":[<予算>,{\"agg\":\"sum\",\"entity\":\"expense\",\"field\":\"amount\",\"filter\":{\"field\":\"date\",\"op\":\"thisMonth\",\"value\":null}}]}。予算額が発話に無い/後で変えたいなら single の entity settings{budget:currency defaultValue 30000}(#267)を作り <予算> = {\"setting\":\"budget\"}(設定画面で編集するだけ・記録を追加させない)。",
         "達成率: stat{format:percent,value:{\"op\":\"div\",\"args\":[{\"agg\":\"sum\",\"entity\":\"saving\",\"field\":\"amount\"},<目標>]}}(percent は 0..1 を % 表示)+ progressBar{entity,field,target:<目標>}。",
         "カウントダウン: exam{title,date:date} の computed days_left(integer) = {\"op\":\"daysUntil\",\"args\":[{\"ref\":\"date\"}]}。list の trailing に days_left、最も近い試験は stat.value = {\"agg\":\"min\",\"entity\":\"exam\",\"field\":\"days_left\",\"filter\":{\"field\":\"days_left\",\"op\":\"gte\",\"value\":0}}。",
         "シフト・バイト代(shift{date,start:string \"HH:mm\"(timePicker),end:string \"HH:mm\",wage:currency 時給}): computed hours(number) = {\"op\":\"hoursBetween\",\"args\":[{\"ref\":\"start\"},{\"ref\":\"end\"}]}(22:00→翌 5:00 は 7)/ pay(currency) = {\"op\":\"round\",\"args\":[{\"op\":\"mul\",\"args\":[{\"ref\":\"hours\"},{\"ref\":\"wage\"}]}]}。今月の給料 = stat aggregate sum pay filter date thisMonth。休憩(分)を引く = hours = max(hoursBetween(start,end) − coalesce(break_min,0) / 60, 0)(break_min:integer unit 分)。夜勤は式を変えない。時刻を toNumber / sub しない。",
         "マスタの値を記録で使う(家事の点数・商品の単価・科目の単位数): 記録 log{chore:ref→chores,...} の computed points(number) = {\"ref\":\"chore.points\"}(ref field 名 + . + 参照先の field・1 段だけ)。単価 × 個数 = {\"op\":\"mul\",\"args\":[{\"ref\":\"item.price\"},{\"ref\":\"qty\"}]}。記録側に同じ値の入力欄(stepper 等)を作らない。人ごとの合計は人 entity の computed agg sum に log.points を使う。",
         "毎日チェックの連続日数・直近 7 日(服薬・習慣 medicine{name,taken_on:date} + list item {toggle:taken_on,resets:daily}): medicine.computed streak(integer) = {\"op\":\"streak\",\"args\":[{\"ref\":\"taken_on\"}]} / last7(integer) = {\"op\":\"doneInDays\",\"args\":[{\"ref\":\"taken_on\"},7]}(丸を押した日は iOS が履歴に残す・実施記録 entity は作らない)。list の trailing に streak、全体は stat.value {\"agg\":\"max\",\"entity\":\"medicine\",\"field\":\"streak\"}(最長の連続)/ {\"agg\":\"sum\",\"entity\":\"medicine\",\"field\":\"last7\"}(直近 7 日の合計回数)。",
-        "クイズの自動採点(#262・questions{text:string 問題文,choices:text 選択肢「A 東京 / B 大阪 …」,correct:enum A/B/C/D hidden:true 正解,points:integer} + players{name} + answers{question:ref→questions,player:ref→players,choice:enum A/B/C/D}・3 つとも scope public): answers.computed is_correct(boolean) = {\"op\":\"eq\",\"args\":[{\"ref\":\"choice\"},{\"ref\":\"question.correct\"}]} / score(integer) = {\"if\":{\"ref\":\"is_correct\"},\"then\":{\"ref\":\"question.points\"},\"else\":0} / players.computed total(integer) = {\"agg\":\"sum\",\"entity\":\"answers\",\"field\":\"score\",\"filter\":{\"field\":\"player\",\"op\":\"eq\",\"value\":{\"ref\":\"id\"}}}。正解は hidden の field にして一覧・表に出さない(回答の一覧は is_correct / score を出す・正解を写すだけの computed は作らない)。回答フォームは picker で問題・回答者・選択肢を選ぶ(点数の入力欄は作らない)。ランキング = players の table を total で sort desc。"
+        "クイズの自動採点(#262・questions{text:string 問題文,choices:text 選択肢「A 東京 / B 大阪 …」,correct:enum A/B/C/D hidden:true 正解,points:integer} + players{name} + answers{question:ref→questions,player:ref→players,choice:enum A/B/C/D}・3 つとも scope public): answers.computed is_correct(boolean) = {\"op\":\"eq\",\"args\":[{\"ref\":\"choice\"},{\"ref\":\"question.correct\"}]} / score(integer) = {\"if\":{\"ref\":\"is_correct\"},\"then\":{\"ref\":\"question.points\"},\"else\":0} / players.computed total(integer) = {\"agg\":\"sum\",\"entity\":\"answers\",\"field\":\"score\",\"filter\":{\"field\":\"player\",\"op\":\"eq\",\"value\":{\"ref\":\"id\"}}}。正解は hidden の field にして一覧・表に出さない(回答の一覧は is_correct / score を出す・正解を写すだけの computed は作らない)。回答フォームは picker で問題・回答者・選択肢を選ぶ(点数の入力欄は作らない)。ランキング = players の table を total で sort desc。",
+        "周期から次の予定日(生理・交換・定期の手入れ・#267): settings{cycle_days:integer defaultValue 28}(single: true)+ periods{start_on:date}。次の予定日 stat.value = {\"op\":\"addDays\",\"args\":[{\"agg\":\"latest\",\"entity\":\"periods\",\"field\":\"start_on\",\"by\":\"start_on\"},{\"setting\":\"cycle_days\"}]}、あと何日 = daysUntil(同じ式)。周期は settings のフォーム(navigate で開く「周期の設定」)で編集し、一覧に周期の記録を並べない。"
       ]
     },
     "ExprRef": {
@@ -3524,6 +3533,20 @@
         },
         "else": {
           "$ref": "#/$defs/Expr"
+        }
+      }
+    },
+    "ExprSetting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "setting"
+      ],
+      "description": "single の entity(設定値の置き場・#267)の 1 件のレコードのフィールド値。行が無い場所(stat.value・progressBar.value・通知の when)でも、どの entity の computed からでも読める。保存前・未入力は field の defaultValue。",
+      "properties": {
+        "setting": {
+          "type": "string",
+          "description": "Field id of a single entity (one field id may belong to only one single entity)."
         }
       }
     },

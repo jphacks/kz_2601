@@ -48,7 +48,7 @@ func TestRetentionRestriction(t *testing.T) {
 	if r := NewClientRestriction(nil, nil, nil); r.Active() {
 		t.Fatal("no allowedComponents = no restriction")
 	}
-	if r := NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching}); r.Active() {
+	if r := NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity}); r.Active() {
 		t.Fatal("a build that purges and draws every part must stay unrestricted (byte-identical prompt)")
 	}
 	old := NewClientRestriction(all, nil, nil)

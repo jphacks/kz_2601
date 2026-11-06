@@ -470,6 +470,9 @@ func (l *linter) settingEntities() map[string]bool {
 		}
 	}
 	out := map[string]bool{}
+	for _, id := range l.app.SingleEntities() {
+		out[id] = true // #267: edited on its form, read with {"setting": ...}
+	}
 	for id := range scalar {
 		if !other[id] {
 			out[id] = true
@@ -479,7 +482,7 @@ func (l *linter) settingEntities() map[string]bool {
 }
 
 // usesPickAgg: the stat reads one record (aggregate latest/earliest, or an
-// agg latest/earliest somewhere in value).
+// agg latest/earliest or a setting somewhere in value).
 func usesPickAgg(c *Component) bool {
 	if IsPickAgg(c.Aggregate) {
 		return true
@@ -487,8 +490,8 @@ func usesPickAgg(c *Component) bool {
 	found := false
 	if c.Type == CompStat && c.Value != nil {
 		walkExpr(c.Value, func(x *Expr) {
-			if x.Kind == ExprAgg && x.Agg != nil && IsPickAgg(x.Agg.Agg) {
-				found = true
+			if (x.Kind == ExprAgg && x.Agg != nil && IsPickAgg(x.Agg.Agg)) || x.Kind == ExprSetting {
+				found = true // a setting is the current value too (#267)
 			}
 		})
 	}

@@ -19,9 +19,9 @@ final class ReviewBuildTests: XCTestCase {
     /// #482・#265: 記録の自動削除・条件の通知はどの版も持つ。#507: 仲間探しは審査用の版では送らない(backend が match・item.interest・matchList を使わない)。
     func testSupportedFeatures() {
         #if APP_STORE_REVIEW
-        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "notification.when"])
+        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "notification.when", "singleEntity"])
         #else
-        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "matching", "notification.when"])
+        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "matching", "notification.when", "singleEntity"])
         #endif
     }
 

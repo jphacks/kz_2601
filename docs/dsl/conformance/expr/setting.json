@@ -1,0 +1,98 @@
+{
+  "description": "setting (#267): a field of the single entity's one record; defaultValue before the first save, the newest record when an older build added more.",
+  "defaults": {
+    "now": "2026-10-28T15:30:45+09:00",
+    "timeZone": "Asia/Tokyo",
+    "entities": [
+      {
+        "id": "settings",
+        "name": "設定",
+        "fields": [
+          {"id": "cycle_days", "name": "周期", "type": "integer", "defaultValue": 28},
+          {"id": "goal", "name": "目標", "type": "number"},
+          {"id": "label", "name": "名前", "type": "string", "defaultValue": "周期"},
+          {"id": "since", "name": "開始日", "type": "date", "defaultValue": "now"},
+          {"id": "cycle_weeks", "name": "週", "type": "number", "computed": {"op": "div", "args": [{"ref": "cycle_days"}, 7]}}
+        ],
+        "single": true
+      },
+      {"id": "periods", "name": "生理", "fields": [{"id": "start_on", "name": "開始日", "type": "date"}]}
+    ],
+    "records": {
+      "periods": [
+        {"id": "p1", "data": {"start_on": "2026-09-01"}, "createdAt": "2026-09-01T08:00:00Z"},
+        {"id": "p2", "data": {"start_on": "2026-10-03"}, "createdAt": "2026-10-03T08:00:00Z"}
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "setting/default-before-first-save",
+      "expr": {"setting": "cycle_days"},
+      "expected": {"type": "number", "value": 28, "text": "28"}
+    },
+    {
+      "name": "setting/saved-value",
+      "expr": {"setting": "cycle_days"},
+      "records": {"settings": [{"id": "s1", "data": {"cycle_days": 30}, "createdAt": "2026-10-01T00:00:00Z"}]},
+      "expected": {"type": "number", "value": 30, "text": "30"}
+    },
+    {
+      "name": "setting/empty-field-reads-default",
+      "expr": {"setting": "cycle_days"},
+      "records": {"settings": [{"id": "s1", "data": {"goal": 50}, "createdAt": "2026-10-01T00:00:00Z"}]},
+      "expected": {"type": "number", "value": 28, "text": "28"}
+    },
+    {"name": "setting/no-default-is-nil", "expr": {"setting": "goal"}, "expected": {"type": "nil"}},
+    {
+      "name": "setting/string-default",
+      "expr": {"setting": "label"},
+      "expected": {"type": "string", "value": "周期", "text": "周期"}
+    },
+    {"name": "setting/date-now-default-not-applied", "expr": {"setting": "since"}, "expected": {"type": "nil"}},
+    {
+      "name": "setting/newest-of-many",
+      "expr": {"setting": "cycle_days"},
+      "records": {
+        "settings": [
+          {"id": "s2", "data": {"cycle_days": 32}, "createdAt": "2026-10-05T00:00:00Z"},
+          {"id": "s1", "data": {"cycle_days": 30}, "createdAt": "2026-10-01T00:00:00Z"}
+        ]
+      },
+      "expected": {"type": "number", "value": 32, "text": "32"}
+    },
+    {
+      "name": "setting/same-createdAt-later-wins",
+      "expr": {"setting": "cycle_days"},
+      "records": {"settings": [{"id": "s1", "data": {"cycle_days": 30}}, {"id": "s2", "data": {"cycle_days": 31}}]},
+      "expected": {"type": "number", "value": 31, "text": "31"}
+    },
+    {
+      "name": "setting/computed-before-first-save",
+      "expr": {"setting": "cycle_weeks"},
+      "expected": {"type": "number", "value": 4, "text": "4"}
+    },
+    {
+      "name": "setting/computed-saved",
+      "expr": {"setting": "cycle_weeks"},
+      "records": {"settings": [{"id": "s1", "data": {"cycle_days": 35}, "createdAt": "2026-10-01T00:00:00Z"}]},
+      "expected": {"type": "number", "value": 5, "text": "5"}
+    },
+    {"name": "setting/unknown-field-is-nil", "expr": {"setting": "start_on"}, "expected": {"type": "nil"}},
+    {
+      "name": "setting/next-period",
+      "expr": {
+        "op": "addDays",
+        "args": [{"entity": "periods", "agg": "latest", "field": "start_on", "by": "start_on"}, {"setting": "cycle_days"}]
+      },
+      "expected": {"type": "date", "value": "2026-10-31T00:00:00+09:00", "text": "2026-10-31"}
+    },
+    {
+      "name": "setting/in-row",
+      "expr": {"op": "addDays", "args": [{"ref": "start_on"}, {"setting": "cycle_days"}]},
+      "row": {"entity": "periods", "record": {"id": "p2", "data": {"start_on": "2026-10-03"}}},
+      "records": {"settings": [{"id": "s1", "data": {"cycle_days": 30}, "createdAt": "2026-10-01T00:00:00Z"}]},
+      "expected": {"type": "date", "value": "2026-11-02T00:00:00+09:00", "text": "2026-11-02"}
+    }
+  ]
+}

@@ -48,7 +48,7 @@ public struct ScreenView: View {
                 }
                 .task(id: route) {
                     // 新規フォームは読み込みを待たずに用意する(FormPrefill は数秒で失効するため、通信待ちで落とさない)
-                    if route.recordId == nil { setUpForm(screen) }
+                    if route.recordId == nil { setUpForm(screen) } // single(#267)は読み込み後に既存の 1 件へ差し替わる
                     await rt.load(entities: rt.dsl.entitiesNeeded(by: screen))
                     setUpForm(screen)
                 }
@@ -66,10 +66,16 @@ public struct ScreenView: View {
             form = nil
             return
         }
-        let record = route.recordId.flatMap { id in rt.records(for: entityId).first { $0.id == id } }
+        let record = Self.formRecord(entity: entity, recordId: route.recordId, records: rt.records(for: entityId))
         if form == nil || form?.entity.id != entityId || form?.recordId != record?.id {
             form = Self.makeDraft(entity: entity, record: record, rt: rt)
         }
+    }
+
+    /// フォームが編集するレコード。single の entity(#267)は recordId によらず、その 1 件(無ければ nil = 初期値の新規)。
+    static func formRecord(entity: Entity, recordId: String?, records: [Record]) -> Record? {
+        if entity.single { return SingleRecord.pick(records) }
+        return recordId.flatMap { id in records.first { $0.id == id } }
     }
 
     /// フォームのドラフト(既存レコードなら編集・権限、新規なら直前に積まれた初期値)。適合テストの描画の木(`RenderTree`)も同じ作り方を使う。
@@ -78,7 +84,7 @@ public struct ScreenView: View {
         let draft = FormDraft(entity: entity, record: record)
         if let record {
             draft.isReadOnly = !rt.canEdit(entity: entity.id, record: record)
-            draft.canDelete = rt.canDelete(entity: entity.id, record: record)
+            draft.canDelete = !entity.single && rt.canDelete(entity: entity.id, record: record) // single の 1 件は消さない(#267)
         } else {
             // calendar の日付タップなど、直前に積まれた初期値を新規フォームだけが受け取る
             for (k, v) in FormPrefill.consume(for: entity) { draft.values[k] = v }

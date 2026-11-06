@@ -40,6 +40,12 @@ const FeatureRecordRetention = "recordRetention"
 // as a plain repeat once (a 09:00 reminder), so it is never generated for them.
 const FeatureNotificationWhen = "notification.when"
 
+// FeatureSingleEntity (#267) is a supportedFeatures value: the iOS build edits
+// the one record of an Entity.single and evaluates {"setting": ...}. Older
+// builds add a record each time the settings form is saved and cannot read a
+// computed that uses setting.
+const FeatureSingleEntity = "singleEntity"
+
 // Restriction is the per-request set of unusable parts. The zero value means
 // no restriction.
 type Restriction struct {
@@ -53,7 +59,9 @@ type Restriction struct {
 	noWhen bool
 	// noMatching (#507): the client has no matching UI (Entity.match)
 	noMatching bool
-	key        string // "" = no restriction; memo key otherwise
+	// noSingle (#267): the client has no Entity.single / {"setting": ...}
+	noSingle bool
+	key      string // "" = no restriction; memo key otherwise
 }
 
 // knownComponentTypes are the container and leaf types of the canonical schema.
@@ -129,6 +137,9 @@ func NewClientRestriction(allowed, disabled, supported []string) Restriction {
 	if len(allowed) > 0 && !slices.Contains(supported, FeatureMatching) {
 		r.noMatching = true
 	}
+	if len(allowed) > 0 && !slices.Contains(supported, FeatureSingleEntity) {
+		r.noSingle = true
+	}
 	r.withholdMatchingUI()
 	r.setKey()
 	return r
@@ -148,11 +159,14 @@ func (r *Restriction) withholdMatchingUI() {
 
 func (r *Restriction) setKey() {
 	r.key = ""
-	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared || r.noRetention || r.noWhen || r.noMatching {
+	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared || r.noRetention || r.noWhen || r.noMatching || r.noSingle {
 		r.key = strings.Join(r.Disallowed(), ",") + fmt.Sprintf("|h=%t|c=%t|s=%t|r=%t|w=%t", r.noHealth, r.noCamera, r.noShared, r.noRetention, r.noWhen) +
-			fmt.Sprintf("|m=%t", r.noMatching)
+			fmt.Sprintf("|m=%t|1=%t", r.noMatching, r.noSingle)
 	}
 }
+
+// NoSingle reports whether Entity.single / {"setting": ...} is unavailable (#267).
+func (r Restriction) NoSingle() bool { return r.noSingle }
 
 // NoMatching reports whether Entity.match is unavailable (#507).
 func (r Restriction) NoMatching() bool { return r.noMatching }
@@ -312,6 +326,9 @@ func restrictSchemaJSON(raw []byte, r Restriction) []byte {
 			delete(props, "interest")
 		}
 	}
+	if r.noSingle {
+		restrictSingle(defs)
+	}
 	if r.disallowed[string(dsl.CompWebView)] {
 		// openUrlButton's description points to webView for embedding (#452 G3)
 		for _, v := range defs {
@@ -463,6 +480,12 @@ func buildRestrictedPrompt(system string, r Restriction) string {
 		s = strings.Replace(s, "\n\n"+matchingRules, "", 1)
 		s = strings.Replace(s, matchingChatRule, noMatchingChatRule, 1)
 	}
+	if r.noSingle {
+		s = strings.Replace(s, "\n\n"+singleRules, "", 1)
+		s = strings.Replace(s, settingsSingleLine, settingsLatestLine, 1)
+		s = strings.Replace(s, notifySettingBudget, notifyLatestBudget, 1)
+		s = strings.Replace(s, singleChatRule, noSingleChatRule, 1)
+	}
 
 	// Rule lines that route an utterance to a disallowed part
 	// (「歩数を見たい」は healthStat ...) are dropped.
@@ -520,6 +543,9 @@ func restrictionNote(r Restriction) string {
 	}
 	if r.noMatching && !r.noShared {
 		b.WriteString("- entity の match は使わない(この版ではお互いに承認してつながる仕組みが無い)。仲間探しを頼まれたら「この版ではお互いに承認してつながる仕組みは使えません。最新版に更新すると使えます」と伝え、みんなで見るプロフィールの一覧(連絡先・写真・位置は載せない)で近い形を作る。\n")
+	}
+	if r.noSingle {
+		b.WriteString("- entity の single と式 {\"setting\":...} は使わない(この版では設定の 1 件を編集する画面が無い)。周期・目標・予算のような値は記録の entity に入れ、最新の値を {\"agg\":\"latest\",...} で読む。\n")
 	}
 	if r.noCamera {
 		b.WriteString("- photoField / videoField の source は library だけ(カメラで撮影はできない。写真・動画はライブラリから選ぶ)。camera / both は使わない。\n")
@@ -596,6 +622,17 @@ func restrictionViolations(raw, base []byte, r Restriction) []string {
 		for _, id := range whenNotifications(raw) {
 			if !prev[id] {
 				out = append(out, fmt.Sprintf("app.notifications %q: when (condition notification) is not available in this app build: remove the notification and substitute (e.g. a shortage list)", id))
+			}
+		}
+	}
+	if r.noSingle {
+		prev := map[string]bool{}
+		for _, id := range singleEntities(base) {
+			prev[id] = true
+		}
+		for _, id := range singleEntities(raw) {
+			if !prev[id] {
+				out = append(out, fmt.Sprintf(`entity %q: single (one record of settings) is not available in this app build: omit it, keep the values as records and read the newest with {"agg":"latest","entity":%q,"field":...} instead of {"setting":...}`, id, id))
 			}
 		}
 	}
@@ -822,7 +859,11 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 			}
 		}
 	}
-	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 && when == 0 && matching == 0 {
+	single := 0
+	if r.noSingle {
+		single = unsingle(root)
+	}
+	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 && when == 0 && matching == 0 && single == 0 {
 		return raw, nil, false
 	}
 	for _, t := range sortedIntKeys(removed) {
@@ -845,6 +886,9 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 	}
 	if matching > 0 {
 		notes = append(notes, fmt.Sprintf("dropped match / item.interest on %d place(s)", matching))
+	}
+	if single > 0 {
+		notes = append(notes, fmt.Sprintf("single -> latest records on %d entity(ies)", single))
 	}
 	b, err := json.Marshal(root)
 	if err != nil {
