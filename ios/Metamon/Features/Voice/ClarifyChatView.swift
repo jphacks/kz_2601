@@ -65,6 +65,7 @@ struct ClarifyChatView: View {
                         actionButton
                     }
                     #endif
+                    RemainingTodayBadge() // #630 今日の残り
                     inputRow
                 }
                 .padding(.bottom, Theme.Spacing.sm)

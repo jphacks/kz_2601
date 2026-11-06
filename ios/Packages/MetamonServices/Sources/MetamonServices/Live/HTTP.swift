@@ -122,7 +122,9 @@ enum HTTP {
         if let appCheck { req.setValue(appCheck, forHTTPHeaderField: AppCheckHeader.name) }
         let (data, resp) = try await session.data(for: req)
         let http = resp as? HTTPURLResponse
-        return Response(status: http?.statusCode ?? -1, data: data, headers: http?.allHeaderFields ?? [:])
+        let r = Response(status: http?.statusCode ?? -1, data: data, headers: http?.allHeaderFields ?? [:])
+        noteRemaining(r) // #630
+        return r
     }
 
     /// `Retry-After` を秒に。`120`(秒)と HTTP-date の両方を受ける。無ければ nil。
