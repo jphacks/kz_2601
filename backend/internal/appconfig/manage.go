@@ -68,15 +68,18 @@ func (h *Handler) rename(r *http.Request, id, name string) error {
 	if cur.Name == name && string(compact(next)) == string(compact(cur.DSL)) {
 		return nil
 	}
-	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
+	pub, err := h.commitPublish(r, id, app, false)
+	if err != nil {
+		return err
+	}
+	_, err = h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
 		BaseVersion: cur.CurrentVersion, DSL: next, Name: name, Patch: ops,
-		Source: &store.Source{Kind: "manual", Mode: "patch", Summary: "名前を「" + name + "」に変更"},
+		Source: &store.Source{Kind: "manual", Mode: "patch", Summary: "名前を「" + name + "」に変更"}, Publish: pub,
 		Events: h.rulesChanged(r, id, cur.DSL, app),
 	})
 	if err != nil {
 		return mapStoreErr(err, "app")
 	}
-	h.publish(r, id, app, next, v.Version)
 	return nil
 }
 
