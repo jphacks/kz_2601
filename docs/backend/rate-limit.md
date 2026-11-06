@@ -95,6 +95,22 @@ rateLimits/{env}_{yyyy-mm-dd}_global
 - **超えた時**: 403 `plan_limit_reached`。`details` は `resource`(`apps` / `recordsPerApp` / `photosPerApp`)・`plan`(`free` / `pro`)・`limit`・`used`・`upgrade`(Pro にすると上がる)・`reason: creator_plan_limit`(作成者のプランの上限。参加者は払えないので課金画面ではなく案内を出す。`pro_required` の `creator_needs_pro` と同じ考え)。ai の generate が新しいアプリで当たった時もそのまま中継する。
 - 消すと空きができる(数は今の件数で、累計ではない)。上限を下げても、もうあるものは消さない(新しく足すのが止まるだけ)。
 
+## 今の使用量(#317・#630)
+
+iOS が「今日の残り N」「上限に近い」を、断られる前に出すための読み取り。appconfig が答える(認証・App Check は他の `/v1/me` と同じ・本人の分だけ)。形は `openapi-appconfig.yaml` の tag `usage`。
+
+| API | 返すもの | 読み取りの費用 |
+| --- | --- | --- |
+| `GET /v1/me/usage` | `plan`・`tier`・`resetAt`(次の 0:00 JST)・`ai`(生成・チャット・text の今日の合計: `used` / `limit` / `remaining` と `weights`)・`apps`(自分のアプリの数と上限)・`perApp`(自分のプランのアプリごとの上限) | `ai` は上の「数える場所」の `uid` のドキュメントを 1 回読む(キャッシュしない)。`apps` は count 集計 1 回を、インスタンスごとに 30 秒キャッシュ |
+| `GET /v1/apps/{appId}/usage` | このアプリの `records` / `photos`(`used` / `limit` / `remaining`)・払う人の `plan`・`payer`(`self` / `creator`)・`upgrade` | entity ごと(+ 写真の項目ごと)の count 集計。(呼び出した人・アプリ・版)ごとに 30 秒キャッシュ |
+
+- **2 本に分けた理由**: 記録・写真はアプリごとで、数えるのに entity の数だけ集計が要る。既存の API もアプリのものは `/v1/apps/{appId}/...`、自分のものは `/v1/me/...` に置いている。一覧や設定で `/v1/me/usage` を、アプリを開いた時に `/v1/apps/{appId}/usage` を呼ぶ想定。
+- **今日の残り(`ai`)は iOS の表示と同じ数**: iOS(#653・#669 の `RemainingToday`)は ai の応答の `X-RateLimit-Remaining` / `-Limit` / `-Reset` を出している。`ai` は同じドキュメント・同じ上限(匿名 30・サインイン 60・Pro 300)・同じ 0:00 JST から出すので、`remaining` はヘッダーと同じ。違うのは、返した分(#548)がすぐ入ること(ヘッダーは次の依頼から)。生成とチャットは 1 つの枠(単位)なので分けない。「新しく作るのはあと何回」は `remaining / weights.create`。
+- **上限の値は ai の環境変数**: appconfig も `RATE_LIMIT_ANON_DAILY` / `_USER_DAILY` / `_PRO_DAILY` / `RATE_LIMIT_WEIGHT_*` / `RATE_LIMIT_COLLECTION` を読む。運用で ai の値を変えた時は appconfig にも同じ値を入れる([runtime-config.md](../infra/runtime-config.md))。`RATE_LIMIT_STORE=memory`(ai がインスタンスのメモリで数える)では `ai` は null。
+- **参加者が見る範囲**: 他の人が作ったアプリでは、作成者のプランの名前と上限・自分から見える分の数だけ。作成者の uid は返さない。scope:"shared" の entity は参加していなければ数えない。
+- `limit` / `remaining` が null = 数えない(環境変数が 0・`PLAN_LIMITS_MODE=off`)。集計に失敗した所は null で、他の所は返す。
+- 自分の写しが無いアプリは 404(`GET /dsl` と違い、ここでは写しを作らない・アプリの数も増えない)。
+
 ## 全体の遮断(#317)
 
 1 日の AI の費用(#298 の `ai.usage` の `est_cost_usd`)の合計が閾値を超えたら、**無料プランの生成を一時停止**する。Pro は止めない(上の上限まで使える)。既定は無効。
@@ -128,7 +144,7 @@ iOS の表示は別の PR(#669 が `ErrorCopy` を変えているため、その
 | 参加者(作った人の上限) | `reason: creator_plan_limit` | このアプリを作った人のプランの上限に達しました。作った人に知らせてください(作った人が Tailor It Pro にすると上限が上がります)。課金画面は出さない |
 | 全体の遮断 | 503 `free_plan_paused` | 今日は利用が集中しているため、無料プランの新しい生成を止めています。{resumeAt}(0:00)に再開します。Tailor It Pro なら続けて使えます。「もう一度」は出さない(`Retry-After` が翌日まで) |
 
-- 「近い」の表示は今は生成の回数だけ(ヘッダーがある)。アプリの数・件数・写真の「近い」を出すには、今の使用量を返す API(例: `GET /v1/me/usage`)が要る(この PR には無い)。
+- 「近い」は、生成の回数なら応答のヘッダー、アプリの数・件数・写真は下の「今の使用量」の API で分かる。
 
 ## 抜け道への対策
 

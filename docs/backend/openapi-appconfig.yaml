@@ -33,6 +33,7 @@ tags:
   - { name: records }
   - { name: release, description: 'リリース申請(#76)。features/release.md' }
   - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。features/sharing.md' }
+  - { name: usage, description: '今の使用量と上限(#317・#630)。生成・チャットの今日の残り・アプリの数・アプリごとの記録と写真。rate-limit.md の「今の使用量」' }
   - { name: versions }
 
 paths:
@@ -944,6 +945,49 @@ paths:
         '401': { description: 未認証, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '500': { description: 途中で失敗。再実行で続きが終わる, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
+  /me/usage:
+    get:
+      tags: [usage]
+      summary: 自分の今日の使用量と上限(#317・#630)
+      description: |
+        「今日の残り N」「上限に近い」を、依頼が断られる前に出すための読み取り。本人の分だけ(パスに uid は無い)。
+        - `ai`: 生成・チャット・text の合計(1 つの枠・単位は重み。新規 3・修正 2・チャット 1・text 1 は `weights`)。ai が数える `rateLimits/{env}_{日付}_uid_{uid}` をそのまま読む(1 回の読み取り・キャッシュしない)。`limit` / `remaining` は ai の `X-RateLimit-Limit` / `-Remaining` と同じ(匿名 30・サインイン 60・Pro 300)。返した分(#548)はすぐ入る(ヘッダーは次の依頼から)
+        - `ai` が null: この appconfig が数えている所を読めない(`RATE_LIMIT_STORE=memory`・読み取りの失敗)。iOS は今までどおりヘッダーの値を使う
+        - `apps`: 自分のアプリの数と上限(共有のアプリを入れたのは数えない)。最大 30 秒遅れる(インスタンスごとのキャッシュ)
+        - `perApp`: 自分のプランの、アプリごとの上限(記録・写真)。実際の数は `GET /apps/{appId}/usage`
+        - `limit` / `remaining` が null = 数えない(環境変数 0・`PLAN_LIMITS_MODE=off`)。`resetAt` は次の 0:00 JST
+      responses:
+        '200':
+          description: OK(`Cache-Control: private, no-store`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyUsage' }
+              example: { plan: free, tier: signed_in, resetAt: '2026-11-07T15:00:00Z', ai: { used: 12, limit: 60, remaining: 48, weights: { create: 3, edit: 2, chat: 1, text: 1 } }, apps: { used: 3, limit: 100, remaining: 97 }, perApp: { recordsPerApp: 5000, photosPerApp: 500 } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /apps/{appId}/usage:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [usage]
+      summary: このアプリの記録・写真の使用量と上限(#317)
+      description: |
+        次の書き込みで `plan_limit_reached` の判定に使うのと同じ数え方: 呼び出した人が見える記録(自分の分 + 共有の分)の全 entity の合計と、その写真の数。払う人のプランの上限で出す(自分のアプリは自分、他の人が作ったアプリは作成者)。
+        - 参加者が見られるのは自分から見える分の数・作成者のプラン(free / pro)と上限だけ。作成者の uid は返さない(`payer: creator`)
+        - scope:"shared" の entity は参加していなければ数えない(他のグループのデータの量を見せない)。作成者が公開していない共有の entity も数えない
+        - 自分の写しが無いアプリは 404(GET /dsl と違い、ここでは写しを作らない)
+        - 数は最大 30 秒遅れる(entity と写真の項目ごとに count 集計をするので、インスタンスごとにキャッシュ)
+      responses:
+        '200':
+          description: OK(`Cache-Control: private, no-store`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppUsage' }
+              example: { appId: kakeibo-1, plan: pro, payer: creator, upgrade: false, records: { used: 120, limit: 50000, remaining: 49880 }, photos: { used: 8, limit: 5000, remaining: 4992 } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /me/devices/{installationId}:
     parameters: [{ in: path, name: installationId, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,64}$' }, description: 'アプリの入れ直しごとに端末で作る識別子(例: UUID)' }]
     put:
@@ -1507,6 +1551,16 @@ components:
         - type: object
           required: [dsl]
           properties: { dsl: { $ref: '../dsl/dsl.schema.json' } }
+    AppUsage:
+      type: object
+      required: [appId, plan, payer, upgrade, records, photos]
+      properties:
+        appId: { type: string }
+        plan: { type: string, enum: [free, pro], description: 払う人のプラン }
+        payer: { type: string, enum: [creator, self], description: 'self = 自分のアプリ・creator = 他の人が作ったアプリ(作成者のプランで数える)' }
+        upgrade: { type: boolean, description: 'Pro にすると記録か写真の上限が上がる(`plan_limit_reached` の `upgrade` と同じ考え)' }
+        records: { oneOf: [{ $ref: '#/components/schemas/UsageMeter' }, { type: 'null' }], description: 数えられなかった時は null }
+        photos: { oneOf: [{ $ref: '#/components/schemas/UsageMeter' }, { type: 'null' }], description: 数えられなかった時は null }
     AutomationResult:
       type: string
       description: |
@@ -1581,6 +1635,13 @@ components:
         dsl: { $ref: '../dsl/dsl.schema.json' }
         source: { $ref: '#/components/schemas/VersionSource' }
         createdAt: { type: string, format: date-time }
+    UsageMeter:
+      type: object
+      required: [used, limit, remaining]
+      properties:
+        used: { type: integer, minimum: 0 }
+        limit: { type: [integer, 'null'], description: null = 数えない }
+        remaining: { type: [integer, 'null'], minimum: 0, description: 'max(0, limit - used)。null = 数えない' }
     VersionSource:
       type: object
       description: このバージョンが生まれた経緯
@@ -1689,6 +1750,36 @@ components:
         os: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    MyUsage:
+      type: object
+      required: [plan, tier, resetAt, ai, apps, perApp]
+      properties:
+        plan: { type: string, enum: [free, pro] }
+        tier: { type: string, enum: [anonymous, pro, signed_in], description: 'ai の上限の段(`RateLimitDetails.tier` と同じ)' }
+        resetAt: { type: string, format: date-time, description: 次の 0:00 JST }
+        ai:
+          description: 生成・チャット・text の今日の合計(単位)。読めない時は null
+          oneOf:
+            - type: 'null'
+            - allOf:
+                - { $ref: '#/components/schemas/UsageMeter' }
+                - type: object
+                  required: [weights]
+                  properties:
+                    weights:
+                      type: object
+                      required: [chat, create, edit, text]
+                      properties:
+                        chat: { type: integer }
+                        create: { type: integer }
+                        edit: { type: integer }
+                        text: { type: integer }
+        apps: { oneOf: [{ $ref: '#/components/schemas/UsageMeter' }, { type: 'null' }], description: 数えられなかった時は null }
+        perApp:
+          type: object
+          properties:
+            photosPerApp: { type: [integer, 'null'] }
+            recordsPerApp: { type: [integer, 'null'] }
     NotifyConsent:
       type: object
       required: [appId, allowed, updatedAt]
