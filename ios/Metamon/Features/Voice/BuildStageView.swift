@@ -3,6 +3,7 @@ import MetamonDSL
 
 /// 生成中の「組み立て台」(#626)。上に空の画面(6 列 × 12 行)、下にパーツ箱。
 /// - 待っている間: `WaitingScript` のコマに合わせて、箱の部品が持ち上がり → 画面に置かれる・入れ替わる・並べ直される
+/// - 本物の部品が SSE で届いたら(`live`・#636): 届いた順に下書きと置き換える(仮置き)。アプリのタブの形も本物にする
 /// - 結果が届いた後(`plan` あり): 本物の結果の部品を上から 1 つずつ置く
 /// Reduce Motion では位置を動かさず、フェードだけで切り替える。VoiceOver からは隠す(状態は GeneratingView の文言で伝える)。
 struct BuildStageView: View {
@@ -10,12 +11,14 @@ struct BuildStageView: View {
     let elapsed: TimeInterval
     /// 結果の組み上げ(nil なら待っている間)
     var plan: BuildChoreography.AssemblyPlan?
+    /// SSE で届いた途中経過(#636)。nil・空なら下書きだけ
+    var live: BuildChoreography.LiveDraft? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// 組み上げの開始(この時刻からの経過で各部品の delay を見る)
     @State private var revealStart: Date?
 
     private var waitingFrame: BuildChoreography.WaitingFrame {
-        script.frame(at: BuildChoreography.WaitingScript.step(elapsed: elapsed, reduceMotion: reduceMotion))
+        script.frame(at: BuildChoreography.WaitingScript.step(elapsed: elapsed, reduceMotion: reduceMotion), live: live)
     }
 
     var body: some View {
@@ -25,21 +28,22 @@ struct BuildStageView: View {
                     let t = revealStart.map { tl.date.timeIntervalSince($0) } ?? 0
                     let placed = plan.steps.filter { reduceMotion || $0.delay <= t }.map(\.part)
                     let picking = plan.steps.first { !reduceMotion && $0.delay > t }?.part.kind
-                    stage(parts: placed, rows: plan.rows, tray: plan.tray, picking: picking)
+                    stage(parts: placed, rows: plan.rows, tray: plan.tray, picking: picking, tabs: plan.tabs)
                 }
                 .onAppear { if revealStart == nil { revealStart = .now } }
             } else {
                 let frame = waitingFrame
-                stage(parts: frame.placed, rows: GridArea.visibleRows, tray: script.tray, picking: frame.picking)
+                stage(parts: frame.placed, rows: frame.rows, tray: live?.tray(base: script.tray) ?? script.tray,
+                      picking: frame.picking, tabs: live?.tabs ?? [])
             }
         }
         .accessibilityHidden(true)
     }
 
     private func stage(parts: [BuildChoreography.PlacedPart], rows: Int, tray: [BuildChoreography.PartKind],
-                       picking: BuildChoreography.PartKind?) -> some View {
+                       picking: BuildChoreography.PartKind?, tabs: [String]) -> some View {
         VStack(spacing: Theme.Spacing.md) {
-            BuildCanvas(parts: parts, rows: rows, reduceMotion: reduceMotion)
+            BuildCanvas(parts: parts, rows: rows, tabs: tabs.count >= 2 ? tabs : [], reduceMotion: reduceMotion)
                 .frame(maxWidth: 220)
                 .aspectRatio(6.0 / 10.0, contentMode: .fit)
             PartTray(kinds: tray, picking: picking, reduceMotion: reduceMotion)
@@ -51,11 +55,27 @@ struct BuildStageView: View {
 private struct BuildCanvas: View {
     let parts: [BuildChoreography.PlacedPart]
     let rows: Int
+    /// タブの見出し(2 つ以上の時だけ・画面の下に帯で出す)
+    var tabs: [String] = []
     let reduceMotion: Bool
 
     private let gap: CGFloat = 5
 
     var body: some View {
+        VStack(spacing: 0) {
+            grid
+            if !tabs.isEmpty {
+                TabStrip(titles: tabs)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.35), value: tabs)
+        .background(Theme.Colors.surface.opacity(0.7), in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.Colors.hairline))
+        .shadow(color: Theme.Shadow.softColor, radius: 12, y: 6)
+    }
+
+    private var grid: some View {
         GeometryReader { geo in
             let inset: CGFloat = 8
             let w = max(0, geo.size.width - inset * 2), h = max(0, geo.size.height - inset * 2)
@@ -84,9 +104,31 @@ private struct BuildCanvas: View {
             .padding(inset)
             .animation(reduceMotion ? .easeInOut(duration: 0.4) : .spring(duration: 0.45, bounce: 0.25), value: parts)
         }
-        .background(Theme.Colors.surface.opacity(0.7), in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.Colors.hairline))
-        .shadow(color: Theme.Shadow.softColor, radius: 12, y: 6)
+    }
+}
+
+/// 組み立て台の下のタブの帯(#636)。本物のアプリのタブの見出しを小さく並べる。
+private struct TabStrip: View {
+    let titles: [String]
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(Array(titles.prefix(5).enumerated()), id: \.offset) { i, title in
+                VStack(spacing: 2) {
+                    Circle()
+                        .fill(i == 0 ? AnyShapeStyle(Theme.brandGradient) : AnyShapeStyle(Theme.Colors.brandA.opacity(0.3)))
+                        .frame(width: 5, height: 5)
+                    Text(title)
+                        .font(.system(size: 7, weight: i == 0 ? .bold : .medium))
+                        .foregroundStyle(i == 0 ? .primary : .secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 5)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.Colors.hairline).frame(height: 0.5) }
     }
 }
 

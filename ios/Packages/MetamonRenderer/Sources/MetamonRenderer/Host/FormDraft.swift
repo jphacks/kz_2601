@@ -17,10 +17,23 @@ public final class FormDraft {
     /// 削除ボタンを出してよいか(共有レコードは作った人だけ)。
     public var canDelete = true
 
+    /// 開いた時(読み込み・保存の後)の値。`hasUnsavedChanges` の比較元(M10)
+    @ObservationIgnored private var baseline: [String: JSONValue] = [:]
+
     public init(entity: Entity, record: Record? = nil) {
         self.entity = entity
         reset()
         if let record { load(record) }
+    }
+
+    /// 今の値を「保存済み」とみなす(開いた時の初期値を入れた後・保存の後)。
+    public func markClean() {
+        baseline = normalized(values)
+    }
+
+    /// 開いてから入力を変えたか(M10: 閉じる前に破棄の確認を出す)。他人の記録(見るだけ)は false。
+    public var hasUnsavedChanges: Bool {
+        !isReadOnly && normalized(values) != baseline
     }
 
     public var isEditing: Bool { recordId != nil }
@@ -32,6 +45,7 @@ public final class FormDraft {
         for f in entity.storedFields {
             values[f.id] = FieldCoding.defaultValue(for: f)
         }
+        markClean()
     }
 
     public func load(_ record: Record) {
@@ -40,6 +54,7 @@ public final class FormDraft {
         for f in entity.storedFields {
             values[f.id] = record.data[f.id] ?? FieldCoding.defaultValue(for: f)
         }
+        markClean()
     }
 
     /// `Field.hidden`(#262)の入力を出してよいか(新規 / 自分が投稿したレコード)。
@@ -55,7 +70,9 @@ public final class FormDraft {
     }
 
     /// appconfig に送る `data`(Field.type に合わせて正規化・空は落とす)。
-    public var payload: [String: JSONValue] {
+    public var payload: [String: JSONValue] { normalized(values) }
+
+    private func normalized(_ values: [String: JSONValue]) -> [String: JSONValue] {
         var out: [String: JSONValue] = [:]
         // computed は保存しない(#101)
         for f in entity.storedFields {

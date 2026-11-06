@@ -51,7 +51,7 @@ final class SharedMembersModel {
             } else if phase == .probing {
                 phase = .hidden // 共有かどうか分からない時は出さない
             } else {
-                phase = .failed(L10n.tr("参加している人を読み込めませんでした: \(error.localizedDescription)"))
+                phase = .failed(ErrorCopy.failure(L10n.tr("参加している人を読み込めませんでした"), error, context: "SharedMembersSection"))
             }
         }
     }
@@ -73,7 +73,7 @@ final class SharedMembersModel {
                 list = back
             }
             if justRemoved == member { justRemoved = nil }
-            return L10n.tr("外せませんでした。元に戻しました: \(error.localizedDescription)")
+            return ErrorCopy.failure(L10n.tr("外せませんでした。元に戻しました"), error, context: "SharedMembersSection")
         }
     }
 
@@ -86,7 +86,7 @@ final class SharedMembersModel {
             return nil
         } catch {
             phase = before
-            return L10n.tr("抜けられませんでした。元に戻しました: \(error.localizedDescription)")
+            return ErrorCopy.failure(L10n.tr("抜けられませんでした。元に戻しました"), error, context: "SharedMembersSection")
         }
     }
 }

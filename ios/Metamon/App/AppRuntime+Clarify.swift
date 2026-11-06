@@ -60,6 +60,7 @@ extension AppRuntime {
     func submitUtterance(_ text: String, source: ClarifyFlow.InputSource = .text, timing: ChatTiming = ChatTiming()) async {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, morphJob == nil, !chatPending else { return }
+        if !hasAIConsent { utteranceAwaitingConsent = (text, source) } // M2: 同意したら捨てずに続けて送る
         if routesToChat(text) {
             chatTiming = timing
             await say(text, source: source)
@@ -81,6 +82,9 @@ extension AppRuntime {
         guard requireAIConsent() else { return nil } // #246: 同意前は吹き出しも足さない
         cancelAutoBuild()
         clearPaidConfirm() // 話し直したら確認カードは閉じる(新しい応答で判定し直す)
+        #if !APP_STORE_REVIEW
+        heldBuild = nil // 「続きから作る」も話し直したら閉じる(H3)
+        #endif
         chatLastInput = source
         withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
             chatBubbles.append(ChatBubble(role: .user, text: text))
@@ -148,8 +152,11 @@ extension AppRuntime {
             // 先に対話を消すと、対話画面の撤去と生成中表示の挿入が重なって GeneratingView が描画されず、
             // 完成まで初期画面が見えていた(#200)。生成中表示が全面を覆うので下の対話は見えない
             cancelAutoBuild()
+            keepChatAfterStop = false
             await generate(text)
-            if isChatting { resetChat() } // 失敗・圏外で保留・無料枠切れ
+            // 失敗・圏外で保留は会話を閉じる。上限・402 で止めた時は会話を残す(H3: 買う・枠が戻ったら続きから作る)
+            if isChatting, !keepChatAfterStop { resetChat() }
+            keepChatAfterStop = false
         }
     }
 
@@ -167,14 +174,18 @@ extension AppRuntime {
     }
 
     /// 会話を捨てる(「最初から」・別アプリへの切替・生成開始)。サーバー側も `DELETE /v1/chat/{appId}`。
-    func resetChat() {
-        archiveLiveChat() // #210 閉じた会話として残す(「最初から」は `restartChat` で消す)
+    /// `archive`: 今の会話を閉じた会話として残すか(「最初から」の「今の会話だけ消す」は残さない・M9)。
+    func resetChat(archive: Bool = true) {
+        if archive { archiveLiveChat() } // #210 閉じた会話として残す(「最初から」は `restartChat` で消す)
         cancelAutoBuild()
         chatTask?.cancel()
         chatTask = nil
         chatLastInput = nil
         chatEpoch += 1
         clearPaidConfirm()
+        #if !APP_STORE_REVIEW
+        heldBuild = nil
+        #endif
         let hadConversation = isChatting
         let appId = document.appId
         withAnimation(.easeInOut(duration: 0.3)) {
@@ -237,6 +248,7 @@ extension AppRuntime {
             print("[Metamon] chat timing: turn=\(turn.turn) kind=\(turn.kind.rawValue) \(timing.summary)")
             #endif
             SpeechReader.shared.speak(turn.text) // #43 AI の質問(録音中・OFF なら喋らない)
+            VoiceOverAnnouncer.announce(turn.text) // H8 AI の返事(VoiceOver が無効なら何も起きない)
             scheduleAutoBuildIfNeeded(turn)
             return turn
         } catch {

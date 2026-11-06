@@ -32,7 +32,7 @@ extension AppRuntime {
             })
         } catch {
             print("[Metamon] deleteApp failed: \(error)")
-            toast = L10n.tr("「\(app.name)」を削除できませんでした: \(error.localizedDescription)")
+            toast = ErrorCopy.failure(L10n.tr("「\(app.name)」を削除できませんでした"), error, context: "delete app")
             return
         }
         await recordSync.purge(appId: app.id)

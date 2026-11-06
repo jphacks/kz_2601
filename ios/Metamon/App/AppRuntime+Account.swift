@@ -19,6 +19,7 @@ extension AppRuntime {
         WidgetCenter.shared.reloadAllTimelines()
         LiveActivities.enqueue { await LiveActivities.endAll() } // ロック画面・Dynamic Island(#423)
         LocalWipe.clearDefaults(.standard, domain: Bundle.main.bundleIdentifier)
+        RemainingTodayStore.shared.clear()              // 今日の残り(#630・前のアカウントの数を出さない)
         aiConsent?.reload()                             // 同意(#246)・チュートリアル(#274)の画面の状態を消した後に合わせる
         tutorial?.reload()
         let center = UNUserNotificationCenter.current()
