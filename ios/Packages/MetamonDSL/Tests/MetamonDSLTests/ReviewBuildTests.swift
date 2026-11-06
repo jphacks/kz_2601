@@ -8,7 +8,7 @@ final class ReviewBuildTests: XCTestCase {
         let allowed = Set(ClientCapabilities.reviewAllowedComponents)
         for t in ClientCapabilities.reviewExcludedComponents { XCTAssertFalse(allowed.contains(t.rawValue), t.rawValue) }
         XCTAssertFalse(allowed.contains(ComponentType.unknown.rawValue))
-        for t in ["vstack", "list", "photoField", "videoField", "chart", "stat", "settlement", "calendar", "gridTable", "locationButton", "routeGuide", "flashcards"] {
+        for t in ["vstack", "list", "photoField", "videoField", "chart", "stat", "settlement", "calendar", "gridTable", "locationButton", "routeGuide", "flashcards", "fileImport"] {
             XCTAssertTrue(allowed.contains(t), t)
         }
         XCTAssertEqual(ClientCapabilities.reviewDisabledFeatures, ["fieldHealth", "cameraCapture", "sharedData"])
