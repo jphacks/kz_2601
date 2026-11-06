@@ -2415,6 +2415,23 @@
         }
       }
     },
+    "再読み込み" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reload"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再読み込み"
+          }
+        }
+      }
+    },
     "再開" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2649,6 +2666,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "削除"
+          }
+        }
+      }
+    },
+    "前のページ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前のページ"
           }
         }
       }
@@ -3193,6 +3227,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "横向き"
+          }
+        }
+      }
+    },
+    "次のページ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forward"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次のページ"
           }
         }
       }
@@ -4077,6 +4128,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "読み取れなかった項目: %@"
+          }
+        }
+      }
+    },
+    "読み込みを止める" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop loading"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み込みを止める"
           }
         }
       }

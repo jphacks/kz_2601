@@ -194,6 +194,16 @@ public final class WhisperKitRecognizer: SpeechTranscriber {
         }
     }
 
+    public func cancelRecording() {
+        guard isRecording, let pipe else { return }
+        watchdog?.cancel()
+        pipe.audioProcessor.stopRecording()
+        pipe.audioProcessor.purgeAudioSamples(keepingLast: 0)
+        isRecording = false
+        recordingStartedAt = nil
+        log("recording cancelled")
+    }
+
     public func stopAndTranscribe() async throws -> String {
         guard let pipe else { throw TranscriberFailure.notReady("\(status)") }
         guard isRecording else { return "" }

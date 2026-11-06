@@ -353,10 +353,25 @@ FAB 本体は `ios/Metamon/App/VoiceFab.swift`。判定ロジックは純粋関�
 | 部品回避 | 吸着した側の最下段 2 列(左 A〜B / 右 E〜F)に部品があれば、その上端まで上げる(#83)。Renderer が `GridBottomObstructionKey`(左)/ `GridBottomTrailingObstructionKey`(右)で上端 y を上げる。ユーザーが下げても退避位置より下には置かない(`FabDock.displayedBottom`) |
 | 背の高い部品 | 最下段に寄せた操作部品ではない背の高い list / table / section 等(背景扱い)は FAB が上に浮く。代わりに `VoiceFab` が止まっている矩形(global)を `VoiceFabFrameKey` で上げ、`RootView` が環境値 `fabFrame` で Renderer に渡す。`GridCell` のセル内スクロール(と area 無しで積んだ画面スクロール)は、FAB と重なる分だけ末尾に `contentMargins` を足し、最後の行を FAB の上までスクロールで出せる(#157・`FabClearance.contentMargin`)。隠れている / 非表示 / 横に重ならない時は 0 |
 | 保存 | `@AppStorage`: `fab.side`(leading/trailing)・`fab.bottom`(下端からの距離。-1 = 自動)・`fab.hidden`。アプリごとではなく Tailor It 共通 |
-| 維持 | フォーム表示中は出さない(#83)・生成中は沈めて触れない。Reduce Motion では吸着アニメを 0.12s の easeOut に短縮 |
+| 維持 | フォーム表示中は出さない(#83)・キーボード表示中は隠す(#143)・生成中は沈めて触れない。Reduce Motion では吸着アニメを 0.12s の easeOut に短縮 |
 | VoiceOver | 本体: 「話しかけて変える」+ アクション「変身一覧」「反対側へ移動」「端に隠す」。取っ手: 「話しかけて変える。ダブルタップで表示」+「変身一覧」 |
 
 ジェスチャ競合: `Button` は残し(VoiceOver・押下ハイライト)、長押しとドラッグを `simultaneousGesture` で重ねる。FAB が指に付いて動くので離した瞬間に Button のタップも発火する → ドラッグ認識時に `suppressTap`、長押し発火時に `longPressFired` を立ててタップを捨てる(次に指が触れた瞬間 = `LongPressGesture.onChanged` でリセット、ドラッグ後は 0.3s 後にも解除)。長押しの許容移動は 10pt でドラッグしきい値と揃える(先に 10pt 動けば長押し失敗 = ドラッグ、0.45s 静止で変身一覧)。長押し発火後のドラッグは無視。
+
+#### どの画面・シートでも出す(#629)
+
+SwiftUI のシートは別の階層に出て根の FAB が隠れるので、層ごとに同じ入口を置き、いちばん上の層だけが出す(`ios/Metamon/App/AIButton.swift`・判定は `AIButtonPlacement`・`AIButtonPlacementTests`)。
+
+| 層 | 入口 | 音声シートの表示元 |
+|---|---|---|
+| 根(タブ・メインのスタック・push 先) | 左下の FAB(`RootView`) | `HostSheets(onModal: false)` |
+| DSL のシート / 全画面(中の push を含む) | 同じ FAB(`ModalVoiceFabLayer`・タブ無し扱いの位置) | `HostSheets(onModal: true)` |
+| 部品から開くシート(場所を選ぶ・曲を探す・QR・ドラレコの映像) | ナビバー右上の小さなマイク(`ComponentAIButtonLayer`)。下側に全幅のボタン・検索欄があるので FAB にしない。長押しの変身一覧は付けない | そのシート(`AIButtonLayers` の一番上) |
+| フォーム画面(どの層でも) | ナビバー右上の小さなマイク(#83) | その層 |
+
+Renderer は部品のシートの中身に `.aiButtonTarget(c)` と `.aiButtonLayer()` を付けるだけで、ホストが環境値 `aiButtonLayer` で包む。システムのアラート・確認の選択肢(`confirmationDialog`)・カメラは UIKit が一番上に出すので、その上には出さない。
+
+押すと今見えている画面(全画面 > シート > メインのスタック)と、部品のシートなら部品を、画面マップと同じ `ScreenMapUI.context` に入れて音声シートを開く。API は変えず、transcript の先頭に「画面「B」(id: b)の部品「場所」(id: where)で: 」を付ける。タブの無いアプリの最初の画面(根)だけは付けない(アプリ全体への指示を 1 画面に縛らない)。
 
 DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例 `right-hidden:360`)/ `auto`(初期状態に戻す)。simctl でドラッグを再現しにくいので保存値を直接書く。
 
@@ -781,8 +796,10 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 
 ### 17.1 タイマー(`timerDisplay`)
 - 状態は `TimerRun { base(一時停止までの累計秒), startedAt(走行中の開始時刻) }` だけ持ち、表示秒は毎回 `now` から計算(`MetamonRenderer/Support/TimerClock.swift`)。
-- `TimerRunStore`(UserDefaults・キー `metamon.timer.<アプリ名>/<画面>/<部品 id>`)に保存。アプリを殺しても、次に開いた時に残り時間 / 完了(00:00)を正しく出す。
-- 終了通知は純粋関数 `TimerNotificationPlan.decide` で判定: **countdown が走行中で scenePhase が active 以外になった時だけ** 終了時刻に予約(識別子 `timer.<キー>`)、active に戻ったら取り消し。inactive(コントロールセンター・許可ダイアログ・App スイッチャー)でも予約するのは、スイッチャーからの強制終了でも通知を残すため(active で取り消すので重複しない)。
+- `TimerRunStore`(UserDefaults・キー `metamon.timer.<appId>/<画面>/<部品 id>`)に保存。アプリを殺しても、次に開いた時に残り時間 / 完了(00:00)を正しく出す。キーは appId で始めるので、同じ名前のアプリが 2 つあっても混ざらない(ライブアクティビティのキー・通知の識別子も同じキーから作る)。
+- 以前のキー(`<アプリ名>/...`)は起動時に 1 回だけ `TimerKeyMigration` で移す(印 `metamon.timerKeys.migratedToAppId`)。持ち主はアプリ一覧のキャッシュと開いているアプリから決め、同じ名前のアプリが複数ある時は開いているアプリがその名前ならそちらへ、それ以外は決められないので捨てる。予約済みの終了通知も新しい識別子で取り直し、古いキーのライブアクティビティは消す(部品を開くと出し直す)。
+- アプリの削除では `TimerCleanup.removeApp(appId:)` でそのアプリの走行状態と終了通知を消す。
+- 終了通知は純粋関数 `TimerNotificationPlan.decide` で判定: **countdown を開始した時点で** 終了時刻に予約(識別子 `timer.<キー>`)し、一時停止・リセット・終了で取り消す。部品の表示や scenePhase には頼らない(生成アプリを切り替えて部品が画面から消えても予約が残る)。予約・取り消しは 1 本の列で順番に流す。前面でその部品が見えている間は通知の delegate がバナーを出さない(`TimerVisibility`)。
 - 通知許可は countdown を初めて開始した時に求める。拒否されていても画面上のタイマーは正しく動く。
 - 見た目(`TimerDisplayLeaf` の body)は変更していない。
 

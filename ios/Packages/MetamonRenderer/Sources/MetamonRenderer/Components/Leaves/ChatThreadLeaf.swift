@@ -19,6 +19,7 @@ struct ChatThreadLeaf: View {
     @State private var librarySelection: PhotosPickerItem?
     @State private var showLibrary = false
     @State private var sending = false
+    @State private var echo: SentTextEcho?
     @State private var barFrame: CGRect = .zero
     @State private var scrollFrame: CGRect = .zero
     @FocusState private var focused: Bool
@@ -112,6 +113,7 @@ struct ChatThreadLeaf: View {
                     .focused($focused)
                     .keyboardAnchor(c, $focused)
                     .accessibilityIdentifier("chatThread.input")
+                    .onChange(of: draft) { _, new in dropEcho(new) }
             }
             .renderInputChrome(focused: focused)
             Button { send(entity: entity, textField: textField) } label: {
@@ -168,17 +170,38 @@ struct ChatThreadLeaf: View {
     }
 
     private func send(entity: Entity, textField: String) {
+        // 入力欄で変換中の文字を確定させて全文を読む(バインディングは確定より遅れる・#627)
+        let text = (focused ? KeyboardState.takeFocusedText() : nil) ?? draft
         let skip = [textField, c.photoField].compactMap { $0 }
-        guard let data = ChatThread.message(text: draft, photo: photo, textField: textField, photoField: c.photoField,
+        guard let data = ChatThread.message(text: text, photo: photo, textField: textField, photoField: c.photoField,
                                             base: Self.defaultData(entity, skipping: skip)) else { return }
         sending = true
+        // 送る前に空にする(送信を待つ間にキーボードから書き戻されない・続けて打てる)。失敗したら戻す
+        let sentPhoto = photo
+        if focused { KeyboardState.clearFocusedText() }
+        draft = ""
+        photo = nil
+        echo = TextSubmission.value(text).map { SentTextEcho(sent: $0) }
         let rt = rt
         Task {
-            if await rt.post(entity: entity.id, data: data) {
-                draft = ""
-                photo = nil
+            let ok = await rt.post(entity: entity.id, data: data)
+            if !ok {
+                echo = nil
+                if draft.isEmpty { draft = text }
+                if photo == nil { photo = sentPhoto }
             }
             sending = false
+        }
+    }
+
+    /// 送った直後にキーボードから書き戻された文字を消す(#627)。
+    private func dropEcho(_ new: String) {
+        guard let echo else { return }
+        if echo.shouldClear(new) {
+            KeyboardState.clearFocusedText()
+            draft = ""
+        } else if !new.isEmpty {
+            self.echo = nil
         }
     }
 }

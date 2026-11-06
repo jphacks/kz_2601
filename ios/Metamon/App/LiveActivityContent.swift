@@ -29,6 +29,10 @@ enum LiveActivityContent {
     static let finishedLinger: TimeInterval = 15 * 60
 
     static func timerKey(_ key: String) -> String { "timer:" + key }
+    /// タイマーの表示で、キーが appId で始まらないもの(移行前のアプリ名のキー)。
+    static func isLegacyTimerKey(_ key: String, appId: String) -> Bool {
+        key.hasPrefix(timerKey("")) && !key.hasPrefix(timerKey(appId + "/"))
+    }
     static func appKey(_ appId: String) -> String { "app:" + appId }
 
     // MARK: - timerDisplay.liveActivity

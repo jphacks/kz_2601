@@ -64,6 +64,7 @@ struct MetamonApp: App {
         #endif
         self.services = services
         let runtime = AppRuntime(document: document, services: services)
+        runtime.migrateTimerKeysIfNeeded() // タイマーのキーをアプリ名 → appId に(1 回だけ・部品が描かれる前)
         runtime.aiConsent = .shared
         runtime.tutorial = .shared
         #if !APP_STORE_REVIEW

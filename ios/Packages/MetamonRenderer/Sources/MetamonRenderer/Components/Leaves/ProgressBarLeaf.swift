@@ -11,7 +11,9 @@ struct ProgressBarLeaf: View {
         let raw = resolvedRatio
         let ratio = max(0, min(1, raw))
         let style = Self.style(raw: raw, tone: c.tone)
-        let percent = Self.percentText(raw: raw, tone: c.tone)
+        // 取得失敗(#85)は「0%」ではなく「—」(記録が無いのと区別・stat と同じ)
+        let unavailable = Self.isUnavailable(c, rt: rt)
+        let percent = unavailable ? EmptyPlaceholder.unavailableValue : Self.percentText(raw: raw, tone: c.tone)
         // area が 1 行しか無いとラベル + バーの 2 段がセルに収まらず、下端が隣のセルに隠れていた(#157)。
         // 高さが足りない時はラベル・バー・% を 1 段に並べた低いカードに切り替える(セル内スクロールにはしない)
         ViewThatFits(in: .vertical) {
@@ -20,7 +22,7 @@ struct ProgressBarLeaf: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(c.label ?? L("進捗"))
-        .accessibilityValue(percent)
+        .accessibilityValue(unavailable ? L("取得できませんでした") : percent)
     }
 
     private typealias Style = (text: Color, fill: AnyShapeStyle)
@@ -104,6 +106,13 @@ struct ProgressBarLeaf: View {
     static func percentText(raw: Double, tone: String?) -> String {
         let shown = tone == nil ? max(0, min(1, raw)) : min(max(0, raw), 9.99)
         return String(format: "%.0f%%", shown * 100) + (tone != nil && raw > 9.99 ? "+" : "")
+    }
+
+    /// entity モードで、サーバーから取れずローカルにも記録が無い(#85)。
+    @MainActor
+    static func isUnavailable(_ c: Component, rt: any DSLRuntime) -> Bool {
+        guard c.value == nil, let entityId = c.entity else { return false }
+        return rt.filteredRecords(c).isEmpty && rt.emptyState(for: entityId) == .unavailable
     }
 
     /// 比率(1 を超えてもよい)。適合テストの描画の木(`RenderTree`)も同じ値を使う。
