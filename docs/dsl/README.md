@@ -58,7 +58,7 @@ Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|me
   Entity.unique?: [fieldId|$author](1〜3・一意)/ deleteBy?: author|admins|authorOrAdmins・Field.editableBy?: "admins"・Field.type "member"・button.visibleTo?: "admins" — §3.13
   Entity.addressedTo?: fieldId(宛先の member / members field。作った人と宛先の人だけが読む)・Field.type "members" — §3.14
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
-Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
+Container { type: vstack|hstack|section|card|disclosure|carousel|grid, id?, area?, title?, spacing?, children[]: Leaf }
 Leaf (66 種・全て id? と area? を持つ) / Action (12 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
@@ -229,8 +229,13 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `datetime` | RFC3339 |
 | `enum` | `options` の 1 つ |
 | `photo` | `"data:image/jpeg;base64,..."`(v1)または https URL |
+| `video` | `"video:<id>\|data:image/jpeg;base64,<先頭フレーム>"`(本体は録画した端末の中) |
+| `audio` | `"audio:<id>\|<秒>"`(本体は録音した端末の中) |
 | `location` | `"lat,lng"`(P1) |
 | `ref` | 参照先(`refEntity`)のレコード id 文字列。入力は picker |
+| `refs` | 参照先(`refEntity`)のレコード id の配列。入力は複数選択の picker |
+| `member` | 参加者の uid 文字列。scope `shared` だけ(§3.13) |
+| `members` | 参加者の uid の配列。scope `shared` だけ(§3.14) |
 | (computed) | 保存しない。`Field.computed` の Expr を iOS が評価(`expressions.md`) |
 
 `defaultValue` は date/datetime で `"now"` を許可。

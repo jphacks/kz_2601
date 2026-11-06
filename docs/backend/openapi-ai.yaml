@@ -122,7 +122,7 @@ paths:
               schema: { $ref: '#/components/schemas/ChatResponse' }
               examples:
                 question:
-                  value: { kind: question, text: レシートの写真も残したいですか?, suggestions: [写真も残す, 文字だけでOK, お任せ], turn: 1, locale: ja, source: claude }
+                  value: { kind: question, text: "レシートの写真も残したいですか?", suggestions: [写真も残す, 文字だけでOK, お任せ], turn: 1, locale: ja, source: claude }
                 ready:
                   value:
                     kind: ready

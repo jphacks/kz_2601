@@ -466,7 +466,7 @@ paths:
     delete:
       tags: [records]
       summary: エンティティの全レコード削除 (デモリセット用・`?confirm=true` 必須)
-      description: public/shared entity では**自分が投稿したレコードだけ**削除する (他人の投稿は残る)。`deleteBy` が admins / authorOrAdmins の entity では管理者は全員の分を消す。`deleteBy: admins` で管理者でなければ 403 `admins_only`(#272)。
+      description: "public/shared entity では**自分が投稿したレコードだけ**削除する (他人の投稿は残る)。`deleteBy` が admins / authorOrAdmins の entity では管理者は全員の分を消す。`deleteBy: admins` で管理者でなければ 403 `admins_only`(#272)。"
       parameters: [{ in: query, name: confirm, required: true, schema: { type: boolean } }]
       responses:
         '204': { description: Deleted }
@@ -485,7 +485,7 @@ paths:
     patch:
       tags: [records]
       summary: レコード部分更新 (data のキー単位でマージ)
-      description: public/shared entity では `author == 自分` のレコードだけ更新できる (他人のは 403)。管理者は他人のレコードでも `editableBy: admins` の field だけは変えられ、管理者でない人がその field を変えると 403 `admins_only`。`unique` の値が他のレコードと同じになる変更は 409 `duplicate_record`(#272 #273)。
+      description: "public/shared entity では `author == 自分` のレコードだけ更新できる (他人のは 403)。管理者は他人のレコードでも `editableBy: admins` の field だけは変えられ、管理者でない人がその field を変えると 403 `admins_only`。`unique` の値が他のレコードと同じになる変更は 409 `duplicate_record`(#272 #273)。"
       requestBody:
         required: true
         content:
@@ -959,7 +959,7 @@ paths:
         - `limit` / `remaining` が null = 数えない(環境変数 0・`PLAN_LIMITS_MODE=off`)。`resetAt` は次の 0:00 JST
       responses:
         '200':
-          description: OK(`Cache-Control: private, no-store`)
+          description: "OK(`Cache-Control: private, no-store`)"
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MyUsage' }
@@ -980,7 +980,7 @@ paths:
         - 数は最大 30 秒遅れる(entity と写真の項目ごとに count 集計をするので、インスタンスごとにキャッシュ)
       responses:
         '200':
-          description: OK(`Cache-Control: private, no-store`)
+          description: "OK(`Cache-Control: private, no-store`)"
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AppUsage' }
