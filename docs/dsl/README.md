@@ -48,7 +48,7 @@
 ## 3. 構造
 
 ```
-AppDSL { schemaVersion:1, app:AppMeta, initialScreen, entities[], screens[] }
+AppDSL { schemaVersion:1, app:AppMeta, initialScreen, entities[], screens[], serverRules[]? }(serverRules は §3.12)
 AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: fullscreen|floating|none, notifications[]?, tabs[]?: {screen,title,icon?} }
 Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|members, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit?, refEntity?, computed?: Expr, health?: "weight" } }
   予約値(field id の代わり): $author(共有 entity の投稿者)・$createdAt(作成日時)— §3.5
@@ -447,7 +447,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 | きっかけ `on` | `record`: `created` / `updated`(+ `entity`、更新は `fields` で「この field が変わった時」に絞れる)。`every`: `daily` / `weekly`(`weekday`)/ `monthly`(`day` 1〜28)+ `time` HH:MM(作成者のタイムゾーン)。時刻のきっかけは `each`: `<entity>` でそのレコード 1 件ずつに動かせる | どちらか 1 つ。削除のきっかけ・1 日 1 回より細かい時刻・外からの呼び出しは無い。`each` は時刻のきっかけだけ・ルールと同じ側の entity だけ |
 | 条件 `if` | Expr(行 = きっかけのレコードか `each` のレコード。`"<refField>.<field>"` で ref 先、更新では `"$prev.<field>"` で前の値)。`agg` で同じアプリの記録を集計できる(下の「記録を読むルール」) | 真偽であること。`streak` / `doneInDays`・computed field は使えない。`each` の無い時刻のきっかけには行が無い(`ref` 不可・`agg` は可) |
 | 処理 `do`(1〜5 個) | `notify`{`to`, `title`, `body`} / `createRecord`{`entity`, `values`} / `updateRecord`{`ref`?, `values`} / `increment`{`ref`, `field`, `by`?} | 1 つのオブジェクトに 1 種類だけ。書けるのはきっかけと同じ側の entity(private どうし・shared / public どうし)。computed・photo・video・location の field には書かない。createRecord は required の field を全部書く |
-| 宛先 `to.kind` | `owner`(作成者)/ `author`(きっかけのレコードを書いた人)/ `authorOf` + `field`(ref 先のレコードを書いた人)/ `members`(参加者全員) | private は `owner` だけ、**public は `owner` と `authorOf` だけ**、shared は全部。きっかけを起こした本人には送らない。任意の uid・メール・電話・外部の宛先は無い |
+| 宛先 `to.kind` | `owner`(作成者)/ `author`(きっかけのレコードを書いた人)/ `authorOf` + `field`(ref 先のレコードを書いた人)/ `members`(参加者全員)/ `recipients` + `field`(宛先付きの記録の宛先の人・§3.14) | private は `owner` だけ、**public は `owner` と `authorOf` だけ**、shared は全部。きっかけを起こした本人には送らない。任意の uid・メール・電話・外部の宛先は無い |
 | 通知の本文 | 決まった枠 + `{<field>}`(きっかけ・`each` のレコードの値)・`{$author}`(書いた人の表示名・shared / public)・`{<名前>}`(`with` の数・日付) | **題 30 字・本文 80 字**(差し込みの `{…}` も数える)。差し込む値は実行の時に 30 字で切る。URL・ドメイン・メールアドレス・電話番号・「公式」「運営」などの名乗り・制御文字・見えない文字は不可。ref・refs・photo・video・location・hidden・computed の field は差し込めない |
 | 連鎖 | 処理が書いたレコードは次のきっかけを起こさない | 別のルール(自分も含む)のきっかけになる書き込み(作るなら created、書き換え・increment は同じ field の updated)を断る |
 | 上限 | ルール 20・時刻のルール 5・処理 5(Pro の値)。1 つのルールが読む entity(`each` + `agg`)は 2 つまで・`with` は 3 つまで | 無料の値(3・1・3)は `App.ServerRuleQuotaProblems(pro)` で、プランが分かる所(appconfig)が見る。読む件数の上限は runner が持つ(下) |
@@ -474,7 +474,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 
 - 例の全体は `backend/pkg/dsl/testdata/server_rules_reads.json`(家計の集計・週のまとめ・期限)と `server_rules_ranking.json`(shared の順位)。
 - **費用と上限**(runner の `quota`): 読んだレコード 1 件 = Firestore の読み取り 1 回(1,000 件 ≈ 0.0004 USD・#338 の原価)。1 回の実行で読めるのは Pro 500 件(`RUNNER_LIMIT_RUN_READS_PRO`)、アプリごとに 1 日 Pro 20,000 件(`RUNNER_LIMIT_APP_READS_PRO`・カウンタ `rr_app_{appId}`)。同じ entity は 1 回の実行で 1 度だけ読む(`each` の行どうしで共有)。**超えたらその回は実行しない**(`skipped_quota`・`limit` に `run_reads` / `app_reads`)。一部の記録だけで計算した誤った合計・順位は出さない。`runner.usage` の `reads` と `est_cost_usd` に入る。値は出発点で、#338 と同じく実測で直す。
-- 読める範囲(#337 の層 3 を広げた): きっかけのレコード・その ref 先に加えて、`each` / `agg` の entity の**同じアプリ・同じ側**のレコードと、その ref 先。取っ手(`scope.Handle.List`)が appId と側を確かめる。
+- 読める範囲(#337 の層 3 を広げた): きっかけのレコード・その ref 先に加えて、`each` / `agg` の entity の**同じアプリ・同じ側**のレコードと、その ref 先。取っ手(`scope.Handle.List`)が appId と側を確かめる。宛先付きの entity(§3.14)は `each` / `agg` / ref 先の読み取りの対象にできない。
 - 1 回の書き込みの上限(Pro 10)は `each` の全部の行で数える。順位を 10 件より多く書き換える日は、残りがその日は書かれない(次の日に続きが書かれる)。
 - まだ作らない(決定の範囲の外か、宣言で表せない): 推薦・相性・似ている人の自動の組み合わせ、複数人への割り当て・日程の自動調整、距離での自動のグループ分け、外部のデータの取得。
 
@@ -513,7 +513,9 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - **読める人の決め方**: レコードを作る時に appconfig が「作った人 + 宛先」を `readers` としてレコードに持たせる(API には出さない)。宛先は送った後で変えられない(PATCH で変えると 422)。宛先が空の作成も 422。`readers` を持つレコードは、後から DSL の `addressedTo` を外しても `readers` の人にしか見えない(古いメッセージが開かない)。
 - **見えない人に対して**(すべて 404・中身も有無も返さない): 一覧(`GET .../records` から除く)・取得・PATCH・DELETE・印(`PUT/DELETE .../marks`)・通報(`POST /reports` の record)。全件削除(`DELETE .../records`)は今までどおり自分の分だけ(`deleteBy` で管理者が消せる entity なら管理者は全員の分を消せる。中身は読めない)。リアルタイム更新(`GET /events`)は、宛先付きの entity では自分が読める記録が変わった時だけ `records` を送る。
 - **集計**: 一覧が読める分だけなので、端末の集計(stat・agg・未読の数)も自分が読める記録だけになる。
-- **自動の動き(§3.12)**: 宛先付きの entity をきっかけにするルールは、通知の宛先が `author` だけ・書き換えはその記録だけ(`createRecord` / `increment` / ref の `updateRecord` は不可)。どのルールも宛先付きの entity に `createRecord` できず、宛先の field を書き換えられない。宛先の人への通知(`to.kind` で field を指す)は、#658 の語彙が入った後に足す。
+- **自動の動き(§3.12)**: 宛先付きの entity をきっかけにするルールは、通知の宛先が `author` と `recipients` だけ・書き換えはその記録だけ(`createRecord` / `increment` / ref の `updateRecord` は不可)。どのルールも宛先付きの entity に `createRecord` できず、宛先の field を書き換えられない。
+- **ルールが読めるもの**: 宛先付きの entity は `on.each`・`agg`(`if` / `values` / `by` / `with` のどこでも)・`{"ref":"<refField>.<field>"}` の対象にできない(`Validate()` で断る)。runner も実行の時に同じ表で確かめ、合わないルールは `skipped_stopped`(`addressed_rule`)で動かさない。`readers` を持つレコードは、後から `addressedTo` を外しても `each` / `agg` / ref 先の読み取りに出てこず、きっかけにもならない。
+- **宛先の人への通知**: `{"to":{"kind":"recipients","field":"<addressedTo の field>"}}`。きっかけが宛先付きの entity のレコードの時だけ。届くのは実行の時に参加している宛先の人だけで、送った本人・同意していない人・ブロックの関係にある人には届かない(`members` と同じ確かめ)。本文に `{<field>}` を差し込める(受け取る人はその記録を読める)。
 - **未読**: 既存の印(§3.5 `marks`)の `read` を使う。受信箱の `list.item.mark: "read"` で既読の印、`{"field":"$marks.read","op":"neq","value":{"me":true}}` で未読だけ。受信箱は `$author` neq me(読めるのは自分宛てだけなので、これで自分宛て)、送信済みは eq。
 - iOS: `supportedFeatures` に `addressedMessages` を送る(審査用の版は共有を外しているので送らない)。送らない版には AI が addressedTo と members を使わない(addressedTo は外し、members は string に・§5.3)。
 - AI: `backend/internal/ai/messages_addressed_rules.go`。ai-eval の `addressed` / `addressedGroup` / `addressedUnread`(`addressed_cases.json`)。

@@ -128,8 +128,10 @@ type PlannedNotify struct {
 	// ("" when the ref field is empty).
 	RefEntity string
 	RefID     string
-	Title     string
-	Body      string
+	// UIDs: for recipients, the people the addressed record is sent to.
+	UIDs  []string
+	Title string
+	Body  string
 }
 
 // Plan is what one rule does for one trigger. Empty = nothing to do.
@@ -304,6 +306,9 @@ func (p *planner) action(i int, act *dsl.RuleAction, out *Plan) error {
 			if f := p.row.Entity.FieldByID(n.To.Field); f != nil {
 				n.RefEntity, n.RefID = f.RefEntity, refID(p.row.Record, f.ID)
 			}
+		}
+		if n.To.Kind == dsl.RecipientRecipients && p.row != nil {
+			n.UIDs = p.row.Entity.Recipients(p.row.Record.Data)
 		}
 		out.Notifies = append(out.Notifies, n)
 	case act.CreateRecord != nil:

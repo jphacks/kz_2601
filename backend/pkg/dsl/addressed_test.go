@@ -75,7 +75,7 @@ func TestAddressedProblems(t *testing.T) {
 		{"admin recipients", `"type": "members", "required": true`, `"type": "members", "required": true, "editableBy": "admins"`, `has editableBy; the sender chooses`},
 		{"members default", `"type": "members", "required": true`, `"type": "members", "defaultValue": "u1"`, `a members field cannot have defaultValue`},
 		{"members not picker", `{"type": "picker", "field": "to", "label": "宛先"}`, `{"type": "textField", "field": "to", "label": "宛先"}`, `is type members; use a picker`},
-		{"notify members", `{"kind": "author"}`, `{"kind": "members"}`, `is addressed (only its author and recipients read it); notify kind "author" only`},
+		{"notify members", `{"kind": "author"}`, `{"kind": "members"}`, `is addressed (only its author and recipients read it); notify kind "author" or "recipients" only`},
 		{"copy out", rule, `"do": [{"createRecord": {"entity": "notes", "values": {"count": 1}}}]`, `a rule on it cannot copy it into other records`},
 		{"create addressed", `{"record": "updated", "entity": "messages", "fields": ["answer"]}`, `{"record": "created", "entity": "notes"}`, ``},
 		{"change recipients", rule, `"do": [{"updateRecord": {"values": {"to": "x"}}}]`, `a rule cannot change them`},

@@ -4643,18 +4643,20 @@
             "owner",
             "author",
             "authorOf",
-            "members"
+            "members",
+            "recipients"
           ],
           "x-enumDescriptions": {
             "owner": "アプリの作成者(private のアプリでは本人)。",
             "author": "きっかけのレコードを書いた人(shared のレコードのきっかけだけ)。",
             "authorOf": "きっかけのレコードの ref field(field)が指すレコードを書いた人(例: 出欠の親の予定を作った人)。",
-            "members": "参加者全員(shared だけ)。"
+            "members": "参加者全員(shared だけ)。",
+            "recipients": "宛先付きの entity(addressedTo)の記録の宛先の人(field に addressedTo の field id)。きっかけがその entity のレコードの時だけ。"
           }
         },
         "field": {
           "type": "string",
-          "description": "kind authorOf だけ: きっかけの entity の type ref の field id。"
+          "description": "kind authorOf: きっかけの entity の type ref の field id。kind recipients: その entity の addressedTo の field id。"
         }
       }
     },

@@ -2,5 +2,6 @@
   {"id": "ad_create_dm", "kind": "create", "group": "addressed", "transcript": "部活の連絡アプリ。メンバーの誰か 1 人にだけ見えるメッセージを送りたい。読んだかどうかも分かるように", "note": "#271 1 対 1 は addressedTo + member・既読は marks read", "expect": {"addressed": true, "addressedUnread": true}},
   {"id": "ad_create_group", "kind": "create", "group": "addressed", "transcript": "サークルの連絡帳。何人かを選んでその人たちにだけメッセージを送れるようにして", "note": "#271 グループ宛ては type members", "expect": {"addressed": true, "addressedGroup": true}},
   {"id": "ad_create_teacher", "kind": "create", "group": "addressed", "transcript": "先生に個別に質問を送れるアプリ。ほかの生徒には見えないように", "note": "#271 個別の質問は宛先付き(chatThread で全員に見せない)", "expect": {"addressed": true}},
-  {"id": "ad_create_group_chat", "kind": "create", "group": "addressed", "transcript": "家族みんなで話せるチャット", "note": "#271 全員が読むチャットは今までどおり(宛先を付けない)", "expect": {"addressed": false}}
+  {"id": "ad_create_group_chat", "kind": "create", "group": "addressed", "transcript": "家族みんなで話せるチャット", "note": "#271 全員が読むチャットは今までどおり(宛先を付けない)", "expect": {"addressed": false}},
+  {"id": "ad_create_notify", "kind": "create", "group": "addressed", "transcript": "サークルの連絡アプリ。選んだ人にだけメッセージを送って、届いたらその人に通知が来るようにして", "note": "#271 宛先の人への通知は to.kind recipients", "expect": {"addressed": true, "ruleTo": "recipients"}}
 ]

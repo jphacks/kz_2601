@@ -18,14 +18,14 @@ var addressedRules = strings.TrimSpace(`
 - 画面: 受信箱 = list(filter {"field":"$author","op":"neq","value":{"me":true}}・読めるのは自分宛てだけなので、これが自分宛て)・item は title 本文・subtitle $author。送信済み = list(op eq)・subtitle to。送る画面 = screen.entity のフォーム(picker で to・textEditor で本文・toolbar の saveRecord)を toolbar の navigate(sheet・「送る」・icon paperplane)で開く。
 - 未読: entity に "marks":[{"id":"read","icon":"eye","label":"既読"}]、受信箱の item に "mark":"read"(押すと既読)。「未読だけ」は filter {"field":"$marks.read","op":"neq","value":{"me":true}}、未読の数は stat の count に同じ filter。
 - 宛先は送った後で変えられない(edit は書かない・edit "members" は不可)。返信は同じ entity に、元の送り手を宛先にした新しい記録。unique を書くなら "$author" を含める。
-- serverRules で宛先付きの entity をきっかけにする時は、通知は to.kind "author" だけ・書き換えはその記録だけ(他の記録へのコピー・数える・宛先の書き換えはできない)。宛先の人へのプッシュ通知は今はできない(「宛先の人への通知は今はできないため、受信箱に届く形にしました。」と申告)。
+- serverRules で宛先付きの entity をきっかけにする時は、通知は to.kind "author" か "recipients"(宛先の人に届く・field は addressedTo の field)だけ・書き換えはその記録だけ(他の記録へのコピー・数える・宛先の書き換えはできない)。宛先付きの entity は on.each・agg・ref 先の読み取りに使えない。
 - 参加者みんなで話すチャット(全員が読む)は今までどおり chatThread。
 `)
 
 // addressedChatRule: the same capability for chat answers (できる?).
 var addressedChatRule = strings.TrimSpace(`
 ## 宛先を選んで送るメッセージ(#271)
-- 「1 対 1 のメッセージ」「DM」「選んだ人にだけ送る」は**できる**(参加した人の中から宛先を選び、送った人と宛先の人だけが読める。受信箱・送信済み・未読の印も作れる)。宛先の人へのプッシュ通知は今はできない。
+- 「1 対 1 のメッセージ」「DM」「選んだ人にだけ送る」は**できる**(参加した人の中から宛先を選び、送った人と宛先の人だけが読める。受信箱・送信済み・未読の印も作れる)。宛先の人へのプッシュ通知もできる。
 `)
 
 // addressedNote is the restrictionNote line for builds without FeatureAddressed.

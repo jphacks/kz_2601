@@ -3,6 +3,7 @@ package dsl
 import (
 	"fmt"
 	"slices"
+	"strings"
 )
 
 // Addressed records (#271, docs/dsl/README.md §3.14): 1 対 1・グループ宛ての
@@ -106,48 +107,102 @@ func checkAddressed(a *App, add func(string, ...any)) {
 	}
 }
 
-// checkAddressedRules keeps server rules from carrying an addressed record
-// to people who cannot read it: a rule on an addressed entity notifies only
-// the author and writes only its own record; no rule creates an addressed
-// record or changes its recipients.
+// checkAddressedRules applies checkAddressedRule to every server rule.
 func checkAddressedRules(a *App, addressed map[string]*Entity, add func(string, ...any)) {
 	for i := range a.ServerRules {
 		r := &a.ServerRules[i]
-		where := fmt.Sprintf("serverRules[%d] (%s)", i, r.ID)
-		row := addressed[r.On.Entity]
-		if r.On.Record == "" {
-			row = nil
+		checkAddressedRule(a, r, addressed, fmt.Sprintf("serverRules[%d] (%s)", i, r.ID), add)
+	}
+}
+
+// AddressedRuleProblems is checkAddressedRules for one rule: the runner
+// checks again at run time (a stored DSL is decoded without Validate). rule
+// may come from another version of the app; a's entities are the ones checked.
+func (a *App) AddressedRuleProblems(r *ServerRule) []string {
+	addressed := map[string]*Entity{}
+	for i := range a.Entities {
+		if e := &a.Entities[i]; e.IsAddressed() {
+			addressed[e.ID] = e
 		}
-		for j := range r.Do {
-			act := &r.Do[j]
-			w := fmt.Sprintf("%s.do[%d]", where, j)
-			switch {
-			case act.Notify != nil && row != nil && act.Notify.To.Kind != RecipientAuthor:
-				add(`%s.notify.to: entity %q is addressed (only its author and recipients read it); notify kind "author" only`, w, row.ID)
-			case act.CreateRecord != nil && addressed[act.CreateRecord.Entity] != nil:
-				add("%s.createRecord: entity %q is addressed; a rule cannot send it (the sender picks the recipients)", w, act.CreateRecord.Entity)
-			case act.CreateRecord != nil && row != nil:
-				add("%s.createRecord: entity %q is addressed; a rule on it cannot copy it into other records", w, row.ID)
-			case act.Increment != nil && row != nil:
-				add("%s.increment: entity %q is addressed; a rule on it cannot count into other records", w, row.ID)
-			case act.UpdateRecord != nil && row != nil && act.UpdateRecord.Ref != "":
-				add("%s.updateRecord: entity %q is addressed; a rule on it may update only the record itself (no ref)", w, row.ID)
-			case act.UpdateRecord != nil:
-				target := row
-				if act.UpdateRecord.Ref != "" {
-					target = nil
-					if trig := a.EntityByID(r.On.Entity); trig != nil {
-						if f := trig.FieldByID(act.UpdateRecord.Ref); f != nil {
-							target = addressed[f.RefEntity]
-						}
+	}
+	if len(addressed) == 0 {
+		return nil
+	}
+	var out []string
+	checkAddressedRule(a, r, addressed, r.ID, func(f string, args ...any) { out = append(out, fmt.Sprintf(f, args...)) })
+	return out
+}
+
+// checkAddressedRule keeps a server rule within who reads an addressed
+// record: no rule lists one (each, agg) or reads one through a ref field;
+// a rule on an addressed entity notifies only its author and recipients and
+// writes only its own record; no rule creates an addressed record or changes
+// its recipients.
+func checkAddressedRule(a *App, r *ServerRule, addressed map[string]*Entity, where string, add func(string, ...any)) {
+	if e := addressed[r.On.Each]; e != nil {
+		add("%s.on.each: entity %q is addressed (only its author and recipients read it); a rule cannot run on each of its records", where, e.ID)
+	}
+	rowEntity := a.EntityByID(r.RowEntity())
+	seen := map[string]bool{} // one problem per expression shape
+	r.walkExprs(func(x *Expr) {
+		id, how := addressedRead(x, rowEntity, addressed)
+		if id != "" && !seen[how+id] {
+			seen[how+id] = true
+			add("%s: %s: entity %q is addressed (only its author and recipients read it); a rule cannot read it", where, how, id)
+		}
+	})
+	row := addressed[r.On.Entity]
+	if r.On.Record == "" {
+		row = nil
+	}
+	for j := range r.Do {
+		act := &r.Do[j]
+		w := fmt.Sprintf("%s.do[%d]", where, j)
+		switch {
+		case act.Notify != nil && row != nil && act.Notify.To.Kind != RecipientAuthor && act.Notify.To.Kind != RecipientRecipients:
+			add(`%s.notify.to: entity %q is addressed (only its author and recipients read it); notify kind "author" or "recipients" only`, w, row.ID)
+		case act.CreateRecord != nil && addressed[act.CreateRecord.Entity] != nil:
+			add("%s.createRecord: entity %q is addressed; a rule cannot send it (the sender picks the recipients)", w, act.CreateRecord.Entity)
+		case act.CreateRecord != nil && row != nil:
+			add("%s.createRecord: entity %q is addressed; a rule on it cannot copy it into other records", w, row.ID)
+		case act.Increment != nil && row != nil:
+			add("%s.increment: entity %q is addressed; a rule on it cannot count into other records", w, row.ID)
+		case act.UpdateRecord != nil && row != nil && act.UpdateRecord.Ref != "":
+			add("%s.updateRecord: entity %q is addressed; a rule on it may update only the record itself (no ref)", w, row.ID)
+		case act.UpdateRecord != nil:
+			target := row
+			if act.UpdateRecord.Ref != "" {
+				target = nil
+				if rowEntity != nil {
+					if f := rowEntity.FieldByID(act.UpdateRecord.Ref); f != nil {
+						target = addressed[f.RefEntity]
 					}
 				}
-				if target != nil {
-					if _, ok := act.UpdateRecord.Values[target.AddressedTo]; ok {
-						add("%s.updateRecord: %q is the recipients of entity %q; a rule cannot change them", w, target.AddressedTo, target.ID)
-					}
+			}
+			if target != nil {
+				if _, ok := act.UpdateRecord.Values[target.AddressedTo]; ok {
+					add("%s.updateRecord: %q is the recipients of entity %q; a rule cannot change them", w, target.AddressedTo, target.ID)
 				}
 			}
 		}
 	}
+}
+
+// addressedRead returns the addressed entity x reads ("" = none) and how:
+// an agg over it, or {"ref":"<ref field>.<field>"} from the row. The row's
+// own fields are not reads of another record.
+func addressedRead(x *Expr, row *Entity, addressed map[string]*Entity) (id, how string) {
+	switch {
+	case x.Kind == ExprAgg && x.Agg != nil && addressed[x.Agg.Entity] != nil:
+		return x.Agg.Entity, "agg"
+	case x.Kind == ExprRef && row != nil && !strings.HasPrefix(x.Ref, PrevPrefix):
+		field, _, ok := strings.Cut(x.Ref, ".")
+		if !ok {
+			return "", ""
+		}
+		if f := row.FieldByID(field); f != nil && addressed[f.RefEntity] != nil {
+			return f.RefEntity, fmt.Sprintf("ref %q", x.Ref)
+		}
+	}
+	return "", ""
 }
