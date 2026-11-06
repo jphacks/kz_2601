@@ -13,6 +13,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -319,6 +320,13 @@ func textHandler(svc *Service) http.Handler {
 			svc.writeErr(w, r, badText("invalid JSON: "+err.Error()))
 			return
 		}
+		// #316: the online AI of an app is a Pro feature (the on-device AI is free)
+		uid := auth.UID(r.Context())
+		if svc.Pro != nil && svc.ProMode.Checks() && !svc.Pro.IsPro(r.Context(), uid) &&
+			svc.ProMode.Stop(r.Context(), svc.logger(), "ai.text", uid, []string{paid.OnlineAI}) {
+			svc.writeErr(w, r, onlineAIRequired(req.Locale))
+			return
+		}
 		res, err := svc.Text(r.Context(), req)
 		if err != nil {
 			svc.writeErr(w, r, err)
@@ -326,4 +334,13 @@ func textHandler(svc *Service) http.Handler {
 		}
 		writeJSON(w, http.StatusOK, res)
 	})
+}
+
+// onlineAIRequired is the 402 of POST /v1/text for a caller without Pro.
+func onlineAIRequired(loc Locale) *Error {
+	f := PaidFeature{ID: paid.OnlineAI}
+	if d, ok := paid.Default.ByID(paid.OnlineAI); ok {
+		f = d.Public(string(loc))
+	}
+	return ProRequired([]PaidFeature{f})
 }

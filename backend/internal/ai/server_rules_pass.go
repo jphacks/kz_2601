@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -264,6 +265,11 @@ func sameServerRules(current []byte, next *dsl.App) bool {
 // summary (the rules in plain words, or the refusal) and the metadata.
 func (s *Service) applyServerRulesPass(ctx context.Context, transcript string, ar *attemptResult, loc Locale) {
 	if !s.serverRulesEnabled() || !wantsServerRules(transcript) {
+		return
+	}
+	// #316: serverRules need Pro. A build without purchases (App Store review:
+	// it also has no shared data) and 「この機能なしで作る」 get none.
+	if restrictionFrom(ctx).NoSharedData() || defaultPaidCatalog.dropped(transcript, paid.ServerRules) {
 		return
 	}
 	before, err := dsl.Parse(ar.raw)

@@ -10,7 +10,7 @@
 - [シェアリンクと「探す」(#49 #50)](features/sharing.md)
 - [生成前の対話(#74)](features/chat.md)
 - [リリース申請(#76)](features/release.md)
-- [有料機能の判定と Pro の権利(#77 #314)](features/pro.md)
+- [有料機能の判定・Pro の権利・サーバーでの強制(#77 #314 #316)](features/pro.md)
 - [ホットリロードの変化通知・SSE(#82)](features/events.md)
 - [計算ロジック Expr(#100)](features/expr.md)
 - [アカウント削除(#119)](features/account-deletion.md)
@@ -438,6 +438,7 @@ backend/
     fsenv/                   # 接続する Firestore の DB を決め、stg が本番の DB を使うと止める(#290)
     httpx/                   # JSON 書き出し・エラー封筒・RequestID・recover・アクセスログ middleware
     metrics/                 # プロダクトの指標のイベントを構造化ログに出す(#297)
+    paid/                    # 有料機能のリスト(paid_features.json)と DSL での判定。ai / appconfig が 402 で止める(#316)
     ratelimit/               # 1 人(と全体)が 1 日に起こせる Claude の処理量の上限(#280)
     store/                   # users/{uid}/apps/{appId} 以下の永続化(Firestore / Memory)
   pkg/

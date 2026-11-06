@@ -31,7 +31,12 @@ extension AppRuntime {
             requestProForAIText()
             throw AITextError.needsPro
         case .send:
-            return try await services.ai.text(request)
+            do {
+                return try await services.ai.text(request)
+            } catch AITextError.needsPro {
+                requestProForAIText() // #316: サーバーが 402 pro_required(端末の Pro の判定が古い・制限が無効の Debug など)
+                throw AITextError.needsPro
+            }
         }
     }
 

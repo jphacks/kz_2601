@@ -14,7 +14,7 @@ const (
 	ResultLimit         = "limit"          // today's limit of the app / creator / person was reached
 	ResultServiceLimit  = "service_limit"  // the service's overall daily limit was reached
 	ResultServicePaused = "service_paused" // the service paused every automation
-	ResultPlan          = "plan"           // the creator's plan cannot run it (anonymous, or shared data without Pro)
+	ResultPlan          = "plan"           // the creator's plan cannot run it (anonymous, or no Pro: #316)
 	ResultStopped       = "stopped"        // the operator stopped the app or the rule (or unpublished the app)
 	ResultChanged       = "changed"        // the app was changed and the rule is no longer in it
 	ResultUnavailable   = "unavailable"    // the app or its creator's account was not usable
