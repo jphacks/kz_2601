@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
@@ -22,7 +21,7 @@ func (f *Firestore) DeactivateUser(ctx context.Context, uid string) error {
 	if err := f.markDeleted(ctx, uid); err != nil {
 		return fmt.Errorf("mark users/%s: %w", uid, err)
 	}
-	now := time.Now().UTC()
+	now := Now()
 	bw := f.c.BulkWriter(ctx)
 	defer bw.End()
 	err := each(ctx, f.userRef(uid).Collection("apps").Query, func(s *firestore.DocumentSnapshot) error {
@@ -68,7 +67,7 @@ func (f *Firestore) markDeleted(ctx context.Context, uid string) error {
 		} else if !isNotFound(err) {
 			return err
 		}
-		return tx.Set(ref, map[string]any{"status": AccountDeleted, "deletedAt": time.Now().UTC()}, firestore.MergeAll)
+		return tx.Set(ref, map[string]any{"status": AccountDeleted, "deletedAt": Now()}, firestore.MergeAll)
 	})
 }
 

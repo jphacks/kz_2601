@@ -71,11 +71,12 @@ func (f *Firestore) ChangeMatchPair(ctx context.Context, appID, a, b string, fn 
 		}
 		next = next.clone()
 		next.ID, next.UIDs = id, SortedPair(a, b)
-		now := time.Now().UTC()
+		now := Now()
 		if next.CreatedAt.IsZero() {
 			next.CreatedAt = now
 		}
 		next.UpdatedAt = now
+		next.MatchedAt = next.MatchedAt.Truncate(time.Microsecond) // fn may set it from time.Now
 		out = next
 		return tx.Set(ref, matchPairDoc{UIDs: next.UIDs[:], From: next.From, Status: next.Status, DeclinedBy: next.DeclinedBy,
 			Profiles: next.Profiles, CreatedAt: next.CreatedAt, UpdatedAt: next.UpdatedAt, MatchedAt: next.MatchedAt})

@@ -259,7 +259,7 @@ func (f *Firestore) EnsureApp(ctx context.Context, uid, appID string, initial js
 		if err != nil {
 			return err
 		}
-		now := time.Now().UTC()
+		now := Now()
 		d := appDoc{Name: name, CurrentVersion: 1, Status: "active", CreatedAt: now, UpdatedAt: now, DSL: m, DSLJSON: string(initial)}
 		if err := tx.Create(ref, d); err != nil {
 			return err
@@ -282,7 +282,7 @@ func (f *Firestore) EnsureApp(ctx context.Context, uid, appID string, initial js
 // UpdateAppMeta implements Store.
 func (f *Firestore) UpdateAppMeta(ctx context.Context, uid, appID string, name, status *string) (*App, error) {
 	ref := f.appRef(uid, appID)
-	updates := []firestore.Update{{Path: "updatedAt", Value: time.Now().UTC()}}
+	updates := []firestore.Update{{Path: "updatedAt", Value: Now()}}
 	if name != nil {
 		updates = append(updates, firestore.Update{Path: "name", Value: *name})
 	}
@@ -350,7 +350,7 @@ func (f *Firestore) CommitVersion(ctx context.Context, uid, appID string, c Comm
 		if err != nil {
 			return err
 		}
-		now := time.Now().UTC()
+		now := Now()
 		upd := []firestore.Update{
 			{Path: "currentVersion", Value: n},
 			{Path: "dsl", Value: m},
@@ -449,7 +449,7 @@ func (f *Firestore) PublishApp(ctx context.Context, uid, appID string, raw json.
 	published := false
 	err = f.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		published = false
-		now := time.Now().UTC()
+		now := Now()
 		snap, err := tx.Get(ref)
 		if err == nil {
 			var d publicAppDoc
@@ -575,7 +575,7 @@ func (f *Firestore) UpdateRecord(ctx context.Context, rs RecordSet, id string, d
 	ref := f.recRef(rs, id)
 	_, err := ref.Update(ctx, []firestore.Update{
 		{Path: "data", Value: data},
-		{Path: "updatedAt", Value: time.Now().UTC()},
+		{Path: "updatedAt", Value: Now()},
 	})
 	if isNotFound(err) {
 		return nil, ErrNotFound

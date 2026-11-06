@@ -69,7 +69,7 @@ func (f *Firestore) catalogRef(id string) *firestore.DocumentRef {
 // CreateShare implements Store.
 func (f *Firestore) CreateShare(ctx context.Context, s Share) error {
 	if s.CreatedAt.IsZero() {
-		s.CreatedAt = time.Now().UTC()
+		s.CreatedAt = Now()
 	}
 	_, err := f.shareRef(s.Token).Create(ctx, shareDoc{AppID: s.AppID, OwnerUID: s.OwnerUID, Name: s.Name,
 		Version: int64(s.Version), DSLJSON: string(s.DSL), Revoked: s.Revoked, CreatedAt: s.CreatedAt})
@@ -110,7 +110,7 @@ func (f *Firestore) PutCatalogApp(ctx context.Context, uid string, c CatalogApp)
 	ref := f.catalogRef(c.ID)
 	var out *CatalogApp
 	err := f.c.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
-		now := time.Now().UTC()
+		now := Now()
 		d := catalogDoc{OwnerUID: uid, Name: c.Name, Description: c.Description, Tags: c.Tags, AuthorName: c.AuthorName,
 			Components: c.Components, Version: int64(c.Version), DSLJSON: string(c.DSL), CreatedAt: now, UpdatedAt: now}
 		snap, err := tx.Get(ref)

@@ -171,6 +171,10 @@ type Store interface {
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).
 const MaxRecordsPerEntity = 2000
 
+// Now is the current UTC time at the microsecond precision Firestore keeps,
+// so a value returned right after a write equals what a later read returns.
+func Now() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
+
 // NewID returns a time-ordered random id with prefix (ULID-like, Crockford base32).
 func NewID(prefix string) string {
 	var b [16]byte
