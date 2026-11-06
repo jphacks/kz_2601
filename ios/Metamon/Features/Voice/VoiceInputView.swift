@@ -185,7 +185,7 @@ struct VoiceInputView: View {
                     Text("Tailor It").font(.headline.weight(.bold))
                 }
             } else {
-                UndoHeaderButtons() // #209 修正チャットの上部に「1つ前に戻す」
+                UndoHeaderButtons() // #209 修正チャットの上部に「元に戻す」
             }
             Spacer()
             if inChat {
@@ -412,9 +412,9 @@ struct VoiceInputView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-        case .failed(let message):
+        case .failed: // 中身はログ(`[Voice]`)と設定の詳細にだけ出す(H9)
             VStack(spacing: Theme.Spacing.sm) {
-                Text("音声モデルの準備に失敗しました\n\(message)")
+                Text("音声モデルを用意できませんでした。接続を確認して「再試行」を押してください")
                     .font(.caption)
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
@@ -448,12 +448,13 @@ struct VoiceInputView: View {
         case .idle:
             typing = false
             await SpeechReader.shared.stopForRecording() // #43 読み上げ中なら即停止してから録音
+            if case .notice = rt.errorCard?.kind { withAnimation { rt.errorCard = nil } } // 前の録音の失敗は話し直したら消す
             do {
                 try await transcriber.startRecording()
                 phase = .listening
             } catch {
                 SpeechReader.shared.recordingFinished()
-                rt.toast = ErrorCopy.message(for: error)
+                showVoiceFailure(error)
             }
         case .listening:
             phase = .transcribing
@@ -462,19 +463,14 @@ struct VoiceInputView: View {
             let text: String
             do {
                 text = try await transcriber.stopAndTranscribe()
-            } catch let failure as TranscriberFailure {
-                // 短すぎ / 無音 / マイク未入力 / セッション失敗。理由はそのまま日本語で出る
-                rt.toast = ErrorCopy.transcriberFailure(failure)
-                phase = .idle
-                return
             } catch {
-                rt.toast = L10n.tr("文字起こしに失敗しました: \(error.localizedDescription)")
+                // 短すぎ / 無音 / マイク未入力 / セッション失敗など。消えない状態カードに次の一手を出す(H9)
+                showVoiceFailure(error)
                 phase = .idle
                 return
             }
             guard !text.isEmpty else {
-                let detail = transcriber.lastDiagnostics.map { "(\(ErrorCopy.diagnosticsSummary($0)))" } ?? ""
-                rt.toast = L10n.tr("音声を聞き取れませんでした\(detail)。もう一度はっきり話してください")
+                showVoiceFailure(nil)
                 phase = .idle
                 return
             }
@@ -489,6 +485,13 @@ struct VoiceInputView: View {
             await morph(text)
         default:
             break
+        }
+    }
+
+    /// 録音・文字起こしの失敗を状態カードに(H9・トーストだと 3 秒で消える)。診断の値はログにだけ残す。
+    private func showVoiceFailure(_ error: Error?) {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            rt.errorCard = .voiceFailure(error, diagnostics: transcriber.lastDiagnostics)
         }
     }
 

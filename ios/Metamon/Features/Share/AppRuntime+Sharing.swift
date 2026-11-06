@@ -105,7 +105,7 @@ extension AppRuntime {
         if let denial = SharedAccessDenial(error) { return denial.message }
         return (error as? APIError)?.status == 404
             ? L10n.tr("このシェアリンクは取り消されたか、存在しません")
-            : L10n.tr("シェアされたアプリを開けませんでした: \(error.localizedDescription)")
+            : ErrorCopy.failure(L10n.tr("シェアされたアプリを開けませんでした"), error, context: "share import")
     }
 
     func installPublic(_ listing: PublicAppListing) async {
@@ -114,7 +114,7 @@ extension AppRuntime {
             let app = try await sharing.install(publicAppId: listing.id)
             await adopt(app, banner: L10n.tr("「\(app.name)」をインストールしました"), own: listing.mine || app.mine)
         } catch {
-            toast = L10n.tr("インストールできませんでした: \(error.localizedDescription)")
+            toast = ErrorCopy.failure(L10n.tr("インストールできませんでした"), error, context: "install public")
         }
     }
 

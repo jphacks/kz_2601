@@ -237,6 +237,7 @@ extension AppRuntime {
             print("[Metamon] chat timing: turn=\(turn.turn) kind=\(turn.kind.rawValue) \(timing.summary)")
             #endif
             SpeechReader.shared.speak(turn.text) // #43 AI の質問(録音中・OFF なら喋らない)
+            VoiceOverAnnouncer.announce(turn.text) // H8 AI の返事(VoiceOver が無効なら何も起きない)
             scheduleAutoBuildIfNeeded(turn)
             return turn
         } catch {
