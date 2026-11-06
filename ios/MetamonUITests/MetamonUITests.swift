@@ -297,6 +297,11 @@ final class MetamonUITests: XCTestCase {
         attachScreenshot("history-3-reopened")
 
         app.buttons["chat.restart"].tap()
+        // これまでの会話があるので確認が出る(M9)。全部消す方を選ぶ
+        let eraseAll = app.buttons["これまでの会話も消す"].firstMatch
+        XCTAssertTrue(eraseAll.waitForExistence(timeout: 10), "「最初から」で確認が出ない")
+        XCTAssertTrue(divider.exists, "確認の前に履歴が消えた")
+        eraseAll.tap()
         XCTAssertTrue(waitFor(divider, "exists == false", timeout: 15), "「最初から」で履歴が消えない")
         attachScreenshot("history-4-restarted")
     }

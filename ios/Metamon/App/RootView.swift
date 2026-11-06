@@ -93,7 +93,7 @@ struct RootView: View {
             #if DEBUG
             UITestMorphProbe()
             #endif
-            if let banner = rt.summaryBanner, let anchor = banner.highlight {
+            if let banner = rt.summaryBanner, let anchor = banner.highlight, rt.isNoticeTurn(.summary) {
                 PositionHighlight(anchor: anchor)
                     .transition(.opacity)
                     .zIndex(3)
@@ -227,9 +227,10 @@ struct RootView: View {
     }
 
     /// 変身直後の要約(読み上げ文)。上部カードで 3〜6 秒表示して自動で消える(VoiceOver の時は長く・H8)。
+    /// 共有の版の課金画面が出ている間は待つ(H7: 出てから時間を数える。課金画面の下で「元に戻す」が時間切れにならない)
     @ViewBuilder
     private var summaryCard: some View {
-        if let banner = rt.summaryBanner {
+        if let banner = rt.summaryBanner, rt.isNoticeTurn(.summary) {
             let dismiss = { withAnimation { rt.summaryBanner = nil } }
             HStack(alignment: .top, spacing: Theme.Spacing.sm + 2) {
                 CraneMascot(pose: .joy, size: 52, sway: 6) // #102

@@ -26,7 +26,8 @@ struct ErrorPresentation: Equatable, Identifiable {
         /// 生成以外の消えない知らせ(H9: 録音の失敗・起動時に届かない等)。主ボタンなし・「閉じる」だけ
         case notice(icon: String, title: String, body: String)
     }
-    enum Primary: Equatable { case retry, sendNow, signIn }
+    /// signInApple = 匿名の上限(M3・「Apple でサインイン」で上限が増える)/ upgradePro = Pro で上限が増える(M3)
+    enum Primary: Equatable { case retry, sendNow, signIn, signInApple, upgradePro }
     enum Secondary: Equatable { case discard, dismiss }
 
     /// 何の失敗か。generate = 生成(「もう一度」で同じ発話を再生成)、chat = 生成前の対話(#75・「もう一度」で同じ履歴を再送)
@@ -128,7 +129,23 @@ struct ErrorPresentation: Equatable, Identifiable {
         case .offlineQueued: .sendNow
         case .offlineInterrupted, .busy, .timeout, .failed, .aiPaused: .retry
         case .sessionExpired: .signIn
-        case .rateLimited, .rejected, .notice: nil
+        case .rejected, .notice: nil
+        case .rateLimited(let info): Self.rateLimitPrimary(info)
+        }
+    }
+
+    /// 上限のカードの次の一手(M3)。もう一度では解けないので再試行は出さない。全体の停止は待つしかない
+    static func rateLimitPrimary(_ info: RateLimitInfo) -> Primary? {
+        switch info.scope {
+        case .global: return nil
+        case .ip: return .signInApple
+        case .user:
+            if info.isAnonymous { return .signInApple }
+            #if APP_STORE_REVIEW
+            return nil // 審査用の版は App 内課金を持たない(#450 G1)
+            #else
+            return info.tier == "pro" ? nil : .upgradePro
+            #endif
         }
     }
 
@@ -215,6 +232,8 @@ struct ErrorCard: View {
         case .retry: ErrorCopy.retry
         case .sendNow: ErrorCopy.sendNow
         case .signIn: ErrorCopy.signIn
+        case .signInApple: ErrorCopy.signInApple
+        case .upgradePro: ErrorCopy.upgradePro
         }
     }
 

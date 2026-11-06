@@ -189,7 +189,7 @@ struct VoiceInputView: View {
             }
             Spacer()
             if inChat {
-                Button { rt.restartChat() } label: {
+                Button { rt.requestRestartChat() } label: {
                     Label(ClarifyCopy.restart, systemImage: "arrow.counterclockwise")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
@@ -200,6 +200,7 @@ struct VoiceInputView: View {
                 }
                 .disabled(rt.isMorphing)
                 .accessibilityIdentifier("chat.restart")
+                .modifier(RestartChatConfirm())
             }
             Button { showSettings = true } label: {
                 Image(systemName: "gearshape")
@@ -546,4 +547,24 @@ enum VoiceModelCopy {
         .environment(AppRuntime(document: (try? DSLExamples.document("initial")) ?? .fallback, services: services))
         .environment(AuthSession(service: services.auth))
         .environment(\.services, services)
+}
+
+/// 「最初から」の確認(M9)。これまでの会話(反映の区切り)も消すと戻せないので、今の会話だけ消すのと選べるようにする。
+private struct RestartChatConfirm: ViewModifier {
+    @Environment(AppRuntime.self) private var rt
+
+    func body(content: Content) -> some View {
+        @Bindable var rt = rt
+        content.confirmationDialog(L10n.tr("最初からにしますか?"), isPresented: $rt.showRestartConfirm, titleVisibility: .visible) {
+            if rt.isChatting {
+                Button(L10n.tr("今の会話だけ消す")) { rt.restartLiveChat() }
+                    .accessibilityIdentifier("chat.restart.live")
+            }
+            Button(L10n.tr("これまでの会話も消す"), role: .destructive) { rt.restartChat() }
+                .accessibilityIdentifier("chat.restart.all")
+            Button(L10n.tr("キャンセル"), role: .cancel) {}
+        } message: {
+            Text(L10n.tr("これまでの会話と反映の記録を消すと、元に戻せません。"))
+        }
+    }
 }
