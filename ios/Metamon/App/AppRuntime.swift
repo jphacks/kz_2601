@@ -984,7 +984,9 @@ final class AppRuntime: DSLRuntime {
     /// ローカル DB の内容で表示を差し替える(画面外からの追加: Siri / ショートカット #80)。今のアプリ以外は何もしない。
     func reloadLocal(_ entity: String, appId: String) async {
         guard appId == document.appId else { return }
-        records[entity] = await recordSync.cached(appId: appId, entity: entity)
+        let cached = await recordSync.cached(appId: appId, entity: entity)
+        guard appId == document.appId else { return }
+        records[entity] = cached
         WidgetSnapshotWriter.write(dsl: dsl, records: records)
     }
 
@@ -994,7 +996,9 @@ final class AppRuntime: DSLRuntime {
             switch event {
             case .sent(let appId, let entity):
                 guard appId == document.appId else { return }
-                records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                let cached = await recordSync.cached(appId: appId, entity: entity)
+                guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
+                records[entity] = cached
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
             case .conflict(let appId, let entity, _):
                 guard appId == document.appId else { return }
@@ -1007,7 +1011,9 @@ final class AppRuntime: DSLRuntime {
             case .rejected(let appId, let entity, let message, let field):
                 guard appId == document.appId else { return }
                 toast = rejectedToast(entity: entity, field: field, message: message)
-                records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                let cached = await recordSync.cached(appId: appId, entity: entity)
+                guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
+                records[entity] = cached
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
             case .paused(let pending):
                 toast = L10n.tr("送信に失敗しました(未送信 \(pending) 件)。接続を確認してください")
@@ -1016,7 +1022,9 @@ final class AppRuntime: DSLRuntime {
             case .notMember(let appId, let entity):
                 guard appId == document.appId else { return }
                 toast = SharedAccessDenial.notMember.message // 送信待ちには残さず、楽観的に出した分を戻す
-                records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                let cached = await recordSync.cached(appId: appId, entity: entity)
+                guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
+                records[entity] = cached
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
             }
         }
