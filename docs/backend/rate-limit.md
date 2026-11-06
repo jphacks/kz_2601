@@ -77,6 +77,59 @@ rateLimits/{env}_{yyyy-mm-dd}_global
 
 `global` は 1 つのドキュメントに全員が書く。Firestore は 1 ドキュメントあたり毎秒 1 回程度が目安で、Claude の 1 回が数十秒かかる今の規模なら足りる。毎秒数回を超えるようなら、global を数個に分ける(shard)。
 
+## プランごとの上限(#317)
+
+無料と Tailor It Pro で使える量の表。値は環境変数で変えられる(`0` = 数えない)。コードの表は `backend/internal/plan`(`plan.Default`・`plan.FromEnv`)の 1 か所。生成・チャットの回数は上の ratelimit がそのまま数え、ここには同じ環境変数を読んで載せているだけ。
+
+| 上限 | 無料 | Pro | 環境変数 | 数える所 |
+| --- | --- | --- | --- | --- |
+| 生成・チャット / 日(単位・上の「重さ」) | 60(匿名は 30) | 300 | `RATE_LIMIT_USER_DAILY`(`_ANON_DAILY`)/ `RATE_LIMIT_PRO_DAILY` | ai(429 `rate_limited`) |
+| アプリの数 / 人 | 100 | 1000 | `PLAN_FREE_APPS` / `PLAN_PRO_APPS` | appconfig: 自分の新しいアプリ(`POST /apps`・新しい appId の最初の読み込み・複製)。共有のアプリを入れるのは数えない |
+| レコードの件数 / アプリ | 5000 | 50000 | `PLAN_FREE_RECORDS_PER_APP` / `PLAN_PRO_RECORDS_PER_APP` | appconfig: レコードの作成。その人が見える分(自分の分 + 共有の分)の全 entity の合計。single の entity は数えない |
+| 写真の枚数 / アプリ(= 容量) | 500(約 150 MB) | 5000(約 1.5 GB) | `PLAN_FREE_PHOTOS_PER_APP` / `PLAN_PRO_PHOTOS_PER_APP` | appconfig: 写真の項目が空から入る作成・更新(差し替えは数えない)。1 枚は 300 KB まで(レコード 1 件の上限)なので、枚数で容量を抑える |
+
+- **既定は緩い**(今の使い方では当たらない)。暴走だけを止める値で、本当の値は #298 の 1 人あたりの費用と #325 の価格から人が決める。
+- **誰のプランで数えるか**: 自分のアプリは呼び出した人、他の人が作ったアプリ(共有のアプリの参加者)は作成者。作った人が払い、参加者は無料(`docs/00_decisions.md`「課金・Pro」)。Pro は ai と同じ検証済みの権利(`users/{uid}/entitlements/pro`)。
+- **強制の段階**: `PLAN_LIMITS_MODE` = `enforce`(既定)/ `log`(止めずに `plan_limit.would_block` を出すだけ)/ `off`。`PRO_GATE_MODE` と同じ考えで、出す時は `log` で量を見てから `enforce`。`plan_limit.would_block` は止めた時(enforce)も出る(`blocked`・`plan`・`resource`・`uid_hash`・`used`・`limit`)。
+- **数え方**: Firestore の count 集計(1000 件で読み 1 回)。レコードの作成のたびに entity の数だけ、写真が入る時は写真の項目の数だけ増える。数えるのに失敗した時は通す(保存を止めるほどのものではない)。
+- **超えた時**: 403 `plan_limit_reached`。`details` は `resource`(`apps` / `recordsPerApp` / `photosPerApp`)・`plan`(`free` / `pro`)・`limit`・`used`・`upgrade`(Pro にすると上がる)・`reason: creator_plan_limit`(作成者のプランの上限。参加者は払えないので課金画面ではなく案内を出す。`pro_required` の `creator_needs_pro` と同じ考え)。ai の generate が新しいアプリで当たった時もそのまま中継する。
+- 消すと空きができる(数は今の件数で、累計ではない)。上限を下げても、もうあるものは消さない(新しく足すのが止まるだけ)。
+
+## 全体の遮断(#317)
+
+1 日の AI の費用(#298 の `ai.usage` の `est_cost_usd`)の合計が閾値を超えたら、**無料プランの生成を一時停止**する。Pro は止めない(上の上限まで使える)。既定は無効。
+
+| 環境変数 | 既定 | 中身 |
+| --- | --- | --- |
+| `AI_FREE_DAILY_BUDGET_USD` | 無し(無効) | その日(0:00 JST から)の費用の閾値(USD)。`0` / 無しで無効 |
+| `AI_FREE_BUDGET_RESUME_DAY` | 無し | 手で戻す: `2026-11-07` のように JST の日付を入れると、その日だけ止めない。翌日からはまた効く(戻し忘れても次の日に遮断が死なない) |
+
+- 止めるもの: Pro でない人の `POST /v1/generate`(`mode=undo` を除く)と `POST /v1/chat`。`POST /v1/text` は Pro の機能(onlineAI)なので止めない。
+- 応答: 503 `free_plan_paused`。`details` は `reason: daily_budget`・`plan: free`・`resumeAt`(次の 0:00 JST)・`retryAfterSec`。`Retry-After` も付く。ログは `budget.free_paused`。
+- 順番: 上限(ratelimit)の内側で判定する(呼び出した人が確かめられていて Pro が分かる)。503 なので数えた分は返す(上の「返す時」)。
+- 費用の数え方: ai のログの出口(`ai.usage` の行)で `est_cost_usd` を足す(`backend/internal/budget`)。料金表に無いモデル(`est_cost_usd` が無い行)は数えない。合計は上限と同じコレクションの `rateLimits/{env}_{yyyy-mm-dd}_ai_cost {usd, expireAt, updatedAt}`(足すのは `Increment`・TTL も同じ)。各インスタンスは 30 秒ごとに読み直し、自分が足した分はすぐ数える。Firestore が読めない時は最後に分かっている合計のまま(止めも解きもしない)。
+- 戻り方: 0:00 JST に自動で戻る。その日のうちに戻すのは `AI_FREE_BUDGET_RESUME_DAY` を今日にする、または `AI_FREE_DAILY_BUDGET_USD` を消す / 上げる(どちらも新しいリビジョン・[runtime-config.md](../infra/runtime-config.md#変え方))。
+- 他の止め方との違い: `RATE_LIMIT_GLOBAL_DAILY` は全員(Pro も)を単位で止める。`AI_PAUSED` は全員を今すぐ止める(障害用)。これは費用で無料だけを止める。
+- 閾値は人が決める(下の「人の判断」)。目安は `scripts/ai-cost.sh prod --days 30` の 1 日の合計の最大より上(普段は当たらず、暴れた日だけ当たる値)。
+- **stg で試す(人の作業)**: ai-stg に `AI_FREE_DAILY_BUDGET_USD=0.01` を入れる → 無料のアカウントで 1 回生成(費用が付く)→ 30 秒以内にもう 1 回生成して 503 `free_plan_paused` → Pro のアカウントは通る → `AI_FREE_BUDGET_RESUME_DAY` を今日にして通る → 両方消す。
+
+## 上限に近い・超えた時の文言(案・#317)
+
+iOS の表示は別の PR(#669 が `ErrorCopy` を変えているため、その後)。サーバーの `message` も同じ考えで書いてある(`plan.Message`・`budget.Message`)。「何が起きたか + 次にすること」の 2 文にする。
+
+| 場面 | 見分け方 | 文言(案) |
+| --- | --- | --- |
+| 生成の残りが少ない(残り 2 割以下) | `X-RateLimit-Remaining` / `Limit` | 今日の生成はあと {n} 回分です。0:00 にまた増えます。 |
+| 生成の上限(無料) | 429 `rate_limited`・`tier` が `signed_in` | 今日の生成の上限に達しました。0:00 からまた使えます。Tailor It Pro にすると 1 日に使える回数が増えます。 |
+| アプリの数の上限 | 403 `plan_limit_reached`・`resource: apps`・`upgrade: true` | 無料プランで作れるアプリ({limit} 個)がいっぱいです。使わないアプリを消すか、Tailor It Pro にすると作れる数が増えます。 |
+| レコードの件数の上限 | `resource: recordsPerApp` | このアプリに保存できるデータ({limit} 件)がいっぱいです。古いデータを消すか、Tailor It Pro にすると上限が上がります。 |
+| 写真の上限 | `resource: photosPerApp` | このアプリに保存できる写真({limit} 枚)がいっぱいです。古い写真を消すか、Tailor It Pro にすると上限が上がります。 |
+| Pro でも上限 | `upgrade: false`・`plan: pro` | {件数 / 枚数}の上限に達しました。古いものを消すと続けて保存できます。 |
+| 参加者(作った人の上限) | `reason: creator_plan_limit` | このアプリを作った人のプランの上限に達しました。作った人に知らせてください(作った人が Tailor It Pro にすると上限が上がります)。課金画面は出さない |
+| 全体の遮断 | 503 `free_plan_paused` | 今日は利用が集中しているため、無料プランの新しい生成を止めています。{resumeAt}(0:00)に再開します。Tailor It Pro なら続けて使えます。「もう一度」は出さない(`Retry-After` が翌日まで) |
+
+- 「近い」の表示は今は生成の回数だけ(ヘッダーがある)。アプリの数・件数・写真の「近い」を出すには、今の使用量を返す API(例: `GET /v1/me/usage`)が要る(この PR には無い)。
+
 ## 抜け道への対策
 
 | 対策 | 状態 |
