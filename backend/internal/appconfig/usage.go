@@ -147,7 +147,7 @@ func (h *Handler) getMyUsage(w http.ResponseWriter, r *http.Request) {
 	}}
 	if pk := u.cfg.Counters; pk != nil {
 		// one document read, not cached: it moves with every AI request
-		if n, err := pk.Peek(ctx, []string{u.cfg.Rate.UserCounterID(day, uid)}); err != nil {
+		if n, err := pk.Peek(ctx, []ratelimit.Counter{{ID: u.cfg.Rate.UserCounterID(day, uid)}}); err != nil {
 			slog.WarnContext(ctx, "appconfig: usage: ai units read failed", slog.Any("error", err))
 		} else {
 			lim := u.cfg.Rate.DailyLimit(tier)

@@ -39,7 +39,7 @@ func TestPeekReadsWhatAllowCharges(t *testing.T) {
 		if !reset.Equal(d.ResetAt) {
 			t.Errorf("reset = %v, Allow = %v", reset, d.ResetAt)
 		}
-		got, err := mem.Peek(context.Background(), []string{cfg.UserCounterID(day, tc.id.UID), "missing"})
+		got, err := mem.Peek(context.Background(), []Counter{{ID: cfg.UserCounterID(day, tc.id.UID)}, {ID: "missing"}})
 		if err != nil || got[0] != 4 || got[1] != 0 {
 			t.Errorf("%s: Peek = %v, %v (want [4 0])", tc.id.UID, got, err)
 		}
@@ -73,7 +73,7 @@ func TestFirestorePeek(t *testing.T) {
 	if _, err := s.Consume(ctx, []Counter{{ID: id, Scope: ScopeUser, Limit: 10}}, 3, time.Now().Add(48*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	got, err := s.Peek(ctx, []string{id, id + "_missing"})
+	got, err := s.Peek(ctx, []Counter{{ID: id}, {ID: id + "_missing"}})
 	if err != nil || len(got) != 2 || got[0] != 3 || got[1] != 0 {
 		t.Fatalf("Peek = %v, %v", got, err)
 	}
