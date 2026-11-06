@@ -98,6 +98,13 @@ type Store interface {
 	Refund(ctx context.Context, counters []Counter, weight int, expireAt time.Time) error
 }
 
+// Peeker is a Store that can read counts without charging. A weight-0 request
+// (generate mode=undo) uses it to report the real remaining units in the
+// response headers instead of the full limit.
+type Peeker interface {
+	Peek(ctx context.Context, counters []Counter) ([]int, error)
+}
+
 // refunded is the count after giving weight back (never below 0).
 func refunded(count, weight int) int {
 	return max(0, count-weight)

@@ -147,6 +147,9 @@ func (h *Handler) reportTarget(r *http.Request, kind, id, appID, entityID, recor
 			// only posts in shared apps can be reported: private records are the caller's own
 			return "", "", mapStoreErr(err, "record")
 		}
+		if !canRead(nil, rec, uidOf(r)) { // #271: an addressed record the caller cannot read
+			return "", "", recordNotFound()
+		}
 		return appID + "/" + entityID + "/" + recordID, rec.Author, nil
 	}
 	return bad("kind must be listing, share, app or record")

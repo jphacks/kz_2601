@@ -267,6 +267,8 @@ func (a *App) Validate() error {
 	checkHiddenFields(a, entities, add)
 	checkMatching(a, add)
 	checkSingleEntities(a, entities, add)
+	checkDataRules(a, add)
+	checkAddressed(a, add)
 	checkServerRules(a, entities, add)
 
 	notifIDs := map[string]bool{}
@@ -425,10 +427,12 @@ func (a *App) Validate() error {
 					add("%s: field %q not in entity %q", where, c.Field, formEntity.ID)
 				} else if f.Computed != nil && c.Type != CompImage && c.Type != CompVideoPlayer {
 					add("%s: field %q is computed (read-only); inputs cannot bind to it. Bind a stored field or show it with list/table/stat", where, c.Field)
-				} else if c.Type == CompPicker && f.Type != FieldEnum && f.Type != FieldRef && f.Type != FieldRefs {
-					add("%s: picker field %q must be enum, ref or refs", where, c.Field)
+				} else if c.Type == CompPicker && f.Type != FieldEnum && f.Type != FieldRef && f.Type != FieldRefs && f.Type != FieldMember && f.Type != FieldMembers {
+					add("%s: picker field %q must be enum, ref, refs, member or members", where, c.Field)
 				} else if c.Type != CompPicker && (f.Type == FieldRef || f.Type == FieldRefs) {
 					add("%s: field %q is type %s; use a picker to choose the %s record", where, c.Field, f.Type, f.RefEntity)
+				} else if c.Type != CompPicker && (f.Type == FieldMember || f.Type == FieldMembers) {
+					add("%s: field %q is type %s; use a picker to choose the participant", where, c.Field, f.Type)
 				} else if (c.Type == CompPhotoField || c.Type == CompImage) && f.Type != FieldPhoto {
 					add("%s: %s field %q must be type photo", where, c.Type, c.Field)
 				} else if (c.Type == CompVideoField || c.Type == CompVideoPlayer) && f.Type != FieldVideo {

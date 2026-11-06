@@ -55,6 +55,8 @@ public extension DSLRuntime {
     /// 表示用の文字列。type=ref は参照先レコードの見出しに解決する(未取得・削除済みは「—」)。
     func display(_ value: JSONValue, field: Field?) -> String {
         if let field, field.type == .refs { return refsTitle(value, field: field) }
+        if let field, field.type == .member { return memberName(value) } // #272
+        if let field, field.type == .members { return memberNames(value) } // #271
         guard let field, field.type == .ref else { return displayText(value, field: field) }
         guard let id = value.stringValue, !id.isEmpty else { return "" }
         // enum から ref に変えた後の古い記録は選択肢の名前そのものを持つので、そのまま出す(#194)

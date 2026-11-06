@@ -96,8 +96,15 @@ type Entity struct {
 	// Match (#507): the entity's role in a matching app (matching.go).
 	Match EntityMatch `json:"match,omitempty"`
 	// Single (#267): the entity holds one record of settings (single.go).
-	Single bool    `json:"single,omitempty"`
-	Fields []Field `json:"fields"`
+	Single bool `json:"single,omitempty"`
+	// Unique (#273): no two records share these values (data_rules.go).
+	Unique []string `json:"unique,omitempty"`
+	// DeleteBy (#272): who may delete a shared/public record (data_rules.go).
+	DeleteBy EntityDeleteBy `json:"deleteBy,omitempty"`
+	// AddressedTo (#271): the member / members field naming who may read a
+	// record besides its author (addressed.go).
+	AddressedTo string  `json:"addressedTo,omitempty"`
+	Fields      []Field `json:"fields"`
 }
 
 // EntityEdit says who may update a shared/public record. Deleting is always
@@ -176,6 +183,8 @@ type Field struct {
 	Computed     *Expr     `json:"computed,omitempty"`  // read-only calculated field (row context = this record)
 	Health       string    `json:"health,omitempty"`    // "weight": also write the saved value to HealthKit (#167)
 	Hidden       bool      `json:"hidden,omitempty"`    // not shown to answerers (quiz answer key); computed may compare it (#262)
+	// EditableBy "admins": only the app's admins set it (#272, data_rules.go).
+	EditableBy string `json:"editableBy,omitempty"`
 }
 
 // Screen is one navigable page.
@@ -367,6 +376,8 @@ type Component struct {
 	Source      string  `json:"source,omitempty"`      // photoField / videoField: camera|library|both
 	MaxDuration int     `json:"maxDuration,omitempty"` // videoField: recording limit in seconds (default 60)
 	Height      string  `json:"height,omitempty"`      // image: small|medium|large
+	// VisibleTo "admins": only the app's admins see the button (#272, data_rules.go).
+	VisibleTo string `json:"visibleTo,omitempty"`
 
 	// data-bound (list / stat / chart)
 	Entity        string    `json:"entity,omitempty"`
