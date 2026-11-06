@@ -4727,23 +4727,6 @@
         }
       }
     },
-    "アプリ一覧" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your apps"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "記録帳の一覧"
-          }
-        }
-      }
-    },
     "インストールできませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
