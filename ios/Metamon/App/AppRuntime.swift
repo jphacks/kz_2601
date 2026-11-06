@@ -26,7 +26,6 @@ final class AppRuntime: DSLRuntime {
     var upcomingNotifications: [UpcomingNotification] = []
     /// 通知が許可されていない(予約しても届かない)。
     var notificationsDenied = false
-    @ObservationIgnored var warnedNotificationsDenied = false
     @ObservationIgnored var notificationSyncTask: Task<Void, Never>?
     @ObservationIgnored var conditionCheckTask: Task<Void, Never>?
     private(set) var loading: Set<String> = []

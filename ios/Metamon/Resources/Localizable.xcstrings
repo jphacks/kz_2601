@@ -3588,6 +3588,23 @@
         }
       }
     },
+    "ふつう 10 秒ほど" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usually about 10 s"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ふつう 10 秒ほど"
+          }
+        }
+      }
+    },
     "ほかのアプリの通話や録音を終えてから、もう一度お試しください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8807,6 +8824,23 @@
         }
       }
     },
+    "取っ手を押すと戻ります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the handle to bring it back"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取っ手を押すと戻ります"
+          }
+        }
+      }
+    },
     "取り消す" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12462,6 +12496,23 @@
         }
       }
     },
+    "設定を開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定を開く"
+          }
+        }
+      }
+    },
     "設定アプリ > Tailor It でマイクを許可してください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13427,6 +13478,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知"
+          }
+        }
+      }
+    },
+    "通知がオフのため、このアプリの通知は届きません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications are off, so this app's notifications won't arrive"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知がオフのため、このアプリの通知は届きません"
           }
         }
       }
