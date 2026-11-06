@@ -6,21 +6,51 @@ import MetamonServices
 // appconfig のアプリとデータ(users/{uid}/...)はそのまま。機種変更・再インストール後は同じ Apple ID でサインインすれば戻れる。
 
 /// 「引き継ぎのためにサインイン」の案内を出したか(端末ごとに 1 回だけ)。
+/// 最初のアプリの直後には出さず(H7: 完成直後のお知らせを減らす)、作った起動を覚えておいて次の起動で出す。
 enum AccountLinkPrompt {
     static let key = "metamon.accountLinkPrompted"
+    /// 案内を待っている(値 = 最初のアプリを作った起動の id)
+    static let pendingKey = "metamon.accountLinkPending"
+    /// この起動の id(プロセスごと)
+    static let currentLaunch = UUID().uuidString
 
     static func shouldOffer(_ defaults: UserDefaults = .standard) -> Bool { !defaults.bool(forKey: key) }
-    static func markOffered(_ defaults: UserDefaults = .standard) { defaults.set(true, forKey: key) }
+    static func markOffered(_ defaults: UserDefaults = .standard) {
+        defaults.set(true, forKey: key)
+        defaults.removeObject(forKey: pendingKey)
+    }
+
+    /// 最初のアプリを作った: この起動の id で予約する(既に予約があれば前のを残す)。
+    static func markPending(_ defaults: UserDefaults = .standard, launch: String = currentLaunch) {
+        guard defaults.string(forKey: pendingKey) == nil else { return }
+        defaults.set(launch, forKey: pendingKey)
+    }
+
+    /// 前の起動で予約した案内があるか(同じ起動の予約はまだ出さない)。
+    static func isDue(_ defaults: UserDefaults = .standard, launch: String = currentLaunch) -> Bool {
+        guard let pending = defaults.string(forKey: pendingKey) else { return false }
+        return pending != launch
+    }
 }
 
 extension AppRuntime {
-    /// 匿名ユーザーが初めてアプリを作った後に 1 回だけ、引き継ぎのためのサインインを案内する。
-    func offerAccountLinkIfNeeded(defaults: UserDefaults = .standard) {
+    /// 匿名ユーザーが初めてアプリを作った: 引き継ぎの案内を次の起動に予約する(H7: 最初のアプリの直後には出さない)。
+    func offerAccountLinkIfNeeded(defaults: UserDefaults = .standard, launch: String = AccountLinkPrompt.currentLaunch) {
         guard isAnonymousUser?() == true, AccountLinkPrompt.shouldOffer(defaults) else { return }
+        AccountLinkPrompt.markPending(defaults, launch: launch)
+    }
+
+    /// 起動時(`bootstrap`): 前の起動で予約した案内があれば 1 回だけ出す。出す順番は `PostBuildNotice`(他のお知らせの後)。
+    func presentDeferredAccountLinkIfNeeded(defaults: UserDefaults = .standard, launch: String = AccountLinkPrompt.currentLaunch) {
+        guard AccountLinkPrompt.isDue(defaults, launch: launch) else { return }
+        guard isAnonymousUser?() == true, AccountLinkPrompt.shouldOffer(defaults) else {
+            defaults.removeObject(forKey: AccountLinkPrompt.pendingKey) // もう Apple に引き継いだ等
+            return
+        }
         AccountLinkPrompt.markOffered(defaults)
         let delay = linkPromptDelay
         Task { [weak self] in
-            try? await Task.sleep(for: delay) // 要約バナーを読んでから
+            try? await Task.sleep(for: delay) // 起動直後の画面が落ち着いてから
             guard let self, self.isAnonymousUser?() == true else { return }
             self.showLinkPrompt = true
         }
@@ -136,13 +166,13 @@ struct AccountLinkPromptSheet: View {
     }
 }
 
-/// RootView に付ける: 案内シートは他のシート(発話・同意・フォーム)と「個人の情報も公開されます」の確認が閉じてから出す。
+/// RootView に付ける: 案内シートは他のシート(発話・同意・フォーム)と完成直後のお知らせ(`PostBuildNotice`)が閉じてから出す。
 struct AccountLinkPromptHost: ViewModifier {
     @Environment(AppRuntime.self) private var rt
 
     func body(content: Content) -> some View {
         content.sheet(isPresented: Binding(
-            get: { rt.showLinkPrompt && !rt.showVoiceSheet && !rt.showAIConsent && !rt.showAppSwitcher && rt.sheet == nil && rt.fullScreen == nil && rt.publicDataPrompt == nil },
+            get: { rt.showLinkPrompt && rt.isNoticeTurn(.accountLink) && !rt.showVoiceSheet && !rt.showAIConsent && !rt.showTutorial && !rt.showAppSwitcher && rt.sheet == nil && rt.fullScreen == nil },
             set: { if !$0 { rt.showLinkPrompt = false } }
         )) {
             AccountLinkPromptSheet()

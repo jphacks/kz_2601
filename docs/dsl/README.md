@@ -56,12 +56,12 @@ Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|me
   Entity.retentionDays?: 1〜3650(記録の保存期間。期限を過ぎた記録を端末が自動で消す)— §3.7
   Entity.single?: true(設定値の置き場。レコードは常に 1 件・式 {"setting": "<fieldId>"} で読む)— §3.11
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
-Container { type: vstack|hstack|section, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (44 種・全て id? と area? を持つ) / Action (13 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField?, when?, alarm? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
+Container { type: vstack|hstack|section|card|disclosure|carousel|grid, id?, area?, title?, spacing?, children[]: Leaf }
+Leaf (66 種・全て id? と area? を持つ) / Action (13 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField?, when?, alarm? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
-### 3.1 コンポーネント(51 種 = Container 7 + Leaf 44)
+### 3.1 コンポーネント(73 種 = Container 7 + Leaf 66)
 
 全種に共通の任意キー: `id`(画面内一意)・`area`(§3.4 のグリッド矩形。Screen 直下と、card / section / vstack の子で有効)。用途・レイアウトの定石は `dsl.schema.json` 各定義の `description` / `x-usage` が正典(AI へのカタログはそこから生成。§4)。
 
@@ -208,7 +208,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 - **`locationPicker`(#212)**: 現在地以外の場所を選ぶ入力欄。シートで店名・地名・住所を検索(MapKit `MKLocalSearch`・API キー不要)/ 地図を動かして中央のピン / 現在地 から選ぶ。保存は `locationButton` と同じ `"lat,lng"`(値の形を増やさない=mapView・appconfig の検証はそのまま)。場所の名前は任意の `nameField`(string field)に入れる(ピン・現在地で名前が無い時は打った名前を消さない)。「今いる場所」だけなら `locationButton`。モック(`METAMON_MOCK=1`)の検索は固定 3 件。
 - **`healthStat` / `Field.health`(#167)**: 端末のヘルスデータ。`healthStat` は **entity を持たない表示カード**で、歩数は iPhone の歩数計(CoreMotion・直近 7 日・capability 不要)、歩数計の無い端末(シミュレータ)はヘルスケアの歩数、体重はヘルスケアの最新値を読む。today は数値(steps は `target` で達成率バー)、week は 7 日のグラフ(steps は棒 + 目標線・weight は折れ線)。許可が無い・使えない端末は「ヘルスケアへのアクセスが許可されていません」等を表示。書き込みは部品ではなく **`Field.health: "weight"`**(number・unit kg): フォームで**新規**保存した時にヘルスケアの体重にも 1 件書く(編集保存では書かない・失敗してもレコードは保存済みでトーストだけ)。入力部品や `saveRecord` を増やさず「どの値をヘルスケアに出すか」をデータ側に 1 キーで持つため。実例: `examples/health.json`。設計は `docs/ios/architecture.md` §15.1。
 - **`sensorValue`(#419)**: iPhone のセンサーの今の値。tilt / pitch / roll(°)・acceleration(G・重力を除いた揺れ)・rotation(°/s)は CoreMotion の device motion、pressure(hPa)・altitude(m・**画面を開いた時を 0 とする相対値**)は CMAltimeter。**画面に出ている間だけ**測り(`.task` の開始・取り消し)、表示の更新は最大 10 回/秒。`entity`+`field` で「今の値を記録」(1 回 1 レコード・`dateField` に時刻・他の field は `defaultValue`)、`seconds` で「記録を開始/停止」(画面を開いている間だけ・`limit` 件で自動停止)、`threshold` は条件に入った瞬間に 1 回だけ発火(警告表示 + 振動・`save` で 1 件保存・`action` は navigate / scheduleNotification / cancelNotification のみ)、条件から出るまで再発火せず最短 3 秒おき。form の無い entity でも lint は通る(locationTracker と同じ)。**温度・湿度は iPhone にセンサーが無いので無い**(AI は「測れません」と答え、手入力の記録を代わりに出す・外付けセンサーは別 Issue)。センサーの無い端末(シミュレータ)は「このセンサーはこの端末では使えません」、`METAMON_MOCK=1` は決まった波形。計算は iOS `SensorReading`(MetamonDSL)。審査用ビルドでは外す(docs/ios/review-build.md)。実例: `examples/sensors.json`。
-- `aiButton`(#78)は **オンデバイス完結の AI 部品**(Apple Intelligence / Foundation Models・iOS 26+)。データは端末外に出ず、クラウド API も課金も無い。結果は output field のドラフトに入るだけで保存はユーザー。非対応端末・Apple Intelligence OFF・モデル準備中は「この端末では AI を使えません」と理由付きで無効化。`Action` の `runAI` 案ではなく Leaf にしたのは、(1) 生成 AI が 1 部品で書き切れる(button + action の 2 段より短く、入力・出力 field を同じ場所で検証できる)、(2) 実行中スピナー・不可時の無効表示が部品の見た目に属する、(3) `ActionType` を増やすとホストの網羅 switch 改修が要る、の 3 点。実例: `examples/diary_ai.json`(本文 → 要約・気分の分類)。
+- `aiButton`(#78)は **端末内の AI を優先する AI 部品**(Apple Intelligence / Foundation Models・iOS 26+)。端末内で動く時はデータは端末外に出ず、課金も無い。結果は output field のドラフトに入るだけで保存はユーザー。非対応端末・Apple Intelligence OFF・モデル準備中は、generate と同じく ai サービスの `POST /v1/text` に `task`(summarize など)を付けて回す(**Tailor It Pro の機能**・AI 送信の同意が要る・材料は文字だけ 4 KB まで・写真は送らない・[text.md](../backend/features/text.md))。オンライン版を持たないホスト(審査用ビルド・プレビュー)では「この端末では AI を使えません」と理由付きで無効化。DSL の宣言は変わらない(どこで動くかはホストが決める)。`Action` の `runAI` 案ではなく Leaf にしたのは、(1) 生成 AI が 1 部品で書き切れる(button + action の 2 段より短く、入力・出力 field を同じ場所で検証できる)、(2) 実行中スピナー・不可時の無効表示が部品の見た目に属する、(3) `ActionType` を増やすとホストの網羅 switch 改修が要る、の 3 点。実例: `examples/diary_ai.json`(本文 → 要約・気分の分類)。
 - **`photoField.analyze`(#418・写真を AI で読み取る / 骨格)**: 写真を撮った・選んだ直後に**端末内で**読み取り、同じレコードの `into` field のドラフトに入れる(保存はユーザー・読み取れなかった項目は今の値のまま・プレビューの下の「もう一度読み取る」で読み直す)。`kind` は閉じた 11 種: `text`(Vision の文字認識 ja+en → string/text)・`amount`(OCR の「合計」の行、無ければ ¥/円 付きの最大額 → currency/integer/number)・`date`(OCR の `2026/10/28`・`2026年10月28日` など → date/datetime)・`classify`(Vision の画像分類のラベル + OCR を Foundation Models で候補 1 つに寄せる。Apple Intelligence が無い端末は候補名とラベル・文字の一致だけ → enum か options 付き string/text)・`describe`(ラベル + OCR から Foundation Models で 1 文。無い端末はラベルの列挙)・`jointAngle`(Vision の `VNDetectHumanBodyPoseRequest` で `joint` の角度 0〜180 度 → number/integer。プレビューに関節の点と線を重ねる。`knee` など左右無しは信頼度の高い側)・`label`(`VNClassifyImageRequest` のラベルのうち、`food` `plant` などの大まかな語を除いたいちばん確かなもの 1 つ。主なラベルは日本語に直し、知らないラベルは英語のまま → string/text)・`labels`(同じラベルを最大 5 つ「、」区切り → string/text)・`barcode`(`VNDetectBarcodesRequest` で写真の中の最初のバーコード・QR の中身 → string/text。カメラで連続して読む `qrScanner` とは別で、撮った・選んだ写真から読む)・`peopleCount`(`VNDetectFaceRectanglesRequest` の顔の数と `VNDetectHumanRectanglesRequest` の人の数の多い方 → integer/number。0 人も値として入れる。顔の特徴は取らず誰かは見分けない)・`color`(写真の中央 60% を 32×32 に縮めた画素を 12 色の名前に振り分け、いちばん多い色 → string/text)。検証(`backend/pkg/dsl/photo_analyze.go`): into は screen.entity の保存される field で photo 自身・computed 不可、kind ごとの型、into の重複、jointAngle の joint 必須、classify の候補(2 つ以上・enum なら options の部分集合)。**新しい部品ではなく photoField の拡張**にしたのは、(1) 撮る操作と読み取りが 1 部品で書け AI が迷わない、(2) 古い iOS は `analyze` を無視して従来の写真入力として動く(落ちない)、(3) 写真ライブラリから選ぶだけでも動くので審査用の版(#245)でも外さなくてよい、の 3 点。backend(Claude の画像入力)へのフォールバックと、カメラ映像でのリアルタイムの回数カウントは後続(課金・認証・レート制限の重み付けが要るため)。実例: `examples/receipt_ai.json`(レシート → 金額・日付・分類・文字)、`examples/form_check.json`(スクワット → 膝・腰の角度)。
   - **拡張の kind(label / labels / barcode / peopleCount / color)の範囲**: 過去の JPHACKS の作品で「写真の理解」が要る 18 作品(`docs/research/jphacks-coverage.md` の 6 番)のうち、端末内の Vision の標準機能だけでできるものに絞った。どれも写真は端末の外に出さず(クラウドの AI に送らない)、新しい権限も使わないので、**プライバシーの申告(App Privacy・プライバシーポリシー・同意の画面)は変わらない**。審査用の版でも同じように残す(選んだ写真を端末内で読むだけ)。作らなかった物: 食べ物のカロリー・栄養の推定と植物・名所の細かい種類(端末内に使えるモデルが無い。独自モデルの同梱は 2.5.2 とアプリの大きさの面で別の判断)、顔で人を見分ける(個人の特定になる)、2 枚の写真の見比べ(`VNGenerateImageFeaturePrintRequest` で距離は出せるが、お手本の写真が別のレコードにあることが多く、点数の目安も決めにくいので後続)、書類の検出・切り抜き(値ではなく写真そのものを書き換えるため `into` の形に合わない。切り抜くなら撮影の画面の側の作業)、明るさ(要る作品が無い)。
 - **`aiButton` の `task: "generate"`(#417)**: 決まった指示(`prompt`)で AI に新しく書かせるボタン(罰ゲームの案・今日の献立・励ましの一言)。結果は `shape` の形でボタンの下に出す: `line`(1 行・既定)/ `list`(箇条書き `count` 個・既定 3)/ `fields`(`items` の名前ごとに 1 つ)。材料は任意で `entity`(新しい順 `limit` ≤ 20 件)か form の `input` / `{{field}}`、iOS が 4 KB に切って渡す。`output` を付けるとフォームのドラフトにも入る(保存は利用者)。付けなければ表示だけで、どの画面にも置ける(screen.entity 不要)。実行は **端末内 AI(Foundation Models)を優先**し、使えない端末だけ ai サービスの `POST /v1/text`(Claude・出力 400 トークン・利用上限の重さ 1)に回す。オンライン版は **Tailor It Pro の機能**(Pro でなければ課金画面・AI 送信の同意が無ければ同意画面)。モック(`METAMON_MOCK=1`)は決まった文を返す。新しい部品 `aiText` にせず aiButton の task にしたのは、(1) 指示テンプレ・`entity`+`limit` の材料・`output` への書き込み・端末内 AI の実行と可用性表示が aiButton と同じで、別部品だと全部が二重になる、(2) AI が「AI で何かするボタン = aiButton」と 1 語で選べる、(3) 部品の enum・レンダラ登録など他の部品と取り合う共有行を増やさない、の 3 点。違いは「入力を変換する(要約など・端末内だけ・無料)」か「指示で新しく書く(generate・オンラインの代わりあり)」で、task で分かれる。
@@ -440,16 +440,39 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 
 | 部分 | 語彙 | 決まり(`Validate()`・`backend/pkg/dsl/server_rules.go`) |
 |---|---|---|
-| きっかけ `on` | `record`: `created` / `updated`(+ `entity`、更新は `fields` で「この field が変わった時」に絞れる)。`every`: `daily` / `weekly`(`weekday`)/ `monthly`(`day` 1〜28)+ `time` HH:MM(作成者のタイムゾーン) | どちらか 1 つ。削除のきっかけ・1 日 1 回より細かい時刻・外からの呼び出しは無い |
-| 条件 `if` | Expr(行 = きっかけのレコード。`"<refField>.<field>"` で ref 先、更新では `"$prev.<field>"` で前の値) | 真偽であること。`agg`・`streak` / `doneInDays`・computed field は使えない。時刻のきっかけには行が無い |
+| きっかけ `on` | `record`: `created` / `updated`(+ `entity`、更新は `fields` で「この field が変わった時」に絞れる)。`every`: `daily` / `weekly`(`weekday`)/ `monthly`(`day` 1〜28)+ `time` HH:MM(作成者のタイムゾーン)。時刻のきっかけは `each`: `<entity>` でそのレコード 1 件ずつに動かせる | どちらか 1 つ。削除のきっかけ・1 日 1 回より細かい時刻・外からの呼び出しは無い。`each` は時刻のきっかけだけ・ルールと同じ側の entity だけ |
+| 条件 `if` | Expr(行 = きっかけのレコードか `each` のレコード。`"<refField>.<field>"` で ref 先、更新では `"$prev.<field>"` で前の値)。`agg` で同じアプリの記録を集計できる(下の「記録を読むルール」) | 真偽であること。`streak` / `doneInDays`・computed field は使えない。`each` の無い時刻のきっかけには行が無い(`ref` 不可・`agg` は可) |
 | 処理 `do`(1〜5 個) | `notify`{`to`, `title`, `body`} / `createRecord`{`entity`, `values`} / `updateRecord`{`ref`?, `values`} / `increment`{`ref`, `field`, `by`?} | 1 つのオブジェクトに 1 種類だけ。書けるのはきっかけと同じ側の entity(private どうし・shared / public どうし)。computed・photo・video・location の field には書かない。createRecord は required の field を全部書く |
 | 宛先 `to.kind` | `owner`(作成者)/ `author`(きっかけのレコードを書いた人)/ `authorOf` + `field`(ref 先のレコードを書いた人)/ `members`(参加者全員) | private は `owner` だけ、**public は `owner` と `authorOf` だけ**、shared は全部。きっかけを起こした本人には送らない。任意の uid・メール・電話・外部の宛先は無い |
-| 通知の本文 | 決まった枠 + `{<field>}`(きっかけのレコードの値)・`{$author}`(書いた人の表示名・shared / public) | **題 30 字・本文 80 字**(差し込みの `{…}` も数える)。差し込む値は実行の時に 30 字で切る。URL・ドメイン・メールアドレス・電話番号・「公式」「運営」などの名乗り・制御文字・見えない文字は不可。ref・refs・photo・video・location・hidden・computed の field は差し込めない |
+| 通知の本文 | 決まった枠 + `{<field>}`(きっかけ・`each` のレコードの値)・`{$author}`(書いた人の表示名・shared / public)・`{<名前>}`(`with` の数・日付) | **題 30 字・本文 80 字**(差し込みの `{…}` も数える)。差し込む値は実行の時に 30 字で切る。URL・ドメイン・メールアドレス・電話番号・「公式」「運営」などの名乗り・制御文字・見えない文字は不可。ref・refs・photo・video・location・hidden・computed の field は差し込めない |
 | 連鎖 | 処理が書いたレコードは次のきっかけを起こさない | 別のルール(自分も含む)のきっかけになる書き込み(作るなら created、書き換え・increment は同じ field の updated)を断る |
-| 上限 | ルール 20・時刻のルール 5・処理 5(Pro の値) | 無料の値(3・1・3)は `App.ServerRuleQuotaProblems(pro)` で、プランが分かる所(appconfig)が見る |
+| 上限 | ルール 20・時刻のルール 5・処理 5(Pro の値)。1 つのルールが読む entity(`each` + `agg`)は 2 つまで・`with` は 3 つまで | 無料の値(3・1・3)は `App.ServerRuleQuotaProblems(pro)` で、プランが分かる所(appconfig)が見る。読む件数の上限は runner が持つ(下) |
 | 使えないアプリ | 仲間探し(`entity.match`)のアプリ | `serverRules` ごと断る |
 | single の entity(§3.11) | 「常に 1 件」なので `createRecord` の行き先にできない。きっかけにするのと、きっかけの 1 件の `updateRecord`(上書き)はよい | `createRecord` の entity が single なら断る |
 | `{"setting":…}` | 設定は利用者ごとの値で、どの人の設定かが決まらないので、条件・値の式で使えない(private のルールでも) | 式に `setting` があれば断る |
+
+#### 記録を読むルール(集計・まとめ・期限・順位)
+
+決定 #336 で「後で(費用の単位を決めてから)」とした `agg` の条件と、定期の集計のやり直しを、読む件数の上限つきで入れた。外部への送信・任意の宛先・処理の連鎖は今までどおり無い。
+
+| 語彙 | 中身 | 例 |
+|---|---|---|
+| `agg` を `if` / `values` / `by` / `with` で | 同じアプリの、**ルールと同じ側**(private どうし・shared / public どうし)の entity のレコードを集計(count / sum / avg / min / max / latest / earliest・filter の期間 `thisWeek` などや比較)。filter の値の `ref` は行のレコード | 「今月の支出が 5 万円を超えたら知らせて」: `if` に `{"op":"gt","args":[{"agg":"sum","entity":"expenses","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}},50000]}` |
+| `on.each`(時刻のきっかけ) | その entity のレコード 1 件ずつにルールを動かす(行 = そのレコード)。`if` で絞り、`{<field>}`・`author`・`updateRecord`(ref 省略 = そのレコード)・`increment` が使える。値が変わらない `updateRecord` は書かない | 締め切りの 3 日前: `{"every":"daily","time":"08:00","each":"tasks"}` + `if` `daysUntil(due) == 3`。順位: `each` + `updateRecord` `rank = count(score > 自分の score) + 1` |
+| `notify.with` | `{名前: 数か日付の Expr}`(3 つまで)。本文に `{名前}` で差し込む。文字の値は不可。数は利用者の値から来ることがあるので、差し込む時に電話番号らしい桁(10 桁以上)を伏せる | 毎週のまとめ: `"body":"今週は {count} 件・{total} 円でした"`, `"with":{"count":{"agg":"count",…},"total":{"agg":"sum",…}}` |
+
+```json
+{"id":"due_soon","on":{"every":"daily","time":"08:00","each":"tasks"},
+ "if":{"op":"and","args":[{"op":"neq","args":[{"ref":"done"},true]},
+       {"op":"eq","args":[{"op":"daysUntil","args":[{"ref":"due"}]},3]}]},
+ "do":[{"notify":{"to":{"kind":"owner"},"title":"締め切り","body":"{title} の締め切りまであと 3 日です"}}]}
+```
+
+- 例の全体は `backend/pkg/dsl/testdata/server_rules_reads.json`(家計の集計・週のまとめ・期限)と `server_rules_ranking.json`(shared の順位)。
+- **費用と上限**(runner の `quota`): 読んだレコード 1 件 = Firestore の読み取り 1 回(1,000 件 ≈ 0.0004 USD・#338 の原価)。1 回の実行で読めるのは Pro 500 件(`RUNNER_LIMIT_RUN_READS_PRO`)、アプリごとに 1 日 Pro 20,000 件(`RUNNER_LIMIT_APP_READS_PRO`・カウンタ `rr_app_{appId}`)。同じ entity は 1 回の実行で 1 度だけ読む(`each` の行どうしで共有)。**超えたらその回は実行しない**(`skipped_quota`・`limit` に `run_reads` / `app_reads`)。一部の記録だけで計算した誤った合計・順位は出さない。`runner.usage` の `reads` と `est_cost_usd` に入る。値は出発点で、#338 と同じく実測で直す。
+- 読める範囲(#337 の層 3 を広げた): きっかけのレコード・その ref 先に加えて、`each` / `agg` の entity の**同じアプリ・同じ側**のレコードと、その ref 先。取っ手(`scope.Handle.List`)が appId と側を確かめる。
+- 1 回の書き込みの上限(Pro 10)は `each` の全部の行で数える。順位を 10 件より多く書き換える日は、残りがその日は書かれない(次の日に続きが書かれる)。
+- まだ作らない(決定の範囲の外か、宣言で表せない): 推薦・相性・似ている人の自動の組み合わせ、複数人への割り当て・日程の自動調整、距離での自動のグループ分け、外部のデータの取得。
 
 - 共有データに効くのは作成者の公開 DSL(`apps_public/{appId}`)の宣言だけ。参加者が自分のコピーを書き換えても効かない(#337・runner の側で守る)。
 - 人が読める説明は `App.DescribeServerRule`(例: 「出欠」が作られた時(条件に合えば)、「予定」を作った人に通知・「予定」の「参加の数」を数える)。「このアプリの自動の動き」の一覧(#347)で使う。

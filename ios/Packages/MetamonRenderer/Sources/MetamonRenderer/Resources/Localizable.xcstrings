@@ -613,6 +613,40 @@
         }
       }
     },
+    "%lld 項目。%@ の %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld items. %@: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 項目。%@ の %@"
+          }
+        }
+      }
+    },
+    "%lld 項目。最大は %@ の %@、最小は %@ の %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld items. Highest: %@ (%@). Lowest: %@ (%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 項目。最大は %@ の %@、最小は %@ の %@"
+          }
+        }
+      }
+    },
     "%lld人で割ります" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1463,6 +1497,23 @@
         }
       }
     },
+    "まだ記録がありません。記録するとグラフになります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No records yet. Add one to see the chart"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ記録がありません。記録するとグラフになります"
+          }
+        }
+      }
+    },
     "まだ誰ともつながっていません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1731,6 +1782,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "クリア"
+          }
+        }
+      }
+    },
+    "グラフ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chart"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "グラフ"
           }
         }
       }
@@ -2738,6 +2806,23 @@
         }
       }
     },
+    "値" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Value"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "値"
+          }
+        }
+      }
+    },
     "停止" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2819,6 +2904,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "先に%@を追加してください"
+          }
+        }
+      }
+    },
+    "入力した内容を破棄しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard your changes?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力した内容を破棄しますか?"
           }
         }
       }
@@ -4353,6 +4455,23 @@
         }
       }
     },
+    "破棄する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "破棄する"
+          }
+        }
+      }
+    },
     "移動手段" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4553,6 +4672,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "線 %lld 本"
+          }
+        }
+      }
+    },
+    "編集を続ける" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep Editing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集を続ける"
           }
         }
       }
@@ -5492,6 +5628,23 @@
         }
       }
     },
+    "閉じると、入力した内容は保存されません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you close, what you entered won't be saved."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じると、入力した内容は保存されません。"
+          }
+        }
+      }
+    },
     "開始" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5607,6 +5760,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音声案内をオンにする"
+          }
+        }
+      }
+    },
+    "項目" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Item"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "項目"
           }
         }
       }

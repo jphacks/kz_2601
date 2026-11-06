@@ -3,7 +3,7 @@ import MetamonDSL
 import MetamonServices
 @testable import Metamon
 
-/// #313 β の初回の案内: β の版の判定(TestFlight は差し込む)・初回 1 回・順序(チュートリアルの後・ダウンロード確認の前)。
+/// #313 β の初回の案内: β の版の判定(TestFlight は差し込む)・初回 1 回・順序(最初のアプリの後・H1)。
 @MainActor
 final class BetaWelcomeTests: XCTestCase {
     private var defaults: UserDefaults!
@@ -50,18 +50,20 @@ final class BetaWelcomeTests: XCTestCase {
     // MARK: - 出すか
 
     func testDecision() {
-        XCTAssertTrue(BetaWelcomeStore.shouldAutoPresent(isBeta: true, hasSeen: false, tutorialSeen: true), "β・未読 → 出す")
-        XCTAssertFalse(BetaWelcomeStore.shouldAutoPresent(isBeta: true, hasSeen: true, tutorialSeen: true), "1 回だけ")
-        XCTAssertFalse(BetaWelcomeStore.shouldAutoPresent(isBeta: true, hasSeen: false, tutorialSeen: false), "チュートリアルより先に出さない")
-        XCTAssertFalse(BetaWelcomeStore.shouldAutoPresent(isBeta: false, hasSeen: false, tutorialSeen: true), "App Store・審査用は出さない")
+        XCTAssertTrue(BetaWelcomeStore.shouldAutoPresent(isBeta: true, hasSeen: false, tutorialSeen: true, firstAppMade: true), "β・未読・最初のアプリの後 → 出す")
+        XCTAssertFalse(BetaWelcomeStore.shouldAutoPresent(isBeta: true, hasSeen: false, tutorialSeen: true, firstAppMade: false),
+                       "最初のアプリの前は出さない(H1: 初回の関門から外す)")
+        XCTAssertFalse(BetaWelcomeStore.shouldAutoPresent(isBeta: true, hasSeen: true, tutorialSeen: true, firstAppMade: true), "1 回だけ")
+        XCTAssertFalse(BetaWelcomeStore.shouldAutoPresent(isBeta: true, hasSeen: false, tutorialSeen: false, firstAppMade: true), "チュートリアルより先に出さない")
+        XCTAssertFalse(BetaWelcomeStore.shouldAutoPresent(isBeta: false, hasSeen: false, tutorialSeen: true, firstAppMade: true), "App Store・審査用は出さない")
     }
 
     func testStorePersistsSeenWithVersionedKey() {
         XCTAssertTrue(BetaWelcomeStore.seenKey.hasSuffix(".v1"))
         let store = BetaWelcomeStore(defaults: defaults, isBeta: true)
-        XCTAssertTrue(store.shouldAutoPresent(tutorialSeen: true))
+        XCTAssertTrue(store.shouldAutoPresent(tutorialSeen: true, firstAppMade: true))
         store.markSeen()
-        XCTAssertFalse(store.shouldAutoPresent(tutorialSeen: true))
+        XCTAssertFalse(store.shouldAutoPresent(tutorialSeen: true, firstAppMade: true))
         XCTAssertTrue(BetaWelcomeStore(defaults: defaults, isBeta: true).hasSeen)
     }
 
@@ -86,24 +88,41 @@ final class BetaWelcomeTests: XCTestCase {
         return rt
     }
 
-    func testRuntimeOrderAfterTutorialBeforeModelDownload() throws {
+    /// H1・U6: β の案内は初回の関門から外し、最初のアプリの後に出す。音声モデルの確認は待たせない
+    func testRuntimeShowsAfterFirstAppNotDuringOnboarding() throws {
         let rt = try makeRuntime(isBeta: true)
-        rt.showModelDownloadConfirm = true
-
         rt.presentBetaWelcomeIfNeeded()
         XCTAssertFalse(rt.showBetaWelcome, "チュートリアルを見る前は出さない")
 
         rt.finishTutorial()
-        XCTAssertFalse(rt.canShowModelDownloadConfirm, "β の案内より先にダウンロード確認を出さない")
         rt.presentBetaWelcomeIfNeeded()
-        XCTAssertTrue(rt.showBetaWelcome)
+        XCTAssertFalse(rt.showBetaWelcome, "チュートリアルの直後(まだ何も作っていない)は出さない")
+        rt.showModelDownloadConfirm = true
+        XCTAssertTrue(rt.canShowModelDownloadConfirm, "β の案内を待たずにダウンロード確認を出せる")
+        rt.showModelDownloadConfirm = false
+
+        rt.tutorial?.markEditHintShown() // 最初のアプリができた
+        rt.showFirstEditHint = true
+        rt.presentBetaWelcomeIfNeeded()
+        XCTAssertFalse(rt.showBetaWelcome, "直し方の例が出ている間は出さない")
+        rt.showFirstEditHint = false
+        rt.presentBetaWelcomeIfNeeded()
+        XCTAssertTrue(rt.showBetaWelcome, "直し方の例を閉じたら出す")
         XCTAssertTrue(rt.canOpenBetaWelcome)
 
         rt.finishBetaWelcome()
         XCTAssertFalse(rt.showBetaWelcome)
-        XCTAssertTrue(rt.canShowModelDownloadConfirm, "案内を閉じたらダウンロード確認")
         rt.presentBetaWelcomeIfNeeded()
         XCTAssertFalse(rt.showBetaWelcome, "2 回目は自動で出さない")
+    }
+
+    func testRuntimeWaitsForVoiceSheet() throws {
+        let rt = try makeRuntime(isBeta: true)
+        rt.finishTutorial()
+        rt.tutorial?.markEditHintShown()
+        rt.showVoiceSheet = true // 直し方の例の「話してみる」
+        rt.presentBetaWelcomeIfNeeded()
+        XCTAssertFalse(rt.showBetaWelcome, "音声シートの上には出さない(次の起動で出す)")
     }
 
     func testRuntimeNotBetaNeverShows() throws {

@@ -8,7 +8,7 @@ struct ConsentHost: ViewModifier {
     func body(content: Content) -> some View {
         @Bindable var rt = rt
         content
-            .sheet(isPresented: $rt.showAIConsent) { AIConsentView() }
+            .sheet(isPresented: $rt.showAIConsent, onDismiss: { Task { await rt.resumeUtteranceAfterConsent() } }) { AIConsentView() }
             .alert(
                 Text("音声モデルをダウンロードしますか？"),
                 isPresented: Binding(get: { rt.canShowModelDownloadConfirm }, // 同意 → チュートリアル(#274)の後

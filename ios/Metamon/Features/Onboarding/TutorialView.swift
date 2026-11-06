@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 初回のチュートリアル(#274): 3 枚のカード。スキップでき、設定の「使い方を見る」から何度でも見られる。
+/// 初回のチュートリアル(#274・H1 で 1 枚)。スキップでき、設定の「使い方を見る」から何度でも見られる。
 struct TutorialView: View {
     @Environment(AppRuntime.self) private var rt
     @Environment(\.colorScheme) private var scheme
@@ -35,8 +35,10 @@ struct TutorialView: View {
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.3), value: page)
 
-                pageDots
-                    .padding(.bottom, Theme.Spacing.md)
+                if cards.count > 1 { // 1 枚(H1)の時は点を出さない
+                    pageDots
+                        .padding(.bottom, Theme.Spacing.md)
+                }
 
                 Button {
                     if isLast { rt.finishTutorial() } else { withAnimation { page += 1 } }

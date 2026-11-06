@@ -4,7 +4,7 @@ import MetamonDSL
 import FoundationModels
 #endif
 
-/// `aiButton`(#78)のオンデバイス AI。Apple Intelligence の Foundation Models(iOS 26+)だけで動き、データは端末外に出ない。
+/// `aiButton`(#78)のオンデバイス AI。Apple Intelligence の Foundation Models(iOS 26+)で動き、データは端末外に出ない(使えない端末のオンライン版は AIOnlineTask.swift)。
 /// FoundationModels に触るのはこのファイルだけ(iOS 17 でもビルド・起動できるよう `canImport` + `#available` で囲う)。
 
 // MARK: - 可用性

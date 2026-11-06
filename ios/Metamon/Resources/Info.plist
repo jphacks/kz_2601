@@ -114,6 +114,9 @@
 	<!-- 止めるまで鳴るアラーム(Notification.alarm・AlarmKit・iOS 26.1 以降)。審査用の版では外す(strip-review-plist.sh) -->
 	<key>NSAlarmKitUsageDescription</key>
 	<string>生成したアプリで、設定した時刻にアラームを鳴らすために使用します。</string>
+	<!-- U5: 音声モデル(WhisperKit)の準備中だけ、Apple の端末内の音声認識(requiresOnDeviceRecognition)で仮に聞き取る。声は端末の外に送らない -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>音声モデルの準備ができるまでの間、話した内容をこの端末の中で文字にするために、音声認識を使用します。声は端末の外に送りません。</string>
 	<key>NSAppleMusicUsageDescription</key>
 	<string>生成したアプリの音楽プレーヤーで、Apple Music の曲を検索して再生するために使用します。</string>
 	<key>NSCameraUsageDescription</key>

@@ -25,6 +25,7 @@ done
 # 残す権限の説明は、外した機能に触れず、「アプリを生成」と言わない文に差し替える(#468・docs/store/wording.md「記録帳」)
 "$PB" -c "Set :NSCameraUsageDescription 記録帳で QR コードを読み取るために、カメラを使用します。" "$PLIST"
 "$PB" -c "Set :NSMicrophoneUsageDescription 話した内容から記録帳を用意・変更したり、記録帳の欄に話した内容を端末の中で文字にして入れたりするために、マイクを使用します。" "$PLIST"
+"$PB" -c "Set :NSSpeechRecognitionUsageDescription 音声モデルの準備ができるまでの間、話した内容をこの端末の中で文字にするために、音声認識を使用します。声は端末の外に送りません。" "$PLIST"
 "$PB" -c "Set :NSLocationWhenInUseUsageDescription 記録帳で、ボタンを押した時の現在地を記録・地図に表示したり、案内を開始した時に目的地まで道案内したりするために使います。" "$PLIST"
 "$PB" -c "Set :NSPhotoLibraryUsageDescription 記録帳に写真や動画を添えるために、写真ライブラリを使用します。" "$PLIST"
 "$PB" -c "Set :NSPhotoLibraryAddUsageDescription 記録帳の画像(QR コードなど)を写真に保存するために、写真ライブラリへの追加を使用します。" "$PLIST"

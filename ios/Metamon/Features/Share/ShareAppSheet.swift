@@ -190,7 +190,7 @@ struct ShareAppSheet: View {
             share = s
             print("[Metamon] share issued: \(s.url)")
         } catch {
-            shareError = SharedAccessDenial(error)?.message ?? L10n.tr("リンクを作れませんでした: \(error.localizedDescription)")
+            shareError = SharedAccessDenial(error)?.message ?? ErrorCopy.failure(L10n.tr("リンクを作れませんでした"), error, context: "ShareAppSheet")
         }
     }
 
@@ -204,7 +204,7 @@ struct ShareAppSheet: View {
             rt.toast = L10n.tr("リンクを取り消しました。もう開けません")
             await issue() // 新しいリンクを用意しておく
         } catch {
-            rt.toast = L10n.tr("取り消せませんでした: \(error.localizedDescription)")
+            rt.toast = ErrorCopy.failure(L10n.tr("取り消せませんでした"), error, context: "ShareAppSheet")
         }
     }
 
@@ -216,7 +216,7 @@ struct ShareAppSheet: View {
             listing = try await services.sharing?.publish(appId: app.id, description: desc, tags: tagList, authorName: nil)
             rt.toast = L10n.tr("「探す」に公開しました")
         } catch {
-            rt.toast = L10n.tr("公開できませんでした: \(error.localizedDescription)")
+            rt.toast = ErrorCopy.failure(L10n.tr("公開できませんでした"), error, context: "ShareAppSheet")
         }
     }
 
@@ -228,7 +228,7 @@ struct ShareAppSheet: View {
             listing = nil
             rt.toast = L10n.tr("公開をやめました")
         } catch {
-            rt.toast = L10n.tr("非公開にできませんでした: \(error.localizedDescription)")
+            rt.toast = ErrorCopy.failure(L10n.tr("非公開にできませんでした"), error, context: "ShareAppSheet")
         }
     }
 }

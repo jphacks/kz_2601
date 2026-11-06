@@ -11,7 +11,7 @@
 | P0 ネイティブ | **カメラ + ローカル通知** | `camera` コンポーネント / `native: notification.*` を実装済み。位置/センサー/共有は P1(ブリッジに stub) |
 | デモ3本 | 家計簿 / トレーニング記録 / 散歩メモ | サンプル DSL は `docs/dsl/examples/*.json`(4 本)をそのままバンドル |
 | 認証 | Sign in with Apple → 詰まったら匿名認証 | `TokenProvider` 抽象の裏で切替。UI/ランタイムは影響なし |
-| STT | WhisperKit 確定・**導入済み** | `SpeechTranscriber` 抽象。実機 `WhisperKitRecognizer`(model `small`)/ シミュレータ `MockTranscriber`(§6) |
+| STT | WhisperKit 確定・**導入済み** | `SpeechTranscriber` 抽象。実機 `WhisperKitRecognizer`(model `small`。準備中は `AppleOnDeviceTranscriber` で仮に聞き取る `FallbackTranscriber`・U5)/ シミュレータ `MockTranscriber`(§6) |
 | iOS CI | 5分制限なし | WhisperKit/Firebase 解決込みのビルドでも可 |
 
 ## 1. 全体構成(マルチモジュール)
@@ -233,10 +233,25 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | モデル | `BuildConfig.whisperModel`(環境変数 `METAMON_WHISPER_MODEL` / Info.plist `MetamonWhisperModel`、既定 **`small`**)。短縮名は `openai_whisper-small` に解決し、Hugging Face `argmaxinc/whisperkit-coreml` から取得 |
 | 配置 | `Application Support/WhisperKit/models/argmaxinc/whisperkit-coreml/openai_whisper-small/`(約 500MB)。`MelSpectrogram/AudioEncoder/TextDecoder.mlmodelc` + `config.json` が揃っていればオフラインでも Hub に問い合わせずロード |
 | DL と状態 | `prepare()` を `AppRuntime.bootstrap()` が起動直後に呼ぶ。`status`: `notDownloaded → downloading(downloadProgress 0〜1) → loading(CoreML ロード + ANE 特化 prewarm) → ready → recognizing`。失敗は `.failed(message)` で UI に「再試行」ボタン |
-| 権限 | `AudioProcessor.requestRecordPermission()`(`NSMicrophoneUsageDescription`、記入済み)。`NSSpeechRecognitionUsageDescription` は Apple Speech フォールバック用に残置(WhisperKit 自体は不要) |
+| 権限 | `AudioProcessor.requestRecordPermission()`(`NSMicrophoneUsageDescription`、記入済み)。WhisperKit 自体は音声認識の許可が不要。`NSSpeechRecognitionUsageDescription` は下の仮の聞き取り(U5)用 |
 | 録音 | 録音前に **自前で** `AVAudioSession(.playAndRecord, .default, [.defaultToSpeaker, .allowBluetooth])` + `setActive(true)`(WhisperKit 側は `try?` で失敗を握りつぶすため。カメラ/AVCaptureSession の後でも record 系に戻す)→ `startRecordingLive(callback: nil)` → 停止で `audioSamples` を取り出し `purgeAudioSamples`。`precheck`: 0 サンプル=`noAudioCaptured`・0.5 秒未満=`tooShort`・ピーク < 0.001(-60dBFS)=`silent` を **理由付き `TranscriberFailure`** として throw(toast にそのまま日本語で出る) |
 | 診断 | `lastDiagnostics: TranscriberDiagnostics`(録音秒数・サンプル数・ピーク/RMS・セッション category/mode・入力ルート・権限・モデル状態・失敗理由)。`[Voice]` プレフィックスで stdout と os_log(subsystem `jp.kz2601.metamon` category `voice`)に `recording started` / `stopped samples=N duration=S peak=…` / `transcribe result text="…"` を出す。実機ログ: `xcrun devicectl device process launch --console --device <id> jp.kz2601.metamon` |
 | 制約 | シミュレータでは `#if targetEnvironment(simulator)` で `MockTranscriber` + 文字入力のみ(マイク非表示)。ストリーミング(途中結果)は未対応=停止後に一括。`small` のメモリは推論時 ~1GB 弱、初回 prewarm は 30〜90 秒 |
+
+### 準備中の仮の聞き取り(U5・2026-11-06)
+
+WhisperKit の DL・読み込み(初回は数分)の間もマイクで話せるように、Apple の端末内の音声認識で仮に聞き取る(UX 点検 H2)。
+
+| 項目 | 内容 |
+|---|---|
+| 組み立て | 実機の `BuildConfig.makeTranscriber()` が `FallbackTranscriber(primary: WhisperKitRecognizer, provisional: AppleOnDeviceTranscriber)` を返す。シミュレータは従来どおり `MockTranscriber` |
+| 切り替え | 録音を**始める時**に選ぶ。WhisperKit が ready なら WhisperKit、そうでなく仮が使えるなら仮。録音中に WhisperKit の準備が終わっても、その録音は始めた方で止める(切り替えは録音の合間) |
+| 見せる状態 | `status`・`downloadProgress`・`needsDownload`・`prepare()` は WhisperKit のまま(設定・DL の確認・進捗の表示は変わらない)。`isReady` は「WhisperKit が ready か仮が使える」。`isProvisional` が true の間、音声画面に「準備中のため簡易の聞き取りです」 |
+| 端末内だけ | `SFSpeechAudioBufferRecognitionRequest.requiresOnDeviceRecognition = true`。`supportsOnDeviceRecognition == false` の端末・言語では使わない(サーバーへ送る Apple の認識には落とさない)→ 今まで通りマイクは灰色で文字の入力を先に出す |
+| 許可 | 最初の仮の録音で `SFSpeechRecognizer.requestAuthorization`(`NSSpeechRecognitionUsageDescription`。審査用の版は `strip-review-plist.sh` が同じ趣旨の文に差し替える)。拒否・制限なら `TranscriberFailure.speechRecognitionDenied` を出し、以後は仮を使わない(マイクは灰色・文字を先に) |
+| 言語 | `LanguagePreference` の `ja` → `ja-JP`、`en` → `en-US` |
+| プライバシー | 声は端末の外に送らず、録音も残さない。プライバシーの申告(音声データは集めない)は変わらない(`docs/store/privacy-label.md`) |
+| テスト | `MetamonServicesTests/FallbackTranscriberTests`(偽の実装で: 準備中は仮・準備後は WhisperKit・録音の合間だけ切り替え・端末内が使えない時は使わない・許可が無い時) |
 
 ### 音声画面 → 生成中 → 変身 の状態遷移(2026-10-24 刷新)
 
@@ -248,7 +263,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 VoiceInputView.phase                         AppRuntime.morphJob               RootView
  idle ──tap──▶ listening ──tap──▶ transcribing ──text──▶ (送信) ─▶ create / edit ──apply──▶ nil
    │ 例文チップ / 文字入力 ─────────────────────────────▶ (送信) ─┘                      │
-   └ 準備中(モデル DL/ロード)はマイク灰色・タップ不可                               summaryBanner 3〜5s
+   └ 準備中(モデル DL/ロード)は仮の聞き取り(U5)。端末内の認識が使えない時はマイク灰色・タップ不可                               summaryBanner 3〜5s
 ```
 
 | 画面状態 | 判定 | UI |
@@ -257,10 +272,10 @@ VoiceInputView.phase                         AppRuntime.morphJob               R
 | idle(準備中) | `status` が notDownloaded/downloading/loading | マイク灰色・無効、下に DL 進捗 / 読み込み中 |
 | listening | 録音中 | 赤〜珊瑚のマイク + 外へ広がる波紋 ×3(擬似音量で振幅が揺れる ※ `SpeechTranscriber` に音量 API が無いため実音量連動は未対応)、"聞いています…" |
 | transcribing | `stopAndTranscribe` 待ち | 波形バー、"文字起こし中…"。結果はカードに 1 文字ずつ(`TypewriterText`)表示してから送信 |
-| 生成中 create | `morphJob.kind == .create`(現在 DSL が voice-only) | 全画面 `GeneratingView`: 見出し=「認識テキスト」、組み立て台 `BuildStageView`(#626: パーツ箱から部品のシルエットを選んで空の画面に置く → 入れ替える → 並べ直す。依頼文の語「グラフ」「記録」「チェック」等から出そうな部品を先に出す・`BuildChoreography.WaitingScript`)、段階文言、経過秒 |
+| 生成中 create | `morphJob.kind == .create`(現在 DSL が voice-only) | 全画面 `GeneratingView`: 見出し=「認識テキスト」、組み立て台 `BuildStageView`(#626: パーツ箱から部品のシルエットを選んで空の画面に置く → 入れ替える → 並べ直す。依頼文の語「グラフ」「記録」「チェック」等から出そうな部品を先に出す・`BuildChoreography.WaitingScript`)、段階文言、経過秒。#636: create は `POST /v1/generate?stream=1`(SSE)で読み、`app` でアプリ名(見出しの上)とタブの帯、`component` で本物の部品を届いた順に下書きと置き換えて**仮置き**(同じ index は 1 回・`LiveDraft`)、`restart` で仮置きを捨てて当て推量に戻る。SSE が使えない(401 / 429・接続断・`result` の前に終わった)時は仮置きを捨てて stream なしの呼び方に戻る(`event: error` はそのまま失敗として出す)。edit は stream しない |
 | 生成中 edit | `morphJob.kind == .edit` | シートを閉じ、現在画面を 45% + blur 1.5 で薄くし、上部に `EditingIndicator` カプセル(小さな部品の並べ直し + 「変更を反映しています…」+ 発話) |
 | 変身 | `apply(doc)` | **同じ `withAnimation(.spring 0.65)` の中で** `document` 差し替えと `morphJob = nil` → 生成中オーバーレイ fade out と新ツリー scale(0.96→1)+fade in がクロスフェード |
-| 組み上げ(create の結果・#626) | `apply(doc, reveal:)` で `buildReveal` が立つ | 結果は適用済みのまま、RootView は `.id` を待っていた時の値(`rootViewID`)に留めて `GeneratingView` を続け、本物の結果の部品(初期タブの直下・上から行 → 列)を 1 つずつ置く(`AssemblyPlan`・全体 1.5 秒以内・タップで飛ばせる)。終わると `buildReveal = nil` で本物の画面へクロスフェード。別の apply が来たら捨てる |
+| 組み上げ(create の結果・#626) | `apply(doc, reveal:)` で `buildReveal` が立つ | 結果は適用済みのまま、RootView は `.id` を待っていた時の値(`rootViewID`)に留めて `GeneratingView` を続け、本物の結果の部品(初期タブの直下・上から行 → 列)を 1 つずつ置く(`AssemblyPlan`。仮置きと id・種類・場所が同じ部品は最初から置いたまま、違う部品は結果で置き直す・#636・全体 1.5 秒以内・タップで飛ばせる)。終わると `buildReveal = nil` で本物の画面へクロスフェード。別の apply が来たら捨てる |
 | 変身(edit の結果・#626) | `apply(doc, highlight:)` | 変わった部品(中身の印で比較・`editHighlight`)だけを Renderer の出現で置き直して光らせ、変わっていない部品は待たせず出す。新しい画面・7 割超が変わった画面はいつもの出現 |
 | Reduce Motion | — | 待っている間は 2.4 秒ごとにフェードだけで切り替え、組み上げは全部を一度にフェード(0.45 秒)、編集は光の淡いフェードだけ |
 | 要約 | `summaryBanner` | 画面上部のカード(sparkles + summary)を 3〜5 秒(文字数÷12 でクランプ)表示して自動で消える。タップで即閉じ |
@@ -270,13 +285,13 @@ VoiceInputView.phase                         AppRuntime.morphJob               R
 
 | 経過 | stage | create の文言 | edit の文言 | 備考 |
 |---|---|---|---|---|
-| 0〜3s | normal | どんなアプリにするか考えています… | 変更を反映しています… | |
+| 0〜3s | normal | どんなアプリにするか考えています… + 経過秒の横に目安「ふつう 10 秒ほど」(0〜10s だけ)+ 小さい **キャンセル** | 変更を反映しています… + **中止** | キャンセル / 中止は最初から出す(言い間違いに気づいたらすぐ止める・UX 点検 M6) |
 | 3〜6s | normal | 必要な画面とデータを決めています… | 〃 | |
 | 6〜9s | normal | 画面を組み立てています… | 〃 | create p50 はここで完了 |
 | 9〜10s | normal | 細部を整えています… | 〃 | (以後 3s 周期で巡回) |
 | 10〜20s | slow | もう少しかかっています… | 〃 | `area` 再生成 1 回 ≒ +7s |
 | 20〜30s | warning | 時間がかかっています。もう少しだけお待ちください(橙) | 〃(橙) | backend 警告ライン |
-| 30s〜 | fallback | 混み合っています。安全なテンプレートに切り替えています… + **キャンセル** | 〃 + **中止** | backend はテンプレ DSL へフォールバック。キャンセルは `AppRuntime.cancelMorph()`(Task cancel → URLSession 中断)。HTTP timeout 45s |
+| 30s〜 | fallback | 混み合っています。安全なテンプレートに切り替えています… + **キャンセル**(枠付きで目立たせる) | 〃 + **中止** | backend はテンプレ DSL へフォールバック。キャンセルは `AppRuntime.cancelMorph()`(Task cancel → URLSession 中断)。HTTP timeout 45s |
 | 失敗 | — | **状態カード**(下表・#60)。トーストは使わない | 〃(画面上部にコンパクト版) | 画面は元のまま。主ボタン「もう一度」は同じ発話で再送 |
 | キャンセル | — | 下部トースト「生成をキャンセルしました」(軽微) | 〃 | 画面は元のまま |
 
@@ -333,6 +348,8 @@ stateDiagram-v2
 カードは初期画面 / 音声シートでは `VoiceInputView` の中(マイクの下)、生成後(edit)の失敗は音声シートが閉じているので `RootView` が画面上部にコンパクト版を出す。
 文言は `Features/Voice/ErrorCopy.swift` に集約(Greeting と同じ方針)。失敗の分類は Services の `FailureKind.classify(error)` が 1 箇所で行い、UI は分類だけを見る。
 トーストに残すのは軽微なもの(保存失敗・キャンセル・「これ以上前の状態はありません」等)だけ。
+**文言に内部の値を出さない**(UX 点検 H9): OS の `localizedDescription`・サーバーの message・秒数 / dB / サンプル数などの診断は画面に出さず、`ErrorLog.record`(stdout の `[Metamon] <context> failed:` と os_log subsystem `jp.kz2601.metamon` category `error`)にだけ残す。画面は `ErrorCopy.failure("〇〇できませんでした", error, context:)` で「何が起きたか。次の一手」(圏外なら接続の確認・それ以外は少し待って再試行)。生成以外の消えない知らせ(録音の失敗・起動時に届かない)は `ErrorPresentation.notice`(主ボタンなし・「閉じる」だけ)。
+**VoiceOver**(H8): `toast` / `summaryBanner` / `errorCard` の didSet と、AI の返事(`chatRound`)・要約の無い完成で `VoiceOverAnnouncer.announce` を出す。VoiceOver が有効な時は要約バナーとトーストが自動で消えるまでを長くする(`VoiceOverAnnouncer.holdSeconds`・3 倍・最低 15 秒)。確認アラートの主ボタンはアクションに合わせる(削除 =「削除」・取り消せない操作は destructive・L1)。
 
 | 状況 | 判定(`FailureKind`) | 表示(カード) | 主ボタン | 副ボタン | 自動復帰 |
 |---|---|---|---|---|---|
@@ -344,9 +361,11 @@ stateDiagram-v2
 | 401(Firebase ID トークン失効) | HTTP 層: `idToken(forceRefresh: true)` → 値が変われば同じリクエストを 1 回再送(ai / appconfig 共通) | 成功すれば何も出ない | — | — | **自動(1 回)** |
 | 401 が再取得後も続く | `.sessionExpired` | 「サインインの有効期限が切れました」「もう一度サインインしてください」 | サインイン | 閉じる | `AuthSession.expire()` → サインアウト → `SignInView` に同じ 1 文を表示 |
 | appconfig 409(version 競合) | `.conflict`(ai 側の baseVersion 無しリトライでも解けなかった時) | バナー「別の端末で更新されていたため、最新の状態に合わせました。もう一度お話しください」 | — | — | **`GET /dsl` で最新を取り直して `apply()`** |
-| 4xx(入力不備など)/ 分類不能 | `.rejected(message)` / `.other` | 「生成に失敗しました」+ サーバーの message | もう一度 | 閉じる | なし |
-| ユーザーのキャンセル | `.cancelled` | トースト「生成をキャンセルしました」 | — | — | — |
-| 起動時にサーバー到達不能 | `restoreFromServer` 失敗 | トースト「オフライン: 最後に取得したアプリ(vN)を表示しています」(キャッシュ無しなら「サーバーに接続できません」) | — | — | 到達性 online 復帰で `GET /dsl` を取り直す |
+| 4xx(入力不備など) | `.rejected(message)` | 「うまく伝わりませんでした」「言い方を変えて、もう一度お話しください」(サーバーの message はログだけ) | — | 閉じる | なし |
+| 分類不能 | `.other` | 「うまく作れませんでした」「少し待ってから、もう一度お試しください」 | もう一度 | 閉じる | なし |
+| ユーザーのキャンセル | `.cancelled` | トースト「作るのをやめました」 | — | — | — |
+| 起動時にサーバー到達不能 | `restoreFromServer` 失敗 | トースト「オフラインです。最後に保存したアプリを表示しています」(キャッシュ無しなら状態カード「サーバーに接続できません」「接続を確認してください。つながると自動で読み込み直します」) | — | 閉じる | 到達性 online 復帰で `GET /dsl` を取り直す |
+| 録音・文字起こしの失敗 | `TranscriberFailure` / 空の書き起こし | 音声画面の状態カード(例「うまく聞き取れませんでした」「マイクに近づいて、もう一度話してください」)。秒数・dB は `[Voice]` のログ | — | 閉じる | 次に録音を始めると消える |
 | レコード取得失敗(#85) | `refresh()` 失敗 & ローカルにも無い → `AppRuntime.failed` に entity | list / table / timeline / chart: 「読み込めませんでした」+ **再試行**、stat: `—`、calendar: 文言 + 再試行(空状態「まだありません」「¥0」と区別) | 再試行(`load(force:)`) | — | 到達性 online 復帰で `failed` の entity を読み直す |
 
 自動再送の方針: **POST を二重実行し得る失敗(5xx / タイムアウト / 接続断)は自動再送しない**(ai の生成はべき等でない)。自動で再送するのは 401(トークン差し替え)と 429(サーバーが待てと言った)だけ、それぞれ 1 回。
@@ -452,6 +471,10 @@ DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例
 | **長押し**(0.45s・`Theme.Layout.fabLongPressSeconds`) | メタ操作 = **変身一覧シート** | `.simultaneousGesture(LongPressGesture)` → `AppRuntime.openSwitcher()`。触覚 `.sensoryFeedback(.impact)`。VoiceOver は accessibilityAction「変身一覧」 |
 | 音声「○○に切り替えて / ○○を開いて / ○○に変身して」 | 名前で切替 | `VoiceIntent.switchApp(name)` → `switchApp(named:)`: `GET /apps` の name と照合(完全一致→前方一致→部分一致・`AppNameMatch`)。1 件なら切替、曖昧/無ければ toast + 一覧を開く |
 | 音声「アプリ一覧 / 変身一覧 / 別のアプリに切り替えて(名前なし)」 | 一覧を開く | `VoiceIntent.listApps` → `openSwitcher()` |
+| 音声シート・初期画面の上部の一覧ボタン(H10) | 一覧を開く | `voice.appList` → `openSwitcher()`。まだ何も作っていない初回の初期画面には出さない(`VoiceTopBar.showsAppList`) |
+| 変身一覧の上部の歯車(H10) | 設定を開く | `switcher.settings` → `SettingsSheet`(音声シートの歯車と同じ) |
+
+常設の UI はマイクだけのまま。一覧・設定の入口は、マイクから開くシート(音声シート・変身一覧)の上部に置く(UX 点検 H10・2026-11-06 オーナーの決定 U1)。
 
 ```
 変身一覧シート(Features/Switcher/AppSwitcherSheet.swift)
@@ -1072,14 +1095,14 @@ iPhone は縦と横(左右)を使える(上下逆さま・iPad は対象外。`I
 5. 有料機能の確認カード(22.7)は同じ「Tailor It Pro」の権利を見るだけなので、RevenueCat に移しても変更不要。
 
 ### 22.7 有料機能の確認カード(チャットの「これでいく」・Issue #77 の残り)
-有料のクラウド機能を使うアプリを作る時、生成の**前**に「〇〇には Tailor It Pro(¥500 / 月)が必要です」→「購入して作る」/「この機能なしで作る」を選んでもらう。
+有料のクラウド機能を使うアプリを作る時、生成の**前**に「〇〇には Tailor It Pro(¥500 / 月)が必要です」→「Pro にする」/「この機能なしで作る」を選んでもらう。課金画面は自動では開かず、「Pro にする」を押した時に開く(UX 点検 H4・2026-11-06 オーナーの決定)。
 
 | 項目 | 決定 |
 |---|---|
 | 何が有料か | backend の `internal/paid/paid_features.json`(1 か所・[docs/backend/features/pro.md](../backend/features/pro.md))。初期は「みんなで共有するデータ」(共有データ型アプリ)だけ。iOS は判定を持たず、`POST /v1/chat` の ready の `requiresPro` / `paidFeatures` / `freeTranscript`、案の `options[].requiresPro` / `freeInstruction` を見るだけ |
 | 出す時 | ready の「これでいく」(`buildFromChat`・声の自動生成も含む)と案の「これでいく」(`choose`)。判定は `MetamonServices/Purchase/PaidFeatureCheck.swift`(純粋関数) |
 | 出さない時 | **Pro 会員** / **回数制限が無効の時(DEBUG ビルドの既定 = デモ端末)**。`METAMON_IAP_ENFORCE=1` で DEBUG でも出る(`ProGate.isEnforced` と同じ扱い・22.4)/ 旧 backend(`requiresPro` 無し)/ ready の transcript 以外の予備文で作る時 |
-| カード | `ClarifyChatView` の「これでいく」の位置(`PaidFeatureCard`・create は初期画面、edit は音声シートの中)。購入して作る = `ProEntitlementStore.purchase` → 成功したら有料機能込みの文で生成(キャンセル・承認待ちはカードに残る)/ この機能なしで作る = `freeTranscript`(`freeInstruction`)で生成 / × = チャットに戻る。話し直すとカードは閉じて次の応答で判定し直す |
+| カード | `ClarifyChatView` の「これでいく」の位置(`PaidFeatureCard`・create は初期画面、edit は音声シートの中)。Pro にする = 課金画面(`ProGate.requestPro`)→ 買ったら有料機能込みの文で生成(閉じた・キャンセル・承認待ちはカードに残る)/ この機能なしで作る = `freeTranscript`(`freeInstruction`)で生成 / × = チャットに戻る。話し直すとカードは閉じて次の応答で判定し直す |
 | 実装 | `Features/Purchase/AppRuntime+PaidFeature.swift`(`holdForPaidConfirm` / `purchaseAndBuild` / `buildWithoutPaidFeatures` / `dismissPaidConfirm`)。モック ai は「みんなで / 共有 / 掲示板 / 投稿」を含む ready に `requiresPro` を付ける |
 | テスト | `MetamonServicesTests/PaidFeatureCheckTests.swift`(出し分け・JSON の新旧)・`MetamonTests/PaidFeatureConfirmTests.swift`(カード → なしで作る・無効化中は出ない・やめる / 話し直し・案)・UI `testPaidFeatureCardBuildWithoutFeature` |
 | 限界(後続) | チャットを通らない経路は 22.8 の「生成の後の判定」で課金画面を通す。サーバーの強制(402)は 22.9 |
@@ -1089,12 +1112,12 @@ iPhone は縦と横(左右)を使える(上下逆さま・iPad は対象外。`I
 
 | 経路 | いつ判定 | 閉じた(買わなかった)時 |
 |---|---|---|
-| チャットの「これでいく」(ready / 案 / 複数選択・声の自動生成) | 生成の前(backend の `requiresPro`) | 確認カード(22.7)に戻る。何も作らない。「この機能なしで作る」/「やめる」/ もう一度「購入して作る」 |
+| チャットの「これでいく」(ready / 案 / 複数選択・声の自動生成) | 生成の前(backend の `requiresPro`)。確認カード(22.7)を出し、課金画面はカードの「Pro にする」で開く(自動では開かない・H4) | 確認カードに戻る。何も作らない。「この機能なしで作る」/「やめる」/ もう一度「Pro にする」 |
 | チャットを通らない生成(チャット OFF・「別のアプリ」・予備文の「このまま作る / このまま反映」・圏外の保留・状態カードの再送・#253 の修正) | 生成の後(できた DSL に shared / public の entity が**新しく**入ったか。もとから共有のアプリの修正は聞き直さない) | 共有を外す修正(`PaidGate.dropSharedDataInstruction`)を送る。外せなければ前の版へ(新規作成なら初期画面) |
 | 元に戻す / やり直す で共有の版に戻った | 戻した後 | 戻す前の版へ |
-| シェアリンクを開く(記録を共有するアプリ・自分のでない) | 参加の確認(#254)の前(`ShareLinkPreview.sharedData`) | 参加しない |
-| プレビューの無い import・「探す」の公開アプリのインストール | import / install の後(`InstalledApp.joined / member`) | そのアプリに切り替えない(一覧には残る) |
 | 新規作成の無料枠 | 生成の前(`admitNewApp`) | 送らない。圏外の保留の自動送信・状態カードの再送も枠を通す(`sendMetered`) |
+
+共有アプリに**参加する人**(シェアリンク・「探す」のインストール)には課金画面を出さない(正典「課金・Pro」2026-11-06: 参加者は無料・作成者の Pro で持つ・UX 点検 H5)。作成者が Pro でない時の書き込みは、サーバーの 402 `creator_needs_pro` を受けて案内(22.9)だけを出す。
 
 ### 22.9 サーバーの 402 `pro_required`(Issue #316)
 サーバーも有料の機能を止める(backend の [pro.md](../backend/features/pro.md) の「サーバーでの強制」)。端末の課金の制限が無効(DEBUG の既定・22.4)でも、サーバーは Pro でない uid の有料の機能を止めるので、**デモ端末でも共有・自動の動きを作るには Pro(Sandbox の購入)が要る**。判定は `MetamonServices/Protocols/ProRequired.swift`(`details.features` / `details.reason`)。
@@ -1112,7 +1135,7 @@ iPhone は縦と横(左右)を使える(上下逆さま・iPad は対象外。`I
 - オンデバイスの `aiButton`(§18)はサーバーを使わないので無料。
 - 課金の制限の無効化(DEBUG の既定・22.4)中は、回数も有料機能も課金画面を出さない。設定のトグル名は「課金の制限を無効にする(デモ用・回数と有料機能)」。
 - モックのストア: DEBUG で `METAMON_MOCK_STORE=1` なら App Store に触れず購入が即成功(¥500)。DEBUG のシミュレータは StoreKit の商品が取れなければ自動でモック(`simctl launch` で起動した時)。`0` で常に StoreKit。Release は常に StoreKit。
-- テスト: `MetamonServicesTests/PaidGateTests.swift`(判定・モックのストア)・`MetamonTests/PaidGateFlowTests.swift`(チャット / 即生成 / 修正 / 元に戻す / 無効化中)・UI `testPaidFeaturePaywallPurchaseThenBuildsSharedApp`(未購入 → 課金画面 → モック購入 → 共有の掲示板ができる)・`testPaidFeatureCardBuildWithoutFeature`・`testDirectGenerationWithSharedDataGoesThroughPaywall`。モック ai の「掲示板」は public のひとこと投稿を返す(無料版・「自分だけ」の指示なら家計簿)。
+- テスト: `MetamonServicesTests/PaidGateTests.swift`(判定・モックのストア)・`MetamonTests/PaidGateFlowTests.swift`(チャット / 即生成 / 修正 / 元に戻す / 無効化中)・UI `testPaidFeaturePaywallPurchaseThenBuildsSharedApp`(未購入 → 確認カード →「Pro にする」→ 課金画面 → モック購入 → 共有の掲示板ができる)・`testPaidFeatureCardBuildWithoutFeature`・`testDirectGenerationWithSharedDataGoesThroughPaywall`。モック ai の「掲示板」は public のひとこと投稿を返す(無料版・「自分だけ」の指示なら家計簿)。
 - 限界(後続): サーバー側で止める(#316)。Pro が切れた後に、自分で作った共有アプリを開く経路は止めていない(自分のデータが見られなくなるため・要判断)。
 
 ## 23. UI テスト(XCUITest・Issue #165)
