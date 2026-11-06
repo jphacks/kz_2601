@@ -22,6 +22,11 @@ type Limits struct {
 	RunRecipientsFree, RunRecipientsPro   int // recipients of one run
 	RunWritesFree, RunWritesPro           int // writes of one run
 	ScheduledRulesFree, ScheduledRulesPro int // scheduled rules of one app
+
+	// Records read by on.each / agg (#340 reads; not in #338's first four
+	// units, values to confirm from runner.usage): per app per day and per run.
+	AppReadsFree, AppReadsPro int
+	RunReadsFree, RunReadsPro int
 }
 
 // DefaultLimits is the starting table of #338 (to be tuned from runner.usage).
@@ -38,6 +43,11 @@ var DefaultLimits = Limits{
 	RunRecipientsFree: 1, RunRecipientsPro: 200,
 	RunWritesFree: 1, RunWritesPro: 10,
 	ScheduledRulesFree: 1, ScheduledRulesPro: 5,
+
+	// 20,000 reads ≈ 0.008 USD a day per app (#338: 1,000 reads ≈ 0.0004);
+	// 500 a run keeps one run near 12 executions' cost.
+	AppReadsFree: 2000, AppReadsPro: 20000,
+	RunReadsFree: 100, RunReadsPro: 500,
 }
 
 // ConfigFromEnv reads RUNNER_LIMIT_* and RUNNER_GLOBAL_DAILY (unset =
@@ -73,6 +83,10 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 		{"RUNNER_LIMIT_RUN_WRITES_PRO", &l.RunWritesPro},
 		{"RUNNER_LIMIT_SCHEDULED_RULES_FREE", &l.ScheduledRulesFree},
 		{"RUNNER_LIMIT_SCHEDULED_RULES_PRO", &l.ScheduledRulesPro},
+		{"RUNNER_LIMIT_APP_READS_FREE", &l.AppReadsFree},
+		{"RUNNER_LIMIT_APP_READS_PRO", &l.AppReadsPro},
+		{"RUNNER_LIMIT_RUN_READS_FREE", &l.RunReadsFree},
+		{"RUNNER_LIMIT_RUN_READS_PRO", &l.RunReadsPro},
 	}
 	for _, f := range fields {
 		raw := getenv(f.key)

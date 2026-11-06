@@ -423,16 +423,39 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 
 | 部分 | 語彙 | 決まり(`Validate()`・`backend/pkg/dsl/server_rules.go`) |
 |---|---|---|
-| きっかけ `on` | `record`: `created` / `updated`(+ `entity`、更新は `fields` で「この field が変わった時」に絞れる)。`every`: `daily` / `weekly`(`weekday`)/ `monthly`(`day` 1〜28)+ `time` HH:MM(作成者のタイムゾーン) | どちらか 1 つ。削除のきっかけ・1 日 1 回より細かい時刻・外からの呼び出しは無い |
-| 条件 `if` | Expr(行 = きっかけのレコード。`"<refField>.<field>"` で ref 先、更新では `"$prev.<field>"` で前の値) | 真偽であること。`agg`・`streak` / `doneInDays`・computed field は使えない。時刻のきっかけには行が無い |
+| きっかけ `on` | `record`: `created` / `updated`(+ `entity`、更新は `fields` で「この field が変わった時」に絞れる)。`every`: `daily` / `weekly`(`weekday`)/ `monthly`(`day` 1〜28)+ `time` HH:MM(作成者のタイムゾーン)。時刻のきっかけは `each`: `<entity>` でそのレコード 1 件ずつに動かせる | どちらか 1 つ。削除のきっかけ・1 日 1 回より細かい時刻・外からの呼び出しは無い。`each` は時刻のきっかけだけ・ルールと同じ側の entity だけ |
+| 条件 `if` | Expr(行 = きっかけのレコードか `each` のレコード。`"<refField>.<field>"` で ref 先、更新では `"$prev.<field>"` で前の値)。`agg` で同じアプリの記録を集計できる(下の「記録を読むルール」) | 真偽であること。`streak` / `doneInDays`・computed field は使えない。`each` の無い時刻のきっかけには行が無い(`ref` 不可・`agg` は可) |
 | 処理 `do`(1〜5 個) | `notify`{`to`, `title`, `body`} / `createRecord`{`entity`, `values`} / `updateRecord`{`ref`?, `values`} / `increment`{`ref`, `field`, `by`?} | 1 つのオブジェクトに 1 種類だけ。書けるのはきっかけと同じ側の entity(private どうし・shared / public どうし)。computed・photo・video・location の field には書かない。createRecord は required の field を全部書く |
 | 宛先 `to.kind` | `owner`(作成者)/ `author`(きっかけのレコードを書いた人)/ `authorOf` + `field`(ref 先のレコードを書いた人)/ `members`(参加者全員) | private は `owner` だけ、**public は `owner` と `authorOf` だけ**、shared は全部。きっかけを起こした本人には送らない。任意の uid・メール・電話・外部の宛先は無い |
-| 通知の本文 | 決まった枠 + `{<field>}`(きっかけのレコードの値)・`{$author}`(書いた人の表示名・shared / public) | **題 30 字・本文 80 字**(差し込みの `{…}` も数える)。差し込む値は実行の時に 30 字で切る。URL・ドメイン・メールアドレス・電話番号・「公式」「運営」などの名乗り・制御文字・見えない文字は不可。ref・refs・photo・video・location・hidden・computed の field は差し込めない |
+| 通知の本文 | 決まった枠 + `{<field>}`(きっかけ・`each` のレコードの値)・`{$author}`(書いた人の表示名・shared / public)・`{<名前>}`(`with` の数・日付) | **題 30 字・本文 80 字**(差し込みの `{…}` も数える)。差し込む値は実行の時に 30 字で切る。URL・ドメイン・メールアドレス・電話番号・「公式」「運営」などの名乗り・制御文字・見えない文字は不可。ref・refs・photo・video・location・hidden・computed の field は差し込めない |
 | 連鎖 | 処理が書いたレコードは次のきっかけを起こさない | 別のルール(自分も含む)のきっかけになる書き込み(作るなら created、書き換え・increment は同じ field の updated)を断る |
-| 上限 | ルール 20・時刻のルール 5・処理 5(Pro の値) | 無料の値(3・1・3)は `App.ServerRuleQuotaProblems(pro)` で、プランが分かる所(appconfig)が見る |
+| 上限 | ルール 20・時刻のルール 5・処理 5(Pro の値)。1 つのルールが読む entity(`each` + `agg`)は 2 つまで・`with` は 3 つまで | 無料の値(3・1・3)は `App.ServerRuleQuotaProblems(pro)` で、プランが分かる所(appconfig)が見る。読む件数の上限は runner が持つ(下) |
 | 使えないアプリ | 仲間探し(`entity.match`)のアプリ | `serverRules` ごと断る |
 | single の entity(§3.11) | 「常に 1 件」なので `createRecord` の行き先にできない。きっかけにするのと、きっかけの 1 件の `updateRecord`(上書き)はよい | `createRecord` の entity が single なら断る |
 | `{"setting":…}` | 設定は利用者ごとの値で、どの人の設定かが決まらないので、条件・値の式で使えない(private のルールでも) | 式に `setting` があれば断る |
+
+#### 記録を読むルール(集計・まとめ・期限・順位)
+
+決定 #336 で「後で(費用の単位を決めてから)」とした `agg` の条件と、定期の集計のやり直しを、読む件数の上限つきで入れた。外部への送信・任意の宛先・処理の連鎖は今までどおり無い。
+
+| 語彙 | 中身 | 例 |
+|---|---|---|
+| `agg` を `if` / `values` / `by` / `with` で | 同じアプリの、**ルールと同じ側**(private どうし・shared / public どうし)の entity のレコードを集計(count / sum / avg / min / max / latest / earliest・filter の期間 `thisWeek` などや比較)。filter の値の `ref` は行のレコード | 「今月の支出が 5 万円を超えたら知らせて」: `if` に `{"op":"gt","args":[{"agg":"sum","entity":"expenses","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}},50000]}` |
+| `on.each`(時刻のきっかけ) | その entity のレコード 1 件ずつにルールを動かす(行 = そのレコード)。`if` で絞り、`{<field>}`・`author`・`updateRecord`(ref 省略 = そのレコード)・`increment` が使える。値が変わらない `updateRecord` は書かない | 締め切りの 3 日前: `{"every":"daily","time":"08:00","each":"tasks"}` + `if` `daysUntil(due) == 3`。順位: `each` + `updateRecord` `rank = count(score > 自分の score) + 1` |
+| `notify.with` | `{名前: 数か日付の Expr}`(3 つまで)。本文に `{名前}` で差し込む。文字の値は不可。数は利用者の値から来ることがあるので、差し込む時に電話番号らしい桁(10 桁以上)を伏せる | 毎週のまとめ: `"body":"今週は {count} 件・{total} 円でした"`, `"with":{"count":{"agg":"count",…},"total":{"agg":"sum",…}}` |
+
+```json
+{"id":"due_soon","on":{"every":"daily","time":"08:00","each":"tasks"},
+ "if":{"op":"and","args":[{"op":"neq","args":[{"ref":"done"},true]},
+       {"op":"eq","args":[{"op":"daysUntil","args":[{"ref":"due"}]},3]}]},
+ "do":[{"notify":{"to":{"kind":"owner"},"title":"締め切り","body":"{title} の締め切りまであと 3 日です"}}]}
+```
+
+- 例の全体は `backend/pkg/dsl/testdata/server_rules_reads.json`(家計の集計・週のまとめ・期限)と `server_rules_ranking.json`(shared の順位)。
+- **費用と上限**(runner の `quota`): 読んだレコード 1 件 = Firestore の読み取り 1 回(1,000 件 ≈ 0.0004 USD・#338 の原価)。1 回の実行で読めるのは Pro 500 件(`RUNNER_LIMIT_RUN_READS_PRO`)、アプリごとに 1 日 Pro 20,000 件(`RUNNER_LIMIT_APP_READS_PRO`・カウンタ `rr_app_{appId}`)。同じ entity は 1 回の実行で 1 度だけ読む(`each` の行どうしで共有)。**超えたらその回は実行しない**(`skipped_quota`・`limit` に `run_reads` / `app_reads`)。一部の記録だけで計算した誤った合計・順位は出さない。`runner.usage` の `reads` と `est_cost_usd` に入る。値は出発点で、#338 と同じく実測で直す。
+- 読める範囲(#337 の層 3 を広げた): きっかけのレコード・その ref 先に加えて、`each` / `agg` の entity の**同じアプリ・同じ側**のレコードと、その ref 先。取っ手(`scope.Handle.List`)が appId と側を確かめる。
+- 1 回の書き込みの上限(Pro 10)は `each` の全部の行で数える。順位を 10 件より多く書き換える日は、残りがその日は書かれない(次の日に続きが書かれる)。
+- まだ作らない(決定の範囲の外か、宣言で表せない): 推薦・相性・似ている人の自動の組み合わせ、複数人への割り当て・日程の自動調整、距離での自動のグループ分け、外部のデータの取得。
 
 - 共有データに効くのは作成者の公開 DSL(`apps_public/{appId}`)の宣言だけ。参加者が自分のコピーを書き換えても効かない(#337・runner の側で守る)。
 - 人が読める説明は `App.DescribeServerRule`(例: 「出欠」が作られた時(条件に合えば)、「予定」を作った人に通知・「予定」の「参加の数」を数える)。「このアプリの自動の動き」の一覧(#347)で使う。

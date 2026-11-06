@@ -17,8 +17,11 @@ import (
 //   - ruleTrigger (string): some rule's trigger is created|updated|daily|weekly|monthly.
 //   - ruleAction (string): some rule has a notify|createRecord|updateRecord|increment action.
 //   - ruleTo (string): some notify goes to owner|author|authorOf|members.
-//   - ruleSim (bool): every rule runs through engine.PlanRule on a made-up
-//     record (the 模擬の実行) without an error.
+//   - ruleSim (bool): every rule runs through engine.PlanRule (on.each:
+//     PlanEach) on made-up records (the 模擬の実行) without an error.
+//   - ruleEach (bool): some rule has on.each (#340 reads).
+//   - ruleAgg (bool): some rule reads records with agg.
+//   - ruleWith (bool): some notify has with.
 //
 // Cases: internal/ai/eval/server_rules_cases.json (-cases).
 func checkServerRules(exp map[string]any, a *dsl.App) []string {
@@ -27,14 +30,18 @@ func checkServerRules(exp map[string]any, a *dsl.App) []string {
 		miss = append(miss, fmt.Sprintf("serverRules=%d", len(a.ServerRules)))
 	}
 	var triggers, actions, tos []string
+	has := map[string]bool{}
 	for i := range a.ServerRules {
 		r := &a.ServerRules[i]
 		triggers = append(triggers, r.On.Record+r.On.Every)
+		has["ruleEach"] = has["ruleEach"] || r.On.Each != ""
+		has["ruleAgg"] = has["ruleAgg"] || len(r.AggEntities()) > 0
 		for _, act := range r.Do {
 			switch {
 			case act.Notify != nil:
 				actions = append(actions, "notify")
 				tos = append(tos, act.Notify.To.Kind)
+				has["ruleWith"] = has["ruleWith"] || len(act.Notify.With) > 0
 			case act.CreateRecord != nil:
 				actions = append(actions, "createRecord")
 			case act.UpdateRecord != nil:
@@ -47,6 +54,11 @@ func checkServerRules(exp map[string]any, a *dsl.App) []string {
 	for key, got := range map[string][]string{"ruleTrigger": triggers, "ruleAction": actions, "ruleTo": tos} {
 		if want, ok := exp[key].(string); ok && !slices.Contains(got, want) {
 			miss = append(miss, fmt.Sprintf("%s=%v", key, got))
+		}
+	}
+	for _, key := range []string{"ruleEach", "ruleAgg", "ruleWith"} {
+		if want, ok := exp[key].(bool); ok && want != has[key] {
+			miss = append(miss, fmt.Sprintf("%s=%v", key, has[key]))
 		}
 	}
 	if want, ok := exp["ruleSim"].(bool); ok && want {
@@ -79,8 +91,28 @@ func simulateRule(a *dsl.App, r *dsl.ServerRule) error {
 			ev.Prev = &prev
 		}
 	}
+	if r.On.Each != "" {
+		ev.Scope = schedScope(a)
+		_, err := engine.PlanEach(context.Background(), a, r, ev, sampleRefs{a})
+		return err
+	}
 	_, err := engine.PlanRule(context.Background(), a, r, ev, sampleRefs{a})
 	return err
+}
+
+// schedScope is the scope a time-triggered rule runs on (any shared entity
+// makes the app's schedule shared).
+func schedScope(a *dsl.App) dsl.EntityScope {
+	s := dsl.ScopePrivate
+	for i := range a.Entities {
+		switch a.Entities[i].EffectiveScope() {
+		case dsl.ScopePublic:
+			return dsl.ScopePublic
+		case dsl.ScopeShared:
+			s = dsl.ScopeShared
+		}
+	}
+	return s
 }
 
 type sampleRefs struct{ a *dsl.App }
@@ -91,6 +123,15 @@ func (s sampleRefs) Record(_ context.Context, entity, id string) (expreval.Recor
 		return expreval.Record{}, false, nil
 	}
 	return sampleRecord(e, id, false), true, nil
+}
+
+// List gives two made-up records of the entity (on.each / agg).
+func (s sampleRefs) List(_ context.Context, entity string) ([]expreval.Record, error) {
+	e := s.a.EntityByID(entity)
+	if e == nil {
+		return nil, nil
+	}
+	return []expreval.Record{sampleRecord(e, "l1", false), sampleRecord(e, "l2", true)}, nil
 }
 
 // sampleRecord fills every field with a value of its type (prev: a different one).
