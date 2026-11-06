@@ -68,6 +68,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompSettlement,
 		// random pick (#263)
 		dsl.CompRandomPicker,
+		// file import: csv / text / pdf -> records on the device
+		dsl.CompFileImport,
 		// flashcards (#264)
 		dsl.CompFlashcards,
 		// on-device AI

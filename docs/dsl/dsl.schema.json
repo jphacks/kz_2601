@@ -773,6 +773,9 @@
           "$ref": "#/$defs/Dashcam"
         },
         {
+          "$ref": "#/$defs/FileImport"
+        },
+        {
           "$ref": "#/$defs/SensorValue"
         },
         {
@@ -3894,6 +3897,81 @@
       },
       "description": "ドライブレコーダー(ドラレコ)。背面カメラの映像を表示しながら録画し、直近 keepMinutes 分だけを 1 分ごとの区間で端末に残す(ループ録画・容量の上限つき)。加速度が impactG を超えたら前後の区間を「保存済み」にして消さない。autoStart の条件(横向き・ほぼ静止・充電中)が続いたら自動で録画を始める。保存済みの映像は部品の中の一覧から再生・写真に保存・共有できる。録画中は画面のスリープを止める。iOS の制約で画面を出している間だけ録画する(裏に回ると止まる)。「ドラレコ」「車載カメラ」「運転中に録画」「スマホスタンドに置いたら録画」「事故の時の映像を残す」の時に必ずこれを選ぶ(videoField で代替しない)。entity は不要(映像は記録に入れない)。",
       "x-usage": "ホーム画面(screen.entity なし)にこれ 1 つを大きく置く: A1:F10(最下 2 行の左 A-B はマイクの席なので空ける)。1 画面に 1 つだけ。「置いたら自動で」は autoStart [landscape, still]、「充電したら」は charging を足す。容量・残す時間・感度の話があれば maxStorageMB / keepMinutes / impactG。entity・フォーム画面・list は作らない(保存済みの一覧は部品の中にある)。"
+    },
+    "FileImport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "accept"
+      ],
+      "properties": {
+        "type": {
+          "const": "fileImport"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string",
+          "description": "記録を足す entity(private か shared。public・single・match には足せない)。"
+        },
+        "accept": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "text",
+              "pdf"
+            ]
+          },
+          "description": "選べるファイル。csv = 表(1 行 = 1 件・1 行目は項目名・Excel の CSV / Shift_JIS も読む)、text = テキストファイル、pdf = PDF(本文を取り出す。画像だけの PDF は端末内の文字認識)。"
+        },
+        "label": {
+          "type": "string",
+          "description": "ボタンの文言(既定「ファイルから取り込む」)。例: 名簿の CSV を取り込む・PDF を取り込む。"
+        },
+        "field": {
+          "type": "string",
+          "description": "text / pdf の本文を入れる field(type text なら 20000 字・string なら 4000 字まで。超えた分は切る)。accept に text / pdf がある時は必須、csv だけなら書かない。entity の titleField(string)にはファイル名が入る。"
+        },
+        "map": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/$defs/ImportColumn"
+          },
+          "description": "csv の列の当て方(省略可)。書いた列が先に当たり、残りは 1 行目の項目名が field の name か id と同じ列に当たる(export の CSV はそのまま読み戻せる)。どの field にも当たらない列は使わない。"
+        }
+      },
+      "description": "ファイルを選んで記録を足すボタン(ファイルの取り込み)。押すと iOS のファイル選択が開き、csv は 1 行ずつ記録にして(型を変換・最大 500 行)、text / pdf は本文を取り出して field に入れた記録を 1 件足す。足す前に「n 件を追加・m 行は読めない」を確かめる。処理はすべて端末内で、ファイルそのものは送らない・残さない(足した記録だけが今まで通り保存・同期される)。「CSV を取り込みたい」「Excel の名簿を入れたい」「PDF・テキストを読み込んで本文を記録したい」「書き出した CSV を戻したい」の時に必ずこれを選ぶ(手入力のフォームで代替しない)。音声・画像・Word のファイルは読めない。",
+      "x-usage": "記録の一覧がある画面で、一覧の下の全幅(例 A9:F10・追加ボタン D11:F12 の上)に置く。追加ボタンが無ければ右下(D11:F12)。左下 A11:B12 はマイクの席なので空ける。CSV の名簿なら entity 例 member{name: string(required), grade: integer, club: string} + fileImport{entity: member, accept: [csv], label: 名簿の CSV を取り込む}。列名が field の name と違う時だけ map: [{column: 氏名, field: name}]。PDF・テキストなら entity 例 doc{title: string, body: text}(titleField: title)+ fileImport{entity: doc, accept: [pdf, text], field: body, label: PDF を取り込む}。取り込んだ本文の要約は同じ entity のフォームに aiButton{task: summarize, input: body}。"
+    },
+    "ImportColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "column",
+        "field"
+      ],
+      "description": "fileImport.map の 1 つ: CSV の 1 行目が column の列を field に入れる。",
+      "properties": {
+        "column": {
+          "type": "string",
+          "description": "CSV の 1 行目(項目名)の文字(例: 氏名)。"
+        },
+        "field": {
+          "type": "string",
+          "description": "入れる先の field id(computed・写真・動画・録音は不可)。"
+        }
+      }
     },
     "SensorValue": {
       "type": "object",

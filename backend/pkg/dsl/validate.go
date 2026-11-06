@@ -639,6 +639,8 @@ func (a *App) Validate() error {
 			case CompRandomPicker:
 				checkRandomPicker(where, c, entities, add)
 				checkAction(where+".onItemTap", c.OnItemTap)
+			case CompFileImport:
+				checkFileImport(where, c, entities, add) // file_import.go
 			case CompAudioRecorder:
 				checkAudioRecorder(where, c, formEntity, add)
 			case CompEmptyState:
