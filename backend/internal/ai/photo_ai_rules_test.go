@@ -8,12 +8,12 @@ import (
 // #418: the photo reading rules reach the generation prompt, and the catalog /
 // chat index (both built from the schema) say photoField can read photos.
 func TestPhotoAIRulesReachPrompts(t *testing.T) {
-	for _, want := range []string{"## 写真を AI で読み取る・骨格(#418)", "{kind: amount, into: amount}", "jointAngle"} {
+	for _, want := range []string{"## 写真を AI で読み取る・骨格(#418)", "{kind: amount, into: amount}", "jointAngle", "  - label:", "  - barcode:", "  - peopleCount:", "  - color:"} {
 		if !strings.Contains(systemPrompt, want) {
 			t.Errorf("systemPrompt lacks %q", want)
 		}
 	}
-	if !strings.Contains(catalog, "analyze") || !strings.Contains(catalog, "kind:jointAngle") {
+	if !strings.Contains(catalog, "analyze") || !strings.Contains(catalog, "kind:jointAngle") || !strings.Contains(catalog, "kind:barcode") {
 		t.Error("catalog lacks photoField.analyze and its usage")
 	}
 	idx := chatCapabilityIndex[strings.Index(chatCapabilityIndex, "  - photoField:"):]

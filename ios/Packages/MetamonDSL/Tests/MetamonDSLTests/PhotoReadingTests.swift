@@ -18,11 +18,43 @@ final class PhotoReadingTests: XCTestCase {
     }
 
     func testUnknownKindAndBrokenEntriesAreDropped() throws {
-        let json = #"{"type":"photoField","field":"p","analyze":[{"kind":"barcode","into":"a"},{"kind":"text"},{"kind":"text","into":"memo"}]}"#
+        let json = #"{"type":"photoField","field":"p","analyze":[{"kind":"calories","into":"a"},{"kind":"text"},{"kind":"text","into":"memo"}]}"#
         let c = try JSONDecoder().decode(Component.self, from: Data(json.utf8))
         XCTAssertEqual(c.analyze, [PhotoAnalyze(kind: .text, into: "memo")], "古い iOS に新しい kind が来ても落ちない")
         let plain = try JSONDecoder().decode(Component.self, from: Data(#"{"type":"photoField","field":"p"}"#.utf8))
         XCTAssertTrue(plain.analyze.isEmpty)
+    }
+
+    func testMoreKindsDecode() throws {
+        let json = #"{"type":"photoField","field":"p","analyze":[{"kind":"label","into":"a"},{"kind":"labels","into":"b"},{"kind":"barcode","into":"c"},{"kind":"peopleCount","into":"d"},{"kind":"color","into":"e"}]}"#
+        let c = try JSONDecoder().decode(Component.self, from: Data(json.utf8))
+        XCTAssertEqual(c.analyze.map(\.kind), [.label, .labels, .barcode, .peopleCount, .color])
+        XCTAssertEqual(c.analyze.map(\.needsLabels), [true, true, false, false, false])
+        XCTAssertFalse(c.analyze.contains(where: \.needsText), "OCR は回さない")
+    }
+
+    // MARK: ラベルの名前・色
+
+    func testNamesSkipGenericLabelsAndDedupe() {
+        XCTAssertEqual(PhotoClassifier.names(labels: ["food", "ramen", "noodles", "dish"], max: 5), ["ラーメン", "麺"])
+        XCTAssertEqual(PhotoClassifier.names(labels: ["plant", "flower", "sunflower", "rose"], max: 2), ["花", "ひまわり"])
+        XCTAssertEqual(PhotoClassifier.names(labels: ["people", "adult"], max: 1), ["人"], "具体的なラベルが無ければ大まかな語")
+        XCTAssertEqual(PhotoClassifier.names(labels: ["person", "people"], max: 5), ["人"], "同じ日本語は 1 つ")
+        XCTAssertEqual(PhotoClassifier.names(labels: [], max: 5), [])
+        XCTAssertEqual(PhotoClassifier.japanese("hot_air_balloon"), "hot air balloon", "知らないラベルは英語のまま")
+    }
+
+    func testColorNames() {
+        let cases: [((Double, Double, Double), String)] = [
+            ((1, 0, 0), "赤"), ((1, 0.5, 0), "オレンジ"), ((1, 1, 0), "黄色"), ((0, 0.8, 0), "緑"), ((0, 1, 1), "水色"),
+            ((0, 0, 1), "青"), ((0.5, 0, 1), "紫"), ((1, 0.4, 0.8), "ピンク"), ((1, 0.7, 0.75), "ピンク"), ((0.5, 0.3, 0.1), "茶色"),
+            ((1, 1, 1), "白"), ((0.5, 0.5, 0.5), "灰色"), ((0.05, 0.05, 0.1), "黒"),
+        ]
+        for ((r, g, b), want) in cases {
+            XCTAssertEqual(PhotoColor.name(r: r, g: g, b: b), want, "\(r),\(g),\(b)")
+        }
+        XCTAssertEqual(PhotoColor.dominant(pixels: [(1, 0, 0), (0, 0, 1), (1, 0, 0)]), "赤")
+        XCTAssertNil(PhotoColor.dominant(pixels: []))
     }
 
     // MARK: レシート

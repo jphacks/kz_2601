@@ -1512,8 +1512,8 @@
     "PhotoField": {
       "type": "object",
       "additionalProperties": false,
-      "description": "カメラ / ライブラリから写真を取り込んで photo field に保存する入力。写真の文字・金額・日付・分類・説明・体の関節の角度を端末内の AI で読み取り、同じレコードの他の項目に入れられる(analyze)。",
-      "x-usage": "「写真を撮る・残す」は source camera、既存の写真を選ぶなら library、迷えば both。「撮ったら読み取って」「レシートを撮ったら金額を入れて」「写真から分類」「フォームをチェック」なら analyze:[{kind, into}] を付け、読み取った値を入れる field(into)を同じ entity に足して、その入力欄も同じフォームに置く(読み取り結果は確認・修正できる)。analyze 付きの photoField は全幅 5〜6 行(例 A1:F5)。レシート → {kind:amount, into:金額(currency)} + {kind:date, into:日付} (+ {kind:text, into:メモ})。写っている物の種類 → {kind:classify, into:enum field}。筋トレ・ストレッチのフォーム → {kind:jointAngle, joint:knee 等, into:角度(number)}(写真に関節の点と線を重ねて出す)。",
+      "description": "カメラ / ライブラリから写真を取り込んで photo field に保存する入力。写真の文字・金額・日付・分類・説明・体の関節の角度・物の名前・バーコード・人数・主な色を端末内の AI で読み取り、同じレコードの他の項目に入れられる(analyze)。",
+      "x-usage": "「写真を撮る・残す」は source camera、既存の写真を選ぶなら library、迷えば both。「撮ったら読み取って」「レシートを撮ったら金額を入れて」「写真から分類」「フォームをチェック」なら analyze:[{kind, into}] を付け、読み取った値を入れる field(into)を同じ entity に足して、その入力欄も同じフォームに置く(読み取り結果は確認・修正できる)。analyze 付きの photoField は全幅 5〜6 行(例 A1:F5)。レシート → {kind:amount, into:金額(currency)} + {kind:date, into:日付} (+ {kind:text, into:メモ})。写っている物の種類 → {kind:classify, into:enum field}。筋トレ・ストレッチのフォーム → {kind:jointAngle, joint:knee 等, into:角度(number)}(写真に関節の点と線を重ねて出す)。花・植物・料理の名前 → {kind:label, into:名前(string)}。冷蔵庫の中の物 → {kind:labels, into:メモ(text)}。本・商品のバーコード → {kind:barcode, into:コード(string)}。集合写真の人数 → {kind:peopleCount, into:人数(integer)}。服・物の色 → {kind:color, into:色(string)}。",
       "required": [
         "type",
         "field"
@@ -4060,7 +4060,12 @@
             "date",
             "classify",
             "describe",
-            "jointAngle"
+            "jointAngle",
+            "label",
+            "labels",
+            "barcode",
+            "peopleCount",
+            "color"
           ],
           "x-enumDescriptions": {
             "text": "写真の文字(日本語・英語)をそのまま読む(OCR)。into は string / text。",
@@ -4068,7 +4073,12 @@
             "date": "レシート・書類の日付(2026/10/28・2026年10月28日 など)。into は date / datetime。",
             "classify": "写っている物と文字から候補を 1 つ選ぶ。into は enum(候補はその options)か、options 付きの string / text。",
             "describe": "写っているものを短い文で説明する。into は string / text。",
-            "jointAngle": "人の体の関節(joint)の角度(度・0〜180)。写真に関節の点と線を重ねて出す。into は number / integer。"
+            "jointAngle": "人の体の関節(joint)の角度(度・0〜180)。写真に関節の点と線を重ねて出す。into は number / integer。",
+            "label": "写っている物・動植物・料理の名前を 1 つ(画像分類のいちばん具体的なラベル。主なものは日本語)。候補が決まっているなら classify。into は string / text。",
+            "labels": "写っている物の名前を最大 5 つ、「、」区切りで(冷蔵庫の中・机の上など)。into は string / text。",
+            "barcode": "写真の中のバーコード・QR コードの中身(JAN・ISBN・URL など。最初の 1 つ)。into は string / text。",
+            "peopleCount": "写っている人の数(顔か体を数える・誰かは見分けない)。into は integer / number。",
+            "color": "写真の中央の主な色の名前(赤・青・緑・白・黒 など 12 色)。into は string / text。"
           }
         },
         "into": {

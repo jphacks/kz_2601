@@ -480,7 +480,7 @@ type Component struct {
 // PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the
 // form field it goes into (Into).
 type PhotoAnalyze struct {
-	Kind    string   `json:"kind"` // text|amount|date|classify|describe|jointAngle
+	Kind    string   `json:"kind"` // text|amount|date|classify|describe|jointAngle|label|labels|barcode|peopleCount|color
 	Into    string   `json:"into"`
 	Options []string `json:"options,omitempty"` // classify candidates (else the enum into's options)
 	Joint   string   `json:"joint,omitempty"`   // jointAngle: knee|elbow|hip|shoulder (+ left/right)
