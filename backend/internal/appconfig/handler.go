@@ -44,6 +44,8 @@ type Handler struct {
 	legacyBefore time.Time // LegacyMembersEnv: set by members.go
 
 	feedbackPerDay int // FEEDBACK_DAILY_LIMIT: set by feedback.go
+
+	outbox outboxConfig // RUNNER_OUTBOX / APP_ENV: set by outbox.go (#341)
 }
 
 // routeGroups holds the feature routes. Each feature file registers its own

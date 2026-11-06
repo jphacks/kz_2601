@@ -58,6 +58,7 @@
 | `RATE_LIMIT_GLOBAL_DAILY` | ai | 環境全体の 1 日の AI 上限(費用ブレーカー)([rate-limit.md](../backend/rate-limit.md))。AI を止める用途には `AI_PAUSED` を使う。`1` にして止めるのは、`AI_PAUSED` の入っていない版が動いている時の予備だけ([incident-runbook.md §5](../ops/incident-runbook.md#5-手順-a-claude-api-の障害上限)) | 2000 |
 | `RATE_LIMIT_ANON_DAILY` / `_USER_DAILY` / `_PRO_DAILY` / `_IP_DAILY` | ai | 利用者ごと・IP ごとの 1 日の上限([rate-limit.md](../backend/rate-limit.md)) | 30 / 60 / 300 / 300 |
 | `RATE_LIMIT_WEIGHT_*` | ai | 呼び出し 1 回で数える重み([rate-limit.md](../backend/rate-limit.md)) | 3 / 2 / 1 / 1 |
+| `RUNNER_OUTBOX` | appconfig | `1` で、serverRules(自動の動き)の条件に合う記録の書き込みを、同じトランザクションで outbox(`runner/{APP_ENV}/outbox`)に積む(#341)。入れるのは人の承認を得てから(runner が無いまま入れると積まれるだけで動かない) | 無し(積まない) |
 | `LOG_LEVEL` | 両方 | ログの詳しさ(調査の間だけ `debug` など) | info |
 
 この表に無い変数は、運用で変えないでください。変えたい時は Issue にして、ワークフローか本書に足します。
