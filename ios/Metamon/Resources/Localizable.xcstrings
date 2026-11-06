@@ -9232,23 +9232,6 @@
         }
       }
     },
-    "新しい appId で音声画面から作り始めます" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Starts from the voice screen with a new appId"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "新しい appId で音声画面から作り始めます"
-          }
-        }
-      }
-    },
     "新しいアプリ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11676,6 +11659,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "話してみる"
+          }
+        }
+      }
+    },
+    "話して新しいアプリを作り始めます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start a new app by talking"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話して新しいアプリを作り始めます"
+          }
+        }
+      }
+    },
+    "話して新しい記録帳を用意し始めます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start a new tracker by talking"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話して新しい記録帳を用意し始めます"
           }
         }
       }

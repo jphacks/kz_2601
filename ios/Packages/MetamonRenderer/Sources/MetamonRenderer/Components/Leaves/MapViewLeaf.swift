@@ -103,6 +103,7 @@ struct MapViewLeaf: View {
                             .foregroundStyle(.white, .tint)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(pin.title)
                 }
             }
         }
