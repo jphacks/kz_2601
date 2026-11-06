@@ -47,6 +47,7 @@ type Backend interface {
 	CreateRecord(ctx context.Context, rs store.RecordSet, rec store.Record) (*store.Record, bool, error)
 	UserDeleted(ctx context.Context, uid string) (bool, error)
 	ListBlocks(ctx context.Context, uid string) ([]store.Block, error)
+	RunnerApp(ctx context.Context, env, key string) (store.RunnerApp, error)
 	store.RunnerWrites
 }
 
@@ -190,6 +191,29 @@ func (h *Handle) Version(ctx context.Context, n int) (*store.Version, error) {
 		return nil, h.check(ctx, store.RecordSet{AppID: v.AppID, Public: h.shared, UID: h.uid})
 	}
 	return v, err
+}
+
+// RunnerApp is the app's runner state (last opened, the creator's time
+// zone): runner/{env}/apps/{store.TenantKey(appId, uid)}, uid "" for
+// shared / public data.
+func (h *Handle) RunnerApp(ctx context.Context) (store.RunnerApp, error) {
+	return h.b.RunnerApp(ctx, h.env, store.TenantKey(h.appID, h.uid))
+}
+
+// CreatedAt is when the creator's app was created (zero when it is gone).
+func (h *Handle) CreatedAt(ctx context.Context) (time.Time, error) {
+	who, err := h.Owner(ctx)
+	if err != nil || who == "" {
+		return time.Time{}, err
+	}
+	a, err := h.b.GetApp(ctx, who, h.appID)
+	if errors.Is(err, store.ErrNotFound) {
+		return time.Time{}, nil
+	}
+	if err != nil {
+		return time.Time{}, err
+	}
+	return a.CreatedAt, nil
 }
 
 // ---- engine.RefReader ---------------------------------------------------------

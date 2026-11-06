@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -21,6 +22,12 @@ import (
 const (
 	OutboxRecordCreated = "record_created"
 	OutboxRecordUpdated = "record_updated"
+	// OutboxRulesChanged: a DSL with (or that had) time-triggered rules was
+	// saved; the runner rebuilds the app's schedules (#342, schedule.go).
+	OutboxRulesChanged = "rules_changed"
+	// OutboxSchedule: one due run of a schedule (#342). Its id is the
+	// schedule key + the due time, so it exists once per run.
+	OutboxSchedule = "schedule"
 
 	OutboxPending = "pending"
 
@@ -33,7 +40,7 @@ type OutboxEvent struct {
 	EventID string `json:"eventId"` // "" = assigned by the store
 	Env     string `json:"env"`     // path segment runner/{env}/outbox
 
-	Kind     string `json:"kind"` // record_created | record_updated
+	Kind     string `json:"kind"` // record_created | record_updated | rules_changed | schedule
 	AppID    string `json:"appId"`
 	Scope    string `json:"scope"`         // private | shared | public
 	UID      string `json:"uid,omitempty"` // private: whose records
@@ -51,6 +58,15 @@ type OutboxEvent struct {
 
 	ActorUID       string `json:"actorUid"`
 	ActorAnonymous bool   `json:"actorAnonymous"`
+
+	// TimeZone is the creator's IANA zone ("" = the runner's default):
+	// what "today" / "now" and the schedules are read in (#342).
+	TimeZone string `json:"timeZone,omitempty"`
+	// DueAt: schedule events only, the run time the schedule was due.
+	DueAt time.Time `json:"dueAt,omitzero"`
+	// Charge is what an attempt counted (quota.Charge as JSON), kept so a
+	// later attempt that gives up can refund it (#342). Never content.
+	Charge json.RawMessage `json:"charge,omitempty"`
 
 	// AvailableAt: when the event may be claimed; zero once it is finished
 	// (the runner removes the field, outbox_queue.go).
@@ -95,13 +111,27 @@ func prepareOutbox(events []OutboxEvent, now time.Time) error {
 		if ev.EventID == "" {
 			ev.EventID = NewID("evt_")
 		}
-		switch {
-		case !outboxEnvRe.MatchString(ev.Env):
+		if !outboxEnvRe.MatchString(ev.Env) {
 			return fmt.Errorf("%w: env %q", ErrOutboxEvent, ev.Env)
-		case ev.Kind != OutboxRecordCreated && ev.Kind != OutboxRecordUpdated:
+		}
+		if ev.AppID == "" {
+			return fmt.Errorf("%w: appId is required", ErrOutboxEvent)
+		}
+		switch ev.Kind {
+		case OutboxRecordCreated, OutboxRecordUpdated:
+			if ev.Entity == "" || ev.RecordID == "" || len(ev.RuleIDs) == 0 {
+				return fmt.Errorf("%w: entity / recordId / ruleIds are required", ErrOutboxEvent)
+			}
+		case OutboxRulesChanged:
+			if ev.UID == "" || ev.Version <= 0 {
+				return fmt.Errorf("%w: rules_changed needs uid and version", ErrOutboxEvent)
+			}
+		case OutboxSchedule:
+			if len(ev.RuleIDs) != 1 || ev.DueAt.IsZero() {
+				return fmt.Errorf("%w: schedule needs one rule and dueAt", ErrOutboxEvent)
+			}
+		default:
 			return fmt.Errorf("%w: kind %q", ErrOutboxEvent, ev.Kind)
-		case ev.AppID == "" || ev.Entity == "" || ev.RecordID == "" || len(ev.RuleIDs) == 0:
-			return fmt.Errorf("%w: appId / entity / recordId / ruleIds are required", ErrOutboxEvent)
 		}
 		if ev.Status == "" {
 			ev.Status = OutboxPending

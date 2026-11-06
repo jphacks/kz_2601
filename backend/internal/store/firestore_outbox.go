@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -30,6 +31,9 @@ type outboxDoc struct {
 	Prev           map[string]any `firestore:"prev,omitempty"`
 	ActorUID       string         `firestore:"actorUid"`
 	ActorAnonymous bool           `firestore:"actorAnonymous"`
+	TimeZone       string         `firestore:"timeZone,omitempty"`
+	DueAt          time.Time      `firestore:"dueAt,omitempty"`
+	ChargeJSON     string         `firestore:"chargeJson,omitempty"`
 	AvailableAt    time.Time      `firestore:"availableAt"`
 	Attempts       int64          `firestore:"attempts"`
 	Status         string         `firestore:"status"`
@@ -46,7 +50,7 @@ func toOutboxDoc(ev *OutboxEvent) outboxDoc {
 	return outboxDoc{
 		Kind: ev.Kind, AppID: ev.AppID, Scope: ev.Scope, UID: ev.UID, Entity: ev.Entity, RecordID: ev.RecordID, Author: ev.Author,
 		Version: int64(ev.Version), RuleIDs: ev.RuleIDs, ChangedFields: ev.ChangedFields, Data: ev.Data, Prev: ev.Prev,
-		ActorUID: ev.ActorUID, ActorAnonymous: ev.ActorAnonymous,
+		ActorUID: ev.ActorUID, ActorAnonymous: ev.ActorAnonymous, TimeZone: ev.TimeZone, DueAt: ev.DueAt, ChargeJSON: string(ev.Charge),
 		AvailableAt: ev.AvailableAt, Attempts: int64(ev.Attempts), Status: ev.Status, CreatedAt: ev.CreatedAt, ExpireAt: ev.ExpireAt,
 	}
 }
@@ -56,10 +60,17 @@ func (d *outboxDoc) toEvent(env, id string) OutboxEvent {
 		EventID: id, Env: env,
 		Kind: d.Kind, AppID: d.AppID, Scope: d.Scope, UID: d.UID, Entity: d.Entity, RecordID: d.RecordID, Author: d.Author,
 		Version: int(d.Version), RuleIDs: d.RuleIDs, ChangedFields: d.ChangedFields, Data: d.Data, Prev: d.Prev,
-		ActorUID: d.ActorUID, ActorAnonymous: d.ActorAnonymous,
+		ActorUID: d.ActorUID, ActorAnonymous: d.ActorAnonymous, TimeZone: d.TimeZone, DueAt: d.DueAt, Charge: rawOrNil(d.ChargeJSON),
 		AvailableAt: d.AvailableAt, Attempts: int(d.Attempts), Status: d.Status, CreatedAt: d.CreatedAt, ExpireAt: d.ExpireAt,
 		Outcome: d.Outcome, RuleOutcomes: d.RuleOutcomes, LastError: d.LastError, FinishedAt: d.FinishedAt,
 	}
+}
+
+func rawOrNil(s string) json.RawMessage {
+	if s == "" {
+		return nil
+	}
+	return json.RawMessage(s)
 }
 
 func (f *Firestore) outboxCol(env string) *firestore.CollectionRef {

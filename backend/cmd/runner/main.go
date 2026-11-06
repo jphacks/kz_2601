@@ -43,6 +43,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 	"github.com/jphacks/kz_2601/backend/internal/runner"
 	"github.com/jphacks/kz_2601/backend/internal/runner/quota"
+	"github.com/jphacks/kz_2601/backend/internal/runner/schedule"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -62,6 +63,11 @@ func main() {
 		os.Exit(2)
 	}
 	interval, err := tickInterval(os.Getenv)
+	if err != nil {
+		logger.Error("runner: bad configuration", slog.Any("error", err))
+		os.Exit(2)
+	}
+	maxLate, err := maxLateFromEnv(os.Getenv)
 	if err != nil {
 		logger.Error("runner: bad configuration", slog.Any("error", err))
 		os.Exit(2)
@@ -91,7 +97,7 @@ func main() {
 	env := outboxEnv(os.Getenv("APP_ENV"))
 	// No device-token store yet (#269) and no APNs key here: notifications
 	// are resolved and counted, and LogSender logs their shape only.
-	r, err := runner.New(runner.Config{Env: env, Store: st, Quota: q, Paused: pausedFromEnv(os.Getenv), Logger: logger})
+	r, err := runner.New(runner.Config{Env: env, Store: st, Quota: q, Paused: pausedFromEnv(os.Getenv), MaxLate: maxLate, Logger: logger})
 	if err != nil {
 		logger.Error("runner: init failed", slog.Any("error", err))
 		os.Exit(1)
@@ -149,6 +155,19 @@ func tickInterval(getenv func(string) string) (time.Duration, error) {
 	d, err := time.ParseDuration(raw)
 	if err != nil || d < time.Second {
 		return 0, fmt.Errorf("RUNNER_TICK_INTERVAL must be a duration of at least 1s, got %q", raw)
+	}
+	return d, nil
+}
+
+// maxLateFromEnv reads RUNNER_SCHEDULE_MAX_LATE ("" = schedule.DefaultMaxLate).
+func maxLateFromEnv(getenv func(string) string) (time.Duration, error) {
+	raw := strings.TrimSpace(getenv("RUNNER_SCHEDULE_MAX_LATE"))
+	if raw == "" {
+		return schedule.DefaultMaxLate, nil
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d < time.Minute {
+		return 0, fmt.Errorf("RUNNER_SCHEDULE_MAX_LATE must be a duration of at least 1m, got %q", raw)
 	}
 	return d, nil
 }

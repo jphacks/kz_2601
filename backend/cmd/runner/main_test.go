@@ -62,6 +62,17 @@ func TestEnvParsing(t *testing.T) {
 			t.Errorf("%q accepted", bad)
 		}
 	}
+	if d, err := maxLateFromEnv(envMap(nil)); d != 30*time.Minute || err != nil {
+		t.Errorf("unset max late: %v %v", d, err)
+	}
+	if d, err := maxLateFromEnv(envMap(map[string]string{"RUNNER_SCHEDULE_MAX_LATE": "45m"})); d != 45*time.Minute || err != nil {
+		t.Errorf("45m: %v %v", d, err)
+	}
+	for _, bad := range []string{"x", "10s", "-5m"} {
+		if _, err := maxLateFromEnv(envMap(map[string]string{"RUNNER_SCHEDULE_MAX_LATE": bad})); err == nil {
+			t.Errorf("max late %q accepted", bad)
+		}
+	}
 	// time/tzdata is linked in: zones load without the OS database
 	if _, err := time.LoadLocation("Asia/Tokyo"); err != nil {
 		t.Fatal(err)

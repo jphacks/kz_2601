@@ -71,7 +71,7 @@ func TestQueueClaimFinish(t *testing.T) {
 		if err := st.FinishOutbox(ctx, env, stale.EventID, stale.Attempts, store.OutboxResult{Status: store.OutboxDone}); err != store.ErrLeaseLost {
 			t.Fatalf("stale finish: %v", err)
 		}
-		if err := q.Retry(ctx, got[1], "boom"); err != nil {
+		if err := q.Retry(ctx, got[1], "boom", nil); err != nil {
 			t.Fatal(err)
 		}
 		// after the lease, only the retried one comes back (finished stays out)
@@ -120,7 +120,7 @@ func TestQueueGiveUp(t *testing.T) {
 				}
 				break
 			}
-			if err := q.Retry(ctx, got[0], "x"); err != nil {
+			if err := q.Retry(ctx, got[0], "x", nil); err != nil {
 				t.Fatal(err)
 			}
 			now = now.Add(q.Delay(i) + time.Second)

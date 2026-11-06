@@ -71,6 +71,7 @@ func (h *Handler) rename(r *http.Request, id, name string) error {
 	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
 		BaseVersion: cur.CurrentVersion, DSL: next, Name: name, Patch: ops,
 		Source: &store.Source{Kind: "manual", Mode: "patch", Summary: "名前を「" + name + "」に変更"},
+		Events: h.rulesChanged(r, id, cur.DSL, app),
 	})
 	if err != nil {
 		return mapStoreErr(err, "app")
@@ -144,7 +145,10 @@ func (h *Handler) seedCopy(r *http.Request, id string, raw json.RawMessage, name
 	if _, _, err := h.store.EnsureApp(r.Context(), uidOf(r), id, initRaw, init.App.Name); err != nil {
 		return nil, err
 	}
-	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{BaseVersion: 1, DSL: raw, Name: name, Source: src})
+	var next dsl.App
+	_ = json.Unmarshal(raw, &next) // only read for its time-triggered rules
+	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{BaseVersion: 1, DSL: raw, Name: name, Source: src,
+		Events: h.rulesChanged(r, id, nil, &next)})
 	if err != nil {
 		return nil, mapStoreErr(err, "app")
 	}

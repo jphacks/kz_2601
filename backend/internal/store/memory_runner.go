@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"maps"
 	"sort"
 	"time"
@@ -54,7 +55,7 @@ func (m *Memory) FinishOutbox(_ context.Context, env, eventID string, attempt in
 }
 
 // RetryOutbox implements OutboxQueue.
-func (m *Memory) RetryOutbox(_ context.Context, env, eventID string, attempt int, at time.Time, lastError string) error {
+func (m *Memory) RetryOutbox(_ context.Context, env, eventID string, attempt int, at time.Time, lastError string, charge json.RawMessage) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	ev, err := m.leasedLocked(env, eventID, attempt)
@@ -62,6 +63,9 @@ func (m *Memory) RetryOutbox(_ context.Context, env, eventID string, attempt int
 		return err
 	}
 	ev.AvailableAt, ev.Status, ev.LastError = at, OutboxRetry, lastError
+	if charge != nil {
+		ev.Charge = cloneRaw(charge)
+	}
 	return nil
 }
 
@@ -88,6 +92,7 @@ func cloneOutbox(ev *OutboxEvent) OutboxEvent {
 	cp.RuleIDs = append([]string(nil), ev.RuleIDs...)
 	cp.ChangedFields = append([]string(nil), ev.ChangedFields...)
 	cp.RuleOutcomes = maps.Clone(ev.RuleOutcomes)
+	cp.Charge = cloneRaw(ev.Charge)
 	return cp
 }
 
