@@ -324,9 +324,9 @@ func stripAreas(raw []byte) ([]byte, bool) {
 }
 
 // serverRuleDefs are the server-rule $defs (#340). They stay out of the
-// generation schema until the AI learns to write rules (#343): the runner is
-// not built yet, and RuleCreateRecord.values is an open map that structured
-// outputs reject. dsl.Parse still accepts serverRules (saved DSL / patches).
+// generation schema (size limit; RuleCreateRecord.values is an open map that
+// structured outputs reject): the AI writes rules in a separate pass with its
+// own schema (server_rules_pass.go, #343). dsl.Parse still accepts serverRules.
 var serverRuleDefs = []string{"ServerRule", "RuleTrigger", "RuleAction", "RuleNotify", "RuleRecipient", "RuleCreateRecord", "RuleUpdateRecord", "RuleIncrement"}
 
 func dropServerRules(root map[string]any) {

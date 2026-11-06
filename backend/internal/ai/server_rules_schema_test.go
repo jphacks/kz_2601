@@ -8,8 +8,8 @@ import (
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
-// #340: serverRules is in the canonical schema but not in the generation
-// schema until #343, so what Claude can emit is unchanged.
+// #340 / #343: serverRules is in the canonical schema but not in the main
+// generation schema (the server-rules pass has its own schema).
 func TestGenerationSchemaOmitsServerRules(t *testing.T) {
 	var root map[string]any
 	if err := json.Unmarshal(dsl.SchemaJSON(), &root); err != nil {

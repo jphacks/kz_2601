@@ -411,7 +411,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 
 ### 3.12 serverRules = サーバーの自動の動き(#340・M4)
 
-「誰かが出欠をつけたら、予定を作った人に通知」のような、**端末を開いていない人にも届く動き**をアプリのトップの `serverRules[]` に宣言する(方式 A = 宣言だけ・AI がコードを書かない。設計は `docs/decisions/336`〜`339`)。**iOS は描画しない**(未知のキーとして無視する)。動かすのはサーバーの runner(#341・#342)で、この PR の時点ではスキーマと検証だけ。生成用スキーマ(`ai.GenerationSchema()`)からは外してあり、AI が書くのは #343 から。
+「誰かが出欠をつけたら、予定を作った人に通知」のような、**端末を開いていない人にも届く動き**をアプリのトップの `serverRules[]` に宣言する(方式 A = 宣言だけ・AI がコードを書かない。設計は `docs/decisions/336`〜`339`)。**iOS は描画しない**(未知のキーとして無視する)。動かすのはサーバーの runner(#341・#342)。
 
 ```json
 {"id":"notify_rsvp","on":{"record":"created","entity":"rsvps"},
@@ -436,6 +436,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - 共有データに効くのは作成者の公開 DSL(`apps_public/{appId}`)の宣言だけ。参加者が自分のコピーを書き換えても効かない(#337・runner の側で守る)。
 - 人が読める説明は `App.DescribeServerRule`(例: 「出欠」が作られた時(条件に合えば)、「予定」を作った人に通知・「予定」の「参加の数」を数える)。「このアプリの自動の動き」の一覧(#347)で使う。
 - 古い iOS: `AppDSL` はトップの未知キーを読まないので、`serverRules` があっても今までどおり開ける。
+- AI の生成(#343): 生成用スキーマ(`ai.GenerationSchema()`)には入れず、依頼が自動の動き(通知・定期・数える など)を含む時だけ、UI の生成の後に別の小さな呼び出し(`backend/internal/ai/server_rules_pass.go`・専用スキーマ `ServerRulesGenerationSchema()`・`createRecord` / `updateRecord` の `values` はそこだけ `[{field, value}]` の配列)で `serverRules` 全体を書く。結果は `Validate()` を通し、通らなければ問題を添えて再生成、最後まで通らなければルール無しで保存して summary で断る。作ったルールは `DescribeServerRule` の文で summary に出る。`AI_SERVER_RULES=1` の時だけ動く(既定は無効)。
 
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 
