@@ -381,6 +381,8 @@ final class AppRuntime: DSLRuntime {
     @ObservationIgnored private var pendingHotReload: AppDocument?
     @ObservationIgnored private var pendingHotReloadTask: Task<Void, Never>?
     @ObservationIgnored private var recordsRefreshTasks: [String: Task<Void, Never>] = [:]
+    /// 保存中のフォーム(saveRecord の連打で同じ記録を 2 件作らない)
+    @ObservationIgnored private var savingForms: Set<ObjectIdentifier> = []
 
     /// シート / 全画面 / push 先 / 音声シートが開いている = 入力や操作の途中。DSL を差し替えるとフォームの下書きが消えるので待つ。
     private var isInteracting: Bool {
@@ -551,9 +553,14 @@ final class AppRuntime: DSLRuntime {
             try await services.ai.morph(transcript: text, appId: appId, currentVersion: version, locale: locale)
         }
         morphTask = task
-        defer { morphTask = nil }
+        defer { if morphTask == task { morphTask = nil } }
         do {
             let result = try await task.value
+            // 待っている間に別のアプリ・初期状態へ移っていたら、前のアプリの結果を今の画面に当てない
+            guard document.appId == previous.appId else {
+                print("[Metamon] morph result dropped: app changed \(previous.appId) → \(document.appId)")
+                return
+            }
             if result.unchanged {
                 presentUnchanged(result.summary)
                 return
@@ -572,6 +579,7 @@ final class AppRuntime: DSLRuntime {
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
             if gatePaid { await gatePaidGeneration(before: previous) } // #414
         } catch {
+            guard document.appId == previous.appId else { return } // 移った先に前のアプリの失敗を出さない
             let failure: FailureKind = interruptedByOffline ? .offline : FailureKind.classify(error)
             interruptedByOffline = false
             print("[Metamon] morph failed: \(failure) (\(error))")
@@ -976,7 +984,9 @@ final class AppRuntime: DSLRuntime {
     /// ローカル DB の内容で表示を差し替える(画面外からの追加: Siri / ショートカット #80)。今のアプリ以外は何もしない。
     func reloadLocal(_ entity: String, appId: String) async {
         guard appId == document.appId else { return }
-        records[entity] = await recordSync.cached(appId: appId, entity: entity)
+        let cached = await recordSync.cached(appId: appId, entity: entity)
+        guard appId == document.appId else { return }
+        records[entity] = cached
         WidgetSnapshotWriter.write(dsl: dsl, records: records)
     }
 
@@ -986,7 +996,9 @@ final class AppRuntime: DSLRuntime {
             switch event {
             case .sent(let appId, let entity):
                 guard appId == document.appId else { return }
-                records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                let cached = await recordSync.cached(appId: appId, entity: entity)
+                guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
+                records[entity] = cached
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
             case .conflict(let appId, let entity, _):
                 guard appId == document.appId else { return }
@@ -999,7 +1011,9 @@ final class AppRuntime: DSLRuntime {
             case .rejected(let appId, let entity, let message, let field):
                 guard appId == document.appId else { return }
                 toast = rejectedToast(entity: entity, field: field, message: message)
-                records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                let cached = await recordSync.cached(appId: appId, entity: entity)
+                guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
+                records[entity] = cached
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
             case .paused(let pending):
                 toast = L10n.tr("送信に失敗しました(未送信 \(pending) 件)。接続を確認してください")
@@ -1008,7 +1022,9 @@ final class AppRuntime: DSLRuntime {
             case .notMember(let appId, let entity):
                 guard appId == document.appId else { return }
                 toast = SharedAccessDenial.notMember.message // 送信待ちには残さず、楽観的に出した分を戻す
-                records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                let cached = await recordSync.cached(appId: appId, entity: entity)
+                guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
+                records[entity] = cached
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
             }
         }
@@ -1094,6 +1110,9 @@ final class AppRuntime: DSLRuntime {
                 authorNamePrompt = AuthorNamePrompt { [weak self] in await self?.perform(action, ctx) }
                 return
             }
+            // 保存ボタンの連打: 1 回目のローカル保存を待つ間に 2 回目が来ると、新規なら同じ内容が 2 件できる
+            guard savingForms.insert(ObjectIdentifier(form)).inserted else { return }
+            defer { savingForms.remove(ObjectIdentifier(form)) }
             // 楽観的 UI: ローカル DB に即反映して画面を進める。appconfig への送信は recordSync のキューが行う
             let payload = form.payload
             let isNew = recordId == nil

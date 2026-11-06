@@ -36,7 +36,7 @@
 | ドラレコ(`dashcam`・#410。カメラの常時録画・CoreMotion) | 部品と登録 / `DashcamRecorder`、写真への追加の説明文から「ドラレコ」を外す | 4.7.2・2.5.14 |
 | DSL から使うマイクの録音(`audioRecorder`・#420) | 部品と登録 / `AudioRecorderController` / `RemoteRecorderCommands`(イヤホンのボタン)。マイクの説明文は音声入力だけの文に差し替え済み | 4.7.2・2.5.14 |
 | アプリ内の Web 表示(`webView`・WKWebView) | 部品と登録 / `WebViewLeaf`。サイトは `openUrlButton` で Safari に開く | 審査メモ「WebView を使わない」(#452 G3) |
-| App 内課金(Tailor It Pro・#77 #414) | `ProGate` / `PaywallSheet` / `ProSettingsSection`(設定の「Tailor It Pro」)/ `AppRuntime+PaidFeature`(有料機能の確認カード)/ `AppRuntime+PaidGate` の課金画面、MetamonServices の `ProEntitlementStore`(StoreKit)/ `ProProducts`(商品 ID)/ `CreationQuota`(端末の 1 日 3 回)。1 日の上限はサーバーの `ratelimit` だけで、当たると状態カード「今日はここまでです / 今日の上限に達しました。〜からまた使えます」(課金画面は出ない)。backend も chat の `requiresPro` / `paidFeatures` を付けない | 最初の版は課金なしで出す(#450 G1・2026-10-30 決定)。3.1.1・3.1.2・2.3.1(サーバーが Pro を判定しない) |
+| App 内課金(Tailor It Pro・#77 #414) | `ProGate` / `PaywallSheet` / `ProSettingsSection`(設定の「Tailor It Pro」)/ `ManageSubscriptionButton`(「サブスクリプションを管理」・#326)/ `AppRuntime+PaidFeature`(有料機能の確認カード)/ `AppRuntime+PaidGate` の課金画面、MetamonServices の `ProEntitlementStore`(StoreKit)/ `ProProducts`(商品 ID)/ `CreationQuota`(端末の 1 日 3 回)。1 日の上限はサーバーの `ratelimit` だけで、当たると状態カード「今日はここまでです / 今日の上限に達しました。〜からまた使えます」(課金画面は出ない)。backend も chat の `requiresPro` / `paidFeatures` を付けない | 最初の版は課金なしで出す(#450 G1・2026-10-30 決定)。3.1.1・3.1.2・2.3.1(サーバーが Pro を判定しない) |
 | 共有・公開のデータ(entity の `scope: shared / public`・`edit`・`marks`)と `chatThread` | `chatThread` の部品と登録 / `ChatThreadLeaf`。`ClientCapabilities.reviewDisabledFeatures` の `sharedData` で、backend が scope を private に直す(下の「AI 側の制限」) | 1.2(通報・ブロック・フィルタが無い)(#451 G2) |
 | aiButton のオンライン版(`POST /v1/text`・#417) | `AppRuntime+AIText` のオンライン経路と Pro の入口 / `HTTPAIClient+Text`(`v1/text`)。端末内 AI(Foundation Models)は残る。端末内 AI が無い端末では理由つきで無効 | 5.1.2(i)。同意文の「記録の中身は送らない」(#452 G4) |
 | aiButton の端末内 AI の集計(`POST /v1/metrics/ai-button`・#446) | `AppRuntime+AIButtonMetrics` は何もしない / MetamonServices の `AIButtonMetrics.swift`(貯める・送る)/ 設定の「AI ボタンの利用状況を送る」。Renderer の数える呼び出しは残るが、ホストが捨てる | 栄養ラベルに「使用状況データ」が増えるため(`docs/analytics/ai-button-metrics.md`) |
@@ -57,6 +57,7 @@
 - QR を作って表示する `qrCode`(#422)も残す。CoreImage で端末内で作るだけで、写真への保存は追加のみの権限(`NSPhotoLibraryAddUsageDescription`)。審査用の版の説明文にも QR の保存を書く(#452 G8)。
 - 声でアプリを作り変える音声入力(マイク FAB)は残す。`audio` field の再生(一覧の行の再生ボタン)も残す(マイクを使わない。この版では録音できないので鳴る録音は無い)。
 - 裏で定期的に同期する `fetch` は残す。
+- 設定の「ライセンス」(このアプリの MIT の表示とサードパーティのライセンスの一覧・#306)は残す。
 - `musicPlayer`(Apple Music の再生・検索)は残す。`NSAppleMusicUsageDescription` も残す(#412)。
 - 最初の版のスコープは、調査メモ(リポジトリ外の `調査_ライセンスとApp Store審査.md`)の「最初の版で削る機能」の表に合わせている。
 - 最初の版は App 内課金なし・共有 / 公開のデータなしで出す(2026-10-30 決定・#450 #451)。通常の版(Debug / Release)の課金と共有は今まで通り。
@@ -140,6 +141,8 @@ strings "$APP/Metamon" | grep -E 'AutomationsView|HTTPAutomationsClient|/automat
 #       この版のサインイン(Sign in with Apple・匿名)では使わない。アプリのコードからは WebKit を使わない
 grep -a -c -F -e 'Tailor It Pro' -e '購入して作る' -e 'オンラインの AI で書く' -e '今日の上限に達したため止めました' "$APP/Metamon"
 #   → 0(日本語の文字列は strings では出ないので grep -a で見る)
+grep -a -c -F -e 'ManageSubscriptionButton' -e 'サブスクリプションを管理' "$APP/Metamon"
+#   → 0(サブスクの管理の導線も無い・#326)
 otool -L "$APP/Metamon" | grep StoreKit
 #   → 何も出ないこと(App 内課金なし・#450 G1)
 ls "$APP" | grep -E '^(health|walk_route|attendance_nearby|dashcam|sensors|gallery-web|chat|board|ranking|post_comments|recipes)\.json$'

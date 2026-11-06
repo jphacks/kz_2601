@@ -214,19 +214,22 @@ struct RootView: View {
     @ViewBuilder
     private var summaryCard: some View {
         if let banner = rt.summaryBanner {
+            let dismiss = { withAnimation { rt.summaryBanner = nil } }
             HStack(alignment: .top, spacing: Theme.Spacing.sm + 2) {
                 CraneMascot(pose: .joy, size: 52, sway: 6) // #102
                 Text(banner.text)
                     .font(.subheadline.weight(.medium))
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityDismissAction(dismiss) // #628
                 Spacer(minLength: 0)
                 if let action = banner.action { SummaryBannerActionButton(action: action) } // #209 元に戻す / やり直す
             }
             .metamonCard(padding: Theme.Spacing.md)
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.top, Theme.Spacing.sm)
+            .swipeToDismiss(onDismiss: dismiss) // #628 上に払って閉じる(元に戻す付きでも)
             .transition(.move(edge: .top).combined(with: .opacity))
-            .onTapGesture { withAnimation { rt.summaryBanner = nil } }
+            .onTapGesture(perform: dismiss)
             .task(id: banner.id) {
                 // 文字数に応じて 3〜5 秒(読み上げを読み切れる長さ)
                 // ボタン付き(#209)は押す余裕を持たせて 6 秒以上
@@ -266,6 +269,7 @@ private struct ToastHost: ViewModifier {
         let active = onModal == (rt.sheet != nil || rt.fullScreen != nil)
         content.overlay(alignment: .bottom) {
             if active, let message = rt.toast {
+                let dismiss = { withAnimation { rt.toast = nil } }
                 Text(message)
                     .font(.footnote.weight(.medium))
                     .padding(.horizontal, Theme.Spacing.md).padding(.vertical, Theme.Spacing.sm + 2)
@@ -274,6 +278,8 @@ private struct ToastHost: ViewModifier {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Theme.Spacing.md)
                     // マイク FAB と DSL の最下段(行 11〜12 のボタン)の上に出す(被せない)。タブ無しでも同じ高さ
+                    .accessibilityDismissAction(dismiss) // #628
+                    .swipeToDismiss(edge: .bottom, onDismiss: dismiss) // 下に出るので下に払って閉じる
                     .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task(id: message) {
@@ -323,9 +329,13 @@ private struct VoiceToolbarButton: View {
             LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
                 .onEnded { _ in rt.openSwitcher() }
         )
+        // 生成中は FAB と同じく押せない(フォームのシートは本体の暗転の外なので、ここから設定の「初期状態に戻す」等に行けていた)
+        .opacity(rt.morphJob != nil ? 0.35 : 1)
+        .allowsHitTesting(rt.morphJob == nil)
+        .disabled(rt.morphJob != nil)
         .accessibilityLabel("話しかけて変える")
         .accessibilityHint(L10n.key("長押しで変身一覧", review: "長押しで記録帳の一覧"))
-        .accessibilityAction(named: L10n.key("変身一覧", review: "記録帳の一覧")) { rt.openSwitcher() }
+        .accessibilityAction(named: L10n.key("変身一覧", review: "記録帳の一覧")) { if rt.morphJob == nil { rt.openSwitcher() } }
     }
 }
 

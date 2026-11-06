@@ -9,9 +9,9 @@ struct RatingLeaf: View {
 
     var body: some View {
         if let form = ctx.form, let field = c.field {
-            let count = Swift.min(Swift.max(Int(c.max ?? 5), 1), 10)
+            let count = NumericInput.ratingCount(c.max)
             let value = form.double(field, fallback: 0)
-            let current = Int(value.wrappedValue.rounded())
+            let current = NumericInput.ratingValue(value.wrappedValue, count: count)
             LabeledInput(label: c.label) {
                 HStack(spacing: RenderTheme.Spacing.sm) {
                     ForEach(1...count, id: \.self) { i in

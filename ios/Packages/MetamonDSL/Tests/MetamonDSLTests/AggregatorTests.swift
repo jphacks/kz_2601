@@ -19,6 +19,22 @@ final class AggregatorTests: XCTestCase {
         XCTAssertEqual(Aggregator.buckets(c, entity: nil, records: rows).map(\.label), ["t1", "t2"])
     }
 
+    /// chart の日付の見出し: 日本語(既定)は「3月」「3/4」、英語は「Mar」「3/4」(英語の UI でも「3月」になっていた)。
+    func testDateBucketLabelsFollowLocale() throws {
+        let entity = try JSONDecoder().decode(Entity.self, from: Data(#"{"id":"e","name":"e","fields":[{"id":"d","name":"d","type":"date"}]}"#.utf8))
+        let rows = [Record(id: "1", data: ["d": "2026-03-04"]), Record(id: "2", data: ["d": "2026-04-10"])]
+        func labels(_ bucket: String, _ locale: Locale?) throws -> [String] {
+            let c = try JSONDecoder().decode(Component.self, from: Data(#"{"type":"chart","entity":"e","groupBy":"d","bucket":"\#(bucket)","aggregate":"count"}"#.utf8))
+            return Aggregator.buckets(c, entity: entity, records: rows, locale: locale).map(\.label)
+        }
+        XCTAssertEqual(try labels("month", nil), ["3月", "4月"])
+        XCTAssertEqual(try labels("month", Locale(identifier: "ja_JP")), ["3月", "4月"])
+        XCTAssertEqual(try labels("month", Locale(identifier: "en_US")), ["Mar", "Apr"])
+        XCTAssertEqual(try labels("day", Locale(identifier: "en_US")), ["3/4", "4/10"])
+        XCTAssertEqual(try labels("day", nil), ["3/4", "4/10"])
+        XCTAssertFalse(try labels("week", Locale(identifier: "en_US")).contains { $0.contains("週") })
+    }
+
     func testAggregate() {
         XCTAssertEqual(Aggregator.aggregate("sum", field: "amount", over: records), 150)
         XCTAssertEqual(Aggregator.aggregate("avg", field: "amount", over: records), 75)
