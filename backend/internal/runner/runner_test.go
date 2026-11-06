@@ -27,6 +27,7 @@ type runnerStore interface {
 	store.Store
 	store.OutboxQueue
 	store.RunnerWrites
+	store.RunnerStops
 }
 
 type outboxLister interface {
@@ -119,11 +120,13 @@ type harness struct {
 	sfx    string
 	clock  time.Time
 	paused bool
-	sender *notify.FakeSender
-	tokens notify.MemoryTokens
-	r      *runner.Runner
-	logs   *syncBuffer
-	pro    fakePro
+	// notifyPaused: RUNNER_NOTIFY_PAUSED
+	notifyPaused bool
+	sender       *notify.FakeSender
+	tokens       notify.MemoryTokens
+	r            *runner.Runner
+	logs         *syncBuffer
+	pro          fakePro
 }
 
 type options struct {
@@ -169,7 +172,7 @@ func newHarness(t *testing.T, st runnerStore, sfx string, opts options) *harness
 	q.Logger = logger
 	r, err := runner.New(runner.Config{
 		Env: env, Store: st, Quota: q, Sender: h.sender, Tokens: h.tokens, Age: opts.age,
-		Paused: func() bool { return h.paused }, Now: func() time.Time { return h.clock }, Logger: logger,
+		Paused: func() bool { return h.paused }, NotifyPaused: func() bool { return h.notifyPaused }, Now: func() time.Time { return h.clock }, Logger: logger,
 	})
 	if err != nil {
 		t.Fatal(err)

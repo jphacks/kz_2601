@@ -47,6 +47,7 @@ const (
 	ReasonVersionMissing = "version_missing" // the trigger's DSL version is gone
 	ReasonRuleRemoved    = "rule_removed"    // not in the trigger's version or not in the current DSL
 	ReasonBadEvent       = "bad_event"
+	ReasonOperatorStop   = "operator_stop" // the operator's app / rule stop (#346); stop_level says which
 )
 
 // DefaultMaxAge: triggers older than this are not run (#337: after a
@@ -58,6 +59,7 @@ type Store interface {
 	scope.Backend
 	store.OutboxQueue
 	store.Schedules
+	store.RunnerStops
 }
 
 // Config configures a Runner. Env, Store and Quota are required.
@@ -75,6 +77,11 @@ type Config struct {
 	Age     notify.AccountAge
 	// Paused (RUNNER_PAUSED): events are finished as skipped_paused, never kept for later.
 	Paused func() bool
+	// NotifyPaused (RUNNER_NOTIFY_PAUSED): rules run and write, notifications
+	// are not sent (and not sent later).
+	NotifyPaused func() bool
+	// AutoPause: the automatic notify pause on reports (#339).
+	AutoPause AutoPause
 	// MaxAge: 0 = DefaultMaxAge.
 	MaxAge time.Duration
 	// MaxLate (RUNNER_SCHEDULE_MAX_LATE): a schedule run started later than
@@ -108,6 +115,10 @@ func New(cfg Config) (*Runner, error) {
 	if cfg.Paused == nil {
 		cfg.Paused = func() bool { return false }
 	}
+	if cfg.NotifyPaused == nil {
+		cfg.NotifyPaused = func() bool { return false }
+	}
+	cfg.AutoPause = cfg.AutoPause.withDefaults()
 	if cfg.MaxAge <= 0 {
 		cfg.MaxAge = DefaultMaxAge
 	}
@@ -137,12 +148,14 @@ func (r *Runner) Queue() *queue.Queue { return r.queue }
 // TickResult counts what one Tick did.
 type TickResult struct {
 	// Scheduled: schedule runs queued by this tick (#342).
-	Scheduled int            `json:"scheduled"`
-	Claimed   int            `json:"claimed"`
-	Done      int            `json:"done"`
-	Retried   int            `json:"retried"`
-	GaveUp    int            `json:"gaveUp"`
-	Events    map[string]int `json:"outcomes,omitempty"` // event outcome -> count
+	Scheduled int `json:"scheduled"`
+	// AutoPaused: apps whose notifications this tick paused on reports (#346).
+	AutoPaused int            `json:"autoPaused,omitempty"`
+	Claimed    int            `json:"claimed"`
+	Done       int            `json:"done"`
+	Retried    int            `json:"retried"`
+	GaveUp     int            `json:"gaveUp"`
+	Events     map[string]int `json:"outcomes,omitempty"` // event outcome -> count
 	// More: the budget ran out with events possibly left.
 	More bool `json:"more"`
 }
@@ -154,6 +167,7 @@ type TickResult struct {
 func (r *Runner) Tick(ctx context.Context, budget time.Duration) (TickResult, error) {
 	deadline := time.Now().Add(budget)
 	var res TickResult
+	res.AutoPaused = r.autoPause(ctx)
 	if err := r.claimSchedules(ctx, deadline, &res); err != nil {
 		return res, err
 	}
