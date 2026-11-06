@@ -1157,6 +1157,23 @@
         }
       }
     },
+    "openUrl: url は https か line/slack/discord/tel/mailto/maps のみ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "openUrl: url must be https or line/slack/discord/tel/mailto/maps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "openUrl: url は https か line/slack/discord/tel/mailto/maps のみ"
+          }
+        }
+      }
+    },
     "β の期間中は、作ったアプリや記録が消えることがあります。大事なデータは、ほかの場所にも残してください。" : {
       "extractionState" : "manual",
       "localizations" : {
