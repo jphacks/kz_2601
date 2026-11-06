@@ -36,8 +36,10 @@ struct WebViewLeaf: View {
         HStack(spacing: 12) {
             Button { state.goBack?() } label: { Image(systemName: "chevron.backward") }
                 .disabled(!state.canGoBack)
+                .accessibilityLabel(L("前のページ"))
             Button { state.goForward?() } label: { Image(systemName: "chevron.forward") }
                 .disabled(!state.canGoForward)
+                .accessibilityLabel(L("次のページ"))
             Text(c.title ?? state.pageTitle)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
@@ -45,6 +47,7 @@ struct WebViewLeaf: View {
             Button { state.reload?() } label: {
                 Image(systemName: state.isLoading ? "xmark" : "arrow.clockwise")
             }
+            .accessibilityLabel(state.isLoading ? L("読み込みを止める") : L("再読み込み"))
         }
         .buttonStyle(.plain)
         .foregroundStyle(.tint)

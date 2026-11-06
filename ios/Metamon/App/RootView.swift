@@ -323,9 +323,13 @@ private struct VoiceToolbarButton: View {
             LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
                 .onEnded { _ in rt.openSwitcher() }
         )
+        // 生成中は FAB と同じく押せない(フォームのシートは本体の暗転の外なので、ここから設定の「初期状態に戻す」等に行けていた)
+        .opacity(rt.morphJob != nil ? 0.35 : 1)
+        .allowsHitTesting(rt.morphJob == nil)
+        .disabled(rt.morphJob != nil)
         .accessibilityLabel("話しかけて変える")
         .accessibilityHint(L10n.key("長押しで変身一覧", review: "長押しで記録帳の一覧"))
-        .accessibilityAction(named: L10n.key("変身一覧", review: "記録帳の一覧")) { rt.openSwitcher() }
+        .accessibilityAction(named: L10n.key("変身一覧", review: "記録帳の一覧")) { if rt.morphJob == nil { rt.openSwitcher() } }
     }
 }
 
