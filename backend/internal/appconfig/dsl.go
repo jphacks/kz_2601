@@ -54,6 +54,7 @@ func (h *Handler) getDSL(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	h.touchOpened(r, app)
 	w.Header().Set("ETag", etag(app.CurrentVersion))
 	w.Header().Set("Cache-Control", "no-cache")
 	if inm := r.Header.Get("If-None-Match"); inm != "" {
@@ -109,13 +110,15 @@ func (h *Handler) putDSL(w http.ResponseWriter, r *http.Request) {
 		fail(w, invalidDSL(err))
 		return
 	}
-	if _, err := h.ensureApp(r, id); err != nil {
+	prev, err := h.ensureApp(r, id)
+	if err != nil {
 		fail(w, err)
 		return
 	}
 	raw := compact(body.DSL)
 	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
 		BaseVersion: base, DSL: raw, Name: app.App.Name, Source: normalizeSource(body.Source, "full"),
+		Events: h.rulesChanged(r, id, prev.DSL, app),
 	})
 	if err != nil {
 		fail(w, mapStoreErr(err, "app"))
@@ -171,6 +174,7 @@ func (h *Handler) patchDSL(w http.ResponseWriter, r *http.Request) {
 	}
 	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
 		BaseVersion: base, DSL: next, Name: app.App.Name, Patch: ops, Source: normalizeSource(src, "patch"),
+		Events: h.rulesChanged(r, id, cur.DSL, app),
 	})
 	if err != nil {
 		fail(w, mapStoreErr(err, "app"))
@@ -272,6 +276,7 @@ func (h *Handler) restoreVersion(w http.ResponseWriter, r *http.Request) {
 	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
 		BaseVersion: cur.CurrentVersion, DSL: target.DSL, Name: app.App.Name,
 		Source: &store.Source{Kind: "restore", Mode: "full", RestoredFrom: n},
+		Events: h.rulesChanged(r, id, cur.DSL, app),
 	})
 	if err != nil {
 		fail(w, mapStoreErr(err, "app"))

@@ -64,6 +64,13 @@ type Memory struct {
 
 	// runner done marks (#341, memory_runner.go): env/key
 	runnerDone map[string]bool
+
+	// runner schedules and per-app state (#342, memory_schedule.go)
+	schedules  map[string]map[string]*Schedule // env -> id
+	runnerApps map[string]*RunnerApp           // env/key
+
+	// runner stops (#346, memory_stop.go)
+	stops map[string]map[string]*Stop // env -> id
 }
 
 // NewMemory returns an empty store.
@@ -247,6 +254,16 @@ func (m *Memory) CommitVersion(_ context.Context, uid, appID string, c Commit) (
 	}
 	now := m.now().UTC()
 	n := a.app.CurrentVersion + 1
+	events, err := commitEvents(c, n, now)
+	if err != nil {
+		return nil, err
+	}
+	for _, ev := range events {
+		if _, dup := m.outbox[ev.Env][ev.EventID]; dup {
+			return nil, ErrAlreadyExists
+		}
+	}
+	m.storeOutboxLocked(events)
 	v := &Version{AppID: appID, Version: n, ParentVersion: c.BaseVersion, DSL: cloneRaw(c.DSL), Patch: c.Patch, Source: c.Source, CreatedAt: now}
 	a.versions[n] = v
 	a.app.CurrentVersion = n

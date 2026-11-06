@@ -27,6 +27,7 @@ type runnerStore interface {
 	store.Store
 	store.OutboxQueue
 	store.RunnerWrites
+	store.RunnerStops
 }
 
 type outboxLister interface {
@@ -119,16 +120,19 @@ type harness struct {
 	sfx    string
 	clock  time.Time
 	paused bool
-	sender *notify.FakeSender
-	tokens notify.MemoryTokens
-	r      *runner.Runner
-	logs   *syncBuffer
-	pro    fakePro
+	// notifyPaused: RUNNER_NOTIFY_PAUSED
+	notifyPaused bool
+	sender       *notify.FakeSender
+	tokens       notify.MemoryTokens
+	r            *runner.Runner
+	logs         *syncBuffer
+	pro          fakePro
 }
 
 type options struct {
-	pro fakePro
-	age notify.AccountAge
+	pro    fakePro
+	age    notify.AccountAge
+	limits func(*quota.Limits)
 }
 
 func stores(t *testing.T, opts options, f func(t *testing.T, h *harness)) {
@@ -156,6 +160,9 @@ func newHarness(t *testing.T, st runnerStore, sfx string, opts options) *harness
 	h.h = auth.Middleware(nil, auth.ModeDev)(appconfig.New(st))
 	lim := quota.DefaultLimits
 	lim.RunWritesFree = 10
+	if opts.limits != nil {
+		opts.limits(&lim)
+	}
 	if opts.pro == nil {
 		opts.pro = fakePro{}
 	}
@@ -165,7 +172,7 @@ func newHarness(t *testing.T, st runnerStore, sfx string, opts options) *harness
 	q.Logger = logger
 	r, err := runner.New(runner.Config{
 		Env: env, Store: st, Quota: q, Sender: h.sender, Tokens: h.tokens, Age: opts.age,
-		Paused: func() bool { return h.paused }, Now: func() time.Time { return h.clock }, Logger: logger,
+		Paused: func() bool { return h.paused }, NotifyPaused: func() bool { return h.notifyPaused }, Now: func() time.Time { return h.clock }, Logger: logger,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -193,10 +200,20 @@ func (h *harness) do(uid, method, path, body string, hdr map[string]string) (int
 
 func (h *harness) putDSL(uid, app string, dsl []byte) {
 	h.t.Helper()
+	h.putDSLTZ(uid, app, dsl, "")
+}
+
+// putDSLTZ saves dsl as a device in time zone tz would ("" = no header).
+func (h *harness) putDSLTZ(uid, app string, dsl []byte, tz string) {
+	h.t.Helper()
 	_, cur := h.do(uid, http.MethodGet, app+"/dsl", "", nil)
 	v, _ := cur["version"].(float64)
 	body := `{"dsl":` + string(dsl) + `,"source":{"kind":"ai","mode":"full","transcript":"x","summary":"x","model":"test"}}`
-	if code, out := h.do(uid, http.MethodPut, app+"/dsl", body, map[string]string{"If-Match": `"` + strconv.Itoa(int(v)) + `"`}); code != http.StatusCreated {
+	hdr := map[string]string{"If-Match": `"` + strconv.Itoa(int(v)) + `"`}
+	if tz != "" {
+		hdr[appconfig.TimeZoneHeader] = tz
+	}
+	if code, out := h.do(uid, http.MethodPut, app+"/dsl", body, hdr); code != http.StatusCreated {
 		h.t.Fatalf("put dsl %s: %d %v", app, code, out)
 	}
 }
@@ -249,7 +266,7 @@ func (h *harness) events(appID string) []store.OutboxEvent {
 	}
 	var out []store.OutboxEvent
 	for _, ev := range all {
-		if ev.AppID == appID {
+		if ev.AppID == appID && (ev.Kind == store.OutboxRecordCreated || ev.Kind == store.OutboxRecordUpdated) {
 			out = append(out, ev)
 		}
 	}

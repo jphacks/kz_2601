@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "time/tzdata" // X-Time-Zone names resolve on a distroless image (#342)
 
 	"github.com/jphacks/kz_2601/backend/internal/appcheck"
 	"github.com/jphacks/kz_2601/backend/internal/appconfig"
