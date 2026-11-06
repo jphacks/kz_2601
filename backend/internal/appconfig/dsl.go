@@ -115,6 +115,10 @@ func (h *Handler) putDSL(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	if err := h.checkPaidSaveRaw(r, id, app, prev); err != nil { // #316
+		fail(w, err)
+		return
+	}
 	raw := compact(body.DSL)
 	pub, err := h.commitPublish(r, id, app, true)
 	if err != nil {
@@ -173,6 +177,10 @@ func (h *Handler) patchDSL(w http.ResponseWriter, r *http.Request) {
 	next, app, err := dsl.ApplyPatch(cur.DSL, ops)
 	if err != nil {
 		fail(w, invalidDSL(err))
+		return
+	}
+	if err := h.checkPaidSaveRaw(r, id, app, cur); err != nil { // #316
+		fail(w, err)
 		return
 	}
 	pub, err := h.commitPublish(r, id, app, true)
@@ -277,6 +285,10 @@ func (h *Handler) restoreVersion(w http.ResponseWriter, r *http.Request) {
 	app, err := dsl.Parse(target.DSL)
 	if err != nil {
 		fail(w, invalidDSL(err))
+		return
+	}
+	if err := h.checkPaidSaveRaw(r, id, app, cur); err != nil { // #316: restoring a paid version
+		fail(w, err)
 		return
 	}
 	pub, err := h.commitPublish(r, id, app, true)

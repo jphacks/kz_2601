@@ -39,6 +39,9 @@ const CodeNotFound = "not_found"
 
 const CodePayloadTooLarge = "payload_too_large"
 
+// a paid feature (Tailor It Pro) the caller or the app's creator does not have (#316)
+const CodeProRequired = "pro_required"
+
 const CodeRateLimited = "rate_limited"
 
 const CodeRefused = "refused"

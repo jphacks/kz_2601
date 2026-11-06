@@ -156,6 +156,9 @@ func (s *Service) logger() *slog.Logger {
 // line carries the request's trace and requestId (#295).
 func (s *Service) errBody(ctx context.Context, ge *Error) map[string]any {
 	details := map[string]any{}
+	for k, v := range ge.Details {
+		details[k] = v
+	}
 	if len(ge.Problems) > 0 {
 		details["problems"] = ge.Problems
 	}

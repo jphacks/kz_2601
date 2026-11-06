@@ -99,6 +99,12 @@ func (h *Handler) createApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "invalid id"))
 		return
 	}
+	if len(body.DSL) > 0 {
+		if err := h.checkPaidSave(r, id, app, nil); err != nil { // #316
+			fail(w, err)
+			return
+		}
+	}
 	created, isNew, err := h.store.EnsureApp(r.Context(), uidOf(r), id, raw, name)
 	if err != nil {
 		fail(w, err)

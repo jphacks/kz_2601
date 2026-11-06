@@ -48,6 +48,12 @@ func (h *Handler) setMark(w http.ResponseWriter, r *http.Request, on bool) {
 		fail(w, apiErr(http.StatusNotFound, httpx.CodeNotFound, "mark not found in current dsl").With("entity", eid).With("mark", mid))
 		return
 	}
+	if on {
+		if err := h.checkSharedWrite(r, cur, ent); err != nil { // #316 (taking a mark back stays open)
+			fail(w, err)
+			return
+		}
+	}
 	st, err := h.store.SetMark(r.Context(), recordSet(r, cur, ent, eid), rid, mid, uidOf(r), on)
 	if err != nil {
 		fail(w, mapStoreErr(err, "record"))

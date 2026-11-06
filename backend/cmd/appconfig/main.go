@@ -42,8 +42,12 @@ func main() {
 	defer closeStore()
 
 	authed := newAuthed(newAppCheck(ctx, project, logger), auth.Middleware(verifier, mode), st)
-	api := appconfig.New(st)
 	ents := newEntitlements(st, logger)
+	// Pro features (#316): paid saves and shared writes need Pro; a purchase
+	// counts at once on this instance (Changed drops the cached "not Pro")
+	pro := entitlement.NewProChecker(ents.Store, ents.Verifier.Environments)
+	ents.Changed = pro.Forget
+	api := appconfig.New(st, appconfig.WithPro(pro))
 	entitlement.Register(api, ents) // Pro (#314)
 	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appStoreNotifications(ents, logger))
 	server := &http.Server{

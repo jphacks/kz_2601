@@ -266,6 +266,10 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "data is required"))
 		return
 	}
+	if err := h.checkSharedWrite(r, cur, ent); err != nil { // #316
+		fail(w, err)
+		return
+	}
 	data, err := normalizeData(ent, body.Data, true)
 	if err != nil {
 		fail(w, err)
@@ -379,6 +383,10 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(body.Data) == 0 {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "data must have at least one key"))
+		return
+	}
+	if err := h.checkSharedWrite(r, cur, ent); err != nil { // #316
+		fail(w, err)
 		return
 	}
 	delta, err := normalizeData(ent, body.Data, false)

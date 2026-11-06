@@ -18,6 +18,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -49,6 +50,8 @@ type Handler struct {
 	activity activity     // lastOpenedAt written today (activity.go, #342)
 
 	runnerEnv string // runner/{env} the automations view reads (automations.go, #347)
+
+	pro paid.ProChecker // Pro features (pro_gate.go, #316); nil = not enforced
 }
 
 // routeGroups holds the feature routes. Each feature file registers its own
@@ -60,8 +63,11 @@ func registerRoutes(f func(h *Handler, mux *http.ServeMux)) { routeGroups = appe
 
 // New builds the v1 router (a ServeMux so the caller can probe matches).
 // Core routes live here; feature routes come from routeGroups.
-func New(s store.Store) *http.ServeMux {
+func New(s store.Store, opts ...Option) *http.ServeMux {
 	h := &Handler{store: s, cache: map[string]*dsl.App{}, eventsMax: eventsMaxStream()}
+	for _, o := range opts {
+		o(h)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/apps", h.listApps)
 	mux.HandleFunc("POST /v1/apps", h.createApp)

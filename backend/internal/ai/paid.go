@@ -1,98 +1,57 @@
 package ai
 
 import (
-	_ "embed"
-	"encoding/json"
-	"fmt"
+	"context"
+	"net/http"
 	"strings"
 
+	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
-// 有料機能の判定(#77)。chat の ready / proposal に「作る予定の内容が Tailor It Pro を要するか」を付ける。
-// リストは paid_features.json の 1 か所。判定は generate に渡す文(transcript / instruction)の語で行う:
+// 有料機能の判定(#77)と強制(#316)。リストは internal/paid/paid_features.json の 1 か所。
+// chat の ready / proposal には generate に渡す文(transcript / instruction)の語で requiresPro を付ける:
 // 生成プロンプト(prompt.go の entity.scope)が同じ語で scope:public を選ぶので、生成前に同じ結果を予測できる。
-// 課金の強制(エンタイトルメント)はしない。iOS が確認カードを出すための情報だけ(後続: レシート検証 + appconfig)。
-
-//go:embed paid_features.json
-var paidFeaturesJSON []byte
-
-type localized struct {
-	JA string `json:"ja"`
-	EN string `json:"en"`
-}
-
-func (l localized) in(loc Locale) string {
-	if loc == LocaleEN && l.EN != "" {
-		return l.EN
-	}
-	return l.JA
-}
-
-type paidFeatureDef struct {
-	ID                 string    `json:"id"`
-	Enabled            bool      `json:"enabled"`
-	Title              localized `json:"title"`
-	Reason             localized `json:"reason"`
-	Keywords           []string  `json:"keywords"`
-	ExcludeKeywords    []string  `json:"excludeKeywords"`
-	DSLEntityScopes    []string  `json:"dslEntityScopes"`
-	WithoutInstruction localized `json:"withoutInstruction"`
-}
+// 保存の前には生成した DSL で判定し、Pro でない作成者には 402 pro_required を返す(gatePaid)。
 
 // PaidFeature is one paid feature in a chat reply (openapi `PaidFeature`).
-type PaidFeature struct {
-	ID     string `json:"id"`
-	Title  string `json:"title"`
-	Reason string `json:"reason"`
-}
+type PaidFeature = paid.Feature
 
-// PaidCatalog is the parsed paid_features.json.
+// PaidCatalog wraps paid.Catalog with the text detection of the chat turn.
 type PaidCatalog struct {
-	features []paidFeatureDef
+	c *paid.Catalog
 }
 
-var defaultPaidCatalog = mustPaidCatalog(paidFeaturesJSON)
-
-func mustPaidCatalog(raw []byte) *PaidCatalog {
-	c, err := ParsePaidCatalog(raw)
-	if err != nil {
-		panic(err)
-	}
-	return c
-}
+var defaultPaidCatalog = &PaidCatalog{c: paid.Default}
 
 // ParsePaidCatalog reads a paid_features.json document; disabled entries are dropped.
 func ParsePaidCatalog(raw []byte) (*PaidCatalog, error) {
-	var doc struct {
-		Features []paidFeatureDef `json:"features"`
+	c, err := paid.Parse(raw)
+	if err != nil {
+		return nil, err
 	}
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return nil, fmt.Errorf("paid_features.json: %w", err)
-	}
-	c := &PaidCatalog{}
-	seen := map[string]bool{}
-	for _, f := range doc.Features {
-		if f.ID == "" || seen[f.ID] {
-			return nil, fmt.Errorf("paid_features.json: empty or duplicate id %q", f.ID)
-		}
-		seen[f.ID] = true
-		if f.Enabled {
-			c.features = append(c.features, f)
-		}
-	}
-	return c, nil
+	return &PaidCatalog{c: c}, nil
 }
 
-func (f paidFeatureDef) public(loc Locale) PaidFeature {
-	return PaidFeature{ID: f.ID, Title: f.Title.in(loc), Reason: f.Reason.in(loc)}
-}
-
-// Detect returns the paid features the text asks for (generation is driven by this text).
+// Detect returns the save-gated paid features the text asks for (generation
+// is driven by this text). The 「この機能なしで作る」 instructions are not
+// read as asking for anything.
 func (c *PaidCatalog) Detect(text string, loc Locale) []PaidFeature {
+	for _, f := range c.c.Defs() {
+		for _, w := range []string{f.WithoutInstruction.JA, f.WithoutInstruction.EN} {
+			if w != "" {
+				text = strings.ReplaceAll(text, w, " ")
+			}
+		}
+	}
 	t := strings.ToLower(text)
 	var out []PaidFeature
-	for _, f := range c.features {
+	for _, f := range c.c.Defs() {
+		if !f.SaveGated() {
+			continue // use-gated features are not asked about before generating
+		}
 		s := t
 		for _, ex := range f.ExcludeKeywords {
 			s = strings.ReplaceAll(s, strings.ToLower(ex), " ")
@@ -110,7 +69,7 @@ func (c *PaidCatalog) Detect(text string, loc Locale) []PaidFeature {
 			hit = in == shareEveryone || in == shareLimited
 		}
 		if hit {
-			out = append(out, f.public(loc))
+			out = append(out, f.Public(string(loc)))
 		}
 	}
 	return out
@@ -125,29 +84,9 @@ func sharesData(scopes []string) bool {
 	return false
 }
 
-// InApp returns the paid features a DSL actually uses (`dslEntityScopes`).
+// InApp returns the save-gated paid features a DSL actually uses.
 func (c *PaidCatalog) InApp(a *dsl.App, loc Locale) []PaidFeature {
-	if a == nil {
-		return nil
-	}
-	var out []PaidFeature
-	for _, f := range c.features {
-		if appUsesScopes(a, f.DSLEntityScopes) {
-			out = append(out, f.public(loc))
-		}
-	}
-	return out
-}
-
-func appUsesScopes(a *dsl.App, scopes []string) bool {
-	for _, e := range a.Entities {
-		for _, s := range scopes {
-			if string(e.Scope) == s {
-				return true
-			}
-		}
-	}
-	return false
+	return c.c.InApp(a, string(loc))
 }
 
 // Without returns text plus the instructions that drop the given features (「この機能なしで作る」).
@@ -155,11 +94,9 @@ func (c *PaidCatalog) Without(text string, drop []PaidFeature, loc Locale) strin
 	var b strings.Builder
 	b.WriteString(strings.TrimSpace(text))
 	for _, p := range drop {
-		for _, f := range c.features {
-			if f.ID == p.ID {
-				b.WriteString("\n")
-				b.WriteString(f.WithoutInstruction.in(loc))
-			}
+		if f, ok := c.c.ByID(p.ID); ok && f.WithoutInstruction.JA != "" {
+			b.WriteString("\n")
+			b.WriteString(f.WithoutInstruction.In(string(loc)))
 		}
 	}
 	return b.String()
@@ -208,4 +145,49 @@ func (c *PaidCatalog) annotate(res *ChatResult, current *dsl.App) {
 			}
 		}
 	}
+}
+
+// dropped reports whether text carries the 「この機能なしで作る」 instruction of
+// feature id (freeTranscript / freeInstruction).
+func (c *PaidCatalog) dropped(text, id string) bool {
+	f, ok := c.c.ByID(id)
+	if !ok {
+		return false
+	}
+	for _, w := range []string{f.WithoutInstruction.JA, f.WithoutInstruction.EN} {
+		if w != "" && strings.Contains(text, w) {
+			return true
+		}
+	}
+	return false
+}
+
+// ProRequired is the 402 of a save (or a paid call) the caller's plan does
+// not cover. details.features lists what needs Pro.
+func ProRequired(features []PaidFeature) *Error {
+	return &Error{
+		Status: http.StatusPaymentRequired, Code: httpx.CodeProRequired,
+		Message: "this needs Tailor It Pro: " + strings.Join(paid.IDs(features), ", "),
+		Details: map[string]any{"features": features},
+	}
+}
+
+// gatePaid refuses to save next when it adds save-gated paid features to
+// prev and the caller is not Pro (#316). Without Service.Pro (local runs,
+// tests) or a caller uid the check is left to appconfig, which enforces it
+// again on PUT / PATCH /dsl.
+func (s *Service) gatePaid(ctx context.Context, next []byte, prev *dsl.App, loc Locale) error {
+	uid := auth.UID(ctx)
+	if s.Pro == nil || uid == "" {
+		return nil
+	}
+	a, err := dsl.Parse(next)
+	if err != nil {
+		return nil // validated before; appconfig answers the save
+	}
+	added := defaultPaidCatalog.c.Added(a, prev, string(loc))
+	if len(added) == 0 || s.Pro.IsPro(ctx, uid) {
+		return nil
+	}
+	return ProRequired(added)
 }

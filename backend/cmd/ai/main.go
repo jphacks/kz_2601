@@ -66,6 +66,9 @@ func main() {
 	authMode := env("AUTH_MODE", auth.ModeFirebase)
 	verifier := auth.VerifierFromEnv(context.Background(), authMode, os.Getenv("GOOGLE_CLOUD_PROJECT"))
 
+	fsClient := newFirestore()
+	pro := newProChecker(fsClient)
+
 	claude := ai.NewClient(apiKey, model, effort)
 	claude.StructuredOutput = os.Getenv("CLAUDE_STRUCTURED_OUTPUT") == "1"
 	claude.Logger = logger // ai.usage JSON lines for the cost sink (#298)
@@ -87,6 +90,8 @@ func main() {
 		// /v1/chat callers (#286): AUTH_MODE=firebase (default) | dev
 		Verifier: verifier,
 		AuthMode: authMode,
+		// Pro features (#316): 402 pro_required on a paid save / POST /v1/text
+		Pro: pro,
 	}
 	// AI_PAUSED=1 stops only the Claude-calling routes with 503 ai_paused,
 	// before the rate limiter (#511). docs/infra/ai-pause.md
@@ -97,7 +102,7 @@ func main() {
 	handler := newAIHandler(ai.NewHandler(svc), logger,
 		newAppCheck(),
 		ai.Pause(paused, logger),
-		newRateLimit(verifier),
+		newRateLimit(verifier, fsClient, pro),
 	)
 	srv := &http.Server{
 		Addr:              ":" + port,
@@ -168,7 +173,7 @@ func newAppCheck() func(http.Handler) http.Handler {
 //	FIRESTORE_DATABASE  database ID (default "(default)"; internal/fsenv)
 //
 // Limits/weights: ratelimit.ConfigFromEnv.
-func newRateLimit(verifier auth.IdentityVerifier) func(http.Handler) http.Handler {
+func newRateLimit(verifier auth.IdentityVerifier, client *firestore.Client, pro ratelimit.ProChecker) func(http.Handler) http.Handler {
 	off := func(h http.Handler) http.Handler { return h }
 	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	mode := env("AUTH_MODE", auth.ModeFirebase)
@@ -186,33 +191,53 @@ func newRateLimit(verifier auth.IdentityVerifier) func(http.Handler) http.Handle
 	if err != nil {
 		log.Fatalf("ai: %v", err)
 	}
-	ctx := context.Background()
-
-	var client *firestore.Client
-	if project != "" {
-		c, err := fsenv.NewClient(ctx, fsenv.FromEnv(os.Getenv))
-		if err != nil {
-			log.Printf("ai: firestore init failed: %v (rate limit counts in memory, nobody is pro)", err)
-		} else {
-			client = c
-		}
-	}
 	var store ratelimit.Store = ratelimit.NewMemory()
 	storeName := "memory"
 	if client != nil && os.Getenv("RATE_LIMIT_STORE") != "memory" {
 		store = ratelimit.NewFirestore(client, os.Getenv("RATE_LIMIT_COLLECTION"))
 		storeName = "firestore"
 	}
-	// Pro tier (#449): users/{uid}/entitlements/pro written by appconfig after
-	// it verified the StoreKit transaction (#314). Without Firestore nobody is pro.
-	var pro ratelimit.ProChecker
-	if client != nil {
-		policy, err := entitlement.ConfigFromEnv(os.Getenv)
-		if err != nil {
-			log.Fatalf("ai: %v", err)
-		}
-		pro = entitlement.NewProChecker(entitlement.NewFirestore(client), policy.Environments)
-	}
 	log.Printf("ai: rate limit on (store=%s env=%q limits=%+v weights=%+v pro=%v)", storeName, cfg.Env, cfg.Limits, cfg.Weights, pro != nil)
 	return ratelimit.New(cfg, store, pro).Middleware(verifier)
 }
+
+// newFirestore connects to Firestore when GOOGLE_CLOUD_PROJECT is set (rate
+// limit counters, Pro entitlements). nil for a bare local run or on failure.
+func newFirestore() *firestore.Client {
+	if os.Getenv("GOOGLE_CLOUD_PROJECT") == "" {
+		return nil
+	}
+	c, err := fsenv.NewClient(context.Background(), fsenv.FromEnv(os.Getenv))
+	if err != nil {
+		log.Printf("ai: firestore init failed: %v (rate limit counts in memory, nobody is pro)", err)
+		return nil
+	}
+	return c
+}
+
+// newProChecker reads users/{uid}/entitlements/pro written by appconfig after
+// it verified the StoreKit transaction (#314): the Pro rate limits (#449) and
+// the paid features (#316). A bare local run (no GOOGLE_CLOUD_PROJECT) checks
+// nothing (nil); a deployed one whose Firestore failed treats nobody as Pro.
+func newProChecker(client *firestore.Client) proChecker {
+	if client == nil {
+		if os.Getenv("GOOGLE_CLOUD_PROJECT") == "" {
+			return nil
+		}
+		return nobodyPro{}
+	}
+	policy, err := entitlement.ConfigFromEnv(os.Getenv)
+	if err != nil {
+		log.Fatalf("ai: %v", err)
+	}
+	return entitlement.NewProChecker(entitlement.NewFirestore(client), policy.Environments)
+}
+
+// proChecker is both ratelimit.ProChecker and paid.ProChecker.
+type proChecker interface {
+	IsPro(ctx context.Context, uid string) bool
+}
+
+type nobodyPro struct{}
+
+func (nobodyPro) IsPro(context.Context, string) bool { return false }
