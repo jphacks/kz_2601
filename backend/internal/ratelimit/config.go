@@ -16,6 +16,7 @@ import (
 //	RATE_LIMIT_WEIGHT_EDIT     generate, edit                   (2)
 //	RATE_LIMIT_WEIGHT_CHAT     chat turn                        (1)
 //	RATE_LIMIT_WEIGHT_TEXT     aiButton generate (/v1/text)     (1)
+//	RATE_LIMIT_WEIGHT_TEXT_TASK aiButton summarize etc. (/v1/text) (2)
 func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	cfg := Config{Limits: DefaultLimits, Weights: DefaultWeights, Env: getenv("APP_ENV")}
 	fields := []struct {
@@ -31,6 +32,7 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 		{"RATE_LIMIT_WEIGHT_EDIT", &cfg.Weights.Edit},
 		{"RATE_LIMIT_WEIGHT_CHAT", &cfg.Weights.Chat},
 		{"RATE_LIMIT_WEIGHT_TEXT", &cfg.Weights.Text},
+		{"RATE_LIMIT_WEIGHT_TEXT_TASK", &cfg.Weights.TextTask},
 	}
 	for _, f := range fields {
 		raw := getenv(f.key)

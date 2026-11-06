@@ -44,6 +44,10 @@
 //	go run ./cmd/ai-eval -stream -repeat 2 -only kakeibo_a,walk_a   # SSE path, time to first event
 //	go run ./cmd/ai-eval -compare-before 'raw/*-before-*.json' -compare-after 'raw/*-after-*.json'  # no API calls
 //	go run ./cmd/ai-eval -chat          # clarify phase (chat.go, chat_cases.json)
+//	go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # pass rate of saved runs, no API calls
+//
+// Past JPHACKS works (coverage.go): jphacks_coverage_cases.json /
+// jphacks_coverage_pending_cases.json; `pendingExpect` holds keys an open PR adds.
 package main
 
 import (
@@ -74,6 +78,9 @@ type Case struct {
 	Note       string         `json:"note,omitempty"`
 	Expect     map[string]any `json:"expect,omitempty"`
 	Needs      []string       `json:"needs,omitempty"` // audit_cases: human checklist only, not checked
+	// PendingExpect: expect keys an open PR adds (jphacks_coverage_pending_cases.json).
+	// A key is checked once expectKeys knows it; until then it is skipped (coverage.go).
+	PendingExpect map[string]any `json:"pendingExpect,omitempty"`
 }
 
 type Metrics struct {
@@ -126,6 +133,7 @@ type Record struct {
 	Group         string              `json:"group"`
 	Transcript    string              `json:"transcript"`
 	Locale        string              `json:"locale,omitempty"`
+	Checked       bool                `json:"checked,omitempty"` // the case had an expect (-score counts only these)
 	Repeat        int                 `json:"repeat,omitempty"`
 	OK            bool                `json:"ok"`
 	Error         string              `json:"error,omitempty"`
@@ -204,12 +212,19 @@ func main() {
 	chatEffort := flag.String("chat-effort", "", "-chat: clarify effort (empty = ai.DefaultChatEffort)")
 	chatThinking := flag.String("chat-thinking", "", "-chat: thinking.type adaptive|disabled|between_tools (empty = ai.DefaultChatThinking)")
 	chatCaps := flag.String("capabilities", "", "-chat: comma-separated capabilities (answer,proposal) sent by cases without their own mode/capabilities (#185)")
+	score := flag.String("score", "", "glob of raw run files: prints the pass rate per group from the saved runs (the latest record of each id) and exits (no API calls)")
 	check := flag.Bool("check", false, "validate the cases file (ids, bases, expect keys and types) and exit (no API calls, #281)")
 	flag.Parse()
 	if *chat && *casesPath == "internal/ai/eval/cases.json" {
 		*casesPath = "internal/ai/eval/chat_cases.json"
 	}
 
+	if *score != "" {
+		if err := scoreRuns(*score); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	if *cmpBefore != "" || *cmpAfter != "" {
 		if err := compare(*cmpBefore, *cmpAfter); err != nil {
 			log.Fatal(err)
@@ -267,6 +282,11 @@ func main() {
 	var cases []Case
 	if err := json.Unmarshal(raw, &cases); err != nil {
 		log.Fatal(err)
+	}
+	for i := range cases {
+		if waiting := mergePendingExpect(&cases[i]); len(waiting) > 0 && (len(filter) == 0 || filter[cases[i].ID]) {
+			log.Printf("[%s] not checked until the PR is merged: %v", cases[i].ID, waiting)
+		}
 	}
 	run := Run{Date: time.Now().Format("2006-01-02"), Model: *model, Effort: *effort, Tag: *tag, Stream: *stream}
 	created := map[string]json.RawMessage{} // case id -> resulting DSL (create or edit)
@@ -343,7 +363,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		}
 	}
 	log.Printf("[%s] %s effort=%s locale=%s stream=%v %q", c.ID, c.Kind, effort, loc, stream, c.Transcript)
-	rec := Record{ID: c.ID, Kind: c.Kind, Group: c.Group, Transcript: c.Transcript, Locale: string(loc)}
+	rec := Record{ID: c.ID, Kind: c.Kind, Group: c.Group, Transcript: c.Transcript, Locale: string(loc), Checked: len(c.Expect) > 0}
 	started := time.Now()
 	req := ai.Request{AppID: appID, Transcript: c.Transcript, Mode: mode, Locale: loc}
 	var res *ai.Result

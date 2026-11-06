@@ -327,3 +327,28 @@ func TestMiddlewareText(t *testing.T) {
 		t.Fatalf("third: %d", w.Code)
 	}
 }
+
+// A transform task on /v1/text (summarize, rewrite...) weighs TextTask.
+func TestWeightTextTask(t *testing.T) {
+	w := Weights{Text: 1, TextTask: 2}
+	for body, want := range map[string]int{
+		`{"instruction":"x"}`:                   1,
+		`{"task":"generate","instruction":"x"}`: 1,
+		`{"task":"summarize","input":"x"}`:      2,
+		`not json`:                              1,
+	} {
+		r := httptest.NewRequest("POST", "/v1/text", nil)
+		if got := w.Weight(r, []byte(body)); got != want {
+			t.Errorf("%s: weight %d, want %d", body, got, want)
+		}
+	}
+	cfg, err := ConfigFromEnv(func(k string) string {
+		if k == "RATE_LIMIT_WEIGHT_TEXT_TASK" {
+			return "3"
+		}
+		return ""
+	})
+	if err != nil || cfg.Weights.TextTask != 3 || DefaultWeights.TextTask != 2 {
+		t.Fatalf("config: %+v %v", cfg.Weights, err)
+	}
+}

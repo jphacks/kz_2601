@@ -97,10 +97,11 @@ type AIUsage struct {
 
 // UsageWeights are the units one request costs (RATE_LIMIT_WEIGHT_*).
 type UsageWeights struct {
-	Create int `json:"create"`
-	Edit   int `json:"edit"`
-	Chat   int `json:"chat"`
-	Text   int `json:"text"`
+	Create   int `json:"create"`
+	Edit     int `json:"edit"`
+	Chat     int `json:"chat"`
+	Text     int `json:"text"`
+	TextTask int `json:"textTask"`
 }
 
 // MyUsage is GET /v1/me/usage.

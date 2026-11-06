@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"slices"
 	"strconv"
 	"time"
 
@@ -170,11 +171,21 @@ func (r *Runner) appState(ctx context.Context, h *scope.Handle, ev store.OutboxE
 		return nil, "", ReasonAppDeleted, nil
 	}
 	// sharing withdrawn (the entity left the published DSL or is no longer
-	// shared): queued shared triggers are dropped, whatever the version (#337)
-	if ent := current.EntityByID(ev.Entity); h.Shared() && (ent == nil || !ent.IsShared()) {
+	// shared; for a time trigger, which has no entity, no entity is shared
+	// any more): queued shared triggers are dropped, whatever the version (#337)
+	if h.Shared() && !stillShared(current, ev) {
 		return nil, "", ReasonRuleRemoved, nil
 	}
 	return current, creator, "", nil
+}
+
+// stillShared reports whether the published DSL still shares the data of ev.
+func stillShared(current *dsl.App, ev store.OutboxEvent) bool {
+	if ev.Kind == store.OutboxSchedule {
+		return slices.ContainsFunc(current.Entities, func(e dsl.Entity) bool { return e.IsShared() })
+	}
+	ent := current.EntityByID(ev.Entity)
+	return ent != nil && ent.IsShared()
 }
 
 // decodeDSL decodes without validating (an older stored DSL that today's
@@ -287,12 +298,25 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		}
 		return finish(dec.Outcome), quota.Charge{}, nil
 	}
-	plan, err := engine.PlanRule(ctx, app, rule, trig, h)
+	reader := &ruleReader{h: h, q: r.cfg.Quota, dec: dec, maxReads: r.cfg.Quota.RunReadCap(dec.Plan), charged: charged, usage: &usage}
+	rows, err := planRows(ctx, app, rule, trig, reader)
+	if errors.Is(err, engine.ErrReadLimit) {
+		// stopped, never computed on part of the records (#338: stop, do not delay)
+		var rle *engine.ReadLimitError
+		if errors.As(err, &rle) {
+			usage.Limit = rle.Scope
+		}
+		return finish(quota.OutcomeSkippedQuota), quota.Charge{}, nil
+	}
 	if err != nil {
 		return fail(err)
 	}
 
-	grant, err := r.cfg.Quota.Writes(ctx, dec, len(plan.Writes))
+	nWrites := 0
+	for _, row := range rows {
+		nWrites += len(row.Plan.Writes)
+	}
+	grant, err := r.cfg.Quota.Writes(ctx, dec, nWrites)
 	if err != nil {
 		return fail(err)
 	}
@@ -301,18 +325,22 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		usage.Limit = grant.Block.Scope
 	}
 	usage.WritesDropped = grant.Dropped
-	for i, w := range plan.Writes {
-		if i >= grant.Allowed {
-			break
-		}
-		wrote, err := r.write(ctx, h, ev, rule, w)
-		if err != nil {
-			return fail(err)
-		}
-		if wrote {
-			usage.Writes++
-		} else {
-			rl.writesSkipped++
+	written := 0
+	for _, row := range rows {
+		for _, w := range row.Plan.Writes {
+			if written >= grant.Allowed {
+				break
+			}
+			written++
+			wrote, err := r.write(ctx, h, ev, rule, row.key, w)
+			if err != nil {
+				return fail(err)
+			}
+			if wrote {
+				usage.Writes++
+			} else {
+				rl.writesSkipped++
+			}
 		}
 	}
 
@@ -330,63 +358,153 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		tokens = r.cfg.Tokens
 	}
 	disp := notify.Dispatcher{Tokens: tokens, Sender: r.cfg.Sender}
-	for _, n := range plan.Notifies {
-		key := markKey(ev, rule, n.Action)
-		done, err := h.Marked(ctx, key)
-		if err != nil {
-			return fail(err)
-		}
-		if done {
-			continue
-		}
-		if notifyPaused != "" {
+	for _, row := range rows {
+		for _, n := range row.Plan.Notifies {
+			key := markKey(ev, rule, row.key, n.Action)
+			done, err := h.Marked(ctx, key)
+			if err != nil {
+				return fail(err)
+			}
+			if done {
+				continue
+			}
+			if notifyPaused != "" {
+				if err := h.Mark(ctx, key); err != nil {
+					return fail(err)
+				}
+				rl.notifyPaused, rl.notifiesSkipped = notifyPaused, rl.notifiesSkipped+1
+				continue
+			}
+			res, err := resolver.Resolve(ctx, row.trig, n)
+			if err != nil {
+				return fail(err)
+			}
+			contentKey := ev.EventID + "/" + rule.ID
+			if row.key != "" {
+				contentKey += "/" + row.key
+			}
+			out, err := disp.Dispatch(ctx, res, notify.Content{Key: contentKey, AppID: ev.AppID, AppName: app.App.Name, Title: n.Title, Body: n.Body})
+			if err != nil {
+				return fail(err)
+			}
+			r.dropUnregistered(ctx, h, out.Unregistered)
+			if out.Retryable {
+				return fail(errSendRetry)
+			}
 			if err := h.Mark(ctx, key); err != nil {
 				return fail(err)
 			}
-			rl.notifyPaused, rl.notifiesSkipped = notifyPaused, rl.notifiesSkipped+1
-			continue
-		}
-		res, err := resolver.Resolve(ctx, trig, n)
-		if err != nil {
-			return fail(err)
-		}
-		out, err := disp.Dispatch(ctx, res, notify.Content{Key: ev.EventID + "/" + rule.ID, AppID: ev.AppID, AppName: app.App.Name, Title: n.Title, Body: n.Body})
-		if err != nil {
-			return fail(err)
-		}
-		r.dropUnregistered(ctx, h, out.Unregistered)
-		if out.Retryable {
-			return fail(errSendRetry)
-		}
-		if err := h.Mark(ctx, key); err != nil {
-			return fail(err)
-		}
-		usage.NotifyRecipients += len(out.Sent)
-		for _, s := range out.Skipped {
-			if s.Reason == notify.ReasonRecipientLimit {
-				usage.RecipientsDropped++
+			usage.NotifyRecipients += len(out.Sent)
+			for _, s := range out.Skipped {
+				if s.Reason == notify.ReasonRecipientLimit {
+					usage.RecipientsDropped++
+				}
 			}
+			rl.notifies = append(rl.notifies, out.Summary())
 		}
-		rl.notifies = append(rl.notifies, out.Summary())
 	}
 	return finish(quota.OutcomeOK), quota.Charge{}, nil
 }
 
-// markKey names the done mark of one action of one rule run.
-func markKey(ev store.OutboxEvent, rule *dsl.ServerRule, action int) string {
-	return ev.EventID + "_" + rule.ID + "_" + strconv.Itoa(action)
+// planRow is the plan for one row: the trigger record, or one record of
+// on.each (key = its id, so marks and created ids differ per record).
+type planRow struct {
+	key  string
+	trig engine.Trigger
+	Plan engine.Plan
+}
+
+// planRows plans the rule: one row, or one per record for on.each.
+func planRows(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, trig engine.Trigger, reader *ruleReader) ([]planRow, error) {
+	if rule.On.Each == "" {
+		p, err := engine.PlanRule(ctx, app, rule, trig, reader)
+		if err != nil {
+			return nil, err
+		}
+		return []planRow{{trig: trig, Plan: p}}, nil
+	}
+	rps, err := engine.PlanEach(ctx, app, rule, trig, reader)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]planRow, len(rps))
+	for i, rp := range rps {
+		out[i] = planRow{key: rp.Trigger.Record.ID, trig: rp.Trigger, Plan: rp.Plan}
+	}
+	return out, nil
+}
+
+// ruleReader is the run's engine.RefReader + engine.Lister: reads go
+// through the appId-bound handle; lists are capped per run (maxReads records in
+// all) and counted against the app's daily reads, all or nothing.
+type ruleReader struct {
+	h        *scope.Handle
+	q        *quota.Quota
+	dec      quota.Decision
+	maxReads int // records one run may list; 0 = no cap
+	read     int // records listed so far
+	charged  *quota.Charge
+	usage    *quota.Usage
+}
+
+// Record implements engine.RefReader.
+func (rr *ruleReader) Record(ctx context.Context, entity, id string) (expreval.Record, bool, error) {
+	return rr.h.Record(ctx, entity, id)
+}
+
+// List implements engine.Lister.
+func (rr *ruleReader) List(ctx context.Context, entity string) ([]expreval.Record, error) {
+	limit := 0
+	if rr.maxReads > 0 {
+		if limit = rr.maxReads - rr.read; limit <= 0 {
+			return nil, &engine.ReadLimitError{Scope: quota.ScopeRunReads, Limit: rr.maxReads, Used: rr.read + 1}
+		}
+	}
+	recs, err := rr.h.List(ctx, entity, limit)
+	if errors.Is(err, scope.ErrTooMany) {
+		rr.usage.Reads += limit + 1 // what the query read
+		return nil, &engine.ReadLimitError{Scope: quota.ScopeRunReads, Limit: rr.maxReads, Used: rr.read + limit + 1}
+	}
+	if err != nil {
+		return nil, err
+	}
+	rr.read += len(recs)
+	rr.usage.Reads += len(recs)
+	ch, blk, err := rr.q.Reads(ctx, rr.dec, len(recs))
+	if err != nil {
+		return nil, err
+	}
+	rr.charged.Parts = append(rr.charged.Parts, ch.Parts...)
+	if blk != nil {
+		return nil, &engine.ReadLimitError{Scope: blk.Scope, Limit: blk.Limit, Used: blk.Used}
+	}
+	return recs, nil
+}
+
+// markKey names the done mark of one action of one rule run (row: the
+// on.each record id, "" otherwise).
+func markKey(ev store.OutboxEvent, rule *dsl.ServerRule, row string, action int) string {
+	k := ev.EventID + "_" + rule.ID + "_" + strconv.Itoa(action)
+	if row != "" {
+		k += "_" + row
+	}
+	return k
 }
 
 // write carries out one planned write once. wrote=false: already done by
 // an earlier attempt, or the target record is gone.
-func (r *Runner) write(ctx context.Context, h *scope.Handle, ev store.OutboxEvent, rule *dsl.ServerRule, w engine.PlannedWrite) (bool, error) {
+func (r *Runner) write(ctx context.Context, h *scope.Handle, ev store.OutboxEvent, rule *dsl.ServerRule, row string, w engine.PlannedWrite) (bool, error) {
 	switch w.Kind {
 	case engine.WriteCreate:
-		id := store.IDFromClientID(ev.EventID + "/" + rule.ID + "/" + strconv.Itoa(w.Action))
+		client := ev.EventID + "/" + rule.ID + "/" + strconv.Itoa(w.Action)
+		if row != "" {
+			client += "/" + row
+		}
+		id := store.IDFromClientID(client)
 		origin := store.RecordOrigin{RuleID: rule.ID, Version: ev.Version, EventID: ev.EventID, ActorUID: ev.ActorUID}
 		return h.CreateRecord(ctx, w.Entity, id, w.Values, origin)
 	case engine.WriteUpdate, engine.WriteIncrement:
-		applied, err := h.ApplyOnce(ctx, w.Entity, w.RecordID, markKey(ev, rule, w.Action), func(d map[string]any) map[string]any {
+		applied, err := h.ApplyOnce(ctx, w.Entity, w.RecordID, markKey(ev, rule, row, w.Action), func(d map[string]any) map[string]any {
 			if d == nil {
 				d = map[string]any{}
 			}

@@ -384,6 +384,10 @@ type exprChecker struct {
 	// be read; nil = not allowed.
 	server bool
 	prev   *Entity
+	// serverScope / serverReads (#340 reads): the side a server rule works
+	// on (agg may read only that side) and the entities its aggs list.
+	serverScope EntityScope
+	serverReads map[string]bool
 }
 
 func (c *exprChecker) dep(e *Entity, fid string) {
@@ -449,8 +453,7 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 		return fieldExprType(f.Type)
 	case ExprAgg:
 		if c.server {
-			c.add("%s: agg is not available in server rules yet (read only the trigger record's fields)", where)
-			return tAny
+			c.checkServerAgg(where, e.Agg)
 		}
 		return c.checkAgg(where, e.Agg, row, depth)
 	case ExprSetting:

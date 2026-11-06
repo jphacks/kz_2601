@@ -952,7 +952,7 @@ paths:
       summary: 自分の今日の使用量と上限(#317・#630)
       description: |
         「今日の残り N」「上限に近い」を、依頼が断られる前に出すための読み取り。本人の分だけ(パスに uid は無い)。
-        - `ai`: 生成・チャット・text の合計(1 つの枠・単位は重み。新規 3・修正 2・チャット 1・text 1 は `weights`)。ai が数える `rateLimits/{env}_{日付}_uid_{uid}` をそのまま読む(1 回の読み取り・キャッシュしない)。`limit` / `remaining` は ai の `X-RateLimit-Limit` / `-Remaining` と同じ(匿名 30・サインイン 60・Pro 300)。返した分(#548)はすぐ入る(ヘッダーは次の依頼から)
+        - `ai`: 生成・チャット・text の合計(1 つの枠・単位は重み。新規 3・修正 2・チャット 1・text 1・text の要約など 2 は `weights`)。ai が数える `rateLimits/{env}_{日付}_uid_{uid}` をそのまま読む(1 回の読み取り・キャッシュしない)。`limit` / `remaining` は ai の `X-RateLimit-Limit` / `-Remaining` と同じ(匿名 30・サインイン 60・Pro 300)。返した分(#548)はすぐ入る(ヘッダーは次の依頼から)
         - `ai` が null: この appconfig が数えている所を読めない(`RATE_LIMIT_STORE=memory`・読み取りの失敗)。iOS は今までどおりヘッダーの値を使う
         - `apps`: 自分のアプリの数と上限(共有のアプリを入れたのは数えない)。最大 30 秒遅れる(インスタンスごとのキャッシュ)
         - `perApp`: 自分のプランの、アプリごとの上限(記録・写真)。実際の数は `GET /apps/{appId}/usage`
@@ -963,7 +963,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MyUsage' }
-              example: { plan: free, tier: signed_in, resetAt: '2026-11-07T15:00:00Z', ai: { used: 12, limit: 60, remaining: 48, weights: { create: 3, edit: 2, chat: 1, text: 1 } }, apps: { used: 3, limit: 100, remaining: 97 }, perApp: { recordsPerApp: 5000, photosPerApp: 500 } }
+              example: { plan: free, tier: signed_in, resetAt: '2026-11-07T15:00:00Z', ai: { used: 12, limit: 60, remaining: 48, weights: { create: 3, edit: 2, chat: 1, text: 1, textTask: 2 } }, apps: { used: 3, limit: 100, remaining: 97 }, perApp: { recordsPerApp: 5000, photosPerApp: 500 } }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
@@ -1831,12 +1831,13 @@ components:
                   properties:
                     weights:
                       type: object
-                      required: [chat, create, edit, text]
+                      required: [chat, create, edit, text, textTask]
                       properties:
                         chat: { type: integer }
                         create: { type: integer }
                         edit: { type: integer }
                         text: { type: integer }
+                        textTask: { type: integer }
         apps: { oneOf: [{ $ref: '#/components/schemas/UsageMeter' }, { type: 'null' }], description: 数えられなかった時は null }
         perApp:
           type: object

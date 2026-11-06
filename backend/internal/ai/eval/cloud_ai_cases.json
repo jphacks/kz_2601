@@ -1,0 +1,7 @@
+[
+  {"id": "ca_diary_summary", "kind": "create", "group": "cloudai", "transcript": "日記を書いたら AI に要約してもらえるアプリ", "note": "aiButton summarize(input 本文 → output 要約)。固定の文や手入力だけにしない", "expect": {"aiTask": "summarize"}},
+  {"id": "ca_essay_rewrite", "kind": "create", "group": "cloudai", "transcript": "英作文を書いて AI に添削してもらう練習帳", "note": "aiButton rewrite", "expect": {"aiTask": "rewrite"}},
+  {"id": "ca_news_classify", "kind": "create", "group": "cloudai", "transcript": "メモを貼ったら事実か意見か AI が分類してくれる", "note": "aiButton classify + enum", "expect": {"aiTask": "classify"}},
+  {"id": "ca_plan_advice", "kind": "create", "group": "cloudai", "transcript": "予定を入れるとおばあちゃん口調で危ない点を助言してくれるアプリ", "note": "aiButton suggest(prompt で口調)", "expect": {"aiTask": "suggest"}},
+  {"id": "ca_consult", "kind": "create", "group": "cloudai", "transcript": "AI に何でも相談できて、過去の相談も見返せるアプリ", "note": "相談の記録 + aiButton generate(entity = 相談・{{question}}・output 答え)", "expect": {"aiGenerate": "line", "aiGenerateEntity": true}}
+]
