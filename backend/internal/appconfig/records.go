@@ -298,10 +298,10 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		rec.ID = store.IDFromClientID(clientKey)
 	}
 	if ent.Single {
-		h.upsertSingle(w, r, recordSet(r, cur, ent, eid), rec)
+		h.upsertSingle(w, r, cur, ent, recordSet(r, cur, ent, eid), rec)
 		return
 	}
-	out, _, err := h.store.CreateRecord(r.Context(), recordSet(r, cur, ent, eid), rec)
+	out, _, err := h.createRecordOutbox(r, cur, ent, recordSet(r, cur, ent, eid), rec)
 	if err != nil {
 		fail(w, mapStoreErr(err, "entity"))
 		return
@@ -312,11 +312,11 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 // upsertSingle (#267): a single entity keeps one record per user under a fixed
 // id, whatever clientId the client sent. Creating it again (another device, a
 // build that does not know single and adds) overwrites its data: 200, not 201.
-func (h *Handler) upsertSingle(w http.ResponseWriter, r *http.Request, rs store.RecordSet, rec store.Record) {
+func (h *Handler) upsertSingle(w http.ResponseWriter, r *http.Request, cur *store.App, ent *dsl.Entity, rs store.RecordSet, rec store.Record) {
 	rec.ID = store.IDFromClientID(dsl.SingleRecordKey)
-	out, created, err := h.store.CreateRecord(r.Context(), rs, rec)
+	out, created, err := h.createRecordOutbox(r, cur, ent, rs, rec)
 	if err == nil && !created {
-		out, err = h.store.UpdateRecord(r.Context(), rs, rec.ID, rec.Data)
+		out, err = h.updateRecordOutbox(r, cur, ent, rs, rec.ID, rec.Data)
 	}
 	if err != nil {
 		fail(w, mapStoreErr(err, "entity"))
@@ -413,7 +413,7 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	rec, err := h.store.UpdateRecord(r.Context(), rs, rid, merged)
+	rec, err := h.updateRecordOutbox(r, cur, ent, rs, rid, merged)
 	if err != nil {
 		fail(w, mapStoreErr(err, "record"))
 		return

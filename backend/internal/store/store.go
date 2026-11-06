@@ -166,6 +166,7 @@ type Store interface {
 	Feedbacks       // in-app feedback (feedback.go)
 	Moderation      // reports, blocks, operator unpublish (moderation.go, #321)
 	Matching        // interests and matches of matching apps (matching.go, #507)
+	Outbox          // record writes that queue runner triggers (outbox.go, #341)
 }
 
 // MaxRecordsPerEntity bounds in-memory sort (architecture.md §3).
