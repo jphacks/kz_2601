@@ -244,7 +244,7 @@
             "ref",
             "refs"
           ],
-          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). audio = voice recording kept on the recording device: \"audio:<id>|<seconds>\" (AAC m4a written by audioRecorder; other devices show only the length). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField. refs = array of record ids of `refEntity` (multi-select, e.g. expense.split_with -> members: who shares this expense); [] or missing = everyone; filter it with op contains, count it with op len."
+          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL; a drawingField saves its drawing here as the same kind of picture. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). audio = voice recording kept on the recording device: \"audio:<id>|<seconds>\" (AAC m4a written by audioRecorder; other devices show only the length). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField. refs = array of record ids of `refEntity` (multi-select, e.g. expense.split_with -> members: who shares this expense); [] or missing = everyone; filter it with op contains, count it with op len."
         },
         "required": {
           "type": "boolean"
@@ -654,6 +654,9 @@
         },
         {
           "$ref": "#/$defs/Divider"
+        },
+        {
+          "$ref": "#/$defs/DrawingField"
         },
         {
           "$ref": "#/$defs/Slider"
@@ -1431,6 +1434,34 @@
         },
         "area": {
           "$ref": "#/$defs/Area"
+        }
+      }
+    },
+    "DrawingField": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "指・Apple Pencil で手書き・お絵かきして photo field に保存する入力(PencilKit)。ペン・消しゴム・元に戻す・やり直し・全部消すができる。描いた絵は写真と同じ画像(白地の JPEG・800px 以下)としてレコードに入り、一覧・image・詳細では写真と同じに見える。保存済みの絵を開くと、その上に描き足せる。",
+      "x-usage": "「手書きで書く・お絵かき・サイン(署名)・スケッチ・図を描く・手書きのメモ・ぬり絵・間違い探しの印」に。フォーム画面(screen.entity)に置き、field は type photo(写真用と同じ型。新しい型は無い)。全幅 4〜6 行(例 A2:F6)。一覧で見せるなら list.item.image にその photo field、詳細で大きく見せるなら image。写真も撮るなら photoField と別の photo field にする。文字の認識(手書きを文字にする)はしない。",
+      "required": [
+        "type",
+        "field"
+      ],
+      "properties": {
+        "type": {
+          "const": "drawingField"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "field": {
+          "type": "string",
+          "description": "Must be a photo field of the screen entity (the drawing is saved as a picture)."
+        },
+        "label": {
+          "type": "string"
         }
       }
     },

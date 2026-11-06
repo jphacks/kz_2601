@@ -337,7 +337,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 | 代わりの表示 | `flashcards` | 「アプリで見られます」の枠に「カード(表: 項目名 / 裏: 項目名)」を添える(カードの中身は出さない・#264) |
 | 描く(見本) | `chart` | 固定の見本の棒 / 円(SVG・データではない)+「グラフはアプリで見られます」 |
 | 描く(押せない) | `textField` `numberField` `datePicker` `timePicker` `picker` `toggle` `slider` `stepper` `textEditor` `secureField` `colorPicker` `rating` `searchBar` | `disabled` の入力欄(picker は enum の選択肢、ラベルは無ければ項目名) |
-| 描く(押せない) | `button` `shareButton` `openUrlButton` `photoField` `videoField` | `disabled` のボタン。URL は出さない |
+| 描く(押せない) | `button` `shareButton` `openUrlButton` `photoField` `videoField` `drawingField` | `disabled` のボタン。URL は出さない |
 | 描く(リンク) | `link` | `https://` の時だけリンク(`rel="nofollow noopener noreferrer ugc"`)、それ以外は文字だけ |
 | 代わりの表示 | `image` `avatar` `videoPlayer` | 「写真」の枠 |
 | 代わりの表示 | 上以外すべて(`voiceInput` `calendar` `gridTable` `mapView` `qrScanner` `qrCode` `timerDisplay` `webView` `settlement` `randomPicker` `aiButton` `chatThread` `dashcam` `sensorValue` `musicPlayer` など)と未知の type | 「アプリで見られます」の枠(`title` があれば添える) |

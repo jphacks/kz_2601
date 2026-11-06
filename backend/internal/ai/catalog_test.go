@@ -68,6 +68,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompSettlement,
 		// random pick (#263)
 		dsl.CompRandomPicker,
+		// handwriting / drawing (PencilKit -> photo field)
+		dsl.CompDrawingField,
 		// flashcards (#264)
 		dsl.CompFlashcards,
 		// on-device AI
