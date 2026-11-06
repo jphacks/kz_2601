@@ -443,6 +443,10 @@ DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例
 | **長押し**(0.45s・`Theme.Layout.fabLongPressSeconds`) | メタ操作 = **変身一覧シート** | `.simultaneousGesture(LongPressGesture)` → `AppRuntime.openSwitcher()`。触覚 `.sensoryFeedback(.impact)`。VoiceOver は accessibilityAction「変身一覧」 |
 | 音声「○○に切り替えて / ○○を開いて / ○○に変身して」 | 名前で切替 | `VoiceIntent.switchApp(name)` → `switchApp(named:)`: `GET /apps` の name と照合(完全一致→前方一致→部分一致・`AppNameMatch`)。1 件なら切替、曖昧/無ければ toast + 一覧を開く |
 | 音声「アプリ一覧 / 変身一覧 / 別のアプリに切り替えて(名前なし)」 | 一覧を開く | `VoiceIntent.listApps` → `openSwitcher()` |
+| 音声シート・初期画面の上部の一覧ボタン(H10) | 一覧を開く | `voice.appList` → `openSwitcher()`。まだ何も作っていない初回の初期画面には出さない(`VoiceTopBar.showsAppList`) |
+| 変身一覧の上部の歯車(H10) | 設定を開く | `switcher.settings` → `SettingsSheet`(音声シートの歯車と同じ) |
+
+常設の UI はマイクだけのまま。一覧・設定の入口は、マイクから開くシート(音声シート・変身一覧)の上部に置く(UX 点検 H10・2026-11-06 オーナーの決定 U1)。
 
 ```
 変身一覧シート(Features/Switcher/AppSwitcherSheet.swift)
@@ -1050,14 +1054,14 @@ iPhone は縦と横(左右)を使える(上下逆さま・iPad は対象外。`I
 5. 有料機能の確認カード(22.7)は同じ「Tailor It Pro」の権利を見るだけなので、RevenueCat に移しても変更不要。
 
 ### 22.7 有料機能の確認カード(チャットの「これでいく」・Issue #77 の残り)
-有料のクラウド機能を使うアプリを作る時、生成の**前**に「〇〇には Tailor It Pro(¥500 / 月)が必要です」→「購入して作る」/「この機能なしで作る」を選んでもらう。
+有料のクラウド機能を使うアプリを作る時、生成の**前**に「〇〇には Tailor It Pro(¥500 / 月)が必要です」→「Pro にする」/「この機能なしで作る」を選んでもらう。課金画面は自動では開かず、「Pro にする」を押した時に開く(UX 点検 H4・2026-11-06 オーナーの決定)。
 
 | 項目 | 決定 |
 |---|---|
 | 何が有料か | backend の `internal/paid/paid_features.json`(1 か所・[docs/backend/features/pro.md](../backend/features/pro.md))。初期は「みんなで共有するデータ」(共有データ型アプリ)だけ。iOS は判定を持たず、`POST /v1/chat` の ready の `requiresPro` / `paidFeatures` / `freeTranscript`、案の `options[].requiresPro` / `freeInstruction` を見るだけ |
 | 出す時 | ready の「これでいく」(`buildFromChat`・声の自動生成も含む)と案の「これでいく」(`choose`)。判定は `MetamonServices/Purchase/PaidFeatureCheck.swift`(純粋関数) |
 | 出さない時 | **Pro 会員** / **回数制限が無効の時(DEBUG ビルドの既定 = デモ端末)**。`METAMON_IAP_ENFORCE=1` で DEBUG でも出る(`ProGate.isEnforced` と同じ扱い・22.4)/ 旧 backend(`requiresPro` 無し)/ ready の transcript 以外の予備文で作る時 |
-| カード | `ClarifyChatView` の「これでいく」の位置(`PaidFeatureCard`・create は初期画面、edit は音声シートの中)。購入して作る = `ProEntitlementStore.purchase` → 成功したら有料機能込みの文で生成(キャンセル・承認待ちはカードに残る)/ この機能なしで作る = `freeTranscript`(`freeInstruction`)で生成 / × = チャットに戻る。話し直すとカードは閉じて次の応答で判定し直す |
+| カード | `ClarifyChatView` の「これでいく」の位置(`PaidFeatureCard`・create は初期画面、edit は音声シートの中)。Pro にする = 課金画面(`ProGate.requestPro`)→ 買ったら有料機能込みの文で生成(閉じた・キャンセル・承認待ちはカードに残る)/ この機能なしで作る = `freeTranscript`(`freeInstruction`)で生成 / × = チャットに戻る。話し直すとカードは閉じて次の応答で判定し直す |
 | 実装 | `Features/Purchase/AppRuntime+PaidFeature.swift`(`holdForPaidConfirm` / `purchaseAndBuild` / `buildWithoutPaidFeatures` / `dismissPaidConfirm`)。モック ai は「みんなで / 共有 / 掲示板 / 投稿」を含む ready に `requiresPro` を付ける |
 | テスト | `MetamonServicesTests/PaidFeatureCheckTests.swift`(出し分け・JSON の新旧)・`MetamonTests/PaidFeatureConfirmTests.swift`(カード → なしで作る・無効化中は出ない・やめる / 話し直し・案)・UI `testPaidFeatureCardBuildWithoutFeature` |
 | 限界(後続) | チャットを通らない経路は 22.8 の「生成の後の判定」で課金画面を通す。サーバーの強制(402)は 22.9 |
@@ -1067,12 +1071,12 @@ iPhone は縦と横(左右)を使える(上下逆さま・iPad は対象外。`I
 
 | 経路 | いつ判定 | 閉じた(買わなかった)時 |
 |---|---|---|
-| チャットの「これでいく」(ready / 案 / 複数選択・声の自動生成) | 生成の前(backend の `requiresPro`) | 確認カード(22.7)に戻る。何も作らない。「この機能なしで作る」/「やめる」/ もう一度「購入して作る」 |
+| チャットの「これでいく」(ready / 案 / 複数選択・声の自動生成) | 生成の前(backend の `requiresPro`)。確認カード(22.7)を出し、課金画面はカードの「Pro にする」で開く(自動では開かない・H4) | 確認カードに戻る。何も作らない。「この機能なしで作る」/「やめる」/ もう一度「Pro にする」 |
 | チャットを通らない生成(チャット OFF・「別のアプリ」・予備文の「このまま作る / このまま反映」・圏外の保留・状態カードの再送・#253 の修正) | 生成の後(できた DSL に shared / public の entity が**新しく**入ったか。もとから共有のアプリの修正は聞き直さない) | 共有を外す修正(`PaidGate.dropSharedDataInstruction`)を送る。外せなければ前の版へ(新規作成なら初期画面) |
 | 元に戻す / やり直す で共有の版に戻った | 戻した後 | 戻す前の版へ |
-| シェアリンクを開く(記録を共有するアプリ・自分のでない) | 参加の確認(#254)の前(`ShareLinkPreview.sharedData`) | 参加しない |
-| プレビューの無い import・「探す」の公開アプリのインストール | import / install の後(`InstalledApp.joined / member`) | そのアプリに切り替えない(一覧には残る) |
 | 新規作成の無料枠 | 生成の前(`admitNewApp`) | 送らない。圏外の保留の自動送信・状態カードの再送も枠を通す(`sendMetered`) |
+
+共有アプリに**参加する人**(シェアリンク・「探す」のインストール)には課金画面を出さない(正典「課金・Pro」2026-11-06: 参加者は無料・作成者の Pro で持つ・UX 点検 H5)。作成者が Pro でない時の書き込みは、サーバーの 402 `creator_needs_pro` を受けて案内(22.9)だけを出す。
 
 ### 22.9 サーバーの 402 `pro_required`(Issue #316)
 サーバーも有料の機能を止める(backend の [pro.md](../backend/features/pro.md) の「サーバーでの強制」)。端末の課金の制限が無効(DEBUG の既定・22.4)でも、サーバーは Pro でない uid の有料の機能を止めるので、**デモ端末でも共有・自動の動きを作るには Pro(Sandbox の購入)が要る**。判定は `MetamonServices/Protocols/ProRequired.swift`(`details.features` / `details.reason`)。
@@ -1090,7 +1094,7 @@ iPhone は縦と横(左右)を使える(上下逆さま・iPad は対象外。`I
 - オンデバイスの `aiButton`(§18)はサーバーを使わないので無料。
 - 課金の制限の無効化(DEBUG の既定・22.4)中は、回数も有料機能も課金画面を出さない。設定のトグル名は「課金の制限を無効にする(デモ用・回数と有料機能)」。
 - モックのストア: DEBUG で `METAMON_MOCK_STORE=1` なら App Store に触れず購入が即成功(¥500)。DEBUG のシミュレータは StoreKit の商品が取れなければ自動でモック(`simctl launch` で起動した時)。`0` で常に StoreKit。Release は常に StoreKit。
-- テスト: `MetamonServicesTests/PaidGateTests.swift`(判定・モックのストア)・`MetamonTests/PaidGateFlowTests.swift`(チャット / 即生成 / 修正 / 元に戻す / 無効化中)・UI `testPaidFeaturePaywallPurchaseThenBuildsSharedApp`(未購入 → 課金画面 → モック購入 → 共有の掲示板ができる)・`testPaidFeatureCardBuildWithoutFeature`・`testDirectGenerationWithSharedDataGoesThroughPaywall`。モック ai の「掲示板」は public のひとこと投稿を返す(無料版・「自分だけ」の指示なら家計簿)。
+- テスト: `MetamonServicesTests/PaidGateTests.swift`(判定・モックのストア)・`MetamonTests/PaidGateFlowTests.swift`(チャット / 即生成 / 修正 / 元に戻す / 無効化中)・UI `testPaidFeaturePaywallPurchaseThenBuildsSharedApp`(未購入 → 確認カード →「Pro にする」→ 課金画面 → モック購入 → 共有の掲示板ができる)・`testPaidFeatureCardBuildWithoutFeature`・`testDirectGenerationWithSharedDataGoesThroughPaywall`。モック ai の「掲示板」は public のひとこと投稿を返す(無料版・「自分だけ」の指示なら家計簿)。
 - 限界(後続): サーバー側で止める(#316)。Pro が切れた後に、自分で作った共有アプリを開く経路は止めていない(自分のデータが見られなくなるため・要判断)。
 
 ## 23. UI テスト(XCUITest・Issue #165)

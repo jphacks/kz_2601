@@ -60,6 +60,7 @@ extension AppRuntime {
     func submitUtterance(_ text: String, source: ClarifyFlow.InputSource = .text, timing: ChatTiming = ChatTiming()) async {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, morphJob == nil, !chatPending else { return }
+        if !hasAIConsent { utteranceAwaitingConsent = (text, source) } // M2: 同意したら捨てずに続けて送る
         if routesToChat(text) {
             chatTiming = timing
             await say(text, source: source)
