@@ -1,6 +1,6 @@
 # Cloud Run の環境変数(デプロイが決める値・運用で変える値)(#509)
 
-`appconfig-<env>` / `ai-<env>`(`<env>` = `stg` / `prod`)の環境変数を、**デプロイ(`.github/workflows/deploy-cloudrun.yml`)が毎回決める値**と、**運用中に人が gcloud で変える値**に分けて書きます。
+`appconfig-<env>` / `ai-<env>`(`<env>` = `stg` / `prod`)と `runner-prod`(#288 の分離まで prod だけ・[runner.md](runner.md))の環境変数を、**デプロイ(`.github/workflows/deploy-cloudrun.yml`)が毎回決める値**と、**運用中に人が gcloud で変える値**に分けて書きます。
 
 デプロイは `--update-env-vars` で前者だけを上書きします。後者は次のデプロイの後も残ります。
 
@@ -33,15 +33,17 @@
 
 | 変数 | サービス | 値 |
 |---|---|---|
-| `GOOGLE_CLOUD_PROJECT` | 両方 | repo Variable `GCP_PROJECT_ID` |
-| `FIRESTORE_DATABASE` | 両方 | Environment 変数 `FIRESTORE_DATABASE`。未設定なら `(default)`。[下を参照](#firestore_database復元時) |
-| `APP_ENV` | 両方 | `stg` / `prod` |
-| `ALLOW_SHARED_PROD_DB` | 両方 | stg は `1`、prod は `0`(#290) |
-| `APP_CHECK_MODE` | 両方 | Environment 変数 `APP_CHECK_MODE`。未設定なら `off`([app-check.md](app-check.md#モードの切り替え)) |
-| `GIT_SHA` | 両方 | デプロイしたコミット |
+| `GOOGLE_CLOUD_PROJECT` | 3 つ(appconfig・ai・runner) | repo Variable `GCP_PROJECT_ID` |
+| `FIRESTORE_DATABASE` | 3 つ | Environment 変数 `FIRESTORE_DATABASE`。未設定なら `(default)`。[下を参照](#firestore_database復元時) |
+| `APP_ENV` | 3 つ | `stg` / `prod` |
+| `ALLOW_SHARED_PROD_DB` | 3 つ | stg は `1`、prod は `0`(#290) |
+| `APP_CHECK_MODE` | appconfig・ai | Environment 変数 `APP_CHECK_MODE`。未設定なら `off`([app-check.md](app-check.md#モードの切り替え)) |
+| `GIT_SHA` | 3 つ | デプロイしたコミット |
 | `APPCONFIG_BASE_URL` | ai | 同じ環境の appconfig の URL |
 
-`GET /health`(appconfig・ai)はこのうち `APP_ENV`・`FIRESTORE_DATABASE`・`GIT_SHA`(先頭 7 文字)だけを返す(#290)。例: `{"status":"ok","env":"stg","firestoreDatabase":"(default)","version":"89061ea"}`。デプロイ後に stg / prod の取り違えと版をここで確かめる。誰でも叩ける口なので、ほかの値は足さない。
+runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイする(既定は飛ばす・[runner.md](runner.md))。
+
+`GET /health`(appconfig・ai・runner)はこのうち `APP_ENV`・`FIRESTORE_DATABASE`・`GIT_SHA`(先頭 7 文字)だけを返す(#290)。例: `{"status":"ok","env":"stg","firestoreDatabase":"(default)","version":"89061ea"}`。デプロイ後に stg / prod の取り違えと版をここで確かめる。誰でも叩ける口なので、ほかの値は足さない。
 
 ## 運用で変える値
 
@@ -59,15 +61,16 @@
 | `RATE_LIMIT_GLOBAL_DAILY` | ai | 環境全体の 1 日の AI 上限(費用ブレーカー)([rate-limit.md](../backend/rate-limit.md))。AI を止める用途には `AI_PAUSED` を使う。`1` にして止めるのは、`AI_PAUSED` の入っていない版が動いている時の予備だけ([incident-runbook.md §5](../ops/incident-runbook.md#5-手順-a-claude-api-の障害上限)) | 2000 |
 | `RATE_LIMIT_ANON_DAILY` / `_USER_DAILY` / `_PRO_DAILY` / `_IP_DAILY` | ai | 利用者ごと・IP ごとの 1 日の上限([rate-limit.md](../backend/rate-limit.md)) | 30 / 60 / 300 / 300 |
 | `RATE_LIMIT_WEIGHT_*` | ai | 呼び出し 1 回で数える重み([rate-limit.md](../backend/rate-limit.md)) | 3 / 2 / 1 / 1 |
-| `RUNNER_GLOBAL_DAILY` | runner(**まだ使われていない**) | 環境全体の 1 日の自動の動きの実行の上限(費用の遮断・[#338](../decisions/338-server-feature-cost-model.md#上限案))。`0` で数えない。runner のサービスの追加は人の承認の後 | 10000 |
-| `RUNNER_LIMIT_*` | runner(**まだ使われていない**) | アプリ・作成者・きっかけの人・受け取る人ごとの 1 日の上限と、1 回の実行の形の上限(`backend/internal/runner/quota/config.go` の `ConfigFromEnv`・#345)。`_FREE` / `_PRO` の組は無料 / Pro。**自動の動きは Pro だけ(#316)なので `_FREE` は今は使われない**(Pro でない作成者のルールは数える前に `skipped_plan`)。`0` で数えない。runner のサービスの追加は人の承認の後 | 実行 100 / 2000(アプリ)・300 / 3000(作成者)、書き込み 100 / 2000、通知の宛先 50 / 1000、受け取る人 20(1 アプリ)・100(合計)、きっかけの人 200、1 回の宛先 1 / 200・書き込み 1 / 10、定期のルール 1 / 5 |
-| `RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS` | runner(**まだデプロイしていない**) | 1 つのアプリ(アプリそのもの・その中の投稿)を 24 時間でこの人数(別々の人)が通報したら、そのアプリの通知を自動で一時停止する(#339・#346)。止めるのは通知だけ(非公開化などは人)。`0` で自動では止めない | 3 |
-| `RUNNER_AUTO_NOTIFY_PAUSE_FOR` | runner(**まだデプロイしていない**) | 上の自動の一時停止の長さ。`48h` のように書く。1 時間未満は起動しない。運営が `moderate resume-notify` で先に解ける([incident-runbook.md 手順 F](../ops/incident-runbook.md#13-手順-f-悪用自動の動き)) | `72h` |
-| `RUNNER_NOTIFY_PAUSED` | runner(**まだデプロイしていない**) | `1`(`true` / `on` も可)で通知だけを全体で止める(#339・#346)。ルールは動き、書き込みはする。止めている間の通知は後から送らない | 無し(止めない) |
-| `RUNNER_PAUSED` | runner(**まだデプロイしていない**) | `1`(`true` / `on` も可)で自動の動きを全体で止める(#337 の停止スイッチの「全体」)。止めている間に取り出したきっかけは `skipped_paused` で終わらせ、再開しても後からまとめて実行しない | 無し(止めない) |
-| `RUNNER_SCHEDULE_MAX_LATE` | runner(**まだデプロイしていない**) | 定期のルール(#342)の実行が期限からこれより遅れたら `skipped_late` にして実行しない(後からまとめて実行しない)。`45m` のように書く。1 分未満は起動しない | `30m` |
-| `RUNNER_TICK_INTERVAL` | runner(**まだデプロイしていない**) | ローカル用。`10s` のように書くと、runner が自分でこの間隔で outbox を処理する。本番は Cloud Scheduler が `POST /internal/tick` を呼ぶので入れない | 無し(`/internal/tick` を呼ばれた時だけ) |
-| `RUNNER_OUTBOX` | appconfig | `1` で、serverRules(自動の動き)の条件に合う記録の書き込みを、同じトランザクションで outbox(`runner/{APP_ENV}/outbox`)に積む(#341)。時刻のきっかけを持つ(持っていた)DSL の保存では `rules_changed` を同じトランザクションで積み、`GET /dsl` で `runner/{APP_ENV}/apps/*` の `lastOpenedAt` を 1 アプリ 1 日 1 回まで書く(#342)。入れるのは人の承認を得てから(runner が無いまま入れると積まれるだけで動かない) | 無し(積まない) |
+| `RUNNER_GLOBAL_DAILY` | runner(prod だけ) | 環境全体の 1 日の自動の動きの実行の上限(費用の遮断・[#338](../decisions/338-server-feature-cost-model.md#上限案))。`0` で数えない | 10000 |
+| `RUNNER_LIMIT_*` | runner(prod だけ) | アプリ・作成者・きっかけの人・受け取る人ごとの 1 日の上限と、1 回の実行の形の上限(`backend/internal/runner/quota/config.go` の `ConfigFromEnv`・#345)。`_FREE` / `_PRO` の組は無料 / Pro。**自動の動きは Pro だけ(#316)なので `_FREE` は今は使われない**(Pro でない作成者のルールは数える前に `skipped_plan`)。`0` で数えない | 実行 100 / 2000(アプリ)・300 / 3000(作成者)、書き込み 100 / 2000、通知の宛先 50 / 1000、受け取る人 20(1 アプリ)・100(合計)、きっかけの人 200、1 回の宛先 1 / 200・書き込み 1 / 10、定期のルール 1 / 5 |
+| `RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS` | runner(prod だけ) | 1 つのアプリ(アプリそのもの・その中の投稿)を 24 時間でこの人数(別々の人)が通報したら、そのアプリの通知を自動で一時停止する(#339・#346)。止めるのは通知だけ(非公開化などは人)。`0` で自動では止めない | 3 |
+| `RUNNER_AUTO_NOTIFY_PAUSE_FOR` | runner(prod だけ) | 上の自動の一時停止の長さ。`48h` のように書く。1 時間未満は起動しない。運営が `moderate resume-notify` で先に解ける([incident-runbook.md 手順 F](../ops/incident-runbook.md#13-手順-f-悪用自動の動き)) | `72h` |
+| `RUNNER_NOTIFY_PAUSED` | runner(prod だけ) | `1`(`true` / `on` も可)で通知だけを全体で止める(#339・#346)。ルールは動き、書き込みはする。止めている間の通知は後から送らない | 無し(止めない) |
+| `RUNNER_PAUSED` | runner(prod だけ) | `1`(`true` / `on` も可)で自動の動きを全体で止める(#337 の停止スイッチの「全体」)。止めている間に取り出したきっかけは `skipped_paused` で終わらせ、再開しても後からまとめて実行しない | 無し(止めない) |
+| `RUNNER_SCHEDULE_MAX_LATE` | runner(prod だけ) | 定期のルール(#342)の実行が期限からこれより遅れたら `skipped_late` にして実行しない(後からまとめて実行しない)。`45m` のように書く。1 分未満は起動しない | `30m` |
+| `RUNNER_TICK_INTERVAL` | runner(prod だけ) | ローカル用。`10s` のように書くと、runner が自分でこの間隔で outbox を処理する。本番は Cloud Scheduler の `runner-tick` が毎分 `POST /internal/tick` を呼ぶので入れない | 無し(`/internal/tick` を呼ばれた時だけ) |
+| `RUNNER_OUTBOX` | appconfig | `1` で、serverRules(自動の動き)の条件に合う記録の書き込みを、同じトランザクションで outbox(`runner/{APP_ENV}/outbox`)に積む(#341)。時刻のきっかけを持つ(持っていた)DSL の保存では `rules_changed` を同じトランザクションで積み、`GET /dsl` で `runner/{APP_ENV}/apps/*` の `lastOpenedAt` を 1 アプリ 1 日 1 回まで書く(#342)。入れるのは人の承認を得てから、runner-prod と `runner-tick` が動いているのを確かめた後([runner.md](runner.md)。runner が無いまま入れると積まれるだけで動かない)。stg には入れない(#288 の分離まで runner は prod だけ) | 無し(積まない) |
+| `AI_SERVER_RULES` | ai | `1` で、「自動の動き」を頼む発話の時に serverRules(自動の動き)を作る呼び出しを足す(#343)。runner と `RUNNER_OUTBOX` が動いていない環境で入れると、作れても動かないルールができる。入れるのは `RUNNER_OUTBOX=1` と同じ時([runner.md](runner.md)) | 無し(作らない) |
 | `LOG_LEVEL` | 両方 | ログの詳しさ(調査の間だけ `debug` など) | info |
 
 この表に無い変数は、運用で変えないでください。変えたい時は Issue にして、ワークフローか本書に足します。

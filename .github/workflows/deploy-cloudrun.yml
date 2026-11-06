@@ -7,6 +7,8 @@
 #   → Artifact Registry `<region>-docker.pkg.dev/<project>/backend/backend:<sha>` に push
 #   → 同じイメージで appconfig-<env> と ai-<env>(--command=/app/ai)を `gcloud run deploy --image`
 #   → 両サービスの GET /health が 200 を返すことを確認し、URL を job summary に出す。
+#   → production で変数 RUNNER_DEPLOY=1 の時だけ、同じイメージで runner-prod(--command=/app/runner・非公開)。
+#     stg には出さない(#288 の分離まで runner は prod だけ・docs/00_decisions.md「M4」)。手順は docs/infra/runner.md
 #
 # 認証: Workload Identity Federation(鍵ファイル無し)。GitHub 側に Secrets は不要。
 #   repo Variables: GCP_PROJECT_ID / GCP_REGION / GCP_WORKLOAD_IDENTITY_PROVIDER / GCP_SERVICE_ACCOUNT
@@ -201,6 +203,37 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "ai-${ENV_SUFFIX}: $url"
 
+      # runner(自動の動き・#341)。prod だけ・repo / Environment の変数 RUNNER_DEPLOY=1 の時だけ(既定は飛ばす)。
+      # 非公開(--no-allow-unauthenticated): 呼べるのは Scheduler の SA runner-scheduler だけ(infra/runner.tf)。
+      # SA runner は infra/runner.tf の runner_enabled = true で作る(無いとここで失敗する)。
+      # 1 回の tick は約 50 秒(TickBudget)なので timeout=90。tick はインスタンスごとに 1 本ずつなので最大 2 台で足りる。
+      # 運用の値(RUNNER_PAUSED など)は --update-env-vars なので残る(docs/infra/runtime-config.md)。
+      # 非公開なので /health は CI から叩かない(gcloud run deploy が Ready になるまで待つ)。
+      - name: Deploy runner-${{ env.ENV_SUFFIX }}
+        id: runner
+        if: env.ENV_SUFFIX == 'prod' && vars.RUNNER_DEPLOY == '1'
+        env:
+          RUNNER_SA: runner@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+        run: |
+          set -euo pipefail
+          gcloud run deploy "runner-${ENV_SUFFIX}" \
+            --image="$IMAGE" \
+            --command=/app/runner \
+            --project="$PROJECT_ID" \
+            --region="$REGION" \
+            --service-account="$RUNNER_SA" \
+            --no-allow-unauthenticated \
+            --port=8080 \
+            --cpu=1 --memory=512Mi \
+            --min-instances=0 --max-instances=2 \
+            --concurrency=10 --timeout=90 \
+            --update-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB},GIT_SHA=${GITHUB_SHA}" \
+            --quiet
+          url="$(gcloud run services describe "runner-${ENV_SUFFIX}" \
+            --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)')"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "runner-${ENV_SUFFIX}: $url (private)"
+
       - name: ヘルスチェック(GET /health が 200)
         env:
           APPCONFIG_BASE_URL: ${{ steps.appconfig.outputs.url }}
@@ -217,6 +250,7 @@ jobs:
           ENVIRONMENT: ${{ needs.deploy-changes.outputs.environment }}
           APPCONFIG_BASE_URL: ${{ steps.appconfig.outputs.url }}
           AI_URL: ${{ steps.ai.outputs.url }}
+          RUNNER_URL: ${{ steps.runner.outputs.url }}
         run: |
           {
             echo "## Cloud Run deploy: ${ENVIRONMENT}"
@@ -225,6 +259,11 @@ jobs:
             echo "|---|---|---|"
             echo "| appconfig-${ENV_SUFFIX} | ${APPCONFIG_BASE_URL} | [/health](${APPCONFIG_BASE_URL}/health) 200 |"
             echo "| ai-${ENV_SUFFIX} | ${AI_URL} | [/health](${AI_URL}/health) 200 |"
+            if [ -n "$RUNNER_URL" ]; then
+              echo "| runner-${ENV_SUFFIX} | ${RUNNER_URL} | 非公開(Ready のみ確認) |"
+            else
+              echo "| runner | (飛ばした: prod かつ RUNNER_DEPLOY=1 の時だけ) | - |"
+            fi
             echo
             echo "image: \`${IMAGE}\`"
           } >> "$GITHUB_STEP_SUMMARY"
