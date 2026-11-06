@@ -349,12 +349,12 @@ func (a *App) Validate() error {
 			if act.NotificationID == "" {
 				add("%s: cancelNotification needs notificationId", where)
 			}
+		case ActionFollow, ActionUnfollow:
+			checkFollowAction(where, act, entities, add) // #270: follow.go
 		case ActionExport:
 			checkExportAction(where, act, entities, add)
 		case ActionStartActivity:
 			checkActivity(where, act.Activity, a, add) // #423: live_activity.go
-		case ActionFollow, ActionUnfollow:
-			checkFollowAction(where, act, entities, add) // #270: follow.go
 		case ActionBack, ActionOpenVoice, ActionResetForm, ActionEndActivity:
 		default:
 			add("%s: unknown action type %q", where, act.Type)

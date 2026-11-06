@@ -366,6 +366,8 @@
             "back",
             "saveRecord",
             "deleteRecord",
+            "follow",
+            "unfollow",
             "openVoice",
             "openUrl",
             "resetForm",
@@ -373,15 +375,15 @@
             "cancelNotification",
             "export",
             "startActivity",
-            "endActivity",
-            "follow",
-            "unfollow"
+            "endActivity"
           ],
           "x-enumDescriptions": {
             "navigate": "画面遷移。list.onItemTap からは recordId が暗黙に渡り、遷移先フォームが編集モードになる(だから onItemTap の遷移先は同じ entity のフォーム)。prefillRef を付けると今のレコード(タップした行・ボタンのあるフォームのレコード)を子フォームの ref に入れて新規で開く。",
             "back": "前の画面へ戻る(push なら pop、モーダルなら dismiss)。",
             "saveRecord": "フォームのドラフトを保存(新規 POST / 編集 PATCH)して screen へ、無ければ back。フォーム画面の toolbar に置く。",
             "deleteRecord": "現在のレコードを削除して back。confirmMessage を付けるのが定石。",
+            "follow": "今開いている投稿(共有 / みんなに公開の entity のレコード)を書いた人をフォローする(#270)。一覧の行から開いた投稿の画面に置く。自分の投稿・フォロー済みの時はボタンが隠れる。フォローした人の投稿だけの一覧は filter {\"field\":\"$author\",\"op\":\"eq\",\"value\":{\"myFollows\":true}}。",
+            "unfollow": "今開いている投稿を書いた人のフォローを外す(#270)。follow と同じ画面に並べて置く(フォローしていない時は隠れる)。",
             "openVoice": "音声シートを開く。",
             "openUrl": "URL を Safari で開く。",
             "resetForm": "フォームのドラフトを既定値に戻す。",
@@ -389,9 +391,7 @@
             "cancelNotification": "予約した通知を取り消す。",
             "export": "記録を CSV(Excel で開ける)か PDF の報告にして共有シートで送る(ファイル・メール・AirDrop)。「CSV で出したい」「PDF にしたい」「Excel で開きたい」「月の報告書」はこれ。button か toolbar に置く。CSV は表示と同じ書式(日付・円・選択肢・参照先の名前・計算項目を含む)、PDF は見出し・絞り込み・表と、同じ画面にある同じ entity のグラフを 1 つにまとめる。",
             "startActivity": "ロック画面と Dynamic Island に「いま◯◯中」を出す(ライブアクティビティ・#423)。activity の title と、任意で残り時間(minutes)・数字(stat)。アプリを閉じても時間は進み、stat は記録を足すたびに更新される。同じアプリで出し直すと前のものを置き換える。タイマー部品の時間を出すだけなら timerDisplay.liveActivity の方が短い。",
-            "endActivity": "startActivity で出したロック画面の表示を消す(「終わった」「到着」ボタンに)。",
-            "follow": "今開いている投稿(共有 / みんなに公開の entity のレコード)を書いた人をフォローする(#270)。一覧の行から開いた投稿の画面に置く。自分の投稿・フォロー済みの時はボタンが隠れる。フォローした人の投稿だけの一覧は filter {\"field\":\"$author\",\"op\":\"eq\",\"value\":{\"myFollows\":true}}。",
-            "unfollow": "今開いている投稿を書いた人のフォローを外す(#270)。follow と同じ画面に並べて置く(フォローしていない時は隠れる)。"
+            "endActivity": "startActivity で出したロック画面の表示を消す(「終わった」「到着」ボタンに)。"
           }
         },
         "screen": {
@@ -415,13 +415,13 @@
         },
         "entity": {
           "type": "string",
-          "description": "saveRecord / deleteRecord / export: entity id. follow / unfollow: the shared/public entity of the record on screen.",
+          "description": "saveRecord / deleteRecord / export: entity id.",
           "x-for": {
+            "follow": "required",
+            "unfollow": "required",
             "saveRecord": "required",
             "deleteRecord": "required",
-            "export": "required",
-            "follow": "required",
-            "unfollow": "required"
+            "export": "required"
           }
         },
         "url": {

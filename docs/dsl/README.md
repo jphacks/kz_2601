@@ -299,6 +299,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 | 部品の `filter` | `{"field":"$author","op":"eq","value":{"myFollows":true}}` | 自分がフォローしている人の投稿だけ(`op:"neq"` = フォローしていない人の投稿。自分の投稿はどちらでも「フォローしていない人」側)。list / table / timeline / stat(件数)/ chart で使え、agg の中では使えない |
 | Action `follow` / `unfollow` | `{"type":"follow","entity":"posts"}` | 今開いている投稿(`list.onItemTap` で開いたその entity の画面)を書いた人をフォローする / 外す。button はフォロー済みなら `follow`、まだなら `unfollow` を隠し、自分の投稿では両方隠す |
 
+- follow / unfollow を Leaf ではなく Action にしたのは `export` と同じ理由(button の見た目と `confirmMessage` を使える・toolbar にも置ける・古い iOS は「未対応のアクション」の toast で済む)。
 - **プロフィール**は投稿者の表示名(`$author`・各自がアプリの設定で決めた名前)。アイコン・自己紹介・人ごとのプロフィール画面は今は無い(参加者の情報に写真が無いため)。
 - **見える範囲**: フォローは本人だけが見られる。フォローされた人には知らせず、フォロワーの一覧・人数も出さない(つきまといに使われにくくする)。scope:shared だけのアプリでは参加者だけがフォローでき、フォローできる相手も参加者だけ。
 - appconfig: `GET /v1/apps/{appId}/follows`(`{uids}`)・`PUT` / `DELETE /v1/apps/{appId}/follows/{uid}`(冪等・`{following, count}`)。一覧の API は `filterField=author&filterOp=in&filterValue=myFollows`(`nin` も)。Firestore は `apps_public/{appId}/follows/{uid}`(`{uids: [...]}`・1 人 1 文書)。1 人が 1 アプリでフォローできるのは 500 人まで。
