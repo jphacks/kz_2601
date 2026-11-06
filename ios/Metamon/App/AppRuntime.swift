@@ -78,6 +78,8 @@ final class AppRuntime: DSLRuntime {
     var confirm: Confirm?
     /// 書き出したファイル(#421)。立つと共有シートを開く(`RootView` の HostSheets)。
     var exportFile: ExportFile?
+    /// addToCalendar で開く「新規イベント」画面の中身(`AppRuntime+Calendar.swift`)。
+    var calendarDraft: CalendarEventDraft?
 
     /// 共有アプリへの初めての投稿で表示名を聞く(#250)。答えたら `resume` で保存を続ける。
     struct AuthorNamePrompt: Identifiable {
@@ -1203,6 +1205,9 @@ final class AppRuntime: DSLRuntime {
 
         case .endActivity:
             await endActivity()
+
+        case .addToCalendar:
+            addToCalendar(action, ctx)
 
         case .unknown:
             toast = L10n.tr("未対応のアクション: \(action.rawType)")
