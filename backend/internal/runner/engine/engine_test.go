@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"errors"
 	"os"
 	"reflect"
@@ -94,7 +95,7 @@ type mapRefs struct {
 	err   error
 }
 
-func (m *mapRefs) Record(entity, id string) (expreval.Record, bool, error) {
+func (m *mapRefs) Record(_ context.Context, entity, id string) (expreval.Record, bool, error) {
 	m.reads++
 	if m.err != nil {
 		return expreval.Record{}, false, m.err
@@ -148,7 +149,7 @@ func TestExampleRules(t *testing.T) {
 		{"状態が変わった($prev)", "status_changed", updated("events",
 			expreval.Record{ID: "e1", Data: map[string]any{"title": "合宿", "status": "予定"}},
 			expreval.Record{ID: "e1", Data: map[string]any{"title": "合宿", "status": "確定"}}), Plan{
-			Writes: []PlannedWrite{{Action: 1, Kind: WriteCreate, Entity: "log", Values: map[string]any{"note": "状態の変更: 合宿"}}},
+			Writes:   []PlannedWrite{{Action: 1, Kind: WriteCreate, Entity: "log", Values: map[string]any{"note": "状態の変更: 合宿"}}},
 			Notifies: []PlannedNotify{{To: dsl.RuleRecipient{Kind: dsl.RecipientMembers}, Title: "予定が変わりました", Body: "合宿 は 確定 になりました"}},
 		}},
 		{"見ている field が変わっていない", "status_changed", updated("events",
@@ -160,7 +161,7 @@ func TestExampleRules(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got, err := PlanRule(a, rule(t, a, c.rule), c.ev, refs)
+			got, err := PlanRule(context.Background(), a, rule(t, a, c.rule), c.ev, refs)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -202,7 +203,7 @@ func TestRefLookupAndValues(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			refs := &mapRefs{recs: map[string]map[string]expreval.Record{"events": events}}
-			got, err := PlanRule(a, rule(t, a, "confirmed_entry"), created("entries", entry(c.event)), refs)
+			got, err := PlanRule(context.Background(), a, rule(t, a, "confirmed_entry"), created("entries", entry(c.event)), refs)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -236,7 +237,7 @@ func TestPrev(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got, err := PlanRule(a, r, updated("entries", rec(c.prev), rec(c.next)), &mapRefs{})
+			got, err := PlanRule(context.Background(), a, r, updated("entries", rec(c.prev), rec(c.next)), &mapRefs{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -276,7 +277,7 @@ func TestRenderCutsAndHides(t *testing.T) {
 	r := rule(t, a, "new_message")
 	long := strings.Repeat("長", 50) + " https://x.example"
 	ev := created("messages", expreval.Record{ID: "m1", AuthorName: "foo@example.com", Data: map[string]any{"body": long}})
-	got, err := PlanRule(a, r, ev, nil)
+	got, err := PlanRule(context.Background(), a, r, ev, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +327,7 @@ func TestErrors(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if _, err := PlanRule(a, c.rule, c.ev, c.refs); err == nil {
+			if _, err := PlanRule(context.Background(), a, c.rule, c.ev, c.refs); err == nil {
 				t.Error("want an error")
 			}
 		})
@@ -334,7 +335,7 @@ func TestErrors(t *testing.T) {
 	// A failing RefReader stops the plan when the condition reads the ref.
 	b := parseApp(t, []byte(extraApp))
 	boom := errors.New("boom")
-	_, err := PlanRule(b, rule(t, b, "confirmed_entry"),
+	_, err := PlanRule(context.Background(), b, rule(t, b, "confirmed_entry"),
 		created("entries", expreval.Record{ID: "x", Data: map[string]any{"event": "ok"}}), &mapRefs{err: boom})
 	if !errors.Is(err, boom) {
 		t.Errorf("err = %v, want boom", err)

@@ -49,10 +49,9 @@ type Trigger struct {
 }
 
 // RefReader reads one record a ref field of the trigger record points to.
-// The runner gives a reader bound to the trigger's appId (and request
-// context); found=false when the record does not exist.
+// The runner gives a reader bound to the trigger's appId; found=false when the record does not exist.
 type RefReader interface {
-	Record(entity, id string) (rec expreval.Record, found bool, err error)
+	Record(ctx context.Context, entity, id string) (rec expreval.Record, found bool, err error)
 }
 
 // Message is one notification to deliver to resolved recipients.
@@ -117,7 +116,7 @@ func (p Plan) Empty() bool { return len(p.Writes) == 0 && len(p.Notifies) == 0 }
 // Plan): the trigger must match the rule, `if` must be
 // true, then each action's values / by / text are computed. An action whose
 // target ref is empty (or whose by is not a number) is skipped.
-func PlanRule(app *dsl.App, rule *dsl.ServerRule, ev Trigger, refs RefReader) (Plan, error) {
+func PlanRule(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger, refs RefReader) (Plan, error) {
 	if app == nil || rule == nil {
 		return Plan{}, errors.New("engine: app and rule are required")
 	}
@@ -129,7 +128,7 @@ func PlanRule(app *dsl.App, rule *dsl.ServerRule, ev Trigger, refs RefReader) (P
 	if loc == nil {
 		loc = time.UTC
 	}
-	src := &refSource{row: row, refs: refs, cache: map[string][]expreval.Record{}}
+	src := &refSource{ctx: ctx, row: row, refs: refs, cache: map[string][]expreval.Record{}}
 	e := expreval.New(expreval.Env{Entities: app.Entities, Source: src, Now: ev.At, Location: loc})
 	p := planner{app: app, ev: ev, row: row, e: e, loc: loc}
 	if rule.If != nil {
@@ -317,6 +316,7 @@ func refID(r expreval.Record, field string) string {
 // refSource is the expreval.Source of a rule: the records the trigger
 // record's ref fields point to, read on demand.
 type refSource struct {
+	ctx   context.Context // expreval.Source has no ctx; lives for one PlanRule call
 	row   *expreval.Row
 	refs  RefReader
 	cache map[string][]expreval.Record
@@ -339,7 +339,7 @@ func (s *refSource) Records(entity string) []expreval.Record {
 				continue
 			}
 			seen[id] = true
-			r, found, err := s.refs.Record(entity, id)
+			r, found, err := s.refs.Record(s.ctx, entity, id)
 			if err != nil {
 				s.err = fmt.Errorf("engine: read %s/%s: %w", entity, id, err)
 				return nil
