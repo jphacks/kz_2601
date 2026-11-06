@@ -151,6 +151,7 @@ struct VoiceInputView: View {
     private var bottomPanel: some View {
         VStack(spacing: 0) {
             if !typing { examples }
+            RemainingTodayBadge() // #630 今日の残り
             textEntry
             #if !APP_STORE_REVIEW
             if isInitial, !typing { DiscoverEntry() } // 「探す」(#50)

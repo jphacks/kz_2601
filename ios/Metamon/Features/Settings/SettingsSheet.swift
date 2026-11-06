@@ -38,6 +38,7 @@ struct SettingsSheet: View {
                 #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
                 ProSettingsSection() // 課金(#77)
                 #endif
+                RemainingTodaySettingsSection() // #630 今日の残り(審査用の版も出す)
                 languageSection
                 voiceModelSection
                 clarifySection
