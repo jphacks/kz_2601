@@ -13686,6 +13686,23 @@
         }
       }
     },
+    "音声を聞き取れませんでした。もう一度はっきり話してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not catch what you said. Please speak clearly and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声を聞き取れませんでした。もう一度はっきり話してください"
+          }
+        }
+      }
+    },
     "音声モデル" : {
       "extractionState" : "manual",
       "localizations" : {

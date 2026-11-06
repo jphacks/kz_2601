@@ -55,6 +55,7 @@
 - 目的地までの道案内 `routeGuide`(#411)も残す。使うのは使用中の位置だけで、背面で案内を続けない(`CLBackgroundActivitySession` も `UIBackgroundModes: location` も使わない)。読み上げ(AVSpeechSynthesizer)に権限は要らない。
 - QR を読む `qrScanner` は残す(カメラの説明文はこれに合わせて差し替える)。
 - QR を作って表示する `qrCode`(#422)も残す。CoreImage で端末内で作るだけで、写真への保存は追加のみの権限(`NSPhotoLibraryAddUsageDescription`)。審査用の版の説明文にも QR の保存を書く(#452 G8)。
+- 生成したアプリの文字起こし `transcribeField` と読み上げ `speakButton` は残す。どちらも端末の中だけで動く(声を送らない・録音を残さない)。文字起こしは音声入力と同じ端末内の音声モデル、読み上げは AVSpeechSynthesizer で権限は要らない。マイクの説明文に「記録帳の欄に話した内容を端末の中で文字にして入れる」を足した。
 - 声でアプリを作り変える音声入力(マイク FAB)は残す。`audio` field の再生(一覧の行の再生ボタン)も残す(マイクを使わない。この版では録音できないので鳴る録音は無い)。
 - 裏で定期的に同期する `fetch` は残す。
 - 設定の「ライセンス」(このアプリの MIT の表示とサードパーティのライセンスの一覧・#306)は残す。

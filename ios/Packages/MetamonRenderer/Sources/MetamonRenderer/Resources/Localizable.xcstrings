@@ -970,6 +970,23 @@
         }
       }
     },
+    "この画面では話して入力を使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speak to type is not available here"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画面では話して入力を使えません"
+          }
+        }
+      }
+    },
     "この端末ではヘルスデータを使えません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1782,6 +1799,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "マイクを使えません"
+          }
+        }
+      }
+    },
+    "マイクを押して話すと、ここに文字で入ります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the mic and speak. Your words appear here."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイクを押して話すと、ここに文字で入ります"
           }
         }
       }
@@ -3061,6 +3095,23 @@
         }
       }
     },
+    "文字にしています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribing…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字にしています…"
+          }
+        }
+      }
+    },
     "書き出し日 %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3261,6 +3312,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "次の月"
+          }
+        }
+      }
+    },
+    "止める" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "止める"
           }
         }
       }
@@ -3707,6 +3775,23 @@
         }
       }
     },
+    "聞いています… タップで終わる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listening… Tap to finish"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "聞いています… タップで終わる"
+          }
+        }
+      }
+    },
     "自分" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4098,6 +4183,23 @@
         }
       }
     },
+    "話して入力" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speak to type"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話して入力"
+          }
+        }
+      }
+    },
     "詳細" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4111,6 +4213,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "詳細"
+          }
+        }
+      }
+    },
+    "読み上げる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read aloud"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み上げる"
+          }
+        }
+      }
+    },
+    "読み上げる内容がまだありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing to read aloud yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み上げる内容がまだありません"
           }
         }
       }
@@ -4519,6 +4655,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "関節の位置を重ねた写真"
+          }
+        }
+      }
+    },
+    "音声モデルを準備しています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing the speech model…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデルを準備しています…"
+          }
+        }
+      }
+    },
+    "音声モデルを用意する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get the speech model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデルを用意する"
           }
         }
       }

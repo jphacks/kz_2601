@@ -113,7 +113,7 @@ public struct RenderTree {
     /// `if let form = ctx.form, let field = c.field` で描き、無ければ `NeedsForm` を出す Leaf。
     static let formBound: Set<ComponentType> = [
         .textField, .numberField, .picker, .toggle, .datePicker, .slider, .stepper, .textEditor, .secureField, .timePicker,
-        .rating, .colorPicker, .photoField, .videoField, .audioRecorder, .locationPicker, .locationButton, .qrScanner,
+        .rating, .colorPicker, .photoField, .videoField, .audioRecorder, .transcribeField, .locationPicker, .locationButton, .qrScanner,
     ]
 
     /// ラベルを `c.label ?? field.name` で補う入力(`InputRow`)。他の入力(`LabeledInput`)は `c.label` だけ。

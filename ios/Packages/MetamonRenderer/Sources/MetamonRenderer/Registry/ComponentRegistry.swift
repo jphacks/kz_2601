@@ -80,6 +80,9 @@ public struct ComponentRegistry: Sendable {
         r.register(.locationPicker) { c, ctx in LocationPickerLeaf(c: c, ctx: ctx) }
         r.register(.qrScanner) { c, ctx in QrScannerLeaf(c: c, ctx: ctx) }
         r.register(.qrCode) { c, ctx in QrCodeLeaf(c: c, ctx: ctx) }
+        // leaf(文字起こし・読み上げ)。端末の中だけで動くので審査用ビルドにも入れる
+        r.register(.transcribeField) { c, ctx in TranscribeFieldLeaf(c: c, ctx: ctx) }
+        r.register(.speakButton) { c, ctx in SpeakButtonLeaf(c: c, ctx: ctx) }
         r.register(.timerDisplay) { c, ctx in TimerDisplayLeaf(c: c, ctx: ctx) }
         // leaf: 入力系バッチ
         r.register(.slider) { c, ctx in SliderLeaf(c: c, ctx: ctx) }

@@ -12,6 +12,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case videoField, videoPlayer
     // leaf(録音・#420)
     case audioRecorder
+    // leaf(文字起こし・読み上げ。端末の中だけ)。transcribeField: field / label / placeholder、speakButton: text / field / value / label は共用
+    case transcribeField, speakButton
     // container(構造系: card/disclosure/carousel/grid)
     case card, disclosure, carousel, grid
     // leaf(ナビ・ネイティブ系)

@@ -167,6 +167,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 共有 | P1 | `native: share {text}` | `UIActivityViewController`(stub) | 不要 |
 | オンデバイス AI | P1 | `aiButton { task, input?, entity?, output, prompt?, options? }` コンポーネント | **実装済み**(`AiButtonLeaf` + `Support/OnDeviceAI.swift`・Foundation Models・§18) | 不要(Apple Intelligence の ON は OS 設定) |
 | 録音(#420) | P3 | `audioRecorder { field, label?, maxDuration? }` + Field `audio` | **実装済み**(`AudioRecorderLeaf` + `Support/AudioRecording.swift` / `AudioPlayback.swift` / `AudioSessionLease.swift`、下記) | `NSMicrophoneUsageDescription`(音声入力と共用) |
+| 文字起こし・読み上げ | P3 | `transcribeField { field, label?, placeholder? }` / `speakButton { text / field / value, label? }` | **実装済み**(`TranscribeFieldLeaf` + `Host/Capabilities/DictationHost.swift` → 本体 `Features/Voice/AppRuntime+Dictation.swift`(音声入力と同じ `services.transcriber`)、`SpeakButtonLeaf` + `Support/LeafSpeech.swift`、下記) | `NSMicrophoneUsageDescription`(音声入力と共用・文字起こしを追記)。読み上げは不要 |
 
 ### photoField(カメラ)の実装要点(`MetamonRenderer/Components/Leaves/PhotoFieldLeaf.swift`)
 
@@ -182,6 +183,17 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 
 画像は **base64 JPEG 文字列として photo フィールドに置き、entity.create の data に含めて送る**(縮小後 ≈ 数十〜100KB で Firestore ドキュメント 1MB 制限内)。Cloud Storage 経由(URL 化)は P1 以降。
 全 usage description は `ios/Metamon/Resources/Info.plist` に記入済み。
+
+### transcribeField / speakButton(文字起こし・読み上げ)の実装要点
+
+| 項目 | 内容 |
+|---|---|
+| 文字起こし | `TranscribeFieldLeaf` → `DictationHost`(Renderer は Services を知らないので能力の protocol 越し)→ 本体の `AppRuntime+Dictation` が `services.transcriber`(WhisperKit・端末内)の `startRecording` / `stopAndTranscribe` を呼ぶ。結果は `DictationText.appending` で field の後ろに足す。声はサーバーに送らず、録音も残さない |
+| 音声モデル | 音声入力と同じモデル。無ければ部品のボタンが「音声モデルを用意する」になり、起動時と同じ確認(#246 `prepareTranscriberIfAllowed`)を出す |
+| マイクの取り合い | 音声入力と同じ `transcriber` を使うので同時には録れない。マイク FAB の音声入力のシート(`showVoiceSheet`)が出たら部品は録音を捨てる。画面を離れた時も捨てる |
+| 読み上げ | `LeafSpeech.shared`(アプリ全体で 1 本)。`usesApplicationAudioSession = false` で共有セッションに触らない(#43 の `SpeechReader` と同じ)。声は UI の言語(`LanguagePreference`: ja-JP / en-US)。設定の「挨拶と質問を読み上げる」(#43)とは別で、ユーザーが押した時だけ喋る |
+| 録音中は喋らない | `SpeechReader.stopForRecording()` / `recordingFinished()` が `LeafSpeech` も止める・抑止を解く。音声入力と `transcribeField` の録音の両方がこれを通る |
+| 審査用ビルド | 両方残す(端末の中だけ・マイクは音声入力と同じ説明文に文字起こしを追記) |
 
 ### audioRecorder(録音・#420)の実装要点
 
@@ -841,7 +853,7 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 | 裏の同期 | ときどき(OS 任せ・最短 15 分) | `BGAppRefreshTask`(§17.2) |
 | カメラ・録画(`photoField` / `videoField` / `qrScanner`) | **止まる**(iOS が背面のカメラを許さない) | 画面を出したまま使う。AI は頼まれたら「画面を出したまま(自動ロックを切って)」と案内する(`internal/ai/live_activity_rules.go`) |
 | 音声入力(マイク・WhisperKit) | **止まる** | 録音は前面のみ。`audio` モードは足していない |
-| 音の再生・読み上げ | 生成アプリの部品には今は無い | 部品で読み上げ(音声案内)を足す時に `UIBackgroundModes: audio` + `AVAudioSession(.playback, .duckOthers)` を一緒に入れる。**審査用の版で残すかはその時に決める**(`strip-review-plist.sh` は今 location だけ外す) |
+| 音の再生・読み上げ(`speakButton`・`transcribeField`) | **止まる** | 前面だけで使う部品として足した(`UIBackgroundModes: audio` は入れていない)。背面で読み上げを続けたくなった時に `UIBackgroundModes: audio` + `AVAudioSession(.playback, .duckOthers)` を一緒に入れ、審査用の版で残すかをその時に決める |
 
 ### 17.5 シミュレータでの確認手順(ヘッドレス)
 - `METAMON_E2E_TIMER_START=<部品 id>`(DEBUG)で、表示時に timerDisplay を開始する。例: `METAMON_INITIAL_EXAMPLE=gallery-structure METAMON_AUTO_OPEN=memo_form:sheet METAMON_E2E_TIMER_START=timer` → `xcrun simctl launch <UDID> com.apple.Preferences` で背面化 → 60 秒後に通知 → アプリを起動し直すと 00:00。
