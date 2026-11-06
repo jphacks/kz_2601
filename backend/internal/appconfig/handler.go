@@ -49,6 +49,8 @@ type Handler struct {
 
 	planLimits *plan.Table // apps / records / photos per plan (plan_limits.go, #317); nil = not checked
 
+	usage *usageState // GET /v1/me/usage and /apps/{appId}/usage (usage.go); nil = no AI units
+
 	outbox   outboxConfig // RUNNER_OUTBOX / APP_ENV: set by outbox.go (#341)
 	activity activity     // lastOpenedAt written today (activity.go, #342)
 
