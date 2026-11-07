@@ -226,8 +226,8 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var back: String?           // 裏の field
     public var toggle: String?         // 覚えた / まだ を保存する boolean field
     // feed(#348)。URL は持たない
-    public var provider: String?       // weather|holidays|rss
-    public var region: String?         // weather: 気象庁の府県予報区のコード
+    public var provider: String?       // weather|warnings|pressure|holidays|rss
+    public var region: String?         // weather / warnings / pressure: 気象庁の府県予報区のコード
     public var feedId: String?         // rss: 許可したフィードの id
 
     /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。

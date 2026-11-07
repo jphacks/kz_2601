@@ -351,7 +351,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [KB_2318](https://github.com/jphacks/KB_2318) | - | READMEが雛形のままで内容なし | その他 | ? | - | 判定不能 |  |
 | [KB_2319](https://github.com/jphacks/KB_2319) | - | READMEが雛形のままで内容なし | その他 | ? | - | 判定不能 |  |
 | [KB_2320](https://github.com/jphacks/KB_2320) | - | READMEが雛形のままで内容なし | その他 | ? | - | 判定不能 |  |
-| [NG_2301](https://github.com/jphacks/NG_2301) | 気圧変化確認ツール | 地点を登録して気圧の予測グラフを見る | 外部API,記録 | ○ | EXT_API | 天気の予報は feed の weather(#659)で出せる。気圧の予測グラフは欠ける |  |
+| [NG_2301](https://github.com/jphacks/NG_2301) | 気圧変化確認ツール | 地点を登録して気圧の予測グラフを見る | 外部API,記録 | ◎ | - | (2026-11-08 見直し)feed pressure で府県の 48 時間の気圧の予報(6 時間ごとの最低 / 最高・急な低下の印・小さな折れ線)を出せる。地点は府県の代表地点で、任意の地点は選べない |  |
 | [NG_2302](https://github.com/jphacks/NG_2302) | DJふっきん(公式の一覧: DJ腹筋) | 車内の全員が曲をリクエストして順に流す | 音声,共有 | ○ | STT,BG_SENSE | 音声リクエストと音量の自動調整が欠ける | 決勝 |
 | [NG_2303](https://github.com/jphacks/NG_2303) | Adversarial Armor | AIが誤認識する画像を当てるクイズ | AI,ゲーム | × | CUSTOM_ML,IMAGE_AI | AI判定が本体。代案は固定問題の画像クイズ |  |
 | [NG_2304](https://github.com/jphacks/NG_2304) | - | README が雛形のまま | その他 | ? | - | 判定不能 |  |
@@ -598,7 +598,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [fk_2510](https://github.com/jphacks/fk_2510) | - | README が雛形のまま | その他 | ? | - | 内容が読めず判定不可 |  |
 | [hs_2501](https://github.com/jphacks/hs_2501) | AIbum | 写真と絵文字から日記文を生成し継続日数を見せるアプリ | AI,カメラ,記録 | ◎ | - | 日記の本文は aiButton generate の length long(追記)。写真そのものは送らず、端末内の analyze の説明を材料にする |  |
 | [hs_2502](https://github.com/jphacks/hs_2502) | LangBridge | 英文を利用者の語彙レベルに合わせ日英混在で表示する | AI,Web専用 | △ | CLOUD_AI,SERVER_LOGIC | 語彙レベル判定と混在翻訳の処理を足す |  |
-| [hs_2503](https://github.com/jphacks/hs_2503) | hinavi | 災害情報と避難所までの道案内、現地情報の投稿ができる防災アプリ | 地図,共有,外部API | ○ | EXT_API | 気象庁の災害情報が欠ける。避難所データと道案内は可 | 企業賞 |
+| [hs_2503](https://github.com/jphacks/hs_2503) | hinavi | 災害情報と避難所までの道案内、現地情報の投稿ができる防災アプリ | 地図,共有,外部API | ◎ | - | (2026-11-08 見直し)気象庁の警報・注意報は feed warnings、避難所データと道案内・投稿は既存の部品で可 | 企業賞 |
 | [hs_2504](https://github.com/jphacks/hs_2504) | PoseTrack | Webカメラで座り姿勢を常時監視し悪いと知らせる | カメラ,AI | △ | CAMERA_LIVE | 連続した姿勢推定を足す。1枚撮影の角度判定は可 |  |
 | [hs_2505](https://github.com/jphacks/hs_2505) | - | README が雛形のまま | その他 | ? | - | 内容が読めず判定不可 |  |
 | [hs_2506](https://github.com/jphacks/hs_2506) | TaskEcho ver2.0 | 授業を文字起こしし、キーワード周辺を要約してカレンダーやNotionに登録する | 音声,AI,外部API | × | STT,EXT_API,CLOUD_AI | 常時文字起こしと外部連携が難しい。代案は期限の手動入力と通知 |  |

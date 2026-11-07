@@ -8,9 +8,10 @@ import (
 )
 
 // Feed (#348) expect keys, checked by checkFeed:
-//   - feed (string): some feed reads this provider (weather|holidays|rss);
+//   - feed (string): some feed reads this provider (weather|warnings|pressure|holidays|rss);
 //     "none" = no feed at all (e.g. an arbitrary URL that must not become one).
-//   - feedRegion (string): some weather feed uses this forecast office code.
+//   - feedRegion (string): some weather / warnings / pressure feed uses this
+//     forecast office code.
 //
 // Cases: internal/ai/eval/feed_cases.json (-cases) and feed_chat_cases.json
 // (-chat -cases).
@@ -27,7 +28,7 @@ func checkFeed(exp map[string]any, a *dsl.App) []string {
 			for _, x := range append([]dsl.Component{c}, c.Children...) {
 				if x.Type == dsl.CompFeed {
 					providers = append(providers, x.Provider)
-					if x.Provider == dsl.FeedWeather {
+					if dsl.FeedUsesRegion(x.Provider) {
 						regions = append(regions, x.Region)
 					}
 				}

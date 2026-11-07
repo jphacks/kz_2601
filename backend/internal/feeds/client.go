@@ -31,6 +31,8 @@ type RSSFeed struct {
 // httptest server; production uses DefaultEndpoints.
 type Endpoints struct {
 	WeatherBase string // + "{region}.json"
+	WarningBase string // + "{region}.json"
+	Pressure    string // + "?lat=..&lon=.." (pressurePoints)
 	Holidays    string
 	RSS         map[string]RSSFeed
 }
@@ -40,6 +42,8 @@ type Endpoints struct {
 func DefaultEndpoints() Endpoints {
 	return Endpoints{
 		WeatherBase: "https://www.jma.go.jp/bosai/forecast/data/forecast/",
+		WarningBase: "https://www.jma.go.jp/bosai/warning/data/r8/",
+		Pressure:    "https://api.met.no/weatherapi/locationforecast/2.0/compact",
 		Holidays:    "https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv",
 		RSS: map[string]RSSFeed{
 			"digital-news":  {Name: "デジタル庁 新着・更新", URL: "https://www.digital.go.jp/rss/news.xml", Publisher: "デジタル庁", SiteURL: "https://www.digital.go.jp/"},
@@ -55,6 +59,10 @@ func (ep Endpoints) source(q Query) Source {
 	switch q.Provider {
 	case dsl.FeedWeather:
 		return Source{Name: "気象庁ホームページ", URL: "https://www.jma.go.jp/", License: pdl}
+	case dsl.FeedWarnings:
+		return Source{Name: "気象庁ホームページ", URL: "https://www.jma.go.jp/bosai/warning/", License: pdl}
+	case dsl.FeedPressure:
+		return Source{Name: "MET Norway(ノルウェー気象研究所)", URL: "https://api.met.no/", License: "CC BY 4.0・6 時間ごとにまとめて加工"}
 	case dsl.FeedHolidays:
 		return Source{Name: "内閣府ホームページ", URL: "https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html", License: pdl}
 	}
@@ -66,6 +74,19 @@ func (ep Endpoints) source(q Query) Source {
 // dsl.WeatherRegions (6 digits), so it cannot add a path or a query.
 func (ep Endpoints) weatherURL(region string) string { return ep.WeatherBase + region + ".json" }
 
+// warningURL builds the warning URL (region checked like weatherURL).
+func (ep Endpoints) warningURL(region string) string { return ep.WarningBase + region + ".json" }
+
+// pressureURL builds the forecast URL for the region's fixed point. MET
+// Norway asks for at most 4 decimals; the points have 2.
+func (ep Endpoints) pressureURL(region string) (string, bool) {
+	p, ok := pressurePoints[region]
+	if !ok {
+		return "", false
+	}
+	return fmt.Sprintf("%s?lat=%.2f&lon=%.2f", ep.Pressure, p[0], p[1]), true
+}
+
 // hosts are the scheme + host pairs the endpoints use.
 func (ep Endpoints) hosts() map[string]bool {
 	out := map[string]bool{}
@@ -75,6 +96,8 @@ func (ep Endpoints) hosts() map[string]bool {
 		}
 	}
 	add(ep.WeatherBase)
+	add(ep.WarningBase)
+	add(ep.Pressure)
 	add(ep.Holidays)
 	for _, f := range ep.RSS {
 		add(f.URL)

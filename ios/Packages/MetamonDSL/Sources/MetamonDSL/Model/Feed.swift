@@ -19,11 +19,13 @@ public struct FeedQuery: Hashable, Sendable {
     /// 部品から。provider が知らない値なら nil(描かずにプレースホルダ)。
     public init?(_ c: Component) {
         guard let p = c.provider, Self.providers.contains(p) else { return nil }
-        self.init(provider: p, region: p == "weather" ? c.region : nil, feedId: p == "rss" ? c.feedId : nil,
+        self.init(provider: p, region: Self.regionProviders.contains(p) ? c.region : nil, feedId: p == "rss" ? c.feedId : nil,
                   limit: Swift.min(Swift.max(c.limit ?? 5, 1), 20))
     }
 
-    public static let providers: Set<String> = ["weather", "holidays", "rss"]
+    public static let providers: Set<String> = ["weather", "holidays", "rss", "warnings", "pressure"]
+    /// `region`(府県予報区のコード)を読む provider。
+    public static let regionProviders: Set<String> = ["weather", "warnings", "pressure"]
 
     /// `v1/feeds/{provider}?…`(値は英数字とハイフンだけなので、そのまま URL に入る)。
     public var path: String {
@@ -75,11 +77,15 @@ public struct FeedItem: Decodable, Sendable, Equatable, Identifiable {
     public var max: Double?
     public var min: Double?
     public var pop: Int?
+    /// pressure: 24 時間以内に 6 hPa 以上下がる。
+    public var drop: Bool?
+    /// pressure: 行の中の 1 時間ごとの気圧(hPa)。
+    public var series: [Double]?
 
     public var id: String { "\(date ?? "")|\(title)|\(url ?? "")" }
 
     public init(date: String? = nil, title: String, subtitle: String? = nil, icon: String? = nil, url: String? = nil,
-                max: Double? = nil, min: Double? = nil, pop: Int? = nil) {
+                max: Double? = nil, min: Double? = nil, pop: Int? = nil, drop: Bool? = nil, series: [Double]? = nil) {
         self.date = date
         self.title = title
         self.subtitle = subtitle
@@ -88,6 +94,8 @@ public struct FeedItem: Decodable, Sendable, Equatable, Identifiable {
         self.max = max
         self.min = min
         self.pop = pop
+        self.drop = drop
+        self.series = series
     }
 
     /// 開ける記事のリンク(https だけ)。

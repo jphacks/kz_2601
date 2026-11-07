@@ -77,6 +77,8 @@ func newFake(t *testing.T) *fake {
 		"/rss2.xml":             []byte(rss2),
 		"/rdf.xml":              []byte(rdf),
 		"/atom.xml":             []byte(atom),
+		"/warning/016000.json":  fixture(t, "jma_warning_r8_016000.json"),
+		"/met/compact":          fixture(t, "met_compact_170000.json"),
 	}, code: map[string]int{}}
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n, _ := f.hits.LoadOrStore(r.URL.Path, new(atomic.Int32))
@@ -113,6 +115,8 @@ func (f *fake) count(path string) int32 {
 func (f *fake) endpoints() *Endpoints {
 	return &Endpoints{
 		WeatherBase: f.srv.URL + "/forecast/",
+		WarningBase: f.srv.URL + "/warning/",
+		Pressure:    f.srv.URL + "/met/compact",
 		Holidays:    f.srv.URL + "/syukujitsu.csv",
 		RSS: map[string]RSSFeed{
 			"digital-news":  {Name: "RSS2", URL: f.srv.URL + "/rss2.xml", Publisher: "A", SiteURL: "https://a.example/"},
