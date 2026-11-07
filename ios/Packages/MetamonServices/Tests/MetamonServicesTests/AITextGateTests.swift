@@ -11,6 +11,46 @@ final class AITextGateTests: XCTestCase {
         XCTAssertEqual(AITextGate.decide(consentGranted: true, isPro: false, enforced: false), .send, "課金の制限の無効化中(Debug の既定)は通す")
     }
 
+    /// 共有のアプリの中では Pro でなくてもサーバーに判定させる(参加者は作成者の Pro で通る)。同意は先に要る
+    func testSharedAppDefersProToServer() {
+        XCTAssertEqual(AITextGate.decide(consentGranted: true, isPro: false, enforced: true, sharedApp: true), .send)
+        XCTAssertEqual(AITextGate.decide(consentGranted: false, isPro: false, enforced: true, sharedApp: true), .needsConsent)
+        XCTAssertEqual(AITextGate.decide(consentGranted: true, isPro: false, enforced: true, sharedApp: false), .needsPro, "自分だけのアプリは今まで通り")
+    }
+
+    /// 参加者への 402(creator_needs_pro)は課金画面ではなく案内。作成者・参加者でない人は今まで通り課金画面(needsPro)
+    func testCreatorNeedsProIsNeutral() {
+        let participant = HTTPAIClient.textError(.server(status: 402, code: "pro_required", message: "this needs Tailor It Pro: onlineAI",
+                                                         details: ["reason": .string("creator_needs_pro")]))
+        XCTAssertEqual(participant as? AITextError, .creatorNeedsPro)
+        XCTAssertEqual(participant.localizedDescription, "この機能は今は使えません。アプリを作った人に知らせてください")
+        XCTAssertFalse(participant.localizedDescription.contains("Pro"), "参加者には課金の案内を出さない")
+        let creator = HTTPAIClient.textError(.server(status: 402, code: "pro_required", message: "x", details: [:]))
+        XCTAssertEqual(creator as? AITextError, .needsPro)
+    }
+
+    /// appId はオンライン版の本文に入る(付けなければ送らない)
+    func testRequestCarriesAppId() throws {
+        let base = AITextRequest(instruction: "励まし", shape: .line)
+        let plain = try JSONSerialization.jsonObject(with: JSONEncoder().encode(base)) as? [String: Any]
+        XCTAssertNil(plain?["appId"])
+        let scoped = base.inApp("app-123")
+        XCTAssertEqual(scoped.appId, "app-123")
+        let body = try JSONSerialization.jsonObject(with: JSONEncoder().encode(scoped)) as? [String: Any]
+        XCTAssertEqual(body?["appId"] as? String, "app-123")
+        XCTAssertEqual(body?["instruction"] as? String, "励まし")
+        XCTAssertNil(base.inApp("").appId, "空の appId は付けない")
+    }
+
+    /// 長い文の依頼にも appId が付き、length は残る(作成者の Pro で判定される)
+    func testLongRequestCarriesAppId() throws {
+        let long = AITextRequest(instruction: "手紙", shape: .line, length: "long").inApp("app-123")
+        XCTAssertTrue(long.isLong)
+        let body = try JSONSerialization.jsonObject(with: JSONEncoder().encode(long)) as? [String: Any]
+        XCTAssertEqual(body?["length"] as? String, "long")
+        XCTAssertEqual(body?["appId"] as? String, "app-123")
+    }
+
     func testMockIsDeterministicPerShape() async throws {
         let mock = MockAIClient(delay: .zero)
         let list = AITextRequest(instruction: "罰ゲーム", shape: .list, count: 4)

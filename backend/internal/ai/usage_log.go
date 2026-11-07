@@ -138,6 +138,10 @@ func (c *Client) logUsage(ctx context.Context, r usageRecord) {
 	if h := UIDHash(auth.UID(ctx)); h != "" {
 		attrs = append(attrs, slog.String("uid_hash", h))
 	}
+	// a shared app's participant: the creator's Pro covers the call
+	if p := payerOf(ctx); p != "" {
+		attrs = append(attrs, slog.String("payer_uid_hash", UIDHash(p)))
+	}
 	// the model that answered is the one billed (a fallback may differ)
 	priced := r.model
 	if respModel != "" {

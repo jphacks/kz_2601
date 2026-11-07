@@ -74,10 +74,10 @@ public struct AutomationRule: Decodable, Sendable, Equatable, Identifiable {
     /// 直近の結果(openapi `AutomationResult`)。知らない語は `.other`。
     public enum Result: String, Sendable, Equatable, CaseIterable {
         case none, ok, notifyPaused = "notify_paused", limit, serviceLimit = "service_limit", servicePaused = "service_paused"
-        case plan, stopped, changed, unavailable, late, inactive, failed, other
+        case plan, stopped, changed, unavailable, late, inactive, failed, disabled, other
 
-        /// 止まった・動かなかった(理由とお問い合わせへの導線を出す)
-        public var isProblem: Bool { self != .none && self != .ok }
+        /// 止まった・動かなかった(理由とお問い合わせへの導線を出す)。作成者がオフにした(`disabled`)は自分の操作なので含めない
+        public var isProblem: Bool { self != .none && self != .ok && self != .disabled }
     }
 
     public enum Trigger: String, Decodable, Sendable, Equatable { case record, schedule }
@@ -91,9 +91,18 @@ public struct AutomationRule: Decodable, Sendable, Equatable, Identifiable {
     public var lastOkAt: Date?
     /// 運営がこのルールを止めている
     public var stopped: AutomationStop?
+    /// 作成者のオン / オフ(`serverRules[].enabled`)。nil = 返さない古いサーバー(切り替えを出さない)
+    public var enabled: Bool?
+    /// うまくいかなかった回数の連続(省略 = 0)
+    public var consecutiveFailures: Int
+
+    /// 何回続けて失敗したら「直しますか?」を出すか
+    public static let fixSuggestionThreshold = 3
+    public var suggestsFix: Bool { consecutiveFailures >= Self.fixSuggestionThreshold }
 
     public init(id: String, description: String, trigger: Trigger = .record, result: Result = .none,
-                lastRunAt: Date? = nil, lastOkAt: Date? = nil, stopped: AutomationStop? = nil) {
+                lastRunAt: Date? = nil, lastOkAt: Date? = nil, stopped: AutomationStop? = nil,
+                enabled: Bool? = nil, consecutiveFailures: Int = 0) {
         self.id = id
         self.description = description
         self.trigger = trigger
@@ -101,9 +110,11 @@ public struct AutomationRule: Decodable, Sendable, Equatable, Identifiable {
         self.lastRunAt = lastRunAt
         self.lastOkAt = lastOkAt
         self.stopped = stopped
+        self.enabled = enabled
+        self.consecutiveFailures = consecutiveFailures
     }
 
-    enum CodingKeys: String, CodingKey { case id, description, trigger, result, lastRunAt, lastOkAt, stopped }
+    enum CodingKeys: String, CodingKey { case id, description, trigger, result, lastRunAt, lastOkAt, stopped, enabled, consecutiveFailures }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -114,6 +125,8 @@ public struct AutomationRule: Decodable, Sendable, Equatable, Identifiable {
         lastRunAt = try c.decodeIfPresent(String.self, forKey: .lastRunAt).flatMap(AppSummary.parseDate)
         lastOkAt = try c.decodeIfPresent(String.self, forKey: .lastOkAt).flatMap(AppSummary.parseDate)
         stopped = try c.decodeIfPresent(AutomationStop.self, forKey: .stopped)
+        enabled = try? c.decodeIfPresent(Bool.self, forKey: .enabled)
+        consecutiveFailures = max(0, (try? c.decodeIfPresent(Int.self, forKey: .consecutiveFailures)) ?? 0)
     }
 }
 
@@ -121,6 +134,8 @@ public struct AutomationRule: Decodable, Sendable, Equatable, Identifiable {
 public protocol AutomationsClient: Sendable {
     /// 作成者以外は 403(`APIError.status == 403`)。
     func automations(appId: String) async throws -> AppAutomations
+    /// ルールのオン / オフ(`PATCH /v1/apps/{appId}/dsl`・If-Match)。他で変わっていれば 412(`APIError.status == 412`)。
+    func setRule(_ ruleId: String, enabled: Bool, appId: String) async throws
 }
 
 /// live の時だけ差し込む(モックとインメモリでは nil = 設定の行を出さない)。
