@@ -30,6 +30,13 @@ extension AppRuntime {
         guard await recordSync.undoDelete(undo.ticket) != nil else { return }
         await reloadLocal(undo.ticket.entity, appId: undo.ticket.appId) // 別のアプリに切り替えた後なら読まない
     }
+
+    /// ログアウト・アカウント削除の前: 「元に戻す」を閉じ、取り消し待ちの削除を待たずに送信の列へ積む
+    /// (オンラインならいまのアカウントで送る。オフラインなら列に残り、ログアウトの確認の未送信件数に入る → 送らないなら端末の削除と一緒に消える)。
+    func settlePendingRecordDeletes() async {
+        withAnimation { recordUndo = nil }
+        await recordSync.commitPendingDeletions()
+    }
 }
 
 /// 下部の「削除しました・元に戻す」。トーストと同じカプセルで、`RecordUndo.seconds` で消える(消えた時に送られる)。
