@@ -76,8 +76,9 @@ func Relax(raw []byte) (json.RawMessage, error) {
 
 // compact shrinks the grammar Claude has to compile: the 15-way Leaf anyOf
 // (expanded once per reference) exceeds the API's grammar size limit. Leaf
-// and Component become one flattened object (type enum + every property
-// optional) and PatchValue becomes primitives | flat node | arrays. Per-type
+// becomes one flattened object (type enum + every property optional),
+// Component becomes Container | Leaf, and PatchValue becomes primitives |
+// flat node | arrays. Per-type
 // required props and combinations are enforced afterwards by dsl.Parse.
 func compact(root map[string]any) {
 	defs, _ := root["$defs"].(map[string]any)
@@ -92,19 +93,19 @@ func compact(root map[string]any) {
 	leafFlat["description"] = "Leaf component. `type` decides which other properties apply (see catalog); do not set unrelated properties."
 	defs["Leaf"] = leafFlat
 
+	// The flat Container+Leaf union is only the PatchNode input below; the
+	// schema's Component is Container | Leaf so Leaf's ~100 properties are
+	// written once, not twice.
 	compFlat := mergeObjects(defs, append([]string{"Container"}, leafNames...))
-	compFlat["properties"].(map[string]any)["children"] = map[string]any{
-		"type": "array", "items": map[string]any{"$ref": "#/$defs/Leaf"},
-		"description": "vstack/hstack/section only. Children stack vertically/horizontally and must not carry `area`.",
-	}
-	compFlat["description"] = "Screen-level component: a container (vstack/hstack/section with children) or a leaf."
-	defs["Component"] = compFlat
-	delete(defs, "Container")
+	compFlat["properties"].(map[string]any)["children"] = childrenSchema()
+	component := splitComponent(defs)
+	defs["Component"] = component
 	for _, n := range leafNames {
 		delete(defs, n)
 	}
 
 	if _, ok := defs["PatchValue"]; ok {
+		defs["Component"] = compFlat
 		node := mergeObjects(defs, []string{"AppMeta", "Tab", "Theme", "Notification", "Entity", "Field", "Screen", "ToolbarButton", "Action", "Component", "ListItem", "Sort", "Filter"})
 		node["description"] = "A DSL sub-document (entity, field, screen, component, action, tab, notification, ...). Set only the properties of that node kind."
 		defs["PatchNode"] = node
@@ -117,8 +118,35 @@ func compact(root map[string]any) {
 				map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/PatchNode"}},
 			},
 		}
+		defs["Component"] = component
 	}
 	pruneDefs(root)
+}
+
+// childrenSchema is Container.children in the generation schemas.
+func childrenSchema() map[string]any {
+	return map[string]any{
+		"type": "array", "items": map[string]any{"$ref": "#/$defs/Leaf"},
+		"description": "Leaf children, stacked in order. `area` on children only for the in-container grid (card/section/vstack, all children or none).",
+	}
+}
+
+// splitComponent makes Component = Container | Leaf (a 2-way anyOf, not the
+// 15-way one compact removes). A restriction that disallows every container
+// leaves Component = Leaf.
+func splitComponent(defs map[string]any) map[string]any {
+	desc := "Screen-level component: a container (Container, with Leaf children) or a Leaf."
+	container, _ := defs["Container"].(map[string]any)
+	props, _ := container["properties"].(map[string]any)
+	tp, _ := props["type"].(map[string]any)
+	if en, _ := tp["enum"].([]any); len(en) == 0 {
+		delete(defs, "Container")
+		return map[string]any{"description": desc, "anyOf": []any{map[string]any{"$ref": "#/$defs/Leaf"}}}
+	}
+	props["children"] = childrenSchema()
+	return map[string]any{"description": desc, "anyOf": []any{
+		map[string]any{"$ref": "#/$defs/Container"}, map[string]any{"$ref": "#/$defs/Leaf"},
+	}}
 }
 
 // refNames lists the $defs names referenced by a schema's anyOf.
