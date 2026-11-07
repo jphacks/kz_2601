@@ -120,6 +120,10 @@ var expectKeys = map[string]expectKind{
 	// checkNotifyWhen (#265): notify_when.go
 	"notifyWhen":   expectBool,
 	"notifyWhenOp": expectString,
+	// checkNotifyNear: notify_near.go
+	"notifyNear":       expectBool,
+	"notifyNearRepeat": expectString,
+	"jitter":           expectBool,
 	// checkAlarm: alarm.go
 	"alarm":       expectBool,
 	"alarmRecord": expectBool,

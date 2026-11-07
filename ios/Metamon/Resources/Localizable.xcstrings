@@ -8127,6 +8127,23 @@
         }
       }
     },
+    "位置情報が許可されていないため、場所に着いた時の通知は届きません(タップで設定を開く)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location access is off, so arrival notifications won't arrive (tap to open Settings)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報が許可されていないため、場所に着いた時の通知は届きません(タップで設定を開く)"
+          }
+        }
+      }
+    },
     "位置情報の許可を待っています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8395,6 +8412,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保存したら、一覧の画面に自動で戻るようにして"
+          }
+        }
+      }
+    },
+    "保存した場所 %lld か所の近くに着いたら知らせます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You'll be notified when you arrive near %lld saved place(s)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存した場所 %lld か所の近くに着いたら知らせます"
           }
         }
       }

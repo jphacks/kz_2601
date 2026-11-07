@@ -65,6 +65,8 @@ type Restriction struct {
 	noRoles bool
 	// noAddressed (#271): the client has no members picker (messages_addressed_rules.go)
 	noAddressed bool
+	// noNear: the client has no Notification.near / jitterMinutes (notify_near_rules.go)
+	noNear bool
 	key         string // "" = no restriction; memo key otherwise
 }
 
@@ -152,6 +154,9 @@ func NewClientRestriction(allowed, disabled, supported []string) Restriction {
 	if len(allowed) > 0 && !slices.Contains(supported, FeatureAddressed) {
 		r.noAddressed = true
 	}
+	if len(allowed) > 0 && !slices.Contains(supported, FeatureNotificationNear) {
+		r.noNear = true
+	}
 	r.withholdMatchingUI()
 	r.setKey()
 	return r
@@ -171,9 +176,9 @@ func (r *Restriction) withholdMatchingUI() {
 
 func (r *Restriction) setKey() {
 	r.key = ""
-	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared || r.noRetention || r.noWhen || r.noMatching || r.noSingle || r.noRoles || r.noAddressed {
+	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared || r.noRetention || r.noWhen || r.noMatching || r.noSingle || r.noRoles || r.noAddressed || r.noNear {
 		r.key = strings.Join(r.Disallowed(), ",") + fmt.Sprintf("|h=%t|c=%t|s=%t|r=%t|w=%t", r.noHealth, r.noCamera, r.noShared, r.noRetention, r.noWhen) +
-			fmt.Sprintf("|m=%t|1=%t|a=%t|to=%t", r.noMatching, r.noSingle, r.noRoles, r.noAddressed)
+			fmt.Sprintf("|m=%t|1=%t|a=%t|to=%t|n=%t", r.noMatching, r.noSingle, r.noRoles, r.noAddressed, r.noNear)
 	}
 }
 
@@ -188,6 +193,9 @@ func (r Restriction) NoRetention() bool { return r.noRetention }
 
 // NoWhen reports whether Notification.when is unavailable (#265).
 func (r Restriction) NoWhen() bool { return r.noWhen }
+
+// NoNear reports whether Notification.near / jitterMinutes are unavailable.
+func (r Restriction) NoNear() bool { return r.noNear }
 
 // Active reports whether anything is restricted.
 func (r Restriction) Active() bool { return r.key != "" }
@@ -327,6 +335,9 @@ func restrictSchemaJSON(raw []byte, r Restriction) []byte {
 			props, _ := n["properties"].(map[string]any)
 			delete(props, "when")
 		}
+	}
+	if r.noNear {
+		restrictNearSchema(defs)
 	}
 	if r.noMatching {
 		if entity, _ := defs["Entity"].(map[string]any); entity != nil {
@@ -496,6 +507,9 @@ func buildRestrictedPrompt(system string, r Restriction) string {
 		s = strings.Replace(s, condNotifyCanLine, condNotifyCannotLine, 1)
 		s = strings.Replace(s, notifyWhenChatRule, noNotifyWhenChatRule, 1)
 	}
+	if r.noNear {
+		s = dropNearRules(s)
+	}
 	if r.noMatching {
 		s = strings.Replace(s, "\n\n"+matchingRules, "", 1)
 		s = strings.Replace(s, matchingChatRule, noMatchingChatRule, 1)
@@ -566,6 +580,9 @@ func restrictionNote(r Restriction) string {
 	}
 	if r.noWhen {
 		b.WriteString("- 条件で知らせる通知(app.notifications の when)は使わない(この版では条件を確かめられない)。在庫が減ったら・予算を超えたら等と頼まれたら、不足の一覧などで代替し「条件で知らせる通知はこの版ではできないため、○○で代替しました。」と申告する。\n")
+	}
+	if r.noNear {
+		b.WriteString(noNearNote)
 	}
 	if r.noMatching && !r.noShared {
 		b.WriteString("- entity の match は使わない(この版ではお互いに承認してつながる仕組みが無い)。仲間探しを頼まれたら「この版ではお互いに承認してつながる仕組みは使えません。最新版に更新すると使えます」と伝え、みんなで見るプロフィールの一覧(連絡先・写真・位置は載せない)で近い形を作る。\n")
@@ -656,6 +673,9 @@ func restrictionViolations(raw, base []byte, r Restriction) []string {
 				out = append(out, fmt.Sprintf("app.notifications %q: when (condition notification) is not available in this app build: remove the notification and substitute (e.g. a shortage list)", id))
 			}
 		}
+	}
+	if r.noNear {
+		out = append(out, nearViolations(raw, base)...)
 	}
 	if r.noSingle {
 		prev := map[string]bool{}
@@ -903,7 +923,11 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 	if r.noAddressed || r.noRoles {
 		addressed = unaddress(root, r.noAddressed)
 	}
-	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 && when == 0 && matching == 0 && single == 0 && roles == 0 && addressed == 0 {
+	near := 0
+	if r.noNear {
+		near = unnear(root)
+	}
+	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 && when == 0 && matching == 0 && single == 0 && roles == 0 && addressed == 0 && near == 0 {
 		return raw, nil, false
 	}
 	for _, t := range sortedIntKeys(removed) {
@@ -935,6 +959,9 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 	}
 	if addressed > 0 {
 		notes = append(notes, fmt.Sprintf("dropped addressedTo / members on %d place(s)", addressed))
+	}
+	if near > 0 {
+		notes = append(notes, fmt.Sprintf("dropped near notification / jitterMinutes on %d place(s)", near))
 	}
 	b, err := json.Marshal(root)
 	if err != nil {

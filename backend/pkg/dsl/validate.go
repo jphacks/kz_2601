@@ -282,6 +282,7 @@ func (a *App) Validate() error {
 		checkNotification(fmt.Sprintf("app.notifications[%d]", i), n, add)
 		checkRecordNotification(fmt.Sprintf("app.notifications[%d]", i), n, entities, add)
 		checkWhenNotification(fmt.Sprintf("app.notifications[%d]", i), n, entities, add)
+		checkNearNotification(fmt.Sprintf("app.notifications[%d]", i), n, entities, add)
 	}
 
 	screens := map[string]bool{}
@@ -347,6 +348,7 @@ func (a *App) Validate() error {
 				if act.Notification.When != nil {
 					add("%s: notification when (condition) belongs in app.notifications, not scheduleNotification", where)
 				}
+				checkNearAction(where, act.Notification, add)
 			}
 		case ActionCancelNotif:
 			if act.NotificationID == "" {

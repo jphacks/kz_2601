@@ -59,7 +59,7 @@ Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|me
   Entity.addressedTo?: fieldId(宛先の member / members field。作った人と宛先の人だけが読む)・Field.type "members" — §3.14
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section|card|disclosure|carousel|grid, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (66 種・全て id? と area? を持つ) / Action (16 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField?, when?, alarm? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
+Leaf (66 種・全て id? と area? を持つ) / Action (16 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField?, when?, alarm?, near?{entity, locationField, radiusM?}, jitterMinutes? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
@@ -576,6 +576,30 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - AI: `backend/internal/ai/alarm_rules.go`。ai-eval の `alarm` / `alarmRecord`(`alarm_cases.json`)。
 - カウントダウン(スヌーズ・タイマー)は使わないので、AlarmKit 用の Live Activity(ウィジェット拡張の `ActivityConfiguration(for: AlarmAttributes…)`)は用意していない。鳴った時の画面は OS の標準のもの(実機で確かめる)。
 
+### 3.16 通知の near = 場所に着いたら知らせる・jitterMinutes = 時刻をずらす
+
+「降りる駅に近づいたら知らせて」「お店の近くを通ったら」「危ない場所に近づいたら警告」は、`app.notifications[]` に `near` を書く。場所は `near.entity` の各レコードの location field(`"lat,lng"`)。「ランダムな時間に」「期限を内緒で前倒し」は、時刻の通知に `jitterMinutes` を足す。
+
+```json
+{"id":"arrive","title":"もうすぐ到着","body":"降りる準備を","repeat":"once","near":{"entity":"stations","locationField":"spot","radiusM":800}}
+{"id":"photo","title":"写真の時間","body":"","repeat":"daily","time":"20:00","jitterMinutes":60}
+```
+
+| 項目 | 決めたこと |
+|---|---|
+| near の形 | `{entity, locationField, radiusM?}`。`locationField` は location 型。`radiusM` は 100〜2000(省略 200) |
+| 引き金は 1 つ | `near` があればそれだけが引き金。`time` / `weekday` / `entity` / `field` / `offsetMinutes` / `titleField` / `enabledField` / `when` / `alarm` / `jitterMinutes` とは組み合わせない。`repeat` は `once`(最初に着いた 1 回だけ)か `daily`(着くたび)。`scheduleNotification` には書けない(`app.notifications` だけ)。backend が拒否(`backend/pkg/dsl/notification_near.go`) |
+| 判定 | iOS の `UNLocationNotificationTrigger`(`CLCircularRegion`・入った時だけ `notifyOnEntry`)。**判定は端末の中**で、位置を backend に送る処理は足していない(レコードの場所は今までどおりレコードとして保存される) |
+| 上限 | iOS の予約は 1 アプリ 64 件・見張れる領域は約 20。全アプリ合わせて **15 か所**(現在地が OS に残っていれば近い順、無ければ新しく保存した順)。残りの枠(60 − 場所の数)を時刻の通知が近い順に使う。レコードが変わる・アプリを開くたびに選び直す |
+| 1 回きり | 予約したのに iOS の予約から消えていれば届いたとみなし、予約し直さない(端末の UserDefaults に記録)。場所(緯度・経度・半径)を直したら見張り直す |
+| 許可 | 位置情報は「使用中のみ」(`NSLocationWhenInUseUsageDescription`)。場所を保存したアプリの予約の時に、未決定なら 1 回だけ聞く。拒否されたら聞き直さず、設定画面の通知の欄に「位置情報が許可されていないため、場所に着いた時の通知は届きません」と出す(上のバーは出さない) |
+| jitterMinutes | 1〜60。時刻の通知(`time` か `entity` + `field`)の回ごとに ±N 分ずらす。ずらし幅は通知の識別子と回の時刻から決まり(FNV-1a)、予約し直しても同じ回は同じ時刻。くり返し(daily / weekly / monthly / yearly)は回ごとに時刻が違うので、近い回から具体的な日時で予約する(毎日 7・毎週 4・毎月 3・毎年 2 回分。識別子 `<id>.j<回の分>`)。「いつも早めに」は `offsetMinutes: -N` と `jitterMinutes: N`(0〜2N 分前)。`when` / `near` / `scheduleNotification` には付けない |
+
+- 古い iOS: `near` を知らない版は残りを**次の 9:00 の 1 回きりの通知として予約してしまう**ので、iOS は `supportedFeatures` に `notification.near` を入れ、`allowedComponents` を送るのにこれを含めない版には AI が `near` / `jitterMinutes` を使わない(生成されたら near の通知ごと・`jitterMinutes` のキーを落とす・§5.3)。審査用の版も送る(位置の判定は端末の中だけ)。保存済みの DSL を古い版で開いた時は防げない(`when` と同じ既知の制限)。
+- iOS: 組み立ては `NotificationPlanner+Near.swift`(純関数)、予約は `UserNotificationScheduler`、1 回きりの記録と許可は `RegionNotifications.swift`(MetamonServices)。
+- AI: `backend/internal/ai/notify_near_rules.go`。ai-eval の `notifyNear` / `notifyNearRepeat` / `jitter`(`notify_near_cases.json`)。
+- できないこと: 残りの距離を通知に出し続ける・経路の途中で鳴らす(道案内は `routeGuide`)・ほかの人が足した場所を、この端末が同期する前に見張る。
+
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 
 AI に渡す部品カタログは手書きではなく **`dsl.schema.json` から自動生成**される(`backend/internal/ai/catalog.go` の `BuildCatalog`)。検証(Go)・描画(iOS)・AI(プロンプト)の 3 者はすべてスキーマから導出され、抜けはテストで赤になる。
@@ -616,7 +640,7 @@ App Store に出した後は古い iOS が残り続ける。backend は「今い
 | どこに | 中身 | 使い道 |
 |---|---|---|
 | generate / chat の body `allowedComponents` | その版が描画できる部品 type の全部(`ComponentType` から自動) | backend はここに**無い** type を生成結果に入れない(下) |
-| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(`recordRetention`・#482、`matching`・#507、`notification.when`・#265、`singleEntity`・#267、`dataRoles`・#272、`addressedMessages`・#271。審査用の版は `matching`・`dataRoles`・`addressedMessages` を送らない) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
+| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(`recordRetention`・#482、`matching`・#507、`notification.when`・#265、`singleEntity`・#267、`dataRoles`・#272、`addressedMessages`・#271、`notification.near`。審査用の版は `matching`・`dataRoles`・`addressedMessages` を送らない) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
 | 全リクエストのヘッダ `X-Client-Platform` / `X-Client-Version` / `X-Client-Build` / `X-Client-DSL-Version` | `ios` / `CFBundleShortVersionString` / `CFBundleVersion` / 描画できる最大の `schemaVersion` | ログ(どの版がまだ使われているか = 最低対応版を上げる判断) |
 
 ### 5.3 backend が古い iOS に新しい部品を出さない仕組み

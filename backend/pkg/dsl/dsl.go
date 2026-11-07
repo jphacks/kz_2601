@@ -66,6 +66,19 @@ type Notification struct {
 	// posts once when it turns false -> true after a record save / delete /
 	// sync on that device. Exclusive with the time and record triggers.
 	When *Expr `json:"when,omitempty"`
+	// Near (app.notifications only): fire on arriving near a record's
+	// location (iOS region monitoring, on device). Its own trigger.
+	Near *NotificationNear `json:"near,omitempty"`
+	// JitterMinutes shifts each occurrence of a time trigger by a random
+	// ±N minutes (stable per occurrence on iOS). Time triggers only.
+	JitterMinutes int `json:"jitterMinutes,omitempty"`
+}
+
+// NotificationNear: the places are the LocationField values of Entity's records.
+type NotificationNear struct {
+	Entity        string `json:"entity"`
+	LocationField string `json:"locationField"`
+	RadiusM       int    `json:"radiusM,omitempty"` // 0 = DefaultNearRadiusM
 }
 
 // VoiceEntry is how the user re-enters voice mode.

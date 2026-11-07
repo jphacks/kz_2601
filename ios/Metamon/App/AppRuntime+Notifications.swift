@@ -20,7 +20,7 @@ extension AppRuntime {
         let appId = document.appId
         let specs = dsl.app.notifications
         var recs: [String: [Record]] = [:]
-        for entity in Set(specs.filter(\.isRecordBased).compactMap(\.entity)) {
+        for entity in Set(specs.compactMap(\.recordEntity)) {
             if let loaded = records[entity] {
                 recs[entity] = loaded
             } else {
@@ -77,6 +77,9 @@ extension AppRuntime {
         upcomingNotifications = result.upcoming
         // 許可が無い時は上のバー(`NotificationsOffBarHost`・設定を開くボタン付き)で伝える。トーストは 3 秒で消えるのでやめた(L3)
         notificationsDenied = result.denied && hasSpecs
+        notificationPlaces = result.places
+        // 場所の通知の位置情報の許可は聞き直さない・バーも出さない(設定画面の通知の欄に書くだけ)
+        placesLocationOff = result.locationOff && hasSpecs
     }
 }
 

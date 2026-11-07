@@ -54,6 +54,8 @@ public enum AlarmPlanner {
             return .relative(hour: h, minute: m, weekdays: [w])
         case .monthly, .yearly:
             return p.nextFire(after: now, calendar: calendar).map { .fixed($0) }
+        case .region: // 場所の通知は alarm にしない(backend が拒否)
+            return nil
         }
     }
 

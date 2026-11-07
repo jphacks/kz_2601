@@ -17,7 +17,7 @@ final class AppRuntime: DSLRuntime {
     /// entity id → レコード(サーバーが正。ここはキャッシュ)
     private(set) var records: [String: [Record]] = [:] {
         didSet {
-            if dsl.app.notifications.contains(where: \.isRecordBased) { scheduleNotificationSync() } // #228 レコードの時刻から通知
+            if dsl.app.notifications.contains(where: { $0.recordEntity != nil }) { scheduleNotificationSync() } // #228 レコードの時刻・場所から通知
             if dsl.app.notifications.contains(where: \.isConditional) { scheduleConditionCheck() } // #265 条件で知らせる
             refreshLiveActivityStats() // #423 ロック画面の数字
         }
@@ -26,6 +26,9 @@ final class AppRuntime: DSLRuntime {
     var upcomingNotifications: [UpcomingNotification] = []
     /// 通知が許可されていない(予約しても届かない)。
     var notificationsDenied = false
+    /// このアプリで「着いたら知らせる」場所の数(near)と、位置情報が許可されず届かない状態(設定画面に静かに出す)。
+    var notificationPlaces = 0
+    var placesLocationOff = false
     @ObservationIgnored var notificationSyncTask: Task<Void, Never>?
     @ObservationIgnored var conditionCheckTask: Task<Void, Never>?
     private(set) var loading: Set<String> = []

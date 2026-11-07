@@ -88,7 +88,7 @@ func TestDataRolesRestriction(t *testing.T) {
 		t.Fatalf("the enforced DSL must stay valid: %v", err)
 	}
 
-	cur := NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles, FeatureAddressed})
+	cur := NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles, FeatureAddressed, FeatureNotificationNear})
 	if cur.Active() {
 		t.Fatal("a current build must stay unrestricted")
 	}
@@ -97,7 +97,7 @@ func TestDataRolesRestriction(t *testing.T) {
 // Builds without shared data: the roles go with the scope, unique on fields stays.
 func TestDataRolesWithoutSharedData(t *testing.T) {
 	all := allComponentTypes()
-	r := NewClientRestriction(all, []string{FeatureSharedData}, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles, FeatureAddressed})
+	r := NewClientRestriction(all, []string{FeatureSharedData}, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles, FeatureAddressed, FeatureNotificationNear})
 	sch := string(r.assets().genSch)
 	if strings.Contains(sch, `"editableBy"`) || strings.Contains(sch, `"deleteBy"`) || strings.Contains(sch, `"visibleTo"`) {
 		t.Fatal("no shared data: admin rules must leave the schema")

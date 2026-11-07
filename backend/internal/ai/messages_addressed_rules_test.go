@@ -40,7 +40,7 @@ const dmDoc = `{"schemaVersion":1,"app":{"name":"連絡","voiceEntry":"none"},"i
  {"id":"note","title":"ひとこと","entity":"notes","toolbar":[{"label":"送信","action":{"type":"saveRecord","entity":"notes"}}],"components":[
  {"type":"picker","field":"to","label":"宛先"},{"type":"textField","field":"body","label":"本文"}]}]}`
 
-var currentFeatures = []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles, FeatureAddressed}
+var currentFeatures = []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles, FeatureAddressed, FeatureNotificationNear}
 
 // Builds without addressedMessages: no addressedTo / members in the schema,
 // prompt or output, and the output stays valid.
