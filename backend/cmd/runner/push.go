@@ -72,7 +72,7 @@ type userGetter interface {
 	GetUser(ctx context.Context, uid string) (*fbauth.UserRecord, error)
 }
 
-// maxAgeCache bounds firebaseAge's cache (creation times never change).
+// maxAgeCache bounds firestoreAge's and firebaseAge's caches (creation times never change).
 const maxAgeCache = 10000
 
 // firebaseAge implements notify.AccountAge with the Firebase Auth creation
@@ -111,14 +111,64 @@ func (a *firebaseAge) CreatedAt(ctx context.Context, uid string) (time.Time, boo
 	return at, true, nil
 }
 
-// ageFromEnv reads RUNNER_ACCOUNT_AGE: "firebase" = Firebase Auth's creation
-// time (the runner SA needs roles/firebaseauth.viewer; locally the SDK
-// follows FIREBASE_AUTH_EMULATOR_HOST); "" = unknown, so nobody can notify
-// others (only the actor's own notifications are sent).
-func ageFromEnv(ctx context.Context, getenv func(string) string, project string) (notify.AccountAge, error) {
+// firstSeenReader is the part of the store firestoreAge uses.
+type firstSeenReader interface {
+	UserFirstSeen(ctx context.Context, uid string) (time.Time, bool, error)
+}
+
+// firestoreAge implements notify.AccountAge with users/{uid}.firstSeenAt,
+// which appconfig records the first time it sees the uid
+// (store.Accounts.SeeUser). Missing = unknown (counts as new). A known time
+// never changes, so it is cached; unknown is not (the next run reads again).
+type firestoreAge struct {
+	users firstSeenReader
+
+	mu    sync.Mutex
+	cache map[string]time.Time
+}
+
+func (a *firestoreAge) CreatedAt(ctx context.Context, uid string) (time.Time, bool, error) {
+	a.mu.Lock()
+	at, ok := a.cache[uid]
+	a.mu.Unlock()
+	if ok {
+		return at, true, nil
+	}
+	at, known, err := a.users.UserFirstSeen(ctx, uid)
+	if err != nil {
+		return time.Time{}, false, fmt.Errorf("first seen: %w", err)
+	}
+	if !known {
+		return time.Time{}, false, nil
+	}
+	a.mu.Lock()
+	if a.cache == nil || len(a.cache) >= maxAgeCache {
+		a.cache = map[string]time.Time{}
+	}
+	a.cache[uid] = at
+	a.mu.Unlock()
+	return at, true, nil
+}
+
+// ageFromEnv reads RUNNER_ACCOUNT_AGE:
+//
+//	firestore  users/{uid}.firstSeenAt written by appconfig (deployed; only
+//	           roles/datastore.user is needed)
+//	firebase   Firebase Auth's creation time (kept, not deployed: the runner
+//	           SA would need roles/firebaseauth.viewer, infra/runner.tf
+//	           runner_firebaseauth_viewer; locally the SDK follows
+//	           FIREBASE_AUTH_EMULATOR_HOST)
+//	""         unknown, so nobody can notify others (only the actor's own
+//	           notifications are sent)
+func ageFromEnv(ctx context.Context, getenv func(string) string, project string, users firstSeenReader) (notify.AccountAge, error) {
 	switch v := strings.ToLower(strings.TrimSpace(getenv("RUNNER_ACCOUNT_AGE"))); v {
 	case "":
 		return nil, nil
+	case "firestore":
+		if users == nil {
+			return nil, errors.New("RUNNER_ACCOUNT_AGE=firestore needs the store")
+		}
+		return &firestoreAge{users: users}, nil
 	case "firebase":
 		app, err := firebase.NewApp(ctx, &firebase.Config{ProjectID: project})
 		if err != nil {
@@ -130,6 +180,6 @@ func ageFromEnv(ctx context.Context, getenv func(string) string, project string)
 		}
 		return &firebaseAge{users: users}, nil
 	default:
-		return nil, fmt.Errorf("RUNNER_ACCOUNT_AGE must be firebase or empty, got %q", v)
+		return nil, fmt.Errorf("RUNNER_ACCOUNT_AGE must be firestore, firebase or empty, got %q", v)
 	}
 }

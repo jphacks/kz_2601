@@ -13,7 +13,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
-	"github.com/jphacks/kz_2601/backend/internal/paid"
+	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -46,6 +46,9 @@ type TextRequest struct {
 	Task string `json:"task,omitempty"`
 	// Options are the classify candidates (task classify only).
 	Options []string `json:"options,omitempty"`
+	// AppID is the app the button is in (optional). A participant of a
+	// shared app is covered by the creator's Pro (text_payer.go).
+	AppID string `json:"appId,omitempty"`
 }
 
 // TextField is one named value of shape fields.
@@ -133,16 +136,17 @@ func normalizeTextRequest(req *TextRequest) error {
 	return nil
 }
 
-// Text runs one shaped generation.
-func (s *Service) Text(ctx context.Context, req TextRequest) (*TextResult, error) {
+// prepareText validates req in place and resolves its locale (no Claude call).
+func prepareText(req *TextRequest) (Locale, error) {
+	if err := normalizeTextRequest(req); err != nil {
+		return "", err
+	}
+	return resolveLocale(req.Locale, req.Instruction)
+}
+
+// text runs one shaped generation of a request prepareText accepted.
+func (s *Service) text(ctx context.Context, req TextRequest, loc Locale) (*TextResult, error) {
 	started := time.Now()
-	if err := normalizeTextRequest(&req); err != nil {
-		return nil, err
-	}
-	loc, err := resolveLocale(req.Locale, req.Instruction)
-	if err != nil {
-		return nil, err
-	}
 	cfg := s.ChatConfig.resolved()
 	ctx, cancel := context.WithTimeout(ctx, s.chatTimeout())
 	defer cancel()
@@ -323,6 +327,8 @@ func parseTextOutput(raw string, req TextRequest) (*TextResult, error) {
 
 // textHandler serves POST /v1/text. A verified caller is required (the rate
 // limiter verifies first in production; auth.Optional covers a bare run).
+// A 402 (no Pro covers the call) gives the rate limit units back
+// (ratelimit.Waive); 400 / 413 keep the charge like /v1/generate.
 func textHandler(svc *Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if auth.UID(r.Context()) == "" {
@@ -343,27 +349,25 @@ func textHandler(svc *Service) http.Handler {
 			svc.writeErr(w, r, badText("invalid JSON: "+err.Error()))
 			return
 		}
-		// #316: the online AI of an app is a Pro feature (the on-device AI is free)
-		uid := auth.UID(r.Context())
-		if svc.Pro != nil && svc.ProMode.Checks() && !svc.Pro.IsPro(r.Context(), uid) &&
-			svc.ProMode.Stop(r.Context(), svc.logger(), "ai.text", uid, []string{paid.OnlineAI}) {
-			svc.writeErr(w, r, onlineAIRequired(req.Locale))
+		loc, err := prepareText(&req)
+		if err != nil {
+			svc.writeErr(w, r, err)
 			return
 		}
-		res, err := svc.Text(r.Context(), req)
+		// #316: the online AI of an app is a Pro feature (the on-device AI is free)
+		ctx, err := svc.gateText(r.Context(), req)
+		if err != nil {
+			if asError(err).Status == http.StatusPaymentRequired {
+				ratelimit.Waive(r.Context()) // no Claude call: the 402 is not charged
+			}
+			svc.writeErr(w, r, err)
+			return
+		}
+		res, err := svc.text(ctx, req, loc)
 		if err != nil {
 			svc.writeErr(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, res)
 	})
-}
-
-// onlineAIRequired is the 402 of POST /v1/text for a caller without Pro.
-func onlineAIRequired(loc Locale) *Error {
-	f := PaidFeature{ID: paid.OnlineAI}
-	if d, ok := paid.Default.ByID(paid.OnlineAI); ok {
-		f = d.Public(string(loc))
-	}
-	return ProRequired([]PaidFeature{f})
 }

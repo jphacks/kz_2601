@@ -42,9 +42,90 @@ final class AutomationsTests: XCTestCase {
         XCTAssertTrue(AutomationRule.Result.failed.isProblem)
         // サーバーの語(openapi AutomationResult)を全部知っている
         for word in ["none", "ok", "notify_paused", "limit", "service_limit", "service_paused", "plan", "stopped",
-                     "changed", "unavailable", "late", "inactive", "failed", "other"] {
+                     "changed", "unavailable", "late", "inactive", "failed", "disabled", "other"] {
             XCTAssertNotNil(AutomationRule.Result(rawValue: word), word)
         }
+        // 作成者がオフにした結果は自分の操作(お問い合わせは出さない)
+        XCTAssertFalse(AutomationRule.Result.disabled.isProblem)
+    }
+
+    // MARK: - オン / オフ(#347・backend #693)
+
+    /// enabled / consecutiveFailures を読む。古いサーバー(どちらも無い)では enabled = nil(切り替えを出さない)・失敗 0。
+    func testDecodeEnabledAndFailures() throws {
+        let json = #"""
+        {"appId":"a","rules":[
+          {"id":"off","description":"x","trigger":"record","result":"disabled","enabled":false},
+          {"id":"failing","description":"y","trigger":"schedule","result":"failed","enabled":true,"consecutiveFailures":3},
+          {"id":"old","description":"z","trigger":"record","result":"ok"},
+          {"id":"weird","description":"w","trigger":"record","result":"ok","enabled":"yes","consecutiveFailures":-2}
+        ]}
+        """#
+        let r = try JSONDecoder().decode(AppAutomations.self, from: Data(json.utf8)).rules
+        XCTAssertEqual(r[0].enabled, false)
+        XCTAssertEqual(r[0].result, .disabled)
+        XCTAssertEqual(r[0].consecutiveFailures, 0)
+        XCTAssertFalse(r[0].suggestsFix)
+        XCTAssertEqual(r[1].enabled, true)
+        XCTAssertEqual(r[1].consecutiveFailures, 3)
+        XCTAssertTrue(r[1].suggestsFix)
+        XCTAssertNil(r[2].enabled)
+        XCTAssertEqual(r[2].consecutiveFailures, 0)
+        XCTAssertNil(r[3].enabled) // 型違いでも一覧ごと落とさない
+        XCTAssertEqual(r[3].consecutiveFailures, 0)
+    }
+
+    func testSuggestsFixThreshold() {
+        XCTAssertFalse(AutomationRule(id: "r", description: "x", consecutiveFailures: 2).suggestsFix)
+        XCTAssertTrue(AutomationRule(id: "r", description: "x", consecutiveFailures: 3).suggestsFix)
+    }
+
+    /// GET /dsl の封筒から version と serverRules。
+    func testParseEnvelope() throws {
+        let json = #"{"appId":"a","version":7,"dsl":{"serverRules":[{"id":"a"},{"id":"b","enabled":false}]}}"#
+        let p = try AutomationToggle.parse(envelope: Data(json.utf8))
+        XCTAssertEqual(p.version, 7)
+        XCTAssertEqual(p.serverRules.count, 2)
+        XCTAssertEqual(try AutomationToggle.parse(envelope: Data(#"{"version":2,"dsl":{}}"#.utf8)).serverRules.count, 0)
+        XCTAssertThrowsError(try AutomationToggle.parse(envelope: Data(#"{"dsl":{}}"#.utf8)))
+    }
+
+    /// オフ = add enabled:false、オン = remove enabled。位置は id で引く。もうその状態なら PATCH しない。
+    func testPatchOps() throws {
+        let rules: [[String: Any]] = [["id": "a"], ["id": "b", "enabled": false], ["id": "c", "enabled": true]]
+        XCTAssertEqual(try AutomationToggle.ops(ruleId: "a", enabled: false, serverRules: rules),
+                       [.init(op: "add", path: "/serverRules/0/enabled", value: false)])
+        XCTAssertEqual(try AutomationToggle.ops(ruleId: "b", enabled: true, serverRules: rules),
+                       [.init(op: "remove", path: "/serverRules/1/enabled")])
+        XCTAssertEqual(try AutomationToggle.ops(ruleId: "c", enabled: false, serverRules: rules),
+                       [.init(op: "add", path: "/serverRules/2/enabled", value: false)])
+        XCTAssertEqual(try AutomationToggle.ops(ruleId: "c", enabled: true, serverRules: rules),
+                       [.init(op: "remove", path: "/serverRules/2/enabled")])
+        XCTAssertEqual(try AutomationToggle.ops(ruleId: "a", enabled: true, serverRules: rules), [])
+        XCTAssertEqual(try AutomationToggle.ops(ruleId: "b", enabled: false, serverRules: rules), [])
+        XCTAssertThrowsError(try AutomationToggle.ops(ruleId: "gone", enabled: false, serverRules: rules)) {
+            XCTAssertEqual($0 as? AutomationToggle.Failure, .ruleNotFound)
+        }
+    }
+
+    /// 本文は {"patch":[...]}。remove には value を付けない。
+    func testPatchBodyEncoding() throws {
+        let body = AutomationToggle.Body(patch: [.init(op: "add", path: "/serverRules/0/enabled", value: false),
+                                                 .init(op: "remove", path: "/serverRules/1/enabled")])
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any])
+        let ops = try XCTUnwrap(obj["patch"] as? [[String: Any]])
+        XCTAssertEqual(ops[0]["op"] as? String, "add")
+        XCTAssertEqual(ops[0]["value"] as? Bool, false)
+        XCTAssertEqual(ops[1]["op"] as? String, "remove")
+        XCTAssertNil(ops[1]["value"])
+    }
+
+    func testConflictClassification() {
+        XCTAssertTrue(AutomationToggle.isConflict(APIError.server(status: 412, code: "precondition_failed", message: "")))
+        XCTAssertTrue(AutomationToggle.isConflict(APIError.http(status: 409, body: "")))
+        XCTAssertTrue(AutomationToggle.isConflict(AutomationToggle.Failure.ruleNotFound))
+        XCTAssertFalse(AutomationToggle.isConflict(APIError.http(status: 500, body: "")))
+        XCTAssertFalse(AutomationToggle.isConflict(URLError(.notConnectedToInternet)))
     }
 }
 #endif

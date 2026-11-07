@@ -36,7 +36,7 @@
 | 仲間探しのアプリ(#507)の `apps_public/*/match_pairs/*`(本人を含むもの)と `match_quota/{uid}` | 消す(ログの `matchPairs`) |
 | 仲間探しのアプリの、本人のプロフィール(`match:"profile"`)と連絡先(`match:"matched"`)のレコード | 消す(ログの `matchRecords`)。上の「投稿は残す」の例外: 本人を表す情報で、共有の場の投稿ではないため |
 | Firebase Auth のユーザー | 消す(アプリが退会時に消しているので、ここは取りこぼしの保険) |
-| `users/{uid}` | `{status: "purged", purgedAt}` だけの墓標にする(`deletedAt` は消す)。同じ uid が来ても 410 を返し続け、二度と対象にならない |
+| `users/{uid}` | `{status: "purged", purgedAt}` だけの墓標にする(`deletedAt` と `firstSeenAt` は消す)。同じ uid が来ても 410 を返し続け、二度と対象にならない |
 | `rateLimits/*_uid_{uid}` | ジョブでは消さない。日付ごとの回数だけで、TTL で消す(下の提案) |
 
 ## 処理の流れ
