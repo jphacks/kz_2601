@@ -1314,6 +1314,9 @@ final class AppRuntime: DSLRuntime {
         case .addToCalendar:
             addToCalendar(action, ctx)
 
+        case .lookupBook:
+            await lookupBook(action, ctx) // Features/Books
+
         case .unknown:
             toast = L10n.tr("未対応のアクション: \(action.rawType)")
         }

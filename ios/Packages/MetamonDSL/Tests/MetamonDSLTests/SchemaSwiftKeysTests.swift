@@ -52,7 +52,7 @@ final class SchemaSwiftKeysTests: XCTestCase {
     func testActionTypesMatchSchema() throws {
         let schemaTypes = try SchemaFixture.load().actionTypes
         let swiftTypes = Set(ActionType.allCases.filter { $0 != .unknown }.map(\.rawValue))
-        XCTAssertEqual(schemaTypes.count, 15, "アクションの数が 15 でない(#351・#270 で follow / unfollow・addToCalendar)")
+        XCTAssertEqual(schemaTypes.count, 16, "アクションの数が 16 でない(#351・#270 で follow / unfollow・addToCalendar・lookupBook)")
         assertSameSet(schema: schemaTypes, swift: swiftTypes, what: "アクションの type",
                       swiftPlace: "ActionType の case")
     }
@@ -61,6 +61,13 @@ final class SchemaSwiftKeysTests: XCTestCase {
         let schemaKeys = try SchemaFixture.load().objectKeys("Action")
         assertSameSet(schema: schemaKeys, swift: Action.codingKeyNames, what: "Action のキー",
                       swiftPlace: "Action の Keys(Model/Action.swift)", allowSwiftOnly: swiftOnlyActionKeys)
+    }
+
+    /// Action の中に直接書いたオブジェクト(`$defs` に無いもの)。
+    func testInlineActionObjectKeysMatchSchema() throws {
+        assertSameSet(schema: try SchemaFixture.load().inlineKeys("Action", "bookLookup"),
+                      swift: Self.storedPropertyNames(BookLookupSpec(isbnField: "i")),
+                      what: "Action.bookLookup のキー", swiftPlace: "BookLookupSpec(Records/BookLookupPlan.swift)の stored property")
     }
 
     // MARK: - entity / field など
@@ -133,6 +140,13 @@ private struct SchemaFixture {
 
     func objectKeys(_ name: String) throws -> Set<String> {
         Set(try XCTUnwrap(try def(name)["properties"] as? [String: Any], "$defs/\(name) に properties が無い").keys)
+    }
+
+    /// `$defs/<name>.properties.<prop>.properties` のキー。
+    func inlineKeys(_ name: String, _ prop: String) throws -> Set<String> {
+        let props = try XCTUnwrap(try def(name)["properties"] as? [String: Any], "$defs/\(name) に properties が無い")
+        let obj = try XCTUnwrap(props[prop] as? [String: Any], "$defs/\(name).\(prop) が無い")
+        return Set(try XCTUnwrap(obj["properties"] as? [String: Any], "$defs/\(name).\(prop) に properties が無い").keys)
     }
 
     /// 部品 type → その部品のスキーマ上の props キー(type / id / area を含む)。

@@ -68,6 +68,8 @@
 
 許可リストを増やす時: `backend/internal/feeds/client.go` の `DefaultEndpoints` と `backend/pkg/dsl/feed.go` の `RSSFeeds` に 1 行ずつ足す(テストが両方の一致を見る)。**規約(再配布・商用・出典)を確かめて、この表に URL を書いてから**。追加は人の判断(#339)。
 
+ISBN から本の情報を引く `lookupBook` も同じ作り(専用のクライアント・固定の URL・上限・キャッシュ・止める)で、出どころは openBD だけ: [book-lookup.md](book-lookup.md)。
+
 ## 安全の作り(#339 の条件との対応)
 
 | #339 の条件 | この実装 |

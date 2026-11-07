@@ -27,6 +27,7 @@ tags:
   - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引をサーバーで検証して保存する。features/pro.md' }
   - { name: feedback, description: 'アプリ内のフィードバック(#319)。features/feedback.md' }
   - { name: feeds, description: '外部の公開データの読み取り(#348)。許可リストの出どころだけ。features/external-feeds.md' }
+  - { name: lookup, description: 'ISBN から本の情報を引く(DSL の lookupBook)。鍵の要らない決まった出どころだけ。features/book-lookup.md' }
   - { name: matching, description: '仲間探しのアプリの相互承認(#507)。features/matching.md' }
   - { name: members, description: 'scope:shared の参加者(#254)。features/members.md' }
   - { name: metrics, description: 'aiButton の端末内 AI の集計(#446)。docs/analytics/ai-button-metrics.md' }
@@ -1430,6 +1431,58 @@ paths:
         '404': { description: 未知の provider, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '429': { description: 1 時間の上限。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '503': { description: 止めている(details.reason = disabled)・出どころに今つながらない(`Retry-After`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /lookup/book:
+    get:
+      tags: [lookup]
+      summary: ISBN から本の書名・著者・出版社・出版日を引く(DSL の lookupBook)
+      description: |
+        DSL の `lookupBook` ボタンがフォームを埋めるための値を、サーバーが**決まった出どころ**(openBD v1・鍵なし)から取って返す。端末は外部へ直接つながらない。
+        - `isbn` だけを受け取る(ISBN-10 / ISBN-13・ハイフンと空白は可)。桁と検査数字(ISBN-13 は 978 / 979 始まり)を確かめてから取りに行くので、正しくない ISBN は出どころへ出ない(400)。他のパラメータ・重複は 400。
+        - 取りに行く URL はサーバーのコードで固定(`https://api.openbd.jp/v1/get?isbn={13 桁}`)。公開アドレス以外へはつながない(feeds と同じクライアント)・8 秒で打ち切り・本文 256 KiB まで・同じホストへのリダイレクト 3 回まで。
+        - キャッシュは ISBN ごと(見つかった本 1 日・無かった 6 時間・失敗 1 分)。同じ ISBN の同時の取得は 1 回にまとめる。
+        - 1 ユーザー 1 時間 `BOOK_LOOKUP_USER_PER_HOUR` 回(既定 60)。超えると 429 `rate_limited`。出どころへの取得はインスタンスあたり 1 分 `BOOK_LOOKUP_UPSTREAM_PER_MINUTE` 回(既定 30)まで。
+        - `BOOK_LOOKUP_DISABLED=1`(または `FEEDS_DISABLED=all`)で止められる。止めている時は 503 `upstream_unavailable`(details.reason = disabled)。
+        - 利用者のことは何も出どころへ送らない(ISBN だけ)。出典(`source`)をフォームの下に出す。
+      parameters:
+        - { name: isbn, in: query, required: true, schema: { type: string, maxLength: 40 }, example: 978-4-7808-0204-7 }
+      responses:
+        '200':
+          description: 'OK(Cache-Control は private, max-age=3600)'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [isbn, title, source, fetchedAt]
+                properties:
+                  isbn: { type: string, pattern: '^97[89][0-9]{10}$', description: ISBN-13 に直した値 }
+                  title: { type: string, maxLength: 300 }
+                  authors: { type: string, maxLength: 300, description: '出どころの書き方のまま 1 つの文字(例「山田玲子／著 水野菜生／英訳」)' }
+                  publisher: { type: string, maxLength: 120 }
+                  publishedDate: { type: string, pattern: '^[0-9]{4}(-[0-9]{2}(-[0-9]{2})?)?$', description: 'YYYY-MM-DD / YYYY-MM / YYYY' }
+                  coverUrl: { type: string, pattern: '^https://cover\.openbd\.jp/', description: 書影(出どころの書影のホストの https だけ。無ければ省略) }
+                  source:
+                    type: object
+                    required: [name, url, license]
+                    properties:
+                      name: { type: string, example: openBD }
+                      url: { type: string, format: uri }
+                      license: { type: string }
+                  fetchedAt: { type: string, format: date-time }
+              example:
+                isbn: '9784780802047'
+                title: おにぎりレシピ101
+                authors: 山田玲子／著 水野菜生／英訳
+                publisher: ポット出版
+                publishedDate: '2014-04-08'
+                coverUrl: 'https://cover.openbd.jp/9784780802047.jpg'
+                source: { name: openBD, url: 'https://openbd.jp/', license: 'openBD の利用条件(本の紹介のため)・書誌は国立国会図書館の書誌データ(CC BY 4.0)を含む' }
+                fetchedAt: '2026-11-08T03:00:00Z'
+        '400': { description: ISBN の桁・検査数字が正しくない・未知のパラメータ・重複, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { description: この ISBN の本が出どころに無い, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 1 時間の上限。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: 止めている(details.reason = disabled)・出どころに今つながらない・取得の予算切れ(`Retry-After`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /client-config:
     get:

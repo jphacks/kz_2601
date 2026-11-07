@@ -417,7 +417,8 @@
             "export",
             "startActivity",
             "endActivity",
-            "addToCalendar"
+            "addToCalendar",
+            "lookupBook"
           ],
           "x-enumDescriptions": {
             "navigate": "画面遷移。list.onItemTap からは recordId が暗黙に渡り、遷移先フォームが編集モードになる(だから onItemTap の遷移先は同じ entity のフォーム)。prefillRef を付けると今のレコード(タップした行・ボタンのあるフォームのレコード)を子フォームの ref に入れて新規で開く。",
@@ -434,7 +435,8 @@
             "export": "記録を CSV(Excel で開ける)か PDF の報告にして共有シートで送る(ファイル・メール・AirDrop)。「CSV で出したい」「PDF にしたい」「Excel で開きたい」「月の報告書」はこれ。button か toolbar に置く。CSV は表示と同じ書式(日付・円・選択肢・参照先の名前・計算項目を含む)、PDF は見出し・絞り込み・表と、同じ画面にある同じ entity のグラフを 1 つにまとめる。",
             "startActivity": "ロック画面と Dynamic Island に「いま◯◯中」を出す(ライブアクティビティ・#423)。activity の title と、任意で残り時間(minutes)・数字(stat)。アプリを閉じても時間は進み、stat は記録を足すたびに更新される。同じアプリで出し直すと前のものを置き換える。タイマー部品の時間を出すだけなら timerDisplay.liveActivity の方が短い。",
             "endActivity": "startActivity で出したロック画面の表示を消す(「終わった」「到着」ボタンに)。",
-            "addToCalendar": "今のレコード(フォーム画面なら入力中の値、list.onItemTap ならタップした行)を iPhone のカレンダー(Google カレンダーと同期していればそこにも)に予定として入れる。押すと OS の「新規イベント」画面が中身を埋めた状態で開き、ユーザーが「追加」を押す。カレンダーの許可は要らない。「カレンダーに入れたい」「予定に登録」「Google カレンダーにも」はこれ。calendarEvent の startField(日付 / 日時)は必須。"
+            "addToCalendar": "今のレコード(フォーム画面なら入力中の値、list.onItemTap ならタップした行)を iPhone のカレンダー(Google カレンダーと同期していればそこにも)に予定として入れる。押すと OS の「新規イベント」画面が中身を埋めた状態で開き、ユーザーが「追加」を押す。カレンダーの許可は要らない。「カレンダーに入れたい」「予定に登録」「Google カレンダーにも」はこれ。calendarEvent の startField(日付 / 日時)は必須。",
+            "lookupBook": "ISBN から本の書名・著者などを埋める。フォームの書名・著者・出版社・出版日の field を上書きする。「ISBN から本の情報を入れたい」「バーコードで本を登録」はこれ。本の entity のフォーム画面(screen.entity)の button / toolbar に置き、ISBN の string field は qrScanner(本のバーコードも読める)か textField で入れる。保存は saveRecord。見つからない時は手入力に戻る。"
           }
         },
         "screen": {
@@ -547,6 +549,34 @@
           "description": "addToCalendar only.",
           "x-for": {
             "addToCalendar": "required"
+          }
+        },
+        "bookLookup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "isbnField"
+          ],
+          "description": "lookupBook only. screen.entity の field id。isbnField は ISBN の string field(必須)。titleField(書名)・authorsField(著者。「山田玲子/著」の形の 1 つの文字)・publisherField・publishedDateField(出版日)は string / text(出版日は date も可)。entity にある分だけ・最低 1 つ。",
+          "properties": {
+            "isbnField": {
+              "type": "string"
+            },
+            "titleField": {
+              "type": "string"
+            },
+            "authorsField": {
+              "type": "string"
+            },
+            "publisherField": {
+              "type": "string"
+            },
+            "publishedDateField": {
+              "type": "string"
+            }
+          },
+          "x-for": {
+            "lookupBook": "required"
           }
         }
       }

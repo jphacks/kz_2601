@@ -936,6 +936,23 @@
         }
       }
     },
+    "ISBN を確かめてください(10 桁か 13 桁)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check the ISBN (10 or 13 digits)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISBN を確かめてください(10 桁か 13 桁)"
+          }
+        }
+      }
+    },
     "OK" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1663,6 +1680,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」の入力を確認してください"
+          }
+        }
+      }
+    },
+    "「%@」の情報を入れました(出典: %@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filled in “%1$@” (source: %2$@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」の情報を入れました(出典: %@)"
           }
         }
       }
@@ -2683,6 +2717,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ここまでに記録した地点はそのまま残ります。"
+          }
+        }
+      }
+    },
+    "この ISBN の本は見つかりませんでした。手で入力してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No book found for this ISBN. Please enter it by hand."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この ISBN の本は見つかりませんでした。手で入力してください"
           }
         }
       }
@@ -8416,6 +8467,23 @@
         }
       }
     },
+    "先に ISBN を入力してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter the ISBN first"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先に ISBN を入力してください"
+          }
+        }
+      }
+    },
     "先に「%@」を保存してください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11302,6 +11370,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未選択"
+          }
+        }
+      }
+    },
+    "本の情報はフォームの画面で読み込めます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Book info can be filled in on a form screen"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本の情報はフォームの画面で読み込めます"
+          }
+        }
+      }
+    },
+    "本の情報を読み込めません。手で入力してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load the book info. Please enter it by hand."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本の情報を読み込めません。手で入力してください"
           }
         }
       }

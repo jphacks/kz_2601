@@ -427,6 +427,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkLiveActivity(c.Expect, app)...)
 		// addToCalendar: calendar_add.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkCalendarAdd(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkBookLookup(c.Expect, app)...) // book_lookup.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkQR(c.Expect, app)...)         // #422: qr.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAudio(c.Expect, app)...)      // #420: audio.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAIGenerate(c.Expect, app)...) // #417: aigen.go
