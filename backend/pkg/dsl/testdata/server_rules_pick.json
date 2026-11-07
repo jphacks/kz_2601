@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "app": {"name": "メニュー制覇", "voiceEntry": "none"},
+  "initialScreen": "home",
+  "entities": [
+    {"id": "menus", "name": "メニュー", "scope": "shared", "titleField": "name", "fields": [
+      {"id": "name", "name": "名前", "type": "string", "required": true},
+      {"id": "category", "name": "種類", "type": "enum", "options": ["main", "side", "drink"]},
+      {"id": "price", "name": "値段", "type": "integer"}
+    ]},
+    {"id": "eats", "name": "食べた記録", "scope": "shared", "titleField": "menu", "fields": [
+      {"id": "menu", "name": "メニュー", "type": "ref", "refEntity": "menus", "required": true},
+      {"id": "next", "name": "次のおすすめ", "type": "ref", "refEntity": "menus"}
+    ]},
+    {"id": "picks", "name": "今日のおすすめ", "scope": "shared", "titleField": "name", "fields": [
+      {"id": "menu", "name": "メニュー", "type": "ref", "refEntity": "menus"},
+      {"id": "name", "name": "名前", "type": "string"},
+      {"id": "day", "name": "日付", "type": "date"}
+    ]}
+  ],
+  "screens": [
+    {"id": "home", "title": "おすすめ", "components": [
+      {"type": "list", "entity": "picks", "item": {"title": "name", "subtitle": "day"}}
+    ]}
+  ],
+  "serverRules": [
+    {"id": "daily_pick", "on": {"every": "daily", "time": "08:00"},
+     "pick": {"entity": "menus", "order": "random", "filter": [{"field": "category", "op": "eq", "value": "main"}], "exclude": {"entity": "eats", "field": "menu"}},
+     "do": [{"createRecord": {"entity": "picks", "values": {"menu": {"ref": "$pick"}, "name": {"ref": "$pick.name"}, "day": {"op": "today", "args": []}}}},
+       {"notify": {"to": {"kind": "members"}, "title": "今日のおすすめ", "body": "まだ食べていない {$pick.name} はどうですか"}}]},
+    {"id": "next_after_eat", "on": {"record": "created", "entity": "eats"},
+     "pick": {"entity": "menus", "order": "oldest", "exclude": {"entity": "eats", "field": "menu"}},
+     "do": [{"updateRecord": {"values": {"next": {"ref": "$pick"}}}},
+       {"notify": {"to": {"kind": "author"}, "title": "次のメニュー", "body": "次は {$pick.name}({$pick.price} 円)はどうですか"}}]}
+  ]
+}

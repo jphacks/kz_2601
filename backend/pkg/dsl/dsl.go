@@ -66,6 +66,19 @@ type Notification struct {
 	// posts once when it turns false -> true after a record save / delete /
 	// sync on that device. Exclusive with the time and record triggers.
 	When *Expr `json:"when,omitempty"`
+	// Near (app.notifications only): fire on arriving near a record's
+	// location (iOS region monitoring, on device). Its own trigger.
+	Near *NotificationNear `json:"near,omitempty"`
+	// JitterMinutes shifts each occurrence of a time trigger by a random
+	// ±N minutes (stable per occurrence on iOS). Time triggers only.
+	JitterMinutes int `json:"jitterMinutes,omitempty"`
+}
+
+// NotificationNear: the places are the LocationField values of Entity's records.
+type NotificationNear struct {
+	Entity        string `json:"entity"`
+	LocationField string `json:"locationField"`
+	RadiusM       int    `json:"radiusM,omitempty"` // 0 = DefaultNearRadiusM
 }
 
 // VoiceEntry is how the user re-enters voice mode.
@@ -291,6 +304,7 @@ const (
 	CompLocationButton ComponentType = "locationButton" // CoreLocation -> location field
 	CompLocationPicker ComponentType = "locationPicker" // search / map pin -> location field (+ nameField) (#212)
 	CompRouteGuide     ComponentType = "routeGuide"     // MapKit turn-by-turn guidance to a destination (#411)
+	CompPlaceSearch    ComponentType = "placeSearch"    // MapKit nearby places -> form fields (place_search.go)
 	CompQrScanner      ComponentType = "qrScanner"      // AVFoundation -> string field
 	CompQrCode         ComponentType = "qrCode"         // CoreImage QR from text / field / value (#422)
 	CompTimerDisplay   ComponentType = "timerDisplay"   // stopwatch / countdown
@@ -455,14 +469,15 @@ type Component struct {
 	BalanceField string `json:"balanceField,omitempty"`
 
 	// aiButton (#78). Label / Prompt / Entity / Limit are shared with the fields above.
-	Task    string   `json:"task,omitempty"`    // summarize|classify|rewrite|extract|suggest
-	Input   string   `json:"input,omitempty"`   // form field fed to the model ("" = whole draft)
-	Output  string   `json:"output,omitempty"`  // form field the result is written to
-	Options []string `json:"options,omitempty"` // classify candidates (else the enum output field's options)
-	Shape   string   `json:"shape,omitempty"`   // generate (#417): line|list|fields
-	Count   int      `json:"count,omitempty"`   // generate list: number of items
-	Items   []string `json:"items,omitempty"`   // generate fields: item names
-	Length  string   `json:"length,omitempty"`  // short (default) | long: cloud-only long text (ai_button.go)
+	Task    string    `json:"task,omitempty"`    // summarize|classify|rewrite|extract|suggest
+	Input   string    `json:"input,omitempty"`   // form field fed to the model ("" = whole draft)
+	Output  string    `json:"output,omitempty"`  // form field the result is written to
+	Options []string  `json:"options,omitempty"` // classify candidates (else the enum output field's options)
+	Shape   string    `json:"shape,omitempty"`   // generate (#417): line|list|fields
+	Count   int       `json:"count,omitempty"`   // generate list: number of items
+	Items   []string  `json:"items,omitempty"`   // generate fields: item names
+	Length  string    `json:"length,omitempty"`  // short (default) | long: cloud-only long text (ai_button.go)
+	SaveTo  *AISaveTo `json:"saveTo,omitempty"`  // generate list: one record per item (ai_save_to.go)
 	// InputPhoto is a photo field of the form sent with the call (cloud only, ai_button_photo.go).
 	InputPhoto string `json:"inputPhoto,omitempty"`
 
@@ -519,6 +534,13 @@ type Component struct {
 	Provider string `json:"provider,omitempty"` // weather|holidays|rss
 	Region   string `json:"region,omitempty"`   // weather: JMA forecast office code (WeatherRegions)
 	FeedID   string `json:"feedId,omitempty"`   // rss: allowlisted feed id (RSSFeeds)
+
+	// placeSearch (place_search.go). Label / NameField / LocationField are shared.
+	Query        string `json:"query,omitempty"`        // fixed search words
+	Category     string `json:"category,omitempty"`     // PlaceCategories
+	Near         string `json:"near,omitempty"`         // "" | current
+	AddressField string `json:"addressField,omitempty"` // placeSearch / locationButton: the address string field
+	Pins         bool   `json:"pins,omitempty"`         // also pin the results on a small map
 }
 
 // PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the

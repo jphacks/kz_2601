@@ -79,14 +79,14 @@ func checkNotifyWith(where string, rc *ruleCheck, n *RuleNotify) {
 		switch {
 		case !idRe.MatchString(name):
 			add("%s: %q is not a valid name (lowercase id)", w, name)
-		case rc.row != nil && rc.row.FieldByID(name) != nil:
-			add("%s: %q is a field of entity %q; give the value another name", w, name, rc.row.ID)
+		case rc.actRow() != nil && rc.actRow().FieldByID(name) != nil:
+			add("%s: %q is a field of entity %q; give the value another name", w, name, rc.actRow().ID)
 		case !used[name]:
 			add("%s: {%s} is not used in title or body", w, name)
 		}
 		v := n.With[name]
 		ch := rc.expr()
-		got := ch.check(w, &v, rc.row, 1)
+		got := ch.check(w, &v, rc.actRow(), 1)
 		checkNoComputed(w, ch, add)
 		if got != tNum && got != tDate {
 			add("%s: must be a number or a date (got %s); insert record text with {<field>} instead", w, got)
@@ -95,7 +95,7 @@ func checkNotifyWith(where string, rc *ruleCheck, n *RuleNotify) {
 }
 
 // ReadEntities returns the entities whose records the rule lists (on.each,
-// every agg and the lookup), sorted and unique.
+// every agg, the lookup, similar and pick), sorted and unique.
 func (r *ServerRule) ReadEntities() []string {
 	seen := map[string]bool{}
 	if r.On.Each != "" {
@@ -103,6 +103,15 @@ func (r *ServerRule) ReadEntities() []string {
 	}
 	if r.Lookup != nil && r.Lookup.Entity != "" {
 		seen[r.Lookup.Entity] = true
+	}
+	if r.Similar != nil && r.Similar.Entity != "" {
+		seen[r.Similar.Entity] = true
+	}
+	if r.Pick != nil && r.Pick.Entity != "" {
+		seen[r.Pick.Entity] = true
+		if r.Pick.Exclude != nil && r.Pick.Exclude.Entity != "" {
+			seen[r.Pick.Exclude.Entity] = true
+		}
 	}
 	r.walkExprs(func(e *Expr) {
 		if e.Kind == ExprAgg && e.Agg != nil && e.Agg.Entity != "" {
@@ -129,6 +138,13 @@ func (r *ServerRule) AggEntities() []string {
 func (r *ServerRule) walkExprs(fn func(*Expr)) {
 	walk := func(e *Expr) { visitExpr(e, fn) }
 	walk(r.If)
+	if r.Pick != nil {
+		for _, f := range r.Pick.Filter { // values read the row, like agg filters
+			if v, err := exprFromValue(f.Value); err == nil && v != nil && v.Kind != ExprLiteral {
+				walk(v)
+			}
+		}
+	}
 	for _, act := range r.Do {
 		switch {
 		case act.Notify != nil:

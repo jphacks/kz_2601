@@ -1,11 +1,16 @@
 import Foundation
 import UserNotifications
 import MetamonDSL
+#if os(iOS)
+import CoreLocation
+#endif
 
 /// `UNUserNotificationCenter` によるローカル通知(#228)。
 /// - アプリごとの予約(`PlannedNotification`)を UserDefaults に持ち、別アプリに切り替えても前のアプリの通知を消さない。
 /// - 予約し直す時は全アプリ分から近い順に `NotificationPlanner.limit` 件だけ iOS に渡す(64 件を超えた分が黙って捨てられないように)。
 /// - 識別子は `dsl.<appId>.…`。それ以外(タイマー `timer.` 等)には触らない。
+/// - 場所の通知(`near`)は全アプリ分から `NotificationPlanner.regionLimit` か所(近い順・新しい順)を `UNLocationNotificationTrigger` で見張る。
+///   位置情報(使用中のみ)の許可は、場所を保存したアプリの予約の時に未決定なら 1 回だけ聞く。判定は iOS が端末の中で行う。
 /// - `alarm` の通知は、`alarms` があり許可されていれば止めるまで鳴るアラーム(AlarmKit)で届け、普通の通知は出さない。
 ///   無い(iOS 26.1 未満・審査用の版)・許可が無い・予約に失敗した時は普通の通知で届ける。
 public struct UserNotificationScheduler: NotificationScheduler {
@@ -57,6 +62,7 @@ public struct UserNotificationScheduler: NotificationScheduler {
         }
         await NotificationRegistry.shared.removeApp(appId)
         await ConditionNotificationStore.shared.removeApp(appId)
+        await RegionNotificationStore.shared.removeApp(appId)
         _ = await apply(appId: appId)
     }
 
@@ -64,6 +70,7 @@ public struct UserNotificationScheduler: NotificationScheduler {
         await alarmSync?.removeAll()
         await NotificationRegistry.shared.removeAll()
         await ConditionNotificationStore.shared.removeAll()
+        await RegionNotificationStore.shared.removeAll()
         let center = UNUserNotificationCenter.current()
         let ids = await center.pendingNotificationRequests().map(\.identifier)
             .filter { $0.hasPrefix(NotificationPlanner.prefix) || $0.hasPrefix(ConditionNotifications.prefix) }
@@ -77,27 +84,55 @@ public struct UserNotificationScheduler: NotificationScheduler {
         let center = UNUserNotificationCenter.current()
         let now = Date()
         let all = await NotificationRegistry.shared.pruned(now: now)
-        let chosen = NotificationPlanner.select(all, now: now)
-        let asAlarm = await alarmSync?.apply(chosen.map(\.0), now: now) ?? []
-        let notify = chosen.filter { !asAlarm.contains($0.0.identifier) }
-        let want = Set(notify.map(\.0.identifier))
+        let mine = NotificationPlanner.prefix + appId + "."
         let pending = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(NotificationPlanner.prefix) }
+        let place = await places(all, appId: appId, pending: Set(pending))
+        let chosen = NotificationPlanner.select(all, now: now, limit: NotificationPlanner.limit - place.regions.count)
+        let asAlarm = await alarmSync?.apply(chosen.map(\.0), now: now) ?? []
+        let notify = chosen.map(\.0).filter { !asAlarm.contains($0.identifier) } + place.regions
+        let want = Set(notify.map(\.identifier))
         center.removePendingNotificationRequests(withIdentifiers: pending.filter { !want.contains($0) })
         var denied = false
         if !notify.isEmpty {
             denied = await !requestPermissionIfNeeded()
         }
-        for (p, _) in notify {
+        var armed: [PlannedNotification] = []
+        for p in notify {
             do {
                 try await center.add(Self.request(p))
+                if p.isRegion { armed.append(p) }
             } catch {
                 print("[Metamon] notification add failed id=\(p.identifier): \(error)")
             }
         }
-        let mine = NotificationPlanner.prefix + appId + "."
+        await RegionNotificationStore.shared.setArmed(armed)
         let upcoming = chosen.filter { $0.0.identifier.hasPrefix(mine) }.map { UpcomingNotification(title: $0.0.title, body: $0.0.body, date: $0.1) }
-        print("[Metamon] notifications scheduled: total=\(chosen.count) alarms=\(asAlarm.count) app=\(upcoming.count) next=\(upcoming.first.map { "\($0.date)" } ?? "-") denied=\(denied)")
-        return NotificationSyncResult(denied: denied, upcoming: upcoming)
+        let myPlaces = place.regions.filter { $0.identifier.hasPrefix(mine) }.count
+        print("[Metamon] notifications scheduled: total=\(chosen.count) alarms=\(asAlarm.count) regions=\(armed.count) app=\(upcoming.count) places=\(myPlaces) next=\(upcoming.first.map { "\($0.date)" } ?? "-") denied=\(denied) locationOff=\(place.locationOff)")
+        return NotificationSyncResult(denied: denied, upcoming: upcoming, places: myPlaces, locationOff: place.locationOff)
+    }
+
+    /// 見張る場所の通知。位置情報が許可されていなければ見張らない(`locationOff` = このアプリに場所があるのに届かない)。
+    /// 未決定なら、このアプリに場所がある時だけ許可を聞く(場所を保存した直後・そのアプリを開いた時 = 使う場面)。
+    private func places(_ all: [PlannedNotification], appId: String, pending: Set<String>) async -> (regions: [PlannedNotification], locationOff: Bool) {
+        #if os(iOS)
+        let known = all.filter(\.isRegion)
+        guard !known.isEmpty else {
+            await RegionNotificationStore.shared.setArmed([])
+            return ([], false)
+        }
+        let hasMine = known.contains { $0.identifier.hasPrefix(NotificationPlanner.prefix + appId + ".") }
+        let access = await RegionLocationAccess.shared
+        let allowed = hasMine ? await access.authorize() : await access.isAuthorized
+        guard allowed else {
+            await RegionNotificationStore.shared.setArmed([])
+            return ([], hasMine)
+        }
+        let candidates = await RegionNotificationStore.shared.toSchedule(known, known: known, pending: pending)
+        return (NotificationPlanner.selectRegions(candidates, here: await access.lastKnown), false)
+        #else
+        return ([], false)
+        #endif
     }
 
     /// 許可されていれば true。未決定ならここでダイアログを出す。
@@ -130,6 +165,16 @@ public struct UserNotificationScheduler: NotificationScheduler {
             trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(day: d, hour: h, minute: m), repeats: true)
         case .yearly(let mo, let d, let h, let m):
             trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(month: mo, day: d, hour: h, minute: m), repeats: true)
+        case .region(let lat, let lng, let radius, let repeats):
+            #if os(iOS)
+            let region = CLCircularRegion(center: CLLocationCoordinate2D(latitude: lat, longitude: lng), radius: radius, identifier: p.identifier)
+            region.notifyOnEntry = true
+            region.notifyOnExit = false
+            trigger = UNLocationNotificationTrigger(region: region, repeats: repeats)
+            #else
+            _ = (lat, lng, radius, repeats) // macOS(パッケージのテスト)は場所の通知を予約しない(`places` が空)
+            trigger = UNTimeIntervalNotificationTrigger(timeInterval: 60, repeats: false)
+            #endif
         }
         return UNNotificationRequest(identifier: p.identifier, content: content, trigger: trigger)
     }
@@ -193,11 +238,11 @@ actor NotificationRegistry {
         save()
     }
 
-    /// 過ぎた 1 回きりを捨てて、全件を返す。
+    /// 過ぎた 1 回きりを捨てて、全件を返す(場所の通知は時刻が無いので残す)。
     func pruned(now: Date) -> [PlannedNotification] {
         var changed = false
         for (k, list) in table {
-            let kept = list.filter { $0.nextFire(after: now) != nil }
+            let kept = list.filter { $0.isRegion || $0.nextFire(after: now) != nil }
             if kept.count != list.count { table[k] = kept; changed = true }
         }
         if changed { save() }

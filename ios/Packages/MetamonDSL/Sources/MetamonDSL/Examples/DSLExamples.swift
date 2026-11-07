@@ -43,6 +43,7 @@ public enum DSLExamples {
             "drive_music",
             "vocab",
             "ai_counselor",
+            "nearby_spots",
         ]
         #if APP_STORE_REVIEW
         return all.filter { !reviewExcluded.contains($0) }

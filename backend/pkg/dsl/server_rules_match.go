@@ -43,7 +43,7 @@ func (a *App) HasRecordRules(entity, kind string) bool {
 func (r *ServerRule) ReferencedFields() []string {
 	seen := map[string]bool{}
 	addField := func(id string) {
-		if id != "" {
+		if id != "" && !isSimilarResult(id) && !isPickResult(id) {
 			seen[id] = true
 		}
 	}
@@ -56,6 +56,11 @@ func (r *ServerRule) ReferencedFields() []string {
 	})
 	if r.Lookup != nil && r.Lookup.Equals != LookupID {
 		addField(r.Lookup.Equals) // the row's value the lookup compares
+	}
+	if r.Similar != nil {
+		for _, f := range r.Similar.Fields {
+			addField(f) // the row's values similar compares
+		}
 	}
 	for _, act := range r.Do {
 		switch {

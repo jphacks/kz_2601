@@ -11,10 +11,12 @@ import (
 type runCache struct {
 	lists map[string][]expreval.Record
 	index map[string]map[string][]string // entity\x00field -> value key -> record ids (at most 2)
+	// similar: entity\x00fields -> the records with their compared items.
+	similar map[string][]similarRec
 }
 
 func newRunCache() *runCache {
-	return &runCache{lists: map[string][]expreval.Record{}, index: map[string]map[string][]string{}}
+	return &runCache{lists: map[string][]expreval.Record{}, index: map[string]map[string][]string{}, similar: map[string][]similarRec{}}
 }
 
 // lookupHolds evaluates rule.Lookup for row: the entity is listed through

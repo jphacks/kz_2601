@@ -92,6 +92,7 @@ var expectKeys = map[string]expectKind{
 	"aiTask":           expectString, // some aiButton has this task (summarize|classify|...|generate)
 	"aiLength":         expectString, // some aiButton has this length (short|long; short = unset too)
 	"aiInputPhoto":     expectBool,   // some aiButton has inputPhoto (false = none)
+	"aiSaveTo":         expectBool,   // some generate list button saves items as records (ai_save_to.go)
 	// checkNearby (#425)
 	"passby":         expectBool,
 	"passbyDistance": expectBool,
@@ -120,6 +121,10 @@ var expectKeys = map[string]expectKind{
 	// checkNotifyWhen (#265): notify_when.go
 	"notifyWhen":   expectBool,
 	"notifyWhenOp": expectString,
+	// checkNotifyNear: notify_near.go
+	"notifyNear":       expectBool,
+	"notifyNearRepeat": expectString,
+	"jitter":           expectBool,
 	// checkAlarm: alarm.go
 	"alarm":       expectBool,
 	"alarmRecord": expectBool,
@@ -133,6 +138,8 @@ var expectKeys = map[string]expectKind{
 	"ruleAgg":     expectBool,
 	"ruleWith":    expectBool,
 	"ruleLookup":  expectString,
+	"ruleSimilar": expectBool,
+	"rulePick":    expectString,
 	// checkFlashcards (#264): flashcards.go
 	"flashcardsUnlearned": expectBool,
 	// checkFeed (#348): feed.go
