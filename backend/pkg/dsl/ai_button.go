@@ -59,6 +59,7 @@ func checkAIButton(where string, c *Component, form *Entity, entities map[string
 		add("%s: aiButton task %q must be one of summarize|classify|rewrite|extract|suggest|generate", where, c.Task)
 	}
 	checkAILength(where, c, form, add)
+	checkAIInputPhoto(where, c, form, add)
 	if c.Task == "generate" {
 		checkAIGenerate(where, c, form, entities, add)
 		return

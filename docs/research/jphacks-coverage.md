@@ -21,6 +21,7 @@
 - **調べた作品: 484 チーム**(2022: 106・2023: 111・2024: 134・2025: 133)。このうち README に中身があって判定できたのは **341 作品**。残りの 143 作品は README が JPHACKS の雛形のまま(または無い)で判定していない(?)。
 - **判定(341 作品のうち・2026-11-08)**: ◎ 64(19%)・○ 100(29%)・△ 77(23%)・× 100(29%)。**今の部品で本体が作れる(◎○)のは 164 作品 = 48%**(11-06 は ◎ 51・○ 97・△ 93 で 148 作品 = 43%)。
 - **11-06 からの変化**: develop に入った部品で 24 作品を紙で判定し直した(△ → ◎ 5・△ → ○ 11・○ → ◎ 8。× は変えていない)。効いたのは 文字起こし `transcribeField`・手書き `drawingField`・読み上げ `speakButton`・写真の `labels`・`fileImport`・天気の `feed`(#659)、`addToCalendar`(#660)、`alarm`(#665)、`follow`(#679)、serverRules の `lookup`(#701)、aiButton の長い文 `length: long`(#702・ng_2406・TK_2312・hs_2501 を ◎)、feed の警報 `warnings`・気圧 `pressure`(#703・hs_2503・NG_2301 を ◎)、本の情報の取得 `lookupBook`(#707・NG_2312 を ◎)、text の `highlight`(#709・E_2202 を ◎)。#702〜#709 で上がった 7 作品はどれも ○ → ◎ で、◎○ の数は変わらない。管理者・一意・宛先つきメッセージ(#678)とプッシュの配信(#683・#691)は、11-06 の判定で共有・通知を既にある物として数えていたので、紙の判定は動かない。変えた行はメモに部品と PR を書いた。
+- **追記(2026-11-08・aiButton の写真 `inputPhoto`)**: aiButton がフォームの写真 1 枚をオンライン AI に見せられるようにした(Pro・サーバーは `AI_TEXT_IMAGE=1` の時だけ)。紙の判定で fk_2502・OL_2316・D_2202・SP_2302 を ○ → ◎、os_2412・tk_b_2508 を △ → ○ にした(一覧の行と ai-eval のケース)。これで ◎ 68・○ 98・△ 75・× 100、◎○ は 166 作品 = 49%。上の数・年ごとの表・下の集計の表は直していない。**プライバシーポリシーが写真を AI に送ると書くまでは本番で使えない**([features/text.md](../backend/features/text.md) の「写真つき」)
 - △ の部品を足していくと ◎○ は増える(下の表の「足した後の ◎○ の累計」)。**上位 5 つを足すと 214 作品(63%)、上位 10 で 246 作品(72%)**。残りの約 3 割は × で、自作の機器・独自の機械学習モデル・AR・カメラの連続認識が本体の作品。
 - **足すべき上位 5 つ**(作品の数は、その物が要ると判定した作品。部品が入って ◎○ になった作品も含む):
   1. **外部 API・Web サービスの連携**(60 作品・大・#348)— 場所・施設の検索、カレンダー、メッセージ(Slack・LINE)、ニュースなどのデータが本体の作品。天気・祝日・RSS の `feed`(#659)、警報・気圧の `feed`(#703)、本の情報 `lookupBook`(#707・openBD)だけ入った
@@ -152,12 +153,12 @@ Web の作品はモバイルに置き換えて考えた(Web だから × には�
 
 | ファイル(`backend/internal/ai/eval/`) | 作品 | group | 中身 |
 |---|---|---|---|
-| `jphacks_coverage_cases.json` | 39 | `cov-full`(◎ 25)・`cov-reduced`(○ 14) | develop にある部品だけで作れる作品(記録を読むルール `ruleAgg`・`ruleEach` は #658、文字起こし・手書き・読み上げ・写真の labels・fileImport・feed は #659、カレンダーへの追加は #660、aiButton の長い文 `aiLength` は #702、feed の warnings・pressure は #703、本の情報の取得 `lookupBook` は #707、text の `highlight` `textHighlight` は #709 で入った) |
+| `jphacks_coverage_cases.json` | 40 | `cov-full`(◎ 26)・`cov-reduced`(○ 14) | develop にある部品だけで作れる作品(記録を読むルール `ruleAgg`・`ruleEach` は #658、文字起こし・手書き・読み上げ・写真の labels・fileImport・feed は #659、カレンダーへの追加は #660、aiButton の長い文 `aiLength` は #702、feed の warnings・pressure は #703、本の情報の取得 `lookupBook` は #707、text の `highlight` `textHighlight` は #709、aiButton の写真 `aiInputPhoto` は inputPhoto の PR で入った) |
 | `jphacks_coverage_pending_cases.json` | 0 | なし | 開いている PR の部品が要る作品(今は無い。新しい部品の PR を待つ作品ができたら `cov-pr<N>` で入れる) |
 
 - **選び方**: 判定 ◎○△ の 241 作品から 39 作品。受賞・決勝の ◎○△ 28 作品のうち 18 作品を入れ、残りは機能の分類(共有・記録・計算・通知・地図・写真・QR・AI・音声・マッチング・音楽)が偏らないように選んだ。× は入れていない(本体が作れないため)。△ は、足りない物が開いている PR で入る作品だけを PR 待ちのファイルに入れた。
 - **依頼の文**: 利用者が話す形で、その作品の本体の体験を 1〜2 文で頼む。作品名・チーム名は入れず、`note` の先頭にリポジトリの名前(`jphacks/<repo>`)・判定・受賞を書いた。
-- **期待の付け方**: 本体の体験に要る物だけを、既存の期待のキーで書く(部品 `has`・共有 `shared` / `scope`・計算 `calc` / `computed`・通知 `notification`・写真の読み取り `photoAnalyze`・AI `aiGenerate` / `aiTask` / `aiLength`・本の情報 `lookupBook`・ハイライト `textHighlight`・曲のリクエスト `musicRequests`・マッチング `matchProfile`・ルール `serverRules` / `ruleTrigger` / `ruleAction` など)。見た目・画面の数・タブは見ない。○ の作品は「欠けるもの」(一覧のメモ)を期待に入れない。
+- **期待の付け方**: 本体の体験に要る物だけを、既存の期待のキーで書く(部品 `has`・共有 `shared` / `scope`・計算 `calc` / `computed`・通知 `notification`・写真の読み取り `photoAnalyze`・AI `aiGenerate` / `aiTask` / `aiLength` / `aiInputPhoto`・本の情報 `lookupBook`・ハイライト `textHighlight`・曲のリクエスト `musicRequests`・マッチング `matchProfile`・ルール `serverRules` / `ruleTrigger` / `ruleAction` など)。見た目・画面の数・タブは見ない。○ の作品は「欠けるもの」(一覧のメモ)を期待に入れない。
 - **PR 待ちの期待**: develop に無い部品は `has` の名前(`transcribeField` など)で書く。PR が足す期待のキー(`addToCalendar` など)は `pendingExpect` に置き、PR がマージされてキーが入ると自動で確かめる対象になる(それまでは実行のログに「not checked until the PR is merged」と出て、確かめない)。
 - **作れた** = 生成が成功し、期待をすべて満たした作品。試験(`backend/cmd/ai-eval/coverage_test.go`)が、作品の数(30〜40)・依頼の文にチーム名が無いこと・develop のファイルが develop の部品だけを使うこと・PR 待ちのケースが本当に新しい部品を要ることを確かめる。
 
@@ -284,7 +285,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [C_2218](https://github.com/jphacks/C_2218) | - | README雛形のまま | その他 | ? | - | 内容なし |  |
 | [C_2219](https://github.com/jphacks/C_2219) | - | README雛形のまま | その他 | ? | - | 内容なし |  |
 | [D_2201](https://github.com/jphacks/D_2201) | Look for Stars | 衛星データから星が見える場所を地図で提案し共有する | 地図,外部API,共有 | △ | EXT_API,SERVER_LOGIC | 衛星・土地データの計算が要る | 決勝 |
-| [D_2202](https://github.com/jphacks/D_2202) | Narcissus | 近くの植物を地図で探し、写真と位置を投稿する | 地図,カメラ,共有,AI | ○ | IMAGE_AI | 植物名の推測は Tailor It では簡易になる。タグ検索と手入力で代替 |  |
+| [D_2202](https://github.com/jphacks/D_2202) | Narcissus | 近くの植物を地図で探し、写真と位置を投稿する | 地図,カメラ,共有,AI | ◎ | - | 植物の名前の推測は aiButton の inputPhoto(オンライン AI・追記)。地図と投稿は今の部品 |  |
 | [D_2203](https://github.com/jphacks/D_2203) | - | ブラウザ上で攻撃を体験するセキュリティ学習サイト | Web専用,その他 | × | WEB_ONLY,SERVER_LOGIC | 実習環境と自動判定が本体。解説+クイズ版で代替 |  |
 | [D_2204](https://github.com/jphacks/D_2204) | - | README雛形のまま | その他 | ? | - | 内容なし |  |
 | [D_2205](https://github.com/jphacks/D_2205) | mapper | 旅行先を地図に記録し友人や公開で共有するSNS | 地図,カメラ,共有 | ◎ | - | - |  |
@@ -380,7 +381,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [OL_2313](https://github.com/jphacks/OL_2313) | ismet | 自炊の写真とレシピを投稿し食べ物でモンスターを育てる | 共有,ゲーム,AI,カメラ | ○ | GAME,CLOUD_AI | モンスター描画と献立自動生成が欠ける(段階表示で代替) |  |
 | [OL_2314](https://github.com/jphacks/OL_2314) | Emotter | 表情と文章の感情が一致する投稿を優遇するSNS | カメラ,AI,独自ML | × | CAMERA_LIVE,CUSTOM_ML | 表情認識が本体。代案は感情を選んで投稿しAI分類で照合 |  |
 | [OL_2315](https://github.com/jphacks/OL_2315) | DIGICRE | 個人開発者の発信と支援者をつなぐSNS | 共有,決済 | ○ | PAYMENT | アプリ内の支援決済が欠ける(外部リンクで代替) |  |
-| [OL_2316](https://github.com/jphacks/OL_2316) | ECOSNAP | ゴミ写真からリサイクル方法とCO2削減量を表示する | カメラ,AI | ○ | IMAGE_AI | 独自物体検知の精度が欠ける(候補からの分類で代替) |  |
+| [OL_2316](https://github.com/jphacks/OL_2316) | ECOSNAP | ゴミ写真からリサイクル方法とCO2削減量を表示する | カメラ,AI | ◎ | - | ゴミの写真から分け方を aiButton の inputPhoto(オンライン AI・追記)で説明する。CO2 の量は AI の目安 |  |
 | [OL_2317](https://github.com/jphacks/OL_2317) | - | READMEが雛形のままで内容なし | その他 | ? | - | 判定不能 |  |
 | [OL_2318](https://github.com/jphacks/OL_2318) | みんなでTodo | 講義の課題を共有し進捗は各自で管理するTodo | 記録,共有 | ◎ | - | - |  |
 | [OL_2319](https://github.com/jphacks/OL_2319) | Dev Study | 初心者エンジニア向けのタグ付きチャットチャンネル | 共有 | ◎ | - | - |  |
@@ -402,7 +403,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [SD_2305](https://github.com/jphacks/SD_2305) | - | README が雛形のまま | その他 | ? | - | 判定不能 |  |
 | [SP_2301](https://github.com/jphacks/SP_2301) | Mooooosic | 自撮りの表情から気分に合う曲を流す | カメラ,AI | ○ | - | 曲は感情ごとの固定リストになる |  |
 | [SP_23018](https://github.com/jphacks/SP_23018) | - | README が雛形のまま | その他 | ? | - | 判定不能 |  |
-| [SP_2302](https://github.com/jphacks/SP_2302) | 今夜の献立AI | 冷蔵庫の写真から在庫を出し献立を考える | カメラ,AI,HW | ○ | IMAGE_AI | 写っている物の名前は photoField.analyze の labels(#659・最大 5 つ)で読み、献立は端末内 AI。食材の細かい見分けは簡易 |  |
+| [SP_2302](https://github.com/jphacks/SP_2302) | 今夜の献立AI | 冷蔵庫の写真から在庫を出し献立を考える | カメラ,AI,HW | ◎ | - | 冷蔵庫の写真を aiButton の inputPhoto(オンライン AI・追記)で読んで献立を書く(端末内なら photoField.analyze の labels と端末内 AI) |  |
 | [SP_2303](https://github.com/jphacks/SP_2303) | Umap | 行った店を地図に記録し友達と交換する | 地図,記録,共有 | ○ | - | スワイプ推薦と育成キャラが欠ける。「まだ行っていない店」を知らせる・印をつけるのは serverRules の lookup(notExists)で書ける(推薦の土台) | Innovator |
 | [SP_2304](https://github.com/jphacks/SP_2304) | ラー麺罪符 | 罪悪感を和らげる言い訳をAIが出す | AI,記録 | ○ | - | 顔文字連打の演出が弱くなる |  |
 | [SP_2305](https://github.com/jphacks/SP_2305) | カラクル | 予定とタスクを同時管理し量を動的に割り当てる | 記録,通知 | △ | SERVER_LOGIC | 行動履歴から割り当てる計算を足す |  |
@@ -505,7 +506,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [os_2409](https://github.com/jphacks/os_2409) | SmartThrone(公式の一覧: スマートイレ) | 人感センサーで既存トイレを自動洗浄しAIと会話する | HW,AI | × | BLE_IOT | 自作機器が本体。代案: 滞在時間と便の記録アプリ | 審査委員特別賞 / Innovator |
 | [os_2410](https://github.com/jphacks/os_2410) | へるぴぃ | 生活習慣を記録しキャラクターのHPで健康度を見せる | 記録,ゲーム | ◎ | - | - |  |
 | [os_2411](https://github.com/jphacks/os_2411) | Chronotes | GitHubやSlackの作業ログからAIが日次ノートを作る | 外部API,AI,記録 | △ | EXT_API | 外部サービスの作業ログ取り込みを足す |  |
-| [os_2412](https://github.com/jphacks/os_2412) | ScanJourney | 観光名所を撮ると名称や歴史をAIが説明する | カメラ,AI,音声 | △ | IMAGE_AI,CLOUD_AI | 名所の認識と長い解説を足す。読み上げは無し |  |
+| [os_2412](https://github.com/jphacks/os_2412) | ScanJourney | 観光名所を撮ると名称や歴史をAIが説明する | カメラ,AI,音声 | ○ | IMAGE_AI | 名所の写真を aiButton の inputPhoto + length long(オンライン AI・追記)で説明し、speakButton で読み上げる。名所の特定は写真だけ(位置と照合しない) |  |
 | [os_2413](https://github.com/jphacks/os_2413) | マイレポ | GitHubのコミットからAIが日報を自動生成する | 外部API,AI,記録 | △ | EXT_API,CLOUD_AI | GitHub取り込みとクラウドAI要約を足す |  |
 | [os_2414](https://github.com/jphacks/os_2414) | - | README が雛形のまま | - | ? | - | 雛形のまま |  |
 | [os_2415](https://github.com/jphacks/os_2415) | - | README が雛形のまま | - | ? | - | 雛形のまま |  |
@@ -586,7 +587,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | チーム(リポジトリ) | 作品名 | 何をするものか | 使っている機能 | 判定 | 足りない物 | メモ | 受賞など |
 |---|---|---|---|---|---|---|---|
 | [fk_2501](https://github.com/jphacks/fk_2501) | - | README が雛形のまま | その他 | ? | - | 内容が読めず判定不可 |  |
-| [fk_2502](https://github.com/jphacks/fk_2502) | PillPal | 処方箋を撮影して服薬予定を作り、通知・家族への知らせ・QR共有をする | カメラ,通知,記録,共有 | ○ | - | 処方箋の構造化抽出の精度が欠ける。手入力併用で可 |  |
+| [fk_2502](https://github.com/jphacks/fk_2502) | PillPal | 処方箋を撮影して服薬予定を作り、通知・家族への知らせ・QR共有をする | カメラ,通知,記録,共有 | ◎ | - | 処方箋の写真は aiButton の inputPhoto(Pro のオンライン AI・写真つき・追記)で薬の名前と飲み方を読む。薬ごとの別の記録には分けない(1 件のメモ)。予定の時刻は利用者が入れる |  |
 | [fk_2503](https://github.com/jphacks/fk_2503) | ゴブジェクター | 不要品を撮影するとAIがリサイクル工作案を提案する | カメラ,AI | ○ | - | 図解や3D完成イメージが欠ける。短い手順の提案は可 |  |
 | [fk_2504](https://github.com/jphacks/fk_2504) | - | README が雛形のまま | その他 | ? | - | 内容が読めず判定不可 |  |
 | [fk_2505](https://github.com/jphacks/fk_2505) | Reply Mate | 複数チャットアプリの通知を集め、緊急度をAIで判定して返信を助ける | 外部API,AI,Web専用 | × | OS_INTEG,EXT_API,WEB_ONLY | 他アプリの通知取得が不可。代案は自分用の返信待ちタスク管理 |  |
@@ -710,7 +711,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [tk_b_2505](https://github.com/jphacks/tk_b_2505) | First Singin'! | カラオケの1曲目の曲と歌う人をAIが提案するアプリ | AI,フォーム | ○ | - | 機械学習の推薦が欠ける。曲リストからランダム選出なら可 |  |
 | [tk_b_2506](https://github.com/jphacks/tk_b_2506) | SympoLink! | 学会参加者が興味タグで交流し、チャットや位置共有で会えるアプリ | 共有,通知,外部API,AI | ○ | EXT_API | ResearchMap連携とLINE通知が欠ける。タグとチャットは可 | 決勝 |
 | [tk_b_2507](https://github.com/jphacks/tk_b_2507) | - | README が雛形のまま | その他 | ? | - | 内容が読めず判定不可 |  |
-| [tk_b_2508](https://github.com/jphacks/tk_b_2508) | MIERUTE | 自然文からAIが手順マニュアルを作り、QRで配って撮影で達成度を判定する | AI,カメラ,共有 | △ | CLOUD_AI,IMAGE_AI | 手順の自動生成と写真での達成度判定を足す | 決勝 |
+| [tk_b_2508](https://github.com/jphacks/tk_b_2508) | MIERUTE | 自然文からAIが手順マニュアルを作り、QRで配って撮影で達成度を判定する | AI,カメラ,共有 | ○ | - | 手順は aiButton の length long、写真での達成度は aiButton classify の inputPhoto(オンライン AI・追記)。QR で配るのは今の部品 | 決勝 |
 | [tk_b_2509](https://github.com/jphacks/tk_b_2509) | SerenSpot | レビュー単位で作業スポットを地図に出し、思わぬ場所と出会うSNS | 地図,共有,記録 | ◎ | - | 公開投稿とmapViewのピン、地名検索で作れる |  |
 | [tk_b_2510](https://github.com/jphacks/tk_b_2510) | Emolog | 写真とコメントを記録しAIが感情コメントを付け、連続日数を見せる | カメラ,AI,記録 | ○ | - | 月末のタイムラプス動画が欠ける。写真の一覧表示は可 |  |
 | [tk_b_2511](https://github.com/jphacks/tk_b_2511) | - | README が雛形のまま | その他 | ? | - | 内容が読めず判定不可 |  |

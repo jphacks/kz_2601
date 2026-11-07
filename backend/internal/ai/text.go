@@ -48,6 +48,8 @@ type TextRequest struct {
 	Options []string `json:"options,omitempty"`
 	// Length is short (default) or long (text_long.go: 16 KB input, longer answer).
 	Length string `json:"length,omitempty"`
+	// Image is the photo of aiButton inputPhoto (text_image.go). Never logged.
+	Image *TextImage `json:"image,omitempty"`
 }
 
 // TextField is one named value of shape fields.
@@ -142,6 +144,9 @@ func normalizeTextRequest(req *TextRequest) error {
 // Text runs one shaped generation.
 func (s *Service) Text(ctx context.Context, req TextRequest) (*TextResult, error) {
 	started := time.Now()
+	if err := s.checkTextImageRequest(req); err != nil {
+		return nil, err
+	}
 	if err := normalizeTextRequest(&req); err != nil {
 		return nil, err
 	}
@@ -168,6 +173,7 @@ func (s *Service) Text(ctx context.Context, req TextRequest) (*TextResult, error
 	if req.isLong() {
 		applyLong(&c, req, loc)
 	}
+	applyImage(&c, req)
 	resp, err := s.Claude.Complete(WithOperation(ctx, OpText), c)
 	if err != nil {
 		return nil, mapClaudeErr(err)
@@ -341,12 +347,12 @@ func textHandler(svc *Service) http.Handler {
 			svc.writeErr(w, r, &Error{Status: http.StatusUnauthorized, Code: httpx.CodeUnauthenticated, Message: "missing or invalid bearer token"})
 			return
 		}
-		body, err := io.ReadAll(io.LimitReader(r.Body, textMaxBodyBytes+1))
+		body, err := io.ReadAll(io.LimitReader(r.Body, textMaxImageBodyBytes+1))
 		if err != nil {
 			svc.writeErr(w, r, badText("cannot read body"))
 			return
 		}
-		if len(body) > textMaxBodyBytes {
+		if len(body) > textMaxImageBodyBytes { // the fields are capped again after decoding
 			svc.writeErr(w, r, &Error{Status: http.StatusRequestEntityTooLarge, Code: httpx.CodePayloadTooLarge, Message: "body too large"})
 			return
 		}

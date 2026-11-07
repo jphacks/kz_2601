@@ -207,6 +207,7 @@ paths:
         - モデルが断ったら 422 `refused`、形に合わない出力は 502 `bad_output`。line は最初の 1 行、list は count を超えた分を切る (1 個以上あれば返す)、fields は全項目そろわなければ 502
         - `task` (summarize / classify / rewrite / extract / suggest) を付けると、端末内 AI が無い端末での aiButton の要約などのオンライン版。input 必須・instruction 任意・shape は line だけ・classify は options 2〜20 個。重さ 2 (`RATE_LIMIT_WEIGHT_TEXT_TASK`)・出力 1000 トークン。答えは text 1 つ (行は残す・1200 字で切る)、classify は候補のどれか 1 つ (docs/backend/features/text.md)
         - `length: long` (aiButton の長文) は、generate (shape line だけ) と classify 以外の task で使える。input 16384 バイト・出力 1500 トークン・答えは text 1 つ (段落は残す・3000 字で切る)・応答に `length: long`。重さ 3 (`RATE_LIMIT_WEIGHT_TEXT_LONG`・task より優先)。Pro の確認は他と同じ。iOS は long では端末内 AI を使わず、いつもここを呼ぶ
+        - `image` (aiButton の inputPhoto) は写真 1 枚。JPEG (`mediaType: image/jpeg`)・長い辺 1024px 以下・base64 400 KB (409600 文字) 以下。超えると 413、JPEG でない・base64 でない・大きすぎる画像は 400。サーバーが `AI_TEXT_IMAGE=1` でなければ 403 `forbidden`。task は何でもよく、task 付きでも input は任意 (写真だけでよい)。本文の上限は写真の分だけ広い (約 433 KB)。重さ 3 (`RATE_LIMIT_WEIGHT_TEXT_IMAGE`・task / length の重さと大きい方)。写真のバイト列はどのログにも出さない
       requestBody:
         required: true
         content:
@@ -395,6 +396,13 @@ components:
         items: { type: array, minItems: 1, maxItems: 10, items: { type: string, maxLength: 20 }, description: fields の項目名 (重複なし)。fields 以外では送らない }
         input: { type: string, description: 材料のアプリのデータ (最近の記録 ≤ 20 件 / フォームの値)。4096 バイトまで (length long は 16384 バイト) }
         length: { type: string, enum: [short, long], default: short, description: 'long = 長文 (出力 1500 トークン・答え 3000 字まで・重さ 3)。classify 不可・generate は shape line だけ' }
+        image:
+          type: object
+          required: [mediaType, data]
+          description: aiButton inputPhoto の写真 1 枚 (長い辺 1024px 以下・重さ 3・AI_TEXT_IMAGE=1 の時だけ)
+          properties:
+            mediaType: { type: string, enum: [image/jpeg] }
+            data: { type: string, maxLength: 409600, description: 標準の base64 (data URL の接頭辞なし) }
         locale: { type: string, enum: [ja, en], description: 省略時は instruction から判定 }
     TextResponse:
       type: object

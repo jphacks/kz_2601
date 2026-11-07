@@ -10,6 +10,11 @@ extension MockAIClient {
     public func text(_ request: AITextRequest) async throws -> AITextResult {
         try await Task.sleep(for: delay / 2)
         let result: AITextResult?
+        if request.image != nil, request.isTransform, request.task != "classify" {
+            // inputPhoto: 写真を読んだ体の決まった文
+            guard let out = AITextResult.normalize(text: "写真から読み取った内容です(モック)", items: nil, fields: nil, for: request) else { throw AITextError.badOutput }
+            return out
+        }
         if request.isLong {
             // length long: 段落のある長い文
             let text = (1...4).map { "\($0) 段落目の長い文章です。決まった文を返しています(モック)。" }.joined(separator: "\n\n")

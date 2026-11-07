@@ -58,12 +58,16 @@ type Weights struct {
 	// TextLong is POST /v1/text with length long (any task): up to 16 KB in
 	// and 1500 tokens out, the cost of about three short calls.
 	TextLong int
+	// TextImage is POST /v1/text with a photo (aiButton inputPhoto, any task):
+	// a ≤ 1024 px image is about 1500 input tokens. The larger of this and the
+	// task / length weight is charged.
+	TextImage int
 }
 
 // DefaultLimits / DefaultWeights: see docs/backend/rate-limit.md for the reasoning.
 var (
 	DefaultLimits  = Limits{Anonymous: 30, SignedIn: 60, Pro: 300, PerIP: 300, Global: 2000}
-	DefaultWeights = Weights{Create: 3, Edit: 2, Chat: 1, Text: 1, TextTask: 2, TextLong: 3}
+	DefaultWeights = Weights{Create: 3, Edit: 2, Chat: 1, Text: 1, TextTask: 2, TextLong: 3, TextImage: 3}
 )
 
 // JST is the day boundary (00:00 Asia/Tokyo). A fixed zone avoids needing
