@@ -62,7 +62,7 @@ struct SettingsSheet: View {
             .screenMapSheet { dismiss() } // 設定は音声シートから開くので、閉じればその画面の文脈で話せる
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) { Button("閉じる") { dismiss() } }
+                SheetCloseToolbarItem { dismiss() }
             }
             .confirmationDialog(L10n.key("アプリを初期状態に戻しますか？", review: "今の記録帳を初期状態に戻しますか？"), isPresented: $confirmReset, titleVisibility: .visible) {
                 Button("初期状態に戻す", role: .destructive) {
@@ -71,7 +71,7 @@ struct SettingsSheet: View {
                 }
                 Button("キャンセル", role: .cancel) {}
             } message: {
-                Text(L10n.key("生成したアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。", review: "今の記録帳は音声画面だけの状態に戻ります。サーバー上のデータは削除されません。"))
+                Text(L10n.key("作ったアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。", review: "今の記録帳は音声画面だけの状態に戻ります。サーバー上のデータは削除されません。"))
             }
         }
         .presentationDetents([.medium, .large])

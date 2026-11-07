@@ -214,7 +214,7 @@ struct VoiceInputView: View {
                         .overlay(Circle().strokeBorder(Theme.Colors.hairline))
                 }
                 .disabled(rt.isMorphing)
-                .accessibilityLabel(Text(L10n.key("アプリ一覧", review: "記録帳の一覧")))
+                .accessibilityLabel(Text(L10n.key("変身一覧", review: "記録帳の一覧")))
                 .accessibilityIdentifier("voice.appList")
             }
             Button { showSettings = true } label: {

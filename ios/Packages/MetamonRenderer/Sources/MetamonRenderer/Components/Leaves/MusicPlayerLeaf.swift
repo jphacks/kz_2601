@@ -347,9 +347,7 @@ struct MusicSearchSheet: View {
             .navigationTitle(L("曲を探す"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(L("閉じる")) { dismiss() }
-                }
+                SheetCloseToolbarItem { dismiss() }
             }
             .aiButtonLayer()
             .task {

@@ -15,7 +15,11 @@ final class RecordDeleteUndoTests: XCTestCase {
     override func setUp() async throws {
         dir = FileManager.default.temporaryDirectory.appendingPathComponent("metamon-undo-\(UUID().uuidString)")
         client = OfflineSimulatingAppConfigClient(inner: InMemoryAppConfigClient())
-        connectivity = ManualConnectivity(online: true)
+        startEngine(online: true)
+    }
+
+    private func startEngine(online: Bool) {
+        connectivity = ManualConnectivity(online: online)
         store = RecordStore(directory: dir)
         queue = SyncQueue(directory: dir, store: store, client: client, policy: .immediate)
         engine = RecordSyncEngine(store: store, queue: queue, client: client, connectivity: connectivity)
@@ -106,8 +110,10 @@ final class RecordDeleteUndoTests: XCTestCase {
     }
 
     func testUnsentCreateUndoKeepsRowAndCommitCancelsCreate() async throws {
+        // 走行中に切ると、エンジンが知る前の保存が送信中になり、作成を畳めない。最初から圏外で始める
+        engine.stop()
         client.setOffline(true)
-        connectivity.set(online: false)
+        startEngine(online: false)
         let made = await engine.save(appId: "a", entity: "memo", recordId: nil, data: ["title": "パン"])
         let (_, t) = await engine.deleteUndoably(appId: "a", entity: "memo", recordId: made[0].id, grace: .seconds(30))
         let restored = await engine.undoDelete(t)

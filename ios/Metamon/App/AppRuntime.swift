@@ -1224,7 +1224,7 @@ final class AppRuntime: DSLRuntime {
                 toast = L10n.tr("保存するフォームがありません")
                 return
             }
-            let missing = form.missingRequired
+            let missing = form.flagMissingRequired() // 空の欄に印を付ける(M10)
             guard missing.isEmpty else {
                 toast = L10n.tr("\(missing.joined(separator: L10n.tr("・"))) を入力してください")
                 return
