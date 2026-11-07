@@ -241,9 +241,9 @@ type countingAccounts struct {
 	lookups int
 }
 
-func (a *countingAccounts) UserDeleted(ctx context.Context, uid string) (bool, error) {
+func (a *countingAccounts) SeeUser(ctx context.Context, uid string) (bool, error) {
 	a.lookups++
-	return a.Accounts.UserDeleted(ctx, uid)
+	return a.Accounts.SeeUser(ctx, uid)
 }
 
 // newAuthed keeps App Check -> auth -> RejectDeleted (#516): rejected requests

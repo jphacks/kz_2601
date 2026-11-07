@@ -6,7 +6,7 @@ App Store 審査ガイドライン 5.1.1(v)(アカウントを作れるアプリ
 
 | 対象 | 扱い |
 |---|---|
-| `users/{uid}` | `{status: "deleted", deletedAt}` を書く(このドキュメントは他に書かれないので、無ければ有効なユーザー) |
+| `users/{uid}` | `{status: "deleted", deletedAt}` を足す(他に入るのは `firstSeenAt` だけ・#339 の通知の 24 時間。`status` が無ければ有効なユーザー)。`firstSeenAt` は 30 日後の消去で消える |
 | `users/{uid}/apps/*` | `status: "archived"`(`DELETE /v1/apps/{appId}` と同じ)。versions・records は残る |
 | `shares/*`(`ownerUid == uid`) | `revoked: true`(受け取り側の取り込み・プレビューは 404) |
 | `public_apps/*`(`ownerUid == uid`) | 取り下げ(「探す」から消える) |
