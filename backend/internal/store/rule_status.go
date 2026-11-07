@@ -58,6 +58,8 @@ type RuleStatuses interface {
 type StopState struct {
 	Level string    `json:"level"`
 	Until time.Time `json:"until,omitzero"`
+	// Force: the rule-triggering writes are refused too (Stop.Force).
+	Force bool `json:"force,omitempty"`
 }
 
 // RunnerActivity is the read-only view of the runner's state the creator's
@@ -76,7 +78,7 @@ func activeStops(got map[string]Stop, now time.Time) map[string]StopState {
 	out := map[string]StopState{}
 	for id, s := range got {
 		if s.Active(now) {
-			out[id] = StopState{Level: s.Level, Until: s.Until}
+			out[id] = StopState{Level: s.Level, Until: s.Until, Force: s.Force}
 		}
 	}
 	return out

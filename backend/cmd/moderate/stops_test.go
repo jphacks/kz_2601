@@ -14,6 +14,7 @@ import (
 // refuse the production database without -allow-prod-db, and lift only
 // what is active.
 func TestRunStops(t *testing.T) {
+	t.Setenv("USER", "ci")
 	ctx := context.Background()
 	m := store.NewMemory()
 	clock := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
