@@ -52,7 +52,7 @@ final class SchemaSwiftKeysTests: XCTestCase {
     func testActionTypesMatchSchema() throws {
         let schemaTypes = try SchemaFixture.load().actionTypes
         let swiftTypes = Set(ActionType.allCases.filter { $0 != .unknown }.map(\.rawValue))
-        XCTAssertEqual(schemaTypes.count, 13, "アクションの数が 13 でない(#351・addToCalendar)")
+        XCTAssertEqual(schemaTypes.count, 15, "アクションの数が 15 でない(#351・#270 で follow / unfollow・addToCalendar)")
         assertSameSet(schema: schemaTypes, swift: swiftTypes, what: "アクションの type",
                       swiftPlace: "ActionType の case")
     }

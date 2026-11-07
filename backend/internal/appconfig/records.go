@@ -103,7 +103,7 @@ func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "unknown sortField").With("field", sortField))
 		return
 	}
-	pred, err := buildFilter(ent, q.Get("filterField"), q.Get("filterOp"), q.Get("filterValue"))
+	pred, err := h.recordFilter(r, cur.ID, ent, q.Get("filterField"), q.Get("filterOp"), q.Get("filterValue")) // follows.go (#270)
 	if err != nil {
 		fail(w, err)
 		return

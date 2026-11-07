@@ -66,7 +66,7 @@ go run ./cmd/ai-eval -chat -env-file ../.env -cases internal/ai/eval/m0disc_chat
 |---|---|---|
 | d_friends_vague | `shared: true` | 友達と使う = 共有。public / shared のどちらでもよい(D-06 で shared になっても通る) |
 | d_sns_post | `photo: true, scope: public`(前から) | — |
-| d_sns_follow | `substitution: true, shared: true` | フォローのタイムラインは M4(D-22) |
+| d_sns_follow | `shared: true, followFilter: true, followButton: true, followEntity: false` | フォローのタイムラインは #270(D-22)で作れるようになった。フォローは appconfig が持ち、DSL は `{"myFollows": true}` の filter と follow / unfollow のボタンで使う |
 | d_group_chat | `substitution: true, shared: true` | 他人の書き込みで届くプッシュは M4(D-21) |
 | d_circle_attend | `scope: shared`(前から) | 洗い出しでは public だった。D-06 の目標どおり残す |
 | d_ranking | `scope: public`(前から) | — |
@@ -113,7 +113,7 @@ PR #378 / #379 が同じ行か隣の行を変えるため、ここで書くと g
 - 全ステップに `textNot: [public, private, shared, entity, scope, disclosure, computed]`(D-10)。返答の本文に DSL の英語の名前が出たら外れ。
   - `op` は入れていない(部分一致なので英単語の一部にも当たる)。#379 の `ai.LeakedTerms` は単語の境目で見るので、チップや案のタイトルも含めてそちらで拾う。
 - `dc_friends_vague`: `expect: question`(ふわっとした依頼は聞き返す)。
-- M4 に回す 4 本(`dc_sns_can` `dc_chat_push_can` `dc_reserve_conflict` `dc_role_can`): `textAny: [できません, できない, 出せません]`(正直に断る)。
+- M4 に回す 3 本(`dc_chat_push_can` `dc_reserve_conflict` `dc_role_can`): `textAny: [できません, できない, 出せません]`(正直に断る)。`dc_sns_can` は #270 でフォローができるようになったので `textNot` に「できません」「できない」を入れた(断らない)。
 - `dc_family_only_can`・`dc_random_can`・`dc_flashcard_can` は D-06 / D-15 / D-16 で答えが変わるので、断り方の期待は付けていない。
 
 ## 6. PR #378 / #379 との関係

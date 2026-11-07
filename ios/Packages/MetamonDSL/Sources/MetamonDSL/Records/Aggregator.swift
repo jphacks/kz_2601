@@ -28,6 +28,11 @@ public enum Aggregator {
             let mine = record.markState(mid).mine
             return f.op == "neq" ? !mine : mine
         }
+        if f.field == RecordValue.author, let followed = f.followedAuthors {
+            // フォローしている人(#270)。value は `resolvingFollows` で uid の配列にしたもの
+            let hit = followed.contains(record.author ?? "")
+            return f.op == "neq" ? !hit : hit
+        }
         if f.field == RecordValue.author {
             // 投稿者の uid と比べる(value は `resolvingMe` で uid にしたもの・#251)。作者の無い行は作者 ""。uid に置き換わっていない me はどれにも一致しない
             guard let uid = f.value?.stringValue else { return false }

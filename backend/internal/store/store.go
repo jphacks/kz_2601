@@ -231,6 +231,7 @@ type Store interface {
 	Purger          // physical app deletion (purge.go)
 	AccountPurger   // physical erasure of deleted accounts (account_purge.go)
 	Marks           // per-user like / save toggles on shared records (marks.go)
+	Follows         // whom people follow in shared apps (follow.go, #270)
 	Feedbacks       // in-app feedback (feedback.go)
 	Moderation      // reports, blocks, operator unpublish (moderation.go, #321)
 	Matching        // interests and matches of matching apps (matching.go, #507)
