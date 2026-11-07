@@ -205,6 +205,40 @@
         }
       }
     },
+    "%@が上限に近づいています(%@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ is nearing its limit (%2$@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@が上限に近づいています(%@)"
+          }
+        }
+      }
+    },
+    "%@が上限に達しています(%@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ has reached its limit (%2$@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@が上限に達しています(%@)"
+          }
+        }
+      }
+    },
     "%@が上限に達しました。作った人に知らせてください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -409,6 +443,23 @@
         }
       }
     },
+    "%lld のうち %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$lld of %1$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld のうち %lld"
+          }
+        }
+      }
+    },
     "%lld 人" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -507,6 +558,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 秒ほど待ってから、もう一度お試しください"
+          }
+        }
+      }
+    },
+    "%lld(上限なし)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld (no limit)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld(上限なし)"
+          }
+        }
+      }
+    },
+    "%lld、上限なし" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld, no limit"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld、上限なし"
           }
         }
       }
@@ -1170,6 +1255,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pro をご利用中です"
+          }
+        }
+      }
+    },
+    "Pro プランの上限です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These are the Pro plan limits"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro プランの上限です"
           }
         }
       }
@@ -2942,6 +3044,23 @@
         }
       }
     },
+    "このアプリの写真" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos in this app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリの写真"
+          }
+        }
+      }
+    },
     "このアプリの自動の動きは運営が止めています。この変更は保存できませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2955,6 +3074,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリの自動の動きは運営が止めています。この変更は保存できませんでした"
+          }
+        }
+      }
+    },
+    "このアプリの記録" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Records in this app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリの記録"
           }
         }
       }
@@ -8195,6 +8331,23 @@
         }
       }
     },
+    "作ったアプリ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps you made"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作ったアプリ"
+          }
+        }
+      }
+    },
     "作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8344,6 +8497,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使い方を見る"
+          }
+        }
+      }
+    },
+    "使っている量" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usage"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使っている量"
+          }
+        }
+      }
+    },
+    "使わないものを消すと、空きが増えます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete what you don't use to free up space"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使わないものを消すと、空きが増えます"
           }
         }
       }
@@ -11935,6 +12122,23 @@
         }
       }
     },
+    "無料プランの上限です。使わないものを消すか、Pro にすると増やせます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These are the free plan limits. Delete what you don't use, or go Pro for more"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無料プランの上限です。使わないものを消すか、Pro にすると増やせます"
+          }
+        }
+      }
+    },
     "無料プランを一時停止しています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12016,6 +12220,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在: %@"
+          }
+        }
+      }
+    },
+    "用意した記録帳" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notebooks you set up"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用意した記録帳"
           }
         }
       }

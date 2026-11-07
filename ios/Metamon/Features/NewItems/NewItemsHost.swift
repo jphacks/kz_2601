@@ -30,6 +30,7 @@ struct NewItemsHost: ViewModifier {
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: notice)
+            .onChange(of: notice != nil) { _, visible in TopNoticeSlot.shared.newItemsVisible = visible } // 上限のお知らせと重ねない
             .task(id: trigger) { await check() }
             .onChange(of: scenePhase) { old, phase in
                 if phase == .active, old == .background { Task { await check() } }

@@ -1129,6 +1129,7 @@ final class AppRuntime: DSLRuntime {
             revokeSaveFeedback(for: event)
             switch event {
             case .sent(let appId, let entity):
+                PlanUsageStore.shared.invalidateApp(appId) // #317 記録・写真の量を読み直す
                 guard appId == document.appId else { return }
                 let cached = await recordSync.cached(appId: appId, entity: entity)
                 guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
