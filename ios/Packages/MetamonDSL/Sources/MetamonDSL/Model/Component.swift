@@ -47,6 +47,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case locationTracker
     // leaf(チャット・#260)
     case chatThread
+    // leaf(クラウドの AI と何往復も話す)。entity / textField / length / placeholder / emptyText は共用
+    case aiChat
     // leaf(ヘルスデータ・#167)
     case healthStat
     // leaf(時間割のマス目・#234)
@@ -202,6 +204,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     // chatThread(#260)。entity / placeholder / emptyText は共用
     public var textField: String?      // 本文の string / text field
     public var photoField: String?     // 任意の photo field
+    // aiChat。entity / textField / length / placeholder / emptyText は共用
+    public var roleField: String?      // user / assistant を書く field(nil = 自分と AI が交互)
+    public var persona: String?        // AI の役と話し方(500 字まで・サーバーへは instruction)
     // dashcam(#410)。title は共用。nil = 既定値(DashcamConfig)
     public var keepMinutes: Int?       // ループで残す分数
     public var maxStorageMB: Int?      // 録画の容量上限
@@ -251,7 +256,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case tone
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
-        case textField, photoField
+        case textField, photoField, roleField, persona
         case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance, allowRequests, autoAccept
         case accept, map
         case show
@@ -352,6 +357,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         rowRange = try? c.decodeIfPresent(GridRange.self, forKey: .rowRange)
         textField = try? c.decodeIfPresent(String.self, forKey: .textField)
         photoField = try? c.decodeIfPresent(String.self, forKey: .photoField)
+        roleField = try? c.decodeIfPresent(String.self, forKey: .roleField)
+        persona = try? c.decodeIfPresent(String.self, forKey: .persona)
         keepMinutes = try? c.decodeIfPresent(Int.self, forKey: .keepMinutes)
         maxStorageMB = try? c.decodeIfPresent(Int.self, forKey: .maxStorageMB)
         impactG = try? c.decodeIfPresent(Double.self, forKey: .impactG)

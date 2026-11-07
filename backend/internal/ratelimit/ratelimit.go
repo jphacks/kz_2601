@@ -55,8 +55,8 @@ type Weights struct {
 	// TextTask is POST /v1/text with a transform task (summarize, rewrite...):
 	// a longer answer (up to 1000 tokens) than generate.
 	TextTask int
-	// TextLong is POST /v1/text with length long (any task): up to 16 KB in
-	// and 1500 tokens out, the cost of about three short calls.
+	// TextLong is POST /v1/text with length long (any task) or task chat
+	// (aiChat, up to 16 KB of turns): the cost of about three short calls.
 	TextLong int
 	// TextImage is POST /v1/text with a photo (aiButton inputPhoto, any task):
 	// a ≤ 1024 px image is about 1500 input tokens. The larger of this and the

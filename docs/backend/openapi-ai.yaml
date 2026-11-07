@@ -389,7 +389,7 @@ components:
       required: [instruction]
       properties:
         instruction: { type: string, maxLength: 500, description: aiButton の prompt (プレースホルダ置換後)。task 付きは空でもよい }
-        task: { type: string, enum: [generate, summarize, classify, rewrite, extract, suggest], default: generate, description: generate 以外は input を処理する (input 必須・shape は line だけ) }
+        task: { type: string, enum: [generate, summarize, classify, rewrite, extract, suggest, chat], default: generate, description: 'generate 以外は input を処理する (input 必須・shape は line だけ)。chat = aiChat の返事 (instruction = persona 必須・messages 必須・input / image は送らない・重さ 3)' }
         options: { type: array, minItems: 2, maxItems: 20, items: { type: string, maxLength: 40 }, description: task classify の候補 (重複なし)。classify 以外では送らない }
         shape: { type: string, enum: [line, list, fields], default: line }
         count: { type: integer, minimum: 1, maximum: 10, description: list の個数 (既定 3)。list 以外では送らない }
@@ -403,6 +403,17 @@ components:
           properties:
             mediaType: { type: string, enum: [image/jpeg] }
             data: { type: string, maxLength: 409600, description: 標準の base64 (data URL の接頭辞なし) }
+        messages:
+          type: array
+          minItems: 1
+          maxItems: 20
+          description: 'task chat の会話 (古い順・最後は user・text の合計 16384 バイトまで = 413)。chat 以外では送らない。ログに出さない'
+          items:
+            type: object
+            required: [role, text]
+            properties:
+              role: { type: string, enum: [user, assistant] }
+              text: { type: string }
         locale: { type: string, enum: [ja, en], description: 省略時は instruction から判定 }
         appId: { type: string, maxLength: 128, description: 'ボタンがあるアプリ (任意)。共有のアプリの参加者なら作成者の Pro で判定する。形が不正なら 400' }
     TextResponse:

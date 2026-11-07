@@ -13,8 +13,8 @@ public enum ClientCapabilities {
         ComponentType.allCases.filter { $0 != .unknown }.map(\.rawValue)
     }
 
-    /// 審査用ビルドでバイナリから外す部品(Renderer の登録もしない)。feed(#348)は外部の Web の内容を出すので外す。
-    public static let reviewExcludedComponents: Set<ComponentType> = [.healthStat, .locationTracker, .nearbyShare, .dashcam, .sensorValue, .audioRecorder, .webView, .chatThread, .matchList, .feed]
+    /// 審査用ビルドでバイナリから外す部品(Renderer の登録もしない)。feed(#348)は外部の Web の内容を出すので外す。aiChat はオンライン AI(POST /v1/text)だけで動き、審査用の版はそれを持たない(#452 G4)ので外す。
+    public static let reviewExcludedComponents: Set<ComponentType> = [.healthStat, .locationTracker, .nearbyShare, .dashcam, .sensorValue, .audioRecorder, .webView, .chatThread, .matchList, .feed, .aiChat]
     /// 審査用ビルドで無効にする機能。fieldHealth = Field.health(HealthKit への書き込み)、cameraCapture = photoField / videoField の撮影、
     /// sharedData = entity の scope shared / public(他の人と同じ記録を見る作り・#451 G2。backend が private に直す)。
     public static let reviewDisabledFeatures = ["fieldHealth", "cameraCapture", "sharedData"]

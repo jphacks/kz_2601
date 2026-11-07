@@ -1,0 +1,7 @@
+[
+  {"id": "ac_counselor", "kind": "create", "group": "aichat", "transcript": "悩みを話すと AI がカウンセラーみたいに話を聞いてくれて、前の話も覚えているアプリ", "note": "aiChat(roleField 付き・persona にカウンセラー)。aiButton の 1 回きりの相談にしない", "expect": {"has": ["aiChat"], "lacks": ["aiButton"]}},
+  {"id": "ac_tutor", "kind": "create", "group": "aichat", "transcript": "わからない数学の問題を AI の家庭教師に質問して、ヒントをもらいながら何回もやり取りしたい", "note": "aiChat(persona に答えを言わずヒント)", "expect": {"has": ["aiChat"]}},
+  {"id": "ac_english_partner", "kind": "create", "group": "aichat", "transcript": "英会話の練習相手になってくれる AI と毎日チャットしたい", "note": "aiChat(persona に英会話の練習相手)", "expect": {"has": ["aiChat"]}},
+  {"id": "ac_interview_practice", "kind": "create", "group": "aichat", "transcript": "就活の面接練習で、AI が面接官になって質問してくれて答えると次の質問が来るアプリ", "note": "aiChat(persona に面接官)", "expect": {"has": ["aiChat"]}},
+  {"id": "ac_diary_comment_not_chat", "kind": "create", "group": "aichat", "transcript": "日記を書いたらボタンで AI に一言コメントをもらいたい", "note": "1 回押して 1 回書かせる = aiButton suggest。aiChat にしない", "expect": {"aiTask": "suggest", "lacks": ["aiChat"]}}
+]

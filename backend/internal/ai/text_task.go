@@ -39,7 +39,7 @@ func IsTextTask(task string) bool { _, ok := textTasks[task]; return ok }
 
 func normalizeTaskRequest(req *TextRequest) error {
 	if !IsTextTask(req.Task) {
-		return badText("task must be generate, summarize, classify, rewrite, extract or suggest")
+		return badText("task must be generate, summarize, classify, rewrite, extract, suggest or chat")
 	}
 	req.Instruction = strings.TrimSpace(req.Instruction)
 	if utf8.RuneCountInString(req.Instruction) > dsl.MaxAIInstructionRunes {

@@ -55,7 +55,7 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 | `RATE_LIMIT_PRO_DAILY` | 300 | Pro でも上限はある(緩い)。Pro はサーバーで検証した権利(`users/{uid}/entitlements/pro`・#314 #449)で判定 |
 | `RATE_LIMIT_IP_DAILY` | 300 | 匿名だけ。同じ IP からの匿名の合計(作り直し対策) |
 | `RATE_LIMIT_GLOBAL_DAILY` | 2000 | 環境全体の費用ブレーカー。新規作成なら約 660 回 |
-| `RATE_LIMIT_WEIGHT_CREATE` / `_EDIT` / `_CHAT` / `_TEXT` / `_TEXT_TASK` / `_TEXT_LONG` / `_TEXT_IMAGE` | 3 / 2 / 1 / 1 / 2 / 3 / 3 | `_TEXT_TASK` は `/v1/text` の本文に generate 以外の `task` がある時。`_TEXT_LONG` は本文に `length: "long"` がある時。`_TEXT_IMAGE` は本文に `image` がある時。重なった時は大きい方(max) |
+| `RATE_LIMIT_WEIGHT_CREATE` / `_EDIT` / `_CHAT` / `_TEXT` / `_TEXT_TASK` / `_TEXT_LONG` / `_TEXT_IMAGE` | 3 / 2 / 1 / 1 / 2 / 3 / 3 | `_TEXT_TASK` は `/v1/text` の本文に generate 以外の `task` がある時。`_TEXT_LONG` は本文に `length: "long"` がある時と `task: "chat"`(aiChat)の時。`_TEXT_IMAGE` は本文に `image` がある時。重なった時は大きい方(max) |
 | `RATE_LIMIT` | on(GOOGLE_CLOUD_PROJECT があれば) | `off` で無効。ローカルで素の起動なら既定 off |
 | `RATE_LIMIT_STORE` | firestore | `memory` でインスタンスごとのメモリ |
 | `RATE_LIMIT_COLLECTION` | rateLimits | |
