@@ -13,6 +13,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -135,16 +136,17 @@ func normalizeTextRequest(req *TextRequest) error {
 	return nil
 }
 
-// Text runs one shaped generation.
-func (s *Service) Text(ctx context.Context, req TextRequest) (*TextResult, error) {
+// prepareText validates req in place and resolves its locale (no Claude call).
+func prepareText(req *TextRequest) (Locale, error) {
+	if err := normalizeTextRequest(req); err != nil {
+		return "", err
+	}
+	return resolveLocale(req.Locale, req.Instruction)
+}
+
+// text runs one shaped generation of a request prepareText accepted.
+func (s *Service) text(ctx context.Context, req TextRequest, loc Locale) (*TextResult, error) {
 	started := time.Now()
-	if err := normalizeTextRequest(&req); err != nil {
-		return nil, err
-	}
-	loc, err := resolveLocale(req.Locale, req.Instruction)
-	if err != nil {
-		return nil, err
-	}
 	cfg := s.ChatConfig.resolved()
 	ctx, cancel := context.WithTimeout(ctx, s.chatTimeout())
 	defer cancel()
@@ -325,6 +327,8 @@ func parseTextOutput(raw string, req TextRequest) (*TextResult, error) {
 
 // textHandler serves POST /v1/text. A verified caller is required (the rate
 // limiter verifies first in production; auth.Optional covers a bare run).
+// A 402 (no Pro covers the call) gives the rate limit units back
+// (ratelimit.Waive); 400 / 413 keep the charge like /v1/generate.
 func textHandler(svc *Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if auth.UID(r.Context()) == "" {
@@ -345,13 +349,21 @@ func textHandler(svc *Service) http.Handler {
 			svc.writeErr(w, r, badText("invalid JSON: "+err.Error()))
 			return
 		}
-		// #316: the online AI of an app is a Pro feature (the on-device AI is free)
-		ctx, err := svc.gateText(r.Context(), req)
+		loc, err := prepareText(&req)
 		if err != nil {
 			svc.writeErr(w, r, err)
 			return
 		}
-		res, err := svc.Text(ctx, req)
+		// #316: the online AI of an app is a Pro feature (the on-device AI is free)
+		ctx, err := svc.gateText(r.Context(), req)
+		if err != nil {
+			if asError(err).Status == http.StatusPaymentRequired {
+				ratelimit.Waive(r.Context()) // no Claude call: the 402 is not charged
+			}
+			svc.writeErr(w, r, err)
+			return
+		}
+		res, err := svc.text(ctx, req, loc)
 		if err != nil {
 			svc.writeErr(w, r, err)
 			return
