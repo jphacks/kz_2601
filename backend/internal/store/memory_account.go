@@ -45,6 +45,37 @@ func (m *Memory) UserDeleted(_ context.Context, uid string) (bool, error) {
 	return ok || m.purged[uid], nil
 }
 
+// SeeUser implements Accounts.
+func (m *Memory) SeeUser(_ context.Context, uid string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.deleted[uid]; ok || m.purged[uid] {
+		return true, nil
+	}
+	if _, ok := m.firstSeen[uid]; !ok {
+		if m.firstSeen == nil {
+			m.firstSeen = map[string]time.Time{}
+		}
+		at := m.now().UTC() // the oldest app / device, like the Firestore one
+		for _, a := range m.users[uid] {
+			at = earlier(at, a.app.CreatedAt)
+		}
+		for _, d := range m.devices[uid] {
+			at = earlier(at, d.CreatedAt)
+		}
+		m.firstSeen[uid] = at
+	}
+	return false, nil
+}
+
+// UserFirstSeen implements Accounts.
+func (m *Memory) UserFirstSeen(_ context.Context, uid string) (time.Time, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	at, ok := m.firstSeen[uid]
+	return at, ok, nil
+}
+
 // DeletedAccounts implements AccountPurger.
 func (m *Memory) DeletedAccounts(_ context.Context, cutoff time.Time, limit int) ([]DeletedAccount, error) {
 	m.mu.Lock()
@@ -151,6 +182,7 @@ func (m *Memory) MarkAccountPurged(_ context.Context, uid string) error {
 		return ErrNotDeleted
 	}
 	delete(m.deleted, uid)
+	delete(m.firstSeen, uid) // the tombstone keeps status and purgedAt only
 	if m.purged == nil {
 		m.purged = map[string]bool{}
 	}

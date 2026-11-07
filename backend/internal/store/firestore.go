@@ -42,6 +42,10 @@ func NewFirestore(ctx context.Context, projectID, database string) (*Firestore, 
 	return &Firestore{c: c}, nil
 }
 
+// NewFirestoreFromClient wraps a client the binary already holds (cmd/ai
+// reads shared-app membership with it).
+func NewFirestoreFromClient(c *firestore.Client) *Firestore { return &Firestore{c: c} }
+
 // Close releases the client.
 func (f *Firestore) Close() error { return f.c.Close() }
 

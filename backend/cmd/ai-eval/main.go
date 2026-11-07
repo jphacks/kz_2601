@@ -39,6 +39,7 @@
 // file without the API, and every run ends with the pass rate per group.
 //
 //	go run ./cmd/ai-eval -check -cases internal/ai/eval/m0disc_cases.json  # no API calls
+//	go run ./cmd/ai-eval -check-all internal/ai/eval  # every file, loader by shape (checkall.go), no API calls
 //	set -a; source ../.env; set +a
 //	go run ./cmd/ai-eval -effort low -out ../docs/backend/ai-eval/raw
 //	go run ./cmd/ai-eval -stream -repeat 2 -only kakeibo_a,walk_a   # SSE path, time to first event
@@ -213,8 +214,24 @@ func main() {
 	chatThinking := flag.String("chat-thinking", "", "-chat: thinking.type adaptive|disabled|between_tools (empty = ai.DefaultChatThinking)")
 	chatCaps := flag.String("capabilities", "", "-chat: comma-separated capabilities (answer,proposal) sent by cases without their own mode/capabilities (#185)")
 	score := flag.String("score", "", "glob of raw run files: prints the pass rate per group from the saved runs (the latest record of each id) and exits (no API calls)")
-	check := flag.Bool("check", false, "validate the cases file (ids, bases, expect keys and types) and exit (no API calls, #281)")
+	check := flag.Bool("check", false, "validate the cases file (ids, bases, expect keys and types; generate / chat / DSL base detected from its shape) and exit (no API calls, #281)")
+	checkAllDir := flag.String("check-all", "", "validate every JSON file under this dir (internal/ai/eval) with the loader its shape needs; unknown shapes fail (no API calls)")
 	flag.Parse()
+	if *checkAllDir != "" {
+		counts, err := checkAll(*checkAllDir, ".")
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("ok %s: %d generate, %d chat, %d dsl\n", *checkAllDir, counts[shapeGenerate], counts[shapeChat], counts[shapeDSL])
+		return
+	}
+	if *check {
+		if _, err := checkFile(*casesPath, "."); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("ok %s\n", *casesPath)
+		return
+	}
 	if *chat && *casesPath == "internal/ai/eval/cases.json" {
 		*casesPath = "internal/ai/eval/chat_cases.json"
 	}
@@ -233,10 +250,6 @@ func main() {
 	}
 	if err := checkCasesFile(*casesPath, *chat); err != nil {
 		log.Fatal(err)
-	}
-	if *check {
-		fmt.Printf("ok %s\n", *casesPath)
-		return
 	}
 
 	if *envFile != "" {

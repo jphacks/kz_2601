@@ -39,7 +39,9 @@ const recheckAfter = 30 * time.Second
 
 // RejectDeleted answers 410 account_deleted to every authenticated request of
 // a deleted uid, except DELETE /v1/me itself (so it stays idempotent). Mount it
-// inside auth.Middleware.
+// inside auth.Middleware. Its lookup (store.Accounts.SeeUser) also records
+// users/{uid}.firstSeenAt for the runner's 24h rule (#339): the same read per
+// uid per recheckAfter, plus one write the first time a uid is seen.
 func RejectDeleted(s store.Accounts, next http.Handler) http.Handler {
 	var (
 		mu      sync.Mutex
@@ -60,7 +62,7 @@ func RejectDeleted(s store.Accounts, next http.Handler) http.Handler {
 		mu.Unlock()
 		if !gone && time.Since(checked) > recheckAfter {
 			var err error
-			if gone, err = s.UserDeleted(r.Context(), uid); err != nil {
+			if gone, err = s.SeeUser(r.Context(), uid); err != nil {
 				fail(w, fmt.Errorf("account status: %w", err))
 				return
 			}
