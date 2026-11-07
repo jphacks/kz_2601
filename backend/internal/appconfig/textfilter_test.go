@@ -1,11 +1,64 @@
 package appconfig
 
 import (
+	"bytes"
+	"log/slog"
 	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/moderation/textfilter"
+	"github.com/jphacks/kz_2601/backend/internal/store"
 )
+
+// TEXT_FILTER: enforce refuses, log saves and logs the category only, off
+// neither refuses nor logs.
+func TestTextFilterModes(t *testing.T) {
+	for _, tc := range []struct {
+		mode    textfilter.Mode
+		code    int
+		logLine string
+	}{
+		{"", http.StatusUnprocessableEntity, "moderation: text refused"},
+		{textfilter.ModeEnforce, http.StatusUnprocessableEntity, "moderation: text refused"},
+		{textfilter.ModeLog, http.StatusCreated, "moderation: text would be refused"},
+		{textfilter.ModeOff, http.StatusCreated, ""},
+	} {
+		t.Run(string(tc.mode), func(t *testing.T) {
+			var logs bytes.Buffer
+			prev := slog.Default()
+			slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+			t.Cleanup(func() { slog.SetDefault(prev) })
+
+			t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
+			e := &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(store.NewMemory(), WithTextFilter(tc.mode)))}
+			const app = "/v1/apps/TEXT-MODE-1"
+			e.ownApp("u1", app, sharedKakeibo(t))
+			r := e.do("u1", http.MethodPost, app+"/entities/expense/records", `{"data":{"amount":1,"memo":"死ね"}}`, nil)
+			if tc.code == http.StatusUnprocessableEntity {
+				wantTextNotAllowed(t, r, "memo", "memo")
+			} else if r.code != tc.code {
+				t.Fatalf("want %d, got %d %s", tc.code, r.code, r.raw)
+			}
+
+			out := logs.String()
+			if strings.Contains(out, "死ね") {
+				t.Errorf("log has the text: %s", out)
+			}
+			if tc.logLine == "" {
+				if strings.Contains(out, "moderation: text") {
+					t.Errorf("off: want no moderation log, got %s", out)
+				}
+				return
+			}
+			if !strings.Contains(out, tc.logLine) || !strings.Contains(out, "category=threat") {
+				t.Errorf("want %q with category=threat, got %s", tc.logLine, out)
+			}
+		})
+	}
+}
 
 func wantTextNotAllowed(t *testing.T, r resp, field, what string) {
 	t.Helper()

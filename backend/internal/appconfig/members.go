@@ -238,7 +238,7 @@ func (h *Handler) removeMember(w http.ResponseWriter, r *http.Request) {
 }
 
 // importName reads the optional {"displayName"} body of POST /shares/{token}/import.
-func importName(w http.ResponseWriter, r *http.Request) (string, bool) {
+func (h *Handler) importName(w http.ResponseWriter, r *http.Request) (string, bool) {
 	if r.ContentLength == 0 {
 		return "", true
 	}
@@ -253,7 +253,7 @@ func importName(w http.ResponseWriter, r *http.Request) (string, bool) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "displayName too long"))
 		return "", false
 	}
-	if err := checkText(r, "member", "displayName", name); err != nil { // #321: shown in the member list
+	if err := h.checkText(r, "member", "displayName", name); err != nil { // #321: shown in the member list
 		fail(w, err)
 		return "", false
 	}

@@ -19,6 +19,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/feeds"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/moderation/textfilter"
 	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
@@ -56,6 +57,8 @@ type Handler struct {
 	proMode paid.Mode       // PRO_GATE_MODE; "" = enforce
 	feeds     *feeds.Service // external feeds (feeds.go, #348); nil = from env
 	feedUsers *feedLimiter
+
+	textMode textfilter.Mode // TEXT_FILTER (textfilter.go, #321); "" = enforce
 }
 
 // routeGroups holds the feature routes. Each feature file registers its own

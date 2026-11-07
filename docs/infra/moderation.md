@@ -23,6 +23,7 @@ App Store Review Guidelines 1.2 / 1.2.1(a)(利用者が作った内容を共有�
 | 投稿の削除 | `apps_public/{appId}/entities/{e}/records/{id}` | `delete-record` で消す |
 | シェアリンクの停止 | `shares/{token}.revoked` | `revoke-share`。共有データの無いアプリのリンクはこれで止める |
 | 表示できない言葉のフィルタ | `internal/moderation/textfilter`(一覧は `terms.txt`) | 他の人に見える文字だけを書き込みの時に見る: public/shared の entity の記録(string / text の項目・authorName)、参加者の表示名(`POST /shares/{token}/import`)、「探す」の掲載(name・description・tags・authorName)。当たれば 422 `text_not_allowed`(「表示できない言葉が含まれています」・`details.field`)で保存しない。作成者だけの private の記録は見ない。ログは `moderation: text refused`(INFO)に場所(record / member / listing)と種類(slur / sexual / threat)だけで、文字は出さない |
+| フィルタの切り替え | appconfig の環境変数 `TEXT_FILTER`([runtime-config.md](runtime-config.md#運用で変える値)) | `enforce`(既定)/ `log`(保存して `moderation: text would be refused` に場所と種類だけ)/ `off`(見ない)。誤検知の時はデプロイせずに落とす。それ以外の値は起動しない |
 
 退会の消去(`cmd/purge`)は、本人の通報・本人が対象の通報・ブロック一覧も消す([account-purge.md](account-purge.md))。
 

@@ -19,6 +19,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/moderation/textfilter"
 	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
@@ -54,7 +55,13 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("pro gate", slog.String("mode", string(proMode)))
-	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode))
+	textMode, err := textfilter.ModeFromEnv(os.Getenv) // TEXT_FILTER: enforce (default) | log | off (#321)
+	if err != nil {
+		logger.Error("text filter", slog.Any("error", err))
+		os.Exit(1)
+	}
+	logger.Info("text filter", slog.String("mode", string(textMode)))
+	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode), appconfig.WithTextFilter(textMode))
 	entitlement.Register(api, ents) // Pro (#314)
 	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appStoreNotifications(ents, logger))
 	server := &http.Server{
