@@ -157,6 +157,8 @@ type options struct {
 	limits func(*quota.Limits)
 	// storeDevices: read devices and consents from the store (#269) instead of h.tokens.
 	storeDevices bool
+	// sender replaces h.sender (e.g. an apns.Client on a fake APNs).
+	sender notify.Sender
 }
 
 func stores(t *testing.T, opts options, f func(t *testing.T, h *harness)) {
@@ -200,6 +202,9 @@ func newHarness(t *testing.T, st runnerStore, sfx string, opts options) *harness
 	}
 	if opts.storeDevices {
 		cfg.Tokens = nil
+	}
+	if opts.sender != nil {
+		cfg.Sender = opts.sender
 	}
 	r, err := runner.New(cfg)
 	if err != nil {

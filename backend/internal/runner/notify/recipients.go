@@ -44,7 +44,7 @@ const (
 	// (LimitDrop.Scope says which). Not sent later.
 	ReasonRecipientLimit Reason = "recipient_limit"
 	ReasonNoDevice       Reason = "no_device"    // no device token
-	ReasonUnregistered   Reason = "unregistered" // every token was rejected as unregistered (410)
+	ReasonUnregistered   Reason = "unregistered" // every token was rejected as unregistered (410 / BadDeviceToken)
 	ReasonSendFailed     Reason = "send_failed"  // sending failed (Outcome.Retryable says whether to retry)
 )
 

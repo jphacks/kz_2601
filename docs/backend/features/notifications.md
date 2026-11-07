@@ -16,9 +16,11 @@ device_tokens/{sha256(token)}          # {uid, installationId}: トークンを�
 | 削除 | `DELETE /v1/me/devices/{installationId}`(サインアウト・通知を切った時・冪等) |
 | ログ・レスポンス | トークンは出さない(環境だけ) |
 | runner が読む | 宛先の判定(参加者・ブロック・同意・上限)を通った uid の分だけ、appId に縛られた取っ手から読む(#337 の 3 層目)。`PushEnvironment`(既定 production)と同じ環境のトークンだけ送る |
-| 410 Unregistered | runner がその uid のそのトークンを消す(失敗はログだけ。次の送信でまた 410 になる) |
+| 送信 | runner が APNs(トークン認証・HTTP/2・`internal/runner/notify/apns`)に送る。鍵が無い間はログに形だけを出す。鍵・環境変数・人の手順は [runner.md](../../infra/runner.md#プッシュ通知を端末に届ける) |
+| 410 Unregistered / 400 BadDeviceToken | runner がその uid のそのトークンを消す(失敗はログだけ。次の送信でまた返る)。`DeviceTokenNotForTopic` は設定の誤りの恐れがあるので消さない |
+| 作成から 24 時間(#339) | 送り手のアカウントの作成時刻は Firebase Auth から読む(`RUNNER_ACCOUNT_AGE=firebase`)。分からない時は新しいアカウントとして扱い、他人宛ては出さない |
 | 退会 | `DELETE /v1/me`(論理削除)の時点で全部消す(#337)。30 日後の消去では残り(ログ `devices`)と同意(ログ `notifyConsents`)を消す |
 | 同意 | `PUT /v1/me/notify-consent/{appId}` `{allowed}`。保存が無い = 受け取らない(作成者以外には送らない)。有効にするには自分のコピー(404)と、shared のデータがあるアプリでは参加(403 `not_member`)が要る。無効はいつでも |
 | 同意の既定(#339) | shared は参加の時に確認つきで有効・public は無効。iOS が参加の画面でこの API を呼んで実現する(画面は未作成) |
 
-iOS 側(APNs の登録・Push の entitlement)は Apple の App ID の設定変更が要るので別の作業。
+iOS 側(APNs の登録・Push の entitlement・同意の画面)は #683。Apple の App ID の設定変更が要る。

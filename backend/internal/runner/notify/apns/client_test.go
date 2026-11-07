@@ -89,6 +89,8 @@ func answers(token string) (int, string) {
 		return http.StatusTooManyRequests, "TooManyRequests"
 	case "bad":
 		return http.StatusBadRequest, "BadDeviceToken"
+	case "topic":
+		return http.StatusBadRequest, "DeviceTokenNotForTopic"
 	case "expired":
 		return http.StatusForbidden, "ExpiredProviderToken"
 	}
@@ -168,7 +170,8 @@ func TestSendClassifies(t *testing.T) {
 		{"gone", 410, true, false},
 		{"busy", 503, false, true},
 		{"many", 429, false, true},
-		{"bad", 400, false, false},
+		{"bad", 400, true, false},
+		{"topic", 400, false, false}, // a wrong APNS_TOPIC must not drop every token
 		{"expired", 403, false, true},
 	} {
 		r, err := c.Send(context.Background(), notify.Push{Token: tc.token})
