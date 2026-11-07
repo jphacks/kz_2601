@@ -49,6 +49,8 @@ type Memory struct {
 	// account deletion
 	deleted map[string]time.Time // uid -> deletedAt of DELETE /v1/me (memory_account.go)
 	purged  map[string]bool      // uids erased by PurgeAccount + MarkAccountPurged
+	// uid -> users/{uid}.firstSeenAt (SeeUser, #339 account age)
+	firstSeen map[string]time.Time
 
 	// devices and consent (#269, memory_device.go)
 	devices      map[string]map[string]*Device        // users/{uid}/devices/{installationId}

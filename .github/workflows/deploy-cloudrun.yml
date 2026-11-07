@@ -211,7 +211,8 @@ jobs:
       # 非公開なので /health は CI から叩かない(gcloud run deploy が Ready になるまで待つ)。
       # APNs(#269): 変数 RUNNER_APNS=1 の時だけ Secret Manager の APNS_AUTH_KEY を注入する(無ければ通知はログだけ)。
       # APNS_KEY_ID / APNS_TEAM_ID / APNS_TOPIC は人が gcloud --update-env-vars で入れる(docs/infra/runner.md)。
-      # RUNNER_ACCOUNT_AGE=firebase: 送り手の作成時刻を Firebase Auth で読む(#339 の 24 時間。SA に roles/firebaseauth.viewer)。
+      # RUNNER_ACCOUNT_AGE=firestore: 送り手の作成時刻は appconfig が書く users/{uid}.firstSeenAt で読む(#339 の 24 時間。datastore.user で足りる)。
+      # firebase(Firebase Auth・SA に roles/firebaseauth.viewer が要る)はコードに残すが使わない(infra/runner.tf)。
       - name: Deploy runner-${{ env.ENV_SUFFIX }}
         id: runner
         if: env.ENV_SUFFIX == 'prod' && vars.RUNNER_DEPLOY == '1'
@@ -235,7 +236,7 @@ jobs:
             --cpu=1 --memory=512Mi \
             --min-instances=0 --max-instances=2 \
             --concurrency=10 --timeout=90 \
-            --update-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB},RUNNER_ACCOUNT_AGE=firebase,GIT_SHA=${GITHUB_SHA}" \
+            --update-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},FIRESTORE_DATABASE=${FIRESTORE_DATABASE},APP_ENV=${ENV_SUFFIX},ALLOW_SHARED_PROD_DB=${ALLOW_SHARED_PROD_DB},RUNNER_ACCOUNT_AGE=firestore,GIT_SHA=${GITHUB_SHA}" \
             "$secrets" \
             --quiet
           url="$(gcloud run services describe "runner-${ENV_SUFFIX}" \

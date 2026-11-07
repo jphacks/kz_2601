@@ -230,6 +230,12 @@ variable "runner_service_url" {
   }
 }
 
+variable "runner_firebaseauth_viewer" {
+  description = "runner の SA に roles/firebaseauth.viewer を付けるか。RUNNER_ACCOUNT_AGE=firebase の時だけ要る。既定(firestore)では付けない(メールなども読めて広い)"
+  type        = bool
+  default     = false
+}
+
 variable "runner_tick_paused" {
   description = "Scheduler の runner-tick を止めておくか(止めている間は自動の動きが進まない。積まれたきっかけは残る)"
   type        = bool
