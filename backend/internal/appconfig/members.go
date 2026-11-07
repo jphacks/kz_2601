@@ -147,7 +147,8 @@ func (h *Handler) join(r *http.Request, appID, inviter, name string) error {
 type memberOut struct {
 	UID         string     `json:"uid"`
 	DisplayName string     `json:"displayName"`
-	Role        string     `json:"role"` // owner | member
+	Role        string     `json:"role"`  // owner | member
+	Admin       bool       `json:"admin"` // #272: the creator and members made admins
 	Via         string     `json:"via,omitempty"`
 	JoinedAt    *time.Time `json:"joinedAt,omitempty"`
 	You         bool       `json:"you"`
@@ -182,16 +183,18 @@ func (h *Handler) listMembers(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]memberOut, 0, len(ms)+1)
 	if owner != "" {
-		items = append(items, memberOut{UID: owner, Role: "owner", You: owner == uid})
+		items = append(items, memberOut{UID: owner, Role: "owner", Admin: true, You: owner == uid})
 	}
+	admin := role == "owner"
 	for i := range ms {
 		m := &ms[i]
 		if m.UID == owner {
 			continue
 		}
-		items = append(items, memberOut{UID: m.UID, DisplayName: m.DisplayName, Role: "member", Via: m.Via, JoinedAt: &m.JoinedAt, You: m.UID == uid})
+		admin = admin || (m.UID == uid && m.Admin)
+		items = append(items, memberOut{UID: m.UID, DisplayName: m.DisplayName, Role: "member", Admin: m.Admin, Via: m.Via, JoinedAt: &m.JoinedAt, You: m.UID == uid})
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": items, "role": role})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": items, "role": role, "admin": admin})
 }
 
 // removeMember: DELETE /v1/apps/{appId}/members/{uid}. "me" (or one's own

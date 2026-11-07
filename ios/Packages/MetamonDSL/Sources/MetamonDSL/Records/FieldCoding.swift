@@ -104,8 +104,8 @@ public enum FieldCoding {
             return nil
         case .boolean:
             return .bool(v.truthy)
-        case .refs:
-            // id の配列(#231)。未選択はキーごと落とす(= 全員)
+        case .refs, .members:
+            // id の配列(#231)・uid の配列(#271)。未選択はキーごと落とす
             let ids = Aggregator.refIds(v)
             return ids.isEmpty ? Optional<JSONValue>.none : .array(ids.map { .string($0) })
         default:

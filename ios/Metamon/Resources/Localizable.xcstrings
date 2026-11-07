@@ -562,6 +562,23 @@
         }
       }
     },
+    "1 人 1 件までです。もう登録しています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One per person. You've already added one"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 人 1 件までです。もう登録しています"
+          }
+        }
+      }
+    },
     "18 歳以上です" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1395,6 +1412,23 @@
         }
       }
     },
+    "「%@」が同じ記録がもうあります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A record with the same “%@” already exists"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」が同じ記録がもうあります"
+          }
+        }
+      }
+    },
     "「%@」さんの投稿と公開したアプリは表示されません。設定から解除できます。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1680,6 +1714,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」は Tailor It Pro が必要なため、保存しませんでした"
+          }
+        }
+      }
+    },
+    "「%@」は管理者だけが変更できます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only admins can change “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」は管理者だけが変更できます"
           }
         }
       }
@@ -9266,6 +9317,23 @@
         }
       }
     },
+    "同じ内容の記録がもうあります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A record with the same details already exists"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同じ内容の記録がもうあります"
+          }
+        }
+      }
+    },
     "同意した日時" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12033,6 +12101,91 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "答えを文字で入力"
+          }
+        }
+      }
+    },
+    "管理者" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Admin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者"
+          }
+        }
+      }
+    },
+    "管理者から外す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove admin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者から外す"
+          }
+        }
+      }
+    },
+    "管理者だけができる操作です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only admins can do this"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者だけができる操作です"
+          }
+        }
+      }
+    },
+    "管理者にする" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make admin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者にする"
+          }
+        }
+      }
+    },
+    "管理者を変更できませんでした。元に戻しました: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't change the admin. Reverted: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者を変更できませんでした。元に戻しました: %@"
           }
         }
       }

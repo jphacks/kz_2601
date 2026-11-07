@@ -20,6 +20,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/feeds"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/paid"
+	"github.com/jphacks/kz_2601/backend/internal/plan"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -46,6 +47,10 @@ type Handler struct {
 	legacyBefore time.Time // LegacyMembersEnv: set by members.go
 
 	feedbackPerDay int // FEEDBACK_DAILY_LIMIT: set by feedback.go
+
+	planLimits *plan.Table // apps / records / photos per plan (plan_limits.go, #317); nil = not checked
+
+	usage *usageState // GET /v1/me/usage and /apps/{appId}/usage (usage.go); nil = no AI units
 
 	outbox   outboxConfig // RUNNER_OUTBOX / APP_ENV: set by outbox.go (#341)
 	activity activity     // lastOpenedAt written today (activity.go, #342)
@@ -257,6 +262,8 @@ func (h *Handler) ensureApp(r *http.Request, appID string) (*store.App, error) {
 	}
 	if pub != nil && !pub.Hidden { // #321: not from an app the operator unpublished
 		raw, name = pub.DSL, pub.Name
+	} else if err := h.checkAppLimit(r); err != nil { // #317: a new app of the caller's own
+		return nil, err
 	}
 	app, _, err := h.store.EnsureApp(ctx, uid, appID, raw, name)
 	return app, err

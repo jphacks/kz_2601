@@ -18,7 +18,7 @@ import (
 var (
 	sharedCodePkgs    = []string{"internal/appcheck", "internal/auth", "internal/httpx", "internal/ratelimit"}
 	appconfigCodePkgs = []string{"cmd/appconfig", "internal/appconfig", "internal/entitlement"}
-	aiCodePkgs        = []string{"cmd/ai", "internal/ai", "internal/appconfigclient"}
+	aiCodePkgs        = []string{"cmd/ai", "internal/ai", "internal/appconfigclient", "internal/budget"}
 )
 
 // aiRelayedCodes are appconfig codes the ai passes through unchanged from the
@@ -32,6 +32,7 @@ var aiRelayedCodes = []string{
 	CodeInvalidDSL,
 	CodeNotFound,
 	CodePayloadTooLarge,
+	CodePlanLimitReached,
 	CodeUnauthenticated,
 	CodeVersionConflict,
 }

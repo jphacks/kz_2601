@@ -105,6 +105,10 @@ func (h *Handler) createApp(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if err := h.checkAppLimit(r); err != nil { // #317
+		fail(w, err)
+		return
+	}
 	created, isNew, err := h.store.EnsureApp(r.Context(), uidOf(r), id, raw, name)
 	if err != nil {
 		fail(w, err)

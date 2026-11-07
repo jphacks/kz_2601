@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "app": {"name": "連絡", "voiceEntry": "none"},
+  "initialScreen": "inbox",
+  "entities": [
+    {"id": "messages", "name": "メッセージ", "scope": "shared", "addressedTo": "to", "fields": [
+      {"id": "to", "name": "宛先", "type": "members", "required": true},
+      {"id": "body", "name": "本文", "type": "text", "required": true}
+    ]},
+    {"id": "notes", "name": "メモ", "scope": "shared", "fields": [
+      {"id": "about", "name": "どれ", "type": "ref", "refEntity": "messages"},
+      {"id": "text", "name": "内容", "type": "string"}
+    ]}
+  ],
+  "screens": [
+    {"id": "inbox", "title": "受信箱", "toolbar": [{"label": "送る", "action": {"type": "navigate", "screen": "compose"}}], "components": [
+      {"type": "list", "entity": "messages", "item": {"title": "body", "subtitle": "$author"}}
+    ]},
+    {"id": "compose", "title": "送る", "entity": "messages", "toolbar": [
+      {"label": "送信", "action": {"type": "saveRecord", "entity": "messages"}}
+    ], "components": [
+      {"type": "picker", "field": "to", "label": "宛先"},
+      {"type": "textEditor", "field": "body"}
+    ]}
+  ],
+  "serverRules": [
+    {"id": "new_message", "on": {"record": "created", "entity": "messages"},
+     "do": [{"notify": {"to": {"kind": "recipients", "field": "to"}, "title": "メッセージ", "body": "{$author}: {body}"}}]}
+  ]
+}

@@ -52,6 +52,18 @@ func (m *Memory) Consume(_ context.Context, counters []Counter, weight int, expi
 	return u, nil
 }
 
+// Peek implements Peeker.
+func (m *Memory) Peek(_ context.Context, counters []Counter) ([]int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.expire()
+	counts := make([]int, len(counters))
+	for i, c := range counters {
+		counts[i] = m.entries[c.ID].count
+	}
+	return counts, nil
+}
+
 // Refund implements Store.
 func (m *Memory) Refund(_ context.Context, counters []Counter, weight int, expireAt time.Time) error {
 	m.mu.Lock()

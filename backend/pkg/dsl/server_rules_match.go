@@ -57,9 +57,7 @@ func (r *ServerRule) ReferencedFields() []string {
 	for _, act := range r.Do {
 		switch {
 		case act.Notify != nil:
-			if act.Notify.To.Kind == RecipientAuthorOf {
-				addField(act.Notify.To.Field)
-			}
+			addField(act.Notify.To.Field) // authorOf: the ref field; recipients: addressedTo
 			for _, s := range []string{act.Notify.Title, act.Notify.Body} {
 				for _, m := range notifyPlaceholderRe.FindAllStringSubmatch(s, -1) {
 					if _, named := act.Notify.With[m[1]]; m[1] != notifyAuthorPlaceholder && !named {

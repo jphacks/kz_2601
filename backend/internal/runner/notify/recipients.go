@@ -286,6 +286,8 @@ func (r *Resolver) candidates(ctx context.Context, ev engine.Trigger, n engine.P
 			return nil, fmt.Errorf("notify: members: %w", err)
 		}
 		uids = append([]string{owner}, ms...)
+	case dsl.RecipientRecipients:
+		uids = n.UIDs
 	}
 	out := make([]string, 0, len(uids))
 	for _, u := range uids {

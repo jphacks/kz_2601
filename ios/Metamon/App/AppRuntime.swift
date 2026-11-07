@@ -523,6 +523,7 @@ final class AppRuntime: DSLRuntime {
         scheduleBuildRevealEnd(reveal, highlight: highlight)
         scheduleNotificationSync()
         noteRetention() // #482 保存期間の確認と期限切れの削除
+        noteAppMembers() // #272 参加者と管理者(member の選択肢・管理者だけのボタン)
         WidgetSnapshotWriter.write(dsl: doc.dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         IntentHost.shared.appsMayHaveChanged() // Siri のフレーズ候補(アプリ名)を引き直す(#80)
     }
@@ -1145,6 +1146,10 @@ final class AppRuntime: DSLRuntime {
                 guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
                 records[entity] = cached
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            case .denied(let appId, let entity, let denial):
+                guard appId == document.appId else { return }
+                toast = denialMessage(denial, entity: entity) // #272 #273
+                await refresh(entity) // 楽観的に書いた値をサーバーの内容に戻す
             case .proRequired(let appId, let entity, let pro):
                 guard appId == document.appId else { return }
                 presentProRequiredWrite(pro) // #316: 書いた分は戻した。作成者なら課金画面、参加者なら案内
@@ -1334,6 +1339,7 @@ final class AppRuntime: DSLRuntime {
     func message(for error: Error, entity: String?) -> String {
         guard let api = error as? APIError else { return ErrorCopy.failure(L10n.tr("うまくいきませんでした"), error, context: "action") }
         if let denial = SharedAccessDenial(api) { return denial.message } // #254
+        if let denial = RecordWriteDenial(api), let entity { return denialMessage(denial, entity: entity) } // #272 #273
         if let pro = ProRequired(api) { return pro.writeMessage } // #316(印を付けるなど)
         if api.code == "invalid_record" || (api.status == 400 && api.field != nil), let fieldId = api.field {
             let name = entity.flatMap { dsl.entity($0)?.field(fieldId)?.name } ?? fieldId

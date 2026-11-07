@@ -15,6 +15,8 @@ info:
       既定の上限: 匿名 30 / サインイン済み 60 / Pro 300(サーバーでの Pro 判定は未実装)/ 匿名の同一 IP 300 / 環境全体 2000。日付は 0:00 JST で切り替わる。
       成功時も `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset`(Unix 秒)を返す。
     - 一時停止(#511): ai に `AI_PAUSED=1` がある間、Claude を呼ぶ `POST /generate`(`mode=undo` を除く)・`POST /chat`・`POST /text` は Claude を呼ばず、上限も数えずに 503 `ai_paused` を返す。`/health`・`DELETE /chat/{appId}` は止めない。`docs/infra/ai-pause.md`
+    - 全体の遮断(#317): `AI_FREE_DAILY_BUDGET_USD` を入れると、その日(0:00 JST から)の AI の費用(`ai.usage` の `est_cost_usd` の合計)が超えた後は、Pro でない人の `POST /generate`(`mode=undo` を除く)・`POST /chat` に 503 `free_plan_paused`(`details.reason: daily_budget`・`resumeAt`・`retryAfterSec`、`Retry-After`)。上限を数えた後に判定し、数えた分は返す。Pro と `POST /text` は止めない。既定は無効。`docs/backend/rate-limit.md`
+    - appconfig のプランの上限(#317)に当たった 403 `plan_limit_reached` は、そのまま中継する(新しいアプリを作る generate がアプリの数の上限に当たった時など)。
 servers:
   - url: http://localhost:8081/v1
   - url: https://ai-REPLACE.a.run.app/v1
@@ -120,7 +122,7 @@ paths:
               schema: { $ref: '#/components/schemas/ChatResponse' }
               examples:
                 question:
-                  value: { kind: question, text: レシートの写真も残したいですか?, suggestions: [写真も残す, 文字だけでOK, お任せ], turn: 1, locale: ja, source: claude }
+                  value: { kind: question, text: "レシートの写真も残したいですか?", suggestions: [写真も残す, 文字だけでOK, お任せ], turn: 1, locale: ja, source: claude }
                 ready:
                   value:
                     kind: ready
@@ -348,11 +350,13 @@ components:
                 - bad_output
                 - bad_request
                 - forbidden
+                - free_plan_paused
                 - generation_failed
                 - internal
                 - invalid_dsl
                 - not_found
                 - payload_too_large
+                - plan_limit_reached
                 - pro_required
                 - rate_limited
                 - refused
