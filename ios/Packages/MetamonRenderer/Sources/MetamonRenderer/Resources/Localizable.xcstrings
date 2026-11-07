@@ -2755,6 +2755,23 @@
         }
       }
     },
+    "保存していない入力は失われます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anything you haven't saved will be lost."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存していない入力は失われます。"
+          }
+        }
+      }
+    },
     "保存しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2921,23 +2938,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "先に%@を追加してください"
-          }
-        }
-      }
-    },
-    "入力した内容を破棄しますか?" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Discard your changes?"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "入力した内容を破棄しますか?"
           }
         }
       }
@@ -3724,6 +3724,23 @@
         }
       }
     },
+    "戻る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "戻る"
+          }
+        }
+      }
+    },
     "手書き" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3856,6 +3873,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "指や Apple Pencil で描きます"
+          }
+        }
+      }
+    },
+    "接続が戻ったら自動で送ります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We'll send it automatically when you're back online"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続が戻ったら自動で送ります"
           }
         }
       }
@@ -4523,7 +4557,7 @@
         }
       }
     },
-    "破棄する" : {
+    "破棄" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -4535,7 +4569,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "破棄する"
+            "value" : "破棄"
           }
         }
       }
@@ -4757,6 +4791,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "編集を続ける"
+          }
+        }
+      }
+    },
+    "編集内容を破棄しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard your changes?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集内容を破棄しますか?"
           }
         }
       }
@@ -5692,23 +5743,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "閉じる"
-          }
-        }
-      }
-    },
-    "閉じると、入力した内容は保存されません。" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "If you close, what you entered won't be saved."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "閉じると、入力した内容は保存されません。"
           }
         }
       }
