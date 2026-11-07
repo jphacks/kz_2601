@@ -78,6 +78,9 @@ func main() {
 	claude := ai.NewClient(apiKey, model, effort)
 	claude.StructuredOutput = os.Getenv("CLAUDE_STRUCTURED_OUTPUT") == "1"
 	claude.Logger = logger // ai.usage JSON lines for the cost sink (#298)
+	// free plan pause on the day's AI cost (#317): ai.usage also adds to the day's total
+	breaker := newBudget(fsClient, pro)
+	claude.Logger = slog.New(breaker.Tap(logger.Handler(), ai.UsageEvent))
 	svc := &ai.Service{
 		Claude:          claude,
 		Store:           store,
@@ -109,7 +112,7 @@ func main() {
 	handler := newAIHandler(ai.NewHandler(svc), logger,
 		newAppCheck(),
 		ai.Pause(paused, logger),
-		newRateLimit(verifier, fsClient, pro),
+		withBudget(newRateLimit(verifier, fsClient, pro), breaker),
 	)
 	srv := &http.Server{
 		Addr:              ":" + port,

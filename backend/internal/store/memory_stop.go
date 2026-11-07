@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -32,6 +33,29 @@ func (m *Memory) putStopLocked(env string, s Stop) {
 		s.CreatedAt = m.now().UTC()
 	}
 	m.stops[env][s.ID] = &s
+	m.appendStopLogLocked(env, setEvent(s))
+}
+
+func (m *Memory) appendStopLogLocked(env string, e StopEvent) {
+	if m.stopLog == nil {
+		m.stopLog = map[string][]StopEvent{}
+	}
+	e.ID = strconv.Itoa(len(m.stopLog[env]) + 1)
+	e.Until, e.At = e.Until.UTC(), e.At.UTC()
+	m.stopLog[env] = append(m.stopLog[env], e)
+}
+
+// StopLog implements RunnerStops.
+func (m *Memory) StopLog(_ context.Context, env, appID string, limit int) ([]StopEvent, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []StopEvent
+	for i := len(m.stopLog[env]) - 1; i >= 0; i-- {
+		if e := m.stopLog[env][i]; appID == "" || e.AppID == appID {
+			out = append(out, e)
+		}
+	}
+	return page(out, limit, 0), nil
 }
 
 // PutStop implements RunnerStops.
@@ -54,7 +78,7 @@ func (m *Memory) PutStopIfInactive(_ context.Context, env string, s Stop, now ti
 }
 
 // LiftStop implements RunnerStops.
-func (m *Memory) LiftStop(_ context.Context, env, id string, at time.Time) (bool, error) {
+func (m *Memory) LiftStop(_ context.Context, env, id string, at time.Time, operator string) (bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	s, ok := m.stops[env][id]
@@ -62,6 +86,7 @@ func (m *Memory) LiftStop(_ context.Context, env, id string, at time.Time) (bool
 		return false, nil
 	}
 	s.LiftedAt = at.UTC()
+	m.appendStopLogLocked(env, liftEvent(*s, at, operator))
 	return true, nil
 }
 

@@ -14,6 +14,7 @@ type memberDoc struct {
 	Via         string    `firestore:"via"`
 	InvitedBy   string    `firestore:"invitedBy,omitempty"`
 	JoinedAt    time.Time `firestore:"joinedAt"`
+	Admin       bool      `firestore:"admin,omitempty"` // #272
 }
 
 func (f *Firestore) membersCol(appID string) *firestore.CollectionRef {
@@ -25,7 +26,7 @@ func memberFrom(snap *firestore.DocumentSnapshot) (*Member, error) {
 	if err := snap.DataTo(&d); err != nil {
 		return nil, err
 	}
-	return &Member{UID: snap.Ref.ID, DisplayName: d.DisplayName, Via: d.Via, InvitedBy: d.InvitedBy, JoinedAt: d.JoinedAt}, nil
+	return &Member{UID: snap.Ref.ID, DisplayName: d.DisplayName, Via: d.Via, InvitedBy: d.InvitedBy, JoinedAt: d.JoinedAt, Admin: d.Admin}, nil
 }
 
 // AddMember implements Store. One transaction, so a concurrent re-join keeps
@@ -90,6 +91,15 @@ func (f *Firestore) ListMembers(ctx context.Context, appID string, limit int) ([
 		}
 		out = append(out, *m)
 	}
+}
+
+// SetMemberAdmin implements Store.
+func (f *Firestore) SetMemberAdmin(ctx context.Context, appID, uid string, admin bool) error {
+	_, err := f.membersCol(appID).Doc(uid).Update(ctx, []firestore.Update{{Path: "admin", Value: admin}})
+	if isNotFound(err) {
+		return ErrNotFound
+	}
+	return err
 }
 
 // RemoveMember implements Store.

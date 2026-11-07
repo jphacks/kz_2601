@@ -15,6 +15,10 @@ final class IntentHost {
     enum Pending: Equatable {
         case open(appId: String)
         case talk
+        #if !APP_STORE_REVIEW
+        /// 通知のタップ(#269)。すでに開いているアプリなら何も言わない
+        case openFromNotification(appId: String)
+        #endif
     }
 
     private(set) var runtime: AppRuntime?
@@ -54,6 +58,10 @@ final class IntentHost {
         switch action {
         case .open(let appId): await runtime.openFromIntent(appId: appId)
         case .talk: runtime.openVoiceFromIntent()
+        #if !APP_STORE_REVIEW
+        case .openFromNotification(let appId):
+            if appId != runtime.document.appId { await runtime.switchApp(to: appId) }
+        #endif
         }
     }
 

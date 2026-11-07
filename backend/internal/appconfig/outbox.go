@@ -125,6 +125,9 @@ func (h *Handler) outboxPlanFor(r *http.Request, cur *store.App, ent *dsl.Entity
 			p.heavy[src.Fields[i].ID] = true
 		}
 	}
+	if err := h.checkAppStop(r, p.env, cur.ID); err != nil { // #346
+		return nil, err
+	}
 	return p, nil
 }
 

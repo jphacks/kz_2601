@@ -22,7 +22,9 @@ public struct DSLView: View {
         if depth >= Self.maxNestingDepth {
             Color.clear
         } else {
-            content.environment(\.dslNestingDepth, depth + 1)
+            content
+                .modifier(RequiredFieldMark(component: component, ctx: ctx))
+                .environment(\.dslNestingDepth, depth + 1)
         }
     }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import MetamonRenderer
 import MetamonServices
 
 // 審査用ビルド(APP_STORE_REVIEW・#245)ではリリース申請を外す。
@@ -116,7 +117,7 @@ struct AppCardActions: View {
             Text("元に戻せません。")
             #else
             if rt.document.appId == app.id {
-                Text("元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ初期画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。")
+                Text("元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ最初の画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。")
             } else {
                 Text("元に戻せません。シェアリンクと「探す」への掲載も取り下げます。")
             }
@@ -210,14 +211,7 @@ struct ReleaseRequestSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .padding(Theme.Spacing.sm + 2)
-                    .background(Theme.Colors.surface, in: Circle())
-            }
-            .accessibilityLabel("閉じる")
+            SheetCloseButton { dismiss() }
         }
     }
 

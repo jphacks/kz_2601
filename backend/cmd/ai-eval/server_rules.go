@@ -16,7 +16,7 @@ import (
 //   - serverRules (bool): app.serverRules is non-empty (validated by dsl.Parse).
 //   - ruleTrigger (string): some rule's trigger is created|updated|daily|weekly|monthly.
 //   - ruleAction (string): some rule has a notify|createRecord|updateRecord|increment action.
-//   - ruleTo (string): some notify goes to owner|author|authorOf|members.
+//   - ruleTo (string): some notify goes to owner|author|authorOf|members|recipients.
 //   - ruleSim (bool): every rule runs through engine.PlanRule (on.each:
 //     PlanEach) on made-up records (the 模擬の実行) without an error.
 //   - ruleEach (bool): some rule has on.each (#340 reads).

@@ -19,7 +19,7 @@ func (a *App) MatchRecordRules(entity, kind string, changed []string) []*ServerR
 	var out []*ServerRule
 	for i := range a.ServerRules {
 		r := &a.ServerRules[i]
-		if r.On.Record != kind || r.On.Entity != entity {
+		if r.On.Record != kind || r.On.Entity != entity || !r.IsEnabled() {
 			continue
 		}
 		if kind == TriggerUpdated && len(r.On.Fields) > 0 && !slices.ContainsFunc(r.On.Fields, func(f string) bool { return slices.Contains(changed, f) }) {
@@ -57,9 +57,7 @@ func (r *ServerRule) ReferencedFields() []string {
 	for _, act := range r.Do {
 		switch {
 		case act.Notify != nil:
-			if act.Notify.To.Kind == RecipientAuthorOf {
-				addField(act.Notify.To.Field)
-			}
+			addField(act.Notify.To.Field) // authorOf: the ref field; recipients: addressedTo
 			for _, s := range []string{act.Notify.Title, act.Notify.Body} {
 				for _, m := range notifyPlaceholderRe.FindAllStringSubmatch(s, -1) {
 					if _, named := act.Notify.With[m[1]]; m[1] != notifyAuthorPlaceholder && !named {

@@ -168,11 +168,11 @@ func TestResolveTable(t *testing.T) {
 func TestKindAllowedMatchesDSL(t *testing.T) {
 	want := map[dsl.EntityScope][]string{
 		dsl.ScopePrivate: {dsl.RecipientOwner},
-		dsl.ScopeShared:  {dsl.RecipientOwner, dsl.RecipientAuthor, dsl.RecipientAuthorOf, dsl.RecipientMembers},
+		dsl.ScopeShared:  {dsl.RecipientOwner, dsl.RecipientAuthor, dsl.RecipientAuthorOf, dsl.RecipientMembers, dsl.RecipientRecipients},
 		dsl.ScopePublic:  {dsl.RecipientOwner, dsl.RecipientAuthorOf},
 	}
 	for scope, kinds := range want {
-		for _, k := range []string{dsl.RecipientOwner, dsl.RecipientAuthor, dsl.RecipientAuthorOf, dsl.RecipientMembers, "everyone"} {
+		for _, k := range []string{dsl.RecipientOwner, dsl.RecipientAuthor, dsl.RecipientAuthorOf, dsl.RecipientMembers, dsl.RecipientRecipients, "everyone"} {
 			if got := KindAllowed(scope, k); got != slices.Contains(kinds, k) {
 				t.Errorf("KindAllowed(%s, %s) = %v", scope, k, got)
 			}
@@ -317,6 +317,69 @@ func TestResolveNewAccount(t *testing.T) {
 			t.Errorf("age %v: got %+v", c.age, got)
 		}
 	}
+}
+
+// recipients (#678) goes through the same checks as the other kinds (#269/#339).
+func TestResolveRecipients(t *testing.T) {
+	ctx := context.Background()
+	addressed := func(uids ...string) engine.PlannedNotify {
+		n := plan(dsl.RecipientRecipients)
+		n.UIDs = uids
+		return n
+	}
+	t.Run("dedupe, actor and outsider dropped", func(t *testing.T) {
+		dir, acc := world()
+		r := resolver(t, Config{Directory: dir, Accounts: acc, Consent: allConsent{}, Age: ages{}})
+		got, _ := r.Resolve(ctx, trig(dsl.ScopeShared, "m1", "m1"), addressed("m2", "", "m2", "x", "m1", "o"))
+		want := []Skip{{UID: "x", Reason: ReasonNotMember}, {UID: "m1", Reason: ReasonActor}}
+		if !slices.Equal(got.To, []string{"m2", "o"}) || !reflect.DeepEqual(got.Skipped, want) {
+			t.Errorf("got %+v", got)
+		}
+	})
+	t.Run("new account cannot address others", func(t *testing.T) {
+		dir, acc := world()
+		r := resolver(t, Config{Directory: dir, Accounts: acc, Consent: allConsent{}, Age: ages{"m1": now.Add(-time.Hour)}})
+		got, _ := r.Resolve(ctx, trig(dsl.ScopeShared, "m1", "m1"), addressed("m2", "o"))
+		want := []Skip{{UID: "m2", Reason: ReasonNewAccount}, {UID: "o", Reason: ReasonNewAccount}}
+		if len(got.To) != 0 || !reflect.DeepEqual(got.Skipped, want) {
+			t.Errorf("got %+v", got)
+		}
+	})
+	t.Run("unknown age counts as new", func(t *testing.T) {
+		dir, acc := world()
+		r := resolver(t, Config{Directory: dir, Accounts: acc, Consent: allConsent{}})
+		got, _ := r.Resolve(ctx, trig(dsl.ScopeShared, "m1", "m1"), addressed("m2"))
+		if len(got.To) != 0 || !reflect.DeepEqual(got.Skipped, []Skip{{UID: "m2", Reason: ReasonNewAccount}}) {
+			t.Errorf("got %+v", got)
+		}
+	})
+	t.Run("blocked and no consent", func(t *testing.T) {
+		dir, acc := world()
+		acc.blocks["m2"] = []string{"m1"}
+		r := resolver(t, Config{Directory: dir, Accounts: acc, Consent: consentSet{}, Age: ages{}})
+		got, _ := r.Resolve(ctx, trig(dsl.ScopeShared, "m1", "m1"), addressed("m2", "o"))
+		// the owner needs no consent
+		if !slices.Equal(got.To, []string{"o"}) || !reflect.DeepEqual(got.Skipped, []Skip{{UID: "m2", Reason: ReasonBlocked}}) {
+			t.Errorf("got %+v", got)
+		}
+		acc.blocks = map[string][]string{}
+		got, _ = r.Resolve(ctx, trig(dsl.ScopeShared, "m1", "m1"), addressed("m2"))
+		if len(got.To) != 0 || !reflect.DeepEqual(got.Skipped, []Skip{{UID: "m2", Reason: ReasonNoConsent}}) {
+			t.Errorf("no consent: got %+v", got)
+		}
+	})
+	t.Run("only shared; empty list is nobody", func(t *testing.T) {
+		dir, acc := world()
+		r := resolver(t, Config{Directory: dir, Accounts: acc, Consent: allConsent{}, Age: ages{}})
+		for _, s := range []dsl.EntityScope{dsl.ScopePrivate, dsl.ScopePublic} {
+			if got, _ := r.Resolve(ctx, trig(s, "o", "o"), addressed("m1")); got.Refused != ReasonScope {
+				t.Errorf("%s: got %+v", s, got)
+			}
+		}
+		if got, _ := r.Resolve(ctx, trig(dsl.ScopeShared, "m1", "m1"), addressed()); got.Refused != ReasonNoRecipient {
+			t.Errorf("empty: got %+v", got)
+		}
+	})
 }
 
 func TestNewResolverRequires(t *testing.T) {

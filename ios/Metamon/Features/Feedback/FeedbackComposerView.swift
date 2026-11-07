@@ -137,7 +137,7 @@ struct FeedbackComposerView: View {
     @ViewBuilder
     private func appPreview(_ app: FeedbackContext.AppSummary) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(L10n.tr("「\(app.name)」の画面と項目の設計(v\(app.ref.dslVersion))")).font(.subheadline.weight(.medium))
+            Text(L10n.tr("「\(app.name)」の画面と項目の設計")).font(.subheadline.weight(.medium))
             Text(L10n.tr("画面: \(app.screens.joined(separator: "、"))")).font(.footnote)
             if !app.entities.isEmpty {
                 Text(L10n.tr("項目: \(app.entities.joined(separator: "、"))")).font(.footnote)

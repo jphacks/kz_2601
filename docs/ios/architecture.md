@@ -164,6 +164,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | URL 起動 | P0 | `openURL` / `native: openURL` | `UIApplication.open`(実装済み) | 不要 |
 | 位置 | P1 | `native: location.current → into` / `map` コンポーネント | `CLLocationManager` 1回取得(stub) / MapKit(実装済み) | `NSLocationWhenInUseUsageDescription` |
 | モーション/歩数 | P1 | `native: motion.read` | CoreMotion / CMPedometer(stub) | `NSMotionUsageDescription` |
+| カレンダーへの追加 | P1 | action `addToCalendar{entity, calendarEvent}` | `EKEventEditViewController`(実装済み・§12.2) | 不要(別プロセスの OS の画面) |
 | 共有 | P1 | `native: share {text}` | `UIActivityViewController`(stub) | 不要 |
 | オンデバイス AI | P1 | `aiButton { task, input?, entity?, output, prompt?, options? }` コンポーネント | **実装済み**(`AiButtonLeaf` + `Support/OnDeviceAI.swift`・Foundation Models・§18) | 不要(Apple Intelligence の ON は OS 設定) |
 | 録音(#420) | P3 | `audioRecorder { field, label?, maxDuration? }` + Field `audio` | **実装済み**(`AudioRecorderLeaf` + `Support/AudioRecording.swift` / `AudioPlayback.swift` / `AudioSessionLease.swift`、下記) | `NSMicrophoneUsageDescription`(音声入力と共用) |
@@ -212,6 +213,21 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 3. 録音中にマイク(FAB)を押す → 音声入力が動く。録音は続く・止まるどちらでも、その後の音声入力が普通に使える。
 4. AirPods を付けてフォームを開き、本体で一度録音・停止 → AirPods を 1 回押すと録音が始まり、もう 1 回で止まる。フォームを閉じた後は AirPods のボタンが録音を始めない。
 5. 上限(maxDuration を 10 秒にした DSL)で自動で止まり、録れた分が残る。録音中に電話が来ても録れた分が残る。
+
+### 5.1 プッシュ通知(#269)
+
+他の人の行動で届く通知の iOS 側。配信は runner(`docs/backend/features/notifications.md`)。審査用の版からは外す(`docs/ios/review-build.md`)。
+
+| 項目 | 決め方 |
+|---|---|
+| 登録 | `Features/Push/PushHost` がサインイン(uid の変化)と前面復帰で通知の許可を見て、許可済みの時だけ `registerForRemoteNotifications` する。許可の確認はここでは出さない(今までの通知の許可の流れで許可された時も、前面に戻るのでここを通る) |
+| 送る | `PushDeviceRegistrar` が `PUT /v1/me/devices/{installationId}`。uid・トークン・環境・版・OS のハッシュを覚えて、変わった時だけ送る。失敗は次の前面復帰でやり直す |
+| installationId | UUID を UserDefaults に保存。ログアウトでも変えない(`LocalWipe.preservedKeys`)。入れ直すと変わる |
+| environment | `embedded.mobileprovision` の `aps-environment` が development なら sandbox、シミュレータも sandbox、他は production |
+| 消す | サインアウトは `wipeLocal` の先頭、退会は `DELETE /v1/me` の前に `DELETE /v1/me/devices/{installationId}`。最大 3 秒で先へ進み、失敗で止めない。通知の許可を切った時も消す |
+| 同意 | 設定の「他の人の行動で届く通知」(共有・公開の記録があるアプリで、作成者以外)が `PUT /v1/me/notify-consent/{appId}`。参加の画面で「参加する」を押すと有効。読む API が無いので値は端末の控え(`NotifyConsentStore`)で、ログアウトや入れ直しの後はオフに見える |
+| タップ | 本文の `appId` を `IntentHost` に渡して開く(bootstrap の前なら待つ)。ローカル通知に `appId` は無い |
+| entitlement | `aps-environment` は App ID の Push の有効化(人の作業)の後に `Metamon.entitlements` に足す。それまで登録は失敗するだけで、利用者には何も出さない |
 
 ## 6. 音声入力画面とホットリロード
 
@@ -729,6 +745,18 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 確認(ユニットテストでは ActivityKit は動かない):
 - **実機**(iPhone 14 Pro 以降で Dynamic Island。13 はロック画面のバナーのみ): `METAMON_INITIAL_EXAMPLE=ramen_timer` で起動 → タイマー開始 → ロックして残り時間が進む・0 で 00:00 → アプリに戻ると「終わりました」→ 15 分で消える。「行列に並ぶ」→ ロック画面に「行列に並び中」と今月の杯数 → 記録を足すと数字が変わる → 「席に着いた」で消える。
 - シミュレータでもロック画面(⌘L)と Dynamic Island(iPhone 17)の表示は確認できる。
+
+### 12.2 端末のカレンダーへの追加(EventKitUI・`addToCalendar`)
+生成アプリのレコードを iPhone のカレンダーに予定として入れる。**アプリは端末の予定を読まない・書き込みもしない**: OS の「新規イベント」画面(`EKEventEditViewController`)を中身を埋めて開き、ユーザーが「追加」を押した時だけ OS が入れる。
+
+| 項目 | 内容 |
+|---|---|
+| DSL | action `addToCalendar{entity, calendarEvent:{startField, endField?, durationMinutes?, titleField?, locationField?, notesField?, alertMinutes?}}`(`docs/dsl/README.md` §3.2) |
+| 権限 | 不要。iOS 17 以降 `EKEventEditViewController` は別プロセスで描かれ、`requestAccess` も `NSCalendars*UsageDescription` も entitlement も要らない(最低 iOS は 17.0)。`EKEventStore()` は event を作るためだけに使う |
+| 値 | フォーム画面なら `FormDraft.payload`(未保存でも今の値)、`list.onItemTap` なら `records` のその行。組み立ては純関数 `CalendarEventPlan.build`(MetamonDSL・`CalendarEventPlanTests`) |
+| 構成 | `Metamon/App/AppRuntime+Calendar.swift`(`addToCalendar` と `CalendarEventEditor`)・`AppRuntime.calendarDraft` が立つと `RootView` の `HostSheets` がシートで出す。「追加」で toast「カレンダーに追加しました」 |
+| 審査用の版 | 残す(権限ダイアログが無い・ユーザーの操作でだけ入る) |
+| 確認 | シミュレータでも OS の画面は開く。保存先はシミュレータのカレンダー |
 
 ## 13. アクセシビリティ最低限(Renderer・Issue #68)
 生成アプリ側(Renderer の全部品)で Dynamic Type・VoiceOver・コントラスト・Reduce Motion の最低線を守る。本体(`ios/Metamon/`)は対象外。

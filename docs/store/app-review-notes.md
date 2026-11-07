@@ -15,6 +15,7 @@
 4. [下書きから直した所](#4-下書きから直した所)
 5. [承認された前例との違いと共通点](#5-承認された前例との違いと共通点)
 6. [審査で聞かれたときの答え方](#6-審査で聞かれたときの答え方)
+7. [M4: サーバーの自動の動きを含む版(下書き)](#7-m4-サーバーの自動の動きを含む版下書き)
 
 ## 1. 出す前に確かめること
 
@@ -193,3 +194,69 @@ App 内課金なし
 | 「課金は無いのか / 上限は何か」(3.1) | この版は App 内課金なし(バイナリに StoreKit の商品も課金画面も無い)。上限はサーバーの費用を抑えるためのもので、当たると翌日まで待つ旨を表示する |
 | 「隠した機能がある」(2.5.19) | 審査用の版はバイナリから外していて、サーバーのフラグで後からオンにする機能は無い。戻すときは新しい版として審査に出す |
 | 「AI にどんなデータを送るか」(5.1.2(i)) | 同意画面の文言どおり。記録の中身は送らない。同意の取り消しは 設定 > プライバシー |
+
+## 7. M4: サーバーの自動の動きを含む版(下書き)
+
+#349。**serverRules(サーバーの自動の動き)を含む版のための下書き。今の審査用の版には serverRules が無いので、2 章の文には足さない。**(今の審査用の版では server-rules pass を飛ばし、iOS の `Features/Automations` も外している・#316 #614・`docs/ios/review-build.md`)
+
+### 7.1 使う前に確かめること
+
+| 項目 | 確かめ方 | 理由 |
+|---|---|---|
+| その版のバイナリに serverRules の機能がある | `APP_STORE_REVIEW` で `Features/Automations` を外す `#if` を外した版か | 書いた機能は必ずバイナリにある(2.5.19・2.3.1) |
+| 課金(Pro)が入っている | serverRules は Pro の機能(`paid.ServerRules`・#316)。課金を入れた版なら 2 章の NO IN-APP PURCHASES の段落も差し替える | 課金なしの版では serverRules が作られない |
+| iOS のプッシュ通知の登録と、アプリごとの通知の同意の画面がある | 2026-11-07 時点では iOS 側は未実装(サーバーの `PUT /v1/me/devices/{installationId}`・`PUT /v1/me/notify-consent/{appId}` だけある・`docs/backend/features/notifications.md`) | 「通知は同意した人だけ」の説明に画面が要る |
+| 共有のデータ(`sharedData`)が入っているか | `ClientCapabilities.reviewDisabledFeatures` に `sharedData` が残っていれば共有は無い | 共有が無い版では英語の版の「Other people receive them only if …」の文を消す(外した機能を書かない) |
+| runner が動いている | 審査の期間中、runner がデプロイされて動いていること(2026-11-07 時点は未デプロイ) | 審査で自動の動きを試されたときに届かないと 2.1 |
+| ASC の 4,000 字 | 下の段落は 1273 字。2 章の文は 3,994 字なので、そのまま足すと超える。足す時は 2 章のほかの所を削り、合計を数え直す | ASC に入らない |
+
+### 7.2 英語の版(2 章の HOW IT WORKS の後に足す)
+
+```text
+SERVER AUTOMATIONS - NO DOWNLOADED CODE (Guidelines 2.5.2, 4.7, 4.5.4)
+- A tracker can have simple automatic actions, such as a reminder at a set time or a count that goes up when a record is added. They are declarative rules in the tracker's JSON configuration: a trigger (a record is added or changed, or a daily, weekly or monthly time), an optional condition, and up to five actions from a closed list (send a notification, add or update a record, add to a number).
+- The rules run on our servers, not on the device. The device receives only the JSON configuration (data) and the notifications. The app does not run the rules, and it never downloads or runs code.
+- Our server checks every rule against a fixed schema when it is saved and applies the same limits when it runs. Rules cannot send email or messages to other services, reach web pages, or notify arbitrary people.
+- Notifications go to the tracker's owner. Other people receive them only if they take part in a shared tracker and have turned on notifications for that tracker. Notification text cannot contain links or claim to be official. We do not use notifications for advertising or marketing.
+- Our operators can stop all automatic actions, all notifications, or a single tracker or rule at any time.
+```
+
+### 7.3 日本語の版(確認用)
+
+```text
+サーバーの自動の動き(コードをダウンロードしない・2.5.2 / 4.7 / 4.5.4)
+- 記録帳に、決まった時刻のリマインダーや、記録を足すと増える数などの簡単な自動の動きを
+  付けられます。これは記録帳の JSON の設定に書かれた宣言的なルールです。きっかけ(記録が
+  足された・変わった、毎日・毎週・毎月の時刻)、任意の条件、決まった一覧から選ぶ 5 つまでの
+  処理(通知を送る・記録を足す / 直す・数を足す)だけでできています。
+- ルールは端末ではなく、私たちのサーバーで動きます。端末に届くのは JSON の設定(データ)と
+  通知だけです。アプリはルールを実行せず、コードをダウンロードも実行もしません。
+- サーバーは、保存の時にすべてのルールを決まったスキーマで確かめ、動かす時にも同じ制限を
+  当てます。ルールから、メールや他のサービスへの送信・Web ページへのアクセス・任意の人への
+  通知はできません。
+- 通知は記録帳の作成者に届きます。ほかの人に届くのは、共有の記録帳に参加して、その記録帳の
+  通知を有効にした場合だけです。通知の文にはリンクを入れられず、公式を名乗れません。
+  通知を広告や宣伝には使いません。
+- 運営は、すべての自動の動き・すべての通知・1 つの記録帳・1 つのルールを、いつでも止められます。
+```
+
+### 7.4 文とコードの対応
+
+| 文 | 根拠(origin/develop) |
+|---|---|
+| 宣言的なルール・きっかけ・条件・5 つまでの処理・決まった一覧 | `backend/pkg/dsl/server_rules.go`(`ruleEvery` = daily / weekly / monthly、処理は notify / createRecord / updateRecord / increment の 1 つずつ)・AI の規則 `backend/internal/ai/server_rules_pass.go` |
+| サーバーで動く・端末はルールを実行しない | 実行は `backend/internal/runner`。iOS は serverRules の数だけを読み、中身は使わない(`MetamonDSL/Model/AppDocument.swift` の `serverRuleCount`) |
+| 保存の時に確かめ、動かす時にも制限を当てる | 保存: `dsl.Parse`(`validate.go` の `checkServerRules`)。実行: `runner/notify/recipients.go`(宛先の種類・参加者・ブロック・同意・上限)・`runner/engine/render.go`(差し込む値の無害化) |
+| 外部への送信・任意の宛先が無い | 宛先の種類は owner / author / authorOf / members だけ(`server_rules.go`)。外部への送信の処理は語彙に無い(#339) |
+| 作成者以外は同意した人だけ | `recipients.go`: 作成者以外は `Consent.Allows` が true の人だけ(既定 `NoConsent` = 誰も同意していない)。同意は `PUT /v1/me/notify-consent/{appId}` |
+| リンクを入れられない・公式を名乗れない | `server_rules.go` の `notifyURLRe`・`notifyNameWords`(公式・運営・Tailor It・Apple)。差し込む値の URL は `render.go` で伏せる |
+| 広告や宣伝に使わない | 通知を送るのは runner がルールから送るものだけ(APNs を呼ぶのは `runner/notify/apns` だけで、運営が一斉に送る仕組みは無い)。規約 `docs/legal/terms.md` が作成者の宣伝目的の通知を禁じる |
+| 運営が止められる | `RUNNER_PAUSED`(全部)・`RUNNER_NOTIFY_PAUSED`(通知だけ)・アプリとルールの停止(`backend/internal/runner/stops.go`・`cmd/runner/main.go`・#346) |
+
+### 7.5 聞かれたときの答え方(足す分)
+
+| 聞かれそうなこと | 答えの要点 |
+|---|---|
+| 「サーバーの機能でアプリの動きを後から変えている」(2.5.2) | ルールは JSON のデータで、サーバーで動く。処理の種類はサーバーに固定で、端末にコードは届かない。端末は今までと同じ JSON と通知を受け取るだけ |
+| 「作ったものが別のアプリとして振る舞っている」(4.7) | 記録帳と自動の動きは Tailor It の中だけにあり、通知も Tailor It の通知として届く。外で動かす・書き出す方法は無い |
+| 「プッシュ通知を宣伝に使っていないか・必須にしていないか」(4.5.4) | 通知は利用者が頼んだルールの知らせだけ。ほかの人には記録帳ごとの同意の後だけ。運営からの宣伝の通知は無い。iOS の通知の許可は Tailor It 本体が求める |

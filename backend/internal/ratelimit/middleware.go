@@ -131,8 +131,14 @@ func (l *Limiter) settle(r *http.Request, dec Decision, charged int, out *outcom
 	)
 }
 
+// setHeaders writes X-RateLimit-* (and Retry-After on 429). An Unmetered
+// allowed request gets none: "remaining 0" or "remaining = limit" would both
+// mislead the client's "今日の残り" (#630).
 func setHeaders(w http.ResponseWriter, d Decision, now time.Time) {
 	h := w.Header()
+	if d.Allowed && d.Unmetered {
+		return
+	}
 	h.Set("X-RateLimit-Limit", strconv.Itoa(d.Limit))
 	h.Set("X-RateLimit-Remaining", strconv.Itoa(d.Remaining))
 	h.Set("X-RateLimit-Reset", strconv.FormatInt(d.ResetAt.Unix(), 10))

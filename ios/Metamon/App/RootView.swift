@@ -203,8 +203,11 @@ struct RootView: View {
         }
     }
 
-    private var colorScheme: ColorScheme? {
-        switch rt.dsl.app.theme?.mode { case "light": .light; case "dark": .dark; default: nil }
+    private var colorScheme: ColorScheme? { Self.colorScheme(themeMode: rt.dsl.app.theme?.mode) }
+
+    /// L7: 端末のダークモードを優先する。`dark` のアプリだけ暗く固定し、`light` は固定しない(夜に画面が急に白くならない)
+    static func colorScheme(themeMode: String?) -> ColorScheme? {
+        themeMode == "dark" ? .dark : nil
     }
 
     /// メインスタック(タブなら選択中タブ)で今いちばん上に見えている画面。モーダルは含めない(FAB はその下に隠れる)。
@@ -362,6 +365,13 @@ private struct HostSheets: ViewModifier {
                 ActivityView(items: [file.url])
                     .presentationDetents([.medium, .large])
                     .ignoresSafeArea()
+            }
+            .sheet(item: Binding(get: { active ? rt.calendarDraft : nil }, set: { rt.calendarDraft = $0 })) { draft in
+                CalendarEventEditor(draft: draft) { saved in
+                    rt.calendarDraft = nil
+                    if saved { rt.toast = L10n.tr("カレンダーに追加しました") }
+                }
+                .ignoresSafeArea()
             }
             .modifier(AuthorNamePromptModifier(active: active)) // 共有アプリへの初投稿で表示名を聞く(#250)
     }

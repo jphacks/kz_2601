@@ -169,7 +169,7 @@ func TestServerRulesRejects(t *testing.T) {
 				a.Entities[i].Scope = ""
 			}
 		}, `kind "members" is not allowed on private data`},
-		{"unknown recipient", func(a *App) { notify(a).To = RuleRecipient{Kind: "everyone"} }, "must be owner, author, authorOf or members"},
+		{"unknown recipient", func(a *App) { notify(a).To = RuleRecipient{Kind: "everyone"} }, "must be owner, author, authorOf, members or recipients"},
 		{"authorOf non-ref", func(a *App) { a.ServerRules[0].Do[0].Notify.To.Field = "answer" }, "must be a type ref field"},
 		{"authorOf on time trigger", func(a *App) {
 			a.ServerRules[3].Do[0].Notify.To = RuleRecipient{Kind: RecipientAuthorOf, Field: "event"}
