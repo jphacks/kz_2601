@@ -22,6 +22,7 @@ App Store Review Guidelines 1.2 / 1.2.1(a)(利用者が作った内容を共有�
 | 共有アプリの非公開化 | `apps_public/{appId}` の同じ項目 | その appId の共有データ(public / shared の entity の記録・いいね)が全員 403 `unpublished`(理由つき)。シェアリンクのプレビュー・参加、「探す」からの参加、他人が appId を開いた時の DSL の配布も止まる。各自の端末のアプリ(自分の木のコピー)と自分だけの記録は残る |
 | 投稿の削除 | `apps_public/{appId}/entities/{e}/records/{id}` | `delete-record` で消す |
 | シェアリンクの停止 | `shares/{token}.revoked` | `revoke-share`。共有データの無いアプリのリンクはこれで止める |
+| 表示できない言葉のフィルタ | `internal/moderation/textfilter`(一覧は `terms.txt`) | 他の人に見える文字だけを書き込みの時に見る: public/shared の entity の記録(string / text の項目・authorName)、参加者の表示名(`POST /shares/{token}/import`)、「探す」の掲載(name・description・tags・authorName)。当たれば 422 `text_not_allowed`(「表示できない言葉が含まれています」・`details.field`)で保存しない。作成者だけの private の記録は見ない。ログは `moderation: text refused`(INFO)に場所(record / member / listing)と種類(slur / sexual / threat)だけで、文字は出さない |
 
 退会の消去(`cmd/purge`)は、本人の通報・本人が対象の通報・ブロック一覧も消す([account-purge.md](account-purge.md))。
 
@@ -75,5 +76,7 @@ gcloud logging metrics create moderation_reports --project=jphacks-kz2601 \
 ## まだ決めていないこと
 
 - 24 時間以内に対応する当番(誰がアラートを受け、休日はどうするか)。
-- 投稿の NG ワードのフィルタ(#321 の残り)と、規約の禁止事項(#246)。
+- 規約の禁止事項(#246)。
+- 表示できない言葉の一覧(`terms.txt`)を見直す担当と頻度、誤って断られた時の問い合わせの受け方。
+- フィルタの対象を広げるか(写真・共有アプリの画面の文字)。
 - 止めた時に作者へ届ける手段(今は掲載者の「探す」・共有アプリを開いた時の 403 の理由だけ)。

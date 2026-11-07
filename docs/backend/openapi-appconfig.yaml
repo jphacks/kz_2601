@@ -592,6 +592,7 @@ paths:
                 displayName: { type: string, maxLength: 64, description: '参加者一覧に出す名前(任意・scope:shared のアプリだけで使う)' }
       responses:
         '201': { description: Imported, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
+        '422': { $ref: '#/components/responses/TextNotAllowed' }
         '403': { description: 'リンクの発行者が参加者でない(inviter_left) / 参加者が上限(members_full)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '403': { $ref: '#/components/responses/Unpublished' }
         '404': { description: 取り消し済み or 存在しない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
@@ -622,6 +623,7 @@ paths:
         '400': { description: 入力不備 / 中身が初期 DSL のまま, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '403': { description: その appId の作成者ではない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/TextNotAllowed' }
     delete:
       tags: [sharing]
       summary: 非公開にする(掲載者のみ)
@@ -1412,7 +1414,7 @@ components:
                   - 'initialScreen "main" does not exist'
                   - 'screen "home" components[1]: list entity "expenses" does not exist'
     InvalidRecord:
-      description: data がエンティティ定義に適合しない
+      description: data がエンティティ定義に適合しない(`invalid_record`)。public/shared の entity では、文字の項目(string / text)と authorName に表示できない言葉があっても 422(`text_not_allowed`・TextNotAllowed と同じ形・#321)
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -1429,6 +1431,12 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: forbidden, message: 'join this app with a share link to see its shared data', details: { reason: not_member } } }
+    TextNotAllowed:
+      description: 他の人に見える文字に表示できない言葉が含まれている(#321・docs/infra/moderation.md)。details.field は直す項目(record の field id・authorName・displayName・name・description・tags)。message はそのまま見せてよい固定の文で、どの言葉かは返さない
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: text_not_allowed, message: '表示できない言葉が含まれています', details: { field: description } } }
   schemas:
     Notice:
       type: object
@@ -1473,6 +1481,7 @@ components:
                 - payload_too_large
                 - pro_required
                 - rate_limited
+                - text_not_allowed
                 - transaction_owned_by_other
                 - unauthenticated
                 - unpublished

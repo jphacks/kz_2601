@@ -270,6 +270,10 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	if err := checkRecordText(r, ent, body.Data, body.AuthorName); err != nil { // #321
+		fail(w, err)
+		return
+	}
 	data, err := normalizeData(ent, body.Data, true)
 	if err != nil {
 		fail(w, err)
@@ -386,6 +390,10 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.checkSharedWrite(r, cur, ent); err != nil { // #316
+		fail(w, err)
+		return
+	}
+	if err := checkRecordText(r, ent, body.Data, ""); err != nil { // #321
 		fail(w, err)
 		return
 	}

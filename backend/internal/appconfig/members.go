@@ -253,5 +253,9 @@ func importName(w http.ResponseWriter, r *http.Request) (string, bool) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "displayName too long"))
 		return "", false
 	}
+	if err := checkText(r, "member", "displayName", name); err != nil { // #321: shown in the member list
+		fail(w, err)
+		return "", false
+	}
 	return name, true
 }

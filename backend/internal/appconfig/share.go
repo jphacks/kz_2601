@@ -475,6 +475,10 @@ func (h *Handler) publishApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, err.Error()))
 		return
 	}
+	if err := checkListingText(r, name, desc, author, tags); err != nil { // #321
+		fail(w, err)
+		return
+	}
 	c, err := h.store.PutCatalogApp(r.Context(), uidOf(r), store.CatalogApp{
 		ID: id, Name: name, Description: desc, Tags: tags, AuthorName: author,
 		Components: componentTypes(parsed), Version: app.CurrentVersion, DSL: app.DSL,
