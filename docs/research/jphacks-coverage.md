@@ -359,7 +359,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [NG_2309](https://github.com/jphacks/NG_2309) | CalmEnginer | コミット間隔からストレス値を推定して通知 | 外部API,独自ML | × | EXT_API,CUSTOM_ML | 異常検知モデルが本体。代案は手入力の気分記録 |  |
 | [NG_2310](https://github.com/jphacks/NG_2310) | - | README が雛形のまま | その他 | ? | - | 判定不能 |  |
 | [NG_2311](https://github.com/jphacks/NG_2311) | - | README が雛形のまま | その他 | ? | - | 判定不能 |  |
-| [NG_2312](https://github.com/jphacks/NG_2312) | LenBow | 友達との本の貸し借りをLINEとQRで管理する | 記録,通知,共有,カメラ | ○ | EXT_API | 書籍情報の自動取得が欠ける(書名は手入力) | 企業賞 |
+| [NG_2312](https://github.com/jphacks/NG_2312) | LenBow | 友達との本の貸し借りをLINEとQRで管理する | 記録,通知,共有,カメラ | ○ | EXT_API | 書籍情報の自動取得が欠ける(書名は手入力)。紙の判定では、本のバーコードを qrScanner で読み lookupBook(ISBN → 書名・著者・出版社・出版日・openBD)で埋め、貸し出しを共有の記録と返す日の前日の通知にすれば本体が作れる = ◎ 相当(LINE での連絡は shareButton の LINE で代える。上の集計の数は README で判定した時のまま) | 企業賞 |
 | [NG_2313](https://github.com/jphacks/NG_2313) | T.H.U.R.S.D.A.Y. | 手元のPDFを読んで答えるデスクトップAIチャット | AI | × | CLOUD_AI,FILE_IMPORT | RAGチャットは難しい。代案はメモ記録とaiButton要約 |  |
 | [NG_2314](https://github.com/jphacks/NG_2314) | - | READMEが雛形のままで内容なし | その他 | ? | - | 判定不能 |  |
 | [NG_2315](https://github.com/jphacks/NG_2315) | - | READMEが雛形のままで内容なし | その他 | ? | - | 判定不能 |  |

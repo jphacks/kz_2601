@@ -48,6 +48,7 @@ var wantRoutes = []string{
 	"GET /v1/apps/{appId}/versions",
 	"GET /v1/apps/{appId}/versions/{version}",
 	"GET /v1/feeds/{provider}",
+	"GET /v1/lookup/book",
 	"GET /v1/me/blocks",
 	"GET /v1/me/usage",
 	"GET /v1/public-apps",

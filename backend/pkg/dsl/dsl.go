@@ -223,6 +223,7 @@ const (
 	ActionStartActivity ActionType = "startActivity" // #423 Live Activity
 	ActionEndActivity   ActionType = "endActivity"
 	ActionAddCalendar   ActionType = "addToCalendar" // system "new event" sheet (calendar_event.go)
+	ActionLookupBook    ActionType = "lookupBook"    // fill the form from an ISBN (book_lookup.go)
 )
 
 // Action is a non-nesting side effect triggered by buttons/list taps.
@@ -244,6 +245,9 @@ type Action struct {
 
 	// addToCalendar: the record fields that become the event (calendar_event.go)
 	CalendarEvent *CalendarEvent `json:"calendarEvent,omitempty"`
+
+	// lookupBook: ISBN field and the fields the book info goes to (book_lookup.go)
+	BookLookup *BookLookup `json:"bookLookup,omitempty"`
 }
 
 // ComponentType discriminates Component.

@@ -20,7 +20,7 @@ public enum TextSubmission {
     /// 送る前に入力欄の内容を確定させる必要があるアクション(フォームを読む・空にする)。
     public static func commitsInput(before action: ActionType?) -> Bool {
         switch action {
-        case .saveRecord?, .resetForm?: true
+        case .saveRecord?, .resetForm?, .lookupBook?: true
         default: false
         }
     }

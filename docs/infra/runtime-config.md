@@ -58,6 +58,8 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 | `FEEDBACK_DAILY_LIMIT` | appconfig | 1 人 1 日のフィードバック送信の上限。`0` で数えない | 5 |
 | `FEEDS_DISABLED` | appconfig | 外部の公開データ(#348)の provider を止める(カンマ区切り・`all` = 全部)。止めた provider は 503 で、部品は「読み込めませんでした」([external-feeds.md](../backend/features/external-feeds.md)) | 無し(止めない) |
 | `FEEDS_USER_PER_HOUR` / `FEEDS_UPSTREAM_PER_MINUTE` | appconfig | 外部の公開データの 1 人 1 時間の回数 / インスタンスあたり 1 分の出どころへの取得 | 120 / 30 |
+| `BOOK_LOOKUP_DISABLED` | appconfig | ISBN から本の情報を引く `lookupBook` を止める(`1` / `true`・`FEEDS_DISABLED=all` でも止まる)。止めると 503 で、ボタンは「手で入力してください」([book-lookup.md](../backend/features/book-lookup.md)) | 無し(止めない) |
+| `BOOK_LOOKUP_USER_PER_HOUR` / `BOOK_LOOKUP_UPSTREAM_PER_MINUTE` | appconfig | 本の情報の 1 人 1 時間の回数 / インスタンスあたり 1 分の出どころ(openBD)への取得 | 60 / 30 |
 | `AI_PAUSED` | ai | `1`(`true` / `on` も可)で AI の生成だけを止める(#511)。generate(`mode=undo` を除く)・chat・text が Claude を呼ばずに 503 `ai_paused` を返す。AI を止める時はこれを使う([ai-pause.md](ai-pause.md)) | 無し(止めない) |
 | `PRO_GATE_MODE` | ai・appconfig・runner(3 つとも同じ値にする) | 有料の機能(共有データ・自動の動き・アプリの中のオンラインの AI)の強制(#316・[pro.md](../backend/features/pro.md))。`enforce` = Pro でなければ 402 `pro_required` / runner は `skipped_plan`。`log` = 止めずに、止めるはずだった事実を構造化ログ `pro_gate.would_block`(`where`・`uid_hash`・`features`・`blocked:false`)に出すだけ(runner は private のアプリを #316 の前の無料の枠で動かす)。`off` = 見ない(#316 の前と同じ)。共有データの自動の動きは #338 のとおりどの値でも Pro だけ。それ以外の値は起動しない(打ち間違いで外れないように)。段階的に出す時は `log` で `would_block` の量を見てから `enforce` | `enforce` |
 | `TEXT_FILTER` | appconfig | 表示できない言葉のフィルタ(#321・[moderation.md](moderation.md))の切り替え。`enforce` = 当たれば 422 `text_not_allowed`。`log` = 保存して、ログ `moderation: text would be refused` に場所と種類だけを出す(文字は出さない)。`off` = 見ない。誤検知で書き込めない人が出た時に、デプロイせずに `log` / `off` へ落とす。それ以外の値は起動しない | `enforce` |

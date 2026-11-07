@@ -10,6 +10,8 @@ public enum ActionType: String, Decodable, Sendable, CaseIterable {
     case startActivity, endActivity // #423 ライブアクティビティ
     /// 今のレコードを端末のカレンダーに予定として入れる(OS の「新規イベント」画面)
     case addToCalendar
+    /// フォームの ISBN から本の情報を引いて、書名などの field を埋める(`BookLookupPlan`)
+    case lookupBook
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -50,6 +52,8 @@ public struct Action: Decodable, Sendable {
     public var activity: ActivitySpec?
     /// addToCalendar
     public var calendarEvent: CalendarEventSpec?
+    /// lookupBook
+    public var bookLookup: BookLookupSpec?
 
     /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
     static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
@@ -59,6 +63,7 @@ public struct Action: Decodable, Sendable {
         case format, filter, fields, title
         case activity
         case calendarEvent
+        case bookLookup
     }
 
     public init(from decoder: Decoder) throws {
@@ -79,6 +84,7 @@ public struct Action: Decodable, Sendable {
         title = try? c.decodeIfPresent(String.self, forKey: .title)
         activity = try? c.decodeIfPresent(ActivitySpec.self, forKey: .activity)
         calendarEvent = try? c.decodeIfPresent(CalendarEventSpec.self, forKey: .calendarEvent)
+        bookLookup = try? c.decodeIfPresent(BookLookupSpec.self, forKey: .bookLookup)
     }
 
     /// DSL 外でクライアントが合成するアクション(例: list の長押し削除)。

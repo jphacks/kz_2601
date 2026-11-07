@@ -19,6 +19,7 @@
 - [フィードバック(#319)](features/feedback.md)
 - [自動の動きの見える化(#347)](features/automations.md)
 - [外部の公開データの読み取り(#348)](features/external-feeds.md)
+- [ISBN から本の情報を入れる(lookupBook)](features/book-lookup.md)
 - [決まった形の文章(#417)](features/text.md)
 - [仲間探しのアプリ(#507)](features/matching.md)
 

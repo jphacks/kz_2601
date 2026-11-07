@@ -56,8 +56,9 @@ func TestCapabilityIndex_IsSummary(t *testing.T) {
 	if n, c := utf8.RuneCountInString(chatCapabilityIndex), utf8.RuneCountInString(catalog); n*3 > c {
 		t.Errorf("index %d runes is not a summary of the %d-rune catalog", n, c)
 	}
+	// 900 → 960: the action line passed 900 with lookupBook (16 actions).
 	for _, l := range strings.Split(chatCapabilityIndex, "\n") {
-		if utf8.RuneCountInString(l) > 900 {
+		if utf8.RuneCountInString(l) > 960 {
 			t.Errorf("index line too long: %.60s…", l)
 		}
 	}
