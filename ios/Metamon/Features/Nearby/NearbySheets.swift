@@ -144,9 +144,7 @@ struct NearbySendSheet: View {
             .navigationTitle("近くの人に送る")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("閉じる") { dismiss() }
-                }
+                SheetCloseToolbarItem { dismiss() }
             }
         }
         .presentationDetents([.medium, .large])

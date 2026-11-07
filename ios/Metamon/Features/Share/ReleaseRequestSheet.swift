@@ -1,4 +1,5 @@
 import SwiftUI
+import MetamonRenderer
 import MetamonServices
 
 // 審査用ビルド(APP_STORE_REVIEW・#245)ではリリース申請を外す。
@@ -210,14 +211,7 @@ struct ReleaseRequestSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .padding(Theme.Spacing.sm + 2)
-                    .background(Theme.Colors.surface, in: Circle())
-            }
-            .accessibilityLabel("閉じる")
+            SheetCloseButton { dismiss() }
         }
     }
 
