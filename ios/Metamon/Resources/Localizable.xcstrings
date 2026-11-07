@@ -1633,19 +1633,19 @@
         }
       }
     },
-    "「%@」の画面と項目の設計(v%lld)" : {
+    "「%@」の画面と項目の設計" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Screens and fields of “%@” (v%lld)"
+            "value" : "Screens and fields of “%@”"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「%@」の画面と項目の設計(v%lld)"
+            "value" : "「%@」の画面と項目の設計"
           }
         }
       }
@@ -4540,23 +4540,6 @@
         }
       }
     },
-    "アプリの生成と対話が使えなくなります。もう一度同意すると使えます。" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "App generation and chat will be disabled until you agree again."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アプリの生成と対話が使えなくなります。もう一度同意すると使えます。"
-          }
-        }
-      }
-    },
     "アプリをリセット(初期状態に戻す)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4642,6 +4625,23 @@
         }
       }
     },
+    "アプリを作る・直す機能と対話が使えなくなります。もう一度同意すると使えます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Making and editing apps, and chat, will be disabled until you agree again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを作る・直す機能と対話が使えなくなります。もう一度同意すると使えます。"
+          }
+        }
+      }
+    },
     "アプリを切り替えています…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4723,23 +4723,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリを読み込めませんでした。接続を確認してください"
-          }
-        }
-      }
-    },
-    "アプリ一覧" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your apps"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "記録帳の一覧"
           }
         }
       }
@@ -7736,6 +7719,23 @@
         }
       }
     },
+    "作ったアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app you made goes back to the voice screen only. Data on the server is not deleted."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作ったアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。"
+          }
+        }
+      }
+    },
     "作ったアプリへの「ここを変えて」はこれまでどおり無料" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8093,7 +8093,7 @@
         }
       }
     },
-    "元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ初期画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。" : {
+    "元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ最初の画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -8105,7 +8105,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ初期画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。"
+            "value" : "元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ最初の画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。"
           }
         }
       }
@@ -8586,23 +8586,6 @@
         }
       }
     },
-    "利用が集中したため、新しい生成を止めています。%@に再開します" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demand is high, so new requests are paused. We'll reopen at %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "利用が集中したため、新しい生成を止めています。%@に再開します"
-          }
-        }
-      }
-    },
     "利用が集中したため、新しい記録帳の用意を止めています。%@に再開します" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8616,6 +8599,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "利用が集中したため、新しい記録帳の用意を止めています。%@に再開します"
+          }
+        }
+      }
+    },
+    "利用が集中したため、新しくアプリを作るのを止めています。%@に再開します" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demand is high, so new requests are paused. We'll reopen at %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "利用が集中したため、新しくアプリを作るのを止めています。%@に再開します"
           }
         }
       }
@@ -11408,23 +11408,6 @@
         }
       }
     },
-    "生成したアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The generated app goes back to the voice screen only. Data on the server is not deleted."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生成したアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。"
-          }
-        }
-      }
-    },
     "用意した記録帳が使えなくなります。この端末のデータも消えます。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13274,6 +13257,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "課金の制限を無効にする(デモ用・回数と有料機能)"
+          }
+        }
+      }
+    },
+    "質問 %lld / %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Question %lld of %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "質問 %lld / %lld"
           }
         }
       }
