@@ -90,6 +90,7 @@ var expectKeys = map[string]expectKind{
 	"aiGenerate":       expectString, // line|list|fields|any
 	"aiGenerateEntity": expectBool,
 	"aiTask":           expectString, // some aiButton has this task (summarize|classify|...|generate)
+	"aiLength":         expectString, // some aiButton has this length (short|long; short = unset too)
 	// checkNearby (#425)
 	"passby":         expectBool,
 	"passbyDistance": expectBool,
@@ -226,6 +227,10 @@ func validateExpect(exp map[string]any) []string {
 		case "aiTask":
 			if s := v.(string); !dsl.AITasks[s] {
 				bad = append(bad, "aiTask must be an aiButton task: "+s)
+			}
+		case "aiLength":
+			if s := v.(string); !dsl.AILengths[s] {
+				bad = append(bad, "aiLength must be short|long: "+s)
 			}
 		}
 	}

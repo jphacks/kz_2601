@@ -15,6 +15,7 @@
 | chat 1 往復 | 1 | 短い出力・軽いモデル設定 |
 | text 1 回(aiButton generate のオンライン版・#417) | 1 | 出力 400 トークンまで・入力 4 KB まで・thinking なし |
 | text 1 回(aiButton の要約・分類・書き直し・抜き出し・提案のオンライン版・`task` 付き) | 2 | 出力 1000 トークンまで(書き直しは入力と同じくらい長い)・入力 4 KB まで・thinking なし |
+| text 1 回(aiButton の長文・`length: long`・task を問わない) | 3 | 出力 1500 トークンまで・入力 16 KB まで(約 4000 トークン)・thinking なし。短い text(入力 4 KB・出力 400〜1000)の約 3 回分の費用。オンライン AI だけで動く(端末内 AI を使わない) |
 | generate の修正(mode edit) | 2 | patch 中心 |
 | generate の新規作成(create / auto) | 3 | 全体生成 + 検証のやり直し + logic pass |
 | generate の undo | 0 | Claude を呼ばない |
@@ -52,7 +53,7 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 | `RATE_LIMIT_PRO_DAILY` | 300 | Pro でも上限はある(緩い)。Pro はサーバーで検証した権利(`users/{uid}/entitlements/pro`・#314 #449)で判定 |
 | `RATE_LIMIT_IP_DAILY` | 300 | 匿名だけ。同じ IP からの匿名の合計(作り直し対策) |
 | `RATE_LIMIT_GLOBAL_DAILY` | 2000 | 環境全体の費用ブレーカー。新規作成なら約 660 回 |
-| `RATE_LIMIT_WEIGHT_CREATE` / `_EDIT` / `_CHAT` / `_TEXT` / `_TEXT_TASK` | 3 / 2 / 1 / 1 / 2 | `_TEXT_TASK` は `/v1/text` の本文に generate 以外の `task` がある時 |
+| `RATE_LIMIT_WEIGHT_CREATE` / `_EDIT` / `_CHAT` / `_TEXT` / `_TEXT_TASK` / `_TEXT_LONG` | 3 / 2 / 1 / 1 / 2 / 3 | `_TEXT_TASK` は `/v1/text` の本文に generate 以外の `task` がある時。`_TEXT_LONG` は本文に `length: "long"` がある時(task より優先) |
 | `RATE_LIMIT` | on(GOOGLE_CLOUD_PROJECT があれば) | `off` で無効。ローカルで素の起動なら既定 off |
 | `RATE_LIMIT_STORE` | firestore | `memory` でインスタンスごとのメモリ |
 | `RATE_LIMIT_COLLECTION` | rateLimits | |

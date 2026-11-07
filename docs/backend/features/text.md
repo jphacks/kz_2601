@@ -27,11 +27,26 @@ aiButton の要約などは端末内 AI だけで動いていたので、Apple I
 | ログ | ai.usage は generate と同じ `operation: text`(数・費用だけ)。入力・答えの文はどのログにも出さない(テストあり) |
 | 写真 | 送らない。プライバシーポリシー 1.3 と同意画面が「写真・音声・動画そのものは送りません」のため。写真の説明・分類は `photoField.analyze`(端末内・#418) |
 
+## 長文(`length: long`)
+
+aiButton の `length: long`(DSL)。長い文の要約・手紙・計画・台本など、短い答えでは足りない用途(過去の JPHACKS 作品の ng_2406・TK_2312・hs_2501・hs_2406)。実装 `internal/ai/text_long.go`。
+
+| 項目 | 決定 |
+|---|---|
+| 使える組み合わせ | generate(shape line だけ)と summarize / rewrite / extract / suggest。classify は 400 |
+| 上限 | input 16384 バイト(413)・本文 32 KB・`max_tokens` 1500・答え 3000 字で切る・タイムアウトは `GENERATE_TIMEOUT_SEC` と 60 秒の大きい方 |
+| 重さ | 3(`RATE_LIMIT_WEIGHT_TEXT_LONG`)。task の重さより優先 |
+| Pro・同意 | 他の `/v1/text` と同じ(402 `onlineAI`・iOS は同意 → Pro の順)。判定の仕方は変えない |
+| どこで動くか | iOS は long では端末内 AI を使わず、いつもオンライン(端末内 AI は短い答え向けで、長い文は切れる・崩れる) |
+| 答え | `text` 1 つ(段落の改行は残す)・応答に `length: "long"`。iOS はボタンの下にスクロール・選択できる形で出す |
+| 費用の目安 | 入力 約 4000 + 出力 1500 トークンで、短い text(入力 約 1300 + 出力 400〜1000)の約 3 倍 |
+
 ## 環境変数
 
 | 変数 | appconfig | ai | 既定 / 備考 |
 |---|---|---|---|
 | `RATE_LIMIT_WEIGHT_TEXT` | - | o | `1`。運用で変える値([docs/infra/runtime-config.md](../../infra/runtime-config.md)・[rate-limit.md](../rate-limit.md)) |
 | `RATE_LIMIT_WEIGHT_TEXT_TASK` | - | o | `2`。`task` 付き(要約など)の重さ |
+| `RATE_LIMIT_WEIGHT_TEXT_LONG` | o | o | `3`。`length: long` の重さ(appconfig も今日の残りの `weights.textLong` に読む) |
 
 モデルは対話と同じ `AI_CHAT_MODEL` / `AI_CHAT_EFFORT`([chat.md](chat.md#環境変数))、タイムアウトは `GENERATE_TIMEOUT_SEC`([architecture.md](../architecture.md#環境変数))。

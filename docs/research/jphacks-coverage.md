@@ -153,12 +153,12 @@ Web の作品はモバイルに置き換えて考えた(Web だから × には�
 
 | ファイル(`backend/internal/ai/eval/`) | 作品 | group | 中身 |
 |---|---|---|---|
-| `jphacks_coverage_cases.json` | 39 | `cov-full`(◎ 18)・`cov-reduced`(○ 21) | develop にある部品だけで作れる作品(記録を読むルール `ruleAgg`・`ruleEach` は #658、文字起こし・手書き・読み上げ・写真の labels・fileImport・feed は #659、カレンダーへの追加は #660 で入った) |
+| `jphacks_coverage_cases.json` | 39 | `cov-full`(◎ 21)・`cov-reduced`(○ 18) | develop にある部品だけで作れる作品(記録を読むルール `ruleAgg`・`ruleEach` は #658、文字起こし・手書き・読み上げ・写真の labels・fileImport・feed は #659、カレンダーへの追加は #660 で入った) |
 | `jphacks_coverage_pending_cases.json` | 0 | なし | 開いている PR の部品が要る作品(今は無い。新しい部品の PR を待つ作品ができたら `cov-pr<N>` で入れる) |
 
 - **選び方**: 判定 ◎○△ の 241 作品から 39 作品。受賞・決勝の ◎○△ 28 作品のうち 18 作品を入れ、残りは機能の分類(共有・記録・計算・通知・地図・写真・QR・AI・音声・マッチング・音楽)が偏らないように選んだ。× は入れていない(本体が作れないため)。△ は、足りない物が開いている PR で入る作品だけを PR 待ちのファイルに入れた。
 - **依頼の文**: 利用者が話す形で、その作品の本体の体験を 1〜2 文で頼む。作品名・チーム名は入れず、`note` の先頭にリポジトリの名前(`jphacks/<repo>`)・判定・受賞を書いた。
-- **期待の付け方**: 本体の体験に要る物だけを、既存の期待のキーで書く(部品 `has`・共有 `shared` / `scope`・計算 `calc` / `computed`・通知 `notification`・写真の読み取り `photoAnalyze`・AI `aiGenerate` / `aiTask`・曲のリクエスト `musicRequests`・マッチング `matchProfile`・ルール `serverRules` / `ruleTrigger` / `ruleAction` など)。見た目・画面の数・タブは見ない。○ の作品は「欠けるもの」(一覧のメモ)を期待に入れない。
+- **期待の付け方**: 本体の体験に要る物だけを、既存の期待のキーで書く(部品 `has`・共有 `shared` / `scope`・計算 `calc` / `computed`・通知 `notification`・写真の読み取り `photoAnalyze`・AI `aiGenerate` / `aiTask` / `aiLength`・曲のリクエスト `musicRequests`・マッチング `matchProfile`・ルール `serverRules` / `ruleTrigger` / `ruleAction` など)。見た目・画面の数・タブは見ない。○ の作品は「欠けるもの」(一覧のメモ)を期待に入れない。
 - **PR 待ちの期待**: develop に無い部品は `has` の名前(`transcribeField` など)で書く。PR が足す期待のキー(`addToCalendar` など)は `pendingExpect` に置き、PR がマージされてキーが入ると自動で確かめる対象になる(それまでは実行のログに「not checked until the PR is merged」と出て、確かめない)。
 - **作れた** = 生成が成功し、期待をすべて満たした作品。試験(`backend/cmd/ai-eval/coverage_test.go`)が、作品の数(30〜40)・依頼の文にチーム名が無いこと・develop のファイルが develop の部品だけを使うこと・PR 待ちのケースが本当に新しい部品を要ることを確かめる。
 
@@ -428,7 +428,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [TK_2309](https://github.com/jphacks/TK_2309) | Twins Link | お題に近い文をAIに出させる力をLINEで競う | AI,ゲーム | △ | CLOUD_AI,SERVER_LOGIC | 文章の類似度採点と生成AIを足す | 審査委員特別賞 / Innovator |
 | [TK_2310](https://github.com/jphacks/TK_2310) | SAFA | 企業の報酬つきゴミ拾いと参加者のマッチング | 地図,カメラ,決済 | ○ | PAYMENT,SERVER_LOGIC | 報酬の支払いと最適な組み合わせ検索が欠ける |  |
 | [TK_2311](https://github.com/jphacks/TK_2311) | PicSchedule | README が雛形のまま | その他 | ? | - | 判定不能 |  |
-| [TK_2312](https://github.com/jphacks/TK_2312) | ATS System | 利用規約の不利な点を抜き出して表示する | AI,Web専用 | ○ | CLOUD_AI | 貼り付けた文のみ。長文の解析と自動取得が欠ける | Innovator |
+| [TK_2312](https://github.com/jphacks/TK_2312) | ATS System | 利用規約の不利な点を抜き出して表示する | AI,Web専用 | ◎ | - | 長文(16KB まで)を貼って aiButton の length long で抜き出す(追記)。規約の自動取得はしない | Innovator |
 | [TK_2313](https://github.com/jphacks/TK_2313) | スマートホームメイド | MR空間のAIキャラで家電を操作する | AR3D,AI,HW | × | AR3D,CLOUD_AI,BLE_IOT | MRと家電制御が本体。代案はAIなしの家電メモ | 決勝 |
 | [TK_2314](https://github.com/jphacks/TK_2314) | つくってくん | 消費期限順の食材リストと余り物レシピ提案 | 記録,通知,AI | ◎ | - | - |  |
 | [TK_2315](https://github.com/jphacks/TK_2315) | - | README が雛形のまま | その他 | ? | - | 判定不能 |  |
@@ -460,7 +460,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [hs_2403](https://github.com/jphacks/hs_2403) | - | READMEが雛形のままで内容なし | その他 | ? | - | 判定不能 |  |
 | [hs_2404](https://github.com/jphacks/hs_2404) | taskEcho | 講義の音声を認識しキーワード検知と要約で聞き逃しを防ぐ | 音声,AI | ◎ | STT | transcribeField(文字起こし・#659)で講義を文字にし、キーワードの検知と要約は端末内 AI | 企業賞 |
 | [hs_2405](https://github.com/jphacks/hs_2405) | Blue Moon | 外見を隠し価値観の質問でつながる匿名マッチング | 共有 | ○ | SERVER_LOGIC | 価値観の近さの自動算出が欠ける |  |
-| [hs_2406](https://github.com/jphacks/hs_2406) | ずんだもんのオールナイトニッポン | ずんだもんが好みに合わせたラジオを生成して読み上げる | AI,音声 | ○ | CLOUD_AI,TTS | 読み上げは speakButton(#659)で可。台本は端末内 AI の短文(長い台本は欠ける) |  |
+| [hs_2406](https://github.com/jphacks/hs_2406) | ずんだもんのオールナイトニッポン | ずんだもんが好みに合わせたラジオを生成して読み上げる | AI,音声 | ○ | CLOUD_AI,TTS | 読み上げは speakButton(#659)、台本は aiButton の length long(#702)。キャラクターの声は無い(端末の声) |  |
 | [hs_2407](https://github.com/jphacks/hs_2407) | SubVision | サブスクの利用時間を可視化し他ユーザと比較する | 記録,共有 | △ | OS_INTEG | アプリ利用時間の自動取得を足す |  |
 | [hs_2408](https://github.com/jphacks/hs_2408) | Brew Buddy | 少ない質問で好みのコーヒー豆を提案する | AI,記録 | ○ | EXT_API | 商品画像のスクレイピング解析が欠ける(固定の候補表で代替) |  |
 | [hs_2409](https://github.com/jphacks/hs_2409) | LiCC | ビデオ通話しながらコードを共同編集するWebアプリ | 共有,通話 | × | CALL,REALTIME,CANVAS | 通話と同時編集が本体。代案はコードメモの共有掲示とチャット |  |
@@ -482,7 +482,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [ng_2403](https://github.com/jphacks/ng_2403) | カンターン | インターンの予定管理と経路提案・メモのAI要約 | 記録,地図,AI,共有 | ○ | EXT_API | 最適経路の自動提案は無く、道案内まで |  |
 | [ng_2404](https://github.com/jphacks/ng_2404) | 悩みをポップな文章に変換するアプリ | 入力した悩みをAIが明るい文章に言い換える | AI | ◎ | - | - |  |
 | [ng_2405](https://github.com/jphacks/ng_2405) | HackDrill | 言語と記法を指定するとAIが難易度別の課題を作る | AI,記録 | △ | CLOUD_AI | 課題文の生成にクラウドAIを足す |  |
-| [ng_2406](https://github.com/jphacks/ng_2406) | 安心打診おばあ | 予定を入れるとおばあ口調で危険と助言をくれる | AI,記録 | ○ | CLOUD_AI | 助言は端末内AIの短文まで | 企業賞 |
+| [ng_2406](https://github.com/jphacks/ng_2406) | 安心打診おばあ | 予定を入れるとおばあ口調で危険と助言をくれる | AI,記録 | ◎ | - | 長めの助言は aiButton suggest の length long(Pro のオンライン AI・追記) | 企業賞 |
 | [ng_2407](https://github.com/jphacks/ng_2407) | 駅くぐる | 駅の設備を地図で調べ利用者の投票で情報を補う | 地図,共有,外部API | ○ | EXT_API | 鉄道会社の設備データは取り込めず手入力と投票で集める |  |
 | [ng_2408](https://github.com/jphacks/ng_2408) | What's Up! | 近くの人と自動でグループを作りチャットする | 共有,地図 | △ | SERVER_LOGIC | 距離で自動グルーピングするサーバー処理を足す |  |
 | [ng_2409](https://github.com/jphacks/ng_2409) | - | README が雛形のまま | - | ? | - | 雛形のまま |  |
@@ -596,7 +596,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [fk_2508](https://github.com/jphacks/fk_2508) | - | README が雛形のまま | その他 | ? | - | 内容が読めず判定不可 |  |
 | [fk_2509](https://github.com/jphacks/fk_2509) | - | README が雛形のまま | その他 | ? | - | 内容が読めず判定不可 |  |
 | [fk_2510](https://github.com/jphacks/fk_2510) | - | README が雛形のまま | その他 | ? | - | 内容が読めず判定不可 |  |
-| [hs_2501](https://github.com/jphacks/hs_2501) | AIbum | 写真と絵文字から日記文を生成し継続日数を見せるアプリ | AI,カメラ,記録 | ○ | - | 長い文体付き生成が欠ける。短文生成なら可 |  |
+| [hs_2501](https://github.com/jphacks/hs_2501) | AIbum | 写真と絵文字から日記文を生成し継続日数を見せるアプリ | AI,カメラ,記録 | ◎ | - | 日記の本文は aiButton generate の length long(追記)。写真そのものは送らず、端末内の analyze の説明を材料にする |  |
 | [hs_2502](https://github.com/jphacks/hs_2502) | LangBridge | 英文を利用者の語彙レベルに合わせ日英混在で表示する | AI,Web専用 | △ | CLOUD_AI,SERVER_LOGIC | 語彙レベル判定と混在翻訳の処理を足す |  |
 | [hs_2503](https://github.com/jphacks/hs_2503) | hinavi | 災害情報と避難所までの道案内、現地情報の投稿ができる防災アプリ | 地図,共有,外部API | ○ | EXT_API | 気象庁の災害情報が欠ける。避難所データと道案内は可 | 企業賞 |
 | [hs_2504](https://github.com/jphacks/hs_2504) | PoseTrack | Webカメラで座り姿勢を常時監視し悪いと知らせる | カメラ,AI | △ | CAMERA_LIVE | 連続した姿勢推定を足す。1枚撮影の角度判定は可 |  |
