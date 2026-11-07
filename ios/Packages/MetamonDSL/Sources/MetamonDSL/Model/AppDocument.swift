@@ -193,15 +193,39 @@ public struct NotificationSpec: Decodable, Identifiable, Sendable {
     /// 止めるまで鳴るアラーム(iOS 26.1 以降の AlarmKit)。使えない時(古い iOS・許可が無い・審査用の版)は同じ時刻の普通の通知。
     /// 古い版はこのキーを知らずに普通の通知として予約する(それが落とし方)。
     public var alarm: Bool?
+    /// 場所に着いたら知らせる(app.notifications のみ): `entity` の各レコードの location field の場所(端末内の領域監視)。
+    /// 時刻・レコードの日付・条件の通知とは組み合わせない(backend が拒否)。古い版はこのキーを知らないので、backend は
+    /// `supportedFeatures` に `notification.near` が無い版には出さない。読めない near は `Lossy` が通知ごと落とす。
+    public var near: Near?
+    /// 時刻の通知を回ごとに ±N 分ずらす(1〜60・回ごとに決まった値)。
+    public var jitterMinutes: Int?
 
-    public var isRecordBased: Bool { when == nil && entity?.isEmpty == false && field?.isEmpty == false }
+    public struct Near: Decodable, Sendable, Equatable {
+        public static let defaultRadius = 200
+        public var entity: String
+        public var locationField: String
+        public var radiusM: Int?
+        /// m。範囲外は 100〜2000 に寄せる。
+        public var radius: Double { Double(min(max(radiusM ?? Self.defaultRadius, 100), 2000)) }
+        public init(entity: String, locationField: String, radiusM: Int? = nil) {
+            self.entity = entity
+            self.locationField = locationField
+            self.radiusM = radiusM
+        }
+    }
+
+    public var isRecordBased: Bool { when == nil && near == nil && entity?.isEmpty == false && field?.isEmpty == false }
+    /// 場所に着いたら知らせる通知。
+    public var isNearBased: Bool { when == nil && near != nil }
+    /// 予約に読むレコードの entity(レコードの時刻・場所の通知)。
+    public var recordEntity: String? { isNearBased ? near?.entity : (isRecordBased ? entity : nil) }
     /// 条件の通知(#265)。予約(時刻・レコードの日付)には入れず、レコードの保存・同期の後に評価する。
     public var isConditional: Bool { when != nil }
 
     public init(
         id: String, title: String, body: String = "", repeat: Repeat = .once, time: String? = nil, weekday: String? = nil,
         entity: String? = nil, field: String? = nil, offsetMinutes: Int? = nil, titleField: String? = nil, enabledField: String? = nil,
-        when: Expr? = nil, alarm: Bool? = nil
+        when: Expr? = nil, alarm: Bool? = nil, near: Near? = nil, jitterMinutes: Int? = nil
     ) {
         self.id = id
         self.title = title
@@ -216,6 +240,8 @@ public struct NotificationSpec: Decodable, Identifiable, Sendable {
         self.enabledField = enabledField
         self.when = when
         self.alarm = alarm
+        self.near = near
+        self.jitterMinutes = jitterMinutes
     }
 }
 

@@ -112,9 +112,9 @@ final class UpdateCheckTests: XCTestCase {
         let body = HTTPAIClient.GenerateBody(appId: "a", baseVersion: nil, transcript: "t")
         let chat = HTTPAIClient.ChatBody(appId: "a", messages: [])
         #if APP_STORE_REVIEW
-        let expected = ["recordRetention", "notification.when", "singleEntity"]
+        let expected = ["recordRetention", "notification.when", "singleEntity", "notification.near"]
         #else
-        let expected = ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages"] // #507 仲間探し(審査用の版は送らない)
+        let expected = ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near"] // #507 仲間探し(審査用の版は送らない)
         #endif
         XCTAssertEqual(body.supportedFeatures, expected)
         XCTAssertEqual(chat.supportedFeatures, expected)

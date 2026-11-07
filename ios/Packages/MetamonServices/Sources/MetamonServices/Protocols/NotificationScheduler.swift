@@ -14,17 +14,22 @@ public struct UpcomingNotification: Sendable, Equatable {
 }
 
 /// `sync` の結果。`denied` は通知が許可されていない(予約しても届かない)。
+/// `places` はこのアプリで見張っている場所の数、`locationOff` は場所の通知があるのに位置情報が許可されていない(届かない)。
 public struct NotificationSyncResult: Sendable, Equatable {
     public var denied: Bool
     public var upcoming: [UpcomingNotification]
-    public init(denied: Bool = false, upcoming: [UpcomingNotification] = []) {
+    public var places: Int
+    public var locationOff: Bool
+    public init(denied: Bool = false, upcoming: [UpcomingNotification] = [], places: Int = 0, locationOff: Bool = false) {
         self.denied = denied
         self.upcoming = upcoming
+        self.places = places
+        self.locationOff = locationOff
     }
 }
 
 /// ローカル通知(#228)。アプリ(appId)ごとに予約を持ち、全アプリ分から近い順に iOS の上限内で予約し直す。
-/// - `sync`: `app.notifications[]`(固定時刻 / レコードの時刻から)をそのアプリ分として置き換える。
+/// - `sync`: `app.notifications[]`(固定時刻 / レコードの時刻から / 場所に着いたら)をそのアプリ分として置き換える。
 /// - `schedule`: `scheduleNotification` アクション(押下時・同 id なら上書き)。DSL の再同期では消えない。
 /// - `post`: `when` の条件が偽 → 真になった時(#265)。予約の枠を使わずすぐ出す。
 public protocol NotificationScheduler: Sendable {
