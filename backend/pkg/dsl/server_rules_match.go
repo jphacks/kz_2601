@@ -19,7 +19,7 @@ func (a *App) MatchRecordRules(entity, kind string, changed []string) []*ServerR
 	var out []*ServerRule
 	for i := range a.ServerRules {
 		r := &a.ServerRules[i]
-		if r.On.Record != kind || r.On.Entity != entity {
+		if r.On.Record != kind || r.On.Entity != entity || !r.IsEnabled() {
 			continue
 		}
 		if kind == TriggerUpdated && len(r.On.Fields) > 0 && !slices.ContainsFunc(r.On.Fields, func(f string) bool { return slices.Contains(changed, f) }) {

@@ -40,6 +40,10 @@ type RuleStatus struct {
 	QuotaUsed  int       `json:"quotaUsed,omitempty"`
 	QuotaLimit int       `json:"quotaLimit,omitempty"`
 	ExpireAt   time.Time `json:"expireAt"`
+	// Failures: the runs that gave up in a row (read). A put with Failed adds
+	// one; a put with LastOKAt resets it to 0; any other put keeps it.
+	Failures int  `json:"failures,omitempty"`
+	Failed   bool `json:"-"`
 }
 
 // RuleStatusID names a rule's status: a hash of the parts (like ScheduleKey).

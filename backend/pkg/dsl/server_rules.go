@@ -26,6 +26,8 @@ type ServerRule struct {
 	On RuleTrigger  `json:"on"`
 	If *Expr        `json:"if,omitempty"`
 	Do []RuleAction `json:"do"`
+	// Enabled: false turns the rule off (the creator's switch, #347); nil = on.
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // RuleTrigger is a record trigger (Record + Entity [+ Fields]) or a time
@@ -794,5 +796,5 @@ func (a *App) DescribeServerRule(r *ServerRule) string {
 			acts = append(acts, fmt.Sprintf("「%s」の「%s」を数える", refName(act.Increment.Ref), fname(target, act.Increment.Field)))
 		}
 	}
-	return when + "、" + a.describeReads(r) + strings.Join(acts, "・")
+	return when + "、" + a.describeReads(r) + strings.Join(acts, "・") + disabledNote(r)
 }
