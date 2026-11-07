@@ -125,7 +125,7 @@ runner(`backend/cmd/runner`・#341)は、appconfig が outbox(`runner/{APP_ENV}/
      --project "$PROJECT_ID" --freshness=15m --limit=10 --format=json
    ```
 
-   `outcome` が `ok` なら動いている。`skipped_plan` は作成者が Pro でない(`PRO_GATE_MODE`・[pro.md](../backend/features/pro.md))、`skipped_paused` / `skipped_stopped` は止めている、`skipped_quota` / `skipped_global` は上限([runtime-config.md](runtime-config.md#運用で変える値)の `RUNNER_LIMIT_*`)。使った量は `jsonPayload.event="runner.usage"`。アプリの中の「実行の履歴」(`rule_status`)にも出る。
+   `outcome` が `ok` なら動いている。`skipped_plan` は作成者が Pro でない(`PRO_GATE_MODE`・[pro.md](../backend/features/pro.md))、`skipped_paused` / `skipped_stopped` は止めている、`skipped_quota` / `skipped_global` は上限([runtime-config.md](runtime-config.md#運用で変える値)の `RUNNER_LIMIT_*`)。使った量は `jsonPayload.event="runner.usage"`(集計は `scripts/runner-usage.sh prod`・[runner-usage.md](runner-usage.md))。アプリの中の「実行の履歴」(`rule_status`)にも出る。
 
 通知は今の版では APNs の鍵を持たず、宛先を数えてログに形だけを出します(端末には届かない)。
 
