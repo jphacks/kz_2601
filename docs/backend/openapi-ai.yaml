@@ -13,7 +13,7 @@ info:
     - `POST /generate`・`POST /chat`・`POST /text` は ai 自身も ID トークンを検証し、利用者ごと・1 日ごとの上限を数える (#280)。
       上限に当たると 429 `rate_limited`(`RateLimited`)。重さ: chat 1 往復 = 1、text 1 回 = 1、generate の修正 = 2、新規作成(create/auto)= 3、undo = 0。
       既定の上限: 匿名 30 / サインイン済み 60 / Pro 300(サーバーでの Pro 判定は未実装)/ 匿名の同一 IP 300 / 環境全体 2000。日付は 0:00 JST で切り替わる。
-      成功時も `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset`(Unix 秒)を返す。
+      成功時も `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset`(Unix 秒)を返す(undo も今日の残りを返す。利用者の上限が 0 = 数えない時は付けない・`docs/backend/rate-limit.md`)。
     - 一時停止(#511): ai に `AI_PAUSED=1` がある間、Claude を呼ぶ `POST /generate`(`mode=undo` を除く)・`POST /chat`・`POST /text` は Claude を呼ばず、上限も数えずに 503 `ai_paused` を返す。`/health`・`DELETE /chat/{appId}` は止めない。`docs/infra/ai-pause.md`
 servers:
   - url: http://localhost:8081/v1
