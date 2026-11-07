@@ -20,6 +20,20 @@ final class FeedTests: XCTestCase {
         XCTAssertNil(FeedQuery(try component(#"{"type":"feed"}"#)))
     }
 
+    func testWarningsAndPressureSendRegion() throws {
+        let w = try XCTUnwrap(FeedQuery(try component(#"{"type":"feed","provider":"warnings","region":"170000","feedId":"x"}"#)))
+        XCTAssertEqual(w.path, "v1/feeds/warnings?region=170000&limit=5")
+        let p = try XCTUnwrap(FeedQuery(try component(#"{"type":"feed","provider":"pressure","region":"016000","limit":8}"#)))
+        XCTAssertEqual(p.path, "v1/feeds/pressure?region=016000&limit=8")
+    }
+
+    func testDecodesPressureRow() throws {
+        let json = #"{"provider":"pressure","title":"石川県の気圧","items":[{"date":"2026-11-09T00:00:00+09:00","title":"0時〜6時","min":1027.9,"max":1029.5,"drop":true,"series":[1029.5,1028.7,1027.9]}],"source":{"name":"MET Norway","url":"https://api.met.no/","license":"CC BY 4.0"}}"#
+        let r = try JSONDecoder().decode(FeedResult.self, from: Data(json.utf8))
+        XCTAssertEqual(r.items.first?.drop, true)
+        XCTAssertEqual(r.items.first?.series, [1029.5, 1028.7, 1027.9])
+    }
+
     func testItemLinkIsHTTPSOnly() {
         XCTAssertNotNil(FeedItem(title: "a", url: "https://www.digital.go.jp/news/1").link)
         XCTAssertNil(FeedItem(title: "a", url: "http://www.digital.go.jp/").link)

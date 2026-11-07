@@ -25,14 +25,16 @@ import (
 
 // Item is one row of a feed. Fields a provider does not use are omitted.
 type Item struct {
-	Date     string   `json:"date,omitempty"` // YYYY-MM-DD (weather, holidays) or RFC 3339 (rss)
-	Title    string   `json:"title"`
-	Subtitle string   `json:"subtitle,omitempty"`
-	Icon     string   `json:"icon,omitempty"` // SF Symbols name (weather)
-	URL      string   `json:"url,omitempty"`  // https only (rss)
-	Max      *float64 `json:"max,omitempty"`  // °C
-	Min      *float64 `json:"min,omitempty"`  // °C
-	Pop      *int     `json:"pop,omitempty"`  // precipitation probability %
+	Date     string    `json:"date,omitempty"` // YYYY-MM-DD (weather, holidays) or RFC 3339 (rss, warnings, pressure)
+	Title    string    `json:"title"`
+	Subtitle string    `json:"subtitle,omitempty"`
+	Icon     string    `json:"icon,omitempty"`   // SF Symbols name (weather, warnings)
+	URL      string    `json:"url,omitempty"`    // https only (rss)
+	Max      *float64  `json:"max,omitempty"`    // °C (weather) / hPa (pressure)
+	Min      *float64  `json:"min,omitempty"`    // °C (weather) / hPa (pressure)
+	Pop      *int      `json:"pop,omitempty"`    // precipitation probability %
+	Drop     *bool     `json:"drop,omitempty"`   // pressure fell 6 hPa or more within 24 hours (pressure)
+	Series   []float64 `json:"series,omitempty"` // hourly hPa in the row (pressure)
 }
 
 // Source is the attribution shown under the list (PDL1.0 asks for it).
@@ -52,7 +54,8 @@ type Result struct {
 	Stale     bool      `json:"stale,omitempty"` // the source failed; this is the last good copy
 }
 
-// Query names what to read. Region is for weather, FeedID for rss.
+// Query names what to read. Region is for weather / warnings / pressure,
+// FeedID for rss.
 type Query struct {
 	Provider string
 	Region   string
@@ -79,6 +82,8 @@ var providerLimits = map[string]limits{
 	dsl.FeedWeather:  {ttl: 30 * time.Minute, maxBody: 256 << 10},
 	dsl.FeedHolidays: {ttl: 12 * time.Hour, maxBody: 128 << 10},
 	dsl.FeedRSS:      {ttl: 15 * time.Minute, maxBody: 512 << 10},
+	dsl.FeedWarnings: {ttl: 10 * time.Minute, maxBody: 512 << 10},
+	dsl.FeedPressure: {ttl: 30 * time.Minute, maxBody: 256 << 10},
 }
 
 const (
@@ -208,8 +213,11 @@ func (s *Service) Get(ctx context.Context, q Query, limit int) (*Result, error) 
 		return nil, err
 	}
 	items := e.items
-	if q.Provider == dsl.FeedHolidays || q.Provider == dsl.FeedWeather {
+	switch q.Provider {
+	case dsl.FeedHolidays, dsl.FeedWeather:
 		items = fromToday(items, s.now())
+	case dsl.FeedPressure:
+		items = notEnded(items, s.now(), pressureBlock)
 	}
 	if len(items) > limit {
 		items = items[:limit]
@@ -227,7 +235,7 @@ func (s *Service) check(q Query) error {
 		return ErrDisabled
 	}
 	switch q.Provider {
-	case dsl.FeedWeather:
+	case dsl.FeedWeather, dsl.FeedWarnings, dsl.FeedPressure:
 		if _, ok := dsl.WeatherRegions[q.Region]; !ok || q.FeedID != "" {
 			return ErrUnknown
 		}
@@ -353,6 +361,24 @@ func (s *Service) fetch(ctx context.Context, q Query) (string, []Item, error) {
 		}
 		items, err := parseRSS(body)
 		return f.Name, items, err
+	case dsl.FeedWarnings:
+		body, err := s.get(ctx, s.ep.warningURL(q.Region), lim.maxBody)
+		if err != nil {
+			return "", nil, err
+		}
+		items, err := parseWarnings(body)
+		return dsl.WeatherRegions[q.Region] + "の警報・注意報", items, err
+	case dsl.FeedPressure:
+		u, ok := s.ep.pressureURL(q.Region)
+		if !ok {
+			return "", nil, ErrUnknown
+		}
+		body, err := s.get(ctx, u, lim.maxBody)
+		if err != nil {
+			return "", nil, err
+		}
+		items, err := parsePressure(body, s.now())
+		return dsl.WeatherRegions[q.Region] + "の気圧", items, err
 	}
 	return "", nil, ErrUnknown
 }
@@ -395,6 +421,16 @@ func fromToday(items []Item, now time.Time) []Item {
 	today := now.In(jst).Format(time.DateOnly)
 	for i, it := range items {
 		if len(it.Date) >= 10 && it.Date[:10] >= today {
+			return items[i:]
+		}
+	}
+	return nil
+}
+
+// notEnded drops rows (dated RFC 3339 at their start) that ended before now.
+func notEnded(items []Item, now time.Time, span time.Duration) []Item {
+	for i, it := range items {
+		if t, err := time.Parse(time.RFC3339, it.Date); err == nil && t.Add(span).After(now) {
 			return items[i:]
 		}
 	}

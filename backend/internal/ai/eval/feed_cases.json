@@ -3,5 +3,7 @@
   {"id": "feed_weather_default", "kind": "create", "group": "feed", "transcript": "明日の天気と、持ち物のチェックリスト", "note": "#348 地域が無い → 東京都にして summary で変えられると伝える", "expect": {"has": ["feed", "list"], "feed": "weather", "feedRegion": "130000", "unreachable": 0}},
   {"id": "feed_holidays", "kind": "create", "group": "feed", "transcript": "次の祝日まで何日か分かる、連休の予定を書くアプリ", "note": "#348 feed holidays + 予定の記録", "expect": {"has": ["feed"], "feed": "holidays", "unreachable": 0}},
   {"id": "feed_rss_disaster", "kind": "create", "group": "feed", "transcript": "消防庁の災害情報を見られるようにして、防災グッズの在庫も管理したい", "note": "#348 feed rss の許可された feedId", "expect": {"has": ["feed"], "feed": "rss", "unreachable": 0}},
-  {"id": "feed_edit_add_weather", "kind": "edit", "base": "feed_holidays", "group": "feed", "transcript": "大阪の天気も上に出して", "note": "#348 既存アプリに weather を足す", "expect": {"patch": true, "feed": "weather", "feedRegion": "270000"}}
+  {"id": "feed_edit_add_weather", "kind": "edit", "base": "feed_holidays", "group": "feed", "transcript": "大阪の天気も上に出して", "note": "#348 既存アプリに weather を足す", "expect": {"patch": true, "feed": "weather", "feedRegion": "270000"}},
+  {"id": "feed_warnings_ishikawa", "kind": "create", "group": "feed", "transcript": "石川県に今出ている大雨や暴風の警報と注意報を確認できるアプリ", "note": "feed warnings + 石川県の府県予報区", "expect": {"has": ["feed"], "feed": "warnings", "feedRegion": "170000", "unreachable": 0}},
+  {"id": "feed_pressure_headache", "kind": "create", "group": "feed", "transcript": "札幌のこれからの気圧の変化を見て、頭痛が起きそうな時を知りたい", "note": "feed pressure(予報)。今の気圧を測る sensorValue ではない", "expect": {"has": ["feed"], "feed": "pressure", "feedRegion": "016000", "unreachable": 0}}
 ]

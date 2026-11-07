@@ -4801,13 +4801,15 @@
           "enum": [
             "weather",
             "holidays",
-            "rss"
+            "rss",
+            "warnings",
+            "pressure"
           ],
-          "description": "データの出どころ(閉じた一覧)。weather = 気象庁の天気予報(region が要る)、holidays = 内閣府の国民の祝日(これから来る祝日)、rss = 運営が許可したお知らせのフィード(feedId が要る)。任意の URL・Web サイトは指定できない。"
+          "description": "データの出どころ(閉じた一覧)。weather = 気象庁の天気予報、warnings = 気象庁の今出ている警報・注意報、pressure = 48 時間の気圧の予報(6 時間ごとの最低 / 最高と急な低下の印)。この 3 つは region が要る。holidays = 内閣府の国民の祝日(これから来る祝日)、rss = 運営が許可したお知らせのフィード(feedId が要る)。任意の URL・Web サイトは指定できない。"
         },
         "region": {
           "type": "string",
-          "description": "weather だけ: 気象庁の府県予報区のコード(6 桁)。例 130000 東京都・170000 石川県・270000 大阪府・016000 石狩・空知・後志地方(札幌)・471000 沖縄本島地方。"
+          "description": "weather / warnings / pressure だけ: 気象庁の府県予報区のコード(6 桁)。例 130000 東京都・170000 石川県・270000 大阪府・016000 石狩・空知・後志地方(札幌)・471000 沖縄本島地方。"
         },
         "feedId": {
           "type": "string",
@@ -4827,7 +4829,7 @@
         }
       },
       "description": "外部の公開データの読み取り専用の一覧(#348)。サーバーが運営の許可した出どころ(気象庁の天気予報・内閣府の祝日・許可したお知らせのフィード)だけから取り、端末は直接外へ出ない。日付・見出し・天気のアイコン・最高 / 最低気温・降水確率・出典を行で出す。記録は作らず保存もしない(読むだけ)。「天気予報」「明日の天気」「次の祝日」「祝日の一覧」「お知らせ・新着ニュース」の時に使う。任意の URL・任意のサイトの読み込み・外部への送信はできない。",
-      "x-usage": "天気: feed{provider: weather, region: 地域のコード, title: 〇〇の天気, limit: 3〜7}(例 A1:F5)。祝日: feed{provider: holidays, title: 次の祝日, limit: 5}。お知らせ: feed{provider: rss, feedId: 許可された id, limit: 10}。地域が分からない天気の依頼は東京都(130000)にして summary で地域を変えられると伝える。entity・保存ボタン・フォームは作らない。"
+      "x-usage": "天気: feed{provider: weather, region: 地域のコード, title: 〇〇の天気, limit: 3〜7}(例 A1:F5)。警報: feed{provider: warnings, region}。気圧・頭痛: feed{provider: pressure, region, limit: 8}。祝日: feed{provider: holidays, title: 次の祝日, limit: 5}。お知らせ: feed{provider: rss, feedId: 許可された id, limit: 10}。地域が分からない天気の依頼は東京都(130000)にして summary で地域を変えられると伝える。entity・保存ボタン・フォームは作らない。"
     }
   }
 }

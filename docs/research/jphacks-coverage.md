@@ -20,6 +20,7 @@
 
 - **調べた作品: 484 チーム**(2022: 106・2023: 111・2024: 134・2025: 133)。このうち README に中身があって判定できたのは **341 作品**。残りの 143 作品は README が JPHACKS の雛形のまま(または無い)で判定していない(?)。
 - **判定(341 作品のうち)**: ◎ 51(15%)・○ 97(28%)・△ 93(27%)・× 100(29%)。**今の部品で本体が作れる(◎○)のは 148 作品 = 43%**。
+  - この数は 2026-11-06 の調査の時点のもの。部品が入って判定を変えた作品は、一覧の行のメモに「(日付 見直し)」と書いた(2026-11-08: NG_2301 △→◎・hs_2503 ○→◎。feed の warnings・pressure)。
 - △ の部品を足していくと ◎○ は増える(下の表の「足した後の ◎○ の累計」)。**上位 5 つを足すと 205 作品(60%)、上位 10 で 245 作品(72%)**。残りの約 3 割は × で、自作の機器・独自の機械学習モデル・AR・カメラの連続認識が本体の作品。
 - **足すべき上位 5 つ**:
   1. **外部 API・Web サービスの連携**(60 作品・大・#348)— 場所・施設の検索、カレンダー、メッセージ(Slack・LINE)、ニュース・天気などのデータが本体の作品
@@ -151,7 +152,7 @@ Web の作品はモバイルに置き換えて考えた(Web だから × には�
 
 | ファイル(`backend/internal/ai/eval/`) | 作品 | group | 中身 |
 |---|---|---|---|
-| `jphacks_coverage_cases.json` | 39 | `cov-full`(◎ 18)・`cov-reduced`(○ 21) | develop にある部品だけで作れる作品(記録を読むルール `ruleAgg`・`ruleEach` は #658、文字起こし・手書き・読み上げ・写真の labels・fileImport・feed は #659、カレンダーへの追加は #660 で入った) |
+| `jphacks_coverage_cases.json` | 39 | `cov-full`(◎ 20)・`cov-reduced`(○ 19) | develop にある部品だけで作れる作品(記録を読むルール `ruleAgg`・`ruleEach` は #658、文字起こし・手書き・読み上げ・写真の labels・fileImport・feed は #659、カレンダーへの追加は #660、feed の warnings・pressure(hs_2503・NG_2301 を ◎ に)は feat/feed-warnings-pressure で入った) |
 | `jphacks_coverage_pending_cases.json` | 0 | なし | 開いている PR の部品が要る作品(今は無い。新しい部品の PR を待つ作品ができたら `cov-pr<N>` で入れる) |
 
 - **選び方**: 判定 ◎○△ の 241 作品から 39 作品。受賞・決勝の ◎○△ 28 作品のうち 18 作品を入れ、残りは機能の分類(共有・記録・計算・通知・地図・写真・QR・AI・音声・マッチング・音楽)が偏らないように選んだ。× は入れていない(本体が作れないため)。△ は、足りない物が開いている PR で入る作品だけを PR 待ちのファイルに入れた。
@@ -349,7 +350,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [KB_2318](https://github.com/jphacks/KB_2318) | - | READMEが雛形のままで内容なし | その他 | ? | - | 判定不能 |  |
 | [KB_2319](https://github.com/jphacks/KB_2319) | - | READMEが雛形のままで内容なし | その他 | ? | - | 判定不能 |  |
 | [KB_2320](https://github.com/jphacks/KB_2320) | - | READMEが雛形のままで内容なし | その他 | ? | - | 判定不能 |  |
-| [NG_2301](https://github.com/jphacks/NG_2301) | 気圧変化確認ツール | 地点を登録して気圧の予測グラフを見る | 外部API,記録 | △ | EXT_API | 気象予報APIを足す |  |
+| [NG_2301](https://github.com/jphacks/NG_2301) | 気圧変化確認ツール | 地点を登録して気圧の予測グラフを見る | 外部API,記録 | ◎ | - | (2026-11-08 見直し)feed pressure で府県の 48 時間の気圧の予報(6 時間ごとの最低 / 最高・急な低下の印・小さな折れ線)を出せる。地点は府県の代表地点で、任意の地点は選べない |  |
 | [NG_2302](https://github.com/jphacks/NG_2302) | DJふっきん(公式の一覧: DJ腹筋) | 車内の全員が曲をリクエストして順に流す | 音声,共有 | ○ | STT,BG_SENSE | 音声リクエストと音量の自動調整が欠ける | 決勝 |
 | [NG_2303](https://github.com/jphacks/NG_2303) | Adversarial Armor | AIが誤認識する画像を当てるクイズ | AI,ゲーム | × | CUSTOM_ML,IMAGE_AI | AI判定が本体。代案は固定問題の画像クイズ |  |
 | [NG_2304](https://github.com/jphacks/NG_2304) | - | README が雛形のまま | その他 | ? | - | 判定不能 |  |
@@ -596,7 +597,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [fk_2510](https://github.com/jphacks/fk_2510) | - | README が雛形のまま | その他 | ? | - | 内容が読めず判定不可 |  |
 | [hs_2501](https://github.com/jphacks/hs_2501) | AIbum | 写真と絵文字から日記文を生成し継続日数を見せるアプリ | AI,カメラ,記録 | ○ | - | 長い文体付き生成が欠ける。短文生成なら可 |  |
 | [hs_2502](https://github.com/jphacks/hs_2502) | LangBridge | 英文を利用者の語彙レベルに合わせ日英混在で表示する | AI,Web専用 | △ | CLOUD_AI,SERVER_LOGIC | 語彙レベル判定と混在翻訳の処理を足す |  |
-| [hs_2503](https://github.com/jphacks/hs_2503) | hinavi | 災害情報と避難所までの道案内、現地情報の投稿ができる防災アプリ | 地図,共有,外部API | ○ | EXT_API | 気象庁の災害情報が欠ける。避難所データと道案内は可 | 企業賞 |
+| [hs_2503](https://github.com/jphacks/hs_2503) | hinavi | 災害情報と避難所までの道案内、現地情報の投稿ができる防災アプリ | 地図,共有,外部API | ◎ | - | (2026-11-08 見直し)気象庁の警報・注意報は feed warnings、避難所データと道案内・投稿は既存の部品で可 | 企業賞 |
 | [hs_2504](https://github.com/jphacks/hs_2504) | PoseTrack | Webカメラで座り姿勢を常時監視し悪いと知らせる | カメラ,AI | △ | CAMERA_LIVE | 連続した姿勢推定を足す。1枚撮影の角度判定は可 |  |
 | [hs_2505](https://github.com/jphacks/hs_2505) | - | README が雛形のまま | その他 | ? | - | 内容が読めず判定不可 |  |
 | [hs_2506](https://github.com/jphacks/hs_2506) | TaskEcho ver2.0 | 授業を文字起こしし、キーワード周辺を要約してカレンダーやNotionに登録する | 音声,AI,外部API | × | STT,EXT_API,CLOUD_AI | 常時文字起こしと外部連携が難しい。代案は期限の手動入力と通知 |  |

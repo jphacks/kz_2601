@@ -18,11 +18,26 @@ final class FeedLeafTests: XCTestCase {
         XCTAssertEqual(FeedLeaf.dateText("2026-11-05T18:30:00+09:00", provider: "rss"), "11/5 18:30")
         XCTAssertNil(FeedLeaf.dateText("きのう", provider: "rss"))
         XCTAssertNil(FeedLeaf.dateText(nil, provider: "weather"))
+        XCTAssertEqual(FeedLeaf.dateText("2026-11-07T15:31:00+09:00", provider: "warnings"), "11/7 15:31")
+        XCTAssertEqual(FeedLeaf.dateText("2026-11-09T06:00:00+09:00", provider: "pressure"), "11/9(月)")
+    }
+
+    func testPressureRangeAndSparkline() {
+        XCTAssertEqual(FeedLeaf.pressureRange(FeedItem(title: "0時〜6時", max: 1013.4, min: 1006.2)), "1006〜1013 hPa")
+        XCTAssertEqual(FeedLeaf.pressureRange(FeedItem(title: "0時〜6時", max: 1013.2, min: 1012.8)), "1013 hPa")
+        XCTAssertNil(FeedLeaf.pressureRange(FeedItem(title: "0時〜6時")))
+        let pts = PressureSparkline.points([1010, 1005, 1000], in: CGSize(width: 40, height: 10))
+        XCTAssertEqual(pts, [CGPoint(x: 0, y: 0), CGPoint(x: 20, y: 5), CGPoint(x: 40, y: 10)])
+        XCTAssertEqual(PressureSparkline.points([1000, 1000], in: CGSize(width: 10, height: 10)).map(\.y), [5, 5])
+        XCTAssertTrue(PressureSparkline.points([1000], in: CGSize(width: 10, height: 10)).isEmpty)
     }
 
     func testIconAndAttribution() {
         XCTAssertEqual(FeedLeaf.icon("weather"), "cloud.sun")
         XCTAssertEqual(FeedLeaf.icon("rss"), "newspaper")
+        XCTAssertEqual(FeedLeaf.icon("warnings"), "exclamationmark.triangle")
+        let w = FeedResult(provider: "warnings", title: "石川県の警報・注意報", items: [], source: FeedSource(name: "気象庁ホームページ", url: "https://www.jma.go.jp/bosai/warning/", license: "公共データ利用規約(第1.0版)"))
+        XCTAssertTrue(FeedLeaf.attribution(w).contains("気象庁"))
         let r = FeedResult(provider: "holidays", title: "国民の祝日", items: [], source: FeedSource(name: "内閣府ホームページ", url: "https://www8.cao.go.jp/", license: "公共データ利用規約(第1.0版)"))
         XCTAssertTrue(FeedLeaf.attribution(r).contains("内閣府ホームページ"))
     }

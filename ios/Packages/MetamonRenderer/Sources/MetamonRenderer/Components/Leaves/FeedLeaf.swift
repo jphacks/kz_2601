@@ -3,8 +3,9 @@
 import SwiftUI
 import MetamonDSL
 
-/// `feed`(#348): 天気予報・祝日・許可したお知らせを読むだけの一覧。データはホスト(`FeedHost`)が appconfig から取る。
-/// 行: 日付・見出し・(天気)アイコン / 最高・最低 / 降水確率、(お知らせ)タップで記事を Safari で開く。下に出典を必ず出す。
+/// `feed`(#348): 天気予報・警報・気圧の予報・祝日・許可したお知らせを読むだけの一覧。データはホスト(`FeedHost`)が appconfig から取る。
+/// 行: 日付・見出し・(天気)アイコン / 最高・最低 / 降水確率、(気圧)最低〜最高 hPa・小さな折れ線・低下の印、
+/// (お知らせ)タップで記事を Safari で開く。下に出典を必ず出す。
 struct FeedLeaf: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.openURL) private var openURL
@@ -75,7 +76,19 @@ struct FeedLeaf: View {
                 }
             }
             Spacer(minLength: 0)
-            if let temps = Self.temps(item) {
+            if provider == "pressure" {
+                if let series = item.series, series.count > 1 {
+                    PressureSparkline(values: series).frame(width: 44, height: 18).accessibilityHidden(true)
+                }
+                if let range = Self.pressureRange(item) {
+                    Text(range).font(.caption.monospacedDigit())
+                }
+                if item.drop == true {
+                    Label(L("低下"), systemImage: "arrow.down.circle.fill")
+                        .font(.caption.bold()).foregroundStyle(.orange)
+                        .accessibilityLabel(Text(L("気圧が大きく下がります")))
+                }
+            } else if let temps = Self.temps(item) {
                 Text(temps).font(RenderTheme.Fonts.rowTrailing)
             }
             if let pop = item.pop {
@@ -114,6 +127,8 @@ struct FeedLeaf: View {
         switch provider {
         case "weather": "cloud.sun"
         case "holidays": "calendar"
+        case "warnings": "exclamationmark.triangle"
+        case "pressure": "gauge.with.dots.needle.33percent"
         default: "newspaper"
         }
     }
@@ -129,7 +144,17 @@ struct FeedLeaf: View {
         }
     }
 
-    /// weather / holidays は「11/7(土)」、rss は「11/5 18:30」。
+    /// 気圧の「1006〜1013 hPa」(片方だけなら「1013 hPa」)。
+    static func pressureRange(_ item: FeedItem) -> String? {
+        let f = { (v: Double) in "\(Int(v.rounded()))" }
+        switch (item.min, item.max) {
+        case let (min?, max?): return f(min) == f(max) ? "\(f(max)) hPa" : "\(f(min))〜\(f(max)) hPa"
+        case let (v?, nil), let (nil, v?): return "\(f(v)) hPa"
+        default: return nil
+        }
+    }
+
+    /// weather / holidays / pressure は「11/7(土)」、rss / warnings は「11/5 18:30」。
     static func dateText(_ raw: String?, provider: String) -> String? {
         guard let raw, !raw.isEmpty else { return nil }
         let jst = TimeZone(identifier: "Asia/Tokyo") ?? .current
@@ -139,7 +164,7 @@ struct FeedLeaf: View {
         out.calendar = cal
         out.timeZone = jst
         out.locale = Locale(identifier: "ja_JP")
-        if provider == "rss" {
+        if provider == "rss" || provider == "warnings" {
             guard let d = ISO8601DateFormatter().date(from: raw) else { return nil }
             out.dateFormat = "M/d H:mm"
             return out.string(from: d)
@@ -156,6 +181,32 @@ struct FeedLeaf: View {
 
     static func attribution(_ r: FeedResult) -> String {
         L("出典: \(r.source.name)(\(r.source.license))")
+    }
+}
+
+/// 気圧の行の小さな折れ線(行の中の最低〜最高を高さいっぱいに)。
+struct PressureSparkline: View {
+    let values: [Double]
+
+    var body: some View {
+        GeometryReader { geo in
+            Path { path in
+                for (i, p) in Self.points(values, in: geo.size).enumerated() {
+                    if i == 0 { path.move(to: p) } else { path.addLine(to: p) }
+                }
+            }
+            .stroke(.secondary, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+        }
+    }
+
+    /// 値を枠の中の点に(変化が無ければ真ん中の横線)。
+    static func points(_ values: [Double], in size: CGSize) -> [CGPoint] {
+        guard values.count > 1, let lo = values.min(), let hi = values.max() else { return [] }
+        let step = size.width / CGFloat(values.count - 1)
+        return values.enumerated().map { i, v in
+            let y = hi > lo ? (1 - CGFloat((v - lo) / (hi - lo))) * size.height : size.height / 2
+            return CGPoint(x: CGFloat(i) * step, y: y)
+        }
     }
 }
 #endif
