@@ -83,6 +83,7 @@ extension AppRuntime {
             let app = try await membership.importShare(token: join.token, displayName: displayName)
             SharingUI.shared.pendingJoin = nil
             await adopt(app, banner: L10n.tr("「\(app.name)」に参加しました"))
+            if document.appId == app.appId { await setNotifyConsent(true, appId: app.appId) } // 参加の画面の確認つきで有効(#339)
             return nil
         } catch {
             return Self.importFailureMessage(error)

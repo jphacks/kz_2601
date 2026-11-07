@@ -168,11 +168,11 @@ func TestResolveTable(t *testing.T) {
 func TestKindAllowedMatchesDSL(t *testing.T) {
 	want := map[dsl.EntityScope][]string{
 		dsl.ScopePrivate: {dsl.RecipientOwner},
-		dsl.ScopeShared:  {dsl.RecipientOwner, dsl.RecipientAuthor, dsl.RecipientAuthorOf, dsl.RecipientMembers},
+		dsl.ScopeShared:  {dsl.RecipientOwner, dsl.RecipientAuthor, dsl.RecipientAuthorOf, dsl.RecipientMembers, dsl.RecipientRecipients},
 		dsl.ScopePublic:  {dsl.RecipientOwner, dsl.RecipientAuthorOf},
 	}
 	for scope, kinds := range want {
-		for _, k := range []string{dsl.RecipientOwner, dsl.RecipientAuthor, dsl.RecipientAuthorOf, dsl.RecipientMembers, "everyone"} {
+		for _, k := range []string{dsl.RecipientOwner, dsl.RecipientAuthor, dsl.RecipientAuthorOf, dsl.RecipientMembers, dsl.RecipientRecipients, "everyone"} {
 			if got := KindAllowed(scope, k); got != slices.Contains(kinds, k) {
 				t.Errorf("KindAllowed(%s, %s) = %v", scope, k, got)
 			}

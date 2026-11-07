@@ -125,7 +125,7 @@ runner(`backend/cmd/runner`・#341)は、appconfig が outbox(`runner/{APP_ENV}/
      --project "$PROJECT_ID" --freshness=15m --limit=10 --format=json
    ```
 
-   `outcome` が `ok` なら動いている。`skipped_plan` は作成者が Pro でない(`PRO_GATE_MODE`・[pro.md](../backend/features/pro.md))、`skipped_paused` / `skipped_stopped` は止めている、`skipped_quota` / `skipped_global` は上限([runtime-config.md](runtime-config.md#運用で変える値)の `RUNNER_LIMIT_*`)。使った量は `jsonPayload.event="runner.usage"`。アプリの中の「実行の履歴」(`rule_status`)にも出る。
+   `outcome` が `ok` なら動いている。`skipped_plan` は作成者が Pro でない(`PRO_GATE_MODE`・[pro.md](../backend/features/pro.md))、`skipped_paused` / `skipped_stopped` は止めている、`skipped_quota` / `skipped_global` は上限([runtime-config.md](runtime-config.md#運用で変える値)の `RUNNER_LIMIT_*`)。使った量は `jsonPayload.event="runner.usage"`(集計は `scripts/runner-usage.sh prod`・[runner-usage.md](runner-usage.md))。アプリの中の「実行の履歴」(`rule_status`)にも出る。
 
 通知は今の版では APNs の鍵を持たず、宛先を数えてログに形だけを出します(端末には届かない)。
 
@@ -135,7 +135,8 @@ runner(`backend/cmd/runner`・#341)は、appconfig が outbox(`runner/{APP_ENV}/
 
 | 何を止める | やり方 | 止めている間 |
 |---|---|---|
-| 1 つのアプリ / ルール / 通知 | `go run ./cmd/moderate stop-app <appId> -env prod -reason "…" -allow-prod-db -yes`(`stop-rule`・`pause-notify` も。解除は `resume-*`)。backend で実行 | そのアプリだけ `skipped_stopped` |
+| 1 つのアプリ / ルール / 通知 | `go run ./cmd/moderate stop-app <appId> -env prod -reason "…" -allow-prod-db -yes`(`stop-rule`・`pause-notify` も。解除は `resume-*`)。backend で実行 | そのアプリだけ `skipped_stopped`(定期のルールも)。`-for 24h` で期限つき、`-force` でルールのきっかけになる書き込みも 403 `app_stopped` |
+| 全体(リビジョン無し) | `go run ./cmd/moderate stop-all -env prod -reason "…" -allow-prod-db -yes`(`-force` も可。解除は `resume-all`)。操作の記録は `stop-log` | 全アプリが `skipped_stopped`(`stop_level=global`) |
 | 全体の通知だけ | `gcloud run services update runner-prod --region "$REGION" --project "$PROJECT_ID" --update-env-vars RUNNER_NOTIFY_PAUSED=1` | ルールは動く。通知は後から送らない |
 | 全体 | 同じく `--update-env-vars RUNNER_PAUSED=1` | 取り出したきっかけは `skipped_paused`。再開しても後からまとめて実行しない |
 | tick そのもの | `gcloud scheduler jobs pause runner-tick --location "$REGION" --project "$PROJECT_ID"`(戻すは `resume`)。続けるなら `runner_tick_paused = true` も tfvars に入れる(次の apply で戻らないように) | きっかけは outbox に残る。再開すると古い順に処理する(定期のルールは `RUNNER_SCHEDULE_MAX_LATE` より遅れた分を捨てる) |

@@ -12,6 +12,12 @@ public final class FormDraft {
     /// 編集中レコードの投稿者 uid(public/shared entity のみ)。新規・private は nil。
     public private(set) var author: String?
     public var values: [String: JSONValue] = [:]
+    /// 保存で空のまま弾かれた必須の field id(M10)。
+    public internal(set) var flaggedFields: Set<String> = []
+    /// 保存で弾かれた回数。同じ欄でも押すたびにスクロールし直す。
+    public internal(set) var flagCount = 0
+    /// VoiceOver のフォーカスを移す field(M10)。
+    var attentionField: String?
     /// 他人の共有レコードを開いた(#249)。保存バーを理由の表示に替え、保存ボタンを隠す。
     public var isReadOnly = false
     /// 削除ボタンを出してよいか(共有レコードは作った人だけ)。
@@ -41,6 +47,7 @@ public final class FormDraft {
     public func reset() {
         recordId = nil
         author = nil
+        flaggedFields = []
         values = [:]
         for f in entity.storedFields {
             values[f.id] = FieldCoding.defaultValue(for: f)
@@ -51,6 +58,7 @@ public final class FormDraft {
     public func load(_ record: Record) {
         recordId = record.id
         author = record.author
+        flaggedFields = []
         for f in entity.storedFields {
             values[f.id] = record.data[f.id] ?? FieldCoding.defaultValue(for: f)
         }
@@ -83,7 +91,7 @@ public final class FormDraft {
 
     /// required 未入力のフィールド名。
     public var missingRequired: [String] {
-        entity.storedFields.filter { ($0.required ?? false) && FieldCoding.normalize(values[$0.id] ?? .null, for: $0) == nil }.map(\.name)
+        missingRequiredFields.map(\.name)
     }
 }
 

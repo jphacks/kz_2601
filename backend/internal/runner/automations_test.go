@@ -26,7 +26,7 @@ func TestEveryOutcomeHasACreatorWord(t *testing.T) {
 		runner.ReasonOperatorStop: status.ResultStopped, runner.ReasonAppHidden: status.ResultStopped,
 		runner.ReasonRuleRemoved: status.ResultChanged, runner.ReasonVersionMissing: status.ResultChanged,
 		runner.ReasonAppDeleted: status.ResultUnavailable, runner.ReasonCreatorDeleted: status.ResultUnavailable,
-		runner.ReasonNotCreator: status.ResultUnavailable, runner.ReasonBadEvent: status.ResultUnavailable,
+		runner.ReasonNotCreator: status.ResultUnavailable, runner.ReasonBadEvent: status.ResultUnavailable, runner.ReasonAddressed: status.ResultUnavailable,
 	}
 	for reason, w := range want {
 		if got := status.Result(runner.OutcomeSkippedStopped, reason, false); got != w {

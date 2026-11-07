@@ -233,16 +233,15 @@ public final class RecordSyncEngine {
 
     /// 削除。ローカルでは即座に一覧から消え(行は delete 待ちで残る)、送信成功で行も消える。
     public func delete(appId: String, entity: String, recordId: String) async -> [Record] {
-        if let row = await store.row(appId: appId, entity: entity, recordId: recordId) {
+        if let row = await store.current(appId: appId, entity: entity, recordId: recordId) {
             store.videos.remove(VideoValue.localIDs(in: row.data)) // 端末内の動画ファイル(#206)
             store.audios.remove(AudioValue.localIDs(in: row.data)) // 端末内の録音(#420)
         }
         let result = await queue.enqueue(SyncOperation(appId: appId, entity: entity, recordId: recordId, kind: .delete))
         if result == .cancelledCreate {
             await store.remove(appId: appId, entity: entity, recordId: recordId) // まだサーバーに無い行はその場で消す
-        } else if var row = await store.row(appId: appId, entity: entity, recordId: recordId) {
-            row.pendingOp = .delete
-            await store.upsert(row)
+        } else {
+            await store.markDeleting(appId: appId, entity: entity, recordId: recordId)
         }
         kick()
         return await shown(appId: appId, entity: entity)

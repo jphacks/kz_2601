@@ -4,7 +4,8 @@
 // against the handle's appId, and records can be read only when they are the
 // trigger record or a record its ref fields point to, or listed by List (all
 // records of one entity on the handle's side: on.each / agg, #340 reads) and
-// the records their ref fields point to.
+// the records their ref fields point to. A record only its readers see
+// (#271 addressed records) is never given to a rule's expressions.
 //
 // It implements engine.RefReader and notify.Directory / notify.Accounts /
 // notify.Consent, and reads device tokens (#269).
@@ -226,20 +227,49 @@ func (h *Handle) CreatedAt(ctx context.Context) (time.Time, error) {
 
 // ---- engine.RefReader ---------------------------------------------------------
 
-// Record implements engine.RefReader.
+// Record implements engine.RefReader: the values a rule's expressions read.
+// A record only its readers see reads as not found.
 func (h *Handle) Record(ctx context.Context, entity, id string) (expreval.Record, bool, error) {
-	rs, err := h.readableSet(ctx, entity, id)
-	if err != nil {
-		return expreval.Record{}, false, err
-	}
-	r, err := h.b.GetRecord(ctx, rs, id)
-	if errors.Is(err, store.ErrNotFound) {
-		return expreval.Record{}, false, nil
-	}
-	if err != nil {
+	r, err := h.stored(ctx, entity, id)
+	if r == nil || err != nil || h.restricted(entity, r) {
 		return expreval.Record{}, false, err
 	}
 	return ToExpr(r), true, nil
+}
+
+// stored reads a readable record (nil = it does not exist).
+func (h *Handle) stored(ctx context.Context, entity, id string) (*store.Record, error) {
+	rs, err := h.readableSet(ctx, entity, id)
+	if err != nil {
+		return nil, err
+	}
+	r, err := h.b.GetRecord(ctx, rs, id)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, nil
+	}
+	return r, err
+}
+
+// restricted reports whether only r's readers see it: stored readers decide
+// whatever the DSL says now, an addressed entity covers older records.
+func (h *Handle) restricted(entity string, r *store.Record) bool {
+	return len(r.Readers) > 0 || h.addressed(entity)
+}
+
+func (h *Handle) addressed(entity string) bool {
+	e := h.app.EntityByID(entity)
+	return e != nil && e.IsAddressed()
+}
+
+// TriggerInfo is the display name on the trigger record ("" when it is gone)
+// and whether only its readers see it: not the record's values, which the
+// event carries.
+func (h *Handle) TriggerInfo(ctx context.Context, entity, id string) (authorName string, restricted bool, err error) {
+	r, err := h.stored(ctx, entity, id)
+	if r == nil || err != nil {
+		return "", false, err
+	}
+	return r.AuthorName, h.restricted(entity, r), nil
 }
 
 // ErrTooMany: List found more records than its limit.
@@ -248,7 +278,9 @@ var ErrTooMany = errors.New("scope: more records than the limit")
 // List returns the records of entity on the handle's side (the user's own
 // for private data) for on.each / agg (#340 reads), newest first. More than
 // limit records (limit > 0) is ErrTooMany. Listed records and the records
-// their ref fields point to become readable by Record.
+// their ref fields point to become readable by Record. An addressed entity
+// is ErrNotReadable; records only their readers see are left out (they
+// outlive addressedTo).
 func (h *Handle) List(ctx context.Context, entity string, limit int) ([]expreval.Record, error) {
 	if h.readable == nil {
 		return nil, ErrNotBound
@@ -256,6 +288,9 @@ func (h *Handle) List(ctx context.Context, entity string, limit int) ([]expreval
 	rs, err := h.recordSet(ctx, entity)
 	if err != nil {
 		return nil, err
+	}
+	if h.addressed(entity) {
+		return nil, ErrNotReadable
 	}
 	n := 0
 	if limit > 0 {
@@ -272,6 +307,9 @@ func (h *Handle) List(ctx context.Context, entity string, limit int) ([]expreval
 	out := make([]expreval.Record, 0, len(recs))
 	for i := range recs {
 		r := &recs[i]
+		if len(r.Readers) > 0 {
+			continue
+		}
 		h.readable[entity+"\x00"+r.ID] = true
 		for _, f := range ent.Fields {
 			if f.Type != dsl.FieldRef {
@@ -335,9 +373,9 @@ func (h *Handle) Members(ctx context.Context) ([]string, error) {
 
 // RecordAuthor implements notify.Directory (readable records only).
 func (h *Handle) RecordAuthor(ctx context.Context, entity, id string) (string, bool, error) {
-	r, found, err := h.Record(ctx, entity, id)
-	if err != nil || !found {
-		return "", found, err
+	r, err := h.stored(ctx, entity, id)
+	if r == nil || err != nil {
+		return "", false, err
 	}
 	return r.Author, true, nil
 }

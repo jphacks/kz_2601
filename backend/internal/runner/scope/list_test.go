@@ -51,3 +51,48 @@ func TestHandleList(t *testing.T) {
 		t.Fatalf("private handle listing shared: %v", err)
 	}
 }
+
+// #271: a record only its readers see is not given to a rule's expressions,
+// whether the entity is addressed or the record keeps its stored readers;
+// who wrote it stays known (authorOf).
+func TestHandleRestrictedRecords(t *testing.T) {
+	ctx := context.Background()
+	st := store.NewMemory()
+	rs := store.PublicRecords("X", "msgs")
+	for id, readers := range map[string][]string{"open": nil, "dm": {"u1", "u2"}} {
+		if _, _, err := st.CreateRecord(ctx, rs, store.Record{ID: id, Data: map[string]any{"body": "x"}, Author: "u1", AuthorName: "Ann", Readers: readers}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bind := func(addressedTo string) *Handle {
+		h, err := New(st, "test", store.OutboxEvent{AppID: "X", Scope: "shared", Kind: store.OutboxSchedule}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		h.Bind(&dsl.App{Entities: []dsl.Entity{{ID: "msgs", Scope: dsl.ScopeShared, AddressedTo: addressedTo}}}, "msgs", "dm", nil)
+		return h
+	}
+	h := bind("to")
+	if _, err := h.List(ctx, "msgs", 10); !errors.Is(err, ErrNotReadable) {
+		t.Fatalf("list of an addressed entity: %v", err)
+	}
+	if _, found, err := h.Record(ctx, "msgs", "dm"); err != nil || found {
+		t.Fatalf("addressed record: %v %v", found, err)
+	}
+	if a, found, err := h.RecordAuthor(ctx, "msgs", "dm"); err != nil || !found || a != "u1" {
+		t.Fatalf("author: %q %v %v", a, found, err)
+	}
+	if name, restricted, err := h.TriggerInfo(ctx, "msgs", "dm"); err != nil || name != "Ann" || !restricted {
+		t.Fatalf("trigger: %q %v %v", name, restricted, err)
+	}
+
+	// addressedTo removed later: the stored readers still decide
+	h = bind("")
+	recs, err := h.List(ctx, "msgs", 10)
+	if err != nil || len(recs) != 1 || recs[0].ID != "open" {
+		t.Fatalf("list: %+v %v", recs, err)
+	}
+	if _, found, err := h.Record(ctx, "msgs", "dm"); err != nil || found {
+		t.Fatalf("stored readers: %v %v", found, err)
+	}
+}

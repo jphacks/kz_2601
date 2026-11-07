@@ -103,6 +103,23 @@
         }
       }
     },
+    "%@ を入力してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please fill in %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ を入力してください"
+          }
+        }
+      }
+    },
     "%@ 前後の映像を保存しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2925,6 +2942,23 @@
         }
       }
     },
+    "入力してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Required"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力してください"
+          }
+        }
+      }
+    },
     "全員" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3482,6 +3516,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "匿名"
+          }
+        }
+      }
+    },
+    "参加している人を読み込めていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The member list isn't loaded yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加している人を読み込めていません"
+          }
+        }
+      }
+    },
+    "参加者" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Member"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加者"
           }
         }
       }

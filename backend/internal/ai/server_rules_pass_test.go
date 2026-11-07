@@ -266,13 +266,13 @@ func TestServerRulesPass_EditAppendsPatchOp(t *testing.T) {
 		t.Fatalf("summary: %q", res.Summary)
 	}
 
-	// removing the rule again: remove op, "止めました"
+	// removing the rule again: remove op, "消しました"
 	f.replies = []string{patch, `{"unchanged":false,"declined":"","serverRules":[]}`}
 	res, err = svc.Generate(context.Background(), Request{AppID: "edit1", Transcript: "名前を部の出欠にして、その通知はやめて"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if last := res.Patch[len(res.Patch)-1]; last.Op != "remove" || last.Path != "/serverRules" || !strings.Contains(res.Summary, "1 件止めました") {
+	if last := res.Patch[len(res.Patch)-1]; last.Op != "remove" || last.Path != "/serverRules" || !strings.Contains(res.Summary, "1 件消しました") {
 		t.Fatalf("patch=%+v summary=%q", res.Patch, res.Summary)
 	}
 }

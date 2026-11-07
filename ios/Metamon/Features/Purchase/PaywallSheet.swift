@@ -2,6 +2,7 @@
 #if !APP_STORE_REVIEW
 import SwiftUI
 import StoreKit
+import MetamonRenderer
 import MetamonServices
 
 /// 「Tailor It Pro」の課金画面(#77 / #414)。何ができるようになるか・価格・購入・復元・サブスクの管理(#326)・規約とプライバシー(3.1.2)。
@@ -51,10 +52,7 @@ struct PaywallSheet: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("閉じる") { dismiss() }
-                        .accessibilityIdentifier("paywall.close")
-                }
+                SheetCloseToolbarItem(identifier: "paywall.close") { dismiss() }
             }
         }
         .presentationDetents([.large])

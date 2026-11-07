@@ -41,13 +41,13 @@ func TestStoreStops(t *testing.T) {
 		}
 
 		at := now.Add(time.Minute)
-		if ok, err := st.LiftStop(ctx, env, op.ID, at); !ok || err != nil {
+		if ok, err := st.LiftStop(ctx, env, op.ID, at, "op"); !ok || err != nil {
 			t.Fatalf("lift: %v %v", ok, err)
 		}
-		if ok, err := st.LiftStop(ctx, env, op.ID, at); ok || err != nil {
+		if ok, err := st.LiftStop(ctx, env, op.ID, at, "op"); ok || err != nil {
 			t.Fatalf("lift twice: %v %v", ok, err)
 		}
-		if ok, err := st.LiftStop(ctx, env, rule, at); ok || err != nil {
+		if ok, err := st.LiftStop(ctx, env, rule, at, "op"); ok || err != nil {
 			t.Fatalf("lift missing: %v %v", ok, err)
 		}
 		all, err := st.ListStops(ctx, env)

@@ -33,8 +33,13 @@ struct ButtonLeaf: View {
         }
     }
 
+    /// visibleTo "admins"(#272): 管理者でないと分かっている時だけ隠す(分からない間は出し、サーバーが判定する)。
+    static func isVisible(visibleTo: String?, isAdmin: Bool?) -> Bool {
+        visibleTo != "admins" || isAdmin != false
+    }
+
     var body: some View {
-        if Self.isVisible(action: c.action, form: ctx.form) {
+        if Self.isVisible(action: c.action, form: ctx.form), Self.isVisible(visibleTo: c.visibleTo, isAdmin: rt.viewerIsAdmin) {
             styled
         }
     }

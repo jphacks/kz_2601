@@ -5,6 +5,7 @@ import Foundation
 /// members API(docs/backend/openapi-appconfig.yaml `members` タグ・#254)。
 extension HTTPSharingClient: MembershipClient {
     private struct ImportBody: Encodable { var displayName: String }
+    private struct AdminBody: Encodable { var admin: Bool }
     private struct DSLScopes: Decodable {
         struct Body: Decodable { var entities: [Entity]? }
         struct Entity: Decodable { var scope: String? }
@@ -37,6 +38,11 @@ extension HTTPSharingClient: MembershipClient {
 
     public func leave(appId: String) async throws {
         _ = try await send("DELETE", "v1/apps/\(appId)/members/me")
+    }
+
+    public func setAdmin(appId: String, uid: String, admin: Bool) async throws {
+        let escaped = uid.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-_."))) ?? uid
+        _ = try await send("PATCH", "v1/apps/\(appId)/members/\(escaped)", body: AdminBody(admin: admin))
     }
 
     private func send(_ method: String, _ path: String, body: (any Encodable)? = nil) async throws -> Data {
