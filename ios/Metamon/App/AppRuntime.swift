@@ -670,7 +670,10 @@ final class AppRuntime: DSLRuntime {
             interruptedByOffline = false
             print("[Metamon] morph failed: \(failure) (\(error))")
             withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
-            if case .rateLimited = failure { keepChatAfterStop = true } // H3・M3: 上限でも会話は消さない(カードから次の一手)
+            switch failure { // H3・M3: 上限・無料プランの停止でも会話は消さない(カードから次の一手)
+            case .rateLimited, .planLimit, .freePlanPaused: keepChatAfterStop = true
+            default: break
+            }
             await present(failure, transcript: text)
         }
     }
@@ -753,10 +756,13 @@ final class AppRuntime: DSLRuntime {
     /// 上限のカードの「Pro にする」(M3)。買えば(サーバーが Pro を知ってから)同じ依頼で続ける。閉じたらカードのまま。
     private func upgradeFromRateLimit(_ card: ErrorPresentation) async {
         // 音声シートの中のカード(edit の対話)はシートの中から出す(根の課金画面はシートに隠れる)
-        guard await proGate.requestPro(.limitReached, placement: showVoiceSheet ? .chat : .root) else { return }
+        var reason = PaywallReason.limitReached
+        if case .planLimit = card.kind { reason = .settings } // #317: 今日の上限ではなくプランの上限
+        guard await proGate.requestPro(reason, placement: showVoiceSheet ? .chat : .root) else { return }
         await proGate.store.serverSyncTask?.value
         guard errorCard == card else { return } // 待っている間に閉じた・話し直した
         withAnimation(.easeInOut(duration: 0.3)) { errorCard = nil }
+        if card.transcript.isEmpty { return } // 記録の保存で当たった上限(#317)は再送する発話が無い
         if card.origin == .chat {
             retryChat()
         } else if isChatting, dsl.isVoiceOnly {
@@ -1150,6 +1156,22 @@ final class AppRuntime: DSLRuntime {
                 presentProRequiredWrite(pro) // #316: 書いた分は戻した。作成者なら課金画面、参加者なら案内
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            case .planLimit(let appId, let entity, let limit):
+                guard appId == document.appId else { return }
+                // #317: 書いた分は戻した。課金画面は自動で開かない(作成者はカードの「Pro にする」から・参加者には出さない)
+                withAnimation(.easeInOut(duration: 0.3)) { errorCard = ErrorPresentation(kind: .planLimit(limit), transcript: "") }
+                records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            case .appStopped(let appId, let entity):
+                guard appId == document.appId else { return }
+                toast = ErrorCopy.appStoppedBody // #346
+                records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            case .textNotAllowed(let appId, let entity, let field):
+                guard appId == document.appId else { return }
+                toast = textNotAllowedToast(entity: entity, field: field) // #321
+                records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records)
             }
         }
     }
@@ -1330,11 +1352,23 @@ final class AppRuntime: DSLRuntime {
         return L10n.tr("保存できませんでした。「\(name)」の入力を確認してください")
     }
 
+    /// 422 `text_not_allowed`(#321)。項目が分かれば名前で出す(英語の field id は見せない)。投稿者名は「表示名」
+    func textNotAllowedToast(entity: String?, field: String?) -> String {
+        guard let field else { return ErrorCopy.textNotAllowed }
+        if field == "authorName" { return ErrorCopy.textNotAllowed(fieldName: L10n.tr("表示名")) }
+        guard let name = entity.flatMap({ dsl.entity($0)?.field(field)?.name }) else { return ErrorCopy.textNotAllowed }
+        return ErrorCopy.textNotAllowed(fieldName: name)
+    }
+
     /// 利用者に出す 1 文(H9)。OS のエラー文・サーバーの文は出さず、ログにだけ残す。
     func message(for error: Error, entity: String?) -> String {
         guard let api = error as? APIError else { return ErrorCopy.failure(L10n.tr("うまくいきませんでした"), error, context: "action") }
         if let denial = SharedAccessDenial(api) { return denial.message } // #254
         if let pro = ProRequired(api) { return pro.writeMessage } // #316(印を付けるなど)
+        if let limit = PlanLimit(api) { return ErrorCopy.planLimitBody(limit) } // #317
+        if api.isAppStopped { return ErrorCopy.appStoppedBody } // #346
+        if api.isFreePlanPaused { return ErrorCopy.freePlanPausedBody(resumeAt: api.resumeAt) } // #317
+        if api.isTextNotAllowed { return textNotAllowedToast(entity: entity, field: api.field) } // #321
         if api.code == "invalid_record" || (api.status == 400 && api.field != nil), let fieldId = api.field {
             let name = entity.flatMap { dsl.entity($0)?.field(fieldId)?.name } ?? fieldId
             ErrorLog.record(error, context: "action \(entity ?? "-").\(fieldId)")

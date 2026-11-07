@@ -89,9 +89,13 @@ extension AppRuntime {
         }
     }
 
+    /// 参加の表示名に表示できない言葉があった(#321)。参加の確認画面はこの文の時に表示名の欄を目立たせる
+    static var displayNameRejected: String { ErrorCopy.textNotAllowed(fieldName: L10n.tr("表示名")) }
+
     /// import の失敗。403 の参加の理由(#254)・取り消し済み(404)・その他。
     static func importFailureMessage(_ error: Error) -> String {
         if let denial = SharedAccessDenial(error) { return denial.message }
+        if (error as? APIError)?.isTextNotAllowed == true { return displayNameRejected } // #321: import で見るのは表示名だけ
         return (error as? APIError)?.status == 404
             ? L10n.tr("このシェアリンクは取り消されたか、存在しません")
             : ErrorCopy.failure(L10n.tr("シェアされたアプリを開けませんでした"), error, context: "share import")
