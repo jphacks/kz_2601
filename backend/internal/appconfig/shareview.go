@@ -96,6 +96,8 @@ type webNode struct {
 
 var hexColorRe = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 
+var textPlaceholderRe = regexp.MustCompile(`\{\{[^{}]*\}\}`)
+
 type webRenderer struct {
 	app      *dsl.App
 	peek     RecordPeek
@@ -252,6 +254,9 @@ func (r *webRenderer) node(s *dsl.Screen, c *dsl.Component, depth int) (webNode,
 		n = r.container(s, c, depth)
 	case dsl.CompText, dsl.CompLabel, dsl.CompMarkdown:
 		n.Kind, n.Text, n.Style = "text", clip(c.Text, maxWebText), c.Style
+		if c.Type == dsl.CompText { // {{fieldId}} is a record value: not shown on the web (#253)
+			n.Text = textPlaceholderRe.ReplaceAllString(n.Text, "—")
+		}
 		if c.Style == "title" || c.Style == "headline" {
 			n.Kind = "heading"
 		}

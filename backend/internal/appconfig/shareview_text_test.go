@@ -1,0 +1,21 @@
+package appconfig
+
+import (
+	"strings"
+	"testing"
+)
+
+// text {{fieldId}} is a record value: the web page shows a dash, never the
+// placeholder (records are not shown, #253).
+func TestShareViewTextPlaceholder(t *testing.T) {
+	raw := []byte(`{"schemaVersion":1,"app":{"name":"x","voiceEntry":"floating"},"initialScreen":"form",
+"entities":[{"id":"memo","name":"m","fields":[{"id":"body","name":"b","type":"text"},{"id":"kw","name":"k","type":"string"}]}],
+"screens":[{"id":"form","title":"f","entity":"memo","components":[{"type":"text","text":"エラー: {{body}}","highlight":{"field":"kw"}}]}]}`)
+	got, err := renderSharePage(buildWebPage("", raw, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := string(got); strings.Contains(s, "{{body}}") || !strings.Contains(s, "エラー: —") {
+		t.Errorf("placeholder not replaced:\n%s", s)
+	}
+}

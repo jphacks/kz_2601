@@ -87,6 +87,7 @@ final class SchemaSwiftKeysTests: XCTestCase {
             ("PhotoAnalyze", "PhotoAnalyze(Records/PhotoReading.swift)", PhotoAnalyze(kind: .text, into: "f")),
             ("ImportColumn", "ImportColumn(Records/RecordImport.swift)", ImportColumn(column: "c", field: "f")),
             ("Notification", "NotificationSpec(Model/AppDocument.swift)", NotificationSpec(id: "n", title: "t")),
+            ("TextHighlight", "TextHighlight(Model/TextHighlight.swift)", TextHighlight()),
         ]
         for c in cases {
             assertSameSet(schema: try schema.objectKeys(c.def), swift: Self.storedPropertyNames(c.value),
