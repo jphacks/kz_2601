@@ -202,6 +202,37 @@
           "items": {
             "$ref": "#/$defs/Field"
           }
+        },
+        "unique": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "description": "同じ値の組み合わせのレコードを 1 件だけにする(一意制約・#273)。field id(string / integer / number / currency / boolean / date / datetime / enum / ref / member)か予約値 $author(1 人 1 件・shared / public だけ)を 1〜3 個。サーバーが保存の時にトランザクションで確かめ、同じ組み合わせが既にあれば保存を断る(409 duplicate_record・iOS は「同じ内容の記録がもうあります」)。値が空の項目があるレコードは比べない。single / match の entity には書かない。",
+          "x-usage": "「同じ時間に 2 人予約できないように」は予約の日時の field(例 [\"slot\"] や [\"date\",\"time\"])、「1 人 1 回答」「1 人 1 票」は [\"$author\"]、「1 つの予定に 1 人 1 回答」は [\"event\",\"$author\"](event は予定への ref)。重複を見つけて消すボタン・filter・computed は作らない。"
+        },
+        "deleteBy": {
+          "type": "string",
+          "enum": [
+            "author",
+            "admins",
+            "authorOrAdmins"
+          ],
+          "description": "public / shared のレコードを誰が削除できるか(#272・省略時 author)。admins = アプリの管理者だけ(作った人が最初の管理者・管理者は参加者を管理者にできる)。authorOrAdmins = 作った人か管理者。private の entity には書かない。",
+          "x-usage": "「削除は店長だけ」「管理者だけが消せる」は admins、「本人か管理者が消せる」(予約の取り消しは本人、荒らしの削除は管理者)は authorOrAdmins。指定が無ければ書かない。",
+          "x-enumDescriptions": {
+            "author": "作った人だけ(既定)。",
+            "admins": "アプリの管理者だけ。シフト表・お知らせ。",
+            "authorOrAdmins": "作った人か管理者。予約・掲示板の投稿。"
+          }
+        },
+        "addressedTo": {
+          "type": "string",
+          "description": "宛先付きの記録(1 対 1・グループ宛てのメッセージ・#271)。宛先の field id(type member = 1 人・members = 複数人)。この entity のレコードは、作った人と宛先の参加者だけが読める(一覧・取得・リアルタイム更新・印。それ以外の人には無いのと同じ)。宛先は送った後で変えられない。scope shared の entity だけ。edit members・single・match とは書けない。unique を書くなら \"$author\" を含める。",
+          "x-usage": "「1 対 1 のメッセージ」「DM」「個別に連絡」「先生にだけ送る」は宛先の field(type member・picker で選ぶ)、「グループに送る」「何人かを選んで送る」は type members。受信箱は filter {\"field\":\"$author\",\"op\":\"neq\",\"value\":{\"me\":true}}(読めるのは自分宛てだけ)、送信済みは op eq。未読は marks の read(icon eye)と list.item.mark、未読だけは filter {\"field\":\"$marks.read\",\"op\":\"neq\",\"value\":{\"me\":true}}。"
         }
       },
       "x-recordValues": {
@@ -242,9 +273,11 @@
             "audio",
             "location",
             "ref",
-            "refs"
+            "refs",
+            "member",
+            "members"
           ],
-          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL; a drawingField saves its drawing here as the same kind of picture. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). audio = voice recording kept on the recording device: \"audio:<id>|<seconds>\" (AAC m4a written by audioRecorder; other devices show only the length). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField. refs = array of record ids of `refEntity` (multi-select, e.g. expense.split_with -> members: who shares this expense); [] or missing = everyone; filter it with op contains, count it with op len."
+          "description": "photo = image as \"data:image/jpeg;base64,...\" (iOS downsizes to <=800px, q0.5) or an https URL; a drawingField saves its drawing here as the same kind of picture. video = movie kept on the recording device: \"video:<id>|data:image/jpeg;base64,<first-frame thumbnail>\" (iOS writes it; other devices show only the thumbnail). audio = voice recording kept on the recording device: \"audio:<id>|<seconds>\" (AAC m4a written by audioRecorder; other devices show only the length). location = \"lat,lng\" string (P1). ref = id (string) of a record of `refEntity` (e.g. expense.payer -> members); pick it with a picker, lists/tables show the referenced record's titleField. refs = array of record ids of `refEntity` (multi-select, e.g. expense.split_with -> members: who shares this expense); [] or missing = everyone; filter it with op contains, count it with op len. member = uid (string) of a participant of the shared data (the creator or someone who joined with the share link; scope \"shared\" only): pick it with a picker, which lists the participants by their display names (e.g. shift.staff = 担当者). The server refuses a uid that does not participate. members = array of participant uids (scope \"shared\" only, e.g. message.to = 宛先 of a group message): pick them with a picker (multi-select of the participants). Use it as entity.addressedTo for messages only the author and the chosen people read."
         },
         "required": {
           "type": "boolean"
@@ -295,6 +328,14 @@
         "hidden": {
           "type": "boolean",
           "description": "回答者に見せない項目(クイズの正解など・#262)。作者がフォームで入れ、一覧・表・グラフ・titleField には出さない。computed では比較(eq / neq / gt / gte / lt / lte)の中でだけ読める(正誤 = eq(回答, 問題.正解))。computed には付けない。画面に出さないだけで値は端末に届く(厳密な秘匿ではない)。"
+        },
+        "editableBy": {
+          "type": "string",
+          "enum": [
+            "admins"
+          ],
+          "description": "この項目を入れる・変えられるのはアプリの管理者だけ(#272)。作った人が最初の管理者で、管理者は参加者を管理者にできる。管理者でない人の保存でこの項目の値が変わるとサーバーが断る(403 admins_only)。管理者は、他の人が作ったレコードでもこの項目だけは変えられる。public / shared の entity の保存する field だけ。",
+          "x-usage": "「店長だけが確定できる」「承認は管理者だけ」「担当は管理者が決める」の確定・承認・担当の field に付ける(例 boolean confirmed)。確定のボタンは visibleTo admins と組み合わせる。"
         }
       }
     },
@@ -366,6 +407,8 @@
             "back",
             "saveRecord",
             "deleteRecord",
+            "follow",
+            "unfollow",
             "openVoice",
             "openUrl",
             "resetForm",
@@ -381,6 +424,8 @@
             "back": "前の画面へ戻る(push なら pop、モーダルなら dismiss)。",
             "saveRecord": "フォームのドラフトを保存(新規 POST / 編集 PATCH)して screen へ、無ければ back。フォーム画面の toolbar に置く。",
             "deleteRecord": "現在のレコードを削除して back。confirmMessage を付けるのが定石。",
+            "follow": "今開いている投稿(共有 / みんなに公開の entity のレコード)を書いた人をフォローする(#270)。一覧の行から開いた投稿の画面に置く。自分の投稿・フォロー済みの時はボタンが隠れる。フォローした人の投稿だけの一覧は filter {\"field\":\"$author\",\"op\":\"eq\",\"value\":{\"myFollows\":true}}。",
+            "unfollow": "今開いている投稿を書いた人のフォローを外す(#270)。follow と同じ画面に並べて置く(フォローしていない時は隠れる)。",
             "openVoice": "音声シートを開く。",
             "openUrl": "URL を Safari で開く。",
             "resetForm": "フォームのドラフトを既定値に戻す。",
@@ -415,6 +460,8 @@
           "type": "string",
           "description": "saveRecord / deleteRecord / export / addToCalendar: entity id.",
           "x-for": {
+            "follow": "required",
+            "unfollow": "required",
             "saveRecord": "required",
             "deleteRecord": "required",
             "export": "required",
@@ -889,6 +936,14 @@
         },
         "action": {
           "$ref": "#/$defs/Action"
+        },
+        "visibleTo": {
+          "type": "string",
+          "enum": [
+            "admins"
+          ],
+          "description": "admins = アプリの管理者にだけボタンを出す(#272)。管理者でない人には出さない(押せないボタンを見せない)。サーバーの権限(field の editableBy・entity の deleteBy)と組み合わせる。表示を隠すだけなので、守りたい値には editableBy / deleteBy も付ける。",
+          "x-usage": "「確定ボタンは店長だけ」「削除ボタンは管理者だけに見せて」。public / shared の entity があるアプリだけ。"
         }
       }
     },
@@ -1174,7 +1229,7 @@
     "Filter": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list / stat / chart / agg のレコード絞り込み。op が today / thisWeek / thisMonth / thisYear(期間・端末ローカル。今週は月曜始まり)のときは value を null にし、field は date / datetime。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。 「自分の投稿だけ」は field \"$author\"・value {\"me\": true}・op eq(public/shared の entity のみ)。 「自分が保存した / いいねしたもの」は field \"$marks.<id>\"・value {\"me\": true}・op eq(neq = まだ付けていない)。",
+      "description": "list / stat / chart / agg のレコード絞り込み。op が today / thisWeek / thisMonth / thisYear(期間・端末ローカル。今週は月曜始まり)のときは value を null にし、field は date / datetime。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。 「自分の投稿だけ」は field \"$author\"・value {\"me\": true}・op eq(public/shared の entity のみ)。 「自分が保存した / いいねしたもの」は field \"$marks.<id>\"・value {\"me\": true}・op eq(neq = まだ付けていない)。 「フォローした人の投稿だけ」(タイムライン)は field \"$author\"・value {\"myFollows\": true}・op eq(neq = フォローしていない人の投稿)。",
       "required": [
         "field",
         "op",
@@ -1183,7 +1238,7 @@
       "properties": {
         "field": {
           "type": "string",
-          "description": "Field id, or \"$author\" (public/shared entity: the poster; value {\"me\": true}, op eq = my posts / neq = others' posts), or \"$marks.<id>\" (public/shared entity with that mark: value {\"me\": true}, op eq = marked by me / neq = not marked by me)."
+          "description": "Field id, or \"$author\" (public/shared entity: the poster; value {\"me\": true}, op eq = my posts / neq = others' posts), or \"$marks.<id>\" (public/shared entity with that mark: value {\"me\": true}, op eq = marked by me / neq = not marked by me), or \"$author\" with value {\"myFollows\": true} (op eq = posts of people I follow / neq = of people I do not follow)."
         },
         "op": {
           "type": "string",
@@ -1242,9 +1297,12 @@
             },
             {
               "$ref": "#/$defs/FilterMe"
+            },
+            {
+              "$ref": "#/$defs/FilterMyFollows"
             }
           ],
-          "description": "Literal or Expr. null for today/thisWeek/thisMonth/thisYear. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id). {\"me\": true} = the signed-in user (only with field \"$author\" or \"$marks.<id>\")."
+          "description": "Literal or Expr. null for today/thisWeek/thisMonth/thisYear. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id). {\"me\": true} = the signed-in user (only with field \"$author\" or \"$marks.<id>\"). {\"myFollows\": true} = the people the signed-in user follows in this app (only with field \"$author\")."
         }
       }
     },
@@ -3921,6 +3979,19 @@
       },
       "description": "filter の value に書く「自分」。field \"$author\"(自分の投稿)か \"$marks.<id>\"(自分が印を付けたもの)と、op eq / neq でだけ使う(public/shared の entity)。"
     },
+    "FilterMyFollows": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "myFollows"
+      ],
+      "properties": {
+        "myFollows": {
+          "const": true
+        }
+      },
+      "description": "filter の value に書く「自分がフォローしている人」(#270)。field \"$author\" と op eq(フォローした人の投稿)/ neq(フォローしていない人の投稿)でだけ使う(public/shared の entity)。フォローはアプリごと・投稿の画面の follow / unfollow ボタンで付け外しする。"
+    },
     "Mark": {
       "type": "object",
       "additionalProperties": false,
@@ -4093,7 +4164,7 @@
         },
         "field": {
           "type": "string",
-          "description": "入れる先の field id(computed・写真・動画・録音は不可)。"
+          "description": "入れる先の field id(computed・写真・動画・録音・参加者(member)は不可)。"
         }
       }
     },
@@ -4506,6 +4577,39 @@
           "$ref": "#/$defs/Expr",
           "description": "条件(真偽の Expr)。行はきっかけのレコード({\"ref\":\"<field>\"}・\"<refField>.<field>\")か on.each のレコード。更新のきっかけでは {\"ref\":\"$prev.<field>\"} で更新の前の値。agg で同じアプリ・同じ側(private どうし・shared / public どうし)の entity を集計できる(期間の filter も可。読む件数は実行ごと・アプリの 1 日ごとに上限があり、超えたらその回は実行しない)。streak・doneInDays・computed field・setting は使えない。each の無い時刻のきっかけには行が無い(ref 不可・agg は可)。"
         },
+        "lookup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "entity",
+            "field",
+            "equals"
+          ],
+          "description": "別の entity との突き合わせ(if と両方そろった時だけ動く)。entity のレコードのうち field の値が行の equals の値と同じものがある(exists)/ 無い(notExists)時。行はきっかけのレコードか on.each のレコード(each の無い時刻のきっかけでは使えない)。等しいかだけを見る(文字と数は全角半角・大文字小文字・前後の空白を区別しない。日付は日付どうし、ref と $id は同じ entity の ID どうし)。行の値が空の時は動かない。同じ entity なら行のレコード自身は数えない。entity は同じアプリ・ルールと同じ側だけ(宛先付きは不可)で、each・agg と合わせて 2 つまで。読む件数の上限は each・agg と同じ。",
+          "x-usage": "名簿との照合: 「名簿に無い学籍番号の登録に印をつけて」= on {every:daily,each:registrations}・lookup {op:notExists, entity:roster, field:student_id, equals:student_id}・updateRecord(ref 省略)values {mismatch: true}。まだ行っていない店: on {every:weekly,each:shops}・lookup {op:notExists, entity:visits, field:shop, equals:$id}。",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "exists",
+                "notExists"
+              ]
+            },
+            "entity": {
+              "type": "string",
+              "description": "探す entity の id。"
+            },
+            "field": {
+              "type": "string",
+              "description": "探す entity の field(string / text / enum / integer / number / date / ref)か $id(レコードの ID)。"
+            },
+            "equals": {
+              "type": "string",
+              "description": "行の field(同じ型の種類)か $id(行のレコードの ID)。"
+            }
+          }
+        },
         "do": {
           "type": "array",
           "minItems": 1,
@@ -4513,6 +4617,11 @@
           "items": {
             "$ref": "#/$defs/RuleAction"
           }
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "false = この自動の動きをオフにする(作成者のスイッチ・#347)。オフの間は動かず、実行の回数にも数えない。省略 = オン。ルールは消さずに残るので、enabled を外せばまた動く。",
+          "x-usage": "「朝の通知を止めて」「この自動の動きをいったんオフに」は該当ルールに enabled: false(ルールは消さない)。「また動かして」「オンに戻して」は enabled を外す。「消して」「もう要らない」はルールごと外す。"
         }
       }
     },
@@ -4646,18 +4755,20 @@
             "owner",
             "author",
             "authorOf",
-            "members"
+            "members",
+            "recipients"
           ],
           "x-enumDescriptions": {
             "owner": "アプリの作成者(private のアプリでは本人)。",
             "author": "きっかけのレコードを書いた人(shared のレコードのきっかけだけ)。",
             "authorOf": "きっかけのレコードの ref field(field)が指すレコードを書いた人(例: 出欠の親の予定を作った人)。",
-            "members": "参加者全員(shared だけ)。"
+            "members": "参加者全員(shared だけ)。",
+            "recipients": "宛先付きの entity(addressedTo)の記録の宛先の人(field に addressedTo の field id)。きっかけがその entity のレコードの時だけ。"
           }
         },
         "field": {
           "type": "string",
-          "description": "kind authorOf だけ: きっかけの entity の type ref の field id。"
+          "description": "kind authorOf: きっかけの entity の type ref の field id。kind recipients: その entity の addressedTo の field id。"
         }
       }
     },

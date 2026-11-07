@@ -69,6 +69,7 @@ func (m *Memory) PurgeAccount(_ context.Context, uid string) (AccountPurgeResult
 	}
 	for appID := range m.users[uid] {
 		m.purgeMatching(appID, uid, &res)
+		m.purgeFollows(appID, uid, &res) // #270
 		c, listed := m.catalog[appID]
 		if listed && c.OwnerUID == uid {
 			delete(m.catalog, appID)
@@ -82,6 +83,7 @@ func (m *Memory) PurgeAccount(_ context.Context, uid string) (AccountPurgeResult
 		if owned && !m.othersIn(appID, uid) {
 			delete(m.public, appID)
 			delete(m.members, appID)
+			delete(m.follows, appID)
 			m.dropMarks("pub/" + appID + "/")
 		} else if p != nil {
 			m.scrubPublic(appID, uid, &res)

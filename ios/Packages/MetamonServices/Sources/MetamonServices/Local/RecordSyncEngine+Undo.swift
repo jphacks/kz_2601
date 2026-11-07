@@ -15,6 +15,8 @@ public struct DeletionTicket: Hashable, Sendable, Identifiable {
 /// 元に戻したら隠すのをやめるだけなので、サーバーの記録の id・作成日時・作者は変わらない
 /// (送った後に作り直すと id と作成日時が変わり、共有の記録では作者の印も付け直しになる)。
 /// 待ちはメモリだけに持つ。背面に回る・サインアウトの送り切りでは待たずに送る。待ちの間にアプリが落ちたら削除されずに残る(消えすぎない側)。
+/// サインアウト・アカウント削除の `wipe` は、積む途中の削除を待ってから列を空にし、wipe を跨いだ削除は積まない
+/// (前の人の削除が次の人の列に残り、次の人の資格で送られることがないように)。
 extension RecordSyncEngine {
     /// 一覧から隠し、`grace` 後に `delete` と同じ送信をする。動画・録音のファイルも送る時に消す(戻せるように)。
     public func deleteUndoably(appId: String, entity: String, recordId: String,
@@ -42,14 +44,32 @@ extension RecordSyncEngine {
     /// 待たずに全部送る(背面に回った・サインアウト前の送り切り)。
     public func commitPendingDeletions() async {
         for id in Array(undoable.keys) { await commitDeletion(id) }
+        await settleCommitting() // 時間切れで並行して積んでいる分も列に入りきるまで待つ
+        await refreshStatus() // 直後の未送信件数(ログアウトの確認)に入るように
     }
 
     func commitDeletion(_ id: UUID) async {
         guard let pending = undoable.removeValue(forKey: id) else { return }
         pending.timer.cancel()
         let t = pending.ticket
-        let current = await currentRecordId(t)
-        _ = await delete(appId: t.appId, entity: t.entity, recordId: current)
+        let generation = wipeGeneration
+        let work = Task { [weak self] in
+            guard let self else { return }
+            let current = await self.currentRecordId(t)
+            guard self.wipeGeneration == generation else { return } // 待つ間に wipe された: 次の人の列に積まない
+            _ = await self.delete(appId: t.appId, entity: t.entity, recordId: current)
+        }
+        committing[id] = work
+        await work.value
+        committing[id] = nil
+    }
+
+    /// 列に積む途中の削除が終わるまで待つ。
+    func settleCommitting() async {
+        while let work = committing.values.first {
+            await work.value
+            if let id = committing.first(where: { $0.value == work })?.key { committing[id] = nil }
+        }
     }
 
     /// 送らずに捨てる(アプリ削除・アカウント削除。ローカルもサーバーも別の経路で消す)。
@@ -71,12 +91,10 @@ extension RecordSyncEngine {
 
     /// 待ちの間に未送信の作成が送られると、仮 id(`local-<clientId>`)がサーバー id に替わる。どちらでも同じ行とみなす。
     static func matches(_ ticket: DeletionTicket, _ row: LocalRecord) -> Bool {
-        row.recordId == ticket.recordId || row.clientId.map(LocalRecord.temporaryId(clientId:)) == ticket.recordId
+        row.isKnown(as: ticket.recordId)
     }
 
     private func currentRecordId(_ t: DeletionTicket) async -> String {
-        if await store.row(appId: t.appId, entity: t.entity, recordId: t.recordId) != nil { return t.recordId }
-        let rows = await store.rows(appId: t.appId, entity: t.entity)
-        return rows.first { Self.matches(t, $0) }?.recordId ?? t.recordId
+        await store.current(appId: t.appId, entity: t.entity, recordId: t.recordId)?.recordId ?? t.recordId
     }
 }

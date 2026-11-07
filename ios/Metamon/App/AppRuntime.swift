@@ -523,6 +523,7 @@ final class AppRuntime: DSLRuntime {
         scheduleBuildRevealEnd(reveal, highlight: highlight)
         scheduleNotificationSync()
         noteRetention() // #482 保存期間の確認と期限切れの削除
+        noteAppMembers() // #272 参加者と管理者(member の選択肢・管理者だけのボタン)
         WidgetSnapshotWriter.write(dsl: doc.dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         IntentHost.shared.appsMayHaveChanged() // Siri のフレーズ候補(アプリ名)を引き直す(#80)
     }
@@ -1145,6 +1146,10 @@ final class AppRuntime: DSLRuntime {
                 guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
                 records[entity] = cached
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            case .denied(let appId, let entity, let denial):
+                guard appId == document.appId else { return }
+                toast = denialMessage(denial, entity: entity) // #272 #273
+                await refresh(entity) // 楽観的に書いた値をサーバーの内容に戻す
             case .proRequired(let appId, let entity, let pro):
                 guard appId == document.appId else { return }
                 presentProRequiredWrite(pro) // #316: 書いた分は戻した。作成者なら課金画面、参加者なら案内
@@ -1219,7 +1224,7 @@ final class AppRuntime: DSLRuntime {
                 toast = L10n.tr("保存するフォームがありません")
                 return
             }
-            let missing = form.missingRequired
+            let missing = form.flagMissingRequired() // 空の欄に印を付ける(M10)
             guard missing.isEmpty else {
                 toast = L10n.tr("\(missing.joined(separator: L10n.tr("・"))) を入力してください")
                 return
@@ -1235,6 +1240,11 @@ final class AppRuntime: DSLRuntime {
                 authorNamePrompt = AuthorNamePrompt { [weak self] in await self?.perform(action, ctx) }
                 return
             }
+            // 既存の記録を何も変えずに保存: 書き込まず(「保存しました」も出さず)に画面だけ進める(M10)
+            guard form.needsWrite else {
+                leaveAfterSave(action, ctx)
+                return
+            }
             // 保存ボタンの連打: 1 回目のローカル保存を待つ間に 2 回目が来ると、新規なら同じ内容が 2 件できる
             guard savingForms.insert(ObjectIdentifier(form)).inserted else { return }
             defer { savingForms.remove(ObjectIdentifier(form)) }
@@ -1243,17 +1253,13 @@ final class AppRuntime: DSLRuntime {
             let isNew = recordId == nil
             records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: recordId, data: payload,
                                                     author: postAuthor(for: entity))
-            form.markClean() // 保存した内容は閉じても破棄の確認を出さない(M10)
+            form.markSaved(queuedOffline: !recordSync.isOnline) // 閉じても破棄の確認を出さない・オフラインなら保存バーが送信待ちと出す(M10)
             WidgetSnapshotWriter.write(dsl: dsl, records: records)
             #if !APP_STORE_REVIEW
             writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)
             #endif
             Task { await purgeExpired(entity) } // #482 保存の後(画面遷移を待たせない)
-            if let screen = action.screen {
-                navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
-            } else {
-                close(ctx.route)
-            }
+            leaveAfterSave(action, ctx)
 
         case .deleteRecord:
             guard let entity = action.entity ?? ctx.form?.entity.id,
@@ -1279,6 +1285,9 @@ final class AppRuntime: DSLRuntime {
 
         case .resetForm:
             ctx.form?.reset()
+
+        case .follow, .unfollow:
+            await runFollow(action, ctx) // #270: Features/Follows
 
         case .scheduleNotification:
             guard let spec = action.notification else { return }
@@ -1310,6 +1319,15 @@ final class AppRuntime: DSLRuntime {
         }
     }
 
+    /// 保存の後: `screen` があればそこへ、無ければ閉じる。
+    private func leaveAfterSave(_ action: Action, _ ctx: ActionContext) {
+        if let screen = action.screen {
+            navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
+        } else {
+            close(ctx.route)
+        }
+    }
+
     /// prefillRef の親が未保存(新規フォームの button / toolbar)。子は親の id が無いと作れないので先に保存してもらう。
     func unsavedParentToast(_ ctx: ActionContext) -> String {
         let name = ctx.form?.entity.name ?? ""
@@ -1334,6 +1352,7 @@ final class AppRuntime: DSLRuntime {
     func message(for error: Error, entity: String?) -> String {
         guard let api = error as? APIError else { return ErrorCopy.failure(L10n.tr("うまくいきませんでした"), error, context: "action") }
         if let denial = SharedAccessDenial(api) { return denial.message } // #254
+        if let denial = RecordWriteDenial(api), let entity { return denialMessage(denial, entity: entity) } // #272 #273
         if let pro = ProRequired(api) { return pro.writeMessage } // #316(印を付けるなど)
         if api.code == "invalid_record" || (api.status == 400 && api.field != nil), let fieldId = api.field {
             let name = entity.flatMap { dsl.entity($0)?.field(fieldId)?.name } ?? fieldId

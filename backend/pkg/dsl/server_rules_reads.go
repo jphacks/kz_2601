@@ -94,12 +94,15 @@ func checkNotifyWith(where string, rc *ruleCheck, n *RuleNotify) {
 	}
 }
 
-// ReadEntities returns the entities whose records the rule lists (on.each and
-// every agg), sorted and unique.
+// ReadEntities returns the entities whose records the rule lists (on.each,
+// every agg and the lookup), sorted and unique.
 func (r *ServerRule) ReadEntities() []string {
 	seen := map[string]bool{}
 	if r.On.Each != "" {
 		seen[r.On.Each] = true
+	}
+	if r.Lookup != nil && r.Lookup.Entity != "" {
+		seen[r.Lookup.Entity] = true
 	}
 	r.walkExprs(func(e *Expr) {
 		if e.Kind == ExprAgg && e.Agg != nil && e.Agg.Entity != "" {

@@ -11,7 +11,8 @@ extension AppRuntime {
         #if !APP_STORE_REVIEW
         LocationTrackingControl.stop()                  // 位置の記録(#168)を止める(青いインジケータを残さない)
         #endif
-        await recordSync.wipe()                         // オフライン DB(metamon-records)と未送信キュー
+        recordUndo = nil                                // 「元に戻す」(M11)を次の人に出さない
+        await recordSync.wipe()                         // オフライン DB(metamon-records)と未送信キュー・取り消し待ちの削除
         DocumentCache.shared.removeAll()                // DSL キャッシュとアプリ一覧(metamon-dsl)
         AppThumbnailStore.shared.removeAll()            // 変身一覧のサムネ(metamon-thumbs)
         ExportFiles.removeAll()                         // 書き出した CSV / PDF(#421・記録の写し)
@@ -43,6 +44,7 @@ enum LocalWipe {
         "metamon.appLanguage",
         "metamon.crashReporting.enabled",
         "metamon.aiButtonMetrics.enabled",
+        "metamon.push.installationId", // 端末ごとに安定させる(#269)。個人のデータではない
         TimerKeyMigration.doneKey, // タイマーのキーの移行(#623)の印。消すと次の起動で移行がもう一度走る(データではない)
     ]
 

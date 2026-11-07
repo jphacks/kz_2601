@@ -367,6 +367,15 @@ func normalizeValue(f *dsl.Field, v any) (any, error) {
 			return nil, fmt.Errorf("must be \"lat,lng\" within range")
 		}
 		return strconv.FormatFloat(lat, 'f', -1, 64) + "," + strconv.FormatFloat(lng, 'f', -1, 64), nil
+	case dsl.FieldMember:
+		// uid of a participant (#272); participation is checked in data_rules.go
+		s, ok := asString(v)
+		if !ok || !idRe.MatchString(s) {
+			return nil, fmt.Errorf("must be the uid of a participant")
+		}
+		return s, nil
+	case dsl.FieldMembers:
+		return normalizeMembers(v) // #271: addressed.go
 	}
 	return nil, fmt.Errorf("has unsupported type %q", f.Type)
 }

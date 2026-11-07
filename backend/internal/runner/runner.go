@@ -47,7 +47,8 @@ const (
 	ReasonVersionMissing = "version_missing" // the trigger's DSL version is gone
 	ReasonRuleRemoved    = "rule_removed"    // not in the trigger's version or not in the current DSL
 	ReasonBadEvent       = "bad_event"
-	ReasonOperatorStop   = "operator_stop" // the operator's app / rule stop (#346); stop_level says which
+	ReasonAddressed      = "addressed_rule" // the rule does not fit who reads an addressed record (#271)
+	ReasonOperatorStop   = "operator_stop"  // the operator's app / rule stop (#346); stop_level says which
 )
 
 // DefaultMaxAge: triggers older than this are not run (#337: after a

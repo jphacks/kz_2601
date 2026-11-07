@@ -22,10 +22,15 @@ import (
 
 // ServerRule is one automatic server action.
 type ServerRule struct {
-	ID string       `json:"id"`
-	On RuleTrigger  `json:"on"`
-	If *Expr        `json:"if,omitempty"`
-	Do []RuleAction `json:"do"`
+	ID string      `json:"id"`
+	On RuleTrigger `json:"on"`
+	If *Expr       `json:"if,omitempty"`
+	// Lookup: run only when another entity has (not) a record with the
+	// row's value (server_rules_lookup.go).
+	Lookup *RuleLookup  `json:"lookup,omitempty"`
+	Do     []RuleAction `json:"do"`
+	// Enabled: false turns the rule off (the creator's switch, #347); nil = on.
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // RuleTrigger is a record trigger (Record + Entity [+ Fields]) or a time
@@ -63,8 +68,8 @@ type RuleNotify struct {
 
 // RuleRecipient is a closed recipient kind.
 type RuleRecipient struct {
-	Kind  string `json:"kind"`            // owner|author|authorOf|members
-	Field string `json:"field,omitempty"` // authorOf: ref field of the trigger entity
+	Kind  string `json:"kind"`            // owner|author|authorOf|members|recipients
+	Field string `json:"field,omitempty"` // authorOf: ref field; recipients: addressedTo of the trigger entity
 }
 
 // RuleCreateRecord creates one record of Entity.
@@ -97,6 +102,8 @@ const (
 	RecipientAuthor   = "author"
 	RecipientAuthorOf = "authorOf"
 	RecipientMembers  = "members"
+	// RecipientRecipients: the people an addressed record is sent to (#271).
+	RecipientRecipients = "recipients"
 
 	// PrevPrefix reads a field's value before the update ("$prev.<field>").
 	PrevPrefix = "$prev."
@@ -197,6 +204,7 @@ func checkServerRules(a *App, entities map[string]*Entity, add func(string, ...a
 			}
 			checkNoComputed(where+".if", ch, add)
 		}
+		checkRuleLookup(where, rc)
 		if len(r.Do) == 0 {
 			add("%s: do needs at least one action", where)
 		}
@@ -207,7 +215,7 @@ func checkServerRules(a *App, entities map[string]*Entity, add func(string, ...a
 			checkRuleAction(fmt.Sprintf("%s.do[%d]", where, j), rc, &r.Do[j])
 		}
 		if n := len(rc.reads); n > MaxRuleReadEntities {
-			add("%s: reads the records of %d entities (each + agg: %s); at most %d", where, n, strings.Join(sortedKeys(rc.reads), ", "), MaxRuleReadEntities)
+			add("%s: reads the records of %d entities (each + agg + lookup: %s); at most %d", where, n, strings.Join(sortedKeys(rc.reads), ", "), MaxRuleReadEntities)
 		}
 	}
 	if scheduled > MaxScheduledRulesPro {
@@ -223,7 +231,7 @@ type ruleCheck struct {
 	scope    EntityScope
 	entities map[string]*Entity
 	add      func(string, ...any)
-	reads    map[string]bool // entities whose records the rule lists (each + agg)
+	reads    map[string]bool // entities whose records the rule lists (each + agg + lookup)
 }
 
 // expr is a checker for one expression of the rule.
@@ -491,7 +499,7 @@ func checkRuleValues(where string, rc *ruleCheck, target *Entity, values map[str
 // (#339: public only the creator and the author of the ref target).
 var recipientsByScope = map[EntityScope][]string{
 	ScopePrivate: {RecipientOwner},
-	ScopeShared:  {RecipientOwner, RecipientAuthor, RecipientAuthorOf, RecipientMembers},
+	ScopeShared:  {RecipientOwner, RecipientAuthor, RecipientAuthorOf, RecipientMembers, RecipientRecipients},
 	ScopePublic:  {RecipientOwner, RecipientAuthorOf},
 }
 
@@ -506,24 +514,35 @@ func checkRuleNotify(where string, rc *ruleCheck, n *RuleNotify) {
 	row, scope, entities, add := rc.row, rc.scope, rc.entities, rc.add
 	k := n.To.Kind
 	switch k {
-	case RecipientOwner, RecipientAuthor, RecipientAuthorOf, RecipientMembers:
+	case RecipientOwner, RecipientAuthor, RecipientAuthorOf, RecipientMembers, RecipientRecipients:
 		if allowed := recipientsByScope[scope]; !slices.Contains(allowed, k) {
 			add("%s.to: kind %q is not allowed on %s data (allowed: %s)", where, k, scope, strings.Join(allowed, ", "))
 		}
 	default:
-		add("%s.to: kind %q must be owner, author, authorOf or members", where, k)
+		add("%s.to: kind %q must be owner, author, authorOf, members or recipients", where, k)
 	}
-	if (k == RecipientAuthor || k == RecipientAuthorOf) && row == nil {
+	if (k == RecipientAuthor || k == RecipientAuthorOf || k == RecipientRecipients) && row == nil {
 		add("%s.to: kind %s needs a record trigger or on.each (a time trigger has no record)", where, k)
 	}
-	if k == RecipientAuthorOf {
+	switch k {
+	case RecipientAuthorOf:
 		if row != nil {
 			if t := refTarget(where+".to", row, n.To.Field, entities, add); t != nil && !t.IsShared() {
 				add("%s.to: the records of entity %q are private (they have no other author); notify owner instead", where, t.ID)
 			}
 		}
-	} else if n.To.Field != "" {
-		add("%s.to: field is only for kind authorOf", where)
+	case RecipientRecipients:
+		switch {
+		case row == nil:
+		case !row.IsAddressed():
+			add("%s.to: kind recipients needs a trigger on an addressed entity; entity %q has no addressedTo", where, row.ID)
+		case n.To.Field != row.AddressedTo:
+			add("%s.to: kind recipients: field %q must be the addressedTo of entity %q (%q)", where, n.To.Field, row.ID, row.AddressedTo)
+		}
+	default:
+		if n.To.Field != "" {
+			add("%s.to: field is only for kind authorOf or recipients", where)
+		}
 	}
 	checkNotifyWith(where, rc, n)
 	checkNotifyText(where+".title", n.Title, MaxNotifyTitleRunes, row, n.With, add)
@@ -747,6 +766,7 @@ func (a *App) DescribeServerRule(r *ServerRule) string {
 	if r.If != nil {
 		when += "(条件に合えば)"
 	}
+	when += a.describeLookup(r, row)
 	acts := make([]string, 0, len(r.Do))
 	for _, act := range r.Do {
 		switch {
@@ -761,6 +781,8 @@ func (a *App) DescribeServerRule(r *ServerRule) string {
 				who = fmt.Sprintf("「%s」を作った人", refName(act.Notify.To.Field))
 			case RecipientMembers:
 				who = "参加者全員"
+			case RecipientRecipients:
+				who = "宛先の人"
 			}
 			acts = append(acts, who+"に通知")
 		case act.CreateRecord != nil:
@@ -779,5 +801,5 @@ func (a *App) DescribeServerRule(r *ServerRule) string {
 			acts = append(acts, fmt.Sprintf("「%s」の「%s」を数える", refName(act.Increment.Ref), fname(target, act.Increment.Field)))
 		}
 	}
-	return when + "、" + a.describeReads(r) + strings.Join(acts, "・")
+	return when + "、" + a.describeReads(r) + strings.Join(acts, "・") + disabledNote(r)
 }

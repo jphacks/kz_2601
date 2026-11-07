@@ -124,6 +124,10 @@ func (h *Handler) duplicateApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	if err := h.checkAppLimit(r); err != nil { // #317
+		fail(w, err)
+		return
+	}
 	v, err := h.seedCopy(r, newID, raw, name, &store.Source{Kind: "import", Mode: "full", Summary: "「" + src.Name + "」を複製"})
 	if err != nil {
 		fail(w, err)

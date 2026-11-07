@@ -107,6 +107,10 @@ var expectKeys = map[string]expectKind{
 	// checkSingle (#267): single.go
 	"single":  expectBool,
 	"setting": expectBool,
+	// checkAddressed (#271): addressed.go
+	"addressed":       expectBool,
+	"addressedGroup":  expectBool,
+	"addressedUnread": expectBool,
 	// checkRepeat (#266): repeat.go
 	"repeat":         expectString,
 	"repeatOffset":   expectNumber,
@@ -126,6 +130,7 @@ var expectKeys = map[string]expectKind{
 	"ruleEach":    expectBool,
 	"ruleAgg":     expectBool,
 	"ruleWith":    expectBool,
+	"ruleLookup":  expectString,
 	// checkFlashcards (#264): flashcards.go
 	"flashcardsUnlearned": expectBool,
 	// checkFeed (#348): feed.go

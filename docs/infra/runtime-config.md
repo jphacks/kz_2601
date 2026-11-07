@@ -60,11 +60,16 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 | `FEEDS_USER_PER_HOUR` / `FEEDS_UPSTREAM_PER_MINUTE` | appconfig | 外部の公開データの 1 人 1 時間の回数 / インスタンスあたり 1 分の出どころへの取得 | 120 / 30 |
 | `AI_PAUSED` | ai | `1`(`true` / `on` も可)で AI の生成だけを止める(#511)。generate(`mode=undo` を除く)・chat・text が Claude を呼ばずに 503 `ai_paused` を返す。AI を止める時はこれを使う([ai-pause.md](ai-pause.md)) | 無し(止めない) |
 | `PRO_GATE_MODE` | ai・appconfig・runner(3 つとも同じ値にする) | 有料の機能(共有データ・自動の動き・アプリの中のオンラインの AI)の強制(#316・[pro.md](../backend/features/pro.md))。`enforce` = Pro でなければ 402 `pro_required` / runner は `skipped_plan`。`log` = 止めずに、止めるはずだった事実を構造化ログ `pro_gate.would_block`(`where`・`uid_hash`・`features`・`blocked:false`)に出すだけ(runner は private のアプリを #316 の前の無料の枠で動かす)。`off` = 見ない(#316 の前と同じ)。共有データの自動の動きは #338 のとおりどの値でも Pro だけ。それ以外の値は起動しない(打ち間違いで外れないように)。段階的に出す時は `log` で `would_block` の量を見てから `enforce` | `enforce` |
+| `TEXT_FILTER` | appconfig | 表示できない言葉のフィルタ(#321・[moderation.md](moderation.md))の切り替え。`enforce` = 当たれば 422 `text_not_allowed`。`log` = 保存して、ログ `moderation: text would be refused` に場所と種類だけを出す(文字は出さない)。`off` = 見ない。誤検知で書き込めない人が出た時に、デプロイせずに `log` / `off` へ落とす。それ以外の値は起動しない | `enforce` |
 | `RATE_LIMIT_GLOBAL_DAILY` | ai | 環境全体の 1 日の AI 上限(費用ブレーカー)([rate-limit.md](../backend/rate-limit.md))。AI を止める用途には `AI_PAUSED` を使う。`1` にして止めるのは、`AI_PAUSED` の入っていない版が動いている時の予備だけ([incident-runbook.md §5](../ops/incident-runbook.md#5-手順-a-claude-api-の障害上限)) | 2000 |
-| `RATE_LIMIT_ANON_DAILY` / `_USER_DAILY` / `_PRO_DAILY` / `_IP_DAILY` | ai | 利用者ごと・IP ごとの 1 日の上限([rate-limit.md](../backend/rate-limit.md)) | 30 / 60 / 300 / 300 |
-| `RATE_LIMIT_WEIGHT_*` | ai | 呼び出し 1 回で数える重み([rate-limit.md](../backend/rate-limit.md)) | 3 / 2 / 1 / 1 / 2 |
+| `RATE_LIMIT_ANON_DAILY` / `_USER_DAILY` / `_PRO_DAILY` / `_IP_DAILY` | ai(`_IP_DAILY` 以外は appconfig も) | 利用者ごと・IP ごとの 1 日の上限([rate-limit.md](../backend/rate-limit.md))。appconfig は `GET /v1/me/usage` の上限の表示に読むので、変える時は両方に同じ値を入れる | 30 / 60 / 300 / 300 |
+| `RATE_LIMIT_WEIGHT_*` | ai・appconfig | 呼び出し 1 回で数える重み([rate-limit.md](../backend/rate-limit.md))。appconfig は `GET /v1/me/usage` の `weights` に出す | 3 / 2 / 1 / 1 / 2 |
 | `RUNNER_GLOBAL_DAILY` | runner(prod だけ) | 環境全体の 1 日の自動の動きの実行の上限(費用の遮断・[#338](../decisions/338-server-feature-cost-model.md#上限案))。`0` で数えない | 10000 |
 | `RUNNER_LIMIT_*` | runner(prod だけ) | アプリ・作成者・きっかけの人・受け取る人ごとの 1 日の上限と、1 回の実行の形の上限(`backend/internal/runner/quota/config.go` の `ConfigFromEnv`・#345)。`_FREE` / `_PRO` の組は無料 / Pro。**自動の動きは Pro だけ(#316)なので `_FREE` は今は使われない**(Pro でない作成者のルールは数える前に `skipped_plan`)。`0` で数えない | 実行 100 / 2000(アプリ)・300 / 3000(作成者)、書き込み 100 / 2000、通知の宛先 50 / 1000、受け取る人 20(1 アプリ)・100(合計)、きっかけの人 200、1 回の宛先 1 / 200・書き込み 1 / 10、定期のルール 1 / 5 |
+| `APNS_KEY_ID` / `APNS_TEAM_ID` / `APNS_TOPIC` | runner(prod だけ) | APNs の鍵の ID・Apple Developer のチーム ID・アプリの bundle id(#269)。鍵(`APNS_AUTH_KEY`)を入れた時は 3 つとも要る(無いと起動しない)。秘密ではないが repo には書かず gcloud で入れる([runner.md](runner.md#プッシュ通知を端末に届ける)) | 無し |
+| `APNS_AUTH_KEY` | runner(prod だけ) | APNs の鍵(.p8 の中身)。**Secret Manager の `APNS_AUTH_KEY` から deploy-cloudrun.yml が注入する**(GitHub の変数 `RUNNER_APNS=1` の時だけ)。env に直接書かない。無ければ通知はログに形を出すだけ | 無し(ログだけ) |
+| `RUNNER_ACCOUNT_AGE` | runner(prod だけ) | `firebase` で送り手のアカウントの作成時刻を Firebase Auth から読む(#339「作成から 24 時間は他人宛ての通知を出せない」)。deploy-cloudrun.yml が入れる。無いと作成時刻が分からず、他人宛ての通知はすべて `new_account` で止まる(自分宛てだけ届く) | deploy で `firebase` |
+| `RUNNER_APNS_ENVIRONMENT` | runner(prod だけ) | `production` / `sandbox`。送る APNs の宛先と、送る端末の `environment`。TestFlight・App Store の版は production、Xcode から入れた開発署名の版は sandbox。1 つの runner はどちらか片方だけに送る | `production` |
 | `RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS` | runner(prod だけ) | 1 つのアプリ(アプリそのもの・その中の投稿)を 24 時間でこの人数(別々の人)が通報したら、そのアプリの通知を自動で一時停止する(#339・#346)。止めるのは通知だけ(非公開化などは人)。`0` で自動では止めない | 3 |
 | `RUNNER_AUTO_NOTIFY_PAUSE_FOR` | runner(prod だけ) | 上の自動の一時停止の長さ。`48h` のように書く。1 時間未満は起動しない。運営が `moderate resume-notify` で先に解ける([incident-runbook.md 手順 F](../ops/incident-runbook.md#13-手順-f-悪用自動の動き)) | `72h` |
 | `RUNNER_NOTIFY_PAUSED` | runner(prod だけ) | `1`(`true` / `on` も可)で通知だけを全体で止める(#339・#346)。ルールは動き、書き込みはする。止めている間の通知は後から送らない | 無し(止めない) |
@@ -73,6 +78,12 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 | `RUNNER_TICK_INTERVAL` | runner(prod だけ) | ローカル用。`10s` のように書くと、runner が自分でこの間隔で outbox を処理する。本番は Cloud Scheduler の `runner-tick` が毎分 `POST /internal/tick` を呼ぶので入れない | 無し(`/internal/tick` を呼ばれた時だけ) |
 | `RUNNER_OUTBOX` | appconfig | `1` で、serverRules(自動の動き)の条件に合う記録の書き込みを、同じトランザクションで outbox(`runner/{APP_ENV}/outbox`)に積む(#341)。時刻のきっかけを持つ(持っていた)DSL の保存では `rules_changed` を同じトランザクションで積み、`GET /dsl` で `runner/{APP_ENV}/apps/*` の `lastOpenedAt` を 1 アプリ 1 日 1 回まで書く(#342)。入れるのは人の承認を得てから、runner-prod と `runner-tick` が動いているのを確かめた後([runner.md](runner.md)。runner が無いまま入れると積まれるだけで動かない)。stg には入れない(#288 の分離まで runner は prod だけ) | 無し(積まない) |
 | `AI_SERVER_RULES` | ai | `1` で、「自動の動き」を頼む発話の時に serverRules(自動の動き)を作る呼び出しを足す(#343)。runner と `RUNNER_OUTBOX` が動いていない環境で入れると、作れても動かないルールができる。入れるのは `RUNNER_OUTBOX=1` と同じ時([runner.md](runner.md)) | 無し(作らない) |
+| `PLAN_FREE_APPS` / `PLAN_PRO_APPS` | appconfig | プランごとの上限(#317)。1 人が作れるアプリの数(共有のアプリを入れるのは数えない)。`0` で数えない([rate-limit.md](../backend/rate-limit.md#プランごとの上限317)) | 100 / 1000 |
+| `PLAN_FREE_RECORDS_PER_APP` / `PLAN_PRO_RECORDS_PER_APP` | appconfig | 1 つのアプリのレコードの件数(その人が見える分: 自分の分 + 共有の分)。共有のアプリは作成者のプランで数える。`0` で数えない | 5000 / 50000 |
+| `PLAN_FREE_PHOTOS_PER_APP` / `PLAN_PRO_PHOTOS_PER_APP` | appconfig | 1 つのアプリの写真の枚数(1 枚 300 KB まで = 容量の上限)。`0` で数えない | 500 / 5000 |
+| `PLAN_LIMITS_MODE` | appconfig | 上の 3 つの強制。`enforce` = 403 `plan_limit_reached` / `log` = 止めずにログ `plan_limit.would_block` だけ / `off` = 数えない(#317 の前と同じ)。それ以外の値は起動しない | `enforce` |
+| `AI_FREE_DAILY_BUDGET_USD` | ai | 全体の遮断(#317)。その日(JST)の AI の費用(`ai.usage` の `est_cost_usd` の合計・USD)がこれを超えたら、Pro でない人の generate・chat を 503 `free_plan_paused` で止める(0:00 JST に自動で戻る)。`0` / 無しで無効([rate-limit.md](../backend/rate-limit.md#全体の遮断317)) | 無し(無効) |
+| `AI_FREE_BUDGET_RESUME_DAY` | ai | 上の遮断を手で戻す。`2026-11-07` のように JST の日付を入れると、その日だけ止めない(翌日からはまた効く) | 無し |
 | `LOG_LEVEL` | 両方 | ログの詳しさ(調査の間だけ `debug` など) | info |
 
 この表に無い変数は、運用で変えないでください。変えたい時は Issue にして、ワークフローか本書に足します。
@@ -92,6 +103,13 @@ gcloud run services update "$SERVICE" --region asia-northeast1 --project jphacks
 ```sh
 gcloud run services update ai-stg --region asia-northeast1 --project jphacks-kz2601 \
   --update-env-vars RATE_LIMIT_GLOBAL_DAILY=200
+```
+
+例: 無料プランの生成の遮断(#317)を今日だけ解く(明日からはまた効く)。
+
+```sh
+gcloud run services update ai-stg --region asia-northeast1 --project jphacks-kz2601 \
+  --update-env-vars AI_FREE_BUDGET_RESUME_DAY=$(TZ=Asia/Tokyo date +%F)
 ```
 
 値にカンマが入る時(`NOTICE_JSON` など)は、区切り文字を `@` に変えます(`^@^`。gcloud の `topic escaping`)。

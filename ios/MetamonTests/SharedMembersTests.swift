@@ -16,6 +16,7 @@ private final class FakeMembers: MembershipClient, @unchecked Sendable {
     var writeError: Error?
     private(set) var removed: [String] = []
     private(set) var left = 0
+    private(set) var admins: [String: Bool] = [:]
 
     func previewShare(token: String) async throws -> ShareLinkPreview { ShareLinkPreview(token: token, name: "n", sharedData: true) }
     func importShare(token: String, displayName: String) async throws -> InstalledApp { InstalledApp(appId: "a", name: "n", member: true) }
@@ -31,6 +32,10 @@ private final class FakeMembers: MembershipClient, @unchecked Sendable {
     func leave(appId: String) async throws {
         if let writeError { throw writeError }
         lock.withLock { left += 1 }
+    }
+    func setAdmin(appId: String, uid: String, admin: Bool) async throws {
+        if let writeError { throw writeError }
+        lock.withLock { admins[uid] = admin }
     }
 }
 

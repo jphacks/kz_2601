@@ -15,7 +15,11 @@ final class RecordDeleteUndoTests: XCTestCase {
     override func setUp() async throws {
         dir = FileManager.default.temporaryDirectory.appendingPathComponent("metamon-undo-\(UUID().uuidString)")
         client = OfflineSimulatingAppConfigClient(inner: InMemoryAppConfigClient())
-        connectivity = ManualConnectivity(online: true)
+        startEngine(online: true)
+    }
+
+    private func startEngine(online: Bool) {
+        connectivity = ManualConnectivity(online: online)
         store = RecordStore(directory: dir)
         queue = SyncQueue(directory: dir, store: store, client: client, policy: .immediate)
         engine = RecordSyncEngine(store: store, queue: queue, client: client, connectivity: connectivity)
@@ -106,8 +110,10 @@ final class RecordDeleteUndoTests: XCTestCase {
     }
 
     func testUnsentCreateUndoKeepsRowAndCommitCancelsCreate() async throws {
+        // 走行中に切ると、エンジンが知る前の保存が送信中になり、作成を畳めない。最初から圏外で始める
+        engine.stop()
         client.setOffline(true)
-        connectivity.set(online: false)
+        startEngine(online: false)
         let made = await engine.save(appId: "a", entity: "memo", recordId: nil, data: ["title": "パン"])
         let (_, t) = await engine.deleteUndoably(appId: "a", entity: "memo", recordId: made[0].id, grace: .seconds(30))
         let restored = await engine.undoDelete(t)
@@ -134,6 +140,69 @@ final class RecordDeleteUndoTests: XCTestCase {
         XCTAssertEqual(t.recordId, "local-c1")
         await engine.commitPendingDeletions()
         try await waitUntil("sent") { self.sentDeletes.contains("pass delete memo/srv1") }
+    }
+
+    // MARK: - サインアウト・アカウント削除(wipe)と取り消し待ち
+
+    func testCommitPendingDeletionsCountsAsUnsentRightAway() async throws {
+        // ログアウトの確認は pendingCount で「未送信あり」を出す。取り消し待ちの削除も積んだ直後から数える
+        let rec = try await seed()
+        client.setOffline(true)
+        connectivity.set(online: false)
+        _ = await engine.deleteUndoably(appId: "a", entity: "memo", recordId: rec.id, grace: .seconds(30))
+        XCTAssertEqual(engine.pendingCount, 0, "待ちの間は列に無い")
+        await engine.commitPendingDeletions()
+        XCTAssertEqual(engine.pendingCount, 1, "積んだ直後に未送信へ入る(確認を .plain で出して捨てない)")
+        XCTAssertTrue(engine.pendingDeletions.isEmpty)
+    }
+
+    func testWipeWhileCommitIsInFlightLeavesNothingForTheNextAccount() async throws {
+        // 時間切れの送信(列に積む途中)とサインアウトの wipe が重なる: wipe の後に積まれて次の人の列に残っていた
+        let rec = try await seed()
+        client.setOffline(true)
+        connectivity.set(online: false)
+        _ = await engine.deleteUndoably(appId: "a", entity: "memo", recordId: rec.id, grace: .seconds(30))
+        let commit = Task { await engine.commitPendingDeletions() }
+        while !engine.pendingDeletions.isEmpty { await Task.yield() } // 待ちから外れ、積む途中に入った
+        await engine.wipe()
+        await commit.value
+
+        let queued = await queue.count
+        XCTAssertEqual(queued, 0, "前の人の削除を次の人の列に残さない")
+        let rows = await store.rows(appId: "a", entity: "memo")
+        XCTAssertTrue(rows.isEmpty)
+
+        // 次の人がサインインしてオンラインに戻っても、前の人の削除は送られない
+        engine.start()
+        client.setOffline(false)
+        connectivity.set(online: true)
+        engine.syncNow()
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertTrue(sentDeletes.isEmpty)
+        XCTAssertEqual(engine.pendingCount, 0)
+    }
+
+    func testTimerAfterWipeNeverEnqueues() async throws {
+        let rec = try await seed()
+        _ = await engine.deleteUndoably(appId: "a", entity: "memo", recordId: rec.id, grace: .milliseconds(50))
+        await engine.wipe()
+        engine.start()
+        try await Task.sleep(for: .milliseconds(200))
+        let queued = await queue.count
+        XCTAssertEqual(queued, 0)
+        XCTAssertTrue(sentDeletes.isEmpty, "wipe で捨てた削除を時間切れで送らない")
+        XCTAssertTrue(engine.pendingDeletions.isEmpty)
+    }
+
+    func testSignOutFlushCommitsPendingDeleteUnderCurrentAccountBeforeWipe() async throws {
+        let rec = try await seed()
+        _ = await engine.deleteUndoably(appId: "a", entity: "memo", recordId: rec.id, grace: .seconds(30))
+        let left = await engine.flush(timeout: .seconds(3))
+        XCTAssertEqual(left, 0)
+        XCTAssertEqual(sentDeletes, ["pass delete memo/\(rec.id)"], "wipe の前に送る(消えたはずの記録が次のサインインで戻らない)")
+        await engine.wipe()
+        let server = try await client.inner.list(appId: "a", entity: "memo")
+        XCTAssertTrue(server.isEmpty)
     }
 
     private func waitUntil(_ what: String, timeout: Duration = .seconds(5), _ cond: @MainActor () -> Bool) async throws {

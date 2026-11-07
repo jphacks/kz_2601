@@ -10,8 +10,11 @@ import (
 )
 
 // Stop switches (#346, decisions 337 / 339). Above them RUNNER_PAUSED stops
-// everything (skipped_paused). The operator's app and rule stops finish a
-// trigger as skipped_stopped (reason operator_stop, stop_level app / rule);
+// everything (skipped_paused). The operator's global (the same without a
+// new revision), app and rule stops finish a trigger as skipped_stopped
+// (reason operator_stop, stop_level global / app / rule); scheduled runs go
+// through the same check. A forced app / global stop also makes appconfig
+// refuse the writes that would trigger rules (appconfig/app_stop.go);
 // RUNNER_NOTIFY_PAUSED and an app's notify pause let the rule run and write
 // but send nothing. A run that met a stop is finished: nothing is kept to
 // run (or send) after the stop is lifted.
@@ -20,6 +23,8 @@ import (
 const (
 	StopLevelApp  = store.StopApp
 	StopLevelRule = store.StopRule
+	// StopLevelGlobal: runner/{env}/stops/global (moderate stop-all).
+	StopLevelGlobal = store.StopGlobal
 	// NotifyPausedEnv: RUNNER_NOTIFY_PAUSED. NotifyPausedApp: the app's notify pause.
 	NotifyPausedEnv = "env"
 	NotifyPausedApp = "app"
@@ -66,15 +71,15 @@ func (a AutoPause) withDefaults() AutoPause {
 
 // stops are the operator's switches that apply to one event.
 type stops struct {
-	app    *store.Stop
-	notify string // NotifyPaused* or ""
+	app    *store.Stop // the global stop, else the app's (Level tells which)
+	notify string      // NotifyPaused* or ""
 	rules  map[string]bool
 }
 
 // stopsFor reads the app's, the app's notify and the event's rules' stops
 // in one batch.
 func (r *Runner) stopsFor(ctx context.Context, ev store.OutboxEvent) (stops, error) {
-	ids := []string{store.AppStopID(ev.AppID), store.NotifyStopID(ev.AppID)}
+	ids := []string{store.AppStopID(ev.AppID), store.NotifyStopID(ev.AppID), store.GlobalStopID}
 	for _, id := range ev.RuleIDs {
 		ids = append(ids, store.RuleStopID(ev.AppID, id))
 	}
@@ -84,7 +89,9 @@ func (r *Runner) stopsFor(ctx context.Context, ev store.OutboxEvent) (stops, err
 	}
 	now := r.cfg.Now()
 	var out stops
-	if s, ok := got[ids[0]]; ok && s.Active(now) {
+	if s, ok := got[store.GlobalStopID]; ok && s.Active(now) {
+		out.app = &s // stop_level=global
+	} else if s, ok := got[ids[0]]; ok && s.Active(now) {
 		out.app = &s
 	}
 	if r.cfg.NotifyPaused() {

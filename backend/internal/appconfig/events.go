@@ -100,7 +100,7 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 		if !member && ent.EffectiveScope() == dsl.ScopeShared {
 			continue
 		}
-		ch, err := watcher.WatchRecords(ctx, recordSet(r, cur, ent, ent.ID))
+		ch, err := h.watchEntity(ctx, watcher, r, cur, ent, uid) // #271: addressed records
 		if err != nil {
 			fail(w, err)
 			return

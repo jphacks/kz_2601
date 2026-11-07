@@ -307,13 +307,14 @@ SEV1。**原因の調査より先にキーを無効化する。**
 
 自動の動き(サーバーのルール・#341)を使ったスパム・フィッシング・いやがらせの通知、または越境(他のアプリのデータが動いた・宛先でない人に届いた)の疑い。越境の疑いは SEV1、スパム・フィッシングは広がり方で SEV1〜2([決定 339](../decisions/339-abuse-threat-model.md#止めるスイッチ346))。
 
-runner はまだデプロイしていない。デプロイの後に使う手順。止めるスイッチ(#346)は 5 つあり、どれもデプロイ無しに次のきっかけから効く(止めている間のきっかけは実行せずに終わり、解いても後からまとめて実行しない):
+runner はまだデプロイしていない。デプロイの後に使う手順。止めるスイッチ(#346)は 6 つあり、どれもデプロイ無しに次のきっかけから効く(止めている間のきっかけは実行せずに終わり、解いても後からまとめて実行しない):
 
 | スイッチ | 止める範囲 | 操作 |
 |---|---|---|
 | `RUNNER_PAUSED=1` | 環境の自動の動きを全部(`skipped_paused`) | runner のサービスの env |
 | `RUNNER_NOTIFY_PAUSED=1` | 環境の**通知だけ**(書き込みは動く) | runner のサービスの env |
-| アプリの停止 | 1 つのアプリ(`skipped_stopped`・`reason=operator_stop`・`stop_level=app`)。作成者は解けない | `moderate stop-app` |
+| 全体の停止 | `RUNNER_PAUSED` と同じ範囲(`skipped_stopped`・`stop_level=global`)。新しいリビジョンを待たずに効く | `moderate stop-all`(`-force` で下の書き込みの拒否も) |
+| アプリの停止 | 1 つのアプリ(`skipped_stopped`・`reason=operator_stop`・`stop_level=app`)。定期のルールも止まる。作成者は解けない。`-for 24h` で期限つきの一時停止、`-force` でルールのきっかけになる書き込みも 403 `app_stopped` で断る(強制停止) | `moderate stop-app` |
 | ルールの停止 | 1 つのルール(`stop_level=rule`) | `moderate stop-rule` |
 | アプリの通知の一時停止 | 1 つのアプリの通知だけ(期限つき) | `moderate pause-notify`(と、下の自動) |
 
@@ -339,16 +340,17 @@ runner はまだデプロイしていない。デプロイの後に使う手順�
 
    ```sh
    go run ./cmd/moderate stop-app <appId> -env prod -reason "規約に反する通知を送っていたため止めました" -allow-prod-db -yes
+   go run ./cmd/moderate stop-app <appId> -env prod -reason "..." -force -allow-prod-db -yes     # 書き込みも断る
    go run ./cmd/moderate stop-rule <appId> <ruleId> -env prod -reason "..." -allow-prod-db -yes
    ```
 
 4. 規約に当たれば非公開化(`hide-app`・[moderation.md](../infra/moderation.md))、悪質ならアカウントの無効化(人)。作成者への理由の表示は #347。
 
-`-env` は runner の環境(`prod` / `stg` / `local`)。本番の Firestore には `-allow-prod-db` が無いと動かない。`-yes` が無いと書かずに何をするかだけ出す。止めた記録は `runner/{env}/stops/*` に残る(誰が・いつ・理由・解いた時刻)。`go run ./cmd/moderate stops -env prod -allow-prod-db` で一覧。
+`-env` は runner の環境(`prod` / `stg` / `local`)。本番の Firestore には `-allow-prod-db` が無いと動かない。`-yes` が無いと書かずに何をするかだけ出す。止めた記録は `runner/{env}/stops/*` に残る(誰が・いつ・理由・解いた時刻)。`go run ./cmd/moderate stops -env prod -allow-prod-db` で一覧。止める・解くたびに `runner/{env}/stop_log` にも 1 件ずつ足す(操作した人 `-operator`(既定 `$USER`)・理由・期限・強制か。自動の一時停止も)。`go run ./cmd/moderate stop-log [appId] -env prod -allow-prod-db` で新しい順に見る。
 
 ### 戻し方
 
-- アプリ・ルール・アプリの通知: `resume-app <appId>` / `resume-rule <appId> <ruleId>` / `resume-notify <appId>`(それぞれ `-env prod -allow-prod-db -yes`)。自動の一時停止も `resume-notify` で解く。解いた後は、それまでの通報では自動で止め直さない(新しく 3 人の通報があれば止まる)。
+- 全体・アプリ・ルール・アプリの通知: `resume-all` / `resume-app <appId>` / `resume-rule <appId> <ruleId>` / `resume-notify <appId>`(それぞれ `-env prod -allow-prod-db -yes`)。自動の一時停止も `resume-notify` で解く。解いた後は、それまでの通報では自動で止め直さない(新しく 3 人の通報があれば止まる)。
 - 環境の `RUNNER_NOTIFY_PAUSED` / `RUNNER_PAUSED`: `--remove-env-vars=RUNNER_NOTIFY_PAUSED`(または `=0`)。
 - 止めていた間のきっかけは実行されない(後からまとめて送らない)。必要なら作成者に知らせる。
 - 振り返り(§10)を書く。

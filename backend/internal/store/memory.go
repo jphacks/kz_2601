@@ -43,6 +43,9 @@ type Memory struct {
 	// marks
 	marks map[string]bool // record/mark/uid keys (memory_marks.go)
 
+	// follows (#270, memory_follow.go): appId -> follower uid -> followed uids
+	follows map[string]map[string][]string
+
 	// account deletion
 	deleted map[string]time.Time // uid -> deletedAt of DELETE /v1/me (memory_account.go)
 	purged  map[string]bool      // uids erased by PurgeAccount + MarkAccountPurged
@@ -75,7 +78,8 @@ type Memory struct {
 	runnerApps map[string]*RunnerApp           // env/key
 
 	// runner stops (#346, memory_stop.go)
-	stops map[string]map[string]*Stop // env -> id
+	stops   map[string]map[string]*Stop // env -> id
+	stopLog map[string][]StopEvent      // env -> entries, oldest first
 
 	// runner rule statuses (#347, memory_rule_status.go)
 	ruleStatus map[string]map[string]*RuleStatus // env -> id

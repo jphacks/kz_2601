@@ -70,6 +70,7 @@ struct JoinShareSheet: View {
             point("eye", "参加している人が付けた記録が見られます")
             point("square.and.pencil", "あなたが付けた記録も、参加している人に見えます")
             point("list.bullet", "参加している人の一覧に、下の名前で出ます")
+            point("bell", "他の人の行動で届く通知を受け取ります。設定でオフにできます")
             point("rectangle.portrait.and.arrow.right", "共有シートから、いつでも抜けられます")
         }
         .frame(maxWidth: .infinity, alignment: .leading)

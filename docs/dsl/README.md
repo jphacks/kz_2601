@@ -48,16 +48,18 @@
 ## 3. 構造
 
 ```
-AppDSL { schemaVersion:1, app:AppMeta, initialScreen, entities[], screens[] }
+AppDSL { schemaVersion:1, app:AppMeta, initialScreen, entities[], screens[], serverRules[]? }(serverRules は §3.12)
 AppMeta { name, description?, icon?, theme?{primaryColor,mode}, voiceEntry: fullscreen|floating|none, notifications[]?, tabs[]?: {screen,title,icon?} }
 Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|members, fields[]: Field{ id, name, type, required?, options?, defaultValue?, unit?, refEntity?, computed?: Expr, health?: "weight" } }
   予約値(field id の代わり): $author(共有 entity の投稿者)・$createdAt(作成日時)— §3.5
   Entity.marks?: [{ id, icon, label }](共有 entity の 1 人 1 回の印・いいね / 保存)・ListItem.mark? / 予約値 $marks.<id>(件数・自分が付けたか)— §3.5
   Entity.retentionDays?: 1〜3650(記録の保存期間。期限を過ぎた記録を端末が自動で消す)— §3.7
   Entity.single?: true(設定値の置き場。レコードは常に 1 件・式 {"setting": "<fieldId>"} で読む)— §3.11
+  Entity.unique?: [fieldId|$author](1〜3・一意)/ deleteBy?: author|admins|authorOrAdmins・Field.editableBy?: "admins"・Field.type "member"・button.visibleTo?: "admins" — §3.13
+  Entity.addressedTo?: fieldId(宛先の member / members field。作った人と宛先の人だけが読む)・Field.type "members" — §3.14
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section|card|disclosure|carousel|grid, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (66 種・全て id? と area? を持つ) / Action (13 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField?, when?, alarm? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
+Leaf (66 種・全て id? と area? を持つ) / Action (15 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField?, when?, alarm? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
@@ -150,7 +152,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 `color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
-### 3.2 アクション(13 種)
+### 3.2 アクション(15 種)
 
 | type | フィールド | iOS の挙動 |
 |---|---|---|
@@ -158,6 +160,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `back` | | スタックがあれば pop、モーダル最下層なら dismiss |
 | `saveRecord` | `entity`, `screen?` | ドラフトを POST(新規)/PATCH(編集)→ レコード再取得 → `screen` へ、無ければ `back` |
 | `deleteRecord` | `entity`, `confirmMessage?` | 現在の recordId を DELETE → back。list の長押し削除も同じ |
+| `follow` / `unfollow` | `entity`(public / shared) | 今開いている投稿を書いた人をフォローする / 外す(#270・下の「フォロー」)。今の状態に合わない方と、自分の投稿では隠れる |
 | `openVoice` | | 音声シートを開く |
 | `openUrl` | `url` | Safari で開く |
 | `resetForm` | | ドラフトを既定値に戻す |
@@ -172,7 +175,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 - **書き出し `export`(#421)**: 記録を CSV(UTF-8 BOM 付き・CRLF・1 行目は項目名)か A4 の PDF(見出し・書き出し日・絞り込み・件数・グラフ・表)にして `UIActivityViewController` で共有する。値は一覧・表と同じ書式(日付・¥・選択肢・参照先の名前・計算項目)で、写真・動画は入れない。`fields` 省略で全項目。`filter` は `list.filter` と同じ(単体 / 配列)。hidden(#262)は自分が書いた行だけ値を出し、他人の行しか無ければ列ごと出さない。`=` `+` `@` 等で始まるセルは `'` を前に付ける(CSV インジェクション対策)。PDF には押した画面にある同じ entity の `chart` を `ImageRenderer` で画像にして表の上に入れる。Leaf(`exportButton`)ではなく Action にしたのは、(1) toolbar からも同じ動作を置ける、(2) `confirmMessage` 等の既存の仕組みと button の見た目をそのまま使える、(3) 古い iOS は「未対応のアクション」の toast で済み画面が崩れない、の 3 点(上の「新規アクションは追加しない」の例外)。整形は `RecordExport` / `CSVWriter`(MetamonDSL・純関数)、PDF とファイルは `RecordExporter.swift`(Renderer)。審査用ビルドにも残す(ネイティブ権限が不要)。
 
-- **カレンダーへの追加 `addToCalendar`**: 今のレコード(`screen.entity == entity` のフォーム画面の button / toolbar なら入力中の値・未保存でも、`list.onItemTap` ならタップした行)を EventKitUI の `EKEventEditViewController` に埋めて開き、ユーザーが「追加」を押すと端末のカレンダー(iCloud・Google など端末に設定したもの)に入る。iOS 17 以降この画面は別プロセスで動くので、**カレンダーの許可・`NSCalendars*UsageDescription`・entitlement は要らない**(アプリは端末の予定を読まない)。`startField` が `date` なら終日、`datetime` ならその時刻から。終わりは `endField` の値(空・始まりより前なら無視)→ `durationMinutes`(既定 60)。名前は `titleField` → `entity.titleField` → 最初の string → entity 名。`alertMinutes` はカレンダー側の通知(N 分前・0 は始まり)。始まりが空なら「「開始」を入力してください」。Go は field の存在と型(start / end = date・datetime、title / location = string・text・enum、notes = string・text)と範囲を検証(`backend/pkg/dsl/calendar_event.go`)。組み立ては `CalendarEventPlan`(MetamonDSL・純関数)、画面は `AppRuntime+Calendar.swift`。Action にしたのは `export` と同じ 3 点(toolbar にも置ける・button の見た目と `confirmMessage` を使える・古い iOS は「未対応のアクション」の toast で済む)。審査用ビルドにも残す(権限が要らない)。止めるまで鳴る目覚ましはカレンダーではなく通知の `alarm`(§3.13・AlarmKit)。スクリーンタイム(FamilyControls)は権限と entitlement が要るので入れていない。
+- **カレンダーへの追加 `addToCalendar`**: 今のレコード(`screen.entity == entity` のフォーム画面の button / toolbar なら入力中の値・未保存でも、`list.onItemTap` ならタップした行)を EventKitUI の `EKEventEditViewController` に埋めて開き、ユーザーが「追加」を押すと端末のカレンダー(iCloud・Google など端末に設定したもの)に入る。iOS 17 以降この画面は別プロセスで動くので、**カレンダーの許可・`NSCalendars*UsageDescription`・entitlement は要らない**(アプリは端末の予定を読まない)。`startField` が `date` なら終日、`datetime` ならその時刻から。終わりは `endField` の値(空・始まりより前なら無視)→ `durationMinutes`(既定 60)。名前は `titleField` → `entity.titleField` → 最初の string → entity 名。`alertMinutes` はカレンダー側の通知(N 分前・0 は始まり)。始まりが空なら「「開始」を入力してください」。Go は field の存在と型(start / end = date・datetime、title / location = string・text・enum、notes = string・text)と範囲を検証(`backend/pkg/dsl/calendar_event.go`)。組み立ては `CalendarEventPlan`(MetamonDSL・純関数)、画面は `AppRuntime+Calendar.swift`。Action にしたのは `export` と同じ 3 点(toolbar にも置ける・button の見た目と `confirmMessage` を使える・古い iOS は「未対応のアクション」の toast で済む)。審査用ビルドにも残す(権限が要らない)。止めるまで鳴る目覚ましはカレンダーではなく通知の `alarm`(§3.15・AlarmKit)。スクリーンタイム(FamilyControls)は権限と entitlement が要るので入れていない。
 
 構造・ナビ・ネイティブ系の設計メモ(新規アクションは追加しない):
 
@@ -194,9 +197,9 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 - `gridTable`(#234)は時間割のマス目。列 = columnField の値(enum の options か columnValues)、行 = rowField の値(integer は rowRange、enum は options か rowValues)。マスのタップは `onItemTap`: 記録 1 件 = recordId 付きで編集、空き = 列・行の値を `FormPrefill` に積んで新規、複数 = メニュー(各記録の編集 + 追加)。1 マスに複数ある時は先頭 + 「+n」。列見出しが曜日なら今日の列を強調。列が画面幅に収まらなければ横スクロール、縦は `GridCell` の内側スクロール。配置計算は iOS `GridTableLayout`(MetamonDSL)。実例: `examples/timetable.json`。
 - **`randomPicker`(#263)**: ボタンを押すたびに entity のレコード(`filter` で絞れる)から 1 件をランダムに選び、`titleField`(+ `subtitleField`)を大きく出す(約 0.7 秒のシャッフル演出・「視差効果を減らす」では演出なし)。候補が 2 件以上なら直前と同じ 1 件は続けて出さない。**乱数は Expr に入れない**: 計算式は描画のたびに評価されるので、乱数を入れると再描画・レコード再取得のたびに値が変わる。選んだ 1 件は部品の表示状態(SwiftUI `@State`)だけに持ち、保存しない(画面を離れると消える・再描画では変わらない)。選んだ 1 件のタップは `onItemTap` を recordId 付きで実行(list の行タップと同じ)。選び方は iOS `RandomPick`(MetamonDSL・乱数源を差し替えてテスト)。古い iOS では未知 type としてプレースホルダになる(落ちない)。実例: `examples/dinner.json`。
 - **ファイルの取り込み `fileImport`**: ボタンで iOS のファイル選択(`.fileImporter`・別プロセスで権限の確認なし)を開き、選んだファイルから entity に記録を足す。**処理はすべて端末内**で、ファイルそのものは送らない・コピーしない・残さない(足した記録だけが `createRecord` で今まで通り保存・同期される)。足す前に件数と読めない行を出して確かめる。
-  - **csv**: 1 行 = 1 件。1 行目は項目名で、`map` に書いた列が先に、残りは項目名が field の `name` か `id` と同じ列に当たる(前後の空白・大文字小文字は無視・1 つの field に 1 列)。計算項目・写真・動画・録音の列は使わない。`export` の CSV(BOM・CRLF・`¥1,200`・はい / いいえ・`10/24(金)`(年なしは今年)・参照先の名前・先頭の `'`)はそのまま読み戻せる。文字コードは UTF-8(BOM 有無)→ UTF-16(BOM)→ Shift_JIS(日本語の Excel)。引用符・`""`・セル内の改行・CRLF / LF / CR に対応。型に合わないセル(数にできない・選択肢に無い・参照先が無い・長すぎる)や空の必須項目がある行は入れずに数え、最初の 3 行を「n 行目: 項目「値」を読めません」で見せる。空のセルはフォームの新規と同じ既定値(boolean false・enum の最初・日付は今日・`defaultValue`)。1 回 500 件・entity の合計 2000 件(`store.MaxRecordsPerEntity`)まで。
+  - **csv**: 1 行 = 1 件。1 行目は項目名で、`map` に書いた列が先に、残りは項目名が field の `name` か `id` と同じ列に当たる(前後の空白・大文字小文字は無視・1 つの field に 1 列)。計算項目・写真・動画・録音・参加者(member / members)の列は使わない。`export` の CSV(BOM・CRLF・`¥1,200`・はい / いいえ・`10/24(金)`(年なしは今年)・参照先の名前・先頭の `'`)はそのまま読み戻せる。文字コードは UTF-8(BOM 有無)→ UTF-16(BOM)→ Shift_JIS(日本語の Excel)。引用符・`""`・セル内の改行・CRLF / LF / CR に対応。型に合わないセル(数にできない・選択肢に無い・参照先が無い・長すぎる)や空の必須項目がある行は入れずに数え、最初の 3 行を「n 行目: 項目「値」を読めません」で見せる。空のセルはフォームの新規と同じ既定値(boolean false・enum の最初・日付は今日・`defaultValue`)。1 回 500 件・entity の合計 2000 件(`store.MaxRecordsPerEntity`)まで。
   - **text / pdf**: 本文を取り出して `field`(text は 20000 字・string は 4000 字まで。超えたら切って伝える)に入れた記録を 1 件足し、entity の `titleField`(string / text)にはファイル名(拡張子なし)を入れる。PDF は PDFKit の文字の層を読み、文字の無いページ(スキャン)は `photoField.analyze` と同じ Vision の文字認識で読む(最大 10 ページ)。パスワード付きの PDF は読めない。
-  - 検証(`backend/pkg/dsl/file_import.go`): entity は private / shared だけ(public・single・match は不可)。`accept` は csv / text / pdf の重複なし。text / pdf があれば `field` は保存する text / string の field、無ければ `field` を書かない。`map` は csv の時だけで、列・field の重複なし、計算項目・写真・動画・録音は不可(最大 50)。text / pdf の entity は、本文・題名・既定値で埋まらない required の field を持てない。
+  - 検証(`backend/pkg/dsl/file_import.go`): entity は private / shared だけ(public・single・match は不可)。`accept` は csv / text / pdf の重複なし。text / pdf があれば `field` は保存する text / string の field、無ければ `field` を書かない。`map` は csv の時だけで、列・field の重複なし、計算項目・写真・動画・録音・参加者(member / members)は不可(最大 50)。text / pdf の entity は、本文・題名・既定値で埋まらない required の field を持てない。
   - 読めないもの: 音声・動画・画像・Word・Excel(.xlsx)のファイル(Excel は CSV で保存してもらう)。審査用ビルドにも残す(権限が不要で端末内の処理だけ・`docs/ios/review-build.md`)。プライバシーの申告は変わらない(`docs/store/privacy-label.md`)。
 - **`flashcards`(#264)**: 単語カード・暗記カード。entity のレコード(`filter` で絞れる)を 1 枚ずつ出し、タップで `front` と `back` をめくる(「視差効果を減らす」では回転せずに切り替える)。右スワイプ = 「覚えた」・左 = 「まだ」で `toggle`(boolean・computed 不可)に true / false を保存し次のカードへ(保存は `list.item.toggle` と同じ `updateRecord` の経路・楽観的 UI)。スワイプの代わりに「まだ」「覚えた」ボタンも出す(VoiceOver はカードの「めくる」と 2 つのボタン)。`filter: {field: toggle, op: eq, value: false}` で覚えたカードを出題から外す(保存値の無いカードは「まだ」として扱う)。上に「n / 全体」の進み具合、全部終えたら完了表示と「もう一度」。どこまで進んだかは部品の表示状態だけに持ち、保存しない(画面を離れると最初から)。`toggle` を省くと記録せずにめくるだけ。並べ方は登録順。状態の計算は iOS `FlashcardDeck`(MetamonDSL)。古い iOS では未知 type としてプレースホルダになる。実例: `examples/vocab.json`。
 - **`feed`(#348)**: 外部の公開データの読み取り専用の一覧。appconfig(`GET /v1/feeds/{provider}`)が**運営の許可リストの出どころだけ**から取る(気象庁の天気予報・内閣府の祝日・許可した公的機関の RSS)。DSL に URL は書けない(provider は閉じた enum・`region` / `feedId` は許可リストと照合)。行は日付・見出し・(天気)アイコン・最高 / 最低・降水確率、(RSS)タップで記事を Safari で開く(https だけ)。下に出典を必ず出す。読むだけで、記録に保存しない・計算やグラフに使えない。審査用の版では部品ごと外す。古い iOS では未知 type としてプレースホルダになる。詳細: [external-feeds.md](../backend/features/external-feeds.md)。
@@ -230,8 +233,13 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `datetime` | RFC3339 |
 | `enum` | `options` の 1 つ |
 | `photo` | `"data:image/jpeg;base64,..."`(v1)または https URL |
+| `video` | `"video:<id>\|data:image/jpeg;base64,<先頭フレーム>"`(本体は録画した端末の中) |
+| `audio` | `"audio:<id>\|<秒>"`(本体は録音した端末の中) |
 | `location` | `"lat,lng"`(P1) |
 | `ref` | 参照先(`refEntity`)のレコード id 文字列。入力は picker |
+| `refs` | 参照先(`refEntity`)のレコード id の配列。入力は複数選択の picker |
+| `member` | 参加者の uid 文字列。scope `shared` だけ(§3.13) |
+| `members` | 参加者の uid の配列。scope `shared` だけ(§3.14) |
 | (computed) | 保存しない。`Field.computed` の Expr を iOS が評価(`expressions.md`) |
 
 `defaultValue` は date/datetime で `"now"` を許可。
@@ -305,6 +313,24 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - appconfig: `PUT` / `DELETE /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}` で自分の印を付ける / 外す(どちらも冪等・`{count, mine}` を返す)。`GET /records` と `GET /records/{id}` はレコード最上位に `marks: {"<markId>": {"count": n, "mine": bool}}` を付ける。Firestore は `…/records/{id}/marks/{markId}`(`count`)と `…/marks/{markId}/by/{uid}`。レコードを消すと印も消える。
 - iOS: 一覧の行のトグルは押した瞬間に件数と塗りを変え、サーバーの `{count, mine}` で確定する(失敗したら戻して理由を出す)。オフラインの間は付けられない(送信待ちの列には積まない)。自分の未送信の投稿にもまだ付けられない。
 - AI: 「いいね」「お気に入り」「保存」「既読」は marks を使い、子 entity を作らない。ai-eval の `mark` / `markedByMe` / `markEntity`(`m0disc_cases.json`)。
+
+#### フォロー `myFollows`(#270)
+
+「フォローした人の投稿だけが流れるタイムライン」。フォローは**アプリごとの人と人の関係**で、appconfig が持つ(DSL の entity ではない)。DSL は読むだけ: 一覧の絞り込みと、投稿の画面のボタン。public / shared の entity だけ。実例: `examples/timeline.json`(ひとことタイムライン)。
+
+| 書く場所 | 形 | 意味 |
+|---|---|---|
+| 部品の `filter` | `{"field":"$author","op":"eq","value":{"myFollows":true}}` | 自分がフォローしている人の投稿だけ(`op:"neq"` = フォローしていない人の投稿。自分の投稿はどちらでも「フォローしていない人」側)。list / table / timeline / stat(件数)/ chart で使え、agg の中では使えない |
+| Action `follow` / `unfollow` | `{"type":"follow","entity":"posts"}` | 今開いている投稿(`list.onItemTap` で開いたその entity の画面)を書いた人をフォローする / 外す。button はフォロー済みなら `follow`、まだなら `unfollow` を隠し、自分の投稿では両方隠す |
+
+- follow / unfollow を Leaf ではなく Action にしたのは `export` と同じ理由(button の見た目と `confirmMessage` を使える・toolbar にも置ける・古い iOS は「未対応のアクション」の toast で済む)。
+- **プロフィール**は投稿者の表示名(`$author`・各自がアプリの設定で決めた名前)。アイコン・自己紹介・人ごとのプロフィール画面は今は無い(参加者の情報に写真が無いため)。
+- **見える範囲**: フォローは本人だけが見られる。フォローされた人には知らせず、フォロワーの一覧・人数も出さない(つきまといに使われにくくする)。scope:shared だけのアプリでは参加者だけがフォローでき、フォローできる相手も参加者だけ。
+- appconfig: `GET /v1/apps/{appId}/follows`(`{uids}`)・`PUT` / `DELETE /v1/apps/{appId}/follows/{uid}`(冪等・`{following, count}`)。一覧の API は `filterField=author&filterOp=in&filterValue=myFollows`(`nin` も)。Firestore は `apps_public/{appId}/follows/{uid}`(`{uids: [...]}`・1 人 1 文書)。1 人が 1 アプリでフォローできるのは 500 人まで。
+- **Firestore の `in`(30 件まで)は使わない**: records は今も 1 entity 2000 件までを読んでメモリで絞っている(§3)。フォローの一覧は 1 文書なので 1 回の読み取りで、何人フォローしても同じ。件数が増えて records をクエリで絞るようになったら、30 人ずつの分割か、投稿時に配る(自動の動き・#341)を選び直す。
+- iOS: 起動時にこのアプリのフォロー一覧を読み、`{"myFollows":true}` を uid の集合に置き換えて端末で絞る(`$author` の `{"me":true}` と同じ所)。ボタンは押した瞬間に一覧へ反映し、失敗したら戻して理由を出す。読み込む前・オフラインで一度も読めていない時は、フォロー中の一覧は空。
+- AI: 「フォロー」「フォロー中」「好きな人の投稿だけ」はこの filter とボタン。フォロー用の entity・相手を選ぶ ref は作らない。ai-eval の `followFilter` / `followButton` / `followEntity`(`follow_cases.json`・`m0disc_cases.json` d_sns_follow)。
+- 古い iOS(この機能の前の版)は `{"myFollows":true}` を読めずに filter ごと捨てるので、その一覧は全員の投稿になり、ボタンは押すと「未対応のアクション」になる(落ちない)。
 
 ### 3.6 ナビゲーション = 画面グラフの規則(#112 #114 #115)
 
@@ -442,11 +468,12 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 |---|---|---|
 | きっかけ `on` | `record`: `created` / `updated`(+ `entity`、更新は `fields` で「この field が変わった時」に絞れる)。`every`: `daily` / `weekly`(`weekday`)/ `monthly`(`day` 1〜28)+ `time` HH:MM(作成者のタイムゾーン)。時刻のきっかけは `each`: `<entity>` でそのレコード 1 件ずつに動かせる | どちらか 1 つ。削除のきっかけ・1 日 1 回より細かい時刻・外からの呼び出しは無い。`each` は時刻のきっかけだけ・ルールと同じ側の entity だけ |
 | 条件 `if` | Expr(行 = きっかけのレコードか `each` のレコード。`"<refField>.<field>"` で ref 先、更新では `"$prev.<field>"` で前の値)。`agg` で同じアプリの記録を集計できる(下の「記録を読むルール」) | 真偽であること。`streak` / `doneInDays`・computed field は使えない。`each` の無い時刻のきっかけには行が無い(`ref` 不可・`agg` は可) |
+| 突き合わせ `lookup` | `{op: exists / notExists, entity, field, equals}`: 別の entity に、`field` の値が行の `equals` の値と同じレコードがある / 無い時だけ動く(`if` と両方)。下の「記録を読むルール」 | 1 ルールに 1 つ・等しいかだけ。行が要る(`each` の無い時刻のきっかけは不可) |
 | 処理 `do`(1〜5 個) | `notify`{`to`, `title`, `body`} / `createRecord`{`entity`, `values`} / `updateRecord`{`ref`?, `values`} / `increment`{`ref`, `field`, `by`?} | 1 つのオブジェクトに 1 種類だけ。書けるのはきっかけと同じ側の entity(private どうし・shared / public どうし)。computed・photo・video・location の field には書かない。createRecord は required の field を全部書く |
-| 宛先 `to.kind` | `owner`(作成者)/ `author`(きっかけのレコードを書いた人)/ `authorOf` + `field`(ref 先のレコードを書いた人)/ `members`(参加者全員) | private は `owner` だけ、**public は `owner` と `authorOf` だけ**、shared は全部。きっかけを起こした本人には送らない。任意の uid・メール・電話・外部の宛先は無い |
+| 宛先 `to.kind` | `owner`(作成者)/ `author`(きっかけのレコードを書いた人)/ `authorOf` + `field`(ref 先のレコードを書いた人)/ `members`(参加者全員)/ `recipients` + `field`(宛先付きの記録の宛先の人・§3.14) | private は `owner` だけ、**public は `owner` と `authorOf` だけ**、shared は全部。きっかけを起こした本人には送らない。任意の uid・メール・電話・外部の宛先は無い |
 | 通知の本文 | 決まった枠 + `{<field>}`(きっかけ・`each` のレコードの値)・`{$author}`(書いた人の表示名・shared / public)・`{<名前>}`(`with` の数・日付) | **題 30 字・本文 80 字**(差し込みの `{…}` も数える)。差し込む値は実行の時に 30 字で切る。URL・ドメイン・メールアドレス・電話番号・「公式」「運営」などの名乗り・制御文字・見えない文字は不可。ref・refs・photo・video・location・hidden・computed の field は差し込めない |
 | 連鎖 | 処理が書いたレコードは次のきっかけを起こさない | 別のルール(自分も含む)のきっかけになる書き込み(作るなら created、書き換え・increment は同じ field の updated)を断る |
-| 上限 | ルール 20・時刻のルール 5・処理 5(Pro の値)。1 つのルールが読む entity(`each` + `agg`)は 2 つまで・`with` は 3 つまで | 無料の値(3・1・3)は `App.ServerRuleQuotaProblems(pro)` で、プランが分かる所(appconfig)が見る。読む件数の上限は runner が持つ(下) |
+| 上限 | ルール 20・時刻のルール 5・処理 5(Pro の値)。1 つのルールが読む entity(`each` + `agg` + `lookup`)は 2 つまで・`with` は 3 つまで | 無料の値(3・1・3)は `App.ServerRuleQuotaProblems(pro)` で、プランが分かる所(appconfig)が見る。読む件数の上限は runner が持つ(下) |
 | 使えないアプリ | 仲間探し(`entity.match`)のアプリ | `serverRules` ごと断る |
 | single の entity(§3.11) | 「常に 1 件」なので `createRecord` の行き先にできない。きっかけにするのと、きっかけの 1 件の `updateRecord`(上書き)はよい | `createRecord` の entity が single なら断る |
 | `{"setting":…}` | 設定は利用者ごとの値で、どの人の設定かが決まらないので、条件・値の式で使えない(private のルールでも) | 式に `setting` があれば断る |
@@ -460,6 +487,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 | `agg` を `if` / `values` / `by` / `with` で | 同じアプリの、**ルールと同じ側**(private どうし・shared / public どうし)の entity のレコードを集計(count / sum / avg / min / max / latest / earliest・filter の期間 `thisWeek` などや比較)。filter の値の `ref` は行のレコード | 「今月の支出が 5 万円を超えたら知らせて」: `if` に `{"op":"gt","args":[{"agg":"sum","entity":"expenses","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}},50000]}` |
 | `on.each`(時刻のきっかけ) | その entity のレコード 1 件ずつにルールを動かす(行 = そのレコード)。`if` で絞り、`{<field>}`・`author`・`updateRecord`(ref 省略 = そのレコード)・`increment` が使える。値が変わらない `updateRecord` は書かない | 締め切りの 3 日前: `{"every":"daily","time":"08:00","each":"tasks"}` + `if` `daysUntil(due) == 3`。順位: `each` + `updateRecord` `rank = count(score > 自分の score) + 1` |
 | `notify.with` | `{名前: 数か日付の Expr}`(3 つまで)。本文に `{名前}` で差し込む。文字の値は不可。数は利用者の値から来ることがあるので、差し込む時に電話番号らしい桁(10 桁以上)を伏せる | 毎週のまとめ: `"body":"今週は {count} 件・{total} 円でした"`, `"with":{"count":{"agg":"count",…},"total":{"agg":"sum",…}}` |
+| `lookup`(突き合わせ) | `entity` のレコードのうち `field`(string / text / enum / integer / number / date / ref か `$id`)の値が、行の `equals`(field か `$id`)の値と同じものがある(`exists`)/ 無い(`notExists`)時だけ動く。文字と数は全角半角・大文字小文字・前後の空白を区別せず文字として比べる(取り込んだ名簿の表記の揺れ)。日付は日付どうし、ref と `$id` は同じ entity の ID どうしで、そのまま比べる。行の値が空ならどちらの op でも動かない。`entity` が行と同じなら行のレコード自身は数えない(重複の検出)。`if` の後に確かめる(`if` が偽なら読まない) | 名簿との照合(tk_2413): `each` registrations + `{"op":"notExists","entity":"roster","field":"student_id","equals":"student_id"}` + `updateRecord` `mismatch = true`。まだ行っていない店: `each` shops + `{"op":"notExists","entity":"visits","field":"shop","equals":"$id"}` |
 
 ```json
 {"id":"due_soon","on":{"every":"daily","time":"08:00","each":"tasks"},
@@ -468,18 +496,55 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
  "do":[{"notify":{"to":{"kind":"owner"},"title":"締め切り","body":"{title} の締め切りまであと 3 日です"}}]}
 ```
 
-- 例の全体は `backend/pkg/dsl/testdata/server_rules_reads.json`(家計の集計・週のまとめ・期限)と `server_rules_ranking.json`(shared の順位)。
+- 例の全体は `backend/pkg/dsl/testdata/server_rules_reads.json`(家計の集計・週のまとめ・期限)と `server_rules_ranking.json`(shared の順位)、`server_rules_lookup.json`(名簿との照合・まだ行っていない店)。
 - **費用と上限**(runner の `quota`): 読んだレコード 1 件 = Firestore の読み取り 1 回(1,000 件 ≈ 0.0004 USD・#338 の原価)。1 回の実行で読めるのは Pro 500 件(`RUNNER_LIMIT_RUN_READS_PRO`)、アプリごとに 1 日 Pro 20,000 件(`RUNNER_LIMIT_APP_READS_PRO`・カウンタ `rr_app_{appId}`)。同じ entity は 1 回の実行で 1 度だけ読む(`each` の行どうしで共有)。**超えたらその回は実行しない**(`skipped_quota`・`limit` に `run_reads` / `app_reads`)。一部の記録だけで計算した誤った合計・順位は出さない。`runner.usage` の `reads` と `est_cost_usd` に入る。値は出発点で、#338 と同じく実測で直す。
-- 読める範囲(#337 の層 3 を広げた): きっかけのレコード・その ref 先に加えて、`each` / `agg` の entity の**同じアプリ・同じ側**のレコードと、その ref 先。取っ手(`scope.Handle.List`)が appId と側を確かめる。
+- 読める範囲(#337 の層 3 を広げた): きっかけのレコード・その ref 先に加えて、`each` / `agg` / `lookup` の entity の**同じアプリ・同じ側**のレコードと、その ref 先。取っ手(`scope.Handle.List`)が appId と側を確かめる。`lookup` は `agg` と同じ取っ手でその entity を 1 回の実行で 1 度だけ一覧し(上の件数の上限・費用に数える)、値で引く表を作って突き合わせる。`agg` の count + filter で読めるものより多くは読まない。宛先付きの entity(§3.14)は `each` / `agg` / `lookup` / ref 先の読み取りの対象にできない。
 - 1 回の書き込みの上限(Pro 10)は `each` の全部の行で数える。順位を 10 件より多く書き換える日は、残りがその日は書かれない(次の日に続きが書かれる)。
-- まだ作らない(決定の範囲の外か、宣言で表せない): 推薦・相性・似ている人の自動の組み合わせ、複数人への割り当て・日程の自動調整、距離での自動のグループ分け、外部のデータの取得。
+- まだ作らない(決定の範囲の外か、宣言で表せない): 好み・相性・似ている人での推薦と自動の組み合わせ(「まだ行っていない」「名簿に無い」は `lookup` で書ける)、複数人への割り当て・日程の自動調整、距離での自動のグループ分け、外部のデータの取得。
 
 - 共有データに効くのは作成者の公開 DSL(`apps_public/{appId}`)の宣言だけ。参加者が自分のコピーを書き換えても効かない(#337・runner の側で守る)。
 - 人が読める説明は `App.DescribeServerRule`(例: 「出欠」が作られた時(条件に合えば)、「予定」を作った人に通知・「予定」の「参加の数」を数える)。「このアプリの自動の動き」の一覧(#347)で使う。
 - 古い iOS: `AppDSL` はトップの未知キーを読まないので、`serverRules` があっても今までどおり開ける。
 - AI の生成(#343): 生成用スキーマ(`ai.GenerationSchema()`)には入れず、依頼が自動の動き(通知・定期・数える など)を含む時だけ、UI の生成の後に別の小さな呼び出し(`backend/internal/ai/server_rules_pass.go`・専用スキーマ `ServerRulesGenerationSchema()`・`createRecord` / `updateRecord` の `values` はそこだけ `[{field, value}]` の配列)で `serverRules` 全体を書く。結果は `Validate()` を通し、通らなければ問題を添えて再生成、最後まで通らなければルール無しで保存して summary で断る。作ったルールは `DescribeServerRule` の文で summary に出る。`AI_SERVER_RULES=1` の時だけ動く(既定は無効)。
 
-### 3.13 通知の alarm = 止めるまで鳴るアラーム
+### 3.13 管理者の権限と重複の防止(#272 #273・M4)
+
+「店長だけが確定できる」「削除は管理者だけ」「同じ時間に 2 人予約できないように」「1 人 1 回答」を宣言で書く。守るのはサーバー(appconfig)で、iOS は表示を合わせるだけ。実装: `backend/pkg/dsl/data_rules.go`(検証)・`backend/internal/appconfig/data_rules.go`(権限と 409)・`backend/internal/store/unique.go`(一意の予約)。
+
+| 書く場所 | 形 | 意味 | 制約(`Validate()`) |
+|---|---|---|---|
+| 管理者(DSL 外) | `PATCH /apps/{appId}/members/{uid}` `{"admin": true}` | 作った人が最初の管理者(外せない)。管理者は参加者を管理者にでき、自分でやめられる(`me`)。`GET /members` の各行と最上位に `admin` | — |
+| `field.editableBy` | `"admins"` | その項目を入れる・変えるのは管理者だけ(作成で既定値・空以外を入れる / 更新で値を変える → 403 `details.reason: admins_only`)。管理者は**他人のレコードでもその項目だけ**変えられる(entity の `edit` によらない) | shared / public の保存する field |
+| `entity.deleteBy` | `author`(省略時)/ `admins` / `authorOrAdmins` | 誰が消せるか。全件削除(`DELETE .../records`)は、管理者なら全員の分・`admins` で管理者でなければ 403 | shared / public・match / single 以外 |
+| `button.visibleTo` | `"admins"` | 管理者にだけボタンを出す(表示だけ。守る値には editableBy / deleteBy も付ける) | button だけ・shared / public の entity があるアプリ |
+| `field.type: "member"` | 参加者の uid(文字列) | 担当者・当番。入力は picker(参加者の表示名が並ぶ)、一覧は表示名。参加者でない uid は 422 | scope `shared` の entity だけ・defaultValue 不可・入力は picker |
+| `entity.unique` | `["slot"]`・`["day","slot"]`・`["$author"]`・`["event","$author"]`(1〜3 個) | 全部が同じレコードは 1 件だけ。違反は **409 `duplicate_record`**(`details.reason: duplicate`・`details.fields`) | field は string / integer / number / currency / boolean / date / datetime / enum / ref / member。`$author` は shared / public。single / match には書かない |
+
+- **一意の守り方**: 値の組を hash した鍵を `entities/{e}/unique/{key}`(`{recordId}`)にレコードと同じトランザクションで置く(2 人が同時に押しても片方だけ通る)。レコードは自分の鍵を `uniqueKey` に持ち、更新で値が変われば鍵を移し、削除・全件削除で外す。`unique` を足す前からあるレコード(鍵が無い)とも比べるため、鍵を取る時に同じ値のレコードをクエリでも探す(読み取り +1)。鍵の持ち主のレコードが無い・別の鍵を持つ時は古い鍵として取り直す。空の項目があるレコードは比べない。値の変わらない更新は比べ直さない(前からある重複を編集で 409 にしない)。
+- **サーバーの自動の動き(§3.12)の書き込み**は権限と一意を見ない(作成者の宣言で動くため)。一意の比較の相手にはなる。
+- iOS: `supportedFeatures` に `dataRoles` を送る。送らない古い版には AI が member と visibleTo を使わない(member は string に・visibleTo は外す・§5.3)。古い版でも editableBy / deleteBy / unique はサーバーが守る(断られた時の文言が汎用になるだけ)。iOS は 409 `duplicate` を「同じ内容の記録がもうあります」、403 `admins_only` を「管理者だけが変更できます」と出す。
+- AI: `backend/internal/ai/data_roles_rules.go`。
+
+### 3.14 宛先を選んで送るメッセージ(1 対 1・グループ宛て・#271・M4)
+
+「1 対 1 のメッセージ」「先生にだけ質問」「選んだ何人かに連絡」を、宛先の人と送った人だけが読める記録で作る。守るのはサーバー(appconfig)で、iOS は宛先を選ぶ入力と表示を持つだけ。実装: `backend/pkg/dsl/addressed.go`(検証)・`backend/internal/appconfig/addressed.go`(読める人の判定)・`backend/internal/store/watch_visible.go`(リアルタイム更新)。
+
+| 書く場所 | 形 | 意味 | 制約(`Validate()`) |
+|---|---|---|---|
+| `entity.addressedTo` | 宛先の field id | この entity のレコードは**作った人と宛先の人だけ**が読める。ほかの参加者(アプリの作成者・管理者を含む)には、無いのと同じ | scope `shared` だけ。宛先の field は type `member`(1 人)か `members`(複数)・computed / editableBy 不可。`edit:"members"`・`single`・`match` とは書けない。`unique` を書くなら `$author` を含める |
+| `field.type: "members"` | 参加者の uid の配列 | グループ宛ての宛先。入力は picker(参加者を複数選ぶ)、一覧は表示名を並べる。参加者でない uid は 422 | scope `shared` の entity だけ・defaultValue 不可・入力は picker |
+
+- **読める人の決め方**: レコードを作る時に appconfig が「作った人 + 宛先」を `readers` としてレコードに持たせる(API には出さない)。宛先は送った後で変えられない(PATCH で変えると 422)。宛先が空の作成も 422。`readers` を持つレコードは、後から DSL の `addressedTo` を外しても `readers` の人にしか見えない(古いメッセージが開かない)。
+- **見えない人に対して**(すべて 404・中身も有無も返さない): 一覧(`GET .../records` から除く)・取得・PATCH・DELETE・印(`PUT/DELETE .../marks`)・通報(`POST /reports` の record)。全件削除(`DELETE .../records`)は今までどおり自分の分だけ(`deleteBy` で管理者が消せる entity なら管理者は全員の分を消せる。中身は読めない)。リアルタイム更新(`GET /events`)は、宛先付きの entity では自分が読める記録が変わった時だけ `records` を送る。
+- **集計**: 一覧が読める分だけなので、端末の集計(stat・agg・未読の数)も自分が読める記録だけになる。
+- **自動の動き(§3.12)**: 宛先付きの entity をきっかけにするルールは、通知の宛先が `author` と `recipients` だけ・書き換えはその記録だけ(`createRecord` / `increment` / ref の `updateRecord` は不可)。どのルールも宛先付きの entity に `createRecord` できず、宛先の field を書き換えられない。
+- **ルールが読めるもの**: 宛先付きの entity は `on.each`・`agg`(`if` / `values` / `by` / `with` のどこでも)・`lookup`・`{"ref":"<refField>.<field>"}` の対象にできない(`Validate()` で断る)。runner も実行の時に同じ表で確かめ、合わないルールは `skipped_stopped`(`addressed_rule`)で動かさない。`readers` を持つレコードは、後から `addressedTo` を外しても `each` / `agg` / ref 先の読み取りに出てこず、きっかけにもならない。
+- **宛先の人への通知**: `{"to":{"kind":"recipients","field":"<addressedTo の field>"}}`。きっかけが宛先付きの entity のレコードの時だけ。届くのは実行の時に参加している宛先の人だけで、送った本人・同意していない人・ブロックの関係にある人には届かない(`members` と同じ確かめ)。本文に `{<field>}` を差し込める(受け取る人はその記録を読める)。
+- **未読**: 既存の印(§3.5 `marks`)の `read` を使う。受信箱の `list.item.mark: "read"` で既読の印、`{"field":"$marks.read","op":"neq","value":{"me":true}}` で未読だけ。受信箱は `$author` neq me(読めるのは自分宛てだけなので、これで自分宛て)、送信済みは eq。
+- iOS: `supportedFeatures` に `addressedMessages` を送る(審査用の版は共有を外しているので送らない)。送らない版には AI が addressedTo と members を使わない(addressedTo は外し、members は string に・§5.3)。
+- AI: `backend/internal/ai/messages_addressed_rules.go`。ai-eval の `addressed` / `addressedGroup` / `addressedUnread`(`addressed_cases.json`)。
+
+### 3.15 通知の alarm = 止めるまで鳴るアラーム
 
 「目覚まし」「7 時に起こして」「止めるまで鳴らして」は、時刻の通知に `"alarm": true` を付ける。iPhone の時計のアラームと同じく、ロック中も全画面で鳴り、止めるまで鳴り続ける(iOS 26.1 以降の AlarmKit)。
 
@@ -541,7 +606,7 @@ App Store に出した後は古い iOS が残り続ける。backend は「今い
 | どこに | 中身 | 使い道 |
 |---|---|---|
 | generate / chat の body `allowedComponents` | その版が描画できる部品 type の全部(`ComponentType` から自動) | backend はここに**無い** type を生成結果に入れない(下) |
-| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(`recordRetention`・#482、`matching`・#507、`notification.when`・#265、`singleEntity`・#267。審査用の版は `matching` を送らない) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
+| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(`recordRetention`・#482、`matching`・#507、`notification.when`・#265、`singleEntity`・#267、`dataRoles`・#272、`addressedMessages`・#271。審査用の版は `matching`・`dataRoles`・`addressedMessages` を送らない) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
 | 全リクエストのヘッダ `X-Client-Platform` / `X-Client-Version` / `X-Client-Build` / `X-Client-DSL-Version` | `ios` / `CFBundleShortVersionString` / `CFBundleVersion` / 描画できる最大の `schemaVersion` | ログ(どの版がまだ使われているか = 最低対応版を上げる判断) |
 
 ### 5.3 backend が古い iOS に新しい部品を出さない仕組み

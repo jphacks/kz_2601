@@ -132,7 +132,7 @@ func (r *Runner) rebuild(ctx context.Context, ev store.OutboxEvent) (string, err
 	keep := map[string]bool{}
 	for i := range app.ServerRules {
 		rule := &app.ServerRules[i]
-		if !rule.IsScheduled() {
+		if !rule.IsScheduled() || !rule.IsEnabled() {
 			continue
 		}
 		s := store.Schedule{

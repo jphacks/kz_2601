@@ -1,6 +1,7 @@
 // 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
 #if !APP_STORE_REVIEW
 import SwiftUI
+import MetamonRenderer
 import MetamonServices
 
 /// 「探す」(#50): 他の人が公開したアプリを検索して、インストール → そのアプリに変身。
@@ -34,9 +35,7 @@ struct DiscoverSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "家計簿、筋トレ、散歩…")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("閉じる") { SharingUI.shared.showDiscover = false }
-                }
+                SheetCloseToolbarItem { SharingUI.shared.showDiscover = false }
             }
         }
         .presentationDetents([.large])

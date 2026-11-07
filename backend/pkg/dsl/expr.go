@@ -307,7 +307,7 @@ func fieldExprType(ft FieldType) exprType {
 		return tBool
 	case FieldDate, FieldDatetime:
 		return tDate
-	case FieldRefs:
+	case FieldRefs, FieldMembers:
 		return tList
 	default:
 		return tStr
@@ -609,8 +609,8 @@ func (c *exprChecker) checkFilter(where string, f *Filter, e *Entity, row *Entit
 		c.add(`%s: %q (marks, #255) works only as the filter of a list/table/timeline/stat/chart component, not inside agg; marks are not records, so show the count with %q (table column / sort) instead of an agg`, where, f.Field, f.Field)
 		return
 	}
-	if f.Field == RecordAuthor || isMeValue(f.Value) {
-		c.add(`%s: %q / {"me":true} (only my posts) works only as the filter of a list/table/timeline/stat/chart component, not inside agg; put it on the component (e.g. stat aggregate count with filter {"field":"$author","op":"eq","value":{"me":true}})`, where, RecordAuthor)
+	if f.Field == RecordAuthor || isMeValue(f.Value) || isMyFollowsValue(f.Value) {
+		c.add(`%s: %q / {"me":true} / {"myFollows":true} (only my posts / people I follow) works only as the filter of a list/table/timeline/stat/chart component, not inside agg; put it on the component (e.g. stat aggregate count with filter {"field":"$author","op":"eq","value":{"me":true}})`, where, RecordAuthor)
 		return
 	}
 	if fld := e.FieldByID(f.Field); fld == nil {

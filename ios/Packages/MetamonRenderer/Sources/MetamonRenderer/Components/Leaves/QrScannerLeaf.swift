@@ -40,7 +40,7 @@ struct QrScannerLeaf: View {
                         .ignoresSafeArea()
                         .navigationTitle(c.label ?? L("QRを読み取る"))
                         .navigationBarTitleDisplayMode(.inline)
-                        .toolbar { ToolbarItem(placement: .cancellationAction) { Button(L("閉じる")) { showScanner = false } } }
+                        .toolbar { SheetCloseToolbarItem { showScanner = false } }
                         .aiButtonLayer()
                     }
                     .aiButtonTarget(c) // #629

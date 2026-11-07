@@ -7,11 +7,15 @@ extension AuthSession {
     @discardableResult
     func signOutAndWipe(runtime: AppRuntime, choice: SignOutFlow.Choice) async throws -> SignOutFlow.Outcome {
         let wasSignedIn = user != nil
+        await runtime.settlePendingRecordDeletes() // 取り消し待ちの削除はいまのアカウントで送る(送らないなら下の wipe で消える)
         let outcome = try await SignOutFlow.run(
             choice: choice,
             auth: service,
             flush: { await runtime.recordSync.flush() },
-            wipeLocal: { await runtime.wipeLocalData() }
+            wipeLocal: {
+                await runtime.unregisterPushDevice() // 送れなくても続ける(#269)
+                await runtime.wipeLocalData()
+            }
         )
         guard outcome == .signedOut else { return outcome }
         signOut() // セッションの表示を即反映(サインアウト済みでも安全)

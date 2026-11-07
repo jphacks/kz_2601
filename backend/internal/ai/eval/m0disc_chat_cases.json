@@ -1,8 +1,8 @@
 [
   {"id": "dc_friends_vague", "group": "m0-social", "mode": "create", "capabilities": ["answer", "proposal"], "note": "ふわっとした共有の依頼で何を聞き返すか",
    "steps": [{"say": "友達と使えるアプリが欲しい", "expect": "question", "textNot": ["public", "private", "shared", "entity", "scope", "disclosure", "computed"]}]},
-  {"id": "dc_sns_can", "group": "m0-social", "mode": "create", "capabilities": ["answer", "proposal"], "note": "SNS(フォロー・タイムライン)はできるか → 正直に答えるか",
-   "steps": [{"say": "インスタみたいに、フォローした人の投稿が流れてくるアプリって作れる?", "textAny": ["できません", "できない", "出せません"], "textNot": ["public", "private", "shared", "entity", "scope", "disclosure", "computed"]}]},
+  {"id": "dc_sns_can", "group": "m0-social", "mode": "create", "capabilities": ["answer", "proposal"], "note": "SNS(フォロー・タイムライン)はできるか → #270 からできる",
+   "steps": [{"say": "インスタみたいに、フォローした人の投稿が流れてくるアプリって作れる?", "textNot": ["できません", "できない", "public", "private", "shared", "entity", "scope", "disclosure", "computed"]}]},
   {"id": "dc_chat_push_can", "group": "m0-social", "mode": "create", "capabilities": ["answer", "proposal"], "note": "メッセージが来たら相手に通知(プッシュ)はできるか",
    "steps": [{"say": "グループチャットで、誰かが書き込んだら他のメンバーのスマホに通知が来るようにできる?", "textAny": ["できません", "できない", "出せません"], "textNot": ["public", "private", "shared", "entity", "scope", "disclosure", "computed"]}]},
   {"id": "dc_invite_can", "group": "m0-social", "base": "internal/ai/examples/warikan.json", "capabilities": ["answer", "proposal"], "note": "この割り勘を友達のスマホからも入力できるか(scope/招待)",

@@ -24,6 +24,7 @@ type ruleStatusDoc struct {
 	QuotaUsed    int       `firestore:"quotaUsed,omitempty"`
 	QuotaLimit   int       `firestore:"quotaLimit,omitempty"`
 	ExpireAt     time.Time `firestore:"expireAt"`
+	Failures     int       `firestore:"failures,omitempty"`
 }
 
 func (f *Firestore) ruleStatusCol(env string) *firestore.CollectionRef {
@@ -44,6 +45,10 @@ func (f *Firestore) PutRuleStatus(ctx context.Context, env string, s RuleStatus)
 	}
 	if !s.LastOKAt.IsZero() {
 		data["lastOkAt"] = s.LastOKAt.UTC()
+		data["failures"] = int64(0)
+	}
+	if s.Failed {
+		data["failures"] = firestore.Increment(1)
 	}
 	if s.QuotaDay != "" {
 		data["quotaDay"], data["quotaUsed"], data["quotaLimit"] = s.QuotaDay, int64(s.QuotaUsed), int64(s.QuotaLimit)
@@ -81,7 +86,7 @@ func (f *Firestore) GetRuleStatuses(ctx context.Context, env string, ids []strin
 		}
 		out[snap.Ref.ID] = RuleStatus{ID: snap.Ref.ID, AppID: d.AppID, RuleID: d.RuleID, At: d.At, Outcome: d.Outcome,
 			Reason: d.Reason, NotifyPaused: d.NotifyPaused, LastOKAt: d.LastOKAt, QuotaDay: d.QuotaDay,
-			QuotaUsed: d.QuotaUsed, QuotaLimit: d.QuotaLimit, ExpireAt: d.ExpireAt}
+			QuotaUsed: d.QuotaUsed, QuotaLimit: d.QuotaLimit, ExpireAt: d.ExpireAt, Failures: d.Failures}
 	}
 	return out, nil
 }

@@ -40,7 +40,7 @@ public extension DSLRuntime {
         let entity = dsl.entity(entityId)
         let rows = unredactedViewRecords(for: entityId)
         guard !filters.isEmpty else { return rows }
-        let resolved = filters.map { $0.resolvingMe(uid: currentUserId) } // {"me": true}(#251)
+        let resolved = resolvingFollows(filters).map { $0.resolvingMe(uid: currentUserId) } // {"myFollows": true}(#270)・{"me": true}(#251)
         if resolved.allSatisfy({ $0.valueExpr == nil }) {
             return rows.filter { r in resolved.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field)) } }
         }
@@ -55,6 +55,8 @@ public extension DSLRuntime {
     /// 表示用の文字列。type=ref は参照先レコードの見出しに解決する(未取得・削除済みは「—」)。
     func display(_ value: JSONValue, field: Field?) -> String {
         if let field, field.type == .refs { return refsTitle(value, field: field) }
+        if let field, field.type == .member { return memberName(value) } // #272
+        if let field, field.type == .members { return memberNames(value) } // #271
         guard let field, field.type == .ref else { return displayText(value, field: field) }
         guard let id = value.stringValue, !id.isEmpty else { return "" }
         // enum から ref に変えた後の古い記録は選択肢の名前そのものを持つので、そのまま出す(#194)

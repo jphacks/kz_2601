@@ -21,7 +21,8 @@ import (
 // The handler reports how the request ended through the request context
 // (ReportStatus / ReportMode), never through a response header, so nothing
 // internal reaches the client. The X-RateLimit-Remaining header was already
-// written before the handler ran, so it does not include the refund.
+// written before the handler ran, so it does not include the refund (the next
+// response does, including a weight-0 undo, which reads the count: Peeker).
 
 // refundTimeout bounds the refund write after the response is done.
 const refundTimeout = 5 * time.Second

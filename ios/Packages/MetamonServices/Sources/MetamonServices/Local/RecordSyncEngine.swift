@@ -43,6 +43,10 @@ public final class RecordSyncEngine {
     @ObservationIgnored private var started = false
     /// 取り消せる削除の待ち(M11)。ticket.id → 送る時刻を待つ Task。`RecordSyncEngine+Undo.swift`
     @ObservationIgnored var undoable: [UUID: (ticket: DeletionTicket, timer: Task<Void, Never>)] = [:]
+    /// 送信の列へ積んでいる途中の取り消し待ち削除。`wipe` はこれを待ってから列を空にする(消した後に積まれて次の人に残らない)
+    @ObservationIgnored var committing: [UUID: Task<Void, Never>] = [:]
+    /// `wipe` ごとに増やす。積む途中で wipe を跨いだ削除は積まない
+    @ObservationIgnored var wipeGeneration = 0
 
     public init(store: RecordStore, queue: SyncQueue, client: any AppConfigClient, connectivity: any ConnectivityMonitor) {
         self.store = store
@@ -97,7 +101,9 @@ public final class RecordSyncEngine {
     /// アカウント削除用(#119): 購読を止め、未送信キューとローカル DB を空にする。次の `start()` で再開できる。
     public func wipe() async {
         stop()
+        wipeGeneration += 1
         dropPendingDeletions { _ in true }
+        await settleCommitting() // 時間切れで積む途中の削除を待つ(列を空にした後に積まれないように)
         await queue.discardAll()
         await store.removeEverything()
         await refreshStatus()
@@ -143,7 +149,7 @@ public final class RecordSyncEngine {
         }
     }
 
-    private func refreshStatus() async {
+    func refreshStatus() async {
         let n = await queue.count
         let draining = await queue.isDraining
         pendingCount = n
@@ -233,16 +239,15 @@ public final class RecordSyncEngine {
 
     /// 削除。ローカルでは即座に一覧から消え(行は delete 待ちで残る)、送信成功で行も消える。
     public func delete(appId: String, entity: String, recordId: String) async -> [Record] {
-        if let row = await store.row(appId: appId, entity: entity, recordId: recordId) {
+        if let row = await store.current(appId: appId, entity: entity, recordId: recordId) {
             store.videos.remove(VideoValue.localIDs(in: row.data)) // 端末内の動画ファイル(#206)
             store.audios.remove(AudioValue.localIDs(in: row.data)) // 端末内の録音(#420)
         }
         let result = await queue.enqueue(SyncOperation(appId: appId, entity: entity, recordId: recordId, kind: .delete))
         if result == .cancelledCreate {
             await store.remove(appId: appId, entity: entity, recordId: recordId) // まだサーバーに無い行はその場で消す
-        } else if var row = await store.row(appId: appId, entity: entity, recordId: recordId) {
-            row.pendingOp = .delete
-            await store.upsert(row)
+        } else {
+            await store.markDeleting(appId: appId, entity: entity, recordId: recordId)
         }
         kick()
         return await shown(appId: appId, entity: entity)

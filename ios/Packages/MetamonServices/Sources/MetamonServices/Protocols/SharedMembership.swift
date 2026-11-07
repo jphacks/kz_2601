@@ -41,16 +41,19 @@ public struct SharedMember: Decodable, Sendable, Equatable, Identifiable, Hashab
     public var role: Role
     /// 呼び出したユーザー本人
     public var you: Bool
+    /// 管理者(#272)。作成者は常に管理者
+    public var isAdmin: Bool
 
     public var id: String { uid }
 
-    enum CodingKeys: String, CodingKey { case uid, displayName, role, you }
+    enum CodingKeys: String, CodingKey { case uid, displayName, role, you, admin }
 
-    public init(uid: String, displayName: String = "", role: Role = .member, you: Bool = false) {
+    public init(uid: String, displayName: String = "", role: Role = .member, you: Bool = false, isAdmin: Bool? = nil) {
         self.uid = uid
         self.displayName = displayName
         self.role = role
         self.you = you
+        self.isAdmin = isAdmin ?? (role == .owner)
     }
 
     public init(from decoder: Decoder) throws {
@@ -59,6 +62,8 @@ public struct SharedMember: Decodable, Sendable, Equatable, Identifiable, Hashab
         displayName = try c.decodeIfPresent(String.self, forKey: .displayName) ?? ""
         role = (try? c.decode(Role.self, forKey: .role)) ?? .member
         you = try c.decodeIfPresent(Bool.self, forKey: .you) ?? false
+        // admin を返さない古いサーバーでは作成者だけが管理者
+        isAdmin = (try? c.decodeIfPresent(Bool.self, forKey: .admin)) ?? (role == .owner)
     }
 }
 
@@ -67,10 +72,22 @@ public struct SharedMemberList: Decodable, Sendable, Equatable {
     public var items: [SharedMember]
     /// 自分が作成者(各行に「外す」)か参加者(「抜ける」)か
     public var role: SharedMember.Role
+    /// 自分が管理者か(#272・各行に「管理者にする」)
+    public var isAdmin: Bool
 
-    public init(items: [SharedMember], role: SharedMember.Role) {
+    enum CodingKeys: String, CodingKey { case items, role, admin }
+
+    public init(items: [SharedMember], role: SharedMember.Role, isAdmin: Bool? = nil) {
         self.items = items
         self.role = role
+        self.isAdmin = isAdmin ?? (role == .owner)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        items = try c.decode([SharedMember].self, forKey: .items)
+        role = try c.decode(SharedMember.Role.self, forKey: .role)
+        isAdmin = (try? c.decodeIfPresent(Bool.self, forKey: .admin)) ?? (role == .owner)
     }
 }
 
@@ -86,5 +103,7 @@ public protocol MembershipClient: Sendable {
     func removeMember(appId: String, uid: String) async throws
     /// 自分が抜ける(冪等)
     func leave(appId: String) async throws
+    /// 管理者が参加者を管理者にする / 外す(#272)。作成者は外せない
+    func setAdmin(appId: String, uid: String, admin: Bool) async throws
 }
 #endif

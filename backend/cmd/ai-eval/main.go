@@ -421,6 +421,8 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		}
 		rec.ExpectMisses = append(rec.ExpectMisses, checkGroupBy(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMarks(c.Expect, app)...) // #255: marks.go
+		// #270: follow.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkFollows(c.Expect, app)...)
 		// #423: live_activity.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkLiveActivity(c.Expect, app)...)
 		// addToCalendar: calendar_add.go
@@ -435,6 +437,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMatching(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRepeat(c.Expect, app)...)      // #266: repeat.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkSingle(c.Expect, app)...)      // #267: single.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAddressed(c.Expect, app)...)   // #271: addressed.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkNotifyWhen(c.Expect, app)...)  // #265: notify_when.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkFlashcards(c.Expect, app)...)  // #264: flashcards.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkFeed(c.Expect, app)...)        // #348: feed.go
