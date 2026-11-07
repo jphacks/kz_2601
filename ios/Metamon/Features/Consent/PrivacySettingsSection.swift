@@ -42,7 +42,7 @@ struct PrivacySettingsSection: View {
             Button("取り消す", role: .destructive) { rt.revokeAIConsent() }
             Button("キャンセル", role: .cancel) {}
         } message: {
-            Text(L10n.key("アプリの生成と対話が使えなくなります。もう一度同意すると使えます。", review: "記録帳を用意する・直す機能と対話が使えなくなります。もう一度同意すると使えます。"))
+            Text(L10n.key("アプリを作る・直す機能と対話が使えなくなります。もう一度同意すると使えます。", review: "記録帳を用意する・直す機能と対話が使えなくなります。もう一度同意すると使えます。"))
         }
         Section {
             Toggle("クラッシュ報告を送る", isOn: Binding(get: { crashReporting.isEnabled }, set: { crashReporting.setEnabled($0) }))

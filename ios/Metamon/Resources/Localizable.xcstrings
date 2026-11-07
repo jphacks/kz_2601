@@ -562,6 +562,23 @@
         }
       }
     },
+    "1 人 1 件までです。もう登録しています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One per person. You've already added one"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 人 1 件までです。もう登録しています"
+          }
+        }
+      }
+    },
     "18 歳以上です" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1395,6 +1412,23 @@
         }
       }
     },
+    "「%@」が同じ記録がもうあります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A record with the same “%@” already exists"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」が同じ記録がもうあります"
+          }
+        }
+      }
+    },
     "「%@」さんの投稿と公開したアプリは表示されません。設定から解除できます。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1633,19 +1667,19 @@
         }
       }
     },
-    "「%@」の画面と項目の設計(v%lld)" : {
+    "「%@」の画面と項目の設計" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Screens and fields of “%@” (v%lld)"
+            "value" : "Screens and fields of “%@”"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「%@」の画面と項目の設計(v%lld)"
+            "value" : "「%@」の画面と項目の設計"
           }
         }
       }
@@ -1680,6 +1714,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」は Tailor It Pro が必要なため、保存しませんでした"
+          }
+        }
+      }
+    },
+    "「%@」は管理者だけが変更できます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only admins can change “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」は管理者だけが変更できます"
           }
         }
       }
@@ -2768,6 +2819,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリには自動の動きがありません。"
+          }
+        }
+      }
+    },
+    "このアプリの通知を受け取る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get notifications from this app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリの通知を受け取る"
           }
         }
       }
@@ -4608,23 +4676,6 @@
         }
       }
     },
-    "アプリの生成と対話が使えなくなります。もう一度同意すると使えます。" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "App generation and chat will be disabled until you agree again."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アプリの生成と対話が使えなくなります。もう一度同意すると使えます。"
-          }
-        }
-      }
-    },
     "アプリをリセット(初期状態に戻す)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4710,6 +4761,23 @@
         }
       }
     },
+    "アプリを作る・直す機能と対話が使えなくなります。もう一度同意すると使えます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Making and editing apps, and chat, will be disabled until you agree again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを作る・直す機能と対話が使えなくなります。もう一度同意すると使えます。"
+          }
+        }
+      }
+    },
     "アプリを切り替えています…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4791,23 +4859,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリを読み込めませんでした。接続を確認してください"
-          }
-        }
-      }
-    },
-    "アプリ一覧" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your apps"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "記録帳の一覧"
           }
         }
       }
@@ -7736,6 +7787,57 @@
         }
       }
     },
+    "他の人の書き込みなどで届く通知です。オフにすると、このアプリからは届きません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These arrive when other people post or respond. Turn this off to stop them from this app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "他の人の書き込みなどで届く通知です。オフにすると、このアプリからは届きません。"
+          }
+        }
+      }
+    },
+    "他の人の行動で届く通知" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications from other people's activity"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "他の人の行動で届く通知"
+          }
+        }
+      }
+    },
+    "他の人の行動で届く通知を受け取ります。設定でオフにできます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You'll get notifications from other people's activity. You can turn them off in Settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "他の人の行動で届く通知を受け取ります。設定でオフにできます"
+          }
+        }
+      }
+    },
     "他の端末で変更されていたため、サーバーの内容に合わせました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7919,6 +8021,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。"
+          }
+        }
+      }
+    },
+    "作ったアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app you made goes back to the voice screen only. Data on the server is not deleted."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作ったアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。"
           }
         }
       }
@@ -8280,7 +8399,7 @@
         }
       }
     },
-    "元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ初期画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。" : {
+    "元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ最初の画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -8292,7 +8411,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ初期画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。"
+            "value" : "元に戻せません。使用中のアプリなので、削除後は別のアプリ(無ければ最初の画面)に切り替わります。シェアリンクと「探す」への掲載も取り下げます。"
           }
         }
       }
@@ -8773,23 +8892,6 @@
         }
       }
     },
-    "利用が集中したため、新しい生成を止めています。%@に再開します" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demand is high, so new requests are paused. We'll reopen at %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "利用が集中したため、新しい生成を止めています。%@に再開します"
-          }
-        }
-      }
-    },
     "利用が集中したため、新しい記録帳の用意を止めています。%@に再開します" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8803,6 +8905,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "利用が集中したため、新しい記録帳の用意を止めています。%@に再開します"
+          }
+        }
+      }
+    },
+    "利用が集中したため、新しくアプリを作るのを止めています。%@に再開します" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demand is high, so new requests are paused. We'll reopen at %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "利用が集中したため、新しくアプリを作るのを止めています。%@に再開します"
           }
         }
       }
@@ -9402,6 +9521,23 @@
         }
       }
     },
+    "同じ内容の記録がもうあります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A record with the same details already exists"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同じ内容の記録がもうあります"
+          }
+        }
+      }
+    },
     "同意した日時" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9738,6 +9874,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "変更しました"
+          }
+        }
+      }
+    },
+    "変更できませんでした。元に戻しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't change this. It's been set back."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更できませんでした。元に戻しました"
           }
         }
       }
@@ -11595,23 +11748,6 @@
         }
       }
     },
-    "生成したアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The generated app goes back to the voice screen only. Data on the server is not deleted."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生成したアプリは音声画面だけの状態に戻ります。サーバー上のデータは削除されません。"
-          }
-        }
-      }
-    },
     "用意した記録帳が使えなくなります。この端末のデータも消えます。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12169,6 +12305,91 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "答えを文字で入力"
+          }
+        }
+      }
+    },
+    "管理者" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Admin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者"
+          }
+        }
+      }
+    },
+    "管理者から外す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove admin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者から外す"
+          }
+        }
+      }
+    },
+    "管理者だけができる操作です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only admins can do this"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者だけができる操作です"
+          }
+        }
+      }
+    },
+    "管理者にする" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make admin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者にする"
+          }
+        }
+      }
+    },
+    "管理者を変更できませんでした。元に戻しました: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't change the admin. Reverted: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者を変更できませんでした。元に戻しました: %@"
           }
         }
       }
@@ -13461,6 +13682,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "課金の制限を無効にする(デモ用・回数と有料機能)"
+          }
+        }
+      }
+    },
+    "質問 %lld / %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Question %lld of %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "質問 %lld / %lld"
           }
         }
       }

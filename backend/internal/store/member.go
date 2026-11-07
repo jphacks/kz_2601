@@ -14,6 +14,9 @@ type Member struct {
 	Via         string    `json:"via"`                 // MemberViaShare | MemberViaLegacy
 	InvitedBy   string    `json:"invitedBy,omitempty"` // uid that issued the share link
 	JoinedAt    time.Time `json:"joinedAt"`
+	// Admin (#272): an admin of the app's shared data. The creator is always
+	// one (without a document); an admin makes other members admins.
+	Admin bool `json:"admin,omitempty"`
 }
 
 // Member.Via values.
@@ -36,4 +39,6 @@ type Membership interface {
 	ListMembers(ctx context.Context, appID string, limit int) ([]Member, error)
 	// RemoveMember returns ErrNotFound when uid is not a member.
 	RemoveMember(ctx context.Context, appID, uid string) error
+	// SetMemberAdmin sets Member.Admin (#272). ErrNotFound when uid is not a member.
+	SetMemberAdmin(ctx context.Context, appID, uid string, admin bool) error
 }

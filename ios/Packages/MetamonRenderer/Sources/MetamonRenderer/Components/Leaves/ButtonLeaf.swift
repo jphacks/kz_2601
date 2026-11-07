@@ -33,9 +33,16 @@ struct ButtonLeaf: View {
         }
     }
 
+    /// visibleTo "admins"(#272): 管理者でないと分かっている時だけ隠す(分からない間は出し、サーバーが判定する)。
+    static func isVisible(visibleTo: String?, isAdmin: Bool?) -> Bool {
+        visibleTo != "admins" || isAdmin != false
+    }
+
     var body: some View {
         // follow / unfollow(#270)は今の投稿の作者の状態に合う方だけ
-        if Self.isVisible(action: c.action, form: ctx.form), rt.showsFollowButton(c.action, recordId: ctx.actionContext().currentRecordId) {
+        if Self.isVisible(action: c.action, form: ctx.form),
+           Self.isVisible(visibleTo: c.visibleTo, isAdmin: rt.viewerIsAdmin),
+           rt.showsFollowButton(c.action, recordId: ctx.actionContext().currentRecordId) {
             styled
         }
     }

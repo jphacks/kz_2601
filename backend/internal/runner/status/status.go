@@ -21,6 +21,7 @@ const (
 	ResultLate          = "late"           // the trigger was too old to run (not run later)
 	ResultInactive      = "inactive"       // nobody opened the app for a while (opening resumes it)
 	ResultFailed        = "failed"         // tried several times and gave up
+	ResultDisabled      = "disabled"       // the creator turned the rule off
 	ResultOther         = "other"          // an outcome this build does not know
 )
 
@@ -37,6 +38,7 @@ const (
 	outcomeSkippedLate   = "skipped_late"
 	outcomeSkippedIdle   = "skipped_inactive"
 	outcomeGaveUp        = "gave_up"
+	outcomeSkippedOff    = "skipped_disabled"
 
 	reasonAppHidden      = "app_hidden"
 	reasonOperatorStop   = "operator_stop"
@@ -69,6 +71,8 @@ func Result(outcome, reason string, notifyPaused bool) string {
 		return ResultInactive
 	case outcomeGaveUp:
 		return ResultFailed
+	case outcomeSkippedOff:
+		return ResultDisabled
 	case outcomeSkippedStop:
 		switch reason {
 		case reasonOperatorStop, reasonAppHidden:

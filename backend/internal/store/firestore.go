@@ -131,6 +131,8 @@ type recordDoc struct {
 	AuthorName string           `firestore:"authorName,omitempty"`
 	MarkCounts map[string]int64 `firestore:"markCounts,omitempty"` // #255
 	Origin     *originDoc       `firestore:"origin,omitempty"`     // #341
+	UniqueKey  string           `firestore:"uniqueKey,omitempty"`  // #273
+	Readers    []string         `firestore:"readers,omitempty"`    // #271
 	CreatedAt  time.Time        `firestore:"createdAt"`
 	UpdatedAt  time.Time        `firestore:"updatedAt"`
 }
@@ -139,7 +141,7 @@ func (d *recordDoc) toRecord(id string) *Record {
 	if d.Data == nil {
 		d.Data = map[string]any{}
 	}
-	rec := &Record{ID: id, Entity: d.Entity, Data: d.Data, ClientID: d.ClientID, Author: d.Author, AuthorName: d.AuthorName, Origin: d.Origin.toOrigin(), CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+	rec := &Record{ID: id, Entity: d.Entity, Data: d.Data, ClientID: d.ClientID, Author: d.Author, AuthorName: d.AuthorName, Origin: d.Origin.toOrigin(), UniqueKey: d.UniqueKey, Readers: d.Readers, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
 	for k, v := range d.MarkCounts {
 		if rec.MarkCounts == nil {
 			rec.MarkCounts = map[string]int{}
@@ -635,7 +637,7 @@ func (f *Firestore) CreateRecord(ctx context.Context, rs RecordSet, rec Record) 
 		}
 		// Firestore keeps microseconds: return what a later read returns
 		now := Now()
-		d := recordDoc{Entity: rs.Entity, Data: rec.Data, ClientID: rec.ClientID, Author: rec.Author, AuthorName: rec.AuthorName, Origin: toOriginDoc(rec.Origin), CreatedAt: now, UpdatedAt: now}
+		d := recordDoc{Entity: rs.Entity, Data: rec.Data, ClientID: rec.ClientID, Author: rec.Author, AuthorName: rec.AuthorName, Readers: rec.Readers, Origin: toOriginDoc(rec.Origin), CreatedAt: now, UpdatedAt: now}
 		if err := tx.Create(ref, d); err != nil {
 			return err
 		}
@@ -671,11 +673,7 @@ func (f *Firestore) DeleteRecord(ctx context.Context, rs RecordSet, id string) e
 	if err := f.deleteMarks(ctx, ref); err != nil {
 		return err
 	}
-	_, err := ref.Delete(ctx, firestore.Exists)
-	if isNotFound(err) {
-		return ErrNotFound
-	}
-	return err
+	return f.deleteRecordAndClaim(ctx, rs, id) // #273: with its unique lock
 }
 
 // deleteAllChunk bounds the deletes sent in one BulkWriter run (Firestore
@@ -697,6 +695,19 @@ func (f *Firestore) DeleteAllRecords(ctx context.Context, rs RecordSet) error {
 			err = f.bulkDelete(ctx, refs)
 			refs = refs[:0]
 		}
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	// #273: the entity.unique locks of the records
+	err = eachRef(f.uniqueCol(rs).DocumentRefs(ctx), func(ref *firestore.DocumentRef) error {
+		refs = append(refs, ref)
+		if len(refs) < deleteAllChunk {
+			return nil
+		}
+		err := f.bulkDelete(ctx, refs)
+		refs = refs[:0]
 		return err
 	})
 	if err != nil {

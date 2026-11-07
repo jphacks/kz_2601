@@ -62,6 +62,16 @@ func (f *Firestore) Consume(ctx context.Context, counters []Counter, weight int,
 	return usage, err
 }
 
+// Peek implements Peeker: one batched read, no transaction and no write
+// (a missing document counts as 0).
+func (f *Firestore) Peek(ctx context.Context, counters []Counter) ([]int, error) {
+	snaps, err := f.c.GetAll(ctx, f.refs(counters))
+	if err != nil {
+		return nil, err
+	}
+	return readCounts(snaps), nil
+}
+
 // Refund implements Store: one transaction, like Consume. A counter document
 // that does not exist (TTL already removed it) is not created again.
 func (f *Firestore) Refund(ctx context.Context, counters []Counter, weight int, expireAt time.Time) error {

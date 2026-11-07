@@ -31,6 +31,7 @@ var serverRulesReadsSection = strings.TrimSpace(`
 - 定期のまとめ: 「毎週日曜の夜に今週の合計を記録して知らせて」= on {every:"weekly",weekday:"sun",time:"20:00"}・createRecord(まとめの entity に values で agg の合計・件数・{"op":"today","args":[]})・notify(body「今週は {count} 件・{total} 円でした」・with に count / total)。
 - 期限のリマインド: 「締め切りの 3 日前に知らせて」= on {every:"daily",time:"08:00",each:"tasks"}・if {"op":"and","args":[{"op":"neq","args":[{"ref":"done"},true]},{"op":"eq","args":[{"op":"daysUntil","args":[{"ref":"due"}]},3]}]}・notify(body「{title} の締め切りまであと 3 日です」)。each の行はそのレコードなので {<field>}・to.kind author(shared)が使える。
 - 順位: 「毎晩、歩数の順位をつけて」(shared)= on {every:"daily",time:"21:00",each:"players"}・updateRecord(ref 省略)values {"rank":{"op":"add","args":[{"agg":"count","entity":"players","filter":{"field":"score","op":"gt","value":{"ref":"score"}}},1]}}。
+- 宛先付きの entity(addressedTo)は on.each・agg・{"ref":"<ref field>.<field>"} の対象にできない(読める人が限られる)。その entity をきっかけにするルールの通知は to.kind author か recipients(field は addressedTo の field)だけ。
 - with: {名前: 数か日付の Expr}(3 つまで・小文字の id・行の field と同じ名前は不可・文字は不可)。title / body で {名前} を必ず使う。生成では with は [{"name":"total","value":<Expr>}] の配列で書く。
 - 読む件数には上限がある(1 回の実行・アプリの 1 日)。超えたらその回は動かない。毎日・毎週・毎月より細かくはできない。
 - 状態の変化(「完了になったら作った人に知らせて」)は on {record:"updated",entity,fields:["status"]}・if {"op":"eq","args":[{"ref":"status"},"done"]} で書く(each や agg は要らない)。

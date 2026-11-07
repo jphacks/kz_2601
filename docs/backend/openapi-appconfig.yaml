@@ -34,6 +34,7 @@ tags:
   - { name: records }
   - { name: release, description: 'リリース申請(#76)。features/release.md' }
   - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。features/sharing.md' }
+  - { name: usage, description: '今の使用量と上限(#317・#630)。生成・チャットの今日の残り・アプリの数・アプリごとの記録と写真。rate-limit.md の「今の使用量」' }
   - { name: versions }
 
 paths:
@@ -414,6 +415,7 @@ paths:
         `filterField=author&filterOp=in&filterValue=myFollows` で自分がフォローしている人の投稿だけ (`nin` = フォローしていない人の投稿・#270)。フォローは 1 文書なのでメモリで絞る (Firestore の `in` の 30 件の上限は関係しない)。
         **scope:shared の entity は作成者と参加者だけ**が読み書きできる (この entity の records の全操作で同じ・それ以外は 403 `not_member`・#254)。public は従来どおり誰でも。
         呼び出した人がブロックしたユーザー(`/me/blocks`)の投稿は一覧から除く(#321)。運営が非公開にした共有アプリ(`apps_public/{appId}.hidden`)は、public/shared の entity の records の全操作が 403 `unpublished`(details.reason = 運営の理由)。
+        運営がアプリのサーバー機能を強制停止している間(#346・`moderate stop-app -force` / `stop-all -force`)は、サーバーのルールのきっかけになる作成・更新(POST / PATCH)が 403 `app_stopped`(details.level = `app` / `global`、期限つきなら details.until)。ルールに当たらない書き込み・読み出し・削除はそのまま。
       parameters:
         - { $ref: '#/components/parameters/PageSize' }
         - { $ref: '#/components/parameters/PageToken' }
@@ -442,6 +444,8 @@ paths:
         `data` は現行 DSL のフィールド定義で型検証・正規化。未知キーは 400。`required` 欠落は 422。
         entity.scope が public/shared なら誰でも作成でき、レスポンスの `author`(uid) と `authorName` はサーバーが付ける
         (`data` に author/authorName は入れられない。冪等 id は uid+clientId から導出するので他人の clientId と衝突しない)。
+        `editableBy: admins` の field に管理者でない人が既定値・空以外を入れると 403(`details.reason: admins_only`・`details.field`)。type member の値が参加者の uid でなければ 422。
+        entity の `unique` の値が他のレコードと同じなら 409 `duplicate_record`(`details.reason: duplicate`・`details.fields`)(#272 #273)。
       requestBody:
         required: true
         content:
@@ -459,11 +463,12 @@ paths:
         '403': { $ref: '#/components/responses/NotMember' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/InvalidRecord' }
+        '409': { $ref: '#/components/responses/DuplicateRecord' }
         '402': { $ref: '#/components/responses/ProRequired' }
     delete:
       tags: [records]
       summary: エンティティの全レコード削除 (デモリセット用・`?confirm=true` 必須)
-      description: public/shared entity では**自分が投稿したレコードだけ**削除する (他人の投稿は残る)。
+      description: "public/shared entity では**自分が投稿したレコードだけ**削除する (他人の投稿は残る)。`deleteBy` が admins / authorOrAdmins の entity では管理者は全員の分を消す。`deleteBy: admins` で管理者でなければ 403 `admins_only`(#272)。"
       parameters: [{ in: query, name: confirm, required: true, schema: { type: boolean } }]
       responses:
         '204': { description: Deleted }
@@ -482,7 +487,7 @@ paths:
     patch:
       tags: [records]
       summary: レコード部分更新 (data のキー単位でマージ)
-      description: public/shared entity では `author == 自分` のレコードだけ更新できる (他人のは 403)。
+      description: "public/shared entity では `author == 自分` のレコードだけ更新できる (他人のは 403)。管理者は他人のレコードでも `editableBy: admins` の field だけは変えられ、管理者でない人がその field を変えると 403 `admins_only`。`unique` の値が他のレコードと同じになる変更は 409 `duplicate_record`(#272 #273)。"
       requestBody:
         required: true
         content:
@@ -496,11 +501,12 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/InvalidRecord' }
+        '409': { $ref: '#/components/responses/DuplicateRecord' }
         '402': { $ref: '#/components/responses/ProRequired' }
     delete:
       tags: [records]
       summary: レコード削除
-      description: public/shared entity では `author == 自分` のレコードだけ削除できる (他人のは 403)。
+      description: public/shared entity では `author == 自分` のレコードだけ削除できる (他人のは 403)。entity の `deleteBy` が admins なら管理者だけ、authorOrAdmins なら作った人か管理者(それ以外は 403 `admins_only`・#272)。
       responses:
         '204': { description: Deleted }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -805,6 +811,7 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/Member' } }
                   role: { type: string, enum: [owner, member], description: 呼び出したユーザーの立場 }
+                  admin: { type: boolean, description: '呼び出したユーザーが管理者か(#272・作成者は常に true)' }
         '403': { $ref: '#/components/responses/NotMember' }
   /apps/{appId}/members/{uid}:
     parameters:
@@ -822,6 +829,32 @@ paths:
         '400': { description: 作成者は抜けられない / uid が不正, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '403': { description: 作成者以外が他人を外そうとした, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '404': { description: その uid は参加者ではない(他人を外す時), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    patch:
+      tags: [members]
+      summary: 参加者を管理者にする / 管理者から外す(#272)
+      description: |
+        呼び出せるのは**管理者だけ**(作成者は常に管理者)。管理者でない参加者は 403(`details.reason: admins_only`)、参加者でなければ 403 `not_member`。
+        作成者は管理者から外せない(400)。`me` で自分が管理者をやめられる。管理者は field の `editableBy: admins` を変えられ、entity の `deleteBy` が admins / authorOrAdmins なら他人のレコードを消せる(docs/dsl/README.md §3.13)。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [admin]
+              properties: { admin: { type: boolean } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uid, admin]
+                properties: { uid: { type: string }, admin: { type: boolean } }
+        '400': { description: 作成者を外そうとした / uid が不正 / admin が無い, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { description: 管理者ではない(admins_only)/ 参加者ではない(not_member), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { description: その uid は参加者ではない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /apps/{appId}/interests:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -958,6 +991,49 @@ paths:
         '204': { description: 削除済み(2 回目以降も 204) }
         '401': { description: 未認証, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '500': { description: 途中で失敗。再実行で続きが終わる, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/usage:
+    get:
+      tags: [usage]
+      summary: 自分の今日の使用量と上限(#317・#630)
+      description: |
+        「今日の残り N」「上限に近い」を、依頼が断られる前に出すための読み取り。本人の分だけ(パスに uid は無い)。
+        - `ai`: 生成・チャット・text の合計(1 つの枠・単位は重み。新規 3・修正 2・チャット 1・text 1・text の要約など 2 は `weights`)。ai が数える `rateLimits/{env}_{日付}_uid_{uid}` をそのまま読む(1 回の読み取り・キャッシュしない)。`limit` / `remaining` は ai の `X-RateLimit-Limit` / `-Remaining` と同じ(匿名 30・サインイン 60・Pro 300)。返した分(#548)はすぐ入る(ヘッダーは次の依頼から)
+        - `ai` が null: この appconfig が数えている所を読めない(`RATE_LIMIT_STORE=memory`・読み取りの失敗)。iOS は今までどおりヘッダーの値を使う
+        - `apps`: 自分のアプリの数と上限(共有のアプリを入れたのは数えない)。最大 30 秒遅れる(インスタンスごとのキャッシュ)
+        - `perApp`: 自分のプランの、アプリごとの上限(記録・写真)。実際の数は `GET /apps/{appId}/usage`
+        - `limit` / `remaining` が null = 数えない(環境変数 0・`PLAN_LIMITS_MODE=off`)。`resetAt` は次の 0:00 JST
+      responses:
+        '200':
+          description: "OK(`Cache-Control: private, no-store`)"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyUsage' }
+              example: { plan: free, tier: signed_in, resetAt: '2026-11-07T15:00:00Z', ai: { used: 12, limit: 60, remaining: 48, weights: { create: 3, edit: 2, chat: 1, text: 1, textTask: 2 } }, apps: { used: 3, limit: 100, remaining: 97 }, perApp: { recordsPerApp: 5000, photosPerApp: 500 } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /apps/{appId}/usage:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    get:
+      tags: [usage]
+      summary: このアプリの記録・写真の使用量と上限(#317)
+      description: |
+        次の書き込みで `plan_limit_reached` の判定に使うのと同じ数え方: 呼び出した人が見える記録(自分の分 + 共有の分)の全 entity の合計と、その写真の数。払う人のプランの上限で出す(自分のアプリは自分、他の人が作ったアプリは作成者)。
+        - 参加者が見られるのは自分から見える分の数・作成者のプラン(free / pro)と上限だけ。作成者の uid は返さない(`payer: creator`)
+        - scope:"shared" の entity は参加していなければ数えない(他のグループのデータの量を見せない)。作成者が公開していない共有の entity も数えない
+        - 自分の写しが無いアプリは 404(GET /dsl と違い、ここでは写しを作らない)
+        - 数は最大 30 秒遅れる(entity と写真の項目ごとに count 集計をするので、インスタンスごとにキャッシュ)
+      responses:
+        '200':
+          description: "OK(`Cache-Control: private, no-store`)"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppUsage' }
+              example: { appId: kakeibo-1, plan: pro, payer: creator, upgrade: false, records: { used: 120, limit: 50000, remaining: 49880 }, photos: { used: 8, limit: 5000, remaining: 4992 } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /me/devices/{installationId}:
     parameters: [{ in: path, name: installationId, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,64}$' }, description: 'アプリの入れ直しごとに端末で作る識別子(例: UUID)' }]
@@ -1429,6 +1505,18 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: pro_required, message: 'this needs Tailor It Pro: sharedData', details: { features: [{ id: sharedData, title: みんなで共有するデータ, reason: みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。 }], reason: creator_needs_pro } } }
+    PlanLimitReached:
+      description: |
+        プランの上限 (#317・docs/backend/rate-limit.md の「プランごとの上限」)。403 `plan_limit_reached`。払う人のプランで数える: 自分のアプリは呼び出した人、他の人が作ったアプリは作成者。
+        - アプリの数: 自分の新しいアプリ (POST /apps・新しい appId の最初の読み込み・duplicate)。共有のアプリを入れるのは数えない
+        - レコードの件数 / アプリ: レコードの作成 (single の entity は数えない)。その人が見えるレコード (自分の分 + 共有の分) の全 entity の合計
+        - 写真の枚数 / アプリ: 写真の項目が空から入る作成・更新 (差し替えは数えない)
+        - details: `resource` (apps / recordsPerApp / photosPerApp)・`plan` (free / pro)・`limit`・`used`・`upgrade` (Pro にすると上限が上がる)。`reason: creator_plan_limit` は作成者のプランの上限 (参加者には課金画面ではなく案内を出す)
+        - `PLAN_LIMITS_MODE=log` / `off` の時は返さない。数えるのに失敗した時は通す
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: plan_limit_reached, message: 'このアプリを作った人のプランの上限に達しました: このアプリに保存できるデータの件数(5000 件)。作った人が Tailor It Pro にすると上限が上がります。', details: { resource: recordsPerApp, plan: free, limit: 5000, used: 5000, upgrade: true, reason: creator_plan_limit } } }
     Unauthenticated: { description: トークン欠落/無効, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     NotFound: { description: 存在しない (他人のリソースも 404), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Forbidden:
@@ -1437,6 +1525,12 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: forbidden, message: 'only the author can modify this record', details: { author: 'uid_of_poster' } } }
+    DuplicateRecord:
+      description: entity の unique の値が同じレコードが既にある(#273)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: duplicate_record, message: 'another record already has the same values', details: { reason: duplicate, fields: [slot] } } }
     VersionConflict:
       description: If-Match が現行と不一致
       content:
@@ -1508,7 +1602,9 @@ components:
               enum:
                 - account_deleted
                 - app_check_failed
+                - app_stopped
                 - bad_request
+                - duplicate_record
                 - forbidden
                 - internal
                 - invalid_dsl
@@ -1516,6 +1612,7 @@ components:
                 - invalid_transaction
                 - not_found
                 - payload_too_large
+                - plan_limit_reached
                 - pro_required
                 - rate_limited
                 - transaction_owned_by_other
@@ -1564,6 +1661,16 @@ components:
         - type: object
           required: [dsl]
           properties: { dsl: { $ref: '../dsl/dsl.schema.json' } }
+    AppUsage:
+      type: object
+      required: [appId, plan, payer, upgrade, records, photos]
+      properties:
+        appId: { type: string }
+        plan: { type: string, enum: [free, pro], description: 払う人のプラン }
+        payer: { type: string, enum: [creator, self], description: 'self = 自分のアプリ・creator = 他の人が作ったアプリ(作成者のプランで数える)' }
+        upgrade: { type: boolean, description: 'Pro にすると記録か写真の上限が上がる(`plan_limit_reached` の `upgrade` と同じ考え)' }
+        records: { oneOf: [{ $ref: '#/components/schemas/UsageMeter' }, { type: 'null' }], description: 数えられなかった時は null }
+        photos: { oneOf: [{ $ref: '#/components/schemas/UsageMeter' }, { type: 'null' }], description: 数えられなかった時は null }
     AutomationResult:
       type: string
       description: |
@@ -1581,9 +1688,11 @@ components:
         - late: 遅れたので動かさなかった(後でまとめて動かさない)
         - inactive: しばらく開かれていないので休んでいる(開くと再開)
         - failed: 何度か試したがうまくいかなかった
+        - disabled: 作成者がこのルールをオフにしている(オフの前に届いていたきっかけを動かさなかった)
         - other: この版の知らない結果
       enum:
         - changed
+        - disabled
         - failed
         - inactive
         - late
@@ -1599,12 +1708,14 @@ components:
         - unavailable
     AutomationRule:
       type: object
-      required: [id, description, trigger, result]
+      required: [id, description, trigger, result, enabled]
       properties:
         id: { type: string }
         description: { type: string, description: 'ルールの説明(日本語・`DescribeServerRule`)。例: 「毎日 07:00、「記録」に記録を足す」' }
         trigger: { type: string, enum: [record, schedule] }
         result: { $ref: '#/components/schemas/AutomationResult' }
+        enabled: { type: boolean, description: 'false = 作成者がオフにしている(DSL の serverRules[].enabled)。オフのルールは動かず、実行の数にも数えない。切り替えは PATCH /v1/apps/{appId}/dsl か AI の編集' }
+        consecutiveFailures: { type: integer, minimum: 0, description: 'うまくいかなかった(failed)回数の連続。うまく動くと 0 に戻る。0 なら省く。続いていればチャットで直すか提案する目安' }
         lastRunAt: { type: string, format: date-time, description: 最後に動いた(止めた・失敗したを含む)時刻。まだ無ければ省く }
         lastOkAt: { type: string, format: date-time, description: 最後にうまく動いた時刻 }
         stopped: { $ref: '#/components/schemas/AutomationStop' }
@@ -1638,6 +1749,13 @@ components:
         dsl: { $ref: '../dsl/dsl.schema.json' }
         source: { $ref: '#/components/schemas/VersionSource' }
         createdAt: { type: string, format: date-time }
+    UsageMeter:
+      type: object
+      required: [used, limit, remaining]
+      properties:
+        used: { type: integer, minimum: 0 }
+        limit: { type: [integer, 'null'], description: null = 数えない }
+        remaining: { type: [integer, 'null'], minimum: 0, description: 'max(0, limit - used)。null = 数えない' }
     VersionSource:
       type: object
       description: このバージョンが生まれた経緯
@@ -1752,6 +1870,37 @@ components:
         os: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    MyUsage:
+      type: object
+      required: [plan, tier, resetAt, ai, apps, perApp]
+      properties:
+        plan: { type: string, enum: [free, pro] }
+        tier: { type: string, enum: [anonymous, pro, signed_in], description: 'ai の上限の段(`RateLimitDetails.tier` と同じ)' }
+        resetAt: { type: string, format: date-time, description: 次の 0:00 JST }
+        ai:
+          description: 生成・チャット・text の今日の合計(単位)。読めない時は null
+          oneOf:
+            - type: 'null'
+            - allOf:
+                - { $ref: '#/components/schemas/UsageMeter' }
+                - type: object
+                  required: [weights]
+                  properties:
+                    weights:
+                      type: object
+                      required: [chat, create, edit, text, textTask]
+                      properties:
+                        chat: { type: integer }
+                        create: { type: integer }
+                        edit: { type: integer }
+                        text: { type: integer }
+                        textTask: { type: integer }
+        apps: { oneOf: [{ $ref: '#/components/schemas/UsageMeter' }, { type: 'null' }], description: 数えられなかった時は null }
+        perApp:
+          type: object
+          properties:
+            photosPerApp: { type: [integer, 'null'] }
+            recordsPerApp: { type: [integer, 'null'] }
     NotifyConsent:
       type: object
       required: [appId, allowed, updatedAt]
@@ -1789,6 +1938,7 @@ components:
         uid: { type: string }
         displayName: { type: string, description: 'import 時の displayName(無ければ空。作成者は常に空)' }
         role: { type: string, enum: [owner, member] }
+        admin: { type: boolean, description: '管理者(#272)。作成者は常に true' }
         via: { type: string, enum: [share, legacy], description: 'share = リンクで参加 / legacy = #254 以前からアプリを持っていた(移行)。作成者には無い' }
         joinedAt: { type: string, format: date-time, description: 作成者には無い }
         you: { type: boolean, description: 呼び出したユーザー本人 }

@@ -61,7 +61,11 @@ type Restriction struct {
 	noMatching bool
 	// noSingle (#267): the client has no Entity.single / {"setting": ...}
 	noSingle bool
-	key      string // "" = no restriction; memo key otherwise
+	// noRoles (#272): the client has no member picker / visibleTo (data_roles_rules.go)
+	noRoles bool
+	// noAddressed (#271): the client has no members picker (messages_addressed_rules.go)
+	noAddressed bool
+	key         string // "" = no restriction; memo key otherwise
 }
 
 // knownComponentTypes are the container and leaf types of the canonical schema.
@@ -116,6 +120,8 @@ func NewRestriction(allowed, disabled []string) Restriction {
 		case FeatureSharedData:
 			r.noShared = true
 			r.noMatching = true // match needs a shared entity
+			r.noRoles = true    // roles are about other people's records
+			r.noAddressed = true
 		}
 	}
 	r.withholdMatchingUI()
@@ -140,6 +146,12 @@ func NewClientRestriction(allowed, disabled, supported []string) Restriction {
 	if len(allowed) > 0 && !slices.Contains(supported, FeatureSingleEntity) {
 		r.noSingle = true
 	}
+	if len(allowed) > 0 && !slices.Contains(supported, FeatureDataRoles) {
+		r.noRoles = true
+	}
+	if len(allowed) > 0 && !slices.Contains(supported, FeatureAddressed) {
+		r.noAddressed = true
+	}
 	r.withholdMatchingUI()
 	r.setKey()
 	return r
@@ -159,9 +171,9 @@ func (r *Restriction) withholdMatchingUI() {
 
 func (r *Restriction) setKey() {
 	r.key = ""
-	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared || r.noRetention || r.noWhen || r.noMatching || r.noSingle {
+	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared || r.noRetention || r.noWhen || r.noMatching || r.noSingle || r.noRoles || r.noAddressed {
 		r.key = strings.Join(r.Disallowed(), ",") + fmt.Sprintf("|h=%t|c=%t|s=%t|r=%t|w=%t", r.noHealth, r.noCamera, r.noShared, r.noRetention, r.noWhen) +
-			fmt.Sprintf("|m=%t|1=%t", r.noMatching, r.noSingle)
+			fmt.Sprintf("|m=%t|1=%t|a=%t|to=%t", r.noMatching, r.noSingle, r.noRoles, r.noAddressed)
 	}
 }
 
@@ -329,6 +341,12 @@ func restrictSchemaJSON(raw []byte, r Restriction) []byte {
 	if r.noSingle {
 		restrictSingle(defs)
 	}
+	if r.noRoles {
+		restrictDataRoles(defs, r.noShared)
+	}
+	if r.noAddressed {
+		restrictAddressed(defs)
+	}
 	if r.disallowed[string(dsl.CompWebView)] {
 		// openUrlButton's description points to webView for embedding (#452 G3)
 		for _, v := range defs {
@@ -488,6 +506,12 @@ func buildRestrictedPrompt(system string, r Restriction) string {
 		s = strings.Replace(s, notifySettingBudget, notifyLatestBudget, 1)
 		s = strings.Replace(s, singleChatRule, noSingleChatRule, 1)
 	}
+	if r.noRoles {
+		s = dropDataRolesRules(s, r.noShared)
+	}
+	if r.noAddressed {
+		s = dropAddressedRules(s)
+	}
 
 	// Rule lines that route an utterance to a disallowed part
 	// (「歩数を見たい」は healthStat ...) are dropped.
@@ -548,6 +572,12 @@ func restrictionNote(r Restriction) string {
 	}
 	if r.noSingle {
 		b.WriteString("- entity の single と式 {\"setting\":...} は使わない(この版では設定の 1 件を編集する画面が無い)。周期・目標・予算のような値は記録の entity に入れ、最新の値を {\"agg\":\"latest\",...} で読む。\n")
+	}
+	if r.noRoles {
+		b.WriteString(dataRolesNote(r.noShared))
+	}
+	if r.noAddressed && !r.noShared {
+		b.WriteString(addressedNote)
 	}
 	if r.noCamera {
 		b.WriteString("- photoField / videoField の source は library だけ(カメラで撮影はできない。写真・動画はライブラリから選ぶ)。camera / both は使わない。\n")
@@ -865,7 +895,15 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 	if r.noSingle {
 		single = unsingle(root)
 	}
-	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 && when == 0 && matching == 0 && single == 0 {
+	roles := 0
+	if r.noRoles {
+		roles = unrole(root, r.noShared)
+	}
+	addressed := 0
+	if r.noAddressed || r.noRoles {
+		addressed = unaddress(root, r.noAddressed)
+	}
+	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 && when == 0 && matching == 0 && single == 0 && roles == 0 && addressed == 0 {
 		return raw, nil, false
 	}
 	for _, t := range sortedIntKeys(removed) {
@@ -891,6 +929,12 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 	}
 	if single > 0 {
 		notes = append(notes, fmt.Sprintf("single -> latest records on %d entity(ies)", single))
+	}
+	if roles > 0 {
+		notes = append(notes, fmt.Sprintf("dropped member / visibleTo / admin rules on %d place(s)", roles))
+	}
+	if addressed > 0 {
+		notes = append(notes, fmt.Sprintf("dropped addressedTo / members on %d place(s)", addressed))
 	}
 	b, err := json.Marshal(root)
 	if err != nil {

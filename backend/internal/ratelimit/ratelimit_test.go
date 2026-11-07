@@ -65,6 +65,30 @@ func TestZeroWeightIsFree(t *testing.T) {
 	}
 }
 
+// An undo (weight 0) charges nothing but reports the real remaining units, so
+// the iOS "今日の残り" does not jump back to the full limit (#630).
+func TestZeroWeightReportsTodaysUsage(t *testing.T) {
+	l, _ := newTestLimiter(Limits{SignedIn: 10})
+	mustAllow(t, l, signed, "", 3)
+	d := mustAllow(t, l, signed, "", 0)
+	if !d.Allowed || d.Unmetered || d.Used != 3 || d.Remaining != 7 || d.Limit != 10 {
+		t.Fatalf("undo: %+v", d)
+	}
+	if d := mustAllow(t, l, signed, "", 1); d.Used != 4 {
+		t.Fatalf("undo must not charge: %+v", d)
+	}
+}
+
+// A user limit of 0 is "not counted": the remaining units are unknown.
+func TestZeroUserLimitIsUnmetered(t *testing.T) {
+	l, _ := newTestLimiter(Limits{SignedIn: 0, Global: 100})
+	for _, w := range []int{3, 0} {
+		if d := mustAllow(t, l, signed, "", w); !d.Allowed || !d.Unmetered {
+			t.Fatalf("weight %d: %+v", w, d)
+		}
+	}
+}
+
 func TestDayRollsOverAtMidnightJST(t *testing.T) {
 	l, c := newTestLimiter(Limits{SignedIn: 3})
 	mustAllow(t, l, signed, "", 3)
@@ -166,6 +190,14 @@ func (failingStore) Refund(context.Context, []Counter, int, time.Time) error {
 	return errors.New("firestore down")
 }
 
+// failingStore cannot Peek either: an undo then reports nothing rather than a full limit.
+func TestZeroWeightWithoutPeekIsUnmetered(t *testing.T) {
+	l := New(Config{Limits: Limits{SignedIn: 5}}, failingStore{}, nil)
+	if d, err := l.Allow(context.Background(), signed, "", 0); err != nil || !d.Allowed || !d.Unmetered {
+		t.Fatalf("undo: %+v %v", d, err)
+	}
+}
+
 func TestStoreFailureFallsBackToMemory(t *testing.T) {
 	l := New(Config{Limits: Limits{SignedIn: 2}}, failingStore{}, nil)
 	ctx := context.Background()
@@ -246,6 +278,33 @@ func TestMiddleware429Shape(t *testing.T) {
 	if e.Details["scope"] != "user" || e.Details["tier"] != "anonymous" || e.Details["limit"] != float64(3) ||
 		e.Details["remaining"] != float64(0) || e.Details["resetAt"] != "2026-10-25T15:00:00Z" || e.Details["retryAfterSec"] != float64(3600) {
 		t.Fatalf("details: %+v", e.Details)
+	}
+}
+
+func TestMiddlewareRemainingHeaders(t *testing.T) {
+	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	l, _ := newTestLimiter(Limits{SignedIn: 10})
+	h := l.Middleware(auth.DevVerifier{})(ok)
+	serve(t, h, "POST", "/v1/generate", "apple-1", `{"mode":"edit"}`)
+	// undo: nothing charged, but the header is today's real remaining, not the limit
+	w := serve(t, h, "POST", "/v1/generate", "apple-1", `{"mode":"undo"}`)
+	if got := w.Header().Get("X-RateLimit-Remaining"); w.Code != 200 || got != "8" || w.Header().Get("X-RateLimit-Limit") != "10" {
+		t.Fatalf("undo: %d remaining=%q limit=%q", w.Code, got, w.Header().Get("X-RateLimit-Limit"))
+	}
+
+	// user limit 0 (not counted): no X-RateLimit-* at all, never "remaining 0"
+	l0, _ := newTestLimiter(Limits{SignedIn: 0, Global: 100})
+	h0 := l0.Middleware(auth.DevVerifier{})(ok)
+	for _, body := range []string{`{"mode":"create"}`, `{"mode":"undo"}`} {
+		w := serve(t, h0, "POST", "/v1/generate", "apple-1", body)
+		if w.Code != 200 {
+			t.Fatalf("%s: %d", body, w.Code)
+		}
+		for _, k := range []string{"X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"} {
+			if v := w.Header().Get(k); v != "" {
+				t.Fatalf("%s: %s = %q, want none", body, k, v)
+			}
+		}
 	}
 }
 

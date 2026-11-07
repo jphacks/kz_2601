@@ -49,13 +49,17 @@ type automationQuota struct {
 }
 
 type automationRule struct {
-	ID          string          `json:"id"`
-	Description string          `json:"description"`
-	Trigger     string          `json:"trigger"` // record | schedule
-	Result      string          `json:"result"`  // status.Result*
-	LastRunAt   *time.Time      `json:"lastRunAt,omitempty"`
-	LastOKAt    *time.Time      `json:"lastOkAt,omitempty"`
-	Stopped     *automationStop `json:"stopped,omitempty"` // the operator stopped this rule
+	ID          string `json:"id"`
+	Description string `json:"description"`
+	Trigger     string `json:"trigger"` // record | schedule
+	Result      string `json:"result"`  // status.Result*
+	Enabled     bool   `json:"enabled"` // false: the creator turned it off (serverRules[].enabled)
+	// ConsecutiveFailures: runs that gave up in a row (0 after an ok run);
+	// iOS offers a fix in the chat when it keeps failing.
+	ConsecutiveFailures int             `json:"consecutiveFailures,omitempty"`
+	LastRunAt           *time.Time      `json:"lastRunAt,omitempty"`
+	LastOKAt            *time.Time      `json:"lastOkAt,omitempty"`
+	Stopped             *automationStop `json:"stopped,omitempty"` // the operator stopped this rule
 }
 
 func (h *Handler) automations(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +100,7 @@ func (h *Handler) automations(w http.ResponseWriter, r *http.Request) {
 
 	// shared / public runs keep one status per rule; private runs one per user (the caller's)
 	statusIDs := make([]string, 0, 2*len(a.ServerRules))
-	stopIDs := []string{store.AppStopID(appID), store.NotifyStopID(appID)}
+	stopIDs := []string{store.AppStopID(appID), store.NotifyStopID(appID), store.GlobalStopID}
 	for i := range a.ServerRules {
 		id := a.ServerRules[i].ID
 		statusIDs = append(statusIDs, store.RuleStatusID(appID, "", id), store.RuleStatusID(appID, uid, id))
@@ -114,13 +118,16 @@ func (h *Handler) automations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out.Stopped = stopOf(stops, store.AppStopID(appID))
+	if out.Stopped == nil { // #346: every app of the environment
+		out.Stopped = stopOf(stops, store.GlobalStopID)
+	}
 	out.NotifyPaused = stopOf(stops, store.NotifyStopID(appID))
 
 	var latest *store.RuleStatus // the newest run that saw the day's counter
 	for i := range a.ServerRules {
 		rule := &a.ServerRules[i]
 		item := automationRule{ID: rule.ID, Description: a.DescribeServerRule(rule), Trigger: "record", Result: status.ResultNone,
-			Stopped: stopOf(stops, store.RuleStopID(appID, rule.ID))}
+			Enabled: rule.IsEnabled(), Stopped: stopOf(stops, store.RuleStopID(appID, rule.ID))}
 		if rule.IsScheduled() {
 			item.Trigger = "schedule"
 		}
@@ -144,6 +151,7 @@ func (h *Handler) automations(w http.ResponseWriter, r *http.Request) {
 		if st != nil {
 			item.Result = status.Result(st.Outcome, st.Reason, st.NotifyPaused)
 			item.LastRunAt = timePtr(st.At)
+			item.ConsecutiveFailures = st.Failures
 			if st.QuotaDay != "" && st.QuotaLimit > 0 && (latest == nil || st.At.After(latest.At)) {
 				latest = st
 			}

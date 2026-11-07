@@ -8,7 +8,7 @@ App Store Review Guidelines 1.2 / 1.2.1(a)(利用者が作った内容を共有�
 - [仕組み](#仕組み)
 - [通報を受けたら(運用)](#通報を受けたら運用)
 - [cmd/moderate の使い方](#cmdmoderate-の使い方)
-- [通報のアラート(設定の手順)](#通報のアラート設定の手順)
+- [通報のアラート](#通報のアラート)
 - [まだ決めていないこと](#まだ決めていないこと)
 
 ## 仕組み
@@ -60,17 +60,20 @@ go run ./cmd/moderate resolve <reportId> -yes     # -status dismissed で「該�
 
 ローカル(エミュレータ)で試す: `make emulator` の後に `make -C backend run-moderate ARGS="reports"`。
 
-## 通報のアラート(設定の手順)
+## 通報のアラート
 
-ログベースの指標と通知のポリシーで、通報が 1 件でも来たらメールを送る案です(未設定)。
+[`infra/moderation_alerts.tf`](../../infra/moderation_alerts.tf) にコードがある(コードは用意済み・`terraform apply` はまだ)。通知先は監視と同じ(`alert_emails` / `alert_notification_channels`・[observability.md](observability.md))で、`monitoring_enabled` が false なら作らない。
 
-```bash
-gcloud logging metrics create moderation_reports --project=jphacks-kz2601 \
-  --description="POST /v1/reports (#321)" \
-  --log-filter='resource.type="cloud_run_revision" AND resource.labels.service_name="appconfig-prod" AND jsonPayload.msg="moderation: report"'
-# 通知のポリシー: Cloud Console > Monitoring > Alerting で
-#   指標 logging/user/moderation_reports の合計 > 0(5 分)→ 運営のメールの通知チャネル
-```
+| 指標(ログベース) | 元のログ | アラート |
+| --- | --- | --- |
+| `logging/user/moderation_reports`(ラベル `kind` / `reason`) | appconfig の `message="moderation: report"`(WARNING) | 5 分の合計 > 0 → WARNING(今は少ないので 1 件でも知らせる) |
+| `logging/user/runner_stops`(ラベル `by` / `level`) | runner の `event="runner.stop"`(WARNING) | `by=auto` の 5 分の合計 > 0 → ERROR(通知の自動一時停止) |
+
+- ログの本文は `httpx.NewCloudHandler` が `msg` を `message` に変えて出すので、フィルタは `jsonPayload.message` を見る(前の案の `jsonPayload.msg` では当たらない)。
+- 通報のアラートは `monitored_services` のサービスだけを見る。stg が同じプロジェクトにある間は stg の通報も届く(件名にサービス名が出る)。
+- 通報が増えたら `google_monitoring_alert_policy.moderation_reports` の `threshold_value` を上げる。
+
+適用(人の作業・[infra/README.md](../../infra/README.md) の手順): `terraform plan -var-file=envs/prod.tfvars` で指標 2 つ・ポリシー 2 つの追加だけになっていることを見てから `apply`。
 
 ## まだ決めていないこと
 

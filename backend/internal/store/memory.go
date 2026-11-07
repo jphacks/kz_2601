@@ -78,7 +78,8 @@ type Memory struct {
 	runnerApps map[string]*RunnerApp           // env/key
 
 	// runner stops (#346, memory_stop.go)
-	stops map[string]map[string]*Stop // env -> id
+	stops   map[string]map[string]*Stop // env -> id
+	stopLog map[string][]StopEvent      // env -> entries, oldest first
 
 	// runner rule statuses (#347, memory_rule_status.go)
 	ruleStatus map[string]map[string]*RuleStatus // env -> id

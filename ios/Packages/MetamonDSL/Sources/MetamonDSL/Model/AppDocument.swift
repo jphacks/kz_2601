@@ -235,6 +235,12 @@ public struct Entity: Decodable, Identifiable, Sendable {
     public var match: String?
     /// 設定値の置き場(#267)。レコードは常に 1 件(`SingleRecord`)。フォームは開くとその 1 件の編集、一覧には出さない。式 `{"setting": ...}` で読む。
     @LossyBool public var single: Bool = false
+    /// 一意制約(#273)。field id か "$author" の組が同じレコードは 1 件だけ(サーバーが 409 で断る)。端末は表示に使わない。
+    public var unique: [String]?
+    /// 共有レコードを誰が消せるか(#272): "author"(省略時)/ "admins" / "authorOrAdmins"。`RecordPermission.canDelete` が読む。
+    public var deleteBy: String?
+    /// 宛先の field id(#271)。この entity の記録は作った人と宛先の人だけが読める(サーバーが一覧から外す)。端末は表示に使わない。
+    public var addressedTo: String?
     @Lossy public var fields: [Field]
 
     /// field id、または予約値(`$author` / `$createdAt`・#250)の仮 Field。
@@ -275,6 +281,10 @@ public enum FieldType: String, Decodable, Sendable {
     /// 別 entity のレコードの複数選択(保存値はレコード id の配列・#231)。空 / 無し = 全員(割り勘する人)。
     /// 式では `len`(選んだ件数)と filter op `contains` だけが読む。
     case refs
+    /// 共有データの参加者(保存値は uid・#272)。入力は参加者の一覧から選び、一覧には表示名を出す。
+    case member
+    /// 共有データの参加者の複数選択(保存値は uid の配列・#271)。グループ宛てのメッセージの宛先。
+    case members
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .string) }
 
     public var isNumeric: Bool { self == .integer || self == .number || self == .currency }
@@ -299,13 +309,17 @@ public struct Field: Decodable, Identifiable, Sendable {
     /// 回答者に見せない項目(クイズの正解・#262)。レコードの作者のフォームにだけ出し、一覧・表・グラフ・見出しには出さない。
     /// 式(比較)からは読める。値は端末に届いているので厳密な秘匿ではない(docs/dsl/expressions.md §7.6)。
     public var hidden: Bool
+    /// "admins" = 管理者だけが入れる・変えられる項目(#272)。サーバーが守り、端末は断られた理由を出す。
+    public var editableBy: String?
 
     public var isComputed: Bool { computed != nil }
+    /// 管理者だけが変えられる項目(#272)。
+    public var isAdminOnly: Bool { editableBy == "admins" }
 
     /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
     static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
 
-    private enum Keys: String, CodingKey, CaseIterable { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health, hidden }
+    private enum Keys: String, CodingKey, CaseIterable { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health, hidden, editableBy }
 
     /// 予約値の仮 Field 用(`RecordValue`)。
     init(id: String, name: String, type: FieldType) {
@@ -328,6 +342,7 @@ public struct Field: Decodable, Identifiable, Sendable {
         computed = try? c.decodeIfPresent(Expr.self, forKey: .computed)
         health = try? c.decodeIfPresent(String.self, forKey: .health)
         hidden = (try? c.decodeIfPresent(Bool.self, forKey: .hidden)) ?? false
+        editableBy = try? c.decodeIfPresent(String.self, forKey: .editableBy)
     }
 }
 

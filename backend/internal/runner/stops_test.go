@@ -25,7 +25,7 @@ func (h *harness) putStop(s store.Stop) {
 
 func (h *harness) lift(id string) {
 	h.t.Helper()
-	if ok, err := h.st.LiftStop(h.t.Context(), h.env, id, h.clock); !ok || err != nil {
+	if ok, err := h.st.LiftStop(h.t.Context(), h.env, id, h.clock, "op"); !ok || err != nil {
 		h.t.Fatalf("lift %s: %v %v", id, ok, err)
 	}
 }
@@ -127,7 +127,7 @@ func TestStopIDsAndNoCreatorPath(t *testing.T) {
 		t.Fatal("app and notify stop ids collide")
 	}
 	api := reflect.TypeFor[store.Store]()
-	for _, m := range []string{"PutStop", "PutStopIfInactive", "LiftStop", "GetStops", "ListStops"} {
+	for _, m := range []string{"PutStop", "PutStopIfInactive", "LiftStop", "GetStops", "ListStops", "StopLog"} {
 		if _, ok := api.MethodByName(m); ok {
 			t.Errorf("store.Store exposes %s to the API handlers", m)
 		}

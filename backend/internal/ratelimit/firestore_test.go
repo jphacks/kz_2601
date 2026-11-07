@@ -50,6 +50,14 @@ func TestFirestoreConsume(t *testing.T) {
 	if err != nil || u.Blocked != 0 || u.Counts[0] != 10 {
 		t.Fatalf("over limit: %+v %v", u, err)
 	}
+	// Peek (undo, weight 0) reads without writing; a missing document is 0.
+	got, err := s.Peek(ctx, append(counters, Counter{ID: "none_" + sfx, Scope: ScopeUser, Limit: 10}))
+	if err != nil || len(got) != 3 || got[0] != 10 || got[1] != 10 || got[2] != 0 {
+		t.Fatalf("peek: %v %v", got, err)
+	}
+	if snap, err := c.Collection("rateLimitsTest").Doc("none_" + sfx).Get(ctx); err == nil || snap.Exists() {
+		t.Fatal("peek must not create a document")
+	}
 }
 
 // Runs against the local emulator only (make emulator); never staging/prod.

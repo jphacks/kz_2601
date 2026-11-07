@@ -85,6 +85,7 @@ public struct GridScreenLayout: View {
                         }
                         .scrollDismissesKeyboard(.interactively)
                         .scrollBounceBehavior(.basedOnSize)
+                        .modifier(RequiredFieldScroller(screen: screen, form: ctx.form, proxy: proxy))
                         // キーボードが上がり切ってから、フォーカスした入力欄を可視領域(保存バーとキーボードの上)の中央へ
                         .task(id: focusRequest?.tick) {
                             guard let key = focusRequest?.key else { return }
