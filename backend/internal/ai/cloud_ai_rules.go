@@ -14,8 +14,8 @@ var cloudAIRules = strings.TrimSpace(`
   - 材料は input(本文の field 1 つ)か、何も付けずにフォーム全体。口調・観点の指定は prompt(例: 「おばあちゃんの口調で、危ない点を 1 つ」)。
   - 形の例: 日記 diary{body: text, summary: text, mood: enum[良い, 普通, 悪い]} のフォームに textField(body)・aiButton{task: summarize, input: body, output: summary}・textField(summary)・aiButton{task: classify, input: body, output: mood}・picker(mood)。
 - 「AI に相談」「AI と話す」「AI が質問に答える」は、相談を 1 件ずつの記録にする: talk{question: text(required), answer: text, date: datetime(defaultValue now)}。フォームに textField(question)・aiButton{task: generate, entity: talk, limit: 10, prompt: 「これまでの相談(下の材料)を踏まえて、次の相談に答えて: {{question}}」, output: answer, label: AI に聞く}・textField(answer)。ホームに talk の list(新しい順・question と answer)。過去の相談が次の答えの材料になる。
-- 「写真を見て」は写真の項目の analyze(describe / classify・端末内)を使う。写真を AI に見せて長い解説・相談をすることはできない(summary で正直に伝える)。
-- AI の処理は、端末内 AI(Apple Intelligence)があれば端末で、無い端末では Tailor It Pro のオンライン AI で動く。材料は 1 回 4KB ほど(日本語で約 1300 字)まで。音声・ファイルの中身は読めない。summary で料金に触れなくてよい。
+- 「写真を見て」は写真の項目の analyze(describe / classify・端末内)を使う。写真を AI に見せて説明・相談するなら aiButton の inputPhoto(下の節)。
+- AI の処理は、端末内 AI(Apple Intelligence)があれば端末で、無い端末では Tailor It Pro のオンライン AI で動く。材料は 1 回 4KB ほど(日本語で約 1300 字)までと、inputPhoto の写真 1 枚。音声・ファイルの中身は読めない。summary で料金に触れなくてよい。
 `)
 
 func init() { systemPrompt += "\n\n" + cloudAIRules }

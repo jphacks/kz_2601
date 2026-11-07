@@ -178,6 +178,9 @@ type Service struct {
 	Pro paid.ProChecker
 	// ProMode is PRO_GATE_MODE: enforce ("" too) / log / off.
 	ProMode paid.Mode
+	// TextImage accepts the photo of aiButton inputPhoto on /v1/text
+	// (text_image.go; env AI_TEXT_IMAGE=1). Off = 403.
+	TextImage bool
 	// Members looks up shared-app membership: a participant's POST /v1/text
 	// with appId is covered by the creator's Pro (text_payer.go). nil = the
 	// caller's own Pro only.

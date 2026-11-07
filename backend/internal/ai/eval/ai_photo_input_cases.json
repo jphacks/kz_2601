@@ -1,0 +1,6 @@
+[
+  {"id": "ap_prescription_read", "kind": "create", "group": "aiphoto", "transcript": "処方箋や薬の袋を撮ると、AI が薬の名前と飲み方を読み取ってメモにしてくれる薬の記録アプリ", "note": "写真を AI に見せて読む = aiButton extract の inputPhoto(photo field)+ output は text", "expect": {"photo": true, "aiInputPhoto": true}},
+  {"id": "ap_whiteboard_clean", "kind": "create", "group": "aiphoto", "transcript": "ホワイトボードの写真を撮ると、AI が書いてあることを読みやすい議事録に清書してくれるアプリ", "note": "写真から清書 = aiButton rewrite / summarize の inputPhoto", "expect": {"photo": true, "aiInputPhoto": true}},
+  {"id": "ap_plant_advice", "kind": "create", "group": "aiphoto", "transcript": "育てている植物の写真を撮ると、AI が元気かどうかと手入れのアドバイスをくれる観察日記", "note": "写真に助言 = aiButton suggest の inputPhoto", "expect": {"photo": true, "aiInputPhoto": true, "aiTask": "suggest"}},
+  {"id": "ap_receipt_amount", "kind": "create", "group": "aiphoto", "transcript": "レシートを撮ったら金額と日付を読み取って家計簿に入れたい", "note": "金額・日付は端末内の photoField.analyze で足りる。inputPhoto を付けない(写真を端末外に出さない)", "expect": {"photoAnalyze": ["amount"], "aiInputPhoto": false}}
+]

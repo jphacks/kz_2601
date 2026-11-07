@@ -461,6 +461,8 @@ type Component struct {
 	Count   int      `json:"count,omitempty"`   // generate list: number of items
 	Items   []string `json:"items,omitempty"`   // generate fields: item names
 	Length  string   `json:"length,omitempty"`  // short (default) | long: cloud-only long text (ai_button.go)
+	// InputPhoto is a photo field of the form sent with the call (cloud only, ai_button_photo.go).
+	InputPhoto string `json:"inputPhoto,omitempty"`
 
 	// healthStat (#167). Label / Target are shared.
 	Metric string `json:"metric,omitempty"` // steps|weight

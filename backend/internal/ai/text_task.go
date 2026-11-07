@@ -71,7 +71,7 @@ func normalizeTaskRequest(req *TextRequest) error {
 	if err := checkTextInput(req); err != nil {
 		return err
 	}
-	if strings.TrimSpace(req.Input) == "" {
+	if strings.TrimSpace(req.Input) == "" && req.Image == nil { // a photo alone is material too (text_image.go)
 		return badText("input is required for task " + req.Task)
 	}
 	return nil

@@ -51,6 +51,16 @@ final class AITextGateTests: XCTestCase {
         XCTAssertEqual(body?["appId"] as? String, "app-123")
     }
 
+    /// 写真つきの依頼にも appId が付き、写真は残る(作成者の Pro で判定される)
+    func testPhotoRequestCarriesAppId() throws {
+        let photo = AITextRequest(instruction: "薬", shape: .line, task: "extract",
+                                  image: AITextImage(jpegBase64: "/9j/AA==")).inApp("app-123")
+        XCTAssertEqual(photo.image, AITextImage(jpegBase64: "/9j/AA=="))
+        let body = try JSONSerialization.jsonObject(with: JSONEncoder().encode(photo)) as? [String: Any]
+        XCTAssertEqual(body?["appId"] as? String, "app-123")
+        XCTAssertEqual((body?["image"] as? [String: Any])?["data"] as? String, "/9j/AA==")
+    }
+
     func testMockIsDeterministicPerShape() async throws {
         let mock = MockAIClient(delay: .zero)
         let list = AITextRequest(instruction: "罰ゲーム", shape: .list, count: 4)
@@ -84,5 +94,23 @@ final class AITextGateTests: XCTestCase {
                        .failed("AI を一時的に止めています。しばらくしてからもう一度お試しください"))
         // #316: サーバーも Pro を確かめる。402 は課金画面へ(needsPro)
         XCTAssertEqual(HTTPAIClient.textError(.server(status: 402, code: "pro_required", message: "this needs Tailor It Pro: onlineAI")) as? AITextError, .needsPro)
+    }
+
+    /// aiButton inputPhoto: 写真の検証・受け付け停止は写真の文言。写真と関係ない 400 はそのまま。
+    func testPhotoErrorsMapToScreenText() {
+        let resend = AITextError.failed("写真を AI に送れませんでした。撮り直してからお試しください")
+        XCTAssertEqual(HTTPAIClient.textError(.server(status: 413, code: "payload_too_large", message: "image must be at most 409600 base64 characters"), photo: true) as? AITextError, resend)
+        XCTAssertEqual(HTTPAIClient.textError(.server(status: 400, code: "bad_request", message: "image must be a JPEG"), photo: true) as? AITextError, resend)
+        XCTAssertEqual(HTTPAIClient.textError(.server(status: 403, code: "forbidden", message: "photo input is not enabled"), photo: true) as? AITextError,
+                       .failed("写真を AI に見せる機能は、今は使えません"))
+        XCTAssertNil(HTTPAIClient.textError(.server(status: 400, code: "bad_request", message: "instruction must be at most 500 characters"), photo: true) as? AITextError)
+    }
+
+    func testRequestEncodesImage() throws {
+        let r = AITextRequest(instruction: "", shape: .line, task: "extract", image: AITextImage(jpegBase64: "/9j/AA=="))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(r)) as? [String: Any])
+        let image = try XCTUnwrap(obj["image"] as? [String: String])
+        XCTAssertEqual(image, ["mediaType": "image/jpeg", "data": "/9j/AA=="])
+        XCTAssertNil(obj["input"])
     }
 }

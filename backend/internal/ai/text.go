@@ -51,6 +51,8 @@ type TextRequest struct {
 	// AppID is the app the button is in (optional). A participant of a
 	// shared app is covered by the creator's Pro (text_payer.go).
 	AppID string `json:"appId,omitempty"`
+	// Image is the photo of aiButton inputPhoto (text_image.go). Never logged.
+	Image *TextImage `json:"image,omitempty"`
 }
 
 // TextField is one named value of shape fields.
@@ -172,6 +174,7 @@ func (s *Service) text(ctx context.Context, req TextRequest, loc Locale) (*TextR
 	if req.isLong() {
 		applyLong(&c, req, loc)
 	}
+	applyImage(&c, req)
 	resp, err := s.Claude.Complete(WithOperation(ctx, OpText), c)
 	if err != nil {
 		return nil, mapClaudeErr(err)
@@ -339,26 +342,31 @@ func parseTextOutput(raw string, req TextRequest) (*TextResult, error) {
 
 // textHandler serves POST /v1/text. A verified caller is required (the rate
 // limiter verifies first in production; auth.Optional covers a bare run).
-// A 402 (no Pro covers the call) gives the rate limit units back
-// (ratelimit.Waive); 400 / 413 keep the charge like /v1/generate.
+// Order: photo checks (403 switch off / 400 / 413) → text checks → Pro gate
+// (402) → Claude. Only the 402 gives the rate limit units back
+// (ratelimit.Waive); 400 / 403 / 413 keep the charge like /v1/generate.
 func textHandler(svc *Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if auth.UID(r.Context()) == "" {
 			svc.writeErr(w, r, &Error{Status: http.StatusUnauthorized, Code: httpx.CodeUnauthenticated, Message: "missing or invalid bearer token"})
 			return
 		}
-		body, err := io.ReadAll(io.LimitReader(r.Body, textMaxBodyBytes+1))
+		body, err := io.ReadAll(io.LimitReader(r.Body, textMaxImageBodyBytes+1))
 		if err != nil {
 			svc.writeErr(w, r, badText("cannot read body"))
 			return
 		}
-		if len(body) > textMaxBodyBytes {
+		if len(body) > textMaxImageBodyBytes { // the fields are capped again after decoding
 			svc.writeErr(w, r, &Error{Status: http.StatusRequestEntityTooLarge, Code: httpx.CodePayloadTooLarge, Message: "body too large"})
 			return
 		}
 		var req TextRequest
 		if err := json.Unmarshal(body, &req); err != nil {
 			svc.writeErr(w, r, badText("invalid JSON: "+err.Error()))
+			return
+		}
+		if err := svc.checkTextImageRequest(req); err != nil {
+			svc.writeErr(w, r, err)
 			return
 		}
 		loc, err := prepareText(&req)

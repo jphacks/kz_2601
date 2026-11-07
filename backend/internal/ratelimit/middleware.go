@@ -30,17 +30,22 @@ func (w Weights) Weight(r *http.Request, body []byte) int {
 		return w.Chat
 	case "/v1/text":
 		var req struct {
-			Task   string `json:"task"`
-			Length string `json:"length"`
+			Task   string          `json:"task"`
+			Length string          `json:"length"`
+			Image  json.RawMessage `json:"image"` // aiButton inputPhoto: not decoded here
 		}
 		_ = json.Unmarshal(body, &req)
-		if req.Length == "long" {
-			return w.TextLong
-		}
+		n := w.Text // the heaviest of task / long / image
 		if req.Task != "" && req.Task != "generate" {
-			return w.TextTask
+			n = max(n, w.TextTask)
 		}
-		return w.Text
+		if req.Length == "long" {
+			n = max(n, w.TextLong)
+		}
+		if len(req.Image) > 0 && string(req.Image) != "null" {
+			n = max(n, w.TextImage)
+		}
+		return n
 	case "/v1/generate":
 		var req struct {
 			Mode string `json:"mode"`

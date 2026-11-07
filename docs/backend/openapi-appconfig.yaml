@@ -1012,7 +1012,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MyUsage' }
-              example: { plan: free, tier: signed_in, resetAt: '2026-11-07T15:00:00Z', ai: { used: 12, limit: 60, remaining: 48, weights: { create: 3, edit: 2, chat: 1, text: 1, textTask: 2, textLong: 3 } }, apps: { used: 3, limit: 100, remaining: 97 }, perApp: { recordsPerApp: 5000, photosPerApp: 500 } }
+              example: { plan: free, tier: signed_in, resetAt: '2026-11-07T15:00:00Z', ai: { used: 12, limit: 60, remaining: 48, weights: { create: 3, edit: 2, chat: 1, text: 1, textTask: 2, textLong: 3, textImage: 3 } }, apps: { used: 3, limit: 100, remaining: 97 }, perApp: { recordsPerApp: 5000, photosPerApp: 500 } }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
@@ -1954,7 +1954,7 @@ components:
                   properties:
                     weights:
                       type: object
-                      required: [chat, create, edit, text, textTask, textLong]
+                      required: [chat, create, edit, text, textTask, textLong, textImage]
                       properties:
                         chat: { type: integer }
                         create: { type: integer }
@@ -1962,6 +1962,7 @@ components:
                         text: { type: integer }
                         textTask: { type: integer }
                         textLong: { type: integer, description: aiButton の length long の重さ }
+                        textImage: { type: integer, description: aiButton の inputPhoto (写真つき) の重さ }
         apps: { oneOf: [{ $ref: '#/components/schemas/UsageMeter' }, { type: 'null' }], description: 数えられなかった時は null }
         perApp:
           type: object

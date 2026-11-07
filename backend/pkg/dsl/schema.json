@@ -3871,9 +3871,13 @@
             "long"
           ],
           "description": "答えの長さ(既定 short)。long=長い文章(長い文の要約・手紙・計画・台本など。材料 16KB・答え約 3000 字まで)。long はオンライン AI だけで動く(Tailor It Pro)。classify には使わない。generate は shape line だけ、output は text field。"
+        },
+        "inputPhoto": {
+          "type": "string",
+          "description": "AI に一緒に見せる写真: screen.entity の photo field id(処方箋・薬の袋・ラベル・ホワイトボードを読む)。いつも Tailor It Pro のオンライン AI で動く(写真は縮小して送る)。"
         }
       },
-      "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はフォームの入力を処理して output field に入れる(端末内 AI(Apple Intelligence / Foundation Models)が使えれば無料で端末の中だけ、無い端末では Tailor It Pro のオンライン AI。写真は送らない)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",
+      "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はフォームの入力を処理して output field に入れる(端末内 AI(Apple Intelligence / Foundation Models)が使えれば無料で端末の中だけ、無い端末では Tailor It Pro のオンライン AI。写真は inputPhoto を付けた時だけオンライン AI に送る)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",
       "x-usage": "summarize〜suggest はフォーム画面のみ(screen.entity 必須)。発話に「要約して」「分類して」「気分を判定」「タグ付け」「一言で」「言い換えて」「丁寧に」「抜き出して」「AI で」がある時に使う。entity に結果用の field(string/text、分類は enum)を足し、その入力欄の直上に 1 行(例 A7:F8)。generate は「〜の案を出してくれるボタン」「今日の献立を提案」「励ましの一言」「お題を考えて」の時: どの画面でもよく、結果を表示する高さを取る(line は 3 行・list/fields は 5〜6 行 例 A1:F6)。記録を材料にするなら entity(+limit)、結果を記録に残したい時だけフォーム画面で output。1 画面 3 個まで。"
     },
     "LocationTracker": {

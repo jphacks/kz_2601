@@ -16,7 +16,9 @@ enum AIGenerateRoute: Equatable {
 
     /// - mock: `METAMON_MOCK=1` は決まった文を返すホストのモックを使う(端末内 AI の答えは毎回変わるため)
     /// - long: `length: long` は端末内 AI を使わず、いつもオンライン(端末内 AI は短い答え向け)
-    static func choose(availability: AIAvailability, hostOnline: Bool, mock: Bool, long: Bool = false) -> AIGenerateRoute {
+    /// - photo: `inputPhoto` も端末内 AI を使わず、いつもオンライン(端末内 AI は写真を読めない)
+    static func choose(availability: AIAvailability, hostOnline: Bool, mock: Bool, long: Bool = false, photo: Bool = false) -> AIGenerateRoute {
+        if photo { return hostOnline ? .online : .unavailable(photoUnavailable) }
         if long { return hostOnline ? .online : .unavailable(longUnavailable) }
         if mock, hostOnline { return .online }
         if availability.isAvailable { return .onDevice }
@@ -27,6 +29,7 @@ enum AIGenerateRoute: Equatable {
     static var isMock: Bool { ProcessInfo.processInfo.environment["METAMON_MOCK"] == "1" }
 
     static let longUnavailable = "長い文章はオンラインの AI だけで書けます(この版では使えません)"
+    static let photoUnavailable = "写真を読むのはオンラインの AI だけです(この版では使えません)"
 }
 
 // MARK: - 依頼の組み立て(純粋関数・テスト対象)

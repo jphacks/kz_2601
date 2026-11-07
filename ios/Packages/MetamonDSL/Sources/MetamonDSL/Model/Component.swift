@@ -158,6 +158,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var count: Int?             // generate list の個数
     public var items: [String]?        // generate fields の項目名
     public var length: String?         // short(既定)| long = 長い文・オンライン AI だけ
+    public var inputPhoto: String?     // 一緒に AI に見せる photo field(オンライン AI だけ)
     public var target: Double?         // progressBar entity モードの分母
     public var tone: String?           // progressBar: positive(目標)| negative(予算)・#140
     public var url: String?            // link
@@ -246,7 +247,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case min, max, step, minLines
         case by
         case nameField, balanceField
-        case task, input, output, options, shape, count, items, length
+        case task, input, output, options, shape, count, items, length, inputPhoto
         case tone
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
@@ -331,6 +332,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         count = try? c.decodeIfPresent(Int.self, forKey: .count)
         items = try? c.decodeIfPresent([String].self, forKey: .items)
         length = try? c.decodeIfPresent(String.self, forKey: .length)
+        inputPhoto = try? c.decodeIfPresent(String.self, forKey: .inputPhoto)
         target = try? c.decodeIfPresent(Double.self, forKey: .target)
         tone = try? c.decodeIfPresent(String.self, forKey: .tone)
         url = try? c.decodeIfPresent(String.self, forKey: .url)

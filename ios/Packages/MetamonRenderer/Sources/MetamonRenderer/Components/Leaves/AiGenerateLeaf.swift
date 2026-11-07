@@ -16,7 +16,7 @@ struct AiGenerateLeaf: View {
 
     private var route: AIGenerateRoute {
         AIGenerateRoute.choose(availability: availability, hostOnline: rt.aiText?.supportsOnlineAIText ?? false, mock: AIGenerateRoute.isMock,
-                               long: c.length == "long")
+                               long: c.length == "long", photo: c.inputPhoto != nil)
     }
 
     var body: some View {
@@ -96,8 +96,9 @@ struct AiGenerateLeaf: View {
             if let form {
                 values = form.showsHiddenFields(currentUid: rt.currentUserId) ? form.values : HiddenFields.redact(form.values, in: form.entity)
             }
-            let request = try AIGenerateBuilder.build(c, form: form?.entity, values: values, sourceEntity: source, records: records,
+            var request = try AIGenerateBuilder.build(c, form: form?.entity, values: values, sourceEntity: source, records: records,
                                                       locale: LanguagePreference.shared.code)
+            if form != nil { try await AIPhotoInput.attach(c, values: values, to: &request) } // inputPhoto: オンラインだけ
             let out: AITextResult
             switch route {
             case .onDevice: out = try await OnDeviceAI.generate(request)
