@@ -833,6 +833,9 @@
           "$ref": "#/$defs/RouteGuide"
         },
         {
+          "$ref": "#/$defs/PlaceSearch"
+        },
+        {
           "$ref": "#/$defs/QrScanner"
         },
         {
@@ -3153,10 +3156,14 @@
         },
         "label": {
           "type": "string"
+        },
+        "addressField": {
+          "type": "string",
+          "description": "任意: screen.entity の string / text field。取った現在地の住所(例: 石川県金沢市広坂1丁目)を端末から Apple のマップに聞いて入れる。"
         }
       },
       "description": "現在地(GPS)を 1 回取得してフォームの location field に保存するボタン。散歩メモ・駐車位置・釣果など「どこで起きたか」を記録するアプリのフォーム画面で選ぶ。",
-      "x-usage": "フォーム画面のみ(screen.entity 必須)。他の入力欄の近くに 1 行(A8:F9)。ホーム側の mapView と対で使う。"
+      "x-usage": "フォーム画面のみ(screen.entity 必須)。他の入力欄の近くに 1 行(A8:F9)。ホーム側の mapView と対で使う。「住所も残したい」「どこにいるか文章で」なら addressField に住所用の string field。"
     },
     "LocationPicker": {
       "type": "object",
@@ -3241,6 +3248,81 @@
       },
       "description": "目的地までの道案内(ナビ)。MapKit で経路を出して地図に線を引き、次に曲がる所・そこまでの距離・残りの距離・到着の予想時刻を現在地に合わせて進める。音声案内(オン・オフ)・車/徒歩の切り替え・道を外れたら経路を引き直す。使用中の位置だけ使う(背面では案内しない)。車線・渋滞の回避など Google マップと同じ精度は無い(MapKit の範囲)。「ナビ」「道案内」「目的地まで案内」「ドライブ」「行き方を教えて」の時に必ずこれを選ぶ(mapView や openUrlButton で地図アプリへ飛ばすだけで代替しない)。",
       "x-usage": "目的地は 3 通り: (1) 行き先リストのホームに routeGuide{entity: spot, locationField: place, titleField: name}(A1:F7・候補から選ぶ)+ spot の list(A8:F10)+ 追加ボタン(D11:F12)、(2) spot の詳細/フォーム画面(screen.entity)に routeGuide{locationField: place, titleField: name}(locationPicker で選んだ場所へそのまま案内)、(3) 行き先が決まっているなら routeGuide{address: \"金沢駅\"}。entity は例 spot{name: string(required), place: location(required)}、フォームは locationPicker{field: place, nameField: name}。徒歩の道案内なら mode walking。"
+    },
+    "PlaceSearch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "placeSearch"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string",
+          "description": "見出し(任意・例: 近くのカフェ)。"
+        },
+        "query": {
+          "type": "string",
+          "description": "決まった検索語(任意・例: コワーキング / ラーメン)。省略すると利用者が打つ。"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "cafe",
+            "restaurant",
+            "bakery",
+            "store",
+            "station",
+            "park",
+            "hospital",
+            "pharmacy",
+            "parking",
+            "gasStation",
+            "evCharger",
+            "hotel",
+            "museum",
+            "library",
+            "movieTheater",
+            "school",
+            "university",
+            "fitness"
+          ],
+          "description": "任意: 施設の種類で絞る。query と一緒でもよい。"
+        },
+        "near": {
+          "type": "string",
+          "enum": [
+            "current"
+          ],
+          "description": "どこの近くか: current = 現在地(既定・使用中の位置だけ)。"
+        },
+        "nameField": {
+          "type": "string",
+          "description": "screen.entity の string / text field。選んだ場所の名前が入る。"
+        },
+        "locationField": {
+          "type": "string",
+          "description": "screen.entity の location field。選んだ場所が \"lat,lng\" で入る。"
+        },
+        "addressField": {
+          "type": "string",
+          "description": "screen.entity の string / text field。選んだ場所の住所が入る。"
+        },
+        "pins": {
+          "type": "boolean",
+          "description": "true で結果を小さな地図のピンでも出す。"
+        }
+      },
+      "description": "現在地の近くの場所(お店・施設)を Apple のマップで探す一覧。名前・距離・住所を近い順に出し、「記録に追加」で入力中のフォームの nameField / locationField / addressField に入れる(保存は saveRecord)。「近くのカフェを探して記録」「周りのコワーキングスペース」「近くの映画館」「近くの飲食店から選ぶ」の時に選ぶ。検索語と現在地のおおよその範囲は端末から Apple に送られる(本アプリのサーバーには送らない)。営業時間・空席・値段・口コミ・上映時間は出ない。",
+      "x-usage": "フォーム画面のみ(screen.entity 必須・nameField / locationField / addressField の 1 つ以上)。A1:F7 程度に置き、下に入力欄と保存ボタン。entity 例 spot{name: string(required), place: location, address: string}。ホームは spot の list と mapView{locationField: place, titleField: name}。決まった物を探すなら query か category、自由に探すなら両方省略。"
     },
     "QrScanner": {
       "type": "object",

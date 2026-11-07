@@ -25,7 +25,7 @@ enum BuildChoreography {
             case .chart: .chart
             case .stat, .gauge, .progressBar, .healthStat, .sensorValue, .timerDisplay: .stat
             case .calendar: .calendar
-            case .mapView, .routeGuide, .locationTracker: .map
+            case .mapView, .routeGuide, .placeSearch, .locationTracker: .map
             case .photoField, .drawingField, .image, .videoField, .videoPlayer, .audioRecorder, .qrCode, .qrScanner, .dashcam,
                  .musicPlayer, .avatar, .icon, .webView: .media
             default: .card

@@ -291,6 +291,7 @@ const (
 	CompLocationButton ComponentType = "locationButton" // CoreLocation -> location field
 	CompLocationPicker ComponentType = "locationPicker" // search / map pin -> location field (+ nameField) (#212)
 	CompRouteGuide     ComponentType = "routeGuide"     // MapKit turn-by-turn guidance to a destination (#411)
+	CompPlaceSearch    ComponentType = "placeSearch"    // MapKit nearby places -> form fields (place_search.go)
 	CompQrScanner      ComponentType = "qrScanner"      // AVFoundation -> string field
 	CompQrCode         ComponentType = "qrCode"         // CoreImage QR from text / field / value (#422)
 	CompTimerDisplay   ComponentType = "timerDisplay"   // stopwatch / countdown
@@ -512,6 +513,13 @@ type Component struct {
 	Provider string `json:"provider,omitempty"` // weather|holidays|rss
 	Region   string `json:"region,omitempty"`   // weather: JMA forecast office code (WeatherRegions)
 	FeedID   string `json:"feedId,omitempty"`   // rss: allowlisted feed id (RSSFeeds)
+
+	// placeSearch (place_search.go). Label / NameField / LocationField are shared.
+	Query        string `json:"query,omitempty"`        // fixed search words
+	Category     string `json:"category,omitempty"`     // PlaceCategories
+	Near         string `json:"near,omitempty"`         // "" | current
+	AddressField string `json:"addressField,omitempty"` // placeSearch / locationButton: the address string field
+	Pins         bool   `json:"pins,omitempty"`         // also pin the results on a small map
 }
 
 // PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the
