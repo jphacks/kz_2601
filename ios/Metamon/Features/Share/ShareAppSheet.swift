@@ -23,6 +23,8 @@ struct ShareAppSheet: View {
     @State private var busy = false
     @State private var copied = false
     @State private var members: SharedMembersModel?
+    /// 表示できない言葉があった項目(#321 text_not_allowed の details.field)
+    @State private var flaggedField: String?
 
     var body: some View {
         ScrollView {
@@ -144,10 +146,12 @@ struct ShareAppSheet: View {
                 // 説明は複数行(return で改行)、タグは 1 行(return で閉じる)・#196
                 TextField("ひとこと説明(任意)", text: $desc, axis: .vertical)
                     .lineLimit(2...5)
-                    .metamonInputField()
+                    .metamonInputField(flagged: flaggedField == "description")
+                    .onChange(of: desc) { if flaggedField == "description" { flaggedField = nil } }
                 TextField("タグ(スペース区切り・任意) 例: 健康 習慣", text: $tags)
                     .submitLabel(.done)
-                    .metamonInputField()
+                    .metamonInputField(flagged: flaggedField == "tags")
+                    .onChange(of: tags) { if flaggedField == "tags" { flaggedField = nil } }
                 Button { Task { await publish() } } label: {
                     Text("公開する")
                         .font(.subheadline.weight(.semibold))
@@ -207,9 +211,25 @@ struct ShareAppSheet: View {
         let tagList = tags.split(whereSeparator: { $0 == " " || $0 == "　" || $0 == "," || $0 == "、" }).map(String.init)
         do {
             listing = try await services.sharing?.publish(appId: app.id, description: desc, tags: tagList, authorName: nil)
+            flaggedField = nil
             rt.toast = L10n.tr("「探す」に公開しました")
+        } catch let api as APIError where api.isTextNotAllowed { // #321
+            ErrorLog.record(api, context: "ShareAppSheet publish")
+            flaggedField = api.field
+            rt.toast = Self.textNotAllowedMessage(field: api.field)
         } catch {
             rt.toast = ErrorCopy.failure(L10n.tr("公開できませんでした"), error, context: "ShareAppSheet")
+        }
+    }
+
+    /// 公開の文字の項目(#321)。どの欄かを名前で出す
+    static func textNotAllowedMessage(field: String?) -> String {
+        switch field {
+        case "description": ErrorCopy.textNotAllowed(fieldName: L10n.tr("ひとこと説明"))
+        case "tags": ErrorCopy.textNotAllowed(fieldName: L10n.tr("タグ"))
+        case "name": ErrorCopy.textNotAllowed(fieldName: L10n.tr("アプリの名前"))
+        case "authorName": ErrorCopy.textNotAllowed(fieldName: L10n.tr("表示名"))
+        default: ErrorCopy.textNotAllowed
         }
     }
 

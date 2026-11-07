@@ -71,6 +71,9 @@ struct FormSaveBar: ViewModifier {
         .disabled(phase != .idle)
         .animation(RenderTheme.Motion.select, value: phase)
         .sensoryFeedback(.success, trigger: phase) { _, new in if case .done = new { true } else { false } }
+        .onChange(of: ctx.form?.lastSaveResult) { _, new in
+            if new == nil, case .done = phase { phase = .idle } // 送った後にサーバーが断った: 「保存しました」を取り消す
+        }
         .accessibilityLabel(save.label)
         .padding(.horizontal, RenderTheme.Spacing.screenInset)
         .padding(.top, RenderTheme.Spacing.sm)
@@ -109,6 +112,6 @@ struct FormSaveBar: ViewModifier {
         }
         phase = .done(result)
         try? await Task.sleep(for: .seconds(RenderTheme.Motion.checkSeconds))
-        phase = .idle
+        if phase == .done(result) { phase = .idle } // 断られて先に戻っていたら、次の保存の表示を消さない
     }
 }

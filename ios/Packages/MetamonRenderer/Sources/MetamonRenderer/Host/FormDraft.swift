@@ -27,7 +27,9 @@ public final class FormDraft {
     public var canDelete = true
 
     /// 開いた時(読み込み・保存の後)の値。`hasUnsavedChanges` の比較元(M10)
-    @ObservationIgnored private var baseline: [String: JSONValue] = [:]
+    @ObservationIgnored var baseline: [String: JSONValue] = [:]
+    /// 最後の保存の前の `baseline`。サーバーが断った時に未保存へ戻す(`markSaveRefused`)
+    @ObservationIgnored var baselineBeforeSave: [String: JSONValue]?
 
     public init(entity: Entity, record: Record? = nil) {
         self.entity = entity

@@ -15,6 +15,10 @@ struct ErrorPresentation: Equatable, Identifiable {
         case rateLimited(RateLimitInfo)
         /// 運営が AI を一時停止中(#511・503 ai_paused)
         case aiPaused
+        /// 無料プランの一時停止(#317・503 free_plan_paused)。もう一度では解けないので再試行は出さない
+        case freePlanPaused(resumeAt: Date?)
+        /// プランの上限(#317・403 plan_limit_reached)。作成者だけ「Pro にする」(押した時だけ課金画面・U3/U4)
+        case planLimit(PlanLimit)
         /// タイムアウト(45s / 504)
         case timeout
         /// 401(再取得しても失効)
@@ -69,6 +73,9 @@ struct ErrorPresentation: Equatable, Identifiable {
         case .sessionExpired: return ErrorPresentation(kind: .sessionExpired, transcript: transcript, origin: origin)
         case .rateLimited(let info): return ErrorPresentation(kind: .rateLimited(info), transcript: transcript, origin: origin)
         case .aiPaused: return ErrorPresentation(kind: .aiPaused, transcript: transcript, origin: origin)
+        case .freePlanPaused(let at): return ErrorPresentation(kind: .freePlanPaused(resumeAt: at), transcript: transcript, origin: origin)
+        case .planLimit(let limit): return ErrorPresentation(kind: .planLimit(limit), transcript: transcript, origin: origin)
+        case .appStopped: return .notice(icon: "pause.circle", title: ErrorCopy.appStoppedTitle, body: ErrorCopy.appStoppedBody)
         case .appCheckFailed: return ErrorPresentation(kind: .failed(message: ErrorCopy.appCheckFailedBody), transcript: transcript, origin: origin)
         case .rejected(let m):
             ErrorLog.record(m, context: "\(origin == .chat ? "chat" : "morph") rejected") // サーバーの文はログにだけ
@@ -86,7 +93,8 @@ struct ErrorPresentation: Equatable, Identifiable {
         case .offlineInterrupted: "wifi.exclamationmark"
         case .busy: "hourglass"
         case .rateLimited: "moon.zzz"
-        case .aiPaused: "pause.circle"
+        case .aiPaused, .freePlanPaused: "pause.circle"
+        case .planLimit: "tray.full"
         case .timeout: "clock.badge.exclamationmark"
         case .sessionExpired: "person.crop.circle.badge.exclamationmark"
         case .failed, .rejected: "exclamationmark.triangle"
@@ -101,6 +109,8 @@ struct ErrorPresentation: Equatable, Identifiable {
         case .busy: ErrorCopy.busyTitle
         case .rateLimited(let info): info.scope == .global ? ErrorCopy.rateLimitedGlobalTitle : ErrorCopy.rateLimitedTitle
         case .aiPaused: ErrorCopy.aiPausedTitle
+        case .freePlanPaused: ErrorCopy.freePlanPausedTitle
+        case .planLimit: ErrorCopy.planLimitTitle
         case .timeout: ErrorCopy.timeoutTitle
         case .sessionExpired: ErrorCopy.sessionExpiredTitle
         case .failed: origin == .chat ? ErrorCopy.chatFailedTitle : ErrorCopy.failedTitle
@@ -116,6 +126,8 @@ struct ErrorPresentation: Equatable, Identifiable {
         case .busy(let after): after.map { $0 > 1 ? ErrorCopy.busyBody(retryAfter: $0) : ErrorCopy.busyBody } ?? ErrorCopy.busyBody
         case .rateLimited(let info): ErrorCopy.rateLimitedBody(info)
         case .aiPaused: ErrorCopy.aiPausedBody
+        case .freePlanPaused(let at): ErrorCopy.freePlanPausedBody(resumeAt: at)
+        case .planLimit(let limit): ErrorCopy.planLimitBody(limit)
         case .timeout: ErrorCopy.timeoutBody
         case .sessionExpired: ErrorCopy.sessionExpiredBody
         case .failed(let message): message
@@ -129,7 +141,8 @@ struct ErrorPresentation: Equatable, Identifiable {
         case .offlineQueued: .sendNow
         case .offlineInterrupted, .busy, .timeout, .failed, .aiPaused: .retry
         case .sessionExpired: .signIn
-        case .rejected, .notice: nil
+        case .rejected, .notice, .freePlanPaused: nil
+        case .planLimit(let limit): ErrorCopy.showsProPath(limit) ? .upgradePro : nil
         case .rateLimited(let info): Self.rateLimitPrimary(info)
         }
     }
