@@ -418,9 +418,7 @@ func (a *App) Validate() error {
 			}
 			switch c.Type {
 			case CompText:
-				if c.Text == "" {
-					add("%s: text is empty", where)
-				}
+				checkText(where, c, formEntity, add) // text_highlight.go
 			case CompButton:
 				if c.Label == "" || c.Action == nil {
 					add("%s: button needs label and action", where)

@@ -389,6 +389,8 @@ type Component struct {
 	Height      string  `json:"height,omitempty"`      // image: small|medium|large
 	// VisibleTo "admins": only the app's admins see the button (#272, data_rules.go).
 	VisibleTo string `json:"visibleTo,omitempty"`
+	// Highlight marks words inside a text (text_highlight.go).
+	Highlight *TextHighlight `json:"highlight,omitempty"`
 
 	// data-bound (list / stat / chart)
 	Entity        string    `json:"entity,omitempty"`

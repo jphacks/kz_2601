@@ -303,7 +303,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [D_2217](https://github.com/jphacks/D_2217) | - | README雛形のまま | その他 | ? | - | 内容なし |  |
 | [D_2218](https://github.com/jphacks/D_2218) | - | README雛形のまま | その他 | ? | - | 内容なし |  |
 | [E_2201](https://github.com/jphacks/E_2201) | Play with Learn | 野菜などを学べるバカゲー風TPSアクション | ゲーム | × | GAME,AR3D | ゲームエンジン級。野菜クイズの暗記カード版で代替 |  |
-| [E_2202](https://github.com/jphacks/E_2202) | YouQuery | エラー文から検索クエリと重要語を提案する | フォーム,AI | ○ | - | 重要箇所のハイライト表示が欠ける | Best Team Collaboration |
+| [E_2202](https://github.com/jphacks/E_2202) | YouQuery | エラー文から検索クエリと重要語を提案する | フォーム,AI | ○ | - | 重要箇所のハイライト表示が欠ける。紙の判定では、text の `{{message}}`(開いているエラー文)+ `highlight`(aiButton extract で出した語の field に印)で重要箇所も出せる = ◎ 相当(上の集計の数は README で判定した時のまま) | Best Team Collaboration |
 | [E_2203](https://github.com/jphacks/E_2203) | レコメニュー | 食べたい料理をおすすめして検索へ飛ばす | AI,外部API | △ | SERVER_LOGIC,EXT_API | 全ユーザー学習の推薦と天気連携を足す |  |
 | [E_2204](https://github.com/jphacks/E_2204) | デスマTV | 開発作業をライブ配信しコメントし合う | 共有,AI | × | CALL,REALTIME | 動画配信が難しい。代案は作業ログとコメント共有 |  |
 | [E_2205](https://github.com/jphacks/E_2205) | TwiCordGram | 複数SNSのタイムラインを一括表示する | 外部API | △ | EXT_API,OS_INTEG | SNS API連携を足す |  |

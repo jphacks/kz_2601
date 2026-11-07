@@ -891,8 +891,8 @@
     "Text": {
       "type": "object",
       "additionalProperties": false,
-      "description": "固定の見出し・説明文・注意書き。レコードの値は表示しない(値は stat / list / image で)。",
-      "x-usage": "style は title(画面内見出し)/ headline / body / caption(補足)。長文はセル内でスクロールする。",
+      "description": "見出し・説明文・注意書き。固定の文字。screen.entity の画面(フォーム・詳細)だけ、text の {{fieldId}} が開いているレコードのその field の値になる(一覧・集計は list / stat で)。highlight で文中の語に印をつける。",
+      "x-usage": "style は title(画面内見出し)/ headline / body / caption(補足)。長文はセル内でスクロールする。記録の文の大事な語を目立たせる(エラー文の重要語・本文のキーワード)時は text「{{body}}」+ highlight{field: 語を「,」で並べた field}。",
       "required": [
         "type",
         "text"
@@ -926,6 +926,9 @@
             "center",
             "trailing"
           ]
+        },
+        "highlight": {
+          "$ref": "#/$defs/TextHighlight"
         }
       }
     },
@@ -4390,6 +4393,34 @@
         "alertMinutes": {
           "type": "integer",
           "description": "任意: 始まりの N 分前にカレンダーの通知を鳴らす(0〜10080・0 は始まりの時刻)。「前日に知らせて」は 1440。"
+        }
+      }
+    },
+    "TextHighlight": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "text の中の語に印をつける。words(決まった語)か field(screen.entity の string / text field。語を「,」「、」か改行で区切った値。AI の抜き出しの output など)のどちらか 1 つ。大文字小文字・全角半角を区別せず、日本語は語の一部でも合う。語は 20 個まで。",
+      "properties": {
+        "words": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          }
+        },
+        "field": {
+          "type": "string"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "marker",
+            "bold"
+          ],
+          "description": "marker(既定: 蛍光ペンの背景 + 太字)/ bold(太字だけ)。"
         }
       }
     },

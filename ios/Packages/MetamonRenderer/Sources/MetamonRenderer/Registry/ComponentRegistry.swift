@@ -44,7 +44,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.hstack) { c, ctx in HStackContainer(c: c, ctx: ctx) }
         r.register(.section) { c, ctx in SectionContainer(c: c, ctx: ctx) }
         // leaf
-        r.register(.text) { c, _ in TextLeaf(c: c) }
+        r.register(.text) { c, ctx in TextLeaf(c: c, ctx: ctx) }
         r.register(.button) { c, ctx in ButtonLeaf(c: c, ctx: ctx) }
         r.register(.textField) { c, ctx in TextFieldLeaf(c: c, ctx: ctx) }
         r.register(.numberField) { c, ctx in NumberFieldLeaf(c: c, ctx: ctx) }
