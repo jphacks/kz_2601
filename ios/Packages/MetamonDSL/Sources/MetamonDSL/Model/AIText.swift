@@ -47,9 +47,12 @@ public struct AITextRequest: Codable, Equatable, Sendable {
     public var task: String?
     /// classify の候補(classify 以外は nil)
     public var options: [String]?
+    /// ボタンがあるアプリ(オンライン版だけ・ホストが付ける)。共有のアプリの参加者はサーバーが作成者の Pro で判定する
+    public var appId: String?
 
     public init(instruction: String, shape: AITextShape, count: Int? = nil, items: [String]? = nil,
-                input: String? = nil, locale: String? = nil, task: String? = nil, options: [String]? = nil) {
+                input: String? = nil, locale: String? = nil, task: String? = nil, options: [String]? = nil,
+                appId: String? = nil) {
         self.instruction = instruction
         self.shape = shape
         self.count = count
@@ -58,6 +61,14 @@ public struct AITextRequest: Codable, Equatable, Sendable {
         self.locale = locale
         self.task = task
         self.options = options
+        self.appId = appId
+    }
+
+    /// 同じ依頼に appId を付ける(空なら付けない)。
+    public func inApp(_ appId: String) -> AITextRequest {
+        var r = self
+        r.appId = appId.isEmpty ? nil : appId
+        return r
     }
 
     /// 入力を変える task(要約など)か。答えは 1 つの文で、output の field に入れる。
@@ -167,6 +178,8 @@ public enum AITextError: LocalizedError, Equatable, Sendable {
     case needsConsent
     /// Tailor It Pro が要る(ホストが課金画面を出した)
     case needsPro
+    /// 共有のアプリの作成者の Pro が要る(参加者は払っても直らないので課金画面は出さない)
+    case creatorNeedsPro
     /// AI が書くのを断った
     case refused
     /// 答えが形に合わない
@@ -183,6 +196,7 @@ public enum AITextError: LocalizedError, Equatable, Sendable {
         #else
         case .needsPro: "この端末ではオンラインの AI を使います。Tailor It Pro で使えます"
         #endif
+        case .creatorNeedsPro: "この機能は今は使えません。アプリを作った人に知らせてください"
         case .refused: "この内容は AI が書けませんでした"
         case .badOutput: "AI の答えを読み取れませんでした。もう一度お試しください"
         case .failed(let message): message

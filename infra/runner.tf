@@ -48,10 +48,12 @@ resource "google_project_iam_member" "runner_datastore" {
   member  = google_service_account.runner[0].member
 }
 
-# 他人宛ての通知の「作成から 24 時間」の判定(#339)に、送り手のアカウントの作成時刻を読む。
-# cmd/runner の RUNNER_ACCOUNT_AGE=firebase。書き込みの権限は持たせない
+# 「作成から 24 時間」の判定(#339)は users/{uid}.firstSeenAt を Firestore から読む
+# (RUNNER_ACCOUNT_AGE=firestore・上の datastore.user で足りる)。
+# 下は RUNNER_ACCOUNT_AGE=firebase(Firebase Auth の作成時刻)に戻す時だけ。
+# この役割はメールアドレスなども読めて広いので、既定では付けない。
 resource "google_project_iam_member" "runner_firebaseauth_viewer" {
-  count   = var.runner_enabled ? 1 : 0
+  count   = var.runner_enabled && var.runner_firebaseauth_viewer ? 1 : 0
   project = var.project_id
   role    = "roles/firebaseauth.viewer"
   member  = google_service_account.runner[0].member

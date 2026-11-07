@@ -11,6 +11,7 @@ runner(`backend/cmd/runner`・#341)は、appconfig が outbox(`runner/{APP_ENV}/
 - [出す手順](#出す手順)
 - [動いたかの確かめ方](#動いたかの確かめ方)
 - [プッシュ通知を端末に届ける](#プッシュ通知を端末に届ける)
+- [アカウントの古さ(作成から 24 時間)](#アカウントの古さ作成から-24-時間)
 - [止め方](#止め方)
 - [戻し方](#戻し方)
 - [発表で見せる場合の最小の手順](#発表で見せる場合の最小の手順)
@@ -19,7 +20,7 @@ runner(`backend/cmd/runner`・#341)は、appconfig が outbox(`runner/{APP_ENV}/
 
 | もの | 作る所 | 中身 |
 |---|---|---|
-| SA `runner` | `infra/runner.tf` | runner の実行 SA。`roles/datastore.user` と `roles/firebaseauth.viewer`(送り手の作成時刻を読むだけ・#339 の 24 時間)。AI の鍵は持たない(#337 の B) |
+| SA `runner` | `infra/runner.tf` | runner の実行 SA。`roles/datastore.user` だけ。#339 の「作成から 24 時間」は appconfig が書く `users/{uid}.firstSeenAt` を Firestore で読む([アカウントの古さ](#アカウントの古さ作成から-24-時間))。AI の鍵は持たない(#337 の B) |
 | SA `runner-scheduler` | `infra/runner.tf` | Scheduler が OIDC のトークンを作る SA。`runner-prod` にだけ `roles/run.invoker` |
 | deployer の actAs | `infra/runner.tf` | `github-deployer` が「runner として」デプロイする `roles/iam.serviceAccountUser` |
 | Scheduler `runner-tick` | `infra/runner.tf` | 毎分(Asia/Tokyo)・`POST <runner の URL>/internal/tick`・OIDC・期限 90 秒・再試行なし(次の分が拾う) |
@@ -58,7 +59,7 @@ runner(`backend/cmd/runner`・#341)は、appconfig が outbox(`runner/{APP_ENV}/
    terraform apply runner1.plan
    ```
 
-   plan で見るもの: 足されるのは `google_service_account.runner*`・`google_project_iam_member.runner_datastore`・`google_project_iam_member.runner_firebaseauth_viewer`・`google_service_account_iam_member.deployer_actas_runner`・`google_firestore_field.runner_ttl["…"]` だけ。`google_firestore_field` に `index_config` の差分が出ていない(インデックスを変えない)。
+   plan で見るもの: 足されるのは `google_service_account.runner*`・`google_project_iam_member.runner_datastore`・`google_service_account_iam_member.deployer_actas_runner`・`google_firestore_field.runner_ttl["…"]` だけ。`google_firestore_field` に `index_config` の差分が出ていない(インデックスを変えない)。
 
 3. **GitHub の変数を入れる。** Settings → Environments → `production` → Variables に `RUNNER_DEPLOY` = `1`(repo の Variables でもよい。stg はどちらでも飛ばす)。
 
@@ -157,9 +158,30 @@ runner は APNs の鍵が無い間、通知をログに出すだけです(`runne
 
 5. **GitHub の変数 `RUNNER_APNS` = `1`** を Environment `production` に入れて、deploy-cloudrun を `main`・`production` で実行する(`APNS_AUTH_KEY` が `--set-secrets` で注入される。`RUNNER_APNS` が無いデプロイは `--clear-secrets` で外す)。
 
-6. **確かめる。** `runner: starting` のログに `apns=true`・`apns_environment`・`account_age=true` が出る。テスト用のアカウント 2 つ(どちらも作って 24 時間以上・作成者は Pro)で共有のアプリに参加し、受け取る側で通知を許可して、もう一方が記録を足す。`runner.usage` の `notify_recipients` が 1 以上で、端末に届けばできています。届かない時は `runner.run` の `notifies`(`skipped` の `new_account` / `no_consent` / `no_device` / `unregistered` / `send_failed`)を見る。`send_failed` が全部なら Key ID・Team ID・topic・環境の食い違いを疑う。
+6. **確かめる。** `runner: starting` のログに `apns=true`・`apns_environment`・`account_age=true` が出る。テスト用のアカウント 2 つ(送り手は appconfig に初めて来てから 24 時間以上・作成者は Pro)で共有のアプリに参加し、受け取る側で通知を許可して、もう一方が記録を足す。`runner.usage` の `notify_recipients` が 1 以上で、端末に届けばできています。届かない時は `runner.run` の `notifies`(`skipped` の `new_account` / `no_consent` / `no_device` / `unregistered` / `send_failed`)を見る。`send_failed` が全部なら Key ID・Team ID・topic・環境の食い違いを疑う。
 
 止める: 全体の通知は [止め方](#止め方) の `RUNNER_NOTIFY_PAUSED=1`。鍵を外す時は `RUNNER_APNS` を消してデプロイ(`--clear-secrets`)→ ログだけに戻る。鍵が漏れた疑いの時は Apple Developer で鍵を Revoke し、新しい鍵で 1・3・4 をやり直す。
+
+## アカウントの古さ(作成から 24 時間)
+
+#339「作成から 24 時間は他人宛ての通知を出せない」の「作成」は、appconfig が初めてそのアカウントのリクエストを受けた時刻です。
+
+| もの | 中身 |
+|---|---|
+| 書く所 | appconfig の `RejectDeleted`(認証の直後・退会済みの確認)。もともと uid ごとに 30 秒に 1 回 `users/{uid}` を読んでいて、そこに `firstSeenAt` が無い時だけトランザクションで 1 回書く(既にあれば書かない・退会済み / 墓標には書かない)。書き込みは uid ごとに 1 回きり |
+| 書く値 | その時刻と、本人のいちばん古いアプリ(`users/{uid}/apps` の `createdAt`)・端末(`users/{uid}/devices` の `createdAt`)の早い方。どれもサーバーが入れた時刻。読むのは 1 件ずつのクエリ 2 本で、書く時(uid ごとに 1 回)だけ |
+| 読む所 | runner の `RUNNER_ACCOUNT_AGE=firestore`(deploy-cloudrun.yml の既定)。無ければ新しいアカウントとして扱う(`new_account`)。分かった時刻はプロセス内に覚える |
+| 消える時 | 退会(論理削除)では残る。30 日後の消去(`MarkAccountPurged`)で `users/{uid}` を墓標に上書きする時に消える([account-purge.md](account-purge.md)) |
+| ID トークンを使わない理由 | `auth_time` はサインインのたびに変わる。トークンに作成時刻は入っていない |
+
+**firebase から切り替えた直後:** 切り替え前からいるアカウントは、アプリか端末があればその作成時刻が `firstSeenAt` になるので、24 時間止まることはありません。どちらも無いアカウント(作ったまま何もしていない)だけ、デプロイ後に初めて appconfig に来た時から 24 時間は他人宛ての通知が `new_account` で止まります(他人に通知を出すには共有のアプリに参加しているはずなので、実際にはほぼ起きない)。
+
+**Firebase Auth で読む方式(`RUNNER_ACCOUNT_AGE=firebase`)** はコードに残していますが使いません。使うには runner の SA に `roles/firebaseauth.viewer`(メールアドレスなども読めて広い)が要るので、tfvars の `runner_firebaseauth_viewer = true` で apply してから、deploy-cloudrun.yml の値を `firebase` にします。
+
+**既に `roles/firebaseauth.viewer` を付けた環境から外す手順**(順番を守る。先に役割を外すと、firebase のままの runner が読めずに再試行を続ける):
+
+1. この変更を含む版を deploy-cloudrun でデプロイする(appconfig が `firstSeenAt` を書き始め、runner が `RUNNER_ACCOUNT_AGE=firestore` になる)
+2. `terraform plan -var-file=envs/prod.tfvars` で消えるのが `google_project_iam_member.runner_firebaseauth_viewer[0]` だけか確かめて apply
 
 ## 止め方
 
@@ -206,5 +228,5 @@ runner は APNs の鍵が無い間、通知をログに出すだけです(`runne
 見せる時の注意:
 - tick は毎分なので、書き込みから動きまで最大 1 分ほどかかる。待てない時は `gcloud scheduler jobs run runner-tick` を手元で叩く。
 - 通知を端末に届けるには[プッシュ通知を端末に届ける](#プッシュ通知を端末に届ける)を先に済ませる。Xcode から入れた版は `RUNNER_APNS_ENVIRONMENT=sandbox` でないと届かない。鍵が無ければ「書き込み」や「実行の履歴」の方を見せる。
-- 他人宛ての通知は、送り手(記録を足す人)のアカウントが作って 24 時間を過ぎていないと出ない(#339)。デモの送り手は前日までに作っておく。
+- 他人宛ての通知は、送り手(記録を足す人)が appconfig に初めて来て(`users/{uid}.firstSeenAt`)24 時間を過ぎていないと出ない(#339)。デモの送り手は前日までにアプリを開いておく。
 - 作成者が Pro でないと `skipped_plan` で動かない(`PRO_GATE_MODE=enforce` が既定)。
