@@ -71,8 +71,25 @@ func TestAIChatValid(t *testing.T) {
 	}
 }
 
+// The conversation the AI reads is only the user's own: private passes,
+// shared / public is an error.
+func TestAIChatEntityMustBePrivate(t *testing.T) {
+	for scope, ok := range map[EntityScope]bool{"": true, ScopePrivate: true, ScopeShared: false, ScopePublic: false} {
+		app := aiChatApp()
+		app.Entities[0].Scope = scope
+		app.Screens[0].Components = []Component{{Type: CompAiChat, Area: "A1:F12", Entity: "memo", TextField: "note", RoleField: "role", Persona: "相談相手"}}
+		err := app.Validate()
+		if ok && err != nil {
+			t.Fatalf("scope %q: %v", scope, err)
+		}
+		if !ok && (err == nil || !strings.Contains(err.Error(), `aiChat entity "memo" must be private`)) {
+			t.Fatalf("scope %q: want private error, got %v", scope, err)
+		}
+	}
+}
+
 // The example passes the schema and lint (the entity needs no form or list);
-// a shared conversation entity warns.
+// a shared / public conversation entity is a validation error.
 func TestAIChatExampleLint(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(docsDir, "examples", "ai_counselor.json"))
 	if err != nil {
@@ -81,10 +98,14 @@ func TestAIChatExampleLint(t *testing.T) {
 	if w := lintApp(t, string(raw)); len(w) != 0 {
 		t.Fatalf("ai_counselor lint: %v", w)
 	}
-	shared := strings.Replace(string(raw), `"titleField": "text",`, `"titleField": "text", "scope": "public",`, 1)
-	w := lintApp(t, shared)
-	if len(w) != 1 || !strings.Contains(w[0], `aiChat entity "turn" is shared`) {
-		t.Fatalf("shared aiChat lint: %v", w)
+	for _, scope := range []string{"shared", "public"} {
+		shared := strings.Replace(string(raw), `"titleField": "text",`, `"titleField": "text", "scope": "`+scope+`",`, 1)
+		if shared == string(raw) {
+			t.Fatal("example changed: no titleField to anchor scope")
+		}
+		if _, err := Parse([]byte(shared)); err == nil || !strings.Contains(err.Error(), `aiChat entity "turn" must be private`) {
+			t.Fatalf("%s aiChat entity: %v", scope, err)
+		}
 	}
 	// persona over 500 characters is caught by the schema too
 	long := strings.Replace(string(raw), `"persona": "`, `"persona": "`+strings.Repeat("あ", 500), 1)

@@ -17,6 +17,14 @@ final class AIChatTests: XCTestCase {
         XCTAssertEqual(turns.map(\.role), [.user, .assistant, .user])
     }
 
+    func testOwnKeepsOnlyMyRecords() {
+        var mine = rec("a", "自分", role: "user", at: 1); mine.author = "u1"
+        let local = rec("b", "未送信", role: "user", at: 2)
+        var other = rec("c", "他の人", role: "user", at: 3); other.author = "u2"
+        XCTAssertEqual(AIChat.own([mine, local, other], uid: "u1").map(\.id), ["a", "b"])
+        XCTAssertEqual(AIChat.own([mine, local, other], uid: nil).map(\.id), ["b"], "uid が分からなければ author の無い分だけ")
+    }
+
     func testTurnsAlternateWithoutRoleField() {
         let rows = [rec("a", "1", at: 1), rec("b", "2", at: 2), rec("c", "3", at: 3)]
         XCTAssertEqual(AIChat.turns(rows, textField: "text", roleField: nil).map(\.role), [.user, .assistant, .user])

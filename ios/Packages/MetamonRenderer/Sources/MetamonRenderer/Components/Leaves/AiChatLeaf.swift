@@ -40,7 +40,7 @@ struct AiChatLeaf: View {
 
     @ViewBuilder
     private func messages(entity: Entity, textField: String) -> some View {
-        let turns = AIChat.turns(rt.viewRecords(for: entity.id), textField: textField, roleField: c.roleField)
+        let turns = AIChat.turns(ownRecords(entity), textField: textField, roleField: c.roleField)
         if turns.isEmpty, pending == nil, !sending {
             EmptyPlaceholder(icon: "sparkles", emptyText: c.emptyText ?? L("話しかけてみましょう"),
                              state: rt.emptyState(for: entity.id)) {
@@ -70,6 +70,11 @@ struct AiChatLeaf: View {
             }
             .accessibilityIdentifier("aiChat.messages")
         }
+    }
+
+    /// 表示と送る履歴に使う記録(自分の分だけ・`AIChat.own`)。
+    private func ownRecords(_ entity: Entity) -> [Record] {
+        AIChat.own(rt.viewRecords(for: entity.id), uid: rt.currentUserId)
     }
 
     private func scrollToEnd(_ proxy: ScrollViewProxy, _ turns: [AIChat.Turn]) {
@@ -123,7 +128,7 @@ struct AiChatLeaf: View {
         guard !text.isEmpty, let host = rt.aiText, !sending else { return }
         let roleField = c.roleField
         let base = ChatThreadLeaf.defaultData(entity, skipping: [textField, roleField].compactMap { $0 })
-        let history = AIChat.turns(rt.viewRecords(for: entity.id), textField: textField, roleField: roleField)
+        let history = AIChat.turns(ownRecords(entity), textField: textField, roleField: roleField)
         let request = AIChat.request(persona: c.persona ?? "", history: history, next: text, long: c.length == "long",
                                      locale: LanguagePreference.shared.code)
         sending = true

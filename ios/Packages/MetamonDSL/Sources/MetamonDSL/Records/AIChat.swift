@@ -21,6 +21,12 @@ public enum AIChat {
     public static let maxTurns = 20
     public static let maxBytes = 16 * 1024
 
+    /// 会話に使うのは自分の記録だけ: author が無い(private の entity・未送信)か、サインイン中の uid と同じもの。
+    /// entity は backend の検証で private に限るが、古い・手で作った DSL でも他の人の発言を履歴に混ぜない。
+    public static func own(_ records: [Record], uid: String?) -> [Record] {
+        records.filter { $0.author == nil || ($0.author == uid && uid != nil) }
+    }
+
     /// 古い順の発言。本文の無いレコードは飛ばす(交互の数え方にも入れない)。
     public static func turns(_ records: [Record], textField: String, roleField: String?) -> [Turn] {
         var out: [Turn] = []

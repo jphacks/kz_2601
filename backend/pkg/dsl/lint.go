@@ -31,7 +31,6 @@ func (a *App) Lint() []string {
 	l.micSeat()
 	l.dupAddControls()
 	l.privateChat()
-	l.sharedAIChat()
 	return l.out
 }
 

@@ -11,7 +11,7 @@ import (
 )
 
 func TestAIChatRulesReachPrompt(t *testing.T) {
-	for _, want := range []string{"## アプリの中の AI と何往復も話す(aiChat)", "aiButton との使い分け", "は aiChat(上の節"} {
+	for _, want := range []string{"## アプリの中の AI と何往復も話す(aiChat)", "aiButton との使い分け", "は aiChat(上の節", "会話の entity は private"} {
 		if !strings.Contains(systemPrompt, want) {
 			t.Errorf("systemPrompt lacks %q", want)
 		}

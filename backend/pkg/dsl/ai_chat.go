@@ -21,8 +21,10 @@ const (
 
 // checkAIChat: textField is a stored string/text field, roleField (optional)
 // a stored string field or an enum with the options user and assistant,
-// persona is required (≤ 500 chars), length short|long, and every other
-// required field has a defaultValue (turns are saved without a form).
+// persona is required (≤ 500 chars), length short|long, the entity is
+// private (the history the AI reads is only the user's own conversation),
+// and every other required field has a defaultValue (turns are saved
+// without a form).
 func checkAIChat(where string, c *Component, entities map[string]*Entity, add func(string, ...any)) {
 	switch n := utf8.RuneCountInString(strings.TrimSpace(c.Persona)); {
 	case n == 0:
@@ -37,6 +39,9 @@ func checkAIChat(where string, c *Component, entities map[string]*Entity, add fu
 	if e == nil {
 		add("%s: aiChat entity %q does not exist", where, c.Entity)
 		return
+	}
+	if e.EffectiveScope() != ScopePrivate {
+		add(`%s: aiChat entity %q must be private (drop "scope"): the conversation is the user's own and the AI reads only those turns`, where, e.ID)
 	}
 	if f := e.FieldByID(c.TextField); f == nil {
 		add("%s: aiChat textField %q not in entity %q (fields: %s)", where, c.TextField, e.ID, fieldIDs(e))
@@ -59,20 +64,5 @@ func checkAIChat(where string, c *Component, entities map[string]*Entity, add fu
 		if f.Required && f.Computed == nil && f.DefaultValue == nil && f.ID != c.TextField && f.ID != c.RoleField {
 			add("%s: aiChat saves turns without a form, so required field %q of entity %q needs a defaultValue (or make it optional; the time is $createdAt, not a field)", where, f.ID, e.ID)
 		}
-	}
-}
-
-// sharedAIChat (lint): an aiChat is a private conversation; on a shared
-// entity the others would read it.
-func (l *linter) sharedAIChat() {
-	for _, s := range l.app.Screens {
-		eachScreenComponent(s.Components, func(_ string, c *Component) {
-			if c.Type != CompAiChat {
-				return
-			}
-			if e := l.app.EntityByID(c.Entity); e != nil && e.IsShared() {
-				l.add(`screen %q: aiChat entity %q is shared, so others can read the conversation; keep the turns private (drop "scope")`, s.ID, e.ID)
-			}
-		})
 	}
 }
