@@ -145,6 +145,10 @@ type Decision struct {
 	Used      int
 	Remaining int
 	ResetAt   time.Time
+	// Unmetered: the user's remaining units are not known (the user limit is 0
+	// = not counted, or a weight-0 request could not read today's count). The
+	// X-RateLimit-* headers are left out so the client keeps what it last saw.
+	Unmetered bool
 
 	// charge is what Allow wrote, so Refund can take it back (zero when nothing was charged).
 	charge charge
@@ -223,10 +227,7 @@ func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight
 	reset := time.Date(y, m, d+1, 0, 0, 0, 0, l.cfg.Location)
 	tier := l.tier(ctx, id)
 	limit := l.userLimit(tier)
-	dec := Decision{Allowed: true, Tier: tier, Limit: limit, Remaining: limit, ResetAt: reset}
-	if weight <= 0 {
-		return dec, nil
-	}
+	dec := Decision{Allowed: true, Tier: tier, Limit: limit, Remaining: limit, ResetAt: reset, Unmetered: limit <= 0}
 
 	prefix := l.cfg.Env
 	if prefix == "" {
@@ -235,6 +236,12 @@ func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight
 	counters := make([]Counter, 0, 3)
 	if limit > 0 {
 		counters = append(counters, Counter{ID: fmt.Sprintf("%s_%s_uid_%s", prefix, day, docSafe(id.UID)), Scope: ScopeUser, Limit: limit})
+	}
+	if weight <= 0 {
+		if limit > 0 {
+			l.peekUser(ctx, counters[0], &dec)
+		}
+		return dec, nil
 	}
 	if tier == TierAnonymous && l.cfg.Limits.PerIP > 0 && ip != "" {
 		counters = append(counters, Counter{ID: fmt.Sprintf("%s_%s_ip_%s", prefix, day, ipKey(ip)), Scope: ScopeIP, Limit: l.cfg.Limits.PerIP})
@@ -273,6 +280,24 @@ func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight
 		dec.Remaining = max(0, limit-dec.Used)
 	}
 	return dec, nil
+}
+
+// peekUser fills dec with today's count of the user counter without charging
+// (weight 0). When the count cannot be read the decision becomes Unmetered.
+func (l *Limiter) peekUser(ctx context.Context, c Counter, dec *Decision) {
+	p, ok := l.store.(Peeker)
+	if !ok {
+		dec.Unmetered = true
+		return
+	}
+	counts, err := p.Peek(ctx, []Counter{c})
+	if err != nil || len(counts) != 1 {
+		l.log.WarnContext(ctx, "ratelimit: peek failed; no remaining header", slog.Any("error", err))
+		dec.Unmetered = true
+		return
+	}
+	dec.Used = counts[0]
+	dec.Remaining = max(0, c.Limit-dec.Used)
 }
 
 // Refund gives back up to units of what Allow charged for dec (#548), to the
