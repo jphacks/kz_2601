@@ -110,6 +110,7 @@ struct AiButtonLeaf: View {
                 await rt.load(entities: [id])
                 source = e
                 records = HiddenFields.redact(rt.records(for: id), in: e) // 回答者に見せない項目(#262)は AI の出力に混ぜない
+                records = try AIInputRecords.select(records, in: e, route: route, uid: rt.currentUserId) // クラウドへは自分の記録だけ
             }
             let values = form.showsHiddenFields(currentUid: rt.currentUserId) ? form.values : HiddenFields.redact(form.values, in: form.entity)
             if route == .onDevice {

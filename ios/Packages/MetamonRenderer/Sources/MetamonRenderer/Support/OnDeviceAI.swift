@@ -101,6 +101,8 @@ enum AIRequestBuilder {
     static let maxInputCharacters = 3000
     /// entity 入力の既定件数。
     static let defaultLimit = 20
+    /// entity 入力の件数の上限(DSL schema の aiButton.limit maximum)。
+    static let maxLimit = 50
 
     enum BuildError: LocalizedError, Equatable {
         case unknownTask
@@ -163,7 +165,7 @@ enum AIRequestBuilder {
                           sourceEntity: Entity?, records: [Record]) -> String {
         if let source = sourceEntity {
             let recent = records.sorted { ($0.updatedAt ?? $0.createdAt ?? "") > ($1.updatedAt ?? $1.createdAt ?? "") }
-                .prefix(Swift.max(c.limit ?? defaultLimit, 1))
+                .prefix(Swift.min(Swift.max(c.limit ?? defaultLimit, 1), maxLimit))
             return recent.map { r in
                 "- " + describe(source.storedFields.filter { $0.id != c.output }, value: { r.data[$0] ?? .null }, separator: " / ")
             }.joined(separator: "\n")
