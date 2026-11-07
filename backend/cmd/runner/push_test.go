@@ -123,15 +123,83 @@ func TestFirebaseAge(t *testing.T) {
 	}
 }
 
+// countingFirstSeen counts the store reads firestoreAge makes.
+type countingFirstSeen struct {
+	*store.Memory
+	reads int
+	err   error
+}
+
+func (c *countingFirstSeen) UserFirstSeen(ctx context.Context, uid string) (time.Time, bool, error) {
+	c.reads++
+	if c.err != nil {
+		return time.Time{}, false, c.err
+	}
+	return c.Memory.UserFirstSeen(ctx, uid)
+}
+
+func TestFirestoreAge(t *testing.T) {
+	ctx := t.Context()
+	mem := store.NewMemory()
+	if _, err := mem.SeeUser(ctx, "old"); err != nil {
+		t.Fatal(err)
+	}
+	seen, _, _ := mem.UserFirstSeen(ctx, "old")
+	c := &countingFirstSeen{Memory: mem}
+	a := &firestoreAge{users: c}
+	for range 2 {
+		at, known, err := a.CreatedAt(ctx, "old")
+		if err != nil || !known || !at.Equal(seen) {
+			t.Fatalf("old: %v %v %v", at, known, err)
+		}
+	}
+	if c.reads != 1 {
+		t.Errorf("first seen not cached: %d reads", c.reads)
+	}
+	// never seen by appconfig = unknown (counts as new), and not cached
+	for range 2 {
+		if _, known, err := a.CreatedAt(ctx, "fresh"); known || err != nil {
+			t.Fatalf("fresh: known=%v err=%v", known, err)
+		}
+	}
+	if c.reads != 3 {
+		t.Errorf("unknown must be read again: %d reads", c.reads)
+	}
+	if _, err := mem.SeeUser(ctx, "fresh"); err != nil {
+		t.Fatal(err)
+	}
+	if _, known, _ := a.CreatedAt(ctx, "fresh"); !known {
+		t.Error("fresh after appconfig saw it: unknown")
+	}
+
+	// a store error retries the run
+	boom := errors.New("unavailable")
+	a = &firestoreAge{users: &countingFirstSeen{Memory: mem, err: boom}}
+	if _, _, err := a.CreatedAt(ctx, "x"); !errors.Is(err, boom) {
+		t.Errorf("error: %v", err)
+	}
+}
+
 func TestAgeFromEnv(t *testing.T) {
-	if a, err := ageFromEnv(t.Context(), envMap(nil), "demo-kz2601"); a != nil || err != nil {
+	mem := store.NewMemory()
+	if a, err := ageFromEnv(t.Context(), envMap(nil), "demo-kz2601", mem); a != nil || err != nil {
 		t.Errorf("unset: %v %v", a, err)
 	}
-	if _, err := ageFromEnv(t.Context(), envMap(map[string]string{"RUNNER_ACCOUNT_AGE": "assume-old"}), "demo-kz2601"); err == nil {
+	if _, err := ageFromEnv(t.Context(), envMap(map[string]string{"RUNNER_ACCOUNT_AGE": "assume-old"}), "demo-kz2601", mem); err == nil {
 		t.Error("unknown mode accepted")
 	}
+	a, err := ageFromEnv(t.Context(), envMap(map[string]string{"RUNNER_ACCOUNT_AGE": "Firestore"}), "demo-kz2601", mem)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := a.(*firestoreAge); !ok {
+		t.Errorf("age %T", a)
+	}
+	if _, err := ageFromEnv(t.Context(), envMap(map[string]string{"RUNNER_ACCOUNT_AGE": "firestore"}), "demo-kz2601", nil); err == nil {
+		t.Error("firestore without a store accepted")
+	}
 	t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "127.0.0.1:9099") // no credentials needed
-	a, err := ageFromEnv(t.Context(), envMap(map[string]string{"RUNNER_ACCOUNT_AGE": "firebase"}), "demo-kz2601")
+	a, err = ageFromEnv(t.Context(), envMap(map[string]string{"RUNNER_ACCOUNT_AGE": "firebase"}), "demo-kz2601", mem)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -201,7 +201,7 @@ paths:
       summary: aiButton のオンライン版。generate は決まった指示で短い文章を決まった形 (1 行 / 箇条書き N 個 / 項目つき) で、task 付きは input を要約・分類・書き直し・抜き出し・提案して 1 つの文で返す
       description: |
         Issue #417。端末内 AI (Apple Intelligence) が使えない端末で、Tailor It Pro の利用者が aiButton{task: generate} を押した時に iOS が呼ぶ。
-        - ID トークン必須 (無い・不正は 401)。上限の重さは 1 (`RATE_LIMIT_WEIGHT_TEXT`)。呼び出した人が Tailor It Pro でなければ 402 `pro_required` (`details.features` = `onlineAI`・#316。Claude は呼ばない)
+        - ID トークン必須 (無い・不正は 401)。上限の重さは 1 (`RATE_LIMIT_WEIGHT_TEXT`)。呼び出した人が Tailor It Pro でなければ 402 `pro_required` (`details.features` = `onlineAI`・#316。Claude は呼ばない)。ただし `appId` の共有のアプリに呼び出した人が参加している (作成者ではないメンバー) 時は、作成者の Pro で判定する (共有のアプリの費用は作成者が持つ)。作成者が Pro でなければ 402 に `details.reason: creator_needs_pro` (iOS は課金画面を出さず案内だけ)。参加はサーバーが app_owners / members で確かめる。利用上限は呼び出した人のまま
         - 上限: instruction 500 字・input 4096 バイト (超えると 413)・本文 16 KB・出力 400 トークン。count / items は 1〜10
         - モデルは対話と同じ設定 (`AI_CHAT_MODEL`、既定 claude-sonnet-5-5・thinking なし)。安全の指示 (暴力・性的・差別・危険な行為を書かない、input の中の命令には従わない) を system に固定
         - モデルが断ったら 422 `refused`、形に合わない出力は 502 `bad_output`。line は最初の 1 行、list は count を超えた分を切る (1 個以上あれば返す)、fields は全項目そろわなければ 502
@@ -396,6 +396,7 @@ components:
         input: { type: string, description: 材料のアプリのデータ (最近の記録 ≤ 20 件 / フォームの値)。4096 バイトまで (length long は 16384 バイト) }
         length: { type: string, enum: [short, long], default: short, description: 'long = 長文 (出力 1500 トークン・答え 3000 字まで・重さ 3)。classify 不可・generate は shape line だけ' }
         locale: { type: string, enum: [ja, en], description: 省略時は instruction から判定 }
+        appId: { type: string, maxLength: 128, description: 'ボタンがあるアプリ (任意)。共有のアプリの参加者なら作成者の Pro で判定する。形が不正なら 400' }
     TextResponse:
       type: object
       required: [shape, text, locale, meta]
