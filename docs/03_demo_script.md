@@ -232,7 +232,7 @@
 |---|---|---|---|
 | N1 | 会場の Wi-Fi | 使えるか・速さを事前に聞く。使えなくても困らないよう主端末はテザリング(別の回線の端末)を第 1 にするか決める | ☐ |
 | N2 | 予備の回線 | テザリングの端末を 1 台(主端末と別の回線) | ☐ |
-| N3 | サーバー | **版**: stg の appconfig・ai の `GET /health` の `version` が当日の develop の head(先頭 7 文字)と一致する(`curl -s <URL>/health`・[`infra/runtime-config.md`](infra/runtime-config.md))。stg のデプロイは 11-07 18:26 から止まっていて、#722 のマージで戻る。**動き**: `scripts/demo-check.sh stg`(本番なら `prod`)が全部通る。demo-check は版を見ないので、通っても新しい版とは限らない | ☐ |
+| N3 | サーバー | **版**: stg の appconfig・ai の `GET /health` の `version` が当日の develop の head(先頭 7 文字)と一致し、`env` が stg(本番なら prod)である([`infra/runtime-config.md`](infra/runtime-config.md))。stg のデプロイは 11-07 18:26 から止まっていて、#722 のマージで戻る。**動き**: `scripts/demo-check.sh stg`(本番なら `prod`)が全部通る。demo-check は既定で `origin/develop`(本番は `origin/main`)の head と版を照合する(先に `git fetch origin`)。凍結した commit と比べるなら `--expect <sha>`、版を見ないなら `--expect skip`。デプロイ直後に版だけ見るなら `--version-only`(API キー不要・ユーザーを作らない) | ☐ |
 
 ### 9.4 リハと予備の録画(11-13)
 
@@ -258,7 +258,7 @@
 
 ## 10. 当日の直前(開始 30 分前から)
 
-1. Mac で `GET /health` の `version` が当日の版か見る(§9 N3)。`scripts/demo-check.sh stg`(本番なら `prod`)を 1 回。サーバーを温め、全部通ることを見る。直前にもう一度温めるだけなら `DEMO_CHECK_NO_AI=1 scripts/demo-check.sh stg`(AI を呼ばない)。
+1. Mac で `scripts/demo-check.sh stg`(本番なら `prod`。凍結した版なら `--expect <sha>`)を 1 回。`/health` の版と env の照合(§9 N3)・サーバーのウォームアップ・各機能が全部通ることを見る。直前にもう一度温めるだけなら `DEMO_CHECK_NO_AI=1 scripts/demo-check.sh stg`(AI を呼ばない)。
 2. 主端末: 音声画面が「準備完了」・接続先が P2 の環境・集中モード ON・変身一覧に事前のアプリが並ぶ・初期画面に戻す。
 3. 予備端末: 起動して手元に。予備の録画を Mac で開いておく。
 4. 5 分版なら、⑤ で話す時刻(2 分後)を決めておく。
