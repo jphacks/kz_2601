@@ -1,0 +1,7 @@
+[
+  {"id": "al_create_wake", "kind": "create", "group": "alarm", "transcript": "目覚ましアプリ。毎朝の起きる時間を自分で決めて、止めるまで鳴らして", "note": "時刻はレコードの HH:mm(timePicker)から・repeat daily・alarm true", "expect": {"alarm": true, "alarmRecord": true}},
+  {"id": "al_create_fixed", "kind": "create", "group": "alarm", "transcript": "毎朝6時に起こして。起きたら起床時間を記録したい", "note": "固定の時刻の目覚まし → alarm true", "expect": {"alarm": true}},
+  {"id": "al_create_quiz", "kind": "create", "group": "alarm", "transcript": "朝のアラームと、起きた後に今日の予定のクイズに答えて記録するアプリ", "note": "NG_2306 の代案。アラーム + クイズの記録", "expect": {"alarm": true}},
+  {"id": "al_create_medicine", "kind": "create", "group": "alarm", "transcript": "薬を飲む時間を登録して、時間になったら通知して", "note": "リマインドは普通の通知(alarm を付けない)", "expect": {"alarm": false, "notification": "any"}},
+  {"id": "al_create_wake_en", "kind": "create", "group": "alarm", "locale": "en", "transcript": "An alarm clock app. Let me set my wake-up time and keep ringing until I stop it", "note": "en", "expect": {"alarm": true}}
+]

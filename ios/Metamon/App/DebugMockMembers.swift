@@ -30,6 +30,13 @@ enum DebugMockMembers {
         }
 
         func remove(_ uid: String) { lock.withLock { items?.removeAll { $0.uid == uid } } }
+
+        func setAdmin(_ uid: String, _ admin: Bool) {
+            lock.withLock {
+                guard let i = items?.firstIndex(where: { $0.uid == uid }) else { return }
+                items?[i].isAdmin = admin
+            }
+        }
     }
     static let store = Store()
 
@@ -69,6 +76,12 @@ extension DebugSharingClient: MembershipClient {
         try await Task.sleep(for: .milliseconds(300))
         if DebugMockMembers.failsWrites { throw APIError.server(status: 503, code: "unavailable", message: "mock failure") }
         DebugMockMembers.store.remove("uid-dad")
+    }
+
+    func setAdmin(appId: String, uid: String, admin: Bool) async throws {
+        try await Task.sleep(for: .milliseconds(300))
+        if DebugMockMembers.failsWrites { throw APIError.server(status: 503, code: "unavailable", message: "mock failure") }
+        DebugMockMembers.store.setAdmin(uid, admin)
     }
 }
 #endif

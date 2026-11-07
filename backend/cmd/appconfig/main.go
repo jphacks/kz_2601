@@ -61,7 +61,8 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("text filter", slog.String("mode", string(textMode)))
-	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode), appconfig.WithTextFilter(textMode))
+	limits := planLimits(logger) // #317
+	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode), appconfig.WithPlanLimits(limits), appconfig.WithTextFilter(textMode), usage(st, logger))
 	entitlement.Register(api, ents) // Pro (#314)
 	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appStoreNotifications(ents, logger))
 	server := &http.Server{

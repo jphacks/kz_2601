@@ -13,6 +13,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/runner/engine"
 	"github.com/jphacks/kz_2601/backend/internal/runner/notify"
+	"github.com/jphacks/kz_2601/backend/internal/runner/queue"
 	"github.com/jphacks/kz_2601/backend/internal/runner/quota"
 	"github.com/jphacks/kz_2601/backend/internal/runner/schedule"
 	"github.com/jphacks/kz_2601/backend/internal/runner/scope"
@@ -54,7 +55,7 @@ func (r *Runner) process(ctx context.Context, ev store.OutboxEvent) (map[string]
 		return nil, none, err
 	}
 	if st.app != nil {
-		stopLevel = StopLevelApp
+		stopLevel = st.app.Level // StopLevelApp | StopLevelGlobal
 		return all(OutcomeSkippedStopped, ReasonOperatorStop), none, nil
 	}
 	if ev.Kind == store.OutboxSchedule && schedule.IsLate(ev.DueAt, r.cfg.Now(), r.cfg.MaxLate) {
@@ -100,7 +101,7 @@ func (r *Runner) process(ctx context.Context, ev store.OutboxEvent) (map[string]
 	}
 	h.Bind(app, ev.Entity, ev.RecordID, ev.Data)
 
-	trig, err := r.trigger(ctx, h, ev, app)
+	trig, restricted, err := r.trigger(ctx, h, ev, app)
 	if err != nil {
 		return nil, none, err
 	}
@@ -112,8 +113,17 @@ func (r *Runner) process(ctx context.Context, ev store.OutboxEvent) (map[string]
 			r.logRun(ctx, ev, runLog{ruleID: id, outcome: OutcomeSkippedStopped, reason: ReasonRuleRemoved})
 			continue
 		}
+		if !now.IsEnabled() { // the creator's switch reads the current DSL
+			out[id] = r.ruleDisabled(ctx, ev, id)
+			continue
+		}
 		if st.rules[id] {
 			out[id] = r.ruleStopped(ctx, ev, rule)
+			continue
+		}
+		if restricted || breaksAddressed(rule, app, current) {
+			out[id] = OutcomeSkippedStopped
+			r.logRun(ctx, ev, runLog{ruleID: id, outcome: OutcomeSkippedStopped, reason: ReasonAddressed})
 			continue
 		}
 		o, charge, err := r.runRule(ctx, h, ev, app, rule, trig, creator, st.notify)
@@ -179,6 +189,13 @@ func (r *Runner) appState(ctx context.Context, h *scope.Handle, ev store.OutboxE
 	return current, creator, "", nil
 }
 
+// breaksAddressed re-checks the addressed rules (Validate's table) at run
+// time, against the trigger's version and the published DSL (a rule checked
+// before an entity became addressed).
+func breaksAddressed(rule *dsl.ServerRule, apps ...*dsl.App) bool {
+	return slices.ContainsFunc(apps, func(a *dsl.App) bool { return len(a.AddressedRuleProblems(rule)) > 0 })
+}
+
 // stillShared reports whether the published DSL still shares the data of ev.
 func stillShared(current *dsl.App, ev store.OutboxEvent) bool {
 	if ev.Kind == store.OutboxSchedule {
@@ -213,17 +230,19 @@ func ruleByID(a *dsl.App, id string) *dsl.ServerRule {
 // trigger builds the engine trigger from the event's snapshot (the values
 // at the time of the write), read in the creator's time zone. The poster's
 // display name of a shared record is read from the record itself (the event
-// does not carry it).
-func (r *Runner) trigger(ctx context.Context, h *scope.Handle, ev store.OutboxEvent, app *dsl.App) (engine.Trigger, error) {
+// does not carry it). restricted: only the record's readers see it, but the
+// version's entity is not addressed (stored readers outlive addressedTo), so
+// the version's rules were not checked for it.
+func (r *Runner) trigger(ctx context.Context, h *scope.Handle, ev store.OutboxEvent, app *dsl.App) (t engine.Trigger, restricted bool, err error) {
 	scopeOf := dsl.EntityScope(ev.Scope)
 	if scopeOf == "" {
 		scopeOf = dsl.ScopePrivate
 	}
 	loc, err := r.location(ctx, h, ev)
 	if err != nil {
-		return engine.Trigger{}, err
+		return engine.Trigger{}, false, err
 	}
-	t := engine.Trigger{
+	t = engine.Trigger{
 		AppID: ev.AppID, Scope: scopeOf, Entity: ev.Entity, Actor: ev.ActorUID, Version: ev.Version, At: ev.CreatedAt,
 		Record: expreval.Record{ID: ev.RecordID, Data: orEmpty(ev.Data), Author: ev.Author}, Location: loc,
 	}
@@ -231,7 +250,7 @@ func (r *Runner) trigger(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 	case store.OutboxSchedule:
 		// the run is "at" its due time: today / now read the scheduled day
 		t.Kind, t.At, t.Record = engine.KindScheduled, ev.DueAt, expreval.Record{}
-		return t, nil
+		return t, false, nil
 	case store.OutboxRecordCreated:
 		t.Kind = engine.KindCreated
 	case store.OutboxRecordUpdated:
@@ -239,18 +258,17 @@ func (r *Runner) trigger(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		t.Prev = &expreval.Record{ID: ev.RecordID, Data: orEmpty(ev.Prev), Author: ev.Author}
 	}
 	if ent := app.EntityByID(ev.Entity); ent != nil && ent.IsShared() {
-		rec, found, err := h.Record(ctx, ev.Entity, ev.RecordID)
+		name, hidden, err := h.TriggerInfo(ctx, ev.Entity, ev.RecordID)
 		if err != nil {
-			return t, err
+			return t, false, err
 		}
-		if found {
-			t.Record.AuthorName = rec.AuthorName
-			if t.Prev != nil {
-				t.Prev.AuthorName = rec.AuthorName
-			}
+		t.Record.AuthorName = name
+		if t.Prev != nil {
+			t.Prev.AuthorName = name
 		}
+		restricted = hidden && !ent.IsAddressed()
 	}
-	return t, nil
+	return t, restricted, nil
 }
 
 func orEmpty(m map[string]any) map[string]any {
@@ -669,6 +687,7 @@ func (r *Runner) putStatus(ctx context.Context, ev store.OutboxEvent, l runLog) 
 	if l.outcome == quota.OutcomeOK {
 		s.LastOKAt = now
 	}
+	s.Failed = l.outcome == queue.OutcomeGaveUp // failures in a row (#347)
 	if l.quota != nil && l.quotaDay != "" {
 		s.QuotaDay, s.QuotaUsed, s.QuotaLimit = l.quotaDay, l.quota.Used, l.quota.Limit
 	}

@@ -56,6 +56,10 @@ public struct LocalRecord: Codable, Sendable, Equatable, Identifiable {
     /// 未送信 create の仮 id(`local-<clientId>`)。サーバー採番後に差し替わる。
     public static func temporaryId(clientId: String) -> String { "local-\(clientId)" }
     public var isTemporary: Bool { recordId.hasPrefix("local-") }
+    /// 今の id か、作成を送る前の仮 id なら true。
+    public func isKnown(as id: String) -> Bool {
+        recordId == id || clientId.map(Self.temporaryId(clientId:)) == id
+    }
 }
 
 /// レコードのローカル DB。
@@ -100,6 +104,12 @@ public actor RecordStore {
         table(appId, entity).first { $0.recordId == recordId }
     }
 
+    /// `row` と同じだが、作成の送信で id が替わった後でも仮 id で引ける。
+    public func current(appId: String, entity: String, recordId: String) -> LocalRecord? {
+        row(appId: appId, entity: entity, recordId: recordId)
+            ?? table(appId, entity).first { $0.isKnown(as: recordId) }
+    }
+
     /// 同期済み行の最大 updatedAt(差分取得の基準。サーバーに `updatedAfter` が無い間は未使用)。
     public func lastUpdatedAt(appId: String, entity: String) -> String? {
         table(appId, entity).filter { $0.pendingOp == .none }.compactMap(\.updatedAt).max()
@@ -124,6 +134,14 @@ public actor RecordStore {
         save(appId, entity, t)
     }
 
+    /// 行を削除待ちにする。読んでから書く間に作成が届いても、古い仮 id の行を書き戻さない。
+    public func markDeleting(appId: String, entity: String, recordId: String) {
+        var t = table(appId, entity)
+        guard let i = t.firstIndex(where: { $0.isKnown(as: recordId) }) else { return }
+        t[i].pendingOp = .delete
+        save(appId, entity, t)
+    }
+
     /// サーバーの全件で置き換える(サーバーが正)。未送信(`pendingOp != none`)の行だけは残す。
     /// - create 待ちの仮行: そのまま残す
     /// - update/delete 待ちの行: ローカルの内容を優先(送信後に次の pull でサーバー版になる)
@@ -139,14 +157,17 @@ public actor RecordStore {
     }
 
     /// 同期完了: 仮 id の行をサーバーのレコードに差し替える(create)/ pendingOp を落とす(update)。
+    /// 送信中に消された行は削除待ちのまま残す(列の delete が送られるまで一覧に戻さない)。
     public func markSynced(appId: String, entity: String, localId: String, server: Record) {
         var t = table(appId, entity)
-        let kept = t.first { $0.recordId == localId }?.marks // サーバーが marks を返さない応答(作成)でも印を消さない
+        let local = t.first { $0.recordId == localId }
+        let kept = local?.marks // サーバーが marks を返さない応答(作成)でも印を消さない
         t.removeAll { $0.recordId == localId }
         t.removeAll { $0.recordId == server.id }
         var row = LocalRecord(appId: appId, entity: entity, server: server)
         row.clientId = localId.hasPrefix("local-") ? String(localId.dropFirst("local-".count)) : nil
         if row.marks == nil { row.marks = kept }
+        if local?.pendingOp == .delete { row.pendingOp = .delete }
         t.append(row)
         save(appId, entity, t)
     }

@@ -119,3 +119,27 @@ func TestTextFilterListingAndMemberName(t *testing.T) {
 		t.Fatalf("ordinary member name: %d %s", r.code, r.raw)
 	}
 }
+
+// #321 × #272/#316: a write the caller may not make is refused as such (403)
+// before the text filter, so a 422 does not hide it; the author is still filtered.
+func TestTextFilterAfterPermissionChecks(t *testing.T) {
+	e := newEnv(t)
+	const app = "/v1/apps/SHIFT-TEXT-1"
+	recs := app + "/entities/shift/records"
+	joinShift(t, e, app)
+
+	wantAdminsOnly(t, e.do("staff", http.MethodPost, recs, `{"data":{"day":"2026-11-07","slot":9,"confirmed":true,"memo":"死ね"}}`, nil), "create admin-only field")
+	wantNotMember(t, e.do("stranger", http.MethodPost, recs, `{"data":{"day":"2026-11-07","slot":9,"memo":"死ね"}}`, nil), "stranger create")
+	r := e.do("staff", http.MethodPost, recs, `{"data":{"day":"2026-11-07","slot":9,"memo":"朝"}}`, nil)
+	if r.code != http.StatusCreated {
+		t.Fatalf("staff create: %d %s", r.code, r.raw)
+	}
+	one := recs + "/" + r.body["id"].(string)
+
+	if r = e.do("boss", http.MethodPatch, one, `{"data":{"memo":"死ね"}}`, nil); r.code != http.StatusForbidden || r.errCode() != "forbidden" {
+		t.Fatalf("non-author patch: want 403 forbidden, got %d %s", r.code, r.raw)
+	}
+	wantNotMember(t, e.do("stranger", http.MethodPatch, one, `{"data":{"memo":"死ね"}}`, nil), "stranger patch")
+	wantAdminsOnly(t, e.do("staff", http.MethodPatch, one, `{"data":{"confirmed":true,"memo":"死ね"}}`, nil), "author patches admin-only field")
+	wantTextNotAllowed(t, e.do("staff", http.MethodPatch, one, `{"data":{"memo":"死ね"}}`, nil), "memo", "author patch")
+}

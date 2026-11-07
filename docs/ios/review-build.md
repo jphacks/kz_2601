@@ -30,6 +30,7 @@
 | HealthKit(`healthStat` / `Field.health`) | 部品と登録 / `HealthData` / `AppRuntime+Health`、`NSHealth*` / `NSMotionUsageDescription`、entitlement `com.apple.developer.healthkit*` | 4.7.2・5.1.3 |
 | バックグラウンドでの位置の記録(`locationTracker`) | 部品と登録 / `LocationTracking`、`UIBackgroundModes` の `location` | 4.7.2・5.1.5・2.5.4 |
 | 端末のセンサー(`sensorValue`・CoreMotion の device motion / CMAltimeter・#419) | 部品と登録 / `SensorData`、`NSMotionUsageDescription`(healthStat と共通) | 4.7.2 |
+| 止めるまで鳴るアラーム(`Notification.alarm`・AlarmKit) | `AlarmKitAlarms`(`AlarmBackend.make()` が nil を返す)、`NSAlarmKitUsageDescription`。`alarm: true` の通知は同じ時刻の普通のローカル通知で届く(DSL・AI はそのまま) | 新しい許可の画面が増え、審査メモに説明が要るため。最初の版では外し、戻す時は審査メモ(`docs/store/app-review-notes.md`)に「目覚ましを作った時だけ許可を求める」説明を足してから出す |
 | 近くの端末との共有(`nearbyShare`・MultipeerConnectivity。すれ違い通信と UWB の距離 #425 を含む) | 部品と登録 / `Features/Nearby` 全部 / `NearbyPassbyLeaf`・`NearbyPassbyHost`、`NSLocalNetworkUsageDescription` / `NSBonjourServices` / `NSNearbyInteractionUsageDescription` | 4.7.2 |
 | 音楽プレーヤーの友だちからの曲リクエスト(`musicPlayer.allowRequests`・#412) | 部品の中のリクエストの UI(`MusicPlayerLeaf` の `requests`)。送受信は上の `Features/Nearby` と一緒に外れる | 4.7.2(近くの端末との通信) |
 | DSL から使うカメラの撮影(`photoField` / `videoField`) | `CameraPicker` / `VideoCameraPicker`、撮影の選択肢 | 4.7.2・2.5.14 |
@@ -43,6 +44,7 @@
 | aiButton の端末内 AI の集計(`POST /v1/metrics/ai-button`・#446) | `AppRuntime+AIButtonMetrics` は何もしない / MetamonServices の `AIButtonMetrics.swift`(貯める・送る)/ 設定の「AI ボタンの利用状況を送る」。Renderer の数える呼び出しは残るが、ホストが捨てる | 栄養ラベルに「使用状況データ」が増えるため(`docs/analytics/ai-button-metrics.md`) |
 | 仲間探し(#507・`matchList` / `list.item.interest`) | `matchList` の部品と登録 / `MatchListLeaf` / `InterestButton` / `MatchingHost`、MetamonServices の `MatchingClient` / `HTTPMatchingClient`(`v1/apps/{appId}/interests`・`matches`)/ `MatchingStore` / `MatchingAgeGate`、`Features/Matching` 全部(18 歳以上の確認 `AdultConfirmSheet`)。`supportedFeatures` に `matching` を送らず、backend が match・`item.interest`・`matchList` を使わない | 共有と一緒に外す(知らない人と連絡先を交換する機能。年齢区分・1.2) |
 | 自動の動きの見える化(#347) | `Features/Automations` 全部(`AutomationsView` / `AutomationsSettingsRow`・設定の「自動の動き」)/ MetamonServices の `AutomationsClient` / `HTTPAutomationsClient`(`v1/apps/{appId}/automations`) | 審査用の版では AI が serverRules を作らない(`sharedData` を無効にした依頼では server-rules pass を飛ばす・#316)ので、出す先が無い |
+| プッシュ通知の登録(#269) | `Features/Push` 全部(`PushHost` / `PushAppDelegate` / `PushConsentSection`。`AppRuntime+Push` はサインアウトの呼び出しの空の関数だけ残る)/ MetamonServices の `Push/` と `HTTPPushDeviceClient`(`v1/me/devices`・`v1/me/notify-consent`)/ 参加の画面の同意。`registerForRemoteNotifications` を呼ばず、`Metamon-Review.entitlements` に `aps-environment` を足さない | 審査用の版では AI が serverRules を作らず共有も無いので、他の人の行動で届く通知が無い |
 | アプリ内のフィードバック(#319) | `Features/Feedback` 全部(`FeedbackComposerView` / `FeedbackContext` / 振って開く `FeedbackShakeHost`・`UIWindow.motionEnded`)/ 設定の「フィードバックを送る」/ MetamonServices の `FeedbackClient` / `HTTPFeedbackClient`(`v1/feedback`) | プライバシーの表示に無い種類(カスタマーサポート・その他の診断データ・スクショ)を集める。表示を足すまで外す(`docs/legal/feedback-privacy-draft.md`) |
 | β の初回の案内(#313) | `BetaEnvironment` / `BetaWelcomeStore` / `BetaWelcomeView`(`BetaWelcomeHost`)/ `AppRuntime` の `betaWelcome`・`showBetaWelcome` / 設定の「β 版のご案内」 | 2.2(App Store の版に β の文言を入れない)。β かどうかは実行時にレシート(`sandboxReceipt` = TestFlight)で見分ける。TestFlight と App Store は同じバイナリなので、Release の App Store では実行時の判定で出ず、審査用の版はコードごと無い |
 | 設定の「投稿に表示する名前」(#250) | `AuthorNameSettingsSection`(説明が「みんなで使うアプリに投稿すると…」)。初投稿で名前を聞くアラート(`AuthorNamePromptModifier`)は残るが、記録がすべて private なので出ない | 共有と一緒に外す(外した共有機能の説明になる・2.3) |
@@ -55,6 +57,7 @@
 - 手書き・お絵かきの `drawingField` は残す。PencilKit で端末内に描くだけで権限は要らず、描いた絵は写真と同じ形(800px 以下の JPEG)で photo field に入る(プライバシーの表示は「写真またはビデオ」の範囲)。
 - 現在地を 1 回だけ取る `locationButton` と、地図の `mapView`(使用中の位置だけ)は残す。
 - 目的地までの道案内 `routeGuide`(#411)も残す。使うのは使用中の位置だけで、背面で案内を続けない(`CLBackgroundActivitySession` も `UIBackgroundModes: location` も使わない)。読み上げ(AVSpeechSynthesizer)に権限は要らない。
+- 端末のカレンダーに予定を入れる `addToCalendar` は残す。OS の「新規イベント」画面(EventKitUI・別プロセス)を開くだけで、カレンダーの許可も説明文も要らず、ユーザーが「追加」を押した時だけ入る。
 - ファイルの取り込み `fileImport` は残す。ファイル選択(`.fileImporter`)は別プロセスで動き、権限の確認も Info.plist の説明文も要らない。CSV の行・テキスト / PDF の本文(PDFKit・文字の無いページは Vision の文字認識)を端末内で読んで記録にするだけで、ファイルそのものは送らない・残さない。ファイルの日時の API(理由が要る API)も使わない。
 - QR を読む `qrScanner` は残す(カメラの説明文はこれに合わせて差し替える)。
 - QR を作って表示する `qrCode`(#422)も残す。CoreImage で端末内で作るだけで、写真への保存は追加のみの権限(`NSPhotoLibraryAddUsageDescription`)。審査用の版の説明文にも QR の保存を書く(#452 G8)。
@@ -89,7 +92,7 @@
   - GoogleService-Info.plist(Firebase)も Review / Release は prod の plist を入れる(#292・`docs/ios/architecture.md`「ビルド構成と接続先」)。
 - **プライバシーマニフェスト(#452 G6)**
   - `Metamon/PrivacyInfo.xcprivacy`(アプリ)と `MetamonWidget/PrivacyInfo.xcprivacy`(ウィジェット)。どの版にも入る(xcodegen が各ターゲットの Resources に入れる)。
-  - 元のファイルは審査用の版の申告。通常の版(Debug / Staging / Release)だけ、ビルドの最後に `scripts/extend-privacy-manifest.sh` がバンドルの写しに通常の版で集める種類(購入履歴・製品の操作・カスタマーサポート)を足す(`docs/store/privacy-label.md` の 4 章)。
+  - 元のファイルは審査用の版の申告。通常の版(Debug / Staging / Release)だけ、ビルドの最後に `scripts/extend-privacy-manifest.sh` がバンドルの写しに通常の版で集める種類(購入履歴・製品の操作・カスタマーサポート・デバイス ID)を足す(`docs/store/privacy-label.md` の 4 章)。
   - 理由が要る API: UserDefaults(`CA92.1` アプリだけ / `1C8F.1` App Group でウィジェットと共有)、空き容量(`E174.1` / `85F4.1`。音声モデルのダウンロード前の確認と不足分の表示)。ファイルの日時・起動からの時間・キーボードは使っていない。
   - 集めるデータ: ユーザー ID・名前(Sign in with Apple の表示名)・その他のユーザーコンテンツ・写真・正確な位置・クラッシュのデータ・パフォーマンスのデータ(Crashlytics・#296。審査用の版でも入れる)。すべて本人に紐づき、トラッキングなし、用途はアプリの機能。`docs/legal/privacy-policy.md` と App Store Connect の栄養ラベルに合わせる。
   - API やデータの扱いを変えたら、このファイルも直す。
@@ -130,7 +133,7 @@ cd ios
 
 ```sh
 APP=<DerivedData>/Build/Products/Review-iphoneos/Metamon.app
-plutil -p "$APP/Info.plist" | grep -E 'NSHealth|NSMotion|NSLocalNetwork|Bonjour|NSNearbyInteraction|CFBundleURLTypes|UIBackgroundModes' -A2
+plutil -p "$APP/Info.plist" | grep -E 'NSHealth|NSMotion|NSLocalNetwork|Bonjour|NSNearbyInteraction|NSAlarmKit|CFBundleURLTypes|UIBackgroundModes' -A2
 #   → UIBackgroundModes が [fetch] だけで、他は出ないこと
 plutil -p "$APP/Info.plist" | grep -E 'MetamonAIBaseURL|MetamonAppConfigBaseURL|NSPhotoLibraryAddUsageDescription'
 #   → URL が ai-prod / appconfig-prod、写真への追加の説明文に QR コードがあること
@@ -138,10 +141,13 @@ ls "$APP/PrivacyInfo.xcprivacy" "$APP/PlugIns/MetamonWidget.appex/PrivacyInfo.xc
 #   → どちらもあること
 codesign -d --entitlements :- "$APP"
 #   → com.apple.developer.healthkit が無いこと
-otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|NearbyInteraction|CoreMotion'
+otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|NearbyInteraction|CoreMotion|AlarmKit'
 #   → 何も出ないこと
 strings "$APP/Metamon" | grep -E 'AutomationsView|HTTPAutomationsClient|/automations|MatchListLeaf|HTTPMatchingClient|MatchingStore|AdultConfirmSheet|/interests|v1/feedback|FeedbackComposerView|HKHealthStore|MCSession|NISession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps|WebViewLeaf|FeedLeaf|HTTPFeedClient|v1/feeds|v1/text|ChatThreadLeaf|jp\.kz2601\.metamon\.pro|PaywallSheet|ProSettingsSection|ProEntitlementStore|購入して作る|Pro にする'
 #   → 何も出ないこと
+strings "$APP/Metamon" | grep -E 'v1/me/devices|notify-consent|HTTPPushDeviceClient|PushDeviceRegistrar'
+#   → 何も出ないこと(プッシュの登録・#269)
+#   注: registerForRemoteNotifications の文字列は FirebaseAuth(電話番号の認証の AuthAPNSTokenManager)から残る。この版では呼ばない
 #   注: WKWebView / WebKit の参照は FirebaseAuth(AuthWebViewController。OAuth・reCAPTCHA 用)から残る。
 #       この版のサインイン(Sign in with Apple・匿名)では使わない。アプリのコードからは WebKit を使わない
 grep -a -c -F -e 'Tailor It Pro' -e '購入して作る' -e 'オンラインの AI で書く' -e '今日の上限に達したため止めました' "$APP/Metamon"

@@ -94,6 +94,8 @@ final class AppRuntime: DSLRuntime {
     var confirm: Confirm?
     /// 書き出したファイル(#421)。立つと共有シートを開く(`RootView` の HostSheets)。
     var exportFile: ExportFile?
+    /// addToCalendar で開く「新規イベント」画面の中身(`AppRuntime+Calendar.swift`)。
+    var calendarDraft: CalendarEventDraft?
 
     /// 共有アプリへの初めての投稿で表示名を聞く(#250)。答えたら `resume` で保存を続ける。
     struct AuthorNamePrompt: Identifiable {
@@ -521,6 +523,7 @@ final class AppRuntime: DSLRuntime {
         scheduleBuildRevealEnd(reveal, highlight: highlight)
         scheduleNotificationSync()
         noteRetention() // #482 保存期間の確認と期限切れの削除
+        noteAppMembers() // #272 参加者と管理者(member の選択肢・管理者だけのボタン)
         WidgetSnapshotWriter.write(dsl: doc.dsl, records: records) // ホーム画面ウィジェットへ stat を反映
         IntentHost.shared.appsMayHaveChanged() // Siri のフレーズ候補(アプリ名)を引き直す(#80)
     }
@@ -1143,6 +1146,10 @@ final class AppRuntime: DSLRuntime {
                 guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
                 records[entity] = cached
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            case .denied(let appId, let entity, let denial):
+                guard appId == document.appId else { return }
+                toast = denialMessage(denial, entity: entity) // #272 #273
+                await refresh(entity) // 楽観的に書いた値をサーバーの内容に戻す
             case .proRequired(let appId, let entity, let pro):
                 guard appId == document.appId else { return }
                 presentProRequiredWrite(pro) // #316: 書いた分は戻した。作成者なら課金画面、参加者なら案内
@@ -1217,7 +1224,7 @@ final class AppRuntime: DSLRuntime {
                 toast = L10n.tr("保存するフォームがありません")
                 return
             }
-            let missing = form.missingRequired
+            let missing = form.flagMissingRequired() // 空の欄に印を付ける(M10)
             guard missing.isEmpty else {
                 toast = L10n.tr("\(missing.joined(separator: L10n.tr("・"))) を入力してください")
                 return
@@ -1300,6 +1307,9 @@ final class AppRuntime: DSLRuntime {
         case .endActivity:
             await endActivity()
 
+        case .addToCalendar:
+            addToCalendar(action, ctx)
+
         case .unknown:
             toast = L10n.tr("未対応のアクション: \(action.rawType)")
         }
@@ -1329,6 +1339,7 @@ final class AppRuntime: DSLRuntime {
     func message(for error: Error, entity: String?) -> String {
         guard let api = error as? APIError else { return ErrorCopy.failure(L10n.tr("うまくいきませんでした"), error, context: "action") }
         if let denial = SharedAccessDenial(api) { return denial.message } // #254
+        if let denial = RecordWriteDenial(api), let entity { return denialMessage(denial, entity: entity) } // #272 #273
         if let pro = ProRequired(api) { return pro.writeMessage } // #316(印を付けるなど)
         if api.code == "invalid_record" || (api.status == 400 && api.field != nil), let fieldId = api.field {
             let name = entity.flatMap { dsl.entity($0)?.field(fieldId)?.name } ?? fieldId

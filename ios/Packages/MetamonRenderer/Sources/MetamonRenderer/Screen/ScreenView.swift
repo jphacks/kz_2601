@@ -44,10 +44,8 @@ public struct ScreenView: View {
                         Button(L("完了")) { KeyboardState.dismiss() }.fontWeight(.semibold)
                     }
                     if route.stack == "sheet" || route.stack == "full", (rt.paths[route.stack] ?? []).isEmpty {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button(L("閉じる")) {
-                                if hasUnsavedInput { confirmDiscard = true } else { rt.close(route) }
-                            }
+                        SheetCloseToolbarItem {
+                            if hasUnsavedInput { confirmDiscard = true } else { rt.close(route) }
                         }
                     }
                 }

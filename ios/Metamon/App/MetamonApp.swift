@@ -13,6 +13,9 @@ struct MetamonApp: App {
     /// 最低対応版・強制アップデート(#302)。サインイン前にも効く
     @State private var updateGate = UpdateGate()
     @Environment(\.scenePhase) private var scenePhase
+    #if !APP_STORE_REVIEW
+    @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate // 端末トークンを受ける(#269)
+    #endif
 
     /// Renderer 同梱のコンポーネント + アプリ本体が提供する `voiceInput`(WhisperKit 依存なので Renderer には置かない)。
     static let componentRegistry = ComponentRegistry.standard
@@ -79,6 +82,7 @@ struct MetamonApp: App {
         // 課金(#314): 検証済みの取引をサーバーに送り、購入の appAccountToken に uid を入れる
         ProGate.shared.store.server = services.entitlements
         ProGate.shared.store.accountUID = { [auth = services.auth] in auth.currentUser?.uid }
+        PushHost.shared.install(services: services) // 端末トークンの登録(#269)
         #endif
         _runtime = State(initialValue: runtime)
         _session = State(initialValue: session)
@@ -119,6 +123,7 @@ struct MetamonApp: App {
             .modifier(UpdateGateModifier(gate: updateGate))
             #if !APP_STORE_REVIEW
             .modifier(ShareLinkReceiver()) // シェアリンクはサインイン前でも受けて保留(#278)
+            .modifier(PushRegistrationObserver(uid: session.user?.uid)) // #269
             #endif
             .environment(session)
             .environment(\.services, services)              // protocol 越しのサービス

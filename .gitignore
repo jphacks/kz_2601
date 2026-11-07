@@ -19,6 +19,11 @@ build/
 # Go
 backend/bin/
 backend/**/*.test
+# go build ./cmd/<名前> を backend/ で実行した時の成果物
+/backend/ai
+/backend/appconfig
+/backend/runner
+/backend/moderate
 
 # misc
 node_modules/

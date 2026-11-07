@@ -66,11 +66,11 @@ func init() {
   - values は [{"field":"<field id>","value":<Expr>}] の配列で書く。
   - increment: きっかけのレコードの ref field(ref)が指すレコードの数の field に by(省略 = 1)を足す。件数は by を省略、合計は by に {"ref":"<数の field>"}。updateRecord の ref 省略 = きっかけのレコード自身。どちらもレコードのきっかけだけ。
   - 書けるのはきっかけと同じ側の entity(private どうし・shared / public どうし)。computed・photo・video・location の field には書かない。single の entity に createRecord しない。createRecord は required の field を全部書く。
-- 宛先 to.kind: owner(作成者)/ author(きっかけのレコードを書いた人)/ authorOf + field(きっかけの ref field が指すレコードを書いた人)/ members(参加者全員)。**private の記録は owner だけ・public は owner と authorOf だけ・shared は全部**。きっかけを起こした本人には届かない。
+- 宛先 to.kind: owner(作成者)/ author(きっかけのレコードを書いた人)/ authorOf + field(きっかけの ref field が指すレコードを書いた人)/ members(参加者全員)/ recipients + field(宛先付きの entity のきっかけだけ: addressedTo の field の宛先の人)。**private の記録は owner だけ・public は owner と authorOf だけ・shared は全部**。きっかけを起こした本人には届かない。
 - 通知: 題 30 字・本文 80 字まで(差し込みの {…} も数える)。差し込めるのは {<field>}(きっかけのレコードの値。ref・refs・photo・video・location・hidden・computed の field は不可)と {$author}(書いた人の表示名・shared / public のレコードのきっかけ)だけ。押すとこのアプリが開く。
 
 ## 作らないもの(頼まれても serverRules に入れない)
-- 外部への送信(メール・SMS・LINE・Slack・Webhook・外部のサーバーや他のアプリ)・任意の宛先(名前・メールアドレス・電話番号・利用者全体)。宛先は上の 4 種類だけ。
+- 外部への送信(メール・SMS・LINE・Slack・Webhook・外部のサーバーや他のアプリ)・任意の宛先(名前・メールアドレス・電話番号・利用者全体)。宛先は上の 5 種類だけ。
 - 通知の題・本文の URL・ドメイン・メールアドレス・電話番号・「公式」「運営」「Tailor It」「Apple」などの名乗り。
 - 処理の連鎖: 処理が書いたレコードで別のルール(自分も含む)が動く形(createRecord の entity に created のルールがある・updateRecord / increment が書く field を updated のルールが見ている)。
 - 仲間探し(entity に match がある)のアプリの serverRules。
@@ -365,23 +365,33 @@ func appendRulesOp(ops []dsl.PatchOp, before, after *dsl.App) []dsl.PatchOp {
 }
 
 // describeRuleChanges is the spoken sentence for the new / changed / removed
-// rules (dsl.DescribeServerRule for ja).
+// rules and the ones only switched off / on (#347; dsl.DescribeServerRule for ja).
 func describeRuleChanges(before, after *dsl.App, loc Locale) string {
-	old := map[string]string{}
+	old := map[string]*dsl.ServerRule{}
 	for i := range before.ServerRules {
-		raw, _ := json.Marshal(before.ServerRules[i])
-		old[before.ServerRules[i].ID] = string(raw)
+		old[before.ServerRules[i].ID] = &before.ServerRules[i]
 	}
-	var changed []string
+	var added, updated, turnedOff, turnedOn []string
 	kept := map[string]bool{}
 	for i := range after.ServerRules {
 		r := &after.ServerRules[i]
 		kept[r.ID] = true
-		raw, _ := json.Marshal(r)
-		if old[r.ID] == string(raw) {
-			continue
+		prev, ok := old[r.ID]
+		switch {
+		case !ok:
+			added = append(added, after.DescribeServerRule(r))
+		case sameRule(prev, r):
+		case sameRuleIgnoringEnabled(prev, r):
+			plain := *r
+			plain.Enabled = nil // without the 「(オフ)」 note
+			if r.IsEnabled() {
+				turnedOn = append(turnedOn, after.DescribeServerRule(&plain))
+			} else {
+				turnedOff = append(turnedOff, after.DescribeServerRule(&plain))
+			}
+		default:
+			updated = append(updated, after.DescribeServerRule(r))
 		}
-		changed = append(changed, after.DescribeServerRule(r))
 	}
 	removed := 0
 	for id := range old {
@@ -389,23 +399,64 @@ func describeRuleChanges(before, after *dsl.App, loc Locale) string {
 			removed++
 		}
 	}
-	var parts []string
 	if loc == LocaleEN {
-		if n := len(changed); n > 0 {
-			parts = append(parts, fmt.Sprintf("Added %d automatic action(s) that run on the server.", n))
+		var parts []string
+		if n := len(added); n > 0 {
+			verb := "run"
+			if n == 1 {
+				verb = "runs"
+			}
+			parts = append(parts, fmt.Sprintf("Added %s that %s on the server.", automaticActions(n), verb))
 		}
-		if removed > 0 {
-			parts = append(parts, fmt.Sprintf("Stopped %d automatic action(s).", removed))
+		for _, c := range []struct {
+			n    int
+			verb string
+		}{{len(updated), "Updated"}, {len(turnedOff), "Turned off"}, {len(turnedOn), "Turned on"}, {removed, "Removed"}} {
+			if c.n > 0 {
+				parts = append(parts, c.verb+" "+automaticActions(c.n)+".")
+			}
 		}
 		return strings.Join(parts, " ")
 	}
-	if len(changed) > 0 {
-		parts = append(parts, "自動の動き: "+strings.Join(changed, "。")+"。")
+	var b strings.Builder
+	if changed := append(added, updated...); len(changed) > 0 {
+		b.WriteString("自動の動き: " + strings.Join(changed, "。") + "。")
+	}
+	if len(turnedOff) > 0 {
+		b.WriteString(quoteRules(turnedOff) + "をオフにしました。")
+	}
+	if len(turnedOn) > 0 {
+		b.WriteString(quoteRules(turnedOn) + "をオンにしました。")
 	}
 	if removed > 0 {
-		parts = append(parts, fmt.Sprintf("自動の動きを %d 件止めました。", removed))
+		fmt.Fprintf(&b, "自動の動きを %d 件消しました。", removed)
 	}
-	return strings.Join(parts, "")
+	return b.String()
+}
+
+func sameRule(a, b *dsl.ServerRule) bool {
+	x, _ := json.Marshal(a)
+	y, _ := json.Marshal(b)
+	return string(x) == string(y)
+}
+
+// sameRuleIgnoringEnabled reports whether a and b differ at most in enabled.
+func sameRuleIgnoringEnabled(a, b *dsl.ServerRule) bool {
+	x, y := *a, *b
+	x.Enabled, y.Enabled = nil, nil
+	return sameRule(&x, &y)
+}
+
+// automaticActions is "1 automatic action" / "N automatic actions".
+func automaticActions(n int) string {
+	if n == 1 {
+		return "1 automatic action"
+	}
+	return fmt.Sprintf("%d automatic actions", n)
+}
+
+func quoteRules(descs []string) string {
+	return "「" + strings.Join(descs, "」「") + "」"
 }
 
 // appendSentence joins summary sentences the way noteOmissions does.

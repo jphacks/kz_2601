@@ -20,9 +20,14 @@ func (m *Memory) PutRuleStatus(_ context.Context, env string, s RuleStatus) erro
 	if m.ruleStatus[env] == nil {
 		m.ruleStatus[env] = map[string]*RuleStatus{}
 	}
+	s.Failures = 0
 	if old, ok := m.ruleStatus[env][s.ID]; ok && m.now().Before(old.ExpireAt) {
 		keepRuleStatus(&s, *old)
 	}
+	if s.Failed {
+		s.Failures++
+	}
+	s.Failed = false
 	m.ruleStatus[env][s.ID] = &s
 	return nil
 }
@@ -45,6 +50,7 @@ func (m *Memory) GetRuleStatuses(_ context.Context, env string, ids []string) (m
 func keepRuleStatus(s *RuleStatus, old RuleStatus) {
 	if s.LastOKAt.IsZero() {
 		s.LastOKAt = old.LastOKAt
+		s.Failures = old.Failures
 	}
 	if s.QuotaDay == "" {
 		s.QuotaDay, s.QuotaUsed, s.QuotaLimit = old.QuotaDay, old.QuotaUsed, old.QuotaLimit

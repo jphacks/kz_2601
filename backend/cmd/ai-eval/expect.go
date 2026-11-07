@@ -76,6 +76,9 @@ var expectKeys = map[string]expectKind{
 	// checkLiveActivity (#423)
 	"liveTimer":       expectBool,
 	"activityButtons": expectBool,
+	// checkCalendarAdd: calendar_add.go
+	"addToCalendar": expectBool,
+	"calendarAlert": expectBool,
 	// checkQR (#422)
 	"qrSource": expectString,
 	// checkPhotoAI (#418)
@@ -104,6 +107,10 @@ var expectKeys = map[string]expectKind{
 	// checkSingle (#267): single.go
 	"single":  expectBool,
 	"setting": expectBool,
+	// checkAddressed (#271): addressed.go
+	"addressed":       expectBool,
+	"addressedGroup":  expectBool,
+	"addressedUnread": expectBool,
 	// checkRepeat (#266): repeat.go
 	"repeat":         expectString,
 	"repeatOffset":   expectNumber,
@@ -111,6 +118,9 @@ var expectKeys = map[string]expectKind{
 	// checkNotifyWhen (#265): notify_when.go
 	"notifyWhen":   expectBool,
 	"notifyWhenOp": expectString,
+	// checkAlarm: alarm.go
+	"alarm":       expectBool,
+	"alarmRecord": expectBool,
 	// checkServerRules (#343): server_rules.go
 	"serverRules": expectBool,
 	"ruleTrigger": expectString,

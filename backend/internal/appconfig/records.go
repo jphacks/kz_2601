@@ -64,6 +64,9 @@ func (h *Handler) ownRecord(r *http.Request, rs store.RecordSet, ent *dsl.Entity
 	if err != nil {
 		return nil, mapStoreErr(err, "record")
 	}
+	if !canRead(ent, rec, uidOf(r)) { // #271: an addressed record of others
+		return nil, recordNotFound()
+	}
 	if forUpdate && ent.MembersCanEdit() {
 		return rec, nil
 	}
@@ -129,7 +132,11 @@ func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	items := make([]store.Record, 0, len(all))
+	uid := uidOf(r)
 	for i := range all {
+		if !canRead(ent, &all[i], uid) { // #271: only the author and recipients
+			continue
+		}
 		if blocked[all[i].Author] || (matchOK != nil && !matchOK(all[i].Author)) {
 			continue
 		}
@@ -270,16 +277,29 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	if err := h.checkRecordText(r, ent, body.Data, body.AuthorName); err != nil { // #321
-		fail(w, err)
-		return
-	}
 	data, err := normalizeData(ent, body.Data, true)
 	if err != nil {
 		fail(w, err)
 		return
 	}
+	if err := h.checkRecordRules(r, cur, ent, nil, data); err != nil { // #272
+		fail(w, err)
+		return
+	}
+	if err := h.checkAddressed(r, cur, ent, nil, data); err != nil { // #271
+		fail(w, err)
+		return
+	}
+	// after the permission checks: a refused write is a 403, not a 422 (#321)
+	if err := h.checkRecordText(r, ent, body.Data, body.AuthorName); err != nil {
+		fail(w, err)
+		return
+	}
 	if err := checkRecordSize(data); err != nil {
+		fail(w, err)
+		return
+	}
+	if err := h.checkRecordLimits(r, cur, ent, data, nil, true); err != nil { // #317
 		fail(w, err)
 		return
 	}
@@ -299,6 +319,7 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 			fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "authorName too long"))
 			return
 		}
+		rec.Readers = recordReaders(ent, rec.Author, data) // #271
 		// the collection is shared, so two users' idempotency keys must not collide
 		clientKey = rec.Author + "/" + body.ClientID
 	}
@@ -309,7 +330,7 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		h.upsertSingle(w, r, cur, ent, recordSet(r, cur, ent, eid), rec)
 		return
 	}
-	out, _, err := h.createRecordOutbox(r, cur, ent, recordSet(r, cur, ent, eid), rec)
+	out, _, err := h.createRecordKept(r, cur, ent, recordSet(r, cur, ent, eid), rec) // #273
 	if err != nil {
 		fail(w, mapStoreErr(err, "entity"))
 		return
@@ -350,6 +371,9 @@ func (h *Handler) getRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	rs := recordSet(r, cur, ent, eid)
 	rec, err := h.store.GetRecord(r.Context(), rs, rid)
+	if err == nil && !canRead(ent, rec, uidOf(r)) {
+		err = store.ErrNotFound // #271: an addressed record of others
+	}
 	if err == nil && ent.IsShared() {
 		var ok func(string) bool
 		if ok, err = h.matchFilter(r, cur.ID, eid, []string{rec.Author}); err == nil && ok != nil && !ok(rec.Author) {
@@ -393,18 +417,27 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	if err := h.checkRecordText(r, ent, body.Data, ""); err != nil { // #321
-		fail(w, err)
-		return
-	}
 	delta, err := normalizeData(ent, body.Data, false)
 	if err != nil {
 		fail(w, err)
 		return
 	}
 	rs := recordSet(r, cur, ent, eid)
-	existing, err := h.ownRecord(r, rs, ent, rid, true)
+	existing, err := h.recordForPatch(r, rs, cur, ent, rid, delta) // #272: admins may change admin-only fields
 	if err != nil {
+		fail(w, err)
+		return
+	}
+	if err := h.checkRecordRules(r, cur, ent, existing, delta); err != nil {
+		fail(w, err)
+		return
+	}
+	if err := h.checkAddressed(r, cur, ent, existing, delta); err != nil { // #271
+		fail(w, err)
+		return
+	}
+	// after the author / admin checks: a non-author's PATCH is a 403, not a 422 (#321)
+	if err := h.checkRecordText(r, ent, body.Data, ""); err != nil {
 		fail(w, err)
 		return
 	}
@@ -429,7 +462,11 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	rec, err := h.updateRecordOutbox(r, cur, ent, rs, rid, merged)
+	if err := h.checkRecordLimits(r, cur, ent, delta, existing.Data, false); err != nil { // #317
+		fail(w, err)
+		return
+	}
+	rec, err := h.updateRecordKept(r, cur, ent, rs, existing, merged) // #273
 	if err != nil {
 		fail(w, mapStoreErr(err, "record"))
 		return
@@ -455,7 +492,7 @@ func (h *Handler) deleteRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	rs := recordSet(r, cur, ent, eid)
 	if ent.IsShared() {
-		if _, err := h.ownRecord(r, rs, ent, rid, false); err != nil {
+		if err := h.checkDelete(r, rs, cur, ent, rid); err != nil { // #272: entity.deleteBy
 			fail(w, err)
 			return
 		}
@@ -488,6 +525,11 @@ func (h *Handler) deleteAllRecords(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	everyone, err := h.deleteAllScope(r, cur, ent) // #272: an admin clears everyone's
+	if err != nil {
+		fail(w, err)
+		return
+	}
 	all, err := h.store.ListRecords(r.Context(), rs, 0)
 	if err != nil {
 		fail(w, mapStoreErr(err, "entity"))
@@ -495,7 +537,7 @@ func (h *Handler) deleteAllRecords(w http.ResponseWriter, r *http.Request) {
 	}
 	uid := uidOf(r)
 	for i := range all {
-		if all[i].Author != uid {
+		if !everyone && all[i].Author != uid {
 			continue
 		}
 		if err := h.store.DeleteRecord(r.Context(), rs, all[i].ID); err != nil && !errors.Is(err, store.ErrNotFound) {
