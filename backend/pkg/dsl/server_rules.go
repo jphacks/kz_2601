@@ -31,7 +31,10 @@ type ServerRule struct {
 	// Similar: run only when a record shares values with the row; the
 	// actions read the best one (server_rules_similar.go).
 	Similar *RuleSimilar `json:"similar,omitempty"`
-	Do      []RuleAction `json:"do"`
+	// Pick: run only when an entity has a record to recommend; the
+	// actions read it (server_rules_pick.go).
+	Pick *RulePick    `json:"pick,omitempty"`
+	Do   []RuleAction `json:"do"`
 	// Enabled: false turns the rule off (the creator's switch, #347); nil = on.
 	Enabled *bool `json:"enabled,omitempty"`
 }
@@ -209,6 +212,7 @@ func checkServerRules(a *App, entities map[string]*Entity, add func(string, ...a
 		}
 		checkRuleLookup(where, rc)
 		checkRuleSimilar(where, rc)
+		checkRulePick(where, rc)
 		if len(r.Do) == 0 {
 			add("%s: do needs at least one action", where)
 		}
@@ -219,7 +223,7 @@ func checkServerRules(a *App, entities map[string]*Entity, add func(string, ...a
 			checkRuleAction(fmt.Sprintf("%s.do[%d]", where, j), rc, &r.Do[j])
 		}
 		if n := len(rc.reads); n > MaxRuleReadEntities {
-			add("%s: reads the records of %d entities (each + agg + lookup + similar: %s); at most %d", where, n, strings.Join(sortedKeys(rc.reads), ", "), MaxRuleReadEntities)
+			add("%s: reads the records of %d entities (each + agg + lookup + similar + pick: %s); at most %d", where, n, strings.Join(sortedKeys(rc.reads), ", "), MaxRuleReadEntities)
 		}
 	}
 	if scheduled > MaxScheduledRulesPro {
@@ -235,9 +239,9 @@ type ruleCheck struct {
 	scope    EntityScope
 	entities map[string]*Entity
 	add      func(string, ...any)
-	reads    map[string]bool // entities whose records the rule lists (each + agg + lookup + similar)
-	// doRow: the row the actions' expressions read (row + the similar
-	// results, server_rules_similar.go); nil = row.
+	reads    map[string]bool // entities whose records the rule lists (each + agg + lookup + similar + pick)
+	// doRow: the row the actions' expressions read (row + the similar /
+	// pick results, server_rules_similar.go / server_rules_pick.go); nil = row.
 	doRow *Entity
 }
 
@@ -536,7 +540,7 @@ func checkRuleNotify(where string, rc *ruleCheck, n *RuleNotify) {
 	default:
 		add("%s.to: kind %q must be owner, author, authorOf, members or recipients", where, k)
 	}
-	if (k == RecipientAuthor || k == RecipientAuthorOf || k == RecipientRecipients) && row == nil {
+	if ((k == RecipientAuthor || k == RecipientRecipients) && rc.row == nil) || (k == RecipientAuthorOf && row == nil) {
 		add("%s.to: kind %s needs a record trigger or on.each (a time trigger has no record)", where, k)
 	}
 	switch k {
@@ -548,7 +552,7 @@ func checkRuleNotify(where string, rc *ruleCheck, n *RuleNotify) {
 		}
 	case RecipientRecipients:
 		switch {
-		case row == nil:
+		case rc.row == nil:
 		case !row.IsAddressed():
 			add("%s.to: kind recipients needs a trigger on an addressed entity; entity %q has no addressedTo", where, row.ID)
 		case n.To.Field != row.AddressedTo:
@@ -618,7 +622,7 @@ func checkNotifyText(where, s string, maxRunes int, row *Entity, with map[string
 }
 
 func checkPlaceholder(where, id string, row *Entity, add func(string, ...any)) {
-	if row == nil {
+	if row == nil || (IsPickRow(row) && !isPickResult(id)) {
 		add("%s: {%s}: a time trigger has no record to insert values from (name a total in notify.with, or use on.each)", where, id)
 		return
 	}
@@ -751,6 +755,9 @@ func (a *App) DescribeServerRule(r *ServerRule) string {
 		if ref == SimilarRef && r.Similar != nil {
 			return "似ている" + ename(r.Similar.Entity)
 		}
+		if ref == PickRef && r.Pick != nil {
+			return "選んだ" + ename(r.Pick.Entity)
+		}
 		if row != nil {
 			if f := row.FieldByID(ref); f != nil {
 				return ename(f.RefEntity)
@@ -786,6 +793,7 @@ func (a *App) DescribeServerRule(r *ServerRule) string {
 	}
 	when += a.describeLookup(r, row)
 	when += a.describeSimilar(r, row)
+	when += a.describePick(r)
 	acts := make([]string, 0, len(r.Do))
 	for _, act := range r.Do {
 		switch {

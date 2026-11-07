@@ -47,6 +47,13 @@ type Trigger struct {
 	At time.Time
 	// Location is the creator's time zone; nil = UTC.
 	Location *time.Location
+	// RunID names the run (the outbox event): pick's random order is seeded
+	// by it, so a retry of the run picks the same record.
+	RunID string
+	// CreatedID is the id the runner gives the record that action creates
+	// for row ("" = no on.each); pick's exclude skips it on a retry. nil =
+	// none.
+	CreatedID func(rule string, action int, row string) string
 }
 
 // Lister lists the records of one entity of the trigger's app (the side the
@@ -148,7 +155,7 @@ func (p Plan) Empty() bool { return len(p.Writes) == 0 && len(p.Notifies) == 0 }
 // Plan): the trigger must match the rule, `if` must be
 // true, then each action's values / by / text are computed. An action whose
 // target ref is empty (or whose by is not a number) is skipped. A rule with
-// agg, lookup or similar needs refs to implement Lister. A rule with on.each runs on one
+// agg, lookup, similar or pick needs refs to implement Lister. A rule with on.each runs on one
 // record here (ev.Record); PlanEach runs it on every record.
 func PlanRule(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger, refs RefReader) (Plan, error) {
 	return planOne(ctx, app, rule, ev, refs, newRunCache())
@@ -248,6 +255,16 @@ func planOne(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger
 		}
 		src.listed[rule.Similar.Entity] = true // "$similar.<field>" reads the listed record
 		p.row = sim
+	}
+	if rule.Pick != nil {
+		picked, ok := pickRow(app, rule, ev, row, src, e)
+		if src.err != nil {
+			return Plan{}, src.err
+		}
+		if !ok {
+			return Plan{}, nil
+		}
+		p.row = picked
 	}
 	var out Plan
 	for i := range rule.Do {
@@ -422,7 +439,7 @@ func (p *planner) values(target *dsl.Entity, exprs map[string]dsl.Expr) map[stri
 	out := make(map[string]any, len(exprs))
 	for k, x := range exprs {
 		f := target.FieldByID(k)
-		if f == nil || strings.HasPrefix(k, "$") { // "$similar…" is read, never written
+		if f == nil || strings.HasPrefix(k, "$") { // "$similar…" / "$pick…" are read, never written
 			continue
 		}
 		if f.Type == dsl.FieldRefs {
