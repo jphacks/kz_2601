@@ -54,7 +54,7 @@ func (r *Runner) process(ctx context.Context, ev store.OutboxEvent) (map[string]
 		return nil, none, err
 	}
 	if st.app != nil {
-		stopLevel = StopLevelApp
+		stopLevel = st.app.Level // StopLevelApp | StopLevelGlobal
 		return all(OutcomeSkippedStopped, ReasonOperatorStop), none, nil
 	}
 	if ev.Kind == store.OutboxSchedule && schedule.IsLate(ev.DueAt, r.cfg.Now(), r.cfg.MaxLate) {

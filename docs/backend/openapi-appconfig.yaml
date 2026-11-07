@@ -413,6 +413,7 @@ paths:
         `filterField=author&filterOp=eq&filterValue=<uid>` で特定ユーザー (自分) の投稿だけに絞れる。
         **scope:shared の entity は作成者と参加者だけ**が読み書きできる (この entity の records の全操作で同じ・それ以外は 403 `not_member`・#254)。public は従来どおり誰でも。
         呼び出した人がブロックしたユーザー(`/me/blocks`)の投稿は一覧から除く(#321)。運営が非公開にした共有アプリ(`apps_public/{appId}.hidden`)は、public/shared の entity の records の全操作が 403 `unpublished`(details.reason = 運営の理由)。
+        運営がアプリのサーバー機能を強制停止している間(#346・`moderate stop-app -force` / `stop-all -force`)は、サーバーのルールのきっかけになる作成・更新(POST / PATCH)が 403 `app_stopped`(details.level = `app` / `global`、期限つきなら details.until)。ルールに当たらない書き込み・読み出し・削除はそのまま。
       parameters:
         - { $ref: '#/components/parameters/PageSize' }
         - { $ref: '#/components/parameters/PageToken' }
@@ -1463,6 +1464,7 @@ components:
               enum:
                 - account_deleted
                 - app_check_failed
+                - app_stopped
                 - bad_request
                 - forbidden
                 - internal
