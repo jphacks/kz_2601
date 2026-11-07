@@ -43,7 +43,7 @@ func (a *App) HasRecordRules(entity, kind string) bool {
 func (r *ServerRule) ReferencedFields() []string {
 	seen := map[string]bool{}
 	addField := func(id string) {
-		if id != "" && !isSimilarResult(id) {
+		if id != "" && !isSimilarResult(id) && !isPickResult(id) {
 			seen[id] = true
 		}
 	}

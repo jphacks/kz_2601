@@ -15,7 +15,11 @@ import (
 // swapped (a renamed line would keep "each・agg・lookup を合わせて").
 func TestServerRulesSimilarPrompt(t *testing.T) {
 	for _, l := range serverRulesSimilarLines {
-		if strings.Contains(serverRulesPrompt, l[0]) || !strings.Contains(serverRulesPrompt, l[1]) {
+		want := l[1]
+		for _, later := range serverRulesPickLines { // swapped again by server_rules_vocab_pick.go
+			want = strings.Replace(want, later[0], later[1], 1)
+		}
+		if strings.Contains(serverRulesPrompt, l[0]) || !strings.Contains(serverRulesPrompt, want) {
 			t.Fatalf("line not swapped: %s", l[0])
 		}
 	}

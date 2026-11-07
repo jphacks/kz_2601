@@ -20,6 +20,9 @@ func TestServerRulesLookupPrompt(t *testing.T) {
 				want = later[1]
 			}
 		}
+		for _, later := range serverRulesPickLines { // and by server_rules_vocab_pick.go
+			want = strings.Replace(want, later[0], later[1], 1)
+		}
 		if strings.Contains(serverRulesPrompt, l[0]) || !strings.Contains(serverRulesPrompt, want) {
 			t.Fatalf("line not swapped: %s", l[0])
 		}

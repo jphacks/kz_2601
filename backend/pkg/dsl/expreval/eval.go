@@ -380,6 +380,39 @@ func (ev *Evaluator) resolve(fs []dsl.Filter, row *Row) ([]filter, bool) {
 	return out, true
 }
 
+// Matching returns the stored records of entity that pass every filter
+// (values evaluated in row), in listed order; nil when a filter value is
+// empty (it matches nothing). Server-rule pick reads it.
+func (ev *Evaluator) Matching(entity string, fs []dsl.Filter, row *Row) []Record {
+	resolved, ok := ev.resolve(fs, row)
+	if !ok {
+		return nil
+	}
+	base := ev.records(entity)
+	if len(resolved) == 0 {
+		return base
+	}
+	return ev.filtered(ev.entities[entity], base, resolved)
+}
+
+// filtered keeps the records of e that pass every resolved filter.
+func (ev *Evaluator) filtered(e *dsl.Entity, base []Record, resolved []filter) []Record {
+	var rows []Record
+	for _, r := range base {
+		ok := true
+		for _, f := range resolved {
+			if !ev.matches(f, r, field(e, f.Field)) {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			rows = append(rows, r)
+		}
+	}
+	return rows
+}
+
 func (ev *Evaluator) aggregate(a *dsl.AggExpr, row *Row) Value {
 	resolved, ok := ev.resolve(a.Filter, row)
 	keyBytes, _ := json.Marshal(struct {
@@ -413,19 +446,7 @@ func (ev *Evaluator) aggregate(a *dsl.AggExpr, row *Row) Value {
 	if !ok {
 		rows = nil
 	} else if len(resolved) > 0 {
-		rows = nil
-		for _, r := range base {
-			ok := true
-			for _, f := range resolved {
-				if !ev.matches(f, r, field(e, f.Field)) {
-					ok = false
-					break
-				}
-			}
-			if ok {
-				rows = append(rows, r)
-			}
-		}
+		rows = ev.filtered(e, base, resolved)
 	}
 	var nums []float64
 	if a.Field != "" {

@@ -245,6 +245,10 @@ func (r *Runner) trigger(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 	t = engine.Trigger{
 		AppID: ev.AppID, Scope: scopeOf, Entity: ev.Entity, Actor: ev.ActorUID, Version: ev.Version, At: ev.CreatedAt,
 		Record: expreval.Record{ID: ev.RecordID, Data: orEmpty(ev.Data), Author: ev.Author}, Location: loc,
+		RunID: ev.EventID,
+		CreatedID: func(rule string, action int, row string) string {
+			return store.IDFromClientID(createClientID(ev.EventID, rule, action, row))
+		},
 	}
 	switch ev.Kind {
 	case store.OutboxSchedule:
@@ -509,16 +513,22 @@ func markKey(ev store.OutboxEvent, rule *dsl.ServerRule, row string, action int)
 	return k
 }
 
+// createClientID is the idempotency key of the record action creates for
+// row (the on.each record id, "" otherwise).
+func createClientID(eventID, rule string, action int, row string) string {
+	client := eventID + "/" + rule + "/" + strconv.Itoa(action)
+	if row != "" {
+		client += "/" + row
+	}
+	return client
+}
+
 // write carries out one planned write once. wrote=false: already done by
 // an earlier attempt, or the target record is gone.
 func (r *Runner) write(ctx context.Context, h *scope.Handle, ev store.OutboxEvent, rule *dsl.ServerRule, row string, w engine.PlannedWrite) (bool, error) {
 	switch w.Kind {
 	case engine.WriteCreate:
-		client := ev.EventID + "/" + rule.ID + "/" + strconv.Itoa(w.Action)
-		if row != "" {
-			client += "/" + row
-		}
-		id := store.IDFromClientID(client)
+		id := store.IDFromClientID(createClientID(ev.EventID, rule.ID, w.Action, row))
 		origin := store.RecordOrigin{RuleID: rule.ID, Version: ev.Version, EventID: ev.EventID, ActorUID: ev.ActorUID}
 		return h.CreateRecord(ctx, w.Entity, id, w.Values, origin)
 	case engine.WriteUpdate, engine.WriteIncrement:

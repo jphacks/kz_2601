@@ -95,7 +95,7 @@ func checkNotifyWith(where string, rc *ruleCheck, n *RuleNotify) {
 }
 
 // ReadEntities returns the entities whose records the rule lists (on.each,
-// every agg and the lookup), sorted and unique.
+// every agg, the lookup, similar and pick), sorted and unique.
 func (r *ServerRule) ReadEntities() []string {
 	seen := map[string]bool{}
 	if r.On.Each != "" {
@@ -106,6 +106,12 @@ func (r *ServerRule) ReadEntities() []string {
 	}
 	if r.Similar != nil && r.Similar.Entity != "" {
 		seen[r.Similar.Entity] = true
+	}
+	if r.Pick != nil && r.Pick.Entity != "" {
+		seen[r.Pick.Entity] = true
+		if r.Pick.Exclude != nil && r.Pick.Exclude.Entity != "" {
+			seen[r.Pick.Exclude.Entity] = true
+		}
 	}
 	r.walkExprs(func(e *Expr) {
 		if e.Kind == ExprAgg && e.Agg != nil && e.Agg.Entity != "" {
@@ -132,6 +138,13 @@ func (r *ServerRule) AggEntities() []string {
 func (r *ServerRule) walkExprs(fn func(*Expr)) {
 	walk := func(e *Expr) { visitExpr(e, fn) }
 	walk(r.If)
+	if r.Pick != nil {
+		for _, f := range r.Pick.Filter { // values read the row, like agg filters
+			if v, err := exprFromValue(f.Value); err == nil && v != nil && v.Kind != ExprLiteral {
+				walk(v)
+			}
+		}
+	}
 	for _, act := range r.Do {
 		switch {
 		case act.Notify != nil:

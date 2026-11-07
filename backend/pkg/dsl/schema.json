@@ -4710,6 +4710,58 @@
             }
           }
         },
+        "pick": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entity",
+            "order"
+          ],
+          "description": "おすすめする記録を 1 つ選ぶ(if・lookup の後。選べた時だけ動く)。entity のレコードから、filter(agg と同じ絞り込み・3 つまで・hidden / computed の field は不可)に合い、exclude の entity のレコードが ref / refs の field で指していないものを、order の順で 1 つ。random は実行ごとに決まる(同じ実行のやり直しでは同じ記録)、oldest / newest は作った時刻の順。do では {\"ref\":\"$pick\"}(その記録の ID・ref)・{\"ref\":\"$pick.<field>\"}・通知の {$pick.<field>}・to {kind: authorOf, field: $pick}(その記録を書いた人)が使える。if では使えない。行のレコード自身は選ばない。each の無い時刻のきっかけでも使える(宛先は owner / members、createRecord)。entity と exclude の entity は同じアプリ・ルールと同じ側だけ(宛先付きは不可)で、each・agg・lookup と合わせて 2 つまで。similar と同じルールには書けない。",
+          "x-usage": "毎朝のおすすめ(まだ食べていないメニュー): on {every:daily, time:\"08:00\"}・pick {entity:menus, order:random, exclude:{entity:eats, field:menu}}・createRecord picks {menu: {ref:$pick}, name: {ref:$pick.name}}・notify to {kind:members} body「今日は {$pick.name} はどうですか」。",
+          "properties": {
+            "entity": {
+              "type": "string",
+              "description": "選ぶ entity の id。"
+            },
+            "order": {
+              "type": "string",
+              "enum": [
+                "random",
+                "oldest",
+                "newest"
+              ],
+              "description": "random(実行ごとに決まるランダム)/ oldest(一番古く作られた記録)/ newest(一番新しい記録)。"
+            },
+            "filter": {
+              "type": "array",
+              "maxItems": 3,
+              "items": {
+                "$ref": "#/$defs/Filter"
+              },
+              "description": "選ぶ記録の絞り込み(agg の filter と同じ。全部そろったもの)。"
+            },
+            "exclude": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "entity",
+                "field"
+              ],
+              "description": "除く記録: entity のレコードが field(選ぶ entity への ref / refs)で指している記録(食べた・見せた・読んだ)。",
+              "properties": {
+                "entity": {
+                  "type": "string",
+                  "description": "除く記録を指す entity の id(食べた記録・見せた記録など)。"
+                },
+                "field": {
+                  "type": "string",
+                  "description": "その entity の ref / refs の field(選ぶ entity を指す)。"
+                }
+              }
+            }
+          }
+        },
         "do": {
           "type": "array",
           "minItems": 1,
