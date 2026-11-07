@@ -23,6 +23,7 @@ import (
 //   - ruleAgg (bool): some rule reads records with agg.
 //   - ruleWith (bool): some notify has with.
 //   - ruleLookup (string): some rule has a lookup with op exists|notExists.
+//   - ruleSimilar (bool): some rule searches the most similar record (similar).
 //
 // Cases: internal/ai/eval/server_rules_cases.json (-cases).
 func checkServerRules(exp map[string]any, a *dsl.App) []string {
@@ -37,6 +38,7 @@ func checkServerRules(exp map[string]any, a *dsl.App) []string {
 		triggers = append(triggers, r.On.Record+r.On.Every)
 		has["ruleEach"] = has["ruleEach"] || r.On.Each != ""
 		has["ruleAgg"] = has["ruleAgg"] || len(r.AggEntities()) > 0
+		has["ruleSimilar"] = has["ruleSimilar"] || r.Similar != nil
 		if r.Lookup != nil {
 			lookups = append(lookups, r.Lookup.Op)
 		}
@@ -60,7 +62,7 @@ func checkServerRules(exp map[string]any, a *dsl.App) []string {
 			miss = append(miss, fmt.Sprintf("%s=%v", key, got))
 		}
 	}
-	for _, key := range []string{"ruleEach", "ruleAgg", "ruleWith"} {
+	for _, key := range []string{"ruleEach", "ruleAgg", "ruleWith", "ruleSimilar"} {
 		if want, ok := exp[key].(bool); ok && want != has[key] {
 			miss = append(miss, fmt.Sprintf("%s=%v", key, has[key]))
 		}
