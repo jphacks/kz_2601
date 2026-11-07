@@ -22,6 +22,7 @@ import (
 //   - ruleEach (bool): some rule has on.each (#340 reads).
 //   - ruleAgg (bool): some rule reads records with agg.
 //   - ruleWith (bool): some notify has with.
+//   - ruleLookup (string): some rule has a lookup with op exists|notExists.
 //
 // Cases: internal/ai/eval/server_rules_cases.json (-cases).
 func checkServerRules(exp map[string]any, a *dsl.App) []string {
@@ -29,13 +30,16 @@ func checkServerRules(exp map[string]any, a *dsl.App) []string {
 	if want, ok := exp["serverRules"].(bool); ok && (len(a.ServerRules) > 0) != want {
 		miss = append(miss, fmt.Sprintf("serverRules=%d", len(a.ServerRules)))
 	}
-	var triggers, actions, tos []string
+	var triggers, actions, tos, lookups []string
 	has := map[string]bool{}
 	for i := range a.ServerRules {
 		r := &a.ServerRules[i]
 		triggers = append(triggers, r.On.Record+r.On.Every)
 		has["ruleEach"] = has["ruleEach"] || r.On.Each != ""
 		has["ruleAgg"] = has["ruleAgg"] || len(r.AggEntities()) > 0
+		if r.Lookup != nil {
+			lookups = append(lookups, r.Lookup.Op)
+		}
 		for _, act := range r.Do {
 			switch {
 			case act.Notify != nil:
@@ -51,7 +55,7 @@ func checkServerRules(exp map[string]any, a *dsl.App) []string {
 			}
 		}
 	}
-	for key, got := range map[string][]string{"ruleTrigger": triggers, "ruleAction": actions, "ruleTo": tos} {
+	for key, got := range map[string][]string{"ruleTrigger": triggers, "ruleAction": actions, "ruleTo": tos, "ruleLookup": lookups} {
 		if want, ok := exp[key].(string); ok && !slices.Contains(got, want) {
 			miss = append(miss, fmt.Sprintf("%s=%v", key, got))
 		}

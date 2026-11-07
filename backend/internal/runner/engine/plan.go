@@ -147,10 +147,10 @@ func (p Plan) Empty() bool { return len(p.Writes) == 0 && len(p.Notifies) == 0 }
 // Plan): the trigger must match the rule, `if` must be
 // true, then each action's values / by / text are computed. An action whose
 // target ref is empty (or whose by is not a number) is skipped. A rule with
-// agg needs refs to implement Lister. A rule with on.each runs on one
+// agg or lookup needs refs to implement Lister. A rule with on.each runs on one
 // record here (ev.Record); PlanEach runs it on every record.
 func PlanRule(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger, refs RefReader) (Plan, error) {
-	return planOne(ctx, app, rule, ev, refs, map[string][]expreval.Record{})
+	return planOne(ctx, app, rule, ev, refs, newRunCache())
 }
 
 // RowPlan is the plan of an on.each rule for one record.
@@ -175,12 +175,12 @@ func PlanEach(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigge
 	if !ok {
 		return nil, errNoLister
 	}
-	lists := map[string][]expreval.Record{}
+	cache := newRunCache()
 	recs, err := l.List(ctx, rule.On.Each)
 	if err != nil {
 		return nil, err
 	}
-	lists[rule.On.Each] = recs
+	cache.lists[rule.On.Each] = recs
 	var out []RowPlan
 	for _, rec := range recs {
 		if rec.ID == "" {
@@ -188,7 +188,7 @@ func PlanEach(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigge
 		}
 		rt := ev
 		rt.Entity, rt.Record = rule.On.Each, rec
-		p, err := planOne(ctx, app, rule, rt, refs, lists)
+		p, err := planOne(ctx, app, rule, rt, refs, cache)
 		if err != nil {
 			return nil, err
 		}
@@ -199,9 +199,9 @@ func PlanEach(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigge
 	return out, nil
 }
 
-// planOne is PlanRule with the lists already read in this run (shared by
-// the rows of PlanEach).
-func planOne(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger, refs RefReader, lists map[string][]expreval.Record) (Plan, error) {
+// planOne is PlanRule with what this run already read (shared by the rows
+// of PlanEach).
+func planOne(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger, refs RefReader, cache *runCache) (Plan, error) {
 	if app == nil || rule == nil {
 		return Plan{}, errors.New("engine: app and rule are required")
 	}
@@ -213,7 +213,7 @@ func planOne(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger
 	if loc == nil {
 		loc = time.UTC
 	}
-	src := &refSource{ctx: ctx, row: row, refs: refs, cache: map[string][]expreval.Record{}, lists: lists, listed: map[string]bool{}}
+	src := &refSource{ctx: ctx, row: row, refs: refs, cache: map[string][]expreval.Record{}, lists: cache.lists, listed: map[string]bool{}}
 	for _, id := range rule.AggEntities() {
 		src.listed[id] = true
 	}
@@ -225,6 +225,15 @@ func planOne(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger
 			return Plan{}, src.err
 		}
 		if v.Kind != expreval.Bool || !v.Bool {
+			return Plan{}, nil
+		}
+	}
+	if rule.Lookup != nil {
+		ok := lookupHolds(app, rule.Lookup, row, src, cache)
+		if src.err != nil {
+			return Plan{}, src.err
+		}
+		if !ok {
 			return Plan{}, nil
 		}
 	}
