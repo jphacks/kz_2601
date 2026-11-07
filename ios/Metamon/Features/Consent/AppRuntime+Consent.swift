@@ -44,9 +44,11 @@ extension AppRuntime {
     /// 起動時: モデルが端末にあれば温める(承認済みならダウンロードも始める)。
     /// 無くて未承認なら**起動では聞かない**(M14・H1: 起動のたびのアラートをやめる)。初期画面のマイクの下の案内
     /// (「音声モデルをダウンロード」)と、マイクを押した時(`askModelDownloadBeforeRecording`)に確認する。
-    func prepareTranscriberIfAllowed(defaults: UserDefaults = .standard) {
+    /// `isExpensiveNetwork` はテストで端末の実回線に左右されないよう渡せる。
+    func prepareTranscriberIfAllowed(defaults: UserDefaults = .standard,
+                                     isExpensiveNetwork: Bool = ExpensiveNetworkProbe.shared.isExpensive) {
         switch ModelDownloadConsent.decide(needsDownload: services.transcriber.needsDownload,
-                                           isExpensiveNetwork: ExpensiveNetworkProbe.shared.isExpensive, // #275
+                                           isExpensiveNetwork: isExpensiveNetwork, // #275
                                            defaults: defaults) {
         case .prepare:
             Task { try? await services.transcriber.prepare() }
@@ -57,10 +59,12 @@ extension AppRuntime {
 
     /// マイクを押した時: モデルが無く、まだダウンロードを承認していなければ確認を出して true(録音しない・M14)。
     /// 音声シートの中では root のアラートが出せないので聞かない(従来どおり録音を試みる)。
-    func askModelDownloadBeforeRecording(defaults: UserDefaults = .standard) -> Bool {
+    /// 従量回線(`isExpensiveNetwork`)では承認済みでも聞き直す(#275)。
+    func askModelDownloadBeforeRecording(defaults: UserDefaults = .standard,
+                                         isExpensiveNetwork: Bool = ExpensiveNetworkProbe.shared.isExpensive) -> Bool {
         guard !showVoiceSheet, services.transcriber.status == .notDownloaded,
               ModelDownloadConsent.decide(needsDownload: services.transcriber.needsDownload,
-                                          isExpensiveNetwork: ExpensiveNetworkProbe.shared.isExpensive,
+                                          isExpensiveNetwork: isExpensiveNetwork,
                                           defaults: defaults) == .ask else { return false }
         print("[Metamon] mic tapped without the voice model: asking before download")
         showModelDownloadConfirm = true
