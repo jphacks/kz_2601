@@ -445,6 +445,8 @@ const noShareChatRule = "- 共有の範囲: このアプリの版では、記録
 // share-scope blocks, the chat share rule and the scope / poster / edit lines.
 func dropSharingRules(s string) string {
 	s = strings.Replace(s, "\n\n"+marksRules+"\n"+marksCatalog, "", 1)
+	s = strings.Replace(s, "\n\n"+followRules, "", 1) // #270
+	s = strings.Replace(s, "\n\n"+followChatRule, "", 1)
 	s = strings.Replace(s, shareRules, "", 1)
 	s = strings.Replace(s, shareChatRule, noShareChatRule, 1)
 	lines := strings.Split(s, "\n")

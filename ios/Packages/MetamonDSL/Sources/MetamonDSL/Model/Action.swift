@@ -3,6 +3,8 @@ import Foundation
 public enum ActionType: String, Decodable, Sendable, CaseIterable {
     case navigate, back, saveRecord, deleteRecord, openVoice, openUrl, resetForm
     case scheduleNotification, cancelNotification
+    /// 今開いている投稿を書いた人をフォローする / 外す(#270)
+    case follow, unfollow
     /// 記録を CSV / PDF にして共有シートへ(#421)
     case export
     case startActivity, endActivity // #423 ライブアクティビティ

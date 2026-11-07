@@ -16,6 +16,7 @@ extension AuthSession {
             // 失効の仕組みと人の作業(鍵の登録)は docs/legal/apple-token-revocation.md(#246)
             _ = await AppleTokenRevocation.run(auth: service, authorizationCode: apple.code, idToken: apple.idToken, nonce: apple.nonce)
         }
+        await runtime.settlePendingRecordDeletes() // 「元に戻す」を閉じる。削除に失敗しても消した記録は戻らない。成功すれば wipe で列ごと消える
         await runtime.unregisterPushDevice() // `DELETE /v1/me` の後は送れない。送れなくても続ける(#269)
         try await AccountDeletionFlow.run(
             account: account,

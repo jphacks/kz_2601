@@ -48,4 +48,58 @@ final class RecordDeleteUndoFlowTests: XCTestCase {
         let shown = await rt.recordSync.cached(appId: appId, entity: "memo")
         XCTAssertTrue(shown.isEmpty, "送った後は戻らない")
     }
+
+    // MARK: - 取り消せる間にログアウト・アカウント削除
+
+    private func deletePending(_ rt: AppRuntime, _ id: String) async {
+        await rt.recordSync.store.upsert(LocalRecord(appId: appId, entity: "memo", recordId: id, data: [:], createdAt: "1"))
+        await rt.run(Action(type: .deleteRecord, entity: "memo"), ActionContext(route: Route(screen: "home", stack: "main"), recordId: id))
+        XCTAssertNotNil(rt.recordUndo)
+        XCTAssertEqual(rt.recordSync.pendingDeletions.count, 1)
+    }
+
+    func testSettleBeforeSignOutDismissesUndoAndCountsDeleteAsUnsent() async throws {
+        let rt = try runtime()
+        rt.recordSync.stop() // 送らずに列の件数を見る
+        await deletePending(rt, "s1")
+        await rt.settlePendingRecordDeletes()
+        XCTAssertNil(rt.recordUndo, "「元に戻す」を閉じる")
+        XCTAssertTrue(rt.recordSync.pendingDeletions.isEmpty, "待ちを残さない")
+        let queued = await rt.recordSync.queue.count
+        XCTAssertEqual(queued, 1, "列に積む(オンラインならいまのアカウントで送る)")
+        XCTAssertEqual(SignOutFlow.prompt(pending: rt.recordSync.pendingCount, isOnline: false), .unsent(count: 1, canSend: false),
+                       "ログアウトの確認に未送信として出る(黙って捨てない)")
+    }
+
+    func testDiscardSignOutWithPendingDeleteLeavesNothingForNextAccount() async throws {
+        let rt = try runtime()
+        rt.recordSync.stop()
+        await deletePending(rt, "s2")
+        let session = AuthSession(service: rt.services.auth)
+        let outcome = try await session.signOutAndWipe(runtime: rt, choice: .discardAndWipe)
+        XCTAssertEqual(outcome, .signedOut)
+        XCTAssertNil(rt.recordUndo, "ログアウト後に「元に戻す」を出さない")
+        XCTAssertTrue(rt.recordSync.pendingDeletions.isEmpty)
+        let queued = await rt.recordSync.queue.count
+        XCTAssertEqual(queued, 0, "前の人の削除を次の人の列に残さない")
+        let rows = await rt.recordSync.store.rows(appId: appId, entity: "memo")
+        XCTAssertTrue(rows.isEmpty)
+    }
+
+    func testAccountDeletionWithPendingDeleteLeavesNothingForNextAccount() async throws {
+        let rt = try runtime()
+        rt.recordSync.stop()
+        await deletePending(rt, "s3")
+        let session = AuthSession(service: rt.services.auth)
+        let deleted = try await session.deleteAccount(account: NoopAccount(), runtime: rt)
+        XCTAssertTrue(deleted)
+        XCTAssertNil(rt.recordUndo)
+        XCTAssertTrue(rt.recordSync.pendingDeletions.isEmpty)
+        let queued = await rt.recordSync.queue.count
+        XCTAssertEqual(queued, 0)
+    }
+
+    private final class NoopAccount: AccountClient, @unchecked Sendable {
+        func deleteAccount() async throws {}
+    }
 }

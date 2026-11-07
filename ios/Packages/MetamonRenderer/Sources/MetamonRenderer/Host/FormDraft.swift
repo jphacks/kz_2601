@@ -16,6 +16,9 @@ public final class FormDraft {
     public internal(set) var flaggedFields: Set<String> = []
     /// 保存で弾かれた回数。同じ欄でも押すたびにスクロールし直す。
     public internal(set) var flagCount = 0
+    /// ホストが書き込んだ回数と、最後の結果(`markSaved`)。保存バーが「保存しました」を出すかの判定に使う(M10)。
+    public internal(set) var saveCount = 0
+    public internal(set) var lastSaveResult: FormSaveResult?
     /// VoiceOver のフォーカスを移す field(M10)。
     var attentionField: String?
     /// 他人の共有レコードを開いた(#249)。保存バーを理由の表示に替え、保存ボタンを隠す。
@@ -41,6 +44,9 @@ public final class FormDraft {
     public var hasUnsavedChanges: Bool {
         !isReadOnly && normalized(values) != baseline
     }
+
+    /// 書き込みが要るか。既存レコードを何も変えずに保存したら送らない(「保存しました」も出さない・M10)。
+    public var needsWrite: Bool { !isEditing || hasUnsavedChanges }
 
     public var isEditing: Bool { recordId != nil }
 

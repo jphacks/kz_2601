@@ -40,9 +40,41 @@ final class FormRequiredSaveTests: XCTestCase {
 
         await rt.run(Action(type: .saveRecord, entity: "memo"), ActionContext(route: Route(screen: "form", stack: "sheet"), form: draft))
 
-        XCTAssertEqual(draft.flagCount, 1, "保存できた時は数えない(保存バーが「保存しました」を出す)")
+        XCTAssertEqual(draft.flagCount, 1, "保存できた時は数えない")
+        XCTAssertEqual(draft.saveCount, 1, "保存バーが「保存しました」を出す")
         XCTAssertTrue(draft.flaggedFields.isEmpty)
         let saved = await rt.recordSync.cached(appId: appId, entity: "memo")
         XCTAssertEqual(saved.count, 1)
+    }
+
+    // MARK: - 書き込まなかった保存では「保存しました」を出さない
+
+    private func save(_ rt: AppRuntime, _ draft: FormDraft) async -> FormSaveResult? {
+        let before = draft.saveCount
+        await rt.run(Action(type: .saveRecord, entity: "memo"), ActionContext(route: Route(screen: "form", stack: "sheet"), form: draft))
+        return FormDraft.saveFeedback(savesBefore: before, form: draft)
+    }
+
+    func testRejectedSaveShowsNoSavedFeedback() async throws {
+        let rt = try runtime()
+        let draft = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("memo")))
+        let result = await save(rt, draft)
+        XCTAssertNil(result)
+    }
+
+    func testUnchangedEditIsNotWrittenNorReportedSaved() async throws {
+        let rt = try runtime()
+        let entity = try XCTUnwrap(rt.dsl.entity("memo"))
+        let draft = FormDraft(entity: entity)
+        draft.values["body"] = .string("牛乳")
+        let first = await save(rt, draft)
+        XCTAssertEqual(first, rt.recordSync.isOnline ? .saved : .queuedOffline)
+
+        let saved = await rt.recordSync.cached(appId: appId, entity: "memo")
+        let editing = FormDraft(entity: entity, record: try XCTUnwrap(saved.first))
+        let second = await save(rt, editing)
+        XCTAssertNil(second, "何も変えずに保存したら「保存しました」を出さない")
+        let after = await rt.recordSync.cached(appId: appId, entity: "memo")
+        XCTAssertEqual(after.count, 1)
     }
 }

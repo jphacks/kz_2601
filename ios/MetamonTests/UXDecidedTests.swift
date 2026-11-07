@@ -55,7 +55,7 @@ final class UXDecidedTests: XCTestCase {
         var screens: [String] = []
 
         // 起動: 音声モデルが無くても確認のアラートは自動で出さない(M14)
-        rt.prepareTranscriberIfAllowed(defaults: defaults)
+        rt.prepareTranscriberIfAllowed(defaults: defaults, isExpensiveNetwork: false)
         XCTAssertFalse(rt.showModelDownloadConfirm, "起動で音声モデルの確認を出さない")
         XCTAssertFalse(transcriber.prepared, "承認前にダウンロードを始めない(4.2.3(ii))")
 
@@ -82,16 +82,27 @@ final class UXDecidedTests: XCTestCase {
     /// M14: 音声モデルの確認は、初めてマイクを押した時に出す(録音は始めない)。承認済みなら聞かない
     func testMicAsksModelDownloadOnlyWhenNotApproved() throws {
         let rt = try makeRuntime(transcriber: NotDownloadedTranscriber())
-        XCTAssertTrue(rt.askModelDownloadBeforeRecording(defaults: defaults), "未承認ならマイクで確認を出す")
+        XCTAssertTrue(rt.askModelDownloadBeforeRecording(defaults: defaults, isExpensiveNetwork: false), "未承認ならマイクで確認を出す")
         XCTAssertTrue(rt.showModelDownloadConfirm)
 
         rt.showModelDownloadConfirm = false
         ModelDownloadConsent.approve(defaults)
-        XCTAssertFalse(rt.askModelDownloadBeforeRecording(defaults: defaults), "承認済み(ダウンロード中)は聞かない")
+        XCTAssertFalse(rt.askModelDownloadBeforeRecording(defaults: defaults, isExpensiveNetwork: false), "承認済み(ダウンロード中)は聞かない")
         XCTAssertFalse(rt.showModelDownloadConfirm)
 
         let ready = try makeRuntime()
-        XCTAssertFalse(ready.askModelDownloadBeforeRecording(defaults: defaults), "モデルがあれば聞かない")
+        XCTAssertFalse(ready.askModelDownloadBeforeRecording(defaults: defaults, isExpensiveNetwork: false), "モデルがあれば聞かない")
+    }
+
+    /// #275: 従量回線(テザリング・省データモード)では承認済みでも聞き直す。モデルがあれば回線に関係なく聞かない
+    func testMicAsksModelDownloadOnExpensiveNetworkEvenIfApproved() throws {
+        let rt = try makeRuntime(transcriber: NotDownloadedTranscriber())
+        ModelDownloadConsent.approve(defaults)
+        XCTAssertTrue(rt.askModelDownloadBeforeRecording(defaults: defaults, isExpensiveNetwork: true), "従量回線なら承認済みでも確認を出す")
+        XCTAssertTrue(rt.showModelDownloadConfirm)
+
+        let ready = try makeRuntime()
+        XCTAssertFalse(ready.askModelDownloadBeforeRecording(defaults: defaults, isExpensiveNetwork: true), "モデルがあれば聞かない")
     }
 
     // MARK: - M2 同意の前に話した内容を捨てない

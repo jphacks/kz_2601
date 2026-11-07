@@ -1,0 +1,49 @@
+# Terms that other people's text may not contain (#321, App Review 1.2).
+# Format: <category> <term>. Categories: slur / sexual / threat, and allow
+# (a phrase that contains a term but is fine; removed before matching).
+# Terms are normalized like the input (Normalize), so hiragana / katakana /
+# full-width forms of one term need only one line.
+# ASCII terms match whole words; a trailing * matches words that start with it.
+# Others match anywhere in the text. Keep the list short and obvious.
+
+slur nigger
+slur nigga
+slur faggot
+slur kike
+slur tranny
+slur きちがい
+slur 気違い
+slur がいじ
+
+sexual porn*
+sexual fuck*
+sexual motherfuck*
+sexual blowjob
+sexual handjob
+sexual rape
+sexual raped
+sexual rapist
+sexual せっくす
+sexual れいぷ
+sexual ちんこ
+sexual まんこ
+
+threat kill yourself
+threat kys
+threat 殺してやる
+threat ころしてやる
+threat 殺すぞ
+threat ころすぞ
+threat ぶっ殺す
+threat 死ね
+
+allow がいじん
+allow ぐれいぷ
+allow ぱちんこ
+allow うーまんこ
+allow ひゅーまんこ
+allow ろまんこ
+allow まんこみ
+allow ゆにせっくす
+allow 死ねない
+allow 死ねる

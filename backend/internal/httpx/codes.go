@@ -58,6 +58,9 @@ const CodeRateLimited = "rate_limited"
 
 const CodeRefused = "refused"
 
+// text other people see contains a word on the moderation list (#321)
+const CodeTextNotAllowed = "text_not_allowed"
+
 const CodeTimeout = "timeout"
 
 const CodeTransactionOwnedByOther = "transaction_owned_by_other"

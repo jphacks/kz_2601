@@ -253,7 +253,7 @@ func (h *Handler) importShare(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	name, ok := importName(w, r)
+	name, ok := h.importName(w, r)
 	if !ok {
 		return
 	}
@@ -473,6 +473,10 @@ func (h *Handler) publishApp(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, err.Error()))
+		return
+	}
+	if err := h.checkListingText(r, name, desc, author, tags); err != nil { // #321
+		fail(w, err)
 		return
 	}
 	c, err := h.store.PutCatalogApp(r.Context(), uidOf(r), store.CatalogApp{

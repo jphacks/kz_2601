@@ -7,6 +7,7 @@ extension AuthSession {
     @discardableResult
     func signOutAndWipe(runtime: AppRuntime, choice: SignOutFlow.Choice) async throws -> SignOutFlow.Outcome {
         let wasSignedIn = user != nil
+        await runtime.settlePendingRecordDeletes() // 取り消し待ちの削除はいまのアカウントで送る(送らないなら下の wipe で消える)
         let outcome = try await SignOutFlow.run(
             choice: choice,
             auth: service,

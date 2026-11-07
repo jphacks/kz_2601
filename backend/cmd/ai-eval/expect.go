@@ -130,6 +130,7 @@ var expectKeys = map[string]expectKind{
 	"ruleEach":    expectBool,
 	"ruleAgg":     expectBool,
 	"ruleWith":    expectBool,
+	"ruleLookup":  expectString,
 	// checkFlashcards (#264): flashcards.go
 	"flashcardsUnlearned": expectBool,
 	// checkFeed (#348): feed.go

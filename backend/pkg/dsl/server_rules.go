@@ -22,10 +22,13 @@ import (
 
 // ServerRule is one automatic server action.
 type ServerRule struct {
-	ID string       `json:"id"`
-	On RuleTrigger  `json:"on"`
-	If *Expr        `json:"if,omitempty"`
-	Do []RuleAction `json:"do"`
+	ID string      `json:"id"`
+	On RuleTrigger `json:"on"`
+	If *Expr       `json:"if,omitempty"`
+	// Lookup: run only when another entity has (not) a record with the
+	// row's value (server_rules_lookup.go).
+	Lookup *RuleLookup  `json:"lookup,omitempty"`
+	Do     []RuleAction `json:"do"`
 	// Enabled: false turns the rule off (the creator's switch, #347); nil = on.
 	Enabled *bool `json:"enabled,omitempty"`
 }
@@ -201,6 +204,7 @@ func checkServerRules(a *App, entities map[string]*Entity, add func(string, ...a
 			}
 			checkNoComputed(where+".if", ch, add)
 		}
+		checkRuleLookup(where, rc)
 		if len(r.Do) == 0 {
 			add("%s: do needs at least one action", where)
 		}
@@ -211,7 +215,7 @@ func checkServerRules(a *App, entities map[string]*Entity, add func(string, ...a
 			checkRuleAction(fmt.Sprintf("%s.do[%d]", where, j), rc, &r.Do[j])
 		}
 		if n := len(rc.reads); n > MaxRuleReadEntities {
-			add("%s: reads the records of %d entities (each + agg: %s); at most %d", where, n, strings.Join(sortedKeys(rc.reads), ", "), MaxRuleReadEntities)
+			add("%s: reads the records of %d entities (each + agg + lookup: %s); at most %d", where, n, strings.Join(sortedKeys(rc.reads), ", "), MaxRuleReadEntities)
 		}
 	}
 	if scheduled > MaxScheduledRulesPro {
@@ -227,7 +231,7 @@ type ruleCheck struct {
 	scope    EntityScope
 	entities map[string]*Entity
 	add      func(string, ...any)
-	reads    map[string]bool // entities whose records the rule lists (each + agg)
+	reads    map[string]bool // entities whose records the rule lists (each + agg + lookup)
 }
 
 // expr is a checker for one expression of the rule.
@@ -762,6 +766,7 @@ func (a *App) DescribeServerRule(r *ServerRule) string {
 	if r.If != nil {
 		when += "(条件に合えば)"
 	}
+	when += a.describeLookup(r, row)
 	acts := make([]string, 0, len(r.Do))
 	for _, act := range r.Do {
 		switch {
