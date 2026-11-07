@@ -38,7 +38,6 @@ func TestTextHighlightSemanticErrors(t *testing.T) {
 		many[i] = "w"
 	}
 	app.Screens[0].Components = []Component{
-		{Type: CompText, Text: "{{body}}"},                                           // needs screen.entity
 		{Type: CompText, Text: "x", Highlight: &TextHighlight{Field: "keywords"}},    // needs screen.entity
 		{Type: CompText, Text: "x", Highlight: &TextHighlight{}},                     // no source
 		{Type: CompText, Text: "x", Highlight: &TextHighlight{Words: many}},          // too many
@@ -61,12 +60,11 @@ func TestTextHighlightSemanticErrors(t *testing.T) {
 	}
 	joined := strings.Join(ve.Problems, "\n")
 	for _, want := range []string{
-		`screen "home" components[0]: text {{body}} requires screen.entity`,
-		`screen "home" components[1]: text.highlight.field requires screen.entity`,
-		`screen "home" components[2]: text.highlight takes exactly one of words`,
-		`screen "home" components[3]: text.highlight.words has 21 words`,
-		`screen "home" components[4]: text.highlight.words[0] must be`,
-		`screen "home" components[5]: text.highlight.style "neon"`,
+		`screen "home" components[0]: text.highlight.field requires screen.entity`,
+		`screen "home" components[1]: text.highlight takes exactly one of words`,
+		`screen "home" components[2]: text.highlight.words has 21 words`,
+		`screen "home" components[3]: text.highlight.words[0] must be`,
+		`screen "home" components[4]: text.highlight.style "neon"`,
 		`text {{zzz}} is not a field of entity "memo"`,
 		`text {{photo}} is type photo`,
 		`text {{secret}} is hidden`,
@@ -78,6 +76,20 @@ func TestTextHighlightSemanticErrors(t *testing.T) {
 		if !strings.Contains(joined, want) {
 			t.Errorf("missing problem %q in:\n%s", want, joined)
 		}
+	}
+}
+
+// A saved app with {{x}} in a text on a screen without screen.entity still
+// validates: there the text is shown as written, as before text.highlight.
+func TestTextPlaceholderWithoutEntityStaysValid(t *testing.T) {
+	raw := []byte(`{"schemaVersion":1,"app":{"name":"x","voiceEntry":"floating"},"initialScreen":"home",
+"entities":[{"id":"memo","name":"m","fields":[{"id":"body","name":"b","type":"text"}]}],
+"screens":[{"id":"home","title":"h","components":[
+ {"type":"text","text":"{{name}} さん、こんにちは"},
+ {"type":"text","text":"テンプレ: {{body}} / {{ }}"},
+ {"type":"list","entity":"memo","item":{"title":"body"}}]}]}`)
+	if _, err := Parse(raw); err != nil {
+		t.Fatalf("existing app with literal {{x}} rejected: %v", err)
 	}
 }
 

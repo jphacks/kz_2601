@@ -19,3 +19,16 @@ func TestShareViewTextPlaceholder(t *testing.T) {
 		t.Errorf("placeholder not replaced:\n%s", s)
 	}
 }
+
+// Without screen.entity the text is shown as written (as before).
+func TestShareViewTextLiteralWithoutEntity(t *testing.T) {
+	raw := []byte(`{"schemaVersion":1,"app":{"name":"x","voiceEntry":"floating"},"initialScreen":"home",
+"entities":[],"screens":[{"id":"home","title":"h","components":[{"type":"text","text":"{{name}} さん"}]}]}`)
+	got, err := renderSharePage(buildWebPage("", raw, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := string(got); !strings.Contains(s, "{{name}} さん") {
+		t.Errorf("literal text changed:\n%s", s)
+	}
+}

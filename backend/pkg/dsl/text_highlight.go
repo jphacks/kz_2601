@@ -27,10 +27,10 @@ func checkText(where string, c *Component, formEntity *Entity, add func(string, 
 	if c.Text == "" {
 		add("%s: text is empty", where)
 	}
+	// Without screen.entity, {{x}} stays literal as before (saved apps keep validating).
 	for _, m := range qrPlaceholderRe.FindAllStringSubmatch(c.Text, -1) {
 		switch f := fieldOrNil(formEntity, m[1]); {
 		case formEntity == nil:
-			add("%s: text {{%s}} requires screen.entity (a form / detail screen)", where, m[1])
 		case f == nil:
 			add("%s: text {{%s}} is not a field of entity %q (fields: %s)", where, m[1], formEntity.ID, fieldIDs(formEntity))
 		case qrUnencodable[f.Type]:
