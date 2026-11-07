@@ -290,6 +290,11 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	// after the permission checks: a refused write is a 403, not a 422 (#321)
+	if err := h.checkRecordText(r, ent, body.Data, body.AuthorName); err != nil {
+		fail(w, err)
+		return
+	}
 	if err := checkRecordSize(data); err != nil {
 		fail(w, err)
 		return
@@ -428,6 +433,11 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.checkAddressed(r, cur, ent, existing, delta); err != nil { // #271
+		fail(w, err)
+		return
+	}
+	// after the author / admin checks: a non-author's PATCH is a 403, not a 422 (#321)
+	if err := h.checkRecordText(r, ent, body.Data, ""); err != nil {
 		fail(w, err)
 		return
 	}
