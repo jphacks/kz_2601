@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"sync"
 	"testing"
 	"time"
@@ -67,6 +68,32 @@ func TestStoreFirstSeen(t *testing.T) {
 		}
 		if _, known, err := s.UserFirstSeen(ctx, uid); known || err != nil {
 			t.Fatalf("purged account keeps firstSeenAt: known=%v err=%v", known, err)
+		}
+
+		// accounts from before firstSeenAt: the oldest app / device is used, not now
+		withApp, withDevice := "fs-app"+sfx, "fs-dev"+sfx
+		dev, err := s.PutDevice(ctx, withDevice, Device{InstallationID: "inst-1", Token: "tok-fs" + sfx, Environment: DeviceSandbox})
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(2 * time.Millisecond)
+		for _, u := range []string{withApp, withDevice} {
+			if _, _, err := s.EnsureApp(ctx, u, "FS-APP"+sfx, json.RawMessage(`{}`), "x"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		app, err := s.GetApp(ctx, withApp, "FS-APP"+sfx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(2 * time.Millisecond)
+		for u, want := range map[string]time.Time{withApp: app.CreatedAt, withDevice: dev.CreatedAt} {
+			if _, err := s.SeeUser(ctx, u); err != nil {
+				t.Fatal(err)
+			}
+			if at, known, _ := s.UserFirstSeen(ctx, u); !known || !at.Equal(want) {
+				t.Errorf("%s: firstSeenAt %v, want the oldest app/device %v", u, at, want)
+			}
 		}
 
 		// an account deleted before it was ever seen gets no firstSeenAt

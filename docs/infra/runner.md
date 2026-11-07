@@ -169,11 +169,12 @@ runner は APNs の鍵が無い間、通知をログに出すだけです(`runne
 | もの | 中身 |
 |---|---|
 | 書く所 | appconfig の `RejectDeleted`(認証の直後・退会済みの確認)。もともと uid ごとに 30 秒に 1 回 `users/{uid}` を読んでいて、そこに `firstSeenAt` が無い時だけトランザクションで 1 回書く(既にあれば書かない・退会済み / 墓標には書かない)。書き込みは uid ごとに 1 回きり |
+| 書く値 | その時刻と、本人のいちばん古いアプリ(`users/{uid}/apps` の `createdAt`)・端末(`users/{uid}/devices` の `createdAt`)の早い方。どれもサーバーが入れた時刻。読むのは 1 件ずつのクエリ 2 本で、書く時(uid ごとに 1 回)だけ |
 | 読む所 | runner の `RUNNER_ACCOUNT_AGE=firestore`(deploy-cloudrun.yml の既定)。無ければ新しいアカウントとして扱う(`new_account`)。分かった時刻はプロセス内に覚える |
 | 消える時 | 退会(論理削除)では残る。30 日後の消去(`MarkAccountPurged`)で `users/{uid}` を墓標に上書きする時に消える([account-purge.md](account-purge.md)) |
 | ID トークンを使わない理由 | `auth_time` はサインインのたびに変わる。トークンに作成時刻は入っていない |
 
-**firebase から切り替えた直後:** 切り替え前からいるアカウントにも `firstSeenAt` はまだ無いので、デプロイ後に初めて appconfig に来た時から 24 時間は他人宛ての通知が `new_account` で止まります。
+**firebase から切り替えた直後:** 切り替え前からいるアカウントは、アプリか端末があればその作成時刻が `firstSeenAt` になるので、24 時間止まることはありません。どちらも無いアカウント(作ったまま何もしていない)だけ、デプロイ後に初めて appconfig に来た時から 24 時間は他人宛ての通知が `new_account` で止まります(他人に通知を出すには共有のアプリに参加しているはずなので、実際にはほぼ起きない)。
 
 **Firebase Auth で読む方式(`RUNNER_ACCOUNT_AGE=firebase`)** はコードに残していますが使いません。使うには runner の SA に `roles/firebaseauth.viewer`(メールアドレスなども読めて広い)が要るので、tfvars の `runner_firebaseauth_viewer = true` で apply してから、deploy-cloudrun.yml の値を `firebase` にします。
 

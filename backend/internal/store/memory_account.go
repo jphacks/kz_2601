@@ -56,7 +56,14 @@ func (m *Memory) SeeUser(_ context.Context, uid string) (bool, error) {
 		if m.firstSeen == nil {
 			m.firstSeen = map[string]time.Time{}
 		}
-		m.firstSeen[uid] = m.now().UTC()
+		at := m.now().UTC() // the oldest app / device, like the Firestore one
+		for _, a := range m.users[uid] {
+			at = earlier(at, a.app.CreatedAt)
+		}
+		for _, d := range m.devices[uid] {
+			at = earlier(at, d.CreatedAt)
+		}
+		m.firstSeen[uid] = at
 	}
 	return false, nil
 }

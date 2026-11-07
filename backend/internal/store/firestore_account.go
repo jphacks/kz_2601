@@ -103,6 +103,10 @@ func (f *Firestore) SeeUser(ctx context.Context, uid string) (bool, error) {
 			return false, nil
 		}
 	}
+	at, err := f.earliestOwned(ctx, uid)
+	if err != nil {
+		return false, fmt.Errorf("first seen users/%s: %w", uid, err)
+	}
 	deleted := false
 	err = f.c.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
 		deleted = false
@@ -118,12 +122,42 @@ func (f *Firestore) SeeUser(ctx context.Context, uid string) (bool, error) {
 		} else if !isNotFound(err) {
 			return err
 		}
-		return tx.Set(ref, map[string]any{"firstSeenAt": Now()}, firestore.MergeAll)
+		return tx.Set(ref, map[string]any{"firstSeenAt": earlier(at, Now())}, firestore.MergeAll)
 	})
 	if err != nil {
 		return false, fmt.Errorf("first seen users/%s: %w", uid, err)
 	}
 	return deleted, nil
+}
+
+// earliestOwned is the oldest server-set createdAt among uid's apps and
+// devices (zero when none): accounts from before firstSeenAt existed keep
+// their age. Two one-document queries on automatic single-field indexes,
+// run only on the write path (once per uid).
+func (f *Firestore) earliestOwned(ctx context.Context, uid string) (time.Time, error) {
+	var at time.Time
+	for _, c := range []*firestore.CollectionRef{f.userRef(uid).Collection("apps"), f.devices(uid)} {
+		err := each(ctx, c.OrderBy("createdAt", firestore.Asc).Limit(1), func(s *firestore.DocumentSnapshot) error {
+			if v, _ := s.DataAt("createdAt"); v != nil {
+				if t, ok := v.(time.Time); ok {
+					at = earlier(at, t)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return time.Time{}, err
+		}
+	}
+	return at, nil
+}
+
+// earlier is the earlier of a and b, ignoring a zero time.
+func earlier(a, b time.Time) time.Time {
+	if a.IsZero() || (!b.IsZero() && b.Before(a)) {
+		return b
+	}
+	return a
 }
 
 // UserFirstSeen implements Accounts.
