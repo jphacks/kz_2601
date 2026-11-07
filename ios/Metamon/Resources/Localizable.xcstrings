@@ -2806,6 +2806,23 @@
         }
       }
     },
+    "このアプリの通知を受け取る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get notifications from this app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリの通知を受け取る"
+          }
+        }
+      }
+    },
     "このアプリは上のオープンソースソフトウェアを使っています。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7651,6 +7668,57 @@
         }
       }
     },
+    "他の人の書き込みなどで届く通知です。オフにすると、このアプリからは届きません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These arrive when other people post or respond. Turn this off to stop them from this app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "他の人の書き込みなどで届く通知です。オフにすると、このアプリからは届きません。"
+          }
+        }
+      }
+    },
+    "他の人の行動で届く通知" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications from other people's activity"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "他の人の行動で届く通知"
+          }
+        }
+      }
+    },
+    "他の人の行動で届く通知を受け取ります。設定でオフにできます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You'll get notifications from other people's activity. You can turn them off in Settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "他の人の行動で届く通知を受け取ります。設定でオフにできます"
+          }
+        }
+      }
+    },
     "他の端末で変更されていたため、サーバーの内容に合わせました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9670,6 +9738,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "変更しました"
+          }
+        }
+      }
+    },
+    "変更できませんでした。元に戻しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't change this. It's been set back."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更できませんでした。元に戻しました"
           }
         }
       }

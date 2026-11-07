@@ -128,6 +128,7 @@ enum BuildConfig {
         .feedback,
         .feeds,
         .matching,
+        .push,
         .releaseRequests,
         .sharing,
     ]

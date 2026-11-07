@@ -12,7 +12,8 @@ MANIFEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/PrivacyInfo.x
 # 購入履歴(App 内課金の取引をサーバーで確かめて保存・v1/me/entitlements/apple)
 # 製品の操作(aiButton の集計・v1/metrics/ai-button)
 # カスタマーサポート(アプリ内のフィードバック・v1/feedback)
-for type in PurchaseHistory ProductInteraction CustomerSupport; do
+# デバイス ID(プッシュの端末の登録・v1/me/devices)
+for type in PurchaseHistory ProductInteraction CustomerSupport DeviceID; do
   key="NSPrivacyCollectedDataType${type}"
   # 差分ビルドでリソースがコピーし直されない時に二重に足さない
   if plutil -extract NSPrivacyCollectedDataTypes xml1 -o - "$MANIFEST" | grep -q "<string>${key}</string>"; then

@@ -11,7 +11,10 @@ extension AuthSession {
             choice: choice,
             auth: service,
             flush: { await runtime.recordSync.flush() },
-            wipeLocal: { await runtime.wipeLocalData() }
+            wipeLocal: {
+                await runtime.unregisterPushDevice() // 送れなくても続ける(#269)
+                await runtime.wipeLocalData()
+            }
         )
         guard outcome == .signedOut else { return outcome }
         signOut() // セッションの表示を即反映(サインアウト済みでも安全)
