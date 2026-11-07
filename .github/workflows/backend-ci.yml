@@ -40,6 +40,7 @@ jobs:
             backend:
               - 'backend/**'
               - 'docs/dsl/conformance/expr/**'
+              - 'docs/dsl/examples/**'
               - '.github/workflows/backend-ci.yml'
 
   backend-ci:
@@ -77,6 +78,11 @@ jobs:
 
       - name: go build
         run: go build ./...
+
+      # 評価ケース・編集の土台の JSON を全部、形に合った読み方で検証する(API は呼ばない)。
+      # 形の分からないファイルは失敗にして、黙って検証漏れにならないようにする。
+      - name: ai-eval cases (offline)
+        run: go run ./cmd/ai-eval -check-all internal/ai/eval
 
       - name: go test (-race)
         run: go test ./... -race -count=1
