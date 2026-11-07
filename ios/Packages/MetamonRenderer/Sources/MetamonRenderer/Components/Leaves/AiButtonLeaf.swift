@@ -17,7 +17,8 @@ struct AiButtonLeaf: View {
     @State private var usedOnline = false
 
     private var route: AIGenerateRoute {
-        AIGenerateRoute.choose(availability: availability, hostOnline: rt.aiText?.supportsOnlineAIText ?? false, mock: AIGenerateRoute.isMock)
+        AIGenerateRoute.choose(availability: availability, hostOnline: rt.aiText?.supportsOnlineAIText ?? false, mock: AIGenerateRoute.isMock,
+                               long: c.length == "long")
     }
 
     private var isUnavailable: Bool {

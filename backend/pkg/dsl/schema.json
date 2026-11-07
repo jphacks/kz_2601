@@ -3821,6 +3821,14 @@
             "type": "string"
           },
           "description": "generate の shape fields の項目名(1〜10 個・各 20 字まで)。例: [\"主菜\",\"副菜\",\"汁物\"]。"
+        },
+        "length": {
+          "type": "string",
+          "enum": [
+            "short",
+            "long"
+          ],
+          "description": "答えの長さ(既定 short)。long=長い文章(長い文の要約・手紙・計画・台本など。材料 16KB・答え約 3000 字まで)。long はオンライン AI だけで動く(Tailor It Pro)。classify には使わない。generate は shape line だけ、output は text field。"
         }
       },
       "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はフォームの入力を処理して output field に入れる(端末内 AI(Apple Intelligence / Foundation Models)が使えれば無料で端末の中だけ、無い端末では Tailor It Pro のオンライン AI。写真は送らない)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",

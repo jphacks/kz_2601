@@ -454,6 +454,7 @@ type Component struct {
 	Shape   string   `json:"shape,omitempty"`   // generate (#417): line|list|fields
 	Count   int      `json:"count,omitempty"`   // generate list: number of items
 	Items   []string `json:"items,omitempty"`   // generate fields: item names
+	Length  string   `json:"length,omitempty"`  // short (default) | long: cloud-only long text (ai_button.go)
 
 	// healthStat (#167). Label / Target are shared.
 	Metric string `json:"metric,omitempty"` // steps|weight

@@ -4,7 +4,7 @@ import MetamonDSL
 /// aiButton の要約・分類・書き直し・抜き出し・提案のオンライン版。
 /// 端末内 AI が使えない端末だけ、ホストの `POST /v1/text`(task 付き・Pro)に回す。材料と指示は端末内 AI と同じ所から取る。
 extension AIRequestBuilder {
-    /// `POST /v1/text` の依頼。材料は 4 KB に切る。`{{input}}` は目印に置き換え、材料は `input` で別に渡す。
+    /// `POST /v1/text` の依頼。材料は 4 KB(length long は 16 KB)に切る。`{{input}}` は目印に置き換え、材料は `input` で別に渡す。
     static func online(_ c: Component, entity: Entity, values: [String: JSONValue],
                        sourceEntity: Entity? = nil, records: [Record] = [], locale: String) throws -> AITextRequest {
         guard let task = c.task.flatMap(AIRequest.Task.init(rawValue:)) else { throw BuildError.unknownTask }
@@ -14,7 +14,9 @@ extension AIRequestBuilder {
             guard list.count >= 2 else { throw BuildError.noOptions }
             options = Array(list.prefix(20)) // backend の上限(TextMaxOptions)
         }
-        let input = AITextLimits.clip(inputText(c, entity: entity, values: values, sourceEntity: sourceEntity, records: records))
+        let long = c.length == "long" && task != .classify
+        let input = AITextLimits.clip(inputText(c, entity: entity, values: values, sourceEntity: sourceEntity, records: records),
+                                      maxBytes: AITextLimits.maxInputBytes(long: long))
         guard !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw BuildError.emptyInput }
 
         var instruction = ""
@@ -23,7 +25,7 @@ extension AIRequestBuilder {
         }
         instruction = String(instruction.trimmingCharacters(in: .whitespacesAndNewlines).prefix(AITextLimits.maxInstruction))
         return AITextRequest(instruction: instruction, shape: .line, input: input, locale: locale,
-                             task: task.rawValue, options: options)
+                             task: task.rawValue, options: options, length: long ? "long" : nil)
     }
 }
 

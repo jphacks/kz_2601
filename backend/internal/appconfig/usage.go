@@ -102,6 +102,7 @@ type UsageWeights struct {
 	Chat     int `json:"chat"`
 	Text     int `json:"text"`
 	TextTask int `json:"textTask"`
+	TextLong int `json:"textLong"`
 }
 
 // MyUsage is GET /v1/me/usage.

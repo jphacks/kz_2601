@@ -15,7 +15,8 @@ struct AiGenerateLeaf: View {
     @State private var error: String?
 
     private var route: AIGenerateRoute {
-        AIGenerateRoute.choose(availability: availability, hostOnline: rt.aiText?.supportsOnlineAIText ?? false, mock: AIGenerateRoute.isMock)
+        AIGenerateRoute.choose(availability: availability, hostOnline: rt.aiText?.supportsOnlineAIText ?? false, mock: AIGenerateRoute.isMock,
+                               long: c.length == "long")
     }
 
     var body: some View {
@@ -37,7 +38,7 @@ struct AiGenerateLeaf: View {
             .disabled(busy || isUnavailable)
             .accessibilityIdentifier("aiGenerate.\(c.id)")
             if let result {
-                AITextResultView(result: result)
+                AITextResultView(result: result, long: c.length == "long")
                     .transition(.opacity)
             }
             caption
@@ -122,8 +123,10 @@ struct AiGenerateLeaf: View {
 }
 
 /// 結果の表示。line = 1 文 / list = 箇条書き / fields = 項目名と値。セルに収まらない時だけ中でスクロールする。
+/// long(length long)は段落のある長い文: 本文の太さで出し、選択してコピーできる。
 struct AITextResultView: View {
     let result: AITextResult
+    var long = false
 
     var body: some View {
         ViewThatFits(in: .vertical) {
@@ -133,14 +136,15 @@ struct AITextResultView: View {
         .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.08)))
         .textSelection(.enabled)
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("aiGenerate.result")
+        .accessibilityIdentifier(long ? "aiGenerate.result.long" : "aiGenerate.result")
     }
 
     private var content: some View {
         VStack(alignment: .leading, spacing: RenderTheme.Spacing.sm) {
             switch result.shape {
             case .line:
-                Text(result.text).font(.body.weight(.medium))
+                Text(result.text).font(long ? .body : .body.weight(.medium))
+                    .lineSpacing(long ? 4 : 0)
             case .list:
                 ForEach(Array((result.items ?? []).enumerated()), id: \.offset) { _, item in
                     HStack(alignment: .firstTextBaseline, spacing: RenderTheme.Spacing.sm) {

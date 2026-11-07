@@ -22,6 +22,34 @@ const (
 // AIShapes is the closed set of aiButton.shape values (task generate).
 var AIShapes = map[string]bool{"line": true, "list": true, "fields": true}
 
+// AILengths is the closed set of aiButton.length values. long = a longer
+// answer (letters, plans, summaries of long input) that only the cloud AI
+// writes (Pro): /v1/text takes up to 16 KB of input and ~1500 output tokens.
+var AILengths = map[string]bool{"short": true, "long": true}
+
+// checkAILength: long fits one text (generate line or a transform other than
+// classify), and a stored answer needs a text field (string is one line).
+func checkAILength(where string, c *Component, form *Entity, add func(string, ...any)) {
+	if c.Length == "" || c.Length == "short" {
+		return
+	}
+	if !AILengths[c.Length] {
+		add("%s: aiButton length %q must be short|long", where, c.Length)
+		return
+	}
+	switch {
+	case c.Task == "classify":
+		add("%s: aiButton length long is not for task classify", where)
+	case c.Task == "generate" && c.Shape != "" && c.Shape != "line":
+		add("%s: aiButton length long needs shape line (one long text)", where)
+	}
+	if form != nil && c.Output != "" {
+		if out := form.FieldByID(c.Output); out != nil && out.Type == FieldString {
+			add("%s: aiButton length long output %q must be a text field (got string)", where, c.Output)
+		}
+	}
+}
+
 // checkAIButton validates an on-device AI button (#78). It writes into the
 // form draft, so it needs screen.entity and a stored text-like output field;
 // classify additionally needs candidates (options or an enum output).
@@ -30,6 +58,7 @@ func checkAIButton(where string, c *Component, form *Entity, entities map[string
 	if !AITasks[c.Task] {
 		add("%s: aiButton task %q must be one of summarize|classify|rewrite|extract|suggest|generate", where, c.Task)
 	}
+	checkAILength(where, c, form, add)
 	if c.Task == "generate" {
 		checkAIGenerate(where, c, form, entities, add)
 		return
