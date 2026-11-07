@@ -67,6 +67,8 @@ type AccountPurgeResult struct {
 	MatchPairs int
 	// uid's records in match profile / matched entities (#507: erased, not kept as posts)
 	MatchRecords int
+	// apps_public/*/follows/{uid}, and uid taken out of others' follows (#270)
+	Follows int
 }
 
 // LogAttrs returns the counts as slog attrs, one per line, for the
@@ -91,6 +93,7 @@ func (r AccountPurgeResult) LogAttrs() []any {
 		slog.Int("matchRecords", r.MatchRecords),
 		slog.Int("devices", r.Devices),
 		slog.Int("notifyConsents", r.NotifyConsents),
+		slog.Int("follows", r.Follows),
 	}
 }
 

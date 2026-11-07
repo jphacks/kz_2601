@@ -421,6 +421,8 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		}
 		rec.ExpectMisses = append(rec.ExpectMisses, checkGroupBy(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMarks(c.Expect, app)...) // #255: marks.go
+		// #270: follow.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkFollows(c.Expect, app)...)
 		// #423: live_activity.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkLiveActivity(c.Expect, app)...)
 		// addToCalendar: calendar_add.go

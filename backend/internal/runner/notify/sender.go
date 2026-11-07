@@ -29,7 +29,8 @@ type Result struct {
 	Status int
 	// Reason is the provider's reason string ("" on success).
 	Reason string
-	// Unregistered: the token is no longer valid (APNs 410). Delete it; do not retry.
+	// Unregistered: the token is no longer valid (APNs 410 / 400 BadDeviceToken).
+	// Delete it; do not retry.
 	Unregistered bool
 	// Retryable: a later attempt may succeed (5xx, 429, network).
 	Retryable bool

@@ -251,7 +251,7 @@ func TestRunAccountPurgedLogKeys(t *testing.T) {
 			}
 		}
 	}
-	want := "time level msg account deletedDaysAgo apps keptMirrors shares listings releases owners installs memberships marks postsScrubbed reports blocks feedback matchPairs matchRecords devices notifyConsents entitlements authDeleted"
+	want := "time level msg account deletedDaysAgo apps keptMirrors shares listings releases owners installs memberships marks postsScrubbed reports blocks feedback matchPairs matchRecords devices notifyConsents follows entitlements authDeleted"
 	if got := strings.Join(keys, " "); got != want {
 		t.Fatalf("account purged log keys:\n got %s\nwant %s", got, want)
 	}

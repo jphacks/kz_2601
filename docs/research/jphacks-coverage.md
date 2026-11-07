@@ -403,7 +403,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [SP_2301](https://github.com/jphacks/SP_2301) | Mooooosic | 自撮りの表情から気分に合う曲を流す | カメラ,AI | ○ | - | 曲は感情ごとの固定リストになる |  |
 | [SP_23018](https://github.com/jphacks/SP_23018) | - | README が雛形のまま | その他 | ? | - | 判定不能 |  |
 | [SP_2302](https://github.com/jphacks/SP_2302) | 今夜の献立AI | 冷蔵庫の写真から在庫を出し献立を考える | カメラ,AI,HW | △ | IMAGE_AI | 写真から複数食材を認識する部品を足す |  |
-| [SP_2303](https://github.com/jphacks/SP_2303) | Umap | 行った店を地図に記録し友達と交換する | 地図,記録,共有 | ○ | - | スワイプ推薦と育成キャラが欠ける | Innovator |
+| [SP_2303](https://github.com/jphacks/SP_2303) | Umap | 行った店を地図に記録し友達と交換する | 地図,記録,共有 | ○ | - | スワイプ推薦と育成キャラが欠ける。「まだ行っていない店」を知らせる・印をつけるのは serverRules の lookup(notExists)で書ける(推薦の土台) | Innovator |
 | [SP_2304](https://github.com/jphacks/SP_2304) | ラー麺罪符 | 罪悪感を和らげる言い訳をAIが出す | AI,記録 | ○ | - | 顔文字連打の演出が弱くなる |  |
 | [SP_2305](https://github.com/jphacks/SP_2305) | カラクル | 予定とタスクを同時管理し量を動的に割り当てる | 記録,通知 | △ | SERVER_LOGIC | 行動履歴から割り当てる計算を足す |  |
 | [SP_2306](https://github.com/jphacks/SP_2306) | おもメロ♪ | 場所に思い出の曲とコメントを紐づけて共有 | 地図,共有 | ◎ | - | - |  |
@@ -546,7 +546,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [tk_2410](https://github.com/jphacks/tk_2410) | ひとひら文庫 | 電子ペーパー端末に小説の一行を表示しお気に入りを記録 | HW,記録 | × | BLE_IOT | 電子ペーパー端末が本体。代案: 日替わり一行の通知とお気に入り記録 |  |
 | [tk_2411](https://github.com/jphacks/tk_2411) | Life DiaLog | 日記を記録しAIが自己分析し対話で検索できる | 記録,AI | △ | CLOUD_AI | 蓄積した日記への会話型の相談・検索を足す |  |
 | [tk_2412](https://github.com/jphacks/tk_2412) | Calm Sense | 皮膚電気センサーで焦りを検知し英文読解にヒントを出す | HW,独自ML,AI | × | BLE_IOT,CUSTOM_ML | センサーと学習モデルが本体。代案: 自己申告の焦り度で出すヒント |  |
-| [tk_2413](https://github.com/jphacks/tk_2413) | フジヱ | 履修登録の誤りの学生情報を名簿から突合して一覧する | フォーム,その他 | △ | FILE_IMPORT,SERVER_LOGIC | 名簿ファイルの取り込みと突合処理を足す |  |
+| [tk_2413](https://github.com/jphacks/tk_2413) | フジヱ | 履修登録の誤りの学生情報を名簿から突合して一覧する | フォーム,その他 | △ | FILE_IMPORT,SERVER_LOGIC | 名簿ファイルの取り込みと突合処理を足す。紙の判定では、名簿の CSV の取り込み(fileImport)と serverRules の lookup(notExists: 名簿に同じ学籍番号が無い登録に印をつける)で本体が作れる = ◎ 相当(上の集計の数は README で判定した時のまま) |  |
 | [tk_2414](https://github.com/jphacks/tk_2414) | FairEdu | 生成AIと対話しながら学ぶ中高生向けオンライン教材 | AI | △ | CLOUD_AI | 長い対話AIと教材の自動生成を足す |  |
 | [tk_2415](https://github.com/jphacks/tk_2415) | - | サンプルのまま内容なし | その他 | ? | - | README が雛形 |  |
 | [tk_2416](https://github.com/jphacks/tk_2416) | Turtle Stamina | グループで体力を共有し亀が疲労を表すアプリ | 記録,共有 | ◎ | - | 歩数・体力メーター・共有・休憩通知で作れる |  |

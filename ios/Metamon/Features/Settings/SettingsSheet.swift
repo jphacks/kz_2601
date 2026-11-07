@@ -223,7 +223,10 @@ struct SettingsSheet: View {
                     }
                 }
                 Button("ログアウト", role: .destructive) {
-                    signOutPrompt = SignOutFlow.prompt(pending: rt.recordSync.pendingCount, isOnline: rt.recordSync.isOnline)
+                    Task {
+                        await rt.settlePendingRecordDeletes() // 取り消し待ちの削除(M11)も未送信に数える
+                        signOutPrompt = SignOutFlow.prompt(pending: rt.recordSync.pendingCount, isOnline: rt.recordSync.isOnline)
+                    }
                 }
                 .disabled(isDeleting || isSigningOut)
                 .accessibilityIdentifier("settings.signOut")

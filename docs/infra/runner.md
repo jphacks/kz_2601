@@ -10,6 +10,7 @@ runner(`backend/cmd/runner`・#341)は、appconfig が outbox(`runner/{APP_ENV}/
 - [既定では何も起きない](#既定では何も起きない)
 - [出す手順](#出す手順)
 - [動いたかの確かめ方](#動いたかの確かめ方)
+- [プッシュ通知を端末に届ける](#プッシュ通知を端末に届ける)
 - [止め方](#止め方)
 - [戻し方](#戻し方)
 - [発表で見せる場合の最小の手順](#発表で見せる場合の最小の手順)
@@ -18,12 +19,12 @@ runner(`backend/cmd/runner`・#341)は、appconfig が outbox(`runner/{APP_ENV}/
 
 | もの | 作る所 | 中身 |
 |---|---|---|
-| SA `runner` | `infra/runner.tf` | runner の実行 SA。`roles/datastore.user` だけ。AI の鍵は持たない(#337 の B) |
+| SA `runner` | `infra/runner.tf` | runner の実行 SA。`roles/datastore.user` と `roles/firebaseauth.viewer`(送り手の作成時刻を読むだけ・#339 の 24 時間)。AI の鍵は持たない(#337 の B) |
 | SA `runner-scheduler` | `infra/runner.tf` | Scheduler が OIDC のトークンを作る SA。`runner-prod` にだけ `roles/run.invoker` |
 | deployer の actAs | `infra/runner.tf` | `github-deployer` が「runner として」デプロイする `roles/iam.serviceAccountUser` |
 | Scheduler `runner-tick` | `infra/runner.tf` | 毎分(Asia/Tokyo)・`POST <runner の URL>/internal/tick`・OIDC・期限 90 秒・再試行なし(次の分が拾う) |
 | Firestore の TTL | `infra/runner.tf` | collection group `done` / `outbox` / `rule_status` の `expireAt`(7 日 / 30 日 / 30 日・#341) |
-| Secret の入れ物(任意) | `infra/runner.tf` | `runner_secret_ids`。APNs の鍵を入れる時だけ。読めるのは `runner` だけ(`run-backend` は読めない) |
+| Secret の入れ物(任意) | `infra/runner.tf` | `runner_secret_ids`。APNs の鍵(`APNS_AUTH_KEY`)を入れる時だけ。読めるのは `runner` だけ(`run-backend` は読めない)。注入は GitHub の変数 `RUNNER_APNS=1` の時だけ([下](#プッシュ通知を端末に届ける)) |
 | サービス `runner-prod` | `.github/workflows/deploy-cloudrun.yml` | 同じイメージを `--command=/app/runner`・`--no-allow-unauthenticated`・最大 2 台・`--timeout=90`・SA `runner` |
 | appconfig の `RUNNER_OUTBOX=1` | 人(gcloud) | 書き込みと同じトランザクションで outbox に積む([runtime-config.md](runtime-config.md#運用で変える値)) |
 | ai の `AI_SERVER_RULES=1` | 人(gcloud) | 「自動の動き」を頼む発話で serverRules を作る(#343) |
@@ -57,7 +58,7 @@ runner(`backend/cmd/runner`・#341)は、appconfig が outbox(`runner/{APP_ENV}/
    terraform apply runner1.plan
    ```
 
-   plan で見るもの: 足されるのは `google_service_account.runner*`・`google_project_iam_member.runner_datastore`・`google_service_account_iam_member.deployer_actas_runner`・`google_firestore_field.runner_ttl["…"]` だけ。`google_firestore_field` に `index_config` の差分が出ていない(インデックスを変えない)。
+   plan で見るもの: 足されるのは `google_service_account.runner*`・`google_project_iam_member.runner_datastore`・`google_project_iam_member.runner_firebaseauth_viewer`・`google_service_account_iam_member.deployer_actas_runner`・`google_firestore_field.runner_ttl["…"]` だけ。`google_firestore_field` に `index_config` の差分が出ていない(インデックスを変えない)。
 
 3. **GitHub の変数を入れる。** Settings → Environments → `production` → Variables に `RUNNER_DEPLOY` = `1`(repo の Variables でもよい。stg はどちらでも飛ばす)。
 
@@ -127,7 +128,38 @@ runner(`backend/cmd/runner`・#341)は、appconfig が outbox(`runner/{APP_ENV}/
 
    `outcome` が `ok` なら動いている。`skipped_plan` は作成者が Pro でない(`PRO_GATE_MODE`・[pro.md](../backend/features/pro.md))、`skipped_paused` / `skipped_stopped` は止めている、`skipped_quota` / `skipped_global` は上限([runtime-config.md](runtime-config.md#運用で変える値)の `RUNNER_LIMIT_*`)。使った量は `jsonPayload.event="runner.usage"`(集計は `scripts/runner-usage.sh prod`・[runner-usage.md](runner-usage.md))。アプリの中の「実行の履歴」(`rule_status`)にも出る。
 
-通知は今の版では APNs の鍵を持たず、宛先を数えてログに形だけを出します(端末には届かない)。
+APNs の鍵を入れるまで([下](#プッシュ通知を端末に届ける))、通知は宛先を数えてログに形だけを出します(端末には届かない)。`runner: starting` の `apns=false` がその状態です。
+
+## プッシュ通知を端末に届ける
+
+runner は APNs の鍵が無い間、通知をログに出すだけです(`runner: starting` の `apns=false`)。鍵を入れると、宛先の判定(参加者・ブロック・同意・上限・停止・作成から 24 時間)を通った人の端末(`users/{uid}/devices`・iOS が `PUT /v1/me/devices/{installationId}` で登録)に送ります。APNs が 410 か 400 `BadDeviceToken` を返したトークンは消します。**鍵の値は repo・GitHub・チャットに置きません。**
+
+前提: [出す手順](#出す手順)の 2(`runner_enabled = true`)が済んでいる。iOS 側で App ID の Push Notifications が有効で、`aps-environment` の入った版が配られている(#683)。
+
+1. **APNs の鍵を作る**(Apple Developer の Account Holder / Admin)。Certificates, Identifiers & Profiles → Keys → +・「Apple Push Notifications service (APNs)」に印 → Configure で Environment は「Sandbox & Production」→ 作って `.p8` を 1 回だけダウンロードする。画面の **Key ID** と、Membership の **Team ID** を控える。`.p8` は再ダウンロードできないので、Secret Manager に入れたら手元のファイルは消す。
+
+2. **Secret の入れ物を作る。** `infra/envs/prod.tfvars` に `runner_secret_ids = ["APNS_AUTH_KEY"]` を入れて plan → apply。足されるのは `google_secret_manager_secret.runner["APNS_AUTH_KEY"]` と `google_secret_manager_secret_iam_member.runner_accessor["APNS_AUTH_KEY"]` だけ。
+
+3. **鍵の値を入れる**(手元のファイルから直接。値を画面やシェルの履歴に出さない)。
+
+   ```sh
+   gcloud secrets versions add APNS_AUTH_KEY --project "$PROJECT_ID" --data-file=<ダウンロードした .p8 のパス>
+   ```
+
+4. **鍵以外の値を入れる**(秘密ではないが repo には書かない。`--update-env-vars` なので次のデプロイの後も残る)。
+
+   ```sh
+   gcloud run services update runner-prod --region "$REGION" --project "$PROJECT_ID" \
+     --update-env-vars APNS_KEY_ID=<Key ID>,APNS_TEAM_ID=<Team ID>,APNS_TOPIC=jp.kz2601.metamon,RUNNER_APNS_ENVIRONMENT=production
+   ```
+
+   `APNS_TOPIC` は配る版の bundle id(`ios/project.yml` の `PRODUCT_BUNDLE_IDENTIFIER`。`METAMON_BUNDLE_ID_SUFFIX` を付けた版ならその値)。`RUNNER_APNS_ENVIRONMENT` は TestFlight・App Store の版なら `production`、Xcode から入れた開発署名の版だけなら `sandbox`。1 つの runner は片方の環境の端末にだけ送ります。
+
+5. **GitHub の変数 `RUNNER_APNS` = `1`** を Environment `production` に入れて、deploy-cloudrun を `main`・`production` で実行する(`APNS_AUTH_KEY` が `--set-secrets` で注入される。`RUNNER_APNS` が無いデプロイは `--clear-secrets` で外す)。
+
+6. **確かめる。** `runner: starting` のログに `apns=true`・`apns_environment`・`account_age=true` が出る。テスト用のアカウント 2 つ(どちらも作って 24 時間以上・作成者は Pro)で共有のアプリに参加し、受け取る側で通知を許可して、もう一方が記録を足す。`runner.usage` の `notify_recipients` が 1 以上で、端末に届けばできています。届かない時は `runner.run` の `notifies`(`skipped` の `new_account` / `no_consent` / `no_device` / `unregistered` / `send_failed`)を見る。`send_failed` が全部なら Key ID・Team ID・topic・環境の食い違いを疑う。
+
+止める: 全体の通知は [止め方](#止め方) の `RUNNER_NOTIFY_PAUSED=1`。鍵を外す時は `RUNNER_APNS` を消してデプロイ(`--clear-secrets`)→ ログだけに戻る。鍵が漏れた疑いの時は Apple Developer で鍵を Revoke し、新しい鍵で 1・3・4 をやり直す。
 
 ## 止め方
 
@@ -173,5 +205,6 @@ runner(`backend/cmd/runner`・#341)は、appconfig が outbox(`runner/{APP_ENV}/
 
 見せる時の注意:
 - tick は毎分なので、書き込みから動きまで最大 1 分ほどかかる。待てない時は `gcloud scheduler jobs run runner-tick` を手元で叩く。
-- 通知は今の版では端末に届かない(APNs の鍵が無い)。見せるのは「書き込み」や「実行の履歴」の方にする。
+- 通知を端末に届けるには[プッシュ通知を端末に届ける](#プッシュ通知を端末に届ける)を先に済ませる。Xcode から入れた版は `RUNNER_APNS_ENVIRONMENT=sandbox` でないと届かない。鍵が無ければ「書き込み」や「実行の履歴」の方を見せる。
+- 他人宛ての通知は、送り手(記録を足す人)のアカウントが作って 24 時間を過ぎていないと出ない(#339)。デモの送り手は前日までに作っておく。
 - 作成者が Pro でないと `skipped_plan` で動かない(`PRO_GATE_MODE=enforce` が既定)。

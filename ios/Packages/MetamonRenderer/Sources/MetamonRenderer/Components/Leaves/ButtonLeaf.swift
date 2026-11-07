@@ -39,7 +39,10 @@ struct ButtonLeaf: View {
     }
 
     var body: some View {
-        if Self.isVisible(action: c.action, form: ctx.form), Self.isVisible(visibleTo: c.visibleTo, isAdmin: rt.viewerIsAdmin) {
+        // follow / unfollow(#270)は今の投稿の作者の状態に合う方だけ
+        if Self.isVisible(action: c.action, form: ctx.form),
+           Self.isVisible(visibleTo: c.visibleTo, isAdmin: rt.viewerIsAdmin),
+           rt.showsFollowButton(c.action, recordId: ctx.actionContext().currentRecordId) {
             styled
         }
     }

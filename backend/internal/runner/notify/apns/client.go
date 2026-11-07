@@ -128,7 +128,8 @@ type payload struct {
 }
 
 // Send posts p. err is nil only for 200; Result says whether the token is
-// unregistered (410) or a retry may help (429, 5xx, network, a provider
+// unregistered (410, or 400 BadDeviceToken: the runner sends only tokens of
+// its own environment, so the token itself is bad) or a retry may help (429, 5xx, network, a provider
 // token APNs refused).
 func (c *Client) Send(ctx context.Context, p notify.Push) (notify.Result, error) {
 	if p.Token == "" {
@@ -172,7 +173,8 @@ func (c *Client) Send(ctx context.Context, p notify.Push) (notify.Result, error)
 	_ = json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&e)
 	r := notify.Result{Status: resp.StatusCode, Reason: e.Reason}
 	switch {
-	case resp.StatusCode == http.StatusGone:
+	case resp.StatusCode == http.StatusGone,
+		resp.StatusCode == http.StatusBadRequest && e.Reason == "BadDeviceToken":
 		r.Unregistered = true
 	case resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500:
 		r.Retryable = true

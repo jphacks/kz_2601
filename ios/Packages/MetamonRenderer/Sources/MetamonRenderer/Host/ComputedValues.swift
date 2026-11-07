@@ -40,7 +40,7 @@ public extension DSLRuntime {
         let entity = dsl.entity(entityId)
         let rows = unredactedViewRecords(for: entityId)
         guard !filters.isEmpty else { return rows }
-        let resolved = filters.map { $0.resolvingMe(uid: currentUserId) } // {"me": true}(#251)
+        let resolved = resolvingFollows(filters).map { $0.resolvingMe(uid: currentUserId) } // {"myFollows": true}(#270)・{"me": true}(#251)
         if resolved.allSatisfy({ $0.valueExpr == nil }) {
             return rows.filter { r in resolved.allSatisfy { Aggregator.matches($0, record: r, field: entity?.field($0.field)) } }
         }

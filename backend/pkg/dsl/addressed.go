@@ -142,6 +142,9 @@ func checkAddressedRule(a *App, r *ServerRule, addressed map[string]*Entity, whe
 	if e := addressed[r.On.Each]; e != nil {
 		add("%s.on.each: entity %q is addressed (only its author and recipients read it); a rule cannot run on each of its records", where, e.ID)
 	}
+	if r.Lookup != nil && addressed[r.Lookup.Entity] != nil {
+		add("%s.lookup: entity %q is addressed (only its author and recipients read it); a rule cannot look up its records", where, r.Lookup.Entity)
+	}
 	rowEntity := a.EntityByID(r.RowEntity())
 	seen := map[string]bool{} // one problem per expression shape
 	r.walkExprs(func(x *Expr) {

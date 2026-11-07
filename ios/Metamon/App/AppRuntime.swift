@@ -1240,6 +1240,11 @@ final class AppRuntime: DSLRuntime {
                 authorNamePrompt = AuthorNamePrompt { [weak self] in await self?.perform(action, ctx) }
                 return
             }
+            // 既存の記録を何も変えずに保存: 書き込まず(「保存しました」も出さず)に画面だけ進める(M10)
+            guard form.needsWrite else {
+                leaveAfterSave(action, ctx)
+                return
+            }
             // 保存ボタンの連打: 1 回目のローカル保存を待つ間に 2 回目が来ると、新規なら同じ内容が 2 件できる
             guard savingForms.insert(ObjectIdentifier(form)).inserted else { return }
             defer { savingForms.remove(ObjectIdentifier(form)) }
@@ -1248,17 +1253,13 @@ final class AppRuntime: DSLRuntime {
             let isNew = recordId == nil
             records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: recordId, data: payload,
                                                     author: postAuthor(for: entity))
-            form.markClean() // 保存した内容は閉じても破棄の確認を出さない(M10)
+            form.markSaved(queuedOffline: !recordSync.isOnline) // 閉じても破棄の確認を出さない・オフラインなら保存バーが送信待ちと出す(M10)
             WidgetSnapshotWriter.write(dsl: dsl, records: records)
             #if !APP_STORE_REVIEW
             writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)
             #endif
             Task { await purgeExpired(entity) } // #482 保存の後(画面遷移を待たせない)
-            if let screen = action.screen {
-                navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
-            } else {
-                close(ctx.route)
-            }
+            leaveAfterSave(action, ctx)
 
         case .deleteRecord:
             guard let entity = action.entity ?? ctx.form?.entity.id,
@@ -1284,6 +1285,9 @@ final class AppRuntime: DSLRuntime {
 
         case .resetForm:
             ctx.form?.reset()
+
+        case .follow, .unfollow:
+            await runFollow(action, ctx) // #270: Features/Follows
 
         case .scheduleNotification:
             guard let spec = action.notification else { return }
@@ -1312,6 +1316,15 @@ final class AppRuntime: DSLRuntime {
 
         case .unknown:
             toast = L10n.tr("未対応のアクション: \(action.rawType)")
+        }
+    }
+
+    /// 保存の後: `screen` があればそこへ、無ければ閉じる。
+    private func leaveAfterSave(_ action: Action, _ ctx: ActionContext) {
+        if let screen = action.screen {
+            navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
+        } else {
+            close(ctx.route)
         }
     }
 

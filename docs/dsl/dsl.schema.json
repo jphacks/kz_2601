@@ -407,6 +407,8 @@
             "back",
             "saveRecord",
             "deleteRecord",
+            "follow",
+            "unfollow",
             "openVoice",
             "openUrl",
             "resetForm",
@@ -422,6 +424,8 @@
             "back": "前の画面へ戻る(push なら pop、モーダルなら dismiss)。",
             "saveRecord": "フォームのドラフトを保存(新規 POST / 編集 PATCH)して screen へ、無ければ back。フォーム画面の toolbar に置く。",
             "deleteRecord": "現在のレコードを削除して back。confirmMessage を付けるのが定石。",
+            "follow": "今開いている投稿(共有 / みんなに公開の entity のレコード)を書いた人をフォローする(#270)。一覧の行から開いた投稿の画面に置く。自分の投稿・フォロー済みの時はボタンが隠れる。フォローした人の投稿だけの一覧は filter {\"field\":\"$author\",\"op\":\"eq\",\"value\":{\"myFollows\":true}}。",
+            "unfollow": "今開いている投稿を書いた人のフォローを外す(#270)。follow と同じ画面に並べて置く(フォローしていない時は隠れる)。",
             "openVoice": "音声シートを開く。",
             "openUrl": "URL を Safari で開く。",
             "resetForm": "フォームのドラフトを既定値に戻す。",
@@ -456,6 +460,8 @@
           "type": "string",
           "description": "saveRecord / deleteRecord / export / addToCalendar: entity id.",
           "x-for": {
+            "follow": "required",
+            "unfollow": "required",
             "saveRecord": "required",
             "deleteRecord": "required",
             "export": "required",
@@ -1223,7 +1229,7 @@
     "Filter": {
       "type": "object",
       "additionalProperties": false,
-      "description": "list / stat / chart / agg のレコード絞り込み。op が today / thisWeek / thisMonth / thisYear(期間・端末ローカル。今週は月曜始まり)のときは value を null にし、field は date / datetime。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。 「自分の投稿だけ」は field \"$author\"・value {\"me\": true}・op eq(public/shared の entity のみ)。 「自分が保存した / いいねしたもの」は field \"$marks.<id>\"・value {\"me\": true}・op eq(neq = まだ付けていない)。",
+      "description": "list / stat / chart / agg のレコード絞り込み。op が today / thisWeek / thisMonth / thisYear(期間・端末ローカル。今週は月曜始まり)のときは value を null にし、field は date / datetime。value には計算式(Expr)も書ける(computed 内の agg では {\"ref\":\"id\"} が外側のレコード)。 「自分の投稿だけ」は field \"$author\"・value {\"me\": true}・op eq(public/shared の entity のみ)。 「自分が保存した / いいねしたもの」は field \"$marks.<id>\"・value {\"me\": true}・op eq(neq = まだ付けていない)。 「フォローした人の投稿だけ」(タイムライン)は field \"$author\"・value {\"myFollows\": true}・op eq(neq = フォローしていない人の投稿)。",
       "required": [
         "field",
         "op",
@@ -1232,7 +1238,7 @@
       "properties": {
         "field": {
           "type": "string",
-          "description": "Field id, or \"$author\" (public/shared entity: the poster; value {\"me\": true}, op eq = my posts / neq = others' posts), or \"$marks.<id>\" (public/shared entity with that mark: value {\"me\": true}, op eq = marked by me / neq = not marked by me)."
+          "description": "Field id, or \"$author\" (public/shared entity: the poster; value {\"me\": true}, op eq = my posts / neq = others' posts), or \"$marks.<id>\" (public/shared entity with that mark: value {\"me\": true}, op eq = marked by me / neq = not marked by me), or \"$author\" with value {\"myFollows\": true} (op eq = posts of people I follow / neq = of people I do not follow)."
         },
         "op": {
           "type": "string",
@@ -1291,9 +1297,12 @@
             },
             {
               "$ref": "#/$defs/FilterMe"
+            },
+            {
+              "$ref": "#/$defs/FilterMyFollows"
             }
           ],
-          "description": "Literal or Expr. null for today/thisWeek/thisMonth/thisYear. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id). {\"me\": true} = the signed-in user (only with field \"$author\" or \"$marks.<id>\")."
+          "description": "Literal or Expr. null for today/thisWeek/thisMonth/thisYear. Inside an `agg` of a computed field, {\"ref\":\"id\"} is the outer record (e.g. payer eq ref id). {\"me\": true} = the signed-in user (only with field \"$author\" or \"$marks.<id>\"). {\"myFollows\": true} = the people the signed-in user follows in this app (only with field \"$author\")."
         }
       }
     },
@@ -3978,6 +3987,19 @@
       },
       "description": "filter の value に書く「自分」。field \"$author\"(自分の投稿)か \"$marks.<id>\"(自分が印を付けたもの)と、op eq / neq でだけ使う(public/shared の entity)。"
     },
+    "FilterMyFollows": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "myFollows"
+      ],
+      "properties": {
+        "myFollows": {
+          "const": true
+        }
+      },
+      "description": "filter の value に書く「自分がフォローしている人」(#270)。field \"$author\" と op eq(フォローした人の投稿)/ neq(フォローしていない人の投稿)でだけ使う(public/shared の entity)。フォローはアプリごと・投稿の画面の follow / unfollow ボタンで付け外しする。"
+    },
     "Mark": {
       "type": "object",
       "additionalProperties": false,
@@ -4562,6 +4584,39 @@
         "if": {
           "$ref": "#/$defs/Expr",
           "description": "条件(真偽の Expr)。行はきっかけのレコード({\"ref\":\"<field>\"}・\"<refField>.<field>\")か on.each のレコード。更新のきっかけでは {\"ref\":\"$prev.<field>\"} で更新の前の値。agg で同じアプリ・同じ側(private どうし・shared / public どうし)の entity を集計できる(期間の filter も可。読む件数は実行ごと・アプリの 1 日ごとに上限があり、超えたらその回は実行しない)。streak・doneInDays・computed field・setting は使えない。each の無い時刻のきっかけには行が無い(ref 不可・agg は可)。"
+        },
+        "lookup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "entity",
+            "field",
+            "equals"
+          ],
+          "description": "別の entity との突き合わせ(if と両方そろった時だけ動く)。entity のレコードのうち field の値が行の equals の値と同じものがある(exists)/ 無い(notExists)時。行はきっかけのレコードか on.each のレコード(each の無い時刻のきっかけでは使えない)。等しいかだけを見る(文字と数は全角半角・大文字小文字・前後の空白を区別しない。日付は日付どうし、ref と $id は同じ entity の ID どうし)。行の値が空の時は動かない。同じ entity なら行のレコード自身は数えない。entity は同じアプリ・ルールと同じ側だけ(宛先付きは不可)で、each・agg と合わせて 2 つまで。読む件数の上限は each・agg と同じ。",
+          "x-usage": "名簿との照合: 「名簿に無い学籍番号の登録に印をつけて」= on {every:daily,each:registrations}・lookup {op:notExists, entity:roster, field:student_id, equals:student_id}・updateRecord(ref 省略)values {mismatch: true}。まだ行っていない店: on {every:weekly,each:shops}・lookup {op:notExists, entity:visits, field:shop, equals:$id}。",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "exists",
+                "notExists"
+              ]
+            },
+            "entity": {
+              "type": "string",
+              "description": "探す entity の id。"
+            },
+            "field": {
+              "type": "string",
+              "description": "探す entity の field(string / text / enum / integer / number / date / ref)か $id(レコードの ID)。"
+            },
+            "equals": {
+              "type": "string",
+              "description": "行の field(同じ型の種類)か $id(行のレコードの ID)。"
+            }
+          }
         },
         "do": {
           "type": "array",
