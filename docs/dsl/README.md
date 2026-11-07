@@ -57,7 +57,7 @@ Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|me
   Entity.single?: true(設定値の置き場。レコードは常に 1 件・式 {"setting": "<fieldId>"} で読む)— §3.11
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section|card|disclosure|carousel|grid, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (66 種・全て id? と area? を持つ) / Action (12 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
+Leaf (66 種・全て id? と area? を持つ) / Action (13 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField?, when?, alarm? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
@@ -150,7 +150,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 
 `color` は `primary|secondary|accent|red|green|orange|blue` の閉じた enum(hex 文字列は不可・Claude 構造化出力互換。iOS は `Color.semantic(_:)` でシステム色に写像)。表示系の実例は `examples/gallery-display.json`(entity は家計簿と同じ `expense` なので iOS モックの seed がそのまま入る)。
 
-### 3.2 アクション(12 種)
+### 3.2 アクション(13 種)
 
 | type | フィールド | iOS の挙動 |
 |---|---|---|
@@ -166,10 +166,13 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | `export` | `entity`, `format`(csv/pdf), `filter?`, `fields?`, `title?` | 記録を CSV / PDF に書き出して共有シート(ファイル・メール・AirDrop)を開く(#421・下の「書き出し」) |
 | `startActivity` | `activity`{`title`, `subtitle?`, `icon?`, `minutes?`(1〜480), `stat?`} | ライブアクティビティ(ロック画面 / Dynamic Island)を出す(#423・下の「ライブアクティビティ」) |
 | `endActivity` | | 出しているライブアクティビティを消す(#423) |
+| `addToCalendar` | `entity`, `calendarEvent`{`startField`, `endField?`, `durationMinutes?`(1〜10080・既定 60), `titleField?`, `locationField?`, `notesField?`, `alertMinutes?`(0〜10080)} | 今のレコードを端末のカレンダーに入れる。OS の「新規イベント」画面を埋めて開く(下の「カレンダーへの追加」) |
 
 `confirmMessage` はどのアクションにも付けられ、先に確認ダイアログを出す。
 
 - **書き出し `export`(#421)**: 記録を CSV(UTF-8 BOM 付き・CRLF・1 行目は項目名)か A4 の PDF(見出し・書き出し日・絞り込み・件数・グラフ・表)にして `UIActivityViewController` で共有する。値は一覧・表と同じ書式(日付・¥・選択肢・参照先の名前・計算項目)で、写真・動画は入れない。`fields` 省略で全項目。`filter` は `list.filter` と同じ(単体 / 配列)。hidden(#262)は自分が書いた行だけ値を出し、他人の行しか無ければ列ごと出さない。`=` `+` `@` 等で始まるセルは `'` を前に付ける(CSV インジェクション対策)。PDF には押した画面にある同じ entity の `chart` を `ImageRenderer` で画像にして表の上に入れる。Leaf(`exportButton`)ではなく Action にしたのは、(1) toolbar からも同じ動作を置ける、(2) `confirmMessage` 等の既存の仕組みと button の見た目をそのまま使える、(3) 古い iOS は「未対応のアクション」の toast で済み画面が崩れない、の 3 点(上の「新規アクションは追加しない」の例外)。整形は `RecordExport` / `CSVWriter`(MetamonDSL・純関数)、PDF とファイルは `RecordExporter.swift`(Renderer)。審査用ビルドにも残す(ネイティブ権限が不要)。
+
+- **カレンダーへの追加 `addToCalendar`**: 今のレコード(`screen.entity == entity` のフォーム画面の button / toolbar なら入力中の値・未保存でも、`list.onItemTap` ならタップした行)を EventKitUI の `EKEventEditViewController` に埋めて開き、ユーザーが「追加」を押すと端末のカレンダー(iCloud・Google など端末に設定したもの)に入る。iOS 17 以降この画面は別プロセスで動くので、**カレンダーの許可・`NSCalendars*UsageDescription`・entitlement は要らない**(アプリは端末の予定を読まない)。`startField` が `date` なら終日、`datetime` ならその時刻から。終わりは `endField` の値(空・始まりより前なら無視)→ `durationMinutes`(既定 60)。名前は `titleField` → `entity.titleField` → 最初の string → entity 名。`alertMinutes` はカレンダー側の通知(N 分前・0 は始まり)。始まりが空なら「「開始」を入力してください」。Go は field の存在と型(start / end = date・datetime、title / location = string・text・enum、notes = string・text)と範囲を検証(`backend/pkg/dsl/calendar_event.go`)。組み立ては `CalendarEventPlan`(MetamonDSL・純関数)、画面は `AppRuntime+Calendar.swift`。Action にしたのは `export` と同じ 3 点(toolbar にも置ける・button の見た目と `confirmMessage` を使える・古い iOS は「未対応のアクション」の toast で済む)。審査用ビルドにも残す(権限が要らない)。止めるまで鳴る目覚ましはカレンダーではなく通知の `alarm`(§3.13・AlarmKit)。スクリーンタイム(FamilyControls)は権限と entitlement が要るので入れていない。
 
 構造・ナビ・ネイティブ系の設計メモ(新規アクションは追加しない):
 
@@ -475,6 +478,28 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - 人が読める説明は `App.DescribeServerRule`(例: 「出欠」が作られた時(条件に合えば)、「予定」を作った人に通知・「予定」の「参加の数」を数える)。「このアプリの自動の動き」の一覧(#347)で使う。
 - 古い iOS: `AppDSL` はトップの未知キーを読まないので、`serverRules` があっても今までどおり開ける。
 - AI の生成(#343): 生成用スキーマ(`ai.GenerationSchema()`)には入れず、依頼が自動の動き(通知・定期・数える など)を含む時だけ、UI の生成の後に別の小さな呼び出し(`backend/internal/ai/server_rules_pass.go`・専用スキーマ `ServerRulesGenerationSchema()`・`createRecord` / `updateRecord` の `values` はそこだけ `[{field, value}]` の配列)で `serverRules` 全体を書く。結果は `Validate()` を通し、通らなければ問題を添えて再生成、最後まで通らなければルール無しで保存して summary で断る。作ったルールは `DescribeServerRule` の文で summary に出る。`AI_SERVER_RULES=1` の時だけ動く(既定は無効)。
+
+### 3.13 通知の alarm = 止めるまで鳴るアラーム
+
+「目覚まし」「7 時に起こして」「止めるまで鳴らして」は、時刻の通知に `"alarm": true` を付ける。iPhone の時計のアラームと同じく、ロック中も全画面で鳴り、止めるまで鳴り続ける(iOS 26.1 以降の AlarmKit)。
+
+```json
+{"id":"wake","title":"起きる時間です","body":"","repeat":"daily","entity":"alarm","field":"time","titleField":"label","enabledField":"on","alarm":true}
+```
+
+| 項目 | 決めたこと |
+|---|---|
+| 形 | 新しいアクションは足さず、`Notification` の真偽 1 つ(`alarm`)。時刻・くり返し・ラベル・オン/オフは通知と同じキー(固定の `time` / `weekday`、レコードの `"HH:mm"` の field + `titleField` + `enabledField`)。`scheduleNotification` のボタンにも付けられ、取消は `cancelNotification` |
+| 付けられないもの | `when`(条件の通知)とは組み合わせない(backend が拒否)。服薬・予定の N 分前などのリマインドには付けない(AI の規則) |
+| くり返し | daily = 毎日・weekly = その曜日(AlarmKit の `.relative` の `.weekly`)、once = 次のその時刻(`.fixed`)。monthly / yearly は AlarmKit にくり返しが無いので次の 1 回だけ予約し、アプリを開いた時の予約し直しで次へ延ばす |
+| 落とし方 | iOS 26.1 未満(26.0 は廃止予定の止めるボタンが必須なので使わない)・アラームの許可が無い・審査用の版・予約の上限で失敗した時は、**同じ時刻の普通のローカル通知**で届ける。`alarm` を知らない古い iOS もこのキーを無視して普通の通知にするので、`supportedFeatures` の印は要らない |
+| 許可 | アラームの通知を初めて予約する時に AlarmKit の許可(`AlarmManager.requestAuthorization`・Info.plist の `NSAlarmKitUsageDescription`)。アラームで届ける分は普通の通知を出さない(二重に鳴らさない) |
+| 予約の id | 通知の識別子(`dsl.<appId>.…`)・見出し・時刻から決まる UUID。中身が変われば古いアラームを消して予約し直す。今鳴っている最中のアラームは予約し直しでは止めない |
+| 後片付け | アプリの削除(`removeApp`)はそのアプリのアラームを鳴っていても消す。サインアウト・アカウント削除(`removeAll`)はこのアプリのアラームを全部消す |
+
+- iOS: 組み立ては `AlarmPlanner` / `AlarmSync`(MetamonServices・AlarmKit を差し替えてテスト)、AlarmKit の呼び出しは `Metamon/App/AlarmKitAlarms.swift`。審査用の版はコードごと外し、`NSAlarmKitUsageDescription` も消す(`docs/ios/review-build.md`)。
+- AI: `backend/internal/ai/alarm_rules.go`。ai-eval の `alarm` / `alarmRecord`(`alarm_cases.json`)。
+- カウントダウン(スヌーズ・タイマー)は使わないので、AlarmKit 用の Live Activity(ウィジェット拡張の `ActivityConfiguration(for: AlarmAttributes…)`)は用意していない。鳴った時の画面は OS の標準のもの(実機で確かめる)。
 
 ## 4. コンポーネント追加手順(スキーマが唯一の正典・3 ステップ)
 

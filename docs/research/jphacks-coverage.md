@@ -151,8 +151,8 @@ Web の作品はモバイルに置き換えて考えた(Web だから × には�
 
 | ファイル(`backend/internal/ai/eval/`) | 作品 | group | 中身 |
 |---|---|---|---|
-| `jphacks_coverage_cases.json` | 37 | `cov-full`(◎ 18)・`cov-reduced`(○ 19) | develop にある部品だけで作れる作品(記録を読むルール `ruleAgg`・`ruleEach` は #658、文字起こし・手書き・読み上げ・写真の labels・fileImport・feed は #659 で入った) |
-| `jphacks_coverage_pending_cases.json` | 2 | `cov-pr660`(2) | 開いている PR の部品が要る作品(カレンダーへの追加は #660) |
+| `jphacks_coverage_cases.json` | 39 | `cov-full`(◎ 18)・`cov-reduced`(○ 21) | develop にある部品だけで作れる作品(記録を読むルール `ruleAgg`・`ruleEach` は #658、文字起こし・手書き・読み上げ・写真の labels・fileImport・feed は #659、カレンダーへの追加は #660 で入った) |
+| `jphacks_coverage_pending_cases.json` | 0 | なし | 開いている PR の部品が要る作品(今は無い。新しい部品の PR を待つ作品ができたら `cov-pr<N>` で入れる) |
 
 - **選び方**: 判定 ◎○△ の 241 作品から 39 作品。受賞・決勝の ◎○△ 28 作品のうち 18 作品を入れ、残りは機能の分類(共有・記録・計算・通知・地図・写真・QR・AI・音声・マッチング・音楽)が偏らないように選んだ。× は入れていない(本体が作れないため)。△ は、足りない物が開いている PR で入る作品だけを PR 待ちのファイルに入れた。
 - **依頼の文**: 利用者が話す形で、その作品の本体の体験を 1〜2 文で頼む。作品名・チーム名は入れず、`note` の先頭にリポジトリの名前(`jphacks/<repo>`)・判定・受賞を書いた。
@@ -169,7 +169,7 @@ go run ./cmd/ai-eval -check -cases internal/ai/eval/jphacks_coverage_pending_cas
 
 # 実際に回す(人が決めた時だけ。-logic-pass / -server-rules は本番の AI_LOGIC_PASS / AI_SERVER_RULES に合わせる)
 go run ./cmd/ai-eval -env-file ../.env -cases internal/ai/eval/jphacks_coverage_cases.json -logic-pass -server-rules -tag jphacks
-go run ./cmd/ai-eval -env-file ../.env -cases internal/ai/eval/jphacks_coverage_pending_cases.json -logic-pass -server-rules -tag jphacks-pending  # #660 のマージ後
+go run ./cmd/ai-eval -env-file ../.env -cases internal/ai/eval/jphacks_coverage_pending_cases.json -logic-pass -server-rules -tag jphacks-pending  # PR 待ちの作品がある時
 
 # 件数を絞る(受賞作の 3 件だけ・落ちた作品だけを回し直す)
 go run ./cmd/ai-eval -env-file ../.env -cases internal/ai/eval/jphacks_coverage_cases.json -logic-pass -server-rules -tag jphacks -only cov_poker_chips,cov_trash_dex,cov_car_dj
@@ -185,9 +185,8 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 
 | 回し方 | 新規作成の回数 | 費用の目安 |
 |---|---|---|
-| develop のファイル | 28 | $0.8〜2.8 |
-| PR 待ちのファイル | 11 | $0.3〜1.1 |
-| 両方 | 39 | $1.2〜3.9(2 回目の呼び出し `-logic-pass` / `-server-rules` を含めると多くて $6 程度) |
+| develop のファイル | 39 | $1.2〜3.9(2 回目の呼び出し `-logic-pass` / `-server-rules` を含めると多くて $6 程度) |
+| PR 待ちのファイル | 0 | $0 |
 | `-only` で 3 件 | 3 | $0.1〜0.3 |
 
 1 回の新規作成を $0.03〜0.10 と置いた(`docs/backend/rate-limit.md` の目安。モデルは ai-eval の既定 `claude-sonnet-5-5`・effort low)。実測の `usage` は結果のファイルに残るので、1 回目の後に直す。ケースは直列に回るので、1 件 30〜60 秒として 39 件で 20〜40 分。

@@ -30,6 +30,7 @@
 | HealthKit(`healthStat` / `Field.health`) | 部品と登録 / `HealthData` / `AppRuntime+Health`、`NSHealth*` / `NSMotionUsageDescription`、entitlement `com.apple.developer.healthkit*` | 4.7.2・5.1.3 |
 | バックグラウンドでの位置の記録(`locationTracker`) | 部品と登録 / `LocationTracking`、`UIBackgroundModes` の `location` | 4.7.2・5.1.5・2.5.4 |
 | 端末のセンサー(`sensorValue`・CoreMotion の device motion / CMAltimeter・#419) | 部品と登録 / `SensorData`、`NSMotionUsageDescription`(healthStat と共通) | 4.7.2 |
+| 止めるまで鳴るアラーム(`Notification.alarm`・AlarmKit) | `AlarmKitAlarms`(`AlarmBackend.make()` が nil を返す)、`NSAlarmKitUsageDescription`。`alarm: true` の通知は同じ時刻の普通のローカル通知で届く(DSL・AI はそのまま) | 新しい許可の画面が増え、審査メモに説明が要るため。最初の版では外し、戻す時は審査メモ(`docs/store/app-review-notes.md`)に「目覚ましを作った時だけ許可を求める」説明を足してから出す |
 | 近くの端末との共有(`nearbyShare`・MultipeerConnectivity。すれ違い通信と UWB の距離 #425 を含む) | 部品と登録 / `Features/Nearby` 全部 / `NearbyPassbyLeaf`・`NearbyPassbyHost`、`NSLocalNetworkUsageDescription` / `NSBonjourServices` / `NSNearbyInteractionUsageDescription` | 4.7.2 |
 | 音楽プレーヤーの友だちからの曲リクエスト(`musicPlayer.allowRequests`・#412) | 部品の中のリクエストの UI(`MusicPlayerLeaf` の `requests`)。送受信は上の `Features/Nearby` と一緒に外れる | 4.7.2(近くの端末との通信) |
 | DSL から使うカメラの撮影(`photoField` / `videoField`) | `CameraPicker` / `VideoCameraPicker`、撮影の選択肢 | 4.7.2・2.5.14 |
@@ -55,6 +56,7 @@
 - 手書き・お絵かきの `drawingField` は残す。PencilKit で端末内に描くだけで権限は要らず、描いた絵は写真と同じ形(800px 以下の JPEG)で photo field に入る(プライバシーの表示は「写真またはビデオ」の範囲)。
 - 現在地を 1 回だけ取る `locationButton` と、地図の `mapView`(使用中の位置だけ)は残す。
 - 目的地までの道案内 `routeGuide`(#411)も残す。使うのは使用中の位置だけで、背面で案内を続けない(`CLBackgroundActivitySession` も `UIBackgroundModes: location` も使わない)。読み上げ(AVSpeechSynthesizer)に権限は要らない。
+- 端末のカレンダーに予定を入れる `addToCalendar` は残す。OS の「新規イベント」画面(EventKitUI・別プロセス)を開くだけで、カレンダーの許可も説明文も要らず、ユーザーが「追加」を押した時だけ入る。
 - ファイルの取り込み `fileImport` は残す。ファイル選択(`.fileImporter`)は別プロセスで動き、権限の確認も Info.plist の説明文も要らない。CSV の行・テキスト / PDF の本文(PDFKit・文字の無いページは Vision の文字認識)を端末内で読んで記録にするだけで、ファイルそのものは送らない・残さない。ファイルの日時の API(理由が要る API)も使わない。
 - QR を読む `qrScanner` は残す(カメラの説明文はこれに合わせて差し替える)。
 - QR を作って表示する `qrCode`(#422)も残す。CoreImage で端末内で作るだけで、写真への保存は追加のみの権限(`NSPhotoLibraryAddUsageDescription`)。審査用の版の説明文にも QR の保存を書く(#452 G8)。
@@ -130,7 +132,7 @@ cd ios
 
 ```sh
 APP=<DerivedData>/Build/Products/Review-iphoneos/Metamon.app
-plutil -p "$APP/Info.plist" | grep -E 'NSHealth|NSMotion|NSLocalNetwork|Bonjour|NSNearbyInteraction|CFBundleURLTypes|UIBackgroundModes' -A2
+plutil -p "$APP/Info.plist" | grep -E 'NSHealth|NSMotion|NSLocalNetwork|Bonjour|NSNearbyInteraction|NSAlarmKit|CFBundleURLTypes|UIBackgroundModes' -A2
 #   → UIBackgroundModes が [fetch] だけで、他は出ないこと
 plutil -p "$APP/Info.plist" | grep -E 'MetamonAIBaseURL|MetamonAppConfigBaseURL|NSPhotoLibraryAddUsageDescription'
 #   → URL が ai-prod / appconfig-prod、写真への追加の説明文に QR コードがあること
@@ -138,7 +140,7 @@ ls "$APP/PrivacyInfo.xcprivacy" "$APP/PlugIns/MetamonWidget.appex/PrivacyInfo.xc
 #   → どちらもあること
 codesign -d --entitlements :- "$APP"
 #   → com.apple.developer.healthkit が無いこと
-otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|NearbyInteraction|CoreMotion'
+otool -L "$APP/Metamon" | grep -E 'HealthKit|MultipeerConnectivity|NearbyInteraction|CoreMotion|AlarmKit'
 #   → 何も出ないこと
 strings "$APP/Metamon" | grep -E 'AutomationsView|HTTPAutomationsClient|/automations|MatchListLeaf|HTTPMatchingClient|MatchingStore|AdultConfirmSheet|/interests|v1/feedback|FeedbackComposerView|HKHealthStore|MCSession|NISession|CMPedometer|CMMotionManager|CMAltimeter|UIImagePickerController|AVAudioRecorder|MPRemoteCommand|release-requests|public-apps|WebViewLeaf|FeedLeaf|HTTPFeedClient|v1/feeds|v1/text|ChatThreadLeaf|jp\.kz2601\.metamon\.pro|PaywallSheet|ProSettingsSection|ProEntitlementStore|購入して作る|Pro にする'
 #   → 何も出ないこと
