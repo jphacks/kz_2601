@@ -4679,6 +4679,37 @@
             }
           }
         },
+        "similar": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entity",
+            "fields"
+          ],
+          "description": "一番似ている記録を探す(if・lookup の後。見つかった時だけ動く)。entity のレコードのうち、fields(行と entity に同じ id である field)の値が行と同じ数(文字は 、 , / ・ 改行で区切った項目ごと・refs は ID ごと)が一番多いもの。同じ数が min(省略 = 1)以上の時だけ動き、do では {\"ref\":\"$similar\"}(その記録の ID・ref)・{\"ref\":\"$similar.<field>\"}・{\"ref\":\"$similarScore\"}(同じ数)・通知の {$similarScore}・to {kind: authorOf, field: $similar}(その記録を書いた人)が使える。if では使えない。行のレコード自身と、shared / public では行を書いた人の記録は数えない。同じ数なら新しい記録。entity は同じアプリ・ルールと同じ側だけ(宛先付きは不可)で、each・agg・lookup と合わせて 2 つまで。hidden・computed の field は比べない。",
+          "x-usage": "似ている人の推薦: on {record:updated, entity:profiles, fields:[hobbies, level]}・similar {entity:profiles, fields:[hobbies, level], min:2}・updateRecord(ref 省略)values {best_match: {ref:$similar}, match_score: {ref:$similarScore}}・notify to {kind:authorOf, field:$similar}。",
+          "properties": {
+            "entity": {
+              "type": "string",
+              "description": "探す entity の id(行と同じ entity でもよい)。"
+            },
+            "fields": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 5,
+              "items": {
+                "type": "string"
+              },
+              "description": "比べる field id(1〜5 個・行と entity の両方にある string / text / enum / integer / number / date / ref / refs)。"
+            },
+            "min": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "description": "動くのに要る同じ数(省略 = 1)。"
+            }
+          }
+        },
         "do": {
           "type": "array",
           "minItems": 1,

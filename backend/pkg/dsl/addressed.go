@@ -145,6 +145,9 @@ func checkAddressedRule(a *App, r *ServerRule, addressed map[string]*Entity, whe
 	if r.Lookup != nil && addressed[r.Lookup.Entity] != nil {
 		add("%s.lookup: entity %q is addressed (only its author and recipients read it); a rule cannot look up its records", where, r.Lookup.Entity)
 	}
+	if r.Similar != nil && addressed[r.Similar.Entity] != nil {
+		add("%s.similar: entity %q is addressed (only its author and recipients read it); a rule cannot compare its records", where, r.Similar.Entity)
+	}
 	rowEntity := a.EntityByID(r.RowEntity())
 	seen := map[string]bool{} // one problem per expression shape
 	r.walkExprs(func(x *Expr) {

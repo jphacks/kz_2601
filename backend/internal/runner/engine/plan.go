@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
@@ -147,7 +148,7 @@ func (p Plan) Empty() bool { return len(p.Writes) == 0 && len(p.Notifies) == 0 }
 // Plan): the trigger must match the rule, `if` must be
 // true, then each action's values / by / text are computed. An action whose
 // target ref is empty (or whose by is not a number) is skipped. A rule with
-// agg or lookup needs refs to implement Lister. A rule with on.each runs on one
+// agg, lookup or similar needs refs to implement Lister. A rule with on.each runs on one
 // record here (ev.Record); PlanEach runs it on every record.
 func PlanRule(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger, refs RefReader) (Plan, error) {
 	return planOne(ctx, app, rule, ev, refs, newRunCache())
@@ -236,6 +237,17 @@ func planOne(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger
 		if !ok {
 			return Plan{}, nil
 		}
+	}
+	if rule.Similar != nil {
+		sim, ok := similarRow(app, rule.Similar, row, src, cache)
+		if src.err != nil {
+			return Plan{}, src.err
+		}
+		if !ok {
+			return Plan{}, nil
+		}
+		src.listed[rule.Similar.Entity] = true // "$similar.<field>" reads the listed record
+		p.row = sim
 	}
 	var out Plan
 	for i := range rule.Do {
@@ -410,7 +422,7 @@ func (p *planner) values(target *dsl.Entity, exprs map[string]dsl.Expr) map[stri
 	out := make(map[string]any, len(exprs))
 	for k, x := range exprs {
 		f := target.FieldByID(k)
-		if f == nil {
+		if f == nil || strings.HasPrefix(k, "$") { // "$similar…" is read, never written
 			continue
 		}
 		if f.Type == dsl.FieldRefs {
