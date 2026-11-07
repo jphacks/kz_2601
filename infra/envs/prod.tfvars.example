@@ -62,5 +62,7 @@ alert_emails = ["you@example.com"]
 # 初回デプロイ(RUNNER_DEPLOY=1)の後に status.url を入れると Scheduler の runner-tick ができる
 # runner_service_url = "https://runner-prod-378953239426.asia-northeast1.run.app"
 # runner_tick_paused = false
+# RUNNER_ACCOUNT_AGE=firebase に戻す時だけ(既定の firestore では要らない・広い権限)
+# runner_firebaseauth_viewer = false
 # APNs の鍵を runner に渡す時だけ(入れ物は runner だけが読める)
 # runner_secret_ids = ["APNS_AUTH_KEY"]

@@ -181,6 +181,10 @@ type Service struct {
 	// TextImage accepts the photo of aiButton inputPhoto on /v1/text
 	// (text_image.go; env AI_TEXT_IMAGE=1). Off = 403.
 	TextImage bool
+	// Members looks up shared-app membership: a participant's POST /v1/text
+	// with appId is covered by the creator's Pro (text_payer.go). nil = the
+	// caller's own Pro only.
+	Members AppMembers
 
 	// Logger gets the ai.generate line per /v1/generate (#322); nil = slog.Default().
 	Logger *slog.Logger

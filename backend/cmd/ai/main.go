@@ -21,6 +21,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
+	fsstore "github.com/jphacks/kz_2601/backend/internal/store"
 )
 
 func env(key, def string) string {
@@ -103,6 +104,10 @@ func main() {
 		// Pro features (#316): 402 pro_required on a paid save / POST /v1/text
 		Pro:     pro,
 		ProMode: proMode,
+	}
+	if fsClient != nil {
+		// a participant's /v1/text is covered by the shared app's creator (read-only lookups)
+		svc.Members = fsstore.NewFirestoreFromClient(fsClient)
 	}
 	// AI_PAUSED=1 stops only the Claude-calling routes with 503 ai_paused,
 	// before the rate limiter (#511). docs/infra/ai-pause.md

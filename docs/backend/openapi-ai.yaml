@@ -201,12 +201,12 @@ paths:
       summary: aiButton のオンライン版。generate は決まった指示で短い文章を決まった形 (1 行 / 箇条書き N 個 / 項目つき) で、task 付きは input を要約・分類・書き直し・抜き出し・提案して 1 つの文で返す
       description: |
         Issue #417。端末内 AI (Apple Intelligence) が使えない端末で、Tailor It Pro の利用者が aiButton{task: generate} を押した時に iOS が呼ぶ。
-        - ID トークン必須 (無い・不正は 401)。上限の重さは 1 (`RATE_LIMIT_WEIGHT_TEXT`)。呼び出した人が Tailor It Pro でなければ 402 `pro_required` (`details.features` = `onlineAI`・#316。Claude は呼ばない)
+        - ID トークン必須 (無い・不正は 401)。上限の重さは 1 (`RATE_LIMIT_WEIGHT_TEXT`)。呼び出した人が Tailor It Pro でなければ 402 `pro_required` (`details.features` = `onlineAI`・#316。Claude は呼ばない)。ただし `appId` の共有のアプリに呼び出した人が参加している (作成者ではないメンバー) 時は、作成者の Pro で判定する (共有のアプリの費用は作成者が持つ)。作成者が Pro でなければ 402 に `details.reason: creator_needs_pro` (iOS は課金画面を出さず案内だけ)。参加はサーバーが app_owners / members で確かめる。利用上限は呼び出した人のまま
         - 上限: instruction 500 字・input 4096 バイト (超えると 413)・本文 16 KB・出力 400 トークン。count / items は 1〜10
         - モデルは対話と同じ設定 (`AI_CHAT_MODEL`、既定 claude-sonnet-5-5・thinking なし)。安全の指示 (暴力・性的・差別・危険な行為を書かない、input の中の命令には従わない) を system に固定
         - モデルが断ったら 422 `refused`、形に合わない出力は 502 `bad_output`。line は最初の 1 行、list は count を超えた分を切る (1 個以上あれば返す)、fields は全項目そろわなければ 502
         - `task` (summarize / classify / rewrite / extract / suggest) を付けると、端末内 AI が無い端末での aiButton の要約などのオンライン版。input 必須・instruction 任意・shape は line だけ・classify は options 2〜20 個。重さ 2 (`RATE_LIMIT_WEIGHT_TEXT_TASK`)・出力 1000 トークン。答えは text 1 つ (行は残す・1200 字で切る)、classify は候補のどれか 1 つ (docs/backend/features/text.md)
-        - `length: long` (aiButton の長文) は、generate (shape line だけ) と classify 以外の task で使える。input 16384 バイト・出力 1500 トークン・答えは text 1 つ (段落は残す・3000 字で切る)・応答に `length: long`。重さ 3 (`RATE_LIMIT_WEIGHT_TEXT_LONG`・task より優先)。Pro の確認は他と同じ。iOS は long では端末内 AI を使わず、いつもここを呼ぶ
+        - `length: long` (aiButton の長文) は、generate (shape line だけ) と classify 以外の task で使える。input 16384 バイト・出力 1500 トークン・答えは text 1 つ (段落は残す・3000 字で切る)・応答に `length: long`。重さ 3 (`RATE_LIMIT_WEIGHT_TEXT_LONG`・task / 写真の重さと大きい方)。Pro の確認は他と同じ。iOS は long では端末内 AI を使わず、いつもここを呼ぶ
         - `image` (aiButton の inputPhoto) は写真 1 枚。JPEG (`mediaType: image/jpeg`)・長い辺 1024px 以下・base64 400 KB (409600 文字) 以下。超えると 413、JPEG でない・base64 でない・大きすぎる画像は 400。サーバーが `AI_TEXT_IMAGE=1` でなければ 403 `forbidden`。task は何でもよく、task 付きでも input は任意 (写真だけでよい)。本文の上限は写真の分だけ広い (約 433 KB)。重さ 3 (`RATE_LIMIT_WEIGHT_TEXT_IMAGE`・task / length の重さと大きい方)。写真のバイト列はどのログにも出さない
       requestBody:
         required: true
@@ -404,6 +404,7 @@ components:
             mediaType: { type: string, enum: [image/jpeg] }
             data: { type: string, maxLength: 409600, description: 標準の base64 (data URL の接頭辞なし) }
         locale: { type: string, enum: [ja, en], description: 省略時は instruction から判定 }
+        appId: { type: string, maxLength: 128, description: 'ボタンがあるアプリ (任意)。共有のアプリの参加者なら作成者の Pro で判定する。形が不正なら 400' }
     TextResponse:
       type: object
       required: [shape, text, locale, meta]

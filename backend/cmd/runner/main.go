@@ -21,7 +21,9 @@
 //	APNS_AUTH_KEY / APNS_KEY_ID / APNS_TEAM_ID / APNS_TOPIC
 //	                                           APNs (#269; push.go). No key = notifications are logged only
 //	RUNNER_APNS_ENVIRONMENT                    production (default) / sandbox
-//	RUNNER_ACCOUNT_AGE=firebase                actors' account age from Firebase Auth (#339 24h ban);
+//	RUNNER_ACCOUNT_AGE=firestore               actors' account age from users/{uid}.firstSeenAt (#339 24h ban;
+//	                                           appconfig writes it). firebase = Firebase Auth (needs
+//	                                           roles/firebaseauth.viewer; not deployed).
 //	                                           "" = unknown, so only the actor's own notifications go out
 //	PORT                                       default 8080
 //
@@ -114,7 +116,7 @@ func main() {
 	q := quota.New(qcfg, ratelimit.NewFirestore(st.Client(), os.Getenv("RATE_LIMIT_COLLECTION")),
 		entitlement.NewProChecker(entitlement.NewFirestore(st.Client()), policy.Environments))
 	q.Logger = logger
-	age, err := ageFromEnv(ctx, os.Getenv, target.Project)
+	age, err := ageFromEnv(ctx, os.Getenv, target.Project, st)
 	if err != nil {
 		logger.Error("runner: account age", slog.Any("error", err))
 		os.Exit(2)

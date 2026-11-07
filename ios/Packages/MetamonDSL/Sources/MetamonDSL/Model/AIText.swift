@@ -59,12 +59,14 @@ public struct AITextRequest: Codable, Equatable, Sendable {
     public var options: [String]?
     /// "long" = 長い文(オンライン AI だけ・材料 16 KB)。nil = short
     public var length: String?
+    /// ボタンがあるアプリ(オンライン版だけ・ホストが付ける)。共有のアプリの参加者はサーバーが作成者の Pro で判定する
+    public var appId: String?
     /// aiButton inputPhoto の写真 1 枚(オンライン AI だけ)。nil = 写真なし
     public var image: AITextImage?
 
     public init(instruction: String, shape: AITextShape, count: Int? = nil, items: [String]? = nil,
                 input: String? = nil, locale: String? = nil, task: String? = nil, options: [String]? = nil,
-                length: String? = nil, image: AITextImage? = nil) {
+                length: String? = nil, appId: String? = nil, image: AITextImage? = nil) {
         self.instruction = instruction
         self.shape = shape
         self.count = count
@@ -74,7 +76,15 @@ public struct AITextRequest: Codable, Equatable, Sendable {
         self.task = task
         self.options = options
         self.length = length == "long" ? "long" : nil
+        self.appId = appId
         self.image = image
+    }
+
+    /// 同じ依頼に appId を付ける(空なら付けない)。写真などほかの値はそのまま。
+    public func inApp(_ appId: String) -> AITextRequest {
+        var r = self
+        r.appId = appId.isEmpty ? nil : appId
+        return r
     }
 
     /// 長い文の依頼か(端末内 AI を使わない)。
@@ -207,6 +217,8 @@ public enum AITextError: LocalizedError, Equatable, Sendable {
     case needsConsent
     /// Tailor It Pro が要る(ホストが課金画面を出した)
     case needsPro
+    /// 共有のアプリの作成者の Pro が要る(参加者は払っても直らないので課金画面は出さない)
+    case creatorNeedsPro
     /// AI が書くのを断った
     case refused
     /// 答えが形に合わない
@@ -223,6 +235,7 @@ public enum AITextError: LocalizedError, Equatable, Sendable {
         #else
         case .needsPro: "この端末ではオンラインの AI を使います。Tailor It Pro で使えます"
         #endif
+        case .creatorNeedsPro: "この機能は今は使えません。アプリを作った人に知らせてください"
         case .refused: "この内容は AI が書けませんでした"
         case .badOutput: "AI の答えを読み取れませんでした。もう一度お試しください"
         case .failed(let message): message

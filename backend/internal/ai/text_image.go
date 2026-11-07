@@ -13,9 +13,13 @@ import (
 // aiButton inputPhoto on POST /v1/text: one photo of the form goes with the
 // call as an image block (any task / length). The app downscales it first
 // (JPEG, long edge ≤ 1024 px, ≤ 400 KB of base64). Cloud only, the same Pro
-// gate as every /v1/text call, rate-limit weight TextImage (3 by default).
+// gate as every /v1/text call (gateText: a participant of a shared app is
+// covered by the creator's Pro; a 402 is not charged), rate-limit weight
+// max(task / long, TextImage (3 by default)).
 // Off unless Service.TextImage (env AI_TEXT_IMAGE=1): the privacy policy has
-// to name photos as sent data first (docs/backend/features/text.md).
+// to name photos as sent data first (docs/backend/features/text.md). The
+// switch and the photo are checked first (403 / 400 / 413, charged like any
+// 4xx but 402), before the text checks and the Pro gate.
 // The image bytes are never logged nor put in an error message.
 
 // Caps of the photo of one call.

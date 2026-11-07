@@ -17,6 +17,9 @@ import (
 //     the difference comes back.
 //   - anything else (4xx, 429, 500) or a client that went away before the
 //     end: nothing comes back. A disconnect may have cost a full Claude call.
+//   - a handler that waives the request (/v1/text 402: no Pro covers it, no
+//     Claude call) calls Waive before writing the error: everything comes
+//     back at once and X-RateLimit-* show the count without this request.
 //
 // The handler reports how the request ended through the request context
 // (ReportStatus / ReportMode), never through a response header, so nothing
@@ -34,6 +37,10 @@ type outcome struct {
 	mu     sync.Mutex
 	status int    // set for SSE, whose HTTP status is always 200
 	mode   string // generate: resolved mode create|edit|undo
+
+	// set by the middleware for Waive
+	waive  func(context.Context) bool
+	waived bool
 }
 
 func outcomeFrom(ctx context.Context) *outcome {
@@ -61,6 +68,25 @@ func ReportMode(ctx context.Context, mode string) {
 		o.mode = mode
 		o.mu.Unlock()
 	}
+}
+
+// Waive gives back everything the request was charged, right away, and
+// rewrites X-RateLimit-* to the count without it. Call it before writing the
+// response of a request that is not charged (/v1/text 402). It reports whether
+// the units came back (false outside the rate limiter, for an uncharged
+// request or when the refund failed; the end-of-request rules then apply).
+func Waive(ctx context.Context) bool {
+	o := outcomeFrom(ctx)
+	if o == nil {
+		return false
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.waived || o.waive == nil {
+		return o.waived
+	}
+	o.waived = o.waive(ctx)
+	return o.waived
 }
 
 // refundUnits applies the rules above. charged is what the request paid,
@@ -111,7 +137,7 @@ func (sw *statusWriter) Flush() {
 }
 
 // final prefers the status the handler reported over the HTTP one.
-func (o *outcome) final(httpStatus int) (int, string) {
+func (o *outcome) final(httpStatus int) (int, string, bool) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	status := httpStatus
@@ -121,5 +147,5 @@ func (o *outcome) final(httpStatus int) (int, string) {
 	if status == 0 {
 		status = http.StatusOK
 	}
-	return status, o.mode
+	return status, o.mode, o.waived
 }

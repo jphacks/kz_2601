@@ -33,6 +33,7 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 | 200 で、mode auto が修正(edit)になった | 3 − 2 = 1(新規 − 修正の重さ) | 修正の重さは表の 2。auto だけ安くも高くもしない |
 | 200 で、mode auto が「元に戻す」(undo)になった | 3 全部 | Claude を呼ばない |
 | 4xx(入力の誤り・422・Claude の 429 も含む)と 500 | 返さない | 利用者が起こせる失敗、または原因が分からない失敗 |
+| `/v1/text` の 402 `pro_required`(Pro が無い・`creator_needs_pro`) | 数えた分の全部(応答の前) | Claude を呼ばない。handler が `ratelimit.Waive` で応答の前に返し、`X-RateLimit-Remaining` もこの依頼を数えない値に書き直す。400 / 403(写真のスイッチ off)/ 413 は上の 4xx と同じく返さない |
 | 503 `ai_paused` | (数えていない) | 一時停止はレートリミットの手前で返す(`cmd/ai/main_test.go` で順番を固定) |
 | 途中で端末が切断した(ストリームの途中など) | 返さない | Claude の 1 回分の費用はもうかかっている。控えめな方を選んだ |
 
@@ -54,7 +55,7 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 | `RATE_LIMIT_PRO_DAILY` | 300 | Pro でも上限はある(緩い)。Pro はサーバーで検証した権利(`users/{uid}/entitlements/pro`・#314 #449)で判定 |
 | `RATE_LIMIT_IP_DAILY` | 300 | 匿名だけ。同じ IP からの匿名の合計(作り直し対策) |
 | `RATE_LIMIT_GLOBAL_DAILY` | 2000 | 環境全体の費用ブレーカー。新規作成なら約 660 回 |
-| `RATE_LIMIT_WEIGHT_CREATE` / `_EDIT` / `_CHAT` / `_TEXT` / `_TEXT_TASK` / `_TEXT_LONG` / `_TEXT_IMAGE` | 3 / 2 / 1 / 1 / 2 / 3 / 3 | `_TEXT_TASK` は `/v1/text` の本文に generate 以外の `task` がある時。`_TEXT_LONG` は本文に `length: "long"` がある時(task より優先)。`_TEXT_IMAGE` は本文に `image` がある時(ほかの重さと大きい方) |
+| `RATE_LIMIT_WEIGHT_CREATE` / `_EDIT` / `_CHAT` / `_TEXT` / `_TEXT_TASK` / `_TEXT_LONG` / `_TEXT_IMAGE` | 3 / 2 / 1 / 1 / 2 / 3 / 3 | `_TEXT_TASK` は `/v1/text` の本文に generate 以外の `task` がある時。`_TEXT_LONG` は本文に `length: "long"` がある時。`_TEXT_IMAGE` は本文に `image` がある時。重なった時は大きい方(max) |
 | `RATE_LIMIT` | on(GOOGLE_CLOUD_PROJECT があれば) | `off` で無効。ローカルで素の起動なら既定 off |
 | `RATE_LIMIT_STORE` | firestore | `memory` でインスタンスごとのメモリ |
 | `RATE_LIMIT_COLLECTION` | rateLimits | |

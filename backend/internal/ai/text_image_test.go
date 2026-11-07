@@ -20,6 +20,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
+	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
 func testJPEG(t *testing.T, w, h int) string {
@@ -236,5 +237,62 @@ func TestAIPhotoInputRulesReachPrompt(t *testing.T) {
 		if !strings.Contains(systemPrompt, want) {
 			t.Errorf("systemPrompt lacks %q", want)
 		}
+	}
+}
+
+// imageLimitStack is /v1/text with the photo switch on/off behind the real
+// rate limiter and the Pro gate; "pro-owner" made app P, "free-owner" app F,
+// "member" joined both (sharedAppFixture).
+func imageLimitStack(t *testing.T, on bool) (http.Handler, *fakeCaller, *countingStore) {
+	t.Helper()
+	m := store.NewMemory()
+	sharedAppFixture(t, m, "")
+	fc := &fakeCaller{replies: []string{reply("ロキソプロフェン")}}
+	svc := &Service{Claude: fc, Verifier: auth.DevVerifier{}, AuthMode: auth.ModeDev,
+		Pro: proSet{"pro-owner": true}, ProMode: paid.ModeEnforce, Members: m, TextImage: on}
+	counting := &countingStore{inner: ratelimit.NewMemory()}
+	limiter := ratelimit.New(ratelimit.Config{Limits: ratelimit.DefaultLimits, Weights: ratelimit.DefaultWeights}, counting, nil)
+	return limiter.Middleware(auth.DevVerifier{})(NewHandler(svc)), fc, counting
+}
+
+// A photo call goes through the same creator-pays gate: a participant of a
+// Pro creator's app is served (charged TextImage); of a creator without Pro
+// gets 402 creator_needs_pro, no Claude call and the units back.
+func TestTextImageCreatorPays(t *testing.T) {
+	limit := ratelimit.DefaultLimits.SignedIn
+	h, fc, counting := imageLimitStack(t, true)
+	img := &TextImage{MediaType: "image/jpeg", Data: testJPEG(t, 32, 32)}
+	rec := postText(t, h, "member", imageBody(t, TextRequest{Task: "extract", Instruction: "薬", AppID: "F", Image: img}))
+	if rec.Code != http.StatusPaymentRequired || textReason(t, rec.Body.Bytes()) != reasonCreatorNeedsPro || len(fc.calls) != 0 {
+		t.Fatalf("free creator: %d %s", rec.Code, rec.Body.String())
+	}
+	if got := remaining(t, rec.Header()); got != limit {
+		t.Fatalf("402 remaining %d, want %d", got, limit)
+	}
+	rec = postText(t, h, "member", imageBody(t, TextRequest{Task: "extract", Instruction: "薬", AppID: "P", Image: img}))
+	if rec.Code != http.StatusOK || len(fc.calls) != 1 || len(fc.calls[0].Messages[0].Images) != 1 {
+		t.Fatalf("Pro creator: %d %s", rec.Code, rec.Body.String())
+	}
+	if got, want := remaining(t, rec.Header()), limit-ratelimit.DefaultWeights.TextImage; got != want {
+		t.Fatalf("photo remaining %d, want %d", got, want)
+	}
+	if counting.refunds.Load() != 1 {
+		t.Fatalf("refunded %d", counting.refunds.Load())
+	}
+}
+
+// The switch comes before the Pro gate: off = 403 even for a participant of
+// a creator without Pro, and the 403 keeps the charge like the other 4xx
+// (only the 402 is waived).
+func TestTextImageDisabledKeepsTheCharge(t *testing.T) {
+	limit := ratelimit.DefaultLimits.SignedIn
+	h, fc, counting := imageLimitStack(t, false)
+	body := imageBody(t, TextRequest{Instruction: "説明", AppID: "F", Image: &TextImage{MediaType: "image/jpeg", Data: testJPEG(t, 32, 32)}})
+	rec := postText(t, h, "member", body)
+	if rec.Code != http.StatusForbidden || errCode(t, rec) != httpx.CodeForbidden || len(fc.calls) != 0 {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	if got, want := remaining(t, rec.Header()), limit-ratelimit.DefaultWeights.TextImage; got != want || counting.refunds.Load() != 0 {
+		t.Fatalf("remaining %d, want %d, refunds %d", got, want, counting.refunds.Load())
 	}
 }
