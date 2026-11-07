@@ -20,6 +20,8 @@ final class FeedLeafTests: XCTestCase {
         XCTAssertNil(FeedLeaf.dateText(nil, provider: "weather"))
         XCTAssertEqual(FeedLeaf.dateText("2026-11-07T15:31:00+09:00", provider: "warnings"), "11/7 15:31")
         XCTAssertEqual(FeedLeaf.dateText("2026-11-09T06:00:00+09:00", provider: "pressure"), "11/9(月)")
+        XCTAssertEqual(FeedLeaf.dateText("2026-11-06T03:59:29+09:00", provider: "arxiv"), "11/6 3:59")
+        XCTAssertEqual(FeedLeaf.dateText("2026-10-23", provider: "diet"), "10/23(金)")
     }
 
     func testPressureRangeAndSparkline() {
@@ -36,6 +38,8 @@ final class FeedLeafTests: XCTestCase {
         XCTAssertEqual(FeedLeaf.icon("weather"), "cloud.sun")
         XCTAssertEqual(FeedLeaf.icon("rss"), "newspaper")
         XCTAssertEqual(FeedLeaf.icon("warnings"), "exclamationmark.triangle")
+        XCTAssertEqual(FeedLeaf.icon("arxiv"), "doc.text")
+        XCTAssertEqual(FeedLeaf.icon("diet"), "building.columns")
         let w = FeedResult(provider: "warnings", title: "石川県の警報・注意報", items: [], source: FeedSource(name: "気象庁ホームページ", url: "https://www.jma.go.jp/bosai/warning/", license: "公共データ利用規約(第1.0版)"))
         XCTAssertTrue(FeedLeaf.attribution(w).contains("気象庁"))
         let r = FeedResult(provider: "holidays", title: "国民の祝日", items: [], source: FeedSource(name: "内閣府ホームページ", url: "https://www8.cao.go.jp/", license: "公共データ利用規約(第1.0版)"))

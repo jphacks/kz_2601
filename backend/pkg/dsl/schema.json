@@ -5145,9 +5145,11 @@
             "holidays",
             "rss",
             "warnings",
-            "pressure"
+            "pressure",
+            "arxiv",
+            "diet"
           ],
-          "description": "データの出どころ(閉じた一覧)。weather = 気象庁の天気予報、warnings = 気象庁の今出ている警報・注意報、pressure = 48 時間の気圧の予報(6 時間ごとの最低 / 最高と急な低下の印)。この 3 つは region が要る。holidays = 内閣府の国民の祝日(これから来る祝日)、rss = 運営が許可したお知らせのフィード(feedId が要る)。任意の URL・Web サイトは指定できない。"
+          "description": "データの出どころ(閉じた一覧)。weather = 気象庁の天気予報、warnings = 気象庁の今出ている警報・注意報、pressure = 48 時間の気圧の予報(6 時間ごとの最低 / 最高と急な低下の印)。この 3 つは region が要る。holidays = 内閣府の国民の祝日(これから来る祝日)、rss = 運営が許可したお知らせのフィード(feedId が要る)。arxiv = arXiv の分野の新着論文(feedId に分野)。diet = 国会会議録の発言の検索(query が要る)。任意の URL・Web サイトは指定できない。"
         },
         "region": {
           "type": "string",
@@ -5155,7 +5157,11 @@
         },
         "feedId": {
           "type": "string",
-          "description": "rss だけ: 許可されたフィードの id(digital-news = デジタル庁 新着・更新 / fdma-news = 消防庁 新着情報 / fdma-disaster = 消防庁 災害情報)。"
+          "description": "rss: 許可されたフィードの id(digital-news = デジタル庁 新着・更新 / fdma-news = 消防庁 新着情報 / fdma-disaster = 消防庁 災害情報)。arxiv: 分野(cs.AI / cs.CL / cs.CV / cs.LG / cs.RO / cs.HC / cs.SE / cs.CR / stat.ML)。"
+        },
+        "query": {
+          "type": "string",
+          "description": "diet だけ: 国会会議録で探す決まった語(40 字まで・空白区切りは AND)。例 こども家庭庁。"
         },
         "title": {
           "type": "string",
@@ -5171,7 +5177,7 @@
         }
       },
       "description": "外部の公開データの読み取り専用の一覧(#348)。サーバーが運営の許可した出どころ(気象庁の天気予報・内閣府の祝日・許可したお知らせのフィード)だけから取り、端末は直接外へ出ない。日付・見出し・天気のアイコン・最高 / 最低気温・降水確率・出典を行で出す。記録は作らず保存もしない(読むだけ)。「天気予報」「明日の天気」「次の祝日」「祝日の一覧」「お知らせ・新着ニュース」の時に使う。任意の URL・任意のサイトの読み込み・外部への送信はできない。",
-      "x-usage": "天気: feed{provider: weather, region: 地域のコード, title: 〇〇の天気, limit: 3〜7}(例 A1:F5)。警報: feed{provider: warnings, region}。気圧・頭痛: feed{provider: pressure, region, limit: 8}。祝日: feed{provider: holidays, title: 次の祝日, limit: 5}。お知らせ: feed{provider: rss, feedId: 許可された id, limit: 10}。地域が分からない天気の依頼は東京都(130000)にして summary で地域を変えられると伝える。entity・保存ボタン・フォームは作らない。"
+      "x-usage": "天気: feed{provider: weather, region: 地域のコード, title: 〇〇の天気, limit: 3〜7}(例 A1:F5)。警報: feed{provider: warnings, region}。気圧・頭痛: feed{provider: pressure, region, limit: 8}。祝日: feed{provider: holidays, title: 次の祝日, limit: 5}。お知らせ: feed{provider: rss, feedId: 許可された id, limit: 10}。論文: feed{provider: arxiv, feedId: cs.AI}。国会: feed{provider: diet, query: 語}。地域が分からない天気の依頼は東京都(130000)にして summary で地域を変えられると伝える。entity・保存ボタン・フォームは作らない。"
     }
   }
 }

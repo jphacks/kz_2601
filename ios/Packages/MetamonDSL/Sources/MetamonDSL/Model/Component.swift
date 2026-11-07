@@ -232,11 +232,11 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var back: String?           // 裏の field
     public var toggle: String?         // 覚えた / まだ を保存する boolean field
     // feed(#348)。URL は持たない
-    public var provider: String?       // weather|warnings|pressure|holidays|rss
+    public var provider: String?       // weather|warnings|pressure|holidays|rss|arxiv|diet
     public var region: String?         // weather / warnings / pressure: 気象庁の府県予報区のコード
-    public var feedId: String?         // rss: 許可したフィードの id
+    public var feedId: String?         // rss: 許可したフィードの id / arxiv: 分野
     // placeSearch。label / nameField / locationField は共用
-    public var query: String?          // 決まった検索語
+    public var query: String?          // 決まった検索語(placeSearch・feed の diet)
     public var category: String?       // cafe|restaurant|…(PlaceSearch.categories)
     public var near: String?           // current(既定)
     public var addressField: String?   // placeSearch / locationButton: 住所の string / text field

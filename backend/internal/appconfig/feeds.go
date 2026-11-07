@@ -1,8 +1,8 @@
 package appconfig
 
 // External feeds (#348): GET /v1/feeds/{provider} reads allowlisted public
-// data (weather / warnings / pressure / holidays / allowlisted rss) for the
-// DSL feed leaf. The
+// data (weather / warnings / pressure / holidays / allowlisted rss / arxiv
+// category / diet speech search) for the DSL feed leaf. The
 // server is the only party that talks to the source (the device never does),
 // takes nothing from the request but the provider and its typed parameter,
 // and sends nothing about the user. internal/feeds holds the allowlist, the
@@ -54,9 +54,9 @@ func feedsPerHour(getenv func(string) string) int {
 	return DefaultFeedsPerHour
 }
 
-var feedParams = map[string]bool{"region": true, "feedId": true, "limit": true}
+var feedParams = map[string]bool{"region": true, "feedId": true, "q": true, "limit": true}
 
-// getFeed: GET /v1/feeds/{provider}?region=&feedId=&limit=
+// getFeed: GET /v1/feeds/{provider}?region=&feedId=&q=&limit=
 func (h *Handler) getFeed(w http.ResponseWriter, r *http.Request) {
 	q := feeds.Query{Provider: r.PathValue("provider")}
 	if !dsl.FeedProviders[q.Provider] {
@@ -70,7 +70,12 @@ func (h *Handler) getFeed(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	q.Region, q.FeedID = vals.Get("region"), vals.Get("feedId")
+	q.Region, q.FeedID, q.Q = vals.Get("region"), vals.Get("feedId"), vals.Get("q")
+	if _, ok := dsl.NormalizeFeedQuery(q.Q); vals.Has("q") && (q.Provider != dsl.FeedDiet || !ok) {
+		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest,
+			fmt.Sprintf("q is for diet only: 1..%d characters, no control characters", dsl.FeedQueryMaxRunes)).With("field", "q"))
+		return
+	}
 	limit := 0
 	if raw := vals.Get("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
@@ -91,7 +96,7 @@ func (h *Handler) getFeed(w http.ResponseWriter, r *http.Request) {
 	res, err := h.feeds.Get(ctx, q, limit)
 	switch {
 	case errors.Is(err, feeds.ErrUnknown):
-		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "region / feedId is not on the allowlist"))
+		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "region / feedId / q is not on the allowlist"))
 	case errors.Is(err, feeds.ErrDisabled):
 		fail(w, apiErr(http.StatusServiceUnavailable, httpx.CodeUpstreamUnavailable, "この読み込みは今止めています").With("reason", "disabled"))
 	case errors.Is(err, feeds.ErrBusy), err != nil:
