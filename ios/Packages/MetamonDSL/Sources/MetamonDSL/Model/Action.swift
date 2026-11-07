@@ -8,6 +8,8 @@ public enum ActionType: String, Decodable, Sendable, CaseIterable {
     /// 記録を CSV / PDF にして共有シートへ(#421)
     case export
     case startActivity, endActivity // #423 ライブアクティビティ
+    /// 今のレコードを端末のカレンダーに予定として入れる(OS の「新規イベント」画面)
+    case addToCalendar
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -46,6 +48,8 @@ public struct Action: Decodable, Sendable {
     public var title: String?
     /// startActivity(#423)
     public var activity: ActivitySpec?
+    /// addToCalendar
+    public var calendarEvent: CalendarEventSpec?
 
     /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
     static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
@@ -54,6 +58,7 @@ public struct Action: Decodable, Sendable {
         case type, screen, presentation, prefillRef, entity, url, confirmMessage, notification, notificationId
         case format, filter, fields, title
         case activity
+        case calendarEvent
     }
 
     public init(from decoder: Decoder) throws {
@@ -73,6 +78,7 @@ public struct Action: Decodable, Sendable {
         fields = try? c.decodeIfPresent([String].self, forKey: .fields)
         title = try? c.decodeIfPresent(String.self, forKey: .title)
         activity = try? c.decodeIfPresent(ActivitySpec.self, forKey: .activity)
+        calendarEvent = try? c.decodeIfPresent(CalendarEventSpec.self, forKey: .calendarEvent)
     }
 
     /// DSL 外でクライアントが合成するアクション(例: list の長押し削除)。
@@ -104,5 +110,31 @@ public struct ActivitySpec: Decodable, Equatable, Sendable {
         self.icon = icon
         self.minutes = minutes
         self.stat = stat
+    }
+}
+
+/// `addToCalendar` の中身。レコードの field id と予定の欄の対応(Go の `dsl.CalendarEvent` と 1:1)。
+public struct CalendarEventSpec: Decodable, Equatable, Sendable {
+    /// date なら終日、datetime ならその時刻から
+    public var startField: String
+    public var endField: String?
+    /// 終わりが無い時の長さ(分)。nil は 60
+    public var durationMinutes: Int?
+    /// nil は entity.titleField → 最初の文字の field
+    public var titleField: String?
+    public var locationField: String?
+    public var notesField: String?
+    /// 始まりの N 分前に通知(0 は始まりの時刻)
+    public var alertMinutes: Int?
+
+    public init(startField: String, endField: String? = nil, durationMinutes: Int? = nil, titleField: String? = nil,
+                locationField: String? = nil, notesField: String? = nil, alertMinutes: Int? = nil) {
+        self.startField = startField
+        self.endField = endField
+        self.durationMinutes = durationMinutes
+        self.titleField = titleField
+        self.locationField = locationField
+        self.notesField = notesField
+        self.alertMinutes = alertMinutes
     }
 }

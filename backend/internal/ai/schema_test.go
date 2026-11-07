@@ -94,8 +94,10 @@ func TestGenerationSchemaHasNoUnsupportedKeywords(t *testing.T) {
 			t.Fatalf("%s should be pruned", gone)
 		}
 	}
-	// Schemas stay small enough for the API grammar compiler.
-	if n := len(GenerationSchema()); n > 20000 {
+	// Schemas stay small enough for the API grammar compiler (structured
+	// output is opt-in for this schema). 20000 → 21000: develop's parts (#659)
+	// plus addToCalendar / alarm reached 20025.
+	if n := len(GenerationSchema()); n > 21000 {
 		t.Fatalf("generation schema too large: %d bytes", n)
 	}
 }

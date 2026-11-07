@@ -355,6 +355,8 @@ func (a *App) Validate() error {
 			checkExportAction(where, act, entities, add)
 		case ActionStartActivity:
 			checkActivity(where, act.Activity, a, add) // #423: live_activity.go
+		case ActionAddCalendar:
+			checkCalendarAction(where, act, entities, add) // calendar_event.go
 		case ActionBack, ActionOpenVoice, ActionResetForm, ActionEndActivity:
 		default:
 			add("%s: unknown action type %q", where, act.Type)

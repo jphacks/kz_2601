@@ -52,7 +52,7 @@ final class SchemaSwiftKeysTests: XCTestCase {
     func testActionTypesMatchSchema() throws {
         let schemaTypes = try SchemaFixture.load().actionTypes
         let swiftTypes = Set(ActionType.allCases.filter { $0 != .unknown }.map(\.rawValue))
-        XCTAssertEqual(schemaTypes.count, 14, "アクションの数が 14 でない(#351・#270 で follow / unfollow)")
+        XCTAssertEqual(schemaTypes.count, 15, "アクションの数が 15 でない(#351・#270 で follow / unfollow・addToCalendar)")
         assertSameSet(schema: schemaTypes, swift: swiftTypes, what: "アクションの type",
                       swiftPlace: "ActionType の case")
     }
@@ -82,6 +82,7 @@ final class SchemaSwiftKeysTests: XCTestCase {
             ("TableColumn", "TableColumnSpec(Model/Component.swift)", TableColumnSpec(field: "f")),
             ("SensorThreshold", "SensorThreshold(Model/Component.swift)", SensorThreshold()),
             ("Activity", "ActivitySpec(Model/Action.swift)", ActivitySpec(title: "t")),
+            ("CalendarEvent", "CalendarEventSpec(Model/Action.swift)", CalendarEventSpec(startField: "s")),
             ("Mark", "Mark(Records/RecordMark.swift)", Mark(id: "m", icon: "heart", label: "l")),
             ("PhotoAnalyze", "PhotoAnalyze(Records/PhotoReading.swift)", PhotoAnalyze(kind: .text, into: "f")),
             ("ImportColumn", "ImportColumn(Records/RecordImport.swift)", ImportColumn(column: "c", field: "f")),

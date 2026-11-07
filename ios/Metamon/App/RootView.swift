@@ -363,6 +363,13 @@ private struct HostSheets: ViewModifier {
                     .presentationDetents([.medium, .large])
                     .ignoresSafeArea()
             }
+            .sheet(item: Binding(get: { active ? rt.calendarDraft : nil }, set: { rt.calendarDraft = $0 })) { draft in
+                CalendarEventEditor(draft: draft) { saved in
+                    rt.calendarDraft = nil
+                    if saved { rt.toast = L10n.tr("カレンダーに追加しました") }
+                }
+                .ignoresSafeArea()
+            }
             .modifier(AuthorNamePromptModifier(active: active)) // 共有アプリへの初投稿で表示名を聞く(#250)
     }
 }
