@@ -715,6 +715,40 @@
         }
       }
     },
+    "AI と話す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talking with AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI と話す"
+          }
+        }
+      }
+    },
+    "AI と話すには Tailor It Pro が必要です。会話はサーバーの AI で返します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talking with AI requires Tailor It Pro. Replies come from the server AI."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI と話すには Tailor It Pro が必要です。会話はサーバーの AI で返します。"
+          }
+        }
+      }
+    },
     "AI に送る内容の説明を改めました。もう一度ご確認ください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14940,6 +14974,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "閉じる"
+          }
+        }
+      }
+    },
+    "閉じると、AI と話す部品は使えません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you close this, you can't talk with the AI."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じると、AI と話す部品は使えません。"
           }
         }
       }
