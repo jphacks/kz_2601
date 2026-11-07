@@ -91,6 +91,7 @@ var expectKeys = map[string]expectKind{
 	"aiGenerateEntity": expectBool,
 	"aiTask":           expectString, // some aiButton has this task (summarize|classify|...|generate)
 	"aiLength":         expectString, // some aiButton has this length (short|long; short = unset too)
+	"aiSaveTo":         expectBool,   // some generate list button saves items as records (ai_save_to.go)
 	// checkNearby (#425)
 	"passby":         expectBool,
 	"passbyDistance": expectBool,

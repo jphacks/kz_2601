@@ -79,7 +79,7 @@ func checkAIGenerate(exp map[string]any, a *dsl.App) []string {
 			miss = append(miss, fmt.Sprintf("aiLength=%s got %v", want, got))
 		}
 	}
-	return miss
+	return append(miss, checkAISaveTo(exp, a)...)
 }
 
 // aiButtons lists every aiButton of the app (also inside a container).
