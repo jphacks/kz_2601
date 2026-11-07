@@ -57,6 +57,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case fileImport
     // leaf(目的地までの道案内・#411)。title / label / entity / locationField / titleField / mode は共用
     case routeGuide
+    // leaf(近くの場所を Apple のマップで探してフォームに入れる)。label / nameField / locationField は共用
+    case placeSearch
     // leaf(ドラレコ・#410)。title は共用
     case dashcam
     // leaf(端末のセンサー・#419)。label / style / min / max / entity / field / dateField / seconds / limit は共用
@@ -232,6 +234,12 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var provider: String?       // weather|warnings|pressure|holidays|rss
     public var region: String?         // weather / warnings / pressure: 気象庁の府県予報区のコード
     public var feedId: String?         // rss: 許可したフィードの id
+    // placeSearch。label / nameField / locationField は共用
+    public var query: String?          // 決まった検索語
+    public var category: String?       // cafe|restaurant|…(PlaceSearch.categories)
+    public var near: String?           // current(既定)
+    public var addressField: String?   // placeSearch / locationButton: 住所の string / text field
+    public var pins: Bool?             // placeSearch: 結果を小さな地図のピンでも出す
 
     /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
     static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
@@ -258,6 +266,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case front, back, toggle
         case visibleTo, highlight
         case provider, region, feedId
+        case query, category, near, addressField, pins
     }
 
     public init(from decoder: Decoder) throws {
@@ -373,6 +382,11 @@ public struct Component: Decodable, Identifiable, Sendable {
         provider = try? c.decodeIfPresent(String.self, forKey: .provider)
         region = try? c.decodeIfPresent(String.self, forKey: .region)
         feedId = try? c.decodeIfPresent(String.self, forKey: .feedId)
+        query = try? c.decodeIfPresent(String.self, forKey: .query)
+        category = try? c.decodeIfPresent(String.self, forKey: .category)
+        near = try? c.decodeIfPresent(String.self, forKey: .near)
+        addressField = try? c.decodeIfPresent(String.self, forKey: .addressField)
+        pins = try? c.decodeIfPresent(Bool.self, forKey: .pins)
     }
 }
 

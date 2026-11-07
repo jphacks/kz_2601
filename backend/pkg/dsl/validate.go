@@ -573,12 +573,15 @@ func (a *App) Validate() error {
 				} else if c.Type == CompQrScanner && f.Type != FieldString && f.Type != FieldText {
 					add("%s: qrScanner field %q must be string or text", where, c.Field)
 				}
+				checkLocationButtonAddress(where, c, formEntity, add) // place_search.go
 			case CompQrCode: // #422
 				checkQRCode(where, c, formEntity, entities, add)
 			case CompLocationPicker: // #212
 				checkLocationPicker(where, c, formEntity, add)
 			case CompRouteGuide: // #411
 				checkRouteGuide(where, c, formEntity, entities, add)
+			case CompPlaceSearch:
+				checkPlaceSearch(where, c, formEntity, add) // place_search.go
 			case CompTimerDisplay:
 				switch c.Mode {
 				case "stopwatch":

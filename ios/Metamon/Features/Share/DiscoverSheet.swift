@@ -188,7 +188,7 @@ enum ComponentIcon {
         case "image": "photo"
         case "drawingField": "pencil.tip"
         case "videoField", "videoPlayer": "video.fill"
-        case "map", "mapView", "locationButton", "locationPicker": "map.fill"
+        case "map", "mapView", "locationButton", "locationPicker", "placeSearch": "map.fill"
         case "timer", "timerDisplay": "timer"
         case "webView": "safari"
         case "qrScanner": "qrcode.viewfinder"

@@ -449,6 +449,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRetention(c.Expect, app)...)  // #482: retention.go
 		// text.highlight: text_highlight.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkTextHighlight(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkPlaceSearch(c.Expect, app)...) // place_search.go
 		// #507: matching.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMatching(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRepeat(c.Expect, app)...)      // #266: repeat.go

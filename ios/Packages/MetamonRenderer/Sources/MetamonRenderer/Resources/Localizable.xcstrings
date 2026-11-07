@@ -1599,6 +1599,23 @@
         }
       }
     },
+    "もう一度探す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度探す"
+          }
+        }
+      }
+    },
     "もう一度読み取る" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2581,6 +2598,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "位置情報がオフのため記録できません。設定で「このAppの使用中のみ許可」を選んでください"
+          }
+        }
+      }
+    },
+    "位置情報が許可されていないので近くを探せません。設定で「このAppの使用中のみ許可」を選ぶか、探す語を入れてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location access is off, so nearby places can't be found. Choose \"While Using the App\" in Settings, or type what to search for."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報が許可されていないので近くを探せません。設定で「このAppの使用中のみ許可」を選ぶか、探す語を入れてください"
           }
         }
       }
@@ -3707,6 +3741,23 @@
         }
       }
     },
+    "店名・種類で探す(例: ラーメン)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search by name or kind (e.g. ramen)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "店名・種類で探す(例: ラーメン)"
+          }
+        }
+      }
+    },
     "徒歩" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4370,6 +4421,57 @@
         }
       }
     },
+    "現在地" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current Location"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地"
+          }
+        }
+      }
+    },
+    "現在地がわからないので近くを探せません。少し待つか、探す語を入れてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your location isn't available yet. Wait a moment, or type what to search for."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地がわからないので近くを探せません。少し待つか、探す語を入れてください"
+          }
+        }
+      }
+    },
+    "現在地が使えないので、近くに限らず探しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location isn't available, so results aren't limited to nearby."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地が使えないので、近くに限らず探しました"
+          }
+        }
+      }
+    },
     "現在地を確認しています…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4931,6 +5033,23 @@
         }
       }
     },
+    "見つかりませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No results"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "見つかりませんでした"
+          }
+        }
+      }
+    },
     "見送る" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5080,6 +5199,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録なし"
+          }
+        }
+      }
+    },
+    "記録に追加" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録に追加"
           }
         }
       }
@@ -5390,6 +5526,40 @@
         }
       }
     },
+    "近くの場所" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nearby places"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの場所"
+          }
+        }
+      }
+    },
+    "近くを探す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search nearby"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くを探す"
+          }
+        }
+      }
+    },
     "追加" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5403,6 +5573,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "追加"
+          }
+        }
+      }
+    },
+    "追加しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加しました"
           }
         }
       }
