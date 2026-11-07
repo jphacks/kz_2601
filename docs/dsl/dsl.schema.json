@@ -414,7 +414,8 @@
             "cancelNotification",
             "export",
             "startActivity",
-            "endActivity"
+            "endActivity",
+            "addToCalendar"
           ],
           "x-enumDescriptions": {
             "navigate": "画面遷移。list.onItemTap からは recordId が暗黙に渡り、遷移先フォームが編集モードになる(だから onItemTap の遷移先は同じ entity のフォーム)。prefillRef を付けると今のレコード(タップした行・ボタンのあるフォームのレコード)を子フォームの ref に入れて新規で開く。",
@@ -428,7 +429,8 @@
             "cancelNotification": "予約した通知を取り消す。",
             "export": "記録を CSV(Excel で開ける)か PDF の報告にして共有シートで送る(ファイル・メール・AirDrop)。「CSV で出したい」「PDF にしたい」「Excel で開きたい」「月の報告書」はこれ。button か toolbar に置く。CSV は表示と同じ書式(日付・円・選択肢・参照先の名前・計算項目を含む)、PDF は見出し・絞り込み・表と、同じ画面にある同じ entity のグラフを 1 つにまとめる。",
             "startActivity": "ロック画面と Dynamic Island に「いま◯◯中」を出す(ライブアクティビティ・#423)。activity の title と、任意で残り時間(minutes)・数字(stat)。アプリを閉じても時間は進み、stat は記録を足すたびに更新される。同じアプリで出し直すと前のものを置き換える。タイマー部品の時間を出すだけなら timerDisplay.liveActivity の方が短い。",
-            "endActivity": "startActivity で出したロック画面の表示を消す(「終わった」「到着」ボタンに)。"
+            "endActivity": "startActivity で出したロック画面の表示を消す(「終わった」「到着」ボタンに)。",
+            "addToCalendar": "今のレコード(フォーム画面なら入力中の値、list.onItemTap ならタップした行)を iPhone のカレンダー(Google カレンダーと同期していればそこにも)に予定として入れる。押すと OS の「新規イベント」画面が中身を埋めた状態で開き、ユーザーが「追加」を押す。カレンダーの許可は要らない。「カレンダーに入れたい」「予定に登録」「Google カレンダーにも」はこれ。calendarEvent の startField(日付 / 日時)は必須。"
           }
         },
         "screen": {
@@ -452,11 +454,12 @@
         },
         "entity": {
           "type": "string",
-          "description": "saveRecord / deleteRecord / export: entity id.",
+          "description": "saveRecord / deleteRecord / export / addToCalendar: entity id.",
           "x-for": {
             "saveRecord": "required",
             "deleteRecord": "required",
-            "export": "required"
+            "export": "required",
+            "addToCalendar": "required"
           }
         },
         "url": {
@@ -531,6 +534,13 @@
           "description": "startActivity only.",
           "x-for": {
             "startActivity": "required"
+          }
+        },
+        "calendarEvent": {
+          "$ref": "#/$defs/CalendarEvent",
+          "description": "addToCalendar only.",
+          "x-for": {
+            "addToCalendar": "required"
           }
         }
       }
@@ -1593,6 +1603,10 @@
         "enabledField": {
           "$ref": "#/$defs/Id",
           "description": "With entity: boolean field; records where it is false are not notified (alarm on/off)."
+        },
+        "alarm": {
+          "type": "boolean",
+          "description": "true = 止めるまで鳴り続けるアラーム(iOS 26.1 以降の AlarmKit・ロック中も全画面で鳴る)。目覚まし・起床・「止めるまで鳴らして」の時だけ。時刻の通知(time / weekday)とレコードの時刻の通知(entity + field)に付けられ、when とは組み合わせない。アラームが使えない端末(古い iOS・許可が無い・審査用の版)では同じ時刻の普通の通知になる。"
         },
         "when": {
           "$ref": "#/$defs/Expr",
@@ -4278,6 +4292,44 @@
         "stat": {
           "type": "string",
           "description": "任意: 同じアプリの stat か progressBar 部品の id。その数字(progressBar は進み具合)を添え、記録が増えるたびに更新する。"
+        }
+      }
+    },
+    "CalendarEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "addToCalendar で予定にする時の、レコードの項目と予定の欄の対応。値はすべて entity の field id。",
+      "required": [
+        "startField"
+      ],
+      "properties": {
+        "startField": {
+          "type": "string",
+          "description": "始まり。date の field なら終日の予定、datetime ならその時刻から。"
+        },
+        "endField": {
+          "type": "string",
+          "description": "任意: 終わり(date / datetime の field)。値が空なら durationMinutes で決める。"
+        },
+        "durationMinutes": {
+          "type": "integer",
+          "description": "任意: 終わりが無い時の長さ(分・1〜10080)。省略で 60。終日の予定では使わない。"
+        },
+        "titleField": {
+          "type": "string",
+          "description": "任意: 予定の名前にする field(string / text / enum)。省略で entity.titleField、無ければ最初の文字の field。"
+        },
+        "locationField": {
+          "type": "string",
+          "description": "任意: 場所の名前の field(string / text / enum)。"
+        },
+        "notesField": {
+          "type": "string",
+          "description": "任意: メモに入れる field(string / text)。"
+        },
+        "alertMinutes": {
+          "type": "integer",
+          "description": "任意: 始まりの N 分前にカレンダーの通知を鳴らす(0〜10080・0 は始まりの時刻)。「前日に知らせて」は 1440。"
         }
       }
     },

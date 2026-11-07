@@ -24,9 +24,13 @@ struct ButtonLeaf: View {
         isVisible(action: action, isEditing: form?.isEditing ?? false, readOnly: form?.isReadOnly ?? false, canDelete: form?.canDelete ?? true)
     }
 
-    /// icon 省略時の既定。書き出し(#421)は共有の矢印にして「押すと共有シートが開く」と分かるように。
+    /// icon 省略時の既定。書き出し(#421)は共有の矢印にして「押すと共有シートが開く」と分かるように。カレンダーへの追加も同じ考え。
     static func defaultIcon(_ action: Action?) -> String? {
-        action?.type == .export ? "square.and.arrow.up" : nil
+        switch action?.type {
+        case .export: "square.and.arrow.up"
+        case .addToCalendar: "calendar.badge.plus"
+        default: nil
+        }
     }
 
     /// visibleTo "admins"(#272): 管理者でないと分かっている時だけ隠す(分からない間は出し、サーバーが判定する)。

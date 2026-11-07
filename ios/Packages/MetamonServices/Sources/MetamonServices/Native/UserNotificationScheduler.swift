@@ -6,8 +6,14 @@ import MetamonDSL
 /// - アプリごとの予約(`PlannedNotification`)を UserDefaults に持ち、別アプリに切り替えても前のアプリの通知を消さない。
 /// - 予約し直す時は全アプリ分から近い順に `NotificationPlanner.limit` 件だけ iOS に渡す(64 件を超えた分が黙って捨てられないように)。
 /// - 識別子は `dsl.<appId>.…`。それ以外(タイマー `timer.` 等)には触らない。
+/// - `alarm` の通知は、`alarms` があり許可されていれば止めるまで鳴るアラーム(AlarmKit)で届け、普通の通知は出さない。
+///   無い(iOS 26.1 未満・審査用の版)・許可が無い・予約に失敗した時は普通の通知で届ける。
 public struct UserNotificationScheduler: NotificationScheduler {
-    public init() {}
+    private let alarmSync: AlarmSync?
+
+    public init(alarms: (any AlarmScheduling)? = nil) {
+        alarmSync = alarms.map(AlarmSync.init)
+    }
 
     public func sync(appId: String, specs: [NotificationSpec], records: [String: [Record]]) async -> NotificationSyncResult {
         await NotificationRegistry.shared.set(appId, NotificationPlanner.plan(appId: appId, specs: specs, records: records))
@@ -46,12 +52,16 @@ public struct UserNotificationScheduler: NotificationScheduler {
     }
 
     public func removeApp(_ appId: String) async {
+        if let alarmSync {
+            await alarmSync.removeApp(await NotificationRegistry.shared.planned(appId), now: Date())
+        }
         await NotificationRegistry.shared.removeApp(appId)
         await ConditionNotificationStore.shared.removeApp(appId)
         _ = await apply(appId: appId)
     }
 
     public func removeAll() async {
+        await alarmSync?.removeAll()
         await NotificationRegistry.shared.removeAll()
         await ConditionNotificationStore.shared.removeAll()
         let center = UNUserNotificationCenter.current()
@@ -68,14 +78,16 @@ public struct UserNotificationScheduler: NotificationScheduler {
         let now = Date()
         let all = await NotificationRegistry.shared.pruned(now: now)
         let chosen = NotificationPlanner.select(all, now: now)
-        let want = Set(chosen.map(\.0.identifier))
+        let asAlarm = await alarmSync?.apply(chosen.map(\.0), now: now) ?? []
+        let notify = chosen.filter { !asAlarm.contains($0.0.identifier) }
+        let want = Set(notify.map(\.0.identifier))
         let pending = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(NotificationPlanner.prefix) }
         center.removePendingNotificationRequests(withIdentifiers: pending.filter { !want.contains($0) })
         var denied = false
-        if !chosen.isEmpty {
+        if !notify.isEmpty {
             denied = await !requestPermissionIfNeeded()
         }
-        for (p, _) in chosen {
+        for (p, _) in notify {
             do {
                 try await center.add(Self.request(p))
             } catch {
@@ -84,7 +96,7 @@ public struct UserNotificationScheduler: NotificationScheduler {
         }
         let mine = NotificationPlanner.prefix + appId + "."
         let upcoming = chosen.filter { $0.0.identifier.hasPrefix(mine) }.map { UpcomingNotification(title: $0.0.title, body: $0.0.body, date: $0.1) }
-        print("[Metamon] notifications scheduled: total=\(chosen.count) app=\(upcoming.count) next=\(upcoming.first.map { "\($0.date)" } ?? "-") denied=\(denied)")
+        print("[Metamon] notifications scheduled: total=\(chosen.count) alarms=\(asAlarm.count) app=\(upcoming.count) next=\(upcoming.first.map { "\($0.date)" } ?? "-") denied=\(denied)")
         return NotificationSyncResult(denied: denied, upcoming: upcoming)
     }
 
@@ -163,6 +175,11 @@ actor NotificationRegistry {
             table[k]?.removeAll { ids.contains($0.identifier) || $0.identifier.hasPrefix(recordPrefix) }
         }
         save()
+    }
+
+    /// そのアプリの予約(DSL 分とボタン分)。
+    func planned(_ appId: String) -> [PlannedNotification] {
+        (table[appId] ?? []) + (table[appId + "#action"] ?? [])
     }
 
     func removeApp(_ appId: String) {

@@ -1786,6 +1786,23 @@
         }
       }
     },
+    "「%@」を入力してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を入力してください"
+          }
+        }
+      }
+    },
     "「%@」を削除しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5063,6 +5080,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "カメラ・写真"
+          }
+        }
+      }
+    },
+    "カレンダーに入れる記録が見つかりません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No record to add to Calendar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーに入れる記録が見つかりません"
+          }
+        }
+      }
+    },
+    "カレンダーに追加しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added to Calendar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーに追加しました"
           }
         }
       }

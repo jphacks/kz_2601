@@ -59,6 +59,9 @@ type Notification struct {
 	OffsetMinutes int    `json:"offsetMinutes,omitempty"`
 	TitleField    string `json:"titleField,omitempty"`   // record field shown as the body
 	EnabledField  string `json:"enabledField,omitempty"` // boolean field; false = skip the record
+	// Alarm: ring until stopped (iOS 26.1+ AlarmKit). Older iOS / no
+	// permission / the review build post a normal notification at the same time.
+	Alarm bool `json:"alarm,omitempty"`
 	// When (#265, app.notifications only): a boolean screen-scalar Expr. iOS
 	// posts once when it turns false -> true after a record save / delete /
 	// sync on that device. Exclusive with the time and record triggers.
@@ -219,6 +222,7 @@ const (
 	ActionExport        ActionType = "export"
 	ActionStartActivity ActionType = "startActivity" // #423 Live Activity
 	ActionEndActivity   ActionType = "endActivity"
+	ActionAddCalendar   ActionType = "addToCalendar" // system "new event" sheet (calendar_event.go)
 )
 
 // Action is a non-nesting side effect triggered by buttons/list taps.
@@ -237,6 +241,9 @@ type Action struct {
 	Fields         []string      `json:"fields,omitempty"`         // export: columns (default all but photo/video)
 	Title          string        `json:"title,omitempty"`          // export: file name / PDF heading
 	Activity       *Activity     `json:"activity,omitempty"`       // startActivity (#423)
+
+	// addToCalendar: the record fields that become the event (calendar_event.go)
+	CalendarEvent *CalendarEvent `json:"calendarEvent,omitempty"`
 }
 
 // ComponentType discriminates Component.

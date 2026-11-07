@@ -190,6 +190,9 @@ public struct NotificationSpec: Decodable, Identifiable, Sendable {
     /// 条件で知らせる(#265・app.notifications のみ): 真偽の式(ref 不可・agg で集計)。偽 → 真に変わった時に 1 回すぐ知らせる。
     /// 時刻・レコードの日付の通知とは組み合わせない(backend が拒否)。式が読めない通知は `Lossy` が落とす(誤って時刻で鳴らさない)。
     public var when: Expr?
+    /// 止めるまで鳴るアラーム(iOS 26.1 以降の AlarmKit)。使えない時(古い iOS・許可が無い・審査用の版)は同じ時刻の普通の通知。
+    /// 古い版はこのキーを知らずに普通の通知として予約する(それが落とし方)。
+    public var alarm: Bool?
 
     public var isRecordBased: Bool { when == nil && entity?.isEmpty == false && field?.isEmpty == false }
     /// 条件の通知(#265)。予約(時刻・レコードの日付)には入れず、レコードの保存・同期の後に評価する。
@@ -198,7 +201,7 @@ public struct NotificationSpec: Decodable, Identifiable, Sendable {
     public init(
         id: String, title: String, body: String = "", repeat: Repeat = .once, time: String? = nil, weekday: String? = nil,
         entity: String? = nil, field: String? = nil, offsetMinutes: Int? = nil, titleField: String? = nil, enabledField: String? = nil,
-        when: Expr? = nil
+        when: Expr? = nil, alarm: Bool? = nil
     ) {
         self.id = id
         self.title = title
@@ -212,6 +215,7 @@ public struct NotificationSpec: Decodable, Identifiable, Sendable {
         self.titleField = titleField
         self.enabledField = enabledField
         self.when = when
+        self.alarm = alarm
     }
 }
 
