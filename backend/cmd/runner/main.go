@@ -18,6 +18,11 @@
 //	RUNNER_TICK_INTERVAL                       e.g. 10s: tick by itself (local); "" = only on /internal/tick
 //	RUNNER_LIMIT_* / RUNNER_GLOBAL_DAILY       quota (internal/runner/quota)
 //	RATE_LIMIT_COLLECTION                      where quota counters live (ratelimit)
+//	APNS_AUTH_KEY / APNS_KEY_ID / APNS_TEAM_ID / APNS_TOPIC
+//	                                           APNs (#269; push.go). No key = notifications are logged only
+//	RUNNER_APNS_ENVIRONMENT                    production (default) / sandbox
+//	RUNNER_ACCOUNT_AGE=firebase                actors' account age from Firebase Auth (#339 24h ban);
+//	                                           "" = unknown, so only the actor's own notifications go out
 //	PORT                                       default 8080
 //
 // A stg process on the production database refuses to start even with
@@ -87,6 +92,11 @@ func main() {
 		os.Exit(2)
 	}
 	logger.Info("runner: pro gate", slog.String("mode", string(qcfg.ProMode))) // PRO_GATE_MODE (#316)
+	push, err := pushFromEnv(os.Getenv)
+	if err != nil {
+		logger.Error("runner: bad APNs configuration", slog.Any("error", err))
+		os.Exit(2)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -104,10 +114,16 @@ func main() {
 	q := quota.New(qcfg, ratelimit.NewFirestore(st.Client(), os.Getenv("RATE_LIMIT_COLLECTION")),
 		entitlement.NewProChecker(entitlement.NewFirestore(st.Client()), policy.Environments))
 	q.Logger = logger
+	age, err := ageFromEnv(ctx, os.Getenv, target.Project)
+	if err != nil {
+		logger.Error("runner: account age", slog.Any("error", err))
+		os.Exit(2)
+	}
 	env := outboxEnv(os.Getenv("APP_ENV"))
-	// No APNs key here yet: notifications are resolved against the stored
-	// devices and consents (#269) and counted, and LogSender logs their shape only.
-	r, err := runner.New(runner.Config{Env: env, Store: st, Quota: q, Paused: pausedFromEnv(os.Getenv),
+	// Notifications are resolved against the stored devices and consents
+	// (#269). Without an APNs key (push.Sender nil) LogSender logs their shape only.
+	r, err := runner.New(runner.Config{Env: env, Store: st, Quota: q, Sender: push.Sender, PushEnvironment: push.Environment,
+		Age: age, Paused: pausedFromEnv(os.Getenv),
 		NotifyPaused: flagFromEnv(os.Getenv, "RUNNER_NOTIFY_PAUSED"), AutoPause: autoPause, MaxLate: maxLate, Logger: logger})
 	if err != nil {
 		logger.Error("runner: init failed", slog.Any("error", err))
@@ -115,7 +131,12 @@ func main() {
 	}
 	logger.Info("runner: starting", slog.String("firestore", target.String()), slog.String("outbox_env", env),
 		slog.Duration("tick_interval", interval), slog.Bool("paused", pausedFromEnv(os.Getenv)()),
-		slog.Bool("notify_paused", flagFromEnv(os.Getenv, "RUNNER_NOTIFY_PAUSED")()))
+		slog.Bool("notify_paused", flagFromEnv(os.Getenv, "RUNNER_NOTIFY_PAUSED")()),
+		slog.Bool("apns", push.Sender != nil), slog.String("apns_environment", push.Environment), slog.String("apns_topic", push.Topic),
+		slog.Bool("account_age", age != nil))
+	if push.Sender != nil && age == nil {
+		logger.Warn("runner: APNs is on but RUNNER_ACCOUNT_AGE is not set: notifications to others are refused as new_account")
+	}
 	t := &serial{t: r}
 	if err := serve(ctx, envOr("PORT", "8080"), newMux(t, logger), t, interval, logger); err != nil {
 		logger.Error("runner: serve failed", slog.Any("error", err))

@@ -48,6 +48,15 @@ resource "google_project_iam_member" "runner_datastore" {
   member  = google_service_account.runner[0].member
 }
 
+# 他人宛ての通知の「作成から 24 時間」の判定(#339)に、送り手のアカウントの作成時刻を読む。
+# cmd/runner の RUNNER_ACCOUNT_AGE=firebase。書き込みの権限は持たせない
+resource "google_project_iam_member" "runner_firebaseauth_viewer" {
+  count   = var.runner_enabled ? 1 : 0
+  project = var.project_id
+  role    = "roles/firebaseauth.viewer"
+  member  = google_service_account.runner[0].member
+}
+
 # deployer が「runner として」サービスをデプロイする actAs
 resource "google_service_account_iam_member" "deployer_actas_runner" {
   count              = var.runner_enabled ? 1 : 0
