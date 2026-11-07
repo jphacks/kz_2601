@@ -50,6 +50,7 @@ jobs:
       - uses: actions/checkout@v7
       - run: scripts/ai-cost-test.sh # jq は runner に同梱
       - run: scripts/runner-usage-test.sh # runner.usage の集計(#345)
+      - run: scripts/demo-check-test.sh # demo-check の版・env 照合(偽の curl)
 
   # アプリに同梱するライセンスの一覧(#306)。Package.resolved・LICENSE が変わったのに一覧が古いと落ちる。
   # ubuntu にはパッケージのチェックアウトが無いので、依存(identity・版・revision)と LICENSE の照合だけ
