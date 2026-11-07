@@ -409,6 +409,23 @@
         }
       }
     },
+    "%lld 回続けてうまくいっていません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed %lld times in a row."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 回続けてうまくいっていません。"
+          }
+        }
+      }
+    },
     "%lld 文字までです" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1850,6 +1867,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」を削除できませんでした"
+          }
+        }
+      }
+    },
+    "「%@」を動かす" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Run “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を動かす"
           }
         }
       }
@@ -3911,6 +3945,23 @@
         }
       }
     },
+    "ほかの変更と重なったため切り替えませんでした。最新の状態を読み込み直しました。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't switch because it overlapped with another change. Reloaded the latest state."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかの変更と重なったため切り替えませんでした。最新の状態を読み込み直しました。"
+          }
+        }
+      }
+    },
     "またね。いつでも戻ってきてください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4897,6 +4948,57 @@
         }
       }
     },
+    "オフ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフ"
+          }
+        }
+      }
+    },
+    "オフにしていたため動かしませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't run because it was turned off"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフにしていたため動かしませんでした"
+          }
+        }
+      }
+    },
+    "オフにすると、このルールは動きません。ルールは消えません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When off, this rule doesn't run. The rule isn't deleted."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフにすると、このルールは動きません。ルールは消えません。"
+          }
+        }
+      }
+    },
     "オフライン" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5063,6 +5165,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "オフライン・未送信 %lld 件"
+          }
+        }
+      }
+    },
+    "オン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オン"
           }
         }
       }
@@ -8807,6 +8926,40 @@
         }
       }
     },
+    "切り替えられませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't switch"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切り替えられませんでした"
+          }
+        }
+      }
+    },
+    "切り替えられませんでした。時間をおいてもう一度お試しください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't switch. Please try again later."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切り替えられませんでした。時間をおいてもう一度お試しください。"
+          }
+        }
+      }
+    },
     "切り替えると、その Apple ID で作ったアプリが開きます。いま匿名で作ったアプリは引き継がれず、この端末から見えなくなります。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12088,6 +12241,23 @@
         }
       }
     },
+    "直しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fix it?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直しますか?"
+          }
+        }
+      }
+    },
     "直し方" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12101,6 +12271,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "直し方"
+          }
+        }
+      }
+    },
+    "直す依頼を入力欄に入れて、設定を閉じます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puts a fix request in the input field and closes Settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直す依頼を入力欄に入れて、設定を閉じます"
           }
         }
       }
@@ -12594,6 +12781,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自動の動き"
+          }
+        }
+      }
+    },
+    "自動の動き「%@」が続けてうまくいっていません。うまく動くように直して" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The automation “%@” keeps failing. Please fix it so it works"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動の動き「%@」が続けてうまくいっていません。うまく動くように直して"
           }
         }
       }
