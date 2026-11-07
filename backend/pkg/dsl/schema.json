@@ -3986,6 +3986,9 @@
         "inputPhoto": {
           "type": "string",
           "description": "AI に一緒に見せる写真: screen.entity の photo field id(処方箋・薬の袋・ラベル・ホワイトボードを読む)。いつも Tailor It Pro のオンライン AI で動く(写真は縮小して送る)。"
+        },
+        "saveTo": {
+          "$ref": "#/$defs/AISaveTo"
         }
       },
       "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はフォームの入力を処理して output field に入れる(端末内 AI(Apple Intelligence / Foundation Models)が使えれば無料で端末の中だけ、無い端末では Tailor It Pro のオンライン AI。写真は inputPhoto を付けた時だけオンライン AI に送る)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",
@@ -4508,6 +4511,23 @@
         "alertMinutes": {
           "type": "integer",
           "description": "任意: 始まりの N 分前にカレンダーの通知を鳴らす(0〜10080・0 は始まりの時刻)。「前日に知らせて」は 1440。"
+        }
+      }
+    },
+    "AISaveTo": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "generate の shape list の結果を 1 項目 = 1 件の記録として entity に保存できるようにする(問題・単語カード・手順・アイデアを一覧に足す)。field は entity の string / text field で、ほかの field は defaultValue か空になる(required なら defaultValue を付ける)。利用者が結果を見て「全部保存」か 1 つずつ保存する。output とは一緒に使わない。public / single / match / addressedTo の entity と editableBy admins の field には保存しない。",
+      "required": [
+        "entity",
+        "field"
+      ],
+      "properties": {
+        "entity": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
         }
       }
     },

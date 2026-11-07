@@ -783,6 +783,23 @@
         }
       }
     },
+    "AI の結果を「%@」に保存" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save AI results to “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI の結果を「%@」に保存"
+          }
+        }
+      }
+    },
     "OK" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2721,6 +2738,23 @@
         }
       }
     },
+    "保存" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
+          }
+        }
+      }
+    },
     "保存した映像" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2853,6 +2887,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保存できませんでした"
+          }
+        }
+      }
+    },
+    "保存済み" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存済み"
           }
         }
       }
@@ -3006,6 +3057,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全員"
+          }
+        }
+      }
+    },
+    "全部保存" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save all"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部保存"
           }
         }
       }

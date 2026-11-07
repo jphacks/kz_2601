@@ -1,0 +1,7 @@
+[
+  {"id": "ast_quiz_cards", "kind": "create", "group": "aisaveto", "transcript": "AI に英単語の問題を作ってもらって、flashcards に足して暗記したい", "note": "aiButton generate list + saveTo(1 項目 = 1 件)+ flashcards で見る", "expect": {"aiGenerate": "list", "aiSaveTo": true, "has": ["flashcards"], "unreachable": 0}},
+  {"id": "ast_steps", "kind": "create", "group": "aisaveto", "transcript": "やりたいことを入れたら AI が手順を書き出して、その手順を一つずつチェックリストに保存できるアプリ", "note": "list の手順を 1 件ずつ記録に(saveTo)・list で見る", "expect": {"aiGenerate": "list", "aiSaveTo": true, "has": ["list"]}},
+  {"id": "ast_ideas", "kind": "create", "group": "aisaveto", "transcript": "企画のアイデアを AI に5つ出してもらって、いいのだけアイデア帳に貯めたい", "note": "1 つずつ保存(saveTo)・アイデア帳は list", "expect": {"aiGenerate": "list", "aiSaveTo": true, "has": ["list"]}},
+  {"id": "ast_show_only", "kind": "create", "group": "aisaveto", "transcript": "罰ゲームの案を3つ出してくれるボタン", "note": "保存の話が無ければ saveTo を付けない(表示だけ)", "expect": {"aiGenerate": "list", "aiSaveTo": false}},
+  {"id": "ast_edit_add", "kind": "edit", "base": "ast_show_only", "group": "aisaveto", "transcript": "出てきた案を一覧に保存できるようにして", "note": "既存の generate list に saveTo と保存先 entity・一覧を足す patch", "expect": {"patch": true, "aiSaveTo": true}}
+]

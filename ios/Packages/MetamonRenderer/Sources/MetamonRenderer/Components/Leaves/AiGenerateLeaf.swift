@@ -2,7 +2,7 @@ import SwiftUI
 import MetamonDSL
 
 /// `aiButton` の `task: "generate"`(#417): 押すと決まった指示で AI が書き、結果を形(1 行 / 箇条書き / 項目つき)でボタンの下に出す。
-/// output があればフォームのドラフトにも入れる(保存は利用者)。端末内 AI を優先し、無ければホストのオンライン版(Pro)。
+/// output があればフォームのドラフトにも入れる(保存は利用者)。list + saveTo なら各行を 1 件の記録として保存できる(AiSaveToList)。端末内 AI を優先し、無ければホストのオンライン版(Pro)。
 struct AiGenerateLeaf: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.scenePhase) private var scenePhase
@@ -13,6 +13,7 @@ struct AiGenerateLeaf: View {
     @State private var result: AITextResult?
     @State private var usedOnline = false
     @State private var error: String?
+    @State private var runs = 0
 
     private var route: AIGenerateRoute {
         AIGenerateRoute.choose(availability: availability, hostOnline: rt.aiText?.supportsOnlineAIText ?? false, mock: AIGenerateRoute.isMock,
@@ -37,7 +38,11 @@ struct AiGenerateLeaf: View {
             .buttonStyle(RenderButtonStyle(kind: .secondary))
             .disabled(busy || isUnavailable)
             .accessibilityIdentifier("aiGenerate.\(c.id)")
-            if let result {
+            if let result, result.shape == .list, let saveTo = c.saveTo {
+                AiSaveToList(c: c, saveTo: saveTo, items: result.items ?? []) // 1 項目 = 1 件(押した時だけ保存)
+                    .id(runs) // 新しい結果は「保存済み」を持ち越さない
+                    .transition(.opacity)
+            } else if let result {
                 AITextResultView(result: result, long: c.length == "long")
                     .transition(.opacity)
             }
@@ -110,6 +115,7 @@ struct AiGenerateLeaf: View {
             if route == .onDevice { rt.aiText?.recordAIButton(.ran(.generate, failure: nil)) }
             withAnimation(RenderTheme.Motion.select) {
                 result = out
+                runs += 1
                 if let output = c.output, let form { form.values[output] = .string(out.text) }
             }
         } catch {

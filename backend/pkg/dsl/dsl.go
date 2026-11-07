@@ -467,14 +467,15 @@ type Component struct {
 	BalanceField string `json:"balanceField,omitempty"`
 
 	// aiButton (#78). Label / Prompt / Entity / Limit are shared with the fields above.
-	Task    string   `json:"task,omitempty"`    // summarize|classify|rewrite|extract|suggest
-	Input   string   `json:"input,omitempty"`   // form field fed to the model ("" = whole draft)
-	Output  string   `json:"output,omitempty"`  // form field the result is written to
-	Options []string `json:"options,omitempty"` // classify candidates (else the enum output field's options)
-	Shape   string   `json:"shape,omitempty"`   // generate (#417): line|list|fields
-	Count   int      `json:"count,omitempty"`   // generate list: number of items
-	Items   []string `json:"items,omitempty"`   // generate fields: item names
-	Length  string   `json:"length,omitempty"`  // short (default) | long: cloud-only long text (ai_button.go)
+	Task    string    `json:"task,omitempty"`    // summarize|classify|rewrite|extract|suggest
+	Input   string    `json:"input,omitempty"`   // form field fed to the model ("" = whole draft)
+	Output  string    `json:"output,omitempty"`  // form field the result is written to
+	Options []string  `json:"options,omitempty"` // classify candidates (else the enum output field's options)
+	Shape   string    `json:"shape,omitempty"`   // generate (#417): line|list|fields
+	Count   int       `json:"count,omitempty"`   // generate list: number of items
+	Items   []string  `json:"items,omitempty"`   // generate fields: item names
+	Length  string    `json:"length,omitempty"`  // short (default) | long: cloud-only long text (ai_button.go)
+	SaveTo  *AISaveTo `json:"saveTo,omitempty"`  // generate list: one record per item (ai_save_to.go)
 	// InputPhoto is a photo field of the form sent with the call (cloud only, ai_button_photo.go).
 	InputPhoto string `json:"inputPhoto,omitempty"`
 
