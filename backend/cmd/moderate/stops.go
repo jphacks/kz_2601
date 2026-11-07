@@ -24,14 +24,18 @@ var (
 )
 
 var runnerCommands = map[string]bool{
-	"stops": true, "stop-app": true, "resume-app": true, "stop-rule": true, "resume-rule": true,
-	"pause-notify": true, "resume-notify": true,
+	"stops": true, "stop-log": true, "stop-app": true, "resume-app": true, "stop-all": true, "resume-all": true,
+	"stop-rule": true, "resume-rule": true, "pause-notify": true, "resume-notify": true,
 }
 
 type stopArgs struct {
 	env      string
 	reason   string
 	pauseFor time.Duration
+	forSet   bool // -for was given (stop-app / stop-all: a pause that ends by itself)
+	force    bool
+	operator string
+	limit    int
 	yes      bool
 }
 
@@ -70,16 +74,44 @@ func runStops(ctx context.Context, st store.RunnerStops, cmd string, pos []strin
 		}
 		return nil
 	}
+	needOperator := func() error {
+		if a.operator == "" {
+			return errors.New("-operator is required (it is kept in the stop log)")
+		}
+		return nil
+	}
 	put := func(desc string, s store.Stop) error {
 		if err := needReason(); err != nil {
 			return err
 		}
-		s.By, s.Reason, s.CreatedAt = store.StopByOperator, a.reason, now()
+		if err := needOperator(); err != nil {
+			return err
+		}
+		s.By, s.Reason, s.Operator, s.CreatedAt = store.StopByOperator, a.reason, a.operator, now()
 		return write(fmt.Sprintf("%s (reason %q)", desc, a.reason), func() error { return st.PutStop(ctx, a.env, s) })
 	}
+	// hardStop is stop-app / stop-all: -for makes it a pause, -force also
+	// refuses the rule-triggering writes in appconfig.
+	hardStop := func(desc string, s store.Stop) error {
+		if a.forSet {
+			if a.pauseFor < time.Minute || a.pauseFor > maxNotifyPause {
+				return fmt.Errorf("-for must be between 1m and %s (leave it out to stop until resumed)", maxNotifyPause)
+			}
+			s.Until = now().Add(a.pauseFor)
+			desc += " for " + a.pauseFor.String()
+		}
+		if a.force {
+			s.Force = true
+			desc += ", refusing the writes that trigger its rules"
+		}
+		return put(desc, s)
+	}
 	lift := func(desc, id string) error {
+		if err := needOperator(); err != nil {
+			return err
+		}
 		return write(desc, func() error {
-			ok, err := st.LiftStop(ctx, a.env, id, now())
+			ok, err := st.LiftStop(ctx, a.env, id, now(), a.operator)
 			if err == nil && !ok {
 				err = errors.New("no active stop")
 			}
@@ -106,19 +138,56 @@ func runStops(ctx context.Context, st store.RunnerStops, cmd string, pos []strin
 			if !s.Until.IsZero() {
 				until = s.Until.Format(time.RFC3339)
 			}
-			_, _ = fmt.Fprintf(out, "%s\t%s\t%s\t%s\t%s\t%s\tuntil=%s\t%s\n", s.CreatedAt.Format(time.RFC3339), state, s.Level, s.AppID, s.RuleID, s.By, until, s.Reason)
+			force := ""
+			if s.Force {
+				force = "\tforce"
+			}
+			_, _ = fmt.Fprintf(out, "%s\t%s\t%s\t%s\t%s\t%s\tuntil=%s\t%s%s\n", s.CreatedAt.Format(time.RFC3339), state, s.Level, s.AppID, s.RuleID, s.By, until, s.Reason, force)
+		}
+		return nil
+	case "stop-log":
+		if len(pos) > 1 {
+			return errUsage
+		}
+		app := ""
+		if len(pos) == 1 {
+			if err := ids(1); err != nil {
+				return err
+			}
+			app = pos[0]
+		}
+		log, err := st.StopLog(ctx, a.env, app, a.limit)
+		if err != nil {
+			return err
+		}
+		for _, e := range log {
+			until := "-"
+			if !e.Until.IsZero() {
+				until = e.Until.Format(time.RFC3339)
+			}
+			_, _ = fmt.Fprintf(out, "%s\t%s\t%s\t%s\t%s\t%s\toperator=%s\tforce=%t\tuntil=%s\t%s\n", e.At.Format(time.RFC3339), e.Action, e.Level, e.AppID, e.RuleID, e.By, e.Operator, e.Force, until, e.Reason)
 		}
 		return nil
 	case "stop-app":
 		if err := ids(1); err != nil {
 			return err
 		}
-		return put("stop app "+pos[0], store.Stop{ID: store.AppStopID(pos[0]), Level: store.StopApp, AppID: pos[0]})
+		return hardStop("stop app "+pos[0], store.Stop{ID: store.AppStopID(pos[0]), Level: store.StopApp, AppID: pos[0]})
 	case "resume-app":
 		if err := ids(1); err != nil {
 			return err
 		}
 		return lift("resume app "+pos[0], store.AppStopID(pos[0]))
+	case "stop-all":
+		if err := ids(0); err != nil {
+			return err
+		}
+		return hardStop("stop every app", store.Stop{ID: store.GlobalStopID, Level: store.StopGlobal})
+	case "resume-all":
+		if err := ids(0); err != nil {
+			return err
+		}
+		return lift("resume every app", store.GlobalStopID)
 	case "stop-rule":
 		if err := ids(2); err != nil {
 			return err

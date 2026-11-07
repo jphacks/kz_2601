@@ -15,6 +15,9 @@ const CodeAIPaused = "ai_paused"
 // App Check enforce (#318)
 const CodeAppCheckFailed = "app_check_failed"
 
+// the operator force-stopped the app's server features (#346)
+const CodeAppStopped = "app_stopped"
+
 const CodeAppconfigError = "appconfig_error"
 
 const CodeAppconfigUnreachable = "appconfig_unreachable"

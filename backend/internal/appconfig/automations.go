@@ -96,7 +96,7 @@ func (h *Handler) automations(w http.ResponseWriter, r *http.Request) {
 
 	// shared / public runs keep one status per rule; private runs one per user (the caller's)
 	statusIDs := make([]string, 0, 2*len(a.ServerRules))
-	stopIDs := []string{store.AppStopID(appID), store.NotifyStopID(appID)}
+	stopIDs := []string{store.AppStopID(appID), store.NotifyStopID(appID), store.GlobalStopID}
 	for i := range a.ServerRules {
 		id := a.ServerRules[i].ID
 		statusIDs = append(statusIDs, store.RuleStatusID(appID, "", id), store.RuleStatusID(appID, uid, id))
@@ -114,6 +114,9 @@ func (h *Handler) automations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out.Stopped = stopOf(stops, store.AppStopID(appID))
+	if out.Stopped == nil { // #346: every app of the environment
+		out.Stopped = stopOf(stops, store.GlobalStopID)
+	}
 	out.NotifyPaused = stopOf(stops, store.NotifyStopID(appID))
 
 	var latest *store.RuleStatus // the newest run that saw the day's counter
