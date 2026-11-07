@@ -63,11 +63,31 @@ final class TextHighlightTests: XCTestCase {
         form.values["message"] = "TypeError: x is undefined"
         let c = try JSONDecoder().decode(Component.self, from: Data(#"{"type":"text","text":"エラー: {{message}}","highlight":{"field":"keywords"}}"#.utf8))
         let ev = { ExprEvaluator(entities: [entity], records: { _ in [] }) }
-        XCTAssertEqual(QRCodeContent.resolve(c, form: form, evaluator: ev), "エラー: TypeError: x is undefined")
-        XCTAssertEqual(QRCodeContent.resolve(c, form: nil, evaluator: ev), "エラー: {{message}}")
+        XCTAssertEqual(TextContent.resolve(c.text ?? "", form: form, evaluator: ev), "エラー: TypeError: x is undefined")
+        XCTAssertEqual(TextContent.resolve(c.text ?? "", form: nil, evaluator: ev), "エラー: {{message}}", "フォームの外は文字のまま")
         form.values["keywords"] = "typeerror, undefined"
         for v in [AnyView(TextLeaf(c: c, ctx: RenderContext(route: Route(screen: "form"), form: form))), AnyView(TextLeaf(c: c))] {
             XCTAssertNotNil(ImageRenderer(content: v.frame(width: 320, height: 120)).uiImage, "フォームの外(プレビュー)でも描ける")
         }
+    }
+
+    /// 知らない名前・写真・hidden の `{{x}}` は書いたままの文字(hidden の値は決して出さない)。
+    @MainActor func testOnlyVisibleScalarFieldsSubstitute() throws {
+        let entity = try JSONDecoder().decode(Entity.self, from: Data(#"""
+        {"id":"m","name":"m","fields":[{"id":"body","name":"b","type":"text"},{"id":"pic","name":"p","type":"photo"},
+          {"id":"secret","name":"s","type":"string","hidden":true},{"id":"n","name":"n","type":"integer"}]}
+        """#.utf8))
+        let form = FormDraft(entity: entity)
+        form.values["body"] = "本文"
+        form.values["pic"] = "photo:abc"
+        form.values["secret"] = "ひみつの答え"
+        form.values["n"] = 3
+        let ev = { ExprEvaluator(entities: [entity], records: { _ in [] }) }
+        let out = TextContent.resolve("{{body}}|{{n}}|{{zzz}}|{{pic}}|{{secret}}", form: form, evaluator: ev)
+        XCTAssertEqual(out, "本文|3|{{zzz}}|{{pic}}|{{secret}}")
+        XCTAssertFalse(out.contains("ひみつ"), "hidden の値は出さない")
+        XCTAssertTrue(TextHighlight.substitutes(entity, "body"))
+        XCTAssertFalse(TextHighlight.substitutes(entity, "secret"))
+        XCTAssertFalse(TextHighlight.substitutes(nil, "body"))
     }
 }

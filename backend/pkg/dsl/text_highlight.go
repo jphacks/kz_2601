@@ -27,18 +27,8 @@ func checkText(where string, c *Component, formEntity *Entity, add func(string, 
 	if c.Text == "" {
 		add("%s: text is empty", where)
 	}
-	// Without screen.entity, {{x}} stays literal as before (saved apps keep validating).
-	for _, m := range qrPlaceholderRe.FindAllStringSubmatch(c.Text, -1) {
-		switch f := fieldOrNil(formEntity, m[1]); {
-		case formEntity == nil:
-		case f == nil:
-			add("%s: text {{%s}} is not a field of entity %q (fields: %s)", where, m[1], formEntity.ID, fieldIDs(formEntity))
-		case qrUnencodable[f.Type]:
-			add("%s: text {{%s}} is type %s; use a text-like field (or image / videoPlayer)", where, m[1], f.Type)
-		case f.Hidden:
-			add("%s: text {{%s}} is hidden — %s", where, m[1], hiddenHint)
-		}
-	}
+	// {{x}} is never an error (saved apps keep validating): only
+	// TextSubstitutes fields are replaced, the rest stays literal.
 	h := c.Highlight
 	if h == nil {
 		return
@@ -69,6 +59,20 @@ func checkText(where string, c *Component, formEntity *Entity, add func(string, 
 	if h.Style != "" && h.Style != "marker" && h.Style != "bold" {
 		add("%s: text.highlight.style %q (marker|bold)", where, h.Style)
 	}
+}
+
+// textScalar lists field types whose value text shows in place of {{fieldId}}.
+var textScalar = map[FieldType]bool{
+	FieldString: true, FieldText: true, FieldInteger: true, FieldNumber: true, FieldBoolean: true,
+	FieldDate: true, FieldDatetime: true, FieldEnum: true, FieldCurrency: true,
+}
+
+// TextSubstitutes reports whether text {{id}} on a screen of e shows the
+// record's value: a known, visible, scalar field. Anything else (unknown,
+// hidden, photo / video / audio / refs ...) stays literal. iOS: TextLeaf.
+func TextSubstitutes(e *Entity, id string) bool {
+	f := fieldOrNil(e, id)
+	return f != nil && !f.Hidden && textScalar[f.Type]
 }
 
 func fieldOrNil(e *Entity, id string) *Field {

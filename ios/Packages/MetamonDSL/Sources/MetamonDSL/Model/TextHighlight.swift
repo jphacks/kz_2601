@@ -39,6 +39,18 @@ public struct TextHighlight: Decodable, Sendable, Equatable {
     }
 }
 
+public extension TextHighlight {
+    /// text の `{{id}}` をレコードの値に置き換えるか: 知っている・hidden でない・ふつうの値の field だけ。
+    /// それ以外(知らない名前・hidden・写真 / 動画 / 録音 / 参照など)は書いたままの文字。Go `dsl.TextSubstitutes` と同じ。
+    static func substitutes(_ entity: Entity?, _ id: String) -> Bool {
+        guard let f = entity?.field(id), !f.hidden else { return false }
+        switch f.type {
+        case .string, .text, .integer, .number, .boolean, .date, .datetime, .enum, .currency: return true
+        default: return false
+        }
+    }
+}
+
 /// 語の照合(描画から切り離して単体テストする)。
 public enum TextHighlightMatcher {
     /// 照合用の形: NFKC + 小文字。

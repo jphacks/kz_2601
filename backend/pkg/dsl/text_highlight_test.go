@@ -45,9 +45,6 @@ func TestTextHighlightSemanticErrors(t *testing.T) {
 		{Type: CompText, Text: "x", Highlight: &TextHighlight{Words: []string{"a"}, Style: "neon"}},
 	}
 	app.Screens[1].Components = []Component{
-		{Type: CompText, Text: "{{zzz}}"},
-		{Type: CompText, Text: "{{photo}}"},
-		{Type: CompText, Text: "{{secret}}"},
 		{Type: CompText, Text: "x", Highlight: &TextHighlight{Words: []string{"a"}, Field: "keywords"}},
 		{Type: CompText, Text: "x", Highlight: &TextHighlight{Field: "date"}},
 		{Type: CompText, Text: "x", Highlight: &TextHighlight{Field: "secret"}},
@@ -65,10 +62,7 @@ func TestTextHighlightSemanticErrors(t *testing.T) {
 		`screen "home" components[2]: text.highlight.words has 21 words`,
 		`screen "home" components[3]: text.highlight.words[0] must be`,
 		`screen "home" components[4]: text.highlight.style "neon"`,
-		`text {{zzz}} is not a field of entity "memo"`,
-		`text {{photo}} is type photo`,
-		`text {{secret}} is hidden`,
-		`screen "form" components[3]: text.highlight takes exactly one of words`,
+		`screen "form" components[0]: text.highlight takes exactly one of words`,
 		`text.highlight.field "date" is type datetime`,
 		`text.highlight.field "secret" is hidden`,
 		`text.highlight.field "nope" is not a field`,
@@ -90,6 +84,30 @@ func TestTextPlaceholderWithoutEntityStaysValid(t *testing.T) {
  {"type":"list","entity":"memo","item":{"title":"body"}}]}]}`)
 	if _, err := Parse(raw); err != nil {
 		t.Fatalf("existing app with literal {{x}} rejected: %v", err)
+	}
+}
+
+// On a screen.entity screen, {{x}} of an unknown, hidden or non-scalar field
+// is not an error either: it stays literal (TextSubstitutes is false).
+func TestTextPlaceholderOnEntityScreenNeverFails(t *testing.T) {
+	app := highlightApp()
+	app.Screens[1].Components = []Component{
+		{Type: CompText, Text: "{{zzz}}"},
+		{Type: CompText, Text: "{{photo}}"},
+		{Type: CompText, Text: "{{secret}}"},
+		{Type: CompText, Text: "{{ }} {{body}}"},
+	}
+	if err := app.Validate(); err != nil {
+		t.Fatalf("literal {{x}} rejected: %v", err)
+	}
+	e := &app.Entities[0]
+	for id, want := range map[string]bool{"body": true, "keywords": true, "date": true, "zzz": false, "photo": false, "secret": false, " ": false} {
+		if got := TextSubstitutes(e, id); got != want {
+			t.Errorf("TextSubstitutes(%q) = %v, want %v", id, got, want)
+		}
+	}
+	if TextSubstitutes(nil, "body") {
+		t.Error("no screen.entity: never substitutes")
 	}
 }
 

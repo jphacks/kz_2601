@@ -2,7 +2,7 @@ import SwiftUI
 import MetamonDSL
 
 /// `text`: style(title|headline|body|caption)と align(leading|center|trailing)。
-/// screen.entity の画面では `{{fieldId}}` を開いているレコードの値にする(qrCode と同じ `QRCodeContent.resolve`)。
+/// screen.entity の画面では `{{fieldId}}` を開いているレコードの値にする(`TextHighlight.substitutes` の field だけ・他は文字のまま)。
 /// `highlight` の語に印(marker: 背景 + 太字 / bold)。印は見た目だけで、VoiceOver はふつうの文として読む。
 struct TextLeaf: View {
     @Environment(\.dslRuntime) private var rt
@@ -18,7 +18,7 @@ struct TextLeaf: View {
 
     private var content: AttributedString {
         let form = ctx?.form
-        let text = QRCodeContent.resolve(c, form: form) { rt.evaluator() }
+        let text = TextContent.resolve(c.text ?? "", form: form) { rt.evaluator() }
         guard let h = c.highlight else { return AttributedString(text) }
         let fieldValue = h.field.flatMap { form?.values[$0]?.displayString }
         return TextHighlightStyle.attributed(text, words: h.resolvedWords(fieldValue: fieldValue), style: h.style)
@@ -32,6 +32,26 @@ struct TextLeaf: View {
     }
     private var frameAlignment: Alignment {
         switch c.align { case "center": .center; case "trailing": .trailing; default: .leading }
+    }
+}
+
+enum TextContent {
+    /// `{{id}}` を置き換える field だけ値にする(hidden の値は決して入れない)。保存値はそのまま、computed は評価。
+    @MainActor
+    static func resolve(_ text: String, form: FormDraft?, evaluator: () -> ExprEvaluator) -> String {
+        guard let form, text.contains("{{") else { return text }
+        var s = text
+        for f in form.entity.fields where TextHighlight.substitutes(form.entity, f.id) && s.contains("{{\(f.id)}}") {
+            let value: String
+            if f.computed != nil {
+                let row = ExprEvaluator.Row(entity: form.entity, record: Record(id: form.recordId ?? "draft", data: form.values), memoizable: false)
+                value = evaluator().fieldValue(f.id, row: row)?.text ?? ""
+            } else {
+                value = (form.values[f.id] ?? .null).displayString
+            }
+            s = s.replacingOccurrences(of: "{{\(f.id)}}", with: value)
+        }
+        return s
     }
 }
 
