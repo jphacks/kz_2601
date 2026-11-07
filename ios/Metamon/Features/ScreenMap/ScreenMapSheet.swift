@@ -60,15 +60,7 @@ struct ScreenMapSheet: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .padding(Theme.Spacing.sm + 2)
-                    .background(Theme.Colors.surface, in: Circle())
-                    .overlay(Circle().strokeBorder(Theme.Colors.hairline))
-            }
-            .accessibilityLabel("閉じる")
+            SheetCloseButton { dismiss() }
         }
     }
 

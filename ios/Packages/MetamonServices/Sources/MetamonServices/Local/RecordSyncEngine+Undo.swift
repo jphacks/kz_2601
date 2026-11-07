@@ -71,12 +71,10 @@ extension RecordSyncEngine {
 
     /// 待ちの間に未送信の作成が送られると、仮 id(`local-<clientId>`)がサーバー id に替わる。どちらでも同じ行とみなす。
     static func matches(_ ticket: DeletionTicket, _ row: LocalRecord) -> Bool {
-        row.recordId == ticket.recordId || row.clientId.map(LocalRecord.temporaryId(clientId:)) == ticket.recordId
+        row.isKnown(as: ticket.recordId)
     }
 
     private func currentRecordId(_ t: DeletionTicket) async -> String {
-        if await store.row(appId: t.appId, entity: t.entity, recordId: t.recordId) != nil { return t.recordId }
-        let rows = await store.rows(appId: t.appId, entity: t.entity)
-        return rows.first { Self.matches(t, $0) }?.recordId ?? t.recordId
+        await store.current(appId: t.appId, entity: t.entity, recordId: t.recordId)?.recordId ?? t.recordId
     }
 }
