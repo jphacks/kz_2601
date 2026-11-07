@@ -4577,6 +4577,39 @@
           "$ref": "#/$defs/Expr",
           "description": "条件(真偽の Expr)。行はきっかけのレコード({\"ref\":\"<field>\"}・\"<refField>.<field>\")か on.each のレコード。更新のきっかけでは {\"ref\":\"$prev.<field>\"} で更新の前の値。agg で同じアプリ・同じ側(private どうし・shared / public どうし)の entity を集計できる(期間の filter も可。読む件数は実行ごと・アプリの 1 日ごとに上限があり、超えたらその回は実行しない)。streak・doneInDays・computed field・setting は使えない。each の無い時刻のきっかけには行が無い(ref 不可・agg は可)。"
         },
+        "lookup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "entity",
+            "field",
+            "equals"
+          ],
+          "description": "別の entity との突き合わせ(if と両方そろった時だけ動く)。entity のレコードのうち field の値が行の equals の値と同じものがある(exists)/ 無い(notExists)時。行はきっかけのレコードか on.each のレコード(each の無い時刻のきっかけでは使えない)。等しいかだけを見る(文字と数は全角半角・大文字小文字・前後の空白を区別しない。日付は日付どうし、ref と $id は同じ entity の ID どうし)。行の値が空の時は動かない。同じ entity なら行のレコード自身は数えない。entity は同じアプリ・ルールと同じ側だけ(宛先付きは不可)で、each・agg と合わせて 2 つまで。読む件数の上限は each・agg と同じ。",
+          "x-usage": "名簿との照合: 「名簿に無い学籍番号の登録に印をつけて」= on {every:daily,each:registrations}・lookup {op:notExists, entity:roster, field:student_id, equals:student_id}・updateRecord(ref 省略)values {mismatch: true}。まだ行っていない店: on {every:weekly,each:shops}・lookup {op:notExists, entity:visits, field:shop, equals:$id}。",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "exists",
+                "notExists"
+              ]
+            },
+            "entity": {
+              "type": "string",
+              "description": "探す entity の id。"
+            },
+            "field": {
+              "type": "string",
+              "description": "探す entity の field(string / text / enum / integer / number / date / ref)か $id(レコードの ID)。"
+            },
+            "equals": {
+              "type": "string",
+              "description": "行の field(同じ型の種類)か $id(行のレコードの ID)。"
+            }
+          }
+        },
         "do": {
           "type": "array",
           "minItems": 1,

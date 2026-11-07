@@ -468,11 +468,12 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 |---|---|---|
 | きっかけ `on` | `record`: `created` / `updated`(+ `entity`、更新は `fields` で「この field が変わった時」に絞れる)。`every`: `daily` / `weekly`(`weekday`)/ `monthly`(`day` 1〜28)+ `time` HH:MM(作成者のタイムゾーン)。時刻のきっかけは `each`: `<entity>` でそのレコード 1 件ずつに動かせる | どちらか 1 つ。削除のきっかけ・1 日 1 回より細かい時刻・外からの呼び出しは無い。`each` は時刻のきっかけだけ・ルールと同じ側の entity だけ |
 | 条件 `if` | Expr(行 = きっかけのレコードか `each` のレコード。`"<refField>.<field>"` で ref 先、更新では `"$prev.<field>"` で前の値)。`agg` で同じアプリの記録を集計できる(下の「記録を読むルール」) | 真偽であること。`streak` / `doneInDays`・computed field は使えない。`each` の無い時刻のきっかけには行が無い(`ref` 不可・`agg` は可) |
+| 突き合わせ `lookup` | `{op: exists / notExists, entity, field, equals}`: 別の entity に、`field` の値が行の `equals` の値と同じレコードがある / 無い時だけ動く(`if` と両方)。下の「記録を読むルール」 | 1 ルールに 1 つ・等しいかだけ。行が要る(`each` の無い時刻のきっかけは不可) |
 | 処理 `do`(1〜5 個) | `notify`{`to`, `title`, `body`} / `createRecord`{`entity`, `values`} / `updateRecord`{`ref`?, `values`} / `increment`{`ref`, `field`, `by`?} | 1 つのオブジェクトに 1 種類だけ。書けるのはきっかけと同じ側の entity(private どうし・shared / public どうし)。computed・photo・video・location の field には書かない。createRecord は required の field を全部書く |
 | 宛先 `to.kind` | `owner`(作成者)/ `author`(きっかけのレコードを書いた人)/ `authorOf` + `field`(ref 先のレコードを書いた人)/ `members`(参加者全員)/ `recipients` + `field`(宛先付きの記録の宛先の人・§3.14) | private は `owner` だけ、**public は `owner` と `authorOf` だけ**、shared は全部。きっかけを起こした本人には送らない。任意の uid・メール・電話・外部の宛先は無い |
 | 通知の本文 | 決まった枠 + `{<field>}`(きっかけ・`each` のレコードの値)・`{$author}`(書いた人の表示名・shared / public)・`{<名前>}`(`with` の数・日付) | **題 30 字・本文 80 字**(差し込みの `{…}` も数える)。差し込む値は実行の時に 30 字で切る。URL・ドメイン・メールアドレス・電話番号・「公式」「運営」などの名乗り・制御文字・見えない文字は不可。ref・refs・photo・video・location・hidden・computed の field は差し込めない |
 | 連鎖 | 処理が書いたレコードは次のきっかけを起こさない | 別のルール(自分も含む)のきっかけになる書き込み(作るなら created、書き換え・increment は同じ field の updated)を断る |
-| 上限 | ルール 20・時刻のルール 5・処理 5(Pro の値)。1 つのルールが読む entity(`each` + `agg`)は 2 つまで・`with` は 3 つまで | 無料の値(3・1・3)は `App.ServerRuleQuotaProblems(pro)` で、プランが分かる所(appconfig)が見る。読む件数の上限は runner が持つ(下) |
+| 上限 | ルール 20・時刻のルール 5・処理 5(Pro の値)。1 つのルールが読む entity(`each` + `agg` + `lookup`)は 2 つまで・`with` は 3 つまで | 無料の値(3・1・3)は `App.ServerRuleQuotaProblems(pro)` で、プランが分かる所(appconfig)が見る。読む件数の上限は runner が持つ(下) |
 | 使えないアプリ | 仲間探し(`entity.match`)のアプリ | `serverRules` ごと断る |
 | single の entity(§3.11) | 「常に 1 件」なので `createRecord` の行き先にできない。きっかけにするのと、きっかけの 1 件の `updateRecord`(上書き)はよい | `createRecord` の entity が single なら断る |
 | `{"setting":…}` | 設定は利用者ごとの値で、どの人の設定かが決まらないので、条件・値の式で使えない(private のルールでも) | 式に `setting` があれば断る |
@@ -486,6 +487,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 | `agg` を `if` / `values` / `by` / `with` で | 同じアプリの、**ルールと同じ側**(private どうし・shared / public どうし)の entity のレコードを集計(count / sum / avg / min / max / latest / earliest・filter の期間 `thisWeek` などや比較)。filter の値の `ref` は行のレコード | 「今月の支出が 5 万円を超えたら知らせて」: `if` に `{"op":"gt","args":[{"agg":"sum","entity":"expenses","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}},50000]}` |
 | `on.each`(時刻のきっかけ) | その entity のレコード 1 件ずつにルールを動かす(行 = そのレコード)。`if` で絞り、`{<field>}`・`author`・`updateRecord`(ref 省略 = そのレコード)・`increment` が使える。値が変わらない `updateRecord` は書かない | 締め切りの 3 日前: `{"every":"daily","time":"08:00","each":"tasks"}` + `if` `daysUntil(due) == 3`。順位: `each` + `updateRecord` `rank = count(score > 自分の score) + 1` |
 | `notify.with` | `{名前: 数か日付の Expr}`(3 つまで)。本文に `{名前}` で差し込む。文字の値は不可。数は利用者の値から来ることがあるので、差し込む時に電話番号らしい桁(10 桁以上)を伏せる | 毎週のまとめ: `"body":"今週は {count} 件・{total} 円でした"`, `"with":{"count":{"agg":"count",…},"total":{"agg":"sum",…}}` |
+| `lookup`(突き合わせ) | `entity` のレコードのうち `field`(string / text / enum / integer / number / date / ref か `$id`)の値が、行の `equals`(field か `$id`)の値と同じものがある(`exists`)/ 無い(`notExists`)時だけ動く。文字と数は全角半角・大文字小文字・前後の空白を区別せず文字として比べる(取り込んだ名簿の表記の揺れ)。日付は日付どうし、ref と `$id` は同じ entity の ID どうしで、そのまま比べる。行の値が空ならどちらの op でも動かない。`entity` が行と同じなら行のレコード自身は数えない(重複の検出)。`if` の後に確かめる(`if` が偽なら読まない) | 名簿との照合(tk_2413): `each` registrations + `{"op":"notExists","entity":"roster","field":"student_id","equals":"student_id"}` + `updateRecord` `mismatch = true`。まだ行っていない店: `each` shops + `{"op":"notExists","entity":"visits","field":"shop","equals":"$id"}` |
 
 ```json
 {"id":"due_soon","on":{"every":"daily","time":"08:00","each":"tasks"},
@@ -494,11 +496,11 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
  "do":[{"notify":{"to":{"kind":"owner"},"title":"締め切り","body":"{title} の締め切りまであと 3 日です"}}]}
 ```
 
-- 例の全体は `backend/pkg/dsl/testdata/server_rules_reads.json`(家計の集計・週のまとめ・期限)と `server_rules_ranking.json`(shared の順位)。
+- 例の全体は `backend/pkg/dsl/testdata/server_rules_reads.json`(家計の集計・週のまとめ・期限)と `server_rules_ranking.json`(shared の順位)、`server_rules_lookup.json`(名簿との照合・まだ行っていない店)。
 - **費用と上限**(runner の `quota`): 読んだレコード 1 件 = Firestore の読み取り 1 回(1,000 件 ≈ 0.0004 USD・#338 の原価)。1 回の実行で読めるのは Pro 500 件(`RUNNER_LIMIT_RUN_READS_PRO`)、アプリごとに 1 日 Pro 20,000 件(`RUNNER_LIMIT_APP_READS_PRO`・カウンタ `rr_app_{appId}`)。同じ entity は 1 回の実行で 1 度だけ読む(`each` の行どうしで共有)。**超えたらその回は実行しない**(`skipped_quota`・`limit` に `run_reads` / `app_reads`)。一部の記録だけで計算した誤った合計・順位は出さない。`runner.usage` の `reads` と `est_cost_usd` に入る。値は出発点で、#338 と同じく実測で直す。
-- 読める範囲(#337 の層 3 を広げた): きっかけのレコード・その ref 先に加えて、`each` / `agg` の entity の**同じアプリ・同じ側**のレコードと、その ref 先。取っ手(`scope.Handle.List`)が appId と側を確かめる。宛先付きの entity(§3.14)は `each` / `agg` / ref 先の読み取りの対象にできない。
+- 読める範囲(#337 の層 3 を広げた): きっかけのレコード・その ref 先に加えて、`each` / `agg` / `lookup` の entity の**同じアプリ・同じ側**のレコードと、その ref 先。取っ手(`scope.Handle.List`)が appId と側を確かめる。`lookup` は `agg` と同じ取っ手でその entity を 1 回の実行で 1 度だけ一覧し(上の件数の上限・費用に数える)、値で引く表を作って突き合わせる。`agg` の count + filter で読めるものより多くは読まない。宛先付きの entity(§3.14)は `each` / `agg` / `lookup` / ref 先の読み取りの対象にできない。
 - 1 回の書き込みの上限(Pro 10)は `each` の全部の行で数える。順位を 10 件より多く書き換える日は、残りがその日は書かれない(次の日に続きが書かれる)。
-- まだ作らない(決定の範囲の外か、宣言で表せない): 推薦・相性・似ている人の自動の組み合わせ、複数人への割り当て・日程の自動調整、距離での自動のグループ分け、外部のデータの取得。
+- まだ作らない(決定の範囲の外か、宣言で表せない): 好み・相性・似ている人での推薦と自動の組み合わせ(「まだ行っていない」「名簿に無い」は `lookup` で書ける)、複数人への割り当て・日程の自動調整、距離での自動のグループ分け、外部のデータの取得。
 
 - 共有データに効くのは作成者の公開 DSL(`apps_public/{appId}`)の宣言だけ。参加者が自分のコピーを書き換えても効かない(#337・runner の側で守る)。
 - 人が読める説明は `App.DescribeServerRule`(例: 「出欠」が作られた時(条件に合えば)、「予定」を作った人に通知・「予定」の「参加の数」を数える)。「このアプリの自動の動き」の一覧(#347)で使う。
@@ -536,7 +538,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - **見えない人に対して**(すべて 404・中身も有無も返さない): 一覧(`GET .../records` から除く)・取得・PATCH・DELETE・印(`PUT/DELETE .../marks`)・通報(`POST /reports` の record)。全件削除(`DELETE .../records`)は今までどおり自分の分だけ(`deleteBy` で管理者が消せる entity なら管理者は全員の分を消せる。中身は読めない)。リアルタイム更新(`GET /events`)は、宛先付きの entity では自分が読める記録が変わった時だけ `records` を送る。
 - **集計**: 一覧が読める分だけなので、端末の集計(stat・agg・未読の数)も自分が読める記録だけになる。
 - **自動の動き(§3.12)**: 宛先付きの entity をきっかけにするルールは、通知の宛先が `author` と `recipients` だけ・書き換えはその記録だけ(`createRecord` / `increment` / ref の `updateRecord` は不可)。どのルールも宛先付きの entity に `createRecord` できず、宛先の field を書き換えられない。
-- **ルールが読めるもの**: 宛先付きの entity は `on.each`・`agg`(`if` / `values` / `by` / `with` のどこでも)・`{"ref":"<refField>.<field>"}` の対象にできない(`Validate()` で断る)。runner も実行の時に同じ表で確かめ、合わないルールは `skipped_stopped`(`addressed_rule`)で動かさない。`readers` を持つレコードは、後から `addressedTo` を外しても `each` / `agg` / ref 先の読み取りに出てこず、きっかけにもならない。
+- **ルールが読めるもの**: 宛先付きの entity は `on.each`・`agg`(`if` / `values` / `by` / `with` のどこでも)・`lookup`・`{"ref":"<refField>.<field>"}` の対象にできない(`Validate()` で断る)。runner も実行の時に同じ表で確かめ、合わないルールは `skipped_stopped`(`addressed_rule`)で動かさない。`readers` を持つレコードは、後から `addressedTo` を外しても `each` / `agg` / ref 先の読み取りに出てこず、きっかけにもならない。
 - **宛先の人への通知**: `{"to":{"kind":"recipients","field":"<addressedTo の field>"}}`。きっかけが宛先付きの entity のレコードの時だけ。届くのは実行の時に参加している宛先の人だけで、送った本人・同意していない人・ブロックの関係にある人には届かない(`members` と同じ確かめ)。本文に `{<field>}` を差し込める(受け取る人はその記録を読める)。
 - **未読**: 既存の印(§3.5 `marks`)の `read` を使う。受信箱の `list.item.mark: "read"` で既読の印、`{"field":"$marks.read","op":"neq","value":{"me":true}}` で未読だけ。受信箱は `$author` neq me(読めるのは自分宛てだけなので、これで自分宛て)、送信済みは eq。
 - iOS: `supportedFeatures` に `addressedMessages` を送る(審査用の版は共有を外しているので送らない)。送らない版には AI が addressedTo と members を使わない(addressedTo は外し、members は string に・§5.3)。

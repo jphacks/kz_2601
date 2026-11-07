@@ -54,6 +54,9 @@ func (r *ServerRule) ReferencedFields() []string {
 			addField(ref)
 		}
 	})
+	if r.Lookup != nil && r.Lookup.Equals != LookupID {
+		addField(r.Lookup.Equals) // the row's value the lookup compares
+	}
 	for _, act := range r.Do {
 		switch {
 		case act.Notify != nil:
