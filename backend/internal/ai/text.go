@@ -13,7 +13,6 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
-	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -46,6 +45,9 @@ type TextRequest struct {
 	Task string `json:"task,omitempty"`
 	// Options are the classify candidates (task classify only).
 	Options []string `json:"options,omitempty"`
+	// AppID is the app the button is in (optional). A participant of a
+	// shared app is covered by the creator's Pro (text_payer.go).
+	AppID string `json:"appId,omitempty"`
 }
 
 // TextField is one named value of shape fields.
@@ -344,26 +346,16 @@ func textHandler(svc *Service) http.Handler {
 			return
 		}
 		// #316: the online AI of an app is a Pro feature (the on-device AI is free)
-		uid := auth.UID(r.Context())
-		if svc.Pro != nil && svc.ProMode.Checks() && !svc.Pro.IsPro(r.Context(), uid) &&
-			svc.ProMode.Stop(r.Context(), svc.logger(), "ai.text", uid, []string{paid.OnlineAI}) {
-			svc.writeErr(w, r, onlineAIRequired(req.Locale))
+		ctx, err := svc.gateText(r.Context(), req)
+		if err != nil {
+			svc.writeErr(w, r, err)
 			return
 		}
-		res, err := svc.Text(r.Context(), req)
+		res, err := svc.Text(ctx, req)
 		if err != nil {
 			svc.writeErr(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, res)
 	})
-}
-
-// onlineAIRequired is the 402 of POST /v1/text for a caller without Pro.
-func onlineAIRequired(loc Locale) *Error {
-	f := PaidFeature{ID: paid.OnlineAI}
-	if d, ok := paid.Default.ByID(paid.OnlineAI); ok {
-		f = d.Public(string(loc))
-	}
-	return ProRequired([]PaidFeature{f})
 }
