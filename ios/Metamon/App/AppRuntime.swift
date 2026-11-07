@@ -431,6 +431,13 @@ final class AppRuntime: DSLRuntime {
     @ObservationIgnored private var recordsRefreshTasks: [String: Task<Void, Never>] = [:]
     /// 保存中のフォーム(saveRecord の連打で同じ記録を 2 件作らない)
     @ObservationIgnored private var savingForms: Set<ObjectIdentifier> = []
+    /// 最後に書き込んだフォーム。送った後にサーバーが断ったら「保存しました」を取り消す(M10 × #317 / #346 / #321)
+    @ObservationIgnored var lastSavedForm: SavedForm?
+    struct SavedForm {
+        let appId: String
+        let entity: String
+        weak var form: FormDraft?
+    }
 
     /// シート / 全画面 / push 先 / 音声シートが開いている = 入力や操作の途中。DSL を差し替えるとフォームの下書きが消えるので待つ。
     private var isInteracting: Bool {
@@ -1119,6 +1126,7 @@ final class AppRuntime: DSLRuntime {
     /// 同期キューからの通知。送信完了はローカル DB を読み直し、競合はサーバーから引き直す(サーバー優先)。
     private func handle(_ event: SyncEvent) {
         Task { @MainActor in
+            revokeSaveFeedback(for: event)
             switch event {
             case .sent(let appId, let entity):
                 guard appId == document.appId else { return }
@@ -1178,6 +1186,26 @@ final class AppRuntime: DSLRuntime {
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
             }
+        }
+    }
+
+    /// サーバーが書き込みを断った(破棄された)イベントなら、その entity に最後に保存したフォームの「保存しました」を取り消す。
+    /// 保存は送信待ちに積んだ時点で数えるので、断られた分はここで戻す(画面を閉じた後なら toast・カードだけが残る)。
+    func revokeSaveFeedback(for event: SyncEvent) {
+        guard let (appId, entity) = Self.refusedWrite(event),
+              let saved = lastSavedForm, saved.appId == appId, saved.entity == entity else { return }
+        saved.form?.markSaveRefused()
+        lastSavedForm = nil
+    }
+
+    static func refusedWrite(_ event: SyncEvent) -> (appId: String, entity: String)? {
+        switch event {
+        case .forbidden(let appId, let entity), .rejected(let appId, let entity, _, _), .notMember(let appId, let entity),
+             .denied(let appId, let entity, _), .proRequired(let appId, let entity, _), .planLimit(let appId, let entity, _),
+             .appStopped(let appId, let entity), .textNotAllowed(let appId, let entity, _):
+            return (appId, entity)
+        case .sent, .conflict, .paused, .drained:
+            return nil
         }
     }
 
@@ -1276,6 +1304,7 @@ final class AppRuntime: DSLRuntime {
             records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: recordId, data: payload,
                                                     author: postAuthor(for: entity))
             form.markSaved(queuedOffline: !recordSync.isOnline) // 閉じても破棄の確認を出さない・オフラインなら保存バーが送信待ちと出す(M10)
+            lastSavedForm = SavedForm(appId: document.appId, entity: entity, form: form)
             WidgetSnapshotWriter.write(dsl: dsl, records: records)
             #if !APP_STORE_REVIEW
             writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)

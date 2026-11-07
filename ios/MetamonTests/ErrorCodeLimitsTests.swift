@@ -149,6 +149,39 @@ final class ErrorCodeLimitsTests: XCTestCase {
             XCTAssertTrue(rows.isEmpty, "楽観的に足した行は戻す")
         }
     }
+
+    // MARK: - 断られた保存に「保存しました」を残さない(M10)
+
+    func testRefusedWriteRevokesSaveFeedback() throws {
+        let doc = try DSLExamples.document("warikan", version: 1)
+        let rt = AppRuntime(document: doc, services: BuildConfig.make(environment: .mock))
+        let entity = try XCTUnwrap(rt.dsl.entity("expenses"))
+        let refusals: [SyncEvent] = [
+            .planLimit(appId: doc.appId, entity: "expenses", limit: PlanLimit(resource: .recordsPerApp)),
+            .appStopped(appId: doc.appId, entity: "expenses"),
+            .textNotAllowed(appId: doc.appId, entity: "expenses", field: "memo"),
+        ]
+        for event in refusals {
+            let form = FormDraft(entity: entity)
+            form.markSaved(queuedOffline: false)
+            rt.lastSavedForm = .init(appId: doc.appId, entity: "expenses", form: form)
+            rt.revokeSaveFeedback(for: event)
+            XCTAssertNil(form.lastSaveResult, "保存バーの「保存しました」を取り消す: \(event)")
+            XCTAssertNil(rt.lastSavedForm)
+        }
+    }
+
+    func testOtherEntityOrSentKeepsSaveFeedback() throws {
+        let doc = try DSLExamples.document("warikan", version: 1)
+        let rt = AppRuntime(document: doc, services: BuildConfig.make(environment: .mock))
+        let form = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("expenses")))
+        form.markSaved(queuedOffline: false)
+        rt.lastSavedForm = .init(appId: doc.appId, entity: "expenses", form: form)
+        rt.revokeSaveFeedback(for: .sent(appId: doc.appId, entity: "expenses"))
+        rt.revokeSaveFeedback(for: .appStopped(appId: doc.appId, entity: "members"))
+        rt.revokeSaveFeedback(for: .appStopped(appId: "other", entity: "expenses"))
+        XCTAssertEqual(form.lastSaveResult, .saved)
+    }
 }
 
 /// records の書き込みが常に `error` で失敗する appconfig。

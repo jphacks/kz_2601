@@ -81,6 +81,19 @@ final class FormDiscardAndSaveFeedbackTests: XCTestCase {
         XCTAssertFalse(draft.hasUnsavedChanges)
     }
 
+    func testRefusedAfterSaveRevokesSavedAndRestoresDirty() throws {
+        let draft = try dirtyDraft()
+        let before = draft.saveCount
+        draft.markSaved(queuedOffline: false) // 送信待ちに積んだ時点で数える
+        draft.markSaveRefused() // 送った後にサーバーが断った(plan_limit_reached / app_stopped / text_not_allowed)
+        XCTAssertNil(FormDraft.saveFeedback(savesBefore: before, form: draft), "断られた書き込みに「保存しました」を出さない")
+        XCTAssertTrue(draft.hasUnsavedChanges, "保存されていないので閉じる前に破棄の確認を出す")
+        draft.markSaveRefused() // 2 回目は何もしない
+        let again = draft.saveCount
+        draft.markSaved(queuedOffline: false)
+        XCTAssertEqual(FormDraft.saveFeedback(savesBefore: again, form: draft), .saved, "直して保存し直せば出す")
+    }
+
     func testNeedsWrite() throws {
         let fresh = FormDraft(entity: try entity())
         XCTAssertTrue(fresh.needsWrite, "新規は初期値のままでも保存する")
