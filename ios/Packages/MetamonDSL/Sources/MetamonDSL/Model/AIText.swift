@@ -15,6 +15,12 @@ public enum AITextLimits {
     public static let maxItemCharacters = 200
     /// 要約・書き直しなど(task が generate 以外)のオンライン版の答えの上限(backend `TextMaxTaskRunes`)。
     public static let maxTaskCharacters = 1200
+    /// length long(backend `TextMaxLongInputBytes` / `TextMaxLongRunes`)。
+    public static let maxLongInputBytes = 16384
+    public static let maxLongCharacters = 3000
+
+    /// 依頼の長さに合わせた材料の上限。
+    public static func maxInputBytes(long: Bool) -> Int { long ? maxLongInputBytes : maxInputBytes }
 
     /// UTF-8 で `maxBytes` 以下に切る(文字の途中では切らない)。
     public static func clip(_ s: String, maxBytes: Int = maxInputBytes) -> String {
@@ -47,12 +53,14 @@ public struct AITextRequest: Codable, Equatable, Sendable {
     public var task: String?
     /// classify の候補(classify 以外は nil)
     public var options: [String]?
+    /// "long" = 長い文(オンライン AI だけ・材料 16 KB)。nil = short
+    public var length: String?
     /// ボタンがあるアプリ(オンライン版だけ・ホストが付ける)。共有のアプリの参加者はサーバーが作成者の Pro で判定する
     public var appId: String?
 
     public init(instruction: String, shape: AITextShape, count: Int? = nil, items: [String]? = nil,
                 input: String? = nil, locale: String? = nil, task: String? = nil, options: [String]? = nil,
-                appId: String? = nil) {
+                length: String? = nil, appId: String? = nil) {
         self.instruction = instruction
         self.shape = shape
         self.count = count
@@ -61,6 +69,7 @@ public struct AITextRequest: Codable, Equatable, Sendable {
         self.locale = locale
         self.task = task
         self.options = options
+        self.length = length == "long" ? "long" : nil
         self.appId = appId
     }
 
@@ -70,6 +79,9 @@ public struct AITextRequest: Codable, Equatable, Sendable {
         r.appId = appId.isEmpty ? nil : appId
         return r
     }
+
+    /// 長い文の依頼か(端末内 AI を使わない)。
+    public var isLong: Bool { length == "long" }
 
     /// 入力を変える task(要約など)か。答えは 1 つの文で、output の field に入れる。
     public var isTransform: Bool { task != nil && task != "generate" }
@@ -105,6 +117,7 @@ public struct AITextResult: Codable, Equatable, Sendable {
     /// 生の出力を依頼の形に合わせる(backend の `parseTextOutput` と同じ規則)。合わなければ nil。
     /// line = 最初の空でない行 / list = 1 個以上(count を超えた分は切る)/ fields = 依頼の名前が全部そろう(依頼の順)。
     public static func normalize(text: String?, items: [String]?, fields: [AITextField]?, for request: AITextRequest) -> AITextResult? {
+        if request.isLong { return normalizeLong(text) }
         if request.isTransform { return normalizeTransform(text, for: request) }
         switch request.shape {
         case .line:
@@ -144,6 +157,13 @@ public struct AITextResult: Codable, Equatable, Sendable {
             return hits.count == 1 ? AITextResult(shape: .line, text: hits[0]) : nil
         }
         return AITextResult(shape: .line, text: String(t.prefix(AITextLimits.maxTaskCharacters)))
+    }
+
+    /// 長い文(backend `parseLongOutput` と同じ規則): 段落を残して前後を整え、3000 字で切る。
+    static func normalizeLong(_ text: String?) -> AITextResult? {
+        let t = (text ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "\"「」").union(.whitespacesAndNewlines))
+        guard !t.isEmpty else { return nil }
+        return AITextResult(shape: .line, text: String(t.prefix(AITextLimits.maxLongCharacters)))
     }
 
     /// `POST /v1/text` の 200 本文(openapi `TextResponse`)。サーバーが整えた後でも同じ規則で確かめる。

@@ -126,3 +126,28 @@ func TestTextAcceptedCallKeepsTheCharge(t *testing.T) {
 		t.Fatalf("remaining %d, want %d", got, want)
 	}
 }
+
+// length long goes through the same creator-pays gate: a participant of a
+// Pro creator's app is charged TextLong (3) and served; of a creator without
+// Pro gets 402 creator_needs_pro and the units back.
+func TestTextLongCreatorPays(t *testing.T) {
+	limit := ratelimit.DefaultLimits.SignedIn
+	h, fc, counting := textLimitStack(t, proSet{"pro-owner": true})
+	rec := postText(t, h, "member", `{"instruction":"手紙","length":"long","appId":"F"}`)
+	if rec.Code != http.StatusPaymentRequired || textReason(t, rec.Body.Bytes()) != reasonCreatorNeedsPro {
+		t.Fatalf("free creator: %d %s", rec.Code, rec.Body.String())
+	}
+	if got := remaining(t, rec.Header()); got != limit {
+		t.Fatalf("402 remaining %d, want %d", got, limit)
+	}
+	rec = postText(t, h, "member", `{"instruction":"手紙","length":"long","appId":"P"}`)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"length":"long"`) {
+		t.Fatalf("Pro creator: %d %s", rec.Code, rec.Body.String())
+	}
+	if got, want := remaining(t, rec.Header()), limit-ratelimit.DefaultWeights.TextLong; got != want {
+		t.Fatalf("long remaining %d, want %d", got, want)
+	}
+	if len(fc.calls) != 1 || counting.refunds.Load() != 1 {
+		t.Fatalf("claude %d refunded %d", len(fc.calls), counting.refunds.Load())
+	}
+}

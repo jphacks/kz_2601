@@ -15,7 +15,9 @@ enum AIGenerateRoute: Equatable {
     case unavailable(String)
 
     /// - mock: `METAMON_MOCK=1` は決まった文を返すホストのモックを使う(端末内 AI の答えは毎回変わるため)
-    static func choose(availability: AIAvailability, hostOnline: Bool, mock: Bool) -> AIGenerateRoute {
+    /// - long: `length: long` は端末内 AI を使わず、いつもオンライン(端末内 AI は短い答え向け)
+    static func choose(availability: AIAvailability, hostOnline: Bool, mock: Bool, long: Bool = false) -> AIGenerateRoute {
+        if long { return hostOnline ? .online : .unavailable(longUnavailable) }
         if mock, hostOnline { return .online }
         if availability.isAvailable { return .onDevice }
         if hostOnline { return .online }
@@ -23,6 +25,8 @@ enum AIGenerateRoute: Equatable {
     }
 
     static var isMock: Bool { ProcessInfo.processInfo.environment["METAMON_MOCK"] == "1" }
+
+    static let longUnavailable = "長い文章はオンラインの AI だけで書けます(この版では使えません)"
 }
 
 // MARK: - 依頼の組み立て(純粋関数・テスト対象)
@@ -64,14 +68,15 @@ enum AIGenerateBuilder {
         } else if let id = c.input, let form {
             input = FieldCoding.display(values[id] ?? .null, field: form.field(id))
         }
-        input = input.map { AITextLimits.clip($0) }.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        let long = c.length == "long"
+        input = input.map { AITextLimits.clip($0, maxBytes: AITextLimits.maxInputBytes(long: long)) }.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
 
         let shape = c.shape.flatMap(AITextShape.init(rawValue:)) ?? .line
         return AITextRequest(
             instruction: instruction, shape: shape,
             count: shape == .list ? Swift.min(Swift.max(c.count ?? AITextLimits.defaultCount, 1), AITextLimits.maxItems) : nil,
             items: shape == .fields ? Array((c.items ?? []).prefix(AITextLimits.maxItems)) : nil,
-            input: input, locale: locale)
+            input: input, locale: locale, length: long ? "long" : nil)
     }
 
     /// 端末内 AI の instructions(安全の指示は backend の system と同じ趣旨)。

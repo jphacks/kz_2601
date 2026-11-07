@@ -9,7 +9,8 @@ extension HTTPAIClient {
     public func text(_ request: AITextRequest) async throws -> AITextResult {
         let data: Data
         do {
-            data = try await HTTP.send("POST", baseURL: baseURL, path: "v1/text", body: request, token: token, timeout: 30)
+            data = try await HTTP.send("POST", baseURL: baseURL, path: "v1/text", body: request, token: token,
+                                   timeout: request.isLong ? 75 : 30) // long は出力 1500 トークン(サーバーは 60 秒まで待つ)
         } catch let e as APIError {
             throw Self.textError(e)
         }

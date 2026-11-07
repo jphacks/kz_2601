@@ -9,7 +9,8 @@ import (
 
 // aiButton generate (#417) expect keys: aiGenerate (string: the shape of some
 // generate button, or any) and aiGenerateEntity (bool: one of them reads
-// records), aiTask (string: some aiButton has this task). Cases:
+// records), aiTask (string: some aiButton has this task), aiLength (string:
+// some aiButton has this length, unset = short). Cases:
 // internal/ai/eval/ai_generate_cases.json and cloud_ai_cases.json (-cases).
 
 // generateButtons lists the generate aiButtons of the app.
@@ -58,18 +59,40 @@ func checkAIGenerate(exp map[string]any, a *dsl.App) []string {
 	}
 	if want, ok := exp["aiTask"].(string); ok {
 		var got []string
-		for _, s := range a.Screens {
-			for _, c := range s.Components {
-				for _, x := range append([]dsl.Component{c}, c.Children...) {
-					if x.Type == dsl.CompAiButton {
-						got = append(got, x.Task)
-					}
-				}
-			}
+		for _, x := range aiButtons(a) {
+			got = append(got, x.Task)
 		}
 		if !slices.Contains(got, want) {
 			miss = append(miss, fmt.Sprintf("aiTask=%s got %v", want, got))
 		}
 	}
+	if want, ok := exp["aiLength"].(string); ok {
+		var got []string
+		for _, x := range aiButtons(a) {
+			l := x.Length
+			if l == "" {
+				l = "short"
+			}
+			got = append(got, l)
+		}
+		if !slices.Contains(got, want) {
+			miss = append(miss, fmt.Sprintf("aiLength=%s got %v", want, got))
+		}
+	}
 	return miss
+}
+
+// aiButtons lists every aiButton of the app (also inside a container).
+func aiButtons(a *dsl.App) []dsl.Component {
+	var out []dsl.Component
+	for _, s := range a.Screens {
+		for _, c := range s.Components {
+			for _, x := range append([]dsl.Component{c}, c.Children...) {
+				if x.Type == dsl.CompAiButton {
+					out = append(out, x)
+				}
+			}
+		}
+	}
+	return out
 }

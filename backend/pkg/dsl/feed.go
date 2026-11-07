@@ -9,18 +9,26 @@ import (
 // fetched by appconfig (GET /v1/feeds/{provider}) and shown as a list. The
 // DSL names a provider from a closed set plus that provider's typed params;
 // it can never carry a URL. Nothing about the user or the app's records is
-// sent out: weather takes a forecast region code, holidays nothing, rss the
-// id of an allowlisted feed. docs/backend/features/external-feeds.md
+// sent out: weather / warnings / pressure take a forecast region code,
+// holidays nothing, rss the id of an allowlisted feed. docs/backend/features/external-feeds.md
 
 // Feed providers (Component.Provider).
 const (
 	FeedWeather  = "weather"  // 気象庁の府県天気予報(Component.Region)
 	FeedHolidays = "holidays" // 内閣府の国民の祝日
 	FeedRSS      = "rss"      // 運営が許可したフィード(Component.FeedID)
+	FeedWarnings = "warnings" // 気象庁の警報・注意報(Component.Region)
+	FeedPressure = "pressure" // MET Norway の気圧の予報(Component.Region の代表地点)
 )
 
 // FeedProviders is the closed set of feed.provider values.
-var FeedProviders = map[string]bool{FeedWeather: true, FeedHolidays: true, FeedRSS: true}
+var FeedProviders = map[string]bool{FeedWeather: true, FeedHolidays: true, FeedRSS: true, FeedWarnings: true, FeedPressure: true}
+
+// FeedUsesRegion reports whether a provider reads Component.Region (a key of
+// WeatherRegions). The same 56 forecast office codes serve all three.
+func FeedUsesRegion(provider string) bool {
+	return provider == FeedWeather || provider == FeedWarnings || provider == FeedPressure
+}
 
 // Feed list size (Component.Limit; 0 = FeedDefaultLimit).
 const (
@@ -55,15 +63,15 @@ var RSSFeeds = map[string]string{
 
 func checkFeed(where string, c *Component, add func(string, ...any)) {
 	if !FeedProviders[c.Provider] {
-		add("%s: feed provider must be weather, holidays or rss (got %q); other sources and URLs are not available", where, c.Provider)
+		add("%s: feed provider must be weather, warnings, pressure, holidays or rss (got %q); other sources and URLs are not available", where, c.Provider)
 		return
 	}
-	if c.Provider == FeedWeather {
+	if FeedUsesRegion(c.Provider) {
 		if _, ok := WeatherRegions[c.Region]; !ok {
-			add("%s: feed weather needs region, a forecast office code such as 130000 (東京都) or 170000 (石川県) (got %q)", where, c.Region)
+			add("%s: feed %s needs region, a forecast office code such as 130000 (東京都) or 170000 (石川県) (got %q)", where, c.Provider, c.Region)
 		}
 	} else if c.Region != "" {
-		add("%s: feed region is only for provider weather", where)
+		add("%s: feed region is only for provider weather, warnings or pressure", where)
 	}
 	if c.Provider == FeedRSS {
 		if _, ok := RSSFeeds[c.FeedID]; !ok {

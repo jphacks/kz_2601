@@ -267,6 +267,7 @@ func (a *App) Validate() error {
 	checkHiddenFields(a, entities, add)
 	checkMatching(a, add)
 	checkSingleEntities(a, entities, add)
+	checkBookLookups(a, entities, add) // book_lookup.go
 	checkDataRules(a, add)
 	checkAddressed(a, add)
 	checkServerRules(a, entities, add)
@@ -359,6 +360,7 @@ func (a *App) Validate() error {
 			checkActivity(where, act.Activity, a, add) // #423: live_activity.go
 		case ActionAddCalendar:
 			checkCalendarAction(where, act, entities, add) // calendar_event.go
+		case ActionLookupBook: // placement and fields: checkBookLookups (book_lookup.go)
 		case ActionBack, ActionOpenVoice, ActionResetForm, ActionEndActivity:
 		default:
 			add("%s: unknown action type %q", where, act.Type)
@@ -416,9 +418,7 @@ func (a *App) Validate() error {
 			}
 			switch c.Type {
 			case CompText:
-				if c.Text == "" {
-					add("%s: text is empty", where)
-				}
+				checkText(where, c, formEntity, add) // text_highlight.go
 			case CompButton:
 				if c.Label == "" || c.Action == nil {
 					add("%s: button needs label and action", where)

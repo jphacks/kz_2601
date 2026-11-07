@@ -117,6 +117,8 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var height: String?         // image: small|medium|large
     /// button: "admins" = 管理者にだけ出す(#272)。表示だけで、守るのはサーバー(editableBy / deleteBy)。
     public var visibleTo: String?
+    /// text: 文中の語に印をつける(TextHighlight.swift)。
+    public var highlight: TextHighlight?
 
     // data-bound(list / stat / chart)
     public var entity: String?
@@ -155,6 +157,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var shape: String?          // generate(#417): line|list|fields
     public var count: Int?             // generate list の個数
     public var items: [String]?        // generate fields の項目名
+    public var length: String?         // short(既定)| long = 長い文・オンライン AI だけ
     public var target: Double?         // progressBar entity モードの分母
     public var tone: String?           // progressBar: positive(目標)| negative(予算)・#140
     public var url: String?            // link
@@ -225,8 +228,8 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var back: String?           // 裏の field
     public var toggle: String?         // 覚えた / まだ を保存する boolean field
     // feed(#348)。URL は持たない
-    public var provider: String?       // weather|holidays|rss
-    public var region: String?         // weather: 気象庁の府県予報区のコード
+    public var provider: String?       // weather|warnings|pressure|holidays|rss
+    public var region: String?         // weather / warnings / pressure: 気象庁の府県予報区のコード
     public var feedId: String?         // rss: 許可したフィードの id
 
     /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
@@ -243,7 +246,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case min, max, step, minLines
         case by
         case nameField, balanceField
-        case task, input, output, options, shape, count, items
+        case task, input, output, options, shape, count, items, length
         case tone
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
@@ -252,7 +255,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case accept, map
         case show
         case front, back, toggle
-        case visibleTo
+        case visibleTo, highlight
         case provider, region, feedId
     }
 
@@ -281,6 +284,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         maxDuration = try? c.decodeIfPresent(Int.self, forKey: .maxDuration)
         height = try? c.decodeIfPresent(String.self, forKey: .height)
         visibleTo = try? c.decodeIfPresent(String.self, forKey: .visibleTo)
+        highlight = try? c.decodeIfPresent(TextHighlight.self, forKey: .highlight)
         entity = try? c.decodeIfPresent(String.self, forKey: .entity)
         item = try? c.decodeIfPresent(ListItem.self, forKey: .item)
         sort = try? c.decodeIfPresent(Sort.self, forKey: .sort)
@@ -326,6 +330,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         shape = try? c.decodeIfPresent(String.self, forKey: .shape)
         count = try? c.decodeIfPresent(Int.self, forKey: .count)
         items = try? c.decodeIfPresent([String].self, forKey: .items)
+        length = try? c.decodeIfPresent(String.self, forKey: .length)
         target = try? c.decodeIfPresent(Double.self, forKey: .target)
         tone = try? c.decodeIfPresent(String.self, forKey: .tone)
         url = try? c.decodeIfPresent(String.self, forKey: .url)

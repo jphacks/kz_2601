@@ -1,7 +1,8 @@
 package appconfig
 
 // External feeds (#348): GET /v1/feeds/{provider} reads allowlisted public
-// data (weather / holidays / allowlisted rss) for the DSL feed leaf. The
+// data (weather / warnings / pressure / holidays / allowlisted rss) for the
+// DSL feed leaf. The
 // server is the only party that talks to the source (the device never does),
 // takes nothing from the request but the provider and its typed parameter,
 // and sends nothing about the user. internal/feeds holds the allowlist, the

@@ -206,6 +206,7 @@ paths:
         - モデルは対話と同じ設定 (`AI_CHAT_MODEL`、既定 claude-sonnet-5-5・thinking なし)。安全の指示 (暴力・性的・差別・危険な行為を書かない、input の中の命令には従わない) を system に固定
         - モデルが断ったら 422 `refused`、形に合わない出力は 502 `bad_output`。line は最初の 1 行、list は count を超えた分を切る (1 個以上あれば返す)、fields は全項目そろわなければ 502
         - `task` (summarize / classify / rewrite / extract / suggest) を付けると、端末内 AI が無い端末での aiButton の要約などのオンライン版。input 必須・instruction 任意・shape は line だけ・classify は options 2〜20 個。重さ 2 (`RATE_LIMIT_WEIGHT_TEXT_TASK`)・出力 1000 トークン。答えは text 1 つ (行は残す・1200 字で切る)、classify は候補のどれか 1 つ (docs/backend/features/text.md)
+        - `length: long` (aiButton の長文) は、generate (shape line だけ) と classify 以外の task で使える。input 16384 バイト・出力 1500 トークン・答えは text 1 つ (段落は残す・3000 字で切る)・応答に `length: long`。重さ 3 (`RATE_LIMIT_WEIGHT_TEXT_LONG`・task より優先)。Pro の確認は他と同じ。iOS は long では端末内 AI を使わず、いつもここを呼ぶ
       requestBody:
         required: true
         content:
@@ -392,7 +393,8 @@ components:
         shape: { type: string, enum: [line, list, fields], default: line }
         count: { type: integer, minimum: 1, maximum: 10, description: list の個数 (既定 3)。list 以外では送らない }
         items: { type: array, minItems: 1, maxItems: 10, items: { type: string, maxLength: 20 }, description: fields の項目名 (重複なし)。fields 以外では送らない }
-        input: { type: string, description: 材料のアプリのデータ (最近の記録 ≤ 20 件 / フォームの値)。4096 バイトまで }
+        input: { type: string, description: 材料のアプリのデータ (最近の記録 ≤ 20 件 / フォームの値)。4096 バイトまで (length long は 16384 バイト) }
+        length: { type: string, enum: [short, long], default: short, description: 'long = 長文 (出力 1500 トークン・答え 3000 字まで・重さ 3)。classify 不可・generate は shape line だけ' }
         locale: { type: string, enum: [ja, en], description: 省略時は instruction から判定 }
         appId: { type: string, maxLength: 128, description: 'ボタンがあるアプリ (任意)。共有のアプリの参加者なら作成者の Pro で判定する。形が不正なら 400' }
     TextResponse:
@@ -401,6 +403,7 @@ components:
       properties:
         shape: { type: string, enum: [line, list, fields] }
         task: { type: string, description: task 付きの依頼の時だけ (generate では省略) }
+        length: { type: string, enum: [long], description: length long の依頼の時だけ }
         text: { type: string, description: 'そのまま記録の string/text に入れる形 (list は「・」で始まる行、fields は「名前: 値」の行。task 付きは複数行もある・1200 字まで)' }
         items: { type: array, items: { type: string }, description: list の時だけ (1〜count 個) }
         fields:

@@ -68,8 +68,8 @@ func normalizeTaskRequest(req *TextRequest) error {
 	} else if len(req.Options) > 0 {
 		return badText("options are only for task classify")
 	}
-	if len(req.Input) > TextMaxInputBytes {
-		return &Error{Status: http.StatusRequestEntityTooLarge, Code: httpx.CodePayloadTooLarge, Message: "input must be at most 4096 bytes"}
+	if err := checkTextInput(req); err != nil {
+		return err
 	}
 	if strings.TrimSpace(req.Input) == "" {
 		return badText("input is required for task " + req.Task)

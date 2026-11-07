@@ -223,6 +223,7 @@ const (
 	ActionStartActivity ActionType = "startActivity" // #423 Live Activity
 	ActionEndActivity   ActionType = "endActivity"
 	ActionAddCalendar   ActionType = "addToCalendar" // system "new event" sheet (calendar_event.go)
+	ActionLookupBook    ActionType = "lookupBook"    // fill the form from an ISBN (book_lookup.go)
 )
 
 // Action is a non-nesting side effect triggered by buttons/list taps.
@@ -244,6 +245,9 @@ type Action struct {
 
 	// addToCalendar: the record fields that become the event (calendar_event.go)
 	CalendarEvent *CalendarEvent `json:"calendarEvent,omitempty"`
+
+	// lookupBook: ISBN field and the fields the book info goes to (book_lookup.go)
+	BookLookup *BookLookup `json:"bookLookup,omitempty"`
 }
 
 // ComponentType discriminates Component.
@@ -385,6 +389,8 @@ type Component struct {
 	Height      string  `json:"height,omitempty"`      // image: small|medium|large
 	// VisibleTo "admins": only the app's admins see the button (#272, data_rules.go).
 	VisibleTo string `json:"visibleTo,omitempty"`
+	// Highlight marks words inside a text (text_highlight.go).
+	Highlight *TextHighlight `json:"highlight,omitempty"`
 
 	// data-bound (list / stat / chart)
 	Entity        string    `json:"entity,omitempty"`
@@ -454,6 +460,7 @@ type Component struct {
 	Shape   string   `json:"shape,omitempty"`   // generate (#417): line|list|fields
 	Count   int      `json:"count,omitempty"`   // generate list: number of items
 	Items   []string `json:"items,omitempty"`   // generate fields: item names
+	Length  string   `json:"length,omitempty"`  // short (default) | long: cloud-only long text (ai_button.go)
 
 	// healthStat (#167). Label / Target are shared.
 	Metric string `json:"metric,omitempty"` // steps|weight

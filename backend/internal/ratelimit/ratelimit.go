@@ -55,12 +55,15 @@ type Weights struct {
 	// TextTask is POST /v1/text with a transform task (summarize, rewrite...):
 	// a longer answer (up to 1000 tokens) than generate.
 	TextTask int
+	// TextLong is POST /v1/text with length long (any task): up to 16 KB in
+	// and 1500 tokens out, the cost of about three short calls.
+	TextLong int
 }
 
 // DefaultLimits / DefaultWeights: see docs/backend/rate-limit.md for the reasoning.
 var (
 	DefaultLimits  = Limits{Anonymous: 30, SignedIn: 60, Pro: 300, PerIP: 300, Global: 2000}
-	DefaultWeights = Weights{Create: 3, Edit: 2, Chat: 1, Text: 1, TextTask: 2}
+	DefaultWeights = Weights{Create: 3, Edit: 2, Chat: 1, Text: 1, TextTask: 2, TextLong: 3}
 )
 
 // JST is the day boundary (00:00 Asia/Tokyo). A fixed zone avoids needing

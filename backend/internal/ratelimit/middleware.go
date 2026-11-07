@@ -30,9 +30,13 @@ func (w Weights) Weight(r *http.Request, body []byte) int {
 		return w.Chat
 	case "/v1/text":
 		var req struct {
-			Task string `json:"task"`
+			Task   string `json:"task"`
+			Length string `json:"length"`
 		}
 		_ = json.Unmarshal(body, &req)
+		if req.Length == "long" {
+			return w.TextLong
+		}
 		if req.Task != "" && req.Task != "generate" {
 			return w.TextTask
 		}

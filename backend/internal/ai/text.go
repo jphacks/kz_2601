@@ -25,8 +25,8 @@ import (
 const (
 	TextMaxInputBytes  = 4096 // records / form values the app sends as data
 	TextMaxOutputToken = 400
-	TextMaxItemRunes   = 200 // one line / item / field value after trimming
-	textMaxBodyBytes   = 16 << 10
+	TextMaxItemRunes   = 200      // one line / item / field value after trimming
+	textMaxBodyBytes   = 32 << 10 // a long input (text_long.go) plus JSON escapes
 )
 
 // TextRequest is the body of POST /v1/text.
@@ -46,6 +46,8 @@ type TextRequest struct {
 	Task string `json:"task,omitempty"`
 	// Options are the classify candidates (task classify only).
 	Options []string `json:"options,omitempty"`
+	// Length is short (default) or long (text_long.go: 16 KB input, longer answer).
+	Length string `json:"length,omitempty"`
 	// AppID is the app the button is in (optional). A participant of a
 	// shared app is covered by the creator's Pro (text_payer.go).
 	AppID string `json:"appId,omitempty"`
@@ -64,6 +66,7 @@ type TextResult struct {
 	Text   string      `json:"text"`           // plain rendering, what a string/text field stores
 	Items  []string    `json:"items,omitempty"`
 	Fields []TextField `json:"fields,omitempty"`
+	Length string      `json:"length,omitempty"` // long when asked (text_long.go)
 	Locale Locale      `json:"locale"`
 	Meta   TextMeta    `json:"meta"`
 }
@@ -82,6 +85,9 @@ func badText(msg string) *Error {
 // normalizeTextRequest applies the same bounds as the DSL validation
 // (dsl.MaxAIInstructionRunes, dsl.MaxAIItems) plus the input cap.
 func normalizeTextRequest(req *TextRequest) error {
+	if err := normalizeLength(req); err != nil {
+		return err
+	}
 	if req.Task != "" && req.Task != "generate" {
 		return normalizeTaskRequest(req)
 	}
@@ -130,10 +136,10 @@ func normalizeTextRequest(req *TextRequest) error {
 	if req.Shape != "fields" && len(req.Items) > 0 {
 		return badText("items are only for shape fields")
 	}
-	if len(req.Input) > TextMaxInputBytes {
-		return &Error{Status: http.StatusRequestEntityTooLarge, Code: httpx.CodePayloadTooLarge, Message: "input must be at most 4096 bytes"}
+	if req.isLong() && req.Shape != "line" {
+		return badText("length long needs shape line")
 	}
-	return nil
+	return checkTextInput(req)
 }
 
 // prepareText validates req in place and resolves its locale (no Claude call).
@@ -148,7 +154,7 @@ func prepareText(req *TextRequest) (Locale, error) {
 func (s *Service) text(ctx context.Context, req TextRequest, loc Locale) (*TextResult, error) {
 	started := time.Now()
 	cfg := s.ChatConfig.resolved()
-	ctx, cancel := context.WithTimeout(ctx, s.chatTimeout())
+	ctx, cancel := context.WithTimeout(ctx, s.textTimeout(req))
 	defer cancel()
 	c := Completion{
 		System:     textSystemPrompt(loc),
@@ -163,6 +169,9 @@ func (s *Service) text(ctx context.Context, req TextRequest, loc Locale) (*TextR
 	if req.Task != "" {
 		c.System, c.Messages[0].Content, c.Schema, c.MaxTokens = taskSystemPrompt(loc), taskUserMessage(req), taskSchema(req), TextMaxTaskOutputToken
 	}
+	if req.isLong() {
+		applyLong(&c, req, loc)
+	}
 	resp, err := s.Claude.Complete(WithOperation(ctx, OpText), c)
 	if err != nil {
 		return nil, mapClaudeErr(err)
@@ -173,6 +182,9 @@ func (s *Service) text(ctx context.Context, req TextRequest, loc Locale) (*TextR
 	parse := parseTextOutput
 	if req.Task != "" {
 		parse = parseTaskOutput
+	}
+	if req.isLong() {
+		parse = parseLongOutput
 	}
 	res, err := parse(resp.Text, req)
 	if err != nil {

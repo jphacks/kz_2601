@@ -440,12 +440,15 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkLiveActivity(c.Expect, app)...)
 		// addToCalendar: calendar_add.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkCalendarAdd(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkBookLookup(c.Expect, app)...) // book_lookup.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkQR(c.Expect, app)...)         // #422: qr.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAudio(c.Expect, app)...)      // #420: audio.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAIGenerate(c.Expect, app)...) // #417: aigen.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkNearby(c.Expect, app)...)     // #425: nearby.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMusic(c.Expect, app)...)      // #412: music.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRetention(c.Expect, app)...)  // #482: retention.go
+		// text.highlight: text_highlight.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkTextHighlight(c.Expect, app)...)
 		// #507: matching.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMatching(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRepeat(c.Expect, app)...)      // #266: repeat.go

@@ -42,6 +42,15 @@ final class AITextGateTests: XCTestCase {
         XCTAssertNil(base.inApp("").appId, "空の appId は付けない")
     }
 
+    /// 長い文の依頼にも appId が付き、length は残る(作成者の Pro で判定される)
+    func testLongRequestCarriesAppId() throws {
+        let long = AITextRequest(instruction: "手紙", shape: .line, length: "long").inApp("app-123")
+        XCTAssertTrue(long.isLong)
+        let body = try JSONSerialization.jsonObject(with: JSONEncoder().encode(long)) as? [String: Any]
+        XCTAssertEqual(body?["length"] as? String, "long")
+        XCTAssertEqual(body?["appId"] as? String, "app-123")
+    }
+
     func testMockIsDeterministicPerShape() async throws {
         let mock = MockAIClient(delay: .zero)
         let list = AITextRequest(instruction: "罰ゲーム", shape: .list, count: 4)
