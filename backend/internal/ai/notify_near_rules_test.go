@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -54,7 +55,11 @@ func TestNotifyNearRestriction(t *testing.T) {
 			t.Errorf("%s: chat rule not swapped", name)
 		}
 	}
-	if sch := string(old.assets().genSch); strings.Contains(sch, `"near":`) || strings.Contains(sch, `"jitterMinutes":`) {
+	// placeSearch also has a "near" key, so look at the Notification def only.
+	if props := notificationProps(t, generationSchema); props["near"] == nil || props["jitterMinutes"] == nil {
+		t.Fatal("full generation schema lacks near / jitterMinutes")
+	}
+	if props := notificationProps(t, old.assets().genSch); props["near"] != nil || props["jitterMinutes"] != nil {
 		t.Fatal("restricted generation schema still offers near / jitterMinutes")
 	}
 
@@ -73,4 +78,21 @@ func TestNotifyNearRestriction(t *testing.T) {
 	if !changed || strings.Contains(s, `"arrive"`) || strings.Contains(s, "jitterMinutes") || !strings.Contains(s, `"rand"`) || !strings.Contains(s, `"daily"`) || len(notes) != 1 {
 		t.Fatalf("enforce: changed=%v notes=%v out=%s", changed, notes, out)
 	}
+}
+
+func notificationProps(t *testing.T, sch []byte) map[string]any {
+	t.Helper()
+	var root struct {
+		Defs map[string]struct {
+			Properties map[string]any `json:"properties"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(sch, &root); err != nil {
+		t.Fatal(err)
+	}
+	n, ok := root.Defs["Notification"]
+	if !ok {
+		t.Fatal("generation schema has no Notification def")
+	}
+	return n.Properties
 }
