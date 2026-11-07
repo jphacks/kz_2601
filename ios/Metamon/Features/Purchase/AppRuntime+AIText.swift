@@ -23,7 +23,9 @@ extension AppRuntime {
     var supportsOnlineAIText: Bool { true }
 
     func generateAIText(_ request: AITextRequest) async throws -> AITextResult {
-        switch AITextGate.decide(consentGranted: hasAIConsent, isPro: proGate.isPro, enforced: proGate.isEnforced) {
+        // 共有のアプリの参加者は作成者の Pro で使える(参加者は払わない)。参加かどうかはサーバーが appId で確かめる
+        switch AITextGate.decide(consentGranted: hasAIConsent, isPro: proGate.isPro, enforced: proGate.isEnforced,
+                                 sharedApp: PaidGate.usesSharedData(dsl)) {
         case .needsConsent:
             _ = requireAIConsent()
             throw AITextError.needsConsent
@@ -32,11 +34,12 @@ extension AppRuntime {
             throw AITextError.needsPro
         case .send:
             do {
-                return try await services.ai.text(request)
+                return try await services.ai.text(request.inApp(document.appId))
             } catch AITextError.needsPro {
                 requestProForAIText() // #316: サーバーが 402 pro_required(端末の Pro の判定が古い・制限が無効の Debug など)
                 throw AITextError.needsPro
             }
+            // AITextError.creatorNeedsPro はそのまま投げる(ボタンの下に案内だけ・課金画面は出さない)
         }
     }
 

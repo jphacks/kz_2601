@@ -102,6 +102,7 @@ func (l *Limiter) Middleware(verifier auth.IdentityVerifier) func(http.Handler) 
 			// verified here: auth.Optional in the handler keeps this uid instead of verifying again
 			ctx := auth.ContextWithUID(r.Context(), id.UID)
 			out := &outcome{}
+			out.waive = func(ctx context.Context) bool { return l.waive(ctx, w, dec, weight) }
 			sw := &statusWriter{ResponseWriter: w}
 			next.ServeHTTP(sw, r.WithContext(context.WithValue(ctx, outcomeKey{}, out)))
 			l.settle(r, dec, weight, out, sw.status)
@@ -111,7 +112,10 @@ func (l *Limiter) Middleware(verifier auth.IdentityVerifier) func(http.Handler) 
 
 // settle refunds what the request should not pay after all (refund.go, #548).
 func (l *Limiter) settle(r *http.Request, dec Decision, charged int, out *outcome, httpStatus int) {
-	status, mode := out.final(httpStatus)
+	status, mode, waived := out.final(httpStatus)
+	if waived {
+		return
+	}
 	gone := r.Context().Err() != nil // the client disconnected before the end
 	units := l.cfg.Weights.refundUnits(charged, status, mode, gone)
 	if units <= 0 {
@@ -129,6 +133,28 @@ func (l *Limiter) settle(r *http.Request, dec Decision, charged int, out *outcom
 		slog.String("mode", mode),
 		slog.String("path", r.URL.Path),
 	)
+}
+
+// waive refunds all of dec at once (Waive) and rewrites the headers that
+// are not sent yet to the count without this request.
+func (l *Limiter) waive(ctx context.Context, w http.ResponseWriter, dec Decision, charged int) bool {
+	if charged <= 0 || dec.charge.store == nil {
+		return false
+	}
+	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), refundTimeout)
+	defer cancel()
+	if err := l.Refund(rctx, dec, charged); err != nil {
+		l.log.WarnContext(rctx, "ratelimit: waive failed", slog.Any("error", err), slog.Int("units", charged))
+		return false
+	}
+	units := min(charged, dec.charge.weight)
+	if !dec.Unmetered {
+		dec.Used = max(0, dec.Used-units)
+		dec.Remaining = max(0, dec.Limit-dec.Used)
+		setHeaders(w, dec, l.cfg.Now())
+	}
+	l.log.InfoContext(rctx, "ratelimit.refund", slog.Int("units", units), slog.String("reason", "waived"))
+	return true
 }
 
 // setHeaders writes X-RateLimit-* (and Retry-After on 429). An Unmetered

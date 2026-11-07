@@ -57,7 +57,7 @@
 | 所 | 止めるもの | Pro を見る相手 |
 |---|---|---|
 | ai `POST /v1/generate`(create / edit) | 生成した DSL が今のアプリに無い save の有料機能を持つ時、**保存せずに** 402(生成した後・保存の前に DSL で判定。Claude の費用は掛かるが、生成前の語の予測より確実)。ストリーミングは `event: error` で同じ本文 | 呼び出した人(`Service.Pro`。ID トークンの uid が無い時は appconfig に任せる) |
-| ai `POST /v1/text` | Pro でなければ 402(features = onlineAI)。Claude は呼ばない | 呼び出した人 |
+| ai `POST /v1/text` | Pro でなければ 402(features = onlineAI)。Claude は呼ばない。`appId` の共有のアプリの参加者(作成者でないメンバー)は作成者の Pro で通る。作成者が Pro でなければ `details.reason: creator_needs_pro`(iOS は課金画面ではなく案内)。参加はサーバーが app_owners / members で確かめる(他人の appId を送っても通らない)。利用上限は呼び出した人のまま、ai.usage に `payer_uid_hash`(作成者)を付ける | 呼び出した人。共有のアプリの参加者はアプリの作成者(app_owners) |
 | appconfig `PUT` / `PATCH /v1/apps/{appId}/dsl`・`POST …/versions/{n}/restore`・`POST /v1/apps`(dsl つき)・`POST …/duplicate` | 今の DSL(新しいアプリは無し)に無い save の有料機能を足す保存は 402。ai の生成も最後はここを通る(ai が 402 を中継する。「元に戻して」も) | 呼び出した人 = アプリの作成者。**参加者の写し**(作成者が別にいる appId)の保存は見ない(写しは公開されず、写しの private のルールは参加者を作成者として runner が止める) |
 | appconfig 共有のレコードの作成・更新・印を付ける | アプリの作成者が Pro でなければ 402(features = sharedData)。呼び出した人が作成者でない時は `details.reason: creator_needs_pro`(参加者は払えないので、iOS は課金画面ではなく案内を出す) | アプリの作成者(app_owners) |
 | runner(自動の動き) | 作成者が Pro でない時は実行しない(`skipped_plan`・`limit: needs_pro`。共有のアプリは今まで通り `shared_needs_pro`、匿名は `anonymous`)。**private のアプリのルールも含む**(#338 の「無料にも小さな枠」は無くした・2026-11-06 の決定)。無料の枠は 0(`quota.Plan` が無料のプランを返さない。`RUNNER_LIMIT_*_FREE` は使われない) | 作成者(共有 = app_owners・private = 写しの持ち主) |
