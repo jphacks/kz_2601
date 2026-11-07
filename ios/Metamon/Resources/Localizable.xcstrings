@@ -14825,6 +14825,23 @@
         }
       }
     },
+    "録音ファイルを文字にできませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't transcribe the recording"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音ファイルを文字にできませんでした"
+          }
+        }
+      }
+    },
     "録音中。タップで終了" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15263,6 +15280,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音声モデルを読み込み中…(初回は1分ほど)"
+          }
+        }
+      }
+    },
+    "音声入力を使っている間は、録音ファイルを文字にできません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recordings can't be transcribed while voice input is open"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声入力を使っている間は、録音ファイルを文字にできません"
           }
         }
       }
