@@ -59,7 +59,7 @@ Entity  { id, name, titleField?, scope?: private|shared|public, edit?: author|me
   Entity.addressedTo?: fieldId(宛先の member / members field。作った人と宛先の人だけが読む)・Field.type "members" — §3.14
 Screen  { id, title, entity?, toolbar[]?: {label, icon?, action}, components[]: Container|Leaf }
 Container { type: vstack|hstack|section|card|disclosure|carousel|grid, id?, area?, title?, spacing?, children[]: Leaf }
-Leaf (66 種・全て id? と area? を持つ) / Action (15 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField?, when?, alarm? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
+Leaf (66 種・全て id? と area? を持つ) / Action (16 種) / Notification { id, title, body, repeat: once|daily|weekly|monthly|yearly, time?, weekday?, entity?, field?, offsetMinutes?, titleField?, enabledField?, when?, alarm? }(monthly / yearly はレコードの日付 field から・expressions.md §7 の 9)
 API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, createdAt? }
 ```
 
