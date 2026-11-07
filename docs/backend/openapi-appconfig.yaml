@@ -1536,9 +1536,11 @@ components:
         - late: 遅れたので動かさなかった(後でまとめて動かさない)
         - inactive: しばらく開かれていないので休んでいる(開くと再開)
         - failed: 何度か試したがうまくいかなかった
+        - disabled: 作成者がこのルールをオフにしている(オフの前に届いていたきっかけを動かさなかった)
         - other: この版の知らない結果
       enum:
         - changed
+        - disabled
         - failed
         - inactive
         - late
@@ -1554,12 +1556,14 @@ components:
         - unavailable
     AutomationRule:
       type: object
-      required: [id, description, trigger, result]
+      required: [id, description, trigger, result, enabled]
       properties:
         id: { type: string }
         description: { type: string, description: 'ルールの説明(日本語・`DescribeServerRule`)。例: 「毎日 07:00、「記録」に記録を足す」' }
         trigger: { type: string, enum: [record, schedule] }
         result: { $ref: '#/components/schemas/AutomationResult' }
+        enabled: { type: boolean, description: 'false = 作成者がオフにしている(DSL の serverRules[].enabled)。オフのルールは動かず、実行の数にも数えない。切り替えは PATCH /v1/apps/{appId}/dsl か AI の編集' }
+        consecutiveFailures: { type: integer, minimum: 0, description: 'うまくいかなかった(failed)回数の連続。うまく動くと 0 に戻る。0 なら省く。続いていればチャットで直すか提案する目安' }
         lastRunAt: { type: string, format: date-time, description: 最後に動いた(止めた・失敗したを含む)時刻。まだ無ければ省く }
         lastOkAt: { type: string, format: date-time, description: 最後にうまく動いた時刻 }
         stopped: { $ref: '#/components/schemas/AutomationStop' }

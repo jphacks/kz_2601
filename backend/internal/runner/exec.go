@@ -13,6 +13,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/runner/engine"
 	"github.com/jphacks/kz_2601/backend/internal/runner/notify"
+	"github.com/jphacks/kz_2601/backend/internal/runner/queue"
 	"github.com/jphacks/kz_2601/backend/internal/runner/quota"
 	"github.com/jphacks/kz_2601/backend/internal/runner/schedule"
 	"github.com/jphacks/kz_2601/backend/internal/runner/scope"
@@ -110,6 +111,10 @@ func (r *Runner) process(ctx context.Context, ev store.OutboxEvent) (map[string]
 		if rule == nil || now == nil {
 			out[id] = OutcomeSkippedStopped
 			r.logRun(ctx, ev, runLog{ruleID: id, outcome: OutcomeSkippedStopped, reason: ReasonRuleRemoved})
+			continue
+		}
+		if !now.IsEnabled() { // the creator's switch reads the current DSL
+			out[id] = r.ruleDisabled(ctx, ev, id)
 			continue
 		}
 		if st.rules[id] {
@@ -669,6 +674,7 @@ func (r *Runner) putStatus(ctx context.Context, ev store.OutboxEvent, l runLog) 
 	if l.outcome == quota.OutcomeOK {
 		s.LastOKAt = now
 	}
+	s.Failed = l.outcome == queue.OutcomeGaveUp // failures in a row (#347)
 	if l.quota != nil && l.quotaDay != "" {
 		s.QuotaDay, s.QuotaUsed, s.QuotaLimit = l.quotaDay, l.quota.Used, l.quota.Limit
 	}
