@@ -48,14 +48,26 @@ public struct ScreenView: View {
                             if hasUnsavedInput { confirmDiscard = true } else { rt.close(route) }
                         }
                     }
+                    // M10: 積まれたフォームに入力があれば、標準の戻るの代わりに確認付きの戻るを出す
+                    if guardsBack {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button { confirmDiscard = true } label: {
+                                Image(systemName: "chevron.backward").fontWeight(.semibold)
+                            }
+                            .accessibilityLabel(L("戻る"))
+                            .accessibilityIdentifier("form.back")
+                        }
+                    }
                 }
+                // 標準の戻るを隠すと、端から払って戻る操作も止まる(払って入力を失わない)
+                .navigationBarBackButtonHidden(guardsBack)
                 // M10: シートのフォームに入力があれば、下に払って閉じない(「閉じる」で破棄を確認する)
                 .interactiveDismissDisabled(hasUnsavedInput)
-                .confirmationDialog(L("入力した内容を破棄しますか?"), isPresented: $confirmDiscard, titleVisibility: .visible) {
-                    Button(L("破棄する"), role: .destructive) { rt.close(route) }
+                .confirmationDialog(L("編集内容を破棄しますか?"), isPresented: $confirmDiscard, titleVisibility: .visible) {
+                    Button(L("破棄"), role: .destructive) { rt.close(route) }
                     Button(L("編集を続ける"), role: .cancel) {}
                 } message: {
-                    Text(L("閉じると、入力した内容は保存されません。"))
+                    Text(L("保存していない入力は失われます。"))
                 }
                 .task(id: route) {
                     // 新規フォームは読み込みを待たずに用意する(FormPrefill は数秒で失効するため、通信待ちで落とさない)
@@ -71,9 +83,26 @@ public struct ScreenView: View {
         }
     }
 
-    /// シート・全画面のフォームに保存していない入力があるか(M10)。
+    /// 戻る・閉じるで入力を失うか(M10)。push された画面も、シート・全画面の中ならシートを払って閉じられる。
     private var hasUnsavedInput: Bool {
-        (route.stack == "sheet" || route.stack == "full") && form?.hasUnsavedChanges == true
+        Self.guardsDiscard(route: route, paths: rt.paths, form: form)
+    }
+
+    /// 積まれた画面で、戻る(ボタン・端から払う)を確認付きに替えるか(M10)。
+    private var guardsBack: Bool {
+        Self.isPushed(route, paths: rt.paths) && hasUnsavedInput
+    }
+
+    /// 閉じる・戻るの前に破棄を確認するか(M10): 保存していない入力があり、シート・全画面の中か push された画面。
+    /// タブ・メインの根のフォームは離れる操作が無い(タブ切替では入力は残る)ので確認しない。
+    static func guardsDiscard(route: Route, paths: [String: [Route]], form: FormDraft?) -> Bool {
+        guard form?.hasUnsavedChanges == true else { return false }
+        return route.stack == "sheet" || route.stack == "full" || isPushed(route, paths: paths)
+    }
+
+    /// `route` が NavigationStack に積まれた(根ではない)画面か。
+    static func isPushed(_ route: Route, paths: [String: [Route]]) -> Bool {
+        (paths[route.stack] ?? []).contains(route)
     }
 
     /// `screen.entity` があればドラフトを用意。recordId 付きなら既存レコードをロード(編集モード)。
