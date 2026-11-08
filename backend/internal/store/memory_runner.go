@@ -69,6 +69,22 @@ func (m *Memory) RetryOutbox(_ context.Context, env, eventID string, attempt int
 	return nil
 }
 
+// DeferOutbox implements OutboxQueue.
+func (m *Memory) DeferOutbox(_ context.Context, env, eventID string, attempt int, at time.Time, lastError string, charge json.RawMessage) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ev, err := m.leasedLocked(env, eventID, attempt)
+	if err != nil {
+		return err
+	}
+	ev.AvailableAt, ev.Status, ev.LastError = at, OutboxRetry, lastError
+	ev.Deferrals++
+	if charge != nil {
+		ev.Charge = cloneRaw(charge)
+	}
+	return nil
+}
+
 func (m *Memory) leasedLocked(env, eventID string, attempt int) (*OutboxEvent, error) {
 	ev, ok := m.outbox[env][eventID]
 	if !ok {

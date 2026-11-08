@@ -71,6 +71,10 @@ var (
 	ErrDisabled = errors.New("feeds: provider disabled")
 	ErrBusy     = errors.New("feeds: outgoing request budget used up")
 	ErrUpstream = errors.New("feeds: source unavailable")
+	// ErrRecentFailure is ErrUpstream served from the cache: the source
+	// failed less than FailTTL ago and was not asked again. A caller that
+	// retries should wait FailTTL (the runner's saveFeed defers, feed.go).
+	ErrRecentFailure = fmt.Errorf("%w (failed recently, cached)", ErrUpstream)
 )
 
 // Per-provider limits.
@@ -93,9 +97,9 @@ var providerLimits = map[string]limits{
 }
 
 const (
-	// failTTL keeps a failure for a while so a broken source is not retried
-	// by every request.
-	failTTL = time.Minute
+	// FailTTL keeps a failure for a while so a broken source is not retried
+	// by every request (ErrRecentFailure until it passes).
+	FailTTL = time.Minute
 	// staleFor is how long a last good copy may stand in for a failing source.
 	staleFor = 24 * time.Hour
 	// maxStoredItems caps what one cached entry keeps.
@@ -294,7 +298,7 @@ func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 		if e != nil && now.Before(e.expires) {
 			s.mu.Unlock()
 			if !e.failedAt.IsZero() {
-				return s.staleOr(e, now)
+				return s.staleOr(e, now, ErrRecentFailure)
 			}
 			return e, false, nil
 		}
@@ -333,7 +337,7 @@ func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 			*ne = *e
 		}
 		if err != nil {
-			ne.failedAt, ne.expires = now, now.Add(failTTL)
+			ne.failedAt, ne.expires = now, now.Add(FailTTL)
 			slog.Warn("feeds: fetch failed", slog.String("provider", q.Provider), slog.String("region", q.Region),
 				slog.String("feedId", q.FeedID), slog.Int("qRunes", len([]rune(q.Q))), slog.Any("error", err))
 		} else {
@@ -350,17 +354,17 @@ func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 		close(c.done)
 		s.mu.Unlock()
 		if err != nil {
-			return s.staleOr(ne, now)
+			return s.staleOr(ne, now, ErrUpstream)
 		}
 		return ne, false, nil
 	}
 }
 
-func (s *Service) staleOr(e *entry, now time.Time) (*entry, bool, error) {
+func (s *Service) staleOr(e *entry, now time.Time, fail error) (*entry, bool, error) {
 	if e.items != nil && now.Sub(e.fetchedAt) < staleFor {
 		return e, true, nil
 	}
-	return nil, false, ErrUpstream
+	return nil, false, fail
 }
 
 // takeBudget counts one upstream fetch against the per-minute cap and, for a

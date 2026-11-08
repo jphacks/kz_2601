@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -29,7 +30,22 @@ type FeedReader interface {
 // the run.
 var ErrFeedSkip = errors.New("engine: feed skipped")
 
-// saveFeed plans the record of one saveFeed action.
+// SkipFeedRequiredEmpty: a required field of the target would be empty
+// (e.g. the weather came back without its text), so that day is not saved.
+const SkipFeedRequiredEmpty = "feed_required_empty"
+
+// feedZone is the zone of a saveFeed record's day. The providers are Japan
+// Meteorological Agency forecasts for a Japanese region, so "today" is the
+// day in Japan whatever the creator's time zone (JST has no daylight
+// saving: a fixed zone needs no tzdata).
+var feedZone = time.FixedZone("JST", 9*60*60)
+
+// FeedDay is the day (YYYY-MM-DD, Japan time) a saveFeed run at `at` saves.
+func FeedDay(at time.Time) string { return at.In(feedZone).Format("2006-01-02") }
+
+// saveFeed plans the record of one saveFeed action: at most one per rule,
+// action and day (Japan time; PlannedWrite.Key), so another run of the same
+// day (a rescheduled or caught-up event) does not add a second record.
 func (p *planner) saveFeed(i int, s *dsl.RuleSaveFeed, out *Plan) error {
 	if p.ev.Kind != KindScheduled {
 		return nil
@@ -63,11 +79,12 @@ func (p *planner) saveFeed(i int, s *dsl.RuleSaveFeed, out *Plan) error {
 		}
 		vals[id] = v
 	}
+	day := FeedDay(p.ev.At)
 	if id := s.Fields.Date; id != "" {
 		if f := target.FieldByID(id); f != nil && f.Type == dsl.FieldDatetime {
 			set(id, p.ev.At.UTC().Format("2006-01-02T15:04:05Z"))
 		} else {
-			set(id, p.ev.At.In(p.loc).Format("2006-01-02"))
+			set(id, day)
 		}
 	}
 	if snap.Summary != "" {
@@ -85,6 +102,12 @@ func (p *planner) saveFeed(i int, s *dsl.RuleSaveFeed, out *Plan) error {
 	if snap.Summary == "" && snap.Min == nil && snap.Max == nil && snap.Drop == nil {
 		return nil // nothing came back: no empty record
 	}
-	out.Writes = append(out.Writes, PlannedWrite{Action: i, Kind: WriteCreate, Entity: target.ID, Values: vals})
+	for _, f := range target.Fields {
+		if _, ok := vals[f.ID]; f.Required && f.Computed == nil && !ok {
+			out.Skipped = append(out.Skipped, PlannedSkip{Action: i, Reason: SkipFeedRequiredEmpty})
+			return nil
+		}
+	}
+	out.Writes = append(out.Writes, PlannedWrite{Action: i, Kind: WriteCreate, Entity: target.ID, Values: vals, Key: day})
 	return nil
 }

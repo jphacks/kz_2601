@@ -1,10 +1,13 @@
 package runner
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/jphacks/kz_2601/backend/internal/feeds"
+	"github.com/jphacks/kz_2601/backend/internal/runner/engine"
 )
 
 func TestFeedSnapshot(t *testing.T) {
@@ -29,5 +32,34 @@ func TestFeedSnapshot(t *testing.T) {
 	}
 	if e := feedSnapshot("weather", nil); e.Summary != "" {
 		t.Fatalf("no weather: %+v", e)
+	}
+}
+
+type errFeeds struct {
+	err error
+	res *feeds.Result
+}
+
+func (f errFeeds) Get(context.Context, feeds.Query, int) (*feeds.Result, error) { return f.res, f.err }
+
+// Busy, recently failed (cached) and stale feeds wait (deferred, not a
+// counted failure); a fresh source failure is an ordinary error; a switched
+// off provider is skipped.
+func TestFeedErrors(t *testing.T) {
+	for _, c := range []struct {
+		name       string
+		f          errFeeds
+		wait, skip bool
+	}{
+		{"busy", errFeeds{err: feeds.ErrBusy}, true, false},
+		{"recent failure", errFeeds{err: feeds.ErrRecentFailure}, true, false},
+		{"stale", errFeeds{res: &feeds.Result{Stale: true}}, true, false},
+		{"upstream", errFeeds{err: feeds.ErrUpstream}, false, false},
+		{"disabled", errFeeds{err: feeds.ErrDisabled}, false, true},
+	} {
+		_, err := (&ruleReader{feeds: c.f}).Feed(t.Context(), "weather", "130000")
+		if err == nil || errors.Is(err, errFeedWait) != c.wait || errors.Is(err, engine.ErrFeedSkip) != c.skip {
+			t.Errorf("%s: %v", c.name, err)
+		}
 	}
 }

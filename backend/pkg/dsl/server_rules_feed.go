@@ -33,7 +33,7 @@ type RuleSaveFeed struct {
 
 // SaveFeedFields names the target fields of the snapshot parts ("" = not saved).
 type SaveFeedFields struct {
-	Date    string `json:"date,omitempty"`    // date / datetime: the run's day
+	Date    string `json:"date,omitempty"`    // date / datetime: the run's day (date: in Japan time, the forecasts' zone)
 	Summary string `json:"summary,omitempty"` // string / text
 	Min     string `json:"min,omitempty"`     // number / integer (°C, hPa)
 	Max     string `json:"max,omitempty"`     // number / integer (°C, hPa)

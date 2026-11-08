@@ -349,6 +349,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 	usage.WritesDropped = grant.Dropped
 	written := 0
 	for _, row := range rows {
+		rl.skips = append(rl.skips, row.Plan.Skipped...)
 		for _, w := range row.Plan.Writes {
 			if written >= grant.Allowed {
 				break
@@ -524,12 +525,24 @@ func createClientID(eventID, rule string, action int, row string) string {
 	return client
 }
 
+// keyedClientID is the idempotency key of a create named by its key
+// (PlannedWrite.Key) instead of the run: the same rule, action and key give
+// the same record whichever event runs it. The record set is the app's (and
+// the user's), so the app and uid need not be in it.
+func keyedClientID(rule string, action int, key string) string {
+	return "key/" + rule + "/" + strconv.Itoa(action) + "/" + key
+}
+
 // write carries out one planned write once. wrote=false: already done by
 // an earlier attempt, or the target record is gone.
 func (r *Runner) write(ctx context.Context, h *scope.Handle, ev store.OutboxEvent, rule *dsl.ServerRule, row string, w engine.PlannedWrite) (bool, error) {
 	switch w.Kind {
 	case engine.WriteCreate:
-		id := store.IDFromClientID(createClientID(ev.EventID, rule.ID, w.Action, row))
+		client := createClientID(ev.EventID, rule.ID, w.Action, row)
+		if w.Key != "" {
+			client = keyedClientID(rule.ID, w.Action, w.Key)
+		}
+		id := store.IDFromClientID(client)
 		origin := store.RecordOrigin{RuleID: rule.ID, Version: ev.Version, EventID: ev.EventID, ActorUID: ev.ActorUID}
 		return h.CreateRecord(ctx, w.Entity, id, w.Values, origin)
 	case engine.WriteUpdate, engine.WriteIncrement:
@@ -642,6 +655,7 @@ type runLog struct {
 	// notifiesSkipped: notify actions not sent because of notifyPaused
 	notifiesSkipped int
 	writesSkipped   int
+	skips           []engine.PlannedSkip // actions the plan left out (reason codes)
 	notifies        []notify.Summary
 	took            time.Duration
 	// quota: the app's execution counter of quotaDay (rule status, #347)
@@ -674,6 +688,13 @@ func (r *Runner) logRun(ctx context.Context, ev store.OutboxEvent, l runLog) {
 	}
 	if l.writesSkipped > 0 {
 		attrs = append(attrs, slog.Int("writes_skipped", l.writesSkipped))
+	}
+	if len(l.skips) > 0 {
+		reasons := make([]string, len(l.skips))
+		for i, s := range l.skips {
+			reasons[i] = s.Reason
+		}
+		attrs = append(attrs, slog.Int("actions_skipped", len(l.skips)), slog.Any("skip_reasons", reasons))
 	}
 	if len(l.notifies) > 0 {
 		attrs = append(attrs, slog.Any("notifies", l.notifies))

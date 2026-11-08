@@ -125,6 +125,11 @@ type PlannedWrite struct {
 	Values   map[string]any // create / update
 	Field    string         // increment
 	By       float64        // increment
+	// Key (create only) names the record independently of the run: the
+	// runner derives its id from the rule, the action and Key, so runs of
+	// different events with the same Key create it once ("" = once per
+	// run). saveFeed: the day in Japan time.
+	Key string
 }
 
 // PlannedNotify is one notification with its recipient still a kind (who it
@@ -146,6 +151,15 @@ type PlannedNotify struct {
 type Plan struct {
 	Writes   []PlannedWrite
 	Notifies []PlannedNotify
+	// Skipped: actions left out on purpose (the runner logs them); never
+	// a reason to retry.
+	Skipped []PlannedSkip
+}
+
+// PlannedSkip is an action the plan leaves out, with a short reason code.
+type PlannedSkip struct {
+	Action int
+	Reason string
 }
 
 // Empty reports whether the plan does nothing.

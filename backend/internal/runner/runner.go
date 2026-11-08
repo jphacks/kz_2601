@@ -11,8 +11,10 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"strconv"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/feeds"
 	"github.com/jphacks/kz_2601/backend/internal/runner/notify"
 	"github.com/jphacks/kz_2601/backend/internal/runner/queue"
 	"github.com/jphacks/kz_2601/backend/internal/runner/quota"
@@ -36,6 +38,9 @@ const (
 	// OutcomeSkippedInactive: nobody opened the app for Config.InactiveDays
 	// before the run was due (#342). The schedule keeps going; opening resumes it.
 	OutcomeSkippedInactive = "skipped_inactive"
+	// OutcomeDeferred: a schedule run waits for a busy or recently failed
+	// feed (errFeedWait); put back without counting as a failed attempt.
+	OutcomeDeferred = "deferred"
 )
 
 // Reasons of OutcomeSkippedStopped.
@@ -236,6 +241,9 @@ func (r *Runner) handle(ctx context.Context, ev store.OutboxEvent) (status, outc
 	}
 	rules, charge, perr := r.process(ctx, ev)
 	if perr != nil {
+		if at, ok := r.deferAt(ev, perr); ok {
+			return r.deferRun(ctx, ev, at, perr, charge)
+		}
 		return r.retry(ctx, ev, perr, charge)
 	}
 	outcome = summarize(rules)
@@ -255,6 +263,38 @@ func (r *Runner) retry(ctx context.Context, ev store.OutboxEvent, perr error, ch
 		}
 	}
 	return store.OutboxRetry, quota.OutcomeError, r.queue.Retry(ctx, ev, code, raw)
+}
+
+// deferAt is when a run that failed with errFeedWait comes back: after
+// feeds.FailTTL plus a jitter of up to FailTTL (by event and attempt), so the
+// runs of one burst spread out instead of all coming back in the same minute.
+// ok=false (an ordinary retry) for other errors, other events, or when that
+// time would be past the run's MaxLate / MaxAge: deferring never makes a run
+// later than it could run anyway.
+func (r *Runner) deferAt(ev store.OutboxEvent, err error) (time.Time, bool) {
+	if ev.Kind != store.OutboxSchedule || !errors.Is(err, errFeedWait) {
+		return time.Time{}, false
+	}
+	at := r.cfg.Now().Add(feeds.FailTTL + schedule.Jitter(ev.EventID+"#"+strconv.Itoa(ev.Attempts), feeds.FailTTL))
+	if schedule.IsLate(ev.DueAt, at, r.cfg.MaxLate) || at.Sub(ev.CreatedAt) > r.cfg.MaxAge {
+		return time.Time{}, false
+	}
+	return at, true
+}
+
+// deferRun puts ev back until at without counting a failed attempt,
+// keeping what this attempt counted with it (like retry).
+func (r *Runner) deferRun(ctx context.Context, ev store.OutboxEvent, at time.Time, perr error, charge quota.Charge) (status, outcome string, err error) {
+	r.cfg.Logger.InfoContext(ctx, "runner: event deferred; feed not ready",
+		slog.String("event_id", ev.EventID), slog.String("app_id", ev.AppID),
+		slog.Int("attempt", ev.Attempts), slog.Int("deferrals", ev.Deferrals), slog.Time("until", at), slog.Any("error", perr))
+	var raw json.RawMessage
+	if !charge.Empty() {
+		if b, err := json.Marshal(charge); err == nil {
+			raw = b
+		}
+	}
+	return store.OutboxRetry, OutcomeDeferred, r.queue.Defer(ctx, ev, at, "feed_wait", raw)
 }
 
 // refund gives back what the attempts of a given-up event counted (#338:

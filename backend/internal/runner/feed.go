@@ -21,9 +21,16 @@ type FeedGetter interface {
 	Get(ctx context.Context, q feeds.Query, limit int) (*feeds.Result, error)
 }
 
+// errFeedWait: the feed cannot answer right now for a reason the next
+// attempt 30 s later would hit again: the per-minute fetch budget is used up
+// (a 07:00 burst), the source failed less than feeds.FailTTL ago (cached), or
+// only a stale copy is left. The run is deferred without counting as a
+// failure (Runner.deferRun), past feeds.FailTTL with jitter.
+var errFeedWait = errors.New("runner: feed not ready")
+
 // errFeedStale: the source failed and only an older copy is cached; the run
-// is retried rather than saving an old value as today's.
-var errFeedStale = errors.New("runner: feed source unavailable (stale copy)")
+// waits rather than saving an old value as today's.
+var errFeedStale = fmt.Errorf("%w: source unavailable (stale copy)", errFeedWait)
 
 // maxFeedSummaryRunes caps the saved summary.
 const maxFeedSummaryRunes = 200
@@ -48,6 +55,8 @@ func (rr *ruleReader) Feed(ctx context.Context, provider, region string) (engine
 	switch {
 	case errors.Is(err, feeds.ErrDisabled), errors.Is(err, feeds.ErrUnknown):
 		return engine.FeedSnapshot{}, engine.ErrFeedSkip
+	case errors.Is(err, feeds.ErrBusy), errors.Is(err, feeds.ErrRecentFailure):
+		return engine.FeedSnapshot{}, fmt.Errorf("runner: feed %s: %w: %w", provider, errFeedWait, err)
 	case err != nil:
 		return engine.FeedSnapshot{}, fmt.Errorf("runner: feed %s: %w", provider, err)
 	case res.Stale:
