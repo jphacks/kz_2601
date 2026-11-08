@@ -2,7 +2,7 @@ import SwiftUI
 import MetamonDSL
 
 /// `aiButton` の `task: "generate"`(#417): 押すと決まった指示で AI が書き、結果を形(1 行 / 箇条書き / 項目つき)でボタンの下に出す。
-/// output があればフォームのドラフトにも入れる(保存は利用者)。list + saveTo なら各行を 1 件の記録として保存できる(AiSaveToList)。端末内 AI を優先し、無ければホストのオンライン版(Pro)。
+/// output があればフォームのドラフトにも入れる(保存は利用者)。fields + outputs なら項目ごとに型を直して各 field に入れる(AIOutputs)。list + saveTo なら各行を 1 件の記録として保存できる(AiSaveToList)。端末内 AI を優先し、無ければホストのオンライン版(Pro)。
 struct AiGenerateLeaf: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.scenePhase) private var scenePhase
@@ -14,6 +14,7 @@ struct AiGenerateLeaf: View {
     @State private var usedOnline = false
     @State private var error: String?
     @State private var runs = 0
+    @State private var filled: [AIOutputs.Fill] = [] // outputs: 今回フォームに入れた / 読めなかった項目
 
     private var route: AIGenerateRoute {
         AIGenerateRoute.choose(availability: availability, hostOnline: rt.aiText?.supportsOnlineAIText ?? false, mock: AIGenerateRoute.isMock,
@@ -69,10 +70,37 @@ struct AiGenerateLeaf: View {
             Text(error).font(.caption).foregroundStyle(.red)
         } else if case .unavailable(let reason) = route {
             Text("\(AIAvailability.title): \(reason)").font(.caption).foregroundStyle(.secondary)
+        } else if result != nil, !filled.isEmpty {
+            outputsCaption
         } else if result != nil, c.output != nil, ctx.form != nil {
             Text("入力欄にも入れました。確認して保存してください").font(.caption).foregroundStyle(.secondary)
         } else if result != nil, usedOnline {
             Text("オンラインの AI が書きました").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private var outputsCaption: some View {
+        let ok = filled.filter { $0.value != nil }.count
+        let missed = filled.filter { $0.value == nil }.map(\.fieldName)
+        VStack(alignment: .leading, spacing: 2) {
+            if ok > 0 { Text(L("\(ok) 項目を入力欄に入れました。確認して保存してください")) }
+            if !missed.isEmpty { Text(L("読み取れず空のまま: \(missed.joined(separator: "、"))")) }
+        }
+        .font(.caption).foregroundStyle(.secondary)
+        .accessibilityIdentifier("aiGenerate.outputs")
+    }
+
+    /// outputs: 結果の各項目を field の型に直してドラフトに入れる。読めない項目は触らない(入力済みは消さない)。
+    private func fillOutputs(_ out: AITextResult, form: FormDraft) {
+        guard out.shape == .fields, let outputs = c.outputs, !outputs.isEmpty else {
+            filled = []
+            return
+        }
+        filled = AIOutputs.fills(out.fields ?? [], outputs: outputs, entity: form.entity)
+        for f in filled { if let v = f.value { form.values[f.field] = v } }
+        let names = filled.filter { $0.value != nil }.map(\.fieldName)
+        if !names.isEmpty {
+            AccessibilityNotification.Announcement(L("入力欄に入れました: \(names.joined(separator: "、"))")).post()
         }
     }
 
@@ -118,6 +146,7 @@ struct AiGenerateLeaf: View {
                 result = out
                 runs += 1
                 if let output = c.output, let form { form.values[output] = .string(out.text) }
+                if let form { fillOutputs(out, form: form) }
             }
         } catch {
             // #446: 端末内 AI の失敗だけ数える(オンライン版は #426 の判断材料ではない)

@@ -73,6 +73,21 @@ final class AiGenerateTests: XCTestCase {
         XCTAssertThrowsError(try AIGenerateBuilder.build(empty, form: nil, values: [:], sourceEntity: nil, records: [], locale: "ja"))
     }
 
+    /// outputs: 数・日付・enum の項目は書き方を指示に足す(500 字に収める)。文字だけなら足さない。
+    func testOutputsAddFormatHint() throws {
+        let entity = try JSONDecoder().decode(Entity.self, from: Data(#"""
+            {"id":"ev","name":"予定","fields":[{"id":"title","name":"題名","type":"string"},{"id":"start","name":"日時","type":"datetime"},
+             {"id":"kind","name":"種類","type":"enum","options":["講演","展示"]}]}
+            """#.utf8))
+        let c = try component(#"{"type":"aiButton","task":"generate","prompt":"\#(String(repeating: "あ", count: 600))","shape":"fields","items":["題名","日時","種類"],"outputs":{"題名":"title","日時":"start","種類":"kind"}}"#)
+        let req = try AIGenerateBuilder.build(c, form: entity, values: [:], sourceEntity: nil, records: [], locale: "ja")
+        XCTAssertLessThanOrEqual(req.instruction.count, AITextLimits.maxInstruction)
+        XCTAssertTrue(req.instruction.hasSuffix("書き方: 日時=YYYY/M/D H:mm(年が無ければ M/D H:mm) / 種類=講演/展示 のどれか(分からなければ -)"), req.instruction)
+        XCTAssertFalse(req.instruction.contains("題名="))
+        let plain = try component(#"{"type":"aiButton","task":"generate","prompt":"抜き出す","shape":"fields","items":["題名"],"outputs":{"題名":"title"}}"#)
+        XCTAssertEqual(try AIGenerateBuilder.build(plain, form: entity, values: [:], sourceEntity: nil, records: [], locale: "ja").instruction, "抜き出す")
+    }
+
     func testPromptDescribesShape() {
         let list = AITextRequest(instruction: "案", shape: .list, count: 4)
         XCTAssertTrue(AIGenerateBuilder.prompt(list).contains("4 個"))

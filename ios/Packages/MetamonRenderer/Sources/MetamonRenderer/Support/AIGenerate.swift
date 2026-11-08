@@ -59,6 +59,11 @@ enum AIGenerateBuilder {
         }
         instruction = String(instruction.trimmingCharacters(in: .whitespacesAndNewlines).prefix(AITextLimits.maxInstruction))
         guard !instruction.isEmpty else { throw BuildError.noInstruction }
+        // outputs: 数・日付・enum の書き方を足す(合わせて 500 字に収める)
+        if c.shape == AITextShape.fields.rawValue, let outputs = c.outputs, let form,
+           let hint = AIOutputs.hint(items: c.items ?? [], outputs: outputs, entity: form, english: english) {
+            instruction = String(instruction.prefix(Swift.max(0, AITextLimits.maxInstruction - hint.count - 1))) + "\n" + hint
+        }
 
         var input: String?
         if let source = sourceEntity {

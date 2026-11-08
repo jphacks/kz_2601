@@ -10,7 +10,7 @@ import (
 )
 
 // featuresDoc uses every clientFeature once: aiButton long / inputPhoto /
-// saveTo / inputFeeds, lookupBook (button and toolbar), text {{field}} + highlight and a
+// saveTo / inputFeeds / outputs, lookupBook (button and toolbar), text {{field}} + highlight and a
 // warnings feed.
 const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","icon":"book","voiceEntry":"fullscreen"},"initialScreen":"home",
 "entities":[
@@ -31,6 +31,7 @@ const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","i
   {"type":"button","label":"ISBN から入力","action":{"type":"lookupBook","bookLookup":{"isbnField":"isbn","titleField":"title"}}},
   {"type":"textField","field":"title"},
   {"type":"textField","field":"body"},
+  {"type":"aiButton","task":"generate","label":"書名を読む","input":"body","prompt":"本文から書名","shape":"fields","items":["書名"],"outputs":{"書名":"title"}},
   {"type":"aiButton","task":"summarize","input":"body","output":"note","length":"long","label":"要約"},
   {"type":"photoField","field":"photo","source":"library"},
   {"type":"aiButton","task":"extract","inputPhoto":"photo","output":"note","label":"写真を読む"},
@@ -62,6 +63,7 @@ func TestClientFeaturesRestriction(t *testing.T) {
 		FeatureAIInputPhoto:  {"## アプリの中の AI に写真を見せる(aiButton inputPhoto)", "AiButton.inputPhoto", 1, `"inputPhoto"`},
 		FeatureAISaveTo:      {"## AI が作った項目を 1 件ずつ記録に足す(aiButton saveTo)", "AiButton.saveTo", 1, `"saveTo"`},
 		FeatureAIInputFeeds:  {"inputFeeds: [その feed の id]", "AiButton.inputFeeds", 1, `"inputFeeds"`},
+		FeatureAIOutputs:     {"## AI の答えを項目ごとに入力欄へ入れる(aiButton outputs)", "AiButton.outputs", 1, `"outputs"`},
 		FeatureLookupBook:    {"## ISBN から本の情報を入れる(lookupBook)", "Action.bookLookup", 2, `"lookupBook"`},
 		FeatureTextHighlight: {"## 文の大事な語に印をつける(text.highlight)", "Text.highlight", 1, `{{body}}`},
 		FeatureFeedV2:        {"警報・注意報」「大雨警報が出ているか」", `"warnings"`, 1, `"warnings"`},
