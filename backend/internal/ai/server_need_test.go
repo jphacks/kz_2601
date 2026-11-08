@@ -215,7 +215,9 @@ func TestServerNeed_FlagOffByteIdentical(t *testing.T) {
 	if _, err := svc.Generate(context.Background(), Request{AppID: "off", Transcript: "名前を家計にして"}); err != nil {
 		t.Fatal(err)
 	}
-	if f.calls[1].System != systemPrompt+"\n"+editRules || !bytes.Equal(f.calls[1].Schema, PatchGenerationSchema()) {
+	// prefix: #782 sends editRules as a second block (SystemSuffix)
+	if sys := f.calls[1].System; !strings.HasPrefix(sys, systemPrompt) || strings.Contains(sys, "serverNeed") ||
+		!bytes.Equal(f.calls[1].Schema, PatchGenerationSchema()) {
 		t.Fatal("edit: prompt / schema changed with the flag off")
 	}
 	if strings.Contains(systemPrompt, "serverNeed") || bytes.Contains(GenerationSchema(), []byte("serverNeed")) || bytes.Contains(PatchGenerationSchema(), []byte("serverNeed")) {
