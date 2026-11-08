@@ -8,6 +8,8 @@ enum AiChatMic: Equatable {
     case hidden
     /// 押すと録音を始める
     case start
+    /// 録音を始めている(押せない・二重に始めない)
+    case starting
     /// 録音中。押すと止めて文字にする
     case stop
     /// 文字にしている
@@ -20,6 +22,7 @@ enum AiChatMic: Equatable {
     static func state(phase: DictationPhase, readiness: DictationReadiness?, voiceInputActive: Bool, online: Bool) -> AiChatMic {
         guard let readiness else { return .hidden }
         switch phase {
+        case .starting: return .starting
         case .listening: return .stop
         case .transcribing: return .transcribing
         case .idle: break
@@ -41,5 +44,27 @@ enum AiChatMic: Equatable {
 
     /// 吹き出しのスピーカー: 録音・文字起こしの間は押せない(読み上げの声をマイクが拾う)。
     static func canSpeak(phase: DictationPhase) -> Bool { phase == .idle }
+
+    /// 録音を始めてよいか。始めている・録音中・文字起こし中は始めない(二重に始めると片方の失敗で読み上げの抑止が外れる)。
+    static func canStart(phase: DictationPhase) -> Bool { phase == .idle }
+}
+
+/// 録音中に届いた返事の VoiceOver の読み上げを録音が終わるまで待たせる(最新の 1 件だけ)。
+struct AiChatAnnounceQueue: Equatable {
+    private(set) var pending: String?
+
+    /// 返事が届いた。`.queue` なら持っておく(古い分は捨てる)。
+    mutating func received(_ text: String, mode: AiChatLeaf.AutoRead) {
+        if mode == .queue { pending = text }
+    }
+
+    /// 録音の段階が変わった。録音が終わった(idle)ら待たせていた文を返す。
+    mutating func phaseChanged(to phase: DictationPhase, visible: Bool, voiceOver: Bool) -> String? {
+        guard phase == .idle, let text = pending else { return nil }
+        pending = nil
+        return visible && voiceOver ? text : nil
+    }
+
+    mutating func clear() { pending = nil }
 }
 #endif

@@ -19,7 +19,8 @@ struct TranscribeFieldLeaf: View {
 
 /// 録音の段階。
 enum DictationPhase: Equatable {
-    case idle, listening, transcribing
+    /// `starting` = 録音を始めている(await の間)。ボタンを押せなくして二重に始めない
+    case idle, starting, listening, transcribing
 }
 
 /// 文字起こしの結果を今の文の後ろに足す(空なら置き換え、それ以外は改行で区切る)。
@@ -79,6 +80,8 @@ struct TranscribeFieldPanel: View {
             switch (phase, host.dictationReadiness) {
             case (.listening, _):
                 micButton(L("聞いています… タップで終わる"), icon: "stop.circle.fill", kind: .primary) { Task { await finish() } }
+            case (.starting, _):
+                micButton(L("話して入力"), icon: "mic.fill", kind: .secondary) {}.disabled(true)
             case (.transcribing, _):
                 HStack(spacing: RenderTheme.Spacing.sm) {
                     ProgressView()
@@ -113,6 +116,7 @@ struct TranscribeFieldPanel: View {
 
     private func start() async {
         guard let host, phase == .idle else { return }
+        phase = .starting
         focused = false
         message = nil
         do {
@@ -120,6 +124,7 @@ struct TranscribeFieldPanel: View {
             phase = .listening
         } catch {
             message = error.localizedDescription
+            phase = .idle
         }
     }
 

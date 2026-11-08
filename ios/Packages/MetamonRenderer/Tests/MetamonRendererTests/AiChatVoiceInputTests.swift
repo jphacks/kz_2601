@@ -53,11 +53,51 @@ final class AiChatVoiceInputTests: XCTestCase {
         XCTAssertFalse(AiChatMic.canSpeak(phase: .transcribing))
     }
 
-    /// speak: true でも録音・文字起こしの間に届いた返事は読まない(VoiceOver にも渡さない)。
+    /// 録音を始めている間(await)はボタンを押せない・もう一度始めない。
+    func testStartingDisablesMicAndIsIdempotent() {
+        XCTAssertEqual(state(.starting, .ready), .starting)
+        XCTAssertEqual(state(.starting, .preparing), .starting)
+        XCTAssertFalse(AiChatMic.starting.enabled)
+        XCTAssertTrue(AiChatMic.canStart(phase: .idle))
+        XCTAssertFalse(AiChatMic.canStart(phase: .starting), "始めている間の 2 回目のタップで二重に始めない")
+        XCTAssertFalse(AiChatMic.canStart(phase: .listening))
+        XCTAssertFalse(AiChatMic.canStart(phase: .transcribing))
+        XCTAssertFalse(AiChatMic.canSend(online: true, sending: false, draft: "こんにちは", phase: .starting))
+        XCTAssertFalse(AiChatMic.canSpeak(phase: .starting))
+    }
+
+    /// speak: true でも録音・文字起こしの間に届いた返事は端末の声で読まない。VoiceOver は録音が終わるまで待たせる。
     func testNoAutoReadWhileRecording() {
         XCTAssertEqual(AiChatLeaf.autoReadMode(speak: true, visible: true, voiceOver: false, recording: true), .none)
-        XCTAssertEqual(AiChatLeaf.autoReadMode(speak: true, visible: true, voiceOver: true, recording: true), .none)
+        XCTAssertEqual(AiChatLeaf.autoReadMode(speak: true, visible: true, voiceOver: true, recording: true), .queue)
+        XCTAssertEqual(AiChatLeaf.autoReadMode(speak: true, visible: false, voiceOver: true, recording: true), .none)
+        XCTAssertEqual(AiChatLeaf.autoReadMode(speak: false, visible: true, voiceOver: true, recording: true), .none)
         XCTAssertEqual(AiChatLeaf.autoReadMode(speak: true, visible: true, voiceOver: false, recording: false), .speak)
+        XCTAssertEqual(AiChatLeaf.autoReadMode(speak: true, visible: true, voiceOver: true, recording: false), .announce)
+    }
+
+    /// 録音中に届いた返事は最新の 1 件だけを録音が終わってから VoiceOver に読ませる。
+    func testQueuedAnnouncementFlushesAfterRecording() {
+        var q = AiChatAnnounceQueue()
+        q.received("一つ目", mode: .queue)
+        q.received("二つ目", mode: .queue)
+        q.received("読まない", mode: .none)
+        XCTAssertNil(q.phaseChanged(to: .listening, visible: true, voiceOver: true))
+        XCTAssertNil(q.phaseChanged(to: .transcribing, visible: true, voiceOver: true), "文字起こしの間も待つ")
+        XCTAssertEqual(q.phaseChanged(to: .idle, visible: true, voiceOver: true), "二つ目")
+        XCTAssertNil(q.phaseChanged(to: .idle, visible: true, voiceOver: true), "一度だけ読む")
+    }
+
+    func testQueuedAnnouncementDroppedWhenHiddenOrVoiceOverOff() {
+        var q = AiChatAnnounceQueue()
+        q.received("返事", mode: .queue)
+        XCTAssertNil(q.phaseChanged(to: .idle, visible: false, voiceOver: true))
+        XCTAssertNil(q.pending, "画面を離れた後は捨てる")
+        q.received("返事", mode: .queue)
+        XCTAssertNil(q.phaseChanged(to: .idle, visible: true, voiceOver: false))
+        q.received("返事", mode: .queue)
+        q.clear()
+        XCTAssertNil(q.phaseChanged(to: .idle, visible: true, voiceOver: true))
     }
 
     func testDictatedTextIsAddedToDraftForReview() {
@@ -68,6 +108,9 @@ final class AiChatVoiceInputTests: XCTestCase {
     func testVoiceOverLabels() {
         XCTAssertEqual(AiChatLeaf.micLabel(.start), L("話して入力"))
         XCTAssertEqual(AiChatLeaf.micLabel(.stop), L("聞いています… タップで終わる"))
+        XCTAssertEqual(AiChatLeaf.micLabel(.stop, voiceOver: true), AiChatLeaf.micLabel(.start, voiceOver: true),
+                       "VoiceOver の時は録音中にラベルを変えない(読んだ声をマイクが拾う)")
+        XCTAssertEqual(AiChatLeaf.micLabel(.starting, voiceOver: true), AiChatLeaf.micLabel(.start, voiceOver: true))
         XCTAssertEqual(AiChatLeaf.micLabel(.busy), L("今は話して入力を使えません"))
         XCTAssertNotEqual(AiChatLeaf.micLabel(.prepare), AiChatLeaf.micLabel(.start))
     }
