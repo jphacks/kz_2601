@@ -24,7 +24,7 @@ import (
 //   - ruleWith (bool): some notify has with.
 //   - ruleLookup (string): some rule has a lookup with op exists|notExists.
 //   - ruleSimilar (bool): some rule searches the most similar record (similar).
-//   - rulePick (string): some rule picks one record with order random|oldest|newest (pick).
+//   - rulePick (string): some rule picks one record with order random|oldest|newest|fewest|most (pick; fewest / most = assignment with count).
 //
 // Cases: internal/ai/eval/server_rules_cases.json (-cases).
 func checkServerRules(exp map[string]any, a *dsl.App) []string {

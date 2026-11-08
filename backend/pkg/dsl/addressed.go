@@ -155,6 +155,9 @@ func checkAddressedRule(a *App, r *ServerRule, addressed map[string]*Entity, whe
 		if p.Exclude != nil && addressed[p.Exclude.Entity] != nil {
 			add("%s.pick.exclude: entity %q is addressed (only its author and recipients read it); a rule cannot read its records", where, p.Exclude.Entity)
 		}
+		if p.Count != nil && addressed[p.Count.Entity] != nil {
+			add("%s.pick.count: entity %q is addressed (only its author and recipients read it); a rule cannot count its records", where, p.Count.Entity)
+		}
 	}
 	rowEntity := a.EntityByID(r.RowEntity())
 	seen := map[string]bool{} // one problem per expression shape

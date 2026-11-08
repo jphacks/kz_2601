@@ -33,6 +33,9 @@ type RulePick struct {
 	Order   string       `json:"order"` // random|oldest|newest
 	Filter  []Filter     `json:"filter,omitempty"`
 	Exclude *PickExclude `json:"exclude,omitempty"`
+	// Count: order fewest / most compare how many records of another
+	// entity point to each candidate (server_rules_assign.go).
+	Count *PickCount `json:"count,omitempty"`
 }
 
 // PickExclude skips the records of the picked entity that a record of
@@ -40,6 +43,8 @@ type RulePick struct {
 type PickExclude struct {
 	Entity string `json:"entity"`
 	Field  string `json:"field"`
+	// Match: only the records whose field equals the row's (server_rules_assign.go).
+	Match *PickMatch `json:"match,omitempty"`
 }
 
 // Pick orders, limits and result names.
@@ -55,7 +60,7 @@ const (
 )
 
 // PickOrders are the orders of rule.pick.
-var PickOrders = []string{PickRandom, PickOldest, PickNewest}
+var PickOrders = []string{PickRandom, PickOldest, PickNewest, PickFewest, PickMost}
 
 // PickRow is row with the pick results the actions read: "$pick" (ref) and
 // "$pick.<field>" for each field of the picked entity but ref / refs (so
@@ -134,6 +139,7 @@ func checkRulePick(where string, rc *ruleCheck) {
 	if x := p.Exclude; x != nil {
 		checkPickExclude(where+".exclude", rc, e, x)
 	}
+	checkPickCount(where, rc, e, p)
 	rc.doRow = PickRow(rc.row, e, p)
 	reported := map[string]bool{}
 	rc.r.walkExprs(func(x *Expr) {
@@ -172,6 +178,9 @@ func checkPickExclude(where string, rc *ruleCheck, picked *Entity, x *PickExclud
 	case f.RefEntity != picked.ID:
 		add("%s: field %q points to entity %q, not to the picked entity %q", where, f.ID, f.RefEntity, picked.ID)
 	}
+	if x.Match != nil {
+		checkPickMatch(where+".match", rc, e, x.Match)
+	}
 }
 
 // describePick is the plain sentence part of pick, e.g.
@@ -188,12 +197,15 @@ func (a *App) describePick(r *ServerRule) string {
 		return id
 	}
 	how := map[string]string{PickRandom: "ランダムに", PickOldest: "古い順に", PickNewest: "新しい順に"}[p.Order]
+	if p.Count != nil {
+		how = describePickCount(p, name)
+	}
 	var conds []string
 	if len(p.Filter) > 0 {
 		conds = append(conds, "条件に合う")
 	}
 	if p.Exclude != nil {
-		conds = append(conds, "「"+name(p.Exclude.Entity)+"」に無い")
+		conds = append(conds, "「"+name(p.Exclude.Entity)+"」に"+a.pickMatchNote(p.Exclude)+"無い")
 	}
 	cond := ""
 	if len(conds) > 0 {

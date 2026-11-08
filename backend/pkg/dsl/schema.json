@@ -4912,7 +4912,7 @@
             "order"
           ],
           "description": "おすすめする記録を 1 つ選ぶ(if・lookup の後。選べた時だけ動く)。entity のレコードから、filter(agg と同じ絞り込み・3 つまで・hidden / computed の field は不可)に合い、exclude の entity のレコードが ref / refs の field で指していないものを、order の順で 1 つ。random は実行ごとに決まる(同じ実行のやり直しでは同じ記録)、oldest / newest は作った時刻の順。do では {\"ref\":\"$pick\"}(その記録の ID・ref)・{\"ref\":\"$pick.<field>\"}・通知の {$pick.<field>}・to {kind: authorOf, field: $pick}(その記録を書いた人)が使える。if では使えない。行のレコード自身は選ばない。each の無い時刻のきっかけでも使える(宛先は owner / members、createRecord)。entity と exclude の entity は同じアプリ・ルールと同じ側だけ(宛先付きは不可)で、each・agg・lookup と合わせて 2 つまで。similar と同じルールには書けない。",
-          "x-usage": "毎朝のおすすめ(まだ食べていないメニュー): on {every:daily, time:\"08:00\"}・pick {entity:menus, order:random, exclude:{entity:eats, field:menu}}・createRecord picks {menu: {ref:$pick}, name: {ref:$pick.name}}・notify to {kind:members} body「今日は {$pick.name} はどうですか」。",
+          "x-usage": "毎朝のおすすめ(まだ食べていないメニュー): on {every:daily, time:\"08:00\"}・pick {entity:menus, order:random, exclude:{entity:eats, field:menu}}・createRecord picks {menu: {ref:$pick}, name: {ref:$pick.name}}・notify to {kind:members} body「今日は {$pick.name} はどうですか」。 割り当て(担当が一番少ない人): on {record:created, entity:shifts}・pick {entity:staff, order:fewest, count:{entity:shifts, field:staff}, exclude:{entity:offs, field:staff, match:{field:day, equals:day}}}・updateRecord(ref 省略)values {staff: {ref:$pick}}・notify to {kind:authorOf, field:$pick}。",
           "properties": {
             "entity": {
               "type": "string",
@@ -4923,9 +4923,11 @@
               "enum": [
                 "random",
                 "oldest",
-                "newest"
+                "newest",
+                "fewest",
+                "most"
               ],
-              "description": "random(実行ごとに決まるランダム)/ oldest(一番古く作られた記録)/ newest(一番新しい記録)。"
+              "description": "random(実行ごとに決まるランダム)/ oldest(一番古く作られた記録)/ newest(一番新しい記録)/ fewest(count の記録に指されている数が一番少ない記録 = 割り当てが一番少ない人・枠。同じ数なら先に作られた記録)/ most(その数が一番多い記録。1 つも無ければ選ばない)。"
             },
             "filter": {
               "type": "array",
@@ -4942,7 +4944,7 @@
                 "entity",
                 "field"
               ],
-              "description": "除く記録: entity のレコードが field(選ぶ entity への ref / refs)で指している記録(食べた・見せた・読んだ)。",
+              "description": "除く記録: entity のレコードが field(選ぶ entity への ref / refs)で指している記録(食べた・見せた・読んだ・休みの人)。match があれば、そのうち行と値が同じレコードだけ(その日に休みの人)。",
               "properties": {
                 "entity": {
                   "type": "string",
@@ -4951,6 +4953,44 @@
                 "field": {
                   "type": "string",
                   "description": "その entity の ref / refs の field(選ぶ entity を指す)。"
+                },
+                "match": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "field",
+                    "equals"
+                  ],
+                  "description": "exclude のレコードのうち field の値が行の equals の値と同じものだけで除く(lookup と同じ比べ方。$id = レコードの ID)。レコードのきっかけか on.each だけ。",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "exclude の entity の field id か $id(例: 休みの日付)。"
+                    },
+                    "equals": {
+                      "type": "string",
+                      "description": "行の field id か $id(例: シフトの日付)。"
+                    }
+                  }
+                }
+              }
+            },
+            "count": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "entity",
+                "field"
+              ],
+              "description": "order fewest / most だけ: 候補ごとに、entity のレコードのうち field(選ぶ entity への ref / refs)で指している数を数える(行のレコード自身は数えない。each では同じ実行で先に割り当てた分も数える)。entity は同じアプリ・ルールと同じ側だけ(宛先付き・hidden・computed は不可)。count のあるルールは entity を 3 つまで読める。",
+              "properties": {
+                "entity": {
+                  "type": "string",
+                  "description": "数える記録の entity の id(シフト・タスクなど)。"
+                },
+                "field": {
+                  "type": "string",
+                  "description": "その entity の ref / refs の field(選ぶ entity を指す。担当者・日など)。"
                 }
               }
             }

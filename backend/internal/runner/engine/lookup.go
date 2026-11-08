@@ -11,6 +11,9 @@ import (
 type runCache struct {
 	lists map[string][]expreval.Record
 	index map[string]map[string][]string // entity\x00field -> value key -> record ids (at most 2)
+	// assigned: rule id -> candidate id -> assignments planned by earlier
+	// rows of this run (pick.count; written after planning). nil until used.
+	assigned map[string]map[string]int
 	// similar: entity\x00fields -> the records with their compared items.
 	similar map[string][]similarRec
 }

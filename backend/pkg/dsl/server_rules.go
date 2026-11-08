@@ -222,8 +222,8 @@ func checkServerRules(a *App, entities map[string]*Entity, add func(string, ...a
 		for j := range r.Do {
 			checkRuleAction(fmt.Sprintf("%s.do[%d]", where, j), rc, &r.Do[j])
 		}
-		if n := len(rc.reads); n > MaxRuleReadEntities {
-			add("%s: reads the records of %d entities (each + agg + lookup + similar + pick: %s); at most %d", where, n, strings.Join(sortedKeys(rc.reads), ", "), MaxRuleReadEntities)
+		if n, most := len(rc.reads), r.readCap(); n > most {
+			add("%s: reads the records of %d entities (each + agg + lookup + similar + pick: %s); at most %d", where, n, strings.Join(sortedKeys(rc.reads), ", "), most)
 		}
 	}
 	if scheduled > MaxScheduledRulesPro {
