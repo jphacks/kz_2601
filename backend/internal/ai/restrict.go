@@ -946,6 +946,9 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 			featureNotes = append(featureNotes, fmt.Sprintf("dropped %s on %d place(s)", f.key, n))
 		}
 	}
+	if n := pruneInputFeeds(root); n > 0 { // a removed feed leaves no dangling inputFeeds id
+		featureNotes = append(featureNotes, fmt.Sprintf("dropped inputFeeds of removed feeds on %d button(s)", n))
+	}
 	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 && when == 0 && matching == 0 && single == 0 && roles == 0 && addressed == 0 && near == 0 && len(featureNotes) == 0 {
 		return raw, nil, false
 	}

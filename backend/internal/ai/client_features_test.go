@@ -10,7 +10,7 @@ import (
 )
 
 // featuresDoc uses every clientFeature once: aiButton long / inputPhoto /
-// saveTo, lookupBook (button and toolbar), text {{field}} + highlight and a
+// saveTo / inputFeeds, lookupBook (button and toolbar), text {{field}} + highlight and a
 // warnings feed.
 const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","icon":"book","voiceEntry":"fullscreen"},"initialScreen":"home",
 "entities":[
@@ -22,8 +22,9 @@ const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","i
 "screens":[
  {"id":"home","title":"ホーム","components":[
   {"type":"feed","provider":"warnings","region":"130000"},
-  {"type":"feed","provider":"weather","region":"170000"},
+  {"type":"feed","id":"wx","provider":"weather","region":"170000"},
   {"type":"aiButton","task":"generate","label":"問題を作る","prompt":"英単語の問題","shape":"list","count":5,"saveTo":{"entity":"card","field":"q"}},
+  {"type":"aiButton","task":"generate","label":"服装","prompt":"今日の天気に合う服装","inputFeeds":["wx"]},
   {"type":"list","entity":"book","item":{"title":"title"},"onItemTap":{"type":"navigate","screen":"form"}}]},
  {"id":"form","title":"本","entity":"book","components":[
   {"type":"textField","field":"isbn"},
@@ -60,6 +61,7 @@ func TestClientFeaturesRestriction(t *testing.T) {
 		FeatureAILong:        {"## アプリの中の AI の長い文章(aiButton length long)", "AiButton.length", 1, `"length"`},
 		FeatureAIInputPhoto:  {"## アプリの中の AI に写真を見せる(aiButton inputPhoto)", "AiButton.inputPhoto", 1, `"inputPhoto"`},
 		FeatureAISaveTo:      {"## AI が作った項目を 1 件ずつ記録に足す(aiButton saveTo)", "AiButton.saveTo", 1, `"saveTo"`},
+		FeatureAIInputFeeds:  {"inputFeeds: [その feed の id]", "AiButton.inputFeeds", 1, `"inputFeeds"`},
 		FeatureLookupBook:    {"## ISBN から本の情報を入れる(lookupBook)", "Action.bookLookup", 2, `"lookupBook"`},
 		FeatureTextHighlight: {"## 文の大事な語に印をつける(text.highlight)", "Text.highlight", 1, `{{body}}`},
 		FeatureFeedV2:        {"警報・注意報」「大雨警報が出ているか」", `"warnings"`, 1, `"warnings"`},
@@ -150,5 +152,35 @@ func TestTextImageOffRestrictsPrompt(t *testing.T) {
 	}
 	if strings.Contains(string(res.DSL), `"inputPhoto"`) || !strings.Contains(string(res.DSL), `"length"`) {
 		t.Fatalf("output: %s", res.DSL)
+	}
+}
+
+// A feed removed by the restriction (a build without feed) takes the
+// inputFeeds ids that name it along, so the enforced document stays valid.
+func TestPruneInputFeedsOfRemovedFeed(t *testing.T) {
+	var allowed []string
+	for typ := range knownComponentTypes {
+		if typ != string(dsl.CompFeed) {
+			allowed = append(allowed, typ)
+		}
+	}
+	r := NewClientRestriction(allowed, nil, currentFeatures)
+	out, notes, changed := enforceRestriction([]byte(featuresDoc), r)
+	if !changed || strings.Contains(string(out), `"inputFeeds"`) || !strings.Contains(strings.Join(notes, ","), "dropped inputFeeds of removed feeds on 1 button(s)") {
+		t.Fatalf("notes=%v out=%s", notes, out)
+	}
+	if _, err := dsl.Parse(out); err != nil {
+		t.Fatalf("enforced doc invalid: %v", err)
+	}
+	root := map[string]any{"screens": []any{map[string]any{"id": "s", "components": []any{
+		map[string]any{"type": "feed", "id": "a"},
+		map[string]any{"type": "aiButton", "inputFeeds": []any{"a", "gone"}},
+	}}}}
+	if n := pruneInputFeeds(root); n != 1 {
+		t.Fatalf("pruned %d", n)
+	}
+	b, _ := json.Marshal(root)
+	if !strings.Contains(string(b), `"inputFeeds":["a"]`) {
+		t.Fatalf("kept ids: %s", b)
 	}
 }

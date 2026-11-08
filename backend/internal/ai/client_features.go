@@ -20,6 +20,7 @@ const (
 	FeatureAILong       = "aiButton.long"       // aiButton length long (ai_long_rules.go)
 	FeatureAIInputPhoto = "aiButton.inputPhoto" // aiButton inputPhoto (ai_photo_input_rules.go)
 	FeatureAISaveTo     = "aiButton.saveTo"     // aiButton saveTo (ai_save_to_rules.go)
+	FeatureAIInputFeeds = "aiButton.inputFeeds" // aiButton inputFeeds (ai_input_feed_rules.go)
 	FeatureLookupBook   = "action.lookupBook"   // action lookupBook (book_rules.go)
 	// FeatureTextHighlight covers text.highlight and text {{fieldId}} on
 	// form / detail screens (text_highlight_rules.go): they shipped together.
@@ -88,6 +89,19 @@ var clientFeatures = []clientFeature{
 			return editComponents(root, func(c map[string]any) bool { return isType(c, dsl.CompAiButton) && deleteKey(c, "saveTo") })
 		},
 		violation: "aiButton saveTo is not available in this app build: omit saveTo (the items show under the button)",
+	},
+	{
+		key:    FeatureAIInputFeeds,
+		rules:  []string{aiInputFeedRules},
+		note:   "- aiButton の inputFeeds(画面の feed の行を AI に読ませる)は使わない(この版では動かない)。feed は表示だけにし、AI のボタンは prompt と記録を材料にする。頼まれたら「feed の内容を AI に読ませるのはこの版ではできないため、○○で代替しました。」と申告する。\n",
+		schema: func(defs map[string]any) { deleteProps(defs, "AiButton", "inputFeeds") },
+		places: func(root map[string]any) []string {
+			return componentPlaces(root, func(c map[string]any) bool { return isType(c, dsl.CompAiButton) && c["inputFeeds"] != nil })
+		},
+		strip: func(root map[string]any) int {
+			return editComponents(root, func(c map[string]any) bool { return isType(c, dsl.CompAiButton) && deleteKey(c, "inputFeeds") })
+		},
+		violation: "aiButton inputFeeds is not available in this app build: omit inputFeeds (the feed still shows on the screen)",
 	},
 	{
 		key:   FeatureLookupBook,
@@ -412,6 +426,59 @@ func dropToolbar(root map[string]any, drop func(map[string]any) bool) int {
 			kept = append(kept, v)
 		}
 		sc["toolbar"] = kept
+	})
+	return n
+}
+
+// pruneInputFeeds drops the inputFeeds ids whose feed is no longer on the
+// screen (a feed removed by the restriction), and inputFeeds left empty, so
+// the enforced document stays valid. It returns the buttons changed.
+func pruneInputFeeds(root map[string]any) int {
+	n := 0
+	forScreens(root, func(_ string, sc map[string]any) {
+		feeds := map[string]bool{}
+		cs, _ := sc["components"].([]any)
+		each := func(fn func(map[string]any)) {
+			for _, v := range cs {
+				c, _ := v.(map[string]any)
+				if c == nil {
+					continue
+				}
+				fn(c)
+				ch, _ := c["children"].([]any)
+				for _, w := range ch {
+					if x, _ := w.(map[string]any); x != nil {
+						fn(x)
+					}
+				}
+			}
+		}
+		each(func(c map[string]any) {
+			if id, _ := c["id"].(string); id != "" && isType(c, dsl.CompFeed) {
+				feeds[id] = true
+			}
+		})
+		each(func(c map[string]any) {
+			ids, ok := c["inputFeeds"].([]any)
+			if !ok || !isType(c, dsl.CompAiButton) {
+				return
+			}
+			kept := []any{}
+			for _, id := range ids {
+				if s, _ := id.(string); feeds[s] {
+					kept = append(kept, id)
+				}
+			}
+			if len(kept) == len(ids) {
+				return
+			}
+			n++
+			if len(kept) == 0 {
+				delete(c, "inputFeeds")
+			} else {
+				c["inputFeeds"] = kept
+			}
+		})
 	})
 	return n
 }
