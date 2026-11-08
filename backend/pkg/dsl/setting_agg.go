@@ -1,6 +1,9 @@
 package dsl
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Goal / budget read with max / min: a setting entity (settingEntities) that
 // is not single keeps one record per "set the goal" (its button opens a new
@@ -11,11 +14,12 @@ import "fmt"
 func (l *linter) settingMaxMin() {
 	settings := l.settingEntities()
 	opened := newRecordForms(l.app)
+	logs := totalledEntities(l.app)
 	// an entered number only: min of an exam date (or of its computed
 	// days_left) is the next exam, not a setting
 	bad := func(entity, agg, field string) bool {
 		e := l.entities[entity]
-		if (agg != "max" && agg != "min") || !settings[entity] || e == nil || e.Single || !opened[entity] {
+		if (agg != "max" && agg != "min") || !settings[entity] || logs[entity] || e == nil || e.Single || !opened[entity] {
 			return false
 		}
 		f := e.FieldByID(field)
@@ -39,6 +43,9 @@ func (l *linter) settingMaxMin() {
 	}
 	for _, s := range l.app.Screens {
 		eachScreenComponent(s.Components, func(w string, c *Component) {
+			if bestLabel(c.Label) {
+				return // 「自己ベスト」: max / min is the point
+			}
 			where := fmt.Sprintf("screen %q %s", s.ID, w)
 			if scalarTypes[c.Type] && bad(c.Entity, c.Aggregate, c.Field) {
 				report(where+" aggregate", c.Entity, c.Aggregate)
@@ -46,6 +53,48 @@ func (l *linter) settingMaxMin() {
 			exprs(where+".value", c.Value)
 		})
 	}
+}
+
+// bestWords: a label asking for the best / worst record ever, where max /
+// min is intended (a goal or budget label never says these).
+var bestWords = []string{"ベスト", "最高", "最低", "最長", "最速", "最多", "自己", "best", "record", "longest", "fastest", "highest", "lowest", "personal"}
+
+func bestLabel(label string) bool {
+	label = strings.ToLower(label)
+	for _, w := range bestWords {
+		if strings.Contains(label, w) {
+			return true
+		}
+	}
+	return false
+}
+
+// totalledEntities: entities read with count / sum / avg anywhere. Those are
+// logs (a budget is never summed), so their max / min is a best record.
+func totalledEntities(a *App) map[string]bool {
+	out := map[string]bool{}
+	total := func(agg string) bool { return agg == "count" || agg == "sum" || agg == "avg" }
+	exprs := func(x *Expr) {
+		walkExpr(x, func(e *Expr) {
+			if e.Kind == ExprAgg && e.Agg != nil && total(e.Agg.Agg) {
+				out[e.Agg.Entity] = true
+			}
+		})
+	}
+	for _, e := range a.Entities {
+		for _, f := range e.Fields {
+			exprs(f.Computed)
+		}
+	}
+	for _, s := range a.Screens {
+		eachScreenComponent(s.Components, func(_ string, c *Component) {
+			if scalarTypes[c.Type] && c.Entity != "" && c.Value == nil && (c.Aggregate == "" || total(c.Aggregate)) {
+				out[c.Entity] = true
+			}
+			exprs(c.Value)
+		})
+	}
+	return out
 }
 
 // newRecordForms: entities whose form a button or toolbar navigate opens

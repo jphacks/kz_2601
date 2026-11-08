@@ -77,6 +77,12 @@ func TestLintSettingMaxMin_Clean(t *testing.T) {
 		"computed field": budgetApp(t, stat("min", "days"), `,{"id":"days","name":"残り日数","type":"integer","computed":{"op":"daysUntil","args":[{"ref":"date"}]}}`, true),
 		// listed records (a best score) are not a setting
 		"listed entity": budgetApp(t, stat("max", "amount")+`{"type":"list","entity":"budget","item":{"title":"amount"}},`, "", true),
+		// a log also summed / counted is a record, so max is its best (#769 review)
+		"summed log": budgetApp(t, stat("max", "amount")+`{"type":"stat","label":"合計","value":{"agg":"sum","entity":"budget","field":"amount"}},`, "", true),
+		"counted log": budgetApp(t, stat("max", "amount")+`{"type":"stat","label":"回数","entity":"budget","aggregate":"count"},`, "", true),
+		// the label asks for the best record
+		"best label": budgetApp(t, `{"type":"stat","label":"自己ベスト","entity":"budget","aggregate":"max","field":"amount"},`, "", true),
+		"best label value": budgetApp(t, `{"type":"stat","label":"Best run","value":{"agg":"max","entity":"budget","field":"amount"}},`, "", true),
 	}
 	for name, got := range cases {
 		t.Run(name, func(t *testing.T) { noLint(t, got, settingMaxMinMsg) })
