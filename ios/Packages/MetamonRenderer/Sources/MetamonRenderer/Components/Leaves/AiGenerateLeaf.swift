@@ -96,6 +96,7 @@ struct AiGenerateLeaf: View {
                 await rt.load(entities: [id])
                 source = e
                 records = HiddenFields.redact(rt.records(for: id), in: e) // #262 回答者に見せない項目は渡さない
+                records = try AIInputRecords.select(records, in: e, route: route, uid: rt.currentUserId) // クラウドへは自分の記録だけ
             }
             var values: [String: JSONValue] = [:]
             if let form {

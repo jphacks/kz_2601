@@ -114,8 +114,10 @@ final class RecordSyncTests: XCTestCase {
         XCTAssertEqual(pending, 2)
 
         await store.markSynced(appId: "a", entity: "e", localId: "local-x", server: Record(id: "srv", data: ["n": 1], createdAt: "9"))
+        XCTAssertEqual(shown.map(\.unsent), [true, false], "未送信 create だけ Record.unsent(aiChat の自分の記録の判定)")
         let after = await store.records(appId: "a", entity: "e")
         XCTAssertEqual(Set(after.map(\.id)), ["srv", "s1"])
+        XCTAssertFalse(after.contains(where: \.unsent), "送信済みになったら外れる")
         let synced = await store.row(appId: "a", entity: "e", recordId: "srv")
         XCTAssertEqual(synced?.pendingOp, PendingOp.none)
         XCTAssertEqual(synced?.clientId, "x")
