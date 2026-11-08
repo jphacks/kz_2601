@@ -2,7 +2,7 @@
 
 > 状態: 実装(2026-11-08)。**既定で止めている**(2026-11-08 のオーナー判断・下の[既定で止めている理由](#既定で止めている理由))。`BOOK_LOOKUP_ENABLED=1` の時だけ動く。外部の公開データ(#348)と同じ安全の作りで、**鍵の要らない決まった出どころ 1 つ(openBD)だけ**を使う。出どころを増やすのは人の判断(#339)。
 > 目的: 過去の JPHACKS 作品 NG_2312 LenBow(本の貸し借り)の「書籍情報の自動取得」を作れるようにする([jphacks-coverage.md](../../research/jphacks-coverage.md))。
-> コード: `backend/pkg/dsl/book_lookup.go`(DSL の検証)・`backend/internal/books`(ISBN の確かめ・取得・キャッシュ)・`backend/internal/appconfig/books.go`(API)・`backend/internal/ai/book_rules.go`(AI の規則)・`backend/internal/ai/book_gate.go`(止めている間は生成しない)・iOS `BookLookupPlan`(MetamonDSL)/ `HTTPBookLookupClient`(MetamonServices)/ `AppRuntime+Books`。
+> コード: `backend/pkg/dsl/book_lookup.go`(DSL の検証)・`backend/internal/books`(ISBN の確かめ・取得・キャッシュ)・`backend/internal/appconfig/books.go`(API)・`backend/internal/ai/book_rules.go`(AI の規則)・`backend/internal/ai/client_features.go`(止めている間は `withFeatureOff(FeatureLookupBook)` で生成しない)・iOS `BookLookupPlan`(MetamonDSL)/ `HTTPBookLookupClient`(MetamonServices)/ `AppRuntime+Books`。
 
 ## 目次
 
@@ -67,7 +67,7 @@ openBD の利用条件は「本の販促・紹介の目的に限る」。蔵書�
 | 場所 | 止めている間 |
 |---|---|
 | appconfig `GET /v1/lookup/book` | ISBN を確かめる前に 503 `upstream_unavailable`(`details.reason = disabled`・「本の情報の取得は今使えません」)。出どころへは出ない |
-| ai(生成・対話) | `lookupBook` を教えない・使わせない(`Service.NoBookLookup`・`book_gate.go`)。規則(`bookRules`)・スキーマの `lookupBook` / `bookLookup`・カタログ・対話の索引から外し、「使わない」の注記を足す。新しく作った `lookupBook` のボタンは作り直させ、最後の回でも残ればボタンごと消す(編集では、すでにあるボタンも消す)。書名・著者は手入力の形になる |
+| ai(生成・対話) | `lookupBook` を教えない・使わせない(`Service.NoBookLookup` → `clientRestriction` の `withFeatureOff(FeatureLookupBook)`)。規則(`bookRules`)・スキーマの `lookupBook` / `bookLookup`・カタログ・対話の索引から外し、「使わない」の注記を足す。新しく作った `lookupBook` のボタンは作り直させ、最後の回でも残ればボタンごと消す(編集では、すでにあるボタンも消す)。書名・著者は手入力の形になる |
 | 保存済みのアプリ | ボタンは残る。押すと「本の情報の取得は今使えません。手で入力してください」(iOS・`details.reason = disabled` の 503) |
 
 動かす時は appconfig と ai の**両方に** `BOOK_LOOKUP_ENABLED=1` を入れる(片方だけだと、ボタンを作るのに 503 になる・作らないのに動く、のずれが出る)。止め直す時は両方から外すか `BOOK_LOOKUP_DISABLED=1`。
@@ -108,7 +108,7 @@ openBD の利用条件は「本の販促・紹介の目的に限る」。蔵書�
 
 - Go: `internal/books`(ISBN の検査数字・記録した openBD の応答(`testdata/`)の解析・通信の前に断る・キャッシュ・同時の取得のまとめ・上限・止める(既定で止まる・`BOOK_LOOKUP_ENABLED` で動く)・内部のアドレス・リダイレクト)、`internal/appconfig/books_test.go`(API の 200 / 400 / 401 / 404 / 429 / 503・既定の 503)、`pkg/dsl/book_lookup_test.go`(置き場所・field の型)。テストは偽の出どころ(httptest)と記録した応答だけで、実際の openBD には出ない。
 - iOS: `BookLookupPlanTests`(ISBN・埋める値・出版日)、`BookLookupClientTests`(`v1/lookup/book` だけに聞く)。
-- AI: `book_rules_test.go`・`book_gate_test.go`(止めている間は規則・スキーマから外れ、作ったボタンは作り直させて消す・動かす時はそのまま)、ai-eval の `lookupBook`(`internal/ai/eval/book_cases.json`・`jphacks_coverage_cases.json` の `cov_book_lending`)。
+- AI: `book_rules_test.go`・`book_lookup_off_test.go`(止めている間は規則・スキーマから外れ、作ったボタンは作り直させて消す・動かす時はそのまま)、ai-eval の `lookupBook`(`internal/ai/eval/book_cases.json`・`jphacks_coverage_cases.json` の `cov_book_lending`)。
 
 ## 人が確かめること
 
