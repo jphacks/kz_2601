@@ -452,6 +452,8 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkPlaceSearch(c.Expect, app)...) // place_search.go
 		// #507: matching.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMatching(c.Expect, app)...)
+		// rowWindow: row_window.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkRowWindow(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRepeat(c.Expect, app)...)      // #266: repeat.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkSingle(c.Expect, app)...)      // #267: single.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAddressed(c.Expect, app)...)   // #271: addressed.go
