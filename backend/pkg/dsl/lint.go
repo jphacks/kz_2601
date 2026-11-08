@@ -3,7 +3,9 @@ package dsl
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
+	"time"
 )
 
 // Lint reports content problems in a document that already passes Validate:
@@ -19,12 +21,15 @@ import (
 //     year) but the filter is missing or another period
 //   - screen graph (nav.go): unreachable screens, fullScreen without a way back
 //   - a toolbar item opening the same form as a button on the screen (#416)
+//   - a date/datetime defaultValue other than "now" or a date ("today" is
+//     saved as the text "today", which no date filter matches)
 func (a *App) Lint() []string {
 	l := &linter{app: a, entities: map[string]*Entity{}}
 	for i := range a.Entities {
 		l.entities[a.Entities[i].ID] = &a.Entities[i]
 	}
 	l.computed()
+	l.dateDefaults()
 	l.screens()
 	l.entityReach()
 	l.navGraph()
@@ -52,6 +57,26 @@ func (l *linter) computed() {
 			where := fmt.Sprintf("entity %q field %q computed", e.ID, f.ID)
 			l.constExpr(where, f.Computed)
 			l.exprFilters(where, f.Computed)
+		}
+	}
+}
+
+var dayLiteral = regexp.MustCompile(`^[0-9]{1,4}-[0-9]{1,2}-[0-9]{1,2}$`)
+
+// dateDefaults: iOS (FieldCoding.defaultValue) turns only "now" into the
+// current date; any other default is saved as is.
+func (l *linter) dateDefaults() {
+	for _, e := range l.app.Entities {
+		for _, f := range e.Fields {
+			if (f.Type != FieldDate && f.Type != FieldDatetime) || f.DefaultValue == nil {
+				continue
+			}
+			if s, ok := f.DefaultValue.(string); ok {
+				if _, err := time.Parse(time.RFC3339, s); s == "now" || dayLiteral.MatchString(s) || err == nil {
+					continue
+				}
+			}
+			l.add(`entity %q field %q: defaultValue %s is not a date; use "now" (today) or a fixed date such as "2026-04-01", or remove it`, e.ID, f.ID, quoteLit(f.DefaultValue))
 		}
 	}
 }
