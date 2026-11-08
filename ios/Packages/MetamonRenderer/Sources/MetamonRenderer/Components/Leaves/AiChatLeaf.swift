@@ -25,6 +25,8 @@ struct AiChatLeaf: View {
     @FocusState private var focused: Bool
     /// 読み上げの持ち主の頭(吹き出しは `owner/turnId`)。
     @State private var owner = UUID().uuidString
+    /// 画面に出ているか。送信の Task は画面を離れても続くので、離れた後に届いた返事は保存だけして読まない
+    @State private var visible = false
     private var speech: LeafSpeech { .shared }
 
     private var online: Bool { rt.aiText?.supportsOnlineAIText ?? false }
@@ -35,6 +37,11 @@ struct AiChatLeaf: View {
                 messages(entity: entity, textField: textField)
                 footer
                 inputBar(entity: entity, textField: textField)
+            }
+            .onAppear { visible = true }
+            .onDisappear {
+                visible = false
+                stopSpeech()
             }
         } else {
             UnsupportedComponent(label: "aiChat")
@@ -93,7 +100,6 @@ struct AiChatLeaf: View {
                 .onChange(of: focused) { _, isFocused in if isFocused { scrollToEnd(proxy, turns) } }
             }
             .accessibilityIdentifier("aiChat.messages")
-            .onDisappear { stopSpeech() }
         }
     }
 
@@ -183,15 +189,31 @@ struct AiChatLeaf: View {
                 if !saved {
                     if roleField == nil { restore(text) } // 対で残さなかった = 自分の発言も消えている
                     self.error = roleField == nil ? L("会話を保存できませんでした") : L("AI の返事を保存できませんでした")
-                } else if c.speak == true,
-                          let spoken = AIChat.spokenReply(AIChat.turns(ownRecords(entity), textField: textField, roleField: roleField),
+                } else if let spoken = AIChat.spokenReply(AIChat.turns(ownRecords(entity), textField: textField, roleField: roleField),
                                                           reply: reply.text) {
-                    speech.speak(spoken.text, owner: speechOwner(spoken.id)) // speak: true(保存できた返事だけ・録音中は LeafSpeech が読まない)
+                    autoRead(spoken) // speak: true(保存できた返事だけ・録音中は LeafSpeech が読まない)
                 }
             } catch {
                 if roleField == nil { pending = nil; restore(text) }
                 self.error = Self.message(error)
             }
+        }
+    }
+
+    /// 届いた返事の自動の読み上げ(`speak: true`)。
+    enum AutoRead: Equatable { case none, speak, announce }
+
+    /// 画面を離れた後は読まない。VoiceOver が動いている時は端末の声と重ねず、VoiceOver に読ませる(スピーカーのボタンはそのまま)。
+    static func autoReadMode(speak: Bool?, visible: Bool, voiceOver: Bool) -> AutoRead {
+        guard speak == true, visible else { return .none }
+        return voiceOver ? .announce : .speak
+    }
+
+    private func autoRead(_ turn: AIChat.Turn) {
+        switch Self.autoReadMode(speak: c.speak, visible: visible, voiceOver: UIAccessibility.isVoiceOverRunning) {
+        case .none: break
+        case .speak: speech.speak(turn.text, owner: speechOwner(turn.id))
+        case .announce: UIAccessibility.post(notification: .announcement, argument: turn.text)
         }
     }
 

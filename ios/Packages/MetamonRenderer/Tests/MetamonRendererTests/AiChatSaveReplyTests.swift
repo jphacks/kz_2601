@@ -109,6 +109,16 @@ final class AiChatSaveReplyTests: XCTestCase {
         XCTAssertFalse(failed)
     }
 
+    /// speak: true の自動読み上げ: 画面を離れた後は読まない・VoiceOver 中は端末の声でなく VoiceOver に渡す。
+    func testAutoReadMode() {
+        XCTAssertEqual(AiChatLeaf.autoReadMode(speak: true, visible: true, voiceOver: false), .speak)
+        XCTAssertEqual(AiChatLeaf.autoReadMode(speak: true, visible: false, voiceOver: false), .none, "画面を離れた後に届いた返事は読まない")
+        XCTAssertEqual(AiChatLeaf.autoReadMode(speak: true, visible: true, voiceOver: true), .announce, "VoiceOver と声を重ねない")
+        XCTAssertEqual(AiChatLeaf.autoReadMode(speak: true, visible: false, voiceOver: true), .none)
+        XCTAssertEqual(AiChatLeaf.autoReadMode(speak: nil, visible: true, voiceOver: false), .none)
+        XCTAssertEqual(AiChatLeaf.autoReadMode(speak: false, visible: true, voiceOver: true), .none)
+    }
+
     /// 対の保存を持たないランタイムは 2 件続けて保存し、1 件目に失敗したら 2 件目を作らない。
     func testFallbackWithoutPairHost() async throws {
         let rt = SavingRuntime(dsl: try dsl())
