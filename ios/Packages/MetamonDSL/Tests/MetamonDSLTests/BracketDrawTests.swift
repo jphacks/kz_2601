@@ -158,6 +158,16 @@ final class BracketDrawTests: XCTestCase {
         XCTAssertEqual(e.tap(e.rounds[0][0], side: .b, winsField: "wins"), .update(["d": 1, "a": 0]))
     }
 
+    /// Int に収まらない wins(CSV の取り込み・型を変えた field の古い値)でも落ちない。
+    func testHugeWinsDoNotTrap() {
+        let r = Record(id: "a", data: ["wins": .number(1e20)])
+        XCTAssertEqual(BracketDraw.wins(r, field: "wins"), BracketDraw.maxWins)
+        XCTAssertEqual(BracketDraw.wins(Record(id: "b", data: ["wins": .number(-1e20)]), field: "wins"), 0)
+        let d = BracketDraw(records: [p("x", at: 1), Record(id: "y", data: ["wins": .number(1e300)], createdAt: "2026-11-02T00:00:00Z")],
+                            winsField: "wins", seedField: nil)
+        XCTAssertEqual(d.champion?.id, "y")
+    }
+
     func testTournamentExampleIsBundled() throws {
         XCTAssertTrue(DSLExamples.names.contains("tournament"))
         var url = URL(fileURLWithPath: #filePath)

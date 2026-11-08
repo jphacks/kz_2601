@@ -6,6 +6,8 @@ import Foundation
 public struct BracketDraw: Equatable, Sendable {
     /// 描く出場者の上限(6 回戦)。Go の `dsl.MaxBracketEntrants` と同じ。
     public static let maxEntrants = 64
+    /// 読む wins の上限(回戦の数より十分大きい)。
+    public static let maxWins = 1_000
 
     public enum Side: String, Equatable, Sendable { case a, b }
 
@@ -110,7 +112,8 @@ public struct BracketDraw: Equatable, Sendable {
     public static func wins(_ r: Record, field: String, pending: [String: Int] = [:]) -> Int {
         if let p = pending[r.id] { return p }
         switch r[field] {
-        case .number(let n): return n.isFinite ? Swift.max(0, Int(n)) : 0
+        // Int(n) は Int に収まらないと落ちるので先に丸める
+        case .number(let n): return n.isFinite ? Int(Swift.min(Swift.max(n, 0), Double(maxWins))) : 0
         case .string(let s): return Swift.max(0, Int(s) ?? 0)
         default: return 0
         }
