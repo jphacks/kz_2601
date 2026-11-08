@@ -18,6 +18,21 @@ func TestAddMinutesRulesInPrompt(t *testing.T) {
 	}
 }
 
+// The rules cover "N hours later" (×60 into addMinutes) and send day units
+// to addDays, not addMinutes(-4320).
+func TestAddMinutesRulesLaterAndDayUnits(t *testing.T) {
+	for _, want := range []string{
+		"○分後・○時間後",
+		`{"op":"addMinutes","args":[{"ref":"taken_at"},240]}`,
+		"日単位(「3日前」「1週間後」)は addMinutes でなく addDays",
+		`{"op":"addDays","args":[{"ref":"due"},-3]}`,
+	} {
+		if !strings.Contains(addMinutesRules, want) {
+			t.Errorf("addMinutes rules lack %q", want)
+		}
+	}
+}
+
 // The prompt's example (departure = arrival − travel minutes) is valid DSL
 // and computes the departure time.
 func TestAddMinutesRulesExampleValid(t *testing.T) {
