@@ -51,14 +51,12 @@ func TestTitleGoalSnippetWithoutDateField(t *testing.T) {
 "entities":[{"id":"budget","name":"予算","fields":[{"id":"amount","name":"予算額","type":"currency"}]}],
 "screens":[{"id":"home","title":"ホーム","components":[{"type":"stat","label":"予算","value":` + value + `}]}]}`)
 	}
-	for name, line := range map[string]string{"single": titleGoalSingleLine, "latest": titleGoalLatestLine} {
-		got := snip.FindString(line)
-		if got == "" {
-			t.Fatalf("%s: no latest snippet in %q", name, line)
-		}
-		if _, err := dsl.Parse(app(got)); err != nil {
-			t.Errorf("%s: snippet %s does not validate without a date field: %v", name, got, err)
-		}
+	got := snip.FindString(titleGoalLatestLine)
+	if got == "" {
+		t.Fatalf("no latest snippet in %q", titleGoalLatestLine)
+	}
+	if _, err := dsl.Parse(app(got)); err != nil {
+		t.Errorf("snippet %s does not validate without a date field: %v", got, err)
 	}
 	// the old snippet fails there, so the check above is not vacuous
 	if _, err := dsl.Parse(app(`{"agg":"latest","entity":"budget","field":"amount","by":"date"}`)); err == nil || !strings.Contains(err.Error(), `latest by "date" not in entity "budget"`) {
@@ -81,5 +79,37 @@ func TestTitleGoalSnippetWithoutDateField(t *testing.T) {
 "screens":[{"id":"home","title":"ホーム","components":[` + goalRateLatest + `]}]}`
 	if _, err := dsl.Parse([]byte(raw)); err != nil {
 		t.Fatalf("goalRateLatest rejected for a goal entity without a date field: %v", err)
+	}
+}
+
+// The 達成率 recipe no longer copies a changeable goal into
+// progressBar.target, and the goal bullet does not repeat prompt.go's
+// "goals are a single setting" line (it keeps only "no max / min").
+func TestGoalRecipeNoChangeableTarget(t *testing.T) {
+	const bare = "progressBar{entity,field,target:<目標>}"
+	old := NewClientRestriction(allComponentTypes(), nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching})
+	noSingle := withoutNote(restrictPrompt(withRestriction(context.Background(), old), systemPrompt))
+	prompts := map[string]string{
+		"create": systemPrompt, "chat": chatSystemPrompt, "chatEdit": chatEditSystemPrompt,
+		"chatCreate": chatCreateSystemPrompt, "logic": logicSystemPrompt, "noSingle": noSingle,
+	}
+	for name, p := range prompts {
+		if strings.Contains(p, bare) || strings.Contains(p, goalRecipeBar) {
+			t.Errorf("%s prompt still pairs the rate with %s", name, bare)
+		}
+	}
+	for _, name := range []string{"create", "noSingle"} {
+		if strings.Count(prompts[name], goalRecipeRate) != 1 {
+			t.Errorf("%s prompt lacks the fixed 達成率 recipe", name)
+		}
+	}
+	if strings.Contains(goalRecipeRate, `{"setting"`) {
+		t.Error(`the recipe is shared with builds without single: no {"setting"}`)
+	}
+	if strings.Contains(titleGoalSingleLine, `"single": true`) || strings.Contains(titleGoalSingleLine, `"agg":"latest"`) || !strings.Contains(titleGoalSingleLine, "max / min で読まない") {
+		t.Errorf("titleGoalSingleLine = %q", titleGoalSingleLine)
+	}
+	if !strings.Contains(systemPrompt, settingsSingleLine) {
+		t.Error("the single line the goal bullet points to is gone")
 	}
 }

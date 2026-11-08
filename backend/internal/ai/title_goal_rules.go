@@ -20,11 +20,33 @@ var titleGoalRules = strings.TrimSpace(`
 `)
 
 const (
-	titleGoalSingleLine = `- 目標・予算のような後から変える値は "single": true の設定にする(single が使えない版では記録を {"agg":"latest","entity":"budget","field":"amount"} の latest で読む(by は省けば作った順。by に書けるのはその entity の date / datetime field だけで、$createdAt や無い field は書けない))。max / min で読まない(下げた目標・予算が反映されない)。`
+	// The single build already says where goals live and how to read them
+	// (prompt.go settingsSingleLine + singleRules): only the max / min part.
+	titleGoalSingleLine = `- 後から変える目標・予算を max / min で読まない(下げた値が反映されない。置き方と読み方は上の「設定値の置き場は single の entity」)。`
 	titleGoalLatestLine = `- 目標・予算のような後から変える値は記録を {"agg":"latest","entity":"budget","field":"amount"} の latest で読む(by は省けば作った順。by に書けるのはその entity の date / datetime field だけで、$createdAt や無い field は書けない)。max / min で読まない(下げた目標・予算が反映されない)。`
 
 	goalRateSetting = `{"type":"stat","label":"目標の達成率","format":"percent","value":{"op":"div","args":[{"agg":"sum","entity":"study","field":"minutes"},{"setting":"target_minutes"}]}}`
 	goalRateLatest  = `{"type":"stat","label":"目標の達成率","format":"percent","value":{"op":"div","args":[{"agg":"sum","entity":"study","field":"minutes"},{"agg":"latest","entity":"goal","field":"target_minutes"}]}}`
+
+	// The Expr catalog's 達成率 recipe (schema.json x-recipes) paired the rate
+	// stat with progressBar{target:<目標>}: a changeable goal copied into a
+	// literal target, the opposite of the goal-rate bullet above.
+	goalRecipeBar  = `(percent は 0..1 を % 表示)+ progressBar{entity,field,target:<目標>}。`
+	goalRecipeRate = `(percent は 0..1 を % 表示)。後から変える目標・予算は <目標> を式で読み、この stat だけにする。progressBar{entity,field,target:<目標の数>} は目標が依頼文で決まっていて変えない時だけ添える(target は数値だけで、変えた目標に追従しない)。`
 )
 
-func init() { systemPrompt += "\n\n" + titleGoalRules }
+// fixGoalRecipe rewrites the 達成率 recipe in a rendered catalog (restrict.go
+// applies it to the restricted ones). The new text names no {"setting"}, so
+// it also fits builds without single.
+func fixGoalRecipe(s string) string { return strings.Replace(s, goalRecipeBar, goalRecipeRate, 1) }
+
+func init() {
+	systemPrompt = fixGoalRecipe(systemPrompt) + "\n\n" + titleGoalRules
+	chatSystemPrompt = fixGoalRecipe(chatSystemPrompt)
+	chatEditSystemPrompt = fixGoalRecipe(chatEditSystemPrompt)
+	chatCreateSystemPrompt = fixGoalRecipe(chatCreateSystemPrompt)
+	logicSystemPrompt = fixGoalRecipe(logicSystemPrompt)
+	// restrictPrompt swaps catalog for the restricted one: keep them equal
+	catalog = fixGoalRecipe(catalog)
+	exprCatalog = fixGoalRecipe(exprCatalog)
+}

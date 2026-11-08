@@ -250,7 +250,7 @@ func (r Restriction) assets() *restrictedAssets {
 	// An allowlist that leaves no leaf cannot build a catalog: keep the full
 	// one (the note and enforceRestriction still apply).
 	if c, err := BuildCatalog(raw); err == nil {
-		a.catalog = c
+		a.catalog = fixGoalRecipe(c) // title_goal_rules.go
 	}
 	if i, err := BuildCapabilityIndex(raw); err == nil {
 		a.index = i
