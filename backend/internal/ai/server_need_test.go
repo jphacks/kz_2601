@@ -255,3 +255,17 @@ func TestServerNeed_Memoized(t *testing.T) {
 		t.Fatal("schema must be memoized")
 	}
 }
+
+// A restricted build gets its restricted schema plus serverNeed, and the
+// later restrictSchema in call leaves it as is.
+func TestServerNeed_RestrictedSchema(t *testing.T) {
+	r := NewClientRestriction(nil, []string{FeatureFieldHealth}, nil)
+	if !r.Active() {
+		t.Fatal("restriction must be active")
+	}
+	ctx := WithOperation(withServerPush(withRestriction(context.Background(), r), true), OpGenerate)
+	got := serverNeedSchema(ctx, GenerationSchema())
+	if !bytes.Equal(got, addServerNeed(r.assets().genSch)) || !bytes.Equal(restrictSchema(ctx, got), got) {
+		t.Fatal("restricted schema + serverNeed expected")
+	}
+}

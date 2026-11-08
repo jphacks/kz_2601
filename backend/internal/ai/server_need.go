@@ -142,6 +142,9 @@ func serverNeedSchema(ctx context.Context, schema json.RawMessage) json.RawMessa
 	if op := operationOf(ctx); op != OpGenerate && op != OpPatch {
 		return schema
 	}
+	// restrictSchema first: it only swaps the exact generationSchema bytes,
+	// so the later restrictSchema in call passes this schema through.
+	schema = restrictSchema(ctx, schema)
 	k := string(schema)
 	if v, ok := serverNeedSchemaMemo.Load(k); ok {
 		return v.(json.RawMessage)
@@ -158,4 +161,31 @@ func (s *Service) logServerNeedMissing(ctx context.Context, mode string) {
 		l = slog.Default()
 	}
 	l.WarnContext(ctx, "ai.server_need missing", slog.String("event", "ai.server_need"), slog.String("mode", mode))
+}
+
+// addServerNeed returns the relaxed schema (schema.go Relax) with the root
+// key serverNeed, required and last in the required order. Only for
+// AI_SERVER_RULES=1 requests; GenerationSchema / PatchGenerationSchema stay
+// as they are. On a decode error the schema is returned unchanged.
+func addServerNeed(raw json.RawMessage) json.RawMessage {
+	var root map[string]any
+	if err := json.Unmarshal(raw, &root); err != nil {
+		return raw
+	}
+	props, _ := root["properties"].(map[string]any)
+	if props == nil {
+		return raw
+	}
+	enum := make([]any, len(serverNeedValues))
+	for i, v := range serverNeedValues {
+		enum[i] = v
+	}
+	props[serverNeedKey] = map[string]any{"type": "string", "enum": enum}
+	req, _ := root["required"].([]any)
+	root["required"] = append(req, serverNeedKey)
+	out, err := json.Marshal(root)
+	if err != nil {
+		return raw
+	}
+	return out
 }

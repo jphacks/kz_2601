@@ -685,8 +685,9 @@ func (s *Service) call(ctx context.Context, system, user string, schema json.Raw
 	}
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	schema = serverNeedSchema(ctx, schema) // restricted first, then + serverNeed (server_need.go)
 	t := time.Now()
-	system, schema = serverPushPrompt(ctx, restrictPrompt(ctx, system)), serverNeedSchema(ctx, restrictSchema(ctx, schema))
+	system, schema = serverPushPrompt(ctx, restrictPrompt(ctx, system)), restrictSchema(ctx, schema)
 	resp, err := s.Claude.Complete(cctx, Completion{System: system, Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
 	ar.latency += time.Since(t)
 	ar.meta.Attempts++
