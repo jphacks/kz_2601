@@ -42,7 +42,7 @@ const dmDoc = `{"schemaVersion":1,"app":{"name":"連絡","voiceEntry":"none"},"i
  {"type":"picker","field":"to","label":"宛先"},{"type":"textField","field":"body","label":"本文"}]}]}`
 
 var currentFeatures = []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles, FeatureAddressed, FeatureNotificationNear,
-	FeatureAILong, FeatureAIInputPhoto, FeatureAISaveTo, FeatureAIInputFeeds, FeatureLookupBook, FeatureTextHighlight, FeatureFeedV2, FeatureAIChatInput}
+	FeatureAILong, FeatureAIInputPhoto, FeatureAISaveTo, FeatureAIInputFeeds, FeatureAIOutputs, FeatureLookupBook, FeatureTextHighlight, FeatureFeedV2, FeatureExprAddMinutes, FeatureAIChatInput}
 
 // featuresWithout is currentFeatures minus some.
 func featuresWithout(drop ...string) []string {

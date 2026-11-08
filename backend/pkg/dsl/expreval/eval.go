@@ -64,6 +64,10 @@ const MaxDepth = 48
 // ExprEvaluator.maxAddDays). Beyond it addDays is nil.
 const MaxAddDays = 100_000
 
+// MaxAddMinutes bounds addMinutes' minute count (MaxAddDays days; iOS
+// ExprEvaluator.maxAddMinutes). Beyond it addMinutes is nil.
+const MaxAddMinutes = MaxAddDays * 1440
+
 // maxHistory is DailyCheck.maxHistory.
 const maxHistory = 400
 

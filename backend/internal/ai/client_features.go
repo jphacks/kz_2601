@@ -21,6 +21,7 @@ const (
 	FeatureAIInputPhoto = "aiButton.inputPhoto" // aiButton inputPhoto (ai_photo_input_rules.go)
 	FeatureAISaveTo     = "aiButton.saveTo"     // aiButton saveTo (ai_save_to_rules.go)
 	FeatureAIInputFeeds = "aiButton.inputFeeds" // aiButton inputFeeds (ai_input_feed_rules.go)
+	FeatureAIOutputs    = "aiButton.outputs"    // aiButton outputs (ai_outputs_rules.go)
 	FeatureLookupBook   = "action.lookupBook"   // action lookupBook (book_rules.go)
 	// FeatureTextHighlight covers text.highlight and text {{fieldId}} on
 	// form / detail screens (text_highlight_rules.go): they shipped together.
@@ -105,6 +106,19 @@ var clientFeatures = []clientFeature{
 			return editComponents(root, func(c map[string]any) bool { return isType(c, dsl.CompAiButton) && deleteKey(c, "inputFeeds") })
 		},
 		violation: "aiButton inputFeeds is not available in this app build: omit inputFeeds (the feed still shows on the screen)",
+	},
+	{
+		key:    FeatureAIOutputs,
+		rules:  []string{aiOutputsRules},
+		note:   "- aiButton の outputs(fields の項目ごとにフォームの field へ入れる)は使わない(この版では動かない)。項目はボタンの下に出すだけにし、利用者が見て入力する形にする。頼まれたら「項目ごとに入力欄へ入れるのはこの版ではできないため、ボタンの下に出す形にしました。」と申告する。\n",
+		schema: func(defs map[string]any) { deleteProps(defs, "AiButton", "outputs") },
+		places: func(root map[string]any) []string {
+			return componentPlaces(root, func(c map[string]any) bool { return isType(c, dsl.CompAiButton) && c["outputs"] != nil })
+		},
+		strip: func(root map[string]any) int {
+			return editComponents(root, func(c map[string]any) bool { return isType(c, dsl.CompAiButton) && deleteKey(c, "outputs") })
+		},
+		violation: "aiButton outputs is not available in this app build: omit outputs (the fields show under the button)",
 	},
 	{
 		key:   FeatureLookupBook,

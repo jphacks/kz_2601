@@ -73,6 +73,26 @@ final class AiGenerateTests: XCTestCase {
         XCTAssertThrowsError(try AIGenerateBuilder.build(empty, form: nil, values: [:], sourceEntity: nil, records: [], locale: "ja"))
     }
 
+    /// outputs: 数・日付・enum の書き方は formats で渡し、指示はボタンの指示のまま(作成者が払う呼び出しの照合)。
+    /// 端末内 AI はプロンプトに書き方を足す。
+    func testOutputsSendFormatsOutsideInstruction() throws {
+        let entity = try JSONDecoder().decode(Entity.self, from: Data(#"""
+            {"id":"ev","name":"予定","fields":[{"id":"title","name":"題名","type":"string"},{"id":"start","name":"日時","type":"datetime"},
+             {"id":"kind","name":"種類","type":"enum","options":["講演","展示"]}]}
+            """#.utf8))
+        let c = try component(#"{"type":"aiButton","task":"generate","prompt":"ポスターから抜き出す","shape":"fields","items":["題名","日時","種類"],"outputs":{"題名":"title","日時":"start","種類":"kind"}}"#)
+        let req = try AIGenerateBuilder.build(c, form: entity, values: [:], sourceEntity: nil, records: [], locale: "ja")
+        XCTAssertEqual(req.instruction, "ポスターから抜き出す")
+        XCTAssertEqual(req.formats, [AITextFormat(item: "日時", kind: "datetime"), AITextFormat(item: "種類", kind: "enum", options: ["講演", "展示"])])
+        XCTAssertTrue(AIGenerateBuilder.prompt(req).contains("書き方: 日時=YYYY/M/D H:mm(年が無ければ M/D H:mm) / 種類=講演/展示 のどれか(分からなければ -)"))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(req)) as? [String: Any])
+        XCTAssertEqual((json["formats"] as? [[String: Any]])?.count, 2)
+        let plain = try component(#"{"type":"aiButton","task":"generate","prompt":"抜き出す","shape":"fields","items":["題名"],"outputs":{"題名":"title"}}"#)
+        let p = try AIGenerateBuilder.build(plain, form: entity, values: [:], sourceEntity: nil, records: [], locale: "ja")
+        XCTAssertNil(p.formats)
+        XCTAssertFalse(AIGenerateBuilder.prompt(p).contains("書き方"))
+    }
+
     func testPromptDescribesShape() {
         let list = AITextRequest(instruction: "案", shape: .list, count: 4)
         XCTAssertTrue(AIGenerateBuilder.prompt(list).contains("4 個"))
