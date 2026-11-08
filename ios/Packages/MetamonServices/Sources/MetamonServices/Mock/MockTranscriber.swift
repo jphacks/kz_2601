@@ -2,7 +2,7 @@ import Foundation
 
 /// 固定文言を返す文字起こしモック(シミュレータ / テスト用)。
 @MainActor
-public final class MockTranscriber: SpeechTranscriber {
+public final class MockTranscriber: SpeechTranscriber, AudioFileTranscriber {
     public var isReady: Bool { true }
     public var cannedText: String
     public var delay: Duration
@@ -25,4 +25,15 @@ public final class MockTranscriber: SpeechTranscriber {
     }
 
     public func cancelRecording() { isRecording = false }
+
+    public var canTranscribeFiles: Bool { !isRecording }
+
+    /// ファイルは読まず、4 段で進んで固定文言を返す(シミュレータで進み具合・キャンセルを見る)。
+    public func transcribeFile(at url: URL, progress: @escaping @MainActor (Double) -> Void) async throws -> String {
+        for step in 1...4 {
+            try await Task.sleep(for: delay)
+            progress(Double(step) / 4)
+        }
+        return "(録音ファイル \(url.lastPathComponent) の文字起こしの例)" + cannedText
+    }
 }

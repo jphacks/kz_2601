@@ -1,0 +1,5 @@
+[
+  {"id": "fia_lecture_recording", "kind": "create", "group": "file_import_audio", "transcript": "授業をボイスメモで録ってあるから、その録音ファイルを文字にして授業ごとにノートとして残したい。あとで要点も見たい", "note": "録音ファイルを fileImport{accept: [audio], field: text} で端末内で文字起こし(F_2213 の代案)。話して入れる transcribeField にしない", "expect": {"has": ["fileImport"], "lacks": ["transcribeField"], "substitution": false, "unreachable": 0}},
+  {"id": "fia_meeting_minutes", "kind": "create", "group": "file_import_audio", "transcript": "会議の録音の m4a ファイルを取り込んで議事録にしたい。配られた PDF の資料も同じところに入れたい", "note": "録音と PDF を 1 つの fileImport{accept: [pdf, text, audio]} にまとめてよい(fk_2402 の文書取込の一部)", "expect": {"has": ["fileImport"], "unreachable": 0}},
+  {"id": "fia_edit_add_audio", "kind": "edit", "base": "fia_lecture_recording", "group": "file_import_audio", "transcript": "授業で配られた PDF も取り込めるようにして", "note": "既存の fileImport を残したまま PDF も読めるようにする", "expect": {"patch": true, "has": ["fileImport"]}}
+]

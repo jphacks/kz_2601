@@ -851,6 +851,40 @@
         }
       }
     },
+    "AI と話す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talking with AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI と話す"
+          }
+        }
+      }
+    },
+    "AI と話すには Tailor It Pro が必要です。会話はサーバーの AI で返します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talking with AI requires Tailor It Pro. Replies come from the server AI."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI と話すには Tailor It Pro が必要です。会話はサーバーの AI で返します。"
+          }
+        }
+      }
+    },
     "AI に送る内容の説明を改めました。もう一度ご確認ください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15420,6 +15454,23 @@
         }
       }
     },
+    "録音ファイルを文字にできませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't transcribe the recording"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音ファイルを文字にできませんでした"
+          }
+        }
+      }
+    },
     "録音中。タップで終了" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15501,6 +15552,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "閉じる"
+          }
+        }
+      }
+    },
+    "閉じると、AI と話す部品は使えません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you close this, you can't talk with the AI."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じると、AI と話す部品は使えません。"
           }
         }
       }
@@ -15858,6 +15926,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音声モデルを読み込み中…(初回は1分ほど)"
+          }
+        }
+      }
+    },
+    "音声入力を使っている間は、録音ファイルを文字にできません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recordings can't be transcribed while voice input is open"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声入力を使っている間は、録音ファイルを文字にできません"
           }
         }
       }
