@@ -2670,6 +2670,23 @@
         }
       }
     },
+    "今は AI と話せません。アプリを作った人に知らせてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can't talk with the AI right now. Please let the app's creator know."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今は AI と話せません。アプリを作った人に知らせてください"
+          }
+        }
+      }
+    },
     "今は表示するものがありません" : {
       "extractionState" : "manual",
       "localizations" : {
