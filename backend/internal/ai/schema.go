@@ -216,6 +216,9 @@ func mergeProp(a, b map[string]any) map[string]any {
 	if a == nil {
 		return cp
 	}
+	if merged, ok := mergeRefs(a, cp); ok {
+		return merged
+	}
 	ae, aok := a["enum"].([]any)
 	be, bok := cp["enum"].([]any)
 	if aok && bok {
@@ -366,4 +369,29 @@ func dropServerRules(root map[string]any) {
 			delete(defs, name)
 		}
 	}
+}
+
+// mergeRefs: one property name over different defs (saveTo is AISaveTo on
+// aiButton and AIChatSaveTo on aiChat) becomes anyOf of the refs, so the
+// flattened leaf accepts each part's shape. ok is false when b is not a
+// plain $ref or a already accepts it.
+func mergeRefs(a, b map[string]any) (map[string]any, bool) {
+	br, isRef := b["$ref"].(string)
+	if !isRef || len(b) != 1 || len(a) != 1 {
+		return nil, false
+	}
+	var refs []any
+	if ar, ok := a["$ref"].(string); ok {
+		refs = []any{map[string]any{"$ref": ar}}
+	} else if alts, ok := a["anyOf"].([]any); ok {
+		refs = alts
+	} else {
+		return nil, false
+	}
+	for _, r := range refs {
+		if m, _ := r.(map[string]any); m["$ref"] == br {
+			return nil, false
+		}
+	}
+	return map[string]any{"anyOf": append(refs, map[string]any{"$ref": br})}, true
 }

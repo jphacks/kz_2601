@@ -18,7 +18,8 @@ extension MockAIClient {
         if request.isChat {
             // aiChat: 最後の発言に返す決まった文
             let last = request.messages?.last?.text ?? ""
-            guard let out = AITextResult.normalize(text: "なるほど、「\(last.prefix(20))」ですね。もう少し聞かせてください(モック)", items: nil, fields: nil, for: request) else { throw AITextError.badOutput }
+            guard var out = AITextResult.normalize(text: "なるほど、「\(last.prefix(20))」ですね。もう少し聞かせてください(モック)", items: nil, fields: nil, for: request) else { throw AITextError.badOutput }
+            out.suggest = request.saveTo.map { Self.mockSuggest($0, last: last) } // saveTo: 記録の案
             return out
         }
         if request.isLong {
@@ -44,5 +45,19 @@ extension MockAIClient {
         }
         guard let result else { throw AITextError.badOutput }
         return result
+    }
+
+    /// aiChat saveTo の案: 文字は最後の発言・数は 1・日付は today・選択肢は最初のもの。
+    static func mockSuggest(_ saveTo: AITextSaveTo, last: String) -> [String: JSONValue] {
+        var out: [String: JSONValue] = [:]
+        for f in saveTo.fields {
+            switch f.type {
+            case "number": out[f.id] = .number(1)
+            case "date": out[f.id] = .string(saveTo.today)
+            case "enum": if let o = f.options?.first { out[f.id] = .string(o) }
+            default: out[f.id] = .string(String(last.prefix(40)))
+            }
+        }
+        return out
     }
 }

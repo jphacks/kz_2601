@@ -55,6 +55,8 @@ type TextRequest struct {
 	Image *TextImage `json:"image,omitempty"`
 	// Messages are the turns of task chat (aiChat, text_chat.go). Never logged.
 	Messages []TextMessage `json:"messages,omitempty"`
+	// SaveTo lets a task chat reply suggest a record (text_chat_suggest.go).
+	SaveTo *ChatSaveTo `json:"saveTo,omitempty"`
 }
 
 // TextField is one named value of shape fields.
@@ -71,8 +73,10 @@ type TextResult struct {
 	Items  []string    `json:"items,omitempty"`
 	Fields []TextField `json:"fields,omitempty"`
 	Length string      `json:"length,omitempty"` // long when asked (text_long.go)
-	Locale Locale      `json:"locale"`
-	Meta   TextMeta    `json:"meta"`
+	// Suggest is the record a task chat reply proposes (text_chat_suggest.go).
+	Suggest map[string]any `json:"suggest,omitempty"`
+	Locale  Locale         `json:"locale"`
+	Meta    TextMeta       `json:"meta"`
 }
 
 // TextMeta is the cost / latency report of one call.
@@ -97,6 +101,9 @@ func normalizeTextRequest(req *TextRequest) error {
 	}
 	if len(req.Messages) > 0 {
 		return badText("messages are only for task chat")
+	}
+	if req.SaveTo != nil {
+		return badText("saveTo is only for task chat")
 	}
 	if req.Task != "" && req.Task != "generate" {
 		return normalizeTaskRequest(req)

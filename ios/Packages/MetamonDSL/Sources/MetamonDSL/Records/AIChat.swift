@@ -55,7 +55,9 @@ public enum AIChat {
 
     /// `POST /v1/text` の task chat。直近 20 発言・本文 16 KB に収まる分だけ(古い方から落とす)。
     /// 最後は利用者の発言(`next`)。それ 1 つで 16 KB を超える時はそこで切る。
-    public static func request(persona: String, history: [Turn], next: String, long: Bool, locale: String) -> AITextRequest {
+    /// `saveTo` は aiChat saveTo の field の形(`AIChatSaveTo.request`・nil = 記録の案なし)。
+    public static func request(persona: String, history: [Turn], next: String, long: Bool, locale: String,
+                               saveTo: AITextSaveTo? = nil) -> AITextRequest {
         let last = AITextLimits.clip(next.trimmingCharacters(in: .whitespacesAndNewlines), maxBytes: maxBytes)
         var picked = [AITextMessage(role: Role.user.rawValue, text: last)]
         var used = last.utf8.count
@@ -67,7 +69,7 @@ public enum AIChat {
         while picked.first?.role == Role.assistant.rawValue { picked.removeFirst() } // 先頭は利用者から
         let instruction = String(persona.trimmingCharacters(in: .whitespacesAndNewlines).prefix(AITextLimits.maxInstruction))
         return AITextRequest(instruction: instruction, shape: .line, locale: locale, task: "chat",
-                             length: long ? "long" : nil, messages: picked)
+                             length: long ? "long" : nil, messages: picked, saveTo: saveTo)
     }
 
     /// 保存する 1 件の data。本文が空なら nil。`base` は entity の他の field の既定値。

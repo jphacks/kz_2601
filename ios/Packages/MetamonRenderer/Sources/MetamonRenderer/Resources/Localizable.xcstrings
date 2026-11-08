@@ -1310,6 +1310,23 @@
         }
       }
     },
+    "この内容で記録しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save this as a record?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この内容で記録しますか?"
+          }
+        }
+      }
+    },
     "この写真は読み取れません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4948,6 +4965,23 @@
         }
       }
     },
+    "直す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fix"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直す"
+          }
+        }
+      }
+    },
     "相手" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5505,6 +5539,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録がありません"
+          }
+        }
+      }
+    },
+    "記録しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録しました"
+          }
+        }
+      }
+    },
+    "記録できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save the record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録できませんでした"
           }
         }
       }

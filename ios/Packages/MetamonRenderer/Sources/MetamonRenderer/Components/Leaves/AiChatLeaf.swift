@@ -30,6 +30,8 @@ struct AiChatLeaf: View {
     /// 画面に出ているか。送信の Task は画面を離れても続くので、離れた後に届いた返事は保存だけして読まない
     @State private var visible = false
     @State private var micPhase: DictationPhase = .idle
+    /// saveTo の記録の案(最新の返事の分だけ・会話の記録には残さない・AiChatSuggestCard.swift)
+    @State private var suggestion: AiChatSuggestion?
     private var speech: LeafSpeech { .shared }
 
     private var online: Bool { rt.aiText?.supportsOnlineAIText ?? false }
@@ -91,6 +93,10 @@ struct AiChatLeaf: View {
                                     toggleSpeech(t)
                                 }
                                 .id(t.id)
+                                if let s = suggestion, s.turnId == t.id {
+                                    AiChatSuggestCard(suggestion: s, onAdd: addSuggestion, onFix: fixSuggestion)
+                                        .id("suggest")
+                                }
                             }
                         }
                         if let pending { AiChatBubble(text: pending, mine: true).id("pending") }
@@ -105,6 +111,7 @@ struct AiChatLeaf: View {
                 .scrollDismissesKeyboard(.interactively)
                 .onChange(of: turns.last?.id) { _, _ in scrollToEnd(proxy, turns) }
                 .onChange(of: sending) { _, _ in scrollToEnd(proxy, turns) }
+                .onChange(of: suggestion?.turnId) { _, _ in scrollToEnd(proxy, turns) }
                 .onChange(of: focused) { _, isFocused in if isFocused { scrollToEnd(proxy, turns) } }
             }
             .accessibilityIdentifier("aiChat.messages")
@@ -117,7 +124,8 @@ struct AiChatLeaf: View {
     }
 
     private func scrollToEnd(_ proxy: ScrollViewProxy, _ turns: [AIChat.Turn]) {
-        let last: String? = sending ? "thinking" : (pending != nil ? "pending" : turns.last?.id)
+        let tail = suggestion != nil && suggestion?.turnId == turns.last?.id ? "suggest" : turns.last?.id
+        let last: String? = sending ? "thinking" : (pending != nil ? "pending" : tail)
         guard let last else { return }
         withAnimation(RenderTheme.Motion.appear) { proxy.scrollTo(last, anchor: .bottom) }
     }
@@ -255,10 +263,15 @@ struct AiChatLeaf: View {
         let roleField = c.roleField
         let base = ChatThreadLeaf.defaultData(entity, skipping: [textField, roleField].compactMap { $0 })
         let history = AIChat.turns(ownRecords(entity), textField: textField, roleField: roleField)
+        let saveTo = c.chatSaveTo
+        let dsl = self.rt.dsl
+        let saveEntity = saveTo.flatMap { dsl.entity($0.entity) }
         let request = AIChat.request(persona: c.persona ?? "", history: history, next: text, long: c.length == "long",
-                                     locale: LanguagePreference.shared.code)
+                                     locale: LanguagePreference.shared.code,
+                                     saveTo: saveEntity.flatMap { saveTo?.request(in: $0, today: DSLClock.now()) })
         sending = true
         error = nil
+        suggestion = nil // 前の案は閉じる(言い直した内容で新しい案が来る)
         if focused { KeyboardState.clearFocusedText() }
         draft = ""
         echo = TextSubmission.value(text).map { SentTextEcho(sent: $0) }
@@ -286,6 +299,9 @@ struct AiChatLeaf: View {
                     self.error = roleField == nil ? L("会話を保存できませんでした") : L("AI の返事を保存できませんでした")
                 } else if let spoken = AIChat.spokenReply(AIChat.turns(ownRecords(entity), textField: textField, roleField: roleField),
                                                           reply: reply.text) {
+                    // saveTo: 返事の下に記録の案(押すまで保存しない)
+                    suggestion = AiChatSuggestion.make(turnId: spoken.id, suggest: reply.suggest, saveTo: saveTo,
+                                                       entity: saveEntity, display: { displayText($0, field: $1) })
                     autoRead(spoken) // speak: true(保存できた返事だけ・録音中は読まない)
                 }
             } catch {
@@ -324,6 +340,32 @@ struct AiChatLeaf: View {
         guard roleField == nil else { return await rt.createRecord(entity: entity, data: ai) }
         guard let mine = AIChat.record(text: text, role: .user, textField: textField, roleField: nil, base: base) else { return false }
         return await rt.saveTurnPair(entity: entity, user: mine, assistant: ai)
+    }
+
+    /// 記録の案の「追加」: いつもの保存(`createRecord`)で 1 件足す。entity の上限に達していれば足さない。
+    private func addSuggestion() {
+        guard var s = suggestion, s.state != .saving, s.state != .saved else { return }
+        s.state = .saving
+        suggestion = s
+        let rt = rt
+        Task {
+            await rt.load(entities: [s.entity])
+            let message: String?
+            if AISaveTo.room(existing: rt.records(for: s.entity).count, wanted: 1) == 0 {
+                message = L("これ以上記録を足せません")
+            } else {
+                message = await rt.createRecord(entity: s.entity, data: s.data) ? nil : L("記録できませんでした")
+            }
+            guard suggestion?.turnId == s.turnId else { return } // その間に次を送った
+            suggestion?.state = message.map { .failed($0) } ?? .saved
+            AccessibilityNotification.Announcement(message ?? L("記録しました")).post()
+        }
+    }
+
+    /// 記録の案の「直す」: カードを閉じて入力欄へ(会話で言い直すと AI が新しい案を出す)。
+    private func fixSuggestion() {
+        suggestion = nil
+        focused = true
     }
 
     /// 送れなかった文を入力欄に戻す(打ち直さなくてよい)。

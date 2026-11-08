@@ -65,10 +65,14 @@ public struct AITextRequest: Codable, Equatable, Sendable {
     public var image: AITextImage?
     /// aiChat の会話(task "chat"・古い順・最後は利用者・オンライン AI だけ)。nil = 会話でない
     public var messages: [AITextMessage]?
+    /// aiChat saveTo の field の形(task "chat" だけ)。付けると返事が記録の案(`AITextResult.suggest`)を返せる
+    public var saveTo: AITextSaveTo?
 
     public init(instruction: String, shape: AITextShape, count: Int? = nil, items: [String]? = nil,
                 input: String? = nil, locale: String? = nil, task: String? = nil, options: [String]? = nil,
-                length: String? = nil, appId: String? = nil, image: AITextImage? = nil, messages: [AITextMessage]? = nil) {
+                length: String? = nil, appId: String? = nil, image: AITextImage? = nil, messages: [AITextMessage]? = nil,
+                saveTo: AITextSaveTo? = nil) {
+        self.saveTo = saveTo
         self.instruction = instruction
         self.shape = shape
         self.count = count
@@ -142,8 +146,12 @@ public struct AITextResult: Codable, Equatable, Sendable {
     public var text: String
     public var items: [String]?
     public var fields: [AITextField]?
+    /// aiChat saveTo の記録の案(field id → 値・サーバーが型を確かめ済み)。保存は利用者が押した時だけ
+    public var suggest: [String: JSONValue]?
 
-    public init(shape: AITextShape, text: String, items: [String]? = nil, fields: [AITextField]? = nil) {
+    public init(shape: AITextShape, text: String, items: [String]? = nil, fields: [AITextField]? = nil,
+                suggest: [String: JSONValue]? = nil) {
+        self.suggest = suggest
         self.shape = shape
         self.text = text
         self.items = items
@@ -205,7 +213,9 @@ public struct AITextResult: Codable, Equatable, Sendable {
     /// `POST /v1/text` の 200 本文(openapi `TextResponse`)。サーバーが整えた後でも同じ規則で確かめる。
     public static func parseServer(_ data: Data, for request: AITextRequest) -> AITextResult? {
         guard let raw = try? JSONDecoder().decode(AITextResult.self, from: data) else { return nil }
-        return normalize(text: raw.text, items: raw.items, fields: raw.fields, for: request)
+        var out = normalize(text: raw.text, items: raw.items, fields: raw.fields, for: request)
+        if request.isChat, request.saveTo != nil, let s = raw.suggest, !s.isEmpty { out?.suggest = s }
+        return out
     }
 
     /// 端末内 AI の構造化出力(`{"text"}` / `{"items"}` / fields は `{"f0": …}` = 依頼の items の順)。

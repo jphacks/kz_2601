@@ -68,6 +68,7 @@ func checkAIChat(where string, c *Component, entities map[string]*Entity, add fu
 			add("%s: aiChat roleField %q is an enum, so its options must include user and assistant", where, c.RoleField)
 		}
 	}
+	checkAIChatSaveTo(where, c, entities, add) // ai_chat_save_to.go
 	for _, f := range e.Fields {
 		if f.Required && f.Computed == nil && f.DefaultValue == nil && f.ID != c.TextField && f.ID != c.RoleField {
 			add("%s: aiChat saves turns without a form, so required field %q of entity %q needs a defaultValue (or make it optional; the time is $createdAt, not a field)", where, f.ID, e.ID)
