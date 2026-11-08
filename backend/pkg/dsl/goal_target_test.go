@@ -50,7 +50,7 @@ func TestLintGoalTarget(t *testing.T) {
 		// nav_study: a goal entity with target_minutes, the bar says 120
 		"single setting": {"goal", "目標", `"single":true,`, "target_minutes", "integer", rateStat + barLit, `{"setting":"target_minutes"}`},
 		// logic_budget / logic_oshi: a goal entity named for it, read by nothing
-		"named entity":  {"budget", "予算", "", "minutes", "integer", barLit, `{"agg":"latest","entity":"budget","field":"minutes"`},
+		"named entity":  {"budget", "予算", "", "minutes", "integer", barLit, `{"agg":"latest","entity":"budget","field":"minutes"} (or`},
 		"japanese name": {"plan", "目標", "", "minutes", "integer", barLit, `plan.minutes`},
 		"gauge max":     {"goal", "目標", `"single":true,`, "target_minutes", "integer", gaugeLit, "gauge max is the literal 120"},
 		// fine: the bar is the only goal (no goal entity) / the rate reads it

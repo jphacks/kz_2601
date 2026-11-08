@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
 // The goal rule is in the prompt with a whole, valid stat component, and a
@@ -35,5 +37,18 @@ func TestGoalTargetRules_InPrompt(t *testing.T) {
 	got := restrictPrompt(withRestriction(context.Background(), old), systemPrompt)
 	if strings.Contains(got, goalRateSetting) || !strings.Contains(got, goalRateLatest) {
 		t.Error("a build without single still reads the goal with setting")
+	}
+}
+
+// The no-single snippet validates against a goal entity with no date field
+// (goal{title,target_minutes}, the common shape): it must not name a "by".
+func TestGoalTargetRules_LatestWithoutDateField(t *testing.T) {
+	raw := `{"schemaVersion":1,"app":{"name":"勉強","voiceEntry":"floating"},"initialScreen":"home",
+"entities":[
+ {"id":"study","name":"勉強","fields":[{"id":"minutes","name":"分","type":"integer"},{"id":"date","name":"日付","type":"date","defaultValue":"now"}]},
+ {"id":"goal","name":"目標","fields":[{"id":"title","name":"名前","type":"string"},{"id":"target_minutes","name":"目標(分)","type":"integer"}]}],
+"screens":[{"id":"home","title":"ホーム","components":[` + goalRateLatest + `]}]}`
+	if _, err := dsl.Parse([]byte(raw)); err != nil {
+		t.Fatalf("goalRateLatest rejected for a goal entity without a date field: %v", err)
 	}
 }

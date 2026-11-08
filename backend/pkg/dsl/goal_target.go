@@ -165,7 +165,7 @@ func (l *linter) goalTarget() {
 				}
 				read := fmt.Sprintf(`{"setting":%q}`, g.field)
 				if e := l.entities[g.entity]; e == nil || !e.Single {
-					read = fmt.Sprintf(`{"agg":"latest","entity":%q,"field":%q,"by":"<date field>"} (or make %q "single": true and use {"setting":%q})`, g.entity, g.field, g.entity, g.field)
+					read = fmt.Sprintf(`{"agg":"latest","entity":%q,"field":%q} (or {"setting":%q} after making %q "single": true)`, g.entity, g.field, g.field, g.entity)
 				}
 				l.add(`screen %q %s: %s %s is the literal %v while the goal is kept in %s.%s, so changing the goal never moves the bar (%s takes only a number); show the rate as a stat {"format":"percent","value":{"op":"div","args":[<the %s total over %q>,<goal>]}} where <goal> is %s`,
 					s.ID, w, c.Type, key, *lit, g.entity, g.field, key, c.Type, c.Entity, read)
