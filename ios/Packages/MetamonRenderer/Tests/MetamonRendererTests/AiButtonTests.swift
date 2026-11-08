@@ -103,6 +103,22 @@ final class AiButtonTests: XCTestCase {
         XCTAssertEqual(req.prompt, "散歩した から大事な語を 5 個まで", "input field 自身のプレースホルダは本文として扱う")
     }
 
+    func testPlaceholdersAllowSpacesInsideBracesLikeGoLint() throws {
+        let dsl = try diary()
+        let entity = try XCTUnwrap(dsl.entity("diary"))
+        let c = try component(#"{"type":"aiButton","task":"rewrite","input":"body","output":"summary","prompt":"{{  mood  }} な気分で {{ input }} を書き換えて"}"#)
+        let req = try AIRequestBuilder.build(c, entity: entity, values: ["body": "散歩した", "mood": "うれしい"])
+        XCTAssertEqual(req.prompt, "うれしい な気分で 散歩した を書き換えて", "Go の lint が通す空白入りも置き換え、本文は二重に付けない")
+    }
+
+    func testPlaceholderWithSpaceInsideNameStaysLiteral() throws {
+        let dsl = try diary()
+        let entity = try XCTUnwrap(dsl.entity("diary"))
+        let c = try component(#"{"type":"aiButton","task":"rewrite","input":"body","output":"summary","prompt":"{{in put}} を丁寧に"}"#)
+        let req = try AIRequestBuilder.build(c, entity: entity, values: ["body": "散歩した"])
+        XCTAssertEqual(req.prompt, "{{in put}} を丁寧に\n\n散歩した", "Go も弾く形はプレースホルダでない")
+    }
+
     func testEntityInputWithFieldPlaceholderAppendsRecords() throws {
         let dsl = try diary()
         let entity = try XCTUnwrap(dsl.entity("diary"))
