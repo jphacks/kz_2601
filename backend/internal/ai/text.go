@@ -57,6 +57,8 @@ type TextRequest struct {
 	Messages []TextMessage `json:"messages,omitempty"`
 	// Formats ask shape fields items in a form the app can read (text_format.go).
 	Formats []TextFormat `json:"formats,omitempty"`
+	// SaveTo lets a task chat reply suggest a record (text_chat_suggest.go).
+	SaveTo *ChatSaveTo `json:"saveTo,omitempty"`
 }
 
 // TextField is one named value of shape fields.
@@ -73,8 +75,10 @@ type TextResult struct {
 	Items  []string    `json:"items,omitempty"`
 	Fields []TextField `json:"fields,omitempty"`
 	Length string      `json:"length,omitempty"` // long when asked (text_long.go)
-	Locale Locale      `json:"locale"`
-	Meta   TextMeta    `json:"meta"`
+	// Suggest is the record a task chat reply proposes (text_chat_suggest.go).
+	Suggest map[string]any `json:"suggest,omitempty"`
+	Locale  Locale         `json:"locale"`
+	Meta    TextMeta       `json:"meta"`
 }
 
 // TextMeta is the cost / latency report of one call.
@@ -102,6 +106,9 @@ func normalizeTextRequest(req *TextRequest) error {
 	}
 	if len(req.Messages) > 0 {
 		return badText("messages are only for task chat")
+	}
+	if req.SaveTo != nil {
+		return badText("saveTo is only for task chat")
 	}
 	if req.Task != "" && req.Task != "generate" {
 		return normalizeTaskRequest(req)
@@ -404,14 +411,16 @@ func textHandler(svc *Service) http.Handler {
 		// #316: the online AI of an app is a Pro feature (the on-device AI is free)
 		ctx, err := svc.gateText(r.Context(), req)
 		if err != nil {
-			if asError(err).Status == http.StatusPaymentRequired {
-				ratelimit.Waive(r.Context()) // no Claude call: the 402 is not charged
+			// no Claude call: the 402 (and the app's daily cap, 429) are not charged
+			if st := asError(err).Status; st == http.StatusPaymentRequired || st == http.StatusTooManyRequests {
+				ratelimit.Waive(r.Context())
 			}
 			svc.writeErr(w, r, err)
 			return
 		}
 		res, err := svc.text(ctx, req, loc)
 		if err != nil {
+			refundCreatorPaid(ctx, asError(err).Status) // Claude 5xx: the creator-paid count comes back
 			svc.writeErr(w, r, err)
 			return
 		}

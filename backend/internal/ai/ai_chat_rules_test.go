@@ -11,7 +11,7 @@ import (
 )
 
 func TestAIChatRulesReachPrompt(t *testing.T) {
-	for _, want := range []string{"## アプリの中の AI と何往復も話す(aiChat)", "aiButton との使い分け", "は aiChat(上の節", "会話の entity は private"} {
+	for _, want := range []string{"## アプリの中の AI と何往復も話す(aiChat)", "aiButton との使い分け", "は aiChat(上の節", "会話の entity は private", "roleField は必須", "は aiChat に speak: true"} {
 		if !strings.Contains(systemPrompt, want) {
 			t.Errorf("systemPrompt lacks %q", want)
 		}
@@ -49,7 +49,7 @@ func TestAIChatRulesDroppedWithoutAIChat(t *testing.T) {
 	}
 	ctx := withRestriction(context.Background(), NewRestriction(allowed, nil))
 	got := withoutNote(restrictPrompt(ctx, systemPrompt))
-	if strings.Contains(got, "」は aiChat") {
+	if strings.Contains(got, "」は aiChat") || strings.Contains(got, "speak: true") {
 		t.Fatal("aiChat routing line still in the restricted prompt")
 	}
 	if !strings.Contains(got, "talk{question") {

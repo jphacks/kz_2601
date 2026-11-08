@@ -21,6 +21,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/feeds"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -91,10 +92,16 @@ func (h *Handler) getFeed(w http.ResponseWriter, r *http.Request) {
 			map[string]any{"scope": "user", "limit": h.feedUsers.perHour, "remaining": 0, "retryAfterSec": wait})
 		return
 	}
+	// bounds the wait only: the source fetch itself runs on (internal/feeds)
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
+	q.UID, q.IP = uidOf(r), ratelimit.IPKey(ratelimit.ClientIP(r))
 	res, err := h.feeds.Get(ctx, q, limit)
 	switch {
+	case errors.Is(err, feeds.ErrUserLimit):
+		w.Header().Set("Retry-After", "600")
+		httpx.ErrorWithDetails(w, http.StatusTooManyRequests, httpx.CodeRateLimited, "しばらくしてからもう一度読み込んでください。",
+			map[string]any{"scope": "user", "remaining": 0, "retryAfterSec": 600})
 	case errors.Is(err, feeds.ErrUnknown):
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "region / feedId / q is not on the allowlist"))
 	case errors.Is(err, feeds.ErrDisabled):

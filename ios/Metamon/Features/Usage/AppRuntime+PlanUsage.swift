@@ -15,7 +15,9 @@ extension AppRuntime {
     func refreshPlanUsage(force: Bool = false) async {
         guard let source = planUsageSource else { return }
         let store = PlanUsageStore.shared
-        if let me = await store.refreshMe(source: source, force: force), let today = me.remainingToday(now: .now) {
+        // 読んだ時刻で記録する(キャッシュを今の時刻で記録すると、HTTP の応答から入った新しい値を上書きする)
+        if let me = await store.refreshMe(source: source, force: force), let at = store.meObservedAt,
+           let today = me.remainingToday(observedAt: at) {
             RemainingTodayStore.shared.record(today)
         }
         guard !dsl.isVoiceOnly else { return }
