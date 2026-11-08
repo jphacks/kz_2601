@@ -204,3 +204,16 @@ func TestLintPeriodLabel(t *testing.T) {
 		t.Errorf("unexpected: %v", ok)
 	}
 }
+
+// format percent means "value is a 0..1 ratio" (schema). An aggregate result
+// is not a ratio, so lint asks for value instead; value + percent stays clean.
+func TestLintStatPercentNeedsValue(t *testing.T) {
+	got := lintWith(t, "", `{"type":"stat","label":"件数","aggregate":"count","entity":"log","format":"percent"},`)
+	if len(got) != 1 || !strings.Contains(got[0], "is not a 0..1 ratio. Compute the ratio in value") {
+		t.Fatalf("want one percent warning, got %v", got)
+	}
+	got = lintWith(t, "", `{"type":"stat","label":"達成率","format":"percent","value":{"op":"div","args":[{"agg":"sum","entity":"log","field":"amount"},10000]}},`)
+	if len(got) > 0 {
+		t.Fatalf("unexpected: %v", got)
+	}
+}
