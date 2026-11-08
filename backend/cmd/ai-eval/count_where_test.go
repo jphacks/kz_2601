@@ -68,6 +68,13 @@ func TestCheckCountWhere(t *testing.T) {
 		{"not count", "days", `{"agg":"latest","entity":"answers","field":"status","filter":[` + rowRef + `,` + byValue + `]}`, false},
 		{"nested in op", "days", `{"op":"add","args":[{"agg":"count","entity":"answers","filter":[` + rowRef + `,` + byValue + `]},1]}`, true},
 		{"on the other entity", "answers", `{"agg":"count","entity":"days","filter":[{"field":"id","op":"eq","value":{"ref":"day"}},{"field":"date","op":"today","value":null}]}`, false},
+		// The row's id must be matched by a ref to this entity, not any field.
+		{"row id on a non-ref field", "days", `{"agg":"count","entity":"answers","filter":[{"field":"status","op":"eq","value":{"ref":"id"}},` + byValue + `]}`, false},
+		{"self count by id", "days", `{"agg":"count","entity":"days","filter":[{"field":"id","op":"eq","value":{"ref":"id"}},{"field":"date","op":"eq","value":"2026-11-08"}]}`, false},
+		{"ref to another entity", "answers", `{"agg":"count","entity":"answers","filter":[` + rowRef + `,` + byValue + `]}`, false},
+		// A date window or a value on the parent field is not "children with a given value".
+		{"row ref and date window", "days", `{"agg":"count","entity":"answers","filter":[` + rowRef + `,{"field":"status","op":"thisWeek","value":""}]}`, false},
+		{"value on the row-ref field only", "days", `{"agg":"count","entity":"answers","filter":[` + rowRef + `,{"field":"day","op":"neq","value":""}]}`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a := countWhereApp(t, tc.on, tc.expr)
@@ -80,9 +87,10 @@ func TestCheckCountWhere(t *testing.T) {
 		})
 	}
 
-	// Entities in either order: the count may sit on any entity.
-	a := countWhereApp(t, "answers", `{"agg":"count","entity":"days","filter":[{"field":"id","op":"eq","value":{"ref":"id"}},{"field":"date","op":"eq","value":"2026-11-08"}]}`)
-	if got := countWhereFields(a); !reflect.DeepEqual(got, []string{"answers.n"}) {
+	// Entities in either order: the parent may come after its children.
+	a := countWhereApp(t, "days", `{"agg":"count","entity":"answers","filter":[`+rowRef+`,`+byValue+`]}`)
+	a.Entities[0], a.Entities[1] = a.Entities[1], a.Entities[0]
+	if got := countWhereFields(a); !reflect.DeepEqual(got, []string{"days.n"}) {
 		t.Fatalf("countWhereFields = %v", got)
 	}
 }
