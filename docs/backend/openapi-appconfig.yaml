@@ -1383,7 +1383,7 @@ paths:
         - diet: `q`(国会会議録で探す語・空白をまとめて 1〜40 字・制御文字や見えない文字は 400)が必須。発言の新しい会議の順に、発言者(会派)・院と会議名と号・会議の日付・発言のページ。発言の本文は返さない。`q` は diet 以外では 400。
         - 上の表に無いパラメータ・同じパラメータの重複は 400。
         - サーバーはプロバイダごとにキャッシュする(天気 30 分・警報 10 分・気圧 30 分・祝日 12 時間・rss 15 分・arxiv 3 時間・diet 3 時間)。arxiv と diet は出どころの求めにより、インスタンスあたり 1 本ずつ 3 秒あけて取りに行く(順番待ちは 10 秒まで。超えたら 503)。出どころが落ちている時は 24 時間以内の最後の取得結果を `stale: true` で返す。
-        - 1 ユーザー 1 時間 `FEEDS_USER_PER_HOUR` 回(既定 120)。超えると 429 `rate_limited`。出どころへの取得はインスタンスあたり 1 分 `FEEDS_UPSTREAM_PER_MINUTE` 回(既定 30)まで。
+        - 1 ユーザー 1 時間 `FEEDS_USER_PER_HOUR` 回(既定 120)。超えると 429 `rate_limited`。出どころへの取得はインスタンスあたり 1 分 `FEEDS_UPSTREAM_PER_MINUTE` 回(既定 30)まで(diet は別枠で 1 分 10 回)。diet の検索語で出どころまで取りに行くのは 1 ユーザー 1 時間 20 回まで(キャッシュにある語は数えない・超えると 429 `rate_limited`)。
         - `FEEDS_DISABLED`(カンマ区切りの provider・`all`)で止められる。止めている provider は 503 `upstream_unavailable`(details.reason = disabled)。
         - 出典(`source`)を一覧の下に必ず出す(公共データ利用規約 第1.0版・pressure は CC BY 4.0 の出典の記載)。
       parameters:

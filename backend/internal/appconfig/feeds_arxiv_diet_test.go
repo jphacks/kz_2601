@@ -27,7 +27,8 @@ func TestFeedDietQuery(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	now := func() time.Time { return time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC) }
-	svc := feeds.New(feeds.Options{Client: srv.Client(), Now: now, Endpoints: &feeds.Endpoints{Diet: srv.URL + "/speech", Arxiv: srv.URL + "/query"}})
+	svc := feeds.New(feeds.Options{Client: srv.Client(), Now: now, UserMissesPerHour: 1,
+		Endpoints: &feeds.Endpoints{Diet: srv.URL + "/speech", Arxiv: srv.URL + "/query"}})
 	e := &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(store.NewMemory(), WithFeeds(svc, 100, now)))}
 
 	for _, c := range []struct {
@@ -58,5 +59,10 @@ func TestFeedDietQuery(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Get("any") != "予算 委員会" {
 		t.Errorf("sent %v", got)
+	}
+	// u1's search words reached the source once this hour (the cap here): a new word is 429
+	r = e.do("u1", http.MethodGet, "/v1/feeds/diet?q="+url.QueryEscape("決算"), nil, nil)
+	if r.code != http.StatusTooManyRequests || r.hdr.Get("Retry-After") == "" || len(got) != 1 {
+		t.Errorf("over the per-user source cap: %d %s (sent %d)", r.code, r.raw, len(got))
 	}
 }
