@@ -18,7 +18,7 @@ struct AiButtonLeaf: View {
 
     private var route: AIGenerateRoute {
         AIGenerateRoute.choose(availability: availability, hostOnline: rt.aiText?.supportsOnlineAIText ?? false, mock: AIGenerateRoute.isMock,
-                               long: c.length == "long")
+                               long: c.length == "long", photo: c.inputPhoto != nil)
     }
 
     private var isUnavailable: Bool {

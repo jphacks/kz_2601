@@ -10,7 +10,8 @@ import (
 // aiButton generate (#417) expect keys: aiGenerate (string: the shape of some
 // generate button, or any) and aiGenerateEntity (bool: one of them reads
 // records), aiTask (string: some aiButton has this task), aiLength (string:
-// some aiButton has this length, unset = short). Cases:
+// some aiButton has this length, unset = short), aiInputPhoto (bool: some
+// aiButton sends a photo field, inputPhoto; false = none does). Cases:
 // internal/ai/eval/ai_generate_cases.json and cloud_ai_cases.json (-cases).
 
 // generateButtons lists the generate aiButtons of the app.
@@ -79,7 +80,16 @@ func checkAIGenerate(exp map[string]any, a *dsl.App) []string {
 			miss = append(miss, fmt.Sprintf("aiLength=%s got %v", want, got))
 		}
 	}
-	return miss
+	if want, ok := exp["aiInputPhoto"].(bool); ok {
+		got := false
+		for _, x := range aiButtons(a) {
+			got = got || x.InputPhoto != ""
+		}
+		if got != want {
+			miss = append(miss, fmt.Sprintf("aiInputPhoto=%v got %v", want, got))
+		}
+	}
+	return append(miss, checkAISaveTo(exp, a)...)
 }
 
 // aiButtons lists every aiButton of the app (also inside a container).

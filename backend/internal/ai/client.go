@@ -25,10 +25,12 @@ const (
 	defaultMaxRetries = 2
 )
 
-// Message is one conversation turn (text only).
+// Message is one conversation turn. Images (a user turn of /v1/text only,
+// client_image.go) are never read from a request body and never logged.
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string       `json:"role"`
+	Content string       `json:"content"`
+	Images  []ImageBlock `json:"-"`
 }
 
 // Completion is one structured-output request to Claude.

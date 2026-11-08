@@ -27,8 +27,14 @@ type ServerRule struct {
 	If *Expr       `json:"if,omitempty"`
 	// Lookup: run only when another entity has (not) a record with the
 	// row's value (server_rules_lookup.go).
-	Lookup *RuleLookup  `json:"lookup,omitempty"`
-	Do     []RuleAction `json:"do"`
+	Lookup *RuleLookup `json:"lookup,omitempty"`
+	// Similar: run only when a record shares values with the row; the
+	// actions read the best one (server_rules_similar.go).
+	Similar *RuleSimilar `json:"similar,omitempty"`
+	// Pick: run only when an entity has a record to recommend; the
+	// actions read it (server_rules_pick.go).
+	Pick *RulePick    `json:"pick,omitempty"`
+	Do   []RuleAction `json:"do"`
 	// Enabled: false turns the rule off (the creator's switch, #347); nil = on.
 	Enabled *bool `json:"enabled,omitempty"`
 }
@@ -205,6 +211,8 @@ func checkServerRules(a *App, entities map[string]*Entity, add func(string, ...a
 			checkNoComputed(where+".if", ch, add)
 		}
 		checkRuleLookup(where, rc)
+		checkRuleSimilar(where, rc)
+		checkRulePick(where, rc)
 		if len(r.Do) == 0 {
 			add("%s: do needs at least one action", where)
 		}
@@ -215,7 +223,7 @@ func checkServerRules(a *App, entities map[string]*Entity, add func(string, ...a
 			checkRuleAction(fmt.Sprintf("%s.do[%d]", where, j), rc, &r.Do[j])
 		}
 		if n := len(rc.reads); n > MaxRuleReadEntities {
-			add("%s: reads the records of %d entities (each + agg + lookup: %s); at most %d", where, n, strings.Join(sortedKeys(rc.reads), ", "), MaxRuleReadEntities)
+			add("%s: reads the records of %d entities (each + agg + lookup + similar + pick: %s); at most %d", where, n, strings.Join(sortedKeys(rc.reads), ", "), MaxRuleReadEntities)
 		}
 	}
 	if scheduled > MaxScheduledRulesPro {
@@ -231,7 +239,18 @@ type ruleCheck struct {
 	scope    EntityScope
 	entities map[string]*Entity
 	add      func(string, ...any)
-	reads    map[string]bool // entities whose records the rule lists (each + agg + lookup)
+	reads    map[string]bool // entities whose records the rule lists (each + agg + lookup + similar + pick)
+	// doRow: the row the actions' expressions read (row + the similar /
+	// pick results, server_rules_similar.go / server_rules_pick.go); nil = row.
+	doRow *Entity
+}
+
+// actRow is the row of the actions' expressions.
+func (rc *ruleCheck) actRow() *Entity {
+	if rc.doRow != nil {
+		return rc.doRow
+	}
+	return rc.row
 }
 
 // expr is a checker for one expression of the rule.
@@ -426,7 +445,7 @@ func checkRuleAction(where string, rc *ruleCheck, act *RuleAction) {
 		}
 		if act.Increment.By != nil {
 			ch := rc.expr()
-			if got := ch.check(w+".by", act.Increment.By, row, 1); !accepts(tNum, got) {
+			if got := ch.check(w+".by", act.Increment.By, rc.actRow(), 1); !accepts(tNum, got) {
 				add("%s.by: must be a number (got %s)", w, got)
 			}
 			checkNoComputed(w+".by", ch, add)
@@ -458,7 +477,7 @@ func checkRuleTargetScope(where string, target *Entity, scope EntityScope, add f
 }
 
 func checkRuleValues(where string, rc *ruleCheck, target *Entity, values map[string]Expr) {
-	row, add := rc.row, rc.add
+	row, add := rc.actRow(), rc.add
 	keys := make([]string, 0, len(values))
 	for k := range values {
 		keys = append(keys, k)
@@ -511,7 +530,7 @@ func RecipientAllowed(scope EntityScope, kind string) bool {
 }
 
 func checkRuleNotify(where string, rc *ruleCheck, n *RuleNotify) {
-	row, scope, entities, add := rc.row, rc.scope, rc.entities, rc.add
+	row, scope, entities, add := rc.actRow(), rc.scope, rc.entities, rc.add
 	k := n.To.Kind
 	switch k {
 	case RecipientOwner, RecipientAuthor, RecipientAuthorOf, RecipientMembers, RecipientRecipients:
@@ -521,7 +540,7 @@ func checkRuleNotify(where string, rc *ruleCheck, n *RuleNotify) {
 	default:
 		add("%s.to: kind %q must be owner, author, authorOf, members or recipients", where, k)
 	}
-	if (k == RecipientAuthor || k == RecipientAuthorOf || k == RecipientRecipients) && row == nil {
+	if ((k == RecipientAuthor || k == RecipientRecipients) && rc.row == nil) || (k == RecipientAuthorOf && row == nil) {
 		add("%s.to: kind %s needs a record trigger or on.each (a time trigger has no record)", where, k)
 	}
 	switch k {
@@ -533,7 +552,7 @@ func checkRuleNotify(where string, rc *ruleCheck, n *RuleNotify) {
 		}
 	case RecipientRecipients:
 		switch {
-		case row == nil:
+		case rc.row == nil:
 		case !row.IsAddressed():
 			add("%s.to: kind recipients needs a trigger on an addressed entity; entity %q has no addressedTo", where, row.ID)
 		case n.To.Field != row.AddressedTo:
@@ -603,7 +622,7 @@ func checkNotifyText(where, s string, maxRunes int, row *Entity, with map[string
 }
 
 func checkPlaceholder(where, id string, row *Entity, add func(string, ...any)) {
-	if row == nil {
+	if row == nil || (IsPickRow(row) && !isPickResult(id)) {
 		add("%s: {%s}: a time trigger has no record to insert values from (name a total in notify.with, or use on.each)", where, id)
 		return
 	}
@@ -733,6 +752,12 @@ func (a *App) DescribeServerRule(r *ServerRule) string {
 		return id
 	}
 	refName := func(ref string) string {
+		if ref == SimilarRef && r.Similar != nil {
+			return "似ている" + ename(r.Similar.Entity)
+		}
+		if ref == PickRef && r.Pick != nil {
+			return "選んだ" + ename(r.Pick.Entity)
+		}
 		if row != nil {
 			if f := row.FieldByID(ref); f != nil {
 				return ename(f.RefEntity)
@@ -767,6 +792,8 @@ func (a *App) DescribeServerRule(r *ServerRule) string {
 		when += "(条件に合えば)"
 	}
 	when += a.describeLookup(r, row)
+	when += a.describeSimilar(r, row)
+	when += a.describePick(r)
 	acts := make([]string, 0, len(r.Do))
 	for _, act := range r.Do {
 		switch {

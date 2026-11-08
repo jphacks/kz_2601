@@ -14,7 +14,16 @@ import (
 // swapped (a renamed line would keep "each と agg を合わせて 2 つまで").
 func TestServerRulesLookupPrompt(t *testing.T) {
 	for _, l := range serverRulesLookupLines {
-		if strings.Contains(serverRulesPrompt, l[0]) || !strings.Contains(serverRulesPrompt, l[1]) {
+		want := l[1]
+		for _, later := range serverRulesSimilarLines { // swapped again by server_rules_similar_vocab.go
+			if later[0] == want {
+				want = later[1]
+			}
+		}
+		for _, later := range serverRulesPickLines { // and by server_rules_vocab_pick.go
+			want = strings.Replace(want, later[0], later[1], 1)
+		}
+		if strings.Contains(serverRulesPrompt, l[0]) || !strings.Contains(serverRulesPrompt, want) {
 			t.Fatalf("line not swapped: %s", l[0])
 		}
 	}

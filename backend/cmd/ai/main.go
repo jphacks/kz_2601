@@ -90,6 +90,7 @@ func main() {
 		LogicPass:       os.Getenv("AI_LOGIC_PASS") == "1",   // UI pass + calculations pass (#100)
 		ServerRulesPass: os.Getenv("AI_SERVER_RULES") == "1", // server rules for automatic actions (#343)
 		LintRetry:       os.Getenv("AI_LINT_RETRY") == "1",   // off: lint warnings are reported only
+		TextImage:       os.Getenv("AI_TEXT_IMAGE") == "1",   // aiButton inputPhoto; off until the privacy policy names photos
 		Logger:          claude.Logger,                       // ai.generate per request (#322)
 		// clarify turn (#147): its own model/effort/thinking; empty = ai.DefaultChat*
 		ChatConfig: ai.ChatConfig{

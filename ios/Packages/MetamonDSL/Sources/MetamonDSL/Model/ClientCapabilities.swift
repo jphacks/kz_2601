@@ -13,8 +13,8 @@ public enum ClientCapabilities {
         ComponentType.allCases.filter { $0 != .unknown }.map(\.rawValue)
     }
 
-    /// 審査用ビルドでバイナリから外す部品(Renderer の登録もしない)。feed(#348)は外部の Web の内容を出すので外す。
-    public static let reviewExcludedComponents: Set<ComponentType> = [.healthStat, .locationTracker, .nearbyShare, .dashcam, .sensorValue, .audioRecorder, .webView, .chatThread, .matchList, .feed]
+    /// 審査用ビルドでバイナリから外す部品(Renderer の登録もしない)。feed(#348)は外部の Web の内容を出すので外す。aiChat はオンライン AI(POST /v1/text)だけで動き、審査用の版はそれを持たない(#452 G4)ので外す。
+    public static let reviewExcludedComponents: Set<ComponentType> = [.healthStat, .locationTracker, .nearbyShare, .dashcam, .sensorValue, .audioRecorder, .webView, .chatThread, .matchList, .feed, .aiChat]
     /// 審査用ビルドで無効にする機能。fieldHealth = Field.health(HealthKit への書き込み)、cameraCapture = photoField / videoField の撮影、
     /// sharedData = entity の scope shared / public(他の人と同じ記録を見る作り・#451 G2。backend が private に直す)。
     public static let reviewDisabledFeatures = ["fieldHealth", "cameraCapture", "sharedData"]
@@ -39,11 +39,13 @@ public enum ClientCapabilities {
     /// singleEntity(#267・設定値の置き場): 知らない版は設定のフォームで保存するたびに記録を足してしまうので、無い版には生成させない。審査用の版も同じ。
     /// dataRoles(#272・参加者を選ぶ member と管理者だけのボタン visibleTo): 参加者の一覧を読むので、共有を外す審査用の版は送らない。
     /// addressedMessages(#271・宛先を選ぶ members と宛先付きの記録): 同じく参加者を選ぶので審査用の版は送らない。
+    /// notification.near(場所に着いたら知らせる・時刻の jitterMinutes): 知らない版は near の通知を 9:00 の 1 回きりとして予約してしまうので、無い版には生成させない。
+    /// 審査用の版も同じ(位置の判定は端末の中だけ・使用中のみの許可)。
     public static var supportedFeatures: [String] {
         #if APP_STORE_REVIEW
-        ["recordRetention", "notification.when", "singleEntity"]
+        ["recordRetention", "notification.when", "singleEntity", "notification.near"]
         #else
-        ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages"]
+        ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near"]
         #endif
     }
 

@@ -80,6 +80,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.mapView) { c, ctx in MapViewLeaf(c: c, ctx: ctx) }
         r.register(.locationButton) { c, ctx in LocationButtonLeaf(c: c, ctx: ctx) }
         r.register(.locationPicker) { c, ctx in LocationPickerLeaf(c: c, ctx: ctx) }
+        r.register(.placeSearch) { c, ctx in PlaceSearchLeaf(c: c, ctx: ctx) }
         r.register(.qrScanner) { c, ctx in QrScannerLeaf(c: c, ctx: ctx) }
         r.register(.qrCode) { c, ctx in QrCodeLeaf(c: c, ctx: ctx) }
         // leaf(文字起こし・読み上げ)。端末の中だけで動くので審査用ビルドにも入れる
@@ -125,6 +126,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.locationTracker) { c, ctx in LocationTrackerLeaf(c: c, ctx: ctx) }
         // leaf(チャット・#260)。他の人と記録を見る作りなので審査用ビルドでは登録しない(#451 G2)
         r.register(.chatThread) { c, ctx in ChatThreadLeaf(c: c, ctx: ctx) }
+        // leaf(クラウドの AI と話す)。オンライン AI だけで動き、審査用ビルドはそれを持たない(#452 G4)
+        r.register(.aiChat) { c, ctx in AiChatLeaf(c: c, ctx: ctx) }
         r.register(.healthStat) { c, _ in HealthStatLeaf(c: c) }
         // leaf(ドラレコ・#410)
         r.register(.dashcam) { c, ctx in DashcamLeaf(c: c, ctx: ctx) }

@@ -833,6 +833,9 @@
           "$ref": "#/$defs/RouteGuide"
         },
         {
+          "$ref": "#/$defs/PlaceSearch"
+        },
+        {
           "$ref": "#/$defs/QrScanner"
         },
         {
@@ -861,6 +864,9 @@
         },
         {
           "$ref": "#/$defs/ChatThread"
+        },
+        {
+          "$ref": "#/$defs/AiChat"
         },
         {
           "$ref": "#/$defs/HealthStat"
@@ -1654,6 +1660,35 @@
           "$ref": "#/$defs/Expr",
           "description": "app.notifications only (#265). 条件で知らせる: 真偽の式(ref 不可・agg で集計)。条件が偽 → 真に変わった時に 1 回だけすぐ知らせ、偽に戻ったらまた知らせられる。iOS がこの端末でレコードを保存・削除・同期した直後に評価する(他の人の操作だけで真になった時は、この端末が同期するまで届かない)。when を書いたら repeat は once、time / weekday / entity / field / offsetMinutes / titleField / enabledField は書かない。",
           "x-usage": "「在庫が少なくなったら教えて」= {\"op\":\"lt\",\"args\":[{\"agg\":\"sum\",\"entity\":\"stock\",\"field\":\"qty\"},5]}。予算オーバー = gt(今月の支出の sum, 予算)。目標達成 = gte(合計, 目標)。"
+        },
+        "near": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entity",
+            "locationField"
+          ],
+          "description": "app.notifications only. 場所に着いたら知らせる: entity の各レコードの location field の場所に半径 radiusM(既定 200)m 以内で入った時(端末内で判定・位置は送らない)。repeat once = 最初の 1 回だけ、daily = 着くたび。time / weekday / entity / field / offsetMinutes / titleField / enabledField / when / alarm / jitterMinutes とは組み合わせない。",
+          "properties": {
+            "entity": {
+              "$ref": "#/$defs/Id"
+            },
+            "locationField": {
+              "$ref": "#/$defs/Id",
+              "description": "location 型の field。"
+            },
+            "radiusM": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 2000
+            }
+          }
+        },
+        "jitterMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "description": "app.notifications only. 時刻の通知を毎回 ±N 分ランダムにずらす(回ごとに別の値)。いつも早めに = offsetMinutes -N と組み合わせる。when / near とは組み合わせない。"
         }
       }
     },
@@ -3153,10 +3188,14 @@
         },
         "label": {
           "type": "string"
+        },
+        "addressField": {
+          "type": "string",
+          "description": "任意: screen.entity の string / text field。取った現在地の住所(例: 石川県金沢市広坂1丁目)を端末から Apple のマップに聞いて入れる。"
         }
       },
       "description": "現在地(GPS)を 1 回取得してフォームの location field に保存するボタン。散歩メモ・駐車位置・釣果など「どこで起きたか」を記録するアプリのフォーム画面で選ぶ。",
-      "x-usage": "フォーム画面のみ(screen.entity 必須)。他の入力欄の近くに 1 行(A8:F9)。ホーム側の mapView と対で使う。"
+      "x-usage": "フォーム画面のみ(screen.entity 必須)。他の入力欄の近くに 1 行(A8:F9)。ホーム側の mapView と対で使う。「住所も残したい」「どこにいるか文章で」なら addressField に住所用の string field。"
     },
     "LocationPicker": {
       "type": "object",
@@ -3241,6 +3280,81 @@
       },
       "description": "目的地までの道案内(ナビ)。MapKit で経路を出して地図に線を引き、次に曲がる所・そこまでの距離・残りの距離・到着の予想時刻を現在地に合わせて進める。音声案内(オン・オフ)・車/徒歩の切り替え・道を外れたら経路を引き直す。使用中の位置だけ使う(背面では案内しない)。車線・渋滞の回避など Google マップと同じ精度は無い(MapKit の範囲)。「ナビ」「道案内」「目的地まで案内」「ドライブ」「行き方を教えて」の時に必ずこれを選ぶ(mapView や openUrlButton で地図アプリへ飛ばすだけで代替しない)。",
       "x-usage": "目的地は 3 通り: (1) 行き先リストのホームに routeGuide{entity: spot, locationField: place, titleField: name}(A1:F7・候補から選ぶ)+ spot の list(A8:F10)+ 追加ボタン(D11:F12)、(2) spot の詳細/フォーム画面(screen.entity)に routeGuide{locationField: place, titleField: name}(locationPicker で選んだ場所へそのまま案内)、(3) 行き先が決まっているなら routeGuide{address: \"金沢駅\"}。entity は例 spot{name: string(required), place: location(required)}、フォームは locationPicker{field: place, nameField: name}。徒歩の道案内なら mode walking。"
+    },
+    "PlaceSearch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "placeSearch"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string",
+          "description": "見出し(任意・例: 近くのカフェ)。"
+        },
+        "query": {
+          "type": "string",
+          "description": "決まった検索語(任意・例: コワーキング / ラーメン)。省略すると利用者が打つ。"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "cafe",
+            "restaurant",
+            "bakery",
+            "store",
+            "station",
+            "park",
+            "hospital",
+            "pharmacy",
+            "parking",
+            "gasStation",
+            "evCharger",
+            "hotel",
+            "museum",
+            "library",
+            "movieTheater",
+            "school",
+            "university",
+            "fitness"
+          ],
+          "description": "任意: 施設の種類で絞る。query と一緒でもよい。"
+        },
+        "near": {
+          "type": "string",
+          "enum": [
+            "current"
+          ],
+          "description": "どこの近くか: current = 現在地(既定・使用中の位置だけ)。"
+        },
+        "nameField": {
+          "type": "string",
+          "description": "screen.entity の string / text field。選んだ場所の名前が入る。"
+        },
+        "locationField": {
+          "type": "string",
+          "description": "screen.entity の location field。選んだ場所が \"lat,lng\" で入る。"
+        },
+        "addressField": {
+          "type": "string",
+          "description": "screen.entity の string / text field。選んだ場所の住所が入る。"
+        },
+        "pins": {
+          "type": "boolean",
+          "description": "true で結果を小さな地図のピンでも出す。"
+        }
+      },
+      "description": "現在地の近くの場所(お店・施設)を Apple のマップで探す一覧。名前・距離・住所を近い順に出し、「記録に追加」で入力中のフォームの nameField / locationField / addressField に入れる(保存は saveRecord)。「近くのカフェを探して記録」「周りのコワーキングスペース」「近くの映画館」「近くの飲食店から選ぶ」の時に選ぶ。検索語と現在地のおおよその範囲は端末から Apple に送られる(本アプリのサーバーには送らない)。営業時間・空席・値段・口コミ・上映時間は出ない。",
+      "x-usage": "フォーム画面のみ(screen.entity 必須・nameField / locationField / addressField の 1 つ以上)。A1:F7 程度に置き、下に入力欄と保存ボタン。entity 例 spot{name: string(required), place: location, address: string}。ホームは spot の list と mapView{locationField: place, titleField: name}。決まった物を探すなら query か category、自由に探すなら両方省略。"
     },
     "QrScanner": {
       "type": "object",
@@ -3871,9 +3985,16 @@
             "long"
           ],
           "description": "答えの長さ(既定 short)。long=長い文章(長い文の要約・手紙・計画・台本など。材料 16KB・答え約 3000 字まで)。long はオンライン AI だけで動く(Tailor It Pro)。classify には使わない。generate は shape line だけ、output は text field。"
+        },
+        "inputPhoto": {
+          "type": "string",
+          "description": "AI に一緒に見せる写真: screen.entity の photo field id(処方箋・薬の袋・ラベル・ホワイトボードを読む)。いつも Tailor It Pro のオンライン AI で動く(写真は縮小して送る)。"
+        },
+        "saveTo": {
+          "$ref": "#/$defs/AISaveTo"
         }
       },
-      "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はフォームの入力を処理して output field に入れる(端末内 AI(Apple Intelligence / Foundation Models)が使えれば無料で端末の中だけ、無い端末では Tailor It Pro のオンライン AI。写真は送らない)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",
+      "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はフォームの入力を処理して output field に入れる(端末内 AI(Apple Intelligence / Foundation Models)が使えれば無料で端末の中だけ、無い端末では Tailor It Pro のオンライン AI。写真は inputPhoto を付けた時だけオンライン AI に送る)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",
       "x-usage": "summarize〜suggest はフォーム画面のみ(screen.entity 必須)。発話に「要約して」「分類して」「気分を判定」「タグ付け」「一言で」「言い換えて」「丁寧に」「抜き出して」「AI で」がある時に使う。entity に結果用の field(string/text、分類は enum)を足し、その入力欄の直上に 1 行(例 A7:F8)。generate は「〜の案を出してくれるボタン」「今日の献立を提案」「励ましの一言」「お題を考えて」の時: どの画面でもよく、結果を表示する高さを取る(line は 3 行・list/fields は 5〜6 行 例 A1:F6)。記録を材料にするなら entity(+limit)、結果を記録に残したい時だけフォーム画面で output。1 画面 3 個まで。"
     },
     "LocationTracker": {
@@ -3959,6 +4080,62 @@
       },
       "description": "LINE のようなチャット画面。メッセージを吹き出しで古い順に上から下へ積み(最新が一番下)、自分の分は右・相手の分は左に送信者名付きで出し、画面下に固定の入力欄から送る(送信 = その entity に 1 件保存・フォーム画面は不要)。ほかの人のメッセージはリアルタイムで届く。グループチャット・1 対 1 のメッセージ・連絡のやり取りで選ぶ。投稿を一覧で眺めるだけなら list。",
       "x-usage": "チャット用のタブかホーム画面に A1:F12 で 1 つだけ置き、同じ画面に他の部品を置かない(左下のマイクは入力欄の左に避けて表示される)。entity は message{text: text(required), photo?: photo} + scope:\"public\" だけ。名前・日時の field、フォーム画面、追加ボタン、list は作らない。entity の他の required field には defaultValue を付ける。"
+    },
+    "AiChat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "textField",
+        "persona"
+      ],
+      "properties": {
+        "type": {
+          "const": "aiChat"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "entity": {
+          "type": "string",
+          "description": "会話を保存する entity(private)。1 発言 = 1 レコード(自分の発言も AI の返事も)。時刻は $createdAt なので日時の field は作らない。"
+        },
+        "textField": {
+          "type": "string",
+          "description": "`entity` の string / text field。発言の本文が入る。"
+        },
+        "roleField": {
+          "type": "string",
+          "description": "`entity` の string field か、options に user と assistant を持つ enum field(任意・推奨)。自分の発言は user、AI の返事は assistant が入る。省略すると自分と AI が交互とみなす。"
+        },
+        "persona": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "AI の役と話し方(500 字まで)。例「やさしく話を聞くカウンセラー。まず気持ちを受け止め、1 回に 1 つだけ質問する」「英会話の練習相手。簡単な英語で返し、間違いはやさしく直す」。安全の決まりは変えられない。"
+        },
+        "length": {
+          "type": "string",
+          "enum": [
+            "short",
+            "long"
+          ],
+          "description": "返事の長さ(既定 short = 数文。long = 説明や添削など長めの返事)。"
+        },
+        "placeholder": {
+          "type": "string",
+          "description": "入力欄の薄い文字(既定「メッセージ」)。"
+        },
+        "emptyText": {
+          "type": "string",
+          "description": "まだ会話が無い時の文言(既定「話しかけてみましょう」)。"
+        }
+      },
+      "description": "クラウドの AI と何往復も話すチャット画面(相談相手・家庭教師・会話の練習相手・壁打ち)。吹き出しで自分は右・AI は左、画面下の入力欄から送ると AI が直近 20 発言を踏まえて返事をし、両方を entity に保存するので会話が残る。オンラインだけで動く(Tailor It Pro・共有のアプリは作成者の Pro)。ボタン 1 回で 1 回書かせるなら aiButton(人どうしのチャットは別の部品)。",
+      "x-usage": "会話用のタブかホーム画面に A1:F12 で 1 つだけ置き、同じ画面に他の部品を置かない。entity は turn{text: text(required), role: enum[user, assistant]} だけ(scope は付けない)。フォーム画面・追加ボタン・list は作らない。persona に役・口調・してほしいこと(質問は 1 つずつ・答えを言わずヒント等)を書く。"
     },
     "HealthStat": {
       "type": "object",
@@ -4396,6 +4573,23 @@
         }
       }
     },
+    "AISaveTo": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "generate の shape list の結果を 1 項目 = 1 件の記録として entity に保存できるようにする(問題・単語カード・手順・アイデアを一覧に足す)。field は entity の string / text field で、ほかの field は defaultValue か空になる(required なら defaultValue を付ける)。利用者が結果を見て「全部保存」か 1 つずつ保存する。output とは一緒に使わない。public / single / match / addressedTo の entity と editableBy admins の field には保存しない。",
+      "required": [
+        "entity",
+        "field"
+      ],
+      "properties": {
+        "entity": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        }
+      }
+    },
     "TextHighlight": {
       "type": "object",
       "additionalProperties": false,
@@ -4676,6 +4870,89 @@
             "equals": {
               "type": "string",
               "description": "行の field(同じ型の種類)か $id(行のレコードの ID)。"
+            }
+          }
+        },
+        "similar": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entity",
+            "fields"
+          ],
+          "description": "一番似ている記録を探す(if・lookup の後。見つかった時だけ動く)。entity のレコードのうち、fields(行と entity に同じ id である field)の値が行と同じ数(文字は 、 , / ・ 改行で区切った項目ごと・refs は ID ごと)が一番多いもの。同じ数が min(省略 = 1)以上の時だけ動き、do では {\"ref\":\"$similar\"}(その記録の ID・ref)・{\"ref\":\"$similar.<field>\"}・{\"ref\":\"$similarScore\"}(同じ数)・通知の {$similarScore}・to {kind: authorOf, field: $similar}(その記録を書いた人)が使える。if では使えない。行のレコード自身と、shared / public では行を書いた人の記録は数えない。同じ数なら新しい記録。entity は同じアプリ・ルールと同じ側だけ(宛先付きは不可)で、each・agg・lookup と合わせて 2 つまで。hidden・computed の field は比べない。",
+          "x-usage": "似ている人の推薦: on {record:updated, entity:profiles, fields:[hobbies, level]}・similar {entity:profiles, fields:[hobbies, level], min:2}・updateRecord(ref 省略)values {best_match: {ref:$similar}, match_score: {ref:$similarScore}}・notify to {kind:authorOf, field:$similar}。",
+          "properties": {
+            "entity": {
+              "type": "string",
+              "description": "探す entity の id(行と同じ entity でもよい)。"
+            },
+            "fields": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 5,
+              "items": {
+                "type": "string"
+              },
+              "description": "比べる field id(1〜5 個・行と entity の両方にある string / text / enum / integer / number / date / ref / refs)。"
+            },
+            "min": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "description": "動くのに要る同じ数(省略 = 1)。"
+            }
+          }
+        },
+        "pick": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entity",
+            "order"
+          ],
+          "description": "おすすめする記録を 1 つ選ぶ(if・lookup の後。選べた時だけ動く)。entity のレコードから、filter(agg と同じ絞り込み・3 つまで・hidden / computed の field は不可)に合い、exclude の entity のレコードが ref / refs の field で指していないものを、order の順で 1 つ。random は実行ごとに決まる(同じ実行のやり直しでは同じ記録)、oldest / newest は作った時刻の順。do では {\"ref\":\"$pick\"}(その記録の ID・ref)・{\"ref\":\"$pick.<field>\"}・通知の {$pick.<field>}・to {kind: authorOf, field: $pick}(その記録を書いた人)が使える。if では使えない。行のレコード自身は選ばない。each の無い時刻のきっかけでも使える(宛先は owner / members、createRecord)。entity と exclude の entity は同じアプリ・ルールと同じ側だけ(宛先付きは不可)で、each・agg・lookup と合わせて 2 つまで。similar と同じルールには書けない。",
+          "x-usage": "毎朝のおすすめ(まだ食べていないメニュー): on {every:daily, time:\"08:00\"}・pick {entity:menus, order:random, exclude:{entity:eats, field:menu}}・createRecord picks {menu: {ref:$pick}, name: {ref:$pick.name}}・notify to {kind:members} body「今日は {$pick.name} はどうですか」。",
+          "properties": {
+            "entity": {
+              "type": "string",
+              "description": "選ぶ entity の id。"
+            },
+            "order": {
+              "type": "string",
+              "enum": [
+                "random",
+                "oldest",
+                "newest"
+              ],
+              "description": "random(実行ごとに決まるランダム)/ oldest(一番古く作られた記録)/ newest(一番新しい記録)。"
+            },
+            "filter": {
+              "type": "array",
+              "maxItems": 3,
+              "items": {
+                "$ref": "#/$defs/Filter"
+              },
+              "description": "選ぶ記録の絞り込み(agg の filter と同じ。全部そろったもの)。"
+            },
+            "exclude": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "entity",
+                "field"
+              ],
+              "description": "除く記録: entity のレコードが field(選ぶ entity への ref / refs)で指している記録(食べた・見せた・読んだ)。",
+              "properties": {
+                "entity": {
+                  "type": "string",
+                  "description": "除く記録を指す entity の id(食べた記録・見せた記録など)。"
+                },
+                "field": {
+                  "type": "string",
+                  "description": "その entity の ref / refs の field(選ぶ entity を指す)。"
+                }
+              }
             }
           }
         },

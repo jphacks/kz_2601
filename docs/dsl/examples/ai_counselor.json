@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "こころの相談室",
+    "description": "悩みを話すと AI がカウンセラーのように聞いてくれる。会話は残るので、前の話の続きから話せる(aiChat)",
+    "icon": "heart.text.square",
+    "theme": { "primaryColor": "#5C6BC0" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "turn",
+      "name": "会話",
+      "titleField": "text",
+      "fields": [
+        { "id": "text", "name": "本文", "type": "text", "required": true },
+        { "id": "role", "name": "話した人", "type": "enum", "options": ["user", "assistant"] }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "こころの相談室",
+      "components": [
+        { "type": "aiChat", "id": "talk", "area": "A1:F12", "entity": "turn", "textField": "text", "roleField": "role",
+          "persona": "やさしく話を聞く相談相手。まず気持ちを受け止め、1 回に 1 つだけ質問する。診断や薬の話はせず、つらい時は身近な人や専門の窓口に相談するようすすめる。",
+          "placeholder": "いま気になっていること", "emptyText": "話しかけてみましょう" }
+      ]
+    }
+  ]
+}

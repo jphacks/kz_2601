@@ -17,14 +17,15 @@ extension AIRequestBuilder {
         let long = c.length == "long" && task != .classify
         let input = AITextLimits.clip(inputText(c, entity: entity, values: values, sourceEntity: sourceEntity, records: records),
                                       maxBytes: AITextLimits.maxInputBytes(long: long))
-        guard !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw BuildError.emptyInput }
+        let hasText = !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard hasText || c.inputPhoto != nil else { throw BuildError.emptyInput } // 写真だけでも材料になる
 
         var instruction = ""
         if let template = c.prompt, !template.isEmpty {
             instruction = expand(template, input: locale == "en" ? "the data below" : "下の材料", entity: entity, values: values)
         }
         instruction = String(instruction.trimmingCharacters(in: .whitespacesAndNewlines).prefix(AITextLimits.maxInstruction))
-        return AITextRequest(instruction: instruction, shape: .line, input: input, locale: locale,
+        return AITextRequest(instruction: instruction, shape: .line, input: hasText ? input : nil, locale: locale,
                              task: task.rawValue, options: options, length: long ? "long" : nil)
     }
 }
@@ -36,8 +37,9 @@ enum AIButtonOnline {
     static func fill(_ c: Component, form: FormDraft, values: [String: JSONValue], sourceEntity: Entity?, records: [Record],
                      host: any AITextHost, locale: String) async throws {
         guard let output = c.output else { throw AIRequestBuilder.BuildError.unknownTask }
-        let request = try AIRequestBuilder.online(c, entity: form.entity, values: values, sourceEntity: sourceEntity,
+        var request = try AIRequestBuilder.online(c, entity: form.entity, values: values, sourceEntity: sourceEntity,
                                                   records: records, locale: locale)
+        try await AIPhotoInput.attach(c, values: values, to: &request)
         let result = try await host.generateAIText(request)
         form.values[output] = .string(result.text)
     }

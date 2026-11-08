@@ -390,7 +390,18 @@ struct SettingsSheet: View {
                     Label("通知がオフです(タップで設定を開く)", systemImage: "bell.slash")
                 }
             }
-            if rt.upcomingNotifications.isEmpty {
+            if rt.placesLocationOff {
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                } label: {
+                    Label("位置情報が許可されていないため、場所に着いた時の通知は届きません(タップで設定を開く)", systemImage: "location.slash")
+                }
+                .accessibilityIdentifier("settings.placesLocationOff")
+            } else if rt.notificationPlaces > 0 {
+                Label("保存した場所 \(rt.notificationPlaces) か所の近くに着いたら知らせます", systemImage: "location")
+                    .foregroundStyle(.secondary)
+            }
+            if rt.upcomingNotifications.isEmpty && rt.notificationPlaces == 0 && !rt.placesLocationOff {
                 Text("予約中の通知はありません").foregroundStyle(.secondary)
             }
             ForEach(Array(rt.upcomingNotifications.prefix(5).enumerated()), id: \.offset) { _, n in

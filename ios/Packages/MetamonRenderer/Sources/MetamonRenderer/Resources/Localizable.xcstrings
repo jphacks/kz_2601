@@ -766,6 +766,40 @@
         }
       }
     },
+    "AI" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI"
+          }
+        }
+      }
+    },
+    "AI が考えています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The AI is thinking…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI が考えています…"
+          }
+        }
+      }
+    },
     "AI で読み取っています…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -779,6 +813,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI で読み取っています…"
+          }
+        }
+      }
+    },
+    "AI と話すには Tailor It Pro が必要です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talking with the AI needs Tailor It Pro"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI と話すには Tailor It Pro が必要です"
+          }
+        }
+      }
+    },
+    "AI の結果を「%@」に保存" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save AI results to “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI の結果を「%@」に保存"
           }
         }
       }
@@ -1208,6 +1276,23 @@
         }
       }
     },
+    "この版では AI と話せません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI chat is not available in this version"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この版では AI と話せません"
+          }
+        }
+      }
+    },
     "この画面では話して入力を使えません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1595,6 +1680,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "もう一度"
+          }
+        }
+      }
+    },
+    "もう一度探す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度探す"
           }
         }
       }
@@ -2585,6 +2687,23 @@
         }
       }
     },
+    "位置情報が許可されていないので近くを探せません。設定で「このAppの使用中のみ許可」を選ぶか、探す語を入れてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location access is off, so nearby places can't be found. Choose \"While Using the App\" in Settings, or type what to search for."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報が許可されていないので近くを探せません。設定で「このAppの使用中のみ許可」を選ぶか、探す語を入れてください"
+          }
+        }
+      }
+    },
     "位置情報の利用が許可されていません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2683,6 +2802,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使わない列: %@"
+          }
+        }
+      }
+    },
+    "保存" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
           }
         }
       }
@@ -2819,6 +2955,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保存できませんでした"
+          }
+        }
+      }
+    },
+    "保存済み" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存済み"
           }
         }
       }
@@ -2972,6 +3125,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全員"
+          }
+        }
+      }
+    },
+    "全部保存" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save all"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部保存"
           }
         }
       }
@@ -3707,6 +3877,23 @@
         }
       }
     },
+    "店名・種類で探す(例: ラーメン)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search by name or kind (e.g. ramen)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "店名・種類で探す(例: ラーメン)"
+          }
+        }
+      }
+    },
     "徒歩" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4370,6 +4557,57 @@
         }
       }
     },
+    "現在地" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current Location"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地"
+          }
+        }
+      }
+    },
+    "現在地がわからないので近くを探せません。少し待つか、探す語を入れてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your location isn't available yet. Wait a moment, or type what to search for."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地がわからないので近くを探せません。少し待つか、探す語を入れてください"
+          }
+        }
+      }
+    },
+    "現在地が使えないので、近くに限らず探しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location isn't available, so results aren't limited to nearby."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地が使えないので、近くに限らず探しました"
+          }
+        }
+      }
+    },
     "現在地を確認しています…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4931,6 +5169,23 @@
         }
       }
     },
+    "見つかりませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No results"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "見つかりませんでした"
+          }
+        }
+      }
+    },
     "見送る" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5084,6 +5339,23 @@
         }
       }
     },
+    "記録に追加" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録に追加"
+          }
+        }
+      }
+    },
     "記録を保存できませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5216,6 +5488,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定アプリで Tailor It のマイクへのアクセスを許可してください。"
+          }
+        }
+      }
+    },
+    "話しかけてみましょう" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Say something to start"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話しかけてみましょう"
           }
         }
       }
@@ -5390,6 +5679,40 @@
         }
       }
     },
+    "近くの場所" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nearby places"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの場所"
+          }
+        }
+      }
+    },
+    "近くを探す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search nearby"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くを探す"
+          }
+        }
+      }
+    },
     "追加" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5403,6 +5726,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "追加"
+          }
+        }
+      }
+    },
+    "追加しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加しました"
           }
         }
       }

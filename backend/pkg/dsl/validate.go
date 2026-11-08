@@ -282,6 +282,7 @@ func (a *App) Validate() error {
 		checkNotification(fmt.Sprintf("app.notifications[%d]", i), n, add)
 		checkRecordNotification(fmt.Sprintf("app.notifications[%d]", i), n, entities, add)
 		checkWhenNotification(fmt.Sprintf("app.notifications[%d]", i), n, entities, add)
+		checkNearNotification(fmt.Sprintf("app.notifications[%d]", i), n, entities, add)
 	}
 
 	screens := map[string]bool{}
@@ -347,6 +348,7 @@ func (a *App) Validate() error {
 				if act.Notification.When != nil {
 					add("%s: notification when (condition) belongs in app.notifications, not scheduleNotification", where)
 				}
+				checkNearAction(where, act.Notification, add)
 			}
 		case ActionCancelNotif:
 			if act.NotificationID == "" {
@@ -571,12 +573,15 @@ func (a *App) Validate() error {
 				} else if c.Type == CompQrScanner && f.Type != FieldString && f.Type != FieldText {
 					add("%s: qrScanner field %q must be string or text", where, c.Field)
 				}
+				checkLocationButtonAddress(where, c, formEntity, add) // place_search.go
 			case CompQrCode: // #422
 				checkQRCode(where, c, formEntity, entities, add)
 			case CompLocationPicker: // #212
 				checkLocationPicker(where, c, formEntity, add)
 			case CompRouteGuide: // #411
 				checkRouteGuide(where, c, formEntity, entities, add)
+			case CompPlaceSearch:
+				checkPlaceSearch(where, c, formEntity, add) // place_search.go
 			case CompTimerDisplay:
 				switch c.Mode {
 				case "stopwatch":
@@ -667,6 +672,8 @@ func (a *App) Validate() error {
 				checkLocationTracker(where, c, entities, add)
 			case CompChatThread:
 				checkChatThread(where, c, entities, add)
+			case CompAiChat:
+				checkAIChat(where, c, entities, add) // ai_chat.go
 			case CompHealthStat:
 				checkHealthStat(where, c, add)
 			case CompDashcam:

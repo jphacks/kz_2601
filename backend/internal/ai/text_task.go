@@ -39,7 +39,7 @@ func IsTextTask(task string) bool { _, ok := textTasks[task]; return ok }
 
 func normalizeTaskRequest(req *TextRequest) error {
 	if !IsTextTask(req.Task) {
-		return badText("task must be generate, summarize, classify, rewrite, extract or suggest")
+		return badText("task must be generate, summarize, classify, rewrite, extract, suggest or chat")
 	}
 	req.Instruction = strings.TrimSpace(req.Instruction)
 	if utf8.RuneCountInString(req.Instruction) > dsl.MaxAIInstructionRunes {
@@ -71,7 +71,7 @@ func normalizeTaskRequest(req *TextRequest) error {
 	if err := checkTextInput(req); err != nil {
 		return err
 	}
-	if strings.TrimSpace(req.Input) == "" {
+	if strings.TrimSpace(req.Input) == "" && req.Image == nil { // a photo alone is material too (text_image.go)
 		return badText("input is required for task " + req.Task)
 	}
 	return nil
