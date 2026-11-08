@@ -65,7 +65,7 @@ final class AggregatorTests: XCTestCase {
         XCTAssertEqual(Aggregator.format(0.5, as: "percent"), "50%")
         XCTAssertEqual(Aggregator.format(1.42, as: "percent"), "142%")
         XCTAssertEqual(Aggregator.format(0, as: "percent"), "0%")
-        // aggregate モード(avg of 0/1)も同じ尺度: 4 件中 1 件 → 25%
+        // format 単体の確認のみ。DSL では aggregate + percent はスキーマと lint で禁止(比率は value で作る)
         let rs = [0.0, 1, 0, 0].enumerated().map { i, v in Record(id: "\(i)", data: ["done": .number(v)]) }
         XCTAssertEqual(Aggregator.format(Aggregator.aggregate("avg", field: "done", over: rs), as: "percent"), "25%")
     }
