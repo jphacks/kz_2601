@@ -313,12 +313,12 @@ struct AiChatLeaf: View {
                 pending = text
             }
             do {
-                // inputEntity: 自分の記録を「参考の記録」として添える(AIChatMaterial.swift)
+                // inputEntity: 自分の記録を「参考の記録」として添える(今の発言に近い記録から・AIChatMaterial.swift)
                 var material: AITextMaterial?
                 if let input {
                     await rt.load(entities: [input.id])
                     material = AIChatMaterial.request(entity: input, records: rt.records(for: input.id),
-                                                      uid: rt.currentUserId, limit: limit)
+                                                      uid: rt.currentUserId, limit: limit, query: text)
                 }
                 let request = AIChat.request(persona: persona, history: history, next: text, long: long, locale: locale,
                                              saveTo: saveRequest, material: material)

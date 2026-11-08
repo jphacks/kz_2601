@@ -109,4 +109,78 @@ final class AIChatMaterialTests: XCTestCase {
         let unnamed = try XCTUnwrap(AIChatMaterial.request(entity: try entity(name: " "), records: [rec("a", "x", day: 1)], uid: nil, limit: nil))
         XCTAssertNil(unnamed.name)
     }
+
+    // MARK: - 発言に近い記録から(AIChatRelevance)
+
+    /// 古いが発言に関係する記録が、新しい関係ない記録より先に入る(新しい順だけなら 21 件目で落ちていた)。
+    func testOlderRelevantRecordBeatsNewerIrrelevantOnes() throws {
+        var rows = (2...25).map { rec("n\($0)", "今日は散歩をして夕飯を作りました \($0)", day: $0) }
+        rows.append(rec("old", "取り込んだ資料: 請求書の支払期限は 12 月 15 日、振込先は北陸銀行", day: 1))
+        let e = try entity()
+        XCTAssertFalse(try XCTUnwrap(AIChatMaterial.request(entity: e, records: rows, uid: "me", limit: nil)).text.contains("支払期限"),
+                       "発言が無ければ新しい順(#748 と同じ)")
+        let m = try XCTUnwrap(AIChatMaterial.request(entity: e, records: rows, uid: "me", limit: nil, query: "請求書の支払期限はいつ?"))
+        XCTAssertTrue(m.text.hasPrefix("- 本文: 取り込んだ資料: 請求書の支払期限"), m.text)
+        let lines = m.text.split(separator: "\n")
+        XCTAssertEqual(lines.count, 20)
+        XCTAssertTrue(lines[1].contains("25"), "残りは新しい順")
+        XCTAssertFalse(m.text.contains(" 6 /"), "20 件を超える古い関係ない記録は落とす")
+        // 英語も小文字の語で比べる
+        let en = [rec("a", "Meeting notes: budget review", day: 1), rec("b", "Grocery list", day: 2)]
+        XCTAssertEqual(AIChatMaterial.select(en, uid: "me", shared: false, limit: 1, query: "What was the BUDGET?",
+                                             fields: AIChatMaterial.fields(of: e)).map(\.id), ["a"])
+    }
+
+    /// 関係する記録が大きくても 8 KB は超えない(入りきらない分は落とす)。
+    func testRelevantRecordsStillWithin8KB() throws {
+        let rows = (1...20).map { rec("r\($0)", "支払期限 " + String(repeating: "あ", count: 1500) + "\($0)", day: $0) }
+            + [rec("new", "関係ない新しい日記", day: 28)]
+        let m = try XCTUnwrap(AIChatMaterial.request(entity: try entity(), records: rows, uid: "me", limit: nil, query: "支払期限"))
+        XCTAssertLessThanOrEqual(m.text.utf8.count, AIChatMaterial.maxBytes)
+        XCTAssertTrue(m.text.hasPrefix("- 本文: 支払期限 "), "関係する記録が先")
+        XCTAssertFalse(m.text.contains("関係ない新しい日記"))
+    }
+
+    /// 同じ点なら新しい順、同じ時刻なら id 順。入力の並びが変わっても同じ結果。
+    func testTiesAreBrokenDeterministically() throws {
+        let fs = AIChatMaterial.fields(of: try entity())
+        let rows = [rec("b", "猫の病院", day: 3), rec("a", "猫の病院", day: 3), rec("c", "猫の病院", day: 5),
+                    rec("d", "犬の散歩", day: 9), rec("e", "猫と病院の予約", day: 1)]
+        let want = AIChatMaterial.select(rows, uid: "me", shared: false, limit: nil, query: "猫の病院", fields: fs).map(\.id)
+        XCTAssertEqual(want, ["c", "a", "b", "e", "d"])
+        for perm in [rows.reversed(), [rows[2], rows[4], rows[0], rows[3], rows[1]]] {
+            XCTAssertEqual(AIChatMaterial.select(Array(perm), uid: "me", shared: false, limit: nil, query: "猫の病院", fields: fs).map(\.id), want)
+        }
+    }
+
+    /// 発言が無い・語にならない・どの記録とも重ならない時は #748 と同じ(新しい順)。
+    func testNoQueryBehavesAsBefore() throws {
+        let e = try entity()
+        let rows = (1...25).map { rec("r\($0)", "日記\($0)", day: $0) }
+        let before = try XCTUnwrap(AIChatMaterial.request(entity: e, records: rows, uid: "me", limit: 5))
+        for q in [nil, "", "  ?!。 ", "zzzz 無関係"] as [String?] {
+            XCTAssertEqual(AIChatMaterial.request(entity: e, records: rows, uid: "me", limit: 5, query: q), before, String(describing: q))
+        }
+        XCTAssertEqual(before.text.split(separator: "\n").first, "- 本文: 日記25 / 気分: つらい")
+    }
+
+    /// 1 件で 8 KB を超える記録(取り込んだ PDF)は、発言の語が一番多い所から 8 KB。無ければ頭から(#748 と同じ)。
+    func testLongRecordSendsTheMostRelevantWindow() throws {
+        let pdf = String(repeating: "前置きの文章です。", count: 1500) + "解約の手続きは窓口で行います。" + String(repeating: "後書き。", count: 300)
+        let rows = [rec("pdf", pdf, day: 1)]
+        let m = try XCTUnwrap(AIChatMaterial.request(entity: try entity(), records: rows, uid: "me", limit: nil, query: "解約の手続きは?"))
+        XCTAssertLessThanOrEqual(m.text.utf8.count, AIChatMaterial.maxBytes)
+        XCTAssertTrue(m.text.hasPrefix("- …"), String(m.text.prefix(40)))
+        XCTAssertTrue(m.text.contains("解約の手続きは窓口で行います。"))
+        let head = try XCTUnwrap(AIChatMaterial.request(entity: try entity(), records: rows, uid: "me", limit: nil, query: "天気"))
+        XCTAssertTrue(head.text.hasPrefix("- 本文: 前置き"))
+        XCTAssertEqual(head, AIChatMaterial.request(entity: try entity(), records: rows, uid: "me", limit: nil))
+    }
+
+    func testTokens() {
+        let t = AIChatRelevance.tokens("ＡＩの支払期限 Report-2026 猫")
+        for want in ["ai", "の支", "支払", "払期", "期限", "report", "2026", "猫"] { XCTAssertTrue(t.contains(want), want) }
+        XCTAssertFalse(t.contains("限 "))
+        XCTAssertTrue(AIChatRelevance.tokens("?! 。a").isEmpty)
+    }
 }
