@@ -58,10 +58,14 @@ func TestServerPushWording_Generate(t *testing.T) {
 		transcript string
 		on         bool
 	}{
-		{"default off", false, nil, "家計簿を作って", false},
-		{"pass on", true, nil, "家計簿を作って", true},
-		{"no shared data", true, []string{FeatureSharedData}, "家計簿を作って", false},
-		{"opted out", true, nil, "家計簿を作って" + without, false},
+		{"default off", false, nil, "家計簿を作って。毎日リマインドして", false},
+		{"pass on", true, nil, "家計簿を作って。毎日リマインドして", true},
+		// The pass skips requests that ask for no automatic action, so the
+		// prompt must not say 「この後の工程で作られる」 for them.
+		{"pass on, no ask", true, nil, "家計簿を作って", false},
+		{"pass on, ask the regex misses", true, nil, "部活のチャット。新着はプッシュして", false},
+		{"no shared data", true, []string{FeatureSharedData}, "家計簿を作って。毎日リマインドして", false},
+		{"opted out", true, nil, "家計簿を作って。毎日リマインドして" + without, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -77,6 +81,13 @@ func TestServerPushWording_Generate(t *testing.T) {
 			}
 			if got := strings.Contains(sys, chatThreadPushCannot); got == c.on {
 				t.Errorf("cannot line present=%t, want %t", got, !c.on)
+			}
+			ran := false
+			for _, call := range f.calls {
+				ran = ran || call.System == serverRulesPrompt
+			}
+			if ran != c.on {
+				t.Errorf("server-rules pass ran=%t, but the push wording says %t", ran, c.on)
 			}
 		})
 	}
@@ -96,6 +107,30 @@ func TestServerPushWording_Chat(t *testing.T) {
 		}
 		if got := strings.Contains(sys, chatLimitPushItem); got == on {
 			t.Errorf("pass=%t: push limit present=%t", on, got)
+		}
+	}
+}
+
+// Client restrictions (old builds, review builds with shared data) must not
+// drop the anchors: the rewrite would silently do nothing. A build without
+// chatThread drops chatThreadRules on purpose (nothing claims "cannot").
+func TestServerPushWording_RestrictedKeepsAnchors(t *testing.T) {
+	all := make([]string, 0, len(knownComponentTypes))
+	for c := range knownComponentTypes {
+		all = append(all, c)
+	}
+	ctx := withRestriction(context.Background(), NewClientRestriction(all, []string{FeatureFieldHealth, FeatureCameraCapture}, nil))
+	ctx = withServerPush(ctx, true)
+	for name, p := range map[string]string{"generate": systemPrompt, "edit": systemPrompt + "\n" + editRules} {
+		got := serverPushPrompt(ctx, restrictPrompt(ctx, p))
+		if strings.Contains(got, chatThreadPushCannot) || !strings.Contains(got, chatThreadPushLater) {
+			t.Errorf("%s: restricted prompt not rewritten", name)
+		}
+	}
+	for name, p := range map[string]string{"chatCreate": chatCreateSystemPrompt, "chatEdit": chatEditSystemPrompt} {
+		got := serverPushPrompt(ctx, restrictPrompt(ctx, p))
+		if strings.Contains(got, chatLimitPushItem) || !strings.Contains(got, serverPushChatRule) {
+			t.Errorf("%s: restricted prompt not rewritten", name)
 		}
 	}
 }

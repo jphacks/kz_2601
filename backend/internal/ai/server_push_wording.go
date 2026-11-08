@@ -28,7 +28,9 @@ const serverPushChatRule = "- サーバーからの通知(#343): 新しい記録
 
 type serverPushKey struct{}
 
-// withServerPush marks ctx: the server-rules pass will run for this request.
+// withServerPush marks ctx: generate / edit — the server-rules pass will run
+// for this request (serverRulesPassRuns); chat — a later generate may run it
+// (serverRulesOn).
 func withServerPush(ctx context.Context, on bool) context.Context {
 	if !on {
 		return ctx
@@ -47,6 +49,14 @@ func serverPushFrom(ctx context.Context) bool {
 func (s *Service) serverRulesOn(ctx context.Context, transcript string) bool {
 	return s.serverRulesEnabled() && !restrictionFrom(ctx).NoSharedData() &&
 		!defaultPaidCatalog.dropped(transcript, paid.ServerRules)
+}
+
+// serverRulesPassRuns reports whether applyServerRulesPass will call the
+// model for this generate / edit request: serverRulesOn and the request asks
+// for an automatic action. The generate wording follows it, so the prompt
+// never says 「この後の工程で作られる」 when no pass follows.
+func (s *Service) serverRulesPassRuns(ctx context.Context, transcript string) bool {
+	return s.serverRulesOn(ctx, transcript) && wantsServerRules(transcript)
 }
 
 var serverPushMemo sync.Map // system -> rewritten
