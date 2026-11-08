@@ -1,9 +1,6 @@
 package dsl
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
 // Literal goal on a bar: a progressBar target (or a gauge max) is a number
 // literal while the app keeps the goal in its own entity, so editing the
@@ -163,10 +160,8 @@ func (l *linter) goalTarget() {
 				if g.entity == c.Entity || l.perKey(g.entity, c.Entity) || !goalFor(g, c.Entity, c.Field, pairs) {
 					continue
 				}
-				read := fmt.Sprintf(`{"setting":%q}`, g.field)
-				if e := l.entities[g.entity]; e == nil || !e.Single {
-					read = fmt.Sprintf(`{"agg":"latest","entity":%q,"field":%q} (or {"setting":%q} after making %q "single": true)`, g.entity, g.field, g.field, g.entity)
-				}
+				e := l.entities[g.entity]
+				read := goalReadFix(g.entity, g.field, e != nil && e.Single)
 				l.add(`screen %q %s: %s %s is the literal %v while the goal is kept in %s.%s, so changing the goal never moves the bar (%s takes only a number); show the rate as a stat {"format":"percent","value":{"op":"div","args":[<the %s total over %q>,<goal>]}} where <goal> is %s`,
 					s.ID, w, c.Type, key, *lit, g.entity, g.field, key, c.Type, c.Entity, read)
 				return

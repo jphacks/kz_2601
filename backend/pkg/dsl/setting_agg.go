@@ -25,14 +25,14 @@ func (l *linter) settingMaxMin() {
 		f := e.FieldByID(field)
 		return f != nil && f.Computed == nil && (f.Type == FieldInteger || f.Type == FieldNumber || f.Type == FieldCurrency)
 	}
-	report := func(where, entity, agg string) {
-		l.add(`%s: %s of %q is the largest/smallest value ever entered, so lowering (or raising) the goal/budget is ignored; read the newest with {"agg":"latest","entity":%q,"field":...} (aggregate "latest"; by is optional and must be a date/datetime field of the entity, omitted = creation order), or make %q "single": true and read it with {"setting":"<fieldId>"}`,
-			where, agg, entity, entity, entity)
+	report := func(where, entity, agg, field string) {
+		l.add(`%s: %s of %q is the largest/smallest value ever entered, so lowering (or raising) the goal/budget is ignored; read the goal as %s`,
+			where, agg, entity, goalReadFix(entity, field, false))
 	}
 	exprs := func(where string, x *Expr) {
 		walkExpr(x, func(e *Expr) {
 			if e.Kind == ExprAgg && e.Agg != nil && bad(e.Agg.Entity, e.Agg.Agg, e.Agg.Field) {
-				report(where, e.Agg.Entity, e.Agg.Agg)
+				report(where, e.Agg.Entity, e.Agg.Agg, e.Agg.Field)
 			}
 		})
 	}
@@ -48,7 +48,7 @@ func (l *linter) settingMaxMin() {
 			}
 			where := fmt.Sprintf("screen %q %s", s.ID, w)
 			if scalarTypes[c.Type] && bad(c.Entity, c.Aggregate, c.Field) {
-				report(where+" aggregate", c.Entity, c.Aggregate)
+				report(where+" aggregate", c.Entity, c.Aggregate, c.Field)
 			}
 			exprs(where+".value", c.Value)
 		})
@@ -124,4 +124,15 @@ func newRecordForms(a *App) map[string]bool {
 		})
 	}
 	return out
+}
+
+// goalReadFix: how to read a goal / budget field. settingMaxMin and
+// goalTarget share it so both lints give the same fix, matching the goal
+// bullets of the prompt (internal/ai/title_goal_rules.go).
+func goalReadFix(entity, field string, single bool) string {
+	if single {
+		return fmt.Sprintf(`{"setting":%q}`, field)
+	}
+	return fmt.Sprintf(`{"agg":"latest","entity":%q,"field":%q} (the newest record; by is optional and must be a date/datetime field of %q, omitted = creation order), or make %q "single": true and read {"setting":%q}`,
+		entity, field, entity, entity, field)
 }

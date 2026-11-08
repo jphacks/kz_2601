@@ -42,7 +42,9 @@ func TestLintSettingMaxMin(t *testing.T) {
 	got := budgetApp(t, strings.Replace(remaining, `"agg":"max"`, `"agg":"min"`, 1), "", true)
 	wantLint(t, got, `min of "budget"`)
 	wantLint(t, got, `"single": true`)
-	wantLint(t, got, `{"agg":"latest","entity":"budget"`)
+	wantLint(t, got, `{"agg":"latest","entity":"budget","field":"amount"}`)
+	// the same fix text as the goal_target lint
+	wantLint(t, got, goalReadFix("budget", "amount", false))
 
 	// stat aggregate (progressBar / gauge allow count / sum only)
 	comp := `{"type":"stat","label":"予算","entity":"budget","aggregate":"max","field":"amount"},`
