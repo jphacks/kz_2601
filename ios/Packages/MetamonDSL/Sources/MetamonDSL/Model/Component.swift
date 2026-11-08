@@ -47,6 +47,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case locationTracker
     // leaf(チャット・#260)
     case chatThread
+    // leaf(クラウドの AI と何往復も話す)。entity / textField / length / placeholder / emptyText は共用
+    case aiChat
     // leaf(ヘルスデータ・#167)
     case healthStat
     // leaf(時間割のマス目・#234)
@@ -205,6 +207,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     // chatThread(#260)。entity / placeholder / emptyText は共用
     public var textField: String?      // 本文の string / text field
     public var photoField: String?     // 任意の photo field
+    // aiChat。entity / textField / length / placeholder / emptyText は共用
+    public var roleField: String?      // user / assistant を書く field(nil = 自分と AI が交互)
+    public var persona: String?        // AI の役と話し方(500 字まで・サーバーへは instruction)
     // dashcam(#410)。title は共用。nil = 既定値(DashcamConfig)
     public var keepMinutes: Int?       // ループで残す分数
     public var maxStorageMB: Int?      // 録画の容量上限
@@ -232,11 +237,11 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var back: String?           // 裏の field
     public var toggle: String?         // 覚えた / まだ を保存する boolean field
     // feed(#348)。URL は持たない
-    public var provider: String?       // weather|warnings|pressure|holidays|rss
+    public var provider: String?       // weather|warnings|pressure|holidays|rss|arxiv|diet
     public var region: String?         // weather / warnings / pressure: 気象庁の府県予報区のコード
-    public var feedId: String?         // rss: 許可したフィードの id
+    public var feedId: String?         // rss: 許可したフィードの id / arxiv: 分野
     // placeSearch。label / nameField / locationField は共用
-    public var query: String?          // 決まった検索語
+    public var query: String?          // 決まった検索語(placeSearch・feed の diet)
     public var category: String?       // cafe|restaurant|…(PlaceSearch.categories)
     public var near: String?           // current(既定)
     public var addressField: String?   // placeSearch / locationButton: 住所の string / text field
@@ -260,7 +265,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case tone
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
-        case textField, photoField
+        case textField, photoField, roleField, persona
         case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance, allowRequests, autoAccept
         case accept, map
         case show
@@ -363,6 +368,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         rowRange = try? c.decodeIfPresent(GridRange.self, forKey: .rowRange)
         textField = try? c.decodeIfPresent(String.self, forKey: .textField)
         photoField = try? c.decodeIfPresent(String.self, forKey: .photoField)
+        roleField = try? c.decodeIfPresent(String.self, forKey: .roleField)
+        persona = try? c.decodeIfPresent(String.self, forKey: .persona)
         keepMinutes = try? c.decodeIfPresent(Int.self, forKey: .keepMinutes)
         maxStorageMB = try? c.decodeIfPresent(Int.self, forKey: .maxStorageMB)
         impactG = try? c.decodeIfPresent(Double.self, forKey: .impactG)

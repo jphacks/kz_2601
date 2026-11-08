@@ -63,10 +63,12 @@ public struct AITextRequest: Codable, Equatable, Sendable {
     public var appId: String?
     /// aiButton inputPhoto の写真 1 枚(オンライン AI だけ)。nil = 写真なし
     public var image: AITextImage?
+    /// aiChat の会話(task "chat"・古い順・最後は利用者・オンライン AI だけ)。nil = 会話でない
+    public var messages: [AITextMessage]?
 
     public init(instruction: String, shape: AITextShape, count: Int? = nil, items: [String]? = nil,
                 input: String? = nil, locale: String? = nil, task: String? = nil, options: [String]? = nil,
-                length: String? = nil, appId: String? = nil, image: AITextImage? = nil) {
+                length: String? = nil, appId: String? = nil, image: AITextImage? = nil, messages: [AITextMessage]? = nil) {
         self.instruction = instruction
         self.shape = shape
         self.count = count
@@ -78,6 +80,7 @@ public struct AITextRequest: Codable, Equatable, Sendable {
         self.length = length == "long" ? "long" : nil
         self.appId = appId
         self.image = image
+        self.messages = messages
     }
 
     /// 同じ依頼に appId を付ける(空なら付けない)。写真などほかの値はそのまま。
@@ -90,11 +93,25 @@ public struct AITextRequest: Codable, Equatable, Sendable {
     /// 長い文の依頼か(端末内 AI を使わない)。
     public var isLong: Bool { length == "long" }
 
+    /// aiChat の返事の依頼か(端末内 AI を使わない)。答えは要約などと同じく 1 つの文(long は長い文)。
+    public var isChat: Bool { task == "chat" }
+
     /// 入力を変える task(要約など)か。答えは 1 つの文で、output の field に入れる。
     public var isTransform: Bool { task != nil && task != "generate" }
 
     /// list の実際の個数(既定 3・1〜10)。
     public var resolvedCount: Int { Swift.min(Swift.max(count ?? AITextLimits.defaultCount, 1), AITextLimits.maxItems) }
+}
+
+/// `POST /v1/text` の `messages` の 1 発言(role は user | assistant)。
+public struct AITextMessage: Codable, Equatable, Sendable {
+    public var role: String
+    public var text: String
+
+    public init(role: String, text: String) {
+        self.role = role
+        self.text = text
+    }
 }
 
 /// `POST /v1/text` の `image`(JPEG・長い辺 1024px・base64 400 KB まで)。

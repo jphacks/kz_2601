@@ -15,6 +15,12 @@ extension MockAIClient {
             guard let out = AITextResult.normalize(text: "写真から読み取った内容です(モック)", items: nil, fields: nil, for: request) else { throw AITextError.badOutput }
             return out
         }
+        if request.isChat {
+            // aiChat: 最後の発言に返す決まった文
+            let last = request.messages?.last?.text ?? ""
+            guard let out = AITextResult.normalize(text: "なるほど、「\(last.prefix(20))」ですね。もう少し聞かせてください(モック)", items: nil, fields: nil, for: request) else { throw AITextError.badOutput }
+            return out
+        }
         if request.isLong {
             // length long: 段落のある長い文
             let text = (1...4).map { "\($0) 段落目の長い文章です。決まった文を返しています(モック)。" }.joined(separator: "\n\n")

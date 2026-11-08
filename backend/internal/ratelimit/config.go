@@ -17,7 +17,7 @@ import (
 //	RATE_LIMIT_WEIGHT_CHAT     chat turn                        (1)
 //	RATE_LIMIT_WEIGHT_TEXT     aiButton generate (/v1/text)     (1)
 //	RATE_LIMIT_WEIGHT_TEXT_TASK aiButton summarize etc. (/v1/text) (2)
-//	RATE_LIMIT_WEIGHT_TEXT_LONG aiButton length long (/v1/text)   (3)
+//	RATE_LIMIT_WEIGHT_TEXT_LONG aiButton length long / aiChat (/v1/text) (3)
 //	RATE_LIMIT_WEIGHT_TEXT_IMAGE aiButton inputPhoto (/v1/text)   (3)
 func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	cfg := Config{Limits: DefaultLimits, Weights: DefaultWeights, Env: getenv("APP_ENV")}

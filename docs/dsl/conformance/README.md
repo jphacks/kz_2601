@@ -175,7 +175,7 @@ DSL に書いた値で `props` に入れるもの: `title text label message pla
 
 `ConformanceTests.testCoverageListIsUpToDate` が「全 case に出てくる部品の type + `coverage.json` の `notYetCovered` = スキーマの全 type」を確かめる(足りない・余計なら赤)。
 
-今: **72 / 73 の type が case に出てくる**(`notYetCovered` は `fileImport` だけ。ファイル選択の後の動きは描画の木に出ないので、取り込みの中身は `RecordImportTests` で確かめる)。そのうち値まで解決して比べるもの:
+今: **72 / 75 の type が case に出てくる**(`notYetCovered` は `fileImport`・`placeSearch`・`aiChat`。ファイル選択の後の動きは描画の木に出ないので、取り込みの中身は `RecordImportTests`、placeSearch の検索は `PlaceSearchTests` で確かめる。aiChat は審査用の版から外す部品で、会話の並び・送る会話は `AIChatTests` で確かめる)。そのうち値まで解決して比べるもの:
 
 | 区分 | type |
 |---|---|

@@ -91,12 +91,14 @@ enum ComposerMetrics {
 
 extension View {
     /// 本体のフォーム(シェア・リリース申請など)の入力欄の器。左右 14・上下 12 の均等な余白 + 角丸 + 細い枠。
-    func metamonInputField() -> some View {
+    /// `flagged`: サーバーが直してほしいと返した項目(#321 text_not_allowed)。枠を警告色にする
+    func metamonInputField(flagged: Bool = false) -> some View {
         self
             .textFieldStyle(.plain)
             .padding(.horizontal, ComposerMetrics.inset)
             .padding(.vertical, 12)
             .background(Theme.Colors.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm + 2, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm + 2, style: .continuous).strokeBorder(Theme.Colors.hairline))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm + 2, style: .continuous)
+                .strokeBorder(flagged ? Theme.Colors.warning : Theme.Colors.hairline, lineWidth: flagged ? 1.5 : 1))
     }
 }

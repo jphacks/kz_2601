@@ -86,16 +86,20 @@ struct JoinShareSheet: View {
         }
     }
 
+    /// 表示名に表示できない言葉があった(#321)
+    private var nameRejected: Bool { error == AppRuntime.displayNameRejected }
+
     private var nameField: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             Text("表示名(任意)").font(.subheadline.weight(.semibold))
             TextField("例: 父、たろう", text: $name)
                 .submitLabel(.done)
                 .textInputAutocapitalization(.never)
-                .metamonInputField()
+                .metamonInputField(flagged: nameRejected)
                 .accessibilityIdentifier("join.name")
                 .onChange(of: name) { _, new in
                     if new.count > SharedDisplayName.maxLength { name = String(new.prefix(SharedDisplayName.maxLength)) }
+                    if nameRejected { error = nil } // 直し始めたら警告を消す
                 }
             Text("空欄のままなら、名前なしで一覧に出ます")
                 .font(.caption)

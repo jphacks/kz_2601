@@ -34,7 +34,7 @@ func checkChatThread(where string, c *Component, entities map[string]*Entity, ad
 	}
 }
 
-// chatEntities: entities a chatThread on a reachable screen writes.
+// chatEntities: entities a chatThread or aiChat on a reachable screen writes.
 func chatEntities(a *App, reach map[string]bool) map[string]bool {
 	out := map[string]bool{}
 	for _, s := range a.Screens {
@@ -42,7 +42,7 @@ func chatEntities(a *App, reach map[string]bool) map[string]bool {
 			continue
 		}
 		eachScreenComponent(s.Components, func(_ string, c *Component) {
-			if c.Type == CompChatThread {
+			if c.Type == CompChatThread || c.Type == CompAiChat {
 				out[c.Entity] = true
 			}
 		})

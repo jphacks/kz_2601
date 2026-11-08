@@ -198,6 +198,7 @@ struct RootView: View {
         .overlay(alignment: .top) { errorCardOverlay }
         .modifier(ToastHost(onModal: false))
         .modifier(NewItemsHost()) // #268: 開いた直後に他の人の新着の数
+        .modifier(UsageNoticeHost()) // #317: 記録・写真が上限に近い(作成者・1 日 1 回)
         .onChange(of: scenePhase) { _, phase in
             rt.setForeground(phase == .active) // ホットリロードのポーリングは前面時のみ
         }

@@ -52,6 +52,12 @@ public enum SyncEvent: Sendable, Equatable {
     /// アプリの決まりで断られた(#272 管理者だけ・#273 同じ内容の記録)。操作は破棄し、create はローカル行も消した。
     /// 楽観的に書いた値が残るので、entity をサーバーから引き直すこと
     case denied(appId: String, entity: String, denial: RecordWriteDenial)
+    /// プランの上限(403 `plan_limit_reached`・#317)。操作は破棄し、create はローカル行も消した
+    case planLimit(appId: String, entity: String, limit: PlanLimit)
+    /// 運営がアプリの自動の動きを止めている(403 `app_stopped`・#346)。操作は破棄し、create はローカル行も消した
+    case appStopped(appId: String, entity: String)
+    /// 他の人に見える文字に表示できない言葉がある(422 `text_not_allowed`・#321)。`field` は直す Field.id(authorName もありうる)
+    case textNotAllowed(appId: String, entity: String, field: String?)
 }
 
 /// 指数バックオフ: base × multiplier^(attempt-1)。attempt は 1 始まり。
@@ -196,6 +202,13 @@ public actor SyncQueue {
                     emit(.notMember(appId: op.appId, entity: op.entity))
                     continue
                 }
+                if let event = Self.refusal(error, appId: op.appId, entity: op.entity) { // 403 forbidden / 4xx rejected より先に見分ける
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: rowId(op))
+                    finish(op)
+                    print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) refused: \(event)")
+                    emit(event)
+                    continue
+                }
                 if let denial = RecordWriteDenial(error) { // #272 #273: 「作った人だけ」の 403・競合の 409 より先に見分ける
                     await store.revertPending(appId: op.appId, entity: op.entity, recordId: op.recordId)
                     finish(op)
@@ -281,6 +294,15 @@ public actor SyncQueue {
             if case .string(let s) = v, s.hasPrefix("local-"), let real = aliases[s] { return .string(real) }
             return v
         }
+    }
+
+    /// 文言を分ける拒否(#317 / #346 / #321)。どれも再試行では直らない
+    static func refusal(_ error: Error, appId: String, entity: String) -> SyncEvent? {
+        guard let api = error as? APIError else { return nil }
+        if let limit = PlanLimit(api) { return .planLimit(appId: appId, entity: entity, limit: limit) }
+        if api.isAppStopped { return .appStopped(appId: appId, entity: entity) }
+        if api.isTextNotAllowed { return .textNotAllowed(appId: appId, entity: entity, field: api.field) }
+        return nil
     }
 
     enum Outcome: Equatable { case transient, conflict, forbidden, rejected(String) }

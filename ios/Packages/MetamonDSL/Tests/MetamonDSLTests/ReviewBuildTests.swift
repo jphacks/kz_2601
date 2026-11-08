@@ -15,6 +15,7 @@ final class ReviewBuildTests: XCTestCase {
         XCTAssertFalse(allowed.contains(ComponentType.chatThread.rawValue), "他の人と記録を見る chatThread は外す(#451 G2)")
         XCTAssertFalse(allowed.contains(ComponentType.matchList.rawValue), "仲間探し(#507)は共有と一緒に外す")
         XCTAssertFalse(allowed.contains(ComponentType.feed.rawValue), "外部の公開データ(#348)は外す(外部の Web の内容を出す)")
+        XCTAssertFalse(allowed.contains(ComponentType.aiChat.rawValue), "aiChat はオンライン AI だけで動く(審査用の版に無い)")
     }
 
     /// #482・#265: 記録の自動削除・条件の通知はどの版も持つ。#507: 仲間探しは審査用の版では送らない(backend が match・item.interest・matchList を使わない)。

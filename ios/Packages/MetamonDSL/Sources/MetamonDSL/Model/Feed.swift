@@ -7,35 +7,44 @@ public struct FeedQuery: Hashable, Sendable {
     public var provider: String
     public var region: String?
     public var feedId: String?
+    /// diet: 国会会議録で探す語(部品の `query`)。
+    public var q: String?
     public var limit: Int
 
-    public init(provider: String, region: String? = nil, feedId: String? = nil, limit: Int = 5) {
+    public init(provider: String, region: String? = nil, feedId: String? = nil, q: String? = nil, limit: Int = 5) {
         self.provider = provider
         self.region = region
         self.feedId = feedId
+        self.q = q
         self.limit = limit
     }
 
     /// 部品から。provider が知らない値なら nil(描かずにプレースホルダ)。
     public init?(_ c: Component) {
         guard let p = c.provider, Self.providers.contains(p) else { return nil }
-        self.init(provider: p, region: Self.regionProviders.contains(p) ? c.region : nil, feedId: p == "rss" ? c.feedId : nil,
+        if p == "diet", (c.query ?? "").trimmingCharacters(in: .whitespaces).isEmpty { return nil }
+        self.init(provider: p, region: Self.regionProviders.contains(p) ? c.region : nil,
+                  feedId: Self.feedIdProviders.contains(p) ? c.feedId : nil, q: p == "diet" ? c.query : nil,
                   limit: Swift.min(Swift.max(c.limit ?? 5, 1), 20))
     }
 
-    public static let providers: Set<String> = ["weather", "holidays", "rss", "warnings", "pressure"]
+    public static let providers: Set<String> = ["weather", "holidays", "rss", "warnings", "pressure", "arxiv", "diet"]
+    /// `feedId`(許可した id)を読む provider。
+    public static let feedIdProviders: Set<String> = ["rss", "arxiv"]
     /// `region`(府県予報区のコード)を読む provider。
     public static let regionProviders: Set<String> = ["weather", "warnings", "pressure"]
 
-    /// `v1/feeds/{provider}?…`(値は英数字とハイフンだけなので、そのまま URL に入る)。
+    /// `v1/feeds/{provider}?…`。q(日本語・記号)は百分率符号化し、`+` も `%2B` にする(サーバーは `+` を空白と読む)。
     public var path: String {
         var items = [URLQueryItem]()
         if let region { items.append(URLQueryItem(name: "region", value: region)) }
         if let feedId { items.append(URLQueryItem(name: "feedId", value: feedId)) }
+        if let q { items.append(URLQueryItem(name: "q", value: q)) }
         items.append(URLQueryItem(name: "limit", value: String(limit)))
         var c = URLComponents()
         c.path = "v1/feeds/\(provider)"
         c.queryItems = items
+        c.percentEncodedQuery = c.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
         return c.string ?? "v1/feeds/\(provider)"
     }
 }

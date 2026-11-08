@@ -672,6 +672,8 @@ func (a *App) Validate() error {
 				checkLocationTracker(where, c, entities, add)
 			case CompChatThread:
 				checkChatThread(where, c, entities, add)
+			case CompAiChat:
+				checkAIChat(where, c, entities, add) // ai_chat.go
 			case CompHealthStat:
 				checkHealthStat(where, c, add)
 			case CompDashcam:
