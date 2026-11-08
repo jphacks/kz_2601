@@ -399,7 +399,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 	var problems []string
 	var lastCandidate []byte
 	var linted *attemptResult // valid output kept while regenerating for its lint warnings
-	streamed := false // a component event was sent: a regeneration sends restart (#636)
+	streamed := false         // a component event was sent: a regeneration sends restart (#636)
 	for i := 0; i <= s.maxRegen(); i++ {
 		if i > 0 {
 			restartEvent(sink, loc, ar.meta.Attempts+1, streamed)
