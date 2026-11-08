@@ -45,7 +45,7 @@ final class MCPassbyTransport: NSObject, PassbyTransport {
 
     var distanceSupport: PassbyDistanceSupport {
         NISession.deviceCapabilities.supportsPreciseDistanceMeasurement
-            ? .supported : .unsupported("この端末は距離・方向の測定に対応していません(iPhone 11 以降・SE を除く)")
+            ? .supported : .unsupported(L10n.tr("この端末は距離・方向の測定に対応していません(iPhone 11 以降・SE を除く)"))
     }
 
     private struct Message: Codable {
@@ -234,7 +234,7 @@ extension MCPassbyTransport: MCNearbyServiceAdvertiserDelegate {
     }
 
     nonisolated func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
-        Task { @MainActor in self.onNotice?("近くの端末を探せませんでした(設定 › プライバシー › ローカルネットワークで Tailor It を許可してください)") }
+        Task { @MainActor in self.onNotice?(L10n.tr("近くの端末を探せませんでした(設定 › プライバシー › ローカルネットワークで Tailor It を許可してください)")) }
     }
 }
 
@@ -246,7 +246,7 @@ extension MCPassbyTransport: MCNearbyServiceBrowserDelegate {
     nonisolated func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {}
 
     nonisolated func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
-        Task { @MainActor in self.onNotice?("近くの端末を探せませんでした(設定 › プライバシー › ローカルネットワークで Tailor It を許可してください)") }
+        Task { @MainActor in self.onNotice?(L10n.tr("近くの端末を探せませんでした(設定 › プライバシー › ローカルネットワークで Tailor It を許可してください)")) }
     }
 }
 

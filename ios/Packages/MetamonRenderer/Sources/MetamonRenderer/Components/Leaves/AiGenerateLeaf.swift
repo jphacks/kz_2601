@@ -31,7 +31,7 @@ struct AiGenerateLeaf: View {
                     } else {
                         Image(systemName: isUnavailable ? "exclamationmark.triangle" : "sparkles")
                     }
-                    Text(busy ? "AI が考えています…" : label)
+                    Text(busy ? L("AI が考えています…") : label)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -61,7 +61,7 @@ struct AiGenerateLeaf: View {
 
     private var label: String {
         if let l = c.label, !l.isEmpty { return l }
-        return result == nil ? "AI に書いてもらう" : "もう一度"
+        return result == nil ? L("AI に書いてもらう") : L("もう一度")
     }
 
     @ViewBuilder private var caption: some View {
@@ -70,9 +70,9 @@ struct AiGenerateLeaf: View {
         } else if case .unavailable(let reason) = route {
             Text("\(AIAvailability.title): \(reason)").font(.caption).foregroundStyle(.secondary)
         } else if result != nil, c.output != nil, ctx.form != nil {
-            Text("入力欄にも入れました。確認して保存してください").font(.caption).foregroundStyle(.secondary)
+            Text(L("入力欄にも入れました。確認して保存してください")).font(.caption).foregroundStyle(.secondary)
         } else if result != nil, usedOnline {
-            Text("オンラインの AI が書きました").font(.caption).foregroundStyle(.secondary)
+            Text(L("オンラインの AI が書きました")).font(.caption).foregroundStyle(.secondary)
         }
     }
 

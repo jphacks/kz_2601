@@ -10,8 +10,8 @@ enum AIPhotoInput {
 
         var errorDescription: String? {
             switch self {
-            case .noPhoto: "先に写真を撮るか選んでください"
-            case .unreadable: "写真を読み込めませんでした。撮り直してからお試しください"
+            case .noPhoto: L("先に写真を撮るか選んでください")
+            case .unreadable: L("写真を読み込めませんでした。撮り直してからお試しください")
             }
         }
     }

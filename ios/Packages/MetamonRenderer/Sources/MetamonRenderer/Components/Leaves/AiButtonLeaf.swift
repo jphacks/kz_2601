@@ -40,7 +40,7 @@ struct AiButtonLeaf: View {
                         } else {
                             Image(systemName: isUnavailable ? "exclamationmark.triangle" : "sparkles")
                         }
-                        Text(busy ? "AI が考えています…" : label)
+                        Text(busy ? L("AI が考えています…") : label)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -61,8 +61,8 @@ struct AiButtonLeaf: View {
 
     private var hint: String {
         switch route {
-        case .onDevice: "端末内の AI で処理し、結果を入力欄に入れます"
-        case .online: "オンラインの AI で処理し、結果を入力欄に入れます"
+        case .onDevice: L("端末内の AI で処理し、結果を入力欄に入れます")
+        case .online: L("オンラインの AI で処理し、結果を入力欄に入れます")
         case .unavailable(let reason): reason
         }
     }
@@ -73,7 +73,7 @@ struct AiButtonLeaf: View {
         } else if case .unavailable(let reason) = route {
             Text("\(AIAvailability.title): \(reason)").font(.caption).foregroundStyle(.secondary)
         } else if done {
-            Text(usedOnline ? "オンラインの AI が入力しました。確認して保存してください" : "端末内の AI が入力しました。確認して保存してください")
+            Text(usedOnline ? L("オンラインの AI が入力しました。確認して保存してください") : L("端末内の AI が入力しました。確認して保存してください"))
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -81,12 +81,12 @@ struct AiButtonLeaf: View {
     private var label: String {
         if let l = c.label, !l.isEmpty { return l }
         switch c.task {
-        case "summarize": return "AI で要約"
-        case "classify": return "AI で分類"
-        case "rewrite": return "AI で書き直す"
-        case "extract": return "AI で抜き出す"
-        case "suggest": return "AI に提案してもらう"
-        default: return "AI で処理"
+        case "summarize": return L("AI で要約")
+        case "classify": return L("AI で分類")
+        case "rewrite": return L("AI で書き直す")
+        case "extract": return L("AI で抜き出す")
+        case "suggest": return L("AI に提案してもらう")
+        default: return L("AI で処理")
         }
     }
 

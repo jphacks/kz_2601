@@ -36,6 +36,9 @@ final class MusicPlayerTests: XCTestCase {
     }
 
     func testReceivePendingThenAcceptOrReject() async throws {
+        let savedLanguage = LanguagePreference.shared.setting
+        LanguagePreference.shared.setting = .ja // 文言は日本語で確かめる
+        defer { LanguagePreference.shared.setting = savedLanguage }
         let (s, _) = session()
         let ack = await s.receive(FakeMusicPlayback.catalog[2], from: "花子", autoAccept: false)
         XCTAssertEqual(ack, .init(ok: true, added: 1))
@@ -68,6 +71,9 @@ final class MusicPlayerTests: XCTestCase {
     }
 
     func testFailedAcceptGoesBackToPending() async throws {
+        let savedLanguage = LanguagePreference.shared.setting
+        LanguagePreference.shared.setting = .ja // 文言は日本語で確かめる
+        defer { LanguagePreference.shared.setting = savedLanguage }
         let (s, _) = session(strict: true)
         _ = await s.receive(MusicSong(title: "存在しない曲", artist: "誰か"), from: "花子", autoAccept: false)
         await s.accept(try XCTUnwrap(s.inbox.pending.first).id)
