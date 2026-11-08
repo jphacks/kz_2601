@@ -36,7 +36,7 @@ func TestServerRulesPass_DropsRepeatOfLocalReminder(t *testing.T) {
 	f := &fakeCaller{replies: []string{reminderApp, reminderRule("21:05")}}
 	svc, _ := newSvc(f)
 	svc.ServerRulesPass = true
-	res, err := svc.Generate(context.Background(), Request{AppID: "sr-" + t.Name(), Transcript: "家計簿。毎日21時05分に記録を忘れないよう通知して"})
+	res, err := svc.Generate(context.Background(), Request{AppID: "sr-" + t.Name(), Transcript: "家計簿。毎日21時05分に記録を忘れないよう私に通知して"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func medicineRule(time string) string {
 // The app already had the 21:05 reminder; 「21:05 に『薬を飲んで』とも知らせて」
 // adds no local notification, so the owner rule is the request: keep it.
 func TestServerRulesPass_KeepsRuleBesideExistingNotification(t *testing.T) {
-	res, a := editWithRule(t, reminderApp, renamePatch, medicineRule("21:05"), "21:05 に『薬を飲んで』とも知らせて")
+	res, a := editWithRule(t, reminderApp, renamePatch, medicineRule("21:05"), "21:05 に『薬を飲んで』と私にも知らせて")
 	if len(a.ServerRules) != 1 || a.ServerRules[0].ID != "medicine" || len(res.Meta.ServerRules.Dropped) != 0 {
 		t.Fatalf("rules=%+v meta=%+v", a.ServerRules, res.Meta.ServerRules)
 	}
@@ -169,7 +169,7 @@ func TestServerRulesPass_DropsRuleRepeatingAddedNotification(t *testing.T) {
 	app := strings.Replace(reminderApp, `"repeat":"daily","time":"21:05"`, `"repeat":"daily","time":"07:00"`, 1)
 	app = strings.Replace(app, `"id":"remind"`, `"id":"morning"`, 1)
 	patch := `{"summary":"通知を足しました。","patch":[{"op":"add","path":"/app/notifications/-","value":{"id":"remind","title":"記録","body":"今日の記録を忘れずに","repeat":"daily","time":"21:05"}}]}`
-	res, a := editWithRule(t, app, patch, reminderRule("21:05"), "毎日21時05分にも記録を忘れないよう通知して")
+	res, a := editWithRule(t, app, patch, reminderRule("21:05"), "毎日21時05分にも記録を忘れないよう私に通知して")
 	sm := res.Meta.ServerRules
 	if len(a.ServerRules) != 0 || len(a.App.Notifications) != 2 || len(sm.Dropped) != 1 || sm.Dropped[0] != "remind_srv" {
 		t.Fatalf("rules=%+v meta=%+v", a.ServerRules, sm)
@@ -180,7 +180,7 @@ func TestServerRulesPass_DropsRuleRepeatingAddedNotification(t *testing.T) {
 func TestServerRulesPass_DropsRuleRepeatingChangedNotification(t *testing.T) {
 	app := strings.Replace(reminderApp, `"time":"21:05"`, `"time":"20:00"`, 1)
 	patch := `{"summary":"時刻を変えました。","patch":[{"op":"replace","path":"/app/notifications/0/time","value":"21:05"}]}`
-	res, a := editWithRule(t, app, patch, reminderRule("21:05"), "記録の通知を21時05分にして")
+	res, a := editWithRule(t, app, patch, reminderRule("21:05"), "記録の通知を21時05分にして、私に届くように")
 	sm := res.Meta.ServerRules
 	if len(a.ServerRules) != 0 || a.App.Notifications[0].Time != "21:05" || len(sm.Dropped) != 1 {
 		t.Fatalf("rules=%+v meta=%+v", a.ServerRules, sm)

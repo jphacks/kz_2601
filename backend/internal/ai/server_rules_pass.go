@@ -42,7 +42,7 @@ type ServerRulesMeta struct {
 var serverRulesAskRe = regexp.MustCompile(`通知|知らせ|教えて|届[くけい]|促|リマインド|毎朝|毎晩|毎日|毎週|毎月|自動|数え|カウント|送っ|送信|送る|(?i:notif|remind|alert|let me know|every (day|morning|night|evening|week|month)|daily|weekly|monthly|automatic|count|\bsend)`)
 
 // wantsServerRules reports whether the request may need server rules.
-func wantsServerRules(transcript string) bool { return serverRulesAskRe.MatchString(transcript) }
+func wantsServerRules(transcript string) bool { return serverRulesAsk().MatchString(transcript) }
 
 func (s *Service) serverRulesEnabled() bool { return s.ServerRulesPass }
 
