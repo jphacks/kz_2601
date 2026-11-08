@@ -1021,6 +1021,23 @@
         }
       }
     },
+    "AI に渡せるのは自分が書いた記録だけです" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only records you wrote can be given to the AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI に渡せるのは自分が書いた記録だけです"
+          }
+        }
+      }
+    },
     "AI の処理に失敗しました(%@)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1731,6 +1748,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この写真は読み取れません"
+          }
+        }
+      }
+    },
+    "この写真は読み込めない場所にあります。撮り直すか選び直してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This photo is in a place the app can't read. Retake it or choose another one"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この写真は読み込めない場所にあります。撮り直すか選び直してください"
           }
         }
       }
@@ -4230,6 +4264,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "写真から選ぶ"
+          }
+        }
+      }
+    },
+    "写真が大きすぎます(10 MB まで)。撮り直すか選び直してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The photo is too large (up to 10 MB). Retake it or choose another one"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真が大きすぎます(10 MB まで)。撮り直すか選び直してください"
           }
         }
       }

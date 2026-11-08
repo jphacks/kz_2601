@@ -13,7 +13,7 @@ enum AIInputRecords {
 
         var errorDescription: String? {
             switch self {
-            case .noOwnRecords: "AI に渡せるのは自分が書いた記録だけです"
+            case .noOwnRecords: L("AI に渡せるのは自分が書いた記録だけです")
             }
         }
     }
