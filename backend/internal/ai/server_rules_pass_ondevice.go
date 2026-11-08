@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
@@ -35,22 +36,26 @@ func init() {
 }
 
 // dropOnDeviceDuplicates removes the rules added in this turn (id not in
-// current) that only repeat a local notification of app to the creator: a
-// daily / weekly time trigger with no row, condition or read, whose actions
-// are all notify to owner, at the same time (and weekday) as a time-based
-// app.notifications entry. It returns the kept rules and the dropped ids.
-func dropOnDeviceDuplicates(current []byte, app *dsl.App, rules []map[string]any) ([]map[string]any, []string) {
+// current) that only repeat a local notification added or changed in this
+// turn (not in before as is) to the creator: a daily / weekly time trigger
+// with no row, condition or read, whose actions are all notify to owner, at
+// the same time (and weekday) as a time-based app.notifications entry. A
+// notification the app already had is not this request, so a rule beside it
+// (「21:05 に薬も」) is kept. before is nil on create (all new). It returns
+// the kept rules and the dropped ids.
+func dropOnDeviceDuplicates(current, before []byte, app *dsl.App, rules []map[string]any) ([]map[string]any, []string) {
 	old := map[string]bool{}
 	if cur, err := dsl.Parse(current); err == nil {
 		for i := range cur.ServerRules {
 			old[cur.ServerRules[i].ID] = true
 		}
 	}
+	fresh := newNotifications(before, app.App.Notifications)
 	drop := map[string]bool{}
 	var ids []string
 	for i := range app.ServerRules {
 		r := &app.ServerRules[i]
-		if !old[r.ID] && repeatsLocalNotification(app, r) {
+		if !old[r.ID] && repeatsLocalNotification(fresh, r) {
 			drop[r.ID] = true
 			ids = append(ids, r.ID)
 		}
@@ -67,7 +72,37 @@ func dropOnDeviceDuplicates(current []byte, app *dsl.App, rules []map[string]any
 	return kept, ids
 }
 
-func repeatsLocalNotification(app *dsl.App, r *dsl.ServerRule) bool {
+// newNotifications returns the entries of ns not in before as is: matched by
+// id, else by time+repeat+weekday+title, and compared in full.
+func newNotifications(before []byte, ns []dsl.Notification) []dsl.Notification {
+	prev := map[string]string{}
+	if b, err := dsl.Parse(before); err == nil {
+		for _, n := range b.App.Notifications {
+			prev[notificationKey(n)] = notificationJSON(n)
+		}
+	}
+	var out []dsl.Notification
+	for _, n := range ns {
+		if j, ok := prev[notificationKey(n)]; !ok || j != notificationJSON(n) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+func notificationKey(n dsl.Notification) string {
+	if n.ID != "" {
+		return "id:" + n.ID
+	}
+	return "at:" + n.Time + "|" + n.Repeat + "|" + n.Weekday + "|" + n.Title
+}
+
+func notificationJSON(n dsl.Notification) string {
+	b, _ := json.Marshal(n)
+	return string(b)
+}
+
+func repeatsLocalNotification(ns []dsl.Notification, r *dsl.ServerRule) bool {
 	on := r.On
 	if (on.Every != "daily" && on.Every != "weekly") || on.Each != "" || on.Record != "" ||
 		r.If != nil || r.Lookup != nil || r.Similar != nil || r.Pick != nil || len(r.Do) == 0 {
@@ -79,7 +114,7 @@ func repeatsLocalNotification(app *dsl.App, r *dsl.ServerRule) bool {
 			return false
 		}
 	}
-	for _, n := range app.App.Notifications {
+	for _, n := range ns {
 		at := n.Time
 		if at == "" {
 			at = "09:00" // iOS NotificationPlanner.fixedTrigger's default
@@ -98,8 +133,8 @@ func repeatsLocalNotification(app *dsl.App, r *dsl.ServerRule) bool {
 // withoutOnDeviceDuplicates applies dropOnDeviceDuplicates to a parsed pass
 // result: it returns the DSL and app to keep (re-parsed when rules were
 // dropped) and the dropped ids.
-func withoutOnDeviceDuplicates(current []byte, next []byte, app *dsl.App, rules []map[string]any) ([]byte, *dsl.App, []string) {
-	kept, dropped := dropOnDeviceDuplicates(current, app, rules)
+func withoutOnDeviceDuplicates(current, before, next []byte, app *dsl.App, rules []map[string]any) ([]byte, *dsl.App, []string) {
+	kept, dropped := dropOnDeviceDuplicates(current, before, app, rules)
 	if len(dropped) == 0 {
 		return next, app, nil
 	}

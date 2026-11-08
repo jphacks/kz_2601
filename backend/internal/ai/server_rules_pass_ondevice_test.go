@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -85,7 +86,7 @@ func TestRepeatsLocalNotification(t *testing.T) {
 		{"record trigger", dsl.ServerRule{On: dsl.RuleTrigger{Record: "created", Entity: "events"}, Do: owner}, false},
 	}
 	for _, c := range cases {
-		if got := repeatsLocalNotification(app, &c.r); got != c.want {
+		if got := repeatsLocalNotification(app.App.Notifications, &c.r); got != c.want {
 			t.Errorf("%s: got %v", c.name, got)
 		}
 	}
@@ -99,7 +100,7 @@ func TestDropOnDeviceDuplicates_KeepsExistingRule(t *testing.T) {
 		t.Fatal(err)
 	}
 	rules := []map[string]any{{"id": "remind_srv"}}
-	kept, dropped := dropOnDeviceDuplicates(cur, a, rules)
+	kept, dropped := dropOnDeviceDuplicates(cur, nil, a, rules)
 	if len(kept) != 1 || dropped != nil {
 		t.Fatalf("kept=%v dropped=%v", kept, dropped)
 	}
@@ -113,10 +114,92 @@ func TestRepeatsLocalNotification_DefaultTimeAndMixedRecipients(t *testing.T) {
 	app.App.Notifications = []dsl.Notification{{ID: "d", Repeat: "daily"}}
 	owner := dsl.RuleAction{Notify: &dsl.RuleNotify{To: dsl.RuleRecipient{Kind: "owner"}, Title: "t", Body: "b"}}
 	members := dsl.RuleAction{Notify: &dsl.RuleNotify{To: dsl.RuleRecipient{Kind: "members"}, Title: "t", Body: "b"}}
-	if !repeatsLocalNotification(app, &dsl.ServerRule{On: dsl.RuleTrigger{Every: "daily", Time: "09:00"}, Do: []dsl.RuleAction{owner}}) {
+	if !repeatsLocalNotification(app.App.Notifications, &dsl.ServerRule{On: dsl.RuleTrigger{Every: "daily", Time: "09:00"}, Do: []dsl.RuleAction{owner}}) {
 		t.Error("09:00 owner rule repeats the untimed daily notification")
 	}
-	if repeatsLocalNotification(app, &dsl.ServerRule{On: dsl.RuleTrigger{Every: "daily", Time: "09:00"}, Do: []dsl.RuleAction{owner, members}}) {
+	if repeatsLocalNotification(app.App.Notifications, &dsl.ServerRule{On: dsl.RuleTrigger{Every: "daily", Time: "09:00"}, Do: []dsl.RuleAction{owner, members}}) {
 		t.Error("owner + members must be kept")
+	}
+}
+
+// editWithRule seeds app, then runs an edit turn whose model replies are
+// patch and rule. It returns the result and the saved app.
+func editWithRule(t *testing.T, app, patch, rule, transcript string) (*Result, *dsl.App) {
+	t.Helper()
+	f := &fakeCaller{replies: []string{patch, rule}}
+	svc, store := newSvc(f)
+	svc.ServerRulesPass = true
+	id := "ed-" + t.Name()
+	if _, err := store.Put(context.Background(), id, 0, []byte(app), appconfigclient.Source{Kind: "seed"}); err != nil {
+		t.Fatal(err)
+	}
+	res, err := svc.Generate(context.Background(), Request{AppID: id, Transcript: transcript, Mode: ModeEdit})
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved, err := store.Get(context.Background(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := dsl.Parse(saved.DSL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res, a
+}
+
+const renamePatch = `{"summary":"名前を変えました。","patch":[{"op":"replace","path":"/app/name","value":"支出メモ"}]}`
+
+func medicineRule(time string) string {
+	return `{"unchanged":false,"declined":"","serverRules":[{"id":"medicine","on":{"every":"daily","time":"` + time + `"},
+"do":[{"notify":{"to":{"kind":"owner"},"title":"薬","body":"薬を飲んで"}}]}]}`
+}
+
+// The app already had the 21:05 reminder; 「21:05 に『薬を飲んで』とも知らせて」
+// adds no local notification, so the owner rule is the request: keep it.
+func TestServerRulesPass_KeepsRuleBesideExistingNotification(t *testing.T) {
+	res, a := editWithRule(t, reminderApp, renamePatch, medicineRule("21:05"), "21:05 に『薬を飲んで』とも知らせて")
+	if len(a.ServerRules) != 1 || a.ServerRules[0].ID != "medicine" || len(res.Meta.ServerRules.Dropped) != 0 {
+		t.Fatalf("rules=%+v meta=%+v", a.ServerRules, res.Meta.ServerRules)
+	}
+}
+
+// An edit that adds the 21:05 local notification: the same owner rule repeats it.
+func TestServerRulesPass_DropsRuleRepeatingAddedNotification(t *testing.T) {
+	app := strings.Replace(reminderApp, `"repeat":"daily","time":"21:05"`, `"repeat":"daily","time":"07:00"`, 1)
+	app = strings.Replace(app, `"id":"remind"`, `"id":"morning"`, 1)
+	patch := `{"summary":"通知を足しました。","patch":[{"op":"add","path":"/app/notifications/-","value":{"id":"remind","title":"記録","body":"今日の記録を忘れずに","repeat":"daily","time":"21:05"}}]}`
+	res, a := editWithRule(t, app, patch, reminderRule("21:05"), "毎日21時05分にも記録を忘れないよう通知して")
+	sm := res.Meta.ServerRules
+	if len(a.ServerRules) != 0 || len(a.App.Notifications) != 2 || len(sm.Dropped) != 1 || sm.Dropped[0] != "remind_srv" {
+		t.Fatalf("rules=%+v meta=%+v", a.ServerRules, sm)
+	}
+}
+
+// An edit that moves an existing notification to 21:05 changes it in this turn.
+func TestServerRulesPass_DropsRuleRepeatingChangedNotification(t *testing.T) {
+	app := strings.Replace(reminderApp, `"time":"21:05"`, `"time":"20:00"`, 1)
+	patch := `{"summary":"時刻を変えました。","patch":[{"op":"replace","path":"/app/notifications/0/time","value":"21:05"}]}`
+	res, a := editWithRule(t, app, patch, reminderRule("21:05"), "記録の通知を21時05分にして")
+	sm := res.Meta.ServerRules
+	if len(a.ServerRules) != 0 || a.App.Notifications[0].Time != "21:05" || len(sm.Dropped) != 1 {
+		t.Fatalf("rules=%+v meta=%+v", a.ServerRules, sm)
+	}
+}
+
+func TestNewNotifications(t *testing.T) {
+	before := []byte(reminderApp)
+	same := dsl.Notification{ID: "remind", Title: "記録", Body: "今日の記録を忘れずに", Repeat: "daily", Time: "21:05"}
+	moved := same
+	moved.Time = "21:10"
+	noID := dsl.Notification{Title: "x", Repeat: "daily", Time: "21:05"}
+	if got := newNotifications(before, []dsl.Notification{same}); len(got) != 0 {
+		t.Errorf("unchanged counted as new: %+v", got)
+	}
+	if got := newNotifications(before, []dsl.Notification{moved, noID}); len(got) != 2 {
+		t.Errorf("changed / added must be new: %+v", got)
+	}
+	if got := newNotifications(nil, []dsl.Notification{same}); len(got) != 1 {
+		t.Errorf("create: all new: %+v", got)
 	}
 }

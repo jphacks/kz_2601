@@ -212,6 +212,8 @@ type attemptResult struct {
 	// forceFull: the DSL was changed after the patch (build restriction), so
 	// it is saved as a full document instead of the model's ops.
 	forceFull bool
+	// before: the app as it was before this turn (edit); nil on create.
+	before []byte
 }
 
 // Generate runs the pipeline: fetch current -> decide mode -> Claude ->
@@ -294,6 +296,8 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 	case ModeEdit:
 		ar, err = s.generateEdit(ctx, transcript, env, loc, sink)
 		if err == nil {
+			// the server-rules pass compares notifications with it
+			ar.before = env.DSL
 			ar.summary = withShareNote(ar.summary, transcript, env.DSL, ar.raw, loc) // #259 #215
 			notePublicPII(ar, env.DSL, loc)                                          // #253
 		}

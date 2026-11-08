@@ -240,7 +240,7 @@ func withServerRules(current []byte, rules []map[string]any) ([]byte, error) {
 // runServerRulesPass returns the validated DSL with the new serverRules (or
 // current when nothing applied) and the pass metadata. It never fails the
 // request: a call error or rules that never validate keep current.
-func (s *Service) runServerRulesPass(ctx context.Context, transcript string, current []byte, loc Locale) ([]byte, *ServerRulesMeta) {
+func (s *Service) runServerRulesPass(ctx context.Context, transcript string, current, before []byte, loc Locale) ([]byte, *ServerRulesMeta) {
 	sm := &ServerRulesMeta{}
 	var problems []string
 	for i := 0; i <= s.maxRegen(); i++ {
@@ -281,7 +281,7 @@ func (s *Service) runServerRulesPass(ctx context.Context, transcript string, cur
 			continue
 		}
 		sm.Problems = nil
-		next, app, sm.Dropped = withoutOnDeviceDuplicates(current, next, app, rules)
+		next, app, sm.Dropped = withoutOnDeviceDuplicates(current, before, next, app, rules)
 		sm.Rules = len(app.ServerRules)
 		if sameServerRules(current, app) {
 			return current, sm
@@ -317,7 +317,7 @@ func (s *Service) applyServerRulesPass(ctx context.Context, transcript string, a
 		return // matching apps cannot have server rules (#339)
 	}
 	t := time.Now()
-	next, sm := s.runServerRulesPass(ctx, transcript, ar.raw, loc)
+	next, sm := s.runServerRulesPass(ctx, transcript, ar.raw, ar.before, loc)
 	ar.latency += time.Since(t)
 	ar.meta.Usage.Add(sm.Usage)
 	ar.meta.ServerRules = sm
