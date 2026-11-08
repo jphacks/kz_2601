@@ -53,6 +53,8 @@ type Restriction struct {
 	noHealth   bool
 	noCamera   bool
 	noShared   bool
+	// noBook: the server switched the book lookup off (book_gate.go)
+	noBook bool
 	// noRetention (#482): the client cannot purge (Entity.retentionDays)
 	noRetention bool
 	// noWhen (#265): the client cannot evaluate Notification.when
@@ -179,6 +181,9 @@ func (r *Restriction) setKey() {
 	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared || r.noRetention || r.noWhen || r.noMatching || r.noSingle || r.noRoles || r.noAddressed || r.noNear {
 		r.key = strings.Join(r.Disallowed(), ",") + fmt.Sprintf("|h=%t|c=%t|s=%t|r=%t|w=%t", r.noHealth, r.noCamera, r.noShared, r.noRetention, r.noWhen) +
 			fmt.Sprintf("|m=%t|1=%t|a=%t|to=%t|n=%t", r.noMatching, r.noSingle, r.noRoles, r.noAddressed, r.noNear)
+	}
+	if r.noBook {
+		r.key += "|book=off"
 	}
 }
 
@@ -323,6 +328,9 @@ func restrictSchemaJSON(raw []byte, r Restriction) []byte {
 	}
 	if r.noShared {
 		restrictEntitySharing(defs)
+	}
+	if r.noBook {
+		restrictBookSchema(defs)
 	}
 	if r.noRetention {
 		if entity, _ := defs["Entity"].(map[string]any); entity != nil {
@@ -498,6 +506,9 @@ func buildRestrictedPrompt(system string, r Restriction) string {
 	if r.noShared {
 		s = dropSharingRules(s)
 	}
+	if r.noBook {
+		s = strings.Replace(s, "\n\n"+bookRules, "", 1)
+	}
 	if r.noRetention {
 		s = strings.Replace(s, "\n\n"+retentionRules, "", 1)
 		s = strings.Replace(s, retentionChatRule, noRetentionChatRule, 1)
@@ -575,6 +586,9 @@ func restrictionNote(r Restriction) string {
 	if r.noShared {
 		b.WriteString("- 記録はすべて自分だけ(private)。entity の scope / edit / marks、$author・$marks は使わない。「みんなで」「共有」「投稿」「ランキング」「掲示板」「チャット」のように他の人とデータを見る依頼は、このアプリの版ではできないと伝え、自分だけの記録で近い形を作る。\n")
 	}
+	if r.noBook {
+		b.WriteString(noBookNote)
+	}
 	if r.noRetention {
 		b.WriteString("- 記録の自動削除(entity の retentionDays)は使わない(この版では期間を過ぎた記録を消せない)。頼まれたら「この版では記録の自動削除はできません。最新版に更新すると使えます」と伝え、ほかの変更だけ行う。\n")
 	}
@@ -635,7 +649,7 @@ func countDisallowed(raw []byte, r Restriction) map[string]int {
 func restrictionViolations(raw, base []byte, r Restriction) []string {
 	now := countDisallowed(raw, r)
 	before := countDisallowed(base, r)
-	var out []string
+	out := bookViolations(raw, base, r)
 	for _, t := range sortedIntKeys(now) {
 		if now[t] > before[t] {
 			out = append(out, fmt.Sprintf("component type %q is not available in this app build: do not use it (use only the parts in the catalog)", t))
@@ -834,6 +848,11 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 			if cs, ok := sc["components"].([]any); ok {
 				sc["components"] = fixComps(cs)
 			}
+		}
+	}
+	if r.noBook {
+		if n := unbook(root); n > 0 {
+			removed["lookupBook button"] = n // notes: "removed n lookupBook button"
 		}
 	}
 	if r.noHealth {

@@ -12003,6 +12003,23 @@
         }
       }
     },
+    "本の情報の取得は今使えません。手で入力してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Book lookup isn't available right now. Please enter it by hand."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本の情報の取得は今使えません。手で入力してください"
+          }
+        }
+      }
+    },
     "本の情報はフォームの画面で読み込めます" : {
       "extractionState" : "manual",
       "localizations" : {
