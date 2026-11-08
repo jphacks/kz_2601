@@ -26,11 +26,13 @@ func TestWantsServerRulesRecall(t *testing.T) {
 		// overlap
 		{"同じ時間に2人が予約できないようにして", true},
 		{"ダブルブッキングを防ぎたい", true},
+		{"会議室の予約がかぶらないようにして", true},
 		// English
 		{"text my mom when I get home", true},
 		{"ping the group when someone signs up", true},
 		{"email all participants the agenda", true},
 		{"let the team know about it", true},
+		{"let the whole team know when a task is done", true},
 		{"when a new member joins", true},
 		{"Every Sunday night, save a summary of the week's habits", true},
 		{"record the day's total at midnight", true},

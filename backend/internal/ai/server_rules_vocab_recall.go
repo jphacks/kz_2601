@@ -17,8 +17,8 @@ const serverRulesRecallAsk = `` +
 	`|(月末|月初|週末)[^。]{0,10}(まとめ|集計|締め|記録|保存)` +
 	`|ローテーション` +
 	// overlapping bookings
-	`|同じ時間[^。]{0,10}予約|ダブルブッキング` +
-	`|(?i:\b(notify|ping|text|email|let)\b[^.]{0,24}\b(my (partner|mom|dad|wife|husband|family|parents)|everyone|everybody|all (the )?(participants|members)|the (group|team))\b` +
+	`|同じ時間[^。]{0,10}予約|予約が(かぶ|重な)|ダブルブッキング` +
+	`|(?i:\b(notify|ping|text|email|let)\b[^.]{0,24}\b(my (partner|mom|dad|wife|husband|family|parents)|everyone|everybody|all (the )?(participants|members)|the (group|team)|the whole (team|group|class|family))\b` +
 	`|\bwhen (my|a|an) \w+( \w+)? (adds|joins|signs up|posts)` +
 	`|\b(save|record|log|store|keep)s? (a|the) (\w+'s )?(daily |weekly |monthly )?(summary|total)\b` +
 	`|\b(log|record|save)\b[^.]{0,12}\bweather\b|double[- ]?book)`
