@@ -73,6 +73,22 @@ final class AiGenerateTests: XCTestCase {
         XCTAssertThrowsError(try AIGenerateBuilder.build(empty, form: nil, values: [:], sourceEntity: nil, records: [], locale: "ja"))
     }
 
+    // #780 プレースホルダは括弧内の空白を許し、1 回の走査で置き換える
+    func testPlaceholdersAllowSpacesAndExpandOnce() throws {
+        let entity = try JSONDecoder().decode(Entity.self, from: Data(#"""
+            {"id":"d","name":"日記","fields":[{"id":"title","name":"題","type":"string"},{"id":"body","name":"本文","type":"text"}]}
+            """#.utf8))
+        let c = try component(#"{"type":"aiButton","task":"generate","prompt":"{{ title }}と{{\tbody }}を{{ input }}で。{{ other }}","input":"body"}"#)
+        let values: [String: JSONValue] = ["title": .string("{{body}}"), "body": .string("{{input}}")]
+        let ja = try AIGenerateBuilder.build(c, form: entity, values: values, sourceEntity: nil, records: [], locale: "ja")
+        XCTAssertEqual(ja.instruction, "{{body}}と{{input}}を下の材料で。{{ other }}", "値の中の {{…}} は再展開しない・知らない id は残す")
+        let en = try AIGenerateBuilder.build(c, form: entity, values: values, sourceEntity: nil, records: [], locale: "en")
+        XCTAssertTrue(en.instruction.contains("the data below"))
+
+        let noForm = try AIGenerateBuilder.build(c, form: nil, values: values, sourceEntity: nil, records: [], locale: "ja")
+        XCTAssertEqual(noForm.instruction, "{{ title }}と{{\tbody }}を下の材料で。{{ other }}", "フォームが無ければ field は置き換えない")
+    }
+
     func testPromptDescribesShape() {
         let list = AITextRequest(instruction: "案", shape: .list, count: 4)
         XCTAssertTrue(AIGenerateBuilder.prompt(list).contains("4 個"))
