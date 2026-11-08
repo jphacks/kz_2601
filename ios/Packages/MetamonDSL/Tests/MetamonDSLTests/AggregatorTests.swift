@@ -57,7 +57,17 @@ final class AggregatorTests: XCTestCase {
         XCTAssertEqual(FieldCoding.currency(-500), "-¥500")
         XCTAssertEqual(FieldCoding.currency(-0.2), "¥0")
         XCTAssertEqual(Aggregator.format(12.5, as: nil, unit: "kg"), "12.5 kg")
-        XCTAssertEqual(Aggregator.format(40, as: "percent"), "40%")
+        XCTAssertEqual(Aggregator.format(0.4, as: "percent"), "40%")
+    }
+
+    /// percent は比率(0〜1)を 100 倍で出す。stat の value / aggregate どちらの経路も同じ関数を通る
+    func testPercentIsRatio() {
+        XCTAssertEqual(Aggregator.format(0.5, as: "percent"), "50%")
+        XCTAssertEqual(Aggregator.format(1.42, as: "percent"), "142%")
+        XCTAssertEqual(Aggregator.format(0, as: "percent"), "0%")
+        // aggregate モード(avg of 0/1)も同じ尺度: 4 件中 1 件 → 25%
+        let rs = [0.0, 1, 0, 0].enumerated().map { i, v in Record(id: "\(i)", data: ["done": .number(v)]) }
+        XCTAssertEqual(Aggregator.format(Aggregator.aggregate("avg", field: "done", over: rs), as: "percent"), "25%")
     }
 
     func testFieldCodingNormalize() throws {

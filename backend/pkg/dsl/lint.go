@@ -77,6 +77,9 @@ func (l *linter) component(where string, c *Component) {
 		l.constExpr(where+".value", c.Value)
 		l.exprFilters(where+".value", c.Value)
 	}
+	if c.Type == CompStat && c.Aggregate != "" && c.Format == "percent" {
+		l.add(`%s: format percent is for value (a 0..1 ratio, shown x100); aggregate %q is a count/total, not a ratio. Use value {"op":"div","args":[{"agg":"sum","entity":...,"field":...},<target>]} with percent, or drop format`, where, c.Aggregate)
+	}
 	switch c.Type {
 	case CompStat, CompProgressBar, CompGauge:
 		l.periodLabel(where, c)
