@@ -203,6 +203,7 @@ final class DashcamRecorder {
     @ObservationIgnored private var rotation: AVCaptureDevice.RotationCoordinator?
     @ObservationIgnored private var wantsRecording = false
     @ObservationIgnored private var resumeAfterBackground = false
+    @ObservationIgnored private var screenAwake: ScreenAwake.Hold?
 
     /// 端末の空きがこれを切ったら録画を止める
     static let minimumFreeBytes: Int64 = 500_000_000
@@ -282,7 +283,7 @@ final class DashcamRecorder {
         autoStart.disarm()
         phase = .recording
         recordingSince = .now
-        UIApplication.shared.isIdleTimerDisabled = true
+        if screenAwake == nil { screenAwake = ScreenAwake.shared.hold() }
         if active == nil { beginSegment() } // 前の区間を閉じている途中なら、閉じた後に始まる
     }
 
@@ -295,7 +296,8 @@ final class DashcamRecorder {
         capture.stopSegment()
         if phase == .recording { phase = .ready }
         recordingSince = nil
-        UIApplication.shared.isIdleTimerDisabled = false
+        screenAwake?.release()
+        screenAwake = nil
     }
 
     /// 「今の映像を保存」: 衝撃が無くても前後を保存済みにする。

@@ -22,6 +22,8 @@ struct FileImportLeaf: View {
     @State private var transcribing: Double?
     @State private var job: Task<Void, Never>?
     @State private var leftForeground = false
+    /// 背面に回った時、今の区切りで止めるまでの猶予
+    @State private var grace = BackgroundGrace()
     @State private var pending: Pending?
     @State private var progress: (done: Int, total: Int)?
     @State private var status: String?
@@ -78,8 +80,10 @@ struct FileImportLeaf: View {
         .onDisappear { job?.cancel() }
         .onChange(of: scenePhase) { _, phase in
             // 文字起こしは前面だけ(背面ではモデルが止められることがある)。戻ってから選び直してもらう。
+            // 止まるまで(長くても 1 区切り)を背面の猶予で待つ。
             if phase == .background, transcribing != nil {
                 leftForeground = true
+                grace.begin("fileImport.transcribe")
                 job?.cancel()
             }
         }
@@ -164,10 +168,11 @@ struct FileImportLeaf: View {
         }
         leftForeground = false
         transcribing = 0
-        UIApplication.shared.isIdleTimerDisabled = true // 文字にしている間は画面を消さない(前面だけで進むため)
+        let awake = ScreenAwake.shared.hold() // 文字にしている間は画面を消さない(前面だけで進むため)
         defer {
             transcribing = nil
-            UIApplication.shared.isIdleTimerDisabled = false
+            awake.release()
+            grace.end()
         }
         do {
             let text = try await host.transcribeAudioFile(url) { transcribing = $0 }

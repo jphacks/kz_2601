@@ -18,16 +18,95 @@ final class AudioFileTranscriberTests: XCTestCase {
         }
     }
 
-    func testBlocksCoverEverySampleOnce() {
-        let rate = 16_000, block = AudioFileChunking.blockSeconds * rate
-        XCTAssertEqual(AudioFileChunking.blocks(sampleCount: 0, sampleRate: rate), [])
-        XCTAssertEqual(AudioFileChunking.blocks(sampleCount: 10, sampleRate: rate), [0..<10])
-        let thirtyMin = 30 * 60 * rate
-        let blocks = AudioFileChunking.blocks(sampleCount: thirtyMin + 5, sampleRate: rate)
-        XCTAssertEqual(blocks.count, 16)
-        XCTAssertEqual(blocks.first, 0..<block)
-        XCTAssertEqual(blocks.last, (15 * block)..<(thirtyMin + 5))
-        XCTAssertEqual(blocks.map(\.count).reduce(0, +), thirtyMin + 5)
+    func testWindowsCoverWholeRecordingOnce() {
+        let size = Double(AudioFileChunking.blockSeconds)
+        XCTAssertEqual(AudioFileChunking.blockSeconds, 30, "背面に回った時に待つのは長くても 30 秒")
+        XCTAssertEqual(AudioFileChunking.windows(seconds: 0), [])
+        XCTAssertEqual(AudioFileChunking.windows(seconds: .nan), [])
+        XCTAssertEqual(AudioFileChunking.windows(seconds: 10), [0..<10])
+        let thirtyMin = 30.0 * 60
+        let windows = AudioFileChunking.windows(seconds: thirtyMin + 5)
+        XCTAssertEqual(windows.count, 61)
+        XCTAssertEqual(windows.first, 0..<size)
+        XCTAssertEqual(windows.last, (60 * size)..<(thirtyMin + 5))
+        XCTAssertEqual(windows.map { $0.upperBound - $0.lowerBound }.reduce(0, +), thirtyMin + 5, accuracy: 1e-6)
+        for (a, b) in zip(windows, windows.dropFirst()) { XCTAssertEqual(a.upperBound, b.lowerBound, "隙間・重なりなし") }
+    }
+
+    /// 区切りは 1 つずつ読んで文字にする(先に全部読まない)。無音の区切りは文字にしない。
+    func testRunReadsOneWindowAtATime() async throws {
+        let log = Log()
+        var seen: [Double] = []
+        let text = try await AudioFileChunking.run(
+            seconds: 75,
+            read: { window in
+                await log.add("read \(Int(window.lowerBound))")
+                return [Float](repeating: window.lowerBound == 30 ? 0 : 0.5, count: 4)
+            },
+            transcribe: { samples, _ in
+                await log.add("transcribe")
+                return samples.first == 0 ? "" : "part"
+            },
+            progress: { seen.append($0) }
+        )
+        XCTAssertEqual(text, "part\npart")
+        let entries = await log.entries
+        XCTAssertEqual(entries, ["read 0", "transcribe", "read 30", "transcribe", "read 60", "transcribe"])
+        XCTAssertEqual(seen, [0, 1.0 / 3, 2.0 / 3, 1])
+    }
+
+    /// 文字にしている途中のキャンセル: `stop` で知らせ(WhisperKit の callback が false を返す)、次の区切りは読まない。
+    func testRunStopsMidChunkOnCancel() async throws {
+        let log = Log()
+        let started = AsyncStream<Void>.makeStream()
+        let job = Task { @MainActor in
+            try await AudioFileChunking.run(
+                seconds: 120,
+                read: { window in
+                    await log.add("read \(Int(window.lowerBound))")
+                    return [0.5]
+                },
+                transcribe: { _, stop in
+                    started.continuation.yield()
+                    // WhisperKit の callback と同じく、stop を見るまで続ける(Task のキャンセルは見ない)
+                    while !stop.isStopped { await Task.yield() }
+                    return "途中まで"
+                },
+                progress: { _ in }
+            )
+        }
+        for await _ in started.stream { break }
+        job.cancel()
+        do {
+            _ = try await job.value
+            XCTFail("want cancellation")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        let entries = await log.entries
+        XCTAssertEqual(entries, ["read 0"], "やめた後の区切りは読まない")
+    }
+
+    func testRunPropagatesReadFailure() async {
+        struct Broken: Error {}
+        do {
+            _ = try await AudioFileChunking.run(seconds: 60, read: { _ in throw Broken() }, transcribe: { _, _ in "x" }, progress: { _ in })
+            XCTFail("want failure")
+        } catch {
+            XCTAssertTrue(error is Broken)
+        }
+    }
+
+    func testStatusAfterRecognizingKeepsOtherStates() {
+        XCTAssertEqual(WhisperKitRecognizer.statusAfterRecognizing(.recognizing), .ready)
+        XCTAssertEqual(WhisperKitRecognizer.statusAfterRecognizing(.failed("x")), .failed("x"), "失敗を ready で上書きしない")
+        XCTAssertEqual(WhisperKitRecognizer.statusAfterRecognizing(.loading), .loading)
+        XCTAssertEqual(WhisperKitRecognizer.statusAfterRecognizing(.notDownloaded), .notDownloaded)
+    }
+
+    actor Log {
+        var entries: [String] = []
+        func add(_ e: String) { entries.append(e) }
     }
 
     func testFallbackUsesPrimaryOnly() async throws {

@@ -11,5 +11,7 @@ extension AppRuntime: FeedHost {
         guard let client = services.feeds else { throw URLError(.unsupportedURL) }
         return try await FeedCache.shared.load(query, force: force, client: client)
     }
+
+    func cachedFeed(_ query: FeedQuery) -> FeedResult? { FeedCache.shared.cached(query) }
 }
 #endif

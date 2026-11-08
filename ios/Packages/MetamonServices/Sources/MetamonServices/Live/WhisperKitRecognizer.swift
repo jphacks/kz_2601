@@ -234,7 +234,7 @@ public final class WhisperKitRecognizer: SpeechTranscriber, AudioFileTranscriber
         }
 
         status = .recognizing
-        defer { status = .ready }
+        defer { status = Self.statusAfterRecognizing(status) }
         let options = DecodingOptions(
             task: .transcribe,
             language: language(),
@@ -264,22 +264,19 @@ public final class WhisperKitRecognizer: SpeechTranscriber, AudioFileTranscriber
 
     public var canTranscribeFiles: Bool { pipe != nil && status == .ready && !isRecording && !isTranscribingFile }
 
-    /// ファイルを 16kHz モノラルに読み、`AudioFileChunking.blockSeconds` ごとに文字にする。端末内だけ。
+    /// ファイルを `AudioFileChunking.blockSeconds` ごとに 16kHz モノラルで読み、その区切りだけを文字にする(全体をメモリに載せない)。端末内だけ。
+    /// キャンセルは区切りの間で見て、文字にしている途中は WhisperKit の callback に false を返して止める。
     public func transcribeFile(at url: URL, progress: @escaping @MainActor (Double) -> Void) async throws -> String {
         guard let pipe, canTranscribeFiles else { throw TranscriberFailure.notReady("\(status)") }
         isTranscribingFile = true
         status = .recognizing
         defer {
             isTranscribingFile = false
-            status = .ready
+            status = Self.statusAfterRecognizing(status)
         }
         let path = url.path
-        let samples = try await Task.detached(priority: .userInitiated) {
-            try AudioProcessor.loadAudioAsFloatArray(fromPath: path)
-        }.value
-        try Task.checkCancellation()
-        let blocks = AudioFileChunking.blocks(sampleCount: samples.count, sampleRate: WhisperKit.sampleRate)
-        log("file transcribe start samples=\(samples.count) blocks=\(blocks.count)")
+        let seconds = try Self.audioSeconds(path: path)
+        log("file transcribe start seconds=\(Int(seconds)) blocks=\(AudioFileChunking.windows(seconds: seconds).count)")
         let options = DecodingOptions(
             task: .transcribe,
             language: language(),
@@ -289,20 +286,41 @@ public final class WhisperKitRecognizer: SpeechTranscriber, AudioFileTranscriber
             withoutTimestamps: true,
             chunkingStrategy: .vad
         )
-        var parts: [String] = []
-        progress(0)
-        for (i, range) in blocks.enumerated() {
-            try Task.checkCancellation()
-            let block = Array(samples[range])
-            if Self.levels(of: block).0 >= Self.silencePeak {
-                let results = try await pipe.transcribe(audioArray: block, decodeOptions: options)
-                let text = results.map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines)
-                if !text.isEmpty { parts.append(text) }
-            }
-            progress(Double(i + 1) / Double(blocks.count))
+        let text = try await AudioFileChunking.run(
+            seconds: seconds,
+            read: { window in try Self.readWindow(path: path, window) },
+            transcribe: { samples, stop in
+                guard Self.levels(of: samples).0 >= Self.silencePeak else { return "" }
+                let results = try await pipe.transcribe(audioArray: samples, decodeOptions: options, callback: { _ in
+                    stop.isStopped ? false : nil
+                })
+                return results.map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines)
+            },
+            progress: progress
+        )
+        log("file transcribe done chars=\(text.count)")
+        return text
+    }
+
+    /// 文字にし終えた後の状態。途中で失敗・読み直しに変わっていたら上書きしない。
+    nonisolated static func statusAfterRecognizing(_ current: TranscriberStatus) -> TranscriberStatus {
+        current == .recognizing ? .ready : current
+    }
+
+    /// 録音の長さ(秒)。ヘッダだけ読む。
+    nonisolated static func audioSeconds(path: String) throws -> Double {
+        let file = try AVAudioFile(forReading: URL(fileURLWithPath: path), commonFormat: .pcmFormatFloat32, interleaved: false)
+        guard file.fileFormat.sampleRate > 0 else { return 0 }
+        return Double(file.length) / file.fileFormat.sampleRate
+    }
+
+    /// 区切り 1 つ分だけを 16kHz モノラルで読む(呼ぶ側の Task のまま・主スレッドの外)。
+    nonisolated static func readWindow(path: String, _ window: Range<Double>) throws -> [Float] {
+        try autoreleasepool {
+            let file = try AVAudioFile(forReading: URL(fileURLWithPath: path), commonFormat: .pcmFormatFloat32, interleaved: false)
+            let buffer = try AudioProcessor.loadAudio(fromFile: file, startTime: window.lowerBound, endTime: window.upperBound)
+            return AudioProcessor.convertBufferToArray(buffer: buffer)
         }
-        log("file transcribe done chars=\(parts.joined().count)")
-        return parts.joined(separator: "\n")
     }
 
     /// (ピーク振幅, RMS)。空なら (0, 0)。
