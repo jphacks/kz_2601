@@ -17,11 +17,13 @@ import (
 )
 
 // sharedAppFixture: "pro-owner" made app P (Pro), "free-owner" made app F (no
-// Pro); "member" joined both, "outsider" joined neither.
+// Pro); "member" joined both, "outsider" joined neither. Both apps publish
+// sharedAppDSL, whose components the tests' requests match.
 func sharedAppFixture(t *testing.T, s interface {
 	AppMembers
 	ClaimApp(ctx context.Context, uid, appID string) (string, error)
 	AddMember(ctx context.Context, appID string, m store.Member) (bool, error)
+	PublishApp(ctx context.Context, uid, appID string, raw json.RawMessage, name string, version int) (bool, error)
 }, suffix string) (proApp, freeApp string) {
 	t.Helper()
 	ctx := context.Background()
@@ -30,12 +32,24 @@ func sharedAppFixture(t *testing.T, s interface {
 		if _, err := s.ClaimApp(ctx, owner, app); err != nil {
 			t.Fatal(err)
 		}
+		if _, err := s.PublishApp(ctx, owner, app, json.RawMessage(sharedAppDSL), "shared", 1); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := s.AddMember(ctx, app, store.Member{UID: "member", Via: store.MemberViaShare, InvitedBy: owner}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	return proApp, freeApp
 }
+
+// sharedAppDSL has the aiButton / aiChat components the shared-app tests call.
+const sharedAppDSL = `{"version":1,"screens":[{"id":"home","title":"t","components":[
+ {"type":"aiButton","task":"generate","prompt":"励ましの一言","output":"s"},
+ {"type":"aiButton","task":"generate","prompt":"x","output":"s"},
+ {"type":"aiButton","task":"generate","prompt":"手紙","length":"long","output":"s"},
+ {"type":"aiButton","task":"generate","prompt":"説明","inputPhoto":"photo","output":"s"},
+ {"type":"stack","children":[{"type":"aiButton","task":"extract","prompt":"薬","inputPhoto":"photo","output":"s"}]},
+ {"type":"aiChat","entity":"msgs","textField":"text","persona":"p"}]}]}`
 
 func textReason(t *testing.T, body []byte) string {
 	t.Helper()

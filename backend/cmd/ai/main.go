@@ -16,6 +16,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/appcheck"
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/books"
 	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
@@ -91,6 +92,7 @@ func main() {
 		ServerRulesPass: os.Getenv("AI_SERVER_RULES") == "1", // server rules for automatic actions (#343)
 		LintRetry:       os.Getenv("AI_LINT_RETRY") == "1",   // off: lint warnings are reported only
 		TextImage:       os.Getenv("AI_TEXT_IMAGE") == "1",   // aiButton inputPhoto; off until the privacy policy names photos
+		NoBookLookup:    !books.EnabledFromEnv(os.Getenv),    // lookupBook only while appconfig has BOOK_LOOKUP_ENABLED (openBD terms)
 		Logger:          claude.Logger,                       // ai.generate per request (#322)
 		// clarify turn (#147): its own model/effort/thinking; empty = ai.DefaultChat*
 		ChatConfig: ai.ChatConfig{
@@ -108,6 +110,19 @@ func main() {
 	if fsClient != nil {
 		// a participant's /v1/text is covered by the shared app's creator (read-only lookups)
 		svc.Members = fsstore.NewFirestoreFromClient(fsClient)
+	}
+	// creator-paid /v1/text calls per app and day (docs/backend/rate-limit.md)
+	creatorDaily, err := ai.CreatorPaidDailyFromEnv(os.Getenv)
+	if err != nil {
+		log.Fatalf("ai: %v", err)
+	}
+	creatorMemberDaily, err := ai.CreatorPaidMemberDailyFromEnv(os.Getenv)
+	if err != nil {
+		log.Fatalf("ai: %v", err)
+	}
+	svc.CreatorPaid = &ai.CreatorPaidCap{Daily: creatorDaily, MemberDaily: creatorMemberDaily, Env: os.Getenv("APP_ENV")}
+	if fsClient != nil && os.Getenv("RATE_LIMIT_STORE") != "memory" {
+		svc.CreatorPaid.Store = ratelimit.NewFirestore(fsClient, os.Getenv("RATE_LIMIT_COLLECTION"))
 	}
 	// AI_PAUSED=1 stops only the Claude-calling routes with 503 ai_paused,
 	// before the rate limiter (#511). docs/infra/ai-pause.md

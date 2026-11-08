@@ -11,14 +11,23 @@ import (
 type runCache struct {
 	lists map[string][]expreval.Record
 	index map[string]map[string][]string // entity\x00field -> value key -> record ids (at most 2)
+	// assigned: rule id -> candidate id -> assignments planned by earlier
+	// rows of this run (pick.count; written after planning). nil until used.
+	assigned map[string]map[string]int
 	// similar: entity\x00fields -> the records with their compared items.
 	similar map[string][]similarRec
+	// picked: rule id -> the records pick with exclude chose for earlier
+	// rows of this run (the writes come after planning, so exclude's list
+	// does not see them yet).
+	picked map[string]map[string]bool
+	// own: rule id + entity -> the ids this run creates (ownCreated).
+	own map[string]map[string]bool
 	// periods: entity\x00field\x00fieldEnd -> the records' periods (overlap).
 	periods map[string][]recPeriod
 }
 
 func newRunCache() *runCache {
-	return &runCache{lists: map[string][]expreval.Record{}, index: map[string]map[string][]string{}, similar: map[string][]similarRec{}, periods: map[string][]recPeriod{}}
+	return &runCache{lists: map[string][]expreval.Record{}, index: map[string]map[string][]string{}, similar: map[string][]similarRec{}, picked: map[string]map[string]bool{}, periods: map[string][]recPeriod{}}
 }
 
 // lookupHolds evaluates rule.Lookup for row: the entity is listed through

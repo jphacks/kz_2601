@@ -3992,6 +3992,16 @@
         },
         "saveTo": {
           "$ref": "#/$defs/AISaveTo"
+        },
+        "inputFeeds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "description": "generate の材料に足す feed: 同じ画面の feed 部品の id(1〜3 個・天気・気圧・警報・祝日・お知らせ)。iOS が画面に読み込んだ行(合わせて最大 20 行・2KB)を「外部データ」として渡す(今日の天気と気圧から体調のアドバイス)。"
         }
       },
       "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はフォームの入力を処理して output field に入れる(端末内 AI(Apple Intelligence / Foundation Models)が使えれば無料で端末の中だけ、無い端末では Tailor It Pro のオンライン AI。写真は inputPhoto を付けた時だけオンライン AI に送る)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",
@@ -4922,7 +4932,7 @@
             "order"
           ],
           "description": "おすすめする記録を 1 つ選ぶ(if・lookup の後。選べた時だけ動く)。entity のレコードから、filter(agg と同じ絞り込み・3 つまで・hidden / computed の field は不可)に合い、exclude の entity のレコードが ref / refs の field で指していないものを、order の順で 1 つ。random は実行ごとに決まる(同じ実行のやり直しでは同じ記録)、oldest / newest は作った時刻の順。do では {\"ref\":\"$pick\"}(その記録の ID・ref)・{\"ref\":\"$pick.<field>\"}・通知の {$pick.<field>}・to {kind: authorOf, field: $pick}(その記録を書いた人)が使える。if では使えない。行のレコード自身は選ばない。each の無い時刻のきっかけでも使える(宛先は owner / members、createRecord)。entity と exclude の entity は同じアプリ・ルールと同じ側だけ(宛先付きは不可)で、each・agg・lookup と合わせて 2 つまで。similar と同じルールには書けない。",
-          "x-usage": "毎朝のおすすめ(まだ食べていないメニュー): on {every:daily, time:\"08:00\"}・pick {entity:menus, order:random, exclude:{entity:eats, field:menu}}・createRecord picks {menu: {ref:$pick}, name: {ref:$pick.name}}・notify to {kind:members} body「今日は {$pick.name} はどうですか」。",
+          "x-usage": "毎朝のおすすめ(まだ食べていないメニュー): on {every:daily, time:\"08:00\"}・pick {entity:menus, order:random, exclude:{entity:eats, field:menu}}・createRecord picks {menu: {ref:$pick}, name: {ref:$pick.name}}・notify to {kind:members} body「今日は {$pick.name} はどうですか」。 割り当て(担当が一番少ない人): on {record:created, entity:shifts}・pick {entity:staff, order:fewest, count:{entity:shifts, field:staff}, exclude:{entity:offs, field:staff, match:{field:day, equals:day}}}・updateRecord(ref 省略)values {staff: {ref:$pick}}・notify to {kind:authorOf, field:$pick}。",
           "properties": {
             "entity": {
               "type": "string",
@@ -4933,9 +4943,11 @@
               "enum": [
                 "random",
                 "oldest",
-                "newest"
+                "newest",
+                "fewest",
+                "most"
               ],
-              "description": "random(実行ごとに決まるランダム)/ oldest(一番古く作られた記録)/ newest(一番新しい記録)。"
+              "description": "random(実行ごとに決まるランダム)/ oldest(一番古く作られた記録)/ newest(一番新しい記録)/ fewest(count の記録に指されている数が一番少ない記録 = 割り当てが一番少ない人・枠。同じ数なら先に作られた記録)/ most(その数が一番多い記録。1 つも無ければ選ばない)。"
             },
             "filter": {
               "type": "array",
@@ -4952,7 +4964,7 @@
                 "entity",
                 "field"
               ],
-              "description": "除く記録: entity のレコードが field(選ぶ entity への ref / refs)で指している記録(食べた・見せた・読んだ)。",
+              "description": "除く記録: entity のレコードが field(選ぶ entity への ref / refs)で指している記録(食べた・見せた・読んだ・休みの人)。match があれば、そのうち行と値が同じレコードだけ(その日に休みの人)。",
               "properties": {
                 "entity": {
                   "type": "string",
@@ -4961,6 +4973,44 @@
                 "field": {
                   "type": "string",
                   "description": "その entity の ref / refs の field(選ぶ entity を指す)。"
+                },
+                "match": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "field",
+                    "equals"
+                  ],
+                  "description": "exclude のレコードのうち field の値が行の equals の値と同じものだけで除く(lookup と同じ比べ方。$id = レコードの ID)。レコードのきっかけか on.each だけ。",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "exclude の entity の field id か $id(例: 休みの日付)。"
+                    },
+                    "equals": {
+                      "type": "string",
+                      "description": "行の field id か $id(例: シフトの日付)。"
+                    }
+                  }
+                }
+              }
+            },
+            "count": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "entity",
+                "field"
+              ],
+              "description": "order fewest / most だけ: 候補ごとに、entity のレコードのうち field(選ぶ entity への ref / refs)で指している数を数える(行のレコード自身は数えない。each では同じ実行で先に割り当てた分も数える)。entity は同じアプリ・ルールと同じ側だけ(宛先付き・hidden・computed は不可)。count のあるルールは entity を 3 つまで読める。",
+              "properties": {
+                "entity": {
+                  "type": "string",
+                  "description": "数える記録の entity の id(シフト・タスクなど)。"
+                },
+                "field": {
+                  "type": "string",
+                  "description": "その entity の ref / refs の field(選ぶ entity を指す。担当者・日など)。"
                 }
               }
             }
@@ -5052,7 +5102,7 @@
       "additionalProperties": false,
       "minProperties": 1,
       "maxProperties": 1,
-      "description": "処理 1 つ。notify / createRecord / updateRecord / increment のどれか 1 つのキーだけを書く。",
+      "description": "処理 1 つ。notify / createRecord / updateRecord / increment / saveFeed のどれか 1 つのキーだけを書く。",
       "properties": {
         "notify": {
           "$ref": "#/$defs/RuleNotify"
@@ -5065,6 +5115,53 @@
         },
         "increment": {
           "$ref": "#/$defs/RuleIncrement"
+        },
+        "saveFeed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "provider",
+            "region",
+            "entity",
+            "fields"
+          ],
+          "description": "公開データ(天気・気圧・警報)のその時点の値を、同じアプリの entity に記録 1 件として残す(履歴にして後で分析する)。each の無い時刻のきっかけだけ・アプリに 3 つまで。entity はルールと同じ側(private は作成者の記録・shared / public はアプリの記録)で、single・宛先付きは不可。取りに行くのは region の公開データだけで、利用者や記録の値は送らない。データが取れない日は記録しない。",
+          "x-usage": "気圧の記録: 「毎朝 7 時に東京の気圧を記録して」= on {every:daily,time:\"07:00\"}・saveFeed {provider:pressure, region:\"130000\", entity:pressure_log, fields:{date:day, summary:note, min:low, max:high, drop:falling}}。",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "weather / pressure / warnings のどれか(閉じた一覧・検証で確かめる)。weather = 今日の天気(summary 天気・min / max 気温 °C)。pressure = これから 24 時間の気圧(summary・min / max hPa・drop 急な低下)。warnings = 今出ている警報・注意報(summary だけ)。"
+            },
+            "region": {
+              "type": "string",
+              "description": "気象庁の府県予報区のコード(6 桁。feed の region と同じ)。例 130000 東京都・170000 石川県。"
+            },
+            "entity": {
+              "type": "string"
+            },
+            "fields": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "残す値 → 書く field の id。date = 実行の日(date / datetime)・summary = 文(string / text)・min / max = 数(number / integer)・drop = 気圧の急な低下(boolean)。summary・min・max・drop のどれか 1 つは要る。required の field は date か summary にする。",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "min": {
+                  "type": "string"
+                },
+                "max": {
+                  "type": "string"
+                },
+                "drop": {
+                  "type": "string"
+                }
+              }
+            }
+          }
         }
       }
     },
