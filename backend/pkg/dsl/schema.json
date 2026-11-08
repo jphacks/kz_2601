@@ -3882,7 +3882,7 @@
       "required": [
         "setting"
       ],
-      "description": "single の entity(設定値の置き場・#267)の 1 件のレコードのフィールド値。行が無い場所(stat.value・progressBar.value・通知の when)でも、どの entity の computed からでも読める。保存前・未入力は field の defaultValue。",
+      "description": "single の entity(設定値の置き場・#267)の 1 件のレコードのフィールド値。行が無い場所(stat.value・通知の when・filter の value)でも、どの entity の computed からでも読める。progressBar / gauge の value・target は不可。保存前・未入力は field の defaultValue。",
       "properties": {
         "setting": {
           "type": "string",
