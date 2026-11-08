@@ -2,14 +2,26 @@ package ratelimit
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"os"
-	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/firestore"
 )
+
+// testSuffix keeps document ids unique across test processes sharing one
+// emulator (a timestamp alone collides when two start at the same instant).
+func testSuffix(t *testing.T) string {
+	t.Helper()
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		t.Fatal(err)
+	}
+	return hex.EncodeToString(b)
+}
 
 // Runs against the local emulator only (make emulator); never staging/prod.
 func TestFirestoreConsume(t *testing.T) {
@@ -23,16 +35,22 @@ func TestFirestoreConsume(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = c.Close() })
 	s := NewFirestore(c, "rateLimitsTest")
-	sfx := strconv.FormatInt(time.Now().UnixNano(), 36)
+	// The emulator locks pessimistically: concurrent transactions on one
+	// document deadlock until its ~2s lock timeout aborts them, so each
+	// collision burns a whole attempt.
+	// Fewer writers and a larger budget keep the test about lost updates,
+	// not about the emulator's timeout under a slow CI runner (#721).
+	s.attempts = 10
+	sfx := testSuffix(t)
 	counters := []Counter{
 		{ID: "u_" + sfx, Scope: ScopeUser, Limit: 10},
 		{ID: "g_" + sfx, Scope: ScopeGlobal, Limit: 1000},
 	}
 	exp := time.Now().Add(48 * time.Hour)
 
-	// 8 concurrent 1-unit charges + the transaction must not lose any.
+	// 4 concurrent 1-unit charges + the transaction must not lose any.
 	var wg sync.WaitGroup
-	for range 8 {
+	for range 4 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -42,9 +60,9 @@ func TestFirestoreConsume(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	u, err := s.Consume(ctx, counters, 2, exp)
+	u, err := s.Consume(ctx, counters, 6, exp)
 	if err != nil || u.Blocked != -1 || u.Counts[0] != 10 || u.Counts[1] != 10 {
-		t.Fatalf("after 8+2: %+v %v", u, err)
+		t.Fatalf("after 4+6: %+v %v", u, err)
 	}
 	u, err = s.Consume(ctx, counters, 1, exp)
 	if err != nil || u.Blocked != 0 || u.Counts[0] != 10 {
@@ -72,7 +90,7 @@ func TestFirestoreRefund(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = c.Close() })
 	s := NewFirestore(c, "rateLimitsTest")
-	sfx := strconv.FormatInt(time.Now().UnixNano(), 36)
+	sfx := testSuffix(t)
 	counters := []Counter{
 		{ID: "u_" + sfx, Scope: ScopeUser, Limit: 10},
 		{ID: "g_" + sfx, Scope: ScopeGlobal, Limit: 1000},
