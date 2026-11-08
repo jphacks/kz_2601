@@ -102,20 +102,35 @@ type Options struct {
 	PerMinute int              // 0 = DefaultUpstreamPerMinute
 }
 
-// OptionsFromEnv: BOOK_LOOKUP_DISABLED (1 / true) switches the lookup off,
-// as does FEEDS_DISABLED=all (every outgoing read). BOOK_LOOKUP_UPSTREAM_PER_MINUTE
-// overrides the upstream budget.
-func OptionsFromEnv(getenv func(string) string) Options {
-	o := Options{}
-	switch strings.ToLower(strings.TrimSpace(getenv("BOOK_LOOKUP_DISABLED"))) {
-	case "1", "true", "yes", "on":
-		o.Disabled = true
+// EnabledFromEnv: the lookup is off unless BOOK_LOOKUP_ENABLED is 1 / true
+// (openBD's terms limit use to introducing books: owner decision 2026-11-08,
+// book-lookup.md). BOOK_LOOKUP_DISABLED (1 / true) and FEEDS_DISABLED=all
+// (every outgoing read) switch it off even then. appconfig (the endpoint) and
+// ai (whether the AI may generate lookupBook) read the same switch.
+func EnabledFromEnv(getenv func(string) string) bool {
+	if !envOn(getenv("BOOK_LOOKUP_ENABLED")) || envOn(getenv("BOOK_LOOKUP_DISABLED")) {
+		return false
 	}
 	for _, p := range strings.Split(getenv("FEEDS_DISABLED"), ",") {
 		if strings.TrimSpace(p) == "all" {
-			o.Disabled = true
+			return false
 		}
 	}
+	return true
+}
+
+func envOn(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
+// OptionsFromEnv: Disabled unless EnabledFromEnv. BOOK_LOOKUP_UPSTREAM_PER_MINUTE
+// overrides the upstream budget.
+func OptionsFromEnv(getenv func(string) string) Options {
+	o := Options{Disabled: !EnabledFromEnv(getenv)}
 	var n int
 	if _, err := fmt.Sscanf(strings.TrimSpace(getenv("BOOK_LOOKUP_UPSTREAM_PER_MINUTE")), "%d", &n); err == nil && n > 0 {
 		o.PerMinute = n

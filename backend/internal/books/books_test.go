@@ -248,15 +248,27 @@ func TestSanitize(t *testing.T) {
 func TestKillSwitchAndBudget(t *testing.T) {
 	f := newSource(t, recorded(t))
 	c := &clock{t: time.Now()}
-	off := newService(f, c, OptionsFromEnv(func(k string) string { return map[string]string{"BOOK_LOOKUP_DISABLED": "true"}[k] }))
+	// Off by default (openBD's terms): only BOOK_LOOKUP_ENABLED turns it on.
+	off := newService(f, c, OptionsFromEnv(func(string) string { return "" }))
 	if _, err := off.Lookup(context.Background(), "9784780802047"); !errors.Is(err, ErrDisabled) || off.Enabled() {
-		t.Fatalf("disabled: %v", err)
+		t.Fatalf("default: %v, want ErrDisabled", err)
 	}
-	if !OptionsFromEnv(func(k string) string { return map[string]string{"FEEDS_DISABLED": "rss, all"}[k] }).Disabled {
-		t.Error("FEEDS_DISABLED=all should switch the lookup off too")
-	}
-	if OptionsFromEnv(func(k string) string { return map[string]string{"FEEDS_DISABLED": "rss"}[k] }).Disabled {
-		t.Error("FEEDS_DISABLED=rss must not switch the lookup off")
+	for _, tc := range []struct {
+		env  map[string]string
+		want bool
+	}{
+		{map[string]string{}, false},
+		{map[string]string{"BOOK_LOOKUP_ENABLED": "0"}, false},
+		{map[string]string{"BOOK_LOOKUP_ENABLED": "1"}, true},
+		{map[string]string{"BOOK_LOOKUP_ENABLED": " TRUE "}, true},
+		{map[string]string{"BOOK_LOOKUP_ENABLED": "1", "BOOK_LOOKUP_DISABLED": "true"}, false},
+		{map[string]string{"BOOK_LOOKUP_ENABLED": "1", "FEEDS_DISABLED": "rss, all"}, false},
+		{map[string]string{"BOOK_LOOKUP_ENABLED": "1", "FEEDS_DISABLED": "rss"}, true},
+	} {
+		getenv := func(k string) string { return tc.env[k] }
+		if got := EnabledFromEnv(getenv); got != tc.want || OptionsFromEnv(getenv).Disabled == tc.want {
+			t.Errorf("%v: enabled = %t, want %t", tc.env, got, tc.want)
+		}
 	}
 	if f.hits.Load() != 0 {
 		t.Fatal("disabled service reached the source")
