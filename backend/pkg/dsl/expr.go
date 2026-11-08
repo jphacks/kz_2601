@@ -347,7 +347,7 @@ var Ops = map[string]opSpec{
 	"and": {2, 2, tBool, tBool}, "or": {2, 2, tBool, tBool}, "not": {1, 1, tBool, tBool},
 	"concat": {2, 2, tAny, tStr}, "len": {1, 1, tStr, tNum},
 	"now": {0, 0, tAny, tDate}, "today": {0, 0, tAny, tDate},
-	"daysBetween": {2, 2, tDate, tNum}, "daysUntil": {1, 1, tDate, tNum}, "addDays": {2, 2, tAny, tDate}, "hoursBetween": {2, 2, tAny, tNum},
+	"daysBetween": {2, 2, tDate, tNum}, "daysUntil": {1, 1, tDate, tNum}, "addDays": {2, 2, tAny, tDate}, "addMinutes": {2, 2, tAny, tAny}, "hoursBetween": {2, 2, tAny, tNum},
 	"nextOccurrence": {2, 2, tAny, tDate}, "year": {1, 1, tDate, tNum}, "month": {1, 1, tDate, tNum}, "day": {1, 1, tDate, tNum}, "weekday": {1, 1, tDate, tNum},
 	"toNumber": {1, 1, tAny, tNum}, "toString": {1, 1, tAny, tStr}, "coalesce": {2, 2, tAny, tAny},
 	// daily check history (#172): arg 0 is {"ref": <resets daily toggle field>}
@@ -487,7 +487,7 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 			aw := fmt.Sprintf("%s.%s.args[%d]", where, e.Op, i)
 			types[i] = c.check(aw, &e.Args[i], row, depth+1)
 			want := spec.arg
-			if e.Op == "addDays" || e.Op == "nextOccurrence" {
+			if e.Op == "addDays" || e.Op == "nextOccurrence" || e.Op == "addMinutes" {
 				want = tDate
 				if i == 1 {
 					want = tNum
@@ -525,6 +525,11 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 				if t != tAny {
 					return t
 				}
+			}
+		case "addMinutes":
+			// a date / datetime stays a date; a string may be "HH:mm" (a string) or a date
+			if n > 0 && types[0] == tDate {
+				return tDate
 			}
 		}
 		return spec.result
@@ -653,6 +658,9 @@ func (c *exprChecker) checkFilter(where string, f *Filter, e *Entity, row *Entit
 func argHint(op string, want, got exprType) string {
 	if want == tNum && (got == tStr || got == tDate) && (op == "sub" || op == "add") {
 		return ` (to get the hours between two "HH:mm" times or datetimes use {"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]}; days between dates use daysBetween; do not toNumber a time)`
+	}
+	if op == "addMinutes" && want == tDate {
+		return ` (pass a "HH:mm" time string or a date / datetime, e.g. departure = {"op":"addMinutes","args":[{"ref":"arrive_at"},{"op":"neg","args":[{"ref":"travel_min"}]}]})`
 	}
 	return convertHint(want)
 }

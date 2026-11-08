@@ -647,7 +647,7 @@ App Store に出した後は古い iOS が残り続ける。backend は「今い
 | どこに | 中身 | 使い道 |
 |---|---|---|
 | generate / chat の body `allowedComponents` | その版が描画できる部品 type の全部(`ComponentType` から自動) | backend はここに**無い** type を生成結果に入れない(下) |
-| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(`recordRetention`・#482、`matching`・#507、`notification.when`・#265、`singleEntity`・#267、`dataRoles`・#272、`addressedMessages`・#271、`notification.near`、`aiButton.long`、`aiButton.inputPhoto`、`aiButton.saveTo`、`action.lookupBook`、`text.highlight`(text の {{fieldId}} も)、`feed.v2`(feed の warnings / pressure)。審査用の版は `matching`・`dataRoles`・`addressedMessages` を送らない) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
+| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(`recordRetention`・#482、`matching`・#507、`notification.when`・#265、`singleEntity`・#267、`dataRoles`・#272、`addressedMessages`・#271、`notification.near`、`aiButton.long`、`aiButton.inputPhoto`、`aiButton.saveTo`、`action.lookupBook`、`text.highlight`(text の {{fieldId}} も)、`feed.v2`(feed の warnings / pressure)、`expr.addMinutes`(計算式の op `addMinutes`)。審査用の版は `matching`・`dataRoles`・`addressedMessages` を送らない) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
 | 全リクエストのヘッダ `X-Client-Platform` / `X-Client-Version` / `X-Client-Build` / `X-Client-DSL-Version` | `ios` / `CFBundleShortVersionString` / `CFBundleVersion` / 描画できる最大の `schemaVersion` | ログ(どの版がまだ使われているか = 最低対応版を上げる判断) |
 
 ### 5.3 backend が古い iOS に新しい部品を出さない仕組み
@@ -657,6 +657,7 @@ App Store に出した後は古い iOS が残り続ける。backend は「今い
 - `allowedComponents` に backend の知らない type(iOS の方が新しい)があっても無視する。全既知 type を送った時は制限なし(プロンプトは byte 同一)。
 - `allowedComponents` を送らない(v1.0 より前の開発版)クライアントは制限なし。
 - 部品でない DSL のキー(`Entity.retentionDays`・#482)は `supportedFeatures` で同じことをする: 無い版にはスキーマ・索引・ルールから外し、新しく付けた分は再生成させ、残れば取り除く。
+- 計算式の op も同じ: `addMinutes`(`expr.addMinutes`)を知らない版は未知の op を「—」として評価する(落ちない)ので、無い版にはスキーマの `ExprOp.op` の値・ルールから外し、新しく使えば再生成させ、残れば式を `""`(その版の表示と同じ「—」)に置き換える。
 - 試験: `backend/internal/ai/compat_test.go`。v1.0 の部品一覧は `testdata/ios_v1_components.json` に凍結してあり、**部品を足しても書き換えない**(足した部品が v1.0 に出ないことを試験が確かめる)。例の DSL ごとに「その部品を知らない 1 つ前の版」を作り、生成結果にその部品が出ないこと・DSL として開けることを確かめる。
 - 保存済みの DSL(別の端末で作った・シェアで取り込んだ)は `GET /dsl` でそのまま返る。古い iOS は未知の type をプレースホルダで描くので、画面は壊れない(§1)。
 
