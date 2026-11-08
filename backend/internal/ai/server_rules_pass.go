@@ -345,8 +345,9 @@ func (s *Service) applyServerRulesPass(ctx context.Context, transcript string, a
 			ar.summary = appendSentence(ar.summary, sm.Declined, loc)
 		case len(sm.Problems) > 0:
 			ar.summary = appendSentence(ar.summary, loc.serverRulesFailed(), loc)
-		case serverNeedAsked(ar.serverNeed) && len(before.ServerRules) == 0:
+		case serverNeedAsked(ar.serverNeed) && len(before.ServerRules) == 0 && len(sm.Dropped) == 0:
 			// the main call asked, the pass made nothing: not silent
+			// (a rule dropped as a repeat of a local notification is covered)
 			ar.summary = appendSentence(ar.summary, loc.serverRulesFailed(), loc)
 		}
 		return

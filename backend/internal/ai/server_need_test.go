@@ -271,3 +271,22 @@ func TestServerNeed_RestrictedSchema(t *testing.T) {
 		t.Fatal("restricted schema + serverNeed expected")
 	}
 }
+
+// The model said "timed" for a reminder the app already has on the device:
+// the pass drops the server copy as a repeat. That is not a failure, so the
+// summary must not say the automatic action could not be made.
+func TestServerNeed_DroppedRepeatIsNotFailed(t *testing.T) {
+	f := &fakeCaller{replies: []string{withNeed(t, reminderApp, "timed"), reminderRule("21:05")}}
+	svc, _ := newSvc(f)
+	svc.ServerRulesPass = true
+	res, err := svc.Generate(context.Background(), Request{AppID: "need-dropped", Transcript: "家計簿。毎日21時05分に記録を忘れないよう通知して"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sm := res.Meta.ServerRules; sm == nil || sm.Applied || len(sm.Dropped) != 1 || sm.Need != "timed" {
+		t.Fatalf("meta: %+v", sm)
+	}
+	if strings.Contains(res.Summary, LocaleJA.serverRulesFailed()) {
+		t.Fatalf("a repeat of the local reminder is not a failure: %q", res.Summary)
+	}
+}
