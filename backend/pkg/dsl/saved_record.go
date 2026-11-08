@@ -27,15 +27,7 @@ var recordTapTypes = map[ComponentType]bool{
 // (entityReach already asks for a list).
 func (l *linter) savedRecordReach() {
 	forms := formScreens(l.app)
-	formOf := map[string]string{}
-	for _, s := range l.app.Screens {
-		if s.Entity != "" {
-			formOf[s.ID] = s.Entity
-		}
-	}
-	reach := l.app.Reachable()
-	opened := map[string]bool{}   // a reachable record tap opens its form
-	tappable := map[string]bool{} // shown by a component that could tap a record
+	opened, tappable := l.app.recordTaps()
 	editOnly := map[string]bool{} // its form has a saved-record-only control
 	for _, s := range l.app.Screens {
 		if s.Entity != "" {
@@ -50,6 +42,40 @@ func (l *linter) savedRecordReach() {
 				}
 			}
 		}
+	}
+	skip := l.settingEntities()
+	for _, id := range l.app.UnlistedEntities() {
+		skip[id] = true
+	}
+	for _, e := range l.app.Entities {
+		fs := forms[e.ID]
+		if len(fs) == 0 || skip[e.ID] || opened[e.ID] || (tappable[e.ID] && !editOnly[e.ID]) {
+			continue
+		}
+		l.add(`entity %q has a form screen %q, but no component lets the user open a saved %q record (table / timeline rows cannot be tapped, and a toolbar "new" button opens an empty form), so saved records can never be edited or deleted: show them with a list (or calendar / mapView / gridTable) whose onItemTap is {"type":"navigate","screen":%q} on a reachable screen`, e.ID, fs[0], e.ID, fs[0])
+	}
+}
+
+// OpenedEntities lists the entities whose saved records a reachable record tap
+// opens in their form: what savedRecordReach accepts (ai-eval masterTappable).
+func (a *App) OpenedEntities() map[string]bool {
+	opened, _ := a.recordTaps()
+	return opened
+}
+
+// recordTaps scans the reachable screens. opened: a record tap navigates to
+// the entity's form without prefillRef (prefillRef starts a new record).
+// tappable: shown by a component that could tap a record at all.
+func (a *App) recordTaps() (opened, tappable map[string]bool) {
+	formOf := map[string]string{}
+	for _, s := range a.Screens {
+		if s.Entity != "" {
+			formOf[s.ID] = s.Entity
+		}
+	}
+	reach := a.Reachable()
+	opened, tappable = map[string]bool{}, map[string]bool{}
+	for _, s := range a.Screens {
 		if !reach[s.ID] {
 			continue
 		}
@@ -67,15 +93,5 @@ func (l *linter) savedRecordReach() {
 			}
 		})
 	}
-	skip := l.settingEntities()
-	for _, id := range l.app.UnlistedEntities() {
-		skip[id] = true
-	}
-	for _, e := range l.app.Entities {
-		fs := forms[e.ID]
-		if len(fs) == 0 || skip[e.ID] || opened[e.ID] || (tappable[e.ID] && !editOnly[e.ID]) {
-			continue
-		}
-		l.add(`entity %q has a form screen %q, but no component lets the user open a saved %q record (table / timeline rows cannot be tapped, and a toolbar "new" button opens an empty form), so saved records can never be edited or deleted: show them with a list (or calendar / mapView / gridTable) whose onItemTap is {"type":"navigate","screen":%q} on a reachable screen`, e.ID, fs[0], e.ID, fs[0])
-	}
+	return opened, tappable
 }
