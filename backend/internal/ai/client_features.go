@@ -21,11 +21,15 @@ const (
 	FeatureAIInputPhoto = "aiButton.inputPhoto" // aiButton inputPhoto (ai_photo_input_rules.go)
 	FeatureAISaveTo     = "aiButton.saveTo"     // aiButton saveTo (ai_save_to_rules.go)
 	FeatureAIInputFeeds = "aiButton.inputFeeds" // aiButton inputFeeds (ai_input_feed_rules.go)
+	FeatureAIOutputs    = "aiButton.outputs"    // aiButton outputs (ai_outputs_rules.go)
 	FeatureLookupBook   = "action.lookupBook"   // action lookupBook (book_rules.go)
 	// FeatureTextHighlight covers text.highlight and text {{fieldId}} on
 	// form / detail screens (text_highlight_rules.go): they shipped together.
 	FeatureTextHighlight = "text.highlight"
 	FeatureFeedV2        = "feed.v2" // feed providers warnings / pressure (feed_warnings_pressure_rules.go)
+	// FeatureAIChatInput covers aiChat inputEntity and its limit
+	// (ai_chat_rules_input.go): a build without it ignores both silently.
+	FeatureAIChatInput = "aiChat.inputEntity"
 )
 
 // clientFeature is one optional DSL part judged by supportedFeatures.
@@ -104,6 +108,19 @@ var clientFeatures = []clientFeature{
 		violation: "aiButton inputFeeds is not available in this app build: omit inputFeeds (the feed still shows on the screen)",
 	},
 	{
+		key:    FeatureAIOutputs,
+		rules:  []string{aiOutputsRules},
+		note:   "- aiButton の outputs(fields の項目ごとにフォームの field へ入れる)は使わない(この版では動かない)。項目はボタンの下に出すだけにし、利用者が見て入力する形にする。頼まれたら「項目ごとに入力欄へ入れるのはこの版ではできないため、ボタンの下に出す形にしました。」と申告する。\n",
+		schema: func(defs map[string]any) { deleteProps(defs, "AiButton", "outputs") },
+		places: func(root map[string]any) []string {
+			return componentPlaces(root, func(c map[string]any) bool { return isType(c, dsl.CompAiButton) && c["outputs"] != nil })
+		},
+		strip: func(root map[string]any) int {
+			return editComponents(root, func(c map[string]any) bool { return isType(c, dsl.CompAiButton) && deleteKey(c, "outputs") })
+		},
+		violation: "aiButton outputs is not available in this app build: omit outputs (the fields show under the button)",
+	},
+	{
 		key:   FeatureLookupBook,
 		rules: []string{bookRules},
 		note:  "- ボタンの lookupBook(ISBN から本の情報を入れる)は使わない(今は使えない)。書名・著者は手で入力する形にし、頼まれたら「ISBN から本の情報を入れる機能は今は使えないため、手入力の形にしました。」と申告する。\n",
@@ -163,6 +180,40 @@ var clientFeatures = []clientFeature{
 		places:    func(root map[string]any) []string { return componentPlaces(root, isFeedV2) },
 		strip:     func(root map[string]any) int { return dropComponents(root, isFeedV2) },
 		violation: "feed provider warnings / pressure is not available in this app build: use provider weather or remove the feed",
+	},
+	{
+		key:   FeatureAIChatInput,
+		rules: []string{aiChatInputRules},
+		rewrite: [][2]string{
+			{"相談しながら日記などの記録も AI に読ませたいなら aiChat に inputEntity を足す(下の節)。", ""},
+		},
+		note: "- aiChat の inputEntity(自分の記録を読んで話す)と limit は使わない(この版では動かない)。aiChat は会話だけにし、頼まれたら「記録を AI に読ませて話すのはこの版ではできないため、会話だけの形にしました。」と申告する。\n",
+		schema: func(defs map[string]any) {
+			deleteProps(defs, "AiChat", "inputEntity", "limit")
+			// the catalog's 使い方 line names inputEntity too
+			if c, _ := defs["AiChat"].(map[string]any); c != nil {
+				for _, k := range []string{"description", "x-usage"} {
+					if s, ok := c[k].(string); ok {
+						c[k] = dropSentences(s, "inputEntity")
+					}
+				}
+			}
+		},
+		places: func(root map[string]any) []string {
+			return componentPlaces(root, func(c map[string]any) bool {
+				return isType(c, dsl.CompAiChat) && (c["inputEntity"] != nil || c["limit"] != nil)
+			})
+		},
+		strip: func(root map[string]any) int {
+			return editComponents(root, func(c map[string]any) bool {
+				if !isType(c, dsl.CompAiChat) {
+					return false
+				}
+				a, b := deleteKey(c, "inputEntity"), deleteKey(c, "limit")
+				return a || b
+			})
+		},
+		violation: "aiChat inputEntity is not available in this app build: omit inputEntity and limit (the chat still works without records)",
 	},
 }
 

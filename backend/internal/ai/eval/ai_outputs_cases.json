@@ -1,0 +1,7 @@
+[
+  {"id": "aot_poster_event", "kind": "create", "group": "aioutputs", "transcript": "イベントのポスターの文章を貼ったら、AI が題名と日時と場所を抜き出してフォームに入れて、そのままカレンダーに追加できるアプリ", "note": "aiButton generate fields + outputs(題名→string・日時→datetime・場所→string)+ addToCalendar", "expect": {"aiGenerate": "fields", "aiOutputs": true, "addToCalendar": true}},
+  {"id": "aot_score", "kind": "create", "group": "aioutputs", "transcript": "問題と自分の答えを書いたら AI が 100 点満点で採点して点数欄に入れてくれる勉強アプリ", "note": "fields の点数を integer / number field に(outputs)・講評は string", "expect": {"aiGenerate": "fields", "aiOutputs": true}},
+  {"id": "aot_receipt_text", "kind": "create", "group": "aioutputs", "transcript": "支払いのメールの文を貼ると、AI が金額と日付とお店を読み取って家計簿の入力欄に入れてくれるようにしたい", "note": "金額→number / integer・日付→date・店→string を outputs で", "expect": {"aiGenerate": "fields", "aiOutputs": true}},
+  {"id": "aot_show_only", "kind": "create", "group": "aioutputs", "transcript": "冷蔵庫の中身から主菜と副菜と汁物を提案してくれるボタン", "note": "入力欄に入れる話が無ければ outputs を付けない(表示だけ)", "expect": {"aiGenerate": "fields", "aiOutputs": false}},
+  {"id": "aot_edit_add", "kind": "edit", "base": "aot_score", "group": "aioutputs", "transcript": "採点の結果を入力欄に入れるのをやめて、表示だけにして", "note": "既存の outputs を外す patch", "expect": {"patch": true, "aiOutputs": false}}
+]

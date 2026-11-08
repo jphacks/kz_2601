@@ -61,6 +61,7 @@ func checkAIButton(where string, c *Component, form *Entity, entities map[string
 	checkAILength(where, c, form, add)
 	checkAIInputPhoto(where, c, form, add)
 	checkAISaveTo(where, c, entities, add)
+	checkAIOutputs(where, c, form, add) // ai_outputs.go
 	if c.Task == "generate" {
 		checkAIGenerate(where, c, form, entities, add)
 		return

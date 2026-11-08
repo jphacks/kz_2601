@@ -316,7 +316,7 @@
         },
         "computed": {
           "$ref": "#/$defs/Expr",
-          "description": "Read-only calculated field (never stored, never bound to inputs). Evaluated per record: `ref` reads this record's fields (\"id\" = record id). type must be number|integer|currency|string|boolean|date. Usable in list/table/stat/chart like a stored field."
+          "description": "Read-only calculated field (never stored, never bound to inputs). Evaluated per record: `ref` reads this record's fields (\"id\" = record id). type must be number|integer|currency|string|boolean|date|datetime (addMinutes of a date / datetime needs datetime: string / date would drop the time). Usable in list/table/stat/chart like a stored field."
         },
         "health": {
           "type": "string",
@@ -3780,6 +3780,7 @@
             "daysBetween",
             "daysUntil",
             "addDays",
+            "addMinutes",
             "nextOccurrence",
             "hoursBetween",
             "year",
@@ -3824,6 +3825,7 @@
             "daysBetween": "daysBetween(a,b) = b - a の日数",
             "daysUntil": "daysUntil(d) = d - 今日 の日数(過ぎたら負)",
             "addDays": "addDays(d, n) = d の n 日後",
+            "addMinutes": "addMinutes(t, n) = t の n 分後(負なら前)。\"HH:mm\" は \"HH:mm\" を返す(24 時間で一周)。日時は日時。到着 − 所要分 = 出発",
             "nextOccurrence": "nextOccurrence(d, \"monthly\"|\"yearly\") = d から毎月 / 毎年くり返す日付のうち、今日以降で最も近い日(d が今日以降なら d)。日が無い月は月末に寄せる(1/31 の毎月 → 2/28・閏年 2/29、2/29 の毎年 → 平年 2/28)。サブスクの次の更新日・次の誕生日。daysUntil と組み合わせて残り日数に",
             "hoursBetween": "hoursBetween(start, end) = \"HH:mm\" 同士の差の時間数(小数。30 分 = 0.5)。end < start は日付またぎとして +24h。勤務時間・睡眠時間に",
             "year": "年",
@@ -4048,6 +4050,15 @@
             "type": "string"
           },
           "description": "generate の材料に足す feed: 同じ画面の feed 部品の id(1〜3 個・天気・気圧・警報・祝日・お知らせ)。iOS が画面に読み込んだ行(合わせて最大 20 行・2KB)を「外部データ」として渡す(今日の天気と気圧から体調のアドバイス)。"
+        },
+        "outputs": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 10,
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "generate の shape fields の項目名 → 入れる screen.entity の field id(string/text/integer/number/date/datetime/enum)。例: {\"題名\":\"title\",\"日時\":\"start\",\"場所\":\"place\"}。iOS が型に直してフォームのドラフトに入れる(読めない値・enum の options に無い値は空のまま)。保存は利用者。output とは一緒に使わない。"
         }
       },
       "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はフォームの入力を処理して output field に入れる(端末内 AI(Apple Intelligence / Foundation Models)が使えれば無料で端末の中だけ、無い端末では Tailor It Pro のオンライン AI。写真は inputPhoto を付けた時だけオンライン AI に送る)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",
@@ -4144,6 +4155,7 @@
         "type",
         "entity",
         "textField",
+        "roleField",
         "persona"
       ],
       "properties": {
@@ -4166,7 +4178,7 @@
         },
         "roleField": {
           "type": "string",
-          "description": "`entity` の string field か、options に user と assistant を持つ enum field(任意・推奨)。自分の発言は user、AI の返事は assistant が入る。省略すると自分と AI が交互とみなす。"
+          "description": "`entity` の string field か、options に user と assistant を持つ enum field(必須)。自分の発言は user、AI の返事は assistant が入る(並び順から役を決めない)。"
         },
         "persona": {
           "type": "string",
@@ -4188,10 +4200,27 @@
         "emptyText": {
           "type": "string",
           "description": "まだ会話が無い時の文言(既定「話しかけてみましょう」)。"
+        },
+        "speak": {
+          "type": "boolean",
+          "description": "true = AI の新しい返事を端末の声で自動で読み上げる(声で聞きたい・会話の練習)。どの返事にも読み上げボタンは付く。"
+        },
+        "saveTo": {
+          "$ref": "#/$defs/AIChatSaveTo"
+        },
+        "inputEntity": {
+          "type": "string",
+          "description": "AI に参考として読ませる記録の entity(会話の entity とは別)。送るたびに利用者自身の新しい記録 limit 件(8 KB まで・hidden の field と写真・位置は送らない)を会話に添える。shared / public でも自分が書いた記録だけ。例: 日記を踏まえた相談・保存した問題についての質問・取り込んだ資料への質問。"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "description": "inputEntity の新しい記録を何件読ませるか(既定 20・最大 20)。inputEntity がある時だけ。"
         }
       },
-      "description": "クラウドの AI と何往復も話すチャット画面(相談相手・家庭教師・会話の練習相手・壁打ち)。吹き出しで自分は右・AI は左、画面下の入力欄から送ると AI が直近 20 発言を踏まえて返事をし、両方を entity に保存するので会話が残る。オンラインだけで動く(Tailor It Pro・共有のアプリは作成者の Pro)。ボタン 1 回で 1 回書かせるなら aiButton(人どうしのチャットは別の部品)。",
-      "x-usage": "会話用のタブかホーム画面に A1:F12 で 1 つだけ置き、同じ画面に他の部品を置かない。entity は turn{text: text(required), role: enum[user, assistant]} だけ(scope は付けない)。フォーム画面・追加ボタン・list は作らない。persona に役・口調・してほしいこと(質問は 1 つずつ・答えを言わずヒント等)を書く。"
+      "description": "クラウドの AI と何往復も話すチャット画面(相談相手・家庭教師・会話の練習相手・壁打ち)。吹き出しで自分は右・AI は左、画面下の入力欄から送ると AI が直近 20 発言を踏まえて返事をし、両方を entity に保存するので会話が残る。オンラインだけで動く(Tailor It Pro・共有のアプリは作成者の Pro)。saveTo を付けると「今日カレー食べた」のような発言から記録の案を返事の下に出し、利用者が「追加」を押した時だけ entity に 1 件足す。ボタン 1 回で 1 回書かせるなら aiButton(人どうしのチャットは別の部品)。",
+      "x-usage": "会話用のタブかホーム画面に A1:F12 で 1 つだけ置き、同じ画面に他の部品を置かない。entity は turn{text: text(required), role: enum[user, assistant]} だけ(scope は付けない)。フォーム画面・追加ボタン・list は作らない。「話して記録」「AI に言えば記録してくれる」(食事・支出・体調・やったこと)なら saveTo{entity: 記録用の別 entity, fields: [AI が埋める field]} を付け、記録を見る list は別の画面に置く。「日記を踏まえて相談」「保存した問題について質問」「取り込んだ資料について聞く」なら inputEntity: その記録の entity(limit は既定のまま)を付け、記録のフォーム・list は別の画面に置く。persona に役・口調・してほしいこと(質問は 1 つずつ・答えを言わずヒント等)を書く。"
     },
     "HealthStat": {
       "type": "object",
@@ -4392,16 +4421,17 @@
         "accept": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 3,
+          "maxItems": 4,
           "items": {
             "type": "string",
             "enum": [
               "csv",
               "text",
-              "pdf"
+              "pdf",
+              "audio"
             ]
           },
-          "description": "選べるファイル。csv = 表(1 行 = 1 件・1 行目は項目名・Excel の CSV / Shift_JIS も読む)、text = テキストファイル、pdf = PDF(本文を取り出す。画像だけの PDF は端末内の文字認識)。"
+          "description": "選べるファイル。csv = 表(1 行 = 1 件・1 行目は項目名・Excel の CSV / Shift_JIS も読む)、text = テキストファイル、pdf = PDF(本文を取り出す。画像だけの PDF は端末内の文字認識)、audio = 録音ファイル(m4a / mp3 / wav など・30 分まで。端末内で文字起こしする)。"
         },
         "label": {
           "type": "string",
@@ -4409,7 +4439,7 @@
         },
         "field": {
           "type": "string",
-          "description": "text / pdf の本文を入れる field(type text なら 20000 字・string なら 4000 字まで。超えた分は切る)。accept に text / pdf がある時は必須、csv だけなら書かない。entity の titleField(string)にはファイル名が入る。"
+          "description": "text / pdf の本文・audio の文字起こしを入れる field(type text なら 20000 字・string なら 4000 字まで。超えた分は切る。audio は text だけ)。accept に text / pdf / audio がある時は必須、csv だけなら書かない。entity の titleField(string)にはファイル名が入る。"
         },
         "map": {
           "type": "array",
@@ -4420,7 +4450,7 @@
           "description": "csv の列の当て方(省略可)。書いた列が先に当たり、残りは 1 行目の項目名が field の name か id と同じ列に当たる(export の CSV はそのまま読み戻せる)。どの field にも当たらない列は使わない。"
         }
       },
-      "description": "ファイルを選んで記録を足すボタン(ファイルの取り込み)。押すと iOS のファイル選択が開き、csv は 1 行ずつ記録にして(型を変換・最大 500 行)、text / pdf は本文を取り出して field に入れた記録を 1 件足す。足す前に「n 件を追加・m 行は読めない」を確かめる。処理はすべて端末内で、ファイルそのものは送らない・残さない(足した記録だけが今まで通り保存・同期される)。「CSV を取り込みたい」「Excel の名簿を入れたい」「PDF・テキストを読み込んで本文を記録したい」「書き出した CSV を戻したい」の時に必ずこれを選ぶ(手入力のフォームで代替しない)。音声・画像・Word のファイルは読めない。",
+      "description": "ファイルを選んで記録を足すボタン(ファイルの取り込み)。押すと iOS のファイル選択が開き、csv は 1 行ずつ記録にして(型を変換・最大 500 行)、text / pdf は本文を取り出して、audio は録音を端末内で文字起こしして、field に入れた記録を 1 件足す。足す前に「n 件を追加・m 行は読めない」を確かめる。処理はすべて端末内で、ファイルそのものは送らない・残さない(足した記録だけが今まで通り保存・同期される)。「CSV を取り込みたい」「Excel の名簿を入れたい」「PDF・テキストを読み込んで本文を記録したい」「書き出した CSV を戻したい」「授業・会議の録音ファイルを文字にしたい」の時に必ずこれを選ぶ(手入力のフォームで代替しない)。動画・画像・Word のファイルは読めない。",
       "x-usage": "記録の一覧がある画面で、一覧の下の全幅(例 A9:F10・追加ボタン D11:F12 の上)に置く。追加ボタンが無ければ右下(D11:F12)。左下 A11:B12 はマイクの席なので空ける。CSV の名簿なら entity 例 member{name: string(required), grade: integer, club: string} + fileImport{entity: member, accept: [csv], label: 名簿の CSV を取り込む}。列名が field の name と違う時だけ map: [{column: 氏名, field: name}]。PDF・テキストなら entity 例 doc{title: string, body: text}(titleField: title)+ fileImport{entity: doc, accept: [pdf, text], field: body, label: PDF を取り込む}。取り込んだ本文の要約は同じ entity のフォームに aiButton{task: summarize, input: body}。"
     },
     "ImportColumn": {
@@ -4643,6 +4673,29 @@
         },
         "field": {
           "type": "string"
+        }
+      }
+    },
+    "AIChatSaveTo": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "aiChat の会話から記録を足す: AI が返事と一緒に entity の 1 件の案(fields の値)を出し、吹き出しの下に「この内容で記録しますか?」と出す。利用者が「追加」を押した時だけ保存(勝手には保存しない・「直す」は会話で言い直す)。entity は会話の entity とは別の private か shared(public / single / match / addressedTo は不可)。fields は 1〜8 個の string / text / number / date / enum field(editableBy admins・hidden・computed は不可)。ほかの required field は defaultValue を付ける。",
+      "required": [
+        "entity",
+        "fields"
+      ],
+      "properties": {
+        "entity": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
