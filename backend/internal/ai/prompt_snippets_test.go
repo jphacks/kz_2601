@@ -165,6 +165,9 @@ type snippetValidator struct {
 	schemas    map[string]*jsonschema.Schema
 	components map[string]bool
 	actions    map[string]bool
+	// ruleActions holds the keys of $defs/RuleAction (one per server rule
+	// `do` item), so new kinds are covered without editing this test.
+	ruleActions map[string]bool
 }
 
 func newSnippetValidator(t *testing.T) *snippetValidator {
@@ -182,6 +185,10 @@ func newSnippetValidator(t *testing.T) *snippetValidator {
 			AnyOf []struct {
 				Ref string `json:"$ref"`
 			} `json:"anyOf"`
+			OneOf []struct {
+				Required   []string                   `json:"required"`
+				Properties map[string]json.RawMessage `json:"properties"`
+			} `json:"oneOf"`
 			Properties map[string]struct {
 				Const any   `json:"const"`
 				Enum  []any `json:"enum"`
@@ -191,7 +198,7 @@ func newSnippetValidator(t *testing.T) *snippetValidator {
 	if err := json.Unmarshal(dsl.SchemaJSON(), &schema); err != nil {
 		t.Fatal(err)
 	}
-	v := &snippetValidator{t: t, compiler: c, schemas: map[string]*jsonschema.Schema{}, components: map[string]bool{}, actions: map[string]bool{}}
+	v := &snippetValidator{t: t, compiler: c, schemas: map[string]*jsonschema.Schema{}, components: map[string]bool{}, actions: map[string]bool{}, ruleActions: map[string]bool{}}
 	var collect func(def string)
 	collect = func(def string) {
 		d := schema.Defs[def]
@@ -211,6 +218,21 @@ func newSnippetValidator(t *testing.T) *snippetValidator {
 		if name, ok := name.(string); ok {
 			v.actions[name] = true
 		}
+	}
+	ra := schema.Defs["RuleAction"]
+	for name := range ra.Properties {
+		v.ruleActions[name] = true
+	}
+	for _, alt := range ra.OneOf {
+		for _, name := range alt.Required {
+			v.ruleActions[name] = true
+		}
+		for name := range alt.Properties {
+			v.ruleActions[name] = true
+		}
+	}
+	if len(v.ruleActions) < 2 {
+		t.Fatalf("rule action kinds not found in the schema (%d)", len(v.ruleActions))
 	}
 	if len(v.components) < 20 || len(v.actions) < 3 {
 		t.Fatalf("component/action types not found in the schema (%d/%d)", len(v.components), len(v.actions))
@@ -333,6 +355,9 @@ func (v *snippetValidator) check(s string) (class string, problems []string, ski
 		return "server-rules", problems, ""
 	case has("id", "on", "do"):
 		return "server-rule", v.schema("ServerRule", raw), ""
+	case len(m) == 1 && v.ruleActions[slices.Collect(maps.Keys(m))[0]]:
+		// {"saveFeed":{...}}: one item of a server rule's `do` list.
+		return "rule-action", v.schema("RuleAction", raw), ""
 	case len(m) == 1 && has("op"):
 		// {"op":"add"} names an op in the catalog list: the name must exist.
 		var name string
@@ -551,6 +576,9 @@ func TestSnippetValidatorCatches(t *testing.T) {
 		{`{"entity":"e","order":"random","filter":[{"field":"a","op":"eq","value":{"op":"not","args":[]}}]}`, true, false},
 		{`{"type":"stat","label":"x","value":{"agg":"sum","entity":"e"}}`, true, false},
 		{`{"type":"stat","label":"自分","entity":"e","aggregate":"count","filter":{"field":"$author","op":"eq","value":{"me":true}}}`, false, false},
+		// rule-action: one item of a server rule's `do` list.
+		{`{"notify":{"to":{"kind":"owner"},"title":"期限です","body":"{title} が今日まで"}}`, false, false},
+		{`{"saveFeed":{"provider":"nope"}}`, true, false},
 	} {
 		_, problems, skip := v.check(tc.src)
 		if (skip != "") != tc.skip || (len(problems) > 0) != tc.fail {
