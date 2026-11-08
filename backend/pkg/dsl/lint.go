@@ -31,6 +31,8 @@ func (a *App) Lint() []string {
 	l.micSeat()
 	l.dupAddControls()
 	l.privateChat()
+	l.optionalTitle()
+	l.settingMaxMin()
 	return l.out
 }
 
