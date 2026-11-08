@@ -38,7 +38,7 @@ func normalizeChatMaterial(req *TextRequest) error {
 	switch {
 	case !fieldIDRe.MatchString(m.Entity):
 		return badText("material.entity must be an entity id")
-	case utf8.RuneCountInString(m.Name) > maxChatSaveNameRunes:
+	case utf8.RuneCountInString(m.Name) > dsl.MaxAIChatSaveNameRunes:
 		return badText("material.name must be at most 40 characters")
 	case m.Text == "":
 		return badText("material.text must not be empty")
@@ -85,7 +85,7 @@ func chatInputOf(app *dsl.App, c *dsl.Component) (entity, name string, ok bool) 
 	}
 	for i := range app.Entities {
 		if e := &app.Entities[i]; e.ID == c.InputEntity {
-			return e.ID, strings.TrimSpace(capRunes(strings.TrimSpace(e.Name), maxChatSaveNameRunes)), true
+			return e.ID, strings.TrimSpace(capRunes(strings.TrimSpace(e.Name), dsl.MaxAIChatSaveNameRunes)), true
 		}
 	}
 	return "", "", false
