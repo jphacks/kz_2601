@@ -36,3 +36,12 @@ public struct HTTPBookLookupClient: BookLookupClient {
         return try JSONDecoder().decode(BookInfo.self, from: data)
     }
 }
+
+extension APIError {
+    /// 本の情報の取得を止めている 503(`details.reason = disabled`)。既定で止めている(openBD の利用条件・2026-11-08)。
+    /// つながらない 503 とは分けて「今使えません」と出す。
+    public var isBookLookupOff: Bool {
+        guard case .server(503, _, _, let d) = self, case .string("disabled")? = d["reason"] else { return false }
+        return true
+    }
+}

@@ -19,7 +19,7 @@ const FeatureNotificationNear = "notification.near"
 // time notification. Appended like alarmRules so prompt.go stays untouched.
 var notifyNearRules = strings.TrimSpace(`
 ## 場所に着いたら知らせる通知は app.notifications の near
-- 「目的地に近づいたら知らせて」「降りる駅の近くで教えて(乗り過ごし防止)」「お店の近くを通ったら買う物を知らせて」「危険な場所に近づいたら警告」: 場所の entity(location 型の field・入力は locationButton / locationPicker・地図は mapView)を作り、app.notifications に {id, title, body, repeat, **near: {entity, locationField, radiusM}**} を 1 件書く。entity の各レコードの場所が見張る場所になる。
+- 「目的地に近づいたら知らせて」「降りる駅の近くで教えて(乗り過ごし防止)」「お店の近くを通ったら買う物を知らせて」「危険な場所に近づいたら警告」: 場所の entity(scope は書かない = 自分だけの記録。hidden にしない location 型の field・入力は locationButton / locationPicker・地図は mapView)を作り、app.notifications に {id, title, body, repeat, **near: {entity, locationField, radiusM}**} を 1 件書く。entity の各レコードの場所が見張る場所になる。
 - radiusM は 100〜2000 の m(省略 200。駅・乗り過ごしは 800〜1000、お店は 150〜300、危険な場所は 200〜300)。repeat once = 最初に着いた 1 回だけ(目的地・乗り過ごし)、daily = 着くたび(お店・危険な場所)。
 - near を書いたら time・weekday・entity・field・offsetMinutes・titleField・enabledField・when・alarm・jitterMinutes は書かない(backend が拒否する)。scheduleNotification には書けない。
 - 判定は**この端末の中**(位置はサーバーに送らない)。iOS が一度に見張れるのは近い順・新しい順に 15 か所まで。位置情報の許可が無い端末では届かない。summary は「保存した場所の近くに着いたら知らせます」程度にし、残りの距離を通知に出す・経路の途中で鳴らすことは約束しない(道案内は別の部品)。

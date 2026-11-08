@@ -271,7 +271,7 @@ func planOne(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger
 		p.row = sim
 	}
 	if rule.Pick != nil {
-		picked, ok := pickRow(app, rule, ev, row, src, e)
+		picked, ok := pickRow(app, rule, ev, row, src, e, cache)
 		if src.err != nil {
 			return Plan{}, src.err
 		}

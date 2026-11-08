@@ -32,6 +32,8 @@ extension AppRuntime {
             toast = L10n.tr("「\(book.title)」の情報を入れました(出典: \(book.source.name))")
         } catch let e as APIError where e.status == 404 {
             toast = L10n.tr("この ISBN の本は見つかりませんでした。手で入力してください")
+        } catch let e as APIError where e.isBookLookupOff {
+            toast = L10n.tr("本の情報の取得は今使えません。手で入力してください")
         } catch let e as APIError where e.status == 400 {
             toast = L10n.tr("ISBN を確かめてください(10 桁か 13 桁)")
         } catch {

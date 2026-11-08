@@ -104,6 +104,7 @@ struct AiGenerateLeaf: View {
             var request = try AIGenerateBuilder.build(c, form: form?.entity, values: values, sourceEntity: source, records: records,
                                                       locale: LanguagePreference.shared.code)
             if form != nil { try await AIPhotoInput.attach(c, values: values, to: &request) } // inputPhoto: オンラインだけ
+            try await AIFeedInput.attach(c, screen: rt.dsl.screen(ctx.route.screen), rt: rt, locale: request.locale ?? "ja", to: &request) // inputFeeds: 画面の feed の行
             let out: AITextResult
             switch route {
             case .onDevice: out = try await OnDeviceAI.generate(request)

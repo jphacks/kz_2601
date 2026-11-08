@@ -58,13 +58,15 @@ func (h *Handler) lookupBook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Off unless BOOK_LOOKUP_ENABLED (books.EnabledFromEnv): 503 for every
+	// call, so a saved lookupBook button shows "not available now".
+	if !h.books.Enabled() {
+		fail(w, apiErr(http.StatusServiceUnavailable, httpx.CodeUpstreamUnavailable, "本の情報の取得は今使えません").With("reason", "disabled"))
+		return
+	}
 	// Checked before the per-user count and before any fetch.
 	if _, ok := books.NormalizeISBN(vals.Get("isbn")); !ok {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "ISBN を確かめてください(10 桁か 13 桁)").With("field", "isbn"))
-		return
-	}
-	if !h.books.Enabled() {
-		fail(w, apiErr(http.StatusServiceUnavailable, httpx.CodeUpstreamUnavailable, "本の情報の読み込みは今止めています").With("reason", "disabled"))
 		return
 	}
 	if wait, ok := h.bookUsers.take(uidOf(r)); !ok {
@@ -82,7 +84,7 @@ func (h *Handler) lookupBook(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, books.ErrNotFound):
 		fail(w, apiErr(http.StatusNotFound, httpx.CodeNotFound, "この ISBN の本は見つかりませんでした"))
 	case errors.Is(err, books.ErrDisabled):
-		fail(w, apiErr(http.StatusServiceUnavailable, httpx.CodeUpstreamUnavailable, "本の情報の読み込みは今止めています").With("reason", "disabled"))
+		fail(w, apiErr(http.StatusServiceUnavailable, httpx.CodeUpstreamUnavailable, "本の情報の取得は今使えません").With("reason", "disabled"))
 	case err != nil:
 		w.Header().Set("Retry-After", "60")
 		fail(w, apiErr(http.StatusServiceUnavailable, httpx.CodeUpstreamUnavailable, "本の情報の提供元に今つながりません"))

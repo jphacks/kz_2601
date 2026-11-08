@@ -1445,7 +1445,7 @@ paths:
         - 取りに行く URL はサーバーのコードで固定(`https://api.openbd.jp/v1/get?isbn={13 桁}`)。公開アドレス以外へはつながない(feeds と同じクライアント)・8 秒で打ち切り・本文 256 KiB まで・同じホストへのリダイレクト 3 回まで。
         - キャッシュは ISBN ごと(見つかった本 1 日・無かった 6 時間・失敗 1 分)。同じ ISBN の同時の取得は 1 回にまとめる。
         - 1 ユーザー 1 時間 `BOOK_LOOKUP_USER_PER_HOUR` 回(既定 60)。超えると 429 `rate_limited`。出どころへの取得はインスタンスあたり 1 分 `BOOK_LOOKUP_UPSTREAM_PER_MINUTE` 回(既定 30)まで。
-        - `BOOK_LOOKUP_DISABLED=1`(または `FEEDS_DISABLED=all`)で止められる。止めている時は 503 `upstream_unavailable`(details.reason = disabled)。
+        - **既定で止めている**(openBD の利用条件が本の紹介のためなので・2026-11-08)。`BOOK_LOOKUP_ENABLED=1` の時だけ動く。`BOOK_LOOKUP_DISABLED=1`・`FEEDS_DISABLED=all` は ENABLED より強く止める。止めている時は ISBN を確かめる前に 503 `upstream_unavailable`(details.reason = disabled)。
         - 利用者のことは何も出どころへ送らない(ISBN だけ)。出典(`source`)をフォームの下に出す。
       parameters:
         - { name: isbn, in: query, required: true, schema: { type: string, maxLength: 40 }, example: 978-4-7808-0204-7 }
