@@ -1,0 +1,54 @@
+package ai
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/jphacks/kz_2601/backend/pkg/dsl"
+)
+
+func TestMasterReachRules_InPrompt(t *testing.T) {
+	for _, want := range []string{"## 保存した記録を開ける一覧(マスタも)", "table と timeline の行はタップできない", `"onItemTap":{"type":"navigate","screen":"member_form"}`} {
+		if !strings.Contains(systemPrompt, want) {
+			t.Errorf("system prompt lacks %q", want)
+		}
+	}
+}
+
+// The rule's list example, swapped into the warikan few-shot in place of its
+// members list, still validates.
+func TestMasterReachRules_ExampleValid(t *testing.T) {
+	start := strings.Index(masterReachRules, `{"type":"list"`)
+	end := strings.Index(masterReachRules[start:], "\n")
+	var example map[string]any
+	if err := json.Unmarshal([]byte(masterReachRules[start:start+end]), &example); err != nil {
+		t.Fatalf("example is not JSON: %v", err)
+	}
+	var app map[string]any
+	if err := json.Unmarshal([]byte(fewShotWarikan), &app); err != nil {
+		t.Fatal(err)
+	}
+	swapped := false
+	for _, s := range app["screens"].([]any) {
+		for _, c := range s.(map[string]any)["components"].([]any) {
+			kids, _ := c.(map[string]any)["children"].([]any)
+			for i, k := range kids {
+				if m := k.(map[string]any); m["type"] == "list" && m["entity"] == "members" {
+					kids[i] = example
+					swapped = true
+				}
+			}
+		}
+	}
+	if !swapped {
+		t.Fatal("warikan few-shot has no members list")
+	}
+	raw, err := json.Marshal(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := dsl.Parse(raw); err != nil {
+		t.Fatalf("example does not validate: %v", err)
+	}
+}

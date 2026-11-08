@@ -1,0 +1,4 @@
+[
+  {"id": "mr_warikan_members", "kind": "create", "group": "master_reach", "transcript": "旅行の割り勘アプリ。メンバーを登録して、誰がいくら払ったかと精算額が見たい", "note": "savedRecordReach: メンバーが table だけで開けない(37 件)。members に list + onItemTap でフォーム", "expect": {"ref": true, "masterTappable": ["members|member|people|person"]}},
+  {"id": "mr_chore_people", "kind": "create", "group": "master_reach", "transcript": "家事の当番アプリ。家族のメンバーを登録して、誰がどの家事をやったか記録して、人ごとの回数を見たい", "note": "savedRecordReach: 家事のメンバーが table だけで開けない。人の entity に list + onItemTap でフォーム", "expect": {"ref": true, "masterTappable": ["members|member|people|person|family|family_members"]}}
+]
