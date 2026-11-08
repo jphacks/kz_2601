@@ -3010,6 +3010,23 @@
         }
       }
     },
+    "データを読み込んでから押してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Load the data first, then tap again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データを読み込んでから押してください"
+          }
+        }
+      }
+    },
     "ドラレコ" : {
       "extractionState" : "manual",
       "localizations" : {
