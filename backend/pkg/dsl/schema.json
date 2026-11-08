@@ -854,6 +854,9 @@
           "$ref": "#/$defs/RandomPicker"
         },
         {
+          "$ref": "#/$defs/Bracket"
+        },
+        {
           "$ref": "#/$defs/AiButton"
         },
         {
@@ -3586,6 +3589,49 @@
       },
       "description": "ランダムに 1 件を選ぶ部品(くじ・抽選・ルーレット・今日の晩ごはん決め)。ボタンを押すたびに entity のレコード(filter で絞れる)から 1 件を短いシャッフル演出付きで選び、titleField(+ subtitleField)を大きく出す。前回と同じ 1 件は続けて出さない(候補が 2 件以上のとき)。結果は保存しない(画面を離れると消える・再描画では変わらない)。「ランダムで決めて」「今日の晩ごはん・ランチを決める」「くじ引き」「当番・順番・席を決める」「ガチャ」の時に必ずこれを選ぶ(list だけで代替しない・計算式 Expr に乱数は無い)。",
       "x-usage": "候補を登録する list と同じ画面に置く: randomPicker を上に A1:F5、候補の list を A6:F10、追加ボタンは右下(D11:F12)。entity は例 dish{name: string(required), genre: enum(任意)}、titleField に name。label は「今日の晩ごはんを決める」のように動詞で。onItemTap は通常 list と同じフォームへの navigate(sheet)。"
+    },
+    "Bracket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "entity",
+        "titleField",
+        "winsField"
+      ],
+      "properties": {
+        "type": {
+          "const": "bracket"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "title": {
+          "type": "string",
+          "description": "表の見出し(任意・例: 社内卓球大会)。"
+        },
+        "entity": {
+          "type": "string",
+          "description": "出場者の entity(例: entrant・team)。1 レコード = 1 人(1 チーム)。"
+        },
+        "titleField": {
+          "type": "string",
+          "description": "表に出す出場者の名前の field。"
+        },
+        "winsField": {
+          "type": "string",
+          "description": "勝ち上がった回戦の数を保存する integer field(computed でない・defaultValue 0)。0 = 1 回戦から、1 = 1 回戦に勝った。勝者を選ぶとここが書き換わる。"
+        },
+        "seedField": {
+          "type": "string",
+          "description": "シード順の integer / number field(小さいほど上位・上位から不戦勝)。省略 = 登録順。"
+        }
+      },
+      "description": "トーナメント表(勝ち抜き戦・ノックアウト)。entity の出場者(最大 64)から 1 回戦の組み合わせを自動で作り(seedField の順か登録順・2 のべき乗に足りない分は上位シードの不戦勝)、回戦を列にして勝ち上がりを表示する。試合の 2 人のどちらかをタップするとその人を勝者にし(もう一度タップで取り消し)、winsField に保存して次の回戦に進める。最後の勝者を優勝として出す。「トーナメント表」「勝ち抜き戦」「対戦表を自動で作る」「勝ち上がり」の時に必ずこれを選ぶ(list や table で代替しない)。リーグ戦(総当たり)・敗者復活・3 位決定戦・スコアの記録はできない。",
+      "x-usage": "出場者の entity(例 entrant{name: string(required), wins: integer(defaultValue 0), seed: integer(任意)})を作り、ホームに bracket{entity: entrant, titleField: name, winsField: wins} を全幅で大きく(例 A1:F7)。下に出場者の list(A8:F10・onItemTap はフォームへ navigate(sheet))と追加ボタン(D11:F12)、出場者のフォーム画面(screen.entity + saveRecord・wins は入力に出さない)を作る。"
     },
     "Expr": {
       "description": "計算式(式ツリー)。リテラル(number/string/boolean)・{ref}(行のフィールド値)・{agg}(エンティティの集計)・{op,args}(関数)・{if,then,else}・{setting}(single の entity の設定値)。評価エラー(ゼロ除算・型不一致・参照先なし)は iOS で「—」表示。深さ 8 まで。",

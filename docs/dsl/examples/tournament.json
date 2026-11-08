@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "らくらくトーナメント",
+    "description": "出場者を登録するとトーナメント表を自動で作る。試合の勝った方をタップすると次の回戦に進む",
+    "icon": "trophy",
+    "theme": { "primaryColor": "#F9A825" },
+    "voiceEntry": "floating"
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "entrant",
+      "name": "出場者",
+      "titleField": "name",
+      "fields": [
+        { "id": "name", "name": "名前", "type": "string", "required": true },
+        { "id": "seed", "name": "シード", "type": "integer" },
+        { "id": "wins", "name": "勝ち上がり", "type": "integer", "defaultValue": 0 }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "トーナメント",
+      "components": [
+        {
+          "type": "bracket", "id": "draw", "area": "A1:F7", "title": "トーナメント表",
+          "entity": "entrant", "titleField": "name", "winsField": "wins", "seedField": "seed"
+        },
+        {
+          "type": "list", "id": "entrants", "area": "A8:F10",
+          "entity": "entrant",
+          "item": { "title": "name", "trailing": "seed" },
+          "emptyText": "出場者を追加してください",
+          "onItemTap": { "type": "navigate", "screen": "entrant_form", "presentation": "sheet" },
+          "swipeToDelete": true
+        },
+        { "type": "button", "id": "add", "area": "D11:F12", "label": "出場者を追加", "icon": "plus",
+          "action": { "type": "navigate", "screen": "entrant_form", "presentation": "sheet" } }
+      ]
+    },
+    {
+      "id": "entrant_form",
+      "title": "出場者",
+      "entity": "entrant",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "entrant" } }],
+      "components": [
+        {
+          "type": "section", "id": "who", "area": "A1:F6", "title": "出場者",
+          "children": [
+            { "type": "textField", "field": "name", "label": "名前", "placeholder": "山田" },
+            { "type": "numberField", "field": "seed", "label": "シード(小さいほど上位・空なら登録順)" }
+          ]
+        },
+        { "type": "button", "id": "delete", "area": "A11:F12", "label": "削除", "style": "destructive",
+          "action": { "type": "deleteRecord", "entity": "entrant", "confirmMessage": "この出場者を削除しますか？" } }
+      ]
+    }
+  ]
+}
