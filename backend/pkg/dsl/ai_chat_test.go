@@ -122,3 +122,27 @@ func TestAIChatExampleLint(t *testing.T) {
 		t.Fatal("long persona must not parse")
 	}
 }
+
+// speak: true reads AI replies aloud; it parses on aiChat and the schema
+// rejects it on any other part (e.g. chatThread).
+func TestAIChatSpeak(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(docsDir, "examples", "ai_counselor.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	spoken := strings.Replace(string(raw), `"roleField": "role",`, `"roleField": "role", "speak": true,`, 1)
+	if spoken == string(raw) {
+		t.Fatal("example changed: no roleField to anchor speak")
+	}
+	app, err := Parse([]byte(spoken))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !app.Screens[0].Components[0].Speak {
+		t.Fatal("speak not decoded")
+	}
+	thread := strings.Replace(spoken, `"type": "aiChat"`, `"type": "chatThread"`, 1)
+	if _, err := Parse([]byte(thread)); err == nil || !strings.Contains(err.Error(), "speak") {
+		t.Fatalf("speak on chatThread must not parse: %v", err)
+	}
+}
