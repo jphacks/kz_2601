@@ -19,10 +19,10 @@ public final class RecordSyncEngine {
 
         public var label: String {
             switch self {
-            case .synced: "最新"
-            case .pending(let n): "未送信 \(n) 件"
-            case .syncing(let n): "送信中(\(n) 件)"
-            case .offline(let n): n == 0 ? "オフライン" : "オフライン・未送信 \(n) 件"
+            case .synced: L("最新")
+            case .pending(let n): L("未送信 \(n) 件")
+            case .syncing(let n): L("送信中(\(n) 件)")
+            case .offline(let n): n == 0 ? L("オフライン") : L("オフライン・未送信 \(n) 件")
             }
         }
     }

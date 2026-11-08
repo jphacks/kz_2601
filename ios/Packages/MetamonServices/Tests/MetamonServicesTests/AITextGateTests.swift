@@ -4,6 +4,10 @@ import MetamonDSL
 
 /// #417 aiButton generate のオンライン版: 送ってよいか(同意 → Pro)・モックの決まった文・サーバーのエラーの文言。
 final class AITextGateTests: XCTestCase {
+    private var savedLanguage: String?
+    override func setUp() { savedLanguage = setAppLanguage("ja") } // 文言は日本語で確かめる(シミュレータの言語に依らない)
+    override func tearDown() { setAppLanguage(savedLanguage) }
+
     func testGateOrder() {
         XCTAssertEqual(AITextGate.decide(consentGranted: false, isPro: true, enforced: true), .needsConsent, "同意が先")
         XCTAssertEqual(AITextGate.decide(consentGranted: true, isPro: false, enforced: true), .needsPro)

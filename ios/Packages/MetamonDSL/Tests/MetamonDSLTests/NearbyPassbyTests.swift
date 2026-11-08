@@ -3,6 +3,10 @@ import XCTest
 
 /// すれ違い通信(nearbyShare mode:passby・#425)の送るデータ・上限・重複除け・同意。通信を通さずに検証する。
 final class NearbyPassbyTests: XCTestCase {
+    private var savedLanguage: String?
+    override func setUp() { savedLanguage = setAppLanguage("ja") } // 文言は日本語で確かめる(シミュレータの言語に依らない)
+    override func tearDown() { setAppLanguage(savedLanguage) }
+
     static let json = """
     {"schemaVersion":1,"app":{"name":"すれ違い","voiceEntry":"none"},"initialScreen":"home",
      "entities":[{"id":"profile","name":"プロフィール","fields":[
