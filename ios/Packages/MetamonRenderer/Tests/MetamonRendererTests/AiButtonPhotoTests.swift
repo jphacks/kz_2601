@@ -102,4 +102,48 @@ final class AiButtonPhotoTests: XCTestCase {
         XCTAssertNil(r.image)
         XCTAssertFalse(try XCTUnwrap(String(data: JSONEncoder().encode(r), encoding: .utf8)).contains("image"))
     }
+
+    // MARK: - https の写真(PR #720 のレビュー: 置き場を限る・読みながら上限で止める)
+
+    func testOnlyStorageHostsAreAllowed() throws {
+        let ok = "https://firebasestorage.googleapis.com/v0/b/x.appspot.com/o/users%2Fu%2Fapps%2Fa%2Fphotos%2F1.jpg?alt=media"
+        XCTAssertTrue(AIPhotoInput.isAllowed(try XCTUnwrap(URL(string: ok))))
+        XCTAssertTrue(AIPhotoInput.isAllowed(try XCTUnwrap(URL(string: "https://storage.googleapis.com/b/p.jpg"))))
+        for bad in ["http://firebasestorage.googleapis.com/a.jpg", "https://evil.example.com/a.jpg",
+                    "https://firebasestorage.googleapis.com.evil.example/a.jpg", "https://u:p@firebasestorage.googleapis.com/a.jpg",
+                    "https://firebasestorage.googleapis.com:8443/a.jpg", "https://localhost/a.jpg", "https://169.254.169.254/latest"] {
+            XCTAssertFalse(AIPhotoInput.isAllowed(try XCTUnwrap(URL(string: bad))), bad)
+        }
+    }
+
+    func testOtherHostsAreRejectedBeforeLoading() async throws {
+        let c = try component(#"{"type":"aiButton","task":"extract","inputPhoto":"rx","output":"note"}"#)
+        var r = try AIRequestBuilder.online(c, entity: entity, values: [:], locale: "ja")
+        do {
+            try await AIPhotoInput.attach(c, values: ["rx": .string("https://evil.example.com/a.jpg")], to: &r)
+            XCTFail("許可していない置き場の写真を読んだ")
+        } catch let e as AIPhotoInput.PhotoError {
+            XCTAssertEqual(e, .untrustedSource)
+            XCTAssertNotNil(e.errorDescription)
+        }
+        XCTAssertNil(r.image)
+    }
+
+    private func stream(_ count: Int) -> AsyncStream<UInt8> {
+        AsyncStream { cont in
+            for _ in 0..<count { cont.yield(0xAB) }
+            cont.finish()
+        }
+    }
+
+    func testReadCappedStopsAtLimit() async throws {
+        let data = try await AIPhotoInput.readCapped(stream(100), limit: 100)
+        XCTAssertEqual(data.count, 100)
+        do {
+            _ = try await AIPhotoInput.readCapped(stream(101), limit: 100)
+            XCTFail("上限を超えて読んだ")
+        } catch let e as AIPhotoInput.PhotoError {
+            XCTAssertEqual(e, .tooLarge)
+        }
+    }
 }

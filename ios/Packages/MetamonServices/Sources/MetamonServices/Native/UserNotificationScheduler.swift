@@ -15,25 +15,42 @@ import CoreLocation
 ///   無い(iOS 26.1 未満・審査用の版)・許可が無い・予約に失敗した時は普通の通知で届ける。
 public struct UserNotificationScheduler: NotificationScheduler {
     private let alarmSync: AlarmSync?
+    private let center: any NotificationCenterClient
+    private let registry: NotificationRegistry
+    private let regionStore: RegionNotificationStore
+    private let location: RegionAccess
+    /// 予約し直しを 1 本ずつに。重なると、片方が読んだ古い予約一覧で「見張ったのに予約に無い = 届いた」と誤る(1 回きりの場所の通知)。
+    private let queue: AsyncSerialQueue
 
     public init(alarms: (any AlarmScheduling)? = nil) {
+        self.init(alarms: alarms, center: SystemNotificationCenter())
+    }
+
+    init(alarms: (any AlarmScheduling)? = nil, center: any NotificationCenterClient,
+         registry: NotificationRegistry = .shared, regionStore: RegionNotificationStore = .shared,
+         location: RegionAccess = .system, queue: AsyncSerialQueue = .notifications) {
         alarmSync = alarms.map(AlarmSync.init)
+        self.center = center
+        self.registry = registry
+        self.regionStore = regionStore
+        self.location = location
+        self.queue = queue
     }
 
     public func sync(appId: String, specs: [NotificationSpec], records: [String: [Record]]) async -> NotificationSyncResult {
-        await NotificationRegistry.shared.set(appId, NotificationPlanner.plan(appId: appId, specs: specs, records: records))
+        await registry.set(appId, NotificationPlanner.plan(appId: appId, specs: specs, records: records))
         return await apply(appId: appId)
     }
 
     public func schedule(_ spec: NotificationSpec, appId: String) async throws -> Date? {
         guard let p = NotificationPlanner.action(appId: appId, spec: spec) else { return nil }
-        await NotificationRegistry.shared.upsertAction(appId, p)
+        await registry.upsertAction(appId, p)
         _ = await apply(appId: appId)
         return p.nextFire(after: Date())
     }
 
     public func cancel(id: String, appId: String) async {
-        await NotificationRegistry.shared.remove(appId: appId, specId: id)
+        await registry.remove(appId: appId, specId: id)
         _ = await apply(appId: appId)
     }
 
@@ -48,7 +65,7 @@ public struct UserNotificationScheduler: NotificationScheduler {
             identifier: ConditionNotifications.identifier(appId: appId, specId: spec.id), content: content,
             trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))
         do {
-            try await UNUserNotificationCenter.current().add(request)
+            try await center.add(request)
             return true
         } catch {
             print("[Metamon] condition notification failed id=\(spec.id): \(error)")
@@ -58,40 +75,45 @@ public struct UserNotificationScheduler: NotificationScheduler {
 
     public func removeApp(_ appId: String) async {
         if let alarmSync {
-            await alarmSync.removeApp(await NotificationRegistry.shared.planned(appId), now: Date())
+            await alarmSync.removeApp(await registry.planned(appId), now: Date())
         }
-        await NotificationRegistry.shared.removeApp(appId)
+        await registry.removeApp(appId)
         await ConditionNotificationStore.shared.removeApp(appId)
-        await RegionNotificationStore.shared.removeApp(appId)
+        await regionStore.removeApp(appId)
         _ = await apply(appId: appId)
     }
 
     public func removeAll() async {
         await alarmSync?.removeAll()
-        await NotificationRegistry.shared.removeAll()
+        await registry.removeAll()
         await ConditionNotificationStore.shared.removeAll()
-        await RegionNotificationStore.shared.removeAll()
-        let center = UNUserNotificationCenter.current()
-        let ids = await center.pendingNotificationRequests().map(\.identifier)
-            .filter { $0.hasPrefix(NotificationPlanner.prefix) || $0.hasPrefix(ConditionNotifications.prefix) }
-        center.removePendingNotificationRequests(withIdentifiers: ids)
+        await regionStore.removeAll()
+        let center = center
+        await queue.run {
+            let ids = await center.pendingIdentifiers()
+                .filter { $0.hasPrefix(NotificationPlanner.prefix) || $0.hasPrefix(ConditionNotifications.prefix) }
+            await center.removePending(ids)
+        }
     }
 
     public func refresh(appId: String) async -> NotificationSyncResult { await apply(appId: appId) }
 
-    /// 全アプリ分を近い順に上限まで予約し直す。結果の upcoming は `appId` の分だけ。
+    /// 全アプリ分を近い順に上限まで予約し直す。結果の upcoming は `appId` の分だけ。直列(`queue`)。
     private func apply(appId: String) async -> NotificationSyncResult {
-        let center = UNUserNotificationCenter.current()
+        await queue.run { await self.applyNow(appId: appId) }
+    }
+
+    private func applyNow(appId: String) async -> NotificationSyncResult {
         let now = Date()
-        let all = await NotificationRegistry.shared.pruned(now: now)
+        let all = await registry.pruned(now: now)
         let mine = NotificationPlanner.prefix + appId + "."
-        let pending = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(NotificationPlanner.prefix) }
+        let pending = await center.pendingIdentifiers().filter { $0.hasPrefix(NotificationPlanner.prefix) }
         let place = await places(all, appId: appId, pending: Set(pending))
         let chosen = NotificationPlanner.select(all, now: now, limit: NotificationPlanner.limit - place.regions.count)
         let asAlarm = await alarmSync?.apply(chosen.map(\.0), now: now) ?? []
         let notify = chosen.map(\.0).filter { !asAlarm.contains($0.identifier) } + place.regions
         let want = Set(notify.map(\.identifier))
-        center.removePendingNotificationRequests(withIdentifiers: pending.filter { !want.contains($0) })
+        await center.removePending(pending.filter { !want.contains($0) })
         var denied = false
         if !notify.isEmpty {
             denied = await !requestPermissionIfNeeded()
@@ -105,7 +127,7 @@ public struct UserNotificationScheduler: NotificationScheduler {
                 print("[Metamon] notification add failed id=\(p.identifier): \(error)")
             }
         }
-        await RegionNotificationStore.shared.setArmed(armed)
+        await regionStore.setArmed(armed)
         let upcoming = chosen.filter { $0.0.identifier.hasPrefix(mine) }.map { UpcomingNotification(title: $0.0.title, body: $0.0.body, date: $0.1) }
         let myPlaces = place.regions.filter { $0.identifier.hasPrefix(mine) }.count
         print("[Metamon] notifications scheduled: total=\(chosen.count) alarms=\(asAlarm.count) regions=\(armed.count) app=\(upcoming.count) places=\(myPlaces) next=\(upcoming.first.map { "\($0.date)" } ?? "-") denied=\(denied) locationOff=\(place.locationOff)")
@@ -115,32 +137,26 @@ public struct UserNotificationScheduler: NotificationScheduler {
     /// 見張る場所の通知。位置情報が許可されていなければ見張らない(`locationOff` = このアプリに場所があるのに届かない)。
     /// 未決定なら、このアプリに場所がある時だけ許可を聞く(場所を保存した直後・そのアプリを開いた時 = 使う場面)。
     private func places(_ all: [PlannedNotification], appId: String, pending: Set<String>) async -> (regions: [PlannedNotification], locationOff: Bool) {
-        #if os(iOS)
         let known = all.filter(\.isRegion)
         guard !known.isEmpty else {
-            await RegionNotificationStore.shared.setArmed([])
+            await regionStore.setArmed([])
             return ([], false)
         }
         let hasMine = known.contains { $0.identifier.hasPrefix(NotificationPlanner.prefix + appId + ".") }
-        let access = await RegionLocationAccess.shared
-        let allowed = hasMine ? await access.authorize() : await access.isAuthorized
+        let allowed = hasMine ? await location.authorize() : await location.isAuthorized()
         guard allowed else {
-            await RegionNotificationStore.shared.setArmed([])
+            await regionStore.setArmed([])
             return ([], hasMine)
         }
-        let candidates = await RegionNotificationStore.shared.toSchedule(known, known: known, pending: pending)
-        return (NotificationPlanner.selectRegions(candidates, here: await access.lastKnown), false)
-        #else
-        return ([], false)
-        #endif
+        let candidates = await regionStore.toSchedule(known, known: known, pending: pending)
+        return (NotificationPlanner.selectRegions(candidates, here: await location.lastKnown()), false)
     }
 
     /// 許可されていれば true。未決定ならここでダイアログを出す。
     public func requestPermissionIfNeeded() async -> Bool {
-        let center = UNUserNotificationCenter.current()
-        switch await center.notificationSettings().authorizationStatus {
+        switch await center.authorizationStatus() {
         case .notDetermined:
-            return (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+            return await center.requestAuthorization()
         case .denied:
             return false
         default:

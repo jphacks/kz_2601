@@ -40,6 +40,13 @@ struct ButtonLeaf: View {
     /// 押してから終わるまで待つ間、くるくるを出すアクション。
     static func showsProgress(_ action: Action?) -> Bool { action?.type == .lookupBook }
 
+    /// 押した時に同期で呼ぶ。実行中なら false(二度押し)。待つアクションは、最初の await より前に実行中にする。
+    static func begin(_ action: Action, running: inout Bool) -> Bool {
+        guard !running else { return false }
+        if showsProgress(action) { running = true }
+        return true
+    }
+
     static func isVisible(visibleTo: String?, isAdmin: Bool?) -> Bool {
         visibleTo != "admins" || isAdmin != false
     }
@@ -56,12 +63,11 @@ struct ButtonLeaf: View {
     @ViewBuilder
     private var styled: some View {
         let button = Button {
-            guard let action = c.action, !running else { return }
+            guard let action = c.action, Self.begin(action, running: &running) else { return }
+            let waits = Self.showsProgress(action)
             Task {
                 // 保存・リセットはフォームを読む / 空にするので、変換中の文字を確定させてから(#627)
                 if TextSubmission.commitsInput(before: action.type) { await KeyboardState.finishEditing() }
-                let waits = Self.showsProgress(action)
-                if waits { running = true }
                 await rt.run(action, ctx.actionContext())
                 if waits { running = false }
             }
