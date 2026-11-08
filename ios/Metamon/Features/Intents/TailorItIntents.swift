@@ -87,8 +87,9 @@ struct AddRecordIntent: AppIntent {
 
         let sent = await runtime.addRecordFromIntent(appId: target.appId, entity: entity.id, data: draft.data)
         let what = draft.summary.isEmpty ? content : draft.summary
+        let refs = draft.refs.isEmpty ? "" : "(\(draft.refs.joined(separator: "・")))" // どのカテゴリに入れたか
         let tail = sent ? "" : "(未送信: 接続が戻ったら自動で送ります)"
-        let message = "\(target.appName)に「\(what)」を追加しました\(tail)"
+        let message = "\(target.appName)に「\(what)」\(refs)を追加しました\(tail)"
         print("[Metamon] intent: \(message)")
         return .result(dialog: IntentDialog(stringLiteral: message))
     }

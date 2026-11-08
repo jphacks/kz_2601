@@ -4,7 +4,7 @@ import Foundation
 /// DSL を変えずに、どの生成アプリでも動くよう Field の型だけで当てはめる:
 /// - タイトル系(titleField → 最初の string/text): 数値を除いた文言。enum ならオプションに一致する値
 /// - 数値 1 つ(最初の required な数値 → 最初の数値): 文中の数値(またはパラメータ)
-/// - ref: 参照先レコードの見出し(`refChoices`)に一致すればその id。一致しなければ既定値
+/// - ref: 参照先レコードの見出し(`refChoices`)に一致すればその id(1 文字の見出しは語単位でだけ)。一致しなければ既定値
 /// - それ以外: フォームと同じ既定値(`FieldCoding.defaultValue`。date の now・enum の先頭など)
 public enum QuickRecord {
     public struct Parsed: Equatable, Sendable {
@@ -21,6 +21,8 @@ public enum QuickRecord {
         public var missing: [String]
         /// 応答用の短い要約(例: 「ランチ ¥800」)
         public var summary: String
+        /// 文中の語で当てた ref(「カテゴリ: 食費」)。既定値のままの ref は含めない
+        public var refs: [String] = []
     }
 
     /// ref の候補 1 件(参照先レコードの id と見出し)。
@@ -142,10 +144,12 @@ public enum QuickRecord {
             if let hit = matchOption(in: rawText, options: f.options ?? []) { values[f.id] = .string(hit) }
         }
         // ref も同じ最長一致で参照先の見出しに合わせ、id を入れる(「食費 コンビニ」→ category=食費レコードの id)
+        var refs: [String] = []
         for f in entity.fields where f.type == .ref {
-            let choices = refChoices[f.id] ?? []
-            if let hit = matchOption(in: rawText, options: choices.map(\.title)),
-               let choice = choices.first(where: { $0.title == hit }) { values[f.id] = .string(choice.id) }
+            if let choice = matchRef(in: rawText, choices: refChoices[f.id] ?? []) {
+                values[f.id] = .string(choice.id)
+                refs.append("\(f.name): \(choice.title)")
+            }
         }
         if let titleF, let title = parsed.title {
             if titleF.type == .enum {
@@ -164,7 +168,18 @@ public enum QuickRecord {
         }
         let missing = entity.fields.filter { ($0.required ?? false) && data[$0.id] == nil }.map(\.name)
         let parts = [titleF, numberF].compactMap { $0 }.compactMap { f in data[f.id].map { FieldCoding.display($0, field: f) } }
-        return Draft(data: data, missing: missing, summary: parts.filter { !$0.isEmpty }.joined(separator: " "))
+        return Draft(data: data, missing: missing, summary: parts.filter { !$0.isEmpty }.joined(separator: " "), refs: refs)
+    }
+
+    /// これより短い ref の見出しは、空白で区切った語と一致する時だけ当てる(「電車」に「車」・「1200円」に「1」を当てない)。
+    static let minRefTitleLength = 2
+
+    /// ref の候補から最長一致を選ぶ。見出しはユーザーが付けるので、短すぎるものは語単位でだけ当てる。
+    static func matchRef(in text: String, choices: [RefChoice]) -> RefChoice? {
+        let words = Set(text.lowercased().split(whereSeparator: \.isWhitespace).map(String.init))
+        let usable = choices.filter { $0.title.count >= minRefTitleLength || words.contains($0.title.lowercased()) }
+        guard let hit = matchOption(in: text, options: usable.map(\.title)) else { return nil }
+        return usable.first { $0.title == hit }
     }
 
     /// 最長一致のオプション(「ベンチプレス」と「ベンチ」なら長い方)。

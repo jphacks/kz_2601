@@ -98,11 +98,27 @@ final class QuickRecordTests: XCTestCase {
         Record(id: "c3", data: ["name": "交通費"]),
     ]
 
-    private func refBuild(_ text: String, categoryDefault: String? = nil) throws -> QuickRecord.Draft {
+    private func refBuild(_ text: String, categoryDefault: String? = nil, records: [Record]? = nil) throws -> QuickRecord.Draft {
         let dsl = try refDSL(categoryDefault: categoryDefault)
         let entity = try XCTUnwrap(dsl.entity("expense"))
-        let choices = QuickRecord.refChoices(for: entity, in: dsl, records: ["categories": categories])
+        let choices = QuickRecord.refChoices(for: entity, in: dsl, records: ["categories": records ?? categories])
         return QuickRecord.build(entity: entity, text: text, refChoices: choices)
+    }
+
+    /// 1 文字の見出しは語の一部に当たりやすい(「電車」に「車」・「1200円」に「1」)ので、空白で区切った語と一致する時だけ当てる。
+    func testRefShortTitleNeedsWholeWord() throws {
+        let short = categories + [Record(id: "c4", data: ["name": "車"]), Record(id: "c5", data: ["name": "1"])]
+        XCTAssertNil(try refBuild("電車 300円", records: short).data["category"])
+        XCTAssertNil(try refBuild("ランチ 1200円", records: short).data["category"])
+        XCTAssertEqual(try refBuild("車 ガソリン 3000円", records: short).data["category"], "c4")
+        XCTAssertEqual(try refBuild("食費 電車 300円", records: short).data["category"], "c1") // 2 文字以上は従来どおり部分一致
+    }
+
+    /// Siri の返事で、どのカテゴリに入れたか分かるようにする(メモに同じ語が残るので要約だけでは当たったか分からない)。
+    func testRefMatchIsReported() throws {
+        XCTAssertEqual(try refBuild("食費 コンビニ 480円").refs, ["カテゴリ: 食費"])
+        XCTAssertEqual(try refBuild("コンビニ 480円").refs, [])
+        XCTAssertEqual(try refBuild("コンビニ 480円", categoryDefault: "c3").refs, []) // 既定値は当てたものではない
     }
 
     func testRefMatchedByRecordTitle() throws {
