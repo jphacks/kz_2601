@@ -63,7 +63,8 @@ func TestServerPushWording_Generate(t *testing.T) {
 		// The pass skips requests that ask for no automatic action, so the
 		// prompt must not say 「この後の工程で作られる」 for them.
 		{"pass on, no ask", true, nil, "家計簿を作って", false},
-		{"pass on, ask the regex misses", true, nil, "部活のチャット。新着はプッシュして", false},
+		{"pass on, push ask", true, nil, "部活のチャット。新着はプッシュして", true},
+		{"pass on, ask the regex misses", true, nil, "部活のチャット。新着が来たら鳴らして", false},
 		{"no shared data", true, []string{FeatureSharedData}, "家計簿を作って。毎日リマインドして", false},
 		{"opted out", true, nil, "家計簿を作って。毎日リマインドして" + without, false},
 	}
