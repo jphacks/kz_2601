@@ -19,10 +19,18 @@ const DefaultCollection = "rateLimits"
 
 // Firestore is the production Store: one transaction per request reads every
 // counter and either adds the weight to all of them or writes nothing.
+//
+// Contention: the client retries an Aborted transaction itself (exponential
+// backoff from 1s). txAttempts keeps the worst case of the request path near
+// 15s; when it is exhausted Allow falls back to the in-memory store.
 type Firestore struct {
-	c   *firestore.Client
-	col string
+	c        *firestore.Client
+	col      string
+	attempts int
 }
+
+// txAttempts is the transaction attempt budget (client default).
+const txAttempts = firestore.DefaultTransactionMaxAttempts
 
 // NewFirestore uses client (honours FIRESTORE_EMULATOR_HOST) and collection
 // (empty = DefaultCollection).
@@ -30,7 +38,7 @@ func NewFirestore(client *firestore.Client, collection string) *Firestore {
 	if collection == "" {
 		collection = DefaultCollection
 	}
-	return &Firestore{c: client, col: collection}
+	return &Firestore{c: client, col: collection, attempts: txAttempts}
 }
 
 // Consume implements Store.
@@ -58,7 +66,7 @@ func (f *Firestore) Consume(ctx context.Context, counters []Counter, weight int,
 			}
 		}
 		return nil
-	}, firestore.MaxAttempts(5))
+	}, firestore.MaxAttempts(f.attempts))
 	return usage, err
 }
 
@@ -96,7 +104,7 @@ func (f *Firestore) Refund(ctx context.Context, counters []Counter, weight int, 
 			}
 		}
 		return nil
-	}, firestore.MaxAttempts(5))
+	}, firestore.MaxAttempts(f.attempts))
 }
 
 func (f *Firestore) refs(counters []Counter) []*firestore.DocumentRef {
