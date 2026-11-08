@@ -478,6 +478,8 @@ type Component struct {
 	SaveTo  *AISaveTo `json:"saveTo,omitempty"`  // generate list: one record per item (ai_save_to.go)
 	// InputPhoto is a photo field of the form sent with the call (cloud only, ai_button_photo.go).
 	InputPhoto string `json:"inputPhoto,omitempty"`
+	// InputFeeds are ids of feeds on the same screen whose rows go with the call (ai_input_feed.go).
+	InputFeeds []string `json:"inputFeeds,omitempty"`
 
 	// healthStat (#167). Label / Target are shared.
 	Metric string `json:"metric,omitempty"` // steps|weight
