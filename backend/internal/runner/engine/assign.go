@@ -10,10 +10,11 @@ import (
 
 // countLoads is candidate id -> how many records of count.entity point to
 // it (listed through the run's reader, capped and counted like each / agg).
-// The row itself and the records this run creates are not counted (a retry
-// counts what the first attempt counted); the rows assigned earlier in this
-// run are. nil when the pick has no count.
-func countLoads(rule *dsl.ServerRule, ev Trigger, row *expreval.Row, rowKey string, src *refSource, c *runCache) map[string]int {
+// The row itself and the records this run creates for any of its rows are
+// not counted (a retry counts what the first attempt counted); the rows
+// assigned earlier in this run are, once, through c.assigned. nil when the
+// pick has no count.
+func countLoads(rule *dsl.ServerRule, ev Trigger, row *expreval.Row, src *refSource, c *runCache) map[string]int {
 	cnt := rule.Pick.Count
 	if cnt == nil || !dsl.IsCountOrder(rule.Pick.Order) {
 		return nil
@@ -22,7 +23,7 @@ func countLoads(rule *dsl.ServerRule, ev Trigger, row *expreval.Row, rowKey stri
 	if src.err != nil {
 		return nil
 	}
-	own := ownCreated(rule, ev, rowKey, cnt.Entity)
+	own := c.ownCreated(rule, ev, cnt.Entity)
 	out := map[string]int{}
 	for _, r := range recs {
 		if own[r.ID] || (row != nil && row.Entity != nil && row.Entity.ID == cnt.Entity && r.ID == row.Record.ID) {
@@ -93,23 +94,44 @@ func (c *runCache) noteAssigned(rule *dsl.ServerRule, row, picked *expreval.Row)
 		c.assigned[rule.ID] = m
 	}
 	m[id] += delta
-	if prev != "" && prev != id {
-		m[prev]-- // listed with its old value, now moved
+	if prev != "" {
+		m[prev]-- // listed with its old value (a retry: already id), now moved
 	}
 }
 
 // ownCreated is the ids of the records of entity this run's createRecord
-// actions create for rowKey.
-func ownCreated(rule *dsl.ServerRule, ev Trigger, rowKey, entity string) map[string]bool {
-	own := map[string]bool{}
-	if ev.CreatedID == nil {
+// actions create for any of its rows (every record of on.each, or the one
+// trigger row): none of them existed while the first attempt planned (the
+// writes come after planning), so a retry leaves them all out. Built once
+// per run, rule and entity.
+func (c *runCache) ownCreated(rule *dsl.ServerRule, ev Trigger, entity string) map[string]bool {
+	key := rule.ID + "\x00" + entity
+	if own, ok := c.own[key]; ok {
 		return own
 	}
-	for i, act := range rule.Do {
-		if act.CreateRecord != nil && act.CreateRecord.Entity == entity {
-			own[ev.CreatedID(rule.ID, i, rowKey)] = true
+	own := map[string]bool{}
+	if ev.CreatedID != nil {
+		rows := []string{""}
+		if rule.On.Each != "" {
+			rows = rows[:0]
+			for _, r := range c.lists[rule.On.Each] {
+				if r.ID != "" {
+					rows = append(rows, r.ID)
+				}
+			}
+		}
+		for i, act := range rule.Do {
+			if act.CreateRecord != nil && act.CreateRecord.Entity == entity {
+				for _, row := range rows {
+					own[ev.CreatedID(rule.ID, i, row)] = true
+				}
+			}
 		}
 	}
+	if c.own == nil {
+		c.own = map[string]map[string]bool{}
+	}
+	c.own[key] = own
 	return own
 }
 

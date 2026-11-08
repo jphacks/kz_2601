@@ -35,7 +35,7 @@ func pickRow(app *dsl.App, rule *dsl.ServerRule, ev Trigger, row *expreval.Row, 
 	// (countLoads), so a candidate may be chosen again while least loaded.
 	once := p.Exclude != nil && !dsl.IsCountOrder(p.Order)
 	if p.Exclude != nil {
-		skip = excluded(app, rule, ev, row, rowKey, src)
+		skip = excluded(app, rule, ev, row, src, c)
 		if src.err != nil {
 			return nil, false
 		}
@@ -46,7 +46,7 @@ func pickRow(app *dsl.App, rule *dsl.ServerRule, ev Trigger, row *expreval.Row, 
 		}
 	}
 	seed := ev.RunID + "\x00" + rule.ID + "\x00" + rowKey
-	load := countLoads(rule, ev, row, rowKey, src, c)
+	load := countLoads(rule, ev, row, src, c)
 	if src.err != nil {
 		return nil, false
 	}
@@ -103,12 +103,13 @@ func pickRow(app *dsl.App, rule *dsl.ServerRule, ev Trigger, row *expreval.Row, 
 }
 
 // excluded is the ids exclude.field points to in the records of
-// exclude.entity. A record this run creates (a retry after the create) is
-// not counted, so the retry picks what the first attempt picked. With
+// exclude.entity. A record this run creates for any of its rows (a retry
+// after the creates) is not counted, so the retry picks what the first
+// attempt picked. With
 // exclude.match only the records matching the row count.
-func excluded(app *dsl.App, rule *dsl.ServerRule, ev Trigger, row *expreval.Row, rowKey string, src *refSource) map[string]bool {
+func excluded(app *dsl.App, rule *dsl.ServerRule, ev Trigger, row *expreval.Row, src *refSource, c *runCache) map[string]bool {
 	x := rule.Pick.Exclude
-	own := ownCreated(rule, ev, rowKey, x.Entity)
+	own := c.ownCreated(rule, ev, x.Entity)
 	match := excludeMatch(app, x, row)
 	recs := src.list(x.Entity)
 	if src.err != nil {

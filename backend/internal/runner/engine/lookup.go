@@ -20,6 +20,8 @@ type runCache struct {
 	// rows of this run (the writes come after planning, so exclude's list
 	// does not see them yet).
 	picked map[string]map[string]bool
+	// own: rule id + entity -> the ids this run creates (ownCreated).
+	own map[string]map[string]bool
 }
 
 func newRunCache() *runCache {

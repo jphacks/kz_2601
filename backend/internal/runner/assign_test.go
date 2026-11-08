@@ -40,3 +40,34 @@ func TestAssignShiftCreated(t *testing.T) {
 		}
 	})
 }
+
+// Shifts saved one after another and run in the same tick go to different
+// staff: a runner takes the events in order and finishes one (its writes
+// included) before planning the next, so each counts the earlier ones.
+func TestAssignShiftsCreatedInTurn(t *testing.T) {
+	stores(t, options{age: oldAccounts{}}, func(t *testing.T, h *harness) {
+		id := "RD-ASSIGN-SEQ" + h.sfx
+		owner := "uid-rd-assign-seq" + h.sfx
+		app := h.circle(id, owner, readsDSL(t, "server_rules_assign.json"))
+		s1 := h.post(owner, app+"/entities/staff/records", `{"data":{"name":"田中"}}`)
+		s2 := h.post(owner, app+"/entities/staff/records", `{"data":{"name":"鈴木"}}`)
+		s3 := h.post(owner, app+"/entities/staff/records", `{"data":{"name":"佐藤"}}`)
+		h.tick()
+		var shifts []string
+		for _, day := range []string{"2026-11-10", "2026-11-11", "2026-11-12"} {
+			shifts = append(shifts, h.post(owner, app+"/entities/shifts/records", `{"data":{"day":"`+day+`"}}`))
+		}
+		h.tick()
+		got := map[string]any{}
+		for _, r := range h.records(store.PublicRecords(id, "shifts")) {
+			got[r.ID] = r.Data["staff"]
+		}
+		seen := map[any]bool{}
+		for _, s := range shifts {
+			seen[got[s]] = true
+		}
+		if len(seen) != 3 || !seen[s1] || !seen[s2] || !seen[s3] {
+			t.Fatalf("staff %v, want one shift each for %s %s %s", got, s1, s2, s3)
+		}
+	})
+}

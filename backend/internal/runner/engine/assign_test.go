@@ -209,3 +209,88 @@ func TestPlanAssignEachExcludeRepeats(t *testing.T) {
 		}
 	}
 }
+
+// eachPicks plans an on.each run: row id -> the "$pick" its write carries.
+func eachPicks(t *testing.T, a *dsl.App, r *dsl.ServerRule, ev Trigger, l *listReader) map[string]any {
+	t.Helper()
+	rows, err := PlanEach(context.Background(), a, r, ev, l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]any{}
+	for _, row := range rows {
+		for _, w := range row.Plan.Writes {
+			got[row.Trigger.Record.ID] = w.Values["staff"]
+		}
+	}
+	return got
+}
+
+func samePicks(t *testing.T, got, want map[string]any) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("picks %v, want %v", got, want)
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Fatalf("picks %v, want %v", got, want)
+		}
+	}
+}
+
+// A retried on.each + createRecord run whose first attempt created the
+// records of some rows picks what the first attempt picked: what it created
+// for any row is left out (earlier rows count once, through the run's own
+// tally; later rows' did not exist while the first attempt planned).
+func TestPlanAssignEachCreateRetry(t *testing.T) {
+	a := readsApp(t, "server_rules_assign.json")
+	r := rule(t, a, "assign_daily")
+	r.If = nil
+	r.Pick.Count = &dsl.PickCount{Entity: "offs", Field: "staff"}
+	r.Do = []dsl.RuleAction{{CreateRecord: &dsl.RuleCreateRecord{Entity: "offs", Values: map[string]dsl.Expr{
+		"staff": {Kind: dsl.ExprRef, Ref: dsl.PickRef}, "day": {Kind: dsl.ExprRef, Ref: "day"}}}}}
+	if err := a.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	shifts := []expreval.Record{
+		rec("y1", map[string]any{"day": "2026-11-10"}),
+		rec("y2", map[string]any{"day": "2026-11-11"}),
+		rec("y3", map[string]any{"day": "2026-11-12"}),
+		rec("y4", map[string]any{"day": "2026-11-13"}),
+		rec("y5", map[string]any{"day": "2026-11-14"}),
+	}
+	created := func(rule string, action int, row string) string { return fmt.Sprintf("c/%s/%d/%s", rule, action, row) }
+	ev := Trigger{AppID: "a", Kind: KindScheduled, Scope: dsl.ScopeShared, At: readsAt, Location: jst, RunID: "run-c", CreatedID: created}
+	offs := []expreval.Record{rec("o1", map[string]any{"staff": "s2"})}
+	l := &listReader{recs: map[string][]expreval.Record{"staff": staff(), "shifts": shifts, "offs": offs}}
+	first := eachPicks(t, a, r, ev, l)
+	// s2 has 1: s1, s3 (s1 older), then all at 1 -> s1, s2, s3.
+	samePicks(t, first, map[string]any{"y1": "s1", "y2": "s3", "y3": "s1", "y4": "s2", "y5": "s3"})
+	// The first attempt created y1's, y2's and y4's (writes stop anywhere).
+	for _, row := range []string{"y1", "y2", "y4"} {
+		l.recs["offs"] = append(l.recs["offs"], rec(created(r.ID, 0, row), map[string]any{"staff": first[row]}))
+	}
+	samePicks(t, eachPicks(t, a, r, ev, l), first)
+}
+
+// updateRecord of the row (no if): a row already holding what it picks
+// counts once, so the first attempt and a retry after some writes agree.
+func TestPlanAssignEachUpdateRetry(t *testing.T) {
+	a := readsApp(t, "server_rules_assign.json")
+	r := rule(t, a, "assign_daily")
+	r.If = nil
+	shifts := []expreval.Record{
+		rec("x1", map[string]any{"day": "2026-11-09", "staff": "s1"}),
+		rec("x2", map[string]any{"day": "2026-11-10"}),
+		rec("x3", map[string]any{"day": "2026-11-11"}),
+		rec("x4", map[string]any{"day": "2026-11-12"}),
+	}
+	l := &listReader{recs: map[string][]expreval.Record{"staff": staff(), "shifts": shifts}}
+	ev := Trigger{AppID: "a", Kind: KindScheduled, Scope: dsl.ScopeShared, At: readsAt, Location: jst, RunID: "run-u"}
+	first := eachPicks(t, a, r, ev, l)
+	// x1 keeps s1 (no write; one shift, not two), then s2, s3, and s1 again.
+	samePicks(t, first, map[string]any{"x2": "s2", "x3": "s3", "x4": "s1"})
+	// The first attempt wrote x2: it is unchanged now, the rest as before.
+	shifts[1] = rec("x2", map[string]any{"day": "2026-11-10", "staff": "s2"})
+	samePicks(t, eachPicks(t, a, r, ev, l), map[string]any{"x3": "s3", "x4": "s1"})
+}
