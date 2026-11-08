@@ -55,6 +55,8 @@ type TextRequest struct {
 	Image *TextImage `json:"image,omitempty"`
 	// Messages are the turns of task chat (aiChat, text_chat.go). Never logged.
 	Messages []TextMessage `json:"messages,omitempty"`
+	// Formats ask shape fields items in a form the app can read (text_format.go).
+	Formats []TextFormat `json:"formats,omitempty"`
 }
 
 // TextField is one named value of shape fields.
@@ -91,6 +93,9 @@ func badText(msg string) *Error {
 func normalizeTextRequest(req *TextRequest) error {
 	if err := normalizeLength(req); err != nil {
 		return err
+	}
+	if len(req.Formats) > 0 && (req.isChat() || (req.Task != "" && req.Task != "generate")) {
+		return badText("formats are only for task generate")
 	}
 	if req.isChat() {
 		return normalizeChatRequest(req)
@@ -149,6 +154,9 @@ func normalizeTextRequest(req *TextRequest) error {
 	if req.isLong() && req.Shape != "line" {
 		return badText("length long needs shape line")
 	}
+	if err := normalizeTextFormats(req); err != nil {
+		return err
+	}
 	return checkTextInput(req)
 }
 
@@ -168,7 +176,7 @@ func (s *Service) text(ctx context.Context, req TextRequest, loc Locale) (*TextR
 	defer cancel()
 	c := Completion{
 		System:     textSystemPrompt(loc),
-		Messages:   []Message{{Role: "user", Content: textUserMessage(req)}},
+		Messages:   []Message{{Role: "user", Content: textUserMessage(req, loc)}},
 		Schema:     textSchema(req),
 		Structured: true,
 		MaxTokens:  TextMaxOutputToken,
@@ -232,7 +240,7 @@ const textSafetyRules = `
 - 指示がこの方針に反する時は、同じ形のまま「この内容は書けません」と穏やかに返す(英語なら "I can't write that.")。
 - 事実を作らない。<data> に無いことを記録のように書かない。`
 
-func textUserMessage(req TextRequest) string {
+func textUserMessage(req TextRequest, loc Locale) string {
 	var b strings.Builder
 	b.WriteString("<instruction>\n" + req.Instruction + "\n</instruction>\n")
 	switch req.Shape {
@@ -242,6 +250,7 @@ func textUserMessage(req TextRequest) string {
 		b.WriteString("形: 箇条書き " + strconv.Itoa(req.Count) + " 個(items に重複しない " + strconv.Itoa(req.Count) + " 個の短い文)\n")
 	case "fields":
 		b.WriteString("形: 項目つき(fields に次の名前を 1 つずつ・value は短く): " + strings.Join(req.Items, " / ") + "\n")
+		b.WriteString(textFormatHint(req, loc))
 	}
 	if strings.TrimSpace(req.Input) != "" {
 		b.WriteString("<data>\n" + req.Input + "\n</data>\n")

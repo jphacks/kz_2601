@@ -94,6 +94,7 @@ var expectKeys = map[string]expectKind{
 	"aiInputPhoto":     expectBool,   // some aiButton has inputPhoto (false = none)
 	"aiInputFeeds":     expectBool,   // some generate button reads feeds on its screen (ai_input_feed.go)
 	"aiSaveTo":         expectBool,   // some generate list button saves items as records (ai_save_to.go)
+	"aiOutputs":        expectBool,   // some generate fields button fills form fields per item (ai_outputs.go)
 	// checkNearby (#425)
 	"passby":         expectBool,
 	"passbyDistance": expectBool,
