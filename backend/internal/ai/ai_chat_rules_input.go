@@ -12,6 +12,7 @@ var aiChatInputRules = strings.TrimSpace(`
   - 形は aiChat の節の turn{text, role} に加えて、記録の entity(例 diary{date: date, mood: enum[よい, ふつう, つらい], body: text(required)}・problem{subject: enum, question: text, memo: text}・資料は fileImport の docs{title, body: text})。inputEntity に会話の entity(turn)を指定しない。記録を書くフォーム画面と list は別のタブに置く(aiChat の画面は A1:F12 のまま)。
   - persona に記録の読み方を書く(例「日記を読んで気持ちに寄り添う相談相手。記録に書かれた出来事に触れて 1 つずつ質問する」「保存した問題の家庭教師。答えをすぐ言わずヒントを出す」「資料に書いてあることだけで答え、無ければ無いと言う」)。
 - 記録を読まない雑談・練習相手には inputEntity を付けない。ボタン 1 回で記録をまとめさせるだけなら aiButton(entity + limit)で、aiChat の inputEntity とは別。
+- 既存の aiChat への「日記も読んだうえで話して」「記録を見て答えて」は aiChat に inputEntity を足す patch(記録の entity が無ければフォーム・list の画面と一緒に add)。
 `)
 
 func init() { systemPrompt += "\n\n" + aiChatInputRules }
