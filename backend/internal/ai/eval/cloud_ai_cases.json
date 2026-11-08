@@ -3,5 +3,5 @@
   {"id": "ca_essay_rewrite", "kind": "create", "group": "cloudai", "transcript": "英作文を書いて AI に添削してもらう練習帳", "note": "aiButton rewrite", "expect": {"aiTask": "rewrite"}},
   {"id": "ca_news_classify", "kind": "create", "group": "cloudai", "transcript": "メモを貼ったら事実か意見か AI が分類してくれる", "note": "aiButton classify + enum", "expect": {"aiTask": "classify"}},
   {"id": "ca_plan_advice", "kind": "create", "group": "cloudai", "transcript": "予定を入れるとおばあちゃん口調で危ない点を助言してくれるアプリ", "note": "aiButton suggest(prompt で口調)", "expect": {"aiTask": "suggest"}},
-  {"id": "ca_consult", "kind": "create", "group": "cloudai", "transcript": "AI に何でも相談できて、過去の相談も見返せるアプリ", "note": "相談の記録 + aiButton generate(entity = 相談・{{question}}・output 答え)", "expect": {"aiGenerate": "line", "aiGenerateEntity": true}}
+  {"id": "ca_consult", "kind": "create", "group": "cloudai", "transcript": "AI に何でも相談できて、過去の相談も見返せるアプリ", "note": "何往復も話して会話を残す = aiChat(相談の記録 + aiButton generate の代わり)", "expect": {"has": ["aiChat"]}}
 ]

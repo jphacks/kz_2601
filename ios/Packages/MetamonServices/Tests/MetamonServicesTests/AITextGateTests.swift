@@ -106,6 +106,18 @@ final class AITextGateTests: XCTestCase {
         XCTAssertNil(HTTPAIClient.textError(.server(status: 400, code: "bad_request", message: "instruction must be at most 500 characters"), photo: true) as? AITextError)
     }
 
+    /// aiChat: モックは最後の発言に返す・会話が長すぎる 413 は会話の文言・402(作成者が Pro でない)は案内だけ。
+    func testChatMockAndErrors() async throws {
+        let r = AITextRequest(instruction: "相談相手", shape: .line, locale: "ja", task: "chat",
+                              messages: [AITextMessage(role: "user", text: "眠れない")])
+        let out = try await MockAIClient(delay: .zero).text(r)
+        XCTAssertTrue(out.text.contains("眠れない"))
+        XCTAssertEqual(HTTPAIClient.textError(.server(status: 413, code: "payload_too_large", message: "messages must be at most 16384 bytes of text"), chat: true) as? AITextError,
+                       .failed("会話が長すぎて AI に送れませんでした。短くしてからお試しください"))
+        XCTAssertEqual(HTTPAIClient.textError(.server(status: 402, code: "pro_required", message: "x", details: ["reason": .string("creator_needs_pro")]), chat: true) as? AITextError,
+                       .creatorNeedsPro)
+    }
+
     func testRequestEncodesImage() throws {
         let r = AITextRequest(instruction: "", shape: .line, task: "extract", image: AITextImage(jpegBase64: "/9j/AA=="))
         let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(r)) as? [String: Any])

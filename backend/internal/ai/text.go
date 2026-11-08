@@ -53,6 +53,8 @@ type TextRequest struct {
 	AppID string `json:"appId,omitempty"`
 	// Image is the photo of aiButton inputPhoto (text_image.go). Never logged.
 	Image *TextImage `json:"image,omitempty"`
+	// Messages are the turns of task chat (aiChat, text_chat.go). Never logged.
+	Messages []TextMessage `json:"messages,omitempty"`
 }
 
 // TextField is one named value of shape fields.
@@ -89,6 +91,12 @@ func badText(msg string) *Error {
 func normalizeTextRequest(req *TextRequest) error {
 	if err := normalizeLength(req); err != nil {
 		return err
+	}
+	if req.isChat() {
+		return normalizeChatRequest(req)
+	}
+	if len(req.Messages) > 0 {
+		return badText("messages are only for task chat")
 	}
 	if req.Task != "" && req.Task != "generate" {
 		return normalizeTaskRequest(req)
@@ -168,10 +176,13 @@ func (s *Service) text(ctx context.Context, req TextRequest, loc Locale) (*TextR
 		Effort:     cfg.Effort,
 		Thinking:   "disabled",
 	}
-	if req.Task != "" {
+	switch {
+	case req.isChat():
+		applyChat(&c, req, loc)
+	case req.Task != "":
 		c.System, c.Messages[0].Content, c.Schema, c.MaxTokens = taskSystemPrompt(loc), taskUserMessage(req), taskSchema(req), TextMaxTaskOutputToken
 	}
-	if req.isLong() {
+	if req.isLong() && !req.isChat() {
 		applyLong(&c, req, loc)
 	}
 	applyImage(&c, req)
@@ -188,6 +199,9 @@ func (s *Service) text(ctx context.Context, req TextRequest, loc Locale) (*TextR
 	}
 	if req.isLong() {
 		parse = parseLongOutput
+	}
+	if req.isChat() {
+		parse = parseChatOutput
 	}
 	res, err := parse(resp.Text, req)
 	if err != nil {

@@ -1,7 +1,6 @@
 package dsl
 
 import (
-	"slices"
 	"strings"
 )
 
@@ -19,10 +18,13 @@ const (
 	FeedRSS      = "rss"      // 運営が許可したフィード(Component.FeedID)
 	FeedWarnings = "warnings" // 気象庁の警報・注意報(Component.Region)
 	FeedPressure = "pressure" // MET Norway の気圧の予報(Component.Region の代表地点)
+	FeedArxiv    = "arxiv"    // arXiv の分野ごとの新着論文(Component.FeedID = ArxivCategories)
+	FeedDiet     = "diet"     // 国会会議録検索システムの発言の検索(Component.Query)
 )
 
 // FeedProviders is the closed set of feed.provider values.
-var FeedProviders = map[string]bool{FeedWeather: true, FeedHolidays: true, FeedRSS: true, FeedWarnings: true, FeedPressure: true}
+var FeedProviders = map[string]bool{FeedWeather: true, FeedHolidays: true, FeedRSS: true, FeedWarnings: true, FeedPressure: true,
+	FeedArxiv: true, FeedDiet: true}
 
 // FeedUsesRegion reports whether a provider reads Component.Region (a key of
 // WeatherRegions). The same 56 forecast office codes serve all three.
@@ -63,7 +65,7 @@ var RSSFeeds = map[string]string{
 
 func checkFeed(where string, c *Component, add func(string, ...any)) {
 	if !FeedProviders[c.Provider] {
-		add("%s: feed provider must be weather, warnings, pressure, holidays or rss (got %q); other sources and URLs are not available", where, c.Provider)
+		add("%s: feed provider must be weather, warnings, pressure, holidays, rss, arxiv or diet (got %q); other sources and URLs are not available", where, c.Provider)
 		return
 	}
 	if FeedUsesRegion(c.Provider) {
@@ -73,24 +75,18 @@ func checkFeed(where string, c *Component, add func(string, ...any)) {
 	} else if c.Region != "" {
 		add("%s: feed region is only for provider weather, warnings or pressure", where)
 	}
-	if c.Provider == FeedRSS {
-		if _, ok := RSSFeeds[c.FeedID]; !ok {
-			add("%s: feed rss needs feedId, one of the allowlisted feeds (%s) (got %q)", where, strings.Join(FeedIDs(), ", "), c.FeedID)
+	if ids := FeedIDTable(c.Provider); ids != nil {
+		if _, ok := ids[c.FeedID]; !ok {
+			add("%s: feed %s needs feedId, one of the allowlisted ids (%s) (got %q)", where, c.Provider, strings.Join(sortedKeys(ids), ", "), c.FeedID)
 		}
 	} else if c.FeedID != "" {
-		add("%s: feed feedId is only for provider rss", where)
+		add("%s: feed feedId is only for provider rss or arxiv", where)
 	}
+	checkFeedQuery(where, c, add) // feed_arxiv_diet.go
 	if c.Limit < 0 || c.Limit > FeedMaxLimit {
 		add("%s: feed limit must be 1..%d (0 = %d)", where, FeedMaxLimit, FeedDefaultLimit)
 	}
 }
 
 // FeedIDs lists the allowlisted rss feed ids, sorted.
-func FeedIDs() []string {
-	ids := make([]string, 0, len(RSSFeeds))
-	for id := range RSSFeeds {
-		ids = append(ids, id)
-	}
-	slices.Sort(ids)
-	return ids
-}
+func FeedIDs() []string { return sortedKeys(RSSFeeds) }

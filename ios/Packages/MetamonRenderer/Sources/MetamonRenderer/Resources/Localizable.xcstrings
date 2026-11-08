@@ -766,6 +766,40 @@
         }
       }
     },
+    "AI" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI"
+          }
+        }
+      }
+    },
+    "AI が考えています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The AI is thinking…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI が考えています…"
+          }
+        }
+      }
+    },
     "AI で読み取っています…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -779,6 +813,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI で読み取っています…"
+          }
+        }
+      }
+    },
+    "AI と話すには Tailor It Pro が必要です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talking with the AI needs Tailor It Pro"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI と話すには Tailor It Pro が必要です"
           }
         }
       }
@@ -1221,6 +1272,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この写真は読み取れません"
+          }
+        }
+      }
+    },
+    "この版では AI と話せません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI chat is not available in this version"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この版では AI と話せません"
           }
         }
       }
@@ -5420,6 +5488,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定アプリで Tailor It のマイクへのアクセスを許可してください。"
+          }
+        }
+      }
+    },
+    "話しかけてみましょう" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Say something to start"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話しかけてみましょう"
           }
         }
       }

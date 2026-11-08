@@ -10,16 +10,16 @@ extension HTTPAIClient {
         let data: Data
         do {
             data = try await HTTP.send("POST", baseURL: baseURL, path: "v1/text", body: request, token: token,
-                                   timeout: request.isLong ? 75 : (request.image != nil ? 45 : 30)) // long は出力 1500 トークン(サーバーは 60 秒まで待つ)・写真は送る分だけ長く
+                                   timeout: request.isLong ? 75 : (request.image != nil || request.isChat ? 45 : 30)) // long は出力 1500 トークン(サーバーは 60 秒まで待つ)・写真と会話は送る分だけ長く
         } catch let e as APIError {
-            throw Self.textError(e, photo: request.image != nil)
+            throw Self.textError(e, photo: request.image != nil, chat: request.isChat)
         }
         guard let result = AITextResult.parseServer(data, for: request) else { throw AITextError.badOutput }
         return result
     }
 
     /// サーバーの英語の理由を画面の文言に寄せる。利用上限(rate_limited)はサーバーの日本語をそのまま出す。
-    static func textError(_ e: APIError, photo: Bool = false) -> Error {
+    static func textError(_ e: APIError, photo: Bool = false, chat: Bool = false) -> Error {
         // inputPhoto: サーバーの写真の検証(413 / 400 の "image …")と、写真の受け付けが止まっている 403
         if photo, case .server(_, let code, let message, _) = e {
             if code == "payload_too_large" || (code == "bad_request" && message.hasPrefix("image")) {
@@ -27,6 +27,8 @@ extension HTTPAIClient {
             }
             if code == "forbidden" { return AITextError.failed("写真を AI に見せる機能は、今は使えません") }
         }
+        // aiChat: 会話が長すぎる(端末で 16 KB に切って送るので普段は来ない)
+        if chat, e.code == "payload_too_large" { return AITextError.failed("会話が長すぎて AI に送れませんでした。短くしてからお試しください") }
         return switch e.code ?? "" {
         case "refused": AITextError.refused
         case "bad_output": AITextError.badOutput

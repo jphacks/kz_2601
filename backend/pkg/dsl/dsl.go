@@ -343,6 +343,8 @@ const (
 	CompLocationTracker ComponentType = "locationTracker"
 	// chat (#260): bubbles oldest-first + a pinned input bar that saves a record
 	CompChatThread ComponentType = "chatThread"
+	// AI conversation (ai_chat.go): bubbles + input bar, each turn a record, the reply from /v1/text task chat
+	CompAiChat ComponentType = "aiChat"
 	// dashcam (#410): rear camera loop recording, impact save, auto start
 	CompDashcam ComponentType = "dashcam"
 	// device health (#167)
@@ -493,6 +495,9 @@ type Component struct {
 	// chatThread (#260). Entity / Placeholder / EmptyText are shared.
 	TextField  string `json:"textField,omitempty"`  // message body (string/text field)
 	PhotoField string `json:"photoField,omitempty"` // optional photo field
+	// aiChat (ai_chat.go). Entity / TextField / Length / Placeholder / EmptyText are shared.
+	RoleField string `json:"roleField,omitempty"` // user|assistant per turn (optional)
+	Persona   string `json:"persona,omitempty"`   // who the AI is (≤ 500 chars)
 	// dashcam (#410). Title is shared. Zero = iOS default.
 	KeepMinutes  int      `json:"keepMinutes,omitempty"`  // loop length (default 10)
 	MaxStorageMB int      `json:"maxStorageMB,omitempty"` // storage cap (default 2000)
@@ -526,12 +531,12 @@ type Component struct {
 	Toggle string `json:"toggle,omitempty"` // boolean field: learned (swipe right) / not yet (left)
 
 	// feed (#348). Title / Limit / EmptyText are shared. Never a URL (feed.go).
-	Provider string `json:"provider,omitempty"` // weather|holidays|rss
+	Provider string `json:"provider,omitempty"` // FeedProviders
 	Region   string `json:"region,omitempty"`   // weather: JMA forecast office code (WeatherRegions)
-	FeedID   string `json:"feedId,omitempty"`   // rss: allowlisted feed id (RSSFeeds)
+	FeedID   string `json:"feedId,omitempty"`   // rss / arxiv: allowlisted id (FeedIDTable)
 
 	// placeSearch (place_search.go). Label / NameField / LocationField are shared.
-	Query        string `json:"query,omitempty"`        // fixed search words
+	Query        string `json:"query,omitempty"`        // fixed search words (placeSearch, feed diet)
 	Category     string `json:"category,omitempty"`     // PlaceCategories
 	Near         string `json:"near,omitempty"`         // "" | current
 	AddressField string `json:"addressField,omitempty"` // placeSearch / locationButton: the address string field

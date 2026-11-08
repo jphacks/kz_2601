@@ -78,6 +78,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompFeed,
 		// on-device AI
 		dsl.CompAiButton,
+		// AI conversation (ai_chat.go)
+		dsl.CompAiChat,
 		// peer-to-peer
 		dsl.CompNearbyShare,
 		// location tracking

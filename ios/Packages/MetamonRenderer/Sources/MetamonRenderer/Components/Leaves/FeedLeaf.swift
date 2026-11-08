@@ -3,9 +3,9 @@
 import SwiftUI
 import MetamonDSL
 
-/// `feed`(#348): 天気予報・警報・気圧の予報・祝日・許可したお知らせを読むだけの一覧。データはホスト(`FeedHost`)が appconfig から取る。
+/// `feed`(#348): 天気予報・警報・気圧の予報・祝日・許可したお知らせ・arXiv の新着・国会会議録の発言を読むだけの一覧。データはホスト(`FeedHost`)が appconfig から取る。
 /// 行: 日付・見出し・(天気)アイコン / 最高・最低 / 降水確率、(気圧)最低〜最高 hPa・小さな折れ線・低下の印、
-/// (お知らせ)タップで記事を Safari で開く。下に出典を必ず出す。
+/// (お知らせ・論文・発言)タップでページを Safari で開く。下に出典を必ず出す。
 struct FeedLeaf: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.openURL) private var openURL
@@ -129,6 +129,8 @@ struct FeedLeaf: View {
         case "holidays": "calendar"
         case "warnings": "exclamationmark.triangle"
         case "pressure": "gauge.with.dots.needle.33percent"
+        case "arxiv": "doc.text"
+        case "diet": "building.columns"
         default: "newspaper"
         }
     }
@@ -154,7 +156,7 @@ struct FeedLeaf: View {
         }
     }
 
-    /// weather / holidays / pressure は「11/7(土)」、rss / warnings は「11/5 18:30」。
+    /// weather / holidays / pressure / diet は「11/7(土)」、rss / warnings / arxiv は「11/5 18:30」。
     static func dateText(_ raw: String?, provider: String) -> String? {
         guard let raw, !raw.isEmpty else { return nil }
         let jst = TimeZone(identifier: "Asia/Tokyo") ?? .current
@@ -164,7 +166,7 @@ struct FeedLeaf: View {
         out.calendar = cal
         out.timeZone = jst
         out.locale = Locale(identifier: "ja_JP")
-        if provider == "rss" || provider == "warnings" {
+        if provider == "rss" || provider == "warnings" || provider == "arxiv" {
             guard let d = ISO8601DateFormatter().date(from: raw) else { return nil }
             out.dateFormat = "M/d H:mm"
             return out.string(from: d)

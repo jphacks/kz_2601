@@ -46,6 +46,45 @@ enum ErrorCopy {
     // 運営による AI の一時停止(#511・503 ai_paused)。上限の文言とは分ける
     static var aiPausedTitle: String { L10n.tr("AI を一時停止しています") }
     static var aiPausedBody: String { L10n.tr("AI を一時的に止めています。しばらくしてからもう一度お試しください") }
+    // 無料プランの一時停止(#317・503 free_plan_paused)。混雑・AI の停止とは分ける
+    static var freePlanPausedTitle: String { L10n.tr("無料プランを一時停止しています") }
+    static func freePlanPausedBody(resumeAt: Date?, timeZone: TimeZone = .current) -> String {
+        guard let resumeAt else {
+            return L10n.tr("利用が集中したため、無料プランの機能を一時的に止めています。しばらくしてからもう一度お試しください")
+        }
+        return L10n.tr("利用が集中したため、無料プランの機能を一時的に止めています。\(resetTime(resumeAt, timeZone: timeZone))に再開します")
+    }
+    // プランの上限(#317・403 plan_limit_reached)。参加者には課金の導線を出さない(U3/U4)
+    static var planLimitTitle: String { L10n.tr("上限に達しました") }
+    /// 何の上限か(上限に当たった時・近い時のお知らせで同じ言い方にする)
+    static func planLimitResourceName(_ resource: PlanLimit.Resource) -> String {
+        switch resource {
+        case .apps: L10n.pick(L10n.tr("作れるアプリの数"), review: L10n.tr("作れる記録帳の数"))
+        case .recordsPerApp: L10n.tr("このアプリに保存できる記録の数")
+        case .photosPerApp: L10n.tr("このアプリに保存できる写真の数")
+        case .other: L10n.tr("このアプリで使える量")
+        }
+    }
+    static func planLimitBody(_ limit: PlanLimit) -> String {
+        let what = planLimitResourceName(limit.resource)
+        if limit.byCreator { return L10n.tr("\(what)が上限に達しました。作った人に知らせてください") }
+        if showsProPath(limit) { return L10n.tr("\(what)が無料プランの上限に達しました。使わないものを消すか、Pro にすると増やせます") }
+        return L10n.tr("\(what)が上限に達しました。使わないものを消すと、続けて使えます")
+    }
+    /// 「Pro にする」を出すか。作成者本人だけ(参加者は払っても直らない)。審査用の版は課金を持たない
+    static func showsProPath(_ limit: PlanLimit) -> Bool {
+        #if APP_STORE_REVIEW
+        return false
+        #else
+        return limit.upgrade && !limit.byCreator
+        #endif
+    }
+    // 運営がアプリの自動の動きを止めている(#346・403 app_stopped)。理由は出さない
+    static var appStoppedTitle: String { L10n.tr("自動の動きが止まっています") }
+    static var appStoppedBody: String { L10n.tr("このアプリの自動の動きは運営が止めています。この変更は保存できませんでした") }
+    // 表示できない言葉(#321・422 text_not_allowed)。どの言葉かは出さない
+    static var textNotAllowed: String { L10n.tr("表示できない言葉が含まれています") }
+    static func textNotAllowed(fieldName: String) -> String { L10n.tr("「\(fieldName)」に表示できない言葉が含まれています") }
     static var timeoutTitle: String { L10n.tr("時間がかかりすぎました") }
     static var timeoutBody: String { L10n.tr("サーバーの応答がありませんでした。もう一度お試しください") }
     // セッション
@@ -103,11 +142,15 @@ enum ErrorCopy {
 
     /// 失敗の「次の一手」。圏外なら接続の確認、それ以外は少し待って再試行。
     static func nextStep(for error: Error) -> String {
-        switch FailureKind.classify(error) {
+        if (error as? APIError)?.isTextNotAllowed == true { return textNotAllowed }
+        return switch FailureKind.classify(error) {
         case .offline: offlineInterruptedBody
         case .sessionExpired: sessionExpiredBody
         case .appCheckFailed: appCheckFailedBody
         case .aiPaused: aiPausedBody
+        case .freePlanPaused(let resumeAt): freePlanPausedBody(resumeAt: resumeAt)
+        case .planLimit(let limit): planLimitBody(limit)
+        case .appStopped: appStoppedBody
         default: otherBody
         }
     }
