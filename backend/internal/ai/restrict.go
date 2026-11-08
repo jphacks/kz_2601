@@ -519,6 +519,7 @@ func buildRestrictedPrompt(system string, r Restriction) string {
 		s = strings.Replace(s, settingsSingleLine, settingsLatestLine, 1)
 		s = strings.Replace(s, notifySettingBudget, notifyLatestBudget, 1)
 		s = strings.Replace(s, singleChatRule, noSingleChatRule, 1)
+		s = strings.Replace(s, titleGoalSingleLine, titleGoalLatestLine, 1)
 	}
 	if r.noRoles {
 		s = dropDataRolesRules(s, r.noShared)
