@@ -18,14 +18,32 @@ final class AIInputRecordsTests: XCTestCase {
     private let mixed = [
         Record(id: "a", data: ["body": "自分の投稿"], updatedAt: "2026-11-01T00:00:00Z", author: "me"),
         Record(id: "b", data: ["body": "他の人の投稿"], updatedAt: "2026-11-02T00:00:00Z", author: "other"),
-        Record(id: "c", data: ["body": "未送信の自分の分"], updatedAt: "2026-11-03T00:00:00Z"),
+        Record(id: "c", data: ["body": "未送信の自分の分"], updatedAt: "2026-11-03T00:00:00Z", unsent: true),
     ]
 
     func testOnlineSharedKeepsOnlyOwnRecords() throws {
         for scope in ["shared", "public"] {
             let out = try AIInputRecords.select(mixed, in: try entity(scope: scope), route: .online, uid: "me")
-            XCTAssertEqual(Set(out.map(\.id)), ["a", "c"], "\(scope): 他の人の記録は送らない・author 無しは自分の分")
+            XCTAssertEqual(Set(out.map(\.id)), ["a", "c"], "\(scope): 他の人の記録は送らない・未送信の author 無しは自分の分")
         }
+    }
+
+    /// shared / public: サーバーの規則が作った記録・古い記録も author が無い(空文字も同じ)ので、未送信でなければ送らない。
+    func testOnlineSharedSkipsAuthorlessRecordsThatAreNotUnsent() throws {
+        let rows = mixed + [
+            Record(id: "d", data: ["body": "規則が作った記録"], updatedAt: "2026-11-04T00:00:00Z"),
+            Record(id: "e", data: ["body": "author が空"], updatedAt: "2026-11-05T00:00:00Z", author: ""),
+            Record(id: "f", data: ["body": "author が空の未送信"], updatedAt: "2026-11-06T00:00:00Z", author: "", unsent: true),
+        ]
+        for scope in ["shared", "public"] {
+            let out = try AIInputRecords.select(rows, in: try entity(scope: scope), route: .online, uid: "me")
+            XCTAssertEqual(Set(out.map(\.id)), ["a", "c", "f"], scope)
+        }
+        XCTAssertEqual(Set(try AIInputRecords.select(rows, in: try entity(scope: "shared"), route: .online, uid: nil).map(\.id)), ["c", "f"])
+        let authorless = [Record(id: "d", data: ["body": "規則が作った記録"])]
+        XCTAssertThrowsError(try AIInputRecords.select(authorless, in: try entity(scope: "shared"), route: .online, uid: "me"))
+        XCTAssertEqual(try AIInputRecords.select(authorless, in: try entity(scope: nil), route: .online, uid: "me").map(\.id), ["d"],
+                       "private は author が無くても自分の分")
     }
 
     func testOnDeviceAndPrivateAreNotFiltered() throws {
