@@ -60,6 +60,9 @@ final class AIInputRecordsTests: XCTestCase {
     }
 
     func testNoOwnRecordsLeftThrowsCalmMessage() throws {
+        let savedLanguage = LanguagePreference.shared.setting
+        LanguagePreference.shared.setting = .ja // 文言は日本語で確かめる
+        defer { LanguagePreference.shared.setting = savedLanguage }
         let others = [Record(id: "b", data: ["body": "他の人の投稿"], author: "other")]
         XCTAssertThrowsError(try AIInputRecords.select(others, in: try entity(scope: "shared"), route: .online, uid: "me")) {
             XCTAssertEqual($0 as? AIInputRecords.SelectError, .noOwnRecords)
