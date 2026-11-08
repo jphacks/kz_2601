@@ -39,6 +39,7 @@ struct SettingsSheet: View {
                 ProSettingsSection() // 課金(#77)
                 #endif
                 RemainingTodaySettingsSection() // #630 今日の残り(審査用の版も出す)
+                UsageSettingsSection() // #317 使っている量(作ったアプリの数・今のアプリの記録と写真)
                 languageSection
                 voiceModelSection
                 clarifySection
@@ -59,6 +60,7 @@ struct SettingsSheet: View {
                 if !Self.e2eDeleteAccount { deleteAccountSection }
             }
             .navigationTitle("設定")
+            .task { await rt.refreshPlanUsage() } // #317 使っている量(5 分キャッシュ)
             .screenMapSheet { dismiss() } // 設定は音声シートから開くので、閉じればその画面の文脈で話せる
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

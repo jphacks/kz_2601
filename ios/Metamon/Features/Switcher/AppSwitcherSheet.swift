@@ -26,6 +26,8 @@ struct AppSwitcherSheet: View {
                 header
                     .padding(.horizontal, Theme.Spacing.lg)
                     .padding(.top, Theme.Spacing.lg)
+                AppsUsageNotice() // #317 作れるアプリの数が上限に近い(1 日 1 回)
+                    .padding(.horizontal, Theme.Spacing.lg)
                 cards
                     .padding(.top, Theme.Spacing.lg)
                 actions
@@ -41,6 +43,7 @@ struct AppSwitcherSheet: View {
         .presentationDragIndicator(.visible)
         .sensoryFeedback(.selection, trigger: selected)
         .task { await rt.appsList() }
+        .onChange(of: rt.apps.count) { PlanUsageStore.shared.invalidateMe() } // 作った・消した・複製した(#317)
         #if !APP_STORE_REVIEW // 審査用ビルドはシェア / リリース申請を外す(#245)
         .task { await releaseUI.refresh(rt.services.releaseRequests) }
         .sheet(item: $sharingUI.shareTarget) { ShareAppSheet(app: $0) }

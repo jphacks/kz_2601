@@ -56,13 +56,17 @@ enum ErrorCopy {
     }
     // プランの上限(#317・403 plan_limit_reached)。参加者には課金の導線を出さない(U3/U4)
     static var planLimitTitle: String { L10n.tr("上限に達しました") }
-    static func planLimitBody(_ limit: PlanLimit) -> String {
-        let what: String = switch limit.resource {
+    /// 何の上限か(上限に当たった時・近い時のお知らせで同じ言い方にする)
+    static func planLimitResourceName(_ resource: PlanLimit.Resource) -> String {
+        switch resource {
         case .apps: L10n.pick(L10n.tr("作れるアプリの数"), review: L10n.tr("作れる記録帳の数"))
         case .recordsPerApp: L10n.tr("このアプリに保存できる記録の数")
         case .photosPerApp: L10n.tr("このアプリに保存できる写真の数")
         case .other: L10n.tr("このアプリで使える量")
         }
+    }
+    static func planLimitBody(_ limit: PlanLimit) -> String {
+        let what = planLimitResourceName(limit.resource)
         if limit.byCreator { return L10n.tr("\(what)が上限に達しました。作った人に知らせてください") }
         if showsProPath(limit) { return L10n.tr("\(what)が無料プランの上限に達しました。使わないものを消すか、Pro にすると増やせます") }
         return L10n.tr("\(what)が上限に達しました。使わないものを消すと、続けて使えます")
