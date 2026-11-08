@@ -293,7 +293,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [D_2207](https://github.com/jphacks/D_2207) | - | README雛形のまま | その他 | ? | - | 内容なし |  |
 | [D_2208](https://github.com/jphacks/D_2208) | スマートポインター | スマホからホストPCのスライドを共同操作する | Web専用,共有 | × | WEB_ONLY,REALTIME | PCの操作が本体。発表タイマーと順番共有版で代替 | 決勝 |
 | [D_2209](https://github.com/jphacks/D_2209) | Airdapt | なぞった地域に雰囲気が似た街を衛星画像で探す | 地図,独自ML | × | CUSTOM_ML | 衛星画像の特徴検索が本体。街の条件タグ照合版で代替 |  |
-| [D_2210](https://github.com/jphacks/D_2210) | スケジュールマジック | グループの予定から全員が空く日を探す | 共有,記録 | ○ | SERVER_LOGIC | 空き日の濃淡集計は Tailor It では簡易になる。予定の重ね表示で代替。候補日のうち誰の予定とも重ならない日は serverRules の `lookup` の `notOverlaps`(期間の重なり)で印を付けられる。何人が空いているかの濃淡は欠ける(○ のまま) |  |
+| [D_2210](https://github.com/jphacks/D_2210) | スケジュールマジック | グループの予定から全員が空く日を探す | 共有,記録 | ○ | SERVER_LOGIC | 予定の重ね表示で代替。候補日のうち誰の予定とも重ならない日は serverRules の `lookup` の `notOverlaps`(期間の重なり)で印を付けられる。候補日ごとの参加できる人数は computed の `agg count`(回答の `day` = 行の `id` かつ `status` = 参加できる)で出せる(例: `docs/dsl/examples/schedule_poll.json`)。各自のカレンダーの予定からの自動取り込みは欠ける(○ のまま) |  |
 | [D_2211](https://github.com/jphacks/D_2211) | - | README雛形のまま | その他 | ? | - | 内容なし |  |
 | [D_2212](https://github.com/jphacks/D_2212) | Complete Menu! | 外食店のメニュー制覇を記録しおすすめを出す | 記録,ゲーム | ○ | SERVER_LOGIC | 店メニューは手入力。おすすめは serverRules の `pick`(#715)(まだ食べていないメニューからランダム・古い順に 1 つ選んで記録・通知)で作れる。店のメニューの取得と好みに合わせたおすすめは欠ける |  |
 | [D_2213](https://github.com/jphacks/D_2213) | - | README雛形のまま | その他 | ? | - | 内容なし |  |
