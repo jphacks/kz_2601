@@ -56,14 +56,16 @@ type Result struct {
 }
 
 // Query names what to read. Region is for weather / warnings / pressure,
-// FeedID for rss / arxiv, Q (search words) for diet. UID is the caller (not
-// part of the cache key): it counts the source fetches search words cause.
+// FeedID for rss / arxiv, Q (search words) for diet. UID and IP (a hashed
+// client address) are the caller, not part of the cache key: they count the
+// source fetches search words cause.
 type Query struct {
 	Provider string
 	Region   string
 	FeedID   string
 	Q        string
 	UID      string
+	IP       string
 }
 
 func (q Query) key() string { return q.Provider + "|" + q.Region + "|" + q.FeedID + "|" + q.Q }
@@ -128,6 +130,9 @@ const (
 	// DefaultUserMissesPerHour caps, per user and instance, the source
 	// fetches of a provider that takes search words (diet).
 	DefaultUserMissesPerHour = 20
+	// DefaultIPMissesPerHour is the same per client address (new anonymous
+	// uids share one address; several users behind one address get room).
+	DefaultIPMissesPerHour = 60
 )
 
 // Service is safe for concurrent use.
@@ -138,6 +143,7 @@ type Service struct {
 	sleep          func(context.Context, time.Duration) bool // sleepCtx; tests move a fake clock
 	disabled       map[string]bool
 	userMissesHour int
+	ipMissesHour   int
 
 	mu       sync.Mutex
 	cache    map[string]*entry
@@ -145,7 +151,7 @@ type Service struct {
 	budgets  map[string]*budget       // per-minute caps: "" = shared, dsl.FeedDiet = diet's own
 	turns    map[string]chan struct{} // one fetch at a time per gap provider, in arrival order
 	lastAt   map[string]time.Time     // last fetch start per provider
-	misses   hourly                   // source fetches per user (search-word providers)
+	misses   hourly                   // source fetches per "u:"uid / "i:"ip (search-word providers)
 }
 
 // budget is a fixed per-minute window of upstream fetches.
@@ -188,6 +194,8 @@ type Options struct {
 	DietPerMinute int
 	// UserMissesPerHour caps a user's search-word fetches; 0 = DefaultUserMissesPerHour.
 	UserMissesPerHour int
+	// IPMissesPerHour caps a client address's search-word fetches; 0 = DefaultIPMissesPerHour.
+	IPMissesPerHour int
 }
 
 // New builds a Service.
@@ -196,6 +204,7 @@ func New(o Options) *Service {
 		cache: map[string]*entry{}, inflight: map[string]*call{},
 		turns: map[string]chan struct{}{}, lastAt: map[string]time.Time{},
 		userMissesHour: cmp.Or(max(o.UserMissesPerHour, 0), DefaultUserMissesPerHour),
+		ipMissesHour:   cmp.Or(max(o.IPMissesPerHour, 0), DefaultIPMissesPerHour),
 		budgets: map[string]*budget{
 			"":           {limit: cmp.Or(max(o.PerMinute, 0), DefaultUpstreamPerMinute)},
 			dsl.FeedDiet: {limit: cmp.Or(max(o.DietPerMinute, 0), DefaultDietPerMinute)},
@@ -334,7 +343,9 @@ func (s *Service) check(q Query) error {
 // failed fetch the last good copy (if recent enough) is served as stale.
 // The fetch runs apart from ctx (only its own requestTimeout bounds it): a
 // caller that gives up after waiting for its turn neither cancels the fetch
-// nor leaves a failure in the cache.
+// nor leaves a failure in the cache. For a gap provider an expired entry with
+// a last good copy is served right away; when the provider's turn is free the
+// caller also starts the one refresh in the background (refresh).
 func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 	k := q.key()
 	turn := s.turns[q.Provider] // nil = no gap
@@ -345,6 +356,7 @@ func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 		}
 	}()
 	var waited time.Duration
+	refresh := false // serve the stale copy now, fetch in the background
 	for {
 		s.mu.Lock()
 		now := s.now()
@@ -356,11 +368,14 @@ func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 			}
 			return e, false, nil
 		}
+		stale := e != nil && e.items != nil && now.Sub(e.fetchedAt) < staleFor
 		if c := s.inflight[k]; c != nil {
 			s.mu.Unlock()
+			if turn != nil && stale { // the refresh is already running
+				return e, true, nil
+			}
 			return await(ctx, c)
 		}
-		stale := e != nil && e.items != nil && now.Sub(e.fetchedAt) < staleFor
 		busy := func(err error) (*entry, bool, error) {
 			if stale {
 				return e, true, nil
@@ -374,7 +389,11 @@ func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 		if turn != nil && !held {
 			s.mu.Unlock()
 			if stale { // a last good copy beats waiting in line
-				return e, true, nil
+				if !tryTurn(turn) {
+					return e, true, nil
+				}
+				held, refresh = true, true
+				continue
 			}
 			if !takeTurn(ctx, turn, maxGapWait-waited) {
 				return nil, false, ErrBusy
@@ -385,6 +404,9 @@ func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 		if gap := providerLimits[q.Provider].gap; gap > 0 {
 			if last, ok := s.lastAt[q.Provider]; ok && now.Sub(last) < gap {
 				s.mu.Unlock()
+				if refresh { // a later caller refreshes after the gap
+					return e, true, nil
+				}
 				wait := gap - now.Sub(last)
 				if waited+wait > maxGapWait || !s.sleep(ctx, wait) {
 					return busy(ErrBusy)
@@ -393,11 +415,15 @@ func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 				continue
 			}
 		}
+		if !s.takeMiss(now, q) { // checked again and counted under the same lock
+			s.mu.Unlock()
+			return busy(ErrUserLimit)
+		}
 		if !s.takeBudget(now, q.Provider) {
+			s.untakeMiss(q)
 			s.mu.Unlock()
 			return busy(ErrBusy)
 		}
-		s.countMiss(q)
 		s.lastAt[q.Provider] = now
 		c := &call{done: make(chan struct{})}
 		s.inflight[k] = c
@@ -407,6 +433,9 @@ func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 			held, done = false, func() { <-turn }
 		}
 		go s.run(context.WithoutCancel(ctx), k, q, e, c, done)
+		if refresh {
+			return e, true, nil
+		}
 		return await(ctx, c)
 	}
 }
@@ -493,6 +522,16 @@ func takeTurn(ctx context.Context, turn chan struct{}, limit time.Duration) bool
 	}
 }
 
+// tryTurn takes a gap provider's fetch slot only when it is free now.
+func tryTurn(turn chan struct{}) bool {
+	select {
+	case turn <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
 // takeBudget counts one upstream fetch against the provider's per-minute
 // cap (diet has its own; every other provider shares one). Caller holds mu.
 func (s *Service) takeBudget(now time.Time, provider string) bool {
@@ -510,22 +549,63 @@ func (s *Service) takeBudget(now time.Time, provider string) bool {
 	return true
 }
 
-// userOver reports whether q's caller used up this hour's search-word
-// fetches. Only queries with search words count. Caller holds mu.
+// missKeys are q's per-user and per-address counters with their caps; none
+// without search words.
+type missKey struct {
+	id    string
+	limit int
+}
+
+func (s *Service) missKeys(q Query) []missKey {
+	if q.Q == "" {
+		return nil
+	}
+	var out []missKey
+	if q.UID != "" {
+		out = append(out, missKey{"u:" + q.UID, s.userMissesHour})
+	}
+	if q.IP != "" {
+		out = append(out, missKey{"i:" + q.IP, s.ipMissesHour})
+	}
+	return out
+}
+
+// userOver reports whether q's caller (uid or address) used up this hour's
+// search-word fetches. Only queries with search words count. Caller holds mu.
 func (s *Service) userOver(now time.Time, q Query) bool {
-	if q.Q == "" || q.UID == "" {
+	keys := s.missKeys(q)
+	if len(keys) == 0 {
 		return false
 	}
 	if s.misses.counts == nil || now.Sub(s.misses.start) >= time.Hour {
 		s.misses = hourly{start: now, counts: map[string]int{}}
 	}
-	return s.misses.counts[q.UID] >= s.userMissesHour
+	for _, kv := range keys {
+		if s.misses.counts[kv.id] >= kv.limit {
+			return true
+		}
+	}
+	return false
 }
 
-// countMiss counts one source fetch for q's caller (userOver ran first). Caller holds mu.
-func (s *Service) countMiss(q Query) {
-	if q.Q != "" && q.UID != "" && s.misses.counts != nil {
-		s.misses.counts[q.UID]++
+// takeMiss checks and counts one source fetch for q's caller in one step
+// (false = over a cap, nothing counted). Caller holds mu.
+func (s *Service) takeMiss(now time.Time, q Query) bool {
+	if s.userOver(now, q) {
+		return false
+	}
+	for _, kv := range s.missKeys(q) {
+		s.misses.counts[kv.id]++
+	}
+	return true
+}
+
+// untakeMiss gives back what takeMiss counted (the fetch did not start). Caller holds mu.
+func (s *Service) untakeMiss(q Query) {
+	for _, kv := range s.missKeys(q) {
+		if k := kv.id; s.misses.counts[k] > 0 {
+			s.misses.counts[k]--
+		}
 	}
 }
 

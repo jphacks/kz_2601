@@ -47,6 +47,8 @@ type Limits struct {
 	// WaivedHourly caps, per uid and hour, the requests a handler gives back
 	// with Waive (waive_cap.go). Past it the request keeps its charge.
 	WaivedHourly int
+	// WaivedIPHourly is the same per client address (every tier).
+	WaivedIPHourly int
 }
 
 // Weights are the units one request costs.
@@ -69,7 +71,7 @@ type Weights struct {
 
 // DefaultLimits / DefaultWeights: see docs/backend/rate-limit.md for the reasoning.
 var (
-	DefaultLimits  = Limits{Anonymous: 30, SignedIn: 60, Pro: 300, PerIP: 300, Global: 2000, WaivedHourly: 30}
+	DefaultLimits  = Limits{Anonymous: 30, SignedIn: 60, Pro: 300, PerIP: 300, Global: 2000, WaivedHourly: 30, WaivedIPHourly: 120}
 	DefaultWeights = Weights{Create: 3, Edit: 2, Chat: 1, Text: 1, TextTask: 2, TextLong: 3, TextImage: 3}
 )
 
@@ -325,6 +327,14 @@ func (l *Limiter) Refund(ctx context.Context, dec Decision, units int) error {
 // docSafe keeps a Firestore document id legal ("/" is the only banned rune).
 func docSafe(s string) string {
 	return strings.ReplaceAll(s, "/", "_")
+}
+
+// IPKey is ipKey for other per-address counts (feeds).
+func IPKey(ip string) string {
+	if ip == "" {
+		return ""
+	}
+	return ipKey(ip)
 }
 
 // ipKey hashes the address (no raw IPs at rest). IPv6 is grouped by /64:

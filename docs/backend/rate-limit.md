@@ -48,26 +48,33 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 
 ### 返した依頼の上限
 
-返した依頼(`ratelimit.Waive`)も、サーバーでは Firestore の読み書き(数える・返す・作成者や参加の確認)を使う。そこで返した回数を利用者ごと・1 時間ごとに別に数える(`RATE_LIMIT_WAIVED_HOURLY`・既定 30)。
+返した依頼(`ratelimit.Waive`)も、サーバーでは Firestore の読み書き(数える・返す・作成者や参加の確認)を使う。そこで返した回数を利用者ごと・1 時間ごと(`RATE_LIMIT_WAIVED_HOURLY`・既定 30)と、IP ごと・1 時間ごと(`RATE_LIMIT_WAIVED_IP_HOURLY`・既定 120・匿名のアカウントを作り直しても同じ IP で数える)に別に数える。2 つは 1 回のトランザクションで数え、どちらかが上限なら数えない。
 
 ```
-rateLimits/{env}_{yyyy-mm-ddTHH}_waived_{uid}   {count, scope: waived, expireAt, updatedAt}
+rateLimits/{env}_{yyyy-mm-ddTHH}_waived_{uid}                    {count, scope: waived, expireAt, updatedAt}
+rateLimits/{env}_{yyyy-mm-ddTHH}_waived_ip_{sha256 先頭 8 バイト}   同上(生の IP は残さない・IPv6 は /64 単位)
 ```
 
-- 30 回までは今までどおり、1 日の利用上限を数えない(`X-RateLimit-Remaining` も変わらない)。
-- 超えた分は返さず、その依頼の重さを 1 日の利用上限で数える。上限に届くと、それ以降はミドルウェアの 429 で止まり、handler まで届かない。
+- 上限までは今までどおり、1 日の利用上限を数えない(`X-RateLimit-Remaining` も変わらない)。
+- どちらかの上限を超えた分は返さず、その依頼の重さを 1 日の利用上限で数える。上限に届くと、それ以降はミドルウェアの 429 で止まり、handler まで届かない。
 - 数える時に Firestore が失敗したら返す(今までと同じ)。
+- 返した回数を数えた後で 1 日の利用上限を返すのに失敗したら、返した回数も戻す(その依頼は返さなかったものとして利用上限を数えたまま。返した回数だけが増えて食い違うことはない)。戻すのにも失敗した時は返した回数が 1 多いまま残る(上限に早く届く側にずれるだけ・ログ `ratelimit: waive count give-back failed`)。
 - 実装: `backend/internal/ratelimit/waive_cap.go`。
 
 ### 作成者が払う呼び出しの上限
 
 共有のアプリの参加者の `/v1/text` は作成者の Pro で通る([pro.md](features/pro.md))。作成者が払う呼び出しを、アプリの部品の設定と照らし合わせ、アプリごとの 1 日の回数で数える。
 
-- 照らし合わせ: 依頼がアプリの公開中の DSL(`apps_public/{appId}`)の部品と合う時だけ作成者が払う。aiButton は同じ task(無ければ generate)で、instruction が prompt の `{{input}}`(端末が書く「下の材料」/「the data below」)と `{{項目}}`(どんな文字でもよい)を埋めたもの。aiChat は instruction が persona と同じ。`length: long` は部品も long の時、写真つきは部品に inputPhoto がある時だけ。端末が 500 字で切った instruction は、途中までが合えばよい。合わなければ呼び出した人の Pro で判定する(Pro でなければ理由なしの 402)。
-- 回数: アプリごと・1 日(0:00 JST)ごとに `AI_CREATOR_PAID_APP_DAILY` 回まで(既定 300・`0` で数えない)。超えると 429 `rate_limited`(`details.scope: app`)で、Claude は呼ばず、利用上限も数えない(上の「返す時」)。Firestore が失敗した時はインスタンスのメモリで数える。
+- 照らし合わせ: 依頼がアプリの公開中の DSL(`apps_public/{appId}`)の部品と合う時だけ作成者が払う。aiButton は同じ task(無ければ generate)で、instruction が prompt の `{{input}}`(端末が書く「下の材料」/「the data below」)と `{{項目}}`(どんな文字でもよい)を埋めたもの。端末と同じく、置き換えるのは `{{input}}` と `{{項目の id}}` がそのままの形の時だけ(`{{ input }}` のように中に空白があるものは文字のまま)。aiChat は instruction が persona と同じ。`length: long` は部品も long の時、写真つきは部品に inputPhoto がある時だけ。端末が 500 字で切った instruction は、途中までが合えばよい。合わなければ呼び出した人の Pro で判定する(Pro でなければ理由なしの 402)。
+  - 項目で埋める文字は合計 400 字まで(DSL に項目ごとの長さの上限は無いので合計だけ)。
+  - `{{項目}}` があって、prompt の自分の文字(空白と `{{…}}` を除く)が 20 字に満たない部品と、`{{項目}}` が 20 個を超える部品は、作成者が払う対象にしない。
+  - prompt は RE2 の正規表現にして照らし合わせる(入力の長さに比例する時間で終わる)。1 つのアプリで見る aiButton / aiChat は 100 個まで。公開中の DSL を読んで組み立てた結果は、インスタンスごとにアプリ 128 件まで 60 秒覚える(公開し直しは最大 60 秒遅れて効く)。
+- 回数: アプリごと・1 日(0:00 JST)ごとに `AI_CREATOR_PAID_APP_DAILY` 回まで(既定 300)、さらにアプリ × 参加者ごと・1 日ごとに `AI_CREATOR_PAID_MEMBER_DAILY` 回まで(既定 30・aiChat も含む)。どちらも `0` で数えない。2 つは 1 回のトランザクションで数え、どちらかが上限なら数えない。超えると 429 `rate_limited`(`details.scope: app` / `app_member`)で、Claude は呼ばず、利用上限も数えない(上の「返す時」)。Firestore が失敗した時はインスタンスのメモリで数える。
+- Claude が 502 / 503 / 504 で終わった時は、数えた 1 回を返す(利用上限の「返す時」と同じ。途中で切れた依頼は返さない)。
 
 ```
-rateLimits/{env}_{yyyy-mm-dd}_creator_paid_{appId}   {count, scope: app, expireAt, updatedAt}
+rateLimits/{env}_{yyyy-mm-dd}_creator_paid_{appId}             {count, scope: app, expireAt, updatedAt}
+rateLimits/{env}_{yyyy-mm-dd}_creator_paid_{appId}_uid_{uid}   {count, scope: app_member, expireAt, updatedAt}
 ```
 
 - 実装: `backend/internal/ai/text_payer_scope.go`。
@@ -82,6 +89,8 @@ rateLimits/{env}_{yyyy-mm-dd}_creator_paid_{appId}   {count, scope: app, expireA
 | `RATE_LIMIT_IP_DAILY` | 300 | 匿名だけ。同じ IP からの匿名の合計(作り直し対策) |
 | `RATE_LIMIT_GLOBAL_DAILY` | 2000 | 環境全体の費用ブレーカー。新規作成なら約 660 回 |
 | `RATE_LIMIT_WAIVED_HOURLY` | 30 | 1 人 1 時間に数えずに返す依頼(上の「返した依頼の上限」)。`0` で数えない |
+| `RATE_LIMIT_WAIVED_IP_HOURLY` | 120 | 同じ IP から 1 時間に数えずに返す依頼(上の「返した依頼の上限」)。`0` で数えない |
+| `AI_CREATOR_PAID_APP_DAILY` / `AI_CREATOR_PAID_MEMBER_DAILY` | 300 / 30 | 作成者が払う呼び出しの、アプリごと / アプリ × 参加者ごとの 1 日の回数(上の「作成者が払う呼び出しの上限」)。`0` で数えない |
 | `RATE_LIMIT_WEIGHT_CREATE` / `_EDIT` / `_CHAT` / `_TEXT` / `_TEXT_TASK` / `_TEXT_LONG` / `_TEXT_IMAGE` | 3 / 2 / 1 / 1 / 2 / 3 / 3 | `_TEXT_TASK` は `/v1/text` の本文に generate 以外の `task` がある時。`_TEXT_LONG` は本文に `length: "long"` がある時と `task: "chat"`(aiChat)の時。`_TEXT_IMAGE` は本文に `image` がある時。重なった時は大きい方(max) |
 | `RATE_LIMIT` | on(GOOGLE_CLOUD_PROJECT があれば) | `off` で無効。ローカルで素の起動なら既定 off |
 | `RATE_LIMIT_STORE` | firestore | `memory` でインスタンスごとのメモリ |

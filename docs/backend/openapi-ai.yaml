@@ -376,9 +376,9 @@ components:
       properties:
         scope:
           type: string
-          enum: [user, ip, global, app]
-          description: user = 利用者の 1 日の上限 / ip = 同じネットワークの匿名利用の上限 / global = 環境全体の費用ブレーカー / app = 共有のアプリで作成者が払う呼び出しの 1 日の上限 (`POST /v1/text` だけ)
-        tier: { type: string, enum: [anonymous, signed_in, pro], description: scope app の時は無い }
+          enum: [user, ip, global, app, app_member]
+          description: user = 利用者の 1 日の上限 / ip = 同じネットワークの匿名利用の上限 / global = 環境全体の費用ブレーカー / app = 共有のアプリで作成者が払う呼び出しの 1 日の上限 / app_member = その参加者ごとの 1 日の上限 (app と app_member は `POST /v1/text` だけ)
+        tier: { type: string, enum: [anonymous, signed_in, pro], description: scope app / app_member の時は無い }
         limit: { type: integer, description: 当たった上限 (単位/日) }
         used: { type: integer, description: 今日使った単位 }
         remaining: { type: integer, description: 残り (今回の依頼の重さより小さい) }

@@ -114,7 +114,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("ai: %v", err)
 	}
-	svc.CreatorPaid = &ai.CreatorPaidCap{Daily: creatorDaily, Env: os.Getenv("APP_ENV")}
+	creatorMemberDaily, err := ai.CreatorPaidMemberDailyFromEnv(os.Getenv)
+	if err != nil {
+		log.Fatalf("ai: %v", err)
+	}
+	svc.CreatorPaid = &ai.CreatorPaidCap{Daily: creatorDaily, MemberDaily: creatorMemberDaily, Env: os.Getenv("APP_ENV")}
 	if fsClient != nil && os.Getenv("RATE_LIMIT_STORE") != "memory" {
 		svc.CreatorPaid.Store = ratelimit.NewFirestore(fsClient, os.Getenv("RATE_LIMIT_COLLECTION"))
 	}

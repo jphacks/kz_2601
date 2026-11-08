@@ -37,13 +37,33 @@ func TestMatchTemplate(t *testing.T) {
 		{"{{x}}  末尾", "末尾", true},
 		{"", "", true},
 		{"", "何か", false},
-		{"あ{{x}}い", long, true}, // cut inside the value
+		{"あ{{x}}い", long, false}, // cut inside the value, but the value adds over 400
 		{strings.Repeat("あ", 300) + "{{x}}" + strings.Repeat("い", 300), long, true},
+		{strings.Repeat("あ", 200) + "{{x}}い", long, true}, // 300 of value
 		{"い{{x}}", long, false},
+		{strings.Repeat("う", 450) + "{{x}}" + strings.Repeat("え", 100), strings.Repeat("う", 450) + strings.Repeat("え", 50), true}, // cut in the literal
+		{strings.Repeat("う", 450) + "{{x}}" + strings.Repeat("え", 100), strings.Repeat("う", 450) + strings.Repeat("お", 50), true}, // cut in the value
+		{strings.Repeat("う", 450) + "え", strings.Repeat("う", 449) + "お" + "x" + strings.Repeat("う", 49), false},
+		// iOS replaces "{{input}}" only as it is: "{{ input }}" stays literal text
+		{"{{ input }}を要約", "下の材料を要約", false},
+		{"{{ input }}を要約", "{{ input }}を要約", true},
+		{"{{ name }}さん", "山田さん", false},
+		{"{{Name}}さん", "{{Name}}さん", true},
+		// the values add at most 400 runes
+		{"{{a}}について", strings.Repeat("x", 400) + "について", true},
+		{"{{a}}について", strings.Repeat("x", 401) + "について", false},
+		{"{{a}}と{{b}}", strings.Repeat("x", 200) + "と" + strings.Repeat("y", 201), false},
+		// special characters of the regexp are literal text
+		{"a.b*{{x}}(c)", "a.b*値(c)", true},
+		{"a.b*{{x}}(c)", "aXbb値(c)", false},
 	}
 	for _, c := range cases {
 		cut := len([]rune(c.got)) >= dsl.MaxAIInstructionRunes
-		if got := matchTemplate(parseTemplate(c.tmpl), c.got, cut); got != c.want {
+		tm, err := compileTemplate(c.tmpl)
+		if err != nil {
+			t.Fatalf("%q: %v", c.tmpl, err)
+		}
+		if got := tm.match(c.got, cut); got != c.want {
 			t.Errorf("%q vs %q = %v, want %v", c.tmpl, c.got, got, c.want)
 		}
 	}

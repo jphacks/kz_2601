@@ -63,9 +63,9 @@ func (s *Service) sharedCreator(ctx context.Context, appID, uid string) string {
 // fromSharedApp reports whether req is what a component of the shared app's
 // published DSL sends (text_payer_scope.go).
 func (s *Service) fromSharedApp(ctx context.Context, req TextRequest) bool {
-	app := s.publishedApp(ctx, req.AppID)
-	if app == nil || !requestInApp(app, req) {
-		s.logger().InfoContext(ctx, "ai: text request does not match the shared app", slog.Bool("published", app != nil))
+	sc := s.appScopeOf(ctx, req.AppID)
+	if sc == nil || !sc.sends(req) {
+		s.logger().InfoContext(ctx, "ai: text request does not match the shared app", slog.Bool("published", sc != nil && len(sc.comps) > 0))
 		return false
 	}
 	return true
@@ -85,10 +85,11 @@ func (s *Service) gateText(ctx context.Context, req TextRequest) (context.Contex
 	}
 	if owner := s.sharedCreator(ctx, req.AppID, uid); owner != "" && s.fromSharedApp(ctx, req) {
 		if s.Pro.IsPro(ctx, owner) || !s.ProMode.Stop(ctx, s.logger(), "ai.text", owner, []string{paid.OnlineAI}) {
-			if err := s.CreatorPaid.take(ctx, s.logger(), req.AppID); err != nil {
+			refund, err := s.CreatorPaid.take(ctx, s.logger(), req.AppID, uid)
+			if err != nil {
 				return ctx, err
 			}
-			return withPayer(ctx, owner), nil
+			return withCreatorRefund(withPayer(ctx, owner), refund), nil
 		}
 		e := onlineAIRequired(req.Locale)
 		e.Details["reason"] = reasonCreatorNeedsPro

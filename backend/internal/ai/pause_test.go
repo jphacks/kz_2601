@@ -28,7 +28,7 @@ type countingStore struct {
 }
 
 func (s *countingStore) Consume(ctx context.Context, c []ratelimit.Counter, w int, exp time.Time) (ratelimit.Usage, error) {
-	if len(c) == 1 && c[0].Scope == ratelimit.ScopeWaived {
+	if len(c) > 0 && c[0].Scope == ratelimit.ScopeWaived {
 		s.waived.Add(1) // the hourly count of waived requests, not a charge
 	} else {
 		s.n.Add(1)

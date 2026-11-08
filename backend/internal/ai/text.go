@@ -400,6 +400,7 @@ func textHandler(svc *Service) http.Handler {
 		}
 		res, err := svc.text(ctx, req, loc)
 		if err != nil {
+			refundCreatorPaid(ctx, asError(err).Status) // Claude 5xx: the creator-paid count comes back
 			svc.writeErr(w, r, err)
 			return
 		}

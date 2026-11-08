@@ -21,6 +21,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/feeds"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -94,7 +95,7 @@ func (h *Handler) getFeed(w http.ResponseWriter, r *http.Request) {
 	// bounds the wait only: the source fetch itself runs on (internal/feeds)
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	q.UID = uidOf(r)
+	q.UID, q.IP = uidOf(r), ratelimit.IPKey(ratelimit.ClientIP(r))
 	res, err := h.feeds.Get(ctx, q, limit)
 	switch {
 	case errors.Is(err, feeds.ErrUserLimit):
