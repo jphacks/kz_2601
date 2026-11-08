@@ -104,6 +104,15 @@ var snippetAllowlist = map[string]string{}
 // fails to parse).
 func scanJSONObjects(s string) []string {
 	var out []string
+	for _, at := range scanJSONObjectsAt(s) {
+		out = append(out, s[at[0]:at[1]])
+	}
+	return out
+}
+
+// scanJSONObjectsAt is scanJSONObjects with the [start,end) offsets.
+func scanJSONObjectsAt(s string) [][2]int {
+	var out [][2]int
 	for i := 0; i+1 < len(s); i++ {
 		if s[i] != '{' || s[i+1] != '"' {
 			continue
@@ -137,7 +146,7 @@ func scanJSONObjects(s string) []string {
 		if end < 0 {
 			end = len(s)
 		}
-		out = append(out, s[i:end])
+		out = append(out, [2]int{i, end})
 		i = end - 1
 	}
 	return out
@@ -386,7 +395,7 @@ func (v *snippetValidator) check(s string) (class string, problems []string, ski
 	case has("me") || has("myFollows"):
 		return "filter-value", v.schema("Filter", []byte(`{"field":"$author","op":"eq","value":`+string(raw)+`}`)), ""
 	case typ != "" && v.components[typ]:
-		return "component", v.schema("Component", filled), ""
+		return "component", append(v.schema("Component", filled), literalValueProblems(typ, m["value"])...), ""
 	case typ != "" && v.actions[typ]:
 		return "action", v.schema("Action", filled), ""
 	case has("id", "fields"):
@@ -409,6 +418,65 @@ func (v *snippetValidator) check(s string) (class string, problems []string, ski
 	// Not skipped: a snippet the classifier does not know would otherwise
 	// never be validated. Teach the classifier or allowlist it.
 	return "unclassified", []string{"no check for keys " + strings.Join(slices.Sorted(maps.Keys(m)), ",")}, ""
+}
+
+// literalValueProblems: progressBar / gauge value is a number literal
+// (dsl checkProgressBar / checkGauge); the schema alone takes any Expr.
+func literalValueProblems(typ string, raw json.RawMessage) []string {
+	if (typ != "progressBar" && typ != "gauge") || len(raw) == 0 {
+		return nil
+	}
+	var e dsl.Expr
+	if err := json.Unmarshal(raw, &e); err != nil {
+		return []string{err.Error()}
+	}
+	if _, ok := e.Number(); !ok {
+		return []string{typ + ".value must be a number literal (expressions only in stat.value)"}
+	}
+	return nil
+}
+
+// literalPropBefore matches prose naming a number-only prop right before a
+// snippet: 「progressBar.value = {」「gauge の max: {」「"target":{」.
+var literalPropBefore = regexp.MustCompile(`(?:(?:progressBar|gauge|slider|stepper|rating|healthStat)(?:\.|\s*の\s*)(?:value|target|min|max|step)|"(?:target|min|max|step)")\s*(?:=|:|は)\s*$`)
+
+// TestPromptLiteralPropsTakeNoExpr: a snippet introduced as the value of a
+// number-only prop (progressBar / gauge value, target, min, max, ...) is an
+// object, which the validator rejects there. TestPromptSnippetsValid checks
+// such a snippet only as a standalone expression, so it misses this.
+func TestPromptLiteralPropsTakeNoExpr(t *testing.T) {
+	ctx := withRestriction(context.Background(), NewClientRestriction(slices.Sorted(maps.Keys(knownComponentTypes)), nil, nil))
+	for _, p := range []struct{ name, text string }{
+		{"systemPrompt", systemPrompt},
+		{"editRules", editRules},
+		{"serverRulesPrompt", serverRulesPrompt},
+		{"logicSystemPrompt", logicSystemPrompt},
+		{"chatSystemPrompt", chatSystemPrompt},
+		{"chatEditSystemPrompt", chatEditSystemPrompt},
+		{"chatCreateSystemPrompt", chatCreateSystemPrompt},
+		{"oldClient/systemPrompt", restrictPrompt(ctx, systemPrompt)},
+	} {
+		for _, at := range scanJSONObjectsAt(p.text) {
+			line := p.text[strings.LastIndexByte(p.text[:at[0]], '\n')+1 : at[0]]
+			if literalPropBefore.MatchString(line) {
+				t.Errorf("%s teaches an expression for a number-only prop: …%s%s", p.name, short(line[max(0, len(line)-40):]), short(p.text[at[0]:at[1]]))
+			}
+		}
+	}
+	for _, tc := range []struct {
+		before string
+		want   bool
+	}{
+		{`達成率 progressBar.value = `, true},
+		{`gauge の max: `, true},
+		{`{"type":"progressBar","target":`, true},
+		{`達成率 = `, false},
+		{`stat.value = `, false},
+	} {
+		if got := literalPropBefore.MatchString(tc.before); got != tc.want {
+			t.Errorf("literalPropBefore(%q) = %v, want %v", tc.before, got, tc.want)
+		}
+	}
 }
 
 // nestedExprProblems shape-checks every expression inside a component,
@@ -575,6 +643,8 @@ func TestSnippetValidatorCatches(t *testing.T) {
 		{`{"op":"add","path":"/screens/0/components/-","value":{"type":"stat","label":"x","value":{"agg":"total","entity":"e","field":"a"}}}`, true, false},
 		{`{"entity":"e","order":"random","filter":[{"field":"a","op":"eq","value":{"op":"not","args":[]}}]}`, true, false},
 		{`{"type":"stat","label":"x","value":{"agg":"sum","entity":"e"}}`, true, false},
+		{`{"type":"progressBar","label":"x","value":{"op":"div","args":[1,{"setting":"g"}]}}`, true, false},
+		{`{"type":"progressBar","label":"x","value":0.5}`, false, false},
 		{`{"type":"stat","label":"自分","entity":"e","aggregate":"count","filter":{"field":"$author","op":"eq","value":{"me":true}}}`, false, false},
 		// rule-action: one item of a server rule's `do` list.
 		{`{"notify":{"to":{"kind":"owner"},"title":"期限です","body":"{title} が今日まで"}}`, false, false},
