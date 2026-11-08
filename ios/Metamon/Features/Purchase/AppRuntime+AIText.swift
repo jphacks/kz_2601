@@ -30,25 +30,42 @@ extension AppRuntime {
             _ = requireAIConsent()
             throw AITextError.needsConsent
         case .needsPro:
-            requestProForAIText()
+            requestProForAIText(chat: request.isChat)
             throw AITextError.needsPro
         case .send:
             do {
                 return try await services.ai.text(request.inApp(document.appId))
             } catch AITextError.needsPro {
-                requestProForAIText() // #316: サーバーが 402 pro_required(端末の Pro の判定が古い・制限が無効の Debug など)
+                requestProForAIText(chat: request.isChat) // #316: サーバーが 402 pro_required(端末の Pro の判定が古い・制限が無効の Debug など)
                 throw AITextError.needsPro
             }
-            // AITextError.creatorNeedsPro はそのまま投げる(ボタンの下に案内だけ・課金画面は出さない)
+            // AITextError.creatorNeedsPro はそのまま投げる(部品の下に案内だけ・課金画面は出さない)
         }
     }
 
     /// 課金画面の差し込み口(1 か所)。#429 の `ProGate.requestPro` で出す(閉じるのは待たない。押し直しで再実行)。
-    func requestProForAIText() {
-        print("[Metamon] IAP: aiButton generate needs Pro (no on-device AI) → paywall")
-        let feature = PaidFeature(id: "aiText", title: L10n.tr("オンラインの AI で書く"),
+    func requestProForAIText(chat: Bool = false) {
+        print("[Metamon] IAP: \(chat ? "aiChat" : "aiButton generate") needs Pro → paywall")
+        let copy = AITextPaywallCopy(chat: chat)
+        Task { _ = await proGate.requestPro(.paidFeature([copy.feature]), closeNote: copy.closeNote) }
+    }
+}
+
+/// オンライン AI の課金画面の文言。aiChat(task chat)は端末内 AI を使わないので「話す」の言い方にする。
+struct AITextPaywallCopy {
+    let feature: PaidFeature
+    let closeNote: String
+
+    init(chat: Bool) {
+        if chat {
+            feature = PaidFeature(id: "aiChat", title: L10n.tr("AI と話す"),
+                                  reason: L10n.tr("AI と話すには Tailor It Pro が必要です。会話はサーバーの AI で返します。"))
+            closeNote = L10n.tr("閉じると、AI と話す部品は使えません。")
+        } else {
+            feature = PaidFeature(id: "aiText", title: L10n.tr("オンラインの AI で書く"),
                                   reason: L10n.tr("この端末では AI を端末内で動かせないため、サーバーの AI を使います。"))
-        Task { _ = await proGate.requestPro(.paidFeature([feature]), closeNote: L10n.tr("閉じると、この端末では AI で書くボタンは使えません。")) }
+            closeNote = L10n.tr("閉じると、この端末では AI で書くボタンは使えません。")
+        }
     }
 }
 #endif

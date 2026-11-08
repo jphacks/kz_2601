@@ -13,10 +13,12 @@ import (
 //   - text / pdf: one record whose field gets the body text (PDF text layer,
 //     or on-device OCR of scanned pages); the entity's titleField gets the
 //     file name.
+//   - audio: a recording (m4a / mp3 / wav) transcribed on the device into
+//     field (file_import_audio.go).
 // iOS shows how many rows will be added / fail before adding anything.
 
 // FileImportAccepts is the closed set of fileImport.accept values.
-var FileImportAccepts = []string{"csv", "text", "pdf"}
+var FileImportAccepts = []string{"csv", "text", "pdf", "audio"}
 
 // MaxImportMap bounds fileImport.map.
 const MaxImportMap = 50
@@ -42,8 +44,9 @@ func checkFileImport(where string, c *Component, entities map[string]*Entity, ad
 	csv, body := checkImportAccept(where, c.Accept, add)
 	if body {
 		checkImportBody(where, c, e, add)
+		checkImportAudio(where, c, e, add) // file_import_audio.go
 	} else if c.Field != "" {
-		add("%s: fileImport field %q is only for accept text / pdf (the body text goes there); csv maps columns by header or map", where, c.Field)
+		add("%s: fileImport field %q is only for accept text / pdf / audio (the body text goes there); csv maps columns by header or map", where, c.Field)
 	}
 	if len(c.Map) > 0 && !csv {
 		add("%s: fileImport map is only for accept csv", where)
@@ -54,13 +57,13 @@ func checkFileImport(where string, c *Component, entities map[string]*Entity, ad
 // checkImportAccept reports whether accept has csv and text / pdf.
 func checkImportAccept(where string, accept []string, add func(string, ...any)) (csv, body bool) {
 	if len(accept) == 0 {
-		add("%s: fileImport needs accept (one or more of csv, text, pdf)", where)
+		add("%s: fileImport needs accept (one or more of csv, text, pdf, audio)", where)
 	}
 	seen := map[string]bool{}
 	for _, a := range accept {
 		switch {
 		case !slices.Contains(FileImportAccepts, a):
-			add("%s: fileImport accept %q must be csv, text or pdf", where, a)
+			add("%s: fileImport accept %q must be csv, text, pdf or audio", where, a)
 		case seen[a]:
 			add("%s: fileImport accept %q is listed twice", where, a)
 		case a == "csv":
@@ -80,7 +83,7 @@ func checkImportBody(where string, c *Component, e *Entity, add func(string, ...
 	f := e.FieldByID(c.Field)
 	switch {
 	case c.Field == "":
-		add("%s: fileImport with accept text / pdf needs field (a text field of entity %q for the body)", where, e.ID)
+		add("%s: fileImport with accept text / pdf / audio needs field (a text field of entity %q for the body)", where, e.ID)
 	case f == nil:
 		add("%s: fileImport field %q not in entity %q (fields: %s)", where, c.Field, e.ID, fieldIDs(e))
 	case f.Computed != nil:
@@ -97,7 +100,7 @@ func checkImportBody(where string, c *Component, e *Entity, add func(string, ...
 		if title != nil && x.ID == title.ID && (x.Type == FieldString || x.Type == FieldText) {
 			continue // the file name
 		}
-		add("%s: fileImport text / pdf fills only field %q and the title; required field %q of entity %q would stay empty (drop required or give it a defaultValue)", where, c.Field, x.ID, e.ID)
+		add("%s: fileImport text / pdf / audio fills only field %q and the title; required field %q of entity %q would stay empty (drop required or give it a defaultValue)", where, c.Field, x.ID, e.ID)
 	}
 }
 

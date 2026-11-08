@@ -28,6 +28,12 @@ public struct MyUsage: Decodable, Equatable, Sendable {
         public var used: Int
         public var limit: Int?
         public var remaining: Int?
+
+        public init(used: Int, limit: Int?, remaining: Int?) {
+            self.used = used
+            self.limit = limit
+            self.remaining = remaining
+        }
     }
     public struct PerApp: Decodable, Equatable, Sendable {
         public var recordsPerApp: Int?
@@ -66,10 +72,11 @@ public struct MyUsage: Decodable, Equatable, Sendable {
         return try decoder.decode(MyUsage.self, from: data)
     }
 
-    /// 「今日の残り」(X3: 単位の数は「今日の残り N」としてだけ出す)。数えない・読めない時は nil
-    public func remainingToday(now: Date) -> RemainingToday? {
+    /// 「今日の残り」(X3: 単位の数は「今日の残り N」としてだけ出す)。数えない・読めない時は nil。
+    /// `observedAt` はこの値をサーバーから読んだ時刻(キャッシュを今の時刻で記録すると、後から届いた新しい値を上書きする)
+    public func remainingToday(observedAt: Date) -> RemainingToday? {
         guard let ai, let remaining = ai.remaining else { return nil }
-        return RemainingToday(remaining: remaining, limit: ai.limit, resetAt: resetAt, observedAt: now)
+        return RemainingToday(remaining: remaining, limit: ai.limit, resetAt: resetAt, observedAt: observedAt)
     }
 }
 
@@ -153,7 +160,8 @@ public enum UsageNoticeRules {
     }
 }
 
-/// お知らせは 1 つのリソースにつき 1 日 1 回(出した時点で数える・閉じても同じ日はもう出さない)。日付は JST(上限の戻る時刻と同じ)
+/// お知らせは 1 つのアカウント・リソースにつき 1 日 1 回(出した時点で数える・閉じても同じ日はもう出さない)。日付は JST(上限の戻る時刻と同じ)。
+/// アカウントを切り替えたら、前のアカウントで出した分とは別に数える(uid をキーに含める)
 public struct UsageNoticeLog: @unchecked Sendable {
     static let key = "metamon.usageNotice.shownDay"
     let defaults: UserDefaults
@@ -169,14 +177,16 @@ public struct UsageNoticeLog: @unchecked Sendable {
 
     private var shown: [String: String] { defaults.dictionary(forKey: Self.key) as? [String: String] ?? [:] }
 
-    public func shouldShow(_ notice: UsageNotice, now: Date = .now) -> Bool {
-        shown[notice.id] != Self.day(now)
+    static func entry(_ notice: UsageNotice, uid: String?) -> String { "\(uid ?? "-")|\(notice.id)" }
+
+    public func shouldShow(_ notice: UsageNotice, uid: String?, now: Date = .now) -> Bool {
+        shown[Self.entry(notice, uid: uid)] != Self.day(now)
     }
 
-    public func markShown(_ notice: UsageNotice, now: Date = .now) {
+    public func markShown(_ notice: UsageNotice, uid: String?, now: Date = .now) {
         let today = Self.day(now)
         var map = shown.filter { $0.value == today } // 前の日の分は捨てる(増え続けない)
-        map[notice.id] = today
+        map[Self.entry(notice, uid: uid)] = today
         defaults.set(map, forKey: Self.key)
     }
 
@@ -195,8 +205,12 @@ public final class PlanUsageStore {
     public private(set) var apps: [String: AppUsage] = [:]
     /// 古くした回数。お知らせのホストが `task(id:)` で読み直す
     public private(set) var revision = 0
+    /// `me` をサーバーから読んだ時刻(読み始め)。キャッシュを返す時もこの時刻のまま(「今日の残り」の記録に使う)
+    public private(set) var meObservedAt: Date?
     @ObservationIgnored private var meFetchedAt: Date?
     @ObservationIgnored private var appFetchedAt: [String: Date] = [:]
+    /// `clear()` の回数。読む間にサインアウトしたら、届いた前のアカウントの量を書き戻さない
+    @ObservationIgnored private var generation = 0
 
     public init() {}
 
@@ -207,9 +221,14 @@ public final class PlanUsageStore {
     public func refreshMe(source: any PlanUsageSource, force: Bool = false, now: Date = .now) async -> MyUsage? {
         if !force, let at = meFetchedAt, now.timeIntervalSince(at) < Self.ttl { return me }
         meFetchedAt = now
+        let gen = generation
         do {
-            me = try await source.myUsage()
+            let fresh = try await source.myUsage()
+            guard gen == generation else { return nil } // 読む間にサインアウトした
+            me = fresh
+            meObservedAt = now
         } catch {
+            guard gen == generation else { return nil }
             meFetchedAt = nil // 次に見る時にまた読む
             print("[Metamon] usage: me failed: \(error)")
         }
@@ -220,9 +239,13 @@ public final class PlanUsageStore {
     public func refreshApp(appId: String, source: any PlanUsageSource, force: Bool = false, now: Date = .now) async -> AppUsage? {
         if !force, let at = appFetchedAt[appId], now.timeIntervalSince(at) < Self.ttl { return apps[appId] }
         appFetchedAt[appId] = now
+        let gen = generation
         do {
-            apps[appId] = try await source.appUsage(appId: appId)
+            let fresh = try await source.appUsage(appId: appId)
+            guard gen == generation else { return nil } // 読む間にサインアウトした
+            apps[appId] = fresh
         } catch {
+            guard gen == generation else { return nil }
             appFetchedAt[appId] = nil
             print("[Metamon] usage: app=\(appId) failed: \(error)")
         }
@@ -243,7 +266,9 @@ public final class PlanUsageStore {
 
     /// サインアウト・アカウント削除(別のアカウントの量を出さない)
     public func clear() {
+        generation += 1
         me = nil
+        meObservedAt = nil
         apps = [:]
         meFetchedAt = nil
         appFetchedAt = [:]

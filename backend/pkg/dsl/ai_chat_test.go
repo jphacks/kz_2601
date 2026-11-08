@@ -28,10 +28,11 @@ func TestAIChatSemanticErrors(t *testing.T) {
 		{Type: CompAiChat, Entity: "memo", TextField: "note", RoleField: "bad", Persona: p},
 		{Type: CompAiChat, Entity: "memo", TextField: "note", RoleField: "note", Persona: p},
 		{Type: CompAiChat, Entity: "memo", TextField: "note", RoleField: "elapsed", Persona: p},
-		{Type: CompAiChat, Entity: "memo", TextField: "note"},
-		{Type: CompAiChat, Entity: "memo", TextField: "note", Persona: strings.Repeat("あ", 501)},
-		{Type: CompAiChat, Entity: "memo", TextField: "note", Persona: p, Length: "huge"},
-		{Type: CompAiChat, Entity: "nope", TextField: "note", Persona: p},
+		{Type: CompAiChat, Entity: "memo", TextField: "note", RoleField: "role"},
+		{Type: CompAiChat, Entity: "memo", TextField: "note", Persona: p}, // no roleField
+		{Type: CompAiChat, Entity: "memo", TextField: "note", RoleField: "role", Persona: strings.Repeat("あ", 501)},
+		{Type: CompAiChat, Entity: "memo", TextField: "note", RoleField: "role", Persona: p, Length: "huge"},
+		{Type: CompAiChat, Entity: "nope", TextField: "note", RoleField: "role", Persona: p},
 	}
 	err := app.Validate()
 	ve, ok := err.(*ValidationError)
@@ -47,6 +48,7 @@ func TestAIChatSemanticErrors(t *testing.T) {
 		`aiChat roleField and textField must differ`,
 		`aiChat roleField "elapsed" must be a stored string or enum field`,
 		`aiChat needs persona`,
+		`aiChat needs roleField`,
 		`aiChat persona must be at most 500 characters`,
 		`aiChat length "huge" must be short|long`,
 		`aiChat entity "nope" does not exist`,
@@ -61,7 +63,6 @@ func TestAIChatValid(t *testing.T) {
 	for _, c := range []Component{
 		{Type: CompAiChat, Area: "A1:F12", Entity: "memo", TextField: "note", RoleField: "role", Persona: "家庭教師", Length: "long"},
 		{Type: CompAiChat, Area: "A1:F12", Entity: "memo", TextField: "note", RoleField: "who", Persona: "英会話の相手"},
-		{Type: CompAiChat, Area: "A1:F12", Entity: "memo", TextField: "note", Persona: "相談相手"}, // roleField omitted: alternating
 	} {
 		app := aiChatApp()
 		app.Screens[0].Components = []Component{c}
@@ -107,9 +108,41 @@ func TestAIChatExampleLint(t *testing.T) {
 			t.Fatalf("%s aiChat entity: %v", scope, err)
 		}
 	}
+	// roleField is required by the schema too
+	noRole := strings.Replace(string(raw), `"roleField": "role",`, ``, 1)
+	if noRole == string(raw) {
+		t.Fatal("example changed: no roleField to drop")
+	}
+	if _, err := Parse([]byte(noRole)); err == nil || !strings.Contains(err.Error(), "roleField") {
+		t.Fatalf("aiChat without roleField: %v", err)
+	}
 	// persona over 500 characters is caught by the schema too
 	long := strings.Replace(string(raw), `"persona": "`, `"persona": "`+strings.Repeat("あ", 500), 1)
 	if _, err := Parse([]byte(long)); err == nil {
 		t.Fatal("long persona must not parse")
+	}
+}
+
+// speak: true reads AI replies aloud; it parses on aiChat and the schema
+// rejects it on any other part (e.g. chatThread).
+func TestAIChatSpeak(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(docsDir, "examples", "ai_counselor.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	spoken := strings.Replace(string(raw), `"roleField": "role",`, `"roleField": "role", "speak": true,`, 1)
+	if spoken == string(raw) {
+		t.Fatal("example changed: no roleField to anchor speak")
+	}
+	app, err := Parse([]byte(spoken))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !app.Screens[0].Components[0].Speak {
+		t.Fatal("speak not decoded")
+	}
+	thread := strings.Replace(spoken, `"type": "aiChat"`, `"type": "chatThread"`, 1)
+	if _, err := Parse([]byte(thread)); err == nil || !strings.Contains(err.Error(), "speak") {
+		t.Fatalf("speak on chatThread must not parse: %v", err)
 	}
 }

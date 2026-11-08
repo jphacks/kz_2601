@@ -178,12 +178,26 @@ public final class RecordSyncEngine {
     /// 表示名を送らなかった投稿に backend が付ける名前(appconfig `defaultAuthorName`)。送信前のローカル行にも同じものを出す。
     nonisolated public static let anonymousName = "匿名"
 
+    /// ローカル行の時刻。小数秒まで持つ(同じ秒に続けて作った行も作った順に並ぶ: aiChat の自分 → AI・サーバーの createdAt と同じ精度)
+    private static let timestamp: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
     /// 作成(`recordId == nil`)または更新。ローカルに即反映し、更新後の一覧を返す。送信はキューが行う。
     /// - Parameter author: shared / public の entity に作る時の投稿者(#250)。uid はローカル行の作者判定と「自分の投稿」用、
     ///   name は POST で送る表示名(nil なら送らない)。更新では使わない。
     public func save(appId: String, entity: String, recordId: String?, data: [String: JSONValue],
                      author: (uid: String?, name: String?)? = nil) async -> [Record] {
-        let now = ISO8601DateFormatter().string(from: .now)
+        await write(appId: appId, entity: entity, recordId: recordId, data: data, author: author).records
+    }
+
+    /// `save` と同じ。書いた行の id も返す(作成なら仮 id `local-<clientId>` = 断られた時の `SyncEvent` の recordId)。
+    public func write(appId: String, entity: String, recordId: String?, data: [String: JSONValue],
+                      author: (uid: String?, name: String?)? = nil) async -> (records: [Record], recordId: String) {
+        let written: String
+        let now = Self.timestamp.string(from: .now)
         if let recordId, var row = await store.row(appId: appId, entity: entity, recordId: recordId) {
             let oldVideos = VideoValue.localIDs(in: row.data)
             let oldAudios = AudioValue.localIDs(in: row.data)
@@ -194,6 +208,7 @@ public final class RecordSyncEngine {
             if row.pendingOp != .create { row.pendingOp = .update }
             await store.upsert(row)
             await queue.enqueue(SyncOperation(appId: appId, entity: entity, recordId: recordId, kind: .update, data: data))
+            written = recordId
         } else {
             let clientId = UUID().uuidString.lowercased()
             let row = LocalRecord(appId: appId, entity: entity, recordId: LocalRecord.temporaryId(clientId: clientId), data: data,
@@ -202,9 +217,10 @@ public final class RecordSyncEngine {
             await store.upsert(row)
             await queue.enqueue(SyncOperation(id: clientId, appId: appId, entity: entity, recordId: row.recordId, kind: .create, data: data,
                                               authorName: author?.name))
+            written = row.recordId
         }
         kick()
-        return await shown(appId: appId, entity: entity)
+        return (await shown(appId: appId, entity: entity), written)
     }
 
     /// 印を付ける / 外す(#255)。押した瞬間にローカルの件数と状態を変え、サーバーの `{count, mine}` で確定する。

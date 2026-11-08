@@ -200,3 +200,38 @@ func TestFewShotMatchesDocsExample(t *testing.T) {
 		t.Fatal("system prompt must embed the few-shot and the grid rules")
 	}
 }
+
+// PatchNode merges Notification.near (object) and placeSearch near (string
+// enum): a patch can write either, so both stay as alternatives.
+func TestPatchNodeKeepsBothNearShapes(t *testing.T) {
+	var root struct {
+		Defs map[string]struct {
+			Properties map[string]json.RawMessage `json:"properties"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(PatchGenerationSchema(), &root); err != nil {
+		t.Fatal(err)
+	}
+	var near struct {
+		AnyOf []struct {
+			Type       string         `json:"type"`
+			Enum       []string       `json:"enum"`
+			Properties map[string]any `json:"properties"`
+		} `json:"anyOf"`
+	}
+	if err := json.Unmarshal(root.Defs["PatchNode"].Properties["near"], &near); err != nil {
+		t.Fatal(err)
+	}
+	var obj, str bool
+	for _, a := range near.AnyOf {
+		obj = obj || (a.Type == "object" && a.Properties["locationField"] != nil)
+		str = str || (a.Type == "string" && len(a.Enum) == 1 && a.Enum[0] == "current")
+	}
+	if !obj || !str {
+		t.Fatalf("PatchNode.near = %s", root.Defs["PatchNode"].Properties["near"])
+	}
+	// two scalars still merge as before (no anyOf for Id vs string)
+	if f := string(root.Defs["PatchNode"].Properties["entity"]); strings.Contains(f, "anyOf") {
+		t.Fatalf("PatchNode.entity = %s", f)
+	}
+}

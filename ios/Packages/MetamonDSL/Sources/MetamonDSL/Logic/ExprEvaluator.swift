@@ -68,12 +68,14 @@ public final class ExprEvaluator {
     public static let maxDepth = 48
     /// addDays の日数の上限(約 273 年)。超えたら nil(Int への変換で落ちない・Go の expreval と同じ)。
     public static let maxAddDays = 100_000
+    /// addMinutes の分数の上限(maxAddDays 日ぶん)。超えたら nil。
+    public static let maxAddMinutes = maxAddDays * 1440
 
     /// 評価できる op(schema の `ExprOp.op` enum と一致させる。テストで突き合わせる)。
     public static let supportedOps: Set<String> = [
         "add", "sub", "mul", "div", "mod", "neg", "abs", "sqrt", "pow", "round", "floor", "ceil", "min", "max", "clamp",
         "eq", "neq", "gt", "gte", "lt", "lte", "and", "or", "not", "concat", "len",
-        "now", "today", "daysBetween", "daysUntil", "addDays", "nextOccurrence", "hoursBetween", "year", "month", "day", "weekday",
+        "now", "today", "daysBetween", "daysUntil", "addDays", "addMinutes", "nextOccurrence", "hoursBetween", "year", "month", "day", "weekday",
         "toNumber", "toString", "coalesce", "streak", "doneInDays",
     ]
 
@@ -363,6 +365,11 @@ public final class ExprEvaluator {
             guard let d = date(0), let n = num(1)?.rounded(), abs(n) <= Double(Self.maxAddDays),
                   let r = calendar.date(byAdding: .day, value: Int(n), to: d) else { return nil }
             return .date(r)
+        case "addMinutes":
+            // "HH:mm" → "HH:mm"(24 時間で一周)、日付・日時 → その時点の n 分後(経過時間。"YYYY-MM-DD" はその日の最初の時刻)
+            guard let n = num(1)?.rounded(), abs(n) <= Double(Self.maxAddMinutes) else { return nil }
+            if !vals.isEmpty, case .string(let s)? = vals[0], let t = Self.timeOfDay(s) { return .string(Self.clockString(t + n * 60)) }
+            return date(0).map { .date($0.addingTimeInterval(n * 60)) }
         case "nextOccurrence":
             // #266: 毎月 / 毎年の次の日(今日以降・月末に寄せる)。第 2 引数は "monthly" | "yearly"
             guard let d = date(0), vals.count >= 2, case .string(let unit)? = vals[1],
@@ -409,6 +416,12 @@ public final class ExprEvaluator {
         let sec = parts.count == 3 ? Int(parts[2]) : 0
         guard let sec, (0..<60).contains(sec) else { return nil }
         return Double(h * 3600 + m * 60 + sec)
+    }
+
+    /// 0:00 からの秒(24 時間で一周させる)→ "HH:mm"(秒が 0 でなければ "HH:mm:ss")。
+    static func clockString(_ secs: Double) -> String {
+        let t = Int((secs.truncatingRemainder(dividingBy: 86_400) + 86_400).truncatingRemainder(dividingBy: 86_400))
+        return t % 60 == 0 ? String(format: "%02d:%02d", t / 3600, t % 3600 / 60) : String(format: "%02d:%02d:%02d", t / 3600, t % 3600 / 60, t % 60)
     }
 
     /// 保存値 → 評価値。date/datetime field の文字列は Date にする。null は nil。
