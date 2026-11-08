@@ -13,10 +13,12 @@ type runCache struct {
 	index map[string]map[string][]string // entity\x00field -> value key -> record ids (at most 2)
 	// similar: entity\x00fields -> the records with their compared items.
 	similar map[string][]similarRec
+	// periods: entity\x00field\x00fieldEnd -> the records' periods (overlap).
+	periods map[string][]recPeriod
 }
 
 func newRunCache() *runCache {
-	return &runCache{lists: map[string][]expreval.Record{}, index: map[string]map[string][]string{}, similar: map[string][]similarRec{}}
+	return &runCache{lists: map[string][]expreval.Record{}, index: map[string]map[string][]string{}, similar: map[string][]similarRec{}, periods: map[string][]recPeriod{}}
 }
 
 // lookupHolds evaluates rule.Lookup for row: the entity is listed through

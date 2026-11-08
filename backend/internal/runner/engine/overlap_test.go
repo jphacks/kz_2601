@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
 
@@ -103,5 +104,45 @@ func TestPlanOverlapDaysOff(t *testing.T) {
 	}
 	if !slices.Equal(hit, []string{"t1", "t3"}) {
 		t.Fatalf("tasks over a day off %v", hit)
+	}
+}
+
+// A date field compares whole days by its type, not by the form of the
+// stored value: a value kept in RFC 3339 (the field was a datetime before an
+// app edit) still includes its end day.
+func TestPlanOverlapDateFieldByType(t *testing.T) {
+	a := readsApp(t, "server_rules_overlap.json")
+	l := &listReader{recs: map[string][]expreval.Record{
+		"days_off": {rec("d1", map[string]any{"day": "2026-11-14T00:00:00+09:00"})},
+		"tasks": {
+			rec("t1", map[string]any{"name": "混在", "from": "2026-11-10", "due": "2026-11-14T00:00:00+09:00"}),
+			rec("t2", map[string]any{"name": "日時の形", "from": "2026-11-10T00:00:00+09:00", "due": "2026-11-14T00:00:00+09:00"}),
+			rec("t3", map[string]any{"name": "前日まで", "from": "2026-11-10", "due": "2026-11-13T23:00:00+09:00"}),
+		},
+	}}
+	ev := Trigger{AppID: "a", Kind: KindScheduled, At: readsAt, Location: jst}
+	rows, err := PlanEach(context.Background(), a, rule(t, a, "day_off_check"), ev, l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var hit []string
+	for _, r := range rows {
+		hit = append(hit, r.Trigger.Record.ID)
+	}
+	if !slices.Equal(hit, []string{"t1", "t2"}) {
+		t.Fatalf("tasks over a day off %v", hit)
+	}
+}
+
+// notOverlaps never fires on part of the records: a read cap stops the run.
+func TestPlanNotOverlapsReadLimit(t *testing.T) {
+	a := readsApp(t, "server_rules_overlap.json")
+	r := rule(t, a, "double_booking")
+	r.Lookup.Op = dsl.LookupNotOverlaps
+	l := &listReader{err: &ReadLimitError{Scope: "run_reads", Limit: 1, Used: 2}}
+	ev := Trigger{AppID: "a", Kind: KindCreated, Entity: "bookings", Record: rec("n1", map[string]any{"title": "新規", "start": "2026-11-11T09:00:00+09:00"}), At: readsAt, Location: jst}
+	p, err := PlanRule(context.Background(), a, r, ev, l)
+	if !errors.Is(err, ErrReadLimit) || !p.Empty() {
+		t.Fatalf("plan %+v err %v", p, err)
 	}
 }

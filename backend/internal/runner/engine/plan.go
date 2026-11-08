@@ -239,7 +239,7 @@ func planOne(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger
 	if rule.Lookup != nil {
 		var ok bool
 		if rule.Lookup.IsOverlap() {
-			ok = overlapHolds(rule.Lookup, row, src, loc)
+			ok = overlapHolds(app, rule.Lookup, row, src, cache, loc)
 		} else {
 			ok = lookupHolds(app, rule.Lookup, row, src, cache)
 		}
