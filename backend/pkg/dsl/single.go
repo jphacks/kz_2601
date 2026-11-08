@@ -134,7 +134,7 @@ func checkSingleEntities(a *App, entities map[string]*Entity, add func(string, .
 		eachScreenComponent(s.Components, func(where string, c *Component) {
 			where = fmt.Sprintf("screen %q %s", s.ID, where)
 			if single[c.Entity] {
-				add("%s: %s over single entity %q; %s (e.g. stat.value / progressBar.value / computed)", where, c.Type, c.Entity, hint)
+				add("%s: %s over single entity %q; %s (e.g. stat.value / computed / notification when)", where, c.Type, c.Entity, hint)
 			}
 			checkAct(where, c.Action)
 			checkAct(where+".onItemTap", c.OnItemTap)
