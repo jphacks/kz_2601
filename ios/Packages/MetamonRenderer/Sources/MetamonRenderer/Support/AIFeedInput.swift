@@ -13,7 +13,7 @@ enum AIFeedInput {
     enum FeedInputError: LocalizedError, Equatable {
         case notLoaded
 
-        var errorDescription: String? { L("データを読み込んでから押してください") }
+        var errorDescription: String? { "データを読み込んでから押してください" }
     }
 
     /// 材料と節を合わせる。節を残し、はみ出す分は元の材料(記録・フォーム)を先に削る。

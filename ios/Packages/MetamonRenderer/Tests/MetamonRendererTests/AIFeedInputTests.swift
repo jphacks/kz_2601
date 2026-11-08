@@ -65,9 +65,6 @@ final class AIFeedInputTests: XCTestCase {
     }
 
     func testWithinTimesOut() async {
-        let savedLanguage = LanguagePreference.shared.setting
-        LanguagePreference.shared.setting = .ja // 文言は日本語で確かめる
-        defer { LanguagePreference.shared.setting = savedLanguage }
         do {
             _ = try await AIFeedInput.within(0.05) { () async throws -> Int in
                 try await Task.sleep(nanoseconds: 5_000_000_000)
