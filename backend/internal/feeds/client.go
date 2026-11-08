@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -35,6 +36,8 @@ type Endpoints struct {
 	Pressure    string // + "?lat=..&lon=.." (pressurePoints)
 	Holidays    string
 	RSS         map[string]RSSFeed
+	Arxiv       string // + "?search_query=cat:{category}&..." (dsl.ArxivCategories)
+	Diet        string // + "?any={q}&..." (国会会議録 speech search)
 }
 
 // DefaultEndpoints are the production sources (terms checked 2026-11-06,
@@ -50,6 +53,8 @@ func DefaultEndpoints() Endpoints {
 			"fdma-news":     {Name: "消防庁 新着情報", URL: "https://www.fdma.go.jp/index.xml", Publisher: "消防庁", SiteURL: "https://www.fdma.go.jp/"},
 			"fdma-disaster": {Name: "消防庁 災害情報", URL: "https://www.fdma.go.jp/disaster/info/index.xml", Publisher: "消防庁", SiteURL: "https://www.fdma.go.jp/"},
 		},
+		Arxiv: "https://export.arxiv.org/api/query",
+		Diet:  "https://kokkai.ndl.go.jp/api/speech",
 	}
 }
 
@@ -65,6 +70,10 @@ func (ep Endpoints) source(q Query) Source {
 		return Source{Name: "MET Norway(ノルウェー気象研究所)", URL: "https://api.met.no/", License: "CC BY 4.0・6 時間ごとにまとめて加工"}
 	case dsl.FeedHolidays:
 		return Source{Name: "内閣府ホームページ", URL: "https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html", License: pdl}
+	case dsl.FeedArxiv:
+		return Source{Name: "arXiv.org", URL: "https://arxiv.org/list/" + q.FeedID + "/recent", License: "論文の情報は CC0 1.0・arXiv の承認や提携はありません"}
+	case dsl.FeedDiet:
+		return Source{Name: "国立国会図書館 国会会議録検索システム", URL: "https://kokkai.ndl.go.jp/", License: "検索用 API・発言の著作権は各発言者"}
 	}
 	f := ep.RSS[q.FeedID]
 	return Source{Name: f.Publisher + "ホームページ", URL: f.SiteURL, License: pdl}
@@ -87,11 +96,27 @@ func (ep Endpoints) pressureURL(region string) (string, bool) {
 	return fmt.Sprintf("%s?lat=%.2f&lon=%.2f", ep.Pressure, p[0], p[1]), true
 }
 
+// arxivURL asks the arXiv API for a category's latest submissions (the RSS
+// feeds are empty on weekends). category was checked against
+// dsl.ArxivCategories.
+func (ep Endpoints) arxivURL(category string) string {
+	v := url.Values{"search_query": {"cat:" + category}, "sortBy": {"submittedDate"}, "sortOrder": {"descending"},
+		"max_results": {strconv.Itoa(dsl.FeedMaxLimit)}}
+	return ep.Arxiv + "?" + v.Encode()
+}
+
+// dietURL searches speeches (newest meeting first). q was normalized by
+// dsl.NormalizeFeedQuery and is only ever a query value.
+func (ep Endpoints) dietURL(q string) string {
+	v := url.Values{"any": {q}, "maximumRecords": {strconv.Itoa(dsl.FeedMaxLimit)}, "recordPacking": {"json"}}
+	return ep.Diet + "?" + v.Encode()
+}
+
 // hosts are the scheme + host pairs the endpoints use.
 func (ep Endpoints) hosts() map[string]bool {
 	out := map[string]bool{}
 	add := func(raw string) {
-		if u, err := url.Parse(raw); err == nil {
+		if u, err := url.Parse(raw); err == nil && u.Host != "" {
 			out[u.Scheme+"://"+u.Host] = true
 		}
 	}
@@ -102,6 +127,8 @@ func (ep Endpoints) hosts() map[string]bool {
 	for _, f := range ep.RSS {
 		add(f.URL)
 	}
+	add(ep.Arxiv)
+	add(ep.Diet)
 	return out
 }
 

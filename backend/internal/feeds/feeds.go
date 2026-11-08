@@ -25,11 +25,11 @@ import (
 
 // Item is one row of a feed. Fields a provider does not use are omitted.
 type Item struct {
-	Date     string    `json:"date,omitempty"` // YYYY-MM-DD (weather, holidays) or RFC 3339 (rss, warnings, pressure)
+	Date     string    `json:"date,omitempty"` // YYYY-MM-DD (weather, holidays, diet) or RFC 3339 (rss, arxiv, warnings, pressure)
 	Title    string    `json:"title"`
 	Subtitle string    `json:"subtitle,omitempty"`
 	Icon     string    `json:"icon,omitempty"`   // SF Symbols name (weather, warnings)
-	URL      string    `json:"url,omitempty"`    // https only (rss)
+	URL      string    `json:"url,omitempty"`    // https only (rss, arxiv, diet)
 	Max      *float64  `json:"max,omitempty"`    // °C (weather) / hPa (pressure)
 	Min      *float64  `json:"min,omitempty"`    // °C (weather) / hPa (pressure)
 	Pop      *int      `json:"pop,omitempty"`    // precipitation probability %
@@ -55,14 +55,15 @@ type Result struct {
 }
 
 // Query names what to read. Region is for weather / warnings / pressure,
-// FeedID for rss.
+// FeedID for rss / arxiv, Q (search words) for diet.
 type Query struct {
 	Provider string
 	Region   string
 	FeedID   string
+	Q        string
 }
 
-func (q Query) key() string { return q.Provider + "|" + q.Region + "|" + q.FeedID }
+func (q Query) key() string { return q.Provider + "|" + q.Region + "|" + q.FeedID + "|" + q.Q }
 
 // Errors returned by Get.
 var (
@@ -76,6 +77,9 @@ var (
 type limits struct {
 	ttl     time.Duration // fresh cache lifetime
 	maxBody int64         // bytes read from the source
+	// gap > 0: the source asks for one request at a time, this far apart
+	// (arXiv: 3 s; 国会会議録: 数秒). Enforced per instance.
+	gap time.Duration
 }
 
 var providerLimits = map[string]limits{
@@ -84,6 +88,8 @@ var providerLimits = map[string]limits{
 	dsl.FeedRSS:      {ttl: 15 * time.Minute, maxBody: 512 << 10},
 	dsl.FeedWarnings: {ttl: 10 * time.Minute, maxBody: 512 << 10},
 	dsl.FeedPressure: {ttl: 30 * time.Minute, maxBody: 256 << 10},
+	dsl.FeedArxiv:    {ttl: 3 * time.Hour, maxBody: 1 << 20, gap: 3 * time.Second},
+	dsl.FeedDiet:     {ttl: 3 * time.Hour, maxBody: 3 << 20, gap: 3 * time.Second},
 }
 
 const (
@@ -94,6 +100,12 @@ const (
 	staleFor = 24 * time.Hour
 	// maxStoredItems caps what one cached entry keeps.
 	maxStoredItems = 60
+	// maxCacheEntries caps the cache (diet keys are free search words).
+	maxCacheEntries = 2000
+	// maxGapWait is how long a request waits for a gap provider's turn
+	// before ErrBusy; gapPoll how often it looks while one is in flight.
+	maxGapWait = 10 * time.Second
+	gapPoll    = 500 * time.Millisecond
 	// DefaultUpstreamPerMinute caps fetches to all sources per instance.
 	DefaultUpstreamPerMinute = 30
 )
@@ -103,14 +115,17 @@ type Service struct {
 	client    *http.Client
 	ep        Endpoints
 	now       func() time.Time
+	sleep     func(context.Context, time.Duration) bool // sleepCtx; tests move a fake clock
 	disabled  map[string]bool
 	perMinute int
 
 	mu       sync.Mutex
 	cache    map[string]*entry
 	inflight map[string]*call
-	window   time.Time // start of the current upstream minute
-	used     int       // fetches in window
+	window   time.Time            // start of the current upstream minute
+	used     int                  // fetches in window
+	running  map[string]int       // fetches in flight per provider
+	lastAt   map[string]time.Time // last fetch start per provider
 }
 
 type entry struct {
@@ -137,7 +152,8 @@ type Options struct {
 // New builds a Service.
 func New(o Options) *Service {
 	s := &Service{client: o.Client, now: o.Now, perMinute: o.PerMinute, disabled: map[string]bool{},
-		cache: map[string]*entry{}, inflight: map[string]*call{}}
+		cache: map[string]*entry{}, inflight: map[string]*call{},
+		running: map[string]int{}, lastAt: map[string]time.Time{}}
 	if s.client == nil {
 		s.client = NewClient()
 	}
@@ -153,6 +169,7 @@ func New(o Options) *Service {
 	if s.now == nil {
 		s.now = time.Now
 	}
+	s.sleep = sleepCtx
 	if s.perMinute <= 0 {
 		s.perMinute = DefaultUpstreamPerMinute
 	}
@@ -201,6 +218,9 @@ func (s *Service) Enabled(provider string) bool {
 
 // Get returns up to limit items for q (limit <= 0 = dsl.FeedDefaultLimit).
 func (s *Service) Get(ctx context.Context, q Query, limit int) (*Result, error) {
+	if q.Provider == dsl.FeedDiet {
+		q.Q, _ = dsl.NormalizeFeedQuery(q.Q) // "" (rejected by check) when invalid
+	}
 	if err := s.check(q); err != nil {
 		return nil, err
 	}
@@ -243,10 +263,21 @@ func (s *Service) check(q Query) error {
 		if _, ok := s.ep.RSS[q.FeedID]; !ok || q.Region != "" {
 			return ErrUnknown
 		}
+	case dsl.FeedArxiv:
+		if _, ok := dsl.ArxivCategories[q.FeedID]; !ok || q.Region != "" {
+			return ErrUnknown
+		}
+	case dsl.FeedDiet:
+		if q.Q == "" || q.Region != "" || q.FeedID != "" {
+			return ErrUnknown
+		}
 	case dsl.FeedHolidays:
 		if q.Region != "" || q.FeedID != "" {
 			return ErrUnknown
 		}
+	}
+	if q.Provider != dsl.FeedDiet && q.Q != "" {
+		return ErrUnknown
 	}
 	return nil
 }
@@ -255,6 +286,7 @@ func (s *Service) check(q Query) error {
 // failed fetch the last good copy (if recent enough) is served as stale.
 func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 	k := q.key()
+	var waited time.Duration
 	for {
 		s.mu.Lock()
 		now := s.now()
@@ -275,10 +307,15 @@ func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 				return nil, false, ErrUpstream
 			}
 		}
-		if !s.takeBudget(now) {
+		if ok, wait := s.takeBudget(now, q.Provider); !ok {
 			s.mu.Unlock()
 			if e != nil && e.items != nil && now.Sub(e.fetchedAt) < staleFor {
 				return e, true, nil
+			}
+			// A gap provider's turn comes within seconds: wait for it.
+			if wait > 0 && waited+wait <= maxGapWait && s.sleep(ctx, wait) {
+				waited += wait
+				continue
 			}
 			return nil, false, ErrBusy
 		}
@@ -290,6 +327,7 @@ func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 
 		s.mu.Lock()
 		now = s.now()
+		s.running[q.Provider]--
 		ne := &entry{}
 		if e != nil {
 			*ne = *e
@@ -297,12 +335,15 @@ func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 		if err != nil {
 			ne.failedAt, ne.expires = now, now.Add(failTTL)
 			slog.Warn("feeds: fetch failed", slog.String("provider", q.Provider), slog.String("region", q.Region),
-				slog.String("feedId", q.FeedID), slog.Any("error", err))
+				slog.String("feedId", q.FeedID), slog.Int("qRunes", len([]rune(q.Q))), slog.Any("error", err))
 		} else {
 			if len(items) > maxStoredItems {
 				items = items[:maxStoredItems]
 			}
 			*ne = entry{items: items, title: title, fetchedAt: now, expires: now.Add(providerLimits[q.Provider].ttl)}
+		}
+		if s.cache[k] == nil && len(s.cache) >= maxCacheEntries {
+			s.prune(now)
 		}
 		s.cache[k] = ne
 		delete(s.inflight, k)
@@ -322,16 +363,63 @@ func (s *Service) staleOr(e *entry, now time.Time) (*entry, bool, error) {
 	return nil, false, ErrUpstream
 }
 
-// takeBudget counts one upstream fetch against the per-minute cap. Caller holds mu.
-func (s *Service) takeBudget(now time.Time) bool {
+// takeBudget counts one upstream fetch against the per-minute cap and, for a
+// provider with a gap, allows it only when none is in flight and the last
+// one started gap ago; otherwise wait says how long until it may (0 = the
+// minute's budget is used up). Caller holds mu.
+func (s *Service) takeBudget(now time.Time, provider string) (ok bool, wait time.Duration) {
 	if now.Sub(s.window) >= time.Minute {
 		s.window, s.used = now, 0
 	}
 	if s.used >= s.perMinute {
-		return false
+		return false, 0
+	}
+	if gap := providerLimits[provider].gap; gap > 0 {
+		if s.running[provider] > 0 {
+			return false, gapPoll
+		}
+		if last, ok := s.lastAt[provider]; ok && now.Sub(last) < gap {
+			return false, gap - now.Sub(last)
+		}
 	}
 	s.used++
-	return true
+	s.running[provider]++
+	s.lastAt[provider] = now
+	return true, 0
+}
+
+// sleepCtx waits d unless ctx ends first.
+func sleepCtx(ctx context.Context, d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+// prune drops entries past their stale window, then (still full) the oldest
+// ones, so free search words cannot grow the cache without bound. Caller holds mu.
+func (s *Service) prune(now time.Time) {
+	for k, e := range s.cache {
+		if s.inflight[k] == nil && now.After(e.expires) && now.Sub(e.fetchedAt) >= staleFor {
+			delete(s.cache, k)
+		}
+	}
+	for len(s.cache) >= maxCacheEntries {
+		oldest, at := "", now
+		for k, e := range s.cache {
+			if s.inflight[k] == nil && !e.fetchedAt.After(at) {
+				oldest, at = k, e.fetchedAt
+			}
+		}
+		if oldest == "" {
+			return
+		}
+		delete(s.cache, oldest)
+	}
 }
 
 // fetch reads one source. The URL comes from Endpoints only.
@@ -379,6 +467,20 @@ func (s *Service) fetch(ctx context.Context, q Query) (string, []Item, error) {
 		}
 		items, err := parsePressure(body, s.now())
 		return dsl.WeatherRegions[q.Region] + "の気圧", items, err
+	case dsl.FeedArxiv:
+		body, err := s.get(ctx, s.ep.arxivURL(q.FeedID), lim.maxBody)
+		if err != nil {
+			return "", nil, err
+		}
+		items, err := parseArxiv(body)
+		return "arXiv " + q.FeedID + "(" + dsl.ArxivCategories[q.FeedID] + ")の新着", items, err
+	case dsl.FeedDiet:
+		body, err := s.get(ctx, s.ep.dietURL(q.Q), lim.maxBody)
+		if err != nil {
+			return "", nil, err
+		}
+		items, err := parseDiet(body)
+		return "国会会議録「" + q.Q + "」", items, err
 	}
 	return "", nil, ErrUnknown
 }

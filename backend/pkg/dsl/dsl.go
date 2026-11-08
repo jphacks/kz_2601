@@ -531,12 +531,12 @@ type Component struct {
 	Toggle string `json:"toggle,omitempty"` // boolean field: learned (swipe right) / not yet (left)
 
 	// feed (#348). Title / Limit / EmptyText are shared. Never a URL (feed.go).
-	Provider string `json:"provider,omitempty"` // weather|holidays|rss
+	Provider string `json:"provider,omitempty"` // FeedProviders
 	Region   string `json:"region,omitempty"`   // weather: JMA forecast office code (WeatherRegions)
-	FeedID   string `json:"feedId,omitempty"`   // rss: allowlisted feed id (RSSFeeds)
+	FeedID   string `json:"feedId,omitempty"`   // rss / arxiv: allowlisted id (FeedIDTable)
 
 	// placeSearch (place_search.go). Label / NameField / LocationField are shared.
-	Query        string `json:"query,omitempty"`        // fixed search words
+	Query        string `json:"query,omitempty"`        // fixed search words (placeSearch, feed diet)
 	Category     string `json:"category,omitempty"`     // PlaceCategories
 	Near         string `json:"near,omitempty"`         // "" | current
 	AddressField string `json:"addressField,omitempty"` // placeSearch / locationButton: the address string field
