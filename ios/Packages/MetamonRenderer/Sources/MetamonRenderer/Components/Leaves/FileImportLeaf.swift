@@ -1,19 +1,29 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 import MetamonDSL
 
 /// `fileImport`: ボタンでファイルを選び、entity に記録を足す。
 /// - csv: 1 行 = 1 件(列の当て方・型の変換は `RecordImport`)。足す前に「n 件を追加・m 行は読めない」を確かめる。
 /// - text / pdf: 本文を取り出して `field` に入れた記録を 1 件(PDF の画像だけのページは端末内の文字認識)。
+/// - audio: 録音を端末内で文字にして(`AudioFileTranscriptionHost`・30 分 / 200MB まで)、`field` に入れた記録を 1 件。
+///   前面にある間だけ進め(画面は消さない)、背面に回った・画面を離れた・やめるで止める。
 /// ファイルはシステムのファイル選択(別プロセス・権限の確認なし)から読むだけで、送らない・コピーしない・残さない。
 /// 足した記録は `createRecord` で、フォームの保存と同じく端末に入り同期される。
 struct FileImportLeaf: View {
     @Environment(\.dslRuntime) private var rt
+    @Environment(\.scenePhase) private var scenePhase
     let c: Component
     let ctx: RenderContext
 
     @State private var picking = false
     @State private var reading = false
+    /// 録音の文字起こしの進み具合(nil = していない)
+    @State private var transcribing: Double?
+    @State private var job: Task<Void, Never>?
+    @State private var leftForeground = false
+    /// 背面に回った時、今の区切りで止めるまでの猶予
+    @State private var grace = BackgroundGrace()
     @State private var pending: Pending?
     @State private var progress: (done: Int, total: Int)?
     @State private var status: String?
@@ -33,19 +43,26 @@ struct FileImportLeaf: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: RenderTheme.Spacing.xs) {
-            Button {
-                status = nil
-                picking = true
-            } label: {
-                if reading || progress != nil {
-                    Label(progressText, systemImage: "hourglass")
-                } else {
-                    Label(buttonLabel, systemImage: "square.and.arrow.down")
+            if let transcribing {
+                FileImportAudioProgress(progress: transcribing) { job?.cancel() }
+            } else {
+                Button {
+                    status = nil
+                    picking = true
+                } label: {
+                    if reading || progress != nil {
+                        Label(progressText, systemImage: "hourglass")
+                    } else {
+                        Label(buttonLabel, systemImage: "square.and.arrow.down")
+                    }
+                }
+                .buttonStyle(RenderButtonStyle(kind: .secondary))
+                .disabled(!usable || reading || progress != nil)
+                .accessibilityIdentifier("fileImport.button")
+                if c.accept.contains("audio"), !reading {
+                    FileImportAudioModelRow(host: rt.audioFileTranscription)
                 }
             }
-            .buttonStyle(RenderButtonStyle(kind: .secondary))
-            .disabled(!usable || reading || progress != nil)
-            .accessibilityIdentifier("fileImport.button")
             if let status {
                 Text(status)
                     .font(.footnote)
@@ -55,7 +72,20 @@ struct FileImportLeaf: View {
         }
         .fileImporter(isPresented: $picking, allowedContentTypes: types, allowsMultipleSelection: false) { result in
             guard case .success(let urls) = result, let url = urls.first else { return }
-            Task { await read(url) }
+            job = Task {
+                await read(url)
+                job = nil
+            }
+        }
+        .onDisappear { job?.cancel() }
+        .onChange(of: scenePhase) { _, phase in
+            // 文字起こしは前面だけ(背面ではモデルが止められることがある)。戻ってから選び直してもらう。
+            // 止まるまで(長くても 1 区切り)を背面の猶予で待つ。
+            if phase == .background, transcribing != nil {
+                leftForeground = true
+                grace.begin("fileImport.transcribe")
+                job?.cancel()
+            }
         }
         .alert(L("取り込みますか？"), isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } }), presenting: pending) { p in
             Button(L("追加する")) { Task { await add(p) } }
@@ -91,6 +121,10 @@ struct FileImportLeaf: View {
         defer { reading = false }
         let refs = Set(entity.fields.compactMap(\.refEntity))
         await rt.load(entities: refs.union([entity.id]))
+        if kind == .audio {
+            await transcribe(url, entity: entity)
+            return
+        }
         let scoped = url.startAccessingSecurityScopedResource()
         let data = try? Data(contentsOf: url, options: .mappedIfSafe)
         if scoped { url.stopAccessingSecurityScopedResource() }
@@ -107,6 +141,50 @@ struct FileImportLeaf: View {
         switch kind {
         case .csv: planCSV(data, entity: entity, fileName: name)
         case .text, .pdf: await planBody(data, kind: kind, entity: entity, fileName: name)
+        case .audio: break
+        }
+    }
+
+    /// 録音を端末内で文字にする。ファイルは読むだけ(コピーしない)で、文字にした後は確かめてから 1 件足す。
+    private func transcribe(_ url: URL, entity: Entity) async {
+        guard let host = rt.audioFileTranscription else {
+            problem = L("この画面では録音ファイルを文字にできません")
+            return
+        }
+        guard host.audioFileReadiness == .ready else {
+            problem = L("音声モデルの準備ができていません。準備ができてから、もう一度選んでください")
+            return
+        }
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        let size = await AudioFileImport.measure(url)
+        if let issue = AudioFileImport.check(bytes: size.bytes, seconds: size.seconds) {
+            problem = switch issue {
+            case .tooLarge: L("ファイルが大きすぎます(\(AudioFileImport.maxBytes / 1_000_000)MB まで)")
+            case .tooLong: L("録音が長すぎます(\(Int(AudioFileImport.maxSeconds) / 60) 分まで)。分けた録音を選んでください")
+            case .unreadable, .empty: L("この録音ファイルは読めませんでした")
+            }
+            return
+        }
+        leftForeground = false
+        transcribing = 0
+        let awake = ScreenAwake.shared.hold() // 文字にしている間は画面を消さない(前面だけで進むため)
+        defer {
+            transcribing = nil
+            awake.release()
+            grace.end()
+        }
+        do {
+            let text = try await host.transcribeAudioFile(url) { transcribing = $0 }
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                problem = L("録音から声を聞き取れませんでした")
+                return
+            }
+            planText(text, entity: entity, fileName: url.lastPathComponent, note: AudioFileImport.durationText(size.seconds ?? 0))
+        } catch is CancellationError {
+            status = leftForeground ? L("アプリを離れたので文字起こしをやめました。もう一度選んでください") : L("文字起こしをやめました")
+        } catch {
+            problem = error.localizedDescription
         }
     }
 
@@ -139,6 +217,11 @@ struct FileImportLeaf: View {
             problem = kind == .pdf ? L("PDF から文字を取り出せませんでした") : L("文字を読めませんでした")
             return
         }
+        planText(text, entity: entity, fileName: fileName)
+    }
+
+    /// 本文(または文字起こし)を `field` に入れた 1 件を、確かめてから足す。`note` は録音の長さなど。
+    private func planText(_ text: String, entity: Entity, fileName: String, note: String? = nil) {
         guard rt.records(for: entity.id).count < RecordImport.maxRecordsPerEntity,
               let field = c.field, let made = RecordImport.bodyRecord(text: text, fileName: fileName, entity: entity, field: field)
         else {
@@ -148,6 +231,7 @@ struct FileImportLeaf: View {
         let count = (made.data[field]?.stringValue ?? "").count
         var message = L("「\(fileName)」から \(count) 文字を「\(entity.name)」に 1 件追加します。")
         if made.truncated { message += "\n" + L("長いので先頭の \(count) 文字だけ入れます。") }
+        if let note { message += "\n" + L("録音の長さ: \(note)") }
         pending = Pending(fileName: fileName, rows: [made.data], message: message)
     }
 

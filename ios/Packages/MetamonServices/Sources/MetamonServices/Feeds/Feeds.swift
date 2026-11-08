@@ -38,6 +38,9 @@ public final class FeedCache {
         return result
     }
 
+    /// 覚えている結果(古くなっていても返す・取りに行かない)。
+    public func cached(_ query: FeedQuery) -> FeedResult? { entries[query]?.result }
+
     /// サインアウト・テスト用。
     public func reset() { entries = [:] }
 }

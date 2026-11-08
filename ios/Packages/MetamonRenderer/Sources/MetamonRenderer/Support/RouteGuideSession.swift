@@ -10,7 +10,7 @@ import MetamonDSL
 /// 進み方・読み上げる時は `RouteGuidance`(MetamonDSL・純粋ロジック)が決める。
 ///
 /// - 位置は **使用中だけ**(When In Use・`CLBackgroundActivitySession` を使わない)。アプリを閉じると案内も止まる(審査用ビルドでも残せる)。
-/// - 案内中は画面を消さない(`isIdleTimerDisabled`)。止める・画面を離れる・到着で戻す。
+/// - 案内中は画面を消さない(`ScreenAwake`)。止める・画面を離れる・到着で戻す。
 /// - 道を外れた位置が 3 回続いたら現在地から引き直す(最短 15 秒おき)。
 /// - モック(`METAMON_MOCK=1`)は権限・通信を使わず、金沢駅から目的地への L 字の経路を 0.5 秒ごとに約 30 点で進む。
 @MainActor
@@ -38,7 +38,7 @@ final class RouteGuideSession {
     private var offRouteFixes = 0
     private var lastReroute: Date?
     private var task: Task<Void, Never>?
-    private var keptScreenOn = false
+    @ObservationIgnored private var screenAwake: ScreenAwake.Hold?
     private let synthesizer = AVSpeechSynthesizer()
 
     static var isMock: Bool { PlacePicking.isMock }
@@ -247,8 +247,11 @@ final class RouteGuideSession {
     }
 
     private func keepScreenOn(_ on: Bool) {
-        guard on != keptScreenOn else { return }
-        keptScreenOn = on
-        UIApplication.shared.isIdleTimerDisabled = on
+        if on {
+            if screenAwake == nil { screenAwake = ScreenAwake.shared.hold() }
+        } else {
+            screenAwake?.release()
+            screenAwake = nil
+        }
     }
 }

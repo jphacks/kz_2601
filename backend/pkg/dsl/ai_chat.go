@@ -11,6 +11,10 @@ import (
 // AI on the left; each turn is one record of entity, so the history stays.
 // The AI reads the last MaxAIChatTurns turns (≤ MaxAIChatBytes) through
 // POST /v1/text task chat (Pro, paid by the app's creator in a shared app).
+// Every AI bubble has a speaker button (the on-device voice of speakButton,
+// nothing is sent); speak: true also reads each new reply aloud. speak is a
+// plain bool of aiChat only: the schema rejects it on any other part, and it
+// needs no cross-check here.
 
 // Bounds of aiChat; /v1/text task chat applies the same ones.
 const (

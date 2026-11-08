@@ -44,6 +44,14 @@ public enum AIChat {
         return out
     }
 
+    /// `speak: true` で読み上げる返事: 保存した直後の並びで、本文が `reply` と同じ一番新しい AI の発言。
+    /// 見つからない(保存に失敗・並びがまだ古い)時は nil(読み上げの印を付ける吹き出しが無い)。
+    public static func spokenReply(_ turns: [Turn], reply: String) -> Turn? {
+        let text = reply.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        return turns.last { $0.role == .assistant && $0.text == text }
+    }
+
     /// `POST /v1/text` の task chat。直近 20 発言・本文 16 KB に収まる分だけ(古い方から落とす)。
     /// 最後は利用者の発言(`next`)。それ 1 つで 16 KB を超える時はそこで切る。
     public static func request(persona: String, history: [Turn], next: String, long: Bool, locale: String) -> AITextRequest {

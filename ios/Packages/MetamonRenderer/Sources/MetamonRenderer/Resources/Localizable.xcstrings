@@ -562,6 +562,23 @@
         }
       }
     },
+    "%lld 分 %lld 秒" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld min %lld s"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 分 %lld 秒"
+          }
+        }
+      }
+    },
     "%lld 枚中 %lld 枚目" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -575,6 +592,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld 枚中 %2$lld 枚目"
+          }
+        }
+      }
+    },
+    "%lld 秒" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld s"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 秒"
           }
         }
       }
@@ -1310,6 +1344,23 @@
         }
       }
     },
+    "この画面では録音ファイルを文字にできません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recordings can't be transcribed on this screen"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画面では録音ファイルを文字にできません"
+          }
+        }
+      }
+    },
     "この種類のファイルは取り込めません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1374,6 +1425,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この端末にはありません"
+          }
+        }
+      }
+    },
+    "この録音ファイルは読めませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read this recording"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この録音ファイルは読めませんでした"
           }
         }
       }
@@ -1748,6 +1816,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリを更新すると表示できます"
+          }
+        }
+      }
+    },
+    "アプリを離れたので文字起こしをやめました。もう一度選んでください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcription stopped because you left the app. Choose the file again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを離れたので文字起こしをやめました。もう一度選んでください"
           }
         }
       }
@@ -2581,6 +2666,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今の映像を保存"
+          }
+        }
+      }
+    },
+    "今は AI と話せません。アプリを作った人に知らせてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can't talk with the AI right now. Please let the app's creator know."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今は AI と話せません。アプリを作った人に知らせてください"
           }
         }
       }
@@ -4234,6 +4336,23 @@
         }
       }
     },
+    "文字起こしをやめました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcription stopped"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字起こしをやめました"
+          }
+        }
+      }
+    },
     "書き出し日 %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4842,6 +4961,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "空き"
+          }
+        }
+      }
+    },
+    "端末の中で文字にしています。終わるまでアプリを開いたままにしてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribing on this device. Keep the app open until it finishes"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末の中で文字にしています。終わるまでアプリを開いたままにしてください"
           }
         }
       }
@@ -5968,6 +6104,40 @@
         }
       }
     },
+    "録音から声を聞き取れませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't hear any speech in the recording"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音から声を聞き取れませんでした"
+          }
+        }
+      }
+    },
+    "録音が長すぎます(%lld 分まで)。分けた録音を選んでください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The recording is too long (up to %lld minutes). Choose a shorter part"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音が長すぎます(%lld 分まで)。分けた録音を選んでください"
+          }
+        }
+      }
+    },
     "録音する" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6002,6 +6172,23 @@
         }
       }
     },
+    "録音の長さ: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Length: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音の長さ: %@"
+          }
+        }
+      }
+    },
     "録音を再生" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6015,6 +6202,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "録音を再生"
+          }
+        }
+      }
+    },
+    "録音を文字にしています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribing the recording…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音を文字にしています…"
+          }
+        }
+      }
+    },
+    "録音ファイル用の音声モデルを準備しています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing the speech model for recordings…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音ファイル用の音声モデルを準備しています…"
+          }
+        }
+      }
+    },
+    "録音ファイル用の音声モデルを用意する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get the speech model for recordings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音ファイル用の音声モデルを用意する"
           }
         }
       }
@@ -6134,6 +6372,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "降水確率 %lld パーセント"
+          }
+        }
+      }
+    },
+    "音声モデルの準備ができていません。準備ができてから、もう一度選んでください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The speech model isn't ready yet. Choose the file again once it's ready"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデルの準備ができていません。準備ができてから、もう一度選んでください"
           }
         }
       }
