@@ -17,8 +17,9 @@ import (
 // chatThreadPushCannot is the chatThreadRules line the pass makes untrue.
 const chatThreadPushCannot = "- 新しいメッセージの通知(プッシュ)はできない。求められたら「新しいメッセージの通知は今はできないため、開いた時にすぐ届く形で代替しました。」と申告する。"
 
-// chatThreadPushLater replaces it when the pass runs.
-const chatThreadPushLater = "- 新しい記録・メッセージが来た時の参加者・作った人への通知(プッシュ)は、この後の工程でサーバーの自動の動き(serverRules)として作られる。この設計図には通知のための部品や記録を足さず、summary に通知の「代替」や「通知はできない」を書かない。summary で料金に触れなくてよい。"
+// chatThreadPushLater replaces it when the pass may run (serverRulesOn): the
+// pass follows when serverNeed (or the request's words) asks for it.
+const chatThreadPushLater = "- 新しい記録・メッセージが来た時の参加者・作った人への通知(プッシュ)が要る時は、serverNeed を書けば、この後の工程でサーバーの自動の動き(serverRules)として作られる。この設計図には通知のための部品や記録を足さず、summary に通知の「代替」や「通知はできない」を書かない。summary で料金に触れなくてよい。"
 
 // chatLimitPushItem is the chatLimits entry the pass makes untrue.
 const chatLimitPushItem = "サーバーからのプッシュ通知(代わり → 時刻指定のローカル通知)、"
@@ -28,9 +29,9 @@ const serverPushChatRule = "- サーバーからの通知(#343): 新しい記録
 
 type serverPushKey struct{}
 
-// withServerPush marks ctx: generate / edit — the server-rules pass will run
-// for this request (serverRulesPassRuns); chat — a later generate may run it
-// (serverRulesOn).
+// withServerPush marks ctx when serverRulesOn: generate / edit — the pass
+// runs when serverNeed or the regex asks (the prompt gets the serverNeed
+// section and the schema the field); chat — a later generate may run it.
 func withServerPush(ctx context.Context, on bool) context.Context {
 	if !on {
 		return ctx
@@ -51,14 +52,6 @@ func (s *Service) serverRulesOn(ctx context.Context, transcript string) bool {
 		!defaultPaidCatalog.dropped(transcript, paid.ServerRules)
 }
 
-// serverRulesPassRuns reports whether applyServerRulesPass will call the
-// model for this generate / edit request: serverRulesOn and the request asks
-// for an automatic action. The generate wording follows it, so the prompt
-// never says 「この後の工程で作られる」 when no pass follows.
-func (s *Service) serverRulesPassRuns(ctx context.Context, transcript string) bool {
-	return s.serverRulesOn(ctx, transcript) && wantsServerRules(transcript)
-}
-
 var serverPushMemo sync.Map // system -> rewritten
 
 // serverPushPrompt rewrites the push lines when ctx says the pass runs.
@@ -75,7 +68,10 @@ func serverPushPrompt(ctx context.Context, system string) string {
 }
 
 func rewriteServerPush(s string) string {
-	s = strings.Replace(s, chatThreadPushCannot, chatThreadPushLater, 1)
+	if strings.Contains(s, chatThreadPushCannot) { // generate / edit (systemPrompt)
+		s = strings.Replace(s, chatThreadPushCannot, chatThreadPushLater, 1)
+		s = insertServerNeedSection(s, chatThreadPushLater)
+	}
 	if strings.Contains(s, chatLimitPushItem) {
 		s = strings.Replace(s, chatLimitPushItem, "", 1)
 		s = strings.Replace(s, "\n"+publicPIIChatRule, "\n"+publicPIIChatRule+"\n"+serverPushChatRule, 1)

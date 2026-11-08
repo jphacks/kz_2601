@@ -522,6 +522,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 - 人が読める説明は `App.DescribeServerRule`(例: 「出欠」が作られた時(条件に合えば)、「予定」を作った人に通知・「予定」の「参加の数」を数える)。「このアプリの自動の動き」の一覧(#347)で使う。
 - 古い iOS: `AppDSL` はトップの未知キーを読まないので、`serverRules` があっても今までどおり開ける。
 - AI の生成(#343): 生成用スキーマ(`ai.GenerationSchema()`)には入れず、依頼が自動の動き(通知・定期・数える など)を含む時だけ、UI の生成の後に別の小さな呼び出し(`backend/internal/ai/server_rules_pass.go`・専用スキーマ `ServerRulesGenerationSchema()`・`createRecord` / `updateRecord` の `values` はそこだけ `[{field, value}]` の配列)で `serverRules` 全体を書く。結果は `Validate()` を通し、通らなければ問題を添えて再生成、最後まで通らなければルール無しで保存して summary で断る。作ったルールは `DescribeServerRule` の文で summary に出る。`AI_SERVER_RULES=1` の時だけ動く(既定は無効)。
+- 別の呼び出しを動かす条件(`AI_SERVER_RULES=1` の時だけ): 生成の呼び出しが出力の最後に `"serverNeed": "none"|"push"|"timed"|"record"` を書き(AI 層だけのキー。生成用スキーマにその時だけ足し、`dsl.Parse` の前に外す。DSL・iOS・このスキーマには入らない)、`none` 以外か、依頼の言葉が当てはまる(`wantsServerRules`・キーが無い時の保険)時に動く。serverNeed が頼んだのにルールが 1 つも作れなかった時は、summary に「うまく作れなかった」の文を足す。
 
 ### 3.13 管理者の権限と重複の防止(#272 #273・M4)
 

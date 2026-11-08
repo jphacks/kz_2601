@@ -367,3 +367,30 @@ func dropServerRules(root map[string]any) {
 		}
 	}
 }
+
+// addServerNeed returns the schema with the root key serverNeed
+// (server_need.go), required and last in the required order. Only for
+// AI_SERVER_RULES=1 requests; GenerationSchema / PatchGenerationSchema stay
+// as they are. On a decode error the schema is returned unchanged.
+func addServerNeed(raw json.RawMessage) json.RawMessage {
+	var root map[string]any
+	if err := json.Unmarshal(raw, &root); err != nil {
+		return raw
+	}
+	props, _ := root["properties"].(map[string]any)
+	if props == nil {
+		return raw
+	}
+	enum := make([]any, len(serverNeedValues))
+	for i, v := range serverNeedValues {
+		enum[i] = v
+	}
+	props[serverNeedKey] = map[string]any{"type": "string", "enum": enum}
+	req, _ := root["required"].([]any)
+	root["required"] = append(req, serverNeedKey)
+	out, err := json.Marshal(root)
+	if err != nil {
+		return raw
+	}
+	return out
+}
