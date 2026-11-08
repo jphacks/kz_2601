@@ -16,6 +16,30 @@ func TestMasterReachRules_InPrompt(t *testing.T) {
 	}
 }
 
+// The rule asks for what lint savedRecordReach checks, no more: setting
+// entities are exempt (a single one cannot be listed at all), other record-tap
+// components count, a prefillRef tap does not, and a ranking is one sorted
+// list rather than a table plus a list of the same entity. Part names that
+// restricted builds drop (matchList, single) are not named here.
+func TestMasterReachRules_MatchesLint(t *testing.T) {
+	for _, want := range []string{"設定(予算・目標", "gridTable など", "prefillRef", `"sort":{"field":"total","direction":"desc"}`} {
+		if !strings.Contains(masterReachRules, want) {
+			t.Errorf("masterReachRules lacks %q", want)
+		}
+	}
+}
+
+// Rules that still told the model to rank masters in a table alone.
+func TestMasterReachRules_NoTableOnlyRanking(t *testing.T) {
+	for name, rule := range map[string]string{"quizRules": quizRules, "groupByRules": groupByRules} {
+		for _, bad := range []string{"の table を total で sort desc", "computed agg + table"} {
+			if strings.Contains(rule, bad) {
+				t.Errorf("%s still says %q", name, bad)
+			}
+		}
+	}
+}
+
 // The rule's list example, swapped into the warikan few-shot in place of its
 // members list, still validates.
 func TestMasterReachRules_ExampleValid(t *testing.T) {
