@@ -136,8 +136,8 @@ enum AIRequestBuilder {
         var prompt: String
         if let template = c.prompt, !template.isEmpty {
             prompt = expand(template, input: input, entity: entity, values: values)
-            // プレースホルダが無いテンプレは「指示」とみなして入力を後ろに付ける
-            if !template.contains("{{") { prompt += "\n\n" + input }
+            // 本文がテンプレに入っていなければ後ろに付ける(オンライン版は常に本文を別に送るのと揃える)
+            if !embedsInput(template, c, sourceEntity: sourceEntity) { prompt += "\n\n" + input }
         } else {
             prompt = input
         }
@@ -172,6 +172,13 @@ enum AIRequestBuilder {
             return FieldCoding.display(values[input] ?? .null, field: entity.field(input))
         }
         return describe(entity.storedFields.filter { $0.id != c.output }, value: { values[$0] ?? .null }, separator: "\n")
+    }
+
+    /// テンプレが本文を含むか: `{{input}}`、または input field 自身の `{{fieldId}}`(entity 入力でない時)。
+    static func embedsInput(_ template: String, _ c: Component, sourceEntity: Entity?) -> Bool {
+        if template.contains("{{input}}") { return true }
+        if sourceEntity == nil, let id = c.input, template.contains("{{\(id)}}") { return true }
+        return false
     }
 
     /// `{{input}}` → 本文、`{{fieldId}}` → フォームの値。

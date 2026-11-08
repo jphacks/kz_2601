@@ -86,6 +86,33 @@ final class AiButtonTests: XCTestCase {
         XCTAssertFalse(req.prompt.contains("古い要約"), "output 自身は入力に含めない")
     }
 
+    func testFieldPlaceholderWithoutInputTokenStillAppendsInput() throws {
+        let dsl = try diary()
+        let entity = try XCTUnwrap(dsl.entity("diary"))
+        let c = try component(#"{"type":"aiButton","task":"rewrite","input":"body","output":"summary","prompt":"{{mood}} な気分の文に書き換えて"}"#)
+        let req = try AIRequestBuilder.build(c, entity: entity, values: ["body": "散歩した", "mood": "うれしい"])
+        XCTAssertTrue(req.prompt.hasPrefix("うれしい な気分の文に書き換えて"), req.prompt)
+        XCTAssertTrue(req.prompt.hasSuffix("\n\n散歩した"), "{{input}} が無ければ本文を後ろに付ける(オンライン版と同じ)")
+    }
+
+    func testInputFieldPlaceholderIsNotAppendedTwice() throws {
+        let dsl = try diary()
+        let entity = try XCTUnwrap(dsl.entity("diary"))
+        let c = try component(#"{"type":"aiButton","task":"extract","input":"body","output":"summary","prompt":"{{body}} から大事な語を 5 個まで"}"#)
+        let req = try AIRequestBuilder.build(c, entity: entity, values: ["body": "散歩した"])
+        XCTAssertEqual(req.prompt, "散歩した から大事な語を 5 個まで", "input field 自身のプレースホルダは本文として扱う")
+    }
+
+    func testEntityInputWithFieldPlaceholderAppendsRecords() throws {
+        let dsl = try diary()
+        let entity = try XCTUnwrap(dsl.entity("diary"))
+        let c = try component(#"{"type":"aiButton","task":"suggest","entity":"diary","output":"summary","prompt":"今の気分は{{mood}}。一言ください"}"#)
+        let records = [Record(id: "1", data: ["body": "昨日"], createdAt: "2026-10-23T00:00:00Z")]
+        let req = try AIRequestBuilder.build(c, entity: entity, values: ["mood": "ふつう"], sourceEntity: entity, records: records)
+        XCTAssertTrue(req.prompt.hasPrefix("今の気分はふつう。一言ください"), req.prompt)
+        XCTAssertTrue(req.prompt.contains("本文: 昨日"), "記録を材料にする時もテンプレの後ろに付ける")
+    }
+
     func testEntityInputUsesRecentRecords() throws {
         let dsl = try diary()
         let entity = try XCTUnwrap(dsl.entity("diary"))
