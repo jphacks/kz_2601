@@ -82,6 +82,9 @@ type Config struct {
 	Consent notify.Consent
 	// Age: nil = notify's default (age unknown).
 	Age notify.AccountAge
+	// Feeds: the public feeds saveFeed reads (feed.go); nil = saveFeed
+	// actions write nothing.
+	Feeds FeedGetter
 	// Paused (RUNNER_PAUSED): events are finished as skipped_paused, never kept for later.
 	Paused func() bool
 	// NotifyPaused (RUNNER_NOTIFY_PAUSED): rules run and write, notifications

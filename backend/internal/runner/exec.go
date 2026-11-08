@@ -320,7 +320,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		}
 		return finish(dec.Outcome), quota.Charge{}, nil
 	}
-	reader := &ruleReader{h: h, q: r.cfg.Quota, dec: dec, maxReads: r.cfg.Quota.RunReadCap(dec.Plan), charged: charged, usage: &usage}
+	reader := &ruleReader{h: h, q: r.cfg.Quota, dec: dec, maxReads: r.cfg.Quota.RunReadCap(dec.Plan), charged: charged, usage: &usage, feeds: r.cfg.Feeds}
 	rows, err := planRows(ctx, app, rule, trig, reader)
 	if errors.Is(err, engine.ErrReadLimit) {
 		// stopped, never computed on part of the records (#338: stop, do not delay)
@@ -467,6 +467,7 @@ type ruleReader struct {
 	read     int // records listed so far
 	charged  *quota.Charge
 	usage    *quota.Usage
+	feeds    FeedGetter // saveFeed (feed.go); nil = skipped
 }
 
 // Record implements engine.RefReader.

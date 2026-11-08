@@ -226,7 +226,7 @@ func planOne(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger
 		src.listed[id] = true
 	}
 	e := expreval.New(expreval.Env{Entities: app.Entities, Source: src, Now: ev.At, Location: loc})
-	p := planner{app: app, ev: ev, row: row, e: e, loc: loc, each: rule.On.Each != ""}
+	p := planner{app: app, ev: ev, row: row, e: e, loc: loc, each: rule.On.Each != "", src: src}
 	if rule.If != nil {
 		v := e.Eval(*rule.If, row)
 		if src.err != nil {
@@ -332,10 +332,13 @@ type planner struct {
 	// each: the row was just listed (on.each), so an update of the row that
 	// changes nothing is not written (a daily recount writes only changes).
 	each bool
+	src  *refSource // ctx + refs (saveFeed reads the feed through refs)
 }
 
 func (p *planner) action(i int, act *dsl.RuleAction, out *Plan) error {
 	switch {
+	case act.SaveFeed != nil:
+		return p.saveFeed(i, act.SaveFeed, out)
 	case act.Notify != nil:
 		n := PlannedNotify{Action: i, To: act.Notify.To,
 			Title: p.render(act.Notify.Title, dsl.MaxNotifyTitleRunes, act.Notify.With),
