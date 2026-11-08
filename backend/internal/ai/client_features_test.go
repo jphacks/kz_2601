@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -52,15 +53,15 @@ func TestClientFeaturesRestriction(t *testing.T) {
 	}
 	gone := map[string]struct {
 		rule   string // a line of the dropped rules
-		schema string // a schema fragment that must go
+		schema string // Def.prop (or a fragment) that must go
 		places int    // uses in featuresDoc
 		left   string // a doc fragment that must go
 	}{
-		FeatureAILong:        {"## アプリの中の AI の長い文章(aiButton length long)", `"length":`, 1, `"length"`},
-		FeatureAIInputPhoto:  {"## アプリの中の AI に写真を見せる(aiButton inputPhoto)", `"inputPhoto":`, 1, `"inputPhoto"`},
-		FeatureAISaveTo:      {"## AI が作った項目を 1 件ずつ記録に足す(aiButton saveTo)", `"saveTo":`, 1, `"saveTo"`},
-		FeatureLookupBook:    {"## ISBN から本の情報を入れる(lookupBook)", `"bookLookup":`, 2, `"lookupBook"`},
-		FeatureTextHighlight: {"## 文の大事な語に印をつける(text.highlight)", `"highlight":`, 1, `{{body}}`},
+		FeatureAILong:        {"## アプリの中の AI の長い文章(aiButton length long)", "AiButton.length", 1, `"length"`},
+		FeatureAIInputPhoto:  {"## アプリの中の AI に写真を見せる(aiButton inputPhoto)", "AiButton.inputPhoto", 1, `"inputPhoto"`},
+		FeatureAISaveTo:      {"## AI が作った項目を 1 件ずつ記録に足す(aiButton saveTo)", "AiButton.saveTo", 1, `"saveTo"`},
+		FeatureLookupBook:    {"## ISBN から本の情報を入れる(lookupBook)", "Action.bookLookup", 2, `"lookupBook"`},
+		FeatureTextHighlight: {"## 文の大事な語に印をつける(text.highlight)", "Text.highlight", 1, `{{body}}`},
 		FeatureFeedV2:        {"警報・注意報」「大雨警報が出ているか」", `"warnings"`, 1, `"warnings"`},
 	}
 	if len(gone) != len(clientFeatures) {
@@ -73,14 +74,14 @@ func TestClientFeaturesRestriction(t *testing.T) {
 			if !r.Active() || !r.NoFeature(f.key) || r.NoNear() {
 				t.Fatalf("active=%v off=%v", r.Active(), r.off)
 			}
-			if !strings.Contains(systemPrompt, g.rule) || !strings.Contains(string(generationSchema), g.schema) {
+			if !strings.Contains(systemPrompt, g.rule) || !schemaHas(t, dsl.SchemaJSON(), g.schema) {
 				t.Fatal("the full prompt / schema lack the part")
 			}
 			p := restrictPrompt(withRestriction(context.Background(), r), systemPrompt)
 			if strings.Contains(withoutNote(p), g.rule) || !strings.Contains(p, strings.TrimSpace(f.note)) {
 				t.Fatal("restricted prompt: rules left / note missing")
 			}
-			if strings.Contains(string(r.assets().genSch), g.schema) {
+			if schemaHas(t, restrictSchemaJSON(dsl.SchemaJSON(), r), g.schema) {
 				t.Fatalf("restricted schema still has %s", g.schema)
 			}
 			v := restrictionViolations([]byte(featuresDoc), nil, r)
@@ -99,6 +100,25 @@ func TestClientFeaturesRestriction(t *testing.T) {
 			}
 		})
 	}
+}
+
+// schemaHas: "Def.prop" is that property of the def in the canonical-shaped
+// schema (the generation schema flattens leaves); anything else a fragment.
+func schemaHas(t *testing.T, sch []byte, what string) bool {
+	t.Helper()
+	def, prop, ok := strings.Cut(what, ".")
+	if !ok || strings.ContainsAny(what, `"`) {
+		return strings.Contains(string(sch), what)
+	}
+	var root struct {
+		Defs map[string]struct {
+			Properties map[string]any `json:"properties"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(sch, &root); err != nil {
+		t.Fatal(err)
+	}
+	return root.Defs[def].Properties[prop] != nil
 }
 
 // AI_TEXT_IMAGE off (the default): every request, restricted or not, is
