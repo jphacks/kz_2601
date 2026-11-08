@@ -28,6 +28,27 @@ func TestNearNotificationValid(t *testing.T) {
 	}
 }
 
+// near watches the user's own places: a shared / public entity or a hidden
+// location field is rejected.
+func TestNearNotificationPrivateVisibleOnly(t *testing.T) {
+	for name, c := range map[string]struct {
+		edit func(*App)
+		want string
+	}{
+		"shared": {func(a *App) { a.Entities[0].Scope = ScopeShared }, `app.notifications[0].near: entity "memo" is shared; near watches the user's own places`},
+		"public": {func(a *App) { a.Entities[0].Scope = ScopePublic }, `app.notifications[0].near: entity "memo" is public; near watches the user's own places`},
+		"hidden": {func(a *App) { a.Entities[0].Fields[1].Hidden = true }, `app.notifications[0].near: locationField "place" is hidden`},
+	} {
+		app := memoApp()
+		app.App.Notifications = []Notification{{ID: "a", Title: "t", Repeat: "once", Near: &NotificationNear{Entity: "memo", LocationField: "place"}}}
+		c.edit(&app)
+		err := app.Validate()
+		if err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
 func TestNearNotificationErrors(t *testing.T) {
 	app := memoApp()
 	near := func(e, f string, r int) *NotificationNear {

@@ -316,7 +316,7 @@
         },
         "computed": {
           "$ref": "#/$defs/Expr",
-          "description": "Read-only calculated field (never stored, never bound to inputs). Evaluated per record: `ref` reads this record's fields (\"id\" = record id). type must be number|integer|currency|string|boolean|date. Usable in list/table/stat/chart like a stored field."
+          "description": "Read-only calculated field (never stored, never bound to inputs). Evaluated per record: `ref` reads this record's fields (\"id\" = record id). type must be number|integer|currency|string|boolean|date|datetime (addMinutes of a date / datetime needs datetime: string / date would drop the time). Usable in list/table/stat/chart like a stored field."
         },
         "health": {
           "type": "string",
@@ -3734,6 +3734,7 @@
             "daysBetween",
             "daysUntil",
             "addDays",
+            "addMinutes",
             "nextOccurrence",
             "hoursBetween",
             "year",
@@ -3778,6 +3779,7 @@
             "daysBetween": "daysBetween(a,b) = b - a の日数",
             "daysUntil": "daysUntil(d) = d - 今日 の日数(過ぎたら負)",
             "addDays": "addDays(d, n) = d の n 日後",
+            "addMinutes": "addMinutes(t, n) = t の n 分後(負なら前)。\"HH:mm\" は \"HH:mm\" を返す(24 時間で一周)。日時は日時。到着 − 所要分 = 出発",
             "nextOccurrence": "nextOccurrence(d, \"monthly\"|\"yearly\") = d から毎月 / 毎年くり返す日付のうち、今日以降で最も近い日(d が今日以降なら d)。日が無い月は月末に寄せる(1/31 の毎月 → 2/28・閏年 2/29、2/29 の毎年 → 平年 2/28)。サブスクの次の更新日・次の誕生日。daysUntil と組み合わせて残り日数に",
             "hoursBetween": "hoursBetween(start, end) = \"HH:mm\" 同士の差の時間数(小数。30 分 = 0.5)。end < start は日付またぎとして +24h。勤務時間・睡眠時間に",
             "year": "年",
@@ -3992,6 +3994,25 @@
         },
         "saveTo": {
           "$ref": "#/$defs/AISaveTo"
+        },
+        "inputFeeds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "description": "generate の材料に足す feed: 同じ画面の feed 部品の id(1〜3 個・天気・気圧・警報・祝日・お知らせ)。iOS が画面に読み込んだ行(合わせて最大 20 行・2KB)を「外部データ」として渡す(今日の天気と気圧から体調のアドバイス)。"
+        },
+        "outputs": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 10,
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "generate の shape fields の項目名 → 入れる screen.entity の field id(string/text/integer/number/date/datetime/enum)。例: {\"題名\":\"title\",\"日時\":\"start\",\"場所\":\"place\"}。iOS が型に直してフォームのドラフトに入れる(読めない値・enum の options に無い値は空のまま)。保存は利用者。output とは一緒に使わない。"
         }
       },
       "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はフォームの入力を処理して output field に入れる(端末内 AI(Apple Intelligence / Foundation Models)が使えれば無料で端末の中だけ、無い端末では Tailor It Pro のオンライン AI。写真は inputPhoto を付けた時だけオンライン AI に送る)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",

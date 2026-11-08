@@ -16,6 +16,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/appcheck"
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/books"
 	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
@@ -91,6 +92,7 @@ func main() {
 		ServerRulesPass: os.Getenv("AI_SERVER_RULES") == "1", // server rules for automatic actions (#343)
 		LintRetry:       os.Getenv("AI_LINT_RETRY") == "1",   // off: lint warnings are reported only
 		TextImage:       os.Getenv("AI_TEXT_IMAGE") == "1",   // aiButton inputPhoto; off until the privacy policy names photos
+		NoBookLookup:    !books.EnabledFromEnv(os.Getenv),    // lookupBook only while appconfig has BOOK_LOOKUP_ENABLED (openBD terms)
 		Logger:          claude.Logger,                       // ai.generate per request (#322)
 		// clarify turn (#147): its own model/effort/thinking; empty = ai.DefaultChat*
 		ChatConfig: ai.ChatConfig{

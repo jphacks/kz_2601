@@ -88,7 +88,7 @@ func checkNotifyWith(where string, rc *ruleCheck, n *RuleNotify) {
 		ch := rc.expr()
 		got := ch.check(w, &v, rc.actRow(), 1)
 		checkNoComputed(w, ch, add)
-		if got != tNum && got != tDate {
+		if g := widen(got); g != tNum && g != tDate {
 			add("%s: must be a number or a date (got %s); insert record text with {<field>} instead", w, got)
 		}
 	}

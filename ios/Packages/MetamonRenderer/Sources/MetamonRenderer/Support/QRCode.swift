@@ -76,8 +76,9 @@ enum QRCodeContent {
     /// 保存値はそのまま(日時・数値を整形しない)、computed は評価。
     @MainActor
     private static func fieldText(_ id: String, form: FormDraft, row: ExprEvaluator.Row?, evaluator: () -> ExprEvaluator) -> String {
-        if form.entity.field(id)?.computed != nil, let row {
-            return evaluator().fieldValue(id, row: row)?.text ?? ""
+        if let f = form.entity.field(id), f.computed != nil, let row {
+            let v = evaluator().fieldValue(id, row: row)
+            return f.type == .datetime ? v?.json(for: f).displayString ?? "" : v?.text ?? "" // datetime は RFC3339(時刻を落とさない)
         }
         return (form.values[id] ?? .null).displayString
     }

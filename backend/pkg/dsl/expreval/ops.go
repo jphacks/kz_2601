@@ -275,6 +275,20 @@ func (ev *Evaluator) apply(name string, args []dsl.Expr, row *Row) Value {
 		if n = roundAway(n); ok1 && ok2 && math.Abs(n) <= MaxAddDays { // false for NaN / ±Inf
 			return DateValue(addDays(d, int(n), ev.loc))
 		}
+	case "addMinutes":
+		// "HH:mm" → "HH:mm" (wraps within the day); a date / datetime → that instant + n minutes
+		n, ok := num(1)
+		if n = roundAway(n); !ok || len(vals) == 0 || !(math.Abs(n) <= MaxAddMinutes) { // NaN / ±Inf fail too
+			return Value{}
+		}
+		if v := vals[0]; v.Kind == String {
+			if t, ok := timeOfDay(v.Str); ok {
+				return StringValue(clockString(t + n*60))
+			}
+		}
+		if d, ok := date(0); ok {
+			return DateValue(d.Add(time.Duration(n) * time.Minute))
+		}
 	case "nextOccurrence":
 		// #266: next monthly / yearly repeat on or after today (clamped to the month end)
 		if d, ok := date(0); ok && len(vals) >= 2 && vals[1].Kind == String {
