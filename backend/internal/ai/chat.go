@@ -344,6 +344,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 	if err != nil {
 		return nil, err
 	}
+	ctx = withServerPush(ctx, s.serverRulesOn(ctx, "")) // chat: the creator has not opted out yet
 	if wantsChatFirst(req) {
 		return s.chatFirst(ctx, req, incoming, started)
 	}
@@ -605,7 +606,7 @@ func (s *Service) callChatWith(ctx context.Context, cfg ChatConfig, system strin
 	defer cancel()
 	t := time.Now()
 	var ttft time.Duration
-	system, schema = restrictPrompt(ctx, system), restrictSchema(ctx, schema)
+	system, schema = serverPushPrompt(ctx, restrictPrompt(ctx, system)), restrictSchema(ctx, schema)
 	resp, err := s.Claude.Complete(cctx, Completion{
 		System:     system,
 		Messages:   []Message{{Role: "user", Content: user}},
