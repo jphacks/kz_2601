@@ -34,5 +34,15 @@ public struct ClientInfo: Equatable, Sendable {
     func apply(to request: inout URLRequest) {
         for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
         request.setValue(TimeZone.current.identifier, forHTTPHeaderField: "X-Time-Zone") // 定期のルールの時刻・「今日」の基準(#342)
+        request.setValue(Self.languageCode(), forHTTPHeaderField: "Accept-Language") // 自動の動きの説明などの言語
+    }
+
+    /// UI の言語("ja" | "en")。LanguagePreference(Renderer)と同じ保存値・同じ選び方(Services は Renderer に依存しない)。
+    static func languageCode(defaults: UserDefaults = .standard) -> String {
+        switch defaults.string(forKey: "metamon.appLanguage") {
+        case "ja": "ja"
+        case "en": "en"
+        default: Bundle.preferredLocalizations(from: ["ja", "en"], forPreferences: Locale.preferredLanguages).first ?? "ja"
+        }
     }
 }

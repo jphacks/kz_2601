@@ -1780,7 +1780,7 @@ components:
       required: [id, description, trigger, result, enabled]
       properties:
         id: { type: string }
-        description: { type: string, description: 'ルールの説明(日本語・`DescribeServerRule`)。例: 「毎日 07:00、「記録」に記録を足す」' }
+        description: { type: string, description: 'ルールの説明(`DescribeServerRuleIn`)。Accept-Language が en なら英語、それ以外・無しなら日本語。例: 「毎日 07:00、「記録」に記録を足す」 / Every day at 07:00: add a record to "記録"' }
         trigger: { type: string, enum: [record, schedule] }
         result: { $ref: '#/components/schemas/AutomationResult' }
         enabled: { type: boolean, description: 'false = 作成者がオフにしている(DSL の serverRules[].enabled)。オフのルールは動かず、実行の数にも数えない。切り替えは PATCH /v1/apps/{appId}/dsl か AI の編集' }
