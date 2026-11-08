@@ -54,11 +54,18 @@ func checkNearNotification(where string, n *Notification, entities map[string]*E
 		add("%s.near: entity %q does not exist", where, nr.Entity)
 		return
 	}
+	// The places are watched on this device: only the user's own records,
+	// never other users' places nor a hidden field.
+	if e.IsShared() {
+		add("%s.near: entity %q is %s; near watches the user's own places: use a private entity", where, nr.Entity, e.EffectiveScope())
+	}
 	switch f := e.FieldByID(nr.LocationField); {
 	case f == nil:
 		add("%s.near: locationField %q does not exist in entity %q", where, nr.LocationField, nr.Entity)
 	case f.Type != FieldLocation:
 		add("%s.near: locationField %q must be a location field (got %s)", where, nr.LocationField, f.Type)
+	case f.Hidden:
+		add("%s.near: locationField %q is hidden; use a field the user sees", where, nr.LocationField)
 	}
 }
 

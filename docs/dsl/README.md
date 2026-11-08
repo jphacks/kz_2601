@@ -597,7 +597,7 @@ field id の代わりに書ける、どのレコードにもある値。`$` 始�
 
 | 項目 | 決めたこと |
 |---|---|
-| near の形 | `{entity, locationField, radiusM?}`。`locationField` は location 型。`radiusM` は 100〜2000(省略 200) |
+| near の形 | `{entity, locationField, radiusM?}`。`entity` は private(shared / public は不可=自分の場所だけを見張る)、`locationField` は hidden でない location 型。`radiusM` は 100〜2000(省略 200) |
 | 引き金は 1 つ | `near` があればそれだけが引き金。`time` / `weekday` / `entity` / `field` / `offsetMinutes` / `titleField` / `enabledField` / `when` / `alarm` / `jitterMinutes` とは組み合わせない。`repeat` は `once`(最初に着いた 1 回だけ)か `daily`(着くたび)。`scheduleNotification` には書けない(`app.notifications` だけ)。backend が拒否(`backend/pkg/dsl/notification_near.go`) |
 | 判定 | iOS の `UNLocationNotificationTrigger`(`CLCircularRegion`・入った時だけ `notifyOnEntry`)。**判定は端末の中**で、位置を backend に送る処理は足していない(レコードの場所は今までどおりレコードとして保存される) |
 | 上限 | iOS の予約は 1 アプリ 64 件・見張れる領域は約 20。全アプリ合わせて **15 か所**(現在地が OS に残っていれば近い順、無ければ新しく保存した順)。残りの枠(60 − 場所の数)を時刻の通知が近い順に使う。レコードが変わる・アプリを開くたびに選び直す |
@@ -650,7 +650,7 @@ App Store に出した後は古い iOS が残り続ける。backend は「今い
 | どこに | 中身 | 使い道 |
 |---|---|---|
 | generate / chat の body `allowedComponents` | その版が描画できる部品 type の全部(`ComponentType` から自動) | backend はここに**無い** type を生成結果に入れない(下) |
-| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(`recordRetention`・#482、`matching`・#507、`notification.when`・#265、`singleEntity`・#267、`dataRoles`・#272、`addressedMessages`・#271、`notification.near`。審査用の版は `matching`・`dataRoles`・`addressedMessages` を送らない) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
+| generate / chat の body `supportedFeatures` | 部品以外で実装済みの DSL の動作(`recordRetention`・#482、`matching`・#507、`notification.when`・#265、`singleEntity`・#267、`dataRoles`・#272、`addressedMessages`・#271、`notification.near`、`aiButton.long`、`aiButton.inputPhoto`、`aiButton.saveTo`、`action.lookupBook`、`text.highlight`(text の {{fieldId}} も)、`feed.v2`(feed の warnings / pressure)。審査用の版は `matching`・`dataRoles`・`addressedMessages` を送らない) | `allowedComponents` を送るのにここに無い動作は AI に使わせない(v1.0 = 記録の自動削除なし) |
 | 全リクエストのヘッダ `X-Client-Platform` / `X-Client-Version` / `X-Client-Build` / `X-Client-DSL-Version` | `ios` / `CFBundleShortVersionString` / `CFBundleVersion` / 描画できる最大の `schemaVersion` | ログ(どの版がまだ使われているか = 最低対応版を上げる判断) |
 
 ### 5.3 backend が古い iOS に新しい部品を出さない仕組み
