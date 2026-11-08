@@ -390,7 +390,8 @@ final class MetamonUITests: XCTestCase {
         attachScreenshot("form-filled")
 
         app.buttons["保存"].firstMatch.tap()
-        let row = element(labelBeginsWith: "UIテスト")
+        // 行の見出しは必須のカテゴリ(既定「食費」)、メモは副題(#769)
+        let row = element(labelBeginsWith: "食費, UIテスト")
         XCTAssertTrue(row.waitForExistence(timeout: 15), "保存した支出が一覧に出ない")
         XCTAssertTrue(row.label.contains("1,234"), "一覧の金額が入力と違う: \(row.label)")
         attachScreenshot("form-saved-list")

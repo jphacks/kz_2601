@@ -131,8 +131,8 @@ final class DSLDecodingTests: XCTestCase {
         XCTAssertEqual(table.limit, 10)
         let feed = try XCTUnwrap(history.components.first { $0.id == "feed" })
         XCTAssertEqual(feed.dateField, "date")
-        XCTAssertEqual(feed.titleField, "memo")
-        XCTAssertEqual(feed.subtitleField, "category")
+        XCTAssertEqual(feed.titleField, "category")
+        XCTAssertEqual(feed.subtitleField, "memo")
         XCTAssertEqual(history.components.first { $0.id == "empty" }?.message, "レシートを撮ると、ここに並びます")
         XCTAssertEqual(overview.referencedEntities, ["expense"])
     }
