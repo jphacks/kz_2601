@@ -16,6 +16,7 @@ func TestAdaptiveAmountRules_InPrompt(t *testing.T) {
 		`{"field":"done","op":"eq","value":true}`,
 		"行ごとの先週に使わない",
 		"固定の値で足りるので、この計算を足さない",
+		"onItemTap で週のフォームを開く", `defaultValue "now"`, `format "percent"`,
 	} {
 		if !strings.Contains(systemPrompt, s) {
 			t.Errorf("systemPrompt lacks %q", s)
@@ -36,12 +37,12 @@ var adaptiveRuleApp = `{"schemaVersion":1,"app":{"name":"t","voiceEntry":"floati
   {"id":"last_rate","name":"先週の達成率","type":"integer","unit":"%","computed":` + adaptiveRateExpr + `},
   {"id":"target","name":"今週の目標","type":"integer","unit":"分","computed":` + adaptiveTargetExpr + `}]},
  {"id":"logs","name":"予定","titleField":"task","fields":[
-  {"id":"date","name":"日付","type":"date","defaultValue":"today"},{"id":"task","name":"内容","type":"string","required":true},
+  {"id":"date","name":"日付","type":"date","defaultValue":"now"},{"id":"task","name":"内容","type":"string","required":true},
   {"id":"done","name":"完了","type":"boolean","defaultValue":false}]}],
 "screens":[
  {"id":"home","title":"週","toolbar":[{"label":"週を足す","action":{"type":"navigate","screen":"week_form","presentation":"sheet"}},{"label":"予定を足す","action":{"type":"navigate","screen":"log_form","presentation":"sheet"}}],
-  "components":[{"type":"table","entity":"weeks","columns":[{"field":"start"},{"field":"last_rate"},{"field":"target"}]},
-   {"type":"list","entity":"logs","item":{"title":"task","subtitle":"date","toggle":"done"}}]},
+  "components":[{"type":"list","entity":"weeks","item":{"title":"start","trailing":"target"},"swipeToDelete":true,"onItemTap":{"type":"navigate","screen":"week_form","presentation":"push"}},
+   {"type":"list","entity":"logs","item":{"title":"task","subtitle":"date","toggle":"done"},"onItemTap":{"type":"navigate","screen":"log_form","presentation":"push"}}]},
  {"id":"week_form","title":"週","entity":"weeks","toolbar":[{"label":"保存","action":{"type":"saveRecord","entity":"weeks"}}],
   "components":[{"type":"datePicker","field":"start"},{"type":"numberField","field":"base"}]},
  {"id":"log_form","title":"予定","entity":"logs","toolbar":[{"label":"保存","action":{"type":"saveRecord","entity":"logs"}}],
@@ -54,6 +55,20 @@ func TestAdaptiveAmountRules_ExprsEvaluate(t *testing.T) {
 	}
 	if l := app.Lint(); len(l) > 0 {
 		t.Errorf("lint %v", l)
+	}
+	// Saved weeks must be reachable: a list item tap opens each form.
+	tapped := map[string]bool{}
+	for _, s := range app.Screens {
+		for _, c := range s.Components {
+			if c.Type == dsl.CompList && c.OnItemTap != nil && c.OnItemTap.Type == dsl.ActionNavigate {
+				tapped[c.OnItemTap.Screen] = true
+			}
+		}
+	}
+	for _, s := range app.Screens {
+		if s.Entity != "" && !tapped[s.ID] {
+			t.Errorf("form %q is never opened by a list item tap", s.ID)
+		}
 	}
 	week := func(id, start string, base float64) expreval.Record {
 		return expreval.Record{ID: id, Data: map[string]any{"start": start, "base": base}}
