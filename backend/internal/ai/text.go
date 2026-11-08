@@ -57,6 +57,8 @@ type TextRequest struct {
 	Messages []TextMessage `json:"messages,omitempty"`
 	// SaveTo lets a task chat reply suggest a record (text_chat_suggest.go).
 	SaveTo *ChatSaveTo `json:"saveTo,omitempty"`
+	// Material is aiChat inputEntity: the user's own records (text_chat_material.go). Never logged.
+	Material *ChatMaterial `json:"material,omitempty"`
 }
 
 // TextField is one named value of shape fields.
@@ -104,6 +106,9 @@ func normalizeTextRequest(req *TextRequest) error {
 	}
 	if req.SaveTo != nil {
 		return badText("saveTo is only for task chat")
+	}
+	if req.Material != nil {
+		return badText("material is only for task chat")
 	}
 	if req.Task != "" && req.Task != "generate" {
 		return normalizeTaskRequest(req)

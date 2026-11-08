@@ -213,6 +213,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var roleField: String?      // user / assistant を書く field(nil = 自分と AI が交互)
     public var persona: String?        // AI の役と話し方(500 字まで・サーバーへは instruction)
     public var speak: Bool?            // aiChat: 新しい AI の返事を端末の声で自動で読み上げる
+    public var inputEntity: String?    // aiChat: 自分の記録を参考として AI に添える entity(limit 件・AIChatMaterial.swift)
     // dashcam(#410)。title は共用。nil = 既定値(DashcamConfig)
     public var keepMinutes: Int?       // ループで残す分数
     public var maxStorageMB: Int?      // 録画の容量上限
@@ -268,7 +269,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case tone
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
-        case textField, photoField, roleField, persona, speak
+        case textField, photoField, roleField, persona, speak, inputEntity
         case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance, allowRequests, autoAccept
         case accept, map
         case show
@@ -376,6 +377,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         roleField = try? c.decodeIfPresent(String.self, forKey: .roleField)
         persona = try? c.decodeIfPresent(String.self, forKey: .persona)
         speak = try? c.decodeIfPresent(Bool.self, forKey: .speak)
+        inputEntity = try? c.decodeIfPresent(String.self, forKey: .inputEntity)
         keepMinutes = try? c.decodeIfPresent(Int.self, forKey: .keepMinutes)
         maxStorageMB = try? c.decodeIfPresent(Int.self, forKey: .maxStorageMB)
         impactG = try? c.decodeIfPresent(Double.self, forKey: .impactG)

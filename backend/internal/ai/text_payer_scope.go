@@ -247,6 +247,7 @@ type scopeComp struct {
 	chat    bool
 	persona string
 	saveTo  string // aiChat saveTo as the device sends it (ChatSaveTo.scopeKey), "" = none
+	input   string // aiChat inputEntity as the device sends it (entity + "\x00" + name), "" = none
 	task    string
 	long    bool
 	photo   bool
@@ -272,6 +273,9 @@ func newAppScope(app *dsl.App) *appScope {
 				comp := scopeComp{chat: true, persona: strings.TrimSpace(c.Persona), long: true}
 				if s := chatSaveToOf(app, c); s != nil {
 					comp.saveTo = s.scopeKey()
+				}
+				if e, name, ok := chatInputOf(app, c); ok {
+					comp.input = e + "\x00" + name
 				}
 				sc.comps = append(sc.comps, comp)
 			case dsl.CompAiButton:
@@ -315,6 +319,10 @@ func (c scopeComp) sends(req TextRequest, cut bool) bool {
 		}
 		// a saveTo must be the component's own (an older device sends none)
 		if req.SaveTo != nil && req.SaveTo.scopeKey() != c.saveTo {
+			return false
+		}
+		// material must come from the component's own inputEntity
+		if req.Material != nil && req.Material.Entity+"\x00"+req.Material.Name != c.input {
 			return false
 		}
 		s := strings.TrimLeftFunc(req.Instruction, unicode.IsSpace)

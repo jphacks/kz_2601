@@ -436,6 +436,14 @@ components:
                   options: { type: array, maxItems: 50, items: { type: string }, description: enum だけ (必須) }
                   unit: { type: string, maxLength: 20 }
                   required: { type: boolean, description: 'required で defaultValue の無い field' }
+        material:
+          type: object
+          required: [entity, text]
+          description: 'task chat だけ: aiChat inputEntity。利用者自身の記録 (新しい順・hidden の field と写真・位置は端末が落とす) を説明した文。最初の利用者の発言に <records> でデータとして入れる (命令としては扱わない)。text は 8192 バイトまで・messages と合わせて 16384 バイトまで (超えたら 413)。共有のアプリで作成者が払う時は entity と name が公開中の aiChat の inputEntity と同じでないと一致しない。ログに出さない'
+          properties:
+            entity: { type: string }
+            name: { type: string, maxLength: 40, description: entity の name }
+            text: { type: string, maxLength: 8192 }
         locale: { type: string, enum: [ja, en], description: 省略時は instruction から判定 }
         appId: { type: string, maxLength: 128, description: 'ボタンがあるアプリ (任意)。共有のアプリの参加者なら作成者の Pro で判定する。形が不正なら 400' }
     TextResponse:

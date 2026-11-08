@@ -10,6 +10,7 @@ import MetamonDSL
 /// 読み上げ: AI の吹き出しごとに小さなスピーカー(`speakButton` と同じ `LeafSpeech`・端末の声)。`speak: true` なら届いた返事を自動で読む。画面を離れたら止める。
 /// 話して入力: 入力欄の横のマイク(`transcribeField` と同じ `DictationHost`・端末内)。押して始め、押して止めると入力欄に文字が入る。送るのはユーザー。
 /// 録音を始めると読み上げを止め、録音の間は返事を自動で読まない。画面を離れた・マイク FAB の音声入力が始まったら録音を捨てる。
+/// inputEntity: 送るたびにその entity の自分の記録(新しい順・limit 件・8 KB)を「参考の記録」として添える(`AIChatMaterial`)。
 struct AiChatLeaf: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.fabFrame) private var fabFrame
@@ -136,6 +137,11 @@ struct AiChatLeaf: View {
                 .accessibilityIdentifier("aiChat.error")
         } else if !online {
             Text(L("この版では AI と話せません")).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+        } else if let input = c.inputEntity.flatMap({ rt.dsl.entity($0) }) {
+            // inputEntity: 何を AI に渡すかを入力欄の上に出しておく
+            Text(L("参考に「\(input.name)」の自分の記録も AI に渡します")).font(.caption).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("aiChat.inputNote")
         }
     }
 
@@ -266,9 +272,10 @@ struct AiChatLeaf: View {
         let saveTo = c.chatSaveTo
         let dsl = self.rt.dsl
         let saveEntity = saveTo.flatMap { dsl.entity($0.entity) }
-        let request = AIChat.request(persona: c.persona ?? "", history: history, next: text, long: c.length == "long",
-                                     locale: LanguagePreference.shared.code,
-                                     saveTo: saveEntity.flatMap { saveTo?.request(in: $0, today: DSLClock.now()) })
+        let persona = c.persona ?? "", long = c.length == "long", locale = LanguagePreference.shared.code
+        let saveRequest = saveEntity.flatMap { saveTo?.request(in: $0, today: DSLClock.now()) }
+        let input = c.inputEntity.flatMap { dsl.entity($0) }
+        let limit = c.limit
         sending = true
         error = nil
         suggestion = nil // 前の案は閉じる(言い直した内容で新しい案が来る)
@@ -290,6 +297,15 @@ struct AiChatLeaf: View {
                 pending = text
             }
             do {
+                // inputEntity: 自分の記録を「参考の記録」として添える(AIChatMaterial.swift)
+                var material: AITextMaterial?
+                if let input {
+                    await rt.load(entities: [input.id])
+                    material = AIChatMaterial.request(entity: input, records: rt.records(for: input.id),
+                                                      uid: rt.currentUserId, limit: limit)
+                }
+                let request = AIChat.request(persona: persona, history: history, next: text, long: long, locale: locale,
+                                             saveTo: saveRequest, material: material)
                 let reply = try await host.generateAIText(request)
                 pending = nil
                 let saved = await Self.saveReply(reply.text, after: text, rt: rt, entity: entity.id, textField: textField,

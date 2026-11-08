@@ -501,6 +501,8 @@ type Component struct {
 	RoleField string `json:"roleField,omitempty"` // user|assistant per turn (optional)
 	Persona   string `json:"persona,omitempty"`   // who the AI is (≤ 500 chars)
 	Speak     bool   `json:"speak,omitempty"`     // read each new AI reply aloud (on-device voice)
+	// InputEntity: the user's own records of it go with each turn as reference (ai_chat_input.go). Limit is shared.
+	InputEntity string `json:"inputEntity,omitempty"`
 	// dashcam (#410). Title is shared. Zero = iOS default.
 	KeepMinutes  int      `json:"keepMinutes,omitempty"`  // loop length (default 10)
 	MaxStorageMB int      `json:"maxStorageMB,omitempty"` // storage cap (default 2000)
