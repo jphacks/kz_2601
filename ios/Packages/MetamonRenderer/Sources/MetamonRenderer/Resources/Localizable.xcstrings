@@ -137,6 +137,23 @@
         }
       }
     },
+    "%@ 第 %lld 試合" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, match %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 第 %lld 試合"
+          }
+        }
+      }
+    },
     "%@(描いた絵あり)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -167,6 +184,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@(添付済み)"
+          }
+        }
+      }
+    },
+    "%@(相手: %@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (vs %2$@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@(相手: %@)"
           }
         }
       }
@@ -6219,6 +6253,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "読めない行: %lld 行(入れません)"
+          }
+        }
+      }
+    },
+    "負け" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lost"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "負け"
           }
         }
       }

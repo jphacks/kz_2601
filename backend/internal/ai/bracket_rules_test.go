@@ -69,3 +69,11 @@ func TestBracketWithheldFromOldBuilds(t *testing.T) {
 		t.Fatalf("a build without the type: disallowed = %v", old.Disallowed())
 	}
 }
+
+// The pairing is never stored, so the rule must say that removing or adding
+// an entrant after the first result redraws the bracket.
+func TestBracketRuleStatesRedrawLimit(t *testing.T) {
+	if !strings.Contains(bracketRules, "途中で出場者を消す・足すと組み合わせが組み直され") {
+		t.Error("bracket rule must state that changing entrants mid-tournament redraws the pairing")
+	}
+}

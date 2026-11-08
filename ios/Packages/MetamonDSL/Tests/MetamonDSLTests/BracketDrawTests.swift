@@ -68,6 +68,36 @@ final class BracketDrawTests: XCTestCase {
         XCTAssertEqual(d.rounds.count, 6)
     }
 
+    /// 標準のシード配置: 1 回戦の 2 人のシード番号の和は枠の数 + 1。不戦勝は上位シードから(1..size-n)。
+    func testSeedPositionsAndByesForManySizes() {
+        for n in [2, 3, 5, 7, 8, 9, 16, 33, 64] {
+            let rs = (1...n).map { p(String(format: "p%02d", $0), at: 1) }
+            let d = BracketDraw(records: rs, winsField: "wins", seedField: nil)
+            var size = 2
+            while size < n { size *= 2 }
+            let seed = { (r: Record?) -> Int? in r.map { Int($0.id.dropFirst())! } }
+            XCTAssertEqual(d.rounds[0].count, size / 2, "n=\(n)")
+            XCTAssertEqual(d.rounds.count, size.trailingZeroBitCount, "n=\(n)")
+            var byes: [Int] = []
+            for m in d.rounds[0] {
+                let a = seed(m.a), b = seed(m.b)
+                XCTAssertNotNil(a, "n=\(n): the top slot always has an entrant")
+                if let a, let b { XCTAssertEqual(a + b, size + 1, "n=\(n)") } else if let a { byes.append(a) }
+            }
+            XCTAssertEqual(byes.sorted(), size > n ? Array(1...(size - n)) : [], "n=\(n)")
+            // 上位 2 シードは決勝まで当たらない
+            guard size >= 4 else { continue }
+            XCTAssertTrue(d.rounds[0].prefix(size / 4).contains { seed($0.a) == 1 }, "n=\(n)")
+            XCTAssertTrue(d.rounds[0].suffix(size / 4).contains { seed($0.a) == 2 }, "n=\(n)")
+        }
+    }
+
+    /// 両方が勝ったことになっている(よそで編集)時は値の大きい方、同じなら上の枠。
+    func testTiesGoToTheLargerWinsThenTheTopSlot() {
+        XCTAssertEqual(four(["a": 1, "d": 1]).rounds[0][0].winner, .a)
+        XCTAssertEqual(four(["a": 1, "d": 2]).rounds[0][0].winner, .b)
+    }
+
     // MARK: - タップ
 
     private func four(_ wins: [String: Int] = [:]) -> BracketDraw {
@@ -77,18 +107,18 @@ final class BracketDrawTests: XCTestCase {
 
     func testTapSetsWinnerAndSwapsBack() {
         let m = four().rounds[0][0] // a-d
-        XCTAssertEqual(BracketDraw.tap(m, side: .b, winsField: "wins"), .update(["d": 1]))
-        let decided = four(["d": 1]).rounds[0][0]
+        XCTAssertEqual(four().tap(m, side: .b, winsField: "wins"), .update(["d": 1]))
+        let dd = four(["d": 1]), decided = dd.rounds[0][0]
         XCTAssertEqual(decided.winner, .b)
         // 相手に変える: a を 1・d を 0 に
-        XCTAssertEqual(BracketDraw.tap(decided, side: .a, winsField: "wins"), .update(["a": 1, "d": 0]))
+        XCTAssertEqual(dd.tap(decided, side: .a, winsField: "wins"), .update(["a": 1, "d": 0]))
         // 勝者をもう一度: 取り消し
-        XCTAssertEqual(BracketDraw.tap(decided, side: .b, winsField: "wins"), .update(["d": 0]))
+        XCTAssertEqual(dd.tap(decided, side: .b, winsField: "wins"), .update(["d": 0]))
     }
 
     func testTapUsesPendingWins() {
         let m = four().rounds[0][0]
-        XCTAssertEqual(BracketDraw.tap(m, side: .a, winsField: "wins", pending: ["d": 1]), .update(["a": 1, "d": 0]))
+        XCTAssertEqual(four().tap(m, side: .a, winsField: "wins", pending: ["d": 1]), .update(["a": 1, "d": 0]))
         let d = BracketDraw(records: four().entrants, winsField: "wins", seedField: nil, pending: ["d": 1])
         XCTAssertEqual(d.rounds[0][0].winner, .b)
     }
@@ -96,16 +126,36 @@ final class BracketDrawTests: XCTestCase {
     /// 先の回戦に進んだ人の試合は変えられない。不戦勝・相手が未定の試合は選べない。
     func testLockedAndNotPlayable() {
         let d = four(["a": 2, "b": 1])
-        XCTAssertEqual(BracketDraw.tap(d.rounds[0][0], side: .b, winsField: "wins"), .locked)
-        XCTAssertEqual(BracketDraw.tap(d.rounds[0][0], side: .a, winsField: "wins"), .locked)
-        XCTAssertEqual(BracketDraw.tap(d.rounds[1][0], side: .a, winsField: "wins"), .update(["a": 1]))
+        XCTAssertEqual(d.tap(d.rounds[0][0], side: .b, winsField: "wins"), .locked)
+        XCTAssertEqual(d.tap(d.rounds[0][0], side: .a, winsField: "wins"), .locked)
+        XCTAssertEqual(d.tap(d.rounds[1][0], side: .a, winsField: "wins"), .update(["a": 1]))
 
         let undecided = four().rounds[1][0]
-        XCTAssertEqual(BracketDraw.tap(undecided, side: .a, winsField: "wins"), .notPlayable)
+        XCTAssertEqual(four().tap(undecided, side: .a, winsField: "wins"), .notPlayable)
         let rs = ["a", "b", "c"].enumerated().map { i, id in p(id, at: i + 1) }
-        let bye = BracketDraw(records: rs, winsField: "wins", seedField: nil).rounds[0][0]
+        let three = BracketDraw(records: rs, winsField: "wins", seedField: nil), bye = three.rounds[0][0]
         XCTAssertTrue(bye.bye)
-        XCTAssertEqual(BracketDraw.tap(bye, side: .a, winsField: "wins"), .notPlayable)
+        XCTAssertEqual(three.tap(bye, side: .a, winsField: "wins"), .notPlayable)
+    }
+
+    /// 決勝の結果が付いたら、負けた側でも前の回戦は変えられない(変えると決勝の結果が別の人に移る)。
+    func testDecidedNextMatchLocksEvenWhenTheFinalistLost() {
+        let d = four(["a": 1, "b": 2]) // a-d は a、b-c は b、決勝 a-b は b
+        XCTAssertEqual(d.rounds[1][0].winner, .b)
+        XCTAssertEqual(d.tap(d.rounds[0][0], side: .b, winsField: "wins"), .locked)
+        XCTAssertEqual(d.tap(d.rounds[0][0], side: .a, winsField: "wins"), .locked)
+        // 決勝を取り消せば変えられる
+        XCTAssertEqual(d.tap(d.rounds[1][0], side: .b, winsField: "wins"), .update(["b": 1]))
+    }
+
+    /// よそで大きすぎる wins を入れられても、先の試合が決まっていなければ取り消せる(決勝は先が無い)。
+    func testOverstatedWinsCanStillBeUndone() {
+        let d = four(["a": 9, "b": 1])
+        XCTAssertEqual(d.champion?.id, "a")
+        XCTAssertEqual(d.tap(d.rounds[1][0], side: .a, winsField: "wins"), .update(["a": 1]))
+        let e = four(["a": 3]) // 2 回戦の相手(b-c)が未定
+        XCTAssertEqual(e.tap(e.rounds[0][0], side: .a, winsField: "wins"), .update(["a": 0]))
+        XCTAssertEqual(e.tap(e.rounds[0][0], side: .b, winsField: "wins"), .update(["d": 1, "a": 0]))
     }
 
     func testTournamentExampleIsBundled() throws {

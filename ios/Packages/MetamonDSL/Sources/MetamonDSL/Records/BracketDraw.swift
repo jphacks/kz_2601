@@ -139,17 +139,29 @@ public struct BracketDraw: Equatable, Sendable {
         case locked
     }
 
+    /// 試合の勝者が上がった先の試合に結果が付いているか(決勝は先が無いので false)。
+    public func nextDecided(_ match: Match) -> Bool {
+        guard match.round < rounds.count else { return false }
+        let next = rounds[match.round]
+        let i = match.index / 2
+        return i < next.count && next[i].winner != nil
+    }
+
+    /// 試合の side の人をタップした時(この表の先の試合を見て止める)。
+    public func tap(_ match: Match, side: Side, winsField: String, pending: [String: Int] = [:]) -> TapResult {
+        Self.tap(match, side: side, winsField: winsField, pending: pending, nextDecided: nextDecided(match))
+    }
+
     /// 試合の side の人をタップした時。勝者でなければ勝者に(相手が勝者なら戻す)、勝者なら取り消す。
-    public static func tap(_ match: Match, side: Side, winsField: String, pending: [String: Int] = [:]) -> TapResult {
+    /// 先の試合(nextDecided)に結果が付いていれば、勝った側・負けた側どちらでも変えない: 変えると先の結果が別の人に移る。
+    /// wins の大きさでは止めない(よそで大きすぎる値が入っても、先が未定なら取り消せる)。
+    public static func tap(_ match: Match, side: Side, winsField: String, pending: [String: Int] = [:], nextDecided: Bool) -> TapResult {
         guard match.isPlayable, let a = match.a, let b = match.b else { return .notPlayable }
         let (me, other) = side == .a ? (a, b) : (b, a)
         let r = match.round
-        let wm = wins(me, field: winsField, pending: pending), wo = wins(other, field: winsField, pending: pending)
-        if match.winner == side {
-            guard wm <= r else { return .locked }
-            return .update([me.id: r - 1])
-        }
-        if match.winner != nil, wo > r { return .locked }
+        if match.winner != nil, nextDecided { return .locked }
+        if match.winner == side { return .update([me.id: r - 1]) }
+        let wo = wins(other, field: winsField, pending: pending)
         var out = [me.id: r]
         if wo >= r { out[other.id] = r - 1 }
         return .update(out)

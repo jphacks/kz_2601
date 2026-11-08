@@ -15,9 +15,9 @@ struct BracketLeaf: View {
 
     private var entityId: String { c.entity ?? "" }
     private var entity: Entity? { rt.dsl.entity(entityId) }
-    /// 1 回戦の 1 試合の高さ。後の回戦は 2 倍ずつ(線で結ばずに、上がる先の試合が真ん中に来る)
-    private let unit: CGFloat = 76
-    private let columnWidth: CGFloat = 150
+    /// 1 回戦の 1 試合の高さ。後の回戦は 2 倍ずつ(線で結ばずに、上がる先の試合が真ん中に来る)。文字の大きさに合わせて伸ばす。
+    @ScaledMetric(relativeTo: .subheadline) private var unit: CGFloat = 76
+    @ScaledMetric(relativeTo: .subheadline) private var columnWidth: CGFloat = 150
 
     var body: some View {
         let draw = Self.draw(c, rt: rt, pending: pending)
@@ -38,7 +38,7 @@ struct BracketLeaf: View {
                 ScrollView([.horizontal, .vertical]) {
                     HStack(alignment: .top, spacing: RenderTheme.Spacing.sm) {
                         ForEach(Array(draw.rounds.enumerated()), id: \.offset) { i, matches in
-                            column(matches, round: i + 1, total: draw.rounds.count)
+                            column(matches, round: i + 1, draw: draw)
                         }
                     }
                     .padding(.bottom, RenderTheme.Spacing.xs)
@@ -70,46 +70,51 @@ struct BracketLeaf: View {
         }
     }
 
-    private func column(_ matches: [BracketDraw.Match], round: Int, total: Int) -> some View {
+    private func column(_ matches: [BracketDraw.Match], round: Int, draw: BracketDraw) -> some View {
         let slot = unit * CGFloat(1 << (round - 1))
+        let title = Self.roundTitle(round, of: draw.rounds.count)
         return VStack(spacing: 0) {
-            Text(Self.roundTitle(round, of: total))
+            Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .frame(height: 20)
                 .accessibilityAddTraits(.isHeader)
             ForEach(matches, id: \.index) { m in
-                matchCard(m)
+                matchCard(m, draw: draw)
                     .frame(height: slot)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel(Self.matchLabel(m, roundTitle: title))
             }
         }
         .frame(width: columnWidth)
     }
 
-    private func matchCard(_ m: BracketDraw.Match) -> some View {
+    private func matchCard(_ m: BracketDraw.Match, draw: BracketDraw) -> some View {
         VStack(spacing: 0) {
-            row(m, side: .a)
+            row(m, side: .a, draw: draw)
             Divider()
-            row(m, side: .b)
+            row(m, side: .b, draw: draw)
         }
         .background(RenderTheme.Colors.brandSoft.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(RenderTheme.Colors.brandSoftStroke))
         .padding(.vertical, RenderTheme.Spacing.xs)
     }
 
-    private func row(_ m: BracketDraw.Match, side: BracketDraw.Side) -> some View {
+    private func row(_ m: BracketDraw.Match, side: BracketDraw.Side, draw: BracketDraw) -> some View {
         let r = side == .a ? m.a : m.b
         let won = m.winner == side
         let lost = m.winner != nil && !won
-        let text = r.map(name) ?? (m.round == 1 ? L("不戦勝") : L("未定"))
+        let text = slotText(m, side: side)
+        let opponent = slotText(m, side: side == .a ? .b : .a)
+        let locked = m.isPlayable && m.winner != nil && draw.nextDecided(m)
         return Button {
-            tap(m, side: side)
+            tap(m, side: side, draw: draw)
         } label: {
             HStack(spacing: RenderTheme.Spacing.xs) {
                 Text(text)
                     .font(.subheadline.weight(won ? .bold : .regular))
                     .foregroundStyle(r == nil || lost ? AnyShapeStyle(Color.secondary) : AnyShapeStyle(Color.primary))
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
                 if won {
@@ -124,10 +129,14 @@ struct BracketLeaf: View {
         }
         .buttonStyle(.plain)
         .disabled(!m.isPlayable)
-        .accessibilityLabel(text)
-        .accessibilityValue(won ? L("勝ち") : "")
-        .accessibilityHint(m.isPlayable ? L("ダブルタップで勝者にする") : "")
+        .accessibilityLabel(L("\(text)(相手: \(opponent))"))
+        .accessibilityValue(won ? L("勝ち") : (lost ? L("負け") : ""))
+        .accessibilityHint(!m.isPlayable || locked ? "" : L("ダブルタップで勝者にする"))
         .accessibilityIdentifier("bracket.r\(m.round).m\(m.index).\(side.rawValue)")
+    }
+
+    private func slotText(_ m: BracketDraw.Match, side: BracketDraw.Side) -> String {
+        (side == .a ? m.a : m.b).map(name) ?? (m.round == 1 ? L("不戦勝") : L("未定"))
     }
 
     private func name(_ r: Record) -> String {
@@ -138,9 +147,9 @@ struct BracketLeaf: View {
 
     // MARK: - 勝者を選ぶ
 
-    private func tap(_ m: BracketDraw.Match, side: BracketDraw.Side) {
+    private func tap(_ m: BracketDraw.Match, side: BracketDraw.Side, draw: BracketDraw) {
         guard let winsField = Self.winsField(c, in: entity) else { return }
-        switch BracketDraw.tap(m, side: side, winsField: winsField, pending: pending) {
+        switch draw.tap(m, side: side, winsField: winsField, pending: pending) {
         case .notPlayable:
             return
         case .locked:
@@ -156,10 +165,15 @@ struct BracketLeaf: View {
             }
             for (id, w) in wins { pending[id] = w }
             taps += 1
-            for (id, w) in wins {
-                Task {
-                    let saved = await rt.updateRecord(entity: entityId, recordId: id, data: [winsField: .number(Double(w))])
-                    if !saved { print("[Metamon] bracket not saved: \(entityId)/\(id)") }
+            Task {
+                // 順に保存: 下げる方(元の勝者)が先。途中で失敗したら残りは送らない(勝者が 2 人になる途中の形を残さない)
+                var failed = false
+                for (id, w) in Self.writeOrder(wins) {
+                    if !failed {
+                        failed = !(await rt.updateRecord(entity: entityId, recordId: id, data: [winsField: .number(Double(w))]))
+                        if failed { print("[Metamon] bracket not saved: \(entityId)/\(id)") }
+                    }
+                    // 失敗なら保存待ちを外す = ストアの値に戻る
                     if pending[id] == w { pending[id] = nil }
                 }
             }
@@ -167,6 +181,16 @@ struct BracketLeaf: View {
     }
 
     // MARK: - 計算(描画の木 RenderTree と共用)
+
+    /// 保存の順: 勝ち数の小さい方(取り消し・元の勝者を戻す方)から。同じなら id 順。
+    static func writeOrder(_ wins: [String: Int]) -> [(String, Int)] {
+        wins.sorted { $0.value != $1.value ? $0.value < $1.value : $0.key < $1.key }.map { ($0.key, $0.value) }
+    }
+
+    /// VoiceOver の試合の見出し: 「準決勝 第 1 試合」。
+    static func matchLabel(_ m: BracketDraw.Match, roundTitle: String) -> String {
+        L("\(roundTitle) 第 \(m.index + 1) 試合")
+    }
 
     /// 勝ち数を保存できる field(integer・computed でない)。条件を満たさなければ nil(表示だけ)。
     static func winsField(_ c: Component, in entity: Entity?) -> String? {
