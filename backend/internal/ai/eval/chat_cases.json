@@ -39,8 +39,8 @@
    "steps": [{"say": "もうちょっと大きくすることも可能?", "expect": "answer", "textAny": ["できます", "可能"]}]},
   {"id": "edit_notify_q", "group": "edit", "base": "internal/ai/examples/kakeibo.json", "capabilities": ["answer", "proposal"], "note": "#185 嘘をつかない: 家計簿に通知は無い",
    "steps": [{"say": "今このアプリって通知出る?", "expect": "answer", "textAny": ["ありません", "出ません", "なし", "設定されていません", "いません"]}]},
-  {"id": "edit_route_q", "group": "edit", "base": "internal/ai/examples/kakeibo.json", "capabilities": ["answer", "proposal"], "note": "#185 できないこと → できないと言い代わりを添える",
-   "steps": [{"say": "地図で経路案内もできる?", "expect": "answer", "textAny": ["できません"]}]},
+  {"id": "edit_route_q", "group": "edit", "base": "internal/ai/examples/kakeibo.json", "capabilities": ["answer", "proposal"], "note": "#185 質問 → answer。#411 経路案内は routeGuide でできる(できないのは車線・渋滞・乗り換えだけ)",
+   "steps": [{"say": "地図で経路案内もできる?", "expect": "answer", "textAny": ["できます", "可能"], "textNot": ["できません", "routeGuide"]}]},
   {"id": "edit_mieyasuku", "group": "edit", "base": "internal/ai/examples/kakeibo.json", "mode": "edit", "note": "#185 曖昧な要望 → proposal。案 1 を generate に流す",
    "steps": [{"say": "もっと見やすくして", "expect": "proposal", "generate": true}]},
   {"id": "edit_family", "group": "edit", "base": "internal/ai/examples/kakeibo.json", "mode": "edit", "note": "#185 曖昧な要望 → proposal(共有の案)。案 1 を generate に流す",
@@ -106,6 +106,6 @@
    "steps": [{"say": "今日の歩数も出せる?", "expect": "answer", "textAny": ["できます", "可能"], "textNot": ["できません", "出せません"], "genSay": "ホームに今日の歩数を表示して。", "genHas": ["healthStat"]}]},
   {"id": "cap_multiselect", "group": "cap", "base": "internal/ai/examples/kakeibo.json", "capabilities": ["answer", "proposal"], "note": "#230 1 つの項目で複数の選択肢を選ぶ入力は DSL に無い(picker は 1 つ)→ できない + 代わり。generate は記録だけ",
    "steps": [{"say": "カテゴリを複数選べるようにできる?", "expect": "answer", "textAny": ["できません"], "genSay": "カテゴリを複数選べるようにして。"}]},
-  {"id": "cap_route", "group": "cap", "base": "internal/ai/examples/kakeibo.json", "capabilities": ["answer", "proposal"], "note": "#230 経路案内はできない。generate は記録だけ",
-   "steps": [{"say": "登録したお店までの経路案内はできる?", "expect": "answer", "textAny": ["できません"], "genSay": "登録したお店までの経路案内をできるようにして。"}]}
+  {"id": "cap_route", "group": "cap", "base": "internal/ai/examples/kakeibo.json", "capabilities": ["answer", "proposal"], "note": "#230 #411 登録したお店までの経路案内は routeGuide でできる。答えと generate を突き合わせる",
+   "steps": [{"say": "登録したお店までの経路案内はできる?", "expect": "answer", "textAny": ["できます", "可能"], "textNot": ["できません", "出せません"], "genSay": "登録したお店までの経路案内をできるようにして。", "genHas": ["routeGuide"]}]}
 ]
