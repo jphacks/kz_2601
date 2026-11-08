@@ -20,6 +20,8 @@ import (
 type AppMembers interface {
 	AppOwner(ctx context.Context, appID string) (string, error)
 	GetMember(ctx context.Context, appID, uid string) (*store.Member, error)
+	// GetPublicApp is the shared app's published DSL (apps_public/{appId}).
+	GetPublicApp(ctx context.Context, appID string) (*store.PublicApp, error)
 }
 
 // reasonCreatorNeedsPro is details.reason when the caller is a participant
@@ -58,9 +60,21 @@ func (s *Service) sharedCreator(ctx context.Context, appID, uid string) string {
 	return owner
 }
 
+// fromSharedApp reports whether req is what a component of the shared app's
+// published DSL sends (text_payer_scope.go).
+func (s *Service) fromSharedApp(ctx context.Context, req TextRequest) bool {
+	app := s.publishedApp(ctx, req.AppID)
+	if app == nil || !requestInApp(app, req) {
+		s.logger().InfoContext(ctx, "ai: text request does not match the shared app", slog.Bool("published", app != nil))
+		return false
+	}
+	return true
+}
+
 // gateText applies the onlineAI gate (#316) and returns ctx marked with the
 // payer. The caller's own Pro comes first; a participant of a shared app is
-// covered by the creator's.
+// covered by the creator's when the request matches one of the app's
+// aiButton / aiChat components, within the app's daily cap.
 func (s *Service) gateText(ctx context.Context, req TextRequest) (context.Context, error) {
 	if !validTextAppID(req.AppID) {
 		return ctx, badText("invalid appId")
@@ -69,8 +83,11 @@ func (s *Service) gateText(ctx context.Context, req TextRequest) (context.Contex
 	if s.Pro == nil || !s.ProMode.Checks() || s.Pro.IsPro(ctx, uid) {
 		return ctx, nil
 	}
-	if owner := s.sharedCreator(ctx, req.AppID, uid); owner != "" {
+	if owner := s.sharedCreator(ctx, req.AppID, uid); owner != "" && s.fromSharedApp(ctx, req) {
 		if s.Pro.IsPro(ctx, owner) || !s.ProMode.Stop(ctx, s.logger(), "ai.text", owner, []string{paid.OnlineAI}) {
+			if err := s.CreatorPaid.take(ctx, s.logger(), req.AppID); err != nil {
+				return ctx, err
+			}
 			return withPayer(ctx, owner), nil
 		}
 		e := onlineAIRequired(req.Locale)

@@ -111,7 +111,7 @@ func (l *Limiter) Middleware(verifier auth.IdentityVerifier) func(http.Handler) 
 			// verified here: auth.Optional in the handler keeps this uid instead of verifying again
 			ctx := auth.ContextWithUID(r.Context(), id.UID)
 			out := &outcome{}
-			out.waive = func(ctx context.Context) bool { return l.waive(ctx, w, dec, weight) }
+			out.waive = func(ctx context.Context) bool { return l.waive(ctx, w, id.UID, dec, weight) }
 			sw := &statusWriter{ResponseWriter: w}
 			next.ServeHTTP(sw, r.WithContext(context.WithValue(ctx, outcomeKey{}, out)))
 			l.settle(r, dec, weight, out, sw.status)
@@ -145,13 +145,17 @@ func (l *Limiter) settle(r *http.Request, dec Decision, charged int, out *outcom
 }
 
 // waive refunds all of dec at once (Waive) and rewrites the headers that
-// are not sent yet to the count without this request.
-func (l *Limiter) waive(ctx context.Context, w http.ResponseWriter, dec Decision, charged int) bool {
+// are not sent yet to the count without this request. Past the uid's hourly
+// cap of waived requests (waive_cap.go) the request keeps its charge.
+func (l *Limiter) waive(ctx context.Context, w http.ResponseWriter, uid string, dec Decision, charged int) bool {
 	if charged <= 0 || dec.charge.store == nil {
 		return false
 	}
 	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), refundTimeout)
 	defer cancel()
+	if !l.takeWaive(rctx, dec.charge.store, uid) {
+		return false
+	}
 	if err := l.Refund(rctx, dec, charged); err != nil {
 		l.log.WarnContext(rctx, "ratelimit: waive failed", slog.Any("error", err), slog.Int("units", charged))
 		return false

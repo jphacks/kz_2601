@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 )
@@ -36,6 +37,33 @@ func TestWaiveRefundsBeforeTheResponse(t *testing.T) {
 		if got := w.Header().Get("X-RateLimit-Limit"); got != "60" {
 			t.Fatalf("%d: limit %q", status, got)
 		}
+	}
+}
+
+// Waives are capped per uid and hour: past WaivedHourly the request keeps its
+// charge; the next hour waives again, and another uid has its own count.
+func TestWaiveHourlyCap(t *testing.T) {
+	c := &clock{t: time.Date(2026, 10, 25, 22, 10, 0, 0, JST)}
+	m := NewMemory()
+	l := New(Config{Limits: Limits{SignedIn: 60, Global: 2000, WaivedHourly: 2}, Weights: DefaultWeights, Env: "test", Now: c.now}, m, nil)
+	h := func(got *bool) http.Handler { return l.Middleware(auth.DevVerifier{})(waiving(http.StatusPaymentRequired, got)) }
+	for i, want := range []bool{true, true, false} {
+		var waived bool
+		serve(t, h(&waived), "POST", "/v1/text", "u1", `{"task":"summarize"}`)
+		if waived != want {
+			t.Fatalf("#%d waived %v, want %v", i, waived, want)
+		}
+	}
+	if u, _, _ := counts(t, m, "u1", ""); u != DefaultWeights.TextTask {
+		t.Fatalf("user = %d, want %d (only the capped request is charged)", u, DefaultWeights.TextTask)
+	}
+	var waived bool
+	if serve(t, h(&waived), "POST", "/v1/text", "u2", `{"task":"summarize"}`); !waived {
+		t.Fatal("u2 has its own count")
+	}
+	c.t = c.t.Add(time.Hour)
+	if serve(t, h(&waived), "POST", "/v1/text", "u1", `{"task":"summarize"}`); !waived {
+		t.Fatal("next hour should waive again")
 	}
 }
 

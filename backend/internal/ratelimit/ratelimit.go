@@ -44,6 +44,9 @@ type Limits struct {
 	PerIP int
 	// Global is the cost breaker across every caller of this environment.
 	Global int
+	// WaivedHourly caps, per uid and hour, the requests a handler gives back
+	// with Waive (waive_cap.go). Past it the request keeps its charge.
+	WaivedHourly int
 }
 
 // Weights are the units one request costs.
@@ -66,7 +69,7 @@ type Weights struct {
 
 // DefaultLimits / DefaultWeights: see docs/backend/rate-limit.md for the reasoning.
 var (
-	DefaultLimits  = Limits{Anonymous: 30, SignedIn: 60, Pro: 300, PerIP: 300, Global: 2000}
+	DefaultLimits  = Limits{Anonymous: 30, SignedIn: 60, Pro: 300, PerIP: 300, Global: 2000, WaivedHourly: 30}
 	DefaultWeights = Weights{Create: 3, Edit: 2, Chat: 1, Text: 1, TextTask: 2, TextLong: 3, TextImage: 3}
 )
 

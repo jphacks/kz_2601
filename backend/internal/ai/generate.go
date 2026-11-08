@@ -185,6 +185,9 @@ type Service struct {
 	// with appId is covered by the creator's Pro (text_payer.go). nil = the
 	// caller's own Pro only.
 	Members AppMembers
+	// CreatorPaid caps the creator-paid /v1/text calls per app and day
+	// (text_payer_scope.go). nil = not counted.
+	CreatorPaid *CreatorPaidCap
 
 	// Logger gets the ai.generate line per /v1/generate (#322); nil = slog.Default().
 	Logger *slog.Logger

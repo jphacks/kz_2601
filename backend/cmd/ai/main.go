@@ -109,6 +109,15 @@ func main() {
 		// a participant's /v1/text is covered by the shared app's creator (read-only lookups)
 		svc.Members = fsstore.NewFirestoreFromClient(fsClient)
 	}
+	// creator-paid /v1/text calls per app and day (docs/backend/rate-limit.md)
+	creatorDaily, err := ai.CreatorPaidDailyFromEnv(os.Getenv)
+	if err != nil {
+		log.Fatalf("ai: %v", err)
+	}
+	svc.CreatorPaid = &ai.CreatorPaidCap{Daily: creatorDaily, Env: os.Getenv("APP_ENV")}
+	if fsClient != nil && os.Getenv("RATE_LIMIT_STORE") != "memory" {
+		svc.CreatorPaid.Store = ratelimit.NewFirestore(fsClient, os.Getenv("RATE_LIMIT_COLLECTION"))
+	}
 	// AI_PAUSED=1 stops only the Claude-calling routes with 503 ai_paused,
 	// before the rate limiter (#511). docs/infra/ai-pause.md
 	paused := ai.PausedFromEnv(os.Getenv)
