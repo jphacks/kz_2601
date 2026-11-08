@@ -800,6 +800,7 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 		return raw, nil, false
 	}
 	removed := map[string]int{}
+	feedsBefore := screenFeedIDs(root)
 	var health, camera, private, retention, when, matching int
 	var fixComps func([]any) []any
 	fixComps = func(cs []any) []any {
@@ -946,7 +947,7 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 			featureNotes = append(featureNotes, fmt.Sprintf("dropped %s on %d place(s)", f.key, n))
 		}
 	}
-	if n := pruneInputFeeds(root); n > 0 { // a removed feed leaves no dangling inputFeeds id
+	if n := pruneInputFeeds(root, removedFeedIDs(feedsBefore, root)); n > 0 { // a removed feed leaves no dangling inputFeeds id
 		featureNotes = append(featureNotes, fmt.Sprintf("dropped inputFeeds of removed feeds on %d button(s)", n))
 	}
 	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 && when == 0 && matching == 0 && single == 0 && roles == 0 && addressed == 0 && near == 0 && len(featureNotes) == 0 {

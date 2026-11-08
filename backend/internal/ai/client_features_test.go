@@ -174,13 +174,33 @@ func TestPruneInputFeedsOfRemovedFeed(t *testing.T) {
 	}
 	root := map[string]any{"screens": []any{map[string]any{"id": "s", "components": []any{
 		map[string]any{"type": "feed", "id": "a"},
-		map[string]any{"type": "aiButton", "inputFeeds": []any{"a", "gone"}},
+		map[string]any{"type": "aiButton", "inputFeeds": []any{"a", "gone", "typo"}},
 	}}}}
-	if n := pruneInputFeeds(root); n != 1 {
+	if n := pruneInputFeeds(root, map[string]map[string]bool{"s": {"gone": true}}); n != 1 {
 		t.Fatalf("pruned %d", n)
 	}
 	b, _ := json.Marshal(root)
-	if !strings.Contains(string(b), `"inputFeeds":["a"]`) {
+	if !strings.Contains(string(b), `"inputFeeds":["a","typo"]`) {
 		t.Fatalf("kept ids: %s", b)
+	}
+}
+
+// An inputFeeds id that names no feed for another reason (a typo) is not
+// pruned by an active restriction: validation still reports it for repair.
+func TestPruneInputFeedsKeepsTypo(t *testing.T) {
+	doc := strings.Replace(featuresDoc, `"inputFeeds":["wx"]`, `"inputFeeds":["wx","wz"]`, 1)
+	var allowed []string
+	for typ := range knownComponentTypes {
+		if typ != string(dsl.CompPhotoField) {
+			allowed = append(allowed, typ)
+		}
+	}
+	r := NewClientRestriction(allowed, nil, currentFeatures)
+	out, notes, changed := enforceRestriction([]byte(doc), r)
+	if !changed || !strings.Contains(string(out), `"inputFeeds":["wx","wz"]`) || strings.Contains(strings.Join(notes, ","), "inputFeeds") {
+		t.Fatalf("notes=%v out=%s", notes, out)
+	}
+	if _, err := dsl.Parse(out); err == nil || !strings.Contains(err.Error(), "wz") {
+		t.Fatalf("typo not reported: %v", err)
 	}
 }

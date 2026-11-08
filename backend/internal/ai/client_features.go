@@ -430,42 +430,79 @@ func dropToolbar(root map[string]any, drop func(map[string]any) bool) int {
 	return n
 }
 
-// pruneInputFeeds drops the inputFeeds ids whose feed is no longer on the
-// screen (a feed removed by the restriction), and inputFeeds left empty, so
-// the enforced document stays valid. It returns the buttons changed.
-func pruneInputFeeds(root map[string]any) int {
-	n := 0
-	forScreens(root, func(_ string, sc map[string]any) {
-		feeds := map[string]bool{}
-		cs, _ := sc["components"].([]any)
-		each := func(fn func(map[string]any)) {
-			for _, v := range cs {
-				c, _ := v.(map[string]any)
-				if c == nil {
-					continue
-				}
-				fn(c)
-				ch, _ := c["children"].([]any)
-				for _, w := range ch {
-					if x, _ := w.(map[string]any); x != nil {
-						fn(x)
-					}
-				}
-			}
+// screenFeedIDs returns the feed ids on each screen (keyed by screen id),
+// children included.
+func screenFeedIDs(root map[string]any) map[string]map[string]bool {
+	out := map[string]map[string]bool{}
+	forScreens(root, func(sid string, sc map[string]any) {
+		feeds := out[sid]
+		if feeds == nil {
+			feeds = map[string]bool{}
+			out[sid] = feeds
 		}
-		each(func(c map[string]any) {
+		eachScreenComponent(sc, func(c map[string]any) {
 			if id, _ := c["id"].(string); id != "" && isType(c, dsl.CompFeed) {
 				feeds[id] = true
 			}
 		})
-		each(func(c map[string]any) {
+	})
+	return out
+}
+
+// removedFeedIDs returns, per screen, the feed ids in before that are gone
+// from root (feeds the restriction removed).
+func removedFeedIDs(before map[string]map[string]bool, root map[string]any) map[string]map[string]bool {
+	after := screenFeedIDs(root)
+	out := map[string]map[string]bool{}
+	for sid, ids := range before {
+		for id := range ids {
+			if !after[sid][id] {
+				if out[sid] == nil {
+					out[sid] = map[string]bool{}
+				}
+				out[sid][id] = true
+			}
+		}
+	}
+	return out
+}
+
+func eachScreenComponent(sc map[string]any, fn func(map[string]any)) {
+	cs, _ := sc["components"].([]any)
+	for _, v := range cs {
+		c, _ := v.(map[string]any)
+		if c == nil {
+			continue
+		}
+		fn(c)
+		ch, _ := c["children"].([]any)
+		for _, w := range ch {
+			if x, _ := w.(map[string]any); x != nil {
+				fn(x)
+			}
+		}
+	}
+}
+
+// pruneInputFeeds drops the inputFeeds ids that name a feed the restriction
+// removed (removed, per screen id), and inputFeeds left empty, so the
+// enforced document stays valid. Other unknown ids are kept for validation
+// to report. It returns the buttons changed.
+func pruneInputFeeds(root map[string]any, removed map[string]map[string]bool) int {
+	n := 0
+	forScreens(root, func(sid string, sc map[string]any) {
+		gone := removed[sid]
+		if len(gone) == 0 {
+			return
+		}
+		eachScreenComponent(sc, func(c map[string]any) {
 			ids, ok := c["inputFeeds"].([]any)
 			if !ok || !isType(c, dsl.CompAiButton) {
 				return
 			}
 			kept := []any{}
 			for _, id := range ids {
-				if s, _ := id.(string); feeds[s] {
+				if s, _ := id.(string); !gone[s] {
 					kept = append(kept, id)
 				}
 			}
