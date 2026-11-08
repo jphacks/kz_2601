@@ -50,7 +50,7 @@
       "name": "勉強の予定",
       "titleField": "task",
       "fields": [
-        { "id": "date", "name": "日付", "type": "date", "required": true, "defaultValue": "today" },
+        { "id": "date", "name": "日付", "type": "date", "required": true, "defaultValue": "now" },
         { "id": "task", "name": "内容", "type": "string", "required": true },
         { "id": "minutes", "name": "時間", "type": "integer", "unit": "分", "defaultValue": 30 },
         { "id": "done", "name": "完了", "type": "boolean", "defaultValue": false }
@@ -65,18 +65,22 @@
         { "label": "週を足す", "icon": "plus", "action": { "type": "navigate", "screen": "week_form", "presentation": "sheet" } }
       ],
       "components": [
-        { "type": "stat", "id": "rate_now", "area": "A1:F2", "label": "今週の達成率(%)",
-          "value": { "op": "round", "args": [{ "op": "mul", "args": [{ "op": "div", "args": [
+        { "type": "stat", "id": "rate_now", "area": "A1:F2", "label": "今週の達成率", "format": "percent",
+          "value": { "op": "div", "args": [
             { "agg": "count", "entity": "logs", "filter": [{ "field": "date", "op": "thisWeek", "value": null }, { "field": "done", "op": "eq", "value": true }] },
             { "agg": "count", "entity": "logs", "filter": { "field": "date", "op": "thisWeek", "value": null } }
-          ] }, 100] }] } },
-        { "type": "table", "id": "weeks", "area": "A3:F12", "entity": "weeks",
+          ] } },
+        { "type": "table", "id": "weeks", "area": "A3:F7", "entity": "weeks",
           "columns": [
             { "field": "start", "title": "週の初め" },
             { "field": "last_rate", "title": "先週の達成率" },
             { "field": "target", "title": "今週の目標" }
           ],
-          "sort": { "field": "start", "direction": "desc" } }
+          "sort": { "field": "start", "direction": "desc" } },
+        { "type": "list", "id": "week_list", "area": "A8:F12", "entity": "weeks",
+          "item": { "title": "start", "subtitle": "base", "trailing": "target" },
+          "sort": { "field": "start", "direction": "desc" }, "emptyText": "週がありません", "swipeToDelete": true,
+          "onItemTap": { "type": "navigate", "screen": "week_form", "presentation": "push" } }
       ]
     },
     {
