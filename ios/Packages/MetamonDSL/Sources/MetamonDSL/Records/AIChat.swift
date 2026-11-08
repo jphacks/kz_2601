@@ -1,7 +1,8 @@
 import Foundation
 
 /// `aiChat` の会話の並び・役・送る依頼・保存するデータ。描画は Renderer の `AiChatLeaf`。
-/// 1 発言 = `entity` の 1 レコード。役は `roleField`(user / assistant)、無ければ古い順に自分 → AI の交互。
+/// 1 発言 = `entity` の 1 レコード。役は `roleField`(user / assistant・backend は必須)。
+/// roleField の無い古い DSL(stg で作られたもの)だけ古い順に自分 → AI の交互で読む(その時は対で保存して交互を崩さない)。
 public enum AIChat {
     public enum Role: String, Sendable { case user, assistant }
 

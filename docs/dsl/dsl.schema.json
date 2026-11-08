@@ -4088,6 +4088,7 @@
         "type",
         "entity",
         "textField",
+        "roleField",
         "persona"
       ],
       "properties": {
@@ -4110,7 +4111,7 @@
         },
         "roleField": {
           "type": "string",
-          "description": "`entity` の string field か、options に user と assistant を持つ enum field(任意・推奨)。自分の発言は user、AI の返事は assistant が入る。省略すると自分と AI が交互とみなす。"
+          "description": "`entity` の string field か、options に user と assistant を持つ enum field(必須)。自分の発言は user、AI の返事は assistant が入る(並び順から役を決めない)。"
         },
         "persona": {
           "type": "string",

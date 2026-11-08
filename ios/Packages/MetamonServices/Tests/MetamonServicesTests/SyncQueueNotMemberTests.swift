@@ -42,7 +42,7 @@ final class SyncQueueNotMemberTests: XCTestCase {
 
         var it = events.makeAsyncIterator()
         let first = await it.next()
-        XCTAssertEqual(first, .notMember(appId: "a", entity: "expense"))
+        XCTAssertEqual(first, .notMember(appId: "a", entity: "expense", recordId: "local-e1"))
         let count = await queue.count
         XCTAssertEqual(count, 0, "参加していない操作は再送しない")
         let calls = await client.calls

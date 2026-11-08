@@ -5,7 +5,8 @@ import MetamonDSL
 
 /// `aiChat`: クラウドの AI と何往復も話す。吹き出しは古い順に上から下へ(自分は右・AI は左)、下に固定の入力欄。
 /// 送る = ホストの `generateAIText`(task chat・同意 → Pro の確認もホスト)。発言と返事を `entity` に 1 件ずつ保存する。
-/// roleField があれば自分の発言を先に保存する(返事に失敗しても残る)。無ければ交互の並びを崩さないよう、返事が来てから 2 件続けて保存する。
+/// 自分の発言を先に保存する(返事に失敗しても残る)。roleField の無い古い DSL(stg)は役を交互の並びで読むので、
+/// 返事が来てから 2 件を対で保存する(片方が保存できない・断られたらもう片方も消す = `AIChatPairSaving`)。
 struct AiChatLeaf: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.fabFrame) private var fabFrame
@@ -144,6 +145,7 @@ struct AiChatLeaf: View {
                 guard let mine = AIChat.record(text: text, role: .user, textField: textField, roleField: roleField, base: base),
                       await rt.createRecord(entity: entity.id, data: mine) else {
                     restore(text)
+                    self.error = L("会話を保存できませんでした")
                     return
                 }
             } else {
@@ -151,19 +153,30 @@ struct AiChatLeaf: View {
             }
             do {
                 let reply = try await host.generateAIText(request)
-                if roleField == nil, let mine = AIChat.record(text: text, role: .user, textField: textField, roleField: nil, base: base) {
-                    guard await rt.createRecord(entity: entity.id, data: mine) else { pending = nil; restore(text); return }
-                    try? await Task.sleep(for: .milliseconds(5)) // 作成時刻で並べるので、自分 → AI の順を同じ時刻にしない
-                }
                 pending = nil
-                if let ai = AIChat.record(text: reply.text, role: .assistant, textField: textField, roleField: roleField, base: base) {
-                    _ = await rt.createRecord(entity: entity.id, data: ai)
+                let saved = await Self.saveReply(reply.text, after: text, rt: rt, entity: entity.id, textField: textField,
+                                                 roleField: roleField, base: base)
+                if !saved {
+                    if roleField == nil { restore(text) } // 対で残さなかった = 自分の発言も消えている
+                    self.error = roleField == nil ? L("会話を保存できませんでした") : L("AI の返事を保存できませんでした")
                 }
             } catch {
                 if roleField == nil { pending = nil; restore(text) }
                 self.error = Self.message(error)
             }
         }
+    }
+
+    /// 返事が届いた後の保存。保存できたら true。
+    /// roleField がある: 自分の発言は保存済みなので返事だけ。無い: 自分 → AI を対で保存し、片方だけは残さない(役は並び順で読むため)。
+    static func saveReply(_ reply: String, after text: String, rt: any DSLRuntime, entity: String, textField: String,
+                          roleField: String?, base: [String: JSONValue]) async -> Bool {
+        guard let ai = AIChat.record(text: reply, role: .assistant, textField: textField, roleField: roleField, base: base) else {
+            return false // 空の返事
+        }
+        guard roleField == nil else { return await rt.createRecord(entity: entity, data: ai) }
+        guard let mine = AIChat.record(text: text, role: .user, textField: textField, roleField: nil, base: base) else { return false }
+        return await rt.saveTurnPair(entity: entity, user: mine, assistant: ai)
     }
 
     /// 送れなかった文を入力欄に戻す(打ち直さなくてよい)。

@@ -9,7 +9,7 @@ import "strings"
 var aiChatRules = strings.TrimSpace(`
 ## アプリの中の AI と何往復も話す(aiChat)
 - 「AI に相談したい」「悩みを聞いてほしい」「AI カウンセラー」「AI の家庭教師に質問」「英会話・面接・プレゼンの練習相手」「AI と雑談・壁打ち」は aiChat(画面下の入力欄から送ると AI が直近の会話を踏まえて返事をし、両方を記録に残す)。
-  - 形: entity turn{text: text(required), role: enum[user, assistant]}(scope は付けない = いつも private。共有のアプリの中でも会話の entity は private にする: 会話は本人だけのもので、shared / public はエラー。日時の field は作らない)+ 会話のタブかホームに aiChat{entity: turn, textField: text, roleField: role, persona: 「…」}(A1:F12・同じ画面に他の部品を置かない)。turn のフォーム画面・追加ボタン・list は作らない。
+  - 形: entity turn{text: text(required), role: enum[user, assistant]}(scope は付けない = いつも private。共有のアプリの中でも会話の entity は private にする: 会話は本人だけのもので、shared / public はエラー。日時の field は作らない)+ 会話のタブかホームに aiChat{entity: turn, textField: text, roleField: role, persona: 「…」}(A1:F12・同じ画面に他の部品を置かない)。roleField は必須(省略はエラー): 会話の entity にはいつも role: enum[user, assistant] を入れて roleField に指定する。turn のフォーム画面・追加ボタン・list は作らない。
   - persona に役・口調・やり方を 500 字以内で書く。例: カウンセラー「やさしく話を聞く相談相手。まず気持ちを受け止め、1 回に 1 つだけ質問する。診断や薬の話はせず、つらい時は身近な人や専門の窓口に相談するようすすめる」、家庭教師「中学生の数学の先生。答えをすぐ言わず、ヒントを 1 つずつ出す」、英会話「簡単な英語で返し、文法の間違いを最後に 1 つだけやさしく直す」。
   - 説明・添削など長めの返事が要る時だけ length: long。
 - aiButton との使い分け: 1 回押して 1 回書かせる(要約・分類・清書・一言コメント・フォームの項目を埋める)は aiButton。続けて話す・前の答えを踏まえて聞き返す・練習の相手は aiChat。
