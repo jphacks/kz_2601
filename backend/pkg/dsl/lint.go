@@ -32,6 +32,8 @@ func (a *App) Lint() []string {
 	l.goalTarget()
 	l.dupAddControls()
 	l.privateChat()
+	l.optionalTitle()
+	l.settingMaxMin()
 	return l.out
 }
 

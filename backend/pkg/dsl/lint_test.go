@@ -121,7 +121,7 @@ func TestLintEntityReach(t *testing.T) {
 // a form but no list; once a ref or a list-like component uses it, it does.
 func TestLintSettingEntityNeedsNoList(t *testing.T) {
 	raw := strings.Replace(strings.Replace(lintBase, "%s", "", 1), "%s",
-		`{"type":"stat","label":"今月の残り","value":{"op":"sub","args":[{"agg":"max","entity":"budget","field":"amount"},{"agg":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}}]}},
+		`{"type":"stat","label":"今月の残り","value":{"op":"sub","args":[{"agg":"latest","entity":"budget","field":"amount"},{"agg":"sum","entity":"log","field":"amount","filter":{"field":"date","op":"thisMonth","value":null}}]}},
 		 {"type":"button","label":"予算","action":{"type":"navigate","screen":"budget_form","presentation":"sheet"}},`, 1)
 	var doc map[string]any
 	_ = json.Unmarshal([]byte(raw), &doc)
