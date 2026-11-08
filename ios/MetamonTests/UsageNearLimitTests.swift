@@ -37,7 +37,7 @@ final class UsageNearLimitTests: XCTestCase {
         XCTAssertEqual(me.apps, UsageMeter(used: 3, limit: 100, remaining: 97))
         XCTAssertEqual(me.perApp?.recordsPerApp, 5000)
         XCTAssertEqual(me.resetAt, ISO8601DateFormatter().date(from: "2026-11-07T15:00:00Z"))
-        let today = try XCTUnwrap(me.remainingToday(now: .now))
+        let today = try XCTUnwrap(me.remainingToday(observedAt: .now))
         XCTAssertEqual(today.remaining, 48, "AI は「今日の残り N」としてだけ使う(X3)")
         XCTAssertEqual(today.limit, 60)
     }
@@ -50,7 +50,7 @@ final class UsageNearLimitTests: XCTestCase {
         let me = try MyUsage.decode(Data(json.utf8))
         XCTAssertTrue(me.isPro)
         XCTAssertNil(me.ai)
-        XCTAssertNil(me.remainingToday(now: .now))
+        XCTAssertNil(me.remainingToday(observedAt: .now))
         XCTAssertNil(me.apps?.limit)
         XCTAssertNil(UsageNoticeRules.appsNotice(me), "数えない上限には出さない")
     }
@@ -114,17 +114,31 @@ final class UsageNearLimitTests: XCTestCase {
         let records = UsageNotice(resource: .recordsPerApp, appId: "a", meter: UsageMeter(used: 9, limit: 10), upgrade: true)
         let otherApp = UsageNotice(resource: .recordsPerApp, appId: "b", meter: UsageMeter(used: 9, limit: 10), upgrade: true)
 
-        XCTAssertTrue(log.shouldShow(apps, now: now))
-        log.markShown(apps, now: now)
-        XCTAssertFalse(log.shouldShow(apps, now: now.addingTimeInterval(3600)), "同じ日はもう出さない")
-        XCTAssertTrue(log.shouldShow(records, now: now), "別のリソースは別に数える")
-        log.markShown(records, now: now)
-        XCTAssertTrue(log.shouldShow(otherApp, now: now), "別のアプリの記録も別")
+        XCTAssertTrue(log.shouldShow(apps, uid: "u1", now: now))
+        log.markShown(apps, uid: "u1", now: now)
+        XCTAssertFalse(log.shouldShow(apps, uid: "u1", now: now.addingTimeInterval(3600)), "同じ日はもう出さない")
+        XCTAssertTrue(log.shouldShow(records, uid: "u1", now: now), "別のリソースは別に数える")
+        log.markShown(records, uid: "u1", now: now)
+        XCTAssertTrue(log.shouldShow(otherApp, uid: "u1", now: now), "別のアプリの記録も別")
 
         let nextDayJST = ISO8601DateFormatter().date(from: "2026-11-08T15:00:00Z")! // 0:00 JST
-        XCTAssertTrue(log.shouldShow(apps, now: nextDayJST), "JST で日付が変われば また出す")
-        log.markShown(apps, now: nextDayJST)
-        XCTAssertTrue(log.shouldShow(records, now: nextDayJST))
+        XCTAssertTrue(log.shouldShow(apps, uid: "u1", now: nextDayJST), "JST で日付が変われば また出す")
+        log.markShown(apps, uid: "u1", now: nextDayJST)
+        XCTAssertTrue(log.shouldShow(records, uid: "u1", now: nextDayJST))
+    }
+
+    /// 1 日 1 回はアカウントごと: 同じ端末で別のアカウントに切り替えたら、そのアカウントにはまだ出す。
+    func testOncePerDayIsPerAccount() {
+        let log = UsageNoticeLog(defaults: defaults)
+        let now = ISO8601DateFormatter().date(from: "2026-11-08T03:00:00Z")!
+        let apps = UsageNotice(resource: .apps, meter: UsageMeter(used: 9, limit: 10), upgrade: true)
+        log.markShown(apps, uid: "u1", now: now)
+        XCTAssertFalse(log.shouldShow(apps, uid: "u1", now: now))
+        XCTAssertTrue(log.shouldShow(apps, uid: "u2", now: now), "別のアカウントは別に数える")
+        XCTAssertTrue(log.shouldShow(apps, uid: nil, now: now))
+        log.markShown(apps, uid: "u2", now: now)
+        XCTAssertFalse(log.shouldShow(apps, uid: "u2", now: now))
+        XCTAssertFalse(log.shouldShow(apps, uid: "u1", now: now), "u2 の記録で u1 の分を消さない")
     }
 
     // MARK: - Copy
@@ -187,6 +201,42 @@ final class UsageNearLimitTests: XCTestCase {
         XCTAssertEqual(source.meCalls.value, 3, "失敗の後は 5 分待たずに読み直す")
     }
 
+    /// キャッシュの `me` を「今日の残り」に入れる時は読んだ時刻で記録する(後から HTTP の応答で入った新しい値を上書きしない)。
+    func testCachedMeKeepsFetchTimeAsObservation() async throws {
+        let source = FakeSource(ai: true)
+        let store = PlanUsageStore()
+        let t0 = Date(timeIntervalSince1970: 1_000_000)
+        await store.refreshMe(source: source, now: t0)
+        XCTAssertEqual(store.meObservedAt, t0)
+        let cached = await store.refreshMe(source: source, now: t0.addingTimeInterval(120))
+        XCTAssertEqual(source.meCalls.value, 1)
+        XCTAssertEqual(store.meObservedAt, t0, "キャッシュを返しても読んだ時刻は変えない")
+
+        let remaining = RemainingTodayStore(defaults: defaults)
+        let header = RemainingToday(remaining: 40, limit: 60, observedAt: t0.addingTimeInterval(60)) // 後で使った分
+        remaining.record(header)
+        let fromCache = try XCTUnwrap(cached?.remainingToday(observedAt: try XCTUnwrap(store.meObservedAt)))
+        remaining.record(fromCache)
+        XCTAssertEqual(remaining.last?.remaining, 40, "古いキャッシュ(48)で新しい残り(40)を上書きしない")
+    }
+
+    /// 読む間にサインアウト(clear)したら、届いた前のアカウントの量を書き戻さない。
+    func testClearDuringFetchDropsResult() async {
+        let store = PlanUsageStore()
+        let source = FakeSource(onFetch: { await MainActor.run { store.clear() } })
+        let me = await store.refreshMe(source: source)
+        XCTAssertNil(me)
+        XCTAssertNil(store.me, "サインアウト後に前のアカウントの量を書き戻さない")
+        XCTAssertNil(store.meObservedAt)
+        let app = await store.refreshApp(appId: "a", source: source)
+        XCTAssertNil(app)
+        XCTAssertNil(store.app("a"))
+        // サインアウトの後に始めた読み取りは入る
+        let fresh = await store.refreshMe(source: FakeSource())
+        XCTAssertNotNil(fresh)
+        XCTAssertNotNil(store.me)
+    }
+
     func testClearForgetsAccount() async {
         let store = PlanUsageStore()
         await store.refreshMe(source: FakeSource())
@@ -204,18 +254,24 @@ private final class Box<T>: @unchecked Sendable {
 
 private struct FakeSource: PlanUsageSource {
     var missing = false
+    var ai = false
+    /// 応答を返す直前に呼ぶ(読む間のサインアウト)
+    var onFetch: (@Sendable () async -> Void)?
     let meCalls = Box(0)
     let appCalls = Box(0)
     let fail = Box(false)
 
     func myUsage() async throws -> MyUsage? {
         meCalls.value += 1
+        await onFetch?()
         if fail.value { throw APIError.server(status: 500, code: "internal", message: "") }
-        return missing ? nil : MyUsage(plan: "free", apps: UsageMeter(used: 9, limit: 10))
+        return missing ? nil : MyUsage(plan: "free", ai: ai ? MyUsage.AI(used: 12, limit: 60, remaining: 48) : nil,
+                                       apps: UsageMeter(used: 9, limit: 10))
     }
 
     func appUsage(appId: String) async throws -> AppUsage? {
         appCalls.value += 1
+        await onFetch?()
         return missing ? nil : AppUsage(appId: appId, plan: "free", payer: "self", upgrade: true,
                                         records: UsageMeter(used: 4000, limit: 5000), photos: nil)
     }

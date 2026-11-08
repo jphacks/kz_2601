@@ -246,6 +246,7 @@ func (tm *template) eligible() bool {
 type scopeComp struct {
 	chat    bool
 	persona string
+	saveTo  string // aiChat saveTo as the device sends it (ChatSaveTo.scopeKey), "" = none
 	task    string
 	long    bool
 	photo   bool
@@ -268,7 +269,11 @@ func newAppScope(app *dsl.App) *appScope {
 			}
 			switch c.Type {
 			case dsl.CompAiChat:
-				sc.comps = append(sc.comps, scopeComp{chat: true, persona: strings.TrimSpace(c.Persona), long: true})
+				comp := scopeComp{chat: true, persona: strings.TrimSpace(c.Persona), long: true}
+				if s := chatSaveToOf(app, c); s != nil {
+					comp.saveTo = s.scopeKey()
+				}
+				sc.comps = append(sc.comps, comp)
 			case dsl.CompAiButton:
 				if utf8.RuneCountInString(c.Prompt) > maxScopeTemplateRunes {
 					return
@@ -306,6 +311,10 @@ func (c scopeComp) sends(req TextRequest, cut bool) bool {
 	}
 	if req.isChat() {
 		if !c.chat {
+			return false
+		}
+		// a saveTo must be the component's own (an older device sends none)
+		if req.SaveTo != nil && req.SaveTo.scopeKey() != c.saveTo {
 			return false
 		}
 		s := strings.TrimLeftFunc(req.Instruction, unicode.IsSpace)

@@ -1,6 +1,8 @@
 package expreval
 
 import (
+	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -222,6 +224,16 @@ func timeOfDay(s string) (float64, bool) {
 		return 0, false
 	}
 	return float64(h*3600 + m*60 + sec), true
+}
+
+// clockString is ExprEvaluator.clockString: seconds after 0:00 wrapped into
+// one day, as "HH:mm" ("HH:mm:ss" when the seconds are not 0).
+func clockString(secs float64) string {
+	t := int(math.Mod(math.Mod(secs, 86400)+86400, 86400))
+	if t%60 != 0 {
+		return fmt.Sprintf("%02d:%02d:%02d", t/3600, t%3600/60, t%60)
+	}
+	return fmt.Sprintf("%02d:%02d", t/3600, t%3600/60)
 }
 
 func clockSeconds(t time.Time, loc *time.Location) float64 {

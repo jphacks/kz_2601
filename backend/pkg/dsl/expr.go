@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -293,10 +294,26 @@ const (
 	tBool
 	tDate
 	tList // type refs field: a list of record ids (only len reads it, #231)
+	// addMinutes results: tDatetime is a date with a time of day (usable as a
+	// date, shown with its time only by a datetime field); tTime is "HH:mm"
+	// (usable as a string, never as a date).
+	tDatetime
+	tTime
 )
 
 func (t exprType) String() string {
-	return [...]string{"any", "number", "string", "boolean", "date", "list of ids (type refs)"}[t]
+	return [...]string{"any", "number", "string", "boolean", "date", "list of ids (type refs)", "datetime", `"HH:mm" time`}[t]
+}
+
+// widen maps the addMinutes result types to the type they are used as.
+func widen(t exprType) exprType {
+	switch t {
+	case tDatetime:
+		return tDate
+	case tTime:
+		return tStr
+	}
+	return t
 }
 
 func fieldExprType(ft FieldType) exprType {
@@ -315,7 +332,7 @@ func fieldExprType(ft FieldType) exprType {
 }
 
 // ComputedFieldTypes are the Field.type values a computed field may declare.
-var ComputedFieldTypes = []FieldType{FieldNumber, FieldInteger, FieldCurrency, FieldString, FieldBoolean, FieldDate}
+var ComputedFieldTypes = []FieldType{FieldNumber, FieldInteger, FieldCurrency, FieldString, FieldBoolean, FieldDate, FieldDatetime}
 
 // AggregateFuncs is the closed set of agg / aggregate names.
 var AggregateFuncs = []string{"count", "sum", "avg", "min", "max", "latest", "earliest"}
@@ -347,7 +364,7 @@ var Ops = map[string]opSpec{
 	"and": {2, 2, tBool, tBool}, "or": {2, 2, tBool, tBool}, "not": {1, 1, tBool, tBool},
 	"concat": {2, 2, tAny, tStr}, "len": {1, 1, tStr, tNum},
 	"now": {0, 0, tAny, tDate}, "today": {0, 0, tAny, tDate},
-	"daysBetween": {2, 2, tDate, tNum}, "daysUntil": {1, 1, tDate, tNum}, "addDays": {2, 2, tAny, tDate}, "hoursBetween": {2, 2, tAny, tNum},
+	"daysBetween": {2, 2, tDate, tNum}, "daysUntil": {1, 1, tDate, tNum}, "addDays": {2, 2, tAny, tDate}, "addMinutes": {2, 2, tAny, tAny}, "hoursBetween": {2, 2, tAny, tNum},
 	"nextOccurrence": {2, 2, tAny, tDate}, "year": {1, 1, tDate, tNum}, "month": {1, 1, tDate, tNum}, "day": {1, 1, tDate, tNum}, "weekday": {1, 1, tDate, tNum},
 	"toNumber": {1, 1, tAny, tNum}, "toString": {1, 1, tAny, tStr}, "coalesce": {2, 2, tAny, tAny},
 	// daily check history (#172): arg 0 is {"ref": <resets daily toggle field>}
@@ -401,7 +418,8 @@ func (c *exprChecker) dep(e *Entity, fid string) {
 
 // accepts reports whether a value of type got can be used where want is expected.
 func accepts(want, got exprType) bool {
-	if want == tAny || got == tAny || want == got {
+	want = widen(want)
+	if want == tAny || got == tAny || want == widen(got) {
 		return true
 	}
 	return want == tDate && got == tStr // "YYYY-MM-DD" literals
@@ -487,7 +505,7 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 			aw := fmt.Sprintf("%s.%s.args[%d]", where, e.Op, i)
 			types[i] = c.check(aw, &e.Args[i], row, depth+1)
 			want := spec.arg
-			if e.Op == "addDays" || e.Op == "nextOccurrence" {
+			if e.Op == "addDays" || e.Op == "nextOccurrence" || e.Op == "addMinutes" {
 				want = tDate
 				if i == 1 {
 					want = tNum
@@ -501,6 +519,9 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 					c.add("%s: a type refs field is a list of ids; only op len (the number of chosen records) reads it. Filter another entity with op contains instead", aw)
 				}
 				continue
+			}
+			if e.Op == "addMinutes" && i == 0 && types[i] == tTime {
+				continue // a "HH:mm" from an inner addMinutes
 			}
 			if !accepts(want, types[i]) {
 				c.add("%s: %s expects a %s but got a %s%s", aw, e.Op, want, types[i], argHint(e.Op, want, types[i]))
@@ -525,6 +546,10 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 				if t != tAny {
 					return t
 				}
+			}
+		case "addMinutes":
+			if n > 0 {
+				return addMinutesType(e.Args[0], types[0])
 			}
 		}
 		return spec.result
@@ -647,12 +672,32 @@ func (c *exprChecker) checkFilter(where string, f *Filter, e *Entity, row *Entit
 	}
 }
 
+// addMinutesType: a date / datetime (or a "YYYY-MM-DD…" literal) gives a
+// datetime, any other string a "HH:mm" time (what the evaluator returns).
+func addMinutesType(arg Expr, t exprType) exprType {
+	switch widen(t) {
+	case tDate:
+		return tDatetime
+	case tStr:
+		if s, ok := arg.Lit.(string); ok && arg.Kind == ExprLiteral && dateLitRe.MatchString(s) {
+			return tDatetime
+		}
+		return tTime
+	}
+	return tAny
+}
+
+var dateLitRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}`)
+
 // argHint: subtracting times / dates is hoursBetween / daysBetween, never
 // toNumber ("09:30" is not 9.5 and a date is not a number). #229: the generic
 // toNumber hint led retries to {"op":"sub","args":[toNumber(end),toNumber(start)]}.
 func argHint(op string, want, got exprType) string {
-	if want == tNum && (got == tStr || got == tDate) && (op == "sub" || op == "add") {
+	if g := widen(got); want == tNum && (g == tStr || g == tDate) && (op == "sub" || op == "add") {
 		return ` (to get the hours between two "HH:mm" times or datetimes use {"op":"hoursBetween","args":[{"ref":"start"},{"ref":"end"}]}; days between dates use daysBetween; do not toNumber a time)`
+	}
+	if op == "addMinutes" && want == tDate {
+		return ` (pass a "HH:mm" time string or a date / datetime, e.g. departure = {"op":"addMinutes","args":[{"ref":"arrive_at"},{"op":"neg","args":[{"ref":"travel_min"}]}]})`
 	}
 	return convertHint(want)
 }
@@ -723,7 +768,7 @@ func checkComputedFields(entities []Entity, byID map[string]*Entity, daily map[s
 				}
 			}
 			if !okType {
-				add("%s: computed field type must be one of number|integer|currency|string|boolean|date (got %s)", where, f.Type)
+				add("%s: computed field type must be one of number|integer|currency|string|boolean|date|datetime (got %s)", where, f.Type)
 			}
 			if f.Required {
 				add("%s: computed fields are read-only; remove required", where)
@@ -733,7 +778,9 @@ func checkComputedFields(entities []Entity, byID map[string]*Entity, daily map[s
 			}
 			c := &exprChecker{entities: byID, add: add, deps: map[fieldKey]bool{}, daily: daily}
 			got := c.check(where+".computed", f.Computed, e, 1)
-			if okType && !accepts(fieldExprType(f.Type), got) {
+			if okType && got == tDatetime && (f.Type == FieldString || f.Type == FieldDate) {
+				add(`%s: computed expression yields a datetime (addMinutes of a date / datetime) but the field type is %s, which shows only the date; make it type datetime (for a time of day only, add minutes to a "HH:mm" string field instead)`, where, f.Type)
+			} else if okType && !accepts(fieldExprType(f.Type), got) {
 				add("%s: computed expression yields a %s but the field type is %s; change the type or convert%s", where, got, f.Type, convertHint(fieldExprType(f.Type)))
 			}
 			checkPayFromHours(where, f, add)
