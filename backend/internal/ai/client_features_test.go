@@ -14,6 +14,7 @@ import (
 // warnings feed.
 const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","icon":"book","voiceEntry":"fullscreen"},"initialScreen":"home",
 "entities":[
+ {"id":"player","name":"出場者","titleField":"name","fields":[{"id":"name","name":"名前","type":"string"},{"id":"wins","name":"勝ち上がり","type":"integer"}]},
  {"id":"book","name":"本","titleField":"title","fields":[
   {"id":"isbn","name":"ISBN","type":"string"},{"id":"title","name":"書名","type":"string"},
   {"id":"body","name":"本文","type":"text"},{"id":"keywords","name":"語","type":"string"},
@@ -21,6 +22,7 @@ const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","i
  {"id":"card","name":"カード","titleField":"q","fields":[{"id":"q","name":"問題","type":"string","required":true}]}],
 "screens":[
  {"id":"home","title":"ホーム","components":[
+  {"type":"bracket","entity":"player","titleField":"name","winsField":"wins"},
   {"type":"feed","provider":"warnings","region":"130000"},
   {"type":"feed","id":"wx","provider":"weather","region":"170000"},
   {"type":"aiButton","task":"generate","label":"問題を作る","prompt":"英単語の問題","shape":"list","count":5,"saveTo":{"entity":"card","field":"q"}},
@@ -65,6 +67,7 @@ func TestClientFeaturesRestriction(t *testing.T) {
 		FeatureLookupBook:    {"## ISBN から本の情報を入れる(lookupBook)", "Action.bookLookup", 2, `"lookupBook"`},
 		FeatureTextHighlight: {"## 文の大事な語に印をつける(text.highlight)", "Text.highlight", 1, `{{body}}`},
 		FeatureFeedV2:        {"警報・注意報」「大雨警報が出ているか」", `"warnings"`, 1, `"warnings"`},
+		FeatureBracket:       {"## トーナメント表(bracket)", `"#/$defs/Bracket"`, 1, `"bracket"`},
 	}
 	if len(gone) != len(clientFeatures) {
 		t.Fatalf("test covers %d of %d features", len(gone), len(clientFeatures))
