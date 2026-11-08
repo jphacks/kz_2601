@@ -104,3 +104,19 @@ func TestDropOnDeviceDuplicates_KeepsExistingRule(t *testing.T) {
 		t.Fatalf("kept=%v dropped=%v", kept, dropped)
 	}
 }
+
+// A time notification without time fires at 09:00 on iOS
+// (NotificationPlanner.fixedTrigger), so a 09:00 owner rule repeats it.
+// Owner + members in one rule still reaches someone the device cannot.
+func TestRepeatsLocalNotification_DefaultTimeAndMixedRecipients(t *testing.T) {
+	app := &dsl.App{}
+	app.App.Notifications = []dsl.Notification{{ID: "d", Repeat: "daily"}}
+	owner := dsl.RuleAction{Notify: &dsl.RuleNotify{To: dsl.RuleRecipient{Kind: "owner"}, Title: "t", Body: "b"}}
+	members := dsl.RuleAction{Notify: &dsl.RuleNotify{To: dsl.RuleRecipient{Kind: "members"}, Title: "t", Body: "b"}}
+	if !repeatsLocalNotification(app, &dsl.ServerRule{On: dsl.RuleTrigger{Every: "daily", Time: "09:00"}, Do: []dsl.RuleAction{owner}}) {
+		t.Error("09:00 owner rule repeats the untimed daily notification")
+	}
+	if repeatsLocalNotification(app, &dsl.ServerRule{On: dsl.RuleTrigger{Every: "daily", Time: "09:00"}, Do: []dsl.RuleAction{owner, members}}) {
+		t.Error("owner + members must be kept")
+	}
+}

@@ -80,7 +80,11 @@ func repeatsLocalNotification(app *dsl.App, r *dsl.ServerRule) bool {
 		}
 	}
 	for _, n := range app.App.Notifications {
-		if n.Entity != "" || n.When != nil || n.Near != nil || n.Time != on.Time || n.Repeat != on.Every {
+		at := n.Time
+		if at == "" {
+			at = "09:00" // iOS NotificationPlanner.fixedTrigger's default
+		}
+		if n.Entity != "" || n.When != nil || n.Near != nil || at != on.Time || n.Repeat != on.Every {
 			continue
 		}
 		if on.Every == "weekly" && n.Weekday != on.Weekday {
