@@ -25,6 +25,8 @@ func TestEditSystemBlocks_ShareCreatePrefix(t *testing.T) {
 		"oldClient": NewClientRestriction(all, nil, nil),
 		"noShared":  NewRestriction(nil, []string{FeatureSharedData}),
 		"noCamera":  NewRestriction(nil, []string{FeatureCameraCapture, FeatureFieldHealth}),
+		// AI_TEXT_IMAGE off (the default Service): inputPhoto is dropped.
+		"noTextImage": (&Service{}).clientRestriction(nil, nil, nil),
 	}
 	for name, r := range cases {
 		ctx := withRestriction(context.Background(), r)
