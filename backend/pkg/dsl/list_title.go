@@ -1,11 +1,13 @@
 package dsl
 
+import "strings"
+
 // Blank list titles: a list / timeline row whose title is an optional
 // free-text field (kakeibo title = memo) shows an empty bold line for every
 // record saved without it (voice 「500円 食費」). iOS ListRow falls back to
 // displayTitleField only when item.title is unset, not when the value is
-// empty. When the entity has a required string / enum field, that one is the
-// title and the optional text goes to the subtitle.
+// empty. When the entity has a required string / enum (or ref) field, that
+// one is the title and the optional text goes to the subtitle.
 
 func (l *linter) optionalTitle() {
 	for _, s := range l.app.Screens {
@@ -16,7 +18,7 @@ func (l *linter) optionalTitle() {
 				return
 			}
 			f := e.FieldByID(title)
-			if f == nil || (f.Type != FieldString && f.Type != FieldText) || f.Required || f.DefaultValue != nil || f.Computed != nil {
+			if f == nil || (f.Type != FieldString && f.Type != FieldText) || f.Required || hasDefault(f) || f.Computed != nil {
 				return
 			}
 			alt := requiredLabelField(e, title)
@@ -46,13 +48,39 @@ func listTitleField(c *Component) (field, key string) {
 	return "", ""
 }
 
-// requiredLabelField: the first required, user-entered string / enum field
-// other than skip ("" if none).
+// hasDefault: a default that never shows blank ("" / "  " count as none).
+func hasDefault(f *Field) bool {
+	if s, ok := f.DefaultValue.(string); ok {
+		return strings.TrimSpace(s) != ""
+	}
+	return f.DefaultValue != nil
+}
+
+// requiredLabelField: the first required, visible, user-entered string /
+// enum field other than skip, else the first such ref (iOS shows the
+// referenced record's title); "" if none. An enum whose options are all
+// blank shows nothing, and refs is a list of names, not a title.
 func requiredLabelField(e *Entity, skip string) string {
+	ref := ""
 	for _, f := range e.Fields {
-		if f.ID != skip && f.Required && f.Computed == nil && !f.Hidden && (f.Type == FieldString || f.Type == FieldEnum) {
+		if f.ID == skip || !f.Required || f.Computed != nil || f.Hidden {
+			continue
+		}
+		switch {
+		case f.Type == FieldString, f.Type == FieldEnum && hasLabel(f.Options):
 			return f.ID
+		case f.Type == FieldRef && ref == "":
+			ref = f.ID
 		}
 	}
-	return ""
+	return ref
+}
+
+func hasLabel(options []string) bool {
+	for _, o := range options {
+		if strings.TrimSpace(o) != "" {
+			return true
+		}
+	}
+	return false
 }
