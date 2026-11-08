@@ -14,8 +14,8 @@ var titleGoalRules = strings.TrimSpace(`
 ` + titleGoalSingleLine)
 
 const (
-	titleGoalSingleLine = `- 目標・予算のような後から変える値は "single": true の設定にする(single が使えない版では記録を {"agg":"latest","entity":"budget","field":"amount","by":"date"} の latest で読む)。max / min で読まない(下げた目標・予算が反映されない)。`
-	titleGoalLatestLine = `- 目標・予算のような後から変える値は記録を {"agg":"latest","entity":"budget","field":"amount","by":"date"} の latest で読む。max / min で読まない(下げた目標・予算が反映されない)。`
+	titleGoalSingleLine = `- 目標・予算のような後から変える値は "single": true の設定にする(single が使えない版では記録を {"agg":"latest","entity":"budget","field":"amount"} の latest で読む(by は省けば作った順。by に書けるのはその entity の date / datetime field だけで、$createdAt や無い field は書けない))。max / min で読まない(下げた目標・予算が反映されない)。`
+	titleGoalLatestLine = `- 目標・予算のような後から変える値は記録を {"agg":"latest","entity":"budget","field":"amount"} の latest で読む(by は省けば作った順。by に書けるのはその entity の date / datetime field だけで、$createdAt や無い field は書けない)。max / min で読まない(下げた目標・予算が反映されない)。`
 )
 
 func init() { systemPrompt += "\n\n" + titleGoalRules }

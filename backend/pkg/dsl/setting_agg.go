@@ -26,7 +26,7 @@ func (l *linter) settingMaxMin() {
 		return f != nil && f.Computed == nil && (f.Type == FieldInteger || f.Type == FieldNumber || f.Type == FieldCurrency)
 	}
 	report := func(where, entity, agg string) {
-		l.add(`%s: %s of %q is the largest/smallest value ever entered, so lowering (or raising) the goal/budget is ignored; make %q "single": true and read it with {"setting":"<fieldId>"}, or use {"agg":"latest","entity":%q,"field":...,"by":"<date field>"} (aggregate "latest" with by)`,
+		l.add(`%s: %s of %q is the largest/smallest value ever entered, so lowering (or raising) the goal/budget is ignored; read the newest with {"agg":"latest","entity":%q,"field":...} (aggregate "latest"; by is optional and must be a date/datetime field of the entity, omitted = creation order), or make %q "single": true and read it with {"setting":"<fieldId>"}`,
 			where, agg, entity, entity, entity)
 	}
 	exprs := func(where string, x *Expr) {
