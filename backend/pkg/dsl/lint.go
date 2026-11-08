@@ -29,6 +29,7 @@ func (a *App) Lint() []string {
 	l.entityReach()
 	l.navGraph()
 	l.micSeat()
+	l.goalTarget()
 	l.dupAddControls()
 	l.privateChat()
 	return l.out
