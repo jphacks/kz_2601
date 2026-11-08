@@ -53,6 +53,14 @@ func TestEditSystemBlocks_ShareCreatePrefix(t *testing.T) {
 	}
 }
 
+// callWith runs serverPushPrompt on the first block only: the edit suffix
+// must hold none of the push-wording anchors (#760).
+func TestEditSystemSuffix_NoServerPushAnchors(t *testing.T) {
+	if s := editSystemSuffix(); rewriteServerPush(s) != s {
+		t.Fatal("editRules holds a server-push anchor; callWith must rewrite the suffix too")
+	}
+}
+
 // Both blocks go on the wire as cached text blocks, in order (2 of the 4
 // cache breakpoints).
 func TestClientSendsSystemSuffixBlock(t *testing.T) {

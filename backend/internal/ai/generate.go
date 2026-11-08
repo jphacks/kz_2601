@@ -212,6 +212,8 @@ type attemptResult struct {
 	// forceFull: the DSL was changed after the patch (build restriction), so
 	// it is saved as a full document instead of the model's ops.
 	forceFull bool
+	// before: the app as it was before this turn (edit); nil on create.
+	before []byte
 }
 
 // Generate runs the pipeline: fetch current -> decide mode -> Claude ->
@@ -246,6 +248,7 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 	if req.AppID == "" || transcript == "" {
 		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "appId and transcript are required"}
 	}
+	ctx = withServerPush(ctx, s.serverRulesPassRuns(ctx, transcript)) // push wording follows the pass
 	loc, err := resolveLocale(req.Locale, transcript)
 	if err != nil {
 		return nil, err
@@ -293,6 +296,8 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 	case ModeEdit:
 		ar, err = s.generateEdit(ctx, transcript, env, loc, sink)
 		if err == nil {
+			// the server-rules pass compares notifications with it
+			ar.before = env.DSL
 			ar.summary = withShareNote(ar.summary, transcript, env.DSL, ar.raw, loc) // #259 #215
 			notePublicPII(ar, env.DSL, loc)                                          // #253
 		}
@@ -659,7 +664,7 @@ func (s *Service) callWith(ctx context.Context, system, suffix, user string, sch
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	t := time.Now()
-	system, schema = restrictPrompt(ctx, system), restrictSchema(ctx, schema)
+	system, schema = serverPushPrompt(ctx, restrictPrompt(ctx, system)), restrictSchema(ctx, schema)
 	resp, err := s.Claude.Complete(cctx, Completion{System: system, SystemSuffix: restrictPromptSuffix(ctx, suffix), Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
 	ar.latency += time.Since(t)
 	ar.meta.Attempts++
