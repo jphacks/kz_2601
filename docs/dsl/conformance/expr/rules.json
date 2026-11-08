@@ -1,5 +1,5 @@
 {
-  "description": "Patterns the prompt rules teach (#775): self-ref prev lookup with coalesce, overdue count (date lt today), HP clamp, same-today count by row value, latest per parent + daysBetween, nested if diagnosis.",
+  "description": "Patterns the prompt rules teach (#775): self-ref prev lookup with coalesce, overdue count (date lt today), HP clamp, same-today count by row value, latest per parent + daysBetween (coalesce 9999 so never-contacted sorts first in desc), nested if diagnosis.",
   "defaults": {
     "now": "2026-10-28T15:30:45+09:00",
     "timeZone": "Asia/Tokyo",
@@ -45,7 +45,10 @@
             "id": "days_since",
             "name": "経過",
             "type": "integer",
-            "computed": {"op": "daysBetween", "args": [{"ref": "last_sent"}, {"op": "today", "args": []}]}
+            "computed": {
+              "op": "coalesce",
+              "args": [{"op": "daysBetween", "args": [{"ref": "last_sent"}, {"op": "today", "args": []}]}, 9999]
+            }
           }
         ],
         "titleField": "name"
@@ -289,10 +292,16 @@
       "expected": {"type": "number", "value": 10, "text": "10"}
     },
     {
-      "name": "last-sent/no-records-is-nil",
-      "expr": {"ref": "days_since"},
+      "name": "last-sent/no-records-last-sent-is-nil",
+      "expr": {"ref": "last_sent"},
       "row": {"entity": "friend", "record": {"id": "f2", "data": {"name": "Bob"}}},
       "expected": {"type": "nil"}
+    },
+    {
+      "name": "last-sent/no-records-days-since-sorts-first",
+      "expr": {"ref": "days_since"},
+      "row": {"entity": "friend", "record": {"id": "f2", "data": {"name": "Bob"}}},
+      "expected": {"type": "number", "value": 9999, "text": "9999"}
     },
     {
       "name": "diagnosis/first-branch",

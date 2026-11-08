@@ -2,6 +2,7 @@ package ai
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -16,7 +17,7 @@ const (
 	jp2ReadyExpr  = `{"op":"and","args":[{"op":"not","args":[{"ref":"done"}]},{"op":"coalesce","args":[{"ref":"prev.done"},true]}]}`
 	jp2SameExpr   = `{"agg":"count","entity":"post","filter":[{"field":"feeling","op":"eq","value":{"ref":"feeling"}},{"field":"date","op":"today","value":null}]}`
 	jp2LastExpr   = `{"agg":"latest","entity":"card","field":"date","by":"date","filter":{"field":"friend","op":"eq","value":{"ref":"id"}}}`
-	jp2SinceExpr  = `{"op":"daysBetween","args":[{"ref":"last_sent"},{"op":"today","args":[]}]}`
+	jp2SinceExpr  = `{"op":"coalesce","args":[{"op":"daysBetween","args":[{"ref":"last_sent"},{"op":"today","args":[]}]},9999]}`
 	jp2DiagExpr   = `{"if":{"op":"eq","args":[{"ref":"acidity"},"好き"]},"then":"エチオピア(浅煎り)","else":"マンデリン(深煎り)"}`
 	jp2NotMine    = `{"field":"$marks.done","op":"neq","value":{"me":true}}`
 	jp2MarksDecl  = `[{"id":"done","icon":"check","label":"済み"}]`
@@ -86,7 +87,7 @@ var jp2RuleApps = map[string]string{
   {"id":"date","name":"日付","type":"date","defaultValue":"now"},{"id":"message","name":"メッセージ","type":"string"}]}],
 "screens":[
  {"id":"home","title":"友達","toolbar":[{"label":"友達を追加","action":{"type":"navigate","screen":"friend_form","presentation":"sheet"}}],
-  "components":[{"type":"list","entity":"friend","sort":{"field":"days_since","direction":"desc"},"item":{"title":"name","trailing":"days_since"},"onItemTap":{"type":"navigate","screen":"card_form","presentation":"sheet","prefillRef":"friend"}},
+  "components":[{"type":"list","entity":"friend","sort":{"field":"days_since","direction":"desc"},"item":{"title":"name","trailing":"last_sent"},"onItemTap":{"type":"navigate","screen":"card_form","presentation":"sheet","prefillRef":"friend"}},
    {"type":"list","entity":"card","item":{"title":"friend","subtitle":"message"},"onItemTap":{"type":"navigate","screen":"card_form"}},
    {"type":"button","label":"友達を直す","action":{"type":"navigate","screen":"friend_list"}}]},
  {"id":"friend_list","title":"友達の一覧","components":[{"type":"list","entity":"friend","item":{"title":"name"},"onItemTap":{"type":"navigate","screen":"friend_form"}}]},
@@ -233,8 +234,19 @@ func TestJPHACKSProducts2Rules_ExprsEvaluate(t *testing.T) {
 				t.Errorf("days_since(%s) = %v, want %v", recs["friend"][id].ID, v, want)
 			}
 		}
-		if v := field(app, ev, "friend", "days_since", recs["friend"][2]); !v.IsNil() {
-			t.Errorf("days_since with no card = %v, want blank", v)
+		if v := field(app, ev, "friend", "days_since", recs["friend"][2]); v.Kind != expreval.Number || v.Num != 9999 {
+			t.Errorf("days_since with no card = %v, want 9999", v)
+		}
+		if v := field(app, ev, "friend", "last_sent", recs["friend"][2]); !v.IsNil() {
+			t.Errorf("last_sent with no card = %v, want blank (the trailing column)", v)
+		}
+		// sort days_since desc: the never-contacted friend comes first
+		order := []expreval.Record{recs["friend"][0], recs["friend"][1], recs["friend"][2]}
+		sort.SliceStable(order, func(i, j int) bool {
+			return field(app, ev, "friend", "days_since", order[i]).Num > field(app, ev, "friend", "days_since", order[j]).Num
+		})
+		if got := order[0].ID + order[1].ID + order[2].ID; got != "cba" {
+			t.Errorf("days_since desc order = %s, want cba (no card first)", got)
 		}
 	}
 
