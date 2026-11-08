@@ -30,14 +30,19 @@ func pickRow(app *dsl.App, rule *dsl.ServerRule, ev Trigger, row *expreval.Row, 
 		rowKey = row.Record.ID
 	}
 	skip := map[string]bool{}
+	// once per run: exclude also skips what earlier rows picked (their
+	// creates are not written yet). fewest / most instead count earlier rows
+	// (countLoads), so a candidate may be chosen again while least loaded.
+	once := p.Exclude != nil && !dsl.IsCountOrder(p.Order)
 	if p.Exclude != nil {
 		skip = excluded(app, rule, ev, row, rowKey, src)
 		if src.err != nil {
 			return nil, false
 		}
-		// earlier rows of this run: their creates are not written yet
-		for id := range c.picked[rule.ID] {
-			skip[id] = true
+		if once {
+			for id := range c.picked[rule.ID] {
+				skip[id] = true
+			}
 		}
 	}
 	seed := ev.RunID + "\x00" + rule.ID + "\x00" + rowKey
@@ -77,7 +82,7 @@ func pickRow(app *dsl.App, rule *dsl.ServerRule, ev Trigger, row *expreval.Row, 
 	if best == nil {
 		return nil, false
 	}
-	if p.Exclude != nil {
+	if once {
 		if c.picked[rule.ID] == nil {
 			c.picked[rule.ID] = map[string]bool{}
 		}

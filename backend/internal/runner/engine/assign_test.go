@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
@@ -161,5 +162,50 @@ func TestPlanAssignMost(t *testing.T) {
 	// s1: 2 (own create not counted), s3: 2 -> tie, s1 is older.
 	if len(p.Writes) != 1 || p.Writes[0].Values["staff"] != "s1" {
 		t.Fatalf("writes %+v", p.Writes)
+	}
+}
+
+// fewest + exclude in an on.each run: pick's once-per-run rule for exclude
+// does not apply; the least loaded member gets several rows while still the
+// least loaded (earlier rows of the run are counted instead).
+func TestPlanAssignEachExcludeRepeats(t *testing.T) {
+	a := readsApp(t, "server_rules_assign.json")
+	r := rule(t, a, "assign_daily")
+	r.Pick.Exclude = &dsl.PickExclude{Entity: "offs", Field: "staff", Match: &dsl.PickMatch{Field: "day", Equals: "day"}}
+	if err := a.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	var shifts []expreval.Record
+	for i, s := range []string{"s2", "s2", "s2", "s3", "s3", "s3"} {
+		shifts = append(shifts, rec(fmt.Sprintf("busy%d", i), map[string]any{"day": "2026-11-01", "staff": s}))
+	}
+	shifts = append(shifts,
+		rec("y1", map[string]any{"day": "2026-11-10"}),
+		rec("y2", map[string]any{"day": "2026-11-11"}),
+		rec("y3", map[string]any{"day": "2026-11-12"}),
+		rec("y4", map[string]any{"day": "2026-11-13"}))
+	offs := []expreval.Record{rec("o1", map[string]any{"staff": "s1", "day": "2026-11-13"})} // s1 is off on y4's day
+	l := &listReader{recs: map[string][]expreval.Record{"staff": staff(), "shifts": shifts, "offs": offs}}
+	ev := Trigger{AppID: "a", Kind: KindScheduled, Scope: dsl.ScopeShared, At: readsAt, Location: jst, RunID: "run-x"}
+	rows, err := PlanEach(context.Background(), a, r, ev, l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]any{}
+	for _, row := range rows {
+		for _, w := range row.Plan.Writes {
+			got[w.RecordID] = w.Values["staff"]
+		}
+	}
+	// s1 (0, 1, 2 < 3) takes three rows; it is off on y4, which goes to s2
+	// (3, tied with s3 and older).
+	want := map[string]any{"y1": "s1", "y2": "s1", "y3": "s1", "y4": "s2"}
+	if len(got) != len(want) {
+		t.Fatalf("writes %v", got)
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Fatalf("writes %v, want %v", got, want)
+		}
 	}
 }
