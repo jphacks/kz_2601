@@ -22,7 +22,7 @@ import (
 //   - ruleEach (bool): some rule has on.each (#340 reads).
 //   - ruleAgg (bool): some rule reads records with agg.
 //   - ruleWith (bool): some notify has with.
-//   - ruleLookup (string): some rule has a lookup with op exists|notExists.
+//   - ruleLookup (string): some rule has a lookup with op exists|notExists|overlaps|notOverlaps.
 //   - ruleSimilar (bool): some rule searches the most similar record (similar).
 //   - rulePick (string): some rule picks one record with order random|oldest|newest (pick).
 //

@@ -57,6 +57,9 @@ func (r *ServerRule) ReferencedFields() []string {
 	if r.Lookup != nil && r.Lookup.Equals != LookupID {
 		addField(r.Lookup.Equals) // the row's value the lookup compares
 	}
+	if r.Lookup != nil {
+		addField(r.Lookup.EqualsEnd) // the end of the row's period (overlap)
+	}
 	if r.Similar != nil {
 		for _, f := range r.Similar.Fields {
 			addField(f) // the row's values similar compares
