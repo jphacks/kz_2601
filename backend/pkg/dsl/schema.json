@@ -4336,16 +4336,17 @@
         "accept": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 3,
+          "maxItems": 4,
           "items": {
             "type": "string",
             "enum": [
               "csv",
               "text",
-              "pdf"
+              "pdf",
+              "audio"
             ]
           },
-          "description": "選べるファイル。csv = 表(1 行 = 1 件・1 行目は項目名・Excel の CSV / Shift_JIS も読む)、text = テキストファイル、pdf = PDF(本文を取り出す。画像だけの PDF は端末内の文字認識)。"
+          "description": "選べるファイル。csv = 表(1 行 = 1 件・1 行目は項目名・Excel の CSV / Shift_JIS も読む)、text = テキストファイル、pdf = PDF(本文を取り出す。画像だけの PDF は端末内の文字認識)、audio = 録音ファイル(m4a / mp3 / wav など・30 分まで。端末内で文字起こしする)。"
         },
         "label": {
           "type": "string",
@@ -4353,7 +4354,7 @@
         },
         "field": {
           "type": "string",
-          "description": "text / pdf の本文を入れる field(type text なら 20000 字・string なら 4000 字まで。超えた分は切る)。accept に text / pdf がある時は必須、csv だけなら書かない。entity の titleField(string)にはファイル名が入る。"
+          "description": "text / pdf の本文・audio の文字起こしを入れる field(type text なら 20000 字・string なら 4000 字まで。超えた分は切る。audio は text だけ)。accept に text / pdf / audio がある時は必須、csv だけなら書かない。entity の titleField(string)にはファイル名が入る。"
         },
         "map": {
           "type": "array",
@@ -4364,7 +4365,7 @@
           "description": "csv の列の当て方(省略可)。書いた列が先に当たり、残りは 1 行目の項目名が field の name か id と同じ列に当たる(export の CSV はそのまま読み戻せる)。どの field にも当たらない列は使わない。"
         }
       },
-      "description": "ファイルを選んで記録を足すボタン(ファイルの取り込み)。押すと iOS のファイル選択が開き、csv は 1 行ずつ記録にして(型を変換・最大 500 行)、text / pdf は本文を取り出して field に入れた記録を 1 件足す。足す前に「n 件を追加・m 行は読めない」を確かめる。処理はすべて端末内で、ファイルそのものは送らない・残さない(足した記録だけが今まで通り保存・同期される)。「CSV を取り込みたい」「Excel の名簿を入れたい」「PDF・テキストを読み込んで本文を記録したい」「書き出した CSV を戻したい」の時に必ずこれを選ぶ(手入力のフォームで代替しない)。音声・画像・Word のファイルは読めない。",
+      "description": "ファイルを選んで記録を足すボタン(ファイルの取り込み)。押すと iOS のファイル選択が開き、csv は 1 行ずつ記録にして(型を変換・最大 500 行)、text / pdf は本文を取り出して、audio は録音を端末内で文字起こしして、field に入れた記録を 1 件足す。足す前に「n 件を追加・m 行は読めない」を確かめる。処理はすべて端末内で、ファイルそのものは送らない・残さない(足した記録だけが今まで通り保存・同期される)。「CSV を取り込みたい」「Excel の名簿を入れたい」「PDF・テキストを読み込んで本文を記録したい」「書き出した CSV を戻したい」「授業・会議の録音ファイルを文字にしたい」の時に必ずこれを選ぶ(手入力のフォームで代替しない)。動画・画像・Word のファイルは読めない。",
       "x-usage": "記録の一覧がある画面で、一覧の下の全幅(例 A9:F10・追加ボタン D11:F12 の上)に置く。追加ボタンが無ければ右下(D11:F12)。左下 A11:B12 はマイクの席なので空ける。CSV の名簿なら entity 例 member{name: string(required), grade: integer, club: string} + fileImport{entity: member, accept: [csv], label: 名簿の CSV を取り込む}。列名が field の name と違う時だけ map: [{column: 氏名, field: name}]。PDF・テキストなら entity 例 doc{title: string, body: text}(titleField: title)+ fileImport{entity: doc, accept: [pdf, text], field: body, label: PDF を取り込む}。取り込んだ本文の要約は同じ entity のフォームに aiButton{task: summarize, input: body}。"
     },
     "ImportColumn": {
