@@ -75,13 +75,18 @@ ASC はデータの種類ごとに「用途 → ユーザーに紐づくか → 
 | aiButton の集計(`v1/metrics/ai-button`) | 使用状況データ > 製品の操作 | 自前のサーバー | アナリティクス | はい | 1.12 | 2 章で宣言済み(サーバーの利用の集計と同じ種類) |
 | aiButton のオンライン版(`v1/text`) | その他のユーザーコンテンツ(最近の記録・入力中の文字・最大 4KB。長い答えは最大 16KB。共有・公開のアプリでは自分の記録だけ・#733) | サーバー経由で Anthropic | App の機能 | はい | 1.3 | 2 章で宣言済み |
 | aiChat(`v1/text` の task chat・#719) | その他のユーザーコンテンツ(自分の会話の直近 20 発言・16KB と AI の役割の説明。会話は private の記録として Firestore) | サーバー経由で Anthropic / Firestore | App の機能 | はい | 1.3・1.4 | 2 章で宣言済み |
+| aiChat の参考の記録(`inputEntity`・`material`・#748) | その他のユーザーコンテンツ(1 つの記録帳の自分の記録の新しい順 20 件まで・8KB。会話と合わせて 16KB。写真・録音・位置・ref・hidden・computed は送らない。他の人の記録は送らない) | サーバー経由で Anthropic | App の機能 | はい | 1.3 | 2 章で宣言済み |
+| aiChat の記録の案(`saveTo`・#745) | 増えない(サーバーは返事の案を確かめるだけで保存しない。「追加」を押した時に端末が記録として保存) | — | — | — | 1.3・1.4 | 足さない |
+| aiButton の outputs(#746) | 増えない(generate の答えをフォームの欄に分けて入れるだけ。保存は利用者) | — | — | — | — | 足さない |
+| aiButton の外部データ(`inputFeeds`・#728) | 増えない(同じ画面の feed の行・20 行・2KB を材料に足す。公開データで本人の情報ではない) | サーバー経由で Anthropic | App の機能 | — | 1.3 | 足さない |
+| aiChat のマイク(#743)・音声ファイルの取り込み(`fileImport` の audio・#721) | 増えない(端末の中の WhisperKit で文字にし、声・ファイルは送らない) | — | — | — | 1.2 | 足さない |
 | aiButton の写真(`inputPhoto`・#714。サーバーの `AI_TEXT_IMAGE` が既定 off) | 写真またはビデオ(フォームの写真 1 枚・JPEG・長い辺 1024px 以下) | サーバー経由で Anthropic | App の機能 | はい | 1.3 | 2 章で宣言済み(送り先に Anthropic が増えるだけ。5 章の健康の判断) |
 | 外部の公開データ(`feed`)・国会会議録の語 | 増えない(出どころへ送るのは府県予報区・代表地点の座標・分野・DSL に書いた語だけ。uid・位置・記録は送らない) | 自前のサーバー → 出どころ | — | — | 1.11 | 足さない |
 | フィードバック(`v1/feedback`) | カスタマーサポート・その他の診断データ・写真(スクショ) | 自前のサーバー([../legal/feedback-privacy-draft.md](../legal/feedback-privacy-draft.md)) | App の機能 | はい | 1.13・3・4 章 | カスタマーサポートを足す(ほかは宣言済み) |
 | 共有・公開・仲間探し・通報 | その他のユーザーコンテンツ(他の人に見える)・名前(表示名) | 自前のサーバー | App の機能 | はい | 1.6 | 宣言済み |
 | 背面の位置の記録(`locationTracker`) | 正確な位置情報(連続した点) | Firestore | App の機能 | はい | 1.5 | 宣言済み |
 | プッシュ通知の端末の登録(`v1/me/devices`・#269) | ID > デバイス ID(APNs の端末のトークン・インストールごとの識別子) | 自前のサーバー(Firestore)・APNs | App の機能(通知を届ける) | はい | 1.10・3・4 章 | 足す |
-| サーバーの自動の動き(`v1/apps/{id}/automations`・runner は未デプロイ) | 増えない(読むのは記録 = その他のユーザーコンテンツ。通知の本文に記録の値 30 字まで) | 自前のサーバー・APNs | App の機能 | はい | 1.10 | 宣言済み |
+| サーバーの自動の動き(`v1/apps/{id}/automations`・runner は未デプロイ) | 増えない(読むのは記録 = その他のユーザーコンテンツ。通知の本文に記録の値 30 字まで。`saveFeed`(#742)は DSL に書いた地域のコードだけで出どころから取って記録に書く。uid・記録の値は出どころへ送らない) | 自前のサーバー・APNs | App の機能 | はい | 1.10 | 宣言済み |
 
 - **端末のトークンを「デバイス ID」にする理由**: Apple の定義は「Such as the device's advertising identifier, or other device-level ID」([App privacy details](https://developer.apple.com/app-store/app-privacy-details/))。APNs のトークンとインストールごとの識別子は、端末(のこのアプリ)を指す値で、サーバーにサインアウト・退会まで残す(「collect」= リクエストに応えるのに要る時間より長く残す、に当たる)。広告 ID ではないが「other device-level ID」に入るので、申告する側に倒す。審査用の版の Firebase のインストール識別子(診断の付属)は 2 章のとおり「その他の診断データ」のまま。
 - **マニフェスト**: `ios/Metamon/PrivacyInfo.xcprivacy` の元のファイルは審査用の版の申告(2 章と 1 対 1)のまま。通常の版は、ビルドの最後に `ios/scripts/extend-privacy-manifest.sh` がバンドルの写しに上の表の「足す」の種類(`PurchaseHistory`・`CustomerSupport`・`DeviceID`)を足す(`ProductInteraction` はサーバーの利用の集計のため元のファイルで宣言済み)(Review 構成では何もしない)。この表とスクリプトの一覧を 1 対 1 に保つ。
