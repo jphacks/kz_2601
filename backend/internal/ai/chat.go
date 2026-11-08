@@ -344,7 +344,6 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 	if err != nil {
 		return nil, err
 	}
-	ctx = withRestriction(ctx, s.bookGate(restrictionFrom(ctx))) // book_gate.go
 	if wantsChatFirst(req) {
 		return s.chatFirst(ctx, req, incoming, started)
 	}

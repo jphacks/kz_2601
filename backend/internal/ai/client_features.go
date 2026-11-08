@@ -92,7 +92,7 @@ var clientFeatures = []clientFeature{
 	{
 		key:   FeatureLookupBook,
 		rules: []string{bookRules},
-		note:  "- ボタンの lookupBook(ISBN から本の情報を入れる)は使わない(この版では動かない)。書名・著者は手で入力する形にし、「ISBN から本の情報を入れるのはこの版ではできないため、手入力の形にしました。」と申告する。\n",
+		note:  "- ボタンの lookupBook(ISBN から本の情報を入れる)は使わない(今は使えない)。書名・著者は手で入力する形にし、頼まれたら「ISBN から本の情報を入れる機能は今は使えないため、手入力の形にしました。」と申告する。\n",
 		schema: func(defs map[string]any) {
 			dropEnumValues(defs, "Action", "type", string(dsl.ActionLookupBook))
 			deleteProps(defs, "Action", "bookLookup")
@@ -103,7 +103,7 @@ var clientFeatures = []clientFeature{
 		strip: func(root map[string]any) int {
 			return dropComponents(root, hasLookupBook) + dropToolbar(root, hasLookupBook)
 		},
-		violation: "action lookupBook is not available in this app build: remove the button and let the user type the book details",
+		violation: "action lookupBook is not available: remove the button and let the user type the book details",
 	},
 	{
 		key:   FeatureTextHighlight,
@@ -206,11 +206,16 @@ func (r Restriction) offKey() string {
 }
 
 // clientRestriction is the request's restriction plus the server switches:
-// with AI_TEXT_IMAGE off, inputPhoto would answer 403, so it is never generated.
+// with AI_TEXT_IMAGE off, inputPhoto would answer 403; with the book lookup
+// off on appconfig (openBD terms, BOOK_LOOKUP_ENABLED), lookupBook would
+// answer 503. Neither is generated then.
 func (s *Service) clientRestriction(allowed, disabled, supported []string) Restriction {
 	r := NewClientRestriction(allowed, disabled, supported)
 	if !s.TextImage {
 		r = r.withFeatureOff(FeatureAIInputPhoto)
+	}
+	if s.NoBookLookup {
+		r = r.withFeatureOff(FeatureLookupBook)
 	}
 	return r
 }
