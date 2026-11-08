@@ -45,7 +45,9 @@ enum TextContent {
             let value: String
             if f.computed != nil {
                 let row = ExprEvaluator.Row(entity: form.entity, record: Record(id: form.recordId ?? "draft", data: form.values), memoizable: false)
-                value = evaluator().fieldValue(f.id, row: row)?.text ?? ""
+                let v = evaluator().fieldValue(f.id, row: row)
+                // datetime は ExprValue.text だと日付だけになる(addMinutes の時刻が消える)→ 表示の書式で時刻まで
+                value = f.type == .datetime ? v.map { displayText($0.json(for: f), field: f) } ?? "" : v?.text ?? ""
             } else {
                 value = (form.values[f.id] ?? .null).displayString
             }

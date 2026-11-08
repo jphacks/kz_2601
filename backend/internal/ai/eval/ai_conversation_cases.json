@@ -1,7 +1,10 @@
 [
-  {"id": "ac_counselor", "kind": "create", "group": "aichat", "transcript": "悩みを話すと AI がカウンセラーみたいに話を聞いてくれて、前の話も覚えているアプリ", "note": "aiChat(roleField 付き・persona にカウンセラー)。aiButton の 1 回きりの相談にしない", "expect": {"has": ["aiChat"], "lacks": ["aiButton"], "noShared": true}},
+  {"id": "ac_counselor", "kind": "create", "group": "aichat", "transcript": "悩みを話すと AI がカウンセラーみたいに話を聞いてくれて、前の話も覚えているアプリ", "note": "aiChat(roleField 付き・persona にカウンセラー)。aiButton の 1 回きりの相談にしない", "expect": {"has": ["aiChat"], "lacks": ["aiButton"], "noShared": true, "aiChatSaveTo": false}},
   {"id": "ac_tutor", "kind": "create", "group": "aichat", "transcript": "わからない数学の問題を AI の家庭教師に質問して、ヒントをもらいながら何回もやり取りしたい", "note": "aiChat(persona に答えを言わずヒント)", "expect": {"has": ["aiChat"], "noShared": true}},
   {"id": "ac_english_partner", "kind": "create", "group": "aichat", "transcript": "英会話の練習相手になってくれる AI と毎日チャットしたい", "note": "aiChat(persona に英会話の練習相手)", "expect": {"has": ["aiChat"], "noShared": true}},
+  {"id": "ac_english_read_aloud", "kind": "create", "group": "aichat", "transcript": "英会話の先生役の AI と話して、AI の返事は声で読み上げてほしい。耳でも聞いて練習したい", "note": "aiChat に speak: true(返事を自動で読み上げ)。speakButton を別に足さない", "expect": {"has": ["aiChat"], "lacks": ["speakButton"], "noShared": true, "aiChatSpeak": true}},
   {"id": "ac_interview_practice", "kind": "create", "group": "aichat", "transcript": "就活の面接練習で、AI が面接官になって質問してくれて答えると次の質問が来るアプリ", "note": "aiChat(persona に面接官)", "expect": {"has": ["aiChat"], "noShared": true}},
+  {"id": "ac_meal_log_by_chat", "kind": "create", "group": "aichat", "transcript": "AI に「今日カレー食べた」って話しかけるだけで、食事の記録に追加してくれるアプリ。記録は一覧で見たい", "note": "aiChat + saveTo{entity: meal(会話とは別), fields: [料理, 日付, 食事の区分]}・記録の list は別の画面。保存は利用者が「追加」を押した時だけ", "expect": {"has": ["aiChat", "list"], "aiChatSaveTo": true}},
+  {"id": "ac_expense_by_chat", "kind": "create", "group": "aichat", "transcript": "会話で「ランチに800円使った」と言うと AI が支出の記録を作ってくれる家計簿", "note": "aiChat + saveTo(品目・金額 number・日付)・支出の list か合計", "expect": {"has": ["aiChat"], "aiChatSaveTo": true}},
   {"id": "ac_diary_comment_not_chat", "kind": "create", "group": "aichat", "transcript": "日記を書いたらボタンで AI に一言コメントをもらいたい", "note": "1 回押して 1 回書かせる = aiButton suggest。aiChat にしない", "expect": {"aiTask": "suggest", "lacks": ["aiChat"]}}
 ]

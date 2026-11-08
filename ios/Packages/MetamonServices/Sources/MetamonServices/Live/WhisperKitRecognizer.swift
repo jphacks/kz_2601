@@ -13,7 +13,7 @@ import WhisperKit
 /// `[Voice]` プレフィックスで stdout(`devicectl device process launch --console`)と os_log(category: voice)に出す。
 @MainActor
 @Observable
-public final class WhisperKitRecognizer: SpeechTranscriber {
+public final class WhisperKitRecognizer: SpeechTranscriber, AudioFileTranscriber {
     public private(set) var status: TranscriberStatus = .notDownloaded
     public private(set) var downloadProgress: Double = 0
     public private(set) var lastDiagnostics: TranscriberDiagnostics?
@@ -34,6 +34,8 @@ public final class WhisperKitRecognizer: SpeechTranscriber {
     @ObservationIgnored private var watchdog: Task<Void, Never>?
     @ObservationIgnored private let logger = Logger(subsystem: "jp.kz2601.metamon", category: "voice")
     private var isRecording = false
+    /// 録音ファイルを文字にしている間 true(同じモデルで録音を始めない)
+    private var isTranscribingFile = false
     /// 認識言語("ja" | "en")。録音ごとに読むので、アプリの言語設定を切り替えると次の発話から反映される(#45)。
     @ObservationIgnored public var language: () -> String = { "ja" }
 
@@ -133,7 +135,7 @@ public final class WhisperKitRecognizer: SpeechTranscriber {
         diag.modelFolderExists = localModelFolder != nil
         defer { lastDiagnostics = diag }
 
-        guard let pipe else {
+        guard let pipe, !isTranscribingFile else {
             diag.failure = "notReady"
             throw TranscriberFailure.notReady("\(status)")
         }
@@ -256,6 +258,51 @@ public final class WhisperKitRecognizer: SpeechTranscriber {
             log("transcribe failed: \(error)")
             throw error
         }
+    }
+
+    // MARK: - 録音ファイル(fileImport accept audio)
+
+    public var canTranscribeFiles: Bool { pipe != nil && status == .ready && !isRecording && !isTranscribingFile }
+
+    /// ファイルを 16kHz モノラルに読み、`AudioFileChunking.blockSeconds` ごとに文字にする。端末内だけ。
+    public func transcribeFile(at url: URL, progress: @escaping @MainActor (Double) -> Void) async throws -> String {
+        guard let pipe, canTranscribeFiles else { throw TranscriberFailure.notReady("\(status)") }
+        isTranscribingFile = true
+        status = .recognizing
+        defer {
+            isTranscribingFile = false
+            status = .ready
+        }
+        let path = url.path
+        let samples = try await Task.detached(priority: .userInitiated) {
+            try AudioProcessor.loadAudioAsFloatArray(fromPath: path)
+        }.value
+        try Task.checkCancellation()
+        let blocks = AudioFileChunking.blocks(sampleCount: samples.count, sampleRate: WhisperKit.sampleRate)
+        log("file transcribe start samples=\(samples.count) blocks=\(blocks.count)")
+        let options = DecodingOptions(
+            task: .transcribe,
+            language: language(),
+            usePrefillPrompt: true,
+            detectLanguage: false,
+            skipSpecialTokens: true,
+            withoutTimestamps: true,
+            chunkingStrategy: .vad
+        )
+        var parts: [String] = []
+        progress(0)
+        for (i, range) in blocks.enumerated() {
+            try Task.checkCancellation()
+            let block = Array(samples[range])
+            if Self.levels(of: block).0 >= Self.silencePeak {
+                let results = try await pipe.transcribe(audioArray: block, decodeOptions: options)
+                let text = results.map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines)
+                if !text.isEmpty { parts.append(text) }
+            }
+            progress(Double(i + 1) / Double(blocks.count))
+        }
+        log("file transcribe done chars=\(parts.joined().count)")
+        return parts.joined(separator: "\n")
     }
 
     /// (ピーク振幅, RMS)。空なら (0, 0)。

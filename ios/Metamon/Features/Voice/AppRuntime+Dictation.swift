@@ -6,9 +6,15 @@ import MetamonRenderer
 /// 声は端末の外に出さない。音声入力のシートが出ている間は部品が録音を捨てるので、マイクを取り合わない。
 extension AppRuntime: DictationHost {
     var dictationReadiness: DictationReadiness {
-        let t = services.transcriber
-        if t.isReady { return .ready }
-        switch t.status {
+        Self.dictationReadiness(isReady: services.transcriber.isReady, status: services.transcriber.status)
+    }
+
+    /// 本命のモデルが文字にしている間(録音ファイルの文字起こしなど)は、仮の聞き取りが使えても録音を始めない(モデルを使っている間)。
+    /// 部品の自分の録音を文字にしている間も recognizing だが、その間の部品は「文字にしています」を出していて読まない。
+    nonisolated static func dictationReadiness(isReady: Bool, status: TranscriberStatus) -> DictationReadiness {
+        if status == .recognizing { return .preparing }
+        if isReady { return .ready }
+        switch status {
         case .ready: return .ready
         case .downloading, .loading, .recognizing: return .preparing
         case .failed: return .failed
