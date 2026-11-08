@@ -25,7 +25,7 @@ var addressedRules = strings.TrimSpace(`
 // addressedChatRule: the same capability for chat answers (できる?).
 var addressedChatRule = strings.TrimSpace(`
 ## 宛先を選んで送るメッセージ(#271)
-- 「1 対 1 のメッセージ」「DM」「選んだ人にだけ送る」は**できる**(参加した人の中から宛先を選び、送った人と宛先の人だけが読める。受信箱・送信済み・未読の印も作れる)。宛先の人へのプッシュ通知もできる。
+- 「1 対 1 のメッセージ」「DM」「選んだ人にだけ送る」は**できる**(参加した人の中から宛先を選び、送った人と宛先の人だけが読める。受信箱・送信済み・未読の印も作れる)。
 `)
 
 // addressedNote is the restrictionNote line for builds without FeatureAddressed.

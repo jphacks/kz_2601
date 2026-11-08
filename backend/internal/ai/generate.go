@@ -246,6 +246,7 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 	if req.AppID == "" || transcript == "" {
 		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "appId and transcript are required"}
 	}
+	ctx = withServerPush(ctx, s.serverRulesOn(ctx, transcript)) // push wording follows the pass
 	loc, err := resolveLocale(req.Locale, transcript)
 	if err != nil {
 		return nil, err
@@ -654,7 +655,7 @@ func (s *Service) call(ctx context.Context, system, user string, schema json.Raw
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	t := time.Now()
-	system, schema = restrictPrompt(ctx, system), restrictSchema(ctx, schema)
+	system, schema = serverPushPrompt(ctx, restrictPrompt(ctx, system)), restrictSchema(ctx, schema)
 	resp, err := s.Claude.Complete(cctx, Completion{System: system, Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
 	ar.latency += time.Since(t)
 	ar.meta.Attempts++
