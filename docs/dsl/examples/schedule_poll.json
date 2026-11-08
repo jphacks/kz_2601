@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "日程調整",
+    "description": "候補日ごとに参加できるかを答え、候補日の一覧で参加できる人数を見る",
+    "icon": "calendar.badge.checkmark",
+    "theme": { "primaryColor": "#00897B" },
+    "voiceEntry": "floating",
+    "tabs": [
+      { "screen": "home", "title": "候補日", "icon": "calendar" },
+      { "screen": "answers", "title": "回答", "icon": "checklist" }
+    ]
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "days",
+      "name": "候補日",
+      "titleField": "date",
+      "scope": "shared",
+      "fields": [
+        { "id": "date", "name": "日付", "type": "date", "required": true },
+        { "id": "note", "name": "メモ", "type": "string" },
+        { "id": "ok_count", "name": "参加できる人", "type": "integer", "unit": "人",
+          "computed": { "agg": "count", "entity": "answers",
+            "filter": [
+              { "field": "day", "op": "eq", "value": { "ref": "id" } },
+              { "field": "status", "op": "eq", "value": "参加できる" }
+            ] } },
+        { "id": "maybe_count", "name": "未定の人", "type": "integer", "unit": "人",
+          "computed": { "agg": "count", "entity": "answers",
+            "filter": [
+              { "field": "day", "op": "eq", "value": { "ref": "id" } },
+              { "field": "status", "op": "eq", "value": "未定" }
+            ] } }
+      ]
+    },
+    {
+      "id": "answers",
+      "name": "回答",
+      "titleField": "name",
+      "scope": "shared",
+      "fields": [
+        { "id": "day", "name": "候補日", "type": "ref", "refEntity": "days", "required": true },
+        { "id": "name", "name": "名前", "type": "string", "required": true },
+        { "id": "status", "name": "参加", "type": "enum", "options": ["参加できる", "未定", "参加できない"], "defaultValue": "参加できる" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "候補日",
+      "toolbar": [
+        { "label": "候補日を足す", "icon": "plus", "action": { "type": "navigate", "screen": "day_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        { "type": "table", "id": "days", "area": "A1:F12", "entity": "days",
+          "columns": [
+            { "field": "date", "title": "日付" },
+            { "field": "ok_count", "title": "参加できる" },
+            { "field": "maybe_count", "title": "未定" }
+          ],
+          "sort": { "field": "date", "direction": "asc" } }
+      ]
+    },
+    {
+      "id": "day_form",
+      "title": "候補日",
+      "entity": "days",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "days" } }],
+      "components": [
+        { "type": "datePicker", "field": "date", "area": "A1:F2", "label": "日付" },
+        { "type": "textField", "field": "note", "area": "A3:F4", "label": "メモ", "placeholder": "午後から" },
+        { "type": "button", "id": "answer", "area": "A5:F6", "label": "この日に回答する", "icon": "checkmark.circle",
+          "action": { "type": "navigate", "screen": "answer_form", "presentation": "sheet", "prefillRef": "day" } }
+      ]
+    },
+    {
+      "id": "answers",
+      "title": "回答",
+      "toolbar": [
+        { "label": "回答する", "icon": "square.and.pencil", "action": { "type": "navigate", "screen": "answer_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        { "type": "list", "id": "answers", "area": "A1:F12", "entity": "answers",
+          "item": { "title": "name", "subtitle": "day", "trailing": "status" },
+          "emptyText": "まだ回答がありません", "swipeToDelete": true,
+          "onItemTap": { "type": "navigate", "screen": "answer_form", "presentation": "push" } }
+      ]
+    },
+    {
+      "id": "answer_form",
+      "title": "回答",
+      "entity": "answers",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "answers" } }],
+      "components": [
+        { "type": "picker", "field": "day", "area": "A1:F2", "label": "候補日", "style": "menu" },
+        { "type": "textField", "field": "name", "area": "A3:F4", "label": "名前", "placeholder": "山田" },
+        { "type": "picker", "field": "status", "area": "A5:F6", "label": "参加", "style": "segmented" }
+      ]
+    }
+  ]
+}
