@@ -24,14 +24,15 @@ func TestCountWhereRules_InPrompt(t *testing.T) {
 
 // parent_child.go must not teach the parent-only count as 参加人数 while
 // this section says not to, and the parent list must stay tappable (the
-// answer button sits on the parent's form, and table has no onItemTap).
+// answer button sits on the parent's form; why table rows can't be tapped is
+// taught once in master_reach_rules.go).
 func TestCountWhereRules_AgreeWithParentChild(t *testing.T) {
 	if strings.Contains(systemPrompt, "親ごとの数(コメント数・参加人数)") {
 		t.Error("parent_child rules still give the parent-only count for 参加人数")
 	}
 	for _, want := range []string{
 		"子の値で絞る数は「親ごとに、子のうち特定の値だけ数える」",
-		"table は行をタップできない",
+		"親の一覧の list(onItemTap でフォーム)",
 	} {
 		if !strings.Contains(systemPrompt, want) {
 			t.Errorf("system prompt lacks %q", want)
