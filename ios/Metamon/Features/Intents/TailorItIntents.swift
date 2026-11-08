@@ -87,11 +87,20 @@ struct AddRecordIntent: AppIntent {
 
         let sent = await runtime.addRecordFromIntent(appId: target.appId, entity: entity.id, data: draft.data)
         let what = draft.summary.isEmpty ? content : draft.summary
-        let refs = draft.refs.isEmpty ? "" : "(\(draft.refs.joined(separator: "・")))" // どのカテゴリに入れたか
-        let tail = sent ? "" : "(未送信: 接続が戻ったら自動で送ります)"
-        let message = "\(target.appName)に「\(what)」\(refs)を追加しました\(tail)"
-        print("[Metamon] intent: \(message)")
-        return .result(dialog: IntentDialog(stringLiteral: message))
+        let message = Self.addedMessage(appName: target.appName, what: what, refs: draft.refs, sent: sent)
+        print("[Metamon] intent: \(String(localized: message))")
+        return .result(dialog: IntentDialog(message))
+    }
+
+    /// 返事の文言。Siri の言語で引けるよう書式キーにする(アプリ名・内容・項目名はデータなので訳さない)。
+    static func addedMessage(appName: String, what: String, refs: [String], sent: Bool) -> LocalizedStringResource {
+        let refs = refs.joined(separator: String(localized: "・")) // どのカテゴリに入れたか
+        switch (refs.isEmpty, sent) {
+        case (true, true): return "\(appName)に「\(what)」を追加しました"
+        case (false, true): return "\(appName)に「\(what)」(\(refs))を追加しました"
+        case (true, false): return "\(appName)に「\(what)」を追加しました(未送信: 接続が戻ったら自動で送ります)"
+        case (false, false): return "\(appName)に「\(what)」(\(refs))を追加しました(未送信: 接続が戻ったら自動で送ります)"
+        }
     }
 }
 
@@ -125,7 +134,7 @@ enum TailorIntentError: Error, CustomLocalizedStringResourceConvertible {
         #else
         case .targetNotFound(let name): "「\(name)」が見つかりませんでした。Tailor It でアプリを確認してください"
         #endif
-        case .missingFields(let names): "「\(names.joined(separator: "・"))」が必要です。Tailor It を開いて追加してください"
+        case .missingFields(let names): "「\(names.joined(separator: String(localized: "・")))」が必要です。Tailor It を開いて追加してください"
         }
     }
 }
