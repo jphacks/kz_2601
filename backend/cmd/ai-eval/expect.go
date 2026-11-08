@@ -127,6 +127,8 @@ var expectKeys = map[string]expectKind{
 	"notifyNear":       expectBool,
 	"notifyNearRepeat": expectString,
 	"jitter":           expectBool,
+	// checkAddMinutes: add_minutes.go
+	"addMinutes": expectBool,
 	// checkAlarm: alarm.go
 	"alarm":       expectBool,
 	"alarmRecord": expectBool,

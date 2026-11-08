@@ -17,7 +17,8 @@ const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","i
  {"id":"book","name":"本","titleField":"title","fields":[
   {"id":"isbn","name":"ISBN","type":"string"},{"id":"title","name":"書名","type":"string"},
   {"id":"body","name":"本文","type":"text"},{"id":"keywords","name":"語","type":"string"},
-  {"id":"photo","name":"写真","type":"photo"},{"id":"note","name":"メモ","type":"text"}]},
+  {"id":"photo","name":"写真","type":"photo"},{"id":"note","name":"メモ","type":"text"},
+  {"id":"meet","name":"集合","type":"string"},{"id":"leave","name":"出発","type":"string","computed":{"op":"addMinutes","args":[{"ref":"meet"},-30]}}]},
  {"id":"card","name":"カード","titleField":"q","fields":[{"id":"q","name":"問題","type":"string","required":true}]}],
 "screens":[
  {"id":"home","title":"ホーム","components":[
@@ -59,14 +60,15 @@ func TestClientFeaturesRestriction(t *testing.T) {
 		places int    // uses in featuresDoc
 		left   string // a doc fragment that must go
 	}{
-		FeatureAILong:        {"## アプリの中の AI の長い文章(aiButton length long)", "AiButton.length", 1, `"length"`},
-		FeatureAIInputPhoto:  {"## アプリの中の AI に写真を見せる(aiButton inputPhoto)", "AiButton.inputPhoto", 1, `"inputPhoto"`},
-		FeatureAISaveTo:      {"## AI が作った項目を 1 件ずつ記録に足す(aiButton saveTo)", "AiButton.saveTo", 1, `"saveTo"`},
-		FeatureAIInputFeeds:  {"inputFeeds: [その feed の id]", "AiButton.inputFeeds", 1, `"inputFeeds"`},
-		FeatureAIOutputs:     {"## AI の答えを項目ごとに入力欄へ入れる(aiButton outputs)", "AiButton.outputs", 1, `"outputs"`},
-		FeatureLookupBook:    {"## ISBN から本の情報を入れる(lookupBook)", "Action.bookLookup", 2, `"lookupBook"`},
-		FeatureTextHighlight: {"## 文の大事な語に印をつける(text.highlight)", "Text.highlight", 1, `{{body}}`},
-		FeatureFeedV2:        {"警報・注意報」「大雨警報が出ているか」", `"warnings"`, 1, `"warnings"`},
+		FeatureAILong:         {"## アプリの中の AI の長い文章(aiButton length long)", "AiButton.length", 1, `"length"`},
+		FeatureAIInputPhoto:   {"## アプリの中の AI に写真を見せる(aiButton inputPhoto)", "AiButton.inputPhoto", 1, `"inputPhoto"`},
+		FeatureAISaveTo:       {"## AI が作った項目を 1 件ずつ記録に足す(aiButton saveTo)", "AiButton.saveTo", 1, `"saveTo"`},
+		FeatureAIInputFeeds:   {"inputFeeds: [その feed の id]", "AiButton.inputFeeds", 1, `"inputFeeds"`},
+		FeatureAIOutputs:      {"## AI の答えを項目ごとに入力欄へ入れる(aiButton outputs)", "AiButton.outputs", 1, `"outputs"`},
+		FeatureLookupBook:     {"## ISBN から本の情報を入れる(lookupBook)", "Action.bookLookup", 2, `"lookupBook"`},
+		FeatureTextHighlight:  {"## 文の大事な語に印をつける(text.highlight)", "Text.highlight", 1, `{{body}}`},
+		FeatureFeedV2:         {"警報・注意報」「大雨警報が出ているか」", `"warnings"`, 1, `"warnings"`},
+		FeatureExprAddMinutes: {"## 時刻に分を足す・引く(addMinutes)", `"addMinutes"`, 1, `"addMinutes"`},
 	}
 	if len(gone) != len(clientFeatures) {
 		t.Fatalf("test covers %d of %d features", len(gone), len(clientFeatures))

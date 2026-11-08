@@ -316,7 +316,7 @@
         },
         "computed": {
           "$ref": "#/$defs/Expr",
-          "description": "Read-only calculated field (never stored, never bound to inputs). Evaluated per record: `ref` reads this record's fields (\"id\" = record id). type must be number|integer|currency|string|boolean|date. Usable in list/table/stat/chart like a stored field."
+          "description": "Read-only calculated field (never stored, never bound to inputs). Evaluated per record: `ref` reads this record's fields (\"id\" = record id). type must be number|integer|currency|string|boolean|date|datetime (addMinutes of a date / datetime needs datetime: string / date would drop the time). Usable in list/table/stat/chart like a stored field."
         },
         "health": {
           "type": "string",
@@ -3734,6 +3734,7 @@
             "daysBetween",
             "daysUntil",
             "addDays",
+            "addMinutes",
             "nextOccurrence",
             "hoursBetween",
             "year",
@@ -3778,6 +3779,7 @@
             "daysBetween": "daysBetween(a,b) = b - a の日数",
             "daysUntil": "daysUntil(d) = d - 今日 の日数(過ぎたら負)",
             "addDays": "addDays(d, n) = d の n 日後",
+            "addMinutes": "addMinutes(t, n) = t の n 分後(負なら前)。\"HH:mm\" は \"HH:mm\" を返す(24 時間で一周)。日時は日時。到着 − 所要分 = 出発",
             "nextOccurrence": "nextOccurrence(d, \"monthly\"|\"yearly\") = d から毎月 / 毎年くり返す日付のうち、今日以降で最も近い日(d が今日以降なら d)。日が無い月は月末に寄せる(1/31 の毎月 → 2/28・閏年 2/29、2/29 の毎年 → 平年 2/28)。サブスクの次の更新日・次の誕生日。daysUntil と組み合わせて残り日数に",
             "hoursBetween": "hoursBetween(start, end) = \"HH:mm\" 同士の差の時間数(小数。30 分 = 0.5)。end < start は日付またぎとして +24h。勤務時間・睡眠時間に",
             "year": "年",
