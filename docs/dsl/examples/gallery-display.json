@@ -58,7 +58,7 @@
         { "type": "table", "id": "recent_table", "area": "A1:F5", "entity": "expense", "limit": 10,
           "columns": [ { "field": "date", "title": "日付" }, { "field": "memo", "title": "内容" }, { "field": "amount", "title": "金額" } ],
           "sort": { "field": "date", "direction": "desc" } },
-        { "type": "timeline", "id": "feed", "area": "A6:F9", "entity": "expense", "dateField": "date", "titleField": "memo", "subtitleField": "category", "limit": 5 },
+        { "type": "timeline", "id": "feed", "area": "A6:F9", "entity": "expense", "dateField": "date", "titleField": "category", "subtitleField": "memo", "limit": 5 },
         { "type": "emptyState", "id": "empty", "area": "C10:F12", "icon": "tray", "title": "まだ写真がありません", "message": "レシートを撮ると、ここに並びます" }
       ]
     }
