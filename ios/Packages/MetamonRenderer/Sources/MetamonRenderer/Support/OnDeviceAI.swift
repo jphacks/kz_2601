@@ -136,8 +136,8 @@ enum AIRequestBuilder {
         var prompt: String
         if let template = c.prompt, !template.isEmpty {
             prompt = expand(template, input: input, entity: entity, values: values)
-            // プレースホルダが無いテンプレは「指示」とみなして入力を後ろに付ける
-            if !template.contains("{{") { prompt += "\n\n" + input }
+            // 本文がテンプレに入っていなければ後ろに付ける(オンライン版は常に本文を別に送るのと揃える)
+            if !embedsInput(template, c, sourceEntity: sourceEntity) { prompt += "\n\n" + input }
         } else {
             prompt = input
         }
@@ -174,13 +174,21 @@ enum AIRequestBuilder {
         return describe(entity.storedFields.filter { $0.id != c.output }, value: { values[$0] ?? .null }, separator: "\n")
     }
 
+    /// テンプレが本文を含むか: `{{input}}`、または input field 自身の `{{fieldId}}`(entity 入力でない時)。
+    static func embedsInput(_ template: String, _ c: Component, sourceEntity: Entity?) -> Bool {
+        let ids = AIPlaceholder.ids(in: template)
+        if ids.contains("input") { return true }
+        if sourceEntity == nil, let id = c.input, ids.contains(id) { return true }
+        return false
+    }
+
     /// `{{input}}` → 本文、`{{fieldId}}` → フォームの値。
     static func expand(_ template: String, input: String, entity: Entity, values: [String: JSONValue]) -> String {
-        var out = template.replacingOccurrences(of: "{{input}}", with: input)
-        for f in entity.fields {
-            out = out.replacingOccurrences(of: "{{\(f.id)}}", with: FieldCoding.display(values[f.id] ?? .null, field: f))
+        AIPlaceholder.replace(template) { id in
+            if id == "input" { return input }
+            guard let f = entity.fields.first(where: { $0.id == id }) else { return nil }
+            return FieldCoding.display(values[f.id] ?? .null, field: f)
         }
-        return out
     }
 
     /// 「名前: 値」を並べる(写真・位置・空は落とす)。
@@ -289,5 +297,28 @@ enum OnDeviceAI {
         }
         #endif
         throw OnDeviceAIError.unavailable(.unavailable(.osTooOld))
+    }
+}
+
+/// aiButton.prompt の `{{id}}`。括弧の内側の空白は許す(Go の `placeholderRe` と同じ: `\{\{\s*([A-Za-z0-9_-]+)\s*\}\}`、RE2 の \s は ASCII の空白)。
+enum AIPlaceholder {
+    private static let regex = try! NSRegularExpression(pattern: #"\{\{[\t\n\f\r ]*([A-Za-z0-9_-]+)[\t\n\f\r ]*\}\}"#)
+
+    static func ids(in template: String) -> Set<String> {
+        let ns = template as NSString
+        return Set(regex.matches(in: template, range: NSRange(location: 0, length: ns.length)).map { ns.substring(with: $0.range(at: 1)) })
+    }
+
+    /// 1 回の走査で置き換える(置換後の文字は再展開しない)。`value` が nil の id は文字のまま残す。
+    static func replace(_ template: String, _ value: (String) -> String?) -> String {
+        let ns = template as NSString
+        var out = ""
+        var last = 0
+        for m in regex.matches(in: template, range: NSRange(location: 0, length: ns.length)) {
+            guard let v = value(ns.substring(with: m.range(at: 1))) else { continue }
+            out += ns.substring(with: NSRange(location: last, length: m.range.location - last)) + v
+            last = m.range.location + m.range.length
+        }
+        return out + ns.substring(from: last)
     }
 }

@@ -51,11 +51,10 @@ enum AIGenerateBuilder {
     static func build(_ c: Component, form: Entity?, values: [String: JSONValue],
                       sourceEntity: Entity?, records: [Record], locale: String) throws -> AITextRequest {
         let english = locale == "en"
-        var instruction = (c.prompt ?? "").replacingOccurrences(of: "{{input}}", with: english ? "the data below" : "下の材料")
-        if let form {
-            for f in form.fields {
-                instruction = instruction.replacingOccurrences(of: "{{\(f.id)}}", with: FieldCoding.display(values[f.id] ?? .null, field: f))
-            }
+        var instruction = AIPlaceholder.replace(c.prompt ?? "") { id in
+            if id == "input" { return english ? "the data below" : "下の材料" }
+            guard let f = form?.fields.first(where: { $0.id == id }) else { return nil }
+            return FieldCoding.display(values[f.id] ?? .null, field: f)
         }
         instruction = String(instruction.trimmingCharacters(in: .whitespacesAndNewlines).prefix(AITextLimits.maxInstruction))
         guard !instruction.isEmpty else { throw BuildError.noInstruction }
